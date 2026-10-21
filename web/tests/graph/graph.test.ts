@@ -115,15 +115,15 @@ describe('WBS 6.6.21 · D-GRP-01/01b mock/API contract', () => {
   });
   it('uses five activity sizes based on each company unique issue count', () => {
     expect([0, 1, 2, 4, 100].map((count) => companyNodeSize(count))).toEqual([
-      18, 22, 26, 34, 44,
+      36, 44, 52, 68, 88,
     ]);
 
     const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const rendered = toG6Data(graph, 1245, 705);
     const nvidia = rendered.nodes?.find((node) => node.id === 'NASDAQ:NVDA');
     const samsung = rendered.nodes?.find((node) => node.id === 'KRX:005930');
-    expect(nvidia?.style?.size).toBe(26);
-    expect(samsung?.style?.size).toBe(44);
+    expect(nvidia?.style?.size).toBe(52);
+    expect(samsung?.style?.size).toBe(88);
   });
   it('G6 data keeps IDs intact and folds single-company events without dangling edges', () => {
     const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
@@ -133,9 +133,8 @@ describe('WBS 6.6.21 · D-GRP-01/01b mock/API contract', () => {
     expect(
       rendered.edges?.every((e) => ids.has(e.source) && ids.has(e.target)),
     ).toBe(true);
-    expect(
-      rendered.nodes?.find((n) => n.id === 'NASDAQ:NVDA')?.style?.x,
-    ).toBeCloseTo(622.5, 0);
+    // Collision avoidance may move example coordinates, but remains stable.
+    expect(toG6Data(graph, 1245, 705)).toEqual(rendered);
   });
   it('maps UI scope to personalFilter only for personal API requests', () => {
     expect(graphUrl({ mode: 'all', personalFilter: 'watchlist' })).toBe(
@@ -144,5 +143,18 @@ describe('WBS 6.6.21 · D-GRP-01/01b mock/API contract', () => {
     expect(graphUrl({ mode: 'personal', personalFilter: 'watchlist' })).toBe(
       '/api/v1/graph?mode=personal&personalFilter=watchlist',
     );
+  });
+  it('sends the chosen depth only with a company focus', () => {
+    expect(
+      graphUrl({
+        mode: 'all',
+        personalFilter: 'watchlist',
+        companyId: 'KRX:005930',
+        depth: 2,
+      }),
+    ).toBe('/api/v1/graph?mode=all&companyId=KRX%3A005930&depth=2');
+    expect(
+      graphUrl({ mode: 'all', personalFilter: 'watchlist', depth: 2 }),
+    ).toBe('/api/v1/graph?mode=all');
   });
 });

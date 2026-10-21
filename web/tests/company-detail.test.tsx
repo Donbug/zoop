@@ -287,6 +287,56 @@ function open(query = '') {
 }
 const pinned = `?asOf=${encodeURIComponent(time)}&graphVersion=v1`;
 
+test('D-COM-05: session response drives chart and timeline; 1d price request has no from', async () => {
+  const range = {
+    from: '2026-10-06T00:00:00Z',
+    to: time,
+    sessionDate: '2026-10-06',
+  };
+  server.on('GET', '/api/v1/companies/:id/prices', () =>
+    json({
+      status: 'available',
+      companyId: id,
+      period: '1d',
+      interval: '5m',
+      source,
+      currency: 'KRW',
+      range,
+      points: [
+        {
+          time: range.from,
+          open: 100,
+          high: 100,
+          low: 100,
+          close: 100,
+          volume: null,
+        },
+        { time, open: 120, high: 120, low: 120, close: 120, volume: null },
+      ],
+    }),
+  );
+  open(`${pinned}&period=1d`);
+  await screen.findByText(
+    '2026-10-06 장 · 거래소 현지 거래일 · 시간 표시는 KST',
+  );
+  await waitFor(() => {
+    const request = server.calls('GET', '/api/v1/events').at(-1)!;
+    expect(request.query.get('from')).toBe(range.from);
+    expect(request.query.get('to')).toBe(range.to);
+  });
+  expect(
+    server
+      .calls('GET', '/api/v1/companies/:id/prices')
+      .every((request) => !request.query.has('from')),
+  ).toBe(true);
+  expect(
+    screen
+      .getByRole('group', { name: '공급된 종가 차트' })
+      .querySelector('polyline')
+      ?.getAttribute('points'),
+  ).toBe('10,160 530,20');
+});
+
 test('D-COM-03 shares the company request and restores the info tab after a map round trip', async () => {
   server.on('GET', '/api/v1/companies/:id', () =>
     json({ ...company, legalName: '합성 정식 법인명' }),
@@ -828,7 +878,7 @@ test('unconfirmed business assertions are excluded from actual impact paths', ()
   ).toEqual([]);
 });
 
-test('D-COM-05/06: every period shares exact chart/timeline from/to and pins graph context', async () => {
+test('D-COM-05/06: periods preserve graph context; legacy 1d omits price from only', async () => {
   open(pinned);
   for (const [period, label, bucket] of [
     ['1m', '1개월', '일'],
@@ -850,9 +900,14 @@ test('D-COM-05/06: every period shares exact chart/timeline from/to and pins gra
       .calls('GET', '/api/v1/companies/:id/prices')
       .at(-1)!;
     const eventsRequest = server.calls('GET', '/api/v1/events').at(-1)!;
-    expect(pricesRequest.query.get('from')).toBe(
-      eventsRequest.query.get('from'),
-    );
+    if (period === '1d') {
+      expect(pricesRequest.query.has('from')).toBe(false);
+      expect(eventsRequest.query.get('from')).toBe('2026-10-05T03:00:00.000Z');
+    } else {
+      expect(pricesRequest.query.get('from')).toBe(
+        eventsRequest.query.get('from'),
+      );
+    }
     expect(pricesRequest.query.get('to')).toBe(eventsRequest.query.get('to'));
     expect(eventsRequest.query.get('asOf')).toBe(time);
     expect(eventsRequest.query.get('graphVersion')).toBe('v1');
@@ -1149,4 +1204,32 @@ test('F05: quote outages offer retry only when the server says it may help', asy
       name: '시세 다시 조회',
     }),
   ).toBeTruthy();
+});
+
+test('without a published graph version the page does not pin a reference time (no 409 loop)', async () => {
+  server.on('GET', '/api/v1/companies/:id', (r) =>
+    json({
+      ...company,
+      id: r.params.id,
+      directIssues: [],
+      structuralIssues: [],
+      metadata: {
+        ...metadata,
+        graphVersion: null,
+        partial: true,
+        asOf: time,
+      },
+    }),
+  );
+  open();
+  await screen.findByRole('heading', { name: '합성 기업' });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const address = screen.getByTestId('address').textContent!;
+  expect(address).not.toContain('asOf=');
+  expect(address).not.toContain('graphVersion=');
+  expect(
+    server
+      .calls('GET', '/api/v1/companies/:id')
+      .every((call) => !call.query.has('asOf')),
+  ).toBe(true);
 });

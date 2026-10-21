@@ -353,7 +353,9 @@ id text PK; member_id text FK members; created_at timestamptz; updated_at timest
 ```text
 id text PK; session_id text FK chat_sessions; seq integer
 question text; request_hash text; asked_at timestamptz; frozen_context jsonb; context_company_ids text[]
-graph_version_id text? FK graph_versions; status text; outcome text?
+graph_version_id text? FK graph_versions; status text; phase text?; outcome text?
+deadline_at timestamptz?
+resolves_job_id text? FK chat_jobs; resolves_choice_id text?
 message_id text? UNIQUE; result jsonb?; result_schema_version text?; failure jsonb?
 route_schema_version text?; route_summary jsonb?
 runs integer; attempts jsonb; owner_token text?; lease_until timestamptz?
@@ -361,11 +363,16 @@ recovery_artifact_id text? FK artifacts; recovery_key text? UNIQUE; cancel_reque
 created_at timestamptz; updated_at timestamptz; finished_at timestamptz?
 UNIQUE(session_id, seq)
 UNIQUE(session_id) WHERE status IN ('queued', 'running')
+CHECK(resolves_choice_id IS NULL OR resolves_job_id IS NOT NULL)
 ```
 
-`chat_results`, `chat_citations`, `chat_attempts`를 합친다. result는 `ChatResult` 전체로 citations/sources/applied/choices/action/metadata를 포함한다. SQL message_id는 result.messageId와 일치해야 한다. frozen_context는 최초 `ChatFrozenContext`로 불변이다. 같은 jobId로 다른 질문/요청이 오면 409. 세션 잠금으로 seq를 부여한다.
+`phase`는 API `ChatJob.phase`(planning/retrieving/writing/verifying)이며 running에서만 값을 갖고 queued·종료 상태에서는 NULL이다. 실행 중인 attempt의 owner token 조건부 UPDATE로만 갱신한다. `deadline_at`은 현재 실행의 기한(시작 시각 + 계획 경로별 단계 상한 합, 최대 60초)이며 lease_until은 이보다 여유 시간만큼 뒤다. 모델 단계 시작 전 잔여 기한 검사의 기준이고 rerun마다 새로 정한다. runs는 모델을 호출한 실행(최초·rerun)만 세며 3을 넘지 않는다. save_only 시도는 attempts에는 기록하지만 runs에 더하지 않는다.
 
-`route_summary`는 사용자에게 노출하지 않는 버전 고정 내부 계약이다. 명시적 `requirementId`, Q01~Q08 multi-label 결과, 논리 기능, 커버리지 판정, 선택·제외 이유, 계획 revision, 예약·사용 예산, `answerBasis`, 최종 계획·출력 검증 상태를 저장한다. 자유 형식 추론 원문은 저장하지 않는다. `route_schema_version` 없이 값을 저장하지 않으며 완료 뒤에는 불변이다. 실패 작업은 마지막으로 확정된 단계까지만 저장하고 완료한 것처럼 채우지 않는다.
+`resolves_job_id`/`resolves_choice_id`는 확인 질문(clarification)에 대한 답을 원 작업과 연결하며 API `ChatJob.resolves`(`ChatClarificationReply`)와 같은 값이다. 둘 다 최초 접수 때 고정하고 request_hash에 포함한다. 접수 트랜잭션에서 원 작업이 같은 session_id이고 status=completed·outcome=clarification인지, resolves_choice_id가 원 작업 `result.choices[].id`에 있는지 검사한다(JSON 항목 FK 대체). choice가 NULL이면 question이 자유 입력 답이다. 새 작업의 frozen_context·context_company_ids·graph_version_id는 요청 context가 아니라 원 작업에서 복사한다. 같은 원 작업에 여러 답 작업을 허용하므로 resolves_job_id에 UNIQUE를 두지 않고, 원 작업 조회용 인덱스 `(resolves_job_id) WHERE resolves_job_id IS NOT NULL`을 둔다.
+
+`chat_results`, `chat_citations`, `chat_attempts`를 합친다. result는 `ChatResult` 전체로 sections/citations/sources/applied/choices/action/limitations/metadata를 포함한다. SQL message_id는 result.messageId와 일치해야 한다. frozen_context는 최초 `ChatFrozenContext`로 불변이다. 같은 jobId로 다른 질문/요청이 오면 409. 세션 잠금으로 seq를 부여한다.
+
+`route_summary`는 사용자에게 노출하지 않는 버전 고정 내부 계약이다. 명시적 `requirementId`, Q01~Q08 multi-label 결과, 논리 기능, 커버리지 판정, 선택·제외 이유, 계획 revision, 단계·체크포인트 선언과 판정 결과(관측 개수·잘림 여부·결정·중단 단계), 예약·사용 예산, `answerBasis`, 최종 계획·출력 검증 상태(결정론적 check ID별 결과, 의미 검증 호출 여부·전체 판정·hold로 제외한 요구)를 저장한다. claim별 Jev 분포와 원문 응답은 `ai_executions`의 영수증 artifact에 둔다. 자유 형식 추론 원문은 저장하지 않는다. `route_schema_version` 없이 값을 저장하지 않으며 완료 뒤에는 불변이다. 실패 작업은 마지막으로 확정된 단계까지만 저장하고 완료한 것처럼 채우지 않는다.
 
 attempts는 내부 스키마의 `{n, mode, ownerToken, recoveryKey, recoveryArtifactId, sourceAttemptNo, startedAt, finishedAt, status, failure}` 배열이다. n은 작업 안에서 유일하고 잠금 아래 증가시킨다. 새 생성 시도의 recoveryKey는 `chat/{jobId}/attempt/{n}/verified-result`처럼 작업+시도 번호로 결정하며 URI 경로 값은 안전하게 인코딩한다. 각 생성 시도의 키는 전역 유일하고 파일 덮어쓰기를 금지한다. DB 저장 전에 시도와 키를 먼저 커밋해 장애 뒤에도 찾을 수 있게 한다. job의 recovery_key/artifact는 현재 복구 대상 포인터이며 최초 실행 전 NULL이다.
 

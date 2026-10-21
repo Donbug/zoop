@@ -83,3 +83,33 @@ describe('기업 패널 API는 감싸지 않은 응답 본문을 그대로 쓴�
     });
   });
 });
+
+describe('연결선 상세(getCompanyRelation)는 실제 API 모드에서 지도와 같은 버전·시점으로 조회한다', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('graphVersion·asOf를 보내고 응답의 버전·시점을 확인한다', async () => {
+    const server = createFakeServer();
+    vi.stubEnv('VITE_GRAPH_DATA_SOURCE', 'api');
+    vi.resetModules();
+    const { getRelation } = await import('@/apis/graph/relations');
+    const context = {
+      graphVersion: 'fixture-2026-10-08',
+      asOf: '2026-10-20T01:00:00Z',
+    };
+    server.on('GET', '/api/v1/graph/edges/:id', (request) =>
+      json({
+        id: request.params.id,
+        metadata: { graphVersion: 'fixture-2026-10-08', asOf: context.asOf },
+      }),
+    );
+
+    const relation = await getRelation('edge-56db9681b075f9a8', context);
+    expect(relation.id).toBe('edge-56db9681b075f9a8');
+    const sent = server.calls('GET', '/api/v1/graph/edges/:id')[0].query;
+    expect(sent.get('graphVersion')).toBe('fixture-2026-10-08');
+    expect(sent.get('asOf')).toBe(context.asOf);
+  });
+});

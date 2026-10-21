@@ -30,6 +30,7 @@ import {
   periods,
   exactTime,
   timeRange,
+  legacyTimeRange,
   bucketKey,
   impactEdges,
   number,
@@ -191,11 +192,23 @@ export default function CompanyWorkspace() {
     const latest = exactTime(latestPoint)
       ? latestPoint
       : company.data?.metadata.asOf;
-    if (!asOf && company.data && !prices.loading && latest && exactTime(latest))
+    // 공개 그래프 버전이 없으면(스냅샷 미게시) 기준 시점을 고정하지 않는다. 고정하면 409가 된다.
+    // 기준 시점을 가격 봉에서 가져오면 그 시점의 버전은 다음 기업 응답이 채운다(지금 버전과 다를 수 있다).
+    const currentVersion = company.data?.metadata.graphVersion ?? null;
+    if (
+      !asOf &&
+      company.data &&
+      currentVersion &&
+      !prices.loading &&
+      latest &&
+      exactTime(latest)
+    )
       updateQuery(
         {
           asOf: latest,
-          graphVersion: company.data?.metadata.graphVersion ?? null,
+          ...(latest === company.data.metadata.asOf
+            ? { graphVersion: currentVersion }
+            : {}),
           period,
         },
         { replace: true },
@@ -218,7 +231,13 @@ export default function CompanyWorkspace() {
   ]);
   const depth = params.get('depth') === '2' ? 2 : 1;
   const eventsQuery = new URLSearchParams({
-    ...range,
+    ...(ready
+      ? period === '1d' &&
+        prices.data?.status === 'available' &&
+        prices.data.range
+        ? { from: prices.data.range.from, to: prices.data.range.to }
+        : legacyTimeRange(asOf!, period)
+      : {}),
     companyId: id,
     depth: String(depth),
     ...(asOf ? { asOf } : {}),
@@ -556,6 +575,7 @@ export default function CompanyWorkspace() {
               <>
                 <PriceChart
                   points={prices.data.points}
+                  range={prices.data.range}
                   asOf={asOf}
                   period={period}
                   groups={groups}

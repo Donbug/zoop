@@ -487,7 +487,7 @@
       "code": "TEAM_DECISION_REQUIRED",
       "target": "submitQuestion",
       "severity": "warning",
-      "message": "대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다. / Jev 0.70/0.35, MCP 12회·동시 4회·ChatJob 30초 등 초기값은 ZOOP-AIG-001 v0.7을 적용하고 변경 시 정책·평가 버전을 함께 올린다.",
+      "message": "대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다. / Jev 0.70/0.35, MCP 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.8을 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다.",
       "source": ""
     },
     {
@@ -1936,7 +1936,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getConversation",
       "severity": "difference",
-      "message": "목표만 140 · BFF만 32 · 형식/필수/권한 변경 21",
+      "message": "목표만 175 · BFF만 32 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -1950,7 +1950,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getCurrentConversation",
       "severity": "difference",
-      "message": "목표만 140 · BFF만 32 · 형식/필수/권한 변경 21",
+      "message": "목표만 175 · BFF만 32 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -1964,7 +1964,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "submitQuestion",
       "severity": "difference",
-      "message": "목표만 219 · BFF만 34 · 형식/필수/권한 변경 38",
+      "message": "목표만 295 · BFF만 34 · 형식/필수/권한 변경 42",
       "source": ""
     },
     {
@@ -1978,7 +1978,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getQuestionJob",
       "severity": "difference",
-      "message": "목표만 157 · BFF만 23 · 형식/필수/권한 변경 21",
+      "message": "목표만 192 · BFF만 23 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {
@@ -1992,7 +1992,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "retryQuestionJob",
       "severity": "difference",
-      "message": "목표만 215 · BFF만 34 · 형식/필수/권한 변경 35",
+      "message": "목표만 285 · BFF만 34 · 형식/필수/권한 변경 39",
       "source": ""
     },
     {
@@ -2006,7 +2006,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "cancelQuestionJob",
       "severity": "difference",
-      "message": "목표만 188 · BFF만 23 · 형식/필수/권한 변경 21",
+      "message": "목표만 223 · BFF만 23 · 형식/필수/권한 변경 23",
       "source": ""
     },
     {

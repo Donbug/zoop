@@ -1,11 +1,18 @@
-/** 기업 이름 첫 글자 표시(D-MY-01 화면 명세의 원형 표식). 로고 계약이 정해지기 전까지 쓴다. */
-export default function CompanyMark({ name }: { name: string }) {
+import CompanyLogo from '@/components/common/CompanyLogo';
+
+/** 기업 원형 표식(D-MY-01 화면 명세). 로고가 없으면 이름 첫 글자를 보인다. */
+export default function CompanyMark({
+  name,
+  logoUrl,
+}: {
+  name: string;
+  logoUrl?: string | null;
+}) {
   return (
-    <span
-      aria-hidden="true"
-      className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-700"
-    >
-      {name.slice(0, 1)}
-    </span>
+    <CompanyLogo
+      name={name}
+      logoUrl={logoUrl}
+      className="size-8 rounded-full bg-gray-200 text-sm font-semibold text-gray-700"
+    />
   );
 }

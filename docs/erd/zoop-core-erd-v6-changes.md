@@ -4,6 +4,18 @@
 
 기준: v5와 사용자 제공 v5 검증 결과. API 필드는 저장소 docs/api/out/zoop-api-spec.md 및 openapi.yaml과 대조했다. 이전 다운로드 API 파일과 바이트 단위 동일성을 검증한 것은 아니다.
 
+## 2026-10-20 추가 변경 — 확인 질문 답 연결
+
+- `chat_jobs`에 `resolves_job_id text? FK chat_jobs`, `resolves_choice_id text?`와 CHECK(choice가 있으면 job 필수)를 추가했다. 기존 계약에는 clarification 선택지(`ChatChoice.id`)를 새 질문에 돌려보낼 필드가 없어 원 질문과 선택을 서버가 결합할 근거가 없었다.
+- API `ChatJobRequest.resolves`·`ChatJob.resolves`(`ChatClarificationReply`)와 대응한다. 원 작업의 같은 대화·completed·clarification 여부와 choice 존재는 접수 트랜잭션에서 검사하며, 새 작업은 원 작업의 고정 문맥을 복사한다.
+- 테이블 수는 그대로 36개다. 챗봇 첫 migration에 함께 포함한다.
+- 정책 v0.8의 단계·체크포인트에 맞춰 `chat_jobs.route_summary`에 단계·체크포인트 선언과 판정 결과(관측 개수·잘림 여부·결정·중단 단계)를 저장하도록 내용을 넓혔다. 컬럼 변경은 없다.
+- API `ChatResult.limitations`(`ChatLimitation`)가 추가되어 `chat_jobs.result` JSONB에 함께 저장된다. 컬럼 변경은 없으며 완료 결과 불변 규칙을 그대로 적용한다.
+- API `ChatResult.sections`(`ChatAnswerSection`, 근거 수준별 본문 구간)도 `chat_jobs.result` JSONB에 함께 저장된다. `answerBasis`는 구간에서 계산된 값으로 저장하며 컬럼 변경은 없다.
+- 챗봇 출력 검증의 결정론적 check 결과와 Jev 의미 검증 요약(호출 여부·전체 판정·hold로 제외한 요구)을 `route_summary`에 저장한다. claim별 분포와 원문 응답은 `ai_executions(feature=chatbot, stage=semantic-verification)`의 영수증 artifact에 둔다. 컬럼 변경은 없다.
+- `chat_jobs`에 `phase text?`(API `ChatJob.phase`, running에서만 값)와 `deadline_at timestamptz?`(계획 경로별 실행 기한, 최대 60초)를 추가했다. 정책 v0.8에서 ChatJob 30초 고정을 단계별 상한 합으로 바꾸고 진행 단계를 공개했기 때문이다. `runs`는 3 이하로 제한하며, 모델을 호출하지 않는 save_only 시도는 attempts에만 기록하고 runs에 더하지 않는다.
+- API `ChatResult.citations`(`Citation`)에 `sourceKind`(article·zoop_doc)와 `docId`·`docVersion`이 추가되어 ZOOP 도움말·정책 인용도 `chat_jobs.result` JSONB에 같은 형식으로 저장된다. 컬럼 변경은 없다.
+
 ## 2026-10-17 추가 변경 — 챗봇 동적 라우팅·도구 호출 관측
 
 - PostgreSQL 테이블 수를 35개에서 36개로 변경하고 `chat_tool_calls`를 추가했다. 질문 결과와 함께 읽는 분류·계획 요약은 `chat_jobs.route_summary` JSONB에 유지하되, 실제 MCP/서버 읽기 호출은 요청당 상한·지연·오류·중복 제거를 독립 집계할 수 있도록 행으로 분리했다.

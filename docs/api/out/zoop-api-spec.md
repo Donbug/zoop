@@ -1309,7 +1309,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## submitQuestion · 질문 접수·맥락 고정·비동기 분석
 
-최초 접수에서 질문·시각·대화·작업 ID·기업/이슈/기업 간 관계·문서·기간·asOf·graphVersion을 고정한다. 같은 jobId/멱등성 키는 저장된 같은 작업을 반환하고 내용 불일치는 409다. 질문의 명시 조건을 화면 맥락보다 우선한다. 내부에서는 Q01~Q08 multi-label 분류, 최소 충분 읽기 도구 계획, 커버리지 검증, 근거 조회, 답변 생성과 출력 검증을 수행하지만 모델은 도구 실행 권한을 갖지 않는다. 검증과 저장이 완료된 결과만 completed다. 유효한 근거 없음을 기술 장애로 위장하지 않는다.
+최초 접수에서 질문·시각·대화·작업 ID·기업/이슈/기업 간 관계·문서·기간·asOf·graphVersion을 고정한다. 같은 jobId/멱등성 키는 저장된 같은 작업을 반환하고 내용 불일치는 409다. 질문의 명시 조건을 화면 맥락보다 우선한다. 내부에서는 Q01~Q08 multi-label 분류, 최소 충분 읽기 도구 계획, 커버리지 검증, 근거 조회, 답변 생성과 출력 검증을 수행하지만 모델은 도구 실행 권한을 갖지 않는다. 검증과 저장이 완료된 결과만 completed다. 유효한 근거 없음을 기술 장애로 위장하지 않는다. 확인 질문에 답할 때는 resolves에 원 작업 ID와 선택지 ID(자유 입력이면 null)를 담는다. 서버는 원 작업이 같은 대화의 completed·clarification인지, choiceId가 그 결과의 choices에 있는지 검사하고(아니면 422 INVALID_REQUEST, 원 작업이 없거나 다른 회원 것이면 404), 원 질문·원 고정 문맥·선택을 합쳐 실행한다. resolves와 context를 함께 보내면 422다. 같은 확인 질문에 여러 번 답할 수 있으며 각 답은 별도 작업이다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1323,7 +1323,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.6.10, 6.9.1, 6.9.2, 6.9.3, 6.9.4, 6.9.5, 6.9.6, 6.9.10, 6.9.11, 6.9.12, 6.9.13, 6.9.14, 6.5.7 |
 | 프로토타입 대응 | /api/chat/sessions/{id}/jobs |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다., Jev 0.70/0.35, MCP 12회·동시 4회·ChatJob 30초 등 초기값은 ZOOP-AIG-001 v0.7을 적용하고 변경 시 정책·평가 버전을 함께 올린다. |
+| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다., Jev 0.70/0.35, MCP 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.8을 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다. |
 
 ### 요청 필드
 
@@ -3322,6 +3322,18 @@ A candidate a publication rule covers: whether it is on the user graph through t
 | kind | 필수 | string |  |
 | label | 필수 | string |  |
 
+<a id="schema-chatanswersection"></a>
+
+### ChatAnswerSection
+
+answered 본문의 근거 수준별 구간.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| basis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded} | 이 구간의 근거 수준. general_knowledge 구간은 서버가 고정 안내 문장 '일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.'로 시작하고 최신 사실·수치·전망·투자 판단을 담지 않는다. |
+| text | 필수 | string |  |
+| evidenceIds | 필수 | string[] (uniqueItems) | 이 구간의 사실 주장이 연결된 근거. 모두 result.citations의 evidenceId여야 하며 general_knowledge 구간은 빈 배열이다. zoop_documented 구간은 sourceKind=zoop_doc, evidence_grounded 구간은 sourceKind=article 인용만 가리킨다. |
+
 <a id="schema-chatapplied"></a>
 
 ### ChatApplied
@@ -3371,7 +3383,18 @@ What the answer was actually built on.
 | --- | --- | --- | --- |
 | id | 필수 | string |  |
 | label | 필수 | string |  |
-| kind | 필수 | string {company, period, scope, snapshot, other} | 확인해야 할 선택지의 종류. id는 서버가 다시 해석할 수 있는 불투명 값이며 클라이언트가 DB 식별자로 가정하지 않는다. |
+| kind | 필수 | string {company, period, scope, snapshot, other} | 확인해야 할 선택지의 종류. id는 서버가 다시 해석할 수 있는 불투명 값이며 클라이언트가 DB 식별자로 가정하지 않는다. 회원이 고른 선택지는 새 질문의 resolves.choiceId로 그대로 돌려보낸다. |
+
+<a id="schema-chatclarificationreply"></a>
+
+### ChatClarificationReply
+
+확인 질문(clarification)에 대한 답. 서버는 원 작업의 질문·고정 문맥과 이 선택을 합쳐 새 작업을 실행하며 원 작업은 바꾸지 않는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| jobId | 필수 | string | 답하는 원 작업. 같은 대화에 속하고 completed·outcome=clarification이어야 한다. |
+| choiceId | 필수 | string, null | 원 작업 result.choices[].id 중 하나. null이면 선택지 대신 question에 쓴 자유 입력이 답이다. |
 
 <a id="schema-chatcontextitem"></a>
 
@@ -3428,10 +3451,10 @@ What the member had selected when asking: graph targets, optional evidence refer
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| kind | 필수 | string {validation_failed, save_failed, result_lost, transient, budget_exceeded, permission_denied, internal} |  |
-| reason | 필수 | string / null |  |
+| kind | 필수 | string {validation_failed, save_failed, result_lost, transient, budget_exceeded, permission_denied, internal} | transient: 같은 고정 문맥으로 다시 실행하면 달라질 수 있는 시간 초과·공급자 오류. 재실행 가능 여부는 retry로 판단하며, 모델 응답 불명(response_unknown)은 중복 호출·과금을 막기 위해 retry=null이다. budget_exceeded: 같은 입력이면 반드시 다시 넘는 크기 한도(rerun 불가, 범위를 좁힌 새 질문 안내). |
+| reason | 필수 | string / null | 기계 판독용 원인 코드. transient: deadline_guard(시작 전 잔여 기한 부족), provider_error(송신 전 연결 실패·처리 거부가 명시된 오류·형식 불일치 응답), tool_timeout(읽기 전용 MCP 조회 상한 초과), response_unknown(모델 송신 후 응답 불명, retry=null). budget_exceeded: context_too_large, output_limit. UI 문구와 관리자 집계의 기준이다. |
 | message | 필수 | string |  |
-| retry | 필수 | string {rerun, save_only} / null | What 'retry' would do: rerun the same job with its frozen context, or only save the kept verified result. null = not allowed. |
+| retry | 필수 | string {rerun, save_only} / null | What 'retry' would do: rerun the same job with its frozen context, or only save the kept verified result. null = not allowed. rerun은 작업당 실행 3회(runs ≤ 3)까지이며 이후에는 null이다. reason=response_unknown이면 처음부터 null이다. |
 
 <a id="schema-chatfrozencontext"></a>
 
@@ -3460,12 +3483,14 @@ The selection frozen when the question was first received.
 | seq | 필수 | integer |  |
 | question | 필수 | string |  |
 | status | 필수 | string {queued, running, completed, failed, cancelled} |  |
+| phase | 필수 | string {planning, retrieving, writing, verifying} / null | running 중 현재 단계(질문 이해·자료 확인·답변 작성·검증). queued와 종료 상태에서는 null이다. 진행 표시용이며 검증 전 본문을 노출하지 않는다. 자료 조회가 없는 경로는 retrieving을 건너뛴다. |
 | outcome | 필수 | string {answered, clarification, guidance, insufficient_evidence} / null |  |
 | askedAt | 필수 | string (date-time) | UTC time the question was first received; relative dates are read against its KST day |
 | context | 필수 | [ChatFrozenContext](#schema-chatfrozencontext) |  |
+| resolves | 필수 | [ChatClarificationReply](#schema-chatclarificationreply) / null | 이 작업이 답한 확인 질문. 최초 접수 때 고정되며 확인 질문 답이 아니면 null이다. |
 | failure | 필수 | [ChatFailure](#schema-chatfailure) / null |  |
 | result | 필수 | [ChatResult](#schema-chatresult) / null | Only a saved result; null until the job is completed |
-| runs | 필수 | integer | Executions started so far (a retry starts another) |
+| runs | 필수 | integer | Executions started so far (a rerun starts another). 모델을 호출한 실행만 세며 최대 3이다. save_only는 세지 않는다. |
 | createdAt | 필수 | string (date-time) |  |
 | updatedAt | 필수 | string (date-time) |  |
 | finishedAt | 필수 | string (date-time) / null |  |
@@ -3474,13 +3499,26 @@ The selection frozen when the question was first received.
 
 ### ChatJobRequest
 
-
+새 질문 또는 확인 질문에 대한 답. resolves가 있으면 context를 보내지 않으며 서버가 원 작업의 고정 문맥을 이어받는다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | jobId | 필수 | string | Client-made idempotency key of this question (not a request-trace id). Resending it never asks twice. |
-| question | 필수 | string |  |
+| question | 필수 | string | 질문 원문. resolves가 있으면 회원에게 보일 답(선택지 label 또는 자유 입력)이다. |
 | context | 선택 | [ChatContextRequest](#schema-chatcontextrequest) |  |
+| resolves | 선택 | [ChatClarificationReply](#schema-chatclarificationreply) |  |
+
+<a id="schema-chatlimitation"></a>
+
+### ChatLimitation
+
+answered 결과에서 답하지 않은 요구 하나와 그 이유.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| kind | 필수 | string {investment_advice, precondition_unmet, results_truncated, evidence_insufficient, out_of_scope} | investment_advice: 투자 판단 요청이라 제공하지 않음. precondition_unmet: 앞 단계 결과가 체크포인트 조건에 못 미쳐 의존 요구를 수행할 수 없음. results_truncated: 조회 상한에 걸려 일부 자료만 확인함. evidence_insufficient: 조회는 성공했으나 이 요구의 공개 근거가 부족함. out_of_scope: 지원하지 않는 하위 요구. 서버가 gate·체크포인트·도구 결과로 정하며 모델 자기평가로 정하지 않는다. |
+| label | 필수 | string | 해당 요구를 회원 질문의 표현으로 나타낸 문구 |
+| message | 필수 | string | kind별 서버 템플릿으로 만든 안내 문장 |
 
 <a id="schema-chatperiod"></a>
 
@@ -3503,15 +3541,17 @@ The selection frozen when the question was first received.
 | --- | --- | --- | --- |
 | outcome | 필수 | string {answered, clarification, guidance, insufficient_evidence} |  |
 | messageId | 필수 | string |  |
-| answer | 필수 | string |  |
-| answerBasis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded, mixed, none} | 사용자 표시용 답변 근거 수준. Q02 일반 개념은 general_knowledge, 승인된 ZOOP 도움말·정책은 zoop_documented, 공개 근거 기반 사실은 evidence_grounded, 둘 이상을 명시적으로 결합하면 mixed, 답변 본문이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가가 아니라 서버 계획과 검증 결과로 정한다. |
+| answer | 필수 | string | 표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만들며, 이어 붙인 전체가 12000자를 넘으면 검증 실패다. |
+| sections | 필수 | [ChatAnswerSection](#schema-chatanswersection)[] | answered 본문을 근거 수준별로 나눈 구간. answered가 아니면 빈 배열이다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다. |
+| answerBasis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded, mixed, none} | 사용자 표시용 답변 근거 수준. 서버가 sections에서 계산한다: 구간 basis가 한 종류면 그 값(Q02 일반 개념 general_knowledge, 승인된 ZOOP 도움말·정책 zoop_documented, 공개 근거 기반 사실 evidence_grounded), 두 종류 이상이면 mixed, 구간이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가로 정하지 않는다. |
 | reason | 필수 | string / null |  |
 | sources | 필수 | string[] (uniqueItems) |  |
 | citations | 필수 | [Citation](#schema-citation)[] |  |
-| graphTargets | 필수 | [GraphTarget](#schema-graphtarget)[] |  |
+| graphTargets | 필수 | [GraphTarget](#schema-graphtarget)[] | 답변 본문이 실제로 가리키는 기업·이슈·관계로 지도에서 열 대상이다. 답변 생성에 쓴 그래프 context 전체(노드 50개·간선 50개 상한)가 아니라 그 부분집합이며, 모두 같은 graphVersion의 도구 결과에 있어야 한다. |
 | applied | 필수 | [ChatApplied](#schema-chatapplied) |  |
-| choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: 기업·기간·범위·스냅샷 중 회원이 고를 수 있는 선택지. 선택은 원 작업을 수정하지 않고 새 질문으로 접수한다. |
+| choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: 기업·기간·범위·스냅샷 중 회원이 고를 수 있는 선택지. 선택은 원 작업을 수정하지 않고 resolves.choiceId를 담은 새 질문으로 접수한다. |
 | action | 필수 | [ChatAction](#schema-chataction) / null | guidance: what the member can do to meet the missing condition |
+| limitations | 필수 | [ChatLimitation](#schema-chatlimitation)[] | answered에서 답하지 않은 요구. 모든 필수 요구는 본문에서 근거와 함께 답했거나 이 배열의 항목 중 정확히 하나에 속한다. answered가 아니면 빈 배열이며 전체 이유는 reason을 쓴다. 도구 장애·timeout은 항목이 아니라 failed다. |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-chatsessionresponse"></a>
@@ -3534,11 +3574,14 @@ The selection frozen when the question was first received.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| evidenceId | 필수 | string |  |
+| sourceKind | 필수 | string {article, zoop_doc} | article: 뉴스·공시 원문(articleId·articleVersion 필수, docId·docVersion null). zoop_doc: 승인된 ZOOP 도움말·화면 명세·정책 문서(docId·docVersion 필수, articleId·articleVersion·publisher·publishedAt·url은 null, articleTitle에는 문서 제목). zoop_documented 구간은 zoop_doc 인용만, evidence_grounded 구간은 article 인용만 쓴다. |
+| evidenceId | 필수 | string | 인용 식별자. article이면 evidence ID, zoop_doc이면 서버가 문서 ID·버전·구간으로 만든 결정적 ID다. sections[].evidenceIds가 이 값을 가리킨다. |
 | quote | 필수 | string |  |
-| articleId | 필수 | string |  |
-| articleVersion | 필수 | string |  |
-| start | 필수 | integer |  |
+| articleId | 필수 | string, null |  |
+| articleVersion | 필수 | string, null |  |
+| docId | 필수 | string, null |  |
+| docVersion | 필수 | string, null |  |
+| start | 필수 | integer | 고정 원문 버전의 Unicode code point 기준 [start,end) 시작 |
 | end | 필수 | integer |  |
 | articleTitle | 필수 | string / null |  |
 | publisher | 필수 | string / null |  |

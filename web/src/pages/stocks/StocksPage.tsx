@@ -25,6 +25,7 @@ function toBrief(company: CompanySummary): CompanyBrief {
     id: company.id,
     name: company.name,
     ticker: company.ticker,
+    logoUrl: company.logoUrl,
     issueCount: company.issueCount,
   };
 }

@@ -58,6 +58,7 @@ type CompanyDetailResponse = {
   id: string;
   name: string;
   ticker: string | null;
+  logoUrl: string | null;
   directIssues: { issueId: string }[];
   structuralIssues: { issueId: string }[];
   metadata?: { failures?: { section?: string | null }[] };
@@ -90,6 +91,7 @@ export async function getCompanyBrief(id: string): Promise<CompanyBrief> {
     id: detail.id,
     name: detail.name,
     ticker: detail.ticker,
+    logoUrl: detail.logoUrl,
     issueCount: issuesUnavailable ? null : issueIds.size,
   };
 }
