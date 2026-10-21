@@ -67,13 +67,20 @@ public final class GraphContextLookup {
             return Optional.of(new Target(id, "edge", label(edge.source()) + " – " + label(edge.target()),
                     companies, visible(ids)));
         }
+        return cited.contains(id) ? listedEvidence(id) : Optional.empty();
+    }
+
+    /**
+     * A span the filtered snapshot lists, whether or not a visible issue or relation cites it. This is NOT proof of
+     * visibility: a basis-only span is public only when the evidence read proves its structural-basis membership in the
+     * version's import receipt, so a caller must check it there before using it.
+     */
+    public Optional<Target> listedEvidence(String id) {
         var found = evidence.get(id);
-        if (found != null && cited.contains(id)) {
-            var article = articles.get(found.articleId());
-            String title = article == null || article.title() == null || article.title().isBlank() ? "근거" : article.title();
-            return Optional.of(new Target(id, "evidence", title, List.of(), List.of(id)));
-        }
-        return Optional.empty();
+        if (found == null) return Optional.empty();
+        var article = articles.get(found.articleId());
+        String title = article == null || article.title() == null || article.title().isBlank() ? "근거" : article.title();
+        return Optional.of(new Target(id, "evidence", title, List.of(), List.of(id)));
     }
 
     /** Only visible evidence: an excluded or withdrawn reference is never counted. */

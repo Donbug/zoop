@@ -8,6 +8,7 @@ import com.zoop.common.exception.ErrorCode;
 import com.zoop.graph.read.GraphContextLookup;
 import com.zoop.graph.read.PublicGraphReader;
 import com.zoop.graph.version.GraphVersionSelector;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -25,6 +26,11 @@ import org.springframework.stereotype.Component;
  * error and is never replaced by another version. A question without any of these pins the active version when one exists
  * and otherwise freezes no graph: a general question does not need the graph and the job reports the missing graph when a
  * requirement does.
+ *
+ * <p>A selected evidence id is accepted only when the public evidence read ({@link ChatEvidenceAccess}) can read it now at
+ * the pinned version: the same document state, rights and graph visibility as {@code GET /api/v1/evidence/{id}}, which is
+ * also what admits a span cited only by a structural basis. Freezing runs outside the chat write transaction because that
+ * read has its own.
  */
 @Component
 public class ChatContextFreezer {
@@ -33,10 +39,12 @@ public class ChatContextFreezer {
 
     private final PublicGraphReader reader;
     private final GraphVersionSelector selector;
+    private final ChatEvidenceAccess access;
 
-    public ChatContextFreezer(PublicGraphReader reader, GraphVersionSelector selector) {
+    public ChatContextFreezer(PublicGraphReader reader, GraphVersionSelector selector, ChatEvidenceAccess access) {
         this.reader = reader;
         this.selector = selector;
+        this.access = access;
     }
 
     /**
@@ -46,7 +54,7 @@ public class ChatContextFreezer {
     public record Frozen(ChatFrozenContext context, FrozenSelection selection, List<String> companyIds,
             String graphVersionId) { }
 
-    public Frozen freeze(ChatContextRequest request) {
+    public Frozen freeze(ChatContextRequest request, String requestId) {
         ChatContextRequest selection = request == null ? ChatContextRequest.EMPTY : request;
         boolean selected = !selection.contextIds().isEmpty() || !selection.evidenceIds().isEmpty();
         if (!selected && selection.asOf() == null && selection.graphVersion() == null) {
@@ -64,11 +72,13 @@ public class ChatContextFreezer {
 
         var pinned = reader.read(null, selection.graphVersion(), selection.asOf());
         var lookup = new GraphContextLookup(pinned.graph());
+        String versionId = pinned.selected().version().id();
+        Instant pinnedAsOf = pinned.selected().asOfRequested() ? pinned.selected().asOf() : null;
         Map<String, GraphContextLookup.Target> targets = new LinkedHashMap<>();
-        for (String id : selection.contextIds()) targets.put(id, find(lookup, id));
+        for (String id : selection.contextIds()) targets.put(id, find(lookup, id, versionId, pinnedAsOf, requestId));
         List<GraphContextLookup.Target> evidence = new ArrayList<>();
         for (String id : selection.evidenceIds()) {
-            var target = find(lookup, id);
+            var target = find(lookup, id, versionId, pinnedAsOf, requestId);
             if (!"evidence".equals(target.kind())) throw new CustomException(ErrorCode.INVALID_REQUEST);
             evidence.add(target);
         }
@@ -107,7 +117,14 @@ public class ChatContextFreezer {
         }
     }
 
-    private static GraphContextLookup.Target find(GraphContextLookup lookup, String id) {
-        return lookup.find(id).orElseThrow(() -> new CustomException(ErrorCode.INVALID_REQUEST));
+    /** A visible target; an evidence id must also be readable now through the public evidence read. */
+    private GraphContextLookup.Target find(GraphContextLookup lookup, String id, String versionId, Instant asOf,
+            String requestId) {
+        var target = lookup.find(id).or(() -> lookup.listedEvidence(id))
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_REQUEST));
+        if ("evidence".equals(target.kind()) && !access.readable(id, versionId, asOf, requestId)) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+        return target;
     }
 }

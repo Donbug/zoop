@@ -64,7 +64,8 @@ public class ChatController {
             description = "최초 접수에서 질문과 맥락을 고정한다. Idempotency-Key는 jobId와 같아야 한다.")
     public ResponseEntity<ChatJob> submitQuestion(@PathVariable String id, @RequestBody JsonNode body,
             @RequestHeader("Idempotency-Key") String idempotencyKey, HttpServletRequest request) {
-        var result = service.submit(principal(request), id, idempotencyKey, ChatJobRequest.parse(body));
+        var result = service.submit(principal(request), id, idempotencyKey, ChatJobRequest.parse(body),
+                RequestIdFilter.currentId(request));
         return ResponseEntity.status(result.accepted() ? HttpStatus.ACCEPTED : HttpStatus.OK)
                 .body(guard.job(result.job(), RequestIdFilter.currentId(request)));
     }

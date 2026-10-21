@@ -28,7 +28,9 @@ import com.zoop.common.json.StrictJson;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -56,14 +58,17 @@ public class ChatService {
     private final ChatContextFreezer freezer;
     private final ObjectMapper mapper;
     private final Clock clock;
+    private final TransactionTemplate transaction;
     private final boolean questionsEnabled;
 
     public ChatService(ChatRepository repository, ChatContextFreezer freezer, ObjectMapper mapper, Clock clock,
+            PlatformTransactionManager transactionManager,
             @Value("${zoop.chat.questions-enabled:false}") boolean questionsEnabled) {
         this.repository = repository;
         this.freezer = freezer;
         this.mapper = mapper;
         this.clock = clock;
+        this.transaction = new TransactionTemplate(transactionManager);
         this.questionsEnabled = questionsEnabled;
     }
 
@@ -100,17 +105,32 @@ public class ChatService {
                 .map(this::conversation).orElse(null)));
     }
 
-    @Transactional
-    public JobResult submit(MemberPrincipal member, String sessionId, String idempotencyKey, ChatJobRequest request) {
+    /**
+     * Accepts a question in three steps so that freezing, whose evidence read has its own transaction, never runs inside the
+     * conversation lock: (1) ownership and an idempotent resend are answered from what is stored, without freezing again;
+     * (2) a new question's context is frozen; (3) under the conversation lock the resend and the single active job are checked
+     * again and the job is stored.
+     */
+    public JobResult submit(MemberPrincipal member, String sessionId, String idempotencyKey, ChatJobRequest request,
+            String requestId) {
         ChatJobRequest.id(sessionId);
         if (!request.jobId().equals(idempotencyKey)) throw new CustomException(ErrorCode.INVALID_REQUEST);
         String requestHash = requestHash(sessionId, request);
-        return data(() -> {
+        JobResult resent = data(() -> transaction.execute(status -> {
+            owned(repository.findSession(sessionId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND)),
+                    member);
+            return repository.findJob(request.jobId())
+                    .map(existing -> new JobResult(view(same(existing, member, sessionId, requestHash)), false)).orElse(null);
+        }));
+        if (resent != null) return resent;
+        if (!questionsEnabled) throw new CustomException(ErrorCode.MODEL_UNAVAILABLE);
+        var frozen = request.resolves() == null ? data(() -> freezer.freeze(request.context(), requestId)) : null;
+
+        return data(() -> transaction.execute(status -> {
             owned(repository.lockSession(sessionId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND)),
                     member);
             var existing = repository.findJob(request.jobId());
             if (existing.isPresent()) return new JobResult(view(same(existing.get(), member, sessionId, requestHash)), false);
-            if (!questionsEnabled) throw new CustomException(ErrorCode.MODEL_UNAVAILABLE);
             if (repository.activeJob(sessionId).isPresent()) throw new CustomException(ErrorCode.JOB_IN_PROGRESS);
 
             String frozenContext;
@@ -126,7 +146,6 @@ public class ChatService {
                 graphVersionId = original.graphVersionId();
                 depth = original.clarificationDepth() + 1;
             } else {
-                var frozen = freezer.freeze(request.context());
                 frozenContext = mapper.writeValueAsString(frozen.context());
                 frozenSelection = mapper.writeValueAsString(frozen.selection());
                 companyIds = frozen.companyIds();
@@ -147,7 +166,7 @@ public class ChatService {
             }
             repository.touchSession(sessionId, askedAt);
             return new JobResult(view(repository.findJob(request.jobId()).orElseThrow()), true);
-        });
+        }));
     }
 
     @Transactional(readOnly = true)
@@ -289,7 +308,7 @@ public class ChatService {
     }
 
     /** SHA-256 of the canonical request: what makes a resent job id "the same request" (ERD {@code request_hash}). */
-    static String requestHash(String sessionId, ChatJobRequest request) {
+    public static String requestHash(String sessionId, ChatJobRequest request) {
         ObjectNode body = StrictJson.newObject().put("sessionId", sessionId).put("question", request.question());
         ChatContextRequest context = request.context();
         if (context == null) {

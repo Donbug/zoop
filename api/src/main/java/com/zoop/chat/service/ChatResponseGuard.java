@@ -15,8 +15,6 @@ import com.zoop.chat.dto.ChatFrozenContext;
 import com.zoop.chat.dto.ChatJob;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.dto.Citation;
-import com.zoop.document.evidence.service.EvidenceService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -36,18 +34,13 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class ChatResponseGuard {
-    static final String WITHHELD_ANSWER = "이 답변이 인용한 자료를 지금은 보여드릴 수 없어요. 자료가 비공개로 바뀌었거나 "
+    public static final String WITHHELD_ANSWER = "이 답변이 인용한 자료를 지금은 보여드릴 수 없어요. 자료가 비공개로 바뀌었거나 "
             + "접근 권한을 확인하지 못했어요. 필요하면 새 질문으로 다시 물어봐 주세요.";
-    static final String WITHHELD_EVIDENCE_LABEL = "표시할 수 없는 근거";
+    public static final String WITHHELD_EVIDENCE_LABEL = "표시할 수 없는 근거";
 
     private final ChatEvidenceAccess access;
 
-    @Autowired
-    public ChatResponseGuard(EvidenceService evidence) {
-        this((ChatEvidenceAccess) evidence::readable);
-    }
-
-    ChatResponseGuard(ChatEvidenceAccess access) {
+    public ChatResponseGuard(ChatEvidenceAccess access) {
         this.access = access;
     }
 

@@ -23,6 +23,9 @@ import com.zoop.common.response.Metadata;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.AbstractPlatformTransactionManager;
+import org.springframework.transaction.support.DefaultTransactionStatus;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -36,6 +39,7 @@ class ChatServiceTest {
     private final ObjectMapper mapper = new ObjectMapper();
     private MemoryChatRepository repository;
     private MutableClock clock;
+    private final FixedFreezer freezer = new FixedFreezer();
     private ChatService service;
 
     @BeforeEach
@@ -67,7 +71,7 @@ class ChatServiceTest {
         assertEquals("conv-0002", service.getCurrentConversation(MEMBER).conversation().session().id());
 
         clock.advance(Duration.ofMinutes(1));
-        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "HBM이 뭐야?"));
+        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "HBM이 뭐야?"), "req-test");
         var current = service.getCurrentConversation(MEMBER).conversation();
         assertEquals(SESSION, current.session().id());
         assertEquals(1, current.session().jobs());
@@ -78,7 +82,7 @@ class ChatServiceTest {
     void acceptanceFreezesTheRequestOnceAndTheSameKeyReturnsTheSameJob() {
         var request = new ChatJobRequest("job-00001", "SK하이닉스 최근 이슈는?",
                 new ChatContextRequest(List.of("company-sk"), List.of(), null, null, null), null);
-        var accepted = service.submit(MEMBER, SESSION, "job-00001", request);
+        var accepted = service.submit(MEMBER, SESSION, "job-00001", request, "req-test");
         assertTrue(accepted.accepted());
         var job = accepted.job();
         assertEquals("queued", job.status());
@@ -94,44 +98,46 @@ class ChatServiceTest {
         assertTrue(repository.jobs.get("job-00001").attempts().contains("\"requestKey\":\"job-00001\""));
 
         clock.advance(Duration.ofSeconds(5));
-        var replay = service.submit(MEMBER, SESSION, "job-00001", request);
+        int frozenBefore = freezer.calls;
+        var replay = service.submit(MEMBER, SESSION, "job-00001", request, "req-test");
         assertFalse(replay.accepted());
         assertEquals(job, replay.job());
+        assertEquals(frozenBefore, freezer.calls, "a resend is answered from the stored job without freezing again");
 
         assertError(ErrorCode.IDEMPOTENCY_CONFLICT, () -> service.submit(MEMBER, SESSION, "job-00001",
-                question("job-00001", "다른 질문")));
+                question("job-00001", "다른 질문"), "req-test"));
         service.createSession(MEMBER, "conv-0002");
-        assertError(ErrorCode.IDEMPOTENCY_CONFLICT, () -> service.submit(MEMBER, "conv-0002", "job-00001", request));
-        assertError(ErrorCode.INVALID_REQUEST, () -> service.submit(MEMBER, SESSION, "other-key", request));
+        assertError(ErrorCode.IDEMPOTENCY_CONFLICT, () -> service.submit(MEMBER, "conv-0002", "job-00001", request, "req-test"));
+        assertError(ErrorCode.INVALID_REQUEST, () -> service.submit(MEMBER, SESSION, "other-key", request, "req-test"));
     }
 
     @Test
     void aConversationAcceptsOneActiveJobAndOnlyItsOwnerMaySubmit() {
-        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "첫 질문"));
+        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "첫 질문"), "req-test");
         assertError(ErrorCode.JOB_IN_PROGRESS,
-                () -> service.submit(MEMBER, SESSION, "job-00002", question("job-00002", "두 번째 질문")));
+                () -> service.submit(MEMBER, SESSION, "job-00002", question("job-00002", "두 번째 질문"), "req-test"));
         assertError(ErrorCode.ACCESS_DENIED,
-                () -> service.submit(OTHER, SESSION, "job-00003", question("job-00003", "남의 대화")));
+                () -> service.submit(OTHER, SESSION, "job-00003", question("job-00003", "남의 대화"), "req-test"));
         assertError(ErrorCode.RESOURCE_NOT_FOUND,
-                () -> service.submit(MEMBER, "conv-missing", "job-00004", question("job-00004", "없는 대화")));
+                () -> service.submit(MEMBER, "conv-missing", "job-00004", question("job-00004", "없는 대화"), "req-test"));
 
         service.cancel(MEMBER, "job-00001", "cancel-1");
-        var second = service.submit(MEMBER, SESSION, "job-00002", question("job-00002", "두 번째 질문"));
+        var second = service.submit(MEMBER, SESSION, "job-00002", question("job-00002", "두 번째 질문"), "req-test");
         assertEquals(2, second.job().seq());
     }
 
     @Test
     void newWorkIsRefusedWhileQuestionsAreDisabledButStoredJobsStayReadable() {
-        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "첫 질문"));
+        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "첫 질문"), "req-test");
         var disabled = service(false);
 
-        var replay = disabled.submit(MEMBER, SESSION, "job-00001", question("job-00001", "첫 질문"));
+        var replay = disabled.submit(MEMBER, SESSION, "job-00001", question("job-00001", "첫 질문"), "req-test");
         assertFalse(replay.accepted());
         assertEquals("queued", disabled.getJob(MEMBER, "job-00001").status());
 
         service.cancel(MEMBER, "job-00001", "cancel-1");
         assertError(ErrorCode.MODEL_UNAVAILABLE,
-                () -> disabled.submit(MEMBER, SESSION, "job-00002", question("job-00002", "두 번째 질문")));
+                () -> disabled.submit(MEMBER, SESSION, "job-00002", question("job-00002", "두 번째 질문"), "req-test"));
         assertFalse(repository.jobs.containsKey("job-00002"));
         repository.finish("job-00001", "failed", null, null, failure("rerun"), 1);
         assertError(ErrorCode.MODEL_UNAVAILABLE, () -> disabled.retry(MEMBER, "job-00001", "retry-1"));
@@ -140,11 +146,11 @@ class ChatServiceTest {
     @Test
     void clarificationReplyCopiesTheFrozenContextAndCountsTheChainDepth() {
         service.submit(MEMBER, SESSION, "job-00001", new ChatJobRequest("job-00001", "삼성 이슈 알려줘",
-                new ChatContextRequest(List.of("company-x"), List.of(), null, null, null), null));
+                new ChatContextRequest(List.of("company-x"), List.of(), null, null, null), null), "req-test");
         repository.finish("job-00001", "completed", "clarification", clarification("choice-a", "choice-b"), null, 1);
 
         var reply = service.submit(MEMBER, SESSION, "job-00002", new ChatJobRequest("job-00002", "삼성전자", null,
-                new ChatClarificationReply("job-00001", "choice-a"))).job();
+                new ChatClarificationReply("job-00001", "choice-a")), "req-test").job();
         assertEquals(new ChatClarificationReply("job-00001", "choice-a"), reply.resolves());
         assertEquals(service.getJob(MEMBER, "job-00001").context(), reply.context());
         assertEquals(1, repository.jobs.get("job-00002").clarificationDepth());
@@ -152,13 +158,13 @@ class ChatServiceTest {
 
         repository.finish("job-00002", "completed", "clarification", clarification("choice-c"), null, 1);
         service.submit(MEMBER, SESSION, "job-00003", new ChatJobRequest("job-00003", "SK하이닉스와 애플", null,
-                new ChatClarificationReply("job-00002", null)));
+                new ChatClarificationReply("job-00002", null)), "req-test");
         assertEquals(2, repository.jobs.get("job-00003").clarificationDepth());
     }
 
     @Test
     void clarificationReplyMustAnswerAnOfferedChoiceOfAClarificationInTheSameConversation() {
-        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "삼성 이슈 알려줘"));
+        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "삼성 이슈 알려줘"), "req-test");
         repository.finish("job-00001", "completed", "answered", answered(), null, 1);
         assertError(ErrorCode.INVALID_REQUEST, () -> reply("job-00009", "job-00001", null));
         repository.finish("job-00001", "completed", "clarification", clarification("choice-a"), null, 1);
@@ -167,11 +173,11 @@ class ChatServiceTest {
         assertError(ErrorCode.RESOURCE_NOT_FOUND, () -> reply("job-00009", "job-missing", null));
         service.createSession(MEMBER, "conv-0002");
         assertError(ErrorCode.INVALID_REQUEST, () -> service.submit(MEMBER, "conv-0002", "job-00009",
-                new ChatJobRequest("job-00009", "답", null, new ChatClarificationReply("job-00001", null))));
+                new ChatJobRequest("job-00009", "답", null, new ChatClarificationReply("job-00001", null)), "req-test"));
 
         service.createSession(OTHER, "conv-other");
         assertError(ErrorCode.RESOURCE_NOT_FOUND, () -> service.submit(OTHER, "conv-other", "job-00009",
-                new ChatJobRequest("job-00009", "답", null, new ChatClarificationReply("job-00001", null))));
+                new ChatJobRequest("job-00009", "답", null, new ChatClarificationReply("job-00001", null)), "req-test"));
 
         // The same clarification may be answered again; every answer is its own job.
         reply("job-00010", "job-00001", "choice-a");
@@ -182,7 +188,7 @@ class ChatServiceTest {
 
     @Test
     void cancelStopsAnActiveJobAndLeavesAFinishedJobAsItIs() {
-        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "첫 질문"));
+        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "첫 질문"), "req-test");
         assertError(ErrorCode.ACCESS_DENIED, () -> service.cancel(OTHER, "job-00001", "cancel-1"));
 
         clock.advance(Duration.ofSeconds(3));
@@ -192,7 +198,7 @@ class ChatServiceTest {
         assertTrue(repository.jobs.get("job-00001").attempts().contains("\"status\":\"cancelled\""));
         assertEquals(cancelled, service.cancel(MEMBER, "job-00001", "cancel-2"));
 
-        service.submit(MEMBER, SESSION, "job-00002", question("job-00002", "두 번째 질문"));
+        service.submit(MEMBER, SESSION, "job-00002", question("job-00002", "두 번째 질문"), "req-test");
         repository.finish("job-00002", "completed", "answered", answered(), null, 1);
         assertEquals("completed", service.cancel(MEMBER, "job-00002", "cancel-3").status());
         assertError(ErrorCode.INVALID_REQUEST, () -> service.cancel(MEMBER, "job-00002", " "));
@@ -200,7 +206,7 @@ class ChatServiceTest {
 
     @Test
     void retryRequeuesOnlyAnAllowedFailureAndTheSameKeyReturnsTheSameRetry() {
-        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "첫 질문"));
+        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "첫 질문"), "req-test");
         assertError(ErrorCode.JOB_IN_PROGRESS, () -> service.retry(MEMBER, "job-00001", "retry-0"));
         repository.finish("job-00001", "failed", null, null, failure("rerun"), 1);
         assertEquals("transient", service.getJob(MEMBER, "job-00001").failure().kind());
@@ -231,16 +237,16 @@ class ChatServiceTest {
 
     @Test
     void retryWaitsForTheConversationsActiveJob() {
-        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "첫 질문"));
+        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "첫 질문"), "req-test");
         repository.finish("job-00001", "failed", null, null, failure("rerun"), 1);
-        service.submit(MEMBER, SESSION, "job-00002", question("job-00002", "두 번째 질문"));
+        service.submit(MEMBER, SESSION, "job-00002", question("job-00002", "두 번째 질문"), "req-test");
         assertError(ErrorCode.JOB_IN_PROGRESS, () -> service.retry(MEMBER, "job-00001", "retry-1"));
     }
 
     @Test
     void theSelectionIsStoredAsRequestedAndAReplyKeepsItsOriginalScope() {
         service.submit(MEMBER, SESSION, "job-00001", new ChatJobRequest("job-00001", "이 근거로 설명해줘",
-                new ChatContextRequest(List.of("ev-1", "ev-2"), List.of("ev-1"), null, null, null), null));
+                new ChatContextRequest(List.of("ev-1", "ev-2"), List.of("ev-1"), null, null, null), null), "req-test");
         var narrowed = mapper.readValue(repository.jobs.get("job-00001").frozenSelection(), FrozenSelection.class);
         assertEquals(new FrozenSelection(List.of("ev-1", "ev-2"), List.of("ev-1"), List.of("ev-1")), narrowed);
 
@@ -251,7 +257,7 @@ class ChatServiceTest {
 
     @Test
     void readingAJobNeverChangesItAndChecksOwnership() {
-        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "첫 질문"));
+        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "첫 질문"), "req-test");
         var before = repository.jobs.get("job-00001");
         assertEquals("queued", service.getJob(MEMBER, "job-00001").status());
         assertEquals(before, repository.jobs.get("job-00001"));
@@ -273,12 +279,12 @@ class ChatServiceTest {
     }
 
     private ChatService service(boolean enabled) {
-        return new ChatService(repository, new FixedFreezer(), mapper, clock, enabled);
+        return new ChatService(repository, freezer, mapper, clock, new NoTransactions(), enabled);
     }
 
     private void reply(String jobId, String originalId, String choiceId) {
         service.submit(MEMBER, SESSION, jobId, new ChatJobRequest(jobId, "답", null,
-                new ChatClarificationReply(originalId, choiceId)));
+                new ChatClarificationReply(originalId, choiceId)), "req-test");
     }
 
     private static ChatJobRequest question(String jobId, String text) {
@@ -310,17 +316,40 @@ class ChatServiceTest {
 
     /** The graph lookup is the public graph read path; here every selected id is a company of version gv-1. */
     private static final class FixedFreezer extends ChatContextFreezer {
+        int calls;
+
         FixedFreezer() {
-            super(null, null);
+            super(null, null, null);
         }
 
         @Override
-        public Frozen freeze(ChatContextRequest request) {
+        public Frozen freeze(ChatContextRequest request, String requestId) {
+            calls++;
             var ids = request == null ? List.<String>of() : request.contextIds();
             var items = ids.stream().map(id -> new ChatContextItem(id, "company", id)).toList();
             var evidence = request == null ? List.<String>of() : request.evidenceIds();
             return new Frozen(new ChatFrozenContext(items, 0, request == null ? null : request.period(), null, "gv-1"),
                     new FrozenSelection(ids, evidence, evidence), ids, "gv-1");
+        }
+    }
+
+    /** The memory repository needs no transaction; the template still runs the callback. */
+    private static final class NoTransactions extends AbstractPlatformTransactionManager {
+        @Override
+        protected Object doGetTransaction() {
+            return new Object();
+        }
+
+        @Override
+        protected void doBegin(Object transaction, TransactionDefinition definition) {
+        }
+
+        @Override
+        protected void doCommit(DefaultTransactionStatus status) {
+        }
+
+        @Override
+        protected void doRollback(DefaultTransactionStatus status) {
         }
     }
 

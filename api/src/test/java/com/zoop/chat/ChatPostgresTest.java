@@ -18,12 +18,19 @@ import com.zoop.auth.service.MemberSessionService;
 import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
 import com.zoop.auth.service.SessionCookie;
 import com.zoop.chat.controller.ChatController;
+import com.zoop.chat.dto.ChatAnswerSection;
+import com.zoop.chat.dto.ChatApplied;
 import com.zoop.chat.dto.ChatJobRequest;
+import com.zoop.chat.dto.ChatResult;
+import com.zoop.chat.dto.Citation;
+import com.zoop.chat.dto.GraphTarget;
+import com.zoop.chat.service.ChatResponseGuard;
 import com.zoop.chat.service.ChatService;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.exception.GlobalExceptionHandler;
 import com.zoop.common.request.RequestIdFilter;
+import com.zoop.common.response.Metadata;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -36,6 +43,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -60,6 +68,7 @@ class ChatPostgresTest {
     @Autowired MemberSessionService sessions;
     @Autowired ChatService service;
     @Autowired ChatController controller;
+    @Autowired ObjectMapper mapper;
 
     @Test
     @Transactional
@@ -124,13 +133,13 @@ class ChatPostgresTest {
 
         String jobId = "job-" + suffix();
         var request = new ChatJobRequest(jobId, "HBM이 뭐야?", null, null);
-        var accepted = service.submit(member, session, jobId, request);
+        var accepted = service.submit(member, session, jobId, request, "req-test");
         assertTrue(accepted.accepted());
         assertEquals("queued", accepted.job().status());
         assertEquals(List.of(), accepted.job().context().items());
         assertEquals("{\"contextIds\": [], \"evidenceIds\": [], \"evidencePool\": []}", jdbc.queryForObject(
                 "SELECT frozen_selection::text FROM chat_jobs WHERE id = ?", String.class, jobId));
-        var replay = service.submit(member, session, jobId, request);
+        var replay = service.submit(member, session, jobId, request, "req-test");
         assertFalse(replay.accepted());
         assertEquals(accepted.job(), replay.job());
 
@@ -159,7 +168,7 @@ class ChatPostgresTest {
                 results.add(pool.submit(() -> {
                     start.await();
                     try {
-                        service.submit(member, session, jobId, new ChatJobRequest(jobId, "동시 질문", null, null));
+                        service.submit(member, session, jobId, new ChatJobRequest(jobId, "동시 질문", null, null), "req-test");
                         return "accepted";
                     } catch (CustomException refused) {
                         return refused.getErrorCode().name();
@@ -241,6 +250,72 @@ class ChatPostgresTest {
         mvc.perform(post("/api/v1/chat/jobs/{id}/cancel", jobId).cookie(cookie).header("Origin", ORIGIN)
                         .header("X-CSRF-Token", issued.response().csrfToken()).header("Idempotency-Key", "cancel-1"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("cancelled"));
+    }
+
+    @Test
+    void everyReturnPathReChecksAStoredCitationWithTheRealEvidenceReadAndLeavesItStored() throws Exception {
+        // The cited evidence id is unknown to the evidence registry, so the real EvidenceService cannot read it now: the
+        // same outcome as a withdrawn or unverifiable document. Not transactional: the evidence read has its own transaction.
+        String memberId = insertMember();
+        try {
+            var member = new MemberPrincipal(memberId, "chat-guard");
+            var issued = sessions.issue(memberId, null, "chat-guard");
+            MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                    .setControllerAdvice(new GlobalExceptionHandler())
+                    .addInterceptors(new MemberCsrfInterceptor(new AuthOriginPolicy(ORIGIN), sessions),
+                            new MemberAuthorizationInterceptor(sessions))
+                    .addFilters(new RequestIdFilter()).build();
+            Cookie cookie = new Cookie(SessionCookie.NAME, issued.token());
+            String session = "conv-" + suffix();
+            service.createSession(member, session);
+            String jobId = "job-" + suffix();
+            String evidenceId = "ev-" + "c".repeat(64);
+            String question = "근거 기반 질문";
+            var result = new ChatResult("answered", "msg-" + jobId, "보호된 답변",
+                    List.of(new ChatAnswerSection("evidence_grounded", "보호된 답변", List.of(evidenceId))), "evidence_grounded",
+                    null, List.of("art-1"), List.of(new Citation("article", evidenceId, "인용", "art-1", "v1", null, null, 0, 2,
+                            "보호된 기사 제목", "언론사", Instant.now(), "https://example.invalid/a")),
+                    List.of(new GraphTarget("KRX:000660", "company")),
+                    new ChatApplied(List.of(), List.of(), null, null, Instant.now(), false), List.of(), null, List.of(),
+                    new Metadata("zoop", Instant.now(), null, "req-0", false, List.of()));
+            jdbc.update("""
+                    INSERT INTO chat_jobs (id, session_id, seq, question, request_hash, asked_at, frozen_context,
+                        frozen_selection, status, outcome, message_id, result, result_schema_version, runs,
+                        created_at, updated_at, finished_at)
+                    VALUES (?, ?, 1, ?, ?, now(), ?::jsonb, ?::jsonb, 'completed', 'answered', ?, ?::jsonb, 'chat-result/v1',
+                        1, now(), now(), now())
+                    """, jobId, session, question,
+                    ChatService.requestHash(session, new ChatJobRequest(jobId, question, null, null)),
+                    "{\"items\":[{\"id\":\"" + evidenceId + "\",\"kind\":\"evidence\",\"label\":\"보호된 기사 제목\"}],"
+                            + "\"evidenceCount\":1,\"period\":null,\"asOf\":null,\"graphVersion\":null}",
+                    SELECTION, "msg-" + jobId, mapper.writeValueAsString(result));
+
+            mvc.perform(get("/api/v1/chat/jobs/{id}", jobId).cookie(cookie))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.result.answer").value(ChatResponseGuard.WITHHELD_ANSWER))
+                    .andExpect(jsonPath("$.result.answerBasis").value("none"))
+                    .andExpect(jsonPath("$.result.citations.length()").value(0))
+                    .andExpect(jsonPath("$.result.sections.length()").value(0))
+                    .andExpect(jsonPath("$.result.graphTargets.length()").value(0))
+                    .andExpect(jsonPath("$.context.items[0].label").value(ChatResponseGuard.WITHHELD_EVIDENCE_LABEL));
+            mvc.perform(get("/api/v1/chat/sessions/{id}", session).cookie(cookie))
+                    .andExpect(jsonPath("$.jobs[0].result.answer").value(ChatResponseGuard.WITHHELD_ANSWER));
+            mvc.perform(get("/api/v1/chat/sessions/current").cookie(cookie))
+                    .andExpect(jsonPath("$.conversation.jobs[0].result.answer").value(ChatResponseGuard.WITHHELD_ANSWER));
+            mvc.perform(post("/api/v1/chat/sessions/{id}/jobs", session).cookie(cookie).header("Origin", ORIGIN)
+                            .header("X-CSRF-Token", issued.response().csrfToken()).header("Idempotency-Key", jobId)
+                            .contentType("application/json")
+                            .content("{\"jobId\":\"" + jobId + "\",\"question\":\"" + question + "\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.result.answer").value(ChatResponseGuard.WITHHELD_ANSWER));
+
+            assertEquals("보호된 답변", jdbc.queryForObject("SELECT result->>'answer' FROM chat_jobs WHERE id = ?",
+                    String.class, jobId), "the stored result never changes");
+            assertEquals(1, jdbc.queryForObject("SELECT jsonb_array_length(result->'citations') FROM chat_jobs WHERE id = ?",
+                    Integer.class, jobId));
+        } finally {
+            jdbc.update("DELETE FROM members WHERE id = ?", memberId);
+        }
     }
 
     private String insertJob(String session, int seq, String status, String resolves, int depth) {
