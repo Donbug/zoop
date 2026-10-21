@@ -10,12 +10,14 @@ import java.util.Map;
 import java.util.Set;
 
 import com.zoop.briefing.storage.BriefingRound;
+import com.zoop.briefing.replay.BriefingReplayReadPolicy;
 import com.zoop.common.json.StrictJson;
 import com.zoop.document.analysis.GrantRegistry;
 import com.zoop.document.evidence.config.DocumentReadProperties;
 import com.zoop.document.evidence.service.DocumentReadGrants;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -31,16 +33,25 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
     private final JdbcTemplate jdbc;
     private final DocumentReadGrants grants;
     private final Clock clock;
+    private final BriefingReplayReadPolicy replay;
 
     public DocumentBriefingContentAccess(JdbcTemplate jdbc, DocumentReadProperties properties, Clock clock) {
+        this(jdbc, properties, clock, BriefingReplayReadPolicy.disabled());
+    }
+
+    @Autowired
+    public DocumentBriefingContentAccess(JdbcTemplate jdbc, DocumentReadProperties properties, Clock clock,
+            BriefingReplayReadPolicy replay) {
         this.jdbc = jdbc;
         this.grants = new DocumentReadGrants(properties.grantsPath());
         this.clock = clock;
+        this.replay = replay;
     }
 
     @Override
     public boolean mayRead(BriefingRound round, String requestId) {
         if (round.publishedAt() == null || round.payload() == null || round.publicSnapshot() == null) return false;
+        if (BriefingReplayReadPolicy.marked(round) && !replay.permits(round)) return false;
         GrantRegistry current = grants.registry(requestId);
         Instant now = clock.instant();
         try {
@@ -57,6 +68,21 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
                             AND m.payload_sha256=encode(sha256(convert_to(m.published_payload::text,'UTF8')),'hex')
                         """, (rs, index) -> new Prior(StrictJson.parseObject(rs.getString("published_payload")).node(),
                                 StrictJson.parseObject(rs.getString("public_snapshot")).node()), round.id(), morningId);
+                if (prior.size() != 1 || !sources(prior.get(0).payload(), prior.get(0).snapshot(), current, now)) return false;
+            }
+            JsonNode previous = round.publicSnapshot().get("previousComparison");
+            if (previous != null && !previous.isNull() && "available".equals(StrictJson.Obj.of(previous).string("status"))) {
+                // A dropped issue discloses previous-only content: its original must still be readable today.
+                var fixed = StrictJson.Obj.of(previous);
+                List<Prior> prior = jdbc.query("""
+                        SELECT published_payload, public_snapshot FROM briefing_rounds
+                        WHERE id=? AND id<>? AND status='published' AND published_at IS NOT NULL
+                            AND scheduled_at<? AND published_at=?::timestamptz AND window_to=?::timestamptz
+                            AND payload_sha256=encode(sha256(convert_to(published_payload::text,'UTF8')),'hex')
+                        """, (rs, index) -> new Prior(StrictJson.parseObject(rs.getString("published_payload")).node(),
+                                StrictJson.parseObject(rs.getString("public_snapshot")).node()),
+                        nonBlank(fixed.string("previousRoundId")), round.id(), java.sql.Timestamp.from(round.scheduledAt()),
+                        fixed.string("previousPublishedAt"), fixed.string("previousDataAsOf"));
                 if (prior.size() != 1 || !sources(prior.get(0).payload(), prior.get(0).snapshot(), current, now)) return false;
             }
             return true;

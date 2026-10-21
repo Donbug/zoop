@@ -244,6 +244,14 @@ jobs:
           DB_USERNAME: company_test
           DB_PASSWORD: ''
         run: ./api/gradlew -p api briefingIntegrationTest --console=plain
+      - name: Local briefing replay PostgreSQL import and HTTP tests
+        env:
+          DB_URL: jdbc:postgresql://127.0.0.1:${{ job.services.company-postgres.ports['5432'] }}/zoop_briefing_replay_test
+          DB_USERNAME: company_test
+          DB_PASSWORD: ''
+        run: |
+          docker exec "${{ job.services.company-postgres.id }}" createdb -U company_test zoop_briefing_replay_test
+          ./api/gradlew -p api briefingReplayIntegrationTest --console=plain
       - name: Bootstrap the ai/service runtime and installed zoop-ai for the real gate (public dependencies, no token)
         run: make service-install
       - name: Real Java client -> ai/service -> zoop-ai replay gate (synthetic in-memory credentials, no model call, no PostgreSQL)

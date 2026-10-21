@@ -1,0 +1,55 @@
+{
+  "type": "object",
+  "properties": {
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "issueId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "NEW",
+              "MATERIAL_UPDATE",
+              "REPEAT",
+              "UNCERTAIN"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          },
+          "deltaEvidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "minItems": 0,
+            "maxItems": 12
+          }
+        },
+        "required": [
+          "issueId",
+          "decision",
+          "reason",
+          "deltaEvidenceIds"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0,
+      "maxItems": 3
+    }
+  },
+  "required": [
+    "decisions"
+  ],
+  "additionalProperties": false
+}

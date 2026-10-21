@@ -322,6 +322,26 @@ class BriefingHttpPostgresTest {
         assertEquals("getBriefingGraphBasis", doc.json().at("/paths/~1api~1v1~1briefings~1{id}~1graph/get/operationId").asText());
         assertTrue(doc.json().at("/components/schemas/BriefingResponse").has("properties"));
         assertTrue(doc.json().at("/components/schemas/BriefingResponse/properties/marketSummary").isObject());
+        for (String name : java.util.List.of("AnalysisSummary", "MarketVariables", "MarketIndicator", "SinceMorning"))
+            assertTrue(doc.json().at("/components/schemas/" + name).has("properties"), name);
+        assertTrue(doc.json().at("/components/schemas/MarketIndicator/properties/valueKind/enum").values().stream()
+                .anyMatch(value -> "reference".equals(value.asText())));
+        JsonNode analysis = doc.json().at("/components/schemas/AnalysisSummary/properties/analysis");
+        assertFalse(analysis.has("type"), "A top-level null type would reject the actual analysis object");
+        assertTrue(analysis.path("anyOf").values().stream().anyMatch(value ->
+                "#/components/schemas/MarketOutlookAnalysis".equals(value.path("$ref").asText())));
+        assertTrue(analysis.path("anyOf").values().stream().anyMatch(value -> "null".equals(value.path("type").asText())));
+        assertFalse(doc.json().at("/components/schemas/AnalysisSummary/required").values().stream()
+                .anyMatch(value -> "analysis".equals(value.asText())));
+        for (String field : java.util.List.of("direction", "updateAction")) {
+            JsonNode nullableEnum = doc.json().at("/components/schemas/MarketOutlookClaim/properties/" + field);
+            assertTrue(nullableEnum.path("anyOf").values().stream().anyMatch(value -> value.path("enum").isArray()));
+            assertTrue(nullableEnum.path("anyOf").values().stream().anyMatch(value -> "null".equals(value.path("type").asText())));
+        }
+        for (JsonNode reference : doc.json().findValues("$ref")) {
+            String path = reference.asText();
+            if (path.startsWith("#/components/schemas/")) assertFalse(doc.json().at(path.substring(1)).isMissingNode(), path);
+        }
     }
 
     @Test
