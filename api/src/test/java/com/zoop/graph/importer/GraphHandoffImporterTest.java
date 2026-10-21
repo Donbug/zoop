@@ -25,6 +25,7 @@ import com.zoop.graph.importer.GraphHandoffResult.Staged;
 import com.zoop.graph.importer.HandoffFixtures.Built;
 import com.zoop.graph.importer.HandoffFixtures.FakeHandoff;
 import com.zoop.graph.importer.HandoffFixtures.FakeIngestion;
+import com.zoop.graph.importer.HandoffFixtures.Shape;
 import com.zoop.graph.importer.HandoffFixtures.Spec;
 import com.zoop.graph.snapshot.GraphSnapshotCodec;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
@@ -44,6 +45,7 @@ import static com.zoop.graph.importer.HandoffFixtures.ARTICLE_VERSION;
 import static com.zoop.graph.importer.HandoffFixtures.BASIS;
 import static com.zoop.graph.importer.HandoffFixtures.COMPANY_A;
 import static com.zoop.graph.importer.HandoffFixtures.COMPANY_B;
+import static com.zoop.graph.importer.HandoffFixtures.COMPANY_M;
 import static com.zoop.graph.importer.HandoffFixtures.EVENT;
 import static com.zoop.graph.importer.HandoffFixtures.GEO;
 import static com.zoop.graph.importer.HandoffFixtures.HANDOFF_ID;
@@ -260,7 +262,7 @@ class GraphHandoffImporterTest {
         String versionId = built.versionId();
 
         JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId)));
-        assertEquals("zoop-graph-handoff-bundle-4", receipt.get("bundle").get("schemaVersion").stringValue());
+        assertEquals("zoop-graph-handoff-bundle-5", receipt.get("bundle").get("schemaVersion").stringValue());
         // The hand-written expectation of the issue's field provenance: the one unanimous mention states every value, and the
         // receipt says so without claiming any value was verified (selection, not fact verification).
         JsonNode provenance = receipt.get("bundle").get("issues").get(0).get("fieldProvenance");
@@ -1033,5 +1035,182 @@ class GraphHandoffImporterTest {
             assertEquals(registryBefore, registry.state());
             assertEquals(0, graph.writes());
         }
+    }
+
+    // ------------------------------------------------------------------------------------------------ structural paths ----
+
+    private Built builtWith(Shape shape) {
+        Built twoHop = HandoffFixtures.build(Spec.standard().withShape(shape));
+        handoff.envelope = twoHop.envelopeBytes();
+        return twoHop;
+    }
+
+    private static List<String> strings(JsonNode array) {
+        List<String> values = new java.util.ArrayList<>();
+        for (JsonNode item : array.values()) {
+            values.add(item.stringValue());
+        }
+        return values;
+    }
+
+    private JsonNode structuralOf(JsonNode bundle) {
+        for (JsonNode relation : bundle.get("relations").values()) {
+            if (relation.get("type").stringValue().equals("STRUCTURALLY_RELATED_TO")) {
+                return relation;
+            }
+        }
+        throw new AssertionError("no structural relation");
+    }
+
+    @Test
+    void aOneHopEdgeKeepsItsCompletePathAndBasisScopesOnlyInTheReceipt() throws Exception {
+        assertTrue(importer.run(built.request()).succeeded());
+        String versionId = built.versionId();
+
+        JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId)));
+        JsonNode structural = structuralOf(receipt.get("bundle"));
+        assertEquals(List.of(COMPANY_A, COMPANY_B), strings(structural.get("structuralPath").get("companyIds")));
+        assertEquals("complete", structural.get("structuralPath").get("status").stringValue());
+        JsonNode link = structural.get("structuralPath").get("links").get(0);
+        assertEquals(COMPANY_B, link.get("supplierCompanyId").stringValue(), "the supplier direction is the S3 fact, not the chain order");
+        assertEquals(COMPANY_A, link.get("customerCompanyId").stringValue());
+        assertEquals("부품 공급 계약", structural.get("basis").get(0).get("businessScope").stringValue());
+        assertEquals("배터리", structural.get("basis").get(0).get("productScope").stringValue());
+        assertEquals(0, receipt.get("bundle").get("pathCompanies").size());
+        assertEquals(0, receipt.get("bundle").get("counts").get("pathCompanies").intValue());
+
+        JsonNode app = receipt.get("appVerification");
+        assertTrue(strings(app.get("checks")).contains("structural_path_closed_over_involves_basis_and_catalog"));
+        assertEquals("operator-mapped-basis-chain-not-causality-or-price-direction", app.get("structuralPath").stringValue());
+
+        // None of the private path data is in the public snapshot, in any wording.
+        String snapshot = new String(Files.readAllBytes(snapshotFile(versionId)), StandardCharsets.UTF_8);
+        for (String privateText : List.of("structuralPath", "pathCompanies", "businessScope", "productScope", "부품 공급 계약",
+                "supplierCompanyId", "customerCompanyId", "companyIds")) {
+            assertFalse(snapshot.contains(privateText), privateText);
+        }
+    }
+
+    @Test
+    void aTwoHopChainThroughAMappedMiddleCompanyStagesThePrivateCompanyOnlyInTheReceipt() throws Exception {
+        graph.seedCompany(COMPANY_M, "합성중간");
+        Built twoHop = builtWith(Shape.TWO_HOP_PRIVATE);
+
+        GraphHandoffResult result = importer.run(twoHop.request());
+
+        assertTrue(result.succeeded(), () -> String.valueOf(result.failure() == null ? null : result.failure().failure()));
+        assertEquals(2, result.staged().companies(), "a private path company is not a public company");
+        byte[] snapshotBytes = Files.readAllBytes(snapshotFile(twoHop.versionId()));
+        PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(snapshotBytes, twoHop.versionId());
+        assertEquals(java.util.Set.of(COMPANY_A, COMPANY_B),
+                snapshot.companies().stream().map(c -> c.companyId()).collect(java.util.stream.Collectors.toSet()));
+        assertEquals(2, snapshot.relations().size(), "one INVOLVES and the one structural edge: no node or edge for the middle");
+        assertEquals(2, snapshot.relations().stream().filter(r -> r.relationType().equals("STRUCTURALLY_RELATED_TO"))
+                .findFirst().orElseThrow().basis().size());
+        String text = new String(snapshotBytes, StandardCharsets.UTF_8);
+        for (String privateText : List.of(COMPANY_M, "합성중간", "structuralPath", "pathCompanies", "businessScope", "소재 공급 계약")) {
+            assertFalse(text.contains(privateText), privateText);
+        }
+
+        JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(twoHop.versionId())));
+        assertEquals(twoHop.bundle(), receipt.get("bundle"), "the receipt retains the complete bundle");
+        JsonNode pathCompanies = receipt.get("bundle").get("pathCompanies");
+        assertEquals(1, pathCompanies.size());
+        assertEquals(COMPANY_M, pathCompanies.get(0).get("id").stringValue());
+        assertEquals(1, receipt.get("bundle").get("counts").get("pathCompanies").intValue());
+        JsonNode path = structuralOf(receipt.get("bundle")).get("structuralPath");
+        assertEquals(List.of(COMPANY_A, COMPANY_M, COMPANY_B), strings(path.get("companyIds")));
+        assertEquals(COMPANY_M, path.get("links").get(0).get("supplierCompanyId").stringValue());
+        assertEquals(COMPANY_A, path.get("links").get(0).get("customerCompanyId").stringValue());
+        assertEquals(COMPANY_B, path.get("links").get(1).get("supplierCompanyId").stringValue());
+        assertEquals(COMPANY_M, path.get("links").get(1).get("customerCompanyId").stringValue());
+        // No private counter reaches the public import result contract.
+        JsonNode written = HandoffFixtures.parse(GraphHandoffResultWriter.toBytes(result));
+        assertFalse(written.toString().contains("pathCompanies"));
+        assertEquals(2, written.get("counts").get("companies").intValue());
+    }
+
+    @Test
+    void aTwoHopChainThroughAPublicMiddleCompanyNeedsNoPathCompany() throws Exception {
+        graph.seedCompany(COMPANY_M, "합성중간");
+        Built twoHop = builtWith(Shape.TWO_HOP_PUBLIC);
+
+        GraphHandoffResult result = importer.run(twoHop.request());
+
+        assertTrue(result.succeeded(), () -> String.valueOf(result.failure() == null ? null : result.failure().failure()));
+        assertEquals(3, result.staged().companies());
+        PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(Files.readAllBytes(snapshotFile(twoHop.versionId())),
+                twoHop.versionId());
+        assertTrue(snapshot.companies().stream().anyMatch(c -> c.companyId().equals(COMPANY_M)));
+        JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(twoHop.versionId())));
+        assertEquals(0, receipt.get("bundle").get("pathCompanies").size());
+        assertEquals(List.of(COMPANY_A, COMPANY_M, COMPANY_B),
+                strings(structuralOf(receipt.get("bundle")).get("structuralPath").get("companyIds")));
+    }
+
+    @Test
+    void aTwoHopChainWithAnUnmappedMiddleStagesAnUnavailablePathWithoutInventingACompany() throws Exception {
+        Built twoHop = builtWith(Shape.TWO_HOP_UNMAPPED);
+
+        GraphHandoffResult result = importer.run(twoHop.request());
+
+        assertTrue(result.succeeded(), () -> String.valueOf(result.failure() == null ? null : result.failure().failure()));
+        assertEquals(2, result.staged().companies());
+        JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(twoHop.versionId())));
+        JsonNode path = structuralOf(receipt.get("bundle")).get("structuralPath");
+        assertEquals("unavailable", path.get("status").stringValue());
+        assertEquals("intermediate_company_unmapped", path.get("reason").stringValue());
+        assertFalse(path.has("companyIds"), "nothing is truncated or fabricated");
+        assertEquals(0, receipt.get("bundle").get("pathCompanies").size());
+        assertEquals(2, structuralOf(receipt.get("bundle")).get("basis").size());
+    }
+
+    @Test
+    void aPathCompanyThatIsMissingOrNamedDifferentlyInTheCatalogueRollsEverythingBack() throws Exception {
+        Built twoHop = builtWith(Shape.TWO_HOP_PRIVATE);
+        for (String catalogued : new String[] {null, "다른 중간"}) {
+            graph = new InMemoryGraphHandoffRepository("fixture-active", 2);
+            graph.seedCompany(COMPANY_A, "합성기업");
+            graph.seedCompany(COMPANY_B, "합성부품");
+            if (catalogued != null) {
+                graph.seedCompany(COMPANY_M, catalogued);
+            }
+            importer = newImporter();
+            InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+            InMemoryDocumentRegistry.State registryBefore = registry.state();
+            long filesBefore = fileCount();
+
+            assertEquals(GraphHandoffFailure.COMPANY_MISMATCH, failure(importer.run(twoHop.request())).failure(),
+                    String.valueOf(catalogued));
+
+            assertEquals(graphBefore, graph.state());
+            assertEquals(registryBefore, registry.state());
+            assertEquals(filesBefore, fileCount());
+            assertEquals(0, graph.writes());
+            assertFalse(Files.exists(snapshotFile(twoHop.versionId())));
+            assertFalse(Files.exists(receiptFile(twoHop.versionId())));
+        }
+        graph = new InMemoryGraphHandoffRepository("fixture-active", 2);
+        graph.seedCompany(COMPANY_A, "합성기업");
+        graph.seedCompany(COMPANY_B, "합성부품");
+        graph.seedCompany(COMPANY_M, "합성중간");
+        importer = newImporter();
+        assertTrue(importer.run(twoHop.request()).succeeded(), "the same pins stage once the catalogue is right");
+    }
+
+    @Test
+    void repeatingATwoHopImportIsUnchangedAndKeepsTheSameBytes() throws Exception {
+        graph.seedCompany(COMPANY_M, "합성중간");
+        Built twoHop = builtWith(Shape.TWO_HOP_PRIVATE);
+        assertTrue(importer.run(twoHop.request()).succeeded());
+        byte[] snapshotBytes = Files.readAllBytes(snapshotFile(twoHop.versionId()));
+        byte[] receiptBytes = Files.readAllBytes(receiptFile(twoHop.versionId()));
+
+        GraphHandoffResult again = importer.run(twoHop.request());
+
+        assertTrue(again.succeeded());
+        assertEquals(Outcome.UNCHANGED, again.staged().outcome());
+        assertTrue(java.util.Arrays.equals(snapshotBytes, Files.readAllBytes(snapshotFile(twoHop.versionId()))));
+        assertTrue(java.util.Arrays.equals(receiptBytes, Files.readAllBytes(receiptFile(twoHop.versionId()))));
     }
 }

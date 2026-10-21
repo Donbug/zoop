@@ -8,11 +8,12 @@ import com.zoop.common.json.StrictJson;
 import com.zoop.common.json.StrictJson.Obj;
 
 /**
- * The one fact the public graph evidence read takes from a graph import's {@code verification_receipt}: which grant each recorded
- * observation of an article version was imported under, as {@code (sourceId, grantId, revision)}. The receipt is retained data,
- * never authority: these pins only say which current registry entry must still allow the read. The receipt must be the closed
- * {@code zoop-graph-handoff-import-receipt-1} document of exactly the graph version being served ({@code gv-} + SHA-256 of its
- * handoff id), and exactly one bundle article must carry the article version; anything else is a {@link Malformed} receipt.
+ * The one fact the public graph evidence read takes from a graph import's {@code verification_receipt} for the GRANTS: which grant
+ * each recorded observation of an article version was imported under, as {@code (sourceId, grantId, revision)}. The receipt is
+ * retained data, never authority: these pins only say which current registry entry must still allow the read. The receipt must be
+ * the closed {@code zoop-graph-handoff-import-receipt-1} document of exactly the graph version being served ({@code gv-} + SHA-256
+ * of its handoff id), and exactly one bundle article must carry the article version; anything else is a {@link Malformed} receipt.
+ * {@link #bundle} parses and checks the receipt ONCE; {@link #pins} and {@link GraphReceiptBasis} read the same parsed bundle.
  */
 final class GraphReceiptGrants {
     static final String SCHEMA = "zoop-graph-handoff-import-receipt-1";
@@ -32,7 +33,8 @@ final class GraphReceiptGrants {
     private GraphReceiptGrants() {
     }
 
-    static Set<Pin> pins(byte[] receipt, String versionId, String articleId, String articleVersion) {
+    /** The bundle of a receipt that is the import receipt of exactly {@code versionId}; the receipt bytes are parsed only here. */
+    static Obj bundle(byte[] receipt, String versionId) {
         try {
             Obj root = StrictJson.parseObject(receipt).requiring(ROOT);
             if (!SCHEMA.equals(root.string("schemaVersion"))) {
@@ -41,8 +43,16 @@ final class GraphReceiptGrants {
             if (!versionId.equals("gv-" + Canonical.sha256(root.string("handoffId")))) {
                 throw new Malformed("receipt_version_mismatch");
             }
+            return root.object("bundle");
+        } catch (StrictJson.Malformed malformed) {
+            throw new Malformed("receipt_shape");
+        }
+    }
+
+    static Set<Pin> pins(Obj bundle, String articleId, String articleVersion) {
+        try {
             Obj match = null;
-            for (Obj article : root.object("bundle").objects("articles")) {
+            for (Obj article : bundle.objects("articles")) {
                 if (articleId.equals(article.string("articleId")) && articleVersion.equals(article.string("articleVersion"))) {
                     if (match != null) {
                         throw new Malformed("receipt_article_ambiguous");

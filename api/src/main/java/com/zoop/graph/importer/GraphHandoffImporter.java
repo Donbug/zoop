@@ -288,12 +288,16 @@ public final class GraphHandoffImporter {
 
     private AppFacts verifyApp(ArtifactFileStore.Session session, HandoffBundle bundle, Checked checked,
             String receiptArtifactId, Instant now) {
+        // The catalogue is checked for the UNION of the public companies and the private path companies: both must exist with an
+        // equal label. A path company is never a graph node; it only has to be a real catalogue company, under the same lock.
+        List<Company> catalogued = new ArrayList<>(bundle.companies());
+        catalogued.addAll(bundle.pathCompanies());
         Set<String> companyIds = new LinkedHashSet<>();
-        for (Company company : bundle.companies()) {
+        for (Company company : catalogued) {
             companyIds.add(company.id());
         }
         Map<String, CompanyRow> catalog = graph.companies(companyIds);
-        for (Company company : bundle.companies()) {
+        for (Company company : catalogued) {
             CompanyRow row = catalog.get(company.id());
             if (row == null || !row.name().equals(company.label())) {
                 throw new GraphHandoffException(GraphHandoffFailure.COMPANY_MISMATCH);

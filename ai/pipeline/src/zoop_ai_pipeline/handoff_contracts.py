@@ -22,7 +22,7 @@ from .source_support import source_support
 __all__ = ["ExtractionFailure", "canonical", "digest"]
 
 SCHEMA = "zoop-ai-handoff-1"
-BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-4"
+BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-5"
 DECISIONS_SCHEMA = "zoop-public-decisions-2"
 BINDINGS_SCHEMA = "zoop-app-document-bindings-1"
 LEDGER_VERSION = "zoop-handoff-ledger-1"
@@ -31,6 +31,9 @@ EVIDENCE_KIND = "graph-body-span"
 OFFSET_UNIT = "unicode_code_point"
 STRUCTURAL_BASIS_TYPES = ("SUPPLIES",)       # the only S3 type inside the PoC structural basis set (PRODUCES/SUPPLIES/USES/...); others are rejected
 PUBLIC_TYPES = ("INVOLVES", "STRUCTURALLY_RELATED_TO", "FOLLOWS")
+STRUCTURAL_PATH_UNAVAILABLE = "intermediate_company_unmapped"      # the ONLY reason a structural path is unavailable: a middle company the operator did not map to a public id
+CONTENT_KEYS = ("companies", "pathCompanies", "issues", "relations", "evidence", "articles")      # the public collections `digests.content` covers
+MAX_SCOPE = 500                                                      # Unicode code points of an S3 `businessScope`/`productScope` (S3's own bound)
 TIME_PRECISIONS = ("year", "month", "day", "datetime", "unknown")
 ASSERTION_STATUSES = ("occurred", "announced", "planned", "forecast", "cancelled", "unknown")     # S2 `Mention.assertion_status`, copied as is
 MENTION_VERIFICATION = "none"             # S2 candidate or operator-frozen snapshot values: no field of a mention is verified, decided or approved here
@@ -406,7 +409,7 @@ def countries_class(countries: list[str]) -> str:
 
 
 def content_digest(bundle: dict) -> str:
-    return digest({key: bundle[key] for key in ("companies", "issues", "relations", "evidence", "articles")})
+    return digest({key: bundle[key] for key in CONTENT_KEYS})
 
 
 # ---------------------------------------------------------------------------------------------- bundle validator --------------------
@@ -587,8 +590,8 @@ def _field_provenance(issue: dict, mentions: list, verdicts: list) -> None:
 def validate_bundle(bundle: dict) -> None:
     """Strict, closed validation of a bundle: exact key sets, types, patterns, referential closure, id formulas, counts and the content digest. Anything
     else is `handoff_bundle_invalid` (a damaged or hand-edited artifact), never a partial read."""
-    _keys(bundle, ("schemaVersion", "handoffId", "manifestDigest", "provenance", "policy", "sources", "companies", "issues", "relations", "evidence",
-                   "articles", "exclusions", "counts", "checks", "readiness", "digests"), "bundle")
+    _keys(bundle, ("schemaVersion", "handoffId", "manifestDigest", "provenance", "policy", "sources", "companies", "pathCompanies", "issues", "relations",
+                   "evidence", "articles", "exclusions", "counts", "checks", "readiness", "digests"), "bundle")
     _need(bundle["schemaVersion"] == BUNDLE_SCHEMA, "schemaVersion")
     _text(bundle["handoffId"], "handoffId", ID)
     _text(bundle["manifestDigest"], "manifestDigest", HASH)
@@ -720,14 +723,24 @@ def validate_bundle(bundle: dict) -> None:
         referenced.update(ids)
         return ids
 
+    def company(c, at: str) -> None:
+        _keys(c, ("id", "canonicalId", "label", "decisionRef"), at)
+        for name in ("id", "canonicalId", "decisionRef"):
+            _text(c[name], at, ID)
+        _text(c["label"], f"{at}.label")
+
     companies = {}
     for c in _list(bundle["companies"], "companies", MAX_DECISIONS):
-        _keys(c, ("id", "canonicalId", "label", "decisionRef"), "company")
-        for name in ("id", "canonicalId", "decisionRef"):
-            _text(c[name], "company", ID)
-        _text(c["label"], "company.label")
+        company(c, "company")
         _need(c["id"] not in companies, "companies.unique")
         companies[c["id"]] = c
+    # Private support references of structural paths: the same closed record as a company, never a graph node, disjoint from the public companies and the issues.
+    path_companies = {}
+    for c in _list(bundle["pathCompanies"], "pathCompanies", MAX_DECISIONS):
+        company(c, "pathCompany")
+        _need(c["id"] not in path_companies and c["id"] not in companies, "pathCompanies.unique")
+        path_companies[c["id"]] = c
+    _need(list(path_companies) == sorted(path_companies), "pathCompanies.order")
 
     by_document: dict = {}
     for article in articles.values():
@@ -829,14 +842,17 @@ def validate_bundle(bundle: dict) -> None:
         _need(support == source_support([{"articleId": a, "textSha256": articles[(a, v)]["textSha256"],
                                           "originId": (articles[(a, v)]["origin"] or {}).get("originId")} for a, v in cited]), "issue.sourceSupport.exact")
         _field_provenance(i, mentions, verdicts)
-        _need(i["id"] not in issues and i["id"] not in companies, "issues.unique")
+        _need(i["id"] not in issues and i["id"] not in companies and i["id"] not in path_companies, "issues.unique")
         issues[i["id"]] = i
 
     relation_ids = set()
     counts = {name: 0 for name in PUBLIC_TYPES}
     linked: dict[str, set] = {name: set() for name in ("issue", "company")}
+    participants: dict[str, set] = {}          # public issue -> the companies an INVOLVES edge of that issue names
+    structural_paths: list = []                # (relation, path) of every STRUCTURALLY_RELATED_TO edge, checked once every INVOLVES edge is known
     for r in _list(bundle["relations"], "relations", MAX_RELATIONS):
-        _keys(r, ("id", "type", "source", "target", "role", "assertionStatus", "evidenceIds", "basis", "provenance", "decisionRef", "sourceRefs"), "relation")
+        _keys(r, ("id", "type", "source", "target", "role", "assertionStatus", "evidenceIds", "basis", "structuralPath", "provenance", "decisionRef",
+                  "sourceRefs"), "relation")
         _text(r["id"], "relation.id", ID)
         _need(r["type"] in PUBLIC_TYPES and r["id"] not in relation_ids, "relation.type")
         relation_ids.add(r["id"])
@@ -857,7 +873,7 @@ def validate_bundle(bundle: dict) -> None:
         _need((r["type"] == "STRUCTURALLY_RELATED_TO") == (len(basis) >= 1), "relation.basis")
         basis_refs = []
         for b in basis:
-            _keys(b, ("sourceRelation", "relationKey", "relationType", "validFrom", "validUntil", "countries", "verifiedAt",
+            _keys(b, ("sourceRelation", "relationKey", "relationType", "businessScope", "productScope", "validFrom", "validUntil", "countries", "verifiedAt",
                       "sourceArticles", "evidenceIds"), "basis")
             src = _keys(b["sourceRelation"], ("jobId", "relationCandidateId"), "basis.sourceRelation")
             _text(src["jobId"], "basis.sourceRelation", ID)
@@ -871,6 +887,9 @@ def validate_bundle(bundle: dict) -> None:
             _text(b["validFrom"], "basis.validFrom", nullable=True)
             _text(b["validUntil"], "basis.validUntil", nullable=True)
             _strings(b["countries"], "basis.countries", maximum=10)
+            for name in ("businessScope", "productScope"):        # S3 text copied exactly (never an entity id), bounded in code points
+                _text(b[name], f"basis.{name}", nullable=True)
+                _need(b[name] is None or len(b[name]) <= MAX_SCOPE, f"basis.{name}.length")
             ids = evidence_ids(b["evidenceIds"], "basis.evidenceIds")
             links = _list(b["sourceArticles"], "basis.sourceArticles", 1000)
             for link in links:
@@ -898,7 +917,10 @@ def validate_bundle(bundle: dict) -> None:
         _need(len(set(reference_keys)) == len(refs), "relation.sourceRefs.unique")
         provenance = r["provenance"]
         preimage = {"type": r["type"], "source": r["source"], "target": r["target"]}
+        if r["type"] != "STRUCTURALLY_RELATED_TO":
+            _need(r["structuralPath"] is None, "relation.structuralPath")
         if r["type"] == "INVOLVES":
+            participants.setdefault(r["source"], set()).add(r["target"])
             _keys(provenance, ("origin", "s3SemanticValidation"), "relation.provenance")
             _need(provenance["origin"] == "s3-relation" and provenance["s3SemanticValidation"] ==
                   involves_validation([used_reviews[ref["jobId"]][ref["id"]] for ref in refs]), "relation.provenance")
@@ -914,6 +936,7 @@ def validate_bundle(bundle: dict) -> None:
             _text(provenance["bindingDigest"], "relation.provenance", HASH)
             _need(r["decisionRef"] == provenance["decisionRef"] and r["role"] is None and reference_keys == basis_refs, "relation.structural")
             preimage["basis"] = [b["relationKey"] for b in basis]
+            structural_paths.append((r, r["structuralPath"]))
         else:
             _keys(provenance, ("origin", "s3SemanticValidation", "s2Relation", "evidenceGate", "groupDigest", "decisionRef",
                                "decisionVersion"), "relation.provenance")
@@ -930,6 +953,31 @@ def validate_bundle(bundle: dict) -> None:
     _need(set(issues) == linked["issue"], "issues.noOrphan")
     _need(set(companies) == linked["company"], "companies.noOrphan")
     _need(set(evidence) == referenced, "evidence.noOrphan")
+
+    # Structural paths: shape and connectivity per edge, then the closure of the private support companies over the complete paths.
+    middles: set = set()
+    for r, path in structural_paths:
+        size = len(r["basis"])
+        _need(isinstance(path, dict) and path.get("status") in ("complete", "unavailable"), "structuralPath")
+        if path["status"] == "unavailable":
+            _keys(path, ("status", "reason"), "structuralPath")
+            _need(path["reason"] == STRUCTURAL_PATH_UNAVAILABLE and size == 2, "structuralPath.unavailable")      # only a two-relation edge has a middle company to be unmapped
+            continue
+        _keys(path, ("status", "companyIds", "links"), "structuralPath")
+        chain = _strings(path["companyIds"], "structuralPath.companyIds", ID, 3)
+        _need(len(chain) == size + 1 and len(set(chain)) == len(chain), "structuralPath.companyIds")
+        _need(set(chain) <= set(companies) | set(path_companies), "structuralPath.catalogue")
+        _need(chain[0] in participants.get(r["source"], ()) and chain[-1] == r["target"] and r["target"] not in participants.get(r["source"], ()), "structuralPath.ends")
+        links = _list(path["links"], "structuralPath.links", 2)
+        _need(len(links) == size, "structuralPath.links")
+        for n, link in enumerate(links):          # one link per basis, in basis order, joining the two adjacent companies of the chain in either S3 direction
+            _keys(link, ("supplierCompanyId", "customerCompanyId"), "structuralPath.link")
+            _text(link["supplierCompanyId"], "structuralPath.link", ID)
+            _text(link["customerCompanyId"], "structuralPath.link", ID)
+            _need(link["supplierCompanyId"] != link["customerCompanyId"]
+                  and {link["supplierCompanyId"], link["customerCompanyId"]} == {chain[n], chain[n + 1]}, "structuralPath.link")
+        middles.update(chain[1:-1])
+    _need(set(path_companies) == middles - set(companies), "pathCompanies.closure")
 
     ex = _keys(bundle["exclusions"], ("counts", "items"), "exclusions")
     items = _list(ex["items"], "exclusions.items", MAX_EXCLUSIONS)
@@ -953,8 +1001,8 @@ def validate_bundle(bundle: dict) -> None:
                 _bad("exclusion.detail")
         tally[item["code"]] = tally.get(item["code"], 0) + 1
     _need(ex["counts"] == tally, "exclusions.counts")
-    expected = {"companies": len(companies), "issues": len(issues), "relations": counts, "evidence": len(evidence), "articles": len(articles),
-                "exclusions": len(items)}
+    expected = {"companies": len(companies), "pathCompanies": len(path_companies), "issues": len(issues), "relations": counts, "evidence": len(evidence),
+                "articles": len(articles), "exclusions": len(items)}
     _need(bundle["counts"] == expected, "counts")
     checks = _keys(bundle["checks"], ("producerConfirmed", "appImportPending"), "checks")
     _need(checks["producerConfirmed"] == list(PRODUCER_CHECKS) and checks["appImportPending"] == list(APP_IMPORT_PENDING), "checks")

@@ -439,8 +439,8 @@ class HandoffSnapshotWriterTest {
 
     private static HandoffBundle rebuilt(HandoffBundle bundle, List<Issue> issues, List<Evidence> evidence, List<Article> articles) {
         return new HandoffBundle(bundle.handoffId(), bundle.manifestDigest(), bundle.sourceKind(), bundle.executionMode(),
-                bundle.recordingKind(), bundle.policyVersion(), bundle.files(), bundle.sources(), bundle.companies(), issues,
-                bundle.relations(), evidence, articles, bundle.approvals());
+                bundle.recordingKind(), bundle.policyVersion(), bundle.files(), bundle.sources(), bundle.companies(),
+                bundle.pathCompanies(), issues, bundle.relations(), evidence, articles, bundle.approvals());
     }
 
     /**

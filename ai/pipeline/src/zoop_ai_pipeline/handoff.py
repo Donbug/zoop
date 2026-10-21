@@ -6,7 +6,7 @@ ONE canonical public issue-centric projection, validates it strictly and stores 
 `recover` settles a `reserved` handoff from the stored artifact only (it never regenerates). `inspect` is ledger + artifact integrity.
 `export` re-validates CURRENT authority, then prints the bundle; any drift is a content-free `withheld` result.
 
-A ledger row whose stored receipt names another bundle schema than this build's (every `-1`, `-2` and `-3` row) is HISTORY: `inspect` shows its stored state, receipt and
+A ledger row whose stored receipt names another bundle schema than this build's (every `-1`, `-2`, `-3` and `-4` row) is HISTORY: `inspect` shows its stored state, receipt and
 attempts, `export` is `withheld` (`handoff_contract_changed`), `recover` and a same-id `freeze` are refused with that code. Decided from the ledger alone before
 any operator file, source authority, artifact or writable ledger is touched, and repeated under the lock; the row, its attempts and its artifact are never read
 as a current bundle, resumed, settled or rewritten.
@@ -37,8 +37,9 @@ from .graph_projection import Registry, Source, approval_basis, gate, load_regis
 from .graph_projection_contracts import MAX_REGISTRY, Withheld, entry_key
 from .handoff_contracts import (APP_IMPORT_PENDING, BUNDLE_SCHEMA, EVIDENCE_KIND, EXECUTION_MODES, ISSUE_FIELDS, LEDGER_VERSION, MAX_ATTEMPTS, MAX_BUNDLE,
     MAX_EVIDENCE, MAX_EXCLUSIONS, MAX_ISSUES, MAX_OPERATOR_FILE, MAX_RELATIONS, MENTION_IDENTITY, MENTION_VERIFICATION, OFFSET_UNIT, ORIGIN_VERIFICATION, POLICY,
-    PRODUCER_CHECKS, SCHEMA, SOURCE_SUPPORT_POLICY, STRUCTURAL_BASIS_TYPES, Bindings, Decisions, Manifest, Selector, VERDICT_FIELDS, app_evidence_id,
-    basis_eligibility, content_digest, countries_class, involves_validation, mention_key, mention_time_precision, selected_basis, text_sha256, time_precision,
+    PRODUCER_CHECKS, SCHEMA, SOURCE_SUPPORT_POLICY, STRUCTURAL_BASIS_TYPES, STRUCTURAL_PATH_UNAVAILABLE, Bindings, Decisions, Manifest, Selector, VERDICT_FIELDS,
+    app_evidence_id, basis_eligibility, content_digest, countries_class, involves_validation, mention_key, mention_time_precision, selected_basis, text_sha256,
+    time_precision,
     validate_bundle, withheld_fields)
 from .ingestion_contracts import Authority, IngestionFailure, byte_hash, canonical, copy_bounded, digest, now, read_file, reserved_state_roots
 from .source_support import source_support
@@ -717,6 +718,7 @@ class Planner:
         self.involved: dict = {}          # public issue -> {canonical company -> public company}
         self.relations: list[dict] = []
         self.used_review: dict = {}       # (jobId, rc) -> approvalBasis (revision included) of every S3 relation behind an emitted edge
+        self.paths: dict = {}             # structural edge id -> (canonical company chain, canonical (supplier, customer) per basis), resolved to public ids at assembly
         self.not_public: dict = {item.pin.relation.job_id: {} for item in self.loaded}
 
     # ---- helpers ------------------------------------------------------------------------------------------------------------------------
@@ -1018,7 +1020,7 @@ class Planner:
             self.involved.setdefault(issue_id, {})[edge["canonicalCompany"]] = company_id
             self.relations.append({
                 "id": "edge-" + digest({"type": "INVOLVES", "source": issue_id, "target": company_id}), "type": "INVOLVES", "source": issue_id, "target": company_id,
-                "role": None, "assertionStatus": self.issues[issue_id]["assertionStatus"], "evidenceIds": sorted(edge["evidence"]), "basis": [],
+                "role": None, "assertionStatus": self.issues[issue_id]["assertionStatus"], "evidenceIds": sorted(edge["evidence"]), "basis": [], "structuralPath": None,
                 "provenance": {"origin": "s3-relation", "s3SemanticValidation": involves_validation([self.used_review[ref] for ref in sorted(edge["refs"])])},
                 "decisionRef": None,
                 "sourceRefs": [{"kind": "s3-relation", "jobId": j, "id": rc} for j, rc in sorted(edge["refs"])]})
@@ -1048,7 +1050,8 @@ class Planner:
             if r["connection"] != "direct" or r["subject"]["kind"] != "company" or r["object"]["kind"] != "company":
                 raise Skip("basis_indirect_unsupported")
             rows.append((loaded, r, self.canon(loaded, "company", r["subject"]["ref"]), self.canon(loaded, "company", r["object"]["ref"])))
-        if not self.connected(rows, set(involved), decision.company):
+        chain = self.chain(rows, set(involved), decision.company)
+        if chain is None:
             raise Skip("basis_path_disconnected")
         when, countries = issue["eventTime"], set(issue["geography"]["countries"])
         for _, r, _, _ in rows:
@@ -1074,16 +1077,18 @@ class Planner:
             evidence = sorted({self.cite(loaded, c) for c in (*r["citations"], *r["validity"]["citations"])})
             articles = sorted({(self.resolver.by_id[i]["articleId"], self.resolver.by_id[i]["articleVersion"]) for i in evidence})
             basis.append({"sourceRelation": {"jobId": ref.job_id, "relationCandidateId": ref.relation_candidate_id},
-                          "relationKey": r["relationKey"], "relationType": r["type"],
+                          "relationKey": r["relationKey"], "relationType": r["type"], "businessScope": r["businessScope"], "productScope": r["productScope"],
                           "validFrom": r["validity"]["from"], "validUntil": r["validity"]["until"], "countries": sorted(r["countries"]),
                           "verifiedAt": approval["decidedAt"],
                           "sourceArticles": [{"articleId": x, "articleVersion": y} for x, y in articles], "evidenceIds": evidence})
         for ref, approval in zip(decision.basis, approvals):
             self.used_review[(ref.job_id, ref.relation_candidate_id)] = approval
-        return {"id": "edge-" + digest({"type": "STRUCTURALLY_RELATED_TO", "source": issue_id, "target": company.public_id,
-                                         "basis": [r["relationKey"] for _, r, _, _ in rows]}),
+        edge_id = "edge-" + digest({"type": "STRUCTURALLY_RELATED_TO", "source": issue_id, "target": company.public_id,
+                                    "basis": [r["relationKey"] for _, r, _, _ in rows]})
+        self.paths[edge_id] = (chain, [(subject, obj) for _, _, subject, obj in rows])          # canonical, resolved to public ids once the companies are final
+        return {"id": edge_id,
                 "type": "STRUCTURALLY_RELATED_TO", "source": issue_id, "target": company.public_id, "role": None, "assertionStatus": issue["assertionStatus"],
-                "evidenceIds": sorted(self.info[issue_id]["eventEvidence"]), "basis": basis,
+                "evidenceIds": sorted(self.info[issue_id]["eventEvidence"]), "basis": basis, "structuralPath": None,
                 "provenance": {"origin": "manual-operator-review", "s3SemanticValidation": "none", "status": a.status, "reviewer": a.reviewer,
                                "decisionRef": a.decision_ref, "decisionVersion": a.decision_version, "bindingDigest": a.binding_digest,
                                "basisEligibility": basis_eligibility(approvals)},
@@ -1091,22 +1096,34 @@ class Planner:
                 "sourceRefs": [{"kind": "s3-relation", "jobId": ref.job_id, "id": ref.relation_candidate_id} for ref in decision.basis]}
 
     @staticmethod
-    def connected(rows: list, participants: set, target: str) -> bool:
-        """An undirected chain participant -> (middle ->) target over the ordered basis relations, no node repeated (path length <= 2)."""
+    def chain(rows: list, participants: set, target: str) -> list[str] | None:
+        """The ordered canonical company chain participant -> (middle ->) target over the ordered basis relations (an undirected walk, no company repeated, path length
+        <= 2), or None when the basis does not connect a participant of the issue to the target."""
         first = rows[0]
         for start, other in ((first[2], first[3]), (first[3], first[2])):
             if start not in participants or start == other:
                 continue
             if len(rows) == 1:
                 if other == target:
-                    return True
+                    return [start, other]
                 continue
             second = rows[1]
             if other in (second[2], second[3]):
                 end = second[3] if other == second[2] else second[2]
                 if end == target and len({start, other, end}) == 3:
-                    return True
-        return False
+                    return [start, other, end]
+        return None
+
+    def structural_path(self, edge: dict) -> dict:
+        """The public form of an edge's chain, resolved after the companies are final. Every company of the chain the operator maps to a public id is named;
+        a middle company the operator did not map makes the path honestly `unavailable` (a public id is never invented). The participant and the target are
+        mapped by construction. Direction is the S3 direction of each basis relation (supplier -> customer), not a causality or price claim."""
+        chain, directed = self.paths[edge["id"]]
+        if any(canonical_id not in self.companies for canonical_id in chain):
+            return {"status": "unavailable", "reason": STRUCTURAL_PATH_UNAVAILABLE}
+        public = {canonical_id: self.companies[canonical_id].public_id for canonical_id in chain}
+        return {"status": "complete", "companyIds": [public[c] for c in chain],
+                "links": [{"supplierCompanyId": public[supplier], "customerCompanyId": public[customer]} for supplier, customer in directed]}
 
     # ---- FOLLOWS (S2 comparison effective FOLLOWS + operator sequence decision) -------------------------------------------------------------
 
@@ -1145,7 +1162,7 @@ class Planner:
         edges.setdefault(source, set()).add(target)
         evidence = sorted({self.cite(loaded, c) for c in comparison["citations"]})
         return {"id": "edge-" + digest({"type": "FOLLOWS", "source": source, "target": target}), "type": "FOLLOWS", "source": source, "target": target, "role": None,
-                "assertionStatus": None, "evidenceIds": evidence, "basis": [],
+                "assertionStatus": None, "evidenceIds": evidence, "basis": [], "structuralPath": None,
                 "provenance": {"origin": "s2-comparison-with-operator-decision", "s3SemanticValidation": "none", "s2Relation": "FOLLOWS",
                                "evidenceGate": "exact-source-citation-in-incoming-article", "groupDigest": s.group_digest,
                                "decisionRef": decision.decision_ref, "decisionVersion": decision.decision_version},
@@ -1183,6 +1200,14 @@ class Planner:
         companies = sorted(({"id": c.public_id, "canonicalId": c.canonical_id, "label": c.label, "decisionRef": c.decision_ref} for c in self.companies.values()
                             if any(r["target"] == c.public_id for r in relations if r["type"] != "FOLLOWS")), key=lambda c: c["id"])
         self.resolve_participants({c["id"] for c in companies})
+        for r in relations:
+            if r["type"] == "STRUCTURALLY_RELATED_TO":
+                r["structuralPath"] = self.structural_path(r)
+        # Private support references: the mapped middle companies of the complete paths that the bundle does not publish as a company (never a graph node).
+        middles = {path["companyIds"][1] for path in (r["structuralPath"] for r in relations if r["structuralPath"]) if path["status"] == "complete" and len(path["companyIds"]) == 3}
+        published = {c["id"] for c in companies}
+        path_companies = sorted(({"id": c.public_id, "canonicalId": c.canonical_id, "label": c.label, "decisionRef": c.decision_ref} for c in self.companies.values()
+                                 if c.public_id in middles and c.public_id not in published), key=lambda c: c["id"])
         issues = [self.issues[i] for i in sorted(self.issues)]
         tally: dict[str, int] = {}
         for item in self.exclusions:
@@ -1206,9 +1231,10 @@ class Planner:
                   "provenance": {"declaredSourceKind": self.manifest.source_kind, "observedSourceKind": next(iter(observed)) if len(observed) == 1 else "mixed",
                                  "executionMode": execution_mode, "recordingKind": recording_kind},
                   "policy": {"version": POLICY, "files": self.manifest.files.wire(), "evidenceIdKind": EVIDENCE_KIND, "offsetUnit": OFFSET_UNIT, **POLICIES},
-                  "sources": sources, "companies": companies, "issues": issues, "relations": relations, "evidence": evidence, "articles": articles,
+                  "sources": sources, "companies": companies, "pathCompanies": path_companies, "issues": issues, "relations": relations, "evidence": evidence,
+                  "articles": articles,
                   "exclusions": {"counts": dict(sorted(tally.items())), "items": items},
-                  "counts": {"companies": len(companies), "issues": len(issues), "relations": {t: sum(r["type"] == t for r in relations) for t in
+                  "counts": {"companies": len(companies), "pathCompanies": len(path_companies), "issues": len(issues), "relations": {t: sum(r["type"] == t for r in relations) for t in
                                                                                          ("INVOLVES", "STRUCTURALLY_RELATED_TO", "FOLLOWS")},
                              "evidence": len(evidence), "articles": len(articles), "exclusions": len(items)},
                   "checks": {"producerConfirmed": list(PRODUCER_CHECKS), "appImportPending": list(APP_IMPORT_PENDING)},

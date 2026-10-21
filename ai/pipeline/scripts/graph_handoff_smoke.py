@@ -7,7 +7,7 @@
 
 Two S2 jobs (two events, one frozen snapshot event with two documents) and two S3 jobs are authored replay: no model, no provider, no original PoC state,
 no network (every CLI subprocess runs under a socket audit hook). Expectations are written by hand from the authored world, never derived from the
-planner under test. `--write-fixture DIR` additionally writes the valid export envelope (bundle `-4`, no operator verdict), the real exports of a hand-reviewed SYNTHETIC world
+planner under test. `--write-fixture DIR` additionally writes the valid export envelope (bundle `-5`, no operator verdict), the real exports of a hand-reviewed SYNTHETIC world
 (`export-field-verdicts.json`, handoff `handoff-verdicts-1`, also importable through `verdict_export`) and of a time-withheld one (`export-field-verdicts-time.json`), the
 hand-written expected original mentions (`expected-mentions.json`), field provenance (`expected-field-provenance.json`), verdicts (`expected-field-verdicts.json`) and public
 headline values (`expected-headline-values.json`), the real withheld envelope of a handoff frozen under an earlier bundle schema and negative fixtures the backend import can be tested with.
@@ -40,7 +40,7 @@ from scripts.ingestion_smoke import json_bytes, ownership_env  # noqa: E402
 from scripts.extraction_smoke import page  # noqa: E402
 from scripts.relation_smoke import RelKit, SUP, INV, co, converge, ev, find, proposal, tree, world_cite  # noqa: E402
 from zoop_ai_pipeline.graph_projection import review_state  # noqa: E402
-from zoop_ai_pipeline.handoff_contracts import POLICY, app_evidence_id  # noqa: E402
+from zoop_ai_pipeline.handoff_contracts import POLICY, app_evidence_id, content_digest  # noqa: E402
 from zoop_ai_pipeline.ingestion_contracts import canonical, digest  # noqa: E402
 
 CUSTOM = {"PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1"}
@@ -85,6 +85,7 @@ VALID2 = validity_sentence("2026-01-01", "2026-12-31")
 EVT_IN = "합성기업은 2026년 10월 신규 투자 계획을 밝혔다."
 EVT_Y = "합성기업은 2026년 9월 해외 공급 계약을 체결했다."
 GEO_Y = "계약은 국내 시장 중심이다."
+CHAIN = "합성투자는 합성부품에 소재를 공급한다."     # `chain=True` worlds: the second SUPPLIES link (SYNTH-4 supplies SYNTH-3) that makes a two-relation structural path
 # A real reviewer name and review note live ONLY in the S3 relation ledger (see the unit tests' review helper). They are unique synthetic markers so that the
 # privacy check cannot collide with legitimate public vocabulary such as the `operator-asserted` status or the operator-asserted reviewer id below.
 PRIVATE_REVIEWER = "private-reviewer-zq7x"
@@ -100,7 +101,7 @@ ORIGINS = {"a": ORIGIN_SHARED, "a2": ORIGIN_SHARED}                             
 
 def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a2_countries: tuple = ("KR",), dated: bool = False,
                 valid_from: str | None = "2026-01-01", valid_until: str | None = "2026-12-31", event_time: str | None = "2026-09-30",
-                a2_event_time=SAME, snapshot_differs: bool = False, approve: bool = False) -> SimpleNamespace:
+                a2_event_time=SAME, snapshot_differs: bool = False, approve: bool = False, chain: bool = False) -> SimpleNamespace:
     """The authored world. Variants (each is a REAL ingestion + S2 + S3 world, used by the integrity regressions):
     collide: the two documents of snapshot event-a use the SAME local mention id (S2 scopes member identity by documentVersion + mentionId, so this is legal);
     a2_differs: the second member's title differs (a metadata conflict unless the operator picks a representative); a2_countries: its country field;
@@ -110,10 +111,12 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
     snapshot_differs: the snapshot upstream b froze says another `action` for document a's mention (`m-a`) than upstream a's own extraction of it, i.e. ONE mention
     identity carried by two upstreams with different values;
     approve: the authored independent verifier HOLDs two relations the issues depend on (rel-a's SUPPLIES basis and rel-b's PARTICIPATES_IN of event-a) and the operator FINALLY
-    approves exactly those two through the real S3 review path (effect `approved`, no call): the other relations stay automatic."""
+    approves exactly those two through the real S3 review path (effect `approved`, no call): the other relations stay automatic;
+    chain: document a also states that SYNTH-4 supplies SYNTH-3 and rel-a holds that eligible SUPPLIES relation (with its own business/product scope), so SYNTH-4 -> SYNTH-3 -> SYNTH-1 is
+    a two-relation structural basis over the supply issue's participant SYNTH-1."""
     kit = RelKit(root)
     valid_text = validity_sentence(valid_from, valid_until) if dated else None
-    d1, d2, d3 = kit.ingest("docs", [{"supplier": "supplier-a", "html": page(SUP, INV, EVT_A, GEO_A), "publisher": PUBLISHERS["a"]},
+    d1, d2, d3 = kit.ingest("docs", [{"supplier": "supplier-a", "html": page(SUP, INV, EVT_A, GEO_A, *((CHAIN,) if chain else ())), "publisher": PUBLISHERS["a"]},
                                      {"supplier": "supplier-a2", "html": page(EVT_A2)},
                                      {"supplier": "supplier-b", "html": page(QB, GEO_B, QB3, *((valid_text,) if valid_text else ())), "published": None}])
     refs = {"a": d1, "a2": d2, "b": d3}
@@ -149,7 +152,8 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
             proposal("PARTICIPATES_IN", co("SYNTH-1"), ev(evc["a"]), [cite(wa, "a", EVT_A)]),
             proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [cite(wa, "a", SUP)], product="배터리 부품"),
             proposal("INVESTS_IN", co("SYNTH-4"), co("SYNTH-3"), [cite(wa, "a", INV)]),
-            proposal("SHARES_ISSUE", co("SYNTH-1"), co("SYNTH-2"), [cite(wa, "a", SUP)])], verify=verify.get("rel-a")),
+            proposal("SHARES_ISSUE", co("SYNTH-1"), co("SYNTH-2"), [cite(wa, "a", SUP)]),
+            *([proposal("SUPPLIES", co("SYNTH-4"), co("SYNTH-3"), [cite(wa, "a", CHAIN)], business="소재 사업", product="소재")] if chain else [])], verify=verify.get("rel-a")),
         "rel-b": converge(wb, "rel-b", [
             proposal("PARTICIPATES_IN", co("SYNTH-1"), ev("event-a"), [cite(wb, "a2", EVT_A2)]),
             proposal("PARTICIPATES_IN", co("SYNTH-1"), ev(evc["b"]), [cite(wb, "b", QB)]),
@@ -167,7 +171,7 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
                                       "decision": "allow", "reviewer": APPROVER, "note": PRIVATE_NOTE})
         jobs[job] = {**jobs[job], **reviewed}          # the S3 result after the operator's final decision (same job, input digest and binding)
         assert next(r for r in jobs[job]["relations"] if match(r))["eligibility"]["approvalBasis"]["kind"] == "operator-final-approval"
-    world.jobs, world.dated, world.valid_text, world.event_time, world.approve = jobs, dated, valid_text, event_time, approve
+    world.jobs, world.dated, world.valid_text, world.event_time, world.approve, world.chain = jobs, dated, valid_text, event_time, approve, chain
     return world
 
 
@@ -262,6 +266,55 @@ def decisions_doc(world, *, verdicts: dict | None = None, published_time=UNSET, 
                          "source": {"upstream": upstream(world, "b"), "eventCandidateId": world.evc["b"], "targetEventId": "event-a",
                                     "groupDigest": comparison["groupDigest"]}}],
             "origins": origins_doc(world, ORIGINS if origins is UNSET else origins)}
+
+
+# ---------------------------------------------------------------- structural paths (the `chain` world) --------------------------
+
+CATALOG = {"co:synth-1": ("KRX:005930", "합성기업", "catalog-2026-10-16:1"), "co:synth-3": ("KRX:000660", "합성부품", "catalog-2026-10-16:3"),
+           "co:synth-4": ("KRX:000999", "합성투자", "catalog-2026-10-16:4")}
+ONE_HOP = ("co:synth-3", [("SYNTH-3", "SYNTH-1")])                                  # participant SYNTH-1 <- SYNTH-3
+TWO_HOP = ("co:synth-4", [("SYNTH-3", "SYNTH-1"), ("SYNTH-4", "SYNTH-3")])         # participant SYNTH-1 <- SYNTH-3 <- SYNTH-4 (middle SYNTH-3)
+
+
+def chain_binding(world, company: str, links: list, *, decision_version: str = "v1") -> str:
+    """Hand-written attestation preimage of a structural decision over the rel-a SUPPLIES relations `links` (supplier ref, customer ref), in basis order."""
+    basis = []
+    for supplier, customer in links:
+        r = find(world.jobs["rel-a"], "SUPPLIES", supplier, customer)
+        basis.append({"jobId": "rel-a", "relationCandidateId": r["relationCandidateId"], "relationKey": r["relationKey"], "type": "SUPPLIES", "revision": r["eligibility"]["revision"]})
+    return digest({"policy": POLICY, "issue": "issue:supply", "company": company, "decisionVersion": decision_version, "eventTime": world.event_time, "geography": "domestic",
+                   "sourceEvents": source_events(world), "basis": basis})
+
+
+def chain_decision(world, company: str, links: list) -> dict:
+    refs = [{"jobId": "rel-a", "relationCandidateId": find(world.jobs["rel-a"], "SUPPLIES", s, c)["relationCandidateId"]} for s, c in links]
+    return {"issue": "issue:supply", "company": company, "basis": refs,
+            "applicability": {"status": "operator-asserted", "reviewer": REVIEWER, "decisionRef": f"applic-2026-10-21:{company}", "decisionVersion": "v1",
+                              "bindingDigest": chain_binding(world, company, links)}}
+
+
+def chain_decisions(world, middle: str) -> dict:
+    """The operator's decisions over the `chain` world for the supply issue. `known`: the middle company SYNTH-3 is itself the target of the one-relation edge, so the bundle
+    publishes it; `private`: only the two-relation edge, SYNTH-3 is mapped but not published; `unmapped`: the operator did not map SYNTH-3 at all."""
+    doc = decisions_doc(world)
+    mapped = ["co:synth-1", "co:synth-4"] + ([] if middle == "unmapped" else ["co:synth-3"])
+    doc["companies"] = [{"canonicalId": c, "publicId": CATALOG[c][0], "label": CATALOG[c][1], "decisionRef": CATALOG[c][2]} for c in sorted(mapped)]
+    doc["structural"] = ([chain_decision(world, *ONE_HOP)] if middle == "known" else []) + [chain_decision(world, *TWO_HOP)]
+    return doc
+
+
+def expected_chain(middle: str, public_ids: dict | None = None) -> dict:
+    """Hand-written public result of `chain_decisions`: the published companies, the private path companies and each structural edge's `structuralPath` by target."""
+    pub = lambda company: (public_ids or {}).get(company, company)  # noqa: E731
+    participant, supplier, tail = pub("KRX:005930"), pub("KRX:000660"), pub("KRX:000999")
+    paths = {tail: ({"status": "unavailable", "reason": "intermediate_company_unmapped"} if middle == "unmapped" else
+                    {"status": "complete", "companyIds": [participant, supplier, tail],
+                     "links": [{"supplierCompanyId": supplier, "customerCompanyId": participant}, {"supplierCompanyId": tail, "customerCompanyId": supplier}]})}
+    if middle == "known":
+        paths[supplier] = {"status": "complete", "companyIds": [participant, supplier], "links": [{"supplierCompanyId": supplier, "customerCompanyId": participant}]}
+    companies = sorted([participant, tail, *([supplier] if middle == "known" else [])])
+    private = [{"id": supplier, "canonicalId": "co:synth-3", "label": "합성부품", "decisionRef": "catalog-2026-10-16:3"}] if middle == "private" else []
+    return {"companies": companies, "pathCompanies": private, "paths": paths}
 
 
 def bindings_doc(world) -> dict:
@@ -395,7 +448,7 @@ def expected(world, public_ids: dict | None = None) -> dict:
                       ("FOLLOWS", "issue:factory-2026q4", "issue:supply-2026q3"): sorted([e["QB"], e["EVT_A"]])},
         "basisEvidence": [e["SUP"]],
         "exclusions": {"geography_unproven": 1, "company_unmapped": 1, "issue_not_public": 1},
-        "counts": {"companies": 2, "issues": 2, "relations": {"INVOLVES": 2, "STRUCTURALLY_RELATED_TO": 1, "FOLLOWS": 1}, "evidence": 6, "articles": 3, "exclusions": 3}}
+        "counts": {"companies": 2, "pathCompanies": 0, "issues": 2, "relations": {"INVOLVES": 2, "STRUCTURALLY_RELATED_TO": 1, "FOLLOWS": 1}, "evidence": 6, "articles": 3, "exclusions": 3}}
 
 
 def relation_id(world, job: str, relation_type: str, subject: str, obj: str) -> str:
@@ -578,6 +631,11 @@ def check_export(world, out: dict, public_ids: dict | None = None) -> None:
     assert {(r["type"], r["source"], r["target"]): r["evidenceIds"] for r in bundle["relations"]} == want["relations"]
     structural = next(r for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO")
     assert [b["evidenceIds"] for b in structural["basis"]] == [want["basisEvidence"]] and structural["basis"][0]["relationType"] == "SUPPLIES"
+    pub = lambda company: (public_ids or {}).get(company, company)  # noqa: E731
+    assert structural["structuralPath"] == {"status": "complete", "companyIds": [pub("KRX:005930"), pub("KRX:000660")],
+                                            "links": [{"supplierCompanyId": pub("KRX:000660"), "customerCompanyId": pub("KRX:005930")}]}, structural["structuralPath"]
+    assert (structural["basis"][0]["businessScope"], structural["basis"][0]["productScope"]) == (None, "배터리 부품") and bundle["pathCompanies"] == []
+    assert all(r["structuralPath"] is None for r in bundle["relations"] if r["type"] != "STRUCTURALLY_RELATED_TO")
     assert structural["provenance"]["origin"] == "manual-operator-review" and structural["provenance"]["s3SemanticValidation"] == "none"
     assert bundle["exclusions"]["counts"] == want["exclusions"] and bundle["counts"] == want["counts"], (bundle["exclusions"], bundle["counts"])
     assert bundle["provenance"] == {"declaredSourceKind": "synthetic", "observedSourceKind": "synthetic", "executionMode": "replay", "recordingKind": "authored-test"}
@@ -753,23 +811,136 @@ def participants_across_upstreams(world) -> str:
     return "participants: a company id mapped by every carrying upstream to one published company is public; unmapped, unknown, unpublished or upstream-disagreeing ids are null and the participant is kept"
 
 
+# ---------------------------------------------------------------- structural paths: CLI check, closed-validator mutations ------------
+
+def check_chain_export(world, bundle: dict, middle: str) -> None:
+    """The chain world's export equals the hand-written expectation: published companies, private path companies, every edge's ordered path with directed links,
+    the S3 scopes copied exactly, the unchanged edge id formula and the participants the bundle does not publish."""
+    want = expected_chain(middle)
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5"
+    assert [c["id"] for c in bundle["companies"]] == want["companies"] and bundle["pathCompanies"] == want["pathCompanies"], (middle, bundle["pathCompanies"])
+    assert not {c["id"] for c in bundle["pathCompanies"]} & ({c["id"] for c in bundle["companies"]} | {i["id"] for i in bundle["issues"]})
+    assert bundle["counts"]["companies"] == len(want["companies"]) and bundle["counts"]["pathCompanies"] == len(want["pathCompanies"]), bundle["counts"]
+    assert bundle["counts"]["relations"]["STRUCTURALLY_RELATED_TO"] == len(want["paths"]) and bundle["digests"]["content"] == content_digest(bundle)
+    structural = {r["target"]: r for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO"}
+    assert {target: r["structuralPath"] for target, r in structural.items()} == want["paths"], (middle, {t: r["structuralPath"] for t, r in structural.items()})
+    assert all(r["structuralPath"] is None for r in bundle["relations"] if r["type"] != "STRUCTURALLY_RELATED_TO")
+    links = {"KRX:000660": ONE_HOP[1], "KRX:000999": TWO_HOP[1]}
+    scopes = {("SYNTH-3", "SYNTH-1"): (None, "배터리 부품"), ("SYNTH-4", "SYNTH-3"): ("소재 사업", "소재")}
+    for target, r in structural.items():
+        keys = [find(world.jobs["rel-a"], "SUPPLIES", s, c)["relationKey"] for s, c in links[target]]
+        assert r["id"] == "edge-" + digest({"type": "STRUCTURALLY_RELATED_TO", "source": "issue:supply-2026q3", "target": target, "basis": keys}), "the edge id formula changed"
+        assert [b["relationKey"] for b in r["basis"]] == keys and [(b["businessScope"], b["productScope"]) for b in r["basis"]] == [scopes[link] for link in links[target]]
+    assert evidence_id(world, "a", CHAIN) in structural["KRX:000999"]["basis"][1]["evidenceIds"]
+    supply = next(i for i in bundle["issues"] if i["id"] == "issue:supply-2026q3")
+    supplier = {p["companyId"] for m in supply["mentions"] for p in m["participants"] if p["sourceCompanyId"] == "SYNTH-3"}
+    assert supplier == {"KRX:000660" if middle == "known" else None}, "a private path company must never resolve a mention participant"
+
+
+def path_mutations() -> dict:
+    """name -> (the export it breaks, the one change, the validator location that must refuse it). The caller recomputes the content digest, so ONLY the structural-path
+    or private-company rule can refuse the bundle. `private` has a two-relation edge over the unpublished SYNTH-3, `known` an extra one-relation edge, `unmapped` an unavailable path."""
+    def edge(b, target):
+        return next(r for r in b["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO" and r["target"] == target)
+
+    two = lambda b: edge(b, "KRX:000999")                                       # noqa: E731
+    path = lambda b: two(b)["structuralPath"]                                  # noqa: E731
+    involves = lambda b: next(r for r in b["relations"] if r["type"] == "INVOLVES")   # noqa: E731
+
+    def add_private(b, **change):
+        b["pathCompanies"].append({"id": "KRX:000777", "canonicalId": "co:synth-7", "label": "합성미사용", "decisionRef": "catalog-2026-10-16:7", **change})
+        b["counts"]["pathCompanies"] += 1
+
+    def drop_private(b):
+        b["pathCompanies"].clear()
+        b["counts"]["pathCompanies"] = 0
+
+    def also_public(b):
+        b["companies"].append(dict(b["pathCompanies"][0]))
+        b["counts"]["companies"] += 1
+
+    def issue_named(b):
+        b["pathCompanies"][0]["id"] = "issue:supply-2026q3"
+
+    def reverse(b):
+        path(b)["companyIds"].reverse()
+        path(b)["links"].reverse()
+
+    def set_link(b, n, **change):
+        path(b)["links"][n].update(change)
+
+    def set_chain(b, n, value):
+        path(b)["companyIds"][n] = value
+
+    def unavailable(b, **change):
+        edge(b, "KRX:000660")["structuralPath"] = {"status": "unavailable", "reason": "intermediate_company_unmapped", **change}
+
+    return {
+        "an unused private company": ("private", add_private, "pathCompanies.closure"),
+        "a complete two-relation path whose middle is in no catalogue": ("private", drop_private, "structuralPath.catalogue"),
+        "a private company that is also public": ("private", also_public, "pathCompanies.unique"),
+        "a private company with an issue id": ("private", issue_named, "issues.unique"),
+        "a private company count that is wrong": ("private", lambda b: b["counts"].update(pathCompanies=0), "counts"),
+        "an unavailable one-relation path": ("known", lambda b: unavailable(b), "structuralPath.unavailable"),
+        "an unavailable path with another reason": ("unmapped", lambda b: path(b).update(reason="unknown"), "structuralPath.unavailable"),
+        "an unavailable path that also lists companies": ("unmapped", lambda b: path(b).update(companyIds=["KRX:005930"]), "structuralPath"),
+        "a complete path on an INVOLVES edge": ("private", lambda b: involves(b).update(structuralPath=json.loads(json.dumps(path(b)))), "relation.structuralPath"),
+        "a structural edge without a path": ("private", lambda b: two(b).update(structuralPath=None), "structuralPath"),
+        "a path with an unknown key": ("private", lambda b: path(b).update(causality="positive"), "structuralPath"),
+        "a chain repeating a company": ("private", lambda b: set_chain(b, 1, path(b)["companyIds"][0]), "structuralPath.companyIds"),
+        "a chain that does not start at an issue participant": ("private", reverse, "structuralPath.ends"),
+        "a chain through a company of no catalogue": ("private", lambda b: set_chain(b, 1, "KRX:000555"), "structuralPath.catalogue"),
+        "a link joining non-adjacent companies": ("private", lambda b: set_link(b, 1, supplierCompanyId="KRX:005930", customerCompanyId="KRX:000999"), "structuralPath.link"),
+        "a link from a company to itself": ("private", lambda b: set_link(b, 0, customerCompanyId=path(b)["links"][0]["supplierCompanyId"]), "structuralPath.link"),
+        "a missing link": ("private", lambda b: path(b).update(links=path(b)["links"][:1]), "structuralPath.links"),
+        "links in the wrong order": ("private", lambda b: path(b)["links"].reverse(), "structuralPath.link"),
+        "an oversized product scope": ("private", lambda b: two(b)["basis"][1].update(productScope="가" * 501), "basis.productScope.length"),
+        "an oversized business scope": ("private", lambda b: two(b)["basis"][1].update(businessScope="가" * 501), "basis.businessScope.length"),
+        "a scope that is not text": ("private", lambda b: two(b)["basis"][1].update(productScope=5), "basis.productScope"),
+        "a basis without its scope keys": ("private", lambda b: two(b)["basis"][0].pop("businessScope"), "basis"),
+    }
+
+
+def structural_paths(root: Path) -> tuple[str, SimpleNamespace, dict]:
+    """Structural paths through the installed CLI over a world whose rel-a also holds SYNTH-4 -> SYNTH-3 -> SYNTH-1: a PUBLISHED middle (`known`), a mapped but unpublished one
+    (`private`: a private support company, never a public company) and one the operator did not map (`unmapped`: unavailable, never invented)."""
+    world = build_world(root.parent / "chain", chain=True)
+    operator = Operator(world)
+    exports = {}
+    for middle in ("known", "private", "unmapped"):
+        exports[middle] = freeze_export(operator, world, f"path-{middle}-1", chain_decisions(world, middle))
+        check_chain_export(world, exports[middle]["bundle"], middle)
+    return ("structural paths: a one- and a two-relation edge name participant -> (middle ->) target with one directed link per basis and the S3 scopes; a mapped but unpublished middle "
+            "is a private pathCompany (never a company, issue or mention participant), an unmapped middle makes the path unavailable (intermediate_company_unmapped), the edge id is unchanged"), world, exports
+
+
 # ---------------------------------------------------------------- handoffs frozen under an earlier bundle schema ----------------------
 
 BUNDLE_1 = "zoop-graph-handoff-bundle-1"           # before original mentions: no issue `mentions`, no `fieldProvenance`
 BUNDLE_2 = "zoop-graph-handoff-bundle-2"           # before field provenance: `mentions`, no issue `fieldProvenance`
 BUNDLE_3 = "zoop-graph-handoff-bundle-3"           # before field verdicts: `fieldProvenance` without `withheld`, no issue `fieldVerdicts`
+BUNDLE_4 = "zoop-graph-handoff-bundle-4"           # before structural paths: no `pathCompanies`, `structuralPath` or basis scopes
 LEGACY_AT = "2026-10-15T00:00:00+00:00"
 LEGACY_CODE = "handoff_contract_changed"
 
 
 def legacy_bundle(bundle: dict, manifest: dict, schema: str) -> dict:
-    """The bundle an earlier build froze for this manifest: today's export under that build's schema string, without what that build did not yet write. `-3` has no
-    issue `fieldVerdicts` and no `fieldProvenance.withheld`; `-2` has no `fieldProvenance` either; `-1` has none of them nor the issues' `mentions`. The content digest is
-    recomputed over the earlier issues (its formula never changed)."""
-    assert schema in (BUNDLE_1, BUNDLE_2, BUNDLE_3), schema
+    """The bundle an earlier build froze for this manifest: today's export under that build's schema string, without what that build did not yet write. `-4` has no top-level
+    `pathCompanies`, no relation `structuralPath`, no basis `businessScope`/`productScope` and no `counts.pathCompanies`; `-3` also has no issue `fieldVerdicts` and no
+    `fieldProvenance.withheld`; `-2` has no `fieldProvenance` either; `-1` has none of them nor the issues' `mentions`. The content digest is recomputed over the earlier
+    collections (its formula never included `pathCompanies`)."""
+    assert schema in (BUNDLE_1, BUNDLE_2, BUNDLE_3, BUNDLE_4), schema
     old = json.loads(json.dumps(bundle))
+    assert not old["pathCompanies"], "an earlier schema cannot carry a private path company"
+    del old["pathCompanies"], old["counts"]["pathCompanies"]
+    for relation in old["relations"]:
+        del relation["structuralPath"]
+        for basis in relation["basis"]:
+            del basis["businessScope"], basis["productScope"]
     for issue in old["issues"]:
         assert not issue["fieldVerdicts"] and not issue["fieldProvenance"]["withheld"], "an earlier schema cannot carry a verdict or a withheld field"
+        if schema == BUNDLE_4:
+            continue
         del issue["fieldVerdicts"]
         if schema == BUNDLE_3:
             del issue["fieldProvenance"]["withheld"]
@@ -794,7 +965,7 @@ KILLED_WRITER = ("import json, os, sqlite3, sys\n"
 
 def plant_legacy_handoff(state: Path, manifest: dict, bundle: dict, *, row_state: str = "ready", artifact: str = "written", schema: str = BUNDLE_2,
                          damaged: bool = False, wal: bool = False) -> dict:
-    """Adds ONE row of an earlier build (`schema`: `BUNDLE_1` or `BUNDLE_2`, see `legacy_bundle`) to an existing handoff ledger with the ledger's own INSERT statements
+    """Adds ONE row of an earlier build (`schema`: `BUNDLE_1` to `BUNDLE_4`, see `legacy_bundle`) to an existing handoff ledger with the ledger's own INSERT statements
     (schema, triggers and every other row stay as they are). `artifact`: `written` (the earlier bundle's exact bytes), `missing` or `garbage` (a file that is no bundle at
     all: the row must never be judged by it); `damaged` leaves the receipt without a bundle schema (damaged state, not history). `wal`: the rows are committed by a
     writer process that dies without closing the ledger, so they exist ONLY in a non-empty `handoff.sqlite3-wal` (a stale `-shm` stays beside it), exactly what a killed
@@ -848,9 +1019,9 @@ def ledger_snapshot(state: Path) -> dict:
 
 
 def legacy_history(world, exported: dict) -> tuple[str, dict]:
-    """Rows frozen by an earlier build (bundle `-3`, before field verdicts, `-2`, before field provenance, and `-1`, before original mentions) are immutable HISTORY through
+    """Rows frozen by an earlier build (bundle `-4`, before structural paths, `-3`, before field verdicts, `-2`, before field provenance, and `-1`, before original mentions) are immutable HISTORY through
     the installed CLI. The ledger is a real current one into which three `-2` rows are planted (ready with its bundle, reserved without its file, failed with a garbage file),
-    one `-1` ready row and a `-3` ready and reserved row, and which a writer would visibly re-permission: every command below answers from the ledger alone (the source ledgers, grant registry and operator files
+    one `-1` ready row, a `-3` ready and reserved row and a `-4` ready, reserved and failed row, and which a writer would visibly re-permission: every command below answers from the ledger alone (the source ledgers, grant registry and operator files
     do not even exist for it) and leaves every byte, mode, mtime and file as it was, while a NEW handoff id in the same ledger still freezes and exports and the history
     stays as it was. Returns the check text and the real withheld envelope of the ready `-2` row."""
     operator = Operator(world)
@@ -860,8 +1031,10 @@ def legacy_history(world, exported: dict) -> tuple[str, dict]:
     planted = {name: plant_legacy_handoff(state, manifest_doc(world, name, files), exported["bundle"], row_state=row_state, artifact=artifact, schema=schema)
                for name, schema, row_state, artifact in (("legacy-ready", BUNDLE_2, "ready", "written"), ("legacy-reserved", BUNDLE_2, "reserved", "missing"),
                                                          ("legacy-failed", BUNDLE_2, "failed", "garbage"), ("legacy-ready-1", BUNDLE_1, "ready", "written"),
-                                                         ("legacy-ready-3", BUNDLE_3, "ready", "written"), ("legacy-reserved-3", BUNDLE_3, "reserved", "missing"))}
-    assert {row["receipt"]["bundleSchema"] for row in planted.values()} == {BUNDLE_1, BUNDLE_2, BUNDLE_3}
+                                                         ("legacy-ready-3", BUNDLE_3, "ready", "written"), ("legacy-reserved-3", BUNDLE_3, "reserved", "missing"),
+                                                         ("legacy-ready-4", BUNDLE_4, "ready", "written"), ("legacy-reserved-4", BUNDLE_4, "reserved", "missing"),
+                                                         ("legacy-failed-4", BUNDLE_4, "failed", "garbage"))}
+    assert {row["receipt"]["bundleSchema"] for row in planted.values()} == {BUNDLE_1, BUNDLE_2, BUNDLE_3, BUNDLE_4}
     os.chmod(state, 0o755)
     for path in (state / "bundles", *(state / "bundles").iterdir(), state / "handoff.sqlite3", state / "handoff.lock"):
         os.chmod(path, 0o755 if path.is_dir() else 0o644)
@@ -992,7 +1165,7 @@ def verdict_export(root: Path, public_ids: dict | None = None) -> tuple[SimpleNa
     out = freeze_export(Operator(world), world, VERDICT_HANDOFF, decisions)
     bundle = out["bundle"]
     ids = {name: evidence_id(world, name, quote) for name, quote in (("a", PERIOD_A), ("a2", PERIOD_A2), ("b", PERIOD_B))}
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-4" and bundle["handoffId"] == VERDICT_HANDOFF
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5" and bundle["handoffId"] == VERDICT_HANDOFF
     assert {i["id"]: i["fieldVerdicts"] for i in bundle["issues"]} == expected_verdicts(world, cases)
     assert {i["id"]: i["fieldProvenance"] for i in bundle["issues"]} == expected_field_provenance(world, VERDICT_WITHHELD)
     assert {i["id"]: i["mentions"] for i in bundle["issues"]} == expected_mentions(world, public_ids), "an original mention value was changed by a verdict"
@@ -1025,7 +1198,7 @@ def approved_export(root: Path, public_ids: dict | None = None) -> tuple[SimpleN
         company["publicId"] = (public_ids or {}).get(company["publicId"], company["publicId"])
     out = freeze_export(Operator(world), world, APPROVED_HANDOFF, decisions)
     bundle = out["bundle"]
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-4" and bundle["handoffId"] == APPROVED_HANDOFF
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5" and bundle["handoffId"] == APPROVED_HANDOFF
     check_export(world, out, public_ids)
     kinds = sorted(u["approvalBasis"]["kind"] for s in bundle["sources"] for u in s["reviewUsed"])
     assert kinds == ["automatic-verifier", "automatic-verifier", "operator-final-approval", "operator-final-approval"], kinds
@@ -1208,19 +1381,23 @@ def smoke(root: Path, fixture: Path | None) -> dict:
     checks.append(participants_across_upstreams(collision_world))
     verdict_checks, verdict_fixtures = field_verdicts(root.parent)
     checks.extend(verdict_checks)
+    path_check, _, path_exports = structural_paths(root)
+    checks.append(path_check)
     legacy_check, legacy_withheld = legacy_history(world, exported)
     checks.append(legacy_check)
 
     if fixture is not None:
-        write_fixture(fixture, world, exported, withheld, legacy_withheld, collision_world, collision, verdict_fixtures)
+        write_fixture(fixture, world, exported, withheld, legacy_withheld, collision_world, collision, verdict_fixtures, path_exports)
         checks.append(f"fixtures written to {fixture}")
     return {"status": "passed", "providerCalls": 0, "modelCalls": 0, "checks": checks}
 
 
-def write_fixture(directory: Path, world, valid: dict, withheld: dict, legacy_withheld: dict, collision_world, collision: dict, verdict_fixtures: SimpleNamespace) -> None:
-    """The valid export envelope (no operator verdict: `fieldVerdicts` empty), the real export of the legal local-mentionId collision world, the real export of the hand-reviewed
+def write_fixture(directory: Path, world, valid: dict, withheld: dict, legacy_withheld: dict, collision_world, collision: dict, verdict_fixtures: SimpleNamespace,
+                  path_exports: dict) -> None:
+    """The valid export envelope (bundle `-5`, no operator verdict: `fieldVerdicts` empty), the real export of the legal local-mentionId collision world, the real export of the hand-reviewed
     verdict world (`export-field-verdicts.json`) and of the time-withheld world (`export-field-verdicts-time.json`), the hand-written expected original mentions, field provenance and
-    verdicts of them, negative bundles (each MUST be refused by an importer; the verdict ones keep a recomputed content digest so only the verdict rule can refuse them)
+    verdicts of them, negative bundles (each MUST be refused by an importer; the verdict and structural-path ones keep a recomputed content digest so only their own rule can refuse them),
+    the real exports of the structural-path world (`export-path-known|private|unmapped.json`, `expected-structural-paths.json`, one rule broken per `bundle-path-NN.json`)
     and the two withheld envelopes (no bundle at all): drift (`export-withheld`) and a handoff frozen under an earlier bundle schema (`export-withheld-legacy`, a `-2` row)."""
     directory.mkdir()                                                    # the caller proved it does not exist: a fixture directory is never reused or overwritten
     write = lambda name, value: (directory / name).write_bytes(json_bytes(value) + b"\n")  # noqa: E731
@@ -1274,7 +1451,7 @@ def write_fixture(directory: Path, world, valid: dict, withheld: dict, legacy_wi
         """A copy of the verdict export with one rule broken and the content digest recomputed, so that ONLY the verdict rule can refuse it."""
         copy = json.loads(json.dumps(verdict_envelope["bundle"]))
         change(copy)
-        copy["digests"]["content"] = digest({key: copy[key] for key in ("companies", "issues", "relations", "evidence", "articles")})
+        copy["digests"]["content"] = content_digest(copy)
         write(name, {**verdict_envelope, "bundle": copy})
 
     supply = lambda b: next(i for i in b["issues"] if i["id"] == "issue:supply-2026q3")      # noqa: E731
@@ -1319,6 +1496,17 @@ def write_fixture(directory: Path, world, valid: dict, withheld: dict, legacy_wi
     forge_manifest("manifest-wrong-file-pin.json", lambda m: m["files"].update({"bindings": "f" * 64}))
     forge_manifest("manifest-unknown-field.json", lambda m: m.update({"operatorPath": "/private/x"}))
     write("export-missing-manifest.json", {key: value for key, value in valid.items() if key != "manifest"})
+
+    # Structural paths: the real exports of the chain world (a published middle, a private middle, an unmapped middle) and one rule broken per negative bundle (content digest recomputed).
+    for middle, out in path_exports.items():
+        write(f"export-path-{middle}.json", out)
+    for number, (name, (middle, change, at)) in enumerate(path_mutations().items(), 1):
+        copy = json.loads(json.dumps(path_exports[middle]["bundle"]))
+        change(copy)
+        copy["digests"]["content"] = content_digest(copy)
+        write(f"bundle-path-{number:02d}.json", {**path_exports[middle], "bundle": copy})
+    write("expected-structural-paths.json", {f"export-path-{middle}.json": expected_chain(middle) for middle in path_exports} |
+          {f"bundle-path-{number:02d}.json": {"breaks": name, "validatorLocation": at} for number, (name, (_, _, at)) in enumerate(path_mutations().items(), 1)})
 
 
 # ---------------------------------------------------------------- retained operator package ----------------------------------------
