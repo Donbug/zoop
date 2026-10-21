@@ -2,6 +2,7 @@ package com.zoop.admin.members;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -110,19 +111,21 @@ class AdminMemberPostgresTest {
         insertMemberSessionAt(memberId, "session-before-" + suffix, memberCreatedAt.minusSeconds(1));
         insertMemberSessionAt(memberId, "session-at-boundary-" + suffix, memberCreatedAt);
         insertMemberSessionAt(memberId, "session-after-" + suffix, memberCreatedAt.plusSeconds(1));
+        String expectedLastActiveAt = memberCreatedAt.plusSeconds(1)
+                .truncatedTo(ChronoUnit.MICROS).toString();
 
         mvc.perform(get("/api/v1/admin/members").cookie(login.cookie())
                         .param("q", email).param("limit", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].activity.sessions").value(2))
                 .andExpect(jsonPath("$.items[0].lastActiveAt")
-                        .value(memberCreatedAt.plusSeconds(1).toString()));
+                        .value(expectedLastActiveAt));
 
         mvc.perform(get("/api/v1/admin/members/{memberId}", memberId).cookie(login.cookie()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.member.activity.sessions").value(2))
                 .andExpect(jsonPath("$.member.lastActiveAt")
-                        .value(memberCreatedAt.plusSeconds(1).toString()));
+                        .value(expectedLastActiveAt));
     }
 
     @Test
