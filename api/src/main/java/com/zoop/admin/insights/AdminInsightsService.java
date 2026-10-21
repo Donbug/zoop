@@ -314,19 +314,28 @@ public class AdminInsightsService {
 
     private Map<String, Long> holdingMembersByCompany(Set<String> companyIds) {
         if (companyIds.isEmpty()) return Map.of();
-        var portfolioIds = portfolios.all().stream().filter(portfolio -> portfolio.holdings().stream()
-                .anyMatch(holding -> companyIds.contains(holding.companyId())))
-                .map(com.zoop.portfolio.model.MockPortfolio::id).toList();
+        var portfoliosByCompany = new HashMap<String, List<String>>();
+        for (var portfolio : portfolios.all()) {
+            for (var holding : portfolio.holdings()) {
+                if (companyIds.contains(holding.companyId())) {
+                    portfoliosByCompany.computeIfAbsent(holding.companyId(), ignored -> new ArrayList<>())
+                            .add(portfolio.id());
+                }
+            }
+        }
+        var portfolioIds = portfoliosByCompany.values().stream().flatMap(List::stream).distinct().toList();
         if (portfolioIds.isEmpty()) return Map.of();
-        var counts = new HashMap<String, Long>();
+        var membersByPortfolio = new HashMap<String, Long>();
         jdbc.query("""
-                SELECT company_id,count(DISTINCT member_id) AS members
+                SELECT mock_portfolio_id,count(DISTINCT member_id) AS members
                 FROM member_portfolio_connections WHERE mock_portfolio_id IN (:portfolios)
-                AND company_id IN (:companies) GROUP BY company_id
-                """, new MapSqlParameterSource().addValue("portfolios", portfolioIds)
-                .addValue("companies", companyIds), rs -> {
-                    counts.put(rs.getString("company_id"), rs.getLong("members"));
+                GROUP BY mock_portfolio_id
+                """, new MapSqlParameterSource().addValue("portfolios", portfolioIds), rs -> {
+                    membersByPortfolio.put(rs.getString("mock_portfolio_id"), rs.getLong("members"));
                 });
+        var counts = new HashMap<String, Long>();
+        portfoliosByCompany.forEach((companyId, ids) -> counts.put(companyId, ids.stream().distinct()
+                .mapToLong(id -> membersByPortfolio.getOrDefault(id, 0L)).sum()));
         return counts;
     }
 
