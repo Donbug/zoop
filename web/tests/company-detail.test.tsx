@@ -7,6 +7,7 @@ import MapPage from '@/pages/map/MapPage';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
   bucketKey,
+  barEnd,
   impactEdges,
   requestTime,
   timeRange,
@@ -1241,5 +1242,19 @@ test('price bar times without seconds become RFC 3339 request times for asOf', (
   expect(requestTime('2026-10-20T17:40+09:00')).toBe('2026-10-20T08:40:00Z');
   expect(requestTime('2026-10-20T06:03:38.413Z')).toBe(
     '2026-10-20T06:03:38.413Z',
+  );
+});
+
+test('the reference time from the last price bar is that bar end, never later than now', () => {
+  // Bars carry the interval start (#236): today's daily bar starts at 00:00 KST.
+  const now = Date.parse('2026-10-20T08:40:00Z');
+  expect(barEnd('2026-10-20T00:00+09:00', '1d', now)).toBe(
+    '2026-10-20T08:40:00Z',
+  );
+  expect(barEnd('2026-10-20T17:35+09:00', '5m', now)).toBe(
+    '2026-10-20T08:40:00Z',
+  );
+  expect(barEnd('2026-10-13T00:00+09:00', '1wk', now)).toBe(
+    '2026-10-19T15:00:00Z',
   );
 });

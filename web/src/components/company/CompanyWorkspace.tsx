@@ -35,6 +35,7 @@ import {
   impactEdges,
   number,
   requestTime,
+  barEnd,
 } from './detail-model';
 
 const workspaceClasses =
@@ -189,10 +190,13 @@ export default function CompanyWorkspace() {
     prices.data?.status === 'available'
       ? prices.data.points.at(-1)?.time
       : null;
+  const latestInterval =
+    prices.data?.status === 'available' ? prices.data.interval : null;
   useEffect(() => {
-    const latest = exactTime(latestPoint)
-      ? latestPoint
-      : company.data?.metadata.asOf;
+    const latest =
+      latestPoint && latestInterval && exactTime(latestPoint)
+        ? barEnd(latestPoint, latestInterval)
+        : company.data?.metadata.asOf;
     // 공개 그래프 버전이 없으면(스냅샷 미게시) 기준 시점을 고정하지 않는다. 고정하면 409가 된다.
     // 기준 시점을 가격 봉에서 가져오면 그 시점의 버전은 다음 기업 응답이 채운다(지금 버전과 다를 수 있다).
     const currentVersion = company.data?.metadata.graphVersion ?? null;
@@ -225,6 +229,7 @@ export default function CompanyWorkspace() {
     asOf,
     version,
     latestPoint,
+    latestInterval,
     company.data?.metadata.asOf,
     company.data?.metadata.graphVersion,
     prices.loading,

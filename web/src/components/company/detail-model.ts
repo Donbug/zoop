@@ -23,6 +23,20 @@ export const exactTime = (value: string | null | undefined) =>
  */
 export const requestTime = (value: string) =>
   new Date(value).toISOString().replace(/\.000Z$/, 'Z');
+const BAR_MS: Record<string, number> = {
+  '5m': 5 * 60 * 1000,
+  '1h': 60 * 60 * 1000,
+  '1d': 24 * 60 * 60 * 1000,
+  '1wk': 7 * 24 * 60 * 60 * 1000,
+};
+/**
+ * 가격 봉 시각은 구간 시작 시각이다(#236). 마지막 봉으로 기준 시점을 정할 때는 그 봉이 끝나는
+ * 시각을 쓰되 지금보다 늦지 않게 한다. 시작 시각을 쓰면 오늘 일봉이 00:00으로 잡혀 오늘이 빠진다.
+ */
+export function barEnd(time: string, interval: string, now = Date.now()) {
+  const end = Date.parse(time) + (BAR_MS[interval] ?? 0);
+  return requestTime(new Date(Math.min(end, now)).toISOString());
+}
 export function bucketKey(
   event: Pick<Event, 'eventTime' | 'timePrecision'>,
   period: ChartPeriod,
