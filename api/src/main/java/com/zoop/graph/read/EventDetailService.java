@@ -1,0 +1,276 @@
+package com.zoop.graph.read;
+
+import com.zoop.common.exception.CustomException;
+import com.zoop.common.exception.ErrorCode;
+import com.zoop.common.json.StrictJson.Obj;
+import com.zoop.common.response.Metadata;
+import com.zoop.common.response.SectionFailure;
+import com.zoop.document.evidence.service.EvidenceService;
+import com.zoop.document.repository.DocumentRegistryRepository;
+import com.zoop.document.repository.VersionRow;
+import com.zoop.graph.importer.MentionIds;
+import com.zoop.graph.read.dto.EventDetail;
+import com.zoop.graph.read.dto.EventDetail.ArticleOut;
+import com.zoop.graph.read.dto.EventDetail.CompanyLink;
+import com.zoop.graph.read.dto.EventDetail.FieldDecisionOut;
+import com.zoop.graph.read.dto.EventDetail.FieldOutcome;
+import com.zoop.graph.read.dto.EventDetail.FollowRef;
+import com.zoop.graph.read.dto.EventDetail.Follows;
+import com.zoop.graph.read.dto.EventDetail.MentionOut;
+import com.zoop.graph.read.dto.EventDetail.Participant;
+import com.zoop.graph.read.dto.EventDetail.RelationOut;
+import com.zoop.graph.read.dto.EventDetail.SourceSupportOut;
+import com.zoop.graph.read.dto.EventDetail.Unavailable;
+import com.zoop.graph.snapshot.PublicGraphSnapshot;
+import com.zoop.graph.snapshot.PublicGraphSnapshot.Article;
+import com.zoop.graph.snapshot.PublicGraphSnapshot.Issue;
+import com.zoop.graph.snapshot.PublicGraphSnapshot.MentionRef;
+import com.zoop.graph.snapshot.PublicGraphSnapshot.Relation;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
+
+/**
+ * {@code getEvent} (#64, FS021): one issue of the pinned, filtered public graph with its relations, companies, articles and
+ * sequence from the snapshot, and, for an imported version, the original mentions, operator field verdicts and source support
+ * the AI handoff carried (the version's receipt, read once). An issue that is not visible in that read is 404, never looked up in
+ * another version. Values held or rejected by an operator field verdict never leave this service, and nothing is inferred that
+ * the handoff did not give: no summary, no approval, no confirmed role.
+ */
+@Service
+public class EventDetailService {
+    static final String SUMMARY_UNAVAILABLE = "사건 요약은 아직 제공되지 않습니다.";
+    private static final String IMPORTED = "snapshot";
+    private static final Set<String> WITHHELD = Set.of("HOLD", "REJECT");
+
+    private final PublicGraphReader reader;
+    private final EvidenceService receipts;
+    private final DocumentRegistryRepository registry;
+
+    public EventDetailService(PublicGraphReader reader, EvidenceService receipts, DocumentRegistryRepository registry) {
+        this.reader = reader;
+        this.receipts = receipts;
+        this.registry = registry;
+    }
+
+    public EventDetail get(String id, String round, String graphVersion, String asOf, String requestId) {
+        PublicGraphReader.Pinned pinned = reader.read(round, graphVersion, parseInstant(asOf));
+        DisplayGraph graph = pinned.graph();
+        Issue issue = graph.issues.get(id);
+        if (issue == null) throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+        PublicGraphSnapshot snapshot = graph.snapshot;
+        String versionId = pinned.selected().version().id();
+        // Synthetic fixtures have no receipt; an imported version must be describable or the read is 503.
+        Obj handoff = IMPORTED.equals(pinned.selected().version().kind())
+                ? handoffIssue(receipts.graphImportBundle(versionId, requestId), id) : null;
+
+        Set<String> visibleEvidence = snapshot.evidence().stream().map(PublicGraphSnapshot.Evidence::evidenceId)
+                .collect(Collectors.toSet());
+        Map<String, Obj> mentionsById = handoff == null ? Map.of() : mentionsById(handoff, issue);
+        Map<String, String> appIds = appIds(mentionsById);
+        Map<String, Set<String>> withheld = handoff == null ? Map.of() : withheld(handoff, appIds);
+
+        List<Relation> relations = snapshot.relations().stream()
+                .filter(r -> r.source().equals(id) || r.target().equals(id)).toList();
+        Metadata metadata = new Metadata("public_graph_snapshot", pinned.selected().asOf(), versionId, requestId, true,
+                List.of(new SectionFailure("summary", "SUMMARY_NOT_PRODUCED", SUMMARY_UNAVAILABLE, false,
+                        pinned.selected().asOf())));
+        return new EventDetail(issue.label(), id, issue.eventTime(), issue.timePrecision(), issue.period(),
+                mentions(mentionsById, withheld, visibleEvidence), articles(snapshot, issue, mentionsById),
+                relations.stream().map(EventDetailService::relation).toList(), companies(graph, id, relations),
+                sourceSupport(handoff, issue), fieldDecisions(handoff, appIds), issue.evidenceIds(),
+                follows(graph, id, relations), null, new Unavailable("unavailable", SUMMARY_UNAVAILABLE), metadata);
+    }
+
+    /** The handoff issue behind this snapshot issue (same id); its absence means the receipt does not describe the version. */
+    private static Obj handoffIssue(Obj bundle, String issueId) {
+        for (Obj candidate : bundle.objects("issues")) {
+            if (issueId.equals(candidate.string("id"))) return candidate;
+        }
+        throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+    }
+
+    /**
+     * Receipt mentions keyed by their app id, in handoff order, kept only when the filtered snapshot still references them (an
+     * article published after asOf takes its mentions with it).
+     */
+    private static Map<String, Obj> mentionsById(Obj handoff, Issue issue) {
+        Set<String> visible = issue.mentions().stream().map(MentionRef::mentionId).collect(Collectors.toSet());
+        Map<String, Obj> byId = new LinkedHashMap<>();
+        for (Obj mention : handoff.objects("mentions")) {
+            String appId = MentionIds.of(mention.string("articleId"), mention.string("articleVersion"),
+                    mention.string("mentionId"));
+            if (visible.contains(appId)) byId.put(appId, mention);
+        }
+        return byId;
+    }
+
+    /** Per app mention id, the fields (eventTime, period) an operator verdict held or rejected. */
+    private static Map<String, Set<String>> withheld(Obj handoff, Map<String, String> appIds) {
+        Map<String, Set<String>> out = new HashMap<>();
+        for (Obj verdict : handoff.objects("fieldVerdicts")) {
+            String appId = appIds.get(producerKey(verdict));
+            if (appId != null && WITHHELD.contains(verdict.string("decision"))) {
+                out.computeIfAbsent(appId, k -> new HashSet<>()).add(verdict.string("field"));
+            }
+        }
+        return out;
+    }
+
+    /** Visible mentions by producer identity, which is how a verdict names its mention. */
+    private static Map<String, String> appIds(Map<String, Obj> mentionsById) {
+        Map<String, String> out = new HashMap<>();
+        mentionsById.forEach((appId, mention) -> out.put(producerKey(mention), appId));
+        return out;
+    }
+
+    /** (documentId, documentVersion, local mentionId): the local id alone repeats across documents. */
+    private static String producerKey(Obj node) {
+        return node.string("documentId") + "\n" + node.string("documentVersion") + "\n" + node.string("mentionId");
+    }
+
+    private static List<MentionOut> mentions(Map<String, Obj> mentionsById, Map<String, Set<String>> withheld,
+            Set<String> visibleEvidence) {
+        List<MentionOut> out = new ArrayList<>();
+        for (Map.Entry<String, Obj> entry : mentionsById.entrySet()) {
+            Obj m = entry.getValue();
+            Set<String> hidden = withheld.getOrDefault(entry.getKey(), Set.of());
+            boolean timeHidden = hidden.contains("eventTime");
+            List<Participant> participants = m.objects("participants").stream()
+                    .map(p -> new Participant(p.stringOrNull("companyId"), p.string("name"), p.stringOrNull("role"),
+                            // The handoff produces no confirmed roles: any role is S2 text (GRAPH_READ_HANDOFF).
+                            p.stringOrNull("role") != null))
+                    .toList();
+            out.add(new MentionOut(m.string("title"), entry.getKey(), m.string("articleId"), m.string("action"),
+                    m.stringOrNull("target"), timeHidden ? null : m.stringOrNull("eventTime"),
+                    timeHidden ? "unknown" : m.string("timePrecision"),
+                    hidden.contains("period") ? null : m.stringOrNull("period"), m.string("assertionStatus"),
+                    participants, m.strings("evidenceIds").stream().filter(visibleEvidence::contains).toList(),
+                    m.bool("background")));
+        }
+        return out;
+    }
+
+    /**
+     * The issue's visible articles, newest first. publisher comes from the stored article version (the handoff carries none).
+     * relationType: PROVIDES_BACKGROUND when every visible mention of that article is background, REPORTS otherwise, null
+     * without mentions (a synthetic fixture).
+     */
+    private List<ArticleOut> articles(PublicGraphSnapshot snapshot, Issue issue, Map<String, Obj> mentionsById) {
+        Set<String> ids = new HashSet<>(issue.articleIds());
+        return snapshot.articles().stream().filter(a -> ids.contains(a.articleId()))
+                .sorted(Comparator.comparing((Article a) -> DisplayGraph.publishedAt(a.publishedAt()),
+                        Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(Article::articleId))
+                .map(a -> new ArticleOut(a.title(), a.articleId(),
+                        registry.findVersion(a.articleId(), a.version()).map(VersionRow::publisher).orElse(null), a.url(),
+                        a.publishedAt(), articleRelation(a, mentionsById)))
+                .toList();
+    }
+
+    private static String articleRelation(Article article, Map<String, Obj> mentionsById) {
+        List<Obj> own = mentionsById.values().stream()
+                .filter(m -> m.string("articleId").equals(article.articleId())
+                        && m.string("articleVersion").equals(article.version()))
+                .toList();
+        if (own.isEmpty()) return null;
+        return own.stream().allMatch(m -> m.bool("background")) ? "PROVIDES_BACKGROUND" : "REPORTS";
+    }
+
+    private static RelationOut relation(Relation r) {
+        return new RelationOut(r.relationId(), DisplayGraph.edgeId(r.relationType(), r.source(), r.target()),
+                r.relationType(), r.source(), r.target(), r.role(), r.role() != null, r.assertionStatus(), r.evidenceIds());
+    }
+
+    /** One link per (company, relation type) from this issue, keeping the first role the snapshot gives. */
+    private static List<CompanyLink> companies(DisplayGraph graph, String id, List<Relation> relations) {
+        Map<String, CompanyLink> links = new LinkedHashMap<>();
+        for (Relation r : relations) {
+            if (!r.source().equals(id) || !DisplayGraph.COMPANY_LINKS.contains(r.relationType())) continue;
+            PublicGraphSnapshot.Company company = graph.companies.get(r.target());
+            if (company == null) continue;
+            links.merge(r.target() + "|" + r.relationType(),
+                    new CompanyLink(r.target(), company.label(), r.role(), r.role() != null, r.relationType()),
+                    (first, next) -> first.role() != null ? first : next);
+        }
+        return List.copyOf(links.values());
+    }
+
+    /**
+     * Copied from the handoff issue (AI: copy, never recompute) when every article it counted is still visible. When asOf hid some,
+     * the visible part only: counts that depend on hidden articles become null (unknown), lists keep visible members. A synthetic
+     * fixture declares no origins, so every article's lineage is unknown.
+     */
+    private static SourceSupportOut sourceSupport(Obj handoff, Issue issue) {
+        List<String> visible = issue.articleIds().stream().distinct().sorted().toList();
+        if (handoff == null) return new SourceSupportOut(visible.size(), null, visible, null, List.of());
+        Obj support = handoff.object("sourceSupport");
+        List<String> unknown = support.strings("unknownLineageArticles");
+        List<List<String>> groups = new ArrayList<>();
+        support.array("duplicateGroups").forEach(g -> {
+            List<String> members = new ArrayList<>();
+            g.forEach(m -> members.add(m.asString()));
+            groups.add(members);
+        });
+        if (support.count("articleCount") == visible.size()) {
+            return new SourceSupportOut(visible.size(), nullable(support, "knownLineageCount"), unknown,
+                    nullable(support, "independentSourceCount"), groups);
+        }
+        Set<String> shown = new TreeSet<>(visible);
+        return new SourceSupportOut(visible.size(), null, unknown.stream().filter(shown::contains).toList(), null,
+                groups.stream().map(g -> g.stream().filter(shown::contains).toList()).filter(g -> g.size() >= 2).toList());
+    }
+
+    private static Integer nullable(Obj node, String name) {
+        return node.isNull(name) ? null : node.count(name);
+    }
+
+    /**
+     * Operator verdicts per visible mention: field, decision and reason code only. The judged value itself is not repeated here,
+     * so a held or rejected value never leaves through this list either.
+     */
+    private static List<FieldDecisionOut> fieldDecisions(Obj handoff, Map<String, String> appIds) {
+        if (handoff == null) return List.of();
+        Map<String, List<FieldOutcome>> byMention = new LinkedHashMap<>();
+        for (Obj verdict : handoff.objects("fieldVerdicts")) {
+            String appId = appIds.get(producerKey(verdict));
+            if (appId == null) continue;
+            byMention.computeIfAbsent(appId, k -> new ArrayList<>()).add(new FieldOutcome(verdict.string("field"),
+                    verdict.string("decision"), verdict.string("reasonCode")));
+        }
+        return byMention.entrySet().stream().map(e -> new FieldDecisionOut(null, e.getKey(), e.getValue())).toList();
+    }
+
+    /** FOLLOWS points from the later issue to the earlier one; only issues visible in this read are listed. */
+    private static Follows follows(DisplayGraph graph, String id, List<Relation> relations) {
+        List<FollowRef> previous = new ArrayList<>();
+        List<FollowRef> next = new ArrayList<>();
+        for (Relation r : relations) {
+            if (!"FOLLOWS".equals(r.relationType())) continue;
+            boolean later = r.source().equals(id);
+            Issue other = graph.issues.get(later ? r.target() : r.source());
+            if (other == null) continue;
+            FollowRef ref = new FollowRef(other.label(), other.issueId(), other.eventTime(), other.timePrecision());
+            (later ? previous : next).add(ref);
+        }
+        return new Follows(previous, next);
+    }
+
+    private static Instant parseInstant(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return Instant.parse(value);
+        } catch (DateTimeParseException exception) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST, exception);
+        }
+    }
+}

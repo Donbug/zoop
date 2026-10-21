@@ -353,6 +353,22 @@ public class EvidenceService {
     }
 
     /**
+     * getEvent (#64): the bundle an imported graph version was staged from, read from its {@code verification_receipt} exactly as
+     * {@link #read} reads it (registry hash and size, version binding). The bundle is retained producer data for display (original
+     * mentions, operator field verdicts, source support), never authority. A missing, mismatched or unreadable receipt is
+     * SOURCE_UNAVAILABLE: the version cannot be described, which is not the same as an event without details.
+     */
+    public StrictJson.Obj graphImportBundle(String versionId, String requestId) {
+        try {
+            return GraphReceiptGrants.bundle(receipt(versionId, requestId), versionId);
+        } catch (Denied | GraphReceiptGrants.Malformed unusable) {
+            log.warn("Graph receipt cannot describe the version (graphVersion={}, reason={}, requestId={})", versionId,
+                    unusable.getMessage(), requestId);
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        }
+    }
+
+    /**
      * The verified bytes of the selected version's import receipt. A registry mismatch (missing, wrong kind, changed file) is a
      * denial; an unset artifact root or an unreadable store is {@code SOURCE_UNAVAILABLE}, never a denial that reads like absence.
      */
