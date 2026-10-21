@@ -139,6 +139,30 @@ class BriefingOutlookHistoryPostgresTest {
         assertThrows(IllegalArgumentException.class, importer::importBundle); assertEquals(before, originals());
     }
 
+    @Test void qualityV23SurvivesActualImportWithPriorHistoryAndFourVerifiedProjections() throws Exception {
+        Path fresh = Files.createTempDirectory(root, "quality-v23-");
+        var command = new ProcessBuilder("python3", Path.of("scripts/briefing_outlook_history_fixture.py").toAbsolutePath().toString(), fresh.toString(), "--quality");
+        command.environment().put("PYTHONDONTWRITEBYTECODE", "1");
+        var process = command.redirectErrorStream(true).redirectOutput(fresh.resolve("fixture.log").toFile()).start();
+        assertEquals(0, process.waitFor(), () -> log(fresh.resolve("fixture.log")));
+        String schema = "quality_" + UUID.randomUUID().toString().replace("-", "");
+        String baseUrl = System.getenv("DB_URL"), url = baseUrl + (baseUrl.contains("?") ? "&" : "?") + "currentSchema=" + schema + ",public";
+        var ds = new DriverManagerDataSource(url, System.getenv().getOrDefault("DB_USERNAME", "company_test"), System.getenv().getOrDefault("DB_PASSWORD", ""));
+        var qualityDb = new JdbcTemplate(ds);
+        try {
+            Flyway.configure().dataSource(ds).schemas(schema).defaultSchema(schema).load().migrate();
+            qualityDb.update("INSERT INTO companies(id,name) VALUES ('company-authored','합성 기업')");
+            var qualityImporter = new BriefingReplayImporter(qualityDb, new DataSourceTransactionManager(ds),
+                    new BriefingReplaySettings(fresh.resolve("sources.jsonl"), fresh.resolve("second/bundle-v2.json"), Files.createDirectory(fresh.resolve("artifacts")),
+                            fresh.resolve("grants.json"), fresh.resolve("manifest.json"), ArtifactFileStore.sha256(Files.readAllBytes(fresh.resolve("sources.jsonl"))),
+                            "inbox/authored-recovery.md", fresh.resolve("clocks.json")));
+            qualityImporter.importBundle();
+            assertEquals(4, qualityDb.queryForObject("SELECT count(*) FROM briefing_rounds WHERE public_snapshot #>> '{marketSummary,analysis,schemaVersion}'='zoop-market-outlook-analysis-v1'", Integer.class));
+            assertEquals(0, qualityDb.queryForObject("SELECT count(*) FROM briefing_rounds b CROSS JOIN LATERAL jsonb_array_elements(b.public_snapshot #> '{marketSummary,analysis,forecasts}') f WHERE jsonb_array_length(f->'conditions')<>0", Integer.class));
+            assertTrue(qualityImporter.importBundle().alreadyImported());
+        } finally { qualityDb.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE"); }
+    }
+
     private static String originals() { return jdbc.queryForObject("SELECT json_agg(row_to_json(t) ORDER BY id)::text FROM (SELECT id,published_payload,public_snapshot,comparison_snapshot FROM briefing_rounds) t", String.class); }
     private static String log(Path path) { try { return Files.readString(path); } catch (Exception error) { return error.toString(); } }
 }

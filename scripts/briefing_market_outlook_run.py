@@ -22,7 +22,7 @@ def helper(name):
 
 context = helper("briefing_market_context")
 base = context.base
-VERSION = "market-context-v2.2-outlook"
+VERSION = "market-context-v2.3-outlook"
 context.PROMPTS = context.PROMPTS.with_name(VERSION)
 
 
@@ -46,12 +46,18 @@ def rebind_derived_contexts(layer, inbox):
 
 
 def prepare(args):
+    global VERSION
+    if getattr(args, "prompt_version", None):
+        VERSION = args.prompt_version
+        context.PROMPTS = context.PROMPTS.with_name(VERSION)
     baseline = Path(args.baseline).resolve()
     raw = base.regular(baseline / "bundle-v2.json")
     bundle = base.strict_load(raw)
     presentation = bundle.get("presentationEnrichment")
     context.require(presentation and presentation.get("schemaVersion") == "zoop-briefing-presentation-enrichment-v1",
                     "outlook_presentation_baseline_required")
+    # Refuse before any paid transport: the importer currently supports one history layer.
+    context.require(not presentation.get("outlookHistory"), "outlook_nested_history_not_supported")
     context.require(base.digest(base.regular(Path(args.sources))) == bundle["sourceFileSha256"]
                     and base.digest(base.regular(Path(args.clocks))) == bundle["clockFileSha256"],
                     "outlook_source_or_clock_mismatch")
@@ -212,6 +218,8 @@ def parser():
         p.add_argument("--" + flag, required=True)
     p.add_argument("--round", action="append", help="Chronological date-edition key; defaults to all available rounds")
     p.add_argument("--key-file")
+    p.add_argument("--prompt-version", choices=("market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook"),
+                   help="Fresh CLI runs default to v2.3; select the original version to reuse an immutable old plan")
     p.add_argument("--max-calls", type=base.bounded(1, 512), default=400)
     p.add_argument("--budget-approval-ref", help="Separate explicit human approval for a ceiling above the existing 400 calls")
     p.add_argument("--max-repairs", type=int, choices=(0, 1), default=0)

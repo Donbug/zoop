@@ -23,6 +23,31 @@ final class BriefingMarketContextRules {
         return summary.has("policy") && POLICY.equals(summary.string("policy"));
     }
 
+    static final List<String> QUALITY_FLAGS = List.of("atomicClaim", "evidenceClauseCoverage", "qualifiersPreserved", "observableConditionsOnly");
+
+    /** v2.3 guards only; older immutable recordings retain their original contract. */
+    static void qualityClaims(StrictJson.Obj summary, StrictJson.Obj news, StrictJson.Obj broad) {
+        Map<String, String> owners = new HashMap<>();
+        for (StrictJson.Obj item : news.objects("selected"))
+            for (StrictJson.Obj source : item.objects("sources"))
+                if (source.has("documentId")) owners.put(source.string("evidenceId"), source.string("documentId"));
+        for (StrictJson.Obj doc : broad.objects("documents"))
+            for (StrictJson.Obj source : doc.objects("sources")) owners.put(source.string("evidenceId"), doc.string("documentId"));
+        for (StrictJson.Obj claim : summary.objects("claims")) {
+            if ("fact".equals(claim.string("kind"))) {
+                Set<String> documents = new HashSet<>();
+                for (String id : claim.strings("evidenceIds")) {
+                    check(owners.containsKey(id) && !owners.get(id).isBlank(), "market_quality_fact_anchor"); documents.add(owners.get(id));
+                }
+                check(documents.size() + claim.strings("indicatorIds").size() == 1
+                        && claim.strings("previousForecastIds").isEmpty() && claim.strings("previousPublicationIds").isEmpty()
+                        && claim.strings("evaluationIds").isEmpty(), "market_quality_fact_anchor");
+            }
+            if ("forecast".equals(claim.string("kind")))
+                check(claim.strings("conditions").isEmpty(), "market_quality_condition_observations_missing");
+        }
+    }
+
     /** Public, verified analysis only. The frozen request and document bodies stay private. */
     static ObjectNode analysis(StrictJson.Obj summary, StrictJson.Obj context, String cutoff) {
         check(contextual(summary) && "PASS".equals(summary.object("verification").string("status")), "analysis_requires_verified_result");

@@ -18,7 +18,7 @@ def load(name, path):
     return value
 
 
-def create(directory, tampered_history=False):
+def create(directory, tampered_history=False, quality=False):
     recovery = load("history_authored_recovery", ROOT / "api/scripts/briefing_recovery_fixture.py")
     presentation = load("history_authored_presentation", ROOT / "scripts/briefing_presentation_enrichment.py")
     market = load("history_authored_market", ROOT / "scripts/tests/test_briefing_market_data.py")
@@ -74,7 +74,16 @@ def create(directory, tampered_history=False):
             runner.context.build_context = altered_context
         first = run("market-context-v2.1-outlook", initial, directory / "first", authored.ContextTransport(mutate=withheld))
         runner.context.build_context = original_context
-        second = run("market-context-v2.2-outlook", directory / "first", directory / "second", authored.ContextTransport())
+        def quality_answer(stage, answer):
+            if stage == "market_summary_generation":
+                for claim in answer["claims"]:
+                    if claim["kind"] == "forecast":
+                        claim.update(conditions=[], direction="uncertain", text="합성 근거가 엇갈려 잠정 방향은 불확실합니다.")
+            else:
+                for check in answer["checks"].values():
+                    check.update({flag: True for flag in runner.context.QUALITY_FLAGS})
+        second = run("market-context-v2.3-outlook" if quality else "market-context-v2.2-outlook",
+                     directory / "first", directory / "second", authored.ContextTransport(quality_answer if quality else None))
     assert first["summaryPass"] == 0 and first["newPaidCalls"] == 8, first
     assert second["summaryPass"] == 4 and second["newPaidCalls"] == 8, second
     return {"realPaidCalls": 0, "realProviderFetches": 0, "authoredOldCalls": 8, "authoredNewCalls": 8,
@@ -82,4 +91,4 @@ def create(directory, tampered_history=False):
 
 
 if __name__ == "__main__":
-    print(create(Path(sys.argv[1]), "--tampered-history" in sys.argv))
+    print(create(Path(sys.argv[1]), "--tampered-history" in sys.argv, "--quality" in sys.argv))

@@ -239,6 +239,22 @@ def _schema(frozen, evidence, indicators, prior, evaluations):
     return schema
 
 
+QUALITY_VERSION = "market-context-v2.3-outlook"
+QUALITY_FLAGS = ("atomicClaim", "evidenceClauseCoverage", "qualifiersPreserved", "observableConditionsOnly")
+
+
+def quality_claims(claims, evidence):
+    """Deterministic anchor/condition guard; semantic coverage still needs a verifier."""
+    for c in claims:
+        if c["kind"] == "fact":
+            owners = {evidence[e].get("documentId") for e in c["evidenceIds"]}
+            require(None not in owners and "" not in owners and len(owners) + len(c["indicatorIds"]) == 1
+                    and not c["previousForecastIds"] and not c["previousPublicationIds"] and not c["evaluationIds"],
+                    "market_quality_fact_anchor")
+        if c["kind"] == "forecast":
+            require(c.get("conditions") == [], "market_quality_condition_observations_missing")
+
+
 def _claims(draft, frozen, evidence, indicators, prior, evaluations):
     require(type(draft) is dict and set(draft) == {"claims"} and type(draft["claims"]) is list
             and 2 <= len(draft["claims"]) <= 8, "market_context_claim_count")
@@ -272,7 +288,7 @@ def _claims(draft, frozen, evidence, indicators, prior, evaluations):
         require(all(evaluations[e]["forecastId"] in c["previousForecastIds"] for e in c["evaluationIds"]), "market_context_evaluation_owner")
         claims.append({"claimId": "market:claim:" + str(index), **c})
     require(any(c["evidenceIds"] for c in claims), "market_context_news_required")
-    if frozen["context"].get("summaryPromptVersion") in {"market-context-v2.1-outlook", "market-context-v2.2-outlook"}:
+    if frozen["context"].get("summaryPromptVersion") in {"market-context-v2.1-outlook", "market-context-v2.2-outlook", QUALITY_VERSION}:
         kinds = {c["kind"] for c in claims}
         if targets:
             require("forecast" in kinds, "market_outlook_forecast_required")
@@ -281,6 +297,8 @@ def _claims(draft, frozen, evidence, indicators, prior, evaluations):
                 require("forecast_update" in kinds, "market_outlook_update_required")
             if frozen["marketContext"]["edition"] == "evening":
                 require("result_comparison" in kinds, "market_outlook_comparison_required")
+    if frozen["context"].get("summaryPromptVersion") == QUALITY_VERSION:
+        quality_claims(claims, evidence)
     return claims
 
 
@@ -301,6 +319,7 @@ def generate_market_summary(client, data, max_repairs=1):
         try:
             claims = _claims(last_draft, frozen, evidence, indicators, prior, evaluations)
         except ContextError as error:
+            claims, verification_key = [], None
             last_validation = {"status": "WITHHELD", "checks": [], "reason": str(error)}
             attempts.append({"attempt": attempt, "generationRequestDigest": generation_key, "verification": last_validation})
             continue
@@ -322,6 +341,8 @@ def generate_market_summary(client, data, max_repairs=1):
         checks = list(decision["checks"].values())
         flags = ("noUnsupportedNumbers", "noUnsupportedCausality", "temporalAppropriate", "noInvestmentAdvice",
                  "comparisonAppropriate", "forecastAppropriate")
+        if frozen["context"].get("summaryPromptVersion") == QUALITY_VERSION:
+            flags += QUALITY_FLAGS
         passed = all(check["verdict"] == "SUPPORTED" and all(check[k] is True for k in flags) for check in checks)
         last_validation = {"status": "PASS" if passed else "WITHHELD", "checks": checks,
                            "meaning": "Independent model assessment of frozen inputs; no external fact certification."}
