@@ -6166,7 +6166,7 @@ One allowed user action. Event-specific schemas reject unknown fields, including
 | --- | --- | --- | --- |
 | type | 필수 | string |  |
 | targetId | 필수 | string | Opened issue identifier. |
-| roundId | 필수 | string | Briefing round containing the issue. |
+| roundId | 필수 | string | Briefing round identifier only: 1-256 ASCII letters, digits, or . _ : / -. Do not include personal data or free text. |
 | viewId | 필수 | string |  |
 
 <a id="schema-telemetryaiquestion"></a>

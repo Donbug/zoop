@@ -20,6 +20,9 @@ CREATE TABLE telemetry_events (
     round_id text,
     view_id text NOT NULL CHECK (view_id ~ '^[A-Za-z0-9-]{8,40}$'),
     occurred_at timestamptz NOT NULL,
+    CONSTRAINT ck_telemetry_round_id_identifier CHECK (
+        round_id IS NULL OR round_id ~ '^[A-Za-z0-9._:/-]{1,256}$'
+    ),
     CONSTRAINT ck_telemetry_event_shape CHECK (
         (event_type = 'screen_view' AND screen IS NOT NULL AND target_id IS NULL AND round_id IS NULL)
         OR (event_type IN ('graph_node_select', 'graph_edge_select') AND screen IS NULL

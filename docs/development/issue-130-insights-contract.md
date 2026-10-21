@@ -54,8 +54,8 @@
 
 ## Task 2~5 백엔드 구현
 
-- **Task 2 · 이벤트 저장소:** `telemetry_events`와 `telemetry_batches` 마이그레이션을 추가했다. principal은 회원/게스트 세션의 analytics key를 사용하며 이벤트에는 실명, 이메일, 질문 본문을 저장하지 않는다.
-- **Task 3 · 수집 API:** `POST /api/v1/telemetry`를 구현했다. 허용 이벤트/필드를 검증하고 1~20건 배치를 저장한다. 같은 principal과 `Idempotency-Key`의 같은 payload는 기존 접수 건수를 반환하고, 다른 payload는 `IDEMPOTENCY_CONFLICT`로 거절한다.
+- **Task 2 · 이벤트 저장소:** `telemetry_events`와 `telemetry_batches` 마이그레이션 및 JPA 스키마 Entity를 추가했다. principal은 회원/게스트 세션의 analytics key를 사용하며 이벤트에는 실명, 이메일, 질문 본문을 저장하지 않는다.
+- **Task 3 · 수집 API:** `POST /api/v1/telemetry`를 구현했다. 요청 DTO와 Bean Validation으로 허용 이벤트/필드를 검증하고 1~20건 배치를 저장한다. `roundId`는 최대 256자의 영숫자·`._:/-` 식별자만 허용한다. 같은 principal과 `Idempotency-Key`의 같은 payload는 기존 접수 건수를 반환하고, 다른 payload는 `IDEMPOTENCY_CONFLICT`로 거절한다.
 - **Task 4 · 전체 통계:** 관리자 전용 overview/summary API에서 기간별 지표, KST 일별 추이, 브리핑 회차별 조회 집계를 제공한다. 비율은 distinct `(principal, viewId)` 기준이며 분모가 5 미만이면 비율을 숨긴다. 브리핑 평가 원천은 아직 연결되지 않아 unavailable/null로 응답한다.
 - **Task 5 · 기업 통계:** 관리자 전용 기업 목록/상세 API에서 카탈로그 기업별 관심 회원, 고정 모의 포트폴리오의 현재 보유 회원, 귀속 가능한 이벤트 집계를 제공한다. 기업별 사건 열기는 사건-기업 매핑이 모호하고 간선 선택은 간선-기업 매핑 원천이 없어 null이다. 목록 커서는 window/limit/offset/asOf를 담은 Base64 URL-safe 값이며, 다음 페이지에서도 집계 기준 시각을 유지한다.
 

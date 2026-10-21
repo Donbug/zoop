@@ -16000,7 +16000,10 @@ components:
           description: "Opened issue identifier."
         roundId:
           type: "string"
-          description: "Briefing round containing the issue."
+          minLength: 1
+          maxLength: 256
+          pattern: "^[A-Za-z0-9._:/\\-]+$"
+          description: "Briefing round identifier only: 1-256 ASCII letters, digits, or . _ : / -. Do not include personal data or free text."
         viewId:
           type: "string"
           pattern: "^[A-Za-z0-9\\-]{8,40}$"

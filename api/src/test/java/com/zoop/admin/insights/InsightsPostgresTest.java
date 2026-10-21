@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import com.zoop.auth.service.MemberSessionService;
 import com.zoop.common.exception.CustomException;
+import com.zoop.telemetry.dto.TelemetryBatchRequest;
 import com.zoop.telemetry.TelemetryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -49,7 +50,7 @@ class InsightsPostgresTest {
                   {"type":"graph_node_select","targetId":"NASDAQ:NVDA","viewId":"%s"}
                 ]}
                 """.formatted(view, view);
-        var body = mapper.readTree(request);
+        var body = mapper.readValue(request, TelemetryBatchRequest.class);
         String key = "issue130-" + UUID.randomUUID();
 
         assertEquals(2, telemetry.record(principal, key, body, "request-a").accepted());
@@ -57,7 +58,9 @@ class InsightsPostgresTest {
         assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM telemetry_events WHERE principal_key=?",
                 Integer.class, principal));
 
-        var changed = mapper.readTree("{\"events\":[{\"type\":\"screen_view\",\"screen\":\"ai\",\"viewId\":\"view-unique-123\"}]}");
+        var changed = mapper.readValue(
+                "{\"events\":[{\"type\":\"screen_view\",\"screen\":\"ai\",\"viewId\":\"view-unique-123\"}]}",
+                TelemetryBatchRequest.class);
         CustomException exception = assertThrows(CustomException.class,
                 () -> telemetry.record(principal, key, changed, "request-c"));
         assertEquals("IDEMPOTENCY_CONFLICT", exception.getErrorCode().name());
@@ -66,14 +69,14 @@ class InsightsPostgresTest {
     }
 
     @Test
-    void summaryUsesDistinctViewRatesAndOverviewKeepsUnavailableFeedbackNull() {
+    void summaryUsesDistinctViewRatesAndOverviewKeepsUnavailableFeedbackNull() throws Exception {
         String view = "view-" + UUID.randomUUID().toString().substring(0, 12);
-        var body = mapper.readTree("""
+        var body = mapper.readValue("""
                 {"events":[
                   {"type":"screen_view","screen":"main","viewId":"%s"},
                   {"type":"graph_node_select","targetId":"NASDAQ:NVDA","viewId":"%s"}
                 ]}
-                """.formatted(view, view));
+                """.formatted(view, view), TelemetryBatchRequest.class);
         telemetry.record(principal, "summary-" + UUID.randomUUID(), body, "summary-request");
 
         var summary = insights.summary("7d", "summary-request");
@@ -85,5 +88,20 @@ class InsightsPostgresTest {
         assertEquals("unavailable", overview.feedback().availability());
         assertEquals("not_integrated", overview.feedback().unavailableReason());
         assertEquals(null, overview.feedback().up());
+    }
+
+    @Test
+    void telemetryRejectsPersonalDataInRoundIdentifier() throws Exception {
+        var body = mapper.readValue("""
+                {"events":[{"type":"briefing_issue_open","targetId":"issue-123",
+                  "roundId":"user@example.com","viewId":"view-unique-123"}]}
+                """, TelemetryBatchRequest.class);
+
+        CustomException exception = assertThrows(CustomException.class,
+                () -> telemetry.record(principal, "privacy-" + UUID.randomUUID(), body, "privacy-request"));
+
+        assertEquals("INVALID_REQUEST", exception.getErrorCode().name());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM telemetry_events WHERE principal_key=?",
+                Integer.class, principal));
     }
 }
