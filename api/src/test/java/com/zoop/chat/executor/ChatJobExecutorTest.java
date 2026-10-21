@@ -5,12 +5,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 import com.zoop.chat.dto.ChatFailure;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.repository.ChatJobRow;
+import com.zoop.chat.repository.ChatToolCallEnd;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
@@ -184,6 +186,55 @@ class ChatJobExecutorTest {
         executor(engine).runOnce();
         assertEquals("result_lost", job(store.job("job-00001")).kind());
         assertTrue(engine.runs.isEmpty());
+    }
+
+    @Test
+    void toolCallsAreReservedInPlanOrderCappedPerAttemptAndClosedWithTheJob() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        executor(new ScriptedChatEngine((run, control) -> {
+            assertEquals(List.of("tc-0", "tc-1"), control.reserveToolCalls(1,
+                    List.of(reservation("company.read"), reservation("issue.read"))));
+            control.toolCallStarted("tc-0");
+            control.toolCallFinished("tc-0", new ChatToolCallEnd("succeeded", null, "v1", List.of("ev-1"), false, false));
+            control.toolCallStarted("tc-1");
+            // 2 reserved + 11 would pass the per-attempt cap of 12: nothing of it is reserved.
+            assertThrows(IllegalArgumentException.class,
+                    () -> control.reserveToolCalls(2, Collections.nCopies(11, reservation("company.read"))));
+            assertEquals(List.of("tc-2"), control.reserveToolCalls(2, List.of(reservation("evidence.resolve"))));
+            return ScriptedChatEngine.generalAnswer("답");
+        })).runOnce();
+
+        var calls = store.toolCalls("job-00001");
+        assertEquals(3, calls.size());
+        assertEquals(List.of("succeeded", "unknown", "cancelled"), calls.stream().map(c -> c.status).toList(),
+                "a call left running ends unknown, a call never started ends cancelled");
+        assertEquals(List.of("ev-1"), calls.get(0).end.evidenceIds());
+        assertEquals(2, calls.get(2).row.planRevision());
+        assertEquals(2, calls.get(2).row.callIndex());
+        assertEquals(1, calls.get(2).row.attemptNo());
+    }
+
+    @Test
+    void aSupersededRunCannotReserveStartOrFinishToolCalls() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        executor(new ScriptedChatEngine((run, control) -> {
+            control.reserveToolCalls(1, List.of(reservation("company.read"), reservation("issue.read")));
+            control.toolCallStarted("tc-0");
+            store.cancel("job-00001", clock.instant());
+            assertThrows(ChatRunSuperseded.class, () -> control.toolCallFinished("tc-0",
+                    new ChatToolCallEnd("succeeded", null, "v1", List.of(), false, false)));
+            assertThrows(ChatRunSuperseded.class, () -> control.toolCallStarted("tc-1"));
+            assertThrows(ChatRunSuperseded.class, () -> control.reserveToolCalls(2, List.of(reservation("issue.read"))));
+            throw new ChatRunSuperseded();
+        })).runOnce();
+
+        assertEquals(List.of("unknown", "cancelled"),
+                store.toolCalls("job-00001").stream().map(c -> c.status).toList());
+    }
+
+    private static ChatToolCallReservation reservation(String capability) {
+        return new ChatToolCallReservation("chat-tools/v1", "zoop-core-read", capability, "app:" + capability,
+                "chat-tool/v1", "0".repeat(64), "{}");
     }
 
     private void assertFailure(int runsBefore, ChatEngineOutcome.Failed outcome, String retry, String attemptStatus) {

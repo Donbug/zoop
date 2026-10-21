@@ -15,6 +15,8 @@ import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.repository.ChatExecutionRepository;
 import com.zoop.chat.repository.ChatJobRow;
 import com.zoop.chat.repository.ChatRepository;
+import com.zoop.chat.repository.ChatToolCallEnd;
+import com.zoop.chat.repository.NewChatToolCall;
 import com.zoop.chat.service.FrozenSelection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +41,9 @@ import tools.jackson.databind.node.ObjectNode;
  * <li>A lease that ran out is recovered as a failure. A run that had announced a model request ends as
  * {@code transient/response_unknown} without retry (the provider may have processed and charged it); one that had not ends
  * as {@code transient/deadline_guard}, which may be rerun.</li>
+ * <li>A run's tool calls ({@code chat_tool_calls}) are reserved, started and finished under the same fence, at most
+ * {@link ChatRunControl#MAX_TOOL_CALLS} per attempt. When the job ends, its calls still reserved are closed as
+ * {@code cancelled} and those still running as {@code unknown}.</li>
  * </ul>
  *
  * <p>The run deadline is the policy maximum until the orchestrator plans per-route deadlines (ZOOP-AIG-001 6.3.3); the lease
@@ -259,6 +264,47 @@ public class ChatJobExecutor {
         public boolean owned() {
             return Boolean.TRUE.equals(transaction.execute(status ->
                     runs.lockOwned(claim.job().id(), claim.ownerToken(), clock.instant()).isPresent()));
+        }
+
+        @Override
+        public List<String> reserveToolCalls(int planRevision, List<ChatToolCallReservation> calls) {
+            if (planRevision < 1 || calls.isEmpty()) throw new IllegalArgumentException("an empty or unnumbered tool plan");
+            List<String> reserved = transaction.execute(status -> {
+                Instant now = clock.instant();
+                if (runs.lockOwned(claim.job().id(), claim.ownerToken(), now).isEmpty()) return null;
+                int first = runs.countToolCalls(claim.job().id(), claim.attemptNo());
+                if (first + calls.size() > MAX_TOOL_CALLS) {
+                    throw new IllegalArgumentException("tool plan exceeds " + MAX_TOOL_CALLS + " calls per attempt");
+                }
+                List<NewChatToolCall> rows = new ArrayList<>();
+                for (int i = 0; i < calls.size(); i++) {
+                    ChatToolCallReservation call = calls.get(i);
+                    int index = first + i;
+                    rows.add(new NewChatToolCall(UUID.randomUUID().toString(), claim.job().id(), claim.attemptNo(),
+                            planRevision, index, "tc-" + index, call.registryVersion(), call.registryGroup(),
+                            call.capabilityId(), call.toolId(), call.schemaVersion(), call.inputDigest(),
+                            call.requestMeta()));
+                }
+                runs.reserveToolCalls(rows, now);
+                return rows.stream().map(NewChatToolCall::toolCallId).toList();
+            });
+            if (reserved == null) throw new ChatRunSuperseded();
+            return reserved;
+        }
+
+        @Override
+        public void toolCallStarted(String toolCallId) {
+            if (!runs.startToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), toolCallId, clock.instant())) {
+                throw new ChatRunSuperseded();
+            }
+        }
+
+        @Override
+        public void toolCallFinished(String toolCallId, ChatToolCallEnd end) {
+            if (!runs.finishToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), toolCallId, end,
+                    clock.instant())) {
+                throw new ChatRunSuperseded();
+            }
         }
     }
 

@@ -738,6 +738,27 @@ class GraphEvidenceServiceTest {
     }
 
     @Test
+    void readabilityKeepsAnOutageApartFromADenial() throws Exception {
+        basisOnly();
+        // A chat tool reports what it found: an outage must not read as "this evidence does not exist".
+        assertEquals(EvidenceService.Readability.READABLE, service().readability(EVIDENCE_ID, GRAPH_VERSION, null, "req-r"));
+
+        ObjectNode notProven = basisReceipt();
+        basisOf(notProven).putArray("evidenceIds").add("ev-" + "d".repeat(64));
+        rewriteRegisteredReceipt(notProven);
+        assertEquals(EvidenceService.Readability.DENIED, service().readability(EVIDENCE_ID, GRAPH_VERSION, null, "req-r"));
+        assertEquals(EvidenceService.Readability.DENIED,
+                service().readability("ev-" + "0".repeat(64), GRAPH_VERSION, null, "req-r"));
+        assertEquals(EvidenceService.Readability.DENIED,
+                service().readability("not-an-evidence-id", GRAPH_VERSION, null, "req-r"));
+
+        rewriteRegisteredReceipt(basisReceipt());
+        graphFailure = new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        assertEquals(EvidenceService.Readability.UNAVAILABLE,
+                service().readability(EVIDENCE_ID, GRAPH_VERSION, null, "req-r"));
+    }
+
+    @Test
     void theRelationsOwnCitationInTheReceiptNeverStandsInForTheBasisCitation() throws Exception {
         basisOnly();
         ObjectNode edited = basisReceipt();

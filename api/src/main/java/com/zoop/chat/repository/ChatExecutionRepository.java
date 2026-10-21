@@ -7,7 +7,9 @@ import java.util.Optional;
 /**
  * The job executor's writes. Every write of a running job is fenced: it applies only while the job is still
  * {@code running} under the same owner token and an unexpired lease, so a cancelled, expired or replaced run changes nothing.
- * The {@code lock*} reads take the row lock and must run inside a transaction.
+ * The {@code lock*} reads take the row lock and must run inside a transaction. Ending a job ({@link #complete},
+ * {@link #fail}, {@link #failExpired}) also closes its open tool calls: reserved ones as {@code cancelled}, running ones as
+ * {@code unknown}.
  */
 public interface ChatExecutionRepository {
     /** The oldest queued job, locked; jobs another executor already locked are skipped. */
@@ -36,4 +38,17 @@ public interface ChatExecutionRepository {
     Optional<ChatJobRow> lockExpired(String jobId, Instant at);
 
     boolean failExpired(String jobId, Instant at, String failure, String attempts);
+
+    /** How many tool calls the attempt has reserved so far (after {@link #lockOwned} in the same transaction). */
+    int countToolCalls(String jobId, int attemptNo);
+
+    /** Stores reserved tool calls (after {@link #lockOwned} in the same transaction). */
+    void reserveToolCalls(List<NewChatToolCall> calls, Instant at);
+
+    /** reserved → running, fenced like every run write; false when the run no longer owns the job. */
+    boolean startToolCall(String jobId, String ownerToken, int attemptNo, String toolCallId, Instant at);
+
+    /** running → succeeded|failed, fenced like every run write; false when the run no longer owns the job. */
+    boolean finishToolCall(String jobId, String ownerToken, int attemptNo, String toolCallId, ChatToolCallEnd end,
+            Instant at);
 }
