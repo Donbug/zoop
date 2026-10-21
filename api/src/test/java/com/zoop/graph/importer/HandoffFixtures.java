@@ -38,8 +38,10 @@ final class HandoffFixtures {
     static final String EVENT = "계약을 발표했다.";
     static final String GEO = "국내 시장이다.";
     static final String BASIS = "구조 근거 문장이다.";
+    /** The second structural basis of a two-hop chain: a sentence no issue, mention or relation cites. */
+    static final String BASIS2 = "두 번째 구조 근거 문장이다.";
     /** The emoji (two UTF-16 units, one code point) sits before every cited sentence. */
-    static final String TEXT = "합성기업은 \uD83D\uDE00 " + EVENT + " " + GEO + " " + BASIS;
+    static final String TEXT = "합성기업은 \uD83D\uDE00 " + EVENT + " " + GEO + " " + BASIS + " " + BASIS2;
     static final String ARTICLE_ID = "doc-" + "a".repeat(64);
     static final String ARTICLE_VERSION = "b".repeat(64);
     static final String RAW_VERSION = "c".repeat(64);
@@ -47,6 +49,8 @@ final class HandoffFixtures {
     static final String PUBLISHED_AT = "2026-10-08T09:00:00+09:00";
     static final String COMPANY_A = "SYNTH:000001";
     static final String COMPANY_B = "SYNTH:000002";
+    /** The middle company of a two-hop chain: a public company, or a private path company, by {@link Shape}. */
+    static final String COMPANY_M = "SYNTH:000003";
     static final String ISSUE = "issue:supply-2026q3";
     static final Observation SELECTOR = new Observation("round-1", SOURCE, 0, 0, ARTICLE_ID, RAW_VERSION, ARTICLE_VERSION);
 
@@ -61,63 +65,84 @@ final class HandoffFixtures {
      */
     record Spec(String handoffId, String canonicalPin, String publishedAt, String precision, String eventTime,
             String eventPrecision, String validFrom, String validUntil, boolean utf16Offsets, boolean verdicts,
-            boolean manualApproval, boolean live, boolean origin) {
+            boolean manualApproval, boolean live, boolean origin, Shape shape) {
         static Spec standard() {
             return new Spec(HANDOFF_ID, "4".repeat(64), PUBLISHED_AT, "datetime", "2026-09-30", "day", "2026-01-01",
-                    "2026-12-31", false, false, false, false, false);
+                    "2026-12-31", false, false, false, false, false, Shape.ONE_HOP);
         }
 
         Spec withHandoffId(String value) {
             return new Spec(value, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, origin);
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape);
         }
 
         Spec withCanonicalPin(String value) {
             return new Spec(handoffId, value, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, origin);
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape);
         }
 
         Spec withPublication(String value, String valuePrecision) {
             return new Spec(handoffId, canonicalPin, value, valuePrecision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, origin);
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape);
         }
 
         Spec withEvent(String value, String valuePrecision) {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, value, valuePrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, origin);
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape);
         }
 
         Spec withValidity(String from, String until) {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, from, until,
-                    utf16Offsets, verdicts, manualApproval, live, origin);
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape);
         }
 
         Spec withUtf16Offsets() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    true, verdicts, manualApproval, live, origin);
+                    true, verdicts, manualApproval, live, origin, shape);
         }
 
         Spec withVerdicts() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, true, manualApproval, live, origin);
+                    utf16Offsets, true, manualApproval, live, origin, shape);
         }
 
         /** The one S3 relation the edges rest on became eligible by an operator's final approval of a HOLD, not by the verifier. */
         Spec withManualApproval() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, true, live, origin);
+                    utf16Offsets, verdicts, true, live, origin, shape);
         }
 
         /** Provider-recorded live provenance ({@code executionMode: live}, {@code recordingKind: provider}). */
         Spec withLive() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, true, origin);
+                    utf16Offsets, verdicts, manualApproval, true, origin, shape);
         }
 
         /** The article's document version carries an operator-declared origin. */
         Spec withOrigin() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, true);
+                    utf16Offsets, verdicts, manualApproval, live, true, shape);
+        }
+
+        /** The shape of the one structural edge's company chain. */
+        Spec withShape(Shape value) {
+            return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
+                    utf16Offsets, verdicts, manualApproval, live, origin, value);
+        }
+    }
+
+    /**
+     * The structural edge {@code issue -> COMPANY_B}: {@link #ONE_HOP} is the complete chain {@code [A, B]} on one basis;
+     * {@link #TWO_HOP_PUBLIC} the complete chain {@code [A, M, B]} on two bases whose middle {@code M} is a PUBLIC company (so it
+     * also needs an INVOLVES edge to be linked); {@link #TWO_HOP_PRIVATE} the same chain whose middle is a private
+     * {@code pathCompanies} entry (never a public node); {@link #TWO_HOP_UNMAPPED} the two-basis edge whose middle company the
+     * operator did not map, so its path is {@code unavailable}.
+     */
+    enum Shape {
+        ONE_HOP, TWO_HOP_PUBLIC, TWO_HOP_PRIVATE, TWO_HOP_UNMAPPED;
+
+        boolean twoHop() {
+            return this != ONE_HOP;
         }
     }
 
@@ -141,16 +166,22 @@ final class HandoffFixtures {
         String relationJob = "rel-1";
         String upstreamJob = "s2-1";
         String candidate = "rc-" + "2".repeat(64);
+        String candidate2 = "rc-" + "9".repeat(64);
         String eventCandidate = "evc-" + "3".repeat(64);
 
         ObjectNode event = span(spec, EVENT);
         ObjectNode geo = span(spec, GEO);
         ObjectNode basis = span(spec, BASIS);
+        ObjectNode basis2 = span(spec, BASIS2);
         List<ObjectNode> evidence = new ArrayList<>(List.of(event, geo, basis));
+        if (spec.shape().twoHop()) {
+            evidence.add(basis2);
+        }
         evidence.sort((a, b) -> a.get("id").stringValue().compareTo(b.get("id").stringValue()));
         String eventId = event.get("id").stringValue();
         String geoId = geo.get("id").stringValue();
         String basisId = basis.get("id").stringValue();
+        String basis2Id = basis2.get("id").stringValue();
 
         ObjectNode bundle = StrictJson.newObject();
         bundle.put("schemaVersion", HandoffBundleVerifier.BUNDLE_SCHEMA);
@@ -194,18 +225,20 @@ final class HandoffFixtures {
             policies.put(name, name + "-1");
         }
         ArrayNode used = source.putArray("reviewUsed");
-        ObjectNode usedEntry = used.addObject();
-        usedEntry.put("relationCandidateId", candidate);
-        usedEntry.put("revision", 1);
-        ObjectNode approvalBasis = usedEntry.putObject("approvalBasis");
-        approvalBasis.put("kind", spec.manualApproval() ? HandoffBundleVerifier.OPERATOR_FINAL : HandoffBundleVerifier.AUTOMATIC);
-        approvalBasis.put("revision", 1);
-        if (spec.manualApproval()) {
-            approvalBasis.put("reviewer", "reviewer-final");
-        } else {
-            approvalBasis.putNull("reviewer");
+        for (String usedCandidate : spec.shape().twoHop() ? List.of(candidate, candidate2) : List.of(candidate)) {
+            ObjectNode usedEntry = used.addObject();
+            usedEntry.put("relationCandidateId", usedCandidate);
+            usedEntry.put("revision", 1);
+            ObjectNode approvalBasis = usedEntry.putObject("approvalBasis");
+            approvalBasis.put("kind", spec.manualApproval() ? HandoffBundleVerifier.OPERATOR_FINAL : HandoffBundleVerifier.AUTOMATIC);
+            approvalBasis.put("revision", 1);
+            if (spec.manualApproval()) {
+                approvalBasis.put("reviewer", "reviewer-final");
+            } else {
+                approvalBasis.putNull("reviewer");
+            }
+            approvalBasis.put("decidedAt", VERIFIED_AT);
         }
-        approvalBasis.put("decidedAt", VERIFIED_AT);
         ObjectNode audit = source.putObject("audit");
         audit.put("s3Relations", 2);
         ObjectNode eligibility = audit.putObject("eligibility");
@@ -217,13 +250,19 @@ final class HandoffFixtures {
         audit.put("impactCandidates", 0);
         audit.putObject("eligibleNotPublicByType");
 
+        List<String[]> publicCompanies = new ArrayList<>(List.of(new String[] {COMPANY_B, "co:b", "합성부품"},
+                new String[] {COMPANY_A, "co:a", "합성기업"}));
+        if (spec.shape() == Shape.TWO_HOP_PUBLIC) {
+            publicCompanies.add(new String[] {COMPANY_M, "co:m", "합성중간"});
+        }
         ArrayNode companies = bundle.putArray("companies");
-        for (String[] company : new String[][] {{COMPANY_B, "co:b", "합성부품"}, {COMPANY_A, "co:a", "합성기업"}}) {
-            ObjectNode node = companies.addObject();
-            node.put("id", company[0]);
-            node.put("canonicalId", company[1]);
-            node.put("label", company[2]);
-            node.put("decisionRef", "catalog-1");
+        for (String[] company : publicCompanies) {
+            companyNode(companies, company);
+        }
+        // The private support references of the complete two-hop path: catalogue companies that are never public nodes.
+        ArrayNode pathCompanies = bundle.putArray("pathCompanies");
+        if (spec.shape() == Shape.TWO_HOP_PRIVATE) {
+            companyNode(pathCompanies, new String[] {COMPANY_M, "co:m", "합성중간"});
         }
 
         ObjectNode sourceEvent = StrictJson.newObject();
@@ -323,29 +362,36 @@ final class HandoffFixtures {
 
         ArrayNode relations = bundle.putArray("relations");
         List<ObjectNode> relationNodes = new ArrayList<>();
-        ObjectNode involves = StrictJson.newObject();
-        involves.put("id", edge(Map.of("type", "INVOLVES", "source", ISSUE, "target", COMPANY_A)));
-        involves.put("type", "INVOLVES");
-        involves.put("source", ISSUE);
-        involves.put("target", COMPANY_A);
-        involves.putNull("role");
-        involves.put("assertionStatus", "announced");
-        involves.putArray("evidenceIds").add(eventId);
-        involves.putArray("basis");
-        ObjectNode involvesProvenance = involves.putObject("provenance");
-        involvesProvenance.put("origin", "s3-relation");
-        involvesProvenance.put("s3SemanticValidation", spec.manualApproval() ? "manual-operator-final-approval"
-                : "independent-verifier-supported-all-claims");
-        involves.putNull("decisionRef");
-        involves.putArray("sourceRefs").add(ref("s3-relation", relationJob, candidate));
-        relationNodes.add(involves);
+        // A participant of the issue: the standard chain starts at COMPANY_A; a PUBLIC middle is a participant too (it needs an
+        // INVOLVES edge to be linked, as every public company does).
+        for (String participant : spec.shape() == Shape.TWO_HOP_PUBLIC ? List.of(COMPANY_A, COMPANY_M) : List.of(COMPANY_A)) {
+            ObjectNode involves = StrictJson.newObject();
+            involves.put("id", edge(Map.of("type", "INVOLVES", "source", ISSUE, "target", participant)));
+            involves.put("type", "INVOLVES");
+            involves.put("source", ISSUE);
+            involves.put("target", participant);
+            involves.putNull("role");
+            involves.put("assertionStatus", "announced");
+            involves.putArray("evidenceIds").add(eventId);
+            involves.putArray("basis");
+            ObjectNode involvesProvenance = involves.putObject("provenance");
+            involvesProvenance.put("origin", "s3-relation");
+            involvesProvenance.put("s3SemanticValidation", spec.manualApproval() ? "manual-operator-final-approval"
+                    : "independent-verifier-supported-all-claims");
+            involves.putNull("decisionRef");
+            involves.putArray("sourceRefs").add(ref("s3-relation", relationJob, candidate));
+            involves.putNull("structuralPath");
+            relationNodes.add(involves);
+        }
 
         String relationKey = "7".repeat(64);
+        List<String> relationKeys = spec.shape().twoHop() ? List.of(relationKey, "9".repeat(64)) : List.of(relationKey);
         ObjectNode structuralPreimage = StrictJson.newObject();
         structuralPreimage.put("type", "STRUCTURALLY_RELATED_TO");
         structuralPreimage.put("source", ISSUE);
         structuralPreimage.put("target", COMPANY_B);
-        structuralPreimage.putArray("basis").add(relationKey);
+        ArrayNode preimageKeys = structuralPreimage.putArray("basis");
+        relationKeys.forEach(preimageKeys::add);
         ObjectNode structural = StrictJson.newObject();
         structural.put("id", "edge-" + Canonical.digest(structuralPreimage));
         structural.put("type", "STRUCTURALLY_RELATED_TO");
@@ -354,16 +400,35 @@ final class HandoffFixtures {
         structural.putNull("role");
         structural.put("assertionStatus", "announced");
         structural.putArray("evidenceIds").add(eventId);
-        ObjectNode basisNode = structural.putArray("basis").addObject();
-        basisNode.putObject("sourceRelation").put("jobId", relationJob).put("relationCandidateId", candidate);
-        basisNode.put("relationKey", relationKey);
-        basisNode.put("relationType", "SUPPLIES");
-        basisNode.put("validFrom", spec.validFrom());
-        basisNode.put("validUntil", spec.validUntil());
-        basisNode.putArray("countries").add("KR");
-        basisNode.put("verifiedAt", VERIFIED_AT);
-        basisNode.putArray("sourceArticles").addObject().put("articleId", ARTICLE_ID).put("articleVersion", ARTICLE_VERSION);
-        basisNode.putArray("evidenceIds").add(basisId);
+        ArrayNode basisArray = structural.putArray("basis");
+        ArrayNode structuralRefs = structural.putArray("sourceRefs");
+        for (int index = 0; index < relationKeys.size(); index++) {
+            String basisCandidate = index == 0 ? candidate : candidate2;
+            ObjectNode basisNode = basisArray.addObject();
+            basisNode.putObject("sourceRelation").put("jobId", relationJob).put("relationCandidateId", basisCandidate);
+            basisNode.put("relationKey", relationKeys.get(index));
+            basisNode.put("relationType", "SUPPLIES");
+            basisNode.put("validFrom", spec.validFrom());
+            basisNode.put("validUntil", spec.validUntil());
+            basisNode.putArray("countries").add("KR");
+            basisNode.put("verifiedAt", VERIFIED_AT);
+            basisNode.putArray("sourceArticles").addObject().put("articleId", ARTICLE_ID).put("articleVersion", ARTICLE_VERSION);
+            basisNode.putArray("evidenceIds").add(index == 0 ? basisId : basis2Id);
+            // The operator's S3 text as it stands: scope text, never an entity id.
+            basisNode.put("businessScope", index == 0 ? "부품 공급 계약" : "소재 공급 계약");
+            basisNode.put("productScope", index == 0 ? "배터리" : null);
+            structuralRefs.add(ref("s3-relation", relationJob, basisCandidate));
+        }
+        ObjectNode path = structural.putObject("structuralPath");
+        switch (spec.shape()) {
+            case ONE_HOP -> completePath(path, List.of(COMPANY_A, COMPANY_B), COMPANY_B);
+            case TWO_HOP_PUBLIC, TWO_HOP_PRIVATE -> completePath(path, List.of(COMPANY_A, COMPANY_M, COMPANY_B), COMPANY_M,
+                    COMPANY_B);
+            case TWO_HOP_UNMAPPED -> {
+                path.put("status", "unavailable");
+                path.put("reason", HandoffBundleVerifier.UNMAPPED_MIDDLE);
+            }
+        }
         ObjectNode structuralProvenance = structural.putObject("provenance");
         structuralProvenance.put("origin", "manual-operator-review");
         structuralProvenance.put("s3SemanticValidation", "none");
@@ -375,7 +440,6 @@ final class HandoffFixtures {
         structuralProvenance.put("basisEligibility", spec.manualApproval() ? "s3-operator-final-approval"
                 : "s3-independent-verifier-supported-all-claims");
         structural.put("decisionRef", "applic-1");
-        structural.putArray("sourceRefs").add(ref("s3-relation", relationJob, candidate));
         relationNodes.add(structural);
         relationNodes.sort((a, b) -> {
             int type = a.get("type").stringValue().compareTo(b.get("type").stringValue());
@@ -414,13 +478,14 @@ final class HandoffFixtures {
         exclusions.putObject("counts");
         exclusions.putArray("items");
         ObjectNode counts = bundle.putObject("counts");
-        counts.put("companies", 2);
+        counts.put("companies", spec.shape() == Shape.TWO_HOP_PUBLIC ? 3 : 2);
+        counts.put("pathCompanies", spec.shape() == Shape.TWO_HOP_PRIVATE ? 1 : 0);
         counts.put("issues", 1);
         ObjectNode relationCounts = counts.putObject("relations");
-        relationCounts.put("INVOLVES", 1);
+        relationCounts.put("INVOLVES", spec.shape() == Shape.TWO_HOP_PUBLIC ? 2 : 1);
         relationCounts.put("STRUCTURALLY_RELATED_TO", 1);
         relationCounts.put("FOLLOWS", 0);
-        counts.put("evidence", 3);
+        counts.put("evidence", spec.shape().twoHop() ? 4 : 3);
         counts.put("articles", 1);
         counts.put("exclusions", 0);
         ObjectNode checks = bundle.putObject("checks");
@@ -617,6 +682,32 @@ final class HandoffFixtures {
         ObjectNode node = StrictJson.newObject();
         preimage.forEach(node::put);
         return "edge-" + Canonical.digest(node);
+    }
+
+    /** One closed company object {@code {id, canonicalId, label, decisionRef}}: {@code company} is {id, canonicalId, label}. */
+    private static void companyNode(ArrayNode into, String[] company) {
+        ObjectNode node = into.addObject();
+        node.put("id", company[0]);
+        node.put("canonicalId", company[1]);
+        node.put("label", company[2]);
+        node.put("decisionRef", "catalog-1");
+    }
+
+    /**
+     * A complete structural path over {@code ids}; {@code suppliers[k]} is the supplier of link k (the other endpoint of the
+     * adjacent pair is its customer), so the link direction is a fact of the S3 relation, not of the chain order.
+     */
+    private static void completePath(ObjectNode path, List<String> ids, String... suppliers) {
+        path.put("status", "complete");
+        ArrayNode chain = path.putArray("companyIds");
+        ids.forEach(chain::add);
+        ArrayNode links = path.putArray("links");
+        for (int index = 0; index < suppliers.length; index++) {
+            String from = ids.get(index);
+            String to = ids.get(index + 1);
+            links.addObject().put("supplierCompanyId", suppliers[index]).put("customerCompanyId",
+                    suppliers[index].equals(from) ? to : from);
+        }
     }
 
     private static ObjectNode ref(String kind, String jobId, String id) {

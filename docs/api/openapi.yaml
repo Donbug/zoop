@@ -11795,7 +11795,7 @@ components:
                 - "unknown"
             -
               type: "null"
-          description: "AI 인계 묶음(zoop-graph-handoff-bundle-2) 이슈의 사건 상태를 그대로 전달한다. 일어난 사건과 발표·예정·전망·취소된 사건을 구분하며, 상태를 바꾸거나 추정하지 않는다. 스냅샷에 상태가 없으면 null이다."
+          description: "AI 인계 묶음 이슈의 사건 상태를 그대로 전달한다. 일어난 사건과 발표·예정·전망·취소된 사건을 구분하며, 상태를 바꾸거나 추정하지 않는다. 스냅샷에 상태가 없으면 null이다."
         companyIds:
           items:
             type: "string"

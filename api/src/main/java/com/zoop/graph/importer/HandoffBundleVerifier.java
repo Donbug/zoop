@@ -31,7 +31,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The strict, closed validator of a {@code zoop-graph-handoff-bundle-4} and of its frozen manifest: a Java port of the
+ * The strict, closed validator of a {@code zoop-graph-handoff-bundle-5} and of its frozen manifest: a Java port of the
  * producer's own {@code validate_bundle} ({@code ai/pipeline/.../handoff_contracts.py}), so the app never trusts a producer
  * claim it did not recompute. Every object has exactly the keys the producer writes, every value its type and pattern, every
  * reference is closed (articles, evidence, companies, issues, relations, source pins, review revisions), every id formula
@@ -43,7 +43,7 @@ import tools.jackson.databind.node.ObjectNode;
  */
 final class HandoffBundleVerifier {
     static final String MANIFEST_SCHEMA = "zoop-ai-handoff-1";
-    static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-4";
+    static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-5";
     static final String POLICY = "zoop-public-projection-policy-1";
     static final String EVIDENCE_KIND = "graph-body-span";
     static final String OFFSET_UNIT = "unicode_code_point";
@@ -108,6 +108,10 @@ final class HandoffBundleVerifier {
     /** The eligibility of an S3 relation was decided by a human's final approval of a HOLD: not a verifier verdict. */
     static final String OPERATOR_FINAL = "operator-final-approval";
     static final String SOURCE_SUPPORT_POLICY = "origin-or-exact-text-union";
+    /** The only reason a structural path may be unavailable: a two-basis chain whose middle company the operator did not map. */
+    static final String UNMAPPED_MIDDLE = "intermediate_company_unmapped";
+    /** The longest business or product scope text of one structural basis, in Unicode code points. */
+    private static final int MAX_SCOPE_CODE_POINTS = 500;
 
     private HandoffBundleVerifier() {
     }
@@ -159,7 +163,7 @@ final class HandoffBundleVerifier {
     /** SHA-256 of the canonical JSON of the five public collections: the bundle's {@code digests.content}. */
     static String contentDigest(JsonNode bundle) {
         ObjectNode subset = StrictJson.newObject();
-        for (String key : List.of("companies", "issues", "relations", "evidence", "articles")) {
+        for (String key : List.of("companies", "pathCompanies", "issues", "relations", "evidence", "articles")) {
             subset.set(key, bundle.get(key));
         }
         return Canonical.digest(subset);
@@ -178,8 +182,8 @@ final class HandoffBundleVerifier {
 
     static HandoffBundle verify(JsonNode node) {
         Obj bundle = Obj.of(node).exactly(Set.of("schemaVersion", "handoffId", "manifestDigest", "provenance", "policy",
-                "sources", "companies", "issues", "relations", "evidence", "articles", "exclusions", "counts", "checks",
-                "readiness", "digests"));
+                "sources", "companies", "pathCompanies", "issues", "relations", "evidence", "articles", "exclusions", "counts",
+                "checks", "readiness", "digests"));
         need(BUNDLE_SCHEMA.equals(bundle.string("schemaVersion")));
         String handoffId = text(bundle, "handoffId", ID);
         String manifestDigest = text(bundle, "manifestDigest", HASH);
@@ -357,14 +361,21 @@ final class HandoffBundleVerifier {
         List<Obj> companyNodes = bundle.objects("companies");
         need(companyNodes.size() <= MAX_DECISIONS);
         for (Obj c : companyNodes) {
-            c.exactly(Set.of("id", "canonicalId", "label", "decisionRef"));
-            String id = text(c, "id", ID);
-            text(c, "canonicalId", ID);
-            text(c, "decisionRef", ID);
-            String label = c.string("label");
-            need(!companies.containsKey(id));
-            companies.put(id, new Company(id, label));
+            Company company = company(c);
+            need(!companies.containsKey(company.id()));
+            companies.put(company.id(), company);
         }
+        // pathCompanies: the private support references of structural paths. Same closed shape as a company, strictly ascending by
+        // id, never a public company or issue; their exact closure over the complete paths is checked with the relations below.
+        Map<String, Company> pathCompanies = new LinkedHashMap<>();
+        List<Obj> pathCompanyNodes = bundle.objects("pathCompanies");
+        need(pathCompanyNodes.size() <= MAX_DECISIONS);
+        for (Obj c : pathCompanyNodes) {
+            Company company = company(c);
+            need(!pathCompanies.containsKey(company.id()) && !companies.containsKey(company.id()));
+            pathCompanies.put(company.id(), company);
+        }
+        need(sortedUnique(new ArrayList<>(pathCompanies.keySet())));
 
         // issues --------------------------------------------------------------------------------------------------------
         Map<String, Issue> issues = new LinkedHashMap<>();
@@ -434,7 +445,7 @@ final class HandoffBundleVerifier {
                 need(eventKeys.contains(Canonical.write(representative.node())));
             }
             // fieldProvenance and fieldVerdicts were checked above, together with the headline values they decide.
-            need(!issues.containsKey(id) && !companies.containsKey(id));
+            need(!issues.containsKey(id) && !companies.containsKey(id) && !pathCompanies.containsKey(id));
             issues.put(id, new Issue(id, title, action, target, eventTime, timePrecision, assertionStatus,
                     geographyValue, geographyPolicy, geographyEvidence, evidenceIds));
         }
@@ -448,11 +459,13 @@ final class HandoffBundleVerifier {
         Set<String> linkedIssues = new HashSet<>();
         Set<String> linkedCompanies = new HashSet<>();
         List<Relation> relations = new ArrayList<>();
+        Map<String, Set<String>> participants = new HashMap<>();
+        List<PendingPath> pendingPaths = new ArrayList<>();
         List<Obj> relationNodes = bundle.objects("relations");
         need(relationNodes.size() <= MAX_RELATIONS);
         for (Obj r : relationNodes) {
             r.exactly(Set.of("id", "type", "source", "target", "role", "assertionStatus", "evidenceIds", "basis",
-                    "provenance", "decisionRef", "sourceRefs"));
+                    "provenance", "decisionRef", "sourceRefs", "structuralPath"));
             String id = text(r, "id", ID);
             String type = r.string("type");
             need(PUBLIC_TYPES.contains(type) && relationIds.add(id));
@@ -468,6 +481,9 @@ final class HandoffBundleVerifier {
                 linkedIssues.add(target);
             } else {
                 linkedCompanies.add(target);
+                if (type.equals("INVOLVES")) {
+                    participants.computeIfAbsent(source, key -> new HashSet<>()).add(target);
+                }
             }
             String role = r.stringOrNull("role");
             String assertionStatus = r.stringOrNull("assertionStatus");
@@ -481,7 +497,7 @@ final class HandoffBundleVerifier {
             ArrayNode relationKeys = StrictJson.newArray();
             for (Obj b : basisNodes) {
                 b.exactly(Set.of("sourceRelation", "relationKey", "relationType", "validFrom", "validUntil", "countries",
-                        "verifiedAt", "sourceArticles", "evidenceIds"));
+                        "verifiedAt", "sourceArticles", "evidenceIds", "businessScope", "productScope"));
                 Obj sourceRelation = b.object("sourceRelation").exactly(Set.of("jobId", "relationCandidateId"));
                 String jobId = text(sourceRelation, "jobId", ID);
                 String candidate = text(sourceRelation, "relationCandidateId", RC);
@@ -496,6 +512,11 @@ final class HandoffBundleVerifier {
                 String validFrom = b.stringOrNull("validFrom");
                 String validUntil = b.stringOrNull("validUntil");
                 strings(b, "countries", 10);
+                // The scopes are the operator's S3 text copied as it stands: text, never an entity id and never a node.
+                for (String scope : List.of("businessScope", "productScope")) {
+                    String value = b.stringOrNull(scope);
+                    need(value == null || value.codePointCount(0, value.length()) <= MAX_SCOPE_CODE_POINTS);
+                }
                 List<String> basisEvidence = evidenceIds(b, "evidenceIds", 1, evidence, referenced);
                 List<Obj> links = b.objects("sourceArticles");
                 need(links.size() <= 1000);
@@ -581,6 +602,11 @@ final class HandoffBundleVerifier {
                             && r.isNull("assertionStatus") && refs.size() == 1 && basisNodes.isEmpty());
                 }
             }
+            if (type.equals("STRUCTURALLY_RELATED_TO")) {
+                pendingPaths.add(new PendingPath(source, target, r.object("structuralPath"), basisNodes.size()));
+            } else {
+                need(r.isNull("structuralPath"));
+            }
             need(id.equals("edge-" + Canonical.digest(preimage)));
             relations.add(new Relation(id, type, source, target, role, assertionStatus, evidenceIds, basis,
                     provenance.string("origin")));
@@ -588,6 +614,9 @@ final class HandoffBundleVerifier {
         need(issues.keySet().equals(linkedIssues));
         need(companies.keySet().equals(linkedCompanies));
         need(evidence.keySet().equals(referenced));
+        // The structural paths close over the INVOLVES participants of their issue, the public companies and the private support
+        // references: no orphan middle company, no public node is invented for a path.
+        need(structuralPaths(pendingPaths, participants, companies, pathCompanies).equals(pathCompanies.keySet()));
 
         // exclusions, counts, checks, readiness, digests ----------------------------------------------------------------
         Obj exclusions = bundle.object("exclusions").exactly(Set.of("counts", "items"));
@@ -624,11 +653,11 @@ final class HandoffBundleVerifier {
             need(exclusionCounts.count(entry.getKey()) == entry.getValue());
         }
 
-        Obj counts = bundle.object("counts").exactly(Set.of("companies", "issues", "relations", "evidence", "articles",
-                "exclusions"));
-        need(counts.count("companies") == companies.size() && counts.count("issues") == issues.size()
-                && counts.count("evidence") == evidence.size() && counts.count("articles") == articles.size()
-                && counts.count("exclusions") == items.size());
+        Obj counts = bundle.object("counts").exactly(Set.of("companies", "pathCompanies", "issues", "relations", "evidence",
+                "articles", "exclusions"));
+        need(counts.count("companies") == companies.size() && counts.count("pathCompanies") == pathCompanies.size()
+                && counts.count("issues") == issues.size() && counts.count("evidence") == evidence.size()
+                && counts.count("articles") == articles.size() && counts.count("exclusions") == items.size());
         Obj relationCounts = counts.object("relations").exactly(Set.copyOf(PUBLIC_TYPES));
         for (String type : PUBLIC_TYPES) {
             need(relationCounts.count(type) == typeCounts.get(type));
@@ -647,8 +676,77 @@ final class HandoffBundleVerifier {
         List<Approval> approvals = new ArrayList<>();
         usedReviews.values().forEach(perJob -> approvals.addAll(perJob.values()));
         return new HandoffBundle(handoffId, manifestDigest, sourceKind, executionMode, recordingKind, policyVersion, files,
-                pins, new ArrayList<>(companies.values()), new ArrayList<>(issues.values()), relations,
-                new ArrayList<>(evidence.values()), new ArrayList<>(articles.values()), approvals);
+                pins, new ArrayList<>(companies.values()), new ArrayList<>(pathCompanies.values()),
+                new ArrayList<>(issues.values()), relations, new ArrayList<>(evidence.values()),
+                new ArrayList<>(articles.values()), approvals);
+    }
+
+    /** One closed company object: the id, the label the app catalogue must hold, and the producer's own canonical id and ref. */
+    private static Company company(Obj node) {
+        node.exactly(Set.of("id", "canonicalId", "label", "decisionRef"));
+        String id = text(node, "id", ID);
+        text(node, "canonicalId", ID);
+        text(node, "decisionRef", ID);
+        return new Company(id, node.string("label"));
+    }
+
+    /** A STRUCTURALLY_RELATED_TO relation's path, held until every INVOLVES relation of the bundle is known. */
+    private record PendingPath(String issue, String target, Obj path, int basis) {
+    }
+
+    /**
+     * The closed {@code structuralPath} of every structural relation, checked against the issue's INVOLVES participants and the
+     * company sets. A {@code complete} path is the ordered company chain {@code [P, C]} or {@code [P, M, C]}, one link per
+     * basis: {@code P} is a participant of the relation's own issue, {@code C} is the relation target and not a participant, all
+     * ids are distinct, the middle is a mapped company (public, or a private path company), and each link's two endpoints are the
+     * adjacent chain ids in either order (the link's direction is the S3 supplier/customer direction, kept as stated). A path is
+     * {@code unavailable} only for a two-basis chain whose middle company is unmapped; a one-basis edge always has the complete
+     * two-company chain, and nothing is ever truncated or invented.
+     *
+     * @return the private path companies the complete paths use: the middles that are not public companies
+     */
+    private static Set<String> structuralPaths(List<PendingPath> pending, Map<String, Set<String>> participants,
+            Map<String, Company> companies, Map<String, Company> pathCompanies) {
+        Set<String> used = new HashSet<>();
+        for (PendingPath item : pending) {
+            Obj path = item.path();
+            String status = path.string("status");
+            if (status.equals("unavailable")) {
+                path.exactly(Set.of("status", "reason"));
+                need(UNMAPPED_MIDDLE.equals(path.string("reason")) && item.basis() == 2);
+                continue;
+            }
+            need(status.equals("complete"));
+            path.exactly(Set.of("status", "companyIds", "links"));
+            List<String> ids = strings(path, "companyIds", 3);
+            need(ids.size() >= 2 && ids.size() == item.basis() + 1 && new HashSet<>(ids).size() == ids.size());
+            for (String id : ids) {
+                need(ID.matcher(id).matches());
+            }
+            Set<String> involved = participants.getOrDefault(item.issue(), Set.of());
+            String first = ids.get(0);
+            String last = ids.get(ids.size() - 1);
+            need(involved.contains(first) && last.equals(item.target()) && !involved.contains(last));
+            need(companies.containsKey(first) && companies.containsKey(last));
+            for (int index = 1; index < ids.size() - 1; index++) {
+                String middle = ids.get(index);
+                need(companies.containsKey(middle) || pathCompanies.containsKey(middle));
+                if (!companies.containsKey(middle)) {
+                    used.add(middle);
+                }
+            }
+            List<Obj> links = path.objects("links");
+            need(links.size() == ids.size() - 1);
+            for (int index = 0; index < links.size(); index++) {
+                Obj link = links.get(index).exactly(Set.of("supplierCompanyId", "customerCompanyId"));
+                String supplier = text(link, "supplierCompanyId", ID);
+                String customer = text(link, "customerCompanyId", ID);
+                String from = ids.get(index);
+                String to = ids.get(index + 1);
+                need((supplier.equals(from) && customer.equals(to)) || (supplier.equals(to) && customer.equals(from)));
+            }
+        }
+        return used;
     }
 
     /**

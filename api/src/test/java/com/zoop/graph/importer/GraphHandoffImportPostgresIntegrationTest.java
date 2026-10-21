@@ -280,6 +280,45 @@ class GraphHandoffImportPostgresIntegrationTest {
     }
 
     @Test
+    void aPrivatePathCompanyIsCheckedInTheCatalogueUnderTheLockAndNeverBecomesAPublicNode() throws Exception {
+        Built twoHop = HandoffFixtures.build(HandoffFixtures.Spec.standard().withShape(HandoffFixtures.Shape.TWO_HOP_PRIVATE));
+        handoff.envelope = twoHop.envelopeBytes();
+        long filesBefore = files();
+        String history = activationFingerprint();
+
+        // Absent from the catalogue, then named differently: the union check fails and nothing at all is written.
+        for (String name : new String[] {null, "다른 중간"}) {
+            if (name != null) {
+                jdbc.update("INSERT INTO companies (id, name, name_key, search_text) VALUES (?, ?, '', '')",
+                        HandoffFixtures.COMPANY_M, name);
+            }
+            GraphHandoffResult refused = importer.run(twoHop.request());
+            assertFalse(refused.succeeded(), String.valueOf(name));
+            assertEquals(GraphHandoffFailure.COMPANY_MISMATCH, refused.failure().failure(), String.valueOf(name));
+            assertEquals(0, count("SELECT count(*) FROM graph_versions WHERE id LIKE 'gv-%'"));
+            assertEquals(0, count("SELECT count(*) FROM evidence WHERE article_id = ?", HandoffFixtures.ARTICLE_ID));
+            assertEquals(0, count("SELECT count(*) FROM artifacts WHERE id LIKE 'artifact-%gv-%'"));
+            assertEquals(filesBefore, files());
+        }
+        jdbc.update("UPDATE companies SET name = ? WHERE id = ?", "합성중간", HandoffFixtures.COMPANY_M);
+
+        GraphHandoffResult staged = importer.run(twoHop.request());
+
+        assertTrue(staged.succeeded(), () -> String.valueOf(staged.failure() == null ? null : staged.failure().failure()));
+        assertEquals(2, staged.staged().companies(), "the path company is catalogue-checked but not a public company");
+        assertEquals(4, count("SELECT count(*) FROM evidence WHERE verification_artifact_id = ? AND quote_verified",
+                "artifact-receipt-" + twoHop.versionId()));
+        assertEquals(history, activationFingerprint());
+        String snapshot = new String(Files.readAllBytes(root.resolve("graph_snapshot").resolve(twoHop.versionId() + ".json")),
+                java.nio.charset.StandardCharsets.UTF_8);
+        assertFalse(snapshot.contains(HandoffFixtures.COMPANY_M));
+        assertFalse(snapshot.contains("structuralPath"));
+        String receipt = new String(Files.readAllBytes(root.resolve("verification_receipt").resolve(twoHop.versionId() + ".json")),
+                java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(receipt.contains("structural_path_closed_over_involves_basis_and_catalog"));
+    }
+
+    @Test
     void anEvidenceCollisionRollsEverythingBackInPostgresAndRemovesTheFilesItCreated() throws Exception {
         String last = built.evidenceIds().get(built.evidenceIds().size() - 1);
         jdbc.update("""

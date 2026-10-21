@@ -1,4 +1,4 @@
-"""Operator per-field verdicts (`eventTime` / `period`) of the public graph handoff (bundle `-4`, decisions `-2`).
+"""Operator per-field verdicts (`eventTime` / `period`) of the public graph handoff (bundle `-5`, decisions `-2`).
 
 A verdict is an OPERATOR review of one original mention's value; S2/S3 verify neither field, and nothing here derives a verdict from a selection, a geography or a model.
 Expectations are written by hand from the authored world (`scripts/graph_handoff_smoke.py`: `verdict_cases`, `expected_verdicts`, `expected_headlines`); the reviews are
@@ -91,7 +91,7 @@ def test_a_decisions_file_without_the_verdict_list_or_of_the_earlier_schema_is_r
 
 def test_the_review_is_exported_as_hand_written_and_withholds_exactly_what_the_selection_basis_rejects(verdict_bundle, shared):
     bundle = verdict_bundle
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-4"
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5"
     assert {i["id"]: i["fieldVerdicts"] for i in bundle["issues"]} == hs.expected_verdicts(shared, hs.verdict_cases(shared))
     assert {i["id"]: i["fieldProvenance"] for i in bundle["issues"]} == hs.expected_field_provenance(shared, hs.VERDICT_WITHHELD)
     assert {i["id"]: (i["eventTime"], i["timePrecision"], i["period"]) for i in bundle["issues"]} == hs.expected_headlines(shared, hs.VERDICT_WITHHELD)

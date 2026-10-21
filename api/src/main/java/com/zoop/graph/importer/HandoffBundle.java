@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The parts of a fully validated {@code zoop-graph-handoff-bundle-4} that the import maps. Every field here has passed the
+ * The parts of a fully validated {@code zoop-graph-handoff-bundle-5} that the import maps. Every field here has passed the
  * closed schema, the reference closure and the id formulas of {@link HandoffBundleVerifier}; nothing is trusted from the producer
  * that the verifier did not check. The snapshot writer reads the fields this model does not type ({@code period}, source events,
  * the representative, per-basis relation key, type, countries and source articles) from the verified raw bundle; the issue's
@@ -20,16 +20,22 @@ import java.util.Map;
  * relation the edges rest on (automatic verdict or an operator's final approval); the verifier recomputed the relation literals
  * from it. Each article's {@code textSha256} and declared {@code origin} are the inputs of the recomputed per-issue
  * {@code sourceSupport}, which (like the approvals) stays in the retained receipt and never reaches the snapshot.
+ *
+ * <p>{@code pathCompanies} are the PRIVATE support references of structural paths: the mapped middle companies of complete
+ * two-hop paths that are not public {@code companies}. They are catalogue-validated beside {@code companies} but are never
+ * public graph nodes, never written to the snapshot, and the structural path itself (and each basis's business and product
+ * scope text) stays in the retained receipt: an operator-mapped basis chain, not a causality or price-direction claim.
  */
 public record HandoffBundle(String handoffId, String manifestDigest, String sourceKind, String executionMode,
         String recordingKind, String policyVersion, Map<String, String> files, List<SourcePin> sources,
-        List<Company> companies, List<Issue> issues, List<Relation> relations, List<Evidence> evidence,
-        List<Article> articles, List<Approval> approvals) {
+        List<Company> companies, List<Company> pathCompanies, List<Issue> issues, List<Relation> relations,
+        List<Evidence> evidence, List<Article> articles, List<Approval> approvals) {
 
     public HandoffBundle {
         files = Map.copyOf(files);
         sources = List.copyOf(sources);
         companies = List.copyOf(companies);
+        pathCompanies = List.copyOf(pathCompanies);
         issues = List.copyOf(issues);
         relations = List.copyOf(relations);
         evidence = List.copyOf(evidence);

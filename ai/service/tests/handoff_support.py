@@ -66,7 +66,38 @@ def manifest_of(bundle: dict[str, Any]) -> dict[str, Any]:
 def seal(bundle: dict[str, Any]) -> dict[str, Any]:
     """Recompute the manifest and content digests after a mutation, the way the producer does, so only the targeted rule can refuse the bundle."""
     bundle["manifestDigest"] = digest(manifest_of(bundle))
-    bundle["digests"]["content"] = digest({key: bundle[key] for key in ("companies", "issues", "relations", "evidence", "articles")})
+    bundle["digests"]["content"] = digest({key: bundle[key] for key in ("companies", "pathCompanies", "issues", "relations", "evidence", "articles")})
+    return bundle
+
+
+def structural(bundle: dict[str, Any], hops: int = 1, middle: str = "private") -> dict[str, Any]:
+    """Add one STRUCTURALLY_RELATED_TO relation from the example issue's participant P to a non-participant company C, in place.
+    `hops` is the number of bases (1 or 2); `middle` is `private` (mapped, only in pathCompanies), `main` (mapped and a public company) or `unmapped` (2 hops only)."""
+    evidence_id = bundle["evidence"][0]["id"]
+    p, c, m = "KRX:005930", "KRX:000660", "KRX:000270"
+    bundle["companies"].append({"id": c, "canonicalId": "co:synth-2", "label": "합성고객", "decisionRef": "canon-2026-10-16:company"})
+    middle_company = {"id": m, "canonicalId": "co:synth-3", "label": "합성중간", "decisionRef": "canon-2026-10-16:company"}
+    if hops == 2 and middle == "main":
+        bundle["companies"].append(middle_company)
+    elif hops == 2 and middle == "private":
+        bundle["pathCompanies"].append(middle_company)
+    bundle["companies"].sort(key=lambda company: company["id"])
+    chain = [p, c] if hops == 1 else [p, m, c]
+    links = [{"supplierCompanyId": chain[i], "customerCompanyId": chain[i + 1]} for i in range(hops)]
+    path = {"status": "unavailable", "reason": "intermediate_company_unmapped"} if middle == "unmapped" else {"status": "complete", "companyIds": chain, "links": links}
+    basis = [{"sourceRelation": {"jobId": "s3-synthetic-relation", "relationCandidateId": "rc-" + str(4 + i) * 64}, "relationKey": str(i + 1) * 64, "relationType": "SUPPLIES",
+             "businessScope": "합성 사업 범위" if i == 0 else None, "productScope": "합성 제품 범위" if i == 0 else None, "validFrom": None, "validUntil": None, "countries": [],
+             "verifiedAt": "2026-10-13T00:00:01+00:00", "sourceArticles": [], "evidenceIds": [evidence_id]} for i in range(hops)]
+    bundle["relations"].append({"id": "edge-" + digest({"type": "STRUCTURALLY_RELATED_TO", "source": "issue:synthetic-supply", "target": c, "hops": hops, "middle": middle}),
+                                "type": "STRUCTURALLY_RELATED_TO", "source": "issue:synthetic-supply", "target": c, "role": None, "assertionStatus": None, "evidenceIds": [],
+                                "basis": basis, "structuralPath": path,
+                                "provenance": {"origin": "manual-operator-review", "s3SemanticValidation": "none", "status": "operator-asserted", "reviewer": "reviewer-1",
+                                               "decisionRef": "structural-1", "decisionVersion": "v1", "bindingDigest": "a" * 64,
+                                               "basisEligibility": "s3-independent-verifier-supported-all-claims"},
+                                "decisionRef": None, "sourceRefs": []})
+    counts = bundle["counts"]
+    counts["companies"], counts["pathCompanies"] = len(bundle["companies"]), len(bundle["pathCompanies"])
+    counts["relations"]["STRUCTURALLY_RELATED_TO"] += 1
     return bundle
 
 
@@ -211,20 +242,14 @@ def full_bundle() -> dict[str, Any]:
         **refs[1], "field": "period", "value": "2026Q4", "decision": "HOLD", "reasonCode": "ambiguous", "evidenceIds": [evidence_id],
         "verification": "operator-field-verdict", "reviewer": "reviewer-2", "decisionRef": "field-2026-10-21:2", "decisionVersion": "v1"})
     bundle["sources"].append({**copy.deepcopy(bundle["sources"][0]), "relation": {"jobId": "s3-synthetic-relation-2", "inputDigest": "7" * 64}})
-    relation_candidate = "rc-" + "4" * 64
-    bundle["relations"].append({
-        "id": "edge-" + "a" * 64, "type": "STRUCTURALLY_RELATED_TO", "source": "issue:synthetic-supply", "target": "KRX:005930", "role": None, "assertionStatus": None,
-        "evidenceIds": [evidence_id],
-        "basis": [{"sourceRelation": {"jobId": job["jobId"], "relationCandidateId": relation_candidate}, "relationKey": "b" * 64, "relationType": "SUPPLIES",
-                   "validFrom": None, "validUntil": "2026-12-31", "countries": ["KR"], "verifiedAt": "2026-10-01T00:00:00+00:00",
-                   "sourceArticles": [{"articleId": article["articleId"], "articleVersion": article["articleVersion"]}], "evidenceIds": [evidence_id]}],
-        "provenance": {"origin": "manual-operator-review", "s3SemanticValidation": "none", "status": "operator-asserted", "reviewer": "reviewer-a",
-                       "decisionRef": "structural-1", "decisionVersion": "v1", "bindingDigest": "c" * 64,
-                       "basisEligibility": "s3-independent-verifier-supported-all-claims"},
-        "decisionRef": "structural-1", "sourceRefs": [{"kind": "s3-relation", "jobId": job["jobId"], "id": relation_candidate}]})
+    structural(bundle, hops=2, middle="private")     # a complete two-link path over a private (non-public) mapped middle company
+    relation = bundle["relations"][-1]
+    relation["basis"][0].update(validUntil="2026-12-31", countries=["KR"], verifiedAt="2026-10-01T00:00:00+00:00",
+                                sourceArticles=[{"articleId": article["articleId"], "articleVersion": article["articleVersion"]}])
+    relation.update(decisionRef="structural-1", sourceRefs=[{"kind": "s3-relation", "jobId": job["jobId"], "id": "rc-" + "4" * 64}])
     bundle["relations"].append({
         "id": "edge-" + "d" * 64, "type": "FOLLOWS", "source": "issue:synthetic-supply", "target": "issue:synthetic-earlier", "role": None, "assertionStatus": None,
-        "evidenceIds": [evidence_id], "basis": [],
+        "evidenceIds": [evidence_id], "basis": [], "structuralPath": None,
         "provenance": {"origin": "s2-comparison-with-operator-decision", "s3SemanticValidation": "none", "s2Relation": "FOLLOWS",
                        "evidenceGate": "exact-source-citation-in-incoming-article", "groupDigest": "e" * 64, "decisionRef": "follows-1", "decisionVersion": "v1"},
         "decisionRef": "follows-1", "sourceRefs": [{"kind": "s2-comparison", "jobId": event["upstream"]["jobId"], "id": "evc-" + "3" * 64 + ">event-1"}]})
@@ -234,4 +259,6 @@ def full_bundle() -> dict[str, Any]:
                                        "detail": {"fields": ["title", "eventTime"]}},
                                       {"kind": "structural", "id": "issue:z", "jobId": None, "code": "applicability_binding_mismatch",
                                        "detail": {"expectedBindingDigest": "f" * 64}}]}
+    bundle["counts"]["relations"] = {name: sum(r["type"] == name for r in bundle["relations"]) for name in ("INVOLVES", "STRUCTURALLY_RELATED_TO", "FOLLOWS")}
+    bundle["counts"]["exclusions"] = len(bundle["exclusions"]["items"])
     return seal(bundle)

@@ -64,7 +64,7 @@ def example_bundle() -> dict[str, Any]:
     verdict = {**mention_ref, "field": "eventTime", "value": "2026-09-30", "decision": "ALLOW", "reasonCode": "stated", "evidenceIds": [evidence_id],
                "verification": "operator-field-verdict", "reviewer": "reviewer-1", "decisionRef": "field-2026-10-21:1", "decisionVersion": "v1"}
     bundle: dict[str, Any] = {
-        "schemaVersion": "zoop-graph-handoff-bundle-4", "handoffId": HANDOFF, "manifestDigest": digest(example_manifest()),
+        "schemaVersion": "zoop-graph-handoff-bundle-5", "handoffId": HANDOFF, "manifestDigest": digest(example_manifest()),
         "provenance": {"declaredSourceKind": "synthetic", "observedSourceKind": "synthetic", "executionMode": "replay", "recordingKind": "authored-test"},
         "policy": {"version": "zoop-public-projection-policy-1", "files": {"canonical": "6" * 64, "decisions": "7" * 64, "bindings": "8" * 64},
                    "evidenceIdKind": "graph-body-span", "offsetUnit": "unicode_code_point", "geography": "operator-field-verdict",
@@ -79,6 +79,7 @@ def example_bundle() -> dict[str, Any]:
                      "audit": {"s3Relations": 1, "eligibility": {"eligible": 1, "hold": 0, "reject": 0, "pending": 0}, "reviewPending": 0,
                                "impactCandidates": 0, "eligibleNotPublicByType": {"SUPPLIES": 0}}}],
         "companies": [{"id": "KRX:005930", "canonicalId": "co:synth-1", "label": "합성기업", "decisionRef": "canon-2026-10-16:company"}],
+        "pathCompanies": [],
         "issues": [{"id": "issue:synthetic-supply", "canonicalId": "issue:supply", "title": "합성 공급 계약", "action": "공급 계약 발표", "target": None,
                     "eventTime": "2026-09-30", "timePrecision": "day", "period": None, "assertionStatus": "announced",
                     "geography": {"value": "domestic", "decisionRef": "geo-2026-10-16:1", "decisionVersion": "v1", "policyVersion": "zoop-public-projection-policy-1",
@@ -90,6 +91,7 @@ def example_bundle() -> dict[str, Any]:
                                       "duplicateGroups": []}}],
         "relations": [{"id": "edge-" + digest({"type": "INVOLVES", "source": "issue:synthetic-supply", "target": "KRX:005930"}), "type": "INVOLVES",
                        "source": "issue:synthetic-supply", "target": "KRX:005930", "role": None, "assertionStatus": None, "evidenceIds": [evidence_id], "basis": [],
+                       "structuralPath": None,
                        "provenance": {"origin": "s3-relation", "s3SemanticValidation": "independent-verifier-supported-all-claims"}, "decisionRef": None,
                        "sourceRefs": [{"kind": "s3-relation", "jobId": job["jobId"], "id": relation_candidate}]}],
         "evidence": [{"id": evidence_id, "kind": "graph-body-span", "articleId": article_id, "articleVersion": doc_version, "start": start, "end": end,
@@ -103,12 +105,12 @@ def example_bundle() -> dict[str, Any]:
                       "observations": [{"roundId": "round-1", "sourceId": "source-1", "page": 1, "ordinal": 0, "observedAt": "2026-09-30T02:00:00+00:00",
                                         "grant": {"grantId": "grant-1", "revision": "1"}}]}],
         "exclusions": {"counts": {}, "items": []},
-        "counts": {"companies": 1, "issues": 1, "relations": {"INVOLVES": 1, "STRUCTURALLY_RELATED_TO": 0, "FOLLOWS": 0}, "evidence": 1, "articles": 1,
+        "counts": {"companies": 1, "pathCompanies": 0, "issues": 1, "relations": {"INVOLVES": 1, "STRUCTURALLY_RELATED_TO": 0, "FOLLOWS": 0}, "evidence": 1, "articles": 1,
                    "exclusions": 0},
         "checks": {"producerConfirmed": list(PRODUCER_CHECKS), "appImportPending": list(APP_IMPORT_PENDING)},
         "readiness": {"app": "import-pending", "evidenceRegistration": "not-registered", "publicActivation": "none", "graphDb": "none"},
         "digests": {"content": ""}}
-    bundle["digests"]["content"] = digest({key: bundle[key] for key in ("companies", "issues", "relations", "evidence", "articles")})
+    bundle["digests"]["content"] = digest({key: bundle[key] for key in ("companies", "pathCompanies", "issues", "relations", "evidence", "articles")})
     return Bundle.model_validate(bundle).wire()
 
 
@@ -125,7 +127,7 @@ def verification(bundle: dict[str, Any]) -> dict[str, Any]:
 DESCRIPTION = """\
 **Graph handoff bundles (`/internal/v1/graph-handoffs`, schema `zoop-ai-internal-handoff-1`, scope `handoff.read`).** A fourth, separate, strictly read-only
 family over the installed `zoop-ai-handoff export` command: the verified status of one AI handoff and, only while it verifies now, the whole versioned bundle
-(`zoop-graph-handoff-bundle-4`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
+(`zoop-graph-handoff-bundle-5`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
 writes nothing (no handoff, no ledger, no cache, no source write, no model or network call), cannot freeze, recover, activate or publish, runs no caller-supplied
 path, command or query and has no list route. It is off unless its all-or-nothing server configuration group is set (otherwise both routes answer 409
 `execution_unavailable` after authentication). `publication` is always `not-published` and `appImport` always `pending`: this service delivers the AI-side
@@ -143,7 +145,7 @@ fields are refused at every level) and requires the model to dump back to exactl
 `delivery.state=withheld`**, a reason code (`source_unauthorized`, `upstream_changed`, `source_pin_missing`, `review_revision_changed`,
 `canonical_mapping_changed`, `decisions_changed`, `bindings_changed`, `handoff_content_changed`, `handoff_not_ready`, `handoff_pin_mismatch`,
 `handoff_contract_changed` ...) and nothing else: no `verification` (so no count, source id or digest) and no `bundle`. `handoff_contract_changed` means the
-handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1`, `-2` or `-3`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.
+handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1`, `-2`, `-3` or `-4`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.
 A withheld answer is not an error and not an empty bundle; do not import it and do not treat it as "no data". The checks are separate reads at separate instants,
 so a revocation that lands between them and the response is not covered and nothing recalls content a caller already received.
 
