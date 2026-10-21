@@ -200,6 +200,12 @@ def full_bundle() -> dict[str, Any]:
     bundle["issues"][0]["mentions"].append({**copy.deepcopy(first), "documentId": "synthetic-doc-2", "documentVersion": "9" * 64, "articleId": "doc-" + "8" * 64,
                                             "articleVersion": "9" * 64, "title": "합성 공급 계약 후속", "target": "합성 대상", "eventTime": None, "timePrecision": "unknown",
                                             "period": "2026Q4", "assertionStatus": "planned", "background": True, "participants": []})
+    # the representative is the first mention's source event and the second mention differs in every headline value but the action: the selection rule is the
+    # operator's representative, and only the action list names both mentions (exact equality, null equals null)
+    refs = [{key: mention[key] for key in ("documentId", "documentVersion", "mentionId")} for mention in bundle["issues"][0]["mentions"]]
+    bundle["issues"][0]["fieldProvenance"] = {
+        "selection": "operator-representative", "verification": "none",
+        "sameValueMentions": {"title": [refs[0]], "action": list(refs), "target": [refs[0]], "eventTime": [refs[0]], "period": [refs[0]], "assertionStatus": [refs[0]]}}
     bundle["sources"].append({**copy.deepcopy(bundle["sources"][0]), "relation": {"jobId": "s3-synthetic-relation-2", "inputDigest": "7" * 64}})
     relation_candidate = "rc-" + "4" * 64
     bundle["relations"].append({

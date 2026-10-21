@@ -252,6 +252,17 @@ final class HandoffFixtures {
         mention.putArray("evidenceIds").add(eventId);
         issue.put("decisionRef", "issue-1");
         issue.putNull("representative");
+        // One mention that every issue value copies: unanimous, and each field's list is that one mention.
+        ObjectNode provenanceOfIssue = issue.putObject("fieldProvenance");
+        provenanceOfIssue.put("selection", "unanimous");
+        provenanceOfIssue.put("verification", "none");
+        ObjectNode sameValue = provenanceOfIssue.putObject("sameValueMentions");
+        for (String field : List.of("title", "action", "target", "eventTime", "period", "assertionStatus")) {
+            ObjectNode reference = sameValue.putArray(field).addObject();
+            reference.put("documentId", ARTICLE_ID);
+            reference.put("documentVersion", ARTICLE_VERSION);
+            reference.put("mentionId", "m-1");
+        }
 
         ArrayNode relations = bundle.putArray("relations");
         List<ObjectNode> relationNodes = new ArrayList<>();

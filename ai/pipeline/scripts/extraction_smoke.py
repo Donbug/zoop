@@ -45,12 +45,14 @@ class Kit(OfflineFixture):
 
     # ---- ingestion ----------------------------------------------------------------------------------------------
     def ingest(self, name: str, documents: list[dict]) -> list[dict]:
-        """documents: [{"supplier": str|None, "html": bytes, "published": iso|None, "url": str}] -> exact observation refs."""
+        """documents: [{"supplier": str|None, "html": bytes, "published": iso|None, "url": str, "publisher": str|None}] -> exact observation refs.
+
+        `publisher` is the operator-declared outlet written into the real fixture item (absent or None: unspecified, no key)."""
         items, bodies = [], {}
         for index, document in enumerate(documents):
             ref = f"d{index}"
             bodies[ref] = document["html"]
-            item = self.item(f"c{index}", document["supplier"], document.get("url", f"https://example.invalid/{name}/{index}"), ref=ref)
+            item = self.item(f"c{index}", document["supplier"], document.get("url", f"https://example.invalid/{name}/{index}"), ref=ref, publisher=document.get("publisher"))
             item["publishedAt"] = document.get("published", "2026-10-08T00:00:00+00:00")
             items.append(item)
         manifest = self.manifest(name, [items], bodies=bodies)

@@ -39,10 +39,24 @@ class DocumentRegistrationServiceTest {
     }
 
     private static RegistrationCommand command(String article, char version, PointerPolicy pointer) {
-        return new RegistrationCommand(article, version(version), "synthetic-source", ArticleKind.NEWS,
+        return authored(article, version(version), "synthetic-source", ArticleKind.NEWS,
                 "text-" + version(version), "artifact-root:extracted_text/text-" + version(version) + ".txt",
                 String.valueOf(version).repeat(64), 100, "제목", "https://example.invalid/" + article, PUBLISHED,
                 FIRST_OBSERVED, pointer);
+    }
+
+    /** The authored form of a command: no declared publisher, a publication instant or none ({@code datetime} / {@code unknown}). */
+    private static RegistrationCommand authored(String articleId, String version, String provider, ArticleKind kind,
+            String textArtifactId, String storageUri, String sha256, long bytes, String title, String url, Instant publishedAt,
+            Instant collectedAt, PointerPolicy pointer) {
+        return new RegistrationCommand(articleId, version, provider, kind, textArtifactId, storageUri, sha256, bytes, title, url,
+                null, publishedAt, null, publishedAt == null ? "unknown" : "datetime", collectedAt, pointer);
+    }
+
+    private static RegistrationCommand withPublisher(RegistrationCommand base, String publisher) {
+        return new RegistrationCommand(base.articleId(), base.version(), base.provider(), base.kind(), base.textArtifactId(),
+                base.storageUri(), base.sha256(), base.bytes(), base.title(), base.url(), publisher, base.publishedAt(),
+                base.publishedDate(), base.publicationPrecision(), base.collectedAt(), base.pointer());
     }
 
     private RegistrationOutcome register(RegistrationCommand command) {
@@ -85,7 +99,7 @@ class DocumentRegistrationServiceTest {
 
     @Test
     void aMissingPublicationTimeIsUnknownNeverAGuessedDayOrMidnight() {
-        RegistrationCommand command = new RegistrationCommand("doc-a", version('a'), "synthetic-source", ArticleKind.NEWS,
+        RegistrationCommand command = authored("doc-a", version('a'), "synthetic-source", ArticleKind.NEWS,
                 "text-" + version('a'), "artifact-root:extracted_text/text-" + version('a') + ".txt", version('a'), 1, "",
                 "https://example.invalid/", null, FIRST_OBSERVED, PointerPolicy.keep());
 
@@ -125,7 +139,7 @@ class DocumentRegistrationServiceTest {
         assertEquals(PointerResult.MOVED, register(command("doc-a", 'b', PointerPolicy.moveFrom(version('a')))).pointer());
 
         // The replay of version a, observed later, without an explicit pointer request: no change.
-        RegistrationCommand replay = new RegistrationCommand("doc-a", version('a'), "synthetic-source", ArticleKind.NEWS,
+        RegistrationCommand replay = authored("doc-a", version('a'), "synthetic-source", ArticleKind.NEWS,
                 "text-" + version('a'), "artifact-root:extracted_text/text-" + version('a') + ".txt", version('a'), 100,
                 "제목", "https://example.invalid/replayed-url", PUBLISHED, LATER_OBSERVED, PointerPolicy.keep());
         RegistrationOutcome outcome = register(replay);
@@ -210,13 +224,13 @@ class DocumentRegistrationServiceTest {
         InMemoryDocumentRegistry.State before = registry.state();
 
         RegistrationCommand base = command("doc-a", 'a', PointerPolicy.keep());
-        RegistrationCommand otherTitle = new RegistrationCommand(base.articleId(), base.version(), base.provider(),
+        RegistrationCommand otherTitle = authored(base.articleId(), base.version(), base.provider(),
                 base.kind(), base.textArtifactId(), base.storageUri(), base.sha256(), base.bytes(), "다른 제목", base.url(),
                 base.publishedAt(), base.collectedAt(), base.pointer());
-        RegistrationCommand otherPublished = new RegistrationCommand(base.articleId(), base.version(), base.provider(),
+        RegistrationCommand otherPublished = authored(base.articleId(), base.version(), base.provider(),
                 base.kind(), base.textArtifactId(), base.storageUri(), base.sha256(), base.bytes(), base.title(), base.url(),
                 PUBLISHED.plusSeconds(1), base.collectedAt(), base.pointer());
-        RegistrationCommand noPublished = new RegistrationCommand(base.articleId(), base.version(), base.provider(),
+        RegistrationCommand noPublished = authored(base.articleId(), base.version(), base.provider(),
                 base.kind(), base.textArtifactId(), base.storageUri(), base.sha256(), base.bytes(), base.title(), base.url(),
                 null, base.collectedAt(), base.pointer());
 
@@ -231,7 +245,8 @@ class DocumentRegistrationServiceTest {
         RegistrationCommand base = command("doc-a", 'a', PointerPolicy.keep());
         java.time.LocalDate day = java.time.LocalDate.of(2026, 10, 14);
         RegistrationCommand dated = new RegistrationCommand(base.articleId(), base.version(), base.provider(), base.kind(),
-                base.textArtifactId(), base.storageUri(), base.sha256(), base.bytes(), base.title(), base.url(), null, day, "day",
+                base.textArtifactId(), base.storageUri(), base.sha256(), base.bytes(), base.title(), base.url(), null, null, day,
+                "day",
                 base.collectedAt(), base.pointer());
 
         register(dated);
@@ -244,10 +259,10 @@ class DocumentRegistrationServiceTest {
         // The same version arriving as an instant, as unknown, or with another day is a different record, never a silent update.
         RegistrationCommand instant = base;
         RegistrationCommand unknown = new RegistrationCommand(base.articleId(), base.version(), base.provider(), base.kind(),
-                base.textArtifactId(), base.storageUri(), base.sha256(), base.bytes(), base.title(), base.url(), null, null,
+                base.textArtifactId(), base.storageUri(), base.sha256(), base.bytes(), base.title(), base.url(), null, null, null,
                 "unknown", base.collectedAt(), base.pointer());
         RegistrationCommand otherDay = new RegistrationCommand(base.articleId(), base.version(), base.provider(), base.kind(),
-                base.textArtifactId(), base.storageUri(), base.sha256(), base.bytes(), base.title(), base.url(), null,
+                base.textArtifactId(), base.storageUri(), base.sha256(), base.bytes(), base.title(), base.url(), null, null,
                 day.plusDays(1), "day", base.collectedAt(), base.pointer());
         for (RegistrationCommand changed : new RegistrationCommand[] {instant, unknown, otherDay}) {
             assertEquals(DocumentImportFailure.VERSION_CONFLICT, rejected(changed).failure());
@@ -258,7 +273,7 @@ class DocumentRegistrationServiceTest {
     void observationLocalValuesAreNeitherComparedNorUpdated() {
         register(command("doc-a", 'a', PointerPolicy.keep()));
         RegistrationCommand base = command("doc-a", 'a', PointerPolicy.keep());
-        RegistrationCommand laterObservation = new RegistrationCommand(base.articleId(), base.version(), base.provider(),
+        RegistrationCommand laterObservation = authored(base.articleId(), base.version(), base.provider(),
                 base.kind(), base.textArtifactId(), base.storageUri(), base.sha256(), base.bytes(), base.title(),
                 "https://example.invalid/another", base.publishedAt(), LATER_OBSERVED, base.pointer());
 
@@ -277,13 +292,13 @@ class DocumentRegistrationServiceTest {
         InMemoryDocumentRegistry.State before = registry.state();
         RegistrationCommand base = command("doc-a", 'a', PointerPolicy.keep());
 
-        RegistrationCommand otherHash = new RegistrationCommand(base.articleId(), base.version(), base.provider(),
+        RegistrationCommand otherHash = authored(base.articleId(), base.version(), base.provider(),
                 base.kind(), base.textArtifactId(), base.storageUri(), version('f'), base.bytes(), base.title(), base.url(),
                 base.publishedAt(), base.collectedAt(), base.pointer());
-        RegistrationCommand otherSize = new RegistrationCommand(base.articleId(), base.version(), base.provider(),
+        RegistrationCommand otherSize = authored(base.articleId(), base.version(), base.provider(),
                 base.kind(), base.textArtifactId(), base.storageUri(), base.sha256(), base.bytes() + 1, base.title(),
                 base.url(), base.publishedAt(), base.collectedAt(), base.pointer());
-        RegistrationCommand otherUri = new RegistrationCommand(base.articleId(), base.version(), base.provider(),
+        RegistrationCommand otherUri = authored(base.articleId(), base.version(), base.provider(),
                 base.kind(), base.textArtifactId(), "artifact-root:extracted_text/elsewhere.txt", base.sha256(),
                 base.bytes(), base.title(), base.url(), base.publishedAt(), base.collectedAt(), base.pointer());
         for (RegistrationCommand changed : new RegistrationCommand[] {otherHash, otherSize, otherUri}) {
@@ -292,7 +307,7 @@ class DocumentRegistrationServiceTest {
         assertEquals(before, registry.state());
 
         // A different document claiming the same URI is refused even though its identity is new.
-        RegistrationCommand sameUri = new RegistrationCommand("doc-b", version('b'), "synthetic-source", ArticleKind.NEWS,
+        RegistrationCommand sameUri = authored("doc-b", version('b'), "synthetic-source", ArticleKind.NEWS,
                 "text-" + version('b'), base.storageUri(), version('b'), 1, "t", "https://example.invalid/b", PUBLISHED,
                 FIRST_OBSERVED, PointerPolicy.keep());
         assertEquals(DocumentImportFailure.ARTIFACT_CONFLICT, rejected(sameUri).failure());
@@ -301,10 +316,10 @@ class DocumentRegistrationServiceTest {
 
     @Test
     void twoSourcesWithTheSameBytesKeepSeparateIdentitiesAndArtifacts() {
-        RegistrationCommand first = new RegistrationCommand("doc-s1", version('1'), "source-one", ArticleKind.NEWS,
+        RegistrationCommand first = authored("doc-s1", version('1'), "source-one", ArticleKind.NEWS,
                 "text-" + version('1'), "artifact-root:extracted_text/text-" + version('1') + ".txt", version('e'), 42,
                 "t", "https://one.invalid/a", PUBLISHED, FIRST_OBSERVED, PointerPolicy.moveFrom(null));
-        RegistrationCommand second = new RegistrationCommand("doc-s2", version('2'), "source-two", ArticleKind.DISCLOSURE,
+        RegistrationCommand second = authored("doc-s2", version('2'), "source-two", ArticleKind.DISCLOSURE,
                 "text-" + version('2'), "artifact-root:extracted_text/text-" + version('2') + ".txt", version('e'), 42,
                 "t", "https://two.invalid/a", null, LATER_OBSERVED, PointerPolicy.keep());
 
@@ -323,5 +338,52 @@ class DocumentRegistrationServiceTest {
                 .equals(state.artifacts().get("text-" + version('2')).storageUri()));
         assertEquals(version('1'), state.articles().get("doc-s1").currentVersion());
         assertNull(state.articles().get("doc-s2").currentVersion());
+    }
+
+    @Test
+    void aDeclaredPublisherIsStoredExactlyAndAReImportOfTheSameVersionIsIdempotent() {
+        String publisher = "  합성일보 \uD83D\uDE00 ";
+        RegistrationCommand declared = withPublisher(command("doc-a", 'a', PointerPolicy.keep()), publisher);
+
+        assertEquals(Presence.CREATED, register(declared).version());
+        assertEquals(publisher, registry.state().versions().values().iterator().next().publisher());
+
+        InMemoryDocumentRegistry.State before = registry.state();
+        RegistrationOutcome replay = register(declared);
+        assertEquals(Presence.EXISTING, replay.version());
+        assertEquals(before, registry.state());
+    }
+
+    @Test
+    void thePublisherIsBoundToTheVersionSoNoOtherValueOrAbsenceMayReuseIt() {
+        RegistrationCommand base = command("doc-a", 'a', PointerPolicy.keep());
+        register(withPublisher(base, "합성일보"));
+        InMemoryDocumentRegistry.State declaredState = registry.state();
+
+        // A different outlet, a different spelling and the absence of any outlet are three other records, never an update.
+        for (String changed : new String[] {"합성경제", "합성일보 ", null}) {
+            assertEquals(DocumentImportFailure.VERSION_CONFLICT, rejected(withPublisher(base, changed)).failure(),
+                    "publisher " + changed);
+        }
+        assertEquals(declaredState, registry.state());
+    }
+
+    @Test
+    void anOlderVersionWithoutAPublisherStaysImmutableAndANewDeclarationNeverBackfillsIt() {
+        RegistrationCommand base = command("doc-a", 'a', PointerPolicy.keep());
+        register(base);
+        InMemoryDocumentRegistry.State before = registry.state();
+
+        assertEquals(DocumentImportFailure.VERSION_CONFLICT, rejected(withPublisher(base, "합성일보")).failure());
+        assertEquals(before, registry.state());
+        assertNull(registry.state().versions().values().iterator().next().publisher());
+
+        // The unchanged NULL-publisher record still re-imports; a publisher-bearing observation is another version (another
+        // documentVersion in the ledger) and registers next to it without touching it.
+        assertEquals(Presence.EXISTING, register(base).version());
+        RegistrationCommand declared = withPublisher(command("doc-a", 'b', PointerPolicy.keep()), "합성일보");
+        assertEquals(Presence.CREATED, register(declared).version());
+        assertNull(registry.state().versions().get("doc-a\u0000" + version('a')).publisher());
+        assertEquals("합성일보", registry.state().versions().get("doc-a\u0000" + version('b')).publisher());
     }
 }

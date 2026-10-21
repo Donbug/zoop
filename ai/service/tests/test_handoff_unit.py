@@ -324,6 +324,71 @@ def test_native_empty_and_long_s2_mention_strings_are_relayed_verbatim_not_refus
     assert parsed.wire() == bundle and canonical(parsed.wire()) == canonical(bundle)
 
 
+FIELDS = ("title", "action", "target", "eventTime", "period", "assertionStatus")
+
+
+def provenance_refusals() -> list[tuple[str, Callable[[dict], Any]]]:
+    def at_issue(change: Callable[[dict], Any]) -> Callable[[dict], Any]:
+        return lambda bundle: change(bundle["issues"][0]["fieldProvenance"])
+    cases: list[tuple[str, Callable[[dict], Any]]] = [
+        ("selection-unknown", at_issue(lambda p: p.update(selection="consensus"))),
+        ("selection-null", at_issue(lambda p: p.update(selection=None))),
+        ("verification-verified", at_issue(lambda p: p.update(verification="operator-field-verdict"))),
+        ("verification-null", at_issue(lambda p: p.update(verification=None))),
+        ("same-value-null", at_issue(lambda p: p.update(sameValueMentions=None))),
+        ("same-value-geography", at_issue(lambda p: p["sameValueMentions"].update(geography=[]))),
+        ("same-value-time-precision", at_issue(lambda p: p["sameValueMentions"].update(timePrecision=[]))),
+        ("field-decisions-in-provenance", at_issue(lambda p: p.update(fieldDecisions=[]))),
+        ("field-decisions-in-issue", lambda bundle: bundle["issues"][0].update(fieldDecisions=[])),
+        ("provenance-missing", lambda bundle: bundle["issues"][0].pop("fieldProvenance")),
+        ("provenance-null", lambda bundle: bundle["issues"][0].update(fieldProvenance=None)),
+        ("reference-extra-key", at_issue(lambda p: p["sameValueMentions"]["title"][0].update(articleId="doc-" + "c" * 64))),
+        ("reference-version-short", at_issue(lambda p: p["sameValueMentions"]["title"][0].update(documentVersion="a" * 63))),
+        ("reference-mention-empty", at_issue(lambda p: p["sameValueMentions"]["title"][0].update(mentionId=""))),
+        ("reference-index", at_issue(lambda p: p["sameValueMentions"].update(title=[0]))),
+        ("list-over-limit", at_issue(lambda p: p["sameValueMentions"].update(title=[copy.deepcopy(p["sameValueMentions"]["title"][0]) for _ in range(1001)]))),
+    ]
+    for field in FIELDS:
+        cases += [(f"{field}-empty", at_issue(lambda p, f=field: p["sameValueMentions"].update({f: []}))),
+                  (f"{field}-missing", at_issue(lambda p, f=field: p["sameValueMentions"].pop(f))),
+                  (f"{field}-null", at_issue(lambda p, f=field: p["sameValueMentions"].update({f: None})))]
+    return cases
+
+
+@pytest.mark.parametrize("name,change", provenance_refusals(), ids=[name for name, _ in provenance_refusals()])
+def test_the_field_provenance_is_closed_in_shape_and_a_malformed_one_is_refused(name, change):
+    for bundle in (example_bundle(), full_bundle()):
+        change(bundle)
+        with pytest.raises(ValidationError):
+            Bundle.model_validate(bundle)
+
+
+def test_the_model_checks_the_shape_of_the_provenance_and_never_its_semantics():
+    """Exactness, order, closure and the selection rule belong to the producer: a shape-valid list the producer would refuse is relayed as it came, because
+    the service neither repairs nor judges it (the producer's validator and the application importer refuse it)."""
+    bundle = full_bundle()
+    mentions = bundle["issues"][0]["fieldProvenance"]["sameValueMentions"]
+    mentions["title"] = list(reversed(mentions["action"]))
+    mentions["target"] = mentions["action"] + mentions["action"]
+    parsed = Bundle.model_validate(bundle)
+    assert parsed.wire() == bundle and canonical(parsed.wire()) == canonical(bundle)
+
+
+def test_the_example_and_the_every_variant_fixture_state_a_truthful_provenance():
+    """The authored provenance of both fixtures equals what the producer's rule derives: exact equality of every headline value, null equal null."""
+    for bundle in (example_bundle(), full_bundle()):
+        issue = bundle["issues"][0]
+        provenance = issue["fieldProvenance"]
+        assert provenance["verification"] == "none"
+        assert provenance["selection"] == ("operator-representative" if issue["representative"] is not None else "unanimous")
+        assert set(provenance["sameValueMentions"]) == set(FIELDS)
+        for field in FIELDS:
+            expected = [{key: mention[key] for key in ("documentId", "documentVersion", "mentionId")} for mention in issue["mentions"] if mention[field] == issue[field]]
+            assert expected and provenance["sameValueMentions"][field] == expected, field
+        if provenance["selection"] == "unanimous":
+            assert all(len(provenance["sameValueMentions"][field]) == len(issue["mentions"]) for field in FIELDS)
+
+
 def test_the_envelope_projection_drops_what_the_application_may_not_read_and_keeps_the_bundle_as_received():
     view = Export.model_validate(envelope())
     assert view.bundle == example_bundle() and view.receipt is not None and view.receipt.bundle_digest == pins(example_bundle())["bundleDigest"]
@@ -336,7 +401,7 @@ def test_the_envelope_projection_drops_what_the_application_may_not_read_and_kee
     lambda out: out.pop("usage"), lambda out: out["usage"].update(providerCalls=1), lambda out: out["usage"].update(modelCalls=True),
     lambda out: out["delivery"].update(status="maybe"), lambda out: out.update(state="published"), lambda out: out.update(publication="published"),
     lambda out: out["delivery"].update(checkedAt="yesterday"), lambda out: out["receipt"].update(bundleDigest="short"),
-    lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-1"),
+    lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-1"), lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-2"),
     lambda out: out["receipt"].update(bundleBytes=0), lambda out: out["receipt"].update(bundleSchema="other"), lambda out: out.update(bundle=[]),
     lambda out: out.update(manifest=[]),
 ])
@@ -425,7 +490,7 @@ def test_a_handoff_frozen_under_the_earlier_bundle_schema_is_withheld_with_its_r
         assert wire["delivery"] == {"state": "withheld", "reason": "handoff_contract_changed", "checkedAt": None}
         assert wire["verification"] is None and wire.get("bundle") is None and wire.get("manifest") is None
         text = json.dumps(wire)
-        for old in ("zoop-graph-handoff-bundle-1", "bundleSchema", "receipt", pins(example_bundle())["bundleDigest"]):
+        for old in ("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "bundleSchema", "receipt", pins(example_bundle())["bundleDigest"]):
             assert old not in text
 
 

@@ -403,15 +403,19 @@ class GraphEvidenceServiceTest {
     @Test
     void theReceiptOfAnEarlierOrTheCurrentBundleSchemaServesTheSameEvidenceBecauseOnlyItsArticlesAreRead() throws Exception {
         setUp();
-        // A version imported under bundle -1 (issues without mentions) stays readable: nothing re-verifies the retained bundle.
-        for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2")) {
+        // A version imported under bundle -1 (issues without mentions) or -2 (mentions, no field provenance) stays readable:
+        // nothing re-verifies the retained bundle, and -3 adds the issue's field provenance beside the same articles.
+        for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3")) {
             ObjectNode edited = receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION));
             ObjectNode bundle = (ObjectNode) edited.get("bundle");
             bundle.put("schemaVersion", schema);
             ObjectNode issue = bundle.putArray("issues").addObject();
             issue.put("id", "iss-1");
-            if (schema.endsWith("-2")) {
+            if (!schema.endsWith("-1")) {
                 issue.putArray("mentions").addObject().put("verification", "none");
+            }
+            if (schema.endsWith("-3")) {
+                issue.putObject("fieldProvenance").put("selection", "unanimous").put("verification", "none");
             }
             rewriteRegisteredReceipt(edited);
             assertNotNull(get(), schema);

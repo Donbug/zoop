@@ -56,8 +56,12 @@ def example_bundle() -> dict[str, Any]:
                "participants": [{"sourceCompanyId": "synthetic-company-1", "companyId": "KRX:005930", "name": "합성기업", "role": "공급자"},
                                 {"sourceCompanyId": None, "companyId": None, "name": "합성 협력사", "role": "수요자"}],
                "evidenceIds": [evidence_id]}
+    # one mention that states every value of the issue: nothing selected, every list is that one identity
+    mention_ref = {"documentId": mention["documentId"], "documentVersion": mention["documentVersion"], "mentionId": mention["mentionId"]}
+    provenance = {"selection": "unanimous", "verification": "none",
+                  "sameValueMentions": {field: [dict(mention_ref)] for field in ("title", "action", "target", "eventTime", "period", "assertionStatus")}}
     bundle: dict[str, Any] = {
-        "schemaVersion": "zoop-graph-handoff-bundle-2", "handoffId": HANDOFF, "manifestDigest": digest(example_manifest()),
+        "schemaVersion": "zoop-graph-handoff-bundle-3", "handoffId": HANDOFF, "manifestDigest": digest(example_manifest()),
         "provenance": {"declaredSourceKind": "synthetic", "observedSourceKind": "synthetic", "executionMode": "replay", "recordingKind": "authored-test"},
         "policy": {"version": "zoop-public-projection-policy-1", "files": {"canonical": "6" * 64, "decisions": "7" * 64, "bindings": "8" * 64},
                    "evidenceIdKind": "graph-body-span", "offsetUnit": "unicode_code_point", "geography": "operator-field-verdict",
@@ -74,7 +78,8 @@ def example_bundle() -> dict[str, Any]:
                     "eventTime": "2026-09-30", "timePrecision": "day", "period": None, "assertionStatus": "announced",
                     "geography": {"value": "domestic", "decisionRef": "geo-2026-10-16:1", "decisionVersion": "v1", "policyVersion": "zoop-public-projection-policy-1",
                                   "countries": ["KR"], "verification": "operator-field-verdict", "evidenceIds": [evidence_id], "basis": [{**event, "countries": ["KR"]}]},
-                    "evidenceIds": [evidence_id], "sourceEvents": [event], "mentions": [mention], "decisionRef": "issue-2026-10-16:1", "representative": None}],
+                    "evidenceIds": [evidence_id], "sourceEvents": [event], "mentions": [mention], "decisionRef": "issue-2026-10-16:1", "representative": None,
+                    "fieldProvenance": provenance}],
         "relations": [{"id": "edge-" + digest({"type": "INVOLVES", "source": "issue:synthetic-supply", "target": "KRX:005930"}), "type": "INVOLVES",
                        "source": "issue:synthetic-supply", "target": "KRX:005930", "role": None, "assertionStatus": None, "evidenceIds": [evidence_id], "basis": [],
                        "provenance": {"origin": "s3-relation", "s3SemanticValidation": "independent-verifier-supported-all-claims"}, "decisionRef": None,
@@ -111,7 +116,7 @@ def verification(bundle: dict[str, Any]) -> dict[str, Any]:
 DESCRIPTION = """\
 **Graph handoff bundles (`/internal/v1/graph-handoffs`, schema `zoop-ai-internal-handoff-1`, scope `handoff.read`).** A fourth, separate, strictly read-only
 family over the installed `zoop-ai-handoff export` command: the verified status of one AI handoff and, only while it verifies now, the whole versioned bundle
-(`zoop-graph-handoff-bundle-2`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
+(`zoop-graph-handoff-bundle-3`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
 writes nothing (no handoff, no ledger, no cache, no source write, no model or network call), cannot freeze, recover, activate or publish, runs no caller-supplied
 path, command or query and has no list route. It is off unless its all-or-nothing server configuration group is set (otherwise both routes answer 409
 `execution_unavailable` after authentication). `publication` is always `not-published` and `appImport` always `pending`: this service delivers the AI-side
@@ -129,7 +134,7 @@ fields are refused at every level) and requires the model to dump back to exactl
 `delivery.state=withheld`**, a reason code (`source_unauthorized`, `upstream_changed`, `source_pin_missing`, `review_revision_changed`,
 `canonical_mapping_changed`, `decisions_changed`, `bindings_changed`, `handoff_content_changed`, `handoff_not_ready`, `handoff_pin_mismatch`,
 `handoff_contract_changed` ...) and nothing else: no `verification` (so no count, source id or digest) and no `bundle`. `handoff_contract_changed` means the
-handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.
+handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1` or `-2`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.
 A withheld answer is not an error and not an empty bundle; do not import it and do not treat it as "no data". The checks are separate reads at separate instants,
 so a revocation that lands between them and the response is not covered and nothing recalls content a caller already received.
 
@@ -139,6 +144,13 @@ identify it; a local id is unique only within one document version), with the ap
 never verified, decided or approved fields, and they are not derived from the merged issue. A participant carries the S2 `sourceCompanyId`, the S2 `name` and the
 S2 `role` text as is (not a confirmed role, not an `INVOLVES` relation); `companyId` is the public company only where every carrying upstream mapped the source id
 to the same company of this bundle, otherwise null.
+
+**Field provenance.** Every issue carries a closed `fieldProvenance` that records how the producer chose the issue's six headline values (`title`, `action`,
+`target`, `eventTime`, `period`, `assertionStatus`): `selection` is `unanimous` (no operator representative; every mention states all six values) or
+`operator-representative` (the operator's single representative decision; it is one choice for all six fields, never a per-field decision). `sameValueMentions`
+lists per field, in the order of `mentions[]`, the identities (`documentId`, `documentVersion`, `mentionId`) of exactly those mentions whose own value equals the
+issue's value (null equals null; no trimming or time normalisation). `verification` is always `none`: this is the actual selection, never a fact verification, a
+support or an approval, and it is not a `fieldDecisions` verdict. The producer proves list exactness and closure; this service checks only the shapes.
 
 **The bundle bytes.** `bundle` is the producer's artifact, relayed with exactly its keys and values. `verification.bundleDigest` is the SHA-256 of its canonical
 UTF-8 bytes, where canonical means JSON with keys sorted by code point, separators `,` and `:` without whitespace and non-ASCII characters not escaped (Python

@@ -11,12 +11,13 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from scripts.collection_smoke import NEWS, PROXY_ENV, ROBOTS, CollectionKit, LocalSite
 from scripts.ingestion_smoke import OfflineFixture, authored_pdf, exact_check, sha
 from zoop_ai_pipeline.collection import Fetcher, parse_robots
-from zoop_ai_pipeline.collection_contracts import Policy
-from zoop_ai_pipeline.ingestion_contracts import IngestionFailure
+from zoop_ai_pipeline.collection_contracts import Policy, Request
+from zoop_ai_pipeline.ingestion_contracts import IngestionFailure, canonical
 from zoop_ai_pipeline.ingestion_url import canonical_url
 
 UA = "ZoopSyntheticCollector/1.0 (+synthetic-local-test)"
@@ -467,3 +468,89 @@ def test_an_authored_export_keeps_exactly_the_closed_key_set_the_application_imp
     assert set(exported["observation"]) == {"roundId", "sourceId", "page", "ordinal", "pageId", "observedAt", "documentId", "rawVersion", "documentVersion",
                                             "url", "title", "publishedAt", "modifiedAt", "sourceRevision", "mediaType"}
     assert set(exported) == {"schemaVersion", "observation", "grant", "document", "locatorMetadata"}
+
+
+# ------------------------------------------------------------------------------------ declared publisher
+
+def _old_request(targets=None):
+    return {"schemaVersion": "zoop-collection-1", "collectionId": "c1", "sourceId": "synthetic-source", "scopeId": "body",
+            "targets": targets or [{"candidateId": "n1", "url": "http://127.0.0.1:1/a", "title": "t", "documentKind": "news", "publishedAt": "2026-10-14",
+                                    "modifiedAt": None, "supplierDocumentId": None, "sourceRevision": None}]}
+
+
+def test_a_request_without_publisher_serializes_and_hashes_exactly_as_before():
+    # Literal taken from the commit before `publisher` existed (a one-time run of that code), not from this implementation.
+    expected = ('{"collectionId":"c1","schemaVersion":"zoop-collection-1","scopeId":"body","sourceId":"synthetic-source","targets":[{"candidateId":"n1",'
+                '"documentKind":"news","modifiedAt":null,"publishedAt":"2026-10-14","sourceRevision":null,"supplierDocumentId":null,"title":"t","url":"http://127.0.0.1:1/a"}]}')
+    wire = canonical(Request.model_validate(_old_request()).wire())
+    assert wire == expected and sha(wire.encode()) == "198b724928ecbdacab977624bf8854a5c57ce31c0c5326c1163de429a2e384f4"
+    # The nested target is dumped by the parent request, so the key must be dropped there too, not only by Target.wire().
+    nulled = _old_request()
+    nulled["targets"][0]["publisher"] = None
+    assert canonical(Request.model_validate(nulled).wire()) == expected
+    assert "publisher" not in Request.model_validate(nulled).targets[0].wire()
+
+
+def test_a_declared_publisher_is_in_the_request_wire_and_changes_its_digest():
+    declared = _old_request()
+    declared["targets"][0]["publisher"] = "합성일보"
+    request = Request.model_validate(declared)
+    assert request.wire()["targets"][0]["publisher"] == "합성일보" == request.targets[0].wire()["publisher"]
+    assert sha(canonical(request.wire()).encode()) != "198b724928ecbdacab977624bf8854a5c57ce31c0c5326c1163de429a2e384f4"
+    assert set(request.wire()["targets"][0]) == set(_old_request()["targets"][0]) | {"publisher"}
+
+
+@pytest.mark.parametrize("value", ["", " ", "\u3000", "\t", "a\nb", "a\x00b", "\x7f", "x" * 201, 5, True, ["a"]])
+def test_an_invalid_target_publisher_is_refused_before_any_request(kit, site, value):
+    invalid = _old_request()
+    invalid["targets"][0]["publisher"] = value
+    with pytest.raises(ValidationError):
+        Request.model_validate(invalid)
+    site.route("/news/a", NEWS)
+    result = kit.collect("bad-publisher", [kit.target(site.url("/news/a"), "n1", publisher=value)], expected=2)
+    assert result["error"]["code"] == "input_or_configuration_invalid" and site.log == []
+
+
+def test_a_lone_surrogate_target_publisher_is_refused():
+    invalid = _old_request()
+    invalid["targets"][0]["publisher"] = "a\ud800b"
+    with pytest.raises(ValidationError):
+        Request.model_validate(invalid)
+
+
+def test_authored_and_collected_publisher_reach_the_export_and_are_never_scraped(kit, site):
+    site.route("/news/a", b'<html><head><meta property="og:site_name" content="Scraped Outlet"><meta name="author" content="Scraped Author"></head>'
+                          b'<body><article><p>' + "본문".encode() + b'</p></article></body></html>')
+    site.route("/news/b", NEWS)
+    targets = [kit.target(site.url("/news/a"), "undeclared", supplier="s-1"), kit.target(site.url("/news/b"), "declared", supplier="s-2", publisher="  합성일보  ")]
+    collected = kit.collect("pub-1", targets)
+    manifest = Path(collected["manifestPath"])
+    page = json.loads((kit.inputs / "collections" / "pub-1" / "page-0.json").read_bytes())
+    assert "publisher" not in page["items"][0] and page["items"][1]["publisher"] == "  합성일보  "
+    ran = kit.cli("run", kit.request(manifest, "r1", 0), manifest=manifest)
+    undeclared, declared = (kit.cli("export", kit.export_selector("r1", ref), extra=["--require-store"]) for ref in ran["documentRefs"])
+    assert "publisher" not in undeclared["observation"] and "Scraped" not in str(undeclared)
+    assert declared["observation"]["publisher"] == "  합성일보  " and declared["observation"]["collection"]["network"] == "synthetic_loopback"
+    # The same fetched page re-collected under a different declared outlet is a new raw/document version of the same document.
+    again = kit.collect("pub-2", [kit.target(site.url("/news/b"), "declared", supplier="s-2", publisher="Another Outlet")])
+    second_manifest = Path(again["manifestPath"])
+    second = kit.cli("run", kit.request(second_manifest, "r2", 1), manifest=second_manifest)["documentRefs"][0]
+    first = ran["documentRefs"][1]
+    assert second["documentId"] == first["documentId"] and second["rawVersion"] != first["rawVersion"] and second["documentVersion"] != first["documentVersion"]
+    assert kit.cli("export", kit.export_selector("r2", second))["observation"]["publisher"] == "Another Outlet"
+    assert kit.cli("export", kit.export_selector("r1", ran["documentRefs"][1]))["observation"]["publisher"] == "  합성일보  "
+
+
+def test_collection_replay_treats_null_as_omitted_and_a_changed_publisher_as_a_conflict(kit, site):
+    site.route("/news/a", NEWS)
+    declared = [kit.target(site.url("/news/a"), "n1", publisher="합성일보")]
+    first = kit.collect("fixed-publisher", declared)
+    seen = len(site.log)
+    assert kit.collect("fixed-publisher", declared)["replayed"] is True and len(site.log) == seen
+    assert kit.collect("fixed-publisher", [kit.target(site.url("/news/a"), "n1", publisher="다른일보")], expected=2)["error"]["code"] == "collection_input_conflict"
+    assert kit.collect("fixed-publisher", [kit.target(site.url("/news/a"), "n1")], expected=2)["error"]["code"] == "collection_input_conflict"
+    plain = [kit.target(site.url("/news/a"), "n1")]
+    kit.collect("fixed-plain", plain)
+    seen = len(site.log)
+    explicit = kit.collect("fixed-plain", [{**plain[0], "publisher": None}])
+    assert explicit["replayed"] is True and len(site.log) == seen and first["state"] == "complete"

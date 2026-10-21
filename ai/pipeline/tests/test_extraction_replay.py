@@ -72,6 +72,37 @@ def test_compare_request_preimage_and_digest_equal_the_captured_original(case):
     assert analysis.request_digest("compare", built, ANALYSIS) == EXPECTED["compare"][case["id"]]["key"]
 
 
+def with_publisher(name: str, publisher: str = "합성일보 Synthetic Daily") -> dict:
+    """The pinned golden export, plus an operator-declared publisher on the observation and another outer documentVersion (what a declared outlet changes)."""
+    export = json.loads(json.dumps(INPUTS["exports"][name]))
+    export["observation"].update(publisher=publisher, documentVersion="f" * 64)
+    return export
+
+
+@pytest.mark.parametrize("name", sorted(EXPECTED["articles"]))
+def test_a_declared_publisher_never_changes_the_captured_article_projection_or_version(name):
+    built = analysis.article(with_publisher(name), True)
+    assert built.model_dump(mode="json") == EXPECTED["articles"][name]["projection"] and built.publisher == ""
+    assert built.version == EXPECTED["articles"][name]["version"]
+    if name == "a":
+        assert analysis.article(with_publisher("a"), False).version == EXPECTED["actualArticleVersionA"]
+
+
+@pytest.mark.parametrize("case", INPUTS["extractCases"], ids=lambda c: c["id"])
+def test_a_declared_publisher_never_enters_the_captured_extract_request(case):
+    built = analysis.extract_input(analysis.article(with_publisher(case["article"]), True), INPUTS["promptVersion"], catalogue(case["catalogue"]))
+    assert built == EXPECTED["extract"][case["id"]]["input"] and "합성일보" not in json.dumps(built, ensure_ascii=False)
+    assert analysis.request_digest("extract", built, ANALYSIS) == EXPECTED["extract"][case["id"]]["key"]
+
+
+@pytest.mark.parametrize("case", INPUTS["compareCases"], ids=lambda c: c["id"])
+def test_a_declared_publisher_never_enters_the_captured_compare_request(case):
+    built = analysis.compare_input(mention(case["mention"]), case["eventId"], [mention(m) for m in case["members"]],
+                                   [analysis.article(with_publisher(a), True) for a in case["articles"]], analysis.article(with_publisher(case["incoming"]), True))
+    assert built == EXPECTED["compare"][case["id"]]["input"] and "합성일보" not in json.dumps(built, ensure_ascii=False)
+    assert analysis.request_digest("compare", built, ANALYSIS) == EXPECTED["compare"][case["id"]]["key"]
+
+
 def test_the_request_digest_binds_stage_input_and_analysis_version_and_ignores_catalogue_order():
     case = INPUTS["extractCases"][0]
     full = catalogue("full")

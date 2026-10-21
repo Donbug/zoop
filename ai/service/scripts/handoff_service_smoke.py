@@ -144,6 +144,13 @@ def run(smoke: Smoke, world: HandoffWorld) -> list[str]:
           and sorted([r["type"], r["source"], r["target"], r["evidenceIds"]] for r in bundle["relations"]) == world.relation_edges
           and bundle["exclusions"]["counts"] == world.exclusions, "the bundle equals the hand-authored expectation of the world")
     check(producer_accepts(response.content), "the producer's own validator accepts the bundle the service delivered")
+    fields = ("title", "action", "target", "eventTime", "period", "assertionStatus")
+    identity = lambda item: {k: item[k] for k in ("documentId", "documentVersion", "mentionId")}  # noqa: E731
+    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-3" and all(
+        set(i["fieldProvenance"]) == {"selection", "verification", "sameValueMentions"} and i["fieldProvenance"]["verification"] == "none"
+        and i["fieldProvenance"]["selection"] == ("operator-representative" if i["representative"] is not None else "unanimous")
+        and all(i["fieldProvenance"]["sameValueMentions"][f] == [identity(m) for m in i["mentions"] if m[f] == i[f]] != [] for f in fields) for i in bundle["issues"]),
+        "every issue states its actual field selection: exact same-value mention lists, never a verdict")
     check(smoke.js_digest(response.content) == pins1["bundleDigest"], "another language recomputes the pinned SHA-256 after a plain JSON round trip")
     manifest = wire["manifest"]
     check(manifest == oracle["manifest"] and canonical(manifest) == canonical(oracle["manifest"]), "HTTP manifest equals the CLI export manifest (the ledger's frozen request)")

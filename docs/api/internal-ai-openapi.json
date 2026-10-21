@@ -3,7 +3,7 @@
   "info": {
     "title": "Zoop internal AI analysis transport",
     "version": "1.0.0",
-    "description": "Internal app-to-AI transport for the S1 analysis family (`zoop-ai-s1-1`): document-summary, document-sentiment,\nsemantic-verification and briefing-outlook. It is a thin, durable HTTP layer over the installed `zoop-ai` CLI; the runtime ledger\nstays the only source of job state, and every state shown here is read from the runtime during the same request.\n\n**Network.** The service binds `127.0.0.1` only. Production reach is an HTTPS reverse proxy co-located with it (same host or network\nnamespace) that terminates TLS, caps bodies at 2,000,000 bytes, never logs `Authorization`, and is reachable only from the app\nbackend's security group. That proxy is an assumption: nothing here was deployed or observed.\n\n**Authentication.** `Authorization: Bearer <token>`. Tokens are operator-issued; the service stores only SHA-256 digests. The\nauthenticated principal is the owner of every job it registers; there is no end-user identity in v1. A job owned by another\nprincipal answers exactly like a missing job (404).\n\n**Idempotency.** `Idempotency-Key` is required on submit and must equal `body.jobId`. Retry any ambiguous submit with the *same* key\nand body; never mint a new jobId to retry. 202 = newly accepted (the runtime registered the job and the service made its owner\nbinding and dispatch intent durable); 200 = idempotent replay of an accepted job.\n\n**Lifecycle.** `202` does not mean the job is authorized, budgeted or that any model call happened. Poll `GET /{jobId}` and follow\n`next`: `wait` (a dispatch is pending or running), `fetch_result`, `recover` (call the recover route), `operator_reconcile` (stop and\nescalate: an attempt has an unknown provider outcome that may have been charged; starting a new jobId accepts that cost) or `none`.\nA job interrupted between two stages (some receipt stored, a later stage never sent) is never continued automatically: its dispatch\nends idle with `lastOutcome=needs_recover`, and only an explicit recover sends the next stage.\nInternal `ready` is not the public `completed`: the app import must still succeed and re-check its own current authority.\n\n**Results.** `GET /{jobId}/result` returns the runtime's `get` payload (`job`, see `ai-contract.schema.json#/$defs/JobResult`) only\nwhile the server's *current* grant registry still permits delivery; otherwise `delivery.state` is `withheld`, `job` is null and only\ncontent-free per-attempt `receipts` are returned for usage accounting. A live job is withheld with `reason=recipient_unproven` until the\nruntime has recorded an attempt for every stage it needs, because only then is the recipient provable. `job.grant` is an execution snapshot, never current authority.\n\n**S3 relation jobs (`/internal/v1/relation-jobs`, schema `zoop-ai-internal-relation-1`, scopes `relation.*`).** A separate family over the\ninstalled `zoop-ai-relation` pipeline, replay only: it shares nothing with the S1 wire contract or state machine. It is off unless its\nall-or-nothing server configuration group is set (otherwise every route answers 409 `execution_unavailable` after authentication). A caller\ncannot name a path, fixture, registry or live mode. The body is the S3 `Submit` (`zoop-relation-s3`) naming an operator-prepared S2 extraction\njob as `upstream {jobId, inputDigest}`; that pair must be listed for the calling principal in a server-owned allowlist, otherwise 403\n`upstream_not_allowed` before anything is stored. The principal owns the job it submits: another principal's job answers like a missing one.\nThe initial dispatch runs once. A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service,\nare never run again automatically (`next=recover`); a call the pipeline reserved but never saw answered ends `reconciling` and is never\nresent. Cancel refuses a ready job (409 `job_already_terminal`); the pipeline would otherwise withhold it for good. Status never carries content.\n`GET /{jobId}/result` returns candidates only for a ready job while the owner is still the principal the allowlist lists for that upstream and the\npipeline reports delivery current (it re-reads the operator source registry on every call); otherwise `delivery.state` is `withheld` with a\nreason code. Delivery is checked at one instant: content already sent cannot be recalled, and a revocation after the check is not observed.\n\n**Review and revalidation (`relation.review`).** `POST /{jobId}/reviews` records one `allow` or `reject` decision on one relation candidate. The\n`Idempotency-Key` is the stable operation id and the body is exactly `{relationCandidateId, expectedSourceVersion, expectedSourceRevision, decision}`; the\nreviewer is always the authenticated principal and cannot be sent. `sourceVersion` is the job's `inputDigest` and `sourceRevision` is the relation's runtime\nevent-chain revision as a decimal string, both read from `GET /{jobId}/result`. They are runtime values, never the application's own review revision (the\npublic decision API's `expectedRevision`), which this service does not see and which must never be forwarded. A new decision is checked against both values\nexactly, the revision inside the pipeline's own append transaction, and anything that does not match records nothing: 409 `source_version_conflict` or\n`source_revision_conflict`, and a relation that is not on hold is `review_target_not_hold`. The same key and body return the existing operation even after the\nrelation has moved on; another body is `idempotency_conflict`, another principal's key is `operation_id_unavailable`. Acceptance, verification and publication\nare separate facts in the operation status. `review` says whether the decision is recorded: `unconfirmed` means the request was reserved but the service has no\nproof yet that the event was appended, so retry the same request, which reads the chain for a marker only this operation can have written and never appends\ntwice. `revalidation` says what the automatic re-check an accepted `allow` requested did: `queued`, `running`, `verified` with the verdict's eligibility,\n`superseded` when a later reject won (a stale allow can never overwrite a rejection), `interrupted`, `failed` or `cancelled`. `publication` is always\n`not_published`. The revalidation is dispatched once, like a job: an ambiguous end waits for the explicit `POST /{jobId}/reviews/{operationId}/recover`, which\nreads the chain first, settles whatever it already proves and otherwise queues the revalidation again. The pipeline never resends a call it already started, so a\nrecover can only finish a saved receipt or send a call that never started; an unanswered call is `reconcile_required`. A revalidation runs only while the owner\nis still listed for the job's upstream. While it runs the job is `running` and its result is withheld. Verification replays authored fixtures only: no model is\ncalled. Operation status is read from the service ledger and carries no content. This slice has no list route, and `eligible` is an automatic evidence gate,\nnever approval or publication.\n\n**S2 extraction jobs (`/internal/v1/extraction-jobs`, schema `zoop-ai-internal-extraction-1`, scopes `extraction.*`).** A separate family over the\ninstalled `zoop-ai-extract` pipeline, replay only: it shares no wire contract, ledger or state machine with S1 or S3, but its children run behind the same\nsingle gate as S3's, so an S2 write and an S3 read of its ledger can never overlap. It is off unless its own all-or-nothing server configuration group is\nset (otherwise every route answers 409 `execution_unavailable` after authentication). A caller never sends the S2 `Submit`: the body is exactly\n`{schemaVersion: \"zoop-extraction-s2-2\", jobId, approvedRequestDigest}`. The operator's server-owned approval file maps `principal + jobId +\napprovedRequestDigest` to the exact S2 request (snapshot, catalogue, incoming observation, topic request) and the digests of the authored replay\nfixtures it runs against; anything not listed is 403 `request_not_approved` before a ledger row or child exists, and the same answer whether or not the\njob exists. An approval only narrows what the pipeline allows: the pipeline still re-reads the operator source registry on every content-bearing command.\nThe principal owns the job it submits (another principal's job answers like a missing one) and a job id that already exists in the pipeline ledger is\n`job_id_unavailable`: an operator's job is never adopted.\n\nThe first reservation freezes the approved digest, the producer fixture digest, the optional topic fixture digest and the `inputDigest` the pipeline must\nreport (computed from the approved bytes, not echoed). The same request again keeps all of it; the same job with another approved digest is\n`idempotency_conflict`; an approval entry or fixture file that has since changed is `approval_changed` / `fixture_changed` (or a withheld result) and the\njob id is never rebound. The approval is re-read, and the fixtures re-hashed, at submit, at every dispatch, at recover and at delivery.\n\nThe initial dispatch runs once. A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service, are never run\nagain automatically (`next=recover`); a pipeline `extraction_busy`/`ingestion_busy` refusal before any effect is retried a few times, but a job that the\npipeline recorded as `stopped` (for example `ingestion_busy` during execution) waits for an explicit recover. A call the pipeline reserved but never saw\nanswered ends `reconciling` and is never resent (`reconcile_required`). Cancel makes a queued, running, stopped or reconciling job `cancelled` for good and\nis idempotent; a ready job is refused with 409 `job_already_terminal` and stays ready. Status never carries content. `GET /{jobId}/result` returns event\ncandidates (with their comparisons, citations and disposition) and topic candidates only for a ready job while the pipeline reports delivery current, the\napproval is still the reserved one, the fixtures are still the pinned bytes and every receipt was answered by them; otherwise `delivery.state` is\n`withheld` with a reason code. Nothing is ever approved by this family: every candidate carries `approved: false`. Delivery is checked at one instant: content\nalready sent cannot be recalled. Listing a delivered S2 job as an S3 upstream is a separate, explicit operator decision in the S3 allowlist; an S2 result never\nwidens S3 authority by itself.\n\n**Graph versions (`/internal/v1/graph-versions`, schema `zoop-ai-internal-graph-1`, scope `graph.read`).** A third, separate, strictly read-only family over the\ninstalled `zoop-ai-graph read|focus` pipeline commands: a verified status of one version and the bounded neighbourhood of one company. It writes nothing\n(no version, no pointer, no graph ledger, Neo4j or source ledger write, no model call), runs no caller-supplied query and has no list route. It is off unless\nits all-or-nothing server configuration group is set (otherwise every route answers 409 `execution_unavailable` after authentication) and it is **not**\npublic: nothing here activates, publishes or withdraws a version, and `publication` is always `not-published`.\n\n**Which versions a caller may read.** The version id is only a label, so the operator lists per principal the exact `{versionId, graphDigest, payloadDigest}` (and\noptionally the frozen S3 relation job as `sourceRelation`) in a server-owned allowlist that is re-read on every request. A version that is not listed answers 403\n`version_not_allowed` before any ledger or child process is touched, with one answer for \"unknown\" and \"exists but not yours\"; the service never adopts a version\nthe operator did not list. A listed version that the graph ledger does not have answers 404 `version_not_found` (an operator configuration gap).\n\n**Delivery.** Content leaves only while the version verifies *now*: the pipeline re-checks the S3/S2 authority and source grants, every canonical decision, the S3\nreview state, the Neo4j store binding and the **full stored graph** against the frozen digest on every call, the digests it reports must equal the listed ones, and\nthe listed entry must be unchanged when read again just before the response. Otherwise the answer is **200 with `delivery.state=withheld`**, a reason code\n(`source_unauthorized`, `upstream_changed`, `canonical_mapping_changed`, `review_revision_changed`, `graph_version_corrupt`, `graph_store_identity_mismatch`,\n`version_not_ready`, `version_pin_mismatch`, `source_pin_mismatch` ...) and nothing else: no `verification`, `graph` or `evidence`. A withheld answer is not an\nerror and not an empty graph. These checks are separate reads at separate instants, so a revocation that lands between them and the response is not covered and\nnothing recalls content a caller already received. `current` means \"verified now\", never \"the version the application shows\": there is no active pointer.\n\n**Status.** `GET /{versionId}` runs the same gate chain and returns identity, `state` (`frozen|reserved|unknown|ready|failed`), `delivery` and, only when current,\n`verification` (graph and payload digests, node and edge counts). It carries no node, edge or evidence and no Issue counts: the graph is built from S3\nrelations, not from Issues.\n\n**Focus.** `GET /{versionId}/focus?companyId=&depth=` takes exactly these two query parameters, each once; `depth` is exactly 1, 2 or 3 and anything else (an unknown\nor repeated key, `01`, `4`, a list) is 422. The neighbourhood is breadth-first over the undirected edges of the verified version; an edge is shown iff one endpoint is\ncloser than `depth`. `focus.found=false` (with empty `graph.nodes`, `graph.edges` and `evidence`) means the company is not a node of the verified version; it is a\nverified answer, not an error. `evidence` lists only the records the shown edges reference, as IDs and document/version/span coordinates: the graph holds no quote,\ntitle, URL, rationale or review note, and none is returned.\n\n**Busy and unavailable.** An operator writer holding a ledger (`graph_busy`, `relation_busy`, `extraction_busy`, `ingestion_busy`) is 503 `runtime_busy`, a graph\ndatabase that does not answer is 503 `runtime_unavailable`, unusable server configuration or state (credentials, unbound store, damaged ledger) is 503\n`service_configuration_invalid`, and too many concurrent reads is 503 `service_busy`; all carry `Retry-After`. A 503 is never an empty graph.\n\n**Graph handoff bundles (`/internal/v1/graph-handoffs`, schema `zoop-ai-internal-handoff-1`, scope `handoff.read`).** A fourth, separate, strictly read-only\nfamily over the installed `zoop-ai-handoff export` command: the verified status of one AI handoff and, only while it verifies now, the whole versioned bundle\n(`zoop-graph-handoff-bundle-2`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It\nwrites nothing (no handoff, no ledger, no cache, no source write, no model or network call), cannot freeze, recover, activate or publish, runs no caller-supplied\npath, command or query and has no list route. It is off unless its all-or-nothing server configuration group is set (otherwise both routes answer 409\n`execution_unavailable` after authentication). `publication` is always `not-published` and `appImport` always `pending`: this service delivers the AI-side\nartifact; the application's article/text/evidence/catalog verification, snapshot registration and activation are the backend's and are not claimed here.\n\n**Which handoffs a caller may read.** A handoff id is only a label, so the operator lists per principal the exact `{handoffId, manifestDigest, bundleDigest}`\n(both SHA-256 pins are required) in a server-owned allowlist that is re-read on every request and again before anything of the answer is used. A handoff that is\nnot listed for the caller answers 403 `handoff_not_allowed` before any child process is touched, with one answer for \"unknown\", \"exists but not yours\" and\n\"listed for another principal\". A listed handoff that the ledger does not have answers 404 `handoff_not_found` (an operator configuration gap).\n\n**Delivery.** Content leaves only while the handoff verifies *now*: the producer re-checks on every export the S3 authority and S2 upstream pins, grants and\nrights, the used review revisions, the three operator files against the manifest pins and the rebuilt content digest; the service then hashes the canonical\nbytes of the bundle it received, requires the result to equal the producer's receipt **and** the operator's pins, parses it through a closed model (unknown\nfields are refused at every level) and requires the model to dump back to exactly those canonical bytes. Otherwise the answer is **200 with\n`delivery.state=withheld`**, a reason code (`source_unauthorized`, `upstream_changed`, `source_pin_missing`, `review_revision_changed`,\n`canonical_mapping_changed`, `decisions_changed`, `bindings_changed`, `handoff_content_changed`, `handoff_not_ready`, `handoff_pin_mismatch`,\n`handoff_contract_changed` ...) and nothing else: no `verification` (so no count, source id or digest) and no `bundle`. `handoff_contract_changed` means the\nhandoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.\nA withheld answer is not an error and not an empty bundle; do not import it and do not treat it as \"no data\". The checks are separate reads at separate instants,\nso a revocation that lands between them and the response is not covered and nothing recalls content a caller already received.\n\n**Original mentions.** Every `issues[].mentions[]` item is one S2 mention exactly as extracted (`documentId`, `documentVersion` and the S2 local `mentionId`\nidentify it; a local id is unique only within one document version), with the app article it belongs to and the evidence ids of its own citations. Its\n`verification` is always `none`: title, action, target, time, period, assertion status, background flag and participants are candidate or snapshot values of S2,\nnever verified, decided or approved fields, and they are not derived from the merged issue. A participant carries the S2 `sourceCompanyId`, the S2 `name` and the\nS2 `role` text as is (not a confirmed role, not an `INVOLVES` relation); `companyId` is the public company only where every carrying upstream mapped the source id\nto the same company of this bundle, otherwise null.\n\n**The bundle bytes.** `bundle` is the producer's artifact, relayed with exactly its keys and values. `verification.bundleDigest` is the SHA-256 of its canonical\nUTF-8 bytes, where canonical means JSON with keys sorted by code point, separators `,` and `:` without whitespace and non-ASCII characters not escaped (Python\n`json.dumps(sort_keys=True, separators=(\",\", \":\"), ensure_ascii=False)`). All numbers are non-negative integers and all keys ASCII, so any JSON parser followed by that\nserialisation reproduces the same bytes and the same digest, whatever the language; do not normalise, drop or add a field before hashing. Every key the service\nadds (`appImport`, `observedAt`, `verification`, `delivery`) is a sibling of `bundle`, never inside it. Strings that came from sources (titles, URLs, labels,\nobservation and grant metadata, `sourceKind`) are data the producer recorded, never an authority: nothing in them proves or extends a right, and the pins and the\ncurrent `delivery.state` are the only delivery gates.\n\n**The manifest bytes.** `manifest` is the operator's frozen manifest exactly as the producer's ledger stored it at freeze time (never rebuilt from today's files or\nconfiguration): schema, handoff id, source-kind declaration, policy version, the S3/S2 source pins with their review digests and the three operator-file SHA-256\nhashes. It holds no path and no secret. Its canonical bytes (same canonicalisation as the bundle) hash to `verification.manifestDigest`, which equals\n`bundle.manifestDigest`. The service refuses (500 `runtime_binding_mismatch`) a manifest whose digest, handoff id, declaration, policy version, file hashes or\nsource pins disagree with the bundle or the producer's receipt, and (500 `runtime_contract_mismatch`) a missing manifest or any unknown field at any level. A\nbackend therefore recomputes both digests from ONE authenticated response. `manifest` is a sibling of `bundle`; status and withheld answers never carry it.\n\n**Status.** `GET /{handoffId}` runs the same full export gate chain and returns identity, `state`, `delivery`, `appImport` and, only when current,\n`verification` (manifest, bundle and content digests, bundle size, the bundle's own counts, number of source jobs, provenance declaration). It carries no\nnode, source id, text or title.\n\n**Bundle.** `GET /{handoffId}/bundle` returns the same fields plus `manifest` and `bundle`. The response is bounded by the producer's 6 MiB bundle limit; the\nservice reads at most 16 MiB from its child, so an oversized answer is a 503 (`runtime_unavailable`), never a truncated bundle.\n\n**Busy and unavailable.** An operator writer holding a ledger (`handoff_busy`, `relation_busy`, `extraction_busy`, `ingestion_busy`) is 503 `runtime_busy`;\nunusable server configuration or operator state (damaged or altered artifact, operator file, ownership, ledger recovery needed) is 503\n`service_configuration_invalid`; too many concurrent reads (at most 2 children) is 503 `service_busy`; a missed 45 s deadline or an unreadable answer is 503\n`runtime_unavailable`. All carry `Retry-After`; there is exactly one child per request and no automatic retry. A child answer that is not the contract this service\nknows is 500 `runtime_contract_mismatch` or `runtime_binding_mismatch` (not retryable). A 503 or 500 is never an empty bundle."
+    "description": "Internal app-to-AI transport for the S1 analysis family (`zoop-ai-s1-1`): document-summary, document-sentiment,\nsemantic-verification and briefing-outlook. It is a thin, durable HTTP layer over the installed `zoop-ai` CLI; the runtime ledger\nstays the only source of job state, and every state shown here is read from the runtime during the same request.\n\n**Network.** The service binds `127.0.0.1` only. Production reach is an HTTPS reverse proxy co-located with it (same host or network\nnamespace) that terminates TLS, caps bodies at 2,000,000 bytes, never logs `Authorization`, and is reachable only from the app\nbackend's security group. That proxy is an assumption: nothing here was deployed or observed.\n\n**Authentication.** `Authorization: Bearer <token>`. Tokens are operator-issued; the service stores only SHA-256 digests. The\nauthenticated principal is the owner of every job it registers; there is no end-user identity in v1. A job owned by another\nprincipal answers exactly like a missing job (404).\n\n**Idempotency.** `Idempotency-Key` is required on submit and must equal `body.jobId`. Retry any ambiguous submit with the *same* key\nand body; never mint a new jobId to retry. 202 = newly accepted (the runtime registered the job and the service made its owner\nbinding and dispatch intent durable); 200 = idempotent replay of an accepted job.\n\n**Lifecycle.** `202` does not mean the job is authorized, budgeted or that any model call happened. Poll `GET /{jobId}` and follow\n`next`: `wait` (a dispatch is pending or running), `fetch_result`, `recover` (call the recover route), `operator_reconcile` (stop and\nescalate: an attempt has an unknown provider outcome that may have been charged; starting a new jobId accepts that cost) or `none`.\nA job interrupted between two stages (some receipt stored, a later stage never sent) is never continued automatically: its dispatch\nends idle with `lastOutcome=needs_recover`, and only an explicit recover sends the next stage.\nInternal `ready` is not the public `completed`: the app import must still succeed and re-check its own current authority.\n\n**Results.** `GET /{jobId}/result` returns the runtime's `get` payload (`job`, see `ai-contract.schema.json#/$defs/JobResult`) only\nwhile the server's *current* grant registry still permits delivery; otherwise `delivery.state` is `withheld`, `job` is null and only\ncontent-free per-attempt `receipts` are returned for usage accounting. A live job is withheld with `reason=recipient_unproven` until the\nruntime has recorded an attempt for every stage it needs, because only then is the recipient provable. `job.grant` is an execution snapshot, never current authority.\n\n**S3 relation jobs (`/internal/v1/relation-jobs`, schema `zoop-ai-internal-relation-1`, scopes `relation.*`).** A separate family over the\ninstalled `zoop-ai-relation` pipeline, replay only: it shares nothing with the S1 wire contract or state machine. It is off unless its\nall-or-nothing server configuration group is set (otherwise every route answers 409 `execution_unavailable` after authentication). A caller\ncannot name a path, fixture, registry or live mode. The body is the S3 `Submit` (`zoop-relation-s3`) naming an operator-prepared S2 extraction\njob as `upstream {jobId, inputDigest}`; that pair must be listed for the calling principal in a server-owned allowlist, otherwise 403\n`upstream_not_allowed` before anything is stored. The principal owns the job it submits: another principal's job answers like a missing one.\nThe initial dispatch runs once. A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service,\nare never run again automatically (`next=recover`); a call the pipeline reserved but never saw answered ends `reconciling` and is never\nresent. Cancel refuses a ready job (409 `job_already_terminal`); the pipeline would otherwise withhold it for good. Status never carries content.\n`GET /{jobId}/result` returns candidates only for a ready job while the owner is still the principal the allowlist lists for that upstream and the\npipeline reports delivery current (it re-reads the operator source registry on every call); otherwise `delivery.state` is `withheld` with a\nreason code. Delivery is checked at one instant: content already sent cannot be recalled, and a revocation after the check is not observed.\n\n**Review and revalidation (`relation.review`).** `POST /{jobId}/reviews` records one `allow` or `reject` decision on one relation candidate. The\n`Idempotency-Key` is the stable operation id and the body is exactly `{relationCandidateId, expectedSourceVersion, expectedSourceRevision, decision}`; the\nreviewer is always the authenticated principal and cannot be sent. `sourceVersion` is the job's `inputDigest` and `sourceRevision` is the relation's runtime\nevent-chain revision as a decimal string, both read from `GET /{jobId}/result`. They are runtime values, never the application's own review revision (the\npublic decision API's `expectedRevision`), which this service does not see and which must never be forwarded. A new decision is checked against both values\nexactly, the revision inside the pipeline's own append transaction, and anything that does not match records nothing: 409 `source_version_conflict` or\n`source_revision_conflict`, and a relation that is not on hold is `review_target_not_hold`. The same key and body return the existing operation even after the\nrelation has moved on; another body is `idempotency_conflict`, another principal's key is `operation_id_unavailable`. Acceptance, verification and publication\nare separate facts in the operation status. `review` says whether the decision is recorded: `unconfirmed` means the request was reserved but the service has no\nproof yet that the event was appended, so retry the same request, which reads the chain for a marker only this operation can have written and never appends\ntwice. `revalidation` says what the automatic re-check an accepted `allow` requested did: `queued`, `running`, `verified` with the verdict's eligibility,\n`superseded` when a later reject won (a stale allow can never overwrite a rejection), `interrupted`, `failed` or `cancelled`. `publication` is always\n`not_published`. The revalidation is dispatched once, like a job: an ambiguous end waits for the explicit `POST /{jobId}/reviews/{operationId}/recover`, which\nreads the chain first, settles whatever it already proves and otherwise queues the revalidation again. The pipeline never resends a call it already started, so a\nrecover can only finish a saved receipt or send a call that never started; an unanswered call is `reconcile_required`. A revalidation runs only while the owner\nis still listed for the job's upstream. While it runs the job is `running` and its result is withheld. Verification replays authored fixtures only: no model is\ncalled. Operation status is read from the service ledger and carries no content. This slice has no list route, and `eligible` is an automatic evidence gate,\nnever approval or publication.\n\n**S2 extraction jobs (`/internal/v1/extraction-jobs`, schema `zoop-ai-internal-extraction-1`, scopes `extraction.*`).** A separate family over the\ninstalled `zoop-ai-extract` pipeline, replay only: it shares no wire contract, ledger or state machine with S1 or S3, but its children run behind the same\nsingle gate as S3's, so an S2 write and an S3 read of its ledger can never overlap. It is off unless its own all-or-nothing server configuration group is\nset (otherwise every route answers 409 `execution_unavailable` after authentication). A caller never sends the S2 `Submit`: the body is exactly\n`{schemaVersion: \"zoop-extraction-s2-2\", jobId, approvedRequestDigest}`. The operator's server-owned approval file maps `principal + jobId +\napprovedRequestDigest` to the exact S2 request (snapshot, catalogue, incoming observation, topic request) and the digests of the authored replay\nfixtures it runs against; anything not listed is 403 `request_not_approved` before a ledger row or child exists, and the same answer whether or not the\njob exists. An approval only narrows what the pipeline allows: the pipeline still re-reads the operator source registry on every content-bearing command.\nThe principal owns the job it submits (another principal's job answers like a missing one) and a job id that already exists in the pipeline ledger is\n`job_id_unavailable`: an operator's job is never adopted.\n\nThe first reservation freezes the approved digest, the producer fixture digest, the optional topic fixture digest and the `inputDigest` the pipeline must\nreport (computed from the approved bytes, not echoed). The same request again keeps all of it; the same job with another approved digest is\n`idempotency_conflict`; an approval entry or fixture file that has since changed is `approval_changed` / `fixture_changed` (or a withheld result) and the\njob id is never rebound. The approval is re-read, and the fixtures re-hashed, at submit, at every dispatch, at recover and at delivery.\n\nThe initial dispatch runs once. A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service, are never run\nagain automatically (`next=recover`); a pipeline `extraction_busy`/`ingestion_busy` refusal before any effect is retried a few times, but a job that the\npipeline recorded as `stopped` (for example `ingestion_busy` during execution) waits for an explicit recover. A call the pipeline reserved but never saw\nanswered ends `reconciling` and is never resent (`reconcile_required`). Cancel makes a queued, running, stopped or reconciling job `cancelled` for good and\nis idempotent; a ready job is refused with 409 `job_already_terminal` and stays ready. Status never carries content. `GET /{jobId}/result` returns event\ncandidates (with their comparisons, citations and disposition) and topic candidates only for a ready job while the pipeline reports delivery current, the\napproval is still the reserved one, the fixtures are still the pinned bytes and every receipt was answered by them; otherwise `delivery.state` is\n`withheld` with a reason code. Nothing is ever approved by this family: every candidate carries `approved: false`. Delivery is checked at one instant: content\nalready sent cannot be recalled. Listing a delivered S2 job as an S3 upstream is a separate, explicit operator decision in the S3 allowlist; an S2 result never\nwidens S3 authority by itself.\n\n**Graph versions (`/internal/v1/graph-versions`, schema `zoop-ai-internal-graph-1`, scope `graph.read`).** A third, separate, strictly read-only family over the\ninstalled `zoop-ai-graph read|focus` pipeline commands: a verified status of one version and the bounded neighbourhood of one company. It writes nothing\n(no version, no pointer, no graph ledger, Neo4j or source ledger write, no model call), runs no caller-supplied query and has no list route. It is off unless\nits all-or-nothing server configuration group is set (otherwise every route answers 409 `execution_unavailable` after authentication) and it is **not**\npublic: nothing here activates, publishes or withdraws a version, and `publication` is always `not-published`.\n\n**Which versions a caller may read.** The version id is only a label, so the operator lists per principal the exact `{versionId, graphDigest, payloadDigest}` (and\noptionally the frozen S3 relation job as `sourceRelation`) in a server-owned allowlist that is re-read on every request. A version that is not listed answers 403\n`version_not_allowed` before any ledger or child process is touched, with one answer for \"unknown\" and \"exists but not yours\"; the service never adopts a version\nthe operator did not list. A listed version that the graph ledger does not have answers 404 `version_not_found` (an operator configuration gap).\n\n**Delivery.** Content leaves only while the version verifies *now*: the pipeline re-checks the S3/S2 authority and source grants, every canonical decision, the S3\nreview state, the Neo4j store binding and the **full stored graph** against the frozen digest on every call, the digests it reports must equal the listed ones, and\nthe listed entry must be unchanged when read again just before the response. Otherwise the answer is **200 with `delivery.state=withheld`**, a reason code\n(`source_unauthorized`, `upstream_changed`, `canonical_mapping_changed`, `review_revision_changed`, `graph_version_corrupt`, `graph_store_identity_mismatch`,\n`version_not_ready`, `version_pin_mismatch`, `source_pin_mismatch` ...) and nothing else: no `verification`, `graph` or `evidence`. A withheld answer is not an\nerror and not an empty graph. These checks are separate reads at separate instants, so a revocation that lands between them and the response is not covered and\nnothing recalls content a caller already received. `current` means \"verified now\", never \"the version the application shows\": there is no active pointer.\n\n**Status.** `GET /{versionId}` runs the same gate chain and returns identity, `state` (`frozen|reserved|unknown|ready|failed`), `delivery` and, only when current,\n`verification` (graph and payload digests, node and edge counts). It carries no node, edge or evidence and no Issue counts: the graph is built from S3\nrelations, not from Issues.\n\n**Focus.** `GET /{versionId}/focus?companyId=&depth=` takes exactly these two query parameters, each once; `depth` is exactly 1, 2 or 3 and anything else (an unknown\nor repeated key, `01`, `4`, a list) is 422. The neighbourhood is breadth-first over the undirected edges of the verified version; an edge is shown iff one endpoint is\ncloser than `depth`. `focus.found=false` (with empty `graph.nodes`, `graph.edges` and `evidence`) means the company is not a node of the verified version; it is a\nverified answer, not an error. `evidence` lists only the records the shown edges reference, as IDs and document/version/span coordinates: the graph holds no quote,\ntitle, URL, rationale or review note, and none is returned.\n\n**Busy and unavailable.** An operator writer holding a ledger (`graph_busy`, `relation_busy`, `extraction_busy`, `ingestion_busy`) is 503 `runtime_busy`, a graph\ndatabase that does not answer is 503 `runtime_unavailable`, unusable server configuration or state (credentials, unbound store, damaged ledger) is 503\n`service_configuration_invalid`, and too many concurrent reads is 503 `service_busy`; all carry `Retry-After`. A 503 is never an empty graph.\n\n**Graph handoff bundles (`/internal/v1/graph-handoffs`, schema `zoop-ai-internal-handoff-1`, scope `handoff.read`).** A fourth, separate, strictly read-only\nfamily over the installed `zoop-ai-handoff export` command: the verified status of one AI handoff and, only while it verifies now, the whole versioned bundle\n(`zoop-graph-handoff-bundle-3`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It\nwrites nothing (no handoff, no ledger, no cache, no source write, no model or network call), cannot freeze, recover, activate or publish, runs no caller-supplied\npath, command or query and has no list route. It is off unless its all-or-nothing server configuration group is set (otherwise both routes answer 409\n`execution_unavailable` after authentication). `publication` is always `not-published` and `appImport` always `pending`: this service delivers the AI-side\nartifact; the application's article/text/evidence/catalog verification, snapshot registration and activation are the backend's and are not claimed here.\n\n**Which handoffs a caller may read.** A handoff id is only a label, so the operator lists per principal the exact `{handoffId, manifestDigest, bundleDigest}`\n(both SHA-256 pins are required) in a server-owned allowlist that is re-read on every request and again before anything of the answer is used. A handoff that is\nnot listed for the caller answers 403 `handoff_not_allowed` before any child process is touched, with one answer for \"unknown\", \"exists but not yours\" and\n\"listed for another principal\". A listed handoff that the ledger does not have answers 404 `handoff_not_found` (an operator configuration gap).\n\n**Delivery.** Content leaves only while the handoff verifies *now*: the producer re-checks on every export the S3 authority and S2 upstream pins, grants and\nrights, the used review revisions, the three operator files against the manifest pins and the rebuilt content digest; the service then hashes the canonical\nbytes of the bundle it received, requires the result to equal the producer's receipt **and** the operator's pins, parses it through a closed model (unknown\nfields are refused at every level) and requires the model to dump back to exactly those canonical bytes. Otherwise the answer is **200 with\n`delivery.state=withheld`**, a reason code (`source_unauthorized`, `upstream_changed`, `source_pin_missing`, `review_revision_changed`,\n`canonical_mapping_changed`, `decisions_changed`, `bindings_changed`, `handoff_content_changed`, `handoff_not_ready`, `handoff_pin_mismatch`,\n`handoff_contract_changed` ...) and nothing else: no `verification` (so no count, source id or digest) and no `bundle`. `handoff_contract_changed` means the\nhandoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1` or `-2`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.\nA withheld answer is not an error and not an empty bundle; do not import it and do not treat it as \"no data\". The checks are separate reads at separate instants,\nso a revocation that lands between them and the response is not covered and nothing recalls content a caller already received.\n\n**Original mentions.** Every `issues[].mentions[]` item is one S2 mention exactly as extracted (`documentId`, `documentVersion` and the S2 local `mentionId`\nidentify it; a local id is unique only within one document version), with the app article it belongs to and the evidence ids of its own citations. Its\n`verification` is always `none`: title, action, target, time, period, assertion status, background flag and participants are candidate or snapshot values of S2,\nnever verified, decided or approved fields, and they are not derived from the merged issue. A participant carries the S2 `sourceCompanyId`, the S2 `name` and the\nS2 `role` text as is (not a confirmed role, not an `INVOLVES` relation); `companyId` is the public company only where every carrying upstream mapped the source id\nto the same company of this bundle, otherwise null.\n\n**Field provenance.** Every issue carries a closed `fieldProvenance` that records how the producer chose the issue's six headline values (`title`, `action`,\n`target`, `eventTime`, `period`, `assertionStatus`): `selection` is `unanimous` (no operator representative; every mention states all six values) or\n`operator-representative` (the operator's single representative decision; it is one choice for all six fields, never a per-field decision). `sameValueMentions`\nlists per field, in the order of `mentions[]`, the identities (`documentId`, `documentVersion`, `mentionId`) of exactly those mentions whose own value equals the\nissue's value (null equals null; no trimming or time normalisation). `verification` is always `none`: this is the actual selection, never a fact verification, a\nsupport or an approval, and it is not a `fieldDecisions` verdict. The producer proves list exactness and closure; this service checks only the shapes.\n\n**The bundle bytes.** `bundle` is the producer's artifact, relayed with exactly its keys and values. `verification.bundleDigest` is the SHA-256 of its canonical\nUTF-8 bytes, where canonical means JSON with keys sorted by code point, separators `,` and `:` without whitespace and non-ASCII characters not escaped (Python\n`json.dumps(sort_keys=True, separators=(\",\", \":\"), ensure_ascii=False)`). All numbers are non-negative integers and all keys ASCII, so any JSON parser followed by that\nserialisation reproduces the same bytes and the same digest, whatever the language; do not normalise, drop or add a field before hashing. Every key the service\nadds (`appImport`, `observedAt`, `verification`, `delivery`) is a sibling of `bundle`, never inside it. Strings that came from sources (titles, URLs, labels,\nobservation and grant metadata, `sourceKind`) are data the producer recorded, never an authority: nothing in them proves or extends a right, and the pins and the\ncurrent `delivery.state` are the only delivery gates.\n\n**The manifest bytes.** `manifest` is the operator's frozen manifest exactly as the producer's ledger stored it at freeze time (never rebuilt from today's files or\nconfiguration): schema, handoff id, source-kind declaration, policy version, the S3/S2 source pins with their review digests and the three operator-file SHA-256\nhashes. It holds no path and no secret. Its canonical bytes (same canonicalisation as the bundle) hash to `verification.manifestDigest`, which equals\n`bundle.manifestDigest`. The service refuses (500 `runtime_binding_mismatch`) a manifest whose digest, handoff id, declaration, policy version, file hashes or\nsource pins disagree with the bundle or the producer's receipt, and (500 `runtime_contract_mismatch`) a missing manifest or any unknown field at any level. A\nbackend therefore recomputes both digests from ONE authenticated response. `manifest` is a sibling of `bundle`; status and withheld answers never carry it.\n\n**Status.** `GET /{handoffId}` runs the same full export gate chain and returns identity, `state`, `delivery`, `appImport` and, only when current,\n`verification` (manifest, bundle and content digests, bundle size, the bundle's own counts, number of source jobs, provenance declaration). It carries no\nnode, source id, text or title.\n\n**Bundle.** `GET /{handoffId}/bundle` returns the same fields plus `manifest` and `bundle`. The response is bounded by the producer's 6 MiB bundle limit; the\nservice reads at most 16 MiB from its child, so an oversized answer is a 503 (`runtime_unavailable`), never a truncated bundle.\n\n**Busy and unavailable.** An operator writer holding a ledger (`handoff_busy`, `relation_busy`, `extraction_busy`, `ingestion_busy`) is 503 `runtime_busy`;\nunusable server configuration or operator state (damaged or altered artifact, operator file, ownership, ledger recovery needed) is 503\n`service_configuration_invalid`; too many concurrent reads (at most 2 children) is 503 `service_busy`; a missed 45 s deadline or an unreadable answer is 503\n`runtime_unavailable`. All carry `Retry-After`; there is exactly one child per request and no automatic retry. A child answer that is not the contract this service\nknows is 500 `runtime_contract_mismatch` or `runtime_binding_mismatch` (not retryable). A 503 or 500 is never an empty bundle."
   },
   "paths": {
     "/internal/v1/analysis-jobs": {
@@ -8657,9 +8657,9 @@
                       },
                       "verification": {
                         "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb",
-                        "bundleDigest": "144231dd776203047c22891174c8f4e816d6b5882530fac23096da76a544d3a3",
-                        "contentDigest": "77417b9a0221a98ec00d6b41085d4dcd78aa21278f792dd4055eed449bfaa224",
-                        "bundleBytes": 7832,
+                        "bundleDigest": "5ca1afb6afefafae8e77cd644e03691fb8e282a2f2abccc65150792e0f160316",
+                        "contentDigest": "11a5e1a79c510e765c6b0337969cdae95960636a951f7b944c24026232254153",
+                        "bundleBytes": 8873,
                         "counts": {
                           "companies": 1,
                           "issues": 1,
@@ -9050,9 +9050,9 @@
                       },
                       "verification": {
                         "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb",
-                        "bundleDigest": "144231dd776203047c22891174c8f4e816d6b5882530fac23096da76a544d3a3",
-                        "contentDigest": "77417b9a0221a98ec00d6b41085d4dcd78aa21278f792dd4055eed449bfaa224",
-                        "bundleBytes": 7832,
+                        "bundleDigest": "5ca1afb6afefafae8e77cd644e03691fb8e282a2f2abccc65150792e0f160316",
+                        "contentDigest": "11a5e1a79c510e765c6b0337969cdae95960636a951f7b944c24026232254153",
+                        "bundleBytes": 8873,
                         "counts": {
                           "companies": 1,
                           "issues": 1,
@@ -9100,7 +9100,7 @@
                         }
                       },
                       "bundle": {
-                        "schemaVersion": "zoop-graph-handoff-bundle-2",
+                        "schemaVersion": "zoop-graph-handoff-bundle-3",
                         "handoffId": "handoff-synthetic-1",
                         "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb",
                         "provenance": {
@@ -9283,7 +9283,55 @@
                               }
                             ],
                             "decisionRef": "issue-2026-10-16:1",
-                            "representative": null
+                            "representative": null,
+                            "fieldProvenance": {
+                              "selection": "unanimous",
+                              "verification": "none",
+                              "sameValueMentions": {
+                                "title": [
+                                  {
+                                    "documentId": "synthetic-doc-1",
+                                    "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                    "mentionId": "m-synthetic-1"
+                                  }
+                                ],
+                                "action": [
+                                  {
+                                    "documentId": "synthetic-doc-1",
+                                    "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                    "mentionId": "m-synthetic-1"
+                                  }
+                                ],
+                                "target": [
+                                  {
+                                    "documentId": "synthetic-doc-1",
+                                    "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                    "mentionId": "m-synthetic-1"
+                                  }
+                                ],
+                                "eventTime": [
+                                  {
+                                    "documentId": "synthetic-doc-1",
+                                    "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                    "mentionId": "m-synthetic-1"
+                                  }
+                                ],
+                                "period": [
+                                  {
+                                    "documentId": "synthetic-doc-1",
+                                    "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                    "mentionId": "m-synthetic-1"
+                                  }
+                                ],
+                                "assertionStatus": [
+                                  {
+                                    "documentId": "synthetic-doc-1",
+                                    "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                    "mentionId": "m-synthetic-1"
+                                  }
+                                ]
+                              }
+                            }
                           }
                         ],
                         "relations": [
@@ -9408,7 +9456,7 @@
                           "graphDb": "none"
                         },
                         "digests": {
-                          "content": "77417b9a0221a98ec00d6b41085d4dcd78aa21278f792dd4055eed449bfaa224"
+                          "content": "11a5e1a79c510e765c6b0337969cdae95960636a951f7b944c24026232254153"
                         }
                       }
                     }
@@ -10293,6 +10341,35 @@
         ],
         "title": "BExclusions"
       },
+      "BFieldProvenance": {
+        "properties": {
+          "selection": {
+            "type": "string",
+            "enum": [
+              "unanimous",
+              "operator-representative"
+            ],
+            "title": "Selection"
+          },
+          "verification": {
+            "type": "string",
+            "const": "none",
+            "title": "Verification"
+          },
+          "sameValueMentions": {
+            "$ref": "#/components/schemas/BSameValueMentions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "selection",
+          "verification",
+          "sameValueMentions"
+        ],
+        "title": "BFieldProvenance",
+        "description": "How the producer chose the issue's six headline values: `unanimous` (every mention states them) or `operator-representative` (the operator's single\nrepresentative decision). `verification` is always `none`: this is the actual selection, never a verification, support or approval of any value."
+      },
       "BFollowsProvenance": {
         "properties": {
           "origin": {
@@ -10651,6 +10728,9 @@
                 "type": "null"
               }
             ]
+          },
+          "fieldProvenance": {
+            "$ref": "#/components/schemas/BFieldProvenance"
           }
         },
         "additionalProperties": false,
@@ -10670,7 +10750,8 @@
           "sourceEvents",
           "mentions",
           "decisionRef",
-          "representative"
+          "representative",
+          "fieldProvenance"
         ],
         "title": "BIssue"
       },
@@ -10842,6 +10923,35 @@
         ],
         "title": "BMention",
         "description": "One original S2 mention of the issue, identified by its source document version and S2 local id (a local id is unique only within one document version).\n`verification` is always `none`: these are S2 candidate or snapshot values, never verified, decided or approved fields."
+      },
+      "BMentionRef": {
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Documentid"
+          },
+          "documentVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Documentversion"
+          },
+          "mentionId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Mentionid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "documentId",
+          "documentVersion",
+          "mentionId"
+        ],
+        "title": "BMentionRef",
+        "description": "The identity of one original mention of the same issue (a reference, never a copy of its values)."
       },
       "BObservation": {
         "properties": {
@@ -11293,6 +11403,76 @@
         ],
         "title": "BRelationCounts"
       },
+      "BSameValueMentions": {
+        "properties": {
+          "title": {
+            "items": {
+              "$ref": "#/components/schemas/BMentionRef"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Title"
+          },
+          "action": {
+            "items": {
+              "$ref": "#/components/schemas/BMentionRef"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Action"
+          },
+          "target": {
+            "items": {
+              "$ref": "#/components/schemas/BMentionRef"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Target"
+          },
+          "eventTime": {
+            "items": {
+              "$ref": "#/components/schemas/BMentionRef"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Eventtime"
+          },
+          "period": {
+            "items": {
+              "$ref": "#/components/schemas/BMentionRef"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Period"
+          },
+          "assertionStatus": {
+            "items": {
+              "$ref": "#/components/schemas/BMentionRef"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Assertionstatus"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "action",
+          "target",
+          "eventTime",
+          "period",
+          "assertionStatus"
+        ],
+        "title": "BSameValueMentions",
+        "description": "Per headline field, the mentions whose own value equals the issue's value exactly (null equals null, no normalisation). Shape only: the producer owns the\nexactness, order and closure of these lists."
+      },
       "BSource": {
         "properties": {
           "relation": {
@@ -11639,7 +11819,7 @@
         "properties": {
           "schemaVersion": {
             "type": "string",
-            "const": "zoop-graph-handoff-bundle-2",
+            "const": "zoop-graph-handoff-bundle-3",
             "title": "Schemaversion"
           },
           "handoffId": {

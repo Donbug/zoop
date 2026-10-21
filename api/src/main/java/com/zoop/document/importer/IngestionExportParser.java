@@ -31,6 +31,7 @@ public final class IngestionExportParser {
     public static final int MAX_TEXT_CODE_POINTS = 500_000;
     static final int MAX_TITLE_CODE_POINTS = 2_000;
     static final int MAX_URL_CODE_POINTS = 8_000;
+    static final int MAX_PUBLISHER_CODE_POINTS = 200;
     private static final int MAX_GRANT_CODE_POINTS = 1_000;
 
     private static final Pattern DOCUMENT_ID = Pattern.compile("doc-[0-9a-f]{64}");
@@ -44,6 +45,12 @@ public final class IngestionExportParser {
     private static final Set<String> MEDIA_TYPES = Set.of("text/html", "application/pdf");
     /** Present together, and only for an observation collected over HTTP; an authored export has neither key. */
     private static final Set<String> COLLECTED_KEYS = Set.of("provenance", "collection");
+    /**
+     * The operator-declared publishing outlet; the ledger omits the key when none was declared, so every older export (which never has
+     * it) stays valid and unchanged. It is the only optional observation key that is not a collection fact.
+     */
+    private static final String PUBLISHER = "publisher";
+    private static final Set<String> OPTIONAL_OBSERVATION = Set.of("provenance", "collection", PUBLISHER);
     private static final Set<String> COLLECTION = Set.of("provenance", "collectionId", "receipt", "fetchedAt", "finalUrl",
             "httpStatus", "contentType", "bodySha256", "documentKind", "network", "published");
     private static final Set<String> FILE_REF = Set.of("file", "sha256");
@@ -62,7 +69,7 @@ public final class IngestionExportParser {
     private static VerifiedDocument verify(StrictJson.Obj root, Observation expected) {
         root.exactly(TOP);
         require(SCHEMA_VERSION.equals(root.string("schemaVersion")));
-        StrictJson.Obj observation = root.object("observation").keys(OBSERVATION, COLLECTED_KEYS);
+        StrictJson.Obj observation = root.object("observation").keys(OBSERVATION, OPTIONAL_OBSERVATION);
         require(observation.has("provenance") == observation.has("collection"));
         StrictJson.Obj grant = root.object("grant").exactly(GRANT);
         StrictJson.Obj document = root.object("document").exactly(DOCUMENT);
@@ -149,8 +156,33 @@ public final class IngestionExportParser {
                 || Text.codePoints(url) > MAX_URL_CODE_POINTS || !Text.storable(title) || !Text.storable(url)) {
             throw failure(DocumentImportFailure.METADATA_UNSUPPORTED);
         }
-        return new VerifiedDocument(expected, textArtifactId, text, textUtf8, title, url, publishedAt, publishedDate, precision,
-                observedAt, grantId, grantRevision, collected, document.node());
+        String publisher = publisher(observation);
+        return new VerifiedDocument(expected, textArtifactId, text, textUtf8, title, url, publisher, publishedAt, publishedDate,
+                precision, observedAt, grantId, grantRevision, collected, document.node());
+    }
+
+    /**
+     * The declared outlet, exactly as written: absent and an explicit null both mean "not declared" (null). A present value is a
+     * string of 1 to 200 code points that PostgreSQL can store, with no control character and not made of separators only.
+     * Nothing is trimmed or normalised, so what the ledger hashed is what the registry stores and compares.
+     */
+    private static String publisher(StrictJson.Obj observation) {
+        if (!observation.has(PUBLISHER) || observation.isNull(PUBLISHER)) {
+            return null;
+        }
+        String value = observation.string(PUBLISHER);
+        int codePoints = Text.codePoints(value);
+        if (codePoints < 1 || codePoints > MAX_PUBLISHER_CODE_POINTS || !Text.storable(value)
+                || value.codePoints().anyMatch(point -> Character.getType(point) == Character.CONTROL)
+                || value.codePoints().allMatch(IngestionExportParser::separator)) {
+            throw failure(DocumentImportFailure.METADATA_UNSUPPORTED);
+        }
+        return value;
+    }
+
+    private static boolean separator(int point) {
+        int type = Character.getType(point);
+        return type == Character.SPACE_SEPARATOR || type == Character.LINE_SEPARATOR || type == Character.PARAGRAPH_SEPARATOR;
     }
 
     /**
