@@ -71,13 +71,13 @@
 | reprocessBriefingRound | /api/v1/admin/briefings/{round_id}/reprocess | /api/admin/briefings/{round_id}/reprocess | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 13 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | appendBriefingCorrection | /api/v1/admin/briefings/{round_id}/corrections | /api/admin/briefings/{round_id}/corrections | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 12 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | setBriefingSuspension | /api/v1/admin/briefings/{round_id}/suspension | /api/admin/briefings/{round_id}/suspension | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 13 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
-| recordInteractionEvents | /api/v1/telemetry | /api/telemetry | 목표만 161 · BFF만 13 · 형식/필수/권한 변경 10 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| recordInteractionEvents | /api/v1/telemetry | /api/telemetry | 목표만 206 · BFF만 28 · 형식/필수/권한 변경 7 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | getMyFeedback | /api/v1/feedback | /api/feedback | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 7 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | setFeedback | /api/v1/feedback | /api/feedback | 목표만 160 · BFF만 12 · 형식/필수/권한 변경 10 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
-| getInsightsOverview | /api/v1/admin/insights/overview | /api/admin/insights/overview | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 7 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
-| getInsightsSummary | /api/v1/admin/insights/summary | /api/admin/insights/summary | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 9 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
-| listCompanyInsights | /api/v1/admin/insights/companies | /api/admin/insights/companies | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 7 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
-| getCompanyInsights | /api/v1/admin/insights/companies/{company_id} | /api/admin/insights/companies/{company_id} | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 9 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| getInsightsOverview | /api/v1/admin/insights/overview | /api/admin/insights/overview | 목표만 124 · BFF만 21 · 형식/필수/권한 변경 10 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| getInsightsSummary | /api/v1/admin/insights/summary | /api/admin/insights/summary | 목표만 119 · BFF만 21 · 형식/필수/권한 변경 13 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| listCompanyInsights | /api/v1/admin/insights/companies | /api/admin/insights/companies | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 9 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
+| getCompanyInsights | /api/v1/admin/insights/companies/{company_id} | /api/admin/insights/companies/{company_id} | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 15 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | getFeedbackSummary | /api/v1/admin/feedback/summary | /api/admin/feedback/summary | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 8 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | listDislikedResults | /api/v1/admin/feedback/dislikes | /api/admin/feedback/dislikes | 목표만 115 · BFF만 23 · 형식/필수/권한 변경 7 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | listMaskedTranscripts | /api/v1/admin/transcripts | /api/admin/transcripts | 목표만 117 · BFF만 23 · 형식/필수/권한 변경 9 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. / BFF에 별도 열람 권한·purpose 필수·기록 실패 차단 계약이 부족하다. |

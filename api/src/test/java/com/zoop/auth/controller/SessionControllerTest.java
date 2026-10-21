@@ -39,7 +39,7 @@ class SessionControllerTest {
             public Optional<MemberSessionRow> findByTokenHash(String hash) {
                 return Optional.of(new MemberSessionRow("session_1", "member-1", "member", hash,
                         "key", 1, now, now.plusSeconds(43200), null, "active",
-                        "a@example.com", "User", false, false));
+                        "a@example.com", "User", false, false, "analytics-member-1"));
             }
 
             @Override
