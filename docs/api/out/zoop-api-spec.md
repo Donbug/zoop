@@ -985,7 +985,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getCompanyPrices · 기간별 가격 차트 조회
 
-기간별 가격 차트 조회. period는 1d/1w/1m/1y이며 봉 해상도는 기간별로 고정한다: 1d=5m, 1w=1h, 1m=1d, 1y=1wk(주봉). 공급자가 목표 해상도를 직접 주지 않으면 같은 공급자의 더 촘촘한 봉(1분봉·일봉)을 거래소 현지 시각 기준 구간으로 집계해 만든다: 시가는 첫 봉 시가, 고가·저가는 최대·최소, 종가는 마지막 봉 종가, 거래량은 합. 5m·1h 구간은 시각을 그 단위로 내림한 봉 시작 시각이고, 1wk는 거래소 현지 날짜의 월요일에 시작하는 주다. 각 점의 time은 구간 시작 시각이다. 더 성긴 봉을 쪼개거나 빈 구간을 보간하지 않으며, 거래가 없는 구간은 점을 만들지 않는다. 집계할 원천도 없으면 200 unavailable(no_data)로 정상 자료 부재를 표현한다. 공급자 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE이며 retryable은 일시 장애에만 true다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다. from/to는 KST 날짜(그날 전체) 또는 오프셋이 있는 시각(to는 그 시각 포함)이며, 각 점은 [from, to]와 겹치는 구간(5m·1h·거래소 하루·월요일 시작 주) 하나로 구간 전체 값을 담는다. 가격은 공개 그래프 버전·기준 시점과 무관하므로 asOf·graphVersion을 받지 않으며 주면 422 INVALID_REQUEST다.
+기간별 가격 차트 조회. period는 1d/1w/1m/1y이며 봉 해상도는 기간별로 고정한다: 1d=5m, 1w=1h, 1m=1d, 1y=1wk(주봉). 공급자가 목표 해상도를 직접 주지 않으면 같은 공급자의 더 촘촘한 봉(1분봉·일봉)을 거래소 현지 시각 기준 구간으로 집계해 만든다: 시가는 첫 봉 시가, 고가·저가는 최대·최소, 종가는 마지막 봉 종가, 거래량은 합. 5m·1h 구간은 시각을 그 단위로 내림한 봉 시작 시각이고, 1wk는 거래소 현지 날짜의 월요일에 시작하는 주다. 각 점의 time은 구간 시작 시각이다. 더 성긴 봉을 쪼개거나 빈 구간을 보간하지 않으며, 거래가 없는 구간은 점을 만들지 않는다. 집계할 원천도 없으면 200 unavailable(no_data)로 정상 자료 부재를 표현한다. 공급자 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE이며 retryable은 일시 장애에만 true다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다. from/to는 KST 날짜(그날 전체) 또는 오프셋이 있는 시각(to는 그 시각 포함)이며, 각 점은 [from, to]와 겹치는 구간(5m·1h·거래소 하루·월요일 시작 주) 하나로 구간 전체 값을 담는다. 1d는 상장 거래소의 당일 정규 거래 시간이다(FS040): 세션 시작·종료와 휴장일은 공급자의 거래소 장 운영 캘린더를 따른다(평소 KRX 09:00–15:30 KST, NASDAQ·NYSE·AMEX 09:30–16:00 America/New_York, 조기 마감일은 그날 마감 시각). 시간외 거래는 넣지 않는다. to가 세션 중이면 세션 시작부터 to까지, 장 시작 전·휴장일이면 직전 거래일 세션 전체다. 캘린더상 정상 세션인데 그 종목의 봉이 없으면(거래 정지·무거래) 직전 거래일로 옮기지 않고 200 unavailable(no_data)다. range의 시각은 초까지 쓴 RFC 3339다. 1d 구간은 서버가 정하므로 from을 주면 422 INVALID_REQUEST다. 응답 range는 점이 다루는 실제 구간이다. 가격은 공개 그래프 버전·기준 시점과 무관하므로 asOf·graphVersion을 받지 않으며 주면 422 INVALID_REQUEST다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1007,7 +1007,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string |  |
 | period | query | 선택 | string {1d, 1w, 1m, 1y} |  |
-| from | query | 선택 | string (date) / string (date-time) | KST 날짜 또는 오프셋을 포함한 정확한 시각. from/to는 동일 기준을 사용한다. 범위는 period 하나(1d=하루, 1w=7일, 1m=한 달, 1y=1년, KST 달력 기준)까지이며, from이 to(생략 시 요청 시각)에서 그만큼 전보다 앞서면 422 INVALID_REQUEST다. |
+| from | query | 선택 | string (date) / string (date-time) | KST 날짜 또는 오프셋을 포함한 정확한 시각. from/to는 동일 기준을 사용한다. 범위는 period 하나(1w=7일, 1m=한 달, 1y=1년, KST 달력 기준)까지이며, from이 to(생략 시 요청 시각)에서 그만큼 전보다 앞서면 422 INVALID_REQUEST다. 1d는 from을 받지 않는다(422). |
 | to | query | 선택 | string (date) / string (date-time) | KST 날짜 또는 오프셋을 포함한 정확한 시각. from/to는 동일 기준을 사용한다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
@@ -5439,6 +5439,10 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 | source | 필수 | [QuoteSourceOut](#schema-quotesourceout) |  |
 | currency | 필수 | string |  |
 | interval | 필수 | string {5m, 1h, 1d, 1wk} | 공급된 가격 봉 해상도다. 기간별로 고정이며 1d=5m, 1w=1h, 1m=1d, 1y=1wk(주봉)다. 조회 기간과 구분하고 from/to 및 자료 기준 시각을 함께 표시한다. 더 촘촘한 봉을 집계한 경우에도 집계 결과의 해상도를 담으며, 다른 해상도를 이 필드로 위장하지 않는다(x-zoop.chartResolution). |
+| range | 필수 | object | 점이 다루는 실제 구간(거래소 현지 오프셋 ISO 8601). 1d는 고른 거래 세션의 시작부터 세션 종료 또는 to까지이고, 그 밖의 기간은 요청 from(생략 시 기본 시작)부터 to까지다. 차트 x축은 이 구간을 쓴다. |
+| range.from | 필수 | string (date-time) |  |
+| range.to | 필수 | string (date-time) |  |
+| range.sessionDate | 필수 | string (date) / null | 1d가 고른 거래소 현지 거래일. 다른 기간은 null. |
 | points | 필수 | [PricePoint](#schema-pricepoint)[] | Oldest first. |
 
 <a id="schema-priceseriesunavailable"></a>
