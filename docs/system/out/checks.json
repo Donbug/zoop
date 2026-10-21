@@ -2370,7 +2370,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "recordInteractionEvents",
       "severity": "difference",
-      "message": "목표만 161 · BFF만 13 · 형식/필수/권한 변경 10",
+      "message": "목표만 206 · BFF만 28 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -2412,7 +2412,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getInsightsOverview",
       "severity": "difference",
-      "message": "목표만 114 · BFF만 21 · 형식/필수/권한 변경 7",
+      "message": "목표만 124 · BFF만 21 · 형식/필수/권한 변경 10",
       "source": ""
     },
     {
@@ -2426,7 +2426,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getInsightsSummary",
       "severity": "difference",
-      "message": "목표만 114 · BFF만 21 · 형식/필수/권한 변경 9",
+      "message": "목표만 119 · BFF만 21 · 형식/필수/권한 변경 13",
       "source": ""
     },
     {
@@ -2440,7 +2440,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "listCompanyInsights",
       "severity": "difference",
-      "message": "목표만 120 · BFF만 21 · 형식/필수/권한 변경 7",
+      "message": "목표만 120 · BFF만 21 · 형식/필수/권한 변경 9",
       "source": ""
     },
     {
@@ -2454,7 +2454,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getCompanyInsights",
       "severity": "difference",
-      "message": "목표만 114 · BFF만 21 · 형식/필수/권한 변경 9",
+      "message": "목표만 114 · BFF만 21 · 형식/필수/권한 변경 15",
       "source": ""
     },
     {

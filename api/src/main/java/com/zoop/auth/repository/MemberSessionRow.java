@@ -7,5 +7,5 @@ public record MemberSessionRow(
         String csrfKeyId, long csrfVersion, Instant createdAt,
         Instant expiresAt, Instant revokedAt, String memberStatus,
         String email, String displayName, boolean completed,
-        boolean tutorialCompleted) {
+        boolean tutorialCompleted, String analyticsKey) {
 }
