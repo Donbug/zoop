@@ -2,7 +2,9 @@ package com.zoop.graph;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zoop.ZoopApplication;
 import com.zoop.admin.auth.service.AdminPrincipal;
@@ -19,9 +21,16 @@ import com.zoop.graph.version.GraphVersionConflictException;
 import com.zoop.graph.version.GraphVersionSelector;
 import com.zoop.graph.version.JdbcGraphVersionRepository;
 import com.zoop.graph.version.JdbcGraphVersionRepository.NewGraphVersion;
+import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -204,8 +213,6 @@ class GraphVersionPostgresIntegrationTest {
                 SELECT count(*) FROM audit_logs WHERE action = 'graph.version.activate' AND admin_id = ?
                   AND target_id = 'fixture-2026-10-01' AND detail->>'previousVersionId' = 'fixture-2026-10-08'
                 """, Integer.class, admin.adminId()));
-        assertEquals(Boolean.TRUE, jdbc.queryForObject(
-                "SELECT published_at IS NOT NULL FROM graph_versions WHERE id = 'fixture-2026-10-01'", Boolean.class));
 
         var list = service.list(null, null);
         assertEquals("fixture-2026-10-01", list.activeVersionId());
@@ -257,6 +264,102 @@ class GraphVersionPostgresIntegrationTest {
         assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
         assertEquals(0, jdbc.queryForObject(
                 "SELECT count(*) FROM idempotency_records WHERE resource_id = 'fixture-unreadable'", Integer.class));
+    }
+
+    @Test
+    void firstActivationStampsPublishedAtWithTheSameTimeAsTheHistoryAndTheAudit() {
+        // Seeding stamps published_at, so clear it: the version is then unpublished like a fresh import.
+        unpublish("fixture-2026-10-01");
+        AdminPrincipal admin = admin();
+
+        context.getBean(AdminGraphVersionService.class).activate("fixture-2026-10-01",
+                new GraphVersionActivateRequest("first publish", "fixture-2026-10-08"), "graph-key-pub",
+                admin, "it-pub");
+
+        Timestamp published = jdbc.queryForObject(
+                "SELECT published_at FROM graph_versions WHERE id = 'fixture-2026-10-01'", Timestamp.class);
+        assertEquals(published, jdbc.queryForObject(
+                "SELECT activated_at FROM graph_activations WHERE reason = 'first publish'", Timestamp.class));
+        assertEquals(published, jdbc.queryForObject(
+                "SELECT occurred_at FROM audit_logs WHERE target_id = 'fixture-2026-10-01' AND admin_id = ?",
+                Timestamp.class, admin.adminId()));
+    }
+
+    @Test
+    void activationTimeIsTakenAfterThePublicationLockNotWhenTheRequestArrived() throws Exception {
+        // Another pointer change holds the shared publication lock (JdbcGraphVersionRepository.PUBLICATION_LOCK) for a while.
+        TransactionTemplate other = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+        CountDownLatch locked = new CountDownLatch(1);
+        Thread holder = new Thread(() -> other.executeWithoutResult(status -> {
+            jdbc.execute("SELECT pg_advisory_xact_lock(" + 0x7a6f6f7067726170L + ")");
+            locked.countDown();
+            try {
+                Thread.sleep(1500);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+            }
+        }));
+        holder.start();
+        assertTrue(locked.await(10, TimeUnit.SECONDS));
+        AdminPrincipal admin = admin();
+
+        context.getBean(AdminGraphVersionService.class).activate("fixture-2026-10-01",
+                new GraphVersionActivateRequest("after the lock", "fixture-2026-10-08"), "graph-key-wait",
+                admin, "it-wait");
+        holder.join();
+
+        Instant requested = jdbc.queryForObject(
+                "SELECT created_at FROM idempotency_records WHERE resource_id = 'fixture-2026-10-01' AND idem_key = ?",
+                Timestamp.class, "graph-key-wait").toInstant();
+        Instant activated = jdbc.queryForObject(
+                "SELECT activated_at FROM graph_activations WHERE reason = 'after the lock'", Timestamp.class).toInstant();
+        assertTrue(Duration.between(requested, activated).toMillis() >= 1000,
+                "activated " + activated + " should follow the held lock, request was " + requested);
+        // An asOf between arrival and the real switch still sees the old version.
+        assertEquals("fixture-2026-10-08", selector.select(null, null, requested.plusMillis(500)).version().id());
+    }
+
+    @Test
+    void importedVersionIsRefusedWithoutAnExclusionStoreAndThePointerStays() {
+        // An unpublished imported version over a readable snapshot (kind is what the gate looks at).
+        unpublish("fixture-2026-10-01");
+        jdbc.update("UPDATE graph_versions SET kind = 'snapshot' WHERE id = 'fixture-2026-10-01'");
+        // The snapshot itself is readable, so the refusal below is the exclusion-store gate, not a broken file.
+        context.getBean(GraphSnapshotStore.class).load(repository.find("fixture-2026-10-01").orElseThrow());
+
+        var error = assertThrows(CustomException.class, () -> context.getBean(AdminGraphVersionService.class)
+                .activate("fixture-2026-10-01", new GraphVersionActivateRequest("go live",
+                        "fixture-2026-10-08"), "graph-key-imported", admin(), "it"));
+
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, error.getErrorCode());
+        assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
+        assertNull(jdbc.queryForObject("SELECT published_at FROM graph_versions WHERE id = 'fixture-2026-10-01'",
+                Timestamp.class));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM graph_activations WHERE reason = 'go live'", Integer.class));
+    }
+
+    @Test
+    void aFailedAuditWriteRollsBackThePointerTheHistoryAndTheIdempotencyRecord() {
+        // graph_activations.admin_id has no FK, but audit_logs.admin_id does: an unknown admin fails only the audit insert.
+        AdminPrincipal ghost = new AdminPrincipal("graph-admin-missing-" + UUID.randomUUID(), "ghost@example.com",
+                "Ghost", "admin", "session-ghost");
+
+        var error = assertThrows(CustomException.class, () -> context.getBean(AdminGraphVersionService.class)
+                .activate("fixture-2026-10-01", new GraphVersionActivateRequest("audit fails",
+                        "fixture-2026-10-08"), "graph-key-ghost", ghost, "it"));
+
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, error.getErrorCode());
+        assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM graph_activations WHERE reason = 'audit fails'", Integer.class));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM idempotency_records WHERE idem_key = 'graph-key-ghost'", Integer.class));
+    }
+
+    /** A snapshot file names its own version id, so tests reuse a seeded version and clear its publication stamp. */
+    private static void unpublish(String versionId) {
+        jdbc.update("UPDATE graph_versions SET published_at = NULL WHERE id = ?", versionId);
     }
 
     private static AdminPrincipal admin() {

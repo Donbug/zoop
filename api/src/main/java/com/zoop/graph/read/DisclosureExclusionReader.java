@@ -7,4 +7,9 @@ package com.zoop.graph.read;
  */
 public interface DisclosureExclusionReader {
     DisclosureExclusions current();
+
+    /** False for the default no-store reader: "nothing excluded" is then unknown, not checked (activation gate, FS059). */
+    default boolean authoritative() {
+        return true;
+    }
 }

@@ -4,6 +4,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -57,6 +58,13 @@ public class JdbcAdminGraphVersionRepository {
                         rs.getString("version_id"), rs.getString("previous_version_id"),
                         rs.getTimestamp("activated_at").toInstant(), rs.getString("admin_email_snapshot"),
                         rs.getString("reason"), rs.getString("action")));
+    }
+
+    /** Holds the cited articles' access state still until the activation commits (in sorted order, so no lock cycle). */
+    public void shareLockArticles(Collection<String> articleIds) {
+        if (articleIds.isEmpty()) return;
+        jdbc.query("SELECT id FROM articles WHERE id IN (:ids) ORDER BY id FOR SHARE",
+                new MapSqlParameterSource("ids", articleIds), (rs, rowNum) -> rs.getString("id"));
     }
 
     public boolean claimIdempotency(String id, String adminId, String path, String key, String versionId,

@@ -4,6 +4,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 import com.zoop.admin.audit.AuditReasonPolicy;
@@ -14,9 +18,18 @@ import com.zoop.admin.graph.GraphVersionAdminResponse.GraphVersionList;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.json.Canonical;
+import com.zoop.document.evidence.graph.GraphEvidence;
+import com.zoop.document.evidence.service.EvidenceService;
+import com.zoop.graph.read.DisclosureExclusionReader;
+import com.zoop.graph.read.GraphEvidenceSnapshotReader;
+import com.zoop.graph.read.GraphSnapshotFilter;
 import com.zoop.graph.snapshot.GraphSnapshotStore;
+import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.version.GraphVersionRecord;
 import com.zoop.graph.version.JdbcGraphVersionRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,30 +37,41 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Lists public graph versions and moves the public pointer for an administrator (FS059). A version is activated only
- * after its snapshot loads and verifies through the configured {@link GraphSnapshotStore}, so the pointer never moves
- * to a version the public read API would answer with 503.
+ * after its snapshot loads and verifies through the configured {@link GraphSnapshotStore} and, for an imported version, its
+ * evidence passes the same current-rights gates getEvidence applies, so the pointer never moves to a version the public read
+ * API would answer with 503 or withheld evidence.
  */
 @Service
 public class AdminGraphVersionService {
+    private static final Logger log = LoggerFactory.getLogger(AdminGraphVersionService.class);
     private static final int DEFAULT_LIMIT = 50;
     private static final int MAX_LIMIT = 100;
     private static final String CURSOR_PREFIX = "gv1:";
+    private static final String IMPORTED = "snapshot";
 
     private final JdbcAdminGraphVersionRepository repository;
     private final JdbcGraphVersionRepository versions;
     private final GraphSnapshotStore snapshots;
+    private final DisclosureExclusionReader exclusions;
+    private final EvidenceService evidence;
     private final AdminAuditRepository audit;
     private final ObjectMapper mapper;
     private final Clock clock;
+    private final boolean allowWithoutExclusionStore;
 
     public AdminGraphVersionService(JdbcAdminGraphVersionRepository repository, JdbcGraphVersionRepository versions,
-            GraphSnapshotStore snapshots, AdminAuditRepository audit, ObjectMapper mapper, Clock clock) {
+            GraphSnapshotStore snapshots, DisclosureExclusionReader exclusions, EvidenceService evidence,
+            AdminAuditRepository audit, ObjectMapper mapper, Clock clock,
+            @Value("${zoop.graph.activation.allow-without-exclusion-store:false}") boolean allowWithoutExclusionStore) {
         this.repository = repository;
         this.versions = versions;
         this.snapshots = snapshots;
+        this.exclusions = exclusions;
+        this.evidence = evidence;
         this.audit = audit;
         this.mapper = mapper;
         this.clock = clock;
+        this.allowWithoutExclusionStore = allowWithoutExclusionStore;
     }
 
     @Transactional(readOnly = true)
@@ -96,11 +120,12 @@ public class AdminGraphVersionService {
         }
         String path = "/api/v1/admin/graph/versions/" + versionId + "/activate";
         String expected = request.expectedActiveVersionId();
-        String requestHash = Canonical.sha256(versionId + "\n" + expected + "\n" + reason);
-        Instant now = clock.instant();
+        // Version ids are never empty, so "" stands for an explicit null without colliding with any id.
+        String requestHash = Canonical.sha256(versionId + "\n" + (expected == null ? "" : expected) + "\n" + reason);
+        Instant requestedAt = clock.instant();
         try {
             boolean claimed = repository.claimIdempotency(UUID.randomUUID().toString(), admin.adminId(), path,
-                    idempotencyKey, versionId, requestHash, now);
+                    idempotencyKey, versionId, requestHash, requestedAt);
             var idempotency = repository.findIdempotencyForUpdate(admin.adminId(), path, idempotencyKey)
                     .orElseThrow(() -> new IllegalStateException("Claimed idempotency record is missing"));
             if (!idempotency.requestHash().equals(requestHash)) {
@@ -115,10 +140,11 @@ public class AdminGraphVersionService {
 
             var version = versions.find(versionId)
                     .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
-            snapshots.load(version);
-            var activation = versions.activateByAdmin(versionId, expected, admin.adminId(), admin.email(), reason, now);
+            PublicGraphSnapshot snapshot = snapshots.load(version);
+            var activation = versions.activateByAdmin(versionId, expected, admin.adminId(), admin.email(), reason,
+                    () -> requirePublishableNow(version, snapshot, requestId));
             audit.recordGraphActivation(admin.adminId(), admin.email(), versionId, activation.previousVersionId(),
-                    activation.pointerChanged(), reason, requestId, now);
+                    activation.pointerChanged(), reason, requestId, activation.activatedAt());
             ActivateResponse result = new ActivateResponse(versionId, activation.previousVersionId(),
                     !activation.pointerChanged());
             repository.completeIdempotency(idempotency.id(), mapper.writeValueAsString(result));
@@ -130,6 +156,33 @@ public class AdminGraphVersionService {
         } catch (Exception exception) {
             throw new IllegalStateException("Unable to persist graph version activation", exception);
         }
+    }
+
+    /**
+     * Runs under the publication lock, before the pointer moves (graph read contract section 0: current rights, exclusions and
+     * read readiness right before the switch). Synthetic fixtures carry no rights and no stored evidence, so only imported
+     * versions are checked. Without an exclusion store "nothing excluded" is unknown: refused unless the operator opted in.
+     */
+    private void requirePublishableNow(GraphVersionRecord version, PublicGraphSnapshot snapshot, String requestId) {
+        if (!IMPORTED.equals(version.kind())) return;
+        if (!exclusions.authoritative() && !allowWithoutExclusionStore) {
+            log.info("Graph activation refused (graphVersion={}, reason=exclusion_store_unavailable, requestId={})",
+                    version.id(), requestId);
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        }
+        PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot, null, exclusions.current());
+        Instant at = clock.instant();
+        Map<String, GraphEvidence> found = new LinkedHashMap<>();
+        Set<String> articles = new TreeSet<>();
+        for (PublicGraphSnapshot.Evidence cited : visible.evidence()) {
+            GraphEvidence located = GraphEvidenceSnapshotReader.locate(visible, version.id(), at, cited.evidenceId());
+            if (located.span() != null) {
+                found.put(cited.evidenceId(), located);
+                articles.add(located.span().articleId());
+            }
+        }
+        repository.shareLockArticles(articles);
+        evidence.requireGraphEvidenceServable(version.id(), found, requestId);
     }
 
     private static void validateKey(String key) {

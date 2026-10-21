@@ -3,6 +3,7 @@ package com.zoop.graph.version;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -24,9 +25,11 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
             """;
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final Clock clock;
 
-    public JdbcGraphVersionRepository(NamedParameterJdbcTemplate jdbc) {
+    public JdbcGraphVersionRepository(NamedParameterJdbcTemplate jdbc, Clock clock) {
         this.jdbc = jdbc;
+        this.clock = clock;
     }
 
     @Override
@@ -132,18 +135,22 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
     }
 
     /**
-     * Moves the pointer for an administrator under the publication lock; the caller has already verified the version's
-     * snapshot. The first pointer change also stamps {@code published_at}. Unknown ids are the caller's 404. When the
-     * current pointer is not {@code expectedActiveVersionId} (null: none active) another change won the race: 409.
+     * Moves the pointer for an administrator under the publication lock. When the current pointer is not
+     * {@code expectedActiveVersionId} (null: none active) another change won the race: 409. {@code publishable} then runs inside
+     * the lock and the same transaction (the caller's current-eligibility checks); it throws to keep the old pointer. The
+     * activation time is read only after both, so a later asOf never selects a version before it was really public. The first
+     * pointer change also stamps {@code published_at}. Unknown ids are the caller's 404.
      */
     @Transactional
     public Activation activateByAdmin(String versionId, String expectedActiveVersionId, String adminId,
-            String adminEmail, String reason, Instant at) {
+            String adminEmail, String reason, Runnable publishable) {
         jdbc.getJdbcTemplate().execute("SELECT pg_advisory_xact_lock(" + PUBLICATION_LOCK + ")");
         if (find(versionId).isEmpty()) throw new IllegalArgumentException("Unknown graph version " + versionId);
         if (!Objects.equals(expectedActiveVersionId, active().map(GraphVersionRecord::id).orElse(null))) {
             throw new CustomException(ErrorCode.REVISION_CONFLICT);
         }
+        publishable.run();
+        Instant at = clock.instant();
         Activation activation = activateLocked(versionId, "activate", adminId, adminEmail, reason, at);
         if (activation.pointerChanged()) {
             jdbc.update("UPDATE graph_versions SET published_at = :at WHERE id = :id AND published_at IS NULL",
@@ -168,7 +175,7 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
                 .addValue("action", action).addValue("actorKind", adminId == null ? "system" : "admin")
                 .addValue("changed", changed).addValue("adminId", adminId).addValue("email", adminEmail)
                 .addValue("reason", reason).addValue("at", Timestamp.from(at)));
-        return new Activation(previous, changed);
+        return new Activation(previous, changed, at);
     }
 
     private static GraphVersionRecord row(ResultSet rs, int rowNumber) throws SQLException {
@@ -183,7 +190,7 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
 
     public enum RegisterOutcome { REGISTERED, UNCHANGED }
 
-    public record Activation(String previousVersionId, boolean pointerChanged) { }
+    public record Activation(String previousVersionId, boolean pointerChanged, Instant activatedAt) { }
 
     public record NewGraphVersion(String id, String kind, String sourceLabel, String snapshotArtifactId,
             String snapshotStorageUri, String snapshotSha256, long snapshotBytes, long issueCount, long relationCount,

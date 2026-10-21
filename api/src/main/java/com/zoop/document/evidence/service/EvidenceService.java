@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 import com.zoop.artifact.storage.ArtifactStoreException;
@@ -287,50 +288,13 @@ public class EvidenceService {
         ArticleRow article;
         VersionRow version;
         try {
-            GraphEvidence.Span span = found.span();
-            if (span == null) {
-                throw new Denied("evidence_not_visible_in_version");
-            }
-            if (!"body".equals(row.inputKind()) || !Boolean.TRUE.equals(row.quoteVerified())) {
-                throw new Denied("not_verified_body_evidence");
-            }
-            if (!span.articleId().equals(row.articleId()) || !span.articleVersion().equals(row.articleVersion())
-                    || span.start() != row.startOffset() || span.end() != row.endOffset()) {
-                throw new Denied("span_mismatch");
-            }
-            article = registry.findArticle(row.articleId()).orElseThrow(() -> new Denied("article_missing"));
-            if (!AVAILABLE.equals(article.accessStatus())) {
-                throw new Denied("article_access_" + article.accessStatus());
-            }
-            // The version is pinned by the snapshot, so it is not required to be the article's newest one.
-            version = registry.findVersion(row.articleId(), row.articleVersion())
-                    .orElseThrow(() -> new Denied("version_missing"));
-            if (!row.textArtifactId().equals(version.textArtifactId())) {
-                throw new Denied("text_artifact_mismatch");
-            }
-            if (row.startOffset() < 0 || row.endOffset() <= row.startOffset()
-                    || row.quote().codePointCount(0, row.quote().length()) != row.endOffset() - row.startOffset()) {
-                throw new Denied("quote_offsets_inconsistent");
-            }
+            Readable readable = readableCitation(row, found.span());
+            article = readable.article();
+            version = readable.version();
             // The receipt of the SELECTED version, not the row's own: a row shared by several imports points at the first one. Its
             // bytes are read and parsed once for the grant pins and, for a basis-only span, for the basis membership.
             StrictJson.Obj receiptBundle = GraphReceiptGrants.bundle(receipt(found.graphVersion(), requestId), found.graphVersion());
-            Set<GraphReceiptGrants.Pin> pins = GraphReceiptGrants.pins(receiptBundle, row.articleId(), row.articleVersion());
-            if (!found.basisRefs().isEmpty()) {
-                GraphReceiptBasis.require(receiptBundle, row.id(), found.basisRefs());
-            }
-            for (GraphReceiptGrants.Pin pin : pins) {
-                if (!pin.sourceId().equals(article.provider())) {
-                    throw new Denied("pin_source_differs_from_article_provider");
-                }
-            }
-            SourceRegistry current = sources.registry(requestId);
-            for (GraphReceiptGrants.Pin pin : pins) {
-                String denial = current.denial(pin.sourceId(), pin.grantId(), pin.revision(), now);
-                if (denial != null) {
-                    throw new Denied("source_" + denial);
-                }
-            }
+            requireCurrentGrants(receiptBundle, row, found, article, () -> sources.registry(requestId), now);
         } catch (GraphReceiptGrants.Malformed malformed) {
             log.info("Graph evidence withheld (evidenceId={}, reason={}, requestId={})", row.id(), malformed.getMessage(), requestId);
             throw new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE);
@@ -350,6 +314,90 @@ public class EvidenceService {
                 row.articleVersion(), articleOut, Boolean.TRUE, found.eventIds(),
                 new Metadata(GRAPH_SOURCE, found.asOf(), found.graphVersion(), requestId, companyId != null, failures), null,
                 row.articleVersion(), null, null, null, null);
+    }
+
+    /**
+     * Activation precheck (FS059, graph read contract section 0): the same gates {@link #read} applies to a graph body citation,
+     * run against a version that is not active yet. {@code visible} maps each evidence id the version would show to what its
+     * snapshot says about it; the caller holds the publication lock and has share-locked the cited articles. The version's
+     * receipt is read once. A withheld citation (access, grant or registry changed since the import) is REVISION_CONFLICT; a
+     * store or registry that cannot be read is SOURCE_UNAVAILABLE. Nothing is written.
+     */
+    public void requireGraphEvidenceServable(String versionId, Map<String, GraphEvidence> visible, String requestId) {
+        Instant now = clock.instant();
+        String id = null;
+        try {
+            StrictJson.Obj receiptBundle = GraphReceiptGrants.bundle(receipt(versionId, requestId), versionId);
+            SourceRegistry current = sources.registry(requestId);
+            for (Map.Entry<String, GraphEvidence> entry : visible.entrySet()) {
+                id = entry.getKey();
+                EvidenceView row = evidence.findEvidence(id).orElseThrow(() -> new Denied("evidence_row_missing"));
+                ArtifactRow verification = row.verificationArtifactId() == null ? null
+                        : registry.findArtifact(row.verificationArtifactId()).orElse(null);
+                if (verification == null || !GRAPH_RECEIPT.equals(verification.kind())) {
+                    throw new Denied("not_graph_citation");
+                }
+                Readable readable = readableCitation(row, entry.getValue().span());
+                requireCurrentGrants(receiptBundle, row, entry.getValue(), readable.article(), () -> current, now);
+            }
+        } catch (GraphReceiptGrants.Malformed | Denied withheld) {
+            log.info("Graph activation refused (graphVersion={}, evidenceId={}, reason={}, requestId={})", versionId, id,
+                    withheld.getMessage(), requestId);
+            throw new CustomException(ErrorCode.REVISION_CONFLICT);
+        }
+    }
+
+    /** The app's own article rows still let this verified body quote be read at the span the snapshot pins. */
+    private Readable readableCitation(EvidenceView row, GraphEvidence.Span span) {
+        if (span == null) {
+            throw new Denied("evidence_not_visible_in_version");
+        }
+        if (!"body".equals(row.inputKind()) || !Boolean.TRUE.equals(row.quoteVerified())) {
+            throw new Denied("not_verified_body_evidence");
+        }
+        if (!span.articleId().equals(row.articleId()) || !span.articleVersion().equals(row.articleVersion())
+                || span.start() != row.startOffset() || span.end() != row.endOffset()) {
+            throw new Denied("span_mismatch");
+        }
+        ArticleRow article = registry.findArticle(row.articleId()).orElseThrow(() -> new Denied("article_missing"));
+        if (!AVAILABLE.equals(article.accessStatus())) {
+            throw new Denied("article_access_" + article.accessStatus());
+        }
+        // The version is pinned by the snapshot, so it is not required to be the article's newest one.
+        VersionRow version = registry.findVersion(row.articleId(), row.articleVersion())
+                .orElseThrow(() -> new Denied("version_missing"));
+        if (!row.textArtifactId().equals(version.textArtifactId())) {
+            throw new Denied("text_artifact_mismatch");
+        }
+        if (row.startOffset() < 0 || row.endOffset() <= row.startOffset()
+                || row.quote().codePointCount(0, row.quote().length()) != row.endOffset() - row.startOffset()) {
+            throw new Denied("quote_offsets_inconsistent");
+        }
+        return new Readable(article, version);
+    }
+
+    /** The selected version's receipt pins grants for this article version, and the CURRENT S2-1 registry still allows them. */
+    private static void requireCurrentGrants(StrictJson.Obj receiptBundle, EvidenceView row, GraphEvidence found,
+            ArticleRow article, Supplier<SourceRegistry> registryNow, Instant now) {
+        Set<GraphReceiptGrants.Pin> pins = GraphReceiptGrants.pins(receiptBundle, row.articleId(), row.articleVersion());
+        if (!found.basisRefs().isEmpty()) {
+            GraphReceiptBasis.require(receiptBundle, row.id(), found.basisRefs());
+        }
+        for (GraphReceiptGrants.Pin pin : pins) {
+            if (!pin.sourceId().equals(article.provider())) {
+                throw new Denied("pin_source_differs_from_article_provider");
+            }
+        }
+        SourceRegistry current = registryNow.get();
+        for (GraphReceiptGrants.Pin pin : pins) {
+            String denial = current.denial(pin.sourceId(), pin.grantId(), pin.revision(), now);
+            if (denial != null) {
+                throw new Denied("source_" + denial);
+            }
+        }
+    }
+
+    private record Readable(ArticleRow article, VersionRow version) {
     }
 
     /**
