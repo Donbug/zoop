@@ -148,8 +148,11 @@ class CiGateTests(unittest.TestCase):
         self.assertIn("ai-worker", require_ci.REQUIRED_JOBS)
         self.assertIn("ai-service", require_ci.REQUIRED_JOBS)
         self.assertIn("api", require_ci.REQUIRED_JOBS)
+        self.assertIn("api-postgres", require_ci.REQUIRED_JOBS)
+        self.assertIn("api-ai-smoke", require_ci.REQUIRED_JOBS)
+        self.assertIn("api-graph-smoke", require_ci.REQUIRED_JOBS)
         self.assertIn("app-web", require_ci.REQUIRED_JOBS)
-        self.assertEqual(len(require_ci.REQUIRED_JOBS), 9)
+        self.assertEqual(len(require_ci.REQUIRED_JOBS), 12)
         for skipped in sorted(require_ci.REQUIRED_JOBS):
             with self.subTest(skipped=skipped), self.assertRaisesRegex(ValueError, "CI job evidence"):
                 require_ci.require_jobs([{"name": name, "conclusion": "skipped" if name == skipped else "success"}
