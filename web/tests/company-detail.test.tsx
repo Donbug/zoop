@@ -1,7 +1,13 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, test, vi } from 'vitest';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom';
 import CompanyDetailPage from '@/pages/company/CompanyDetailPage';
 import MapPage from '@/pages/map/MapPage';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -287,6 +293,19 @@ function open(query = '') {
   );
 }
 const pinned = `?asOf=${encodeURIComponent(time)}&graphVersion=v1`;
+
+function VersionOnlyNavigation() {
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() =>
+        navigate(`/companies/${encodeURIComponent(id)}?graphVersion=v-past`)
+      }
+    >
+      버전 단독 주소로 이동
+    </button>
+  );
+}
 
 test('D-COM-05: session response drives chart and timeline; 1d price request has no from', async () => {
   const range = {
@@ -1327,3 +1346,112 @@ test('a graphVersion-only address explains it cannot open that version and moves
   expect(await screen.findByText(/별 종가/)).toBeTruthy();
   expect(screen.queryByText(/그래프 버전\(v-past\)만 있어/)).toBeNull();
 });
+
+test.each(['success', 'failure'] as const)(
+  'D-COM-01 discards a late price %s after entering a graphVersion-only address',
+  async (outcome) => {
+    const pending = deferred<Response>();
+    const priceResponse = () =>
+      json({
+        status: 'available',
+        companyId: id,
+        period: '1m',
+        interval: '1d',
+        source,
+        currency: 'KRW',
+        points: [
+          {
+            time: old,
+            open: 100,
+            high: 115,
+            low: 90,
+            close: 110,
+            volume: null,
+          },
+          { time, open: 110, high: 130, low: 100, close: 120, volume: null },
+        ],
+      });
+    let first = true;
+    server.on('GET', '/api/v1/companies/:id/prices', () => {
+      if (first) {
+        first = false;
+        return pending.promise;
+      }
+      return priceResponse();
+    });
+    server.on('GET', '/api/v1/companies/:id', (r) =>
+      json({
+        ...company,
+        metadata: {
+          ...metadata,
+          graphVersion: r.query.get('graphVersion') ?? 'v1',
+        },
+      }),
+    );
+    render(
+      <MemoryRouter
+        initialEntries={[`/companies/${encodeURIComponent(id)}${pinned}`]}
+      >
+        <Address />
+        <VersionOnlyNavigation />
+        <Routes>
+          <Route path="/companies/:id" element={<CompanyDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() =>
+      expect(server.calls('GET', '/api/v1/companies/:id/prices')).toHaveLength(
+        1,
+      ),
+    );
+    expect(screen.getByText(/차트 불러오는 중/)).toBeTruthy();
+    await userEvent.click(
+      screen.getByRole('button', { name: '버전 단독 주소로 이동' }),
+    );
+    const notice = await screen.findByText(/그래프 버전\(v-past\)만 있어/);
+    const assertUnsupported = () => {
+      expect(server.calls('GET', '/api/v1/companies/:id/prices')).toHaveLength(
+        1,
+      );
+      expect(screen.getByTestId('address').textContent).toContain(
+        'graphVersion=v-past',
+      );
+      expect(screen.getByTestId('address').textContent).not.toContain('asOf=');
+      expect(screen.queryByText(/별 종가/)).toBeNull();
+      expect(
+        screen.queryByText(
+          /차트 불러오는 중|차트 조회 실패|최신 제공 시점 확인 중/,
+        ),
+      ).toBeNull();
+      expect(screen.getByRole('region', { name: '최신 시세' })).toBeTruthy();
+    };
+    assertUnsupported();
+    await act(async () => {
+      pending.resolve(
+        outcome === 'success'
+          ? priceResponse()
+          : apiError(503, 'SOURCE_UNAVAILABLE'),
+      );
+    });
+    assertUnsupported();
+
+    await userEvent.click(
+      within(notice.closest('p')!).getByRole('button', {
+        name: '최신 자료로 보기',
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('address').textContent).toContain(
+        `asOf=${encodeURIComponent(time)}`,
+      ),
+    );
+    expect(screen.getByTestId('address').textContent).toContain(
+      'graphVersion=v1',
+    );
+    expect(await screen.findByText(/별 종가/)).toBeTruthy();
+    expect(
+      server.calls('GET', '/api/v1/companies/:id/prices').length,
+    ).toBeGreaterThan(1);
+    expect(screen.queryByText(/그래프 버전\(v-past\)만 있어/)).toBeNull();
+  },
+);
