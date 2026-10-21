@@ -56,8 +56,10 @@ CLI_SLOTS = 4
 BUSY_WAIT = 10.0
 CONFIG_CODES = frozenset({"input_or_configuration_invalid", "persistence_failed", "extraction_internal_failure", "ledger_version_unknown",
                           "analysis_contract_changed", "state_ownership_unconfigured", "replay_fixture_invalid",
-                          "replay_fixture_required", "replay_provenance_conflict", "replay_prompt_version_conflict", "live_mode_unsupported",
+                          "replay_fixture_required", "replay_provenance_conflict", "replay_prompt_version_conflict",
                           "fixture_not_allowed", "command_input_limit"})
+# A job whose call was sent and never answered is reconcile-only; the pipeline names that failure per execution mode.
+UNANSWERED = frozenset({"replay_response_unknown", "live_response_unknown"})
 
 
 class ExtractionError(ApiError):
@@ -196,8 +198,8 @@ class ExtractionJobs:
         refusal = self.authority.refusal(row.owner, row.job_id, row.pins.approval)
         if refusal == "service_configuration_invalid":
             raise self._fault(seen, "extraction_approvals_unreadable")
-        if refusal is None and call_pin_problem(view, row.pins) is not None:
-            refusal = "fixture_changed"
+        if refusal is None:
+            refusal = call_pin_problem(view, row.pins)
         if refusal is not None:
             return ExtractionDelivery(state="withheld", reason=refusal)
         return ExtractionDelivery(state="available")
@@ -256,7 +258,9 @@ class ExtractionJobs:
             approval = self._approval(seen, owner, job_id)
             if approval is None or approval.approved_digest != body.approved_request_digest:
                 raise ExtractionError(403, "request_not_approved")
-            pins = Pins(approval.approved_digest, approval.producer_digest, approval.topic_digest, approval.input_digest)
+            pins = Pins(approval.approved_digest, approval.producer_digest, approval.topic_digest, approval.input_digest, approval.live_identity)
+            if approval.live and self.config.pipeline_live is None:
+                raise ExtractionError(409, "live_unavailable")
             if row is not None and row.pins != pins:
                 raise ExtractionError(409, "approval_changed")  # the reserved identity is never rebound to a rotated approval
             problem = self.authority.fixtures(pins.producer_digest, pins.topic_digest)
@@ -273,7 +277,7 @@ class ExtractionJobs:
                 if row.submit_attempts == 0:
                     self._refuse_adoption(job_id, owner, digest, seen)
                 self.ledger.begin_attempt(job_id)
-                outcome = self.process.submit(approval.request)
+                outcome = self.process.submit(approval.request, live=approval.live)
                 self._log(seen, "submit", outcome)
                 if outcome.kind != "result":
                     outcome = self._reconcile(job_id, owner, digest, outcome, seen)
@@ -326,6 +330,9 @@ class ExtractionJobs:
                 or view.provenance.model_dump() != {"source_kind": provenance.get("sourceKind"), "execution_mode": provenance.get("executionMode"),
                                                     "recording_kind": provenance.get("recordingKind")}):
             raise ExtractionError(500, "runtime_binding_mismatch")  # the reservation is kept: this is not a registration the service made
+        if row.pins.live_binding is not None and call_pin_problem(view, row.pins) is not None:
+            # The pipeline froze this job under a runtime other than the one the operator approved. It will never be dispatched or delivered.
+            raise ExtractionError(409, "live_binding_mismatch")
         return view
 
     def status(self, owner: str, job_id: str, seen: Observation) -> Reply:
@@ -373,6 +380,8 @@ class ExtractionJobs:
 
     def recover(self, owner: str, job_id: str, seen: Observation) -> Reply:
         row = self._owned(owner, job_id)
+        if row.pins.live_binding is not None and self.config.pipeline_live is None:
+            raise ExtractionError(409, "live_unavailable", job_status=self._status(row, self._read(row, seen), seen))
         refusal = self.authority.refusal(owner, job_id, row.pins.approval)  # a recovery is a content-bearing use: the approval is read NOW
         if refusal is not None:
             raise self._authority_error(refusal, seen)
@@ -382,7 +391,7 @@ class ExtractionJobs:
         status = self._status(row, view, seen)
         if dispatch.state in ("pending", "in_flight"):
             return Reply(200, status, self._headers(status))
-        if view.state == "reconciling" or (view.failure is not None and view.failure.code == "replay_response_unknown"):
+        if view.state == "reconciling" or (view.failure is not None and view.failure.code in UNANSWERED):
             raise ExtractionError(409, "reconcile_required", job_status=status)
         if view.state not in ("queued", "running", "stopped"):
             raise ExtractionError(409, "job_not_recoverable", job_status=status)

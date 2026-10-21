@@ -101,11 +101,12 @@ public class DocumentRegistrationService {
     }
 
     private boolean registerVersion(RegistrationCommand command) {
-        // The publisher and raw artifact are not exported by S2-1, so they stay NULL. Time precision is the export's own:
-        // an instant, a calendar date (never a midnight) or nothing.
-        VersionRow wanted = new VersionRow(command.articleId(), command.version(), command.title(), null, command.url(),
-                command.publishedAt(), command.publishedDate(), command.publicationPrecision(), null, command.textArtifactId(),
-                command.collectedAt());
+        // The publisher is the operator-declared outlet carried by the export (NULL when none was declared, as in every older
+        // export); the raw artifact is not exported by S2-1, so it stays NULL. Time precision is the export's own: an instant,
+        // a calendar date (never a midnight) or nothing.
+        VersionRow wanted = new VersionRow(command.articleId(), command.version(), command.title(), command.publisher(),
+                command.url(), command.publishedAt(), command.publishedDate(), command.publicationPrecision(), null,
+                command.textArtifactId(), command.collectedAt());
         boolean created = repository.insertVersionIfAbsent(wanted);
         VersionRow stored = repository.findVersion(command.articleId(), command.version())
                 .orElseThrow(() -> new DocumentImportException(DocumentImportFailure.INTERNAL_ERROR));

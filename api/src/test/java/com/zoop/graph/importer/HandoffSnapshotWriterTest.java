@@ -25,6 +25,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -119,20 +120,26 @@ class HandoffSnapshotWriterTest {
         assertEquals("2026Q3", supply.period());
         assertEquals("announced", supply.assertionStatus());
         // The S2 comparison and the S2 snapshot both list mention m-a of document a: one mention. Mention ids are the app's own.
-        assertEquals(ascending(ref(A_ID, A_VERSION, "m-a"), ref(A2_ID, A2_VERSION, "m-a2")), supply.mentions());
-        assertEquals(appMention(A_ID, A_VERSION, "m-a"), supply.representativeMentionId());
+        // The document versions are the INPUT bundle's (they move with any metadata the producer hashes, e.g. a declared publisher);
+        // the expected app ids are computed by hand from them.
+        String aVersion = versionOf(bundle, A_ID);
+        String a2Version = versionOf(bundle, A2_ID);
+        String bVersion = versionOf(bundle, B_ID);
+        assertEquals(3, List.of(aVersion, a2Version, bVersion).stream().distinct().count());
+        assertEquals(ascending(ref(A_ID, aVersion, "m-a"), ref(A2_ID, a2Version, "m-a2")), supply.mentions());
+        assertEquals(appMention(A_ID, aVersion, "m-a"), supply.representativeMentionId());
         PublicGraphSnapshot.Issue factory = issue(snapshot, "issue:factory-2026q4");
         assertEquals("2026Q4", factory.period());
-        assertEquals(List.of(ref(B_ID, B_VERSION, "m-b")), factory.mentions());
+        assertEquals(List.of(ref(B_ID, bVersion, "m-b")), factory.mentions());
         assertNull(factory.representativeMentionId());
 
         // The structural basis is structured: its own id, the business relation type, countries and every source article.
         var basis = snapshot.relations().stream().filter(r -> r.relationType().equals("STRUCTURALLY_RELATED_TO")).findFirst()
                 .orElseThrow().basis().get(0);
-        assertEquals("074949b69d25fefaa5c75af0a78de7015a773f58e91003a37cebd878d116f743", basis.basisId());
+        assertEquals(inputBasisId(root), basis.basisId());
         assertEquals("SUPPLIES", basis.relationType());
         assertEquals(List.of(), basis.countries());
-        assertEquals(List.of(new ArticleRef(A_ID, A_VERSION)), basis.articles());
+        assertEquals(List.of(new ArticleRef(A_ID, aVersion)), basis.articles());
         // Unknown validity of the manual structural basis stays unknown (never a forever-valid window).
         assertNull(basis.validFrom());
         assertNull(basis.validUntil());
@@ -159,18 +166,21 @@ class HandoffSnapshotWriterTest {
         // Documents a and a2 of ONE issue both use the producer-local mention id m-a (S2 scopes it by document version): legal input.
         PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(bytes, versionId);
         PublicGraphSnapshot.Issue supply = issue(snapshot, "issue:supply-2026q3");
-        assertEquals(ascending(ref(A_ID, A_VERSION, "m-a"), ref(A2_ID, A2_VERSION, "m-a")), supply.mentions());
+        String aVersion = versionOf(verified.bundle(), A_ID);
+        String a2Version = versionOf(verified.bundle(), A2_ID);
+        String bVersion = versionOf(verified.bundle(), B_ID);
+        assertEquals(ascending(ref(A_ID, aVersion, "m-a"), ref(A2_ID, a2Version, "m-a")), supply.mentions());
         assertEquals(2, supply.mentions().stream().map(MentionRef::mentionId).distinct().count());
         assertTrue(supply.mentions().stream().noneMatch(m -> m.mentionId().equals("m-a")));
         // The representative is the member of document a, never the other document's m-a.
-        assertEquals(appMention(A_ID, A_VERSION, "m-a"), supply.representativeMentionId());
-        assertNotEquals(appMention(A2_ID, A2_VERSION, "m-a"), supply.representativeMentionId());
+        assertEquals(appMention(A_ID, aVersion, "m-a"), supply.representativeMentionId());
+        assertNotEquals(appMention(A2_ID, a2Version, "m-a"), supply.representativeMentionId());
         // Nothing else was dropped to make the ids unique.
         assertEquals(2, snapshot.issues().size());
         assertEquals(4, snapshot.relations().size());
         assertEquals(3, snapshot.articles().size());
         assertEquals(6, snapshot.evidence().size());
-        assertEquals(List.of(ref(B_ID, B_VERSION, "m-b")), issue(snapshot, "issue:factory-2026q4").mentions());
+        assertEquals(List.of(ref(B_ID, bVersion, "m-b")), issue(snapshot, "issue:factory-2026q4").mentions());
         // A retry reproduces the same ids and the same bytes, also from a freshly verified copy of the same export.
         assertArrayEquals(bytes, HandoffSnapshotWriter.snapshot(versionId, verifiedResource(export, root)));
         // The producer's local ids stay in the retained receipt: all three source events of the issue still say m-a.
@@ -184,6 +194,78 @@ class HandoffSnapshotWriterTest {
         assertEquals(2, mentions.size());
         assertTrue(mentions.values().stream().allMatch(mention -> mention.get("mentionId").stringValue().equals("m-a")));
         assertEquals(2, mentions.values().stream().map(mention -> mention.get("documentId").stringValue()).distinct().count());
+    }
+
+    @Test
+    void aRealProducerVerdictExportWritesTheWithheldHeadlineValuesAsNullAndKeepsOriginalsAndVerdictsInTheReceipt() throws Exception {
+        byte[] export = resource("export-field-verdicts.json");
+        JsonNode root = HandoffFixtures.parse(export);
+        VerifiedHandoff verified = verifiedResource(export, root);
+        String versionId = version(verified);
+        // Hand-written in graph_handoff_smoke.py: the supply representative's time is REJECTed (null, unknown) while its period is
+        // ALLOWed; the factory's only mention has its period HELD (null) and keeps its time.
+        JsonNode headlines = HandoffFixtures.parse(resource("expected-headline-values.json")).get("export-field-verdicts.json");
+
+        byte[] bytes = HandoffSnapshotWriter.snapshot(versionId, verified);
+
+        PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(bytes, versionId);
+        for (JsonNode bundleIssue : root.get("bundle").get("issues")) {
+            String id = bundleIssue.get("id").stringValue();
+            JsonNode expected = headlines.get(id);
+            PublicGraphSnapshot.Issue written = issue(snapshot, id);
+            assertEquals(expected.get("eventTime").isNull() ? null : expected.get("eventTime").stringValue(), written.eventTime(), id);
+            assertEquals(expected.get("timePrecision").stringValue(), written.timePrecision(), id);
+            assertEquals(expected.get("period").isNull() ? null : expected.get("period").stringValue(), written.period(), id);
+            // The verdict's own span is part of the issue's evidence exactly as the verified bundle states it.
+            assertEquals(bundleIssue.get("evidenceIds").values().stream().map(JsonNode::stringValue).toList(), written.evidenceIds(), id);
+        }
+        PublicGraphSnapshot.Issue supply = issue(snapshot, "issue:supply-2026q3");
+        assertNull(supply.eventTime());
+        assertEquals("unknown", supply.timePrecision());
+        assertEquals("2026Q3", supply.period());
+        PublicGraphSnapshot.Issue factory = issue(snapshot, "issue:factory-2026q4");
+        assertEquals("2026-11-15", factory.eventTime());
+        assertNull(factory.period());
+        // The relations are unchanged by the verdicts (the operator re-attested the structural edge against the withheld time).
+        assertEquals(root.get("bundle").get("relations").size(), snapshot.relations().size());
+        assertEquals(root.get("bundle").get("evidence").size(), snapshot.evidence().size());
+
+        // The retained receipt keeps the complete original: every mention value and every verdict, byte for byte.
+        JsonNode receipt = HandoffFixtures.parse(HandoffSnapshotWriter.receipt(verified));
+        assertEquals(root.get("bundle"), receipt.get("bundle"));
+        for (JsonNode receiptIssue : receipt.get("bundle").get("issues")) {
+            assertTrue(receiptIssue.get("fieldVerdicts").size() > 0, receiptIssue.get("id").stringValue());
+            assertTrue(receiptIssue.get("mentions").values().stream().noneMatch(m -> m.get("eventTime").isNull()),
+                    "an original mention value was redacted in the receipt");
+        }
+        // No verdict, reason, reviewer or withheld list reached the public projection.
+        String snapshotText = new String(bytes, StandardCharsets.UTF_8);
+        for (String leaked : List.of("fieldVerdicts", "operator-field-verdict", "contradicted", "ambiguous", "unstated", "fverdict",
+                "withheld", "reasonCode")) {
+            assertFalse(snapshotText.contains(leaked), leaked);
+        }
+        // Same bytes every time.
+        assertArrayEquals(bytes, HandoffSnapshotWriter.snapshot(versionId, verifiedResource(export, root)));
+    }
+
+    @Test
+    void aWithheldEventTimeMakesAStructuralRelationReviewedAgainstItFailClosedInTheRealExport() throws Exception {
+        byte[] export = resource("export-field-verdicts-time.json");
+        JsonNode root = HandoffFixtures.parse(export);
+        VerifiedHandoff verified = verifiedResource(export, root);
+        JsonNode bundle = root.get("bundle");
+
+        PublicGraphSnapshot snapshot = written(verified);
+
+        // The supply time is REJECTed and therefore withheld; the structural attestation was reviewed against the original time, so the
+        // producer excluded it visibly rather than keep an edge whose basis it can no longer bind to the public time.
+        PublicGraphSnapshot.Issue supply = issue(snapshot, "issue:supply-2026q3");
+        assertNull(supply.eventTime());
+        assertEquals("unknown", supply.timePrecision());
+        assertEquals("2026Q3", supply.period());
+        assertTrue(bundle.get("exclusions").get("counts").has("applicability_binding_mismatch"));
+        assertTrue(snapshot.relations().stream().noneMatch(r -> r.relationType().equals("STRUCTURALLY_RELATED_TO")));
+        assertEquals(bundle.get("relations").size(), snapshot.relations().size());
     }
 
     @Test
@@ -267,7 +349,8 @@ class HandoffSnapshotWriterTest {
         Article first = bundle.articles().get(0);
         List<Article> articles = new ArrayList<>(bundle.articles());
         articles.add(new Article("doc-" + "9".repeat(64), "8".repeat(64), first.documentId(), first.documentVersion(),
-                first.rawVersion(), first.title(), first.url(), first.publishedAt(), first.precision(), first.observations()));
+                first.rawVersion(), first.title(), first.url(), first.publishedAt(), first.precision(), first.observations(),
+                first.textSha256(), first.origin()));
         VerifiedHandoff ambiguous = new VerifiedHandoff(rebuilt(bundle, bundle.issues(), bundle.evidence(), articles),
                 verified.manifest(), verified.manifestNode(), verified.bundleNode(), verified.receiptNode(),
                 verified.attemptsNode(), verified.manifestDigest(), verified.bundleDigest(), verified.contentDigest());
@@ -283,13 +366,34 @@ class HandoffSnapshotWriterTest {
     private static final String SECOND_ARTICLE = "doc-" + "9".repeat(64);
     private static final String SECOND_VERSION = "8".repeat(64);
     private static final String SECOND_RAW = "7".repeat(64);
-    // Documents a, a2 and b of the real producer exports under graph-handoff/ (content-derived, equal in every export).
+    // Documents a, a2 and b of the real producer exports under graph-handoff/. The document ids are content-derived from the supplier
+    // (equal in every export); their versions are NOT constants: they are read from each input bundle (see versionOf).
     private static final String A_ID = "doc-5cf551c4a3ea4c5a0e6fcde416d2153d1b796251bb2e0b50bb20e1eb61dac458";
-    private static final String A_VERSION = "e4cf9d2db4be08fc7c2c4e0a2d31ae042c61bb83e046f5a9283b43be0140307d";
     private static final String A2_ID = "doc-15e86e5ab95b2d8b7765a38ccf84d3c85aea3909f784f025770a714b01bbd1b7";
-    private static final String A2_VERSION = "ada790eabf095b9e6430e6f0622e7614ecb14c600346b869db6fa2a695157903";
     private static final String B_ID = "doc-597676263c5323120431cc5d14b03ee798b62c9afc6375e71fb5a72ac81b9afa";
-    private static final String B_VERSION = "6cbe480a580c19e69fbef46abf68a7b53e059a62e86813adffee98fc87313634";
+
+    /** The version the INPUT bundle names for one document: exactly one article must carry the document id. */
+    private static String versionOf(HandoffBundle bundle, String documentId) {
+        List<String> versions = bundle.articles().stream().filter(a -> a.documentId().equals(documentId))
+                .map(Article::documentVersion).toList();
+        assertEquals(1, versions.size(), documentId);
+        assertTrue(bundle.articles().stream().filter(a -> a.documentId().equals(documentId))
+                .allMatch(a -> a.articleId().equals(documentId) && a.articleVersion().equals(a.documentVersion())));
+        return versions.get(0);
+    }
+
+    /** The producer's own id of the structural basis in the INPUT bundle (its relationKey), not a pinned literal. */
+    private static String inputBasisId(JsonNode root) {
+        List<String> keys = new ArrayList<>();
+        for (JsonNode relation : root.get("bundle").get("relations")) {
+            if (relation.get("type").stringValue().equals("STRUCTURALLY_RELATED_TO")) {
+                relation.get("basis").forEach(basis -> keys.add(basis.get("relationKey").stringValue()));
+            }
+        }
+        assertEquals(1, keys.size());
+        assertTrue(keys.get(0).matches("[0-9a-f]{64}"));
+        return keys.get(0);
+    }
 
     /**
      * The app's mention id, written out by hand and never taken from the writer: {@code "mention-"} + the SHA-256 of the canonical
@@ -335,8 +439,8 @@ class HandoffSnapshotWriterTest {
 
     private static HandoffBundle rebuilt(HandoffBundle bundle, List<Issue> issues, List<Evidence> evidence, List<Article> articles) {
         return new HandoffBundle(bundle.handoffId(), bundle.manifestDigest(), bundle.sourceKind(), bundle.executionMode(),
-                bundle.recordingKind(), bundle.policyVersion(), bundle.files(), bundle.sources(), bundle.companies(), issues,
-                bundle.relations(), evidence, articles);
+                bundle.recordingKind(), bundle.policyVersion(), bundle.files(), bundle.sources(), bundle.companies(),
+                bundle.pathCompanies(), issues, bundle.relations(), evidence, articles, bundle.approvals());
     }
 
     /**
@@ -357,7 +461,8 @@ class HandoffSnapshotWriterTest {
         if (second) {
             articles.add(new Article(SECOND_ARTICLE, SECOND_VERSION, SECOND_ARTICLE, SECOND_VERSION, SECOND_RAW, "합성 제목 B",
                     "https://example.invalid/b", null, "unknown", List.of(new ObservationPin(HandoffFixtures.SELECTOR.roundId(),
-                            HandoffFixtures.SOURCE, 0, ordinal, HandoffFixtures.OBSERVED_AT, "operator-grant", "rights-1"))));
+                            HandoffFixtures.SOURCE, 0, ordinal, HandoffFixtures.OBSERVED_AT, "operator-grant", "rights-1")),
+                    "9".repeat(64), null));
             if (citedByIssue) {
                 String evidenceId = HandoffBundleVerifier.appEvidenceId(SECOND_ARTICLE, SECOND_VERSION, 0, 3);
                 evidence.add(new Evidence(evidenceId, SECOND_ARTICLE, SECOND_VERSION, 0, 3, "a".repeat(64), List.of("loc-1"),

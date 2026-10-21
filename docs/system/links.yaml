@@ -325,8 +325,11 @@ userDecisions:
   impactLabels: "사용자 결정 완료: 긍정/부정, 혼재/판단 보류 유지. 명칭은 재질문하지 않는다. 퍼센트/영향 생산 정책은 별도 팀 질문이다."
   apiCommon: "사용자 잠정 채택 · 시연 기준. 팀 숙독/최종 승인/구현 완료가 아니다."
   modelConfiguration: "LLM 모델/추론 수준은 .env에서 명시 설정한다. 값 선택·유료 실호출·예산 승인은 별개이며 예산은 미정이다."
+  candidateFinalApproval: "2026-10-21 사용자 결정(docs/share/seojin-execution-plan-2026-10-20.md의 10/21 우선순위 변경과 실모델 종단 확인, 팀 확정 아님): FS067-02 허용은 HOLD 후보·관계에 대한 운영자 최종 승인이며 재검증 작업·모델 호출을 만들지 않는다. 승인은 공개·그래프 활성화가 아니다. 현재 대상·원천 CAS, 스키마·endpoint·정확한 인용·현재 원천 권리 검증은 사람이 덮어쓰지 못한다. 2026-10-18 원문의 '재검증' 문구와 이전 allow/revalidation 이력은 보존하며 승인으로 소급하지 않는다. 같은 날 사용자가 승인한 합성 문서 대상 실모델 시험 USD 10은 해당 시험에 한정되며 전역 예산·운영 호출 승인이 아니므로 authority.ai.liveBudget(미정)과 implementationScope.paidExecutionApproved를 바꾸지 않는다."
   conflictPermission: "원본 충돌은 작업자 가결정→시연→팀 최종 결정으로 처리하고 정정 요청을 보존한다. 요구 범위는 authority의 사용자 결정으로 이미 포함되지만 유료 호출 허가는 별개다."
 featureDecisions:
+  FS067-02:
+    reason: "2026-10-21 사용자 결정으로 허용=HOLD에 대한 운영자 최종 승인(재검증 아님)이다. 원문(functional-spec_2026-10-18 11-AI-평가-관리자.csv)의 '허용은 재검증 대상 전환'과 수용 기준은 고치지 않고 보존하며, 이 해석은 팀 확정이 아닌 사용자 정책이다. 이전 재검증 접수 기록은 이력으로만 남는다. 정본 계약은 decideAnalysisCandidate다."
   FS042:
     apiDisposition: "기존 API로 지원"
     reason: "목차·상세 FS042는 시점 기반 관계 그래프이며 getCompanyGraphAsOf에 연결한다. 목차의 요구 번호 42는 기준일 재무·실적(요구 42)이며 폐기 선언이 없어 reservedRequirements로 별도 유보한다. 재무 폐기·시점 그래프 완료·팀 승인으로 승격하지 않는다."

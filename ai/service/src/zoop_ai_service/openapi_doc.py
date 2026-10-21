@@ -53,36 +53,44 @@ content-free per-attempt `receipts` are returned for usage accounting. A live jo
 runtime has recorded an attempt for every stage it needs, because only then is the recipient provable. `job.grant` is an execution snapshot, never current authority.
 
 **S3 relation jobs (`/internal/v1/relation-jobs`, schema `zoop-ai-internal-relation-1`, scopes `relation.*`).** A separate family over the
-installed `zoop-ai-relation` pipeline, replay only: it shares nothing with the S1 wire contract or state machine. It is off unless its
+installed `zoop-ai-relation` pipeline: it shares nothing with the S1 wire contract or state machine. It is off unless its
 all-or-nothing server configuration group is set (otherwise every route answers 409 `execution_unavailable` after authentication). A caller
-cannot name a path, fixture, registry or live mode. The body is the S3 `Submit` (`zoop-relation-s3`) naming an operator-prepared S2 extraction
+cannot name a path, fixture or registry. The body is the S3 `Submit` (`zoop-relation-s3`) naming an operator-prepared S2 extraction
 job as `upstream {jobId, inputDigest}`; that pair must be listed for the calling principal in a server-owned allowlist, otherwise 403
-`upstream_not_allowed` before anything is stored. The principal owns the job it submits: another principal's job answers like a missing one.
-The initial dispatch runs once. A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service,
+`upstream_not_allowed` before anything is stored. `provenance.executionMode` is `replay` (authored fixtures, no network) or `live`
+(`recordingKind: provider`: a real model call that costs money). A live job needs the service's live group (409 `live_unavailable` otherwise) AND an
+allowlist entry that pins the runtime identity the operator approved (403 `live_not_approved` otherwise); the pipeline must freeze the job under exactly
+that identity (409 `live_binding_mismatch` otherwise), and the pin is re-read before every live child and every delivery. The principal owns the job it
+submits: another principal's job answers like a missing one.
+The initial dispatch runs once, under the pipeline's own under-lock initial-only restriction (a job that already took its first dispatch is refused with no
+effect). A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service,
 are never run again automatically (`next=recover`); a call the pipeline reserved but never saw answered ends `reconciling` and is never
-resent. Cancel refuses a ready job (409 `job_already_terminal`); the pipeline would otherwise withhold it for good. Status never carries content.
+resent. Only an explicit `recover` dispatches again (and, for a live job, spends again). Cancel refuses a ready job (409 `job_already_terminal`); the pipeline would otherwise withhold it for good. Status never carries content.
 `GET /{jobId}/result` returns candidates only for a ready job while the owner is still the principal the allowlist lists for that upstream and the
 pipeline reports delivery current (it re-reads the operator source registry on every call); otherwise `delivery.state` is `withheld` with a
 reason code. Delivery is checked at one instant: content already sent cannot be recalled, and a revocation after the check is not observed.
 
-**Review and revalidation (`relation.review`).** `POST /{jobId}/reviews` records one `allow` or `reject` decision on one relation candidate. The
-`Idempotency-Key` is the stable operation id and the body is exactly `{relationCandidateId, expectedSourceVersion, expectedSourceRevision, decision}`; the
+**Review (`relation.review`).** `POST /{jobId}/reviews` records one `allow` or `reject` decision on one relation candidate that is on HOLD. `allow` is the
+operator's FINAL approval: it is not a re-verification, it appends the event with effect `approved`, it runs no verifier or model call, and the operation is
+terminal (200, `revalidation.state=not_requested`, `next=none`). The pipeline still re-runs the deterministic checks (schema, endpoints, exact citations)
+and re-reads the current source rights, so an approval can never override an unsupported candidate, an invalid citation or a withdrawn source
+(409 `review_candidate_ineligible`, or the pipeline's own refusal), and it is refused while a model call for the job is in flight (409 `review_call_in_flight`).
+The earlier automatic verdict and claim distributions stay in the history unchanged. `reject` excludes. The result then shows
+`eligibility.approvalBasis` (`automatic-verifier` or `operator-final-approval` with the reviewer, the deciding event's revision and time): internal audit
+metadata, never an application approval or a publication.
+The `Idempotency-Key` is the stable operation id and the body is exactly `{relationCandidateId, expectedSourceVersion, expectedSourceRevision, decision}`; the
 reviewer is always the authenticated principal and cannot be sent. `sourceVersion` is the job's `inputDigest` and `sourceRevision` is the relation's runtime
 event-chain revision as a decimal string, both read from `GET /{jobId}/result`. They are runtime values, never the application's own review revision (the
 public decision API's `expectedRevision`), which this service does not see and which must never be forwarded. A new decision is checked against both values
 exactly, the revision inside the pipeline's own append transaction, and anything that does not match records nothing: 409 `source_version_conflict` or
 `source_revision_conflict`, and a relation that is not on hold is `review_target_not_hold`. The same key and body return the existing operation even after the
-relation has moved on; another body is `idempotency_conflict`, another principal's key is `operation_id_unavailable`. Acceptance, verification and publication
-are separate facts in the operation status. `review` says whether the decision is recorded: `unconfirmed` means the request was reserved but the service has no
-proof yet that the event was appended, so retry the same request, which reads the chain for a marker only this operation can have written and never appends
-twice. `revalidation` says what the automatic re-check an accepted `allow` requested did: `queued`, `running`, `verified` with the verdict's eligibility,
-`superseded` when a later reject won (a stale allow can never overwrite a rejection), `interrupted`, `failed` or `cancelled`. `publication` is always
-`not_published`. The revalidation is dispatched once, like a job: an ambiguous end waits for the explicit `POST /{jobId}/reviews/{operationId}/recover`, which
-reads the chain first, settles whatever it already proves and otherwise queues the revalidation again. The pipeline never resends a call it already started, so a
-recover can only finish a saved receipt or send a call that never started; an unanswered call is `reconcile_required`. A revalidation runs only while the owner
-is still listed for the job's upstream. While it runs the job is `running` and its result is withheld. Verification replays authored fixtures only: no model is
-called. Operation status is read from the service ledger and carries no content. This slice has no list route, and `eligible` is an automatic evidence gate,
-never approval or publication.
+relation has moved on; another body is `idempotency_conflict`, another principal's key is `operation_id_unavailable`. `review` says whether the decision is
+recorded: `unconfirmed` means the request was reserved but the service has no proof yet that the event was appended (a lost reply included), so retry the same
+request, which reads the chain for a marker only this operation can have written and never appends twice. `publication` is always `not_published`.
+Operation status is read from the service ledger and carries no content. An operation recorded under the EARLIER contract (where `allow` asked for an
+automatic revalidation) is history: it stays readable with `limitation=review_contract_changed`, its `revalidation` is `verified`/`superseded` only where its
+stored history settled it and `contract_changed` otherwise, it is never dispatched or resent and never read as an approval, and its key answers 409
+`review_contract_changed` while unconfirmed: a NEW decision with a new key at the relation's current revision is how to proceed. This slice has no list route.
 """
 
 
@@ -190,8 +198,9 @@ def relation_operation(**overrides: Any) -> dict[str, Any]:
     """An authored operation status built through the real derivation from a ledger row, so an example cannot contradict the rules."""
     row = {"operation_id": OPERATION, "owner": "app", "job_id": RELATION_JOB, "relation_candidate_id": RELATION_ID, "decision": "allow",
            "expected_source_version": DIGEST, "expected_source_revision": 1, "request_digest": DIGEST, "review_state": "applied", "review_attempts": 1,
-           "reserved_at": STAMP, "applied_at": STAMP, "applied_event_at": STAMP, "reval_state": "pending", "reval_count": 0, "busy_count": 0,
-           "last_outcome": None, "last_runtime_code": None, "reval_updated_at": STAMP, "settled": None, "settled_eligibility": None, "settled_at": None}
+           "reserved_at": STAMP, "applied_at": STAMP, "applied_event_at": STAMP, "reval_state": None, "reval_count": 0, "busy_count": 0,
+           "last_outcome": None, "last_runtime_code": None, "reval_updated_at": None, "settled": None, "settled_eligibility": None, "settled_at": None,
+           "contract": "final-approval"}
     return operation_status(OperationRow(**{**row, **overrides}), STAMP).wire()
 
 
@@ -206,7 +215,8 @@ def relation_content() -> dict[str, Any]:
         "productScope": "배터리 부품", "validity": {"from": None, "until": None, "fromStatus": "unknown", "untilStatus": "unknown", "citations": []},
         "countries": [], "context": {"market": "unknown", "check": "unknown", "knownCountries": []}, "citations": [citation], "path": [],
         "generatorReasons": ["authored producer reason"], "proposalCount": 1, "precheck": {"state": "pending", "reasons": []}, "approved": False,
-        "eligibility": {"status": "eligible", "reasons": [], "revision": 1, "reviewPending": False},
+        "eligibility": {"status": "eligible", "reasons": [], "revision": 1, "reviewPending": False,
+                        "approvalBasis": {"kind": "automatic-verifier", "revision": 1, "reviewer": None, "decidedAt": STAMP}},
         "history": [{"seq": 1, "kind": "verdict", "createdAt": STAMP, "eligibility": "eligible", "reasons": [reason], "decision": None, "effect": None}],
         "impact": {"status": "not-applicable", "labelNote": "textual impact direction of cited statements; not a price direction, probability or forecast",
                    "candidates": []}}
@@ -239,16 +249,13 @@ def relation_examples() -> dict[str, dict[str, Any]]:
                                                        "job": relation_content(), "receipts": [receipt]}).wire()
     withheld = RelationResultEnvelope.model_validate({"schemaVersion": RELATION_SCHEMA, "status": revoked, "delivery": {"state": "withheld", "reason": "source_unauthorized"},
                                                       "job": None, "receipts": [receipt]}).wire()
-    queued_review = relation_operation()
-    running_review = relation_operation(reval_state="in_flight", reval_count=1)
-    verified_review = relation_operation(reval_state="idle", reval_count=1, last_outcome="exited", settled="verified", settled_eligibility="eligible",
-                                         settled_at=STAMP)
-    superseded_review = relation_operation(reval_state="idle", reval_count=1, last_outcome="runtime_error", last_runtime_code="review_revision_conflict",
-                                           settled="superseded", settled_at=STAMP)
-    rejected_review = relation_operation(decision="reject", reval_state=None, reval_updated_at=None)
-    unconfirmed_review = relation_operation(review_state="reserved", applied_at=None, applied_event_at=None, reval_state=None, reval_updated_at=None)
-    interrupted_review = relation_operation(reval_state="idle", reval_count=1, last_outcome="transport_unknown")
-    unanswered_review = relation_operation(reval_state="idle", reval_count=2, last_outcome="runtime_error", last_runtime_code="replay_response_unknown")
+    approved_review = relation_operation()
+    rejected_review = relation_operation(decision="reject")
+    unconfirmed_review = relation_operation(review_state="reserved", applied_at=None, applied_event_at=None)
+    legacy = {"contract": "legacy-revalidation", "reval_state": "idle", "reval_count": 1, "reval_updated_at": STAMP}
+    legacy_verified = relation_operation(**legacy, last_outcome="exited", settled="verified", settled_eligibility="eligible", settled_at=STAMP)
+    legacy_unsettled = relation_operation(**legacy, last_outcome="transport_unknown")
+    legacy_unconfirmed = relation_operation(contract="legacy-revalidation", review_state="reserved", applied_at=None, applied_event_at=None)
     return {
         "submit.202": {"queuedJob": {"summary": "Newly accepted: the pipeline froze the upstream as a queued job, one initial dispatch is pending", "value": queued}},
         "submit.200": {"readyReplay": {"summary": "Same key and body sent again: the actual current state", "value": ready}},
@@ -265,19 +272,16 @@ def relation_examples() -> dict[str, dict[str, Any]]:
         "cancel.200": {"cancelled": {"summary": "Cancelled (also when it already was); an in-flight child is not killed", "value": cancelled}},
         "recover.202": {"enqueued": {"summary": "A dispatch was enqueued", "value": recovering}},
         "recover.200": {"coalesced": {"summary": "A dispatch is already pending or in flight", "value": recovering}},
-        "review.202": {"allowQueued": {"summary": "An allow is recorded in the runtime ledger and its revalidation is queued: acceptance only, nothing verified or published", "value": queued_review}},
-        "review.200": {"rejectRecorded": {"summary": "A reject is recorded; nothing is revalidated and the relation is excluded", "value": rejected_review},
-                       "replay": {"summary": "The same key and body again, after the revalidation finished: the existing operation, whatever the relation did since", "value": verified_review}},
+        "review.200": {"allowApproved": {"summary": "An allow is the operator's final approval, recorded in the runtime ledger: terminal, nothing is revalidated, queued or called, nothing is published", "value": approved_review},
+                       "rejectRecorded": {"summary": "A reject is recorded and the relation is excluded", "value": rejected_review},
+                       "replay": {"summary": "The same key and body again: the existing operation, whatever the relation did since", "value": approved_review},
+                       "legacyReplay": {"summary": "A key recorded under the earlier contract (allow meant revalidate): history only, its stored settlement is shown and never reinterpreted as an approval", "value": legacy_verified}},
         "operation.200": {
-            "queued": {"summary": "Accepted, revalidation waiting for the single dispatcher", "value": queued_review},
-            "running": {"summary": "The revalidation child is running; the job is `running` and its result withheld meanwhile", "value": running_review},
-            "verified": {"summary": "A verdict was appended: the verification is done and the relation's revision moved by two. Still not published", "value": verified_review},
-            "superseded": {"summary": "A reject was recorded first: this allow can never be revalidated and nothing overwrote the rejection", "value": superseded_review},
-            "unconfirmed": {"summary": "Reserved but not proven in the chain (a crash or an unanswered review): retry the same POST", "value": unconfirmed_review},
-            "interrupted": {"summary": "The child timed out, died or the service restarted: nothing is run again automatically; call recover", "value": interrupted_review},
-            "unansweredCall": {"summary": "A verification call was reserved but never answered: it is never resent; stop and escalate", "value": unanswered_review}},
-        "operation.recover.202": {"enqueued": {"summary": "The chain still waits at the revision the review left: the revalidation was queued again", "value": queued_review}},
-        "operation.recover.200": {"settled": {"summary": "Nothing to add: the chain already proved the outcome, or a revalidation is already pending or running", "value": verified_review}},
+            "approved": {"summary": "A recorded final approval: revalidation not_requested, next none", "value": approved_review},
+            "rejected": {"summary": "A recorded exclusion", "value": rejected_review},
+            "unconfirmed": {"summary": "Reserved but not proven in the chain (a crash or a lost reply): retry the same POST", "value": unconfirmed_review},
+            "legacySettled": {"summary": "Recorded under the earlier contract and settled by its own stored history", "value": legacy_verified},
+            "legacyUnsettled": {"summary": "Recorded under the earlier contract and never settled: contract_changed, nothing is dispatched or resent", "value": legacy_unsettled}},
         "errors": {
             "401": {"summary": "Missing, malformed or unknown bearer token", "value": relation_error("authentication_required")},
             "403.scope": {"summary": "Principal lacks the route's scope", "value": relation_error("scope_denied")},
@@ -294,8 +298,11 @@ def relation_examples() -> dict[str, dict[str, Any]]:
             "409.sourceRevision": {"summary": "The relation moved past the expected sourceRevision (another decision or a verdict); nothing was recorded", "value": relation_error("source_revision_conflict")},
             "409.notOnHold": {"summary": "Only a relation on HOLD can be reviewed", "value": relation_error("review_target_not_hold", runtime_code="review_target_not_hold")},
             "409.operationIdUnavailable": {"summary": "The operation key belongs to another principal", "value": relation_error("operation_id_unavailable")},
-            "409.reviewNotConfirmed": {"summary": "Recover of a review that is not proven yet: retry the review request with the same key and body first", "value": relation_error("review_not_confirmed", operation=unconfirmed_review)},
-            "409.operationNotRecoverable": {"summary": "A reject, or a revalidation the chain no longer allows, has nothing to recover", "value": relation_error("operation_not_recoverable", operation=rejected_review)},
+            "409.reviewContractChanged": {"summary": "The key was reserved under the earlier revalidation contract and never confirmed: history only, use a new key", "value": relation_error("review_contract_changed", operation=legacy_unconfirmed)},
+            "409.reviewCallInFlight": {"summary": "A model call for this job has no answer yet: nothing is approved until it is reconciled", "value": relation_error("review_call_in_flight", runtime_code="review_call_in_flight")},
+            "409.candidateIneligible": {"summary": "The deterministic checks or the current source rights no longer hold for this candidate: a human decision cannot override them", "value": relation_error("review_candidate_ineligible", runtime_code="review_candidate_ineligible")},
+            "403.liveNotApproved": {"summary": "A live job needs an allowlist entry pinning the runtime identity", "value": relation_error("live_not_approved")},
+            "409.liveUnavailable": {"summary": "The service has no live group", "value": relation_error("live_unavailable")},
             "404.operation": {"summary": "Unknown operation, another principal's, or another job's", "value": relation_error("operation_not_found")},
             "404.candidate": {"summary": "The relation candidate is not in this job", "value": relation_error("relation_candidate_not_found", runtime_code="relation_candidate_not_found")},
             "503.unconfirmed": {"summary": "The review could not be proven in the chain either way yet: retry the same key and body", "value": relation_error("review_unconfirmed", retryable=True)},
@@ -328,9 +335,11 @@ def _document_relation(spec: dict[str, Any], sample: dict[str, dict[str, Any]]) 
         base["responses"][code]["headers"] = {
             "Location": {"description": "Status URL of the job.", "schema": {"type": "string"}},
             "Retry-After": {"description": "Seconds to wait before polling; present while next is wait.", "schema": {"type": "integer"}}}
-    _attach(base, "403", {"scopeDenied": sample["errors"]["403.scope"], "upstreamNotAllowed": sample["errors"]["403.upstream"]})
+    _attach(base, "403", {"scopeDenied": sample["errors"]["403.scope"], "upstreamNotAllowed": sample["errors"]["403.upstream"],
+                          "liveNotApproved": sample["errors"]["403.liveNotApproved"]})
     _attach(base, "409", {"executionUnavailable": sample["errors"]["409.executionUnavailable"], "idempotencyConflict": sample["errors"]["409.idempotencyConflict"],
-                          "jobIdUnavailable": sample["errors"]["409.jobIdUnavailable"], "upstreamUnavailable": sample["errors"]["409.upstreamUnavailable"]})
+                          "jobIdUnavailable": sample["errors"]["409.jobIdUnavailable"], "upstreamUnavailable": sample["errors"]["409.upstreamUnavailable"],
+                          "liveUnavailable": sample["errors"]["409.liveUnavailable"]})
     for path, method in (("/internal/v1/relation-jobs/{jobId}", "get"), ("/internal/v1/relation-jobs/{jobId}/result", "get"),
                          ("/internal/v1/relation-jobs/{jobId}/cancel", "post"), ("/internal/v1/relation-jobs/{jobId}/recover", "post")):
         _attach(paths[path][method], "403", {"example": sample["errors"]["403.scope"]})
@@ -359,37 +368,26 @@ def _document_relation(spec: dict[str, Any], sample: dict[str, dict[str, Any]]) 
     review = paths["/internal/v1/relation-jobs/{jobId}/reviews"]["post"]
     review["requestBody"] = {"required": True, "content": {"application/json": {
         "schema": {"$ref": "#/components/schemas/RelationReview"},
-        "examples": {"allow": {"summary": "Allow: request a revalidation. Quote the values read from the result; the reviewer is the authenticated principal", "value": RELATION_REVIEW},
+        "examples": {"allow": {"summary": "Allow: the operator's FINAL approval of a HOLD relation (no revalidation). Quote the values read from the result; the reviewer is the authenticated principal", "value": RELATION_REVIEW},
                      "reject": {"summary": "Reject: exclude the relation", "value": {**RELATION_REVIEW, "decision": "reject"}}}}}}
-    review["responses"]["202"]["description"] = "An allow is recorded in the runtime ledger and its revalidation is queued. Acceptance only: the verdict comes later and nothing is published."
-    review["responses"]["200"]["description"] = "A reject is recorded, or the same key and body were sent again (the existing operation, whatever the relation did since)."
-    _attach(review, "202", sample["review.202"])
+    review["responses"]["200"]["description"] = "The decision is recorded in the runtime ledger and is terminal: an allow is the final approval (nothing is revalidated or called), a reject an exclusion. Also the answer to the same key and body sent again (the existing operation, whatever the relation did since)."
     _attach(review, "200", sample["review.200"])
-    for code in ("200", "202"):
-        review["responses"][code]["headers"] = {
-            "Location": {"description": "Status URL of the operation.", "schema": {"type": "string"}},
-            "Retry-After": {"description": "Seconds to wait before polling; present while next is wait.", "schema": {"type": "integer"}}}
+    review["responses"]["200"]["headers"] = {"Location": {"description": "Status URL of the operation.", "schema": {"type": "string"}}}
     _attach(review, "403", {"scopeDenied": sample["errors"]["403.scope"], "upstreamNotAllowed": sample["errors"]["403.upstream"]})
     _attach(review, "404", {"jobNotFound": sample["errors"]["404"], "relationCandidateNotFound": sample["errors"]["404.candidate"]})
     _attach(review, "409", {"sourceVersionConflict": sample["errors"]["409.sourceVersion"], "sourceRevisionConflict": sample["errors"]["409.sourceRevision"],
-                            "reviewTargetNotHold": sample["errors"]["409.notOnHold"], "idempotencyConflict": sample["errors"]["409.idempotencyConflict"],
+                            "reviewTargetNotHold": sample["errors"]["409.notOnHold"], "reviewCallInFlight": sample["errors"]["409.reviewCallInFlight"],
+                            "reviewCandidateIneligible": sample["errors"]["409.candidateIneligible"],
+                            "reviewContractChanged": sample["errors"]["409.reviewContractChanged"], "idempotencyConflict": sample["errors"]["409.idempotencyConflict"],
                             "operationIdUnavailable": sample["errors"]["409.operationIdUnavailable"],
                             "upstreamUnavailable": sample["errors"]["409.upstreamUnavailable"], "executionUnavailable": sample["errors"]["409.executionUnavailable"]})
     _attach(review, "503", {"runtimeBusy": sample["errors"]["503"], "reviewUnconfirmed": sample["errors"]["503.unconfirmed"]})
     lookup = paths["/internal/v1/relation-jobs/{jobId}/reviews/{operationId}"]["get"]
-    lookup["responses"]["200"]["description"] = "The operation, identified exactly by its key: candidate, decision, reviewer and the two expectations sent, plus acceptance, verification and publication. Read from the service ledger; no content."
+    lookup["responses"]["200"]["description"] = "The operation, identified exactly by its key: candidate, decision, reviewer and the two expectations sent, plus acceptance, the (legacy-only) revalidation state and publication. Read from the service ledger; no content."
     _attach(lookup, "200", sample["operation.200"])
     _attach(lookup, "403", {"example": sample["errors"]["403.scope"]})
     _attach(lookup, "404", {"jobNotFound": sample["errors"]["404"], "operationNotFound": sample["errors"]["404.operation"]})
     _attach(lookup, "409", {"example": sample["errors"]["409.executionUnavailable"]})
-    again = paths["/internal/v1/relation-jobs/{jobId}/reviews/{operationId}/recover"]["post"]
-    again["responses"]["202"]["description"] = "The chain still waits at the revision the review left: the revalidation was queued again."
-    _attach(again, "202", sample["operation.recover.202"])
-    _attach(again, "200", sample["operation.recover.200"])
-    _attach(again, "403", {"scopeDenied": sample["errors"]["403.scope"], "upstreamNotAllowed": sample["errors"]["403.upstream"]})
-    _attach(again, "404", {"jobNotFound": sample["errors"]["404"], "operationNotFound": sample["errors"]["404.operation"]})
-    _attach(again, "409", {"reviewNotConfirmed": sample["errors"]["409.reviewNotConfirmed"], "operationNotRecoverable": sample["errors"]["409.operationNotRecoverable"],
-                           "reconcileRequired": sample["errors"]["409.reconcileRequired"], "executionUnavailable": sample["errors"]["409.executionUnavailable"]})
 
 
 def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
@@ -400,8 +398,8 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
                     "description": (DESCRIPTION + "\n" + extraction_doc.DESCRIPTION + "\n" + graph_doc.DESCRIPTION + "\n" + handoff_doc.DESCRIPTION).strip()}
     spec["servers"] = [{"url": "http://127.0.0.1:8797", "description": "Loopback only. Never exposed directly; reach it through a co-located TLS proxy."}]
     spec["tags"] = [{"name": "analysis-jobs", "description": "S1 analysis jobs over the installed zoop-ai runtime."},
-                    {"name": "relation-jobs", "description": "S3 relation/impact candidate jobs over an operator-prepared S2 upstream, through the installed zoop-ai-relation pipeline (replay only)."},
-                    {"name": "extraction-jobs", "description": "S2 event/topic candidate jobs over an operator-approved request, through the installed zoop-ai-extract pipeline (replay only)."},
+                    {"name": "relation-jobs", "description": "S3 relation/impact candidate jobs over an operator-prepared S2 upstream, through the installed zoop-ai-relation pipeline (replay, or live for an operator-pinned upstream)."},
+                    {"name": "extraction-jobs", "description": "S2 event/topic candidate jobs over an operator-approved request, through the installed zoop-ai-extract pipeline (replay, or live for an operator-pinned approval)."},
                     {"name": "graph-versions", "description": "Read-only, nonpublic S3 graph version status and company focus over operator-listed versions, through the installed zoop-ai-graph pipeline (no write, no model)."},
                     {"name": "graph-handoffs", "description": "Read-only, nonpublic AI handoff status and whole-bundle delivery over operator-pinned handoffs, through the installed zoop-ai-handoff export command (no write, no model, no network)."}]
     components = spec["components"]
@@ -414,7 +412,7 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
               "cancelAnalysisJob": "analysis.cancel", "recoverAnalysisJob": "analysis.recover",
               "submitRelationJob": "relation.submit", "getRelationJobStatus": "relation.read", "getRelationJobResult": "relation.read",
               "cancelRelationJob": "relation.cancel", "recoverRelationJob": "relation.recover", "submitRelationReview": "relation.review",
-              "getRelationReviewOperation": "relation.read", "recoverRelationReviewOperation": "relation.recover",
+              "getRelationReviewOperation": "relation.read",
               "submitExtractionJob": "extraction.submit", "getExtractionJobStatus": "extraction.read", "getExtractionJobResult": "extraction.read",
               "cancelExtractionJob": "extraction.cancel", "recoverExtractionJob": "extraction.recover",
               "getGraphVersionStatus": "graph.read", "getGraphVersionFocus": "graph.read",

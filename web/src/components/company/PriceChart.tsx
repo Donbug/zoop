@@ -1,6 +1,6 @@
 import type { ChartPeriod } from '@/types/company';
-import type { EventDetail, Events } from '@/types/company/detail';
-import { bucketKey, exactTime, timeRange } from './detail-model';
+import type { EventDetail, Events, PriceRange } from '@/types/company/detail';
+import { bucketKey, exactTime, legacyTimeRange } from './detail-model';
 
 // D-COM-05 시세 차트. 가격 선과, 사건이 있던 시점에만 ⚡ 표식과 세로 점선을 그린다.
 // 표식을 눌러도 기준 시점(asOf)은 바뀌지 않고 아래 타임라인에서 그 버킷의 사건을 보여 준다.
@@ -57,6 +57,7 @@ function markerTime(
 
 export default function PriceChart({
   points,
+  range: suppliedRange,
   asOf,
   period,
   groups,
@@ -65,6 +66,7 @@ export default function PriceChart({
   onBucket,
 }: {
   points: { time: string; close: number }[];
+  range?: PriceRange | null;
   asOf: string | null;
   period: ChartPeriod;
   groups: Map<string, Events['items']>;
@@ -78,9 +80,10 @@ export default function PriceChart({
   const min = Math.min(...values),
     max = Math.max(...values);
   const range =
-    asOf && exactTime(asOf)
-      ? timeRange(asOf, period)
-      : { from: points[0].time, to: points.at(-1)!.time };
+    suppliedRange ??
+    (asOf && exactTime(asOf)
+      ? legacyTimeRange(asOf, period)
+      : { from: points[0].time, to: points.at(-1)!.time });
   const start = Date.parse(range.from),
     end = Date.parse(range.to);
   const x = (time: string) =>
@@ -99,6 +102,11 @@ export default function PriceChart({
 
   return (
     <figure className="flex flex-col gap-1">
+      {period === '1d' && suppliedRange?.sessionDate && (
+        <p className="text-xs text-zoop-muted">
+          {suppliedRange.sessionDate} 장 · 거래소 현지 거래일 · 시간 표시는 KST
+        </p>
+      )}
       <svg
         className="h-auto w-full"
         viewBox="0 0 600 205"

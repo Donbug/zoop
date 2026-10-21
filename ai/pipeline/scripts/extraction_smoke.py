@@ -7,11 +7,14 @@ from __future__ import annotations
 
 import html as htmllib
 import hashlib
+import http.server
 import json
 import os
 import subprocess
 import sys
+import shutil
 import tempfile
+import threading
 import stat
 from pathlib import Path
 
@@ -20,9 +23,10 @@ sys.path[:0] = [str(PIPELINE)]
 
 from scripts.ingestion_smoke import OfflineFixture, exact_check, json_bytes, ownership_env  # noqa: E402
 from zoop_ai_pipeline import extraction_replay as analysis  # noqa: E402
-from zoop_ai_pipeline.extraction_contracts import REPLAY_FORMAT, SCHEMA, Catalogue, Mention, digest  # noqa: E402
+from zoop_ai_pipeline.extraction_contracts import REPLAY_FORMAT, SCHEMA, TOPIC_RESPONSE, Catalogue, Mention, digest  # noqa: E402
 
 PROMPT = "zoop-extraction-authored-1"
+LIVE_PROMPT = "zoop-extraction-live-label-1"  # an operator label: the prompt the provider is actually given is frozen in the runtime binding
 INGESTION_SCHEMA = "zoop-ingestion-s2-1"
 CATALOGUE = {"revision": "catalogue-1", "companies": [
     {"companyId": "SYNTH-1", "name": "합성기업", "aliases": [], "ticker": None},
@@ -45,12 +49,14 @@ class Kit(OfflineFixture):
 
     # ---- ingestion ----------------------------------------------------------------------------------------------
     def ingest(self, name: str, documents: list[dict]) -> list[dict]:
-        """documents: [{"supplier": str|None, "html": bytes, "published": iso|None, "url": str}] -> exact observation refs."""
+        """documents: [{"supplier": str|None, "html": bytes, "published": iso|None, "url": str, "publisher": str|None}] -> exact observation refs.
+
+        `publisher` is the operator-declared outlet written into the real fixture item (absent or None: unspecified, no key)."""
         items, bodies = [], {}
         for index, document in enumerate(documents):
             ref = f"d{index}"
             bodies[ref] = document["html"]
-            item = self.item(f"c{index}", document["supplier"], document.get("url", f"https://example.invalid/{name}/{index}"), ref=ref)
+            item = self.item(f"c{index}", document["supplier"], document.get("url", f"https://example.invalid/{name}/{index}"), ref=ref, publisher=document.get("publisher"))
             item["publishedAt"] = document.get("published", "2026-10-08T00:00:00+00:00")
             items.append(item)
         manifest = self.manifest(name, [items], bodies=bodies)
@@ -106,26 +112,43 @@ class Kit(OfflineFixture):
                 "promptVersion": prompt, "incoming": incoming, "catalogue": CATALOGUE, "snapshot": {"revision": "snapshot-1", "events": events or []},
                 "topic": {"producerVersion": "zoop-topic-replay-producer-1"} if topic else None}
 
+    def submit_live(self, job: str, incoming: dict, events: list[dict] | None = None, *, topic: bool = False, source_kind: str = "synthetic", prompt: str = LIVE_PROMPT) -> dict:
+        """A live job request: the provenance pair is executionMode live + recordingKind provider; `sourceKind` stays the truth about the documents."""
+        request = self.submit(job, incoming, events, topic=topic, source_kind=source_kind, prompt=prompt)
+        return {**request, "provenance": {"sourceKind": source_kind, "executionMode": "live", "recordingKind": "provider"}}
+
+    def allow_model_send(self, runtime, stages=("extract", "compare", "topic")) -> None:
+        """Grant exactly the model-send right the runtime will ask for: the operation, its purposes and its recipients (the live authority is only this registry)."""
+        grant = self.registry["sources"][0]["grant"]
+        grant["allowedOperations"] = ["read", "store", "quote-display", "model-send"]
+        grant["purposes"] = [runtime.purpose(stage) for stage in stages]
+        grant["recipients"] = sorted({runtime.recipient(stage) for stage in stages})
+        self.save_registry()
+
     @staticmethod
     def job_selector(job: str) -> dict:
         return {"schemaVersion": SCHEMA, "jobId": job}
 
     # ---- process runner -------------------------------------------------------------------------------------
     def run(self, command: str, request: dict, *, state: str = "extraction", replay: Path | None = None, topic: Path | None = None,
-            crash: str | None = None, expected: int = 0, sources: bool = True, raw: bool = False, forbid_execution: bool = False):
-        """`forbid_execution` ends the process with 76 if it reaches stage execution, a replay model or a call reservation (a submit must not)."""
-        env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()), "LANG": "en_US.UTF-8", **ownership_env(), **CUSTOM}
+            crash: str | None = None, expected: int = 0, sources: bool = True, raw: bool = False, forbid_execution: bool = False,
+            live: dict | None = None, extra: tuple = ()):
+        """`forbid_execution` ends the process with 76 if it reaches stage execution, a replay model or a call reservation (a submit must not).
+
+        `live` is the child environment of a live job (gate, endpoints, keys, budget): only then may the process reach the network (loopback or the real
+        provider); every other process keeps the audit hook that rejects any socket use. `extra` is extra CLI arguments (`--initial-only`)."""
+        env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()), "LANG": "en_US.UTF-8", **ownership_env(), **CUSTOM, **(live or {})}
         guard = ("import os, sys, runpy\n"
-                 "def _guard(event, args):\n"
-                 " if event in {'socket.connect', 'socket.getaddrinfo', 'socket.gethostbyname', 'socket.bind'}:\n"
-                 "  raise RuntimeError('network attempted')\n"
-                 "sys.addaudithook(_guard)\n"
-                 "from zoop_ai_pipeline.extraction import Extractor\n")
+                 + ("" if live else "def _guard(event, args):\n"
+                    " if event in {'socket.connect', 'socket.getaddrinfo', 'socket.gethostbyname', 'socket.bind'}:\n"
+                    "  raise RuntimeError('network attempted')\n"
+                    "sys.addaudithook(_guard)\n")
+                 + "from zoop_ai_pipeline.extraction import Extractor\n")
         hook = ""
         if forbid_execution:
             hook = ("from zoop_ai_pipeline.extraction import Fixtures\n"
                     "def _forbidden(*a, **k):\n os._exit(76)\n"
-                    "Extractor._execute = Extractor._reserve = Extractor._receipted = Fixtures.index = _forbidden\n")
+                    "Extractor._execute = Extractor._reserve = Extractor._receipted = Extractor._live_receipted = Fixtures.index = _forbidden\n")
         if crash:
             kind, _, argument = crash.partition(":")
             hook = {
@@ -133,7 +156,7 @@ class Kit(OfflineFixture):
                 "receipt": "original = Extractor._receive\ncount = [0]\ndef stop(self, *a):\n original(self, *a)\n count[0] += 1\n if count[0] == " + (argument or "1") + ":\n  os._exit(75)\nExtractor._receive = stop",
                 "stage": "Extractor._stage_saved = lambda self, stage: os._exit(75) if stage == " + repr(argument) + " else None",
             }[kind]
-        argv = [sys.executable, "-c", guard + hook + "\nrunpy.run_module('zoop_ai_pipeline.extraction_cli', run_name='__main__')", command]
+        argv = [sys.executable, "-c", guard + hook + "\nrunpy.run_module('zoop_ai_pipeline.extraction_cli', run_name='__main__')", command, *extra]
         argv += ["--state-dir", str(self.root / state), "--ingestion-state-dir", str(self.root / "ingestion")]
         if sources:
             argv += ["--sources", str(self.registry_path)]
@@ -415,7 +438,7 @@ def smoke(root: Path) -> dict:
     assert kit.run("submit", submitted, expected=2)["error"]["code"] == "replay_fixture_required"
     assert kit.run("submit", submitted, replay=r12, topic=r12, expected=2)["error"]["code"] == "fixture_not_allowed"
     live = {**submitted, "provenance": {**submitted["provenance"], "executionMode": "live", "recordingKind": "provider"}}
-    assert kit.run("submit", live, replay=r12, expected=2)["error"]["code"] == "live_mode_unsupported"
+    assert kit.run("submit", live, replay=r12, expected=2)["error"]["code"] == "fixture_not_allowed"
     other12 = kit.replay("r-submit-other").extract(art["a1"], [m1])
     other12.doc["analysisVersion"] = "authored-analysis-2"
     for changed, fixture in (({**submitted, "snapshot": {"revision": "snapshot-2", "events": []}}, r12), (submitted, other12.write())):
@@ -446,13 +469,314 @@ def smoke(root: Path) -> dict:
     return {"status": "passed", "schemaVersion": SCHEMA, "checks": checks, "providerCalls": 0, "modelCalls": 0, "networkAttempts": "audit hook rejected socket use in every CLI subprocess; none occurred"}
 
 
+# ======================================================================== live provider path ==========================
+# Two entry points over the same scenario: `--live-loopback` runs it (plus a fault matrix) against a deterministic provider SIMULATOR on 127.0.0.1 with fake
+# keys, no paid call; `--live` runs it ONCE against the real provider with the live environment the operator exported (gate, models, budget directory, keys).
+# Neither asserts what a model decides: the structural invariants (provenance, binding, receipts, counts, rights, no resend, no secret in any state) hold
+# whatever the answer is, and a legitimately held/rejected or unusable reply is reported as such rather than coerced.
+
+LIVE_ENV_NAMES = ("ZOOP_AI_PIPELINE_LIVE_ENABLED", "ZOOP_AI_PIPELINE_LIVE_MODEL", "ZOOP_AI_PIPELINE_LIVE_REASONING_EFFORT", "ZOOP_AI_PIPELINE_LIVE_MAX_OUTPUT_TOKENS",
+                  "ZOOP_AI_PIPELINE_LIVE_TIMEOUT_SECONDS", "ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR", "ZOOP_AI_PIPELINE_LIVE_MAX_USD", "ZOOP_AI_PIPELINE_LIVE_MAX_CALLS",
+                  "ZOOP_AI_BASE_URL", "ZOOP_AI_API_KEY", "TYPESAFE_BASE_URL", "TYPESAFE_API_KEY", "TYPESAFE_VALIDATION_MODEL")
+SECRET_NAMES = ("ZOOP_AI_API_KEY", "TYPESAFE_API_KEY")
+
+
+def process_live_env() -> dict[str, str]:
+    """The live variables of THIS process (real mode: exactly what the operator exported). Nothing else is ever handed to a child."""
+    return {name: os.environ[name] for name in LIVE_ENV_NAMES if name in os.environ}
+
+
+def no_secret_anywhere(root: Path, env: dict[str, str], *texts: str) -> None:
+    """Neither a key nor its bearer header may be in any state file, ledger, WAL or delivered output."""
+    secrets = [env[name].encode() for name in SECRET_NAMES if env.get(name)]
+    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+        data = path.read_bytes()
+        assert not any(secret in data for secret in secrets), path.name
+    assert not any(secret.decode() in text for secret in secrets for text in texts)
+
+
+def summary(result: dict) -> dict:
+    """What a live run reports about itself: facts and counts, never the model's text."""
+    return {"state": result["state"], "phase": result["phase"], "failure": result["failure"], "stages": {k: v["state"] for k, v in result["stages"].items()},
+            "counts": result["counts"], "usage": result["usage"], "delivery": result["delivery"]["status"],
+            "calls": [{k: c[k] for k in ("stage", "state", "verdict", "httpStatus", "model", "usage", "cost")} for c in result["calls"]]}
+
+
+class LiveWorld:
+    """Two synthetic documents (a frozen snapshot event over the first, the incoming second) and exactly the model-send grant the runtime asks for."""
+
+    def __init__(self, root: Path, env: dict[str, str]):
+        from zoop_ai_pipeline.live_runtime import LiveRuntime
+        self.env = env
+        previous = {name: os.environ.get(name) for name in LIVE_ENV_NAMES}
+        os.environ.update(env)
+        try:
+            self.runtime = LiveRuntime.from_env()  # configuration only: no network, no key is needed
+        finally:
+            for name, value in previous.items():
+                os.environ.pop(name, None) if value is None else os.environ.__setitem__(name, value)
+        self.kit = kit = Kit(root)
+        self.a1, self.a2 = kit.ingest("live-docs", [{"supplier": "supplier-a1", "html": page(Q3, "계약 상대는 합성상대다.")},
+                                                     {"supplier": "supplier-a2", "html": page(Q3B, "상대는 합성상대로 확인됐다.")}])
+        article = kit.article(self.a1)
+        self.event1 = kit.event("event-1", [(self.a1, kit.mention(article, "m1", [kit.evidence(article, Q3)]))])
+        kit.allow_model_send(self.runtime)
+        self.identity = self.runtime.binding()["identity"]
+
+    def request(self, job: str, *, snapshot: bool = True, topic: bool = True) -> dict:
+        return self.kit.submit_live(job, self.a2, [self.event1] if snapshot else [], topic=topic)
+
+    def run(self, command: str, request: dict, *, env: dict | None = None, **options):
+        return self.kit.run(command, request, live=self.env if env is None else env, **options)
+
+    def documents(self) -> dict:
+        found = {}
+        for ref in (self.a1, self.a2):
+            selector = self.kit.selector("round-live-docs", documentId=ref["documentId"], documentVersion=ref["documentVersion"])
+            found[(ref["documentId"], ref["documentVersion"])] = self.kit.cli("inspect", selector, state="ingestion")["document"]["text"]
+        return found
+
+
+def check_delivered(world: LiveWorld, done: dict) -> None:
+    """A ready live job: every call is a stored 2xx receipt, the counts add up, nothing is approved, and every citation is an exact source quote."""
+    assert done["provenance"] == {"sourceKind": "synthetic", "executionMode": "live", "recordingKind": "provider"} and "replay" not in done["binding"]
+    usage, calls = done["usage"], done["calls"]
+    assert {s["state"] for s in done["stages"].values()} == {"complete"} and done["delivery"]["status"] == "current" and usage["executionMode"] == "live"
+    assert all(c["state"] == "received" and c["verdict"] is None and c["httpStatus"] == 200 for c in calls)
+    assert usage["providerCalls"] == usage["receivedCalls"] == len(calls) and usage["startedWithoutReceipt"] == usage["unsentCalls"] == usage["replayCalls"] == 0
+    assert all(c["recipient"] == world.runtime.recipient(c["stage"]) and c["purpose"] == world.runtime.purpose(c["stage"]) for c in calls)
+    texts = world.documents()
+    for candidate in done["eventCandidates"]:
+        assert candidate["approved"] is False
+        for citation in candidate["citations"] + [x for c in candidate["comparisons"] for x in c["citations"]]:
+            assert texts[(citation["documentId"], citation["documentVersion"])][citation["start"]:citation["end"]] == citation["quote"]
+    for topic in done["topicCandidates"]:
+        assert topic["approved"] is False
+        for citation in topic["citations"]:
+            assert texts[(citation["documentId"], citation["documentVersion"])][citation["start"]:citation["end"]] == citation["quote"]
+
+
+def live_scenario(world: LiveWorld, requests=None) -> dict:
+    """submit (frozen binding, no call) -> automatic dispatch once -> nothing re-dispatchable -> env-free inspect -> no resend. `requests` counts provider hits."""
+    kit, job = world.kit, "live-main"
+    request, selector = world.request(job), kit.job_selector(job)
+    queued = world.run("submit", request, forbid_execution=True)
+    assert queued["state"] == "queued" and queued["calls"] == [] and queued["provenance"] == request["provenance"] and "replay" not in queued["binding"]
+    live = queued["binding"]["live"]
+    assert live["bindingDigest"] == world.identity == live["runtime"]["identity"] and live["runtime"] == world.runtime.binding() and live["analysisVersion"] == "live-" + world.identity
+    assert queued["binding"]["adapter"]["version"] == "zoop-extraction-native-live-1" and queued["usage"]["executionMode"] == "live" and queued["usage"]["providerCalls"] == 0
+    assert world.run("submit", request, forbid_execution=True) == queued and (requests is None or len(requests) == 0)
+    assert world.run("submit", request, env={}, expected=2)["error"]["code"] == "live_not_enabled"  # a live freeze needs the gate; nothing was written for it
+    done = world.run("resume", selector, extra=("--initial-only",))
+    assert world.run("resume", selector, extra=("--initial-only",), expected=2) == {"schemaVersion": SCHEMA, "error": {"code": "initial_dispatch_taken"}}
+    assert world.run("inspect", selector, env={}) == done, "inspect needs neither the environment nor a key"
+    if done["state"] == "ready":
+        check_delivered(world, done)
+        sent = None if requests is None else len(requests)
+        assert world.run("resume", selector) == done and (sent is None or len(requests) == sent), "a finished job is never re-sent"
+    no_secret_anywhere(kit.root, world.env, json.dumps(done))
+    return summary(done)
+
+
+# ---- authored provider simulator: NOT an AI and never a stand-in for one -------------------------------------------------
+# A deterministic OpenAI-compatible chat-completions server that answers each stage with a reply grounded in the exact projection the runtime sent. It exists
+# only so the offline fault matrix can exercise the real live path (request building, budget, receipt, decode, parse, exact grounding) without a paid call.
+
+FAKE_KEYS = {"ZOOP_AI_API_KEY": "sk-offline-simulator-openai-key", "TYPESAFE_API_KEY": "tsk-offline-simulator-jev-key"}
+
+
+def _first_line(text: str) -> str:
+    return next(line.strip() for line in text.split("\n") if line.strip())
+
+
+def simulated_answer(stage: str, projection: dict) -> dict:
+    if stage == "extract":
+        article = projection["article"]
+        evidence = {"article_id": article["article_id"], "article_version": article["article_version"], "start": None, "end": None, "quote": _first_line(article["body"])}
+        return {"mentions": [{"mention_id": "m-sim-1", "article_id": article["article_id"], "article_version": article["article_version"], "title": "합성 공급 계약",
+                              "event_type": "supply_contract", "action": "공급 계약 발표", "target": "공급 계약", "event_time": None, "period": "2026Q3",
+                              "assertion_status": "announced", "participants": [{"company_id": "SYNTH-1", "name": "합성기업", "role": "issuer"}],
+                              "evidence": [evidence], "keywords": [], "background": False, "countries": []}]}
+    if stage == "compare":
+        incoming, member = projection["article"], projection["issue"]["articles"][0]
+        return {"relation": "SAME", "reason": "simulated: same 2026Q3 supply contract", "evidence": [
+            {"article_id": a["article_id"], "article_version": a["article_version"], "start": None, "end": None, "quote": _first_line(a["body"])} for a in (incoming, member)]}
+    if stage == "topic":
+        # The request carries schemaVersion zoop-topic-request-1, but the reply contract (and the strict schema the provider enforces) pins the RESPONSE literal.
+        return {"schemaVersion": TOPIC_RESPONSE, "producerVersion": projection["producerVersion"], "topics": [{
+            "label": "합성 공급 계약", "criteria": "simulated: same company contract events", "rationale": "simulated grouping",
+            "members": [{"kind": e["kind"], "ref": e["ref"]} for e in projection["events"]],
+            "citations": [{"documentId": d["documentId"], "documentVersion": d["documentVersion"], "start": None, "end": None, "quote": _first_line(d["text"])}
+                          for d in projection["documents"][:2]]}]}
+    raise AssertionError(stage)
+
+
+def chat_reply(content: str, *, prompt_tokens: int = 1200, completion_tokens: int = 300, reasoning_tokens: int = 120) -> dict:
+    return {"id": "chatcmpl-simulated", "object": "chat.completion", "model": "gpt-6-luna-simulated",
+            "choices": [{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": content}}],
+            "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "prompt_tokens_details": {"cached_tokens": 0},
+                      "completion_tokens_details": {"reasoning_tokens": reasoning_tokens}}}
+
+
+def simulate(body: dict) -> dict:
+    stage_input = json.loads(body["messages"][1]["content"])
+    return chat_reply(json.dumps(simulated_answer(stage_input["stage"], stage_input["input"]), ensure_ascii=False))
+
+
+class SimulatedProvider:
+    """Loopback server for the OpenAI chat wire. `mode`: ok | garbage (HTTP 200, content is not JSON) | http500 | silent (connection closed, no reply).
+    `requests` records every request that reached it, in order."""
+
+    def __init__(self):
+        self.mode, self.requests = "ok", []
+        provider = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                provider.requests.append({"path": self.path, "authorization": self.headers.get("Authorization"), "body": body})
+                if provider.mode == "silent":
+                    self.close_connection = True
+                    return
+                status = 500 if provider.mode == "http500" else 200
+                reply = {"error": {"message": "simulated"}} if status == 500 else chat_reply("this is not json") if provider.mode == "garbage" else simulate(body)
+                data = json.dumps(reply, ensure_ascii=False).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, *args):
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+
+    @property
+    def base_url(self) -> str:
+        return f"http://127.0.0.1:{self.server.server_address[1]}/v1"
+
+    def __enter__(self) -> "SimulatedProvider":
+        self.thread.start()
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+
+
+def simulator_env(base_url: str, budget: Path, **changes: str) -> dict[str, str]:
+    return {"ZOOP_AI_PIPELINE_LIVE_ENABLED": "1", "ZOOP_AI_PIPELINE_LIVE_MODEL": "gpt-6-luna", "ZOOP_AI_PIPELINE_LIVE_REASONING_EFFORT": "high",
+            "TYPESAFE_VALIDATION_MODEL": "jev-1.14.0", "ZOOP_AI_BASE_URL": base_url, "ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR": str(budget),
+            "ZOOP_AI_PIPELINE_LIVE_MAX_USD": "5", "ZOOP_AI_PIPELINE_LIVE_MAX_CALLS": "40", "ZOOP_AI_PIPELINE_LIVE_TIMEOUT_SECONDS": "10", **FAKE_KEYS, **changes}
+
+
+def loopback_smoke(root: Path) -> dict:
+    """The live path through actual CLI subprocesses against the simulator: the main scenario plus every provider/process fault the contract names."""
+    checks = []
+    with SimulatedProvider() as provider:
+        env = simulator_env(provider.base_url, root / "budget")
+        world = LiveWorld(root / "world", env)
+        kit, hits = world.kit, provider.requests
+
+        report = live_scenario(world, hits)
+        assert report["state"] == "ready" and report["usage"]["providerCalls"] == 3 == len(hits) and report["counts"]["topicCandidates"] == 1, report
+        assert report["usage"]["inputTokens"] == 3 * 1200 and report["usage"]["outputTokens"] == 3 * 300 and report["usage"]["paidModelCalls"] == 3, report
+        assert all(h["authorization"] == "Bearer " + FAKE_KEYS["ZOOP_AI_API_KEY"] for h in hits)
+        assert not any(leak in h["body"]["messages"][1]["content"] for h in hits for leak in ("allow_model_send", "example.invalid", "operator-grant"))
+        checks.append("main scenario: frozen live binding, one automatic dispatch, extract+compare+topic receipts, exact citations, env-free inspect, no resend, no key in any state file")
+
+        # Provider silence after the request left: reconciling, never resent, usage unknown rather than zero.
+        before, provider.mode = len(hits), "silent"
+        silent = world.run("run", world.request("live-silent", topic=False))
+        provider.mode = "ok"
+        assert silent["state"] == "reconciling" and silent["resumeMode"] == "reconcile_only" and silent["failure"]["code"] == "live_response_unknown", silent
+        assert len(hits) == before + 1 and silent["usage"]["startedWithoutReceipt"] == 1 and silent["usage"]["providerCalls"] == 1 and silent["usage"]["estimatedUsd"] is None
+        assert [c["state"] for c in silent["calls"]] == ["started"] and silent["calls"][0]["httpStatus"] is None
+        assert world.run("resume", kit.job_selector("live-silent")) == silent and len(hits) == before + 1
+        cancelled = world.run("cancel", kit.job_selector("live-silent"), expected=2)
+        assert cancelled["state"] == "cancelled" and len(hits) == before + 1
+        checks.append("provider silence: started-without-receipt is reconciling, never resent, usage unknown not zero, cancel allowed")
+
+        # A received reply that cannot be used stays durable and failed; another call never repairs it.
+        for mode, code in (("garbage", "live_reply_not_json"), ("http500", "live_http_500")):
+            job, before, provider.mode = f"live-{mode}", len(hits), mode
+            failed = world.run("run", world.request(job, topic=False))
+            provider.mode = "ok"
+            assert failed["state"] == "stopped" and failed["failure"]["code"] == code and failed["calls"][0]["verdict"] == code, failed
+            assert failed["calls"][0]["state"] == "received" and failed["usage"]["receivedCalls"] == 1 and len(hits) == before + 1
+            assert world.run("resume", kit.job_selector(job)) == failed and len(hits) == before + 1
+        checks.append("malformed 200 and HTTP 500 replies are stored receipts with a failed verdict; resume never calls the provider again")
+
+        # Death after the provider answered but before the receipt was stored: indistinguishable from a lost reply, so reconcile-only.
+        before = len(hits)
+        world.run("run", world.request("live-lost", topic=False), crash="unknown", expected=75)
+        lost = world.run("resume", kit.job_selector("live-lost"))
+        assert lost["state"] == "reconciling" and lost["failure"]["code"] == "live_response_unknown" and len(hits) == before + 1 and lost["usage"]["startedWithoutReceipt"] == 1
+        checks.append("process death before the receipt is stored: reconcile-only after exactly one provider request")
+
+        # Death after the receipt is stored: recovery decodes the stored receipt with NO environment and NO key, and sends nothing.
+        before = len(hits)
+        world.run("run", world.request("live-recover", snapshot=False, topic=False), crash="receipt:1", expected=75)
+        recovered = world.run("resume", kit.job_selector("live-recover"), env={})
+        assert recovered["state"] == "ready" and recovered["usage"]["providerCalls"] == recovered["usage"]["receivedCalls"] == 1 and len(hits) == before + 1, recovered
+        check_delivered(world, recovered)
+        checks.append("process death after the receipt: resume with no environment/key decodes the stored receipt and makes zero provider calls")
+
+        # Rights and configuration are re-checked against the CURRENT state before any send.
+        before, grant = len(hits), kit.registry["sources"][0]["grant"]
+        queued = world.run("submit", world.request("live-rights", snapshot=False, topic=False), forbid_execution=True)
+        allowed, grant["allowedOperations"] = grant["allowedOperations"], ["read", "store", "quote-display"]
+        kit.save_registry()
+        denied = world.run("resume", kit.job_selector("live-rights"), expected=0)
+        assert denied["state"] == "stopped" and denied["failure"]["code"] == "source_operation_denied" and denied["calls"] == [] and len(hits) == before, denied
+        grant["allowedOperations"], grant["recipients"] = allowed, []
+        kit.save_registry()
+        assert world.run("resume", kit.job_selector("live-rights"))["failure"]["code"] == "source_purpose_or_recipient_denied" and len(hits) == before
+        grant["recipients"] = sorted({world.runtime.recipient(s) for s in ("extract", "compare", "topic")})
+        kit.save_registry()
+        granted = world.run("resume", kit.job_selector("live-rights"))
+        assert queued["state"] == "queued" and granted["state"] == "ready" and len(hits) == before + 1
+        drifted = world.request("live-drift", snapshot=False, topic=False)
+        world.run("submit", drifted, forbid_execution=True)
+        other = {**env, "ZOOP_AI_PIPELINE_LIVE_REASONING_EFFORT": "low"}
+        stopped = world.run("resume", kit.job_selector("live-drift"), env=other)
+        assert stopped["state"] == "stopped" and stopped["failure"]["code"] == "live_config_changed" and stopped["calls"] == [] and len(hits) == before + 1
+        assert world.run("submit", drifted, env=other, expected=2)["error"]["code"] == "job_input_conflict"
+        checks.append("model-send rights (operation, purpose, recipient) and the frozen configuration are enforced before any send; a drifted environment cannot resume or re-freeze a job")
+
+        no_secret_anywhere(root, env)
+    return {"status": "passed", "schemaVersion": SCHEMA, "checks": checks, "providerRequests": len(hits), "paidModelCalls": 0,
+            "network": "loopback simulator only (no external host, fake keys)"}
+
+
+def real_smoke(root: Path) -> dict:
+    """ONE real-provider run of the main scenario (a handful of paid calls under the operator's budget). Needs the live environment exported by the caller."""
+    env = process_live_env()
+    for name in ("ZOOP_AI_PIPELINE_LIVE_ENABLED", "ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR", "ZOOP_AI_API_KEY"):
+        assert env.get(name), f"{name} must be exported for the real live smoke"
+    assert not Path(env["ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR"]).resolve().is_relative_to(root), "the budget directory must outlive the smoke state"
+    report = live_scenario(LiveWorld(root, env))
+    return {"status": "completed" if report["state"] == "ready" else report["state"], "schemaVersion": SCHEMA, "report": report}
+
+
 def main() -> None:
+    flags = set(sys.argv[1:]) - {"--keep"}
+    assert flags <= {"--live", "--live-loopback"} and len(flags) <= 1, "usage: extraction_smoke.py [--live | --live-loopback] [--keep]"
+    run = real_smoke if "--live" in flags else loopback_smoke if "--live-loopback" in flags else smoke
     with tempfile.TemporaryDirectory(prefix="zoop-s2-2-smoke-") as temporary:
         root = Path(temporary).resolve()
-        result = smoke(root)
+        result = run(root)
+        if "--keep" in sys.argv:
+            kept = Path(tempfile.mkdtemp(prefix="zoop-s2-2-kept-")) / "state"
+            shutil.copytree(root, kept)
+            result["keptState"] = str(kept)
     assert not root.exists()
     result["temporaryStateCleanup"] = {"removed": True, "root": str(root)}
     print(json.dumps(result, ensure_ascii=False, indent=2))
+    if result["status"] not in {"passed", "completed"}:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

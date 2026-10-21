@@ -47,19 +47,30 @@ import tools.jackson.databind.node.ObjectNode;
  * always gives the same ids. The representative event resolves to its article version the same way, and is written as
  * {@code null} when that mention is not among the written ones, never as a mention the snapshot lacks. A document identity that
  * matches more than one bundle article is genuinely ambiguous and refused ({@link GraphHandoffFailure#MENTION_ARTICLE_AMBIGUOUS});
- * the verifier of {@code zoop-graph-handoff-bundle-2} already requires exactly one article per mention document version, and every
+ * the verifier of {@code zoop-graph-handoff-bundle-5} already requires exactly one article per mention document version, and every
  * original mention cites evidence of its own article, so under that schema the references cover every mention of an issue. The
  * snapshot does not carry the mention values (title, action, time, assertion status, background, participants): they are the
  * producer's S2 candidate or snapshot values ({@code verification: "none"}) and stay only in the receipt, which keeps the whole
  * bundle, the producer's own mention ids and decisions, source references and each producer field the snapshot has no place for.
  * Any later reader of receipt mentions must check {@code receipt.bundle.schemaVersion}: for {@code zoop-graph-handoff-bundle-1}
- * the mention values are unavailable, never empty and never copied from the issue.
+ * the mention values are unavailable, never empty and never copied from the issue, for {@code -1} and {@code -2} the issue's
+ * {@code fieldProvenance} (which mentions state each selected headline value; a selection record, not a verification) is absent,
+ * never rebuilt as {@code unanimous} from a null representative, and for {@code -1} to {@code -3} the issue's {@code fieldVerdicts}
+ * (operator ALLOW/HOLD/REJECT judgements of one original mention's {@code eventTime} or {@code period}) and
+ * {@code fieldProvenance.withheld} are absent, never reconstructed as "no verdict" from a headline value. The snapshot carries
+ * no field provenance and no verdict either; it carries the issue's headline values as the verifier recomputed them, so an
+ * {@code eventTime} or {@code period} that a HOLD/REJECT verdict withheld on the selection basis is {@code null} there (and
+ * {@code eventTime} has {@code unknown} precision) while the receipt still holds every original mention value and verdict.
+ * For {@code zoop-graph-handoff-bundle-1} to {@code -4} the top-level {@code pathCompanies}, every relation's {@code structuralPath}
+ * and each basis's {@code businessScope}/{@code productScope} are absent from the receipt: a reader must treat them as unavailable,
+ * never as an empty path or an empty scope. The snapshot carries none of them in any version.
  *
  * <p>{@code validUntil} is the last valid day (inclusive) and {@code null} is unknown, never "forever": days are written verbatim
  * or not at all ({@link HandoffTime#dayOrNull}); no midnight and no extra day is ever added.
  *
- * <p>The <b>receipt</b> is the {@code verification_receipt} artifact: the complete original manifest and bundle, the producer's
- * own receipt and attempts, and what this app verified (and did not). Evidence rows point at it as their verification artifact.
+ * <p>The <b>receipt</b> is the {@code verification_receipt} artifact: the complete original manifest and bundle (so the private
+ * structural paths, path companies and basis scopes live ONLY here, never in the snapshot), the producer's own receipt and attempts,
+ * and what this app verified (and did not). Evidence rows point at it as their verification artifact.
  */
 final class HandoffSnapshotWriter {
     static final String RECEIPT_SCHEMA = "zoop-graph-handoff-import-receipt-1";
@@ -342,12 +353,17 @@ final class HandoffSnapshotWriter {
                 "closed_bundle_schema_and_semantic_references", "ingestion_export_require_store_every_observation",
                 "rights_rechecked_before_commit", "article_version_title_url_publication_equal_bundle",
                 "app_text_equals_ingestion_export_text", "evidence_quote_sha256_equals_app_text_code_point_span",
-                "company_ids_exist_with_equal_label", "evidence_ids_follow_app_formula_without_collision")) {
+                "company_ids_exist_with_equal_label", "evidence_ids_follow_app_formula_without_collision",
+                "article_textSha256_equals_app_text_sha256", "source_support_recomputed_from_declared_origins_and_exact_text",
+                "approval_basis_recomputed_and_bound_to_eligibility_revision",
+                "structural_path_closed_over_involves_basis_and_catalog")) {
             checks.add(check);
         }
         app.put("quoteIntegrity", "app-text-code-point-span-sha256-equals-bundle-quoteSha256");
         app.put("semanticTruth", "not-verified");
         app.put("structuralRelations", "manual-operator-review");
+        app.put("structuralPath", "operator-mapped-basis-chain-not-causality-or-price-direction");
+        app.put("approvalBasis", "audit-metadata-not-a-verifier-verdict");
         app.put("publication", "not-published");
         app.put("activation", "none");
         return Canonical.bytes(root);

@@ -16,6 +16,119 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "request:application/json.expectedRevision": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 1
+    },
+    "request:application/json.expectedRevision:required": true,
+    "response:200:application/json.detail.feedbackDown<anyOf:0>": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.detail.feedbackDown<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.detail.feedbackUp<anyOf:0>": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.detail.feedbackUp<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.detail.holdingCount<anyOf:0>": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.detail.holdingCount<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.detail.member.activity.aiQuestions<anyOf:0>": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.detail.member.activity.aiQuestions<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.detail.member.activity.briefingViews<anyOf:0>": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.detail.member.activity.briefingViews<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.detail.member.activity.graphSelections<anyOf:0>": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.detail.member.activity.graphSelections<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.detail.member.statusRevision": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 1
+    },
+    "response:200:application/json.detail.member.statusRevision:required": true,
+    "response:200:application/json.detail.metadata": {
+      "type": "object"
+    },
+    "response:200:application/json.detail.metadata.asOf": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.detail.metadata.asOf:required": true,
+    "response:200:application/json.detail.metadata.failures": {
+      "type": "array"
+    },
+    "response:200:application/json.detail.metadata.failures:required": true,
+    "response:200:application/json.detail.metadata.failures[]": {
+      "type": "object"
+    },
+    "response:200:application/json.detail.metadata.failures[].asOf": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "response:200:application/json.detail.metadata.failures[].asOf:required": true,
+    "response:200:application/json.detail.metadata.failures[].code": {
+      "type": "string"
+    },
+    "response:200:application/json.detail.metadata.failures[].code:required": true,
+    "response:200:application/json.detail.metadata.failures[].message": {
+      "type": "string"
+    },
+    "response:200:application/json.detail.metadata.failures[].message:required": true,
+    "response:200:application/json.detail.metadata.failures[].retryable": {
+      "type": "boolean"
+    },
+    "response:200:application/json.detail.metadata.failures[].retryable:required": true,
+    "response:200:application/json.detail.metadata.failures[].section": {
+      "type": "string"
+    },
+    "response:200:application/json.detail.metadata.failures[].section:required": true,
+    "response:200:application/json.detail.metadata.graphVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.detail.metadata.graphVersion:required": true,
+    "response:200:application/json.detail.metadata.partial": {
+      "type": "boolean"
+    },
+    "response:200:application/json.detail.metadata.partial:required": true,
+    "response:200:application/json.detail.metadata.requestId": {
+      "type": "string"
+    },
+    "response:200:application/json.detail.metadata.requestId:required": true,
+    "response:200:application/json.detail.metadata.source": {
+      "type": "string"
+    },
+    "response:200:application/json.detail.metadata.source:required": true,
+    "response:200:application/json.detail.metadata:required": true,
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -414,6 +527,24 @@
     }
   },
   "bffOnly": {
+    "response:200:application/json.detail.feedbackDown": {
+      "type": "integer"
+    },
+    "response:200:application/json.detail.feedbackUp": {
+      "type": "integer"
+    },
+    "response:200:application/json.detail.holdingCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.detail.member.activity.aiQuestions": {
+      "type": "integer"
+    },
+    "response:200:application/json.detail.member.activity.briefingViews": {
+      "type": "integer"
+    },
+    "response:200:application/json.detail.member.activity.graphSelections": {
+      "type": "integer"
+    },
     "response:401:application/json.error.details<anyOf:0>": {
       "type": "object"
     },
@@ -464,12 +595,22 @@
     "request:application/json.reason": {
       "target": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "maxLength": 1000
       },
       "bff": {
         "type": "string",
         "minLength": 1,
         "maxLength": 500
+      }
+    },
+    "response:200:application/json.detail.member.activity.sessions": {
+      "target": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "bff": {
+        "type": "integer"
       }
     },
     "response:200:application/json.detail.member.createdAt": {

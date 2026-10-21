@@ -44,6 +44,10 @@ Tokens live in `src/index.css` under `@theme`. Use `font-panel`, `text-panel-ink
 
 These values come from the D-GRP-03/D-GRP-05 Figma frames (619:6729, 619:8225), including the 11 px body scale and 32 px controls. A future accessibility/responsive size change should update all panels together, not introduce one-off typography. Existing chart and graph geometry CSS stays local; new repeated UI styling belongs in these recipes. Avoid unlayered `font: inherit` or high-specificity rules overriding Tailwind utilities.
 
+### Dark theme
+
+`:root[data-theme='dark']` in `src/index.css` gives every `zoop-*` and `panel-*` token a dark value; light values stay in `@theme`. Use tokens instead of hex so both themes follow. The Tailwind `white` and `gray-*` scale is inverted in dark for screens not yet on tokens. G6 canvas colors cannot read CSS, so graph code calls `themeColor()` from `src/util/theme-color.ts`; the header moon button (`toggleTheme`) reloads so the canvas redraws. Black line icons from `/graph-assets` carry `data-icon` and are inverted in dark; company logos are not.
+
 ## Behavior checklist
 
 - Heading focus on selection; visible keyboard focus; Escape closes; restore focus to the opener or map when it no longer exists.
@@ -63,3 +67,29 @@ The component uses existing Tailwind tokens, focus rings and native buttons with
 Use `AccountMenu` from `@/components/common/AccountMenu` through `ServiceHeader` for D-GRP-01/D-MY-01 and other service screens, including mobile. It replaces the member link to `/my` with a popup containing confirmed name/email and logout only; nonmembers retain the login link. This is the user's approved account-navigation refinement, rather than a new profile/settings page. Keep styles in Tailwind tokens.
 
 Click/tap, Enter/Space and arrow keys open the menu, with `aria-expanded` reflecting its state. Focus the logout item when opening; Escape closes and returns focus to the trigger, and outside pointer/Tab/focus departure close it. Disabling a focused action can cause a native browser blur, so keep pending/error UI visible and restore retry focus. Logout reuses cookie/CSRF transport, preserves the session on failure, prevents duplicate requests and ignores old responses after a member change. D-MY-01's page body no longer owns logout. Cover these behaviors with `tests/auth/account-menu.test.tsx` and `tests/auth/authJourney.test.tsx`.
+
+## Admin screen primitives (A-ADM-\*)
+
+Admin screens (`/admin/*`) are dense operation tables, not detail panels. They share Tailwind recipes and small components instead of `panelStyles`:
+
+```tsx
+import {
+  ErrorBox,
+  Loading,
+  PageHeader,
+  Section,
+  Segmented,
+  Table,
+} from '@/components/admin/common/AdminUi';
+import { BUTTON, TD, TH, count } from '@/components/admin/common/adminStyles';
+```
+
+- `adminStyles.ts`: class recipes (`BUTTON`, `PRIMARY_BUTTON`, `TH`, `TD`, `LINK`, `SELECT`, `TEXTAREA`, `SEARCH_INPUT`, `FOCUS_RING`), `count`/`formatPercent`, and `adminErrorMessage`/`adminActionErrorMessage` for API failures.
+- `AdminUi.tsx`: `PageHeader`, `Section` (title + links to other admin screens), `Table` (caption + horizontal scroll), `Segmented` (period/status filters, `aria-pressed`), `Tabs`, `Metric`, `Loading`, `ErrorBox` (retry), `Empty`, `Note`, `MoreButton` (opaque-cursor paging with `useCursorPages`).
+- Colors use the `zoop-*` tokens in `src/index.css`; values match the `panel-*` tokens. Error text uses `text-zoop-alert`.
+- Admin writes (reprocess, correction, suspension, member block/unblock) take a required reason, send the admin CSRF token and an `Idempotency-Key` from `useIdempotencyKey` (the same key when an unanswered request is resent unchanged, a new key after an edit or a definite 4xx rejection), and show the result inline.
+- Unknown values from the API (`null`) render as `–`, never as `0`.
+
+## Graph feature port
+
+D-GRP-01/01b uses `graph-view` for member/mode-scoped state and legend keys. G6 supplies the conditional desktop minimap. Saved zoom/pan is reused only when the map size is unchanged; otherwise the default layout opens. `MapDetailSheet` owns M-GRP-01 modal snaps and focus return; `IsolatedIssuesPanel` reuses the detail panel tokens.

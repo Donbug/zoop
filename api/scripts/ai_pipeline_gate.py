@@ -6,7 +6,7 @@ Builds a FRESH synthetic operator world with the actual pipeline code (authored 
 call, no network, no PostgreSQL) over it, writes a private manifest and runs `./api/gradlew aiPipelineContractTest` against them.
 
 The six services are the real installed `zoop-ai-extract` / `zoop-ai-relation` behind the real service, and differ only in the operator-side fault they
-are launched with: `main` (the whole chain: S2 -> operator lists the upstream -> S3 -> review/revalidation, plus source/approval/upstream revocation),
+are launched with: `main` (the whole chain: S2 -> operator lists the upstream -> S3 -> review: an allow is the final approval, no revalidation, plus source/approval/upstream revocation),
 `s2Crash` (a child dies after its stage was stored), `s2Unknown` (a child dies with a call reserved and unanswered), `s2Hold` and `s3Hold` (a dispatch is
 held so a queued job can be cancelled), `s3Crash` (S3 child dies after its stage was stored).
 

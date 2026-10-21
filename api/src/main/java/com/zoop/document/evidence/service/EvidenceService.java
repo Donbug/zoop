@@ -255,9 +255,11 @@ public class EvidenceService {
     /**
      * One verified body citation of a pinned public graph version. The pinned, filtered snapshot decides visibility and the span;
      * the app's own article rows decide that the quote is still readable (access, selected version, stored text); the selected
-     * version's own import receipt, verified against its registered hash and size, names the grants the version was imported
-     * under; and the CURRENT S2-1 source registry, read now, decides whether those grants still allow it. The receipt grants
-     * nothing and the S1 registry is not involved. Any denial is {@code EVIDENCE_UNAVAILABLE} without a reason on the wire.
+     * version's own import receipt, verified against its registered hash and size and read ONCE, names the grants the version was
+     * imported under (and, for a span no visible issue or relation cites but a visible structural basis references, proves that
+     * exactly that relation's basis cites it: such a basis-only citation has no {@code eventIds}); and the CURRENT S2-1 source
+     * registry, read now, decides whether those grants still allow it. The receipt grants nothing and the S1 registry is not
+     * involved. Any denial is {@code EVIDENCE_UNAVAILABLE} without a reason on the wire.
      */
     private EvidenceResponse serveGraph(EvidenceView row, String graphVersion, Instant asOf, String companyId, String requestId,
             Instant now) {
@@ -291,9 +293,13 @@ public class EvidenceService {
                     || row.quote().codePointCount(0, row.quote().length()) != row.endOffset() - row.startOffset()) {
                 throw new Denied("quote_offsets_inconsistent");
             }
-            // The receipt of the SELECTED version, not the row's own: a row shared by several imports points at the first one.
-            Set<GraphReceiptGrants.Pin> pins = GraphReceiptGrants.pins(receipt(found.graphVersion(), requestId),
-                    found.graphVersion(), row.articleId(), row.articleVersion());
+            // The receipt of the SELECTED version, not the row's own: a row shared by several imports points at the first one. Its
+            // bytes are read and parsed once for the grant pins and, for a basis-only span, for the basis membership.
+            StrictJson.Obj receiptBundle = GraphReceiptGrants.bundle(receipt(found.graphVersion(), requestId), found.graphVersion());
+            Set<GraphReceiptGrants.Pin> pins = GraphReceiptGrants.pins(receiptBundle, row.articleId(), row.articleVersion());
+            if (!found.basisRefs().isEmpty()) {
+                GraphReceiptBasis.require(receiptBundle, row.id(), found.basisRefs());
+            }
             for (GraphReceiptGrants.Pin pin : pins) {
                 if (!pin.sourceId().equals(article.provider())) {
                     throw new Denied("pin_source_differs_from_article_provider");

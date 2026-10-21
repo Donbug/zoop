@@ -41,15 +41,18 @@ public record GraphHandoffResult(Staged staged, GraphHandoffException failure) {
     }
 
     /**
-     * @param origins provenance origins of the staged relations (for example {@code manual-operator-review}), by count: the
-     *                result states explicitly how much of the staged graph is a manual operator assertion
+     * @param origins        provenance origins of the staged relations (for example {@code manual-operator-review}), by count: the
+     *                       result states explicitly how much of the staged graph is a manual operator assertion
+     * @param approvalBases  by count, how the S3 relations the staged edges rest on became eligible: {@code automatic-verifier}
+     *                       or {@code operator-final-approval} (a human's approval of a HOLD, not a verifier verdict)
      */
     public record Staged(String handoffId, String versionId, Outcome outcome, String manifestDigest, String bundleDigest,
             String contentDigest, String sourceKind, String executionMode, String recordingKind, Map<String, Integer> origins,
-            int companies, int issues, int relations, int articles, int evidence, int evidenceRegistered,
-            int evidenceExisting, StoredFileFact snapshot, StoredFileFact receipt) {
+            Map<String, Integer> approvalBases, int companies, int issues, int relations, int articles, int evidence,
+            int evidenceRegistered, int evidenceExisting, StoredFileFact snapshot, StoredFileFact receipt) {
         public Staged {
             origins = Map.copyOf(origins);
+            approvalBases = Map.copyOf(approvalBases);
         }
     }
 }

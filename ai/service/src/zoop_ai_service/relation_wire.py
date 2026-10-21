@@ -15,7 +15,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
-from .wire import ErrorBody, Safe
+from .wire import ErrorBody, Reviewer, Safe
 
 SCHEMA = "zoop-ai-internal-relation-1"
 RUNTIME_SCHEMA = "zoop-relation-s3"
@@ -38,8 +38,11 @@ ResumeMode = Literal["none", "resume", "reconcile_only"]
 Next = Literal["wait", "fetch_result", "operator_reconcile", "recover", "none"]
 DispatchOutcome = Literal["exited", "busy", "runtime_error", "transport_unknown", "runtime_unavailable", "service_restarted", "cancelled"]
 Decision = Literal["allow", "reject"]
-OperationNext = Literal["wait", "recover", "retry_review", "operator_reconcile", "none"]
-RevalidationState = Literal["not_requested", "queued", "running", "verified", "superseded", "interrupted", "failed", "cancelled"]
+OperationNext = Literal["retry_review", "none"]
+RevalidationState = Literal["not_requested", "verified", "superseded", "contract_changed"]
+ExecutionMode = Literal["replay", "live"]
+RecordingKind = Literal["authored-test", "provider"]
+PAIRS = {("replay", "authored-test"), ("live", "provider")}
 
 
 class Rel(BaseModel):
@@ -67,8 +70,14 @@ class Projection(BaseModel):
 
 class RelationProvenance(Request):
     source_kind: Literal["synthetic", "actual"]
-    execution_mode: Literal["replay"]
-    recording_kind: Literal["authored-test"]
+    execution_mode: ExecutionMode
+    recording_kind: RecordingKind
+
+    @model_validator(mode="after")
+    def pair(self) -> RelationProvenance:
+        if (self.execution_mode, self.recording_kind) not in PAIRS:
+            raise ValueError("executionMode and recordingKind disagree")
+        return self
 
 
 class RelationUpstream(Request):
@@ -77,7 +86,7 @@ class RelationUpstream(Request):
 
 
 class RelationSubmit(Request):
-    """The S3 `Submit` contract (`zoop-relation-s3`). Fixtures, registries, paths and live mode cannot be named."""
+    """The S3 `Submit` contract (`zoop-relation-s3`). Fixtures, registries and paths cannot be named. `executionMode: live` is accepted only for an upstream the operator listed as live-approved."""
     schema_version: Literal["zoop-relation-s3"]
     job_id: str = Field(pattern=JOB_ID_PATTERN, description="Equals the Idempotency-Key.")
     provenance: RelationProvenance
@@ -146,7 +155,9 @@ class RelationReviewPhase(Rel):
 
 
 class RelationRevalidationPhase(Rel):
-    """Verification: the automatic re-check that an accepted `allow` requests. A verdict is not approval, and `eligible` is not publication."""
+    """Legacy only. A final approval (`allow`) or exclusion (`reject`) requests no revalidation (`not_requested`). The two other states describe an
+    operation recorded under the earlier contract, where an `allow` asked for an automatic re-check: `verified`/`superseded` are what its stored
+    history settled, `contract_changed` that it never settled and never will (nothing is dispatched or resent)."""
     state: RevalidationState
     dispatch_count: int
     last_outcome: DispatchOutcome | None
@@ -175,6 +186,7 @@ class RelationOperationStatus(Rel):
     revalidation: RelationRevalidationPhase
     publication: RelationPublicationPhase
     next: OperationNext
+    limitation: Literal["review_contract_changed"] | None
     accepted_at: str
     observed_at: str
 
@@ -193,8 +205,13 @@ class RtUpstream(Projection):
     input_digest: str
 
 
+class RtRuntime(Projection):
+    identity: str = Field(pattern=HASH_PATTERN)   # the frozen live runtime binding's identity (sha256 of its canonical form, secret-free)
+
+
 class RtBinding(Projection):
     upstream: RtUpstream
+    runtime: RtRuntime | None = None              # live jobs only; replay bindings carry none
 
 
 class RtFailure(Projection):
@@ -221,8 +238,14 @@ class RtDelivery(Projection):
 
 class RtProvenance(Projection):
     source_kind: Literal["synthetic", "actual"]
-    execution_mode: Literal["replay"]
-    recording_kind: Literal["authored-test"]
+    execution_mode: ExecutionMode
+    recording_kind: RecordingKind
+
+    @model_validator(mode="after")
+    def pair(self) -> RtProvenance:
+        if (self.execution_mode, self.recording_kind) not in PAIRS:
+            raise ValueError("executionMode and recordingKind disagree")
+        return self
 
 
 class RelationView(Projection):
@@ -334,11 +357,20 @@ class RcPrecheck(Projection):
     reasons: list[RcReason]
 
 
+class RcApprovalBasis(Projection):
+    """Why a relation is `eligible`: the automatic verifier's verdict or the operator's final approval, with the deciding chain event."""
+    kind: Literal["automatic-verifier", "operator-final-approval"]
+    revision: int
+    reviewer: Reviewer | None
+    decided_at: str
+
+
 class RcEligibility(Projection):
     status: Literal["pending", "eligible", "hold", "reject"]
     reasons: list[RcReason]
     revision: int
     review_pending: bool
+    approval_basis: RcApprovalBasis | None
 
 
 class RcEvent(Projection):

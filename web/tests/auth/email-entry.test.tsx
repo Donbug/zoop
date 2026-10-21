@@ -421,10 +421,10 @@ describe('Issue35 · FS003 D-AUT-02', () => {
 describe('Issue35 · FS006 D-AUT-01/D-ONB-01', () => {
   it.each([
     { holdings: [], watchlistIds: [], mode: 'all' },
-    { holdings: [{}], watchlistIds: [], mode: 'personal' },
-    { holdings: [], watchlistIds: ['synthetic-company'], mode: 'personal' },
+    { holdings: [{}], watchlistIds: [], mode: 'all' },
+    { holdings: [], watchlistIds: ['synthetic-company'], mode: 'all' },
   ])(
-    'completed login chooses $mode from known holdings/interests',
+    'completed login opens the whole market regardless of holdings/interests',
     async ({ holdings, watchlistIds, mode }) => {
       server.on('POST', '/api/v1/auth/login', () => {
         current = member(true);
@@ -473,7 +473,7 @@ describe('Issue35 · FS006 D-AUT-01/D-ONB-01', () => {
       screen.getByRole('button', { name: '로그인 상태 다시 확인' }),
     );
     expect((await screen.findByTestId('destination')).textContent).toBe(
-      '/?mode=personal',
+      '/?mode=all',
     );
     expect(server.calls('POST', '/api/v1/auth/login')).toHaveLength(1);
   });

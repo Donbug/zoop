@@ -1,9 +1,9 @@
-"""Independent offline S3 relation/impact candidate ledger. Private to this ledger: no application, S1, ingestion or S2 writer.
+"""Independent S3 relation/impact candidate ledger (authored replay or the bound live runtime). Private to this ledger: no application, S1, ingestion or S2 writer.
 
 Flow: read-only snapshot of one completed, currently authorized S2 job -> relation generation receipt -> per-relation independent
-verifier receipts -> impact producer receipt per eligible relation -> per-impact independent verifier receipts. Every decision is an
-append-only verdict; HOLD review can only request a new automatic revalidation attempt. Replay is authored-response replay, not
-independent AI inference; nothing here is approved, published or a graph write.
+verifier receipts -> impact producer receipt per automatically eligible relation -> per-impact independent verifier receipts. Every automatic decision
+is an append-only verdict. A HOLD can later receive ONE final human decision (approve or reject) by revision CAS; approval re-runs only the
+deterministic gate and calls no model. Replay is authored-response replay, not independent AI inference; nothing here is published or a graph write.
 """
 from __future__ import annotations
 
@@ -12,19 +12,23 @@ import json
 import os
 import sqlite3
 import uuid
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import live_prompts
 from . import relation_rules as rules
 from .dependency_contracts import array, cites, invalid
 from .extraction import Extractor, Sources, cite_exact, upstream_digest
 from .extraction import Store as ExtractionStore
-from .extraction_contracts import ObservationRef
+from .extraction_contracts import ObservationRef, ProviderResponseUnknown
 from .ingestion_contracts import byte_hash, now, reserved_state_roots
-from .relation_contracts import (CANDIDATE_VERSION, IMPACT_CANDIDATE_VERSION, IMPACT_POLICY, IMPACT_PRODUCER, IMPACT_VERIFIER, LABEL_NOTE,
-    LABELS, LEDGER_VERSION, MAX_DOCUMENTS, POLICY, PRODUCER, REQUEST, REVALIDATION_POLICY, SCHEMA, VERIFIER, VOCABULARY, CitationFailure,
-    ExtractionFailure, Replay, ReplyInvalid, Review, Revalidate, Submit, canonical, digest)
+from .live_runtime import LiveFailure, LiveRuntime
+from .relation_contracts import (BASIS_AUTOMATIC, BASIS_OPERATOR, CANDIDATE_VERSION, EFFECT_APPROVED, EFFECT_EXCLUDED, EFFECT_LEGACY_REVALIDATION,
+    EFFECT_OF, IMPACT_CANDIDATE_VERSION, IMPACT_POLICY, IMPACT_PRODUCER, IMPACT_VERIFIER, LABEL_NOTE, LABELS, LEDGER_VERSION, MAX_DOCUMENTS, POLICY,
+    PRODUCER, REQUEST, REVALIDATION_POLICY, SCHEMA, VERIFIER, VOCABULARY, CitationFailure, ExtractionFailure, Replay, ReplyInvalid, Review, Submit,
+    canonical, digest)
 
 _SQL = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -170,6 +174,10 @@ class Fixtures:
     def __init__(self, producer: bytes | None, verifier: bytes | None):
         self.docs = {"producer": self._load(producer, "producer"), "verifier": self._load(verifier, "verifier")}
 
+    @property
+    def provided(self) -> bool:
+        return any(doc is not None for doc in self.docs.values())
+
     @staticmethod
     def _load(raw: bytes | None, role: str):
         if raw is None:
@@ -201,6 +209,13 @@ class Doc:
     export: dict
 
 
+class VerificationUnavailable(ExtractionFailure):
+    """A live verifier produced no usable semantic judgment (transport, HTTP, malformed or schema-invalid reply). Never a verdict."""
+
+    def __init__(self, stage: str, ref: str, code: str):
+        super().__init__("verification_unavailable", {"stage": stage, "ref": ref, "code": code})
+
+
 @dataclass
 class Context:
     request: Submit
@@ -211,6 +226,7 @@ class Context:
     events: list
     topics: list
     digest: str
+    live: bool = False
 
 
 def document_view(export: dict) -> dict:
@@ -218,11 +234,7 @@ def document_view(export: dict) -> dict:
             "title": export["observation"]["title"], "text": export["document"]["text"]}
 
 
-def next_attempt(events: list[dict], kind: str) -> dict:
-    """Distinct identity of the next verification attempt: kind, ordinal, its own policy, and the prior verdict it supersedes."""
-    verdicts = [e for e in events if e["kind"] == "verdict"]
-    prior = digest({k: v for k, v in verdicts[-1].items() if k not in {"seq", "createdAt"}}) if verdicts else None
-    return rules.attempt_wire(kind, len(verdicts), REVALIDATION_POLICY if kind == "revalidation" else POLICY, prior)
+INITIAL_ATTEMPT = rules.attempt_wire("initial", 0, POLICY, None)
 
 
 def chain(store: Store, job_id: str, rc: str) -> list[dict]:
@@ -231,27 +243,46 @@ def chain(store: Store, job_id: str, rc: str) -> list[dict]:
             for e in store.all("SELECT * FROM relation_events WHERE job_id=? AND relation_candidate_id=? ORDER BY seq", (job_id, rc))]
 
 
+def _basis(kind: str, event: dict) -> dict:
+    return {"kind": kind, "revision": event["seq"], "reviewer": event.get("reviewer") if kind == BASIS_OPERATOR else None, "decidedAt": event["createdAt"]}
+
+
 def standing(events: list[dict]) -> dict:
-    """Effective state from the append-only chain: the latest verdict, then later reviews. `allow` never changes eligibility."""
+    """Effective state from the append-only chain: the latest verdict, then later reviews by their recorded effect.
+
+    `approved` (a human's FINAL decision on a HOLD) makes the relation eligible with `approvalBasis.kind == operator-final-approval`; `excluded`
+    rejects. `revalidation-requested` only exists in ledgers written before the cutover: it is history (a still-open legacy request keeps
+    `reviewPending`), never an approval. `approvalBasis` is null unless eligible; its `revision` is the seq of the deciding event."""
     verdict_at = max((i for i, e in enumerate(events) if e["kind"] == "verdict"), default=None)
     if verdict_at is None:
-        return {"eligibility": "pending", "reasons": [], "reviewPending": False, "revision": len(events), "verdicts": 0}
+        return {"eligibility": "pending", "reasons": [], "reviewPending": False, "revision": len(events), "verdicts": 0, "approvalBasis": None}
     last = events[verdict_at]
-    status, reasons, pending = last["eligibility"], last["reasons"], False
+    status, reasons, pending, deciding = last["eligibility"], last["reasons"], False, ("verdict", last)
     for event in events[verdict_at + 1:]:
-        if event["decision"] == "reject":
-            status, reasons, pending = "reject", [{"code": "admin_rejected"}], False
-        else:
+        effect = event.get("effect")
+        if effect == EFFECT_EXCLUDED:
+            status, reasons, pending, deciding = "reject", [{"code": "admin_rejected"}], False, None
+        elif effect == EFFECT_APPROVED:
+            status, reasons, pending, deciding = "eligible", [], False, ("review", event)
+        elif effect == EFFECT_LEGACY_REVALIDATION:
             pending = True
+        else:
+            raise ValueError("review effect")
+    basis = None
+    if status == "eligible" and deciding is not None:
+        basis = _basis(BASIS_AUTOMATIC if deciding[0] == "verdict" else BASIS_OPERATOR, deciding[1])
     return {"eligibility": status, "reasons": reasons, "reviewPending": pending, "revision": len(events),
-            "verdicts": sum(e["kind"] == "verdict" for e in events)}
+            "verdicts": sum(e["kind"] == "verdict" for e in events), "approvalBasis": basis}
 
 
 class Engine:
-    def __init__(self, store: Store, sources: Sources, extraction_dir: Path, ingestion_dir: Path):
+    def __init__(self, store: Store, sources: Sources, extraction_dir: Path, ingestion_dir: Path, runtime_factory: Callable[..., LiveRuntime] | None = None):
+        """`runtime_factory(need_send=bool)` builds the live runtime lazily and only for a live job (the CLI passes it solely for run/submit/resume)."""
         self.store, self.sources = store, sources
         self.extraction_dir, self.ingestion_dir = extraction_dir, ingestion_dir
         self.db = store.db
+        self.runtime_factory = runtime_factory
+        self._runtimes: dict[bool, LiveRuntime] = {}
         self._phase = "relation"
 
     # ------------------------------------------------------------------ upstream snapshot --------------------------------
@@ -304,7 +335,8 @@ class Engine:
         companies = {c.company_id: [c.name, *c.aliases] for c in submit.catalogue.companies}
         view = rules.View(companies, view_events, view_topics, {str(c) for c in countries}, self._cite_for(docs))
         return Context(request, request.provenance.source_kind == "synthetic", result, docs, view,
-                       sorted(events, key=lambda e: e["ref"]), sorted(topics, key=lambda t: t["ref"]), upstream_digest(result))
+                       sorted(events, key=lambda e: e["ref"]), sorted(topics, key=lambda t: t["ref"]), upstream_digest(result),
+                       live=request.provenance.execution_mode == "live")
 
     def _cite_for(self, docs: dict):
         def cite(c: dict) -> dict:
@@ -315,6 +347,7 @@ class Engine:
         return cite
 
     def _binding(self, ctx: Context) -> dict:
+        """Replay-identical frozen identity. A live job adds `runtime` (the secret-free provider/prompt/budget-free runtime binding) at freeze only."""
         return {"schema": SCHEMA, "candidate": CANDIDATE_VERSION, "impactCandidate": IMPACT_CANDIDATE_VERSION,
                 "versions": {"producer": PRODUCER, "verifier": VERIFIER, "impactProducer": IMPACT_PRODUCER, "impactVerifier": IMPACT_VERIFIER,
                              "policy": POLICY, "revalidationPolicy": REVALIDATION_POLICY, "impactPolicy": IMPACT_POLICY},
@@ -328,9 +361,54 @@ class Engine:
             raise ExtractionFailure("upstream_changed")
 
     def _check_binding(self, ctx: Context, row) -> None:
-        stored, fresh = json.loads(row["binding"]), self._binding(ctx)
+        stored = json.loads(row["binding"])
+        runtime = stored.pop("runtime", None)
+        if (runtime is not None) != ctx.live:
+            raise ExtractionFailure("job_binding_changed")
+        fresh = self._binding(ctx)
         if fresh != stored:
             raise ExtractionFailure("upstream_changed" if fresh["upstream"] != stored["upstream"] else "job_binding_changed")
+
+    # ------------------------------------------------------------------ live runtime ------------------------------------
+
+    def _build_runtime(self, send: bool) -> LiveRuntime:
+        if self.runtime_factory is None:
+            raise ExtractionFailure("live_runtime_unavailable")
+        if send not in self._runtimes:
+            try:
+                self._runtimes[send] = self.runtime_factory(need_send=send)
+            except LiveFailure as exc:
+                raise ExtractionFailure(exc.code) from exc
+        return self._runtimes[send]
+
+    def _runtime(self, row, *, send: bool) -> LiveRuntime:
+        """The runtime of a live job. `send=False` is rebuilt PURELY from the frozen binding (decoding saved receipts and rechecking purpose/recipient
+        need no key, budget or environment). `send=True` is the environment runtime, and only while it still equals the frozen binding."""
+        frozen = json.loads(row["binding"])["runtime"]
+        if not send:
+            try:
+                return LiveRuntime.from_binding(frozen)
+            except LiveFailure as exc:
+                raise ExtractionFailure(exc.code) from exc
+        runtime = self._build_runtime(True)
+        if not runtime.accepts(frozen):
+            raise ExtractionFailure("live_config_changed")
+        return runtime
+
+    @staticmethod
+    def _is_live(row) -> bool:
+        return json.loads(row["request"])["provenance"]["executionMode"] == "live"
+
+    def _authorize_send(self, ctx: Context, runtime: LiveRuntime, stage: str, documents=None) -> None:
+        """Current model-send authority for the whole SOURCE DEPENDENCY CLOSURE of this stage, under this stage's purpose and recipient.
+
+        Quoted documents are not the only source-derived content that reaches the provider: endpoint names, event titles/participants, topic labels and
+        the generated relation itself all derive from EVERY document the S2 job bound (the producer saw them all, and a name cannot be attributed to
+        one document). So every downstream model stage (generation, verification, impact, impact verification) requires model-send for each
+        bound source document, even though only `documents` have their raw text sent. This only widens the authority check; no extra text is sent."""
+        purpose, recipient = runtime.purpose(stage), runtime.recipient(stage)
+        for key in sorted(ctx.docs):
+            self.sources.authorize_model_send(ctx.docs[key].ref, purpose, recipient)
 
     # ------------------------------------------------------------------ commands -----------------------------------------
 
@@ -342,7 +420,8 @@ class Engine:
 
     def freeze(self, request: Submit) -> None:
         """The only registration path: durably freeze the exact upstream (a ready, currently authorized S2 job) as `queued`, with no replay
-        fixture, call or candidate effect. The producer/verifier fixtures are per-call inputs, not part of the frozen job.
+        fixture, call or candidate effect. The producer/verifier fixtures are per-call inputs, not part of the frozen job. A live job also
+        freezes the non-secret runtime binding (configuration only: no key, budget or network is touched).
 
         A job that already exists is not touched at all: same input returns without re-freezing, resuming, resetting a stopped job or
         reading the upstream; another input is `job_input_conflict` with nothing written. A new job needs a ready current upstream
@@ -354,17 +433,31 @@ class Engine:
                 raise ExtractionFailure("job_input_conflict")
             return
         ctx = self._context(request)
+        binding = self._binding(ctx)
+        if ctx.live:
+            binding["runtime"] = self._build_runtime(False).binding()
         with self.store.transaction(lambda: self._verify(ctx)):
             self.db.execute("INSERT INTO jobs(job_id,input_digest,request,binding,state,phase,resume_mode,created_at,updated_at) VALUES(?,?,?,?,'queued','relation','resume',?,?)",
-                (request.job_id, input_digest, canonical(request.wire()), canonical(self._binding(ctx)), now(), now()))
+                (request.job_id, input_digest, canonical(request.wire()), canonical(binding), now(), now()))
 
     def run(self, request: Submit, fixtures: Fixtures) -> dict:
         """Convenience: `freeze` then `resume` the same job."""
         self.freeze(request)
         return self.resume(request.job_id, fixtures)
 
-    def resume(self, job_id: str, fixtures: Fixtures) -> dict:
-        self._execute(self._job(job_id), fixtures)
+    def resume(self, job_id: str, fixtures: Fixtures, *, initial_only: bool = False) -> dict:
+        """Execute (or recover) the job. `initial_only` is the service's first-dispatch gate: under the ledger lock the first dispatch is recorded
+        durably, and any later initial-only dispatch is `initial_dispatch_taken` with no effect, so a retrying caller can never resume or
+        stimulate work; plain `resume` is explicit operator recovery."""
+        row = self._job(job_id)
+        if self._is_live(row) and fixtures.provided:
+            raise ExtractionFailure("fixture_not_allowed")
+        with self.store.transaction():
+            if initial_only and (row["state"] != "queued" or self.store.one("SELECT 1 FROM stages WHERE job_id=? AND stage='dispatch'", (job_id,))
+                                 or self.store.one("SELECT 1 FROM calls WHERE job_id=?", (job_id,))):
+                raise ExtractionFailure("initial_dispatch_taken")
+            self.db.execute("INSERT OR IGNORE INTO stages VALUES(?,'dispatch','initial',?,?)", (job_id, canonical({"initialOnly": initial_only}), now()))
+        self._execute(row, fixtures)
         return self.result(job_id)
 
     def inspect(self, job_id: str) -> dict:
@@ -379,53 +472,43 @@ class Engine:
         return self.result(job_id)
 
     def review(self, request: Review) -> dict:
-        """Append-only HOLD review bound to the expected revision. `allow` requests revalidation only; `reject` can only exclude."""
+        """Append-only HOLD review bound to the expected revision. `allow` is the operator's FINAL approval: after the deterministic candidate and
+        current-rights gate it appends effect `approved` and nothing else (no model, verifier or impact call, no revalidation). `reject` excludes.
+        Only a HOLD can be decided (approving an eligible relation or reversing a reject is not supported)."""
         row = self._job(request.job_id)
         if row["state"] == "cancelled":
             raise ExtractionFailure("job_cancelled")
         ctx = self._context(Submit.model_validate_json(row["request"]))
         self._check_binding(ctx, row)
         with self.store.transaction(lambda: self._verify(ctx)):
-            self._candidate(request.job_id, request.relation_candidate_id)
+            candidate = self._candidate(request.job_id, request.relation_candidate_id)
             events = self._events(request.job_id, request.relation_candidate_id)
             state = standing(events)
             if request.expected_revision != state["revision"]:
                 raise ExtractionFailure("review_revision_conflict", {"currentRevision": state["revision"]})
             if state["eligibility"] != "hold":
                 raise ExtractionFailure("review_target_not_hold")
-            if state["reviewPending"] and request.decision == "allow":
-                raise ExtractionFailure("review_already_pending")
+            if request.decision == "allow":
+                if self._unknown_calls(request.job_id, request.relation_candidate_id):
+                    raise ExtractionFailure("review_call_in_flight")
+                self._recheck(candidate, ctx)
             self._append(request.job_id, request.relation_candidate_id, state["revision"] + 1, "review",
                 {"decision": request.decision, "reviewer": request.reviewer, "note": request.note, "expectedRevision": request.expected_revision,
-                 "effect": "revalidation-requested" if request.decision == "allow" else "excluded"})
+                 "effect": EFFECT_OF[request.decision]})
         return self.result(request.job_id)
 
-    def revalidate(self, request: Revalidate, fixtures: Fixtures) -> dict:
-        """A new, distinctly identified automatic verification attempt over the fixed stored candidate. Never regenerates, never auto-allows."""
-        row = self._job(request.job_id)
-        if row["state"] not in {"ready", "stopped", "running"}:  # `running` under our exclusive lock is a process that died mid-attempt
-            raise ExtractionFailure("job_not_revalidatable", {"state": row["state"]})
-        ctx = self._context(Submit.model_validate_json(row["request"]))
-        self._check_binding(ctx, row)
-        if self.store.one("SELECT 1 FROM calls WHERE job_id=? AND state='started' AND response IS NULL", (row["job_id"],)):
-            self._status(row["job_id"], row["fence"], "reconciling", row["phase"], "replay_response_unknown", "reconcile_only")
-            raise ExtractionFailure("replay_response_unknown")
-        candidate = self._candidate(request.job_id, request.relation_candidate_id)
-        state = standing(self._events(request.job_id, request.relation_candidate_id))
-        if state["revision"] != request.expected_revision:
-            raise ExtractionFailure("review_revision_conflict", {"currentRevision": state["revision"]})
-        if not state["reviewPending"]:
-            raise ExtractionFailure("revalidation_not_requested")
-        previous = (row["state"], row["phase"], row["failure"], row["detail"], row["resume_mode"])
-        fence = row["fence"]
-        self.db.execute("UPDATE jobs SET state='running',phase='revalidate',updated_at=? WHERE job_id=? AND fence=?", (now(), row["job_id"], fence))
-        try:
-            self._verify_relation(row, ctx, fixtures, fence, candidate, "revalidation")
-        except ExtractionFailure:
-            self.db.execute("UPDATE jobs SET state=?,phase=?,failure=?,detail=?,resume_mode=?,updated_at=? WHERE job_id=? AND fence=?", (*previous, now(), row["job_id"], fence))
-            raise
-        self._finish(row, ctx, fixtures, fence)
-        return self.result(request.job_id)
+    def _recheck(self, candidate_row, ctx: Context) -> None:
+        """The deterministic gate a human approval can never override: the stored candidate must have passed the schema/endpoint/evidence precheck
+        and must still be exactly what that precheck derives NOW from the current exact sources and upstream."""
+        stored = json.loads(candidate_row["payload"])
+        stored.pop("relationCandidateId", None)
+        if stored["precheck"]["state"] != "pending":
+            raise ExtractionFailure("review_candidate_ineligible", {"reasons": stored["precheck"]["reasons"]})
+        fresh = rules.reevaluate(stored, ctx.view)
+        if fresh["precheck"]["state"] != "pending":
+            raise ExtractionFailure("review_candidate_ineligible", {"reasons": fresh["precheck"]["reasons"]})
+        if canonical(fresh) != canonical(stored):
+            raise ExtractionFailure("review_candidate_ineligible", {"reasons": [{"code": "candidate_changed"}]})
 
     # ------------------------------------------------------------------ execution ---------------------------------------
 
@@ -438,14 +521,24 @@ class Engine:
         if row["fence"] != fence or row["state"] != "running":
             raise ExtractionFailure("job_cancelled_or_fenced")
 
+    def _unknown_calls(self, job_id: str, rc: str | None = None) -> list:
+        """Started calls with no receipt whose transmission is UNKNOWN (never a definitively refused one). With `rc`, only those that could still
+        write that relation's verdict or impact."""
+        rows = self.store.all("SELECT ref FROM calls WHERE job_id=? AND state='started' AND response IS NULL AND attempt_id NOT IN "
+                              "(SELECT ref FROM stages WHERE job_id=? AND stage='refusal')", (job_id, job_id))
+        if rc is None:
+            return rows
+        impacts = {i["impact_candidate_id"] for i in self.store.all("SELECT impact_candidate_id FROM impact_candidates WHERE job_id=? AND relation_candidate_id=?", (job_id, rc))}
+        return [r for r in rows if r["ref"] == rc or r["ref"].startswith(rc + "|") or r["ref"] in impacts]
+
     def _execute(self, row, fixtures: Fixtures) -> None:
         job_id, fence = row["job_id"], row["fence"]
-        if row["state"] in {"cancelled", "reconciling"} or (row["state"] == "ready" and not self._has_saved_revalidation(job_id)):
-            # A ready job only re-enters for a DURABLY saved revalidation receipt; a newly allowed review never auto-executes.
+        if row["state"] in {"cancelled", "reconciling", "ready"}:
+            # A ready job is complete: a human decision never re-enters execution, and nothing is verified or re-called afterwards.
             return
-        if self.store.one("SELECT 1 FROM calls WHERE job_id=? AND state='started' AND response IS NULL", (job_id,)):
+        if self._unknown_calls(job_id):
             # Holding the lock proves the previous process stopped, not that its call was never sent: never auto-resend.
-            self._status(job_id, fence, "reconciling", row["phase"], "replay_response_unknown", "reconcile_only")
+            self._status(job_id, fence, "reconciling", row["phase"], "live_response_unknown" if self._is_live(row) else "replay_response_unknown", "reconcile_only")
             return
         self._status(job_id, fence, "running", row["phase"])
         try:
@@ -461,6 +554,9 @@ class Engine:
         try:
             self._work(row, ctx, fixtures, fence)
             self._status(job_id, fence, "ready", "complete", resume="none")
+        except ProviderResponseUnknown as exc:
+            # A request may have reached the provider: the job is reconciling (operator reconcile, never recover/resend), not a stopped failure.
+            self._status(job_id, fence, "reconciling", self._phase, exc.code, "reconcile_only")
         except ExtractionFailure as exc:
             self._status(job_id, fence, "stopped", self._phase, exc.code, detail=exc.detail)
         except (sqlite3.Error, OSError):
@@ -475,21 +571,30 @@ class Engine:
         if not self.store.one("SELECT 1 FROM stages WHERE job_id=? AND stage='relation'", (job_id,)):
             self._at(job_id, fence, "relation")
             self._generate(row, ctx, fixtures, fence)
+        unavailable: list[dict] = []
         for candidate in self.store.all("SELECT * FROM relation_candidates WHERE job_id=? ORDER BY relation_candidate_id", (job_id,)):
-            events = self._events(job_id, candidate["relation_candidate_id"])
-            kind = "initial" if not events else self._saved_revalidation(job_id, candidate["relation_candidate_id"], events)
-            if kind:
-                self._at(job_id, fence, "verify-relation" if kind == "initial" else "revalidate")
-                self._verify_relation(row, ctx, fixtures, fence, candidate, kind)
+            if not self._events(job_id, candidate["relation_candidate_id"]):
+                self._at(job_id, fence, "verify-relation")
+                try:
+                    self._verify_relation(row, ctx, fixtures, fence, candidate)
+                except VerificationUnavailable as exc:
+                    unavailable.append(exc.detail)
         for candidate in self.store.all("SELECT * FROM relation_candidates WHERE job_id=? ORDER BY relation_candidate_id", (job_id,)):
             rc = candidate["relation_candidate_id"]
-            if standing(self._events(job_id, rc))["eligibility"] == "eligible" and not self.store.one("SELECT 1 FROM stages WHERE job_id=? AND stage='impact' AND ref=?", (job_id, rc)):
+            state = standing(self._events(job_id, rc))
+            # Impact exists only for relations the independent verifier made eligible. A human-approved relation never triggers a model call.
+            if (state["approvalBasis"] or {}).get("kind") == BASIS_AUTOMATIC and not self.store.one("SELECT 1 FROM stages WHERE job_id=? AND stage='impact' AND ref=?", (job_id, rc)):
                 self._at(job_id, fence, "impact")
                 self._impact(row, ctx, fixtures, fence, candidate)
         for impact in self.store.all("SELECT * FROM impact_candidates WHERE job_id=? ORDER BY impact_candidate_id", (job_id,)):
             if not self.store.one("SELECT 1 FROM impact_verdicts WHERE job_id=? AND impact_candidate_id=?", (job_id, impact["impact_candidate_id"])):
                 self._at(job_id, fence, "verify-impact")
-                self._verify_impact(row, ctx, fixtures, fence, impact)
+                try:
+                    self._verify_impact(row, ctx, fixtures, fence, impact)
+                except VerificationUnavailable as exc:
+                    unavailable.append(exc.detail)
+        if unavailable:
+            raise ExtractionFailure("verification_unavailable", {"calls": unavailable})
 
     def _persist(self, row, ctx: Context, fence: int, write) -> None:
         """Candidates/verdicts and their completion record commit together, under the current fence and current upstream rights."""
@@ -501,53 +606,86 @@ class Engine:
             write()
 
     def _reserve(self, job_id: str, fence: int, stage: str, ref: str, key: str, fixture_hash: str) -> str:
+        """The durable attempt record, written BEFORE anything is sent. A call whose transmission was definitively refused before sending is
+        re-armed under a new attempt id (same row, same request); any other existing call is never re-reserved."""
         attempt = "attempt-" + uuid.uuid4().hex
         with self.store.transaction(lambda: self._guard(job_id, fence)):
-            self.db.execute("INSERT INTO calls(attempt_id,job_id,stage,ref,request_digest,fixture_hash,state,started_at) VALUES(?,?,?,?,?,?,'started',?)",
-                (attempt, job_id, stage, ref, key, fixture_hash, now()))
+            old = self.store.one("SELECT attempt_id,request_digest,state,response FROM calls WHERE job_id=? AND stage=? AND ref=?", (job_id, stage, ref))
+            if old is None:
+                self.db.execute("INSERT INTO calls(attempt_id,job_id,stage,ref,request_digest,fixture_hash,state,started_at) VALUES(?,?,?,?,?,?,'started',?)",
+                    (attempt, job_id, stage, ref, key, fixture_hash, now()))
+            elif (old["request_digest"] != key or old["state"] != "started" or old["response"] is not None
+                  or not self.store.one("SELECT 1 FROM stages WHERE job_id=? AND stage='refusal' AND ref=?", (job_id, old["attempt_id"]))):
+                raise ExtractionFailure("receipt_request_mismatch")
+            else:
+                self.db.execute("UPDATE calls SET attempt_id=? WHERE attempt_id=?", (attempt, old["attempt_id"]))
         return attempt
+
+    def _refuse(self, job_id: str, attempt: str, code: str) -> None:
+        """Durably record that this attempt was refused BEFORE any transmission (it is not an unknown call)."""
+        self.db.execute("INSERT OR IGNORE INTO stages VALUES(?,'refusal',?,?,?)", (job_id, attempt, canonical({"code": code}), now()))
 
     def _receive(self, attempt: str, raw) -> None:
         self.db.execute("UPDATE calls SET state='received',response=?,response_digest=?,received_at=? WHERE attempt_id=? AND state='started'",
             (canonical(raw), digest(raw), now(), attempt))
 
-    def _receipted(self, row, ctx: Context, fence: int, stage: str, ref: str, key: str, lookup, parse, check=None):
-        """One provider-style attempt. The whole fixture is already valid; `lookup()` finds the authored reply BEFORE a call is reserved.
+    def _receipted(self, row, ctx: Context, fence: int, stage: str, ref: str, payload: dict, parse, *, fixtures: Fixtures | None = None,
+                   role: str | None = None, documents=(), check=None):
+        """One provider-style attempt over the native stage `payload` (its digest is the request identity).
 
-        A saved receipt is re-parsed through the same pure production parser and never re-fetched; a started call without a receipt is
-        unknown and never resent; a received reply that violates its contract is permanently marked and never reusable. `check` is the
-        post-receipt validation (citations/membership): reply faults mark the receipt, authority failures leave a valid receipt behind.
+        Replay: the whole fixture is already valid and `fixtures.find` locates the authored reply BEFORE a call is reserved. Live: prepare, check the
+        current model-send rights of every document that is sent, reserve durably, send once, persist the raw receipt BEFORE decoding.
+
+        A saved receipt is re-decoded through the same pure production parser and never re-fetched; a started call without a receipt is unknown
+        and never resent; a received reply that violates its contract is permanently marked and never reusable. `check` is the post-receipt
+        validation (citations/membership): reply faults mark the receipt, authority failures leave a valid receipt behind.
         """
         job_id = row["job_id"]
+        key = digest(payload)
+        unknown = "live_response_unknown" if ctx.live else "replay_response_unknown"
         call = self.store.one("SELECT * FROM calls WHERE job_id=? AND stage=? AND ref=?", (job_id, stage, ref))
+        if call is not None and ctx.live and call["state"] == "started" and call["response"] is None and self.store.one(
+                "SELECT 1 FROM stages WHERE job_id=? AND stage='refusal' AND ref=?", (job_id, call["attempt_id"])):
+            call = None  # definitively never sent: `_reserve` re-arms the same row under a new attempt id
         if call is None:
-            raw, fixture_hash = lookup()
-            self._verify(ctx)
-            attempt = self._reserve(job_id, fence, stage, ref, key, fixture_hash)
-            try:
-                result = parse(raw)
-            except ReplyInvalid as exc:
+            if ctx.live:
+                attempt, receipt = self._send(row, ctx, fence, stage, ref, key, payload, documents)
+                result = self._answer(row, ctx, stage, attempt, receipt, parse, documents)
+            else:
+                raw, fixture_hash = fixtures.find(role, stage, key, ctx.synthetic)
+                self._verify(ctx)
+                attempt = self._reserve(job_id, fence, stage, ref, key, fixture_hash)
+                try:
+                    result = parse(raw)
+                except ReplyInvalid as exc:
+                    self._receive(attempt, raw)
+                    self._mark(attempt, exc.code)
+                    raise
                 self._receive(attempt, raw)
-                self._mark(attempt, exc.code)
-                raise
-            self._receive(attempt, raw)
         else:
             if call["request_digest"] != key:
                 raise ExtractionFailure("receipt_request_mismatch")
             if call["state"] != "received":
-                raise ExtractionFailure("replay_response_unknown")
+                raise ProviderResponseUnknown(unknown)
             if call["verdict"]:
                 raise ReplyInvalid(call["verdict"])
             raw = json.loads(call["response"])
             if digest(raw) != call["response_digest"]:
                 raise ExtractionFailure("receipt_integrity_failed")
             attempt = call["attempt_id"]
-            try:
-                result = parse(raw)
-            except ReplyInvalid as exc:
-                self._mark(attempt, exc.code)
-                raise
+            if ctx.live:
+                if not isinstance(raw, dict) or raw.get("attemptId") != attempt:
+                    raise ExtractionFailure("receipt_integrity_failed")
+                result = self._answer(row, ctx, stage, attempt, raw, parse, documents)
+            else:
+                try:
+                    result = parse(raw)
+                except ReplyInvalid as exc:
+                    self._mark(attempt, exc.code)
+                    raise
         self._verify(ctx)
+        if ctx.live:
+            self._authorize_send(ctx, self._runtime(row, send=False), stage, documents)
         if check is not None:
             try:
                 result = check(result)
@@ -556,6 +694,57 @@ class Engine:
                 raise
         return result
 
+    def _send(self, row, ctx: Context, fence: int, stage: str, ref: str, key: str, payload: dict, documents):
+        """Live transmission. Ordering: pure prepare -> current rights for every sent document -> durable reservation -> the runtime reserves
+        budget, calls `authorize` immediately before sending and sends once -> the raw receipt is persisted before anything parses it.
+        A transport failure leaves the reservation `started` (unknown, never resent); a refusal before sending is recorded as such."""
+        job_id = row["job_id"]
+        runtime = self._runtime(row, send=True)
+        try:
+            prepared = runtime.prepare(stage, payload)
+        except LiveFailure as exc:
+            raise ExtractionFailure(exc.code) from exc
+        self._authorize_send(ctx, runtime, stage, documents)
+        self._verify(ctx)
+        attempt = self._reserve(job_id, fence, stage, ref, key, digest(json.loads(row["binding"])["runtime"]))
+
+        def authorize() -> None:
+            self._guard(job_id, fence)
+            self._verify(ctx)
+            self._authorize_send(ctx, runtime, stage, documents)
+
+        try:
+            receipt = runtime.send(prepared, attempt_id=attempt, authorize=authorize)
+        except LiveFailure as exc:
+            if exc.uncertain:
+                raise ProviderResponseUnknown(exc.code) from exc
+            self._refuse(job_id, attempt, exc.code)
+            raise ExtractionFailure(exc.code) from exc
+        except ExtractionFailure as exc:
+            self._refuse(job_id, attempt, exc.code)
+            raise
+        self._receive(attempt, receipt)
+        return attempt, receipt
+
+    def _answer(self, row, ctx: Context, stage: str, attempt: str, receipt: dict, parse, documents):
+        """Strict decode of a PERSISTED receipt into the native response and its pure parser. Any fault marks the receipt permanently.
+
+        A producer model cannot count code points, so its citations may carry no offsets: `resolve_citations` fills them ONLY from a unique literal
+        quote in the exact prepared text of a document that was sent (identity is never repaired); everything else still faces the exact check."""
+        runtime = self._runtime(row, send=False)
+        try:
+            raw = runtime.answer(stage, receipt)
+            if stage in {"relation", "impact"}:
+                raw = live_prompts.resolve_citations(raw, {key: ctx.docs[key].export["document"]["text"] for key in documents})
+        except LiveFailure as exc:
+            self._mark(attempt, exc.code)
+            raise ReplyInvalid(exc.code) from exc
+        try:
+            return parse(raw)
+        except ReplyInvalid as exc:
+            self._mark(attempt, exc.code)
+            raise
+
     def _mark(self, attempt: str, code: str) -> None:
         self.db.execute("UPDATE calls SET verdict=? WHERE attempt_id=? AND verdict IS NULL", (code, attempt))
 
@@ -563,20 +752,6 @@ class Engine:
 
     def _events(self, job_id: str, rc: str) -> list[dict]:
         return chain(self.store, job_id, rc)
-
-    def _has_saved_revalidation(self, job_id: str) -> bool:
-        return any(self._saved_revalidation(job_id, c["relation_candidate_id"], self._events(job_id, c["relation_candidate_id"]))
-                   for c in self.store.all("SELECT relation_candidate_id FROM relation_candidates WHERE job_id=?", (job_id,)))
-
-    def _saved_revalidation(self, job_id: str, rc: str, events: list[dict]) -> str | None:
-        """A requested revalidation whose receipt is saved but whose verdict was never committed (the process died between).
-
-        It is a durable stage: the saved receipt is re-parsed and its verdict appended, never re-called and never overwriting
-        history. If the request was withdrawn (admin reject) or already answered, the orphaned receipt is simply never consumed."""
-        if not standing(events)["reviewPending"]:
-            return None
-        ref = f"{rc}|revalidation|{next_attempt(events, 'revalidation')['seq']}"
-        return "revalidation" if self.store.one("SELECT 1 FROM calls WHERE job_id=? AND stage='verify-relation' AND ref=?", (job_id, ref)) else None
 
     def _candidate(self, job_id: str, rc: str):
         row = self.store.one("SELECT * FROM relation_candidates WHERE job_id=? AND relation_candidate_id=?", (job_id, rc))
@@ -598,7 +773,7 @@ class Engine:
         job_id = row["job_id"]
         request = self.generation_request(ctx)
         key = digest(request)
-        response = self._receipted(row, ctx, fence, "relation", "job", key, lambda: fixtures.find("producer", "relation", key, ctx.synthetic), rules.parse_relations)
+        response = self._receipted(row, ctx, fence, "relation", "job", request, rules.parse_relations, fixtures=fixtures, role="producer", documents=set(ctx.docs))
         candidates = []
         for merged in rules.merge([p.wire() for p in response.relations]):
             candidate = rules.evaluate(merged, ctx.view)
@@ -609,7 +784,7 @@ class Engine:
             for c in candidates:
                 self.db.execute("INSERT OR IGNORE INTO relation_candidates VALUES(?,?,?,?)", (job_id, c["relationCandidateId"], c["relationKey"], canonical(c)))
                 if c["precheck"]["state"] != "pending":
-                    self._append(job_id, c["relationCandidateId"], 1, "verdict", self._deterministic(c, next_attempt([], "initial")))
+                    self._append(job_id, c["relationCandidateId"], 1, "verdict", self._deterministic(c, INITIAL_ATTEMPT))
             self.db.execute("INSERT INTO stages VALUES(?,?,?,?,?)", (job_id, "relation", "job",
                 canonical({"relations": len(candidates), "proposals": len(response.relations), "requestDigest": key}), now()))
 
@@ -621,24 +796,30 @@ class Engine:
         return {"kind": "verdict", "attempt": attempt, "eligibility": candidate["precheck"]["state"],
                 "reasons": candidate["precheck"]["reasons"], "claims": None, "verifier": "not-called", "requestDigest": None}
 
-    def _verify_relation(self, row, ctx: Context, fixtures: Fixtures, fence: int, candidate_row, kind: str) -> None:
+    def _verify_relation(self, row, ctx: Context, fixtures: Fixtures, fence: int, candidate_row) -> None:
         job_id, rc = row["job_id"], candidate_row["relation_candidate_id"]
         candidate = json.loads(candidate_row["payload"])
-        attempt = next_attempt(self._events(job_id, rc), kind)
         if candidate["precheck"]["state"] != "pending":
-            verdict = self._deterministic(candidate, attempt)
+            verdict = self._deterministic(candidate, INITIAL_ATTEMPT)
         else:
-            key = digest(rules.verifier_request(candidate, attempt))
+            request = rules.verifier_request(candidate, INITIAL_ATTEMPT)
+            key = digest(request)
+            documents = {(q["documentId"], q["documentVersion"]) for q in candidate["quotes"]}
             try:
-                decision = self._receipted(row, ctx, fence, "verify-relation", f"{rc}|{kind}|{attempt['seq']}", key,
-                    lambda: fixtures.find("verifier", "verify-relation", key, ctx.synthetic), lambda raw: rules.decide_relation(candidate, raw))
+                decision = self._receipted(row, ctx, fence, "verify-relation", f"{rc}|initial|0", request, lambda raw: rules.decide_relation(candidate, raw),
+                                           fixtures=fixtures, role="verifier", documents=documents)
             except ReplyInvalid as exc:
+                if ctx.live:
+                    # A transport/HTTP/malformed/schema-invalid reply is no semantic judgment: no verdict is written (the candidate stays pending and
+                    # non-eligible, never a HOLD a human could approve) and the job stops. Only a valid interpreted answer yields a verdict.
+                    raise VerificationUnavailable("verify-relation", rc, exc.code) from exc
                 decision = {"eligibility": "reject", "reasons": [{"code": "verification_reply_invalid", "detail": exc.code}], "claims": None}
-            verdict = {"kind": "verdict", "attempt": attempt, **decision, "verifier": "called", "requestDigest": key}
+            verdict = {"kind": "verdict", "attempt": INITIAL_ATTEMPT, **decision, "verifier": "called", "requestDigest": key}
 
         def write():
-            seq = self.store.one("SELECT COUNT(*) AS n FROM relation_events WHERE job_id=? AND relation_candidate_id=?", (job_id, rc))["n"] + 1
-            self._append(job_id, rc, seq, "verdict", verdict)
+            if self.store.one("SELECT 1 FROM relation_events WHERE job_id=? AND relation_candidate_id=?", (job_id, rc)):
+                raise ExtractionFailure("verdict_superseded")  # a decision already exists: an automatic verdict never follows or overwrites it
+            self._append(job_id, rc, 1, "verdict", verdict)
 
         self._persist(row, ctx, fence, write)
 
@@ -650,8 +831,8 @@ class Engine:
         request = rules.impact_request(candidate, documents)
         key = digest(request)
         try:
-            impacts = self._receipted(row, ctx, fence, "impact", rc, key, lambda: fixtures.find("producer", "impact", key, ctx.synthetic),
-                rules.parse_impacts, lambda response: rules.evaluate_impacts(response, candidate, allowed, ctx.view.cite))
+            impacts = self._receipted(row, ctx, fence, "impact", rc, request, rules.parse_impacts, fixtures=fixtures, role="producer", documents=allowed,
+                check=lambda response: rules.evaluate_impacts(response, candidate, allowed, ctx.view.cite))
             summary = {"status": "complete", "candidates": len(impacts), "requestDigest": key}
         except ReplyInvalid as exc:
             # A faulty impact reply never touches the verified relation: it is recorded and the relation stays eligible.
@@ -680,10 +861,13 @@ class Engine:
         attempt = rules.attempt_wire("initial", 0, IMPACT_POLICY, None)
         request = rules.impact_verifier_request(candidate, attempt)
         key = digest(request)
+        documents = {(q["documentId"], q["documentVersion"]) for q in candidate["quotes"]}
         try:
-            decision = self._receipted(row, ctx, fence, "verify-impact", ic, key, lambda: fixtures.find("verifier", "verify-impact", key, ctx.synthetic),
-                lambda raw: rules.decide_impact(candidate, raw))
+            decision = self._receipted(row, ctx, fence, "verify-impact", ic, request, lambda raw: rules.decide_impact(candidate, raw),
+                                       fixtures=fixtures, role="verifier", documents=documents)
         except ReplyInvalid as exc:
+            if ctx.live:
+                raise VerificationUnavailable("verify-impact", ic, exc.code) from exc  # no judgment exists: nothing is written, no label is invented
             decision = {"status": "reject", "label": None, "reasons": [{"code": "verification_reply_invalid", "detail": exc.code}], "targetVerdict": None, "mapped": None}
         verdict = {**decision, "verifier": "called", "attempt": attempt, "requestDigest": key}
 
@@ -700,19 +884,25 @@ class Engine:
     def result(self, job_id: str) -> dict:
         row = self._job(job_id)
         request = Submit.model_validate_json(row["request"])
+        live = request.provenance.execution_mode == "live"
         binding = json.loads(row["binding"])
         calls = self.store.all("SELECT * FROM calls WHERE job_id=? ORDER BY started_at,attempt_id", (job_id,))
         stages = self.store.all("SELECT * FROM stages WHERE job_id=?", (job_id,))
+        refused = {s["ref"]: json.loads(s["summary"])["code"] for s in stages if s["stage"] == "refusal"}
+        received = sum(c["state"] == "received" for c in calls)
+        unknown = sum(c["state"] == "started" and c["attempt_id"] not in refused for c in calls)
         candidates = self.store.all("SELECT * FROM relation_candidates WHERE job_id=? ORDER BY relation_candidate_id", (job_id,))
         result = {"schemaVersion": SCHEMA, "jobId": job_id, "inputDigest": row["input_digest"], "state": row["state"], "phase": row["phase"],
             "resumeMode": row["resume_mode"], "failure": {"code": row["failure"], **({"detail": json.loads(row["detail"])} if row["detail"] else {})} if row["failure"] else None,
             "provenance": request.provenance.wire(), "binding": binding,
             "stages": {"relation": {"state": "complete", **json.loads(next(s["summary"] for s in stages if s["stage"] == "relation"))} if any(s["stage"] == "relation" for s in stages) else {"state": "pending"},
                        "impact": {"complete": sum(s["stage"] == "impact" for s in stages)}},
-            "usage": {"executionMode": "replay", "replayCalls": sum(c["state"] == "received" for c in calls), "startedWithoutReceipt": sum(c["state"] == "started" for c in calls),
-                      "providerCalls": 0, "modelCalls": 0, "creatorJobId": job_id},
-            "calls": [{"stage": c["stage"], "state": c["state"], "requestDigest": c["request_digest"], "fixtureHash": c["fixture_hash"],
-                       "responseDigest": c["response_digest"], "verdict": c["verdict"]} for c in calls]}
+            "usage": {"executionMode": "live" if live else "replay", "replayCalls": 0 if live else received, "startedWithoutReceipt": unknown,
+                      # Conservative like S2: every attempt that was or may have been transmitted (received + unknown), never one proven refused.
+                      # `startedWithoutReceipt` keeps receipts (received = providerCalls - startedWithoutReceipt) distinct from unknown outcomes.
+                      "providerCalls": received + unknown if live else 0, "modelCalls": received + unknown if live else 0, "creatorJobId": job_id},
+            "calls": [{"stage": c["stage"], "state": "refused" if c["state"] == "started" and c["attempt_id"] in refused else c["state"], "requestDigest": c["request_digest"],
+                       "fixtureHash": c["fixture_hash"], "responseDigest": c["response_digest"], "verdict": c["verdict"] or refused.get(c["attempt_id"])} for c in calls]}
         if row["state"] == "cancelled":
             result["delivery"] = {"status": "withheld", "code": "job_cancelled"}
             return result
@@ -739,10 +929,11 @@ class Engine:
             for i in found:
                 if i["verdict"] and i["verdict"]["label"]:
                     labels[i["verdict"]["label"]] += 1
-            impact_state = ("not-applicable" if state["eligibility"] in {"hold", "reject"} else "pending" if marker is None
-                            else marker["status"] if marker["status"] != "complete" else "complete")
+            # A human-approved relation was never given an impact stage (no model call follows a human allow).
+            impact_state = ("not-applicable" if state["eligibility"] in {"hold", "reject"} or (marker is None and (state["approvalBasis"] or {}).get("kind") == BASIS_OPERATOR)
+                            else "pending" if marker is None else marker["status"] if marker["status"] != "complete" else "complete")
             relations.append({**payload, "eligibility": {"status": state["eligibility"], "reasons": state["reasons"], "revision": state["revision"],
-                "reviewPending": state["reviewPending"]}, "history": events,
+                "reviewPending": state["reviewPending"], "approvalBasis": state["approvalBasis"]}, "history": events,
                 "impact": {"status": impact_state, "labelNote": LABEL_NOTE, "candidates": found}})
         result["counts"] = {"relations": len(candidates), "eligibility": counts, "impactLabels": labels,
                             "impactCandidates": sum(len(v) for v in impacts.values())}

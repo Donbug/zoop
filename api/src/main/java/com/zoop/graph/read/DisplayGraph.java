@@ -6,6 +6,11 @@ import com.zoop.graph.snapshot.PublicGraphSnapshot.Relation;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
@@ -92,19 +97,34 @@ public final class DisplayGraph {
         return g;
     }
 
-    /** Newest event first, unknown time last; ties by newest article, then id (prototype {@code sort_recent}). */
+    /**
+     * Newest event first, unknown time last; ties by newest article, then id (prototype {@code sort_recent}). Times are
+     * compared as instants, never as strings: a fraction or an offset does not reorder them.
+     */
     static final Comparator<Issue> RECENT = Comparator
-            .comparing((Issue i) -> eventStart(i), Comparator.reverseOrder())
-            .thenComparing(Issue::latestPublishedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+            .comparing(DisplayGraph::eventStart, Comparator.nullsLast(Comparator.reverseOrder()))
+            .thenComparing(i -> publishedAt(i.latestPublishedAt()), Comparator.nullsLast(Comparator.reverseOrder()))
             .thenComparing(Issue::issueId);
 
-    static String eventStart(Issue i) {
-        if (i.eventTime() == null) return "";
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
+    /** Start of the approved event time: a year, month or day starts at its first KST midnight; null when unknown. */
+    static Instant eventStart(Issue i) {
+        String t = i.eventTime();
+        if (t == null) return null;
         return switch (i.timePrecision()) {
-            case "year" -> i.eventTime() + "-01-01";
-            case "month" -> i.eventTime() + "-01";
-            default -> i.eventTime();
+            case "year" -> LocalDate.of(Integer.parseInt(t), 1, 1).atStartOfDay(KST).toInstant();
+            case "month" -> YearMonth.parse(t).atDay(1).atStartOfDay(KST).toInstant();
+            case "day" -> LocalDate.parse(t).atStartOfDay(KST).toInstant();
+            default -> OffsetDateTime.parse(t).toInstant();
         };
+    }
+
+    /** A publication time as an instant: a date-only one is that KST day's start; null stays null. */
+    static Instant publishedAt(String value) {
+        if (value == null) return null;
+        return value.length() == 10 ? LocalDate.parse(value).atStartOfDay(KST).toInstant()
+                : OffsetDateTime.parse(value).toInstant();
     }
 
     /** The structural bases of the source relations behind a display edge; empty for other edge types. */

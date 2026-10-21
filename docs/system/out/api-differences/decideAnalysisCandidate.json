@@ -35,13 +35,6 @@
       "type": "string"
     },
     "response:200:application/json.candidateId:required": true,
-    "response:200:application/json.jobId": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "response:200:application/json.jobId:required": true,
     "response:200:application/json.publicChanged": {
       "type": "boolean",
       "const": false
@@ -584,7 +577,7 @@
       "target": {
         "type": "string",
         "enum": [
-          "revalidation_requested",
+          "approved",
           "rejected"
         ]
       },

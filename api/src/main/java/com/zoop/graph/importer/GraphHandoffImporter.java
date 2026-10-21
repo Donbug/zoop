@@ -288,12 +288,16 @@ public final class GraphHandoffImporter {
 
     private AppFacts verifyApp(ArtifactFileStore.Session session, HandoffBundle bundle, Checked checked,
             String receiptArtifactId, Instant now) {
+        // The catalogue is checked for the UNION of the public companies and the private path companies: both must exist with an
+        // equal label. A path company is never a graph node; it only has to be a real catalogue company, under the same lock.
+        List<Company> catalogued = new ArrayList<>(bundle.companies());
+        catalogued.addAll(bundle.pathCompanies());
         Set<String> companyIds = new LinkedHashSet<>();
-        for (Company company : bundle.companies()) {
+        for (Company company : catalogued) {
             companyIds.add(company.id());
         }
         Map<String, CompanyRow> catalog = graph.companies(companyIds);
-        for (Company company : bundle.companies()) {
+        for (Company company : catalogued) {
             CompanyRow row = catalog.get(company.id());
             if (row == null || !row.name().equals(company.label())) {
                 throw new GraphHandoffException(GraphHandoffFailure.COMPANY_MISMATCH);
@@ -323,9 +327,10 @@ public final class GraphHandoffImporter {
             ArtifactRow text = registry.findArtifact(version.textArtifactId()).orElseThrow(
                     () -> new GraphHandoffException(GraphHandoffFailure.ARTICLE_MISMATCH));
             // The app's own stored text must be byte-for-byte the text the current export proved (hash and size equal, and the
-            // file itself is read back and verified against the registry).
+            // file itself is read back and verified against the registry), and its hash is the textSha256 the bundle's exact-text
+            // sourceSupport was computed from: a bundle whose lineage rests on another text is refused.
             if (!"extracted_text".equals(text.kind()) || !text.sha256().equals(facts.textSha256())
-                    || text.bytes() != facts.textBytes()) {
+                    || !text.sha256().equals(article.textSha256()) || text.bytes() != facts.textBytes()) {
                 throw new GraphHandoffException(GraphHandoffFailure.TEXT_MISMATCH);
             }
             texts.put(key, decode(readRegistered(session, text)));
@@ -495,11 +500,15 @@ public final class GraphHandoffImporter {
         for (Relation relation : bundle.relations()) {
             origins.merge(relation.origin(), 1, Integer::sum);
         }
+        Map<String, Integer> approvalBases = new TreeMap<>();
+        for (HandoffBundle.Approval approval : bundle.approvals()) {
+            approvalBases.merge(approval.kind(), 1, Integer::sum);
+        }
         VerifiedHandoff handoff = checked.handoff();
         return new Staged(bundle.handoffId(), HandoffSnapshotWriter.versionId(bundle.handoffId()), outcome,
                 handoff.manifestDigest(), handoff.bundleDigest(), handoff.contentDigest(), bundle.sourceKind(),
-                bundle.executionMode(), bundle.recordingKind(), origins, bundle.companies().size(), bundle.issues().size(),
-                bundle.relations().size(), bundle.articles().size(), bundle.evidence().size(), evidenceCounts[0],
-                evidenceCounts[1], Objects.requireNonNull(snapshot), Objects.requireNonNull(receipt));
+                bundle.executionMode(), bundle.recordingKind(), origins, approvalBases, bundle.companies().size(),
+                bundle.issues().size(), bundle.relations().size(), bundle.articles().size(), bundle.evidence().size(),
+                evidenceCounts[0], evidenceCounts[1], Objects.requireNonNull(snapshot), Objects.requireNonNull(receipt));
     }
 }

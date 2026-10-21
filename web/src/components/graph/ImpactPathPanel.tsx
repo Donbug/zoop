@@ -1,4 +1,5 @@
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import CompanyLogo from '@/components/common/CompanyLogo';
 import GraphIcon from '@/components/graph/GraphIcon';
 import { useEffect, useRef } from 'react';
 import type { Impact } from '@/types/company/detail';
@@ -133,11 +134,17 @@ export default function ImpactPathPanel({
                         key={`${step.id}-${index}`}
                         className="relative flex gap-2.5 py-2.5 not-last:border-b not-last:border-panel-line"
                       >
-                        <span className={ui.avatar} aria-hidden="true">
-                          {node?.kind === 'issue'
-                            ? '◇'
-                            : (node?.label.slice(0, 1) ?? '•')}
-                        </span>
+                        {node?.kind === 'company' ? (
+                          <CompanyLogo
+                            name={node.label}
+                            logoUrl={node.logoUrl}
+                            className={ui.avatar}
+                          />
+                        ) : (
+                          <span className={ui.avatar} aria-hidden="true">
+                            {node ? '◇' : '•'}
+                          </span>
+                        )}
                         <div className="min-w-0 flex-1">
                           <p className={ui.muted}>
                             {node?.kind === 'issue' ? '사건' : '기업'} ·{' '}
@@ -173,9 +180,11 @@ export default function ImpactPathPanel({
                 <ul className={`${ui.list} [&>li]:flex [&>li]:gap-2.5`}>
                   {connectedCompanies.map(({ edge, company: connected }) => (
                     <li key={edge.id}>
-                      <span className={ui.avatar} aria-hidden="true">
-                        {connected?.label.slice(0, 1)}
-                      </span>
+                      <CompanyLogo
+                        name={connected?.label ?? ''}
+                        logoUrl={connected?.logoUrl}
+                        className={ui.avatar}
+                      />
                       <div className="min-w-0">
                         <strong className={ui.itemTitle}>
                           {connected?.label}

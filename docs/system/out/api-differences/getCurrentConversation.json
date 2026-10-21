@@ -22,6 +22,39 @@
       ]
     },
     "response:200:application/json.conversation<anyOf:0>.jobs[].context.graphVersion:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].phase:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].phase<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "planning",
+        "retrieving",
+        "writing",
+        "verifying"
+      ]
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].phase<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].resolves:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].resolves<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].resolves<anyOf:0>.choiceId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].resolves<anyOf:0>.choiceId:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].resolves<anyOf:0>.jobId": {
+      "type": "string"
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].resolves<anyOf:0>.jobId:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].resolves<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.answerBasis": {
       "type": "string",
       "enum": [
@@ -44,6 +77,57 @@
       ]
     },
     "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.choices[].kind:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.citations[].docId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.citations[].docId:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.citations[].docVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.citations[].docVersion:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.citations[].sourceKind": {
+      "type": "string",
+      "enum": [
+        "article",
+        "zoop_doc"
+      ]
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.citations[].sourceKind:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.limitations": {
+      "type": "array",
+      "maxItems": 8
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.limitations:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.limitations[]": {
+      "type": "object"
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.limitations[].kind": {
+      "type": "string",
+      "enum": [
+        "investment_advice",
+        "precondition_unmet",
+        "results_truncated",
+        "evidence_insufficient",
+        "out_of_scope"
+      ]
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.limitations[].kind:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.limitations[].label": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.limitations[].label:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.limitations[].message": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.limitations[].message:required": true,
     "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.metadata.failures": {
       "type": "array"
     },
@@ -89,6 +173,37 @@
       "type": "string"
     },
     "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.metadata.requestId:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.sections": {
+      "type": "array",
+      "maxItems": 12
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.sections:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.sections[]": {
+      "type": "object"
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.sections[].basis": {
+      "type": "string",
+      "enum": [
+        "general_knowledge",
+        "zoop_documented",
+        "evidence_grounded"
+      ]
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.sections[].basis:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.sections[].evidenceIds": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.sections[].evidenceIds:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.sections[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.sections[].text": {
+      "type": "string",
+      "maxLength": 12000
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.sections[].text:required": true,
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -548,6 +663,28 @@
       },
       "bff": {
         "type": "array"
+      }
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.citations[].articleId": {
+      "target": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "string"
+      }
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.citations[].articleVersion": {
+      "target": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "string"
       }
     },
     "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.citations[].publishedAt<anyOf:0>": {

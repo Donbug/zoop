@@ -57,6 +57,10 @@ final class GraphHandoffResultWriter {
         for (Map.Entry<String, Integer> origin : new TreeMap<>(staged.origins()).entrySet()) {
             origins.put(origin.getKey(), origin.getValue());
         }
+        ObjectNode approvals = provenance.putObject("approvalBases");
+        for (Map.Entry<String, Integer> approval : new TreeMap<>(staged.approvalBases()).entrySet()) {
+            approvals.put(approval.getKey(), approval.getValue());
+        }
         provenance.put("structuralRelationOrigin", "manual-operator-review");
         root.put("quoteVerification", "quote-integrity-only");
         ObjectNode counts = root.putObject("counts");

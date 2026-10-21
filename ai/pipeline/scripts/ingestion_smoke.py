@@ -88,8 +88,9 @@ class OfflineFixture:
         path.write_bytes(raw)
         return {"file": name, "sha256": sha(raw)}
 
-    def item(self, candidate="c1", supplier="supplier-1", url="https://example.invalid/article", ref="html", media="text/html"):
-        return {"candidateId": candidate, "supplierDocumentId": supplier, "url": url, "bodyRef": ref, "mediaType": media, "title": "authored", "publishedAt": "2026-10-08T00:00:00+00:00", "modifiedAt": None, "sourceRevision": None}
+    def item(self, candidate="c1", supplier="supplier-1", url="https://example.invalid/article", ref="html", media="text/html", publisher=None):
+        item = {"candidateId": candidate, "supplierDocumentId": supplier, "url": url, "bodyRef": ref, "mediaType": media, "title": "authored", "publishedAt": "2026-10-08T00:00:00+00:00", "modifiedAt": None, "sourceRevision": None}
+        return item if publisher is None else {**item, "publisher": publisher}
 
     def manifest(self, name, batches, *, bodies=None, statuses=None, terminal=True, coverage=None):
         documents = {key: self.file(f"{name}-{key}.bin", body) for key, body in (bodies or {"html": HTML}).items()}
@@ -288,11 +289,46 @@ def review_smoke(root):
     return checked
 
 
+def publisher_smoke(root):
+    """An operator-declared publisher over the actual CLI: absent stays byte-identical to the earlier behavior, present is a new version of one document."""
+    kit = OfflineFixture(root / "publisher")
+
+    def export(ref, rid):
+        return kit.cli("export", kit.selector(rid, **{k: ref[k] for k in ("page", "ordinal", "documentId", "rawVersion", "documentVersion")}))
+
+    plain_manifest = kit.manifest("plain", [[kit.item()]])
+    plain = kit.cli("run", kit.request(plain_manifest, "plain", 0), manifest=plain_manifest)["documentRefs"][0]
+    # Pinned from the code before publisher existed (one-time run of the earlier commit), never from this implementation.
+    assert (plain["documentId"], plain["rawVersion"], plain["documentVersion"]) == (
+        "doc-e222c75b08309d1fb600b12fee9d0e3d1608abf308b1e2729d150b70edde50a0",
+        "763f311a471328bb47ba04b484173642acc840e6f5bba9afcad601424c424986",
+        "4b685906fc3a1402c605da54a7ab7fc9e2e49f7af6021dbc06eab3287a551fe9"), plain
+    assert "publisher" not in export(plain, "plain")["observation"]
+    named_manifest = kit.manifest("named", [[kit.item(publisher="합성일보 Synthetic Daily")]])
+    named = kit.cli("run", kit.request(named_manifest, "named", 1), manifest=named_manifest)["documentRefs"][0]
+    assert named["documentId"] == plain["documentId"] and named["rawVersion"] != plain["rawVersion"] and named["documentVersion"] != plain["documentVersion"]
+    assert export(named, "named")["observation"]["publisher"] == "합성일보 Synthetic Daily"
+    other_manifest = kit.manifest("other", [[kit.item(publisher="Another Outlet")]])
+    other = kit.cli("run", kit.request(other_manifest, "other", 2), manifest=other_manifest)["documentRefs"][0]
+    assert other["documentId"] == plain["documentId"] and other["documentVersion"] not in {plain["documentVersion"], named["documentVersion"]}
+    replay = kit.cli("run", kit.request(named_manifest, "again", 3), manifest=named_manifest)
+    assert replay["counts"]["newRawVersions"] == 0 and replay["documentRefs"][0]["documentVersion"] == named["documentVersion"]
+    # An explicit null is the same as an omitted key, and an invalid publisher is an item error that stores nothing.
+    null_manifest = kit.manifest("null", [[{**kit.item(), "publisher": None}]])
+    null = kit.cli("run", kit.request(null_manifest, "null", 4), manifest=null_manifest)["documentRefs"][0]
+    assert null["documentVersion"] == plain["documentVersion"] and "publisher" not in export(null, "null")["observation"]
+    bad_manifest = kit.manifest("bad", [[kit.item(publisher="   ")]])
+    bad = kit.cli("run", kit.request(bad_manifest, "bad", 5), manifest=bad_manifest)
+    assert bad["state"] == "incomplete" and bad["documentRefs"][0]["error"] == "discovery_item_invalid" and bad["counts"]["textReady"] == 0
+    return ["authored publisher: no-publisher identity pinned to the earlier commit; declared publisher is a new raw/document version of the same document, exported exactly, replay idempotent, null == omitted, whitespace-only refused"]
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="zoop-s2-ingestion-smoke-") as temporary:
         root = Path(temporary).resolve()
         result = smoke(root)
         result["reviewRegressions"] = review_smoke(root)
+        result["publisherRegressions"] = publisher_smoke(root)
     assert not root.exists()
     result["temporaryStateCleanup"] = {"removed": True, "root": str(root)}
     print(json.dumps(result, ensure_ascii=False, indent=2))
