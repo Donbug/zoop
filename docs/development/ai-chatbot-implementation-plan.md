@@ -1,6 +1,6 @@
 # ZOOP AI 챗봇 구현 준비·개발 계획
 
-기준일: 2026년 10월 20일
+기준일: 2026년 10월 21일
 
 기준 정책: `ZOOP-AIG-001 v0.8`
 
@@ -69,11 +69,11 @@ flowchart LR
 ### 단계 1 — 저장과 공개 job 수명주기
 
 1. 새 Flyway migration으로 `chat_sessions`, `chat_jobs`, `chat_tool_calls` 및 부분 UNIQUE·CHECK·인덱스를 만든다.
-2. Java에 chat controller/service/repository와 멱등성·소유권·대화당 활성 job 하나 제약을 구현한다. `resolves`가 있으면 원 작업의 같은 대화·clarification·choice 존재를 같은 트랜잭션에서 검사하고 원 고정 문맥을 복사한다.
+2. Java에 chat controller/service/repository와 멱등성·소유권·대화당 활성 job 하나 제약을 구현한다. `resolves`가 있으면 원 작업의 같은 대화·clarification·choice 존재를 같은 트랜잭션에서 검사하고 원 고정 문맥을 복사한다. 확인 질문 사슬 깊이(`clarification_depth`, 원 작업 + 1, 최대 2)를 함께 고정한다.
 3. `queued → running → completed|failed|cancelled`, lease/owner token(lease = 시작 시각 + 실행 기한 + 여유), 늦은 완료 차단, recovery artifact와 `save_only`, 작업당 실행 3회 상한(`runs` ≤ 3, 이후 `retry=null`, 모델을 호출하지 않는 `save_only`는 횟수에서 제외)을 구현한다.
 4. `getCurrentConversation`은 최신 저장 대화만 복원하고 모델을 호출하지 않게 한다.
 
-완료 조건: 동시 접수 한 건만 성공, 다른 회원 접근 차단, 같은 jobId 같은 본문 재전송은 같은 작업 반환, 다른 본문은 409, save_only 모델 호출 0회.
+완료 조건: 동시 접수 한 건만 성공, 다른 회원 접근 차단, 같은 jobId 같은 본문 재전송은 같은 작업 반환, 다른 본문은 409, save_only 모델 호출 0회, 깊이 2 작업의 clarification 저장 0건.
 
 ### 단계 2 — 오케스트레이터 골격
 
@@ -118,7 +118,7 @@ flowchart LR
 3. 서버 검증기는 요구 커버리지, citation offset·문서 버전·철회, 수치·통화·날짜, graph endpoint·hop, 회원 범위, 투자 판단, `answerBasis`를 검사한다. 요구 커버리지는 모든 필수 요구가 본문 답변과 `limitations` 항목 중 정확히 하나에 속하는지로 판정하고, `limitations`는 gate·체크포인트·`truncated`·citation 부재에서 서버가 만들며 `message`는 `kind`별 템플릿을 쓴다. 본문은 근거 수준별 `sections`로 받고, 서버가 `general_knowledge` 구간에 고정 안내를 붙이고 구간 text를 이어 `answer`를 만들며 `answerBasis`를 구간 basis에서 계산한다. 일반 개념 구간의 최신 사실·근거 연결, 근거 구간의 구간 밖 인용, `citations`에 없는 `evidenceIds`는 검증 실패다.
 4. 3의 검사는 [설계 요약 8.2절](../design/ai-chatbot-design-summary.md)의 1층 결정론적 검사 표를 check ID 단위로 구현한다. 하나라도 실패하면 Jev를 호출하지 않는다.
 5. 1층을 통과하면 Jev `semantic-verification` stage를 1회 호출한다. 챗봇 전용 질문 집합(근거 구간 claim별 Choice와 Noul `prohibitedAdvice`·`unsupportedCausality`, `general_knowledge` 구간별 Noul `prohibitedAdvice`만)과 정책 버전을 쓰고, S1 어댑터의 엄격한 응답 검사·영수증 선저장·무재시도 원칙을 재사용한다. 일반 개념 구간의 판정은 사실 검증 통과로 기록하지 않는다.
-6. 판정 처리: `contradicted` 또는 Noul 예 → 전체 `validation_failed`; hold → 해당 요구 구간 제외와 `evidence_insufficient` limitation, 남은 요구가 없으면 `insufficient_evidence`; Jev 장애 → `transient`(retry=`rerun`). 구간 제외 뒤 `answer`·`answerBasis`·`citations`를 서버가 다시 계산한다.
+6. 판정 처리: `contradicted` 또는 Noul 예 → 전체 `validation_failed`; hold → 해당 요구 구간 제외와 `evidence_insufficient` limitation, 남은 요구가 없으면 `insufficient_evidence`; Jev 송신 전 장애·응답을 받은 확정 실패 → `transient`(`provider_error`, retry=`rerun`), 송신 후 timeout·연결 끊김으로 응답 불명 → `transient`(`response_unknown`, retry=null, 호출 `unknown`·운영자 정산). 구간 제외 뒤 `answer`·`answerBasis`·`citations`를 서버가 다시 계산한다.
 7. 검증 실패는 `validation_failed`; 자동 재생성·부분 답변·근거 부족 성공으로 바꾸지 않는다.
 
 완료 조건: 모든 중요 사실 주장에 유효 근거와 Jev supported 판정, 1층 실패 시 Jev 호출 0회, 일반 개념 구간의 Choice 판정 0건과 `prohibitedAdvice` 판정 100%, Q02 최신 사실 우회 0건, 철회 근거 노출 0건, 다른 회원 종목 노출 0건.
@@ -185,7 +185,7 @@ flowchart LR
 | 그래프 | 챗봇 경로가 같은 graphVersion의 `/api/v1/graph` 결과와 일치, 공개 제외 결정 반영 후 철회 간선 미노출, 공개 활성화 이력이 없는 버전·사용 불가 버전 거부, 이전 공개 버전은 현재 공개 제외 결정을 적용해 조회(Q05), 기업 간 hop 1·2·3과 4 거부, 노드·간선 50개 절단 시 `truncated`, graphTargets가 지도에서 열림, Neo4j·AI 내부 그래프 API 호출 0회 |
 | 결과 | answerBasis를 sections에서 계산(단일·mixed·none), `zoop_documented` 구간의 `zoop_doc` 인용과 `evidence_grounded` 구간의 `article` 인용 교차 사용 거부, 이어 붙인 answer 12,000자 초과 거부, Q02 단독은 general_knowledge 구간 하나와 빈 sources·citations, Q02+Q03은 mixed와 구간별 인용, 일반 개념 구간의 근거 연결·최신 사실 거부, 고정 안내 중복 없음, clarification 새 job, no PARTIAL |
 | 제한 | 투자 판단 혼합 질문의 `investment_advice`, 체크포인트 미달 `precondition_unmet`, 문서 20개 잘림 `results_truncated`, 한 요구만 근거 부족, 요구 누락·중복 소속·본문의 제한 요구 답변 시 `validation_failed`, 모델이 근거 없이 제안한 제한 거부, 도구 timeout이 limitation이 아닌 failed, answered 외 outcome의 빈 배열 |
-| 확인 답 | 선택지 답·자유 입력 답, 없는 choiceId·clarification 아닌 원 작업·다른 대화 원 작업 422/404, resolves+context 422, 원 고정 문맥 복사, 원 작업 불변, 같은 확인 질문 재답변 |
+| 확인 답 | 선택지 답·자유 입력 답, 없는 choiceId·clarification 아닌 원 작업·다른 대화 원 작업 422/404, resolves+context 422, 원 고정 문맥 복사, 원 작업 불변, 같은 확인 질문 재답변, 깊이 2 작업의 모호·체크포인트 초과는 `guidance`와 다음 단계·생성 호출 0회, 깊이 2에서 모호함이 해소되면 `answered`·도구 장애는 `failed`(guidance로 바꾸지 않음), 확인 답의 답이 루트 질문과 사슬의 답을 순서대로 합쳐 재실행 |
 | 의미 검증 | 1층 실패 시 Jev 0회, 일반 개념 구간은 Choice 없이 `prohibitedAdvice`만 판정하고 예이면 전체 실패, 전부 supported 통과, contradicted·prohibitedAdvice 예 전체 실패, 한 요구 hold 시 그 구간·통합 구간 제외와 limitation 및 answer·answerBasis·citations 재계산, 모든 요구 hold 시 insufficient_evidence, 응답 형식 오류 시 영수증 저장 후 transient |
 | 장애 | Jev/Luna/MCP timeout, unknown 호출, 저장 실패, result_lost, save_only |
 | 기한·한도 | 경로별 기한 계산(Q02 단독 44초·단순 조회 54초·복합 60초), 모든 경로 합 60초 이하, MCP 상한 초과 `tool_timeout`(rerun), 모델 송신 전 연결 실패 `provider_error`(rerun), 모델 송신 후 상한 초과·연결 끊김 `response_unknown`(retry null, 호출 `unknown`, 자동·수동 재전송 0회), 남은 필수 단계 합보다 기한이 부족하면 모델 호출 0회와 `deadline_guard`(생성 뒤 의미 검증 직전 중단 없음), 커버리지 재확인 생략 조건, 요구 7개 질문의 계획 시점 clarification, `save_only`가 실행 횟수에 포함되지 않음, 입력 24k 초과 `budget_exceeded`·`context_too_large`(retry null), 출력 상한 도달 `output_limit`, 실행 3회 뒤 retry null, lease 만료 뒤 늦은 완료 거부, `phase` 전이와 종료 시 null |
