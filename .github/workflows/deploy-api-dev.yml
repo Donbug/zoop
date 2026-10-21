@@ -131,18 +131,35 @@ jobs:
           set -euo pipefail
 
           tagged_image="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          lookup_error="$(mktemp)"
 
-          image_digest="$(
+          trap 'rm -f "$lookup_error"' EXIT
+
+          lookup_image_digest() {
+            : > "$lookup_error"
+
             aws ecr describe-images \
               --repository-name "$ECR_REPOSITORY" \
               --image-ids "imageTag=$IMAGE_TAG" \
               --query 'imageDetails[0].imageDigest' \
-              --output text 2>/dev/null || true
-          )"
+              --output text \
+              2>"$lookup_error"
+          }
 
-          if [ -n "$image_digest" ] && [ "$image_digest" != "None" ]; then
+          set +e
+          image_digest="$(lookup_image_digest)"
+          lookup_status=$?
+          set -e
+
+          if [ "$lookup_status" -eq 0 ]; then
+            if [[ "$image_digest" != sha256:* ]]; then
+              cat "$lookup_error" >&2
+              echo "::error::ECR lookup succeeded but returned an invalid image digest."
+              exit 1
+            fi
+
             echo "Reusing existing immutable image: $tagged_image"
-          else
+          elif grep -q "ImageNotFoundException" "$lookup_error"; then
             echo "No existing image found. Building: $tagged_image"
 
             docker build \
@@ -155,21 +172,35 @@ jobs:
             image_digest=""
 
             for attempt in $(seq 1 10); do
-              image_digest="$(
-                aws ecr describe-images \
-                  --repository-name "$ECR_REPOSITORY" \
-                  --image-ids "imageTag=$IMAGE_TAG" \
-                  --query 'imageDetails[0].imageDigest' \
-                  --output text 2>/dev/null || true
-              )"
+              set +e
+              candidate_digest="$(lookup_image_digest)"
+              lookup_status=$?
+              set -e
 
-              if [ -n "$image_digest" ] && [ "$image_digest" != "None" ]; then
+              if [ "$lookup_status" -eq 0 ]; then
+                if [[ "$candidate_digest" != sha256:* ]]; then
+                  cat "$lookup_error" >&2
+                  echo "::error::ECR lookup succeeded but returned an invalid image digest."
+                  exit 1
+                fi
+
+                image_digest="$candidate_digest"
                 break
+              fi
+
+              if ! grep -q "ImageNotFoundException" "$lookup_error"; then
+                cat "$lookup_error" >&2
+                echo "::error::ECR image lookup failed after the image push."
+                exit "$lookup_status"
               fi
 
               echo "Waiting for the pushed image digest: attempt $attempt/10"
               sleep 2
             done
+          else
+            cat "$lookup_error" >&2
+            echo "::error::ECR image lookup failed. The image will not be built or pushed."
+            exit "$lookup_status"
           fi
 
           if [[ "$image_digest" != sha256:* ]]; then
