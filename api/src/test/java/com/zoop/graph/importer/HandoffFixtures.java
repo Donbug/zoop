@@ -53,42 +53,71 @@ final class HandoffFixtures {
     private HandoffFixtures() {
     }
 
-    /** Knobs that change the content of the handoff (and therefore its digests). */
+    /**
+     * Knobs that change the content of the handoff (and therefore its digests). {@code verdicts} adds an operator review of the
+     * one mention: a REJECT/contradicted on its {@code eventTime} (citing the event sentence) and a HOLD/ambiguous on its
+     * {@code period} (citing the structural basis sentence, which no mention cites), so the issue's headline {@code eventTime} and
+     * {@code period} are withheld while the mention keeps both original values.
+     */
     record Spec(String handoffId, String canonicalPin, String publishedAt, String precision, String eventTime,
-            String eventPrecision, String validFrom, String validUntil, boolean utf16Offsets) {
+            String eventPrecision, String validFrom, String validUntil, boolean utf16Offsets, boolean verdicts,
+            boolean manualApproval, boolean live, boolean origin) {
         static Spec standard() {
             return new Spec(HANDOFF_ID, "4".repeat(64), PUBLISHED_AT, "datetime", "2026-09-30", "day", "2026-01-01",
-                    "2026-12-31", false);
+                    "2026-12-31", false, false, false, false, false);
         }
 
         Spec withHandoffId(String value) {
             return new Spec(value, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets);
+                    utf16Offsets, verdicts, manualApproval, live, origin);
         }
 
         Spec withCanonicalPin(String value) {
             return new Spec(handoffId, value, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets);
+                    utf16Offsets, verdicts, manualApproval, live, origin);
         }
 
         Spec withPublication(String value, String valuePrecision) {
             return new Spec(handoffId, canonicalPin, value, valuePrecision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets);
+                    utf16Offsets, verdicts, manualApproval, live, origin);
         }
 
         Spec withEvent(String value, String valuePrecision) {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, value, valuePrecision, validFrom, validUntil,
-                    utf16Offsets);
+                    utf16Offsets, verdicts, manualApproval, live, origin);
         }
 
         Spec withValidity(String from, String until) {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, from, until,
-                    utf16Offsets);
+                    utf16Offsets, verdicts, manualApproval, live, origin);
         }
 
         Spec withUtf16Offsets() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    true);
+                    true, verdicts, manualApproval, live, origin);
+        }
+
+        Spec withVerdicts() {
+            return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
+                    utf16Offsets, true, manualApproval, live, origin);
+        }
+
+        /** The one S3 relation the edges rest on became eligible by an operator's final approval of a HOLD, not by the verifier. */
+        Spec withManualApproval() {
+            return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
+                    utf16Offsets, verdicts, true, live, origin);
+        }
+
+        /** Provider-recorded live provenance ({@code executionMode: live}, {@code recordingKind: provider}). */
+        Spec withLive() {
+            return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
+                    utf16Offsets, verdicts, manualApproval, true, origin);
+        }
+
+        /** The article's document version carries an operator-declared origin. */
+        Spec withOrigin() {
+            return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
+                    utf16Offsets, verdicts, manualApproval, live, true);
         }
     }
 
@@ -130,8 +159,8 @@ final class HandoffFixtures {
         ObjectNode provenance = bundle.putObject("provenance");
         provenance.put("declaredSourceKind", "synthetic");
         provenance.put("observedSourceKind", "synthetic");
-        provenance.put("executionMode", "replay");
-        provenance.put("recordingKind", "authored-test");
+        provenance.put("executionMode", spec.live() ? "live" : "replay");
+        provenance.put("recordingKind", spec.live() ? "provider" : "authored-test");
         ObjectNode policy = bundle.putObject("policy");
         policy.put("version", HandoffBundleVerifier.POLICY);
         ObjectNode files = policy.putObject("files");
@@ -143,6 +172,7 @@ final class HandoffFixtures {
         policy.put("geography", "operator-field-verdict");
         policy.put("structural", "manual-operator-review");
         policy.put("sequence", "s2-comparison-with-operator-decision");
+        policy.put("sourceSupport", HandoffBundleVerifier.SOURCE_SUPPORT_POLICY);
 
         ObjectNode pin = StrictJson.newObject();
         pin.putObject("relation").put("jobId", relationJob).put("inputDigest", "f".repeat(64));
@@ -156,15 +186,26 @@ final class HandoffFixtures {
         source.set("relation", pin.get("relation"));
         source.set("upstream", pin.get("upstream"));
         source.put("reviewDigest", "1".repeat(64));
+        source.putObject("provenance").put("sourceKind", "synthetic").put("executionMode", spec.live() ? "live" : "replay")
+                .put("recordingKind", spec.live() ? "provider" : "authored-test");
         ObjectNode policies = source.putObject("policies");
         for (String name : List.of("producer", "verifier", "impactProducer", "impactVerifier", "policy", "revalidationPolicy",
                 "impactPolicy")) {
             policies.put(name, name + "-1");
         }
         ArrayNode used = source.putArray("reviewUsed");
-        ArrayNode usedEntry = used.addArray();
-        usedEntry.add(candidate);
-        usedEntry.add(1);
+        ObjectNode usedEntry = used.addObject();
+        usedEntry.put("relationCandidateId", candidate);
+        usedEntry.put("revision", 1);
+        ObjectNode approvalBasis = usedEntry.putObject("approvalBasis");
+        approvalBasis.put("kind", spec.manualApproval() ? HandoffBundleVerifier.OPERATOR_FINAL : HandoffBundleVerifier.AUTOMATIC);
+        approvalBasis.put("revision", 1);
+        if (spec.manualApproval()) {
+            approvalBasis.put("reviewer", "reviewer-final");
+        } else {
+            approvalBasis.putNull("reviewer");
+        }
+        approvalBasis.put("decidedAt", VERIFIED_AT);
         ObjectNode audit = source.putObject("audit");
         audit.put("s3Relations", 2);
         ObjectNode eligibility = audit.putObject("eligibility");
@@ -207,9 +248,16 @@ final class HandoffFixtures {
         issue.put("title", "합성 공급 계약");
         issue.put("action", "공급 계약");
         issue.put("target", "배터리");
-        issue.put("eventTime", spec.eventTime());
-        issue.put("timePrecision", spec.eventPrecision());
-        issue.put("period", "2026Q3");
+        // A withheld headline value is null (an event time then has unknown precision); the mention below keeps the original.
+        if (spec.verdicts()) {
+            issue.putNull("eventTime");
+            issue.put("timePrecision", "unknown");
+            issue.putNull("period");
+        } else {
+            issue.put("eventTime", spec.eventTime());
+            issue.put("timePrecision", spec.eventPrecision());
+            issue.put("period", "2026Q3");
+        }
         issue.put("assertionStatus", "announced");
         ObjectNode geography = issue.putObject("geography");
         geography.put("value", "domestic");
@@ -223,7 +271,7 @@ final class HandoffFixtures {
         geographyBasis.putArray("countries").add("KR");
         geography.putArray("basis").add(geographyBasis);
         ArrayNode issueEvidence = issue.putArray("evidenceIds");
-        for (String id : sorted(eventId, geoId)) {
+        for (String id : spec.verdicts() ? sorted(eventId, geoId, basisId) : sorted(eventId, geoId)) {
             issueEvidence.add(id);
         }
         issue.putArray("sourceEvents").add(sourceEvent);
@@ -252,10 +300,19 @@ final class HandoffFixtures {
         mention.putArray("evidenceIds").add(eventId);
         issue.put("decisionRef", "issue-1");
         issue.putNull("representative");
-        // One mention that every issue value copies: unanimous, and each field's list is that one mention.
+        // One mention that every issue value copies: unanimous, each field's list is that one mention, no operator verdict (so nothing is
+        // withheld and every headline value is the mention's own).
         ObjectNode provenanceOfIssue = issue.putObject("fieldProvenance");
         provenanceOfIssue.put("selection", "unanimous");
         provenanceOfIssue.put("verification", "none");
+        ArrayNode withheld = provenanceOfIssue.putArray("withheld");
+        ArrayNode verdicts = issue.putArray("fieldVerdicts");
+        if (spec.verdicts()) {
+            withheld.add("eventTime").add("period");
+            verdicts.add(verdict("eventTime", spec.eventTime(), "REJECT", "contradicted", eventId));
+            verdicts.add(verdict("period", "2026Q3", "HOLD", "ambiguous", basisId));
+        }
+        issue.set("sourceSupport", sourceSupport(spec.origin()));
         ObjectNode sameValue = provenanceOfIssue.putObject("sameValueMentions");
         for (String field : List.of("title", "action", "target", "eventTime", "period", "assertionStatus")) {
             ObjectNode reference = sameValue.putArray(field).addObject();
@@ -277,7 +334,8 @@ final class HandoffFixtures {
         involves.putArray("basis");
         ObjectNode involvesProvenance = involves.putObject("provenance");
         involvesProvenance.put("origin", "s3-relation");
-        involvesProvenance.put("s3SemanticValidation", "independent-verifier-supported-all-claims");
+        involvesProvenance.put("s3SemanticValidation", spec.manualApproval() ? "manual-operator-final-approval"
+                : "independent-verifier-supported-all-claims");
         involves.putNull("decisionRef");
         involves.putArray("sourceRefs").add(ref("s3-relation", relationJob, candidate));
         relationNodes.add(involves);
@@ -303,7 +361,7 @@ final class HandoffFixtures {
         basisNode.put("validFrom", spec.validFrom());
         basisNode.put("validUntil", spec.validUntil());
         basisNode.putArray("countries").add("KR");
-        basisNode.put("verifiedAt", "2026-10-16T12:00:00.123456+00:00");
+        basisNode.put("verifiedAt", VERIFIED_AT);
         basisNode.putArray("sourceArticles").addObject().put("articleId", ARTICLE_ID).put("articleVersion", ARTICLE_VERSION);
         basisNode.putArray("evidenceIds").add(basisId);
         ObjectNode structuralProvenance = structural.putObject("provenance");
@@ -314,7 +372,8 @@ final class HandoffFixtures {
         structuralProvenance.put("decisionRef", "applic-1");
         structuralProvenance.put("decisionVersion", "v1");
         structuralProvenance.put("bindingDigest", "8".repeat(64));
-        structuralProvenance.put("basisEligibility", "s3-independent-verifier-supported-all-claims");
+        structuralProvenance.put("basisEligibility", spec.manualApproval() ? "s3-operator-final-approval"
+                : "s3-independent-verifier-supported-all-claims");
         structural.put("decisionRef", "applic-1");
         structural.putArray("sourceRefs").add(ref("s3-relation", relationJob, candidate));
         relationNodes.add(structural);
@@ -337,6 +396,12 @@ final class HandoffFixtures {
         article.put("url", "https://example.invalid/a");
         article.put("publishedAt", spec.publishedAt());
         article.put("publicationPrecision", spec.precision());
+        article.put("textSha256", Canonical.sha256(TEXT));
+        if (spec.origin()) {
+            article.set("origin", origin());
+        } else {
+            article.putNull("origin");
+        }
         ObjectNode observed = article.putArray("observations").addObject();
         observed.put("roundId", SELECTOR.roundId());
         observed.put("sourceId", SELECTOR.sourceId());
@@ -439,6 +504,26 @@ final class HandoffFixtures {
         return Canonical.bytes(copy);
     }
 
+    /**
+     * The handoff after {@code change} was applied to a copy of its BUNDLE, with the content digest, the bundle digest and the
+     * producer's receipt recomputed: the strict verifier sees a self-consistent bundle (the manifest is unchanged), so only a rule
+     * about the mutated content can refuse it. {@code change} must not alter the counts, the sources or the provenance.
+     */
+    static Built repinned(Built built, java.util.function.Consumer<ObjectNode> change) {
+        ObjectNode envelope = built.envelope().deepCopy();
+        ObjectNode bundle = (ObjectNode) envelope.get("bundle");
+        change.accept(bundle);
+        ((ObjectNode) bundle.get("digests")).put("content", HandoffBundleVerifier.contentDigest(bundle));
+        byte[] bundleBytes = Canonical.bytes(bundle);
+        String bundleDigest = Canonical.sha256(bundleBytes);
+        ObjectNode receipt = (ObjectNode) envelope.get("receipt");
+        receipt.put("bundleDigest", bundleDigest);
+        receipt.put("contentDigest", bundle.get("digests").get("content").stringValue());
+        receipt.put("bundleBytes", bundleBytes.length);
+        return new Built(built.spec(), built.manifest(), bundle, envelope, Canonical.bytes(envelope), built.manifestDigest(),
+                bundleDigest, built.evidenceIds());
+    }
+
     // ---------------------------------------------------------------------------------------------- evidence -----------
 
     /** An evidence node for one cited sentence: offsets in code points (or, for a negative test, in UTF-16 units). */
@@ -467,6 +552,60 @@ final class HandoffFixtures {
         preimage.add(end);
         source.put("sourceEvidenceId", "ev-" + Canonical.digest(preimage).substring(0, 32));
         source.put("inputKind", "body");
+        return node;
+    }
+
+    /**
+     * One operator field verdict of the standard mention, in the closed bundle shape ({@code evidenceIds} instead of spans).
+     * SYNTHETIC: it names no real reviewer and no real review.
+     */
+    static ObjectNode verdict(String field, String value, String decision, String reason, String... evidenceIds) {
+        ObjectNode node = StrictJson.newObject();
+        node.put("documentId", ARTICLE_ID);
+        node.put("documentVersion", ARTICLE_VERSION);
+        node.put("mentionId", "m-1");
+        node.put("field", field);
+        node.put("value", value);
+        node.put("decision", decision);
+        node.put("reasonCode", reason);
+        ArrayNode ids = node.putArray("evidenceIds");
+        for (String id : sorted(evidenceIds)) {
+            ids.add(id);
+        }
+        node.put("verification", "operator-field-verdict");
+        node.put("reviewer", "reviewer-a");
+        node.put("decisionRef", "fverdict-1:" + field);
+        node.put("decisionVersion", "fv1");
+        return node;
+    }
+
+    /** The time of the event that made the one S3 relation eligible: the structural basis's {@code verifiedAt} too. */
+    static final String VERIFIED_AT = "2026-10-16T12:00:00.123456+00:00";
+
+    /** The operator-declared origin of the standard article's document version (SYNTHETIC reviewer and decision). */
+    static ObjectNode origin() {
+        ObjectNode node = StrictJson.newObject();
+        node.put("originId", "origin-wire-1");
+        node.put("reviewer", "reviewer-a");
+        node.put("decisionRef", "origin-1:" + ARTICLE_ID);
+        node.put("decisionVersion", "o1");
+        node.put("verification", "operator-declared-origin");
+        return node;
+    }
+
+    /** The sourceSupport of the standard single-article issue: one article, with or without a declared origin. */
+    static ObjectNode sourceSupport(boolean origin) {
+        ObjectNode node = StrictJson.newObject();
+        node.put("articleCount", 1);
+        node.put("knownLineageCount", origin ? 1 : 0);
+        ArrayNode unknown = node.putArray("unknownLineageArticles");
+        if (origin) {
+            node.put("independentSourceCount", 1);
+        } else {
+            unknown.add(ARTICLE_ID);
+            node.putNull("independentSourceCount");
+        }
+        node.putArray("duplicateGroups");
         return node;
     }
 

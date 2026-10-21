@@ -1649,9 +1649,9 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 <a id="decideanalysiscandidate"></a>
 
-## decideAnalysisCandidate · 후보 거부 또는 재검증 대상으로 전환
+## decideAnalysisCandidate · 후보 거부 또는 운영자 최종 승인
 
-관리자는 후보 상세에서 확인한 대상별 revision과 AI 원천 sourceVersion/sourceRevision을 expectedRevision/expectedSourceVersion/expectedSourceRevision으로 보낸다. relationId가 있으면 세 기대값은 해당 relation의 값이다. 서버는 대상·현재 AI 원천을 다시 확인하고 하나라도 다르면 REVISION_CONFLICT/409로 거절하며 결정·재검증 작업·감사를 성공으로 기록하지 않는다. allow는 재검증 대상으로만 전환한다. 필수 근거 확인 및 자동 검증 통과 전에 공개할 수 없다. 결정·재검증·공개는 별도 기록이다.
+관리자는 후보 상세에서 확인한 대상별 revision과 AI 원천 sourceVersion/sourceRevision을 expectedRevision/expectedSourceVersion/expectedSourceRevision으로 보낸다. relationId가 있으면 세 기대값은 해당 relation의 값이다. 서버는 대상·현재 AI 원천을 다시 확인하고 하나라도 다르면 REVISION_CONFLICT/409로 거절하며 결정·감사를 성공으로 기록하지 않는다. allow는 현재 HOLD인 대상에 대한 운영자의 최종 승인이다(2026-10-21 사용자 정책, DecisionResponse.decision=approved). 재검증·모델 호출·작업 접수가 아니며 jobId를 만들지 않는다. 대상이 HOLD가 아니거나 응답 없는 모델 호출이 남아 있는 등 현재 상태와 맞지 않으면 REVISION_CONFLICT/409다. 결정성 검사(스키마·endpoint·정확한 인용 좌표·현재 원천 권리)는 사람이 덮어쓸 수 없으며 통과하지 못하거나 원천이 철회됐으면 VALIDATION_FAILED/422다. 기존 자동 검증 판정과 claim 분포는 이력으로 그대로 남고 수동 승인이 자동 검증을 통과한 것으로 표시되지 않는다. reject는 대상을 제외한다. 이미 ALLOW인 대상의 승인과 확정된 reject의 번복은 이 계약 범위 밖이다. 승인은 공개·그래프 활성화가 아니므로 publicChanged는 항상 false이며 투영과 활성화는 별도 기록이다. 승인 근거(approvalBasis)는 내부 감사 메타데이터이며 이 응답에 넣지 않는다. 이전 계약의 allow(재검증 접수, revalidation_requested, jobId)는 이력으로만 보존하며 승인으로 소급하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1664,8 +1664,10 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
 | WBS | 6.1.2, 6.11.1, 6.10.7, 6.10.16, 6.5.5 |
 | 프로토타입 대응 | /api/admin/pipeline/candidates/{candidate_id}/decision |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF allow 처리와 목표의 재검증 접수·expectedRevision·expectedSourceVersion·expectedSourceRevision·비공개 유지 규칙을 대조한다. |
-| 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 프로토타입 BFF의 allow는 후보를 곧바로 공개 그래프 반영 경로에 올리며 expectedSourceVersion/expectedSourceRevision 대조(CAS)가 없고 응답도 decision/idempotent/onUserGraph 형태다. 목표의 HOLD 한정 최종 승인·결정성 검사 재확인·원천 CAS·publicChanged=false(승인≠공개)와 다르며 깨끗한 본개발 소비자로 보지 않는다. 프로토타입 BFF/UI 이전은 이번 계약 정렬 범위 밖이다. |
+| 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다., allow=HOLD 최종 승인(재검증 아님)은 2026-10-21 사용자 정책이다. 원문 FS067-02의 '재검증' 문구와 팀 합의로 확인되지 않았으므로 팀이 원문 정정 또는 확정을 해야 한다. |
+
+명세 의미 구분: FS067-02: 원문(2026-10-18 고정본)의 '허용은 재검증 대상 전환'은 보존한다. 2026-10-21 사용자 정책은 허용을 HOLD에 대한 운영자 최종 승인으로 해석하며 재검증 작업을 만들지 않는다. 팀 확정이 아니다.
 
 ### 요청 필드
 
@@ -4057,14 +4059,13 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 
 ### DecisionResponse
 
-허용은 재검증 접수다. 결정 요청 자체로 공개 상태를 바꾸지 않는다.
+allow는 HOLD 대상의 운영자 최종 승인(approved)이며 재검증이나 작업 접수가 아니므로 jobId가 없다. reject는 rejected다. 결정 요청 자체로 공개 상태를 바꾸지 않아 publicChanged는 항상 false다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | candidateId | 필수 | string |  |
-| decision | 필수 | string {revalidation_requested, rejected} |  |
+| decision | 필수 | string {approved, rejected} |  |
 | revision | 필수 | integer |  |
-| jobId | 필수 | string, null |  |
 | publicChanged | 필수 | boolean |  |
 
 <a id="schema-dislikepage"></a>

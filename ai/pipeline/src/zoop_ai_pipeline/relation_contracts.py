@@ -82,7 +82,8 @@ class Selector(Wire):
 
 
 class Review(Wire):
-    """Append-only HOLD review. `allow` only requests a new automatic revalidation; it never makes anything eligible or public."""
+    """Append-only HOLD review at the CURRENT revision. `allow` is the operator's FINAL semantic approval (effect `approved`): it re-runs only the
+    deterministic gate, never a model, verifier or impact call. `reject` excludes. Neither is a publication decision."""
     schema_version: Literal["zoop-relation-s3"]
     job_id: str = Field(pattern=ID)
     relation_candidate_id: str = Field(pattern=RC)
@@ -92,11 +93,13 @@ class Review(Wire):
     note: str = Field(min_length=1, max_length=2000)
 
 
-class Revalidate(Wire):
-    schema_version: Literal["zoop-relation-s3"]
-    job_id: str = Field(pattern=ID)
-    relation_candidate_id: str = Field(pattern=RC)
-    expected_revision: int = Field(ge=1)
+# Review effects. `revalidation-requested` only exists in ledgers written before the final-approval cutover: it is readable history, never an approval.
+EFFECT_APPROVED = "approved"
+EFFECT_EXCLUDED = "excluded"
+EFFECT_LEGACY_REVALIDATION = "revalidation-requested"
+EFFECT_OF = {"allow": EFFECT_APPROVED, "reject": EFFECT_EXCLUDED}
+BASIS_AUTOMATIC = "automatic-verifier"
+BASIS_OPERATOR = "operator-final-approval"
 
 
 # ---- Producer contract (generation) ---------------------------------------------------------------------------------
@@ -199,7 +202,7 @@ class VerifierResponse(Wire):
 
 class QuoteEffect(Wire):
     quote_id: str = Field(min_length=1, max_length=100)
-    effect: Literal["positive", "negative", "neutral"]
+    effect: Literal["positive", "negative", "neutral", "uncertain"]
 
 
 class ImpactVerifierResponse(Wire):

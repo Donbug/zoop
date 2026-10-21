@@ -7,7 +7,7 @@ import com.zoop.ai.PipelineJob;
 /**
  * The S2 job an S3 job is built over: its id and input digest. Naming it grants nothing: the service refuses with
  * {@code 403 upstream_not_allowed} unless the operator's server-side allowlist lists exactly this pair for the calling principal,
- * and the same allowlist is read again on every submit, result, review and revalidation.
+ * and the same allowlist is read again on every submit, result, review and live dispatch.
  */
 public record RelationUpstream(String jobId, String inputDigest) {
     /** The S2 job id as the service accepts it (wider than the app's own job ids: it may contain {@code :}). */

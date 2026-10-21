@@ -1,4 +1,4 @@
-"""Prototype-owned offline S2-2 wire contracts. Not an S1 schema alias, HTTP route or application document API.
+"""Prototype-owned S2-2 wire contracts (authored replay and live provider). Not an S1 schema alias, HTTP route or application document API.
 
 All text offsets are Python Unicode code points over the exact prepared ingestion text (never bytes/UTF-16).
 Event candidates, topic candidates and prepared documents are separate identities; none is an approved result.
@@ -17,6 +17,9 @@ __all__ = ["canonical", "digest"]
 SCHEMA = "zoop-extraction-s2-2"
 LEDGER_VERSION = "zoop-extraction-ledger-1"
 ADAPTER_VERSION = "zoop-extraction-native-replay-1"  # article projection, request preimages, quote resolution, strict parse/grounding and effective/disposition rules: any change MUST bump it
+# The live adapter shares every rule above with replay (same projection, preimages, grounding, SAME/disposition). It only adds the provider call path, so a
+# change to a shared rule MUST bump BOTH versions, and a change to the live call/decode/persistence path bumps this one.
+LIVE_ADAPTER_VERSION = "zoop-extraction-native-live-1"
 REPLAY_FORMAT = "zoop-analysis-replay-1"
 ARTICLE_PROJECTION = "zoop-article-projection-1"
 CANDIDATE_VERSION = "zoop-event-candidate-1"
@@ -46,13 +49,24 @@ class ExtractionFailure(Exception):
 
 
 class Provenance(Wire):
+    """Truthful source/execution provenance. `executionMode` and `recordingKind` are one pair: replay is authored-test, live is provider."""
     source_kind: Literal["synthetic", "actual"]
-    execution_mode: Literal["replay"]
-    recording_kind: Literal["authored-test"]
+    execution_mode: Literal["replay", "live"]
+    recording_kind: Literal["authored-test", "provider"]
+
+    @model_validator(mode="after")
+    def paired(self):
+        if (self.execution_mode, self.recording_kind) not in {("replay", "authored-test"), ("live", "provider")}:
+            raise ValueError("execution mode and recording kind conflict")
+        return self
 
 
 class ReplyInvalid(ExtractionFailure):
     """The received reply (not the environment) violates a contract; it stays auditable and is never reusable."""
+
+
+class ProviderResponseUnknown(ExtractionFailure):
+    """A live request may have reached the provider but no reply was received. Never resent automatically; the job reconciles."""
 
 
 class CitationFailure(ReplyInvalid):

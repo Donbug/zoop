@@ -403,9 +403,11 @@ class GraphEvidenceServiceTest {
     @Test
     void theReceiptOfAnEarlierOrTheCurrentBundleSchemaServesTheSameEvidenceBecauseOnlyItsArticlesAreRead() throws Exception {
         setUp();
-        // A version imported under bundle -1 (issues without mentions) or -2 (mentions, no field provenance) stays readable:
-        // nothing re-verifies the retained bundle, and -3 adds the issue's field provenance beside the same articles.
-        for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3")) {
+        // A version imported under bundle -1 (issues without mentions), -2 (mentions, no field provenance) or -3 (field provenance,
+        // no operator field verdicts) stays readable: nothing re-verifies the retained bundle, and -4 adds the issue's field verdicts
+        // (and the withheld list of its provenance) beside the same articles.
+        for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3",
+                "zoop-graph-handoff-bundle-4")) {
             ObjectNode edited = receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION));
             ObjectNode bundle = (ObjectNode) edited.get("bundle");
             bundle.put("schemaVersion", schema);
@@ -414,12 +416,50 @@ class GraphEvidenceServiceTest {
             if (!schema.endsWith("-1")) {
                 issue.putArray("mentions").addObject().put("verification", "none");
             }
-            if (schema.endsWith("-3")) {
-                issue.putObject("fieldProvenance").put("selection", "unanimous").put("verification", "none");
+            if (schema.endsWith("-3") || schema.endsWith("-4")) {
+                ObjectNode provenance = issue.putObject("fieldProvenance").put("selection", "unanimous").put("verification", "none");
+                if (schema.endsWith("-4")) {
+                    provenance.putArray("withheld").add("eventTime");
+                    ObjectNode verdict = issue.putArray("fieldVerdicts").addObject();
+                    verdict.put("field", "eventTime").put("decision", "REJECT").put("verification", "operator-field-verdict");
+                    verdict.putArray("evidenceIds");
+                }
             }
             rewriteRegisteredReceipt(edited);
             assertNotNull(get(), schema);
         }
+    }
+
+    @Test
+    void aReceiptOfTheFullBundle4WithApprovalBasesLiveProvenanceAndSourceSupportServesTheSameEvidence() throws Exception {
+        setUp();
+        // The importer's receipt holds the whole bundle: per-source provenance and review approvals (an operator's final approval
+        // beside an automatic verdict), the origin and text digest of every article and the issue's sourceSupport. The evidence
+        // read takes only the article's observation pins from it and must neither need nor trip over any of it.
+        ObjectNode edited = receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION));
+        ObjectNode bundle = (ObjectNode) edited.get("bundle");
+        bundle.put("schemaVersion", "zoop-graph-handoff-bundle-4");
+        bundle.putObject("provenance").put("declaredSourceKind", "synthetic").put("observedSourceKind", "synthetic")
+                .put("executionMode", "live").put("recordingKind", "provider");
+        ObjectNode source = bundle.putArray("sources").addObject();
+        source.putObject("provenance").put("sourceKind", "synthetic").put("executionMode", "live").put("recordingKind", "provider");
+        ArrayNode used = source.putArray("reviewUsed");
+        used.addObject().put("relationCandidateId", "rc-" + "1".repeat(64)).put("revision", 2).putObject("approvalBasis")
+                .put("kind", "automatic-verifier").put("revision", 2).putNull("reviewer").put("decidedAt", "2026-10-21T00:00:00Z");
+        used.addObject().put("relationCandidateId", "rc-" + "2".repeat(64)).put("revision", 3).putObject("approvalBasis")
+                .put("kind", "operator-final-approval").put("revision", 3).put("reviewer", "reviewer-1")
+                .put("decidedAt", "2026-10-21T01:00:00Z");
+        ArrayNode articles = (ArrayNode) bundle.get("articles");
+        ObjectNode article = (ObjectNode) articles.get(1);
+        article.put("textSha256", "a".repeat(64));
+        article.putObject("origin").put("originId", "origin-1").put("reviewer", "reviewer-1").put("decisionRef", "d:1")
+                .put("decisionVersion", "v1").put("verification", "operator-declared-origin");
+        ObjectNode issue = bundle.putArray("issues").addObject();
+        issue.put("id", "iss-1");
+        issue.putObject("sourceSupport").put("articleCount", 1).put("knownLineageCount", 1).put("independentSourceCount", 1)
+                .putArray("unknownLineageArticles");
+        rewriteRegisteredReceipt(edited);
+        assertNotNull(get());
     }
 
     /** A new receipt file under the same artifact id: registered hash and size follow, so only the content is at fault. */

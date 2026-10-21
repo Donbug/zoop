@@ -449,11 +449,11 @@ CHECK(revision >= 1 AND global_revision >= 1)
 CHECK(origin <> 'admin' OR admin_id IS NOT NULL)
 ```
 
-candidate와 relation 결정을 모두 보존한다. revision은 결정 대상별 값이며 current_revision은 최초 0이다. relationId가 없으면 candidate 대상, 있으면 해당 후보에 속하는 relation 대상을 해석하고 expectedRevision을 그 대상의 current_revision과 비교한다. 공개 응답의 decision/history에 대상별 revision을 제공해 클라이언트가 같은 대상의 값을 보내도록 한다. 공통 publication_state advisory lock→대상 행 잠금 순으로 획득하고 `current_revision=expectedRevision` 조건부 UPDATE로 +1한 값과 동일 revision의 결정을 INSERT한다. UPDATE 0건 또는 UNIQUE(target_id,revision) 충돌은 REVISION_CONFLICT/409다. origin=admin이면 admin_id 필수, verification_artifact_id는 실제 자동 검증 결과가 있을 때만 채운다. allow는 재검증 접수이며 scope=admin, kind=revalidate, status=queued인 job과 결정·감사·멱등성 완료 기록을 같은 트랜잭션에서 저장한다. 기존 DecisionResponse로 decision=revalidation_requested, jobId=접수한 작업 ID, publicChanged=false를 반환한다. 다른 관리자 작업이 running이어도 접수를 허용하며, 실행 중이라는 이유로 결정을 롤백하거나 결정 API에 JOB_IN_PROGRESS를 추가하지 않는다. 동일 멱등성 요청은 기존 결정 응답과 jobId를 재생한다.
+candidate와 relation 결정을 모두 보존한다. revision은 결정 대상별 값이며 current_revision은 최초 0이다. relationId가 없으면 candidate 대상, 있으면 해당 후보에 속하는 relation 대상을 해석하고 expectedRevision을 그 대상의 current_revision과 비교한다. 공개 응답의 decision/history에 대상별 revision을 제공해 클라이언트가 같은 대상의 값을 보내도록 한다. 공통 publication_state advisory lock→대상 행 잠금 순으로 획득하고 `current_revision=expectedRevision` 조건부 UPDATE로 +1한 값과 동일 revision의 결정을 INSERT한다. UPDATE 0건 또는 UNIQUE(target_id,revision) 충돌은 REVISION_CONFLICT/409다. origin=admin이면 admin_id 필수, verification_artifact_id는 실제 자동 검증 결과가 있을 때만 채운다. decision=allow는 2026-10-21 사용자 정책에 따라 현재 HOLD인 대상에 대한 운영자 최종 승인이며(DecisionResponse.decision=approved) 재검증 접수가 아니다. 결정·감사·멱등성 완료 기록만 저장하고 analysis_jobs(kind=revalidate) 행이나 모델·검증 호출을 만들지 않는다. DecisionResponse는 publicChanged=false를 반환하며 jobId는 없다(승인은 그래프 투영·활성화가 아니다). 스키마·endpoint·정확한 인용·현재 원천 권리 검사는 사람이 덮어쓸 수 없고, 이전 자동 판정과 claim 분포는 AI 원천에서 불변으로 남는다. `job_id`는 이전 계약이 allow로 접수한 재검증 job의 이력 링크로 nullable을 유지한다. 신규 approved와 reject는 항상 NULL이다. 이전 allow 행과 그 재검증 job은 삭제·이관하지 않으며 신규 승인으로 재해석하지 않는다. 현재 승인 여부는 최신 원천 revision에 대해 AI 원천이 반환하는 approvalBasis(kind=operator-final-approval)로만 판단하고 review_decisions 행만으로 추정하지 않는다. 다른 관리자 작업이 running이어도 결정 접수에는 영향이 없으며 결정 API에 JOB_IN_PROGRESS를 추가하지 않는다. 동일 멱등성 요청은 기존 결정 응답을 재생한다.
 
 관리자 allow/reject는 자동 검증 판정과 독립적인 이력이다. `verification_artifact_id`를 채운 결정은 그 결정 시점에 실제 참조한 후보 검증 artifact만 가리키며, 사후 생성된 검증 결과를 과거 결정 행에 덧붙이지 않는다. 결과와 영수증 artifact ID는 공개 결정 응답에 추가하지 않고 내부 감사·재현에 사용한다.
 
-결정과 동일 트랜잭션에 저장하는 감사 상세에 `reviewDecisionId`, `sourceVersion`, `sourceRevision`을 넣고 변경하지 않는다. 최신 원천 버전·revision과 일치하지 않는 과거 결정은 history에 남기되 현재 승인·공개 근거로 사용하지 않는다. 결정 API는 상세 응답의 대상별 `sourceVersion`/`sourceRevision`을 `expectedSourceVersion`/`expectedSourceRevision`으로 받는다. `expectedRevision`과 두 원천 기대값을 잠근 검수 대상 및 권위 AI 원천과 비교하고, 하나라도 다르면 REVISION_CONFLICT/409로 거절하며 결정·재검증 작업을 만들지 않는다. relation 결정이면 후보가 아닌 해당 relation의 세 기대값을 비교한다.
+결정과 동일 트랜잭션에 저장하는 감사 상세에 `reviewDecisionId`, `sourceVersion`, `sourceRevision`을 넣고 변경하지 않는다. 최신 원천 버전·revision과 일치하지 않는 과거 결정은 history에 남기되 현재 승인·공개 근거로 사용하지 않는다. 결정 API는 상세 응답의 대상별 `sourceVersion`/`sourceRevision`을 `expectedSourceVersion`/`expectedSourceRevision`으로 받는다. `expectedRevision`과 두 원천 기대값을 잠근 검수 대상 및 권위 AI 원천과 비교하고, 하나라도 다르면 REVISION_CONFLICT/409로 거절하며 결정을 만들지 않는다. relation 결정이면 후보가 아닌 해당 relation의 세 기대값을 비교한다.
 
 global_revision은 대상 전체에 걸친 전역 검수 revision이다. 공통 잠금 아래 `COALESCE(MAX(global_revision),0)+1`로 할당하고 커밋까지 잠금을 유지한다. 전용 DB sequence를 사용하지 않는다. 모든 결정 쓰기·이행 경로가 같은 잠금을 사용하며 이력은 append-only다. READ COMMITTED 트랜잭션에서 잠금 획득 후 별도 SELECT로 MAX를 읽어 대기 전 snapshot을 재사용하지 않는다. 규칙 변경·그래프 생성/활성화·브리핑 발행도 동일 publication_state 잠금을 공유하며 외부 호출은 잠금 밖에서 수행한다.
 
@@ -503,13 +503,13 @@ attempts jsonb; owner_token text?; lease_until timestamptz?; next_attempt_at tim
 UNIQUE(scope) WHERE scope='admin' AND status='running'
 ```
 
-kind=ingest/revalidate/project, scope=admin/internal_projection, status=queued/running/succeeded/failed/cancelled. scope=internal_projection이면 kind=project인 CHECK를 둔다. 클라이언트가 scope를 지정할 수 없으며 자동 투영만 internal_projection, 관리자 createAnalysisJob과 결정 API가 돌려주는 재검증 job은 admin이다. `analysis_job_attempts`는 내부 실행 배열로 통합한다. JobOut의 retryOf/report/checkpoint 의미를 유지한다. 관리자의 재시도는 API 의미에 맞는 새 job과 retry_of를 생성하고, 내부 worker 회수만 attempts에 기록한다.
+kind=ingest/revalidate/project, scope=admin/internal_projection, status=queued/running/succeeded/failed/cancelled. scope=internal_projection이면 kind=project인 CHECK를 둔다. 클라이언트가 scope를 지정할 수 없으며 자동 투영만 internal_projection, 관리자 createAnalysisJob이 접수하는 job은 admin이다. 이전 계약에서 결정 API가 접수한 revalidate job도 admin 이력으로 남기며 현재 결정 API는 job을 만들지 않는다. `analysis_job_attempts`는 내부 실행 배열로 통합한다. JobOut의 retryOf/report/checkpoint 의미를 유지한다. 관리자의 재시도는 API 의미에 맞는 새 job과 retry_of를 생성하고, 내부 worker 회수만 attempts에 기록한다.
 
 자동 graph project 작업은 원인 변경과 같은 RDB 트랜잭션에서 queued로 생성하는 outbox 역할을 한다. JobList.items/active, JobLock, RetryState.other_running, Dashboard.jobs, Overview.jobs의 running/queued/failed24h 모두 scope=admin만 대상으로 한다. failed24h는 해당 scope의 failed 행 중 finished_at이 응답 기준 시각 직전 24시간에 속한 수다. 관리자의 job 단건 조회/재시도/취소에서 internal_projection은 RESOURCE_NOT_FOUND로 처리하고 내부 worker만 회수한다. 내부 작업 상태는 pipeline.graphDb.pendingJobs 등 그래프 운영 상태에 반영한다. ai_executions 비용은 scope와 무관하게 실제 실행을 집계하므로 누락하지 않는다.
 
 관리자 작업은 queued를 여러 개 허용하고 running만 최대 하나로 제한한다. 접수는 queued INSERT로 끝나며 실행권 확보를 기다리지 않는다. 동일 요청은 멱등성/command_key로 기존 job을 반환한다. 내부 투영은 이 실행 제약에서 제외하고 command_key로 중복을 막는다. 대기열 인덱스는 `(requested_at, id) WHERE scope='admin' AND status='queued'`로 둔다.
 
-worker는 짧은 실행권 획득 트랜잭션에서 관리자 실행 advisory lock을 잡고 running이 없을 때 실행 가능한 queued를 requested_at, id 순서로 선택한다. 아직 next_attempt_at이 되지 않은 행과 취소된 행은 제외한다. 선택한 행을 잠근 뒤 queued 상태를 재확인하고 running 전이·새 owner_token·lease_until·시도 기록을 함께 커밋한 다음 외부 작업을 실행한다. 부분 UNIQUE 경합은 worker의 실행권 획득 실패로 처리해 롤백 후 대기시키며, 이미 완료한 allow 접수에 오류를 전파하지 않는다. 종료 시 토큰 조건으로 상태를 확정하고 다음 대기 작업을 실행한다. 임대 만료 회수는 기존 실행을 안전하게 종결/회수하고 오래된 worker의 쓰기를 차단한 뒤 같은 단일 running 제약 아래 수행한다.
+worker는 짧은 실행권 획득 트랜잭션에서 관리자 실행 advisory lock을 잡고 running이 없을 때 실행 가능한 queued를 requested_at, id 순서로 선택한다. 아직 next_attempt_at이 되지 않은 행과 취소된 행은 제외한다. 선택한 행을 잠근 뒤 queued 상태를 재확인하고 running 전이·새 owner_token·lease_until·시도 기록을 함께 커밋한 다음 외부 작업을 실행한다. 부분 UNIQUE 경합은 worker의 실행권 획득 실패로 처리해 롤백 후 대기시키며, 이미 완료한 접수에 오류를 전파하지 않는다. 종료 시 토큰 조건으로 상태를 확정하고 다음 대기 작업을 실행한다. 임대 만료 회수는 기존 실행을 안전하게 종결/회수하고 오래된 worker의 쓰기를 차단한 뒤 같은 단일 running 제약 아래 수행한다.
 
 JobList.items는 대기·실행·종료 작업을 모두 포함한다. JobList.active는 scope=admin이면서 running인 작업 하나 또는 NULL이다. JobLock은 같은 running 행이 있을 때만 locked=true와 해당 jobId를 반환하며, queued만 있으면 locked=false, jobId=null이다. 이 잠금은 실행권 상태를 뜻하며 새 작업 접수를 막지 않는다. Dashboard.jobs/Overview.jobs는 queued를 대기 행 수, running을 0 또는 1로 집계한다. 재시도는 기존 실패 종류·superseded·중복 재시도 검증을 유지하되 다른 작업의 running만으로 접수를 거절하지 않고 허용된 재시도 작업을 queued로 저장한다. RetryState.other_running은 기존 enum에 남기되 이 대기열 정책에서는 다른 실행이 있다는 이유만으로 반환하지 않는다.
 
@@ -639,7 +639,7 @@ erDiagram
     briefing_rounds ||--o{ briefing_changes : changes
     graph_versions ||--o{ graph_activations : activates
     review_targets ||--o{ review_decisions : decisions
-    analysis_jobs o|--o{ review_decisions : revalidation
+    analysis_jobs o|--o{ review_decisions : legacy_revalidation
     publication_rules ||--o{ publication_rule_changes : changes
 ```
 
@@ -720,7 +720,7 @@ API DTO를 그대로 노출하는 DB 엔티티로 만들지는 않는다. 저장
 | `getAdminSession`, `logInAdmin`, `logOutAdmin` | admins, admin_sessions, 코드 권한 매핑 | 별도 쿠키와 유휴/절대 만료 |
 | `getAdminDashboard`, `getPipelineOverview` | 회원·후보·작업·브리핑·그래프·AI·감사 원천의 집계, Neo4j 상태 | 별도 dashboard 테이블 없음. 외부 상태 조회 실패를 실제로 표현 |
 | `listAuditRecords` | audit_logs | 필터·커서로 조회 |
-| `listAnalysisCandidates`, `getAnalysisCandidate`, `decideAnalysisCandidate` | review_targets, 분석 후보 원천, review_decisions, analysis_jobs, audit_logs | revision 검사, allow는 재검증 접수 |
+| `listAnalysisCandidates`, `getAnalysisCandidate`, `decideAnalysisCandidate` | review_targets, 분석 후보 원천, review_decisions, audit_logs (이전 계약 이력 조회 시 analysis_jobs) | revision·원천 CAS, allow는 HOLD 최종 승인이며 job·모델 호출 없음 |
 | `listPublicationRules`, `setPublicationRule` | publication_rules, publication_rule_changes, review_targets, graph_versions | 현재 상태·history·집계와 변경 직렬화 |
 | `listGraphVersions`, `publishGraphVersion`, `activateGraphVersion` | graph_versions, graph_activations, artifacts, analysis_jobs, audit_logs | 검증된 snapshot·투영 성공·활성화 이력 |
 | `listAnalysisJobs`, `createAnalysisJob`, `getAnalysisJob`, `retryAnalysisJob`, `cancelAnalysisJob` | analysis_jobs, audit_logs, idempotency_records | scope=admin의 ingest/revalidate/project, retryOf·checkpoint·취소 |

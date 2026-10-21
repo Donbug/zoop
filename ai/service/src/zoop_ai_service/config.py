@@ -11,6 +11,7 @@ import re
 import stat
 from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from . import extraction_access, graph_access, grants, handoff_access, relation_access
@@ -63,6 +64,16 @@ GRAPH_CREDENTIALS = ("ZOOP_GRAPH_USER", "ZOOP_GRAPH_PASSWORD")
 HANDOFF_VARS = ("ZOOP_AI_SERVICE_HANDOFF_COMMAND", "ZOOP_AI_HANDOFF_STATE_DIR", "ZOOP_AI_HANDOFF_RELATION_STATE_DIR", "ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR",
                 "ZOOP_AI_HANDOFF_INGESTION_STATE_DIR", "ZOOP_AI_SERVICE_HANDOFF_SOURCES", "ZOOP_AI_SERVICE_HANDOFF_CANONICAL",
                 "ZOOP_AI_SERVICE_HANDOFF_DECISIONS", "ZOOP_AI_SERVICE_HANDOFF_BINDINGS", "ZOOP_AI_SERVICE_HANDOFF_EXPORTS")
+# Live S2/S3 children. ONE service-side switch AND the pipeline's own gate are both required; neither alone forwards anything. The names below are
+# the complete set the pipeline's live runtime reads (`zoop_ai_pipeline.live_runtime`): nothing else of the service environment ever reaches a
+# pipeline child, and replay, dependency, graph, handoff and S1 children never receive any of it. A job-registering child (`submit`) gets only the
+# non-secret model/endpoint names; only a child that may send (`resume`) also gets the budget settings and both keys. Values are never logged.
+PIPELINE_LIVE_SWITCH = "ZOOP_AI_SERVICE_PIPELINE_LIVE"
+PIPELINE_LIVE_GATE = "ZOOP_AI_PIPELINE_LIVE_ENABLED"
+PIPELINE_LIVE_PUBLIC_REQUIRED = (PIPELINE_LIVE_GATE, "ZOOP_AI_PIPELINE_LIVE_MODEL", "ZOOP_AI_PIPELINE_LIVE_REASONING_EFFORT", "TYPESAFE_VALIDATION_MODEL")
+PIPELINE_LIVE_PUBLIC_OPTIONAL = ("ZOOP_AI_PIPELINE_LIVE_MAX_OUTPUT_TOKENS", "ZOOP_AI_PIPELINE_LIVE_TIMEOUT_SECONDS", "ZOOP_AI_BASE_URL", "TYPESAFE_BASE_URL")
+PIPELINE_LIVE_BUDGET = ("ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR", "ZOOP_AI_PIPELINE_LIVE_MAX_USD", "ZOOP_AI_PIPELINE_LIVE_MAX_CALLS")
+PIPELINE_LIVE_SECRETS = ("ZOOP_AI_API_KEY", "TYPESAFE_API_KEY")
 
 
 class ConfigError(Exception):
@@ -78,6 +89,23 @@ class Principal:
     name: str
     digests: tuple[str, ...]
     scopes: frozenset[str]
+
+
+@dataclass(frozen=True)
+class PipelineLive:
+    """The environment a live S2/S3 child may receive, split by what each command needs. Frozen at start; the service never reads it again."""
+    public: Mapping[str, str]
+    budget: Mapping[str, str]
+    secret: Mapping[str, str]
+
+    def freeze_env(self, base: Mapping[str, str]) -> dict[str, str]:
+        """A child that registers a live job: the gate, the non-secret model/endpoint settings and the budget DIRECTORY (pinned in the
+        runtime binding by its realpath; nothing is created), never a key, a cap, or a budget amount."""
+        return {**base, **self.public, "ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR": self.budget["ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR"]}
+
+    def send_env(self, base: Mapping[str, str]) -> dict[str, str]:
+        """A child that may send a model call: everything the live runtime reads."""
+        return {**base, **self.public, **self.budget, **self.secret}
 
 
 @dataclass(frozen=True)
@@ -150,6 +178,7 @@ class ServiceConfig:
     extraction: ExtractionConfig | None = None
     graph: GraphConfig | None = None
     handoff: HandoffConfig | None = None
+    pipeline_live: PipelineLive | None = None
 
     @property
     def transport_dir(self) -> Path:
@@ -321,8 +350,9 @@ def _extraction(environ: Mapping[str, str], principals: tuple[Principal, ...], s
     producer = _file(environ["ZOOP_AI_SERVICE_EXTRACTION_REPLAY"], "ZOOP_AI_SERVICE_EXTRACTION_REPLAY")
     topic = _file(environ[EXTRACTION_TOPIC], EXTRACTION_TOPIC) if EXTRACTION_TOPIC in environ else None
     approvals = _file(environ["ZOOP_AI_SERVICE_EXTRACTION_APPROVALS"], "ZOOP_AI_SERVICE_EXTRACTION_APPROVALS")
+    live_available = environ.get(PIPELINE_LIVE_SWITCH) == "1" and environ.get(PIPELINE_LIVE_GATE) == "1"
     try:
-        extraction_access.load(approvals, [p.name for p in principals], topic_available=topic is not None)
+        extraction_access.load(approvals, [p.name for p in principals], topic_available=topic is not None, live_available=live_available)
     except extraction_access.AccessError as error:
         raise ConfigError("ZOOP_AI_SERVICE_EXTRACTION_APPROVALS", error.code) from None
     return ExtractionConfig(command, extraction, ingestion, sources, producer, topic, approvals, _child_env(app_state, worker_state))
@@ -430,6 +460,39 @@ def _handoff(environ: Mapping[str, str], principals: tuple[Principal, ...], stat
                          relation is not None or extraction is not None, _child_env(app_state, worker_state))
 
 
+def _pipeline_live(environ: Mapping[str, str], state_dir: Path, relation: RelationConfig | None, extraction: ExtractionConfig | None) -> PipelineLive | None:
+    """Off unless BOTH the service switch and the pipeline gate are `1`. When on: an S2 or S3 group must exist and every required name must be set
+    and valid, otherwise start fails with the offending name only (never a value)."""
+    if environ.get(PIPELINE_LIVE_SWITCH) != "1":
+        return None
+    if environ.get(PIPELINE_LIVE_GATE) != "1":
+        raise ConfigError(PIPELINE_LIVE_GATE, "pipeline_live_gate_missing")
+    if relation is None and extraction is None:
+        raise ConfigError(PIPELINE_LIVE_SWITCH, "pipeline_live_without_group")
+    for name in (*PIPELINE_LIVE_PUBLIC_REQUIRED, *PIPELINE_LIVE_BUDGET, *PIPELINE_LIVE_SECRETS):
+        if not environ.get(name):
+            raise ConfigError(name, "pipeline_live_incomplete")
+    for name in (*PIPELINE_LIVE_PUBLIC_REQUIRED, *PIPELINE_LIVE_PUBLIC_OPTIONAL, *PIPELINE_LIVE_BUDGET, *PIPELINE_LIVE_SECRETS):
+        value = environ.get(name)
+        if value is not None and (value != value.strip() or any(ord(char) < 32 for char in value)):
+            raise ConfigError(name, "pipeline_live_invalid")
+    try:
+        ceiling = Decimal(environ["ZOOP_AI_PIPELINE_LIVE_MAX_USD"])
+        calls = int(environ["ZOOP_AI_PIPELINE_LIVE_MAX_CALLS"])
+    except (InvalidOperation, ValueError):
+        raise ConfigError("ZOOP_AI_PIPELINE_LIVE_MAX_USD", "pipeline_live_invalid") from None
+    if not ceiling.is_finite() or ceiling <= 0:
+        raise ConfigError("ZOOP_AI_PIPELINE_LIVE_MAX_USD", "pipeline_live_invalid")
+    if calls <= 0:
+        raise ConfigError("ZOOP_AI_PIPELINE_LIVE_MAX_CALLS", "pipeline_live_invalid")
+    budget = _absolute(environ["ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR"], "ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR")
+    roots = [state_dir, *(group.state_dir for group in (relation, extraction) if group is not None)]
+    if any(_overlaps(budget, root) for root in roots):
+        raise ConfigError("ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR", "pipeline_live_budget_overlaps_state")
+    return PipelineLive({name: environ[name] for name in (*PIPELINE_LIVE_PUBLIC_REQUIRED, *PIPELINE_LIVE_PUBLIC_OPTIONAL) if name in environ},
+                        {name: environ[name] for name in PIPELINE_LIVE_BUDGET}, {name: environ[name] for name in PIPELINE_LIVE_SECRETS})
+
+
 def load(environ: Mapping[str, str]) -> ServiceConfig:
     principals = _principals(environ.get("ZOOP_AI_SERVICE_PRINCIPALS"))
     state_dir = _absolute(environ.get("ZOOP_AI_SERVICE_STATE_DIR"), "ZOOP_AI_SERVICE_STATE_DIR")
@@ -464,4 +527,6 @@ def load(environ: Mapping[str, str]) -> ServiceConfig:
     extraction = _extraction(environ, principals, state_dir, worker_state)
     graph = _graph(environ, principals, state_dir, worker_state, relation, extraction)
     handoff = _handoff(environ, principals, state_dir, worker_state, relation, extraction, graph)
-    return ServiceConfig(principals, state_dir, worker_state, command, grants_path, replay, port, live, child, relation, extraction, graph, handoff)
+    pipeline_live = _pipeline_live(environ, state_dir, relation, extraction)
+    return ServiceConfig(principals, state_dir, worker_state, command, grants_path, replay, port, live, child, relation, extraction, graph, handoff,
+                         pipeline_live)

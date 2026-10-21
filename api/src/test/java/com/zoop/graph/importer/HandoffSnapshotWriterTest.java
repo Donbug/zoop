@@ -25,6 +25,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -196,6 +197,78 @@ class HandoffSnapshotWriterTest {
     }
 
     @Test
+    void aRealProducerVerdictExportWritesTheWithheldHeadlineValuesAsNullAndKeepsOriginalsAndVerdictsInTheReceipt() throws Exception {
+        byte[] export = resource("export-field-verdicts.json");
+        JsonNode root = HandoffFixtures.parse(export);
+        VerifiedHandoff verified = verifiedResource(export, root);
+        String versionId = version(verified);
+        // Hand-written in graph_handoff_smoke.py: the supply representative's time is REJECTed (null, unknown) while its period is
+        // ALLOWed; the factory's only mention has its period HELD (null) and keeps its time.
+        JsonNode headlines = HandoffFixtures.parse(resource("expected-headline-values.json")).get("export-field-verdicts.json");
+
+        byte[] bytes = HandoffSnapshotWriter.snapshot(versionId, verified);
+
+        PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(bytes, versionId);
+        for (JsonNode bundleIssue : root.get("bundle").get("issues")) {
+            String id = bundleIssue.get("id").stringValue();
+            JsonNode expected = headlines.get(id);
+            PublicGraphSnapshot.Issue written = issue(snapshot, id);
+            assertEquals(expected.get("eventTime").isNull() ? null : expected.get("eventTime").stringValue(), written.eventTime(), id);
+            assertEquals(expected.get("timePrecision").stringValue(), written.timePrecision(), id);
+            assertEquals(expected.get("period").isNull() ? null : expected.get("period").stringValue(), written.period(), id);
+            // The verdict's own span is part of the issue's evidence exactly as the verified bundle states it.
+            assertEquals(bundleIssue.get("evidenceIds").values().stream().map(JsonNode::stringValue).toList(), written.evidenceIds(), id);
+        }
+        PublicGraphSnapshot.Issue supply = issue(snapshot, "issue:supply-2026q3");
+        assertNull(supply.eventTime());
+        assertEquals("unknown", supply.timePrecision());
+        assertEquals("2026Q3", supply.period());
+        PublicGraphSnapshot.Issue factory = issue(snapshot, "issue:factory-2026q4");
+        assertEquals("2026-11-15", factory.eventTime());
+        assertNull(factory.period());
+        // The relations are unchanged by the verdicts (the operator re-attested the structural edge against the withheld time).
+        assertEquals(root.get("bundle").get("relations").size(), snapshot.relations().size());
+        assertEquals(root.get("bundle").get("evidence").size(), snapshot.evidence().size());
+
+        // The retained receipt keeps the complete original: every mention value and every verdict, byte for byte.
+        JsonNode receipt = HandoffFixtures.parse(HandoffSnapshotWriter.receipt(verified));
+        assertEquals(root.get("bundle"), receipt.get("bundle"));
+        for (JsonNode receiptIssue : receipt.get("bundle").get("issues")) {
+            assertTrue(receiptIssue.get("fieldVerdicts").size() > 0, receiptIssue.get("id").stringValue());
+            assertTrue(receiptIssue.get("mentions").values().stream().noneMatch(m -> m.get("eventTime").isNull()),
+                    "an original mention value was redacted in the receipt");
+        }
+        // No verdict, reason, reviewer or withheld list reached the public projection.
+        String snapshotText = new String(bytes, StandardCharsets.UTF_8);
+        for (String leaked : List.of("fieldVerdicts", "operator-field-verdict", "contradicted", "ambiguous", "unstated", "fverdict",
+                "withheld", "reasonCode")) {
+            assertFalse(snapshotText.contains(leaked), leaked);
+        }
+        // Same bytes every time.
+        assertArrayEquals(bytes, HandoffSnapshotWriter.snapshot(versionId, verifiedResource(export, root)));
+    }
+
+    @Test
+    void aWithheldEventTimeMakesAStructuralRelationReviewedAgainstItFailClosedInTheRealExport() throws Exception {
+        byte[] export = resource("export-field-verdicts-time.json");
+        JsonNode root = HandoffFixtures.parse(export);
+        VerifiedHandoff verified = verifiedResource(export, root);
+        JsonNode bundle = root.get("bundle");
+
+        PublicGraphSnapshot snapshot = written(verified);
+
+        // The supply time is REJECTed and therefore withheld; the structural attestation was reviewed against the original time, so the
+        // producer excluded it visibly rather than keep an edge whose basis it can no longer bind to the public time.
+        PublicGraphSnapshot.Issue supply = issue(snapshot, "issue:supply-2026q3");
+        assertNull(supply.eventTime());
+        assertEquals("unknown", supply.timePrecision());
+        assertEquals("2026Q3", supply.period());
+        assertTrue(bundle.get("exclusions").get("counts").has("applicability_binding_mismatch"));
+        assertTrue(snapshot.relations().stream().noneMatch(r -> r.relationType().equals("STRUCTURALLY_RELATED_TO")));
+        assertEquals(bundle.get("relations").size(), snapshot.relations().size());
+    }
+
+    @Test
     void theValidityWindowKeepsItsLastValidDayAndEveryBasisFactAsGiven() {
         VerifiedHandoff verified = verified(HandoffFixtures.build());
 
@@ -276,7 +349,8 @@ class HandoffSnapshotWriterTest {
         Article first = bundle.articles().get(0);
         List<Article> articles = new ArrayList<>(bundle.articles());
         articles.add(new Article("doc-" + "9".repeat(64), "8".repeat(64), first.documentId(), first.documentVersion(),
-                first.rawVersion(), first.title(), first.url(), first.publishedAt(), first.precision(), first.observations()));
+                first.rawVersion(), first.title(), first.url(), first.publishedAt(), first.precision(), first.observations(),
+                first.textSha256(), first.origin()));
         VerifiedHandoff ambiguous = new VerifiedHandoff(rebuilt(bundle, bundle.issues(), bundle.evidence(), articles),
                 verified.manifest(), verified.manifestNode(), verified.bundleNode(), verified.receiptNode(),
                 verified.attemptsNode(), verified.manifestDigest(), verified.bundleDigest(), verified.contentDigest());
@@ -366,7 +440,7 @@ class HandoffSnapshotWriterTest {
     private static HandoffBundle rebuilt(HandoffBundle bundle, List<Issue> issues, List<Evidence> evidence, List<Article> articles) {
         return new HandoffBundle(bundle.handoffId(), bundle.manifestDigest(), bundle.sourceKind(), bundle.executionMode(),
                 bundle.recordingKind(), bundle.policyVersion(), bundle.files(), bundle.sources(), bundle.companies(), issues,
-                bundle.relations(), evidence, articles);
+                bundle.relations(), evidence, articles, bundle.approvals());
     }
 
     /**
@@ -387,7 +461,8 @@ class HandoffSnapshotWriterTest {
         if (second) {
             articles.add(new Article(SECOND_ARTICLE, SECOND_VERSION, SECOND_ARTICLE, SECOND_VERSION, SECOND_RAW, "합성 제목 B",
                     "https://example.invalid/b", null, "unknown", List.of(new ObservationPin(HandoffFixtures.SELECTOR.roundId(),
-                            HandoffFixtures.SOURCE, 0, ordinal, HandoffFixtures.OBSERVED_AT, "operator-grant", "rights-1"))));
+                            HandoffFixtures.SOURCE, 0, ordinal, HandoffFixtures.OBSERVED_AT, "operator-grant", "rights-1")),
+                    "9".repeat(64), null));
             if (citedByIssue) {
                 String evidenceId = HandoffBundleVerifier.appEvidenceId(SECOND_ARTICLE, SECOND_VERSION, 0, 3);
                 evidence.add(new Evidence(evidenceId, SECOND_ARTICLE, SECOND_VERSION, 0, 3, "a".repeat(64), List.of("loc-1"),

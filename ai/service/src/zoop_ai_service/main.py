@@ -73,15 +73,16 @@ def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) 
         process = RelationProcess(config, deadlines)
         names = [principal.name for principal in config.principals]
         upstreams = config.relation.upstreams_path
-        relation_dispatcher = RelationDispatcher(relation_ledger, process, gate, emit,
-                                                 lambda owner, job_id, digest: relation_access.refusal(upstreams, names, owner, job_id, digest))
+        relation_dispatcher = RelationDispatcher(
+            relation_ledger, process, gate, emit,
+            lambda owner, job_id, digest, identity: relation_access.refusal(upstreams, names, owner, job_id, digest, identity))
         relation = RelationJobs(config, relation_ledger, process, relation_dispatcher, gate)
     if config.extraction is not None:
         extraction_ledger = ExtractionLedger(config.state_dir, config.extraction.state_dir)
         extraction_interrupted = extraction_ledger.interrupt_in_flight()
         extraction_process = ExtractionProcess(config, deadlines)
         authority = extraction_access.Authority(config.extraction.approvals_path, [principal.name for principal in config.principals],
-                                                config.extraction.producer_replay, config.extraction.topic_replay)
+                                                config.extraction.producer_replay, config.extraction.topic_replay, config.pipeline_live is not None)
         extraction_dispatcher = ExtractionDispatcher(extraction_ledger, extraction_process, gate, emit,
                                                      lambda owner, pins, job_id: authority.refusal(owner, job_id, pins.approval))
         extraction = ExtractionJobs(config, extraction_ledger, extraction_process, extraction_dispatcher, gate, authority)

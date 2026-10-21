@@ -94,7 +94,8 @@ class AiPipelineContractTest {
         }
         manifest = JSON.readTree(Files.readString(Path.of(path)));
         world = manifest.get("world");
-        s2Submission = new ExtractionSubmission(world.get("s2JobId").stringValue(), world.get("s2ApprovedRequestDigest").stringValue());
+        s2Submission = new ExtractionSubmission(world.get("s2JobId").stringValue(), world.get("s2ApprovedRequestDigest").stringValue(),
+                com.zoop.ai.ExecutionMode.REPLAY);
         upstream = new RelationUpstream(world.get("upstream").get("jobId").stringValue(), world.get("upstream").get("inputDigest").stringValue());
         main = manifest.get("main");
         s2 = extraction(main, "alpha");
@@ -127,7 +128,7 @@ class AiPipelineContractTest {
     }
 
     private RelationSubmission s3Submission(String jobId) {
-        return new RelationSubmission(jobId, PipelineJob.SourceKind.SYNTHETIC, upstream);
+        return new RelationSubmission(jobId, PipelineJob.SourceKind.SYNTHETIC, com.zoop.ai.ExecutionMode.REPLAY, upstream);
     }
 
     private Path file(String name) {
@@ -210,7 +211,8 @@ class AiPipelineContractTest {
         ExtractionJobStatus ready = s2Ready(s2, s2Submission.jobId());
         assertEquals(Next.FETCH_RESULT, ready.next());
         assertEquals(upstream.inputDigest(), ready.inputDigest(), "the service-built job has the operator job's input digest");
-        assertEquals(new ExtractionJobStatus.Usage(world.get("s2ReplayCalls").longValue(), 0, 0, 0), ready.usage(), "replay only, no provider");
+        assertEquals(new ExtractionJobStatus.Usage(world.get("s2ReplayCalls").longValue(), 0, 0, 0, 0, 0, java.util.Optional.empty(),
+                java.util.Optional.empty(), java.util.Optional.empty(), java.util.Optional.empty(), java.util.Optional.empty()), ready.usage(), "replay only, no provider");
 
         ExtractionResult result = s2.result(s2Submission.jobId());
         assertEquals(DeliveryState.AVAILABLE, result.delivery().state());
@@ -233,12 +235,12 @@ class AiPipelineContractTest {
         assertEquals(State.READY, replay.status().state());
 
         // a different approved request under the same key, and a digest or a job id the operator never approved
-        assertDefinite(s2Refusal(() -> s2.submit(new ExtractionSubmission(jobId, world.get("s2OtherApprovedRequestDigest").stringValue()))),
-                409, "idempotency_conflict");
-        assertDefinite(s2Refusal(() -> s2.submit(new ExtractionSubmission(world.get("s2OtherJobId").stringValue(), "0".repeat(64)))),
-                403, "request_not_approved");
-        assertDefinite(s2Refusal(() -> s2.submit(new ExtractionSubmission("gate-unlisted-s2", s2Submission.approvedRequestDigest()))),
-                403, "request_not_approved");
+        assertDefinite(s2Refusal(() -> s2.submit(new ExtractionSubmission(jobId, world.get("s2OtherApprovedRequestDigest").stringValue(),
+                com.zoop.ai.ExecutionMode.REPLAY))), 409, "idempotency_conflict");
+        assertDefinite(s2Refusal(() -> s2.submit(new ExtractionSubmission(world.get("s2OtherJobId").stringValue(), "0".repeat(64),
+                com.zoop.ai.ExecutionMode.REPLAY))), 403, "request_not_approved");
+        assertDefinite(s2Refusal(() -> s2.submit(new ExtractionSubmission("gate-unlisted-s2", s2Submission.approvedRequestDigest(),
+                com.zoop.ai.ExecutionMode.REPLAY))), 403, "request_not_approved");
 
         HttpExtractionClient beta = extraction(main, "beta");
         assertDefinite(s2Refusal(() -> beta.status(jobId)), 404, "job_not_found");
@@ -324,38 +326,31 @@ class AiPipelineContractTest {
 
     @Test
     @Order(5)
-    void anAllowIsRecordedThenRevalidatedAndTheNewRevisionMakesTheOldOneStale() {
+    void anAllowIsTheFinalApprovalAndTheNewRevisionMakesTheOldOneStale() {
         RelationReviewRequest allow = RelationReviewRequest.of(ALLOW_KEY, held, RelationDecision.ALLOW);
         long expected = Long.parseLong(held.sourceRevision());
         RelationOperationAcknowledgement accepted = s3.review(S3_JOB_1, allow);
-        assertEquals(RelationOperationAcknowledgement.Disposition.REVIEW_ACCEPTED, accepted.disposition());
+        assertEquals(RelationOperationAcknowledgement.Disposition.REVIEW_RECORDED_OR_REPLAYED, accepted.disposition());
         RelationOperationStatus first = accepted.status();
         assertEquals(RelationDecision.ALLOW, first.decision());
         assertEquals("alpha", first.reviewer(), "the reviewer is the authenticated principal");
         assertEquals(ReviewState.APPLIED, first.review().state());
         assertEquals(Long.toString(expected + 1), first.review().resultingSourceRevision().orElseThrow());
-        assertNotEquals(RevalidationState.NOT_REQUESTED, first.revalidation().state());
-
-        RelationOperationStatus verified = eventually(() -> s3.operation(S3_JOB_1, ALLOW_KEY),
-                o -> o.revalidation().state() == RevalidationState.VERIFIED, "revalidation verified");
-        assertEquals(RelationOperationStatus.Verdict.ELIGIBLE, verified.revalidation().verdict().orElseThrow());
-        assertEquals(Long.toString(expected + 2), verified.revalidation().resultingSourceRevision().orElseThrow());
-        assertEquals(RelationOperationStatus.Next.NONE, verified.next());
+        assertEquals(RevalidationState.NOT_REQUESTED, first.revalidation().state(), "an allow is the final approval: no revalidation follows");
+        assertEquals(RelationOperationStatus.Next.NONE, first.next());
+        assertTrue(first.limitation().isEmpty());
 
         RelationOperationAcknowledgement replay = s3.review(S3_JOB_1, allow);
         assertEquals(RelationOperationAcknowledgement.Disposition.REVIEW_RECORDED_OR_REPLAYED, replay.disposition());
-        assertEquals(RevalidationState.VERIFIED, replay.status().revalidation().state());
+        assertEquals(RevalidationState.NOT_REQUESTED, replay.status().revalidation().state());
         assertDefinite(s3Refusal(() -> s3.review(S3_JOB_1, new RelationReviewRequest(ALLOW_KEY, held.relationCandidateId(), sourceVersion,
                 held.sourceRevision(), RelationDecision.REJECT))), 409, "idempotency_conflict");
-        RelationOperationAcknowledgement settled = s3.recoverOperation(S3_JOB_1, ALLOW_KEY);
-        assertEquals(RelationOperationAcknowledgement.Disposition.RECOVERY_COALESCED, settled.disposition());
-        assertEquals(RevalidationState.VERIFIED, settled.status().revalidation().state());
 
         assertDefinite(s3Refusal(() -> relation(main, "beta").operation(S3_JOB_1, ALLOW_KEY)), 404, "job_not_found");
         assertDefinite(s3Refusal(() -> relation(main, "viewer").operation(S3_JOB_1, ALLOW_KEY)), 404, "job_not_found");
 
         UntrustedRelationPayload after = payload(s3, S3_JOB_1);
-        assertEquals(Long.toString(expected + 2), candidate(after, held.relationCandidateId()).sourceRevision());
+        assertEquals(Long.toString(expected + 1), candidate(after, held.relationCandidateId()).sourceRevision());
         assertDefinite(s3Refusal(() -> s3.review(S3_JOB_1, RelationReviewRequest.of("gate-after-stale", held, RelationDecision.ALLOW))), 409,
                 "source_revision_conflict");
         assertDefinite(s3Refusal(() -> s3.review(S3_JOB_1, RelationReviewRequest.of("gate-after-current",
@@ -381,7 +376,7 @@ class AiPipelineContractTest {
 
         assertDefinite(s3Refusal(() -> s3.operation(S3_JOB_1, REJECT_KEY)), 404, "operation_not_found");
         assertDefinite(s3Refusal(() -> s3.operation(S3_JOB_2, ALLOW_KEY)), 404, "operation_not_found");
-        assertEquals(RevalidationState.VERIFIED, s3.operation(S3_JOB_1, ALLOW_KEY).revalidation().state(), "the first job is unaffected");
+        assertEquals(RevalidationState.NOT_REQUESTED, s3.operation(S3_JOB_1, ALLOW_KEY).revalidation().state(), "the first job is unaffected");
         UntrustedRelationPayload.Candidate closed = candidate(payload(s3, S3_JOB_2), held.relationCandidateId());
         assertEquals(Long.toString(Long.parseLong(second.sourceRevision()) + 1), closed.sourceRevision());
         assertDefinite(s3Refusal(() -> s3.review(S3_JOB_2, RelationReviewRequest.of("gate-allow-late", closed, RelationDecision.ALLOW))), 409,
@@ -405,7 +400,7 @@ class AiPipelineContractTest {
             RelationResult s3Result = s3.result(S3_JOB_1);
             assertEquals("source_unauthorized", s3Result.delivery().reason().orElseThrow());
             assertTrue(s3Result.payload().isEmpty() && s3Result.readyPayload().isEmpty());
-            assertEquals(RevalidationState.VERIFIED, s3.operation(S3_JOB_1, ALLOW_KEY).revalidation().state(),
+            assertEquals(RevalidationState.NOT_REQUESTED, s3.operation(S3_JOB_1, ALLOW_KEY).revalidation().state(),
                     "an operation is read from the service ledger only");
         });
         assertEquals(DeliveryState.AVAILABLE, s2.result(s2Job).delivery().state());

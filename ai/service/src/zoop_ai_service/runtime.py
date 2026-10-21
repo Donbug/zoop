@@ -88,9 +88,10 @@ class WorkerProcess:
                              self._deadlines.long, stop)
 
     def execute(self, argv: list[str], payload: dict[str, Any], deadline: float, stop: threading.Event | None = None,
-                interpret: Callable[[int, bytes], Outcome] | None = None) -> Outcome:
+                interpret: Callable[[int, bytes], Outcome] | None = None, env: Mapping[str, str] | None = None) -> Outcome:
         """Run one fixed command: payload through an anonymous stdin file, one canonical JSON out. `interpret` maps the exit code and
-        stdout of another contract's runtime (the S3 door) to an Outcome; the default is the S1 contract."""
+        stdout of another contract's runtime (the S3 door) to an Outcome; the default is the S1 contract. `env` replaces the runner's fixed
+        child environment for this one command (the only way a live pipeline child receives its model settings and keys)."""
         data = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
         transport = self._config.transport_dir
         try:
@@ -99,7 +100,7 @@ class WorkerProcess:
                 stdin.flush()
                 stdin.seek(0)
                 try:
-                    child = subprocess.Popen(argv, stdin=stdin, stdout=stdout, stderr=subprocess.DEVNULL, env=self._env,
+                    child = subprocess.Popen(argv, stdin=stdin, stdout=stdout, stderr=subprocess.DEVNULL, env=self._env if env is None else dict(env),
                                              cwd=transport, start_new_session=True, close_fds=True)
                 except OSError:
                     return Outcome("unavailable")

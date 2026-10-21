@@ -236,6 +236,16 @@ def evaluate(n: dict, view: View) -> dict:
     return payload
 
 
+def reevaluate(stored: dict, view: View) -> dict:
+    """The deterministic precheck re-run over an already stored candidate against the CURRENT frozen view and exact sources. Final human approval
+    uses it: the result is the candidate as it would be generated today, so any difference (schema, endpoint, citation, rights drift) is visible."""
+    n = {key: stored[key] for key in ("relationKey", "type", "subject", "object", "reordered", "connection", "businessScope", "productScope",
+                                      "countries", "citations", "path", "proposalCount")}
+    n["validity"] = {"from": stored["validity"]["from"], "until": stored["validity"]["until"], "citations": stored["validity"]["citations"]}
+    n["reasons"] = stored["generatorReasons"]
+    return evaluate(n, view)
+
+
 def facts(c: dict, view: View) -> dict:
     """Fixed, reasoning-free statement the verifier judges. Contains no generator reasoning, ID, confidence or sibling output."""
     def ep(e: dict) -> dict:
@@ -397,8 +407,15 @@ def decide_impact(c: dict, raw: Any) -> dict:
         raise ReplyInvalid("verifier_quote_missing")
     effect = {q.quote_id: q.effect for q in response.quotes}
     mapped = {side: [i for i in sorted(effect) if effect[i] == key] for side, key in (("positive", "positive"), ("negative", "negative"), ("neutral", "neutral"))}
+    uncertain = [i for i in sorted(effect) if effect[i] == "uncertain"]
+    if uncertain:
+        mapped["uncertain"] = uncertain  # only present when a (live) verifier was not confident about a quote, so replay verdicts keep their exact shape
     if response.target == "contradicted":
         return {"status": "reject", "label": None, "reasons": [_reason("impact_target_contradicted")], "targetVerdict": response.target, "mapped": mapped}
+    if uncertain:
+        # One unconfident quote effect means the cited evidence is not a confident reading: no label may come from the other quotes.
+        reasons = [_reason("quote_effect_uncertain"), *([_reason("impact_target_insufficient")] if response.target == "insufficient" else [])]
+        return {"status": "verified", "label": "undetermined", "reasons": reasons, "targetVerdict": response.target, "mapped": mapped}
     if response.target == "insufficient":
         return {"status": "verified", "label": "undetermined", "reasons": [_reason("impact_target_insufficient")], "targetVerdict": response.target, "mapped": mapped}
     label = label_from(mapped["positive"], mapped["negative"])

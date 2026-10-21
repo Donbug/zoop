@@ -13,9 +13,10 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
-from .relation_wire import HASH_PATTERN, JOB_ID_PATTERN, Next, Projection, Rel, Request, ResumeMode, State, next_action  # noqa: F401 (next_action is re-exported)
+from .relation_wire import (HASH_PATTERN, JOB_ID_PATTERN, PAIRS, ExecutionMode, Next, Projection, RecordingKind, Rel, Request,  # noqa: F401 (next_action is re-exported)
+                            ResumeMode, State, next_action)
 from .wire import ErrorBody, Safe
 
 SCHEMA = "zoop-ai-internal-extraction-1"
@@ -39,8 +40,8 @@ class ExtractionSubmit(Request):
 
 class ExtractionProvenance(Rel):
     source_kind: Literal["synthetic", "actual"]
-    execution_mode: Literal["replay"]
-    recording_kind: Literal["authored-test"]
+    execution_mode: ExecutionMode
+    recording_kind: RecordingKind
 
 
 class ExtractionApproval(Rel):
@@ -48,10 +49,19 @@ class ExtractionApproval(Rel):
 
 
 class ExtractionUsage(Rel):
+    """Accounting. `providerCalls` counts calls transmitted or possibly transmitted (a started call without receipt included), `receivedCalls` the
+    ones a reply was stored for, `unsentCalls` the ones definitively NOT sent. A replay job reports 0/null for the live-only fields."""
     replay_calls: int
     started_without_receipt: int
     provider_calls: int
     paid_model_calls: int
+    received_calls: int
+    unsent_calls: int
+    input_tokens: int | None
+    output_tokens: int | None
+    reasoning_tokens: int | None
+    estimated_usd: str | None
+    charged_usd: str | None
 
 
 class ExtractionFailure(Rel):
@@ -113,13 +123,20 @@ class RtUsage(Projection):
     started_without_receipt: int
     provider_calls: int
     paid_model_calls: int
+    received_calls: int = 0
+    unsent_calls: int = 0
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    reasoning_tokens: int | None = None
+    estimated_usd: str | None = None
+    charged_usd: str | None = None
 
 
 class RtCall(Projection):
     stage: Safe
     state: Safe
     verdict: Safe | None
-    fixture_hash: str  # read inside the service to prove which fixture bytes answered the call; never emitted
+    fixture_hash: str | None = None  # a replay call's answering fixture bytes, read inside the service only; a live call has none
 
 
 class RtStage(Projection):
@@ -133,8 +150,22 @@ class RtDelivery(Projection):
 
 class RtProvenance(Projection):
     source_kind: Literal["synthetic", "actual"]
-    execution_mode: Literal["replay"]
-    recording_kind: Literal["authored-test"]
+    execution_mode: ExecutionMode
+    recording_kind: RecordingKind
+
+    @model_validator(mode="after")
+    def pair(self) -> RtProvenance:
+        if (self.execution_mode, self.recording_kind) not in PAIRS:
+            raise ValueError("executionMode and recordingKind disagree")
+        return self
+
+
+class RtLive(Projection):
+    binding_digest: str = Field(pattern=HASH_PATTERN)  # the frozen live runtime binding's identity (secret-free)
+
+
+class RtBinding(Projection):
+    live: RtLive | None = None                         # live jobs only
 
 
 class ExtractionView(Projection):
@@ -146,6 +177,7 @@ class ExtractionView(Projection):
     resume_mode: ResumeMode
     failure: RtFailure | None
     provenance: RtProvenance
+    binding: RtBinding | None = None
     stages: dict[str, RtStage]
     usage: RtUsage
     calls: list[RtCall]

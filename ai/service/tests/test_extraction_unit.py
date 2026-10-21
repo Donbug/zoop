@@ -23,7 +23,7 @@ from zoop_ai_service import extraction_access, extraction_doc, relation_access
 from zoop_ai_service.config import EXTRACTION_OWN, EXTRACTION_TOPIC, EXTRACTION_VARS, RELATION_VARS, ConfigError, load
 from zoop_ai_service.extraction_access import SCHEMA as APPROVALS_SCHEMA
 from zoop_ai_service.extraction_dispatch import BUSY_CODES, call_pin_problem
-from zoop_ai_service.extraction_ledger import LEDGER_SCHEMA, ExtractionLedger, Pins
+from zoop_ai_service.extraction_ledger import LEDGER_SCHEMA, MIGRATES_FROM, ExtractionLedger, Pins
 from zoop_ai_service.extraction_runtime import interpret
 from zoop_ai_service.extraction_wire import (ExtractionErrorEnvelope, ExtractionJobContent, ExtractionJobStatus, ExtractionResultEnvelope,
                                              ExtractionSubmit, ExtractionView)
@@ -244,12 +244,55 @@ def test_a_missing_or_oversized_manifest_is_unreadable_and_a_valid_one_exposes_e
     path.write_text(document(entry(), entry(PLAIN), entry(PLAIN, "beta")))
     approvals = extraction_access.load(path, ["alpha", "beta"], topic_available=True)
     found = approvals.find("alpha", "s2-job")
-    assert found is not None and found.pins == (digest(REQUEST), PRODUCER, TOPIC) and found.request == REQUEST
+    assert found is not None and found.pins == (digest(REQUEST), PRODUCER, TOPIC, None) and found.request == REQUEST
     assert approvals.find("beta", "s2-job") is None and approvals.find("alpha", "unknown") is None
     # The input digest the pipeline must report is computed from the approved bytes and the pinned producer digest.
     assert found.input_digest == digest({"request": REQUEST, "replayFixtureHash": PRODUCER})
     plain = approvals.find("alpha", "s2-plain")
     assert plain is not None and plain.topic_digest is None
+
+
+LIVE_IDENTITY = "9" * 64
+LIVE_REQUEST = {**REQUEST, "jobId": "s2-live", "provenance": {"sourceKind": "synthetic", "executionMode": "live", "recordingKind": "provider"}}
+
+
+def live_entry(request: dict[str, Any] = LIVE_REQUEST, **overrides: Any) -> dict[str, Any]:
+    return {**entry(request, producerReplayDigest=None, topicReplayDigest=None, liveRuntimeIdentity=LIVE_IDENTITY), **overrides}
+
+
+def live_error(text: str, tmp: Path, *, live: bool = True) -> str:
+    path = tmp / "live.json"
+    path.write_text(text)
+    with pytest.raises(extraction_access.AccessError) as caught:
+        extraction_access.load(path, ["alpha"], topic_available=True, live_available=live)
+    return caught.value.code
+
+
+def test_a_live_approval_pins_the_runtime_identity_and_carries_no_fixture(tmp_path):
+    path = tmp_path / "live.json"
+    path.write_text(document(entry(), live_entry()))
+    approvals = extraction_access.load(path, ["alpha"], topic_available=True, live_available=True)
+    found = approvals.find("alpha", "s2-live")
+    assert found is not None and found.live and found.pins == (digest(LIVE_REQUEST), None, None, LIVE_IDENTITY)
+    # The input digest the pipeline must report binds the request and the approved runtime identity (no fixture exists).
+    assert found.input_digest == digest({"request": LIVE_REQUEST, "liveBindingDigest": LIVE_IDENTITY})
+    assert not approvals.find("alpha", "s2-job").live
+    # Without the live group a live entry is refused at start, never silently kept as a request that could not run.
+    assert live_error(document(live_entry()), tmp_path, live=False) == "extraction_approval_live_unconfigured"
+
+
+@pytest.mark.parametrize("text,reason", [
+    (document(live_entry(liveRuntimeIdentity=None)), "extraction_approval_live_pin_mismatch"),
+    (document(live_entry(producerReplayDigest=PRODUCER)), "extraction_approval_live_pin_mismatch"),
+    (document(live_entry(topicReplayDigest=TOPIC)), "extraction_approval_live_pin_mismatch"),
+    (document(live_entry(liveRuntimeIdentity="short")), "extraction_approval_entry_invalid"),
+    (document(entry(liveRuntimeIdentity=LIVE_IDENTITY)), "extraction_approval_request_invalid"),             # a replay request never carries a runtime pin
+    (document(entry(LIVE_REQUEST)), "extraction_approval_live_pin_mismatch"),                               # a live request cannot name replay fixtures
+    (document(live_entry({**LIVE_REQUEST, "provenance": {**LIVE_REQUEST["provenance"], "recordingKind": "authored-test"}})),
+     "extraction_approval_request_invalid"),
+])
+def test_a_live_approval_is_strict(tmp_path, text, reason):
+    assert live_error(text, tmp_path) == reason
 
 
 # ---- authority: re-read on every call ---------------------------------------------------------------------------------------
@@ -265,11 +308,12 @@ def authority(tmp_path: Path, *, topic: bool = True) -> tuple[extraction_access.
 
 def test_the_authority_names_exactly_what_moved(tmp_path):
     auth, producer, topic, approvals = authority(tmp_path)
-    pins = (digest(REQUEST), hashlib.sha256(b"producer").hexdigest(), hashlib.sha256(b"topic").hexdigest())
+    pins = (digest(REQUEST), hashlib.sha256(b"producer").hexdigest(), hashlib.sha256(b"topic").hexdigest(), None)
     assert auth.refusal("alpha", "s2-job", pins) is None
     assert auth.refusal("beta", "s2-job", pins) == "approval_revoked"                       # another principal's approval does not count
     assert auth.refusal("alpha", "s2-job", (digest(PLAIN), *pins[1:])) == "approval_revoked"  # the job was reserved under another digest
-    assert auth.refusal("alpha", "s2-job", (pins[0], "f" * 64, pins[2])) == "approval_changed"  # the entry's own pins moved
+    assert auth.refusal("alpha", "s2-job", (pins[0], "f" * 64, pins[2], None)) == "approval_changed"  # the entry's own pins moved
+    assert auth.refusal("alpha", "s2-job", (*pins[:3], LIVE_IDENTITY)) == "approval_changed"      # a replay approval can never be turned live
     topic.write_bytes(b"rotated")
     assert auth.refusal("alpha", "s2-job", pins) == "fixture_changed"
     topic.unlink()
@@ -289,9 +333,27 @@ def test_the_authority_names_exactly_what_moved(tmp_path):
     assert auth.refusal("alpha", "s2-job", pins) == "service_configuration_invalid"
 
 
+def test_a_live_job_is_authorized_by_its_identity_and_never_by_a_fixture(tmp_path):
+    approvals = tmp_path / "a.json"
+    approvals.write_text(document(live_entry()))
+    auth = extraction_access.Authority(approvals, ["alpha"], tmp_path / "no-such-producer.json", None, True)   # the fixture files do not even exist
+    pins = (digest(LIVE_REQUEST), None, None, LIVE_IDENTITY)
+    assert auth.refusal("alpha", "s2-live", pins) is None
+    assert auth.refusal("alpha", "s2-live", (*pins[:3], "8" * 64)) == "approval_changed"       # the operator rotated the runtime identity
+    assert auth.refusal("alpha", "s2-live", (*pins[:3], None)) == "approval_changed"
+    approvals.write_text(document(live_entry(liveRuntimeIdentity="8" * 64)))
+    assert auth.refusal("alpha", "s2-live", pins) == "approval_changed"
+    approvals.write_text(document())
+    assert auth.refusal("alpha", "s2-live", pins) == "approval_revoked"
+    no_live = extraction_access.Authority(approvals, ["alpha"], tmp_path / "p", None, False)
+    approvals.write_text(document(live_entry()))
+    assert no_live.refusal("alpha", "s2-live", pins) == "service_configuration_invalid"           # the live group is off: fail closed
+
+
 # ---- the service ledger freezes the identity and never rebinds ------------------------------------------------------------
 
 PINS = Pins(digest(REQUEST), PRODUCER, TOPIC, digest({"request": REQUEST, "replayFixtureHash": PRODUCER}))
+LIVE_PINS = Pins(digest(LIVE_REQUEST), None, None, digest({"request": LIVE_REQUEST, "liveBindingDigest": LIVE_IDENTITY}), LIVE_IDENTITY)
 
 
 def test_a_reservation_is_frozen_and_only_a_release_removes_it(tmp_path):
@@ -302,7 +364,7 @@ def test_a_reservation_is_frozen_and_only_a_release_removes_it(tmp_path):
     assert ledger.begin_attempt("j1") == 1
     database = sqlite3.connect(tmp_path / "extraction-jobs.sqlite3", isolation_level=None)
     for column, value in (("approved_digest", "x"), ("producer_digest", "x"), ("topic_digest", None), ("input_digest", "x"), ("owner", "beta"),
-                          ("request_digest", "x")):
+                          ("request_digest", "x"), ("live_binding", "x")):
         with pytest.raises(sqlite3.IntegrityError):
             database.execute(f"UPDATE extraction_jobs SET {column}=? WHERE job_id='j1'", (value,))   # no rotation can rebind the pinned identity
     assert ledger.release("j1", "beta", "rd") is False and ledger.release("j1", "alpha", "other") is False
@@ -338,6 +400,84 @@ def test_dispatch_is_claimed_once_interrupted_never_requeued_and_recovered_expli
     ledger.close()
 
 
+def test_a_live_reservation_pins_the_runtime_and_its_first_dispatch_is_never_explicit(tmp_path):
+    ledger = ExtractionLedger(tmp_path, tmp_path / "extraction")
+    row = ledger.reserve("live", "alpha", "rd", LIVE_PINS)
+    assert row.pins == LIVE_PINS and row.pins.producer_digest is None and row.pins.live_binding == LIVE_IDENTITY
+    assert ledger.reserve("live", "alpha", "rd", Pins(LIVE_PINS.approved_digest, None, None, LIVE_PINS.input_digest, "8" * 64)).pins == LIVE_PINS
+    database = sqlite3.connect(tmp_path / "extraction-jobs.sqlite3", isolation_level=None)
+    with pytest.raises(sqlite3.IntegrityError):
+        database.execute("UPDATE extraction_jobs SET live_binding='8' WHERE job_id='live'")
+    database.close()
+    assert ledger.accept("live", "alpha", 1000) == "accepted"
+    first = ledger.claim_next()
+    assert first is not None and first.pins == LIVE_PINS and first.explicit is False   # the automatic dispatch runs under the pipeline's initial-only restriction
+    assert ledger.finish("live", Update("idle", "transport_unknown"))
+    assert ledger.enqueue("live", 1000) == "enqueued"
+    again = ledger.claim_next()
+    assert again is not None and again.explicit is True                                  # only an operator's recover runs without it
+    ledger.close()
+
+
+class _NoLiveExtraction:
+    live_available = False
+
+    def __init__(self):
+        self.resumes: list[tuple] = []
+
+    def resume(self, *args, **kwargs):
+        self.resumes.append((args, kwargs))
+        raise AssertionError("a live job must not start a child when the service has no live group")
+
+
+class _OpenGate:
+    def acquire(self, timeout: float) -> bool:
+        return True
+
+    def release(self) -> None:
+        pass
+
+
+def test_a_pending_live_extraction_dispatch_survives_a_restart_without_live_and_ends_idle_unavailable_with_no_child(tmp_path):
+    from zoop_ai_service.extraction_dispatch import ExtractionDispatcher
+    first = ExtractionLedger(tmp_path, tmp_path / "extraction")
+    first.reserve("live", "alpha", "rd", LIVE_PINS)
+    assert first.accept("live", "alpha", 1000) == "accepted"
+    first.close()
+    ledger = ExtractionLedger(tmp_path, tmp_path / "extraction")   # the restart
+    process, logged = _NoLiveExtraction(), []
+    dispatcher = ExtractionDispatcher(ledger, process, _OpenGate(), logged.append, lambda *args: pytest.fail("authority is not even asked"))
+    assert dispatcher.step() is True
+    row = ledger.dispatch("live")
+    assert (row.state, row.last_outcome, row.last_runtime_code) == ("idle", "runtime_error", "live_unavailable") and process.resumes == []
+    assert dispatcher.step() is False
+    assert ledger.enqueue("live", 1000) == "enqueued"
+    ledger.close()
+
+
+def test_a_first_schema_ledger_gains_its_columns_in_place_and_reads_every_old_job_as_replay(tmp_path):
+    ledger = ExtractionLedger(tmp_path, tmp_path / "extraction")
+    ledger.reserve("old", "alpha", "rd", PINS)
+    assert ledger.accept("old", "alpha", 1000) == "accepted"
+    ledger.close()
+    database = sqlite3.connect(tmp_path / "extraction-jobs.sqlite3")  # what a `-1` ledger looks like
+    database.execute("DROP TRIGGER extraction_jobs_immutable")
+    database.execute("ALTER TABLE extraction_jobs DROP COLUMN live_binding")
+    database.execute("ALTER TABLE extraction_dispatch DROP COLUMN explicit")
+    database.execute("UPDATE meta SET value=? WHERE key='schema'", (MIGRATES_FROM[0],))
+    database.commit()
+    database.close()
+    migrated = ExtractionLedger(tmp_path, tmp_path / "extraction")
+    old = migrated.job("old")
+    assert old is not None and old.pins == PINS and old.pins.live_binding is None and old.state == "accepted"
+    claim = migrated.claim_next()
+    assert claim is not None and claim.explicit is False
+    migrated.close()
+    database = sqlite3.connect(tmp_path / "extraction-jobs.sqlite3")
+    assert database.execute("SELECT value FROM meta WHERE key='schema'").fetchone() == (LEDGER_SCHEMA,)
+    database.close()
+
+
 def test_the_ledger_is_bound_to_its_extraction_root_and_schema(tmp_path):
     ledger = ExtractionLedger(tmp_path, tmp_path / "extraction")
     ledger.close()
@@ -351,7 +491,7 @@ def test_the_ledger_is_bound_to_its_extraction_root_and_schema(tmp_path):
     database.close()
     with pytest.raises(ConfigError) as foreign:
         ExtractionLedger(tmp_path, tmp_path / "extraction")
-    assert foreign.value.reason == "extraction_ledger_schema_mismatch" and LEDGER_SCHEMA == "zoop-ai-extraction-jobs-ledger-1"
+    assert foreign.value.reason == "extraction_ledger_schema_mismatch" and LEDGER_SCHEMA == "zoop-ai-extraction-jobs-ledger-2"
 
 
 # ---- dispatch policy: S2's busy codes, nothing else is retried ----------------------------------------------------------------
@@ -525,3 +665,96 @@ def test_a_service_without_the_group_answers_409_after_authentication_with_its_o
     s1 = service.request("GET", "/internal/v1/analysis-jobs/j1", as_=None)
     assert s1.status_code == 401 and s1.json()["schemaVersion"] == "zoop-ai-internal-1"
     assert service.request("GET", "/internal/v1/extraction-jobs/bad id!", as_="alpha").json()["schemaVersion"] == "zoop-ai-internal-extraction-1"
+
+
+# ---- live: the opt-in group, the per-command child environment and the pinned runtime ---------------------------------------------------
+
+LIVE_ENV = {"ZOOP_AI_SERVICE_PIPELINE_LIVE": "1", "ZOOP_AI_PIPELINE_LIVE_ENABLED": "1", "ZOOP_AI_PIPELINE_LIVE_MODEL": "gpt-6-luna",
+            "ZOOP_AI_PIPELINE_LIVE_REASONING_EFFORT": "high", "TYPESAFE_VALIDATION_MODEL": "jev-1.14.0", "ZOOP_AI_PIPELINE_LIVE_MAX_USD": "10",
+            "ZOOP_AI_PIPELINE_LIVE_MAX_CALLS": "20", "ZOOP_AI_API_KEY": "k-openai-secret", "TYPESAFE_API_KEY": "k-jev-secret"}
+
+
+def live_env(ws: Workspace, root: Path, **overrides: str | None) -> dict[str, str]:
+    return extraction_env(ws, root, **{"ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR": str(root / "budget"), **LIVE_ENV, **overrides})
+
+
+def test_pipeline_live_is_off_unless_the_service_switch_and_the_pipeline_gate_are_both_on(tmp_path):
+    ws = Workspace(tmp_path, replay=document_replay())
+    assert load(live_env(ws, tmp_path)).pipeline_live is not None
+    for off in ({"ZOOP_AI_SERVICE_PIPELINE_LIVE": None}, {"ZOOP_AI_SERVICE_PIPELINE_LIVE": "0"}):
+        assert load(live_env(ws, tmp_path, **off)).pipeline_live is None            # the gate and keys alone forward nothing
+    error = refused(live_env(ws, tmp_path, ZOOP_AI_PIPELINE_LIVE_ENABLED=None))
+    assert (error.field, error.reason) == ("ZOOP_AI_PIPELINE_LIVE_ENABLED", "pipeline_live_gate_missing")
+    for name in ("ZOOP_AI_PIPELINE_LIVE_MODEL", "ZOOP_AI_PIPELINE_LIVE_REASONING_EFFORT", "TYPESAFE_VALIDATION_MODEL", "ZOOP_AI_PIPELINE_LIVE_MAX_USD",
+                 "ZOOP_AI_PIPELINE_LIVE_MAX_CALLS", "ZOOP_AI_API_KEY", "TYPESAFE_API_KEY", "ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR"):
+        missing = refused(live_env(ws, tmp_path, **{name: None}) if name != "ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR"
+                          else {k: v for k, v in live_env(ws, tmp_path).items() if k != name})
+        assert (missing.field, missing.reason) == (name, "pipeline_live_incomplete")
+    for name, value in (("ZOOP_AI_PIPELINE_LIVE_MAX_USD", "0"), ("ZOOP_AI_PIPELINE_LIVE_MAX_USD", "nan"), ("ZOOP_AI_PIPELINE_LIVE_MAX_CALLS", "0"),
+                        ("ZOOP_AI_PIPELINE_LIVE_MAX_CALLS", "x"), ("ZOOP_AI_PIPELINE_LIVE_MODEL", " gpt")):
+        assert refused(live_env(ws, tmp_path, **{name: value})).reason == "pipeline_live_invalid"
+    assert refused(live_env(ws, tmp_path, ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR=str(tmp_path / "extraction" / "b"))).reason == "pipeline_live_budget_overlaps_state"
+    # A switch with no S2 or S3 group at all is an error, not a silent no-op.
+    bare = {k: v for k, v in Workspace(tmp_path, replay=document_replay()).env().items()} | {k: v for k, v in LIVE_ENV.items() if v is not None}
+    bare["ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR"] = str(tmp_path / "budget")
+    assert (refused(bare).field, refused(bare).reason) == ("ZOOP_AI_SERVICE_PIPELINE_LIVE", "pipeline_live_without_group")
+
+
+def test_the_live_environment_is_split_by_what_each_command_needs_and_never_reaches_a_replay_command(tmp_path):
+    from zoop_ai_service.extraction_runtime import ExtractionProcess
+    ws = Workspace(tmp_path, replay=document_replay())
+    config = load(live_env(ws, tmp_path, ZOOP_AI_BASE_URL="http://127.0.0.1:1"))
+    assert config.extraction is not None and config.pipeline_live is not None
+    process = ExtractionProcess(config)
+    seen: list[tuple[list[str], dict[str, str] | None]] = []
+    process._runner.execute = lambda argv, payload, deadline, stop=None, interpret=None, env=None: (seen.append((argv, env)), Outcome("unavailable"))[1]  # type: ignore[method-assign]
+    process.submit({"x": 1}, live=True)
+    process.resume("j", topic=True, live=True, initial_only=True)
+    process.inspect("j")
+    process.cancel("j")
+    process.submit({"x": 1})
+    process.resume("j", topic=True, initial_only=True)
+    (live_submit, live_env_), (live_resume, send_env), (inspect, inspect_env), (cancel, cancel_env), (replay_submit, replay_submit_env), (replay_resume, replay_env) = seen
+    assert "--replay" not in live_submit and "--replay" not in live_resume and "--topic-replay" not in live_resume and "--initial-only" in live_resume
+    assert live_env_ is not None and live_env_["ZOOP_AI_PIPELINE_LIVE_ENABLED"] == "1" and live_env_["ZOOP_AI_BASE_URL"] == "http://127.0.0.1:1"
+    assert not {"ZOOP_AI_API_KEY", "TYPESAFE_API_KEY", "ZOOP_AI_PIPELINE_LIVE_MAX_USD", "ZOOP_AI_PIPELINE_LIVE_MAX_CALLS"} & set(live_env_)  # registering needs no key or cap
+    assert live_env_["ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR"] == str(tmp_path / "budget")   # the binding pins the directory's realpath
+    assert send_env is not None and send_env["ZOOP_AI_API_KEY"] == "k-openai-secret" and send_env["TYPESAFE_API_KEY"] == "k-jev-secret"
+    assert send_env["ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR"] == str(tmp_path / "budget") and send_env["ZOOP_AI_PIPELINE_LIVE_MAX_CALLS"] == "20"
+    assert set(send_env) - set(config.extraction.child_env) == set(LIVE_ENV) - {"ZOOP_AI_SERVICE_PIPELINE_LIVE"} | {
+        "ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR", "ZOOP_AI_BASE_URL"}   # exactly the documented names: nothing else of the service environment
+    assert "ZOOP_AI_SERVICE_PIPELINE_LIVE" not in send_env and "HOME" not in send_env and "OPENAI_API_KEY" not in send_env
+    assert (inspect_env, cancel_env, replay_submit_env, replay_env) == (None, None, None, None)   # the fixed replay-only environment
+    assert "--replay" in replay_submit and "--replay" in replay_resume and "--topic-replay" in replay_resume and "--initial-only" in replay_resume
+    assert "--initial-only" not in live_submit + replay_submit + inspect + cancel
+
+
+def live_view(*, digest_: str | None = LIVE_IDENTITY, fixture: str | None = None, calls: bool = True) -> ExtractionView:
+    value = payload(provenance={"sourceKind": "synthetic", "executionMode": "live", "recordingKind": "provider"},
+                    binding={"adapter": {"version": "x"}, "live": {"runtime": {"secret": "no"}, "bindingDigest": digest_}} if digest_ else {"adapter": {}},
+                    calls=[{"stage": "extract", "state": "received", "requestDigest": "e" * 64, "fixtureHash": fixture, "responseDigest": "f" * 64,
+                            "verdict": None}] if calls else [],
+                    usage={"executionMode": "live", "replayCalls": 0, "startedWithoutReceipt": 0, "providerCalls": 1, "paidModelCalls": 1, "receivedCalls": 1,
+                           "unsentCalls": 0, "inputTokens": 10, "outputTokens": 20, "reasoningTokens": 5, "estimatedUsd": "0.000123", "chargedUsd": None})
+    return ExtractionView.model_validate(value)
+
+
+def test_a_live_job_is_checked_against_its_pinned_runtime_identity_not_against_fixtures():
+    assert call_pin_problem(live_view(), LIVE_PINS) is None
+    assert call_pin_problem(live_view(calls=False), LIVE_PINS) is None
+    assert call_pin_problem(live_view(digest_="8" * 64), LIVE_PINS) == "live_binding_changed"      # frozen under another runtime than the approved one
+    assert call_pin_problem(live_view(digest_=None), LIVE_PINS) == "live_binding_changed"          # no live binding reported at all
+    assert call_pin_problem(live_view(fixture="f" * 64), LIVE_PINS) == "live_binding_changed"     # a live call answered by a fixture contradicts itself
+    view = live_view()
+    assert (view.usage.received_calls, view.usage.input_tokens, view.usage.estimated_usd, view.usage.charged_usd) == (1, 10, "0.000123", None)
+    dumped = json.dumps(view.wire())
+    assert "secret" not in dumped  # the runtime binding's other keys are dropped
+
+
+def test_an_unknown_live_outcome_and_the_unsent_state_are_relayed_as_stopped_states_without_interpretation():
+    unknown = payload("reconciling", resumeMode="reconcile_only", failure={"code": "live_response_unknown"},
+                      calls=[{"stage": "extract", "state": "started", "requestDigest": "e" * 64, "fixtureHash": None, "responseDigest": None, "verdict": None}])
+    view = ExtractionView.model_validate(unknown)
+    assert (view.state, view.failure.code, view.calls[0].state) == ("reconciling", "live_response_unknown", "started")
+    from zoop_ai_service.extraction_jobs import UNANSWERED
+    assert "live_response_unknown" in UNANSWERED and "replay_response_unknown" in UNANSWERED
