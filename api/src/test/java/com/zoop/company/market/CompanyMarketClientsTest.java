@@ -284,7 +284,9 @@ class CompanyMarketClientsTest {
 
         // Sunday before the open: Saturday and Sunday are skipped, Friday 10-16 has no bars (a holiday here), so 10-15.
         var weekend = client.prices("KRX:005930", "KRX", "005930", "1d", null, java.time.Instant.parse("2026-10-18T00:00:00Z"));
-        assertEquals("2026-10-15", weekend.range().sessionDate());
+        // A past session is the whole session: it ends at that day's close, not at the requested to.
+        assertEquals(new CompanyPriceResponse.Range("2026-10-15T09:00+09:00", "2026-10-15T15:30+09:00", "2026-10-15"),
+                weekend.range());
         assertEquals(2, weekend.points().size());
         assertFalse(candleQueries.stream().anyMatch(q -> q.contains("before=2026-10-17T15") || q.contains("before=2026-10-18T15")));
     }
