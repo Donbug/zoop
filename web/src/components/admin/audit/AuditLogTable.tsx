@@ -114,7 +114,9 @@ export default function AuditLogTable() {
                 <td className={`${TD} text-zoop-muted`}>
                   {row.actorKind === 'system'
                     ? '시스템'
-                    : (row.actorEmail ?? row.actorId)}
+                    : row.actorKind === 'anonymous'
+                      ? '익명'
+                      : (row.actorEmail ?? row.actorId)}
                 </td>
                 <td className={`${TD} whitespace-nowrap`}>
                   {auditActionLabel[row.action] ?? row.action}

@@ -1532,7 +1532,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## listAuditRecords · 운영 감사 기록 조회
 
-운영 감사 기록 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+관리자 감사 기록을 occurred_at DESC, id DESC로 조회한다. DB outcome=succeeded는 응답 ok로 변환하며 denied/failed는 그대로 반환한다. actor_kind=anonymous인 로그인 실패도 누락하지 않는다. 검색·반환·커서·민감정보 경계는 docs/development/issue-138-audit-contract.md를 따른다. 빈 결과는 200 {items: [], nextCursor: null}이다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1552,13 +1552,13 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
-| action | query | 선택 | string / null |  |
-| actor | query | 선택 | string / null |  |
-| targetType | query | 선택 | string / null |  |
-| q | query | 선택 | string / null |  |
+| action | query | 선택 | string | 동작 코드 정확 일치. 빈 문자열은 필터 없음. 최대 80자. |
+| actor | query | 선택 | string | actor_id 또는 actor_email_snapshot 정확 일치. 빈 문자열은 필터 없음. 최대 200자. |
+| targetType | query | 선택 | string | 대상 종류 정확 일치. 빈 문자열은 필터 없음. 최대 80자. |
+| q | query | 선택 | string | 대소문자 구분 없는 부분 검색: action, actor_id, actor_email_snapshot, target_id, 공개 허용된 reason. 숨긴 사유·detail·인증정보는 검색하지 않는다. 빈 문자열은 필터 없음. 최대 200자. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
-| limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
+| limit | query | 선택 | integer | 페이지 크기. 기본 50, 최대 100. 커서 재사용 시 첫 페이지와 같은 값을 사용한다. |
 
 <a id="getpipelineoverview"></a>
 
@@ -2868,15 +2868,15 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | --- | --- | --- | --- |
 | id | 필수 | integer |  |
 | at | 필수 | string |  |
-| actorKind | 필수 | string {admin, system} |  |
+| actorKind | 필수 | string {admin, system, anonymous} | DB actor_kind를 그대로 반환한다. anonymous는 인증되지 않은 로그인 실패 주체이며 actorId는 unknown이다. |
 | actorId | 필수 | string |  |
-| actorEmail | 필수 | string / null |  |
+| actorEmail | 필수 | string / null | 기록 당시 관리자 이메일. 익명·시스템 행은 null. |
 | action | 필수 | string |  |
 | targetType | 필수 | string |  |
 | targetId | 필수 | string / null |  |
-| reason | 필수 | string / null |  |
-| outcome | 필수 | string {ok, denied, failed} |  |
-| detail | 필수 | object |  |
+| reason | 필수 | string / null | 운영상 필요한 사유만 반환한다. 저장된 비밀값·불필요한 개인정보는 반환하지 않으며 안전하지 않은 과거 값은 null이다. |
+| outcome | 필수 | string {ok, denied, failed} | DB succeeded를 ok로 변환한다. denied와 failed는 그대로 반환한다. |
+| detail | 필수 | object | 동작별 허용된 비민감 필드만 반환한다. 미허용 키·원문·인증정보는 제거한다. |
 
 <a id="schema-auditpage"></a>
 

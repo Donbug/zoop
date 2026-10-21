@@ -2076,7 +2076,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "listAuditRecords",
       "severity": "difference",
-      "message": "목표만 115 · BFF만 23 · 형식/필수/권한 변경 11",
+      "message": "목표만 119 · BFF만 31 · 형식/필수/권한 변경 8",
       "source": ""
     },
     {

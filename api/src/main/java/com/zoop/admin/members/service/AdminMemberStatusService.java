@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import com.zoop.admin.auth.repository.AdminAuditRepository;
 import com.zoop.admin.auth.service.AdminPrincipal;
+import com.zoop.admin.audit.AuditReasonPolicy;
 import com.zoop.admin.members.dto.MemberAdminResponse.MemberStatusResult;
 import com.zoop.admin.members.dto.MemberStatusRequest;
 import com.zoop.admin.members.repository.AdminMemberRepository;
@@ -50,7 +51,9 @@ public class AdminMemberStatusService {
             AdminPrincipal admin, String requestId, String targetStatus, String action) {
         validateKey(idempotencyKey);
         String reason = request.reason().strip();
-        if (reason.isEmpty()) throw new CustomException(ErrorCode.INVALID_REQUEST);
+        if (!AuditReasonPolicy.safeMemberReason(reason)) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
         String path = "/api/v1/admin/members/" + memberId + "/" + (targetStatus.equals("blocked") ? "block" : "unblock");
         String requestHash = Canonical.sha256(memberId + "\n" + targetStatus + "\n"
                 + request.expectedRevision() + "\n" + reason);

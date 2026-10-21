@@ -279,6 +279,45 @@ class AdminAuthPostgresTest {
                 """, Integer.class, adminId));
     }
 
+    @Test
+    void auditLogRequiresAdminSessionAndReturnsFilteredRecords() throws Exception {
+        mvc.perform(get("/api/v1/admin/audit-log"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
+
+        String suffix = UUID.randomUUID().toString();
+        String email = "audit-http-" + suffix + "@example.com";
+        String adminId = provisioning.provision(email, "Audit Admin", PASSWORD,
+                "provision-audit-http-" + suffix);
+        var login = mvc.perform(post("/api/v1/admin/auth/login").header("Origin", ORIGIN)
+                        .contentType("application/json")
+                        .content("{\"email\":\"" + email + "\",\"password\":\"" + PASSWORD + "\"}"))
+                .andExpect(status().isOk()).andReturn();
+        var cookie = login.getResponse().getCookie(AdminSessionCookie.NAME);
+
+        mvc.perform(get("/api/v1/admin/audit-log").cookie(cookie)
+                        .param("action", "auth.login").param("actor", adminId)
+                        .header("X-Request-ID", "audit-read-" + suffix))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Request-ID", "audit-read-" + suffix))
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].actorKind").value("admin"))
+                .andExpect(jsonPath("$.items[0].outcome").value("ok"))
+                .andExpect(jsonPath("$.items[0].action").value("auth.login"))
+                .andExpect(jsonPath("$.nextCursor").value(org.hamcrest.Matchers.nullValue()));
+        mvc.perform(get("/api/v1/admin/audit-log").cookie(cookie)
+                        .param("action", "auth.login").param("actor", adminId)
+                        .param("q", "unmatched-value-" + suffix))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0));
+        mvc.perform(get("/api/v1/admin/audit-log").cookie(cookie).param("limit", "101"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        mvc.perform(get("/api/v1/admin/audit-log").cookie(cookie).param("cursor", "tampered"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.code").value("INVALID_CURSOR"));
+    }
+
     private void insertDashboardMember(String id, String suffix, String status, Instant createdAt) {
         String email = suffix + "@example.test";
         jdbc.update("""
