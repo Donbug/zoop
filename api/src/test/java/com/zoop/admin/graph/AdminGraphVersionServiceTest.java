@@ -136,7 +136,7 @@ class AdminGraphVersionServiceTest {
     }
 
     @Test
-    void syntheticFixturesSkipTheRightsGate() {
+    void syntheticFixturesSkipTheRightsGateUnderTheFixtureSource() {
         claim("fixture-2026-10-01", ACTIVE, "rollback");
         when(versions.find("fixture-2026-10-01")).thenReturn(Optional.of(FIXTURE));
         when(snapshots.load(FIXTURE)).thenReturn(fixtureSnapshot());
@@ -146,6 +146,24 @@ class AdminGraphVersionServiceTest {
 
         verifyNoInteractions(evidence);
         verify(repository, never()).shareLockArticles(any());
+    }
+
+    @Test
+    void aSyntheticFixtureIsNeverActivatedOutsideTheFixtureSource() {
+        for (String source : new String[] {"artifact", "none"}) {
+            org.mockito.Mockito.reset(repository, versions, snapshots);
+            claim("fixture-2026-10-01", ACTIVE, "rollback");
+            when(versions.find("fixture-2026-10-01")).thenReturn(Optional.of(FIXTURE));
+            when(snapshots.load(FIXTURE)).thenReturn(fixtureSnapshot());
+            activating("fixture-2026-10-01", ACTIVE, "rollback", new Activation(ACTIVE, true, LATER));
+
+            var error = assertThrows(CustomException.class, () -> service(storeExists(), true, source)
+                    .activate("fixture-2026-10-01", request("rollback", ACTIVE), "key-1", ADMIN, "r"));
+
+            assertEquals(ErrorCode.INVALID_REQUEST, error.getErrorCode(), source);
+            verify(repository, never()).completeIdempotency(any(), any());
+        }
+        verifyNoInteractions(audit, evidence);
     }
 
     @Test
@@ -333,8 +351,14 @@ class AdminGraphVersionServiceTest {
                 null, "a".repeat(64), 1, false, null, new GraphDbVersionState("unknown", null, null));
     }
 
+    /** The local/dev fixture source, where synthetic fixtures may be activated. */
     private AdminGraphVersionService service(DisclosureExclusionReader exclusions, boolean allowWithoutStore) {
+        return service(exclusions, allowWithoutStore, "fixture");
+    }
+
+    private AdminGraphVersionService service(DisclosureExclusionReader exclusions, boolean allowWithoutStore,
+            String snapshotSource) {
         return new AdminGraphVersionService(repository, versions, snapshots, exclusions, evidence, audit,
-                JsonMapper.builder().build(), Clock.fixed(NOW, ZoneOffset.UTC), allowWithoutStore);
+                JsonMapper.builder().build(), Clock.fixed(NOW, ZoneOffset.UTC), allowWithoutStore, snapshotSource);
     }
 }

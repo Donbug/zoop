@@ -48,6 +48,7 @@ public class AdminGraphVersionService {
     private static final int MAX_LIMIT = 100;
     private static final String CURSOR_PREFIX = "gv1:";
     private static final String IMPORTED = "snapshot";
+    private static final String FIXTURE_SOURCE = "fixture";
 
     private final JdbcAdminGraphVersionRepository repository;
     private final JdbcGraphVersionRepository versions;
@@ -58,11 +59,13 @@ public class AdminGraphVersionService {
     private final ObjectMapper mapper;
     private final Clock clock;
     private final boolean allowWithoutExclusionStore;
+    private final String snapshotSource;
 
     public AdminGraphVersionService(JdbcAdminGraphVersionRepository repository, JdbcGraphVersionRepository versions,
             GraphSnapshotStore snapshots, DisclosureExclusionReader exclusions, EvidenceService evidence,
             AdminAuditRepository audit, ObjectMapper mapper, Clock clock,
-            @Value("${zoop.graph.activation.allow-without-exclusion-store:false}") boolean allowWithoutExclusionStore) {
+            @Value("${zoop.graph.activation.allow-without-exclusion-store:false}") boolean allowWithoutExclusionStore,
+            @Value("${zoop.graph.snapshot.source:none}") String snapshotSource) {
         this.repository = repository;
         this.versions = versions;
         this.snapshots = snapshots;
@@ -72,6 +75,7 @@ public class AdminGraphVersionService {
         this.mapper = mapper;
         this.clock = clock;
         this.allowWithoutExclusionStore = allowWithoutExclusionStore;
+        this.snapshotSource = snapshotSource;
     }
 
     @Transactional(readOnly = true)
@@ -160,11 +164,20 @@ public class AdminGraphVersionService {
 
     /**
      * Runs under the publication lock, before the pointer moves (graph read contract section 0: current rights, exclusions and
-     * read readiness right before the switch). Synthetic fixtures carry no rights and no stored evidence, so only imported
-     * versions are checked. Without an exclusion store "nothing excluded" is unknown: refused unless the operator opted in.
+     * read readiness right before the switch). A synthetic fixture is publishable only where the snapshot source itself is
+     * the local/dev fixture source: an artifact deployment can still read old fixture rows, and "[합성]" data must never become
+     * its public graph. Fixtures carry no rights and no stored evidence, so only imported versions get the rights checks.
+     * Without an exclusion store "nothing excluded" is unknown: refused unless the operator opted in.
      */
     private void requirePublishableNow(GraphVersionRecord version, PublicGraphSnapshot snapshot, String requestId) {
-        if (!IMPORTED.equals(version.kind())) return;
+        if (!IMPORTED.equals(version.kind())) {
+            if (!FIXTURE_SOURCE.equals(snapshotSource)) {
+                log.info("Graph activation refused (graphVersion={}, reason=fixture_outside_fixture_source, source={}, "
+                        + "requestId={})", version.id(), snapshotSource, requestId);
+                throw new CustomException(ErrorCode.INVALID_REQUEST);
+            }
+            return;
+        }
         if (!exclusions.authoritative() && !allowWithoutExclusionStore) {
             log.info("Graph activation refused (graphVersion={}, reason=exclusion_store_unavailable, requestId={})",
                     version.id(), requestId);
