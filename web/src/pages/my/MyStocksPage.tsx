@@ -8,6 +8,7 @@ import { getPortfolio } from '@/apis/portfolio/portfolio';
 import { getSettings } from '@/apis/settings/settings';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import type { CompanySearchTerms } from '@/types/company';
+import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 
 const CONNECT_PARAM = 'account';
 const CONNECT_VALUE = 'connect';
@@ -18,6 +19,12 @@ const CONNECT_VALUE = 'connect';
 //   목록은 숨기기만 하고 언마운트하지 않아 관심 검색어·결과가 남고, 돌아오면 스크롤 위치를 되살린다.
 //   연결 성공·취소·브라우저 뒤로 가기 모두 내 종목으로 돌아온다.
 export default function MyStocksPage() {
+  const ownerId = useAuthStore(selectMemberId);
+  return <MyStocksWorkspace key={ownerId ?? 'anonymous'} ownerId={ownerId} />;
+}
+
+// FS054: 회원별 조회·검색·계좌 작업을 분리하고 같은 회원의 세션 갱신에는 유지한다.
+function MyStocksWorkspace({ ownerId }: { ownerId: string | null }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [params] = useSearchParams();
@@ -31,6 +38,14 @@ export default function MyStocksPage() {
   });
   const savedScroll = useRef<number | null>(null);
   const wasConnecting = useRef(connecting);
+  const active = useRef(true);
+
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (connecting) {
@@ -53,6 +68,9 @@ export default function MyStocksPage() {
 
   // 내 종목에서 열었으면 기록을 하나 되돌려 앞으로 가기에 연결 화면이 남지 않게 한다.
   const closeConnect = () => {
+    // 이전 회원의 연결 응답이나 화면을 떠난 뒤의 응답은 현재 경로를 바꾸지 않는다.
+    if (!active.current || selectMemberId(useAuthStore.getState()) !== ownerId)
+      return;
     if ((location.state as { from?: string } | null)?.from === 'my') {
       navigate(-1);
     } else {
