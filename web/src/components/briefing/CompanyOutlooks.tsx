@@ -149,6 +149,12 @@ export default function CompanyOutlooks({
                 >
                   자세히 · 기업 전망 전문과 근거
                 </summary>
+                {company.price?.status === 'available' && (
+                  <p className={`${NOTE} mt-2`}>
+                    아래 전문은 시세 연결 전에 작성한 원문입니다. 가격 정보는
+                    위의 회차 기준 시세로 별도 보완했습니다.
+                  </p>
+                )}
                 <h5 className="mt-3 text-sm font-semibold">조건부 기업 전망</h5>
                 <Statement value={company.outlook} company={company} />
                 <h5 className="mt-3 text-sm font-semibold">
