@@ -2471,7 +2471,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 ## listMembers · 회원 활동 목록 조회
 
-회원 활동 목록 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원 활동 목록 조회. 활동 기간은 [회원 생성 시각, metadata.asOf)이며 세션은 만료·회수 여부와 무관하게 생성된 member 세션을 센다. 저장 원천이 없는 지표는 null이고 metadata.failures에 SOURCE_UNAVAILABLE을 남긴다. cursor는 status·q·limit과 결합한 불투명 키셋이며 회원 상태가 페이지 사이에 바뀌는 경우 각 페이지 읽기 시점의 상태를 반영한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2492,16 +2492,16 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
 | status | query | 선택 | string {active, blocked} / null |  |
-| q | query | 선택 | string / null | Matches the pseudonymous id or the masked e-mail |
+| q | query | 선택 | string / null | 가명 회원 ID 또는 정규화된 전체 이메일의 정확 일치. 응답 이메일은 항상 마스킹한다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
-| limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
+| limit | query | 선택 | integer | 페이지 크기. 기본값 50, 최대 100. |
 
 <a id="getmemberactivity"></a>
 
 ## getMemberActivity · 회원 활동 상세 조회
 
-회원 활동 상세 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원 활동 상세 조회. 조회는 회원·세션 상태를 변경하지 않으며 대화·AI 결과·브리핑 원문을 읽거나 반환하지 않는다. 활동 기간과 unavailable 표현은 목록과 같다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2528,13 +2528,13 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 ## blockMember · 회원 차단 및 세션 회수
 
-회원 차단 및 세션 회수.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원 차단 및 활성 member 세션 회수. expectedRevision이 현재 statusRevision과 같아야 하며 실제 변경 시 revision을 증가시킨다. 같은 Idempotency-Key와 같은 본문은 최초 응답을 재현하고 다른 본문은 IDEMPOTENCY_CONFLICT다. 이 작업의 완료 레코드는 별도 보존 만료 정책이 도입되기 전까지 자동 삭제하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `POST /api/v1/admin/members/{member_id}/block` |
 | 권한·우선순위 | 관리자(작업별 권한) · P2 |
-| 요청 본문 | [ReasonRequest](#schema-reasonrequest) |
+| 요청 본문 | [MemberStatusRequest](#schema-memberstatusrequest) |
 | 응답 | 200: [MemberStatusResult](#schema-memberstatusresult), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS069-02](../../system/out/feature-FS069-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
@@ -2553,19 +2553,19 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
 | Idempotency-Key | header | 필수 | string | 같은 주체·작업의 중복 실행 방지 키. 보존 기간은 팀 확인 필요다. |
 
-본문 스키마: [ReasonRequest](#schema-reasonrequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
+본문 스키마: [MemberStatusRequest](#schema-memberstatusrequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
 
 <a id="unblockmember"></a>
 
 ## unblockMember · 회원 차단 해제
 
-회원 차단 해제.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원 차단 해제. expectedRevision이 현재 statusRevision과 같아야 한다. 해제는 신규 로그인을 허용하지만 이전에 회수된 세션을 복구하지 않는다. 같은 Idempotency-Key 재전송 규칙과 완료 레코드 보존은 차단과 같다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `POST /api/v1/admin/members/{member_id}/unblock` |
 | 권한·우선순위 | 관리자(작업별 권한) · P2 |
-| 요청 본문 | [ReasonRequest](#schema-reasonrequest) |
+| 요청 본문 | [MemberStatusRequest](#schema-memberstatusrequest) |
 | 응답 | 200: [MemberStatusResult](#schema-memberstatusresult), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS069-02](../../system/out/feature-FS069-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
@@ -2584,7 +2584,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
 | Idempotency-Key | header | 필수 | string | 같은 주체·작업의 중복 실행 방지 키. 보존 기간은 팀 확인 필요다. |
 
-본문 스키마: [ReasonRequest](#schema-reasonrequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
+본문 스키마: [MemberStatusRequest](#schema-memberstatusrequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
 
 <a id="getcompanyfinancials"></a>
 
@@ -5032,10 +5032,10 @@ The three market indicators stored with a published round; never changed after p
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| sessions | 필수 | integer |  |
-| graphSelections | 필수 | integer |  |
-| aiQuestions | 필수 | integer |  |
-| briefingViews | 필수 | integer |  |
+| sessions | 필수 | integer | [member.createdAt, metadata.asOf) 사이 생성된 kind=member 세션 수. 만료·회수된 세션도 포함한다. |
+| graphSelections | 필수 | integer / null | 그래프 선택 횟수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다. |
+| aiQuestions | 필수 | integer / null | AI 질문 횟수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다. |
+| briefingViews | 필수 | integer / null | 브리핑 조회 횟수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다. |
 
 <a id="schema-membercounts"></a>
 
@@ -5061,11 +5061,12 @@ The three market indicators stored with a published round; never changed after p
 | onboardingCompleted | 필수 | boolean |  |
 | tutorialCompleted | 필수 | boolean |  |
 | watchlistCount | 필수 | integer |  |
-| holdingCount | 필수 | integer |  |
+| holdingCount | 필수 | integer / null | 보유 종목 수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다. |
 | accountConnected | 필수 | boolean |  |
-| feedbackUp | 필수 | integer |  |
-| feedbackDown | 필수 | integer |  |
+| feedbackUp | 필수 | integer / null | 긍정 평가 수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다. |
+| feedbackDown | 필수 | integer / null | 부정 평가 수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다. |
 | history | 필수 | [MemberAction](#schema-memberaction)[] |  |
+| metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-memberlist"></a>
 
@@ -5078,6 +5079,7 @@ The three market indicators stored with a published round; never changed after p
 | items | 필수 | [MemberRow](#schema-memberrow)[] |  |
 | nextCursor | 필수 | string / null |  |
 | counts | 필수 | [MemberCounts](#schema-membercounts) |  |
+| metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-memberrow"></a>
 
@@ -5091,9 +5093,21 @@ The three market indicators stored with a published round; never changed after p
 | emailMasked | 필수 | string |  |
 | signupMethod | 필수 | string |  |
 | createdAt | 필수 | string (date-time) |  |
-| lastActiveAt | 필수 | string (date-time) / null |  |
+| lastActiveAt | 필수 | string (date-time) / null | metadata.asOf 이전에 생성된 가장 최근 member 세션 시각. 세션이 없으면 null이다. |
 | status | 필수 | string {active, blocked} |  |
+| statusRevision | 필수 | integer (int64) | 회원 상태 변경 선행조건. 상태가 실제 변경될 때만 증가한다. |
 | activity | 필수 | [MemberActivity](#schema-memberactivity) |  |
+
+<a id="schema-memberstatusrequest"></a>
+
+### MemberStatusRequest
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| expectedRevision | 필수 | integer (int64) |  |
+| reason | 필수 | string |  |
 
 <a id="schema-memberstatusresult"></a>
 
@@ -5103,7 +5117,7 @@ The three market indicators stored with a published round; never changed after p
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| changed | 필수 | boolean | False when the member already had that status (the call is idempotent) |
+| changed | 필수 | boolean | 최신 expectedRevision에서 이미 목표 상태이면 false다. 오래된 revision은 false가 아니라 REVISION_CONFLICT이며 같은 키 재전송은 최초 응답의 값을 재현한다. |
 | detail | 필수 | [MemberDetail](#schema-memberdetail) |  |
 
 <a id="schema-mentionout"></a>

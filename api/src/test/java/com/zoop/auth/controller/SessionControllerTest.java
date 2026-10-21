@@ -43,8 +43,9 @@ class SessionControllerTest {
             }
 
             @Override
-            public void insertMemberSession(String id, String memberId, String hash,
+            public boolean insertMemberSession(String id, String memberId, String hash,
                     String keyId, Instant created, Instant expiry) {
+                return true;
             }
 
             @Override
