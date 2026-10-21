@@ -216,6 +216,11 @@ def _prepare(data):
                    "allowedEvidenceIds": sorted(evidence), "allowedPreviousForecastIds": sorted(prior),
                    "allowedEvaluationIds": sorted(evaluations),
                    "allowedPreviousPublicationIds": [previous["roundId"]] if previous["status"] == "available" else []})
+    if data["context"].get("summaryPromptVersion") == ROLE_VERSION:
+        frozen["claimRequirements"] = {"version": ROLE_VERSION, "requiredKinds": required_kinds(frozen),
+            "factUnit": "one independently verifiable subject-predicate-time-scope assertion; qualifiers belong to that assertion",
+            "comparisonUnit": "prior simulated judgment + current observation or missingness + server evaluation status",
+            "repair": "return every required slot on every attempt; retain supported roles and correct only rejected content; never invent a missing outlook"}
     return frozen, evidence, indicators, prior, evaluations, note
 
 
@@ -236,11 +241,55 @@ def _schema(frozen, evidence, indicators, prior, evaluations):
     props["targetId"]["enum"] = [None, *(t["targetId"] for t in targets)]
     if not targets:
         props["kind"]["enum"].remove("forecast")
+    if frozen["context"].get("summaryPromptVersion") == ROLE_VERSION:
+        # Required roles are separate, mandatory schema fields on the first AND repair call.
+        slots = {}
+        for kind in required_kinds(frozen):
+            slot = copy.deepcopy(schema["properties"]["claims"]["items"])
+            slot["properties"]["kind"]["enum"] = [kind]
+            slots[kind] = slot
+        props["kind"]["enum"] = [k for k in props["kind"]["enum"]
+            if k not in {"forecast_update", "result_comparison"} or k in slots]
+        schema["properties"]["claims"].update(minItems=max(0, 2-len(slots)), maxItems=8-len(slots))
+        schema["properties"]["requiredClaims"] = {"type": "object", "properties": slots,
+            "required": list(slots), "additionalProperties": False}
     return schema
 
 
 QUALITY_VERSION = "market-context-v2.3-outlook"
 QUALITY_FLAGS = ("atomicClaim", "evidenceClauseCoverage", "qualifiersPreserved", "observableConditionsOnly")
+ROLE_VERSION = "market-context-v2.4-outlook"
+ROLE_FLAGS = ("factUnitAppropriate", "comparisonElementsComplete", "evidenceClauseCoverage", "qualifiersPreserved", "observableConditionsOnly")
+QUALITY_VERSIONS = {QUALITY_VERSION, ROLE_VERSION}
+
+
+def required_kinds(frozen):
+    context = frozen["marketContext"]
+    kinds = ["forecast"] if context["forecastTargets"] else []
+    previous = context["previousPublication"]
+    if previous["status"] == "available":
+        if context["edition"] == "morning" and previous["summary"].get("forecasts"):
+            kinds.append("forecast_update")
+        if context["edition"] == "evening":
+            kinds.append("result_comparison")
+    return kinds
+
+
+def draft_claims(draft, frozen):
+    """Lossless projection, never an insertion/restoration of an omitted model claim."""
+    if frozen["context"].get("summaryPromptVersion") != ROLE_VERSION:
+        return draft
+    require(type(draft) is dict and set(draft) == {"claims", "requiredClaims"}
+            and type(draft["claims"]) is list and type(draft["requiredClaims"]) is dict,
+            "market_role_draft_structure")
+    roles = required_kinds(frozen)
+    require(set(draft["requiredClaims"]) == set(roles), "market_role_required_slots")
+    for role in roles:
+        slot = draft["requiredClaims"][role]
+        require(type(slot) is dict and slot.get("kind") == role, "market_role_slot_kind")
+    require(all(c.get("kind") not in {"forecast_update", "result_comparison"} or c.get("kind") in roles for c in draft["claims"]),
+            "market_role_comparison_slot_required")
+    return {"claims": [*draft["claims"], *(draft["requiredClaims"][role] for role in roles)]}
 
 
 def quality_claims(claims, evidence):
@@ -256,6 +305,7 @@ def quality_claims(claims, evidence):
 
 
 def _claims(draft, frozen, evidence, indicators, prior, evaluations):
+    draft = draft_claims(draft, frozen)
     require(type(draft) is dict and set(draft) == {"claims"} and type(draft["claims"]) is list
             and 2 <= len(draft["claims"]) <= 8, "market_context_claim_count")
     targets = {t["targetId"]: t for t in frozen["marketContext"]["forecastTargets"]}
@@ -284,11 +334,16 @@ def _claims(draft, frozen, evidence, indicators, prior, evaluations):
             require(c.get("updateAction") is None, "market_context_foreign_update")
         if kind == "result_comparison":
             require(frozen["marketContext"]["edition"] == "evening" and (c["previousForecastIds"] or c["previousPublicationIds"]), "market_context_comparison_basis")
+            if frozen["context"].get("summaryPromptVersion") == ROLE_VERSION:
+                expected = {key for key, value in evaluations.items() if value["forecastId"] in c["previousForecastIds"]}
+                require(set(c["evaluationIds"]) == expected and (expected or not c["previousForecastIds"]),
+                        "market_role_comparison_evaluations")
+                require(c["previousForecastIds"] or c["evidenceIds"] or c["indicatorIds"], "market_role_comparison_current_basis")
         # Evaluation IDs must concern precisely the forecasts named by this claim.
         require(all(evaluations[e]["forecastId"] in c["previousForecastIds"] for e in c["evaluationIds"]), "market_context_evaluation_owner")
         claims.append({"claimId": "market:claim:" + str(index), **c})
     require(any(c["evidenceIds"] for c in claims), "market_context_news_required")
-    if frozen["context"].get("summaryPromptVersion") in {"market-context-v2.1-outlook", "market-context-v2.2-outlook", QUALITY_VERSION}:
+    if frozen["context"].get("summaryPromptVersion") in {"market-context-v2.1-outlook", "market-context-v2.2-outlook", *QUALITY_VERSIONS}:
         kinds = {c["kind"] for c in claims}
         if targets:
             require("forecast" in kinds, "market_outlook_forecast_required")
@@ -297,7 +352,7 @@ def _claims(draft, frozen, evidence, indicators, prior, evaluations):
                 require("forecast_update" in kinds, "market_outlook_update_required")
             if frozen["marketContext"]["edition"] == "evening":
                 require("result_comparison" in kinds, "market_outlook_comparison_required")
-    if frozen["context"].get("summaryPromptVersion") == QUALITY_VERSION:
+    if frozen["context"].get("summaryPromptVersion") in QUALITY_VERSIONS:
         quality_claims(claims, evidence)
     return claims
 
@@ -341,8 +396,8 @@ def generate_market_summary(client, data, max_repairs=1):
         checks = list(decision["checks"].values())
         flags = ("noUnsupportedNumbers", "noUnsupportedCausality", "temporalAppropriate", "noInvestmentAdvice",
                  "comparisonAppropriate", "forecastAppropriate")
-        if frozen["context"].get("summaryPromptVersion") == QUALITY_VERSION:
-            flags += QUALITY_FLAGS
+        if frozen["context"].get("summaryPromptVersion") in QUALITY_VERSIONS:
+            flags += ROLE_FLAGS if frozen["context"]["summaryPromptVersion"] == ROLE_VERSION else QUALITY_FLAGS
         passed = all(check["verdict"] == "SUPPORTED" and all(check[k] is True for k in flags) for check in checks)
         last_validation = {"status": "PASS" if passed else "WITHHELD", "checks": checks,
                            "meaning": "Independent model assessment of frozen inputs; no external fact certification."}

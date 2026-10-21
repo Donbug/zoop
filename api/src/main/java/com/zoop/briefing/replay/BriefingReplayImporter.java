@@ -801,12 +801,12 @@ public final class BriefingReplayImporter {
         marketArtifact(output, "summaries", record.string("summaryResultSha256"), summary.node());
         if (record.has("marketContext")) {
             StrictJson.Obj broad = record.object("marketContext");
-            require(BriefingMarketContextRules.contextual(summary) && Set.of("market-context-v2", "market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook").contains(context.string("summaryPromptVersion"))
+            require(BriefingMarketContextRules.contextual(summary) && Set.of("market-context-v2", "market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook", "market-context-v2.4-outlook").contains(context.string("summaryPromptVersion"))
                     && context.string("marketContextSha256").equals(summary.string("marketContextSha256")), "market_context_digest_binding");
             marketArtifact(output, "contexts", context.string("marketContextSha256"), broad.node());
             BriefingMarketContextRules.targetsAndEvaluations(broad, snapshot);
-            validateMarketSummary(summary, news, snapshot, broad, "market-context-v2.3-outlook".equals(context.string("summaryPromptVersion")));
-            if (Set.of("market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook").contains(context.string("summaryPromptVersion"))) BriefingMarketContextRules.outlookRequired(summary, broad);
+            validateMarketSummary(summary, news, snapshot, broad, BriefingMarketContextRules.qualityFlags(context.string("summaryPromptVersion")));
+            if (Set.of("market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook", "market-context-v2.4-outlook").contains(context.string("summaryPromptVersion"))) BriefingMarketContextRules.outlookRequired(summary, broad);
         } else {
             require(!BriefingMarketContextRules.contextual(summary), "market_context_result_without_input");
             validateMarketSummary(summary, news, snapshot);
@@ -817,7 +817,7 @@ public final class BriefingReplayImporter {
     private static String marketPromptFolder(StrictJson.Obj record) {
         if (!record.has("marketContext")) return "market-summary";
         String version = record.object("context").string("summaryPromptVersion");
-        require(Set.of("market-context-v2", "market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook").contains(version), "market_context_prompt_version");
+        require(Set.of("market-context-v2", "market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook", "market-context-v2.4-outlook").contains(version), "market_context_prompt_version");
         return "market-context-v2".equals(version) ? "market-context" : version;
     }
 
@@ -951,6 +951,10 @@ public final class BriefingReplayImporter {
     }
 
     static void validateMarketSummary(StrictJson.Obj summary, StrictJson.Obj news, StrictJson.Obj snapshot, StrictJson.Obj broad, boolean quality) {
+        validateMarketSummary(summary, news, snapshot, broad, quality ? BriefingMarketContextRules.QUALITY_FLAGS : List.of());
+    }
+
+    static void validateMarketSummary(StrictJson.Obj summary, StrictJson.Obj news, StrictJson.Obj snapshot, StrictJson.Obj broad, List<String> qualityFlags) {
         boolean contextual = broad != null;
         Instant.parse(summary.string("generatedAt")); text(summary, "scopeNote");
         Set<String> evidence = new HashSet<>(); for (StrictJson.Obj selected : news.objects("selected"))
@@ -989,10 +993,11 @@ public final class BriefingReplayImporter {
                     && check.bool("noUnsupportedCausality") && check.bool("temporalAppropriate") && check.bool("noInvestmentAdvice")
                     && (!contextual || (check.bool("comparisonAppropriate") && check.bool("forecastAppropriate"))); text(check, "reason");
         }
-        if (quality) {
+        if (!qualityFlags.isEmpty()) {
             for (StrictJson.Obj check : verification.objects("checks"))
-                for (String flag : BriefingMarketContextRules.QUALITY_FLAGS) supported &= check.bool(flag);
+                for (String flag : qualityFlags) supported &= check.bool(flag);
             if ("PASS".equals(status)) BriefingMarketContextRules.qualityClaims(summary, news, broad);
+            if ("PASS".equals(status) && qualityFlags.equals(BriefingMarketContextRules.ROLE_FLAGS)) BriefingMarketContextRules.roleClaims(summary, broad);
         }
         if (contextual) BriefingMarketContextRules.claims(summary, broad);
         require(checked.equals(targets) && ("PASS".equals(status) == supported), "market_summary_verification_coverage");
@@ -1045,7 +1050,9 @@ public final class BriefingReplayImporter {
                 ArrayNode projected = StrictJson.newArray(); for (StrictJson.Obj claim : summary.objects("claims")) {
                     ObjectNode value = (ObjectNode) claim.node().deepCopy(); value.remove("claimId"); projected.add(value);
                 }
-                require(actual.array("claims").equals(projected), "market_summary_generated_content_binding");
+                JsonNode generatedClaims = record.has("marketContext") && BriefingMarketContextRules.ROLE_VERSION.equals(marketPromptFolder(record))
+                        ? BriefingMarketContextRules.generatedClaims(actual, record.object("marketContext")) : actual.array("claims");
+                require(generatedClaims.equals(projected), "market_summary_generated_content_binding");
             } else {
                 require(data.object("draft").array("claims").equals(summary.array("claims")), "market_summary_verified_draft_binding");
                 Set<String> checked = new HashSet<>(); for (StrictJson.Obj check : summary.object("verification").objects("checks")) {

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /** Internal historical context contract; never turns simulated predecessors into operating publications. */
@@ -24,6 +25,50 @@ final class BriefingMarketContextRules {
     }
 
     static final List<String> QUALITY_FLAGS = List.of("atomicClaim", "evidenceClauseCoverage", "qualifiersPreserved", "observableConditionsOnly");
+    static final String ROLE_VERSION = "market-context-v2.4-outlook";
+    static final List<String> ROLE_FLAGS = List.of("factUnitAppropriate", "comparisonElementsComplete", "evidenceClauseCoverage", "qualifiersPreserved", "observableConditionsOnly");
+
+    static List<String> qualityFlags(String version) {
+        return ROLE_VERSION.equals(version) ? ROLE_FLAGS : "market-context-v2.3-outlook".equals(version) ? QUALITY_FLAGS : List.of();
+    }
+
+    static List<String> requiredKinds(StrictJson.Obj context) {
+        List<String> roles = new java.util.ArrayList<>();
+        if (!context.objects("forecastTargets").isEmpty()) roles.add("forecast");
+        StrictJson.Obj previous = context.object("previousPublication");
+        if ("available".equals(previous.string("status"))) {
+            if ("morning".equals(context.string("edition")) && !previous.object("summary").objects("forecasts").isEmpty()) roles.add("forecast_update");
+            if ("evening".equals(context.string("edition"))) roles.add("result_comparison");
+        }
+        return roles;
+    }
+
+    /** Exact projection of required model slots, with no synthetic restoration of a missing forecast. */
+    static ArrayNode generatedClaims(StrictJson.Obj draft, StrictJson.Obj context) {
+        draft.exactly(Set.of("claims", "requiredClaims"));
+        var roles = requiredKinds(context); StrictJson.Obj slots = draft.object("requiredClaims");
+        slots.exactly(Set.copyOf(roles)); ArrayNode result = (ArrayNode) draft.array("claims").deepCopy();
+        for (StrictJson.Obj claim : draft.objects("claims"))
+            check(!Set.of("forecast_update", "result_comparison").contains(claim.string("kind")) || roles.contains(claim.string("kind")), "market_role_comparison_slot_required");
+        for (String role : roles) {
+            check(role.equals(slots.object(role).string("kind")), "market_role_slot_kind");
+            result.add(slots.object(role).node().deepCopy());
+        }
+        return result;
+    }
+
+    static void roleClaims(StrictJson.Obj summary, StrictJson.Obj context) {
+        for (StrictJson.Obj claim : summary.objects("claims")) {
+            if (!"result_comparison".equals(claim.string("kind"))) continue;
+            Set<String> expected = new HashSet<>();
+            for (StrictJson.Obj evaluation : context.objects("forecastEvaluations"))
+                if (claim.strings("previousForecastIds").contains(evaluation.string("forecastId"))) expected.add(evaluation.string("evaluationId"));
+            check(new HashSet<>(claim.strings("evaluationIds")).equals(expected)
+                    && (!expected.isEmpty() || claim.strings("previousForecastIds").isEmpty()), "market_role_comparison_evaluations");
+            check(!claim.strings("previousForecastIds").isEmpty() || !claim.strings("evidenceIds").isEmpty()
+                    || !claim.strings("indicatorIds").isEmpty(), "market_role_comparison_current_basis");
+        }
+    }
 
     /** v2.3 guards only; older immutable recordings retain their original contract. */
     static void qualityClaims(StrictJson.Obj summary, StrictJson.Obj news, StrictJson.Obj broad) {

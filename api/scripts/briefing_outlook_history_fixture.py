@@ -18,7 +18,7 @@ def load(name, path):
     return value
 
 
-def create(directory, tampered_history=False, quality=False, continuation=False):
+def create(directory, tampered_history=False, quality=False, continuation=False, role=False):
     recovery = load("history_authored_recovery", ROOT / "api/scripts/briefing_recovery_fixture.py")
     presentation = load("history_authored_presentation", ROOT / "scripts/briefing_presentation_enrichment.py")
     market = load("history_authored_market", ROOT / "scripts/tests/test_briefing_market_data.py")
@@ -52,14 +52,17 @@ def create(directory, tampered_history=False, quality=False, continuation=False)
         def run(version, baseline, output, transport):
             runner.VERSION = version
             runner.context.PROMPTS = ROOT / "api/src/main/resources/briefing/prompts" / version
-            args = runner.parser().parse_args([
+            arguments = [
                 "--baseline", str(baseline), "--sources", str(directory / "sources.jsonl"),
                 "--clocks", str(directory / "clocks.json"), "--session-calendar", str(calendar_path),
                 "--output", str(output), "--user-inbox-ref", "inbox/authored-recovery.md",
                 "--run-id", "authored-" + version.replace(".", "_"), "--max-calls", "400", "--max-repairs", "0",
                 "--execute-authorized-generation",
-                "--round", "2026-10-07-morning", "--round", "2026-10-07-evening",
-                "--round", "2026-10-08-morning", "--round", "2026-10-08-evening"])
+                "--round", "2026-10-07-morning", "--round", "2026-10-07-evening"]
+            if version != runner.context.ROLE_VERSION:
+                arguments += ["--round", "2026-10-08-morning"]
+            arguments += ["--round", "2026-10-08-evening"]
+            args = runner.parser().parse_args(arguments)
             return runner.run(args, transport)
         def withheld(stage, answer):
             if stage == "market_summary_verification":
@@ -81,12 +84,25 @@ def create(directory, tampered_history=False, quality=False, continuation=False)
                         claim.update(conditions=[], direction="uncertain", text="합성 근거가 엇갈려 잠정 방향은 불확실합니다.")
             else:
                 for check in answer["checks"].values():
-                    check.update({flag: True for flag in runner.context.QUALITY_FLAGS})
-        second = run("market-context-v2.3-outlook" if quality else "market-context-v2.2-outlook",
-                     directory / "first", directory / "second", authored.ContextTransport(quality_answer if quality else None))
+                    check.update({flag: True for flag in (runner.context.ROLE_FLAGS if role else runner.context.QUALITY_FLAGS)})
+            if role and stage == "market_summary_generation":
+                slots, optional = {}, []
+                for claim in answer["claims"]:
+                    kind = claim["kind"]
+                    if kind in {"forecast", "forecast_update", "result_comparison"} and kind not in slots:
+                        slots[kind] = claim
+                    else:
+                        optional.append(claim)
+                answer.update(claims=optional, requiredClaims=slots)
+        version = runner.context.ROLE_VERSION if role else "market-context-v2.3-outlook" if quality else "market-context-v2.2-outlook"
+        second = run(version, directory / "first", directory / "second", authored.ContextTransport(quality_answer if quality or role else None))
+        if role:
+            plan = base.strict_load(base.regular(directory / "second/outlook-plan.json"))
+            assert len(plan["requestedRoundIds"]) == 3 and len(plan["dependencyRoundIds"]) == 1, plan
+            assert plan["plannedNewCalls"] == plan["maximumNewCalls"] == 8, plan
         if continuation:
-            third = run("market-context-v2.3-outlook", directory / "second", directory / "third", authored.ContextTransport(quality_answer))
-            assert third["summaryPass"] == 4 and third["newPaidCalls"] == (0 if quality else 8), third  # identical prompt/input recordings are reused
+            third = run(version if role else "market-context-v2.3-outlook", directory / "second", directory / "third", authored.ContextTransport(quality_answer))
+            assert third["summaryPass"] == 4 and third["newPaidCalls"] == (0 if quality or role else 8), third
     assert first["summaryPass"] == 0 and first["newPaidCalls"] == 8, first
     assert second["summaryPass"] == 4 and second["newPaidCalls"] == 8, second
     return {"realPaidCalls": 0, "realProviderFetches": 0, "authoredOldCalls": 8, "authoredNewCalls": 8,
@@ -94,4 +110,4 @@ def create(directory, tampered_history=False, quality=False, continuation=False)
 
 
 if __name__ == "__main__":
-    print(create(Path(sys.argv[1]), "--tampered-history" in sys.argv, "--quality" in sys.argv, "--continuation" in sys.argv))
+    print(create(Path(sys.argv[1]), "--tampered-history" in sys.argv, "--quality" in sys.argv, "--continuation" in sys.argv, "--role" in sys.argv))

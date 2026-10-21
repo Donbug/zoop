@@ -22,7 +22,7 @@ def helper(name):
 
 context = helper("briefing_market_context")
 base = context.base
-VERSION = "market-context-v2.3-outlook"
+VERSION = "market-context-v2.4-outlook"
 context.PROMPTS = context.PROMPTS.with_name(VERSION)
 
 
@@ -98,6 +98,21 @@ def prepare(args):
         chosen.append((definitions[row["roundId"]], effective, row))
     cutoffs = [context.legacy._aware(x[0]["window"]["to"]) for x in chosen]
     context.require(cutoffs == sorted(set(cutoffs)), "outlook_chronological_rounds_required")
+    requested = [r[0]["roundId"] for r in chosen]
+    if VERSION == context.ROLE_VERSION:
+        # A changed predecessor invalidates a retained paid successor's frozen context.
+        # Include that successor instead of splicing old and new comparison histories.
+        changed = set(requested)
+        for row in sorted(presentation["rounds"], key=lambda x: context.legacy._aware(x["marketEnrichment"]["cutoff"])):
+            current = row["marketEnrichment"]
+            predecessors = [r for r in presentation["rounds"] if r["marketEnrichment"]["cutoff"] == definitions[row["roundId"]]["window"]["from"]]
+            if "marketContext" in current and any(p["roundId"] in changed for p in predecessors):
+                changed.add(row["roundId"])
+        chosen = [(definitions[rid], recovered[rid], records[rid]) for rid in changed]
+        chosen.sort(key=lambda x: context.legacy._aware(x[0]["window"]["to"]))
+        for _, effective, _ in chosen:
+            context.require(effective["status"] == "SELECTED" and effective["result"]["verification"]["status"] == "PASS"
+                and base.digest(base.canonical(effective["result"])) == effective["resultSha256"], "outlook_verified_news_required")
     # Verify the calendar and all source populations without making a paid call.
     coverage = []
     for definition, effective, row in chosen:
@@ -107,7 +122,7 @@ def prepare(args):
         coverage.append({"roundId": definition["roundId"], **broad["coverage"],
                          "targetDates": sorted({t["targetDate"] for t in broad["forecastTargets"]})})
     prior = len(list((baseline / "calls").glob("*.pending.json")))
-    context.require(prior + 2 * len(chosen) <= args.max_calls <= 512, "outlook_shared_budget_insufficient")
+    context.require(1 <= args.max_calls <= 512, "outlook_budget_range")
     if args.max_calls > 400:
         context.require(bool(getattr(args, "budget_approval_ref", None)), "outlook_budget_extension_approval_required")
     prompts = {p.name: base.digest(base.regular(p)) for p in sorted(context.PROMPTS.iterdir()) if p.is_file()}
@@ -121,6 +136,17 @@ def prepare(args):
             "maxRepairsPerRound": getattr(args, "max_repairs", 0),
             "plannedNewCalls": 2 * len(chosen), "roundIds": [r[0]["roundId"] for r in chosen],
             "coverage": coverage, "newProviderFetches": 0, "operationalCollectionGate": False}
+    if VERSION == context.ROLE_VERSION:
+        plan.update({"requestedRoundIds": requested,
+            "dependencyRoundIds": [r[0]["roundId"] for r in chosen if r[0]["roundId"] not in requested],
+            "maximumNewCalls": 2 * (1 + getattr(args, "max_repairs", 0)) * len(chosen),
+            "minimumTotalReservations": prior + 2 * len(chosen),
+            "maximumTotalReservations": prior + 2 * (1 + getattr(args, "max_repairs", 0)) * len(chosen),
+            "additionalCeilingForMinimum": max(0, prior + 2 * len(chosen) - args.max_calls),
+            "additionalCeilingForMaximum": max(0, prior + 2 * (1 + getattr(args, "max_repairs", 0)) * len(chosen) - args.max_calls),
+        })
+    else:
+        context.require(prior + 2 * len(chosen) <= args.max_calls, "outlook_shared_budget_insufficient")
     return raw, bundle, rows, unknown, calendar, chosen, records, plan
 
 
@@ -128,6 +154,8 @@ def run(args, transport=None):
     raw, original, rows, unknown, calendar, chosen, records, plan = prepare(args)
     if not args.execute_authorized_generation:
         return {**plan, "status": "OFFLINE", "newPaidCalls": 0}
+    context.require(plan.get("minimumTotalReservations", plan["priorReservations"] + plan["plannedNewCalls"]) <= args.max_calls,
+                    "outlook_shared_budget_insufficient")
     output, baseline = Path(args.output).resolve(), Path(args.baseline).resolve()
     context.require(output != baseline and baseline not in output.parents and output not in baseline.parents,
                     "outlook_separate_output_required")
@@ -237,8 +265,8 @@ def parser():
         p.add_argument("--" + flag, required=True)
     p.add_argument("--round", action="append", help="Chronological date-edition key; defaults to all available rounds")
     p.add_argument("--key-file")
-    p.add_argument("--prompt-version", choices=("market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook"),
-                   help="Fresh CLI runs default to v2.3; select the original version to reuse an immutable old plan")
+    p.add_argument("--prompt-version", choices=("market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook", "market-context-v2.4-outlook"),
+                   help="Fresh CLI runs default to v2.4; select the original version to reuse an immutable old plan")
     p.add_argument("--max-calls", type=base.bounded(1, 512), default=400)
     p.add_argument("--budget-approval-ref", help="Separate explicit human approval for a ceiling above the existing 400 calls")
     p.add_argument("--max-repairs", type=int, choices=(0, 1), default=0)

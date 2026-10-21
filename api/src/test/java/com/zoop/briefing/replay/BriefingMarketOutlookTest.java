@@ -103,4 +103,35 @@ class BriefingMarketOutlookTest {
         ObjectNode context = context("evening", true); ((ArrayNode) context.get("forecastTargets")).add(target());
         assertDoesNotThrow(() -> BriefingMarketContextRules.outlookRequired(StrictJson.Obj.of(withheld), StrictJson.Obj.of(context)));
     }
+
+    @Test void roleSlotsCannotDropForecastOrHideComparisonInOptionalClaims() {
+        ObjectNode context = context("evening", true); ((ArrayNode) context.get("forecastTargets")).add(target());
+        ObjectNode draft = StrictJson.newObject(); draft.putArray("claims").addObject().put("kind", "fact").put("text", "Authored fact");
+        var slots = draft.putObject("requiredClaims"); slots.putObject("result_comparison").put("kind", "result_comparison");
+        assertThrows(StrictJson.Malformed.class, () -> BriefingMarketContextRules.generatedClaims(StrictJson.Obj.of(draft), StrictJson.Obj.of(context)));
+        slots.putObject("forecast").put("kind", "forecast").put("text", "Authored forecast");
+        byte[] before = StrictJson.write(draft);
+        var result = BriefingMarketContextRules.generatedClaims(StrictJson.Obj.of(draft), StrictJson.Obj.of(context));
+        assertEquals(3, result.size()); assertEquals("forecast", result.get(1).path("kind").asString());
+        assertEquals("result_comparison", result.get(2).path("kind").asString());
+        assertArrayEquals(before, StrictJson.write(draft));
+        ((ArrayNode) draft.get("claims")).addObject().put("kind", "result_comparison");
+        assertDoesNotThrow(() -> BriefingMarketContextRules.generatedClaims(StrictJson.Obj.of(draft), StrictJson.Obj.of(context)));
+        slots.remove("result_comparison");
+        assertThrows(StrictJson.Malformed.class, () -> BriefingMarketContextRules.generatedClaims(StrictJson.Obj.of(draft), StrictJson.Obj.of(context)));
+    }
+
+    @Test void comparisonIncludesTheExactServerEvaluationWithoutApplyingFactAtomicity() {
+        ObjectNode context = context("evening", true), summary = summary("result_comparison");
+        ((ArrayNode) context.get("forecastEvaluations")).addObject().put("evaluationId", "server-evaluation").put("forecastId", "prior-forecast")
+                .put("status", "unavailable").put("reason", "direction_not_testable");
+        ObjectNode claim = (ObjectNode) summary.path("claims").get(0);
+        ((ArrayNode) claim.get("previousForecastIds")).add("prior-forecast");
+        assertThrows(IllegalArgumentException.class, () -> BriefingMarketContextRules.roleClaims(StrictJson.Obj.of(summary), StrictJson.Obj.of(context)));
+        ((ArrayNode) claim.get("evaluationIds")).add("server-evaluation");
+        assertDoesNotThrow(() -> BriefingMarketContextRules.roleClaims(StrictJson.Obj.of(summary), StrictJson.Obj.of(context)));
+        assertTrue(BriefingMarketContextRules.qualityFlags("market-context-v2.3-outlook").contains("atomicClaim"));
+        assertFalse(BriefingMarketContextRules.qualityFlags(BriefingMarketContextRules.ROLE_VERSION).contains("atomicClaim"));
+        assertTrue(BriefingMarketContextRules.qualityFlags(BriefingMarketContextRules.ROLE_VERSION).contains("comparisonElementsComplete"));
+    }
 }

@@ -58,3 +58,14 @@
 `briefing_market_outlook_run.py`는 새 실행 전 history의 바이트 SHA·뉴스 동일성·receipt 목록 연결을 확인한다. 실제 요청은 원본 inputUserInboxRef 계보를 유지하고, 추가 유료 실행 승인·상한은 별도의 budgetApprovalRef/최대425 설정과 계획에 남긴다. 입력 폴더와 기존 DB/서버를 덮어쓰지 않는다.
 
 완료 결과의 비교 목록은 `scripts/briefing_outlook_compare.py --baseline <기존 bundle-v2.json> --current <새 bundle-v2.json> --output <별도 private review 폴더>`로 만든다. 생성한 comparison.json/index.html은 같은 회차별 기존/새 버전·상태·문안·근거 수·조건/입력 문서 수를 나란히 보여준다. 실제 프론트 주소를 --old-url/--new-url로 지정한다. 보류 문안은 ‘비교용 보류 기록’으로 표시하며 발행으로 꾸미지 않는다. 이 도구는 모델 호출·DB 쓰기를 하지 않는 로컬 검토용이며 원문/키/로그 폴더를 HTTP 공개 루트로 쓰지 않는다.
+
+
+## v2.4 역할별 사실/비교 검증·필수 전망 슬롯 (2026-10-21)
+
+새 CLI 기본은 `market-context-v2.4-outlook`이다. 기존 완료 실행은 원래 `--prompt-version`과 output/plan으로 재사용한다. v2.3 기록을 새 버전으로 재명명하지 않는다.
+
+v2.4는 사실의 독립 주장 단위와 비교/갱신의 요소 완전성을 구분한다. 생성 응답의 `requiredClaims`는 현재 target/직전 구조화 전망/직전 summary에 따라 필수 역할을 가진다. 첫 생성과 보완 모두 동일한 필수 슬롯·kind 검사를 통과해야 하며, Python/Java는 raw 응답을 동일한 순서로 투영한다. 서버 전망 삽입이나 기존 실패 판정 변경은 없다. 자세한 정의/반례는 `docs/development/briefing-outlook-quality.md`와 v2.4 생성/검증 prompt를 본다.
+
+부분 회차 요청은 새 선행 결과로 입력이 바뀌는 후속 유료 회차를 포함한다. `requestedRoundIds`/`dependencyRoundIds`로 원요청과 추가 의존 회차를 구분한다. `plannedNewCalls`는 생성+검증 기본 수, `maximumNewCalls`는 `--max-repairs`를 포함한 상한이다. `minimumTotalReservations`, `maximumTotalReservations`, `additionalCeilingForMinimum/Maximum`은 기존 미응답까지 포함한 계획이며 승인 자체가 아니다. 미실행 계획은 현재 승인 상한이 부족해도 표시할 수 있지만 `--execute-authorized-generation`은 최소 예산 부족 시 어떤 호출/출력 생성도 하기 전에 거부한다.
+
+10/7 출근·퇴근 +10/8 퇴근 요청에는10/8 출근이 추가돼4개를 순서대로 다시 연결한다. 실제424/425 기록 기준 신규8~16, 총432~440이 필요하다. 현재는 보완 코드/합성 검증만 실행했으며 기존 실제v2.3의1PASS/3WITHHELD·화면·DB는 보존한다. 새 실제 문안이 나와 검증된 뒤 별도 실행/DB/비교 목록에 등록한다.

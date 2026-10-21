@@ -4,6 +4,8 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 spec=importlib.util.spec_from_file_location('continuation_runner',Path(__file__).parents[1]/'briefing_market_outlook_run.py')
 r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
@@ -38,5 +40,15 @@ class OutlookContinuationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root,current,_=self.chain(d)
             with self.assertRaisesRegex(r.context.ContextError,'cycle_or_depth'):r.history_chain(root,current,max_depth=1)
+
+    def test_insufficient_approved_ceiling_rejects_execution_before_transport_or_output(self):
+        plan = {'minimumTotalReservations':432,'maxCallsIncludingPrior':425,'priorReservations':424,'plannedNewCalls':8}
+        prepared = (b'{}',{},[],[],{},[],{},plan)
+        args = SimpleNamespace(execute_authorized_generation=True,max_calls=425)
+        calls = []
+        with patch.object(r,'prepare',return_value=prepared):
+            with self.assertRaisesRegex(r.context.ContextError,'shared_budget_insufficient'):
+                r.run(args,lambda request: calls.append(request))
+        self.assertEqual([],calls)
 
 if __name__=='__main__':unittest.main()
