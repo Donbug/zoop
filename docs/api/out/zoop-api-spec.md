@@ -4251,7 +4251,7 @@ details에는 승인된 검증 정보만 제공한다. 스택·원문·개인정
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | items | 필수 | [EventSummary](#schema-eventsummary)[] |  |
-| unknownTimeItems | 필수 | [EventSummary](#schema-eventsummary)[] | With from/to: events without an approved event time whose reportedAt (KST date) falls in the range, newest report first. Without from/to they are in `items` and this is empty. |
+| unknownTimeItems | 필수 | [EventSummary](#schema-eventsummary)[] | With from/to: events without an approved event time whose reportedAt (KST date) falls in the range, newest report first. Without from/to they are in `items` and this is empty. Paging treats `items` then `unknownTimeItems` as one sequence: limit counts both arrays together and nextCursor continues into the unknown-time events. |
 | metadata | 필수 | [EventListMetadata](#schema-eventlistmetadata) |  |
 | nextCursor | 필수 | string, null |  |
 
