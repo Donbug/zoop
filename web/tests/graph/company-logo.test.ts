@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { companyLogo } from '@/util/company-logo';
 import { createMockGraph } from '@/mocks/graph/response';
 import { toG6Data } from '@/components/graph/graph-model';
+import { styleGraph } from '@/components/graph/graph-appearance';
 
 it('D-GRP-01 resolves all fixture company logos to existing local files', () => {
   const assets = Object.keys(
@@ -61,3 +62,47 @@ it('D-GRP-01 renders logos even when the API supplies null', () => {
     expect(node.style.iconHeight).toBe(icon);
   }
 });
+
+it.each([
+  { theme: 'light' as const, paper: '#ffffff', ink: '#1a1a1a' },
+  { theme: 'dark' as const, paper: '#3d3937', ink: '#ffffff' },
+])(
+  'D-GRP-01 keeps a readable $theme fallback without any logo or brand color',
+  ({ theme, paper, ink }) => {
+    const root = document.documentElement;
+    const previousStyle = root.getAttribute('style');
+    const previousTheme = root.getAttribute('data-theme');
+    try {
+      root.dataset.theme = theme;
+      // JSDOM does not load the app stylesheet; use its actual light/dark tokens.
+      root.style.setProperty('--color-zoop-paper', paper);
+      root.style.setProperty('--color-zoop-ink', ink);
+      const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+      const company = {
+        ...graph.nodes.find((node) => node.kind === 'company')!,
+        id: 'ORG:UNMAPPED_FIXTURE_COMPANY',
+        label: '새로운 기업 (합성)',
+        logoUrl: null,
+        brandColor: null,
+      };
+      expect(companyLogo(company.id, company.logoUrl)).toBeNull();
+      graph.nodes.push(company);
+      const data = toG6Data(graph, 1245, 705);
+      for (const variant of ['original', 'improved'] as const) {
+        const node = styleGraph(data, { variant, theme }).nodes?.find(
+          (node) => node.id === company.id,
+        );
+        expect(node?.style?.iconSrc).toBeUndefined();
+        expect(node?.style?.iconText).toBe('새');
+        expect(node?.style?.fill).toBe(paper);
+        expect(node?.style?.iconFill).toBe(ink);
+        expect(node?.style?.fill).not.toBe(node?.style?.iconFill);
+      }
+    } finally {
+      if (previousStyle === null) root.removeAttribute('style');
+      else root.setAttribute('style', previousStyle);
+      if (previousTheme === null) root.removeAttribute('data-theme');
+      else root.setAttribute('data-theme', previousTheme);
+    }
+  },
+);

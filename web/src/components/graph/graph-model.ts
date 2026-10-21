@@ -239,7 +239,11 @@ export function toG6Data(
           x: x * sx,
           y: y * sy,
           size,
-          fill: company ? logoBackground(logo) : themeColor('ink'),
+          fill: company
+            ? logo
+              ? logoBackground(logo)
+              : themeColor('paper')
+            : themeColor('ink'),
           stroke: themeColor('ink'),
           lineWidth: n.isFocus ? 1.4 : 0.667,
           halo: n.isFocus,
