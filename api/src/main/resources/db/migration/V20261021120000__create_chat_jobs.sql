@@ -27,6 +27,7 @@ CREATE TABLE chat_jobs (
     request_hash text NOT NULL,
     asked_at timestamptz NOT NULL,
     frozen_context jsonb NOT NULL,
+    frozen_selection jsonb NOT NULL,
     context_company_ids text[] NOT NULL DEFAULT '{}',
     graph_version_id text,
     status text NOT NULL,
@@ -68,6 +69,11 @@ CREATE TABLE chat_jobs (
     CONSTRAINT ck_chat_jobs_question CHECK (char_length(question) BETWEEN 1 AND 4000 AND btrim(question) <> ''),
     CONSTRAINT ck_chat_jobs_request_hash CHECK (request_hash ~ '^[0-9a-f]{64}$'),
     CONSTRAINT ck_chat_jobs_frozen_context CHECK (jsonb_typeof(frozen_context) = 'object'),
+    CONSTRAINT ck_chat_jobs_frozen_selection CHECK (
+        jsonb_typeof(frozen_selection) = 'object'
+        AND COALESCE(jsonb_typeof(frozen_selection -> 'contextIds') = 'array', false)
+        AND COALESCE(jsonb_typeof(frozen_selection -> 'evidenceIds') = 'array', false)
+        AND COALESCE(jsonb_typeof(frozen_selection -> 'evidencePool') = 'array', false)),
     CONSTRAINT ck_chat_jobs_status CHECK (status IN ('queued', 'running', 'completed', 'failed', 'cancelled')),
     CONSTRAINT ck_chat_jobs_phase CHECK (
         (status = 'running' OR phase IS NULL)
@@ -108,6 +114,7 @@ BEGIN
     IF NEW.session_id IS DISTINCT FROM OLD.session_id OR NEW.seq IS DISTINCT FROM OLD.seq
         OR NEW.question IS DISTINCT FROM OLD.question OR NEW.request_hash IS DISTINCT FROM OLD.request_hash
         OR NEW.asked_at IS DISTINCT FROM OLD.asked_at OR NEW.frozen_context IS DISTINCT FROM OLD.frozen_context
+        OR NEW.frozen_selection IS DISTINCT FROM OLD.frozen_selection
         OR NEW.context_company_ids IS DISTINCT FROM OLD.context_company_ids
         OR NEW.graph_version_id IS DISTINCT FROM OLD.graph_version_id
         OR NEW.resolves_job_id IS DISTINCT FROM OLD.resolves_job_id

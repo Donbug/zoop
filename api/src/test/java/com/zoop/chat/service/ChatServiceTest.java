@@ -238,6 +238,18 @@ class ChatServiceTest {
     }
 
     @Test
+    void theSelectionIsStoredAsRequestedAndAReplyKeepsItsOriginalScope() {
+        service.submit(MEMBER, SESSION, "job-00001", new ChatJobRequest("job-00001", "이 근거로 설명해줘",
+                new ChatContextRequest(List.of("ev-1", "ev-2"), List.of("ev-1"), null, null, null), null));
+        var narrowed = mapper.readValue(repository.jobs.get("job-00001").frozenSelection(), FrozenSelection.class);
+        assertEquals(new FrozenSelection(List.of("ev-1", "ev-2"), List.of("ev-1"), List.of("ev-1")), narrowed);
+
+        repository.finish("job-00001", "completed", "clarification", clarification("choice-a"), null, 1);
+        reply("job-00002", "job-00001", "choice-a");
+        assertEquals(repository.jobs.get("job-00001").frozenSelection(), repository.jobs.get("job-00002").frozenSelection());
+    }
+
+    @Test
     void readingAJobNeverChangesItAndChecksOwnership() {
         service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "첫 질문"));
         var before = repository.jobs.get("job-00001");
@@ -306,8 +318,9 @@ class ChatServiceTest {
         public Frozen freeze(ChatContextRequest request) {
             var ids = request == null ? List.<String>of() : request.contextIds();
             var items = ids.stream().map(id -> new ChatContextItem(id, "company", id)).toList();
+            var evidence = request == null ? List.<String>of() : request.evidenceIds();
             return new Frozen(new ChatFrozenContext(items, 0, request == null ? null : request.period(), null, "gv-1"),
-                    ids, "gv-1");
+                    new FrozenSelection(ids, evidence, evidence), ids, "gv-1");
         }
     }
 

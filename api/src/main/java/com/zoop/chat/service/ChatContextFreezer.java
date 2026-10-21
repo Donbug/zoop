@@ -39,22 +39,27 @@ public class ChatContextFreezer {
         this.selector = selector;
     }
 
-    /** The frozen context, the company ids it involves ({@code context_company_ids}) and the pinned version id (or null). */
-    public record Frozen(ChatFrozenContext context, List<String> companyIds, String graphVersionId) { }
+    /**
+     * The public frozen context, the internal selection that reproduces its scope, the company ids it involves
+     * ({@code context_company_ids}) and the pinned version id (or null).
+     */
+    public record Frozen(ChatFrozenContext context, FrozenSelection selection, List<String> companyIds,
+            String graphVersionId) { }
 
     public Frozen freeze(ChatContextRequest request) {
         ChatContextRequest selection = request == null ? ChatContextRequest.EMPTY : request;
         boolean selected = !selection.contextIds().isEmpty() || !selection.evidenceIds().isEmpty();
         if (!selected && selection.asOf() == null && selection.graphVersion() == null) {
             String active = activeVersion();
-            return new Frozen(new ChatFrozenContext(List.of(), 0, selection.period(), null, active), List.of(), active);
+            return new Frozen(new ChatFrozenContext(List.of(), 0, selection.period(), null, active), FrozenSelection.NONE,
+                    List.of(), active);
         }
         if (!selected) {
             // Nothing to look up: pin the requested version without loading its snapshot.
             var version = selector.select(null, selection.graphVersion(), selection.asOf());
             String id = version.version().id();
             return new Frozen(new ChatFrozenContext(List.of(), 0, selection.period(),
-                    version.asOfRequested() ? version.asOf() : null, id), List.of(), id);
+                    version.asOfRequested() ? version.asOf() : null, id), FrozenSelection.NONE, List.of(), id);
         }
 
         var pinned = reader.read(null, selection.graphVersion(), selection.asOf());
@@ -89,6 +94,7 @@ public class ChatContextFreezer {
         var version = pinned.selected();
         return new Frozen(new ChatFrozenContext(List.copyOf(items), Math.min(pool.size(), MAX_EVIDENCE),
                 selection.period(), version.asOfRequested() ? version.asOf() : null, version.version().id()),
+                new FrozenSelection(selection.contextIds(), selection.evidenceIds(), List.copyOf(pool)),
                 List.copyOf(companyIds), version.version().id());
     }
 

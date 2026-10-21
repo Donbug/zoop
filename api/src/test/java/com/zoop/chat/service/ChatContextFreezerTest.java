@@ -73,6 +73,21 @@ class ChatContextFreezerTest {
     }
 
     @Test
+    void theSameTargetsNarrowedToDifferentEvidenceKeepDifferentSelections() {
+        String supplyHynix = "ev-bb3008cb36e9b51c0d2fd77af059259332b1887cc04862e185a496c3dcc9e421";
+        var first = freezer(true).freeze(new ChatContextRequest(List.of(SUPPLY_NVDA, supplyHynix), List.of(SUPPLY_NVDA),
+                null, null, null));
+        var second = freezer(true).freeze(new ChatContextRequest(List.of(SUPPLY_NVDA, supplyHynix), List.of(supplyHynix),
+                null, null, null));
+        // The public context cannot tell them apart; the stored selection can.
+        assertEquals(first.context(), second.context());
+        assertEquals(new FrozenSelection(List.of(SUPPLY_NVDA, supplyHynix), List.of(SUPPLY_NVDA), List.of(SUPPLY_NVDA)),
+                first.selection());
+        assertEquals(List.of(supplyHynix), second.selection().evidencePool());
+        assertEquals(FrozenSelection.NONE, freezer(true).freeze(null).selection());
+    }
+
+    @Test
     void asOfPinsTheVersionActiveThenAndIsKept() {
         Instant asOf = Instant.parse("2026-10-05T00:00:00Z");
         var frozen = freezer(true).freeze(new ChatContextRequest(List.of(HYNIX), List.of(), null, asOf, null));

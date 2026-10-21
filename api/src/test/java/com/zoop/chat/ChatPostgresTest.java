@@ -54,6 +54,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Tag("auth-postgres")
 class ChatPostgresTest {
     private static final String ORIGIN = "https://zoop.example";
+    private static final String SELECTION = "{\"contextIds\":[],\"evidenceIds\":[],\"evidencePool\":[]}";
 
     @Autowired JdbcTemplate jdbc;
     @Autowired MemberSessionService sessions;
@@ -75,12 +76,12 @@ class ChatPostgresTest {
         assertConstraint(() -> insertJob(session, 2, "cancelled", root, 0));
         assertConstraint(() -> insertJob(session, 2, "cancelled", null, 1));
         assertConstraint(() -> jdbc.update("""
-                INSERT INTO chat_jobs (id, session_id, seq, question, request_hash, asked_at, frozen_context, status,
-                    outcome, result, result_schema_version, message_id, resolves_job_id, clarification_depth,
-                    created_at, updated_at, finished_at)
-                VALUES (?, ?, 3, 'q', repeat('a', 64), now(), '{}', 'completed', 'clarification', '{}', 'v1', ?, ?, 2,
-                    now(), now(), now())
-                """, "job-" + suffix(), session, "message-" + suffix(), root));
+                INSERT INTO chat_jobs (id, session_id, seq, question, request_hash, asked_at, frozen_context,
+                    frozen_selection, status, outcome, result, result_schema_version, message_id, resolves_job_id,
+                    clarification_depth, created_at, updated_at, finished_at)
+                VALUES (?, ?, 3, 'q', repeat('a', 64), now(), '{}', ?::jsonb, 'completed', 'clarification', '{}', 'v1', ?,
+                    ?, 2, now(), now(), now())
+                """, "job-" + suffix(), session, SELECTION, "message-" + suffix(), root));
         // Status and stored outcome go together.
         assertConstraint(() -> jdbc.update("UPDATE chat_jobs SET outcome = 'answered' WHERE id = ?", root));
         assertConstraint(() -> jdbc.update("UPDATE chat_jobs SET phase = 'planning' WHERE id = ?", root));
@@ -88,6 +89,14 @@ class ChatPostgresTest {
 
         // The frozen request never changes; a completed job never changes.
         assertImmutable(() -> jdbc.update("UPDATE chat_jobs SET question = 'changed' WHERE id = ?", root));
+        assertImmutable(() -> jdbc.update("UPDATE chat_jobs SET frozen_selection = "
+                + "'{\"contextIds\":[\"x\"],\"evidenceIds\":[],\"evidencePool\":[]}' WHERE id = ?", root));
+        // The selection keeps all three lists.
+        assertConstraint(() -> jdbc.update("""
+                INSERT INTO chat_jobs (id, session_id, seq, question, request_hash, asked_at, frozen_context,
+                    frozen_selection, status, created_at, updated_at, finished_at)
+                VALUES (?, ?, 9, 'q', repeat('a', 64), now(), '{}', '{"contextIds":[]}', 'cancelled', now(), now(), now())
+                """, "job-" + suffix(), session));
         assertImmutable(() -> jdbc.update("UPDATE chat_jobs SET frozen_context = '{\"items\":[],\"evidenceCount\":1}' WHERE id = ?", root));
         jdbc.update("""
                 UPDATE chat_jobs SET status = 'completed', outcome = 'clarification', result = '{"choices":[]}',
@@ -119,6 +128,8 @@ class ChatPostgresTest {
         assertTrue(accepted.accepted());
         assertEquals("queued", accepted.job().status());
         assertEquals(List.of(), accepted.job().context().items());
+        assertEquals("{\"contextIds\": [], \"evidenceIds\": [], \"evidencePool\": []}", jdbc.queryForObject(
+                "SELECT frozen_selection::text FROM chat_jobs WHERE id = ?", String.class, jobId));
         var replay = service.submit(member, session, jobId, request);
         assertFalse(replay.accepted());
         assertEquals(accepted.job(), replay.job());
@@ -236,10 +247,11 @@ class ChatPostgresTest {
         String id = "job-" + suffix();
         boolean finished = !status.equals("queued") && !status.equals("running");
         jdbc.update("""
-                INSERT INTO chat_jobs (id, session_id, seq, question, request_hash, asked_at, frozen_context, status,
-                    resolves_job_id, clarification_depth, created_at, updated_at, finished_at)
-                VALUES (?, ?, ?, 'q', repeat('a', 64), now(), '{"items":[]}', ?, ?, ?, now(), now(), ?)
-                """, id, session, seq, status, resolves, depth, finished ? Timestamp.from(Instant.now()) : null);
+                INSERT INTO chat_jobs (id, session_id, seq, question, request_hash, asked_at, frozen_context,
+                    frozen_selection, status, resolves_job_id, clarification_depth, created_at, updated_at, finished_at)
+                VALUES (?, ?, ?, 'q', repeat('a', 64), now(), '{"items":[]}', ?::jsonb, ?, ?, ?, now(), now(), ?)
+                """, id, session, seq, SELECTION, status, resolves, depth,
+                finished ? Timestamp.from(Instant.now()) : null);
         return id;
     }
 

@@ -7,7 +7,9 @@ import com.zoop.chat.dto.ChatCurrentResponse;
 import com.zoop.chat.dto.ChatJob;
 import com.zoop.chat.dto.ChatJobRequest;
 import com.zoop.chat.dto.ChatSessionResponse;
+import com.zoop.chat.service.ChatResponseGuard;
 import com.zoop.chat.service.ChatService;
+import com.zoop.common.request.RequestIdFilter;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -22,14 +24,19 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 
-/** D-AI-01, D-AI-01b, D-AI-02, D-AI-02b: member conversations and question jobs (OpenAPI tag {@code chat}). */
+/**
+ * D-AI-01, D-AI-01b, D-AI-02, D-AI-02b: member conversations and question jobs (OpenAPI tag {@code chat}). Every job it
+ * returns passes {@link ChatResponseGuard}, outside the service transaction, so evidence access is re-checked on each return.
+ */
 @RestController
 @RequestMapping("/api/v1/chat")
 public class ChatController {
     private final ChatService service;
+    private final ChatResponseGuard guard;
 
-    public ChatController(ChatService service) {
+    public ChatController(ChatService service, ChatResponseGuard guard) {
         this.service = service;
+        this.guard = guard;
     }
 
     @PutMapping("/sessions/{id}")
@@ -43,13 +50,13 @@ public class ChatController {
     @Operation(operationId = "getCurrentConversation", summary = "최신 대화 복원",
             description = "저장된 최신 대화만 회수한다. 모델을 호출하지 않는다.")
     public ChatCurrentResponse getCurrentConversation(HttpServletRequest request) {
-        return service.getCurrentConversation(principal(request));
+        return guard.current(service.getCurrentConversation(principal(request)), RequestIdFilter.currentId(request));
     }
 
     @GetMapping("/sessions/{id}")
     @Operation(operationId = "getConversation", summary = "대화와 질문 작업 조회")
     public ChatConversation getConversation(@PathVariable String id, HttpServletRequest request) {
-        return service.getConversation(principal(request), id);
+        return guard.conversation(service.getConversation(principal(request), id), RequestIdFilter.currentId(request));
     }
 
     @PostMapping("/sessions/{id}/jobs")
@@ -58,14 +65,15 @@ public class ChatController {
     public ResponseEntity<ChatJob> submitQuestion(@PathVariable String id, @RequestBody JsonNode body,
             @RequestHeader("Idempotency-Key") String idempotencyKey, HttpServletRequest request) {
         var result = service.submit(principal(request), id, idempotencyKey, ChatJobRequest.parse(body));
-        return ResponseEntity.status(result.accepted() ? HttpStatus.ACCEPTED : HttpStatus.OK).body(result.job());
+        return ResponseEntity.status(result.accepted() ? HttpStatus.ACCEPTED : HttpStatus.OK)
+                .body(guard.job(result.job(), RequestIdFilter.currentId(request)));
     }
 
     @GetMapping("/jobs/{jobId}")
     @Operation(operationId = "getQuestionJob", summary = "질문 작업 상태·저장 결과 회수",
             description = "저장된 상태만 회수한다. 모델을 호출하지 않는다.")
     public ChatJob getQuestionJob(@PathVariable String jobId, HttpServletRequest request) {
-        return service.getJob(principal(request), jobId);
+        return guard.job(service.getJob(principal(request), jobId), RequestIdFilter.currentId(request));
     }
 
     @PostMapping("/jobs/{jobId}/retry")
@@ -73,14 +81,15 @@ public class ChatController {
     public ResponseEntity<ChatJob> retryQuestionJob(@PathVariable String jobId,
             @RequestHeader("Idempotency-Key") String idempotencyKey, HttpServletRequest request) {
         var result = service.retry(principal(request), jobId, idempotencyKey);
-        return ResponseEntity.status(result.accepted() ? HttpStatus.ACCEPTED : HttpStatus.OK).body(result.job());
+        return ResponseEntity.status(result.accepted() ? HttpStatus.ACCEPTED : HttpStatus.OK)
+                .body(guard.job(result.job(), RequestIdFilter.currentId(request)));
     }
 
     @PostMapping("/jobs/{jobId}/cancel")
     @Operation(operationId = "cancelQuestionJob", summary = "질문 작업 명시적 취소")
     public ChatJob cancelQuestionJob(@PathVariable String jobId, @RequestHeader("Idempotency-Key") String idempotencyKey,
             HttpServletRequest request) {
-        return service.cancel(principal(request), jobId, idempotencyKey);
+        return guard.job(service.cancel(principal(request), jobId, idempotencyKey), RequestIdFilter.currentId(request));
     }
 
     private static MemberPrincipal principal(HttpServletRequest request) {

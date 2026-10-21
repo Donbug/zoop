@@ -77,7 +77,7 @@ final class MemoryChatRepository implements ChatRepository {
     public boolean insertJob(NewChatJob job) {
         if (jobs.containsKey(job.id()) || activeJob(job.sessionId()).isPresent()) return false;
         jobs.put(job.id(), new ChatJobRow(job.id(), job.sessionId(), sessions.get(job.sessionId()).memberId(), job.seq(),
-                job.question(), job.requestHash(), job.askedAt(), job.frozenContext(),
+                job.question(), job.requestHash(), job.askedAt(), job.frozenContext(), job.frozenSelection(),
                 new ArrayList<>(job.contextCompanyIds()), job.graphVersionId(), "queued", null, null, job.resolvesJobId(),
                 job.resolvesChoiceId(), job.clarificationDepth(), null, null, 0, job.attempts(), job.askedAt(),
                 job.askedAt(), null));
@@ -109,7 +109,7 @@ final class MemoryChatRepository implements ChatRepository {
     private static ChatJobRow with(ChatJobRow job, String status, String outcome, String result, String failure, int runs,
             String attempts, Instant updatedAt, Instant finishedAt) {
         return new ChatJobRow(job.id(), job.sessionId(), job.memberId(), job.seq(), job.question(), job.requestHash(),
-                job.askedAt(), job.frozenContext(), job.contextCompanyIds(), job.graphVersionId(), status, null, outcome,
+                job.askedAt(), job.frozenContext(), job.frozenSelection(), job.contextCompanyIds(), job.graphVersionId(), status, null, outcome,
                 job.resolvesJobId(), job.resolvesChoiceId(), job.clarificationDepth(), result, failure, runs, attempts,
                 job.createdAt(), updatedAt, finishedAt);
     }

@@ -20,7 +20,8 @@ public class JdbcChatRepository implements ChatRepository {
     private static final String SESSION_COLUMNS = "id, member_id, created_at, updated_at";
     private static final String JOB_SELECT = """
             SELECT j.id, j.session_id, s.member_id, j.seq, j.question, j.request_hash, j.asked_at,
-                   j.frozen_context::text AS frozen_context, j.context_company_ids, j.graph_version_id, j.status, j.phase,
+                   j.frozen_context::text AS frozen_context, j.frozen_selection::text AS frozen_selection,
+                   j.context_company_ids, j.graph_version_id, j.status, j.phase,
                    j.outcome, j.resolves_job_id, j.resolves_choice_id, j.clarification_depth, j.result::text AS result,
                    j.failure::text AS failure, j.runs, j.attempts::text AS attempts, j.created_at, j.updated_at,
                    j.finished_at
@@ -107,16 +108,18 @@ public class JdbcChatRepository implements ChatRepository {
                 connection.createArrayOf("text", job.contextCompanyIds().toArray()));
         return jdbc.update("""
                 INSERT INTO chat_jobs (id, session_id, seq, question, request_hash, asked_at, frozen_context,
-                    context_company_ids, graph_version_id, status, resolves_job_id, resolves_choice_id,
+                    frozen_selection, context_company_ids, graph_version_id, status, resolves_job_id, resolves_choice_id,
                     clarification_depth, attempts, created_at, updated_at)
                 VALUES (:id, :sessionId, :seq, :question, :requestHash, :askedAt, CAST(:frozenContext AS jsonb),
+                    CAST(:frozenSelection AS jsonb),
                     :companyIds, :graphVersionId, 'queued', :resolvesJobId, :resolvesChoiceId,
                     :depth, CAST(:attempts AS jsonb), :askedAt, :askedAt)
                 ON CONFLICT DO NOTHING
                 """, new MapSqlParameterSource().addValue("id", job.id()).addValue("sessionId", job.sessionId())
                 .addValue("seq", job.seq()).addValue("question", job.question())
                 .addValue("requestHash", job.requestHash()).addValue("askedAt", Timestamp.from(job.askedAt()))
-                .addValue("frozenContext", job.frozenContext()).addValue("companyIds", companyIds)
+                .addValue("frozenContext", job.frozenContext())
+                .addValue("frozenSelection", job.frozenSelection()).addValue("companyIds", companyIds)
                 .addValue("graphVersionId", job.graphVersionId()).addValue("resolvesJobId", job.resolvesJobId())
                 .addValue("resolvesChoiceId", job.resolvesChoiceId()).addValue("depth", job.clarificationDepth())
                 .addValue("attempts", job.attempts())) == 1;
@@ -149,6 +152,7 @@ public class JdbcChatRepository implements ChatRepository {
     private static final RowMapper<ChatJobRow> JOB = (rs, index) -> new ChatJobRow(rs.getString("id"),
             rs.getString("session_id"), rs.getString("member_id"), rs.getInt("seq"), rs.getString("question"),
             rs.getString("request_hash"), instant(rs, "asked_at"), rs.getString("frozen_context"),
+            rs.getString("frozen_selection"),
             strings(rs.getArray("context_company_ids")), rs.getString("graph_version_id"), rs.getString("status"),
             rs.getString("phase"), rs.getString("outcome"), rs.getString("resolves_job_id"),
             rs.getString("resolves_choice_id"), rs.getInt("clarification_depth"), rs.getString("result"),

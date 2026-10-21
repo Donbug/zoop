@@ -59,6 +59,9 @@ class GraphContextLookupTest {
                 new DisclosureExclusions(1, Set.of(HBM_SUPPLY), Set.of(), Set.of()));
         var filtered = new GraphContextLookup(DisplayGraph.of(visible));
         assertTrue(filtered.find(HBM_SUPPLY).isEmpty());
+        // The excluded issue's evidence may stay in the snapshot's evidence list; nothing visible cites it any more.
+        assertTrue(visible.evidence().stream().anyMatch(e -> e.evidenceId().equals(SUPPLY_NVDA)));
+        assertTrue(filtered.find(SUPPLY_NVDA).isEmpty());
         assertTrue(filtered.find(HYNIX).orElseThrow().evidenceIds().stream()
                 .noneMatch(id -> id.equals(SUPPLY_HYNIX)));
     }

@@ -66,6 +66,8 @@
 
 ## 3. 완료 결과 표시
 
+서버는 결과를 돌려줄 때마다 현재 근거 접근 권한을 다시 확인한다. 인용한 자료가 철회·비공개로 바뀌었거나 확인할 수 없으면 `answer`에 고정 안내 문장만 오고 `sections`·`citations`가 비어 있으며 `answerBasis=none`이다. UI는 이를 근거 부족이나 장애로 바꿔 표시하지 않고 `answer`를 그대로 보여 주며, 예전에 받은 본문을 cache에서 되살리지 않는다. 선택 근거의 label이 '표시할 수 없는 근거'로 오면 그대로 표시한다.
+
 `ChatResult.answerBasis`는 서버가 `sections`에서 계산하며 UI가 추측하지 않는다. 결과 상단 배지는 `answerBasis`, 본문은 `sections`를 순서대로 렌더링하고 각 구간에 아래 배지를 붙인다. `answer` 문자열을 잘라 구간을 추정하지 않는다.
 
 | answerBasis·구간 basis | 사용자 표시 |

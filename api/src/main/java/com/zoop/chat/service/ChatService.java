@@ -114,18 +114,21 @@ public class ChatService {
             if (repository.activeJob(sessionId).isPresent()) throw new CustomException(ErrorCode.JOB_IN_PROGRESS);
 
             String frozenContext;
+            String frozenSelection;
             List<String> companyIds;
             String graphVersionId;
             int depth = 0;
             if (request.resolves() != null) {
                 ChatJobRow original = clarified(member, sessionId, request.resolves());
                 frozenContext = original.frozenContext();
+                frozenSelection = original.frozenSelection();
                 companyIds = original.contextCompanyIds();
                 graphVersionId = original.graphVersionId();
                 depth = original.clarificationDepth() + 1;
             } else {
                 var frozen = freezer.freeze(request.context());
                 frozenContext = mapper.writeValueAsString(frozen.context());
+                frozenSelection = mapper.writeValueAsString(frozen.selection());
                 companyIds = frozen.companyIds();
                 graphVersionId = frozen.graphVersionId();
             }
@@ -133,7 +136,7 @@ public class ChatService {
             Instant askedAt = clock.instant();
             ArrayNode attempts = StrictJson.newArray().add(attempt(1, "run", request.jobId(), askedAt));
             var job = new NewChatJob(request.jobId(), sessionId, repository.nextSeq(sessionId), request.question(),
-                    requestHash, askedAt, frozenContext, companyIds, graphVersionId,
+                    requestHash, askedAt, frozenContext, frozenSelection, companyIds, graphVersionId,
                     request.resolves() == null ? null : request.resolves().jobId(),
                     request.resolves() == null ? null : request.resolves().choiceId(), depth, attempts.toString());
             if (!repository.insertJob(job)) {

@@ -2,6 +2,7 @@ package com.zoop.graph.read;
 
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -15,7 +16,8 @@ import java.util.stream.Stream;
 /**
  * Looks up the graph targets a member selected (company, issue, display edge or evidence) in one pinned, filtered display
  * graph, for callers outside this package that freeze a selection (the chat job context). Only what is publicly visible in
- * that graph is found; an excluded or unknown id is absent.
+ * that graph is found; an excluded or unknown id is absent. Evidence follows {@link GraphEvidenceSnapshotReader}: it is
+ * visible only while the filtered snapshot lists it AND a visible issue or relation still cites it.
  */
 public final class GraphContextLookup {
     /** One selected target: its kind, display label, linked company ids and the evidence it carries. */
@@ -24,6 +26,7 @@ public final class GraphContextLookup {
     private final DisplayGraph graph;
     private final Map<String, PublicGraphSnapshot.Evidence> evidence;
     private final Map<String, PublicGraphSnapshot.Article> articles;
+    private final Set<String> cited = new HashSet<>();
 
     public GraphContextLookup(DisplayGraph graph) {
         this.graph = graph;
@@ -31,6 +34,11 @@ public final class GraphContextLookup {
                 .collect(Collectors.toMap(PublicGraphSnapshot.Evidence::evidenceId, Function.identity(), (a, b) -> a));
         this.articles = graph.snapshot.articles().stream()
                 .collect(Collectors.toMap(PublicGraphSnapshot.Article::articleId, Function.identity(), (a, b) -> a));
+        graph.snapshot.issues().forEach(i -> {
+            cited.addAll(i.evidenceIds());
+            cited.addAll(i.geographyEvidenceIds());
+        });
+        graph.snapshot.relations().forEach(r -> cited.addAll(r.evidenceIds()));
     }
 
     public Optional<Target> find(String id) {
@@ -60,7 +68,7 @@ public final class GraphContextLookup {
                     companies, visible(ids)));
         }
         var found = evidence.get(id);
-        if (found != null) {
+        if (found != null && cited.contains(id)) {
             var article = articles.get(found.articleId());
             String title = article == null || article.title() == null || article.title().isBlank() ? "근거" : article.title();
             return Optional.of(new Target(id, "evidence", title, List.of(), List.of(id)));
@@ -68,9 +76,9 @@ public final class GraphContextLookup {
         return Optional.empty();
     }
 
-    /** Only evidence the filtered snapshot still carries: an excluded or withdrawn reference is never counted. */
+    /** Only visible evidence: an excluded or withdrawn reference is never counted. */
     private List<String> visible(Collection<String> ids) {
-        return ids.stream().filter(evidence::containsKey).distinct().toList();
+        return ids.stream().filter(id -> evidence.containsKey(id) && cited.contains(id)).distinct().toList();
     }
 
     private String label(String id) {
