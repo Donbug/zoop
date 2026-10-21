@@ -44,7 +44,7 @@ import tools.jackson.databind.node.ObjectNode;
  * with another body is {@code IDEMPOTENCY_CONFLICT}. A conversation has at most one queued or running job: every job write
  * takes the conversation row lock and the partial unique index is the last word. Reading a job or a conversation never starts
  * an execution. Accepting work that needs the executor (a new question or a retry) is refused with
- * {@code MODEL_UNAVAILABLE} while {@code zoop.chat.questions-enabled} is off, so no job waits for an executor that is not
+ * {@code MODEL_UNAVAILABLE} while {@code zoop.chat.questions-enabled} is off, so no job waits for an engine that is not
  * deployed.
  */
 @Service

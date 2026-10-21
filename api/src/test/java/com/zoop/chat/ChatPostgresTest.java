@@ -25,6 +25,7 @@ import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.dto.Citation;
 import com.zoop.chat.dto.GraphTarget;
 import com.zoop.chat.service.ChatResponseGuard;
+import com.zoop.chat.executor.ChatEngine;
 import com.zoop.chat.service.ChatService;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
@@ -37,6 +38,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -56,7 +59,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "ZOOP_AUTH_CSRF_ACTIVE_KEY_ID=test",
         "ZOOP_AUTH_CSRF_KEYS=test=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        "zoop.chat.questions-enabled=true"
+        "zoop.chat.questions-enabled=true",
+        "zoop.chat.executor.enabled=false"
 })
 @EnabledIfEnvironmentVariable(named = "DB_URL", matches = "jdbc:postgresql:.*")
 @Tag("auth-postgres")
@@ -69,6 +73,17 @@ class ChatPostgresTest {
     @Autowired ChatService service;
     @Autowired ChatController controller;
     @Autowired ObjectMapper mapper;
+
+    /** Intake needs a registered engine; the scheduler is off, so these tests only see queued jobs. */
+    @TestConfiguration
+    static class NoRunEngine {
+        @Bean
+        ChatEngine chatEngine() {
+            return (run, control) -> {
+                throw new IllegalStateException("no job runs in this test");
+            };
+        }
+    }
 
     @Test
     @Transactional
