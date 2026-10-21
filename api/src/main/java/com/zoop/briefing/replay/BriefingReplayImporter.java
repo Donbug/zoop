@@ -272,10 +272,11 @@ public final class BriefingReplayImporter {
                             && coverage.count("unconfirmedTotal") == 0 && clocks.verified.size() == pool.size(), "simulation_empty_confirmation");
                     for (JsonNode value : receipts.values()) {
                         String stage = StrictJson.Obj.of(value).string("stage");
-                        require(!stage.endsWith("_generation") && !stage.endsWith("_verification"), "simulation_empty_has_no_generated_result");
+                        require(!Set.of("round_simulation_morning_generation", "round_simulation_evening_generation",
+                                "round_simulation_morning_verification", "round_simulation_evening_verification").contains(stage), "simulation_empty_has_no_generated_result");
                     }
-                    validateSimulationSuccessRecordings(definition, receipts);
-                    // Coverage has no selected text or model verification. Keep the full audited source scope as authority.
+                    if (!grouped) validateSimulationSuccessRecordings(definition, receipts, inputs);
+                    // No generated news text; retain the full source scope and validated assessment/novelty/selection evidence.
                     Map<String, Source> coverageSources = new LinkedHashMap<>(pool);
                     documents.putAll(coverageSources); inputs = coverageSources;
                     Instant determined = created.isAfter(cutoff) ? created : cutoff;
@@ -287,7 +288,7 @@ public final class BriefingReplayImporter {
                     require(Canonical.digest(result.node()).equals(definition.string("resultSha256")), "simulation_result_hash");
                     if (!grouped) {
                         validateSimulationSuccessReceipts(edition, result, receipts, qualityV2);
-                        validateSimulationSuccessRecordings(definition, receipts);
+                        validateSimulationSuccessRecordings(definition, receipts, inputs);
                     } // Grouped recordings are bound by BriefingGroupedSimulationRules.round above.
                 }
                 Instant generated = Instant.parse(result.string("generatedAt")); if (generated.isAfter(created)) created = generated;
@@ -1505,7 +1506,7 @@ public final class BriefingReplayImporter {
     }
 
     /** Bind the final published draft to the immutable provider recordings, not just self-declared receipt IDs. */
-    private void validateSimulationSuccessRecordings(StrictJson.Obj round, Map<String, JsonNode> receipts) {
+    private void validateSimulationSuccessRecordings(StrictJson.Obj round, Map<String, JsonNode> receipts, Map<String, Source> inputs) {
         Map<String, StrictJson.Obj> requests = new LinkedHashMap<>(), outputs = new LinkedHashMap<>();
         for (var entry : receipts.entrySet()) {
             StrictJson.Obj receipt = StrictJson.Obj.of(entry.getValue());
@@ -1542,11 +1543,9 @@ public final class BriefingReplayImporter {
             requests.put(digest, data); outputs.put(digest, StrictJson.parseObject(texts.getFirst()));
         }
         if (round.isNull("result")) {
-            for (var entry : outputs.entrySet()) {
-                String stage = StrictJson.Obj.of(receipts.get(entry.getKey())).string("stage");
-                if ("round_simulation_selection".equals(stage))
-                    require(entry.getValue().array("selected").isEmpty(), "simulation_empty_selection_recording");
-            }
+            Map<String, StrictJson.Obj> sources = new LinkedHashMap<>();
+            inputs.values().forEach(source -> sources.put(source.id(), source.row()));
+            BriefingSimulationEmptyRules.validate(round, receipts, requests, outputs, sources);
             return;
         }
         StrictJson.Obj result = round.object("result");

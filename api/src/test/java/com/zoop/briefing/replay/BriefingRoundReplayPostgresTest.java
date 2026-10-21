@@ -380,6 +380,73 @@ class BriefingRoundReplayPostgresTest {
         for (var round : bundleNode().path("rounds")) { assertTrue(round.path("result").isNull()); assertTrue(round.path("resultSha256").isNull()); }
     }
 
+    private BriefingReplayImporter produce(String mode) throws Exception {
+        var process = new ProcessBuilder("python3", "scripts/briefing_review_fixture.py", directory.toString(), mode).redirectErrorStream(true).start();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals(0, process.waitFor(), output);
+        jdbc.update("INSERT INTO companies(id,name) VALUES ('company-authored-review','시험 기업') ON CONFLICT DO NOTHING");
+        return new BriefingReplayImporter(jdbc, transactionManager,
+                new BriefingReplaySettings(source, bundle, artifacts, grants, manifest, Canonical.sha256(Files.readAllBytes(source)), INBOX, clocks));
+    }
+
+    @Test
+    void actualV2RepeatOnlyRoundImportsItsNoveltyVerificationAndRemainsPubliclyEmpty() throws Exception {
+        var actual = produce("v2-repeat"); actual.importBundle();
+        assertEquals(14, count("briefing_rounds")); assertEquals(7, receiptCount());
+        assertEquals(14, jdbc.queryForObject("SELECT count(*) FROM briefing_rounds WHERE published_at IS NOT NULL", Integer.class));
+        var evening = get(localPort, QUERY + "evening");
+        assertEquals(200, evening.status(), evening.body()); assertEquals("published", evening.json().path("status").asText());
+        assertEquals("no_issues_in_window", evening.json().path("emptyReason").asText()); assertEquals(0, evening.json().path("items").size());
+        var morning = get(localPort, QUERY + "morning"); assertEquals(1, morning.json().path("items").size());
+        assertTrue(actual.importBundle().alreadyImported());
+    }
+
+    @Test
+    void actualV2LowImportanceNeedsAssessmentButDoesNotInventSelectionOrNoveltyCalls() throws Exception {
+        var actual = produce("v2-rejected"); actual.importBundle();
+        assertEquals(14, count("briefing_rounds")); assertEquals(2, receiptCount());
+        assertEquals(14, jdbc.queryForObject("SELECT count(*) FROM briefing_rounds WHERE jsonb_array_length(published_payload->'items')=0", Integer.class));
+        assertEquals("published", get(localPort, QUERY + "morning").json().path("status").asText());
+        assertTrue(actual.importBundle().alreadyImported());
+    }
+
+    @Test
+    void heldCannotBecomeConfirmedEmptyByRemovingAllOrJustFinalSelectionRecordings() throws Exception {
+        for (boolean keepImportance : List.of(false, true)) {
+            var actual = produce("insufficient"); var candidate = bundleNode();
+            var first = (ObjectNode) candidate.path("rounds").get(0);
+            assertEquals("HELD_VALIDATION", first.path("selectionStatus").asText());
+            assertEquals(3, first.path("receipts").size());
+            var deleted = new java.util.HashSet<String>(); var kept = JSON.createArrayNode();
+            for (var receipt : first.path("receipts")) {
+                if (keepImportance && receipt.path("stage").asText().equals("round_simulation_importance")) kept.add(receipt);
+                else deleted.add(receipt.path("requestDigest").asText());
+            }
+            first.set("receipts", kept); first.put("selectionStatus", "EMPTY_CONFIRMED");
+            var ledger = JSON.createArrayNode();
+            for (var receipt : candidate.path("receipts")) if (!deleted.contains(receipt.path("requestDigest").asText())) ledger.add(receipt);
+            candidate.set("receipts", ledger); writeBundle(candidate);
+            assertTrue(assertThrows(RuntimeException.class, actual::importBundle).getMessage().contains("simulation_empty_"));
+            assertEquals(0, count("briefing_rounds")); assertEquals(0, count("artifacts"));
+        }
+    }
+
+    @Test
+    void repeatCannotBecomeConfirmedEmptyByRemovingItsAuditAndBothNoveltyReceipts() throws Exception {
+        var actual = produce("v2-repeat"); var candidate = bundleNode();
+        var repeat = (ObjectNode) candidate.path("rounds").get(1); repeat.remove("noveltyAudit");
+        var deleted = new java.util.HashSet<String>(); var kept = JSON.createArrayNode();
+        for (var receipt : repeat.path("receipts")) {
+            if (receipt.path("stage").asText().startsWith("round_simulation_novelty")) deleted.add(receipt.path("requestDigest").asText());
+            else kept.add(receipt);
+        }
+        repeat.set("receipts", kept); var ledger = JSON.createArrayNode();
+        for (var receipt : candidate.path("receipts")) if (!deleted.contains(receipt.path("requestDigest").asText())) ledger.add(receipt);
+        candidate.set("receipts", ledger); writeBundle(candidate);
+        assertTrue(assertThrows(RuntimeException.class, actual::importBundle).getMessage().contains("simulation_empty_novelty_required"));
+        assertEquals(0, count("briefing_rounds")); assertEquals(0, count("artifacts"));
+    }
+
     @Test
     void actualProducerStructurallyRejectedMarketRepairImportsAsWithheldAndPreservesAllAttempts() throws Exception {
         var process = new ProcessBuilder("python3", "scripts/briefing_review_fixture.py", directory.toString(), "market-repair").redirectErrorStream(true).start();

@@ -16,11 +16,32 @@ fixture.clocks = folder / "clocks.json"
 fixture.html = folder / "html"
 fixture.html.mkdir(exist_ok=True)
 fixture.output = folder / ("producer-" + sys.argv[2] if len(sys.argv) > 2 else "producer-output")
-fixture.prepare([m.source("authored-morning", "2026-10-02T09:00:00+09:00"),
-                 m.source("authored-evening", "2026-10-02T10:00:00+09:00")])
+mode = sys.argv[2] if len(sys.argv) > 2 else ""
+rows = [m.source("authored-morning", "2026-10-02T09:00:00+09:00"),
+        m.source("a-repeat" if mode == "v2-repeat" else "authored-evening", "2026-10-02T10:00:00+09:00")]
+fixture.prepare(rows[:1] if mode == "insufficient" else rows)
 args = fixture.args(True)
 args.user_inbox_ref = "inbox/synthetic-round-authorization.md"
-transport = m.AuthoredTransport(select_none=len(sys.argv) > 2 and sys.argv[2] == "select-none")
+transport = m.AuthoredTransport(select_none=mode == "select-none", insufficient=mode == "insufficient")
+if mode == "v2-repeat":
+    spec_v2 = importlib.util.spec_from_file_location("authored_quality", root / "scripts/tests/test_briefing_quality_v2.py")
+    v2 = importlib.util.module_from_spec(spec_v2)
+    spec_v2.loader.exec_module(v2)
+    transport = v2.V2Transport()
+    args.quality_policy = m.sim.QUALITY_V2
+elif mode == "v2-rejected":
+    args.quality_policy = m.sim.QUALITY_V2
+    class RejectedImportance(m.AuthoredTransport):
+        def __call__(self, raw):
+            status, body = super().__call__(raw)
+            if m.sim.base.strict_load(raw)["text"]["format"]["name"] == "round_simulation_importance":
+                answer = m.sim.base.strict_load(body)
+                result = m.sim.base.strict_load(answer["output"][0]["content"][0]["text"])
+                for value in result["assessments"].values():
+                    value.update(status="REJECT", importance=1)
+                return m.response(result, raw)
+            return status, body
+    transport = RejectedImportance()
 m.sim.run(args, transport)
 output = fixture.output
 if len(sys.argv) > 2 and sys.argv[2] == "market-repair":
