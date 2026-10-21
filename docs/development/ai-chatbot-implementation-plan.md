@@ -85,6 +85,8 @@ flowchart LR
 
 완료 조건: 예산 초과 계획은 도구 호출 0회와 clarification, 체크포인트 초과 시 다음 단계 호출 0회·생성 호출 0회와 실제 결과 기반 choices, 취소·lease 만료 뒤 신규 호출 0회, 병렬 호출도 최대 4개.
 
+첫 오케스트레이터(`com.zoop.chat.orchestrator`)는 모델 단계를 typed port(라우터·생성·의미 검증)로만 두고 서버 결정을 구현한다. 확률은 `p >= 0.70`을 채택하고, 0.35 이상 검토 구간은 커버리지 검증 stage가 붙기 전까지 명시적 요구에 한해 최고 후보 하나만 쓴다. 투자 판단은 Noul `p > 0.10`(불확실 포함)이면 `investment_advice` limitation이다. 체크포인트는 앞 단계가 찾은 기업 수로 평가하고, 초과 선택지는 `exactly(n)` 조합이 6개 이하일 때만 만든다(이슈 결과는 기업 ID만 가지므로 현재 선택지 표시명은 ID다). 인용은 생성 결과가 아니라 근거 조회 결과로 서버가 만들고, 의미 검증 hold는 해당 요구와 그 요구를 잇는 구간을 함께 제외한다. 추론만 된 요구는 처리할 수 없으면 limitation 없이 뺀다. 세 모델 adapter가 모두 생기기 전에는 엔진을 bean으로 등록하지 않는다.
+
 ### 단계 3 — Jev router와 Luna coverage-verifier
 
 1. 기존 S1 `semantic-verification`과 분리된 Jev router schema·prompt·kind를 추가한다.

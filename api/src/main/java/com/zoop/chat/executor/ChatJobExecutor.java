@@ -211,11 +211,16 @@ public class ChatJobExecutor {
         List<ChatRun.Turn> turns = new ArrayList<>();
         ChatJobRow at = job;
         while (true) {
-            turns.addFirst(new ChatRun.Turn(at.id(), at.question(), at.resolvesChoiceId()));
-            if (at.resolvesJobId() == null) break;
-            String parent = at.resolvesJobId();
-            at = chats.findJob(parent)
-                    .orElseThrow(() -> new IllegalStateException("clarification chain is broken at " + parent));
+            if (at.resolvesJobId() == null) {
+                turns.addFirst(new ChatRun.Turn(at.id(), at.question(), null, null));
+                break;
+            }
+            String parentId = at.resolvesJobId();
+            ChatJobRow parent = chats.findJob(parentId)
+                    .orElseThrow(() -> new IllegalStateException("clarification chain is broken at " + parentId));
+            turns.addFirst(new ChatRun.Turn(at.id(), at.question(), at.resolvesChoiceId(),
+                    choiceLabel(parent, at.resolvesChoiceId())));
+            at = parent;
         }
         return new ChatRun(job.id(), job.sessionId(), job.memberId(), claim.attemptNo(), claim.mode(), List.copyOf(turns),
                 mapper.readValue(job.frozenContext(), ChatFrozenContext.class),
@@ -306,6 +311,14 @@ public class ChatJobExecutor {
                 throw new ChatRunSuperseded();
             }
         }
+    }
+
+    /** The label the clarification showed for the picked option; null for a free-text answer. */
+    private String choiceLabel(ChatJobRow clarification, String choiceId) {
+        if (choiceId == null || clarification.result() == null) return null;
+        ChatResult result = mapper.readValue(clarification.result(), ChatResult.class);
+        return result.choices() == null ? null : result.choices().stream().filter(c -> choiceId.equals(c.id()))
+                .map(c -> c.label()).findFirst().orElse(null);
     }
 
     static String messageId(String jobId) {

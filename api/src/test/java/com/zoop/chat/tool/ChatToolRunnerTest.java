@@ -207,7 +207,7 @@ class ChatToolRunnerTest {
     }
 
     private static ChatRun run(String graphVersion, Instant asOf) {
-        return new ChatRun("job-1", "conv-1", "member-a", 1, "run", List.of(new ChatRun.Turn("job-1", "질문", null)),
+        return new ChatRun("job-1", "conv-1", "member-a", 1, "run", List.of(new ChatRun.Turn("job-1", "질문", null, null)),
                 new ChatFrozenContext(List.of(), 0, null, asOf, graphVersion), FrozenSelection.NONE, graphVersion, 0,
                 asOf, Instant.now().plusSeconds(60));
     }
