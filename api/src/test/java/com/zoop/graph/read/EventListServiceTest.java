@@ -108,6 +108,57 @@ class EventListServiceTest {
     }
 
     @Test
+    void limitAndCursorRunThroughTimedThenUnknownTimeEventsWithOneAsOf() {
+        // hbm-supply and euv-export lose their event time; a clock that moves on every read stands for later requests.
+        var base = GraphReadFixtures.snapshot("fixture-2026-10-08");
+        var issues = base.issues().stream().map(i -> List.of(HBM_SUPPLY, EUV).contains(i.issueId())
+                ? new Issue(i.issueId(), i.label(), null, "unknown", i.period(), i.assertionStatus(), i.action(), i.target(),
+                        i.geography(), i.geographyPolicyVersion(), i.geographyEvidenceIds(), i.articleIds(), i.evidenceIds(),
+                        i.mentions(), i.representativeMentionId(), i.latestPublishedAt())
+                : i).toList();
+        var snapshot = new com.zoop.graph.snapshot.PublicGraphSnapshot(base.snapshotFormat(), base.versionId(),
+                base.sourceBundleId(), base.companies(), issues, base.relations(), base.articles(), base.evidence());
+        var ticks = new java.util.concurrent.atomic.AtomicLong();
+        var clock = new java.time.Clock() {
+            public java.time.ZoneId getZone() { return java.time.ZoneOffset.UTC; }
+            public java.time.Clock withZone(java.time.ZoneId zone) { return this; }
+            public Instant instant() { return NOW.plusSeconds(ticks.incrementAndGet()); }
+        };
+        var reader = new PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
+                clock), version -> snapshot, () -> DisclosureExclusions.NONE);
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        var paged = new EventListService(reader, jdbc, JsonMapper.builder().build());
+
+        List<String> items = new java.util.ArrayList<>(), undated = new java.util.ArrayList<>();
+        Set<String> asOfs = new java.util.HashSet<>();
+        String cursor = null;
+        for (int page = 0; page < 10; page++) {
+            var r = paged.list(null, null, "2026-09-01", "2026-10-31", cursor, 1, null, null);
+            assertEquals(1, r.items().size() + r.unknownTimeItems().size()); // limit counts both arrays
+            items.addAll(ids(r.items()));
+            undated.addAll(ids(r.unknownTimeItems()));
+            asOfs.add(r.metadata().asOf());
+            cursor = r.nextCursor();
+            if (cursor == null) break;
+        }
+        assertEquals(List.of(AI_ACCEL, HBM_EQUIP), items);
+        assertEquals(List.of(EUV, HBM_SUPPLY), undated); // newest report first, reached through the cursor
+        assertEquals(Set.of(NOW.plusSeconds(1).toString()), asOfs); // every page keeps the first page's time
+    }
+
+    @Test
+    void recentComparesInstantsNotStrings() {
+        Issue whole = issue("2026-10-05T09:00:00Z", "datetime", null);
+        Issue fraction = new Issue("b", "label", "2026-10-05T09:00:00.500Z", "datetime", null, null, null, null, "KR", "p",
+                List.of(), List.of(), List.of(), List.of(), null, null);
+        Issue offset = new Issue("c", "label", "2026-10-05T17:59:00+09:00", "datetime", null, null, null, null, "KR", "p",
+                List.of(), List.of(), List.of(), List.of(), null, null);
+        // As strings ".500Z" sorts before "Z" and "17:59+09:00" after "09:00Z"; as instants 09:00:00.5Z > 09:00Z > 08:59Z.
+        assertEquals(List.of("b", "i", "c"),
+                java.util.stream.Stream.of(whole, fraction, offset).sorted(DisplayGraph.RECENT).map(Issue::issueId).toList());
+    }
+
+    @Test
     void reportedAtIsNeverMadeUpFromADateOnlyPublication() {
         var r = list(null, null, null, null, null, null);
         assertNull(r.items().get(1).reportedAt()); // hbm-equip was published on 2026-09-25 with no time

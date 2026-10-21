@@ -11733,7 +11733,7 @@ components:
           items:
             "$ref": "#/components/schemas/EventSummary"
           type: "array"
-          description: "With from/to: events without an approved event time whose reportedAt (KST date) falls in the range, newest report first. Without from/to they are in `items` and this is empty."
+          description: "With from/to: events without an approved event time whose reportedAt (KST date) falls in the range, newest report first. Without from/to they are in `items` and this is empty. Paging treats `items` then `unknownTimeItems` as one sequence: limit counts both arrays together and nextCursor continues into the unknown-time events."
         metadata:
           "$ref": "#/components/schemas/EventListMetadata"
         nextCursor:

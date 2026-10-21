@@ -47,8 +47,12 @@ public class EventListService {
     }
 
     /** Opaque page position, bound to the query and to the version and asOf the first page pinned. */
+    /**
+     * asOf is the request's own value (null: no asOf filter, the mode every page keeps); pinnedAt is the time the first page
+     * resolved, sent back as metadata.asOf on every page so a later page does not report a new request time.
+     */
     record Cursor(String companyId, Integer depth, String from, String to, Integer limit, String versionId, String asOf,
-            int offset) { }
+            String pinnedAt, int offset) { }
 
     public EventListResponse list(String companyId, Integer depth, String from, String to, String cursor, Integer limit,
             String graphVersion, String asOf) {
@@ -84,26 +88,31 @@ public class EventListService {
         }
         timed.sort(DisplayGraph.RECENT);
         List<Issue> reported = unknown.stream().filter(i -> reportedIn(i, start, end))
-                .sorted(Comparator.comparing(Issue::latestPublishedAt, Comparator.reverseOrder()).thenComparing(Issue::issueId))
+                .sorted(Comparator.comparing((Issue i) -> DisplayGraph.publishedAt(i.latestPublishedAt()), Comparator.reverseOrder())
+                        .thenComparing(Issue::issueId))
                 .toList();
 
+        // One sequence, timed events then unknown-time ones, so limit and cursor cover both arrays to the end.
+        int count = timed.size() + reported.size();
         int offset = after == null ? 0 : after.offset();
-        if (offset > timed.size()) throw new CustomException(ErrorCode.INVALID_CURSOR);
-        int pageLimit = limit != null ? limit : after != null ? after.limit() : timed.size() - offset;
+        if (offset > count) throw new CustomException(ErrorCode.INVALID_CURSOR);
+        int pageLimit = limit != null ? limit : after != null ? after.limit() : count - offset;
         // long: a forged cursor's offset + limit must not overflow into a negative end.
-        List<Issue> page = timed.subList(offset, (int) Math.min(timed.size(), (long) offset + pageLimit));
-        String next = offset + page.size() < timed.size()
+        int pageEnd = (int) Math.min(count, (long) offset + pageLimit);
+        List<Issue> items = timed.subList(Math.min(offset, timed.size()), Math.min(pageEnd, timed.size()));
+        List<Issue> undated = reported.subList(Math.max(0, offset - timed.size()), Math.max(0, pageEnd - timed.size()));
+        // Without an asOf every page keeps the no-asOf read of the pinned version, and reports the first page's time.
+        String pinnedAt = after != null && asOf == null ? after.pinnedAt() : pinned.selected().asOf().toString();
+        String next = pageEnd < count
                 ? encode(new Cursor(companyId, hops, from, to, pageLimit, pinned.selected().version().id(), asOf,
-                        offset + page.size()))
+                        pinnedAt, pageEnd))
                 : null;
 
-        var metadata = new EventListResponse.Metadata("public_graph_snapshot", pinned.selected().asOf().toString(),
+        var metadata = new EventListResponse.Metadata("public_graph_snapshot", pinnedAt,
                 pinned.selected().version().id(), timed.size(), unknown.size(), latestEventTime(scope),
                 latestReported(scope));
-        return new EventListResponse(page.stream().map(i -> summary(graph, i, companyId)).toList(),
-                // Unknown-time events are one short list beside the timeline, sent with the first page only.
-                after == null ? reported.stream().map(i -> summary(graph, i, companyId)).toList() : List.of(),
-                metadata, next);
+        return new EventListResponse(items.stream().map(i -> summary(graph, i, companyId)).toList(),
+                undated.stream().map(i -> summary(graph, i, companyId)).toList(), metadata, next);
     }
 
     /**
@@ -195,9 +204,10 @@ public class EventListService {
     private Cursor decode(String cursor) {
         try {
             Cursor c = mapper.readValue(new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8), Cursor.class);
-            if (c.versionId() == null || c.limit() == null || c.limit() < 1 || c.offset() < 1) {
+            if (c.versionId() == null || c.pinnedAt() == null || c.limit() == null || c.limit() < 1 || c.offset() < 1) {
                 throw new CustomException(ErrorCode.INVALID_CURSOR);
             }
+            Instant.parse(c.pinnedAt()); // a cursor is client input: a pinnedAt that is no instant is a bad cursor
             return c;
         } catch (CustomException exception) {
             throw exception;
