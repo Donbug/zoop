@@ -1295,6 +1295,10 @@ test('a graphVersion-only address explains it cannot open that version and moves
   expect(screen.getByTestId('address').textContent).not.toContain('asOf=');
   expect(server.calls('GET', '/api/v1/events')).toHaveLength(0);
   expect(server.calls('GET', '/api/v1/companies/:id/graph')).toHaveLength(0);
+  expect(server.calls('GET', '/api/v1/companies/:id/prices')).toHaveLength(0);
+  expect(screen.queryByText(/최신 제공 시점 확인 중/)).toBeNull();
+  expect(screen.queryByText(/차트 불러오는 중/)).toBeNull();
+  expect(screen.queryByText(/별 종가/)).toBeNull();
   expect(
     server
       .calls('GET', '/api/v1/companies/:id')
@@ -1317,5 +1321,9 @@ test('a graphVersion-only address explains it cannot open that version and moves
   await waitFor(() =>
     expect(server.calls('GET', '/api/v1/events').length).toBeGreaterThan(0),
   );
+  expect(
+    server.calls('GET', '/api/v1/companies/:id/prices').length,
+  ).toBeGreaterThan(0);
+  expect(await screen.findByText(/별 종가/)).toBeTruthy();
   expect(screen.queryByText(/그래프 버전\(v-past\)만 있어/)).toBeNull();
 });

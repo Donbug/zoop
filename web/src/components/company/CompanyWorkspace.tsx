@@ -184,8 +184,11 @@ export default function CompanyWorkspace() {
     owner,
   );
   const quote = useCompanyResource<Quote>(companyUrl(id, '/quote'));
+  // 버전 단독 주소는 그 버전의 차트를 열 수 없다고 안내하므로 가격 조회도 시작하지 않는다.
   const prices = useCompanyResource<Prices>(
-    invalid ? null : companyUrl(id, '/prices', { period, ...range }),
+    invalid || versionOnly
+      ? null
+      : companyUrl(id, '/prices', { period, ...range }),
   );
   useEffect(() => {
     // FS040: 처음 열 때의 기준 시점은 기업 응답의 공개 기준 시점과 그 버전이다. 가격 봉 시각은
@@ -553,8 +556,13 @@ export default function CompanyWorkspace() {
             </button>
           </nav>
           <p>
-            기준 {asOf ? formatKst(asOf) : '최신 제공 시점 확인 중'} ·{' '}
-            {periods.find((p) => p.value === period)?.bucket} 버킷
+            기준{' '}
+            {asOf
+              ? formatKst(asOf)
+              : versionOnly
+                ? '시점 없음'
+                : '최신 제공 시점 확인 중'}{' '}
+            · {periods.find((p) => p.value === period)?.bucket} 버킷
           </p>
           {prices.data?.status === 'available' &&
             prices.data.points.length > 1 && (
