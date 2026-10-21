@@ -2740,6 +2740,76 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하지 않는다. 필수 필드는 null 허용 여부와 별개다. JSON 필드 이름·중첩 참조의 정본은 OpenAPI다.
 
+<a id="schema-companystatement"></a>
+
+### CompanyStatement
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| text | 필수 | string |  |
+| evidenceIds | 필수 | string[] |  |
+
+<a id="schema-companyoutlooks"></a>
+
+### CompanyOutlooks
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 필수 | string |  |
+| roundId | 필수 | string |  |
+| edition | 필수 | string {morning, evening} |  |
+| cutoff | 필수 | string (date-time) |  |
+| status | 필수 | string {PASS, WITHHELD} |  |
+| resultVersion | 필수 | string |  |
+| generatedAt | 필수 | string (date-time) |  |
+| scopeNote | 필수 | string |  |
+| reason | 선택 | string |  |
+| companies | 필수 | [CompanyOutlook](#schema-companyoutlook)[] |  |
+
+<a id="schema-companyoutlook"></a>
+
+### CompanyOutlook
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyId | 필수 | string |  |
+| companyName | 필수 | string |  |
+| issueIds | 필수 | string[] |  |
+| facts | 필수 | [CompanyStatement](#schema-companystatement)[] |  |
+| assessment | 필수 | string {positive, negative, mixed, watch} |  |
+| impact | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| outlook | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| conditions | 필수 | [CompanyStatement](#schema-companystatement)[] |  |
+| risks | 필수 | [CompanyStatement](#schema-companystatement)[] |  |
+| comparison | 필수 | [CompanyStatement](#schema-companystatement) / object |  |
+| comparison.status | 필수 | string {updated, compared, unavailable} |  |
+| comparison.previousResultVersion | 필수 | string, null |  |
+| previous | 필수 | object |  |
+| previous.status | 필수 | string {available, unavailable} |  |
+| previous.reason | 선택 | string |  |
+| previous.roundId | 선택 | string |  |
+| previous.cutoff | 선택 | string (date-time) |  |
+| previous.resultVersion | 선택 | string |  |
+| previous.judgment | 선택 | object |  |
+| observedMovement | 필수 | object |  |
+| observedMovement.status | 필수 | string |  |
+| observedMovement.reason | 필수 | string |  |
+| sources | 필수 | object[] |  |
+| sources[].evidenceId | 필수 | string |  |
+| sources[].documentId | 필수 | string |  |
+| sources[].documentVersion | 필수 | string |  |
+| sources[].bodySha256 | 필수 | string |  |
+| sources[].quote | 필수 | string |  |
+| sources[].title | 필수 | string |  |
+| sources[].url | 필수 | string (uri) |  |
+| sources[].publishedAt | 필수 | string (date-time) |  |
+
 <a id="schema-activateresponse"></a>
 
 ### ActivateResponse
@@ -3190,6 +3260,7 @@ The immutable published original of a round (what users saw before any correctio
 | dataAsOf | 필수 | string (date-time) / null |  |
 | graphVersion | 필수 | string / null |  |
 | items | 필수 | [BriefingItem](#schema-briefingitem)[] |  |
+| companyOutlooks | 선택 | [CompanyOutlooks](#schema-companyoutlooks) | 선정 기업별 사업 전망·조건·근거와 동일 기업의 이전 판단 비교. 과거 발행본에는 없을 수 있습니다. 시장 요약·지표와 별도이며 주가 예측이 아닙니다. |
 | marketSummary | 필수 | [AnalysisSummary](#schema-analysissummary) / [Unavailable](#schema-unavailable) |  |
 | marketVariables | 필수 | [MarketVariables](#schema-marketvariables) / [Unavailable](#schema-unavailable) | KOSPI, KOSDAQ and USD/KRW stored with the published round; unavailable (with the reason) when the round has none |
 | sinceMorning | 필수 | [SinceMorning](#schema-sincemorning) / [Unavailable](#schema-unavailable) / null | Evening rounds only: key issues compared with the same day's published morning round; null for morning rounds |

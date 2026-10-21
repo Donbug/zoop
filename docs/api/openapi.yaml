@@ -8192,6 +8192,95 @@ components:
       name: "zoop_admin_session"
       description: "관리자 세션 및 작업별 권한 검증."
   schemas:
+    CompanyStatement:
+      type: object
+      required: [text, evidenceIds]
+      properties:
+        text: {type: string}
+        evidenceIds:
+          type: array
+          minItems: 1
+          items: {type: string}
+    CompanyOutlooks:
+      type: object
+      required: [schemaVersion, roundId, edition, cutoff, status, resultVersion, generatedAt, scopeNote, companies]
+      properties:
+        schemaVersion: {type: string, const: zoop-company-outlooks-v1}
+        roundId: {type: string}
+        edition: {type: string, enum: [morning, evening]}
+        cutoff: {type: string, format: date-time}
+        status: {type: string, enum: [PASS, WITHHELD]}
+        resultVersion: {type: string}
+        generatedAt: {type: string, format: date-time}
+        scopeNote: {type: string}
+        reason: {type: string}
+        companies:
+          type: array
+          items:
+            "$ref": "#/components/schemas/CompanyOutlook"
+    CompanyOutlook:
+      type: object
+      required: [companyId, companyName, issueIds, facts, assessment, impact, outlook, conditions, risks, comparison, previous, observedMovement, sources]
+      properties:
+        companyId: {type: string}
+        companyName: {type: string}
+        issueIds:
+          type: array
+          items: {type: string}
+        facts:
+          type: array
+          items: {"$ref": "#/components/schemas/CompanyStatement"}
+        assessment: {type: string, enum: [positive, negative, mixed, watch]}
+        impact: {"$ref": "#/components/schemas/CompanyStatement"}
+        outlook: {"$ref": "#/components/schemas/CompanyStatement"}
+        conditions:
+          type: array
+          minItems: 1
+          items: {"$ref": "#/components/schemas/CompanyStatement"}
+        risks:
+          type: array
+          minItems: 1
+          items: {"$ref": "#/components/schemas/CompanyStatement"}
+        comparison:
+          allOf:
+            - {"$ref": "#/components/schemas/CompanyStatement"}
+            - type: object
+              required: [status, previousResultVersion]
+              properties:
+                status: {type: string, enum: [updated, compared, unavailable]}
+                previousResultVersion: {type: [string, 'null']}
+        previous:
+          type: object
+          required: [status]
+          properties:
+            status: {type: string, enum: [available, unavailable]}
+            reason: {type: string}
+            roundId: {type: string}
+            cutoff: {type: string, format: date-time}
+            resultVersion: {type: string}
+            judgment: {type: object}
+        observedMovement:
+          type: object
+          required: [status, reason]
+          properties:
+            status: {type: string, const: unavailable}
+            reason: {type: string}
+        sources:
+          type: array
+          items:
+            type: object
+            required: [evidenceId, documentId, documentVersion, bodySha256, quote, title, url, publishedAt]
+            properties:
+              evidenceId: {type: string}
+              documentId: {type: string}
+              documentVersion: {type: string}
+              bodySha256: {type: string}
+              quote: {type: string}
+              title: {type: string}
+              url: {type: string, format: uri}
+              publishedAt: {type: string, format: date-time}
+
+
     ActivateResponse:
       properties:
         activeVersionId:
@@ -9175,6 +9264,9 @@ components:
           items:
             "$ref": "#/components/schemas/BriefingItem"
           type: "array"
+        companyOutlooks:
+          "$ref": "#/components/schemas/CompanyOutlooks"
+          description: "선정 기업별 사업 전망·조건·근거와 동일 기업의 이전 판단 비교. 과거 발행본에는 없을 수 있습니다. 시장 요약·지표와 별도이며 주가 예측이 아닙니다."
         marketSummary:
           anyOf:
             -

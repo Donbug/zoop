@@ -508,6 +508,21 @@ public final class BriefingReplayImporter {
                 blobs.put(historyNamespace + "-bundle", blob("ai_submit", historyBytes));
                 historyRoot = priorLayer;
             }
+            StrictJson.Obj companyLayer = presentation.root().has("companyOutlookLayer") ? presentation.root().object("companyOutlookLayer") : null;
+            Map<String, StrictJson.Obj> companyRows = companyLayer == null ? Map.of() : BriefingCompanyOutlookRules.rows(companyLayer);
+            Map<String, JsonNode> companyReceipts = companyLayer == null ? Map.of() : simulationReceiptLedger(companyLayer.objects("receipts"));
+            List<Map<String, StrictJson.Obj>> priorCompanyRows = new ArrayList<>(); List<List<StrictJson.Obj>> priorCompanyHistory = new ArrayList<>();
+            if (companyLayer != null && companyLayer.has("previousRuns")) {
+                require(companyLayer.objects("previousRuns").size() <= 2, "company_outlook_history_limit");
+                for (StrictJson.Obj priorLayer : companyLayer.objects("previousRuns")) {
+                    require(!priorLayer.has("previousRuns"), "company_outlook_nested_history");
+                    priorCompanyRows.add(BriefingCompanyOutlookRules.rows(priorLayer)); priorCompanyHistory.add(new ArrayList<>());
+                    require(simulationReceiptLedger(priorLayer.objects("receipts")).entrySet().stream()
+                            .allMatch(e -> e.getValue().equals(companyReceipts.get(e.getKey()))), "company_outlook_history_receipt");
+                }
+            }
+            Set<String> companyOwned = new HashSet<>(); List<StrictJson.Obj> companyHistory = new ArrayList<>();
+            require(published.containsAll(companyRows.keySet()), "company_outlook_unknown_round");
             Set<String> accountedMarket = new HashSet<>();
             List<StrictJson.Obj> validatedMarkets = new ArrayList<>();
             List<Round> enriched = new ArrayList<>(); Map<LocalDate, BriefingPresentationRules.Previous> mornings = new LinkedHashMap<>();
@@ -571,6 +586,28 @@ public final class BriefingReplayImporter {
                             citation.quote(), citation.start(), citation.end(), source.title(), source.provider(), source.url(), clock == null ? null : clock.publishedAt().toString(), source.kind()));
                 }
                 BriefingPresentationRules.details(payload, snapshot, effective.object("result"), record.object("itemDetails"), detailEvidence);
+                for (int historyIndex = 0; historyIndex < priorCompanyRows.size(); historyIndex++) {
+                    StrictJson.Obj priorCompany = priorCompanyRows.get(historyIndex).get(base.id());
+                    if (priorCompany != null) {
+                        BriefingCompanyOutlookRules.apply(priorCompany, payload, effective, record.object("marketEnrichment"),
+                                detailEvidence, priorCompanyHistory.get(historyIndex), companyReceipts, settings.bundle().getParent(), companyOwned);
+                        priorCompanyHistory.get(historyIndex).add(priorCompany);
+                        blobs.put(namespace + "-company-prior-" + historyIndex + "-" + enriched.size(), blob("briefing_input", StrictJson.write(priorCompany.node())));
+                    }
+                }
+                if (companyRows.containsKey(base.id())) {
+                    StrictJson.Obj company = companyRows.get(base.id());
+                    snapshot.set("companyOutlooks", BriefingCompanyOutlookRules.apply(company, payload, effective,
+                            record.object("marketEnrichment"), detailEvidence, companyHistory, companyReceipts, settings.bundle().getParent(), companyOwned));
+                    companyHistory.add(company);
+                    Instant companyGenerated = Instant.parse(company.string("generatedAt"));
+                    if (companyGenerated.isAfter(publishedAt)) publishedAt = companyGenerated;
+                    if ("PASS".equals(company.string("status")) && companyGenerated.isAfter(generated)) {
+                        generated = companyGenerated; payload.put("generatedAt", generated.toString());
+                    }
+                    if (companyGenerated.isAfter(created)) created = companyGenerated;
+                    blobs.put(namespace + "-company-" + enriched.size(), blob("briefing_input", StrictJson.write(company.node())));
+                }
                 ObjectNode lineage = snapshot.putObject("presentationEnrichment").put("schemaVersion", BriefingPresentationRules.SCHEMA)
                         .put("baseBundleSha256", presentation.root().string("baseBundleSha256")).put("baseResultSha256", record.string("baseResultSha256"));
                 lineage.put("comparisonBasis", "event_identity");
@@ -581,6 +618,8 @@ public final class BriefingReplayImporter {
             }
             for (StrictJson.Obj market : validatedMarkets) if (market.has("marketContext")) BriefingMarketContextRules.previous(market, validatedMarkets);
             require(accountedMarket.equals(layerReceipts.keySet()), "presentation_unowned_receipt");
+            require(companyOwned.equals(companyReceipts.keySet()), "company_outlook_unowned_receipts");
+            for (var receipt : companyReceipts.entrySet()) require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "company_outlook_duplicate_receipts");
             for (var receipt : layerReceipts.entrySet()) {
                 JsonNode oldReceipt = allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue());
                 require(oldReceipt == null || (historyOwnedReceipts.contains(receipt.getKey()) && oldReceipt.equals(receipt.getValue())), "presentation_receipt_reuses_existing_call");

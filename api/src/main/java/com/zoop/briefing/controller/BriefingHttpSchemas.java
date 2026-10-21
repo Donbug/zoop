@@ -22,6 +22,7 @@ public final class BriefingHttpSchemas {
             @Schema(nullable = true) BriefingWindow dataWindow, @Schema(nullable = true) Instant dataAsOf,
             @Schema(nullable = true) String graphVersion, List<BriefingItem> items,
             @Schema(oneOf = {AnalysisSummary.class, Unavailable.class}) JsonNode marketSummary,
+            @Schema(description = "선정 기업별 조건부 사업 전망. 과거 발행본에는 없을 수 있습니다.", implementation = CompanyOutlooks.class) JsonNode companyOutlooks,
             @Schema(oneOf = {MarketVariables.class, Unavailable.class}) JsonNode marketVariables,
             @Schema(nullable = true, oneOf = {SinceMorning.class, Unavailable.class}) JsonNode sinceMorning,
             @Schema(nullable = true, oneOf = {PreviousComparison.class, Unavailable.class},
@@ -29,6 +30,26 @@ public final class BriefingHttpSchemas {
             @Schema(nullable = true, allowableValues = {"no_issues_in_window"}) String emptyReason,
             List<BriefingCorrection> corrections, @Schema(nullable = true) BriefingNotice notice,
             BriefingReferences references, BriefingMetadata metadata, @Schema(nullable = true) BriefingOutlook outlook) { }
+
+    @Schema(name = "CompanyOutlooks", requiredProperties = {"schemaVersion", "roundId", "edition", "cutoff", "status", "resultVersion", "generatedAt", "scopeNote", "companies"})
+    public record CompanyOutlooks(String schemaVersion, String roundId, String edition, Instant cutoff,
+            @Schema(allowableValues = {"PASS", "WITHHELD"}) String status, String resultVersion, Instant generatedAt,
+            String scopeNote, List<CompanyOutlook> companies, String reason) { }
+
+    @Schema(name = "CompanyStatement", requiredProperties = {"text", "evidenceIds"})
+    public record CompanyStatement(String text, List<String> evidenceIds) { }
+    @Schema(name = "CompanyComparison", requiredProperties = {"text", "evidenceIds", "status", "previousResultVersion"})
+    public record CompanyComparison(String text, List<String> evidenceIds,
+            @Schema(allowableValues = {"updated", "compared", "unavailable"}) String status,
+            @Schema(nullable = true) String previousResultVersion) { }
+    @Schema(name = "CompanyOutlookSource", requiredProperties = {"evidenceId", "documentId", "documentVersion", "bodySha256", "quote", "title", "url", "publishedAt"})
+    public record CompanyOutlookSource(String evidenceId, String documentId, String documentVersion, String bodySha256,
+            String quote, String title, String url, Instant publishedAt) { }
+    @Schema(name = "CompanyOutlook", requiredProperties = {"companyId", "companyName", "issueIds", "facts", "assessment", "impact", "outlook", "conditions", "risks", "comparison", "previous", "observedMovement", "sources"})
+    public record CompanyOutlook(String companyId, String companyName, List<String> issueIds, List<CompanyStatement> facts,
+            @Schema(allowableValues = {"positive", "negative", "mixed", "watch"}) String assessment,
+            CompanyStatement impact, CompanyStatement outlook, List<CompanyStatement> conditions, List<CompanyStatement> risks,
+            CompanyComparison comparison, JsonNode previous, JsonNode observedMovement, List<CompanyOutlookSource> sources) { }
 
     @Schema(name = "BriefingRoundsResponse", requiredProperties = {"items", "nextCursor"})
     public record BriefingRoundsResponse(List<BriefingRoundRef> items, @Schema(nullable = true) String nextCursor) { }

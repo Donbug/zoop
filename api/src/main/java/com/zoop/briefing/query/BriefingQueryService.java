@@ -170,6 +170,8 @@ public class BriefingQueryService {
         out.put("status", "published").put("publishedAt", row.publishedAt().toString());
         out.set("dataAsOf", payload.get("dataWindow").get("end").deepCopy());
         out.set("marketSummary", row.publicSnapshot().get("marketSummary").deepCopy());
+        JsonNode companyOutlooks = row.publicSnapshot().get("companyOutlooks");
+        if (companyOutlooks != null) out.set("companyOutlooks", companyOutlooks.deepCopy());
         var market = payload.get("marketVariables");
         out.set("marketVariables", market.isNull() ? unavailableSection("발행 당시 시장 지표가 저장되지 않았습니다.") : publicMarketVariables(market));
         out.set("sinceMorning", row.comparisonSnapshot() == null ? mapper.nullNode() : row.comparisonSnapshot().deepCopy());

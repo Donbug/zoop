@@ -75,12 +75,43 @@ final class BriefingSnapshotValidator {
         JsonNode snapshot = object(row.publicSnapshot());
         summary(field(snapshot, "marketSummary"), evidence);
         marketAnalysis(field(snapshot, "marketSummary"), row);
+        if (snapshot.has("companyOutlooks")) companyOutlooks(snapshot.get("companyOutlooks"), row, evidence);
         JsonNode market = field(p, "marketVariables");
         if (!market.isNull()) market(market, row.windowTo());
         if ("morning".equals(row.edition())) check(row.comparisonSnapshot() == null || row.comparisonSnapshot().isNull());
         else comparison(row.comparisonSnapshot());
         JsonNode previous = snapshot.get("previousComparison");
         if (previous != null && !previous.isNull()) previousComparison(previous, row);
+    }
+
+    private static void companyOutlooks(JsonNode layer, BriefingRound row, Set<String> evidence) {
+        object(layer); same(text(layer, "schemaVersion"), "zoop-company-outlooks-v1");
+        same(text(layer, "roundId"), row.id()); same(text(layer, "edition"), row.edition());
+        check(Instant.parse(text(layer, "cutoff")).equals(row.windowTo())); timestamp(layer, "generatedAt"); text(layer, "resultVersion"); text(layer, "scopeNote");
+        String status = choice(layer, "status", Set.of("PASS", "WITHHELD"));
+        if ("WITHHELD".equals(status)) { check(array(layer, "companies").isEmpty()); text(layer, "reason"); return; }
+        Set<String> expected = new HashSet<>(), actual = new HashSet<>();
+        for (JsonNode item : row.payload().path("items")) for (JsonNode company : item.path("companies")) expected.add(text(company, "id"));
+        for (JsonNode company : array(layer, "companies")) {
+            check(actual.add(text(company, "companyId"))); text(company, "companyName");
+            choice(company, "assessment", Set.of("positive", "negative", "mixed", "watch"));
+            Set<String> ownSources = new HashSet<>();
+            for (JsonNode source : array(company, "sources")) {
+                String id = text(source, "evidenceId"); check(evidence.contains(id) && ownSources.add(id));
+                text(source, "quote"); text(source, "documentId"); text(source, "documentVersion"); text(source, "bodySha256");
+                text(source, "title"); String url = text(source, "url"); check(url.startsWith("https://") || url.startsWith("http://"));
+                check(!Instant.parse(text(source, "publishedAt")).isAfter(row.windowTo()));
+            }
+            for (String field : java.util.List.of("impact", "outlook", "comparison")) companyStatement(field(company, field), ownSources);
+            for (String field : java.util.List.of("facts", "conditions", "risks")) {
+                check(!array(company, field).isEmpty()); for (JsonNode statement : array(company, field)) companyStatement(statement, ownSources);
+            }
+            choice(field(company, "comparison"), "status", Set.of("updated", "compared", "unavailable"));
+        }
+        check(actual.equals(expected));
+    }
+    private static void companyStatement(JsonNode statement, Set<String> sources) {
+        object(statement); text(statement, "text"); Set<String> refs = strings(statement, "evidenceIds"); check(!refs.isEmpty() && sources.containsAll(refs));
     }
 
     private static void metadata(JsonNode value, String graphVersion, boolean localReplay) {

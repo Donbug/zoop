@@ -7,6 +7,302 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "response:200:application/json.companyOutlooks": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies": {
+      "type": "array"
+    },
+    "response:200:application/json.companyOutlooks.companies:required": true,
+    "response:200:application/json.companyOutlooks.companies[]": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].assessment": {
+      "type": "string",
+      "enum": [
+        "positive",
+        "negative",
+        "mixed",
+        "watch"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].assessment:required": true,
+    "response:200:application/json.companyOutlooks.companies[].companyId": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].companyId:required": true,
+    "response:200:application/json.companyOutlooks.companies[].companyName": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].companyName:required": true,
+    "response:200:application/json.companyOutlooks.companies[].comparison:required": true,
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:0>.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:0>.evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:0>.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:0>.text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:0>.text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:1>": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:1>.previousResultVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:1>.previousResultVersion:required": true,
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:1>.status": {
+      "type": "string",
+      "enum": [
+        "updated",
+        "compared",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:1>.status:required": true,
+    "response:200:application/json.companyOutlooks.companies[].conditions": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].conditions:required": true,
+    "response:200:application/json.companyOutlooks.companies[].conditions[]": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].conditions[].evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].conditions[].evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].conditions[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].conditions[].text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].conditions[].text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].facts": {
+      "type": "array"
+    },
+    "response:200:application/json.companyOutlooks.companies[].facts:required": true,
+    "response:200:application/json.companyOutlooks.companies[].facts[]": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].facts[].evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].facts[].evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].facts[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].facts[].text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].facts[].text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].impact": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].impact.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].impact.evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].impact.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].impact.text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].impact.text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].impact:required": true,
+    "response:200:application/json.companyOutlooks.companies[].issueIds": {
+      "type": "array"
+    },
+    "response:200:application/json.companyOutlooks.companies[].issueIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].issueIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].observedMovement": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].observedMovement.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].observedMovement.reason:required": true,
+    "response:200:application/json.companyOutlooks.companies[].observedMovement.status": {
+      "type": "string",
+      "const": "unavailable"
+    },
+    "response:200:application/json.companyOutlooks.companies[].observedMovement.status:required": true,
+    "response:200:application/json.companyOutlooks.companies[].observedMovement:required": true,
+    "response:200:application/json.companyOutlooks.companies[].outlook": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].outlook.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].outlook.evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].outlook.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].outlook.text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].outlook.text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].outlook:required": true,
+    "response:200:application/json.companyOutlooks.companies[].previous": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].previous.cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyOutlooks.companies[].previous.cutoff:required": false,
+    "response:200:application/json.companyOutlooks.companies[].previous.judgment": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].previous.judgment:required": false,
+    "response:200:application/json.companyOutlooks.companies[].previous.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].previous.reason:required": false,
+    "response:200:application/json.companyOutlooks.companies[].previous.resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].previous.resultVersion:required": false,
+    "response:200:application/json.companyOutlooks.companies[].previous.roundId": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].previous.roundId:required": false,
+    "response:200:application/json.companyOutlooks.companies[].previous.status": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].previous.status:required": true,
+    "response:200:application/json.companyOutlooks.companies[].previous:required": true,
+    "response:200:application/json.companyOutlooks.companies[].risks": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].risks:required": true,
+    "response:200:application/json.companyOutlooks.companies[].risks[]": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].risks[].evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].risks[].evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].risks[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].risks[].text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].risks[].text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources": {
+      "type": "array"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources[]": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].bodySha256": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].bodySha256:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources[].documentId": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].documentId:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources[].documentVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].documentVersion:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources[].evidenceId": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].evidenceId:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources[].publishedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].publishedAt:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources[].quote": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].quote:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources[].title": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].title:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources[].url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].url:required": true,
+    "response:200:application/json.companyOutlooks.cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyOutlooks.cutoff:required": true,
+    "response:200:application/json.companyOutlooks.edition": {
+      "type": "string",
+      "enum": [
+        "morning",
+        "evening"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.edition:required": true,
+    "response:200:application/json.companyOutlooks.generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyOutlooks.generatedAt:required": true,
+    "response:200:application/json.companyOutlooks.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.reason:required": false,
+    "response:200:application/json.companyOutlooks.resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.resultVersion:required": true,
+    "response:200:application/json.companyOutlooks.roundId": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.roundId:required": true,
+    "response:200:application/json.companyOutlooks.schemaVersion": {
+      "type": "string",
+      "const": "zoop-company-outlooks-v1"
+    },
+    "response:200:application/json.companyOutlooks.schemaVersion:required": true,
+    "response:200:application/json.companyOutlooks.scopeNote": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.scopeNote:required": true,
+    "response:200:application/json.companyOutlooks.status": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "WITHHELD"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.status:required": true,
+    "response:200:application/json.companyOutlooks:required": false,
     "response:200:application/json.items[].summary<anyOf:0>": {
       "type": "object"
     },

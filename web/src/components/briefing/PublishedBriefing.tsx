@@ -10,6 +10,7 @@ import type { FeedbackValue } from '@/types/feedback';
 import type { BriefingEdition, BriefingResponse } from '@/types/briefing';
 import { briefingTime } from '@/util/briefingTime';
 import BriefingQuickRead from './BriefingQuickRead';
+import CompanyOutlooks from './CompanyOutlooks';
 import BriefingReadingSection from './BriefingReadingSection';
 import MarketIndicators from './MarketIndicators';
 import MarketSummary from './MarketSummary';
@@ -267,7 +268,10 @@ export default function PublishedBriefing({
           {result.status === 'published' && (
             <>
               {(!compact || !knownLimits) && partialInfo}
-              {compact && <BriefingQuickRead result={result} />}
+              <CompanyOutlooks result={result} compact={compact} />
+              {compact && !result.companyOutlooks && (
+                <BriefingQuickRead result={result} />
+              )}
               {compact && (
                 <MarketIndicators variables={result.marketVariables} compact />
               )}
@@ -275,8 +279,8 @@ export default function PublishedBriefing({
                 compact={compact}
                 title={
                   result.edition === 'morning'
-                    ? '오늘 전망 자세히 읽기'
-                    : '결과 비교와 다음 거래일 전망 읽기'
+                    ? '시장 요약·시장 전체 전망 읽기'
+                    : '시장 요약·시장 흐름 비교 읽기'
                 }
               >
                 <MarketSummary

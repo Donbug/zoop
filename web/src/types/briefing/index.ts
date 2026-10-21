@@ -137,6 +137,7 @@ export type BriefingResponse = {
   dataAsOf: string | null;
   graphVersion: string | null;
   items: BriefingItem[];
+  companyOutlooks?: import('./companyOutlook').CompanyOutlooks;
   marketSummary: BriefingMarketSummary;
   marketVariables:
     | { status: 'available'; indicators: MarketIndicator[] }
