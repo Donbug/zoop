@@ -18,8 +18,8 @@ def load(name, path):
     return value
 
 
-def create(directory, tampered_history=False, quality=False, continuation=False, role=False, structure=False):
-    role = role or structure
+def create(directory, tampered_history=False, quality=False, continuation=False, role=False, structure=False, grounded=False):
+    role = role or structure or grounded
     recovery = load("history_authored_recovery", ROOT / "api/scripts/briefing_recovery_fixture.py")
     presentation = load("history_authored_presentation", ROOT / "scripts/briefing_presentation_enrichment.py")
     market = load("history_authored_market", ROOT / "scripts/tests/test_briefing_market_data.py")
@@ -95,20 +95,21 @@ def create(directory, tampered_history=False, quality=False, continuation=False,
                     else:
                         optional.append(claim)
                 answer.update(claims=optional, requiredClaims=slots)
-        version = runner.context.STRUCTURE_VERSION if structure else runner.context.ROLE_VERSION if role else "market-context-v2.3-outlook" if quality else "market-context-v2.2-outlook"
-        second = run(version, directory / "first", directory / "second", authored.ContextTransport(quality_answer if quality or role else None))
+        version = runner.context.grounding.VERSION if grounded else runner.context.STRUCTURE_VERSION if structure else runner.context.ROLE_VERSION if role else "market-context-v2.3-outlook" if quality else "market-context-v2.2-outlook"
+        ground_transport = load("history_authored_ground", ROOT / "scripts/tests/test_briefing_market_grounding.py")
+        second = run(version, directory / "first", directory / "second", ground_transport.GroundTransport() if grounded else authored.ContextTransport(quality_answer if quality or role else None))
         if role:
             plan = base.strict_load(base.regular(directory / "second/outlook-plan.json"))
             assert len(plan["requestedRoundIds"]) == 3 and len(plan["dependencyRoundIds"]) == 1, plan
-            assert plan["plannedNewCalls"] == plan["maximumNewCalls"] == 8, plan
+            assert plan["plannedNewCalls"] == plan["maximumNewCalls"] == (12 if grounded else 8), plan
         if continuation:
-            third = run(version if role else "market-context-v2.3-outlook", directory / "second", directory / "third", authored.ContextTransport(quality_answer))
+            third = run(version if role else "market-context-v2.3-outlook", directory / "second", directory / "third", ground_transport.GroundTransport() if grounded else authored.ContextTransport(quality_answer))
             assert third["summaryPass"] == 4 and third["newPaidCalls"] == (0 if quality or role else 8), third
     assert first["summaryPass"] == 0 and first["newPaidCalls"] == 8, first
-    assert second["summaryPass"] == 4 and second["newPaidCalls"] == 8, second
-    return {"realPaidCalls": 0, "realProviderFetches": 0, "authoredOldCalls": 8, "authoredNewCalls": 8,
+    assert second["summaryPass"] == 4 and second["newPaidCalls"] == (12 if grounded else 8), second
+    return {"realPaidCalls": 0, "realProviderFetches": 0, "authoredOldCalls": 8, "authoredNewCalls": 12 if grounded else 8,
             "bundle": str(directory / ("third" if continuation else "second") / "bundle-v2.json")}
 
 
 if __name__ == "__main__":
-    print(create(Path(sys.argv[1]), "--tampered-history" in sys.argv, "--quality" in sys.argv, "--continuation" in sys.argv, "--role" in sys.argv, "--structure" in sys.argv))
+    print(create(Path(sys.argv[1]), "--tampered-history" in sys.argv, "--quality" in sys.argv, "--continuation" in sys.argv, "--role" in sys.argv, "--structure" in sys.argv, "--grounded" in sys.argv))

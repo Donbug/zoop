@@ -1,0 +1,96 @@
+{
+  "type": "object",
+  "properties": {
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "targetId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "SUPPORTED",
+              "UNSUPPORTED",
+              "UNCERTAIN"
+            ]
+          },
+          "noUnsupportedNumbers": {
+            "type": "boolean"
+          },
+          "noUnsupportedCausality": {
+            "type": "boolean"
+          },
+          "temporalAppropriate": {
+            "type": "boolean"
+          },
+          "noInvestmentAdvice": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "comparisonAppropriate": {
+            "type": "boolean"
+          },
+          "forecastAppropriate": {
+            "type": "boolean"
+          },
+          "evidenceClauseCoverage": {
+            "type": "boolean"
+          },
+          "qualifiersPreserved": {
+            "type": "boolean"
+          },
+          "observableConditionsOnly": {
+            "type": "boolean"
+          },
+          "factUnitAppropriate": {
+            "type": "boolean"
+          },
+          "comparisonElementsComplete": {
+            "type": "boolean"
+          },
+          "factPlanCoverage": {
+            "type": "boolean"
+          },
+          "scopePreserved": {
+            "type": "boolean"
+          },
+          "koreanOnly": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "targetId",
+          "verdict",
+          "noUnsupportedNumbers",
+          "noUnsupportedCausality",
+          "temporalAppropriate",
+          "noInvestmentAdvice",
+          "reason",
+          "comparisonAppropriate",
+          "forecastAppropriate",
+          "evidenceClauseCoverage",
+          "qualifiersPreserved",
+          "observableConditionsOnly",
+          "factUnitAppropriate",
+          "comparisonElementsComplete",
+          "factPlanCoverage",
+          "scopePreserved",
+          "koreanOnly"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "checks"
+  ],
+  "additionalProperties": false
+}

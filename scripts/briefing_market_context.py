@@ -18,6 +18,7 @@ def helper(name):
     return module
 
 
+grounding = helper("briefing_market_grounding")
 legacy = helper("briefing_market_summary")
 simulation = helper("briefing_round_simulation")
 base = legacy.base
@@ -247,7 +248,7 @@ def _schema(frozen, evidence, indicators, prior, evaluations):
         for kind in required_kinds(frozen):
             slot = copy.deepcopy(schema["properties"]["claims"]["items"])
             slot["properties"]["kind"]["enum"] = [kind]
-            if frozen["context"]["summaryPromptVersion"] == STRUCTURE_VERSION:
+            if frozen["context"]["summaryPromptVersion"] in {STRUCTURE_VERSION, *grounding.VERSIONS}:
                 fields = slot["properties"]
                 if kind == "forecast":
                     fields["targetId"] = {"type": "string", "enum": [t["targetId"] for t in targets]}
@@ -275,7 +276,7 @@ QUALITY_FLAGS = ("atomicClaim", "evidenceClauseCoverage", "qualifiersPreserved",
 ROLE_VERSION = "market-context-v2.4-outlook"
 ROLE_FLAGS = ("factUnitAppropriate", "comparisonElementsComplete", "evidenceClauseCoverage", "qualifiersPreserved", "observableConditionsOnly")
 STRUCTURE_VERSION = "market-context-v2.5-outlook"
-ROLE_VERSIONS = {ROLE_VERSION, STRUCTURE_VERSION}
+ROLE_VERSIONS = {ROLE_VERSION, STRUCTURE_VERSION, *grounding.VERSIONS}
 QUALITY_VERSIONS = {QUALITY_VERSION, *ROLE_VERSIONS}
 
 
@@ -291,7 +292,7 @@ def required_kinds(frozen):
     return kinds
 
 
-def draft_claims(draft, frozen):
+def draft_claims(draft, frozen, fact_plan=None):
     """Lossless projection, never an insertion/restoration of an omitted model claim."""
     if frozen["context"].get("summaryPromptVersion") not in ROLE_VERSIONS:
         return draft
@@ -305,7 +306,8 @@ def draft_claims(draft, frozen):
         require(type(slot) is dict and slot.get("kind") == role, "market_role_slot_kind")
     require(all(c.get("kind") not in {"forecast_update", "result_comparison"} or c.get("kind") in roles for c in draft["claims"]),
             "market_role_comparison_slot_required")
-    return {"claims": [*draft["claims"], *(draft["requiredClaims"][role] for role in roles)]}
+    result = {"claims": [*draft["claims"], *(draft["requiredClaims"][role] for role in roles)]}
+    return grounding.project(result, fact_plan, require, frozen["context"].get("summaryPromptVersion") in grounding.STRICT_VERSIONS) if fact_plan is not None else result
 
 
 def quality_claims(claims, evidence):
@@ -320,8 +322,8 @@ def quality_claims(claims, evidence):
             require(c.get("conditions") == [], "market_quality_condition_observations_missing")
 
 
-def _claims(draft, frozen, evidence, indicators, prior, evaluations):
-    draft = draft_claims(draft, frozen)
+def _claims(draft, frozen, evidence, indicators, prior, evaluations, fact_plan=None):
+    draft = draft_claims(draft, frozen, fact_plan)
     require(type(draft) is dict and set(draft) == {"claims"} and type(draft["claims"]) is list
             and 2 <= len(draft["claims"]) <= 8, "market_context_claim_count")
     targets = {t["targetId"]: t for t in frozen["marketContext"]["forecastTargets"]}
@@ -378,17 +380,43 @@ def generate_market_summary(client, data, max_repairs=1):
     frozen, evidence, indicators, prior, evaluations, note = _prepare(data)
     frozen_sha = base.digest(base.canonical(frozen))
     schema = _schema(frozen, evidence, indicators, prior, evaluations)
+    grounded = frozen["context"].get("summaryPromptVersion") in grounding.VERSIONS
+    translated = frozen["context"].get("summaryPromptVersion") in grounding.STRICT_VERSIONS
+    extractive = frozen["context"].get("summaryPromptVersion") in grounding.EXTRACTIVE_VERSIONS
+    fact_plan, fact_key, fact_attempts, fact_error = None, None, [], None
+    if grounded:
+        # An immutable model response fixes the facts before the analytical call.
+        # Same paid stage, separate phase/schema/receipt; nothing is silently edited.
+        for index in range(max_repairs + 1):
+            fact_request = {**frozen, "frozenInputSha256": frozen_sha, "phase": "facts",
+                            "repairAttempt": index, "priorDraft": fact_plan, "priorValidation": fact_error}
+            fact_key = client.request_digest("market_summary_generation", fact_request,
+                "generation.md", "generation.schema.json", schema_override=grounding.fact_schema(evidence, translated, extractive))
+            fact_plan = client.call("market_summary_generation", fact_request,
+                "generation.md", "generation.schema.json", schema_override=grounding.fact_schema(evidence, translated, extractive))
+            try:
+                grounding.validate_facts(fact_plan, evidence, require, translated, extractive)
+                fact_error = None
+            except ContextError as error:
+                fact_error = {"status": "WITHHELD", "reason": str(error)}
+            fact_attempts.append({"requestDigest": fact_key, "error": fact_error})
+            if fact_error is None:
+                break
+        schema = grounding.analysis_schema(schema, fact_plan, translated) if fact_error is None else schema
     last_draft, last_validation, attempts, claims = None, None, [], []
     generation_key = verification_key = None
-    for attempt in range(max_repairs + 1):
+    for attempt in range(0 if fact_error else max_repairs + 1):
         request = {**frozen, "frozenInputSha256": frozen_sha, "repairAttempt": attempt,
                    "priorDraft": last_draft, "priorValidation": last_validation}
+        if grounded:
+            request.update(phase="analysis", factPlan=fact_plan, factPlanRequestDigest=fact_key)
+        request = grounding.model_input(request)
         generation_key = client.request_digest("market_summary_generation", request,
             "generation.md", "generation.schema.json", max_output=8000, schema_override=schema)
         last_draft = client.call("market_summary_generation", request,
             "generation.md", "generation.schema.json", max_output=8000, schema_override=schema)
         try:
-            claims = _claims(last_draft, frozen, evidence, indicators, prior, evaluations)
+            claims = _claims(last_draft, frozen, evidence, indicators, prior, evaluations, fact_plan)
         except ContextError as error:
             claims, verification_key = [], None
             last_validation = {"status": "WITHHELD", "checks": [], "reason": str(error)}
@@ -401,9 +429,18 @@ def generate_market_summary(client, data, max_repairs=1):
             check = copy.deepcopy(item)
             check["properties"]["targetId"]["enum"] = [c["claimId"]]
             props[c["claimId"]] = check
+        if grounded:
+            for check in props.values():
+                for flag in grounding.FLAGS:
+                    check["properties"][flag] = {"type": "boolean"}
+                    if flag not in check["required"]:
+                        check["required"].append(flag)
         template["properties"]["checks"] = {"type": "object", "properties": props,
                                             "required": list(props), "additionalProperties": False}
         verify_data = {**frozen, "frozenInputSha256": frozen_sha, "draft": {"claims": claims}}
+        if grounded:
+            verify_data.update(phase="verify", factPlan=fact_plan, factPlanRequestDigest=fact_key)
+        verify_data = grounding.model_input(verify_data)
         verification_key = client.request_digest("market_summary_verification", verify_data,
             "verification.md", "verification.schema.json", max_output=8000, schema_override=template)
         decision = client.call("market_summary_verification", verify_data,
@@ -414,6 +451,8 @@ def generate_market_summary(client, data, max_repairs=1):
                  "comparisonAppropriate", "forecastAppropriate")
         if frozen["context"].get("summaryPromptVersion") in QUALITY_VERSIONS:
             flags += ROLE_FLAGS if frozen["context"]["summaryPromptVersion"] in ROLE_VERSIONS else QUALITY_FLAGS
+        if grounded:
+            flags += grounding.FLAGS
         passed = all(check["verdict"] == "SUPPORTED" and all(check[k] is True for k in flags) for check in checks)
         last_validation = {"status": "PASS" if passed else "WITHHELD", "checks": checks,
                            "meaning": "Independent model assessment of frozen inputs; no external fact certification."}
@@ -421,7 +460,30 @@ def generate_market_summary(client, data, max_repairs=1):
                          "verificationRequestDigest": verification_key, "verification": last_validation})
         if passed:
             break
+        if grounded and frozen["context"].get("summaryPromptVersion") in grounding.SEMANTIC_VERSIONS and attempt < max_repairs:
+            bad_facts = [check for check in checks[:len(fact_plan["facts"])]
+                         if check["verdict"] != "SUPPORTED" or not all(check[k] is True for k in flags)]
+            if bad_facts:
+                fact_request = {**frozen, "frozenInputSha256": frozen_sha, "phase": "facts",
+                    "repairAttempt": 2, "priorDraft": fact_plan, "priorValidation": {"status": "WITHHELD", "checks": bad_facts}}
+                fact_key = client.request_digest("market_summary_generation", fact_request,
+                    "generation.md", "generation.schema.json", schema_override=grounding.fact_schema(evidence, translated, extractive))
+                fact_plan = client.call("market_summary_generation", fact_request,
+                    "generation.md", "generation.schema.json", schema_override=grounding.fact_schema(evidence, translated, extractive))
+                try:
+                    grounding.validate_facts(fact_plan, evidence, require, translated, extractive)
+                    fact_error = None
+                except ContextError as error:
+                    fact_error = {"status": "WITHHELD", "reason": str(error)}
+                fact_attempts.append({"requestDigest": fact_key, "error": fact_error})
+                if fact_error:
+                    claims, verification_key = [], None
+                    break
+                schema = grounding.analysis_schema(_schema(frozen, evidence, indicators, prior, evaluations), fact_plan, translated)
     keys = {a[k] for a in attempts for k in ("generationRequestDigest", "verificationRequestDigest") if k in a}
+    keys.update(a["requestDigest"] for a in fact_attempts)
+    if fact_error:
+        last_validation, generation_key = {**fact_error, "checks": []}, fact_key
     receipts = [r for r in client.receipts() if r["requestDigest"] in keys]
     generated = max((r["finishedAt"] for r in receipts if r.get("stage") == "market_summary_generation"), default=base.now())
     passed = last_validation["status"] == "PASS"
@@ -437,7 +499,8 @@ def generate_market_summary(client, data, max_repairs=1):
                          "text": c["text"], "direction": c["direction"], "conditions": c["conditions"],
                          "counterFactors": c["counterFactors"], "evidenceIds": c["evidenceIds"], "indicatorIds": c["indicatorIds"]}
                 forecasts.append({"forecastId": "market-forecast-" + identity_digest({"value": value, "version": version})[:32], **value})
-    return {"generatedAt": generated, "policy": POLICY, "claims": claims, "text": text, "scopeNote": note,
+    return {**({"factPlan": fact_plan, "factPlanRequestDigest": fact_key, "factPlanAttempts": fact_attempts} if grounded else {}),
+            "generatedAt": generated, "policy": POLICY, "claims": claims, "text": text, "scopeNote": note,
             "summary": {"text": text, "generatedAt": generated, "resultVersion": version, "evidenceIds": evidence_ids} if passed else None,
             "verification": last_validation, "resultVersion": version, "evidenceIds": evidence_ids,
             "generationRequestDigest": generation_key, "verificationRequestDigest": verification_key,

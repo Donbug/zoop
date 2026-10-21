@@ -24,7 +24,7 @@ def compare(baseline,current):
             summary=value['summaryResult']
             rejected = []
             for check in summary['verification'].get('checks',[]):
-                if check.get('verdict') != 'SUPPORTED' or any(check.get(k) is False for k in ['atomicClaim','factUnitAppropriate','comparisonElementsComplete','evidenceClauseCoverage','qualifiersPreserved','observableConditionsOnly']):
+                if check.get('verdict') != 'SUPPORTED' or any(check.get(k) is False for k in ['atomicClaim','factUnitAppropriate','comparisonElementsComplete','evidenceClauseCoverage','qualifiersPreserved','observableConditionsOnly','factPlanCoverage','scopePreserved','koreanOnly']):
                     rejected.append(check.get('reason','검증 보류'))
             if summary['verification'].get('reason'):
                 reasons={'market_outlook_forecast_required':'보완 초안에서 필수인 오늘/다음 거래일 전망 문장이 빠졌습니다.',
@@ -39,6 +39,7 @@ def compare(baseline,current):
                     text=next(t['text'] for m in response['output'] if m['type']=='message' for t in m['content'] if t['type']=='output_text')
                     raw_draft=json.loads(text)
                     draft=list(raw_draft.get('claims',[]))
+                    draft += [{'kind':'fact_plan','text':f['text'],'evidenceIds':f.get('sourceIds',[f.get('evidenceId')])} for f in raw_draft.get('facts',[])]
                     slots=raw_draft.get('requiredClaims',{})
                     for kind in ['forecast','forecast_update','result_comparison']:
                         if kind in slots: draft.append(slots[kind])
@@ -57,7 +58,7 @@ PAGE='''<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewpor
 <title>시장 요약 수정 전·후 비교</title><style>
 body{font-family:system-ui,sans-serif;color:#202b37;background:#f6f8fa;margin:0}main{max-width:1360px;margin:auto;padding:30px 20px}h1{font-size:28px;margin:0 0 10px}p{line-height:1.7}nav{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0}button,a{font:inherit}button{padding:12px 18px;border:1px solid #c6d0db;border-radius:10px;background:white;cursor:pointer}button[aria-pressed=true]{background:#183d65;color:white}.columns{display:grid;grid-template-columns:1fr 1fr;gap:22px}article{background:white;border:1px solid #dce2e8;padding:24px;border-radius:14px}article.new{border-top:5px solid #277c65}h2{font-size:21px}.meta{font-size:14px;color:#576b80}.claim{border-top:1px solid #e8edf2;padding:16px 0}.kind{font-size:13px;color:#276c9e;font-weight:700}.claim p{margin:7px 0;white-space:pre-wrap}.basis{font-size:13px;color:#6c7b89}.warning{color:#8b4b13}a{color:#165a9a}.links{display:flex;gap:22px;margin:10px 0 20px}summary{cursor:pointer}details{font-size:13px;color:#687c8c;margin-top:24px}@media(max-width:760px){.columns{grid-template-columns:1fr}main{padding:20px 12px}article{padding:18px}}
 </style><main><h1>시장 요약 수정 전·후</h1><p>같은 회차의 기존 생성본과 새 생성본을 비교합니다. 핵심 이슈와 수집 자료를 재사용하고 시장 요약을 다시 작성했습니다.</p><nav id="rounds" aria-label="비교 회차"></nav><h2 id="heading"></h2><p id="changes"></p><div class="links" id="links"></div><div class="columns" id="content"></div><details><summary>기록 식별 정보</summary><p id="identity"></p></details></main><script>
-const data=__DATA__;const urls=__URLS__;const labels={fact:'확인된 정보',interpretation:'시장 해석',forecast:'전망',forecast_update:'이전 전망 갱신',result_comparison:'아침 예상과 관측 비교'};
+const data=__DATA__;const urls=__URLS__;const labels={fact_plan:'반려된 사실 계획(미발행)',fact:'확인된 정보',interpretation:'시장 해석',forecast:'전망',forecast_update:'이전 전망 갱신',result_comparison:'아침 예상과 관측 비교'};
 function el(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n}
 function draw(i){const r=data.rounds[i];document.querySelectorAll('nav button').forEach((b,k)=>b.setAttribute('aria-pressed',String(i===k)));document.querySelector('#heading').textContent=r.date+' '+(r.edition==='morning'?'출근':'퇴근');
 const count=v=>v.claims.length;const conditions=v=>v.forecasts.reduce((s,f)=>s+f.conditions.length,0);

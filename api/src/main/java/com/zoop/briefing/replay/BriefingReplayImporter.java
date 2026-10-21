@@ -465,7 +465,7 @@ public final class BriefingReplayImporter {
             Set<String> historyDigests = new HashSet<>(), historyOwnedReceipts = new HashSet<>();
             historyDigests.add(bundleSha); int historyDepth = 0;
             while (historyRoot.has("outlookHistory")) {
-                require(++historyDepth <= 8, "outlook_history_depth_limit");
+                require(++historyDepth <= 12, "outlook_history_depth_limit");
                 String historyNamespace = namespace + "-outlook-history" + (historyDepth == 1 ? "" : "-" + historyDepth);
                 StrictJson.Obj history = historyRoot.object("outlookHistory");
                 String historySha = history.string("bundleSha256");
@@ -801,12 +801,12 @@ public final class BriefingReplayImporter {
         marketArtifact(output, "summaries", record.string("summaryResultSha256"), summary.node());
         if (record.has("marketContext")) {
             StrictJson.Obj broad = record.object("marketContext");
-            require(BriefingMarketContextRules.contextual(summary) && Set.of("market-context-v2", "market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook", "market-context-v2.4-outlook", "market-context-v2.5-outlook").contains(context.string("summaryPromptVersion"))
+            require(BriefingMarketContextRules.contextual(summary) && Set.of("market-context-v2", "market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook", "market-context-v2.4-outlook", "market-context-v2.5-outlook", "market-context-v2.6-outlook", "market-context-v2.7-outlook", "market-context-v2.8-outlook", "market-context-v2.9-outlook", "market-context-v3-grounded").contains(context.string("summaryPromptVersion"))
                     && context.string("marketContextSha256").equals(summary.string("marketContextSha256")), "market_context_digest_binding");
             marketArtifact(output, "contexts", context.string("marketContextSha256"), broad.node());
             BriefingMarketContextRules.targetsAndEvaluations(broad, snapshot);
             validateMarketSummary(summary, news, snapshot, broad, BriefingMarketContextRules.qualityFlags(context.string("summaryPromptVersion")));
-            if (Set.of("market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook", "market-context-v2.4-outlook", "market-context-v2.5-outlook").contains(context.string("summaryPromptVersion"))) BriefingMarketContextRules.outlookRequired(summary, broad);
+            if (Set.of("market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook", "market-context-v2.4-outlook", "market-context-v2.5-outlook", "market-context-v2.6-outlook", "market-context-v2.7-outlook", "market-context-v2.8-outlook", "market-context-v2.9-outlook", "market-context-v3-grounded").contains(context.string("summaryPromptVersion"))) BriefingMarketContextRules.outlookRequired(summary, broad);
         } else {
             require(!BriefingMarketContextRules.contextual(summary), "market_context_result_without_input");
             validateMarketSummary(summary, news, snapshot);
@@ -817,7 +817,7 @@ public final class BriefingReplayImporter {
     private static String marketPromptFolder(StrictJson.Obj record) {
         if (!record.has("marketContext")) return "market-summary";
         String version = record.object("context").string("summaryPromptVersion");
-        require(Set.of("market-context-v2", "market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook", "market-context-v2.4-outlook", "market-context-v2.5-outlook").contains(version), "market_context_prompt_version");
+        require(Set.of("market-context-v2", "market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook", "market-context-v2.4-outlook", "market-context-v2.5-outlook", "market-context-v2.6-outlook", "market-context-v2.7-outlook", "market-context-v2.8-outlook", "market-context-v2.9-outlook", "market-context-v3-grounded").contains(version), "market_context_prompt_version");
         return "market-context-v2".equals(version) ? "market-context" : version;
     }
 
@@ -997,7 +997,7 @@ public final class BriefingReplayImporter {
             for (StrictJson.Obj check : verification.objects("checks"))
                 for (String flag : qualityFlags) supported &= check.bool(flag);
             if ("PASS".equals(status)) BriefingMarketContextRules.qualityClaims(summary, news, broad);
-            if ("PASS".equals(status) && qualityFlags.equals(BriefingMarketContextRules.ROLE_FLAGS)) BriefingMarketContextRules.roleClaims(summary, broad);
+            if ("PASS".equals(status) && (qualityFlags.equals(BriefingMarketContextRules.ROLE_FLAGS) || qualityFlags.equals(BriefingMarketGroundingRules.FLAGS))) BriefingMarketContextRules.roleClaims(summary, broad);
         }
         if (contextual) BriefingMarketContextRules.claims(summary, broad);
         require(checked.equals(targets) && ("PASS".equals(status) == supported), "market_summary_verification_coverage");
@@ -1006,16 +1006,27 @@ public final class BriefingReplayImporter {
 
     private static void validateMarketSummaryRecordings(StrictJson.Obj record, StrictJson.Obj news, Map<String, JsonNode> receipts, Path output) {
         StrictJson.Obj summary = record.object("summaryResult");
-        for (String field : List.of("generationRequestDigest", "verificationRequestDigest")) {
+        boolean grounded = BriefingMarketGroundingRules.version(marketPromptFolder(record));
+        if (grounded) BriefingMarketGroundingRules.validatePlan(summary.object("factPlan"), news, record.object("marketContext"), BriefingMarketGroundingRules.strictVersion(marketPromptFolder(record)), BriefingMarketGroundingRules.extractiveVersion(marketPromptFolder(record)));
+        for (String field : grounded ? List.of("factPlanRequestDigest", "generationRequestDigest", "verificationRequestDigest") : List.of("generationRequestDigest", "verificationRequestDigest")) {
+            boolean generation = !"verificationRequestDigest".equals(field);
             String digest = summary.string(field); JsonNode node = receipts.get(digest); require(node != null, "market_summary_final_receipt_missing");
-            StrictJson.Obj receipt = StrictJson.Obj.of(node); String stage = "generationRequestDigest".equals(field)
-                    ? "market_summary_generation" : "market_summary_verification";
+            StrictJson.Obj receipt = StrictJson.Obj.of(node); String stage = generation ? "market_summary_generation" : "market_summary_verification";
             require(stage.equals(receipt.string("stage")) && success(receipt) && receipt.bool("usageKnown") && receipt.count("httpStatus") == 200, "market_summary_final_receipt_failed");
             byte[] requestBytes = read(output.resolve("calls").resolve(digest + ".request.json"));
             require(digest.equals(Canonical.sha256(requestBytes)), "market_summary_request_hash");
             StrictJson.Obj request = StrictJson.parseObject(requestBytes), data = StrictJson.parseObject(request.string("input"));
+            boolean slim = grounded && BriefingMarketGroundingRules.VERSION.equals(marketPromptFolder(record)) && data.has("modelView");
+            StrictJson.Obj bindingData = data;
+            if (slim) {
+                byte[] bytes = read(output.resolve("market/frozen-inputs/" + summary.string("frozenInputSha256") + ".json"));
+                require(Canonical.sha256(bytes).equals(summary.string("frozenInputSha256")), "market_context_frozen_input_hash");
+                bindingData = StrictJson.parseObject(bytes);
+                require(data.object("modelView").node().equals(BriefingMarketGroundingRules.modelView(bindingData, summary.object("factPlan"))), "market_grounding_model_view_binding");
+                require(data.object("context").node().equals(bindingData.object("context").node()) && data.string("contextSha256").equals(bindingData.string("contextSha256")), "market_grounding_model_view_context");
+            }
             if (record.has("marketContext")) {
-                String prompt = "generationRequestDigest".equals(field) ? "generation.md" : "verification.md";
+                String prompt = generation ? "generation.md" : "verification.md";
                 try (var stream = BriefingReplayImporter.class.getResourceAsStream("/briefing/prompts/" + marketPromptFolder(record) + "/" + prompt)) {
                     require(stream != null && request.string("instructions").equals(new String(stream.readAllBytes(), StandardCharsets.UTF_8)), "market_context_request_instructions");
                 } catch (IOException error) { throw new IllegalArgumentException("Market summary prompt unavailable", error); }
@@ -1024,14 +1035,20 @@ public final class BriefingReplayImporter {
                     && receipt.string("model").equals(request.string("model"))
                     && record.string("contextSha256").equals(data.string("contextSha256"))
                     && record.object("context").node().equals(data.object("context").node())
-                    && record.object("marketSnapshot").node().equals(data.object("marketSnapshot").node())
-                    && news.array("selected").equals(data.array("selected"))
-                    && news.object("result").array("items").equals(data.array("newsItems")), "market_summary_request_context");
+                    && record.object("marketSnapshot").node().equals(bindingData.object("marketSnapshot").node())
+                    && news.array("selected").equals(bindingData.array("selected"))
+                    && news.object("result").array("items").equals(bindingData.array("newsItems")), "market_summary_request_context");
             if (record.has("marketContext")) {
-                require(record.object("marketContext").node().equals(data.object("marketContext").node())
+                require(record.object("marketContext").node().equals(bindingData.object("marketContext").node())
                         && summary.string("frozenInputSha256").equals(data.string("frozenInputSha256")), "market_context_recording_binding");
-                ObjectNode frozen = (ObjectNode) data.node().deepCopy();
+                ObjectNode frozen = (ObjectNode) bindingData.node().deepCopy();
                 frozen.remove(List.of("frozenInputSha256", "repairAttempt", "priorDraft", "priorValidation", "draft"));
+                if (grounded) {
+                    frozen.remove(List.of("phase", "factPlan", "factPlanRequestDigest"));
+                    require(("factPlanRequestDigest".equals(field) ? "facts" : generation ? "analysis" : "verify").equals(data.string("phase")), "market_grounding_phase");
+                    if (!"factPlanRequestDigest".equals(field)) require(data.object("factPlan").node().equals(summary.object("factPlan").node())
+                        && data.string("factPlanRequestDigest").equals(summary.string("factPlanRequestDigest")), "market_grounding_plan_binding");
+                }
                 marketArtifact(output, "frozen-inputs", summary.string("frozenInputSha256"), frozen);
             }
             byte[] responseBytes = read(output.resolve("calls").resolve(digest + ".response.json"));
@@ -1046,12 +1063,15 @@ public final class BriefingReplayImporter {
                     if ("output_text".equals(content.string("type"))) texts.add(content.string("text"));
                 }
             require(texts.size() == 1, "market_summary_one_output_required"); StrictJson.Obj actual = StrictJson.parseObject(texts.getFirst());
-            if ("generationRequestDigest".equals(field)) {
+            if ("factPlanRequestDigest".equals(field)) {
+                require(actual.node().equals(summary.object("factPlan").node()), "market_grounding_raw_plan");
+            } else if ("generationRequestDigest".equals(field)) {
                 ArrayNode projected = StrictJson.newArray(); for (StrictJson.Obj claim : summary.objects("claims")) {
                     ObjectNode value = (ObjectNode) claim.node().deepCopy(); value.remove("claimId"); projected.add(value);
                 }
                 JsonNode generatedClaims = record.has("marketContext") && BriefingMarketContextRules.roleVersion(marketPromptFolder(record))
                         ? BriefingMarketContextRules.generatedClaims(actual, record.object("marketContext")) : actual.array("claims");
+                if (grounded) generatedClaims = BriefingMarketGroundingRules.project((ArrayNode) generatedClaims, summary.object("factPlan"), BriefingMarketGroundingRules.strictVersion(marketPromptFolder(record)));
                 require(generatedClaims.equals(projected), "market_summary_generated_content_binding");
             } else {
                 require(data.object("draft").array("claims").equals(summary.array("claims")), "market_summary_verified_draft_binding");

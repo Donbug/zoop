@@ -22,7 +22,7 @@ def helper(name):
 
 context = helper("briefing_market_context")
 base = context.base
-VERSION = "market-context-v2.5-outlook"
+VERSION = "market-context-v3-grounded"
 context.PROMPTS = context.PROMPTS.with_name(VERSION)
 
 
@@ -45,7 +45,7 @@ def rebind_derived_contexts(layer, inbox):
         market["contextSha256"] = base.digest(base.canonical(market["context"]))
 
 
-def history_chain(baseline, bundle, max_depth=8):
+def history_chain(baseline, bundle, max_depth=12):
     """Validate immutable ancestry before any paid request, including receipt ownership."""
     seen, chain, current = {base.digest(base.canonical(bundle))}, [], bundle
     news = {k:v for k,v in bundle.items() if k != "presentationEnrichment"}
@@ -75,7 +75,7 @@ def prepare(args):
     presentation = bundle.get("presentationEnrichment")
     context.require(presentation and presentation.get("schemaVersion") == "zoop-briefing-presentation-enrichment-v1",
                     "outlook_presentation_baseline_required")
-    ancestry = history_chain(baseline, bundle, max_depth=7)  # new output adds the eighth layer
+    ancestry = history_chain(baseline, bundle, max_depth=11)  # new output adds at most the twelfth layer
     context.require(base.digest(base.regular(Path(args.sources))) == bundle["sourceFileSha256"]
                     and base.digest(base.regular(Path(args.clocks))) == bundle["clockFileSha256"],
                     "outlook_source_or_clock_mismatch")
@@ -136,17 +136,22 @@ def prepare(args):
             "maxRepairsPerRound": getattr(args, "max_repairs", 0),
             "plannedNewCalls": 2 * len(chosen), "roundIds": [r[0]["roundId"] for r in chosen],
             "coverage": coverage, "newProviderFetches": 0, "operationalCollectionGate": False}
+    if VERSION in context.grounding.VERSIONS:
+        plan["plannedNewCalls"] = 3 * len(chosen)
     if VERSION in context.ROLE_VERSIONS:
+        calls_per_round = 3 if VERSION in context.grounding.VERSIONS else 2
+        repair_calls_per_round = 4 if VERSION in context.grounding.SEMANTIC_VERSIONS else 3 if VERSION in context.grounding.VERSIONS else 2
+        max_new = (calls_per_round + repair_calls_per_round * getattr(args, "max_repairs", 0)) * len(chosen)
         plan.update({"requestedRoundIds": requested,
             "dependencyRoundIds": [r[0]["roundId"] for r in chosen if r[0]["roundId"] not in requested],
-            "maximumNewCalls": 2 * (1 + getattr(args, "max_repairs", 0)) * len(chosen),
-            "minimumTotalReservations": prior + 2 * len(chosen),
-            "maximumTotalReservations": prior + 2 * (1 + getattr(args, "max_repairs", 0)) * len(chosen),
-            "additionalCeilingForMinimum": max(0, prior + 2 * len(chosen) - args.max_calls),
-            "additionalCeilingForMaximum": max(0, prior + 2 * (1 + getattr(args, "max_repairs", 0)) * len(chosen) - args.max_calls),
+            "maximumNewCalls": max_new,
+            "minimumTotalReservations": prior + plan["plannedNewCalls"],
+            "maximumTotalReservations": prior + max_new,
+            "additionalCeilingForMinimum": max(0, prior + plan["plannedNewCalls"] - args.max_calls),
+            "additionalCeilingForMaximum": max(0, prior + max_new - args.max_calls),
         })
     else:
-        context.require(prior + 2 * len(chosen) <= args.max_calls, "outlook_shared_budget_insufficient")
+        context.require(prior + plan["plannedNewCalls"] <= args.max_calls, "outlook_shared_budget_insufficient")
     return raw, bundle, rows, unknown, calendar, chosen, records, plan
 
 
@@ -265,8 +270,8 @@ def parser():
         p.add_argument("--" + flag, required=True)
     p.add_argument("--round", action="append", help="Chronological date-edition key; defaults to all available rounds")
     p.add_argument("--key-file")
-    p.add_argument("--prompt-version", choices=("market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook", "market-context-v2.4-outlook", "market-context-v2.5-outlook"),
-                   help="Fresh CLI runs default to v2.5; select the original version to reuse an immutable old plan")
+    p.add_argument("--prompt-version", choices=("market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook", "market-context-v2.4-outlook", "market-context-v2.5-outlook", "market-context-v2.6-outlook", "market-context-v2.7-outlook", "market-context-v2.8-outlook", "market-context-v2.9-outlook", "market-context-v3-grounded"),
+                   help="Fresh CLI runs default to v3-grounded; select the original version to reuse an immutable old plan")
     p.add_argument("--max-calls", type=base.bounded(1, 512), default=400)
     p.add_argument("--budget-approval-ref", help="Separate explicit human approval for a ceiling above the existing 400 calls")
     p.add_argument("--max-repairs", type=int, choices=(0, 1), default=0)

@@ -152,12 +152,19 @@ class BriefingOutlookHistoryPostgresTest {
         qualityImport(continuation, role, false);
     }
 
+    @Test void groundedV3FactPlanningAndAnalyticalRecordingsSurviveImport() throws Exception { qualityImport(true, true, true, true); }
+
     private void qualityImport(boolean continuation, boolean role, boolean structure) throws Exception {
+        qualityImport(continuation, role, structure, false);
+    }
+
+    private void qualityImport(boolean continuation, boolean role, boolean structure, boolean grounded) throws Exception {
         Path fresh = Files.createTempDirectory(root, "quality-v23-");
         var arguments = new java.util.ArrayList<>(java.util.List.of("python3", Path.of("scripts/briefing_outlook_history_fixture.py").toAbsolutePath().toString(), fresh.toString(), "--quality"));
         if (continuation) arguments.add("--continuation");
         if (role) arguments.add("--role");
         if (structure) arguments.add("--structure");
+        if (grounded) arguments.add("--grounded");
         var command = new ProcessBuilder(arguments);
         command.environment().put("PYTHONDONTWRITEBYTECODE", "1");
         var process = command.redirectErrorStream(true).redirectOutput(fresh.resolve("fixture.log").toFile()).start();

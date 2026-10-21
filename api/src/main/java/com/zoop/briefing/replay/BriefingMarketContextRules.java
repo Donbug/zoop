@@ -28,10 +28,10 @@ final class BriefingMarketContextRules {
     static final String ROLE_VERSION = "market-context-v2.4-outlook";
     static final List<String> ROLE_FLAGS = List.of("factUnitAppropriate", "comparisonElementsComplete", "evidenceClauseCoverage", "qualifiersPreserved", "observableConditionsOnly");
 
-    static boolean roleVersion(String version) { return Set.of(ROLE_VERSION, "market-context-v2.5-outlook").contains(version); }
+    static boolean roleVersion(String version) { return Set.of(ROLE_VERSION, "market-context-v2.5-outlook", "market-context-v2.6-outlook", "market-context-v2.7-outlook", "market-context-v2.8-outlook", "market-context-v2.9-outlook", BriefingMarketGroundingRules.VERSION).contains(version); }
 
     static List<String> qualityFlags(String version) {
-        return roleVersion(version) ? ROLE_FLAGS : "market-context-v2.3-outlook".equals(version) ? QUALITY_FLAGS : List.of();
+        return BriefingMarketGroundingRules.version(version) ? BriefingMarketGroundingRules.FLAGS : roleVersion(version) ? ROLE_FLAGS : "market-context-v2.3-outlook".equals(version) ? QUALITY_FLAGS : List.of();
     }
 
     static List<String> requiredKinds(StrictJson.Obj context) {
@@ -181,7 +181,10 @@ final class BriefingMarketContextRules {
         if (!"available".equals(prior.string("status"))) return result;
         StrictJson.Obj summary = prior.object("summary");
         if (summary.has("forecasts")) for (StrictJson.Obj forecast : summary.objects("forecasts"))
-            check(result.putIfAbsent(forecast.string("forecastId"), forecast) == null, "previous_forecast_duplicate");
+            {
+                StrictJson.Obj old = result.putIfAbsent(forecast.string("forecastId"), forecast);
+                check(old == null || old.node().equals(forecast.node()), "previous_forecast_duplicate");
+            }
         return result;
     }
 
@@ -218,8 +221,11 @@ final class BriefingMarketContextRules {
         }
         Map<String, StrictJson.Obj> prior = priorForecasts(context);
         Set<String> accounted = new HashSet<>();
+        Map<String, JsonNode> seenEvaluations = new HashMap<>();
         for (StrictJson.Obj evaluation : context.objects("forecastEvaluations")) {
             String id = evaluation.string("forecastId"); StrictJson.Obj forecast = prior.get(id);
+            JsonNode duplicate = seenEvaluations.putIfAbsent(id, evaluation.node());
+            if (duplicate != null) { check(duplicate.equals(evaluation.node()), "evaluation_conflicting_duplicate"); continue; }
             check(forecast != null && accounted.add(id), "evaluation_owner");
             StrictJson.Obj target = forecast.object("target");
             check(target.node().equals(evaluation.object("target").node()) && target.string("rule").equals(evaluation.string("rule")), "evaluation_target");
