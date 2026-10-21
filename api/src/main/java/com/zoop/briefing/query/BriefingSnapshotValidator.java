@@ -74,10 +74,79 @@ final class BriefingSnapshotValidator {
         }
         JsonNode snapshot = object(row.publicSnapshot());
         summary(field(snapshot, "marketSummary"), evidence);
+        marketAnalysis(field(snapshot, "marketSummary"), row);
+        if (snapshot.has("companyOutlooks")) companyOutlooks(snapshot.get("companyOutlooks"), row, evidence);
         JsonNode market = field(p, "marketVariables");
         if (!market.isNull()) market(market, row.windowTo());
         if ("morning".equals(row.edition())) check(row.comparisonSnapshot() == null || row.comparisonSnapshot().isNull());
         else comparison(row.comparisonSnapshot());
+        JsonNode previous = snapshot.get("previousComparison");
+        if (previous != null && !previous.isNull()) previousComparison(previous, row);
+    }
+
+    private static void companyOutlooks(JsonNode layer, BriefingRound row, Set<String> evidence) {
+        object(layer); same(text(layer, "schemaVersion"), "zoop-company-outlooks-v1");
+        same(text(layer, "roundId"), row.id()); same(text(layer, "edition"), row.edition());
+        check(Instant.parse(text(layer, "cutoff")).equals(row.windowTo())); timestamp(layer, "generatedAt"); text(layer, "resultVersion"); text(layer, "scopeNote");
+        String status = choice(layer, "status", Set.of("PASS", "WITHHELD"));
+        if ("WITHHELD".equals(status)) { check(array(layer, "companies").isEmpty()); text(layer, "reason"); return; }
+        Set<String> expected = new HashSet<>(), actual = new HashSet<>();
+        for (JsonNode item : row.payload().path("items")) for (JsonNode company : item.path("companies")) expected.add(text(company, "id"));
+        for (JsonNode company : array(layer, "companies")) {
+            check(actual.add(text(company, "companyId"))); text(company, "companyName");
+            choice(company, "assessment", Set.of("positive", "negative", "mixed", "watch"));
+            Set<String> ownSources = new HashSet<>();
+            for (JsonNode source : array(company, "sources")) {
+                String id = text(source, "evidenceId"); check(evidence.contains(id) && ownSources.add(id));
+                text(source, "quote"); text(source, "documentId"); text(source, "documentVersion"); text(source, "bodySha256");
+                text(source, "title"); String url = text(source, "url"); check(url.startsWith("https://") || url.startsWith("http://"));
+                check(!Instant.parse(text(source, "publishedAt")).isAfter(row.windowTo()));
+            }
+            for (String field : java.util.List.of("impact", "outlook", "comparison")) companyStatement(field(company, field), ownSources);
+            for (String field : java.util.List.of("facts", "conditions", "risks")) {
+                check(!array(company, field).isEmpty()); for (JsonNode statement : array(company, field)) companyStatement(statement, ownSources);
+            }
+            choice(field(company, "comparison"), "status", Set.of("updated", "compared", "unavailable"));
+            if (company.has("reading")) {
+                JsonNode reading = object(field(company, "reading")); text(reading, "resultVersion");
+                if ("PASS".equals(choice(reading, "status", Set.of("PASS", "WITHHELD")))) {
+                    for (String field : java.util.List.of("brief", "watch", "change")) {
+                        companyStatement(field(reading, field), ownSources);
+                        String value = text(field(reading, field), "text");
+                        check(value.codePointCount(0, value.length()) <= switch (field) { case "brief" -> 70; case "watch" -> 50; default -> 60; });
+                    }
+                }
+            }
+            if (company.has("price")) companyPrice(object(field(company, "price")), text(company, "companyId"), row.windowTo());
+        }
+        check(actual.equals(expected));
+    }
+    private static void companyStatement(JsonNode statement, Set<String> sources) {
+        object(statement); text(statement, "text"); Set<String> refs = strings(statement, "evidenceIds"); check(!refs.isEmpty() && sources.containsAll(refs));
+    }
+
+    private static void companyPrice(JsonNode price, String companyId, Instant cutoff) {
+        same(text(price, "companyId"), companyId); same(timestamp(price, "cutoff"), cutoff);
+        choice(price, "currency", Set.of("KRW", "USD")); bool(price, "official"); text(price, "source"); text(price, "note");
+        String status = choice(price, "status", Set.of("available", "unavailable"));
+        if ("unavailable".equals(status)) { check(field(price, "latest").isNull()); return; }
+        JsonNode latest = object(field(price, "latest"));
+        java.math.BigDecimal value = new java.math.BigDecimal(text(latest, "value")); check(value.signum() > 0);
+        Instant observed = timestamp(latest, "observedAt"); check(!observed.isAfter(cutoff));
+        choice(latest, "kind", Set.of("five_minute_close", "daily_close"));
+        String comparison = choice(price, "comparisonStatus", Set.of("available", "unavailable", "no_new_session"));
+        JsonNode baseline = field(price, "baseline");
+        if (!baseline.isNull()) {
+            object(baseline); check(!timestamp(baseline, "observedAt").isAfter(observed));
+            java.math.BigDecimal before = new java.math.BigDecimal(text(baseline, "value")); check(before.signum() > 0);
+            if ("available".equals(comparison)) {
+                java.math.BigDecimal delta = value.subtract(before);
+                check(delta.compareTo(new java.math.BigDecimal(text(price, "change"))) == 0);
+                check(delta.multiply(java.math.BigDecimal.valueOf(100)).divide(before, 2, java.math.RoundingMode.HALF_UP)
+                        .compareTo(new java.math.BigDecimal(text(price, "changeRate"))) == 0);
+            } else if ("no_new_session".equals(comparison)) same(timestamp(baseline, "observedAt"), observed);
+        } else check("unavailable".equals(comparison));
+        if (!"available".equals(comparison)) check(field(price, "change").isNull() && field(price, "changeRate").isNull());
     }
 
     private static void metadata(JsonNode value, String graphVersion, boolean localReplay) {
@@ -106,6 +175,86 @@ final class BriefingSnapshotValidator {
             check(!cited.isEmpty() && references.containsAll(cited));
             timestamp(value, "generatedAt"); text(value, "resultVersion");
         }
+    }
+
+    /** Optional outlook is a structured view of the same verified text, never a second producer. */
+    private static void marketAnalysis(JsonNode summary, BriefingRound row) {
+        JsonNode analysis = summary.get("analysis");
+        if (analysis == null || analysis.isNull()) return; // Existing publications retain their original DTO.
+        check(!summary.has("status")); object(analysis);
+        same(text(analysis, "schemaVersion"), "zoop-market-outlook-analysis-v1");
+        same(text(analysis, "edition"), row.edition()); same(timestamp(analysis, "cutoff"), row.windowTo());
+        same(text(analysis, "mode"), "morning".equals(row.edition()) ? "morning_update" : "evening_review");
+        JsonNode coverage = object(field(analysis, "coverage"));
+        check(integer(coverage, "documents", false) == integer(coverage, "newDocuments", false) + integer(coverage, "backgroundDocuments", false));
+        strings(coverage, "companyNames"); check(!bool(coverage, "marketRepresentative") && !bool(coverage, "sectorPriceFeedAvailable"));
+        JsonNode previous = object(field(analysis, "previousPublication"));
+        same(text(previous, "kind"), "simulated_previous_output");
+        boolean available = "available".equals(choice(previous, "status", Set.of("available", "unavailable")));
+        Set<String> publications = new HashSet<>();
+        if (available) {
+            publications.add(text(previous, "roundId")); text(previous, "resultVersion"); LocalDate.parse(text(previous, "date"));
+            same(text(previous, "edition"), "morning".equals(row.edition()) ? "evening" : "morning");
+            same(timestamp(previous, "cutoff"), row.windowFrom());
+        } else text(previous, "reason");
+        Set<String> evidence = strings(summary, "evidenceIds"), claims = new HashSet<>(), forecastClaims = new HashSet<>();
+        Set<String> forecastIds = new HashSet<>();
+        StringBuilder verifiedText = new StringBuilder();
+        for (JsonNode claim : array(analysis, "claims")) {
+            object(claim); String id = text(claim, "claimId"); check(claims.add(id));
+            verifiedText.append(text(claim, "text")).append('\n');
+            String kind = choice(claim, "kind", Set.of("fact", "interpretation", "forecast", "forecast_update", "result_comparison"));
+            check(evidence.containsAll(strings(claim, "evidenceIds")));
+            strings(claim, "indicatorIds"); Set<String> priorForecasts = strings(claim, "previousForecastIds"); strings(claim, "evaluationIds");
+            check(publications.containsAll(strings(claim, "previousPublicationIds")));
+            stringValues(claim, "conditions"); stringValues(claim, "counterFactors");
+            if ("forecast".equals(kind)) {
+                check(!strings(claim, "evidenceIds").isEmpty()); check(!array(claim, "counterFactors").isEmpty());
+                forecastClaims.add(text(claim, "targetId")); choice(claim, "direction", Set.of("up", "down", "flat", "uncertain"));
+            } else check(field(claim, "targetId").isNull() && field(claim, "direction").isNull()
+                    && array(claim, "conditions").isEmpty() && array(claim, "counterFactors").isEmpty());
+            if ("forecast_update".equals(kind)) {
+                check("morning".equals(row.edition()) && available && !priorForecasts.isEmpty());
+                choice(claim, "updateAction", Set.of("maintain", "strengthen", "weaken", "withdraw"));
+            } else check(field(claim, "updateAction").isNull());
+            if ("result_comparison".equals(kind)) check("evening".equals(row.edition()) && available);
+        }
+        check(claims.size() >= 2 && claims.size() <= 8);
+        verifiedText.append(text(analysis, "scopeNote")); same(verifiedText.toString(), text(summary, "text"));
+        Set<String> forecastTargets = new HashSet<>();
+        for (JsonNode forecast : array(analysis, "forecasts")) {
+            object(forecast); check(forecastIds.add(text(forecast, "forecastId"))); text(forecast, "text");
+            choice(forecast, "direction", Set.of("up", "down", "flat", "uncertain"));
+            check(evidence.containsAll(strings(forecast, "evidenceIds"))); strings(forecast, "indicatorIds");
+            stringValues(forecast, "conditions"); check(!array(forecast, "counterFactors").isEmpty()); stringValues(forecast, "counterFactors");
+            JsonNode target = object(field(forecast, "target")); forecastTargets.add(text(target, "targetId"));
+            check(timestamp(target, "targetEnd").isAfter(row.windowTo())); marketTarget(target);
+        }
+        check(forecastTargets.equals(forecastClaims));
+        Set<String> evaluations = new HashSet<>();
+        for (JsonNode evaluation : array(analysis, "forecastEvaluations")) {
+            object(evaluation); check(available && evaluations.add(text(evaluation, "evaluationId"))); text(evaluation, "forecastId");
+            JsonNode target = object(field(evaluation, "target")); marketTarget(target);
+            same(text(evaluation, "rule"), text(target, "rule"));
+            String status = choice(evaluation, "status", Set.of("evaluated", "unavailable"));
+            if ("unavailable".equals(status)) {
+                text(evaluation, "reason"); check(field(evaluation, "actualValue").isNull() && field(evaluation, "actualDirection").isNull()
+                        && field(evaluation, "directionMatched").isNull());
+            } else {
+                check(!timestamp(target, "targetEnd").isAfter(row.windowTo()) && field(evaluation, "reason").isNull());
+                check(field(evaluation, "actualValue").isNumber()); bool(evaluation, "directionMatched");
+                choice(evaluation, "actualDirection", Set.of("up", "down", "flat"));
+            }
+        }
+        for (JsonNode claim : array(analysis, "claims")) check(evaluations.containsAll(strings(claim, "evaluationIds")));
+    }
+
+    private static void marketTarget(JsonNode target) {
+        choice(target, "indicatorId", Set.of("kospi", "kosdaq")); same(text(target, "valueKind"), "close");
+        same(text(target, "rule"), "close_vs_baseline_v1"); text(target, "targetId"); text(target, "calendarRef");
+        check(field(target, "baselineValue").isNumber());
+        LocalDate baseline = LocalDate.parse(text(target, "baselineDate")), date = LocalDate.parse(text(target, "targetDate"));
+        check(baseline.isBefore(date)); timestamp(target, "targetEnd");
     }
 
     private static void sourceSupport(JsonNode value) {
@@ -162,6 +311,31 @@ final class BriefingSnapshotValidator {
             choice(item, "change", Set.of("new", "continuing", "dropped"));
             integer(item, "rank", true); integer(item, "morningRank", true);
             integer(item, "evidenceCount", true); integer(item, "morningEvidenceCount", true);
+        }
+    }
+
+    private static void previousComparison(JsonNode value, BriefingRound row) {
+        object(value);
+        if ("unavailable".equals(text(value, "status"))) { text(value, "reason"); return; }
+        same(text(value, "status"), "available"); check(!row.id().equals(text(value, "previousRoundId")));
+        // Receipt wall clocks need not follow historical replay order; authority checks the stored prior timestamp.
+        timestamp(value, "previousPublishedAt");
+        check(timestamp(value, "previousDataAsOf").isBefore(row.windowTo()));
+        if (value.has("previousDate") || value.has("previousEdition")) {
+            LocalDate.parse(text(value, "previousDate")); choice(value, "previousEdition", Set.of("morning", "evening"));
+        }
+        same(text(value, "comparisonBasis"), "event_identity");
+        JsonNode evaluation = object(field(value, "forecastEvaluation"));
+        same(text(evaluation, "status"), "unavailable"); text(evaluation, "reason");
+        Set<String> events = new HashSet<>();
+        for (JsonNode item : array(value, "items")) {
+            object(item); text(item, "title"); check(events.add(text(item, "eventId"))); nullableText(item, "eventTime");
+            choice(item, "timePrecision", PRECISIONS); nullableReportedAt(item, "reportedAt"); stringValues(item, "companyNames");
+            String change = choice(item, "change", Set.of("new", "continuing", "dropped"));
+            int rank = integer(item, "rank", true), oldRank = integer(item, "previousRank", true);
+            int count = integer(item, "evidenceCount", true), oldCount = integer(item, "previousEvidenceCount", true);
+            check("dropped".equals(change) ? rank == -1 && count == -1 : rank > 0 && count >= 0);
+            check("new".equals(change) ? oldRank == -1 && oldCount == -1 : oldRank > 0 && oldCount >= 0);
         }
     }
 

@@ -251,7 +251,6 @@ jobs:
           DB_PASSWORD: ''
         run: |
           docker exec "${{ job.services.company-postgres.id }}" createdb -U company_test zoop_briefing_replay_test
-          docker exec "${{ job.services.company-postgres.id }}" psql -X -v ON_ERROR_STOP=1 -U company_test -d zoop_briefing_replay_test -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public'
           ./api/gradlew -p api briefingReplayIntegrationTest --console=plain
       - name: Bootstrap the ai/service runtime and installed zoop-ai for the real gate (public dependencies, no token)
         run: make service-install

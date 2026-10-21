@@ -114,6 +114,56 @@ class BriefingRoundReplayPostgresTest {
 
 
     @Test
+    void groupedSchemaStoresImmutableArchiveAndKeepsUnverifiedRoundsUnpublished() throws Exception {
+        prepareEmptyGroupedArchive();
+        var imported = importer().importBundle();
+        assertEquals(14, imported.roundIds().size());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM briefing_rounds WHERE published_at IS NOT NULL", Integer.class));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM artifacts WHERE id LIKE '%-grouped-issues'", Integer.class));
+        assertEquals("failed", get(localPort, QUERY + "morning").json().path("status").asText());
+        byte[] originalManifest = Files.readAllBytes(manifest);
+        assertTrue(importer().importBundle().alreadyImported());
+        assertArrayEquals(originalManifest, Files.readAllBytes(manifest));
+    }
+
+    @Test
+    void groupedArchiveTamperingCannotWriteRowsEvenWhenSourceAndRoundIdentitiesAreValid() throws Exception {
+        prepareEmptyGroupedArchive();
+        Files.writeString(directory.resolve("grouped-issues.json"), "{\"schemaVersion\":\"changed\"}");
+        rejectWithoutPublication();
+        assertEquals(0, count("artifacts"));
+    }
+
+    private static void prepareEmptyGroupedArchive() throws Exception {
+        var candidate = bundleNode();
+        ObjectNode archive = JSON.createObjectNode().put("schemaVersion", "zoop-grouped-issues-v1").put("sourceFileSha256", sourceSha);
+        archive.putArray("issues"); archive.putArray("documents"); archive.putArray("receipts");
+        byte[] bytes = Canonical.write(archive).getBytes(StandardCharsets.UTF_8);
+        Files.write(directory.resolve("grouped-issues.json"), bytes);
+        candidate.put("schemaVersion", BriefingGroupedSimulationRules.SCHEMA).put("groupArchiveSha256", ArtifactFileStore.sha256(bytes));
+        candidate.putArray("groupingReceipts"); candidate.putArray("receipts");
+        for (JsonNode node : candidate.path("rounds")) {
+            ObjectNode round = (ObjectNode) node;
+            ObjectNode previous = JSON.createObjectNode().put("type", "simulated_previous_output")
+                    .put("status", "unavailable").put("reason", "Authored grouping fixture has no verified publication");
+            round.set("previous", previous);
+            round.put("selectionStatus", "HELD_VALIDATION").putNull("result").putNull("resultSha256").putNull("groupedSelectionRequestDigest");
+            round.putArray("selected"); round.putArray("receipts");
+            ObjectNode identity = (ObjectNode) round.path("identity");
+            identity.set("previous", previous.deepCopy()); identity.put("groupArchiveSha256", ArtifactFileStore.sha256(bytes));
+            ObjectNode prompts = (ObjectNode) identity.path("promptArtifacts");
+            for (String name : List.of("selection.md", "selection.schema.json", "generation-morning.md", "generation-evening.md", "verification.md")) {
+                try (var stream = BriefingRoundReplayPostgresTest.class.getResourceAsStream("/briefing/prompts/grouped-issues/" + name)) {
+                    if (stream == null) throw new IllegalStateException("Missing grouped prompt resource");
+                    prompts.put("grouped-" + name, ArtifactFileStore.sha256(stream.readAllBytes()));
+                }
+            }
+            round.put("identitySha256", Canonical.digest(identity));
+        }
+        writeBundle(candidate);
+    }
+
+    @Test
     void eachRoundSelectsOnlyItsOwnWindowAndMorningEveningHaveDifferentIssues() throws Exception {
         var imported = importer().importBundle();
         assertEquals(14, imported.roundIds().size());

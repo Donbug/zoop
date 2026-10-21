@@ -1,6 +1,12 @@
 import type { BriefingResponse, MarketIndicator } from '@/types/briefing';
 import { briefingTime } from '@/util/briefingTime';
-import { EMPTY, NOTE, SECTION, SECTION_TITLE } from './briefingStyles';
+import {
+  EMPTY,
+  FOCUS_RING,
+  NOTE,
+  SECTION,
+  SECTION_TITLE,
+} from './briefingStyles';
 
 const labels = { kospi: 'KOSPI', kosdaq: 'KOSDAQ', usdkrw: '원/달러' } as const;
 // 정상(ok)은 따로 적지 않는다. 값이 없거나 늦은 경우만 상태를 밝힌다.
@@ -68,8 +74,10 @@ function Change({ item }: { item: MarketIndicator }) {
 // D-BRF-01·02 주요 시장 지표 (FS031). 발행 당시 저장한 값만 보여 주고 실시간 시세로 바꾸지 않는다.
 export default function MarketIndicators({
   variables,
+  compact = false,
 }: {
   variables?: BriefingResponse['marketVariables'];
+  compact?: boolean;
 }) {
   return (
     <section className={SECTION} aria-labelledby="market-indicators-title">
@@ -79,7 +87,13 @@ export default function MarketIndicators({
       {variables?.status === 'unavailable' && (
         <p className={`${EMPTY} mb-3`}>{variables.reason}</p>
       )}
-      <ul className="grid grid-cols-3 max-sm:grid-cols-1 max-sm:gap-4">
+      <ul
+        className={
+          compact
+            ? 'grid grid-cols-3 gap-2'
+            : 'grid grid-cols-3 max-sm:grid-cols-1 max-sm:gap-4'
+        }
+      >
         {Object.entries(labels).map(([id, label]) => {
           const item =
             variables?.status === 'available'
@@ -92,7 +106,11 @@ export default function MarketIndicators({
           return (
             <li
               key={id}
-              className="min-h-[86px] min-w-0 border-r-[0.667px] border-zoop-line px-[18px] py-1 first:pl-0 last:border-r-0 last:pr-0 max-sm:border-r-0 max-sm:border-b-[0.667px] max-sm:px-0 max-sm:pb-4 max-sm:last:border-b-0"
+              className={
+                compact
+                  ? 'min-w-0 rounded-panel border border-panel-line p-2'
+                  : 'min-h-[86px] min-w-0 border-r-[0.667px] border-zoop-line px-[18px] py-1 first:pl-0 last:border-r-0 last:pr-0 max-sm:border-r-0 max-sm:border-b-[0.667px] max-sm:px-0 max-sm:pb-4 max-sm:last:border-b-0'
+              }
             >
               <p className="flex items-center gap-2">
                 <strong className="text-xs">{label}</strong>
@@ -105,13 +123,31 @@ export default function MarketIndicators({
               {hasValue ? (
                 <>
                   <p className={`${NOTE} mt-1`}>{observed(item)}</p>
-                  <p className={NOTE}>{baseline(item)}</p>
-                  <p className="mt-3 mb-1 text-2xl font-[750] tracking-[-0.03em] tabular-nums">
+                  {!compact && <p className={NOTE}>{baseline(item)}</p>}
+                  <p
+                    className={
+                      compact
+                        ? 'mt-2 text-base font-bold tracking-tight tabular-nums'
+                        : 'mt-3 mb-1 text-2xl font-[750] tracking-[-0.03em] tabular-nums'
+                    }
+                  >
                     {number(item.value!)}
                     {item.unit === 'KRW' ? '원' : ' pt'}
                   </p>
-                  <Change item={item} />
-                  {item.reason && <p className={NOTE}>{item.reason}</p>}
+                  {compact ? (
+                    <p
+                      className={`mt-1 text-xs font-semibold tabular-nums ${item.changeRate !== null && item.changeRate < 0 ? 'text-zoop-down' : item.changeRate !== null && item.changeRate > 0 ? 'text-zoop-up' : 'text-zoop-muted'}`}
+                    >
+                      {item.changeRate === null
+                        ? '등락률 미확인'
+                        : `${item.changeRate > 0 ? '▲ ' : item.changeRate < 0 ? '▼ ' : ''}${signed(item.changeRate * 100)}%`}
+                    </p>
+                  ) : (
+                    <Change item={item} />
+                  )}
+                  {item.reason && !compact && (
+                    <p className={NOTE}>{item.reason}</p>
+                  )}
                 </>
               ) : (
                 <p className={`${NOTE} mt-1`}>
@@ -121,7 +157,26 @@ export default function MarketIndicators({
                       : '지표 데이터 준비 중')}
                 </p>
               )}
-              {item?.source && (
+              {item && compact && (
+                <details className="mt-2">
+                  <summary
+                    className={`min-h-11 cursor-pointer content-center text-[11px] text-zoop-muted ${FOCUS_RING}`}
+                  >
+                    출처·비교 기준
+                  </summary>
+                  <p className={NOTE}>{baseline(item)}</p>
+                  {item.reason && <p className={NOTE}>{item.reason}</p>}
+                  <Change item={item} />
+                  {item.source && (
+                    <p className={NOTE}>
+                      {item.source.name}
+                      {!item.source.official && ' · 비공식'}
+                      {item.source.delayNote && ` · ${item.source.delayNote}`}
+                    </p>
+                  )}
+                </details>
+              )}
+              {item?.source && !compact && (
                 <p className={`${NOTE} mt-1 text-zoop-faint`}>
                   출처 {item.source.name}
                   {!item.source.official && ' · 비공식'}

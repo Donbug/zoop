@@ -14,6 +14,7 @@ import re
 import stat
 import sys
 import threading
+import tempfile
 import urllib.error
 import urllib.request
 
@@ -77,11 +78,21 @@ def write_once(path: Path, value: bytes):
         if regular(path) != value or stat.S_IMODE(path.stat().st_mode) != 0o600:
             raise ReplayError("immutable_private_file_conflict")
         return
-    fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0), 0o600)
-    with os.fdopen(fd, "wb") as stream:
-        stream.write(value)
-        stream.flush()
-        os.fsync(stream.fileno())
+    # The final name must never expose a partially written JSON receipt to readers.
+    # link() publishes complete bytes atomically without replacing an existing file.
+    fd, temporary = tempfile.mkstemp(prefix=".write-once-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(value)
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.link(temporary, path)
+        except FileExistsError:
+            if regular(path) != value or stat.S_IMODE(path.stat().st_mode) != 0o600:
+                raise ReplayError("immutable_private_file_conflict")
+    finally:
+        os.unlink(temporary)
 
 
 def save_json(path: Path, value):
@@ -111,7 +122,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def authenticated_transport(key_file: Path):
+def authenticated_transport(key_file: Path, timeout=180):
     key = read_key(key_file)
     opener = urllib.request.build_opener(NoRedirect())
 
@@ -119,7 +130,7 @@ def authenticated_transport(key_file: Path):
         request = urllib.request.Request(ENDPOINT, data=body, method="POST", headers={
             "Authorization": "Bearer " + key, "Content-Type": "application/json"})
         try:
-            with opener.open(request, timeout=180) as reply:
+            with opener.open(request, timeout=timeout) as reply:
                 value = reply.read(MAX_RESPONSE_BYTES + 1)
                 if len(value) > MAX_RESPONSE_BYTES:
                     raise ReplayError("provider_response_too_large_unknown_usage")

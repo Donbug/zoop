@@ -132,6 +132,33 @@ public class BriefingQueryService {
         }
     }
 
+    /** Restore only the selected item's preserved detail after the same current authority check as the round. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, timeout = 5)
+    public ObjectNode getItem(String roundId, String eventId, String requestId) {
+        if (roundId == null || roundId.isBlank() || roundId.length() > 256
+                || eventId == null || eventId.isBlank() || eventId.length() > 256) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+        try {
+            var row = repository.findById(roundId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+            requireReadable(row, requestId);
+            validateSnapshot(row);
+            JsonNode selected = null;
+            for (JsonNode item : row.payload().path("items")) {
+                if (eventId.equals(item.path("eventId").asString())) selected = item;
+            }
+            if (selected == null) throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+            JsonNode detail = row.publicSnapshot().path("itemDetails").path(eventId);
+            if (detail.isMissingNode() || detail.isNull()) throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+            BriefingItemDetailValidator.validate(row, selected, detail, repository);
+            ObjectNode out = (ObjectNode) detail.deepCopy();
+            ((ObjectNode) out.path("metadata")).put("requestId", requestId);
+            return out;
+        } catch (DataAccessException | IllegalArgumentException | DateTimeException | com.zoop.common.json.StrictJson.Malformed error) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        }
+    }
+
     private ObjectNode restore(BriefingRound row, List<BriefingChange> changes, String requestId) {
         validateSnapshot(row);
         var payload = row.payload();
@@ -143,9 +170,13 @@ public class BriefingQueryService {
         out.put("status", "published").put("publishedAt", row.publishedAt().toString());
         out.set("dataAsOf", payload.get("dataWindow").get("end").deepCopy());
         out.set("marketSummary", row.publicSnapshot().get("marketSummary").deepCopy());
+        JsonNode companyOutlooks = row.publicSnapshot().get("companyOutlooks");
+        if (companyOutlooks != null) out.set("companyOutlooks", companyOutlooks.deepCopy());
         var market = payload.get("marketVariables");
         out.set("marketVariables", market.isNull() ? unavailableSection("발행 당시 시장 지표가 저장되지 않았습니다.") : publicMarketVariables(market));
         out.set("sinceMorning", row.comparisonSnapshot() == null ? mapper.nullNode() : row.comparisonSnapshot().deepCopy());
+        JsonNode previous = row.publicSnapshot().get("previousComparison");
+        out.set("previousComparison", previous == null ? mapper.nullNode() : previous.deepCopy());
         var corrections = out.putArray("corrections");
         for (var change : changes) {
             if (!"correction".equals(change.kind())) continue;
@@ -192,6 +223,7 @@ public class BriefingQueryService {
         out.set("marketSummary", unavailableSection("이 회차의 공개 내용을 제공하지 않습니다."));
         out.set("marketVariables", unavailableSection("이 회차의 공개 내용을 제공하지 않습니다."));
         out.putNull("sinceMorning");
+        out.putNull("previousComparison");
         var metadata = out.putObject("metadata");
         metadata.put("source", "zoop-briefing").put("asOf", clock.instant().toString()).putNull("graphVersion")
                 .put("requestId", requestId).put("partial", false);

@@ -70,6 +70,21 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
                                 StrictJson.parseObject(rs.getString("public_snapshot")).node()), round.id(), morningId);
                 if (prior.size() != 1 || !sources(prior.get(0).payload(), prior.get(0).snapshot(), current, now)) return false;
             }
+            JsonNode previous = round.publicSnapshot().get("previousComparison");
+            if (previous != null && !previous.isNull() && "available".equals(StrictJson.Obj.of(previous).string("status"))) {
+                // A dropped issue discloses previous-only content: its original must still be readable today.
+                var fixed = StrictJson.Obj.of(previous);
+                List<Prior> prior = jdbc.query("""
+                        SELECT published_payload, public_snapshot FROM briefing_rounds
+                        WHERE id=? AND id<>? AND status='published' AND published_at IS NOT NULL
+                            AND scheduled_at<? AND published_at=?::timestamptz AND window_to=?::timestamptz
+                            AND payload_sha256=encode(sha256(convert_to(published_payload::text,'UTF8')),'hex')
+                        """, (rs, index) -> new Prior(StrictJson.parseObject(rs.getString("published_payload")).node(),
+                                StrictJson.parseObject(rs.getString("public_snapshot")).node()),
+                        nonBlank(fixed.string("previousRoundId")), round.id(), java.sql.Timestamp.from(round.scheduledAt()),
+                        fixed.string("previousPublishedAt"), fixed.string("previousDataAsOf"));
+                if (prior.size() != 1 || !sources(prior.get(0).payload(), prior.get(0).snapshot(), current, now)) return false;
+            }
             return true;
         } catch (StrictJson.Malformed malformed) {
             return false;
