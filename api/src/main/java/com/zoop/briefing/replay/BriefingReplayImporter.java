@@ -461,20 +461,24 @@ public final class BriefingReplayImporter {
             Set<String> published = new LinkedHashSet<>(); publications.forEach(row -> published.add(row.id()));
             require(published.equals(presentation.rounds().keySet()), "presentation_published_round_coverage");
             Map<String, JsonNode> layerReceipts = simulationReceiptLedger(presentation.root().objects("receipts"));
-            if (presentation.root().has("outlookHistory")) {
-                StrictJson.Obj history = presentation.root().object("outlookHistory");
+            StrictJson.Obj historyRoot = presentation.root();
+            Set<String> historyDigests = new HashSet<>(), historyOwnedReceipts = new HashSet<>();
+            historyDigests.add(bundleSha); int historyDepth = 0;
+            while (historyRoot.has("outlookHistory")) {
+                require(++historyDepth <= 8, "outlook_history_depth_limit");
+                String historyNamespace = namespace + "-outlook-history" + (historyDepth == 1 ? "" : "-" + historyDepth);
+                StrictJson.Obj history = historyRoot.object("outlookHistory");
                 String historySha = history.string("bundleSha256");
-                require(historySha.matches("[0-9a-f]{64}"), "outlook_history_digest");
+                require(historySha.matches("[0-9a-f]{64}") && historyDigests.add(historySha), "outlook_history_digest_or_cycle");
                 byte[] historyBytes = read(settings.bundle().getParent().resolve("market/outlook-history/" + historySha + ".json"));
                 require(Canonical.sha256(historyBytes).equals(historySha), "outlook_history_bundle_digest");
                 StrictJson.Obj priorBundle = StrictJson.parseObject(historyBytes);
                 ObjectNode priorNews = (ObjectNode) priorBundle.node().deepCopy(); priorNews.remove("presentationEnrichment");
                 ObjectNode currentNews = (ObjectNode) bundle.node().deepCopy(); currentNews.remove("presentationEnrichment");
                 require(priorNews.equals(currentNews), "outlook_history_news_changed");
-                BriefingPresentationRules.Layer verifiedHistory = BriefingPresentationRules.load(priorBundle, settings.bundle().getParent(), settings.userInboxRef());
+                BriefingPresentationRules.Layer verifiedHistory = BriefingPresentationRules.load(priorBundle, settings.bundle().getParent(), settings.userInboxRef(), settings.maximumPaidCalls());
                 require(verifiedHistory != null && published.equals(verifiedHistory.rounds().keySet()), "outlook_history_round_coverage");
                 StrictJson.Obj priorLayer = verifiedHistory.root();
-                require(!priorLayer.has("outlookHistory"), "outlook_nested_history_requires_explicit_continuation");
                 Map<String, JsonNode> historyReceipts = simulationReceiptLedger(history.objects("receipts"));
                 require(historyReceipts.equals(simulationReceiptLedger(priorLayer.objects("receipts"))), "outlook_history_receipt_ledger");
                 Set<String> accountedHistory = new HashSet<>(); List<StrictJson.Obj> historyMarkets = new ArrayList<>();
@@ -492,7 +496,7 @@ public final class BriefingReplayImporter {
                     for (var receipt : simulationReceiptLedger(market.objects("receipts")).entrySet()) {
                         require(receipt.getValue().equals(historyReceipts.get(receipt.getKey())) && accountedHistory.add(receipt.getKey()), "outlook_history_receipt_owner");
                     }
-                    registerMarketBlobs(namespace + "-outlook-history-" + historyMarkets.size(), market, blobs);
+                    registerMarketBlobs(historyNamespace + "-" + historyMarkets.size(), market, blobs);
                 }
                 for (StrictJson.Obj market : historyMarkets) BriefingMarketContextRules.previous(market, historyMarkets);
                 require(accountedHistory.equals(historyReceipts.keySet()), "outlook_history_unowned_receipt");
@@ -500,7 +504,9 @@ public final class BriefingReplayImporter {
                     JsonNode prior = allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue());
                     require(prior == null || prior.equals(receipt.getValue()), "outlook_history_receipt_conflict");
                 }
-                blobs.put(namespace + "-outlook-history-bundle", blob("ai_submit", historyBytes));
+                historyOwnedReceipts.addAll(historyReceipts.keySet());
+                blobs.put(historyNamespace + "-bundle", blob("ai_submit", historyBytes));
+                historyRoot = priorLayer;
             }
             Set<String> accountedMarket = new HashSet<>();
             List<StrictJson.Obj> validatedMarkets = new ArrayList<>();
@@ -575,7 +581,10 @@ public final class BriefingReplayImporter {
             }
             for (StrictJson.Obj market : validatedMarkets) if (market.has("marketContext")) BriefingMarketContextRules.previous(market, validatedMarkets);
             require(accountedMarket.equals(layerReceipts.keySet()), "presentation_unowned_receipt");
-            for (var receipt : layerReceipts.entrySet()) require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "presentation_receipt_reuses_existing_call");
+            for (var receipt : layerReceipts.entrySet()) {
+                JsonNode oldReceipt = allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue());
+                require(oldReceipt == null || (historyOwnedReceipts.contains(receipt.getKey()) && oldReceipt.equals(receipt.getValue())), "presentation_receipt_reuses_existing_call");
+            }
             require(allReceipts.size() <= (presentation.root().has("maximumPaidCallsIncludingPrior") ? presentation.root().count("maximumPaidCallsIncludingPrior") : 400), "presentation_reservation_limit");
             publications.clear(); publications.addAll(enriched);
         }

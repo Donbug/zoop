@@ -108,8 +108,8 @@ export default function MarketSummary({
       kind: 'forecast',
       title:
         edition === 'morning'
-          ? '오늘의 조건부 전망'
-          : '다음 거래일의 조건부 전망',
+          ? '오늘의 전망'
+          : '다음 거래일의 전망',
     },
   ];
   return (
@@ -199,7 +199,7 @@ export default function MarketSummary({
           })}
           {!analysis.claims.some((claim) => claim.kind === 'forecast') && (
             <p className={NOTE}>
-              이 회차에는 검증을 통과한 새로운 조건부 전망이 없습니다.
+              이 회차에는 검증을 통과한 새로운 전망이 없습니다.
             </p>
           )}
           <div>

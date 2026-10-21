@@ -49,15 +49,6 @@ class MarketQualityTest(unittest.TestCase):
             transport=f.ContextTransport(change)
             client=c.legacy.MarketSummaryClient(Path(d),transport,8,prompt_root=c.PROMPTS)
             return c.generate_market_summary(client,data,0), transport
-    def test_nested_history_is_rejected_before_new_paid_execution(self):
-        from types import SimpleNamespace
-        spec=importlib.util.spec_from_file_location('quality_runner',Path(__file__).parents[1]/'briefing_market_outlook_run.py')
-        runner=importlib.util.module_from_spec(spec);spec.loader.exec_module(runner)
-        with tempfile.TemporaryDirectory() as d:
-            Path(d,'bundle-v2.json').write_bytes(c.base.canonical({'presentationEnrichment':{
-                'schemaVersion':'zoop-briefing-presentation-enrichment-v1','outlookHistory':{'bundleSha256':'old'}}}))
-            with self.assertRaisesRegex(runner.context.ContextError,'nested_history_not_supported'):
-                runner.prepare(SimpleNamespace(baseline=d))
     def test_complete_quality_verification_passes(self):
         result, transport=self.execute()
         self.assertEqual('PASS',result['verification']['status']); self.assertEqual(2,len(transport.requests))

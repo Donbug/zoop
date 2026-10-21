@@ -45,6 +45,25 @@ def rebind_derived_contexts(layer, inbox):
         market["contextSha256"] = base.digest(base.canonical(market["context"]))
 
 
+def history_chain(baseline, bundle, max_depth=8):
+    """Validate immutable ancestry before any paid request, including receipt ownership."""
+    seen, chain, current = {base.digest(base.canonical(bundle))}, [], bundle
+    news = {k:v for k,v in bundle.items() if k != "presentationEnrichment"}
+    while current["presentationEnrichment"].get("outlookHistory"):
+        history = current["presentationEnrichment"]["outlookHistory"]
+        sha = history.get("bundleSha256")
+        context.require(type(sha) is str and len(sha) == 64 and all(c in "0123456789abcdef" for c in sha), "outlook_history_digest")
+        context.require(len(chain) < max_depth and sha not in seen, "outlook_history_cycle_or_depth")
+        seen.add(sha)
+        raw = base.regular(baseline / "market/outlook-history" / (sha + ".json"))
+        context.require(base.digest(raw) == sha, "outlook_history_bundle_digest")
+        prior = base.strict_load(raw)
+        context.require({k:v for k,v in prior.items() if k != "presentationEnrichment"} == news, "outlook_history_news_changed")
+        context.require(history.get("receipts") == prior["presentationEnrichment"]["receipts"], "outlook_history_receipt_ledger")
+        chain.append(sha);current = prior
+    return chain
+
+
 def prepare(args):
     global VERSION
     if getattr(args, "prompt_version", None):
@@ -56,8 +75,7 @@ def prepare(args):
     presentation = bundle.get("presentationEnrichment")
     context.require(presentation and presentation.get("schemaVersion") == "zoop-briefing-presentation-enrichment-v1",
                     "outlook_presentation_baseline_required")
-    # Refuse before any paid transport: the importer currently supports one history layer.
-    context.require(not presentation.get("outlookHistory"), "outlook_nested_history_not_supported")
+    ancestry = history_chain(baseline, bundle)
     context.require(base.digest(base.regular(Path(args.sources))) == bundle["sourceFileSha256"]
                     and base.digest(base.regular(Path(args.clocks))) == bundle["clockFileSha256"],
                     "outlook_source_or_clock_mismatch")
@@ -98,6 +116,7 @@ def prepare(args):
             "promptArtifacts": prompts, "sourceFileSha256": bundle["sourceFileSha256"],
             "clockFileSha256": bundle["clockFileSha256"], "calendarSha256": base.digest(base.canonical(calendar)),
             "priorReservations": prior, "maxCallsIncludingPrior": args.max_calls,
+            "preservedHistoryBundles": ancestry,
             "budgetApprovalRef": getattr(args, "budget_approval_ref", None),
             "maxRepairsPerRound": getattr(args, "max_repairs", 0),
             "plannedNewCalls": 2 * len(chosen), "roundIds": [r[0]["roundId"] for r in chosen],

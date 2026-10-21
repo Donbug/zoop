@@ -50,3 +50,11 @@
 `PASS`는 문안·근거 검증 통과다. `previousPublication.status`는 비교할 이전 브리핑의 가용성이고, `forecastEvaluations.status`는 조건부 전망의 평가 가능성이다. 이 세 상태를 합치지 않는다. 실제 두 퇴근 회차의 비교 문장은 저장된 아침 전망과 종가를 함께 설명하지만, 조건 충족 여부가 별도 관측되지 않아 적중/실패 판정은 하지 않았다. 이 실행을 예측 성과나 실시간 운영 검증으로 보고하지 않는다.
 
 가져오기 서버도 기본 400회 제한을 유지한다. 더 큰 한도의 결과를 등록하려면 비공개 local replay 실행에 `zoop.briefing.replay.maximum-paid-calls=415`와 별도 `zoop.briefing.replay.budget-approval-ref`를 함께 지정한다. bundle이 스스로 한도를 올릴 수 없고, 승인 참조 누락·설정 상한 초과는 DB 쓰기 전에 거절한다. 승인된 확장은 비공개 manifest의 `budgetAuthorization`에 보존하며 공개 조회 권한을 확대하지 않는다.
+
+## 연속 실행과 수정 전·후 목록 (2026-10-21)
+
+실제 다음 실행은 현재 bundle을 입력으로 받고 별도 output/DB를 쓴다. `outlookHistory.bundleSha256` 체인을 최대8층까지 순회해 모든 이전 bundle 바이트·뉴스/회차·원문 인용·모델 요청/응답·영수증·직전 결과 연결을 검사한다. 일부 회차의 동일 입력 호출이 재사용되어 여러 층에 같은 receipt가 있으면 같은 내용일 때만 한 번 계산한다. 상충한 영수증·누락/위조·하위 원문 변조·깊이 초과는 거부한다. 각 이전 layer도 외부에서 설정한 승인 상한 안에서 검증한다. 기존한도400 기본은 유지한다.
+
+`briefing_market_outlook_run.py`는 새 실행 전 history의 바이트 SHA·뉴스 동일성·receipt 목록 연결을 확인한다. 실제 요청은 원본 inputUserInboxRef 계보를 유지하고, 추가 유료 실행 승인·상한은 별도의 budgetApprovalRef/최대425 설정과 계획에 남긴다. 입력 폴더와 기존 DB/서버를 덮어쓰지 않는다.
+
+완료 결과의 비교 목록은 `scripts/briefing_outlook_compare.py --baseline <기존 bundle-v2.json> --current <새 bundle-v2.json> --output <별도 private review 폴더>`로 만든다. 생성한 comparison.json/index.html은 같은 회차별 기존/새 버전·상태·문안·근거 수·조건/입력 문서 수를 나란히 보여준다. 실제 프론트 주소를 --old-url/--new-url로 지정한다. 보류 문안은 ‘비교용 보류 기록’으로 표시하며 발행으로 꾸미지 않는다. 이 도구는 모델 호출·DB 쓰기를 하지 않는 로컬 검토용이며 원문/키/로그 폴더를 HTTP 공개 루트로 쓰지 않는다.

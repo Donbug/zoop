@@ -18,7 +18,7 @@ def load(name, path):
     return value
 
 
-def create(directory, tampered_history=False, quality=False):
+def create(directory, tampered_history=False, quality=False, continuation=False):
     recovery = load("history_authored_recovery", ROOT / "api/scripts/briefing_recovery_fixture.py")
     presentation = load("history_authored_presentation", ROOT / "scripts/briefing_presentation_enrichment.py")
     market = load("history_authored_market", ROOT / "scripts/tests/test_briefing_market_data.py")
@@ -84,11 +84,14 @@ def create(directory, tampered_history=False, quality=False):
                     check.update({flag: True for flag in runner.context.QUALITY_FLAGS})
         second = run("market-context-v2.3-outlook" if quality else "market-context-v2.2-outlook",
                      directory / "first", directory / "second", authored.ContextTransport(quality_answer if quality else None))
+        if continuation:
+            third = run("market-context-v2.3-outlook", directory / "second", directory / "third", authored.ContextTransport(quality_answer))
+            assert third["summaryPass"] == 4 and third["newPaidCalls"] == (0 if quality else 8), third  # identical prompt/input recordings are reused
     assert first["summaryPass"] == 0 and first["newPaidCalls"] == 8, first
     assert second["summaryPass"] == 4 and second["newPaidCalls"] == 8, second
     return {"realPaidCalls": 0, "realProviderFetches": 0, "authoredOldCalls": 8, "authoredNewCalls": 8,
-            "bundle": str(directory / "second/bundle-v2.json")}
+            "bundle": str(directory / ("third" if continuation else "second") / "bundle-v2.json")}
 
 
 if __name__ == "__main__":
-    print(create(Path(sys.argv[1]), "--tampered-history" in sys.argv, "--quality" in sys.argv))
+    print(create(Path(sys.argv[1]), "--tampered-history" in sys.argv, "--quality" in sys.argv, "--continuation" in sys.argv))

@@ -139,9 +139,14 @@ class BriefingOutlookHistoryPostgresTest {
         assertThrows(IllegalArgumentException.class, importer::importBundle); assertEquals(before, originals());
     }
 
-    @Test void qualityV23SurvivesActualImportWithPriorHistoryAndFourVerifiedProjections() throws Exception {
+    @Test void qualityV23SurvivesActualImportWithPriorHistoryAndFourVerifiedProjections() throws Exception { qualityImport(false); }
+    @Test void thirdExecutionRetainsBothHistoryGenerationsAndRejectsDeepestTamper() throws Exception { qualityImport(true); }
+
+    private void qualityImport(boolean continuation) throws Exception {
         Path fresh = Files.createTempDirectory(root, "quality-v23-");
-        var command = new ProcessBuilder("python3", Path.of("scripts/briefing_outlook_history_fixture.py").toAbsolutePath().toString(), fresh.toString(), "--quality");
+        var arguments = new java.util.ArrayList<>(java.util.List.of("python3", Path.of("scripts/briefing_outlook_history_fixture.py").toAbsolutePath().toString(), fresh.toString(), "--quality"));
+        if (continuation) arguments.add("--continuation");
+        var command = new ProcessBuilder(arguments);
         command.environment().put("PYTHONDONTWRITEBYTECODE", "1");
         var process = command.redirectErrorStream(true).redirectOutput(fresh.resolve("fixture.log").toFile()).start();
         assertEquals(0, process.waitFor(), () -> log(fresh.resolve("fixture.log")));
@@ -153,13 +158,25 @@ class BriefingOutlookHistoryPostgresTest {
             Flyway.configure().dataSource(ds).schemas(schema).defaultSchema(schema).load().migrate();
             qualityDb.update("INSERT INTO companies(id,name) VALUES ('company-authored','합성 기업')");
             var qualityImporter = new BriefingReplayImporter(qualityDb, new DataSourceTransactionManager(ds),
-                    new BriefingReplaySettings(fresh.resolve("sources.jsonl"), fresh.resolve("second/bundle-v2.json"), Files.createDirectory(fresh.resolve("artifacts")),
+                    new BriefingReplaySettings(fresh.resolve("sources.jsonl"), fresh.resolve((continuation ? "third" : "second") + "/bundle-v2.json"), Files.createDirectory(fresh.resolve("artifacts")),
                             fresh.resolve("grants.json"), fresh.resolve("manifest.json"), ArtifactFileStore.sha256(Files.readAllBytes(fresh.resolve("sources.jsonl"))),
                             "inbox/authored-recovery.md", fresh.resolve("clocks.json")));
             qualityImporter.importBundle();
             assertEquals(4, qualityDb.queryForObject("SELECT count(*) FROM briefing_rounds WHERE public_snapshot #>> '{marketSummary,analysis,schemaVersion}'='zoop-market-outlook-analysis-v1'", Integer.class));
             assertEquals(0, qualityDb.queryForObject("SELECT count(*) FROM briefing_rounds b CROSS JOIN LATERAL jsonb_array_elements(b.public_snapshot #> '{marketSummary,analysis,forecasts}') f WHERE jsonb_array_length(f->'conditions')<>0", Integer.class));
             assertTrue(qualityImporter.importBundle().alreadyImported());
+            if (continuation) {
+                var current = StrictJson.parseObject(Files.readAllBytes(fresh.resolve("third/bundle-v2.json")));
+                String secondSha = current.object("presentationEnrichment").object("outlookHistory").string("bundleSha256");
+                var second = StrictJson.parseObject(Files.readAllBytes(fresh.resolve("third/market/outlook-history/" + secondSha + ".json")));
+                String firstSha = second.object("presentationEnrichment").object("outlookHistory").string("bundleSha256");
+                assertEquals(1, qualityDb.queryForObject("SELECT count(*) FROM artifacts WHERE sha256=?", Integer.class, firstSha));
+                assertEquals(1, qualityDb.queryForObject("SELECT count(*) FROM artifacts WHERE sha256=?", Integer.class, secondSha));
+                String saved = qualityDb.queryForObject("SELECT json_agg(row_to_json(t) ORDER BY id)::text FROM (SELECT id,public_snapshot FROM briefing_rounds) t", String.class);
+                Files.writeString(fresh.resolve("third/market/outlook-history/" + firstSha + ".json"), "{}");
+                assertThrows(IllegalArgumentException.class, qualityImporter::importBundle);
+                assertEquals(saved, qualityDb.queryForObject("SELECT json_agg(row_to_json(t) ORDER BY id)::text FROM (SELECT id,public_snapshot FROM briefing_rounds) t", String.class));
+            }
         } finally { qualityDb.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE"); }
     }
 

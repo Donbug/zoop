@@ -165,7 +165,7 @@ describe('D-BRF-01·02 저장된 전망형 시장 분석', () => {
       screen.getByRole('heading', { name: '시장에 대한 해석' }),
     ).toBeTruthy();
     expect(
-      screen.getByRole('heading', { name: '오늘의 조건부 전망' }),
+      screen.getByRole('heading', { name: '오늘의 전망' }),
     ).toBeTruthy();
     expect(screen.getByText('이전 전망 완화')).toBeTruthy();
     expect(
@@ -209,7 +209,7 @@ describe('D-BRF-01·02 저장된 전망형 시장 분석', () => {
       screen.getByRole('heading', { name: '아침 예상과 관측 결과 비교' }),
     ).toBeTruthy();
     expect(
-      screen.getByRole('heading', { name: '다음 거래일의 조건부 전망' }),
+      screen.getByRole('heading', { name: '다음 거래일의 전망' }),
     ).toBeTruthy();
     expect(screen.getByText(/대상 2026-10-08 KOSPI 종가/)).toBeTruthy();
     expect(
@@ -232,11 +232,11 @@ describe('D-BRF-01·02 저장된 전망형 시장 분석', () => {
     ).toBeTruthy();
     expect(
       screen.getByText(
-        '이 회차에는 검증을 통과한 새로운 조건부 전망이 없습니다.',
+        '이 회차에는 검증을 통과한 새로운 전망이 없습니다.',
       ),
     ).toBeTruthy();
     expect(
-      screen.queryByRole('heading', { name: '오늘의 조건부 전망' }),
+      screen.queryByRole('heading', { name: '오늘의 전망' }),
     ).toBeNull();
   });
   it('다른 회차의 구조화 분석을 현재 회차 전망으로 노출하지 않는다', () => {
