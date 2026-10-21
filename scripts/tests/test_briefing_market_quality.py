@@ -78,4 +78,67 @@ class MarketQualityTest(unittest.TestCase):
         self.assertEqual('WITHHELD',result['verification']['status']); self.assertEqual([],result['claims'])
         self.assertIsNone(result['verificationRequestDigest']); self.assertEqual(1,len(transport.requests))
 
+    def test_semantic_rejection_routes_adversarial_wording_to_withheld(self):
+        # Authored verifier decisions exercise the gate; they do not measure model detection accuracy.
+        cases = [
+            ('실적 기대가 지속되는 가운데 지수 상승을 전망합니다.', 'observableConditionsOnly'),
+            ('기자가 인용한 애널리스트의 수요 전망을 회사가 확정 발표했습니다.', 'evidenceClauseCoverage'),
+            ('합성 원문의 약20억원 예상과 달리 20억원 확정으로 썼습니다.', 'qualifiersPreserved'),
+        ]
+        for wording, flag in cases:
+            with self.subTest(flag=flag):
+                def change(stage, answer):
+                    if stage == 'market_summary_generation': answer['claims'][0]['text'] = wording
+                    else:
+                        for check in answer['checks'].values(): check.update({k:True for k in c.QUALITY_FLAGS})
+                        check=next(iter(answer['checks'].values()))
+                        check.update(verdict='UNSUPPORTED',reason='Authored rejection: '+flag);check[flag]=False
+                with tempfile.TemporaryDirectory() as d:
+                    transport=f.ContextTransport(change)
+                    client=c.legacy.MarketSummaryClient(Path(d),transport,8,prompt_root=c.PROMPTS)
+                    result=c.generate_market_summary(client,self.data(),0)
+                self.assertEqual('WITHHELD',result['verification']['status']);self.assertIsNone(result['summary'])
+                self.assertEqual(2,len(result['claims'])) # audit retains both; no silent one-claim publication
+                self.assertEqual(2,len(result['usage']))
+
+    def test_repair_with_invalid_anchor_clears_final_draft_but_keeps_attempt_history(self):
+        generations=0
+        def change(stage,answer):
+            nonlocal generations
+            if stage=='market_summary_generation':
+                generations+=1
+                if generations==2: answer['claims'][0]['indicatorIds']=['kospi']
+            else:
+                for check in answer['checks'].values(): check.update({k:True for k in c.QUALITY_FLAGS})
+                check=next(iter(answer['checks'].values()));check['atomicClaim']=False
+                check.update(verdict='UNSUPPORTED',reason='Authored first-attempt semantic failure')
+        with tempfile.TemporaryDirectory() as d:
+            transport=f.ContextTransport(change)
+            client=c.legacy.MarketSummaryClient(Path(d),transport,8,prompt_root=c.PROMPTS)
+            result=c.generate_market_summary(client,self.data(),1)
+        self.assertEqual('WITHHELD',result['verification']['status']);self.assertEqual([],result['claims'])
+        self.assertIsNone(result['verificationRequestDigest']);self.assertIsNone(result['summary'])
+        self.assertEqual(2,len(result['attempts']));self.assertEqual(3,len(result['usage']))
+        self.assertIsNotNone(result['attempts'][0]['verificationRequestDigest'])
+        self.assertTrue(result['attempts'][0]['verification']['checks'])
+        self.assertNotIn('verificationRequestDigest',result['attempts'][1])
+
+    def test_rejected_generation_can_be_repaired_without_rewriting_the_first_attempt(self):
+        generations=0
+        def change(stage,answer):
+            nonlocal generations
+            if stage=='market_summary_generation':
+                generations+=1
+                if generations==1: answer['claims'][0]['indicatorIds']=['kospi']
+            else:
+                for check in answer['checks'].values(): check.update({k:True for k in c.QUALITY_FLAGS})
+        with tempfile.TemporaryDirectory() as d:
+            transport=f.ContextTransport(change)
+            client=c.legacy.MarketSummaryClient(Path(d),transport,8,prompt_root=c.PROMPTS)
+            result=c.generate_market_summary(client,self.data(),1)
+        self.assertEqual('PASS',result['verification']['status']);self.assertEqual(2,len(result['attempts']))
+        self.assertEqual('WITHHELD',result['attempts'][0]['verification']['status'])
+        self.assertIn('fact_anchor',result['attempts'][0]['verification']['reason'])
+        self.assertEqual(3,len(result['usage']))
+
 if __name__=='__main__': unittest.main()
