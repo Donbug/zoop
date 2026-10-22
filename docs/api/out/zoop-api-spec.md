@@ -157,6 +157,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | [getEvidence](#getevidence) | GET | /api/v1/evidence/{id} | 공개 | P1 |
 | [getBriefing](#getbriefing) | GET | /api/v1/briefings | 공개 | P1 |
 | [listBriefingRounds](#listbriefingrounds) | GET | /api/v1/briefings/rounds | 공개 | P1 |
+| [getBriefingRecap](#getbriefingrecap) | GET | /api/v1/briefings/{id}/recap | 공개 | P1 |
 | [getBriefingItemDetail](#getbriefingitemdetail) | GET | /api/v1/briefings/{roundId}/items/{eventId} | 공개 | P1 |
 | [getBriefingGraphBasis](#getbriefinggraphbasis) | GET | /api/v1/briefings/{id}/graph | 공개 | P1 |
 | [createConversation](#createconversation) | PUT | /api/v1/chat/sessions/{id} | 회원(본인) | P1 |
@@ -1197,6 +1198,33 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
 | limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
+
+<a id="getbriefingrecap"></a>
+
+## getBriefingRecap · 새 핵심 이슈가 없는 회차의 이전 발행본 복기
+
+정상 발행된 빈 회차(no_issues_in_window)의 고정 비교 참조만 사용한다. 저장된 이전 회차 원문을 현재 권한·정정·시점 검증 후 반환한다. 새 이슈·새 전망·재평가가 아니며, 실패·보류 회차를 정상 무소식으로 전환하지 않는다. 고정 참조가 없거나 변경·정정·중단되면 다른 회차로 대체하지 않는다. 읽기 전용이며 기존 payload와 DB 스키마는 변경하지 않는다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/briefings/{id}/recap` |
+| 권한·우선순위 | 공개 · P1 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [BriefingRecap](#schema-briefingrecap), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
+| FS/NFS | [FS028](../../system/out/feature-FS028.md) · [FS029](../../system/out/feature-FS029.md) · [FS033](../../system/out/feature-FS033.md) · [FS035](../../system/out/feature-FS035.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) |
+| WBS | 6.1.2, 6.11.1 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | Spring 공개 조회의 읽기 전용 복기 뷰이며 직접 대응 BFF 없음. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| id | path | 필수 | string |  |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
 <a id="getbriefingitemdetail"></a>
 
@@ -3315,6 +3343,22 @@ The immutable published original of a round (what users saw before any correctio
 | eventIds | 필수 | string[] |  |
 | evidenceIds | 필수 | string[] |  |
 | companyIds | 필수 | string[] |  |
+
+<a id="schema-briefingrecap"></a>
+
+### BriefingRecap
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| roundId | 필수 | string |  |
+| graphVersion | 필수 | string / null |  |
+| dataAsOf | 필수 | string (date-time) / null |  |
+| status | 필수 | string {available, unavailable, not_applicable} |  |
+| reason | 필수 | string / null |  |
+| message | 필수 | string |  |
+| previous | 필수 | [BriefingResponse](#schema-briefingresponse) / null | 고정 참조의 과거 발행 원문. 이번 회차의 새 평가·새 전망이 아니다. available일 때만 제공하며 기존 데이터·시장 지표의 시점도 과거 그대로다. |
 
 <a id="schema-briefingresponse"></a>
 

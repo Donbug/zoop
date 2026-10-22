@@ -74,8 +74,25 @@ class BriefingHttpPostgresTest {
     }
 
     @BeforeEach
-    void loadSyntheticFixture() throws IOException {
-        loadFixture(resource("fixture.sql"));
+    void loadSyntheticFixture(org.junit.jupiter.api.TestInfo info) throws IOException {
+        String fixture = resource("fixture.sql");
+        if (info.getTestMethod().orElseThrow().getName().startsWith("recap")) {
+            int start = fixture.indexOf("$records$") + "$records$".length();
+            int end = fixture.indexOf("$records$", start);
+            var records = JSON.readTree(fixture.substring(start, end));
+            for (var record : records) {
+                if (ROUND.equals(record.path("p").path("id").asString())) {
+                    var payload = (tools.jackson.databind.node.ObjectNode) record.get("p");
+                    payload.putArray("items"); payload.put("emptyReason", "no_issues_in_window").putNull("outlook");
+                    for (var item : record.path("comparison").path("items")) {
+                        ((tools.jackson.databind.node.ObjectNode) item).put("change", "dropped").putNull("rank").putNull("evidenceCount");
+                    }
+                    ((tools.jackson.databind.node.ObjectNode) payload.get("references")).putArray("eventIds");
+                }
+            }
+            fixture = fixture.substring(0, start) + JSON.writeValueAsString(records) + fixture.substring(end);
+        }
+        loadFixture(fixture);
     }
 
     private void loadFixture(String sql) throws IOException {
@@ -131,6 +148,67 @@ class BriefingHttpPostgresTest {
         assertEquals("continuing", evening.json().at("/sinceMorning/items/0/change").asText());
         assertEquals("synthetic-original-request", jdbc.queryForObject(
                 "SELECT published_payload->'metadata'->>'requestId' FROM briefing_rounds WHERE id=?", String.class, ROUND));
+    }
+
+    @Test
+    void recapRestoresFixedMorningOriginalForAnAuthoredQuietEveningAndPreservesHashes() throws Exception {
+        String digest = jdbc.queryForObject("SELECT payload_sha256 FROM briefing_rounds WHERE id=?", String.class,
+                "brf-test-2026-10-15-morning");
+        var response = get("/api/v1/briefings/" + ROUND + "/recap", "recap-http");
+        assertEquals(200, response.status());
+        assertEquals("available", response.json().path("status").asString());
+        var morning = get(MORNING, "original-http");
+        assertEquals(morning.json().path("items"), response.json().at("/previous/items"));
+        assertEquals("brf-test-2026-10-15-morning", response.json().at("/previous/id").asString());
+        assertEquals("recap-http", response.json().at("/previous/metadata/requestId").asString());
+        assertEquals(digest, jdbc.queryForObject("SELECT payload_sha256 FROM briefing_rounds WHERE id=?", String.class,
+                "brf-test-2026-10-15-morning"));
+        assertEquals(0, get(EVENING, "current-http").json().path("items").size());
+    }
+
+    @Test
+    void recapDoesNotHidePriorRevocationCorrectionOrAnUnpublishedCurrentRound() throws Exception {
+        String path = "/api/v1/briefings/" + ROUND + "/recap";
+        Files.writeString(GRANTS, "{}");
+        assertEquals(503, get(path, "revoked-recap").status());
+        Files.writeString(GRANTS, resource("grants.json"));
+        jdbc.update("""
+                INSERT INTO briefing_changes(round_id,kind,seq,event_id,original,corrected,reason,admin_id,admin_email_snapshot,created_at)
+                VALUES ('brf-test-2026-10-15-morning','correction',1,'brf-test-event','old','corrected','[합성시험] 정정','synthetic-admin','synthetic@example.invalid',now())
+                """);
+        var corrected = get(path, "corrected-recap");
+        assertEquals(200, corrected.status());
+        assertEquals("previous_corrected", corrected.json().path("reason").asString());
+        assertTrue(corrected.json().path("previous").isNull());
+        var pending = get("/api/v1/briefings/brf-test-2026-10-16-morning/recap", "pending-recap");
+        assertEquals("not_applicable", pending.json().path("status").asString());
+        assertTrue(pending.json().path("previous").isNull());
+        assertTrue(pending.json().path("graphVersion").isNull());
+    }
+
+    @Test
+    void recapAndGraphKeepCurrentEmptyScopeSeparateFromPreservedMorning() throws Exception {
+        registerSyntheticGraph();
+        var recap = get("/api/v1/briefings/" + ROUND + "/recap", "combined-recap");
+        assertEquals(200, recap.status(), recap.body());
+        assertEquals("available", recap.json().path("status").asText());
+        String previousId = recap.json().at("/previous/id").asText();
+        assertEquals("brf-test-2026-10-15-morning", previousId);
+        var basis = get("/api/v1/briefings/" + ROUND + "/graph", "combined-empty-basis");
+        assertEquals(200, basis.status(), basis.body());
+        assertEquals("available", basis.json().path("status").asText());
+        assertEquals(0, basis.json().path("keyIssueIds").size());
+        var emptyGraph = get("/api/v1/graph?round=" + ROUND, "combined-empty-map");
+        assertEquals(200, emptyGraph.status(), emptyGraph.body());
+        assertEquals(0, emptyGraph.json().path("nodes").size());
+        assertEquals(0, emptyGraph.json().path("edges").size());
+        assertEquals("2026-10-15T08:30:00Z", emptyGraph.json().at("/metadata/asOf").asText());
+        var previousGraph = get("/api/v1/graph?round=" + previousId, "combined-prior-map");
+        assertEquals(200, previousGraph.status(), previousGraph.body());
+        assertEquals(2, previousGraph.json().path("nodes").size());
+        assertEquals(1, previousGraph.json().path("edges").size());
+        assertEquals("2026-10-15T00:20:00Z", previousGraph.json().at("/metadata/asOf").asText());
+        assertEquals(0, get(EVENING, "combined-current-original").json().path("items").size());
     }
 
     @Test
