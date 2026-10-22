@@ -21,18 +21,21 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
     selectedId,
     focusId,
     focusHops,
+    memoryOwner,
     onSelect,
   }: {
     data: GraphResponse;
     selectedId: string | null;
     focusId: string | null;
     focusHops: 1 | 2;
+    memoryOwner: string;
     onSelect: (id: string) => void;
   }) => (
     <div
       data-testid="graph-canvas"
       data-focus={focusId ?? ''}
       data-hops={focusHops}
+      data-view-owner={memoryOwner}
     >
       {data.nodes.map((node) => (
         <button
@@ -148,6 +151,9 @@ it('D-BRF-04 회차 지도를 최신 main 지도에 연결하고 현재 지도�
   });
   const router = setup(`/?mode=all&round=${roundId}`);
   await screen.findByTestId('graph-canvas');
+  expect(
+    screen.getByTestId('graph-canvas').getAttribute('data-view-owner'),
+  ).toContain(`:round:${roundId}`);
   expect(
     vi
       .mocked(getGraph)

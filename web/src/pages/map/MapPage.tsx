@@ -673,7 +673,9 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                 data={data}
                 filterHost={filterHost}
                 centerRequest={centerRequest}
-                memoryOwner={memoryOwner}
+                memoryOwner={
+                  round ? `${memoryOwner}:round:${round}` : memoryOwner
+                }
                 onOpenIsolated={() => {
                   updateQuery({
                     select: 'bundle:isolated',
