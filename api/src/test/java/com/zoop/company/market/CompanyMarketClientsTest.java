@@ -177,7 +177,7 @@ class CompanyMarketClientsTest {
         assertEquals("1d", result.interval());
         assertEquals("KRW", result.currency());
         assertEquals("toss", result.source().provider());
-        assertEquals(List.of("2026-10-14T00:00+09:00", "2026-10-15T00:00+09:00"),
+        assertEquals(List.of("2026-10-14T00:00:00+09:00", "2026-10-15T00:00:00+09:00"),
                 result.points().stream().map(p -> p.time()).toList());
         var last = result.points().get(1);
         assertEquals(695.0, last.open());
@@ -190,7 +190,7 @@ class CompanyMarketClientsTest {
         exchangeDaily = true;
         var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m",
                 kst("2026-10-15T00:00"), kst("2026-10-16T00:00"));
-        assertEquals(List.of("2026-10-15T00:00+09:00"), result.points().stream().map(p -> p.time()).toList());
+        assertEquals(List.of("2026-10-15T00:00:00+09:00"), result.points().stream().map(p -> p.time()).toList());
 
         var empty = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m",
                 kst("2026-01-01T00:00"), kst("2026-02-01T00:00"));
@@ -204,7 +204,7 @@ class CompanyMarketClientsTest {
         exchangeDaily = true;
         var result = tossClient("test-client", "test-secret").prices("NASDAQ:NVDA", "NASDAQ", "NVDA", "1m",
                 kst("2026-10-01T00:00"), kst("2026-10-15T10:00").plusNanos(1));
-        assertEquals(List.of("2026-10-14T00:00-04:00"), result.points().stream().map(p -> p.time()).toList());
+        assertEquals(List.of("2026-10-14T00:00:00-04:00"), result.points().stream().map(p -> p.time()).toList());
         assertEquals("USD", result.currency());
     }
 
@@ -243,7 +243,7 @@ class CompanyMarketClientsTest {
 
         assertEquals("1wk", result.interval());
         // 10-14 and 10-15 fall in the week of Monday 10-12; the 2025 bars have no open and are left out.
-        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-12T00:00+09:00", 645, 720, 640, 700, 2634.0)),
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-12T00:00:00+09:00", 645, 720, 640, 700, 2634.0)),
                 result.points());
     }
 
@@ -254,8 +254,8 @@ class CompanyMarketClientsTest {
 
         assertEquals("5m", result.interval());
         // Toss stamps a minute bar with its end: 12:01 and 12:02 start in the 12:00 bucket, 12:06 in 12:05.
-        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00+09:00", 100, 105, 99, 104, 15.0),
-                new CompanyPriceResponse.Point("2026-10-15T12:05+09:00", 104, 104, 103, 103, 1.0)), result.points());
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00:00+09:00", 100, 105, 99, 104, 15.0),
+                new CompanyPriceResponse.Point("2026-10-15T12:05:00+09:00", 104, 104, 103, 103, 1.0)), result.points());
         // Today (10-16) is a holiday on the calendar stub, so the session is the previous business day: all of 10-15.
         assertEquals(new CompanyPriceResponse.Range("2026-10-15T09:00:00+09:00", "2026-10-15T15:30:00+09:00", "2026-10-15"),
                 result.range());
@@ -272,7 +272,7 @@ class CompanyMarketClientsTest {
         // Friday close before the 03-08 DST start: the week of 03-02 ends at 03-09 00:00 EDT, which is 167 hours on.
         var result = tossClient("test-client", "test-secret").prices("NASDAQ:NVDA", "NASDAQ", "NVDA", "1y", null,
                 java.time.Instant.parse("2026-03-06T21:00:00Z").plusNanos(1));
-        assertEquals(List.of(new CompanyPriceResponse.Point("2026-03-02T00:00-05:00", 110, 115, 109, 114, 5.0)),
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-03-02T00:00:00-05:00", 110, 115, 109, 114, 5.0)),
                 result.points());
     }
 
@@ -284,7 +284,7 @@ class CompanyMarketClientsTest {
                 java.time.Instant.parse("2026-10-15T03:00:00Z").plusNanos(1));
         assertEquals(new CompanyPriceResponse.Range("2026-10-15T09:00:00+09:00", "2026-10-15T12:00:00+09:00", "2026-10-15"),
                 open.range());
-        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00+09:00", 100, 105, 99, 104, 15.0)), open.points());
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00:00+09:00", 100, 105, 99, 104, 15.0)), open.points());
 
         // Sunday before the open: the calendar's previous business day (10-15; 10-16 is a holiday) as a whole session,
         // ending at its close, not at the requested to. Weekend and holiday days are never read.
@@ -313,8 +313,8 @@ class CompanyMarketClientsTest {
                 java.time.Instant.parse("2026-11-27T19:00:00Z").plusNanos(1));
         assertEquals(new CompanyPriceResponse.Range("2026-11-27T09:30:00-05:00", "2026-11-27T13:00:00-05:00", "2026-11-27"),
                 result.range());
-        assertEquals(List.of(new CompanyPriceResponse.Point("2026-11-27T09:30-05:00", 190, 191, 189, 190, 1.0),
-                new CompanyPriceResponse.Point("2026-11-27T12:00-05:00", 200, 202, 199, 201, 2.0)), result.points());
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-11-27T09:30:00-05:00", 190, 191, 189, 190, 1.0),
+                new CompanyPriceResponse.Point("2026-11-27T12:00:00-05:00", 200, 202, 199, 201, 2.0)), result.points());
     }
 
     @Test
@@ -324,7 +324,7 @@ class CompanyMarketClientsTest {
                 java.time.Instant.parse("2026-11-27T14:30:00Z").plusNanos(1));
         assertEquals(new CompanyPriceResponse.Range("2026-11-27T09:30:00-05:00", "2026-11-27T09:30:00-05:00", "2026-11-27"),
                 us.range());
-        assertEquals(List.of(new CompanyPriceResponse.Point("2026-11-27T09:30-05:00", 190, 191, 189, 190, 1.0)), us.points());
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-11-27T09:30:00-05:00", 190, 191, 189, 190, 1.0)), us.points());
 
         // KRX 09:00:00 reads that day (10-15), not the previous business day (10-14).
         tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1d", null,
@@ -361,7 +361,7 @@ class CompanyMarketClientsTest {
     void weekUsesHourBuckets() {
         var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1w", null, null);
         assertEquals("1h", result.interval());
-        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00+09:00", 100, 105, 99, 103, 16.0)),
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00:00+09:00", 100, 105, 99, 103, 16.0)),
                 result.points());
         assertEquals("not_connected", tossClient("", "").prices("KRX:005930", "KRX", "005930", "1m", null, null).reasonCode());
     }
