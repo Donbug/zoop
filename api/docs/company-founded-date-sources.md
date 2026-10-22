@@ -1,9 +1,9 @@
-| NASDAQ:AMZN | (비움) | [Amazon 1997년 10-K](https://www.annualreports.com/HostedData/AnnualReportArchive/a/NASDAQ_AMZN_1997.pdf)와 이후 10-K는 "incorporated in July 1994"까지만 밝힘. 일자 없음. || NASDAQ:META | 2004-07-29 | [Meta 정관(SEC 첨부)](https://www.sec.gov/Archives/edgar/data/1326801/000119312512325997/d371464dex31.htm)의 최초 설립증서 접수일(TheFacebook, Inc.). 정식 법인명 기준이며 Facebook 공개일 2004-02-04와 구분. || NASDAQ:MSFT | (비움) | Microsoft 공식 자료([Facts About Microsoft](https://news.microsoft.com/facts-about-microsoft/), 연차보고서)는 1975년만 밝힘. 4월 4일은 기념일로 쓰이나 설립일로 명시한 공식 문장을 찾지 못함. || ORG:ANTHROPIC | (비움) | 공식 원문에서 일자를 확인하지 못함. LEI·기업 DB에 2021-01-26이 있으나 회사 작성 원문이 아니어서 사용하지 않음. |# 기업 카탈로그 해외 기업 설립일
+| NASDAQ:AMZN | 1996-05-28 | [Amazon 정관(SEC 첨부)](https://www.sec.gov/Archives/edgar/data/1018724/000110465922065872/tm2215904d1_ex3-1.htm)의 최초 설립증서 접수일. 현재 법인 Amazon.com, Inc.(Delaware) 기준. 10-K는 1994년 Washington 설립만 밝히고 일자가 없어 사용하지 않음. |
 
-확인일: 2026-10-22. 대상: `src/main/resources/company/demo-companies.json`의 해외 기업 15곳. 그중 공식 자료로 일자를 확인한 12곳만 채우고 Amazon·Microsoft·Anthropic은 비운다.
+확인일: 2026-10-22. 대상: `src/main/resources/company/demo-companies.json`의 해외 기업 15곳. 그중 공식 자료로 일자를 확인한 13곳만 채우고 Microsoft·Anthropic은 비운다.
 기업 상세 D-COM-03 / `getCompany`의 `foundedDate`를 채운다. 연도나 월만 있는 자료를 임의의 일자로 보충하지 않는다.
 
-공식 연혁의 창립일을 사용하되, 별도로 설립된 지주회사인 Alphabet·Broadcom·Arm Holdings는 카탈로그의 정식 법인명에 해당하는 법인의 설립일을 사용했다. OpenAI는 조직의 기원인 OpenAI, Inc. 설립일이며 현재 정식명 OpenAI Group PBC의 전환일이 아니다. 이 필드는 모든 기업의 현재 법인 등기일만을 뜻하지는 않는다.
+공식 연혁의 창립일을 사용하되, 별도로 설립된 지주회사인 Alphabet·Broadcom·Arm Holdings와 사명 변경·재설립을 거친 Meta·Amazon은 카탈로그의 정식 법인명에 해당하는 법인의 설립일을 사용했다. OpenAI는 조직의 기원인 OpenAI, Inc. 설립일이며 현재 정식명 OpenAI Group PBC의 전환일이 아니다. 이 필드는 모든 기업의 현재 법인 등기일만을 뜻하지는 않는다.
 
 | 기업 ID | 설립일 | 근거 및 기준 |
 | --- | --- | --- |
