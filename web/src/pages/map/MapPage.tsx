@@ -6,7 +6,7 @@ import {
 import { mapAppearanceStyles } from '@/components/common/map-appearance-styles';
 import HoldingsSidebar from '@/components/graph/HoldingsSidebar';
 import { companyLogo } from '@/util/company-logo';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import ServiceHeader from '@/components/common/ServiceHeader';
 import GraphCanvas from '@/components/graph/GraphCanvas';
 import GraphIcon from '@/components/graph/GraphIcon';
@@ -71,6 +71,22 @@ function readFilter(value: string | null): PersonalScope {
   return value === 'holdings' || value === 'watchlist' ? value : 'all';
 }
 
+// An empty holdings/watchlist filter does not mean that the member has no stocks.
+// Check the combined scope before applying FS014's market-wide fallback.
+async function hasNoPersonalStocks(
+  graph: Awaited<ReturnType<typeof getGraph>>,
+  filter: PersonalScope,
+) {
+  if (graph.metadata.emptyReason !== 'no_personal_stocks') return false;
+  if (filter === 'all') return true;
+  const combined = await getGraph({
+    mode: 'personal',
+    personalFilter: 'all',
+    depth: 1,
+  });
+  return combined.metadata.emptyReason === 'no_personal_stocks';
+}
+
 // WBS 6.6.21~6.6.23 · D-GRP-01/01b + D-GRP-02/03.
 export default function MapPage() {
   const inherited = useContext(GraphAppearanceContext);
@@ -89,6 +105,7 @@ export default function MapPage() {
 
 function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
   const { params, updateQuery } = useRouteQuery();
+  const navigate = useNavigate();
   // FS065 계측: 메인 지도 노출 1회와 노드 선택. 노출 중 선택 여부는 viewId로 묶는다.
   const viewId = useScreenView('main');
   // 회원 세션의 회원 ID(쿠키 세션). 비회원·세션 없음은 null
@@ -100,6 +117,7 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
   const modeSequence = useRef(0);
   const [switching, setSwitching] = useState<MapMode | null>(null);
   const [transitionNotice, setTransitionNotice] = useState('');
+  const [fallbackCheckFailed, setFallbackCheckFailed] = useState(false);
   const evidenceOpen = useGraphUiStore((state) =>
     Boolean(state.evidenceTarget),
   );
@@ -170,6 +188,53 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
     retry,
     prefetch,
   );
+  useEffect(() => {
+    if (
+      !data ||
+      loading ||
+      error ||
+      requestedMode !== 'personal' ||
+      data.metadata.mode !== 'personal' ||
+      data.metadata.personalFilter !== filter ||
+      data.metadata.emptyReason !== 'no_personal_stocks' ||
+      companyId
+    )
+      return;
+    let active = true;
+    const sessionRevision = revision;
+    void hasNoPersonalStocks(data, filter)
+      .then((empty) => {
+        if (active) setFallbackCheckFailed(false);
+        if (
+          !active ||
+          !empty ||
+          sessionRevision !== useAuthStore.getState().sessionRevision
+        )
+          return;
+        setTransitionNotice(
+          '보유종목과 관심종목이 없어 시장 전체 지도를 보여드립니다.',
+        );
+        navigate('/?mode=all', { replace: true });
+      })
+      .catch(() => {
+        if (active) {
+          setFallbackCheckFailed(true);
+          setTransitionNotice('내 종목 상태를 확인하지 못했습니다.');
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    data,
+    loading,
+    error,
+    requestedMode,
+    filter,
+    companyId,
+    revision,
+    navigate,
+  ]);
   const appliedMode = data?.metadata.mode ?? 'all';
   useEffect(() => {
     if (
@@ -438,6 +503,7 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
     const request = { mode, personalFilter: nextFilter, depth: 1 as const };
     setSwitching(mode);
     setTransitionNotice('');
+    setFallbackCheckFailed(false);
     try {
       const nextGraph = await getGraph(request);
       if (
@@ -446,11 +512,23 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
           nextGraph.metadata.personalFilter !== nextFilter)
       )
         throw new Error('요청한 모드와 범위가 다른 응답입니다.');
+      const noStocks =
+        mode === 'personal' &&
+        (await hasNoPersonalStocks(nextGraph, nextFilter));
       if (
         sequence !== modeSequence.current ||
         sessionRevision !== useAuthStore.getState().sessionRevision
       )
         return;
+      if (noStocks) {
+        setSwitching(null);
+        setFallbackCheckFailed(false);
+        setTransitionNotice(
+          '보유종목과 관심종목이 없어 시장 전체 지도를 보여드립니다.',
+        );
+        if (appliedMode !== 'all') navigate('/?mode=all', { replace: true });
+        return;
+      }
       const restored = restoreTargets(saved, nextGraph);
       prefetch.current = {
         key: graphRequestKey(request, token),
@@ -890,6 +968,17 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                 {transitionNotice && (
                   <p>
                     {transitionNotice}{' '}
+                    {fallbackCheckFailed && (
+                      <button
+                        onClick={() => {
+                          setFallbackCheckFailed(false);
+                          setTransitionNotice('');
+                          setRetry((value) => value + 1);
+                        }}
+                      >
+                        다시 시도
+                      </button>
+                    )}{' '}
                     <button onClick={() => setTransitionNotice('')}>
                       안내 닫기
                     </button>
