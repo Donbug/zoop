@@ -210,6 +210,23 @@ live S2/S3 job은 **서버 운영자가 고정한 것만** 돌아갑니다. 호�
 
 **시험.** `tests/test_handoff_unit.py`(설정 닫힘·allowlist 엄격성·exit·canonical 줄 해석·닫힌 모델을 모든 노드에서 변조·`fieldProvenance`/`withheld`/`fieldVerdicts` 모양 거절과 의미 비판단·결정/사유/span 조합·전달 규칙·예시), `tests/test_handoff_http.py`(실제 uvicorn + 시험 소유 stand-in 명령: 고정 argv·최소 환경·pin·중첩 모르는 필드와 verdict 자유 서술 note·원문 span 키 거절·`fieldProvenance`/verdict 모양 변조·`-1`/`-2`/`-3` 모양 거절·바이트 동일 중계·JS digest·withheld·busy·deadline·동시성·로그), `pipeline_tests/test_handoff_real_cli.py`(실제 `zoop-ai-handoff`와 S3 job 두 개 세계: CLI export와 바이트 동일, 생산자 검증기 통과, issue별 `fieldProvenance`의 동치·닫힘과 verdict의 모양·결속·withheld 재계산을 독립적으로 재확인, 권한 철회·운영자 파일 변경 withheld→복원)는 기본 `service-test`/`service-pipeline-test`에 들어갑니다. 서비스 시험·smoke는 판정을 만들거나 선택에서 유추하지 않으며 실제 verdict 입력은 생산자 fixture가 제공하고, 없으면 빈 `fieldVerdicts`·빈 `withheld`만 확인합니다. 종단 smoke는 `make service-handoff-smoke`(`scripts/handoff_service_smoke.py`, Neo4j 불필요, pipeline 설치가 없으면 skip이 아니라 **실패**)입니다. 생성된 [내부 OpenAPI](../../docs/api/internal-ai-openapi.yaml)가 계약이며 백엔드 사용 주의는 [인수 문서](../../api/docs/GRAPH_READ_HANDOFF.md)에 있습니다.
 
+## 챗봇 모델 단계 (`/internal/v1/chat-stages/{stage}`)
+
+챗봇 오케스트레이터가 모델 단계 하나(`chat-router` 네이티브 Jev, `chat-answer` Luna, `chat-verification` 네이티브 Jev)를 **동기**로 실행하는 다섯 번째 가족이다. scope는 `chat.invoke`이며 설치된 `zoop-ai-chat invoke`만 고정 argv로 실행한다(계약 `zoop-ai-chat-1`, 규칙은 [AI 런타임 준비 §11](../../docs/development/ai-runtime-setup.md)). 아래 그룹이 없으면 인증 뒤 409 `execution_unavailable`이다.
+
+| 변수 | 규칙 |
+|---|---|
+| `ZOOP_AI_SERVICE_CHAT_COMMAND` | 설치된 `zoop-ai-chat`의 절대 경로(실행 가능) |
+| `ZOOP_AI_CHAT_STATE_DIR` | 호출 원장(`chat.sqlite3`) 디렉터리. 없으면 0700으로 만든다(부모는 있어야 함). 서비스·worker·앱 상태와 겹치면 거부 |
+| `ZOOP_AI_SERVICE_CHAT_GRANTS` | 운영자 챗봇 grant registry(`schemaVersion: zoop-ai-chat-1`). S1 registry와 별도 |
+| `ZOOP_AI_SERVICE_CHAT_REPLAY` | 선택. authored replay fixture. 없으면 `mode=replay`는 409 `execution_unavailable` |
+| 챗봇 live | `ZOOP_AI_CHAT_LIVE_ENABLED=1`과 양수 `ZOOP_AI_CHAT_MAX_CALLS`가 모두 있을 때만 이 둘과 `ZOOP_AI_API_KEY`·`TYPESAFE_API_KEY`가 **챗봇 child에만** 전달된다. 모델·endpoint 이름(`ZOOP_AI_CHAT_ANSWER_MODEL`·`_REASONING_EFFORT`, `ZOOP_AI_CHAT_JEV_MODEL`, `ZOOP_AI_BASE_URL`, `TYPESAFE_BASE_URL`)은 항상 전달된다. S1·파이프라인 게이트는 이 child를 열지 않는다 |
+
+- 본문은 `StageRequest`(`schemaVersion`, `invocationId`, `stage`, `mode`, `input`)이고 `Idempotency-Key`는 `invocationId`와 같아야 하며 경로의 stage와 본문 stage가 같아야 한다. child는 `<principal>:<invocationId>`를 받으므로 principal끼리 원장 행을 공유하지 않는다.
+- **200**은 stage 결과다. `status=failed`도 200이며 `failure.sent`·`failure.unknown`이 송신 여부와 결과 불명을 말한다. **502/504 `stage_outcome_unknown`**은 child가 보냈을 수 있다는 뜻이므로 그 invocation을 다시 보내지 않는다. **503**(`runtime_unavailable`, `service_busy`, `service_configuration_invalid`)은 보내지 않았다는 뜻이다.
+- 동시 child 4개, 슬롯을 1초 안에 얻지 못하면 503 `service_busy`. child 기한은 stage 상한 + 3초(라우터 7초, 답변 28초, 검증 9초).
+- 시험: `tests/test_chat_unit.py`(child 없음), `tests/test_chat_http.py`(실제 uvicorn + 기록용 stand-in CLI). 실제 worker CLI는 `ai/worker/tests/test_chat_stages.py`.
+
 ## 네트워크와 한계
 
 - 서비스는 `127.0.0.1`에만 묻습니다. 운영에서는 같은 호스트/네임스페이스의 HTTPS reverse proxy가 TLS, 본문 2,000,000B 상한, `Authorization` 비로깅을 맡고 App SG에서만 접근되게 해야 합니다. **이는 가정이며 관측·배포한 사실이 없습니다**(WBS 6.11.2/8의 실관측 과제).
