@@ -170,7 +170,7 @@ function MemberDetail({ memberId }: { memberId: string }) {
             />
             <Metric
               label="가상 보유 종목"
-              value={`${count(data.holdingCount)}개`}
+              value={countWith(data.holdingCount, '개')}
               detail={
                 data.accountConnected ? '가상 계좌 연결됨' : '가상 계좌 없음'
               }

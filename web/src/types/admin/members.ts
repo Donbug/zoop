@@ -11,6 +11,8 @@ export type MemberRow = {
   createdAt: string;
   lastActiveAt: string | null;
   status: MemberStatus;
+  /** 상태가 바뀔 때마다 늘어나는 번호. 차단·해제 요청에 화면에서 본 값을 보내 동시 변경을 막는다. */
+  statusRevision: number;
   activity: {
     sessions: number | null;
     graphSelections: number | null;
@@ -30,10 +32,11 @@ export type MemberDetail = {
   onboardingCompleted: boolean;
   tutorialCompleted: boolean;
   watchlistCount: number;
-  holdingCount: number;
+  /** 가상 계좌 원천을 읽지 못하면 null(0과 다름) */
+  holdingCount: number | null;
   accountConnected: boolean;
-  feedbackUp: number;
-  feedbackDown: number;
+  feedbackUp: number | null;
+  feedbackDown: number | null;
   history: {
     at: string;
     action: 'member.block' | 'member.unblock';
