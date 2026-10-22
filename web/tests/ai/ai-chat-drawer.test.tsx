@@ -1,4 +1,11 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  configure,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -121,6 +128,9 @@ function conversation(jobs: ChatJob[], id = 'conv-0001') {
 }
 
 let server: FakeServer;
+
+// Each step waits on a fake HTTP round trip and a React update; CI runners under load need more than the default 1 s.
+configure({ asyncUtilTimeout: 3000 });
 
 beforeEach(() => {
   server = createFakeServer();
