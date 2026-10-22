@@ -282,6 +282,8 @@ jobs:
         run: make service-install
       - name: Real Java client -> ai/service -> zoop-ai replay gate (synthetic in-memory credentials, no model call, no PostgreSQL)
         run: make api-ai-smoke
+      - name: Real Java chat adapters -> ai/service -> zoop-ai-chat replay gate (authored synthetic fixture, no model call, no PostgreSQL)
+        run: make api-ai-chat-smoke
 
 
 

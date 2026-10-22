@@ -15,7 +15,7 @@ API_GRADLE ?= ./api/gradlew -p api --console=plain
 ARTIFACT_DIR ?= /tmp/zoop-release-artifacts
 COMMIT ?=
 
-.PHONY: help projects available-checks config-check tooling-test public-check contracts-check worker-schema-check worker-contracts-check evaluation-verification-check bff-types-check docs-check tokens-check secret-check web-install web-typecheck web-test web-build app-web-install app-web-lint app-web-format-check app-web-build app-web-test bff-install bff-test bff-build worker-install worker-test worker-build pipeline-install pipeline-test pipeline-smoke pipeline-build service-install service-test service-smoke service-pipeline-test service-pipeline-smoke service-openapi-check service-build api-test api-ai-smoke api-build package-artifacts
+.PHONY: help projects available-checks config-check tooling-test public-check contracts-check worker-schema-check worker-contracts-check evaluation-verification-check bff-types-check docs-check tokens-check secret-check web-install web-typecheck web-test web-build app-web-install app-web-lint app-web-format-check app-web-build app-web-test bff-install bff-test bff-build worker-install worker-test worker-build pipeline-install pipeline-test pipeline-smoke pipeline-build service-install service-test service-smoke service-pipeline-test service-pipeline-smoke service-openapi-check service-build api-test api-ai-smoke api-ai-chat-smoke api-build package-artifacts
 help:
 	@$(PYTHON) scripts/repo_checks.py help
 projects:
@@ -144,6 +144,10 @@ api-test:
 	$(API_GRADLE) test
 api-ai-smoke:
 	$(SERVICE_PYTHON) api/scripts/ai_contract_gate.py
+# Real Java ChatModelStages -> ai/service -> installed zoop-ai-chat over an authored replay fixture (needs `make service-install`;
+# no model call, no PostgreSQL; fails, never skips).
+api-ai-chat-smoke:
+	$(SERVICE_PYTHON) api/scripts/ai_chat_gate.py
 .PHONY: api-ai-pipeline-smoke
 api-ai-pipeline-smoke:
 	$(SERVICE_PYTHON) api/scripts/ai_pipeline_gate.py
