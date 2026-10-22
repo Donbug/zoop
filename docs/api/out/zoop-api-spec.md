@@ -1016,15 +1016,15 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## listCompanyDocuments · 기업 맥락 뉴스·공시와 긍부정 조회
 
-기업 맥락 뉴스·공시와 긍부정 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기업 맥락 뉴스·공시와 긍부정 조회. from/to가 있으면 발행 시각 미상 문서를 제외한다. to는 선택된 공개 그래프 버전 안에서 기사·사건·기업 직접 관계의 시점 상한이며 버전 선택은 asOf/graphVersion 규칙을 따른다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `GET /api/v1/companies/{id}/documents` |
 | 권한·우선순위 | 공개 · P1 |
 | 요청 본문 | 없음 |
-| 응답 | 200: [CompanyDocumentsResponse](#schema-companydocumentsresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, INVALID_CURSOR |
+| 응답 | 200: [CompanyDocumentsResponse](#schema-companydocumentsresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, INVALID_CURSOR, VERSION_UNAVAILABLE |
 | FS/NFS | [FS021](../../system/out/feature-FS021.md) · [FS043](../../system/out/feature-FS043.md) · [FS056](../../system/out/feature-FS056.md) · [FS063](../../system/out/feature-FS063.md) · [FS064](../../system/out/feature-FS064.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-COM-02](../../system/out/screen-D-COM-02.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) · [D-SEN-01](../../system/out/screen-D-SEN-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.6.5, 6.6.22, 6.7.6, 6.7.9, 6.5.2, 6.5.6, 6.5.7 |
@@ -1043,9 +1043,9 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 | kind | query | 선택 | string {news, disclosure} |  |
-| round | query | 선택 | string | 브리핑 회차 ID. 회차의 문서와 기업별 긍부정 발행본을 함께 고정한다. |
+| round | query | 선택 | string | 브리핑 회차 ID. 회차의 문서와 기업별 긍부정 발행본을 함께 고정하려는 계약이다. 현재 회차별 그래프 버전 조회가 미구현이므로 전달하면 409 VERSION_UNAVAILABLE을 반환하며 최신 자료로 대체하지 않는다. |
 | from | query | 선택 | string (date) / string (date-time) | 차트·타임라인과 같은 조회 시작 조건. 날짜 또는 오프셋을 포함한 시각이다. |
-| to | query | 선택 | string (date) / string (date-time) | 같은 조회 종료 조건이며 이 시각 이후 공개된 문서는 제외한다. |
+| to | query | 선택 | string (date) / string (date-time) | 같은 조회 종료 조건이며 이 시각 이후 공개된 기사와 아직 공개되지 않은 사건·기업 관계는 제외한다. 날짜는 KST 그날 전체, 오프셋이 있는 시각은 그 시각을 포함한다. 발행 시각 미상 문서는 제외한다. |
 
 <a id="listevents"></a>
 

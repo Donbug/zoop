@@ -1824,7 +1824,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "listCompanyDocuments",
       "severity": "difference",
-      "message": "목표만 118 · BFF만 64 · 형식/필수/권한 변경 19",
+      "message": "목표만 135 · BFF만 55 · 형식/필수/권한 변경 20",
       "source": ""
     },
     {
