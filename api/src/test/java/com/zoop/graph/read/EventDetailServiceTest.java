@@ -229,6 +229,22 @@ class EventDetailServiceTest {
     }
 
     @Test
+    void aMatchingArticleCountNeverLetsAHiddenListedArticleThrough() {
+        // Same count as the visible articles, yet the lists name art-hidden, which this read does not show.
+        String counted = bundle(false).node().toString()
+                .replace("\"knownLineageCount\":0", "\"knownLineageCount\":1")
+                .replace("\"unknownLineageArticles\":[\"" + EUV_ARTICLE + "\"]", "\"unknownLineageArticles\":[\"art-hidden\"]")
+                .replace("\"independentSourceCount\":null", "\"independentSourceCount\":1")
+                .replace("\"duplicateGroups\":[]", "\"duplicateGroups\":[[\"" + EUV_ARTICLE + "\",\"art-hidden\"]]");
+
+        EventDetail.SourceSupportOut support = imported(StrictJson.parseObject(counted))
+                .get(EUV, null, null, null, "r").sourceSupport();
+
+        assertEquals(new EventDetail.SourceSupportOut(1, null, List.of(), null, List.of()), support,
+                "no hidden id in either list, and the counts that may include it are unknown");
+    }
+
+    @Test
     void anUnreadableReceiptIsUnavailable() {
         when(receipts.graphImportBundle(anyString(), anyString()))
                 .thenThrow(new CustomException(ErrorCode.SOURCE_UNAVAILABLE));

@@ -221,13 +221,17 @@ public class EventDetailService {
             g.forEach(m -> members.add(m.asString()));
             groups.add(members);
         });
-        if (support.count("articleCount") == visible.size()) {
-            return new SourceSupportOut(visible.size(), nullable(support, "knownLineageCount"), unknown,
-                    nullable(support, "independentSourceCount"), groups);
-        }
+        // Lists are always cut to the visible articles, so a hidden id never leaves even if the counts happen to match.
         Set<String> shown = new TreeSet<>(visible);
-        return new SourceSupportOut(visible.size(), null, unknown.stream().filter(shown::contains).toList(), null,
-                groups.stream().map(g -> g.stream().filter(shown::contains).toList()).filter(g -> g.size() >= 2).toList());
+        List<String> shownUnknown = unknown.stream().filter(shown::contains).toList();
+        List<List<String>> shownGroups = groups.stream().map(g -> g.stream().filter(shown::contains).toList())
+                .filter(g -> g.size() >= 2).toList();
+        boolean nothingHidden = support.count("articleCount") == visible.size() && shownUnknown.size() == unknown.size()
+                && shownGroups.equals(groups);
+        return nothingHidden
+                ? new SourceSupportOut(visible.size(), nullable(support, "knownLineageCount"), shownUnknown,
+                        nullable(support, "independentSourceCount"), shownGroups)
+                : new SourceSupportOut(visible.size(), null, shownUnknown, null, shownGroups);
     }
 
     private static Integer nullable(Obj node, String name) {
