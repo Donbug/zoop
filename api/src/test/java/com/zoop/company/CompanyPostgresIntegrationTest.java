@@ -154,7 +154,11 @@ class CompanyPostgresIntegrationTest {
                 "SELECT profile->>'foundedDate' FROM companies WHERE id='KRX:005930'", String.class));
         assertEquals("Apple Inc.", jdbc.queryForObject(
                 "SELECT profile->>'legalName' FROM companies WHERE id='NASDAQ:AAPL'", String.class));
-        assertFalse(jdbc.queryForObject("SELECT profile ? 'foundedDate' FROM companies WHERE id='NASDAQ:AAPL'",
+        assertEquals("1976-04-01", jdbc.queryForObject(
+                "SELECT profile->>'foundedDate' FROM companies WHERE id='NASDAQ:AAPL'", String.class));
+        assertEquals(21, jdbc.queryForObject(
+                "SELECT count(*) FROM companies WHERE profile->>'foundedDate' IS NOT NULL", Integer.class));
+        assertFalse(jdbc.queryForObject("SELECT profile ? 'foundedDate' FROM companies WHERE id='NASDAQ:AMZN'",
                 Boolean.class), "an unconfirmed value is left out, not stored as an empty string");
         assertTrue(repository.catalogRevision() > before);
         long after = repository.catalogRevision();

@@ -11,7 +11,7 @@
       "profile": {
         "legalName": "OpenAI Group PBC",
         "representative": "Sam Altman",
-        "foundedDate": null,
+        "foundedDate": "2015-12-08",
         "websiteUrl": "https://openai.com",
         "sector": null
       }
@@ -46,7 +46,7 @@
       "profile": {
         "legalName": "ASML Holding N.V.",
         "representative": "Christophe Fouquet",
-        "foundedDate": null,
+        "foundedDate": "1984-04-01",
         "websiteUrl": "https://www.asml.com",
         "sector": "Special Industry Machinery, NEC"
       }
@@ -66,7 +66,7 @@
       "profile": {
         "legalName": "Taiwan Semiconductor Manufacturing Company Limited",
         "representative": "C.C. Wei",
-        "foundedDate": null,
+        "foundedDate": "1987-02-21",
         "websiteUrl": "https://www.tsmc.com",
         "sector": "Semiconductors & Related Devices"
       }
@@ -106,7 +106,7 @@
       "profile": {
         "legalName": "NVIDIA Corporation",
         "representative": "Jen-Hsun Huang",
-        "foundedDate": null,
+        "foundedDate": "1993-04-05",
         "websiteUrl": "https://www.nvidia.com",
         "sector": "Semiconductors & Related Devices"
       }
@@ -125,7 +125,7 @@
       "profile": {
         "legalName": "Advanced Micro Devices, Inc.",
         "representative": "Lisa T. Su",
-        "foundedDate": null,
+        "foundedDate": "1969-05-01",
         "websiteUrl": "https://www.amd.com",
         "sector": "Semiconductors & Related Devices"
       }
@@ -144,7 +144,7 @@
       "profile": {
         "legalName": "Apple Inc.",
         "representative": "John Ternus",
-        "foundedDate": null,
+        "foundedDate": "1976-04-01",
         "websiteUrl": "https://www.apple.com",
         "sector": "Electronic Computers"
       }
@@ -183,7 +183,7 @@
       "profile": {
         "legalName": "Micron Technology, Inc.",
         "representative": "Sanjay Mehrotra",
-        "foundedDate": null,
+        "foundedDate": "1978-10-05",
         "websiteUrl": "https://www.micron.com",
         "sector": "Semiconductors & Related Devices"
       }
@@ -261,7 +261,7 @@
       "profile": {
         "legalName": "Meta Platforms, Inc.",
         "representative": "Mark Zuckerberg",
-        "foundedDate": null,
+        "foundedDate": "2004-07-29",
         "websiteUrl": "https://www.meta.com",
         "sector": "Services-Computer Programming, Data Processing, Etc."
       }
@@ -401,7 +401,7 @@
       "profile": {
         "legalName": "Alphabet Inc.",
         "representative": "Sundar Pichai",
-        "foundedDate": null,
+        "foundedDate": "2015-07-23",
         "websiteUrl": "https://abc.xyz",
         "sector": "Services-Computer Programming, Data Processing, Etc."
       }
@@ -420,7 +420,7 @@
       "profile": {
         "legalName": "Intel Corporation",
         "representative": "Lip-Bu Tan",
-        "foundedDate": null,
+        "foundedDate": "1968-07-18",
         "websiteUrl": "https://www.intel.com",
         "sector": "Semiconductors & Related Devices"
       }
@@ -439,7 +439,7 @@
       "profile": {
         "legalName": "Broadcom Inc.",
         "representative": "Hock E. Tan",
-        "foundedDate": null,
+        "foundedDate": "2018-01-17",
         "websiteUrl": "https://www.broadcom.com",
         "sector": "Semiconductors & Related Devices"
       }
@@ -459,7 +459,7 @@
       "profile": {
         "legalName": "Arm Holdings plc",
         "representative": "Rene Haas",
-        "foundedDate": null,
+        "foundedDate": "2018-04-09",
         "websiteUrl": "https://www.arm.com",
         "sector": "Semiconductors & Related Devices"
       }
