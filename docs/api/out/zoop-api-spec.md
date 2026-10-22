@@ -1043,7 +1043,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 | kind | query | 선택 | string {news, disclosure} |  |
-| round | query | 선택 | string | 브리핑 회차 ID. 회차의 문서와 기업별 긍부정 발행본을 함께 고정하려는 계약이다. 현재 회차별 그래프 버전 조회가 미구현이므로 전달하면 409 VERSION_UNAVAILABLE을 반환하며 최신 자료로 대체하지 않는다. |
+| round | query | 선택 | string | 브리핑 회차 ID. 회차가 고정한 버전·마감 시각과 선정 이슈 범위의 문서만 반환한다. cursor도 회차·버전·시각에 결속하며 다른 회차로 재사용하면 INVALID_CURSOR다. 현재 접근 권한·정확 인용을 재확인하고 최신 문서나 새 분석으로 대체하지 않는다. 재구성 자료는 metadata.source=briefing_reconstructed_graph로 구분한다. |
 | from | query | 선택 | string (date) / string (date-time) | 차트·타임라인과 같은 조회 시작 조건. 날짜 또는 오프셋을 포함한 시각이다. |
 | to | query | 선택 | string (date) / string (date-time) | 같은 조회 종료 조건이며 이 시각 이후 공개된 기사와 아직 공개되지 않은 사건·기업 관계는 제외한다. 날짜는 KST 그날 전체, 오프셋이 있는 시각은 그 시각을 포함한다. 발행 시각 미상 문서는 제외한다. |
 
@@ -1115,7 +1115,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getEvidence · 원문 인용과 기업별 긍부정 조회
 
-원문 인용과 기업별 긍부정 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+원문 인용 조회. round를 지정하면 해당 회차의 버전·마감 시각과 선정 이슈 범위를 공통 reader에서 고정한다. 원래 그래프의 인용은 선택 버전의 import receipt·정확 span·현재 source grant를 검사한다. 로컬 재구성 그래프의 인용은 보존된 회차 상세·원문 버전·정확 span·현재 발행 권한을 검사하고 metadata.source=briefing_reconstructed_graph로 구분한다. 현재 기업별 감성 판정은 생성하지 않으며 companyId 지정 시 해당 섹션은 unavailable로 안내한다. 최신 그래프나 최신 문서로 대체하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |

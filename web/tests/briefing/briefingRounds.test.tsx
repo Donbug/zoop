@@ -228,7 +228,7 @@ describe('D-BRF-04 회차 기준 지도 (FS032·FS035, getBriefingGraphBasis)', 
     expect(screen.getByText('2026-09-17 퇴근 브리핑 기준 그래프')).toBeTruthy();
     expect(
       await screen.findByText(
-        '발행 당시의 관계·근거 · 핵심 이슈 1개 · 관련 기업 1개 · 데이터 기준 2026-09-17 18:10 KST · 버전 v1 · 정정 1건은 브리핑에서 확인',
+        '발행 당시의 관계·근거 · 핵심 이슈 1개 · 브리핑에 기록된 기업 1개 · 데이터 기준 2026-09-17 18:10 KST · 버전 v1 · 정정 1건은 브리핑에서 확인',
       ),
     ).toBeTruthy();
     expect(

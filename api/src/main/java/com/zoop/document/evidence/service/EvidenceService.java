@@ -129,17 +129,24 @@ public class EvidenceService {
                 throw new CustomException(ErrorCode.INVALID_REQUEST);
             }
         }
-        if (round != null) {
-            // Briefing rounds pin no graph version yet: refused for every kind of evidence, before any lookup.
-            throw new CustomException(ErrorCode.VERSION_UNAVAILABLE);
-        }
-        if (!EVIDENCE_ID.matcher(id).matches()) {
+        if (id == null || id.isBlank() || id.length() > 256
+                || (round == null && !EVIDENCE_ID.matcher(id).matches())) {
             throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
         }
         Instant now = clock.instant();
         Instant pinnedAt = requestedAsOf;
         try {
-            return transaction.execute(status -> dispatch(id, graphVersion, pinnedAt, companyId, requestId, now, false));
+            return transaction.execute(status -> {
+                if (round == null) return dispatch(id, graphVersion, pinnedAt, companyId, requestId, now, false);
+                var selected = graph.readRound(round, graphVersion, pinnedAt, id, companyId, requestId);
+                if (selected.preserved() != null) return selected.preserved();
+                var row = evidence.findEvidence(id).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+                var verification = row.verificationArtifactId() == null ? null
+                        : registry.findArtifact(row.verificationArtifactId()).orElse(null);
+                if (verification == null || !GRAPH_RECEIPT.equals(verification.kind()))
+                    throw new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE);
+                return serveGraph(row, companyId, requestId, now, selected.graph());
+            });
         } catch (DataAccessException | TransactionException error) {
             log.warn("Evidence read failed in the database (cause={}, requestId={})", error.getClass().getSimpleName(), requestId);
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, error);
@@ -204,6 +211,17 @@ public class EvidenceService {
             return false;
         } catch (DataAccessException | TransactionException unverifiable) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, unverifiable);
+        }
+    }
+
+    public boolean shownNow(String id, String round, String graphVersion, Instant asOf, String requestId) {
+        if (round == null) return shownNow(id, graphVersion, asOf, requestId);
+        try {
+            read(id, round, graphVersion, asOf == null ? null : asOf.toString(), null, requestId);
+            return true;
+        } catch (CustomException failure) {
+            if (failure.getErrorCode() == ErrorCode.SOURCE_UNAVAILABLE) throw failure;
+            return false;
         }
     }
 
@@ -309,6 +327,11 @@ public class EvidenceService {
             Instant now) {
         // A selector failure keeps its own status: 409 unavailable or staged, 422 inconsistent, 503 unreadable snapshot.
         GraphEvidence found = graph.read(graphVersion, asOf, row.id());
+        return serveGraph(row, companyId, requestId, now, found);
+    }
+
+    private EvidenceResponse serveGraph(EvidenceView row, String companyId, String requestId, Instant now,
+            GraphEvidence found) {
         ArticleRow article;
         VersionRow version;
         try {

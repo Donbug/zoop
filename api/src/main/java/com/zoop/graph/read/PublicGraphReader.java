@@ -37,17 +37,20 @@ public class PublicGraphReader {
         PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot,
                 selected.asOfRequested() ? selected.asOf() : null, exclusions.current(),
                 selected.briefing() != null && selected.briefing().reconstruction() != null);
-        DisplayGraph display = DisplayGraph.of(visible);
         var basis = selected.briefing();
         if (basis != null) {
-            if (!display.issues.keySet().containsAll(basis.keyIssueIds())
-                    || !display.companies.keySet().containsAll(basis.companyIds()))
+            if (!visible.issues().stream().map(PublicGraphSnapshot.Issue::issueId).toList().containsAll(basis.keyIssueIds())
+                    || !visible.companies().stream().map(PublicGraphSnapshot.Company::companyId).toList().containsAll(basis.companyIds()))
                 throw new BriefingGraphUnavailableException("briefing_targets_unavailable");
-            basis.issueCompanies().forEach((issue, companies) -> {
-                if (!display.issueCompanies.getOrDefault(issue, java.util.Set.of()).containsAll(companies))
+            for (var entry : basis.issueCompanies().entrySet()) {
+                if (!visible.relations().stream().filter(r -> r.source().equals(entry.getKey())
+                        && DisplayGraph.COMPANY_LINKS.contains(r.relationType())).map(PublicGraphSnapshot.Relation::target)
+                        .toList().containsAll(entry.getValue()))
                     throw new BriefingGraphUnavailableException("briefing_targets_unavailable");
-            });
+            }
+            // Restrict the shared snapshot BEFORE deriving edges or serving any detail consumer.
+            visible = GraphSnapshotFilter.briefing(visible, basis);
         }
-        return new Pinned(selected, display);
+        return new Pinned(selected, DisplayGraph.of(visible));
     }
 }

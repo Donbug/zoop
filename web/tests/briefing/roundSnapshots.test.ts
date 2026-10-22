@@ -3,7 +3,7 @@ import { getGraph } from '@/apis/graph/graph';
 import { getEvent } from '@/apis/graph/events';
 import { getEvidence } from '@/apis/evidence/evidence';
 import { getRelation } from '@/apis/graph/relations';
-import { getCompany } from '@/apis/graph/companies';
+import { getCompany, getCompanyDocuments } from '@/apis/graph/companies';
 import { getCompanyIssueImpact } from '@/apis/graph/impact';
 import { createFakeServer, json } from '../support/fakeServer';
 const context = {
@@ -171,3 +171,28 @@ it.each(consumers)(
     await expect(load()).rejects.toThrow();
   },
 );
+
+// D-GRP-03: historical company documents never take the development mock or current version.
+it('pins company documents to the round even in development mock mode', async () => {
+  const server = createFakeServer();
+  server.on('GET', '/api/v1/companies/:id/documents', () =>
+    json({ items: [], nextCursor: null, metadata }),
+  );
+  expect((await getCompanyDocuments('fixture', context)).items).toEqual([]);
+  const query = server.calls('GET', '/api/v1/companies/:id/documents')[0].query;
+  expect(query.get('round')).toBe(context.round);
+  expect(query.get('graphVersion')).toBe(context.graphVersion);
+  expect(query.get('asOf')).toBe(context.asOf);
+});
+it('rejects current documents returned for a historical round', async () => {
+  const server = createFakeServer();
+  server.on('GET', '/api/v1/companies/:id/documents', () =>
+    json({
+      items: [{ id: 'newest' }],
+      metadata: { ...metadata, graphVersion: 'newest' },
+    }),
+  );
+  await expect(getCompanyDocuments('fixture', context)).rejects.toThrow(
+    '버전·기준 시점',
+  );
+});

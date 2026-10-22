@@ -16,4 +16,7 @@ public record SelectedGraphVersion(GraphVersionRecord version, Instant asOf, boo
         Objects.requireNonNull(version, "version");
         Objects.requireNonNull(asOf, "asOf");
     }
+
+    public boolean reconstructed() { return briefing != null && briefing.reconstruction() != null; }
+    public String source() { return reconstructed() ? "briefing_reconstructed_graph" : "public_graph_snapshot"; }
 }

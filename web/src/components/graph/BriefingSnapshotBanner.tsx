@@ -55,7 +55,7 @@ export default function BriefingSnapshotBanner({
       .filter(Boolean)
       .join(' · ');
   else
-    detail = `${data?.graphOrigin === 'reconstructed' ? '저장된 발행 자료로 재구성' : '발행 당시의 관계·근거'} · 핵심 이슈 ${data?.keyIssueIds.length ?? 0}개 · 관련 기업 ${data?.companyIds.length ?? 0}개 · 데이터 기준 ${briefingTime(data?.dataAsOf ?? null)} · 버전 ${data?.graphVersion ?? '미확인'}${
+    detail = `${data?.graphOrigin === 'reconstructed' ? '저장된 발행 자료로 재구성' : '발행 당시의 관계·근거'} · 핵심 이슈 ${data?.keyIssueIds.length ?? 0}개 · 브리핑에 기록된 기업 ${data?.companyIds.length ?? 0}개 · 데이터 기준 ${briefingTime(data?.dataAsOf ?? null)} · 버전 ${data?.graphVersion ?? '미확인'}${
       data?.correctionCount
         ? ` · 정정 ${data.correctionCount}건은 브리핑에서 확인`
         : ''

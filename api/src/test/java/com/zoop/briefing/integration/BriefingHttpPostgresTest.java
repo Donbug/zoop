@@ -67,6 +67,8 @@ class BriefingHttpPostgresTest {
         properties.add("spring.flyway.default-schema", () -> SCHEMA);
         properties.add("spring.jpa.properties.hibernate.default_schema", () -> SCHEMA);
         properties.add("zoop.document-read.grants", () -> GRANTS.toString());
+        properties.add("zoop.document-read.artifact-root", () -> GRAPH_ROOT.toString());
+        properties.add("zoop.document-read.ingestion-sources", () -> GRAPH_ROOT.resolve("sources.json").toString());
         properties.add("zoop.graph.snapshot.source", () -> "artifact");
         properties.add("zoop.graph.snapshot.artifact-root", () -> GRAPH_ROOT.toString());
     }
@@ -82,11 +84,11 @@ class BriefingHttpPostgresTest {
         jdbc.execute("TRUNCATE TABLE briefing_changes, briefing_rounds RESTART IDENTITY CASCADE");
         jdbc.execute("DELETE FROM graph_activations");
         jdbc.execute("DELETE FROM graph_versions");
-        jdbc.update("DELETE FROM evidence WHERE id LIKE 'brf-test-%'");
+        jdbc.update("DELETE FROM evidence WHERE article_id LIKE 'brf-test-%'");
         jdbc.update("UPDATE articles SET current_version=NULL WHERE id LIKE 'brf-test-%'");
         jdbc.update("DELETE FROM article_versions WHERE article_id LIKE 'brf-test-%'");
         jdbc.update("DELETE FROM articles WHERE id LIKE 'brf-test-%'");
-        jdbc.update("DELETE FROM artifacts WHERE id LIKE 'brf-test-%'");
+        jdbc.update("DELETE FROM artifacts WHERE id LIKE 'brf-test-%' OR id LIKE 'artifact-receipt-gv-%'");
         jdbc.update("DELETE FROM companies WHERE id LIKE 'brf-test-%'");
         jdbc.execute(sql);
     }
@@ -101,9 +103,9 @@ class BriefingHttpPostgresTest {
             }
         }
         Files.deleteIfExists(GRANTS);
-        Files.deleteIfExists(GRAPH_ROOT.resolve("graph/synthetic.json"));
-        Files.deleteIfExists(GRAPH_ROOT.resolve("graph"));
-        Files.deleteIfExists(GRAPH_ROOT);
+        try (var files = Files.walk(GRAPH_ROOT)) {
+            for (Path file : files.sorted(java.util.Comparator.reverseOrder()).toList()) Files.deleteIfExists(file);
+        }
     }
 
     @Test
@@ -297,6 +299,63 @@ class BriefingHttpPostgresTest {
         assertEquals(422, get(query + "&asOf=2026-10-16T00:20:00Z", "wrong-cutoff").status());
         Files.writeString(GRANTS, resource("grants.json").replace("\"enabled\": true", "\"enabled\": false"));
         assertEquals(503, get(query, "direct-round-grant-revoked").status());
+    }
+
+    @Test
+    void originalRoundGraphRelationEvidenceAndDocumentsUseThePinnedReceiptOverHttp() throws Exception {
+        String version = "gv-" + com.zoop.common.json.Canonical.sha256("briefing-round-http");
+        String evidenceId = "ev-" + "7".repeat(64);
+        loadFixture(resource("fixture.sql").replace("synthetic-graph-v1", version).replace("brf-test-evidence", evidenceId));
+        byte[] snapshot = resource("graph-snapshot.json").replace("synthetic-graph-v1", version)
+                .replace("brf-test-evidence", evidenceId).getBytes(StandardCharsets.UTF_8);
+        Files.write(GRAPH_ROOT.resolve("graph/synthetic.json"), snapshot);
+        Files.setPosixFilePermissions(GRAPH_ROOT.resolve("graph/synthetic.json"), java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+        String digest = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(snapshot));
+        jdbc.update("INSERT INTO artifacts(id,kind,storage_uri,sha256,bytes,media_type,created_at) VALUES ('brf-test-graph','graph_snapshot','artifact-root:graph/synthetic.json',?,?,'application/json','2026-10-15T09:00:00Z')", digest, snapshot.length);
+        jdbc.update("INSERT INTO graph_versions(id,sequence,kind,created_at,published_at,created_by,source_label,issue_count,relation_count,article_count,snapshot_artifact_id,review_revision,active) VALUES (?,1,'snapshot','2026-10-15T09:00:00Z','2026-10-15T09:00:00Z','system','synthetic',1,1,1,'brf-test-graph',1,true)", version);
+        jdbc.update("INSERT INTO graph_activations(version_id,action,actor_kind,pointer_changed,admin_email_snapshot,activated_at) VALUES (?,'publish','system',true,'system','2026-10-15T09:00:00Z')", version);
+        String receipt = """
+                {"schemaVersion":"zoop-graph-handoff-import-receipt-1","handoffId":"briefing-round-http","bundle":{"articles":[
+                {"articleId":"brf-test-document","articleVersion":"synthetic-v1","observations":[
+                {"sourceId":"authored-replay","grant":{"grantId":"round-read-grant","revision":"r1"}}]}]}}
+                """;
+        try (var files = com.zoop.artifact.storage.ArtifactFileStore.at(GRAPH_ROOT).open()) {
+            var file = files.put("verification_receipt", version + ".json", receipt.getBytes(StandardCharsets.UTF_8));
+            jdbc.update("INSERT INTO artifacts(id,kind,storage_uri,sha256,bytes,media_type,created_at) VALUES (?,'verification_receipt',?,?,?,'application/json','2026-10-15T09:00:00Z')", "artifact-receipt-" + version, file.uri(), file.sha256(), file.bytes());
+        }
+        String sources = """
+                {"schemaVersion":"zoop-ingestion-s2-1","revision":"r1","sources":[{"sourceId":"authored-replay","adapter":"authored-files",
+                "inputRoot":"/srv/zoop/test","allowedHosts":["example.invalid"],"scopes":[{"scopeId":"body","selection":"authored test",
+                "initialCursor":null,"articleXPath":null,"timestampLimitations":["synthetic"]}],"grant":{"grantId":"round-read-grant",
+                "revision":"r1","sourceId":"authored-replay","enabled":true,"rights":"known","allowedOperations":["read","store","quote-display"],
+                "recipients":[],"purposes":[],"evidence":["authored fixture"],"expiresAt":null}}]}
+                """;
+        Files.writeString(GRAPH_ROOT.resolve("sources.json"), sources);
+        String original = publishedPayload();
+        var graph = get("/api/v1/graph?round=" + ROUND, "round-imported-graph");
+        assertEquals(200, graph.status(), graph.body());
+        String edge = graph.json().path("edges").get(0).path("id").asText();
+        var relation = get("/api/v1/graph/edges/" + edge + "?round=" + ROUND, "round-relation");
+        assertEquals(200, relation.status(), relation.body());
+        assertEquals(evidenceId, relation.json().path("evidenceIds").get(0).asText());
+        String query = "?round=" + ROUND + "&graphVersion=" + version + "&asOf=2026-10-15T08:30:00Z";
+        var citation = get("/api/v1/evidence/" + evidenceId + query, "round-citation");
+        assertEquals(200, citation.status(), citation.body());
+        assertEquals("합성시험", citation.json().path("quote").asText());
+        assertEquals(version, citation.json().at("/metadata/graphVersion").asText());
+        assertEquals("brf-test-event", citation.json().path("eventIds").get(0).asText());
+        var documents = get("/api/v1/companies/brf-test-company/documents" + query + "&limit=3", "round-documents");
+        assertEquals(200, documents.status(), documents.body());
+        assertEquals(1, documents.json().path("items").size());
+        assertEquals("brf-test-event", documents.json().at("/items/0/events/0/eventId").asText());
+        assertEquals(409, get("/api/v1/evidence/" + evidenceId + "?graphVersion=" + version + "&asOf=2026-10-15T08:30:00Z", "no-round").status(),
+                "the import was activated AFTER cutoff; removing round cannot select it");
+        assertEquals(422, get("/api/v1/evidence/" + evidenceId + query.replace(version, "other"), "wrong-round-version").status());
+        Files.writeString(GRAPH_ROOT.resolve("sources.json"), sources.replace("\"enabled\":true", "\"enabled\":false"));
+        assertEquals("EVIDENCE_UNAVAILABLE", get("/api/v1/evidence/" + evidenceId + query, "revoked-quote").json().at("/error/code").asText());
+        Files.writeString(GRAPH_ROOT.resolve("sources.json"), sources);
+        assertEquals(200, get("/api/v1/evidence/" + evidenceId + query, "restored-quote").status());
+        assertEquals(original, publishedPayload(), "all reads preserve the original publication");
     }
 
     @Test
@@ -503,6 +562,9 @@ class BriefingHttpPostgresTest {
         try {
             Path root = Files.createTempDirectory("zoop-briefing-graph-").toRealPath();
             Files.createDirectory(root.resolve("graph"));
+            Files.createDirectory(root.resolve("verification_receipt"));
+            Files.setPosixFilePermissions(root.resolve("verification_receipt"), java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+            Files.writeString(root.resolve("sources.json"), "{}");
             Files.setPosixFilePermissions(root, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
             Files.setPosixFilePermissions(root.resolve("graph"), java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
             return root;
