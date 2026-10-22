@@ -146,16 +146,19 @@ class ChatToolRunnerTest {
         var runner = runner(Map.of(ChatCapability.COMPANY_READ, (scope, request) -> {
             peak.accumulateAndGet(running.incrementAndGet(), Math::max);
             try {
-                // Ignores the timeout's interrupt, as a blocked driver call might: it keeps its slot.
-                while (release.getCount() > 0) Thread.onSpinWait();
+                awaitIgnoringInterrupts(release);
             } finally {
                 running.decrementAndGet();
             }
             return output("v1", List.of());
         }), Duration.ofMillis(400), Duration.ofMillis(300));
 
-        var results = runner.runStage(run("v1", null), control, 1, Collections.nCopies(6, request("company.read")));
-        release.countDown();
+        List<ChatToolResult> results;
+        try {
+            results = runner.runStage(run("v1", null), control, 1, Collections.nCopies(6, request("company.read")));
+        } finally {
+            release.countDown();
+        }
 
         assertEquals(4, peak.get());
         assertEquals(6, results.size());
@@ -246,23 +249,24 @@ class ChatToolRunnerTest {
         var release = new CountDownLatch(1);
         var later = new AtomicInteger();
         var runner = runner(Map.of(ChatCapability.COMPANY_READ, (scope, request) -> {
-            // A read that ignores interruption, as a blocked driver call might.
-            while (release.getCount() > 0) Thread.onSpinWait();
+            awaitIgnoringInterrupts(release);
             return output("v1", List.of());
         }, ChatCapability.ISSUE_READ, (scope, request) -> {
             later.incrementAndGet();
             return output("v1", List.of());
         }), Duration.ofMillis(400), Duration.ofMillis(150), ChatToolRunner.RECORD_GRACE, 4);
 
-        var stuck = runner.runStage(run("v1", null), new RecordingControl(Duration.ofSeconds(60)), 1,
-                Collections.nCopies(4, request("company.read")));
-        assertTrue(stuck.stream().allMatch(r -> ChatToolRunner.TIMEOUT.equals(r.error())));
-        var blocked = runner.runStage(run("v1", null), new RecordingControl(Duration.ofSeconds(60)), 1,
-                List.of(request("issue.read")));
-        assertEquals(ChatToolRunner.TIMEOUT, blocked.getFirst().error(), "the four stuck reads still hold the slots");
-        assertEquals(0, later.get());
-
-        release.countDown();
+        try {
+            var stuck = runner.runStage(run("v1", null), new RecordingControl(Duration.ofSeconds(60)), 1,
+                    Collections.nCopies(4, request("company.read")));
+            assertTrue(stuck.stream().allMatch(r -> ChatToolRunner.TIMEOUT.equals(r.error())));
+            var blocked = runner.runStage(run("v1", null), new RecordingControl(Duration.ofSeconds(60)), 1,
+                    List.of(request("issue.read")));
+            assertEquals(ChatToolRunner.TIMEOUT, blocked.getFirst().error(), "the four stuck reads still hold the slots");
+            assertEquals(0, later.get());
+        } finally {
+            release.countDown();
+        }
         var free = runner.runStage(run("v1", null), new RecordingControl(Duration.ofSeconds(60)), 1,
                 List.of(request("issue.read")));
         assertTrue(free.getFirst().succeeded());
@@ -306,6 +310,17 @@ class ChatToolRunnerTest {
         return new ChatRun("job-1", "conv-1", "member-a", 1, "run", List.of(new ChatRun.Turn("job-1", "질문", null, null)),
                 new ChatFrozenContext(List.of(), 0, null, asOf, graphVersion), FrozenSelection.NONE, graphVersion, 0,
                 asOf, Instant.now().plusSeconds(60));
+    }
+
+    /** A read that ignores the timeout's interrupt, as a blocked driver call might, without keeping a CPU busy. */
+    private static void awaitIgnoringInterrupts(CountDownLatch latch) {
+        while (latch.getCount() > 0) {
+            try {
+                latch.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException ignored) {
+                // keeps waiting
+            }
+        }
     }
 
     private static void pause(Duration duration) {
