@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAuthCompletion } from '@/hooks/useAuthCompletion';
 import type { SignupTerm } from '@/types/auth/session';
 import SessionStatus from './SessionStatus';
+import MarkdownContent from '@/components/common/MarkdownContent';
 import {
   authAlert,
   authHeading,
@@ -296,9 +297,13 @@ export default function SignupForm({ social = false }: { social?: boolean }) {
                     <summary className="cursor-pointer py-1">
                       {t.title} 본문 보기
                     </summary>
-                    <p className="mt-1 max-h-[200px] overflow-auto bg-white p-3 whitespace-pre-wrap text-gray-700">
-                      {usable(t) ? t.body : '약관 본문 준비 중'}
-                    </p>
+                    <div className="mt-1 max-h-[200px] overflow-auto bg-white p-3 text-gray-700">
+                      {usable(t) ? (
+                        <MarkdownContent source={t.body!} />
+                      ) : (
+                        '약관 본문 준비 중'
+                      )}
+                    </div>
                   </details>
                 </div>
               ))}
