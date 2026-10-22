@@ -32,8 +32,9 @@ public class AnalysisJobController {
 
     @GetMapping
     @Operation(operationId = "listAnalysisJobs", summary = "분석·수집·재검증 작업 목록 조회")
-    public JobList list(@RequestParam(required = false) String status) {
-        return service.list(status);
+    public JobList list(@RequestParam(required = false) String status, @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit, HttpServletRequest request) {
+        return service.list(principal(request).adminId(), status, cursor, limit);
     }
 
     @GetMapping("/{jobId}")

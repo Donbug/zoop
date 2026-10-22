@@ -29,7 +29,8 @@ public final class AnalysisJobResponse {
     public record JobLock(boolean locked, String jobId, String reason) {
     }
 
-    public record IngestBaseline(String at, String jobId, String outcome, Integer newArticles, int unresolvedFailures) {
+    public record IngestBaseline(String at, String jobId, String outcome, Integer newArticles,
+            Integer unresolvedFailures) {
     }
 
     public record IngestOutcome(String outcome, Integer newArticles, Integer duplicateArticles, String baselineBefore,

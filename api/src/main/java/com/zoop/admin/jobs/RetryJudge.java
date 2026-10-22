@@ -8,10 +8,10 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Whether an administrator may retry a job (OpenAPI {@code RetryState}), judged from the job and the other admin jobs. A retry
- * is a new job with {@code retry_of}; it never resends an AI request on its own. {@code other_running} stays in the contract
- * but is never returned: under the queue policy (ERD v6 section 31) another running job only delays a retry, it does not
- * refuse it.
+ * Whether an administrator may retry a job (OpenAPI {@code RetryState}), judged from the job and the admin jobs related to it
+ * (its retries, later successes on its input). A retry is a new job with {@code retry_of}; it never resends an AI request on its
+ * own. {@code other_running} stays in the contract but is never returned: under the queue policy (ERD v6 section 31) another
+ * running job only delays a retry, it does not refuse it.
  */
 final class RetryJudge {
     /**
@@ -23,8 +23,8 @@ final class RetryJudge {
     private RetryJudge() {
     }
 
-    /** {@code errorCode} is the job's stored {@code error.code}, null when it has none. */
-    static RetryState judge(JobRow job, String errorCode, List<JobRow> adminJobs) {
+    /** {@code errorCode} is the job's stored {@code error.code}, null when it has none; {@code context} may hold other jobs too. */
+    static RetryState judge(JobRow job, String errorCode, List<JobRow> context) {
         switch (job.status()) {
             case "queued", "running" -> {
                 return state(false, "in_progress", "작업이 아직 진행 중입니다.", null);
@@ -36,7 +36,7 @@ final class RetryJudge {
                 // failed or cancelled
             }
         }
-        List<JobRow> retries = adminJobs.stream().filter(j -> job.id().equals(j.retryOf()))
+        List<JobRow> retries = context.stream().filter(j -> job.id().equals(j.retryOf()))
                 .sorted(Comparator.comparing(JobRow::requestedAt).reversed()).toList();
         Optional<JobRow> active = retries.stream()
                 .filter(j -> "queued".equals(j.status()) || "running".equals(j.status())).findFirst();
@@ -48,7 +48,7 @@ final class RetryJudge {
                     retries.get(0).id());
         }
         // The same input succeeded later in another job: retrying this one would only redo that result.
-        Optional<JobRow> successor = adminJobs.stream()
+        Optional<JobRow> successor = context.stream()
                 .filter(j -> !j.id().equals(job.id()) && "succeeded".equals(j.status()) && j.kind().equals(job.kind())
                         && j.input().equals(job.input()) && j.requestedAt().isAfter(job.requestedAt()))
                 .max(Comparator.comparing(JobRow::requestedAt));

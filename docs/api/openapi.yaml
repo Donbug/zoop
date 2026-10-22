@@ -13249,7 +13249,11 @@ components:
             -
               type: "null"
         unresolvedFailures:
-          type: "integer"
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
       type: "object"
       required:
         - "at"
@@ -13257,7 +13261,7 @@ components:
         - "outcome"
         - "newArticles"
         - "unresolvedFailures"
-      description: "The checkpoint the next article-processing run starts from: the start time of the latest run that\nfinished normally, also when it found nothing new. Failed and cancelled runs never move it.\n``unresolved_failures`` counts article files whose latest run failed or was cancelled."
+      description: "The checkpoint the next article-processing run starts from: the start time of the latest run that\nfinished normally, also when it found nothing new. Failed and cancelled runs never move it.\n``unresolved_failures`` counts article files whose latest run failed or was cancelled; null while no\nper-article run record exists (it is never a job count)."
     IngestOutcome:
       properties:
         outcome:

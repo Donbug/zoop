@@ -11,6 +11,12 @@
       "type": "string"
     },
     "query.cursor:required": false,
+    "response:200:application/json.ingest.unresolvedFailures<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.ingest.unresolvedFailures<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.nextCursor": {
       "type": [
         "string",
@@ -334,6 +340,9 @@
       "type": "boolean"
     },
     "response:200:application/json.active<anyOf:0>.paid:required": true,
+    "response:200:application/json.ingest.unresolvedFailures": {
+      "type": "integer"
+    },
     "response:200:application/json.items[].command": {
       "type": "array"
     },

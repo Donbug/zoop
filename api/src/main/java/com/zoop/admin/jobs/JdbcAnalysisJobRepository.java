@@ -34,13 +34,58 @@ public class JdbcAnalysisJobRepository {
     public record IdempotencyRow(String id, String requestHash, String status, Integer responseStatus, String responseBody) {
     }
 
+    /** One page of administrator jobs, newest request first, after the keyset ({@code ix_analysis_jobs_admin_latest}). */
+    public List<JobRow> page(String status, Instant afterAt, String afterId, int limit) {
+        return jdbc.query("SELECT " + COLUMNS + """
+                 FROM analysis_jobs
+                WHERE scope = 'admin'
+                  AND (CAST(:status AS text) IS NULL OR status = :status)
+                  AND (CAST(:afterAt AS timestamptz) IS NULL OR (requested_at, id) < (:afterAt, :afterId))
+                ORDER BY requested_at DESC, id DESC
+                LIMIT :limit
+                """, new MapSqlParameterSource("status", status)
+                .addValue("afterAt", afterAt == null ? null : Timestamp.from(afterAt)).addValue("afterId", afterId)
+                .addValue("limit", limit), JdbcAnalysisJobRepository::row);
+    }
+
+    public Optional<JobRow> adminJob(String id) {
+        return jdbc.query("SELECT " + COLUMNS + " FROM analysis_jobs WHERE id = :id AND scope = 'admin'",
+                new MapSqlParameterSource("id", id), JdbcAnalysisJobRepository::row).stream().findFirst();
+    }
+
+    /** The administrator job holding the run slot, if any ({@code uq_analysis_jobs_admin_running} allows one). */
+    public Optional<JobRow> running() {
+        return jdbc.query("SELECT " + COLUMNS + " FROM analysis_jobs WHERE scope = 'admin' AND status = 'running'",
+                JdbcAnalysisJobRepository::row).stream().findFirst();
+    }
+
+    /** The newest administrator ingest that finished normally: the next run's baseline. */
+    public Optional<JobRow> latestSucceededIngest() {
+        return jdbc.query("SELECT " + COLUMNS + """
+                 FROM analysis_jobs
+                WHERE scope = 'admin' AND kind = 'ingest' AND status = 'succeeded'
+                ORDER BY finished_at DESC, id DESC
+                LIMIT 1
+                """, JdbcAnalysisJobRepository::row).stream().findFirst();
+    }
+
     /**
-     * Every administrator job, newest request first. The retry judgement of one job looks at the others (its retries, a later
-     * success on the same input), so the service reads them together.
-     * shortcut: the whole admin set per request; move to per-job queries (retry_of, same input) once the table is large.
+     * What the retry judgement of {@code jobs} needs, and nothing more: their retries ({@code retry_of}) and, for the failed or
+     * cancelled ones, succeeded jobs of the same kind and input ({@code ix_analysis_jobs_admin_succeeded_input}).
      */
-    public List<JobRow> adminJobs() {
-        return jdbc.query("SELECT " + COLUMNS + " FROM analysis_jobs WHERE scope = 'admin' ORDER BY requested_at DESC, id DESC",
+    public List<JobRow> retryContext(List<JobRow> jobs) {
+        if (jobs.isEmpty()) return List.of();
+        List<JobRow> settled = jobs.stream().filter(j -> "failed".equals(j.status()) || "cancelled".equals(j.status()))
+                .toList();
+        return jdbc.query("SELECT " + COLUMNS + """
+                 FROM analysis_jobs
+                WHERE scope = 'admin'
+                  AND (retry_of IN (:ids)
+                       OR (status = 'succeeded' AND (kind, md5(input::text)) IN (
+                           SELECT k, md5(i::text) FROM unnest(CAST(:kinds AS text[]), CAST(:inputs AS jsonb[])) AS t(k, i))))
+                """, new MapSqlParameterSource("ids", jobs.stream().map(JobRow::id).toList())
+                .addValue("kinds", settled.stream().map(JobRow::kind).toArray(String[]::new))
+                .addValue("inputs", settled.stream().map(JobRow::input).toArray(String[]::new)),
                 JdbcAnalysisJobRepository::row);
     }
 

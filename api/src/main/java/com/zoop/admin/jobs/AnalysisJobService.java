@@ -15,6 +15,7 @@ import com.zoop.admin.jobs.AnalysisJobResponse.LedgerCounts;
 import com.zoop.admin.jobs.AnalysisJobResponse.RunReport;
 import com.zoop.admin.jobs.JdbcAnalysisJobRepository.IdempotencyRow;
 import com.zoop.admin.jobs.JdbcAnalysisJobRepository.JobRow;
+import com.zoop.auth.service.CsrfKeyRing;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.json.Canonical;
@@ -22,6 +23,7 @@ import com.zoop.common.json.StrictJson;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -42,32 +44,51 @@ public class AnalysisJobService {
     static final String RETRY_RULE = "실패하거나 취소된 작업만, 그 작업의 가장 최근 시도에서 재시도할 수 있습니다. 재시도는 새 작업으로 대기열에 들어가며 "
             + "실행 여부가 확인되지 않은 외부 호출은 자동으로 다시 보내지 않습니다.";
     private static final Set<String> STATUSES = Set.of("queued", "running", "succeeded", "failed", "cancelled");
+    private static final int DEFAULT_LIMIT = 50;
+    private static final int MAX_LIMIT = 100;
 
     private final JdbcAnalysisJobRepository repository;
     private final AdminAuditRepository audit;
     private final ObjectMapper mapper;
+    private final CsrfKeyRing keys;
     private final Clock clock;
 
     public AnalysisJobService(JdbcAnalysisJobRepository repository, AdminAuditRepository audit, ObjectMapper mapper,
-            Clock clock) {
+            CsrfKeyRing keys, Clock clock) {
         this.repository = repository;
         this.audit = audit;
         this.mapper = mapper;
+        this.keys = keys;
         this.clock = clock;
     }
 
     @Transactional(readOnly = true)
-    public JobList list(String status) {
+    public JobList list(String adminId, String status, String cursor, Integer requestedLimit) {
         if (status != null && !STATUSES.contains(status)) throw new CustomException(ErrorCode.INVALID_REQUEST);
+        if (requestedLimit != null && (requestedLimit < 1 || requestedLimit > MAX_LIMIT)) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+        var position = JobCursor.decode(mapper, keys, cursor, adminId, status, requestedLimit, MAX_LIMIT);
+        int limit = requestedLimit != null ? requestedLimit : position == null ? DEFAULT_LIMIT : position.limit();
         try {
-            List<JobRow> jobs = repository.adminJobs();
-            List<JobOut> items = jobs.stream().filter(j -> status == null || status.equals(j.status()))
-                    .map(j -> out(j, jobs)).toList();
-            JobOut active = jobs.stream().filter(j -> "running".equals(j.status())).findFirst().map(j -> out(j, jobs))
-                    .orElse(null);
+            List<JobRow> rows = repository.page(status, position == null ? null : position.at(),
+                    position == null ? null : position.id(), limit + 1);
+            boolean hasNext = rows.size() > limit;
+            List<JobRow> page = hasNext ? rows.subList(0, limit) : rows;
+            JobRow running = repository.running().orElse(null);
+            List<JobRow> judged = new ArrayList<>(page);
+            if (running != null) judged.add(running);
+            List<JobRow> context = repository.retryContext(judged);
+            List<JobOut> items = page.stream().map(j -> out(j, context)).toList();
+            JobOut active = running == null ? null : out(running, context);
             JobLock lock = active == null ? new JobLock(false, null, null)
                     : new JobLock(true, active.id(), "다른 관리자 작업이 실행 중입니다. 새 작업은 대기열에서 순서대로 실행됩니다.");
-            return new JobList(items, active, lock, baseline(jobs), RETRY_RULE, null);
+            String nextCursor = null;
+            if (hasNext) {
+                JobRow last = page.get(page.size() - 1);
+                nextCursor = JobCursor.encode(mapper, keys, adminId, status, limit, last.requestedAt(), last.id());
+            }
+            return new JobList(items, active, lock, baseline(), RETRY_RULE, nextCursor);
         } catch (DataAccessException exception) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception);
         }
@@ -76,9 +97,8 @@ public class AnalysisJobService {
     @Transactional(readOnly = true)
     public JobOut get(String id) {
         try {
-            List<JobRow> jobs = repository.adminJobs();
-            return jobs.stream().filter(j -> j.id().equals(id)).findFirst().map(j -> out(j, jobs))
-                    .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+            JobRow job = repository.adminJob(id).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+            return out(job, repository.retryContext(List.of(job)));
         } catch (DataAccessException exception) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception);
         }
@@ -123,8 +143,7 @@ public class AnalysisJobService {
         return idempotent(admin, path, idempotencyKey, id, requestHash("retry", id, reason), 202, JobCreated.class, () -> {
             // The source row lock serialises two retries of the same job; the judge then sees the first one.
             JobRow job = repository.lockAdmin(id).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
-            List<JobRow> jobs = repository.adminJobs();
-            if (!RetryJudge.judge(job, errorCode(job), jobs).allowed()) throw new CustomException(ErrorCode.REVISION_CONFLICT);
+            if (!RetryJudge.judge(job, errorCode(job), repository.retryContext(List.of(job))).allowed()) throw new CustomException(ErrorCode.REVISION_CONFLICT);
             Instant now = clock.instant();
             String newId = "job-" + UUID.randomUUID();
             repository.insertQueued(newId, job.kind(), job.label(), reason, admin.adminId(), now, id, "retry:" + id,
@@ -163,29 +182,28 @@ public class AnalysisJobService {
         }
     }
 
-    private JobOut out(JobRow j, List<JobRow> jobs) {
+    /** {@code context} holds at least the job's retries and later successes on its input (see {@code retryContext}). */
+    private JobOut out(JobRow j, List<JobRow> context) {
         JobError error = read(j.error(), JobError.class);
         Double duration = j.startedAt() == null || j.finishedAt() == null ? null
                 : Duration.between(j.startedAt(), j.finishedAt()).toMillis() / 1000.0;
         return new JobOut(j.id(), j.kind(), j.label(), j.status(), j.reason(), j.requestedBy(), iso(j.requestedAt()),
                 iso(j.startedAt()), iso(j.finishedAt()), duration, j.retryOf(), j.cancelRequested(), j.recovered(),
-                RetryJudge.judge(j, error == null ? null : error.code(), jobs), read(j.ingest(), IngestOutcome.class),
+                RetryJudge.judge(j, error == null ? null : error.code(), context), read(j.ingest(), IngestOutcome.class),
                 read(j.report(), RunReport.class), read(j.flush(), FlushResult.class), error,
                 read(j.ledgerBefore(), LedgerCounts.class), read(j.ledgerAfter(), LedgerCounts.class));
     }
 
     /**
-     * The newest succeeded ingest and the failed or cancelled ingest jobs nobody retried yet. Until the worker exists no job
-     * runs, so this is all null and zero.
+     * The next article run's baseline: the start of the newest ingest that finished normally (OpenAPI {@code IngestBaseline}).
+     * {@code unresolvedFailures} counts article files, which only the worker's per-article records can tell; until they exist
+     * it is null rather than a job count shown as an article count.
      */
-    private IngestBaseline baseline(List<JobRow> jobs) {
-        var latest = jobs.stream().filter(j -> "ingest".equals(j.kind()) && "succeeded".equals(j.status())).findFirst();
-        int unresolved = (int) jobs.stream()
-                .filter(j -> "ingest".equals(j.kind()) && ("failed".equals(j.status()) || "cancelled".equals(j.status())))
-                .filter(j -> jobs.stream().noneMatch(other -> j.id().equals(other.retryOf()))).count();
+    private IngestBaseline baseline() {
+        var latest = repository.latestSucceededIngest();
         IngestOutcome outcome = latest.map(j -> read(j.ingest(), IngestOutcome.class)).orElse(null);
-        return new IngestBaseline(latest.map(j -> iso(j.finishedAt())).orElse(null), latest.map(JobRow::id).orElse(null),
-                outcome == null ? null : outcome.outcome(), outcome == null ? null : outcome.newArticles(), unresolved);
+        return new IngestBaseline(latest.map(j -> iso(j.startedAt())).orElse(null), latest.map(JobRow::id).orElse(null),
+                outcome == null ? null : outcome.outcome(), outcome == null ? null : outcome.newArticles(), null);
     }
 
     private String errorCode(JobRow job) {

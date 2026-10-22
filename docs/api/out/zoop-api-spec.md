@@ -4991,7 +4991,8 @@ same request again never toggles anything.
 
 The checkpoint the next article-processing run starts from: the start time of the latest run that
 finished normally, also when it found nothing new. Failed and cancelled runs never move it.
-``unresolved_failures`` counts article files whose latest run failed or was cancelled.
+``unresolved_failures`` counts article files whose latest run failed or was cancelled; null while no
+per-article run record exists (it is never a job count).
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -4999,7 +5000,7 @@ finished normally, also when it found nothing new. Failed and cancelled runs nev
 | jobId | 필수 | string / null |  |
 | outcome | 필수 | string {collected, empty} / null |  |
 | newArticles | 필수 | integer / null |  |
-| unresolvedFailures | 필수 | integer |  |
+| unresolvedFailures | 필수 | integer / null |  |
 
 <a id="schema-ingestoutcome"></a>
 

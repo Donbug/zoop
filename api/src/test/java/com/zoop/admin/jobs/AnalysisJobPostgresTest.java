@@ -15,6 +15,8 @@ import com.zoop.common.request.RequestIdFilter;
 import jakarta.servlet.http.Cookie;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -77,10 +80,69 @@ class AnalysisJobPostgresTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[?(@.id == '" + failed + "')]").exists())
                 .andExpect(jsonPath("$.items[?(@.id == '" + projection + "')]").doesNotExist())
-                .andExpect(jsonPath("$.retryRule").isNotEmpty())
-                .andExpect(jsonPath("$.nextCursor").isEmpty());
+                .andExpect(jsonPath("$.retryRule").isNotEmpty());
         mvc.perform(get("/api/v1/admin/jobs").param("status", "paused").cookie(login.cookie()))
                 .andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void theListPagesWithASignedCursorAndTheBaselineIsTheNewestNormalIngestStart() throws Exception {
+        String suffix = UUID.randomUUID().toString();
+        Login login = login(suffix);
+        // Requested ten years ahead of now, so these three are the newest succeeded jobs whatever else the shared database
+        // holds, including the same rows from earlier runs (whose "now" was earlier; the rows are one second apart).
+        Instant base = Instant.now().plus(3_650, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS);
+        String oldest = insertAt("succeeded", "ingest", suffix + "-p1", planInput("p1-" + suffix), base);
+        String middle = insertAt("succeeded", "ingest", suffix + "-p2", planInput("p2-" + suffix), base.plusSeconds(1));
+        String newest = insertAt("succeeded", "ingest", suffix + "-p3", planInput("p3-" + suffix), base.plusSeconds(2));
+
+        String first = mvc.perform(get("/api/v1/admin/jobs").param("status", "succeeded").param("limit", "1")
+                        .cookie(login.cookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(newest))
+                .andExpect(jsonPath("$.ingest.jobId").value(newest))
+                .andExpect(jsonPath("$.ingest.at").value(base.plusSeconds(12).toString()))
+                .andExpect(jsonPath("$.ingest.unresolvedFailures").isEmpty())
+                .andReturn().getResponse().getContentAsString();
+        String cursor = JsonPath.read(first, "$.nextCursor");
+        assertNotNull(cursor);
+        String second = mvc.perform(get("/api/v1/admin/jobs").param("status", "succeeded").param("cursor", cursor)
+                        .cookie(login.cookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(middle))
+                .andReturn().getResponse().getContentAsString();
+        String third = JsonPath.read(second, "$.nextCursor");
+        mvc.perform(get("/api/v1/admin/jobs").param("status", "succeeded").param("cursor", third).cookie(login.cookie()))
+                .andExpect(jsonPath("$.items[0].id").value(oldest));
+
+        // A cursor is bound to its filter, its limit and the admin it was issued to.
+        mvc.perform(get("/api/v1/admin/jobs").param("status", "failed").param("cursor", cursor).cookie(login.cookie()))
+                .andExpect(status().isUnprocessableContent());
+        mvc.perform(get("/api/v1/admin/jobs").param("status", "succeeded").param("cursor", cursor).param("limit", "2")
+                        .cookie(login.cookie()))
+                .andExpect(status().isUnprocessableContent());
+        mvc.perform(get("/api/v1/admin/jobs").param("status", "succeeded").param("cursor", cursor)
+                        .cookie(login(suffix + "-other").cookie()))
+                .andExpect(status().isUnprocessableContent());
+        mvc.perform(get("/api/v1/admin/jobs").param("limit", "101").cookie(login.cookie()))
+                .andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void aLaterSuccessOnTheSameInputSupersedesAFailedJobInDetailAndRetry() throws Exception {
+        String suffix = UUID.randomUUID().toString();
+        Login login = login(suffix);
+        String input = planInput("same-" + suffix);
+        Instant at = Instant.now().minusSeconds(3_600);
+        String failed = insertAt("failed", "revalidate", suffix + "-f", input, at);
+        String later = insertAt("succeeded", "revalidate", suffix + "-s", input, at.plusSeconds(60));
+
+        mvc.perform(get("/api/v1/admin/jobs/{id}", failed).cookie(login.cookie()))
+                .andExpect(jsonPath("$.retry.code").value("superseded"))
+                .andExpect(jsonPath("$.retry.blockedBy").value(later));
+        retry(login, failed, "retry-sup-" + suffix, "다시").andExpect(status().isConflict());
     }
 
     @Test
@@ -164,6 +226,39 @@ class AnalysisJobPostgresTest {
                 () -> insertJob("succeeded", "admin", "ingest", null, suffix + "-no-times", false));
     }
 
+    @Test
+    void theRequestedCommandIsImmutableAndOnlyARunningJobHoldsALease() {
+        String suffix = UUID.randomUUID().toString();
+        String queued = insertJob("queued", "admin", "ingest", null, suffix + "-cmd");
+        for (String change : List.of("kind = 'project'", "input = '{\"planId\":\"other\"}'::jsonb", "reason = 'other'",
+                "command_key = 'other-" + suffix + "'", "requested_at = requested_at + interval '1 second'",
+                "requested_by = 'other'", "label = 'other'")) {
+            assertThrows(DataAccessException.class,
+                    () -> jdbc.update("UPDATE analysis_jobs SET " + change + " WHERE id = ?", queued), change);
+        }
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
+                "UPDATE analysis_jobs SET owner_token = 'w', lease_until = now() WHERE id = ?", queued), "queued holds no lease");
+        String running = insertJob("running", "admin", "ingest", null, suffix + "-lease");
+        try {
+            assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
+                    "UPDATE analysis_jobs SET owner_token = 'w' WHERE id = ?", running), "owner and deadline together");
+            assertEquals(1, jdbc.update("UPDATE analysis_jobs SET owner_token = 'w', lease_until = now() WHERE id = ?",
+                    running));
+        } finally {
+            jdbc.update("UPDATE analysis_jobs SET owner_token = NULL, lease_until = NULL WHERE id = ?", running);
+            finish(running);
+        }
+    }
+
+    @Test
+    void documentAndExecutionRecordsCanOnlyNameAnExistingJob() {
+        assertEquals(2, jdbc.queryForObject("""
+                SELECT count(*) FROM pg_constraint
+                WHERE conname IN ('fk_document_analyses_analysis_job', 'fk_ai_executions_analysis_job')
+                  AND confrelid = 'analysis_jobs'::regclass AND confdeltype = 'r' AND confupdtype = 'r'
+                """, Integer.class), "RESTRICT foreign keys from both job-owned columns");
+    }
+
     private ResultActions cancel(Login login, String id, String key, String reason) throws Exception {
         return mvc.perform(post("/api/v1/admin/jobs/{id}/cancel", id).cookie(login.cookie()).header("Origin", ORIGIN)
                 .header("X-CSRF-Token", login.csrf()).header("Idempotency-Key", key)
@@ -206,6 +301,23 @@ class AnalysisJobPostgresTest {
                 started ? Timestamp.from(requested.plusSeconds(10)) : null,
                 finished ? Timestamp.from(requested.plusSeconds(20)) : null, retryOf, "test:" + key,
                 "{\"planId\":\"plan-" + key + "\"}", "failed".equals(status) ? "{\"code\":\"provider_error\",\"message\":\"합성 실패\"}" : null);
+        return id;
+    }
+
+    private static String planInput(String planId) {
+        return "{\"planId\":\"" + planId + "\"}";
+    }
+
+    /** A finished admin job requested at {@code requested}; it starts 10 s and ends 20 s later. */
+    private String insertAt(String status, String kind, String key, String input, Instant requested) {
+        String id = "job-" + UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO analysis_jobs (id, kind, scope, label, status, reason, requested_by, requested_at, started_at,
+                                           finished_at, command_key, input, error)
+                VALUES (?, ?, 'admin', '합성 작업', ?, '시험', 'admin-test', ?, ?, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb))
+                """, id, kind, status, Timestamp.from(requested), Timestamp.from(requested.plusSeconds(10)),
+                Timestamp.from(requested.plusSeconds(20)), "test:" + key, input,
+                "failed".equals(status) ? "{\"code\":\"provider_error\",\"message\":\"합성 실패\"}" : null);
         return id;
     }
 
