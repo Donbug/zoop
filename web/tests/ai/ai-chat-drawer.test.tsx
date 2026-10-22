@@ -293,6 +293,101 @@ describe('D-AI-01 · asking with a linked target', () => {
     expect((second.body as { jobId: string }).jobId).toBe(
       (first.body as { jobId: string }).jobId,
     );
+    expect((screen.getByLabelText('질문') as HTMLTextAreaElement).value).toBe(
+      '',
+    );
+  });
+
+  it('keeps an unconfirmed question pending: no new id until it is resent or discarded', async () => {
+    // SESSION also matches /current, so CURRENT is registered last to win that path.
+    server.on('GET', SESSION, () => json(conversation([]).conversation));
+    server.on('GET', CURRENT, () => json(conversation([])));
+    server.on('POST', JOBS, () => {
+      throw new Error('connection reset');
+    });
+    const { user } = open(null);
+    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    await user.type(screen.getByLabelText('질문'), '첫 질문');
+    await user.click(screen.getByRole('button', { name: '보내기' }));
+    await screen.findByText(/질문이 접수됐는지 확인하지 못했어요/);
+
+    // A different question cannot be sent while the first one may exist on the server.
+    await user.clear(screen.getByLabelText('질문'));
+    await user.type(screen.getByLabelText('질문'), '두 번째 질문');
+    expect(
+      screen.getByRole('button', { name: '보내기' }).hasAttribute('disabled'),
+    ).toBe(true);
+    expect(server.calls('POST', JOBS)).toHaveLength(1);
+
+    await user.click(
+      screen.getByRole('button', { name: '보내지 않은 것으로 하기' }),
+    );
+    // Discarding re-reads the conversation so a question the server did accept would appear.
+    await waitFor(() =>
+      expect(
+        server
+          .calls('GET', SESSION)
+          .filter((call) => call.params.id === 'conv-0001'),
+      ).toHaveLength(1),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: '보내기' }).hasAttribute('disabled'),
+      ).toBe(false),
+    );
+  });
+
+  it('retries a conversation that could not be created with the same id before sending', async () => {
+    server.on('GET', CURRENT, () => json({ conversation: null }));
+    let puts = 0;
+    server.on('PUT', SESSION, (request) => {
+      puts += 1;
+      if (puts === 1) return apiError(503, 'SOURCE_UNAVAILABLE');
+      return json({
+        id: request.params.id,
+        createdAt: '2026-10-21T00:00:00Z',
+        jobs: 0,
+      });
+    });
+    server.on('POST', JOBS, (request) =>
+      json(
+        job({
+          id: (request.body as { jobId: string }).jobId,
+          sessionId: request.params.id,
+          question: '질문',
+        }),
+        202,
+      ),
+    );
+    const { user } = open(null);
+    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    await user.type(screen.getByLabelText('질문'), '질문');
+    await user.click(screen.getByRole('button', { name: '보내기' }));
+    await user.click(
+      await screen.findByRole('button', { name: '같은 질문 다시 보내기' }),
+    );
+    await screen.findByRole('article', { name: '질문' });
+    const [first, second] = server.calls('PUT', SESSION);
+    expect(second.params.id).toBe(first.params.id);
+    expect(server.calls('POST', JOBS)[0].params.id).toBe(first.params.id);
+  });
+
+  it('a new conversation drops a restore that arrives late', async () => {
+    const late = deferred<Response>();
+    server.on('GET', CURRENT, () => late.promise);
+    server.on('PUT', SESSION, (request) =>
+      json(
+        { id: request.params.id, createdAt: '2026-10-21T00:00:00Z', jobs: 0 },
+        201,
+      ),
+    );
+    const { user } = open(null);
+    await waitFor(() => expect(server.calls('GET', CURRENT)).toHaveLength(1));
+    await user.click(screen.getByRole('button', { name: '새 대화' }));
+    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    late.resolve(json(conversation([job({ question: '이전 대화의 질문' })])));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByText('이전 대화의 질문')).toBeNull();
   });
 
   it('shows the active job of a busy conversation instead of creating another', async () => {
@@ -482,10 +577,24 @@ describe('D-AI-02 · job states and stored results', () => {
         .getAttribute('href'),
     ).toBe('https://example.com/a');
     expect(within(card).getByText(/질문에 적힌 대상을 기준으로/)).toBeTruthy();
+    onViewOnMap.mockReturnValueOnce(true);
     await user.click(
       within(card).getByRole('button', { name: /지도에서 보기 · SK하이닉스/ }),
     );
-    expect(onViewOnMap).toHaveBeenCalledWith('KRX:000660');
+    expect(onViewOnMap).toHaveBeenCalledWith({
+      id: 'KRX:000660',
+      kind: 'company',
+      graphVersion: 'gv-1',
+      asOf: '2026-10-21T00:00:00Z',
+    });
+    expect(within(card).queryByText(/그대로 열 수 없어요/)).toBeNull();
+    onViewOnMap.mockReturnValueOnce(false);
+    await user.click(
+      within(card).getByRole('button', { name: /지도에서 보기 · SK하이닉스/ }),
+    );
+    expect(
+      within(card).getByText(/그래프 버전 gv-1 기준이라 지금 지도에서/),
+    ).toBeTruthy();
   });
 
   it('shows a withheld answer as the server sent it, without a basis badge', async () => {
@@ -556,6 +665,59 @@ describe('D-AI-02 · job states and stored results', () => {
     expect(
       server.calls('POST', RETRY)[0].headers.get('Idempotency-Key'),
     ).toBeTruthy();
+  });
+
+  it('announces the running phase in the live region', async () => {
+    const running = job({
+      status: 'running',
+      phase: 'writing',
+      outcome: null,
+      result: null,
+      finishedAt: null,
+    });
+    server.on('GET', CURRENT, () => json(conversation([running])));
+    server.on('GET', JOB, () => json(running));
+    open();
+    await screen.findByRole('article', { name: 'HBM이 뭐야?' });
+    const live = document.querySelector('[aria-live="polite"]');
+    expect(live?.textContent).toContain('답변 작성');
+  });
+
+  it('a late retry answer from the previous conversation is not merged into the new one', async () => {
+    const failed = job({
+      id: 'job-failed02',
+      question: '이전 대화의 실패',
+      status: 'failed',
+      outcome: null,
+      result: null,
+      failure: {
+        kind: 'transient',
+        reason: 'tool_timeout',
+        message: '자료 조회가 제한 시간 안에 끝나지 않았어요.',
+        retry: 'rerun',
+      },
+    });
+    const retried = deferred<Response>();
+    server.on('GET', CURRENT, () => json(conversation([failed])));
+    server.on('POST', RETRY, () => retried.promise);
+    server.on('PUT', SESSION, (request) =>
+      json(
+        { id: request.params.id, createdAt: '2026-10-21T00:00:00Z', jobs: 0 },
+        201,
+      ),
+    );
+    const { user } = open();
+    const card = await screen.findByRole('article', {
+      name: '이전 대화의 실패',
+    });
+    await user.click(
+      within(card).getByRole('button', { name: '질문 다시 처리' }),
+    );
+    await user.click(screen.getByRole('button', { name: '새 대화' }));
+    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    retried.resolve(json({ ...failed, status: 'queued', failure: null }, 202));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByText('이전 대화의 실패')).toBeNull();
   });
 
   it('cancels a queued job', async () => {
@@ -673,7 +835,25 @@ describe('membership', () => {
 });
 
 describe('contextFromTarget', () => {
-  it('splits an impact path, keeps evidence and the pinned version, and never sends asOf', () => {
+  it('keeps the cutoff the member set on the map address', () => {
+    expect(
+      contextFromTarget({
+        kind: 'company',
+        id: 'KRX:005930',
+        mapContext: {
+          url: '/?mode=all&companyId=KRX%3A005930&asOf=2026-10-01T00%3A00%3A00Z&graphVersion=gv-old',
+          graphVersion: 'gv-old',
+          asOf: '2026-10-01T00:00:00Z',
+        },
+      }),
+    ).toEqual({
+      contextIds: ['KRX:005930'],
+      graphVersion: 'gv-old',
+      asOf: '2026-10-01T00:00:00Z',
+    });
+  });
+
+  it('splits an impact path, keeps evidence and the pinned version, and sends no asOf the member did not set', () => {
     expect(
       contextFromTarget({
         kind: 'path',

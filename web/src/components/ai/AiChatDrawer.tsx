@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
-import ChatJobCard from '@/components/ai/ChatJobCard';
+import ChatJobCard, { type AnswerMapTarget } from '@/components/ai/ChatJobCard';
+import { PHASE_LABEL } from '@/components/ai/chat-phases';
 import {
   contextFromTarget,
   isSendable,
@@ -9,6 +10,7 @@ import {
   questionLength,
   useChatConversation,
   type ChatNotice,
+  type PendingQuestion,
 } from '@/hooks/use-chat-conversation';
 import { useAuth } from '@/hooks/useAuth';
 import { useAiChatStore } from '@/stores/useAiChatStore';
@@ -26,7 +28,8 @@ const TARGET_KIND: Record<GraphTarget['kind'], string> = {
 };
 
 type Props = {
-  onViewOnMap?: (id: string) => void;
+  /** 답변이 가리키는 대상을 답변의 그래프 버전 기준으로 지도에 연다. 열 수 없으면 false. */
+  onViewOnMap?: (target: AnswerMapTarget) => boolean;
 };
 
 export default function AiChatDrawer({ onViewOnMap }: Props) {
@@ -152,7 +155,7 @@ function ChatPanel({
   onViewOnMap,
 }: {
   memberId: string;
-  onViewOnMap?: (id: string) => void;
+  onViewOnMap?: Props['onViewOnMap'];
 }) {
   const target = useAiChatStore((state) => state.context);
   const draft = useAiChatStore((state) => state.draft);
@@ -165,7 +168,10 @@ function ChatPanel({
   const useTarget = linked && target !== null;
   const targetLabel = target ? (target.label ?? target.id) : null;
   const locked =
-    chat.load.kind !== 'ready' || chat.sending || chat.active !== null;
+    chat.load.kind !== 'ready' ||
+    chat.sending ||
+    chat.active !== null ||
+    chat.pending !== null;
   const sendable = isSendable(draft) && !locked;
   const length = questionLength(draft);
 
@@ -180,8 +186,21 @@ function ChatPanel({
     }
   }
 
+  /** 미확정 질문을 다시 보내 접수되면 일반 전송과 같이 입력과 답할 확인 질문을 비운다. */
+  async function resend() {
+    if (await chat.resend()) {
+      setDraft('');
+      setReplyTo(null);
+    }
+  }
+
   const byId = new Map(chat.jobs.map((job) => [job.id, job]));
-  const latest = chat.jobs.at(-1);
+  // 안내할 작업: 진행 중인 작업(재시도한 이전 작업일 수 있음), 없으면 가장 최근에 바뀐 작업.
+  const announced =
+    chat.active ??
+    [...chat.jobs]
+      .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))
+      .at(-1);
 
   return (
     <>
@@ -233,7 +252,7 @@ function ChatPanel({
         </section>
 
         <div aria-live="polite" className="sr-only">
-          {latest ? statusText(latest) : ''}
+          {announced ? statusText(announced) : ''}
         </div>
 
         {chat.load.kind === 'loading' && (
@@ -285,12 +304,16 @@ function ChatPanel({
             </button>
           </div>
         )}
-        {chat.notice && (
-          <NoticeBox
-            notice={chat.notice}
-            onResend={chat.hasUnsent ? () => void chat.resend() : undefined}
-            onDismiss={chat.dismissNotice}
+        {chat.pending && (
+          <PendingBox
+            pending={chat.pending}
+            busy={chat.sending}
+            onResend={() => void resend()}
+            onDiscard={() => void chat.discard()}
           />
+        )}
+        {chat.notice && (
+          <NoticeBox notice={chat.notice} onDismiss={chat.dismissNotice} />
         )}
       </div>
 
@@ -378,7 +401,10 @@ function ChatPanel({
 
 function statusText(job: ChatJob) {
   if (job.status === 'queued') return '질문을 접수했어요.';
-  if (job.status === 'running') return '답변을 준비하고 있어요.';
+  if (job.status === 'running')
+    return job.phase
+      ? `답변을 준비하고 있어요. 지금 단계: ${PHASE_LABEL[job.phase]}`
+      : '답변을 준비하고 있어요.';
   if (job.status === 'failed') return '질문을 처리하지 못했어요.';
   if (job.status === 'cancelled') return '질문을 취소했어요.';
   if (job.result?.outcome === 'clarification') return '확인 질문이 도착했어요.';
@@ -455,13 +481,41 @@ function LoadError({
   );
 }
 
+// 응답을 받지 못한 질문: 서버가 받았는지 모르므로 같은 질문으로만 다시 보내거나, 버리고 새로 쓴다.
+function PendingBox({
+  pending,
+  busy,
+  onResend,
+  onDiscard,
+}: {
+  pending: PendingQuestion;
+  busy: boolean;
+  onResend: () => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <div className={ui.state} role="status">
+      <p className="mt-0!">
+        “{pending.request.question}” 질문이 접수됐는지 확인하지 못했어요. 같은
+        질문으로 다시 보내면 한 번만 처리돼요.
+      </p>
+      <div className="flex flex-wrap gap-3">
+        <button type="button" disabled={busy} onClick={onResend}>
+          같은 질문 다시 보내기
+        </button>
+        <button type="button" disabled={busy} onClick={onDiscard}>
+          보내지 않은 것으로 하기
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function NoticeBox({
   notice,
-  onResend,
   onDismiss,
 }: {
   notice: ChatNotice;
-  onResend?: () => void;
   onDismiss: () => void;
 }) {
   const details = errorDetails(notice);
@@ -473,11 +527,6 @@ function NoticeBox({
       <p className="mt-0!">{notice.message}</p>
       {details && <p className={ui.muted}>{details}</p>}
       <div className="flex flex-wrap gap-3">
-        {onResend && (
-          <button type="button" onClick={onResend}>
-            같은 질문 다시 보내기
-          </button>
-        )}
         <button type="button" onClick={onDismiss}>
           닫기
         </button>

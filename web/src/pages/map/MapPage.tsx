@@ -22,6 +22,7 @@ import EventDetailPanel, {
   type EventAction,
 } from '@/components/graph/EventDetailPanel';
 import AiChatDrawer from '@/components/ai/AiChatDrawer';
+import type { AnswerMapTarget } from '@/components/ai/ChatJobCard';
 import BriefingSnapshotBanner from '@/components/graph/BriefingSnapshotBanner';
 import EvidenceDrawer from '@/components/evidence/EvidenceDrawer';
 import { graphSummary } from '@/components/graph/graph-model';
@@ -361,6 +362,30 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
     };
     if (action === 'evidence') useGraphUiStore.getState().openEvidence(target);
     else openAi(target);
+  }
+  /**
+   * D-AI-02 "지도에서 보기": 답변을 만든 그래프 버전 기준으로 연다. 지금 지도가 같은 버전이면 그 자리에서 초점을 맞추고,
+   * 다른 버전의 기업이면 그 버전·시점의 지도로 이동한다. 다른 버전의 사건·관계는 지금 지도가 그 버전을 열 수 없으므로 false.
+   */
+  function viewAnswerTarget(target: AnswerMapTarget) {
+    const shown = data?.metadata.graphVersion ?? null;
+    if (!target.graphVersion || target.graphVersion === shown) {
+      updateQuery({ focus: target.id, hops: '1', path: null });
+      return true;
+    }
+    if (target.kind === 'company' && target.asOf) {
+      updateQuery({
+        companyId: target.id,
+        asOf: target.asOf,
+        graphVersion: target.graphVersion,
+        focus: null,
+        hops: null,
+        path: null,
+        select: `node:${target.id}`,
+      });
+      return true;
+    }
+    return false;
   }
   function eventAction(action: EventAction, event: EventDetail) {
     const target: GraphTarget = {
@@ -788,6 +813,7 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                       kind: 'company',
                       id: companyNode.id,
                       label: companyNode.label,
+                      mapContext: { ...eventContext, url: `/?${params}` },
                     })
                   }
                 />
@@ -953,11 +979,7 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
               </div>
             )}
           </div>
-          <AiChatDrawer
-            onViewOnMap={(id) =>
-              updateQuery({ focus: id, hops: '1', path: null })
-            }
-          />
+          <AiChatDrawer onViewOnMap={viewAnswerTarget} />
           <EvidenceDrawer
             onViewOnMap={(id) =>
               updateQuery({ focus: id, hops: '1', path: null })

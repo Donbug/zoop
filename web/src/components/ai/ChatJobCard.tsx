@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import { PHASES } from '@/components/ai/chat-phases';
 import {
   formatPublishedAt,
   safeArticleUrl,
@@ -10,19 +12,19 @@ import type {
   ChatChoice,
   ChatCitation,
   ChatJob,
-  ChatPhase,
   ChatResult,
 } from '@/types/ai';
 
 // D-AI-01b·D-AI-02 · 질문 작업 하나: 상태(접수·진행·실패·취소)와 저장된 결과.
 // 문구·근거 수준·제한은 서버가 준 값만 그대로 쓰고 본문에서 추측하지 않는다.
 
-const PHASES: { phase: ChatPhase; label: string }[] = [
-  { phase: 'planning', label: '질문 이해' },
-  { phase: 'retrieving', label: '자료 확인' },
-  { phase: 'writing', label: '답변 작성' },
-  { phase: 'verifying', label: '검증' },
-];
+/** 답변이 가리키는 지도 대상과 답변을 만든 그래프 버전·기준 시각. */
+export type AnswerMapTarget = {
+  id: string;
+  kind: string;
+  graphVersion: string | null;
+  asOf: string | null;
+};
 
 const BASIS_LABEL: Record<ChatBasis, string> = {
   general_knowledge: '일반 개념',
@@ -51,7 +53,8 @@ type Props = {
   onAnswerFreely: (job: ChatJob) => void;
   onRetry: (job: ChatJob) => void;
   onCancel: (job: ChatJob) => void;
-  onViewOnMap?: (id: string) => void;
+  /** 답변의 그래프 버전 기준으로 지도에 연다. 그 버전으로 열 수 없으면 false. */
+  onViewOnMap?: (target: AnswerMapTarget) => boolean;
 };
 
 function formatTime(value: string | null) {
@@ -253,13 +256,15 @@ function ResultView({
       </div>
     );
   }
-  return <Answer result={result} onViewOnMap={onViewOnMap} />;
+  return <Answer job={job} result={result} onViewOnMap={onViewOnMap} />;
 }
 
 function Answer({
+  job,
   result,
   onViewOnMap,
 }: {
+  job: ChatJob;
   result: ChatResult;
   onViewOnMap?: Props['onViewOnMap'];
 }) {
@@ -323,19 +328,52 @@ function Answer({
         </section>
       )}
       {result.graphTargets.length > 0 && onViewOnMap && (
-        <div className={ui.textActions}>
-          {result.graphTargets.map((target) => (
-            <button
-              key={target.id}
-              type="button"
-              onClick={() => onViewOnMap(target.id)}
-            >
-              ◇ 지도에서 보기 · {labelOf(result, target.id)}
-            </button>
-          ))}
-        </div>
+        <MapTargets job={job} result={result} onViewOnMap={onViewOnMap} />
       )}
       <Applied result={result} />
+    </div>
+  );
+}
+
+// 대상은 답변을 만든 그래프 버전에 묶여 있다: 지금 지도가 다른 버전이면 그 버전으로 열거나, 열 수 없다고 알린다.
+function MapTargets({
+  job,
+  result,
+  onViewOnMap,
+}: {
+  job: ChatJob;
+  result: ChatResult;
+  onViewOnMap: NonNullable<Props['onViewOnMap']>;
+}) {
+  const [unavailable, setUnavailable] = useState(false);
+  return (
+    <div>
+      <div className={ui.textActions}>
+        {result.graphTargets.map((target) => (
+          <button
+            key={target.id}
+            type="button"
+            onClick={() =>
+              setUnavailable(
+                !onViewOnMap({
+                  id: target.id,
+                  kind: target.kind,
+                  graphVersion: result.applied.graphVersion,
+                  asOf: job.context.asOf ?? result.applied.dataAsOf,
+                }),
+              )
+            }
+          >
+            ◇ 지도에서 보기 · {labelOf(result, target.id)}
+          </button>
+        ))}
+      </div>
+      {unavailable && (
+        <p className={ui.muted} role="status">
+          이 답변은 그래프 버전 {result.applied.graphVersion} 기준이라 지금
+          지도에서 그대로 열 수 없어요.
+        </p>
+      )}
     </div>
   );
 }
