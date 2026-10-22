@@ -29,7 +29,23 @@ export function useTutorialInteractionLock(
       HTMLElement,
       { disabled: boolean | null; aria: string | null; tab: string | null }
     >();
+    function restore(element: HTMLElement) {
+      const value = saved.get(element);
+      if (!value) return;
+      if (value.disabled !== null)
+        (element as HTMLButtonElement).disabled = value.disabled;
+      if (value.aria === null) element.removeAttribute('aria-disabled');
+      else element.setAttribute('aria-disabled', value.aria);
+      if (value.tab === null) element.removeAttribute('tabindex');
+      else element.setAttribute('tabindex', value.tab);
+      saved.delete(element);
+    }
     function apply() {
+      // A retry can remove and restore an action marker without changing steps
+      // or replacing its DOM node. Release only attributes owned by this lock.
+      saved.forEach((_, element) => {
+        if (allowed(element)) restore(element);
+      });
       document
         .querySelectorAll<HTMLElement>(
           'button,a[href],input,select,textarea,summary,[tabindex="0"]',
@@ -85,20 +101,18 @@ export function useTutorialInteractionLock(
     }
     apply();
     const observer = new MutationObserver(apply);
-    observer.observe(document.body, { subtree: true, childList: true });
+    observer.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['data-tutorial-action'],
+    });
     const events = ['click', 'pointerdown', 'keydown'] as const;
     events.forEach((name) => document.addEventListener(name, block, true));
     return () => {
       observer.disconnect();
       events.forEach((name) => document.removeEventListener(name, block, true));
-      saved.forEach((value, element) => {
-        if (value.disabled !== null)
-          (element as HTMLButtonElement).disabled = value.disabled;
-        if (value.aria === null) element.removeAttribute('aria-disabled');
-        else element.setAttribute('aria-disabled', value.aria);
-        if (value.tab === null) element.removeAttribute('tabindex');
-        else element.setAttribute('tabindex', value.tab);
-      });
+      saved.forEach((_, element) => restore(element));
     };
   }, [step, zoomReady]);
 }

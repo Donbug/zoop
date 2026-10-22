@@ -222,7 +222,10 @@ describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
     member();
     const session = useAuthStore.getState().session!;
     useAuthStore.setState({
-      session: { ...session, setup: { completed: true, tutorialCompleted: true } },
+      session: {
+        ...session,
+        setup: { completed: true, tutorialCompleted: true },
+      },
     });
     vi.mocked(getGraph).mockImplementation(async (request) =>
       createMockGraph(request),
@@ -306,6 +309,65 @@ describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
         graphVersion: graph.metadata.graphVersion,
       }),
     );
+  });
+
+  it('3단계 부분 응답 재조회 후 같은 상세 사건 버튼을 복원하고 다음 단계로 진행한다', async () => {
+    const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const partial = {
+      ...graph,
+      metadata: { ...graph.metadata, partial: true },
+    };
+    vi.mocked(getGraph).mockResolvedValue(partial);
+    const router = setup('/?mode=all&tour=1');
+    await userEvent.click(
+      await screen.findByRole('button', { name: '지도 이동 실습' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: '지도 확대 실습' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: '삼성전자 선택' }),
+    );
+    const panel = await screen.findByRole('complementary', {
+      name: '삼성전자 기업 상세',
+    });
+    const issue = await within(panel).findByRole('button', {
+      name: /^HBM4 공급 계약/,
+    });
+    await waitFor(() =>
+      expect((issue as HTMLButtonElement).disabled).toBe(false),
+    );
+    let finish!: (value: GraphResponse) => void;
+    vi.mocked(getGraph).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    await waitFor(() => {
+      expect(issue.getAttribute('data-tutorial-action')).toBeNull();
+      expect((issue as HTMLButtonElement).disabled).toBe(true);
+      expect(issue.getAttribute('tabindex')).toBe('-1');
+    });
+    expect(screen.getByText('튜토리얼 3/5')).toBeTruthy();
+    await act(async () => finish(partial));
+    await waitFor(() => {
+      expect(
+        within(panel).getByRole('button', { name: /^HBM4 공급 계약/ }),
+      ).toBe(issue);
+      expect(issue.getAttribute('data-tutorial-action')).toBe('issue');
+      expect((issue as HTMLButtonElement).disabled).toBe(false);
+      expect(issue.getAttribute('aria-disabled')).toBeNull();
+      expect(issue.getAttribute('tabindex')).toBeNull();
+    });
+    issue.focus();
+    expect(document.activeElement).toBe(issue);
+    await userEvent.click(issue);
+    await screen.findByText('튜토리얼 4/5');
+    expect(
+      new URLSearchParams(router.state.location.search).get('impact'),
+    ).toBe('KRX:005930,mock-issue-1');
   });
 
   it.each(['error', 'partial', 'no-target'] as const)(

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { useTutorialInteractionLock } from '@/components/graph/tutorial/useTutorialInteractionLock';
@@ -39,6 +39,52 @@ function Surface({
   );
 }
 describe('D-GRP-T2/T3 · tutorial input boundary', () => {
+  it('같은 단계의 허용 표식 변경을 복원하되 원래 비활성 속성과 tabindex는 보존한다', async () => {
+    function RetrySurface({ ready }: { ready: boolean }) {
+      useTutorialInteractionLock(3, false);
+      return (
+        <>
+          <button data-tutorial-action={ready ? 'issue' : undefined}>
+            사건 선택
+          </button>
+          <button
+            disabled
+            aria-disabled="true"
+            tabIndex={2}
+            data-tutorial-action={ready ? 'issue' : undefined}
+          >
+            원래 잠긴 사건
+          </button>
+          <div data-tutorial-action={ready ? 'issue' : undefined}>
+            <div tabIndex={0}>키보드 대상</div>
+          </div>
+        </>
+      );
+    }
+    const view = render(<RetrySurface ready={false} />);
+    const issue = screen.getByRole('button', {
+      name: '사건 선택',
+    }) as HTMLButtonElement;
+    const disabled = screen.getByRole('button', {
+      name: '원래 잠긴 사건',
+    }) as HTMLButtonElement;
+    expect(issue.disabled).toBe(true);
+    view.rerender(<RetrySurface ready />);
+    await waitFor(() => expect(issue.disabled).toBe(false));
+    expect(issue.getAttribute('aria-disabled')).toBeNull();
+    expect(issue.getAttribute('tabindex')).toBeNull();
+    expect(disabled.disabled).toBe(true);
+    expect(disabled.getAttribute('aria-disabled')).toBe('true');
+    expect(disabled.getAttribute('tabindex')).toBe('2');
+    expect(screen.getByText('키보드 대상').getAttribute('tabindex')).toBe('0');
+    view.rerender(<RetrySurface ready={false} />);
+    await waitFor(() => expect(issue.disabled).toBe(true));
+    view.rerender(<RetrySurface ready />);
+    await waitFor(() => expect(issue.disabled).toBe(false));
+    view.unmount();
+    expect(disabled.disabled).toBe(true);
+    expect(disabled.getAttribute('tabindex')).toBe('2');
+  });
   it('2단계에서 이동과 확대를 계속 허용하고 3단계에서는 다시 차단한다', async () => {
     const action = vi.fn();
     const view = render(<Surface step={2} action={action} />);
