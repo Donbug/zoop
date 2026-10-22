@@ -26,8 +26,8 @@ public interface EvidenceReadRepository {
 
     /**
      * The required recipients of the executions of {@code creatorJobId} owned by {@code ownerAnalysisId} under the given grant
-     * snapshot, per stage wire name ({@code document-summary}, {@code semantic-verification}). A stage without a recipient is
-     * absent from the map.
+     * snapshot, per stage wire name ({@code document-summary}, {@code document-sentiment},
+     * {@code semantic-verification}). A stage without a recipient is absent from the map.
      */
     Map<String, Set<String>> executionRecipients(String creatorJobId, String ownerAnalysisId, String grantId,
             String grantRevision);

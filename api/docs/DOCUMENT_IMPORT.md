@@ -2,7 +2,7 @@
 
 FS056(WBS 6.5.2)의 **문서 쪽** 저장입니다. 설치된 `zoop-ai-ingest export`가 내보낸 정제 텍스트 한 건(문서 버전)을 앱 DB의 `artifacts`·`articles`·`article_versions`(ERD v6 §14–16)와 로컬 파일로 등록합니다. 운영자가 실행하는 **비웹 Spring 프로세스**이며 HTTP 경로는 없습니다. 목표 OpenAPI에도 문서 쓰기 경로가 없습니다.
 
-**하지 않는 것:** 분석·요약·감성 결과 import(별도의 operator 실행인 [문서 분석](DOCUMENT_ANALYSIS.md)이 `document_analyses`·`evidence`·`ai_executions`에 저장하며 여기서는 쓰지 않음, `analysis_jobs`는 아직 없음), 그래프 반영, 공개·발행, 사건(event) 쪽 FS056 항목, 수집 실행·스케줄, 원문(raw) 바이트 저장(S2-1이 내보내지 않으므로 `raw_artifact_id`는 NULL), 문서를 읽는 API(저장된 요약의 본문 인용을 읽는 `getEvidence` 한 건만 [문서 분석](DOCUMENT_ANALYSIS.md#근거-읽기-getevidence-부분-구현)에 부분 구현했고 이 import와는 무관하며, `listCompanyDocuments` 등은 없음). 등록된 행은 **읽기 권한이 아니라 이력**입니다(아래 [접근](#접근과-권리)).
+**하지 않는 것:** 분석·요약·감성 결과 import(별도의 operator 실행인 [문서 분석](DOCUMENT_ANALYSIS.md)이 `document_analyses`·`evidence`·`ai_executions`에 저장하며 여기서는 쓰지 않음, `analysis_jobs`는 아직 없음), 그래프 반영, 공개·발행, 사건(event) 쪽 FS056 항목, 수집 실행·스케줄, 원문(raw) 바이트 저장(S2-1이 내보내지 않으므로 `raw_artifact_id`는 NULL). 등록된 행은 **읽기 권한이 아니라 이력**입니다(아래 [접근](#접근과-권리)). 문서 목록은 [기업 문서 조회](COMPANY_DOCUMENTS.md)를 참고하세요.
 
 ## 흐름
 
@@ -144,7 +144,7 @@ DB는 JPA `ddl-auto: validate`와 제약·트리거로 같은 불변식을 지�
 ## 접근과 권리
 
 - **쓰기:** 모든 쓰기(이미 있는 버전의 no-op 재실행과 포인터만 이동하는 경우 포함)는 같은 실행에서 그 선택자의 **새 export가 성공**해야 합니다. 철회된 grant로는 export가 거부되므로 어떤 쓰기도 일어나지 않습니다.
-- **읽기:** 저장된 행과 `access_status='available'`은 읽기 권한이 아닙니다. 읽는 쪽은 `articles.provider`의 **현재** grant를 다시 확인하고 `available`을 요구해야 하며, `current_version IS NULL`을 “지정된 현재 버전 없음”으로 다루고 `MAX(collected_at)`이나 `published_at`으로 대체하면 안 됩니다(ERD v6). 이 import는 읽는 기능을 갖지 않으며, 현재 있는 읽기(`getEvidence`)는 [문서 분석](DOCUMENT_ANALYSIS.md#근거-읽기-getevidence-부분-구현)이 이 규칙대로 구현합니다.
+- **읽기:** 저장된 행과 `access_status='available'`은 읽기 권한이 아닙니다. 읽는 쪽은 `articles.provider`의 **현재** grant를 다시 확인하고 `available`을 요구해야 하며, `current_version IS NULL`을 “지정된 현재 버전 없음”으로 다루고 `MAX(collected_at)`이나 `published_at`으로 대체하면 안 됩니다(ERD v6). 현재 읽기(`getEvidence`, `listCompanyDocuments`)는 각자 선택된 그래프 버전의 receipt와 현재 source registry에 이 규칙을 적용합니다.
 - **철회 창:** export와 commit 사이에 grant가 철회될 수 있습니다. 트랜잭션 안에서 export를 다시 부르면 하위 프로세스를 잠금 안에서 기다리게 되므로 받아들인 한계이며, 읽기 시점의 grant 재확인이 독립적으로 필요합니다.
 - **`store` 권리는 CLI가 확인합니다.** import는 항상 `--require-store`를 넘기므로 grant가 `read`·`quote-display`만 허용하면 `ingestion_export_failed`(`source_unauthorized`)이고 파일·행은 하나도 생기지 않습니다. 이 플래그를 모르는 이전 CLI는 구조화된 JSON 없이 실패하므로(`ingestion_export_unavailable`) 마찬가지로 거부됩니다.
 - 범위(scope) 단위 철회는 앱 행에 round·scope가 없어 읽기 시점에 source 단위로만 확인할 수 있습니다.
@@ -204,7 +204,7 @@ DB_URL=jdbc:postgresql://127.0.0.1:<port>/<db> DB_USERNAME=<user> DB_PASSWORD=<d
 ## 남은 결정과 한계
 
 - 이 migration(`V20261014120000`)과 `artifacts`·`articles`·`article_versions`의 소유는 **로컬 제안**이며 담당 합의 전까지 확정이 아닙니다(소유 담당은 [migration 담당 경계](../../docs/development/api-migration-ownership.md)에서 확정). 다른 브랜치의 migration과 버전이 겹치면 병합 전에 이 파일의 이름만 바꿉니다. 첫 작성자는 이 경로이며 다른 기능은 `artifacts`를 다시 정의하지 말고 참조합니다.
-- 문서를 읽는 기능(`listCompanyDocuments`, `getEvidence` 등)은 저장 행을 권한으로 쓰면 안 됩니다. 응답 때마다 `articles.provider`의 **현재** grant와 `access_status='available'`을 다시 확인해야 하고, `current_version IS NULL`을 “현재 버전 없음”으로 다루며 시각으로 대체하면 안 됩니다. `getEvidence`는 이 규칙대로 읽습니다([문서 분석](DOCUMENT_ANALYSIS.md#근거-읽기-getevidence-부분-구현)); `listCompanyDocuments`는 아직 없습니다.
+- 문서를 읽는 기능(`listCompanyDocuments`, `getEvidence` 등)은 저장 행을 권한으로 쓰면 안 됩니다. 응답 때마다 `articles.provider`의 **현재** grant와 `access_status='available'`을 다시 확인해야 하고, `current_version IS NULL`을 “현재 버전 없음”으로 다루며 시각으로 대체하면 안 됩니다. `getEvidence`는 이 규칙대로 읽습니다([문서 분석](DOCUMENT_ANALYSIS.md#근거-읽기-getevidence-부분-구현)). `listCompanyDocuments`도 선택된 그래프 버전 receipt에 결속된 현재 source grant를 문서 공개 게이트로 확인하며 registry 장애는 503으로 전달합니다([기업 문서 조회](COMPANY_DOCUMENTS.md)).
 - 2026-10-20: graph 본문 근거를 읽는 `getEvidence` 경로는 S1 grant가 아니라 이 import가 쓰는 S2-1 source registry(같은 파일을 `ZOOP_DOCUMENT_READ_INGESTION_SOURCES`로 지정)의 **현재** `read`·`store`·`quote-display` 권리와 `access_status='available'`을 요청마다 다시 확인합니다([graph 본문 근거 경로](GRAPH_READ_HANDOFF.md#2026-10-20-getevidence의-graph-본문-근거-경로-로컬-작업-트리-미게시)).
 - `articles.provider_key`·`lineage_key`·`raw_artifact_id`는 S2-1이 값을 내보낼 때까지 비어 있습니다. `day` 정밀도는 `zoop-ai-collect`로 수집한 export가 날짜만 선언했을 때 채워집니다.
 - **발행 매체(`publisher`).** 선택적 `observation.publisher`는 수집 요청의 대상(`targets[]`) 또는 authored 원장 항목에 운영자가 선언한 값이며 export가 키를 생략하면 선언이 없는 것입니다(`null`을 내보내지 않으므로 이전 export·해시·NULL 버전은 그대로 import됩니다). **배포 순서: 이 파서(소비자)를 먼저 배포한 뒤에야 발행 매체를 선언한 export를 만들 수 있습니다.** 이전 파서는 알 수 없는 관찰 키를 `export_invalid`로 거절합니다. 저장된 값은 공개 `getEvidence`(S1 경로와 graph 경로 모두)가 `article.publisher`로 그대로 돌려주며, 매체가 없는 버전은 계속 `null`입니다. 이 값은 S2 분석 `Article`·handoff bundle·`sourceId`로 흘러가지 않습니다.
