@@ -40,16 +40,20 @@ export function getMemberActivity(memberId: string) {
   return adminCall<MemberDetail>(member(memberId), 'GET');
 }
 
-/** blockMember: 차단하고 열린 세션을 회수한다. */
+/**
+ * blockMember: 차단하고 열린 세션을 회수한다.
+ * expectedRevision은 화면에서 본 회원 상태 번호다. 그 사이 상태가 바뀌었으면 409로 거절된다.
+ */
 export function blockMember(
   memberId: string,
+  expectedRevision: number,
   reason: string,
   idempotencyKey: string,
 ) {
   return adminCall<MemberStatusResult>(
     `${member(memberId)}/block`,
     'POST',
-    { reason },
+    { expectedRevision, reason },
     { 'Idempotency-Key': idempotencyKey },
   );
 }
@@ -57,13 +61,14 @@ export function blockMember(
 /** unblockMember: 차단을 푼다. 다시 로그인할 수 있다. */
 export function unblockMember(
   memberId: string,
+  expectedRevision: number,
   reason: string,
   idempotencyKey: string,
 ) {
   return adminCall<MemberStatusResult>(
     `${member(memberId)}/unblock`,
     'POST',
-    { reason },
+    { expectedRevision, reason },
     { 'Idempotency-Key': idempotencyKey },
   );
 }

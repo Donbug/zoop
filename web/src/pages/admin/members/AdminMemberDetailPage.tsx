@@ -17,6 +17,7 @@ import {
   TD,
   TH,
   count,
+  countWith,
 } from '@/components/admin/common/adminStyles';
 import MemberStatusForm from '@/components/admin/members/MemberStatusForm';
 import { memberStatusLabel, signupMethodLabel } from '@/constants/adminLabels';
@@ -134,20 +135,20 @@ function MemberDetail({ memberId }: { memberId: string }) {
             />
             <Metric
               label="로그인 세션(누적)"
-              value={`${count(row.activity.sessions)}회`}
+              value={countWith(row.activity.sessions, '회')}
             />
             <Metric
               label="그래프 선택"
-              value={`${count(row.activity.graphSelections)}회`}
+              value={countWith(row.activity.graphSelections, '회')}
               detail="노드·간선"
             />
             <Metric
               label="AI 질문"
-              value={`${count(row.activity.aiQuestions)}회`}
+              value={countWith(row.activity.aiQuestions, '회')}
             />
             <Metric
               label="브리핑 조회"
-              value={`${count(row.activity.briefingViews)}회`}
+              value={countWith(row.activity.briefingViews, '회')}
             />
             <Metric
               label="평가"
@@ -169,7 +170,7 @@ function MemberDetail({ memberId }: { memberId: string }) {
             />
             <Metric
               label="가상 보유 종목"
-              value={`${count(data.holdingCount)}개`}
+              value={countWith(data.holdingCount, '개')}
               detail={
                 data.accountConnected ? '가상 계좌 연결됨' : '가상 계좌 없음'
               }
