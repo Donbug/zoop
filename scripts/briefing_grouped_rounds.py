@@ -171,20 +171,27 @@ def build_grouped_candidates(archive, spec, identity_holds=None):
                  "newEvidenceIds": sorted({e["evidenceId"] for m in new for e in m["evidence"]}),
                  "asOfEvidenceIds": sorted({e["evidenceId"] for m in available for e in m["evidence"]}),
                  "window": copied(spec["window"]), "sourceFileSha256": archive.get("sourceFileSha256"),
-                 "historicalSimulation": True, "operationalCollectionGate": False,
+                 "historicalSimulation": not bool(spec.get("localCollection")), "operationalCollectionGate": False,
                  "historicalBodyUnchangedProven": False}
         value["asOfSnapshotSha256"] = base.digest(base.canonical(value))
         result.append(value)
     return result
 
 
-def selection_schema(candidates):
+def selection_schema(candidates, publication_company_ids=None):
     value = base.strict_load(base.regular(PROMPTS / "selection.schema.json"))
     template = value["properties"]["assessments"]["additionalProperties"]
     ids = sorted(c["issueId"] for c in candidates)
     value["properties"]["assessments"] = {"type": "object", "properties": {key: copied(template) for key in ids},
         "required": ids, "additionalProperties": False}
-    value["properties"]["selected"]["items"]["properties"]["issueId"]["enum"] = ids or ["__no_candidate__"]
+    selected_ids = ids
+    if publication_company_ids is not None:
+        registered = set(publication_company_ids)
+        selected_ids = [c["issueId"] for c in candidates if
+            (linked := {co["companyId"] for m in c["newMentions"] + c["backgroundMentions"] for co in m["companies"]})
+            and linked <= registered]
+        value["properties"]["selected"]["items"]["properties"]["companyIds"]["items"]["enum"] = sorted(registered)
+    value["properties"]["selected"]["items"]["properties"]["issueId"]["enum"] = selected_ids or ["__no_candidate__"]
     return value
 
 
@@ -378,8 +385,9 @@ class GroupedSimulationClient(sim.SimulationClient):
             require(prompt_name in allowed_names and schema_name == phase + ".schema.json", "grouped_generation_prompt_name_invalid")
         else:
             return super().request(stage, data, prompt_name, schema_name, max_output, schema_override)
-        instructions = base.regular(PROMPTS / resource_name).decode("utf-8")
         identity = data.get("context", {})
+        prompt_root = PROMPTS.with_name("local-collection") if identity.get("mode") == "local_collection_validation" else PROMPTS
+        instructions = base.regular(prompt_root / resource_name).decode("utf-8")
         expected = identity.get("promptArtifacts", {}).get("grouped-" + resource_name)
         if stage == SELECTION_STAGE:
             expected = identity.get("groupedPromptSha256") or expected
@@ -417,13 +425,14 @@ def attempt_grouped_selection(client, candidates, context, identity_sha, previou
     # copy for both attempts so another caller cannot alter the correction basis.
     candidates, context, previous_selected = copied(candidates), copied(context), copied(list(previous_selected))
     _frozen_candidate_inputs(candidates, previous_selected)
-    data, output_schema = grouped_selection_data(candidates, context, previous_selected), selection_schema(candidates)
+    data, output_schema = grouped_selection_data(candidates, context, previous_selected), selection_schema(candidates, context.get("context", {}).get("publicationCompanyIds"))
     max_output = selection_output_cap(candidates)
     request_digest = client.request_digest(SELECTION_STAGE, data, "selection.md", "selection.schema.json",
                                            max_output=max_output, schema_override=output_schema)
     reply = client.call(SELECTION_STAGE, data, "selection.md", "selection.schema.json", max_output=max_output,
                         schema_override=output_schema)
     try:
+        base.validate_schema(reply, output_schema)
         selected = freeze_grouped_selection(reply, candidates, identity_sha, previous_selected)
         return {"selected": selected, "requestDigest": request_digest, "corrections": [], "failure": None}
     except ReplayError as error:
@@ -451,6 +460,7 @@ def attempt_grouped_selection(client, candidates, context, identity_sha, previou
              "originalResponseSha256": receipt["responseSha256"], "correctedRequestDigest": corrected_digest,
              "sameFrozenInputs": True, "status": "PASS"}
     try:
+        base.validate_schema(corrected_reply, output_schema)
         selected = freeze_grouped_selection(corrected_reply, candidates, identity_sha, previous_selected)
         return {"selected": selected, "requestDigest": corrected_digest, "corrections": [audit], "failure": None}
     except ReplayError as error:

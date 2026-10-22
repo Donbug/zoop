@@ -325,7 +325,7 @@ final class BriefingGroupedSimulationRules {
     private static void snapshot(StrictJson.Obj candidate, StrictJson.Obj issue, StrictJson.Obj round, Archive archive) {
         require(candidate.object("window").node().equals(round.object("window").node())
                 && archive.root().string("sourceFileSha256").equals(candidate.string("sourceFileSha256"))
-                && candidate.bool("historicalSimulation") && !candidate.bool("operationalCollectionGate")
+                && candidate.bool("historicalSimulation") == !round.has("localCollection") && !candidate.bool("operationalCollectionGate")
                 && !candidate.bool("historicalBodyUnchangedProven"), "snapshot_scope");
         ObjectNode identity = (ObjectNode) candidate.node().deepCopy(); identity.remove("asOfSnapshotSha256");
         require(Canonical.digest(identity).equals(candidate.string("asOfSnapshotSha256")), "snapshot_digest");

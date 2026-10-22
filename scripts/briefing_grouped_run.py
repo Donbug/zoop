@@ -13,11 +13,11 @@ import briefing_grouped_rounds as grouped
 sim, base = grouped.sim, grouped.base
 
 
-def prompt_artifacts():
+def prompt_artifacts(local_collection=False):
     names = ["importance.md", "importance.schema.json", "selection.md", "selection.schema.json",
              "generation-morning.md", "generation-evening.md", "generation.schema.json", "verification.md", "verification.schema.json"]
     result = {n:base.digest(base.regular(sim.PROMPTS/n)) for n in names}
-    result.update({"grouped-"+n:base.digest(base.regular(grouped.PROMPTS/n)) for n in
+    result.update({"grouped-"+n:base.digest(base.regular((grouped.PROMPTS.with_name("local-collection") if local_collection and n.endswith(".md") else grouped.PROMPTS)/n)) for n in
                    ["selection.md","selection.schema.json","generation-morning.md","generation-evening.md","verification.md"]})
     return result
 
@@ -28,13 +28,30 @@ def run(args, transport=None):
     rows, unknown, source = sim.load_inputs(source_path, clock_path)
     if archive["sourceFileSha256"] != source["sourceFileSha256"] or archive["clockFileSha256"] != source["clockFileSha256"]:
         raise sim.ReplayError("grouped_run_source_binding_mismatch")
-    prompts = prompt_artifacts()
-    authorization = {"scope": sim.MODE, "sourceSha256": source["sourceFileSha256"], "userInboxRef": args.user_inbox_ref,
+    local_spec = None
+    if getattr(args, "round_spec", None):
+        import briefing_local_window as local
+        local_spec = local.load(args.round_spec, source["sourceFileSha256"])
+        local.sources_before_cutoff(rows, local_spec)
+    publication_ids = None
+    if getattr(args, "publication_catalog", None):
+        if not local_spec: raise sim.ReplayError("publication_catalog_requires_local_round")
+        catalog_raw = base.regular(Path(args.publication_catalog))
+        publication_ids = sorted(c["company_id"] for c in base.strict_load(catalog_raw)["companies"])
+    mode = "local_collection_validation" if local_spec else sim.MODE
+    prompts = prompt_artifacts(bool(local_spec))
+    authorization = {"scope": mode, "sourceSha256": source["sourceFileSha256"], "userInboxRef": args.user_inbox_ref,
                      "productionAuthorized": False, "groupArchiveSha256": archive_sha}
     run_identity = {"source":source,"archiveSha256":archive_sha,"promptArtifacts":prompts,"authorization":authorization}
+    if local_spec:
+        authorization["localCollection"] = local_spec["localCollection"]
+        run_identity["localRound"] = local_spec
+    if publication_ids is not None:
+        run_identity["publicationCompanyIds"] = publication_ids
+        run_identity["publicationCatalogSha256"] = base.digest(catalog_raw)
     run_id = "grouped-round-simulation-"+base.digest(base.canonical(run_identity))[:20]
     prepared, identity_holds_by_round = [], {}
-    for spec in sim.windows():
+    for spec in ([local_spec] if local_spec else sim.windows()):
         pool, inputs, clocks, duplicates, coverage = sim.pool_for_round(rows,spec,len(unknown))
         identity_holds = []
         candidates = grouped.build_grouped_candidates(archive,spec,identity_holds)
@@ -52,6 +69,7 @@ def run(args, transport=None):
     output=Path(args.output);base.private_dir(output)
     base.save_json(output/"plan.json",plan)
     base.write_once(output/"grouped-issues.json",raw)
+    if publication_ids is not None: base.write_once(output/"publication-companies.json",catalog_raw)
     # Copy original provider recordings, never fabricated/relabelled replay receipts.
     calls=output/"calls";base.private_dir(calls)
     for path in sorted((archive_path.parent/"calls").glob("*.json")):
@@ -61,13 +79,17 @@ def run(args, transport=None):
     rounds=[];published_history=[]
     for spec,inputs,clocks,duplicates,coverage,candidates in prepared:
         previous, previous_result=sim.previous_context(rounds[-1] if rounds else None)
-        identity={"mode":sim.MODE,"runId":run_id,"sourceFileSha256":source["sourceFileSha256"],
+        identity={"mode":mode,"runId":run_id,"sourceFileSha256":source["sourceFileSha256"],
                   "clockFileSha256":source["clockFileSha256"],**spec,"contextVersion":"round-simulation-v1",
                   "candidateInputSha256":base.digest(base.canonical(inputs)),"promptArtifacts":prompts,
                   "previous":previous,"operationalCollectionGate":False,"authorization":authorization,
                   "groupArchiveSha256":archive_sha,
-                  "baseline":{"from":sim.BASELINE,"meaning":"simulation_baseline_not_service_first_round"}}
-        identity_sha=base.digest(base.canonical(identity));round_id="sim-"+spec["date"]+"-"+spec["edition"]+"-"+identity_sha[:12]
+                  "baseline":{"from":local_spec["window"]["from"] if local_spec else sim.BASELINE,
+                    "meaning":"local_validation_window_start" if local_spec else "simulation_baseline_not_service_first_round"}}
+        if publication_ids is not None:
+            identity["publicationCompanyIds"] = publication_ids
+            identity["publicationCatalogSha256"] = base.digest(catalog_raw)
+        identity_sha=base.digest(base.canonical(identity));round_id=("local-" if local_spec else "sim-")+spec["date"]+"-"+spec["edition"]+"-"+identity_sha[:12]
         directory=output/(spec["date"]+"-"+spec["edition"]);base.private_dir(directory)
         path=directory/"round.json"
         if path.exists():
@@ -90,7 +112,7 @@ def run(args, transport=None):
         else:
             data=grouped.grouped_selection_data(candidates,context,published_history)
             selection_digest=client.request_digest(grouped.SELECTION_STAGE,data,"selection.md","selection.schema.json",max_output=grouped.selection_output_cap(candidates),
-                                                   schema_override=grouped.selection_schema(candidates))
+                                                   schema_override=grouped.selection_schema(candidates, publication_ids))
             record["groupedSelectionRequestDigest"]=selection_digest
             try:
                 outcome=grouped.attempt_grouped_selection(client,candidates,context,identity_sha,published_history)
@@ -138,13 +160,15 @@ def run(args, transport=None):
     # Files for grouping calls share storage, but their ownership is explicit and distinct.
     group_keys={r["requestDigest"] for r in archive["receipts"]}
     round_receipts=[r for r in receipts if r["requestDigest"] not in group_keys]
-    bundle={"schemaVersion":"zoop-briefing-grouped-simulation-v1","mode":sim.MODE,"runId":run_id,
+    bundle={"schemaVersion":"zoop-briefing-grouped-simulation-v1","mode":mode,"runId":run_id,
             "sourceFileSha256":source["sourceFileSha256"],"clockFileSha256":source["clockFileSha256"],
-            "authorization":authorization,"retrospectiveBodies":True,"operationalCollectionGate":False,"graphVersion":None,
+            "authorization":authorization,"retrospectiveBodies":not bool(local_spec),"operationalCollectionGate":False,"graphVersion":None,
             "groupArchiveSha256":archive_sha,"groupingReceipts":archive["receipts"],"rounds":rounds,"receipts":round_receipts,
             "marketSummary":{"status":"unavailable","reason":"Grouped-issue replay; new market summary not generated."},
             "marketVariables":{"status":"unavailable","reason":"Market snapshots are separate from issue regrouping."},
             "sinceMorning":{"status":"unavailable","reason":"No operational forecast evaluation for late-body replay."}}
+    if local_spec:
+        bundle["localCollection"] = local_spec["localCollection"]
     base.save_json(output/"bundle-v2.json",bundle)
     return {**plan,"status":"COMPLETE","newPaidCalls":len(client.new_calls),
             "selectedRounds":sum(r["selectionStatus"]=="SELECTED" for r in rounds),
@@ -154,7 +178,7 @@ def run(args, transport=None):
 def parser():
     p=argparse.ArgumentParser(description=__doc__)
     for name in ["archive","sources","clocks","output","user-inbox-ref"]:p.add_argument("--"+name,required=True)
-    p.add_argument("--key-file");p.add_argument("--execute-authorized",action="store_true")
+    p.add_argument("--publication-catalog");p.add_argument("--round-spec");p.add_argument("--key-file");p.add_argument("--execute-authorized",action="store_true")
     p.add_argument("--hold-unresolved-requests",action="store_true",
         help="Withhold unchanged requests already pending without a completion at startup; never resend them.")
     p.add_argument("--max-calls",type=int,choices=range(1,513),default=400)
