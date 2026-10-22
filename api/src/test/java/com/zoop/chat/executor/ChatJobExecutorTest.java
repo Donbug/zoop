@@ -79,7 +79,8 @@ class ChatJobExecutorTest {
 
     @Test
     void aReplyRunsWithTheWholeClarificationChainInOrder() {
-        store.add(queued("job-00001", null, null, 0, "run", "completed"));
+        store.add(withResult(queued("job-00001", null, null, 0, "run", "completed"),
+                ScriptedChatEngine.clarification("어느 기업인가요?", "choice-a", "choice-b").result()));
         store.add(queued("job-00002", "job-00001", "choice-a", 1, "run", "completed"));
         store.add(queued("job-00003", "job-00002", null, 2, "run"));
         var engine = new ScriptedChatEngine((run, control) -> ScriptedChatEngine.guidance("대상을 구체적으로 적어 주세요."));
@@ -89,9 +90,10 @@ class ChatJobExecutorTest {
         assertEquals("job-00003", run.jobId());
         assertEquals(2, run.clarificationDepth());
         assertEquals(List.of("ev-1"), run.selection().evidencePool());
-        assertEquals(List.of(new ChatRun.Turn("job-00001", "질문 job-00001", null),
-                new ChatRun.Turn("job-00002", "질문 job-00002", "choice-a"),
-                new ChatRun.Turn("job-00003", "질문 job-00003", null)), run.turns());
+        // The picked option carries the label the clarification showed, so the next run can read what was chosen.
+        assertEquals(List.of(new ChatRun.Turn("job-00001", "질문 job-00001", null, null),
+                new ChatRun.Turn("job-00002", "질문 job-00002", "choice-a", "choice-a 선택"),
+                new ChatRun.Turn("job-00003", "질문 job-00003", null, null)), run.turns());
         assertEquals("guidance", store.job("job-00003").row.outcome());
     }
 
@@ -189,6 +191,30 @@ class ChatJobExecutorTest {
     }
 
     @Test
+    void aResultReturnedAfterTheRunDeadlineIsNeverStoredAsCompleted() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        store.add(queued("job-00002", null, null, 0, "run"));
+        var engine = new ScriptedChatEngine((run, control) -> {
+            if (run.jobId().equals("job-00001")) control.beforeModelCall();
+            // Past the 60 s deadline, still inside the 15 s lease grace: the write would be accepted by the fence.
+            clock.advance(Duration.ofSeconds(65));
+            return ScriptedChatEngine.generalAnswer("늦은 답");
+        });
+        var executor = executor(engine);
+        executor.runOnce();
+        executor.runOnce();
+
+        var called = job(store.job("job-00001"));
+        assertEquals("failed", store.job("job-00001").row.status());
+        assertEquals("response_unknown", called.reason());
+        assertNull(called.retry());
+        var notCalled = job(store.job("job-00002"));
+        assertEquals("deadline_guard", notCalled.reason());
+        assertEquals("rerun", notCalled.retry());
+        assertNull(store.job("job-00002").result);
+    }
+
+    @Test
     void toolCallsAreReservedInPlanOrderCappedPerAttemptAndClosedWithTheJob() {
         store.add(queued("job-00001", null, null, 0, "run"));
         executor(new ScriptedChatEngine((run, control) -> {
@@ -273,6 +299,14 @@ class ChatJobExecutorTest {
                 List.of(),
                 null, status, null, "completed".equals(status) ? "clarification" : null, resolves, choice, depth, null, null,
                 0, attempts, NOW, NOW, null);
+    }
+
+    private ChatJobRow withResult(ChatJobRow r, ChatResult result) {
+        return new ChatJobRow(r.id(), r.sessionId(), r.memberId(), r.seq(), r.question(), r.requestHash(), r.askedAt(),
+                r.frozenContext(), r.frozenSelection(), r.contextCompanyIds(), r.graphVersionId(), r.status(), r.phase(),
+                r.outcome(), r.resolvesJobId(), r.resolvesChoiceId(), r.clarificationDepth(),
+                mapper.writeValueAsString(result), r.failure(), r.runs(), r.attempts(), r.createdAt(), r.updatedAt(),
+                r.finishedAt());
     }
 
     private static ChatJobRow withRuns(ChatJobRow r, int runs) {

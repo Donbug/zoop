@@ -17,7 +17,8 @@ import org.springframework.transaction.TransactionException;
  * Reads targets of one kind from the run's pinned public graph, through the same path as the public graph API
  * ({@link PublicGraphReader}: pinned version, asOf filter, current exclusions) and never Neo4j or an AI-internal graph. A
  * target that is not visible there is absent from the result. The evidence passed on is what the public evidence read can
- * read now at that version, in target order, deduplicated and capped at the request limit.
+ * read now at that version, in target order, deduplicated, kept within the request's evidence scope and capped at the
+ * request limit.
  *
  * <p>The data version is the pinned graph version. A run without a frozen graph, an unavailable version or snapshot, a
  * database that cannot be read and an evidence state that could not be checked are {@link ChatToolUnavailable}, never an
@@ -65,6 +66,7 @@ abstract class GraphTargetTool implements ChatTool {
             for (String evidenceId : target.get().evidenceIds()) {
                 // The runner interrupts a read that ran out of time: stop instead of reading on.
                 if (Thread.currentThread().isInterrupted()) throw new ChatToolUnavailable("read interrupted");
+                if (request.evidenceScope() != null && !request.evidenceScope().contains(evidenceId)) continue;
                 if (passed.contains(evidenceId)) {
                     evidence.add(evidenceId);
                 } else if (passed.size() >= request.limit()) {

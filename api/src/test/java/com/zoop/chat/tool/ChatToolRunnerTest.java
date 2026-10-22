@@ -109,6 +109,17 @@ class ChatToolRunnerTest {
     }
 
     @Test
+    void evidenceOutsideTheRequestedScopeIsAnAdapterFaultAndTheScopeIsRecorded() {
+        var control = new RecordingControl(Duration.ofSeconds(60));
+        var runner = runner(Map.of(ChatCapability.COMPANY_READ, (scope, request) -> output("v1", List.of("ev-1", "ev-2"))));
+        var results = runner.runStage(run("v1", null), control, 1, List.of(
+                new ChatToolRequest("company.read", List.of("KRX:000660"), 20, List.of("ev-1"))));
+        assertEquals(ChatToolRunner.FAILED, results.getFirst().error());
+        assertTrue(control.reserved.getFirst().requestMeta().contains("\"evidenceScope\":[\"ev-1\"]"),
+                control.reserved.getFirst().requestMeta());
+    }
+
+    @Test
     void aSlowCallTimesOutAndTheOthersStillEnd() {
         var control = new RecordingControl(Duration.ofSeconds(60));
         var release = new CountDownLatch(1);
@@ -296,7 +307,7 @@ class ChatToolRunnerTest {
     }
 
     private static ChatRun run(String graphVersion, Instant asOf) {
-        return new ChatRun("job-1", "conv-1", "member-a", 1, "run", List.of(new ChatRun.Turn("job-1", "질문", null)),
+        return new ChatRun("job-1", "conv-1", "member-a", 1, "run", List.of(new ChatRun.Turn("job-1", "질문", null, null)),
                 new ChatFrozenContext(List.of(), 0, null, asOf, graphVersion), FrozenSelection.NONE, graphVersion, 0,
                 asOf, Instant.now().plusSeconds(60));
     }
