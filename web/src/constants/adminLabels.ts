@@ -87,7 +87,8 @@ export const auditActionLabel: Record<string, string> = {
   'review.decide': '검수 결정',
   'review.rule': '검수 규칙 전환',
   'graph.publish': '그래프 게시',
-  'graph.activate': '그래프 버전 전환',
+  // 백엔드가 실제로 남기는 그래프 전환 동작 코드(#275). 감사 로그 동작 필터도 이 값으로 조회한다.
+  'graph.version.activate': '그래프 버전 전환',
   'graph.seed': '그래프 최초 등록',
   'job.create': '작업 실행',
   'job.retry': '작업 재시도',
