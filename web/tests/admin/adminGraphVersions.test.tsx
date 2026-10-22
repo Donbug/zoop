@@ -310,4 +310,78 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     await screen.findByRole('button', { name: '더 보기' });
     expect(server.calls('GET', VERSIONS).length).toBeGreaterThan(reads);
   });
+
+  test('다른 탭에 있는 동안 전환이 실패해도 돌아오면 실패 안내가 남아 있다', async () => {
+    server.on('GET', VERSIONS, () => json(list()));
+    const pending = deferred<Response>();
+    server.on('POST', ACTIVATE, () => pending.promise);
+    const { user } = open();
+
+    await user.click(await screen.findByRole('button', { name: 'v1로 전환' }));
+    const form = screen.getByRole('form', { name: '그래프 버전 전환' });
+    await user.type(
+      within(form).getByLabelText('전환 사유(감사 로그에 남아요)'),
+      '되돌림',
+    );
+    await user.click(within(form).getByRole('button', { name: 'v1로 전환' }));
+    await user.click(screen.getByRole('tab', { name: '작업' }));
+    await act(async () => pending.resolve(apiError(409, 'REVISION_CONFLICT')));
+    await user.click(screen.getByRole('tab', { name: '그래프 버전' }));
+
+    expect(
+      await within(
+        screen.getByRole('form', { name: '그래프 버전 전환' }),
+      ).findByText(/표시 버전이나 근거 공개 조건이 달라져 전환하지 못했어요/),
+    ).toBeTruthy();
+    // 실패 뒤에는 진행 상태가 풀려 같은 폼에서 다시 보낼 수 있다.
+    expect(
+      (
+        within(
+          screen.getByRole('form', { name: '그래프 버전 전환' }),
+        ).getByRole('button', { name: 'v1로 전환' }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
+  });
+
+  test('사유를 입력한 폼이 열린 채 페이지 간 표시 버전이 달라지면 제출을 막고 기대 버전을 바꾸지 않는다', async () => {
+    server.on('GET', VERSIONS, ({ query }) =>
+      query.get('cursor')
+        ? json({
+            ...list('v1'),
+            items: [version({ id: 'v0', sequence: 0, active: false })],
+            nextCursor: null,
+          })
+        : json({
+            ...list('v2'),
+            items: list('v2').items,
+            nextCursor: 'c1',
+          }),
+    );
+    server.on('POST', ACTIVATE, () =>
+      json({
+        activeVersionId: 'v1',
+        previousActiveVersionId: 'v2',
+        idempotent: false,
+      }),
+    );
+    const { user } = open();
+
+    await user.click(await screen.findByRole('button', { name: 'v1로 전환' }));
+    const form = screen.getByRole('form', { name: '그래프 버전 전환' });
+    await user.type(
+      within(form).getByLabelText('전환 사유(감사 로그에 남아요)'),
+      '되돌림',
+    );
+    await user.click(screen.getByRole('button', { name: '더 보기' }));
+    expect(
+      await within(form).findByText('목록을 다시 불러온 뒤 전환해 주세요.'),
+    ).toBeTruthy();
+    expect(within(form).getByText('v2')).toBeTruthy();
+    const submit = within(form).getByRole('button', {
+      name: 'v1로 전환',
+    }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    await user.click(submit);
+    expect(server.calls('POST', ACTIVATE)).toHaveLength(0);
+  });
 });
