@@ -184,6 +184,29 @@ public class EvidenceService {
         }
     }
 
+    /**
+     * {@link #readable} for a page that shows producer text next to its citations (getEvent): the same gates, but only a denial
+     * (withheld, unknown or malformed id) is "not shown". A state that cannot be verified right now (store, registry or
+     * database unreadable) is SOURCE_UNAVAILABLE, so a passing outage is a 503 and never reads as an event that is not there.
+     */
+    public boolean shownNow(String id, String graphVersion, Instant asOf, String requestId) {
+        if (id == null || !EVIDENCE_ID.matcher(id).matches()) {
+            return false;
+        }
+        Instant now = clock.instant();
+        try {
+            transaction.execute(status -> dispatch(id, graphVersion, asOf, null, requestId, now, true));
+            return true;
+        } catch (CustomException failure) {
+            if (failure.getErrorCode() == ErrorCode.SOURCE_UNAVAILABLE) {
+                throw failure;
+            }
+            return false;
+        } catch (DataAccessException | TransactionException unverifiable) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, unverifiable);
+        }
+    }
+
     private EvidenceResponse serve(EvidenceView row, String companyId, String requestId, Instant now, GrantRegistry current) {
         String id = row.id();
         ArticleRow article;

@@ -271,7 +271,7 @@ class EventDetailServiceTest {
     @Test
     void aWithdrawnCitationTakesItsRelationAndCompanyButNotTheEvent() {
         EventDetailService service = imported(bundle(false));
-        when(receipts.readable(eq(TSM_EVIDENCE), anyString(), any(), anyString())).thenReturn(false);
+        when(receipts.shownNow(eq(TSM_EVIDENCE), anyString(), any(), anyString())).thenReturn(false);
 
         EventDetail detail = service.get(EUV, null, null, null, "r");
 
@@ -286,13 +286,24 @@ class EventDetailServiceTest {
     void whenTheRepresentativeMentionsEvidenceIsWithdrawnAtAPastAsOfTheEventIsNotFound() {
         EventDetailService service = imported(bundle(false));
         // Both mentions cite only VISIBLE_EVIDENCE (the other id is not in this version): withdrawing it leaves no head.
-        when(receipts.readable(eq(VISIBLE_EVIDENCE), anyString(), any(), anyString())).thenReturn(false);
+        when(receipts.shownNow(eq(VISIBLE_EVIDENCE), anyString(), any(), anyString())).thenReturn(false);
         Instant past = Instant.parse("2026-10-01T00:00:00Z");
 
         assertEquals(ErrorCode.RESOURCE_NOT_FOUND, assertThrows(CustomException.class,
                 () -> service.get(EUV, null, null, "2026-10-01T00:00:00Z", "r")).getErrorCode());
         // Judged at the pinned version and the requested asOf, the same gates a citation read uses.
-        verify(receipts).readable(VISIBLE_EVIDENCE, "gv-imported", past, "r");
+        verify(receipts).shownNow(VISIBLE_EVIDENCE, "gv-imported", past, "r");
+    }
+
+    @Test
+    void aCitationThatCannotBeVerifiedNowIsUnavailableNotNotFound() {
+        EventDetailService service = imported(bundle(false));
+        // The store or registry behind a citation cannot be read: a passing outage, not a withdrawal.
+        when(receipts.shownNow(eq(TSM_EVIDENCE), anyString(), any(), anyString()))
+                .thenThrow(new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
+
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> service.get(EUV, null, null, null, "r")).getErrorCode());
     }
 
     @Test
@@ -303,7 +314,7 @@ class EventDetailServiceTest {
 
         assertFalse(detail.evidenceIds().contains(TSM_EVIDENCE));
         assertTrue(detail.relations().stream().noneMatch(r -> r.target().equals("NYSE:TSM")));
-        verify(receipts, never()).readable(eq(TSM_EVIDENCE), anyString(), any(), anyString());
+        verify(receipts, never()).shownNow(eq(TSM_EVIDENCE), anyString(), any(), anyString());
     }
 
     @Test
@@ -350,7 +361,7 @@ class EventDetailServiceTest {
             DisclosureExclusions exclusions) {
         if (bundle != null) when(receipts.graphImportBundle(anyString(), anyString())).thenReturn(bundle);
         // Every citation is readable now unless a test withdraws one.
-        when(receipts.readable(anyString(), anyString(), any(), anyString())).thenReturn(true);
+        when(receipts.shownNow(anyString(), anyString(), any(), anyString())).thenReturn(true);
         PublicGraphSnapshot base = GraphReadFixtures.snapshot("fixture-2026-10-08");
         List<Issue> issues = base.issues().stream().map(i -> !i.issueId().equals(EUV) ? i : new Issue(i.issueId(),
                 i.label(), i.eventTime(), i.timePrecision(), i.period(), i.assertionStatus(), i.action(), i.target(),

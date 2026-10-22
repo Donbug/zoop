@@ -89,7 +89,7 @@ public class EventDetailService {
         Map<String, PublicGraphSnapshot.Evidence> readable = new LinkedHashMap<>();
         for (PublicGraphSnapshot.Evidence e : snapshot.evidence()) {
             if (cited.contains(e.evidenceId())
-                    && (handoff == null || receipts.readable(e.evidenceId(), versionId, at, requestId))) {
+                    && (handoff == null || receipts.shownNow(e.evidenceId(), versionId, at, requestId))) {
                 readable.put(e.evidenceId(), e);
             }
         }
