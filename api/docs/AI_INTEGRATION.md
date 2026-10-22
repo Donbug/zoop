@@ -134,7 +134,13 @@ HTTP/1.1, 프록시 없음, 쿠키 없음, **리다이렉트 안 따름**, 자�
 | `ZOOP_AI_CHAT_CLIENT_MODE` | `replay` | `replay`(AI 쪽 고정 응답, 네트워크 없음) 또는 `live`(실제 Luna/Jev 호출. AI 서비스의 chat live gate·호출 상한이 따로 열려 있어야 하며 유료 호출은 별도 승인 필요). 다른 값은 기동 실패 |
 | `…_BASE_URL`, `…_TOKEN`, `…_CONNECT_TIMEOUT`, `…_REQUEST_TIMEOUT`, `…_MAX_RESPONSE_BYTES` | 없음, 없음, `3s`, `35s`, `2097152` | S1 표와 같은 규칙. 토큰의 principal에는 `chat.invoke` scope가 필요합니다. 요청 마감은 가장 긴 단계(answer 25초)와 서비스 여유를 덮고, 단계별 상한은 오케스트레이터가 따로 끊습니다 |
 
-이 PR의 시험은 모두 stub(loopback 서버·스크립트 클라이언트)이며 실제 모델·live 호출은 하지 않았습니다.
+**종단 replay gate.** `make service-install api-ai-chat-smoke`(`api/scripts/ai_chat_gate.py`, Gradle `aiChatContractTest`, CI에서 실행)는 합성 시나리오에 대해 Java 어댑터가 만들어야 할 단계 입력과 replay 응답을 Python 쪽에서 작성합니다. replay 응답은 worker의 request identity(입력·설정 digest)로 찾으므로, Java가 만든 입력이 한 필드라도 다르면 `replay_input_mismatch`로 거절됩니다. 작성한 fixture는 먼저 프로세스 안에서 worker runtime으로 재생해 확인합니다. 그다음 실제 `ai/service`(loopback, replay 전용, live gate 닫힘)를 띄우고, 실제 `ChatModelStages` → `HttpChatStageClient`로 다음을 검사합니다.
+
+- 세 단계의 성공
+- 같은 invocation 재전송 시 저장된 결과 반환(재발송 없음)
+- grant 없는 인용 거절, 모르는 입력 거절, live 거절, `chat.invoke` 없는 principal 거절
+
+JUnit 보고서(0건·skip 금지)와 자격 증명 누출도 확인합니다. 모델 호출과 PostgreSQL은 쓰지 않습니다. `ChatCapability` 설명이나 입력 구성을 바꾸면 gate의 시나리오도 함께 갱신해야 합니다. 그 밖의 단위 시험은 stub(loopback 서버·스크립트 클라이언트)이며 실제 모델·live 호출은 하지 않았습니다.
 
 ## 소유와 격리
 
