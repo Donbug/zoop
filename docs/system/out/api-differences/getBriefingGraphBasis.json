@@ -7,6 +7,25 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "response:200:application/json.graphOrigin:required": false,
+    "response:200:application/json.graphOrigin<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "publication_snapshot",
+        "reconstructed"
+      ]
+    },
+    "response:200:application/json.graphOrigin<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.reconstructedAt:required": false,
+    "response:200:application/json.reconstructedAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.reconstructedAt<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.unavailableReason:required": false,
     "response:200:application/json.unavailableReason<anyOf:0>": {
       "type": "string",

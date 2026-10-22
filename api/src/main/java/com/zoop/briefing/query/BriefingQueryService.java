@@ -121,7 +121,7 @@ public class BriefingQueryService {
             out.put("graphVersion", row.publishedAt() == null ? null : row.graphVersion());
             out.putArray("keyIssueIds");
             out.putArray("companyIds");
-            out.putNull("unavailableReason");
+            out.putNull("unavailableReason").putNull("graphOrigin").putNull("reconstructedAt");
             out.put("correctionCount", changes.stream().filter(change -> "correction".equals(change.kind())).count());
             if (row.publishedAt() == null) {
                 out.put("status", "not_published").put("message", "아직 발행되지 않은 회차입니다.").putNull("reason");
@@ -131,25 +131,27 @@ public class BriefingQueryService {
                         .put("reason", suspension == null ? null : suspension.reason());
             } else {
                 requireReadable(row, requestId);
-                if (row.graphVersion() == null) {
-                    graphUnavailable(out, "snapshot_not_recorded");
+                if (graphSnapshots == null) {
+                    graphUnavailable(out, row.graphVersion() == null ? "snapshot_not_recorded" : "snapshot_unavailable");
                 } else {
-                    validateSnapshot(row);
-                    if (graphSnapshots == null) {
-                        graphUnavailable(out, "snapshot_unavailable");
-                    } else {
-                        try {
-                            var pinned = graphSnapshots.read(row.id(), row.graphVersion(), row.windowTo(), requestId);
-                            var basis = pinned.selected().briefing();
-                            if (basis == null || !row.id().equals(basis.roundId())) unavailable();
-                            basis.keyIssueIds().forEach(out.withArray("keyIssueIds")::add);
-                            basis.companyIds().forEach(out.withArray("companyIds")::add);
-                            out.put("status", "available").putNull("message").putNull("reason");
-                        } catch (BriefingGraphUnavailableException error) {
-                            graphUnavailable(out, error.reason());
-                        } catch (GraphSnapshotUnavailableException error) {
-                            graphUnavailable(out, "snapshot_unavailable");
+                    try {
+                        var pinned = graphSnapshots.read(row.id(), row.graphVersion(), row.windowTo(), requestId);
+                        var basis = pinned.selected().briefing();
+                        if (basis == null || !row.id().equals(basis.roundId())) unavailable();
+                        basis.keyIssueIds().forEach(out.withArray("keyIssueIds")::add);
+                        basis.companyIds().forEach(out.withArray("companyIds")::add);
+                        out.put("graphVersion", basis.graphVersion());
+                        out.put("status", "available").putNull("reason");
+                        if (basis.reconstruction() != null) {
+                            out.put("graphOrigin", "reconstructed").put("reconstructedAt", basis.reconstruction().createdAt().toString());
+                            out.put("message", "발행 당시 저장본이 아니라, 회차 마감 이전에 발행된 저장 자료로 나중에 재구성한 그래프입니다. 당시 수집·본문 버전의 동일성을 보장하지 않습니다.");
+                        } else {
+                            out.put("graphOrigin", "publication_snapshot").putNull("message");
                         }
+                    } catch (BriefingGraphUnavailableException error) {
+                        graphUnavailable(out, error.reason());
+                    } catch (GraphSnapshotUnavailableException error) {
+                        graphUnavailable(out, "snapshot_unavailable");
                     }
                 }
             }

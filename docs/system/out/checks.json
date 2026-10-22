@@ -1915,7 +1915,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getBriefingGraphBasis",
       "severity": "difference",
-      "message": "목표만 100 · BFF만 30 · 형식/필수/권한 변경 7",
+      "message": "목표만 106 · BFF만 30 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {

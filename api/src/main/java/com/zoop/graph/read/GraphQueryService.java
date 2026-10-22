@@ -135,7 +135,9 @@ public class GraphQueryService {
                         RelationValidity.of(graph.basesOf(e), selected.asOf())))
                 .toList();
         String emptyReason = edges.isEmpty() ? (focus.isEmpty() ? "no_approved_issues" : "no_related_issues") : null;
-        return new GraphResponse(nodes, edges, new GraphResponse.Metadata("public_graph_snapshot",
+        String source = selected.briefing() != null && selected.briefing().reconstruction() != null
+                ? "briefing_reconstructed_graph" : "public_graph_snapshot";
+        return new GraphResponse(nodes, edges, new GraphResponse.Metadata(source,
                 selected.asOf().toString(), selected.version().id(), mode, selection.truncated(), emptyReason,
                 focus, depth, NODE_LIMIT, requestId, false, List.of(), personalFilter));
     }

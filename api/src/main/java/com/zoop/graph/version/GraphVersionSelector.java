@@ -52,6 +52,8 @@ public class GraphVersionSelector {
             if ((graphVersion != null && !graphVersion.equals(basis.graphVersion()))
                     || (asOf != null && !asOf.equals(basis.dataAsOf())))
                 throw new CustomException(ErrorCode.INVALID_REQUEST);
+            if (basis.reconstruction() != null)
+                return new SelectedGraphVersion(basis.reconstruction().version(), basis.dataAsOf(), true, basis);
             if (!repository.everActivated(basis.graphVersion()))
                 throw new BriefingGraphUnavailableException("snapshot_unavailable");
             // A graph can be published after the input cutoff. Use the recorded version, not activeVersionIdAt(cutoff).

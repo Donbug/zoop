@@ -29,6 +29,10 @@ public final class GraphSnapshotFilter {
     }
 
     public static PublicGraphSnapshot apply(PublicGraphSnapshot s, Instant asOf, DisclosureExclusions exclusions) {
+        return apply(s, asOf, exclusions, false);
+    }
+
+    static PublicGraphSnapshot apply(PublicGraphSnapshot s, Instant asOf, DisclosureExclusions exclusions, boolean reconstruction) {
         Set<String> articles = s.articles().stream()
                 .filter(a -> asOf == null || publishedBy(a.publishedAt(), asOf))
                 .map(GraphSnapshotFilter::articleKey).collect(Collectors.toSet());
@@ -43,7 +47,7 @@ public final class GraphSnapshotFilter {
                 .filter(i -> !exclusions.issueIds().contains(i.issueId()))
                 .filter(i -> asOf == null || (publishedBy(i.latestPublishedAt(), asOf) && articleIds.containsAll(i.articleIds())))
                 .map(i -> withEvidence(i, evidenceIds))
-                .filter(i -> !i.evidenceIds().isEmpty() && !i.geographyEvidenceIds().isEmpty())
+                .filter(i -> !i.evidenceIds().isEmpty() && (!i.geographyEvidenceIds().isEmpty() || (reconstruction && i.geography() == null)))
                 .toList();
         Set<String> kept = issues.stream().map(Issue::issueId).collect(Collectors.toCollection(HashSet::new));
 

@@ -11,7 +11,13 @@ import java.util.Map;
 public interface BriefingGraphLookup {
     Basis resolve(String roundId, String requestId);
 
-    record Basis(String roundId, String graphVersion, Instant dataAsOf, Map<String, List<String>> issueCompanies) {
+    record Reconstruction(GraphVersionRecord version, Instant createdAt) { }
+
+    record Basis(String roundId, String graphVersion, Instant dataAsOf, Map<String, List<String>> issueCompanies,
+            Reconstruction reconstruction) {
+        public Basis(String roundId, String graphVersion, Instant dataAsOf, Map<String, List<String>> issueCompanies) {
+            this(roundId, graphVersion, dataAsOf, issueCompanies, null);
+        }
         public Basis {
             var copy = new LinkedHashMap<String, List<String>>();
             issueCompanies.forEach((issue, companies) -> copy.put(issue, List.copyOf(companies)));

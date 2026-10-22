@@ -1,3 +1,4 @@
+import BriefingRoundIssuePanel from '@/components/graph/BriefingRoundIssuePanel';
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   GraphAppearanceContext,
@@ -850,17 +851,27 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                   onAskAi={() => openAi(impactTarget())}
                 />
               )}
-              {eventId && !pathFrom && (
-                <EventDetailPanel
-                  key={eventId}
-                  id={eventId}
-                  context={eventContext}
-                  geography={selectedNode?.geography ?? null}
-                  logoOf={logoOf}
-                  onClose={() => selectNode(null)}
-                  onAction={eventAction}
-                />
-              )}
+              {eventId &&
+                !pathFrom &&
+                (round ? (
+                  <BriefingRoundIssuePanel
+                    key={`${round}:${eventId}`}
+                    roundId={round}
+                    eventId={eventId}
+                    graphVersion={data?.metadata.graphVersion ?? null}
+                    onClose={() => selectNode(null)}
+                  />
+                ) : (
+                  <EventDetailPanel
+                    key={eventId}
+                    id={eventId}
+                    context={eventContext}
+                    geography={selectedNode?.geography ?? null}
+                    logoOf={logoOf}
+                    onClose={() => selectNode(null)}
+                    onAction={eventAction}
+                  />
+                ))}
               {edgeId && !pathFrom && (
                 <RelationDetailPanel
                   key={edgeId}
