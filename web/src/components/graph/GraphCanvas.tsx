@@ -799,7 +799,13 @@ export default function GraphCanvas({
       if (camera) {
         retainFocus();
         await graph.zoomTo(camera.zoom, false);
-        await graph.translateTo(camera.position, false);
+        // 저장한 값은 getPosition()(캔버스 원점의 화면 위치)이다. translateTo는 기준이 달라
+        // 노드가 화면 밖으로 밀려나므로, 지금 위치와의 차이만큼 옮겨 같은 화면을 되살린다.
+        const current = graph.getPosition();
+        await graph.translateBy(
+          [camera.position[0] - current[0], camera.position[1] - current[1]],
+          false,
+        );
       }
       instance.current = graph;
       syncSelection();

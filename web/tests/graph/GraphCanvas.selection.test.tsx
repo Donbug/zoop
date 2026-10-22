@@ -517,7 +517,8 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     act(() => canvas.handlers.get('aftertransform')!({ target: { id: '' } }));
     rerender(<GraphCanvas data={all} memoryOwner="member-a" />);
     await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalledWith(1.8, false));
-    expect(canvas.translateTo).toHaveBeenCalledWith([40, 60], false);
+    // 저장한 화면 위치(40, 60)와 지금 위치(5, 10)의 차이만큼 옮긴다.
+    expect(canvas.translateBy).toHaveBeenCalledWith([35, 50], false);
   });
   it('opens the default layout instead of a saved camera taken at another map size', async () => {
     const all = createMockGraph({ mode: 'all', personalFilter: 'all' });
@@ -535,6 +536,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
     expect(canvas.zoomTo).not.toHaveBeenCalled();
     expect(canvas.translateTo).not.toHaveBeenCalled();
+    expect(canvas.translateBy).not.toHaveBeenCalled();
   });
   it('D-GRP-01 flow order neither reuses nor overwrites the remembered map camera', async () => {
     const all = createMockGraph({ mode: 'all', personalFilter: 'all' });
@@ -550,7 +552,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       <GraphCanvas data={all} memoryOwner="member-a" flow />,
     );
     await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
-    expect(canvas.translateTo).not.toHaveBeenCalled();
+    expect(canvas.zoomTo).not.toHaveBeenCalledWith(1.8, false);
     canvas.getZoom.mockReturnValue(0.4);
     canvas.getPosition.mockReturnValue([900, 900]);
     unmount();
