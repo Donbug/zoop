@@ -351,6 +351,9 @@ class BriefingHttpPostgresTest {
         assertEquals(409, get("/api/v1/evidence/" + evidenceId + "?graphVersion=" + version + "&asOf=2026-10-15T08:30:00Z", "no-round").status(),
                 "the import was activated AFTER cutoff; removing round cannot select it");
         assertEquals(422, get("/api/v1/evidence/" + evidenceId + query.replace(version, "other"), "wrong-round-version").status());
+        var missingRound = get("/api/v1/evidence/" + evidenceId + "?round=brf-1", "missing-round-no-fallback");
+        assertEquals(404, missingRound.status(), missingRound.body());
+        assertEquals("RESOURCE_NOT_FOUND", missingRound.json().at("/error/code").asText());
         Files.writeString(GRAPH_ROOT.resolve("sources.json"), sources.replace("\"enabled\":true", "\"enabled\":false"));
         assertEquals("EVIDENCE_UNAVAILABLE", get("/api/v1/evidence/" + evidenceId + query, "revoked-quote").json().at("/error/code").asText());
         Files.writeString(GRAPH_ROOT.resolve("sources.json"), sources);
