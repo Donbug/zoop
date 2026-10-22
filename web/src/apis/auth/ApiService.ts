@@ -20,6 +20,7 @@ type ErrorBody = {
     code?: unknown;
     message?: unknown;
     retryable?: unknown;
+    requestId?: unknown;
   };
 };
 
@@ -68,18 +69,22 @@ export class ApiError extends Error {
   readonly code: string | null;
   /** 같은 요청을 다시 보내면 나아질 수 있는지(계약의 error.retryable). 서버가 주지 않으면 null */
   readonly retryable: boolean | null;
+  /** 문의·로그 대조용 요청 ID(오류 본문의 requestId 또는 X-Request-ID). 없으면 null */
+  readonly requestId: string | null;
 
   constructor(
     status: number,
     code: string | null,
     message: string,
     retryable: boolean | null = null,
+    requestId: string | null = null,
   ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.retryable = retryable;
+    this.requestId = requestId;
   }
 }
 
@@ -87,16 +92,19 @@ async function toApiError(response: Response) {
   let code: string | null = null;
   let message = response.statusText || `HTTP ${response.status}`;
   let retryable: boolean | null = null;
+  let requestId = response.headers?.get('X-Request-ID') ?? null;
   try {
     const body = (await response.json()) as ErrorBody;
     if (typeof body.error?.code === 'string') code = body.error.code;
     if (typeof body.error?.message === 'string') message = body.error.message;
     if (typeof body.error?.retryable === 'boolean')
       retryable = body.error.retryable;
+    if (typeof body.error?.requestId === 'string')
+      requestId = body.error.requestId;
   } catch {
     // 본문이 JSON이 아니면 상태 문구만 쓴다.
   }
-  return new ApiError(response.status, code, message, retryable);
+  return new ApiError(response.status, code, message, retryable, requestId);
 }
 
 function createRequestOptions(

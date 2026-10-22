@@ -784,7 +784,11 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                     if (edge) selectEdge(edge.id);
                   }}
                   onAskAi={() =>
-                    openAi({ kind: 'company', id: companyNode.id })
+                    openAi({
+                      kind: 'company',
+                      id: companyNode.id,
+                      label: companyNode.label,
+                    })
                   }
                 />
               )}
@@ -949,7 +953,11 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
               </div>
             )}
           </div>
-          <AiChatDrawer />
+          <AiChatDrawer
+            onViewOnMap={(id) =>
+              updateQuery({ focus: id, hops: '1', path: null })
+            }
+          />
           <EvidenceDrawer
             onViewOnMap={(id) =>
               updateQuery({ focus: id, hops: '1', path: null })

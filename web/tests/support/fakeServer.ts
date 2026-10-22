@@ -9,6 +9,7 @@ export type FakeRequest = {
   query: URLSearchParams;
   params: Record<string, string>;
   body: unknown;
+  headers: Headers;
 };
 
 type Handler = (request: FakeRequest) => Response | Promise<Response>;
@@ -90,6 +91,7 @@ export function createFakeServer() {
           query: url.searchParams,
           params,
           body,
+          headers: new Headers(init?.headers),
         };
         requests.push(request);
         return route.handler(request);
