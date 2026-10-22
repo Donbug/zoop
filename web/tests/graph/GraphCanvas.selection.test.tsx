@@ -738,6 +738,41 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     );
   });
 
+  it('D-GRP-07b focus mode keeps 1·2-hop nodes and edges at full strength even while the focus company is selected', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(
+      <GraphCanvas
+        data={data}
+        selectedId="NASDAQ:NVDA"
+        focusId="NASDAQ:NVDA"
+        focusHops={2}
+        focusLayout
+      />,
+    );
+    await waitFor(() => expect(canvas.setElementState).toHaveBeenCalled());
+    const states = canvas.setElementState.mock.calls.at(-1)![0] as Record<
+      string,
+      string[]
+    >;
+    expect(states['NASDAQ:NVDA']).toEqual(expect.arrayContaining(['selected']));
+    expect(
+      Object.values(states).some((list) => list.includes('inactive')),
+    ).toBe(false);
+  });
+
+  it('D-GRP-01 outside focus mode a selected company still dims unrelated nodes', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} selectedId="NASDAQ:NVDA" />);
+    await waitFor(() => expect(canvas.setElementState).toHaveBeenCalled());
+    const states = canvas.setElementState.mock.calls.at(-1)![0] as Record<
+      string,
+      string[]
+    >;
+    expect(
+      Object.values(states).some((list) => list.includes('inactive')),
+    ).toBe(true);
+  });
+
   it('D-GRP-04 selects eligible edges via canvas/keyboard and never recreates the viewport', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const onSelectEdge = vi.fn();

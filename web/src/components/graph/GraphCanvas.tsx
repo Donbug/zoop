@@ -170,6 +170,8 @@ export default function GraphCanvas({
           }
         }
       }
+      // 포커스 모드에서는 연결 없는 노드가 이미 숨겨지므로, 남은 1·2단계 노드·연결선을 흐리게 하지 않는다.
+      const dimRest = !(focusLayout && focusId);
       const states: Record<string, string[]> = {};
       for (const node of rendered.nodes ?? []) {
         const id = String(node.id);
@@ -182,14 +184,16 @@ export default function GraphCanvas({
                 : relatedNodes.has(id)
                   ? 'related'
                   : 'inactive',
-            ]
+            ].filter((state) => dimRest || state !== 'inactive')
           : [];
         if (id === selected) states[id].push('selected');
       }
       for (const edge of rendered.edges ?? []) {
         const id = String(edge.id);
         states[id] = active
-          ? [relatedEdges.has(id) ? 'related' : 'inactive']
+          ? [relatedEdges.has(id) ? 'related' : 'inactive'].filter(
+              (state) => dimRest || state !== 'inactive',
+            )
           : [];
         if (id === selectedEdgeId) states[id].push('selected');
       }
