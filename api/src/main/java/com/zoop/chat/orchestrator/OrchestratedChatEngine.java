@@ -125,6 +125,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         } catch (Stop stop) {
             return stop.failed;
         } catch (ChatModels.Failure failure) {
+            if (failure.fate() == ChatModels.Failure.Fate.REFUSED) return new ChatEngineOutcome.Failed("internal", null, false);
             boolean unknown = failure.fate() == ChatModels.Failure.Fate.UNKNOWN;
             return new ChatEngineOutcome.Failed("transient", unknown ? "response_unknown" : "provider_error", !unknown);
         } catch (ChatToolUnavailable unavailable) {
@@ -173,7 +174,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         control.phase("writing");
         var context = new ChatBranchContext(run.turns(), run.context(), branches, ChatAnswerCheck.MAX_CITATIONS);
         ChatGeneratedAnswer generated = model(control, limits.generate(), limits.verify().plus(limits.server()),
-                () -> generator.generate(context));
+                () -> generator.generate(run, context));
         var checked = ChatAnswerCheck.check(branches, generated);
         route.put("deterministicCheck", checked.failedCheck() == null ? "passed" : checked.failedCheck());
         if (checked.failedCheck() != null) return validationFailed();
