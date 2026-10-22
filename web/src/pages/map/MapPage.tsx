@@ -75,6 +75,39 @@ function readFilter(value: string | null): PersonalScope {
 
 // WBS 6.6.21~6.6.23 · D-GRP-01/01b + D-GRP-02/03.
 export default function MapPage() {
+  const { params, updateQuery } = useRouteQuery();
+  const owner = useAuthStore(
+    (state) => `${selectMemberId(state) ?? 'guest'}:${state.sessionRevision}`,
+  );
+  const tour = params.get('tour') === '1';
+  const [tutorialRun, setTutorialRun] = useState(0);
+  const entryKey = `${owner}:${tour}:${tutorialRun}`;
+  const [readyEntry, setReadyEntry] = useState<string | null>(null);
+  useEffect(() => {
+    if (readyEntry === entryKey) return;
+    let active = true;
+    if (tour) {
+      // Gate the workspace before mounting any stale detail/mobile modal.
+      useGraphUiStore.getState().closeEvidence();
+      useGraphUiStore.getState().setTutorialStep(1);
+      useAiChatStore.getState().close();
+      if (params.toString() !== 'mode=all&tour=1')
+        updateQuery(
+          {
+            ...Object.fromEntries([...params.keys()].map((key) => [key, null])),
+            mode: 'all',
+            tour: '1',
+          },
+          { replace: true },
+        );
+    }
+    void Promise.resolve().then(() => {
+      if (active) setReadyEntry(entryKey);
+    });
+    return () => {
+      active = false;
+    };
+  }, [entryKey, readyEntry, tour, params, updateQuery]);
   const inherited = useContext(GraphAppearanceContext);
   const theme =
     document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
@@ -84,12 +117,28 @@ export default function MapPage() {
   );
   return (
     <GraphAppearanceContext value={appearance}>
-      <MapWorkspace appearance={appearance} />
+      {tour && readyEntry !== entryKey ? (
+        <p role="status">튜토리얼 지도를 준비하고 있어요.</p>
+      ) : (
+        <MapWorkspace
+          appearance={appearance}
+          onStartTutorial={() => {
+            setTutorialRun((run) => run + 1);
+            updateQuery({ tour: '1' });
+          }}
+        />
+      )}
     </GraphAppearanceContext>
   );
 }
 
-function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
+function MapWorkspace({
+  appearance,
+  onStartTutorial,
+}: {
+  appearance: GraphAppearance;
+  onStartTutorial: () => void;
+}) {
   const { params, updateQuery } = useRouteQuery();
   // FS065 계측: 메인 지도 노출 1회와 노드 선택. 노출 중 선택 여부는 viewId로 묶는다.
   const viewId = useScreenView('main');
@@ -149,7 +198,8 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
     ? 'all'
     : readFilter(params.get('scope') ?? sessionStorage.getItem(FILTER_KEY));
   const companyId = params.get('companyId') ?? undefined;
-  const historical = companyId && exactTime(params.get('asOf'));
+  const historical =
+    !tutorialOpen && companyId && exactTime(params.get('asOf'));
   const asOf = historical ? params.get('asOf')! : undefined;
   const graphVersion = historical
     ? (params.get('graphVersion') ?? undefined)
@@ -169,7 +219,9 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
   const impactIssueId = impactParts.length === 2 ? impactParts[1] : null;
   const returnTo = params.get('returnTo');
   const round =
-    requestedMode === 'all' ? (params.get('round') ?? undefined) : undefined;
+    !tutorialOpen && requestedMode === 'all'
+      ? (params.get('round') ?? undefined)
+      : undefined;
   const { data, error, loading } = useGraphData(
     {
       mode: requestedMode,
@@ -195,12 +247,12 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
       ? '실제 관계 지도를 불러오고 있어요.'
       : error
         ? '지도를 불러오지 못했어요. 아래 다시 시도로 실제 데이터를 불러오거나 건너뛰어 주세요.'
-        : tutorialStep === 1
-          ? practice.pan
-            ? '이동했어요! 휠을 움직이거나 왼쪽 아래 확대·축소 버튼을 눌러 보세요.'
-            : '점선으로 강조된 빈 공간을 누른 채 끌어 지도를 이동해 보세요.'
-          : !target
-            ? '현재 실제 지도에 안내할 기업·사건 연결이 없어요. 다시 불러오거나 튜토리얼을 건너뛸 수 있어요.'
+        : !target
+          ? '현재 실제 지도에 안내할 기업·사건 연결이 없어요. 다시 불러오거나 튜토리얼을 건너뛸 수 있어요.'
+          : tutorialStep === 1
+            ? practice.pan
+              ? '이동했어요! 휠을 움직이거나 왼쪽 아래 확대·축소 버튼을 눌러 보세요.'
+              : '점선으로 강조된 빈 공간을 누른 채 끌어 지도를 이동해 보세요.'
             : tutorialStep === 2
               ? `지도를 드래그하거나 확대·축소하며 살펴본 뒤 강조된 ${target.company.label} 기업 노드를 선택하세요.`
               : tutorialStep === 3
@@ -383,12 +435,19 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
     });
     if (id) track({ type: 'graph_node_select', targetId: id, viewId });
   };
-  const eventContext = {
-    round,
-    graphVersion:
-      params.get('graphVersion') ?? data?.metadata.graphVersion ?? undefined,
-    asOf: params.get('asOf') ?? data?.metadata.asOf ?? undefined,
-  };
+  const eventContext = tutorialOpen
+    ? {
+        graphVersion: data?.metadata.graphVersion ?? undefined,
+        asOf: data?.metadata.asOf ?? undefined,
+      }
+    : {
+        round,
+        graphVersion:
+          params.get('graphVersion') ??
+          data?.metadata.graphVersion ??
+          undefined,
+        asOf: params.get('asOf') ?? data?.metadata.asOf ?? undefined,
+      };
   const impact = useImpactPath(
     round && !data ? null : impactCompanyId,
     round && !data ? null : impactIssueId,
@@ -741,13 +800,7 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
               >
                 <GraphIcon name="info" size={15} />
               </button>
-              <button
-                onClick={() => {
-                  setTutorialStep(1);
-                  updateQuery({ tour: '1' });
-                }}
-                aria-label="튜토리얼 다시 보기"
-              >
+              <button onClick={onStartTutorial} aria-label="튜토리얼 다시 보기">
                 <GraphIcon name="help" size={15} />
               </button>
             </div>
@@ -870,6 +923,11 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                   step={tutorialStep}
                   practice
                   instruction={tutorialInstruction}
+                  onReload={
+                    !loading && data && !target
+                      ? () => setRetry((v) => v + 1)
+                      : undefined
+                  }
                   saving={tutorialSaving}
                   error={tutorialError}
                   onStepChange={(step: GraphTutorialStep) => {
@@ -897,6 +955,11 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                       step={tutorialStep}
                       practice
                       instruction={tutorialInstruction}
+                      onReload={
+                        !loading && data && !target
+                          ? () => setRetry((v) => v + 1)
+                          : undefined
+                      }
                       saving={tutorialSaving}
                       error={tutorialError}
                       onStepChange={(step: GraphTutorialStep) => {
@@ -1095,7 +1158,10 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                   <p>
                     조회 실패: {error}
                     {data && ' 직전 정상 그래프를 표시합니다.'}{' '}
-                    <button onClick={() => setRetry((v) => v + 1)}>
+                    <button
+                      data-tutorial-action="retry"
+                      onClick={() => setRetry((v) => v + 1)}
+                    >
                       다시 시도
                     </button>
                   </p>
@@ -1128,7 +1194,10 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                 {data?.metadata.partial && (
                   <p>
                     일부 데이터를 조회하지 못했습니다.{' '}
-                    <button onClick={() => setRetry((v) => v + 1)}>
+                    <button
+                      data-tutorial-action="retry"
+                      onClick={() => setRetry((v) => v + 1)}
+                    >
                       다시 시도
                     </button>
                   </p>

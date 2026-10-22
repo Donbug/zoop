@@ -44,6 +44,7 @@ type Props = {
   onFinish: () => void;
   onSkip: () => void;
   onRetry?: () => void;
+  onReload?: () => void;
 };
 
 // WBS 6.3.10 · D-GRP-T/T2/T3/T4/T5 · Figma 619:3337~5682
@@ -58,6 +59,7 @@ export default function GraphTutorial({
   onFinish,
   onSkip,
   onRetry,
+  onReload,
 }: Props) {
   const current = steps[step - 1];
   return (
@@ -119,6 +121,15 @@ export default function GraphTutorial({
             </div>
           )}
           <div className="flex flex-wrap items-center gap-2">
+            {onReload && (
+              <button
+                data-tutorial-action="retry"
+                onClick={onReload}
+                className="h-8 px-2 text-[11px] underline"
+              >
+                지도 다시 불러오기
+              </button>
+            )}
             {step > 1 && !practice ? (
               <button
                 className="h-8 rounded-panel border border-panel-line px-3 text-[12px] font-semibold hover:bg-panel-soft"

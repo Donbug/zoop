@@ -24,13 +24,15 @@ import {
 import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { freeViewport, nodeRect, type Rect } from './graph-geometry';
 
+const noHighlightedEdges: string[] = [];
+
 export default function GraphCanvas({
   data,
   selectedId: selected = null,
   onSelect,
   focusId = null,
   focusHops = 1,
-  highlightedEdgeIds = [],
+  highlightedEdgeIds = noHighlightedEdges,
   selectedEdgeId = null,
   onSelectEdge,
   connectionPath = false,
@@ -167,11 +169,16 @@ export default function GraphCanvas({
     const point = graph.getViewportByCanvas([x, y]);
     const rawSize = node.style?.size;
     const size = Number(Array.isArray(rawSize) ? rawSize[0] : rawSize) || 40;
-    setTutorialMarker({
+    const next = {
       x: point[0],
       y: point[1],
       size: size * graph.getZoom() + 20,
-    });
+    };
+    setTutorialMarker((old) =>
+      old?.x === next.x && old.y === next.y && old.size === next.size
+        ? old
+        : next,
+    );
   });
   function handleNodeSelect(id: string | null) {
     if (tutorialPhase || (tutorialLocked && id !== tutorialTargetId)) return;
@@ -454,9 +461,12 @@ export default function GraphCanvas({
             host.clientWidth,
             host.clientHeight,
             selected ?? focusId,
-            data.edges
-              .filter((edge) => highlightedEdgeIds.includes(edge.id))
-              .flatMap((edge) => [edge.source, edge.target]),
+            [
+              ...(tutorialTargetId ? [tutorialTargetId] : []),
+              ...data.edges
+                .filter((edge) => highlightedEdgeIds.includes(edge.id))
+                .flatMap((edge) => [edge.source, edge.target]),
+            ],
             connectionPath && highlightedEdgeIds.length
               ? new Set(
                   data.edges
@@ -1200,7 +1210,12 @@ export default function GraphCanvas({
       {renderError && (
         <div className="relationship-message" role="alert">
           그래프를 표시하지 못했습니다.
-          <button onClick={() => setRetry((v) => v + 1)}>다시 시도</button>
+          <button
+            data-tutorial-action="retry"
+            onClick={() => setRetry((v) => v + 1)}
+          >
+            다시 시도
+          </button>
         </div>
       )}
       <div

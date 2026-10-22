@@ -10,10 +10,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import GraphCanvas from '@/components/graph/GraphCanvas';
 import { createMockGraph } from '@/mocks/graph/response';
 import type { GraphData } from '@antv/g6';
-import { MemoryRouter } from 'react-router-dom';
+import {
+  MemoryRouter,
+  createMemoryRouter,
+  RouterProvider,
+} from 'react-router-dom';
 import MapPage from '@/pages/map/MapPage';
 import * as graphApi from '@/apis/graph/graph';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useGraphUiStore } from '@/stores/useGraphUiStore';
 
 const canvas = vi.hoisted(() => ({
   created: vi.fn(),
@@ -77,6 +82,7 @@ beforeEach(() => {
   sessionStorage.clear();
   canvas.getZoom.mockReturnValue(1);
   canvas.getPosition.mockReturnValue([0, 0]);
+  canvas.translateBy.mockResolvedValue(undefined);
   canvas.handlers.clear();
   canvas.resizeCallbacks.length = 0;
   Object.defineProperty(document, 'fonts', {
@@ -95,6 +101,91 @@ beforeEach(() => {
   );
 });
 describe('D-GRP-02 · canvas selection bridge', () => {
+  it('모바일의 기존 상세/경로를 닫고 실제 캔버스에서 재시작·이동·확대·기업 선택을 수행한다', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('max-width: 767px'),
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    useAuthStore.setState({ status: 'ready', session: null, member: null });
+    useGraphUiStore.getState().reset();
+    vi.spyOn(graphApi, 'getGraph').mockResolvedValue(
+      createMockGraph({ mode: 'all', personalFilter: 'all' }),
+    );
+    const router = createMemoryRouter([{ path: '/', element: <MapPage /> }], {
+      initialEntries: [
+        '/?mode=all&path=KRX:005930,NASDAQ:NVDA&select=node:KRX:005930',
+      ],
+    });
+    const view = render(<RouterProvider router={router} />);
+    await screen.findByRole('dialog', { name: '지도 상세' });
+    await act(async () => {
+      await router.navigate(
+        '/?mode=all&tour=1&path=KRX:005930,NASDAQ:NVDA&select=node:KRX:005930&impact=KRX:005930,old&round=old&asOf=2020-01-01T00:00:00Z&graphVersion=old',
+      );
+    });
+    const pad = await screen.findByRole('button', {
+      name: '강조된 지도 이동 영역',
+    });
+    expect(screen.queryByRole('dialog', { name: '지도 상세' })).toBeNull();
+    for (
+      let parent: HTMLElement | null = pad;
+      parent;
+      parent = parent.parentElement
+    )
+      expect(parent.inert).not.toBe(true);
+    expect(router.state.location.search).toBe('?mode=all&tour=1');
+    fireEvent.keyDown(pad, { key: 'ArrowRight' });
+    const zoom = screen.getByRole('button', { name: '확대' });
+    await waitFor(() =>
+      expect((zoom as HTMLButtonElement).disabled).toBe(false),
+    );
+    await userEvent.click(zoom);
+    const target = await screen.findByRole('button', {
+      name: '강조된 삼성전자 노드 선택',
+    });
+    await userEvent.click(target);
+    await screen.findByRole('dialog', { name: '지도 상세' });
+    expect(useGraphUiStore.getState().tutorialStep).toBe(3);
+    view.unmount();
+  });
+  it('기업 하나에만 연결된 목표 사건도 실제 G6 데이터와 클릭 강조 영역에 표시한다', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const company = data.nodes.find((node) => node.id === 'KRX:005930')!;
+    const issue = data.nodes.find((node) => node.kind === 'issue')!;
+    const edge = data.edges.find(
+      (edge) => edge.source === issue.id && edge.target === company.id,
+    )!;
+    const small = { ...data, nodes: [company, issue], edges: [edge] };
+    const select = vi.fn();
+    render(
+      <GraphCanvas
+        data={small}
+        tutorialLocked
+        tutorialTargetId={issue.id}
+        onSelect={select}
+      />,
+    );
+    const marker = await screen.findByRole('button', {
+      name: `강조된 ${issue.label} 노드 선택`,
+    });
+    await waitFor(() => {
+      const rendered = canvas.setData.mock.lastCall![0] as GraphData;
+      expect(
+        rendered.nodes?.some(
+          (node) => node.id === issue.id && node.style?.visibility !== 'hidden',
+        ),
+      ).toBe(true);
+    });
+    await userEvent.click(marker);
+    expect(select).toHaveBeenCalledWith(issue.id);
+    const draws = canvas.draw.mock.calls.length;
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    expect(canvas.draw).toHaveBeenCalledTimes(draws);
+  });
   it.each(['light', 'dark'] as const)(
     'D-GRP-01 uses the approved appearance on the normal %s map route',
     async (theme) => {

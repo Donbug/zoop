@@ -69,7 +69,9 @@ function SectionError({
   return (
     <p className="company-section-error" role="alert">
       일부 정보를 불러오지 못했습니다.{' '}
-      <button onClick={retry}>다시 시도</button>
+      <button data-tutorial-action="retry" onClick={retry}>
+        다시 시도
+      </button>
     </p>
   );
 }

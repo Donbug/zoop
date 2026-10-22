@@ -118,7 +118,8 @@ export default function EvidenceDrawer({
   );
 
   useEffect(() => {
-    if (target && !loading && items.length > 0) onReady?.(target.id);
+    if (target && !loading && items.some((item) => item.article !== null))
+      onReady?.(target.id);
   }, [target, loading, items, onReady]);
 
   useEffect(() => {
