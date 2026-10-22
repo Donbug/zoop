@@ -43,6 +43,7 @@ public class CompanyDocumentsService {
     public record Response(List<Document> items, Metadata metadata, String nextCursor) { }
     record Cursor(String companyId, String kind, String from, String to, int limit, String graphVersion,
             String asOf, String pinnedAt, String lastArticleId, String lastPublishedAt) { }
+    private record DocumentKey(String articleId, String articleVersion) { }
     private record Candidate(PublicGraphSnapshot.Article snapshot, ArticleRow article, VersionRow version,
             List<EventRef> events, Set<String> evidenceIds, Instant published) { }
 
@@ -95,29 +96,49 @@ public class CompanyDocumentsService {
         PublicGraphReader.Pinned pinned = reader.read(null,
                 after == null ? graphVersion : after.graphVersion(), requestedAsOf);
         DisplayGraph graph = pinned.graph();
-        Map<String, PublicGraphSnapshot.Article> snapshotArticles = new HashMap<>();
-        for (var article : graph.snapshot.articles()) snapshotArticles.put(article.articleId(), article);
+        Map<DocumentKey, PublicGraphSnapshot.Article> snapshotArticles = new HashMap<>();
+        Map<String, List<PublicGraphSnapshot.Article>> articlesById = new HashMap<>();
+        for (var article : graph.snapshot.articles()) {
+            snapshotArticles.put(new DocumentKey(article.articleId(), article.version()), article);
+            articlesById.computeIfAbsent(article.articleId(), ignored -> new ArrayList<>()).add(article);
+        }
         Map<String, PublicGraphSnapshot.Evidence> snapshotEvidence = new HashMap<>();
         for (var span : graph.snapshot.evidence()) snapshotEvidence.put(span.evidenceId(), span);
-        Map<String, List<EventRef>> events = new LinkedHashMap<>();
-        Map<String, Set<String>> evidenceIds = new LinkedHashMap<>();
+        Map<DocumentKey, List<EventRef>> events = new LinkedHashMap<>();
+        Map<DocumentKey, Set<String>> evidenceIds = new LinkedHashMap<>();
         for (Issue issue : graph.issuesOf(companyId)) {
             if (end != null && !visibleAtTo(issue, companyId, end, graph, snapshotArticles, snapshotEvidence)) continue;
             EventRef event = new EventRef(issue.issueId(), issue.label(), null);
-            for (String articleId : issue.articleIds()) {
-                if (snapshotArticles.containsKey(articleId))
-                    events.computeIfAbsent(articleId, key -> new ArrayList<>()).add(event);
+            Set<DocumentKey> issueArticles = new LinkedHashSet<>();
+            for (var mention : issue.mentions()) {
+                DocumentKey key = new DocumentKey(mention.articleId(), mention.articleVersion());
+                if (snapshotArticles.containsKey(key)) issueArticles.add(key);
             }
+            // Older/fixture snapshots without mentions can be resolved only when the article has one pinned version.
+            if (issueArticles.isEmpty() && issue.mentions().isEmpty()) {
+                for (String articleId : issue.articleIds()) {
+                    List<PublicGraphSnapshot.Article> versions = articlesById.getOrDefault(articleId, List.of());
+                    if (versions.size() == 1) {
+                        var article = versions.get(0);
+                        issueArticles.add(new DocumentKey(article.articleId(), article.version()));
+                    }
+                }
+            }
+            for (DocumentKey key : issueArticles)
+                events.computeIfAbsent(key, ignored -> new ArrayList<>()).add(event);
             for (String evidenceId : issue.evidenceIds()) {
                 PublicGraphSnapshot.Evidence span = snapshotEvidence.get(evidenceId);
-                if (span != null && events.containsKey(span.articleId()))
-                    evidenceIds.computeIfAbsent(span.articleId(), key -> new LinkedHashSet<>()).add(evidenceId);
+                if (span != null) {
+                    DocumentKey key = new DocumentKey(span.articleId(), span.articleVersion());
+                    if (issueArticles.contains(key))
+                        evidenceIds.computeIfAbsent(key, ignored -> new LinkedHashSet<>()).add(evidenceId);
+                }
             }
         }
         List<Candidate> candidates = new ArrayList<>();
         for (var entry : events.entrySet()) {
             PublicGraphSnapshot.Article snapshot = snapshotArticles.get(entry.getKey());
-            ArticleRow article = registry.findArticle(entry.getKey()).orElse(null);
+            ArticleRow article = registry.findArticle(entry.getKey().articleId()).orElse(null);
             if (article == null || !"available".equals(article.accessStatus())) continue;
             if (kind != null && !kind.equals(article.kind())) continue;
             VersionRow version = registry.findVersion(snapshot.articleId(), snapshot.version()).orElse(null);
@@ -133,7 +154,11 @@ public class CompanyDocumentsService {
                     evidenceIds.getOrDefault(entry.getKey(), Set.of()), published));
         }
         candidates.sort(Comparator.comparing(Candidate::published, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(item -> item.snapshot().articleId()));
+                .thenComparing(item -> item.snapshot().articleId())
+                .thenComparing(item -> item.snapshot().version()));
+        // The list contract returns one row per article: choose its newest pinned publication, then version id as a stable tie-breaker.
+        Set<String> selectedArticleIds = new LinkedHashSet<>();
+        candidates.removeIf(candidate -> !selectedArticleIds.add(candidate.snapshot().articleId()));
         Instant lastPublished = after == null || after.lastPublishedAt() == null ? null
                 : Instant.parse(after.lastPublishedAt());
         int startIndex = 0;
@@ -146,6 +171,7 @@ public class CompanyDocumentsService {
         List<Document> page = new ArrayList<>();
         for (Candidate candidate : candidates.subList(startIndex, pageEnd)) {
             List<Quote> quotes = new ArrayList<>();
+            boolean sourceAuthorized = false;
             for (String evidenceId : candidate.evidenceIds()) {
                 try {
                     EvidenceResponse visible = evidence.read(evidenceId, null, pinned.selected().version().id(), asOf,
@@ -153,21 +179,26 @@ public class CompanyDocumentsService {
                     boolean sameSnapshot = asOf == null || visible.metadata() != null
                             && pinned.selected().version().id().equals(visible.metadata().graphVersion())
                             && requestedAsOf.equals(visible.metadata().asOf());
-                    if (sameSnapshot && candidate.snapshot().articleId().equals(visible.articleId())
-                            && candidate.snapshot().version().equals(visible.articleVersion())
-                            && visible.eventIds().stream().anyMatch(id -> candidate.events().stream()
-                                    .anyMatch(event -> event.eventId().equals(id)))) {
-                        quotes.add(new Quote(evidenceId, visible.quote(), visible.quoteVerified()));
+                    boolean sameDocument = sameSnapshot && candidate.snapshot().articleId().equals(visible.articleId())
+                            && candidate.snapshot().version().equals(visible.articleVersion());
+                    if (sameDocument) {
+                        sourceAuthorized = true;
+                        if (visible.eventIds().stream().anyMatch(id -> candidate.events().stream()
+                                .anyMatch(event -> event.eventId().equals(id))))
+                            quotes.add(new Quote(evidenceId, visible.quote(), visible.quoteVerified()));
                     }
                 } catch (CustomException error) {
                     if (error.getErrorCode() != ErrorCode.EVIDENCE_UNAVAILABLE
                             && error.getErrorCode() != ErrorCode.RESOURCE_NOT_FOUND) throw error;
                 }
             }
+            // A current source grant must authorize document metadata as well as any quote we display.
+            if (!sourceAuthorized) continue;
             // A date-only publication is not promoted to an invented date-time on the wire.
             Instant publishedAt = "datetime".equals(candidate.version().publicationPrecision())
                     ? candidate.version().publishedAt() : null;
-            var analysis = analyses.read(candidate.article(), candidate.version(), companyId, requestId);
+            var analysis = analyses.read(candidate.article(), candidate.version(), companyId, requestId,
+                    requestedAsOf != null || graphVersion != null);
             page.add(new Document(candidate.snapshot().articleId(), candidate.snapshot().title(),
                     candidate.version().publisher(), candidate.snapshot().url(), publishedAt, candidate.article().kind(),
                     candidate.events(), List.copyOf(quotes), analysis.sentiment(), candidate.snapshot().version(),
@@ -190,18 +221,30 @@ public class CompanyDocumentsService {
 
     /** Apply the prototype's to-time graph cutoff inside the already selected public version. */
     private static boolean visibleAtTo(Issue issue, String companyId, Instant end, DisplayGraph graph,
-            Map<String, PublicGraphSnapshot.Article> articles,
+            Map<DocumentKey, PublicGraphSnapshot.Article> articles,
             Map<String, PublicGraphSnapshot.Evidence> evidence) {
-        if (!publishedBeforeEnd(issue.latestPublishedAt(), end)
-                || issue.articleIds().stream().anyMatch(id -> {
-                    var article = articles.get(id);
-                    return article == null || !publishedBeforeEnd(article.publishedAt(), end);
-                })) return false;
+        if (!publishedBeforeEnd(issue.latestPublishedAt(), end)) return false;
+        Set<DocumentKey> articleRefs = new LinkedHashSet<>();
+        for (var mention : issue.mentions())
+            articleRefs.add(new DocumentKey(mention.articleId(), mention.articleVersion()));
+        if (articleRefs.isEmpty() && issue.mentions().isEmpty()) {
+            for (String articleId : issue.articleIds()) {
+                List<PublicGraphSnapshot.Article> versions = graph.snapshot.articles().stream()
+                        .filter(article -> article.articleId().equals(articleId)).toList();
+                if (versions.size() != 1) return false;
+                var article = versions.get(0);
+                articleRefs.add(new DocumentKey(article.articleId(), article.version()));
+            }
+        }
+        if (articleRefs.stream().anyMatch(key -> {
+            var article = articles.get(key);
+            return article == null || !publishedBeforeEnd(article.publishedAt(), end);
+        })) return false;
         return graph.snapshot.relations().stream().filter(relation -> relation.source().equals(issue.issueId())
                 && relation.target().equals(companyId) && DisplayGraph.COMPANY_LINKS.contains(relation.relationType()))
                 .anyMatch(relation -> relation.evidenceIds().stream().allMatch(id -> {
                     var span = evidence.get(id);
-                    var article = span == null ? null : articles.get(span.articleId());
+                    var article = span == null ? null : articles.get(new DocumentKey(span.articleId(), span.articleVersion()));
                     return article != null && publishedBeforeEnd(article.publishedAt(), end);
                 }) && (!"STRUCTURALLY_RELATED_TO".equals(relation.relationType()) || relation.basis().stream()
                         .anyMatch(basis -> Instant.parse(basis.verifiedAt()).isBefore(end))));

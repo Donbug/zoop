@@ -115,6 +115,15 @@ public class CompanyDocumentAnalysisReader {
         return new Visible(sentimentResult, summaryResult, status, provenance, resultVersion);
     }
 
+    /** Historical graph snapshots cannot prove which later S1 analysis result was visible at their as-of time. */
+    public Visible read(ArticleRow article, VersionRow version, String companyId, String requestId, boolean pinnedRead) {
+        if (!pinnedRead) return read(article, version, companyId, requestId);
+        Analysis summary = latest(article.id(), version.version(), "summary", null);
+        Analysis sentiment = latest(article.id(), version.version(), "sentiment", companyId);
+        Status status = new Status(stage(summary, summary != null), stage(sentiment, sentiment != null));
+        return new Visible(null, null, status, null, null);
+    }
+
     private Analysis latest(String articleId, String version, String stage, String companyId) {
         String sql = """
                 SELECT id, status, reason, result_version, CAST(result AS text) AS result_text,

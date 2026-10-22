@@ -99,4 +99,14 @@ class CompanyDocumentAnalysisReaderTest {
         assertEquals("withheld", result.status().sentiment().status());
         assertTrue(result.status().summary().status().equals("not_requested"));
     }
+
+    @Test
+    void pinnedGraphReadWithholdsAnAnalysisThatCannotBeBoundToItsAsOf() throws Exception {
+        var result = reader(mock(EvidenceReadRepository.class), temp.resolve("not-needed.json"))
+                .read(ARTICLE, VERSION, "KRX:000660", "req", true);
+        assertNull(result.sentiment());
+        assertEquals("withheld", result.status().sentiment().status());
+        assertNull(result.summary());
+        assertEquals("not_requested", result.status().summary().status());
+    }
 }

@@ -8,8 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.zoop.common.exception.CustomException;
@@ -62,14 +65,25 @@ class CompanyDocumentsServiceTest {
                     day ? "day" : item.publishedAt() == null ? "unknown" : "datetime", null, null, NOW)));
         }
         evidence = mock(EvidenceService.class);
-        when(evidence.read(anyString(), any(), any(), any(), any(), any()))
-                .thenThrow(new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE));
+        var snapshotEvidence = GraphReadFixtures.snapshot("fixture-2026-10-08").evidence();
+        when(evidence.read(anyString(), any(), any(), any(), any(), any())).thenAnswer(call -> {
+            String evidenceId = call.getArgument(0);
+            var span = snapshotEvidence.stream().filter(item -> item.evidenceId().equals(evidenceId)).findFirst().orElseThrow();
+            String selectedVersion = call.getArgument(2);
+            String requestedAsOf = call.getArgument(3);
+            var metadata = requestedAsOf == null ? null : new Metadata("public_graph_snapshot", Instant.parse(requestedAsOf),
+                    selectedVersion, "req-1", false, List.of());
+            return new EvidenceResponse(evidenceId, "quote", span.start(), span.end(), span.articleId(),
+                    span.articleVersion(), null, true, List.of(), metadata, null, span.articleVersion(), null, null, null, null);
+        });
         analyses = mock(CompanyDocumentAnalysisReader.class);
-        when(analyses.read(any(), any(), anyString(), anyString())).thenReturn(
-                new CompanyDocumentAnalysisReader.Visible(null, null,
-                        new CompanyDocumentAnalysisReader.Status(
-                                new CompanyDocumentAnalysisReader.StageStatus("not_requested", null),
-                                new CompanyDocumentAnalysisReader.StageStatus("not_requested", null)), null, null));
+        var noAnalysis = new CompanyDocumentAnalysisReader.Visible(null, null,
+                new CompanyDocumentAnalysisReader.Status(
+                        new CompanyDocumentAnalysisReader.StageStatus("not_requested", null),
+                        new CompanyDocumentAnalysisReader.StageStatus("not_requested", null)), null, null);
+        when(analyses.read(any(), any(), anyString(), anyString())).thenReturn(noAnalysis);
+        when(analyses.read(any(), any(), anyString(), anyString(), eq(true))).thenReturn(noAnalysis);
+        when(analyses.read(any(), any(), anyString(), anyString(), eq(false))).thenReturn(noAnalysis);
         service = new CompanyDocumentsService(GraphReadFixtures.reader(NOW, () -> DisclosureExclusions.NONE), jdbc,
                 registry, evidence, analyses, JsonMapper.builder().build());
     }
@@ -208,6 +222,66 @@ class CompanyDocumentsServiceTest {
         for (var document : documents.items()) {
             for (var event : document.events()) assertTrue(timelineIds.contains(event.eventId()));
         }
+        verify(analyses, atLeastOnce()).read(any(), any(), eq(COMPANY), eq("req-1"), eq(true));
+    }
+
+    @Test
+    void articleVersionsAreJoinedByExactMentionAndNewestVersionWinsPerArticle() {
+        var source = GraphReadFixtures.snapshot("fixture-2026-10-08");
+        String articleId = "art-hbm-supply";
+        String newEvidenceId = "ev-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        var newArticle = new PublicGraphSnapshot.Article(articleId, "v2", "새 제목", "https://example.invalid/v2",
+                "2026-09-24T01:00:00Z");
+        var oldIssue = source.issues().stream().filter(issue -> issue.issueId().equals(GraphReadFixtures.HBM_SUPPLY))
+                .findFirst().orElseThrow();
+        String newIssueId = "iss-fixture-hbm-supply-v2";
+        var newIssue = new PublicGraphSnapshot.Issue(newIssueId, "새 버전 사건", oldIssue.eventTime(), oldIssue.timePrecision(),
+                oldIssue.period(), oldIssue.assertionStatus(), oldIssue.action(), oldIssue.target(), oldIssue.geography(),
+                oldIssue.geographyPolicyVersion(), List.of(), List.of(articleId), List.of(newEvidenceId),
+                List.of(new PublicGraphSnapshot.MentionRef("men-v2", articleId, "v2")), null, "2026-09-24T01:00:00Z");
+        var baseRelation = source.relations().stream().filter(relation -> relation.source().equals(oldIssue.issueId())
+                && relation.target().equals(COMPANY)).findFirst().orElseThrow();
+        var newRelation = new PublicGraphSnapshot.Relation("rel-fixture-v2", baseRelation.relationType(), newIssueId,
+                baseRelation.target(), baseRelation.role(), baseRelation.assertionStatus(), List.of(newEvidenceId), List.of());
+        var snapshot = new PublicGraphSnapshot(source.snapshotFormat(), source.versionId(), source.sourceBundleId(),
+                source.companies(), java.util.stream.Stream.concat(source.issues().stream(), java.util.stream.Stream.of(newIssue)).toList(),
+                java.util.stream.Stream.concat(source.relations().stream(), java.util.stream.Stream.of(newRelation)).toList(),
+                java.util.stream.Stream.concat(source.articles().stream(), java.util.stream.Stream.of(newArticle)).toList(),
+                java.util.stream.Stream.concat(source.evidence().stream(), java.util.stream.Stream.of(
+                        new PublicGraphSnapshot.Evidence(newEvidenceId, articleId, "v2", 0, 40))).toList());
+        PublicGraphReader reader = mock(PublicGraphReader.class);
+        when(reader.read(any(), any(), any())).thenReturn(new PublicGraphReader.Pinned(
+                new SelectedGraphVersion(GraphReadFixtures.record("fixture-2026-10-08", true), NOW, false),
+                DisplayGraph.of(snapshot)));
+        when(registry.findArticle(articleId)).thenReturn(Optional.of(new ArticleRow(articleId, "news", "test", "v2", "available")));
+        when(registry.findVersion(articleId, "v2")).thenReturn(Optional.of(new VersionRow(articleId, "v2", "새 제목",
+                "publisher-v2", "https://example.invalid/v2", Instant.parse("2026-09-24T01:00:00Z"), null,
+                "datetime", null, null, NOW)));
+        EvidenceResponse visibleV2 = new EvidenceResponse(newEvidenceId, "새 인용", 0, 40, articleId, "v2", null,
+                true, List.of(newIssueId), null, null, "v2", null, null, null, null);
+        doReturn(visibleV2).when(evidence).read(eq(newEvidenceId), any(), any(), any(), any(), any());
+        service = new CompanyDocumentsService(reader, jdbc, registry, evidence, analyses, JsonMapper.builder().build());
+
+        var result = list(null, null, null, null);
+        var document = result.items().stream().filter(item -> item.id().equals(articleId)).findFirst().orElseThrow();
+        assertEquals("v2", document.documentVersion());
+        assertEquals("새 제목", document.title());
+        assertEquals(List.of(newIssueId), document.events().stream().map(CompanyDocumentsService.EventRef::eventId).toList());
+        assertEquals(List.of(newEvidenceId), document.quotes().stream().map(CompanyDocumentsService.Quote::evidenceId).toList());
+    }
+
+    @Test
+    void deniedSourceGrantHidesDocumentAndRegistryFailurePropagates() {
+        var spans = GraphReadFixtures.snapshot("fixture-2026-10-08").evidence().stream()
+                .filter(span -> span.articleId().equals("art-hbm-supply")).toList();
+        spans.forEach(span -> doThrow(new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE))
+                .when(evidence).read(eq(span.evidenceId()), any(), any(), any(), any(), any()));
+        assertTrue(list(null, null, null, null).items().stream().noneMatch(item -> item.id().equals("art-hbm-supply")));
+
+        doThrow(new CustomException(ErrorCode.SOURCE_UNAVAILABLE)).when(evidence)
+                .read(eq(spans.get(0).evidenceId()), any(), any(), any(), any(), any());
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> list(null, null, null, null)).getErrorCode());
     }
 
     @Test
