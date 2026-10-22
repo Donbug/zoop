@@ -355,9 +355,13 @@ class EventDetailServiceTest {
     @Test
     void aFollowedEventThatCannotBeShownLeavesFollowsAndRelations() {
         EventDetailService service = imported(hbmBundle());
-        // Both shown: equipment (unanimous) follows supply.
-        assertEquals(List.of(HBM_SUPPLY), service.get(HBM_EQUIP, null, null, null, "r").follows().previous().stream()
-                .map(EventDetail.FollowRef::id).toList());
+        // The label follows would carry is the snapshot's headline of supply, not the receipt mention's title.
+        String supplyLabel = GraphReadFixtures.snapshot("fixture-2026-10-08").issues().stream()
+                .filter(i -> i.issueId().equals(HBM_SUPPLY)).findFirst().orElseThrow().label();
+        // Both shown: equipment (unanimous) follows supply, and its label is in the response.
+        EventDetail shown = service.get(HBM_EQUIP, null, null, null, "r");
+        assertEquals(List.of(HBM_SUPPLY), shown.follows().previous().stream().map(EventDetail.FollowRef::id).toList());
+        assertEquals(List.of(supplyLabel), shown.follows().previous().stream().map(EventDetail.FollowRef::title).toList());
 
         // Supply's citation is withdrawn: its own detail is closed, and equipment no longer names it.
         when(receipts.shownNow(eq(SUPPLY_EV[0]), anyString(), any(), anyString())).thenReturn(false);
@@ -366,7 +370,7 @@ class EventDetailServiceTest {
         EventDetail equipment = service.get(HBM_EQUIP, null, null, null, "r");
         assertEquals(List.of(), equipment.follows().previous());
         assertTrue(equipment.relations().stream().noneMatch(r -> r.relationType().equals("FOLLOWS")));
-        assertFalse(equipment.toString().contains("supply title"));
+        assertFalse(equipment.toString().contains(supplyLabel), "supply's headline does not leave through equipment");
     }
 
     @Test
