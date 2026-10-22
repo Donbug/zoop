@@ -4836,7 +4836,7 @@ same request again never toggles anything.
 | graphVersion | 필수 | string, null | 공개 데이터는 반드시 실제 사용한 버전 ID를 제공한다. 개인 설정 등 비그래프 리소스만 null이다. |
 | mode | 필수 | string {all, personal} |  |
 | truncated | 필수 | boolean |  |
-| emptyReason | 필수 | string / null | null은 빈 결과 사유 없음. no_personal_stocks는 개인화 조회에서 선택한 범위의 기준 기업이 없음(다른 범위에는 있을 수 있음), no_related_issues는 기준 기업은 있지만 관련 관계가 없음, no_approved_issues는 공개할 사건이 없음. 장애는 이 값 대신 오류 응답을 사용한다. |
+| emptyReason | 필수 | string / null | null은 빈 결과 사유 없음. no_personal_stocks는 개인화 조회에서 선택한 범위의 기준 기업이 없음(다른 범위에는 있을 수 있음), no_related_issues는 기준 기업은 있지만 관련 관계가 없음, no_approved_issues는 기준 기업이 없고 반환 간선도 없다는 판정이다. 이때 고립된 이슈 노드가 남을 수 있으므로 공개 가능한 사건이 전혀 없음을 보장하지 않는다. 장애는 이 값 대신 오류 응답을 사용한다. |
 | focusCompanyIds | 필수 | string[] |  |
 | depth | 필수 | integer / null | Requested hop count; null when omitted (whole connected component). |
 | limit | 필수 | integer |  |

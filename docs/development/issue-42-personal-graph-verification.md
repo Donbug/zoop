@@ -1,5 +1,7 @@
 # #42 FS014 초기 개인화 관계 그래프 검증
 
+> 적용 범위: 프론트 동작·테스트 결과는 해당 구현이 포함된 `82d6236` 기준의 과거 기록이다. 프론트 변경과 테스트는 `c9ee3c0`에서 이 PR 범위에서 제거됐다. 현재 PR은 API 회귀 테스트·HTTP smoke·계약·문서 변경을 포함하며, 이 문서는 현재 head의 프론트 전환 검증 증거가 아니다.
+
 2026-10-22 · 연결 이슈: [#42](https://github.com/Donbug/zoop/issues/42), [#45](https://github.com/Donbug/zoop/issues/45)
 
 ## 범위와 화면 추적
@@ -16,11 +18,13 @@
 ## 계약 결정
 
 - `GET /api/v1/graph?mode=personal`은 회원의 모의 보유와 관심 종목을 요청 때 읽는다. `personalFilter`가 고른 범위에 기준 기업이 없으면 빈 응답과 `emptyReason=no_personal_stocks`를 반환한다. 다른 범위에 종목이 있는지는 이 값만으로 알 수 없다.
-- 온보딩에서 둘 다 없으면 `/?mode=all`로 이동한다. 이후 개인화 URL에 직접 들어온 경우, 전체 개인화 범위도 비어 있음을 확인한 다음 시장 전체 지도로 전환한다. 보유만 또는 관심만 빈 필터는 유지한다.
+- 프론트 요구사항/이전 구현(`82d6236`): 온보딩에서 둘 다 없으면 `/?mode=all`로 이동한다. 이후 개인화 URL에 직접 들어온 경우 전체 개인화 범위도 비어 있음을 확인한 다음 시장 전체 지도로 전환한다. 보유만 또는 관심만 빈 필터는 유지한다. 이 동작은 현재 PR head에 구현되어 있지 않다.
 - 같은 `companies` 카탈로그가 관심 종목 검색·설정 유효성 검사·그래프 기준 기업 조회에 쓰인다. 카탈로그에는 있지만 현재 fixture 스냅샷에 없는 기준 기업은 관계 없는 노드로 유지된다. 관계나 사건을 만들어 내지 않는다.
 - 그래프 조회 실패는 오류 응답이다. 빈 그래프로 대체하지 않으며 화면에서 재시도를 제공한다. 개인화 모드에 브리핑 `round`를 보내면 422다.
 
 ## 검증 기록
+
+아래 화면 전환 및 웹 테스트 결과는 프론트 구현이 포함된 `82d6236`에서 수행한 이력이며, 현재 PR head에서 재검증한 결과가 아니다.
 
 실제 HTTP 확인은 일회용 PostgreSQL, 로컬 API, 합성 graph fixture에서 수행했다. `api/scripts/initial_personal_graph_smoke.py`는 필수 약관을 조회해 합성 회원을 만들고 아래 경로를 재실행한다. 로그에 쿠키·CSRF 토큰을 출력하지 않는다.
 
@@ -36,7 +40,7 @@
 
 온보딩 프런트 통합 테스트는 D-WAT-01에서 첫 지도까지 네 조합과 D-ONB-01 → D-ONB-02 → D-WAT-01 → D-GRP-01b의 모의 계좌 연결 경로를 검증한다. 가입·로그인·세션 회복은 기존 `web/tests/auth/authJourney.test.tsx` 회귀 테스트로 확인했다. 실제 브라우저와 실제 API를 동시에 실행하는 E2E는 수행하지 않았으며, 프런트 통합 테스트는 API 형식의 합성 응답을 사용한다.
 
-실행 결과:
+과거 실행 결과 (`82d6236`; 현재 head에서 재실행하지 않음):
 
 - API: `GraphVersionPostgresIntegrationTest.fs014SavedWatchlistAndMockHoldingsAppearInTheNextPersonalRead`, `GraphControllerTest`, `GraphQueryServiceTest` 통과.
 - 웹: `initial-personal-graph.test.tsx`, `watchlist.test.tsx`, `investmentChoice.test.tsx`, `virtualAccount.test.tsx`, `MainGraphCompletion.test.tsx`, `GraphCanvas.selection.test.tsx`, `mobile-and-isolated.test.tsx`, `authJourney.test.tsx` 통과.
@@ -51,6 +55,6 @@ ZOOP_GRAPH_SMOKE_ORIGIN=http://localhost:8080 \
 python3 api/scripts/initial_personal_graph_smoke.py
 ```
 
-## 롤백
+## 현재 PR 범위와 롤백
 
-화면 전환 문제가 생기면 `MapPage`의 `no_personal_stocks` 처리와 해당 화면 테스트를 되돌릴 수 있다. 서버 응답 의미와 기존 `GraphSelection`은 변경하지 않았으므로 API 응답 호환 경로는 유지된다. 계약 설명은 화면 동작과 함께 검토해 되돌린다.
+현재 PR은 개인화 응답의 API 계약, 백엔드 회귀 테스트, HTTP smoke와 검증 문서 범위다. 프론트 시장 전체 전환 구현·테스트는 포함하지 않는다. API 계약 변경을 되돌릴 때는 `docs/api/openapi.yaml`과 생성 명세를 함께 되돌린다. 과거 `MapPage` 동작과 화면 테스트는 별도 프론트 작업에서 관리한다.
