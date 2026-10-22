@@ -42,7 +42,10 @@ class CompanyMarketClientsTest {
     private volatile boolean fridayOpen;
     /** The KR calendar stub answers for another day than the one asked (a provider format failure). */
     private volatile boolean calendarDateMismatch;
+    /** The KR calendar stub's previous business day has no regular-session end (a provider format failure). */
+    private volatile boolean calendarPreviousWithoutEnd;
     private final List<String> candleQueries = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final List<String> calendarQueries = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     @BeforeEach
     void startProviderStub() throws IOException {
@@ -57,6 +60,7 @@ class CompanyMarketClientsTest {
             if (path.equals("/api/v1/candles") && rateLimitOnce) { rateLimitOnce = false; status = 429; }
             String rawQuery = exchange.getRequestURI().getRawQuery();
             if (path.equals("/api/v1/candles")) candleQueries.add(rawQuery);
+            if (path.startsWith("/api/v1/market-calendar/")) calendarQueries.add(path + "?" + rawQuery);
             String body = response(path, rawQuery);
             byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -177,7 +181,7 @@ class CompanyMarketClientsTest {
         assertEquals("1d", result.interval());
         assertEquals("KRW", result.currency());
         assertEquals("toss", result.source().provider());
-        assertEquals(List.of("2026-10-14T00:00+09:00", "2026-10-15T00:00+09:00"),
+        assertEquals(List.of("2026-10-14T00:00:00+09:00", "2026-10-15T00:00:00+09:00"),
                 result.points().stream().map(p -> p.time()).toList());
         var last = result.points().get(1);
         assertEquals(695.0, last.open());
@@ -190,7 +194,7 @@ class CompanyMarketClientsTest {
         exchangeDaily = true;
         var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m",
                 kst("2026-10-15T00:00"), kst("2026-10-16T00:00"));
-        assertEquals(List.of("2026-10-15T00:00+09:00"), result.points().stream().map(p -> p.time()).toList());
+        assertEquals(List.of("2026-10-15T00:00:00+09:00"), result.points().stream().map(p -> p.time()).toList());
 
         var empty = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m",
                 kst("2026-01-01T00:00"), kst("2026-02-01T00:00"));
@@ -204,7 +208,7 @@ class CompanyMarketClientsTest {
         exchangeDaily = true;
         var result = tossClient("test-client", "test-secret").prices("NASDAQ:NVDA", "NASDAQ", "NVDA", "1m",
                 kst("2026-10-01T00:00"), kst("2026-10-15T10:00").plusNanos(1));
-        assertEquals(List.of("2026-10-14T00:00-04:00"), result.points().stream().map(p -> p.time()).toList());
+        assertEquals(List.of("2026-10-14T00:00:00-04:00"), result.points().stream().map(p -> p.time()).toList());
         assertEquals("USD", result.currency());
     }
 
@@ -243,7 +247,7 @@ class CompanyMarketClientsTest {
 
         assertEquals("1wk", result.interval());
         // 10-14 and 10-15 fall in the week of Monday 10-12; the 2025 bars have no open and are left out.
-        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-12T00:00+09:00", 645, 720, 640, 700, 2634.0)),
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-12T00:00:00+09:00", 645, 720, 640, 700, 2634.0)),
                 result.points());
     }
 
@@ -254,8 +258,8 @@ class CompanyMarketClientsTest {
 
         assertEquals("5m", result.interval());
         // Toss stamps a minute bar with its end: 12:01 and 12:02 start in the 12:00 bucket, 12:06 in 12:05.
-        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00+09:00", 100, 105, 99, 104, 15.0),
-                new CompanyPriceResponse.Point("2026-10-15T12:05+09:00", 104, 104, 103, 103, 1.0)), result.points());
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00:00+09:00", 100, 105, 99, 104, 15.0),
+                new CompanyPriceResponse.Point("2026-10-15T12:05:00+09:00", 104, 104, 103, 103, 1.0)), result.points());
         // Today (10-16) is a holiday on the calendar stub, so the session is the previous business day: all of 10-15.
         assertEquals(new CompanyPriceResponse.Range("2026-10-15T09:00:00+09:00", "2026-10-15T15:30:00+09:00", "2026-10-15"),
                 result.range());
@@ -272,7 +276,7 @@ class CompanyMarketClientsTest {
         // Friday close before the 03-08 DST start: the week of 03-02 ends at 03-09 00:00 EDT, which is 167 hours on.
         var result = tossClient("test-client", "test-secret").prices("NASDAQ:NVDA", "NASDAQ", "NVDA", "1y", null,
                 java.time.Instant.parse("2026-03-06T21:00:00Z").plusNanos(1));
-        assertEquals(List.of(new CompanyPriceResponse.Point("2026-03-02T00:00-05:00", 110, 115, 109, 114, 5.0)),
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-03-02T00:00:00-05:00", 110, 115, 109, 114, 5.0)),
                 result.points());
     }
 
@@ -284,7 +288,7 @@ class CompanyMarketClientsTest {
                 java.time.Instant.parse("2026-10-15T03:00:00Z").plusNanos(1));
         assertEquals(new CompanyPriceResponse.Range("2026-10-15T09:00:00+09:00", "2026-10-15T12:00:00+09:00", "2026-10-15"),
                 open.range());
-        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00+09:00", 100, 105, 99, 104, 15.0)), open.points());
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00:00+09:00", 100, 105, 99, 104, 15.0)), open.points());
 
         // Sunday before the open: the calendar's previous business day (10-15; 10-16 is a holiday) as a whole session,
         // ending at its close, not at the requested to. Weekend and holiday days are never read.
@@ -313,8 +317,8 @@ class CompanyMarketClientsTest {
                 java.time.Instant.parse("2026-11-27T19:00:00Z").plusNanos(1));
         assertEquals(new CompanyPriceResponse.Range("2026-11-27T09:30:00-05:00", "2026-11-27T13:00:00-05:00", "2026-11-27"),
                 result.range());
-        assertEquals(List.of(new CompanyPriceResponse.Point("2026-11-27T09:30-05:00", 190, 191, 189, 190, 1.0),
-                new CompanyPriceResponse.Point("2026-11-27T12:00-05:00", 200, 202, 199, 201, 2.0)), result.points());
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-11-27T09:30:00-05:00", 190, 191, 189, 190, 1.0),
+                new CompanyPriceResponse.Point("2026-11-27T12:00:00-05:00", 200, 202, 199, 201, 2.0)), result.points());
     }
 
     @Test
@@ -324,13 +328,53 @@ class CompanyMarketClientsTest {
                 java.time.Instant.parse("2026-11-27T14:30:00Z").plusNanos(1));
         assertEquals(new CompanyPriceResponse.Range("2026-11-27T09:30:00-05:00", "2026-11-27T09:30:00-05:00", "2026-11-27"),
                 us.range());
-        assertEquals(List.of(new CompanyPriceResponse.Point("2026-11-27T09:30-05:00", 190, 191, 189, 190, 1.0)), us.points());
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-11-27T09:30:00-05:00", 190, 191, 189, 190, 1.0)), us.points());
 
         // KRX 09:00:00 reads that day (10-15), not the previous business day (10-14).
         tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1d", null,
                 java.time.Instant.parse("2026-10-15T00:00:00Z").plusNanos(1));
         assertTrue(candleQueries.stream().anyMatch(q -> q.contains("before=2026-10-15T15")));
         assertFalse(candleQueries.stream().anyMatch(q -> q.contains("before=2026-10-14T15")));
+    }
+
+    @Test
+    void onlyAPastDaysCalendarIsKept() {
+        var client = tossClient("test-client", "test-secret");
+        // 10-15 is before today (the clock's 10-16 KST): read once, then kept.
+        for (int i = 0; i < 2; i++) client.prices("KRX:005930", "KRX", "005930", "1d", null,
+                java.time.Instant.parse("2026-10-15T03:00:00Z").plusNanos(1));
+        assertEquals(1, calendarQueries.stream().filter(q -> q.contains("date=2026-10-15")).count());
+
+        // Today can still gain an early close or a holiday, and a later day is not settled either: read every time.
+        for (int i = 0; i < 2; i++) client.prices("KRX:005930", "KRX", "005930", "1d", null, null);
+        assertEquals(2, calendarQueries.stream().filter(q -> q.contains("date=2026-10-16")).count());
+        for (int i = 0; i < 2; i++) client.prices("KRX:005930", "KRX", "005930", "1d", null,
+                java.time.Instant.parse("2026-10-18T00:00:00Z"));
+        assertEquals(2, calendarQueries.stream().filter(q -> q.contains("date=2026-10-18")).count());
+    }
+
+    @Test
+    void aCalendarFormatFailureIsNotKept() {
+        var client = tossClient("test-client", "test-secret");
+        var to = java.time.Instant.parse("2026-10-15T03:00:00Z").plusNanos(1);
+        calendarDateMismatch = true;
+        assertThrows(MarketDataException.class, () -> client.prices("KRX:005930", "KRX", "005930", "1d", null, to));
+        calendarDateMismatch = false;
+        assertEquals("2026-10-15", client.prices("KRX:005930", "KRX", "005930", "1d", null, to).range().sessionDate());
+        assertEquals(2, calendarQueries.stream().filter(q -> q.contains("date=2026-10-15")).count());
+    }
+
+    @Test
+    void aPastCalendarWithABadSessionIsNotKept() {
+        var client = tossClient("test-client", "test-secret");
+        var to = java.time.Instant.parse("2026-10-15T03:00:00Z").plusNanos(1);
+        calendarPreviousWithoutEnd = true;
+        // 10-15 is open at to, so the bad previous day is not read for the answer, but the calendar is not kept either.
+        assertEquals("2026-10-15", client.prices("KRX:005930", "KRX", "005930", "1d", null, to).range().sessionDate());
+        calendarPreviousWithoutEnd = false;
+        client.prices("KRX:005930", "KRX", "005930", "1d", null, to);
+        client.prices("KRX:005930", "KRX", "005930", "1d", null, to);
+        assertEquals(2, calendarQueries.stream().filter(q -> q.contains("date=2026-10-15")).count());
     }
 
     @Test
@@ -361,7 +405,7 @@ class CompanyMarketClientsTest {
     void weekUsesHourBuckets() {
         var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1w", null, null);
         assertEquals("1h", result.interval());
-        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00+09:00", 100, 105, 99, 103, 16.0)),
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00:00+09:00", 100, 105, 99, 103, 16.0)),
                 result.points());
         assertEquals("not_connected", tossClient("", "").prices("KRX:005930", "KRX", "005930", "1m", null, null).reasonCode());
     }
@@ -446,7 +490,9 @@ class CompanyMarketClientsTest {
                 """;
         boolean open = date.equals("2026-10-15") || (date.equals("2026-10-16") && fridayOpen);
         String previous = date.equals("2026-10-15") ? "2026-10-14" : fridayOpen && !date.equals("2026-10-16") ? "2026-10-16" : "2026-10-15";
-        return "{\"result\":{\"today\":" + krDay(calendarDateMismatch ? "2026-10-19" : date, open) + ",\"previousBusinessDay\":" + krDay(previous, true)
+        String previousDay = calendarPreviousWithoutEnd ? krDay(previous, true).replaceAll(",\"endTime\":\"[^\"]*\"", "")
+                : krDay(previous, true);
+        return "{\"result\":{\"today\":" + krDay(calendarDateMismatch ? "2026-10-19" : date, open) + ",\"previousBusinessDay\":" + previousDay
                 + ",\"nextBusinessDay\":" + krDay("2026-10-19", true) + "}}";
     }
 

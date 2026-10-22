@@ -1,0 +1,90 @@
+{
+  "type": "object",
+  "properties": {
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "targetId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600
+          },
+          "checkedText": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "SUPPORTED",
+              "UNSUPPORTED",
+              "UNCERTAIN"
+            ]
+          },
+          "flags": {
+            "type": "object",
+            "properties": {
+              "typeAppropriate": {
+                "type": "boolean"
+              },
+              "temporalAppropriate": {
+                "type": "boolean"
+              },
+              "noUnsupportedNumbers": {
+                "type": "boolean"
+              },
+              "noInvestmentAdvice": {
+                "type": "boolean"
+              },
+              "conditionsPreserved": {
+                "type": "boolean"
+              },
+              "atomicClaim": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "typeAppropriate",
+              "temporalAppropriate",
+              "noUnsupportedNumbers",
+              "noInvestmentAdvice",
+              "conditionsPreserved",
+              "atomicClaim"
+            ],
+            "additionalProperties": false
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          },
+          "unsupportedSpan": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 250
+          }
+        },
+        "required": [
+          "targetId",
+          "checkedText",
+          "verdict",
+          "flags",
+          "reason",
+          "unsupportedSpan"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0,
+      "maxItems": 12
+    }
+  },
+  "required": [
+    "checks"
+  ],
+  "additionalProperties": false
+}

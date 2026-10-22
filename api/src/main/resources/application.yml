@@ -52,6 +52,10 @@ zoop:
       # (snapshots staged by the operator graph handoff import, read-only and verified; needs artifact-root).
       source: ${ZOOP_GRAPH_SNAPSHOT_SOURCE:none}
       artifact-root: ${ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT:}
+    activation:
+      # Imported (non-fixture) versions are not activated while no public exclusion store exists (FS081), because "nothing
+      # excluded" cannot be checked. An operator who accepts that may set this to true; synthetic fixtures are not affected.
+      allow-without-exclusion-store: ${ZOOP_GRAPH_ACTIVATION_ALLOW_WITHOUT_EXCLUSION_STORE:false}
   chat:
     # Accepting new questions and retries needs a ChatEngine (the orchestrator), which is not deployed yet. Off by default:
     # submit and retry answer 503 MODEL_UNAVAILABLE instead of leaving a job queued forever, and startup refuses intake on

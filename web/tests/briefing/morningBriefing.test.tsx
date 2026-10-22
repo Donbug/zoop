@@ -7,7 +7,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import BriefingPage from '@/pages/briefing/BriefingPage';
 import type { BriefingResponse, MarketIndicator } from '@/types/briefing';
@@ -100,9 +100,31 @@ function setup(response = round(), url = '/briefing') {
   return server;
 }
 describe('D-BRF-01 / FS028 FS030 FS031 FS033 FS035', () => {
+  it('labels a stored historical replay and preserves missing market data', async () => {
+    const response = round();
+    setup({
+      ...response,
+      graphVersion: null,
+      marketVariables: { status: 'unavailable', reason: '당시 지표 미수집' },
+      metadata: {
+        ...response.metadata,
+        source: 'zoop-briefing-development-replay',
+        graphVersion: null,
+      },
+    });
+    const note = await screen.findByRole('note', { name: '개발 재생 안내' });
+    expect(note.textContent).toContain('과거 수집 자료');
+    expect(note.textContent).toContain('동일한 자료');
+    expect(screen.getByText('당시 지표 미수집')).toBeTruthy();
+    expect(screen.queryByText('2,600 pt')).toBeNull();
+    expect(
+      screen.getByRole('heading', { name: /합성 핵심 이슈/ }),
+    ).toBeTruthy();
+  });
   it('requests latest morning without a date and renders stored summary, times and fractional changes', async () => {
     const server = setup();
     await screen.findByText('합성 시장 요약');
+    expect(screen.queryByRole('note', { name: '개발 재생 안내' })).toBeNull();
     expect(server.requests[0].query.get('edition')).toBe('morning');
     expect(server.requests[0].query.has('date')).toBe(false);
     expect(screen.getByText('2,600 pt')).toBeTruthy();
@@ -117,6 +139,25 @@ describe('D-BRF-01 / FS028 FS030 FS031 FS033 FS035', () => {
       ).length,
     ).toBeGreaterThan(0);
   });
+  it.each(['published', 'not_ready'] as const)(
+    'labels a per-round historical simulation with status %s',
+    async (status) => {
+      const response = round({ status });
+      setup({
+        ...response,
+        metadata: {
+          ...response.metadata,
+          source: 'zoop-briefing-publication-clock-simulation',
+        },
+      });
+      const note = await screen.findByRole('note', {
+        name: '회차별 과거 시뮬레이션 안내',
+      });
+      expect(note.textContent).toContain('회차별로 나눈');
+      expect(note.textContent).toContain('당시 본문과');
+      expect(screen.queryByRole('note', { name: '개발 재생 안내' })).toBeNull();
+    },
+  );
   it.each(['not_ready', 'generating', 'failed', 'suspended'] as const)(
     'shows %s without exposing unpublished content',
     async (status) => {
@@ -351,4 +392,89 @@ it('does not offer retry for a suspended round even with retryable section failu
   await screen.findByText('발행 중단');
   expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
   expect(screen.queryByText('합성 시장 요약')).toBeNull();
+});
+
+// D-BRF-01·02 mobile: same stored response, only reading layout changes.
+describe('mobile reading layout', () => {
+  it('uses compact on narrow screens and restores the full text without a new briefing request', async () => {
+    vi.stubGlobal('matchMedia', () => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const server = setup();
+    await screen.findByRole('heading', { name: '출근 브리핑' });
+    expect(
+      document.querySelector('article')?.getAttribute('data-reading'),
+    ).toBe('compact');
+    expect(
+      document.querySelector('#market-summary-title')?.closest('details')?.open,
+    ).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: '전체 보기' }));
+    expect(
+      document.querySelector('article')?.getAttribute('data-reading'),
+    ).toBe('full');
+    expect(
+      document.querySelector('#market-summary-title')?.closest('details'),
+    ).toBeNull();
+    expect(screen.getByText('합성 시장 요약')).toBeTruthy();
+    expect(
+      screen.getByText('선정 이유: 합성 선정 이유 · 근거 1건'),
+    ).toBeTruthy();
+    expect(server.calls('GET', '/api/v1/briefings')).toHaveLength(1);
+  });
+
+  it('defaults to the existing full desktop view and allows compact without losing issues', async () => {
+    const server = setup();
+    await screen.findByRole('heading', { name: '출근 브리핑' });
+    expect(
+      document.querySelector('article')?.getAttribute('data-reading'),
+    ).toBe('full');
+    fireEvent.click(screen.getByRole('button', { name: '간단히' }));
+    expect(
+      document.querySelector('article')?.getAttribute('data-reading'),
+    ).toBe('compact');
+    const summary = screen.getByText('1. 합성 핵심 이슈 · 근거 1건');
+    expect(summary.closest('details')?.open).toBe(false);
+    fireEvent.click(summary);
+    expect(summary.closest('details')?.open).toBe(true);
+    expect(
+      screen.getByRole('button', { name: '핵심 이슈 1 근거 보기' }),
+    ).toBeTruthy();
+    expect(server.calls('GET', '/api/v1/briefings')).toHaveLength(1);
+  });
+
+  it('keeps a selected full view on mobile and does not hide real failures', async () => {
+    vi.stubGlobal('matchMedia', () => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const result = round();
+    setup(
+      {
+        ...result,
+        metadata: {
+          ...result.metadata,
+          partial: true,
+          failures: [
+            {
+              section: 'items',
+              code: 'SERVICE_UNAVAILABLE',
+              message: '합성 원천 조회 장애',
+              asOf: null,
+              retryable: true,
+            },
+          ],
+        },
+      },
+      '/briefing?reading=full',
+    );
+    expect(await screen.findByText('합성 원천 조회 장애')).toBeTruthy();
+    expect(
+      document.querySelector('article')?.getAttribute('data-reading'),
+    ).toBe('full');
+    fireEvent.click(screen.getByRole('button', { name: '간단히' }));
+    expect(screen.getByText('합성 원천 조회 장애')).toBeTruthy();
+  });
 });

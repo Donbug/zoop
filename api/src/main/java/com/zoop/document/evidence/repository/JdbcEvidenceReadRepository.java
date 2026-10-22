@@ -45,7 +45,7 @@ public class JdbcEvidenceReadRepository implements EvidenceReadRepository {
                      THEN e.grant_scope -> 'requiredRecipients' ELSE '[]'::jsonb END) AS r(recipient)
             WHERE e.ai_job_id = :creatorJobId AND e.document_analysis_id = :ownerId
               AND e.grant_id = :grantId AND e.grant_revision = :grantRevision
-              AND e.stage IN ('document-summary', 'semantic-verification')
+              AND e.stage IN ('document-summary', 'document-sentiment', 'semantic-verification')
             """;
     private static final String COMPANY_EXISTS = "SELECT EXISTS (SELECT 1 FROM companies WHERE id = :id)";
 

@@ -56,4 +56,16 @@ public class BriefingController {
     public ObjectNode getBriefingGraphBasis(@PathVariable String id, HttpServletRequest request) {
         return service.graphBasis(id, RequestIdFilter.currentId(request));
     }
+
+    @GetMapping("/{roundId}/items/{eventId}")
+    @Operation(operationId = "getBriefingItemDetail", summary = "회차에 고정된 브리핑 항목과 근거 조회",
+            description = "해당 발행 회차에 선정된 항목의 저장된 주장·선정 근거·정확 인용·동일 버전 원문 문맥을 복원합니다. 현재 원문 권한을 다시 검증하며 재생성하거나 최신 원문으로 바꾸지 않습니다.")
+    @ApiResponse(responseCode = "200", description = "회차에 고정된 항목 상세",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = BriefingHttpSchemas.BriefingItemDetail.class)))
+    @ApiResponse(responseCode = "404", description = "회차·항목 또는 저장된 상세가 없음")
+    @ApiResponse(responseCode = "503", description = "현재 권한·원문 버전·저장 상세 검증 불가 또는 제공 중단")
+    public ObjectNode getBriefingItemDetail(@PathVariable String roundId, @PathVariable String eventId,
+            HttpServletRequest request) {
+        return service.getItem(roundId, eventId, RequestIdFilter.currentId(request));
+    }
 }

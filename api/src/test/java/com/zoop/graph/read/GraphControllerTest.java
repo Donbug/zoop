@@ -10,11 +10,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.zoop.auth.service.MemberSessionService;
+import com.zoop.auth.service.SessionCookie;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.exception.GlobalExceptionHandler;
 import com.zoop.common.request.RequestIdFilter;
 import com.zoop.graph.read.dto.GraphResponse;
+import jakarta.servlet.http.Cookie;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
@@ -55,6 +57,16 @@ class GraphControllerTest {
                 .andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
         mvc.perform(get("/api/v1/graph").param("mode", "all"));
         org.mockito.Mockito.verify(sessions, org.mockito.Mockito.times(1)).requireMember(any());
+    }
+
+    @Test
+    void aGuestSessionGetsNoPersonalGraph() throws Exception {
+        when(sessions.requireMember("guest-token")).thenThrow(new CustomException(ErrorCode.MEMBER_REQUIRED));
+        // FS017 ⑩ / FS019 ③: a guest is refused before any holding or watchlist is read.
+        mvc.perform(get("/api/v1/graph").param("mode", "personal").cookie(new Cookie(SessionCookie.NAME, "guest-token")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("MEMBER_REQUIRED"));
+        org.mockito.Mockito.verifyNoInteractions(personalCompanies, service);
     }
 
     @Test

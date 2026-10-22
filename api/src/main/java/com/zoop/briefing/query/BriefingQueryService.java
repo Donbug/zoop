@@ -11,13 +11,16 @@ import java.util.List;
 import com.zoop.briefing.storage.BriefingChange;
 import com.zoop.briefing.storage.BriefingRound;
 import com.zoop.briefing.storage.BriefingRoundRepository;
+import com.zoop.briefing.replay.BriefingReplayReadPolicy;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /** Public reads only restore a preserved original; neither a source nor a model is called here. */
@@ -29,12 +32,20 @@ public class BriefingQueryService {
     private final BriefingRoundRepository repository;
     private final Clock clock;
     private final BriefingContentAccess access;
+    private final BriefingReplayReadPolicy replay;
     private final JsonMapper mapper = JsonMapper.builder().build();
 
     public BriefingQueryService(BriefingRoundRepository repository, Clock clock, BriefingContentAccess access) {
+        this(repository, clock, access, BriefingReplayReadPolicy.disabled());
+    }
+
+    @Autowired
+    public BriefingQueryService(BriefingRoundRepository repository, Clock clock, BriefingContentAccess access,
+            BriefingReplayReadPolicy replay) {
         this.repository = repository;
         this.clock = clock;
         this.access = access;
+        this.replay = replay;
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, timeout = 5)
@@ -109,7 +120,7 @@ public class BriefingQueryService {
                         .put("reason", suspension == null ? null : suspension.reason());
             } else {
                 requireReadable(row, requestId);
-                BriefingSnapshotValidator.validate(row);
+                validateSnapshot(row);
                 // The company reader cannot prove whole-graph readiness. Until that owner is connected,
                 // expose the exact stored basis but never advertise a graph or fall back to the newest one.
                 out.put("status", "unavailable").put("message", "발행 당시 고정 그래프 조회가 아직 연결되지 않았습니다.")
@@ -121,8 +132,35 @@ public class BriefingQueryService {
         }
     }
 
+    /** Restore only the selected item's preserved detail after the same current authority check as the round. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, timeout = 5)
+    public ObjectNode getItem(String roundId, String eventId, String requestId) {
+        if (roundId == null || roundId.isBlank() || roundId.length() > 256
+                || eventId == null || eventId.isBlank() || eventId.length() > 256) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+        try {
+            var row = repository.findById(roundId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+            requireReadable(row, requestId);
+            validateSnapshot(row);
+            JsonNode selected = null;
+            for (JsonNode item : row.payload().path("items")) {
+                if (eventId.equals(item.path("eventId").asString())) selected = item;
+            }
+            if (selected == null) throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+            JsonNode detail = row.publicSnapshot().path("itemDetails").path(eventId);
+            if (detail.isMissingNode() || detail.isNull()) throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+            BriefingItemDetailValidator.validate(row, selected, detail, repository);
+            ObjectNode out = (ObjectNode) detail.deepCopy();
+            ((ObjectNode) out.path("metadata")).put("requestId", requestId);
+            return out;
+        } catch (DataAccessException | IllegalArgumentException | DateTimeException | com.zoop.common.json.StrictJson.Malformed error) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        }
+    }
+
     private ObjectNode restore(BriefingRound row, List<BriefingChange> changes, String requestId) {
-        BriefingSnapshotValidator.validate(row);
+        validateSnapshot(row);
         var payload = row.payload();
         var out = mapper.createObjectNode();
         for (String field : List.of("id", "date", "edition", "scheduledAt", "generatedAt", "dataWindow", "graphVersion",
@@ -132,9 +170,13 @@ public class BriefingQueryService {
         out.put("status", "published").put("publishedAt", row.publishedAt().toString());
         out.set("dataAsOf", payload.get("dataWindow").get("end").deepCopy());
         out.set("marketSummary", row.publicSnapshot().get("marketSummary").deepCopy());
+        JsonNode companyOutlooks = row.publicSnapshot().get("companyOutlooks");
+        if (companyOutlooks != null) out.set("companyOutlooks", companyOutlooks.deepCopy());
         var market = payload.get("marketVariables");
-        out.set("marketVariables", market.isNull() ? unavailableSection("발행 당시 시장 지표가 저장되지 않았습니다.") : market.deepCopy());
+        out.set("marketVariables", market.isNull() ? unavailableSection("발행 당시 시장 지표가 저장되지 않았습니다.") : publicMarketVariables(market));
         out.set("sinceMorning", row.comparisonSnapshot() == null ? mapper.nullNode() : row.comparisonSnapshot().deepCopy());
+        JsonNode previous = row.publicSnapshot().get("previousComparison");
+        out.set("previousComparison", previous == null ? mapper.nullNode() : previous.deepCopy());
         var corrections = out.putArray("corrections");
         for (var change : changes) {
             if (!"correction".equals(change.kind())) continue;
@@ -145,6 +187,24 @@ public class BriefingQueryService {
         out.putNull("notice");
         ((ObjectNode) out.get("metadata")).put("requestId", requestId);
         return out;
+    }
+
+    /** Contract projection only: legacy bank daily references were stored under the old close enum. */
+    private static JsonNode publicMarketVariables(JsonNode stored) {
+        JsonNode copy = stored.deepCopy();
+        if (!"available".equals(copy.path("status").asString())) return copy;
+        for (JsonNode indicator : copy.path("indicators")) {
+            JsonNode source = indicator.path("source");
+            if ("usdkrw".equals(indicator.path("id").asString())
+                    && "close".equals(indicator.path("valueKind").asString())
+                    && indicator.path("observedAt").isNull()
+                    && "naver".equals(source.path("provider").asString())
+                    && "FX_USDKRW".equals(source.path("symbol").asString())
+                    && source.path("url").asString("").startsWith("https://api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices?")) {
+                ((ObjectNode) indicator).put("valueKind", "reference");
+            }
+        }
+        return copy;
     }
 
     private ObjectNode empty(LocalDate date, String edition, BriefingRound row, String requestId, String status,
@@ -163,10 +223,18 @@ public class BriefingQueryService {
         out.set("marketSummary", unavailableSection("이 회차의 공개 내용을 제공하지 않습니다."));
         out.set("marketVariables", unavailableSection("이 회차의 공개 내용을 제공하지 않습니다."));
         out.putNull("sinceMorning");
+        out.putNull("previousComparison");
         var metadata = out.putObject("metadata");
         metadata.put("source", "zoop-briefing").put("asOf", clock.instant().toString()).putNull("graphVersion")
                 .put("requestId", requestId).put("partial", false);
         metadata.putArray("failures");
+        if (row != null && row.publishedAt() == null && BriefingReplayReadPolicy.marked(row) && replay.permits(row)
+                && "publication_clock_simulation".equals(row.publicSnapshot().path("replay").path("scope").asString())) {
+            metadata.put("source", "zoop-briefing-publication-clock-simulation").put("partial", true);
+            metadata.withArray("failures").addObject().put("section", "sourceCoverage").put("code", "SIMULATION_HELD")
+                    .put("message", "과거 발행시각 시뮬레이션에서 입력·선정·검증이 완료되지 않아 발행하지 않은 회차입니다.")
+                    .put("retryable", false).putNull("asOf");
+        }
         metadata.putObject("schedule").put("morning", "09:20").put("evening", "17:30").put("confirmed", true);
         metadata.putObject("selection").put("basis", "market").putNull("reason");
         String message = switch (status) {
@@ -183,7 +251,12 @@ public class BriefingQueryService {
     }
 
     private void requireReadable(BriefingRound row, String requestId) {
+        if (BriefingReplayReadPolicy.marked(row) && !replay.permits(row)) unavailable();
         if (!"published".equals(row.status()) || !access.mayRead(row, requestId)) unavailable();
+    }
+
+    private void validateSnapshot(BriefingRound row) {
+        BriefingSnapshotValidator.validate(row, BriefingReplayReadPolicy.marked(row) && replay.permits(row));
     }
 
     private BriefingChange suspension(List<BriefingChange> changes) {

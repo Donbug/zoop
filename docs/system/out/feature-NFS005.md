@@ -36,7 +36,7 @@
 | 도메인 | 연결 작업 수 | 작업 목록 |
 | --- | --- | --- |
 | companies | 4 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
-| briefings | 2 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
+| briefings | 3 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | chat | 7 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 
 작업별 FS/NFS 역링크와 전체 연결은 API 명세서 및 xlsx 추적표에 보존한다.

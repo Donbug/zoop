@@ -1,0 +1,60 @@
+{
+  "type": "object",
+  "properties": {
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "targetId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "SUPPORTED",
+              "UNSUPPORTED",
+              "UNCERTAIN"
+            ]
+          },
+          "typeAppropriate": {
+            "type": "boolean"
+          },
+          "temporalAppropriate": {
+            "type": "boolean"
+          },
+          "noUnsupportedNumbers": {
+            "type": "boolean"
+          },
+          "noInvestmentAdvice": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        },
+        "required": [
+          "targetId",
+          "verdict",
+          "typeAppropriate",
+          "temporalAppropriate",
+          "noUnsupportedNumbers",
+          "noInvestmentAdvice",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "maxItems": 12
+    }
+  },
+  "required": [
+    "checks"
+  ],
+  "additionalProperties": false,
+  "description": "Per-round publication_clock_simulation output; independent request context and private recording."
+}

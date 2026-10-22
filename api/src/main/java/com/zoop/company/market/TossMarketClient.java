@@ -149,7 +149,7 @@ public class TossMarketClient {
         try {
             List<CompanyPriceResponse.Point> points = List.of();
             if ("1d".equals(period)) {
-                Session session = session("KRX".equals(exchange), end.minusNanos(1).atZone(zone).toLocalDate(), end);
+                Session session = session("KRX".equals(exchange), end.minusNanos(1).atZone(zone).toLocalDate(), end, zone);
                 start = session.open();
                 end = end.isBefore(session.close()) ? end : session.close();
                 sessionDate = session.date();
@@ -204,18 +204,40 @@ public class TossMarketClient {
      * KR is the calendar's integrated regular session, the union of KRX and NXT regular hours.
      * shortcut: that union equals KRX regular hours only while NXT's main market (09:00:30–15:20) stays inside KRX's; read a
      * KRX-only schedule if NXT ever trades outside KRX regular hours.
+     * A day before today (exchange-local) is kept: its calendar no longer changes, while today's can still gain an early
+     * close or a holiday. shortcut: per-process LRU of 256 market-days, shared store together with the minute cache.
      */
-    private Session session(boolean krx, LocalDate day, Instant at) {
-        JsonNode calendar = get("/api/v1/market-calendar/" + (krx ? "KR" : "US"), Map.of("date", day.toString())).path("result");
+    private Session session(boolean krx, LocalDate day, Instant at, ZoneId zone) {
+        String market = krx ? "KR" : "US";
+        JsonNode calendar = calendarCache.get(market + "|" + day);
+        if (calendar == null) {
+            calendar = get("/api/v1/market-calendar/" + market, Map.of("date", day.toString())).path("result");
+            // The calendar answers for the asked day; a missing or different date is a provider format failure, never a holiday.
+            if (!day.toString().equals(text(calendar.path("today").get("date")))) throw formatFailure();
+            if (day.isBefore(clock.instant().atZone(zone).toLocalDate()) && wellFormed(krx, calendar)) {
+                calendarCache.put(market + "|" + day, calendar);
+            }
+        }
         JsonNode today = calendar.path("today");
-        // The calendar answers for the asked day; a missing or different date is a provider format failure, never a holiday.
-        if (!day.toString().equals(text(today.get("date")))) throw formatFailure();
         Session current = regular(krx, today); // null: the asked day has no regular session (closed)
         // at is the exclusive end (an exact to + 1ns), so a to at the opening instant is in the session and gets its bucket.
         if (current != null && current.open().isBefore(at)) return current;
         Session previous = regular(krx, calendar.path("previousBusinessDay"));
         if (previous == null) throw formatFailure(); // a business day always has a regular session
         return previous;
+    }
+
+    /**
+     * Whether both days parse and the previous business day has a session, so a kept calendar never fails later. A bad
+     * answer is not kept and is read again next time; the request itself still fails only where it did before.
+     */
+    private static boolean wellFormed(boolean krx, JsonNode calendar) {
+        try {
+            regular(krx, calendar.path("today"));
+            return regular(krx, calendar.path("previousBusinessDay")) != null;
+        } catch (RuntimeException exception) {
+            return false;
+        }
     }
 
     /** A calendar day's regular session; null when the day has none (closed). */
@@ -292,6 +314,10 @@ public class TossMarketClient {
     private final Map<String, List<PriceBars.Bar>> minuteCache = java.util.Collections.synchronizedMap(
             new java.util.LinkedHashMap<>(64, 0.75f, true) {
                 @Override protected boolean removeEldestEntry(Map.Entry<String, List<PriceBars.Bar>> eldest) { return size() > 512; }
+            });
+    private final Map<String, JsonNode> calendarCache = java.util.Collections.synchronizedMap(
+            new java.util.LinkedHashMap<>(16, 0.75f, true) {
+                @Override protected boolean removeEldestEntry(Map.Entry<String, JsonNode> eldest) { return size() > 256; }
             });
     private final java.util.concurrent.ExecutorService minuteReads =
             java.util.concurrent.Executors.newFixedThreadPool(4, Thread.ofPlatform().daemon().name("toss-minute-", 0).factory());

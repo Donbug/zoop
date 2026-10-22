@@ -7,8 +7,1038 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "response:200:application/json.companyOutlooks": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies": {
+      "type": "array"
+    },
+    "response:200:application/json.companyOutlooks.companies:required": true,
+    "response:200:application/json.companyOutlooks.companies[]": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].assessment": {
+      "type": "string",
+      "enum": [
+        "positive",
+        "negative",
+        "mixed",
+        "watch"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].assessment:required": true,
+    "response:200:application/json.companyOutlooks.companies[].companyId": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].companyId:required": true,
+    "response:200:application/json.companyOutlooks.companies[].companyName": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].companyName:required": true,
+    "response:200:application/json.companyOutlooks.companies[].comparison:required": true,
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:0>.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:0>.evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:0>.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:0>.text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:0>.text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:1>": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:1>.previousResultVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:1>.previousResultVersion:required": true,
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:1>.status": {
+      "type": "string",
+      "enum": [
+        "updated",
+        "compared",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].comparison<allOf:1>.status:required": true,
+    "response:200:application/json.companyOutlooks.companies[].conditions": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].conditions:required": true,
+    "response:200:application/json.companyOutlooks.companies[].conditions[]": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].conditions[].evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].conditions[].evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].conditions[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].conditions[].text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].conditions[].text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].facts": {
+      "type": "array"
+    },
+    "response:200:application/json.companyOutlooks.companies[].facts:required": true,
+    "response:200:application/json.companyOutlooks.companies[].facts[]": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].facts[].evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].facts[].evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].facts[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].facts[].text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].facts[].text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].impact": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].impact.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].impact.evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].impact.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].impact.text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].impact.text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].impact:required": true,
+    "response:200:application/json.companyOutlooks.companies[].issueIds": {
+      "type": "array"
+    },
+    "response:200:application/json.companyOutlooks.companies[].issueIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].issueIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].observedMovement": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].observedMovement.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].observedMovement.reason:required": true,
+    "response:200:application/json.companyOutlooks.companies[].observedMovement.status": {
+      "type": "string",
+      "const": "unavailable"
+    },
+    "response:200:application/json.companyOutlooks.companies[].observedMovement.status:required": true,
+    "response:200:application/json.companyOutlooks.companies[].observedMovement:required": true,
+    "response:200:application/json.companyOutlooks.companies[].outlook": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].outlook.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].outlook.evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].outlook.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].outlook.text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].outlook.text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].outlook:required": true,
+    "response:200:application/json.companyOutlooks.companies[].previous": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].previous.cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyOutlooks.companies[].previous.cutoff:required": false,
+    "response:200:application/json.companyOutlooks.companies[].previous.judgment": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].previous.judgment:required": false,
+    "response:200:application/json.companyOutlooks.companies[].previous.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].previous.reason:required": false,
+    "response:200:application/json.companyOutlooks.companies[].previous.resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].previous.resultVersion:required": false,
+    "response:200:application/json.companyOutlooks.companies[].previous.roundId": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].previous.roundId:required": false,
+    "response:200:application/json.companyOutlooks.companies[].previous.status": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].previous.status:required": true,
+    "response:200:application/json.companyOutlooks.companies[].previous:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.baseline:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.baseline<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.baseline<anyOf:0>.kind": {
+      "type": "string",
+      "enum": [
+        "five_minute_close",
+        "daily_close"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.baseline<anyOf:0>.kind:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.baseline<anyOf:0>.observedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.baseline<anyOf:0>.observedAt:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.baseline<anyOf:0>.sessionDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.baseline<anyOf:0>.sessionDate:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.baseline<anyOf:0>.value": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.baseline<anyOf:0>.value:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.baseline<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.baselineKind": {
+      "type": "string",
+      "enum": [
+        "morning_cutoff",
+        "previous_close"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.baselineKind:required": false,
+    "response:200:application/json.companyOutlooks.companies[].price.change": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.change:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.changeRate": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.changeRate:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.companyId": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.companyId:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.comparisonStatus": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable",
+        "no_new_session"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.comparisonStatus:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.currency": {
+      "type": "string",
+      "enum": [
+        "KRW",
+        "USD"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.currency:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.cutoff:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.exchangeTimezone": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.exchangeTimezone:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.latest:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.latest<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.latest<anyOf:0>.kind": {
+      "type": "string",
+      "enum": [
+        "five_minute_close",
+        "daily_close"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.latest<anyOf:0>.kind:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.latest<anyOf:0>.observedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.latest<anyOf:0>.observedAt:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.latest<anyOf:0>.sessionDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.latest<anyOf:0>.sessionDate:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.latest<anyOf:0>.value": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.latest<anyOf:0>.value:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.latest<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.note": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.note:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.official": {
+      "type": "boolean"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.official:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.reason:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.source": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.source:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.sources": {
+      "type": "array"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.sources:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.sources[]": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].bytes": {
+      "type": "integer"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].bytes:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].collectedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].collectedAt:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].companyId": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].companyId:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].httpStatus": {
+      "type": "integer"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].httpStatus:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].interval": {
+      "type": "string",
+      "enum": [
+        "5m",
+        "1d"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].interval:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].sha256": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].sha256:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].url:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.status": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.status:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price:required": false,
+    "response:200:application/json.companyOutlooks.companies[].reading": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.brief": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.brief.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.brief.evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].reading.brief.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.brief.text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.brief.text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].reading.brief:required": false,
+    "response:200:application/json.companyOutlooks.companies[].reading.change": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.change.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.change.evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].reading.change.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.change.text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.change.text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].reading.change:required": false,
+    "response:200:application/json.companyOutlooks.companies[].reading.resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.resultVersion:required": true,
+    "response:200:application/json.companyOutlooks.companies[].reading.status": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "WITHHELD"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.status:required": true,
+    "response:200:application/json.companyOutlooks.companies[].reading.watch": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.watch.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.watch.evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].reading.watch.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.watch.text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.watch.text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].reading.watch:required": false,
+    "response:200:application/json.companyOutlooks.companies[].reading:required": false,
+    "response:200:application/json.companyOutlooks.companies[].risks": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].risks:required": true,
+    "response:200:application/json.companyOutlooks.companies[].risks[]": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].risks[].evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].risks[].evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].risks[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].risks[].text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].risks[].text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources": {
+      "type": "array"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources[]": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].bodySha256": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].bodySha256:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources[].documentId": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].documentId:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources[].documentVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].documentVersion:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources[].evidenceId": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].evidenceId:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources[].publishedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].publishedAt:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources[].quote": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].quote:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources[].title": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].title:required": true,
+    "response:200:application/json.companyOutlooks.companies[].sources[].url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "response:200:application/json.companyOutlooks.companies[].sources[].url:required": true,
+    "response:200:application/json.companyOutlooks.cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyOutlooks.cutoff:required": true,
+    "response:200:application/json.companyOutlooks.edition": {
+      "type": "string",
+      "enum": [
+        "morning",
+        "evening"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.edition:required": true,
+    "response:200:application/json.companyOutlooks.generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyOutlooks.generatedAt:required": true,
+    "response:200:application/json.companyOutlooks.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.reason:required": false,
+    "response:200:application/json.companyOutlooks.resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.resultVersion:required": true,
+    "response:200:application/json.companyOutlooks.roundId": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.roundId:required": true,
+    "response:200:application/json.companyOutlooks.schemaVersion": {
+      "type": "string",
+      "const": "zoop-company-outlooks-v1"
+    },
+    "response:200:application/json.companyOutlooks.schemaVersion:required": true,
+    "response:200:application/json.companyOutlooks.scopeNote": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.scopeNote:required": true,
+    "response:200:application/json.companyOutlooks.status": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "WITHHELD"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.status:required": true,
+    "response:200:application/json.companyOutlooks:required": false,
     "response:200:application/json.items[].summary<anyOf:0>": {
       "type": "object"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis:required": false,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[]": {
+      "type": "object"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].claimId": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].claimId:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].conditions": {
+      "type": "array"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].conditions:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].conditions[]": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].counterFactors": {
+      "type": "array"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].counterFactors:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].counterFactors[]": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].direction": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "up",
+        "down",
+        "flat",
+        "uncertain",
+        null
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].direction:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].evaluationIds": {
+      "type": "array"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].evaluationIds:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].evaluationIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].evidenceIds": {
+      "type": "array"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].evidenceIds:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].indicatorIds": {
+      "type": "array"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].indicatorIds:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].indicatorIds[]": {
+      "type": "string",
+      "enum": [
+        "kospi",
+        "kosdaq",
+        "usdkrw"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].kind": {
+      "type": "string",
+      "enum": [
+        "fact",
+        "interpretation",
+        "forecast",
+        "forecast_update",
+        "result_comparison"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].kind:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].previousForecastIds": {
+      "type": "array"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].previousForecastIds:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].previousForecastIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].previousPublicationIds": {
+      "type": "array"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].previousPublicationIds:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].previousPublicationIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].targetId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].targetId:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].text": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].text:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].updateAction": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "maintain",
+        "strengthen",
+        "weaken",
+        "withdraw",
+        null
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.claims[].updateAction:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.coverage": {
+      "type": "object"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.coverage.backgroundDocuments": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.coverage.backgroundDocuments:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.coverage.companyNames": {
+      "type": "array"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.coverage.companyNames:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.coverage.companyNames[]": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.coverage.documents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.coverage.documents:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.coverage.marketRepresentative": {
+      "type": "boolean"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.coverage.marketRepresentative:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.coverage.newDocuments": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.coverage.newDocuments:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.coverage.sectorPriceFeedAvailable": {
+      "type": "boolean"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.coverage.sectorPriceFeedAvailable:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.coverage:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.cutoff:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.edition": {
+      "type": "string",
+      "enum": [
+        "morning",
+        "evening"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.edition:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations": {
+      "type": "array"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[]": {
+      "type": "object"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].actualDirection": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "up",
+        "down",
+        "flat",
+        null
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].actualDirection:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].actualValue": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].actualValue:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].directionMatched": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].directionMatched:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].evaluationId": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].evaluationId:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].forecastId": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].forecastId:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].reason:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].rule": {
+      "type": "string",
+      "enum": [
+        "close_vs_baseline_v1"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].rule:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].status": {
+      "type": "string",
+      "enum": [
+        "evaluated",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].status:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target": {
+      "type": "object"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.baselineDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.baselineDate:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.baselineValue": {
+      "type": "number"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.baselineValue:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.calendarRef": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.calendarRef:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.indicatorId": {
+      "type": "string",
+      "enum": [
+        "kospi",
+        "kosdaq"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.indicatorId:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.rule": {
+      "type": "string",
+      "enum": [
+        "close_vs_baseline_v1"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.rule:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetDate:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetEnd": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetEnd:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetId": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetId:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.valueKind": {
+      "type": "string",
+      "enum": [
+        "close"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.valueKind:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts": {
+      "type": "array"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[]": {
+      "type": "object"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].conditions": {
+      "type": "array"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].conditions:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].conditions[]": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].counterFactors": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].counterFactors:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].counterFactors[]": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].direction": {
+      "type": "string",
+      "enum": [
+        "up",
+        "down",
+        "flat",
+        "uncertain"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].direction:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].evidenceIds:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].forecastId": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].forecastId:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].indicatorIds": {
+      "type": "array"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].indicatorIds:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].indicatorIds[]": {
+      "type": "string",
+      "enum": [
+        "kospi",
+        "kosdaq",
+        "usdkrw"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target": {
+      "type": "object"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.baselineDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.baselineDate:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.baselineValue": {
+      "type": "number"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.baselineValue:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.calendarRef": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.calendarRef:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.indicatorId": {
+      "type": "string",
+      "enum": [
+        "kospi",
+        "kosdaq"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.indicatorId:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.rule": {
+      "type": "string",
+      "enum": [
+        "close_vs_baseline_v1"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.rule:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetDate:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetEnd": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetEnd:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetId": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetId:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.valueKind": {
+      "type": "string",
+      "enum": [
+        "close"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.valueKind:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].text": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.forecasts[].text:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.mode": {
+      "type": "string",
+      "enum": [
+        "morning_update",
+        "evening_review"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.mode:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication": {
+      "type": "object"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication.cutoff": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication.cutoff:required": false,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication.date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication.date:required": false,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication.edition": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "morning",
+        "evening",
+        null
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication.edition:required": false,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication.kind": {
+      "type": "string",
+      "enum": [
+        "simulated_previous_output"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication.kind:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication.reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication.reason:required": false,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication.resultVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication.resultVersion:required": false,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication.roundId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication.roundId:required": false,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication.status": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication.status:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.previousPublication:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.schemaVersion": {
+      "type": "string",
+      "enum": [
+        "zoop-market-outlook-analysis-v1"
+      ]
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.schemaVersion:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.scopeNote": {
+      "type": "string"
+    },
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:0>.scopeNote:required": true,
+    "response:200:application/json.items[].summary<anyOf:0>.analysis<anyOf:1>": {
+      "type": "null"
     },
     "response:200:application/json.items[].summary<anyOf:0>.evidenceIds": {
       "type": "array"
@@ -44,6 +1074,494 @@
     "response:200:application/json.items[].summary<anyOf:1>.status:required": true,
     "response:200:application/json.marketSummary<anyOf:0>": {
       "type": "object"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis:required": false,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[]": {
+      "type": "object"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].claimId": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].claimId:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].conditions": {
+      "type": "array"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].conditions:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].conditions[]": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].counterFactors": {
+      "type": "array"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].counterFactors:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].counterFactors[]": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].direction": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "up",
+        "down",
+        "flat",
+        "uncertain",
+        null
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].direction:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].evaluationIds": {
+      "type": "array"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].evaluationIds:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].evaluationIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].evidenceIds": {
+      "type": "array"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].evidenceIds:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].indicatorIds": {
+      "type": "array"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].indicatorIds:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].indicatorIds[]": {
+      "type": "string",
+      "enum": [
+        "kospi",
+        "kosdaq",
+        "usdkrw"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].kind": {
+      "type": "string",
+      "enum": [
+        "fact",
+        "interpretation",
+        "forecast",
+        "forecast_update",
+        "result_comparison"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].kind:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].previousForecastIds": {
+      "type": "array"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].previousForecastIds:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].previousForecastIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].previousPublicationIds": {
+      "type": "array"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].previousPublicationIds:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].previousPublicationIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].targetId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].targetId:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].text": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].text:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].updateAction": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "maintain",
+        "strengthen",
+        "weaken",
+        "withdraw",
+        null
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.claims[].updateAction:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.coverage": {
+      "type": "object"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.coverage.backgroundDocuments": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.coverage.backgroundDocuments:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.coverage.companyNames": {
+      "type": "array"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.coverage.companyNames:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.coverage.companyNames[]": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.coverage.documents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.coverage.documents:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.coverage.marketRepresentative": {
+      "type": "boolean"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.coverage.marketRepresentative:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.coverage.newDocuments": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.coverage.newDocuments:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.coverage.sectorPriceFeedAvailable": {
+      "type": "boolean"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.coverage.sectorPriceFeedAvailable:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.coverage:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.cutoff:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.edition": {
+      "type": "string",
+      "enum": [
+        "morning",
+        "evening"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.edition:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations": {
+      "type": "array"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[]": {
+      "type": "object"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].actualDirection": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "up",
+        "down",
+        "flat",
+        null
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].actualDirection:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].actualValue": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].actualValue:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].directionMatched": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].directionMatched:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].evaluationId": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].evaluationId:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].forecastId": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].forecastId:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].reason:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].rule": {
+      "type": "string",
+      "enum": [
+        "close_vs_baseline_v1"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].rule:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].status": {
+      "type": "string",
+      "enum": [
+        "evaluated",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].status:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target": {
+      "type": "object"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.baselineDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.baselineDate:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.baselineValue": {
+      "type": "number"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.baselineValue:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.calendarRef": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.calendarRef:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.indicatorId": {
+      "type": "string",
+      "enum": [
+        "kospi",
+        "kosdaq"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.indicatorId:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.rule": {
+      "type": "string",
+      "enum": [
+        "close_vs_baseline_v1"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.rule:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetDate:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetEnd": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetEnd:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetId": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetId:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.valueKind": {
+      "type": "string",
+      "enum": [
+        "close"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.valueKind:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts": {
+      "type": "array"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[]": {
+      "type": "object"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].conditions": {
+      "type": "array"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].conditions:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].conditions[]": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].counterFactors": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].counterFactors:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].counterFactors[]": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].direction": {
+      "type": "string",
+      "enum": [
+        "up",
+        "down",
+        "flat",
+        "uncertain"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].direction:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].evidenceIds:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].forecastId": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].forecastId:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].indicatorIds": {
+      "type": "array"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].indicatorIds:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].indicatorIds[]": {
+      "type": "string",
+      "enum": [
+        "kospi",
+        "kosdaq",
+        "usdkrw"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target": {
+      "type": "object"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.baselineDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.baselineDate:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.baselineValue": {
+      "type": "number"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.baselineValue:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.calendarRef": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.calendarRef:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.indicatorId": {
+      "type": "string",
+      "enum": [
+        "kospi",
+        "kosdaq"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.indicatorId:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.rule": {
+      "type": "string",
+      "enum": [
+        "close_vs_baseline_v1"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.rule:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetDate:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetEnd": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetEnd:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetId": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetId:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.valueKind": {
+      "type": "string",
+      "enum": [
+        "close"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.valueKind:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].target:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].text": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.forecasts[].text:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.mode": {
+      "type": "string",
+      "enum": [
+        "morning_update",
+        "evening_review"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.mode:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication": {
+      "type": "object"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication.cutoff": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication.cutoff:required": false,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication.date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication.date:required": false,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication.edition": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "morning",
+        "evening",
+        null
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication.edition:required": false,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication.kind": {
+      "type": "string",
+      "enum": [
+        "simulated_previous_output"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication.kind:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication.reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication.reason:required": false,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication.resultVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication.resultVersion:required": false,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication.roundId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication.roundId:required": false,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication.status": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication.status:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.previousPublication:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.schemaVersion": {
+      "type": "string",
+      "enum": [
+        "zoop-market-outlook-analysis-v1"
+      ]
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.schemaVersion:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.scopeNote": {
+      "type": "string"
+    },
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:0>.scopeNote:required": true,
+    "response:200:application/json.marketSummary<anyOf:0>.analysis<anyOf:1>": {
+      "type": "null"
     },
     "response:200:application/json.marketSummary<anyOf:0>.evidenceIds": {
       "type": "array"
@@ -122,6 +1640,163 @@
       "type": "string"
     },
     "response:200:application/json.metadata.requestId:required": true,
+    "response:200:application/json.previousComparison:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.comparisonBasis": {
+      "type": "string",
+      "enum": [
+        "event_identity"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.comparisonBasis:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.forecastEvaluation": {
+      "type": "object"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.forecastEvaluation.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.forecastEvaluation.reason:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.forecastEvaluation.status": {
+      "type": "string",
+      "const": "unavailable"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.forecastEvaluation.status:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.forecastEvaluation:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items": {
+      "type": "array"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[]": {
+      "type": "object"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].change": {
+      "type": "string",
+      "enum": [
+        "new",
+        "continuing",
+        "dropped"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].change:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].companyNames": {
+      "type": "array"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].companyNames:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].companyNames[]": {
+      "type": "string"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].eventId": {
+      "type": "string"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].eventId:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].eventTime": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].eventTime:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].evidenceCount": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].evidenceCount:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].previousEvidenceCount": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].previousEvidenceCount:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].previousRank": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].previousRank:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].rank": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].rank:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].reportedAt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].reportedAt:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].timePrecision": {
+      "type": "string",
+      "enum": [
+        "year",
+        "month",
+        "day",
+        "datetime",
+        "unknown"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].timePrecision:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].title": {
+      "type": "string"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].title:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.previousDataAsOf": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.previousDataAsOf:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.previousDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.previousDate:required": false,
+    "response:200:application/json.previousComparison<anyOf:0>.previousEdition": {
+      "type": "string",
+      "enum": [
+        "morning",
+        "evening"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.previousEdition:required": false,
+    "response:200:application/json.previousComparison<anyOf:0>.previousPublishedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.previousPublishedAt:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.previousRoundId": {
+      "type": "string"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.previousRoundId:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.status": {
+      "type": "string",
+      "enum": [
+        "available"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.status:required": true,
+    "response:200:application/json.previousComparison<anyOf:1>": {
+      "type": "object"
+    },
+    "response:200:application/json.previousComparison<anyOf:1>.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.previousComparison<anyOf:1>.reason:required": true,
+    "response:200:application/json.previousComparison<anyOf:1>.status": {
+      "type": "string",
+      "const": "unavailable"
+    },
+    "response:200:application/json.previousComparison<anyOf:1>.status:required": true,
+    "response:200:application/json.previousComparison<anyOf:2>": {
+      "type": "null"
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -548,6 +2223,23 @@
       },
       "bff": {
         "type": "string"
+      }
+    },
+    "response:200:application/json.marketVariables<oneOf:0>.indicators[].valueKind<anyOf:0>": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "close",
+          "latest",
+          "reference"
+        ]
+      },
+      "bff": {
+        "type": "string",
+        "enum": [
+          "close",
+          "latest"
+        ]
       }
     },
     "response:200:application/json.marketVariables<oneOf:0>.rateCutoffAt": {

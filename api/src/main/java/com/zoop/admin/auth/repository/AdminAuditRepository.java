@@ -14,4 +14,7 @@ public interface AdminAuditRepository {
     void recordMemberStatusAction(String adminId, String email, String action,
             String memberId, String reason, String beforeStatus, String afterStatus,
             long beforeRevision, long afterRevision, String requestId, Instant occurredAt);
+
+    void recordGraphActivation(String adminId, String email, String versionId, String previousVersionId,
+            boolean pointerChanged, String reason, String requestId, Instant occurredAt);
 }
