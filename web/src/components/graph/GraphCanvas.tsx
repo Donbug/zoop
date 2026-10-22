@@ -33,6 +33,7 @@ export default function GraphCanvas({
   focusHops = 1,
   focusLayout = false,
   flow = false,
+  onFlowChange,
   highlightedEdgeIds = [],
   selectedEdgeId = null,
   onSelectEdge,
@@ -53,6 +54,8 @@ export default function GraphCanvas({
   focusLayout?: boolean;
   /** D-GRP-01 [흐름 순으로 정렬]: 사건→기업·선행→후속 방향으로 왼쪽에서 오른쪽에 층을 나눈다. */
   flow?: boolean;
+  /** 주면 확대·축소 묶음에 [흐름 순으로 정렬] 토글을 둔다. */
+  onFlowChange?: (flow: boolean) => void;
   highlightedEdgeIds?: string[];
   selectedEdgeId?: string | null;
   onSelectEdge?: (id: string) => void;
@@ -227,6 +230,9 @@ export default function GraphCanvas({
     // A late leave from the previous node must not clear the new node's hover.
     if (hovered.current === id) hoverNode(null);
   });
+  const isArranged = useEffectEvent(
+    () => (focusLayout && Boolean(focusId)) || flow,
+  );
   const retainFocus = useEffectEvent(() => {
     lastFocused.current = focusId;
   });
@@ -669,6 +675,8 @@ export default function GraphCanvas({
     const rememberCamera = () => {
       if (!graph || disposed || graph.destroyed || instance.current !== graph)
         return;
+      // 포커스·흐름 순 배치의 카메라는 원래 지도 좌표와 맞지 않으므로 기억하지 않는다.
+      if (lastArrangement.current !== 'map') return;
       const position = graph.getPosition();
       const saved = readModeEntry(memoryOwner, graphMode);
       saveModeEntry(memoryOwner, graphMode, {
@@ -777,8 +785,11 @@ export default function GraphCanvas({
       if (disposed) return;
       const saved = readModeEntry(memoryOwner, graphMode)?.view.camera;
       // 창 크기가 달라졌으면 예전 위치가 화면 밖을 가리킬 수 있어 화면에 맞춰 연다.
+      // 포커스·흐름 순으로 열면 기억한 원래 지도 카메라를 쓰지 않고 새 배치에 맞춘다.
+      const arranged = isArranged();
       const camera =
         !appearance.preview &&
+        !arranged &&
         saved &&
         sameViewport(saved.size, host.clientWidth, host.clientHeight)
           ? saved
@@ -945,6 +956,22 @@ export default function GraphCanvas({
         >
           <GraphIcon name="fit" />
         </button>
+        {onFlowChange && (
+          <button
+            type="button"
+            aria-pressed={flow}
+            disabled={focusLayout && Boolean(focusId)}
+            title={
+              focusLayout && focusId
+                ? '포커스 모드에서는 흐름 순 정렬을 쓸 수 없어요. 전체 보기로 나온 뒤 켜 주세요.'
+                : '사건에서 관련 기업, 선행 사건에서 후속 사건 방향으로 왼쪽에서 오른쪽에 정렬해요.'
+            }
+            onClick={() => onFlowChange(!flow)}
+            className="w-auto! px-2! text-[11px] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 aria-pressed:bg-zoop-soft aria-pressed:outline-[0.667px] aria-pressed:outline-zoop-ink"
+          >
+            흐름 순으로 정렬
+          </button>
+        )}
         <output>{Math.round(zoom * 100)}% · 드래그로 이동 · 휠로 확대</output>
       </div>
       {selectedNode && (

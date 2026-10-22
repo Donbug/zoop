@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -535,6 +536,30 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     expect(canvas.zoomTo).not.toHaveBeenCalled();
     expect(canvas.translateTo).not.toHaveBeenCalled();
   });
+  it('D-GRP-01 flow order neither reuses nor overwrites the remembered map camera', async () => {
+    const all = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const saved = JSON.stringify({
+      url: '/?mode=all',
+      view: {
+        hidden: [],
+        camera: { zoom: 1.8, position: [40, 60], size: [0, 0] },
+      },
+    });
+    sessionStorage.setItem('zoop.graph.view:member-a:all', saved);
+    const { unmount } = render(
+      <GraphCanvas data={all} memoryOwner="member-a" flow />,
+    );
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    expect(canvas.translateTo).not.toHaveBeenCalled();
+    canvas.getZoom.mockReturnValue(0.4);
+    canvas.getPosition.mockReturnValue([900, 900]);
+    unmount();
+    expect(
+      JSON.parse(sessionStorage.getItem('zoop.graph.view:member-a:all')!).view
+        .camera,
+    ).toEqual({ zoom: 1.8, position: [40, 60], size: [0, 0] });
+  });
+
   it('enables the desktop minimap only above sixty visible nodes', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const { rerender } = render(<GraphCanvas data={data} />);
@@ -770,6 +795,36 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     >;
     expect(
       Object.values(states).some((list) => list.includes('inactive')),
+    ).toBe(true);
+  });
+
+  it('D-GRP-01 shows the flow order toggle in the always-visible zoom controls', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const onFlowChange = vi.fn();
+    const { rerender } = render(
+      <GraphCanvas data={data} onFlowChange={onFlowChange} />,
+    );
+    const zoom = screen.getByLabelText('지도 확대 조절');
+    const toggle = within(zoom).getByRole('button', {
+      name: '흐름 순으로 정렬',
+    });
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    await act(async () => toggle.click());
+    expect(onFlowChange).toHaveBeenCalledWith(true);
+    rerender(
+      <GraphCanvas
+        data={data}
+        onFlowChange={onFlowChange}
+        focusId="NASDAQ:NVDA"
+        focusLayout
+      />,
+    );
+    expect(
+      (
+        within(screen.getByLabelText('지도 확대 조절')).getByRole('button', {
+          name: '흐름 순으로 정렬',
+        }) as HTMLButtonElement
+      ).disabled,
     ).toBe(true);
   });
 

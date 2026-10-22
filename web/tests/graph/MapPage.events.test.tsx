@@ -26,13 +26,28 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
     selectedId,
     onSelect,
     onSelectEdge,
+    flow,
+    onFlowChange,
+    focusLayout,
   }: {
     data: GraphResponse;
     selectedId: string | null;
     onSelect: (id: string) => void;
     onSelectEdge: (id: string) => void;
+    flow?: boolean;
+    onFlowChange?: (flow: boolean) => void;
+    focusLayout?: boolean;
   }) => (
     <div data-testid="graph-canvas">
+      {onFlowChange && (
+        <button
+          aria-pressed={flow}
+          disabled={focusLayout}
+          onClick={() => onFlowChange(!flow)}
+        >
+          흐름 순으로 정렬
+        </button>
+      )}
       {data.nodes.map((node) => (
         <button
           key={node.id}
