@@ -32,6 +32,42 @@ class ChatPlannerTest {
     }
 
     @Test
+    void aConceptMixedWithACurrentFactNeverFallsBackToGeneralKnowledge() {
+        var plan = run(planner.plan(run(0, "v1"), decision(
+                req("mixed", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9), Map.of()),
+                req("concept", Map.of(ChatQueryType.Q02, 0.9), Map.of())), BOUND));
+        assertEquals(Mode.LIMITED, plan.requirements().get(0).mode());
+        assertEquals("out_of_scope", plan.requirements().get(0).limitation(),
+                "Q03 needs a lookup; the Q02 part does not make it a general answer");
+        assertEquals(Mode.GENERAL, plan.requirements().get(1).mode());
+    }
+
+    @Test
+    void evidenceTheMemberNarrowedToBoundsTheContextAndWhatDependsOnIt() {
+        var narrowed = run(0, "v1", List.of("iss-selected"), List.of("ev-1"), List.of("ev-1"));
+        var plan = run(planner.plan(narrowed, decision(
+                req("a", Map.of(ChatQueryType.Q03, 0.9), Map.of("issue.read", 0.9)),
+                req("b", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9)).dependingOn(new Dependency("a", "exactly", 2)),
+                req("c", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of("KRX:000660"))), BOUND));
+        var a = plan.requirements().get(0);
+        assertEquals(ChatPlan.TargetSource.CONTEXT, a.targetSource());
+        assertEquals(List.of("ev-1"), a.evidenceScope());
+        assertEquals(List.of("ev-1"), plan.requirements().get(1).evidenceScope(), "a dependent stage keeps its source's scope");
+        assertEquals(ChatPlan.TargetSource.QUESTION, plan.requirements().get(2).targetSource());
+        assertNull(plan.requirements().get(2).evidenceScope(), "a target the question names is not the narrowed selection");
+
+        var evidenceOnly = run(0, "v1", List.of(), List.of("ev-1"), List.of("ev-1"));
+        var resolved = run(planner.plan(evidenceOnly, decision(req("r", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("evidence.resolve", 0.9))), BOUND)).requirements().getFirst();
+        assertEquals(List.of("ev-1"), resolved.targets());
+        assertEquals(List.of("ev-1"), resolved.evidenceScope());
+
+        var notNarrowed = run(planner.plan(run(0, "v1", List.of("iss-selected")), decision(req("r",
+                Map.of(ChatQueryType.Q03, 0.9), Map.of("issue.read", 0.9))), BOUND)).requirements().getFirst();
+        assertNull(notNarrowed.evidenceScope());
+    }
+
+    @Test
     void thresholdsTakeHighCandidatesAndTheReviewBandOnlyForAnExplicitRequirement() {
         var plan = run(planner.plan(run(0, "v1"), decision(
                 req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.8, "issue.read", 0.5,
@@ -201,9 +237,14 @@ class ChatPlannerTest {
     }
 
     static ChatRun run(int depth, String graphVersion, List<String> contextIds) {
+        return run(depth, graphVersion, contextIds, List.of(), List.of());
+    }
+
+    static ChatRun run(int depth, String graphVersion, List<String> contextIds, List<String> evidenceIds,
+            List<String> evidencePool) {
         return new ChatRun("job-1", "conv-1", "member-a", 1, "run", List.of(new ChatRun.Turn("job-1", "질문", null, null)),
                 new ChatFrozenContext(List.of(), 0, null, null, graphVersion),
-                new FrozenSelection(contextIds, List.of(), List.of()), graphVersion, depth, Instant.EPOCH,
+                new FrozenSelection(contextIds, evidenceIds, evidencePool), graphVersion, depth, Instant.EPOCH,
                 Instant.EPOCH.plusSeconds(60));
     }
 }

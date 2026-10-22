@@ -27,6 +27,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -38,7 +45,8 @@ import tools.jackson.databind.node.ObjectNode;
  * <ul>
  * <li>Every model stage is announced through {@link ChatRunControl#beforeModelCall()} and starts only when the time left
  * covers it and every required stage after it (router 4 s, tools 10 s, generation 25 s, verification 6 s, server 3 s);
- * otherwise the run ends as {@code transient/deadline_guard} without calling it.</li>
+ * otherwise the run ends as {@code transient/deadline_guard} without calling it. A stage gets at most its own limit: one
+ * that runs out ends as {@code response_unknown}. The executor refuses a completion past the run deadline.</li>
  * <li>A model failure is {@code transient}: {@code provider_error} (rerunnable) when nothing was processed or the answer was
  * malformed, {@code response_unknown} (never rerun) when the provider may have processed it.</li>
  * <li>A tool failure ends the run before any count is evaluated: {@code tool_timeout} and unavailable data are transient,
@@ -52,12 +60,12 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>It is not registered as a bean: no production router, generator or verifier exists yet, and the executor must claim
  * nothing until they do.
  */
-public class OrchestratedChatEngine implements ChatEngine {
-    static final Duration ROUTER = Duration.ofSeconds(4);
-    static final Duration TOOLS = Duration.ofSeconds(10);
-    static final Duration GENERATE = Duration.ofSeconds(25);
-    static final Duration VERIFY = Duration.ofSeconds(6);
-    static final Duration SERVER = Duration.ofSeconds(3);
+public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
+    /** The provisional stage limits of ZOOP-AIG-001 6.3.3 (design summary 5.1), to be re-set from measured p95. */
+    record StageLimits(Duration router, Duration tools, Duration generate, Duration verify, Duration server) {
+        static final StageLimits POLICY = new StageLimits(Duration.ofSeconds(4), Duration.ofSeconds(10),
+                Duration.ofSeconds(25), Duration.ofSeconds(6), Duration.ofSeconds(3));
+    }
     private static final Set<String> SUPPORT = Set.of("supported", "contradicted", "hold");
     private static final Set<String> ADVICE = Set.of("no", "yes", "hold");
 
@@ -69,9 +77,18 @@ public class OrchestratedChatEngine implements ChatEngine {
     private final ChatCitationSource citations;
     private final ChatPlanner planner = new ChatPlanner();
     private final Clock clock;
+    private final StageLimits limits;
+    private final ExecutorService models = Executors.newVirtualThreadPerTaskExecutor();
 
     public OrchestratedChatEngine(ChatModels.Router router, ChatModels.Generator generator, ChatModels.Verifier verifier,
             ChatToolRegistry registry, ChatToolRunner runner, ChatCitationSource citations, Clock clock) {
+        this(router, generator, verifier, registry, runner, citations, clock, StageLimits.POLICY);
+    }
+
+    OrchestratedChatEngine(ChatModels.Router router, ChatModels.Generator generator, ChatModels.Verifier verifier,
+            ChatToolRegistry registry, ChatToolRunner runner, ChatCitationSource citations, Clock clock,
+            StageLimits limits) {
+        this.limits = limits;
         this.router = router;
         this.generator = generator;
         this.verifier = verifier;
@@ -117,8 +134,9 @@ public class OrchestratedChatEngine implements ChatEngine {
 
     private ChatEngineOutcome run(ChatRun run, ChatRunControl control, ObjectNode route) {
         Set<String> bound = registry.bound();
-        model(control, ROUTER.plus(GENERATE).plus(VERIFY).plus(SERVER));
-        ChatRouteDecision decision = router.route(run, bound);
+        ChatRouteDecision decision = model(control, limits.router(),
+                limits.generate().plus(limits.verify()).plus(limits.server()),
+                () -> router.route(run, bound));
         ChatPlan plan = planner.plan(run, decision, bound);
         if (plan instanceof ChatPlan.Stop stop) return stopped(run, route, stop);
         var confirmed = (ChatPlan.Run) plan;
@@ -127,7 +145,7 @@ public class OrchestratedChatEngine implements ChatEngine {
         var retrieved = new ChatRetrieval.Outcome(Map.of(), Map.of(), Set.of(), null, null);
         if (confirmed.requirements().stream().anyMatch(p -> p.mode() == Mode.TOOLS)) {
             control.phase("retrieving");
-            guard(control, TOOLS.plus(GENERATE).plus(VERIFY).plus(SERVER));
+            guard(control, limits.tools().plus(limits.generate()).plus(limits.verify()).plus(limits.server()));
             retrieved = retrieval.run(run, control, confirmed);
             if (retrieved.failed() != null) throw new Stop(toolFailure(retrieved.failed()));
             if (retrieved.stop() != null) return stopped(run, route, retrieved.stop());
@@ -153,8 +171,9 @@ public class OrchestratedChatEngine implements ChatEngine {
         }
 
         control.phase("writing");
-        model(control, GENERATE.plus(VERIFY).plus(SERVER));
-        ChatGeneratedAnswer generated = generator.generate(new ChatBranchContext(run.turns(), run.context(), branches));
+        var context = new ChatBranchContext(run.turns(), run.context(), branches, ChatAnswerCheck.MAX_CITATIONS);
+        ChatGeneratedAnswer generated = model(control, limits.generate(), limits.verify().plus(limits.server()),
+                () -> generator.generate(context));
         var checked = ChatAnswerCheck.check(branches, generated);
         route.put("deterministicCheck", checked.failedCheck() == null ? "passed" : checked.failedCheck());
         if (checked.failedCheck() != null) return validationFailed();
@@ -172,8 +191,9 @@ public class OrchestratedChatEngine implements ChatEngine {
         }
 
         control.phase("verifying");
-        model(control, VERIFY.plus(SERVER));
-        ChatSemanticVerdicts verdicts = verifier.verify(run, passed.sections(), List.copyOf(cited.values()));
+        List<Citation> allCited = List.copyOf(cited.values());
+        ChatSemanticVerdicts verdicts = model(control, limits.verify(), limits.server(),
+                () -> verifier.verify(run, passed.sections(), allCited));
         Set<String> held = held(passed.sections(), verdicts);
         if (held == null) return validationFailed();
         route.putArray("heldRequirements").addAll(strings(held));
@@ -218,8 +238,13 @@ public class OrchestratedChatEngine implements ChatEngine {
         branches.stream().filter(b -> answered.contains(b.requirementId()))
                 .forEach(b -> b.results().forEach(r -> r.items().forEach(i -> reachable.add(i.id()))));
         var targets = passed.graphTargets().stream().filter(g -> reachable.contains(g.id())).toList();
+        // The question replaced the selection when an answered requirement read targets the member had not selected.
+        Set<String> selected = Set.copyOf(run.selection().contextIds());
+        boolean overrode = !selected.isEmpty() && confirmed.requirements().stream()
+                .anyMatch(p -> answered.contains(p.id()) && p.targetSource() == ChatPlan.TargetSource.QUESTION
+                        && !selected.containsAll(p.targets()));
         ChatResult result = ChatResults.answered(run, kept, keptCitations, targets,
-                List.copyOf(companies.values()), List.copyOf(issues.values()), limitations, clock.instant());
+                List.copyOf(companies.values()), List.copyOf(issues.values()), limitations, overrode, clock.instant());
         route.put("outcome", "answered");
         return new ChatEngineOutcome.Completed(result, route);
     }
@@ -251,10 +276,33 @@ public class OrchestratedChatEngine implements ChatEngine {
         return new ChatModels.Failure(ChatModels.Failure.Fate.NOT_SENT, "verdicts do not match the sections");
     }
 
-    /** Starts a model stage: the time left must cover it and what follows, and the call is announced first. */
-    private static void model(ChatRunControl control, Duration needed) {
-        guard(control, needed);
+    /**
+     * One model stage: it starts only when the time left covers it and what follows, is announced before it is sent, and
+     * gets at most its own limit. A stage that runs out is interrupted and ends as a response of unknown fate: the provider
+     * may have processed it, so it is never rerun and its late answer never becomes a result.
+     */
+    private <T> T model(ChatRunControl control, Duration stage, Duration after, Supplier<T> call) {
+        guard(control, stage.plus(after));
         control.beforeModelCall();
+        Future<T> pending = models.submit(call::get);
+        try {
+            return pending.get(stage.toNanos(), TimeUnit.NANOSECONDS);
+        } catch (TimeoutException late) {
+            pending.cancel(true);
+            throw new ChatModels.Failure(ChatModels.Failure.Fate.UNKNOWN, "model stage ran past its limit");
+        } catch (InterruptedException interrupted) {
+            pending.cancel(true);
+            Thread.currentThread().interrupt();
+            throw new ChatModels.Failure(ChatModels.Failure.Fate.UNKNOWN, "interrupted while waiting for a model");
+        } catch (ExecutionException failed) {
+            if (failed.getCause() instanceof RuntimeException runtime) throw runtime;
+            throw new IllegalStateException("model stage failed", failed.getCause());
+        }
+    }
+
+    @Override
+    public void close() {
+        models.shutdownNow();
     }
 
     private static void guard(ChatRunControl control, Duration needed) {

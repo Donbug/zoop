@@ -9,8 +9,10 @@ import java.util.Set;
 /**
  * What the answer generator gets (implementation plan stage 5 {@code BranchContext}): the question chain, the frozen context
  * and one branch per answerable requirement with its tool results. Full article texts are never included.
+ * {@code maxCitations} is the number of distinct evidence ids the whole answer may cite.
  */
-public record ChatBranchContext(List<ChatRun.Turn> turns, ChatFrozenContext context, List<Branch> branches) {
+public record ChatBranchContext(List<ChatRun.Turn> turns, ChatFrozenContext context, List<Branch> branches,
+        int maxCitations) {
     public ChatBranchContext {
         turns = List.copyOf(turns);
         branches = List.copyOf(branches);

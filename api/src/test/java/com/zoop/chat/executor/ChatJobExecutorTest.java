@@ -191,6 +191,30 @@ class ChatJobExecutorTest {
     }
 
     @Test
+    void aResultReturnedAfterTheRunDeadlineIsNeverStoredAsCompleted() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        store.add(queued("job-00002", null, null, 0, "run"));
+        var engine = new ScriptedChatEngine((run, control) -> {
+            if (run.jobId().equals("job-00001")) control.beforeModelCall();
+            // Past the 60 s deadline, still inside the 15 s lease grace: the write would be accepted by the fence.
+            clock.advance(Duration.ofSeconds(65));
+            return ScriptedChatEngine.generalAnswer("늦은 답");
+        });
+        var executor = executor(engine);
+        executor.runOnce();
+        executor.runOnce();
+
+        var called = job(store.job("job-00001"));
+        assertEquals("failed", store.job("job-00001").row.status());
+        assertEquals("response_unknown", called.reason());
+        assertNull(called.retry());
+        var notCalled = job(store.job("job-00002"));
+        assertEquals("deadline_guard", notCalled.reason());
+        assertEquals("rerun", notCalled.retry());
+        assertNull(store.job("job-00002").result);
+    }
+
+    @Test
     void toolCallsAreReservedInPlanOrderCappedPerAttemptAndClosedWithTheJob() {
         store.add(queued("job-00001", null, null, 0, "run"));
         executor(new ScriptedChatEngine((run, control) -> {

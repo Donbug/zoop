@@ -20,7 +20,8 @@ import java.util.Set;
 
 /**
  * Runs a confirmed plan's stages in order and evaluates each dependent requirement's checkpoint before its stage (design
- * summary 5.2). Requirements of one stage run together; the same read asked by two requirements is made once.
+ * summary 5.2). Requirements of one stage run together; the same read (capability, targets and evidence scope) asked by two
+ * requirements is made once.
  *
  * <ul>
  * <li>A failed call (timeout, unavailable data, adapter fault) ends retrieval at once: no checkpoint is evaluated and no
@@ -78,12 +79,14 @@ final class ChatRetrieval {
                 for (ChatCapability capability : p.capabilities()) {
                     for (int from = 0; from < targets.size(); from += ChatToolRequest.MAX_TARGETS) {
                         var chunk = targets.subList(from, Math.min(targets.size(), from + ChatToolRequest.MAX_TARGETS));
-                        String key = capability.id() + "\u0000" + String.join("\u0000", chunk);
+                        String key = capability.id() + "\u0000" + String.join("\u0000", chunk) + "\u0001"
+                                + (p.evidenceScope() == null ? "*" : String.join("\u0000", p.evidenceScope()));
                         Integer index = callIndex.get(key);
                         if (index == null) {
                             index = calls.size();
                             callIndex.put(key, index);
-                            calls.add(new ChatToolRequest(capability.id(), chunk, ChatToolRequest.MAX_LIMIT));
+                            calls.add(new ChatToolRequest(capability.id(), chunk, ChatToolRequest.MAX_LIMIT,
+                                    p.evidenceScope()));
                         }
                         owned.computeIfAbsent(p.id(), k -> new ArrayList<>()).add(index);
                     }

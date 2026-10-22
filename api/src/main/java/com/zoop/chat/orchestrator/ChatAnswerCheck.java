@@ -22,9 +22,12 @@ import java.util.regex.Pattern;
  * <li>{@code schema}: at most 12 sections with a known basis, text and requirements; at most 20 distinct evidence ids each.</li>
  * <li>{@code coverage}: every answerable requirement is in a section or declared insufficient, never both; a limited or
  * unknown requirement is in neither.</li>
- * <li>{@code general_section}: a {@code general_knowledge} section cites nothing and answers Q02 requirements only.</li>
+ * <li>{@code general_section}: a {@code general_knowledge} section cites nothing, answers pure Q02 requirements only and
+ * states no current fact: no amount, percentage, price, year or calendar date (design summary 8.2: Q02 is never a way around
+ * a lookup).</li>
  * <li>{@code evidence_section}: an {@code evidence_grounded} section cites only evidence its own requirements' tool results
  * passed on, and cites some unless all its requirements found nothing.</li>
+ * <li>{@code citation_budget}: all sections together cite at most 20 distinct evidence ids ({@code ChatResult.citations}).</li>
  * <li>{@code graph_targets}: at most 50, each a company or issue a tool returned.</li>
  * <li>{@code length}: the joined answer, general notice included, is at most 12,000 characters.</li>
  * <li>{@code investment_wording}: no buy/sell recommendation wording (the verifier's {@code prohibitedAdvice} checks again).</li>
@@ -34,9 +37,15 @@ final class ChatAnswerCheck {
     static final String GENERAL_NOTICE = "일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.";
     static final int MAX_SECTIONS = 12;
     static final int MAX_SECTION_EVIDENCE = 20;
+    /** Distinct evidence one answer cites at most. */
+    static final int MAX_CITATIONS = 20;
     static final int MAX_GRAPH_TARGETS = 50;
     static final int MAX_ANSWER = 12_000;
     private static final Set<String> BASES = Set.of("general_knowledge", "evidence_grounded");
+    /** Current-fact markers a general explanation must not carry. */
+    private static final Pattern CURRENT_FACT = Pattern.compile(
+            "\\d[\\d,.]*\\s*(%|퍼센트|원|달러|엔|위안|억|조|만\\s*원|USD|KRW|bp)|[$₩€¥]\\s*\\d|(19|20)\\d{2}\\s*년"
+                    + "|\\d{1,2}\\s*월\\s*\\d{1,2}\\s*일|\\d{4}-\\d{2}-\\d{2}|(최근|오늘|어제|올해|작년|이번 분기|지난 분기)");
     private static final Pattern ADVICE = Pattern.compile(
             "(매수|매도|사|팔|담으)(하)?(세요|십시오|는 것을 추천|기를 권)|추천 종목|목표\\s*주가|지금이 (매수|매도) (적기|타이밍)");
 
@@ -81,7 +90,8 @@ final class ChatAnswerCheck {
         for (var section : answer.sections()) {
             List<Branch> owners = section.requirementIds().stream().map(byId::get).toList();
             if ("general_knowledge".equals(section.basis())) {
-                if (!section.evidenceIds().isEmpty() || owners.stream().anyMatch(b -> !b.types().contains(ChatQueryType.Q02))) {
+                if (!section.evidenceIds().isEmpty() || owners.stream().anyMatch(b -> !b.general())
+                        || CURRENT_FACT.matcher(section.text()).find()) {
                     return Result.fail("general_section");
                 }
                 String text = section.text().strip();
@@ -99,6 +109,10 @@ final class ChatAnswerCheck {
                 sections.add(section);
             }
         }
+
+        Set<String> cited = new HashSet<>();
+        sections.forEach(s -> cited.addAll(s.evidenceIds()));
+        if (cited.size() > MAX_CITATIONS) return Result.fail("citation_budget");
 
         if (answer.graphTargetIds().size() > MAX_GRAPH_TARGETS) return Result.fail("graph_targets");
         Map<String, String> returned = new HashMap<>();

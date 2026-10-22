@@ -31,21 +31,27 @@ public sealed interface ChatPlan {
     /** How a requirement is served: a Q02 general section, tool reads, or a server limitation (never a model's choice). */
     enum Mode { GENERAL, TOOLS, LIMITED }
 
+    /** Where a TOOLS requirement's targets came from. */
+    enum TargetSource { QUESTION, CONTEXT, DEPENDENCY }
+
     /**
      * One planned requirement. TOOLS requirements read {@code capabilities} on {@code targets}, or, when
      * {@code dependsOn} is set, on the companies its source finds; {@code stage} is 1 plus its source's stage. A LIMITED one
-     * carries its {@code limitation} kind.
+     * carries its {@code limitation} kind. {@code evidenceScope} is the evidence the member narrowed the selection to
+     * (null when not narrowed): the requirement may read and cite nothing else.
      */
     record Planned(String id, String label, Set<ChatQueryType> types, Mode mode, String limitation,
-            List<ChatCapability> capabilities, List<String> targets, ChatRouteDecision.Dependency dependsOn, int stage) {
+            List<ChatCapability> capabilities, List<String> targets, TargetSource targetSource, List<String> evidenceScope,
+            ChatRouteDecision.Dependency dependsOn, int stage) {
         public Planned {
             types = Set.copyOf(types);
             capabilities = List.copyOf(capabilities);
             targets = List.copyOf(targets);
+            evidenceScope = evidenceScope == null ? null : List.copyOf(evidenceScope);
         }
 
         Planned limited(String kind) {
-            return new Planned(id, label, types, Mode.LIMITED, kind, List.of(), List.of(), dependsOn, stage);
+            return new Planned(id, label, types, Mode.LIMITED, kind, List.of(), List.of(), null, null, dependsOn, stage);
         }
     }
 }

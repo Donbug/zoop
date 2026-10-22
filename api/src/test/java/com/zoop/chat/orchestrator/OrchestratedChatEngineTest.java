@@ -51,6 +51,7 @@ class OrchestratedChatEngineTest {
     private static final Map<String, String> LABELS = Map.of(HYNIX, "SK하이닉스", NVDA, "NVIDIA", AMD, "AMD");
 
     private final List<ChatToolRunner> runners = new ArrayList<>();
+    private final List<OrchestratedChatEngine> engines = new ArrayList<>();
     private final List<ChatBranchContext> generated = new ArrayList<>();
     private final Map<ChatCapability, BiFunction<ChatToolScope, ChatToolRequest, ChatToolOutput>> tools = new HashMap<>();
     private final Map<String, Citation> readable = new HashMap<>();
@@ -64,8 +65,11 @@ class OrchestratedChatEngineTest {
 
     OrchestratedChatEngineTest() {
         tools.put(ChatCapability.COMPANY_READ, (scope, request) -> {
+            // Like the real adapter: evidence outside the request's scope is never passed on.
             List<ChatToolItem> items = request.targets().stream().filter(LABELS::containsKey)
-                    .map(id -> new ChatToolItem(id, "company", LABELS.get(id), List.of(id), List.of(evidence(id)))).toList();
+                    .map(id -> new ChatToolItem(id, "company", LABELS.get(id), List.of(id),
+                            request.evidenceScope() == null || request.evidenceScope().contains(evidence(id))
+                                    ? List.of(evidence(id)) : List.of())).toList();
             return new ChatToolOutput(scope.graphVersionId(), items,
                     items.stream().flatMap(i -> i.evidenceIds().stream()).toList(), false, false);
         });
@@ -85,6 +89,7 @@ class OrchestratedChatEngineTest {
     @AfterEach
     void tearDown() {
         runners.forEach(ChatToolRunner::close);
+        engines.forEach(OrchestratedChatEngine::close);
     }
 
     @Test
@@ -326,6 +331,63 @@ class OrchestratedChatEngineTest {
         assertFailed("transient", "provider_error", true, engine().answer(run(), new Control(Duration.ofSeconds(60))));
     }
 
+    @Test
+    void evidenceTheMemberNarrowedToIsTheOnlyEvidenceTheAnswerCanCite() {
+        decision = ChatPlannerTest.decision(req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9)));
+        var narrowed = ChatPlannerTest.run(0, "v1", List.of(HYNIX, NVDA), List.of(evidence(HYNIX)),
+                List.of(evidence(HYNIX)));
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+
+        answer = new ChatGeneratedAnswer(List.of(grounded("엔비디아", List.of("r2"), evidence(NVDA))), List.of(), List.of());
+        var control = new Control(Duration.ofSeconds(60));
+        assertFailed("validation_failed", null, false, engine().answer(narrowed, control));
+        assertTrue(control.reserved.getFirst().requestMeta().contains(evidence(HYNIX)), "the scope is part of the record");
+
+        answer = new ChatGeneratedAnswer(List.of(grounded("하이닉스", List.of("r2"), evidence(HYNIX))), List.of(), List.of());
+        ChatResult result = completed(engine().answer(narrowed, new Control(Duration.ofSeconds(60))));
+        assertEquals(List.of(evidence(HYNIX)), result.citations().stream().map(Citation::evidenceId).toList());
+    }
+
+    @Test
+    void theAppliedScopeSaysWhenTheQuestionReplacedTheSelection() {
+        answer = new ChatGeneratedAnswer(List.of(grounded("사실", List.of("r2"), evidence(HYNIX))), List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+        decision = ChatPlannerTest.decision(req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
+                List.of(HYNIX)));
+
+        var selectedOther = ChatPlannerTest.run(0, "v1", List.of(NVDA));
+        assertTrue(completed(engine().answer(selectedOther, new Control(Duration.ofSeconds(60))))
+                .applied().questionOverrodeContext());
+        var selectedSame = ChatPlannerTest.run(0, "v1", List.of(HYNIX));
+        assertFalse(completed(engine().answer(selectedSame, new Control(Duration.ofSeconds(60))))
+                .applied().questionOverrodeContext());
+        assertFalse(completed(engine().answer(run(), new Control(Duration.ofSeconds(60))))
+                .applied().questionOverrodeContext(), "nothing was selected, so nothing was replaced");
+    }
+
+    @Test
+    void aModelStageThatRunsPastItsLimitIsInterruptedAndNeverRerun() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()));
+        var interrupted = new java.util.concurrent.CountDownLatch(1);
+        ChatModels.Generator slow = context -> {
+            try {
+                Thread.sleep(5_000);
+            } catch (InterruptedException stop) {
+                interrupted.countDown();
+            }
+            return new ChatGeneratedAnswer(List.of(general("늦은 답", "r1")), List.of(), List.of());
+        };
+        var limits = new OrchestratedChatEngine.StageLimits(Duration.ofMillis(200), Duration.ofMillis(200),
+                Duration.ofMillis(200), Duration.ofMillis(200), Duration.ofMillis(200));
+        var control = new Control(Duration.ofSeconds(60));
+        try (var engine = engine(slow, limits)) {
+            assertFailed("transient", "response_unknown", false, engine.answer(run(), control));
+        }
+        assertEquals(2, control.modelCalls, "the generator was announced, so the run counts as having called a model");
+        assertDoesNotThrow(() -> assertTrue(interrupted.await(2, java.util.concurrent.TimeUnit.SECONDS)));
+        assertEquals(0, verifierCalls);
+    }
+
     // ---- fixtures -------------------------------------------------------------------------------------------------------
 
     private ChatRouteDecision dependent(String cardinality, int count) {
@@ -335,6 +397,10 @@ class OrchestratedChatEngineTest {
     }
 
     private OrchestratedChatEngine engine() {
+        return engine(null, OrchestratedChatEngine.StageLimits.POLICY);
+    }
+
+    private OrchestratedChatEngine engine(ChatModels.Generator replacement, OrchestratedChatEngine.StageLimits limits) {
         List<ChatTool> adapters = tools.entrySet().stream().map(e -> (ChatTool) new ChatTool() {
             public ChatCapability capability() { return e.getKey(); }
             public ChatToolOutput read(ChatToolScope scope, ChatToolRequest request) {
@@ -358,8 +424,10 @@ class OrchestratedChatEngineTest {
             return verdicts;
         };
         ChatCitationSource citations = (id, version, asOf, trace) -> Optional.ofNullable(readable.get(id));
-        return new OrchestratedChatEngine(router, generator, verifier, registry, runner, citations,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+        var engine = new OrchestratedChatEngine(router, replacement != null ? replacement : generator, verifier, registry,
+                runner, citations, Clock.fixed(NOW, ZoneOffset.UTC), limits);
+        engines.add(engine);
+        return engine;
     }
 
     private static ChatRun run() {

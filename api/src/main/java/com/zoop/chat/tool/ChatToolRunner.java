@@ -44,7 +44,8 @@ import tools.jackson.databind.node.ObjectNode;
  * <li>The stage waits for its records at most {@link #RECORD_GRACE} past its end. A call whose record could not be made in
  * time, or failed, is never reported as a result: the stage throws {@link ChatRunSuperseded}, the run stores nothing, and
  * the job ends through lease recovery.</li>
- * <li>The graph version and asOf come from the run's frozen context, never from the plan.</li>
+ * <li>The graph version and asOf come from the run's frozen context, never from the plan. Output evidence outside a call's
+ * {@code evidenceScope} is an adapter fault.</li>
  * <li>A failed call is never an empty result. Whether a stage may continue is the orchestrator's decision (a tool failure
  * ends the job as a failure before any count is evaluated).</li>
  * </ul>
@@ -231,6 +232,9 @@ public class ChatToolRunner implements AutoCloseable {
         if (output.items().stream().anyMatch(item -> !passed.containsAll(item.evidenceIds()))) {
             return "item evidence not passed on";
         }
+        if (call.evidenceScope() != null && !call.evidenceScope().containsAll(output.evidenceIds())) {
+            return "evidence outside the requested scope";
+        }
         return null;
     }
 
@@ -243,6 +247,10 @@ public class ChatToolRunner implements AutoCloseable {
         meta.put("limit", call.limit());
         meta.put("graphVersion", scope.graphVersionId());
         meta.put("asOf", scope.asOf() == null ? null : scope.asOf().toString());
+        if (call.evidenceScope() != null) {
+            var evidence = meta.putArray("evidenceScope");
+            call.evidenceScope().forEach(evidence::add);
+        }
         ObjectNode input = StrictJson.newObject();
         input.put("capabilityId", binding.capability().id());
         input.set("request", meta);

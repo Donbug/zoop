@@ -63,21 +63,21 @@ final class ChatResults {
     /** A clarification, guidance or insufficient-evidence result: no sections, citations or limitations. */
     static ChatResult withoutAnswer(ChatRun run, String outcome, String reasonCode, List<ChatChoice> choices, Instant now) {
         return new ChatResult(outcome, PENDING_MESSAGE, "", List.of(), "none", reason(reasonCode), List.of(), List.of(),
-                List.of(), applied(run, List.of(), List.of(), now), List.copyOf(choices), null, List.of(),
+                List.of(), applied(run, List.of(), List.of(), false, now), List.copyOf(choices), null, List.of(),
                 metadata(run, now));
     }
 
     static ChatResult answered(ChatRun run, List<ChatGeneratedAnswer.Section> sections, List<Citation> citations,
             List<GraphTarget> targets, List<ChatAppliedItem> companies, List<ChatAppliedItem> issues,
-            List<ChatLimitation> limitations, Instant now) {
+            List<ChatLimitation> limitations, boolean questionOverrodeContext, Instant now) {
         List<ChatAnswerSection> publicSections = sections.stream()
                 .map(s -> new ChatAnswerSection(s.basis(), s.text(), s.evidenceIds())).toList();
         Set<String> sources = new LinkedHashSet<>();
         citations.forEach(c -> sources.add(c.articleId()));
         return new ChatResult("answered", PENDING_MESSAGE, ChatAnswerCheck.joined(sections), publicSections,
-                answerBasis(sections), null, List.copyOf(sources).subList(0, Math.min(20, sources.size())),
-                List.copyOf(citations), List.copyOf(targets), applied(run, companies, issues, now), List.of(), null,
-                List.copyOf(limitations), metadata(run, now));
+                answerBasis(sections), null, List.copyOf(sources), List.copyOf(citations), List.copyOf(targets),
+                applied(run, companies, issues, questionOverrodeContext, now), List.of(), null, List.copyOf(limitations),
+                metadata(run, now));
     }
 
     /** One basis gives that basis; more than one is {@code mixed}; none is {@code none}. */
@@ -88,12 +88,12 @@ final class ChatResults {
     }
 
     private static ChatApplied applied(ChatRun run, List<ChatAppliedItem> companies, List<ChatAppliedItem> issues,
-            Instant now) {
+            boolean questionOverrodeContext, Instant now) {
         var context = run.context();
         ChatAppliedPeriod period = context.period() == null ? null
                 : new ChatAppliedPeriod(context.period().start(), context.period().end(), "context", null);
         return new ChatApplied(List.copyOf(companies), List.copyOf(issues), period, run.graphVersionId(),
-                context.asOf() != null ? context.asOf() : now, false);
+                context.asOf() != null ? context.asOf() : now, questionOverrodeContext);
     }
 
     private static Metadata metadata(ChatRun run, Instant now) {

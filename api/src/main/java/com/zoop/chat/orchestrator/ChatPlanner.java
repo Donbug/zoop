@@ -5,6 +5,7 @@ import com.zoop.chat.executor.ChatRun;
 import com.zoop.chat.executor.ChatRunControl;
 import com.zoop.chat.orchestrator.ChatPlan.Mode;
 import com.zoop.chat.orchestrator.ChatPlan.Planned;
+import com.zoop.chat.orchestrator.ChatPlan.TargetSource;
 import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatToolRequest;
 import java.util.ArrayList;
@@ -30,7 +31,11 @@ import java.util.Set;
  * {@code investment_advice} limitation; a requirement with no allowed and registered capability is {@code out_of_scope};
  * a requirement whose source cannot run is {@code precondition_unmet}. A capability is allowed only through its Q type
  * ({@link ChatQueryType}) and runs only when bound in the registry.</li>
- * <li>Targets named in the question take precedence over the selected context; a lookup with neither is ambiguous.</li>
+ * <li>Targets named in the question take precedence over the selected context; a lookup with neither is ambiguous. When
+ * the context is used and the member narrowed it to chosen evidence, the requirement (and what depends on it) may read and
+ * cite only that evidence.</li>
+ * <li>General knowledge answers a pure Q02 requirement only. A requirement that also asks for a current fact needs a lookup
+ * or is {@code out_of_scope}; it never falls back to a general answer.</li>
  * <li>Before any call: more than 6 explicit requirements, an ambiguity, more than 3 dependent stages or more than 12 calls in
  * the worst case the checkpoints allow end as {@code clarification}. At clarification depth 2 every such stop is
  * {@code guidance} instead (ZOOP-AIG-001 6.3.4).</li>
@@ -112,12 +117,14 @@ public class ChatPlanner {
         // A source the planner dropped (an unstated requirement below the threshold) cannot run either.
         Planned source = r.dependsOn() == null ? null : earlier.get(r.dependsOn().requirementId());
         int stage = source == null ? 1 : source.stage() + 1;
-        var base = new Planned(r.id(), r.label(), all, Mode.LIMITED, null, List.of(), List.of(), r.dependsOn(), stage);
+        var base = new Planned(r.id(), r.label(), all, Mode.LIMITED, null, List.of(), List.of(), null, null, r.dependsOn(),
+                stage);
 
         if (r.prohibitedAdvice() > ADVICE) return base.limited("investment_advice");
         if (all.isEmpty()) return base.limited("out_of_scope");
+        // Only a pure concept question is answered from general knowledge; Q02 never stands in for a current fact.
         if (all.equals(Set.of(ChatQueryType.Q02))) {
-            return new Planned(r.id(), r.label(), all, Mode.GENERAL, null, List.of(), List.of(), null, 1);
+            return new Planned(r.id(), r.label(), all, Mode.GENERAL, null, List.of(), List.of(), null, null, null, 1);
         }
 
         Map<String, Double> allowed = new HashMap<>();
@@ -131,20 +138,25 @@ public class ChatPlanner {
             best(allowed).filter(e -> e.getValue() >= REVIEW)
                     .ifPresent(e -> capabilities.add(ChatCapability.of(e.getKey()).orElseThrow()));
         }
-        if (capabilities.isEmpty()) {
-            if (all.contains(ChatQueryType.Q02)) {
-                return new Planned(r.id(), r.label(), all, Mode.GENERAL, null, List.of(), List.of(), null, 1);
-            }
-            return base.limited("out_of_scope");
-        }
+        // A fact requirement without a lookup it may make is out of scope, even when it also asks about a concept.
+        if (capabilities.isEmpty()) return base.limited("out_of_scope");
 
         if (r.dependsOn() != null) {
             if (source == null || source.mode() != Mode.TOOLS) return base.limited("precondition_unmet");
-            return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities, List.of(), r.dependsOn(), stage);
+            return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities, List.of(), TargetSource.DEPENDENCY,
+                    source.evidenceScope(), r.dependsOn(), stage);
         }
-        List<String> targets = !r.targets().isEmpty() ? r.targets() : run.selection().contextIds();
+        if (!r.targets().isEmpty()) {
+            return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities, r.targets(), TargetSource.QUESTION,
+                    null, null, 1);
+        }
+        // The selected context: its targets, or the selected evidence alone, narrowed to the evidence the member chose.
+        var selection = run.selection();
+        List<String> targets = !selection.contextIds().isEmpty() ? selection.contextIds() : selection.evidenceIds();
         if (targets.isEmpty()) return null;
-        return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities, targets, null, 1);
+        List<String> scope = selection.evidenceIds().isEmpty() ? null : selection.evidencePool();
+        return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities, targets, TargetSource.CONTEXT, scope,
+                null, 1);
     }
 
     /** The best type when only an explicit requirement may use the review band. */

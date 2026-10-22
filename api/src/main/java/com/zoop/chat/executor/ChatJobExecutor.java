@@ -40,6 +40,7 @@ import tools.jackson.databind.node.ObjectNode;
  * <li>Every write of a run is fenced by its owner token and unexpired lease. A cancel, an expired lease or a newer run makes
  * the old run's phase, model-call record and completion fail; its result is discarded, never stored late.</li>
  * <li>{@code runs} counts model-calling runs only: it is raised when an engine announces its first model request.</li>
+ * <li>A result returned after the run deadline is never stored as completed: it ends as on lease recovery.</li>
  * <li>A lease that ran out is recovered as a failure. A run that had announced a model request ends as
  * {@code transient/response_unknown} without retry (the provider may have processed and charged it); one that had not ends
  * as {@code transient/deadline_guard}, which may be rerun.</li>
@@ -171,7 +172,8 @@ public class ChatJobExecutor {
             if (locked.isEmpty()) return false;
             ArrayNode attempts = attempts(locked.get().attempts());
             ObjectNode attempt = attempt(attempts, claim.attemptNo());
-            if (checked instanceof ChatEngineOutcome.Completed completed) {
+            ChatEngineOutcome ending = late(checked, attempt, now, claim.deadline());
+            if (ending instanceof ChatEngineOutcome.Completed completed) {
                 attempt.put("status", "succeeded").put("finishedAt", now.toString());
                 ChatResult result = withMessageId(completed.result(), messageId(claim.job().id()));
                 String route = completed.routeSummary() == null ? null : mapper.writeValueAsString(completed.routeSummary());
@@ -179,7 +181,7 @@ public class ChatJobExecutor {
                         mapper.writeValueAsString(result), RESULT_SCHEMA_VERSION, route,
                         route == null ? null : ROUTE_SCHEMA_VERSION, attempts.toString());
             }
-            var failed = (ChatEngineOutcome.Failed) checked;
+            var failed = (ChatEngineOutcome.Failed) ending;
             String kind = ChatFailures.ENGINE_KINDS.contains(failed.kind()) || "result_lost".equals(failed.kind())
                     ? failed.kind() : "internal";
             ChatFailure failure = ChatFailures.of(kind, failed.reason(), failed.rerunnable(), locked.get().runs());
@@ -190,6 +192,18 @@ public class ChatJobExecutor {
                     attempts.toString());
         });
         return Boolean.TRUE.equals(stored);
+    }
+
+    /**
+     * A result that comes back after the run deadline is not stored as completed (the deadline covers verification and
+     * saving): the run ends as it would on recovery, {@code response_unknown} once a model was called, otherwise
+     * {@code deadline_guard}.
+     */
+    private static ChatEngineOutcome late(ChatEngineOutcome outcome, ObjectNode attempt, Instant now, Instant deadline) {
+        if (!(outcome instanceof ChatEngineOutcome.Completed) || !now.isAfter(deadline)) return outcome;
+        return attempt.path("modelCalled").asBoolean(false)
+                ? new ChatEngineOutcome.Failed("transient", "response_unknown", false)
+                : new ChatEngineOutcome.Failed("transient", "deadline_guard", true);
     }
 
     /**
