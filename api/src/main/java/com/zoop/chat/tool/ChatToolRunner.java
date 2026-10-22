@@ -68,6 +68,12 @@ public class ChatToolRunner implements AutoCloseable {
     private final Duration recordGrace;
     private final Semaphore inFlight;
     private final ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor();
+    /**
+     * Records run on their own platform threads: a read that keeps a CPU busy (and so its virtual-thread carrier) can never
+     * hold back the record that ends a call.
+     */
+    private final ExecutorService records = Executors.newFixedThreadPool(MAX_CONCURRENT, Thread.ofPlatform().daemon()
+            .name("chat-tool-record-", 0).factory());
 
     @Autowired
     public ChatToolRunner(ChatToolRegistry registry) {
@@ -121,7 +127,7 @@ public class ChatToolRunner implements AutoCloseable {
                 slots.release();
                 inFlight.release();
                 started.add(CompletableFuture.supplyAsync(
-                        () -> finish(control, id, call, null, new TimeoutException(), superseded), pool));
+                        () -> finish(control, id, call, null, new TimeoutException(), superseded), records));
                 continue;
             }
             // The task always runs (never cancelled before it starts), so its slots are always given back; a timeout
@@ -145,7 +151,8 @@ public class ChatToolRunner implements AutoCloseable {
                 Thread thread = reader.get();
                 if (error instanceof TimeoutException && thread != null) thread.interrupt();
             });
-            started.add(read.handleAsync((output, error) -> finish(control, id, call, output, error, superseded), pool));
+            started.add(read.handleAsync((output, error) -> finish(control, id, call, output, error, superseded),
+                    records));
         }
         awaitRecords(started, stageEnd, superseded);
         if (superseded.get()) throw new ChatRunSuperseded();
@@ -161,6 +168,7 @@ public class ChatToolRunner implements AutoCloseable {
     @Override
     public void close() {
         pool.shutdownNow();
+        records.shutdownNow();
     }
 
     /** Waits for every started call to be recorded, at most {@code recordGrace} past the stage end. */
