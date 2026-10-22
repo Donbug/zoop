@@ -22,6 +22,7 @@ import {
   sameViewport,
 } from './graph-view';
 import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
+import { arrangeFlow, arrangeFocus } from './graph-arrange';
 import { freeViewport, nodeRect, type Rect } from './graph-geometry';
 
 export default function GraphCanvas({
@@ -30,6 +31,8 @@ export default function GraphCanvas({
   onSelect,
   focusId = null,
   focusHops = 1,
+  focusLayout = false,
+  flow = false,
   highlightedEdgeIds = [],
   selectedEdgeId = null,
   onSelectEdge,
@@ -46,6 +49,10 @@ export default function GraphCanvas({
   onSelect?: (id: string | null) => void;
   focusId?: string | null;
   focusHops?: 1 | 2;
+  /** D-GRP-07b 포커스 모드: 포커스 노드의 1·2단계 이웃만 남기고 방사형으로 다시 배치한다. */
+  focusLayout?: boolean;
+  /** D-GRP-01 [흐름 순으로 정렬]: 사건→기업·선행→후속 방향으로 왼쪽에서 오른쪽에 층을 나눈다. */
+  flow?: boolean;
   highlightedEdgeIds?: string[];
   selectedEdgeId?: string | null;
   onSelectEdge?: (id: string) => void;
@@ -105,6 +112,8 @@ export default function GraphCanvas({
   const preservePositions = useRef(false);
   const [centerSequence, setCenterSequence] = useState(0);
   const renderedData = useRef<ReturnType<typeof toG6Data> | null>(null);
+  // 지금 적용한 배치(원래 지도·포커스·흐름 순). 바뀌면 화면을 새 배치에 맞춘다.
+  const lastArrangement = useRef('map');
   function handleNodeSelect(id: string | null) {
     if (id === '__isolated__') return onOpenIsolated?.();
     // 이미 선택한 노드를 다시 눌러도 수동 이동한 지도에서 중앙으로 돌아온다.
@@ -367,6 +376,12 @@ export default function GraphCanvas({
     const host = container.current;
     if (!graph || !host) return;
     // Serialize G6 drawing; selecting/closing never recreates the graph or viewport.
+    const arrangeFocusNow = focusLayout && Boolean(focusId);
+    const arrangement = arrangeFocusNow
+      ? `focus:${focusId}:${focusHops}`
+      : flow
+        ? 'flow'
+        : 'map';
     drawing.current = drawing.current
       .then(async () => {
         if (graph.destroyed) return;
@@ -376,9 +391,12 @@ export default function GraphCanvas({
             host.clientWidth,
             host.clientHeight,
             selected ?? focusId,
-            data.edges
-              .filter((edge) => highlightedEdgeIds.includes(edge.id))
-              .flatMap((edge) => [edge.source, edge.target]),
+            [
+              ...data.edges
+                .filter((edge) => highlightedEdgeIds.includes(edge.id))
+                .flatMap((edge) => [edge.source, edge.target]),
+              ...(arrangeFocusNow ? focusedNodes : []),
+            ],
             connectionPath && highlightedEdgeIds.length
               ? new Set(
                   data.edges
@@ -431,9 +449,41 @@ export default function GraphCanvas({
             .filter((edge) => highlightedEdgeIds.includes(edge.id))
             .flatMap((edge) => [edge.source, edge.target]),
         );
+        // 배치가 바뀌면(포커스 진입·해제, 흐름 순 켜기·끄기) 이전 위치를 유지하지 않고 새 배치 전체를 화면에 맞춘다.
+        if (arrangement !== lastArrangement.current) {
+          lastArrangement.current = arrangement;
+          preservePositions.current = false;
+          centerTarget.current = null;
+          fitPending.current = true;
+        }
+        const arrangedHidden = new Set<string>();
+        if (arrangeFocusNow && focusId) {
+          const focused = arrangeFocus(
+            rendered,
+            data,
+            focusId,
+            focusHops,
+            host.clientWidth,
+            host.clientHeight,
+          );
+          rendered.nodes = focused.nodes;
+          focused.hidden.forEach((id) => arrangedHidden.add(id));
+        } else if (flow) {
+          rendered.nodes = arrangeFlow(
+            rendered,
+            data,
+            host.clientWidth,
+            host.clientHeight,
+          );
+        }
+        if (arrangement !== 'map') arrangedHidden.add('__isolated__');
         // Closing details changes the available width, but must not rearrange
         // the graph the user just centered (including its surrounding nodes).
-        if (preservePositions.current && renderedData.current) {
+        if (
+          arrangement === 'map' &&
+          preservePositions.current &&
+          renderedData.current
+        ) {
           const positions = new Map(
             renderedData.current.nodes?.map((node) => [node.id, node.style]),
           );
@@ -447,14 +497,15 @@ export default function GraphCanvas({
               : node;
           });
         }
-        const hiddenNodes = new Set(
-          data.nodes
+        const hiddenNodes = new Set([
+          ...data.nodes
             .filter(
               (node) =>
                 view.hidden.includes(node.kind) && !pathNodes.has(node.id),
             )
             .map((node) => node.id),
-        );
+          ...arrangedHidden,
+        ]);
         rendered.nodes = rendered.nodes?.map((node) => ({
           ...node,
           style: {
@@ -509,6 +560,7 @@ export default function GraphCanvas({
         renderedData.current = rendered;
         await syncVisualStates(graph, rendered);
         if (
+          !arrangeFocusNow &&
           focusId &&
           focusId !== lastFocused.current &&
           rendered.nodes?.some((node) => node.id === focusId)
@@ -553,6 +605,8 @@ export default function GraphCanvas({
     selectedEdgeId,
     focusId,
     focusHops,
+    focusLayout,
+    flow,
     highlightedEdgeIds,
     connectionPath,
     view.hidden,

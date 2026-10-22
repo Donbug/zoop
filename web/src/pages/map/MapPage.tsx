@@ -222,6 +222,8 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
     companyNode?.id ??
     null;
   const focusId = params.get('focus');
+  // D-GRP-01 [흐름 순으로 정렬]. 주소(?arrange=flow)에 남겨 새로 고침·공유에도 유지한다.
+  const flowOrder = params.get('arrange') === 'flow';
   const focusHops: 1 | 2 = params.get('hops') === '2' ? 2 : 1;
   const focusNode = data?.nodes.find((node) => node.id === focusId) ?? null;
   const logoOf = (companyId: string) =>
@@ -620,6 +622,22 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                 </div>
               </>
             )}
+            <button
+              type="button"
+              className="ml-auto h-7 shrink-0 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 text-[11px] font-semibold whitespace-nowrap text-zoop-ink hover:bg-zoop-wash disabled:cursor-not-allowed disabled:opacity-50 aria-pressed:border-zoop-ink aria-pressed:bg-zoop-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
+              aria-pressed={flowOrder}
+              disabled={Boolean(focusId)}
+              title={
+                focusId
+                  ? '포커스 모드에서는 흐름 순 정렬을 쓸 수 없어요. 전체 보기로 나온 뒤 켜 주세요.'
+                  : '사건에서 관련 기업, 선행 사건에서 후속 사건 방향으로 왼쪽에서 오른쪽에 정렬해요.'
+              }
+              onClick={() =>
+                updateQuery({ arrange: flowOrder ? null : 'flow' })
+              }
+            >
+              흐름 순으로 정렬
+            </button>
             <div className="relationship-toolbar-help">
               <button
                 onClick={() => setNotice(notice === 'info' ? '' : 'info')}
@@ -700,6 +718,8 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                       (historical ? (detailEventId ?? companyId) : null))
                 }
                 focusHops={focusHops}
+                focusLayout={!pathFrom && Boolean(focusId)}
+                flow={flowOrder}
               />
             ) : (
               <div className="relationship-canvas">

@@ -252,3 +252,39 @@ describe('D-GRP-04 · map navigation and evidence handoff', () => {
     ).toBe(`edge:${edge.id}`);
   });
 });
+
+describe('D-GRP-01 · flow order toggle', () => {
+  it('toggles flow order in the address and is unavailable in focus mode', async () => {
+    const router = setup('/?mode=all');
+    const toggle = await screen.findByRole('button', {
+      name: '흐름 순으로 정렬',
+    });
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    await userEvent.click(toggle);
+    expect(
+      new URLSearchParams(router.state.location.search).get('arrange'),
+    ).toBe('flow');
+    expect(
+      screen
+        .getByRole('button', { name: '흐름 순으로 정렬' })
+        .getAttribute('aria-pressed'),
+    ).toBe('true');
+    await userEvent.click(
+      screen.getByRole('button', { name: '흐름 순으로 정렬' }),
+    );
+    expect(
+      new URLSearchParams(router.state.location.search).get('arrange'),
+    ).toBeNull();
+
+    await act(async () => {
+      await router.navigate('/?mode=all&focus=KRX:005930&hops=1');
+    });
+    expect(
+      (
+        screen.getByRole('button', {
+          name: '흐름 순으로 정렬',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+  });
+});
