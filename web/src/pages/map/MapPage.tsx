@@ -797,6 +797,7 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                   to={pathTo}
                   loading={loading}
                   error={error}
+                  unavailable={unavailable}
                   onRetry={() => setRetry((v) => v + 1)}
                   onClose={() => updateQuery({ path: null })}
                   onPick={(id) =>

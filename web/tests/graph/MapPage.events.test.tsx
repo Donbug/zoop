@@ -270,6 +270,24 @@ describe('D-BRF-04 · round map that is not provided', () => {
     expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
   });
 
+  it('keeps the not-provided notice without retry in the company path panel of a round link', async () => {
+    vi.mocked(getGraph).mockRejectedValue(
+      new RoundGraphUnavailableError(
+        '발행 당시 고정 그래프 조회가 아직 연결되지 않았습니다.',
+      ),
+    );
+    setup('/?round=brf-2026-10-15-evening&path=KRX:005930,KRX:000660');
+    expect(
+      (
+        await screen.findAllByText(
+          '이 회차의 관계 지도는 아직 제공하지 않아요.',
+        )
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText('그래프 조회 실패')).toBeNull();
+    expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
+  });
+
   it('keeps the failure and retry for a round map that failed to load', async () => {
     vi.mocked(getGraph).mockRejectedValue(new Error('네트워크 오류'));
     setup('/?round=brf-2026-10-15-evening');
