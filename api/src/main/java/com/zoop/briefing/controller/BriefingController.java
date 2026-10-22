@@ -50,7 +50,7 @@ public class BriefingController {
 
     @GetMapping("/{id}/graph")
     @Operation(operationId = "getBriefingGraphBasis", summary = "발행 당시 그래프 기준 조회",
-            description = "회차의 고정 버전을 반환합니다. 고정 그래프 조회가 준비되지 않았으면 unavailable이며 최신 그래프로 대체하지 않습니다.")
+            description = "회차의 저장 버전과 가용 상태를 반환합니다. 과거 재구성본은 graphOrigin=reconstructed와 reconstructedAt으로 구분하며 원래 발행본의 graphVersion을 변경하지 않습니다. 저장본이 없으면 unavailable이며 최신 그래프로 대체하지 않습니다.")
     @ApiResponse(responseCode = "200", description = "고정 그래프 기준과 가용 상태",
             content = @Content(mediaType = "application/json", schema = @Schema(implementation = BriefingHttpSchemas.BriefingGraphBasis.class)))
     public ObjectNode getBriefingGraphBasis(@PathVariable String id, HttpServletRequest request) {

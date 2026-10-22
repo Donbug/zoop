@@ -39,7 +39,7 @@
 | getBriefing | /api/v1/briefings | /api/briefings | 목표만 721 · BFF만 60 · 형식/필수/권한 변경 21 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | listBriefingRounds | /api/v1/briefings/rounds | /api/briefings/rounds | 목표만 84 · BFF만 39 · 형식/필수/권한 변경 6 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | getBriefingItemDetail | /api/v1/briefings/{roundId}/items/{eventId} | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
-| getBriefingGraphBasis | /api/v1/briefings/{id}/graph | /api/briefings/{id}/graph | 목표만 97 · BFF만 30 · 형식/필수/권한 변경 7 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| getBriefingGraphBasis | /api/v1/briefings/{id}/graph | /api/briefings/{id}/graph | 목표만 106 · BFF만 30 · 형식/필수/권한 변경 7 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | createConversation | /api/v1/chat/sessions/{id} | /api/chat/sessions/{id} | 목표만 161 · BFF만 12 · 형식/필수/권한 변경 9 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
 | getConversation | /api/v1/chat/sessions/{id} | /api/chat/sessions/{id} | 목표만 175 · BFF만 32 · 형식/필수/권한 변경 23 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
 | getCurrentConversation | /api/v1/chat/sessions/current | /api/chat/sessions/current | 목표만 175 · BFF만 32 · 형식/필수/권한 변경 23 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |

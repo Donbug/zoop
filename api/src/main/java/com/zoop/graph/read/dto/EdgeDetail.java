@@ -16,7 +16,7 @@ public record EdgeDetail(String id, String relationType, boolean derived, boolea
     /** logoUrl and brandColor are set for a company end (null when the catalog has none) and null for an issue end. */
     public record EndpointRef(String id, String kind, String label, String logoUrl, String brandColor) { }
 
-    /** ALLOW for an approved public relation; not_applicable for a derived edge, which is never verified. */
+    /** ALLOW for an approved public relation; not_applicable for a derived edge or a local reconstruction, neither implying approval. */
     public record Verification(String status, String note) { }
 
     public record ViaIssue(String title, String id, String eventTime, String timePrecision, List<String> evidenceIds) { }

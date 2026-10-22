@@ -80,7 +80,14 @@ export default function RelationDetailPanel({
           <div className="mt-3 flex flex-wrap gap-1.5">
             <span className={ui.badge}>{data.summary}</span>
             <span className={ui.badge}>
-              {shared ? '사건 공유' : '후속 관계'}
+              {data.relationType === 'INVOLVES' && !data.role
+                ? '역할 미확인'
+                : {
+                    SHARES_ISSUE: '사건 공유',
+                    FOLLOWS: '후속 관계',
+                    INVOLVES: '직접 관련',
+                    STRUCTURALLY_RELATED_TO: '구조적 관련',
+                  }[data.relationType]}
             </span>
           </div>
         )}
