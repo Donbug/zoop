@@ -55,7 +55,7 @@ export default function BriefingSnapshotBanner({
       .filter(Boolean)
       .join(' · ');
   else
-    detail = `발행 당시의 관계·근거 · 데이터 기준 ${briefingTime(data?.dataAsOf ?? null)}${
+    detail = `발행 당시의 관계·근거 · 핵심 이슈 ${data?.keyIssueIds.length ?? 0}개 · 관련 기업 ${data?.companyIds.length ?? 0}개 · 데이터 기준 ${briefingTime(data?.dataAsOf ?? null)} · 버전 ${data?.graphVersion ?? '미확인'}${
       data?.correctionCount
         ? ` · 정정 ${data.correctionCount}건은 브리핑에서 확인`
         : ''
@@ -70,7 +70,10 @@ export default function BriefingSnapshotBanner({
         <p className="text-[13px] font-bold">{title}</p>
         <p
           role={
-            basis.status === 'error' || (data && data.status !== 'available')
+            basis.status === 'error' ||
+            (data &&
+              data.status !== 'available' &&
+              data.unavailableReason !== 'snapshot_not_recorded')
               ? 'alert'
               : 'status'
           }

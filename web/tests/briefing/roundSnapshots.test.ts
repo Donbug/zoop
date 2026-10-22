@@ -22,7 +22,55 @@ const basis = {
   status: 'available',
   graphVersion: context.graphVersion,
   dataAsOf: context.asOf,
+  keyIssueIds: [],
+  companyIds: [],
 };
+
+it('distinguishes a missing historical recording without fetching the current graph', async () => {
+  const server = createFakeServer();
+  server.on('GET', '/api/v1/briefings/:id/graph', () =>
+    json({
+      ...basis,
+      status: 'unavailable',
+      graphVersion: null,
+      unavailableReason: 'snapshot_not_recorded',
+      message: '당시 저장된 그래프가 없습니다.',
+    }),
+  );
+  await expect(getGraph(request)).rejects.toMatchObject({
+    name: 'BriefingGraphUnavailableError',
+    reason: 'snapshot_not_recorded',
+  });
+  expect(server.calls('GET', '/api/v1/graph')).toHaveLength(0);
+});
+
+it.each([true, false])(
+  'validates canonical round targets in the graph (present=%s)',
+  async (present) => {
+    const server = createFakeServer();
+    server.on('GET', '/api/v1/briefings/:id/graph', () =>
+      json({
+        ...basis,
+        keyIssueIds: ['event-original'],
+        companyIds: ['company-original'],
+      }),
+    );
+    server.on('GET', '/api/v1/graph', () =>
+      json({
+        nodes: present
+          ? [
+              { id: 'event-original', kind: 'issue' },
+              { id: 'company-original', kind: 'company' },
+            ]
+          : [],
+        edges: [],
+        metadata,
+      }),
+    );
+    if (present) expect((await getGraph(request)).nodes).toHaveLength(2);
+    else await expect(getGraph(request)).rejects.toThrow('핵심 이슈·관련 기업');
+  },
+);
 
 it.each(['suspended', 'unavailable', 'not_published'])(
   'blocks %s round before requesting a graph',

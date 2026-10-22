@@ -4,6 +4,7 @@ import com.zoop.graph.snapshot.GraphSnapshotStore;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.version.GraphVersionSelector;
 import com.zoop.graph.version.SelectedGraphVersion;
+import com.zoop.graph.version.BriefingGraphUnavailableException;
 import java.time.Instant;
 import org.springframework.stereotype.Component;
 
@@ -27,10 +28,25 @@ public class PublicGraphReader {
     public record Pinned(SelectedGraphVersion selected, DisplayGraph graph) { }
 
     public Pinned read(String round, String graphVersion, Instant asOf) {
-        SelectedGraphVersion selected = selector.select(round, graphVersion, asOf);
+        return read(round, graphVersion, asOf, null);
+    }
+
+    public Pinned read(String round, String graphVersion, Instant asOf, String requestId) {
+        SelectedGraphVersion selected = selector.select(round, graphVersion, asOf, requestId);
         PublicGraphSnapshot snapshot = store.load(selected.version());
         PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot,
                 selected.asOfRequested() ? selected.asOf() : null, exclusions.current());
-        return new Pinned(selected, DisplayGraph.of(visible));
+        DisplayGraph display = DisplayGraph.of(visible);
+        var basis = selected.briefing();
+        if (basis != null) {
+            if (!display.issues.keySet().containsAll(basis.keyIssueIds())
+                    || !display.companies.keySet().containsAll(basis.companyIds()))
+                throw new BriefingGraphUnavailableException("briefing_targets_unavailable");
+            basis.issueCompanies().forEach((issue, companies) -> {
+                if (!display.issueCompanies.getOrDefault(issue, java.util.Set.of()).containsAll(companies))
+                    throw new BriefingGraphUnavailableException("briefing_targets_unavailable");
+            });
+        }
+        return new Pinned(selected, display);
     }
 }

@@ -7,6 +7,18 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "response:200:application/json.unavailableReason:required": false,
+    "response:200:application/json.unavailableReason<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "snapshot_not_recorded",
+        "snapshot_unavailable",
+        "briefing_targets_unavailable"
+      ]
+    },
+    "response:200:application/json.unavailableReason<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },

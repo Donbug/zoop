@@ -1,0 +1,73 @@
+{
+  "snapshotFormat": 3,
+  "versionId": "synthetic-graph-v1",
+  "sourceBundleId": null,
+  "companies": [
+    {
+      "companyId": "brf-test-company",
+      "label": "[합성시험] 시험기업"
+    }
+  ],
+  "issues": [
+    {
+      "issueId": "brf-test-event",
+      "label": "[합성시험] 반도체 시험 이슈",
+      "eventTime": "2026-10-15T00:00:00Z",
+      "timePrecision": "datetime",
+      "action": "시험",
+      "target": "반도체",
+      "geography": "domestic",
+      "geographyPolicyVersion": "synthetic-v1",
+      "geographyEvidenceIds": [
+        "brf-test-evidence"
+      ],
+      "articleIds": [
+        "brf-test-document"
+      ],
+      "evidenceIds": [
+        "brf-test-evidence"
+      ],
+      "assertionStatus": "occurred",
+      "mentions": [
+        {
+          "mentionId": "synthetic-mention",
+          "articleId": "brf-test-document",
+          "articleVersion": "synthetic-v1"
+        }
+      ],
+      "latestPublishedAt": "2026-10-13T00:00:00Z"
+    }
+  ],
+  "relations": [
+    {
+      "relationId": "synthetic-relation",
+      "relationType": "INVOLVES",
+      "source": "brf-test-event",
+      "target": "brf-test-company",
+      "role": "시험 대상",
+      "assertionStatus": "occurred",
+      "evidenceIds": [
+        "brf-test-evidence"
+      ],
+      "basis": []
+    }
+  ],
+  "articles": [
+    {
+      "articleId": "brf-test-document",
+      "version": "synthetic-v1",
+      "title": "[합성시험] 직접 작성한 시험 원문",
+      "url": "https://example.invalid/synthetic-document",
+      "publishedAt": "2026-10-13T00:00:00Z"
+    }
+  ],
+  "evidence": [
+    {
+      "evidenceId": "brf-test-evidence",
+      "articleId": "brf-test-document",
+      "articleVersion": "synthetic-v1",
+      "start": 0,
+      "end": 4
+    }
+  ]
+}

@@ -190,6 +190,12 @@ export type BriefingGraphBasis = {
   /** 제공 중단 회차에 관리자가 적은 사유 */
   reason: string | null;
   publishedAt: string | null;
+  /** 저장본 부재와 일시 조회 불가를 구분한다. 기존 서버와 호환하기 위해 선택 필드다. */
+  unavailableReason?:
+    | 'snapshot_not_recorded'
+    | 'snapshot_unavailable'
+    | 'briefing_targets_unavailable'
+    | null;
   /** 회차 데이터 창의 끝(KST). 보여 주는 관계·근거의 기준 시각 */
   dataAsOf: string | null;
   graphVersion: string | null;

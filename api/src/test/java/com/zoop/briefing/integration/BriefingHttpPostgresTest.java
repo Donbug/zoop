@@ -48,6 +48,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class BriefingHttpPostgresTest {
     private static final String SCHEMA = "briefing_http_" + UUID.randomUUID().toString().replace("-", "");
     private static final Path GRANTS = createGrantFile();
+    private static final Path GRAPH_ROOT = createGraphRoot();
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String MORNING = "/api/v1/briefings?date=2026-10-15&edition=morning";
     private static final String EVENING = "/api/v1/briefings?date=2026-10-15&edition=evening";
@@ -66,20 +67,28 @@ class BriefingHttpPostgresTest {
         properties.add("spring.flyway.default-schema", () -> SCHEMA);
         properties.add("spring.jpa.properties.hibernate.default_schema", () -> SCHEMA);
         properties.add("zoop.document-read.grants", () -> GRANTS.toString());
+        properties.add("zoop.graph.snapshot.source", () -> "artifact");
+        properties.add("zoop.graph.snapshot.artifact-root", () -> GRAPH_ROOT.toString());
     }
 
     @BeforeEach
     void loadSyntheticFixture() throws IOException {
+        loadFixture(resource("fixture.sql"));
+    }
+
+    private void loadFixture(String sql) throws IOException {
         Files.writeString(GRANTS, resource("grants.json"));
         // Every statement is confined to this test class's random schema, never the shared public schema.
         jdbc.execute("TRUNCATE TABLE briefing_changes, briefing_rounds RESTART IDENTITY CASCADE");
+        jdbc.execute("DELETE FROM graph_activations");
+        jdbc.execute("DELETE FROM graph_versions");
         jdbc.update("DELETE FROM evidence WHERE id LIKE 'brf-test-%'");
         jdbc.update("UPDATE articles SET current_version=NULL WHERE id LIKE 'brf-test-%'");
         jdbc.update("DELETE FROM article_versions WHERE article_id LIKE 'brf-test-%'");
         jdbc.update("DELETE FROM articles WHERE id LIKE 'brf-test-%'");
         jdbc.update("DELETE FROM artifacts WHERE id LIKE 'brf-test-%'");
         jdbc.update("DELETE FROM companies WHERE id LIKE 'brf-test-%'");
-        jdbc.execute(resource("fixture.sql"));
+        jdbc.execute(sql);
     }
 
     @AfterAll
@@ -92,6 +101,9 @@ class BriefingHttpPostgresTest {
             }
         }
         Files.deleteIfExists(GRANTS);
+        Files.deleteIfExists(GRAPH_ROOT.resolve("graph/synthetic.json"));
+        Files.deleteIfExists(GRAPH_ROOT.resolve("graph"));
+        Files.deleteIfExists(GRAPH_ROOT);
     }
 
     @Test
@@ -249,7 +261,7 @@ class BriefingHttpPostgresTest {
     }
 
     @Test
-    void graphBasisUsesFrozenVersionAndExplicitUnavailableUntilGraphOwnerIsConnected() throws Exception {
+    void missingRegisteredSnapshotIsExplicitlyUnavailableWithoutCurrentGraphFallback() throws Exception {
         var graph = get("/api/v1/briefings/" + ROUND + "/graph", "graph-request");
         assertEquals(200, graph.status());
         assertEquals("unavailable", graph.json().path("status").asText());
@@ -260,6 +272,69 @@ class BriefingHttpPostgresTest {
         var suspended = get("/api/v1/briefings/brf-test-2026-10-14-evening/graph", "suspended-graph");
         assertEquals("suspended", suspended.json().path("status").asText());
         assertEquals(0, suspended.json().path("keyIssueIds").size());
+    }
+
+    @Test
+    void publishedRoundGraphRestoresCanonicalTargetsAndNeverUsesANewerActivePointer() throws Exception {
+        registerSyntheticGraph();
+        var basis = get("/api/v1/briefings/" + ROUND + "/graph", "basis-ready");
+        assertEquals(200, basis.status(), basis.body());
+        assertEquals("available", basis.json().path("status").asText());
+        assertEquals("brf-test-event", basis.json().at("/keyIssueIds/0").asText());
+        assertEquals("brf-test-company", basis.json().at("/companyIds/0").asText());
+        String query = "/api/v1/graph?round=" + ROUND;
+        var graph = get(query, "graph-ready");
+        assertEquals(200, graph.status(), graph.body());
+        assertEquals("synthetic-graph-v1", graph.json().at("/metadata/graphVersion").asText());
+        assertEquals("2026-10-15T08:30:00Z", graph.json().at("/metadata/asOf").asText());
+        assertEquals(2, graph.json().path("nodes").size());
+        assertEquals(1, graph.json().path("edges").size());
+        assertTrue(graph.json().path("nodes").values().stream().allMatch(n -> n.path("isFocus").asBoolean()));
+        // The round remains pinned even if the current market pointer is cleared.
+        jdbc.update("UPDATE graph_versions SET active=false WHERE id='synthetic-graph-v1'");
+        assertEquals(200, get(query, "same-round-after-pointer-change").status());
+        assertEquals(422, get(query + "&graphVersion=newest", "wrong-version").status());
+        assertEquals(422, get(query + "&asOf=2026-10-16T00:20:00Z", "wrong-cutoff").status());
+        Files.writeString(GRANTS, resource("grants.json").replace("\"enabled\": true", "\"enabled\": false"));
+        assertEquals(503, get(query, "direct-round-grant-revoked").status());
+    }
+
+    @Test
+    void legacyNullVersionIsMissingRecordingRatherThanATemporaryFetchFailure() throws Exception {
+        loadFixture(resource("fixture.sql").replace("\"graphVersion\":\"synthetic-graph-v1\"", "\"graphVersion\":null"));
+        var basis = get("/api/v1/briefings/" + ROUND + "/graph", "legacy-no-snapshot");
+        assertEquals(200, basis.status(), basis.body());
+        assertEquals("unavailable", basis.json().path("status").asText());
+        assertEquals("snapshot_not_recorded", basis.json().path("unavailableReason").asText());
+        assertTrue(basis.json().path("graphVersion").isNull());
+        assertTrue(basis.json().path("keyIssueIds").isEmpty());
+        assertEquals(409, get("/api/v1/graph?round=" + ROUND, "legacy-direct-no-fallback").status());
+    }
+
+    @Test
+    void missingOrChangedSnapshotIsUnavailableWithoutAReplacementGraph() throws Exception {
+        registerSyntheticGraph();
+        Files.writeString(GRAPH_ROOT.resolve("graph/synthetic.json"), "{tampered}");
+        var basis = get("/api/v1/briefings/" + ROUND + "/graph", "snapshot-tampered");
+        assertEquals(200, basis.status());
+        assertEquals("unavailable", basis.json().path("status").asText());
+        assertEquals("snapshot_unavailable", basis.json().path("unavailableReason").asText());
+        assertTrue(basis.json().path("keyIssueIds").isEmpty());
+        assertEquals(503, get("/api/v1/graph?round=" + ROUND, "no-fallback").status());
+    }
+
+    private void registerSyntheticGraph() throws Exception {
+        byte[] bytes = resource("graph-snapshot.json").getBytes(StandardCharsets.UTF_8);
+        Files.write(GRAPH_ROOT.resolve("graph/synthetic.json"), bytes);
+        Files.setPosixFilePermissions(GRAPH_ROOT.resolve("graph/synthetic.json"), java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+        String sha = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        jdbc.update("INSERT INTO artifacts(id,kind,storage_uri,sha256,bytes,media_type,created_at) VALUES ('brf-test-graph','graph_snapshot','artifact-root:graph/synthetic.json',?,?,'application/json','2026-10-15T09:00:00Z')", sha, bytes.length);
+        jdbc.execute("""
+                INSERT INTO graph_versions(id,sequence,kind,created_at,published_at,created_by,source_label,issue_count,relation_count,article_count,snapshot_artifact_id,review_revision,active)
+                VALUES ('synthetic-graph-v1',1,'snapshot','2026-10-15T09:00:00Z','2026-10-15T09:00:00Z','system','synthetic',1,1,1,'brf-test-graph',1,true);
+                INSERT INTO graph_activations(version_id,action,actor_kind,pointer_changed,admin_email_snapshot,activated_at)
+                VALUES ('synthetic-graph-v1','publish','system',true,'system','2026-10-15T09:00:00Z');
+                """);
     }
 
     @Test
@@ -422,6 +497,17 @@ class BriefingHttpPostgresTest {
         try (var input = BriefingHttpPostgresTest.class.getResourceAsStream("/briefing/" + name)) {
             if (input == null) throw new IOException("Missing synthetic briefing resource");
             return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+    private static Path createGraphRoot() {
+        try {
+            Path root = Files.createTempDirectory("zoop-briefing-graph-").toRealPath();
+            Files.createDirectory(root.resolve("graph"));
+            Files.setPosixFilePermissions(root, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+            Files.setPosixFilePermissions(root.resolve("graph"), java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+            return root;
+        } catch (IOException failure) {
+            throw new IllegalStateException(failure);
         }
     }
     private static Path createGrantFile() {

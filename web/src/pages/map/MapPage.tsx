@@ -156,7 +156,7 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
   const returnTo = params.get('returnTo');
   const round =
     requestedMode === 'all' ? (params.get('round') ?? undefined) : undefined;
-  const { data, error, loading } = useGraphData(
+  const { data, error, loading, unavailableReason } = useGraphData(
     {
       mode: requestedMode,
       personalFilter: filter,
@@ -706,7 +706,9 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                 <p className="relationship-message" role="status">
                   {loading
                     ? '관계 지도를 불러오는 중입니다.'
-                    : '관계 지도를 불러오지 못했습니다.'}
+                    : unavailableReason === 'snapshot_not_recorded'
+                      ? '이 회차의 그래프 저장본이 없습니다.'
+                      : '관계 지도를 불러오지 못했습니다.'}
                 </p>
               </div>
             )}
@@ -898,11 +900,13 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                 {loading && <p>선택한 그래프 조회 중…</p>}
                 {error && (
                   <p>
-                    조회 실패: {error}
+                    {unavailableReason ? error : `조회 실패: ${error}`}
                     {data && ' 직전 정상 그래프를 표시합니다.'}{' '}
-                    <button onClick={() => setRetry((v) => v + 1)}>
-                      다시 시도
-                    </button>
+                    {unavailableReason !== 'snapshot_not_recorded' && (
+                      <button onClick={() => setRetry((v) => v + 1)}>
+                        다시 시도
+                      </button>
+                    )}
                   </p>
                 )}
                 {loginNeeded && (
