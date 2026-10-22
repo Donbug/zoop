@@ -146,6 +146,8 @@ public class AdminGraphVersionService {
 
             var version = versions.find(versionId)
                     .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+            // Before the snapshot read: under source=none the read itself fails (503), which would hide this 422.
+            refuseFixtureOutsideFixtureSource(version, requestId);
             PublicGraphSnapshot snapshot = snapshots.load(version);
             var activation = versions.activateByAdmin(versionId, expected, admin.adminId(), admin.email(), reason,
                     () -> publishableNow(version, snapshot, requestId));
@@ -165,22 +167,27 @@ public class AdminGraphVersionService {
     }
 
     /**
+     * A synthetic fixture is publishable only where the snapshot source itself is the local/dev fixture source: an artifact
+     * deployment can still read old fixture rows, and "[합성]" data must never become its public graph. The source is fixed
+     * configuration, so checking it once before the snapshot read is the same answer the lock would give.
+     */
+    private void refuseFixtureOutsideFixtureSource(GraphVersionRecord version, String requestId) {
+        if (!IMPORTED.equals(version.kind()) && !FIXTURE_SOURCE.equals(snapshotSource)) {
+            log.info("Graph activation refused (graphVersion={}, reason=fixture_outside_fixture_source, source={}, "
+                    + "requestId={})", version.id(), snapshotSource, requestId);
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+    }
+
+    /**
      * Runs under the publication lock, before the pointer moves (graph read contract section 0: current rights, exclusions and
-     * read readiness right before the switch). A synthetic fixture is publishable only where the snapshot source itself is
-     * the local/dev fixture source: an artifact deployment can still read old fixture rows, and "[합성]" data must never become
-     * its public graph. Fixtures carry no rights and no stored evidence, so only imported versions get the rights checks.
+     * read readiness right before the switch). Fixtures carry no rights and no stored evidence (and were already refused
+     * outside the fixture source), so only imported versions get the rights checks.
      * Without an exclusion store "nothing excluded" is unknown: refused unless the operator opted in. Returns the last check,
      * which the repository runs at the activation time: grant pins are judged at the moment the version becomes public.
      */
     private Consumer<Instant> publishableNow(GraphVersionRecord version, PublicGraphSnapshot snapshot, String requestId) {
-        if (!IMPORTED.equals(version.kind())) {
-            if (!FIXTURE_SOURCE.equals(snapshotSource)) {
-                log.info("Graph activation refused (graphVersion={}, reason=fixture_outside_fixture_source, source={}, "
-                        + "requestId={})", version.id(), snapshotSource, requestId);
-                throw new CustomException(ErrorCode.INVALID_REQUEST);
-            }
-            return at -> { };
-        }
+        if (!IMPORTED.equals(version.kind())) return at -> { };
         if (!exclusions.authoritative() && !allowWithoutExclusionStore) {
             log.info("Graph activation refused (graphVersion={}, reason=exclusion_store_unavailable, requestId={})",
                     version.id(), requestId);

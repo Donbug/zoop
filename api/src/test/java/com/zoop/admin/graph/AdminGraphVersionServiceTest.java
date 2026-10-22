@@ -178,13 +178,17 @@ class AdminGraphVersionServiceTest {
             org.mockito.Mockito.reset(repository, versions, snapshots);
             claim("fixture-2026-10-01", ACTIVE, "rollback");
             when(versions.find("fixture-2026-10-01")).thenReturn(Optional.of(FIXTURE));
-            when(snapshots.load(FIXTURE)).thenReturn(fixtureSnapshot());
-            activating("fixture-2026-10-01", ACTIVE, "rollback", new Activation(ACTIVE, true, LATER));
+            // Like the real source=none store (GraphSnapshotConfiguration): every read fails, which would surface as 503.
+            org.mockito.Mockito.lenient().when(snapshots.load(FIXTURE))
+                    .thenThrow(new GraphSnapshotUnavailableException("snapshot_source_disabled"));
 
             var error = assertThrows(CustomException.class, () -> service(storeExists(), true, source)
                     .activate("fixture-2026-10-01", request("rollback", ACTIVE), "key-1", ADMIN, "r"));
 
+            // 422 from the contract, decided before the snapshot is read and before the pointer could move.
             assertEquals(ErrorCode.INVALID_REQUEST, error.getErrorCode(), source);
+            verify(snapshots, never()).load(any());
+            verify(versions, never()).activateByAdmin(any(), any(), any(), any(), any(), any());
             verify(repository, never()).completeIdempotency(any(), any());
         }
         verifyNoInteractions(audit, evidence);
