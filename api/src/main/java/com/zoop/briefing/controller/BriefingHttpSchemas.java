@@ -31,6 +31,13 @@ public final class BriefingHttpSchemas {
             List<BriefingCorrection> corrections, @Schema(nullable = true) BriefingNotice notice,
             BriefingReferences references, BriefingMetadata metadata, @Schema(nullable = true) BriefingOutlook outlook) { }
 
+    @Schema(name = "BriefingRecap", requiredProperties = {"roundId", "graphVersion", "dataAsOf", "status", "reason", "message", "previous"})
+    public record BriefingRecap(String roundId, @Schema(nullable = true) String graphVersion,
+            @Schema(nullable = true) Instant dataAsOf,
+            @Schema(allowableValues = {"available", "unavailable", "not_applicable"}) String status,
+            @Schema(nullable = true) String reason, String message,
+            @Schema(nullable = true, description = "고정 참조의 과거 발행 원문. 새 이슈 또는 이번 회차 재평가가 아닙니다.") BriefingResponse previous) { }
+
     @Schema(name = "CompanyOutlooks", requiredProperties = {"schemaVersion", "roundId", "edition", "cutoff", "status", "resultVersion", "generatedAt", "scopeNote", "companies"})
     public record CompanyOutlooks(String schemaVersion, String roundId, String edition, Instant cutoff,
             @Schema(allowableValues = {"PASS", "WITHHELD"}) String status, String resultVersion, Instant generatedAt,

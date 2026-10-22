@@ -14,6 +14,7 @@ import BriefingReadingSection from './BriefingReadingSection';
 import MarketIndicators from './MarketIndicators';
 import MarketSummary from './MarketSummary';
 import BriefingIssueList from './BriefingIssueList';
+import BriefingRecap from './BriefingRecap';
 import BriefingComparison from './BriefingComparison';
 import PersonalBasisNotice from './PersonalBasisNotice';
 import { hasOnlyKnownLimitations } from './briefingLimitations';
@@ -267,6 +268,14 @@ export default function PublishedBriefing({
           {result.status === 'published' && (
             <>
               {(!compact || !knownLimits) && partialInfo}
+              {result.items.length === 0 &&
+                result.emptyReason === 'no_issues_in_window' && (
+                  <BriefingRecap
+                    key={`${result.id}:${result.graphVersion}:${result.dataAsOf}`}
+                    round={result}
+                    compact={compact}
+                  />
+                )}
               <CompanyOutlooks result={result} compact={compact} />
               {compact && (
                 <MarketIndicators variables={result.marketVariables} compact />

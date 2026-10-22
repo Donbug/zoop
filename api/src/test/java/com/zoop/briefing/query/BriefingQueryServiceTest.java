@@ -97,6 +97,93 @@ class BriefingQueryServiceTest {
         transform.accept(analysis); return row;
     }
 
+    private BriefingRound quietEvening() {
+        var row = round("evening", "published", p -> {
+            p.putArray("items"); p.put("emptyReason", "no_issues_in_window");
+        });
+        var reference = (ObjectNode) row.comparisonSnapshot();
+        reference.put("status", "available").put("morningRoundId", published().id())
+                .put("morningDataAsOf", MORNING.toString()).put("morningPublishedAt", published().publishedAt().toString());
+        reference.putArray("items");
+        when(repository.findById(row.id())).thenReturn(Optional.of(row));
+        when(repository.findById(published().id())).thenReturn(Optional.of(published()));
+        return row;
+    }
+
+    @Test void recapUsesOnlyTheFixedPriorOriginalAndDoesNotMutateEitherPublication() {
+        var row = quietEvening(); var prior = published();
+        when(repository.findById(prior.id())).thenReturn(Optional.of(prior));
+        var currentBefore = row.payload().deepCopy(); var priorBefore = prior.payload().deepCopy();
+        var recap = service.recap(row.id(), "recap-request");
+        assertEquals("available", recap.path("status").asString());
+        assertEquals(prior.id(), recap.at("/previous/id").asString());
+        assertEquals(prior.payload().path("items"), recap.at("/previous/items"));
+        assertEquals("recap-request", recap.at("/previous/metadata/requestId").asString());
+        assertEquals(currentBefore, row.payload()); assertEquals(priorBefore, prior.payload());
+        verify(repository, never()).latest(any(), any());
+    }
+
+    @Test void morningRecapUsesItsSavedPreviousEditionAndCutoffInsteadOfSameDayMorning() {
+        var prior = round("evening", "published", ignored -> { });
+        var source = round("morning", "published", p -> {
+            p.putArray("items"); p.put("emptyReason", "no_issues_in_window");
+            p.withObject("references").putArray("eventIds");
+        });
+        Instant cutoff = MORNING.plusSeconds(86400);
+        LocalDate date = DATE.plusDays(1); String id = "brf-" + date + "-morning";
+        var payload = (ObjectNode) source.payload();
+        payload.put("id", id).put("date", date.toString()).put("scheduledAt", cutoff.toString())
+                .put("generatedAt", cutoff.plusSeconds(5).toString());
+        payload.withObject("dataWindow").put("end", cutoff.toString());
+        payload.withObject("metadata").put("asOf", cutoff.toString());
+        var reference = ((ObjectNode) source.publicSnapshot()).putObject("previousComparison")
+                .put("status", "available").put("previousRoundId", prior.id()).put("previousDate", prior.date().toString())
+                .put("previousEdition", prior.edition()).put("previousPublishedAt", prior.publishedAt().toString())
+                .put("previousDataAsOf", prior.windowTo().toString()).put("comparisonBasis", "event_identity");
+        reference.putArray("items");
+        reference.putObject("forecastEvaluation").put("status", "unavailable").put("reason", "새 평가 없음");
+        var current = new BriefingRound(id, date, "morning", cutoff, null, cutoff, true, "published",
+                cutoff.plusSeconds(10), cutoff.plusSeconds(5), source.graphVersion(), payload, source.publicSnapshot(), null);
+        when(repository.findById(id)).thenReturn(Optional.of(current));
+        when(repository.findById(prior.id())).thenReturn(Optional.of(prior));
+        assertEquals(prior.id(), service.recap(id, "request").at("/previous/id").asString());
+        reference.put("previousEdition", "morning");
+        assertEquals("previous_basis_changed", service.recap(id, "request").path("reason").asString());
+    }
+
+    @Test void recapDoesNotReplaceMissingChangedOrFutureFixedBasisWithAnotherRound() {
+        var row = quietEvening(); var reference = (ObjectNode) row.comparisonSnapshot();
+        reference.put("status", "unavailable").put("reason", "no prior");
+        assertEquals("previous_not_recorded", service.recap(row.id(), "request").path("reason").asString());
+        reference.put("status", "available").put("morningRoundId", "not-stored");
+        assertEquals("previous_not_available", service.recap(row.id(), "request").path("reason").asString());
+        reference.put("morningRoundId", published().id()).put("morningDataAsOf", row.windowTo().plusSeconds(1).toString());
+        assertEquals("previous_basis_changed", service.recap(row.id(), "request").path("reason").asString());
+        verify(repository, never()).latest(any(), any());
+    }
+
+    @Test void recapRechecksPriorAuthorityAndNeverReemphasizesCorrectedFacts() {
+        var row = quietEvening(); var prior = published();
+        when(access.mayRead(argThat(r -> r != null && prior.id().equals(r.id())), anyString())).thenReturn(false);
+        assertUnavailable(() -> service.recap(row.id(), "request"));
+        when(access.mayRead(any(), anyString())).thenReturn(true);
+        when(repository.changes(prior.id())).thenReturn(List.of(new BriefingChange(1, "correction", "event-original",
+                "wrong", "corrected", "reason", MORNING.plusSeconds(30), null)));
+        var result = service.recap(row.id(), "request");
+        assertEquals("previous_corrected", result.path("reason").asString());
+        assertTrue(result.path("previous").isNull());
+    }
+
+    @Test void recapDoesNotTreatGenerationFailureOrSelectedIssuesAsAnEmptyPublishedRound() {
+        for (String status : List.of("failed", "generating", "suspended", "published")) {
+            var row = round("evening", status, ignored -> { });
+            when(repository.findById(row.id())).thenReturn(Optional.of(row));
+            var result = service.recap(row.id(), "request");
+            assertEquals("not_applicable", result.path("status").asString());
+            assertTrue(result.path("previous").isNull());
+        }
+    }
+
     @Test void structuredMarketAnalysisRestoresSameVerifiedTextWithoutInvokingProducer() {
         var row = authoredAnalysis(ignored -> { }); when(repository.find(DATE, "morning")).thenReturn(Optional.of(row));
         var result = service.get(DATE, "morning", "request");

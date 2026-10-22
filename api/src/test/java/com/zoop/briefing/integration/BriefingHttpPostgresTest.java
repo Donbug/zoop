@@ -69,7 +69,7 @@ class BriefingHttpPostgresTest {
     }
 
     @BeforeEach
-    void loadSyntheticFixture() throws IOException {
+    void loadSyntheticFixture(org.junit.jupiter.api.TestInfo info) throws IOException {
         Files.writeString(GRANTS, resource("grants.json"));
         // Every statement is confined to this test class's random schema, never the shared public schema.
         jdbc.execute("TRUNCATE TABLE briefing_changes, briefing_rounds RESTART IDENTITY CASCADE");
@@ -79,7 +79,24 @@ class BriefingHttpPostgresTest {
         jdbc.update("DELETE FROM articles WHERE id LIKE 'brf-test-%'");
         jdbc.update("DELETE FROM artifacts WHERE id LIKE 'brf-test-%'");
         jdbc.update("DELETE FROM companies WHERE id LIKE 'brf-test-%'");
-        jdbc.execute(resource("fixture.sql"));
+        String fixture = resource("fixture.sql");
+        if (info.getTestMethod().orElseThrow().getName().startsWith("recap")) {
+            int start = fixture.indexOf("$records$") + "$records$".length();
+            int end = fixture.indexOf("$records$", start);
+            var records = JSON.readTree(fixture.substring(start, end));
+            for (var record : records) {
+                if (ROUND.equals(record.path("p").path("id").asString())) {
+                    var payload = (tools.jackson.databind.node.ObjectNode) record.get("p");
+                    payload.putArray("items"); payload.put("emptyReason", "no_issues_in_window").putNull("outlook");
+                    for (var item : record.path("comparison").path("items")) {
+                        ((tools.jackson.databind.node.ObjectNode) item).put("change", "dropped").putNull("rank").putNull("evidenceCount");
+                    }
+                    ((tools.jackson.databind.node.ObjectNode) payload.get("references")).putArray("eventIds");
+                }
+            }
+            fixture = fixture.substring(0, start) + JSON.writeValueAsString(records) + fixture.substring(end);
+        }
+        jdbc.execute(fixture);
     }
 
     @AfterAll
@@ -117,6 +134,42 @@ class BriefingHttpPostgresTest {
         assertEquals("continuing", evening.json().at("/sinceMorning/items/0/change").asText());
         assertEquals("synthetic-original-request", jdbc.queryForObject(
                 "SELECT published_payload->'metadata'->>'requestId' FROM briefing_rounds WHERE id=?", String.class, ROUND));
+    }
+
+    @Test
+    void recapRestoresFixedMorningOriginalForAnAuthoredQuietEveningAndPreservesHashes() throws Exception {
+        String digest = jdbc.queryForObject("SELECT payload_sha256 FROM briefing_rounds WHERE id=?", String.class,
+                "brf-test-2026-10-15-morning");
+        var response = get("/api/v1/briefings/" + ROUND + "/recap", "recap-http");
+        assertEquals(200, response.status());
+        assertEquals("available", response.json().path("status").asString());
+        var morning = get(MORNING, "original-http");
+        assertEquals(morning.json().path("items"), response.json().at("/previous/items"));
+        assertEquals("brf-test-2026-10-15-morning", response.json().at("/previous/id").asString());
+        assertEquals("recap-http", response.json().at("/previous/metadata/requestId").asString());
+        assertEquals(digest, jdbc.queryForObject("SELECT payload_sha256 FROM briefing_rounds WHERE id=?", String.class,
+                "brf-test-2026-10-15-morning"));
+        assertEquals(0, get(EVENING, "current-http").json().path("items").size());
+    }
+
+    @Test
+    void recapDoesNotHidePriorRevocationCorrectionOrAnUnpublishedCurrentRound() throws Exception {
+        String path = "/api/v1/briefings/" + ROUND + "/recap";
+        Files.writeString(GRANTS, "{}");
+        assertEquals(503, get(path, "revoked-recap").status());
+        Files.writeString(GRANTS, resource("grants.json"));
+        jdbc.update("""
+                INSERT INTO briefing_changes(round_id,kind,seq,event_id,original,corrected,reason,admin_id,admin_email_snapshot,created_at)
+                VALUES ('brf-test-2026-10-15-morning','correction',1,'brf-test-event','old','corrected','[합성시험] 정정','synthetic-admin','synthetic@example.invalid',now())
+                """);
+        var corrected = get(path, "corrected-recap");
+        assertEquals(200, corrected.status());
+        assertEquals("previous_corrected", corrected.json().path("reason").asString());
+        assertTrue(corrected.json().path("previous").isNull());
+        var pending = get("/api/v1/briefings/brf-test-2026-10-16-morning/recap", "pending-recap");
+        assertEquals("not_applicable", pending.json().path("status").asString());
+        assertTrue(pending.json().path("previous").isNull());
+        assertTrue(pending.json().path("graphVersion").isNull());
     }
 
     @Test

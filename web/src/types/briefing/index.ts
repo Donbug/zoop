@@ -197,3 +197,14 @@ export type BriefingGraphBasis = {
   companyIds: string[];
   correctionCount: number;
 };
+
+/** 새 핵심 이슈가 없는 정상 회차에서만 제공하는, 고정된 이전 발행본의 읽기 뷰. */
+export type BriefingRecap = {
+  roundId: string;
+  graphVersion: string | null;
+  dataAsOf: string | null;
+  status: 'available' | 'unavailable' | 'not_applicable';
+  reason: string | null;
+  message: string;
+  previous: BriefingResponse | null;
+};
