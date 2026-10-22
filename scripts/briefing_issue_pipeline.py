@@ -488,12 +488,17 @@ def run(args, transport=None):
         import briefing_local_window as local
         local_spec = local.load(args.round_spec, source["sourceFileSha256"])
         local.sources_before_cutoff(rows, local_spec)
-    windows = [local_spec] if local_spec else sim.windows()
+    series = None
+    if getattr(args, "round_series", None):
+        if local_spec: raise Error("conflicting_round_modes")
+        import briefing_round_series
+        series = briefing_round_series.load(args.round_series, source["sourceFileSha256"])
+    windows = series["rounds"] if series else [local_spec] if local_spec else sim.windows()
     allowed = {r["documentId"] for spec in windows for r in sim.pool_for_round(rows, spec, len(unknown))[0]}
     rows = sorted((r for r in rows if r["documentId"] in allowed), key=lambda r: (r["clockTime"], r["documentId"]))
     all_rows = [base.strict_load(line) for line in base.regular(Path(args.sources)).decode().splitlines() if line.strip()]
     catalogue = load_catalogue(Path(args.companies))
-    issues, seed = seed_issues(rules, Path(args.seed), local_spec["window"]["from"] if local_spec else sim.BASELINE)
+    issues, seed = seed_issues(rules, Path(args.seed), windows[0]["window"]["from"] if series else local_spec["window"]["from"] if local_spec else sim.BASELINE)
     authorization = {"scope": "historical_issue_grouping_simulation", "userInboxRef": args.user_inbox_ref,
                      "sourceSha256": source["sourceFileSha256"], "seedSha256": seed["snapshotSha256"],
                      "originalSourceFlagsUnchanged": True, "operationalCollectionGate": False, "productionAuthorized": False,
@@ -507,6 +512,7 @@ def run(args, transport=None):
     if local_spec:
         identity["localCollection"] = local_spec
         authorization["scope"] = "local_collection_issue_grouping"
+    if series: identity["roundSeries"] = series
     comparison_wire = getattr(args, "comparison_wire", "legacy")
     if comparison_wire != "legacy":
         identity["comparisonCodec"] = {"wireVersion": comparison_wire,
@@ -630,6 +636,7 @@ def parser():
     for field in ("poc-root", "sources", "clocks", "seed", "companies", "output", "user-inbox-ref"):
         p.add_argument("--" + field, required=True)
     p.add_argument("--key-file")
+    p.add_argument("--round-series")
     p.add_argument("--round-spec", help="Explicit same-response local collection round; leaves historical defaults unchanged.")
     p.add_argument("--execute-authorized", action="store_true")
     p.add_argument("--hold-unresolved-requests", action="store_true",

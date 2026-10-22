@@ -33,9 +33,14 @@ def run(args, transport=None):
         import briefing_local_window as local
         local_spec = local.load(args.round_spec, source["sourceFileSha256"])
         local.sources_before_cutoff(rows, local_spec)
+    series = None
+    if getattr(args, "round_series", None):
+        if local_spec: raise sim.ReplayError("conflicting_round_modes")
+        import briefing_round_series
+        series = briefing_round_series.load(args.round_series, source["sourceFileSha256"])
     publication_ids = None
     if getattr(args, "publication_catalog", None):
-        if not local_spec: raise sim.ReplayError("publication_catalog_requires_local_round")
+        if not (local_spec or series): raise sim.ReplayError("publication_catalog_requires_explicit_rounds")
         catalog_raw = base.regular(Path(args.publication_catalog))
         publication_ids = sorted(c["company_id"] for c in base.strict_load(catalog_raw)["companies"])
     mode = "local_collection_validation" if local_spec else sim.MODE
@@ -43,6 +48,9 @@ def run(args, transport=None):
     authorization = {"scope": mode, "sourceSha256": source["sourceFileSha256"], "userInboxRef": args.user_inbox_ref,
                      "productionAuthorized": False, "groupArchiveSha256": archive_sha}
     run_identity = {"source":source,"archiveSha256":archive_sha,"promptArtifacts":prompts,"authorization":authorization}
+    if series:
+        run_identity["roundSeries"] = series
+        authorization["roundSeriesSha256"] = base.digest(base.canonical(series))
     if local_spec:
         authorization["localCollection"] = local_spec["localCollection"]
         run_identity["localRound"] = local_spec
@@ -51,7 +59,7 @@ def run(args, transport=None):
         run_identity["publicationCatalogSha256"] = base.digest(catalog_raw)
     run_id = "grouped-round-simulation-"+base.digest(base.canonical(run_identity))[:20]
     prepared, identity_holds_by_round = [], {}
-    for spec in ([local_spec] if local_spec else sim.windows()):
+    for spec in (series["rounds"] if series else [local_spec] if local_spec else sim.windows()):
         pool, inputs, clocks, duplicates, coverage = sim.pool_for_round(rows,spec,len(unknown))
         identity_holds = []
         candidates = grouped.build_grouped_candidates(archive,spec,identity_holds)
@@ -84,8 +92,9 @@ def run(args, transport=None):
                   "candidateInputSha256":base.digest(base.canonical(inputs)),"promptArtifacts":prompts,
                   "previous":previous,"operationalCollectionGate":False,"authorization":authorization,
                   "groupArchiveSha256":archive_sha,
-                  "baseline":{"from":local_spec["window"]["from"] if local_spec else sim.BASELINE,
-                    "meaning":"local_validation_window_start" if local_spec else "simulation_baseline_not_service_first_round"}}
+                  "baseline":{"from":series["rounds"][0]["window"]["from"] if series else local_spec["window"]["from"] if local_spec else sim.BASELINE,
+                    "meaning":"explicit_series_baseline" if series else "local_validation_window_start" if local_spec else "simulation_baseline_not_service_first_round"}}
+        if series: identity["roundSeries"] = series
         if publication_ids is not None:
             identity["publicationCompanyIds"] = publication_ids
             identity["publicationCatalogSha256"] = base.digest(catalog_raw)
@@ -167,6 +176,7 @@ def run(args, transport=None):
             "marketSummary":{"status":"unavailable","reason":"Grouped-issue replay; new market summary not generated."},
             "marketVariables":{"status":"unavailable","reason":"Market snapshots are separate from issue regrouping."},
             "sinceMorning":{"status":"unavailable","reason":"No operational forecast evaluation for late-body replay."}}
+    if series: bundle["roundSeries"] = series
     if local_spec:
         bundle["localCollection"] = local_spec["localCollection"]
     base.save_json(output/"bundle-v2.json",bundle)
@@ -178,7 +188,7 @@ def run(args, transport=None):
 def parser():
     p=argparse.ArgumentParser(description=__doc__)
     for name in ["archive","sources","clocks","output","user-inbox-ref"]:p.add_argument("--"+name,required=True)
-    p.add_argument("--publication-catalog");p.add_argument("--round-spec");p.add_argument("--key-file");p.add_argument("--execute-authorized",action="store_true")
+    p.add_argument("--round-series");p.add_argument("--publication-catalog");p.add_argument("--round-spec");p.add_argument("--key-file");p.add_argument("--execute-authorized",action="store_true")
     p.add_argument("--hold-unresolved-requests",action="store_true",
         help="Withhold unchanged requests already pending without a completion at startup; never resend them.")
     p.add_argument("--max-calls",type=int,choices=range(1,513),default=400)
