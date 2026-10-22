@@ -42,6 +42,8 @@ class CompanyMarketClientsTest {
     private volatile boolean fridayOpen;
     /** The KR calendar stub answers for another day than the one asked (a provider format failure). */
     private volatile boolean calendarDateMismatch;
+    /** The KR calendar stub's previous business day has no regular-session end (a provider format failure). */
+    private volatile boolean calendarPreviousWithoutEnd;
     private final List<String> candleQueries = new java.util.concurrent.CopyOnWriteArrayList<>();
     private final List<String> calendarQueries = new java.util.concurrent.CopyOnWriteArrayList<>();
 
@@ -363,6 +365,19 @@ class CompanyMarketClientsTest {
     }
 
     @Test
+    void aPastCalendarWithABadSessionIsNotKept() {
+        var client = tossClient("test-client", "test-secret");
+        var to = java.time.Instant.parse("2026-10-15T03:00:00Z").plusNanos(1);
+        calendarPreviousWithoutEnd = true;
+        // 10-15 is open at to, so the bad previous day is not read for the answer, but the calendar is not kept either.
+        assertEquals("2026-10-15", client.prices("KRX:005930", "KRX", "005930", "1d", null, to).range().sessionDate());
+        calendarPreviousWithoutEnd = false;
+        client.prices("KRX:005930", "KRX", "005930", "1d", null, to);
+        client.prices("KRX:005930", "KRX", "005930", "1d", null, to);
+        assertEquals(2, calendarQueries.stream().filter(q -> q.contains("date=2026-10-15")).count());
+    }
+
+    @Test
     void aCalendarAnsweringForAnotherDayIsAFormatFailureNotAHoliday() {
         calendarDateMismatch = true;
         var error = assertThrows(MarketDataException.class, () -> tossClient("test-client", "test-secret")
@@ -475,7 +490,9 @@ class CompanyMarketClientsTest {
                 """;
         boolean open = date.equals("2026-10-15") || (date.equals("2026-10-16") && fridayOpen);
         String previous = date.equals("2026-10-15") ? "2026-10-14" : fridayOpen && !date.equals("2026-10-16") ? "2026-10-16" : "2026-10-15";
-        return "{\"result\":{\"today\":" + krDay(calendarDateMismatch ? "2026-10-19" : date, open) + ",\"previousBusinessDay\":" + krDay(previous, true)
+        String previousDay = calendarPreviousWithoutEnd ? krDay(previous, true).replaceAll(",\"endTime\":\"[^\"]*\"", "")
+                : krDay(previous, true);
+        return "{\"result\":{\"today\":" + krDay(calendarDateMismatch ? "2026-10-19" : date, open) + ",\"previousBusinessDay\":" + previousDay
                 + ",\"nextBusinessDay\":" + krDay("2026-10-19", true) + "}}";
     }
 

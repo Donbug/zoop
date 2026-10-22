@@ -214,7 +214,9 @@ public class TossMarketClient {
             calendar = get("/api/v1/market-calendar/" + market, Map.of("date", day.toString())).path("result");
             // The calendar answers for the asked day; a missing or different date is a provider format failure, never a holiday.
             if (!day.toString().equals(text(calendar.path("today").get("date")))) throw formatFailure();
-            if (day.isBefore(clock.instant().atZone(zone).toLocalDate())) calendarCache.put(market + "|" + day, calendar);
+            if (day.isBefore(clock.instant().atZone(zone).toLocalDate()) && wellFormed(krx, calendar)) {
+                calendarCache.put(market + "|" + day, calendar);
+            }
         }
         JsonNode today = calendar.path("today");
         Session current = regular(krx, today); // null: the asked day has no regular session (closed)
@@ -223,6 +225,19 @@ public class TossMarketClient {
         Session previous = regular(krx, calendar.path("previousBusinessDay"));
         if (previous == null) throw formatFailure(); // a business day always has a regular session
         return previous;
+    }
+
+    /**
+     * Whether both days parse and the previous business day has a session, so a kept calendar never fails later. A bad
+     * answer is not kept and is read again next time; the request itself still fails only where it did before.
+     */
+    private static boolean wellFormed(boolean krx, JsonNode calendar) {
+        try {
+            regular(krx, calendar.path("today"));
+            return regular(krx, calendar.path("previousBusinessDay")) != null;
+        } catch (RuntimeException exception) {
+            return false;
+        }
     }
 
     /** A calendar day's regular session; null when the day has none (closed). */
