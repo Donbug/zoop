@@ -4,6 +4,7 @@ import {
   type GraphAppearance,
 } from '@/components/graph/graph-appearance';
 import { mapAppearanceStyles } from '@/components/common/map-appearance-styles';
+import { useTutorialInteractionLock } from '@/components/graph/tutorial/useTutorialInteractionLock';
 import HoldingsSidebar from '@/components/graph/HoldingsSidebar';
 import { companyLogo } from '@/util/company-logo';
 import { Link } from 'react-router-dom';
@@ -11,6 +12,7 @@ import ServiceHeader from '@/components/common/ServiceHeader';
 import GraphCanvas from '@/components/graph/GraphCanvas';
 import GraphIcon from '@/components/graph/GraphIcon';
 import GraphTutorial from '@/components/graph/GraphTutorial';
+import { tutorialTarget } from '@/components/graph/tutorial/tutorial-target';
 import GraphFocusControls from '@/components/graph/GraphFocusControls';
 import CompanyPathPanel from '@/components/graph/CompanyPathPanel';
 import { companyPath } from '@/components/graph/company-path';
@@ -127,13 +129,25 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
   const openAi = useAiChatStore((state) => state.open);
   const tutorialStep = useGraphUiStore((state) => state.tutorialStep);
   const setTutorialStep = useGraphUiStore((state) => state.setTutorialStep);
+  const tutorialOpen = params.get('tour') === '1';
+  const tutorialKey = `${memoryOwner}:${tutorialOpen}`;
+  const [practice, setPractice] = useState({
+    key: tutorialKey,
+    pan: false,
+  });
+  if (practice.key !== tutorialKey)
+    setPractice({ key: tutorialKey, pan: false });
+  useTutorialInteractionLock(tutorialOpen ? tutorialStep : null, practice.pan);
   const desiredMode: MapMode =
     params.get('mode') === 'personal' ? 'personal' : 'all';
-  const requestedMode =
-    desiredMode === 'personal' && !token ? 'all' : desiredMode;
-  const filter = readFilter(
-    params.get('scope') ?? sessionStorage.getItem(FILTER_KEY),
-  );
+  const requestedMode = tutorialOpen
+    ? 'all'
+    : desiredMode === 'personal' && !token
+      ? 'all'
+      : desiredMode;
+  const filter = tutorialOpen
+    ? 'all'
+    : readFilter(params.get('scope') ?? sessionStorage.getItem(FILTER_KEY));
   const companyId = params.get('companyId') ?? undefined;
   const historical = companyId && exactTime(params.get('asOf'));
   const asOf = historical ? params.get('asOf')! : undefined;
@@ -160,19 +174,44 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
     {
       mode: requestedMode,
       personalFilter: filter,
-      companyId,
-      asOf,
-      graphVersion,
-      depth: params.get('depth') === '2' ? 2 : 1,
-      round,
+      companyId: tutorialOpen ? undefined : companyId,
+      asOf: tutorialOpen ? undefined : asOf,
+      graphVersion: tutorialOpen ? undefined : graphVersion,
+      depth: tutorialOpen ? 1 : params.get('depth') === '2' ? 2 : 1,
+      round: tutorialOpen ? undefined : round,
     },
     token,
     retry,
     prefetch,
   );
   const appliedMode = data?.metadata.mode ?? 'all';
+  const target = useMemo(
+    () =>
+      tutorialOpen && !loading && !error ? tutorialTarget(data, true) : null,
+    [tutorialOpen, loading, error, data],
+  );
+  const tutorialInstruction =
+    !data || loading
+      ? '실제 관계 지도를 불러오고 있어요.'
+      : error
+        ? '지도를 불러오지 못했어요. 아래 다시 시도로 실제 데이터를 불러오거나 건너뛰어 주세요.'
+        : tutorialStep === 1
+          ? practice.pan
+            ? '이동했어요! 휠을 움직이거나 왼쪽 아래 확대·축소 버튼을 눌러 보세요.'
+            : '점선으로 강조된 빈 공간을 누른 채 끌어 지도를 이동해 보세요.'
+          : !target
+            ? '현재 실제 지도에 안내할 기업·사건 연결이 없어요. 다시 불러오거나 튜토리얼을 건너뛸 수 있어요.'
+            : tutorialStep === 2
+              ? `지도를 드래그하거나 확대·축소하며 살펴본 뒤 강조된 ${target.company.label} 기업 노드를 선택하세요.`
+              : tutorialStep === 3
+                ? `지도에서 강조된 「${target.issue.label}」 사건을 누르세요. ${target.company.label} 상세의 같은 사건을 눌러도 영향 경로를 열 수 있어요.`
+                : tutorialStep === 4
+                  ? '영향 경로 패널의 강조된 「근거 N건 보기」를 눌러 실제 기사·공시를 확인하세요.'
+                  : '「AI에게 묻기」로 선택한 기업·사건을 질문에 연결할 수 있어요. 강조된 버튼을 누르면 AI 창을 열지 않고 튜토리얼을 마쳐요.';
+
   useEffect(() => {
     if (
+      tutorialOpen ||
       !data ||
       loading ||
       error ||
@@ -185,7 +224,16 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
       url: `/?${paramsKey}`,
       view: saved?.view ?? emptyView(),
     });
-  }, [data, loading, error, requestedMode, memoryOwner, paramsKey, round]);
+  }, [
+    data,
+    loading,
+    error,
+    requestedMode,
+    memoryOwner,
+    paramsKey,
+    round,
+    tutorialOpen,
+  ]);
   const stats = data ? graphSummary(data) : null;
   const rawSelection = params.get('select');
   const pathParts = params.get('path')?.split(',') ?? [];
@@ -226,11 +274,18 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
   const focusNode = data?.nodes.find((node) => node.id === focusId) ?? null;
   const logoOf = (companyId: string) =>
     data?.nodes.find((node) => node.id === companyId)?.logoUrl;
-  const tutorialOpen = params.get('tour') === '1';
   useEffect(() => {
     if (tutorialOpen && tutorialStep === null) setTutorialStep(1);
     if (!tutorialOpen && tutorialStep !== null) setTutorialStep(null);
   }, [setTutorialStep, tutorialOpen, tutorialStep]);
+  const tutorialOwner = useRef(memoryOwner);
+  useEffect(() => {
+    if (tutorialOwner.current === memoryOwner) return;
+    tutorialOwner.current = memoryOwner;
+    setTutorialStep(tutorialOpen ? 1 : null);
+    if (tutorialOpen)
+      updateQuery({ select: null, impact: null, path: null, focus: null });
+  }, [memoryOwner, tutorialOpen, setTutorialStep, updateQuery]);
   // FS015: 튜토리얼을 마치거나 건너뛰지 않은 회원은 지도에 들어오면 한 번 자동으로 연다.
   // 완료·건너뛰기는 PUT /api/v1/auth/tutorial로 계정에 저장되어 다음부터는 열지 않는다.
   const tutorialPending = useAuthStore(
@@ -286,6 +341,20 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
       .sort((a, b) => b.sharedIssueCount - a.sharedIssueCount);
   }, [companyNode, data]);
   const selectNode = (id: string | null) => {
+    if (tutorialOpen && tutorialStep && tutorialStep < 5) {
+      if (!id) return;
+      else {
+        if (tutorialStep === 3 && target && id === target.issue.id) {
+          openImpact(target.company.id, target.issue.id);
+          return;
+        }
+        if (tutorialStep === 1 || id !== target?.company.id) return;
+        if (tutorialStep === 2) {
+          setTutorialStep(3);
+          setCenterRequest((old) => ({ id, seq: (old?.seq ?? 0) + 1 }));
+        }
+      }
+    }
     if (pathFrom && !id) {
       updateQuery({ path: null, select: null });
       return;
@@ -323,7 +392,12 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
   const impact = useImpactPath(
     round && !data ? null : impactCompanyId,
     round && !data ? null : impactIssueId,
-    round ? eventContext : undefined,
+    round || tutorialOpen ? eventContext : undefined,
+    tutorialOpen &&
+      target?.company.id === impactCompanyId &&
+      target?.issue.id === impactIssueId
+      ? target.edge.id
+      : undefined,
   );
   function selectEdge(id: string) {
     if (
@@ -333,6 +407,31 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
       opener.current = document.activeElement;
     updateQuery({ select: `edge:${id}`, id: null, impact: null, path: null });
   }
+  useEffect(() => {
+    if (
+      tutorialOpen &&
+      tutorialStep === 3 &&
+      impactCompanyId === target?.company.id &&
+      impactIssueId === target?.issue.id &&
+      !impact.loading &&
+      !impact.error &&
+      impact.data?.companyId === target?.company.id &&
+      impact.data?.issueId === target?.issue.id &&
+      impact.data?.steps.some((step) => step.id === target?.company.id) &&
+      impact.data?.steps.some((step) => step.id === target?.issue.id)
+    )
+      setTutorialStep(4);
+  }, [
+    tutorialOpen,
+    tutorialStep,
+    impactCompanyId,
+    impactIssueId,
+    target,
+    impact.loading,
+    impact.error,
+    impact.data,
+    setTutorialStep,
+  ]);
   function relationAction(
     action: 'evidence' | 'ai',
     relation: RelationDetail,
@@ -380,6 +479,12 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
     if (action === 'focus') updateQuery({ focus: event.id, hops: '1' });
   }
   function openImpact(companyId: string, issueId: string) {
+    if (
+      tutorialOpen &&
+      tutorialStep === 3 &&
+      (companyId !== target?.company.id || issueId !== target?.issue.id)
+    )
+      return;
     updateQuery({
       select: `node:${companyId}`,
       impact: `${companyId},${issueId}`,
@@ -414,7 +519,10 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
     updateQuery({ tour: null });
   }
   const loginNeeded =
-    !checking && !token && (desiredMode === 'personal' || notice === 'login');
+    !tutorialOpen &&
+    !checking &&
+    !token &&
+    (desiredMode === 'personal' || notice === 'login');
   async function changeMode(mode: MapMode) {
     if (mode === 'personal' && !token) {
       setNotice('login');
@@ -500,9 +608,15 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
   }
   return (
     <div
+      data-tutorial-ai-focus={tutorialOpen && tutorialStep === 5}
       className={`${mapAppearanceStyles(appearance)} relationship-map min-w-0! [&_.relationship-toolbar]:overflow-x-auto [&_.relationship-toolbar]:max-w-full max-md:min-h-0! max-md:[&_.relationship-header]:h-auto! max-md:[&_.relationship-header]:flex-wrap! max-md:[&_.relationship-header]:gap-2! max-md:[&_.relationship-header]:px-2! max-md:[&_.relationship-header]:py-2! max-md:[&_.relationship-header_nav]:order-last max-md:[&_.relationship-header_nav]:w-full max-md:[&_.relationship-header_nav]:h-10! max-md:[&_.relationship-header_nav]:flex! max-md:[&_.relationship-header_nav]:overflow-y-hidden! max-md:[&_.relationship-header_nav>*]:shrink-0 max-md:[&_.relationship-header_nav]:overflow-x-auto max-md:[&_.relationship-toolbar]:max-w-full max-md:[&_.relationship-toolbar]:overflow-x-auto [&_.relationship-canvas]:min-h-0! max-md:[&_.relationship-body]:min-h-0! max-md:[&_.relationship-body]:px-1!`}
     >
       <ServiceHeader />
+      {tutorialOpen && (
+        <p className="border-b border-zoop-line bg-zoop-soft px-4 py-2 text-xs max-md:hidden">
+          실제 시장 전체 지도 · 삼성전자를 중심으로 안내합니다.
+        </p>
+      )}
       {returnTo?.startsWith('/companies/') && (
         <Link to={returnTo}>기업 상세로 돌아가기</Link>
       )}
@@ -672,8 +786,38 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
               <GraphCanvas
                 data={data}
                 filterHost={filterHost}
+                tutorialLocked={Boolean(
+                  tutorialOpen && tutorialStep && tutorialStep < 5,
+                )}
+                tutorialCameraEnabled={tutorialOpen && tutorialStep === 2}
+                tutorialShowNeighborhood={tutorialOpen && tutorialStep === 3}
                 centerRequest={centerRequest}
-                memoryOwner={memoryOwner}
+                tutorialCenterId={tutorialOpen ? target?.company.id : undefined}
+                memoryOwner={
+                  tutorialOpen ? `${memoryOwner}:tutorial` : memoryOwner
+                }
+                tutorialPhase={
+                  tutorialOpen && tutorialStep === 1
+                    ? practice.pan
+                      ? 'zoom'
+                      : 'pan'
+                    : undefined
+                }
+                tutorialTargetId={
+                  tutorialOpen && tutorialStep === 2
+                    ? target?.company.id
+                    : tutorialOpen && tutorialStep === 3
+                      ? target?.issue.id
+                      : undefined
+                }
+                onTutorialAction={(action) => {
+                  if (!tutorialOpen || tutorialStep !== 1) return;
+                  if (action === 'pan')
+                    setPractice((old) => ({ ...old, pan: true }));
+                  if (action === 'zoom' && practice.pan) {
+                    setTutorialStep(2);
+                  }
+                }}
                 onOpenIsolated={() => {
                   updateQuery({
                     select: 'bundle:isolated',
@@ -719,23 +863,55 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
               />
             )}
             {tutorialOpen && tutorialStep && (
-              <GraphTutorial
-                step={tutorialStep}
-                saving={tutorialSaving}
-                error={tutorialError}
-                onStepChange={(step: GraphTutorialStep) => {
-                  setTutorialError('');
-                  setTutorialStep(step);
-                }}
-                onFinish={() => void closeTutorial()}
-                onSkip={() => void closeTutorial()}
-                onRetry={() => void closeTutorial()}
-              />
+              <div
+                className={`order-first shrink-0 ${selectedPanel ? 'max-md:hidden' : ''}`}
+              >
+                <GraphTutorial
+                  step={tutorialStep}
+                  practice
+                  instruction={tutorialInstruction}
+                  saving={tutorialSaving}
+                  error={tutorialError}
+                  onStepChange={(step: GraphTutorialStep) => {
+                    setTutorialError('');
+                    setTutorialStep(step);
+                  }}
+                  onFinish={() => void closeTutorial()}
+                  onSkip={() => void closeTutorial()}
+                  onRetry={() => void closeTutorial()}
+                />
+              </div>
             )}
             <MapDetailSheet
+              tutorialLocked={Boolean(
+                tutorialOpen && tutorialStep && tutorialStep < 5,
+              )}
               open={Boolean(selectedPanel)}
               suspended={evidenceOpen}
+              tutorial={
+                tutorialOpen &&
+                tutorialStep && (
+                  <div className="shrink-0 border-b border-panel-line">
+                    <GraphTutorial
+                      compact
+                      step={tutorialStep}
+                      practice
+                      instruction={tutorialInstruction}
+                      saving={tutorialSaving}
+                      error={tutorialError}
+                      onStepChange={(step: GraphTutorialStep) => {
+                        setTutorialError('');
+                        setTutorialStep(step);
+                      }}
+                      onFinish={() => void closeTutorial()}
+                      onSkip={() => void closeTutorial()}
+                      onRetry={() => void closeTutorial()}
+                    />
+                  </div>
+                )
+              }
               onClose={() => {
+                selectNode(null);
                 updateQuery({ select: null, impact: null, path: null });
               }}
             >
@@ -752,11 +928,16 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                 <CompanyDetailPanel
                   key={companyNode.id}
                   companyId={companyNode.id}
-                  context={round ? eventContext : undefined}
+                  context={round || tutorialOpen ? eventContext : undefined}
                   fallback={companyNode}
                   relatedCompanies={relatedCompanies}
                   token={token}
                   onClose={() => selectNode(null)}
+                  tutorialIssueId={
+                    tutorialOpen && tutorialStep === 3
+                      ? target?.issue.id
+                      : undefined
+                  }
                   onSelectIssue={(issueId) =>
                     openImpact(companyNode.id, issueId)
                   }
@@ -784,8 +965,12 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                     if (edge) selectEdge(edge.id);
                   }}
                   onAskAi={() =>
-                    openAi({ kind: 'company', id: companyNode.id })
+                    tutorialOpen && tutorialStep === 5
+                      ? void closeTutorial()
+                      : openAi({ kind: 'company', id: companyNode.id })
                   }
+                  tutorialAi={tutorialOpen && tutorialStep === 5}
+                  tutorialSaving={tutorialSaving}
                 />
               )}
               {pathFrom && (
@@ -831,19 +1016,29 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                   loading={impact.loading}
                   error={impact.error}
                   onRetry={impact.retry}
-                  onClose={() => updateQuery({ impact: null })}
+                  onClose={() => {
+                    if (tutorialOpen && tutorialStep === 4) setTutorialStep(3);
+                    updateQuery({ impact: null });
+                  }}
                   onViewIssue={() =>
                     updateQuery({
                       select: `node:${impactIssueId}`,
                       impact: null,
                     })
                   }
+                  tutorialEvidence={tutorialOpen && tutorialStep === 4}
+                  tutorialAi={tutorialOpen && tutorialStep === 5}
+                  tutorialSaving={tutorialSaving}
                   onEvidence={(evidenceIds) =>
                     useGraphUiStore
                       .getState()
                       .openEvidence(impactTarget(evidenceIds))
                   }
-                  onAskAi={() => openAi(impactTarget())}
+                  onAskAi={() =>
+                    tutorialOpen && tutorialStep === 5
+                      ? void closeTutorial()
+                      : openAi(impactTarget())
+                  }
                 />
               )}
               {eventId && !pathFrom && (
@@ -951,6 +1146,23 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
           </div>
           <AiChatDrawer />
           <EvidenceDrawer
+            onTutorialSkip={
+              tutorialOpen && tutorialStep && tutorialStep < 5
+                ? () => {
+                    useGraphUiStore.getState().closeEvidence();
+                    void closeTutorial();
+                  }
+                : undefined
+            }
+            onReady={(id) => {
+              if (
+                tutorialOpen &&
+                tutorialStep === 4 &&
+                target &&
+                id === `${target.company.id},${target.issue.id}`
+              )
+                setTutorialStep(5);
+            }}
             onViewOnMap={(id) =>
               updateQuery({ focus: id, hops: '1', path: null })
             }

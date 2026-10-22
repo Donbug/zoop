@@ -17,6 +17,9 @@ type Props = {
   token: string | null;
   onClose: () => void;
   onSelectIssue: (id: string) => void;
+  tutorialIssueId?: string;
+  tutorialAi?: boolean;
+  tutorialSaving?: boolean;
   onFocus: () => void;
   onConnections: () => void;
   onSelectRelation?: (companyId: string) => void;
@@ -360,7 +363,8 @@ export default function CompanyDetailPanel(props: Props) {
             <button onClick={props.onFocus}>이 기업 중심으로 보기</button>
             <button onClick={props.onConnections}>다른 기업과 연결 보기</button>
             <button
-              className="col-span-2 bg-panel-ink! text-white!"
+              className={`col-span-2 bg-panel-ink! text-white! ${props.tutorialAi ? 'tutorial-target tutorial-ai-target' : ''}`}
+              disabled={props.tutorialSaving}
               onClick={props.onAskAi}
             >
               AI에게 이 기업 묻기
@@ -381,7 +385,19 @@ export default function CompanyDetailPanel(props: Props) {
               <ul className="company-list">
                 {company.directIssues.map((issue) => (
                   <li key={issue.issueId}>
-                    <button onClick={() => props.onSelectIssue(issue.issueId)}>
+                    <button
+                      className={
+                        props.tutorialIssueId === issue.issueId
+                          ? 'tutorial-target'
+                          : undefined
+                      }
+                      data-tutorial-action={
+                        props.tutorialIssueId === issue.issueId
+                          ? 'issue'
+                          : undefined
+                      }
+                      onClick={() => props.onSelectIssue(issue.issueId)}
+                    >
                       <b>{issue.title}</b>
                       <span>
                         {issue.eventTime ?? '시각 미상'} · 근거{' '}
@@ -404,7 +420,19 @@ export default function CompanyDetailPanel(props: Props) {
               <ul className="company-list">
                 {company.structuralIssues.map((issue) => (
                   <li key={issue.issueId}>
-                    <button onClick={() => props.onSelectIssue(issue.issueId)}>
+                    <button
+                      className={
+                        props.tutorialIssueId === issue.issueId
+                          ? 'tutorial-target'
+                          : undefined
+                      }
+                      data-tutorial-action={
+                        props.tutorialIssueId === issue.issueId
+                          ? 'issue'
+                          : undefined
+                      }
+                      onClick={() => props.onSelectIssue(issue.issueId)}
+                    >
                       <b>{issue.title}</b>
                       <span>구조적 연관 · 근거 {issue.evidenceCount}건</span>
                     </button>
