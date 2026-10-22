@@ -31,7 +31,10 @@ export default function PipelineReview() {
           updateQuery({ tab: next === 'versions' ? null : next })
         }
       />
-      {tab === 'versions' && <GraphVersions />}
+      {/* 다른 탭으로 옮겨도 진행 중인 버전 전환과 그 결과를 잃지 않도록 숨기기만 한다. */}
+      <div hidden={tab !== 'versions'}>
+        <GraphVersions />
+      </div>
       {tab === 'candidates' && (
         <Empty>
           후보 검수는 아직 준비 중이에요. 검수 API가 생기면 연결해요.

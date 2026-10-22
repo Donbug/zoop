@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test } from 'vitest';
 import AdminProtectedRoute from '@/components/admin/common/AdminProtectedRoute';
 import AdminPipelinePage from '@/pages/admin/pipeline/AdminPipelinePage';
@@ -11,6 +11,7 @@ import type {
 import {
   apiError,
   createFakeServer,
+  deferred,
   json,
   type FakeServer,
 } from '../support/fakeServer';
@@ -218,7 +219,9 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     await user.click(within(form).getByRole('button', { name: 'v1로 전환' }));
 
     expect(
-      await within(form).findByText(/그 사이 표시 버전이 바뀌었어요/),
+      await within(form).findByText(
+        /표시 버전이나 근거 공개 조건이 달라져 전환하지 못했어요/,
+      ),
     ).toBeTruthy();
   });
 
@@ -238,5 +241,73 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     expect(
       screen.getByText(/분석 작업 관리는 아직 준비 중이에요/),
     ).toBeTruthy();
+  });
+
+  test('전환 요청이 진행 중이면 다른 버전을 고를 수 없고, 탭을 옮겨도 결과를 잃지 않는다', async () => {
+    const base = list();
+    const three: GraphVersionList = {
+      ...base,
+      items: [
+        ...base.items,
+        version({ id: 'v0', sequence: 0, active: false, reason: null }),
+      ],
+    };
+    server.on('GET', VERSIONS, () => json(three));
+    const pending = deferred<Response>();
+    server.on('POST', ACTIVATE, () => pending.promise);
+    const { user } = open();
+
+    await user.click(await screen.findByRole('button', { name: 'v1로 전환' }));
+    const form = screen.getByRole('form', { name: '그래프 버전 전환' });
+    await user.type(
+      within(form).getByLabelText('전환 사유(감사 로그에 남아요)'),
+      '되돌림',
+    );
+    await user.click(within(form).getByRole('button', { name: 'v1로 전환' }));
+    expect(
+      (screen.getByRole('button', { name: 'v0로 전환' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+
+    await user.click(screen.getByRole('tab', { name: '후보' }));
+    await act(async () =>
+      pending.resolve(
+        json({
+          activeVersionId: 'v1',
+          previousActiveVersionId: 'v2',
+          idempotent: false,
+        }),
+      ),
+    );
+    await user.click(screen.getByRole('tab', { name: '그래프 버전' }));
+    expect(await screen.findByText('v1로 바꿨어요.')).toBeTruthy();
+    expect(server.calls('POST', ACTIVATE)).toHaveLength(1);
+  });
+
+  test('더 불러온 쪽의 표시 버전이 첫 쪽과 다르면 전환을 막고 다시 불러오게 한다', async () => {
+    server.on('GET', VERSIONS, ({ query }) =>
+      query.get('cursor')
+        ? json({
+            ...list('v1'),
+            items: [version({ id: 'v0', sequence: 0, active: false })],
+            nextCursor: null,
+          })
+        : json({
+            ...list('v2'),
+            items: [list('v2').items[0]],
+            nextCursor: 'c1',
+          }),
+    );
+    const { user } = open();
+
+    await user.click(await screen.findByRole('button', { name: '더 보기' }));
+    expect(
+      await screen.findByText(/목록을 읽는 사이 표시 버전이 바뀌었어요/),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /로 전환$/ })).toBeNull();
+    const reads = server.calls('GET', VERSIONS).length;
+    await user.click(screen.getByRole('button', { name: '다시 불러오기' }));
+    await screen.findByRole('button', { name: '더 보기' });
+    expect(server.calls('GET', VERSIONS).length).toBeGreaterThan(reads);
   });
 });

@@ -13,10 +13,13 @@ import type {
   GraphVersionActivated,
 } from '@/types/admin/graphVersions';
 
-/** 전환 실패 문구. 그 사이 다른 관리자가 바꾼 경우(409)는 목록을 새로 읽게 안내한다. */
+/**
+ * 전환 실패 문구. 409 REVISION_CONFLICT는 표시 버전이 바뀐 경우뿐 아니라 근거 철회·비공개·권한 변경으로
+ * 공개 조건이 달라진 경우에도 오므로 원인을 단정하지 않는다.
+ */
 function activationErrorMessage(error: Error) {
   if (error instanceof ApiError && error.code === 'REVISION_CONFLICT')
-    return '그 사이 표시 버전이 바뀌었어요. 목록을 새로 고친 뒤 다시 확인해 주세요.';
+    return '표시 버전이나 근거 공개 조건이 달라져 전환하지 못했어요. 목록을 새로 고친 뒤 다시 확인해 주세요.';
   if (error instanceof ApiError && error.code === 'RESOURCE_NOT_FOUND')
     return '이 버전을 찾을 수 없어요. 목록을 새로 고쳐 주세요.';
   return adminActionErrorMessage(error);
@@ -30,11 +33,17 @@ function activationErrorMessage(error: Error) {
 export default function GraphVersionForm({
   version,
   activeVersionId,
+  stale = false,
+  onPendingChange,
   onCancel,
   onDone,
 }: {
   version: GraphVersion;
   activeVersionId: string | null;
+  /** 목록의 표시 버전이 페이지마다 달라 다시 읽어야 한다. 이때는 새로 제출하지 않는다. */
+  stale?: boolean;
+  /** 요청이 진행 중인지 상위에 알린다. 진행 중에는 다른 버전 선택·폼 교체를 막는다. */
+  onPendingChange: (pending: boolean) => void;
   onCancel: () => void;
   onDone: (result: GraphVersionActivated) => void;
 }) {
@@ -47,22 +56,29 @@ export default function GraphVersionForm({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending) return;
+    if (pending || stale) return;
     const trimmed = reason.trim();
     setMissing(!trimmed);
     if (!trimmed) return;
     setError(null);
     setPending(true);
+    onPendingChange(true);
     const key = idempotency.keyFor({
       versionId: version.id,
       activeVersionId,
       reason: trimmed,
     });
     try {
-      onDone(
-        await activateGraphVersion(version.id, trimmed, activeVersionId, key),
+      const result = await activateGraphVersion(
+        version.id,
+        trimmed,
+        activeVersionId,
+        key,
       );
+      onPendingChange(false);
+      onDone(result);
     } catch (submitError) {
+      onPendingChange(false);
       idempotency.settle(submitError);
       setError(
         submitError instanceof Error
@@ -107,6 +123,11 @@ export default function GraphVersionForm({
           사유를 입력해 주세요.
         </p>
       )}
+      {stale && (
+        <p role="alert" className="text-[11px] text-zoop-alert">
+          목록을 다시 불러온 뒤 전환해 주세요.
+        </p>
+      )}
       {error && (
         <p role="alert" className="text-[11px] text-zoop-alert">
           버전을 바꾸지 못했어요. {activationErrorMessage(error)}
@@ -121,7 +142,11 @@ export default function GraphVersionForm({
         >
           취소
         </button>
-        <button type="submit" disabled={pending} className={PRIMARY_BUTTON}>
+        <button
+          type="submit"
+          disabled={pending || stale}
+          className={PRIMARY_BUTTON}
+        >
           {pending ? '바꾸고 있어요' : `${version.id}로 전환`}
         </button>
       </div>

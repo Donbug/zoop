@@ -38,8 +38,15 @@ export default function GraphVersions() {
   const versions = useCursorPages(listGraphVersions);
   const [target, setTarget] = useState<GraphVersion | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // 전환 요청이 진행 중인지. 진행 중에는 다른 버전을 고르거나 폼을 바꾸지 못하게 한다.
+  const [pending, setPending] = useState(false);
   const first = versions.pages[0];
   const activeVersionId = first?.activeVersionId ?? null;
+  // 커서는 표시 버전을 고정하지 않는다. 더 불러온 쪽의 표시 버전이 첫 쪽과 다르면 목록이 섞인 것이므로
+  // 다시 읽게 하고, 그때까지 새 전환을 막는다(열린 폼의 기대 버전은 몰래 바꾸지 않는다).
+  const stale = versions.pages.some(
+    (page) => page.activeVersionId !== activeVersionId,
+  );
 
   if (versions.status === 'loading')
     return <Loading>그래프 버전을 불러오고 있어요</Loading>;
@@ -63,6 +70,28 @@ export default function GraphVersions() {
           . 이미 있는 버전으로만 바꿀 수 있어요. 새 버전 게시는 아직 지원하지
           않아요.
         </Note>
+        {stale && (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center gap-3 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-wash px-4 py-3"
+          >
+            <p className="min-w-0 flex-1 text-xs">
+              목록을 읽는 사이 표시 버전이 바뀌었어요. 다시 불러와서 확인해
+              주세요.
+            </p>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                setNotice(null);
+                versions.reload();
+              }}
+              className={BUTTON}
+            >
+              다시 불러오기
+            </button>
+          </div>
+        )}
         {notice && (
           <p role="status" className="text-[11px] font-semibold">
             {notice}
@@ -73,6 +102,8 @@ export default function GraphVersions() {
             key={target.id}
             version={target}
             activeVersionId={activeVersionId}
+            stale={stale}
+            onPendingChange={setPending}
             onCancel={() => setTarget(null)}
             onDone={(result) => {
               setTarget(null);
@@ -109,7 +140,9 @@ export default function GraphVersions() {
               {versions.items.map((version) => (
                 <tr
                   key={version.id}
-                  className={version.active ? 'bg-zoop-wash' : undefined}
+                  className={
+                    version.id === activeVersionId ? 'bg-zoop-wash' : undefined
+                  }
                 >
                   <td className={`${TD} font-inter font-semibold break-all`}>
                     {version.id}
@@ -120,7 +153,7 @@ export default function GraphVersions() {
                     )}
                   </td>
                   <td className={`${TD} whitespace-nowrap`}>
-                    {version.active ? (
+                    {version.id === activeVersionId ? (
                       <span className="font-semibold">표시 중</span>
                     ) : (
                       <span className="text-zoop-faint">–</span>
@@ -150,9 +183,10 @@ export default function GraphVersions() {
                     {version.reason ?? '–'}
                   </td>
                   <td className={`${TD} text-right whitespace-nowrap`}>
-                    {!version.active && (
+                    {version.id !== activeVersionId && !stale && (
                       <button
                         type="button"
+                        disabled={pending}
                         aria-label={`${version.id}로 전환`}
                         onClick={() => {
                           setNotice(null);
