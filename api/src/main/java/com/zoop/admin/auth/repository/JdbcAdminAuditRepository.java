@@ -86,4 +86,23 @@ public class JdbcAdminAuditRepository implements AdminAuditRepository {
                 .addValue("beforeRevision", beforeRevision).addValue("afterRevision", afterRevision)
                 .addValue("requestId", requestId).addValue("occurredAt", Timestamp.from(occurredAt)));
     }
+
+    @Override
+    public void recordGraphActivation(String adminId, String email, String versionId, String previousVersionId,
+            boolean pointerChanged, String reason, String requestId, Instant occurredAt) {
+        jdbc.update("""
+                INSERT INTO audit_logs
+                  (actor_kind, admin_id, actor_id, actor_email_snapshot, action,
+                   target_type, target_id, outcome, purpose, reason, request_id, detail, occurred_at)
+                VALUES ('admin', :adminId, :adminId, :email, 'graph.version.activate',
+                        'graph_version', :versionId, 'succeeded', 'graph_publication', :reason,
+                        :requestId, jsonb_build_object(
+                            'previousVersionId', CAST(:previousVersionId AS text),
+                            'pointerChanged', :pointerChanged), :occurredAt)
+                """, new MapSqlParameterSource("adminId", adminId)
+                .addValue("email", email).addValue("versionId", versionId)
+                .addValue("previousVersionId", previousVersionId).addValue("pointerChanged", pointerChanged)
+                .addValue("reason", reason).addValue("requestId", requestId)
+                .addValue("occurredAt", Timestamp.from(occurredAt)));
+    }
 }

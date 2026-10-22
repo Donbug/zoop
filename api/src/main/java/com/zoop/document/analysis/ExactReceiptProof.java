@@ -21,6 +21,7 @@ public final class ExactReceiptProof {
     private static final Set<String> CITATION_KEYS = Set.of("evidenceId", "modelEvidenceId", "start", "end", "rawLocatorIds");
     private static final Pattern JOB_ID = Pattern.compile("[A-Za-z0-9_.-]{1,120}");
     private static final String SUMMARY = "document-summary";
+    private static final String SENTIMENT = "document-sentiment";
     private static final String VERIFIER = "semantic-verification";
 
     private ExactReceiptProof() {
@@ -69,6 +70,46 @@ public final class ExactReceiptProof {
                     || !subject.semanticReceiptId().equals(ResultAssessor.artifactId(creator, VERIFIER, inputDigest))
                     || !cites(root, subject)) {
                 return null;
+            }
+            return creator;
+        } catch (StrictJson.Malformed malformed) {
+            return null;
+        }
+    }
+
+    /** Proves the creator of a cache-served company sentiment without exposing its unregistered model citations. */
+    public record SentimentSubject(String analysisId, String aiJobId, String articleId, String articleVersion,
+            String textArtifactId, String textSha256, String resultVersion, String resultArtifactId,
+            String semanticReceiptId) { }
+
+    public static String sentimentCreatorJobId(byte[] receipt, SentimentSubject subject) {
+        try {
+            StrictJson.Obj root = StrictJson.parseObject(receipt).exactly(KEYS);
+            String creator = root.string("creatorJobId");
+            String inputDigest = root.string("inputDigest");
+            if (!ResultAssessor.EXACT_SCHEMA.equals(root.string("schemaVersion"))
+                    || !subject.analysisId().equals(root.string("analysisId"))
+                    || !subject.aiJobId().equals(root.string("aiJobId"))
+                    || !SENTIMENT.equals(root.string("kind"))
+                    || !subject.articleId().equals(root.string("documentId"))
+                    || !subject.articleVersion().equals(root.string("documentVersion"))
+                    || !subject.textArtifactId().equals(root.string("textArtifactId"))
+                    || !subject.textSha256().equals(root.string("textSha256"))
+                    || !subject.resultVersion().equals(root.string("resultVersion"))
+                    || !ResultAssessor.POLICY_VERSION.equals(root.string("policyVersion"))
+                    || !JOB_ID.matcher(creator).matches() || creator.equals(subject.aiJobId())
+                    || !StrictJson.SHA256.matcher(inputDigest).matches()
+                    || !subject.resultArtifactId().equals(ResultAssessor.artifactId(creator, SENTIMENT, inputDigest))
+                    || !subject.semanticReceiptId().equals(ResultAssessor.artifactId(creator, VERIFIER, inputDigest))) {
+                return null;
+            }
+            // Sentiment citations have no public evidence id. Their stored receipt must keep that distinction.
+            if (root.array("citations").isEmpty()) return null;
+            for (JsonNode node : root.array("citations").values()) {
+                StrictJson.Obj citation = StrictJson.Obj.of(node).exactly(CITATION_KEYS);
+                if (citation.stringOrNull("evidenceId") != null || citation.string("modelEvidenceId").isBlank()
+                        || citation.count("start") < 0 || citation.count("end") <= citation.count("start")
+                        || citation.strings("rawLocatorIds").isEmpty()) return null;
             }
             return creator;
         } catch (StrictJson.Malformed malformed) {

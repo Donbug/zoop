@@ -4,6 +4,7 @@ import com.zoop.company.market.dto.CompanyPriceResponse.Point;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -52,7 +53,7 @@ final class PriceBars {
             // One unknown volume makes the bucket's volume unknown; it is never counted as zero.
             Double volume = group.stream().anyMatch(b -> b.volume() == null) ? null
                     : group.stream().mapToDouble(Bar::volume).sum();
-            points.add(new Point(start.atZone(zone).toOffsetDateTime().toString(), group.getFirst().open(), high, low,
+            points.add(new Point(start.atZone(zone).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME), group.getFirst().open(), high, low,
                     group.getLast().close(), volume));
         });
         return points;

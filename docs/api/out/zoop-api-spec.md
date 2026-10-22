@@ -1016,15 +1016,15 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## listCompanyDocuments · 기업 맥락 뉴스·공시와 긍부정 조회
 
-기업 맥락 뉴스·공시와 긍부정 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기업 맥락 뉴스·공시와 긍부정 조회. from/to가 있으면 발행 시각 미상 문서를 제외한다. to는 선택된 공개 그래프 버전 안에서 기사·사건·기업 직접 관계의 시점 상한이며 버전 선택은 asOf/graphVersion 규칙을 따른다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `GET /api/v1/companies/{id}/documents` |
 | 권한·우선순위 | 공개 · P1 |
 | 요청 본문 | 없음 |
-| 응답 | 200: [CompanyDocumentsResponse](#schema-companydocumentsresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, INVALID_CURSOR |
+| 응답 | 200: [CompanyDocumentsResponse](#schema-companydocumentsresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, INVALID_CURSOR, VERSION_UNAVAILABLE |
 | FS/NFS | [FS021](../../system/out/feature-FS021.md) · [FS043](../../system/out/feature-FS043.md) · [FS056](../../system/out/feature-FS056.md) · [FS063](../../system/out/feature-FS063.md) · [FS064](../../system/out/feature-FS064.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-COM-02](../../system/out/screen-D-COM-02.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) · [D-SEN-01](../../system/out/screen-D-SEN-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.6.5, 6.6.22, 6.7.6, 6.7.9, 6.5.2, 6.5.6, 6.5.7 |
@@ -1043,9 +1043,9 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 | kind | query | 선택 | string {news, disclosure} |  |
-| round | query | 선택 | string | 브리핑 회차 ID. 회차의 문서와 기업별 긍부정 발행본을 함께 고정한다. |
+| round | query | 선택 | string | 브리핑 회차 ID. 회차의 문서와 기업별 긍부정 발행본을 함께 고정하려는 계약이다. 현재 회차별 그래프 버전 조회가 미구현이므로 전달하면 409 VERSION_UNAVAILABLE을 반환하며 최신 자료로 대체하지 않는다. |
 | from | query | 선택 | string (date) / string (date-time) | 차트·타임라인과 같은 조회 시작 조건. 날짜 또는 오프셋을 포함한 시각이다. |
-| to | query | 선택 | string (date) / string (date-time) | 같은 조회 종료 조건이며 이 시각 이후 공개된 문서는 제외한다. |
+| to | query | 선택 | string (date) / string (date-time) | 같은 조회 종료 조건이며 이 시각 이후 공개된 기사와 아직 공개되지 않은 사건·기업 관계는 제외한다. 날짜는 KST 그날 전체, 오프셋이 있는 시각은 그 시각을 포함한다. 발행 시각 미상 문서는 제외한다. |
 
 <a id="listevents"></a>
 
@@ -1829,13 +1829,13 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## activateGraphVersion · 기존 공개 버전 활성화
 
-기존 공개 버전 활성화.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기존 공개 버전 활성화. 공개 포인터를 수입·등록된 버전으로 옮긴다(FS059). 서버는 공유 publication lock 안에서 expectedActiveVersionId를 현재 활성 버전과 비교하고 다르면 REVISION_CONFLICT/409로 거절한다(그래프 조회 계약 §0 '기대 활성 버전 비교'). 포인터를 옮기기 전에 선택한 스냅샷을 읽고 hash를 검증하며 실패하면 SOURCE_UNAVAILABLE/503이고 활성 버전은 그대로다. 합성 fixture 버전(kind=fixture)은 서버의 스냅샷 소스가 fixture(로컬·개발 전용)일 때만 활성화할 수 있고, 그 외 구성에서는 남아 있는 fixture 행이 공개 그래프가 되지 않도록 INVALID_REQUEST/422로 거절한다. 수입한(fixture가 아닌) 버전은 같은 lock 안에서 현재 공개 적격성도 다시 확인한다(그래프 조회 계약 §0 '활성화 직전 현재 권리·제외 재확인'). (1) 공개 제외 저장소(FS081)가 없으면 '제외 없음'을 확인할 수 없으므로 SOURCE_UNAVAILABLE/503으로 거절하며, 운영자가 서버 설정으로 명시 허용한 경우에만 이 단계를 넘긴다. (2) 현재 제외를 적용한 스냅샷의 모든 근거에 getEvidence와 같은 검사(검증된 본문 인용·기사 접근 상태·문서 버전·선택 버전 receipt의 grant·현재 원천 registry)를 수행하고, 수입 이후 철회·비공개·grant 변경으로 하나라도 보류되면 REVISION_CONFLICT/409, registry·저장소를 읽을 수 없으면 SOURCE_UNAVAILABLE/503이며 활성 버전은 그대로다. 검사 중 인용 기사 행은 공유 잠금으로 고정한다. 활성화 시각은 lock 획득·기대 버전 비교·적격성 검사 뒤에 정해 graph_activations·최초 published_at·감사 기록에 같은 값을 쓰며, 근거가 고정한 grant의 만료·철회 판정도 검사 시작 시각이 아니라 이 활성화 시각에 원천 registry를 다시 읽어 한다(검사 중 만료된 grant는 REVISION_CONFLICT/409), 멱등 레코드 생성 시각(요청 수신 시각)과 구분한다. 이미 활성인 버전이면 idempotent=true이고 포인터는 움직이지 않는다. 같은 Idempotency-Key·같은 본문은 최초 응답을 재현하고 다른 본문은 IDEMPOTENCY_CONFLICT다(본문 비교는 versionId·expectedActiveVersionId·reason의 정규 JSON이라 expectedActiveVersionId의 null과 빈 문자열은 다른 본문이다). expectedActiveVersionId가 본문에 없으면 INVALID_REQUEST/422이고 명시적 null은 '활성 버전 없음'이다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `POST /api/v1/admin/graph/versions/{version_id}/activate` |
 | 권한·우선순위 | 관리자(작업별 권한) · P1 |
-| 요청 본문 | [ReasonRequest](#schema-reasonrequest) |
+| 요청 본문 | [GraphVersionActivateRequest](#schema-graphversionactivaterequest) |
 | 응답 | 200: [ActivateResponse](#schema-activateresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS059](../../system/out/feature-FS059.md) · [FS067-02](../../system/out/feature-FS067-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
@@ -1854,7 +1854,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
 | Idempotency-Key | header | 필수 | string | 같은 주체·작업의 중복 실행 방지 키. 보존 기간은 팀 확인 필요다. |
 
-본문 스키마: [ReasonRequest](#schema-reasonrequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
+본문 스키마: [GraphVersionActivateRequest](#schema-graphversionactivaterequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
 
 <a id="listanalysisjobs"></a>
 
@@ -4891,6 +4891,17 @@ same request again never toggles anything.
 | id | 필수 | string |  |
 | kind | 필수 | string {company, issue, edge} |  |
 
+<a id="schema-graphversionactivaterequest"></a>
+
+### GraphVersionActivateRequest
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| reason | 필수 | string |  |
+| expectedActiveVersionId | 필수 | string / null | 관리자가 목록에서 확인한 현재 활성 버전 ID. 활성 버전이 없었으면 null. 현재 값과 다르면 REVISION_CONFLICT/409. |
+
 <a id="schema-graphversionlist"></a>
 
 ### GraphVersionList
@@ -4914,7 +4925,7 @@ same request again never toggles anything.
 | --- | --- | --- | --- |
 | id | 필수 | string |  |
 | sequence | 필수 | integer |  |
-| kind | 필수 | string {seed, ledger} |  |
+| kind | 필수 | string {fixture, snapshot} |  |
 | createdAt | 필수 | string (date-time) |  |
 | createdBy | 필수 | string |  |
 | reason | 필수 | string / null |  |
