@@ -57,6 +57,8 @@ function metric(overrides: Partial<StatsMetric>): StatsMetric {
     kind: 'count',
     unit: '명',
     definition: '정의',
+    availability: 'available',
+    unavailableReason: null,
     count: 0,
     numerator: null,
     denominator: null,

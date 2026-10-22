@@ -1,14 +1,28 @@
 import type { StatsMetric } from '@/types/admin/insights';
 import { count, formatPercent } from '@/components/admin/common/adminStyles';
 
+const UNAVAILABLE_LABEL: Record<string, string> = {
+  not_integrated: '미연동',
+  source_unavailable: '조회 불가',
+  insufficient_history: '이력 부족',
+};
+/** 지표 원천이 없을 때의 짧은 표기. 0이나 '표본 부족'과 구분한다. */
+export const unavailableLabel = (reason: string | null | undefined) =>
+  (reason && UNAVAILABLE_LABEL[reason]) ?? '제공 안 됨';
+
 // 통계·선호도 화면이 함께 쓰는 지표 표기. 표본이 작으면 비율 대신 건수만 보여 준다.
 // 모르는 값(null)은 0이 아니라 '–'로 보여 준다.
 
-const countOrDash = (value: number | null) =>
-  value === null ? '–' : count(value);
+const countOrDash = count;
 
 /** 지표 값: 건수는 단위와 함께, 비율은 분모가 기준 이상일 때만 퍼센트 */
 export function MetricValue({ metric }: { metric: StatsMetric }) {
+  if (metric.availability === 'unavailable')
+    return (
+      <span className="font-semibold whitespace-nowrap text-zoop-muted">
+        {unavailableLabel(metric.unavailableReason)}
+      </span>
+    );
   if (metric.kind === 'count')
     return (
       <span className="font-semibold whitespace-nowrap tabular-nums">
@@ -39,7 +53,7 @@ export function MetricBasis({
   metric: StatsMetric;
   minSample: number;
 }) {
-  if (metric.kind === 'count')
+  if (metric.kind === 'count' || metric.availability === 'unavailable')
     return <span className="text-zoop-faint">–</span>;
   return (
     <span className="whitespace-nowrap tabular-nums">

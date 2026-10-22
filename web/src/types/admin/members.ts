@@ -12,10 +12,10 @@ export type MemberRow = {
   lastActiveAt: string | null;
   status: MemberStatus;
   activity: {
-    sessions: number;
-    graphSelections: number;
-    aiQuestions: number;
-    briefingViews: number;
+    sessions: number | null;
+    graphSelections: number | null;
+    aiQuestions: number | null;
+    briefingViews: number | null;
   };
 };
 
