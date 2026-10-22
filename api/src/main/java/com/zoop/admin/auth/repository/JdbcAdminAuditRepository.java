@@ -125,4 +125,29 @@ public class JdbcAdminAuditRepository implements AdminAuditRepository {
                 .addValue("createdJobId", createdJobId).addValue("reason", reason).addValue("requestId", requestId)
                 .addValue("occurredAt", Timestamp.from(occurredAt)));
     }
+
+    @Override
+    public void recordReviewDecision(String adminId, String email, String targetId, long reviewDecisionId, String decision,
+            String sourceVersion, String sourceRevision, long revision, long globalRevision, String reason, String requestId,
+            Instant occurredAt) {
+        jdbc.update("""
+                INSERT INTO audit_logs
+                  (actor_kind, admin_id, actor_id, actor_email_snapshot, action,
+                   target_type, target_id, outcome, purpose, reason, request_id, detail, occurred_at)
+                VALUES ('admin', :adminId, :adminId, :email, 'review.decision',
+                        'review_target', :targetId, 'succeeded', 'review', :reason,
+                        :requestId, jsonb_build_object(
+                            'reviewDecisionId', CAST(:reviewDecisionId AS bigint),
+                            'decision', CAST(:decision AS text),
+                            'sourceVersion', CAST(:sourceVersion AS text),
+                            'sourceRevision', CAST(:sourceRevision AS text),
+                            'revision', CAST(:revision AS bigint),
+                            'globalRevision', CAST(:globalRevision AS bigint)), :occurredAt)
+                """, new MapSqlParameterSource("adminId", adminId)
+                .addValue("email", email).addValue("targetId", targetId).addValue("reviewDecisionId", reviewDecisionId)
+                .addValue("decision", decision).addValue("sourceVersion", sourceVersion)
+                .addValue("sourceRevision", sourceRevision).addValue("revision", revision)
+                .addValue("globalRevision", globalRevision).addValue("reason", reason).addValue("requestId", requestId)
+                .addValue("occurredAt", Timestamp.from(occurredAt)));
+    }
 }
