@@ -7,6 +7,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -1081,5 +1082,79 @@ class GraphEvidenceServiceTest {
         assertEquals(List.of(), get().eventIds(), "an already imported receipt with the needed shape serves a basis-only span");
         writeSources(source(PROVIDER, SOURCE_GRANT, "rev-2", true, "known", List.of("read", "store", "quote-display"), "e", null));
         assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "the current rights gate still decides");
+    }
+
+    // ---- activation precheck (FS059, PR #275 review 1) -------------------------------------------------------------------
+
+    /** Both steps, the last one at the clock's now (the activation time when nothing else is going on). */
+    private void precheck() {
+        service().prepareGraphActivation(GRAPH_VERSION, Map.of(EVIDENCE_ID, found), "req-a").accept(NOW);
+    }
+
+    @Test
+    void aGrantValidWhenTheChecksStartButExpiredAtActivationIsRefused() throws Exception {
+        setUp();
+        // Valid at NOW, ends one second later (an expiry equal to the judged time already denies).
+        writeSources(source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, true, "known", List.of("read", "store", "quote-display"),
+                "e", "2026-10-15T01:00:01Z"));
+        var atActivation = service().prepareGraphActivation(GRAPH_VERSION, Map.of(EVIDENCE_ID, found), "req-a");
+
+        atActivation.accept(NOW);
+        assertEquals(ErrorCode.REVISION_CONFLICT, assertThrows(CustomException.class,
+                () -> atActivation.accept(NOW.plusSeconds(2))).getErrorCode(),
+                "the slow step judged nothing by time; the activation time decides");
+    }
+
+    @Test
+    void theSlowStepNeverReadsTheRegistry() throws Exception {
+        setUp();
+        Files.delete(sources);
+
+        var atActivation = service().prepareGraphActivation(GRAPH_VERSION, Map.of(EVIDENCE_ID, found), "req-a");
+
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> atActivation.accept(NOW)).getErrorCode(), "the registry is read once, at the activation time");
+    }
+
+    private ErrorCode precheckRefused() {
+        return assertThrows(CustomException.class, this::precheck).getErrorCode();
+    }
+
+    @Test
+    void theActivationPrecheckPassesWhatGetEvidenceServesWithoutAPinnedGraphRead() throws Exception {
+        setUp();
+        assertNotNull(get());
+        graphReads.set(0);
+
+        precheck();
+
+        assertEquals(0, graphReads.get(), "the version is not active yet, so the selector must not be asked");
+    }
+
+    @Test
+    void theActivationPrecheckRefusesWhateverGetEvidenceWouldWithholdAsAConflict() throws Exception {
+        setUp();
+        List<String> needed = List.of("read", "store", "quote-display");
+        world.registry.setAccessStatus(ARTICLE, "private");
+        assertEquals(ErrorCode.REVISION_CONFLICT, precheckRefused(), "article made private after the import");
+        world.registry.setAccessStatus(ARTICLE, "available");
+
+        writeSources(source(PROVIDER, SOURCE_GRANT, "rev-2", true, "known", needed, "e", null));
+        assertEquals(ErrorCode.REVISION_CONFLICT, precheckRefused(), "grant revision changed after the import");
+        writeSources(source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, false, "known", needed, "e", null));
+        assertEquals(ErrorCode.REVISION_CONFLICT, precheckRefused(), "source disabled after the import");
+        writeSources(source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, true, "known", needed, "e", null));
+        precheck();
+
+        world.read.evidence.remove(EVIDENCE_ID);
+        assertEquals(ErrorCode.REVISION_CONFLICT, precheckRefused(), "the staged citation row is gone");
+    }
+
+    @Test
+    void anUnreadableRegistryMakesTheActivationPrecheckUnavailableNotAConflict() throws Exception {
+        setUp();
+        Files.delete(sources);
+
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, precheckRefused());
     }
 }

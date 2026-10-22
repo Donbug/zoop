@@ -16,6 +16,13 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "request:application/json.expectedActiveVersionId:required": true,
+    "request:application/json.expectedActiveVersionId<anyOf:0>": {
+      "type": "string"
+    },
+    "request:application/json.expectedActiveVersionId<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -464,7 +471,8 @@
     "request:application/json.reason": {
       "target": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "maxLength": 1000
       },
       "bff": {
         "type": "string",

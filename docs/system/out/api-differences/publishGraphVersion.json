@@ -485,6 +485,22 @@
         "type": "string"
       }
     },
+    "response:201:application/json.version.kind": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "fixture",
+          "snapshot"
+        ]
+      },
+      "bff": {
+        "type": "string",
+        "enum": [
+          "seed",
+          "ledger"
+        ]
+      }
+    },
     "response:401:application/json.error.code": {
       "target": {
         "type": "string",
