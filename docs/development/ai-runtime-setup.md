@@ -155,6 +155,22 @@ ai/worker/.venv/bin/python ai/worker/scripts/native_jev_smoke.py
 4. 개인 Jev 계정 키·비용 부담 주체, Choice/Noul 임계치의 보정 방식(한국어 평가셋)과 네이티브 검증을 켤 문서 종류·시점.
 5. 도구/추론이 필요한 단계를 만들 때 Responses adapter를 구현할지 여부.
 
+## 11. 챗봇 모델 단계 (`zoop-ai-chat`, 구현됨, 기본 꺼짐, 호출 승인 아님)
+
+챗봇 오케스트레이터(`api` `com.zoop.chat.orchestrator`)의 모델 단계 셋을 한 번에 하나씩 실행하는 CLI다. S1·파이프라인과 계약·게이트·원장·grant를 공유하지 않는다(정책 6.3.2).
+
+| stage | provider | 요청 | 시간 상한 |
+| --- | --- | --- | --- |
+| `chat-router` | 네이티브 Jev `/systemone`, `ZOOP_AI_CHAT_JEV_MODEL=jev-1.14.0` | 요구별 Q01~Q08·연결 기능·투자 판단 Noul | 4초 |
+| `chat-answer` | OpenAI 호환 `chat/completions`, `ZOOP_AI_CHAT_ANSWER_MODEL`(`gpt-6-luna`)·`_REASONING_EFFORT` | 엄격 JSON 구간별 답변 | 25초 |
+| `chat-verification` | 네이티브 Jev `/systemone` | 근거 구간 지지 Choice, 모든 구간 투자 판단 Noul | 6초 |
+
+- **게이트·예산**: `ZOOP_AI_CHAT_LIVE_ENABLED=1`과 양수 `ZOOP_AI_CHAT_MAX_CALLS`가 모두 있어야 live 송신. 상한은 세 stage가 공유하며 `chat.sqlite3`의 live 송신 건수로 센다. 없으면 `chat_live_disabled`로 아무것도 보내지 않는다. key는 생성 `ZOOP_AI_API_KEY`, Jev `TYPESAFE_API_KEY`이며 각 key는 자기 endpoint에만 간다.
+- **멱등·응답 불명**: `invocationId`(작업·시도·stage)당 한 번만 보낸다. 같은 입력으로 다시 부르면 저장된 결과를 돌려주고, 다른 입력이면 `invocation_conflict`. 보낸 뒤 timeout·연결 끊김이나 송신 기록 뒤 프로세스가 죽은 경우는 `provider_response_unknown`(`unknown=true`)이며 다시 보내지 않는다. 받은 응답이 형식·모델·분포 검사에 실패하면 원문을 receipt로 남기고 실패한다(재시도 없음).
+- **grant**: 인용문(`Quote.sourceId`)이 있는 stage는 운영자 챗봇 grant registry(`zoop-ai-chat-1`, S1 registry와 별도)에서 같은 source의 활성·`rights=known`·`model-send`·해당 stage 목적·정확한 수신자(`openai-compatible:<rev>` 또는 `typesafe-native:<rev>`, replay는 `authored-replay`) grant가 있어야 한다. 없으면 보내지 않는다.
+- **잠정 결정(2026-10-22, 미보정)**: Jev 판정 임계치는 S1 잠정값(Choice ≥ 0.90·confidence ≥ 0.80, Noul ≥ 0.90 / ≤ 0.10)을 재사용하고 라우터 확률은 앱이 0.70/0.35·투자 판단 > 0.10으로 적용한다. 질문 집합·임계치는 실제 호출 전 챗봇 평가 세트로 보정해야 한다.
+- **replay**: `--replay`의 authored fixture(`recordingKind=authored-test`)를 요청 identity digest로 정확히 찾는다. 없으면 `replay_input_mismatch`이며 보낸 것으로 기록하지 않는다.
+
 ## 10. S2/S3 live 파이프라인 런타임 (구현됨, 기본 꺼짐, 호출 승인 아님)
 
 `ai/pipeline/src/zoop_ai_pipeline/live_runtime.py`(+ `live_prompts.py`, `live_jev.py`, `live_budget.py`)가 S2/S3의 실제 모델 경로다. S1 worker 코드·설정·원장과 **공유하지 않으며** private PoC를 import하지 않는다(PoC 프롬프트는 읽기 전용 exemplar로만 참고했다). 단위 테스트는 가짜 HTTP(`httpx.MockTransport`와 loopback 서버)만 쓴다. 별도 승인을 받은 운영자가 합성 데이터로 실제 호출 한 번을 검증했다(§10.8). 지출은 승인된 별도 실행의 몫이며 환경변수가 채워진 것은 승인이 아니다.
