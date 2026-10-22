@@ -149,6 +149,13 @@ class CompanyPostgresIntegrationTest {
         assertEquals("Alphabet", jdbc.queryForObject(
                 "SELECT name FROM companies WHERE id='NASDAQ:GOOGL'", String.class));
         assertEquals(List.of("ORG:OPENAI"), ids(search("openai")));
+        assertEquals("KOSPI", jdbc.queryForObject("SELECT market FROM companies WHERE id='KRX:005930'", String.class));
+        assertEquals("1969-01-13", jdbc.queryForObject(
+                "SELECT profile->>'foundedDate' FROM companies WHERE id='KRX:005930'", String.class));
+        assertEquals("Apple Inc.", jdbc.queryForObject(
+                "SELECT profile->>'legalName' FROM companies WHERE id='NASDAQ:AAPL'", String.class));
+        assertFalse(jdbc.queryForObject("SELECT profile ? 'foundedDate' FROM companies WHERE id='NASDAQ:AAPL'",
+                Boolean.class), "an unconfirmed value is left out, not stored as an empty string");
         assertTrue(repository.catalogRevision() > before);
         long after = repository.catalogRevision();
 
@@ -173,6 +180,38 @@ class CompanyPostgresIntegrationTest {
         assertThrows(IllegalArgumentException.class, () -> importer.importFile(file));
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id='ORG:DUP'", Integer.class));
         assertEquals(revision, repository.catalogRevision());
+    }
+
+    @Test
+    void anOmittedProfileOrMarketKeepsTheStoredOneAndABadProfileRejectsTheWholeCatalog(@TempDir Path directory)
+            throws Exception {
+        jdbc.update("""
+                INSERT INTO companies (id, name, ticker, exchange_code, market, profile)
+                VALUES ('NYSE:KEEP', 'Keep', 'KEEP', 'NYSE', 'NYSE', '{"legalName":"Keep Inc."}'::jsonb)
+                """);
+        var importer = context.getBean(CompanyCatalogImportService.class);
+        Path omitted = directory.resolve("omitted.json");
+        Files.writeString(omitted, """
+                {"companies":[{"company_id":"NYSE:KEEP","name":"Keep","ticker":"KEEP","aliases":[]}]}
+                """);
+        importer.importFile(omitted);
+        assertEquals("NYSE", jdbc.queryForObject("SELECT market FROM companies WHERE id='NYSE:KEEP'", String.class));
+        assertEquals("Keep Inc.", jdbc.queryForObject(
+                "SELECT profile->>'legalName' FROM companies WHERE id='NYSE:KEEP'", String.class));
+
+        for (String profile : List.of("""
+                {"foundedDate":"2004-07"}""", """
+                {"websiteUrl":"http://keep.test"}""", """
+                {"ceo":"Someone"}""", """
+                {"legalName":""}""")) {
+            Path bad = directory.resolve("bad.json");
+            Files.writeString(bad, """
+                    {"companies":[{"company_id":"NYSE:KEEP","name":"Changed","ticker":"KEEP","aliases":[],
+                      "profile":%s}]}
+                    """.formatted(profile));
+            assertThrows(IllegalArgumentException.class, () -> importer.importFile(bad), profile);
+        }
+        assertEquals("Keep", jdbc.queryForObject("SELECT name FROM companies WHERE id='NYSE:KEEP'", String.class));
     }
 
     @Test
