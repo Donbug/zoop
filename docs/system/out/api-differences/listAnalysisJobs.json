@@ -573,6 +573,35 @@
         "type": "string"
       }
     },
+    "response:200:application/json.active<anyOf:0>.retry.code": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "allowed",
+          "succeeded",
+          "in_progress",
+          "superseded",
+          "newer_attempt",
+          "duplicate_running",
+          "other_running",
+          "dataset_missing",
+          "outcome_unknown"
+        ]
+      },
+      "bff": {
+        "type": "string",
+        "enum": [
+          "allowed",
+          "succeeded",
+          "in_progress",
+          "superseded",
+          "newer_attempt",
+          "duplicate_running",
+          "other_running",
+          "dataset_missing"
+        ]
+      }
+    },
     "response:200:application/json.active<anyOf:0>.startedAt<anyOf:0>": {
       "target": {
         "type": "string",
@@ -634,6 +663,35 @@
       },
       "bff": {
         "type": "string"
+      }
+    },
+    "response:200:application/json.items[].retry.code": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "allowed",
+          "succeeded",
+          "in_progress",
+          "superseded",
+          "newer_attempt",
+          "duplicate_running",
+          "other_running",
+          "dataset_missing",
+          "outcome_unknown"
+        ]
+      },
+      "bff": {
+        "type": "string",
+        "enum": [
+          "allowed",
+          "succeeded",
+          "in_progress",
+          "superseded",
+          "newer_attempt",
+          "duplicate_running",
+          "other_running",
+          "dataset_missing"
+        ]
       }
     },
     "response:200:application/json.items[].startedAt<anyOf:0>": {
