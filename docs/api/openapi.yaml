@@ -2687,7 +2687,7 @@ paths:
       tags:
         - "market"
       summary: "기업 맥락 뉴스·공시와 긍부정 조회"
-      description: "기업 맥락 뉴스·공시와 긍부정 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "기업 맥락 뉴스·공시와 긍부정 조회. from/to가 있으면 발행 시각 미상 문서를 제외한다. to는 선택된 공개 그래프 버전 안에서 기사·사건·기업 직접 관계의 시점 상한이며 버전 선택은 asOf/graphVersion 규칙을 따른다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
       operationId: "listCompanyDocuments"
       parameters:
         -
@@ -2719,7 +2719,7 @@ paths:
           name: "round"
           in: "query"
           required: false
-          description: "브리핑 회차 ID. 회차의 문서와 기업별 긍부정 발행본을 함께 고정한다."
+          description: "브리핑 회차 ID. 회차의 문서와 기업별 긍부정 발행본을 함께 고정하려는 계약이다. 현재 회차별 그래프 버전 조회가 미구현이므로 전달하면 409 VERSION_UNAVAILABLE을 반환하며 최신 자료로 대체하지 않는다."
           schema:
             type: "string"
         -
@@ -2739,7 +2739,7 @@ paths:
           name: "to"
           in: "query"
           required: false
-          description: "같은 조회 종료 조건이며 이 시각 이후 공개된 문서는 제외한다."
+          description: "같은 조회 종료 조건이며 이 시각 이후 공개된 기사와 아직 공개되지 않은 사건·기업 관계는 제외한다. 날짜는 KST 그날 전체, 오프셋이 있는 시각은 그 시각을 포함한다. 발행 시각 미상 문서는 제외한다."
           schema:
             anyOf:
               -
@@ -2762,6 +2762,8 @@ paths:
                 type: "string"
         "404":
           "$ref": "#/components/responses/Error404"
+        "409":
+          "$ref": "#/components/responses/Error409"
         "422":
           "$ref": "#/components/responses/Error422"
         "500":
@@ -2805,6 +2807,7 @@ paths:
           - "SOURCE_UNAVAILABLE"
           - "INTERNAL_ERROR"
           - "INVALID_CURSOR"
+          - "VERSION_UNAVAILABLE"
         prototype:
           method: "GET"
           path: "/api/companies/{id}/documents"
