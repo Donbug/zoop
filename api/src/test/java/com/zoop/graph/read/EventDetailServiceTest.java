@@ -164,7 +164,7 @@ class EventDetailServiceTest {
         MentionOut allowed = detail.mentions().get(0);
         assertEquals("2026-09", allowed.eventTime(), "an ALLOW verdict keeps the value");
         assertEquals("2026Q4", allowed.period());
-        assertEquals(List.of(VISIBLE_EVIDENCE), allowed.evidenceIds(), "evidence outside the filtered version is dropped");
+        assertEquals(List.of(VISIBLE_EVIDENCE), allowed.evidenceIds());
         MentionOut held = detail.mentions().get(1);
         assertNull(held.eventTime(), "HOLD on eventTime");
         assertEquals("unknown", held.timePrecision());
@@ -267,6 +267,13 @@ class EventDetailServiceTest {
     // ---- current rights, exclusions, article versions and old receipts (PR #278 review) --------------------------------
 
     private static final String TSM_EVIDENCE = "ev-2efb74012127277470344892d9ba439c77a42180b4538d86c319d643bfefbc62";
+    private static final String SAMSUNG_EVIDENCE = "ev-d2cb5acbc5dc430d53378e9dcdc47549436b0a7c48011ef79314fd1e188cd50e";
+    private static final String EQUIP_M = MentionIds.of("art-hbm-equip", "v1", "e1");
+    private static final String SUPPLY_M = MentionIds.of("art-hbm-supply", "v1", "s1");
+    private static final String[] EQUIP_EV = {"ev-e194f2923147a4df39496036f54d7a335eaea21b9706941a05417c2aa2c7833c",
+            "ev-fd9d18853fde470f24184b7db11e534270c580072fc0ca877323825a751c94bf"};
+    private static final String[] SUPPLY_EV = {"ev-912843a071ee90c12ee7e909c65f06ce748d2a35c7c29c6c871faac130e4f395",
+            "ev-bb3008cb36e9b51c0d2fd77af059259332b1887cc04862e185a496c3dcc9e421"};
 
     @Test
     void aWithdrawnCitationTakesItsRelationAndCompanyButNotTheEvent() {
@@ -304,6 +311,62 @@ class EventDetailServiceTest {
 
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
                 () -> service.get(EUV, null, null, null, "r")).getErrorCode());
+    }
+
+    @Test
+    void aMentionWithOneOfItsTwoCitationsWithdrawnIsLeftOutWhole() {
+        EventDetailService service = imported(bundle(false));
+        // m2 cites two real evidence ids; only the second is withdrawn. Its text may rest on that one, so m2 goes whole.
+        when(receipts.shownNow(eq(SAMSUNG_EVIDENCE), anyString(), any(), anyString())).thenReturn(false);
+
+        EventDetail detail = service.get(EUV, null, null, null, "r");
+
+        assertEquals(List.of(M1), detail.mentions().stream().map(MentionOut::mentionId).toList());
+        assertEquals(List.of(M1), detail.fieldDecisions().stream().map(EventDetail.FieldDecisionOut::mentionId).toList());
+        assertFalse(detail.toString().contains("m2 title"));
+        assertTrue(detail.relations().stream().noneMatch(r -> r.target().equals("KRX:005930")));
+    }
+
+    @Test
+    void aRepresentativeThatLostOneOfTwoRealCitationsToAnExclusionClosesTheEvent() {
+        // m1 (the representative) cites two real evidence ids; the exclusion store removes one of them.
+        String twoCitations = bundle(false).node().toString().replace("\"evidenceIds\":[\"" + VISIBLE_EVIDENCE + "\"]}",
+                "\"evidenceIds\":[\"" + VISIBLE_EVIDENCE + "\",\"" + TSM_EVIDENCE + "\"]}");
+        EventDetailService service = imported(StrictJson.parseObject(twoCitations), List.of(),
+                new DisclosureExclusions(1, java.util.Set.of(), java.util.Set.of(), java.util.Set.of(TSM_EVIDENCE)));
+
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, assertThrows(CustomException.class,
+                () -> service.get(EUV, null, null, null, "r")).getErrorCode());
+    }
+
+    @Test
+    void aUnanimousEventWithoutARepresentativeIsShownAndNeedsEveryMention() {
+        // A normal unanimous event: no representative, every mention gives the same head values.
+        EventDetailService service = imported(bundle(false), List.of(), DisclosureExclusions.NONE, null);
+        assertEquals(List.of(M1, M2), service.get(EUV, null, null, null, "r").mentions().stream()
+                .map(MentionOut::mentionId).toList());
+
+        // Its head rests on all of them: one mention no longer wholly shown closes it, never a first mention in its place.
+        when(receipts.shownNow(eq(SAMSUNG_EVIDENCE), anyString(), any(), anyString())).thenReturn(false);
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, assertThrows(CustomException.class,
+                () -> service.get(EUV, null, null, null, "r")).getErrorCode());
+    }
+
+    @Test
+    void aFollowedEventThatCannotBeShownLeavesFollowsAndRelations() {
+        EventDetailService service = imported(hbmBundle());
+        // Both shown: equipment (unanimous) follows supply.
+        assertEquals(List.of(HBM_SUPPLY), service.get(HBM_EQUIP, null, null, null, "r").follows().previous().stream()
+                .map(EventDetail.FollowRef::id).toList());
+
+        // Supply's citation is withdrawn: its own detail is closed, and equipment no longer names it.
+        when(receipts.shownNow(eq(SUPPLY_EV[0]), anyString(), any(), anyString())).thenReturn(false);
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, assertThrows(CustomException.class,
+                () -> service.get(HBM_SUPPLY, null, null, null, "r")).getErrorCode());
+        EventDetail equipment = service.get(HBM_EQUIP, null, null, null, "r");
+        assertEquals(List.of(), equipment.follows().previous());
+        assertTrue(equipment.relations().stream().noneMatch(r -> r.relationType().equals("FOLLOWS")));
+        assertFalse(equipment.toString().contains("supply title"));
     }
 
     @Test
@@ -359,15 +422,24 @@ class EventDetailServiceTest {
 
     private EventDetailService imported(StrictJson.Obj bundle, List<PublicGraphSnapshot.Article> extraArticles,
             DisclosureExclusions exclusions) {
+        return imported(bundle, extraArticles, exclusions, M1);
+    }
+
+    /** euvRepresentative null: the EUV mentions agree on every head field (fieldProvenance.selection unanimous). */
+    private EventDetailService imported(StrictJson.Obj bundle, List<PublicGraphSnapshot.Article> extraArticles,
+            DisclosureExclusions exclusions, String euvRepresentative) {
         if (bundle != null) when(receipts.graphImportBundle(anyString(), anyString())).thenReturn(bundle);
         // Every citation is readable now unless a test withdraws one.
         when(receipts.shownNow(anyString(), anyString(), any(), anyString())).thenReturn(true);
         PublicGraphSnapshot base = GraphReadFixtures.snapshot("fixture-2026-10-08");
-        List<Issue> issues = base.issues().stream().map(i -> !i.issueId().equals(EUV) ? i : new Issue(i.issueId(),
-                i.label(), i.eventTime(), i.timePrecision(), i.period(), i.assertionStatus(), i.action(), i.target(),
-                i.geography(), i.geographyPolicyVersion(), i.geographyEvidenceIds(), i.articleIds(), i.evidenceIds(),
-                List.of(new MentionRef(M1, EUV_ARTICLE, "v1"), new MentionRef(M2, EUV_ARTICLE, "v1")), M1,
-                i.latestPublishedAt())).toList();
+        List<Issue> issues = base.issues().stream().map(i -> switch (i.issueId()) {
+            case EUV -> withMentions(i, List.of(new MentionRef(M1, EUV_ARTICLE, "v1"), new MentionRef(M2, EUV_ARTICLE, "v1")),
+                    euvRepresentative);
+            // As in the fixture: equipment is unanimous (no representative), supply has one.
+            case HBM_EQUIP -> withMentions(i, List.of(new MentionRef(EQUIP_M, "art-hbm-equip", "v1")), null);
+            case HBM_SUPPLY -> withMentions(i, List.of(new MentionRef(SUPPLY_M, "art-hbm-supply", "v1")), SUPPLY_M);
+            default -> i;
+        }).toList();
         PublicGraphSnapshot snapshot = new PublicGraphSnapshot(base.snapshotFormat(), base.versionId(), base.sourceBundleId(),
                 base.companies(), issues, base.relations(),
                 java.util.stream.Stream.concat(base.articles().stream(), extraArticles.stream()).toList(), base.evidence());
@@ -384,6 +456,29 @@ class EventDetailServiceTest {
         return new EventDetailService(reader, receipts, registry);
     }
 
+    private static Issue withMentions(Issue i, List<MentionRef> mentions, String representative) {
+        return new Issue(i.issueId(), i.label(), i.eventTime(), i.timePrecision(), i.period(), i.assertionStatus(), i.action(),
+                i.target(), i.geography(), i.geographyPolicyVersion(), i.geographyEvidenceIds(), i.articleIds(), i.evidenceIds(),
+                mentions, representative, i.latestPublishedAt());
+    }
+
+    /** Both HBM events as the receipt carries them: one mention each, citing every evidence id of its own event. */
+    private static StrictJson.Obj hbmBundle() {
+        String mention = """
+                {"documentId":"%s","documentVersion":"dv1","mentionId":"%s","articleId":"%s","articleVersion":"v1",
+                 "title":"%s","action":"supply","target":null,"eventTime":null,"timePrecision":"unknown","period":null,
+                 "assertionStatus":"occurred","background":false,"participants":[],"evidenceIds":["%s","%s"]}""";
+        String issue = """
+                {"id":"%s","mentions":[%s],"fieldVerdicts":[],
+                 "sourceSupport":{"articleCount":1,"knownLineageCount":null,"unknownLineageArticles":["%s"],
+                   "independentSourceCount":null,"duplicateGroups":[]}}""";
+        return StrictJson.parseObject("{\"schemaVersion\":\"zoop-graph-handoff-bundle-5\",\"issues\":["
+                + issue.formatted(HBM_EQUIP, mention.formatted("de", "e1", "art-hbm-equip", "equip title", EQUIP_EV[0],
+                        EQUIP_EV[1]), "art-hbm-equip") + ","
+                + issue.formatted(HBM_SUPPLY, mention.formatted("ds", "s1", "art-hbm-supply", "supply title", SUPPLY_EV[0],
+                        SUPPLY_EV[1]), "art-hbm-supply") + "]}");
+    }
+
     /** The parts of an AI handoff bundle getEvent reads; values a verdict holds or rejects are marked so a leak is visible. */
     private static StrictJson.Obj bundle(boolean allBackground) {
         return StrictJson.parseObject("""
@@ -394,11 +489,11 @@ class EventDetailServiceTest {
                      "period":"2026Q4","assertionStatus":"occurred","background":%s,
                      "participants":[{"sourceCompanyId":"S1","companyId":"NASDAQ:ASML","name":"ASML","role":"supplier"},
                                      {"sourceCompanyId":"S2","companyId":null,"name":"Unknown Co","role":null}],
-                     "evidenceIds":["%s","ev-not-in-this-version"]},
+                     "evidenceIds":["%s"]},
                     {"documentId":"d1","documentVersion":"dv1","mentionId":"m2","articleId":"%s","articleVersion":"v1",
                      "title":"m2 title","action":"export","target":null,"eventTime":"2026-10-HELD","timePrecision":"month",
                      "period":"2027-REJECTED","assertionStatus":"announced","background":true,"participants":[],
-                     "evidenceIds":["%s"]},
+                     "evidenceIds":["%s","%s"]},
                     {"documentId":"d9","documentVersion":"dv9","mentionId":"m9","articleId":"art-hidden","articleVersion":"v1",
                      "title":"not referenced by the snapshot","action":"x","target":null,"eventTime":null,
                      "timePrecision":"unknown","period":null,"assertionStatus":"unknown","background":false,
@@ -413,6 +508,6 @@ class EventDetailServiceTest {
                   "sourceSupport":{"articleCount":1,"knownLineageCount":0,"unknownLineageArticles":["%s"],
                     "independentSourceCount":null,"duplicateGroups":[]}}]}
                 """.formatted(EUV, EUV_ARTICLE, allBackground, VISIBLE_EVIDENCE, EUV_ARTICLE, VISIBLE_EVIDENCE,
-                EUV_ARTICLE));
+                SAMSUNG_EVIDENCE, EUV_ARTICLE));
     }
 }

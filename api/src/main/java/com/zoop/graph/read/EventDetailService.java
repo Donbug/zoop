@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
@@ -74,47 +75,43 @@ public class EventDetailService {
         PublicGraphSnapshot snapshot = graph.snapshot;
         String versionId = pinned.selected().version().id();
         // Synthetic fixtures have no receipt; an imported version must be describable or the read is 503.
-        Obj handoff = IMPORTED.equals(pinned.selected().version().kind())
-                ? handoffIssue(receipts.graphImportBundle(versionId, requestId), id) : null;
+        Obj bundle = IMPORTED.equals(pinned.selected().version().kind())
+                ? currentBundle(receipts.graphImportBundle(versionId, requestId)) : null;
+        Obj handoff = bundle == null ? null : handoffIssue(bundle, id);
 
-        // The issue's evidence the filtered snapshot still shows (asOf, exclusions). An imported version also keeps only what
-        // is readable right now under the evidence gates (article access, source grant, registry): the snapshot filter never
-        // looks at current rights, and the receipt's original text must not outlive them.
-        List<Relation> touching = snapshot.relations().stream()
-                .filter(r -> r.source().equals(id) || r.target().equals(id)).toList();
-        Set<String> own = new HashSet<>(issue.evidenceIds());
-        own.addAll(issue.geographyEvidenceIds());
-        Set<String> cited = new HashSet<>(own);
-        touching.forEach(r -> cited.addAll(r.evidenceIds()));
-        Map<String, PublicGraphSnapshot.Evidence> readable = new LinkedHashMap<>();
-        for (PublicGraphSnapshot.Evidence e : snapshot.evidence()) {
-            if (cited.contains(e.evidenceId())
-                    && (handoff == null || receipts.shownNow(e.evidenceId(), versionId, at, requestId))) {
-                readable.put(e.evidenceId(), e);
-            }
-        }
-        Map<String, Obj> mentionsById = handoff == null ? Map.of() : mentionsById(handoff, issue, readable.keySet());
-        // The head values (label, time, period) are the representative mention's: with none of its evidence readable they
-        // cannot be shown, and a partial head would still rest on hidden text. Closed like an issue this read does not show.
-        if (handoff != null && (!mentionsById.containsKey(issue.representativeMentionId())
-                || issue.evidenceIds().stream().noneMatch(readable::containsKey))) {
-            throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
-        }
+        // Evidence the filtered snapshot still shows (asOf, exclusions); for an imported version also readable right now under
+        // the evidence gates (article access, source grant, registry), which the snapshot filter never looks at. Asked once per id.
+        Map<String, PublicGraphSnapshot.Evidence> inSnapshot = new LinkedHashMap<>();
+        snapshot.evidence().forEach(e -> inSnapshot.put(e.evidenceId(), e));
+        Map<String, Boolean> judged = new HashMap<>();
+        Predicate<String> shown = e -> inSnapshot.containsKey(e) && (bundle == null
+                || judged.computeIfAbsent(e, k -> receipts.shownNow(k, versionId, at, requestId)));
+
+        Map<String, Obj> mentionsById = handoff == null ? Map.of() : mentionsById(handoff, issue, shown);
+        // Closed like an issue this read does not show when the head values rest on text that is not wholly shown.
+        if (bundle != null && !headShown(issue, mentionsById)) throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
         Map<String, String> appIds = appIds(mentionsById);
         Map<String, Set<String>> withheld = handoff == null ? Map.of() : withheld(handoff, appIds);
 
-        // A relation whose evidence is not all readable now is left out, as the snapshot filter does for evidence it hides.
-        List<Relation> relations = touching.stream().filter(r -> readable.keySet().containsAll(r.evidenceIds())).toList();
+        // A relation needs all its evidence shown, as the snapshot filter requires for evidence it hides; a FOLLOWS relation
+        // also needs the other event's head to be showable, or its label and time would leave through follows.
+        List<Relation> relations = snapshot.relations().stream()
+                .filter(r -> r.source().equals(id) || r.target().equals(id))
+                .filter(r -> r.evidenceIds().stream().allMatch(shown))
+                .filter(r -> bundle == null || !"FOLLOWS".equals(r.relationType()) || otherHeadShown(graph, bundle, id, r, shown))
+                .toList();
+        Set<String> own = new HashSet<>(issue.evidenceIds());
+        own.addAll(issue.geographyEvidenceIds());
         List<ArticleOut> articles = articles(snapshot,
-                readable.values().stream().filter(e -> own.contains(e.evidenceId())).toList(), mentionsById);
+                own.stream().filter(shown).map(inSnapshot::get).toList(), mentionsById);
         Metadata metadata = new Metadata("public_graph_snapshot", pinned.selected().asOf(), versionId, requestId, true,
                 List.of(new SectionFailure("summary", "SUMMARY_NOT_PRODUCED", SUMMARY_UNAVAILABLE, false,
                         pinned.selected().asOf())));
         return new EventDetail(issue.label(), id, issue.eventTime(), issue.timePrecision(), issue.period(),
-                mentions(mentionsById, withheld, readable.keySet()), articles,
+                mentions(mentionsById, withheld, shown), articles,
                 relations.stream().map(EventDetailService::relation).toList(), companies(graph, id, relations),
                 sourceSupport(handoff, articles.stream().map(ArticleOut::id).toList()), fieldDecisions(handoff, appIds),
-                issue.evidenceIds().stream().filter(readable::containsKey).toList(),
+                issue.evidenceIds().stream().filter(shown).toList(),
                 follows(graph, id, relations), null, new Unavailable("unavailable", SUMMARY_UNAVAILABLE), metadata);
     }
 
@@ -124,27 +121,52 @@ public class EventDetailService {
      * {@code -2}/{@code -3} no field verdicts) is SOURCE_UNAVAILABLE, never read as empty lists.
      */
     private static Obj handoffIssue(Obj bundle, String issueId) {
-        if (!bundle.has("schemaVersion") || !BUNDLE_SCHEMA.equals(bundle.string("schemaVersion"))) {
-            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
-        }
         for (Obj candidate : bundle.objects("issues")) {
             if (issueId.equals(candidate.string("id"))) return candidate;
         }
         throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
     }
 
+    /** Only the current bundle schema carries the mentions and verdicts read here (see {@link #handoffIssue}). */
+    private static Obj currentBundle(Obj bundle) {
+        if (!bundle.has("schemaVersion") || !BUNDLE_SCHEMA.equals(bundle.string("schemaVersion"))) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        }
+        return bundle;
+    }
+
+    /**
+     * Whether the head values (label, time, period) can be shown: they are the representative mention's when an operator chose
+     * one (fieldProvenance.selection operator-representative), and every mention's when they all agree (unanimous, no
+     * representative), so every one of those mentions must be wholly shown. Never a first mention picked in place of a missing
+     * representative.
+     */
+    private static boolean headShown(Issue issue, Map<String, Obj> shownMentions) {
+        List<String> basis = issue.representativeMentionId() != null ? List.of(issue.representativeMentionId())
+                : issue.mentions().stream().map(MentionRef::mentionId).toList();
+        return !basis.isEmpty() && shownMentions.keySet().containsAll(basis);
+    }
+
+    /** The event on the other end of a FOLLOWS relation passes the same head check as a direct read of it. */
+    private static boolean otherHeadShown(DisplayGraph graph, Obj bundle, String id, Relation r, Predicate<String> shown) {
+        Issue other = graph.issues.get(r.source().equals(id) ? r.target() : r.source());
+        return other != null && headShown(other, mentionsById(handoffIssue(bundle, other.issueId()), other, shown));
+    }
+
     /**
      * Receipt mentions keyed by their app id, in handoff order, kept only when the filtered snapshot still references them (an
-     * article published after asOf takes its mentions with it) and at least one of their evidence is readable now: a mention
-     * whose every citation was withdrawn or excluded is the withdrawn text itself.
+     * article published after asOf takes its mentions with it) and every one of their evidence is shown now. The handoff does
+     * not say which citation supports which field of the original text, so a mention with any citation withdrawn or excluded
+     * is left out whole rather than shown on the part that remains.
      */
-    private static Map<String, Obj> mentionsById(Obj handoff, Issue issue, Set<String> readable) {
+    private static Map<String, Obj> mentionsById(Obj handoff, Issue issue, Predicate<String> shown) {
         Set<String> visible = issue.mentions().stream().map(MentionRef::mentionId).collect(Collectors.toSet());
         Map<String, Obj> byId = new LinkedHashMap<>();
         for (Obj mention : handoff.objects("mentions")) {
             String appId = MentionIds.of(mention.string("articleId"), mention.string("articleVersion"),
                     mention.string("mentionId"));
-            if (visible.contains(appId) && mention.strings("evidenceIds").stream().anyMatch(readable::contains)) {
+            List<String> evidence = mention.strings("evidenceIds");
+            if (visible.contains(appId) && !evidence.isEmpty() && evidence.stream().allMatch(shown)) {
                 byId.put(appId, mention);
             }
         }
@@ -176,7 +198,7 @@ public class EventDetailService {
     }
 
     private static List<MentionOut> mentions(Map<String, Obj> mentionsById, Map<String, Set<String>> withheld,
-            Set<String> visibleEvidence) {
+            Predicate<String> shown) {
         List<MentionOut> out = new ArrayList<>();
         for (Map.Entry<String, Obj> entry : mentionsById.entrySet()) {
             Obj m = entry.getValue();
@@ -191,7 +213,7 @@ public class EventDetailService {
                     m.stringOrNull("target"), timeHidden ? null : m.stringOrNull("eventTime"),
                     timeHidden ? "unknown" : m.string("timePrecision"),
                     hidden.contains("period") ? null : m.stringOrNull("period"), m.string("assertionStatus"),
-                    participants, m.strings("evidenceIds").stream().filter(visibleEvidence::contains).toList(),
+                    participants, m.strings("evidenceIds").stream().filter(shown).toList(),
                     m.bool("background")));
         }
         return out;
