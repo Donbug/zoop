@@ -17,8 +17,10 @@ import com.zoop.auth.service.MemberSettingsService;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.json.StrictJson;
+import com.zoop.graph.read.EventDetailService;
 import com.zoop.graph.read.GraphQueryService;
 import com.zoop.graph.read.PersonalCompanies;
+import com.zoop.graph.read.dto.EventDetail;
 import com.zoop.graph.snapshot.FixtureGraphVersionSeeder;
 import com.zoop.graph.snapshot.GraphSnapshotStore;
 import com.zoop.graph.version.GraphVersionConflictException;
@@ -248,6 +250,21 @@ class GraphVersionPostgresIntegrationTest {
     @Test
     void theDatabaseRejectsTwoActiveVersions() {
         assertThrows(DataAccessException.class, () -> jdbc.update("UPDATE graph_versions SET active = true"));
+    }
+
+    @Test
+    void getEventReadsTheActiveFixtureVersionThroughTheRealContext() {
+        var service = context.getBean(EventDetailService.class);
+
+        var detail = service.get("iss-fixture-hbm-equip", null, null, null, "it-event");
+        assertEquals("fixture-2026-10-08", detail.metadata().graphVersion());
+        assertEquals(List.of("iss-fixture-hbm-supply"),
+                detail.follows().previous().stream().map(EventDetail.FollowRef::id).toList());
+        assertEquals("unavailable", ((EventDetail.Unavailable) detail.summary()).status());
+        // The fixture's articles have no stored article version, so the publisher is unknown rather than invented.
+        assertEquals(null, detail.articles().get(0).publisher());
+        assertThrows(CustomException.class, () -> service.get("iss-fixture-ai-accel", null, null,
+                "2026-10-05T00:00:00Z", "it-event-past"));
     }
 
     @Test

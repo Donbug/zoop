@@ -184,6 +184,29 @@ public class EvidenceService {
         }
     }
 
+    /**
+     * {@link #readable} for a page that shows producer text next to its citations (getEvent): the same gates, but only a denial
+     * (withheld, unknown or malformed id) is "not shown". A state that cannot be verified right now (store, registry or
+     * database unreadable) is SOURCE_UNAVAILABLE, so a passing outage is a 503 and never reads as an event that is not there.
+     */
+    public boolean shownNow(String id, String graphVersion, Instant asOf, String requestId) {
+        if (id == null || !EVIDENCE_ID.matcher(id).matches()) {
+            return false;
+        }
+        Instant now = clock.instant();
+        try {
+            transaction.execute(status -> dispatch(id, graphVersion, asOf, null, requestId, now, true));
+            return true;
+        } catch (CustomException failure) {
+            if (failure.getErrorCode() == ErrorCode.SOURCE_UNAVAILABLE) {
+                throw failure;
+            }
+            return false;
+        } catch (DataAccessException | TransactionException unverifiable) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, unverifiable);
+        }
+    }
+
     private EvidenceResponse serve(EvidenceView row, String companyId, String requestId, Instant now, GrantRegistry current) {
         String id = row.id();
         ArticleRow article;
@@ -315,6 +338,22 @@ public class EvidenceService {
                 row.articleVersion(), articleOut, Boolean.TRUE, found.eventIds(),
                 new Metadata(GRAPH_SOURCE, found.asOf(), found.graphVersion(), requestId, companyId != null, failures), null,
                 row.articleVersion(), null, null, null, null);
+    }
+
+    /**
+     * getEvent (#64): the bundle an imported graph version was staged from, read from its {@code verification_receipt} exactly as
+     * {@link #read} reads it (registry hash and size, version binding). The bundle is retained producer data for display (original
+     * mentions, operator field verdicts, source support), never authority. A missing, mismatched or unreadable receipt is
+     * SOURCE_UNAVAILABLE: the version cannot be described, which is not the same as an event without details.
+     */
+    public StrictJson.Obj graphImportBundle(String versionId, String requestId) {
+        try {
+            return GraphReceiptGrants.bundle(receipt(versionId, requestId), versionId);
+        } catch (Denied | GraphReceiptGrants.Malformed unusable) {
+            log.warn("Graph receipt cannot describe the version (graphVersion={}, reason={}, requestId={})", versionId,
+                    unusable.getMessage(), requestId);
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        }
     }
 
     /**
