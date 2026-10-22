@@ -68,7 +68,7 @@ def start(args,work,jar,common,env,round_id):
     value={"roundId":round_id,"database":args.database,"apiPort":args.api_port,"webPort":args.web_port,
         "apiPid":api.pid,"webPid":web.pid,"briefingUrl":"http://127.0.0.1:"+str(args.web_port)+"/briefing?reading=compact",
         "mapUrl":"http://127.0.0.1:"+str(args.web_port)+"/?round="+round_id,
-        "mode":local.MODE,"productionAuthorized":False}
+        "mode":getattr(args,"preview_mode",local.MODE),"productionAuthorized":False}
     base.save_json(runtime,value)
     return value
 

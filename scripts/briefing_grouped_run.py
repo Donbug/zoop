@@ -128,6 +128,7 @@ def run(args, transport=None):
                 selected=outcome["selected"]
                 record["groupedSelectionRequestDigest"]=outcome["requestDigest"]
                 record["groupedSelectionCorrections"]=outcome["corrections"]
+                record["groupedRejectedSelections"]=outcome.get("rejectedSelections",[])
                 base.save_json(directory/"selected.json",selected)
                 if outcome["failure"]:
                     record["selectionStatus"]="HELD_VALIDATION"

@@ -55,6 +55,14 @@ def run(args, market_transport=None, ai_transport=None):
     calendar_path = getattr(args, "session_calendar", None)
     calendar = base.strict_load(base.regular(Path(calendar_path))) if calendar_path else None
     context_rows, unknown, _ = context_summary.simulation.load_inputs(Path(args.sources), Path(args.clocks)) if contextual else ([], [], {})
+    company_archive = None
+    if contextual and getattr(args, "grounded_company_metadata", False):
+        if original.get("schemaVersion") != "zoop-briefing-grouped-simulation-v1":
+            raise base.ReplayError("grounded_companies_require_grouped_archive")
+        archive_raw = base.regular(baseline / "grouped-issues.json")
+        if base.digest(archive_raw) != original["groupArchiveSha256"]:
+            raise base.ReplayError("company_archive_digest")
+        company_archive = base.strict_load(archive_raw)
     seed_records = []
     seed_path = getattr(args, "previous_market_bundle", None)
     if seed_path:
@@ -80,6 +88,7 @@ def run(args, market_transport=None, ai_transport=None):
             "roundIds": [r["roundId"] for r in rounds], "maximumSummaryCalls": 4 * len(rounds),
             "maxCalls": args.max_calls, "sourceFileSha256": original["sourceFileSha256"],
             "clockFileSha256": original["clockFileSha256"], "operationalCollectionGate": False}
+    if company_archive is not None: plan["companyMetadataPolicy"] = "accepted-issue-company-evidence-v1"
     if getattr(args, "concise_analysis", False): plan["seriesWritingPolicy"] = "complete-short-sentences-v1"
     if contextual:
         plan.update({"summaryPolicy": context_summary.POLICY,
@@ -167,7 +176,7 @@ def run(args, market_transport=None, ai_transport=None):
             if contextual:
                 # Prefer this run's immediate predecessor; never use a future or stale fallback.
                 records = [*completed_records, *(x for x in seed_records if x["roundId"] not in {p["roundId"] for p in completed_records})]
-                broad = context_summary.build_context(context_rows, r, snapshot, records, calendar, len(unknown))
+                broad = context_summary.build_context(context_rows, r, snapshot, records, calendar, len(unknown), company_archive)
                 context["marketContextSha256"] = base.digest(base.canonical(broad))
                 context["summaryPromptVersion"] = version or "market-context-v2"
             if getattr(args, "concise_analysis", False):
@@ -234,6 +243,7 @@ def parser():
     p.add_argument("--round-series")
     p.add_argument("--prompt-version", choices=("market-context-v3-grounded",))
     p.add_argument("--key-file")
+    p.add_argument("--grounded-company-metadata", action="store_true", help="Use accepted exact issue evidence, not search associations")
     p.add_argument("--include-market-context", action="store_true", help="Use all verified company sources and chronological prior summaries")
     p.add_argument("--previous-market-bundle", help="Frozen same-baseline historical market bundle, never an operating publication")
     p.add_argument("--session-calendar", help="Explicit as-of session calendar; missing calendar disables new price targets")

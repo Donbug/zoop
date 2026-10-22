@@ -15,3 +15,5 @@ SELECTABLE이면서 importance>=2인 서로 다른 사건을 중요도 내림차
 자료는 뒤늦게 수집한 원문과 현재 확인한 publisher 시각으로 구분한 회차별 과거 시뮬레이션이다. 당시 수집본/본문 동일성, 실시간 권한, 운영 발행 가능성을 증명하지 않는다. 시장 지표와 가격 성과 데이터는 이 선택 입력에 없다. 미래 장 방향·주가 전망·예측 적중·매수/매도/목표가를 생성하지 않는다. 제공된 JSON schema만 출력한다.
 
 selectionCorrection이 있으면 previousReply와 failure는 같은 고정 입력의 첫 완료 응답을 1회 보완하기 위한 참고일 뿐 사실 근거나 승인으로 사용하지 않는다. 기존 모든 선정·근거·신규성 조건을 다시 검사하며, 인용/기업/변화 근거를 입력에서 찾을 수 없는 이슈는 제외한다.
+
+후속 editorial freshness 검토가 있는 경우 freshnessReview.decision=REPEAT/UNCERTAIN인 사건은 selected에 넣지 않는다. MATERIAL_UPDATE는 그 검토의 deltaEvidenceIds와 실제 선택 인용이 교차하는 경우에만 허용한다. NOT_CHECKED는 확인된 과거 원문을 찾지 못했다는 뜻이며 신규성의 증명이 아니다. 기사 날짜 대신 실제 행위/발표 시점과 원문을 비교한다. 선택 인용과 연결된 검증 기업을 companyIds에서 누락하지 않는다. ASML처럼 이미 검증된 참여 기업을 빈 목록으로 바꾸지 않는다.

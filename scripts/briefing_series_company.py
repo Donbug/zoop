@@ -14,7 +14,9 @@ def run(args):
         raise base.ReplayError('series_company_separate_output_required')
     raw=base.regular(source/'bundle-v2.json');bundle=base.strict_load(raw)
     if not bundle.get('roundSeries'):raise base.ReplayError('series_required')
+    version=getattr(args,'prompt_version','company-outlook-v1')
     identity={'baselineSha256':base.digest(raw),'authorizationRef':args.authorization_ref,'maximumCalls':args.max_calls}
+    if version!='company-outlook-v1':identity['promptVersion']=version
     if not args.execute:
         return {'status':'OFFLINE','minimumNewCalls':2*len(bundle['marketEnrichment']['rounds']),'maximumTotalCalls':args.max_calls,'newPaidCalls':0}
     if not args.key_file:raise base.ReplayError('series_company_key_required')
@@ -30,11 +32,13 @@ def run(args):
             if not target.exists():os.link(f,target)
     metadata={d['documentId']:d for d in [base.strict_load(line) for line in base.regular(Path(args.sources)).decode().splitlines()]}
     receipts=[];history=[];news={r['roundId']:r for r in bundle['rounds']}
-    client=company.context.legacy.MarketSummaryClient(output,base.authenticated_transport(Path(args.key_file),timeout=600),args.max_calls,prompt_root=company.PROMPTS)
+    client=company.context.legacy.MarketSummaryClient(output,base.authenticated_transport(Path(args.key_file),timeout=600),args.max_calls,prompt_root=company.PROMPTS.with_name(version))
     for market in bundle['marketEnrichment']['rounds']:
         definition=news[market['roundId']]
         row={'roundId':market['roundId'],'date':market['date'],'edition':market['edition'],'marketEnrichment':market}
         frozen=company.freeze(row,definition,metadata,history)
+        if getattr(args,'edition_bound_comparison',False) or version=='company-outlook-v2':frozen['comparisonContract']='edition-bound-v2'
+        frozen['promptVersion']=version
         path=output/'company-rounds'/(row['roundId']+'.json');base.private_dir(path.parent)
         if path.exists():
             record=base.strict_load(base.regular(path))
@@ -58,6 +62,8 @@ def run(args):
 def parser():
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('baseline','output','sources','authorization-ref'):p.add_argument('--'+key,required=True)
+    p.add_argument('--prompt-version',choices=['company-outlook-v1','company-outlook-v2'],default='company-outlook-v1')
+    p.add_argument('--edition-bound-comparison',action='store_true')
     p.add_argument('--key-file');p.add_argument('--execute',action='store_true')
     p.add_argument('--max-calls',type=int,choices=range(1,513),default=80)
     return p
