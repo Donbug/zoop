@@ -10,6 +10,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.TransactionException;
 
 /**
  * Reads targets of one kind from the run's pinned public graph, through the same path as the public graph API
@@ -17,8 +19,9 @@ import java.util.Set;
  * target that is not visible there is absent from the result. The evidence passed on is what the public evidence read can
  * read now at that version, in target order, deduplicated and capped at the request limit.
  *
- * <p>The data version is the pinned graph version. A run without a frozen graph, an unavailable version or snapshot and an
- * evidence state that could not be checked are {@link ChatToolUnavailable}, never an empty result.
+ * <p>The data version is the pinned graph version. A run without a frozen graph, an unavailable version or snapshot, a
+ * database that cannot be read and an evidence state that could not be checked are {@link ChatToolUnavailable}, never an
+ * empty result; any other error stays an adapter fault.
  */
 abstract class GraphTargetTool implements ChatTool {
     private final PublicGraphReader reader;
@@ -46,7 +49,8 @@ abstract class GraphTargetTool implements ChatTool {
             var pinned = reader.read(null, scope.graphVersionId(), scope.asOf());
             lookup = new GraphContextLookup(pinned.graph());
             version = pinned.selected().version().id();
-        } catch (CustomException unavailable) {
+        } catch (CustomException | DataAccessException | TransactionException unavailable) {
+            // The version, its snapshot or the database behind them cannot be read now; any other error is a fault.
             throw new ChatToolUnavailable("graph version " + scope.graphVersionId() + " cannot be read", unavailable);
         }
 
@@ -59,6 +63,8 @@ abstract class GraphTargetTool implements ChatTool {
             if (target.isEmpty()) continue;
             List<String> evidence = new ArrayList<>();
             for (String evidenceId : target.get().evidenceIds()) {
+                // The runner interrupts a read that ran out of time: stop instead of reading on.
+                if (Thread.currentThread().isInterrupted()) throw new ChatToolUnavailable("read interrupted");
                 if (passed.contains(evidenceId)) {
                     evidence.add(evidenceId);
                 } else if (passed.size() >= request.limit()) {

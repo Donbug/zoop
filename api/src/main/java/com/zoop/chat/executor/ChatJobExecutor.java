@@ -21,8 +21,10 @@ import com.zoop.chat.service.FrozenSelection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -269,7 +271,8 @@ public class ChatJobExecutor {
         @Override
         public List<String> reserveToolCalls(int planRevision, List<ChatToolCallReservation> calls) {
             if (planRevision < 1 || calls.isEmpty()) throw new IllegalArgumentException("an empty or unnumbered tool plan");
-            List<String> reserved = transaction.execute(status -> {
+            List<String> reserved = recorded(() -> transaction.execute(status -> {
+                runs.limitWait(waitBudget());
                 Instant now = clock.instant();
                 if (runs.lockOwned(claim.job().id(), claim.ownerToken(), now).isEmpty()) return null;
                 int first = runs.countToolCalls(claim.job().id(), claim.attemptNo());
@@ -287,22 +290,47 @@ public class ChatJobExecutor {
                 }
                 runs.reserveToolCalls(rows, now);
                 return rows.stream().map(NewChatToolCall::toolCallId).toList();
-            });
+            }));
             if (reserved == null) throw new ChatRunSuperseded();
             return reserved;
         }
 
         @Override
         public void toolCallStarted(String toolCallId) {
-            if (!runs.startToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), toolCallId, clock.instant())) {
-                throw new ChatRunSuperseded();
-            }
+            Boolean started = recorded(() -> transaction.execute(status -> {
+                runs.limitWait(waitBudget());
+                return runs.startToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), toolCallId,
+                        clock.instant());
+            }));
+            if (!Boolean.TRUE.equals(started)) throw new ChatRunSuperseded();
         }
 
         @Override
         public void toolCallFinished(String toolCallId, ChatToolCallEnd end) {
-            if (!runs.finishToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), toolCallId, end,
-                    clock.instant())) {
+            Boolean finished = recorded(() -> transaction.execute(status -> {
+                runs.limitWait(waitBudget());
+                return runs.finishToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), toolCallId, end,
+                        clock.instant());
+            }));
+            if (!Boolean.TRUE.equals(finished)) throw new ChatRunSuperseded();
+        }
+
+        /**
+         * How long a tool-call record may wait for locks and the database: until the run's deadline. Past it, the run
+         * records nothing more and ends through lease recovery.
+         */
+        private Duration waitBudget() {
+            Duration left = Duration.between(clock.instant(), claim.deadline());
+            if (left.toMillis() < 1) throw new ChatRunSuperseded();
+            return left;
+        }
+
+        /** A record the database could not make in time is not made: the run cannot go on as if it were. */
+        private <T> T recorded(java.util.function.Supplier<T> write) {
+            try {
+                return write.get();
+            } catch (DataAccessException | TransactionException unrecorded) {
+                log.warn("chat tool call record of job {} failed; the run stops", claim.job().id(), unrecorded);
                 throw new ChatRunSuperseded();
             }
         }

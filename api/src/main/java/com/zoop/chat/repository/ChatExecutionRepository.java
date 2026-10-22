@@ -1,5 +1,6 @@
 package com.zoop.chat.repository;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -38,6 +39,12 @@ public interface ChatExecutionRepository {
     Optional<ChatJobRow> lockExpired(String jobId, Instant at);
 
     boolean failExpired(String jobId, Instant at, String failure, String attempts);
+
+    /**
+     * Bounds every statement of the current transaction, lock waits included, to {@code wait}; a statement that runs out
+     * fails instead of holding the run past its deadline.
+     */
+    void limitWait(Duration wait);
 
     /** How many tool calls the attempt has reserved so far (after {@link #lockOwned} in the same transaction). */
     int countToolCalls(String jobId, int attemptNo);
