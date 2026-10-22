@@ -89,8 +89,42 @@ run 파일(`zoop-bench-run-1`) 형식은 위 설계 문서의 “입력 계약�
 
 ## 한계
 
-- 측정한 검색·답변 시스템이 없다. 저장소에 검색기·채팅 실행 코드가 없고, `zoop-ai-graph`의 도구 baseline(위 절)은 합성 world에서 이 도구의 호출 비용과 이웃 결과 정확성만 잰다. 그 외 점수는 모두 채점기 점검용 authored control이다. control은 `real_measured` 결과와 같은 표에 올리거나 순위를 매기지 않는다(`compare`가 거부한다).
+- 이 하네스에 전체 검색·답변 시스템을 연결한 측정 결과는 없다. `zoop-ai-graph` baseline은 합성 world에서 도구 호출 비용과 이웃 결과 정확성만 확인하며, 검증 다리의 loopback 결과도 하위 단계의 기록·채점 점검이다. 다른 팀의 실행 코드 유무를 이 상태로 단정하지 않는다. authored control은 실제 모델 결과와 섞어 순위를 매기지 않는다.
 - gold는 단일 작성자 초안이며 합의를 거치지 않았고(`adjudicated=false`) 규모가 작아 비율이 거칠다. 기존 그래프·QA corpus는 영어 합성 문장이므로 한국어 표현을 검증하지 않는다. 한국어 검증 corpus도 합성 dev 전용이며 실제 모델 품질 근거가 아니다.
 - 자유 서술 품질과 인용의 의미적 뒷받침은 자동 지표가 없고 사람 또는 모델 평가가 필요하다.
 - 실제 모델 호출, 외부·경쟁 서비스 질의, 그래프 DB 설치, 새 의존성, test split 사용은 사용자 승인 전에는 하지 않는다. WBS는 변경하지 않는다.
 - 루트·CI 연결은 한국어 semantic-verification 점검에 한정된다. 기존 그래프·QA 하네스의 전체 시험과 Neo4j 도구 baseline은 위의 개별 명령으로 실행한다.
+
+## 네이티브 이슈 요약 검증 벤치마크
+
+`summary-verify-*` 명령은 production `verify-issue-summary` 판정을 별도 합성 corpus `fin-summary-verify-ko-v1`의 24개 사례·30개 주장과 비교한다. 기존 S1 `verify-*` 계약과 control은 바꾸지 않는다. 이 corpus는 **AI 보조 단일 작성자의 개발용 gold**이며 독립적인 사람의 합의·검수를 거치지 않았다. 실제 모델 품질, 생성 품질, RAG·그래프·전체 S2/S3 품질이나 임곗값 보정을 평가하지 않는다.
+
+```bash
+# ai/evaluation에서 실행: 표준 라이브러리만 필요
+python3 -B -m zoop_eval summary-verify-validate
+python3 -B -m zoop_eval summary-verify-controls --out-dir fixtures/summary-verification
+python3 -B -m zoop_eval summary-verify-score fixtures/summary-verification/oracle.run.json --format text
+python3 -B -m zoop_eval summary-verify-score RUN.json --out score.json
+python3 -B -m unittest discover -s tests -p 'test_summary_verification.py'
+```
+
+`controls`는 gold에서 `oracle.script.json`과 `deviations.script.json`을 만들 뿐 native receipt를 합성하지 않는다. 독립 평가 시험의 `oracle.run.json`·`deviations.run.json`은 아래 실제 loopback HTTP 경로로 캡처한 fixture다. fixture가 없으면 시험을 건너뛰지 않고 실패한다. 파이프라인 개발 환경을 설치한 뒤 저장소 루트에서 다음과 같이 새 run을 만든다.
+
+```bash
+ai/pipeline/.venv/bin/python ai/pipeline/scripts/summary_verify_bench.py loopback \
+  --script ai/evaluation/fixtures/summary-verification/oracle.script.json \
+  --out /tmp/summary-oracle.run.json
+ai/pipeline/.venv/bin/python ai/pipeline/scripts/summary_verify_bench.py loopback \
+  --script ai/evaluation/fixtures/summary-verification/deviations.script.json \
+  --out /tmp/summary-deviations.run.json
+```
+
+- Producer는 보이는 `cases.json`과 loopback script만 읽고, native runtime의 prepare/send/receipt/answer를 거친다. 채점기는 pipeline을 import하지 않고 표준 라이브러리로 요청·공개 question preimage·binding·원문 응답·usage·비용·판정을 다시 계산한다. 미인용 quote는 입력에 있어도 되지만 전송 요청의 `state.quotes`에서는 빠져야 한다.
+- 오류가 있는 사례도 gold 쪽 분모에서 빼지 않는다. 주장별 confusion·precision/recall/F1, advice/causality/framing 검사, available/hold/reject gate, 태그별 정확도와 오류 수를 보고한다. 형식이나 해시·판정이 맞지 않는 run은 `Rejected`와 종료 코드 2로 거부하며 부분 점수를 내지 않는다. 순위·우승 모델·합격 임곗값은 산출하지 않는다.
+- `authorizedMayHaveSentMs`는 전송 직전 승인 callback이 실행된 오류의 send 구간이다. **provider가 요청을 받았다는 증거가 아니다.** HTTP 응답이 저장된 사례는 따로 센다. send 시간에는 예산 예약·승인·네트워크·정산이 포함되고, loopback 시간은 모델 지연이 아니다.
+- 보수적 runtime 추정액, 예산에 반영된 금액, 결과 미상의 예약 위험액을 구분한다. 소유한 가짜 loopback endpoint만 실제 청구액을 `loopback_no_charge=0`으로 표기한다. 실제 provider 청구액은 `unknown/null`이며 usage가 없다고 비용을 0으로 취급하지 않는다.
+- 모든 receipt에서 `bodyText`의 UTF-8 바이트와 `bodySha256`을 비교한다. 정상 UTF-8의 U+FFFD 문자도 예외가 아니다. 원래 잘못된 UTF-8 바이트가 native capture에서 대체 문자로 바뀌어 복원되지 않는 경우에는 `receipt_body_mismatch`로 채점을 거부한다. production receipt 형식을 바꿔 이 한계를 숨기지 않는다.
+- 해시는 내부 정합성을 확인할 뿐 실제 실행을 인증하지 않는다. 전송 중단 기록은 `bench_outcome_unrecorded/unknown`, 뒤의 미시도 사례는 `bench_not_attempted/definite`로 남긴다. assemble은 저장 기록만 다시 읽으며 자동 재전송하지 않는다.
+- 실제 provider 호출은 이 문서의 명령에 포함되지 않는다. 향후 live 실험은 매번 별도 사용자 승인을 받아야 하며 명시적인 live 모드·고정 corpus digest·기존 live gate·고정 모델·새 예산·정확한 provider endpoint가 모두 필요하다. `--check` 통과나 환경 설정만으로 호출이 승인되지는 않는다. `.env`는 읽지 않는다.
+
+원시 run에는 합성 입력·요청·응답이 들어 있지만 score의 사례별 결과에는 원문을 싣지 않는다. 지표 정의와 해석 범위는 [AI 벤치마크 설계](../../docs/design/ai-benchmark.md)를 참고한다.

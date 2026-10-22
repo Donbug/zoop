@@ -18,6 +18,10 @@ from .scoring import score_run
 from .verification import (
     DEFAULT_VERIFY_CORPUS, describe, load_verify_corpus, parse_verify_run, render_verify_score, score_verify_run, write_verify_controls,
 )
+from .summary_verification import (
+    DEFAULT_SUMMARY_CORPUS, describe_summary, load_summary_corpus, parse_summary_run,
+    render_summary_score, score_summary_run, write_summary_controls,
+)
 
 
 def _emit(document: dict[str, Any], fmt: str, renderer, out: Path | None) -> None:
@@ -78,9 +82,33 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--format", choices=("json", "text"), default="json")
             p.add_argument("--out", type=Path, help="also write the JSON document here")
             p.add_argument("run", help="run file (zoop-verify-run-1)")
+    for name in ("summary-verify-validate", "summary-verify-controls", "summary-verify-score"):
+        p = sub.add_parser(name)
+        p.add_argument("--corpus", type=Path, default=DEFAULT_SUMMARY_CORPUS,
+                       help="native issue-summary corpus directory (cases.json, gold.json)")
+        if name == "summary-verify-controls":
+            p.add_argument("--out-dir", type=Path, required=True)
+        if name == "summary-verify-score":
+            p.add_argument("--format", choices=("json", "text"), default="json")
+            p.add_argument("--out", type=Path)
+            p.add_argument("run", help="captured zoop-summary-verify-run-1 file")
     args = parser.parse_args(argv)
     try:
-        if args.command == "verify-validate":
+        if args.command == "summary-verify-validate":
+            print(json.dumps(describe_summary(load_summary_corpus(args.corpus)), indent=1, ensure_ascii=False))
+        elif args.command == "summary-verify-controls":
+            paths = write_summary_controls(load_summary_corpus(args.corpus), args.out_dir)
+            print(json.dumps({"ok": True, "written": list(paths.values()),
+                              "note": "authored provider scripts only; capture native receipts with the pipeline loopback runner"}, indent=1))
+        elif args.command == "summary-verify-score":
+            corpus = load_summary_corpus(args.corpus)
+            try:
+                raw = Path(args.run).read_bytes()
+            except OSError as exc:
+                raise Rejected("file_unreadable", str(exc)) from None
+            _emit(score_summary_run(corpus, parse_summary_run(raw, corpus["inputs"])),
+                  args.format, render_summary_score, args.out)
+        elif args.command == "verify-validate":
             print(json.dumps(describe(load_verify_corpus(args.corpus)), indent=1, ensure_ascii=False))
         elif args.command == "verify-controls":
             written = write_verify_controls(load_verify_corpus(args.corpus), args.out_dir)

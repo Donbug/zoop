@@ -19,6 +19,11 @@ SCHEMA_VERIFY_GOLD = "zoop-verify-gold-1"
 SCHEMA_VERIFY_RUN = "zoop-verify-run-1"
 SCHEMA_VERIFY_SCORE = "zoop-verify-score-1"
 SCHEMA_VERIFY_LOOPBACK = "zoop-verify-loopback-script-1"
+SCHEMA_SUMMARY_VERIFY_CASES = "zoop-summary-verify-cases-1"
+SCHEMA_SUMMARY_VERIFY_GOLD = "zoop-summary-verify-gold-1"
+SCHEMA_SUMMARY_VERIFY_RUN = "zoop-summary-verify-run-1"
+SCHEMA_SUMMARY_VERIFY_SCORE = "zoop-summary-verify-score-1"
+SCHEMA_SUMMARY_VERIFY_LOOPBACK = "zoop-summary-verify-loopback-script-1"
 
 SPLITS = ("dev", "test")
 TASK_KINDS = ("graph", "qa")

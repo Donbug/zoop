@@ -1,13 +1,14 @@
 # AI 그래프·검색·답변 벤치마크: 평가 하네스와 측정 계획
 
-**이 문서가 다루는 것.** 이미 기록된 출력과 trace를 사람이 따로 작성한 gold와 결정적으로 비교하는 평가 하네스(`ai/evaluation`), 그 지표 정의, 데이터 분리·gold 검수 방법, 공정한 baseline·경쟁 서비스 구분, 처음 측정할 계획, 승인 경계를 정한다.
+**이 문서가 다루는 것.** 기록된 출력과 trace를 별도로 작성한 gold와 결정적으로 비교하는 평가 하네스(`ai/evaluation`), 지표 정의, 데이터 분리·gold 검수 방법, baseline·경쟁 서비스의 비교 조건과 승인 경계를 정한다. gold의 작성 방식과 검수 수준은 각 corpus의 provenance를 따른다.
 
 **현재 상태 (사실).**
 
-- 하네스·합성 corpus·authored control·시험·smoke까지 구현했다. 모델·네트워크·그래프 DB 호출은 0이다.
-- 저장소에는 벡터 RAG, 그래프 순회 검색, 일반 채팅, Neo4j 검색·질의 경로가 **없다**(비공개 version stage `zoop-ai-graph`의 `read`/`focus`는 저장된 version을 검증해 읽는 기능이다). 이 도구의 호출 비용과 이웃 결과 정확성만 아래 “그래프 도구 baseline”의 합성 world에서 한 번 측정했다(“첫 측정”). 이는 검색·RAG·agent 시스템의 측정이 아니므로 그런 시스템에 대한 측정값은 **0건**이다. 그 외 지금 만들어지는 모든 점수는 하네스가 올바르게 채점하는지 확인하는 authored control의 값이며 벤치마크 결과가 아니다.
+- 순수 채점기는 모델·네트워크·DB를 호출하지 않는다. 실행 다리는 합성 loopback HTTP 검증과 별도 승인된 로컬 Neo4j 도구 측정을 지원한다. 아래 절에서 실제 실행 경계와 모의 응답을 구분한다.
+- 이 하네스에는 전체 벡터 RAG·일반 채팅·agent 답변 실행을 연결한 측정 결과가 없다. 그래프 도구 baseline은 호출 비용·이웃 결과 정확성만, 네이티브 이슈 요약 검증 다리는 검증 하위 단계의 기록·채점 정합성만 확인했다. 다른 팀의 구현 유무나 전체 서비스 품질을 이 상태로 단정하지 않는다.
 - gold는 합성 코퍼스에 대한 **단일 작성자 초안**이며 두 사람의 독립 라벨링·합의(adjudication)를 거치지 않았다(`adjudicated=false`, `annotators=1`). 여기서 나온 점수는 실제 데이터에 대한 정확도 주장이 아니다.
 - 자유 서술 답변의 의미 품질은 정확 일치로 판정할 수 없다. 사람 또는 모델 평가가 필요하며 이 하네스는 그 지표를 만들지 않는다(`freeText.status = human_or_model_evaluation_required`).
+- **2026-10-22 추가:** 본개발 `verify-issue-summary`의 요청·원문 응답·판정을 기록하고 독립 채점하는 네이티브 다리를 연결했다. 한국어 합성 24개 사례·30개 주장, 실제 로컬 HTTP 대조군, 중단 복구와 변조 거부를 검증했다. 실제 Jev 품질·생성 품질·전체 RAG 성능·임곗값 보정 결과는 아니다.
 
 ## 실행 명령
 
@@ -383,11 +384,64 @@ WBS는 변경하지 않았고 이 벤치마크는 독립 WBS 행·일정이 없�
 
 ## 한계와 아직 측정하지 않는 것
 
-- 실제 검색기·채팅이 없고 그래프 DB는 비공개 version stage(`zoop-ai-graph`)뿐이라 어떤 시스템의 점수도 없다. control은 채점기 점검이다.
+- 전체 검색·채팅·RAG·agent 답변의 실행 adapter와 품질 측정은 이 하네스에 아직 연결하지 않았다. 그래프 도구와 검증 하위 단계의 control 결과를 전체 시스템 점수로 확대하지 않는다.
 - gold는 단일 작성자 초안이며 합의를 거치지 않았다. 규모가 작아(split당 질문 9, 그래프 task 5, edge 13) 비율이 거칠다. 통계적 유의성 검정은 하지 않는다.
 - 자유 서술 품질, 인용의 의미적 뒷받침, 사실별 인용 귀속, 사용자 체감 품질은 측정하지 않는다.
-- 기존 그래프/QA corpus는 영어 합성 문장이다. 별도 `fin-verify-ko-v1`은 한국어 금융 합성 사례지만 단일 작성자·미합의 dev 자료이며, 실제 한국어 기사나 모델 품질을 검증한 것은 아니다.
+- 그래프/QA corpus는 영어 합성 문장이다. `fin-verify-ko-v1`과 `fin-summary-verify-ko-v1`은 한국어 합성 dev 자료이지만 단일 작성·미합의 자료이며 실제 기사나 모델 품질의 근거는 아니다. 특히 이슈 요약 corpus는 AI 보조 작성임을 명시한다.
 - trace의 시계(단조 시계)와 span 의미는 adapter가 보장해야 한다. 하네스는 일관성만 검사하고 측정이 정확한지는 알 수 없다.
 - replay 기록의 지연은 하네스 시간이며 모델·서비스 지연이 아니다.
 - 이 하네스(`zoop_eval`, `score`, `measure`)는 `ai/evaluation`에서만 동작하며 BFF·S1·S2·S3 코드를 import하지 않는다. 예외는 그래프 도구 baseline의 `prepare`·`cleanup`뿐이며, 파이프라인 인터프리터에서 `ai/pipeline/scripts`의 손으로 쓴 world 빌더를 import한다.
 - 그래프 도구 baseline은 합성 world 한 벌(기업 4)과 dev case 13+4개라 지연 분포는 호출 비용의 감각 이상이 아니며, 정확성은 도구가 문서화된 규칙대로 동작하는지의 확인이다. 모델·RAG·agent 품질, Neo4j 순회 성능, 방향 공급망 추론은 측정하지 않는다.
+
+## 네이티브 이슈 요약 검증: 기록·채점 연결 (2026-10-22)
+
+**목적과 범위.** `verify-issue-summary`가 각 주장과 세 검사 항목(advice·causality·framing)에 내린 판정을 기록하고 평가한다. 생성 모델은 호출하지 않으며 사건 추출·관계 생성·GraphDB 구성·검색·전체 RAG의 점수를 만들지 않는다. native runtime과 영수증 형식은 그대로 두고, S1의 `zoop-verify-*`와 구분되는 `zoop-summary-verify-{cases,gold,run,score}-1`을 사용한다.
+
+### 자료와 기대 판정
+
+`ai/evaluation/corpus/fin-summary-verify-ko-v1/cases.json`에는 전송 가능한 합성 인용문·주장만, `gold.json`에는 기대 판정·태그·근거 설명을 따로 둔다. 24개 사례·30개 주장으로 구성하며 기대 결과는 available 6개·hold 5개·reject 13개다. 주장은 supported 12개·insufficient 11개·contradicted 7개다.
+
+이는 AI 보조 단일 작성자의 dev 자료이며 사람의 독립 라벨링·합의를 거치지 않았다. 별도 AI 문서 검토로 일관성을 점검한 사실을 사람의 검수나 실제 모델 평가로 표시하지 않는다. 임곗값 학습·보정용 정답으로 확정한 자료도 아니다.
+
+미인용 구절이 있어도 유효한 입력이다. NS10·NS23은 그 구절에 필요한 사실이나 현재 보도가 있지만 해당 주장이 인용하지 않는 사례다. native 요청의 `state.quotes`에서는 미인용 구절이 빠져야 한다. 주장 자체가 그 구절과 같은 문장일 수 있으므로 전체 요청 문자열 검색이 아니라 구조로 검사한다. 다른 주장이 인용한 구절을 빌려 판단하는 오류도 별도 사례로 구분한다.
+
+### 기록과 재검증
+
+생산자 `ai/pipeline/scripts/summary_verify_bench.py`는 실제 `LiveRuntime`의 ISSUE_SUMMARY family를 사용한다. `prepare` → 전송 의도 기록 → `send` → 원문 receipt 저장 → `answer` 순서이며 사례당 한 번만 요청하고 자동 재시도하지 않는다. producer·assemble은 gold를 열지 않는다. 실제 loopback smoke도 생산 과정이 끝난 뒤에만 gold를 읽어 채점한다.
+
+새 run 디렉터리와 파일은 비공개 권한으로 만들고, 파일 쓰기는 같은 디렉터리의 staging 파일을 fsync한 뒤 덮어쓰지 않는 원자적 게시로 완료한다. 중단된 staging 파일은 완성된 기록으로 읽지 않는다. 의도만 있고 결과가 없으면 `bench_outcome_unrecorded/unknown`, 뒤의 미시도 사례는 `bench_not_attempted/definite`로 남긴다. receipt가 온전히 저장됐다면 결과 기록이 없어도 키·전송 없이 다시 해석할 수 있다. 완성된 이름으로 게시됐는데 손상된 기록은 복구를 가장해 무시하지 않고 거절한다.
+
+채점기 `summary_verification.py`는 pipeline을 import하지 않는 표준 라이브러리 구현이다. 보이는 입력으로 요청·인용 범위·질문을 다시 만들고 공개 adapter preimage·binding·원문 응답·usage·비용·정규화 판정을 대조한다. 누락·중복·변조·출처 위조가 있으면 부분 점수 없이 거절한다. 모든 body hash를 확인하므로 원래 잘못된 UTF-8 바이트가 capture에서 대체 문자로 바뀌어 복원되지 않는 기록은 `receipt_body_mismatch`로 채점할 수 없다. 해시는 내부 정합성 검사이지 실행이나 공급자 출처의 암호학적 인증은 아니다.
+
+### 지표 해석
+
+| 구역 | 의미와 분모 |
+|---|---|
+| 주장 | 세 판정의 confusion·정확도·precision/recall/F1·macro-F1, 근거가 부족하거나 모순인 주장을 supported로 통과시킨 비율. 오류 사례의 주장도 gold 쪽 분모에 남긴다. |
+| 세 검사 | advice·causality·framing의 present/absent/uncertain/unscored 구분, present의 precision·recall, 오탐·불확실·미채점 수. |
+| 검증 결과 | available/hold/reject/error의 정확도와 confusion, `unsafeAvailable`, 클래스별 recall. `availableCoverage`는 전체 사례 중 available 비율이며 안전한 사례만의 recall과 다르다. `availablePrecision`은 available 중 기대 결과도 available인 비율이다. |
+| 오류 | 오류 코드·단계별 개수와 definite/unknown 구분. 통신·형식 오류를 hold/reject 또는 빈 성공으로 바꾸지 않는다. |
+| 지연 | `perf_counter_ns`로 측정한 `send()` 구간이다. 예산 예약·전송 직전 확인·네트워크·정산을 포함하며 모델 추론 시간은 아니다. 오류 지연도 별도로 보존한다. |
+| 비용 | 보수적 runtime 추정액, receipt로 확인한 예산 반영액, 결과 미상의 최대 예약 위험액, 실제 청구액을 분리한다. 실제 provider 청구는 `unknown/null`, 소유한 loopback 모의 서버만 `loopback_no_charge=0`이다. |
+
+`authorizedOffsetNs`는 전송 직전 callback이 실행됐다는 뜻이지 provider 수신 증거가 아니다. HTTP 응답이 저장된 경우와 전송 결과 미상을 구분한다. 날짜 문자열의 차이로 지연을 만들지 않는다. 금액 추정은 청구서가 아니며 unknown을 0으로 채우지 않는다.
+
+순위·우승 모델·합격 기준·calibration은 산출하지 않는다. `comparisonKey`는 corpus/gold·stage·adapter·정책·모델·실행 종류의 비교 조건을 식별할 뿐이다. 단일 합성 실행의 시간으로 모델이나 전체 서비스의 속도를 비교하지 않는다.
+
+### 재현과 관측 증거
+
+실행 명령과 파일 형식은 [evaluation README](../../ai/evaluation/README.md)의 네이티브 이슈 요약 검증 절과 [pipeline README](../../ai/pipeline/README.md)의 recorder 절을 따른다.
+
+```sh
+ai/pipeline/.venv/bin/python ai/pipeline/scripts/summary_verify_bench.py smoke
+```
+
+2026-10-22 로컬 검증에서 정상·의도적 오류 대조군 각각 24개 사례가 실제 native runtime과 loopback HTTP를 통과했다. 제어 요청 48회와 중단 시험 요청 3회가 관측됐고 외부 provider·모델 호출은 0이었다. 의도적 오류 대조군은 주장 22/30·검증 결과 14/24 일치, 오류 5건(결과 미상 1건)을 재현했다. 이는 넣어 둔 오답·실패를 도구가 제대로 검출했다는 증거이지 Jev의 정확도가 아니다.
+
+전송 의도·receipt·결과 파일의 게시 전 중단을 포함한 5개 중단 경계, 변조 28종, live 실행 선행 조건 거부 7종을 확인했다. 영수증 쓰기를 중단하면 복구가 막히던 문제를 실패 3건으로 재현한 뒤 원자적 게시로 수정했다. usage 상한·오류 우선순위와 과대 지연 정수의 구조화된 거부도 회귀로 확인했다. evaluation 전체 213개, recorder 13개, pipeline 전체 1,982개가 통과했고 기존 S1 verification loopback 경로도 통과했다.
+
+### 실제 모델 실험 전 조건
+
+Live 경로는 구현했지만 이번 작업에서 실행하지 않았다. 실행마다 대상·자료·모델·호출 수·금액 상한의 별도 승인이 필요하다. CLI도 명시적인 live 모드, 저장소에 고정된 합성 corpus의 digest 확인, 기존 live gate·모델 설정, 새 예산 디렉터리와 지정된 provider endpoint를 요구한다. `.env`는 읽지 않으며 `--check`는 파일·전송 없이 설정과 키 존재 여부만 확인한다. 설정이나 `--check` 통과가 지출 승인은 아니다.
+
+실제 기사·외부 서비스·경쟁 모델·test split·임곗값 보정·외부 결과 공개는 이 작업에 포함되지 않았다. 새 CI job·의존성·자격증명·서비스 배포를 추가하지 않았고 WBS 담당·일정·진척률도 변경하지 않았다.
