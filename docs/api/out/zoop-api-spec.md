@@ -806,7 +806,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getGraph · 전체·개인화·시점별 관계 그래프 조회
 
-기업/이슈 노드만 제공한다. 전체 모드에는 개인 정보가 없고 개인화 모드는 회원 본인만 허용한다. 필터 결과의 기준 기업은 관계 0건이어도 유지한다. 국내/국제 속성이 없는 이슈는 공개 검증에서 제외/보완하며 임의로 값을 만들지 않는다. asOf/graphVersion/round를 고정하고 관계 0건·기준 기업 0개·장애를 구분한다.
+기업/이슈 노드만 제공한다. 전체 모드에는 개인 정보가 없고 개인화 모드는 회원 본인만 허용한다. 필터 결과의 기준 기업은 관계 0건이어도 유지한다. 국내/국제 속성이 없는 이슈는 공개 검증에서 제외/보완하며 임의로 값을 만들지 않는다. asOf/graphVersion/round를 고정하고 관계 0건·기준 기업 0개·장애를 구분한다. 개인화 조회에서 선택한 범위에 기준 기업이 없으면 emptyReason=no_personal_stocks와 빈 노드·간선을 반환한다. 전체 시장은 mode=all로 별도 조회한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -4836,7 +4836,7 @@ same request again never toggles anything.
 | graphVersion | 필수 | string, null | 공개 데이터는 반드시 실제 사용한 버전 ID를 제공한다. 개인 설정 등 비그래프 리소스만 null이다. |
 | mode | 필수 | string {all, personal} |  |
 | truncated | 필수 | boolean |  |
-| emptyReason | 필수 | string / null |  |
+| emptyReason | 필수 | string / null | null은 빈 결과 사유 없음. no_personal_stocks는 개인화 조회에서 선택한 범위의 기준 기업이 없음(다른 범위에는 있을 수 있음), no_related_issues는 기준 기업은 있지만 관련 관계가 없음, no_approved_issues는 공개할 사건이 없음. 장애는 이 값 대신 오류 응답을 사용한다. |
 | focusCompanyIds | 필수 | string[] |  |
 | depth | 필수 | integer / null | Requested hop count; null when omitted (whole connected component). |
 | limit | 필수 | integer |  |
