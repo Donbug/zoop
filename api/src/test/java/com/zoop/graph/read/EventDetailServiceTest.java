@@ -10,8 +10,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -254,9 +258,84 @@ class EventDetailServiceTest {
 
     @Test
     void aReceiptThatDoesNotKnowTheIssueIsUnavailable() {
-        EventDetailService service = imported(StrictJson.parseObject("{\"issues\":[]}"));
+        EventDetailService service = imported(StrictJson.parseObject(
+                "{\"schemaVersion\":\"zoop-graph-handoff-bundle-5\",\"issues\":[]}"));
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
                 () -> service.get(EUV, null, null, null, "r")).getErrorCode());
+    }
+
+    // ---- current rights, exclusions, article versions and old receipts (PR #278 review) --------------------------------
+
+    private static final String TSM_EVIDENCE = "ev-2efb74012127277470344892d9ba439c77a42180b4538d86c319d643bfefbc62";
+
+    @Test
+    void aWithdrawnCitationTakesItsRelationAndCompanyButNotTheEvent() {
+        EventDetailService service = imported(bundle(false));
+        when(receipts.readable(eq(TSM_EVIDENCE), anyString(), any(), anyString())).thenReturn(false);
+
+        EventDetail detail = service.get(EUV, null, null, null, "r");
+
+        assertFalse(detail.evidenceIds().contains(TSM_EVIDENCE));
+        assertTrue(detail.relations().stream().noneMatch(r -> r.target().equals("NYSE:TSM")));
+        assertTrue(detail.companies().stream().noneMatch(c -> c.id().equals("NYSE:TSM")));
+        assertEquals(List.of(M1, M2), detail.mentions().stream().map(MentionOut::mentionId).toList(),
+                "their own citation is still readable");
+    }
+
+    @Test
+    void whenTheRepresentativeMentionsEvidenceIsWithdrawnAtAPastAsOfTheEventIsNotFound() {
+        EventDetailService service = imported(bundle(false));
+        // Both mentions cite only VISIBLE_EVIDENCE (the other id is not in this version): withdrawing it leaves no head.
+        when(receipts.readable(eq(VISIBLE_EVIDENCE), anyString(), any(), anyString())).thenReturn(false);
+        Instant past = Instant.parse("2026-10-01T00:00:00Z");
+
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, assertThrows(CustomException.class,
+                () -> service.get(EUV, null, null, "2026-10-01T00:00:00Z", "r")).getErrorCode());
+        // Judged at the pinned version and the requested asOf, the same gates a citation read uses.
+        verify(receipts).readable(VISIBLE_EVIDENCE, "gv-imported", past, "r");
+    }
+
+    @Test
+    void anExcludedCitationLeavesTheDetailLikeTheGraph() {
+        EventDetail detail = imported(bundle(false), List.of(),
+                new DisclosureExclusions(1, java.util.Set.of(), java.util.Set.of(), java.util.Set.of(TSM_EVIDENCE)))
+                .get(EUV, null, null, null, "r");
+
+        assertFalse(detail.evidenceIds().contains(TSM_EVIDENCE));
+        assertTrue(detail.relations().stream().noneMatch(r -> r.target().equals("NYSE:TSM")));
+        verify(receipts, never()).readable(eq(TSM_EVIDENCE), anyString(), any(), anyString());
+    }
+
+    @Test
+    void anotherVersionOfTheSameArticleIsNotThisEventsArticle() {
+        // Another issue may cite art-euv-export v2; this one cites only v1.
+        var v2 = new PublicGraphSnapshot.Article(EUV_ARTICLE, "v2", "later text", "https://example.invalid/v2",
+                "2026-09-29T00:00:00Z");
+
+        EventDetail detail = imported(bundle(false), List.of(v2), DisclosureExclusions.NONE).get(EUV, null, null, null, "r");
+
+        assertEquals(List.of("v1"), detail.articles().stream().map(a -> a.url().endsWith("/v2") ? "v2" : "v1").toList());
+    }
+
+    @Test
+    void anOlderReceiptSchemaIsUnavailableNotEmpty() {
+        for (String schema : new String[] {"zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-3",
+                "zoop-graph-handoff-bundle-4"}) {
+            String old = bundle(false).node().toString().replace("zoop-graph-handoff-bundle-5", schema);
+            assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                    () -> imported(StrictJson.parseObject(old)).get(EUV, null, null, null, "r")).getErrorCode(), schema);
+        }
+        String unnamed = bundle(false).node().toString().replace("\"schemaVersion\":\"zoop-graph-handoff-bundle-5\",", "");
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> imported(StrictJson.parseObject(unnamed)).get(EUV, null, null, null, "r")).getErrorCode());
+    }
+
+    @Test
+    void anAsOfBeforeOneOfTheEventsArticlesHidesTheWholeEvent() {
+        // The filter keeps an issue only when every article is published by asOf (GraphSnapshotFilter): never a partial head.
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, assertThrows(CustomException.class,
+                () -> imported(bundle(false)).get(EUV, null, null, "2026-09-28T03:29:59Z", "r")).getErrorCode());
+        assertEquals(EUV, imported(bundle(false)).get(EUV, null, null, "2026-09-28T03:30:00Z", "r").id());
     }
 
     /**
@@ -264,7 +343,14 @@ class EventDetailServiceTest {
      * formula the import uses, so the receipt mentions below resolve to them.
      */
     private EventDetailService imported(StrictJson.Obj bundle) {
+        return imported(bundle, List.of(), DisclosureExclusions.NONE);
+    }
+
+    private EventDetailService imported(StrictJson.Obj bundle, List<PublicGraphSnapshot.Article> extraArticles,
+            DisclosureExclusions exclusions) {
         if (bundle != null) when(receipts.graphImportBundle(anyString(), anyString())).thenReturn(bundle);
+        // Every citation is readable now unless a test withdraws one.
+        when(receipts.readable(anyString(), anyString(), any(), anyString())).thenReturn(true);
         PublicGraphSnapshot base = GraphReadFixtures.snapshot("fixture-2026-10-08");
         List<Issue> issues = base.issues().stream().map(i -> !i.issueId().equals(EUV) ? i : new Issue(i.issueId(),
                 i.label(), i.eventTime(), i.timePrecision(), i.period(), i.assertionStatus(), i.action(), i.target(),
@@ -272,7 +358,8 @@ class EventDetailServiceTest {
                 List.of(new MentionRef(M1, EUV_ARTICLE, "v1"), new MentionRef(M2, EUV_ARTICLE, "v1")), M1,
                 i.latestPublishedAt())).toList();
         PublicGraphSnapshot snapshot = new PublicGraphSnapshot(base.snapshotFormat(), base.versionId(), base.sourceBundleId(),
-                base.companies(), issues, base.relations(), base.articles(), base.evidence());
+                base.companies(), issues, base.relations(),
+                java.util.stream.Stream.concat(base.articles().stream(), extraArticles.stream()).toList(), base.evidence());
         GraphVersionRecord record = new GraphVersionRecord("gv-imported", 2, "snapshot", "artifact-gv", "artifact:gv",
                 "a".repeat(64), true);
         GraphVersionRepository versions = new GraphVersionRepository() {
@@ -282,14 +369,14 @@ class EventDetailServiceTest {
             public boolean everActivated(String id) { return record.id().equals(id); }
         };
         PublicGraphReader reader = new PublicGraphReader(new GraphVersionSelector(versions, Clock.fixed(NOW, ZoneOffset.UTC)),
-                version -> snapshot, () -> DisclosureExclusions.NONE);
+                version -> snapshot, () -> exclusions);
         return new EventDetailService(reader, receipts, registry);
     }
 
     /** The parts of an AI handoff bundle getEvent reads; values a verdict holds or rejects are marked so a leak is visible. */
     private static StrictJson.Obj bundle(boolean allBackground) {
         return StrictJson.parseObject("""
-                {"issues":[{"id":"%s",
+                {"schemaVersion":"zoop-graph-handoff-bundle-5","issues":[{"id":"%s",
                   "mentions":[
                     {"documentId":"d1","documentVersion":"dv1","mentionId":"m1","articleId":"%s","articleVersion":"v1",
                      "title":"m1 title","action":"export","target":"EUV","eventTime":"2026-09","timePrecision":"month",

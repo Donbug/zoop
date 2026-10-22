@@ -49,8 +49,10 @@ public class EventController {
     @Operation(operationId = "getEvent", summary = "사건 상세와 근거 참조 조회",
             description = "공개 그래프 버전 하나를 고정해(round·asOf·graphVersion은 그래프 조회와 같은 규칙) 그 버전에서 보이는 사건 하나를 반환합니다. "
                     + "관계·기업·기사·선후 사건(follows)은 스냅샷에서, 원본 언급(mentions)·운영자 필드 판정(fieldDecisions)·출처 지지도(sourceSupport)는 "
-                    + "수입한 버전의 receipt(AI 인계 묶음)에서 읽습니다. 운영자가 보류·거절한 언급의 시각·기간은 null입니다. summary는 아직 생산자가 없어 "
-                    + "unavailable이고 approval은 null입니다. 그 버전에서 보이지 않는 사건 404, 잘못된 입력 422, 고정 버전 없음 409, 스냅샷·receipt 읽기 실패 503입니다.")
+                    + "수입한 버전의 receipt(AI 인계 묶음)에서 읽습니다. 수입한 버전은 근거마다 현재 공개 게이트(기사 접근·source grant)를 다시 적용해 "
+                    + "읽을 수 없는 근거에 기대는 언급·기사·관계를 빼고, 대표 언급의 근거가 모두 가려지면 404입니다. 운영자가 보류·거절한 언급의 "
+                    + "시각·기간은 null입니다. summary는 아직 생산자가 없어 unavailable이고 approval은 null입니다. 그 버전에서 보이지 않는 사건 404, "
+                    + "잘못된 입력 422, 고정 버전 없음 409, 스냅샷·receipt 읽기 실패와 이전 인계 묶음 스키마 503입니다.")
     public EventDetail getEvent(@PathVariable String id, @RequestParam(required = false) String round,
             @RequestParam(required = false) String graphVersion, @RequestParam(required = false) String asOf,
             HttpServletRequest request) {

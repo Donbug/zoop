@@ -52,6 +52,8 @@ public class EventDetailService {
     static final String SUMMARY_UNAVAILABLE = "사건 요약은 아직 제공되지 않습니다.";
     private static final String IMPORTED = "snapshot";
     private static final Set<String> WITHHELD = Set.of("HOLD", "REJECT");
+    /** The only receipt bundle schema whose mentions and field verdicts this service reads. */
+    private static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-5";
 
     private final PublicGraphReader reader;
     private final EvidenceService receipts;
@@ -64,7 +66,8 @@ public class EventDetailService {
     }
 
     public EventDetail get(String id, String round, String graphVersion, String asOf, String requestId) {
-        PublicGraphReader.Pinned pinned = reader.read(round, graphVersion, parseInstant(asOf));
+        Instant at = parseInstant(asOf);
+        PublicGraphReader.Pinned pinned = reader.read(round, graphVersion, at);
         DisplayGraph graph = pinned.graph();
         Issue issue = graph.issues.get(id);
         if (issue == null) throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
@@ -74,26 +77,56 @@ public class EventDetailService {
         Obj handoff = IMPORTED.equals(pinned.selected().version().kind())
                 ? handoffIssue(receipts.graphImportBundle(versionId, requestId), id) : null;
 
-        Set<String> visibleEvidence = snapshot.evidence().stream().map(PublicGraphSnapshot.Evidence::evidenceId)
-                .collect(Collectors.toSet());
-        Map<String, Obj> mentionsById = handoff == null ? Map.of() : mentionsById(handoff, issue);
+        // The issue's evidence the filtered snapshot still shows (asOf, exclusions). An imported version also keeps only what
+        // is readable right now under the evidence gates (article access, source grant, registry): the snapshot filter never
+        // looks at current rights, and the receipt's original text must not outlive them.
+        List<Relation> touching = snapshot.relations().stream()
+                .filter(r -> r.source().equals(id) || r.target().equals(id)).toList();
+        Set<String> own = new HashSet<>(issue.evidenceIds());
+        own.addAll(issue.geographyEvidenceIds());
+        Set<String> cited = new HashSet<>(own);
+        touching.forEach(r -> cited.addAll(r.evidenceIds()));
+        Map<String, PublicGraphSnapshot.Evidence> readable = new LinkedHashMap<>();
+        for (PublicGraphSnapshot.Evidence e : snapshot.evidence()) {
+            if (cited.contains(e.evidenceId())
+                    && (handoff == null || receipts.readable(e.evidenceId(), versionId, at, requestId))) {
+                readable.put(e.evidenceId(), e);
+            }
+        }
+        Map<String, Obj> mentionsById = handoff == null ? Map.of() : mentionsById(handoff, issue, readable.keySet());
+        // The head values (label, time, period) are the representative mention's: with none of its evidence readable they
+        // cannot be shown, and a partial head would still rest on hidden text. Closed like an issue this read does not show.
+        if (handoff != null && (!mentionsById.containsKey(issue.representativeMentionId())
+                || issue.evidenceIds().stream().noneMatch(readable::containsKey))) {
+            throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
         Map<String, String> appIds = appIds(mentionsById);
         Map<String, Set<String>> withheld = handoff == null ? Map.of() : withheld(handoff, appIds);
 
-        List<Relation> relations = snapshot.relations().stream()
-                .filter(r -> r.source().equals(id) || r.target().equals(id)).toList();
+        // A relation whose evidence is not all readable now is left out, as the snapshot filter does for evidence it hides.
+        List<Relation> relations = touching.stream().filter(r -> readable.keySet().containsAll(r.evidenceIds())).toList();
+        List<ArticleOut> articles = articles(snapshot,
+                readable.values().stream().filter(e -> own.contains(e.evidenceId())).toList(), mentionsById);
         Metadata metadata = new Metadata("public_graph_snapshot", pinned.selected().asOf(), versionId, requestId, true,
                 List.of(new SectionFailure("summary", "SUMMARY_NOT_PRODUCED", SUMMARY_UNAVAILABLE, false,
                         pinned.selected().asOf())));
         return new EventDetail(issue.label(), id, issue.eventTime(), issue.timePrecision(), issue.period(),
-                mentions(mentionsById, withheld, visibleEvidence), articles(snapshot, issue, mentionsById),
+                mentions(mentionsById, withheld, readable.keySet()), articles,
                 relations.stream().map(EventDetailService::relation).toList(), companies(graph, id, relations),
-                sourceSupport(handoff, issue), fieldDecisions(handoff, appIds), issue.evidenceIds(),
+                sourceSupport(handoff, articles.stream().map(ArticleOut::id).toList()), fieldDecisions(handoff, appIds),
+                issue.evidenceIds().stream().filter(readable::containsKey).toList(),
                 follows(graph, id, relations), null, new Unavailable("unavailable", SUMMARY_UNAVAILABLE), metadata);
     }
 
-    /** The handoff issue behind this snapshot issue (same id); its absence means the receipt does not describe the version. */
+    /**
+     * The handoff issue behind this snapshot issue (same id); its absence means the receipt does not describe the version. Only
+     * the current bundle schema carries the mentions and verdicts read here: an older receipt ({@code -1} has no mentions,
+     * {@code -2}/{@code -3} no field verdicts) is SOURCE_UNAVAILABLE, never read as empty lists.
+     */
     private static Obj handoffIssue(Obj bundle, String issueId) {
+        if (!bundle.has("schemaVersion") || !BUNDLE_SCHEMA.equals(bundle.string("schemaVersion"))) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        }
         for (Obj candidate : bundle.objects("issues")) {
             if (issueId.equals(candidate.string("id"))) return candidate;
         }
@@ -102,15 +135,18 @@ public class EventDetailService {
 
     /**
      * Receipt mentions keyed by their app id, in handoff order, kept only when the filtered snapshot still references them (an
-     * article published after asOf takes its mentions with it).
+     * article published after asOf takes its mentions with it) and at least one of their evidence is readable now: a mention
+     * whose every citation was withdrawn or excluded is the withdrawn text itself.
      */
-    private static Map<String, Obj> mentionsById(Obj handoff, Issue issue) {
+    private static Map<String, Obj> mentionsById(Obj handoff, Issue issue, Set<String> readable) {
         Set<String> visible = issue.mentions().stream().map(MentionRef::mentionId).collect(Collectors.toSet());
         Map<String, Obj> byId = new LinkedHashMap<>();
         for (Obj mention : handoff.objects("mentions")) {
             String appId = MentionIds.of(mention.string("articleId"), mention.string("articleVersion"),
                     mention.string("mentionId"));
-            if (visible.contains(appId)) byId.put(appId, mention);
+            if (visible.contains(appId) && mention.strings("evidenceIds").stream().anyMatch(readable::contains)) {
+                byId.put(appId, mention);
+            }
         }
         return byId;
     }
@@ -162,13 +198,15 @@ public class EventDetailService {
     }
 
     /**
-     * The issue's visible articles, newest first. publisher comes from the stored article version (the handoff carries none).
-     * relationType: PROVIDES_BACKGROUND when every visible mention of that article is background, REPORTS otherwise, null
-     * without mentions (a synthetic fixture).
+     * The articles the issue's readable evidence cites, by exact (article, version): the same article in another version
+     * belongs to whatever issue cites that version. Newest first. publisher comes from the stored article version (the handoff
+     * carries none). relationType: PROVIDES_BACKGROUND when every visible mention of that article is background, REPORTS
+     * otherwise, null without mentions (a synthetic fixture, or an article cited only for geography).
      */
-    private List<ArticleOut> articles(PublicGraphSnapshot snapshot, Issue issue, Map<String, Obj> mentionsById) {
-        Set<String> ids = new HashSet<>(issue.articleIds());
-        return snapshot.articles().stream().filter(a -> ids.contains(a.articleId()))
+    private List<ArticleOut> articles(PublicGraphSnapshot snapshot, java.util.Collection<PublicGraphSnapshot.Evidence> evidence,
+            Map<String, Obj> mentionsById) {
+        Set<String> pairs = evidence.stream().map(e -> e.articleId() + "@" + e.articleVersion()).collect(Collectors.toSet());
+        return snapshot.articles().stream().filter(a -> pairs.contains(a.articleId() + "@" + a.version()))
                 .sorted(Comparator.comparing((Article a) -> DisplayGraph.publishedAt(a.publishedAt()),
                         Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(Article::articleId))
                 .map(a -> new ArticleOut(a.title(), a.articleId(),
@@ -206,12 +244,13 @@ public class EventDetailService {
     }
 
     /**
-     * Copied from the handoff issue (AI: copy, never recompute) when every article it counted is still visible. When asOf hid some,
-     * the visible part only: counts that depend on hidden articles become null (unknown), lists keep visible members. A synthetic
-     * fixture declares no origins, so every article's lineage is unknown.
+     * Copied from the handoff issue (AI: copy, never recompute) when every article it counted is still shown. When some are not
+     * (current rights withdrew their evidence, or an exclusion hid it), the shown part only: counts that depend on hidden
+     * articles become null (unknown), lists keep shown members. A synthetic fixture declares no origins, so every article's
+     * lineage is unknown.
      */
-    private static SourceSupportOut sourceSupport(Obj handoff, Issue issue) {
-        List<String> visible = issue.articleIds().stream().distinct().sorted().toList();
+    private static SourceSupportOut sourceSupport(Obj handoff, List<String> shownArticleIds) {
+        List<String> visible = shownArticleIds.stream().distinct().sorted().toList();
         if (handoff == null) return new SourceSupportOut(visible.size(), null, visible, null, List.of());
         Obj support = handoff.object("sourceSupport");
         List<String> unknown = support.strings("unknownLineageArticles");
