@@ -153,6 +153,17 @@ class GraphQueryServiceTest {
     }
 
     @Test
+    void aCompanyBothHeldAndWatchedIsOneNodeWithBothFlags() {
+        var both = new PersonalCompanies.Ids(List.of(HYNIX), List.of(HYNIX, NVDA));
+        GraphResponse r = service.getGraph("personal", null, 1, null, null, null, null, both, "p");
+        // FS017 ④⑤: the union keeps one focus entry and one node, which shows holding and watch together.
+        assertEquals(List.of(HYNIX, NVDA), r.metadata().focusCompanyIds());
+        var hynix = r.nodes().stream().filter(n -> n.id().equals(HYNIX)).toList();
+        assertEquals(1, hynix.size());
+        assertTrue(hynix.getFirst().holding() && hynix.getFirst().watch() && hynix.getFirst().isFocus());
+    }
+
+    @Test
     void personalFilterNarrowsTheFocusAndCompanyIdRecentres() {
         assertEquals(List.of(NVDA), service.getGraph("personal", null, 1, null, null, null, "watchlist", MINE, "p")
                 .metadata().focusCompanyIds());
