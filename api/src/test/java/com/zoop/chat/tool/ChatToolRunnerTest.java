@@ -135,7 +135,8 @@ class ChatToolRunnerTest {
         var runner = runner(Map.of(ChatCapability.COMPANY_READ, (scope, request) -> {
             peak.accumulateAndGet(running.incrementAndGet(), Math::max);
             try {
-                await(release);
+                // Ignores the timeout's interrupt, as a blocked driver call might: it keeps its slot.
+                while (release.getCount() > 0) Thread.onSpinWait();
             } finally {
                 running.decrementAndGet();
             }
@@ -177,18 +178,102 @@ class ChatToolRunnerTest {
         assertEquals(List.of("tc-0"), control.started);
     }
 
+    @Test
+    void recordsThatCannotBeMadeInTimeStopTheRunInsteadOfHoldingIt() {
+        var control = new RecordingControl(Duration.ofSeconds(60));
+        control.finishDelay = Duration.ofSeconds(5);
+        var runner = runner(Map.of(ChatCapability.COMPANY_READ, (scope, request) -> output("v1", List.of())),
+                Duration.ofMillis(300), Duration.ofMillis(200), Duration.ofMillis(200), ChatToolRunner.MAX_IN_FLIGHT);
+        long start = System.nanoTime();
+        assertThrows(ChatRunSuperseded.class, () -> runner.runStage(run("v1", null), control, 1,
+                List.of(request("company.read"))));
+        assertTrue(Duration.ofNanos(System.nanoTime() - start).toMillis() < 2_000,
+                "the stage waits at most its end plus the record grace");
+    }
+
+    @Test
+    void aCallWhoseStartWasRecordedAfterTheStageEndedIsNotMade() {
+        var control = new RecordingControl(Duration.ofSeconds(60));
+        control.startDelay = Duration.ofMillis(400);
+        var calls = new AtomicInteger();
+        var runner = runner(Map.of(ChatCapability.COMPANY_READ, (scope, request) -> {
+            calls.incrementAndGet();
+            return output("v1", List.of());
+        }), Duration.ofMillis(300), Duration.ofMillis(200));
+        var results = runner.runStage(run("v1", null), control, 1, List.of(request("company.read")));
+        assertEquals(ChatToolRunner.TIMEOUT, results.getFirst().error());
+        assertEquals(0, calls.get());
+        assertEquals(ChatToolCallEnd.failed(ChatToolRunner.TIMEOUT), control.ends.get("tc-0"));
+    }
+
+    @Test
+    void aTimedOutReadIsInterruptedAndGivesItsSlotBack() {
+        var interrupted = new AtomicInteger();
+        var runner = runner(Map.of(ChatCapability.COMPANY_READ, (scope, request) -> {
+            try {
+                Thread.sleep(10_000);
+            } catch (InterruptedException stop) {
+                interrupted.incrementAndGet();
+                throw new ChatToolUnavailable("interrupted");
+            }
+            return output("v1", List.of());
+        }, ChatCapability.ISSUE_READ, (scope, request) -> output("v1", List.of())), Duration.ofSeconds(2),
+                Duration.ofMillis(200), ChatToolRunner.RECORD_GRACE, 1);
+
+        var first = runner.runStage(run("v1", null), new RecordingControl(Duration.ofSeconds(60)), 1,
+                List.of(request("company.read")));
+        assertEquals(ChatToolRunner.TIMEOUT, first.getFirst().error());
+        // With a single runner-wide slot, the next job can read only because the interrupted read really ended.
+        var next = runner.runStage(run("v1", null), new RecordingControl(Duration.ofSeconds(60)), 1,
+                List.of(request("issue.read")));
+        assertTrue(next.getFirst().succeeded());
+        assertEquals(1, interrupted.get());
+    }
+
+    @Test
+    void readsThatIgnoreTheirTimeoutKeepRunnerWideSlotsSoLaterJobsCannotPileUp() {
+        var release = new CountDownLatch(1);
+        var later = new AtomicInteger();
+        var runner = runner(Map.of(ChatCapability.COMPANY_READ, (scope, request) -> {
+            // A read that ignores interruption, as a blocked driver call might.
+            while (release.getCount() > 0) Thread.onSpinWait();
+            return output("v1", List.of());
+        }, ChatCapability.ISSUE_READ, (scope, request) -> {
+            later.incrementAndGet();
+            return output("v1", List.of());
+        }), Duration.ofMillis(400), Duration.ofMillis(150), ChatToolRunner.RECORD_GRACE, 4);
+
+        var stuck = runner.runStage(run("v1", null), new RecordingControl(Duration.ofSeconds(60)), 1,
+                Collections.nCopies(4, request("company.read")));
+        assertTrue(stuck.stream().allMatch(r -> ChatToolRunner.TIMEOUT.equals(r.error())));
+        var blocked = runner.runStage(run("v1", null), new RecordingControl(Duration.ofSeconds(60)), 1,
+                List.of(request("issue.read")));
+        assertEquals(ChatToolRunner.TIMEOUT, blocked.getFirst().error(), "the four stuck reads still hold the slots");
+        assertEquals(0, later.get());
+
+        release.countDown();
+        var free = runner.runStage(run("v1", null), new RecordingControl(Duration.ofSeconds(60)), 1,
+                List.of(request("issue.read")));
+        assertTrue(free.getFirst().succeeded());
+    }
+
     private ChatToolRunner runner(Map<ChatCapability, ChatToolFunction> tools) {
         return runner(tools, ChatToolRunner.STAGE_LIMIT, ChatToolRunner.CALL_LIMIT);
     }
 
     private ChatToolRunner runner(Map<ChatCapability, ChatToolFunction> tools, Duration stage, Duration call) {
+        return runner(tools, stage, call, ChatToolRunner.RECORD_GRACE, ChatToolRunner.MAX_IN_FLIGHT);
+    }
+
+    private ChatToolRunner runner(Map<ChatCapability, ChatToolFunction> tools, Duration stage, Duration call,
+            Duration recordGrace, int maxInFlight) {
         List<ChatTool> adapters = tools.entrySet().stream().map(e -> (ChatTool) new ChatTool() {
             public ChatCapability capability() { return e.getKey(); }
             public ChatToolOutput read(ChatToolScope scope, ChatToolRequest request) {
                 return e.getValue().read(scope, request);
             }
         }).toList();
-        var runner = new ChatToolRunner(new ChatToolRegistry(adapters), stage, call);
+        var runner = new ChatToolRunner(new ChatToolRegistry(adapters), stage, call, recordGrace, maxInFlight);
         runners.add(runner);
         return runner;
     }
@@ -212,6 +297,15 @@ class ChatToolRunnerTest {
                 asOf, Instant.now().plusSeconds(60));
     }
 
+    private static void pause(Duration duration) {
+        if (duration.isZero()) return;
+        try {
+            Thread.sleep(duration.toMillis());
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private static void await(CountDownLatch latch) {
         try {
             latch.await(5, TimeUnit.SECONDS);
@@ -228,6 +322,9 @@ class ChatToolRunnerTest {
         final Map<String, ChatToolCallEnd> ends = new ConcurrentHashMap<>();
         final Duration remaining;
         int supersededAfterStarts = Integer.MAX_VALUE;
+        /** How long recording a start or an end takes, as a slow or locked database would. */
+        Duration startDelay = Duration.ZERO;
+        Duration finishDelay = Duration.ZERO;
 
         RecordingControl(Duration remaining) {
             this.remaining = remaining;
@@ -252,11 +349,13 @@ class ChatToolRunnerTest {
         @Override
         public void toolCallStarted(String toolCallId) {
             if (started.size() >= supersededAfterStarts) throw new ChatRunSuperseded();
+            pause(startDelay);
             started.add(toolCallId);
         }
 
         @Override
         public void toolCallFinished(String toolCallId, ChatToolCallEnd end) {
+            pause(finishDelay);
             ends.put(toolCallId, end);
         }
     }

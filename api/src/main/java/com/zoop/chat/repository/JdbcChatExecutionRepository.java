@@ -2,6 +2,7 @@ package com.zoop.chat.repository;
 
 import java.sql.Array;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -113,6 +114,12 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
                 + "attempts = CAST(:attempts AS jsonb), finished_at = :at, updated_at = :at, " + RELEASE
                 + " WHERE id = :id AND status = 'running' AND lease_until <= :at", new MapSqlParameterSource().addValue("id", jobId).addValue("at", Timestamp.from(at))
                 .addValue("failure", failure).addValue("attempts", attempts)) == 1 && closeToolCalls(jobId, at);
+    }
+
+    @Override
+    public void limitWait(Duration wait) {
+        jdbc.queryForObject("SELECT set_config('statement_timeout', :ms, true)",
+                new MapSqlParameterSource("ms", Long.toString(Math.max(1, wait.toMillis()))), String.class);
     }
 
     @Override

@@ -22,6 +22,8 @@ import com.zoop.graph.version.GraphVersionRecord;
 import com.zoop.graph.version.GraphVersionRepository;
 import com.zoop.graph.version.GraphVersionSelector;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.transaction.CannotCreateTransactionException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -114,6 +116,18 @@ class GraphTargetToolTest {
     }
 
     @Test
+    void aDatabaseOutageIsUnavailableButAnyOtherErrorStaysAFault() {
+        var request = new ChatToolRequest("company.read", List.of(HYNIX), 20);
+        for (RuntimeException failure : List.of(new DataAccessResourceFailureException("graph_versions unreachable"),
+                new CannotCreateTransactionException("no connection"))) {
+            var tool = new CompanyReadTool(failingReader(failure), access());
+            assertThrows(ChatToolUnavailable.class, () -> tool.read(SCOPE, request));
+        }
+        var bug = new CompanyReadTool(failingReader(new IllegalStateException("bug")), access());
+        assertThrows(IllegalStateException.class, () -> bug.read(SCOPE, request));
+    }
+
+    @Test
     void readsUseThePinnedVersionAsOfAndCurrentExclusions() {
         Instant asOf = Instant.parse("2026-10-09T00:00:00Z");
         company().read(new ChatToolScope("job-1", ACTIVE, asOf), new ChatToolRequest("company.read", List.of(HYNIX), 20));
@@ -149,6 +163,17 @@ class GraphTargetToolTest {
         var selector = new GraphVersionSelector(repository(), Clock.fixed(NOW, ZoneOffset.UTC));
         return new PublicGraphReader(selector, new FixtureGraphSnapshotStore(GraphTargetToolTest.class.getClassLoader()),
                 () -> exclusions);
+    }
+
+    private PublicGraphReader failingReader(RuntimeException failure) {
+        GraphVersionRepository failing = new GraphVersionRepository() {
+            public Optional<GraphVersionRecord> find(String id) { throw failure; }
+            public Optional<GraphVersionRecord> active() { throw failure; }
+            public Optional<String> activeVersionIdAt(Instant asOf) { throw failure; }
+            public boolean everActivated(String id) { throw failure; }
+        };
+        return new PublicGraphReader(new GraphVersionSelector(failing, Clock.fixed(NOW, ZoneOffset.UTC)),
+                new FixtureGraphSnapshotStore(GraphTargetToolTest.class.getClassLoader()), () -> exclusions);
     }
 
     private ChatEvidenceAccess access() {

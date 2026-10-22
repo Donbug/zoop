@@ -170,6 +170,11 @@ final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
         closeToolCalls(job.row.id());
     }
 
+    /** Memory waits for nothing. */
+    @Override
+    public void limitWait(java.time.Duration wait) {
+    }
+
     @Override
     public synchronized int countToolCalls(String jobId, int attemptNo) {
         return (int) toolCalls.stream().filter(c -> c.row.jobId().equals(jobId) && c.row.attemptNo() == attemptNo).count();
