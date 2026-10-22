@@ -172,15 +172,32 @@ public class EvidenceService {
      * all "not readable"; denials are logged with the request id as in a read. It never writes.
      */
     public boolean readable(String id, String graphVersion, Instant asOf, String requestId) {
+        return readability(id, graphVersion, asOf, requestId) == Readability.READABLE;
+    }
+
+    /** What {@link #readable} decides, keeping a denial apart from a state that could not be checked. */
+    public enum Readability { READABLE, DENIED, UNAVAILABLE }
+
+    /**
+     * {@link #readable} for a caller that must not mistake an outage for an absence (a chat tool that reports what it found):
+     * an unknown id, a denial or an unverified span is {@code DENIED}; an unreadable registry, store, version or database is
+     * {@code UNAVAILABLE}.
+     */
+    public Readability readability(String id, String graphVersion, Instant asOf, String requestId) {
         if (id == null || !EVIDENCE_ID.matcher(id).matches()) {
-            return false;
+            return Readability.DENIED;
         }
         Instant now = clock.instant();
         try {
             transaction.execute(status -> dispatch(id, graphVersion, asOf, null, requestId, now, true));
-            return true;
-        } catch (CustomException | DataAccessException | TransactionException notReadable) {
-            return false;
+            return Readability.READABLE;
+        } catch (CustomException notReadable) {
+            return switch (notReadable.getErrorCode()) {
+                case RESOURCE_NOT_FOUND, EVIDENCE_UNAVAILABLE, INVALID_REQUEST -> Readability.DENIED;
+                default -> Readability.UNAVAILABLE;
+            };
+        } catch (DataAccessException | TransactionException unavailable) {
+            return Readability.UNAVAILABLE;
         }
     }
 
