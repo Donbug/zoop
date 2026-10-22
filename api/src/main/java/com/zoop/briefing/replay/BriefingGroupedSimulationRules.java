@@ -187,6 +187,12 @@ final class BriefingGroupedSimulationRules {
             snapshot(candidate, expected.get(id), round, archive);
         }
         require(candidates.keySet().equals(expected.keySet()), "candidate_population");
+        if (round.object("identity").has("selectionEligibilityPolicy")) require("explicit-eligibility-v1".equals(round.object("identity").string("selectionEligibilityPolicy"))
+                && request.has("selectionEligibility"), "selection_eligibility_policy");
+        if (request.has("selectionEligibility")) {
+            StrictJson.Obj providerRequest = StrictJson.parseObject(read(output.resolve("calls/"+key+".request.json")));
+            eligibilityManifest(request, providerRequest, candidates.keySet());
+        }
         selectionCorrection(round, receipts, receipt, selected, output);
         boolean published = Set.of("SELECTED", "EMPTY_CONFIRMED").contains(round.string("selectionStatus"));
         // Invalid completed model answers are retained as audit for held rounds; they do not authorize publication.
@@ -330,6 +336,14 @@ final class BriefingGroupedSimulationRules {
     private static Recording phase(Map<String, JsonNode> receipts, String digest, String stage, Path output) {
         require(receipts.containsKey(digest), "phase_receipt_missing"); StrictJson.Obj receipt = StrictJson.Obj.of(receipts.get(digest));
         require(stage.equals(receipt.string("stage")), "phase_stage"); return recording(receipt, output, true);
+    }
+
+    static void eligibilityManifest(StrictJson.Obj input, StrictJson.Obj providerRequest, Set<String> candidates) {
+        JsonNode items = providerRequest.object("text").object("format").object("schema").object("properties").object("selected").raw("items");
+        List<String> allowed = new ArrayList<>();
+        for (JsonNode variant : items.path("anyOf")) allowed.add(variant.path("properties").path("issueId").path("enum").get(0).stringValue());
+        require(new HashSet<>(allowed).size() == allowed.size() && candidates.containsAll(allowed)
+                && allowed.equals(input.object("selectionEligibility").strings("allowedIssueIds")), "selection_eligibility_manifest");
     }
 
     private static void context(StrictJson.Obj input, StrictJson.Obj round) {

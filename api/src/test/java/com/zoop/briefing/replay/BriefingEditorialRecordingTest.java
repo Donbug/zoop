@@ -30,4 +30,12 @@ class BriefingEditorialRecordingTest {
         receipt.put("responseSha256", "a".repeat(64));
         assertThrows(IllegalArgumentException.class, () -> BriefingGroupedSimulationRules.recording(StrictJson.Obj.of(receipt), output, true));
     }
+    @Test void allowedIssueManifestCannotOmitAProviderSchemaCandidate() {
+        var provider = StrictJson.parseObject("{\"text\":{\"format\":{\"schema\":{\"properties\":{\"selected\":{\"items\":{\"anyOf\":[{\"properties\":{\"issueId\":{\"enum\":[\"issue-authored\"]}}}]}}}}}}}");
+        var valid = StrictJson.parseObject("{\"selectionEligibility\":{\"allowedIssueIds\":[\"issue-authored\"]}}");
+        assertDoesNotThrow(() -> BriefingGroupedSimulationRules.eligibilityManifest(valid, provider, java.util.Set.of("issue-authored")));
+        var omitted = StrictJson.parseObject("{\"selectionEligibility\":{\"allowedIssueIds\":[]}}");
+        assertThrows(IllegalArgumentException.class, () -> BriefingGroupedSimulationRules.eligibilityManifest(omitted, provider, java.util.Set.of("issue-authored")));
+    }
+
 }

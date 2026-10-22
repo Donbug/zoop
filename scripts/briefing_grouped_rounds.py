@@ -455,7 +455,14 @@ class GroupedSimulationClient(sim.SimulationClient):
 
 
 def grouped_selection_data(candidates, context, previous_selected=()):
-    return {**context, "issues": candidates, "maximumIssues": 3,
+    policy = {}
+    if any("freshnessReview" in c for c in candidates):
+        contract = selection_schema(candidates, context.get("context", {}).get("publicationCompanyIds"))
+        items = contract["properties"]["selected"]["items"]
+        allowed = [v["properties"]["issueId"]["enum"][0] for v in items.get("anyOf", [])]
+        policy = {"selectionEligibility": {"allowedIssueIds": allowed,
+            "meaning": "These IDs are allowed by the exact output contract. Eligibility is not importance or publication approval. Do not claim a listed issue is absent from the allowed list."}}
+    return {**context, **policy, "issues": candidates, "maximumIssues": 3,
             "previousSelectedIssues": [{key: row.get(key) for key in ("issueId", "title", "sources")}
                                        for row in previous_selected],
             "operationalCollectionGate": False, "historicalBodyUnchangedProven": False}

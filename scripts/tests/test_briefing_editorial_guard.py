@@ -30,6 +30,10 @@ class EditorialTests(unittest.TestCase):
         self.assertEqual(guard.company_names(a,'doc',G.sim.aware('2026-10-07T09:00:00+09:00')),[])
         m['companyProjection']={'briefingEligible':False}
         self.assertEqual(guard.company_names(a,'doc',G.sim.aware('2026-10-07T13:00:00+09:00')),[])
+    def test_eligibility_manifest_lists_a_valid_candidate_explicitly(self):
+        _,candidate=self.candidate()
+        data=G.grouped_selection_data([candidate],{'context':{}},[])
+        self.assertIn(candidate['issueId'],data['selectionEligibility']['allowedIssueIds'])
     def test_duplicate_choice_is_audited_without_duplicating_a_valid_issue(self):
         _,candidate=self.candidate();other=copy.deepcopy(candidate);other['issueId']='issue-other'
         other['asOfSnapshotSha256']=G.base.digest(G.base.canonical({k:v for k,v in other.items() if k!='asOfSnapshotSha256'}))

@@ -57,6 +57,7 @@ def run(args, transport=None):
     if publication_ids is not None:
         run_identity["publicationCompanyIds"] = publication_ids
         run_identity["publicationCatalogSha256"] = base.digest(catalog_raw)
+    if archive.get("editorialReview"): run_identity["selectionEligibilityPolicy"] = "explicit-eligibility-v1"
     run_id = "grouped-round-simulation-"+base.digest(base.canonical(run_identity))[:20]
     prepared, identity_holds_by_round = [], {}
     for spec in (series["rounds"] if series else [local_spec] if local_spec else sim.windows()):
@@ -94,6 +95,7 @@ def run(args, transport=None):
                   "groupArchiveSha256":archive_sha,
                   "baseline":{"from":series["rounds"][0]["window"]["from"] if series else local_spec["window"]["from"] if local_spec else sim.BASELINE,
                     "meaning":"explicit_series_baseline" if series else "local_validation_window_start" if local_spec else "simulation_baseline_not_service_first_round"}}
+        if archive.get("editorialReview"): identity["selectionEligibilityPolicy"] = "explicit-eligibility-v1"
         if series: identity["roundSeries"] = series
         if publication_ids is not None:
             identity["publicationCompanyIds"] = publication_ids
