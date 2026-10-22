@@ -74,6 +74,52 @@ class BriefingQueryServiceTest {
 
     private BriefingRound published() { return round("morning", "published", ignored -> { }); }
 
+    private BriefingRound authoredAnalysis(Consumer<ObjectNode> transform) {
+        var row = published();
+        var summary = ((ObjectNode) row.publicSnapshot()).putObject("marketSummary").put("text", "확인된 기업 사실\n조건부 해석\n수집 범위 한정")
+                .put("generatedAt", row.generatedAt().toString()).put("resultVersion", "authored-outlook");
+        summary.putArray("evidenceIds").add("e-original");
+        var analysis = summary.putObject("analysis").put("schemaVersion", "zoop-market-outlook-analysis-v1").put("edition", "morning")
+                .put("cutoff", MORNING.toString()).put("mode", "morning_update").put("scopeNote", "수집 범위 한정");
+        analysis.putObject("previousPublication").put("status", "unavailable").put("kind", "simulated_previous_output")
+                .put("reason", "immediate_previous_summary_withheld");
+        analysis.putObject("coverage").put("documents", 3).put("newDocuments", 1).put("backgroundDocuments", 2)
+                .put("marketRepresentative", false).put("sectorPriceFeedAvailable", false).putArray("companyNames").add("원본 기업");
+        var claims = analysis.putArray("claims");
+        for (String kind : List.of("fact", "interpretation")) {
+            var claim = claims.addObject().put("claimId", "market:claim:" + claims.size()).put("kind", kind)
+                    .put("text", "fact".equals(kind) ? "확인된 기업 사실" : "조건부 해석")
+                    .putNull("targetId").putNull("direction").putNull("updateAction");
+            for (String field : List.of("evidenceIds", "indicatorIds", "previousPublicationIds", "previousForecastIds", "evaluationIds", "conditions", "counterFactors")) claim.putArray(field);
+            claim.withArray("evidenceIds").add("e-original");
+        }
+        analysis.putArray("forecasts"); analysis.putArray("forecastEvaluations");
+        transform.accept(analysis); return row;
+    }
+
+    @Test void structuredMarketAnalysisRestoresSameVerifiedTextWithoutInvokingProducer() {
+        var row = authoredAnalysis(ignored -> { }); when(repository.find(DATE, "morning")).thenReturn(Optional.of(row));
+        var result = service.get(DATE, "morning", "request");
+        assertEquals("morning_update", result.at("/marketSummary/analysis/mode").asString());
+        assertEquals("조건부 해석", result.at("/marketSummary/analysis/claims/1/text").asString());
+        assertEquals("immediate_previous_summary_withheld", result.at("/marketSummary/analysis/previousPublication/reason").asString());
+        assertEquals(row.publicSnapshot().path("marketSummary"), result.path("marketSummary"));
+    }
+
+    @Test void alteredAnalysisTextCutoffForeignEvidenceOrFabricatedEvaluationCannotBeDisclosed() {
+        List<Consumer<ObjectNode>> changes = List.of(
+                a -> ((ObjectNode) a.at("/claims/0")).put("text", "생성 기록에 없는 새 전망"),
+                a -> a.put("cutoff", MORNING.plusSeconds(1).toString()),
+                a -> ((ObjectNode) a.get("coverage")).put("marketRepresentative", true),
+                a -> ((ObjectNode) a.get("coverage")).put("backgroundDocuments", 3),
+                a -> ((tools.jackson.databind.node.ArrayNode) a.at("/claims/0/evidenceIds")).add("foreign-evidence"),
+                a -> a.putArray("forecastEvaluations").addObject().put("evaluationId", "invented-evaluation"));
+        for (var change : changes) {
+            var row = authoredAnalysis(change); when(repository.find(DATE, "morning")).thenReturn(Optional.of(row));
+            assertUnavailable(() -> service.get(DATE, "morning", "request"));
+        }
+    }
+
     @Test void restoresRealNestedDtoAndCorrectionsWithoutChangingOriginal() {
         var row = published(); when(repository.find(DATE, "morning")).thenReturn(Optional.of(row));
         when(repository.changes(row.id())).thenReturn(List.of(new BriefingChange(1, "correction", "event-original", "원문",
@@ -89,6 +135,63 @@ class BriefingQueryServiceTest {
         assertEquals("07:40", result.path("metadata").path("schedule").path("morning").asString());
         assertEquals("g-original", result.path("graphVersion").asString());
         assertEquals("unavailable", result.path("marketVariables").path("status").asString());
+    }
+
+    private BriefingRound marketRound(Consumer<ObjectNode> transform) {
+        return round("morning", "published", payload -> {
+            var market = payload.putObject("marketVariables").put("status", "available")
+                    .put("referenceAt", MORNING.toString()).put("rateCutoffAt", MORNING.toString())
+                    .put("collectedAt", MORNING.toString());
+            var indicators = market.putArray("indicators");
+            ObjectNode fx = null;
+            for (String id : List.of("kospi", "kosdaq", "usdkrw")) {
+                boolean bank = "usdkrw".equals(id);
+                var indicator = indicators.addObject().put("id", id).put("label", id)
+                        .put("unit", bank ? "KRW" : "pt").put("status", "delayed").put("value", 1300.0)
+                        .put("valueKind", "close").put("observedDate", DATE.minusDays(1).toString())
+                        .putNull("observedAt").putNull("change").putNull("changeRate").putNull("baseline")
+                        .putNull("reason").putNull("reasonCode");
+                indicator.putObject("source").put("provider", bank ? "naver" : "yahoo")
+                        .put("symbol", bank ? "FX_USDKRW" : id).put("name", "Synthetic source")
+                        .put("official", false).putNull("delayNote").put("url", bank
+                                ? "https://api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices?pageSize=40&page=1"
+                                : "https://example.invalid/index");
+                if (bank) fx = indicator;
+            }
+            transform.accept(fx);
+        });
+    }
+
+    @Test void legacyBankReferenceIsProjectedWithoutChangingStoredPublication() {
+        var row = marketRound(ignored -> { }); var original = row.payload().deepCopy();
+        when(repository.find(DATE, "morning")).thenReturn(Optional.of(row));
+        var result = service.get(DATE, "morning", "request");
+        assertEquals("reference", result.path("marketVariables").path("indicators").get(2).path("valueKind").asString());
+        assertEquals("close", result.path("marketVariables").path("indicators").get(0).path("valueKind").asString());
+        assertEquals(original, row.payload());
+        ((ObjectNode) result.path("marketVariables").path("indicators").get(2)).put("value", 0.0);
+        assertEquals(original, row.payload());
+        assertEquals(1300.0, service.get(DATE, "morning", "again").path("marketVariables").path("indicators").get(2).path("value").doubleValue());
+    }
+
+    @Test void explicitReferenceIsAcceptedAndUnknownCloseOrLatestAreNotRelabeled() {
+        for (String mode : List.of("reference", "foreign_close", "latest")) {
+            var row = marketRound(fx -> {
+                if ("reference".equals(mode)) fx.put("valueKind", "reference");
+                if ("foreign_close".equals(mode)) ((ObjectNode) fx.get("source")).put("url", "https://example.invalid/fx");
+                if ("latest".equals(mode)) fx.put("valueKind", "latest").put("observedAt", MORNING.minusSeconds(1).toString());
+            });
+            when(repository.find(DATE, "morning")).thenReturn(Optional.of(row));
+            String expected = "foreign_close".equals(mode) ? "close" : mode;
+            assertEquals(expected, service.get(DATE, "morning", "request").path("marketVariables").path("indicators").get(2).path("valueKind").asString());
+        }
+    }
+
+    @Test void bankReferenceCannotBeAssignedToAnIndex() {
+        var row = marketRound(ignored -> { });
+        ((ObjectNode) row.payload().path("marketVariables").path("indicators").get(0)).put("valueKind", "reference");
+        when(repository.find(DATE, "morning")).thenReturn(Optional.of(row));
+        assertUnavailable(() -> service.get(DATE, "morning", "request"));
     }
 
     @Test void latestComesFromDatabaseEvenAcrossNonGenerationDays() {

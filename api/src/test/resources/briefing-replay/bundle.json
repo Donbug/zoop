@@ -1,0 +1,272 @@
+{
+  "schemaVersion": "zoop-briefing-replay-v1",
+  "sourceFileSha256": "cf762563566486baa3638f299b2dd55ffb11069339bd095361934fa932598b60",
+  "runId": "brf-replay-synthetic-062",
+  "authorization": {
+    "scope": "development_replay",
+    "sourceSha256": "cf762563566486baa3638f299b2dd55ffb11069339bd095361934fa932598b60",
+    "userInboxRef": "inbox/synthetic-test-authorization.md"
+  },
+  "historicalReplay": {
+    "sourcePeriod": {
+      "start": "2026-10-02",
+      "end": "2026-10-08"
+    },
+    "roundDate": "2026-10-09",
+    "sameSourcePoolForBothEditions": true,
+    "collectionAfterRound": true
+  },
+  "selected": [
+    {
+      "issueId": "issue-ai-synthetic-062",
+      "rank": 1,
+      "reason": "[합성시험] 저장된 후보 선정 결과를 시험합니다.",
+      "companyNames": [
+        "[합성시험] 시험기업"
+      ],
+      "score": 2,
+      "sources": [
+        {
+          "documentId": "doc-synthetic-replay-062",
+          "documentVersion": "sha256-8cb8b4e9417d4fdb7d679da0fac4f7b9cbf324acc93003bf15ead1ac3bdde601",
+          "bodySha256": "8cb8b4e9417d4fdb7d679da0fac4f7b9cbf324acc93003bf15ead1ac3bdde601",
+          "url": "https://example.invalid/synthetic-briefing-replay-062",
+          "quote": "시험기업은 설비 계획을 발표했다.",
+          "start": 9,
+          "end": 27,
+          "evidenceId": "evidence-replay-synthetic-062"
+        }
+      ]
+    }
+  ],
+  "editions": {
+    "morning": {
+      "generatedAt": "2026-10-16T01:00:00Z",
+      "items": [
+        {
+          "issueId": "issue-ai-synthetic-062",
+          "rank": 1,
+          "title": "[합성시험] 시험기업 설비 계획 발표",
+          "titleEvidenceIds": [
+            "evidence-replay-synthetic-062"
+          ],
+          "claims": [
+            {
+              "text": "[합성시험] 시험기업은 설비 계획을 발표했다.",
+              "type": "fact",
+              "evidenceIds": [
+                "evidence-replay-synthetic-062"
+              ]
+            },
+            {
+              "text": "[합성시험] 후속 자료 확인이 필요하다.",
+              "type": "plan",
+              "evidenceIds": [
+                "evidence-replay-synthetic-062"
+              ]
+            }
+          ]
+        }
+      ],
+      "verification": {
+        "status": "PASS",
+        "checks": [
+          {
+            "targetId": "issue-ai-synthetic-062:title",
+            "verdict": "SUPPORTED",
+            "typeAppropriate": true,
+            "temporalAppropriate": true,
+            "noUnsupportedNumbers": true,
+            "noInvestmentAdvice": true,
+            "reason": "[합성시험] 직접 작성한 검증 결과이며 실제 모델 검증이 아닙니다."
+          },
+          {
+            "targetId": "issue-ai-synthetic-062:claim:0",
+            "verdict": "SUPPORTED",
+            "typeAppropriate": true,
+            "temporalAppropriate": true,
+            "noUnsupportedNumbers": true,
+            "noInvestmentAdvice": true,
+            "reason": "[합성시험] 직접 작성한 검증 결과이며 실제 모델 검증이 아닙니다."
+          },
+          {
+            "targetId": "issue-ai-synthetic-062:claim:1",
+            "verdict": "SUPPORTED",
+            "typeAppropriate": true,
+            "temporalAppropriate": true,
+            "noUnsupportedNumbers": true,
+            "noInvestmentAdvice": true,
+            "reason": "[합성시험] 직접 작성한 검증 결과이며 실제 모델 검증이 아닙니다."
+          }
+        ]
+      },
+      "usage": [
+        {
+          "stage": "briefing_morning_generation",
+          "model": "gpt-6-luna",
+          "inputTokens": 102,
+          "outputTokens": 22,
+          "requestDigest": "ef621f64e428fd08ccd36e0fa50f181bcf077b5b218b365cbe69785577f91fc5",
+          "responseId": "resp_synthetic_briefing_morning_generation",
+          "status": "completed",
+          "usageKnown": true
+        },
+        {
+          "stage": "briefing_morning_verification",
+          "model": "gpt-6-luna",
+          "inputTokens": 103,
+          "outputTokens": 23,
+          "requestDigest": "d86036cecabb670b89ad918767e4c871293ed5bb5529809b1720ae4ff472477f",
+          "responseId": "resp_synthetic_briefing_morning_verification",
+          "status": "completed",
+          "usageKnown": true
+        }
+      ]
+    },
+    "evening": {
+      "generatedAt": "2026-10-16T01:05:00Z",
+      "items": [
+        {
+          "issueId": "issue-ai-synthetic-062",
+          "rank": 1,
+          "title": "[합성시험] 시험기업 설비 계획 발표",
+          "titleEvidenceIds": [
+            "evidence-replay-synthetic-062"
+          ],
+          "claims": [
+            {
+              "text": "[합성시험] 시험기업은 설비 계획을 발표했다.",
+              "type": "fact",
+              "evidenceIds": [
+                "evidence-replay-synthetic-062"
+              ]
+            },
+            {
+              "text": "[합성시험] 후속 자료 확인이 필요하다.",
+              "type": "plan",
+              "evidenceIds": [
+                "evidence-replay-synthetic-062"
+              ]
+            }
+          ]
+        }
+      ],
+      "verification": {
+        "status": "PASS",
+        "checks": [
+          {
+            "targetId": "issue-ai-synthetic-062:title",
+            "verdict": "SUPPORTED",
+            "typeAppropriate": true,
+            "temporalAppropriate": true,
+            "noUnsupportedNumbers": true,
+            "noInvestmentAdvice": true,
+            "reason": "[합성시험] 직접 작성한 검증 결과이며 실제 모델 검증이 아닙니다."
+          },
+          {
+            "targetId": "issue-ai-synthetic-062:claim:0",
+            "verdict": "SUPPORTED",
+            "typeAppropriate": true,
+            "temporalAppropriate": true,
+            "noUnsupportedNumbers": true,
+            "noInvestmentAdvice": true,
+            "reason": "[합성시험] 직접 작성한 검증 결과이며 실제 모델 검증이 아닙니다."
+          },
+          {
+            "targetId": "issue-ai-synthetic-062:claim:1",
+            "verdict": "SUPPORTED",
+            "typeAppropriate": true,
+            "temporalAppropriate": true,
+            "noUnsupportedNumbers": true,
+            "noInvestmentAdvice": true,
+            "reason": "[합성시험] 직접 작성한 검증 결과이며 실제 모델 검증이 아닙니다."
+          }
+        ]
+      },
+      "usage": [
+        {
+          "stage": "briefing_evening_generation",
+          "model": "gpt-6-luna",
+          "inputTokens": 104,
+          "outputTokens": 24,
+          "requestDigest": "402c8228aba12489e0e2e35f56174270c92bb0d7af3ad160cf1fd84c78330258",
+          "responseId": "resp_synthetic_briefing_evening_generation",
+          "status": "completed",
+          "usageKnown": true
+        },
+        {
+          "stage": "briefing_evening_verification",
+          "model": "gpt-6-luna",
+          "inputTokens": 105,
+          "outputTokens": 25,
+          "requestDigest": "6142b674c4d1004bdcf9ba40ae677d4ba31af770f46300d058c8cb55d153465b",
+          "responseId": "resp_synthetic_briefing_evening_verification",
+          "status": "completed",
+          "usageKnown": true
+        }
+      ]
+    }
+  },
+  "receipts": [
+    {
+      "stage": "briefing_population_importance",
+      "model": "gpt-6-luna",
+      "inputTokens": 100,
+      "outputTokens": 20,
+      "requestDigest": "288963df60b1ddfd57f72b1a99b8cd187cbc916b4dfff0fb0336453d31095a78",
+      "responseId": "resp_synthetic_briefing_population_importance",
+      "status": "completed",
+      "usageKnown": true
+    },
+    {
+      "stage": "briefing_global_selection",
+      "model": "gpt-6-luna",
+      "inputTokens": 101,
+      "outputTokens": 21,
+      "requestDigest": "d6f522c14ce1a305c8ee3fb805de7b7ea8f0c08aa308a8a1002c7a92678327f8",
+      "responseId": "resp_synthetic_briefing_global_selection",
+      "status": "completed",
+      "usageKnown": true
+    },
+    {
+      "stage": "briefing_morning_generation",
+      "model": "gpt-6-luna",
+      "inputTokens": 102,
+      "outputTokens": 22,
+      "requestDigest": "ef621f64e428fd08ccd36e0fa50f181bcf077b5b218b365cbe69785577f91fc5",
+      "responseId": "resp_synthetic_briefing_morning_generation",
+      "status": "completed",
+      "usageKnown": true
+    },
+    {
+      "stage": "briefing_morning_verification",
+      "model": "gpt-6-luna",
+      "inputTokens": 103,
+      "outputTokens": 23,
+      "requestDigest": "d86036cecabb670b89ad918767e4c871293ed5bb5529809b1720ae4ff472477f",
+      "responseId": "resp_synthetic_briefing_morning_verification",
+      "status": "completed",
+      "usageKnown": true
+    },
+    {
+      "stage": "briefing_evening_generation",
+      "model": "gpt-6-luna",
+      "inputTokens": 104,
+      "outputTokens": 24,
+      "requestDigest": "402c8228aba12489e0e2e35f56174270c92bb0d7af3ad160cf1fd84c78330258",
+      "responseId": "resp_synthetic_briefing_evening_generation",
+      "status": "completed",
+      "usageKnown": true
+    },
+    {
+      "stage": "briefing_evening_verification",
+      "model": "gpt-6-luna",
+      "inputTokens": 105,
+      "outputTokens": 25,
+      "requestDigest": "6142b674c4d1004bdcf9ba40ae677d4ba31af770f46300d058c8cb55d153465b",
+      "responseId": "resp_synthetic_briefing_evening_verification",
+      "status": "completed",
+      "usageKnown": true
+    }
+  ]
+}

@@ -1,20 +1,26 @@
 package com.zoop.graph.read;
 
+import com.zoop.common.request.RequestIdFilter;
+import com.zoop.graph.read.dto.EventDetail;
 import com.zoop.graph.read.dto.EventListResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** OpenAPI {@code listEvents}. */
+/** OpenAPI {@code listEvents} and {@code getEvent}. */
 @RestController
 @RequestMapping("/api/v1/events")
 public class EventController {
     private final EventListService service;
+    private final EventDetailService details;
 
-    public EventController(EventListService service) {
+    public EventController(EventListService service, EventDetailService details) {
         this.service = service;
+        this.details = details;
     }
 
     @GetMapping
@@ -37,5 +43,20 @@ public class EventController {
             @RequestParam(required = false) String graphVersion,
             @RequestParam(required = false) String asOf) {
         return service.list(companyId, depth, from, to, cursor, limit, graphVersion, asOf);
+    }
+
+    @GetMapping("/{id}")
+    @Operation(operationId = "getEvent", summary = "사건 상세와 근거 참조 조회",
+            description = "공개 그래프 버전 하나를 고정해(round·asOf·graphVersion은 그래프 조회와 같은 규칙) 그 버전에서 보이는 사건 하나를 반환합니다. "
+                    + "관계·기업·기사·선후 사건(follows)은 스냅샷에서, 원본 언급(mentions)·운영자 필드 판정(fieldDecisions)·출처 지지도(sourceSupport)는 "
+                    + "수입한 버전의 receipt(AI 인계 묶음)에서 읽습니다. 수입한 버전은 근거마다 현재 공개 게이트(기사 접근·source grant)를 다시 적용해 "
+                    + "근거가 일부라도 가려진 언급과 읽을 수 없는 근거의 기사·관계를 빼고, 머리 값의 바탕(대표 언급, 대표가 없으면 모든 언급)이 온전히 보이지 않으면 404, "
+                    + "follows 상대 사건도 같은 검사를 통과해야 합니다. 운영자가 보류·거절한 언급의 "
+                    + "시각·기간은 null입니다. summary는 아직 생산자가 없어 unavailable이고 approval은 null입니다. 그 버전에서 보이지 않는 사건 404, "
+                    + "잘못된 입력 422, 고정 버전 없음 409, 스냅샷·receipt 읽기 실패와 이전 인계 묶음 스키마 503입니다.")
+    public EventDetail getEvent(@PathVariable String id, @RequestParam(required = false) String round,
+            @RequestParam(required = false) String graphVersion, @RequestParam(required = false) String asOf,
+            HttpServletRequest request) {
+        return details.get(id, round, graphVersion, asOf, RequestIdFilter.currentId(request));
     }
 }

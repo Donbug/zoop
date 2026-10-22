@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "properties": {
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "documentId": {"type": "string", "minLength": 1},
+          "decision": {"type": "string", "enum": ["NEW_EVENT", "MATERIAL_UPDATE", "REPEAT", "UNCERTAIN"]},
+          "matchedIssueId": {"type": ["string", "null"]},
+          "reason": {"type": "string", "minLength": 1, "maxLength": 500},
+          "delta": {"type": "string", "maxLength": 700},
+          "quoteIds": {"type": "array", "items": {"type": "string"}, "maxItems": 8}
+        },
+        "required": ["documentId", "decision", "matchedIssueId", "reason", "delta", "quoteIds"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["decisions"],
+  "additionalProperties": false
+}

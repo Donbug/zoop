@@ -74,7 +74,17 @@ public class GraphSnapshotConfiguration {
     @Bean
     @ConditionalOnMissingBean(DisclosureExclusionReader.class)
     DisclosureExclusionReader noDisclosureExclusions() {
-        return () -> DisclosureExclusions.NONE;
+        return new DisclosureExclusionReader() {
+            @Override
+            public DisclosureExclusions current() {
+                return DisclosureExclusions.NONE;
+            }
+
+            @Override
+            public boolean authoritative() {
+                return false;
+            }
+        };
     }
 
     /** No source configured: a registered version cannot be read, which is 503 and never an empty graph. */

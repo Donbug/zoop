@@ -10,6 +10,7 @@
 | --- | --- | --- | --- |
 | [FS028](feature-FS028.md) · [FS029](feature-FS029.md) · [FS030](feature-FS030.md) · [FS031](feature-FS031.md) · [FS033](feature-FS033.md) · [FS034](feature-FS034.md) · [FS035](feature-FS035.md) | [getBriefing](../../api/out/zoop-api-spec.md#getbriefing) | GET /api/v1/briefings | P1 |
 | [FS033](feature-FS033.md) · [FS035](feature-FS035.md) | [listBriefingRounds](../../api/out/zoop-api-spec.md#listbriefingrounds) | GET /api/v1/briefings/rounds | P1 |
+| [FS030](feature-FS030.md) · [FS033](feature-FS033.md) · [FS035](feature-FS035.md) | [getBriefingItemDetail](../../api/out/zoop-api-spec.md#getbriefingitemdetail) | GET /api/v1/briefings/{roundId}/items/{eventId} | P1 |
 | [FS066-01](feature-FS066-01.md) | [getMyFeedback](../../api/out/zoop-api-spec.md#getmyfeedback) | GET /api/v1/feedback | P2 |
 | [FS066-01](feature-FS066-01.md) | [setFeedback](../../api/out/zoop-api-spec.md#setfeedback) | PUT /api/v1/feedback | P2 |
 | [FS036](feature-FS036.md) | [getPersonalizedBriefing](../../api/out/zoop-api-spec.md#getpersonalizedbriefing) | GET /api/v1/briefings/{id}/personalized | P2 |

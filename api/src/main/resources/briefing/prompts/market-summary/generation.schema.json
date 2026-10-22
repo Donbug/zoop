@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "properties": {
+    "claims": {
+      "type": "array", "minItems": 2, "maxItems": 4,
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": {"type": "string", "minLength": 1, "maxLength": 250},
+          "evidenceIds": {"type": "array", "items": {"type": "string"}, "maxItems": 6},
+          "indicatorIds": {"type": "array", "items": {"type": "string"}, "maxItems": 3}
+        },
+        "required": ["text", "evidenceIds", "indicatorIds"], "additionalProperties": false
+      }
+    }
+  },
+  "required": ["claims"], "additionalProperties": false
+}

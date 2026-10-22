@@ -9,12 +9,15 @@ import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import type { FeedbackValue } from '@/types/feedback';
 import type { BriefingEdition, BriefingResponse } from '@/types/briefing';
 import { briefingTime } from '@/util/briefingTime';
+import CompanyOutlooks from './CompanyOutlooks';
+import BriefingReadingSection from './BriefingReadingSection';
 import MarketIndicators from './MarketIndicators';
+import MarketSummary from './MarketSummary';
 import BriefingIssueList from './BriefingIssueList';
 import BriefingComparison from './BriefingComparison';
 import PersonalBasisNotice from './PersonalBasisNotice';
+import { hasOnlyKnownLimitations } from './briefingLimitations';
 import {
-  BODY,
   CARD,
   EMPTY,
   NOTE,
@@ -48,11 +51,13 @@ export default function PublishedBriefing({
   date,
   edition,
   personal = false,
+  compact = false,
 }: {
   date: string;
   edition: BriefingEdition;
   /** 내 종목 기준 보기(FS036). 회원만 */
   personal?: boolean;
+  compact?: boolean;
 }) {
   const [result, setResult] = useState<BriefingResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -171,8 +176,58 @@ export default function PublishedBriefing({
         (result.status !== 'published' ||
           result.metadata.failures.some((failure) => failure.retryable))));
 
+  const publicationInfo = result && (
+    <>
+      <p className="mt-1.5 font-inter text-[10px] leading-normal text-zoop-faint">
+        발행일 {result.date} · 예정 {clock(result.scheduledAt)} · 생성{' '}
+        {briefingTime(result.generatedAt)} · 발행{' '}
+        {briefingTime(result.publishedAt)} · 데이터 기준{' '}
+        {briefingTime(result.dataAsOf)}
+      </p>
+      {result.status === 'published' &&
+        result.metadata.source === 'zoop-briefing-development-replay' && (
+          <p
+            role="note"
+            aria-label="개발 재생 안내"
+            className={`${EMPTY} mt-4`}
+          >
+            과거 수집 자료로 생성·검증한 개발 재생본입니다. 출근·퇴근은 동일한
+            자료를 형식별로 작성했습니다.
+          </p>
+        )}
+      {result.metadata.source ===
+        'zoop-briefing-publication-clock-simulation' && (
+        <p
+          role="note"
+          aria-label="회차별 과거 시뮬레이션 안내"
+          className={`${EMPTY} mt-4`}
+        >
+          확인된 원발행 시각을 기준으로 회차별로 나눈 과거 시뮬레이션입니다.
+          실제 수집은 나중에 이뤄졌으며, 당시 본문과 같은 버전인지는 확인되지
+          않았습니다.
+        </p>
+      )}
+    </>
+  );
+  const knownLimits =
+    result && hasOnlyKnownLimitations(result.metadata.failures);
+  const partialInfo = result?.metadata.partial && (
+    <div role={knownLimits ? 'note' : 'status'} className={`${EMPTY} mt-4`}>
+      {knownLimits
+        ? '이 회차 자료의 확인 범위'
+        : '일부 정보를 불러오지 못했어요.'}
+      {result.metadata.failures.map((failure) => (
+        <p key={failure.section}>{failure.message}</p>
+      ))}
+    </div>
+  );
+
   return (
-    <article className={CARD} aria-busy={loading}>
+    <article
+      data-reading={compact ? 'compact' : 'full'}
+      className={CARD}
+      aria-busy={loading}
+    >
       {loading && (
         <p role="status" className="text-xs text-zoop-muted">
           브리핑을 불러오고 있어요.
@@ -192,12 +247,16 @@ export default function PublishedBriefing({
               </h2>
               <span className={STATUS_PILL}>{statuses[result.status]}</span>
             </div>
-            <p className="mt-1.5 font-inter text-[10px] leading-normal text-zoop-faint">
-              발행일 {result.date} · 예정 {clock(result.scheduledAt)} · 생성{' '}
-              {briefingTime(result.generatedAt)} · 발행{' '}
-              {briefingTime(result.publishedAt)} · 데이터 기준{' '}
-              {briefingTime(result.dataAsOf)}
-            </p>
+            {compact && (
+              <p className={`${NOTE} mt-2`}>
+                데이터 기준 {briefingTime(result.dataAsOf)}
+                {result.metadata.source.includes('simulation') ||
+                result.metadata.source.includes('replay')
+                  ? ' · 과거 자료 시뮬레이션'
+                  : ''}
+              </p>
+            )}
+            {!compact && publicationInfo}
           </header>
           {result.notice && (
             <p className={`${EMPTY} mt-4`} role="status">
@@ -207,23 +266,28 @@ export default function PublishedBriefing({
           )}
           {result.status === 'published' && (
             <>
-              {result.metadata.partial && (
-                <div role="status" className={`${EMPTY} mt-4`}>
-                  일부 정보를 불러오지 못했어요.
-                  {result.metadata.failures.map((failure) => (
-                    <p key={failure.section}>{failure.message}</p>
-                  ))}
-                </div>
+              {(!compact || !knownLimits) && partialInfo}
+              <CompanyOutlooks result={result} compact={compact} />
+              {compact && (
+                <MarketIndicators variables={result.marketVariables} compact />
               )}
-              <section className={SECTION}>
-                <h3 className={SECTION_TITLE}>시장 요약</h3>
-                <p className={BODY}>
-                  {'text' in result.marketSummary
-                    ? result.marketSummary.text
-                    : result.marketSummary.reason}
-                </p>
-              </section>
-              <MarketIndicators variables={result.marketVariables} />
+              <BriefingReadingSection
+                compact={compact}
+                title={
+                  result.edition === 'morning'
+                    ? '시장 요약·시장 전체 전망 읽기'
+                    : '시장 요약·시장 흐름 비교 읽기'
+                }
+              >
+                <MarketSummary
+                  summary={result.marketSummary}
+                  edition={result.edition}
+                  dataAsOf={result.dataAsOf}
+                />
+              </BriefingReadingSection>
+              {!compact && (
+                <MarketIndicators variables={result.marketVariables} />
+              )}
               {personal && (
                 <PersonalBasisNotice
                   member={Boolean(memberId)}
@@ -246,7 +310,10 @@ export default function PublishedBriefing({
                 </p>
               )}
               <BriefingIssueList
+                compact={compact}
                 items={(personalBriefing ?? result).items}
+                roundId={result.id}
+                graphVersion={result.graphVersion}
                 graphHref={`/?round=${encodeURIComponent(result.id)}`}
                 renderExtra={(item) => (
                   <div className="mt-1 flex flex-col gap-2">
@@ -272,12 +339,24 @@ export default function PublishedBriefing({
                   </div>
                 )}
               />
-              {result.edition === 'evening' && (
-                <BriefingComparison
-                  since={result.sinceMorning}
-                  roundDate={result.date}
-                />
-              )}
+              <BriefingReadingSection
+                compact={compact}
+                title="이전 브리핑과 핵심 이슈 변화 보기"
+              >
+                {result.edition === 'evening' && (
+                  <BriefingComparison
+                    since={result.sinceMorning}
+                    roundDate={result.date}
+                  />
+                )}
+                {result.edition === 'morning' && (
+                  <BriefingComparison
+                    basis="previous"
+                    previous={result.previousComparison ?? null}
+                    roundDate={result.date}
+                  />
+                )}
+              </BriefingReadingSection>
               {result.corrections.length > 0 && (
                 <section className={SECTION}>
                   <h3 className={SECTION_TITLE}>정정 이력</h3>
@@ -322,6 +401,12 @@ export default function PublishedBriefing({
                 )}
               </section>
             </>
+          )}
+          {compact && (
+            <BriefingReadingSection compact title="발행 정보와 자료 확인 범위">
+              {publicationInfo}
+              {knownLimits && partialInfo}
+            </BriefingReadingSection>
           )}
         </>
       )}

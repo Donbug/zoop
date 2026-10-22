@@ -1,0 +1,105 @@
+{
+  "type": "object",
+  "properties": {
+    "assessments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "importance": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ELIGIBLE",
+              "HOLD",
+              "REJECT"
+            ]
+          },
+          "eventKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 180
+          },
+          "headline": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "COMMON_POLICY",
+              "BROAD_MARKET",
+              "COMPANY",
+              "INSUFFICIENT"
+            ]
+          },
+          "affectedSectors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "minItems": 0,
+            "maxItems": 5
+          },
+          "transmission": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 200
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "minItems": 1,
+            "maxItems": 5
+          }
+        },
+        "required": [
+          "documentId",
+          "importance",
+          "priority",
+          "status",
+          "eventKey",
+          "headline",
+          "reason",
+          "scope",
+          "affectedSectors",
+          "transmission",
+          "limitations"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "maxItems": 30
+    }
+  },
+  "required": [
+    "assessments"
+  ],
+  "additionalProperties": false
+}
