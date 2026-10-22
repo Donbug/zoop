@@ -53,13 +53,11 @@ describe('D-GRP-05 · evidence drawer states and interactions', () => {
     await screen.findAllByText('근거 문서를 제공할 수 없습니다.');
     expect(onReady).not.toHaveBeenCalled();
     mocked.mockImplementation(async (id) => createMockEvidence(id));
-    useGraphUiStore
-      .getState()
-      .openEvidence({
-        ...target,
-        id: 'new-target',
-        evidenceIds: ['mock-evidence-1'],
-      });
+    useGraphUiStore.getState().openEvidence({
+      ...target,
+      id: 'new-target',
+      evidenceIds: ['mock-evidence-1'],
+    });
     await waitFor(() => expect(onReady).toHaveBeenCalledWith('new-target'));
     expect(onReady).not.toHaveBeenCalledWith(target.id);
   });
