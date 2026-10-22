@@ -156,7 +156,7 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
   const returnTo = params.get('returnTo');
   const round =
     requestedMode === 'all' ? (params.get('round') ?? undefined) : undefined;
-  const { data, error, loading } = useGraphData(
+  const { data, error, unavailable, loading } = useGraphData(
     {
       mode: requestedMode,
       personalFilter: filter,
@@ -706,7 +706,9 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                 <p className="relationship-message" role="status">
                   {loading
                     ? '관계 지도를 불러오는 중입니다.'
-                    : '관계 지도를 불러오지 못했습니다.'}
+                    : unavailable
+                      ? '이 회차의 관계 지도는 아직 제공하지 않아요.'
+                      : '관계 지도를 불러오지 못했습니다.'}
                 </p>
               </div>
             )}
@@ -896,7 +898,8 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                   </p>
                 )}
                 {loading && <p>선택한 그래프 조회 중…</p>}
-                {error && (
+                {/* 회차 지도 미제공은 위 회차 안내가 사유를 밝히므로 조회 실패·다시 시도로 보이지 않는다. */}
+                {error && !unavailable && (
                   <p>
                     조회 실패: {error}
                     {data && ' 직전 정상 그래프를 표시합니다.'}{' '}

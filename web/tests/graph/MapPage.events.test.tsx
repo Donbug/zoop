@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import MapPage from '@/pages/map/MapPage';
 import { getEvent } from '@/apis/graph/events';
 import { getGraph } from '@/apis/graph/graph';
+import { RoundGraphUnavailableError } from '@/apis/graph/round-graph-error';
 import { createMockEvent } from '@/mocks/events/fixture';
 import { createMockGraph } from '@/mocks/graph/response';
 import { createMockRelation } from '@/mocks/relations/fixture';
@@ -250,5 +251,32 @@ describe('D-GRP-04 · map navigation and evidence handoff', () => {
     expect(
       new URLSearchParams(router.state.location.search).get('select'),
     ).toBe(`edge:${edge.id}`);
+  });
+});
+
+describe('D-BRF-04 · round map that is not provided', () => {
+  it('shows a not-provided notice instead of a failure and retry', async () => {
+    vi.mocked(getGraph).mockRejectedValue(
+      new RoundGraphUnavailableError(
+        '발행 당시 고정 그래프 조회가 아직 연결되지 않았습니다.',
+      ),
+    );
+    setup('/?round=brf-2026-10-15-evening');
+    expect(
+      await screen.findByText('이 회차의 관계 지도는 아직 제공하지 않아요.'),
+    ).toBeTruthy();
+    expect(screen.queryByText('관계 지도를 불러오지 못했습니다.')).toBeNull();
+    expect(screen.queryByText(/조회 실패/)).toBeNull();
+    expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
+  });
+
+  it('keeps the failure and retry for a round map that failed to load', async () => {
+    vi.mocked(getGraph).mockRejectedValue(new Error('네트워크 오류'));
+    setup('/?round=brf-2026-10-15-evening');
+    expect(
+      await screen.findByText('관계 지도를 불러오지 못했습니다.'),
+    ).toBeTruthy();
+    expect(screen.getByText(/조회 실패: 네트워크 오류/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeTruthy();
   });
 });

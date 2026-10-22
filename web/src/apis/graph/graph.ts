@@ -1,4 +1,5 @@
 import { getBriefingGraphBasis } from '@/apis/briefing/briefing';
+import { RoundGraphUnavailableError } from '@/apis/graph/round-graph-error';
 import { assertSnapshot } from './snapshot';
 import { call } from '@/apis/auth/ApiService';
 import { readCompanyResource } from '@/apis/company/company';
@@ -31,9 +32,12 @@ export async function getGraph(request: GraphRequest): Promise<GraphResponse> {
     throw new Error('개인화 지도는 로그인이 필요합니다.');
   if (request.round) {
     const basis = await getBriefingGraphBasis(request.round);
+    if (basis.roundId === request.round && basis.status !== 'available')
+      throw new RoundGraphUnavailableError(
+        basis.message ?? '이 회차의 그래프를 제공할 수 없습니다.',
+      );
     if (
       basis.roundId !== request.round ||
-      basis.status !== 'available' ||
       !basis.graphVersion ||
       !basis.dataAsOf
     )
