@@ -10,6 +10,11 @@ Rules (ZOOP-AIG-001 6.3.2-6.3.3, design summary 5.1):
 - Every quoted span must be allowed by the operator chat grant registry: an enabled grant with known rights, `model-send`, the
   stage as purpose and the exact recipient (`authored-replay`, or `<provider>:<revision>` live). Otherwise nothing is sent.
 - Each stage has its own client timeout (router 4 s, answer 25 s, verification 6 s); a timeout after sending is `unknown`.
+- The models are pinned like the pipeline's: Luna `gpt-6-luna` at reasoning effort `high`, Jev `jev-1.14.0`. The model that
+  answered must be the pinned one (a Luna answer may name a `gpt-6-luna-...` snapshot) and is what the receipt records.
+- Order of one invocation: the ledger first (a known invocation answers from its record, whatever the gate or keys are now),
+  then the gate, grants and sender for a new one, then one atomic claim with the live ceiling, the send, the raw answer stored,
+  and only then usage and answer interpretation. Any interpretation failure keeps the raw answer as a definite failure.
 """
 from __future__ import annotations
 
@@ -28,7 +33,7 @@ from . import chat_jev, chat_luna
 from .chat_contracts import (CHAT_SCHEMA_VERSION, AnswerInput, ChatAnswer, ChatGrantRegistry, Receipt, RouterInput,
                              StageFailure, StageRequest, StageResult, Usage, VerificationInput)
 from .contracts import canonical, digest
-from .provider import DEFAULT_BASE_URL, EFFORTS, NATIVE_DEFAULT_BASE_URL, ProviderError, native_revision, validate_base_url
+from .provider import DEFAULT_BASE_URL, NATIVE_DEFAULT_BASE_URL, ProviderError, native_revision, validate_base_url
 
 STAGE_TIMEOUT = {"chat-router": 4.0, "chat-answer": 25.0, "chat-verification": 6.0}
 LUNA = "openai-compatible"
@@ -71,9 +76,11 @@ def stage_config(stage: str, mode: str, env: dict[str, str] | None = None) -> Ch
         model = env.get("ZOOP_AI_CHAT_ANSWER_MODEL", "").strip()
         if not model:
             raise ProviderError("stage_model_required")
-        effort = env.get("ZOOP_AI_CHAT_ANSWER_REASONING_EFFORT", "").strip() or None
-        if effort is not None and effort not in EFFORTS:
-            raise ProviderError("reasoning_effort_invalid")
+        if model != chat_luna.MODEL:
+            raise ProviderError("answer_model_unsupported")
+        effort = env.get("ZOOP_AI_CHAT_ANSWER_REASONING_EFFORT", "").strip() or chat_luna.REASONING_EFFORT
+        if effort != chat_luna.REASONING_EFFORT:
+            raise ProviderError("reasoning_effort_unsupported")
         return ChatStageConfig(LUNA, digest({"endpoint": base}), model, effort, _prompt_version(stage), mode)
     base = env.get("TYPESAFE_BASE_URL", "").strip() or NATIVE_DEFAULT_BASE_URL
     validate_base_url(base)
@@ -88,8 +95,16 @@ def stage_config(stage: str, mode: str, env: dict[str, str] | None = None) -> Ch
 
 
 def request_identity(request: StageRequest, config: ChatStageConfig) -> str:
+    """What the provider is asked: the input and the frozen stage configuration. It keys the authored replay fixture."""
     return digest({"schemaVersion": CHAT_SCHEMA_VERSION, "stage": request.stage, "input": request.parsed().wire(),
                    "config": config.wire()})
+
+
+def request_digest(request: StageRequest) -> str:
+    """What the caller asked under an invocation id, without the configuration: a later configuration change (gate, key, model
+    setting) never makes a stored invocation look new or conflicting."""
+    return digest({"schemaVersion": CHAT_SCHEMA_VERSION, "stage": request.stage, "mode": request.mode,
+                   "input": request.parsed().wire()})
 
 
 def live_ceiling(env: dict[str, str] | None = None) -> int:
@@ -106,14 +121,13 @@ def live_ceiling(env: dict[str, str] | None = None) -> int:
     return ceiling
 
 
-def check_grants(request: StageRequest, config: ChatStageConfig, registry: ChatGrantRegistry | None) -> None:
+def check_grants(request: StageRequest, recipient: str, registry: ChatGrantRegistry | None) -> None:
     quotes = request.quotes()
     if not quotes:
         return
     if registry is None:
         raise ProviderError("source_grant_required")
     now = datetime.now(UTC)
-    recipient = config.recipient()
     for quote in quotes:
         allowed = any(
             g.source_id == quote.source_id and g.enabled and g.rights == "known" and "model-send" in g.allowed_operations
@@ -125,7 +139,15 @@ def check_grants(request: StageRequest, config: ChatStageConfig, registry: ChatG
 
 
 class ChatLedger:
-    """`chat.sqlite3`: one row per invocation. `reserved` was never sent; `sent` left the process and is `unknown` if found again."""
+    """`chat.sqlite3`: one row per invocation, written before anything leaves the process.
+
+    `claim` decides in one IMMEDIATE transaction who sends: the row is inserted as `sent` together with its pre-send receipt, and
+    the live ceiling counts every live row, so neither a second process with the same invocation id nor a different id can send
+    past it. Only the claimer sends. The raw provider answer is stored (`received`) before it is interpreted; `finish` stores the
+    outcome. A `sent` row whose outcome was never stored (the process stopped after claiming, while waiting, or after receiving)
+    is answered as `unknown` and never sent again. `reserved` is only read, from ledgers written by an earlier version: it was never
+    sent and is claimed like a new invocation.
+    """
 
     def __init__(self, state_dir: Path):
         self.db = sqlite3.connect(state_dir / "chat.sqlite3", isolation_level=None, timeout=5)
@@ -134,63 +156,83 @@ class ChatLedger:
             invocation_id TEXT PRIMARY KEY, stage TEXT NOT NULL, mode TEXT NOT NULL, input_digest TEXT NOT NULL,
             status TEXT NOT NULL CHECK (status IN ('reserved','sent','succeeded','failed','unknown')),
             result TEXT, raw TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)""")
+        columns = {row[1] for row in self.db.execute("PRAGMA table_info(chat_invocations)")}
+        for column in ("request_digest", "receipt"):
+            if column not in columns:
+                self.db.execute(f"ALTER TABLE chat_invocations ADD COLUMN {column} TEXT")
 
     def close(self) -> None:
         self.db.close()
 
-    def begin(self, request: StageRequest, identity: str, ceiling: int | None) -> StageResult | None:
-        """Claims the invocation for sending, or returns its stored outcome. Raises ProviderError for a conflict or budget."""
+    def stored(self, request: StageRequest) -> StageResult | None:
+        """The outcome already recorded for this invocation id, before any current gate, key or grant is consulted. Raises
+        `invocation_conflict` when the id was used for another request."""
+        row = self.db.execute("SELECT request_digest, status, result, receipt FROM chat_invocations WHERE invocation_id=?",
+                              (request.invocation_id,)).fetchone()
+        return None if row is None else self._outcome(request, row)
+
+    @staticmethod
+    def _outcome(request: StageRequest, row: tuple) -> StageResult | None:
+        recorded, status, result, receipt = row
+        if recorded is not None and recorded != request_digest(request):
+            raise ProviderError("invocation_conflict")
+        if status in ("succeeded", "failed", "unknown"):
+            return StageResult.model_validate_json(result)
+        if status == "sent":
+            # Claimed and possibly sent; its outcome was never stored: never send again.
+            return _failed(request, "provider_response_unknown", sent=True, unknown=True,
+                           receipt=None if receipt is None else Receipt.model_validate_json(receipt))
+        return None
+
+    def claim(self, request: StageRequest, identity: str, ceiling: int | None, receipt: Receipt) -> StageResult | None:
+        """Takes the right to send, or returns the outcome another claimer recorded meanwhile. Raises `chat_budget_exhausted`
+        or `invocation_conflict` without claiming."""
         self.db.execute("BEGIN IMMEDIATE")
         try:
-            row = self.db.execute("SELECT input_digest, status, result FROM chat_invocations WHERE invocation_id=?",
+            row = self.db.execute("SELECT request_digest, status, result, receipt FROM chat_invocations WHERE invocation_id=?",
                                   (request.invocation_id,)).fetchone()
             if row is not None:
-                if row[0] != identity:
-                    raise ProviderError("invocation_conflict")
-                if row[1] in ("succeeded", "failed", "unknown"):
-                    return StageResult.model_validate_json(row[2])
-                if row[1] == "sent":
-                    # A previous process sent it and never stored the outcome: never send again.
-                    result = _failed(request, "provider_response_unknown", sent=True, unknown=True, receipt=None)
-                    self.db.execute("UPDATE chat_invocations SET status='unknown', result=?, updated_at=? WHERE invocation_id=?",
-                                    (canonical(result.wire()), _now(), request.invocation_id))
-                    return result
+                outcome = self._outcome(request, row)
+                if outcome is not None:
+                    self.db.execute("COMMIT")
+                    return outcome
             if ceiling is not None:
                 used = self.db.execute("SELECT count(*) FROM chat_invocations WHERE mode='live' AND status<>'reserved'"
                                        ).fetchone()[0]
                 if used >= ceiling:
                     raise ProviderError("chat_budget_exhausted")
-            if row is None:
-                self.db.execute("INSERT INTO chat_invocations VALUES (?,?,?,?, 'reserved', NULL, NULL, ?, ?)",
-                                (request.invocation_id, request.stage, request.mode, identity, _now(), _now()))
+            self.db.execute("""INSERT INTO chat_invocations (invocation_id, stage, mode, input_digest, status, result, raw,
+                                   created_at, updated_at, request_digest, receipt)
+                               VALUES (?,?,?,?, 'sent', NULL, NULL, ?, ?, ?, ?)
+                               ON CONFLICT(invocation_id) DO UPDATE SET status='sent', input_digest=excluded.input_digest,
+                                   request_digest=excluded.request_digest, receipt=excluded.receipt, updated_at=excluded.updated_at
+                               WHERE chat_invocations.status='reserved'""",
+                            (request.invocation_id, request.stage, request.mode, identity, _now(), _now(),
+                             request_digest(request), canonical(receipt.wire())))
             self.db.execute("COMMIT")
             return None
         except BaseException:
             self.db.execute("ROLLBACK")
             raise
 
-    def mark_sent(self, invocation_id: str) -> None:
-        self.db.execute("UPDATE chat_invocations SET status='sent', updated_at=? WHERE invocation_id=? AND status='reserved'",
-                        (_now(), invocation_id))
+    def received(self, invocation_id: str, raw: Any) -> None:
+        """Keeps the provider's raw answer durably before it is interpreted."""
+        self.db.execute("UPDATE chat_invocations SET raw=?, updated_at=? WHERE invocation_id=? AND status='sent'",
+                        (canonical(raw), _now(), invocation_id))
 
-    def finish(self, result: StageResult, raw: Any) -> None:
+    def finish(self, result: StageResult) -> None:
         status = "succeeded" if result.status == "succeeded" else "unknown" if result.failure and result.failure.unknown \
             else "failed"
-        self.db.execute("UPDATE chat_invocations SET status=?, result=?, raw=?, updated_at=? WHERE invocation_id=?",
-                        (status, canonical(result.wire()), None if raw is None else canonical(raw), _now(),
-                         result.invocation_id))
+        self.db.execute("UPDATE chat_invocations SET status=?, result=?, receipt=?, updated_at=? WHERE invocation_id=? "
+                        "AND status='sent'",
+                        (status, canonical(result.wire()), None if result.receipt is None else canonical(result.receipt.wire()),
+                         _now(), result.invocation_id))
 
 
 def _failed(request: StageRequest, code: str, *, sent: bool, unknown: bool, receipt: Receipt | None) -> StageResult:
     return StageResult(schema_version=CHAT_SCHEMA_VERSION, invocation_id=request.invocation_id, stage=request.stage,
                        status="failed", answer=None, failure=StageFailure(code=code, sent=sent, unknown=unknown),
                        receipt=receipt)
-
-
-@dataclass
-class Reply:
-    raw: Any
-    usage: Usage
 
 
 def _no_usage() -> Usage:
@@ -208,7 +250,8 @@ def provider_body(request: StageRequest, config: ChatStageConfig) -> tuple[str, 
 
 
 class LiveSender:
-    """Real HTTP: one POST, no retry, no redirect. Non-2xx is a definite failure; a transport error leaves the fate unknown."""
+    """Real HTTP: one POST, no retry, no redirect. Non-2xx is a definite failure; a transport error leaves the fate unknown.
+    It returns the raw answer only: nothing is interpreted before the ledger has stored it."""
 
     def __init__(self, env: dict[str, str] | None = None, transport: httpx.BaseTransport | None = None):
         self.env = os.environ if env is None else env
@@ -225,7 +268,7 @@ class LiveSender:
         if not self._endpoint(config)[1]:
             raise ProviderError("provider_key_required")
 
-    def send(self, request: StageRequest, config: ChatStageConfig) -> Reply:
+    def send(self, request: StageRequest, config: ChatStageConfig) -> Any:
         base, key = self._endpoint(config)
         path, body = provider_body(request, config)
         with httpx.Client(base_url=base.rstrip("/") + "/", timeout=STAGE_TIMEOUT[request.stage],
@@ -239,10 +282,9 @@ class LiveSender:
             raise ProviderError("provider_option_unsupported" if response.status_code == 400
                                 else f"provider_http_{response.status_code}")
         try:
-            raw = response.json()
+            return response.json()
         except ValueError:
-            raw = {"responseText": response.text, "httpStatus": response.status_code}
-        return Reply(raw, _usage(raw, config.provider))
+            return {"responseText": response.text, "httpStatus": response.status_code}
 
 
 class ReplaySender:
@@ -263,26 +305,55 @@ class ReplaySender:
     def preflight(self, request: StageRequest, config: ChatStageConfig) -> None:
         self._entry(request, config)
 
-    def send(self, request: StageRequest, config: ChatStageConfig) -> Reply:
+    def send(self, request: StageRequest, config: ChatStageConfig) -> Any:
         entry = self._entry(request, config)
         if "error" in entry:
             raise ProviderError(entry["error"], uncertain=entry.get("uncertain", False))
-        return Reply(entry["response"], _no_usage())
+        return entry["response"]
 
 
-def _usage(raw: Any, provider: str) -> Usage:
+def _count(block: dict[str, Any], name: str) -> int | None:
+    value = block.get(name)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError("provider_usage_invalid")
+    return value
+
+
+def _details(block: dict[str, Any], name: str) -> dict[str, Any]:
+    value = block.get(name)
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError("provider_usage_invalid")
+    return value
+
+
+def usage_of(raw: Any, provider: str) -> Usage:
+    """Reported token counts. No usage block is no counts; a block of the wrong shape is a ValueError, never another error."""
     block = raw.get("usage") if isinstance(raw, dict) else None
+    if block is None:
+        return _no_usage()
     if not isinstance(block, dict):
-        return _no_usage()
+        raise ValueError("provider_usage_invalid")
     if provider == JEV:
-        values = (block.get("input_tokens"), block.get("output_tokens"), None, None)
-    else:
-        values = (block.get("prompt_tokens"), block.get("completion_tokens"),
-                  (block.get("prompt_tokens_details") or {}).get("cached_tokens"),
-                  (block.get("completion_tokens_details") or {}).get("reasoning_tokens"))
-    if any(v is not None and (isinstance(v, bool) or not isinstance(v, int) or v < 0) for v in values):
-        return _no_usage()
-    return Usage(input_tokens=values[0], output_tokens=values[1], cached_tokens=values[2], reasoning_tokens=values[3])
+        return Usage(input_tokens=_count(block, "input_tokens"), output_tokens=_count(block, "output_tokens"),
+                     cached_tokens=None, reasoning_tokens=None)
+    return Usage(input_tokens=_count(block, "prompt_tokens"), output_tokens=_count(block, "completion_tokens"),
+                 cached_tokens=_count(_details(block, "prompt_tokens_details"), "cached_tokens"),
+                 reasoning_tokens=_count(_details(block, "completion_tokens_details"), "reasoning_tokens"))
+
+
+def responded_model(raw: Any, config: ChatStageConfig) -> str:
+    """The model that answered, which the receipt records. It must be the configured model, or for an OpenAI-compatible answer
+    a dated or named snapshot of it (`<model>-...`); anything else is a model mismatch."""
+    model = raw.get("model") if isinstance(raw, dict) else None
+    if not isinstance(model, str) or not model:
+        raise ValueError("provider_model_missing")
+    if model == config.model or (config.provider == LUNA and model.startswith(config.model + "-") and len(model) <= 200):
+        return model
+    raise ValueError("provider_model_mismatch")
 
 
 def interpret(request: StageRequest, config: ChatStageConfig, raw: Any) -> dict[str, Any]:
@@ -321,48 +392,77 @@ def _interpret_answer(raw: Any, payload: AnswerInput) -> dict[str, Any]:
     return answer.wire()
 
 
+def _recipient(receipt: Receipt) -> str:
+    return receipt.provider if receipt.execution_mode == "replay" else f"{receipt.provider}:{receipt.provider_revision}"
+
+
+def _as_stored(request: StageRequest, stored: StageResult, registry: ChatGrantRegistry | None) -> StageResult:
+    """A stored outcome as it may be shown now. It is never turned into a request that was not sent; a stored answer whose
+    quoted sources lost their grant since is withheld (`source_grant_withdrawn`) with its receipt, without sending again."""
+    if stored.status != "succeeded" or stored.receipt is None:
+        return stored
+    try:
+        check_grants(request, _recipient(stored.receipt), registry)
+    except ProviderError:
+        return _failed(request, "source_grant_withdrawn", sent=True, unknown=False, receipt=stored.receipt)
+    return stored
+
+
 def invoke(request: StageRequest, *, state_dir: Path, registry: ChatGrantRegistry | None,
            sender: LiveSender | ReplaySender,
            env: dict[str, str] | None = None) -> StageResult:
-    """Runs one stage. Never raises for provider or policy outcomes: they become a failed StageResult."""
+    """Runs one stage. Never raises for provider or policy outcomes: they become a failed StageResult.
+
+    The ledger is read first: an invocation that was already claimed answers from its record whatever the gate, keys or
+    configuration are now. Only a new invocation is checked against the gate, grants and sender and then claimed."""
     ledger = ChatLedger(state_dir)
     try:
+        try:
+            stored = ledger.stored(request)
+        except ProviderError as conflict:
+            return _failed(request, conflict.code, sent=False, unknown=False, receipt=None)
+        if stored is not None:
+            return _as_stored(request, stored, registry)
         try:
             config = stage_config(request.stage, request.mode, env)
             ceiling = live_ceiling(env) if request.mode == "live" else None
             identity = request_identity(request, config)
-            check_grants(request, config, registry)
+            check_grants(request, config.recipient(), registry)
             sender.preflight(request, config)
         except ProviderError as refused:
             return _failed(request, refused.code, sent=False, unknown=False, receipt=None)
+
+        receipt = Receipt(provider=config.provider, provider_revision=config.provider_revision, model=config.model,
+                          prompt_version=config.prompt_version, execution_mode=request.mode, usage=_no_usage(),
+                          sent_at=_now(), received_at=None)
         try:
-            stored = ledger.begin(request, identity, ceiling)
+            stored = ledger.claim(request, identity, ceiling, receipt)
         except ProviderError as refused:
             return _failed(request, refused.code, sent=False, unknown=False, receipt=None)
         if stored is not None:
-            return stored
+            return _as_stored(request, stored, registry)
 
-        sent_at = _now()
-        ledger.mark_sent(request.invocation_id)
-        receipt = Receipt(provider=config.provider, provider_revision=config.provider_revision, model=config.model,
-                          prompt_version=config.prompt_version, execution_mode=request.mode, usage=_no_usage(),
-                          sent_at=sent_at, received_at=None)
         try:
-            reply = sender.send(request, config)
+            raw = sender.send(request, config)
         except ProviderError as error:
             result = _failed(request, error.code, sent=True, unknown=error.uncertain, receipt=receipt)
-            ledger.finish(result, None)
+            ledger.finish(result)
             return result
 
-        receipt = receipt.model_copy(update={"usage": reply.usage, "received_at": _now()})
+        ledger.received(request.invocation_id, raw)
+        receipt = receipt.model_copy(update={"received_at": _now()})
         try:
-            answer = interpret(request, config, reply.raw)
+            receipt = receipt.model_copy(update={"usage": usage_of(raw, config.provider),
+                                                 "model": responded_model(raw, config)})
+            answer = interpret(request, config, raw)
         except ValueError as invalid:
             result = _failed(request, str(invalid), sent=True, unknown=False, receipt=receipt)
+        except Exception:  # noqa: BLE001 - any other interpretation error keeps the stored raw answer as a definite failure
+            result = _failed(request, "provider_response_invalid", sent=True, unknown=False, receipt=receipt)
         else:
             result = StageResult(schema_version=CHAT_SCHEMA_VERSION, invocation_id=request.invocation_id,
                                  stage=request.stage, status="succeeded", answer=answer, failure=None, receipt=receipt)
-        ledger.finish(result, reply.raw)
+        ledger.finish(result)
         return result
     finally:
         ledger.close()
