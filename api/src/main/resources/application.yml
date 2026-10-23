@@ -33,6 +33,11 @@ zoop:
     naver-world-url: ${ZOOP_NAVER_WORLD_URL:https://api.stock.naver.com}
     naver-autocomplete-url: ${ZOOP_NAVER_AC_URL:https://ac.stock.naver.com}
     timeout: ${ZOOP_MARKET_TIMEOUT:5s}
+    quote-cache-ttl: ${ZOOP_MARKET_QUOTE_CACHE_TTL:5m}
+    metrics-cache-ttl: ${ZOOP_MARKET_METRICS_CACHE_TTL:30m}
+    price-cache-ttl: ${ZOOP_MARKET_PRICE_CACHE_TTL:30s}
+    cache-max-entries: ${ZOOP_MARKET_CACHE_MAX_ENTRIES:2048}
+    provider-max-concurrent-requests: ${ZOOP_MARKET_MAX_CONCURRENT_REQUESTS:4}
   api:
     cors:
       allowed-origins: ${ZOOP_API_CORS_ALLOWED_ORIGINS:}
