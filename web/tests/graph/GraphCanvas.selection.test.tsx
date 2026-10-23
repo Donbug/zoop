@@ -208,12 +208,19 @@ describe('D-GRP-02 · canvas selection bridge', () => {
         );
         expect(direct?.style?.lineWidth).toBe(1.5);
         expect(direct?.style?.stroke).toBe(
-          theme === 'dark' ? '#c4c9d1' : '#606a76',
+          theme === 'dark' ? '#a3a3a3' : '#777773',
         );
         const label = rendered.nodes?.find(
           (node) => node.id === 'NASDAQ:NVDA',
         )?.style;
         expect(Number(label?.labelFontSize)).toBeGreaterThan(17.2);
+        const aiFeature = screen.getByRole('button', { name: 'AI 기능' });
+        expect(aiFeature.querySelector('img')?.getAttribute('src')).toBe(
+          '/graph-assets/ai.svg',
+        );
+        expect(
+          screen.getByRole('button', { name: 'AI 채팅' }).querySelector('img'),
+        ).toBeNull();
         const filters = screen.getByRole('group', { name: '그래프 표시 필터' });
         expect(filters.closest('.relationship-toolbar')).toBeTruthy();
         expect(screen.queryByLabelText('그래프 범례')).toBeNull();
