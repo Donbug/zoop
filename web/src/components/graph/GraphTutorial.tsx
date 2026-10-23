@@ -35,23 +35,31 @@ const steps = [
 
 type Props = {
   step: GraphTutorialStep;
+  practice?: boolean;
+  compact?: boolean;
+  instruction?: string;
   saving?: boolean;
   error?: string | null;
   onStepChange: (step: GraphTutorialStep) => void;
   onFinish: () => void;
   onSkip: () => void;
   onRetry?: () => void;
+  onReload?: () => void;
 };
 
 // WBS 6.3.10 · D-GRP-T/T2/T3/T4/T5 · Figma 619:3337~5682
 export default function GraphTutorial({
   step,
+  practice = false,
+  compact = false,
+  instruction,
   saving = false,
   error,
   onStepChange,
   onFinish,
   onSkip,
   onRetry,
+  onReload,
 }: Props) {
   const current = steps[step - 1];
   return (
@@ -59,7 +67,7 @@ export default function GraphTutorial({
       data-screen-id={current.id}
       aria-label="관계 그래프 튜토리얼"
       aria-live="polite"
-      className="order-first flex w-[260px] shrink-0 flex-col self-start rounded-[6px] border border-panel-line bg-white p-4 font-panel text-panel-ink shadow-[0_0_0_0.5px_rgb(26_26_26/0.08)] max-sm:w-full"
+      className={`order-first flex ${compact ? 'w-full' : 'w-[260px]'} shrink-0 flex-col self-start rounded-[6px] border border-panel-line bg-white p-4 font-panel text-panel-ink shadow-[0_0_0_0.5px_rgb(26_26_26/0.08)] max-sm:w-full`}
     >
       <div>
         <p className="flex items-center gap-1.5 text-[11px] leading-[16.5px] text-panel-muted">
@@ -77,10 +85,14 @@ export default function GraphTutorial({
       </div>
       <div className="mt-2 flex flex-col">
         <p className="text-[12px] leading-[19px] text-panel-secondary">
-          {current.body}
+          {instruction ?? current.body}
         </p>
         <p className="mt-2 text-[11px] leading-[17px] text-panel-muted">
-          {current.tip}
+          {practice
+            ? step === 5
+              ? 'AI 답변은 투자 권유가 아니며 근거를 함께 확인해 주세요.'
+              : '강조된 동작을 완료하면 자동으로 다음 단계로 넘어가요. 언제든 건너뛸 수 있어요.'
+            : current.tip}
         </p>
         <div className="mt-3" aria-label={`전체 5단계 중 ${step}단계`}>
           <div className="mb-3 grid grid-cols-5 gap-1" aria-hidden="true">
@@ -98,14 +110,27 @@ export default function GraphTutorial({
             >
               <p>{error}</p>
               {onRetry && (
-                <button className="mt-2 underline" onClick={onRetry}>
+                <button
+                  className="mt-2 underline"
+                  data-tutorial-action="retry"
+                  onClick={onRetry}
+                >
                   다시 시도
                 </button>
               )}
             </div>
           )}
           <div className="flex flex-wrap items-center gap-2">
-            {step > 1 ? (
+            {onReload && (
+              <button
+                data-tutorial-action="retry"
+                onClick={onReload}
+                className="h-8 px-2 text-[11px] underline"
+              >
+                지도 다시 불러오기
+              </button>
+            )}
+            {step > 1 && !practice ? (
               <button
                 className="h-8 rounded-panel border border-panel-line px-3 text-[12px] font-semibold hover:bg-panel-soft"
                 onClick={() => onStepChange((step - 1) as GraphTutorialStep)}
@@ -114,24 +139,29 @@ export default function GraphTutorial({
                 이전
               </button>
             ) : null}
-            <button
-              className="h-8 rounded-panel bg-panel-ink px-3 text-[12px] font-semibold text-white disabled:bg-panel-muted"
-              onClick={() =>
-                step === 5
-                  ? onFinish()
-                  : onStepChange((step + 1) as GraphTutorialStep)
-              }
-              disabled={saving}
-            >
-              {saving ? '저장 중…' : step === 5 ? '마치기' : '다음'}
-            </button>
-            <button
-              className="ml-auto h-8 rounded-panel border border-panel-line px-2 text-[11px] font-semibold text-panel-secondary hover:bg-panel-soft"
-              onClick={onSkip}
-              disabled={saving}
-            >
-              튜토리얼 건너뛰기
-            </button>
+            {(!practice || step === 5) && (
+              <button
+                className="h-8 rounded-panel bg-panel-ink px-3 text-[12px] font-semibold text-white disabled:bg-panel-muted"
+                onClick={() =>
+                  step === 5
+                    ? onFinish()
+                    : onStepChange((step + 1) as GraphTutorialStep)
+                }
+                disabled={saving}
+              >
+                {saving ? '저장 중…' : step === 5 ? '마치기' : '다음'}
+              </button>
+            )}
+            {step < 5 && (
+              <button
+                className="ml-auto h-8 rounded-panel border border-panel-line px-2 text-[11px] font-semibold text-panel-secondary hover:bg-panel-soft"
+                data-tutorial-action="skip"
+                onClick={onSkip}
+                disabled={saving}
+              >
+                튜토리얼 건너뛰기
+              </button>
+            )}
           </div>
         </div>
       </div>

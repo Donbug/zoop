@@ -42,6 +42,25 @@ beforeEach(() => {
 });
 
 describe('D-GRP-05 · evidence drawer states and interactions', () => {
+  it('문서 제공 불가 응답만 있으면 완료하지 않고 새 요청의 표시 가능한 문서를 기다린다', async () => {
+    const onReady = vi.fn();
+    mocked.mockImplementation(async (id) => ({
+      ...createMockEvidence(id),
+      article: null,
+    }));
+    useGraphUiStore.getState().openEvidence(target);
+    render(<EvidenceDrawer onReady={onReady} />);
+    await screen.findAllByText('근거 문서를 제공할 수 없습니다.');
+    expect(onReady).not.toHaveBeenCalled();
+    mocked.mockImplementation(async (id) => createMockEvidence(id));
+    useGraphUiStore.getState().openEvidence({
+      ...target,
+      id: 'new-target',
+      evidenceIds: ['mock-evidence-1'],
+    });
+    await waitFor(() => expect(onReady).toHaveBeenCalledWith('new-target'));
+    expect(onReady).not.toHaveBeenCalledWith(target.id);
+  });
   it('traps reverse Tab from the heading and restores background interaction on close', async () => {
     mocked.mockImplementation(async (id) => createMockEvidence(id));
     render(<Harness />);

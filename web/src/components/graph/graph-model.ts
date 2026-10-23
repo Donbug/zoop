@@ -238,8 +238,9 @@ export function toG6Data(
         type: company ? 'circle' : 'diamond',
         data: { kind: n.kind },
         style: {
-          x: x * sx,
-          y: y * sy,
+          // Spread positions without inflating node icons or labels.
+          x: width / 2 + (x * sx - width / 2) * 1.75,
+          y: height / 2 + (y * sy - height / 2) * 1.65,
           size,
           fill: company
             ? logo

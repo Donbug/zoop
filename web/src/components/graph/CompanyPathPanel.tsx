@@ -10,6 +10,7 @@ export default function CompanyPathPanel({
   to,
   loading,
   error,
+  unavailable = false,
   onPick,
   onClose,
   onRetry,
@@ -20,6 +21,8 @@ export default function CompanyPathPanel({
   to: string | null;
   loading: boolean;
   error: string | null;
+  /** 회차 지도가 실패가 아니라 제공되지 않는 상태(D-BRF-04). 다시 시도를 두지 않는다. */
+  unavailable?: boolean;
   onPick: (id: string) => void;
   onClose: () => void;
   onRetry: () => void;
@@ -71,6 +74,10 @@ export default function CompanyPathPanel({
         {loading ? (
           <p className={ui.state} role="status">
             경로의 기준 그래프를 확인하고 있어요.
+          </p>
+        ) : error && unavailable ? (
+          <p className={ui.state} role="status">
+            이 회차의 관계 지도는 아직 제공하지 않아요.
           </p>
         ) : error ? (
           <div className={ui.state} role="alert">

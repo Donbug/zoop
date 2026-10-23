@@ -7,6 +7,12 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "response:200:application/json.jobs.ingest.unresolvedFailures<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.ingest.unresolvedFailures<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -281,6 +287,9 @@
     }
   },
   "bffOnly": {
+    "response:200:application/json.jobs.ingest.unresolvedFailures": {
+      "type": "integer"
+    },
     "response:401:application/json.error.details<anyOf:0>": {
       "type": "object"
     },

@@ -6,6 +6,9 @@ import type { Impact } from '@/types/company/detail';
 import type { GraphResponse } from '@/types/map/graph';
 
 type Props = {
+  tutorialEvidence?: boolean;
+  tutorialAi?: boolean;
+  tutorialSaving?: boolean;
   companyId: string;
   issueId: string;
   graph: GraphResponse;
@@ -24,6 +27,9 @@ const unique = (items: string[]) => [...new Set(items)];
 // WBS 6.6.26 · D-GRP-06 · Figma 619:8880
 export default function ImpactPathPanel({
   companyId,
+  tutorialEvidence = false,
+  tutorialAi = false,
+  tutorialSaving = false,
   issueId,
   graph,
   impact,
@@ -89,8 +95,15 @@ export default function ImpactPathPanel({
           {company?.label ?? companyId} · 영향 경로
         </h2>
         <p className={ui.muted}>
-          직접 연결 · 지도 기준{' '}
-          {new Date(graph.metadata.asOf).toLocaleString('ko-KR')}
+          {graph.edges.some(
+            (edge) =>
+              edge.relationType === 'INVOLVES' &&
+              [edge.source, edge.target].includes(companyId) &&
+              [edge.source, edge.target].includes(issueId),
+          )
+            ? '직접 관련'
+            : '구조적 관련'}{' '}
+          · 지도 기준 {new Date(graph.metadata.asOf).toLocaleString('ko-KR')}
         </p>
       </header>
       <div className={ui.scroll} aria-busy={loading}>
@@ -105,14 +118,20 @@ export default function ImpactPathPanel({
             <strong>영향 경로를 불러오지 못했습니다.</strong>
             <p>{error}</p>
             <p>지도와 기업 선택은 그대로 유지됩니다.</p>
-            <button onClick={onRetry}>다시 시도</button>
+            <button data-tutorial-action="retry" onClick={onRetry}>
+              다시 시도
+            </button>
           </div>
         )}
         {impact && (
           <>
             <div className={ui.actions}>
               <button onClick={onViewIssue}>사건 상세 보기</button>
-              <button className="bg-panel-ink! text-white!" onClick={onAskAi}>
+              <button
+                className={`bg-panel-ink! text-white! ${tutorialAi ? 'tutorial-target tutorial-ai-target' : ''}`}
+                disabled={tutorialSaving}
+                onClick={onAskAi}
+              >
                 <GraphIcon name="ai" size={14} />
                 AI에게 묻기
               </button>
@@ -156,6 +175,12 @@ export default function ImpactPathPanel({
                           <button
                             className="mt-1 text-[11px] font-semibold underline disabled:text-panel-muted"
                             disabled={stepEvidence.length === 0}
+                            data-tutorial-action={
+                              tutorialEvidence ? 'evidence' : undefined
+                            }
+                            data-tutorial-evidence={
+                              tutorialEvidence || undefined
+                            }
                             onClick={() => onEvidence(stepEvidence)}
                           >
                             근거 {stepEvidence.length}건 보기

@@ -125,7 +125,7 @@ describe('Issue #11 · WBS 6.4.5 · D-WAT-01/01b', () => {
       screen.getByRole('button', { name: '고르지 않고 지도 보기' }),
     );
     expect((await screen.findByTestId('destination')).textContent).toBe(
-      '/?mode=all',
+      '/?mode=all&tour=1',
     );
     expect(server.requests.find((r) => r.method === 'PUT')?.body).toMatchObject(
       {
@@ -159,7 +159,7 @@ describe('Issue #11 · WBS 6.4.5 · D-WAT-01/01b', () => {
       screen.getByRole('button', { name: '고르지 않고 지도 보기' }),
     );
     expect((await screen.findByTestId('destination')).textContent).toBe(
-      '/?mode=personal',
+      '/?mode=all&tour=1',
     );
     expect(server.requests.find((r) => r.method === 'PUT')?.body).toMatchObject(
       { mode: 'assets' },
@@ -186,7 +186,7 @@ describe('Issue #11 · WBS 6.4.5 · D-WAT-01/01b', () => {
       screen.getByRole('button', { name: '1개 종목으로 시작하기' }),
     );
     expect((await screen.findByTestId('destination')).textContent).toBe(
-      '/?mode=personal',
+      '/?mode=all&tour=1',
     );
     expect(server.requests.find((r) => r.method === 'PUT')?.body).toMatchObject(
       { watchlistIds: [company.id] },
@@ -310,7 +310,7 @@ describe('Issue #11 · WBS 6.4.5 · D-WAT-01/01b', () => {
     );
     await user.click(screen.getByRole('button', { name: '저장 다시 시도' }));
     expect((await screen.findByTestId('destination')).textContent).toBe(
-      '/?mode=personal',
+      '/?mode=all&tour=1',
     );
   });
   it('shows empty/search failure and allows retry', async () => {

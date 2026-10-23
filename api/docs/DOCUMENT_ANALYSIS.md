@@ -2,7 +2,7 @@
 
 [문서 import](DOCUMENT_IMPORT.md)가 등록한 문서 버전 한 건을 S1 AI 서비스(`ai/service`, 계약 `zoop-ai-s1-1`)로 요약(`document-summary`) 또는 기업 판정(`document-sentiment`)하고, 검증을 통과한 결과를 앱 DB의 `document_analyses`·`evidence`·`ai_executions`(ERD v6 §17·§18·§32)와 로컬 artifact 파일에 저장합니다. 분석 실행은 운영자가 실행하는 **비웹 Spring 프로세스**이며 HTTP 경로가 없습니다. 저장된 요약의 본문 인용을 읽는 공개 경로는 `getEvidence` 한 건만 있고([근거 읽기](#근거-읽기-getevidence-부분-구현), 부분 구현) 분석을 읽는 다른 공개 API는 없습니다.
 
-**하지 않는 것:** `getEvidence` 외의 공개·관리자 경로(`listCompanyDocuments`, `getAiUsage` 등 읽기; `getEvidence`는 그래프 없이 부분 응답만), `analysis_jobs`(공개 관리자 작업)와 그 FK, 그래프(GraphDB) 반영, 취소·포기, 챗봇·브리핑 실행 기록, 요약 텍스트 artifact(`summary_text`)와 요약을 입력으로 하는 근거, 보존·삭제, **live 모드 실행**. `status=available`은 “생성·검증·수입이 끝난 이력”이지 **공개 허가가 아닙니다**([권리](#권리)).
+**하지 않는 것:** `getEvidence` 외의 공개·관리자 경로(`listCompanyDocuments`, `getAiUsage` 등 읽기; `getEvidence`는 그래프 없이 부분 응답만), `analysis_jobs`(공개 관리자 작업) 쓰기, 그래프(GraphDB) 반영, 취소·포기, 챗봇·브리핑 실행 기록, 요약 텍스트 artifact(`summary_text`)와 요약을 입력으로 하는 근거, 보존·삭제, **live 모드 실행**. `status=available`은 “생성·검증·수입이 끝난 이력”이지 **공개 허가가 아닙니다**([권리](#권리)).
 
 ## 흐름
 
@@ -245,7 +245,7 @@ smoke는 합성 문서 6건을 설치된 CLI로 만들어 jar의 import로 등�
 ## 남은 결정과 한계
 
 - 이 migration(`V20261014130000`)과 `document_analyses`·`evidence`·`ai_executions`의 소유는 **로컬 제안**입니다([소유 경계](../../docs/development/api-migration-ownership.md)). 병합 순서상 이 파일이 최신 버전 뒤에 오도록 이름만 바꿉니다.
-- **연기한 FK.** `analysis_jobs`·`chat_jobs`·`briefing_attempts` 테이블은 없습니다(다른 담당). `document_analyses.analysis_job_id`와 `ai_executions.chat_job_id`·`briefing_attempt_id`·`analysis_job_id`는 **일반 text 열**이고 이 코드는 쓰지 않습니다. FK는 해당 테이블을 만드는 migration이 추가합니다(브리핑의 `graph_version_id`와 같은 선례). `ai_executions.document_analysis_id`와 `ai_job_id` 일치는 코드와 트리거로, 다른 실행 소유가 문서 분석을 추가 문맥으로 가질 수 있어 복합 FK는 만들지 않았습니다.
+- **연기한 FK.** `document_analyses.analysis_job_id`와 `ai_executions.analysis_job_id`의 FK는 `analysis_jobs`를 만드는 `V20261022120000`이 추가했습니다(RESTRICT). `chat_jobs`·`briefing_attempts` 테이블은 아직 없어(다른 담당) `ai_executions.chat_job_id`·`briefing_attempt_id`는 **일반 text 열**이고, FK는 해당 테이블을 만드는 migration이 추가합니다(브리핑의 `graph_version_id`와 같은 선례). 이 코드는 네 열 모두 쓰지 않습니다. `ai_executions.document_analysis_id`와 `ai_job_id` 일치는 코드와 트리거로, 다른 실행 소유가 문서 분석을 추가 문맥으로 가질 수 있어 복합 FK는 만들지 않았습니다.
 - **evidence id 네임스페이스(ERD §8 항목 4 “원문/요약 인용 네임스페이스”)는 이 변경이 로컬로 정했습니다**: `ev-` + sha256(`{analysisId, 모델 evidenceId}`). 모델 id(`e1` 등)는 전역 유일하지 않고 `evidence.id`는 전역 PK이기 때문입니다. 확정은 소유자의 몫입니다.
 - 분석 `replay`의 의미(ERD §32 “저장 산출물 재사용” vs 이 저장소의 authored replay)는 열린 항목이며, 캐시로 돌려준 결과는 별도 replay 실행으로 세지 않습니다.
 - 잘못된 prepare는 그 범위를 terminal이 될 때까지 막습니다(취소·포기 경로 없음). 권리 때문에 withheld된 결과의 복구는 명시적 재요청이며 grant revision이 같을 때만 캐시 덕에 무료입니다. withheld 행은 내용 artifact가 없어 감사 근거가 이유 코드와 영수증입니다.

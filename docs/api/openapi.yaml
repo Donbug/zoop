@@ -5783,7 +5783,7 @@ paths:
       tags:
         - "admin-jobs"
       summary: "허용된 분석 작업 재시도"
-      description: "허용된 분석 작업 재시도.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "허용된 분석 작업 재시도. RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 작업(같은 종류·라벨·입력)으로 대기열에 넣고 202를 돌려준다. 허용되지 않으면 REVISION_CONFLICT/409이고 아무것도 만들지 않는다. AI 요청을 직접 다시 보내지 않으며, 새 모델 실행이 필요하면 작업 실행 시 새 AI jobId를 쓴다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
       operationId: "retryAnalysisJob"
       parameters:
         -
@@ -5927,7 +5927,7 @@ paths:
           "$ref": "#/components/responses/Error500"
         "503":
           "$ref": "#/components/responses/Error503"
-      description: "분석 작업 명시적 취소.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "분석 작업 명시적 취소. queued는 즉시 cancelled, running은 cancelRequested=true로 표시하고 소유 worker가 종료한다(진행 중인 AI 하위 실행은 죽이지 않는다). 이미 cancelled면 같은 작업을 돌려준다. succeeded·failed는 끝난 작업이라 REVISION_CONFLICT/409이며, 취소는 완료된 결과의 철회나 공개 버전 비활성화를 대신하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
       security:
         -
           adminSession: []
@@ -13338,7 +13338,11 @@ components:
             -
               type: "null"
         unresolvedFailures:
-          type: "integer"
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
       type: "object"
       required:
         - "at"
@@ -13346,7 +13350,7 @@ components:
         - "outcome"
         - "newArticles"
         - "unresolvedFailures"
-      description: "The checkpoint the next article-processing run starts from: the start time of the latest run that\nfinished normally, also when it found nothing new. Failed and cancelled runs never move it.\n``unresolved_failures`` counts article files whose latest run failed or was cancelled."
+      description: "The checkpoint the next article-processing run starts from: the start time of the latest run that\nfinished normally, also when it found nothing new. Failed and cancelled runs never move it.\n``unresolved_failures`` counts article files whose latest run failed or was cancelled; null while no\nper-article run record exists (it is never a job count)."
     IngestOutcome:
       properties:
         outcome:
@@ -15258,6 +15262,8 @@ components:
             - "duplicate_running"
             - "other_running"
             - "dataset_missing"
+            - "outcome_unknown"
+          description: "재시도 판정. in_progress(대기·실행 중), succeeded(이미 성공), duplicate_running(이 작업의 재시도가 대기·실행 중), newer_attempt(더 새 재시도가 있어 가장 최근 시도만 재시도 가능), superseded(같은 종류·같은 입력의 더 나중 작업이 성공), outcome_unknown(외부 실행 결과를 확인할 수 없음: 응답 유실로 실행·과금 여부를 모르므로 자동 재시도하지 않음), dataset_missing(작업의 실행 계획이나 입력 연결이 없거나 철회됨, 일시적 조회 장애는 해당하지 않음), allowed. other_running은 대기열 정책상 다른 작업 실행만으로 재시도를 거절하지 않으므로 반환하지 않는다. blockedBy는 막고 있는 작업 ID다."
         reason:
           type: "string"
         blockedBy:
