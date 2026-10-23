@@ -64,7 +64,7 @@ def run(args):
     base.private_dir(output)
     base.write_once(output / "base-presentation-bundle.json", raw)
     # Recovery validation retains its own base, editorial review and immutable calls.
-    for name in ("base-bundle-v2.json", "grouped-issues.json", "editorial-review-holds.json"):
+    for name in ("base-bundle-v2.json", "grouped-issues.json", "editorial-review-holds.json", "publication-companies.json"):
         if (baseline / name).exists():
             base.write_once(output / name, base.regular(baseline / name))
     base.private_dir(output / "calls")

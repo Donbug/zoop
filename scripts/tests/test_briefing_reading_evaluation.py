@@ -22,4 +22,11 @@ class PairwiseTest(unittest.TestCase):
   other={'frozen':{**row['frozen'],'schemaVersion':'v2'}}
   self.assertEqual(e.compare_input(row),e.compare_input(other))
   other['frozen']['previous']='another-version';self.assertNotEqual(e.compare_input(row),e.compare_input(other))
+ def test_multi_round_sampling_preserves_round_identity_and_distinct_company_issues(self):
+  rows=[{'roundId':'r1','frozen':{'targets':[{'companyId':'A','issueIds':['one']},{'companyId':'B','issueIds':['two']}]}},
+        {'roundId':'r2','frozen':{'targets':[{'companyId':'A','issueIds':['three']},{'companyId':'C','issueIds':['three']}]}}]
+  cases=e.representative_round_cases(rows)
+  self.assertEqual(3,len(cases));self.assertEqual({'A','B','C'},{c['companyId'] for c in cases})
+  self.assertEqual({'one','two','three'},{c['issueId'] for c in cases})
+  self.assertEqual('r2',next(c['roundId'] for c in cases if c['companyId']=='C'))
 if __name__=='__main__':unittest.main()
