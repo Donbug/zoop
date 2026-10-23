@@ -225,6 +225,34 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     ).toBeTruthy();
   });
 
+  test('요청한 버전과 다른 성공 응답은 전환 완료로 표시하지 않는다', async () => {
+    server.on('GET', VERSIONS, () => json(list()));
+    server.on('POST', ACTIVATE, () =>
+      json({
+        activeVersionId: 'v0',
+        previousActiveVersionId: 'v2',
+        idempotent: false,
+      }),
+    );
+    const { user } = open();
+
+    await user.click(await screen.findByRole('button', { name: 'v1로 전환' }));
+    const form = screen.getByRole('form', { name: '그래프 버전 전환' });
+    await user.type(
+      within(form).getByLabelText('전환 사유(감사 로그에 남아요)'),
+      '되돌림',
+    );
+    await user.click(within(form).getByRole('button', { name: 'v1로 전환' }));
+
+    expect(
+      await within(form).findByText(
+        '버전을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText('v0로 바꿨어요.')).toBeNull();
+    expect(server.calls('GET', VERSIONS)).toHaveLength(1);
+  });
+
   test('목록을 불러오지 못하면 다시 시도할 수 있고, 후보·작업 탭은 준비 중으로 보인다', async () => {
     server.on('GET', VERSIONS, () => apiError(503, 'SOURCE_UNAVAILABLE'));
     const { user, location } = open();

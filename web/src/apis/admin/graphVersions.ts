@@ -1,4 +1,5 @@
 import { adminCall } from '@/apis/admin/auth';
+import { ApiError } from '@/apis/auth/ApiService';
 import type {
   GraphVersionActivated,
   GraphVersionList,
@@ -18,16 +19,26 @@ export function listGraphVersions(cursor?: string) {
  * activateGraphVersion: 이미 있는 공개 버전을 사용자에게 보이는 버전으로 바꾼다.
  * expectedActiveVersionId는 관리자가 화면에서 본 현재 버전이다. 그 사이 다른 관리자가 바꿨으면 409로 거절된다.
  */
-export function activateGraphVersion(
+export async function activateGraphVersion(
   versionId: string,
   reason: string,
   expectedActiveVersionId: string | null,
   idempotencyKey: string,
 ) {
-  return adminCall<GraphVersionActivated>(
+  const result = await adminCall<GraphVersionActivated>(
     `${VERSIONS}/${encodeURIComponent(versionId)}/activate`,
     'POST',
     { reason, expectedActiveVersionId },
     { 'Idempotency-Key': idempotencyKey },
   );
+  if (
+    result.activeVersionId !== versionId ||
+    result.previousActiveVersionId !== expectedActiveVersionId
+  )
+    throw new ApiError(
+      200,
+      'INVALID_RESPONSE',
+      '요청한 그래프 버전 전환과 응답이 일치하지 않습니다.',
+    );
+  return result;
 }
