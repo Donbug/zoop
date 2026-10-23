@@ -25,8 +25,13 @@ CREATE TABLE publication_rules (
 );
 
 -- The definition is fixed with its id; only the switch, its revision and its time move, and the revision only forward by one.
+-- A rule is never deleted, whether or not it was ever switched: deleting one and inserting the id again would redefine a version
+-- without a trace. A changed definition is a new version (a new id).
 CREATE FUNCTION publication_rules_guard_update() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'publication rules are kept' USING ERRCODE = 'restrict_violation';
+    END IF;
     IF (NEW.id, NEW.title, NEW.summary, NEW.definition, NEW.default_enabled)
         IS DISTINCT FROM (OLD.id, OLD.title, OLD.summary, OLD.definition, OLD.default_enabled) THEN
         RAISE EXCEPTION 'publication rule definition is immutable' USING ERRCODE = 'restrict_violation';
@@ -38,7 +43,7 @@ BEGIN
 END
 $$;
 
-CREATE TRIGGER tr_publication_rules_guard BEFORE UPDATE ON publication_rules
+CREATE TRIGGER tr_publication_rules_guard BEFORE UPDATE OR DELETE ON publication_rules
     FOR EACH ROW EXECUTE FUNCTION publication_rules_guard_update();
 
 -- One row per switch. `revision` is the rule's own (1, 2, ...); `log_revision` is the app-wide rule counter that graph versions

@@ -13,7 +13,6 @@ import com.zoop.admin.rules.PublicationRuleResponse.SwitchResponse;
 import com.zoop.auth.service.CsrfKeyRing;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -40,18 +39,20 @@ public class PublicationRuleService {
     private final AdminAuditRepository audit;
     private final ObjectMapper mapper;
     private final CsrfKeyRing keys;
-    private final Clock clock;
 
     public PublicationRuleService(JdbcPublicationRuleRepository repository, AdminAuditRepository audit, ObjectMapper mapper,
-            CsrfKeyRing keys, Clock clock) {
+            CsrfKeyRing keys) {
         this.repository = repository;
         this.audit = audit;
         this.mapper = mapper;
         this.keys = keys;
-        this.clock = clock;
     }
 
-    /** One snapshot (ERD v6: composed reads use one DB snapshot), so a rule's state and its history never disagree. */
+    /**
+     * One snapshot (ERD v6: composed reads use one DB snapshot), so a rule's state and its history never disagree. {@code asOf} is
+     * that snapshot's time, read by the transaction's first statement, never the time the response is built: a switch committed
+     * while the page is read is after {@code asOf} and not in the page.
+     */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public RuleList list(String adminId, String cursor, Integer requestedLimit) {
         if (requestedLimit != null && (requestedLimit < 1 || requestedLimit > MAX_LIMIT)) {
@@ -60,12 +61,13 @@ public class PublicationRuleService {
         var position = RuleCursor.decode(mapper, keys, cursor, adminId, requestedLimit, MAX_LIMIT);
         int limit = requestedLimit != null ? requestedLimit : position == null ? DEFAULT_LIMIT : position.limit();
         try {
+            Instant asOf = repository.databaseTime();
             List<RuleRow> rows = repository.page(position == null ? null : position.id(), limit + 1);
             boolean hasNext = rows.size() > limit;
             List<RuleRow> page = hasNext ? rows.subList(0, limit) : rows;
             String nextCursor = hasNext ? RuleCursor.encode(mapper, keys, adminId, limit, page.get(page.size() - 1).id())
                     : null;
-            return new RuleList(outs(page), clock.instant().toString(), nextCursor);
+            return new RuleList(outs(page), asOf.toString(), nextCursor);
         } catch (DataAccessException exception) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception);
         }
@@ -89,7 +91,7 @@ public class PublicationRuleService {
             long reviewRevision = repository.reviewRevision();
             if (rule.enabled() == enabled) return new SwitchResponse(out(rule), true, reviewRevision);
 
-            Instant now = clock.instant();
+            Instant now = repository.databaseTime();
             long revision = rule.revision() + 1;
             long logRevision = repository.nextLogRevision();
             repository.switchRule(ruleId, revision, enabled, now);

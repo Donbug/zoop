@@ -5,6 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.hamcrest.Matchers.contains;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.reset;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -16,9 +20,12 @@ import com.zoop.admin.auth.provision.AdminProvisioningService;
 import com.zoop.admin.auth.service.AdminSessionCookie;
 import com.zoop.common.request.RequestIdFilter;
 import jakarta.servlet.http.Cookie;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -28,12 +35,18 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-/** The admin publication rule API over the real migration, admin session, CSRF, publication lock and audit tables. */
+/**
+ * The admin publication rule API over the real migration, admin session, CSRF, publication lock and audit tables. The repository spy
+ * gives this class its own context, closed after it so its connection pool does not stay open beside the shared ones.
+ */
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @SpringBootTest(properties = {
         "ZOOP_AUTH_CSRF_ACTIVE_KEY_ID=test",
         "ZOOP_AUTH_CSRF_KEYS=test=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -49,6 +62,7 @@ class PublicationRulePostgresTest {
     @Autowired RequestIdFilter requestIds;
     @Autowired JdbcTemplate jdbc;
     @Autowired AdminProvisioningService provisioning;
+    @MockitoSpyBean JdbcPublicationRuleRepository rules;
 
     private MockMvc mvc;
 
@@ -58,6 +72,7 @@ class PublicationRulePostgresTest {
     @BeforeEach
     void setUp() {
         mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(requestIds).build();
+        reset(rules);
     }
 
     @Test
@@ -101,6 +116,49 @@ class PublicationRulePostgresTest {
                 .andExpect(status().isUnprocessableContent());
         mvc.perform(get("/api/v1/admin/pipeline/rules").param("limit", "101").cookie(login.cookie()))
                 .andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void theListsAsOfIsTheTimeOfItsSnapshotNotOfTheResponse() throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        Login login = login(suffix);
+        String rule = insertRule("Tq" + suffix, false);
+        // Another administrator's switch commits after the list's snapshot is taken and before its page is read.
+        AtomicBoolean switchOnce = new AtomicBoolean(true);
+        AtomicReference<Throwable> switchFailure = new AtomicReference<>();
+        doAnswer(call -> {
+            if (switchOnce.compareAndSet(true, false)) {
+                Thread other = new Thread(() -> {
+                    try {
+                        set(login, rule, true, "읽는 중 전환").andExpect(status().isOk());
+                    } catch (Throwable failure) {
+                        switchFailure.set(failure);
+                    }
+                });
+                other.start();
+                other.join(10_000);
+            }
+            return call.callRealMethod();
+        }).when(rules).page(any(), anyInt());
+
+        String body = mvc.perform(get("/api/v1/admin/pipeline/rules").param("limit", "100").cookie(login.cookie()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertEquals(null, switchFailure.get());
+        assertEquals(1, changeCount(rule), "the switch committed while the page was read");
+        assertEquals(List.of(false), JsonPath.read(body, "$.items[?(@.id == '" + rule + "')].enabled"),
+                "the page is the snapshot before it");
+        Instant asOf = Instant.parse(JsonPath.read(body, "$.asOf"));
+        Instant changedAt = jdbc.queryForObject("SELECT changed_at FROM publication_rule_changes WHERE rule_id = ?",
+                java.sql.Timestamp.class, rule).toInstant();
+        assertTrue(asOf.isBefore(changedAt), "asOf " + asOf + " precedes the switch it does not show (" + changedAt + ")");
+
+        // The next list shows the switch, and its asOf and the switch's changedAt are times of the one database clock.
+        String after = mvc.perform(get("/api/v1/admin/pipeline/rules").param("limit", "100").cookie(login.cookie()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertEquals(List.of(true), JsonPath.read(after, "$.items[?(@.id == '" + rule + "')].enabled"));
+        assertEquals(List.of(changedAt.toString()), JsonPath.read(after, "$.items[?(@.id == '" + rule + "')].changedAt"));
+        assertTrue(!Instant.parse(JsonPath.read(after, "$.asOf")).isBefore(changedAt), "a shown switch is not after asOf");
     }
 
     @Test
@@ -185,6 +243,13 @@ class PublicationRulePostgresTest {
                 () -> jdbc.update("UPDATE publication_rule_changes SET reason = 'x' WHERE rule_id = ?", rule));
         assertThrows(DataAccessException.class,
                 () -> jdbc.update("DELETE FROM publication_rule_changes WHERE rule_id = ?", rule));
+        // A rule is never deleted, switched or not: a never-switched one could otherwise be redefined under the same id.
+        String untouched = insertRule("Tu" + suffix, false);
+        for (String id : List.of(untouched, rule)) {
+            DataAccessException refused = assertThrows(DataAccessException.class,
+                    () -> jdbc.update("DELETE FROM publication_rules WHERE id = ?", id), id);
+            assertTrue(refused.getMostSpecificCause().getMessage().contains("publication rules are kept"), id);
+        }
         assertThrows(DataAccessException.class,
                 () -> jdbc.update("INSERT INTO publication_rules (id, title, summary, definition, default_enabled, enabled, "
                         + "updated_at) VALUES ('no-version', 't', 's', '{}', false, false, now())"), "the id carries a version");

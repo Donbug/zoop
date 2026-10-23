@@ -30,6 +30,18 @@ public class JdbcPublicationRuleRepository {
             Instant changedAt) {
     }
 
+    /**
+     * The database time of this statement: the one clock for every time this area writes or reports. As the first statement of a
+     * REPEATABLE READ transaction it is when the transaction's snapshot is taken, so it is the instant the following reads
+     * describe; a switch stamps its {@code changed_at} with it too, so an {@code asOf} and a {@code changedAt} never come from two
+     * clocks that may disagree.
+     */
+    public Instant databaseTime() {
+        Timestamp at = jdbc.getJdbcTemplate().queryForObject("SELECT statement_timestamp()", Timestamp.class);
+        if (at == null) throw new IllegalStateException("No database time");
+        return at.toInstant();
+    }
+
     /** One page of rules in id order, after {@code afterId}. */
     public List<RuleRow> page(String afterId, int limit) {
         return jdbc.query("SELECT " + COLUMNS + """
