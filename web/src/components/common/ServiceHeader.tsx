@@ -1,6 +1,7 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { toggleTheme } from '@/util/theme-color';
 import GraphIcon from '@/components/graph/GraphIcon';
+import { useAiChatStore } from '@/stores/useAiChatStore';
 import AccountMenu from './AccountMenu';
 import './service-shell.css';
 
@@ -17,6 +18,14 @@ export default function ServiceHeader({
 }: {
   navLabel?: string;
 }) {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  /** D-AI-01: the AI drawer lives on the map. Elsewhere, go to the map first; the selected target is kept as it is. */
+  function openAiChat() {
+    if (pathname !== '/') navigate('/');
+    useAiChatStore.getState().open(undefined);
+  }
+
   return (
     <header className="relationship-header">
       <NavLink to="/" className="relationship-logo">
@@ -30,7 +39,7 @@ export default function ServiceHeader({
             {menu.label}
           </NavLink>
         ))}
-        <button>
+        <button type="button" onClick={openAiChat}>
           <GraphIcon name="ai" size={15} />
           AI질의
         </button>
