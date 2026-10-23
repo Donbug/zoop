@@ -127,13 +127,16 @@ public class JdbcChatRepository implements ChatRepository {
 
     @Override
     public boolean cancel(String jobId, Instant at, String attempts) {
-        return jdbc.update("""
+        var params = new MapSqlParameterSource().addValue("id", jobId).addValue("at", Timestamp.from(at))
+                .addValue("attempts", attempts);
+        boolean cancelled = jdbc.update("""
                 UPDATE chat_jobs SET status = 'cancelled', phase = NULL, owner_token = NULL, lease_until = NULL,
                     deadline_at = NULL, cancel_requested = true, attempts = CAST(:attempts AS jsonb),
                     finished_at = :at, updated_at = :at
                  WHERE id = :id AND status IN ('queued', 'running')
-                """, new MapSqlParameterSource().addValue("id", jobId).addValue("at", Timestamp.from(at))
-                .addValue("attempts", attempts)) == 1;
+                """, params) == 1;
+        if (cancelled) jdbc.update(JdbcChatExecutionRepository.CLOSE_TOOL_CALLS, params);
+        return cancelled;
     }
 
     @Override

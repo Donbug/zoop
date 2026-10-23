@@ -122,4 +122,28 @@ describe('D-GRP-04 · relation rail states', () => {
       ),
     );
   });
+  it('does not label an unconfirmed reconstructed company role as a follow-up relation', async () => {
+    const original = createMockRelation(edge.id);
+    mocked.mockResolvedValueOnce({
+      ...original,
+      relationType: 'INVOLVES',
+      derived: false,
+      role: null,
+      roles: [],
+      metadata: {
+        ...original.metadata,
+        source: 'briefing_reconstructed_graph',
+      },
+      verification: {
+        status: 'not_applicable',
+        note: '저장된 연결이며 별도 역할 확인이 아닙니다.',
+      },
+    });
+    render(<RelationDetailPanel {...props} />);
+    expect(await screen.findByText('역할 미확인')).toBeTruthy();
+    expect(screen.queryByText('후속 관계')).toBeNull();
+    expect(
+      screen.getByText('저장된 연결이며 별도 역할 확인이 아닙니다.'),
+    ).toBeTruthy();
+  });
 });

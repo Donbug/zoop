@@ -21,7 +21,8 @@ RELATION_SCOPES = ("relation.submit", "relation.read", "relation.cancel", "relat
 EXTRACTION_SCOPES = ("extraction.submit", "extraction.read", "extraction.cancel", "extraction.recover")
 GRAPH_SCOPES = ("graph.read",)
 HANDOFF_SCOPES = ("handoff.read",)
-SCOPES = (*ANALYSIS_SCOPES, *RELATION_SCOPES, *EXTRACTION_SCOPES, *GRAPH_SCOPES, *HANDOFF_SCOPES)
+CHAT_SCOPES = ("chat.invoke",)
+SCOPES = (*ANALYSIS_SCOPES, *RELATION_SCOPES, *EXTRACTION_SCOPES, *GRAPH_SCOPES, *HANDOFF_SCOPES, *CHAT_SCOPES)
 PRINCIPAL = re.compile(r"[a-z][a-z0-9-]{0,62}")
 DIGEST = re.compile(r"[0-9a-f]{64}")
 HOST = "127.0.0.1"
@@ -74,6 +75,15 @@ PIPELINE_LIVE_PUBLIC_REQUIRED = (PIPELINE_LIVE_GATE, "ZOOP_AI_PIPELINE_LIVE_MODE
 PIPELINE_LIVE_PUBLIC_OPTIONAL = ("ZOOP_AI_PIPELINE_LIVE_MAX_OUTPUT_TOKENS", "ZOOP_AI_PIPELINE_LIVE_TIMEOUT_SECONDS", "ZOOP_AI_BASE_URL", "TYPESAFE_BASE_URL")
 PIPELINE_LIVE_BUDGET = ("ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR", "ZOOP_AI_PIPELINE_LIVE_MAX_USD", "ZOOP_AI_PIPELINE_LIVE_MAX_CALLS")
 PIPELINE_LIVE_SECRETS = ("ZOOP_AI_API_KEY", "TYPESAFE_API_KEY")
+# The chatbot model stage door (`zoop-ai-chat`) is a fifth, separate all-or-nothing group (scope `chat.invoke`). Its child gets the chat gate, the
+# non-secret model and endpoint names, and the two keys only while the chat gate is open (`ZOOP_AI_CHAT_LIVE_ENABLED=1` and a positive
+# `ZOOP_AI_CHAT_MAX_CALLS`). The S1 and pipeline gates never open it, and no other child receives any of it. The replay fixture is optional.
+CHAT_VARS = ("ZOOP_AI_SERVICE_CHAT_COMMAND", "ZOOP_AI_CHAT_STATE_DIR", "ZOOP_AI_SERVICE_CHAT_GRANTS")
+CHAT_REPLAY = "ZOOP_AI_SERVICE_CHAT_REPLAY"
+CHAT_GATE = ("ZOOP_AI_CHAT_LIVE_ENABLED", "ZOOP_AI_CHAT_MAX_CALLS")
+CHAT_PUBLIC = ("ZOOP_AI_CHAT_ANSWER_MODEL", "ZOOP_AI_CHAT_ANSWER_REASONING_EFFORT", "ZOOP_AI_CHAT_JEV_MODEL", "ZOOP_AI_BASE_URL",
+               "TYPESAFE_BASE_URL")
+CHAT_SECRETS = ("ZOOP_AI_API_KEY", "TYPESAFE_API_KEY")
 
 
 class ConfigError(Exception):
@@ -164,6 +174,16 @@ class HandoffConfig:
 
 
 @dataclass(frozen=True)
+class ChatConfig:
+    command: Path
+    state_dir: Path             # the chat invocation ledger (chat.sqlite3): the `zoop-ai-chat` child this service starts is its only writer
+    grants_path: Path           # operator chat grant registry (zoop-ai-chat-1), separate from the S1 registry
+    replay_path: Path | None    # authored replay fixture; without it a replay request answers 409 execution_unavailable
+    live_available: bool        # the chat gate is open: the child may send to a provider
+    child_env: Mapping[str, str]
+
+
+@dataclass(frozen=True)
 class ServiceConfig:
     principals: tuple[Principal, ...]
     state_dir: Path
@@ -179,6 +199,7 @@ class ServiceConfig:
     graph: GraphConfig | None = None
     handoff: HandoffConfig | None = None
     pipeline_live: PipelineLive | None = None
+    chat: ChatConfig | None = None
 
     @property
     def transport_dir(self) -> Path:
@@ -249,6 +270,34 @@ def _prepare_state_dir(path: Path) -> None:
         transport = path / "transport"
         transport.mkdir(mode=0o700, exist_ok=True)
         os.chmod(transport, 0o700)
+    except OSError:
+        raise ConfigError(field, "state_dir_unusable") from None
+
+
+CHAT_LEDGER_FILES = ("chat.sqlite3", "chat.sqlite3-wal", "chat.sqlite3-shm")
+
+
+def _prepare_chat_state(path: Path) -> None:
+    """The chat ledger holds raw provider answers and the no-resend and budget records. Like the service state root it must be a real directory
+    owned by this user with no group or world access; an existing one is checked, never repaired by chmod, and a symlink is refused. Ledger files
+    already in it must be regular private files of this user (the worker creates them 0600)."""
+    field = "ZOOP_AI_CHAT_STATE_DIR"
+    try:
+        if not os.path.lexists(path):
+            if not path.parent.is_dir():
+                raise ConfigError(field, "parent_missing")
+            os.mkdir(path, 0o700)
+            os.chmod(path, 0o700)
+        info = os.lstat(path)
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+            raise ConfigError(field, "state_dir_not_private")
+        for name in CHAT_LEDGER_FILES:
+            entry = path / name
+            if not os.path.lexists(entry):
+                continue
+            item = os.lstat(entry)
+            if not stat.S_ISREG(item.st_mode) or item.st_uid != os.getuid() or item.st_mode & 0o077:
+                raise ConfigError(field, "ledger_not_private")
     except OSError:
         raise ConfigError(field, "state_dir_unusable") from None
 
@@ -493,6 +542,45 @@ def _pipeline_live(environ: Mapping[str, str], state_dir: Path, relation: Relati
                         {name: environ[name] for name in PIPELINE_LIVE_BUDGET}, {name: environ[name] for name in PIPELINE_LIVE_SECRETS})
 
 
+def _chat(environ: Mapping[str, str], state_dir: Path, worker_state: Path) -> ChatConfig | None:
+    """All-or-nothing, like the other groups. The chat state root may not exist yet (the child creates its ledger file), but its parent must."""
+    if not any(name in environ for name in (*CHAT_VARS, CHAT_REPLAY)):
+        return None
+    for name in CHAT_VARS:
+        if name not in environ:
+            raise ConfigError(name, "chat_group_incomplete")
+    command = _file(environ["ZOOP_AI_SERVICE_CHAT_COMMAND"], "ZOOP_AI_SERVICE_CHAT_COMMAND", executable=True)
+    chat_state = _absolute(environ["ZOOP_AI_CHAT_STATE_DIR"], "ZOOP_AI_CHAT_STATE_DIR")
+    roots = {"ZOOP_AI_SERVICE_STATE_DIR": state_dir, "ZOOP_AI_WORKER_STATE_DIR": worker_state, "ZOOP_AI_CHAT_STATE_DIR": chat_state}
+    if environ.get("ZOOP_STATE_DIR"):
+        roots["ZOOP_STATE_DIR"] = _absolute(environ["ZOOP_STATE_DIR"], "ZOOP_STATE_DIR")
+    _disjoint(roots, "chat_roots_overlap")
+    _prepare_chat_state(chat_state)
+    grants_path = _file(environ["ZOOP_AI_SERVICE_CHAT_GRANTS"], "ZOOP_AI_SERVICE_CHAT_GRANTS")
+    try:
+        registry = json.loads(grants_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise ConfigError("ZOOP_AI_SERVICE_CHAT_GRANTS", "not_json") from None
+    if not isinstance(registry, dict) or registry.get("schemaVersion") != "zoop-ai-chat-1" or not isinstance(registry.get("grants"), list):
+        raise ConfigError("ZOOP_AI_SERVICE_CHAT_GRANTS", "schema_invalid")
+    replay = _file(environ[CHAT_REPLAY], CHAT_REPLAY) if environ.get(CHAT_REPLAY) else None
+    raw_ceiling = environ.get("ZOOP_AI_CHAT_MAX_CALLS")
+    try:
+        ceiling = int(raw_ceiling) if raw_ceiling is not None else 0
+    except ValueError:
+        raise ConfigError("ZOOP_AI_CHAT_MAX_CALLS", "not_integer") from None
+    live = environ.get("ZOOP_AI_CHAT_LIVE_ENABLED") == "1" and ceiling > 0
+    child = {**CHILD_BASE_ENV}
+    for name in CHAT_PUBLIC:
+        if name in environ:
+            child[name] = environ[name]
+    if live:
+        for name in (*CHAT_GATE, *CHAT_SECRETS):
+            if name in environ:
+                child[name] = environ[name]
+    return ChatConfig(command, chat_state, grants_path, replay, live, child)
+
+
 def load(environ: Mapping[str, str]) -> ServiceConfig:
     principals = _principals(environ.get("ZOOP_AI_SERVICE_PRINCIPALS"))
     state_dir = _absolute(environ.get("ZOOP_AI_SERVICE_STATE_DIR"), "ZOOP_AI_SERVICE_STATE_DIR")
@@ -528,5 +616,6 @@ def load(environ: Mapping[str, str]) -> ServiceConfig:
     graph = _graph(environ, principals, state_dir, worker_state, relation, extraction)
     handoff = _handoff(environ, principals, state_dir, worker_state, relation, extraction, graph)
     pipeline_live = _pipeline_live(environ, state_dir, relation, extraction)
+    chat = _chat(environ, state_dir, worker_state)
     return ServiceConfig(principals, state_dir, worker_state, command, grants_path, replay, port, live, child, relation, extraction, graph, handoff,
-                         pipeline_live)
+                         pipeline_live, chat)

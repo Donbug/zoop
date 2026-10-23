@@ -14,8 +14,11 @@ import java.util.List;
 public record ChatRun(String jobId, String sessionId, String memberId, int attemptNo, String mode, List<Turn> turns,
         ChatFrozenContext context, FrozenSelection selection, String graphVersionId, int clarificationDepth, Instant askedAt, Instant deadline) {
 
-    /** One question of the chain; {@code choiceId} is the clarification option it picked (null for free text or the root). */
-    public record Turn(String jobId, String question, String choiceId) { }
+    /**
+     * One question of the chain; {@code choiceId} and {@code choiceLabel} are the clarification option it picked, as the
+     * answered clarification offered it (both null for free text or the root).
+     */
+    public record Turn(String jobId, String question, String choiceId, String choiceLabel) { }
 
     public String question() {
         return turns.getLast().question();
