@@ -544,3 +544,5 @@ zoop-ai-handoff-exposure --state-dir HANDOFF < relation-change.json
 **적용 효과는 없습니다.** 출력은 선택한 handoff에 한정된 제안입니다. `effect`와 `scope.notCovered`가 그 한계를 명시하며, 앱 exclusion revision·`graphVersion`·활성 버전·전체 합집합을 만들지 않습니다. 빈 결과나 이전보다 작은 목록을 기존 제외 해제로 사용하면 안 됩니다. 앱 목록·S1·브리핑·채팅·캐시·Neo4j, 이전 schema와 선택하지 않은 handoff, 운영자 canonical/decisions/bindings 변경은 이 명령의 적용 대상이 아닙니다. 실제 제외 저장·현재 조회 반영·복구는 앱 담당 범위입니다.
 
 공유 잠금은 결과 출력이 끝날 때까지 유지합니다. 원장·artifact를 변경하지 않고 모델·네트워크도 호출하지 않습니다. 결과는 시각 없는 정렬된 canonical JSON 한 줄이며 6 MiB를 넘으면 `exposure_report_limit`로 거절합니다. 자르거나 부분 보고하지 않습니다. 실행 검증은 `scripts/handoff_exposure_smoke.py`이며 `make pipeline-smoke`에도 포함됩니다. 앱 소비 시 주의사항은 [그래프 인수 문서](../../api/docs/GRAPH_READ_HANDOFF.md)를 따릅니다.
+
+같은 질의를 인증된 내부 HTTP로 전달하려면 [service README의 Handoff 영향 ID 조회](../service/README.md#handoff-영향-id-조회-post-internalv1graph-handoffsexposure)를 따릅니다. 전용 scope·서버 설정·선택 전체의 허용 검사는 서비스가 담당하며, CLI의 원장 읽기와 앱의 실제 제외 적용 경계는 유지됩니다.

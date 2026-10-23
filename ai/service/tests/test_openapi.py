@@ -32,10 +32,10 @@ def test_every_route_is_documented_with_its_enforced_scope():
                   for path, item in spec()["paths"].items() for method, operation in item.items()}
     routes = {(method, route.path) for route in create_app().routes if hasattr(route, "methods") and route.path.startswith("/internal")
               for method in route.methods}
-    assert set(documented) == routes and len(routes) == 21
+    assert set(documented) == routes and len(routes) == 22
     assert set(documented.values()) == {"analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover",
                                         "relation.submit", "relation.read", "relation.cancel", "relation.recover", "relation.review",
-                                        "extraction.submit", "extraction.read", "extraction.cancel", "extraction.recover", "graph.read", "handoff.read"}
+                                        "extraction.submit", "extraction.read", "extraction.cancel", "extraction.recover", "graph.read", "handoff.read", "handoff.exposure"}
 
 
 def test_documented_scopes_are_what_the_service_enforces(start):

@@ -6234,6 +6234,95 @@
       "security":
         - "bearerAuth":
             - "graph.read"
+  "/internal/v1/graph-handoffs/exposure":
+    "post":
+      "tags":
+        - "graph-handoffs"
+      "summary": "Identity-only exposure of an explicit complete handoff selection"
+      "operationId": "queryGraphHandoffExposure"
+      "parameters":
+        - "name": "X-Request-ID"
+          "in": "header"
+          "required": false
+          "schema":
+            "type": "string"
+            "pattern": "^[A-Za-z0-9._-]{1,128}$"
+          "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+      "responses":
+        "200":
+          "description": "Complete unchanged identity-only report in the handoff envelope; not current delivery authority or import readiness."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HdExposure"
+        "401":
+          "description": "authentication_required: missing, malformed or unknown bearer token."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HdErrorEnvelope"
+          "headers":
+            "WWW-Authenticate":
+              "description": "Bearer"
+              "schema":
+                "type": "string"
+        "403":
+          "description": "scope_denied: requires handoff.exposure, independent of handoff.read; handoff_not_allowed: any selected entry absent or changed."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HdErrorEnvelope"
+        "409":
+          "description": "execution_unavailable, handoff_selection_unmappable or handoff_pin_mismatch; no partial report."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HdErrorEnvelope"
+        "422":
+          "description": "invalid_request, changed_identity_unknown, changed_relation_unused or exposure_report_limit."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HdErrorEnvelope"
+        "500":
+          "description": "runtime_contract_mismatch, runtime_binding_mismatch or internal_error (not retryable)."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HdErrorEnvelope"
+        "503":
+          "description": "runtime_unavailable, runtime_busy, service_configuration_invalid or service_busy (retryable); never an empty bundle."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HdErrorEnvelope"
+          "headers":
+            "Retry-After":
+              "description": "Seconds before retrying with the same key and body."
+              "schema":
+                "type": "integer"
+        "413":
+          "description": "request_too_large: declared or streamed body exceeds 65,536 bytes."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HdErrorEnvelope"
+        "415":
+          "description": "unsupported_media_type: requires application/json with UTF-8."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HdErrorEnvelope"
+      "security":
+        - "bearerAuth":
+            - "handoff.exposure"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/ExposureQuery"
+      "description": "Requires handoff.exposure, independent of handoff.read. One explicit selection of 1–20 unique handoff IDs; request at most 65,536 UTF-8 bytes. No query parameters, idempotency requirement, job, cache, retry or partial result. Invokes zoop-ai-handoff-exposure directly, never ordinary export. Source rights are not evaluated: frozen identity reads remain possible after source revocation, but every allowlist entry must remain unchanged. A complete allowlist snapshot is checked before the child, after any gate wait, after the child before errors are interpreted, and before response. These are separate observations, not atomic revocation. Closed canonical report limit: 6 MiB including newline; model/provider calls are zero. The CLI validates frozen artifacts; the service compares reported manifest/bundle pins to the allowlist, not hashes of bundle bytes it did not receive. The app must reconcile handoffId, manifestDigest, bundleDigest and contentDigest with its receipt. This endpoint changes no exclusion, revision or activation state; errors and empty/smaller reports never clear exclusions."
   "/internal/v1/graph-handoffs/{handoffId}":
     "get":
       "tags":
@@ -10249,6 +10338,37 @@
         - "lastRuntimeCode"
         - "updatedAt"
       "title": "Dispatch"
+    "DocumentChange":
+      "properties":
+        "kind":
+          "type": "string"
+          "const": "document"
+          "title": "Kind"
+        "documentId":
+          "type": "string"
+          "maxLength": 200
+          "minLength": 1
+          "title": "Documentid"
+        "documentVersion":
+          "anyOf":
+            - "type": "string"
+              "pattern": "^[a-f0-9]{64}$"
+            - "type": "null"
+          "title": "Documentversion"
+        "rawVersion":
+          "anyOf":
+            - "type": "string"
+              "pattern": "^[a-f0-9]{64}$"
+            - "type": "null"
+          "title": "Rawversion"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "kind"
+        - "documentId"
+        - "documentVersion"
+        - "rawVersion"
+      "title": "DocumentChange"
     "EcCitation":
       "properties":
         "evidenceId":
@@ -10722,6 +10842,310 @@
       "required":
         - "error"
       "title": "ErrorEnvelope"
+    "ExposureArticle":
+      "properties":
+        "articleId":
+          "type": "string"
+          "pattern": "^doc-[a-f0-9]{64}$"
+          "title": "Articleid"
+        "articleVersion":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Articleversion"
+        "documentId":
+          "type": "string"
+          "maxLength": 200
+          "minLength": 1
+          "title": "Documentid"
+        "documentVersion":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Documentversion"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "articleId"
+        - "articleVersion"
+        - "documentId"
+        - "documentVersion"
+      "title": "ExposureArticle"
+    "ExposureCounts":
+      "properties":
+        "articles":
+          "type": "integer"
+          "minimum": 0.0
+          "title": "Articles"
+        "issues":
+          "type": "integer"
+          "minimum": 0.0
+          "title": "Issues"
+        "relations":
+          "type": "integer"
+          "minimum": 0.0
+          "title": "Relations"
+        "evidence":
+          "type": "integer"
+          "minimum": 0.0
+          "title": "Evidence"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "articles"
+        - "issues"
+        - "relations"
+        - "evidence"
+      "title": "ExposureCounts"
+    "ExposureHandoff":
+      "properties":
+        "handoffId":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+          "title": "Handoffid"
+        "bundleSchema":
+          "type": "string"
+          "const": "zoop-graph-handoff-bundle-7"
+          "title": "Bundleschema"
+        "manifestDigest":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Manifestdigest"
+        "bundleDigest":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Bundledigest"
+        "contentDigest":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Contentdigest"
+        "bound":
+          "type": "boolean"
+          "title": "Bound"
+        "exposed":
+          "type": "boolean"
+          "title": "Exposed"
+        "articles":
+          "items":
+            "$ref": "#/components/schemas/ExposureArticle"
+          "type": "array"
+          "maxItems": 1000
+          "title": "Articles"
+        "issues":
+          "items":
+            "$ref": "#/components/schemas/ExposureIssue"
+          "type": "array"
+          "maxItems": 2000
+          "title": "Issues"
+        "relations":
+          "items":
+            "$ref": "#/components/schemas/ExposureRelation"
+          "type": "array"
+          "maxItems": 10000
+          "title": "Relations"
+        "evidenceIds":
+          "items":
+            "type": "string"
+            "pattern": "^ev-[a-f0-9]{64}$"
+          "type": "array"
+          "maxItems": 20000
+          "title": "Evidenceids"
+        "counts":
+          "$ref": "#/components/schemas/ExposureCounts"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "handoffId"
+        - "bundleSchema"
+        - "manifestDigest"
+        - "bundleDigest"
+        - "contentDigest"
+        - "bound"
+        - "exposed"
+        - "articles"
+        - "issues"
+        - "relations"
+        - "evidenceIds"
+        - "counts"
+      "title": "ExposureHandoff"
+    "ExposureIdentity":
+      "properties":
+        "boundInSelection":
+          "type": "boolean"
+          "title": "Boundinselection"
+        "recordedInIngestion":
+          "anyOf":
+            - "type": "boolean"
+            - "type": "null"
+          "title": "Recordediningestion"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "boundInSelection"
+        - "recordedInIngestion"
+      "title": "ExposureIdentity"
+    "ExposureIssue":
+      "properties":
+        "id":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+          "title": "Id"
+        "reasons":
+          "items":
+            "type": "string"
+            "enum":
+              - "disposition-input"
+              - "involvement-lost"
+              - "source-document"
+          "type": "array"
+          "minItems": 1
+          "title": "Reasons"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "id"
+        - "reasons"
+      "title": "ExposureIssue"
+    "ExposureRelation":
+      "properties":
+        "id":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+          "title": "Id"
+        "type":
+          "type": "string"
+          "enum":
+            - "INVOLVES"
+            - "STRUCTURALLY_RELATED_TO"
+            - "FOLLOWS"
+          "title": "Type"
+        "reasons":
+          "items":
+            "type": "string"
+            "enum":
+              - "anchor"
+              - "anchor-undetermined"
+              - "basis-evidence"
+              - "evidence"
+              - "issue"
+              - "source-relation"
+              - "upstream-input"
+          "type": "array"
+          "minItems": 1
+          "title": "Reasons"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "id"
+        - "type"
+        - "reasons"
+      "title": "ExposureRelation"
+    "ExposureReport":
+      "properties":
+        "schemaVersion":
+          "type": "string"
+          "const": "zoop-handoff-exposure-1"
+          "title": "Schemaversion"
+        "changed":
+          "oneOf":
+            - "$ref": "#/components/schemas/DocumentChange"
+            - "$ref": "#/components/schemas/SourceChange"
+            - "$ref": "#/components/schemas/GrantChange"
+            - "$ref": "#/components/schemas/RelationChange"
+          "title": "Changed"
+          "discriminator":
+            "propertyName": "kind"
+            "mapping":
+              "document": "#/components/schemas/DocumentChange"
+              "grant": "#/components/schemas/GrantChange"
+              "s3-relation": "#/components/schemas/RelationChange"
+              "source": "#/components/schemas/SourceChange"
+        "cause":
+          "type": "string"
+          "enum":
+            - "source-change"
+            - "relation-retraction"
+          "title": "Cause"
+        "identity":
+          "$ref": "#/components/schemas/ExposureIdentity"
+        "scope":
+          "$ref": "#/components/schemas/ExposureScope"
+        "basis":
+          "type": "string"
+          "title": "Basis"
+        "consistency":
+          "type": "string"
+          "const": "shared locks on every opened ledger were held from the first read until this output"
+          "title": "Consistency"
+        "effect":
+          "type": "string"
+          "const": "none: identity-only proposal for the selected handoffs; nothing was excluded, revised, overlaid, activated or written, and an empty or smaller result never clears or narrows any existing exclusion"
+          "title": "Effect"
+        "handoffs":
+          "items":
+            "$ref": "#/components/schemas/ExposureHandoff"
+          "type": "array"
+          "maxItems": 20
+          "minItems": 1
+          "title": "Handoffs"
+        "usage":
+          "$ref": "#/components/schemas/ExposureUsage"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "schemaVersion"
+        - "changed"
+        - "cause"
+        - "identity"
+        - "scope"
+        - "basis"
+        - "consistency"
+        - "effect"
+        - "handoffs"
+        - "usage"
+      "title": "ExposureReport"
+    "ExposureScope":
+      "properties":
+        "selection":
+          "type": "string"
+          "const": "explicit"
+          "title": "Selection"
+        "handoffIds":
+          "items":
+            "type": "string"
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+          "type": "array"
+          "maxItems": 20
+          "minItems": 1
+          "title": "Handoffids"
+        "notCovered":
+          "items":
+            "type": "string"
+          "type": "array"
+          "title": "Notcovered"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "selection"
+        - "handoffIds"
+        - "notCovered"
+      "title": "ExposureScope"
+    "ExposureUsage":
+      "properties":
+        "providerCalls":
+          "type": "integer"
+          "maximum": 0.0
+          "minimum": 0.0
+          "title": "Providercalls"
+        "modelCalls":
+          "type": "integer"
+          "maximum": 0.0
+          "minimum": 0.0
+          "title": "Modelcalls"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "providerCalls"
+        - "modelCalls"
+      "title": "ExposureUsage"
     "ExtractionApproval":
       "properties":
         "approvedRequestDigest":
@@ -11116,6 +11540,31 @@
         - "code"
         - "stage"
       "title": "Failure"
+    "GrantChange":
+      "properties":
+        "kind":
+          "type": "string"
+          "const": "grant"
+          "title": "Kind"
+        "grantId":
+          "type": "string"
+          "maxLength": 200
+          "minLength": 1
+          "title": "Grantid"
+        "revision":
+          "anyOf":
+            - "type": "string"
+              "maxLength": 200
+              "minLength": 1
+            - "type": "null"
+          "title": "Revision"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "kind"
+        - "grantId"
+        - "revision"
+      "title": "GrantChange"
     "GraphContent":
       "properties":
         "nodes":
@@ -11655,6 +12104,20 @@
       "required":
         - "error"
       "title": "HdErrorEnvelope"
+    "HdExposure":
+      "properties":
+        "schemaVersion":
+          "type": "string"
+          "const": "zoop-ai-internal-handoff-1"
+          "title": "Schemaversion"
+          "default": "zoop-ai-internal-handoff-1"
+        "report":
+          "$ref": "#/components/schemas/ExposureReport"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "report"
+      "title": "HdExposure"
     "HdStatus":
       "properties":
         "schemaVersion":
@@ -12391,6 +12854,27 @@
         - "untilStatus"
         - "citations"
       "title": "RcValidity"
+    "RelationChange":
+      "properties":
+        "kind":
+          "type": "string"
+          "const": "s3-relation"
+          "title": "Kind"
+        "jobId":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+          "title": "Jobid"
+        "relationCandidateId":
+          "type": "string"
+          "pattern": "^rc-[a-f0-9]{64}$"
+          "title": "Relationcandidateid"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "kind"
+        - "jobId"
+        - "relationCandidateId"
+      "title": "RelationChange"
     "RelationDelivery":
       "properties":
         "state":
@@ -12908,6 +13392,23 @@
         - "job"
         - "receipts"
       "title": "ResultEnvelope"
+    "SourceChange":
+      "properties":
+        "kind":
+          "type": "string"
+          "const": "source"
+          "title": "Kind"
+        "sourceId":
+          "type": "string"
+          "maxLength": 200
+          "minLength": 1
+          "title": "Sourceid"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "kind"
+        - "sourceId"
+      "title": "SourceChange"
     "Usage":
       "properties":
         "providerAttempts":
@@ -13034,6 +13535,41 @@
         - "jobId"
         - "approvedRequestDigest"
       "title": "ExtractionSubmit"
+      "type": "object"
+    "ExposureQuery":
+      "additionalProperties": false
+      "properties":
+        "schemaVersion":
+          "const": "zoop-handoff-exposure-1"
+          "title": "Schemaversion"
+          "type": "string"
+        "handoffIds":
+          "items":
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+            "type": "string"
+          "maxItems": 20
+          "minItems": 1
+          "title": "Handoffids"
+          "type": "array"
+        "changed":
+          "discriminator":
+            "mapping":
+              "document": "#/components/schemas/DocumentChange"
+              "grant": "#/components/schemas/GrantChange"
+              "s3-relation": "#/components/schemas/RelationChange"
+              "source": "#/components/schemas/SourceChange"
+            "propertyName": "kind"
+          "oneOf":
+            - "$ref": "#/components/schemas/DocumentChange"
+            - "$ref": "#/components/schemas/SourceChange"
+            - "$ref": "#/components/schemas/GrantChange"
+            - "$ref": "#/components/schemas/RelationChange"
+          "title": "Changed"
+      "required":
+        - "schemaVersion"
+        - "handoffIds"
+        - "changed"
+      "title": "ExposureQuery"
       "type": "object"
   "securitySchemes":
     "bearerAuth":

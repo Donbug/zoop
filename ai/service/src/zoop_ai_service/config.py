@@ -20,7 +20,7 @@ ANALYSIS_SCOPES = ("analysis.submit", "analysis.read", "analysis.cancel", "analy
 RELATION_SCOPES = ("relation.submit", "relation.read", "relation.cancel", "relation.recover", "relation.review")
 EXTRACTION_SCOPES = ("extraction.submit", "extraction.read", "extraction.cancel", "extraction.recover")
 GRAPH_SCOPES = ("graph.read",)
-HANDOFF_SCOPES = ("handoff.read",)
+HANDOFF_SCOPES = ("handoff.read", "handoff.exposure")
 SCOPES = (*ANALYSIS_SCOPES, *RELATION_SCOPES, *EXTRACTION_SCOPES, *GRAPH_SCOPES, *HANDOFF_SCOPES)
 PRINCIPAL = re.compile(r"[a-z][a-z0-9-]{0,62}")
 DIGEST = re.compile(r"[0-9a-f]{64}")
@@ -64,6 +64,9 @@ GRAPH_CREDENTIALS = ("ZOOP_GRAPH_USER", "ZOOP_GRAPH_PASSWORD")
 HANDOFF_VARS = ("ZOOP_AI_SERVICE_HANDOFF_COMMAND", "ZOOP_AI_HANDOFF_STATE_DIR", "ZOOP_AI_HANDOFF_RELATION_STATE_DIR", "ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR",
                 "ZOOP_AI_HANDOFF_INGESTION_STATE_DIR", "ZOOP_AI_SERVICE_HANDOFF_SOURCES", "ZOOP_AI_SERVICE_HANDOFF_CANONICAL",
                 "ZOOP_AI_SERVICE_HANDOFF_DECISIONS", "ZOOP_AI_SERVICE_HANDOFF_BINDINGS", "ZOOP_AI_SERVICE_HANDOFF_EXPORTS")
+HANDOFF_EXPOSURE_VARS = ("ZOOP_AI_SERVICE_HANDOFF_EXPOSURE_COMMAND", "ZOOP_AI_HANDOFF_EXPOSURE_STATE_DIR",
+                         "ZOOP_AI_HANDOFF_EXPOSURE_EXTRACTION_STATE_DIR", "ZOOP_AI_HANDOFF_EXPOSURE_INGESTION_STATE_DIR",
+                         "ZOOP_AI_SERVICE_HANDOFF_EXPOSURE_EXPORTS")
 # Live S2/S3 children. ONE service-side switch AND the pipeline's own gate are both required; neither alone forwards anything. The names below are
 # the complete set the pipeline's live runtime reads (`zoop_ai_pipeline.live_runtime`): nothing else of the service environment ever reaches a
 # pipeline child, and replay, dependency, graph, handoff and S1 children never receive any of it. A job-registering child (`submit`) gets only the
@@ -164,6 +167,17 @@ class HandoffConfig:
 
 
 @dataclass(frozen=True)
+class HandoffExposureConfig:
+    command: Path
+    state_dir: Path
+    extraction_state_dir: Path
+    ingestion_state_dir: Path
+    exports_path: Path
+    shared_gate: bool
+    child_env: Mapping[str, str]
+
+
+@dataclass(frozen=True)
 class ServiceConfig:
     principals: tuple[Principal, ...]
     state_dir: Path
@@ -179,6 +193,7 @@ class ServiceConfig:
     graph: GraphConfig | None = None
     handoff: HandoffConfig | None = None
     pipeline_live: PipelineLive | None = None
+    handoff_exposure: HandoffExposureConfig | None = None
 
     @property
     def transport_dir(self) -> Path:
@@ -460,6 +475,47 @@ def _handoff(environ: Mapping[str, str], principals: tuple[Principal, ...], stat
                          relation is not None or extraction is not None, _child_env(app_state, worker_state))
 
 
+def _handoff_exposure(environ: Mapping[str, str], principals: tuple[Principal, ...], state_dir: Path, worker_state: Path,
+                      relation: RelationConfig | None, extraction: ExtractionConfig | None, graph: GraphConfig | None,
+                      handoff: HandoffConfig | None) -> HandoffExposureConfig | None:
+    if not any(name in environ for name in HANDOFF_EXPOSURE_VARS):
+        return None
+    for name in HANDOFF_EXPOSURE_VARS:
+        if name not in environ:
+            raise ConfigError(name, "handoff_exposure_group_incomplete")
+    command = _file(environ[HANDOFF_EXPOSURE_VARS[0]], HANDOFF_EXPOSURE_VARS[0], executable=True)
+    app_state = _absolute(environ.get("ZOOP_STATE_DIR"), "ZOOP_STATE_DIR")
+    roots = {name: _existing_dir(environ[name], name) for name in HANDOFF_EXPOSURE_VARS[1:4]}
+    _disjoint({"ZOOP_AI_SERVICE_STATE_DIR": state_dir, "ZOOP_AI_WORKER_STATE_DIR": worker_state, "ZOOP_STATE_DIR": app_state, **roots},
+              "handoff_exposure_roots_overlap")
+    root, extracted, ingested = (roots[name] for name in HANDOFF_EXPOSURE_VARS[1:4])
+    for group in (relation, graph):
+        if group is not None and any(_overlaps(path, group.state_dir) for path in roots.values()):
+            raise ConfigError(HANDOFF_EXPOSURE_VARS[1], "handoff_exposure_roots_overlap")
+    exports = _file(environ[HANDOFF_EXPOSURE_VARS[4]], HANDOFF_EXPOSURE_VARS[4])
+    try:
+        handoff_access.load(exports, [p.name for p in principals])
+    except handoff_access.AccessError as error:
+        raise ConfigError(HANDOFF_EXPOSURE_VARS[4], error.code) from None
+    same: list[tuple[str, Path, Path]] = []
+    for group in (relation, graph, handoff):
+        if group is not None:
+            same += [(HANDOFF_EXPOSURE_VARS[2], extracted, group.extraction_state_dir),
+                     (HANDOFF_EXPOSURE_VARS[3], ingested, group.ingestion_state_dir)]
+    if extraction is not None:
+        same += [(HANDOFF_EXPOSURE_VARS[2], extracted, extraction.state_dir),
+                 (HANDOFF_EXPOSURE_VARS[3], ingested, extraction.ingestion_state_dir)]
+    if handoff is not None:
+        same += [(HANDOFF_EXPOSURE_VARS[1], root, handoff.state_dir), (HANDOFF_EXPOSURE_VARS[4], exports, handoff.exports_path)]
+        if any(_overlaps(path, handoff.relation_state_dir) for path in roots.values()):
+            raise ConfigError(HANDOFF_EXPOSURE_VARS[1], "handoff_exposure_roots_overlap")
+    for name, mine, theirs in same:
+        if mine != theirs:
+            raise ConfigError(name, "handoff_exposure_source_inconsistent")
+    return HandoffExposureConfig(command, root, extracted, ingested, exports, relation is not None or extraction is not None,
+                                 _child_env(app_state, worker_state))
+
+
 def _pipeline_live(environ: Mapping[str, str], state_dir: Path, relation: RelationConfig | None, extraction: ExtractionConfig | None) -> PipelineLive | None:
     """Off unless BOTH the service switch and the pipeline gate are `1`. When on: an S2 or S3 group must exist and every required name must be set
     and valid, otherwise start fails with the offending name only (never a value)."""
@@ -528,5 +584,6 @@ def load(environ: Mapping[str, str]) -> ServiceConfig:
     graph = _graph(environ, principals, state_dir, worker_state, relation, extraction)
     handoff = _handoff(environ, principals, state_dir, worker_state, relation, extraction, graph)
     pipeline_live = _pipeline_live(environ, state_dir, relation, extraction)
+    exposure = _handoff_exposure(environ, principals, state_dir, worker_state, relation, extraction, graph, handoff)
     return ServiceConfig(principals, state_dir, worker_state, command, grants_path, replay, port, live, child, relation, extraction, graph, handoff,
-                         pipeline_live)
+                         pipeline_live, exposure)

@@ -218,6 +218,41 @@ live S2/S3 job은 **서버 운영자가 고정한 것만** 돌아갑니다. 호�
 
 **시험.** `tests/test_handoff_unit.py`(설정 닫힘·allowlist 엄격성·exit·canonical 줄 해석·닫힌 모델을 모든 노드에서 변조·`fieldProvenance`/`withheld`/`fieldVerdicts` 모양 거절과 의미 비판단·결정/사유/span 조합·전달 규칙·예시), `tests/test_handoff_summary_unit.py`(issue `summary`: 손으로 쓴 basis·digest 기대, 여섯 결과 전부와 live 신원, 55가지 내용 변조·hidden id(geography/verdict 전용 근거 포함)·잘못된 basis·잘못된 provenance 거절, 같은 변경을 다시 pin하면 받아들여짐, 60/61 인용 경계, HOLD/REJECT 우선순위, claim 길이·한글 경계, 그리고 `generatedAt` 문법: 생산자·앱 verifier와 **같은 공유 vector 파일** `api/src/test/resources/graph-handoff/summary-time-vectors.json`의 accept·reject 전부와 Python 라이브러리 파서가 받는데 문법이 거절하는 형태), `tests/test_handoff_http.py`(실제 uvicorn + 시험 소유 stand-in 명령: 고정 argv·최소 환경·pin·중첩 모르는 필드와 verdict 자유 서술 note·원문 span 키 거절·`fieldProvenance`/verdict 모양 변조·`-1`~`-6` 모양 거절·`impacts` 행 상태표·coverage·정렬·label·effects·source 승인 위조·길이(Unicode code point)·count/policy/digest를 digest를 다시 봉인한 채 변조·같은 edge의 상반 행 보존·summary 결과별 바이트 동일 중계와 status에 summary 없음과 운영자 상태 무변경·digest·pin을 다시 맞춘 summary 변조(내용·hidden id·basis·provenance)의 500 거절·JS digest·withheld·busy·deadline·동시성·로그), `pipeline_tests/test_handoff_real_cli.py`(실제 `zoop-ai-handoff`와 S3 job 두 개 세계: CLI export와 바이트 동일, 생산자 검증기 통과, issue별 `fieldProvenance`의 동치·닫힘과 verdict의 모양·결속·withheld 재계산을 독립적으로 재확인, 생산자 세계의 손으로 쓴 `impacts`·`summary` 기대와 일치, status에 impact 내용 없음, 권한 철회·운영자 파일 변경 withheld→복원, 그리고 **서비스 모델과 설치된 생산자 `validate_bundle`이 summary 156개 fixture·변조(시간 문법 포함)에 같은 판정을 내는지의 차분 시험**)는 기본 `service-test`/`service-pipeline-test`에 들어갑니다. 서비스 시험·smoke는 판정을 만들거나 선택에서 유추하지 않으며 실제 verdict 입력은 생산자 fixture가 제공하고, 없으면 빈 `fieldVerdicts`·빈 `withheld`만 확인합니다. 종단 smoke는 `make service-handoff-smoke`(`scripts/handoff_service_smoke.py`, Neo4j 불필요, pipeline 설치가 없으면 skip이 아니라 **실패**)입니다. 생성된 [내부 OpenAPI](../../docs/api/internal-ai-openapi.yaml)가 계약이며 백엔드 사용 주의는 [인수 문서](../../api/docs/GRAPH_READ_HANDOFF.md)에 있습니다.
 
+## Handoff 영향 ID 조회 (`POST /internal/v1/graph-handoffs/exposure`)
+
+`queryGraphHandoffExposure`는 일반 export를 먼저 호출하지 않고 설치된 `zoop-ai-handoff-exposure`를 한 번 실행합니다. 별도 scope `handoff.exposure`가 필요하며 `handoff.read`와 어느 방향으로도 권한을 포함하지 않습니다. 현재 source 권리가 철회되어 bundle 전달이 withheld인 뒤에도 고정 기록의 영향 ID를 조회할 수 있지만, handoff allowlist의 허용이 철회되면 조회도 거절합니다.
+
+**독립 설정.** 다음 다섯 변수는 전부 없으면 비활성화이고, 일부만 있거나 값이 잘못되면 시작을 거절합니다. 기존 서비스 기본 설정과 소유 경계용 `ZOOP_STATE_DIR`는 그대로 필요합니다. 실제 환경 파일은 자동으로 수정하지 않습니다.
+
+| 변수 | 값 |
+|---|---|
+| `ZOOP_AI_SERVICE_HANDOFF_EXPOSURE_COMMAND` | 설치된 `zoop-ai-handoff-exposure` 실행 파일의 절대 경로 |
+| `ZOOP_AI_HANDOFF_EXPOSURE_STATE_DIR` | 기존 handoff 원장 루트 |
+| `ZOOP_AI_HANDOFF_EXPOSURE_EXTRACTION_STATE_DIR` | 기존 S2 원장 루트 |
+| `ZOOP_AI_HANDOFF_EXPOSURE_INGESTION_STATE_DIR` | 기존 ingestion 원장 루트 |
+| `ZOOP_AI_SERVICE_HANDOFF_EXPOSURE_EXPORTS` | 기존 `zoop-ai-handoff-exports-1` 형식의 principal별 manifest/bundle pin allowlist |
+
+세 루트는 서로 및 앱·서비스·S1 상태와 겹칠 수 없고 symlink를 허용하지 않습니다. 함께 설정된 S2/S3·graph·일반 handoff 그룹과 원천 루트가 같아야 하며, 일반 handoff가 있으면 handoff 루트와 allowlist 파일도 같아야 합니다. exposure만 켤 때는 source registry·canonical·decisions·bindings·S3 원장·모델/graph 자격 증명이 필요하지 않으며 다른 그룹도 켜지지 않습니다.
+
+**입출력.** 요청은 기존 닫힌 `zoop-handoff-exposure-1` 계약입니다. `handoffIds`는 중복 없는 명시적 ID 1~20개이고, `changed`는 문서·source·grant 또는 `(jobId, relationCandidateId)` 쌍의 `s3-relation`입니다. 문서의 `documentVersion`·`rawVersion`, grant의 `revision`은 필수 nullable 필드입니다. null은 그 신원의 모든 고정 버전/리비전을 뜻하며 handoff 선택의 wildcard는 아닙니다. 인증·scope 확인 뒤 JSON/UTF-8, 중복 키·비유한 숫자·알 수 없는 필드를 검사하고 선언/스트리밍 본문 모두 65,536바이트로 제한합니다. query parameter·job 등록·idempotency 요구·캐시·자동 재시도·부분 성공은 없습니다.
+
+성공은 `200 {"schemaVersion":"zoop-ai-internal-handoff-1","report":…}`입니다. report는 생산자 출력 그대로이며 닫힌 중첩 모델로 키·타입·신원·선택 전체·정렬/중복·개수·고정 한계 문구·모델/공급자 호출 0을 검증합니다. 정규화가 생기거나 canonical JSON 한 줄이 아니거나 newline 포함 6 MiB를 넘으면 전달하지 않습니다. 서비스는 영향 전파를 다시 계산하지 않으며, **report의 manifest/bundle pin과 allowlist를 비교할 뿐 받지 않은 bundle 바이트의 해시를 계산했다고 주장하지 않습니다.** 기사·이슈·관계·근거 식별자 외에 제목·label·URL·본문·인용문·자유 진단을 추가할 수 없습니다.
+
+**실행과 철회.** 전체 선택을 한 allowlist snapshot으로 허가한 뒤 두 reader slot 및 같은 프로세스 S2/S3 writer의 `RelationGate`를 사용합니다(gate 대기 10초, child deadline 45초). 대기 뒤·child 종료 뒤 오류 해석 전·응답 직전에 전체 선택의 같은 항목을 다시 확인합니다. 중간 철회는 성공과 오류를 모두 숨깁니다. 이들은 별도 시점의 읽기이며 최종 확인 직후 철회를 원자적으로 막는 보장은 아닙니다. source 계열은 ingestion/extraction 경로를 넘기고 S3 관계 철회는 handoff 경로만 넘깁니다. child는 자격 증명 없는 환경·익명 stdin·서버 소유 cwd·폐기되는 stderr를 사용합니다. 공통 runner의 16 MiB stdout 파일 크기 확인은 종료 후 검사이지 실시간 디스크 quota가 아닙니다.
+
+| 상황 | HTTP / code |
+|---|---|
+| 미인증 / scope 없음 / 선택 중 미허용·변경 항목 | 401 `authentication_required` / 403 `scope_denied` / 403 `handoff_not_allowed` |
+| 비활성 / 선택 중 누락·history·손상·미준비 / pin 불일치 | 409 `execution_unavailable` / `handoff_selection_unmappable` / `handoff_pin_mismatch` |
+| 잘못된 요청 / 모르는 신원 / 미사용 관계 / 생산자 보고서 상한 | 422 `invalid_request` / `changed_identity_unknown` / `changed_relation_unused` / `exposure_report_limit` |
+| 본문 상한 / media type | 413 `request_too_large` / 415 `unsupported_media_type` |
+| slot·gate·원장 경합 / 실행 불가·timeout / 운영자 설정·원장 오류 | 503 `service_busy`·`runtime_busy` / `runtime_unavailable` / `service_configuration_invalid` |
+| 잘못된 report / 요청 결속 불일치 / 알 수 없는 생산자 오류 | 500 `runtime_contract_mismatch` / `runtime_binding_mismatch` / `internal_error` |
+
+오류는 기존 `HdErrorEnvelope`만 쓰며 영향 ID·부분 report·CLI detail을 싣지 않습니다. 기록은 있으나 선택된 handoff에 연결되지 않은 신원은 완전한 빈 report가 될 수 있지만 모르는 신원은 오류입니다. 앱은 네 receipt 신원을 대조하고 버전별 제외·정정·복구·revision·활성화를 별도로 처리합니다. 빈 결과나 더 작은 결과가 기존 제외를 해제하지 않습니다.
+
+**검증 명령(별도 실행).** `ai/service/.venv/bin/python -m pytest ai/service/tests`와 `ai/service/.venv/bin/python -m pytest ai/service/pipeline_tests`는 서로 다른 프로세스로 실행합니다. 새 실제 HTTP/CLI smoke는 `ai/service/.venv/bin/python ai/service/scripts/handoff_exposure_service_smoke.py`입니다. 설치된 CLI, 실제 loopback HTTP, 기존 synthetic replay world와 손으로 작성된 영향 기대값을 사용하며 source 철회 뒤 조회·일반 export withheld·기록된 빈 결과와 모르는 신원·선택 전체 실패·원장 경합·원장/앱 무변경을 검사합니다. 이는 실기사 품질·모델 성능·배포 검증이 아닙니다.
+
 ## 네트워크와 한계
 
 - 서비스는 `127.0.0.1`에만 묻습니다. 운영에서는 같은 호스트/네임스페이스의 HTTPS reverse proxy가 TLS, 본문 2,000,000B 상한, `Authorization` 비로깅을 맡고 App SG에서만 접근되게 해야 합니다. **이는 가정이며 관측·배포한 사실이 없습니다**(WBS 6.11.2/8의 실관측 과제).
@@ -229,7 +264,7 @@ live S2/S3 job은 **서버 운영자가 고정한 것만** 돌아갑니다. 호�
 
 ## 검증
 
-`tests/`는 실제 uvicorn 프로세스(127.0.0.1)와 실제 설치된 `zoop-ai`를 쓰고 CLI를 흉내 내지 않습니다. 자격 증명은 시험마다 메모리에서 만든 합성 값이며 저장소에는 토큰도 digest도 없습니다. 모델은 호출하지 않습니다. 오직 live 경로 시험이 `127.0.0.1`의 loopback provider(표준 라이브러리 HTTP 서버, 요청 수만 센다)를 쓰고 외부 네트워크는 쓰지 않습니다. 프로세스 충돌 시험은 `tests/launcher.py`가 실제 컴포넌트를 감싸 정해진 경계에서 서비스를 SIGKILL하며 프로덕션 코드에는 그런 hook이 없습니다.
+`tests/`는 실제 uvicorn 프로세스(127.0.0.1)에서 HTTP 경계를 검사하며, 목적에 따라 설치된 `zoop-ai` 또는 시험 소유의 CLI 대역을 사용합니다. 대역 시험은 잘못된 출력·시간 초과·권한 변경 등 전송 경계만 증명하며, 실제 pipeline 실행은 `pipeline_tests/`와 각 설치 CLI smoke로 별도 확인합니다. 자격 증명은 시험마다 메모리에서 만든 합성 값이며 저장소에는 토큰도 digest도 없습니다. 모델은 호출하지 않습니다. live 경로 시험은 `127.0.0.1`의 loopback provider를 사용하고 외부 네트워크는 쓰지 않습니다. 프로세스 충돌 시험은 `tests/launcher.py`가 실제 컴포넌트를 감싸 정해진 경계에서 서비스를 SIGKILL하며 프로덕션 코드에는 그런 hook이 없습니다.
 
 | 파일 | 증명 |
 |---|---|

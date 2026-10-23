@@ -69,7 +69,7 @@ class Credentials:
         relation = ["relation.submit", "relation.read", "relation.cancel", "relation.recover", "relation.review"]
         extraction = ["extraction.submit", "extraction.read", "extraction.cancel", "extraction.recover"]
         self.scopes = {
-            "alpha": ["analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover", *relation, *extraction, "graph.read", "handoff.read"],
+            "alpha": ["analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover", *relation, *extraction, "graph.read", "handoff.read", "handoff.exposure"],
             "beta": ["analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover", *relation, *extraction, "graph.read", "handoff.read"],
             "reader": ["analysis.read"],
             "submitter": ["analysis.submit"],

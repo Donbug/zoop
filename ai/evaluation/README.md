@@ -2,6 +2,14 @@
 
 이미 기록된 그래프 구성·검색·답변 출력과 trace를, 따로 작성한 gold와 비교해 채점한다. 표준 라이브러리만 쓰며(Python 3.12 이상) 채점기는 모델·네트워크·그래프 DB를 호출하지 않는다(예외: 아래 그래프 도구 baseline의 `measure`가 설치된 `zoop-ai-graph` CLI를 subprocess로 호출하고, 그 CLI가 승인된 loopback Neo4j를 읽는다. 모델·provider 호출은 0이다). 지표 정의, 데이터 분리, gold 검수, baseline과 측정 계획, 승인 경계는 [`docs/design/ai-benchmark.md`](../../docs/design/ai-benchmark.md)에 있고 여기서 반복하지 않는다.
 
+## 실제 자료 intake와 다음 평가
+
+[`corpus/external-pilot-v1/manifest.json`](corpus/external-pilot-v1/manifest.json)에 KLUE RE train 첫 20행과 TAT-QA 공식 dev 첫 5개 context·30개 질문의 출처·권리·원본 식별·파일 해시를 기록했다. 입력/gold 네 파일을 분리해 저장했고 해시·크기·고유 ID·KLUE entity span 40개·원래 annotation 복원 일치·입력의 gold annotation 키 부재를 확인했다. 번역·모델 호출은 없었다.
+
+이 자료는 **원자료 순서로 선택해 이미 열람한 개발용 표본**이며 대표 표본이나 held-out test가 아니다. KLUE row 응답과 관측한 HF revision의 결합은 미검증이다. 기존 `zoop_eval`은 이 외부 형식을 받지 않으며 adapter·채점 연결도 아직 구현하지 않았다. 아래 명령에 이 파일들을 바로 넣어 채점하지 않는다.
+
+한국어 실제 공시의 사람 합의 gold를 주 평가로 삼고 영어 QA는 별도 보조 평가로 둔다. 자료 후보·권리 조건, G/R/A/J 트랙, B0–B4 대조군, `gpt-6-luna High`·`jev-1.14.0` 고정, dev/test 동결과 실행 순서는 [설계 문서의 실제 자료·gold 제작 프로토콜](../../docs/design/ai-benchmark.md#실제-자료와-gold-제작-프로토콜)을 따른다. 다음 순서는 **자료 intake → 두 사람의 독립 라벨링·합의 → adapter → 무모델 검색·고정 순회 → 제한된 live 승인 → 동결 실행·보고**다. 현재 수집 완료를 한국어 gold 확보나 모델 품질 측정 완료로 표시하지 않는다.
+
 ## 명령
 
 저장소 루트 기준이다.
@@ -90,7 +98,7 @@ run 파일(`zoop-bench-run-1`) 형식은 위 설계 문서의 “입력 계약�
 ## 한계
 
 - 이 하네스에 전체 검색·답변 시스템을 연결한 측정 결과는 없다. `zoop-ai-graph` baseline은 합성 world에서 도구 호출 비용과 이웃 결과 정확성만 확인하며, 검증 다리의 loopback 결과도 하위 단계의 기록·채점 점검이다. 다른 팀의 실행 코드 유무를 이 상태로 단정하지 않는다. authored control은 실제 모델 결과와 섞어 순위를 매기지 않는다.
-- gold는 단일 작성자 초안이며 합의를 거치지 않았고(`adjudicated=false`) 규모가 작아 비율이 거칠다. 기존 그래프·QA corpus는 영어 합성 문장이므로 한국어 표현을 검증하지 않는다. 한국어 검증 corpus도 합성 dev 전용이며 실제 모델 품질 근거가 아니다.
+- 기존 합성 gold는 단일 작성자 초안이며 합의를 거치지 않았고(`adjudicated=false`) 규모가 작아 비율이 거칠다. 기존 그래프·QA corpus는 영어 합성 문장이므로 한국어 표현을 검증하지 않는다. 한국어 검증 corpus도 합성 dev 전용이며 실제 모델 품질 근거가 아니다. 별도 외부 intake의 원래 annotation은 Zoop 한국어 금융 gold를 대체하지 않는다.
 - 자유 서술 품질과 인용의 의미적 뒷받침은 자동 지표가 없고 사람 또는 모델 평가가 필요하다.
 - 실제 모델 호출, 외부·경쟁 서비스 질의, 그래프 DB 설치, 새 의존성, test split 사용은 사용자 승인 전에는 하지 않는다. WBS는 변경하지 않는다.
 - 루트·CI 연결은 한국어 semantic-verification 점검에 한정된다. 기존 그래프·QA 하네스의 전체 시험과 Neo4j 도구 baseline은 위의 개별 명령으로 실행한다.

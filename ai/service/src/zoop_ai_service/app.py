@@ -30,6 +30,8 @@ from .graph_reads import GraphError, GraphReads
 from .graph_wire import COMPANY_ID_PATTERN, VERSION_ID_PATTERN, GraphErrorEnvelope, GraphFocusResult, GraphVersionStatus
 from .handoff_reads import HandoffError, HandoffReads
 from .handoff_wire import HANDOFF_ID_PATTERN, HdBundle, HdErrorEnvelope, HdStatus
+from .handoff_exposure_reads import HandoffExposureReads
+from .handoff_exposure_wire import MAX_COMMAND as EXPOSURE_MAX_BODY, ExposureQuery, HdExposure
 from .relation_jobs import RelationError, RelationJobs
 from .relation_wire import RelationErrorEnvelope, RelationJobStatus, RelationOperationStatus, RelationResultEnvelope, RelationReview, RelationSubmit
 from .wire import KINDS, ErrorBody, ErrorEnvelope, JobStatus, ResultEnvelope
@@ -95,11 +97,11 @@ def check_content_type(request: Request) -> None:
         raise ApiError(415, "unsupported_media_type")
 
 
-async def read_body(request: Request) -> bytes:
+async def read_body(request: Request, maximum: int = MAX_BODY) -> bytes:
     declared = request.headers.get("content-length")
     if declared is not None and (not declared.isascii() or not declared.isdigit()):
         raise invalid("Content-Length")
-    if declared is not None and int(declared) > MAX_BODY:
+    if declared is not None and int(declared) > maximum:
         # The refusal is already determined: answer now. Never wait on a body the client may never send; the gateway drains a
         # little of it after the response has gone out, only so that a client that is mid-upload can still read the 413.
         raise ApiError(413, "request_too_large")
@@ -107,7 +109,7 @@ async def read_body(request: Request) -> bytes:
     size = 0
     async for chunk in request.stream():
         size += len(chunk)
-        if size > MAX_BODY:
+        if size > maximum:
             raise ApiError(413, "request_too_large")
         chunks.append(chunk)
     return b"".join(chunks)
@@ -316,14 +318,27 @@ HANDOFF_ERRORS = {
 }
 
 
+EXPOSURE_ERRORS = {
+    **HANDOFF_ERRORS,
+    403: {"model": HdErrorEnvelope, "description": "scope_denied: requires handoff.exposure, independent of handoff.read; handoff_not_allowed: any selected entry absent or changed."},
+    409: {"model": HdErrorEnvelope, "description": "execution_unavailable, handoff_selection_unmappable or handoff_pin_mismatch; no partial report."},
+    413: {"model": HdErrorEnvelope, "description": "request_too_large: declared or streamed body exceeds 65,536 bytes."},
+    415: {"model": HdErrorEnvelope, "description": "unsupported_media_type: requires application/json with UTF-8."},
+    422: {"model": HdErrorEnvelope, "description": "invalid_request, changed_identity_unknown, changed_relation_unused or exposure_report_limit."},
+}
+EXPOSURE_ERRORS.pop(404)
+
+
 def create_app(service: JobService | None = None, relation: RelationJobs | None = None, extraction: ExtractionJobs | None = None,
-               graph: GraphReads | None = None, handoff: HandoffReads | None = None) -> FastAPI:
+               graph: GraphReads | None = None, handoff: HandoffReads | None = None,
+               handoff_exposure: HandoffExposureReads | None = None) -> FastAPI:
     """With no service this builds the route skeleton only (OpenAPI export); a service makes it serve requests. `relation` is the
     S3 relation-job family, `extraction` the S2 extraction-job family, `graph` the read-only graph-version family and `handoff` the read-only handoff family; without one, every
     route of that family answers 409 `execution_unavailable` after authentication."""
     app = FastAPI(title="Zoop internal AI analysis transport", version="1.0.0", docs_url=None, redoc_url=None, openapi_url=None,
                   redirect_slashes=False)
     app.state.service, app.state.relation, app.state.extraction, app.state.graph, app.state.handoff, app.state.log = service, relation, extraction, graph, handoff, emit
+    app.state.handoff_exposure = handoff_exposure
     app.add_middleware(Gateway)
 
     @app.exception_handler(ApiError)
@@ -635,6 +650,24 @@ def create_app(service: JobService | None = None, relation: RelationJobs | None 
         context["handoffId"] = handoff_id
         seen = context["seen"] = Observation()
         return respond(await run_in_threadpool(getattr(handoff_reads, operation), principal.name, handoff_id, seen))
+
+    @app.post("/internal/v1/graph-handoffs/exposure", operation_id="queryGraphHandoffExposure", tags=["graph-handoffs"],
+              response_model=HdExposure, summary="Identity-only exposure of an explicit complete handoff selection", responses=EXPOSURE_ERRORS)
+    async def handoff_exposure_query(request: Request, principal: Annotated[Principal, Depends(require("handoff.exposure"))],
+                                     x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        reads = request.app.state.handoff_exposure
+        if reads is None:
+            raise HandoffError(409, "execution_unavailable")
+        graph_query(request, ())
+        check_content_type(request)
+        raw = await read_body(request, EXPOSURE_MAX_BODY)
+        try:
+            value = json.loads(raw.decode("utf-8"), object_pairs_hook=_duplicate_free, parse_constant=_no_constant)
+            query = ExposureQuery.model_validate(value)
+        except (UnicodeError, ValueError, RecursionError):
+            raise invalid("body") from None
+        seen = _context(request)["seen"] = Observation()
+        return respond(await run_in_threadpool(reads.query, principal.name, query, seen))
 
     @app.get("/internal/v1/graph-handoffs/{handoffId}", operation_id="getGraphHandoffStatus", tags=["graph-handoffs"],
              response_model=HdStatus, summary="Verified, content-free status of one allowlisted AI handoff", responses=HANDOFF_ERRORS)

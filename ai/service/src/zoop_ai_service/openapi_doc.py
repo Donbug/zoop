@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from . import extraction_doc, graph_doc, handoff_doc
+from .handoff_exposure_wire import ExposureQuery
 from .relation_ledger import OperationRow
 from .relation_review import operation_status
 from .relation_wire import (SCHEMA as RELATION_SCHEMA, RelationErrorEnvelope, RelationJobContent, RelationJobStatus, RelationOperationStatus,
@@ -416,7 +417,7 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
               "submitExtractionJob": "extraction.submit", "getExtractionJobStatus": "extraction.read", "getExtractionJobResult": "extraction.read",
               "cancelExtractionJob": "extraction.cancel", "recoverExtractionJob": "extraction.recover",
               "getGraphVersionStatus": "graph.read", "getGraphVersionFocus": "graph.read",
-              "getGraphHandoffStatus": "handoff.read", "getGraphHandoffBundle": "handoff.read"}
+              "getGraphHandoffStatus": "handoff.read", "getGraphHandoffBundle": "handoff.read", "queryGraphHandoffExposure": "handoff.exposure"}
     for path in spec["paths"].values():
         for operation in path.values():
             operation["security"] = [{"bearerAuth": [scopes[operation["operationId"]]]}]
@@ -467,4 +468,20 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     extraction_doc.document(spec)
     graph_doc.document(spec)
     handoff_doc.document(spec)
+    request = ExposureQuery.model_json_schema(by_alias=True, ref_template="#/components/schemas/{model}")
+    for name, definition in request.pop("$defs", {}).items():
+        components["schemas"].setdefault(name, definition)
+    components["schemas"]["ExposureQuery"] = request
+    exposure = spec["paths"]["/internal/v1/graph-handoffs/exposure"]["post"]
+    exposure["requestBody"] = {"required": True, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ExposureQuery"}}}}
+    exposure["description"] = (
+        "Requires handoff.exposure, independent of handoff.read. One explicit selection of 1–20 unique handoff IDs; request at most 65,536 UTF-8 bytes. "
+        "No query parameters, idempotency requirement, job, cache, retry or partial result. Invokes zoop-ai-handoff-exposure directly, never ordinary export. "
+        "Source rights are not evaluated: frozen identity reads remain possible after source revocation, but every allowlist entry must remain unchanged. "
+        "A complete allowlist snapshot is checked before the child, after any gate wait, after the child before errors are interpreted, and before response. "
+        "These are separate observations, not atomic revocation. Closed canonical report limit: 6 MiB including newline; model/provider calls are zero. "
+        "The CLI validates frozen artifacts; the service compares reported manifest/bundle pins to the allowlist, not hashes of bundle bytes it did not receive. "
+        "The app must reconcile handoffId, manifestDigest, bundleDigest and contentDigest with its receipt. This endpoint changes no exclusion, revision or "
+        "activation state; errors and empty/smaller reports never clear exclusions.")
+    exposure["responses"]["200"]["description"] = "Complete unchanged identity-only report in the handoff envelope; not current delivery authority or import readiness."
     return spec

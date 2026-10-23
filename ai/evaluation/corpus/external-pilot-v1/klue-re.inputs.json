@@ -1,0 +1,348 @@
+{
+  "dataset": "klue/klue",
+  "configuration": "re",
+  "split": "train",
+  "selection": "first 20 rows, offset 0; development intake only",
+  "records": [
+    {
+      "guid": "klue-re-v1_train_00000",
+      "sentence": "〈Something〉는 조지 해리슨이 쓰고 비틀즈가 1969년 앨범 《Abbey Road》에 담은 노래다.",
+      "subject_entity": {
+        "word": "비틀즈",
+        "start_idx": 24,
+        "end_idx": 26,
+        "type": "ORG"
+      },
+      "object_entity": {
+        "word": "조지 해리슨",
+        "start_idx": 13,
+        "end_idx": 18,
+        "type": "PER"
+      },
+      "source": "wikipedia"
+    },
+    {
+      "guid": "klue-re-v1_train_00001",
+      "sentence": "호남이 기반인 바른미래당·대안신당·민주평화당이 우여곡절 끝에 합당해 민생당(가칭)으로 재탄생한다.",
+      "subject_entity": {
+        "word": "민주평화당",
+        "start_idx": 19,
+        "end_idx": 23,
+        "type": "ORG"
+      },
+      "object_entity": {
+        "word": "대안신당",
+        "start_idx": 14,
+        "end_idx": 17,
+        "type": "ORG"
+      },
+      "source": "wikitree"
+    },
+    {
+      "guid": "klue-re-v1_train_00002",
+      "sentence": "K리그2에서 성적 1위를 달리고 있는 광주FC는 지난 26일 한국프로축구연맹으로부터 관중 유치 성과와 마케팅 성과를 인정받아 ‘풀 스타디움상’과 ‘플러스 스타디움상’을 수상했다.",
+      "subject_entity": {
+        "word": "광주FC",
+        "start_idx": 21,
+        "end_idx": 24,
+        "type": "ORG"
+      },
+      "object_entity": {
+        "word": "한국프로축구연맹",
+        "start_idx": 34,
+        "end_idx": 41,
+        "type": "ORG"
+      },
+      "source": "wikitree"
+    },
+    {
+      "guid": "klue-re-v1_train_00003",
+      "sentence": "균일가 생활용품점 (주)아성다이소(대표 박정부)는 코로나19 바이러스로 어려움을 겪고 있는 대구광역시에 행복박스를 전달했다고 10일 밝혔다.",
+      "subject_entity": {
+        "word": "아성다이소",
+        "start_idx": 13,
+        "end_idx": 17,
+        "type": "ORG"
+      },
+      "object_entity": {
+        "word": "박정부",
+        "start_idx": 22,
+        "end_idx": 24,
+        "type": "PER"
+      },
+      "source": "wikitree"
+    },
+    {
+      "guid": "klue-re-v1_train_00004",
+      "sentence": "1967년 프로 야구 드래프트 1순위로 요미우리 자이언츠에게 입단하면서 등번호는 8번으로 배정되었다.",
+      "subject_entity": {
+        "word": "요미우리 자이언츠",
+        "start_idx": 22,
+        "end_idx": 30,
+        "type": "ORG"
+      },
+      "object_entity": {
+        "word": "1967",
+        "start_idx": 0,
+        "end_idx": 3,
+        "type": "DAT"
+      },
+      "source": "wikipedia"
+    },
+    {
+      "guid": "klue-re-v1_train_00005",
+      "sentence": ": 유엔, 유럽 의회, 북대서양 조약 기구 (NATO), 국제이주기구, 세계 보건 기구 (WHO), 지중해 연합, 이슬람 협력 기구, 유럽 안보 협력 기구, 국제 통화 기금, 세계무역기구 그리고 프랑코포니.",
+      "subject_entity": {
+        "word": "북대서양 조약 기구",
+        "start_idx": 13,
+        "end_idx": 22,
+        "type": "ORG"
+      },
+      "object_entity": {
+        "word": "NATO",
+        "start_idx": 25,
+        "end_idx": 28,
+        "type": "ORG"
+      },
+      "source": "wikipedia"
+    },
+    {
+      "guid": "klue-re-v1_train_00006",
+      "sentence": "그에 따라 나폴리와 계약을 연장한 마라도나는 1989년 팀을 UEFA컵 정상으로 인도했으며 이듬해에는 유럽 챔피언 AC 밀란을 상대로 승리를 거두고 다시 한 번 세리에A에서 정상에 등극했다.",
+      "subject_entity": {
+        "word": "AC 밀란",
+        "start_idx": 64,
+        "end_idx": 68,
+        "type": "ORG"
+      },
+      "object_entity": {
+        "word": "1989",
+        "start_idx": 25,
+        "end_idx": 28,
+        "type": "DAT"
+      },
+      "source": "wikipedia"
+    },
+    {
+      "guid": "klue-re-v1_train_00007",
+      "sentence": "박용오(朴容旿, 1937년 4월 29일(음력 3월 19일)(음력 3월 19일) ~ 2009년 11월 4일)는 서울에서 태어난 대한민국의 기업인으로 두산그룹 회장, KBO 총재 등을 역임했다.",
+      "subject_entity": {
+        "word": "박용오",
+        "start_idx": 0,
+        "end_idx": 2,
+        "type": "PER"
+      },
+      "object_entity": {
+        "word": "1937년 4월 29일",
+        "start_idx": 9,
+        "end_idx": 20,
+        "type": "DAT"
+      },
+      "source": "wikipedia"
+    },
+    {
+      "guid": "klue-re-v1_train_00008",
+      "sentence": "중공군에게 온전히 대항할 수 없을 정도로 약해진 국민당은 타이베이로 수도를 옮기는 것을 결정해, 남아있는 중화민국군의 병력이나 국가, 개인의 재산등을 속속 타이완으로 옮기기 시작해, 12월에는 중앙 정부 기구도 모두 이전해 타이베이 시를 중화민국의 새로운 수도로 삼았다.",
+      "subject_entity": {
+        "word": "중화민국",
+        "start_idx": 59,
+        "end_idx": 62,
+        "type": "ORG"
+      },
+      "object_entity": {
+        "word": "타이베이",
+        "start_idx": 32,
+        "end_idx": 35,
+        "type": "LOC"
+      },
+      "source": "wikipedia"
+    },
+    {
+      "guid": "klue-re-v1_train_00009",
+      "sentence": "특히 김동연 전 경제부총리를 비롯한 김두관 국회의원, 안규백 국회의원, 김종민 국회의원, 오제세 국회의원, 최운열 국회의원, 김정우 국회의원, 권칠승 국회의원, 맹성규 국회의원등 더불어민주당 국회의원 8명이 영상 축하 메세지를 보내 눈길을 끌었다.",
+      "subject_entity": {
+        "word": "안규백",
+        "start_idx": 30,
+        "end_idx": 32,
+        "type": "PER"
+      },
+      "object_entity": {
+        "word": "더불어민주당",
+        "start_idx": 100,
+        "end_idx": 105,
+        "type": "ORG"
+      },
+      "source": "wikitree"
+    },
+    {
+      "guid": "klue-re-v1_train_00010",
+      "sentence": "하비에르 파스토레는 아르헨티나 클럽 타예레스의 유소년팀에서 축구를 시작하였다.",
+      "subject_entity": {
+        "word": "하비에르 파스토레",
+        "start_idx": 0,
+        "end_idx": 8,
+        "type": "PER"
+      },
+      "object_entity": {
+        "word": "아르헨티나",
+        "start_idx": 11,
+        "end_idx": 15,
+        "type": "LOC"
+      },
+      "source": "wikipedia"
+    },
+    {
+      "guid": "klue-re-v1_train_00011",
+      "sentence": "이른바 'Z세대'로 불리는 1990년대 중반 이후 태어난 세대에게 대표 아이콘으로 통하는 미국 싱어송라이터 빌리 아일리시(본명 빌리 오코널, 19)가 팝 역사를 새로 썼다.",
+      "subject_entity": {
+        "word": "빌리 아일리시",
+        "start_idx": 60,
+        "end_idx": 66,
+        "type": "PER"
+      },
+      "object_entity": {
+        "word": "싱어송라이터",
+        "start_idx": 53,
+        "end_idx": 58,
+        "type": "POH"
+      },
+      "source": "wikitree"
+    },
+    {
+      "guid": "klue-re-v1_train_00012",
+      "sentence": "2009년 9월, 미국 프로 야구 필라델피아 필리스 소속의 야구 선수 박찬호는 《MBC 스페셜-박찬호는 당신을 잊지 않았다》 편에서 “최진실 씨의 아픔과 죽음의 고통을 이해합니다. 최진실 씨 사건에 눈물을 흘렸습니다. 저도 죽으려고 마음을 먹었던 적이 있었습니다. 잘하려고 애를 쓰는데 비난과 비판이 쏟아졌습니다. 머리가 빠지고 너무 힘들었습니다”라고 말하며 최진실의 죽음에 대해 안타까움을 표현했다.",
+      "subject_entity": {
+        "word": "필라델피아 필리스",
+        "start_idx": 19,
+        "end_idx": 27,
+        "type": "ORG"
+      },
+      "object_entity": {
+        "word": "박찬호",
+        "start_idx": 39,
+        "end_idx": 41,
+        "type": "PER"
+      },
+      "source": "wikipedia"
+    },
+    {
+      "guid": "klue-re-v1_train_00013",
+      "sentence": "뉴질랜드 1차산업부 생물보안 대변인 캐서린 더시 박사는 과일파리를 잡기 위해 오클랜드 전역에 1천300여개의 파리통을 놓았다며, 곧 통들을 마지막으로 점검할 것이라고 말했다.",
+      "subject_entity": {
+        "word": "뉴질랜드",
+        "start_idx": 0,
+        "end_idx": 3,
+        "type": "ORG"
+      },
+      "object_entity": {
+        "word": "오클랜드",
+        "start_idx": 43,
+        "end_idx": 46,
+        "type": "LOC"
+      },
+      "source": "wikitree"
+    },
+    {
+      "guid": "klue-re-v1_train_00014",
+      "sentence": "조토 디 본도네, 마사초, 피에로 델라 프란체스카, 도메니코 기를란다요, 페루지노, 미켈란젤로, 라파엘로, 보티첼리, 레오나르도 다빈치, 티치아노 등으로 대표되는 이탈리아 르네상스 회화는 당대와 그 이후의 시기 유럽 전체에 영향을 주었다.",
+      "subject_entity": {
+        "word": "미켈란젤로",
+        "start_idx": 47,
+        "end_idx": 51,
+        "type": "PER"
+      },
+      "object_entity": {
+        "word": "르네상스",
+        "start_idx": 96,
+        "end_idx": 99,
+        "type": "DAT"
+      },
+      "source": "wikipedia"
+    },
+    {
+      "guid": "klue-re-v1_train_00015",
+      "sentence": "성명에는 더불어민주당 이상민 대전광역시당 위원장, 이춘희 세종특별자치시당 위원장, 홍재형 충청북도당 위원장, 박수현 충청남도당 위원장, 이해찬, 박병석, 변재일, 오제세, 노영민, 양승조, 박범계, 박완주 의원이 서명했다.",
+      "subject_entity": {
+        "word": "노영민",
+        "start_idx": 96,
+        "end_idx": 98,
+        "type": "PER"
+      },
+      "object_entity": {
+        "word": "더불어민주당",
+        "start_idx": 5,
+        "end_idx": 10,
+        "type": "ORG"
+      },
+      "source": "wikipedia"
+    },
+    {
+      "guid": "klue-re-v1_train_00016",
+      "sentence": "이정미 대표도 이날 기자회견에 앞서 한 라디오 방송에 출연 \"정개특위를 한국당에 내주는 건 어떤 일이 있어도 안 된다\"며 \"지금 한국당을 어르고 구슬리는 게 민주당에 득이 된다고 생각할지 모르겠지만 정부 여당의 개혁 정책에 가장 힘을 실어줬던 정의당과 야3당의 개혁 공조가 어그러지는 상황이 될 것\"이라고 지적했다.",
+      "subject_entity": {
+        "word": "이정미",
+        "start_idx": 0,
+        "end_idx": 2,
+        "type": "PER"
+      },
+      "object_entity": {
+        "word": "정의당",
+        "start_idx": 136,
+        "end_idx": 138,
+        "type": "ORG"
+      },
+      "source": "wikitree"
+    },
+    {
+      "guid": "klue-re-v1_train_00017",
+      "sentence": "제2총군은 태평양 전쟁 말기에 일본 본토에 상륙하려는 연합군에게 대항하기 위해 설립된 일본 제국 육군의 총군이었다.",
+      "subject_entity": {
+        "word": "제2총군",
+        "start_idx": 0,
+        "end_idx": 3,
+        "type": "ORG"
+      },
+      "object_entity": {
+        "word": "일본 제국 육군",
+        "start_idx": 48,
+        "end_idx": 55,
+        "type": "ORG"
+      },
+      "source": "wikipedia"
+    },
+    {
+      "guid": "klue-re-v1_train_00018",
+      "sentence": "문성민은 경기대학교에 입학하여 황동일, 신영석과 함께 경기대학교의 전성기를 이끌면서 하계대회, 전국체전, 최강전 등 3관왕을 이룬다.",
+      "subject_entity": {
+        "word": "문성민",
+        "start_idx": 0,
+        "end_idx": 2,
+        "type": "PER"
+      },
+      "object_entity": {
+        "word": "경기대",
+        "start_idx": 5,
+        "end_idx": 7,
+        "type": "ORG"
+      },
+      "source": "wikipedia"
+    },
+    {
+      "guid": "klue-re-v1_train_00019",
+      "sentence": "이번 포럼은 제주개발공사와 유네스코 아시아-태평양 본부, 한국지질자원연구원이 공동 주최하고 유네스코 파리본부, 제주특자치도, 환경부, 한국수자원공사, 한국건설기술연구원 등이 후원한다.",
+      "subject_entity": {
+        "word": "한국수자원공사",
+        "start_idx": 75,
+        "end_idx": 81,
+        "type": "ORG"
+      },
+      "object_entity": {
+        "word": "환경부",
+        "start_idx": 70,
+        "end_idx": 72,
+        "type": "ORG"
+      },
+      "source": "wikitree"
+    }
+  ]
+}

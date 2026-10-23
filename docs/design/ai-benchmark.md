@@ -6,9 +6,10 @@
 
 - 순수 채점기는 모델·네트워크·DB를 호출하지 않는다. 실행 다리는 합성 loopback HTTP 검증과 별도 승인된 로컬 Neo4j 도구 측정을 지원한다. 아래 절에서 실제 실행 경계와 모의 응답을 구분한다.
 - 이 하네스에는 전체 벡터 RAG·일반 채팅·agent 답변 실행을 연결한 측정 결과가 없다. 그래프 도구 baseline은 호출 비용·이웃 결과 정확성만, 네이티브 이슈 요약 검증 다리는 검증 하위 단계의 기록·채점 정합성만 확인했다. 다른 팀의 구현 유무나 전체 서비스 품질을 이 상태로 단정하지 않는다.
-- gold는 합성 코퍼스에 대한 **단일 작성자 초안**이며 두 사람의 독립 라벨링·합의(adjudication)를 거치지 않았다(`adjudicated=false`, `annotators=1`). 여기서 나온 점수는 실제 데이터에 대한 정확도 주장이 아니다.
+- 기존 합성 corpus의 gold는 **단일 작성자 초안**이며 두 사람의 독립 라벨링·합의(adjudication)를 거치지 않았다(`adjudicated=false`, `annotators=1`). 여기서 나온 점수는 실제 데이터에 대한 정확도 주장이 아니다. 별도로 수집한 공개 자료의 원래 annotation은 아래 “실제 자료와 gold 제작 프로토콜”에서 구분한다.
 - 자유 서술 답변의 의미 품질은 정확 일치로 판정할 수 없다. 사람 또는 모델 평가가 필요하며 이 하네스는 그 지표를 만들지 않는다(`freeText.status = human_or_model_evaluation_required`).
 - **2026-10-22 추가:** 본개발 `verify-issue-summary`의 요청·원문 응답·판정을 기록하고 독립 채점하는 네이티브 다리를 연결했다. 한국어 합성 24개 사례·30개 주장, 실제 로컬 HTTP 대조군, 중단 복구와 변조 거부를 검증했다. 실제 Jev 품질·생성 품질·전체 RAG 성능·임곗값 보정 결과는 아니다.
+- **외부 자료 수집:** KLUE RE 20행과 TAT-QA 5개 context·30개 질문을 입력/gold로 분리해 로컬에 저장했다. 개발용 형식 점검 자료이며 대표 표본·held-out test가 아니다. 기존 `zoop_eval`은 이 외부 형식을 받지 않고 adapter도 구현하지 않았다.
 
 ## 실행 명령
 
@@ -61,7 +62,7 @@ corpus의 기업·기사는 모두 허구다. 실제 발행사·기사·시장 �
 
 ```jsonc
 {
-  "schema": "zoop-bench-run-1", "runId": "r-agent-low-001", "label": "optional",
+  "schema": "zoop-bench-run-1", "runId": "r-agent-high-001", "label": "optional",
   "provenance": {
     "kind": "real_measured",            // 또는 "authored_control"
     "executionMode": "live",            // real_measured: live|replay, authored_control: authored
@@ -70,9 +71,9 @@ corpus의 기업·기사는 모두 허구다. 실제 발행사·기사·시장 �
   "corpus": { "corpusId": "zoop-bench-v1", "corpusRevision": "2026-10-14.1", "goldRevision": "2026-10-14.1",
               "inputsSha256": "(선택, validate가 출력하는 값)", "split": "dev", "tasks": ["graph", "qa"] },
   "system": {
-    "systemId": "agent-graphrag-low", "family": "agent_graphrag",   // no_model_deterministic|vector_rag|fixed_graph_traversal|agent_graphrag|other
-    "model": { "provider": "…", "name": "…", "version": "…" },       // 모델이 없으면 null
-    "config": { "reasoningEffort": "low", "maxToolCalls": 8, "maxHops": 3, "topK": null, "timeoutMs": 120000 },  // 스칼라만
+    "systemId": "agent-graphrag-high", "family": "agent_graphrag",   // no_model_deterministic|vector_rag|fixed_graph_traversal|agent_graphrag|other
+    "model": { "provider": "…", "name": "gpt-6-luna", "version": "…" }, // 실제 실행 시 고정 버전 기록; 모델이 없으면 null
+    "config": { "reasoningEffort": "high", "maxToolCalls": 8, "maxHops": 3, "topK": 5, "timeoutMs": 120000 },  // 실험 제안 예시, 스칼라만
     "promptRevision": "…", "toolRevision": "…", "schemaRevision": "…", "graphRevision": null,
     "capabilities": { "retrieval": true, "path": true, "citations": true }          // qa 채점 시 필수
   },
@@ -195,7 +196,7 @@ S3 관계 생산 계약(`relation_contracts.MAX_PATH=2`)은 **관계 후보로 �
 | gold 은닉 | 시스템 입력은 `corpus.json`+`tasks.json`뿐이다. gold의 정답·근거·경로·결정 어휘를 프롬프트·few-shot·도구 설명·검색 색인에 넣지 않는다. | 시험이 시스템 가시 파일에 gold 어휘가 없는지 확인. `inputsSha256`로 시스템이 본 입력을 고정 |
 | dev/test 분리 | 한 문서는 한 split의 한 task에만 속한다. 같은 `originFamily`(재보도 계열), 같은 entity가 양쪽 split의 gold edge에 쓰이지 않는다. 질문의 근거·경로·답은 자기 split 안에 있다. | `validate`가 위반 시 `split_leakage`로 거부 |
 | dev 사용 | 프롬프트·도구·K·한도 선택은 dev에서만 한다. | 절차 규칙 |
-| test 1회 | 설정을 동결하고 기록한 뒤 test는 설정당 한 번만 연다. test 결과를 보고 고치면 dev로 돌아가고 새 test 사례를 새 revision으로 추가해야 한다. | 절차 규칙. run 파일의 `recordedAt`·`runId`로 추적 |
+| test 캠페인 | dev에서 설정과 반복 계획을 동결한 뒤 test를 하나의 캠페인으로 실행한다. 사전에 정한 반복은 허용하지만 test 결과로 재튜닝하지 않는다. 수정하면 dev로 돌아가고 새 held-out test revision을 준비한다. | 절차 규칙. run 파일의 `recordedAt`·`runId`와 캠페인별 반복 계획으로 추적 |
 | 다른 split 기록 거부 | dev run이 test case 기록을 가지면 `unmatched_case`. | `parse_run` |
 | 재사용 금지 | gold를 사람이 본 뒤 프롬프트를 고치는 행위를 막을 수는 없으므로, 어느 revision을 보고 튜닝했는지 run 메타데이터에 적는다. | 절차 규칙 |
 
@@ -203,58 +204,111 @@ S3 관계 생산 계약(`relation_contracts.MAX_PATH=2`)은 **관계 후보로 �
 
 ## gold 검수 절차 (제안, 아직 실행하지 않음)
 
-1. **작성**: corpus 문장만 보고, 어떤 시스템의 출력도 보지 않은 상태에서 작성자 A가 gold를 쓴다. 근거 passage를 edge마다 적는다.
-2. **독립 라벨링**: 작성자 B가 gold를 보지 않고 `tasks.json`만으로 entity 링크·병합·edge·질문 답을 라벨링한다.
-3. **불일치 합의**: 불일치 항목을 목록화하고 제3자 또는 합의 회의에서 결정한다. 합의가 안 되면 모호한 항목은 `UNDECIDABLE`/`null`/abstain으로 남기고 정확 일치 채점 대상에서 제외한다. 모호함은 지우지 않고 기록한다.
-4. **동결**: `goldRevision`을 올리고 `validate`의 `goldSha256`을 기록한다. 이후 gold 수정은 새 revision이며 이전 revision 결과와 비교하지 않는다.
-5. **기록**: 작성자 수, 합의 여부(`adjudicated`), 불일치율을 `gold.json`의 `provenance`에 적는다. 지금은 `annotators=1, adjudicated=false`다.
-6. **규모**: 거버넌스 문서 [`ZOOP_AI_거버넌스_정책.md`](../ZOOP_AI_거버넌스_정책.md) 11절은 일반 유형 20건 이상, 복잡·예외 40건 이상을 **제안**한다. 현재 split당 질문 9·그래프 task 5는 이에 한참 못 미친다. 사람 gold를 먼저 만들자는 팀 내 제안은 결정이 아니라 제안이다(`docs/evidence/raw/notion_2026-10-03` 0916 스크럼 기록).
+1. **독립 작성**: 두 사람이 corpus와 시스템에 보이는 task를 읽고 서로의 라벨과 시스템 출력을 보지 않은 상태에서 entity 링크·사건·병합·방향/기간·질문 답·근거를 각각 작성한다.
+2. **불일치 합의**: 불일치 항목을 목록화하고 제3자 또는 합의 회의에서 결정한다. 합의가 안 된 항목은 모호함을 기록하고 `UNDECIDABLE`/`null`/abstain 등 해당 계약으로 표현한다. 결정 가능한 항목의 정확도와 모호한 항목의 안전한 보류를 구분한다.
+3. **평가자 분리**: Jev는 평가 대상인 운영 검증기다. Jev가 자기 평가에 쓸 gold를 결정하게 하지 않는다. 모델의 보조 제안이나 문서 일관성 검토를 사람의 독립 라벨링·합의로 표시하지 않는다.
+4. **동결**: 입력과 gold revision·digest, 작성자 수, 합의 여부, 불일치율·해결 근거를 기록한다. 기존 형식은 `validate`의 `goldSha256`을 사용한다. 새 외부 형식의 검증·변환은 adapter 구현 범위이며 현재 지원하는 것처럼 실행하지 않는다.
+5. **규모와 상태**: 기존 합성 corpus는 여전히 `annotators=1, adjudicated=false`다. 거버넌스 문서 [`ZOOP_AI_거버넌스_정책.md`](../ZOOP_AI_거버넌스_정책.md) 11절의 일반 유형 20건 이상·복잡/예외 40건 이상은 제안이며, 아래 실제 자료 계획이나 의미 품질의 승인 임곗값을 대신하지 않는다.
 
-## 공정한 baseline과 경쟁 서비스의 분리
+## 실제 자료와 gold 제작 프로토콜
 
-**Baseline 후보(모두 `system.family`로 구분, 아직 구현·측정 전).** 비교는 같은 corpus·split·도구 예산·`timingContext`에서만 한다.
+**한국어 실제 공시의 별도 gold가 주 평가 자료다.** 공개 데이터셋은 관계 판별·표/수치 QA·다중 근거 검색 등 하위 능력의 보조 평가로 사용한다. 아래 계획은 자료 수집·평가 설계이며 실제 모델 성능 결과가 아니다.
 
-| ID | family | 설명 | 선언하는 capability | 모델 호출 |
-|---|---|---|---|---|
-| B0 | `no_model_deterministic` | 전부 abstain하는 control. 하한 점검용이며 시스템 결과가 아니다 | 없음 | 0 |
-| B1 | `no_model_deterministic` | 결정적 도구(문자열·정규식·고정 규칙)만 쓰는 구성·검색 | 구현에 따름 | 0 |
-| B2 | `vector_rag` | 청크 벡터 top-K 검색 후 답변. 임베딩·답변 모델이 필요하면 모델 호출 | `retrieval`, `citations` (경로 없음 → 경로 지표는 `null`) | 있음 |
-| B3 | `fixed_graph_traversal` | 시스템이 구성한 그래프 위에서 앵커→고정 규칙 순회(LLM이 경로를 고르지 않음). gold 그래프 위의 순회는 **상한 control**로 따로 표시하고 시스템 결과와 섞지 않는다 | `retrieval`, `path`, `citations` | 0 또는 답변 생성 시 있음 |
-| B4 | `agent_graphrag` | LLM이 도구(그래프 조회·검색)를 호출해 경로를 고른다. `reasoningEffort`·`maxToolCalls`·`maxHops` 변형을 격자로 비교 | 전부 | 있음 |
+### 수집한 개발용 자료
 
-Microsoft GraphRAG 문서([Query Overview](https://microsoft.github.io/graphrag/query/overview/))는 **Basic Search**(벡터 RAG top-k baseline), **Local Search**(그래프+텍스트 청크로 특정 entity 질문), **Global Search**(커뮤니티 보고서 map-reduce로 데이터셋 전체 질문), **DRIFT Search**(커뮤니티 정보로 Local을 확장)를 구분한다. 위 B2·B3·B4의 구성을 정할 때 후보로 참고하며, 어느 쪽이 우월하다는 근거로 인용하지 않는다. 학술 논문의 성능 주장은 이 문서에서 인용하지 않았고, 필요하면 출처를 읽고 별도로 조사한다.
+[`external-pilot-v1/manifest.json`](../../ai/evaluation/corpus/external-pilot-v1/manifest.json)에 원출처·reader URL·라이선스·변경 내역·파일별 SHA256과 바이트 크기를 기록했다. 입력과 gold 두 쌍, 총 네 파일을 저장했으며 annotation은 다시 쓰거나 번역하지 않고 원자료에서 분리했다. 수집 과정에서 모델 호출·원저장소 코드 실행은 없었다.
 
-**경쟁·참고 서비스(조사 후보일 뿐, 선정·측정하지 않음).** `docs/evidence/notion-decisions.md`는 토스증권 AI, Google Finance, ChatGPT 금융을 조사자의 해석으로 기록하며 팀 검증을 받지 않았다. 이 서비스들은 trace·그래프·근거 passage가 비공개일 수 있어 같은 구조화 기록(`path`, `retrieved`, trace span)을 만들 수 없다. 따라서:
+- **KLUE RE:** HF train의 첫 20행이다. 고유 행 20개와 원래 inclusive 좌표의 entity span 40개가 일치했다. 관측한 HF metadata revision은 `349481ec73fff722f88e0453ca05c77a447d967c`이나 row 응답과 이 revision의 결합은 **미검증**이다. 로컬 해시는 저장 표본을 고정할 뿐 공식 배포본과의 동일성을 증명하지 않는다.
+- **TAT-QA:** 공식 dev 파일의 첫 5개 context, 고유 질문 30개다. reader가 생략한 마지막 LF 하나를 복원한 원본은 1,637,431바이트이며 Git blob `48075c812af3fe6698b1d5cb50d9dbf358d52784`와 일치했다.
+- **수집 무결성 확인:** 네 파일의 저장 해시·크기, 고유 ID, KLUE 좌표를 확인했다. 입력과 gold를 합치면 선택한 원래 행/질문과 정확히 같고, 시스템에 보이는 입력의 gold annotation 키는 0개였다. 이는 수집·분리 확인이지 기존 scorer로 채점한 결과가 아니다.
+- **사용 한계:** 원자료 순서로 고른 표본이며 무작위·균형·대표 표본이 아니다. 이미 열람한 개발용 자료이므로 held-out test로 승격하지 않는다. 기존 `zoop_eval` 명령은 이 외부 형식을 받지 않으며 adapter·채점 연결은 미구현이다.
 
-- 우리 하네스의 run과 **같은 표에 올리지 않는다**. 별도 참고 표에 “검토 방식, 날짜, 질문, 관찰 가능한 필드”만 기록한다.
-- 접근 가능한 것은 같은 질문을 입력해 얻은 최종 답과 화면의 출처 표시뿐이다. 이 경우 `family=other`, `capabilities`를 관찰 가능한 것만 선언한 별도 run으로 기록하되, 사람이 수기로 입력·판독한 값은 recorder에 그렇게 표시하고 지연 비교 대상에서 뺀다.
-- 서비스 이용 약관·계정·과금·개인정보 조건을 확인하기 전에는 질의하지 않는다(승인 경계 참조). 실제 시장 데이터가 포함된 질의는 합성 corpus와 비교 가능하지 않으므로 **정확도 순위로 쓰지 않는다**. 경쟁 비교는 기능 축(근거 표시 단위, abstain 상태, 시점 표시)의 서술에 한정한다.
+### 자료 후보 6종과 권리 경계
 
-## 첫 측정 계획 (제안, 승인 전 실행 금지)
-
-원칙은 **한 번에 한 요인만 바꾸고 나머지는 고정**하는 것이다. 모든 단계의 점수는 dev에서만 보고, 요인 선택이 끝난 뒤 test를 설정당 1회 연다. LLM의 비결정성이 있으므로 같은 설정을 반복 실행해(제안: 3회) run을 각각 보고하고 평균으로 합치지 않는다.
-
-| 단계 | 내용 | 비고 |
+| 자료·1차 출처 | 평가 용도 | 현재 상태와 권리·한계 |
 |---|---|---|
-| 0 | 하네스·authored control 확인(완료) | 모델 호출 0 |
-| 1 | B0, B1(결정적 도구) 기록을 하네스에 넣어 하한을 확인 | 모델 호출 0 |
-| 2 | 기준 구성 고정: 가장 낮은 지연·노력 설정(낮은 `reasoningEffort`, 적은 `maxToolCalls`, 3 hop까지 허용). 모델은 “빠르고 저렴한 후보”를 승인 후 선정 | 후보 이름은 아직 정하지 않음 |
-| 3 | 한 요인씩 변경(아래 격자) | 요인마다 별도 run |
-| 4 | 동결한 구성으로 test 1회 | dev 결과를 본 뒤 수정 금지 |
-| 5 | 지연은 정확도 run과 분리한 별도 run에서 동시성 `C=1→5→10`, warmup 제외, `timingContext` 기록 | 단계 구분은 [release-verification.md](../development/release-verification.md)의 제안과 같다(그 값도 작업자 제안) |
+| [OpenDART](https://opendart.fss.or.kr/intro/main.do), [검색 API](https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS001&apiId=2019001), [원문 API](https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS001&apiId=2019003) | 한국어 기업·사건, 정정/철회, 방향·시점·인용 gold의 원천 | **조사 완료·수집 전 승인 필요.** [약관](https://opendart.fss.or.kr/intro/terms.do)에 따른 키·등록 이용 범위와 외부 모델 전송 권리를 확인한 뒤 40–60문서를 목표로 한다. 재배포까지 포괄 허용된 것으로 해석하지 않는다. |
+| [KLUE RE](https://github.com/KLUE-benchmark/KLUE), [공식 스키마](https://github.com/KLUE-benchmark/KLUE/wiki/KLUE-RE-dataset-description) | 한국어 관계·무관계·방향·멘션 위치 | **20행 수집.** [CC BY-SA 4.0](https://github.com/KLUE-benchmark/KLUE/blob/main/License.md); 출처·변경 표시와 동일조건 준수. 일반 영역 관계 gold이지 금융 사건 병합·시계열 그래프 gold가 아니다. |
+| [FinQA](https://github.com/czyssrs/FinQA), [공식 데이터 사이트](https://finqasite.github.io/) | 영어 금융 표/본문 근거와 계산 | **조사만 완료.** 데이터 CC BY 4.0, 코드 MIT. execution/program accuracy의 보조 후보이며 계산 단계 수를 그래프 hop 수로 세지 않는다. |
+| [TAT-QA](https://github.com/NExTplusplus/TAT-QA), [공식 예시](https://nextplusplus.github.io/TAT-QA/) | 영어 금융 표+본문 QA, 단위·스케일 | **5개 context·30문항 수집.** 데이터 CC BY 4.0, 코드 MIT. 공식 EM/F1와 scale을 보조 평가에 쓰며 `dataset_tagop`의 휴리스틱 `facts/mapping`을 사람 gold로 취급하지 않는다. |
+| [FinanceBench](https://github.com/patronus-ai/financebench), [공식 데이터 카드](https://huggingface.co/datasets/PatronusAI/financebench/blob/main/README.md) | 영어 공시 답변·페이지 근거 | **권리 확인 전 보류.** CC BY-NC 4.0. 평가 목적의 비상업성 또는 별도 허가를 확인해야 한다. 공개 150문항을 연구 전체 10,231문항과 혼동하지 않는다. |
+| [MuSiQue](https://github.com/StonyBrookNLP/musique) | 2·3-hop 근거 연결, 근거 부족 시 abstain | **조사만 완료·동일성 확인 전 채택 보류.** 공식 CC BY 4.0. 실제 문단을 연결한 구성형 질문이며 금융 자료가 아니다. 열람한 비공식 미러와 공식 배포본의 동일성은 미검증이다. |
 
-**요인 격자(제안값; `system.config` 키 이름 규약).** 값은 아직 어떤 사실로도 확정되지 않았다.
+추가 후보인 [AI Hub 금융·법률 문서 기계독해](https://www.aihub.or.kr/aihubdata/data/view.do?currMenu=115&dataSetSn=71610&topMenu=100)는 [이용정책](https://www.aihub.or.kr/intrcn/guid/usagepolicy.do?currMenu=151&topMenu=105)상 평가 목적 사용과 외부 모델 API 전송·국외 반출 허용이 확인되지 않아 사용을 보류한다. 공개 접근이나 CC 표시만으로 모든 제3자 권리·전송·재배포가 승인되었다고 보지 않는다.
 
-| 요인 | 키 | 시작 | 변경 값 |
-|---|---|---|---|
-| 추론 노력 | `reasoningEffort` | 제공자가 지원하는 가장 낮은 값 | 한 단계씩 높임(제공자별 문자열을 그대로 기록) |
-| 도구 호출 한도 | `maxToolCalls` | 4 | 8, 16 |
-| 순회 깊이 | `maxHops` | 3 | 1, 2 (3 초과는 4-hop gold를 만든 뒤) |
-| 검색 폭(B2) | `topK` | 5 | 3, 10 (dev에서 선택) |
-| 출력·시간 한도 | `maxOutputTokens`, `timeoutMs` | 제공자 기본값 기록 | 한 번에 하나 |
-| 모델 | `system.model` | 기준 후보 1개 | 다른 후보(요인 하나로 취급) |
+### 한국어 주 평가 자료와 split 제안
 
-**합격 기준은 정하지 않는다.** 이 문서는 정확도·지연·비용 목표를 만들지 않는다. 참고로 거버넌스 문서의 매크로 F1 0.90, 유형별 recall 0.85, false approval 0건과 `release-verification.md`의 로컬 p95 제안은 모두 **확정되지 않은 제안**이며, 이 벤치마크 지표와 단위·정의가 다르다. 팀이 수용 기준을 승인하고 표본 수가 정해진 뒤에만 합격 판정을 한다. 승인값은 실행 전에 기록하고 결과를 본 뒤 바꾸지 않는다. 현재 표본으로는 p95를 대표값으로 쓸 수 없다(질문 9개).
+OpenDART 수집이 승인되면 실제 공시 40–60문서에서 **dev QA 30개·test QA 60개**, 짧은 브리핑 **dev 4개·test 8개**를 만드는 안을 사용한다. 이는 목표 규모이지 확보된 자료 수나 일정 약속이 아니다.
+
+1. **원문과 시점 보존:** 접수일, 사건 발생일, 발행/수집 시각을 구분한다. 원문에 있는 날짜·시각의 정밀도와 정정 이력을 보존하고 날짜만 있는 값을 임의의 시각으로 늘리지 않는다. 원문 버전·해시·인용 위치를 고정하며 접수일을 사건 발생일로 대체하지 않는다. 기존 날짜 전용 scorer의 계약보다 정밀한 값은 adapter 설계에서 다루고 조용히 손실 변환하지 않는다.
+2. **묶음 단위 분리:** 연결된 사건 계열, 정정본·첨부·중복/재보도, 재사용 표, 기업 간 연결 경로를 한 그룹으로 묶어 dev/test에 나눈다. 같은 경로의 기업을 회사명만으로 따로 분리하지 않는다. 보조 금융 자료끼리도 기업·연도·보고서·본문 중복을 확인한다.
+3. **QA 구성:** 실제 근거가 있는 범위에서 split별 1·2·3-hop을 균형 배치한다. 연결 근거가 부족하면 부족한 수를 보고하고 관계나 경로를 만들어 채우지 않는다. 정정/철회, 계약 확정/예정, 날짜 미상, 기업 별칭·동명이인, 역방향, 공동 언급뿐인 문장, 증거 부족·상충을 포함한다.
+4. **브리핑 gold:** 정답 문장 하나가 아니라 필수 사실·허용 사실·금지 추론과 주장별 인용을 정의한다. 두 사람의 독립 라벨링과 합의로 수치·시점·인과·투자 권유·중요 사실 누락을 평가한다.
+5. **입력 은닉:** 원문은 검색할 수 있지만 정답·gold 근거 표시·도출 과정은 입력/색인에서 제외한다. 예를 들어 TAT-QA의 `answer/derivation/rel_paragraphs`, FinQA의 `program/gold_inds/exe_ans`, MuSiQue의 `question_decomposition/is_supporting/answerable`은 숨긴다. MuSiQue 채택 시 공식 원천 single-hop 누출 방지 목록도 적용한다.
+
+영어 보조 평가는 한국어 원문 평가와 **점수를 합산하지 않는다**. 번역본도 별도 조건으로 표시한다. 오래된 공개 자료의 사전학습 오염을 배제할 수 없으므로, 이 자료의 점수를 최신 한국어 held-out 성능으로 대체하지 않는다.
+
+## 공정한 baseline과 평가 트랙
+
+### 네 가지 질문을 분리한다
+
+| 트랙 | 입력 → 평가 대상 | 통제 조건과 해석 |
+|---|---|---|
+| G: 그래프 구성 | 원문 → entity·event·병합·방향/시간 그래프·인용 | 추출·병합·방향·기간·인용을 기존 지표별로 채점한다. 검색기가 좋아서 구성 오류가 가려지지 않게 한다. |
+| R: 검색·선택 | 같은 원문 corpus와 동결된 **동일 시스템 그래프** → 근거·경로 선택 | 검색/순회 방식만 비교한다. gold 그래프는 별도 상한 진단이며 주 결과에 섞지 않는다. |
+| A: 전체 답변 | 원문 → 그래프 구축을 포함한 QA·브리핑 | 구성부터 최종 답변까지 평가한다. 그래프 구축·색인 비용과 온라인 질의 비용을 분리한다. |
+| J: 검증기 | 고정된 주장·인용 → 독립 검증 판정 | 사람이 합의한 gold로 `jev-1.14.0`을 별도 평가한다. J 점수를 생성기나 전체 A 성능으로 대체하지 않는다. |
+
+### B0–B4 대조군
+
+아래 시스템 대조군은 **구현·측정 제안**이다. 이미 측정한 무방향 `focus` 도구 control과 구분한다. 생성형 비교는 같은 corpus·청크·질문·생성 지침·문맥 상한·실행 환경을 쓰고, R에서는 그래프도 같아야 한다.
+
+| ID | 구현 제안·family | 공정한 비교 조건 |
+|---|---|---|
+| B0 | 전부 abstain하는 authored 하네스 점검, `no_model_deterministic` | 경쟁 시스템이나 실측 하한이 아니다. 실제 측정과 같은 표에 넣지 않는다. |
+| B1 | TF-IDF 또는 BM25 어휘 검색 + 동일 생성기, `other` | 임베딩 없음. 토큰화/문자 n-gram·선택 방식은 dev에서 고정한다. 검색 단계만 먼저 무모델로 측정할 수 있으나 전체 B1 답변에는 생성 호출이 필요하다. |
+| B2 | 벡터 top-K RAG + 동일 생성기, `vector_rag` | B1과 같은 청크·topK·문맥 상한을 사용한다. 임베딩 모델은 미선정이며 승인 없이 ID를 정하지 않는다. |
+| B3 | 고정 1–3-hop 순회 + 동일 생성기, `fixed_graph_traversal` | 동일 시스템 그래프에서 방향·predicate·`asOf`를 적용한다. 검색/순회 단계에는 모델을 쓰지 않는다. gold 그래프 결과는 별도 상한 진단이다. |
+| B4 | 그래프·검색 도구를 선택하는 agent + 동일 생성기, `agent_graphrag` | B3와 같은 그래프·도구 계약을 쓰고 도구/문맥 예산을 고정한다. 경로 선택 효과와 그래프 구축 효과를 섞지 않는다. |
+
+경로를 내지 않는 B1/B2에 경로 capability를 선언하지 않는다. 미지원 경로 점수를 0점으로 처리해 순위를 만들지 않는다. 현재 무방향 `focus`의 depth 지연은 B3의 방향·시점 추론 성능이나 B4의 3단계 agent 추론 지연이 아니다.
+
+선택적 외부 참고 구현은 [Microsoft GraphRAG Local](https://microsoft.github.io/graphrag/query/local_search/)과 [LightRAG `naive`/`hybrid`/`mix`](https://github.com/HKUDS/LightRAG#selecting-query-modes)다. 코드는 각각 [MIT](https://github.com/microsoft/graphrag/blob/main/LICENSE), [MIT](https://github.com/HKUDS/LightRAG/blob/main/LICENSE)이며 **아직 설치·실행하지 않았다**. 채택 시 commit·설정·프롬프트·추출 모델·reranker·캐시를 고정한다. Local이나 `mix`를 자동으로 3단계 tool agent와 동등하다고 보지 않는다. [GraphRAG Global](https://microsoft.github.io/graphrag/query/overview/)의 community map-reduce는 별도 브리핑 과제로 평가한다. 공개 논문 점수를 가져와 자체 순위표를 만들지 않는다.
+
+토스증권 AI·Google Finance·ChatGPT 금융 같은 외부 서비스는 별도 관찰 대상이다. 약관·계정·과금·데이터 전송 승인 전에 질의하지 않는다. trace·그래프·원문 corpus를 통제할 수 없으면 근거 표시·abstain·시점 표시 등 관찰 가능한 기능만 서술하고 자체 대조군과 정확도·지연 순위를 매기지 않는다.
+
+## 첫 측정 프로토콜 (제안, live 실행은 별도 승인)
+
+**기준 모델은 `gpt-6-luna High`와 `jev-1.14.0`을 유지한다.** 빠른 첫 대조군은 낮은 Luna effort가 아니라 **모델 없는 어휘 검색·고정 순회 단계**다. 약한 모델 비교는 모델명·버전·사용권·예산을 명시적으로 승인받은 뒤에만 한다. 그때도 먼저 planner만 바꾸고 생성기·검증기·도구 예산은 고정한다. 모델 전체를 교체하는 실험은 별도 요인으로 분리한다.
+
+### dev 초기 설정과 test 동결
+
+| 항목 | dev 제안값 | 동결·기록 규칙 |
+|---|---|---|
+| 순회·도구 한도 | `maxHops=3`, `maxToolCalls=8` | 질문의 실제 근거 hop과 실제 호출 수도 기록 |
+| 검색·문맥 | `topK=5`, 문맥 8,000토큰 | 같은 청크와 토큰 계산 기준 사용; 임베딩 모델은 선정·승인 후 고정 |
+| 제한 시간·동시성 | `timeoutMs=120000`, concurrency 1 | 같은 환경에서 측정; 운영 NFS나 서비스 SLA가 아닌 실험 제안 |
+| 반복 | 설정당 3회 | 서로 다른 task 수와 반복 시도 수를 분리; test 반복 계획도 test 열람 전에 고정 |
+| 모델·버전 | `gpt-6-luna High`, `jev-1.14.0` | 실제 버전·프롬프트·도구·schema·graph·corpus/gold revision 기록 |
+
+dev에서 한 번에 한 요인만 바꾸어 선택한 뒤 모든 설정과 실패 처리·반복 계획을 동결한다. test는 그 설정의 단일 캠페인으로 실행하며 사전 계획한 반복을 재튜닝 기회로 사용하지 않는다. test 결과를 보고 바꾸면 새 held-out revision이 필요하다. 반복 평균만으로 서로 다른 질문 수가 늘어난 것처럼 보고하지 않는다.
+
+### 보고할 지표와 구현 경계
+
+- **정확도:** 1·2·3-hop별 최종 답 정확도·전체 근거 회수·경로 유효성·방향/시점 오류·abstain을 나눈다. J는 false approval과 안전한 답변의 수용률을 함께 보고한다. 브리핑은 사람이 주장별 의미적 지지와 필수 사실 누락을 판정한다. 기존 passage 집합 일치 지표를 의미적 지지로 부르지 않는다.
+- **지연·비용:** 색인/그래프 구축과 온라인 질의를 분리하고 wall·LLM·도구·검색·검증 구간을 기록한다. cold/warm, 준비 실행, 답변/검색 캐시 적중 여부를 명시한다. 공급자가 보고한 실제 토큰·비용, 추정값, 미상 값을 구분하고 미상을 0으로 채우지 않는다.
+- **실패와 표본:** 오류·timeout·미시도는 정확도 분모에서 빠지지 않는다. 서로 다른 task 수, 반복 수, 성공/실패 수를 별도로 낸다. 기존 공통 latency scorer는 `ok` 기록만 분포에 쓰고 `refused/error`는 제외하므로 그 분포를 전체 시도 지연으로 표시하지 않는다. 실패 지연·timeout은 별도 보고가 필요하다. 기존 graph-tool의 전체 시도 분포와도 계약이 다르다.
+- **비교 해석:** 동일 사례의 paired 변화와 불확실성 구간을 보고하는 안을 사용한다. 반복을 독립 질문처럼 세지 않고 사건 그룹 구조를 고려해 구간 산출 방법을 test 전에 정한다. 이는 추가 보고 설계이며 현재 `compare`에 신뢰구간·통계 검정 도구가 구현되었다는 뜻이 아니다. 종합 승자나 가중 단일 점수는 만들지 않는다.
+- **차단 조건과 의미 KPI:** 결정적으로 확인할 수 있는 권리 위반·유효하지 않은 인용·발행 규칙 위반은 정확도가 높아도 진행을 차단한다. 의미 품질의 숫자 임곗값은 충분한 사람 합의 표본과 별도 승인 전까지 제안이다. 거버넌스의 macro-F1 0.90·유형별 recall 0.85·false approval 0건, 로컬 p95 목표도 승인된 합격선으로 쓰지 않는다. 관측 오류 0건은 위험 0의 증명이 아니다.
+
+### 실행 순서와 남은 승인
+
+1. **자료 intake:** 수집한 개발용 두 자료의 manifest를 사용하고, 한국어 공시는 키·등록 이용 범위·외부 전송 권리를 확인한 뒤 수집한다.
+2. **사람 gold:** 사건 그룹별 split과 실제 근거 경로를 정하고 두 사람의 독립 라벨링·합의를 마친다. 공개 annotation의 복사를 Zoop 한국어 gold 합의로 간주하지 않는다.
+3. **Adapter:** 외부 형식의 입력/gold 분리·ID·인용 좌표·단위 보존과 run 변환을 구현한다. 현재 `zoop_eval`에 외부 파일을 바로 넣어 실행하지 않는다.
+4. **오프라인 대조군:** B0 하네스 점검과 무모델 어휘 검색·방향/시점 고정 순회의 기록 경로를 먼저 확인한다. 이는 전체 생성형 B1/B3 품질 평가가 아니다.
+5. **제한된 live 승인:** 대상 자료·전송 권리·모델/버전·endpoint·호출 수·금액 상한을 정해 실행별 승인을 받는다. 기존 설정·키 존재·과거 승인은 새 지출 승인이 아니다.
+6. **동결 실행·보고:** dev 선택을 마친 뒤 승인된 test 캠페인과 계획된 반복만 실행하고, 트랙·언어·실패·비용 출처·표본 한계를 분리해 보고한다. 외부 공개는 별도 승인을 받는다.
 
 ## 그래프 도구 baseline (`zoop-ai-graph focus`, 결정적 도구 control)
 
