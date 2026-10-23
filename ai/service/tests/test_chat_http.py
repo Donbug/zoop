@@ -126,7 +126,8 @@ def test_the_chat_ledger_root_and_files_must_be_private_and_are_never_repaired(t
     link.symlink_to(elsewhere, target_is_directory=True)
     with pytest.raises(ConfigError) as linked:
         load(ws.env(**stub.env(ZOOP_AI_CHAT_STATE_DIR=str(link))))
-    assert linked.value.reason == "state_dir_not_private"
+    # A symlinked root is refused by the path check before the privacy check (which also looks at the link itself, never its target).
+    assert (linked.value.field, linked.value.reason) == ("ZOOP_AI_CHAT_STATE_DIR", "symlinked_component")
 
 
 def test_bad_chat_settings_refuse_to_start(tmp_path):
