@@ -285,6 +285,29 @@ make pipeline-smoke
 - **그 밖의 수정본:** [#286](https://github.com/Donbug/zoop/pull/286#pullrequestreview-5623221711)·[#296](https://github.com/Donbug/zoop/pull/296#pullrequestreview-5623221706)은 이전 지적 해소, [#292](https://github.com/Donbug/zoop/pull/292#pullrequestreview-5623221734)는 소스 지적 해소와 migration 적용 이력 확인 필요, [#293](https://github.com/Donbug/zoop/pull/293#pullrequestreview-5623221730)은 기존 결정 정산·ID/오류/저장 제약 지적 유지로 기록했다. [#300](https://github.com/Donbug/zoop/pull/300#pullrequestreview-5623221723)에는 일반 재기동의 profile 덮어쓰기와 입력 형식·설립일 근거 불일치를 전달했다. 모두 소스 검토이며 별도 실행은 하지 않았다.
 - **추가 할당 확인:** 열린 담당 이슈에 `/health` Liveness 구현 `#242`가 추가로 있었다. 현재 API 소스에는 경로가 없으며 일반 앱은 DB/Flyway를 기동 조건으로 사용한다. 응답이 DB/AI를 검사하지 않는 Liveness와 DB 없이 전체 앱이 기동하는 요구는 다른 범위이므로, 이를 구분하지 않고 전체 수용 조건을 완료로 표시하지 않는다.
 
+#### 10/23 후속 통합·평가 자료 변환
+
+- **현재 통합 기준:** 작업 중 main이 `e57c73c5`로 이동했다. 여기에는 회차 그래프·이전 브리핑 복기·챗봇 HTTP 승격 PR #302와 #299 수정본 등이 포함된다. 앞선 PR 화면의 base SHA만으로 현재 main을 판단할 수 없었으며, 원격 ref를 확인해 새 변경을 통합했다. #279는 `f0b426e5`, #290 후속은 `a812219a`에서 main을 통합하고 `d7181b32`에서 #279의 커밋 이력을 연결했다. 마지막 연결은 이미 검증한 코드와 같고 회차 설명 두 줄만 추가됐다.
+- **회차·요약 인계:** 선택 회차의 INVOLVES가 참조한 정확한 기사 버전에서만 영향 인용 후보를 유지한다. 공개 직접 인용 ID나 회차 범위를 늘리지 않고, receipt 소속과 현재 원천·브리핑 권리를 확인한다. 원래 회차와 복원 회차의 읽기 경로를 구분하며, bundle7 요약의 위조 거절·비공개 보존도 함께 유지했다.
+- **HTTP 서비스 통합:** exposure와 chat의 scope·원장 경로·자격 증명 경계를 분리했다. S2/S3·handoff·exposure는 공통 gate를 사용하고 chat은 독립 실행한다. 읽기 전용 exposure의 재시도 가능한 503과 송신됐을 수 있는 chat의 재시도 불가 unknown 502를 구분한다. 독립 소스 리뷰에서 새 통합 결함은 없었다.
+- **상속된 계약 결함 수정:** upstream chat 문서의 `ChatStageRequest` 참조가 실제 components에 없어 소비자 참조 해석이 실패함을 재현했다. 요청 모델과 하위 정의를 등록하고 모든 내부 참조를 해석하는 회귀 검사를 추가했다. 생성물 일치 검사는 이 누락을 잡지 못했으므로 두 검사를 별개로 유지한다.
+
+| 최종 로컬 검사 | 관측 결과와 범위 |
+|---|---|
+| #279 통합 | API 1,252 통과·72 제외, build 성공; service 1,272·설치 pipeline HTTP 125 통과; 실제 인계 smoke 36단계 |
+| #290 통합 | API 1,270 통과·72 제외·실패 0, build 성공; service 전체 1,684 통과, 설치 pipeline HTTP 139 통과 |
+| #290 계약 수정 | 수정 후 OpenAPI 시험 9개 통과, JSON/YAML 재생성 일치. 서비스 전체 수치와 합산하지 않음 |
+| #290 실제 인계 경로 | 설치 CLI → Spring jar → PostgreSQL 17.11에서 38단계, 인계 10개·수입 29회·근거 HTTP 174회(회차 19회) 통과. 조작된 요약 네 종류 거절, 원장 무변경 |
+| 실제 exposure·chat HTTP | 설치 CLI와 loopback HTTP로 exposure의 철회·권한·원장 무변경을 확인. 실제 chat CLI의 replay 요구 두 개, scope 거절 403, 동일 invocation 결과 재사용 확인 |
+| 문서·공통 계약 | 생성물 275개 일치, 문서 시험 22개 통과, hard error 0. 원문 경고 377건 보존 |
+| 외부 표본 adapter | `2d8544ed`: 평가 시험 235개 및 material CLI·기존 scorer smoke 통과. KLUE 20행·40좌표, TAT-QA 5개 context·30문항 정규화. 입력 변환은 gold를 열지 않고, 수치·단위·권리·출처를 보존 |
+
+- **시험 중 수정·한계:** 새 main의 Java 시험 호출부 인자 수 불일치를 수정한 뒤 API 전체 검사를 통과했다. material 시험의 Python 3.14 argparse 환경 조회는 표준 라이브러리 표시용 조회와 애플리케이션 조회를 구분해 검사하며, 과도한 Decimal 지수는 traceback 대신 입력 거절로 처리한다. 실제 chat smoke의 첫 실행은 macOS 임시 경로의 symlink를 거절했고, 시험 소유 경로를 정규화한 뒤 통과했다. 이는 운영 정책을 완화한 것이 아니다.
+- **원격 CI 구분:** `2226ec73`의 수동 CI 39889760290은 10개 작업이 통과했다. `f0b426e5`에는 별도 자동 CI 39902188915가 시작됐다. #290은 최종 게시 head에서 승인된 CI를 확인하며 이전 head의 성공을 재사용하지 않는다. 최신 결과는 해당 PR과 연결된 실행 기록을 따른다.
+- **남은 경계:** 실제 모델·외부 공급자 호출은 모두 0건이다. 인계 smoke의 활성화 준비는 합성 SQL이며 실제 관리자 활성화 HTTP·AWS 배포 검증이 아니다. 외부 표본은 개발용 자료 변환만 완성했으며 전용 runner/scorer, 무모델 검색·순회 대조군, 사람 합의 gold와 live 비용 승인은 남아 있다. 앱 제외 저장소·수령자 수용·#242 범위 확정도 별도다. PR 병합·이슈 종료·공유 WBS/Jira 변경은 하지 않았다.
+- **리뷰 후속:** #292의 `a1687305`도 검토·게시했다. 추가 변경은 생성 XLSX 병합이었고 소스 신규 결함은 없었으나 공유 DB의 실제 migration 이력은 확인하지 않았다. 이미 병합된 PR의 과거 지적을 현재 결함으로 일괄 이월하지 않는다.
+- **정리:** 시험 소유 PostgreSQL 컨테이너는 정상 종료·자동 제거했다. 임시 smoke 파일은 제거했으며 `.env`·개인 키·`.lapis/`는 커밋 대상에서 제외했다.
+
 
 
 
