@@ -275,10 +275,7 @@ function CompanyAtAGlance({
             <span className="hidden group-open:inline">−</span>
           </span>
         </div>
-        <p
-          className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed font-medium"
-          aria-label={`${company.companyName} 한눈 판단`}
-        >
+        <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed font-medium">
           {summary?.text ??
             '검증된 짧은 요약이 없습니다. 전문·시세·근거를 펼쳐보세요.'}
         </p>

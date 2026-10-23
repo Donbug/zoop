@@ -5,6 +5,10 @@ import CompanyOutlooks from '@/components/briefing/CompanyOutlooks';
 import type { BriefingResponse } from '@/types/briefing';
 import type { CompanyOutlooks as Layer } from '@/types/briefing/companyOutlook';
 
+const summaryText = (name: string) =>
+  screen.getByLabelText(`${name} 한눈 요약`).querySelector('summary p')!
+    .textContent;
+
 const statement = {
   text: '공급이 이행되는 경우 사업 기회를 검토합니다.',
   evidenceIds: ['e'],
@@ -144,9 +148,7 @@ describe('D-BRF-01·02 company outlook', () => {
         compact
       />,
     );
-    expect(screen.getByLabelText('합성 기업 한눈 판단').textContent).toContain(
-      '사업 기회는 있으나',
-    );
+    expect(summaryText('합성 기업')).toContain('사업 기회는 있으나');
     const detail = screen.getByLabelText(
       '합성 기업 한눈 요약',
     ) as HTMLDetailsElement;
@@ -415,10 +417,7 @@ describe('D-BRF-01/02 at-a-glance reading', () => {
         `${company.companyName} 한눈 요약`,
       ) as HTMLDetailsElement;
       expect(card.open).toBe(false);
-      expect(
-        within(card).getByLabelText(`${company.companyName} 한눈 판단`)
-          .textContent,
-      ).toBe(company.reading.brief.text);
+      expect(summaryText(company.companyName)).toBe(company.reading.brief.text);
     }
     const first = screen.getByLabelText(
       '기업 가 한눈 요약',
@@ -470,7 +469,7 @@ describe('D-BRF-01/02 at-a-glance reading', () => {
         compact
       />,
     );
-    expect(screen.getByLabelText('합성 기업 한눈 판단').textContent).toBe(text);
+    expect(summaryText('합성 기업')).toBe(text);
     rerender(
       <CompanyOutlooks
         result={{
@@ -491,11 +490,7 @@ describe('D-BRF-01/02 at-a-glance reading', () => {
         compact
       />,
     );
-    expect(
-      screen.getByLabelText('합성 기업 한눈 판단').textContent,
-    ).not.toContain(text);
-    expect(screen.getByLabelText('합성 기업 한눈 판단').textContent).toContain(
-      '검증된 짧은 요약이 없습니다',
-    );
+    expect(summaryText('합성 기업')).not.toContain(text);
+    expect(summaryText('합성 기업')).toContain('검증된 짧은 요약이 없습니다');
   });
 });
