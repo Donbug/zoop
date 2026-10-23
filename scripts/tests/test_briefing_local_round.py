@@ -35,6 +35,7 @@ def prepare(fixture,directory=None):
     rows,_,source=run.sim.load_inputs(fixture.clock.sources,fixture.clock.clocks)
     archive.update(sourceFileSha256=source["sourceFileSha256"],clockFileSha256=source["clockFileSha256"])
     archive["documents"]=[{k:v for k,v in rows[0].items() if k!="clockTime"}]
+    fixture_module.fixtures.record_grounding(archive, fixture.root)
     fixture.archive_path.write_bytes(base.canonical(archive))
     local_round={"date":"2026-10-02","edition":"morning","window":{
         "from":"2026-10-01T17:30:00+09:00","to":"2026-10-02T09:25:00+09:00","openStart":False},

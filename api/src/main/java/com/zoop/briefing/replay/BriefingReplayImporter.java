@@ -45,6 +45,7 @@ public final class BriefingReplayImporter {
     private final TransactionTemplate transaction;
     private final BriefingReplaySettings settings;
     private final boolean continuityEnabled;
+    private final boolean coreSemanticEnabled;
 
     public BriefingReplayImporter(JdbcTemplate jdbc, PlatformTransactionManager transactions, BriefingReplaySettings settings) {
         this(jdbc, transactions, settings, false);
@@ -52,6 +53,12 @@ public final class BriefingReplayImporter {
 
     public BriefingReplayImporter(JdbcTemplate jdbc, PlatformTransactionManager transactions, BriefingReplaySettings settings,
             boolean continuityEnabled) {
+        this(jdbc, transactions, settings, continuityEnabled, false);
+    }
+
+    public BriefingReplayImporter(JdbcTemplate jdbc, PlatformTransactionManager transactions, BriefingReplaySettings settings,
+            boolean continuityEnabled, boolean coreSemanticEnabled) {
+        this.coreSemanticEnabled = coreSemanticEnabled;
         this.jdbc = jdbc; this.transaction = new TransactionTemplate(transactions); this.settings = settings;
         this.continuityEnabled = continuityEnabled;
         transaction.setTimeout(30);
@@ -200,7 +207,7 @@ public final class BriefingReplayImporter {
         PublicationClockRegistry clocks = new PublicationClockRegistry(settings.clocks(), sourceSha, clockSha, sourceNodes);
         BriefingGroupedSimulationRules.Archive groupedArchive = grouped
                 ? BriefingGroupedSimulationRules.archive(bundle, settings.bundle().getParent(), sourceNodes, clocks) : null;
-        Map<String,BriefingReferenceSupport.Proof> referenceSupport=continuityEnabled && grouped
+        Map<String,BriefingReferenceSupport.Proof> referenceSupport=(continuityEnabled || coreSemanticEnabled) && grouped
                 ? BriefingReferenceSupport.load(groupedArchive,settings.bundle().getParent()) : Map.of();
         List<StrictJson.Obj> definitions = bundle.objects("rounds");
         boolean explicitSeries = bundle.has("roundSeries");
@@ -270,7 +277,9 @@ public final class BriefingReplayImporter {
                     Set<String> resolvedIds = new HashSet<>(); selected.get(item.string("issueId")).companies().forEach(company -> resolvedIds.add(company.id()));
                     require(suppliedIds.equals(resolvedIds), "grouped_company_catalog_identity");
                 }
-                BriefingGroupedSimulationRules.round(bundle, definition, groupedArchive, receipts, settings.bundle().getParent(), groupedHistory);
+                if (coreSemanticEnabled) BriefingGroupedSimulationRules.round(bundle, definition, groupedArchive, receipts,
+                        settings.bundle().getParent(), groupedHistory, true, referenceSupport);
+                else BriefingGroupedSimulationRules.round(bundle, definition, groupedArchive, receipts, settings.bundle().getParent(), groupedHistory);
                 if (definition.has("groupedUnresolvedPaidRequest") && BriefingGroupedSimulationRules.SELECTION_STAGE.equals(
                         definition.object("groupedUnresolvedPaidRequest").string("stage"))) {
                     StrictJson.Obj disposition = definition.object("groupedUnresolvedPaidRequest");
@@ -296,6 +305,8 @@ public final class BriefingReplayImporter {
                     .put("clockFileSha256", clockSha).put("bundleSha256", bundleSha).put("userInboxRef", settings.userInboxRef())
                     .put("retrospectiveBodies", !localCollection).put("operationalCollectionGate", false)
                     .put("identitySha256", definition.string("identitySha256")).put("selectionStatus", state);
+            if (coreSemanticEnabled && grouped) marker.set("selectionEvidenceReview",
+                    BriefingCoreEvidenceRules.review(definition, receipts, settings.bundle().getParent(), referenceSupport));
             if (localCollection) marker.set("localCollection", bundle.object("localCollection").node().deepCopy());
             marker.set("identity", definition.object("identity").node().deepCopy());
             marker.set("previous", previous.node().deepCopy()); marker.set("sourceCoverage", coverage.node().deepCopy());
@@ -1434,6 +1445,10 @@ public final class BriefingReplayImporter {
         for (String name : names) {
             String resource = name.startsWith("grouped-") ? "/briefing/prompts/" + (LocalBriefingCollectionRules.enabled(bundle) && name.endsWith(".md") ? "local-collection/" : "grouped-issues/") + name.substring("grouped-".length())
                     : "/briefing/prompts/round-simulation/" + name;
+            if ("grouped-selection.md".equals(name) && identity.has("selectionEvidencePolicy")) {
+                require(BriefingCoreEvidenceRules.POLICY.equals(identity.string("selectionEvidencePolicy")), "selection_evidence_policy");
+                resource = resource.replace("/selection.md", "/selection-semantic-v2.md");
+            }
             try (var stream = BriefingReplayImporter.class.getResourceAsStream(resource)) {
                 require(stream != null && Canonical.sha256(stream.readAllBytes()).equals(prompts.string(name)), "simulation_prompt_hash");
             } catch (IOException unavailable) { throw new IllegalArgumentException("Simulation prompt is unavailable", unavailable); }

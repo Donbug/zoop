@@ -9,6 +9,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import briefing_grouped_rounds as grouped
+import briefing_semantic_support as semantic
 
 sim, base = grouped.sim, grouped.base
 
@@ -45,6 +46,8 @@ def run(args, transport=None):
         publication_ids = sorted(c["company_id"] for c in base.strict_load(catalog_raw)["companies"])
     mode = "local_collection_validation" if local_spec else sim.MODE
     prompts = prompt_artifacts(bool(local_spec))
+    selection_root = grouped.PROMPTS.with_name("local-collection") if local_spec else grouped.PROMPTS
+    prompts["grouped-selection.md"] = base.digest(base.regular(selection_root / "selection-semantic-v2.md"))
     authorization = {"scope": mode, "sourceSha256": source["sourceFileSha256"], "userInboxRef": args.user_inbox_ref,
                      "productionAuthorized": False, "groupArchiveSha256": archive_sha}
     run_identity = {"source":source,"archiveSha256":archive_sha,"promptArtifacts":prompts,"authorization":authorization}
@@ -57,13 +60,15 @@ def run(args, transport=None):
     if publication_ids is not None:
         run_identity["publicationCompanyIds"] = publication_ids
         run_identity["publicationCatalogSha256"] = base.digest(catalog_raw)
+    run_identity["selectionEvidencePolicy"] = semantic.POLICY
+    support = semantic.load(archive, archive_path.parent)
     if archive.get("editorialReview"): run_identity["selectionEligibilityPolicy"] = "explicit-eligibility-v1"
     run_id = "grouped-round-simulation-"+base.digest(base.canonical(run_identity))[:20]
     prepared, identity_holds_by_round = [], {}
     for spec in (series["rounds"] if series else [local_spec] if local_spec else sim.windows()):
         pool, inputs, clocks, duplicates, coverage = sim.pool_for_round(rows,spec,len(unknown))
         identity_holds = []
-        candidates = grouped.build_grouped_candidates(archive,spec,identity_holds)
+        candidates = semantic.apply(grouped.build_grouped_candidates(archive,spec,identity_holds), support)
         identity_holds_by_round[(spec['date'],spec['edition'])] = identity_holds
         prepared.append((spec,inputs,clocks,duplicates,coverage,candidates))
     plan = {"runId":run_id,"groupArchiveSha256":archive_sha,"maximumPaidCalls":args.max_calls,
@@ -95,6 +100,7 @@ def run(args, transport=None):
                   "groupArchiveSha256":archive_sha,
                   "baseline":{"from":series["rounds"][0]["window"]["from"] if series else local_spec["window"]["from"] if local_spec else sim.BASELINE,
                     "meaning":"explicit_series_baseline" if series else "local_validation_window_start" if local_spec else "simulation_baseline_not_service_first_round"}}
+        identity["selectionEvidencePolicy"] = semantic.POLICY
         if archive.get("editorialReview"): identity["selectionEligibilityPolicy"] = "explicit-eligibility-v1"
         if series: identity["roundSeries"] = series
         if publication_ids is not None:

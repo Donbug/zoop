@@ -562,3 +562,33 @@ class GroupedRoundTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def record_grounding(value, directory):
+    """Authored provider files for tests only; exercises real digest/semantic binding."""
+    calls = Path(directory) / 'calls'; calls.mkdir(exist_ok=True)
+    prompt = 'Authored independent event and participant verification fixture.'
+    value.setdefault('identity', {}).setdefault('promptSha256', {})['issue_grounding'] = base.digest(prompt.encode())
+    mentions = {}
+    for issue in value['issues']:
+        for m in issue['mentions']:
+            m['pocArticleVersion'] = m['articleVersion']; m['assertionStatus'] = 'occurred'
+            m['grounding'] = {'verdict': 'SUPPORTED', 'reason': 'Authored original supports this test event.'}
+            mentions[m['mentionId']] = {'article_id': m['articleId'], 'article_version': m['pocArticleVersion'],
+                'title': m['title'], 'action': m['action'], 'assertion_status': m['assertionStatus'],
+                'background': False, 'evidence': m['evidence'], 'participants': []}
+    data = {'authorization': {'sourceSha256': value['sourceFileSha256']}, 'mentions': mentions,
+        'articles': [{'article_id': d['documentId'], 'body': d['body'], 'url': d['url']} for d in value['documents']]}
+    request = {'store': False, 'model': base.MODEL, 'instructions': prompt, 'input': base.canonical(data).decode(),
+        'text': {'format': {'name': 'issue_grounding'}}}
+    raw = base.canonical(request); key = base.digest(raw)
+    response = {'id': 'authored-grounding-' + key[:12], 'status': 'completed', 'usage': {'input_tokens': 100, 'output_tokens': 10},
+        'output': [{'type': 'message', 'content': [{'type': 'output_text', 'text': base.canonical({'verdicts': {m['mentionId']: m['grounding'] for i in value['issues'] for m in i['mentions']}}).decode()}]}]}
+    response_raw = base.canonical(response)
+    receipt = {'requestDigest': key, 'stage': 'issue_grounding', 'status': 'completed', 'httpStatus': 200,
+        'usageKnown': True, 'model': base.MODEL, 'responseId': response['id'], 'inputTokens': 100, 'outputTokens': 10,
+        'responseSha256': base.digest(response_raw)}
+    value['receipts'] = [r for r in value['receipts'] if r['stage'] != 'issue_grounding'] + [receipt]
+    for suffix, content in [('request', raw), ('response', response_raw), ('complete', base.canonical(receipt))]:
+        (calls / (key + '.' + suffix + '.json')).write_bytes(content)
+    return key

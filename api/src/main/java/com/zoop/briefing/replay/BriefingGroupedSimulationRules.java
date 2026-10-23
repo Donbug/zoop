@@ -154,6 +154,16 @@ final class BriefingGroupedSimulationRules {
 
     static void round(StrictJson.Obj bundle, StrictJson.Obj round, Archive archive,
             Map<String, JsonNode> receipts, Path output, ArrayNode history) {
+        boolean semantic = round.object("identity").has("selectionEvidencePolicy");
+        round(bundle, round, archive, receipts, output, history, semantic,
+                semantic ? BriefingReferenceSupport.load(archive, output) : Map.of());
+    }
+
+    static void round(StrictJson.Obj bundle, StrictJson.Obj round, Archive archive,
+            Map<String, JsonNode> receipts, Path output, ArrayNode history, boolean semantic,
+            Map<String, BriefingReferenceSupport.Proof> support) {
+        if (round.object("identity").has("selectionEvidencePolicy")) require(semantic
+                && BriefingCoreEvidenceRules.POLICY.equals(round.object("identity").string("selectionEvidencePolicy")), "semantic_evidence_policy");
         require(bundle.string("groupArchiveSha256").equals(round.object("identity").string("groupArchiveSha256")), "identity_archive");
         Set<String> stages = Set.of(SELECTION_STAGE, "round_simulation_" + round.string("edition") + "_generation",
                 "round_simulation_" + round.string("edition") + "_verification");
@@ -185,6 +195,8 @@ final class BriefingGroupedSimulationRules {
         for (StrictJson.Obj candidate : request.objects("issues")) {
             String id = candidate.string("issueId"); require(candidates.putIfAbsent(id, candidate) == null && expected.containsKey(id), "candidate_identity");
             snapshot(candidate, expected.get(id), round, archive);
+            if (round.object("identity").has("selectionEvidencePolicy")) BriefingCoreEvidenceRules.frozen(candidate, support);
+            else require(!candidate.has("evidencePolicy") && !candidate.has("semanticSupport"), "undeclared_evidence_policy");
         }
         require(candidates.keySet().equals(expected.keySet()), "candidate_population");
         if (round.object("identity").has("selectionEligibilityPolicy")) require("explicit-eligibility-v1".equals(round.object("identity").string("selectionEligibilityPolicy"))
@@ -264,9 +276,11 @@ final class BriefingGroupedSimulationRules {
                 require(!expectedLinks.isEmpty() && expectedLinks.equals(Set.copyOf(company.strings("evidenceIds"))), "selected_company_citations");
                 companyIds.add(companyId); companyNames.add(company.string("name"));
             }
+            if (semantic) require(BriefingCoreEvidenceRules.eligible(candidate, support), "selected_semantic_support_missing");
             if (candidate.has("freshnessReview")) {
                 StrictJson.Obj review = candidate.object("freshnessReview");
-                require(item.objects("sources").stream().mapToInt(e -> e.string("quote").codePointCount(0, e.string("quote").length())).sum() >= 80, "selected_evidence_too_thin");
+                // Only replay an explicitly legacy contract with its historical threshold.
+                if (!semantic) require(item.objects("sources").stream().mapToInt(e -> e.string("quote").codePointCount(0, e.string("quote").length())).sum() >= 80, "selected_evidence_too_thin");
                 require(!Set.of("REPEAT", "UNCERTAIN").contains(review.string("decision")), "editorial_repeat_selected");
                 if ("MATERIAL_UPDATE".equals(review.string("decision")))
                     require("MATERIAL_UPDATE".equals(choice.string("novelty")) && choice.strings("deltaEvidenceIds").stream().anyMatch(review.strings("deltaEvidenceIds")::contains), "editorial_delta_missing");

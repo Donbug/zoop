@@ -182,6 +182,16 @@ def build_grouped_candidates(archive, spec, identity_holds=None):
     return result
 
 
+def evidence_eligible(candidate):
+    if "evidencePolicy" in candidate:
+        import briefing_semantic_support as semantic
+        return semantic.eligible(candidate)
+    # Historical contracts are replayed verbatim. Fresh runs always declare the
+    # semantic policy; this branch cannot authorize a new semantic selection.
+    return "freshnessReview" not in candidate or sum(len(e["quote"]) for eid, e in _catalog(candidate)[0].items()
+        if eid in candidate["newEvidenceIds"]) >= 80
+
+
 def selection_schema(candidates, publication_company_ids=None):
     value = base.strict_load(base.regular(PROMPTS / "selection.schema.json"))
     template = value["properties"]["assessments"]["additionalProperties"]
@@ -198,8 +208,7 @@ def selection_schema(candidates, publication_company_ids=None):
     selected_ids = [i for i in selected_ids if next(c for c in candidates if c["issueId"] == i).get("freshnessReview", {}).get("decision") not in {"REPEAT", "UNCERTAIN"}]
     value["properties"]["selected"]["items"]["properties"]["issueId"]["enum"] = selected_ids or ["__no_candidate__"]
     guarded = any("freshnessReview" in c for c in candidates)
-    if guarded:
-        selected_ids = [i for i in selected_ids if sum(len(e["quote"]) for eid,e in _catalog(next(c for c in candidates if c["issueId"] == i))[0].items() if eid in next(c for c in candidates if c["issueId"] == i)["newEvidenceIds"]) >= 80]
+    selected_ids = [i for i in selected_ids if evidence_eligible(next(c for c in candidates if c["issueId"] == i))]
     value["properties"]["selected"]["items"]["properties"]["issueId"]["enum"] = selected_ids or ["__no_candidate__"]
     value["properties"]["selected"]["maxItems"] = min(3, len(selected_ids))
     if guarded and selected_ids:
@@ -321,6 +330,7 @@ def freeze_grouped_selection(reply, candidates, identity_sha, previous_selected=
                     and bool(assessment["transmission"].strip())
                     and (assessment["scope"] != "BROAD_MARKET" or len(set(assessment["affectedSectors"])) >= 2),
                     "importance_three_impact_proof_missing")
+        require(evidence_eligible(candidate), "grouped_selected_semantic_support_missing")
         evidence, companies = _catalog(candidate)
         ids, delta = choice["evidenceIds"], choice["deltaEvidenceIds"]
         require(len(set(ids)) == len(ids) and set(ids).issubset(evidence), "grouped_unknown_or_duplicate_citation")
@@ -340,7 +350,6 @@ def freeze_grouped_selection(reply, candidates, identity_sha, previous_selected=
         # Opt-in v2 closes the gap where a model could drop every known company.
         if candidate.get("freshnessReview") is not None:
             review = candidate["freshnessReview"]
-            require(sum(len(evidence[i]["quote"]) for i in ids) >= 80, "grouped_selected_evidence_too_thin")
             require(review["decision"] not in {"REPEAT", "UNCERTAIN"}, "grouped_editorial_repeat_or_uncertain")
             if review["decision"] == "MATERIAL_UPDATE":
                 require(choice["novelty"] == "MATERIAL_UPDATE" and set(delta) & set(review["deltaEvidenceIds"]), "grouped_editorial_delta_missing")
@@ -436,7 +445,12 @@ class GroupedSimulationClient(sim.SimulationClient):
             return super().request(stage, data, prompt_name, schema_name, max_output, schema_override)
         identity = data.get("context", {})
         prompt_root = PROMPTS.with_name("local-collection") if identity.get("mode") == "local_collection_validation" else PROMPTS
-        instructions = base.regular(prompt_root / resource_name).decode("utf-8")
+        resolved_name = resource_name
+        if stage == SELECTION_STAGE and identity.get("selectionEvidencePolicy") is not None:
+            import briefing_semantic_support as semantic
+            require(identity["selectionEvidencePolicy"] == semantic.POLICY, "semantic_evidence_policy_unknown")
+            resolved_name = "selection-semantic-v2.md"
+        instructions = base.regular(prompt_root / resolved_name).decode("utf-8")
         expected = identity.get("promptArtifacts", {}).get("grouped-" + resource_name)
         if stage == SELECTION_STAGE:
             expected = identity.get("groupedPromptSha256") or expected
