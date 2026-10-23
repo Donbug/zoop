@@ -161,13 +161,25 @@ async function send(
   await user.click(button);
 }
 
-function open(target: GraphTarget | null = SAMSUNG, onViewOnMap = vi.fn()) {
+/**
+ * Opens the drawer and waits for its initial focus: the drawer moves focus to its title on the next animation frame, and on
+ * a loaded CI runner that frame could land after a test had clicked the input, sending the typed question nowhere.
+ */
+async function open(
+  target: GraphTarget | null = SAMSUNG,
+  onViewOnMap = vi.fn(),
+) {
   useAiChatStore.getState().open(target);
   const user = userEvent.setup();
   render(
     <MemoryRouter>
       <AiChatDrawer onViewOnMap={onViewOnMap} />
     </MemoryRouter>,
+  );
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      screen.getByRole('heading', { name: 'AI에게 묻기' }),
+    ),
   );
   return { user, onViewOnMap };
 }
@@ -206,7 +218,7 @@ describe('D-AI-01 · asking with a linked target', () => {
       }),
     );
 
-    const { user } = open();
+    const { user } = await open();
     await screen.findByText(/궁금한 점을 입력해 보세요/);
     expect(screen.getByText('질문 대상: 삼성전자')).toBeTruthy();
     await user.type(screen.getByLabelText('질문'), '삼성전자 최근 이슈는?');
@@ -253,7 +265,7 @@ describe('D-AI-01 · asking with a linked target', () => {
     server.on('POST', JOBS, (request) =>
       json(job({ id: (request.body as { jobId: string }).jobId })),
     );
-    const { user } = open();
+    const { user } = await open();
     await screen.findByText(/궁금한 점을 입력해 보세요/);
     await user.click(screen.getByRole('checkbox'));
     expect(screen.getByText('질문 대상: 없음')).toBeTruthy();
@@ -298,7 +310,7 @@ describe('D-AI-01 · asking with a linked target', () => {
         202,
       );
     });
-    const { user } = open(null);
+    const { user } = await open(null);
     await screen.findByText(/궁금한 점을 입력해 보세요/);
     await send(user, 'HBM?');
     expect((await screen.findByRole('alert')).textContent).toContain(
@@ -329,7 +341,7 @@ describe('D-AI-01 · asking with a linked target', () => {
       sentId = (request.body as { jobId: string }).jobId;
       return accepted.promise;
     });
-    const { user } = open(null);
+    const { user } = await open(null);
     await screen.findByText(/궁금한 점을 입력해 보세요/);
     await send(user, 'HBM?');
     await waitFor(() => expect(server.calls('POST', JOBS)).toHaveLength(1));
@@ -349,7 +361,7 @@ describe('D-AI-01 · asking with a linked target', () => {
           headers: { 'Content-Type': 'application/json' },
         }),
     );
-    const { user } = open(null);
+    const { user } = await open(null);
     await screen.findByText(/궁금한 점을 입력해 보세요/);
     await send(user, 'HBM?');
     await screen.findByText(/질문이 접수됐는지 확인하지 못했어요/);
@@ -365,7 +377,7 @@ describe('D-AI-01 · asking with a linked target', () => {
     server.on('POST', JOBS, () => {
       throw new Error('connection reset');
     });
-    const { user } = open(null);
+    const { user } = await open(null);
     await screen.findByText(/궁금한 점을 입력해 보세요/);
     await send(user, '첫 질문');
     await screen.findByText(/질문이 접수됐는지 확인하지 못했어요/);
@@ -422,7 +434,7 @@ describe('D-AI-01 · asking with a linked target', () => {
         202,
       ),
     );
-    const { user } = open(null);
+    const { user } = await open(null);
     await screen.findByText(/궁금한 점을 입력해 보세요/);
     await send(user, '질문');
     await user.click(
@@ -443,7 +455,7 @@ describe('D-AI-01 · asking with a linked target', () => {
         201,
       ),
     );
-    const { user } = open(null);
+    const { user } = await open(null);
     await waitFor(() => expect(server.calls('GET', CURRENT)).toHaveLength(1));
     await user.click(screen.getByRole('button', { name: '새 대화' }));
     await screen.findByText(/궁금한 점을 입력해 보세요/);
@@ -479,7 +491,7 @@ describe('D-AI-01 · asking with a linked target', () => {
     server.on('GET', CURRENT, () =>
       json(conversation([job({ id: 'job-done0001', question: '이전 질문' })])),
     );
-    const { user } = open(null);
+    const { user } = await open(null);
     await screen.findByRole('article', { name: '이전 질문' });
     await send(user, '새 질문');
     await screen.findByRole('article', { name: '처리 중인 질문' });
@@ -521,7 +533,7 @@ describe('D-AI-01b · clarification', () => {
         202,
       );
     });
-    const { user } = open();
+    const { user } = await open();
     await screen.findByText('어느 기업인지 골라 주세요.');
     await user.click(screen.getByRole('button', { name: 'SK하이닉스' }));
     await screen.findByText('확인 질문 “그 기업은 언제?”에 대한 답');
@@ -541,7 +553,7 @@ describe('D-AI-01b · clarification', () => {
     server.on('POST', JOBS, (request) =>
       json(job({ id: (request.body as { jobId: string }).jobId, seq: 2 }), 202),
     );
-    const { user } = open();
+    const { user } = await open();
     await user.click(
       await screen.findByRole('button', { name: '직접 입력해 답하기' }),
     );
@@ -613,7 +625,7 @@ describe('D-AI-02 · job states and stored results', () => {
       }),
     });
     server.on('GET', CURRENT, () => json(conversation([answered])));
-    const { user, onViewOnMap } = open();
+    const { user, onViewOnMap } = await open();
     const card = await screen.findByRole('article', {
       name: 'HBM이 뭐고 SK하이닉스 최근 HBM 뉴스는?',
     });
@@ -667,7 +679,7 @@ describe('D-AI-02 · job states and stored results', () => {
       }),
     });
     server.on('GET', CURRENT, () => json(conversation([withheld])));
-    open();
+    await open();
     const card = await screen.findByRole('article', { name: 'HBM이 뭐야?' });
     expect(
       within(card).getByText(
@@ -713,7 +725,7 @@ describe('D-AI-02 · job states and stored results', () => {
     server.on('GET', JOB, () =>
       json({ ...rerun, status: 'queued', failure: null }),
     );
-    const { user } = open();
+    const { user } = await open();
     const failed = await screen.findByRole('article', { name: '실패한 질문' });
     const lost = screen.getByRole('article', { name: '응답 불명 질문' });
     expect(within(lost).queryByRole('button', { name: /다시/ })).toBeNull();
@@ -738,7 +750,7 @@ describe('D-AI-02 · job states and stored results', () => {
     });
     server.on('GET', CURRENT, () => json(conversation([running])));
     server.on('GET', JOB, () => json(running));
-    open();
+    await open();
     await screen.findByRole('article', { name: 'HBM이 뭐야?' });
     const live = document.querySelector('[aria-live="polite"]');
     expect(live?.textContent).toContain('답변 작성');
@@ -767,7 +779,7 @@ describe('D-AI-02 · job states and stored results', () => {
         201,
       ),
     );
-    const { user } = open();
+    const { user } = await open();
     const card = await screen.findByRole('article', {
       name: '이전 대화의 실패',
     });
@@ -808,7 +820,7 @@ describe('D-AI-02 · job states and stored results', () => {
     server.on('GET', CURRENT, () => json(conversation([queued])));
     server.on('GET', JOB, () => json(queued));
     server.on('POST', CANCEL, () => json({ ...queued, status: 'cancelled' }));
-    const { user } = open();
+    const { user } = await open();
     await user.click(await screen.findByRole('button', { name: '질문 취소' }));
     await screen.findByText(/취소한 질문이에요/);
     expect(
@@ -826,7 +838,7 @@ describe('D-AI-02 · job states and stored results', () => {
     });
     server.on('GET', CURRENT, () => json(conversation([running])));
     server.on('GET', JOB, () => apiError(503, 'SOURCE_UNAVAILABLE'));
-    const { user } = open();
+    const { user } = await open();
     await screen.findByText(
       /질문 상태를 확인하지 못했어요/,
       {},
@@ -867,7 +879,7 @@ describe('D-AI-02b · conversation read failure', () => {
           )
         : json(conversation([job({ question: '회수된 질문' })])),
     );
-    const { user } = open();
+    const { user } = await open();
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toContain('대화를 불러오지 못했어요.');
     expect(alert.textContent).toContain('SOURCE_UNAVAILABLE');
@@ -888,7 +900,7 @@ describe('D-AI-02b · conversation read failure', () => {
 describe('membership', () => {
   it('asks a guest to log in and sends nothing', async () => {
     useAuthStore.getState().clearSession();
-    open();
+    await open();
     expect(
       await screen.findByRole('link', { name: '로그인 후 질문하기' }),
     ).toBeTruthy();
@@ -898,7 +910,7 @@ describe('membership', () => {
   it('drops a late conversation of the previous member', async () => {
     const late = deferred<Response>();
     server.on('GET', CURRENT, () => late.promise);
-    open();
+    await open();
     await waitFor(() => expect(server.calls('GET', CURRENT)).toHaveLength(1));
     server.on('GET', CURRENT, () => json(conversation([])));
     act(() => {
