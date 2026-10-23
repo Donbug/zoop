@@ -78,8 +78,10 @@ test('흐름 순 정렬: 사건은 관련 기업보다, 선행 사건은 후속 
   for (const edge of data.edges) {
     if (!present.has(edge.source) || !present.has(edge.target)) continue;
     if (edge.relationType === 'FOLLOWS') {
-      expect(point(nodes, edge.source).x).toBeLessThan(
-        point(nodes, edge.target).x,
+      // 계약의 FOLLOWS는 뒤 사건(source) → 앞 사건(target)이므로
+      // 시간 순 배치는 target(선행)을 왼쪽에 둔다.
+      expect(point(nodes, edge.target).x).toBeLessThan(
+        point(nodes, edge.source).x,
       );
       checked += 1;
     }

@@ -122,8 +122,10 @@ export function arrangeFlow(
     let from: string | null = null;
     let to: string | null = null;
     if (edge.relationType === 'FOLLOWS') {
-      from = edge.source;
-      to = edge.target;
+      // 공개 계약은 뒤 사건(source) → 앞 사건(target)으로 저장한다.
+      // 화면의 시간 흐름은 앞 사건 → 뒤 사건이므로 배치 방향만 뒤집는다.
+      from = edge.target;
+      to = edge.source;
     } else if (
       edge.relationType === 'INVOLVES' ||
       edge.relationType === 'STRUCTURALLY_RELATED_TO'

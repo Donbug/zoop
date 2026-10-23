@@ -463,6 +463,9 @@ export default function GraphCanvas({
         if (arrangement !== lastArrangement.current) {
           lastArrangement.current = arrangement;
           preservePositions.current = false;
+          // 정렬 좌표는 현재 캔버스 크기로 다시 계산된다. 상세 패널이나
+          // 창 크기가 바뀌어도 새 배치가 잘리지 않도록 화면 맞춤을 이어 간다.
+          followFit.current = true;
           centerTarget.current = null;
           fitPending.current = true;
         }
