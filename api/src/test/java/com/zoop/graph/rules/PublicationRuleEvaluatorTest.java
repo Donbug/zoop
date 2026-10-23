@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -194,6 +195,46 @@ class PublicationRuleEvaluatorTest {
     }
 
     @Test
+    void basisAndImpactOnlyCitationsStayWhileTheirRelationIsVisible() {
+        // Spans nothing lists directly: one in the structural basis article art-9, one beside the INVOLVES citation in art-5.
+        // The evidence read finds them by article version and proves them against the receipt, so they are not orphans.
+        Fixture f = new Fixture();
+        f.issue("iss-a", "occurred", "art-1", "art-2");
+        f.structural("rel-structural", "iss-a", "C2", List.of(new ArticleRef("art-9", "v1")), f.evidence("art-1", "v1"));
+        String basisOnly = f.evidence("art-9", "v1");
+        f.relation("rel-involves", "INVOLVES", "iss-a", "C1", f.evidence("art-5", "v1"), f.evidence("art-1", "v1"));
+        String impactOnly = f.evidence("art-5", "v1");
+        PublicGraphSnapshot input = f.snapshot();
+
+        assertEquals(input, PublicationRuleEvaluator.apply(input, List.of()).snapshot(), "no rules: the input");
+        for (EnabledRule unmatched : List.of(SINGLE_SOURCE, SPECULATIVE)) {
+            Outcome outcome = PublicationRuleEvaluator.apply(input, List.of(unmatched));
+            assertEquals(input, outcome.snapshot(), unmatched.ruleId() + " matches nothing: the input");
+        }
+
+        EnabledRule strictStructural = new EnabledRule("strict-structural@1",
+                new SingleSource(3, Set.of("STRUCTURALLY_RELATED_TO")));
+        Outcome noBasis = PublicationRuleEvaluator.apply(input, List.of(strictStructural));
+        assertEquals(Set.of("rel-structural"), noBasis.hiddenRelationIds());
+        assertEquals(Set.of(impactOnly), indirect(noBasis, basisOnly, impactOnly), "the last basis citing art-9 is gone");
+        assertTrue(noBasis.snapshot().articles().stream().noneMatch(a -> a.articleId().equals("art-9")));
+        readable(noBasis);
+
+        EnabledRule strictInvolves = new EnabledRule("strict-involves@1", new SingleSource(3, Set.of("INVOLVES")));
+        Outcome noImpact = PublicationRuleEvaluator.apply(input, List.of(strictInvolves));
+        assertEquals(Set.of("rel-involves"), noImpact.hiddenRelationIds());
+        assertEquals(Set.of(basisOnly), indirect(noImpact, basisOnly, impactOnly), "the last INVOLVES citing art-5 is gone");
+        assertTrue(noImpact.snapshot().articles().stream().noneMatch(a -> a.articleId().equals("art-5")));
+        readable(noImpact);
+
+        for (Outcome outcome : List.of(noBasis, noImpact)) {
+            assertTrue(outcome.snapshot().relations().stream()
+                    .noneMatch(r -> r.evidenceIds().contains(basisOnly) || r.evidenceIds().contains(impactOnly)),
+                    "an indirect citation is never added to a relation's evidenceIds");
+        }
+    }
+
+    @Test
     void ruleIdsAreUniqueAndAnUnreadableDefinitionNeverEvaluates() {
         for (String id : List.of("single-source", "@1", "single-source@0", "1rule@1", "single source@1")) {
             assertThrows(IllegalArgumentException.class, () -> new EnabledRule(id, SINGLE_SOURCE.definition()), id);
@@ -232,6 +273,13 @@ class PublicationRuleEvaluatorTest {
 
     private static List<String> relationIds(Outcome outcome) {
         return outcome.snapshot().relations().stream().map(Relation::relationId).toList();
+    }
+
+    /** Which of the given evidence ids the output kept. */
+    private static Set<String> indirect(Outcome outcome, String... evidenceIds) {
+        Set<String> wanted = Set.of(evidenceIds);
+        return outcome.snapshot().evidence().stream().map(Evidence::evidenceId).filter(wanted::contains)
+                .collect(Collectors.toSet());
     }
 
     /** The output is a snapshot the app can store and read back: every reference still closes. */

@@ -36,7 +36,8 @@ import java.util.regex.Pattern;
  * <li>relation rules hide relations that are left;</li>
  * <li>an issue that had company relations ({@code INVOLVES}, {@code STRUCTURALLY_RELATED_TO}) and has none left is hidden;</li>
  * <li>a {@code FOLLOWS} with a hidden end is hidden;</li>
- * <li>evidence and article versions no visible issue or relation cites are dropped.</li>
+ * <li>evidence and article versions no visible issue or relation cites are dropped; spans of an article version a visible
+ * basis or a visible {@code INVOLVES} cites stay as indirect citations.</li>
  * </ol>
  * One pass is enough: {@code FOLLOWS} never counts as a company relation, so step 5 cannot hide another issue. An issue that
  * never had a company relation is not hidden by step 4, so with no rules the output is the input.
@@ -164,15 +165,27 @@ public final class PublicationRuleEvaluator {
                 citedVersions.add(key(mention.articleId(), mention.articleVersion()));
             }
         }
+        // Article versions whose spans stay as indirect citation candidates: those of a visible relation's basis, and those a
+        // visible INVOLVES cites (impact quotes). Nothing lists these spans directly; the evidence read proves them against the
+        // import receipt (GraphEvidenceSnapshotReader, as GraphSnapshotFilter.briefing keeps them), so dropping them would lose
+        // citations even with no rules. They are never added to a relation's evidenceIds.
+        Set<String> candidateVersions = new HashSet<>();
+        Set<String> impactCitations = new HashSet<>();
         for (Relation relation : relations) {
             citedEvidence.addAll(relation.evidenceIds());
+            if ("INVOLVES".equals(relation.relationType())) impactCitations.addAll(relation.evidenceIds());
             for (Basis basis : relation.basis()) {
                 for (ArticleRef article : basis.articles()) {
-                    citedVersions.add(key(article.articleId(), article.articleVersion()));
+                    candidateVersions.add(key(article.articleId(), article.articleVersion()));
                 }
             }
         }
-        List<Evidence> evidence = snapshot.evidence().stream().filter(e -> citedEvidence.contains(e.evidenceId())).toList();
+        for (Evidence e : snapshot.evidence()) {
+            if (impactCitations.contains(e.evidenceId())) candidateVersions.add(key(e.articleId(), e.articleVersion()));
+        }
+        citedVersions.addAll(candidateVersions);
+        List<Evidence> evidence = snapshot.evidence().stream().filter(e -> citedEvidence.contains(e.evidenceId())
+                || candidateVersions.contains(key(e.articleId(), e.articleVersion()))).toList();
         for (Evidence e : evidence) {
             citedVersions.add(key(e.articleId(), e.articleVersion()));
         }
