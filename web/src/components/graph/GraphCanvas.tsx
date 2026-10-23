@@ -25,6 +25,8 @@ import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { arrangeFlow, arrangeFocus } from './graph-arrange';
 import { freeViewport, nodeRect, type Rect } from './graph-geometry';
 
+const noHighlightedEdges: string[] = [];
+
 export default function GraphCanvas({
   data,
   selectedId: selected = null,
@@ -34,7 +36,7 @@ export default function GraphCanvas({
   focusLayout = false,
   flow = false,
   onFlowChange,
-  highlightedEdgeIds = [],
+  highlightedEdgeIds = noHighlightedEdges,
   selectedEdgeId = null,
   onSelectEdge,
   connectionPath = false,
@@ -42,10 +44,23 @@ export default function GraphCanvas({
   onOpenIsolated,
   centerRequest = null,
   filterHost,
+  tutorialPhase,
+  tutorialTargetId,
+  tutorialCenterId,
+  tutorialLocked = false,
+  tutorialCameraEnabled = false,
+  tutorialShowNeighborhood = false,
+  onTutorialAction,
 }: {
   data: GraphResponse;
-  /** Render the one legend in the map toolbar, sharing this canvas visibility state. */
   filterHost?: HTMLElement | null;
+  tutorialPhase?: 'pan' | 'zoom';
+  tutorialTargetId?: string;
+  tutorialCenterId?: string;
+  tutorialLocked?: boolean;
+  tutorialCameraEnabled?: boolean;
+  tutorialShowNeighborhood?: boolean;
+  onTutorialAction?: (action: 'pan' | 'zoom') => void;
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
   focusId?: string | null;
@@ -67,6 +82,13 @@ export default function GraphCanvas({
 }) {
   const appearance = useContext(GraphAppearanceContext) ?? defaultAppearance;
   const colors = appearanceColors(appearance);
+  const tutorialAction = useEffectEvent((action: 'pan' | 'zoom') =>
+    onTutorialAction?.(action),
+  );
+  const currentTutorialPhase = useEffectEvent(() => tutorialPhase);
+  const isTutorial = useEffectEvent(() =>
+    Boolean(tutorialPhase || tutorialCenterId),
+  );
   const viewKey = `${memoryOwner}:${data.metadata.mode}`;
   const [viewState, setViewState] = useState(() => ({
     key: viewKey,
@@ -100,13 +122,27 @@ export default function GraphCanvas({
     });
   }
   const container = useRef<HTMLDivElement>(null);
+  const dragPractice = useRef<{ x: number; y: number; moved: number } | null>(
+    null,
+  );
   const instance = useRef<Graph | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [dragAnchor, setDragAnchor] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  const [tutorialMarker, setTutorialMarker] = useState<{
+    x: number;
+    y: number;
+    size: number;
+  } | null>(null);
+
   const drawing = useRef(Promise.resolve());
   const lastFocused = useRef<string | null>(null);
+  const tutorialCentered = useRef<string | undefined>(undefined);
   const hovered = useRef<string | null>(null);
   const [hoveredIssue, setHoveredIssue] = useState<string | null>(null);
   const fitPending = useRef(false);
+  const defaultZoomPending = useRef(false);
   const followFit = useRef(true);
   const minimapShown = useRef(false);
   // D-GRP-01/03: 상세 패널을 제외한 지도 영역의 중앙에 선택 노드를 유지한다.
@@ -115,9 +151,49 @@ export default function GraphCanvas({
   const preservePositions = useRef(false);
   const [centerSequence, setCenterSequence] = useState(0);
   const renderedData = useRef<ReturnType<typeof toG6Data> | null>(null);
+  const syncTutorialMarker = useEffectEvent(() => {
+    const graph = instance.current;
+    const host = container.current;
+    if (
+      tutorialPhase === 'pan' &&
+      host &&
+      host.clientWidth &&
+      host.clientHeight
+    ) {
+      // Five o'clock: 30 degrees right of down, 25% of the shorter viewport edge.
+      const distance = Math.min(host.clientWidth, host.clientHeight) * 0.25;
+      const x = host.clientWidth / 2 + distance * 0.5;
+      const y = host.clientHeight / 2 + (distance * Math.sqrt(3)) / 2;
+      setDragAnchor((old) => (old?.x === x && old.y === y ? old : { x, y }));
+    }
+    const node = renderedData.current?.nodes?.find(
+      (item) => item.id === tutorialTargetId,
+    );
+    if (!graph || graph.destroyed || !node) {
+      setTutorialMarker(null);
+      return;
+    }
+    const x = Number(node.style?.x);
+    const y = Number(node.style?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const point = graph.getViewportByCanvas([x, y]);
+    const rawSize = node.style?.size;
+    const size = Number(Array.isArray(rawSize) ? rawSize[0] : rawSize) || 40;
+    const next = {
+      x: point[0],
+      y: point[1],
+      size: size * graph.getZoom() + 20,
+    };
+    setTutorialMarker((old) =>
+      old?.x === next.x && old.y === next.y && old.size === next.size
+        ? old
+        : next,
+    );
+  });
   // 지금 적용한 배치(원래 지도·포커스·흐름 순). 바뀌면 화면을 새 배치에 맞춘다.
   const lastArrangement = useRef('map');
   function handleNodeSelect(id: string | null) {
+    if (tutorialPhase || (tutorialLocked && id !== tutorialTargetId)) return;
     if (id === '__isolated__') return onOpenIsolated?.();
     // 이미 선택한 노드를 다시 눌러도 수동 이동한 지도에서 중앙으로 돌아온다.
     centerTarget.current = id;
@@ -131,6 +207,7 @@ export default function GraphCanvas({
   }
   const selectNode = useEffectEvent(handleNodeSelect);
   const selectEdge = useEffectEvent((id: string) => {
+    if (tutorialPhase || tutorialLocked) return;
     if (data.edges.some((edge) => edge.id === id && isSelectableRelation(edge)))
       onSelectEdge?.(id);
   });
@@ -189,7 +266,11 @@ export default function GraphCanvas({
                   : 'inactive',
             ].filter((state) => dimRest || state !== 'inactive')
           : [];
-        if (id === selected) states[id].push('selected');
+        if (tutorialLocked && !tutorialPhase && !tutorialShowNeighborhood)
+          states[id] = id === tutorialTargetId ? [] : ['inactive'];
+        if (id === selected && (!tutorialLocked || tutorialShowNeighborhood))
+          states[id].push('selected');
+        if (id === tutorialTargetId) states[id].push('tutorial');
       }
       for (const edge of rendered.edges ?? []) {
         const id = String(edge.id);
@@ -198,12 +279,16 @@ export default function GraphCanvas({
               (state) => dimRest || state !== 'inactive',
             )
           : [];
-        if (id === selectedEdgeId) states[id].push('selected');
+        if (tutorialLocked && !tutorialShowNeighborhood)
+          states[id] = ['inactive'];
+        if (id === selectedEdgeId && !tutorialLocked)
+          states[id].push('selected');
       }
       await graph.setElementState(states);
     },
   );
   const hoverNode = useEffectEvent((id: string | null) => {
+    if (tutorialLocked) return;
     if (hovered.current === id) return;
     hovered.current = id;
     setHoveredIssue(
@@ -402,6 +487,7 @@ export default function GraphCanvas({
             host.clientHeight,
             selected ?? focusId,
             [
+              ...(tutorialTargetId ? [tutorialTargetId] : []),
               ...data.edges
                 .filter((edge) => highlightedEdgeIds.includes(edge.id))
                 .flatMap((edge) => [edge.source, edge.target]),
@@ -587,6 +673,22 @@ export default function GraphCanvas({
           fitPending.current = false;
           await fitVisibleGraph(graph);
         }
+        if (defaultZoomPending.current) {
+          defaultZoomPending.current = false;
+          await graph.zoomTo(0.53, false);
+          setZoom(0.53);
+          followFit.current = false;
+        }
+        if (
+          tutorialCenterId &&
+          tutorialCentered.current !== tutorialCenterId &&
+          rendered.nodes?.some((node) => node.id === tutorialCenterId)
+        ) {
+          await graph.focusElement(tutorialCenterId, false);
+          followFit.current = false;
+        }
+        tutorialCentered.current = tutorialCenterId;
+        syncTutorialMarker();
       })
       .catch(() => {
         if (!graph.destroyed) setRenderError(true);
@@ -615,6 +717,12 @@ export default function GraphCanvas({
   }, [
     selected,
     centerSequence,
+    tutorialTargetId,
+    tutorialCenterId,
+    tutorialPhase,
+    tutorialLocked,
+    tutorialCameraEnabled,
+    tutorialShowNeighborhood,
     selectedEdgeId,
     focusId,
     focusHops,
@@ -632,9 +740,32 @@ export default function GraphCanvas({
     let observer: ResizeObserver | null = null;
     let resizeFrame: number | null = null;
     const clearHover = () => hoverNode(null);
-    let pointerStart: { x: number; y: number } | null = null;
+    let pointerStart: {
+      x: number;
+      y: number;
+      graphX: number;
+      graphY: number;
+      allowed: boolean;
+    } | null = null;
+    let wheelPending = false;
+    let previousZoom = 1;
     const pointerDown = (event: PointerEvent) => {
-      pointerStart = { x: event.clientX, y: event.clientY };
+      if (!graph || event.button !== 0) return;
+      const bounds = host.getBoundingClientRect();
+      const position = graph.getPosition();
+      wheelPending = false;
+      pointerStart = {
+        x: event.clientX,
+        y: event.clientY,
+        graphX: position[0],
+        graphY: position[1],
+        allowed:
+          currentTutorialPhase() === 'pan' &&
+          Math.hypot(
+            event.clientX - bounds.left - bounds.width / 2,
+            event.clientY - bounds.top - bounds.height * 0.72,
+          ) <= 64,
+      };
     };
     const pointerMove = (event: PointerEvent) => {
       if (
@@ -648,10 +779,30 @@ export default function GraphCanvas({
         centerTarget.current = null;
       }
     };
-    const pointerUp = () => {
+    const pointerUp = (event: PointerEvent) => {
+      if (
+        pointerStart?.allowed &&
+        graph &&
+        !graph.destroyed &&
+        Math.hypot(
+          event.clientX - pointerStart.x,
+          event.clientY - pointerStart.y,
+        ) >= 24
+      ) {
+        const position = graph.getPosition();
+        if (
+          Math.hypot(
+            position[0] - pointerStart.graphX,
+            position[1] - pointerStart.graphY,
+          ) >= 12
+        )
+          tutorialAction('pan');
+      }
       pointerStart = null;
     };
-    const stopFollowing = () => {
+    const stopFollowing = (event: WheelEvent) => {
+      if (event.deltaY !== 0 && currentTutorialPhase() === 'zoom')
+        wheelPending = true;
       followFit.current = false;
       centerTarget.current = null;
     };
@@ -734,6 +885,19 @@ export default function GraphCanvas({
         },
         node: {
           state: {
+            tutorial: {
+              opacity: 1,
+              halo: true,
+              stroke: '#2f6fd8',
+              lineDash: [6, 4],
+              haloStroke: '#2f6fd8',
+              haloOpacity: 1,
+              haloFill: 'transparent',
+              haloLineDash: [5, 4],
+              haloLineWidth: 4,
+              haloStrokeOpacity: 1,
+              lineWidth: 3,
+            },
             related: {
               opacity: 1,
               lineWidth: 1.4,
@@ -774,7 +938,18 @@ export default function GraphCanvas({
       graph.on('aftertransform', () => {
         if (!graph || disposed) return;
         try {
-          setZoom(graph.getZoom());
+          const nextZoom = graph.getZoom();
+          setZoom(nextZoom);
+          if (
+            wheelPending &&
+            currentTutorialPhase() === 'zoom' &&
+            Math.abs(nextZoom - previousZoom) > 0.0001
+          ) {
+            wheelPending = false;
+            tutorialAction('zoom');
+          }
+          previousZoom = nextZoom;
+          syncTutorialMarker();
           rememberCamera();
         } catch {
           /* transform may fire before canvas init */
@@ -786,7 +961,9 @@ export default function GraphCanvas({
         if (!disposed) setRenderError(true);
       }
       if (disposed) return;
-      const saved = readModeEntry(memoryOwner, graphMode)?.view.camera;
+      const saved = isTutorial()
+        ? undefined
+        : readModeEntry(memoryOwner, graphMode)?.view.camera;
       // 창 크기가 달라졌으면 예전 위치가 화면 밖을 가리킬 수 있어 화면에 맞춰 연다.
       // 포커스·흐름 순으로 열면 기억한 원래 지도 카메라를 쓰지 않고 새 배치에 맞춘다.
       const arranged = isArranged();
@@ -799,6 +976,7 @@ export default function GraphCanvas({
           : null;
       followFit.current = !camera;
       fitPending.current = !camera;
+      defaultZoomPending.current = !camera;
       if (camera) {
         retainFocus();
         await graph.zoomTo(camera.zoom, false);
@@ -889,6 +1067,7 @@ export default function GraphCanvas({
           ),
           false,
         );
+        onTutorialAction?.('zoom');
       }
     } catch {
       setRenderError(true);
@@ -898,12 +1077,18 @@ export default function GraphCanvas({
     <div
       className="relationship-canvas [&_.graph-overview]:rounded-panel [&_.graph-overview]:border [&_.graph-overview]:border-panel-line [&_.graph-overview]:bg-zoop-paper [&_.graph-overview]:shadow-lg [&_.graph-overview]:bottom-16! [&_.graph-overview]:top-auto!"
       data-testid="graph-canvas"
+      onWheel={(event) => {
+        if (tutorialPhase === 'zoom' && event.deltaY !== 0)
+          void control(event.deltaY < 0 ? 'in' : 'out');
+      }}
     >
       <div
         ref={container}
         // G6 writes an inline position: relative on its container, which would size the host by
         // its own canvas. Keep it pinned to the map surface so each new graph measures full size.
-        className="relationship-g6 absolute! inset-0"
+        className={`relationship-g6 absolute! inset-0 ${(tutorialLocked && !tutorialCameraEnabled) || tutorialPhase ? 'pointer-events-none' : ''} ${tutorialPhase ? 'opacity-35' : ''}`}
+        data-tutorial-action={tutorialCameraEnabled ? 'move' : undefined}
+        aria-disabled={Boolean(tutorialPhase)}
         role="img"
         aria-label={`${personal ? '내 종목' : '시장 전체'} 관계 지도: 기업 ${stats.company}개, 사건 ${stats.issue}개. 드래그로 이동하고 휠로 확대합니다.`}
       />
@@ -934,6 +1119,7 @@ export default function GraphCanvas({
           type="button"
           className="sr-only focus:not-sr-only focus:absolute focus:top-12 focus:right-3 focus:z-20 focus:bg-white focus:p-3"
           onClick={onOpenIsolated}
+          disabled={Boolean(tutorialPhase)}
           aria-label={`연결 없는 사건 ${stats.disconnected}건 보기`}
         >
           {stats.disconnected}
@@ -952,14 +1138,117 @@ export default function GraphCanvas({
           KST
         </p>
       </div>
-      <div className="relationship-zoom" aria-label="지도 확대 조절">
-        <button onClick={() => void control('in')} aria-label="확대">
+      {tutorialPhase === 'pan' && (
+        <button
+          className="absolute z-20 grid size-32 -translate-x-1/2 -translate-y-1/2 touch-none place-items-center rounded-full border-2 border-dashed border-zoop-down bg-zoop-paper/75 px-3 text-center text-xs font-bold text-zoop-down focus-visible:outline-4"
+          style={{
+            left: dragAnchor?.x ?? '62.5%',
+            top: dragAnchor?.y ?? '71.65%',
+          }}
+          data-tutorial-action="move"
+          aria-label="강조된 지도 이동 영역"
+          onPointerDown={(event) => {
+            if (event.button !== 0) return;
+            event.preventDefault();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            dragPractice.current = {
+              x: event.clientX,
+              y: event.clientY,
+              moved: 0,
+            };
+          }}
+          onPointerMove={(event) => {
+            const previous = dragPractice.current;
+            const graph = instance.current;
+            if (!previous || !graph || graph.destroyed) return;
+            const dx = event.clientX - previous.x;
+            const dy = event.clientY - previous.y;
+            previous.x = event.clientX;
+            previous.y = event.clientY;
+            previous.moved += Math.hypot(dx, dy);
+            followFit.current = false;
+            centerTarget.current = null;
+            drawing.current = drawing.current.then(async () => {
+              if (!graph.destroyed && instance.current === graph)
+                await graph.translateBy([dx, dy], false);
+            });
+          }}
+          onPointerUp={() => {
+            const moved = dragPractice.current?.moved ?? 0;
+            dragPractice.current = null;
+            if (moved >= 24) {
+              void drawing.current.then(() => onTutorialAction?.('pan'));
+            }
+          }}
+          onPointerCancel={() => {
+            dragPractice.current = null;
+          }}
+          onKeyDown={(event) => {
+            const direction: Record<string, [number, number]> = {
+              ArrowLeft: [-40, 0],
+              ArrowRight: [40, 0],
+              ArrowUp: [0, -40],
+              ArrowDown: [0, 40],
+            };
+            const graph = instance.current;
+            if (direction[event.key] && graph && !graph.destroyed) {
+              event.preventDefault();
+              followFit.current = false;
+              void graph
+                .translateBy(direction[event.key], false)
+                .then(() => onTutorialAction?.('pan'));
+            }
+          }}
+        >
+          이 빈 공간을 누른 채 끌어 보세요
+        </button>
+      )}
+      {tutorialTargetId && tutorialMarker && (
+        <button
+          type="button"
+          aria-label={`강조된 ${data.nodes.find((node) => node.id === tutorialTargetId)?.label ?? ''} 노드 선택`}
+          data-tutorial-action="node"
+          className="absolute z-20 rounded-full border-2 border-dashed border-zoop-down bg-transparent focus-visible:outline-4"
+          style={{
+            left: tutorialMarker.x,
+            top: tutorialMarker.y,
+            width:
+              tutorialMarker.size *
+              (data.nodes.find((node) => node.id === tutorialTargetId)?.kind ===
+              'issue'
+                ? 1.15
+                : 1),
+            height:
+              tutorialMarker.size *
+              (data.nodes.find((node) => node.id === tutorialTargetId)?.kind ===
+              'issue'
+                ? 1.15
+                : 1),
+            transform: 'translate(-50%, -50%)',
+          }}
+          onClick={() => onSelect?.(tutorialTargetId)}
+        />
+      )}
+      <div
+        className={`relationship-zoom ${tutorialPhase === 'zoom' ? 'tutorial-target' : ''}`}
+        aria-label="지도 확대 조절"
+      >
+        <button
+          data-tutorial-action="zoom"
+          onClick={() => void control('in')}
+          aria-label="확대"
+        >
           <GraphIcon name="plus" />
         </button>
-        <button onClick={() => void control('out')} aria-label="축소">
+        <button
+          data-tutorial-action="zoom"
+          onClick={() => void control('out')}
+          aria-label="축소"
+        >
           <GraphIcon name="minus" />
         </button>
         <button
+          data-tutorial-action={tutorialCameraEnabled ? 'zoom' : undefined}
           onClick={() => void control('fit')}
           aria-label="전체 그래프 맞춤"
         >
@@ -1013,19 +1302,33 @@ export default function GraphCanvas({
       {renderError && (
         <div className="relationship-message" role="alert">
           그래프를 표시하지 못했습니다.
-          <button onClick={() => setRetry((v) => v + 1)}>다시 시도</button>
+          <button
+            data-tutorial-action="retry"
+            onClick={() => setRetry((v) => v + 1)}
+          >
+            다시 시도
+          </button>
         </div>
       )}
       <div
         className="relationship-accessible-nodes"
         aria-label="키보드로 기업·사건·연결선 선택"
+        inert={Boolean(tutorialPhase)}
       >
         {data.nodes
           .filter((node) => !view.hidden.includes(node.kind))
           .map((node) => (
             <button
               key={node.id}
+              data-tutorial-managed-disabled
+              disabled={tutorialLocked && node.id !== tutorialTargetId}
+              data-tutorial-action={
+                node.id === tutorialTargetId ? 'node' : undefined
+              }
               aria-pressed={selected === node.id}
+              className={
+                node.id === tutorialTargetId ? 'tutorial-target' : undefined
+              }
               onClick={() => handleNodeSelect(node.id)}
             >
               {node.kind === 'issue' ? '사건: ' : '기업: '}
@@ -1047,6 +1350,8 @@ export default function GraphCanvas({
           .map((edge) => (
             <button
               key={edge.id}
+              data-tutorial-managed-disabled
+              disabled={tutorialLocked}
               aria-pressed={selectedEdgeId === edge.id}
               onClick={() => onSelectEdge?.(edge.id)}
             >
