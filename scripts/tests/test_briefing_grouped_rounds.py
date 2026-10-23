@@ -566,7 +566,7 @@ if __name__ == "__main__":
 
 def record_grounding(value, directory):
     """Authored provider files for tests only; exercises real digest/semantic binding."""
-    calls = Path(directory) / 'calls'; calls.mkdir(exist_ok=True)
+    calls = Path(directory) / 'calls'; base.private_dir(calls)
     prompt = 'Authored independent event and participant verification fixture.'
     value.setdefault('identity', {}).setdefault('promptSha256', {})['issue_grounding'] = base.digest(prompt.encode())
     mentions = {}
@@ -576,7 +576,9 @@ def record_grounding(value, directory):
             m['grounding'] = {'verdict': 'SUPPORTED', 'reason': 'Authored original supports this test event.'}
             mentions[m['mentionId']] = {'article_id': m['articleId'], 'article_version': m['pocArticleVersion'],
                 'title': m['title'], 'action': m['action'], 'assertion_status': m['assertionStatus'],
-                'background': False, 'evidence': m['evidence'], 'participants': []}
+                'background': False, 'evidence': m['evidence'], 'participants':
+                    [a['rawParticipant'] for a in m['companyProjection']['audit']] if m.get('companyProjection') else
+                    [{'company_id': c['companyId'], 'name': c['name'], 'role': c['role']} for c in m['companies']]}
     data = {'authorization': {'sourceSha256': value['sourceFileSha256']}, 'mentions': mentions,
         'articles': [{'article_id': d['documentId'], 'body': d['body'], 'url': d['url']} for d in value['documents']]}
     request = {'store': False, 'model': base.MODEL, 'instructions': prompt, 'input': base.canonical(data).decode(),

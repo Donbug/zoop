@@ -92,4 +92,20 @@ class CoreEvidenceTests(unittest.TestCase):
             self.assertNotEqual(B.digest(raw), B.digest(legacy))
             self.assertEqual(B.strict_load(legacy)['instructions'], B.regular(G.PROMPTS/'selection.md').decode())
 
+    def test_held_round_recovery_keeps_the_frozen_semantic_policy_and_short_quote(self):
+        import briefing_grouped_recovery_run as recovery
+        from test_briefing_grouped_rounds import AuthoredTransport
+        candidates = S.apply(G.build_grouped_candidates(self.a, round_spec()), S.load(self.a, self.root))
+        client = G.GroupedSimulationClient(self.root, AuthoredTransport())
+        outcome = G.attempt_grouped_selection(client, candidates, {'context': {
+            'selectionEvidencePolicy': S.POLICY}}, 'authored-identity')
+        record = {**round_spec(), 'selectionStatus': 'HELD_VALIDATION',
+            'identity': {'selectionEvidencePolicy': S.POLICY}, 'identitySha256': 'authored-identity',
+            'groupedSelectionRequestDigest': outcome['requestDigest'],
+            'receipts': [r for r in client.receipts() if r['stage'] == G.SELECTION_STAGE]}
+        repaired = recovery.prepare_round(record, self.a, self.root/'calls', [])
+        self.assertEqual('NEEDS_DRAFT', repaired[0]['status'])
+        self.assertEqual(candidates[0], repaired[0]['selection']['frozenGroupedIssueSnapshot'])
+        self.assertLess(len(repaired[0]['selection']['sources'][0]['quote']), 80)
+
 if __name__ == '__main__': unittest.main()
