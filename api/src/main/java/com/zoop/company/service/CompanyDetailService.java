@@ -68,7 +68,7 @@ public class CompanyDetailService {
                 company.aliases(), company.sector(), company.brandColor(), company.logoUrl(),
                 missingFromGraph ? List.of() : graph.directIssues(),
                 missingFromGraph ? List.of() : graph.structuralIssues(), summary, null, null,
-                new Metadata("public_graph_snapshot", graph.asOf(), graph.graphVersion(), requestId,
+                new Metadata(graph.source(), graph.asOf(), graph.graphVersion(), requestId,
                         !failures.isEmpty(), failures));
     }
 

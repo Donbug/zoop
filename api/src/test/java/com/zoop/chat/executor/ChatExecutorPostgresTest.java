@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,7 +20,10 @@ import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
 import com.zoop.chat.dto.ChatJobRequest;
 import com.zoop.chat.repository.ChatExecutionRepository;
 import com.zoop.chat.repository.ChatRepository;
+import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.service.ChatService;
+import com.zoop.chat.tool.ChatToolRequest;
+import com.zoop.chat.tool.ChatToolRunner;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -50,6 +54,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @EnabledIfEnvironmentVariable(named = "DB_URL", matches = "jdbc:postgresql:.*")
 @Tag("auth-postgres")
 class ChatExecutorPostgresTest {
+    private static final String EVIDENCE = "ev-" + "a".repeat(64);
     @Autowired JdbcTemplate jdbc;
     @Autowired ChatService service;
     @Autowired ChatJobExecutor executor;
@@ -59,6 +64,7 @@ class ChatExecutorPostgresTest {
     @Autowired ObjectProvider<ChatEngine> engines;
     @Autowired ObjectMapper mapper;
     @Autowired PlatformTransactionManager transactions;
+    @Autowired ChatToolRunner tools;
 
     private String memberId;
     private MemberPrincipal member;
@@ -110,6 +116,32 @@ class ChatExecutorPostgresTest {
         assertEquals("chat-result/v1", jdbc.queryForObject("SELECT result_schema_version FROM chat_jobs WHERE id = ?",
                 String.class, jobId));
         assertFalse(executor.runOnce());
+    }
+
+    @Test
+    void aModelStageIsRecordedAsAChatbotExecutionOwnedByTheJob() {
+        String jobId = submit("기록");
+        var recorder = new com.zoop.chat.model.ChatModelRecorder(
+                new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc), Clock.systemUTC());
+        String id = recorder.start(jobId, "chat-router", "replay");
+        assertEquals("running", jdbc.queryForObject("SELECT status FROM ai_executions WHERE id = ?", String.class, id));
+        recorder.finish(id, "succeeded", new com.zoop.ai.chat.ChatStageReply.Receipt("typesafe", "systemone-v1", "jev",
+                "chat-router-1", "replay", 12L, null, Instant.now(), Instant.now()), null);
+        recorder.finish(id, "failed", null, "late");
+        var row = jdbc.queryForMap("SELECT feature, execution_mode, status, chat_job_id, stage, model, input_tokens, "
+                + "output_tokens, error_code, finished_at FROM ai_executions WHERE id = ?", id);
+        assertEquals("chatbot", row.get("feature"));
+        assertEquals("replay", row.get("execution_mode"));
+        assertEquals("succeeded", row.get("status"), "an ended execution is not rewritten");
+        assertEquals(jobId, row.get("chat_job_id"));
+        assertEquals("chat-router", row.get("stage"));
+        assertEquals("jev", row.get("model"));
+        assertEquals(12L, ((Number) row.get("input_tokens")).longValue());
+        assertNull(row.get("output_tokens"));
+        assertNull(row.get("error_code"));
+        assertTrue(row.get("finished_at") != null);
+        // ai_executions keeps its chat job (ON DELETE RESTRICT): remove the record before the member cascade.
+        jdbc.update("DELETE FROM ai_executions WHERE id = ?", id);
     }
 
     @Test
@@ -200,6 +232,86 @@ class ChatExecutorPostgresTest {
         assertEquals("response_unknown", failed.failure().reason());
         assertNull(failed.failure().retry());
         assertEquals(1, failed.runs());
+    }
+
+    @Test
+    void toolCallsAreRecordedUnderTheRunAndClosedWithTheJob() {
+        engine.script((run, control) -> {
+            assertEquals(List.of("tc-0", "tc-1", "tc-2"), control.reserveToolCalls(1,
+                    List.of(reservation("company.read"), reservation("issue.read"), reservation("evidence.resolve"))));
+            control.toolCallStarted("tc-0");
+            control.toolCallFinished("tc-0", new ChatToolCallEnd("succeeded", null, "fixture-2026-10-08",
+                    List.of(EVIDENCE), true, false));
+            control.toolCallStarted("tc-1");
+            assertThrows(IllegalArgumentException.class,
+                    () -> control.reserveToolCalls(2, Collections.nCopies(10, reservation("company.read"))));
+            return ScriptedChatEngine.generalAnswer("도구를 부른 답");
+        });
+        String jobId = submit("도구 호출 기록");
+        assertTrue(executor.runOnce());
+
+        var rows = jdbc.queryForList("""
+                SELECT tool_call_id, call_index, plan_revision, attempt_no, registry_version, registry_group, capability_id,
+                       tool_id, schema_version, request_meta->>'limit' AS meta_limit, status, error_code, data_version,
+                       array_to_string(evidence_ids, ',') AS evidence, truncated, next_allowed, finished_at
+                  FROM chat_tool_calls WHERE chat_job_id = ? ORDER BY call_index
+                """, jobId);
+        assertEquals(3, rows.size(), "the refused plan reserved nothing");
+        assertEquals(List.of("succeeded", "unknown", "cancelled"), rows.stream().map(r -> r.get("status")).toList());
+        var first = rows.getFirst();
+        assertEquals("tc-0", first.get("tool_call_id"));
+        assertEquals(1, first.get("attempt_no"));
+        assertEquals("chat-tools/v1", first.get("registry_version"));
+        assertEquals("zoop-core-read", first.get("registry_group"));
+        assertEquals("app:company.read", first.get("tool_id"));
+        assertEquals("20", first.get("meta_limit"));
+        assertEquals("fixture-2026-10-08", first.get("data_version"));
+        assertEquals(EVIDENCE, first.get("evidence"));
+        assertEquals(true, first.get("truncated"));
+        assertEquals(false, first.get("next_allowed"));
+        assertTrue(rows.stream().allMatch(r -> r.get("finished_at") != null));
+    }
+
+    @Test
+    void aCancelClosesTheRunsToolCallsAndFencesItsLaterWrites() {
+        String jobId = submit("도구 호출 중 취소");
+        var claim = executor.claimNext().orElseThrow();
+        engine.script((run, control) -> {
+            control.reserveToolCalls(1, List.of(reservation("company.read"), reservation("issue.read")));
+            control.toolCallStarted("tc-0");
+            service.cancel(member, run.jobId(), "cancel-" + suffix());
+            assertThrows(ChatRunSuperseded.class, () -> control.toolCallFinished("tc-0",
+                    new ChatToolCallEnd("succeeded", null, "v1", List.of(), false, false)));
+            assertThrows(ChatRunSuperseded.class, () -> control.toolCallStarted("tc-1"));
+            throw new ChatRunSuperseded();
+        });
+        executor.execute(claim);
+
+        assertEquals(List.of("unknown", "cancelled"), jdbc.queryForList(
+                "SELECT status FROM chat_tool_calls WHERE chat_job_id = ? ORDER BY call_index", String.class, jobId));
+    }
+
+    @Test
+    void theToolRunnerRecordsAnUnreadableGraphAsAFailedCallNotAnEmptyResult() {
+        engine.script((run, control) -> {
+            // The test context has no snapshot source: with or without a frozen version, the graph cannot be read.
+            var results = tools.runStage(run, control, 1,
+                    List.of(new ChatToolRequest("company.read", List.of("KRX:000660"), 20)));
+            assertEquals(ChatToolRunner.UNAVAILABLE, results.getFirst().error());
+            assertThrows(IllegalArgumentException.class, () -> tools.runStage(run, control, 1,
+                    List.of(new ChatToolRequest("graph.path.read", List.of("KRX:000660"), 20))));
+            return new ChatEngineOutcome.Failed("transient", "provider_error", true);
+        });
+        String jobId = submit("그래프 없이 도구 호출");
+        assertTrue(executor.runOnce());
+
+        assertEquals(List.of("failed:tool_unavailable"), jdbc.queryForList(
+                "SELECT status || ':' || error_code FROM chat_tool_calls WHERE chat_job_id = ?", String.class, jobId));
+    }
+
+    private static ChatToolCallReservation reservation(String capability) {
+        return new ChatToolCallReservation("chat-tools/v1", "zoop-core-read", capability, "app:" + capability,
+                "chat-tool/v1", "0".repeat(64), "{\"limit\":20}");
     }
 
     private String submit(String question) {

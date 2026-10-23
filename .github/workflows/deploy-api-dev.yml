@@ -1,0 +1,257 @@
+name: Deploy API to Dev
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Build/reuse the image only, or deploy it to ECS
+        required: true
+        default: stage-image
+        type: choice
+        options:
+          - stage-image
+          - deploy
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-api-dev
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY: ${{ vars.API_ECR_REPOSITORY }}
+  ECS_CLUSTER: ${{ vars.API_ECS_CLUSTER }}
+  ECS_SERVICE: ${{ vars.API_ECS_SERVICE }}
+  ECS_TASK_DEFINITION: ${{ vars.API_ECS_TASK_DEFINITION }}
+  ECS_CONTAINER_NAME: ${{ vars.API_ECS_CONTAINER_NAME }}
+
+jobs:
+  deploy:
+    name: Build, stage, or deploy API
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: dev
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+
+      - name: Validate deployment variables
+        shell: bash
+        env:
+          DEPLOY_OPERATION: ${{ inputs.operation }}
+          AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+        run: |
+          set -euo pipefail
+
+          required_variables=(
+            AWS_REGION
+            ECR_REPOSITORY
+            AWS_ROLE_ARN
+          )
+
+          if [ "$DEPLOY_OPERATION" = "deploy" ]; then
+            required_variables+=(
+              ECS_CLUSTER
+              ECS_SERVICE
+              ECS_TASK_DEFINITION
+              ECS_CONTAINER_NAME
+            )
+          fi
+
+          for variable_name in "${required_variables[@]}"; do
+            if [ -z "${!variable_name:-}" ]; then
+              echo "::error::$variable_name is not configured."
+              exit 1
+            fi
+          done
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: zoop-api-dev-${{ github.run_id }}
+
+      - name: Require an active ECS service for deployment
+        if: ${{ inputs.operation == 'deploy' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          service_count="$(
+            aws ecs describe-services \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_SERVICE" \
+              --query 'length(services)' \
+              --output text
+          )"
+
+          if [ "$service_count" != "1" ]; then
+            echo "::error::The ECS service could not be found."
+            exit 1
+          fi
+
+          desired_count="$(
+            aws ecs describe-services \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_SERVICE" \
+              --query 'services[0].desiredCount' \
+              --output text
+          )"
+
+          if [ -z "$desired_count" ] || [ "$desired_count" = "None" ]; then
+            echo "::error::The ECS service desired count could not be determined."
+            exit 1
+          fi
+
+          if [ "$desired_count" -lt 1 ]; then
+            echo "::error::ECS desired count is 0. Activate the service through the approved Terraform procedure before deployment."
+            exit 1
+          fi
+
+          echo "ECS service desired count: $desired_count"
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd
+
+      - name: Reuse or build API image
+        id: build-image
+        shell: bash
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          tagged_image="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          lookup_error="$(mktemp)"
+
+          trap 'rm -f "$lookup_error"' EXIT
+
+          lookup_image_digest() {
+            : > "$lookup_error"
+
+            aws ecr describe-images \
+              --repository-name "$ECR_REPOSITORY" \
+              --image-ids "imageTag=$IMAGE_TAG" \
+              --query 'imageDetails[0].imageDigest' \
+              --output text \
+              2>"$lookup_error"
+          }
+
+          set +e
+          image_digest="$(lookup_image_digest)"
+          lookup_status=$?
+          set -e
+
+          if [ "$lookup_status" -eq 0 ]; then
+            if [[ "$image_digest" != sha256:* ]]; then
+              cat "$lookup_error" >&2
+              echo "::error::ECR lookup succeeded but returned an invalid image digest."
+              exit 1
+            fi
+
+            echo "Reusing existing immutable image: $tagged_image"
+          elif grep -q "ImageNotFoundException" "$lookup_error"; then
+            echo "No existing image found. Building: $tagged_image"
+
+            docker build \
+              --file api/Dockerfile \
+              --tag "$tagged_image" \
+              api
+
+            docker push "$tagged_image"
+
+            image_digest=""
+
+            for attempt in $(seq 1 10); do
+              set +e
+              candidate_digest="$(lookup_image_digest)"
+              lookup_status=$?
+              set -e
+
+              if [ "$lookup_status" -eq 0 ]; then
+                if [[ "$candidate_digest" != sha256:* ]]; then
+                  cat "$lookup_error" >&2
+                  echo "::error::ECR lookup succeeded but returned an invalid image digest."
+                  exit 1
+                fi
+
+                image_digest="$candidate_digest"
+                break
+              fi
+
+              if ! grep -q "ImageNotFoundException" "$lookup_error"; then
+                cat "$lookup_error" >&2
+                echo "::error::ECR image lookup failed after the image push."
+                exit "$lookup_status"
+              fi
+
+              echo "Waiting for the pushed image digest: attempt $attempt/10"
+              sleep 2
+            done
+          else
+            cat "$lookup_error" >&2
+            echo "::error::ECR image lookup failed. The image will not be built or pushed."
+            exit "$lookup_status"
+          fi
+
+          if [[ "$image_digest" != sha256:* ]]; then
+            echo "::error::Could not resolve the ECR image digest."
+            exit 1
+          fi
+
+          digest_image="$ECR_REGISTRY/$ECR_REPOSITORY@$image_digest"
+
+          echo "Resolved image: $digest_image"
+          echo "image=$digest_image" >> "$GITHUB_OUTPUT"
+          echo "tagged-image=$tagged_image" >> "$GITHUB_OUTPUT"
+
+      - name: Download current task definition
+        if: ${{ inputs.operation == 'deploy' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          aws ecs describe-task-definition \
+            --task-definition "$ECS_TASK_DEFINITION" \
+            --query taskDefinition \
+            > task-definition.json
+
+      - name: Render API task definition
+        if: ${{ inputs.operation == 'deploy' }}
+        id: render-task-definition
+        uses: aws-actions/amazon-ecs-render-task-definition@138c24f321fdbdf7edee4a685519d253cae2cdea
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.ECS_CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Deploy API to Amazon ECS
+        if: ${{ inputs.operation == 'deploy' }}
+        uses: aws-actions/amazon-ecs-deploy-task-definition@c465972ecbd160473f22e683363b422a5412a3de
+        with:
+          task-definition: ${{ steps.render-task-definition.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - name: Write workflow summary
+        shell: bash
+        env:
+          DEPLOY_OPERATION: ${{ inputs.operation }}
+          RESOLVED_IMAGE: ${{ steps.build-image.outputs.image }}
+        run: |
+          {
+            echo "## API Dev workflow result"
+            echo
+            echo "- Operation: \`$DEPLOY_OPERATION\`"
+            echo "- Image: \`$RESOLVED_IMAGE\`"
+          } >> "$GITHUB_STEP_SUMMARY"

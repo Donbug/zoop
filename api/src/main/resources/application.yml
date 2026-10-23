@@ -52,8 +52,12 @@ zoop:
       # (snapshots staged by the operator graph handoff import, read-only and verified; needs artifact-root).
       source: ${ZOOP_GRAPH_SNAPSHOT_SOURCE:none}
       artifact-root: ${ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT:}
+    activation:
+      # Imported (non-fixture) versions are not activated while no public exclusion store exists (FS081), because "nothing
+      # excluded" cannot be checked. An operator who accepts that may set this to true; synthetic fixtures are not affected.
+      allow-without-exclusion-store: ${ZOOP_GRAPH_ACTIVATION_ALLOW_WITHOUT_EXCLUSION_STORE:false}
   chat:
-    # Accepting new questions and retries needs a ChatEngine (the orchestrator), which is not deployed yet. Off by default:
+    # Accepting new questions and retries needs a ChatEngine, registered by zoop.ai.chat-client.enabled=true. Off by default:
     # submit and retry answer 503 MODEL_UNAVAILABLE instead of leaving a job queued forever, and startup refuses intake on
     # without an engine. Reading conversations and jobs always works.
     questions-enabled: ${ZOOP_CHAT_QUESTIONS_ENABLED:false}
@@ -87,6 +91,17 @@ zoop:
       connect-timeout: ${ZOOP_AI_RELATION_CLIENT_CONNECT_TIMEOUT:3s}
       request-timeout: ${ZOOP_AI_RELATION_CLIENT_REQUEST_TIMEOUT:30s}
       max-response-bytes: ${ZOOP_AI_RELATION_CLIENT_MAX_RESPONSE_BYTES:8388608}
+    chat-client:
+      # Chatbot model stages through ai/service (POST /internal/v1/chat-stages/{stage}). Disabled by default. Enabled, it
+      # registers the chat engine, so zoop.chat.questions-enabled may be turned on. mode: replay (AI-side fixtures, no network)
+      # or live (real Luna/Jev calls behind the AI service's own chat gate and call ceiling; paid calls need approval).
+      enabled: ${ZOOP_AI_CHAT_CLIENT_ENABLED:false}
+      base-url: ${ZOOP_AI_CHAT_CLIENT_BASE_URL:}
+      token: ${ZOOP_AI_CHAT_CLIENT_TOKEN:}
+      mode: ${ZOOP_AI_CHAT_CLIENT_MODE:replay}
+      connect-timeout: ${ZOOP_AI_CHAT_CLIENT_CONNECT_TIMEOUT:3s}
+      request-timeout: ${ZOOP_AI_CHAT_CLIENT_REQUEST_TIMEOUT:35s}
+      max-response-bytes: ${ZOOP_AI_CHAT_CLIENT_MAX_RESPONSE_BYTES:2097152}
   document-import:
     # Operator-only, non-web import of S2-1 extracted text (see api/docs/DOCUMENT_IMPORT.md). Disabled by default; the
     # application starts without any of these settings. Enabled, it refuses to start unless the run is non-web

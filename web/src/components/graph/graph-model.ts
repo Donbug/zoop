@@ -44,8 +44,9 @@ export function graphSummary(data: GraphResponse) {
     ]),
   );
   const folded = new Map<string, number>();
-  incident.forEach((ids) => {
-    if (ids.length === 1) folded.set(ids[0], (folded.get(ids[0]) ?? 0) + 1);
+  incident.forEach((ids, issueId) => {
+    if (ids.length === 1 && !nodesById.get(issueId)?.isFocus)
+      folded.set(ids[0], (folded.get(ids[0]) ?? 0) + 1);
   });
   return {
     companyNodes,
@@ -143,6 +144,7 @@ export function toG6Data(
     (n) =>
       forcedNodes.includes(n.id) ||
       n.kind === 'company' ||
+      n.isFocus ||
       n.id === expandedId ||
       (summary.incident.get(n.id)?.length ?? 0) > 1 ||
       followsIds.has(n.id),

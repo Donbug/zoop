@@ -21,4 +21,10 @@ public class EvidenceReadAccess implements ChatEvidenceAccess {
     public boolean readable(String evidenceId, String graphVersion, Instant asOf, String requestId) {
         return evidence.readable(evidenceId, graphVersion, asOf, requestId);
     }
+
+    @Override
+    public EvidenceService.Readability readability(String evidenceId, String graphVersion, Instant asOf,
+            String requestId) {
+        return evidence.readability(evidenceId, graphVersion, asOf, requestId);
+    }
 }

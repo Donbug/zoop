@@ -1,3 +1,4 @@
+import BriefingRoundIssuePanel from '@/components/graph/BriefingRoundIssuePanel';
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   GraphAppearanceContext,
@@ -24,6 +25,7 @@ import EventDetailPanel, {
   type EventAction,
 } from '@/components/graph/EventDetailPanel';
 import AiChatDrawer from '@/components/ai/AiChatDrawer';
+import type { AnswerMapTarget } from '@/components/ai/ChatJobCard';
 import BriefingSnapshotBanner from '@/components/graph/BriefingSnapshotBanner';
 import EvidenceDrawer from '@/components/evidence/EvidenceDrawer';
 import { graphSummary } from '@/components/graph/graph-model';
@@ -179,14 +181,14 @@ function MapWorkspace({
   const tutorialStep = useGraphUiStore((state) => state.tutorialStep);
   const setTutorialStep = useGraphUiStore((state) => state.setTutorialStep);
   const tutorialOpen = params.get('tour') === '1';
-  const tutorialKey = `${memoryOwner}:${tutorialOpen}`;
-  const [practice, setPractice] = useState({
-    key: tutorialKey,
-    pan: false,
-  });
-  if (practice.key !== tutorialKey)
-    setPractice({ key: tutorialKey, pan: false });
-  useTutorialInteractionLock(tutorialOpen ? tutorialStep : null, practice.pan);
+  // MapPage gates and remounts this workspace for every tutorial entry.
+  // Keeping the practice flag local therefore resets it without a render-time
+  // or effect-driven state update.
+  const [tutorialPanReady, setTutorialPanReady] = useState(false);
+  useTutorialInteractionLock(
+    tutorialOpen ? tutorialStep : null,
+    tutorialPanReady,
+  );
   const desiredMode: MapMode =
     params.get('mode') === 'personal' ? 'personal' : 'all';
   const requestedMode = tutorialOpen
@@ -222,7 +224,7 @@ function MapWorkspace({
     !tutorialOpen && requestedMode === 'all'
       ? (params.get('round') ?? undefined)
       : undefined;
-  const { data, error, loading } = useGraphData(
+  const { data, error, loading, unavailableReason } = useGraphData(
     {
       mode: requestedMode,
       personalFilter: filter,
@@ -250,7 +252,7 @@ function MapWorkspace({
         : !target
           ? '현재 실제 지도에 안내할 기업·사건 연결이 없어요. 다시 불러오거나 튜토리얼을 건너뛸 수 있어요.'
           : tutorialStep === 1
-            ? practice.pan
+            ? tutorialPanReady
               ? '이동했어요! 휠을 움직이거나 왼쪽 아래 확대·축소 버튼을 눌러 보세요.'
               : '점선으로 강조된 빈 공간을 누른 채 끌어 지도를 이동해 보세요.'
             : tutorialStep === 2
@@ -519,6 +521,40 @@ function MapWorkspace({
     };
     if (action === 'evidence') useGraphUiStore.getState().openEvidence(target);
     else openAi(target);
+  }
+  /**
+   * D-AI-02 "지도에서 보기": 답변을 만든 스냅샷(그래프 버전과 질문에 명시된 기준 시각)으로 연다.
+   * - 지금 지도가 같은 버전·같은 기준 시각이고 대상 노드가 있으면 그 자리에서 초점을 맞춘다.
+   * - 아니면 기업 대상이고 명시된 시각이 있을 때만 그 버전·시각의 기업 지도로 이동하며, 이전 사건·영향·회차 선택은 지운다.
+   * - 그 밖(사건·관계, 시각 없이 버전만 고정된 답변)은 지금 지도가 그 스냅샷을 열 수 없으므로 false: 시각을 지어내지 않는다.
+   */
+  function viewAnswerTarget(target: AnswerMapTarget) {
+    const shownVersion = data?.metadata.graphVersion ?? null;
+    const sameSnapshot =
+      (!target.graphVersion || target.graphVersion === shownVersion) &&
+      (target.asOf ?? null) === (asOf ?? null);
+    if (sameSnapshot) {
+      if (!data?.nodes.some((node) => node.id === target.id)) return false;
+      updateQuery({ focus: target.id, hops: '1', path: null });
+      return true;
+    }
+    if (target.kind === 'company' && target.graphVersion && target.asOf) {
+      updateQuery({
+        companyId: target.id,
+        asOf: target.asOf,
+        graphVersion: target.graphVersion,
+        select: `node:${target.id}`,
+        focus: null,
+        hops: null,
+        path: null,
+        event: null,
+        impact: null,
+        round: null,
+        id: null,
+      });
+      return true;
+    }
+    return false;
   }
   function eventAction(action: EventAction, event: EventDetail) {
     const target: GraphTarget = {
@@ -847,11 +883,15 @@ function MapWorkspace({
                 centerRequest={centerRequest}
                 tutorialCenterId={tutorialOpen ? target?.company.id : undefined}
                 memoryOwner={
-                  tutorialOpen ? `${memoryOwner}:tutorial` : memoryOwner
+                  tutorialOpen
+                    ? `${memoryOwner}:tutorial`
+                    : round
+                      ? `${memoryOwner}:round:${round}`
+                      : memoryOwner
                 }
                 tutorialPhase={
                   tutorialOpen && tutorialStep === 1
-                    ? practice.pan
+                    ? tutorialPanReady
                       ? 'zoom'
                       : 'pan'
                     : undefined
@@ -865,9 +905,8 @@ function MapWorkspace({
                 }
                 onTutorialAction={(action) => {
                   if (!tutorialOpen || tutorialStep !== 1) return;
-                  if (action === 'pan')
-                    setPractice((old) => ({ ...old, pan: true }));
-                  if (action === 'zoom' && practice.pan) {
+                  if (action === 'pan') setTutorialPanReady(true);
+                  if (action === 'zoom' && tutorialPanReady) {
                     setTutorialStep(2);
                   }
                 }}
@@ -903,7 +942,9 @@ function MapWorkspace({
                 <p className="relationship-message" role="status">
                   {loading
                     ? '관계 지도를 불러오는 중입니다.'
-                    : '관계 지도를 불러오지 못했습니다.'}
+                    : unavailableReason === 'snapshot_not_recorded'
+                      ? '이 회차의 그래프 저장본이 없습니다.'
+                      : '관계 지도를 불러오지 못했습니다.'}
                 </p>
               </div>
             )}
@@ -1030,7 +1071,12 @@ function MapWorkspace({
                   onAskAi={() =>
                     tutorialOpen && tutorialStep === 5
                       ? void closeTutorial()
-                      : openAi({ kind: 'company', id: companyNode.id })
+                      : openAi({
+                          kind: 'company',
+                          id: companyNode.id,
+                          label: companyNode.label,
+                          mapContext: { ...eventContext, url: `/?${params}` },
+                        })
                   }
                   tutorialAi={tutorialOpen && tutorialStep === 5}
                   tutorialSaving={tutorialSaving}
@@ -1104,17 +1150,27 @@ function MapWorkspace({
                   }
                 />
               )}
-              {eventId && !pathFrom && (
-                <EventDetailPanel
-                  key={eventId}
-                  id={eventId}
-                  context={eventContext}
-                  geography={selectedNode?.geography ?? null}
-                  logoOf={logoOf}
-                  onClose={() => selectNode(null)}
-                  onAction={eventAction}
-                />
-              )}
+              {eventId &&
+                !pathFrom &&
+                (round ? (
+                  <BriefingRoundIssuePanel
+                    key={`${round}:${eventId}`}
+                    roundId={round}
+                    eventId={eventId}
+                    graphVersion={data?.metadata.graphVersion ?? null}
+                    onClose={() => selectNode(null)}
+                  />
+                ) : (
+                  <EventDetailPanel
+                    key={eventId}
+                    id={eventId}
+                    context={eventContext}
+                    geography={selectedNode?.geography ?? null}
+                    logoOf={logoOf}
+                    onClose={() => selectNode(null)}
+                    onAction={eventAction}
+                  />
+                ))}
               {edgeId && !pathFrom && (
                 <RelationDetailPanel
                   key={edgeId}
@@ -1156,14 +1212,16 @@ function MapWorkspace({
                 {loading && <p>선택한 그래프 조회 중…</p>}
                 {error && (
                   <p>
-                    조회 실패: {error}
+                    {unavailableReason ? error : `조회 실패: ${error}`}
                     {data && ' 직전 정상 그래프를 표시합니다.'}{' '}
-                    <button
-                      data-tutorial-action="retry"
-                      onClick={() => setRetry((v) => v + 1)}
-                    >
-                      다시 시도
-                    </button>
+                    {unavailableReason !== 'snapshot_not_recorded' && (
+                      <button
+                        data-tutorial-action="retry"
+                        onClick={() => setRetry((v) => v + 1)}
+                      >
+                        다시 시도
+                      </button>
+                    )}
                   </p>
                 )}
                 {loginNeeded && (
@@ -1213,7 +1271,7 @@ function MapWorkspace({
               </div>
             )}
           </div>
-          <AiChatDrawer />
+          <AiChatDrawer onViewOnMap={viewAnswerTarget} />
           <EvidenceDrawer
             onTutorialSkip={
               tutorialOpen && tutorialStep && tutorialStep < 5

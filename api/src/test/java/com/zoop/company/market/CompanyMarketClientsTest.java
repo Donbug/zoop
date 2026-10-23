@@ -42,7 +42,10 @@ class CompanyMarketClientsTest {
     private volatile boolean fridayOpen;
     /** The KR calendar stub answers for another day than the one asked (a provider format failure). */
     private volatile boolean calendarDateMismatch;
+    /** The KR calendar stub's previous business day has no regular-session end (a provider format failure). */
+    private volatile boolean calendarPreviousWithoutEnd;
     private final List<String> candleQueries = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final List<String> calendarQueries = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     @BeforeEach
     void startProviderStub() throws IOException {
@@ -57,6 +60,7 @@ class CompanyMarketClientsTest {
             if (path.equals("/api/v1/candles") && rateLimitOnce) { rateLimitOnce = false; status = 429; }
             String rawQuery = exchange.getRequestURI().getRawQuery();
             if (path.equals("/api/v1/candles")) candleQueries.add(rawQuery);
+            if (path.startsWith("/api/v1/market-calendar/")) calendarQueries.add(path + "?" + rawQuery);
             String body = response(path, rawQuery);
             byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -334,6 +338,46 @@ class CompanyMarketClientsTest {
     }
 
     @Test
+    void onlyAPastDaysCalendarIsKept() {
+        var client = tossClient("test-client", "test-secret");
+        // 10-15 is before today (the clock's 10-16 KST): read once, then kept.
+        for (int i = 0; i < 2; i++) client.prices("KRX:005930", "KRX", "005930", "1d", null,
+                java.time.Instant.parse("2026-10-15T03:00:00Z").plusNanos(1));
+        assertEquals(1, calendarQueries.stream().filter(q -> q.contains("date=2026-10-15")).count());
+
+        // Today can still gain an early close or a holiday, and a later day is not settled either: read every time.
+        for (int i = 0; i < 2; i++) client.prices("KRX:005930", "KRX", "005930", "1d", null, null);
+        assertEquals(2, calendarQueries.stream().filter(q -> q.contains("date=2026-10-16")).count());
+        for (int i = 0; i < 2; i++) client.prices("KRX:005930", "KRX", "005930", "1d", null,
+                java.time.Instant.parse("2026-10-18T00:00:00Z"));
+        assertEquals(2, calendarQueries.stream().filter(q -> q.contains("date=2026-10-18")).count());
+    }
+
+    @Test
+    void aCalendarFormatFailureIsNotKept() {
+        var client = tossClient("test-client", "test-secret");
+        var to = java.time.Instant.parse("2026-10-15T03:00:00Z").plusNanos(1);
+        calendarDateMismatch = true;
+        assertThrows(MarketDataException.class, () -> client.prices("KRX:005930", "KRX", "005930", "1d", null, to));
+        calendarDateMismatch = false;
+        assertEquals("2026-10-15", client.prices("KRX:005930", "KRX", "005930", "1d", null, to).range().sessionDate());
+        assertEquals(2, calendarQueries.stream().filter(q -> q.contains("date=2026-10-15")).count());
+    }
+
+    @Test
+    void aPastCalendarWithABadSessionIsNotKept() {
+        var client = tossClient("test-client", "test-secret");
+        var to = java.time.Instant.parse("2026-10-15T03:00:00Z").plusNanos(1);
+        calendarPreviousWithoutEnd = true;
+        // 10-15 is open at to, so the bad previous day is not read for the answer, but the calendar is not kept either.
+        assertEquals("2026-10-15", client.prices("KRX:005930", "KRX", "005930", "1d", null, to).range().sessionDate());
+        calendarPreviousWithoutEnd = false;
+        client.prices("KRX:005930", "KRX", "005930", "1d", null, to);
+        client.prices("KRX:005930", "KRX", "005930", "1d", null, to);
+        assertEquals(2, calendarQueries.stream().filter(q -> q.contains("date=2026-10-15")).count());
+    }
+
+    @Test
     void aCalendarAnsweringForAnotherDayIsAFormatFailureNotAHoliday() {
         calendarDateMismatch = true;
         var error = assertThrows(MarketDataException.class, () -> tossClient("test-client", "test-secret")
@@ -446,7 +490,9 @@ class CompanyMarketClientsTest {
                 """;
         boolean open = date.equals("2026-10-15") || (date.equals("2026-10-16") && fridayOpen);
         String previous = date.equals("2026-10-15") ? "2026-10-14" : fridayOpen && !date.equals("2026-10-16") ? "2026-10-16" : "2026-10-15";
-        return "{\"result\":{\"today\":" + krDay(calendarDateMismatch ? "2026-10-19" : date, open) + ",\"previousBusinessDay\":" + krDay(previous, true)
+        String previousDay = calendarPreviousWithoutEnd ? krDay(previous, true).replaceAll(",\"endTime\":\"[^\"]*\"", "")
+                : krDay(previous, true);
+        return "{\"result\":{\"today\":" + krDay(calendarDateMismatch ? "2026-10-19" : date, open) + ",\"previousBusinessDay\":" + previousDay
                 + ",\"nextBusinessDay\":" + krDay("2026-10-19", true) + "}}";
     }
 

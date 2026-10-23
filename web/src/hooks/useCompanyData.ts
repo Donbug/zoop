@@ -49,7 +49,11 @@ export function useCompanyData(
         quote: getCompanyQuote(companyId),
         metrics: getCompanyMetrics(companyId),
         prices: getCompanyPrices(companyId),
-        documents: getCompanyDocuments(companyId),
+        documents: getCompanyDocuments(companyId, {
+          round,
+          graphVersion,
+          asOf,
+        }),
         holding: token
           ? getPortfolio().then(
               (portfolio) =>

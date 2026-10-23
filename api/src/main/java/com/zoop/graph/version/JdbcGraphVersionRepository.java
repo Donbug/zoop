@@ -3,9 +3,15 @@ package com.zoop.graph.version;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import com.zoop.common.exception.CustomException;
+import com.zoop.common.exception.ErrorCode;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -21,9 +27,11 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
             """;
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final Clock clock;
 
-    public JdbcGraphVersionRepository(NamedParameterJdbcTemplate jdbc) {
+    public JdbcGraphVersionRepository(NamedParameterJdbcTemplate jdbc, Clock clock) {
         this.jdbc = jdbc;
+        this.clock = clock;
     }
 
     @Override
@@ -116,7 +124,7 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
                 VALUES (:id, (SELECT COALESCE(MAX(sequence), 0) + 1 FROM graph_versions), :kind, :at, :at, 'system',
                     :reason, :label, :issues, :relations, :articles, :artifactId, 0, false)
                 """, p);
-        activateLocked(version.id(), "seed", reason, at);
+        activateLocked(version.id(), "seed", null, "system", reason, at);
         return RegisterOutcome.REGISTERED;
     }
 
@@ -125,10 +133,39 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
     public void activateSystem(String versionId, String reason, Instant at) {
         jdbc.getJdbcTemplate().execute("SELECT pg_advisory_xact_lock(" + PUBLICATION_LOCK + ")");
         if (find(versionId).isEmpty()) throw new IllegalArgumentException("Unknown graph version " + versionId);
-        activateLocked(versionId, "activate", reason, at);
+        activateLocked(versionId, "activate", null, "system", reason, at);
     }
 
-    private void activateLocked(String versionId, String action, String reason, Instant at) {
+    /**
+     * Moves the pointer for an administrator under the publication lock. When the current pointer is not
+     * {@code expectedActiveVersionId} (null: none active) another change won the race: 409. The caller's current-eligibility
+     * checks then run inside the lock and the same transaction: {@code publishable} runs the slow, time-independent part and
+     * returns the part that depends on time. The activation time is read only after the slow part, that last part judges the
+     * version at exactly that time (a grant expiring meanwhile is refused), and the same time stamps the history, the first
+     * {@code published_at} and the caller's audit. Either part throws to keep the old pointer. So a later asOf never selects a
+     * version before it was really public. Unknown ids are the caller's 404.
+     */
+    @Transactional
+    public Activation activateByAdmin(String versionId, String expectedActiveVersionId, String adminId,
+            String adminEmail, String reason, Supplier<Consumer<Instant>> publishable) {
+        jdbc.getJdbcTemplate().execute("SELECT pg_advisory_xact_lock(" + PUBLICATION_LOCK + ")");
+        if (find(versionId).isEmpty()) throw new IllegalArgumentException("Unknown graph version " + versionId);
+        if (!Objects.equals(expectedActiveVersionId, active().map(GraphVersionRecord::id).orElse(null))) {
+            throw new CustomException(ErrorCode.REVISION_CONFLICT);
+        }
+        Consumer<Instant> atActivation = publishable.get();
+        Instant at = clock.instant();
+        atActivation.accept(at);
+        Activation activation = activateLocked(versionId, "activate", adminId, adminEmail, reason, at);
+        if (activation.pointerChanged()) {
+            jdbc.update("UPDATE graph_versions SET published_at = :at WHERE id = :id AND published_at IS NULL",
+                    new MapSqlParameterSource("id", versionId).addValue("at", Timestamp.from(at)));
+        }
+        return activation;
+    }
+
+    private Activation activateLocked(String versionId, String action, String adminId, String adminEmail,
+            String reason, Instant at) {
         String previous = active().map(GraphVersionRecord::id).orElse(null);
         boolean changed = !versionId.equals(previous);
         if (changed) {
@@ -138,10 +175,12 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
         jdbc.update("""
                 INSERT INTO graph_activations (version_id, previous_version_id, action, actor_kind, pointer_changed,
                     admin_id, admin_email_snapshot, reason, activated_at)
-                VALUES (:id, :previous, :action, 'system', :changed, NULL, 'system', :reason, :at)
+                VALUES (:id, :previous, :action, :actorKind, :changed, :adminId, :email, :reason, :at)
                 """, new MapSqlParameterSource().addValue("id", versionId).addValue("previous", previous)
-                .addValue("action", action).addValue("changed", changed).addValue("reason", reason)
-                .addValue("at", Timestamp.from(at)));
+                .addValue("action", action).addValue("actorKind", adminId == null ? "system" : "admin")
+                .addValue("changed", changed).addValue("adminId", adminId).addValue("email", adminEmail)
+                .addValue("reason", reason).addValue("at", Timestamp.from(at)));
+        return new Activation(previous, changed, at);
     }
 
     private static GraphVersionRecord row(ResultSet rs, int rowNumber) throws SQLException {
@@ -155,6 +194,8 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
     }
 
     public enum RegisterOutcome { REGISTERED, UNCHANGED }
+
+    public record Activation(String previousVersionId, boolean pointerChanged, Instant activatedAt) { }
 
     public record NewGraphVersion(String id, String kind, String sourceLabel, String snapshotArtifactId,
             String snapshotStorageUri, String snapshotSha256, long snapshotBytes, long issueCount, long relationCount,

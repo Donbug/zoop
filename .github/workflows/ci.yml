@@ -1,15 +1,19 @@
 name: CI
+
 on:
   push:
     branches: [main]
   pull_request:
     types: [opened, synchronize, reopened, edited, ready_for_review]
   workflow_dispatch:
+
 permissions:
   contents: read
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   public-config:
     name: public-config
@@ -37,6 +41,7 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: python scripts/repo_checks.py pr-title
+
   web:
     name: web
     runs-on: ubuntu-24.04
@@ -54,6 +59,7 @@ jobs:
           run_install: false
           package_json_file: prototype/web/package.json
       - run: make web-install web-typecheck web-test web-build
+
   app-web:
     name: app-web
     runs-on: ubuntu-24.04
@@ -72,6 +78,7 @@ jobs:
           package_json_file: web/package.json
       - name: Production web (root web/) frozen install, lint, format check, build and Vitest
         run: make app-web-install app-web-lint app-web-format-check app-web-build app-web-test
+
   bff:
     name: bff
     runs-on: ubuntu-24.04
@@ -133,6 +140,7 @@ jobs:
           package_json_file: prototype/web/package.json
       - name: Check BFF-generated web type drift without a running server
         run: make web-install bff-types-check
+
   ai-pipeline:
     name: ai-pipeline
     runs-on: ubuntu-24.04
@@ -151,6 +159,7 @@ jobs:
         run: make pipeline-install
       - name: Offline pipeline tests and actual CLI smokes (native replay only, investmate is not installed; no model token, provider call or real state)
         run: make pipeline-test pipeline-smoke
+
   ai-worker:
     name: ai-worker
     runs-on: ubuntu-24.04
@@ -173,6 +182,7 @@ jobs:
         run: make evaluation-verification-check
       - name: Validate portable authored contract fixture
         run: python ai/worker/scripts/validate_contracts.py
+
   ai-service:
     name: ai-service
     runs-on: ubuntu-24.04
@@ -191,6 +201,22 @@ jobs:
         run: make service-install
       - name: Offline service tests, real loopback smoke and internal OpenAPI drift (no model token, external network or real state)
         run: make service-test service-smoke service-openapi-check
+
+  api-container:
+    name: api-container
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Build API container without AWS credentials
+        run: |
+          docker build \
+            --file api/Dockerfile \
+            --tag "zoop-api:ci-${GITHUB_SHA}" \
+            api
+
   api:
     name: api
     runs-on: ubuntu-24.04
@@ -256,6 +282,9 @@ jobs:
         run: make service-install
       - name: Real Java client -> ai/service -> zoop-ai replay gate (synthetic in-memory credentials, no model call, no PostgreSQL)
         run: make api-ai-smoke
+
+
+
       - name: Bootstrap the ai/pipeline runtime for the graph handoff import smoke (public dependencies, no token)
         run: make pipeline-install
       - name: Create a dedicated empty database for the graph handoff import smoke (the shared test database is never reused)
@@ -274,7 +303,16 @@ jobs:
   required-ci:
     name: required-ci
     if: always()
-    needs: [public-config, web, app-web, bff, ai-pipeline, ai-worker, ai-service, api]
+    needs:
+      - public-config
+      - web
+      - app-web
+      - bff
+      - ai-pipeline
+      - ai-worker
+      - ai-service
+      - api-container
+      - api
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
@@ -287,6 +325,7 @@ jobs:
           AI_PIPELINE_RESULT: ${{ needs.ai-pipeline.result }}
           AI_RESULT: ${{ needs.ai-worker.result }}
           AI_SERVICE_RESULT: ${{ needs.ai-service.result }}
+          API_CONTAINER_RESULT: ${{ needs.api-container.result }}
           API_RESULT: ${{ needs.api.result }}
         run: |
           test "$PUBLIC_RESULT" = success
@@ -296,4 +335,5 @@ jobs:
           test "$AI_PIPELINE_RESULT" = success
           test "$AI_RESULT" = success
           test "$AI_SERVICE_RESULT" = success
+          test "$API_CONTAINER_RESULT" = success
           test "$API_RESULT" = success
