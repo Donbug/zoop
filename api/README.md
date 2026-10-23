@@ -217,6 +217,7 @@ Swagger `/v3/api-docs`의 위 5개 operation과 목표 정본 [`docs/api/openapi
 
 | 시작할 작업 | 안내 |
 |---|---|
+| 키 없이 저장된 10/21 퇴근·10/22 출퇴근 3회차를 API·화면에서 보기 | [팀원용 재생 실행](docs/BRIEFING_TEAM_DEMO.md): 저장 결과 포함, 임시 Docker DB, AI·시세 재호출 없음 |
 | DB·권한·공개 HTTP·합성 자료로 프론트 연결 | [BRIEFING_READ](docs/BRIEFING_READ.md) |
 | 실제 수집부터 한 회차 생성·검증·DB·지도 실행 | [BRIEFING_LOCAL_ROUND](docs/BRIEFING_LOCAL_ROUND.md) |
 | 지정 출퇴근 회차를 시간순으로 재생 | [BRIEFING_ROUND_SERIES](docs/BRIEFING_ROUND_SERIES.md) |
