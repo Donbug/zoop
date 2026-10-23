@@ -22,6 +22,7 @@ from .summary_verification import (
     DEFAULT_SUMMARY_CORPUS, describe_summary, load_summary_corpus, parse_summary_run,
     render_summary_score, score_summary_run, write_summary_controls,
 )
+from .materials import DEFAULT_MATERIALS, DATASETS, canonical as material_json, convert_materials
 
 
 def _emit(document: dict[str, Any], fmt: str, renderer, out: Path | None) -> None:
@@ -58,8 +59,15 @@ def _validate(args) -> dict[str, Any]:
     }
 
 
+class _MaterialArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise Rejected("materials_arguments", "invalid material command arguments")
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="zoop_eval", description="Deterministic offline scoring of recorded outputs against authored gold. Makes no model, network or database calls.")
+    argv = list(sys.argv[1:] if argv is None else argv)
+    parser_type = _MaterialArgumentParser if argv and argv[0].startswith("materials-") else argparse.ArgumentParser
+    parser = parser_type(prog="zoop_eval", description="Deterministic offline scoring of recorded outputs against authored gold. Makes no model, network or database calls.")
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("validate", "controls", "score", "compare"):
         p = sub.add_parser(name)
@@ -92,9 +100,17 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--format", choices=("json", "text"), default="json")
             p.add_argument("--out", type=Path)
             p.add_argument("run", help="captured zoop-summary-verify-run-1 file")
-    args = parser.parse_args(argv)
+    for name in ("materials-validate", "materials-inputs", "materials-gold"):
+        p = sub.add_parser(name, help="read-only development material conversion, not scoring")
+        p.add_argument("--materials", type=Path, default=DEFAULT_MATERIALS)
+        if name != "materials-validate":
+            p.add_argument("--dataset", choices=DATASETS, required=True)
     try:
-        if args.command == "summary-verify-validate":
+        args = parser.parse_args(argv)
+        if args.command.startswith("materials-"):
+            document = convert_materials(args.command, args.materials, getattr(args, "dataset", None))
+            print(material_json(document))
+        elif args.command == "summary-verify-validate":
             print(json.dumps(describe_summary(load_summary_corpus(args.corpus)), indent=1, ensure_ascii=False))
         elif args.command == "summary-verify-controls":
             paths = write_summary_controls(load_summary_corpus(args.corpus), args.out_dir)

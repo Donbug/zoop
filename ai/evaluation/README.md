@@ -6,9 +6,39 @@
 
 [`corpus/external-pilot-v1/manifest.json`](corpus/external-pilot-v1/manifest.json)에 KLUE RE train 첫 20행과 TAT-QA 공식 dev 첫 5개 context·30개 질문의 출처·권리·원본 식별·파일 해시를 기록했다. 입력/gold 네 파일을 분리해 저장했고 해시·크기·고유 ID·KLUE entity span 40개·원래 annotation 복원 일치·입력의 gold annotation 키 부재를 확인했다. 번역·모델 호출은 없었다.
 
-이 자료는 **원자료 순서로 선택해 이미 열람한 개발용 표본**이며 대표 표본이나 held-out test가 아니다. KLUE row 응답과 관측한 HF revision의 결합은 미검증이다. 기존 `zoop_eval`은 이 외부 형식을 받지 않으며 adapter·채점 연결도 아직 구현하지 않았다. 아래 명령에 이 파일들을 바로 넣어 채점하지 않는다.
+이 자료는 **원자료 순서로 선택해 이미 열람한 개발용 표본**이며 대표 표본이나 held-out test가 아니다. KLUE row 응답과 관측한 HF revision의 결합은 미검증이다. `materials-*`는 이 두 자료를 읽기 전용으로 검증·정규화하는 adapter다. 모델 runner나 채점 연결은 아니다. 기존 `score`·`verify-score`·`summary-verify-score`는 원자료와 새 material artifact 모두 받지 않으며 0점으로 대신 처리하지 않는다.
 
-한국어 실제 공시의 사람 합의 gold를 주 평가로 삼고 영어 QA는 별도 보조 평가로 둔다. 자료 후보·권리 조건, G/R/A/J 트랙, B0–B4 대조군, `gpt-6-luna High`·`jev-1.14.0` 고정, dev/test 동결과 실행 순서는 [설계 문서의 실제 자료·gold 제작 프로토콜](../../docs/design/ai-benchmark.md#실제-자료와-gold-제작-프로토콜)을 따른다. 다음 순서는 **자료 intake → 두 사람의 독립 라벨링·합의 → adapter → 무모델 검색·고정 순회 → 제한된 live 승인 → 동결 실행·보고**다. 현재 수집 완료를 한국어 gold 확보나 모델 품질 측정 완료로 표시하지 않는다.
+한국어 실제 공시의 사람 합의 gold를 주 평가로 삼고 영어 QA는 별도 보조 평가로 둔다. 자료 후보·권리 조건, G/R/A/J 트랙, B0–B4 대조군, `gpt-6-luna High`·`jev-1.14.0` 고정, dev/test 동결과 실행 순서는 [설계 문서의 실제 자료·gold 제작 프로토콜](../../docs/design/ai-benchmark.md#실제-자료와-gold-제작-프로토콜)을 따른다. 공개 표본의 material 변환과 별개로 **한국어 공시 수집 승인·사람 합의 gold·외부 자료 전용 run/채점 계약·무모델 검색/고정 순회 baseline·제한된 live 승인·동결 실행**이 남아 있다. material 변환 구현을 전체 벤치마크 완성이나 모델 품질 측정으로 표시하지 않는다.
+
+### 읽기 전용 material 명령
+
+`ai/evaluation`에서 실행한다. `--materials` 기본값은 `corpus/external-pilot-v1`이며 출력은 stdout JSON뿐이다. 파일을 생성하지 않고 네트워크·모델·provider·애플리케이션 환경 설정이나 `.env`를 읽지 않는다. `-B`는 Python의 bytecode 파일 생성을 막는다.
+
+```bash
+python3 -B -m zoop_eval materials-validate
+python3 -B -m zoop_eval materials-inputs --dataset klue-re
+python3 -B -m zoop_eval materials-inputs --dataset tatqa
+python3 -B -m zoop_eval materials-gold --dataset klue-re
+python3 -B -m zoop_eval materials-gold --dataset tatqa
+python3 -B -m unittest discover -s tests -p 'test_materials.py'
+python3 -B scripts/materials_smoke.py
+```
+
+| 명령·출력 schema | 확인하는 범위 |
+|---|---|
+| `materials-validate` · `zoop-eval-material-validation-1` | manifest의 파일·역할·SHA256·바이트 크기, 두 자료의 입력/gold 구조와 정확한 ID 대응을 모두 확인한다. KLUE 행/구간 수와 TAT-QA context/질문 수를 보고한다. |
+| `materials-inputs` · `zoop-eval-material-inputs-1` | manifest와 **선택한 입력 파일만** 읽는다. gold의 존재·접근 가능 여부를 요구하지 않고 기존 기본 corpus의 gold도 열지 않는다. `validationScope=manifest-and-selected-input-only`이며 전체 gold 검증으로 표시하지 않는다. |
+| `materials-gold` · `zoop-eval-material-gold-1` | 선택한 입력과 gold의 구조·ID·context closure를 확인한다. `inputsSha256`은 정확히 같은 `materials-inputs` JSON 바이트에 묶인다. |
+
+세 schema의 닫힌 필드 정의는 `zoop_eval/contracts.py`에 있다. canonical JSON은 키 정렬·공백 없는 UTF-8이며 배열은 원자료 순서를 유지한다. `inputsSha256`은 stdout 마지막 LF를 제외한 전체 입력 artifact의 SHA256이다. 원본 파일 해시와는 다르며 출처 metadata도 binding에 포함한다. JSON 숫자는 `Decimal`로 읽어 이진 부동소수점 반올림 없이 내보내고, 음수·소수 정밀도·원래 단위를 유지한다.
+
+- **KLUE:** guid·문장·source·entity 문자열/유형을 보존한다. 원문 substring을 확인한 뒤 inclusive 좌표를 `unit=unicode-codepoint`, `endExclusive=true`인 반열린 구간으로 바꾼다. `choices`는 코드에 고정한 공개 30개 label vocabulary이며 gold에서 읽어 만들지 않는다. gold는 원래 숫자 `labelId`와 같은 공개 label을 함께 낸다. S3의 다섯 predicate로 매핑하지 않는다.
+- **TAT-QA:** table UID·셀 문자열·paragraph UID/order/text를 context에 두고 question UID/order/text가 `contextId`로 참조한다. 입력에는 answer/type/from/derivation/scale/support annotation 키를 허용하지 않는다. 본문·표에 원래 있는 답 단어나 숫자는 정상 입력이다. gold의 `rel_paragraphs` 문자열 순서를 해당 context의 안정된 paragraph UID로 연결해 `paragraphIds`에 담고 원래 annotation도 보존한다. table-cell 정답은 만들지 않는다. 문자열 annotation은 upstream 값 그대로 유지하며 null·빈 값·빈 answer 문자열을 추론해서 채우지 않는다.
+- 파일은 정해진 네 basename으로 한정하고 symlink·비정규 파일·8 MiB 초과 파일·경로 이탈·역할 교환을 거부한다. 중복 JSON 키·비유한 상수·정수 자리에 온 bool·중복/고아 ID·잘못된 span/label·추가 annotation 키·해시/크기 불일치도 전체 거부한다. 성공은 0, 거부는 2이며 원문이나 비공개 경로를 오류 메시지에 넣지 않는다.
+- 출력은 원저자·URL·라이선스·변경 내역·원본/로컬 해시와 `development-intake` 상태를 보존한다. manifest의 `collectionExecution`은 수집 당시 기록이므로 `adapterOrScorerImplemented=false`를 현재 adapter 상태로 해석하지 않는다. upstream annotation은 Zoop 사람 합의 gold가 아니다. 해시 일치는 출판자 진위·법적 이용 가능성·외부 모델 전송 승인을 증명하지 않는다.
+
+smoke는 실제 저장 자료와 임시 디렉터리의 잘못된 fixture를 실제 CLI로 처리한다. 성공 시 관측한 20행·30문항과 검증 범위를 출력하며 정확도를 내지 않는다. command seam의 audit는 gold 접근·네트워크·자식 프로세스·파일 쓰기와 애플리케이션 환경 조회를 감시한다. Python 시작/import와 argparse의 locale·화면 크기 조회까지 환경 읽기 0으로 주장하지 않는다. 시험 fixture 변경은 임시 디렉터리에만 한정된다.
+
 
 ## 명령
 

@@ -9,7 +9,7 @@
 - 기존 합성 corpus의 gold는 **단일 작성자 초안**이며 두 사람의 독립 라벨링·합의(adjudication)를 거치지 않았다(`adjudicated=false`, `annotators=1`). 여기서 나온 점수는 실제 데이터에 대한 정확도 주장이 아니다. 별도로 수집한 공개 자료의 원래 annotation은 아래 “실제 자료와 gold 제작 프로토콜”에서 구분한다.
 - 자유 서술 답변의 의미 품질은 정확 일치로 판정할 수 없다. 사람 또는 모델 평가가 필요하며 이 하네스는 그 지표를 만들지 않는다(`freeText.status = human_or_model_evaluation_required`).
 - **2026-10-22 추가:** 본개발 `verify-issue-summary`의 요청·원문 응답·판정을 기록하고 독립 채점하는 네이티브 다리를 연결했다. 한국어 합성 24개 사례·30개 주장, 실제 로컬 HTTP 대조군, 중단 복구와 변조 거부를 검증했다. 실제 Jev 품질·생성 품질·전체 RAG 성능·임곗값 보정 결과는 아니다.
-- **외부 자료 수집:** KLUE RE 20행과 TAT-QA 5개 context·30개 질문을 입력/gold로 분리해 로컬에 저장했다. 개발용 형식 점검 자료이며 대표 표본·held-out test가 아니다. 기존 `zoop_eval`은 이 외부 형식을 받지 않고 adapter도 구현하지 않았다.
+- **외부 자료 변환:** KLUE RE 20행과 TAT-QA 5개 context·30개 질문의 입력/gold를 분리한 개발용 자료를 저장했고, `materials-validate`·`materials-inputs`·`materials-gold` 읽기 전용 adapter를 구현했다. 대표 표본·held-out test가 아니며 모델 실행·외부 자료 채점·전체 benchmark는 이 변환의 범위가 아니다.
 
 ## 실행 명령
 
@@ -207,7 +207,7 @@ S3 관계 생산 계약(`relation_contracts.MAX_PATH=2`)은 **관계 후보로 �
 1. **독립 작성**: 두 사람이 corpus와 시스템에 보이는 task를 읽고 서로의 라벨과 시스템 출력을 보지 않은 상태에서 entity 링크·사건·병합·방향/기간·질문 답·근거를 각각 작성한다.
 2. **불일치 합의**: 불일치 항목을 목록화하고 제3자 또는 합의 회의에서 결정한다. 합의가 안 된 항목은 모호함을 기록하고 `UNDECIDABLE`/`null`/abstain 등 해당 계약으로 표현한다. 결정 가능한 항목의 정확도와 모호한 항목의 안전한 보류를 구분한다.
 3. **평가자 분리**: Jev는 평가 대상인 운영 검증기다. Jev가 자기 평가에 쓸 gold를 결정하게 하지 않는다. 모델의 보조 제안이나 문서 일관성 검토를 사람의 독립 라벨링·합의로 표시하지 않는다.
-4. **동결**: 입력과 gold revision·digest, 작성자 수, 합의 여부, 불일치율·해결 근거를 기록한다. 기존 형식은 `validate`의 `goldSha256`을 사용한다. 새 외부 형식의 검증·변환은 adapter 구현 범위이며 현재 지원하는 것처럼 실행하지 않는다.
+4. **동결**: 입력과 gold revision·digest, 작성자 수, 합의 여부, 불일치율·해결 근거를 기록한다. 기존 형식은 `validate`의 `goldSha256`을 사용한다. 수집된 KLUE/TAT-QA는 아래 `materials-*`로 구조·무결성을 확인하고 `inputsSha256`으로 정규화 입력에 gold를 묶을 수 있다. 이 binding을 사람 합의나 scorer 연동으로 해석하지 않는다.
 5. **규모와 상태**: 기존 합성 corpus는 여전히 `annotators=1, adjudicated=false`다. 거버넌스 문서 [`ZOOP_AI_거버넌스_정책.md`](../ZOOP_AI_거버넌스_정책.md) 11절의 일반 유형 20건 이상·복잡/예외 40건 이상은 제안이며, 아래 실제 자료 계획이나 의미 품질의 승인 임곗값을 대신하지 않는다.
 
 ## 실제 자료와 gold 제작 프로토콜
@@ -221,7 +221,31 @@ S3 관계 생산 계약(`relation_contracts.MAX_PATH=2`)은 **관계 후보로 �
 - **KLUE RE:** HF train의 첫 20행이다. 고유 행 20개와 원래 inclusive 좌표의 entity span 40개가 일치했다. 관측한 HF metadata revision은 `349481ec73fff722f88e0453ca05c77a447d967c`이나 row 응답과 이 revision의 결합은 **미검증**이다. 로컬 해시는 저장 표본을 고정할 뿐 공식 배포본과의 동일성을 증명하지 않는다.
 - **TAT-QA:** 공식 dev 파일의 첫 5개 context, 고유 질문 30개다. reader가 생략한 마지막 LF 하나를 복원한 원본은 1,637,431바이트이며 Git blob `48075c812af3fe6698b1d5cb50d9dbf358d52784`와 일치했다.
 - **수집 무결성 확인:** 네 파일의 저장 해시·크기, 고유 ID, KLUE 좌표를 확인했다. 입력과 gold를 합치면 선택한 원래 행/질문과 정확히 같고, 시스템에 보이는 입력의 gold annotation 키는 0개였다. 이는 수집·분리 확인이지 기존 scorer로 채점한 결과가 아니다.
-- **사용 한계:** 원자료 순서로 고른 표본이며 무작위·균형·대표 표본이 아니다. 이미 열람한 개발용 자료이므로 held-out test로 승격하지 않는다. 기존 `zoop_eval` 명령은 이 외부 형식을 받지 않으며 adapter·채점 연결은 미구현이다.
+- **사용 한계:** 원자료 순서로 고른 표본이며 무작위·균형·대표 표본이 아니다. 이미 열람한 개발용 자료이므로 held-out test로 승격하지 않는다. `materials-*`는 자료 변환만 지원한다. 기존 `score`·`verify-score`·`summary-verify-score`는 원자료와 `zoop-eval-material-{inputs,gold,validation}-1`을 받지 않는다. 외부 자료 전용 run/채점 계약과 B1–B4 실행 연결은 별도 작업이다.
+
+### Material adapter의 계약과 확인 범위
+
+```bash
+cd ai/evaluation
+python3 -B -m zoop_eval materials-validate
+python3 -B -m zoop_eval materials-inputs --dataset klue-re
+python3 -B -m zoop_eval materials-inputs --dataset tatqa
+python3 -B -m zoop_eval materials-gold --dataset klue-re
+python3 -B -m zoop_eval materials-gold --dataset tatqa
+python3 -B -m unittest discover -s tests -p 'test_materials.py'
+python3 -B scripts/materials_smoke.py
+```
+
+기본 `--materials`는 `corpus/external-pilot-v1`이다. 세 명령은 stdout JSON만 출력하며 파일·네트워크·모델·provider 상태를 쓰거나 애플리케이션 환경/`.env`를 읽지 않는다. 성공은 종료 코드 0, 구조·무결성 거부는 기존 `Rejected` JSON과 종료 코드 2이며 부분 성공을 내지 않는다. 파일 역할·허용 basename·8 MiB 상한·regular file·SHA256·바이트 크기를 확인하고, symlink·경로 이탈·중복 JSON 키·비유한 상수·정수 자리에 온 bool·추가 annotation 키를 거부한다.
+
+`materials-inputs`는 manifest와 선택한 입력만 열고 gold의 존재를 요구하지 않는다. `validationScope=manifest-and-selected-input-only`를 그대로 내므로 gold 검증과 혼동하지 않는다. `materials-gold`는 선택한 자료의 입력과 gold를 열어 정확한 ID/context 대응까지 확인한다. `materials-validate`만 네 파일 모두를 검사한다. schema별 닫힌 필드 정의는 `ai/evaluation/zoop_eval/contracts.py`에 있다.
+
+- **KLUE 입력/정답:** guid·문장·source·entity 문자열/유형을 보존한다. substring을 먼저 확인하고 inclusive 좌표를 Unicode code point 기준 `[start,end)`로 바꾼다. 모델 선택지는 공개 30개 label을 코드에 고정해 gold 읽기와 분리했다. 정답은 원래 숫자 ID와 공개 label을 함께 보존하며 S3의 다섯 predicate로 바꾸지 않는다.
+- **TAT-QA 입력/정답:** table UID/셀과 paragraph UID/order/text를 context로 유지하고 question UID/order/text가 이를 참조한다. 입력에서 정답·유형·출처·식·scale·support annotation 키를 배제하되 원래 문맥의 단어·숫자는 지우지 않는다. gold는 `answer`, `answer_type`, `answer_from`, `scale`, `derivation`, `req_comparison`, `rel_paragraphs`를 보존하고 paragraph order를 같은 context의 UID로 연결한다. 빈 값·null·알 수 없는 문자열 annotation을 추정하지 않고 table-cell gold도 만들지 않는다. 숫자는 Decimal로 읽고 내보내 정밀도와 음수·원래 단위를 유지한다. 번역·날짜 보충·식 실행·답 추론은 하지 않는다.
+- **Binding과 출처:** `inputsSha256`은 `materials-inputs`의 키 정렬·공백 없는 UTF-8 JSON 전체(마지막 LF 제외)의 digest이며 원본 파일 SHA256과 구분한다. 배열은 원자료 순서를 유지한다. 원저자·라이선스·URL·수집/변경 provenance·파일 해시와 `development-intake` 상태를 유지한다. manifest의 `collectionExecution`은 수집 당시 기록이지 현재 adapter 구현 상태가 아니다. HF row/revision 결합은 여전히 미검증이고 upstream annotation은 Zoop 사람 합의 gold가 아니다. 해시 일치만으로 출판자 진위·법적 이용권·모델 전송 승인이 생기지 않는다.
+
+smoke는 실제 수집 파일과 임시 invalid fixture를 실제 CLI로 처리하고 성공 시 관측된 20행·30문항과 proof scope를 출력한다. gold 부재/접근 금지, canonical binding, 잘못된 label·paragraph·annotation 거부를 다룬다. audit 범위는 Python import 이후 command seam의 파일 접근·쓰기·네트워크·자식 프로세스·애플리케이션 환경 조회다. Python 시작이나 argparse의 locale·화면 크기 조회까지 환경 읽기 0으로 주장하지 않는다. 이는 자료 변환 확인이지 정확도나 모델 품질 결과가 아니다. 사람 합의 한국어 gold, 무모델 어휘 검색·방향/시점 순회 baseline, 외부 자료 run/채점 연결과 승인된 live 측정은 남아 있다.
+
 
 ### 자료 후보 6종과 권리 경계
 
@@ -305,7 +329,7 @@ dev에서 한 번에 한 요인만 바꾸어 선택한 뒤 모든 설정과 실�
 
 1. **자료 intake:** 수집한 개발용 두 자료의 manifest를 사용하고, 한국어 공시는 키·등록 이용 범위·외부 전송 권리를 확인한 뒤 수집한다.
 2. **사람 gold:** 사건 그룹별 split과 실제 근거 경로를 정하고 두 사람의 독립 라벨링·합의를 마친다. 공개 annotation의 복사를 Zoop 한국어 gold 합의로 간주하지 않는다.
-3. **Adapter:** 외부 형식의 입력/gold 분리·ID·인용 좌표·단위 보존과 run 변환을 구현한다. 현재 `zoop_eval`에 외부 파일을 바로 넣어 실행하지 않는다.
+3. **Adapter:** 수집된 KLUE/TAT-QA의 읽기 전용 입력/gold 정규화·ID·좌표·단위 보존은 `materials-*`로 제공한다. 외부 실행 기록과 채점 계약은 별도로 구현해야 하며 material artifact를 기존 `score`에 넣지 않는다. 이 변환을 전체 benchmark 완료로 표시하지 않는다.
 4. **오프라인 대조군:** B0 하네스 점검과 무모델 어휘 검색·방향/시점 고정 순회의 기록 경로를 먼저 확인한다. 이는 전체 생성형 B1/B3 품질 평가가 아니다.
 5. **제한된 live 승인:** 대상 자료·전송 권리·모델/버전·endpoint·호출 수·금액 상한을 정해 실행별 승인을 받는다. 기존 설정·키 존재·과거 승인은 새 지출 승인이 아니다.
 6. **동결 실행·보고:** dev 선택을 마친 뒤 승인된 test 캠페인과 계획된 반복만 실행하고, 트랙·언어·실패·비용 출처·표본 한계를 분리해 보고한다. 외부 공개는 별도 승인을 받는다.
