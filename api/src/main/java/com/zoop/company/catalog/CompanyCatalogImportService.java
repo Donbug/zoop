@@ -185,6 +185,9 @@ public class CompanyCatalogImportService {
 
     /** Only the keys the company detail reads (others are rejected); a null value is left out so the API reports it as null. */
     private ObjectNode profile(JsonNode node, String id) {
+        if (node.isNull()) {
+            return mapper.createObjectNode(); // explicit null clears, like market and brand_source
+        }
         if (!node.isObject()) {
             throw new IllegalArgumentException("profile must be an object for " + id);
         }

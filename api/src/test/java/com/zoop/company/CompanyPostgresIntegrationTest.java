@@ -216,6 +216,13 @@ class CompanyPostgresIntegrationTest {
             assertThrows(IllegalArgumentException.class, () -> importer.importFile(bad), profile);
         }
         assertEquals("Keep", jdbc.queryForObject("SELECT name FROM companies WHERE id='NYSE:KEEP'", String.class));
+
+        Path cleared = directory.resolve("cleared.json");
+        Files.writeString(cleared, """
+                {"companies":[{"company_id":"NYSE:KEEP","name":"Keep","ticker":"KEEP","aliases":[],"profile":null}]}
+                """);
+        importer.importFile(cleared);
+        assertEquals("{}", jdbc.queryForObject("SELECT profile::text FROM companies WHERE id='NYSE:KEEP'", String.class));
     }
 
     @Test
