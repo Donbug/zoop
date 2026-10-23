@@ -12,6 +12,11 @@ class PairwiseTest(unittest.TestCase):
   value={'checks':[self.check('A'),self.check('B'),self.check('C')]};e.validate_judgment(value,['A','B','C'])
   del value['checks'][0]['continuity']
   with self.assertRaises(e.base.ReplayError):e.validate_judgment(value,['A','B','C'])
+ def test_three_companies_of_one_story_are_not_three_representative_issues(self):
+  f={'targets':[{'companyId':x,'issueIds':['same-story']} for x in ('A','B','C')]}
+  self.assertEqual(e.representative_cases(f),[])
+  f['targets'][0]['issueIds'].append('second-story');f['targets'][2]['issueIds']=['third-story']
+  cases=e.representative_cases(f);self.assertEqual(len({c['issueId'] for c in cases}),3)
  def test_same_input_hash_ignores_only_output_contract_version(self):
   row={'frozen':{'schemaVersion':'v1','sources':{'a':'actual quote'},'previous':'exact-version'}}
   other={'frozen':{**row['frozen'],'schemaVersion':'v2'}}

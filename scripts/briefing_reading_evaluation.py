@@ -7,6 +7,7 @@ performance or a factual ground-truth label. Original results remain immutable.
 import argparse
 import copy
 import os
+from itertools import combinations, product
 from pathlib import Path
 import briefing_company_reading as reading
 base = reading.base
@@ -17,6 +18,15 @@ def compare_input(row):
     value = copy.deepcopy(row['frozen'])
     value.pop('schemaVersion')
     return value
+
+
+def representative_cases(frozen):
+    targets = sorted(frozen['targets'], key=lambda t: t['companyId'])
+    for chosen in combinations(targets, 3):
+        for issues in product(*(t['issueIds'] for t in chosen)):
+            if len(set(issues)) == 3:
+                return [{'companyId': t['companyId'], 'issueId': issue} for t, issue in zip(chosen, issues)]
+    return []
 
 
 def judge_schema(ids):
@@ -42,7 +52,7 @@ def run(args, transport=None):
     layer = bundle['marketEnrichment']['seriesCompanyReading']
     reading.company.require(layer['schemaVersion'] == reading.SCHEMA_V2, 'evaluation_v2_required')
     rows = [row for row in layer['rounds'] if row['status'] == 'PASS' and
-            (not args.round_id or row['roundId'] == args.round_id) and len(row['draft']['companies']) >= 3]
+            (not args.round_id or row['roundId'] == args.round_id) and len(row['draft']['companies']) >= 3 and representative_cases(row['frozen'])]
     reading.company.require(bool(rows), 'evaluation_three_companies_required')
     improved = rows[0]
     full = next(row for row in bundle['marketEnrichment']['seriesCompanyOutlooks']['rounds'] if row['roundId'] == improved['roundId'])
@@ -71,7 +81,8 @@ def run(args, transport=None):
     legacy = reading.assess(legacy_client, legacy_frozen)
     base.write_once(output / 'legacy.json', base.canonical(legacy))
     reading.company.require(legacy['status'] == 'PASS', 'evaluation_legacy_withheld_not_a_valid_baseline')
-    selected = sorted(c['companyId'] for c in improved['draft']['companies'])[:3]
+    cases = representative_cases(improved['frozen'])
+    selected = [case['companyId'] for case in cases]
     old = {c['companyId']: c for c in legacy['draft']['companies']}
     new = {c['companyId']: c for c in improved['draft']['companies']}
     judge = reading.company.context.legacy.MarketSummaryClient(output, send, args.max_calls, prompt_root=prompts)
@@ -83,7 +94,7 @@ def run(args, transport=None):
         answer = judge.call('company_reading_pairwise', data, 'review.md', 'unused', 6000, judge_schema(selected))
         validate_judgment(answer, selected)
         results.append({'improvedIsA': improved_is_a, 'requestDigest': digest, 'judgment': answer})
-    proof = {'status': 'COMPLETE', 'identity': identity, 'sampleSize': len(selected), 'orderReversed': True,
+    proof = {'status': 'COMPLETE', 'identity': identity, 'sampleSize': len(selected), 'cases': cases, 'orderReversed': True,
              'results': results, 'newPaidCalls': len(legacy_client.new_calls | judge.new_calls),
              'limitation': 'Model comparison of three companies under identical frozen inputs; not human calibration or investment performance.'}
     base.write_once(output / 'comparison.json', base.canonical(proof))
