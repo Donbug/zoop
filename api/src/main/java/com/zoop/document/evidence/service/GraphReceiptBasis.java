@@ -23,18 +23,23 @@ import com.zoop.document.evidence.graph.GraphEvidence.BasisRef;
  * read from the same bytes as the grant pins. For each candidate reference exactly one bundle relation must carry its id and
  * equal its type, source and target, and exactly one of that relation's bases must carry its {@code relationKey}; a missing,
  * duplicated or mismatching relation or basis makes the whole receipt {@link GraphReceiptGrants.Malformed} for this read (fail
- * closed, never "the other candidate was fine"). The evidence is served when at least one such basis lists the id. A receipt whose
- * bundle predates the shape ({@code relations[].basis[].relationKey} and {@code evidenceIds}) fails closed the same way.
+ * closed, never "the other candidate was fine"). {@link #proves} is true when at least one such basis lists the id and false for
+ * a structurally valid receipt whose referenced bases do not (the caller may then try {@link GraphReceiptImpact}); structural
+ * malformation always throws, so it can never hide behind a true answer of the other seam. A receipt whose bundle predates the
+ * shape ({@code relations[].basis[].relationKey} and {@code evidenceIds}) fails closed the same way.
  */
 final class GraphReceiptBasis {
 
     private GraphReceiptBasis() {
     }
 
-    /** @throws GraphReceiptGrants.Malformed unless the receipt proves that a referenced basis cites {@code evidenceId} */
-    static void require(Obj bundle, String evidenceId, List<BasisRef> refs) {
+    /**
+     * @return whether a referenced basis of the receipt cites {@code evidenceId}; false when there is no reference or none does
+     * @throws GraphReceiptGrants.Malformed when a referenced relation or basis is missing, duplicated or does not match
+     */
+    static boolean proves(Obj bundle, String evidenceId, List<BasisRef> refs) {
         if (refs.isEmpty()) {
-            throw new GraphReceiptGrants.Malformed("receipt_basis_unreferenced");
+            return false;
         }
         try {
             // One pass over the receipt's relations: an id carried twice is remembered and refuses only a reference that names it.
@@ -73,9 +78,7 @@ final class GraphReceiptBasis {
                 }
                 cited |= basis.strings("evidenceIds").contains(evidenceId);
             }
-            if (!cited) {
-                throw new GraphReceiptGrants.Malformed("receipt_basis_evidence_missing");
-            }
+            return cited;
         } catch (StrictJson.Malformed malformed) {
             throw new GraphReceiptGrants.Malformed("receipt_shape");
         }

@@ -24,8 +24,21 @@ set -a
 set +a
 
 docker compose --env-file api/.env -f api/compose.local.yaml up -d --wait
-./api/gradlew -p api bootRun
+SPRING_PROFILES_ACTIVE=local ./api/gradlew -p api bootRun
 ```
+```sh
+# 윈도우용
+Copy-Item api/.env.example api/.env
+# api/.env의 필수 값 확인 후 아래 환경변수에도 설정합니다.
+$env:ZOOP_AUTH_CSRF_KEYS = "local-v1=<생성한 키>"
+$env:ZOOP_AUTH_ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:8080"
+$env:SPRING_PROFILES_ACTIVE = "local"
+
+docker compose --env-file api/.env -f api/compose.local.yaml up -d --wait
+.\api\gradlew.bat -p api bootRun
+```
+
+application-local.yml 파일을 설정하세요.
 
 Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경변수를 내보낸 후 실행하거나 IDE Run Configuration에 아래 변수를 직접 등록하세요. Compose의 `--env-file`은 DB 컨테이너 설정에만 적용됩니다.
 
@@ -87,8 +100,8 @@ set -a
 set +a
 export SPRING_PROFILES_ACTIVE=local
 export ZOOP_SWAGGER_ENABLED=true
-export ZOOP_AUTH_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
-export ZOOP_API_CORS_ALLOWED_ORIGINS=http://localhost:3000
+export ZOOP_AUTH_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:8080
+export ZOOP_API_CORS_ALLOWED_ORIGINS=http://localhost:5173
 docker compose --env-file api/.env -f api/compose.local.yaml up -d --wait
 ./api/gradlew -p api bootRun
 ```
@@ -217,6 +230,7 @@ Swagger `/v3/api-docs`의 위 5개 operation과 목표 정본 [`docs/api/openapi
 
 | 시작할 작업 | 안내 |
 |---|---|
+| 키 없이 저장된 10/21 퇴근·10/22 출퇴근 3회차를 API·화면에서 보기 | [팀원용 재생 실행](docs/BRIEFING_TEAM_DEMO.md): 저장 결과 포함, 임시 Docker DB, AI·시세 재호출 없음 |
 | DB·권한·공개 HTTP·합성 자료로 프론트 연결 | [BRIEFING_READ](docs/BRIEFING_READ.md) |
 | 실제 수집부터 한 회차 생성·검증·DB·지도 실행 | [BRIEFING_LOCAL_ROUND](docs/BRIEFING_LOCAL_ROUND.md) |
 | 지정 출퇴근 회차를 시간순으로 재생 | [BRIEFING_ROUND_SERIES](docs/BRIEFING_ROUND_SERIES.md) |

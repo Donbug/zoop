@@ -10,13 +10,31 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from .extraction import Extractor, Fixtures, Sources, Store, open_legacy_history
-from .extraction_contracts import MAX_COMMAND, MAX_REPLAY, SCHEMA, ExtractionFailure, Selector, Submit, canonical
+from .extraction_contracts import MAX_COMMAND, MAX_REPLAY, SCHEMA, EnqueueRound, ExtractionFailure, Selector, Submit, canonical
+from .extraction_enqueue import enqueue_round
 from .ingestion_contracts import Authority, IngestionFailure, read_file
+
+
+def enqueue(args, incoming) -> int:
+    """`enqueue-round`: register one job per planned observation of a complete ingestion round, never execute it. The replay fixture is the frozen input of
+    every replay job (required), a live job takes none; the topic fixture belongs to a later stage-time `resume`, never to registration."""
+    request = EnqueueRound.model_validate(incoming)
+    if args.initial_only:
+        raise ExtractionFailure("initial_only_not_allowed")
+    live = request.provenance.execution_mode == "live"
+    if args.topic_replay or (live and args.replay):
+        raise ExtractionFailure("fixture_not_allowed")
+    if args.replay is None and not live:
+        raise ExtractionFailure("replay_fixture_required")
+    fixtures = Fixtures(read_file(args.replay, MAX_REPLAY) if args.replay else None, None)
+    body, code = enqueue_round(request, fixtures, args.state_dir, args.ingestion_state_dir, args.sources)
+    print(canonical(body))
+    return code
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("run", "submit", "resume", "inspect", "cancel"))
+    parser.add_argument("command", choices=("run", "submit", "resume", "inspect", "cancel", "enqueue-round"))
     parser.add_argument("--state-dir", required=True, type=Path)
     parser.add_argument("--ingestion-state-dir", required=True, type=Path)
     parser.add_argument("--sources", required=True, type=Path)
@@ -30,6 +48,8 @@ def main() -> int:
         if len(raw) > MAX_COMMAND:
             raise ExtractionFailure("command_input_limit")
         incoming = json.loads(raw)
+        if args.command == "enqueue-round":
+            return enqueue(args, incoming)
         if args.command in {"run", "submit"}:
             # Live is inferred from the request's provenance (the pair executionMode live / recordingKind provider); the provider runtime reads its own
             # environment lazily, so a replay job and inspect/cancel never need a gate, key or endpoint.

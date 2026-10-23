@@ -7,7 +7,7 @@ import pytest
 
 from extraction_support import ExtractionService, ExtractionWorkspace, make_service, terminate_extraction
 from relation_support import RelationService, RelationWorkspace, World, build_world, terminate_relation, tree
-from real_handoff_support import BUILD_VERDICT_HANDOFF_WORLD, HandoffWorld, RealWorkspace, build_handoff_world
+from real_handoff_support import BUILD_IMPACT_HANDOFF_WORLD, BUILD_VERDICT_HANDOFF_WORLD, HandoffWorld, RealWorkspace, build_handoff_world
 from support import ServiceProcess, remove_tree
 
 
@@ -107,6 +107,13 @@ def verdict_world(tmp_path_factory: pytest.TempPathFactory) -> HandoffWorld:
     return build_handoff_world(tmp_path_factory.mktemp("verdict-world"), BUILD_VERDICT_HANDOFF_WORLD)
 
 
+@pytest.fixture(scope="session")
+def impact_world(tmp_path_factory: pytest.TempPathFactory) -> HandoffWorld:
+    """One fresh actual two-S3-job world with REAL impact states (verified positive/negative/undetermined, verifier reject, no-evidence, precheck reject), ONE handoff frozen
+    and exported through the installed CLI. `impacts` holds the pipeline smoke's hand-written expected rows."""
+    return build_handoff_world(tmp_path_factory.mktemp("impact-world"), BUILD_IMPACT_HANDOFF_WORLD)
+
+
 def _handoff_services(tmp_path: Path, world: HandoffWorld):
     before = world.ledgers()
     started: list[ServiceProcess] = []
@@ -136,3 +143,10 @@ def start_handoff(tmp_path: Path, handoff_world: HandoffWorld) -> Callable[..., 
 def start_verdict_handoff(tmp_path: Path, verdict_world: HandoffWorld) -> Callable[..., tuple[RealWorkspace, ServiceProcess]]:
     """The same factory over the reviewed (verdict) world and its own ledgers."""
     yield from _handoff_services(tmp_path, verdict_world)
+
+
+
+@pytest.fixture
+def start_impact_handoff(tmp_path: Path, impact_world: HandoffWorld) -> Callable[..., tuple[RealWorkspace, ServiceProcess]]:
+    """The same factory over the real impact world and its own ledgers."""
+    yield from _handoff_services(tmp_path, impact_world)

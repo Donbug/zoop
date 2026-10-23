@@ -459,6 +459,7 @@ def test_the_envelope_projection_drops_what_the_application_may_not_read_and_kee
     lambda out: out["delivery"].update(checkedAt="yesterday"), lambda out: out["receipt"].update(bundleDigest="short"),
     lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-1"), lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-2"),
     lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-3"), lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-4"),
+    lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-5"),
     lambda out: out["receipt"].update(bundleBytes=0), lambda out: out["receipt"].update(bundleSchema="other"), lambda out: out.update(bundle=[]),
     lambda out: out.update(manifest=[]),
 ])
@@ -547,7 +548,7 @@ def test_a_handoff_frozen_under_the_earlier_bundle_schema_is_withheld_with_its_r
         assert wire["delivery"] == {"state": "withheld", "reason": "handoff_contract_changed", "checkedAt": None}
         assert wire["verification"] is None and wire.get("bundle") is None and wire.get("manifest") is None
         text = json.dumps(wire)
-        for old in ("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3", "zoop-graph-handoff-bundle-4", "bundleSchema", "receipt", pins(example_bundle())["bundleDigest"]):
+        for old in ("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3", "zoop-graph-handoff-bundle-4", "zoop-graph-handoff-bundle-5", "bundleSchema", "receipt", pins(example_bundle())["bundleDigest"]):
             assert old not in text
 
 
@@ -684,6 +685,9 @@ def test_the_provenance_pairs_the_approval_basis_and_the_source_support_are_clos
     manual["sources"][0]["reviewUsed"][0]["approvalBasis"] = {"kind": "operator-final-approval", "revision": 1, "reviewer": "ops-1",
                                                               "decidedAt": "2026-10-13T00:00:02+00:00"}
     manual["relations"][0]["provenance"]["s3SemanticValidation"] = "manual-operator-final-approval"   # the INVOLVES edge says whose approval it rests on
+    manual["impacts"][0].update(impactCandidateId=None, status="not-applicable", code=None, label=None, targetVerdict=None, effects=None, verifier="not-called",
+                                verifierRequestDigest=None, proposal=None)       # an operator-final-approval source has no impact candidate (contract: not-applicable, all null)
+    manual["sources"][0]["audit"]["impactCandidates"] = 0
     assert Bundle.model_validate(manual).wire() == manual
     declared = copy.deepcopy(bundle)
     declared["articles"][0]["origin"] = dict(ORIGIN)

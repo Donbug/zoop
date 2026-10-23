@@ -1,4 +1,4 @@
-"""Wire models of the read-only handoff family (`zoop-ai-internal-handoff-1`) and the CLOSED model of the `zoop-graph-handoff-bundle-5` bundle.
+"""Wire models of the read-only handoff family (`zoop-ai-internal-handoff-1`) and the CLOSED model of the `zoop-graph-handoff-bundle-6` bundle.
 
 Three kinds of model live here:
   * `Hd*` models (extra forbidden) are what this service emits as status and what the generated OpenAPI documents;
@@ -16,6 +16,8 @@ The models are the structural contract the application can rely on (exact key se
 export, and the service never repeats or second-guesses them. Everything in the bundle that came from a source (titles, URLs, labels, observation
 metadata) is data, never authority: no field of it grants, extends or proves a right, and the service gates delivery only on the producer's current
 verdict and the operator's pins.
+The one exception is the `impacts` list: its row state table and every closure the closed models can see (one row per emitted INVOLVES source relation, endpoints,
+source approval kind, effect evidence ids and article versions, counts, policy, deterministic label) are enforced here as well, so a forged row never leaves.
 """
 from __future__ import annotations
 
@@ -29,7 +31,7 @@ from .wire import ErrorBody, Reviewer, Safe
 
 SCHEMA = "zoop-ai-internal-handoff-1"
 RUNTIME_SCHEMA = "zoop-ai-handoff-1"
-BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-5"
+BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-6"
 POLICY = "zoop-public-projection-policy-1"
 HANDOFF_ID_PATTERN = r"^[A-Za-z0-9._:-]{1,200}$"
 HASH_PATTERN = r"^[a-f0-9]{64}$"
@@ -101,6 +103,7 @@ class BPolicy(Bx):
     structural: Literal["manual-operator-review"]
     sequence: Literal["s2-comparison-with-operator-decision"]
     source_support: Literal["origin-or-exact-text-union"]
+    impacts: Literal["s3-independent-verifier-quote-effect"]
 
 
 class BJob(Bx):
@@ -476,6 +479,106 @@ class BRelation(Bx):
         return self
 
 
+ImpactLabel = Literal["positive", "negative", "mixed", "undetermined"]
+IMPACT_CANDIDATE_PATTERN = r"^ic-[a-f0-9]{64}$"
+WITHHELD_CODES = ("impact_evidence_outside_relation_documents", "impact_quote_ambiguous")
+MAX_EFFECT_IDS = 40
+EffectIds = Annotated[list[Annotated[str, StringConstraints(pattern=EVIDENCE_ID_PATTERN)]], Field(max_length=MAX_EFFECT_IDS)]
+
+
+class BImpactProposal(Bx):
+    """The producer's UNVERIFIED private proposal (direction, reason, limitations): never a verified reason. Lengths are Unicode code points."""
+    direction: ImpactLabel
+    reason: Annotated[str, StringConstraints(min_length=1, max_length=2000)]
+    limitations: Annotated[str, StringConstraints(max_length=1000)] | None
+    verification: Literal["none"]
+
+
+class BImpactEffects(Bx):
+    """The verifier-mapped app evidence ids per effect side: sorted, unique, disjoint, 1..40 in all."""
+    positive: EffectIds
+    negative: EffectIds
+    neutral: EffectIds
+    uncertain: EffectIds
+
+    @model_validator(mode="after")
+    def sides_are_sorted_unique_disjoint_and_bounded(self) -> BImpactEffects:
+        sides = (self.positive, self.negative, self.neutral, self.uncertain)
+        if any(side != sorted(set(side)) for side in sides):
+            raise ValueError("every effect side is sorted and unique")
+        union = [i for side in sides for i in side]
+        if len(union) != len(set(union)) or not 1 <= len(union) <= MAX_EFFECT_IDS:
+            raise ValueError("effect sides are disjoint and hold 1..40 evidence ids in all")
+        return self
+
+    def all_ids(self) -> list[str]:
+        return [*self.positive, *self.negative, *self.neutral, *self.uncertain]
+
+
+def impact_label(target_verdict: str, effects: BImpactEffects) -> str:
+    if effects.uncertain or target_verdict == "insufficient":
+        return "undetermined"
+    if effects.positive and effects.negative:
+        return "mixed"
+    if effects.positive:
+        return "positive"
+    if effects.negative:
+        return "negative"
+    return "undetermined"
+
+
+class BImpact(Bx):
+    """One impact row per emitted INVOLVES source relation: the independent verifier's mapped effect on the company, or why there is none. Never a public
+    label of the event, never causality or price probability."""
+    edge_id: Id
+    issue_id: Id
+    company_id: Id
+    source_relation: BSourceRelation
+    impact_candidate_id: Annotated[str, StringConstraints(pattern=IMPACT_CANDIDATE_PATTERN)] | None
+    status: Literal["not-applicable", "not-proposed", "no-evidence", "technical-reject", "verifier-reject", "verified", "withheld"]
+    code: Literal["producer_reply_invalid", "impact_precheck_rejected", "verifier_reply_invalid",
+                  "impact_evidence_outside_relation_documents", "impact_quote_ambiguous"] | None
+    label: ImpactLabel | None
+    target_verdict: Literal["supported", "insufficient", "contradicted"] | None
+    effects: BImpactEffects | None
+    verifier: Literal["called", "not-called"]
+    verifier_request_digest: Hash | None
+    proposal: BImpactProposal | None
+
+    @model_validator(mode="after")
+    def state_table(self) -> BImpact:
+        s, c = self.status, self.code
+        called = self.verifier == "called"
+        has_ic, has_proposal = self.impact_candidate_id is not None, self.proposal is not None
+        if called != (self.verifier_request_digest is not None):
+            raise ValueError("verifierRequestDigest is present exactly when the verifier was called")
+        verified = s == "verified"
+        if (self.label is not None) != verified or (self.effects is not None) != verified:
+            raise ValueError("label and effects exist only on a verified row")
+        if (self.target_verdict is not None) != (s in ("verified", "verifier-reject")):
+            raise ValueError("targetVerdict exists only on verified and verifier-reject rows")
+        if verified:
+            if self.target_verdict not in ("supported", "insufficient") or self.label != impact_label(self.target_verdict, self.effects):  # type: ignore[arg-type]
+                raise ValueError("a verified row has a supported or insufficient target and its deterministic label")
+        if s == "verifier-reject" and self.target_verdict != "contradicted":
+            raise ValueError("a verifier-reject row is a contradicted target")
+        if s in ("not-applicable", "not-proposed"):
+            ok = c is None and not has_ic and not called and not has_proposal
+        elif s == "no-evidence":
+            ok = c is None and has_ic and not called and has_proposal
+        elif s == "technical-reject":
+            ok = {"producer_reply_invalid": not has_ic and not called and not has_proposal,
+                  "impact_precheck_rejected": has_ic and not called and not has_proposal,
+                  "verifier_reply_invalid": has_ic and called and has_proposal}.get(c or "", False)
+        elif s in ("verifier-reject", "verified"):
+            ok = c is None and has_ic and called and has_proposal
+        else:
+            ok = c in WITHHELD_CODES and has_ic and called and has_proposal
+        if not ok:
+            raise ValueError("status, code, impactCandidateId, verifier and proposal do not combine")
+        return self
+
+
 class BEvidenceSource(Bx):
     document_id: Name
     document_version: Hash
@@ -566,6 +669,7 @@ class BRelationCounts(Bx):
 class BCounts(Bx):
     companies: Count
     path_companies: Count
+    impacts: Count
     issues: Count
     relations: BRelationCounts
     evidence: Count
@@ -594,7 +698,7 @@ class BDigests(Bx):
 
 class Bundle(Bx):
     """The producer's artifact. Key names, order-free content and every value are the producer's; this class only says which shapes are acceptable."""
-    schema_version: Literal["zoop-graph-handoff-bundle-5"]
+    schema_version: Literal["zoop-graph-handoff-bundle-6"]
     handoff_id: Id
     manifest_digest: Hash
     provenance: BProvenance
@@ -604,6 +708,7 @@ class Bundle(Bx):
     path_companies: Annotated[list[BCompany], Field(max_length=MAX_COMPANIES)]
     issues: Annotated[list[BIssue], Field(max_length=MAX_ISSUES)]
     relations: Annotated[list[BRelation], Field(max_length=MAX_RELATIONS)]
+    impacts: Annotated[list[BImpact], Field(max_length=MAX_RELATIONS)]
     evidence: Annotated[list[BEvidence], Field(max_length=MAX_EVIDENCE)]
     articles: Annotated[list[BArticle], Field(max_length=MAX_ARTICLES)]
     exclusions: BExclusions
@@ -636,7 +741,50 @@ class Bundle(Bx):
             raise ValueError("pathCompanies must equal the mapped middle companies of complete paths that are not main companies")
         if self.counts.companies != len(main) or self.counts.path_companies != len(private):
             raise ValueError("counts.companies and counts.pathCompanies must equal the list lengths")
+        self.impacts_close_over_the_involves_sources()
         return self
+
+    def impacts_close_over_the_involves_sources(self) -> None:
+        """Exact one-row coverage of every emitted INVOLVES s3 sourceRef, endpoint/source-approval agreement and the evidence bindings of verified effects."""
+        edges: dict[tuple[str, str, str], BRelation] = {}
+        for r in self.relations:
+            if r.type != "INVOLVES":
+                continue
+            if not r.source_refs or any(ref.kind != "s3-relation" for ref in r.source_refs):
+                raise ValueError("an INVOLVES relation has at least one sourceRef and all of them are s3-relation")
+            for ref in r.source_refs:
+                if (r.id, ref.job_id, ref.id) in edges:
+                    raise ValueError("INVOLVES sourceRefs are unique per edge")
+                edges[(r.id, ref.job_id, ref.id)] = r
+        keys = [(i.edge_id, i.source_relation.job_id, i.source_relation.relation_candidate_id) for i in self.impacts]
+        if keys != sorted(set(keys)) or set(keys) != set(edges) or len(keys) > MAX_RELATIONS:
+            raise ValueError("impacts are sorted, unique and cover exactly the INVOLVES s3 source relations")
+        if self.counts.impacts != len(self.impacts):
+            raise ValueError("counts.impacts must equal the impact list length")
+        approvals = {(s.relation.job_id, u.relation_candidate_id): u.approval_basis.kind for s in self.sources for u in s.review_used}
+        evidence = {e.id: e for e in self.evidence}
+        seen: set[tuple[str, str]] = set()
+        for impact, key in zip(self.impacts, keys):
+            edge = edges[key]
+            job, rc = key[1], key[2]
+            if impact.code == "verifier_reply_invalid" and (self.provenance.execution_mode != "replay" or any(s.provenance.execution_mode != "replay" for s in self.sources)):
+                raise ValueError("verifier_reply_invalid exists only in a replay bundle")
+            if (impact.issue_id, impact.company_id) != (edge.source, edge.target):
+                raise ValueError("an impact row repeats its edge endpoints")
+            if (job, rc) not in approvals or (approvals[(job, rc)] == "operator-final-approval") != (impact.status == "not-applicable"):
+                raise ValueError("an impact row is not-applicable exactly for an operator-final-approval source")
+            if impact.impact_candidate_id is not None:
+                if (job, impact.impact_candidate_id) in seen:
+                    raise ValueError("an impact candidate belongs to one row per job")
+                seen.add((job, impact.impact_candidate_id))
+            if impact.effects is None:
+                continue
+            cited = {(evidence[e].article_id, evidence[e].article_version) for e in edge.evidence_ids if e in evidence}
+            ids = impact.effects.all_ids()
+            if any(e not in evidence or (evidence[e].article_id, evidence[e].article_version) not in cited for e in ids):
+                raise ValueError("every effect evidence id is in the bundle and of an article version the edge cites")
+            if len({evidence[e].source.source_evidence_id for e in ids}) != len(ids):
+                raise ValueError("effect evidence of one row has distinct source evidence ids")
 
 
 class BmSource(Bx):
@@ -726,7 +874,7 @@ class RtUsage(Projection):
 class RtReceipt(Projection):
     handoff_id: str
     manifest_digest: str = Field(pattern=HASH_PATTERN)
-    bundle_schema: Literal["zoop-graph-handoff-bundle-5"]
+    bundle_schema: Literal["zoop-graph-handoff-bundle-6"]
     bundle_digest: str = Field(pattern=HASH_PATTERN)
     content_digest: str = Field(pattern=HASH_PATTERN)
     bundle_bytes: int = Field(ge=1)

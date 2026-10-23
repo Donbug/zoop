@@ -86,8 +86,10 @@ pipeline-test:
 	$(PIPELINE_PYTHON) -m pytest ai/pipeline/tests
 pipeline-smoke:
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/ingestion_smoke.py
+	$(PIPELINE_PYTHON) ai/pipeline/scripts/round_smoke.py
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/collection_smoke.py
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/extraction_smoke.py
+	$(PIPELINE_PYTHON) ai/pipeline/scripts/round_enqueue_smoke.py
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/relation_smoke.py
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/dependency_smoke.py
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/graph_handoff_smoke.py

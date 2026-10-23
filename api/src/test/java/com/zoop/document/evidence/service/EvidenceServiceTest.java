@@ -727,7 +727,7 @@ class EvidenceServiceTest {
             public RoundRead readRound(String round, String version, Instant at, String id, String company, String request) {
                 if (!savedId.equals(id)) throw new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE);
                 assertEquals("saved-round", round);
-                var facts = new com.zoop.document.evidence.graph.GraphEvidence("reconstructed", EvidenceWorld.NOW, null, List.of(), List.of());
+                var facts = new com.zoop.document.evidence.graph.GraphEvidence("reconstructed", EvidenceWorld.NOW, null, List.of(), List.of(), List.of());
                 var response = new com.zoop.document.evidence.dto.EvidenceResponse(id, "saved quote", 0, 11, "article", "v1",
                         null, true, List.of("issue"), null, null, "v1", null, null, null, null);
                 return new RoundRead(facts, response);

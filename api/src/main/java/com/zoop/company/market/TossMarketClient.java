@@ -30,6 +30,9 @@ public class TossMarketClient {
     private final RestClient client;
     private final ObjectMapper mapper;
     private final Clock clock;
+    private final MarketDataCache<String, CompanyQuoteResponse> quoteCache;
+    private final MarketDataCache<String, CompanyPriceResponse> priceCache;
+    private final MarketDataConcurrencyLimiter limiter;
     private final ReentrantLock tokenLock = new ReentrantLock();
     private volatile String token;
     private volatile Instant tokenExpires = Instant.EPOCH;
@@ -38,6 +41,9 @@ public class TossMarketClient {
         this.settings = settings;
         this.mapper = mapper;
         this.clock = clock;
+        this.quoteCache = new MarketDataCache<>(settings.cacheMaxEntries());
+        this.priceCache = new MarketDataCache<>(settings.cacheMaxEntries());
+        this.limiter = new MarketDataConcurrencyLimiter(settings.providerMaxConcurrentRequests(), settings.timeout());
         var httpClient = java.net.http.HttpClient.newBuilder().connectTimeout(settings.timeout()).build();
         var requestFactory = new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(settings.timeout());
@@ -52,6 +58,12 @@ public class TossMarketClient {
         if (!("KRX".equals(exchange) || "NASDAQ".equals(exchange) || "NYSE".equals(exchange) || "AMEX".equals(exchange))) {
             return CompanyQuoteResponse.unavailable(companyId, "unsupported_symbol", "이 종목은 토스증권 시세 조회를 지원하지 않아요.");
         }
+        String key = companyId + "|" + exchange + "|" + code;
+        return quoteCache.get(key, () -> loadQuote(companyId, exchange, code), result ->
+                "available".equals(result.status()) ? settings.quoteCacheTtl() : shorter(settings.quoteCacheTtl(), java.time.Duration.ofSeconds(5)));
+    }
+
+    private CompanyQuoteResponse loadQuote(String companyId, String exchange, String code) {
         try {
             JsonNode priceRoot = get("/api/v1/prices", Map.of("symbols", code));
             JsonNode price = matching(priceRoot.path("result"), code);
@@ -141,6 +153,17 @@ public class TossMarketClient {
         if (!("KRX".equals(exchange) || "NASDAQ".equals(exchange) || "NYSE".equals(exchange) || "AMEX".equals(exchange))) {
             return CompanyPriceResponse.unavailable(companyId, period, "unsupported_symbol", "이 종목은 토스증권 시세 조회를 지원하지 않아요.");
         }
+        Instant end = to != null ? to : clock.instant();
+        Instant start = from != null ? from : periodStart(period, end);
+        if (!"1d".equals(period) && to != null && end.isBefore(clock.instant().minus(java.time.Duration.ofHours(1)))) {
+            String key = companyId + "|" + exchange + "|" + code + "|" + period + "|" + start + "|" + end;
+            return priceCache.get(key, settings.priceCacheTtl(), () -> loadPrices(companyId, exchange, code, period, from, to));
+        }
+        return loadPrices(companyId, exchange, code, period, from, to);
+    }
+
+    private CompanyPriceResponse loadPrices(String companyId, String exchange, String code, String period,
+            Instant from, Instant to) {
         String interval = PERIOD_INTERVAL.get(period);
         ZoneId zone = marketZone(exchange);
         Instant end = to != null ? to : clock.instant();
@@ -403,7 +426,7 @@ public class TossMarketClient {
         for (int attempt = 0; attempt < 2; attempt++) {
             final String usedToken = accessToken;
             final boolean firstAttempt = attempt == 0;
-            var response = client.get().uri(uri -> {
+            var response = limiter.execute(() -> client.get().uri(uri -> {
                 var builder = uri.path(path);
                 // Values go through URI variables so reserved characters are encoded ("+09:00" -> "%2B09:00");
                 // a literal "+" would otherwise reach the provider as a space.
@@ -420,7 +443,7 @@ public class TossMarketClient {
                         if (code >= 500) throw new MarketDataException(true);
                         if (code < 200 || code >= 300) throw new MarketDataException(false);
                         return new HttpResult(code, body);
-                    });
+                    }));
             if (response.status == 401 && attempt == 0) { accessToken = token(usedToken); continue; }
             JsonNode root = read(response.body);
             if (!root.isObject() || !root.has("result")) throw formatFailure();
@@ -431,17 +454,17 @@ public class TossMarketClient {
 
     private String token() { return token(null); }
     private String token(String stale) {
-        if (token != null && Instant.now().isBefore(tokenExpires) && !token.equals(stale)) return token;
+        if (token != null && clock.instant().isBefore(tokenExpires) && !token.equals(stale)) return token;
         tokenLock.lock();
         try {
-            if (token != null && Instant.now().isBefore(tokenExpires) && !token.equals(stale)) return token;
+            if (token != null && clock.instant().isBefore(tokenExpires) && !token.equals(stale)) return token;
             var form = new LinkedMultiValueMap<String, String>();
             form.add("grant_type", "client_credentials");
             form.add("client_id", settings.tossClientId());
             form.add("client_secret", settings.tossClientSecret());
             JsonNode root;
             try {
-                byte[] body = client.post().uri("/oauth2/token").contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                byte[] body = limiter.execute(() -> client.post().uri("/oauth2/token").contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .body(form).exchange((request, response) -> {
                             int code = response.getStatusCode().value();
                             byte[] bytes = response.getBody().readAllBytes();
@@ -449,7 +472,7 @@ public class TossMarketClient {
                             if (code == 429 || code >= 500) throw new MarketDataException(true);
                             if (code < 200 || code >= 300) throw new MarketDataException(false);
                             return bytes;
-                        });
+                        }));
                 root = read(body);
             } catch (TossAuthException exception) { throw new MarketDataException(false); }
             catch (RestClientException exception) { throw new MarketDataException(true); }
@@ -458,7 +481,7 @@ public class TossMarketClient {
             if (newToken == null || expires == null || expires <= 0) throw formatFailure();
             token = newToken;
             long expiresSeconds = expires.longValue();
-            tokenExpires = Instant.now().plusSeconds(Math.max(1, expiresSeconds - Math.min(60, expiresSeconds / 2)));
+            tokenExpires = clock.instant().plusSeconds(Math.max(1, expiresSeconds - Math.min(60, expiresSeconds / 2)));
             return token;
         } finally { tokenLock.unlock(); }
     }
@@ -501,6 +524,10 @@ public class TossMarketClient {
     }
     private static boolean blank(String value) { return value == null || value.isBlank(); }
     private static MarketDataException formatFailure() { return new MarketDataException(false); }
+
+    private static java.time.Duration shorter(java.time.Duration configured, java.time.Duration cap) {
+        return configured.compareTo(cap) < 0 ? configured : cap;
+    }
     private record HttpResult(int status, byte[] body) { }
     private static class TossAuthException extends RuntimeException { }
     private static class TossUnsupportedSymbolException extends RuntimeException { }

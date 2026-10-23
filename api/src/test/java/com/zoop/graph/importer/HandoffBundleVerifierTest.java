@@ -151,7 +151,7 @@ class HandoffBundleVerifierTest {
             byte[] export = resource(name);
             HandoffBundle verified = new HandoffExportParser().parse(export, pinning(export)).bundle();
             JsonNode bundle = HandoffFixtures.parse(export).get("bundle");
-            assertEquals("zoop-graph-handoff-bundle-5", bundle.get("schemaVersion").stringValue(), name);
+            assertEquals("zoop-graph-handoff-bundle-6", bundle.get("schemaVersion").stringValue(), name);
             assertEquals(headlines.get(name).size(), bundle.get("issues").size(), name);
             for (JsonNode issue : bundle.get("issues")) {
                 String id = issue.get("id").stringValue();
@@ -305,7 +305,8 @@ class HandoffBundleVerifierTest {
         assertRefused("an earlier schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-2"));
         assertRefused("the schema version before field verdicts", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-3"));
         assertRefused("the schema version before structural paths", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-4"));
-        assertRefused("a later schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-6"));
+        assertRefused("the schema version before impacts", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-5"));
+        assertRefused("a later schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-7"));
         assertRefused("wrong policy version", b -> ((ObjectNode) b.get("policy")).put("version", "zoop-public-projection-policy-2"));
         assertRefused("live without a provider recording", b -> setMode(b, "live", "authored-test"));
         assertRefused("a provider recording of a replay", b -> setMode(b, "replay", "provider"));
@@ -524,6 +525,12 @@ class HandoffBundleVerifierTest {
             basis.put("decidedAt", "2026-10-17T00:00:00+00:00");
             ObjectNode ref = ((ArrayNode) relationOfType(b, "INVOLVES").get("sourceRefs")).addObject();
             ref.put("kind", "s3-relation").put("jobId", "rel-1").put("id", "rc-" + "3".repeat(64));
+            // One impact row per INVOLVES source relation: the operator-approved one is not-applicable (it made no impact call).
+            ObjectNode row = ((ObjectNode) b.get("impacts").get(0)).deepCopy();
+            ((ObjectNode) row.get("sourceRelation")).put("relationCandidateId", "rc-" + "3".repeat(64));
+            row.put("status", "not-applicable");
+            ((ArrayNode) b.get("impacts")).add(row);
+            ((ObjectNode) b.get("counts")).put("impacts", 2);
         };
         assertRefused("the automatic literal over a contributing operator approval", addApprovedReview::accept);
         HandoffBundle bundle = HandoffBundleVerifier.verify(mutated(b -> {
@@ -1869,5 +1876,677 @@ class HandoffBundleVerifierTest {
                 .remove("businessScope"));
         assertRefusedFrom(BUILT, "a missing product scope", b -> ((ObjectNode) structuralOf(b).get("basis").get(0))
                 .remove("productScope"));
+    }
+
+    // ------------------------------------------------------------------------------------------------ impacts (bundle -6) ---
+
+    private static final HandoffFixtures.Built IMPACT = HandoffFixtures.build(HandoffFixtures.Spec.standard().withImpact());
+    private static final HandoffFixtures.Built IMPACT_TWO = HandoffFixtures.build(
+            HandoffFixtures.Spec.standard().withImpact().withShape(HandoffFixtures.Shape.TWO_HOP_PUBLIC));
+    private static final HandoffFixtures.Built TWO_DEFAULT = HandoffFixtures.build(
+            HandoffFixtures.Spec.standard().withShape(HandoffFixtures.Shape.TWO_HOP_PUBLIC));
+    private static final HandoffFixtures.Built LIVE = HandoffFixtures.build(HandoffFixtures.Spec.standard().withLive());
+    private static final String EMOJI = "\uD83D\uDE00";
+
+    private static ObjectNode impactRow(ObjectNode bundle, int index) {
+        return (ObjectNode) bundle.get("impacts").get(index);
+    }
+
+    private static void setImpactCount(ObjectNode bundle, int count) {
+        ((ObjectNode) bundle.get("counts")).put("impacts", count);
+    }
+
+    private static void assertAcceptedFrom(HandoffFixtures.Built built, String rule, Consumer<ObjectNode> change) {
+        try {
+            HandoffBundleVerifier.verify(mutatedFrom(built, change));
+        } catch (StrictJson.Malformed refused) {
+            throw new AssertionError("refused though valid: " + rule, refused);
+        }
+    }
+
+    private static ObjectNode proposalNode(String direction, String reason, String limitations) {
+        ObjectNode proposal = StrictJson.newObject();
+        proposal.put("direction", direction);
+        proposal.put("reason", reason);
+        if (limitations == null) {
+            proposal.putNull("limitations");
+        } else {
+            proposal.put("limitations", limitations);
+        }
+        proposal.put("verification", "none");
+        return proposal;
+    }
+
+    /** A row of the default (no quote) world put into one state of the table, with the candidate always present. */
+    private static void candidateRow(ObjectNode row, String status, String code, boolean called, boolean proposal) {
+        row.put("status", status);
+        if (code == null) {
+            row.putNull("code");
+        } else {
+            row.put("code", code);
+        }
+        row.put("impactCandidateId", "ic-" + "a".repeat(64));
+        row.put("verifier", called ? "called" : "not-called");
+        if (called) {
+            row.put("verifierRequestDigest", "b".repeat(64));
+        } else {
+            row.putNull("verifierRequestDigest");
+        }
+        row.putNull("label");
+        row.putNull("targetVerdict");
+        row.putNull("effects");
+        if (proposal) {
+            row.set("proposal", proposalNode("positive", "합성 사유", null));
+        } else {
+            row.putNull("proposal");
+        }
+    }
+
+    private static void effectsOf(ObjectNode row, List<String> positive, List<String> negative, List<String> neutral,
+            List<String> uncertain) {
+        ObjectNode effects = StrictJson.newObject();
+        for (Object[] side : new Object[][] {{"positive", positive}, {"negative", negative}, {"neutral", neutral},
+                {"uncertain", uncertain}}) {
+            ArrayNode ids = effects.putArray((String) side[0]);
+            @SuppressWarnings("unchecked")
+            List<String> values = (List<String>) side[1];
+            values.forEach(ids::add);
+        }
+        row.set("effects", effects);
+    }
+
+    /** The one quote the impact world's verified row lists, and any other evidence id of the same article version. */
+    private static String quote() {
+        return impactRow(IMPACT.bundle(), 0).get("effects").get("positive").get(0).stringValue();
+    }
+
+    private static String otherEvidence() {
+        for (String id : IMPACT.evidenceIds()) {
+            if (!id.equals(quote())) {
+                return id;
+            }
+        }
+        throw new AssertionError("no other evidence");
+    }
+
+    /** Every S3 relation the edges rest on turned into an operator's final approval, with the literals the relations derive from it. */
+    private static void approveByOperator(ObjectNode bundle) {
+        for (JsonNode source : bundle.get("sources").values()) {
+            for (JsonNode used : source.get("reviewUsed").values()) {
+                ((ObjectNode) used.get("approvalBasis")).put("kind", HandoffBundleVerifier.OPERATOR_FINAL).put("reviewer", "reviewer-final");
+            }
+        }
+        for (JsonNode relation : bundle.get("relations").values()) {
+            ObjectNode provenance = (ObjectNode) relation.get("provenance");
+            if (relation.get("type").stringValue().equals("INVOLVES")) {
+                provenance.put("s3SemanticValidation", "manual-operator-final-approval");
+            } else {
+                provenance.put("basisEligibility", "s3-operator-final-approval");
+            }
+        }
+    }
+
+    @Test
+    void theDefaultWorldHasOneNotProposedRowPerInvolvesSourceAndAnOperatorApprovalIsNotApplicable() {
+        for (HandoffFixtures.Built built : List.of(BUILT, TWO_DEFAULT, MANUAL)) {
+            HandoffBundleVerifier.verify(built.bundle());
+            JsonNode impacts = built.bundle().get("impacts");
+            int involves = 0;
+            for (JsonNode relation : built.bundle().get("relations").values()) {
+                involves += relation.get("type").stringValue().equals("INVOLVES") ? 1 : 0;
+            }
+            assertEquals(involves, impacts.size());
+            for (JsonNode row : impacts.values()) {
+                assertEquals(built == MANUAL ? "not-applicable" : "not-proposed", row.get("status").stringValue());
+                assertTrue(row.get("code").isNull() && row.get("impactCandidateId").isNull() && row.get("label").isNull()
+                        && row.get("targetVerdict").isNull() && row.get("effects").isNull() && row.get("proposal").isNull()
+                        && row.get("verifierRequestDigest").isNull());
+                assertEquals("not-called", row.get("verifier").stringValue());
+                assertEquals(13, row.size());
+            }
+            assertEquals(involves, built.bundle().get("counts").get("impacts").intValue());
+            assertEquals("s3-independent-verifier-quote-effect", built.bundle().get("policy").get("impacts").stringValue());
+        }
+        assertEquals(2, TWO_DEFAULT.bundle().get("impacts").size(), "one row per INVOLVES edge, even when both rest on one S3 relation");
+    }
+
+    @Test
+    void aVerifiedImpactIsAcceptedAndItsQuoteIsEvidenceNoOtherPartCitesSoItIsNotAnOrphan() {
+        HandoffBundle verified = HandoffBundleVerifier.verify(IMPACT.bundle());
+        String quote = quote();
+        assertTrue(verified.evidence().stream().anyMatch(e -> e.id().equals(quote)));
+        for (JsonNode relation : IMPACT.bundle().get("relations").values()) {
+            for (JsonNode cited : relation.get("evidenceIds").values()) {
+                assertFalse(cited.stringValue().equals(quote), "the impact quote is cited by no relation");
+            }
+            for (JsonNode basis : relation.get("basis").values()) {
+                for (JsonNode cited : basis.get("evidenceIds").values()) {
+                    assertFalse(cited.stringValue().equals(quote), "the impact quote is cited by no structural basis");
+                }
+            }
+        }
+        HandoffBundleVerifier.verify(IMPACT_TWO.bundle());
+        assertEquals(2, IMPACT_TWO.bundle().get("impacts").size());
+        // Dropping the verified row would leave the quote's evidence referenced by nothing: no orphan evidence.
+        assertRefusedFrom(IMPACT, "orphan evidence once the verified row is a not-proposed row", b -> {
+            ObjectNode row = impactRow(b, 0);
+            row.put("status", "not-proposed");
+            row.putNull("impactCandidateId");
+            row.putNull("label");
+            row.putNull("targetVerdict");
+            row.putNull("effects");
+            row.put("verifier", "not-called");
+            row.putNull("verifierRequestDigest");
+            row.putNull("proposal");
+        });
+    }
+
+    @Test
+    void everyNonVerifiedStateOfTheStatusTableIsAcceptedWithExactlyItsShape() {
+        assertAcceptedFrom(BUILT, "no-evidence", b -> candidateRow(impactRow(b, 0), "no-evidence", null, false, true));
+        assertAcceptedFrom(BUILT, "impact_precheck_rejected",
+                b -> candidateRow(impactRow(b, 0), "technical-reject", "impact_precheck_rejected", false, false));
+        assertAcceptedFrom(BUILT, "verifier_reply_invalid in a replay",
+                b -> candidateRow(impactRow(b, 0), "technical-reject", "verifier_reply_invalid", true, true));
+        assertAcceptedFrom(BUILT, "producer_reply_invalid", b -> {
+            candidateRow(impactRow(b, 0), "technical-reject", "producer_reply_invalid", false, false);
+            impactRow(b, 0).putNull("impactCandidateId");
+        });
+        assertAcceptedFrom(BUILT, "verifier-reject", b -> {
+            candidateRow(impactRow(b, 0), "verifier-reject", null, true, true);
+            impactRow(b, 0).put("targetVerdict", "contradicted");
+        });
+        for (String code : List.of("impact_evidence_outside_relation_documents", "impact_quote_ambiguous")) {
+            assertAcceptedFrom(BUILT, code, b -> candidateRow(impactRow(b, 0), "withheld", code, true, true));
+        }
+        // A live provider never writes a verdict out of a reply the ledger refused: only an authored replay holds one.
+        assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(mutatedFrom(LIVE,
+                b -> candidateRow(impactRow(b, 0), "technical-reject", "verifier_reply_invalid", true, true))));
+    }
+
+    @Test
+    void theStatusCodeAndNullTableIsEnforcedRowByRow() {
+        assertRefusedFrom(BUILT, "an unknown status", b -> impactRow(b, 0).put("status", "pending"));
+        assertRefusedFrom(BUILT, "a code on not-proposed", b -> impactRow(b, 0).put("code", "impact_quote_ambiguous"));
+        assertRefusedFrom(BUILT, "a technical-reject without a code", b -> candidateRow(impactRow(b, 0), "technical-reject", null, false, false));
+        assertRefusedFrom(BUILT, "a technical-reject with an unknown code",
+                b -> candidateRow(impactRow(b, 0), "technical-reject", "impact_quote_ambiguous", true, true));
+        assertRefusedFrom(BUILT, "a withheld row with a technical code",
+                b -> candidateRow(impactRow(b, 0), "withheld", "producer_reply_invalid", true, true));
+        assertRefusedFrom(BUILT, "a withheld row without a code", b -> candidateRow(impactRow(b, 0), "withheld", null, true, true));
+        assertRefusedFrom(BUILT, "a producer_reply_invalid row that names a candidate",
+                b -> candidateRow(impactRow(b, 0), "technical-reject", "producer_reply_invalid", false, false));
+        assertRefusedFrom(BUILT, "an impact_precheck_rejected row without a candidate", b -> {
+            candidateRow(impactRow(b, 0), "technical-reject", "impact_precheck_rejected", false, false);
+            impactRow(b, 0).putNull("impactCandidateId");
+        });
+        assertRefusedFrom(BUILT, "an impact_precheck_rejected row with a proposal (the raw error would not be exported)",
+                b -> candidateRow(impactRow(b, 0), "technical-reject", "impact_precheck_rejected", false, true));
+        assertRefusedFrom(BUILT, "a not-proposed row with a proposal", b -> impactRow(b, 0).set("proposal", proposalNode("positive", "x", null)));
+        assertRefusedFrom(BUILT, "a not-proposed row with a candidate",
+                b -> impactRow(b, 0).put("impactCandidateId", "ic-" + "a".repeat(64)));
+        assertRefusedFrom(BUILT, "a not-proposed row that called the verifier", b -> {
+            impactRow(b, 0).put("verifier", "called");
+            impactRow(b, 0).put("verifierRequestDigest", "b".repeat(64));
+        });
+        assertRefusedFrom(BUILT, "a not-proposed row with a request digest", b -> impactRow(b, 0).put("verifierRequestDigest", "b".repeat(64)));
+        assertRefusedFrom(BUILT, "a not-proposed row with a label", b -> impactRow(b, 0).put("label", "positive"));
+        assertRefusedFrom(BUILT, "a not-proposed row with a target verdict", b -> impactRow(b, 0).put("targetVerdict", "supported"));
+        assertRefusedFrom(BUILT, "a not-proposed row with effects", b -> effectsOf(impactRow(b, 0), List.of(), List.of(), List.of(), List.of()));
+        assertRefusedFrom(BUILT, "a verifier that is neither called nor not-called", b -> impactRow(b, 0).put("verifier", "maybe"));
+        assertRefusedFrom(BUILT, "a called verifier without a digest", b -> {
+            candidateRow(impactRow(b, 0), "verifier-reject", null, true, true);
+            impactRow(b, 0).put("targetVerdict", "contradicted").putNull("verifierRequestDigest");
+        });
+        assertRefusedFrom(BUILT, "a no-evidence row with a label", b -> {
+            candidateRow(impactRow(b, 0), "no-evidence", null, false, true);
+            impactRow(b, 0).put("label", "undetermined");
+        });
+        assertRefusedFrom(BUILT, "a no-evidence row that called the verifier", b -> candidateRow(impactRow(b, 0), "no-evidence", null, true, true));
+        assertRefusedFrom(BUILT, "a no-evidence row without a proposal", b -> candidateRow(impactRow(b, 0), "no-evidence", null, false, false));
+        assertRefusedFrom(BUILT, "a no-evidence row with a request digest", b -> {
+            candidateRow(impactRow(b, 0), "no-evidence", null, false, true);
+            impactRow(b, 0).put("verifierRequestDigest", "b".repeat(64));
+        });
+        assertRefusedFrom(BUILT, "a verifier-reject that is not contradicted", b -> candidateRow(impactRow(b, 0), "verifier-reject", null, true, true));
+        assertRefusedFrom(BUILT, "a verifier-reject with a label", b -> {
+            candidateRow(impactRow(b, 0), "verifier-reject", null, true, true);
+            impactRow(b, 0).put("targetVerdict", "contradicted").put("label", "negative");
+        });
+        assertRefusedFrom(BUILT, "a withheld row with a label", b -> {
+            candidateRow(impactRow(b, 0), "withheld", "impact_quote_ambiguous", true, true);
+            impactRow(b, 0).put("label", "positive");
+        });
+        assertRefusedFrom(BUILT, "a withheld row with a target verdict", b -> {
+            candidateRow(impactRow(b, 0), "withheld", "impact_quote_ambiguous", true, true);
+            impactRow(b, 0).put("targetVerdict", "supported");
+        });
+        assertRefusedFrom(BUILT, "a withheld row with effects (never recomputed from a subset)", b -> {
+            candidateRow(impactRow(b, 0), "withheld", "impact_quote_ambiguous", true, true);
+            effectsOf(impactRow(b, 0), List.of(), List.of(), List.of(), List.of());
+        });
+        assertRefusedFrom(BUILT, "a candidate id that is not an ic- hash", b -> {
+            candidateRow(impactRow(b, 0), "no-evidence", null, false, true);
+            impactRow(b, 0).put("impactCandidateId", "ic-" + "A".repeat(64));
+        });
+        assertRefusedFrom(BUILT, "a request digest that is not a hash", b -> {
+            candidateRow(impactRow(b, 0), "verifier-reject", null, true, true);
+            impactRow(b, 0).put("targetVerdict", "contradicted").put("verifierRequestDigest", "XYZ");
+        });
+    }
+
+    @Test
+    void everyImpactRowIsExactlyOneOfTheInvolvesSourceRelationsInOrder() {
+        assertRefusedFrom(BUILT, "a missing row", b -> {
+            ((ArrayNode) b.get("impacts")).remove(0);
+            setImpactCount(b, 0);
+        });
+        assertRefusedFrom(BUILT, "a duplicate row", b -> {
+            ((ArrayNode) b.get("impacts")).add(impactRow(b, 0).deepCopy());
+            setImpactCount(b, 2);
+        });
+        assertRefusedFrom(BUILT, "a row of the structural edge", b -> {
+            ObjectNode extra = impactRow(b, 0).deepCopy();
+            extra.put("edgeId", relationOfType(b, "STRUCTURALLY_RELATED_TO").get("id").stringValue());
+            ((ArrayNode) b.get("impacts")).add(extra);
+            setImpactCount(b, 2);
+        });
+        assertRefusedFrom(BUILT, "a row of an edge that does not exist", b -> impactRow(b, 0).put("edgeId", "edge-" + "0".repeat(64)));
+        assertRefusedFrom(BUILT, "a row of another source relation of the edge", b -> {
+            ObjectNode extra = impactRow(b, 0).deepCopy();
+            ((ObjectNode) extra.get("sourceRelation")).put("relationCandidateId", "rc-" + "9".repeat(64));
+            ((ArrayNode) b.get("impacts")).add(extra);
+            setImpactCount(b, 2);
+        });
+        assertRefusedFrom(BUILT, "a source relation no edge lists",
+                b -> ((ObjectNode) impactRow(b, 0).get("sourceRelation")).put("jobId", "rel-9"));
+        assertRefusedFrom(BUILT, "a source relation id that is not rc-", b -> ((ObjectNode) impactRow(b, 0).get("sourceRelation"))
+                .put("relationCandidateId", "x"));
+        assertRefusedFrom(BUILT, "a wrong issue", b -> impactRow(b, 0).put("issueId", "issue:other"));
+        assertRefusedFrom(BUILT, "a wrong company", b -> impactRow(b, 0).put("companyId", HandoffFixtures.COMPANY_B));
+        assertRefusedFrom(BUILT, "an unknown row key", b -> impactRow(b, 0).put("aggregate", "positive"));
+        assertRefusedFrom(BUILT, "a missing row key", b -> impactRow(b, 0).remove("proposal"));
+        assertRefusedFrom(BUILT, "an unknown source relation key", b -> ((ObjectNode) impactRow(b, 0).get("sourceRelation")).put("x", "y"));
+        assertRefusedFrom(BUILT, "impacts that are not an array", b -> b.put("impacts", "none"));
+        assertRefusedFrom(BUILT, "a row that is not an object", b -> ((ArrayNode) b.get("impacts")).add("row"));
+        assertThrows(StrictJson.Malformed.class, () -> {
+            ObjectNode copy = BUILT.bundle().deepCopy();
+            copy.remove("impacts");
+            HandoffBundleVerifier.verify(copy);
+        }, "a bundle-6 without its impacts key");
+
+        HandoffBundleVerifier.verify(IMPACT_TWO.bundle());
+        assertRefusedFrom(IMPACT_TWO, "rows in the wrong order", b -> {
+            ArrayNode rows = (ArrayNode) b.get("impacts");
+            JsonNode first = rows.get(0).deepCopy();
+            rows.set(0, rows.get(1).deepCopy());
+            rows.set(1, first);
+        });
+        assertRefusedFrom(IMPACT_TWO, "one impact candidate id used by two rows of one job",
+                b -> impactRow(b, 1).put("impactCandidateId", impactRow(b, 0).get("impactCandidateId").stringValue()));
+    }
+
+    @Test
+    void notApplicableIsTheOperatorsFinalApprovalAndNothingElseInBothDirections() {
+        assertRefusedFrom(BUILT, "not-applicable on an automatic relation", b -> impactRow(b, 0).put("status", "not-applicable"));
+        assertRefusedFrom(MANUAL, "not-proposed on an operator-approved relation", b -> impactRow(b, 0).put("status", "not-proposed"));
+        assertRefusedFrom(MANUAL, "a no-evidence row on an operator-approved relation",
+                b -> candidateRow(impactRow(b, 0), "no-evidence", null, false, true));
+        // The same approval switch on the default world is valid exactly when the rows say not-applicable.
+        assertAcceptedFrom(BUILT, "an operator-approved world with not-applicable rows", b -> {
+            approveByOperator(b);
+            impactRow(b, 0).put("status", "not-applicable");
+        });
+        assertRefusedFrom(BUILT, "an operator-approved world whose row still says not-proposed", BUILT_APPROVE);
+        // A verifier label can never be claimed for a human-approved relation.
+        assertRefusedFrom(IMPACT, "a verified label on an operator-approved relation", BUILT_APPROVE);
+    }
+
+    private static final Consumer<ObjectNode> BUILT_APPROVE = HandoffBundleVerifierTest::approveByOperator;
+
+    @Test
+    void theVerifiedLabelIsRecomputedFromTheVerifierMappedEffectsNeverTrusted() {
+        String quote = quote();
+        String other = otherEvidence();
+        // positive + negative -> mixed
+        assertAcceptedFrom(IMPACT, "mixed", b -> {
+            effectsOf(impactRow(b, 0), List.of(quote), List.of(other), List.of(), List.of());
+            impactRow(b, 0).put("label", "mixed");
+        });
+        assertRefusedFrom(IMPACT, "a positive label over both sides", b -> {
+            effectsOf(impactRow(b, 0), List.of(quote), List.of(other), List.of(), List.of());
+        });
+        assertAcceptedFrom(IMPACT, "negative only", b -> {
+            effectsOf(impactRow(b, 0), List.of(), List.of(quote), List.of(), List.of());
+            impactRow(b, 0).put("label", "negative");
+        });
+        assertRefusedFrom(IMPACT, "a positive label over a negative quote",
+                b -> effectsOf(impactRow(b, 0), List.of(), List.of(quote), List.of(), List.of()));
+        assertAcceptedFrom(IMPACT, "neutral only is undetermined", b -> {
+            effectsOf(impactRow(b, 0), List.of(), List.of(), List.of(quote), List.of());
+            impactRow(b, 0).put("label", "undetermined");
+        });
+        assertRefusedFrom(IMPACT, "a positive label over a neutral quote",
+                b -> effectsOf(impactRow(b, 0), List.of(), List.of(), List.of(quote), List.of()));
+        assertAcceptedFrom(IMPACT, "one uncertain quote leaves no label", b -> {
+            effectsOf(impactRow(b, 0), List.of(quote), List.of(), List.of(), List.of(other));
+            impactRow(b, 0).put("label", "undetermined");
+        });
+        for (String label : List.of("positive", "mixed")) {
+            assertRefusedFrom(IMPACT, "a " + label + " label beside an uncertain quote", b -> {
+                effectsOf(impactRow(b, 0), List.of(quote), List.of(), List.of(), List.of(other));
+                impactRow(b, 0).put("label", label);
+            });
+        }
+        assertAcceptedFrom(IMPACT, "an insufficient target is undetermined", b -> {
+            impactRow(b, 0).put("targetVerdict", "insufficient").put("label", "undetermined");
+        });
+        assertRefusedFrom(IMPACT, "a positive label under an insufficient target", b -> impactRow(b, 0).put("targetVerdict", "insufficient"));
+        assertRefusedFrom(IMPACT, "a contradicted target on a verified row", b -> impactRow(b, 0).put("targetVerdict", "contradicted"));
+        assertRefusedFrom(IMPACT, "a verified row without a target verdict", b -> impactRow(b, 0).putNull("targetVerdict"));
+        assertRefusedFrom(IMPACT, "a verified row without a label", b -> impactRow(b, 0).putNull("label"));
+        assertRefusedFrom(IMPACT, "a label outside the four", b -> impactRow(b, 0).put("label", "bullish"));
+    }
+
+    @Test
+    void theEffectSidesAreSortedUniqueDisjointOneToFortyAndOnTheEdgesOwnArticleVersions() {
+        String quote = quote();
+        String other = otherEvidence();
+        List<String> ascending = quote.compareTo(other) < 0 ? List.of(quote, other) : List.of(other, quote);
+        List<String> descending = List.of(ascending.get(1), ascending.get(0));
+        assertAcceptedFrom(IMPACT, "two positive quotes in order", b -> effectsOf(impactRow(b, 0), ascending, List.of(), List.of(), List.of()));
+        assertRefusedFrom(IMPACT, "a side out of order", b -> effectsOf(impactRow(b, 0), descending, List.of(), List.of(), List.of()));
+        assertRefusedFrom(IMPACT, "a duplicate in one side", b -> effectsOf(impactRow(b, 0), List.of(quote, quote), List.of(), List.of(), List.of()));
+        assertRefusedFrom(IMPACT, "one id on two sides", b -> {
+            effectsOf(impactRow(b, 0), List.of(quote), List.of(quote), List.of(), List.of());
+            impactRow(b, 0).put("label", "mixed");
+        });
+        assertRefusedFrom(IMPACT, "empty effects on a verified row", b -> {
+            effectsOf(impactRow(b, 0), List.of(), List.of(), List.of(), List.of());
+            impactRow(b, 0).put("label", "undetermined");
+        });
+        assertRefusedFrom(IMPACT, "an effect id the bundle does not carry", b -> effectsOf(impactRow(b, 0),
+                List.of("ev-" + "0".repeat(64)), List.of(), List.of(), List.of()));
+        assertRefusedFrom(IMPACT, "an effect id that is not an app evidence id", b -> effectsOf(impactRow(b, 0),
+                List.of("ev-" + "0".repeat(32)), List.of(), List.of(), List.of()));
+        assertRefusedFrom(IMPACT, "an unknown effect side", b -> ((ObjectNode) impactRow(b, 0).get("effects")).putArray("supporting"));
+        assertRefusedFrom(IMPACT, "a missing effect side", b -> ((ObjectNode) impactRow(b, 0).get("effects")).remove("uncertain"));
+
+        // Two quotes that state one source evidence id could be counted twice: refused inside one row, fine when distinct.
+        assertAcceptedFrom(IMPACT, "distinct source evidence ids", b -> {
+            effectsOf(impactRow(b, 0), List.of(quote), List.of(other), List.of(), List.of());
+            impactRow(b, 0).put("label", "mixed");
+        });
+        assertRefusedFrom(IMPACT, "one source evidence id behind two quotes of a row", b -> {
+            effectsOf(impactRow(b, 0), List.of(quote), List.of(other), List.of(), List.of());
+            impactRow(b, 0).put("label", "mixed");
+            String shared = null;
+            for (JsonNode evidence : b.get("evidence").values()) {
+                if (evidence.get("id").stringValue().equals(quote)) {
+                    shared = evidence.get("source").get("sourceEvidenceId").stringValue();
+                }
+            }
+            for (JsonNode evidence : b.get("evidence").values()) {
+                if (evidence.get("id").stringValue().equals(other)) {
+                    ((ObjectNode) evidence.get("source")).put("sourceEvidenceId", shared);
+                }
+            }
+        });
+    }
+
+    @Test
+    void theProposalIsClosedUnverifiedAndBoundedInCodePointsNotUtf16Units() {
+        assertAcceptedFrom(IMPACT, "a reason of 2000 characters", b -> impactRow(b, 0).set("proposal", proposalNode("positive", "x".repeat(2000), null)));
+        assertRefusedFrom(IMPACT, "a reason of 2001 characters", b -> impactRow(b, 0).set("proposal", proposalNode("positive", "x".repeat(2001), null)));
+        assertRefusedFrom(IMPACT, "an empty reason", b -> impactRow(b, 0).set("proposal", proposalNode("positive", "", null)));
+        // 1001 emoji are 1001 code points (2002 UTF-16 units): accepted; counting UTF-16 units would refuse them.
+        assertAcceptedFrom(IMPACT, "1001 emoji as the reason", b -> impactRow(b, 0).set("proposal", proposalNode("negative", EMOJI.repeat(1001), null)));
+        assertAcceptedFrom(IMPACT, "2000 emoji as the reason", b -> impactRow(b, 0).set("proposal", proposalNode("mixed", EMOJI.repeat(2000), null)));
+        assertRefusedFrom(IMPACT, "2001 emoji as the reason", b -> impactRow(b, 0).set("proposal", proposalNode("mixed", EMOJI.repeat(2001), null)));
+        assertAcceptedFrom(IMPACT, "1000 emoji as the limitations", b -> impactRow(b, 0).set("proposal", proposalNode("positive", "r", EMOJI.repeat(1000))));
+        assertRefusedFrom(IMPACT, "1001 emoji as the limitations", b -> impactRow(b, 0).set("proposal", proposalNode("positive", "r", EMOJI.repeat(1001))));
+        assertRefusedFrom(IMPACT, "1001 characters of limitations", b -> impactRow(b, 0).set("proposal", proposalNode("positive", "r", "x".repeat(1001))));
+        assertAcceptedFrom(IMPACT, "empty limitations", b -> impactRow(b, 0).set("proposal", proposalNode("positive", "r", "")));
+        assertAcceptedFrom(IMPACT, "a proposal direction that differs from the verified label",
+                b -> impactRow(b, 0).set("proposal", proposalNode("negative", "r", null)));
+        assertRefusedFrom(IMPACT, "a verified proposal", b -> ((ObjectNode) impactRow(b, 0).get("proposal")).put("verification", "verified"));
+        assertRefusedFrom(IMPACT, "an unknown direction", b -> ((ObjectNode) impactRow(b, 0).get("proposal")).put("direction", "bullish"));
+        assertRefusedFrom(IMPACT, "an unknown proposal key", b -> ((ObjectNode) impactRow(b, 0).get("proposal")).put("supporting", "x"));
+        assertRefusedFrom(IMPACT, "a missing proposal key", b -> ((ObjectNode) impactRow(b, 0).get("proposal")).remove("limitations"));
+    }
+
+    @Test
+    void theImpactCountPolicyAndContentDigestAreRecomputedHere() {
+        assertRefusedFrom(BUILT, "a wrong impact count", b -> setImpactCount(b, 5));
+        assertRefusedFrom(BUILT, "a missing impact count", b -> ((ObjectNode) b.get("counts")).remove("impacts"));
+        assertRefusedFrom(BUILT, "a wrong impact policy", b -> ((ObjectNode) b.get("policy")).put("impacts", "s3-label-by-producer"));
+        assertRefusedFrom(BUILT, "a missing impact policy", b -> ((ObjectNode) b.get("policy")).remove("impacts"));
+        // The content digest covers impacts: editing a row without recomputing it is refused, and so is the old five-collection digest.
+        ObjectNode edited = IMPACT.bundle().deepCopy();
+        impactRow(edited, 0).put("label", "negative");
+        assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(edited));
+        ObjectNode withoutImpacts = IMPACT.bundle().deepCopy();
+        ObjectNode legacyDigest = StrictJson.newObject();
+        for (String key : List.of("companies", "pathCompanies", "issues", "relations", "evidence", "articles")) {
+            legacyDigest.set(key, withoutImpacts.get(key));
+        }
+        ((ObjectNode) withoutImpacts.get("digests")).put("content", Canonical.digest(legacyDigest));
+        assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(withoutImpacts));
+        assertEquals(Canonical.digest(subsetOf(IMPACT.bundle())), IMPACT.bundle().get("digests").get("content").stringValue());
+    }
+
+    private static JsonNode subsetOf(JsonNode bundle) {
+        ObjectNode subset = StrictJson.newObject();
+        for (String key : List.of("companies", "pathCompanies", "issues", "relations", "evidence", "articles", "impacts")) {
+            subset.set(key, bundle.get(key));
+        }
+        return subset;
+    }
+
+    @Test
+    void theEarlierBundleFiveShapeIsRefusedAndAForgedBundleSixLabelCannotRideOnIt() {
+        assertRefusedFrom(BUILT, "the schema before impacts", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-5"));
+        assertThrows(StrictJson.Malformed.class, () -> {
+            ObjectNode earlier = BUILT.bundle().deepCopy();
+            earlier.put("schemaVersion", "zoop-graph-handoff-bundle-5");
+            earlier.remove("impacts");
+            ((ObjectNode) earlier.get("policy")).remove("impacts");
+            ((ObjectNode) earlier.get("counts")).remove("impacts");
+            ((ObjectNode) earlier.get("digests")).put("content", Canonical.digest(withoutImpactsSubset(earlier)));
+            HandoffBundleVerifier.verify(earlier);
+        }, "the bundle-5 shape: no impacts, the five-collection digest");
+        assertRefusedFrom(BUILT, "a later schema", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-7"));
+        // A bundle-6 whose provenance says live cannot carry the replay-only technical code.
+        assertRefusedFrom(LIVE, "a replay-only code in a live bundle",
+                b -> candidateRow(impactRow(b, 0), "technical-reject", "verifier_reply_invalid", true, true));
+    }
+
+    private static JsonNode withoutImpactsSubset(JsonNode bundle) {
+        ObjectNode subset = StrictJson.newObject();
+        for (String key : List.of("companies", "pathCompanies", "issues", "relations", "evidence", "articles")) {
+            subset.set(key, bundle.get(key));
+        }
+        return subset;
+    }
+
+    @Test
+    void theProducersRealImpactExportsAreAcceptedWithTheHandWrittenRows() throws Exception {
+        // expected-impacts.json is written by hand in graph_handoff_smoke.py (never derived from the planner): per export file, the
+        // impacts rows the authored world implies.
+        JsonNode expected = HandoffFixtures.parse(resource("expected-impacts.json"));
+        int exports = 0;
+        java.util.Set<String> statuses = new java.util.TreeSet<>();
+        for (String name : expected.propertyNames()) {
+            if (name.startsWith("bundle-impact-")) {
+                continue;
+            }
+            byte[] export = resource(name);
+            HandoffBundle verified = new HandoffExportParser().parse(export, pinning(export)).bundle();
+            JsonNode bundle = HandoffFixtures.parse(export).get("bundle");
+            assertEquals("zoop-graph-handoff-bundle-6", bundle.get("schemaVersion").stringValue(), name);
+            assertEquals(expected.get(name), bundle.get("impacts"), name);
+            assertEquals(expected.get(name).size(), bundle.get("counts").get("impacts").intValue(), name);
+            assertEquals("s3-independent-verifier-quote-effect", bundle.get("policy").get("impacts").stringValue(), name);
+            // One row per INVOLVES source relation: the row set is exactly the edges' sourceRefs.
+            int sources = 0;
+            for (JsonNode relation : bundle.get("relations").values()) {
+                sources += relation.get("type").stringValue().equals("INVOLVES") ? relation.get("sourceRefs").size() : 0;
+            }
+            assertEquals(sources, bundle.get("impacts").size(), name);
+            for (JsonNode row : bundle.get("impacts").values()) {
+                statuses.add(row.get("status").stringValue());
+                assertEquals(13, row.size(), name);
+                if (!row.get("proposal").isNull()) {
+                    assertEquals("none", row.get("proposal").get("verification").stringValue(), name);
+                }
+                if (!row.get("status").stringValue().equals("verified")) {
+                    assertTrue(row.get("label").isNull() && row.get("effects").isNull(), name);
+                }
+            }
+            assertFalse(verified.evidence().isEmpty(), name);
+            exports++;
+        }
+        assertTrue(exports >= 8, "expected the producer's default, approved, impact and unicode exports: " + exports);
+        for (String status : List.of("not-proposed", "not-applicable", "no-evidence", "technical-reject", "verifier-reject",
+                "verified")) {
+            assertTrue(statuses.contains(status), "no real export carries a " + status + " row");
+        }
+    }
+
+    @Test
+    void theProducersOwnImpactNegativeFixturesAreRefusedWithTheirContentDigestRecomputed() throws Exception {
+        JsonNode expected = HandoffFixtures.parse(resource("expected-impacts.json"));
+        int refused = 0;
+        for (String name : expected.propertyNames()) {
+            if (!name.startsWith("bundle-impact-")) {
+                continue;
+            }
+            byte[] export = resource(name);
+            JsonNode bundle = HandoffFixtures.parse(export).get("bundle");
+            String location = expected.get(name).get("validatorLocation").stringValue();
+            String breaks = expected.get(name).get("breaks").stringValue();
+            if (location.equals("digests.content")) {
+                // The one fixture whose point is an impacts edit WITHOUT its digest.
+                assertFalse(HandoffBundleVerifier.contentDigest(bundle).equals(bundle.get("digests").get("content").stringValue()), name);
+            } else {
+                assertEquals(HandoffBundleVerifier.contentDigest(bundle), bundle.get("digests").get("content").stringValue(), name);
+            }
+            assertEquals(GraphHandoffFailure.BUNDLE_INVALID, failureOf(export), name + ": " + breaks);
+            refused++;
+        }
+        assertEquals(35, refused);
+    }
+
+    @Test
+    void aMaximalUnicodeProposalOfARealExportIsAcceptedAndOneCodePointMoreIsRefused() throws Exception {
+        byte[] export = resource("export-impacts-unicode.json");
+        new HandoffExportParser().parse(export, pinning(export));
+        JsonNode bundle = HandoffFixtures.parse(export).get("bundle");
+        ObjectNode proposal = null;
+        for (JsonNode row : bundle.get("impacts").values()) {
+            if (!row.get("proposal").isNull()
+                    && row.get("proposal").get("reason").stringValue().codePointCount(0, row.get("proposal").get("reason").stringValue().length()) == 2000) {
+                proposal = (ObjectNode) row.get("proposal");
+            }
+        }
+        assertTrue(proposal != null, "the real export carries a reason of exactly 2000 code points");
+        assertTrue(proposal.get("reason").stringValue().length() > 2000, "astral code points are more than 2000 UTF-16 units");
+        assertForged("a reason of 2001 code points", bundle, b -> {
+            for (JsonNode row : b.get("impacts").values()) {
+                JsonNode reason = row.get("proposal").isNull() ? null : row.get("proposal").get("reason");
+                if (reason != null && reason.stringValue().codePointCount(0, reason.stringValue().length()) == 2000) {
+                    ((ObjectNode) row.get("proposal")).put("reason", reason.stringValue() + "x");
+                }
+            }
+        });
+    }
+
+    /**
+     * The impact world plus a SECOND article that has the SAME article version as the first but another article id (a distinct document
+     * with the same version hash), and an evidence span of it that the verified row lists as a positive effect. Everything is
+     * rehashed and the label stays valid, so only the article closure of the row can refuse it: the edge cites {@code ARTICLE_ID},
+     * never the foreign article, and the pair {@code (articleId, articleVersion)} (not the version alone) is the closure.
+     */
+    private static void withForeignArticleEffect(ObjectNode bundle, boolean edgeCitesIt) {
+        String quoteId = impactRow(bundle, 0).get("effects").get("positive").get(0).stringValue();
+        ObjectNode quote = null;
+        for (JsonNode evidence : bundle.get("evidence").values()) {
+            if (evidence.get("id").stringValue().equals(quoteId)) {
+                quote = (ObjectNode) evidence;
+            }
+        }
+        String foreignArticle = "doc-" + "d".repeat(64);
+        ObjectNode article = ((ObjectNode) bundle.get("articles").get(0)).deepCopy();
+        article.put("articleId", foreignArticle).put("documentId", foreignArticle);
+        ((ArrayNode) bundle.get("articles")).add(article);
+        ObjectNode foreign = quote.deepCopy();
+        String foreignId = HandoffBundleVerifier.appEvidenceId(foreignArticle, HandoffFixtures.ARTICLE_VERSION,
+                quote.get("start").intValue(), quote.get("end").intValue());
+        foreign.put("id", foreignId).put("articleId", foreignArticle);
+        ((ObjectNode) foreign.get("source")).put("documentId", foreignArticle).put("sourceEvidenceId", "ev-" + "e".repeat(32));
+        ((ArrayNode) bundle.get("evidence")).add(foreign);
+        ((ObjectNode) bundle.get("counts")).put("evidence", 5).put("articles", 2);
+        List<String> positive = new ArrayList<>(List.of(quoteId, foreignId));
+        Collections.sort(positive);
+        ArrayNode ids = ((ObjectNode) impactRow(bundle, 0).get("effects")).putArray("positive");
+        positive.forEach(ids::add);
+        if (edgeCitesIt) {
+            ObjectNode involves = relationOfType(bundle, "INVOLVES");
+            List<String> cited = new ArrayList<>();
+            involves.get("evidenceIds").values().forEach(item -> cited.add(item.stringValue()));
+            cited.add(foreignId);
+            Collections.sort(cited);
+            ArrayNode evidenceIds = involves.putArray("evidenceIds");
+            cited.forEach(evidenceIds::add);
+        }
+    }
+
+    @Test
+    void anEffectOfAnotherArticleWithTheSameArticleVersionIsNotOnTheEdgesOwnArticleAndIsRefused() {
+        assertRefusedFrom(IMPACT, "an effect span of another article id with the edge's article version",
+                b -> withForeignArticleEffect(b, false));
+        // The control: the very same bundle is valid once the edge itself cites that article's span, so the pair closure is the only difference.
+        assertAcceptedFrom(IMPACT, "the same foreign article cited by the edge itself", b -> withForeignArticleEffect(b, true));
+    }
+
+    /**
+     * The impact world whose one verified row lists exactly {@code total} distinct, valid evidence spans of the edge's own article version, spread
+     * over all four effect sides (so no single side is near its own cap), each with its own source evidence id. The uncertain side is non-empty, hence the
+     * recomputed label is {@code undetermined}. Every span is referenced, every id unique and well formed: only the row's TOTAL can be at fault.
+     */
+    private static void withEffectTotal(ObjectNode bundle, int total) {
+        String quoteId = impactRow(bundle, 0).get("effects").get("positive").get(0).stringValue();
+        ObjectNode quote = null;
+        for (JsonNode evidence : bundle.get("evidence").values()) {
+            if (evidence.get("id").stringValue().equals(quoteId)) {
+                quote = (ObjectNode) evidence;
+            }
+        }
+        List<String> ids = new ArrayList<>(List.of(quoteId));
+        for (int index = 1; index < total; index++) {
+            int start = 1_000 + 2 * index;
+            int end = start + 1;
+            ObjectNode extra = quote.deepCopy();
+            String id = HandoffBundleVerifier.appEvidenceId(HandoffFixtures.ARTICLE_ID, HandoffFixtures.ARTICLE_VERSION, start, end);
+            extra.put("id", id).put("start", start).put("end", end).put("quoteSha256", Canonical.sha256("quote-" + index));
+            ((ObjectNode) extra.get("source")).put("sourceEvidenceId", "ev-" + String.format("%032x", index));
+            ((ArrayNode) bundle.get("evidence")).add(extra);
+            ids.add(id);
+        }
+        // The impact world holds four evidence spans (event, geography, basis, impact quote); the extra ones are the total minus the quote itself.
+        ((ObjectNode) bundle.get("counts")).put("evidence", 3 + total);
+        List<List<String>> sides = List.of(new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
+        for (int index = 0; index < ids.size(); index++) {
+            sides.get(index % 4).add(ids.get(index));
+        }
+        sides.forEach(Collections::sort);
+        effectsOf(impactRow(bundle, 0), sides.get(0), sides.get(1), sides.get(2), sides.get(3));
+        impactRow(bundle, 0).put("label", "undetermined");
+    }
+
+    @Test
+    void aVerifiedRowMayListFortyEffectsInTotalAcrossSidesAndFortyOneIsRefused() {
+        assertAcceptedFrom(IMPACT, "40 valid effects spread over four sides", b -> withEffectTotal(b, 40));
+        assertRefusedFrom(IMPACT, "41 otherwise valid effects spread over four sides (no side exceeds its share)", b -> withEffectTotal(b, 41));
     }
 }

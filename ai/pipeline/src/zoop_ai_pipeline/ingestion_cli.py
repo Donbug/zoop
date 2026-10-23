@@ -9,12 +9,13 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from .ingestion import Ingestor, Store
-from .ingestion_contracts import SCHEMA, MAX_INPUT, Authority, Export, IngestionFailure, Inspect, Resume, Run, canonical
+from .ingestion_contracts import SCHEMA, MAX_INPUT, Authority, Export, IngestionFailure, Inspect, Resume, Run, Tick, canonical
+from .ingestion_schedule import clock, latest_slot, not_due, tick
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("run", "resume", "inspect", "export"))
+    parser.add_argument("command", choices=("run", "resume", "inspect", "export", "tick"))
     parser.add_argument("--state-dir", required=True, type=Path)
     parser.add_argument("--sources", required=True, type=Path)
     parser.add_argument("--fixture-manifest", type=Path)
@@ -26,6 +27,20 @@ def main() -> int:
         if len(raw) > MAX_INPUT:
             raise IngestionFailure("command_input_limit")
         incoming = json.loads(raw)
+        if args.command == "tick":
+            if args.require_store:
+                raise IngestionFailure("require_store_not_allowed")
+            request = Tick.model_validate(incoming)
+            now = clock(request)
+            slot, reason = latest_slot(now)
+            if slot is None:
+                # Not due: no registry, manifest or state is touched.
+                print(canonical(not_due(now, reason)))
+                return 0
+            store = Store(args.state_dir)
+            body, code = tick(request, now, slot, store, Authority(args.sources), args.fixture_manifest)
+            print(canonical(body))
+            return code
         authority = Authority(args.sources)
         model = {"run": Run, "resume": Resume, "inspect": Inspect, "export": Export}[args.command]
         request = model.model_validate(incoming)

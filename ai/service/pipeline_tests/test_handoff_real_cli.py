@@ -20,7 +20,7 @@ from typing import Any, Callable
 import pytest
 
 from handoff_support import bundle_url, status_url
-from real_handoff_support import (VERDICT_HANDOFF, RealWorkspace, digest_of, pin_entry, producer_accepts, producer_accepts_manifest, verdict_problems)
+from real_handoff_support import (IMPACT_HANDOFF, VERDICT_HANDOFF, RealWorkspace, digest_of, pin_entry, producer_accepts, producer_accepts_manifest, verdict_problems)
 from relation_support import PIPELINE
 from support import canonical
 from zoop_ai_service.handoff_doc import example_bundle, example_manifest
@@ -115,10 +115,17 @@ def test_the_http_bundle_is_the_real_cli_export_of_a_two_job_world_and_the_produ
             assert expected and provenance["sameValueMentions"][name] == expected, (issue["id"], name)
             assert issue[name] == (None if name in suppressed else selected)
         assert issue["timePrecision"] == ("unknown" if "eventTime" in suppressed else issue["timePrecision"])
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5"
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-6"
     assert (bundle["readiness"], wire["verification"]["provenance"]) == ({"app": "import-pending", "evidenceRegistration": "not-registered", "publicActivation": "none",
                                                                           "graphDb": "none"}, bundle["provenance"])
     assert producer_accepts(response.content)
+    # impacts: the real producer's rows, relayed exactly and equal to the pipeline world's hand-written expectation (never derived from the bundle or the service)
+    assert handoff_world.impacts and bundle["impacts"] == handoff_world.impacts and bundle["counts"]["impacts"] == len(bundle["impacts"])
+    assert bundle["policy"]["impacts"] == "s3-independent-verifier-quote-effect"
+    involves = sorted((r["id"], ref["jobId"], ref["id"]) for r in bundle["relations"] if r["type"] == "INVOLVES" for ref in r["sourceRefs"] if ref["kind"] == "s3-relation")
+    assert [(i["edgeId"], i["sourceRelation"]["jobId"], i["sourceRelation"]["relationCandidateId"]) for i in bundle["impacts"]] == involves
+    assert all(set(i) == {"edgeId", "issueId", "companyId", "sourceRelation", "impactCandidateId", "status", "code", "label", "targetVerdict", "effects", "verifier",
+                          "verifierRequestDigest", "proposal"} for i in bundle["impacts"])
     manifest = wire["manifest"]                                    # the ledger's frozen request, carried beside the bundle
     assert manifest == oracle["manifest"] and canonical(manifest) == canonical(oracle["manifest"])
     assert digest_of(manifest) == pins["manifestDigest"] == bundle["manifestDigest"] == wire["verification"]["manifestDigest"] == oracle["receipt"]["manifestDigest"]
@@ -134,6 +141,73 @@ def test_the_real_bundle_hashes_to_the_pin_in_another_language_after_a_plain_jso
     assert response.status_code == 200 and digest == handoff_world.handoffs["handoff-1"]["bundleDigest"]
 
 
+def test_the_default_world_relays_not_proposed_rows_for_every_automatic_participation(handoff_world, start_handoff: Start):
+    _, service = start_handoff(listed(handoff_world, "handoff-1"))
+    rows = get(service, bundle_url("handoff-1")).json()["bundle"]["impacts"]
+    assert rows == handoff_world.impacts and rows and all(r["status"] == "not-proposed" and r["impactCandidateId"] is None and r["proposal"] is None for r in rows)
+
+
+def test_the_real_impact_world_is_relayed_with_every_state_the_pipeline_authored(impact_world, start_impact_handoff: Start):
+    """The pipeline's hand-written rich-world expectation (`impact_world.impacts`, never derived from the service) spans the real states and the HTTP bundle relays exactly
+    those rows, byte-equal to the CLI export: on the supply edge four rows of one edge kept apart (verified positive, verifier-reject, verified negative of the other job,
+    verified undetermined for an insufficient target), on the factory edge a no-evidence row (label null) and a precheck-rejected technical reject. The verifier is an authored
+    replay, not independent inference."""
+    ws, service = start_impact_handoff(listed(impact_world, IMPACT_HANDOFF))
+    code, oracle, _ = ws.direct(IMPACT_HANDOFF)
+    response = get(service, bundle_url(IMPACT_HANDOFF))
+    wire = response.json()
+    assert code == 0 and response.status_code == 200 and wire["delivery"]["state"] == "current", response.text[:300]
+    bundle = wire["bundle"]
+    rows = bundle["impacts"]
+    assert bundle == oracle["bundle"] and canonical(bundle) == canonical(oracle["bundle"]) and digest_of(bundle) == impact_world.handoffs[IMPACT_HANDOFF]["bundleDigest"]
+    assert rows == impact_world.impacts and bundle["counts"]["impacts"] == len(rows) == 6 and producer_accepts(response.content)
+    assert sorted(((r["status"], r["code"]) for r in rows), key=repr) == sorted([("verified", None)] * 3 + [("verifier-reject", None), ("no-evidence", None),
+                                                                                 ("technical-reject", "impact_precheck_rejected")], key=repr)
+    verified = [r for r in rows if r["status"] == "verified"]
+    assert {r["label"] for r in verified} == {"positive", "negative", "undetermined"}
+    assert all(r["effects"] and sum(map(len, r["effects"].values())) >= 1 and r["proposal"]["verification"] == "none" and r["verifier"] == "called" for r in verified)
+    assert all(r["label"] is None and r["effects"] is None for r in rows if r["status"] != "verified")
+    assert all(r["targetVerdict"] == "contradicted" for r in rows if r["status"] == "verifier-reject")
+    assert all(r["impactCandidateId"] is not None and r["proposal"] is not None for r in rows if r["status"] in ("no-evidence", "verified", "verifier-reject"))
+    assert all(r["impactCandidateId"] is not None and r["proposal"] is None and r["verifier"] == "not-called" for r in rows if r["status"] == "technical-reject")
+    supply = [r for r in rows if r["issueId"] == "issue:supply-2026q3"]
+    assert len(supply) == 4 and len({r["edgeId"] for r in supply}) == 1 and len({r["sourceRelation"]["relationCandidateId"] for r in supply}) == 4
+    by_label = {r["label"]: r for r in supply if r["status"] == "verified"}
+    assert {"positive", "negative"} <= set(by_label), "the same edge keeps its opposite verified labels as separate rows, never aggregated"
+    assert by_label["positive"]["edgeId"] == by_label["negative"]["edgeId"] and by_label["positive"]["sourceRelation"] != by_label["negative"]["sourceRelation"]
+    assert by_label["positive"]["effects"]["positive"] and by_label["negative"]["effects"]["negative"]
+    assert by_label["positive"]["impactCandidateId"] != by_label["negative"]["impactCandidateId"]
+    status = get(service, status_url(IMPACT_HANDOFF))
+    assert status.status_code == 200 and "bundle" not in status.json() and status.json()["verification"]["counts"]["impacts"] == 6
+    assert not [s for s in ("effects", "proposal", "verifierRequestDigest", "targetVerdict", "impactCandidateId", "positive") if s in status.text]
+    assert not [s for s in ws.world.private if s in response.text + status.text]
+
+
+def test_the_service_model_refuses_every_negative_the_producers_validator_refuses_and_accepts_the_unicode_length_bundle(impact_world):
+    """The pipeline's one-rule-broken bundles of the REAL rich export (digest recomputed, so only the broken rule can refuse them) against the service's closed model. A case
+    about the content digest itself is not a model rule: the rebuilt digest must differ from the one the bundle states."""
+    from pydantic import ValidationError
+    from zoop_ai_service.handoff_reads import content_digest
+    from zoop_ai_service.handoff_wire import Bundle
+    assert len(impact_world.impact_negatives) >= 30
+    survived = []
+    for name, case in impact_world.impact_negatives.items():
+        bundle = case["bundle"]
+        if not case["digestRefreshed"]:
+            assert content_digest(bundle) != bundle["digests"]["content"], name
+            continue
+        try:
+            Bundle.model_validate(bundle)
+        except ValidationError:
+            continue
+        survived.append((name, case["validatorLocation"]))
+    assert survived == [], survived
+    unicode_bundle = impact_world.impact_unicode
+    row = next(r for r in unicode_bundle["impacts"] if r["status"] == "verified")
+    assert len(row["proposal"]["reason"]) == 2000 and len(row["proposal"]["reason"].encode("utf-16-le")) == 8000
+    assert Bundle.model_validate(unicode_bundle).wire() == unicode_bundle
+
+
 def test_a_status_over_the_real_cli_is_content_free_and_agrees_with_the_receipt(handoff_world, start_handoff: Start):
     ws, service = start_handoff(listed(handoff_world, "handoff-1"))
     _, oracle, _ = ws.direct("handoff-1")
@@ -146,6 +220,7 @@ def test_a_status_over_the_real_cli_is_content_free_and_agrees_with_the_receipt(
     assert (wire["delivery"]["state"], wire["delivery"]["reason"]) == ("current", None) and wire["delivery"]["checkedAt"]   # its own check time, not the oracle's
     for private in (*ws.private_strings(), "rel-a", "rel-b", "KRX:005930", "doc-", "ev-", "issue:supply", "reviewDigest", "attempts"):
         assert private not in response.text, private
+    assert not [s for s in ("effects", "proposal", "verifierRequestDigest", "targetVerdict", "impactCandidateId") if s in response.text]   # status carries no impact content (only the count)
 
 
 def test_principals_see_only_their_own_pinned_handoffs_and_every_refusal_is_the_same_before_any_child(handoff_world, start_handoff: Start):
@@ -259,7 +334,7 @@ def test_the_http_bundle_carries_the_operators_real_field_verdicts_with_the_supp
     wire = response.json()
     assert response.status_code == 200 and wire["delivery"]["state"] == "current", response.text[:300]
     bundle = wire["bundle"]
-    assert bundle == oracle["bundle"] and canonical(bundle) == canonical(oracle["bundle"]) and bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5"
+    assert bundle == oracle["bundle"] and canonical(bundle) == canonical(oracle["bundle"]) and bundle["schemaVersion"] == "zoop-graph-handoff-bundle-6"
     assert digest_of(bundle) == pins["bundleDigest"] == wire["verification"]["bundleDigest"] == oracle["receipt"]["bundleDigest"]
     delivered = [v for issue in bundle["issues"] for v in issue["fieldVerdicts"]]
     assert len(delivered) == 5 and {v["decision"] for v in delivered} == {"ALLOW", "HOLD", "REJECT"}      # non-empty, every decision, from the real producer
