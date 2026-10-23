@@ -56,7 +56,7 @@ POST 가입·로그인·소셜 가입 완료·명시적 소셜 연결 시작과 
 
 ### publicationVersions
 
-그래프·사건·관계·근거 조회는 선택 graphVersion 또는 asOf를 받는다. 생략하면 한 요청 시작 시 활성 공개 버전을 고정하고 응답 metadata.graphVersion/asOf에 반환한다. 둘을 함께 지정하면 일치해야 한다. asOf는 그 시점 이전 공개 버전을 선택하며 이후 공개 자료는 사용하지 않는다. round는 발행 회차가 고정한 버전을 뜻한다. 고정 버전 부재는 VERSION_UNAVAILABLE이며 최신 자료로 대체하지 않는다. 브리핑은 그래프 버전·자료·시장 지표·긍부정을 발행 시 고정한다. 정정은 원문 밖에 덧붙인다.
+그래프·사건·관계·근거 조회는 선택 graphVersion 또는 asOf를 받는다. 생략하면 한 요청 시작 시 활성 공개 버전을 고정하고 응답 metadata.graphVersion/asOf에 반환한다. 둘을 함께 지정하면 일치해야 한다. asOf는 그 시점 이전 공개 버전을 선택하며 이후 공개 자료는 사용하지 않는다. round는 발행 회차가 고정한 버전과 회차 마감 시각을 함께 뜻한다. round와 graphVersion/asOf를 함께 지정하면 저장된 회차 기준과 정확히 같아야 한다. 회차의 저장 버전은 데이터 마감 이후 발행될 수 있으므로 activeVersionAt(asOf)로 다시 선택하지 않는다. 고정 버전 부재는 VERSION_UNAVAILABLE이며 최신 자료로 대체하지 않는다. 과거 로컬 회차의 별도 재구성본은 graphOrigin=reconstructed로 구분하고 원본 발행 버전·문안을 변경하지 않으며, 재구성 ID는 round 문맥 없이 직접 조회할 수 없다. 브리핑은 그래프 버전·자료·시장 지표·긍부정을 발행 시 고정한다. 정정은 원문 밖에 덧붙인다.
 
 ### partialFailures
 
@@ -157,6 +157,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | [getEvidence](#getevidence) | GET | /api/v1/evidence/{id} | 공개 | P1 |
 | [getBriefing](#getbriefing) | GET | /api/v1/briefings | 공개 | P1 |
 | [listBriefingRounds](#listbriefingrounds) | GET | /api/v1/briefings/rounds | 공개 | P1 |
+| [getBriefingRecap](#getbriefingrecap) | GET | /api/v1/briefings/{id}/recap | 공개 | P1 |
 | [getBriefingItemDetail](#getbriefingitemdetail) | GET | /api/v1/briefings/{roundId}/items/{eventId} | 공개 | P1 |
 | [getBriefingGraphBasis](#getbriefinggraphbasis) | GET | /api/v1/briefings/{id}/graph | 공개 | P1 |
 | [createConversation](#createconversation) | PUT | /api/v1/chat/sessions/{id} | 회원(본인) | P1 |
@@ -806,7 +807,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getGraph · 전체·개인화·시점별 관계 그래프 조회
 
-기업/이슈 노드만 제공한다. 전체 모드에는 개인 정보가 없고 개인화 모드는 회원 본인만 허용한다. 필터 결과의 기준 기업은 관계 0건이어도 유지한다. 국내/국제 속성이 없는 이슈는 공개 검증에서 제외/보완하며 임의로 값을 만들지 않는다. asOf/graphVersion/round를 고정하고 관계 0건·기준 기업 0개·장애를 구분한다.
+기업/이슈 노드만 제공한다. 전체 모드에는 개인 정보가 없고 개인화 모드는 회원 본인만 허용한다. 필터 결과의 기준 기업은 관계 0건이어도 유지한다. 국내/국제 속성이 없는 이슈는 공개 검증에서 제외/보완하며 임의로 값을 만들지 않는다. asOf/graphVersion/round를 고정하고 관계 0건·기준 기업 0개·장애를 구분한다. 개인화 조회에서 선택한 범위에 기준 기업이 없으면 emptyReason=no_personal_stocks와 빈 노드·간선을 반환한다. 전체 시장은 mode=all로 별도 조회한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1016,15 +1017,15 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## listCompanyDocuments · 기업 맥락 뉴스·공시와 긍부정 조회
 
-기업 맥락 뉴스·공시와 긍부정 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기업 맥락 뉴스·공시와 긍부정 조회. from/to가 있으면 발행 시각 미상 문서를 제외한다. to는 선택된 공개 그래프 버전 안에서 기사·사건·기업 직접 관계의 시점 상한이며 버전 선택은 asOf/graphVersion 규칙을 따른다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `GET /api/v1/companies/{id}/documents` |
 | 권한·우선순위 | 공개 · P1 |
 | 요청 본문 | 없음 |
-| 응답 | 200: [CompanyDocumentsResponse](#schema-companydocumentsresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, INVALID_CURSOR |
+| 응답 | 200: [CompanyDocumentsResponse](#schema-companydocumentsresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, INVALID_CURSOR, VERSION_UNAVAILABLE |
 | FS/NFS | [FS021](../../system/out/feature-FS021.md) · [FS043](../../system/out/feature-FS043.md) · [FS056](../../system/out/feature-FS056.md) · [FS063](../../system/out/feature-FS063.md) · [FS064](../../system/out/feature-FS064.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-COM-02](../../system/out/screen-D-COM-02.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) · [D-SEN-01](../../system/out/screen-D-SEN-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.6.5, 6.6.22, 6.7.6, 6.7.9, 6.5.2, 6.5.6, 6.5.7 |
@@ -1043,9 +1044,9 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 | kind | query | 선택 | string {news, disclosure} |  |
-| round | query | 선택 | string | 브리핑 회차 ID. 회차의 문서와 기업별 긍부정 발행본을 함께 고정한다. |
+| round | query | 선택 | string | 브리핑 회차 ID. 회차가 고정한 버전·마감 시각과 선정 이슈 범위의 문서만 반환한다. cursor도 회차·버전·시각에 결속하며 다른 회차로 재사용하면 INVALID_CURSOR다. 현재 접근 권한·정확 인용을 재확인하고 최신 문서나 새 분석으로 대체하지 않는다. 재구성 자료는 metadata.source=briefing_reconstructed_graph로 구분한다. |
 | from | query | 선택 | string (date) / string (date-time) | 차트·타임라인과 같은 조회 시작 조건. 날짜 또는 오프셋을 포함한 시각이다. |
-| to | query | 선택 | string (date) / string (date-time) | 같은 조회 종료 조건이며 이 시각 이후 공개된 문서는 제외한다. |
+| to | query | 선택 | string (date) / string (date-time) | 같은 조회 종료 조건이며 이 시각 이후 공개된 기사와 아직 공개되지 않은 사건·기업 관계는 제외한다. 날짜는 KST 그날 전체, 오프셋이 있는 시각은 그 시각을 포함한다. 발행 시각 미상 문서는 제외한다. |
 
 <a id="listevents"></a>
 
@@ -1085,7 +1086,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getEvent · 사건 상세와 근거 참조 조회
 
-사건 상세와 근거 참조 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+사건 상세와 근거 참조 조회. round·graphVersion·asOf로 공개 버전 하나를 고정하고(그래프 조회와 같은 규칙) 그 버전에서 현재 제외를 적용한 뒤 보이는 사건만 반환하며, 보이지 않으면 RESOURCE_NOT_FOUND/404다. relations·companies·articles·follows·evidenceIds와 사건 머리 필드는 스냅샷에서 읽는다. asOf는 그래프와 같이 사건의 기사가 하나라도 asOf 이후에 공개됐으면 사건 전체를 가리며(404), 일부 기사만 남긴 상세는 만들지 않는다. articles는 이 사건의 보이는 근거가 가리키는 정확한 (기사 ID, 기사 버전)만 담고 같은 기사의 다른 버전은 넣지 않으며, 최신 공개순이다(FS021의 관련도 우선 정렬은 관련도 원천이 없어 미구현). relations[].edgeId는 그래프 표시 간선 ID와 같다. follows는 FOLLOWS 관계(뒤 사건→앞 사건)에서 이 버전에 보이는 사건만 담는다. 수입한 버전은 그 버전의 import receipt(AI 인계 묶음)에서 mentions(원본 S2 언급, verification none)·fieldDecisions(운영자 필드 판정의 필드·결정·사유 코드만, 판정 대상 값은 싣지 않음, candidateId는 null)·sourceSupport(인계 값을 그대로 복사)를 읽고, receipt를 읽을 수 없거나, 그 사건을 담지 않거나, 인계 묶음 스키마가 현재(zoop-graph-handoff-bundle-5)가 아니면(이전 묶음은 언급·필드 판정이 없으므로 빈 목록으로 대신하지 않음) SOURCE_UNAVAILABLE/503이다. 수입한 버전은 근거마다 getEvidence와 같은 현재 공개 게이트(기사 접근 상태·현재 source grant·registry)를 지금 다시 적용해, 언급은 그 근거가 모두 보일 때만 참가자와 함께 내보내고(일부라도 가려지면 언급 전체를 뺌), 관계는 근거가 모두 보일 때만, 기사는 보이는 근거가 가리킬 때만 남긴다. 머리 필드는 운영자가 고른 대표 언급(fieldProvenance.selection=operator-representative)의 값이거나, 대표가 없으면(unanimous) 모든 언급이 같은 값이므로, 대표 언급 또는 모든 언급이 온전히 보이지 않으면 사건 전체를 RESOURCE_NOT_FOUND/404로 닫는다. follows와 FOLLOWS 관계의 상대 사건도 같은 머리 검사를 통과해야 하며, 통과하지 못하면 관계와 참조 모두에서 뺀다. 운영자가 보류·거절(HOLD·REJECT)한 언급의 eventTime(이때 timePrecision=unknown)·period는 null이며 어떤 필드로도 내보내지 않는다. 현재 권한·제외로 기사 일부가 빠지면 sourceSupport는 articleCount를 보이는 기사 수로 하고 가려진 기사에 의존하는 knownLineageCount·independentSourceCount는 null, 목록은 보이는 기사만 남긴다. 합성 fixture 버전은 receipt가 없어 mentions·fieldDecisions가 빈 배열이고 sourceSupport는 모든 기사의 출처가 알려지지 않은 것으로 표시한다(개수는 0이 아니라 null). articles[].publisher는 고정된 기사 버전의 저장된 article_versions 값이며 없으면 null, relationType은 그 기사의 보이는 언급이 모두 background면 PROVIDES_BACKGROUND, 아니면 REPORTS, 언급 정보가 없으면 null이다(앱 결정). role이 있는 companies·relations·참가자는 roleUnconfirmed=true다(인계가 확인된 역할을 생산하지 않음). summary는 아직 사건 요약 생산자가 없어 Unavailable이고 metadata.partial=true·failures에 summary를 남기며, approval은 null이다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1115,7 +1116,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getEvidence · 원문 인용과 기업별 긍부정 조회
 
-원문 인용과 기업별 긍부정 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+원문 인용 조회. round를 지정하면 해당 회차의 버전·마감 시각과 선정 이슈 범위를 공통 reader에서 고정한다. 원래 그래프의 인용은 선택 버전의 import receipt·정확 span·현재 source grant를 검사한다. 로컬 재구성 그래프의 인용은 보존된 회차 상세·원문 버전·정확 span·현재 발행 권한을 검사하고 metadata.source=briefing_reconstructed_graph로 구분한다. 현재 기업별 감성 판정은 생성하지 않으며 companyId 지정 시 해당 섹션은 unavailable로 안내한다. 최신 그래프나 최신 문서로 대체하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1198,6 +1199,33 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
 | limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
 
+<a id="getbriefingrecap"></a>
+
+## getBriefingRecap · 새 핵심 이슈가 없는 회차의 이전 발행본 복기
+
+정상 발행된 빈 회차(no_issues_in_window)의 고정 비교 참조만 사용한다. 저장된 이전 회차 원문을 현재 권한·정정·시점 검증 후 반환한다. 새 이슈·새 전망·재평가가 아니며, 실패·보류 회차를 정상 무소식으로 전환하지 않는다. 고정 참조가 없거나 변경·정정·중단되면 다른 회차로 대체하지 않는다. 읽기 전용이며 기존 payload와 DB 스키마는 변경하지 않는다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/briefings/{id}/recap` |
+| 권한·우선순위 | 공개 · P1 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [BriefingRecap](#schema-briefingrecap), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
+| FS/NFS | [FS028](../../system/out/feature-FS028.md) · [FS029](../../system/out/feature-FS029.md) · [FS033](../../system/out/feature-FS033.md) · [FS035](../../system/out/feature-FS035.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) |
+| WBS | 6.1.2, 6.11.1 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | Spring 공개 조회의 읽기 전용 복기 뷰이며 직접 대응 BFF 없음. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| id | path | 필수 | string |  |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+
 <a id="getbriefingitemdetail"></a>
 
 ## getBriefingItemDetail · 회차에 고정된 브리핑 항목과 근거 조회
@@ -1230,7 +1258,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getBriefingGraphBasis · 발행 당시 그래프 기준 조회
 
-발행 당시 그래프 기준 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+발행본의 graphVersion과 회차 마감 시각을 고정해 핵심 이슈·관련 기업을 조회한다. 저장본과 대상 관계가 실제로 읽히는 경우에만 available이다. 과거 회차의 별도 재구성본은 graphOrigin=reconstructed와 reconstructedAt으로 구분하고 당시 발행본의 graphVersion을 변경하지 않는다. 원본·재구성본 모두 없으면 unavailableReason=snapshot_not_recorded로 구분한다. 최신 그래프로 대체하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1829,13 +1857,13 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## activateGraphVersion · 기존 공개 버전 활성화
 
-기존 공개 버전 활성화.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기존 공개 버전 활성화. 공개 포인터를 수입·등록된 버전으로 옮긴다(FS059). 서버는 공유 publication lock 안에서 expectedActiveVersionId를 현재 활성 버전과 비교하고 다르면 REVISION_CONFLICT/409로 거절한다(그래프 조회 계약 §0 '기대 활성 버전 비교'). 포인터를 옮기기 전에 선택한 스냅샷을 읽고 hash를 검증하며 실패하면 SOURCE_UNAVAILABLE/503이고 활성 버전은 그대로다. 합성 fixture 버전(kind=fixture)은 서버의 스냅샷 소스가 fixture(로컬·개발 전용)일 때만 활성화할 수 있고, 그 외 구성에서는 남아 있는 fixture 행이 공개 그래프가 되지 않도록 INVALID_REQUEST/422로 거절한다. 수입한(fixture가 아닌) 버전은 같은 lock 안에서 현재 공개 적격성도 다시 확인한다(그래프 조회 계약 §0 '활성화 직전 현재 권리·제외 재확인'). (1) 공개 제외 저장소(FS081)가 없으면 '제외 없음'을 확인할 수 없으므로 SOURCE_UNAVAILABLE/503으로 거절하며, 운영자가 서버 설정으로 명시 허용한 경우에만 이 단계를 넘긴다. (2) 현재 제외를 적용한 스냅샷의 모든 근거에 getEvidence와 같은 검사(검증된 본문 인용·기사 접근 상태·문서 버전·선택 버전 receipt의 grant·현재 원천 registry)를 수행하고, 수입 이후 철회·비공개·grant 변경으로 하나라도 보류되면 REVISION_CONFLICT/409, registry·저장소를 읽을 수 없으면 SOURCE_UNAVAILABLE/503이며 활성 버전은 그대로다. 검사 중 인용 기사 행은 공유 잠금으로 고정한다. 활성화 시각은 lock 획득·기대 버전 비교·적격성 검사 뒤에 정해 graph_activations·최초 published_at·감사 기록에 같은 값을 쓰며, 근거가 고정한 grant의 만료·철회 판정도 검사 시작 시각이 아니라 이 활성화 시각에 원천 registry를 다시 읽어 한다(검사 중 만료된 grant는 REVISION_CONFLICT/409), 멱등 레코드 생성 시각(요청 수신 시각)과 구분한다. 이미 활성인 버전이면 idempotent=true이고 포인터는 움직이지 않는다. 같은 Idempotency-Key·같은 본문은 최초 응답을 재현하고 다른 본문은 IDEMPOTENCY_CONFLICT다(본문 비교는 versionId·expectedActiveVersionId·reason의 정규 JSON이라 expectedActiveVersionId의 null과 빈 문자열은 다른 본문이다). expectedActiveVersionId가 본문에 없으면 INVALID_REQUEST/422이고 명시적 null은 '활성 버전 없음'이다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `POST /api/v1/admin/graph/versions/{version_id}/activate` |
 | 권한·우선순위 | 관리자(작업별 권한) · P1 |
-| 요청 본문 | [ReasonRequest](#schema-reasonrequest) |
+| 요청 본문 | [GraphVersionActivateRequest](#schema-graphversionactivaterequest) |
 | 응답 | 200: [ActivateResponse](#schema-activateresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS059](../../system/out/feature-FS059.md) · [FS067-02](../../system/out/feature-FS067-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
@@ -1854,7 +1882,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
 | Idempotency-Key | header | 필수 | string | 같은 주체·작업의 중복 실행 방지 키. 보존 기간은 팀 확인 필요다. |
 
-본문 스키마: [ReasonRequest](#schema-reasonrequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
+본문 스키마: [GraphVersionActivateRequest](#schema-graphversionactivaterequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
 
 <a id="listanalysisjobs"></a>
 
@@ -3107,11 +3135,14 @@ answer from that state, never from the newest graph. Any status but ``available`
 | date | 필수 | string (date) |  |
 | edition | 필수 | string {morning, evening} |  |
 | status | 필수 | string {available, suspended, unavailable, not_published} |  |
-| message | 필수 | string / null | User-facing notice for every status but available |
+| message | 필수 | string / null | User-facing status notice, including reconstruction limitations when graphOrigin is reconstructed |
 | reason | 필수 | string / null | Admin-written reason, only for suspended rounds |
 | publishedAt | 필수 | string (date-time) / null |  |
 | dataAsOf | 필수 | string (date-time) / null | End of the round's data window (KST): the reference time of the relations and evidence shown |
-| graphVersion | 필수 | string / null | Graph version the round was published from |
+| graphVersion | 필수 | string / null | Selected graph version: original publication snapshot or a later reconstruction distinguished by graphOrigin. The original published payload is unchanged. |
+| graphOrigin | 선택 | string {publication_snapshot, reconstructed} / null | Original publication snapshot or a separately registered later reconstruction. Reconstruction never overwrites the publication graphVersion. |
+| reconstructedAt | 선택 | string (date-time) / null | When the reconstruction artifact was first registered; not the briefing cutoff or publication time. |
+| unavailableReason | 선택 | string {snapshot_not_recorded, snapshot_unavailable, briefing_targets_unavailable} / null | Unavailable graph detail: no original snapshot was recorded, the recorded snapshot cannot be read, or the briefing targets are no longer visible. Never substitute the newest graph. |
 | keyIssueIds | 필수 | string[] | The round's key issues in rank order; empty unless available |
 | companyIds | 필수 | string[] | Companies related to those issues; empty unless available |
 | correctionCount | 필수 | integer | Corrections registered beside the published original |
@@ -3312,6 +3343,22 @@ The immutable published original of a round (what users saw before any correctio
 | eventIds | 필수 | string[] |  |
 | evidenceIds | 필수 | string[] |  |
 | companyIds | 필수 | string[] |  |
+
+<a id="schema-briefingrecap"></a>
+
+### BriefingRecap
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| roundId | 필수 | string |  |
+| graphVersion | 필수 | string / null |  |
+| dataAsOf | 필수 | string (date-time) / null |  |
+| status | 필수 | string {available, unavailable, not_applicable} |  |
+| reason | 필수 | string / null |  |
+| message | 필수 | string |  |
+| previous | 필수 | [BriefingResponse](#schema-briefingresponse) / null | 고정 참조의 과거 발행 원문. 이번 회차의 새 평가·새 전망이 아니다. available일 때만 제공하며 기존 데이터·시장 지표의 시점도 과거 그대로다. |
 
 <a id="schema-briefingresponse"></a>
 
@@ -4836,7 +4883,7 @@ same request again never toggles anything.
 | graphVersion | 필수 | string, null | 공개 데이터는 반드시 실제 사용한 버전 ID를 제공한다. 개인 설정 등 비그래프 리소스만 null이다. |
 | mode | 필수 | string {all, personal} |  |
 | truncated | 필수 | boolean |  |
-| emptyReason | 필수 | string / null |  |
+| emptyReason | 필수 | string / null | null은 빈 결과 사유 없음. no_personal_stocks는 개인화 조회에서 선택한 범위의 기준 기업이 없음(다른 범위에는 있을 수 있음), no_related_issues는 기준 기업은 있지만 관련 관계가 없음, no_approved_issues는 기준 기업이 없고 반환 간선도 없다는 판정이다. 이때 고립된 이슈 노드가 남을 수 있으므로 공개 가능한 사건이 전혀 없음을 보장하지 않는다. 장애는 이 값 대신 오류 응답을 사용한다. |
 | focusCompanyIds | 필수 | string[] |  |
 | depth | 필수 | integer / null | Requested hop count; null when omitted (whole connected component). |
 | limit | 필수 | integer |  |
@@ -4891,6 +4938,17 @@ same request again never toggles anything.
 | id | 필수 | string |  |
 | kind | 필수 | string {company, issue, edge} |  |
 
+<a id="schema-graphversionactivaterequest"></a>
+
+### GraphVersionActivateRequest
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| reason | 필수 | string |  |
+| expectedActiveVersionId | 필수 | string / null | 관리자가 목록에서 확인한 현재 활성 버전 ID. 활성 버전이 없었으면 null. 현재 값과 다르면 REVISION_CONFLICT/409. |
+
 <a id="schema-graphversionlist"></a>
 
 ### GraphVersionList
@@ -4914,7 +4972,7 @@ same request again never toggles anything.
 | --- | --- | --- | --- |
 | id | 필수 | string |  |
 | sequence | 필수 | integer |  |
-| kind | 필수 | string {seed, ledger} |  |
+| kind | 필수 | string {fixture, snapshot} |  |
 | createdAt | 필수 | string (date-time) |  |
 | createdBy | 필수 | string |  |
 | reason | 필수 | string / null |  |

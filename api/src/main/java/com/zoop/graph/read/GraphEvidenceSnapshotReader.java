@@ -1,5 +1,13 @@
 package com.zoop.graph.read;
 
+import com.zoop.briefing.query.BriefingQueryService;
+import com.zoop.briefing.storage.BriefingRoundRepository;
+import com.zoop.common.exception.CustomException;
+import com.zoop.common.exception.ErrorCode;
+import com.zoop.common.response.Metadata;
+import com.zoop.common.response.SectionFailure;
+import com.zoop.document.evidence.dto.EvidenceArticle;
+import com.zoop.document.evidence.dto.EvidenceResponse;
 import com.zoop.document.evidence.graph.GraphEvidence;
 import com.zoop.document.evidence.graph.GraphEvidenceReader;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
@@ -27,17 +35,68 @@ import org.springframework.stereotype.Component;
 @Component
 public class GraphEvidenceSnapshotReader implements GraphEvidenceReader {
     private final PublicGraphReader reader;
+    private final BriefingQueryService publications;
+    private final BriefingRoundRepository rounds;
 
     public GraphEvidenceSnapshotReader(PublicGraphReader reader) {
+        this(reader, null, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public GraphEvidenceSnapshotReader(PublicGraphReader reader,
+            BriefingQueryService publications,
+            BriefingRoundRepository rounds) {
         this.reader = reader;
+        this.publications = publications;
+        this.rounds = rounds;
+    }
+
+    @Override
+    public RoundRead readRound(String round, String graphVersion, Instant asOf, String evidenceId,
+            String companyId, String requestId) {
+        var pinned = reader.read(round, graphVersion, asOf, requestId);
+        var selected = pinned.selected();
+        var found = locate(pinned.graph().snapshot, selected.version().id(), selected.asOf(), evidenceId);
+        if (!selected.reconstructed()) return new RoundRead(found, null);
+        if (found.span() == null || publications == null)
+            throw new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE);
+        if (companyId != null && !pinned.graph().companies.containsKey(companyId))
+            throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+        // getItem rechecks current authority and exact stored citation/body/version. No fabricated graph import receipt.
+        for (String event : found.eventIds()) {
+            for (var citation : publications.getItem(round, event, requestId).path("evidence")) {
+                if (!evidenceId.equals(citation.path("id").asString())) continue;
+                var span = found.span();
+                var saved = rounds.findItemEvidence(evidenceId).orElseThrow(() ->
+                        new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE));
+                if (span.start() != saved.start() || span.end() != saved.end()
+                        || !span.articleId().equals(citation.path("documentId").asString())
+                        || !span.articleVersion().equals(citation.path("documentVersion").asString()))
+                    throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+                var article = new EvidenceArticle(citation.path("title").asString(),
+                        citation.path("publisher").asString(), citation.path("url").asString(),
+                        citation.path("publishedAt").isNull() ? null : Instant.parse(citation.path("publishedAt").asString()));
+                var failures = companyId == null ? List.<SectionFailure>of()
+                        : List.of(new SectionFailure("sentiment", "SOURCE_UNAVAILABLE",
+                                "이 회차 근거에서 기업별 감성 판정을 제공하지 않습니다.", false, null));
+                var response = new EvidenceResponse(evidenceId, citation.path("quote").asString(),
+                        span.start(), span.end(), span.articleId(), span.articleVersion(), article, true, found.eventIds(),
+                        new Metadata(selected.source(), selected.asOf(), selected.version().id(),
+                                requestId, companyId != null, failures), null, span.articleVersion(), null, null, null, null);
+                return new RoundRead(found, response);
+            }
+        }
+        throw new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE);
     }
 
     @Override
     public GraphEvidence read(String graphVersion, Instant asOf, String evidenceId) {
         PublicGraphReader.Pinned pinned = reader.read(null, graphVersion, asOf);
-        PublicGraphSnapshot snapshot = pinned.graph().snapshot;
-        String version = pinned.selected().version().id();
-        Instant at = pinned.selected().asOf();
+        return locate(pinned.graph().snapshot, pinned.selected().version().id(), pinned.selected().asOf(), evidenceId);
+    }
+
+    /** The same facts from an already filtered snapshot; activation uses it for a version the selector cannot pin yet. */
+    public static GraphEvidence locate(PublicGraphSnapshot snapshot, String version, Instant at, String evidenceId) {
         Evidence span = snapshot.evidence().stream().filter(e -> e.evidenceId().equals(evidenceId)).findFirst().orElse(null);
         if (span == null) {
             return new GraphEvidence(version, at, null, List.of(), List.of(), List.of());

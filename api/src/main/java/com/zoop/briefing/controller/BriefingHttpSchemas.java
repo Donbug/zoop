@@ -31,6 +31,13 @@ public final class BriefingHttpSchemas {
             List<BriefingCorrection> corrections, @Schema(nullable = true) BriefingNotice notice,
             BriefingReferences references, BriefingMetadata metadata, @Schema(nullable = true) BriefingOutlook outlook) { }
 
+    @Schema(name = "BriefingRecap", requiredProperties = {"roundId", "graphVersion", "dataAsOf", "status", "reason", "message", "previous"})
+    public record BriefingRecap(String roundId, @Schema(nullable = true) String graphVersion,
+            @Schema(nullable = true) Instant dataAsOf,
+            @Schema(allowableValues = {"available", "unavailable", "not_applicable"}) String status,
+            @Schema(nullable = true) String reason, String message,
+            @Schema(nullable = true, description = "고정 참조의 과거 발행 원문. 새 이슈 또는 이번 회차 재평가가 아닙니다.") BriefingResponse previous) { }
+
     @Schema(name = "CompanyOutlooks", requiredProperties = {"schemaVersion", "roundId", "edition", "cutoff", "status", "resultVersion", "generatedAt", "scopeNote", "companies"})
     public record CompanyOutlooks(String schemaVersion, String roundId, String edition, Instant cutoff,
             @Schema(allowableValues = {"PASS", "WITHHELD"}) String status, String resultVersion, Instant generatedAt,
@@ -82,7 +89,11 @@ public final class BriefingHttpSchemas {
             @Schema(allowableValues = {"available", "suspended", "unavailable", "not_published"}) String status,
             @Schema(nullable = true) String message, @Schema(nullable = true) String reason,
             @Schema(nullable = true) Instant publishedAt, @Schema(nullable = true) Instant dataAsOf,
-            @Schema(nullable = true) String graphVersion, List<String> keyIssueIds, List<String> companyIds, long correctionCount) { }
+            @Schema(nullable = true) String graphVersion, List<String> keyIssueIds, List<String> companyIds, long correctionCount,
+            @Schema(nullable = true, allowableValues = {"snapshot_not_recorded", "snapshot_unavailable", "briefing_targets_unavailable"})
+            String unavailableReason,
+            @Schema(nullable = true, allowableValues = {"publication_snapshot", "reconstructed"}) String graphOrigin,
+            @Schema(nullable = true) Instant reconstructedAt) { }
 
     @Schema(name = "BriefingItem", requiredProperties = {"title", "eventId", "eventTime", "timePrecision", "companies", "evidenceCount",
             "sourceSupport", "matchedCompanyIds", "rank", "reason", "evidenceIds", "summary", "reportedAt", "documentSentiments"})

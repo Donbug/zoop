@@ -15,12 +15,16 @@ import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.repository.ChatExecutionRepository;
 import com.zoop.chat.repository.ChatJobRow;
 import com.zoop.chat.repository.ChatRepository;
+import com.zoop.chat.repository.ChatToolCallEnd;
+import com.zoop.chat.repository.NewChatToolCall;
 import com.zoop.chat.service.FrozenSelection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -36,9 +40,13 @@ import tools.jackson.databind.node.ObjectNode;
  * <li>Every write of a run is fenced by its owner token and unexpired lease. A cancel, an expired lease or a newer run makes
  * the old run's phase, model-call record and completion fail; its result is discarded, never stored late.</li>
  * <li>{@code runs} counts model-calling runs only: it is raised when an engine announces its first model request.</li>
+ * <li>A result returned after the run deadline is never stored as completed: it ends as on lease recovery.</li>
  * <li>A lease that ran out is recovered as a failure. A run that had announced a model request ends as
  * {@code transient/response_unknown} without retry (the provider may have processed and charged it); one that had not ends
  * as {@code transient/deadline_guard}, which may be rerun.</li>
+ * <li>A run's tool calls ({@code chat_tool_calls}) are reserved, started and finished under the same fence, at most
+ * {@link ChatRunControl#MAX_TOOL_CALLS} per attempt. When the job ends, its calls still reserved are closed as
+ * {@code cancelled} and those still running as {@code unknown}.</li>
  * </ul>
  *
  * <p>The run deadline is the policy maximum until the orchestrator plans per-route deadlines (ZOOP-AIG-001 6.3.3); the lease
@@ -164,7 +172,8 @@ public class ChatJobExecutor {
             if (locked.isEmpty()) return false;
             ArrayNode attempts = attempts(locked.get().attempts());
             ObjectNode attempt = attempt(attempts, claim.attemptNo());
-            if (checked instanceof ChatEngineOutcome.Completed completed) {
+            ChatEngineOutcome ending = late(checked, attempt, now, claim.deadline());
+            if (ending instanceof ChatEngineOutcome.Completed completed) {
                 attempt.put("status", "succeeded").put("finishedAt", now.toString());
                 ChatResult result = withMessageId(completed.result(), messageId(claim.job().id()));
                 String route = completed.routeSummary() == null ? null : mapper.writeValueAsString(completed.routeSummary());
@@ -172,7 +181,7 @@ public class ChatJobExecutor {
                         mapper.writeValueAsString(result), RESULT_SCHEMA_VERSION, route,
                         route == null ? null : ROUTE_SCHEMA_VERSION, attempts.toString());
             }
-            var failed = (ChatEngineOutcome.Failed) checked;
+            var failed = (ChatEngineOutcome.Failed) ending;
             String kind = ChatFailures.ENGINE_KINDS.contains(failed.kind()) || "result_lost".equals(failed.kind())
                     ? failed.kind() : "internal";
             ChatFailure failure = ChatFailures.of(kind, failed.reason(), failed.rerunnable(), locked.get().runs());
@@ -183,6 +192,18 @@ public class ChatJobExecutor {
                     attempts.toString());
         });
         return Boolean.TRUE.equals(stored);
+    }
+
+    /**
+     * A result that comes back after the run deadline is not stored as completed (the deadline covers verification and
+     * saving): the run ends as it would on recovery, {@code response_unknown} once a model was called, otherwise
+     * {@code deadline_guard}.
+     */
+    private static ChatEngineOutcome late(ChatEngineOutcome outcome, ObjectNode attempt, Instant now, Instant deadline) {
+        if (!(outcome instanceof ChatEngineOutcome.Completed) || !now.isAfter(deadline)) return outcome;
+        return attempt.path("modelCalled").asBoolean(false)
+                ? new ChatEngineOutcome.Failed("transient", "response_unknown", false)
+                : new ChatEngineOutcome.Failed("transient", "deadline_guard", true);
     }
 
     /**
@@ -206,11 +227,16 @@ public class ChatJobExecutor {
         List<ChatRun.Turn> turns = new ArrayList<>();
         ChatJobRow at = job;
         while (true) {
-            turns.addFirst(new ChatRun.Turn(at.id(), at.question(), at.resolvesChoiceId()));
-            if (at.resolvesJobId() == null) break;
-            String parent = at.resolvesJobId();
-            at = chats.findJob(parent)
-                    .orElseThrow(() -> new IllegalStateException("clarification chain is broken at " + parent));
+            if (at.resolvesJobId() == null) {
+                turns.addFirst(new ChatRun.Turn(at.id(), at.question(), null, null));
+                break;
+            }
+            String parentId = at.resolvesJobId();
+            ChatJobRow parent = chats.findJob(parentId)
+                    .orElseThrow(() -> new IllegalStateException("clarification chain is broken at " + parentId));
+            turns.addFirst(new ChatRun.Turn(at.id(), at.question(), at.resolvesChoiceId(),
+                    choiceLabel(parent, at.resolvesChoiceId())));
+            at = parent;
         }
         return new ChatRun(job.id(), job.sessionId(), job.memberId(), claim.attemptNo(), claim.mode(), List.copyOf(turns),
                 mapper.readValue(job.frozenContext(), ChatFrozenContext.class),
@@ -260,6 +286,81 @@ public class ChatJobExecutor {
             return Boolean.TRUE.equals(transaction.execute(status ->
                     runs.lockOwned(claim.job().id(), claim.ownerToken(), clock.instant()).isPresent()));
         }
+
+        @Override
+        public List<String> reserveToolCalls(int planRevision, List<ChatToolCallReservation> calls) {
+            if (planRevision < 1 || calls.isEmpty()) throw new IllegalArgumentException("an empty or unnumbered tool plan");
+            List<String> reserved = recorded(() -> transaction.execute(status -> {
+                runs.limitWait(waitBudget());
+                Instant now = clock.instant();
+                if (runs.lockOwned(claim.job().id(), claim.ownerToken(), now).isEmpty()) return null;
+                int first = runs.countToolCalls(claim.job().id(), claim.attemptNo());
+                if (first + calls.size() > MAX_TOOL_CALLS) {
+                    throw new IllegalArgumentException("tool plan exceeds " + MAX_TOOL_CALLS + " calls per attempt");
+                }
+                List<NewChatToolCall> rows = new ArrayList<>();
+                for (int i = 0; i < calls.size(); i++) {
+                    ChatToolCallReservation call = calls.get(i);
+                    int index = first + i;
+                    rows.add(new NewChatToolCall(UUID.randomUUID().toString(), claim.job().id(), claim.attemptNo(),
+                            planRevision, index, "tc-" + index, call.registryVersion(), call.registryGroup(),
+                            call.capabilityId(), call.toolId(), call.schemaVersion(), call.inputDigest(),
+                            call.requestMeta()));
+                }
+                runs.reserveToolCalls(rows, now);
+                return rows.stream().map(NewChatToolCall::toolCallId).toList();
+            }));
+            if (reserved == null) throw new ChatRunSuperseded();
+            return reserved;
+        }
+
+        @Override
+        public void toolCallStarted(String toolCallId) {
+            Boolean started = recorded(() -> transaction.execute(status -> {
+                runs.limitWait(waitBudget());
+                return runs.startToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), toolCallId,
+                        clock.instant());
+            }));
+            if (!Boolean.TRUE.equals(started)) throw new ChatRunSuperseded();
+        }
+
+        @Override
+        public void toolCallFinished(String toolCallId, ChatToolCallEnd end) {
+            Boolean finished = recorded(() -> transaction.execute(status -> {
+                runs.limitWait(waitBudget());
+                return runs.finishToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), toolCallId, end,
+                        clock.instant());
+            }));
+            if (!Boolean.TRUE.equals(finished)) throw new ChatRunSuperseded();
+        }
+
+        /**
+         * How long a tool-call record may wait for locks and the database: until the run's deadline. Past it, the run
+         * records nothing more and ends through lease recovery.
+         */
+        private Duration waitBudget() {
+            Duration left = Duration.between(clock.instant(), claim.deadline());
+            if (left.toMillis() < 1) throw new ChatRunSuperseded();
+            return left;
+        }
+
+        /** A record the database could not make in time is not made: the run cannot go on as if it were. */
+        private <T> T recorded(java.util.function.Supplier<T> write) {
+            try {
+                return write.get();
+            } catch (DataAccessException | TransactionException unrecorded) {
+                log.warn("chat tool call record of job {} failed; the run stops", claim.job().id(), unrecorded);
+                throw new ChatRunSuperseded();
+            }
+        }
+    }
+
+    /** The label the clarification showed for the picked option; null for a free-text answer. */
+    private String choiceLabel(ChatJobRow clarification, String choiceId) {
+        if (choiceId == null || clarification.result() == null) return null;
+        ChatResult result = mapper.readValue(clarification.result(), ChatResult.class);
+        return result.choices() == null ? null : result.choices().stream().filter(c -> choiceId.equals(c.id()))
+                .map(c -> c.label()).findFirst().orElse(null);
     }
 
     static String messageId(String jobId) {

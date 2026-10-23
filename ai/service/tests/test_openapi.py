@@ -5,6 +5,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import unquote
 
 import pytest
 
@@ -32,10 +33,11 @@ def test_every_route_is_documented_with_its_enforced_scope():
                   for path, item in spec()["paths"].items() for method, operation in item.items()}
     routes = {(method, route.path) for route in create_app().routes if hasattr(route, "methods") and route.path.startswith("/internal")
               for method in route.methods}
-    assert set(documented) == routes and len(routes) == 22
+    assert set(documented) == routes and len(routes) == 23
     assert set(documented.values()) == {"analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover",
                                         "relation.submit", "relation.read", "relation.cancel", "relation.recover", "relation.review",
-                                        "extraction.submit", "extraction.read", "extraction.cancel", "extraction.recover", "graph.read", "handoff.read", "handoff.exposure"}
+                                        "extraction.submit", "extraction.read", "extraction.cancel", "extraction.recover", "graph.read", "handoff.read",
+                                        "handoff.exposure", "chat.invoke"}
 
 
 def test_documented_scopes_are_what_the_service_enforces(start):
@@ -43,7 +45,7 @@ def test_documented_scopes_are_what_the_service_enforces(start):
     job_id = document_jobs()[0]["jobId"]
     for (method, path), scope in {(m.upper(), p): o["security"][0]["bearerAuth"][0]
                                    for p, i in spec()["paths"].items() for m, o in i.items()}.items():
-        url = path.replace("{jobId}", job_id).replace("{operationId}", "review-op-1").replace("{versionId}", "graph-main-1").replace("{handoffId}", "handoff-synthetic-1")
+        url = path.replace("{jobId}", job_id).replace("{operationId}", "review-op-1").replace("{versionId}", "graph-main-1").replace("{handoffId}", "handoff-synthetic-1").replace("{stage}", "chat-router")
         lacking = "submitter" if scope != "analysis.submit" else "reader"
         assert service.request(method, url, as_=lacking).status_code == 403, (method, path)
         assert service.request(method, url, as_=None).status_code == 401, (method, path)
@@ -56,6 +58,29 @@ def test_the_s1_wire_contract_is_referenced_never_copied():
     assert "ai-contract.schema.json#/$defs/Submit" in text and "ai-contract.schema.json#/$defs/JobResult" in text
     assert not {"Submit", "JobResult", "AnalysisArtifact", "SourceGrant", "Document"} & set(document["components"]["schemas"])
     assert (ROOT / "docs/api/ai-contract.schema.json").is_file()
+
+
+def test_every_local_openapi_reference_resolves():
+    document = spec()
+
+    def check(node):
+        if isinstance(node, dict):
+            ref = node.get("$ref")
+            if isinstance(ref, str) and ref.startswith("#/"):
+                target = document
+                for token in unquote(ref[2:]).split("/"):
+                    key = token.replace("~1", "/").replace("~0", "~")
+                    try:
+                        target = target[int(key)] if isinstance(target, list) else target[key]
+                    except (KeyError, IndexError, TypeError, ValueError):
+                        pytest.fail(f"Unresolved local OpenAPI reference: {ref}")
+            for value in node.values():
+                check(value)
+        elif isinstance(node, list):
+            for value in node:
+                check(value)
+
+    check(document)
 
 
 def test_authored_request_example_is_accepted_by_the_real_service(start):

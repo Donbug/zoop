@@ -89,6 +89,33 @@ class GraphVersionSelectorTest {
                 assertThrows(CustomException.class, () -> emptySelector.select(null, null, null)).getErrorCode());
     }
 
+    @Test
+    void roundUsesItsStoredVersionEvenWhenActivationHappenedAfterTheDataCutoff() {
+        Instant cutoff = Instant.parse("2026-10-05T00:00:00Z");
+        var basis = new BriefingGraphLookup.Basis("round", "v2", cutoff, Map.of("issue", List.of("company")));
+        var rounds = new GraphVersionSelector(repository, Clock.fixed(NOW, ZoneOffset.UTC), (id, requestId) -> {
+            assertEquals("round", id);
+            assertEquals("request", requestId);
+            return basis;
+        });
+        var result = rounds.select("round", null, null, "request");
+        assertEquals("v2", result.version().id());
+        assertEquals(cutoff, result.asOf());
+        assertEquals(basis, result.briefing());
+        assertEquals(ErrorCode.INVALID_REQUEST, assertThrows(CustomException.class,
+                () -> rounds.select("round", "v1", null, "request")).getErrorCode());
+        assertEquals(ErrorCode.INVALID_REQUEST, assertThrows(CustomException.class,
+                () -> rounds.select("round", null, NOW, "request")).getErrorCode());
+    }
+
+    @Test
+    void roundCannotExposeAnUnactivatedCandidateVersion() {
+        var rounds = new GraphVersionSelector(repository, Clock.fixed(NOW, ZoneOffset.UTC),
+                (id, requestId) -> new BriefingGraphLookup.Basis(id, "registered-only", NOW, Map.of()));
+        assertEquals(ErrorCode.VERSION_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> rounds.select("round", null, null)).getErrorCode());
+    }
+
     /** Mirrors the SQL ordering of JdbcGraphVersionRepository: (activated_at DESC, id DESC), pointer changes only. */
     static final class InMemoryRepository implements GraphVersionRepository {
         private final Map<String, GraphVersionRecord> versions = new HashMap<>();

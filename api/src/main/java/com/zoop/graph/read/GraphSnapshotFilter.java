@@ -28,7 +28,44 @@ public final class GraphSnapshotFilter {
     private GraphSnapshotFilter() {
     }
 
+    /** All round consumers share this closed projection; derived edges are built only afterwards. */
+    static PublicGraphSnapshot briefing(PublicGraphSnapshot s, com.zoop.graph.version.BriefingGraphLookup.Basis basis) {
+        Set<String> selected = Set.copyOf(basis.keyIssueIds());
+        var issues = s.issues().stream().filter(i -> selected.contains(i.issueId())).toList();
+        var relations = s.relations().stream().filter(r -> selected.contains(r.source())
+                && (!"FOLLOWS".equals(r.relationType()) || selected.contains(r.target()))).toList();
+        Set<String> companies = new HashSet<>(basis.companyIds());
+        relations.stream().filter(r -> !"FOLLOWS".equals(r.relationType())).forEach(r -> companies.add(r.target()));
+        Set<String> cited = new HashSet<>();
+        issues.forEach(i -> { cited.addAll(i.evidenceIds()); cited.addAll(i.geographyEvidenceIds()); });
+        relations.forEach(r -> cited.addAll(r.evidenceIds()));
+        Set<String> membershipArticles = new HashSet<>();
+        relations.forEach(r -> r.basis().forEach(b -> b.articles().forEach(a ->
+                membershipArticles.add(a.articleId() + "@" + a.articleVersion()))));
+        Set<String> impactCitations = relations.stream().filter(r -> "INVOLVES".equals(r.relationType()))
+                .flatMap(r -> r.evidenceIds().stream()).collect(Collectors.toSet());
+        // Preserve candidates for receipt-proven impact quotes, but only for INVOLVES edges inside this round.
+        // These spans are not added to an issue or relation's evidence ids and confer no membership on their own.
+        for (Evidence span : s.evidence()) {
+            if (impactCitations.contains(span.evidenceId())) {
+                membershipArticles.add(span.articleId() + "@" + span.articleVersion());
+            }
+        }
+        var evidence = s.evidence().stream().filter(e -> cited.contains(e.evidenceId())
+                || membershipArticles.contains(e.articleId() + "@" + e.articleVersion())).toList();
+        Set<String> articles = new HashSet<>(membershipArticles);
+        evidence.forEach(e -> articles.add(e.articleId() + "@" + e.articleVersion()));
+        issues.forEach(i -> i.mentions().forEach(m -> articles.add(m.articleId() + "@" + m.articleVersion())));
+        return new PublicGraphSnapshot(s.snapshotFormat(), s.versionId(), s.sourceBundleId(),
+                s.companies().stream().filter(c -> companies.contains(c.companyId())).toList(), issues, relations,
+                s.articles().stream().filter(a -> articles.contains(articleKey(a))).toList(), evidence);
+    }
+
     public static PublicGraphSnapshot apply(PublicGraphSnapshot s, Instant asOf, DisclosureExclusions exclusions) {
+        return apply(s, asOf, exclusions, false);
+    }
+
+    static PublicGraphSnapshot apply(PublicGraphSnapshot s, Instant asOf, DisclosureExclusions exclusions, boolean reconstruction) {
         Set<String> articles = s.articles().stream()
                 .filter(a -> asOf == null || publishedBy(a.publishedAt(), asOf))
                 .map(GraphSnapshotFilter::articleKey).collect(Collectors.toSet());
@@ -43,7 +80,7 @@ public final class GraphSnapshotFilter {
                 .filter(i -> !exclusions.issueIds().contains(i.issueId()))
                 .filter(i -> asOf == null || (publishedBy(i.latestPublishedAt(), asOf) && articleIds.containsAll(i.articleIds())))
                 .map(i -> withEvidence(i, evidenceIds))
-                .filter(i -> !i.evidenceIds().isEmpty() && !i.geographyEvidenceIds().isEmpty())
+                .filter(i -> !i.evidenceIds().isEmpty() && (!i.geographyEvidenceIds().isEmpty() || (reconstruction && i.geography() == null)))
                 .toList();
         Set<String> kept = issues.stream().map(Issue::issueId).collect(Collectors.toCollection(HashSet::new));
 

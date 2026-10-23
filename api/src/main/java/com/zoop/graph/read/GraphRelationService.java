@@ -54,7 +54,7 @@ public class GraphRelationService {
         List<Relation> sources = edge.relationIds().stream().map(relations::get).toList();
         Map<String, PublicGraphSnapshot.Company> catalog = CompanyAppearance.of(jdbc,
                 List.of(edge.source(), edge.target()).stream().filter(graph.companies::containsKey).toList());
-        Metadata metadata = new Metadata("public_graph_snapshot", pinned.selected().asOf(),
+        Metadata metadata = new Metadata(pinned.selected().source(), pinned.selected().asOf(),
                 pinned.selected().version().id(), requestId, false, List.of());
         return new EdgeDetail(edge.id(), edge.relationType(), edge.derived(), !edge.derived(),
                 endpoint(graph, catalog, edge.source()), endpoint(graph, catalog, edge.target()), edge.role(), edge.summary(),
@@ -64,9 +64,15 @@ public class GraphRelationService {
                         .map(b -> GraphCompanySnapshotReader.basisOut(b, articles, pinned.selected().asOf())).toList(),
                 edge.relationIds(),
                 edge.derived() ? new Verification("not_applicable", "파생 연결은 검증 대상이 아닙니다.")
-                        : new Verification("ALLOW", null),
+                        : pinned.selected().reconstructed()
+                                ? new Verification("not_applicable", "저장된 브리핑 연결의 재구성이며 별도 관계 승인이나 역할 확인을 뜻하지 않습니다.")
+                                : new Verification("ALLOW", null),
                 edge.derived() ? via(graph, edge) : List.of(),
-                edge.derived() ? DERIVED_EXPLANATION : EXPLANATIONS.get(edge.relationType()),
+                edge.derived() ? DERIVED_EXPLANATION
+                        : "INVOLVES".equals(edge.relationType()) && (pinned.selected().reconstructed() || edge.role() == null)
+                                ? (pinned.selected().briefing() != null ? "이 회차에 저장된" : "저장된")
+                                        + " 기업·사건 연결입니다. 구체적인 역할은 저장된 근거에서 확인해야 합니다."
+                                : EXPLANATIONS.get(edge.relationType()),
                 RelationValidity.of(graph.basesOf(edge), pinned.selected().asOf()), metadata);
     }
 

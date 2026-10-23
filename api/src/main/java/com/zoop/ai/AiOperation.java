@@ -2,8 +2,8 @@ package com.zoop.ai;
 
 /**
  * The operations of the internal AI transports. The first five exist in every family (S1 analysis, S2 extraction, S3
- * relation); the last two are the S3 review operation: {@code REVIEW} records one decision (an allow is the operator's final
- * approval, terminal), {@code OPERATION} reads it by its key.
+ * relation); {@code REVIEW} records one S3 review decision (an allow is the operator's final approval, terminal) and
+ * {@code OPERATION} reads it by its key; {@code CHAT_STAGE} runs one synchronous chatbot model stage.
  */
 public enum AiOperation {
     SUBMIT(true),
@@ -12,7 +12,9 @@ public enum AiOperation {
     CANCEL(true),
     RECOVER(true),
     REVIEW(true),
-    OPERATION(false);
+    OPERATION(false),
+    /** One chatbot model stage (router, answer or verification); it may send a model request. */
+    CHAT_STAGE(true);
 
     private final boolean mutating;
 

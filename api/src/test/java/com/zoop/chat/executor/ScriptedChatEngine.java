@@ -46,7 +46,7 @@ final class ScriptedChatEngine implements ChatEngine {
 
     static ChatEngineOutcome.Completed clarification(String reason, String... choiceIds) {
         List<ChatChoice> choices = new ArrayList<>();
-        for (String id : choiceIds) choices.add(new ChatChoice(id, id, "company"));
+        for (String id : choiceIds) choices.add(new ChatChoice(id, id + " 선택", "company"));
         return new ChatEngineOutcome.Completed(result("clarification", "", List.of(), "none", choices, reason), null);
     }
 

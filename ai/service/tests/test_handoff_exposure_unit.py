@@ -125,3 +125,39 @@ def test_final_recheck_suppresses_revocation_during_report_validation(tmp_path, 
     with pytest.raises(HandoffError) as caught:
         invoke(service)
     assert caught.value.code == "handoff_not_allowed"
+
+
+def test_service_composes_one_s2_s3_exposure_gate_without_blocking_the_separate_chat_ledger(tmp_path):
+    import os
+
+    from test_chat_http import ChatStub, body
+    from zoop_ai_service.chat_wire import ChatStageRequest
+    from zoop_ai_service.main import build_service
+
+    ws = workspace(tmp_path / "ws", with_relation=True)
+    stub = ChatStub(tmp_path / "chat")
+    approvals = ws.root / "extraction-approvals.json"
+    approvals.write_text('{"schemaVersion":"zoop-ai-extraction-approvals-1","approvals":[]}', encoding="utf-8")
+    cfg = load(ws.env(**{**exposure_env(ws), **stub.env(),
+                        "ZOOP_AI_SERVICE_EXTRACTION_COMMAND": str(ws.command),
+                        "ZOOP_AI_SERVICE_EXTRACTION_REPLAY": str(ws.producer),
+                        "ZOOP_AI_SERVICE_EXTRACTION_APPROVALS": str(approvals)}))
+    service = build_service(cfg)
+    try:
+        gate = service.relation.gate
+        assert service.extraction.gate is service.handoff.gate is service.handoff_exposure.gate is gate
+        assert service.relation_dispatcher._gate is service.extraction_dispatcher._gate is gate
+        service.handoff_exposure._busy_wait = 0.01
+        with gate.hold(0):
+            with pytest.raises(HandoffError) as caught:
+                invoke(service.handoff_exposure)
+            assert caught.value.code == "runtime_busy" and ws.calls() == []
+            status, answer = service.chat.invoke("chatter", "chat-router", ChatStageRequest.model_validate(body()), Observation())
+            assert status == 200 and answer.invocation_id == body()["invocationId"] and len(stub.calls()) == 1
+        assert invoke(service.handoff_exposure).status == 200 and len(ws.calls()) == 1
+        assert cfg.chat.state_dir == stub.state and not (stub.state / "handoff.sqlite3").exists()
+    finally:
+        service.extraction_ledger.close()
+        service.relation_ledger.close()
+        service.ledger.close()
+        os.close(service.lock._fd)

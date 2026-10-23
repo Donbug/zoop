@@ -234,6 +234,8 @@ live S2/S3 job은 **서버 운영자가 고정한 것만** 돌아갑니다. 호�
 
 세 루트는 서로 및 앱·서비스·S1 상태와 겹칠 수 없고 symlink를 허용하지 않습니다. 함께 설정된 S2/S3·graph·일반 handoff 그룹과 원천 루트가 같아야 하며, 일반 handoff가 있으면 handoff 루트와 allowlist 파일도 같아야 합니다. exposure만 켤 때는 source registry·canonical·decisions·bindings·S3 원장·모델/graph 자격 증명이 필요하지 않으며 다른 그룹도 켜지지 않습니다.
 
+챗봇을 함께 켜면 `ZOOP_AI_CHAT_STATE_DIR`도 이 세 원장 루트와 같거나 그 상위·하위 경로일 수 없습니다(`chat_roots_overlap`). 일반 handoff가 꺼져 있어도 이 검사는 적용됩니다. 챗봇이나 S2/S3의 live 설정·키가 있어도 exposure child에는 전달되지 않습니다.
+
 **입출력.** 요청은 기존 닫힌 `zoop-handoff-exposure-1` 계약입니다. `handoffIds`는 중복 없는 명시적 ID 1~20개이고, `changed`는 문서·source·grant 또는 `(jobId, relationCandidateId)` 쌍의 `s3-relation`입니다. 문서의 `documentVersion`·`rawVersion`, grant의 `revision`은 필수 nullable 필드입니다. null은 그 신원의 모든 고정 버전/리비전을 뜻하며 handoff 선택의 wildcard는 아닙니다. 인증·scope 확인 뒤 JSON/UTF-8, 중복 키·비유한 숫자·알 수 없는 필드를 검사하고 선언/스트리밍 본문 모두 65,536바이트로 제한합니다. query parameter·job 등록·idempotency 요구·캐시·자동 재시도·부분 성공은 없습니다.
 
 성공은 `200 {"schemaVersion":"zoop-ai-internal-handoff-1","report":…}`입니다. report는 생산자 출력 그대로이며 닫힌 중첩 모델로 키·타입·신원·선택 전체·정렬/중복·개수·고정 한계 문구·모델/공급자 호출 0을 검증합니다. 정규화가 생기거나 canonical JSON 한 줄이 아니거나 newline 포함 6 MiB를 넘으면 전달하지 않습니다. 서비스는 영향 전파를 다시 계산하지 않으며, **report의 manifest/bundle pin과 allowlist를 비교할 뿐 받지 않은 bundle 바이트의 해시를 계산했다고 주장하지 않습니다.** 기사·이슈·관계·근거 식별자 외에 제목·label·URL·본문·인용문·자유 진단을 추가할 수 없습니다.
@@ -251,7 +253,32 @@ live S2/S3 job은 **서버 운영자가 고정한 것만** 돌아갑니다. 호�
 
 오류는 기존 `HdErrorEnvelope`만 쓰며 영향 ID·부분 report·CLI detail을 싣지 않습니다. 기록은 있으나 선택된 handoff에 연결되지 않은 신원은 완전한 빈 report가 될 수 있지만 모르는 신원은 오류입니다. 앱은 네 receipt 신원을 대조하고 버전별 제외·정정·복구·revision·활성화를 별도로 처리합니다. 빈 결과나 더 작은 결과가 기존 제외를 해제하지 않습니다.
 
+공통 runner가 child 시작 뒤 출력 상한 초과나 I/O 오류를 보고해도 읽기 전용 exposure는 503 `runtime_unavailable`로 응답하며 자동 재시도하지 않습니다. 호출자가 다시 조회할 수 있다는 뜻이지 이전 요청을 서비스가 재실행한다는 뜻은 아닙니다. 같은 상황에서 챗봇은 모델 요청을 보냈을 수 있으므로 502 `stage_outcome_unknown`으로 응답하고 재송신을 허용하지 않습니다.
+
 **검증 명령(별도 실행).** `ai/service/.venv/bin/python -m pytest ai/service/tests`와 `ai/service/.venv/bin/python -m pytest ai/service/pipeline_tests`는 서로 다른 프로세스로 실행합니다. 새 실제 HTTP/CLI smoke는 `ai/service/.venv/bin/python ai/service/scripts/handoff_exposure_service_smoke.py`입니다. 설치된 CLI, 실제 loopback HTTP, 기존 synthetic replay world와 손으로 작성된 영향 기대값을 사용하며 source 철회 뒤 조회·일반 export withheld·기록된 빈 결과와 모르는 신원·선택 전체 실패·원장 경합·원장/앱 무변경을 검사합니다. 이는 실기사 품질·모델 성능·배포 검증이 아닙니다.
+
+## 챗봇 모델 단계 (`/internal/v1/chat-stages/{stage}`)
+
+챗봇 오케스트레이터가 모델 단계 하나(`chat-router` 네이티브 Jev, `chat-answer` Luna, `chat-verification` 네이티브 Jev)를 **동기**로 실행하는 다섯 번째 가족이다. scope는 `chat.invoke`이며 설치된 `zoop-ai-chat invoke`만 고정 argv로 실행한다(계약 `zoop-ai-chat-1`, 규칙은 [AI 런타임 준비 §11](../../docs/development/ai-runtime-setup.md)). 아래 그룹이 없으면 인증 뒤 409 `execution_unavailable`이다.
+
+| 변수 | 규칙 |
+|---|---|
+| `ZOOP_AI_SERVICE_CHAT_COMMAND` | 설치된 `zoop-ai-chat`의 절대 경로(실행 가능) |
+| `ZOOP_AI_CHAT_STATE_DIR` | 호출 원장(`chat.sqlite3`) 디렉터리. 없으면 0700으로 만든다(부모는 있어야 함). 이미 있으면 이 사용자 소유의 실제 디렉터리(symlink 아님)이고 group·world 권한이 없어야 하며, 그 안의 원장 파일(`chat.sqlite3`, `-wal`, `-shm`)도 이 사용자 소유의 일반 파일이고 비공개여야 한다. 아니면 기동을 거부한다(`state_dir_not_private`, `ledger_not_private`). 기존 경로를 chmod로 고치지 않는다. 서비스·worker·앱 상태와 겹쳐도 거부 |
+| `ZOOP_AI_SERVICE_CHAT_GRANTS` | 운영자 챗봇 grant registry(`schemaVersion: zoop-ai-chat-1`). S1 registry와 별도 |
+| `ZOOP_AI_SERVICE_CHAT_REPLAY` | 선택. authored replay fixture. 없으면 `mode=replay`는 409 `execution_unavailable` |
+| 챗봇 live | `ZOOP_AI_CHAT_LIVE_ENABLED=1`과 양수 `ZOOP_AI_CHAT_MAX_CALLS`가 모두 있을 때만 이 둘과 `ZOOP_AI_API_KEY`·`TYPESAFE_API_KEY`가 **챗봇 child에만** 전달된다. 모델·endpoint 이름(`ZOOP_AI_CHAT_ANSWER_MODEL`·`_REASONING_EFFORT`, `ZOOP_AI_CHAT_JEV_MODEL`, `ZOOP_AI_BASE_URL`, `TYPESAFE_BASE_URL`)은 항상 전달된다. S1·파이프라인 게이트는 이 child를 열지 않는다 |
+
+- 챗봇 원장은 함께 설정된 S2/S3·graph·handoff·exposure의 모든 원장 루트와도 분리한다(`chat_roots_overlap`). S2/S3와 exposure는 같은 `RelationGate`로 직렬화하지만, 별도 원장을 쓰는 챗봇은 이 gate를 공유하지 않는다.
+
+- 본문은 `StageRequest`(`schemaVersion`, `invocationId`, `stage`, `mode`, `input`)이고 `Idempotency-Key`는 `invocationId`와 같아야 하며 경로의 stage와 본문 stage가 같아야 한다. child는 `<principal>:<invocationId>`를 받으므로 principal끼리 원장 행을 공유하지 않는다.
+- **200**은 stage 결과다. `status=failed`도 200이며 `failure.sent`·`failure.unknown`이 송신 여부와 결과 불명을 말한다. **502/504 `stage_outcome_unknown`**은 child가 보냈을 수 있다는 뜻이므로 그 invocation을 다시 보내지 않는다. **503**(`runtime_unavailable`, `service_busy`, `service_configuration_invalid`)은 보내지 않았다는 뜻이다. `runtime_unavailable`은 child가 **시작조차 못 한** 경우에만 쓰고, 시작한 뒤의 출력 상한 초과나 출력 읽기 오류는 502 `stage_outcome_unknown`이다.
+- child 결과는 **고치기 전에** 검사한다. 다음을 모두 만족해야 200이고, 하나라도 어긋나면 caller id로 바꿔 200으로 정규화하지 않고 502 `stage_outcome_unknown`이다.
+  - `invocationId`가 정확히 `<principal>:<invocationId>`이고, stage가 경로와 같으며, receipt의 `executionMode`가 요청 mode와 같다.
+  - answer가 그 stage의 닫힌 모델(`RouterAnswer`/`ChatAnswer`/`VerificationAnswer`, 모르는 키 거절)을 따른다.
+  - 성공에는 answer·receipt가 있고 failure가 없다. 실패에는 failure가 있고 answer가 없다. `unknown`이면 `sent`이고, receipt는 `sent`일 때만 있다.
+- 동시 child 4개, 슬롯을 1초 안에 얻지 못하면 503 `service_busy`. child 기한은 stage 상한 + 3초(라우터 7초, 답변 28초, 검증 9초).
+- 시험: `tests/test_chat_unit.py`(child 없음), `tests/test_chat_http.py`(실제 uvicorn + 기록용 stand-in CLI). 실제 worker CLI는 `ai/worker/tests/test_chat_stages.py`.
 
 ## 네트워크와 한계
 
