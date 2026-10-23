@@ -37,6 +37,8 @@ function overview(): InsightsOverview {
         denominator: null,
         rate: null,
         sampleHidden: false,
+        availability: 'available',
+        unavailableReason: null,
       },
       {
         key: 'nodeCtr',
@@ -50,6 +52,8 @@ function overview(): InsightsOverview {
         denominator: 37,
         rate: 0.405,
         sampleHidden: false,
+        availability: 'available',
+        unavailableReason: null,
       },
       {
         key: 'briefingRate',
@@ -63,9 +67,18 @@ function overview(): InsightsOverview {
         denominator: 4,
         rate: null,
         sampleHidden: true,
+        availability: 'available',
+        unavailableReason: null,
       },
     ],
-    feedback: { up: 0, down: 0, rate: null, sampleHidden: true },
+    feedback: {
+      up: 0,
+      down: 0,
+      rate: null,
+      sampleHidden: true,
+      availability: 'available',
+      unavailableReason: null,
+    },
     members: { registered: 3, active: 3, blocked: 0 },
   };
 }
@@ -239,6 +252,48 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
     ).toBeTruthy();
     expect(within(section).getByText('3명')).toBeTruthy();
     expect(within(section).getByText('차단 0명')).toBeTruthy();
+  });
+
+  test('연결되지 않은 지표·피드백(null)은 0이나 표본 부족이 아니라 미연동으로 보이고 화면이 깨지지 않는다', async () => {
+    // #262 계약: 원천이 없으면 availability=unavailable, 값은 null이다.
+    const base = overview();
+    server.on('GET', DASHBOARD, () => json(dashboard()));
+    server.on('GET', OVERVIEW, () =>
+      json({
+        ...base,
+        metrics: [
+          ...base.metrics,
+          {
+            ...base.metrics[0],
+            key: 'aiQuestions',
+            group: 'ai',
+            label: 'AI 질문',
+            count: null,
+            availability: 'unavailable',
+            unavailableReason: 'not_integrated',
+          },
+        ],
+        feedback: {
+          up: null,
+          down: null,
+          rate: null,
+          sampleHidden: false,
+          availability: 'unavailable',
+          unavailableReason: 'not_integrated',
+        },
+      }),
+    );
+    openDashboard();
+
+    const section = await screen.findByRole('region', {
+      name: '이용·선호도(7일)',
+    });
+    expect(await within(section).findByText('40.5%')).toBeTruthy();
+    expect(within(section).getAllByText('미연동')).toHaveLength(2);
+    expect(
+      within(section).getByText('좋아요·싫어요 집계가 아직 연결되지 않았어요'),
+    ).toBeTruthy();
+    expect(within(section).queryByText(/좋아요 0/)).toBeNull();
   });
 
   test('이용·선호도 조회가 실패해도 나머지 대시보드는 보인다', async () => {

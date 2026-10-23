@@ -54,6 +54,7 @@ public class ArtifactGraphSnapshotStore implements GraphSnapshotStore {
                     : "missing".equals(error.detail()) ? "snapshot_missing" : "snapshot_hash_mismatch";
             throw new GraphSnapshotUnavailableException(reason, error);
         }
-        return GraphSnapshotCodec.read(bytes, version.id());
+        return "briefing_reconstruction".equals(version.kind())
+                ? GraphSnapshotCodec.readReconstruction(bytes, version.id()) : GraphSnapshotCodec.read(bytes, version.id());
     }
 }

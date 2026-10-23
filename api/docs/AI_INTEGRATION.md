@@ -117,6 +117,25 @@ HTTP/1.1, 프록시 없음, 쿠키 없음, **리다이렉트 안 따름**, 자�
 
 **없는 것(명시).** S2·S3 쪽에는 앱 DB·작업 저장소·jobId/operationId의 사용자·문서·회차 결속·후보의 앱 검증(문서 버전·인용 오프셋·현재 권리)·결과 import·공개 endpoint·스케줄러·AI 오류→공개 `ErrorCode` 매핑이 없습니다(S1 문서 요약·기업 판정만 [문서 분석](DOCUMENT_ANALYSIS.md)이 앱 DB로 import합니다). S3 검수 결정을 앱 검수 흐름(앱의 `expectedRevision`·승인·게시)과 잇는 일은 첫 소비 기능 소유자의 몫이며, 이 클라이언트는 AI 원천 expectation만 전달합니다. live 모드·모델 호출·실제 토큰은 사용하지 않았습니다.
 
+## 챗봇 모델 단계 클라이언트
+
+`com.zoop.ai.chat.ChatStageClient`(`HttpChatStageClient`)는 `POST /internal/v1/chat-stages/{stage}`(계약 `zoop-ai-chat-1`)로 챗봇 모델 단계 하나를 동기로 실행합니다. 단계는 `chat-router`(Jev), `chat-answer`(Luna), `chat-verification`(Jev)입니다. 같은 전송 계층(`AiHttpTransport`: 재시도·redirect·proxy 없음, 응답 크기·마감 제한, `X-Request-ID` 대조)을 쓰고 오류 봉투는 S1(`zoop-ai-internal-1`)입니다. `Idempotency-Key`는 `invocationId`(`<chatJobId>.<attemptNo>.<router|answer|verify>`)라서 같은 시도의 같은 단계는 AI 쪽에서 두 번 보내지지 않고, 재실행(rerun)은 새 시도 번호로 새 invocation이 됩니다.
+
+`com.zoop.chat.model.ChatModelStages`가 오케스트레이터의 세 포트(`ChatModels.Router/Generator/Verifier`)를 구현합니다.
+
+- **보내는 것.** 확인 질문 사슬(질문과 고른 선택지 이름), 서버가 나눈 요구사항, 바인딩된 논리 기능의 설명, 도구 결과 항목 중 ZOOP 그래프·카탈로그 데이터인 기업·사건·관계 항목(id·종류·이름. 이름이 기사 제목인 `evidence` 항목은 보내지 않음), 근거 인용 구간(근거 레코드에서 만든 `quote`와 그 기사의 `articles.provider`인 `sourceId`, 제목, 발행 시각)만 보냅니다. 회원 ID, 계정 정보, 기사 전문은 보내지 않습니다. 인용 전송 허용 여부는 AI 쪽 챗봇 grant registry가 `sourceId`로 판단하며 허용되지 않으면 단계가 거절됩니다(fail closed).
+- **잠정 규칙(2026-10-22).** 요구사항 분해는 결정론적입니다(`ChatRequirementSplitter`: 물음표·줄바꿈·세미콜론·독립된 "그리고"/"또한"에서만 나누고, 나누지 못하면 질문 전체가 요구 하나). 기업명은 모델이 아니라 서버가 카탈로그 이름·별칭과 **정확히 일치**할 때만 해석하고, 겹치면 긴 이름이 이깁니다(`CompanyNameResolver`). 같은 이름이 여러 기업이면 모델을 호출하지 않고 `kind=company` 확인 질문을 만듭니다. 다음 실행에서는 회원이 고른 선택지 id 또는 자유 입력 답에 쓴 정확한 기업명으로 해석합니다. 확인 답 실행은 루트 질문과 답을 순서대로 반영한 뒤 제한·모호성을 판단합니다. 루트의 요구가 6개를 넘으면 자유 입력 답을 나눈 요구가 그 자리를 대신합니다.
+- **실패 의미.** 단계 결과 `failed`는 `unknown`이면 `UNKNOWN`(재전송 금지), 보냈지만 확정 실패면 `NOT_SENT`(재실행 가능), 보내지 않았으면(설정·grant·live gate·호출 상한 거절) `REFUSED`(같은 실행은 다시 거절되므로 재실행하지 않음, 공개 실패 `internal`)입니다. HTTP 502/504 `stage_outcome_unknown`과 연결 이후 전송 실패는 `UNKNOWN`, 503은 시작되지 않았으므로 `NOT_SENT`, 그 밖의 4xx(409 `execution_unavailable` 등)는 `REFUSED`입니다. 형식이 맞지 않는 답은 `NOT_SENT`입니다. 클라이언트는 결과 불변식도 검사해서 어긋나면 `RESPONSE_MALFORMED`(결과 불명)로 처리하고 사용할 답으로 바꾸지 않습니다. 불변식: 성공에는 answer·receipt가 있고 failure가 없으며, 실패에는 answer가 없고, `unknown`이면 `sent`이며, receipt는 보냈을 때만 있고 요청 mode와 같아야 합니다.
+- **기록.** 각 단계는 `ai_executions`에 `feature=chatbot`, `chat_job_id`, `stage`, `execution_mode`와 함께 호출 전 `running`으로 남고, 끝나면 `succeeded`/`failed`/`unknown`, 영수증의 provider·model·prompt version·토큰과 오류 코드로 갱신됩니다. 이 행은 `chat_jobs`를 `ON DELETE RESTRICT`로 참조하므로 기록이 있는 작업의 대화·회원은 이 행을 먼저 정리하지 않으면 삭제되지 않습니다(ERD v6 보존 정책).
+
+| 환경 변수 | 기본값 | 규칙 |
+|---|---|---|
+| `ZOOP_AI_CHAT_CLIENT_ENABLED` | `false` | `true`일 때만 클라이언트·어댑터·`OrchestratedChatEngine` bean을 등록합니다. 그래야 `ZOOP_CHAT_QUESTIONS_ENABLED=true`로 기동할 수 있습니다 |
+| `ZOOP_AI_CHAT_CLIENT_MODE` | `replay` | `replay`(AI 쪽 고정 응답, 네트워크 없음) 또는 `live`(실제 Luna/Jev 호출. AI 서비스의 chat live gate·호출 상한이 따로 열려 있어야 하며 유료 호출은 별도 승인 필요). 다른 값은 기동 실패 |
+| `…_BASE_URL`, `…_TOKEN`, `…_CONNECT_TIMEOUT`, `…_REQUEST_TIMEOUT`, `…_MAX_RESPONSE_BYTES` | 없음, 없음, `3s`, `35s`, `2097152` | S1 표와 같은 규칙. 토큰의 principal에는 `chat.invoke` scope가 필요합니다. 요청 마감은 가장 긴 단계(answer 25초)와 서비스 여유를 덮고, 단계별 상한은 오케스트레이터가 따로 끊습니다 |
+
+이 PR의 시험은 모두 stub(loopback 서버·스크립트 클라이언트)이며 실제 모델·live 호출은 하지 않았습니다.
+
 ## 소유와 격리
 
 AI 서비스의 소유자는 **인증된 principal 하나**(이 앱)이며 최종 사용자(tenant) 식별이 없습니다. 같은 principal의 작업은 모두 같은 소유자라서 **사용자 간 격리는 이 클라이언트가 하지 않습니다.** 앱이 jobId를 사용자·문서·회차에 결속해 저장하고 접근 시 직접 확인해야 합니다. 이 결속을 담을 열은 ERD v6에도 정해져 있지 않습니다([아래](#erd-v6-설계와의-관계)). 다른 principal의 작업은 404와 동일하게 보입니다.

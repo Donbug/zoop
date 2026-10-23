@@ -4,6 +4,7 @@ import type {
   BriefingGraphBasis,
   BriefingItemDetail,
   BriefingResponse,
+  BriefingRecap,
   BriefingRoundsResponse,
 } from '@/types/briefing';
 
@@ -73,4 +74,48 @@ export function getPersonalizedBriefing(roundId: string) {
     `/api/v1/briefings/${encodeURIComponent(roundId)}/personalized`,
     'GET',
   );
+}
+
+/** D-BRF-01·02: 현재 회차가 고정한 과거 발행본만 복기한다. */
+export async function getBriefingRecap(round: BriefingResponse) {
+  const recap = await call<BriefingRecap>(
+    `/api/v1/briefings/${encodeURIComponent(round.id)}/recap`,
+    'GET',
+    undefined,
+    { skipAuth: true },
+  );
+  if (
+    recap.roundId !== round.id ||
+    recap.graphVersion !== round.graphVersion ||
+    Date.parse(recap.dataAsOf ?? '') !== Date.parse(round.dataAsOf ?? '')
+  )
+    throw new Error(
+      '요청한 회차·버전·기준 시각과 복기 응답이 일치하지 않습니다.',
+    );
+  if (recap.status === 'available') {
+    const reference =
+      round.edition === 'evening'
+        ? round.sinceMorning
+        : round.previousComparison;
+    const expectedId =
+      reference?.status === 'available'
+        ? 'morningRoundId' in reference
+          ? reference.morningRoundId
+          : reference.previousRoundId
+        : null;
+    const previous = recap.previous;
+    if (
+      !previous ||
+      previous.id !== expectedId ||
+      previous.id === round.id ||
+      previous.status !== 'published' ||
+      previous.corrections.length > 0 ||
+      !previous.items.length ||
+      !(Date.parse(previous.dataAsOf ?? '') < Date.parse(round.dataAsOf ?? ''))
+    )
+      throw new Error('고정된 이전 발행본과 복기 응답이 일치하지 않습니다.');
+  } else if (recap.previous !== null) {
+    throw new Error('제공할 수 없는 과거 내용이 포함돼 있습니다.');
+  }
+  return recap;
 }

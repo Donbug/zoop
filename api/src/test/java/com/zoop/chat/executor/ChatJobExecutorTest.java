@@ -5,12 +5,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 import com.zoop.chat.dto.ChatFailure;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.repository.ChatJobRow;
+import com.zoop.chat.repository.ChatToolCallEnd;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
@@ -77,7 +79,8 @@ class ChatJobExecutorTest {
 
     @Test
     void aReplyRunsWithTheWholeClarificationChainInOrder() {
-        store.add(queued("job-00001", null, null, 0, "run", "completed"));
+        store.add(withResult(queued("job-00001", null, null, 0, "run", "completed"),
+                ScriptedChatEngine.clarification("어느 기업인가요?", "choice-a", "choice-b").result()));
         store.add(queued("job-00002", "job-00001", "choice-a", 1, "run", "completed"));
         store.add(queued("job-00003", "job-00002", null, 2, "run"));
         var engine = new ScriptedChatEngine((run, control) -> ScriptedChatEngine.guidance("대상을 구체적으로 적어 주세요."));
@@ -87,9 +90,10 @@ class ChatJobExecutorTest {
         assertEquals("job-00003", run.jobId());
         assertEquals(2, run.clarificationDepth());
         assertEquals(List.of("ev-1"), run.selection().evidencePool());
-        assertEquals(List.of(new ChatRun.Turn("job-00001", "질문 job-00001", null),
-                new ChatRun.Turn("job-00002", "질문 job-00002", "choice-a"),
-                new ChatRun.Turn("job-00003", "질문 job-00003", null)), run.turns());
+        // The picked option carries the label the clarification showed, so the next run can read what was chosen.
+        assertEquals(List.of(new ChatRun.Turn("job-00001", "질문 job-00001", null, null),
+                new ChatRun.Turn("job-00002", "질문 job-00002", "choice-a", "choice-a 선택"),
+                new ChatRun.Turn("job-00003", "질문 job-00003", null, null)), run.turns());
         assertEquals("guidance", store.job("job-00003").row.outcome());
     }
 
@@ -186,6 +190,79 @@ class ChatJobExecutorTest {
         assertTrue(engine.runs.isEmpty());
     }
 
+    @Test
+    void aResultReturnedAfterTheRunDeadlineIsNeverStoredAsCompleted() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        store.add(queued("job-00002", null, null, 0, "run"));
+        var engine = new ScriptedChatEngine((run, control) -> {
+            if (run.jobId().equals("job-00001")) control.beforeModelCall();
+            // Past the 60 s deadline, still inside the 15 s lease grace: the write would be accepted by the fence.
+            clock.advance(Duration.ofSeconds(65));
+            return ScriptedChatEngine.generalAnswer("늦은 답");
+        });
+        var executor = executor(engine);
+        executor.runOnce();
+        executor.runOnce();
+
+        var called = job(store.job("job-00001"));
+        assertEquals("failed", store.job("job-00001").row.status());
+        assertEquals("response_unknown", called.reason());
+        assertNull(called.retry());
+        var notCalled = job(store.job("job-00002"));
+        assertEquals("deadline_guard", notCalled.reason());
+        assertEquals("rerun", notCalled.retry());
+        assertNull(store.job("job-00002").result);
+    }
+
+    @Test
+    void toolCallsAreReservedInPlanOrderCappedPerAttemptAndClosedWithTheJob() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        executor(new ScriptedChatEngine((run, control) -> {
+            assertEquals(List.of("tc-0", "tc-1"), control.reserveToolCalls(1,
+                    List.of(reservation("company.read"), reservation("issue.read"))));
+            control.toolCallStarted("tc-0");
+            control.toolCallFinished("tc-0", new ChatToolCallEnd("succeeded", null, "v1", List.of("ev-1"), false, false));
+            control.toolCallStarted("tc-1");
+            // 2 reserved + 11 would pass the per-attempt cap of 12: nothing of it is reserved.
+            assertThrows(IllegalArgumentException.class,
+                    () -> control.reserveToolCalls(2, Collections.nCopies(11, reservation("company.read"))));
+            assertEquals(List.of("tc-2"), control.reserveToolCalls(2, List.of(reservation("evidence.resolve"))));
+            return ScriptedChatEngine.generalAnswer("답");
+        })).runOnce();
+
+        var calls = store.toolCalls("job-00001");
+        assertEquals(3, calls.size());
+        assertEquals(List.of("succeeded", "unknown", "cancelled"), calls.stream().map(c -> c.status).toList(),
+                "a call left running ends unknown, a call never started ends cancelled");
+        assertEquals(List.of("ev-1"), calls.get(0).end.evidenceIds());
+        assertEquals(2, calls.get(2).row.planRevision());
+        assertEquals(2, calls.get(2).row.callIndex());
+        assertEquals(1, calls.get(2).row.attemptNo());
+    }
+
+    @Test
+    void aSupersededRunCannotReserveStartOrFinishToolCalls() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        executor(new ScriptedChatEngine((run, control) -> {
+            control.reserveToolCalls(1, List.of(reservation("company.read"), reservation("issue.read")));
+            control.toolCallStarted("tc-0");
+            store.cancel("job-00001", clock.instant());
+            assertThrows(ChatRunSuperseded.class, () -> control.toolCallFinished("tc-0",
+                    new ChatToolCallEnd("succeeded", null, "v1", List.of(), false, false)));
+            assertThrows(ChatRunSuperseded.class, () -> control.toolCallStarted("tc-1"));
+            assertThrows(ChatRunSuperseded.class, () -> control.reserveToolCalls(2, List.of(reservation("issue.read"))));
+            throw new ChatRunSuperseded();
+        })).runOnce();
+
+        assertEquals(List.of("unknown", "cancelled"),
+                store.toolCalls("job-00001").stream().map(c -> c.status).toList());
+    }
+
+    private static ChatToolCallReservation reservation(String capability) {
+        return new ChatToolCallReservation("chat-tools/v1", "zoop-core-read", capability, "app:" + capability,
+                "chat-tool/v1", "0".repeat(64), "{}");
+    }
+
     private void assertFailure(int runsBefore, ChatEngineOutcome.Failed outcome, String retry, String attemptStatus) {
         String id = "job-f" + store.jobs.size() + "000";
         store.add(withRuns(queued(id, null, null, 0, "rerun"), runsBefore));
@@ -222,6 +299,14 @@ class ChatJobExecutorTest {
                 List.of(),
                 null, status, null, "completed".equals(status) ? "clarification" : null, resolves, choice, depth, null, null,
                 0, attempts, NOW, NOW, null);
+    }
+
+    private ChatJobRow withResult(ChatJobRow r, ChatResult result) {
+        return new ChatJobRow(r.id(), r.sessionId(), r.memberId(), r.seq(), r.question(), r.requestHash(), r.askedAt(),
+                r.frozenContext(), r.frozenSelection(), r.contextCompanyIds(), r.graphVersionId(), r.status(), r.phase(),
+                r.outcome(), r.resolvesJobId(), r.resolvesChoiceId(), r.clarificationDepth(),
+                mapper.writeValueAsString(result), r.failure(), r.runs(), r.attempts(), r.createdAt(), r.updatedAt(),
+                r.finishedAt());
     }
 
     private static ChatJobRow withRuns(ChatJobRow r, int runs) {
