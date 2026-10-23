@@ -9,6 +9,7 @@ import {
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import GraphCanvas from '@/components/graph/GraphCanvas';
+import { GraphAppearanceContext } from '@/components/graph/graph-appearance';
 import { createMockGraph } from '@/mocks/graph/response';
 import type { GraphData } from '@antv/g6';
 import {
@@ -44,8 +45,8 @@ const canvas = vi.hoisted(() => ({
 vi.mock('@antv/g6', () => ({
   Graph: class {
     destroyed = false;
-    constructor() {
-      canvas.created();
+    constructor(options: unknown) {
+      canvas.created(options);
     }
     on(name: string, handler: (event: { target: { id: string } }) => void) {
       canvas.handlers.set(name, handler);
@@ -102,6 +103,148 @@ beforeEach(() => {
   );
 });
 describe('D-GRP-02 · canvas selection bridge', () => {
+  it('keeps the renderer when a parent supplies equivalent appearance values', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const page = (selectedId?: string) => (
+      <GraphAppearanceContext
+        value={{ variant: 'improved', theme: 'light', preview: true }}
+      >
+        <GraphCanvas data={data} selectedId={selectedId} />
+      </GraphAppearanceContext>
+    );
+    const view = render(page());
+    await waitFor(() => expect(canvas.created).toHaveBeenCalledTimes(1));
+    view.rerender(page('KRX:005930'));
+    await waitFor(() =>
+      expect(
+        canvas.setData.mock.lastCall?.[0].nodes.some(
+          (n: { id: string }) => n.id === 'KRX:005930',
+        ),
+      ).toBe(true),
+    );
+    expect(canvas.created).toHaveBeenCalledTimes(1);
+    expect(canvas.destroyed).not.toHaveBeenCalled();
+  });
+
+  it('D-GRP-01 stores dragged coordinates, suppresses the drag click and restores after a redraw', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const select = vi.fn();
+    const view = render(
+      <GraphCanvas data={data} memoryOwner="drag-owner" onSelect={select} />,
+    );
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    const node = canvas.setData.mock.lastCall![0].nodes.find(
+      (n: { id: string }) => n.id === 'KRX:005930',
+    );
+    const other = canvas.setData.mock.lastCall![0].nodes.find(
+      (n: { id: string }) => n.id === 'NASDAQ:NVDA',
+    );
+    const originalOther = [other.style.x, other.style.y];
+    await act(async () => {
+      canvas.handlers.get('node:dragstart')!({ target: { id: node.id } });
+      node.style.x = 1234;
+      node.style.y = 567;
+      canvas.handlers.get('node:dragend')!({ target: { id: node.id } });
+      canvas.handlers.get('node:click')!({ target: { id: node.id } });
+    });
+    expect(select).not.toHaveBeenCalled();
+    view.rerender(
+      <GraphCanvas
+        data={data}
+        memoryOwner="drag-owner"
+        onSelect={select}
+        selectedId="NASDAQ:NVDA"
+      />,
+    );
+    await waitFor(() => {
+      const nodes = canvas.setData.mock.lastCall![0].nodes;
+      expect(nodes.find((n: { id: string }) => n.id === node.id).style.x).toBe(
+        1234,
+      );
+      expect(nodes.find((n: { id: string }) => n.id === node.id).style.y).toBe(
+        567,
+      );
+      const unchanged = nodes.find((n: { id: string }) => n.id === other.id);
+      expect([unchanged.style.x, unchanged.style.y]).toEqual(originalOther);
+    });
+    view.unmount();
+    render(<GraphCanvas data={data} memoryOwner="drag-owner" />);
+    await waitFor(() =>
+      expect(
+        canvas.setData.mock.lastCall![0].nodes.find(
+          (n: { id: string }) => n.id === node.id,
+        ).style.x,
+      ).toBe(1234),
+    );
+  });
+
+  it('D-GRP-01 double click fits the visible neighborhood and tutorial blocks drag and double click', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const view = render(<GraphCanvas data={data} />);
+    const host = screen.getByRole('img');
+    Object.defineProperty(host, 'clientWidth', {
+      configurable: true,
+      value: 1200,
+    });
+    Object.defineProperty(host, 'clientHeight', {
+      configurable: true,
+      value: 700,
+    });
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    canvas.zoomTo.mockClear();
+    await act(async () =>
+      canvas.handlers.get('node:dblclick')!({ target: { id: 'KRX:005930' } }),
+    );
+    await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalled());
+    expect(canvas.zoomTo.mock.lastCall![0]).toBeLessThanOrEqual(1.8);
+    canvas.zoomTo.mockClear();
+    fireEvent.keyDown(screen.getByRole('button', { name: '기업: 삼성전자' }), {
+      key: 'Enter',
+      shiftKey: true,
+    });
+    await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalled());
+    view.rerender(
+      <GraphCanvas data={data} tutorialLocked tutorialTargetId="KRX:005930" />,
+    );
+    await act(async () => {});
+    canvas.zoomTo.mockClear();
+    await act(async () => {
+      canvas.handlers.get('node:dblclick')!({ target: { id: 'KRX:005930' } });
+      canvas.handlers.get('node:dragend')!({ target: { id: 'KRX:005930' } });
+    });
+    expect(canvas.zoomTo).not.toHaveBeenCalled();
+    const behavior = canvas.created.mock.lastCall![0].behaviors.find(
+      (b: { type?: string }) => b.type === 'drag-element',
+    );
+    expect(behavior.enable()).toBe(false);
+  });
+
+  it('M-GRP-01 folds path details into a compact bar and reopens the sheet without losing the path', async () => {
+    vi.stubGlobal('matchMedia', () => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    useAuthStore.setState({ status: 'ready', session: null, member: null });
+    useGraphUiStore.getState().reset();
+    vi.spyOn(graphApi, 'getGraph').mockResolvedValue(
+      createMockGraph({ mode: 'all', personalFilter: 'all' }),
+    );
+    const router = createMemoryRouter([{ path: '/', element: <MapPage /> }], {
+      initialEntries: ['/?mode=all&path=KRX:005930,NASDAQ:NVDA'],
+    });
+    render(<RouterProvider router={router} />);
+    await screen.findByRole('dialog', { name: '지도 상세' });
+    await userEvent.click(screen.getByRole('button', { name: '지도로 접기' }));
+    expect(screen.queryByRole('dialog', { name: '지도 상세' })).toBeNull();
+    const bar = screen.getByRole('group', { name: '지도 경로' });
+    expect(bar.textContent).toContain('삼성전자 ⇆ NVIDIA');
+    expect(router.state.location.search).toContain('path=');
+    await userEvent.click(
+      within(bar).getByRole('button', { name: '경로 단계 보기' }),
+    );
+    expect(screen.getByRole('dialog', { name: '지도 상세' })).toBeTruthy();
+  });
   it('모바일의 기존 상세/경로를 닫고 실제 캔버스에서 재시작·이동·확대·기업 선택을 수행한다', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({
       matches: query.includes('max-width: 767px'),
@@ -659,12 +802,12 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       );
       expect(canvas.created).toHaveBeenCalledOnce();
 
-      // An explicit fit can still use the full, newly expanded graph surface.
+      // Fit uses the expanded viewport through the camera, preserving saved node positions.
       await userEvent.click(
         screen.getByRole('button', { name: '전체 그래프 맞춤' }),
       );
       await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalled());
-      expect(positions()).not.toEqual(before);
+      expect(positions()).toEqual(before);
     },
   );
   it('keeps a user-placed view centered when a sidebar narrows the map', async () => {

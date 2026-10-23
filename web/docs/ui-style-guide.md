@@ -101,3 +101,5 @@ D-GRP-01/01b MapPage provides the approved light/dark GraphAppearanceContext and
 Render one GraphLegend group in the top toolbar using the GraphCanvas portal slot. Preserve its member/mode-scoped visibility state, aria-pressed, relationship explanations, camera, selection and at least one visible node kind. The left legend was removed by user request. Let toolbar items scroll horizontally without shrinking or creating vertical clipping.
 
 Company logos use `CompanyLogo`, `logoScale` and `logoBackground` from the shared logo utility. Background marks with checked safe margins fill the circle; other symbols fit the inscribed square (68% diameter) and use object-contain. Preserve brand colors and the Micron/Amazon backgrounds across themes. See [graph UI improvements](GRAPH_UI_IMPROVEMENTS.md) for asset provenance, verification and scope.
+
+D-GRP-01/01b uses `graph-readability` for screen-size text, LOD and measured label culling, and `graph-positions` for owner/snapshot/arrangement-scoped node coordinates. Mobile tools reuse zoop tokens and 44px targets. See [canvas enhancements](GRAPH_CANVAS_ENHANCEMENTS.md) for behavior and validation limits.

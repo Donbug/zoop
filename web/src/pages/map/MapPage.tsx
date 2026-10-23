@@ -170,6 +170,7 @@ function MapWorkspace({
   const [retry, setRetry] = useState(0);
   const [notice, setNotice] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsedPath, setCollapsedPath] = useState<string | null>(null);
   const [filterHost, setFilterHost] = useState<HTMLDivElement | null>(null);
   const [centerRequest, setCenterRequest] = useState<{
     id: string;
@@ -297,6 +298,8 @@ function MapWorkspace({
   const pathParts = params.get('path')?.split(',') ?? [];
   const pathFrom = pathParts[0] || null;
   const pathTo = pathParts.length === 2 ? pathParts[1] || null : null;
+  const pathIsCollapsed =
+    !tutorialOpen && Boolean(pathFrom) && collapsedPath === params.get('path');
   const displayedPath =
     data && !loading && !error && pathFrom && pathTo
       ? companyPath(data, pathFrom, pathTo)
@@ -848,7 +851,7 @@ function MapWorkspace({
             </div>
           </div>
           <div
-            className={`relationship-body${selectedPanel ? ' has-company-panel max-md:pb-[48dvh]!' : ''}${tutorialOpen || sidebarOpen ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
+            className={`relationship-body${selectedPanel ? ` has-company-panel ${pathIsCollapsed ? '' : 'max-md:pb-[48dvh]!'}` : ''}${tutorialOpen || sidebarOpen ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
             aria-busy={loading}
           >
             {sidebarOpen && (
@@ -893,7 +896,9 @@ function MapWorkspace({
                     ? `${memoryOwner}:tutorial`
                     : round
                       ? `${memoryOwner}:round:${round}`
-                      : memoryOwner
+                      : historical
+                        ? `${memoryOwner}:asOf:${asOf}`
+                        : memoryOwner
                 }
                 tutorialPhase={
                   tutorialOpen && tutorialStep === 1
@@ -961,6 +966,37 @@ function MapWorkspace({
                 </p>
               </div>
             )}
+            {pathFrom && pathIsCollapsed && (
+              <div
+                role="group"
+                aria-label="지도 경로"
+                data-screen-id="D-GRP-07"
+                className="absolute top-2 right-2 left-2 z-20 flex flex-wrap items-center gap-1 rounded-lg border border-zoop-line bg-zoop-paper p-2 text-[13px] text-zoop-ink md:hidden"
+              >
+                <strong className="min-w-0 flex-1 truncate">
+                  {data?.nodes.find((n) => n.id === pathFrom)?.label ??
+                    '첫 기업'}{' '}
+                  ⇆{' '}
+                  {data?.nodes.find((n) => n.id === pathTo)?.label ??
+                    '기업 선택'}
+                  {displayedPath
+                    ? ` · ${displayedPath.edgeIds.length}단계`
+                    : ''}
+                </strong>
+                <button
+                  className="min-h-11 rounded border border-zoop-line px-2"
+                  onClick={() => setCollapsedPath(null)}
+                >
+                  경로 단계 보기
+                </button>
+                <button
+                  className="min-h-11 rounded border border-zoop-line px-2"
+                  onClick={() => updateQuery({ path: null })}
+                >
+                  경로 나가기
+                </button>
+              </div>
+            )}
             {focusNode?.kind === 'company' && !pathFrom && (
               <GraphFocusControls
                 label={focusNode.label}
@@ -999,7 +1035,7 @@ function MapWorkspace({
                 tutorialOpen && tutorialStep && tutorialStep < 5,
               )}
               open={Boolean(selectedPanel)}
-              suspended={evidenceOpen}
+              suspended={evidenceOpen || pathIsCollapsed}
               tutorial={
                 tutorialOpen &&
                 tutorialStep && (
@@ -1094,6 +1130,14 @@ function MapWorkspace({
                   tutorialAi={tutorialOpen && tutorialStep === 5}
                   tutorialSaving={tutorialSaving}
                 />
+              )}
+              {pathFrom && !tutorialOpen && (
+                <button
+                  className="min-h-11 w-full border-b border-zoop-line bg-zoop-paper px-4 text-left text-[13px] text-zoop-ink md:hidden"
+                  onClick={() => setCollapsedPath(params.get('path'))}
+                >
+                  지도로 접기
+                </button>
               )}
               {pathFrom && (
                 <CompanyPathPanel

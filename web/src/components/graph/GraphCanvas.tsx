@@ -1,4 +1,11 @@
-import { useContext, useEffect, useEffectEvent, useRef, useState } from 'react';
+import {
+  useContext,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   GraphAppearanceContext,
   defaultAppearance,
@@ -23,6 +30,14 @@ import {
 } from './graph-view';
 import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { arrangeFlow, arrangeFocus } from './graph-arrange';
+import { applyGraphReading } from './graph-readability';
+import {
+  positionKey,
+  readPositions,
+  restorePositions,
+  savePositions,
+} from './graph-positions';
+import GraphMobileTools from './GraphMobileTools';
 import { freeViewport, nodeRect, type Rect } from './graph-geometry';
 
 const noHighlightedEdges: string[] = [];
@@ -80,7 +95,14 @@ export default function GraphCanvas({
   /** 내 종목 사이드바에서 고른 기업. seq가 바뀔 때마다 그 노드를 화면 가운데로 옮긴다. */
   centerRequest?: { id: string; seq: number } | null;
 }) {
-  const appearance = useContext(GraphAppearanceContext) ?? defaultAppearance;
+  const suppliedAppearance =
+    useContext(GraphAppearanceContext) ?? defaultAppearance;
+  const { variant, theme, preview } = suppliedAppearance;
+  // A parent render with equivalent theme values must not destroy the renderer.
+  const appearance = useMemo(
+    () => ({ variant, theme, preview }),
+    [variant, theme, preview],
+  );
   const colors = appearanceColors(appearance);
   const tutorialAction = useEffectEvent((action: 'pan' | 'zoom') =>
     onTutorialAction?.(action),
@@ -140,6 +162,90 @@ export default function GraphCanvas({
   const lastFocused = useRef<string | null>(null);
   const tutorialCentered = useRef<string | undefined>(undefined);
   const hovered = useRef<string | null>(null);
+  const hoveredEdge = useRef<string | null>(null);
+  const readingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragged = useRef<{ id: string; until: number } | null>(null);
+  const renderedData = useRef<ReturnType<typeof toG6Data> | null>(null);
+  const lastArrangement = useRef('map');
+  const [renderError, setRenderError] = useState(false);
+  const reading = useEffectEvent(() => {
+    const graph = instance.current;
+    const base = renderedData.current;
+    if (!graph || graph.destroyed || !base) return;
+    drawing.current = drawing.current
+      .then(async () => {
+        if (
+          instance.current !== graph ||
+          graph.destroyed ||
+          renderedData.current !== base
+        )
+          return;
+        const path = new Set(highlightedEdgeIds);
+        for (const edge of base.edges ?? [])
+          if (path.has(String(edge.id))) {
+            path.add(String(edge.source));
+            path.add(String(edge.target));
+          }
+        await applyGraphReading(graph, base, data, {
+          zoom: graph.getZoom(),
+          anchor: hovered.current ?? selected,
+          edge: hoveredEdge.current ?? selectedEdgeId,
+          focus: focusId,
+          path,
+        });
+      })
+      .catch(() => {
+        if (!graph.destroyed) setRenderError(true);
+      });
+  });
+  const scheduleReading = useEffectEvent(() => {
+    if (readingTimer.current !== null) clearTimeout(readingTimer.current);
+    readingTimer.current = setTimeout(() => {
+      readingTimer.current = null;
+      reading();
+    }, 140);
+  });
+  const pinchEnabled = useEffectEvent(
+    () =>
+      !isTutorial() ||
+      currentTutorialPhase() === 'zoom' ||
+      tutorialCameraEnabled,
+  );
+  const interactionEnabled = useEffectEvent(
+    () => !tutorialLocked && !tutorialPhase && !tutorialCenterId,
+  );
+  const rememberNodes = useEffectEvent((graph: Graph) => {
+    const host = container.current;
+    if (
+      !host ||
+      !interactionEnabled() ||
+      graph.destroyed ||
+      instance.current !== graph
+    )
+      return;
+    const nodes = graph.getNodeData();
+    savePositions(
+      positionKey(memoryOwner, data, lastArrangement.current),
+      nodes,
+      host.clientWidth,
+      host.clientHeight,
+    );
+    if (renderedData.current) {
+      const positions = new Map(nodes.map((n) => [n.id, n.style]));
+      renderedData.current = {
+        ...renderedData.current,
+        nodes: renderedData.current.nodes?.map((n) => ({
+          ...n,
+          style: {
+            ...n.style,
+            x: positions.get(n.id)?.x ?? n.style?.x,
+            y: positions.get(n.id)?.y ?? n.style?.y,
+          },
+        })),
+      };
+    }
+    scheduleReading();
+  });
   const [hoveredIssue, setHoveredIssue] = useState<string | null>(null);
   const fitPending = useRef(false);
   const defaultZoomPending = useRef(false);
@@ -150,7 +256,6 @@ export default function GraphCanvas({
   const previousSelected = useRef<string | null>(null);
   const preservePositions = useRef(false);
   const [centerSequence, setCenterSequence] = useState(0);
-  const renderedData = useRef<ReturnType<typeof toG6Data> | null>(null);
   const syncTutorialMarker = useEffectEvent(() => {
     const graph = instance.current;
     const host = container.current;
@@ -191,9 +296,14 @@ export default function GraphCanvas({
     );
   });
   // 지금 적용한 배치(원래 지도·포커스·흐름 순). 바뀌면 화면을 새 배치에 맞춘다.
-  const lastArrangement = useRef('map');
   function handleNodeSelect(id: string | null) {
     if (tutorialPhase || (tutorialLocked && id !== tutorialTargetId)) return;
+    if (
+      id &&
+      dragged.current?.id === id &&
+      performance.now() < dragged.current.until
+    )
+      return;
     if (id === '__isolated__') return onOpenIsolated?.();
     // 이미 선택한 노드를 다시 눌러도 수동 이동한 지도에서 중앙으로 돌아온다.
     centerTarget.current = id;
@@ -211,7 +321,6 @@ export default function GraphCanvas({
     if (data.edges.some((edge) => edge.id === id && isSelectableRelation(edge)))
       onSelectEdge?.(id);
   });
-  const [renderError, setRenderError] = useState(false);
   const [retry, setRetry] = useState(0);
   const stats = graphSummary(data);
   const nodeKinds = new Map(data.nodes.map((node) => [node.id, node.kind]));
@@ -285,6 +394,7 @@ export default function GraphCanvas({
           states[id].push('selected');
       }
       await graph.setElementState(states);
+      scheduleReading();
     },
   );
   const hoverNode = useEffectEvent((id: string | null) => {
@@ -367,7 +477,11 @@ export default function GraphCanvas({
       false,
     );
   }
-  async function fitVisibleGraph(graph: Graph) {
+  async function fitVisibleGraph(
+    graph: Graph,
+    ids?: Set<string>,
+    maxZoom = 1.5,
+  ) {
     const host = container.current;
     if (!host || graph.destroyed || !host.clientWidth || !host.clientHeight)
       return;
@@ -435,7 +549,11 @@ export default function GraphCanvas({
     if (safe.width < 40 || safe.height < 40) return;
     const rects = graph
       .getNodeData()
-      .filter((node) => node.style?.visibility !== 'hidden')
+      .filter(
+        (node) =>
+          node.style?.visibility !== 'hidden' &&
+          (!ids || ids.has(String(node.id))),
+      )
       .map(nodeRect);
     if (!rects.length) return;
     const left = Math.min(...rects.map((r) => r.x)),
@@ -446,7 +564,7 @@ export default function GraphCanvas({
       Math.max(
         0.01,
         Math.min(
-          1.5,
+          maxZoom,
           safe.width / Math.max(1, right - left),
           safe.height / Math.max(1, bottom - top),
         ),
@@ -466,6 +584,47 @@ export default function GraphCanvas({
       false,
     );
   }
+  const [neighborhoodRequest, setNeighborhoodRequest] = useState<{
+    id: string;
+  } | null>(null);
+  const zoomNeighborhood = useEffectEvent((id: string) => {
+    const graph = instance.current;
+    if (!interactionEnabled() || !graph || graph.destroyed) return;
+    const base = renderedData.current;
+    if (!base) return;
+    const ids = new Set([id]);
+    const edge = base.edges?.find((e) => e.id === id);
+    if (edge) {
+      ids.add(String(edge.source));
+      ids.add(String(edge.target));
+    }
+    for (const e of base.edges ?? [])
+      if (
+        e.style?.visibility !== 'hidden' &&
+        (e.source === id || e.target === id)
+      ) {
+        ids.add(String(e.source));
+        ids.add(String(e.target));
+      }
+    centerTarget.current = null;
+    followFit.current = false;
+    fitPending.current = false;
+    const current = graph;
+    drawing.current = drawing.current
+      .then(async () => {
+        if (!current.destroyed) {
+          await fitVisibleGraph(current, ids, 1.8);
+          scheduleReading();
+        }
+      })
+      .catch(() => {
+        if (!current.destroyed) setRenderError(true);
+      });
+  });
+  useEffect(() => {
+    if (neighborhoodRequest) zoomNeighborhood(neighborhoodRequest.id);
+  }, [neighborhoodRequest]);
+
   const syncSelection = useEffectEvent(() => {
     const graph = instance.current;
     const host = container.current;
@@ -576,6 +735,15 @@ export default function GraphCanvas({
           );
         }
         if (arrangement !== 'map') arrangedHidden.add('__isolated__');
+        if (!isTutorial()) {
+          const restored = restorePositions(
+            rendered,
+            readPositions(positionKey(memoryOwner, data, arrangement)),
+            host.clientWidth,
+            host.clientHeight,
+          );
+          rendered.nodes = restored.nodes;
+        }
         // Closing details changes the available width, but must not rearrange
         // the graph the user just centered (including its surrounding nodes).
         if (
@@ -689,6 +857,14 @@ export default function GraphCanvas({
         }
         tutorialCentered.current = tutorialCenterId;
         syncTutorialMarker();
+        if (!isTutorial())
+          savePositions(
+            positionKey(memoryOwner, data, arrangement),
+            rendered.nodes ?? [],
+            host.clientWidth,
+            host.clientHeight,
+          );
+        scheduleReading();
       })
       .catch(() => {
         if (!graph.destroyed) setRenderError(true);
@@ -739,7 +915,12 @@ export default function GraphCanvas({
     let graph: Graph | null = null;
     let observer: ResizeObserver | null = null;
     let resizeFrame: number | null = null;
-    const clearHover = () => hoverNode(null);
+    const clearHover = () => {
+      hoveredEdge.current = null;
+      setHoveredIssue(null);
+      hoverNode(null);
+      scheduleReading();
+    };
     let pointerStart: {
       x: number;
       y: number;
@@ -860,7 +1041,21 @@ export default function GraphCanvas({
           toG6Data(data, host.clientWidth, host.clientHeight),
           appearance,
         ),
-        behaviors: ['drag-canvas', 'zoom-canvas'],
+        behaviors: [
+          'drag-canvas',
+          'zoom-canvas',
+          {
+            type: 'zoom-canvas',
+            key: 'map-pinch-zoom',
+            trigger: ['pinch'],
+            enable: () => pinchEnabled(),
+          },
+          {
+            type: 'drag-element',
+            enable: () => interactionEnabled(),
+            animation: false,
+          },
+        ],
         zoomRange: [0.01, 4],
         edge: {
           state: {
@@ -921,6 +1116,44 @@ export default function GraphCanvas({
           },
         },
       });
+      graph.on('node:dragstart', (event: IElementEvent) => {
+        if (!interactionEnabled()) return;
+        dragged.current = { id: event.target.id, until: Infinity };
+        followFit.current = false;
+        centerTarget.current = null;
+        fitPending.current = false;
+        if (readingTimer.current !== null) clearTimeout(readingTimer.current);
+      });
+      graph.on('node:dragend', (event: IElementEvent) => {
+        if (!interactionEnabled()) return;
+        dragged.current = {
+          id: event.target.id,
+          until: performance.now() + 250,
+        };
+        rememberNodes(graph!);
+      });
+      graph.on('canvas:pointercancel', () => {
+        dragged.current = null;
+      });
+      graph.on('node:dblclick', (event: IElementEvent) =>
+        zoomNeighborhood(event.target.id),
+      );
+      graph.on('edge:dblclick', (event: IElementEvent) =>
+        zoomNeighborhood(event.target.id),
+      );
+      graph.on('edge:pointerenter', (event: IElementEvent) => {
+        if (!interactionEnabled()) return;
+        hoveredEdge.current = event.target.id;
+        setHoveredIssue(
+          data.edges.find((e) => e.id === event.target.id)?.summary ?? null,
+        );
+        scheduleReading();
+      });
+      graph.on('edge:pointerleave', () => {
+        hoveredEdge.current = null;
+        setHoveredIssue(null);
+        scheduleReading();
+      });
       graph.on('node:click', (event: IElementEvent) =>
         selectNode(event.target.id),
       );
@@ -930,7 +1163,7 @@ export default function GraphCanvas({
       graph.on('node:pointerleave', (event: IElementEvent) =>
         leaveNode(event.target.id),
       );
-      graph.on('canvas:pointerleave', () => hoverNode(null));
+      graph.on('canvas:pointerleave', clearHover);
       graph.on('canvas:click', () => selectNode(null));
       graph.on('edge:click', (event: IElementEvent) =>
         selectEdge(event.target.id),
@@ -940,6 +1173,7 @@ export default function GraphCanvas({
         try {
           const nextZoom = graph.getZoom();
           setZoom(nextZoom);
+          scheduleReading();
           if (
             wheelPending &&
             currentTutorialPhase() === 'zoom' &&
@@ -1035,6 +1269,10 @@ export default function GraphCanvas({
     });
     return () => {
       rememberCamera();
+      if (readingTimer.current !== null) {
+        clearTimeout(readingTimer.current);
+        readingTimer.current = null;
+      }
       disposed = true;
       host.removeEventListener('pointerleave', clearHover);
       host.removeEventListener('pointerdown', pointerDown);
@@ -1230,7 +1468,7 @@ export default function GraphCanvas({
         />
       )}
       <div
-        className={`relationship-zoom ${tutorialPhase === 'zoom' ? 'tutorial-target' : ''}`}
+        className={`relationship-zoom z-20 ${tutorialPhase ? '' : 'max-md:left-auto! max-md:right-3! max-md:bottom-3! max-md:flex-col max-md:gap-2 max-md:border-0! max-md:bg-transparent! max-md:[&>button]:size-11! max-md:[&>button]:rounded-full! max-md:[&>button]:border! max-md:[&>button]:border-zoop-line! max-md:[&>button]:bg-zoop-paper! max-md:[&>button]:text-zoop-ink! max-md:[&>button]:shadow-sm'} ${tutorialPhase === 'zoom' ? 'tutorial-target' : ''}`}
         aria-label="지도 확대 조절"
       >
         <button
@@ -1265,12 +1503,21 @@ export default function GraphCanvas({
                 : '사건에서 관련 기업, 선행 사건에서 후속 사건 방향으로 왼쪽에서 오른쪽에 정렬해요.'
             }
             onClick={() => onFlowChange(!flow)}
-            className="w-auto! px-2! text-[11px] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 aria-pressed:bg-zoop-soft aria-pressed:outline-[0.667px] aria-pressed:outline-zoop-ink"
+            className="max-md:hidden! w-auto! px-2! text-[13px] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 aria-pressed:bg-zoop-soft aria-pressed:outline-[0.667px] aria-pressed:outline-zoop-ink"
           >
             흐름 순으로 정렬
           </button>
         )}
-        <output>{Math.round(zoom * 100)}% · 드래그로 이동 · 휠로 확대</output>
+        {!tutorialPhase && (
+          <GraphMobileTools
+            flow={flow}
+            onFlowChange={onFlowChange}
+            focusActive={focusLayout && Boolean(focusId)}
+          />
+        )}
+        <output className="max-md:sr-only text-[13px]!">
+          {Math.round(zoom * 100)}% · 드래그로 이동 · 휠로 확대
+        </output>
       </div>
       {selectedNode && (
         <p className="relationship-selection" role="status">
@@ -1329,6 +1576,13 @@ export default function GraphCanvas({
               className={
                 node.id === tutorialTargetId ? 'tutorial-target' : undefined
               }
+              title="Shift+Enter로 연결된 이웃 맞춤 확대"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && event.shiftKey) {
+                  event.preventDefault();
+                  setNeighborhoodRequest({ id: node.id });
+                }
+              }}
               onClick={() => handleNodeSelect(node.id)}
             >
               {node.kind === 'issue' ? '사건: ' : '기업: '}
@@ -1353,12 +1607,20 @@ export default function GraphCanvas({
               data-tutorial-managed-disabled
               disabled={tutorialLocked}
               aria-pressed={selectedEdgeId === edge.id}
+              title="Shift+Enter로 연결된 이웃 맞춤 확대"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && event.shiftKey) {
+                  event.preventDefault();
+                  setNeighborhoodRequest({ id: edge.id });
+                }
+              }}
               onClick={() => onSelectEdge?.(edge.id)}
             >
               연결선:{' '}
               {data.nodes.find((node) => node.id === edge.source)?.label} –{' '}
               {data.nodes.find((node) => node.id === edge.target)?.label} ·{' '}
-              {edge.relationType === 'SHARES_ISSUE' ? '사건 공유' : '후속 관계'}
+              {edge.relationType === 'SHARES_ISSUE' ? '사건 공유' : '후속 관계'}{' '}
+              · {edge.summary}
             </button>
           ))}
       </div>
