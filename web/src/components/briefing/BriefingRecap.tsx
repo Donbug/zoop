@@ -94,7 +94,9 @@ export default function BriefingRecap({
                   compact={compact}
                   title={`이전 이슈 · ${item.title}`}
                 >
-                  <h4 className="text-sm font-bold">{item.title}</h4>
+                  <h4 className="text-sm font-bold">
+                    이전 이슈 · {item.title}
+                  </h4>
                   <p className={BODY}>
                     {'text' in item.summary
                       ? item.summary.text
@@ -104,6 +106,7 @@ export default function BriefingRecap({
                     roundId={previous.id}
                     graphVersion={previous.graphVersion}
                     item={item}
+                    isRecap
                   />
                 </BriefingReadingSection>
               </li>
