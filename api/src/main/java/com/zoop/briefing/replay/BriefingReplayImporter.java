@@ -44,9 +44,16 @@ public final class BriefingReplayImporter {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final BriefingReplaySettings settings;
+    private final boolean continuityEnabled;
 
     public BriefingReplayImporter(JdbcTemplate jdbc, PlatformTransactionManager transactions, BriefingReplaySettings settings) {
+        this(jdbc, transactions, settings, false);
+    }
+
+    public BriefingReplayImporter(JdbcTemplate jdbc, PlatformTransactionManager transactions, BriefingReplaySettings settings,
+            boolean continuityEnabled) {
         this.jdbc = jdbc; this.transaction = new TransactionTemplate(transactions); this.settings = settings;
+        this.continuityEnabled = continuityEnabled;
         transaction.setTimeout(30);
     }
 
@@ -211,7 +218,7 @@ public final class BriefingReplayImporter {
         require(seriesCompanyRows.keySet().containsAll(seriesReadingRows.keySet()), "series_reading_company_rounds");
         Set<String> seriesReadingOwned = new HashSet<>();
         Set<String> seriesCompanyOwned = new HashSet<>(); List<StrictJson.Obj> seriesCompanyHistory = new ArrayList<>();
-        ArrayNode noveltyHistory = StrictJson.newArray(), groupedHistory = StrictJson.newArray();
+        ArrayNode noveltyHistory = StrictJson.newArray(), groupedHistory = StrictJson.newArray(), continuityHistory = StrictJson.newArray();
         String namespace = "brf-sim-" + Canonical.sha256(effectiveRun).substring(0, 16);
         Map<String, Source> documents = new LinkedHashMap<>(); Map<String, Citation> citations = new LinkedHashMap<>();
         Map<String, Blob> blobs = new LinkedHashMap<>(); List<Round> publications = new ArrayList<>();
@@ -277,6 +284,12 @@ public final class BriefingReplayImporter {
                     validateSimulationNoveltyRecording(definition, receipts, inputs);
             }
             String state = definition.string("selectionStatus");
+            ObjectNode continuity = continuityEnabled && grouped
+                    ? BriefingContinuityRules.build(definition, receipts, settings.bundle().getParent(), continuityHistory) : null;
+            boolean continuityRound = continuity != null && "HELD_SOURCE_COVERAGE".equals(state)
+                    && inputs.size() > 0 && !definition.has("groupedUnresolvedPaidRequest")
+                    && ("reference".equals(continuity.path("mode").asString())
+                        || "recap".equals(continuity.path("mode").asString()));
             ObjectNode marker = StrictJson.newObject().put("scope", scope).put("runId", run).put("sourceFileSha256", sourceSha)
                     .put("clockFileSha256", clockSha).put("bundleSha256", bundleSha).put("userInboxRef", settings.userInboxRef())
                     .put("retrospectiveBodies", !localCollection).put("operationalCollectionGate", false)
@@ -288,17 +301,18 @@ public final class BriefingReplayImporter {
             ObjectNode input = (ObjectNode) definition.node().deepCopy(); input.remove("result"); input.remove("receipts");
             blobs.put(namespace + "-input-" + index, blob("briefing_input", StrictJson.write(input)));
             documents.putAll(inputs);
-            if (Set.of("HELD_SOURCE_COVERAGE", "HELD_VALIDATION").contains(state)) {
+            if (Set.of("HELD_SOURCE_COVERAGE", "HELD_VALIDATION").contains(state) && !continuityRound) {
                 require(selected.isEmpty() && definition.isNull("result") && definition.isNull("resultSha256"), "simulation_held_not_published");
                 ObjectNode snapshot = StrictJson.newObject(); snapshot.set("replay", marker);
+                if (continuity != null) snapshot.set("continuity", continuity);
                 held.add(new Held(id, date, edition, from, cutoff, "HELD_VALIDATION".equals(state) ? "failed" : "missing", snapshot));
                 priorId = null; priorSha = null;
             } else {
-                boolean emptyConfirmed = "EMPTY_CONFIRMED".equals(state);
+                boolean emptyConfirmed = "EMPTY_CONFIRMED".equals(state) || continuityRound;
                 StrictJson.Obj result;
                 if (emptyConfirmed) {
                     require(selected.isEmpty() && definition.isNull("result") && definition.isNull("resultSha256")
-                            && coverage.count("unconfirmedTotal") == 0 && clocks.verified.size() == pool.size(), "simulation_empty_confirmation");
+                            && (continuityRound || (coverage.count("unconfirmedTotal") == 0 && clocks.verified.size() == pool.size())), "simulation_empty_confirmation");
                     for (JsonNode value : receipts.values()) {
                         String stage = StrictJson.Obj.of(value).string("stage");
                         require(!Set.of("round_simulation_morning_generation", "round_simulation_evening_generation",
@@ -306,11 +320,11 @@ public final class BriefingReplayImporter {
                     }
                     if (!grouped) validateSimulationSuccessRecordings(definition, receipts, inputs);
                     // No generated news text; retain the full source scope and validated assessment/novelty/selection evidence.
-                    Map<String, Source> coverageSources = new LinkedHashMap<>(pool);
+                    Map<String, Source> coverageSources = new LinkedHashMap<>(continuityRound ? inputs : pool);
                     documents.putAll(coverageSources); inputs = coverageSources;
                     Instant determined = created.isAfter(cutoff) ? created : cutoff;
                     ObjectNode empty = StrictJson.newObject().put("generatedAt", determined.toString()); empty.putArray("items");
-                    result = StrictJson.Obj.of(empty); marker.put("emptyConfirmation", "source_coverage_no_selected_issue");
+                    result = StrictJson.Obj.of(empty); marker.put("emptyConfirmation", continuityRound ? "reference_or_recap_not_new_headlines" : "source_coverage_no_selected_issue");
                 } else {
                     require("SELECTED".equals(state) && !inputs.isEmpty() && !selected.isEmpty(), "simulation_selection_state");
                     result = definition.object("result"); validateGeneration(result, selected);
@@ -351,6 +365,24 @@ public final class BriefingReplayImporter {
                     failure(limitations, "marketVariables", "SOURCE_UNAVAILABLE", "이 실행에서 지표와 동일 날짜 출근 전망은 아직 연결되지 않았습니다.");
                 }
                 ObjectNode snapshot = base.snapshot(); snapshot.set("replay", marker);
+                if (continuity != null) {
+                    snapshot.set("continuity", continuity);
+                    if (continuityRound) {
+                        // Preserve the model's original HOLD/result bytes. Only exact reference quotations
+                        // are added to a separately labelled, deterministic briefing; no AI fact is invented.
+                        for (JsonNode reference : continuity.path("references")) for (JsonNode e : reference.path("sources")) {
+                            Source source = pool.get(e.path("documentId").asString() + "\u0000" + e.path("bodySha256").asString());
+                            require(source != null && inputs.containsKey(source.key()), "continuity_reference_source");
+                            String eid=e.path("evidenceId").asString();
+                            Citation citation = new Citation(eid, source, e.path("quote").asString(), e.path("start").asInt(), e.path("end").asInt());
+                            Citation old=citations.putIfAbsent(eid,citation); require(old == null || old.equals(citation), "continuity_evidence_conflict");
+                            ArrayNode refs=(ArrayNode)payload.path("references").path("evidenceIds");
+                            if (!java.util.stream.StreamSupport.stream(refs.spliterator(),false).anyMatch(x->eid.equals(x.asString()))) refs.add(eid);
+                        }
+                        metadata.withObject("selection").put("reason", "핵심 중요도 2 이상 미선정 후 중요도 1 참고 자료만 별도로 제공합니다. 원래 AI HOLD와 원문·검증 기록을 보존합니다.");
+                        marker.put("continuityPolicy", BriefingContinuityRules.VERSION);
+                    }
+                }
                 if (grouped) ((ObjectNode) snapshot.get("marketSummary")).put("reason", "이번 이슈 묶음 브리핑에서는 시장 요약을 새로 생성하지 않았습니다.");
                 marker.put("inputArtifactId", namespace + "-input-" + index);
                 if (!emptyConfirmed) {
@@ -419,6 +451,20 @@ public final class BriefingReplayImporter {
                     if (finished.isAfter(created)) created=finished;
                     blobs.put(namespace+"-series-company-"+index, blob("briefing_input",StrictJson.write(company.node())));
                 }
+                if (continuity != null && !"core".equals(continuity.path("mode").asString())) {
+                    Round prior = publications.stream().filter(p -> !p.scheduled().isAfter(from) && !p.payload().path("items").isEmpty())
+                            .max(java.util.Comparator.comparing(Round::scheduled)).orElse(null);
+                    if (prior != null) {
+                        BriefingContinuityRules.recap(continuity, prior.id(), prior.scheduled(), prior.payload(), prior.snapshot());
+                        for (JsonNode binding : prior.snapshot().path("sourceBindings")) {
+                            ArrayNode bindings=(ArrayNode)snapshot.path("sourceBindings");
+                            if (!java.util.stream.StreamSupport.stream(bindings.spliterator(),false).anyMatch(x->x.equals(binding))) bindings.add(binding.deepCopy());
+                        }
+                        ArrayNode refs=(ArrayNode)payload.path("references").path("evidenceIds");
+                        for(JsonNode eid:prior.payload().path("references").path("evidenceIds"))
+                            if(!java.util.stream.StreamSupport.stream(refs.spliterator(),false).anyMatch(x->x.equals(eid)))refs.add(eid.deepCopy());
+                    }
+                }
                 if ((localCollection || explicitSeries) && !emptyConfirmed) localDetails(payload, snapshot, result, selected, clocks);
                 publications.add(new Round(id, date, edition, cutoff, from, generated, published, payload, snapshot, comparison));
                 for (Issue issue : selected.values()) for (Citation citation : issue.citations()) {
@@ -430,6 +476,10 @@ public final class BriefingReplayImporter {
                     ObjectNode previousIssue = groupedHistory.addObject().put("issueId", item.string("issueId")).put("title", item.string("title"));
                     previousIssue.set("sources", item.array("sources").deepCopy());
                 }
+            }
+            if (continuityEnabled && continuity != null) {
+                for (JsonNode item : continuity.path("references")) continuityHistory.add(item.deepCopy());
+                for (StrictJson.Obj item : definition.objects("selected")) continuityHistory.add(item.node().deepCopy());
             }
             ids.add(id);
         }

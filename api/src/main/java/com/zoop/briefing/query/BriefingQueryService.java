@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.node.ArrayNode;
 
 /** Public reads only restore a preserved original; neither a source nor a model is called here. */
 @Service
@@ -275,8 +276,31 @@ public class BriefingQueryService {
                     .put("corrected", change.corrected()).put("reason", change.reason()).put("createdAt", change.createdAt().toString());
         }
         out.putNull("notice");
+        if (row.publicSnapshot().has("continuity")) out.set("continuity", continuity(row, requestId));
         ((ObjectNode) out.get("metadata")).put("requestId", requestId);
         return out;
+    }
+
+    private JsonNode continuity(BriefingRound row, String requestId) {
+        ObjectNode value = (ObjectNode) row.publicSnapshot().path("continuity").deepCopy();
+        if (!row.id().equals(value.path("roundId").asString()) || !row.windowTo().equals(Instant.parse(value.path("cutoff").asString()))) unavailable();
+        JsonNode recap=value.path("recap");
+        if ("available".equals(recap.path("status").asString())) {
+            BriefingRound previous=repository.findById(recap.path("previousRoundId").asString()).orElse(null);
+            boolean valid=previous!=null && previous.publishedAt()!=null && "published".equals(previous.status())
+                    && previous.windowTo().isBefore(row.windowTo()) && (row.windowFrom()==null || !previous.windowTo().isAfter(row.windowFrom()))
+                    && previous.windowTo().equals(Instant.parse(recap.path("dataAsOf").asString()))
+                    && previous.payload().path("items").equals(recap.path("items"))
+                    && repository.changes(previous.id()).stream().noneMatch(c->"correction".equals(c.kind()));
+            if (valid) { requireReadable(previous,requestId); validateSnapshot(previous); }
+            else {
+                ObjectNode old=value.withObject("recap");old.put("status","unavailable").put("message","고정한 이전 발행본이 변경·정정·중단되어 복기를 제공하지 않습니다.");old.putArray("items");
+                ArrayNode conditions=mapper.createArrayNode();
+                for(JsonNode condition:value.path("watchConditions")) if(!"previous_condition".equals(condition.path("kind").asString()))conditions.add(condition);
+                value.set("watchConditions",conditions);
+            }
+        }
+        return value;
     }
 
     /** Contract projection only: legacy bank daily references were stored under the old close enum. */
@@ -321,6 +345,11 @@ public class BriefingQueryService {
         if (row != null && row.publishedAt() == null && BriefingReplayReadPolicy.marked(row) && replay.permits(row)
                 && "publication_clock_simulation".equals(row.publicSnapshot().path("replay").path("scope").asString())) {
             metadata.put("source", "zoop-briefing-publication-clock-simulation").put("partial", true);
+            JsonNode continuity = row.publicSnapshot().path("continuity");
+            if (List.of("coverage_limited", "validation_failed").contains(continuity.path("mode").asString())
+                    && continuity.path("references").isEmpty() && !"available".equals(continuity.path("recap").path("status").asString())) {
+                out.set("continuity", continuity.deepCopy()); out.put("dataAsOf", row.windowTo().toString());
+            }
             metadata.withArray("failures").addObject().put("section", "sourceCoverage").put("code", "SIMULATION_HELD")
                     .put("message", "과거 발행시각 시뮬레이션에서 입력·선정·검증이 완료되지 않아 발행하지 않은 회차입니다.")
                     .put("retryable", false).putNull("asOf");

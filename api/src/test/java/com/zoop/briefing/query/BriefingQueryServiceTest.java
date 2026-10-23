@@ -403,6 +403,29 @@ class BriefingQueryServiceTest {
         assertUnavailable(() -> service.get(DATE, "morning", "request"));
     }
 
+    private BriefingRound continuityEvening() {
+        var row=quietEvening(); var prior=published();
+        var layer=((ObjectNode)row.publicSnapshot()).putObject("continuity").put("schemaVersion","importance-continuity-v1")
+                .put("roundId",row.id()).put("cutoff",row.windowTo().toString()).put("mode","recap");
+        var recap=layer.putObject("recap").put("status","available").put("previousRoundId",prior.id()).put("dataAsOf",prior.windowTo().toString());
+        recap.set("items",prior.payload().path("items").deepCopy());
+        layer.putArray("watchConditions").addObject().put("kind","previous_condition").put("text","이전 조건");
+        when(repository.find(DATE,"evening")).thenReturn(Optional.of(row));
+        return row;
+    }
+    @Test void continuityRechecksPreviousAuthorityRatherThanTrustingCopiedOldText() {
+        continuityEvening(); var prior=published();when(access.mayRead(prior,"request")).thenReturn(false);
+        assertUnavailable(()->service.get(DATE,"evening","request"));
+    }
+    @Test void continuityWithholdsCorrectedRecapAndItsOldConditions() {
+        var row=continuityEvening();var prior=published();
+        when(repository.changes(prior.id())).thenReturn(List.of(new BriefingChange(7,"correction","event-original","old","corrected","reason",MORNING.plusSeconds(60),null)));
+        var result=service.get(DATE,"evening","request");
+        assertEquals("unavailable",result.at("/continuity/recap/status").asString());
+        assertTrue(result.at("/continuity/recap/items").isEmpty());assertTrue(result.at("/continuity/watchConditions").isEmpty());
+        assertEquals("available",row.publicSnapshot().at("/continuity/recap/status").asString());
+    }
+
     private void assertUnavailable(Runnable action) {
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class, action::run).getErrorCode());
     }

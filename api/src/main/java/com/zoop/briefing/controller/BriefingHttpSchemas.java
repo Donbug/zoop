@@ -29,7 +29,27 @@ public final class BriefingHttpSchemas {
                     description = "직전 발행 회차와 사건 ID 기준 포함 여부 비교입니다. 전망 정확도 평가는 제공하지 않습니다.") JsonNode previousComparison,
             @Schema(nullable = true, allowableValues = {"no_issues_in_window"}) String emptyReason,
             List<BriefingCorrection> corrections, @Schema(nullable = true) BriefingNotice notice,
-            BriefingReferences references, BriefingMetadata metadata, @Schema(nullable = true) BriefingOutlook outlook) { }
+            BriefingReferences references, BriefingMetadata metadata, @Schema(nullable = true) BriefingOutlook outlook,
+            @Schema(nullable = true, description = "선택적 조용한 회차 정책. 핵심·참고·복기·수집부족을 구분하며 원 발행 문안을 바꾸지 않습니다.") BriefingContinuity continuity) { }
+
+
+    @Schema(name = "BriefingContinuity")
+    public record BriefingContinuity(String schemaVersion, String roundId, Instant cutoff,
+            @Schema(allowableValues = {"core", "reference", "recap", "coverage_limited", "validation_failed"}) String mode,
+            @Schema(nullable = true, allowableValues = {"1", "2"}) Integer importanceFloor, String message,
+            ContinuityCoverage coverage, List<ContinuityReference> references, ContinuityRecap recap,
+            List<ContinuityCondition> watchConditions, ContinuityForecast forecast) { }
+    public record ContinuityCoverage(@Schema(allowableValues = {"registered_scope", "limited", "insufficient"}) String status,
+            int confirmedDocuments, String message) { }
+    public record ContinuityReference(String issueId, String title, int importance, String label,
+            List<ContinuityCompany> companies, List<tools.jackson.databind.JsonNode> sources) { }
+    public record ContinuityCompany(String id, String name) { }
+    public record ContinuityRecap(String status, @Schema(nullable = true) String previousRoundId,
+            @Schema(nullable = true) Instant dataAsOf, @Schema(nullable = true) LocalDate date,
+            @Schema(nullable = true) String edition, String message, List<BriefingItem> items) { }
+    public record ContinuityCondition(String text, String kind, @Schema(nullable = true) String companyName,
+            @Schema(nullable = true) String previousRoundId) { }
+    public record ContinuityForecast(String status, String message) { }
 
     @Schema(name = "BriefingRecap", requiredProperties = {"roundId", "graphVersion", "dataAsOf", "status", "reason", "message", "previous"})
     public record BriefingRecap(String roundId, @Schema(nullable = true) String graphVersion,
