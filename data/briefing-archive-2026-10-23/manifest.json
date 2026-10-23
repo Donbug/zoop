@@ -1,0 +1,462 @@
+{
+  "schemaVersion": "zoop-collected-data-archive-v1",
+  "capturedAt": "2026-10-23T07:17:55.039813+00:00",
+  "captureFinishedAt": "2026-10-23T07:21:40.524591+00:00",
+  "sourceCommit": "1a62a5a643fac9b88ee535a0baacb02f898ccbe3",
+  "newAiCalls": 0,
+  "newProviderCalls": 0,
+  "files": 132244,
+  "uniqueObjects": 24121,
+  "logicalBytes": 11187508660,
+  "uniqueBytes": 1409198837,
+  "groups": {
+    "briefing-data-142": {
+      "files": 397,
+      "logicalBytes": 148494191
+    },
+    "private-brf-ai-046": {
+      "files": 60,
+      "logicalBytes": 11016236
+    },
+    "private-brf-dart-047": {
+      "files": 97,
+      "logicalBytes": 15596497
+    },
+    "private-brf-editorial-045": {
+      "files": 10,
+      "logicalBytes": 11361290
+    },
+    "private-brf-generation-049": {
+      "files": 80,
+      "logicalBytes": 564811
+    },
+    "private-brf-real-input-044": {
+      "files": 6,
+      "logicalBytes": 11339828
+    },
+    "private-brf-review-066": {
+      "files": 22,
+      "logicalBytes": 291251
+    },
+    "private-briefing-continuity-122": {
+      "files": 571,
+      "logicalBytes": 31875293
+    },
+    "private-briefing-core-evidence-126": {
+      "files": 575,
+      "logicalBytes": 31819661
+    },
+    "private-briefing-docs-prices-131": {
+      "files": 940,
+      "logicalBytes": 50350572
+    },
+    "private-briefing-evidence-125": {
+      "files": 574,
+      "logicalBytes": 31768941
+    },
+    "private-briefing-graph-110": {
+      "files": 6,
+      "logicalBytes": 1785681
+    },
+    "private-briefing-integration-117": {
+      "files": 11,
+      "logicalBytes": 1777680
+    },
+    "private-briefing-integration-128": {
+      "files": 587,
+      "logicalBytes": 32052754
+    },
+    "private-briefing-live-round-119": {
+      "files": 940,
+      "logicalBytes": 57355941
+    },
+    "private-briefing-market-065": {
+      "files": 4533,
+      "logicalBytes": 276010061
+    },
+    "private-briefing-presentation-081": {
+      "files": 4468,
+      "logicalBytes": 309554867
+    },
+    "private-briefing-quality-064": {
+      "files": 193,
+      "logicalBytes": 7698992
+    },
+    "private-briefing-quality-121": {
+      "files": 3982,
+      "logicalBytes": 259139280
+    },
+    "private-briefing-quality-137": {
+      "files": 8770,
+      "logicalBytes": 543297828
+    },
+    "private-briefing-reading-097": {
+      "files": 6635,
+      "logicalBytes": 792573160
+    },
+    "private-briefing-recap-115": {
+      "files": 4,
+      "logicalBytes": 31328
+    },
+    "private-briefing-reconstructed-111": {
+      "files": 22,
+      "logicalBytes": 1834684
+    },
+    "private-briefing-recovery-079": {
+      "files": 5993,
+      "logicalBytes": 403127491
+    },
+    "private-briefing-replay-062": {
+      "files": 263,
+      "logicalBytes": 14235448
+    },
+    "private-briefing-round-flow-132": {
+      "files": 957,
+      "logicalBytes": 50209192
+    },
+    "private-briefing-sequence-120": {
+      "files": 3405,
+      "logicalBytes": 199965426
+    },
+    "private-briefing-simulation-063": {
+      "files": 3952,
+      "logicalBytes": 294653043
+    },
+    "private-briefing-status-080": {
+      "files": 2,
+      "logicalBytes": 10610
+    },
+    "private-company-outlook-096": {
+      "files": 12531,
+      "logicalBytes": 1715597260
+    },
+    "private-integration-094": {
+      "files": 8,
+      "logicalBytes": 49778
+    },
+    "private-issue-grouping-074": {
+      "files": 801,
+      "logicalBytes": 29455411
+    },
+    "private-issue-grouping-074-catalog-v1": {
+      "files": 1267,
+      "logicalBytes": 98078086
+    },
+    "private-issue-grouping-074-identity-v2": {
+      "files": 1267,
+      "logicalBytes": 99597108
+    },
+    "private-issue-grouping-074-preview": {
+      "files": 4159,
+      "logicalBytes": 297078500
+    },
+    "private-main-align-101": {
+      "files": 1,
+      "logicalBytes": 801
+    },
+    "private-main-briefing-078": {
+      "files": 5,
+      "logicalBytes": 27360
+    },
+    "private-main-runtime-103": {
+      "files": 3,
+      "logicalBytes": 95041
+    },
+    "private-main303-preview-135": {
+      "files": 952,
+      "logicalBytes": 50205928
+    },
+    "private-market-051": {
+      "files": 6,
+      "logicalBytes": 25044
+    },
+    "private-market-context-070": {
+      "files": 12,
+      "logicalBytes": 7999871
+    },
+    "private-market-context-071": {
+      "files": 3829,
+      "logicalBytes": 259836973
+    },
+    "private-market-outlook-084": {
+      "files": 12830,
+      "logicalBytes": 918703104
+    },
+    "private-market-outlook-088": {
+      "files": 5811,
+      "logicalBytes": 497704926
+    },
+    "private-market-outlook-089": {
+      "files": 4,
+      "logicalBytes": 285142
+    },
+    "private-market-outlook-090": {
+      "files": 7829,
+      "logicalBytes": 815943150
+    },
+    "private-market-outlook-091": {
+      "files": 13989,
+      "logicalBytes": 1891927714
+    },
+    "private-mobile-093": {
+      "files": 1,
+      "logicalBytes": 1017
+    },
+    "private-pr-fixes-095": {
+      "files": 7,
+      "logicalBytes": 155206
+    },
+    "private-pr-stack-082": {
+      "files": 4393,
+      "logicalBytes": 224087689
+    },
+    "private-review-fixes-098": {
+      "files": 3365,
+      "logicalBytes": 324814585
+    },
+    "private-round-review-113": {
+      "files": 6,
+      "logicalBytes": 12722
+    },
+    "private-toss-connect-107": {
+      "files": 2,
+      "logicalBytes": 432
+    },
+    "private-toss-verify-108": {
+      "files": 2,
+      "logicalBytes": 4443
+    },
+    "search-week-side": {
+      "files": 11105,
+      "logicalBytes": 352356182
+    },
+    "source-BRF-DEV-062": {
+      "files": 4,
+      "logicalBytes": 13673150
+    }
+  },
+  "shards": [
+    {
+      "path": "objects-001.tar.gz",
+      "bytes": 18586031,
+      "sha256": "711a41a99344a068ffc917f310a7799f52620fc750b77ef8cead45c0b7d41143",
+      "objects": 1541
+    },
+    {
+      "path": "objects-002.tar.gz",
+      "bytes": 18541414,
+      "sha256": "4bc080cf619628867c944e55c8b7786b25cddaa39c8df52f9a921737dca9f60d",
+      "objects": 1360
+    },
+    {
+      "path": "objects-003.tar.gz",
+      "bytes": 17784708,
+      "sha256": "814132d9df24bc419c438506419b86414492d21c8f5c02148b3fd71c182d7f13",
+      "objects": 1194
+    },
+    {
+      "path": "objects-004.tar.gz",
+      "bytes": 18567010,
+      "sha256": "b7161f95c5e975535287b79b3a9ee40a544d89d210e9fcd614d1e4c514b7e06d",
+      "objects": 1190
+    },
+    {
+      "path": "objects-005.tar.gz",
+      "bytes": 18004490,
+      "sha256": "baa55f7c6e7a6218d2f01f3cc1f44a558f0116a732d9c99dd1c057576e2fc6b1",
+      "objects": 1004
+    },
+    {
+      "path": "objects-006.tar.gz",
+      "bytes": 19324722,
+      "sha256": "a4f8a04f2c2ec975f01bd081a55c213e138350a5a21b1e5a7e83ff38cde7def5",
+      "objects": 1286
+    },
+    {
+      "path": "objects-007.tar.gz",
+      "bytes": 17801721,
+      "sha256": "140e830e56865681e7fa0509a3086a2b42bb9dee858d2664e8a0a06b8b2cec8b",
+      "objects": 1381
+    },
+    {
+      "path": "objects-008.tar.gz",
+      "bytes": 4223248,
+      "sha256": "81464542de11cde922b57a4744eb49e961f8c0fd45d921fb807a0b69356d62a3",
+      "objects": 365
+    },
+    {
+      "path": "objects-009.tar.gz",
+      "bytes": 18045046,
+      "sha256": "2c4cb5b94be46df580602552cbd225fbd188819cf70cff5c497471f051030acb",
+      "objects": 1
+    },
+    {
+      "path": "objects-010.tar.gz",
+      "bytes": 16939001,
+      "sha256": "6168979733a7ba3a03fcb5c945249fce2a2a8842857d19519b2c94e14aa6aa8e",
+      "objects": 1247
+    },
+    {
+      "path": "objects-011.tar.gz",
+      "bytes": 17984210,
+      "sha256": "44e9e12d16ef024948e55b052a233db7f72c03dbdd0da46f91ca100d19141ce7",
+      "objects": 1369
+    },
+    {
+      "path": "objects-012.tar.gz",
+      "bytes": 17741214,
+      "sha256": "8f2f33f9fcf1970b2fbac58b7a3624c606fca9167470a4c4e608cbe776939635",
+      "objects": 1155
+    },
+    {
+      "path": "objects-013.tar.gz",
+      "bytes": 17635797,
+      "sha256": "e93adc7702cddac8b14b53e95627412a5713f68835def56ffdc6c65bfa8a9721",
+      "objects": 1424
+    },
+    {
+      "path": "objects-014.tar.gz",
+      "bytes": 16896382,
+      "sha256": "cf0871a63a838103adb1fc1d6cbe64cd2c00a623d80f5efd00de29261756e100",
+      "objects": 1095
+    },
+    {
+      "path": "objects-015.tar.gz",
+      "bytes": 16493767,
+      "sha256": "324721e22ae07370aa43ed271a1a8c6f84b56b3190308ea664aca388fb578aa2",
+      "objects": 313
+    },
+    {
+      "path": "objects-016.tar.gz",
+      "bytes": 21240739,
+      "sha256": "8e7768e299e46b15d13f759a3a4ea3e9b58576a54db17affd7e9404bdaa40d89",
+      "objects": 1131
+    },
+    {
+      "path": "objects-017.tar.gz",
+      "bytes": 18169444,
+      "sha256": "a8248a1519fd944b2328b3ca2a56209e1d0cc71a5c3f8e6ed4a128bc1c8263a4",
+      "objects": 1344
+    },
+    {
+      "path": "objects-018.tar.gz",
+      "bytes": 18843887,
+      "sha256": "8d72bdc540e8e781f1dce8e6971a27603f9a5fa11e00b6e45dbf8c28a670b0fc",
+      "objects": 1325
+    },
+    {
+      "path": "objects-019.tar.gz",
+      "bytes": 17801165,
+      "sha256": "ab8b773ef70772205d404a0c5f710629402e4096bfeee5ab8960629f56d81e54",
+      "objects": 979
+    },
+    {
+      "path": "objects-020.tar.gz",
+      "bytes": 19515951,
+      "sha256": "03f154c7330c47f44906c1e60cc64f11d4b3c081858e8579ee9176066a91c364",
+      "objects": 1417
+    },
+    {
+      "path": "objects-021.tar.gz",
+      "bytes": 15686935,
+      "sha256": "fcb3feb02682b4ec6f3e987d4b12d170f746d18be86d7a32a245133ee02866ff",
+      "objects": 701
+    },
+    {
+      "path": "objects-022.tar.gz",
+      "bytes": 18352315,
+      "sha256": "5417fe419d9ec1ffa41aaaebabd9e6a6aa9d47a7fab4b1de2984867589a94178",
+      "objects": 1274
+    },
+    {
+      "path": "objects-023.tar.gz",
+      "bytes": 1889047,
+      "sha256": "c886158a2d2b4f8976b7ce1745ecd88cd29847ac7a25821c9d756a7663e6efe1",
+      "objects": 25
+    }
+  ],
+  "redactedFiles": 1937,
+  "excludedEntries": 665,
+  "roots": [
+    "workspaces/codex/private-brf-ai-046",
+    "workspaces/codex/private-brf-dart-047",
+    "workspaces/codex/private-brf-editorial-045",
+    "workspaces/codex/private-brf-generation-049",
+    "workspaces/codex/private-brf-real-input-044",
+    "workspaces/codex/private-brf-review-066",
+    "workspaces/codex/private-briefing-continuity-122",
+    "workspaces/codex/private-briefing-core-evidence-126",
+    "workspaces/codex/private-briefing-docs-prices-131",
+    "workspaces/codex/private-briefing-evidence-125",
+    "workspaces/codex/private-briefing-graph-110",
+    "workspaces/codex/private-briefing-integration-117",
+    "workspaces/codex/private-briefing-integration-128",
+    "workspaces/codex/private-briefing-live-round-119",
+    "workspaces/codex/private-briefing-market-065",
+    "workspaces/codex/private-briefing-presentation-081",
+    "workspaces/codex/private-briefing-quality-064",
+    "workspaces/codex/private-briefing-quality-121",
+    "workspaces/codex/private-briefing-quality-137",
+    "workspaces/codex/private-briefing-reading-097",
+    "workspaces/codex/private-briefing-recap-115",
+    "workspaces/codex/private-briefing-reconstructed-111",
+    "workspaces/codex/private-briefing-recovery-079",
+    "workspaces/codex/private-briefing-replay-062",
+    "workspaces/codex/private-briefing-round-flow-132",
+    "workspaces/codex/private-briefing-sequence-120",
+    "workspaces/codex/private-briefing-simulation-063",
+    "workspaces/codex/private-briefing-status-080",
+    "workspaces/codex/private-company-outlook-096",
+    "workspaces/codex/private-integration-094",
+    "workspaces/codex/private-issue-grouping-074",
+    "workspaces/codex/private-issue-grouping-074-catalog-v1",
+    "workspaces/codex/private-issue-grouping-074-identity-v2",
+    "workspaces/codex/private-issue-grouping-074-preview",
+    "workspaces/codex/private-main-align-101",
+    "workspaces/codex/private-main-briefing-078",
+    "workspaces/codex/private-main-merge-102",
+    "workspaces/codex/private-main-runtime-103",
+    "workspaces/codex/private-main303-preview-135",
+    "workspaces/codex/private-market-051",
+    "workspaces/codex/private-market-context-070",
+    "workspaces/codex/private-market-context-071",
+    "workspaces/codex/private-market-outlook-084",
+    "workspaces/codex/private-market-outlook-088",
+    "workspaces/codex/private-market-outlook-089",
+    "workspaces/codex/private-market-outlook-090",
+    "workspaces/codex/private-market-outlook-091",
+    "workspaces/codex/private-mobile-093",
+    "workspaces/codex/private-pr-fixes-095",
+    "workspaces/codex/private-pr-stack-082",
+    "workspaces/codex/private-review-fixes-098",
+    "workspaces/codex/private-round-review-113",
+    "workspaces/codex/search-week-side",
+    "shared/sources/2026-10-16/BRF-DEV-062",
+    "workspaces/codex/briefing-data-142/postgres"
+  ],
+  "sourceStatus": {
+    "private-briefing-quality-137": "in_progress; point-in-time intermediate and failed results included; not a final quality approval"
+  },
+  "notes": [
+    "Original UTF-8/legacy-encoded HTML and raw ZIP provider responses plus recorded transformations; collection-time limitations remain.",
+    "Known credential values and credential fields are redacted. sourceSha256 describes local pre-redaction bytes.",
+    "SQLite files are consistent read-only logical SQL snapshots; PostgreSQL only exports explicitly allowlisted data tables.",
+    "Builds, binaries, runtime processes, auth/credential directories and unrelated personal documents are excluded.",
+    "Manifest and payload hashes inside historical files are original audit references; use files.jsonl for distribution integrity."
+  ],
+  "files.jsonl": {
+    "path": "files.jsonl.gz",
+    "encoding": "gzip",
+    "sha256": "65cfe93f4f50ad55373fa459d87fcd146dec5a51b641a23055fde79743a9e996",
+    "bytes": 9342003,
+    "uncompressedBytes": 58446962
+  },
+  "excluded.jsonl": {
+    "sha256": "3534ab3357231d4182da7bda44b98fab82d9d65bbb39996710af33b68c2dcc28",
+    "bytes": 68287
+  },
+  "redactions.jsonl": {
+    "sha256": "97465d33cca1d328c4b915d90642f1cba0ad98cf387d02fa9a5bf6a5d9867301",
+    "bytes": 436953
+  }
+}
