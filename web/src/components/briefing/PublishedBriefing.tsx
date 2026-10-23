@@ -224,6 +224,30 @@ export default function PublishedBriefing({
     </div>
   );
 
+  const currentContext = result && (
+    <>
+      <CompanyOutlooks result={result} compact={compact} />
+      {compact && (
+        <MarketIndicators variables={result.marketVariables} compact />
+      )}
+      <BriefingReadingSection
+        compact={compact}
+        title={
+          result.edition === 'morning'
+            ? '시장 요약·시장 전체 전망 읽기'
+            : '시장 요약·시장 흐름 비교 읽기'
+        }
+      >
+        <MarketSummary
+          summary={result.marketSummary}
+          edition={result.edition}
+          dataAsOf={result.dataAsOf}
+        />
+      </BriefingReadingSection>
+      {!compact && <MarketIndicators variables={result.marketVariables} />}
+    </>
+  );
+
   return (
     <article
       data-reading={compact ? 'compact' : 'full'}
@@ -286,6 +310,7 @@ export default function PublishedBriefing({
               title="시장·지표와 전체 저장 상태 보기"
             >
               {(!compact || !knownLimits) && partialInfo}
+              {currentContext}
               {result.items.length === 0 &&
                 result.emptyReason === 'no_issues_in_window' &&
                 !result.continuity && (
@@ -295,27 +320,6 @@ export default function PublishedBriefing({
                     compact={compact}
                   />
                 )}
-              <CompanyOutlooks result={result} compact={compact} />
-              {compact && (
-                <MarketIndicators variables={result.marketVariables} compact />
-              )}
-              <BriefingReadingSection
-                compact={compact}
-                title={
-                  result.edition === 'morning'
-                    ? '시장 요약·시장 전체 전망 읽기'
-                    : '시장 요약·시장 흐름 비교 읽기'
-                }
-              >
-                <MarketSummary
-                  summary={result.marketSummary}
-                  edition={result.edition}
-                  dataAsOf={result.dataAsOf}
-                />
-              </BriefingReadingSection>
-              {!compact && (
-                <MarketIndicators variables={result.marketVariables} />
-              )}
               {personal && (
                 <PersonalBasisNotice
                   member={Boolean(memberId)}

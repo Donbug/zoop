@@ -113,7 +113,7 @@ it('과거 표시와 전문 링크를 유지하고 간단히에서는 펼쳐야 
   expect(
     screen.getByText('[합성시험] 당시 보존된 요약').closest('details')?.open,
   ).toBe(false);
-  await user.click(screen.getByText(/이전 이슈 ·/));
+  await user.click(screen.getByText(/이전 이슈 ·/, { selector: 'summary' }));
   expect(screen.getByText('[합성시험] 당시 보존된 요약')).toBeTruthy();
   expect(
     screen.getByRole('link', { name: /이전 브리핑 전문/ }).getAttribute('href'),
@@ -123,7 +123,7 @@ it('과거 표시와 전문 링크를 유지하고 간단히에서는 펼쳐야 
     apiError(404, 'RESOURCE_NOT_FOUND'),
   );
   await user.click(
-    screen.getByRole('button', { name: '핵심 이슈 1 근거 보기' }),
+    screen.getByRole('button', { name: '이전 핵심 이슈 1 근거 보기' }),
   );
   await waitFor(() =>
     expect(
@@ -222,5 +222,145 @@ it.each([
       screen.queryByRole('heading', { name: /이전 브리핑 복기/ }),
     ).toBeNull();
     expect(server.calls('GET', path)).toHaveLength(0);
+  },
+);
+
+it.each([false, true])(
+  '현재 전망·요약·지표를 복기보다 먼저 읽는다 (compact=%s)',
+  async (compact) => {
+    const server = createFakeServer();
+    server.on('GET', '/api/v1/briefings', () => json(quiet()));
+    server.on('GET', path, () => json(recap()));
+    render(
+      <MemoryRouter>
+        <PublishedBriefing
+          date="2026-10-08"
+          edition="evening"
+          compact={compact}
+        />
+      </MemoryRouter>,
+    );
+    const recapHeading = await screen.findByRole('heading', {
+      name: /이전 브리핑 복기/,
+    });
+    for (const name of ['기업별 전망 미제공', '시장 요약', '주요 시장 지표']) {
+      const current = screen.getByRole('heading', { name, hidden: true });
+      expect(
+        current.compareDocumentPosition(recapHeading) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+    expect(await screen.findByText(/이전 발행:/)).toBeTruthy();
+  },
+);
+
+it('전체 보기의 제목·접근 이름·로딩과 저장 안내가 이전 회차를 유지한다', async () => {
+  const server = createFakeServer();
+  const pending = deferred<Response>();
+  server.on('GET', path, () => json(recap()));
+  server.on(
+    'GET',
+    '/api/v1/briefings/:roundId/items/:eventId',
+    () => pending.promise,
+  );
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <BriefingRecap round={quiet()} compact={false} />
+    </MemoryRouter>,
+  );
+  expect(
+    await screen.findByRole('heading', {
+      name: '이전 이슈 · [합성시험] 이전 공급 계획',
+    }),
+  ).toBeTruthy();
+  expect(
+    screen.queryByRole('button', { name: '핵심 이슈 1 자세히 보기' }),
+  ).toBeNull();
+  await user.click(
+    screen.getByRole('button', { name: '이전 핵심 이슈 1 자세히 보기' }),
+  );
+  expect(
+    screen.getByText('이전 회차의 상세·근거를 불러오고 있어요.'),
+  ).toBeTruthy();
+  const previous = prior();
+  await act(async () =>
+    pending.resolve(
+      json({
+        roundId: previous.id,
+        eventId: previous.items[0].eventId,
+        title: previous.items[0].title,
+        summary: previous.items[0].summary,
+        selectionReason: previous.items[0].reason,
+        claims: [],
+        companies: [],
+        evidence: [],
+        limitations: [],
+        metadata: previous.metadata,
+      }),
+    ),
+  );
+  expect(await screen.findByText(/이전 회차에 저장된 문안·근거/)).toBeTruthy();
+  expect(
+    screen.getByRole('region', { name: '이전 핵심 이슈 1 상세' }),
+  ).toBeTruthy();
+  expect(
+    screen.getByRole('heading', { name: '이전 브리핑 문안' }),
+  ).toBeTruthy();
+  await user.click(
+    screen.getByRole('button', { name: '이전 핵심 이슈 1 근거 보기' }),
+  );
+  expect(
+    screen.getByRole('region', { name: '이전 핵심 이슈 1 근거' }),
+  ).toBeTruthy();
+  expect(
+    screen.getByText('이전 회차에서 제공할 수 있는 원문 근거가 없어요.'),
+  ).toBeTruthy();
+  const calls = server.calls(
+    'GET',
+    '/api/v1/briefings/:roundId/items/:eventId',
+  );
+  expect(calls).toHaveLength(1);
+  expect(calls[0].params).toEqual({
+    roundId: previous.id,
+    eventId: previous.items[0].eventId,
+  });
+});
+
+it.each([
+  [401, '이전 회차의 상세·근거를 조회할 권한이 없어요.'],
+  [403, '이전 회차의 상세·근거를 조회할 권한이 없어요.'],
+  [404, '이전 회차에서 제공할 수 있는 상세·근거가 없어요.'],
+  [
+    503,
+    '이전 회차의 고정 상세·근거를 지금 제공할 수 없어요. 다시 시도해 주세요.',
+  ],
+  [500, '이전 회차의 상세·근거를 불러오지 못했어요. 다시 시도해 주세요.'],
+])(
+  '이전 상세의 %s 오류와 재시도도 이전 회차로 안내한다',
+  async (status, message) => {
+    const server = createFakeServer();
+    server.on('GET', path, () => json(recap()));
+    server.on('GET', '/api/v1/briefings/:roundId/items/:eventId', () =>
+      apiError(Number(status), 'SOURCE_UNAVAILABLE'),
+    );
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <BriefingRecap round={quiet()} compact={false} />
+      </MemoryRouter>,
+    );
+    await user.click(
+      await screen.findByRole('button', {
+        name: '이전 핵심 이슈 1 자세히 보기',
+      }),
+    );
+    expect(await screen.findByRole('alert')).toHaveProperty(
+      'textContent',
+      message,
+    );
+    expect(
+      screen.getByRole('button', { name: '이전 회차 상세·근거 다시 시도' }),
+    ).toBeTruthy();
   },
 );

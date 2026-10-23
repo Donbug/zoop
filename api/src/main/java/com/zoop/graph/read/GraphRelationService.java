@@ -70,7 +70,8 @@ public class GraphRelationService {
                 edge.derived() ? via(graph, edge) : List.of(),
                 edge.derived() ? DERIVED_EXPLANATION
                         : "INVOLVES".equals(edge.relationType()) && (pinned.selected().reconstructed() || edge.role() == null)
-                                ? "이 회차에 저장된 기업·사건 연결입니다. 구체적인 역할은 저장된 근거에서 확인해야 합니다."
+                                ? (pinned.selected().briefing() != null ? "이 회차에 저장된" : "저장된")
+                                        + " 기업·사건 연결입니다. 구체적인 역할은 저장된 근거에서 확인해야 합니다."
                                 : EXPLANATIONS.get(edge.relationType()),
                 RelationValidity.of(graph.basesOf(edge), pinned.selected().asOf()), metadata);
     }

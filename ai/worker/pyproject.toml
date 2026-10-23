@@ -7,6 +7,7 @@ dependencies = ["pydantic==2.13.5", "httpx==0.28.1"]
 
 [project.scripts]
 zoop-ai = "zoop_ai.cli:main"
+zoop-ai-chat = "zoop_ai.chat_cli:main"
 
 [dependency-groups]
 dev = ["pytest==9.1.1"]

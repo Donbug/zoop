@@ -46,11 +46,15 @@ class Outcome:
     timeout     the deadline passed and the child group was terminated: the runtime may have progressed
     unavailable the child could not start or its output exceeded the cap
     abandoned   the service is stopping; the child was left running on purpose
+
+    `started` is true once the child process was created: an `unavailable` outcome after that (output over the cap, an I/O error while
+    reading it) does not prove that the runtime did nothing.
     """
     kind: str
     result: dict[str, Any] | None = None
     code: str | None = None
     exit_code: int | None = None
+    started: bool = False
 
 
 class WorkerProcess:
@@ -94,6 +98,7 @@ class WorkerProcess:
         child environment for this one command (the only way a live pipeline child receives its model settings and keys)."""
         data = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
         transport = self._config.transport_dir
+        started = False
         try:
             with tempfile.TemporaryFile(dir=transport) as stdin, tempfile.TemporaryFile(dir=transport) as stdout:
                 stdin.write(data)
@@ -104,16 +109,17 @@ class WorkerProcess:
                                              cwd=transport, start_new_session=True, close_fds=True)
                 except OSError:
                     return Outcome("unavailable")
+                started = True
                 code = self._wait(child, deadline, stop)
                 if code is None:
                     return Outcome("abandoned" if stop is not None and stop.is_set() else "timeout")
                 size = stdout.seek(0, os.SEEK_END)
                 if size > MAX_STDOUT:
-                    return Outcome("unavailable", exit_code=code)
+                    return Outcome("unavailable", exit_code=code, started=True)
                 stdout.seek(0)
                 return (interpret or _interpret)(code, stdout.read(MAX_STDOUT + 1))
         except OSError:
-            return Outcome("unavailable")
+            return Outcome("unavailable", started=started)
 
     def _wait(self, child: subprocess.Popen, deadline: float, stop: threading.Event | None) -> int | None:
         """Exit code, or None after a deadline kill / an abandonment. An abandoned child is deliberately left running."""
