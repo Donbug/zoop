@@ -509,7 +509,8 @@ WRONG_MENTION = [_set((*MENTION, "verification"), "verified"), _set((*MENTION, "
                  _set((*MENTION, "participants", 0, "role"), None), _set((*MENTION, "participants", 0, "name"), None),
                  _set((*MENTION, "participants", 0, "sourceCompanyId"), 5),
                  _set(("schemaVersion",), "zoop-graph-handoff-bundle-1"), _set(("schemaVersion",), "zoop-graph-handoff-bundle-2"),
-                 _set(("schemaVersion",), "zoop-graph-handoff-bundle-3"), _set(("schemaVersion",), "zoop-graph-handoff-bundle-4")]
+                 _set(("schemaVersion",), "zoop-graph-handoff-bundle-3"), _set(("schemaVersion",), "zoop-graph-handoff-bundle-4"),
+                 _set(("schemaVersion",), "zoop-graph-handoff-bundle-5")]
 VERDICTS = ("issues", 0, "fieldVerdicts")
 VERDICT = (*VERDICTS, 0)
 UNKNOWN_VERDICT = [_set((*VERDICT, "extra"), 1), _set((*VERDICT, "note"), "review prose"), _set((*VERDICT, "evidence"), []), _set((*VERDICT, "notes"), "x"),
@@ -625,9 +626,10 @@ def test_a_supplier_customer_direction_is_relayed_as_the_producer_states_it_and_
 
 
 def test_a_current_answer_in_an_earlier_bundle_schema_is_refused_and_a_legacy_handoff_is_withheld_without_any_old_content(tmp_path, start):
-    """The service knows only `zoop-graph-handoff-bundle-5`: a bundle-1 shaped export (no mentions), a bundle-2 shaped export (mentions, no `fieldProvenance`), a
-    bundle-3 shaped export (provenance, no `fieldVerdicts`/`withheld`) or a bundle-4 shaped export (no `pathCompanies`/`structuralPath`/basis scopes) is never relayed,
-    and the producer's own withheld answer for a handoff frozen under any of them reaches the caller as a 200 with that reason and nothing of the old receipt."""
+    """The service knows only `zoop-graph-handoff-bundle-6`: a bundle-1 shaped export (no mentions), a bundle-2 shaped export (mentions, no `fieldProvenance`), a
+    bundle-3 shaped export (provenance, no `fieldVerdicts`/`withheld`), a bundle-4 shaped export (no `pathCompanies`/`structuralPath`/basis scopes) or a bundle-5 shaped
+    export (no `impacts`) is never relayed, and the producer's own withheld answer for a handoff frozen under any of them reaches the caller as a 200 with that reason
+    and nothing of the old receipt."""
     ws = workspace(tmp_path)
     service = start(workspace=ws)
 
@@ -642,12 +644,21 @@ def test_a_current_answer_in_an_earlier_bundle_schema_is_refused_and_a_legacy_ha
         b["digests"]["content"] = digest({key: b[key] for key in ("companies", "issues", "relations", "evidence", "articles")})
         return b
 
+    def five() -> dict[str, Any]:
+        """A genuine bundle-5 shape: no impacts/counts.impacts/policy.impacts, sealed over the HISTORICAL six content lists."""
+        b = copy.deepcopy(example_bundle())
+        b["schemaVersion"] = "zoop-graph-handoff-bundle-5"
+        del b["impacts"], b["counts"]["impacts"], b["policy"]["impacts"]
+        b["manifestDigest"] = digest(manifest_of(b))
+        b["digests"]["content"] = digest({key: b[key] for key in ("companies", "pathCompanies", "issues", "relations", "evidence", "articles")})
+        return b
+
     earlier = (mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-1"), [(issue.pop("mentions"), issue.pop("fieldProvenance"), issue.pop("fieldVerdicts"))
                                                                                        for issue in b["issues"]])),
                mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-2"), [(issue.pop("fieldProvenance"), issue.pop("fieldVerdicts")) for issue in b["issues"]])),
                mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-3"), [(issue.pop("fieldVerdicts"), issue["fieldProvenance"].pop("withheld"))
                                                                                        for issue in b["issues"]])),
-               four())
+               four(), five())
     for legacy in earlier:
         serve(ws, legacy)
         for url in (bundle_url(), status_url()):
@@ -659,6 +670,202 @@ def test_a_current_answer_in_an_earlier_bundle_schema_is_refused_and_a_legacy_ha
         wire = get(service, url).json()
         assert wire["delivery"] == {"state": "withheld", "reason": "handoff_contract_changed", "checkedAt": None}
         assert wire["verification"] is None and wire.get("bundle") is None and wire.get("manifest") is None
+
+
+# ---- bundle 6: impact rows ------------------------------------------------------------------------------------------------------
+
+EDGE = "edge-" + digest({"type": "INVOLVES", "source": "issue:synthetic-supply", "target": "KRX:005930"})
+IC, DIGEST = "ic-" + "a" * 64, "b" * 64
+EV1 = example_bundle()["evidence"][0]["id"]
+EV2, EV3 = "ev-" + "1" * 64, "ev-" + "2" * 64
+PROPOSAL = {"direction": "positive", "reason": "합성 제안", "limitations": None, "verification": "none"}
+
+
+def _row(status: str, **fields: Any):
+    base = {"impactCandidateId": None, "code": None, "label": None, "targetVerdict": None, "effects": None, "verifier": "not-called", "verifierRequestDigest": None,
+            "proposal": None, "status": status, **fields}
+    return lambda bundle: bundle["impacts"][0].update(base)
+
+
+def _called(status: str, **fields: Any):
+    return _row(status, **{"impactCandidateId": IC, "verifier": "called", "verifierRequestDigest": DIGEST, "proposal": copy.deepcopy(PROPOSAL), **fields})
+
+
+def _sides(**sides: list[str]) -> dict[str, list[str]]:
+    return {"positive": [], "negative": [], "neutral": [], "uncertain": [], **sides}
+
+
+def _verified(label: str, target: str = "supported", **sides: list[str]):
+    return _called("verified", label=label, targetVerdict=target, effects=_sides(**sides))
+
+
+def _more_evidence(bundle: dict[str, Any]) -> None:
+    base = bundle["evidence"][0]
+    for n, evidence_id in enumerate((EV2, EV3), 1):
+        bundle["evidence"].append({**copy.deepcopy(base), "id": evidence_id, "source": {**base["source"], "sourceEvidenceId": "ev-" + str(n) * 32}})
+    bundle["counts"]["evidence"] = len(bundle["evidence"])
+
+
+def _operator_approved(bundle: dict[str, Any]) -> None:
+    bundle["sources"][0]["reviewUsed"][0]["approvalBasis"] = {"kind": "operator-final-approval", "revision": 1, "reviewer": "reviewer-1", "decidedAt": "2026-10-13T00:00:01+00:00"}
+
+
+def _all(*changes):
+    return lambda bundle: [change(bundle) for change in changes]
+
+
+IMPACT_ACCEPTED = {
+    "example_verified_positive": lambda b: None,
+    "not_proposed": _row("not-proposed"),
+    "not_applicable_operator_final": _all(_operator_approved, _row("not-applicable")),
+    "no_evidence": _row("no-evidence", impactCandidateId=IC, proposal=copy.deepcopy(PROPOSAL)),
+    "producer_reply_invalid": _row("technical-reject", code="producer_reply_invalid"),
+    "precheck_rejected": _row("technical-reject", code="impact_precheck_rejected", impactCandidateId=IC),
+    "verifier_reply_invalid": _called("technical-reject", code="verifier_reply_invalid"),
+    "verifier_reject": _called("verifier-reject", targetVerdict="contradicted"),
+    "withheld_outside_documents": _called("withheld", code="impact_evidence_outside_relation_documents"),
+    "withheld_ambiguous_quote": _called("withheld", code="impact_quote_ambiguous"),
+    "verified_negative": _verified("negative", negative=[EV1]),
+    "verified_mixed": _all(_more_evidence, _verified("mixed", positive=[EV1], negative=[EV2])),
+    "verified_neutral_only": _verified("undetermined", neutral=[EV1]),
+    "verified_uncertain": _verified("undetermined", uncertain=[EV1], positive=[]),
+    "verified_insufficient_target": _verified("undetermined", "insufficient", positive=[EV1]),
+    "reason_at_2000_code_points": lambda b: b["impacts"][0]["proposal"].update(reason="😀" * 2000),
+    "limitations_at_1000_code_points": lambda b: b["impacts"][0]["proposal"].update(limitations="😀" * 1000),
+}
+
+
+@pytest.mark.parametrize("change", [pytest.param(change, id=name) for name, change in IMPACT_ACCEPTED.items()])
+def test_every_impact_state_is_relayed_exactly_and_sealed_in_the_content_digest(tmp_path, start, change):
+    ws = workspace(tmp_path)
+    bundle = serve(ws, mutated(change))
+    wire = get(start(workspace=ws), bundle_url()).json()
+    assert wire["bundle"] == bundle and sha(wire["bundle"]) == wire["verification"]["bundleDigest"]
+    assert wire["verification"]["counts"]["impacts"] == len(bundle["impacts"]) == 1 and wire["bundle"]["policy"]["impacts"] == "s3-independent-verifier-quote-effect"
+    assert wire["verification"]["contentDigest"] == digest({key: bundle[key] for key in ("companies", "pathCompanies", "issues", "relations", "impacts", "evidence", "articles")})
+
+
+def _impact(bundle: dict[str, Any]) -> dict[str, Any]:
+    return bundle["impacts"][0]
+
+
+IMPACT_REFUSED = {
+    # coverage, order, counts, policy, endpoints, source
+    "missing_row": lambda b: (b["impacts"].clear(), b["counts"].update(impacts=0)),
+    "duplicate_row": lambda b: (b["impacts"].append(copy.deepcopy(b["impacts"][0])), b["counts"].update(impacts=2)),
+    "extra_row_for_unknown_edge": lambda b: (b["impacts"].append({**copy.deepcopy(b["impacts"][0]), "edgeId": "edge-other"}), b["counts"].update(impacts=2)),
+    "wrong_edge": lambda b: _impact(b).update(edgeId="edge-other"),
+    "wrong_issue": lambda b: _impact(b).update(issueId="issue:other"),
+    "wrong_company": lambda b: _impact(b).update(companyId="KRX:000660"),
+    "wrong_job": lambda b: _impact(b)["sourceRelation"].update(jobId="other-job"),
+    "wrong_relation": lambda b: _impact(b)["sourceRelation"].update(relationCandidateId="rc-" + "9" * 64),
+    "count_impacts": lambda b: b["counts"].update(impacts=2),
+    "policy_impacts": lambda b: b["policy"].update(impacts="other"),
+    "policy_impacts_missing": lambda b: b["policy"].pop("impacts"),
+    "effects_other_article_same_version": _all(lambda b: (_more_evidence(b), b["evidence"][1].update(articleId="doc-" + "7" * 64)), _verified("positive", positive=[EV1, EV2])),
+    "involves_extra_non_s3_ref": lambda b: b["relations"][0]["sourceRefs"].append({"kind": "s2-comparison", "jobId": "s2-synthetic-extraction", "id": "evc-" + "3" * 64 + ">e"}),
+    "involves_duplicate_ref": lambda b: b["relations"][0]["sourceRefs"].append(copy.deepcopy(b["relations"][0]["sourceRefs"][0])),
+    "involves_only_non_s3_ref": lambda b: b["relations"].append({**copy.deepcopy(b["relations"][0]), "id": "edge-x", "target": "KRX:005930",
+                                                                 "sourceRefs": [{"kind": "s2-comparison", "jobId": "s2-synthetic-extraction", "id": "evc-" + "3" * 64 + ">e"}]}),
+    "involves_no_ref": lambda b: b["relations"].append({**copy.deepcopy(b["relations"][0]), "id": "edge-y", "sourceRefs": []}),
+    "verifier_reply_invalid_in_live_bundle": lambda b: (b["provenance"].update(executionMode="live", recordingKind="provider"),
+                                                        [s["provenance"].update(executionMode="live", recordingKind="provider") for s in b["sources"]],
+                                                        _called("technical-reject", code="verifier_reply_invalid")(b)),
+    "impacts_root_missing": lambda b: b.pop("impacts"),
+    "counts_impacts_missing": lambda b: b["counts"].pop("impacts"),
+    "unknown_row_key": lambda b: _impact(b).update(extra=1),
+    "unknown_proposal_key": lambda b: _impact(b)["proposal"].update(extra=1),
+    "unknown_effects_key": lambda b: _impact(b)["effects"].update(extra=[]),
+    "row_key_missing": lambda b: _impact(b).pop("verifierRequestDigest"),
+    # manual approval forgery and the state table
+    "manual_source_with_candidate": _all(_operator_approved),
+    "not_applicable_on_automatic_source": _row("not-applicable"),
+    "not_proposed_on_manual_source": _all(_operator_approved, _row("not-proposed")),
+    "not_applicable_with_candidate": _all(_operator_approved, _row("not-applicable", impactCandidateId=IC)),
+    "not_proposed_with_candidate": _row("not-proposed", impactCandidateId=IC),
+    "no_evidence_without_proposal": _row("no-evidence", impactCandidateId=IC),
+    "no_evidence_with_label": _row("no-evidence", impactCandidateId=IC, proposal=copy.deepcopy(PROPOSAL), label="undetermined"),
+    "no_evidence_called": _called("no-evidence"),
+    "producer_invalid_with_candidate": _row("technical-reject", code="producer_reply_invalid", impactCandidateId=IC),
+    "technical_without_code": _row("technical-reject"),
+    "technical_unknown_code": _row("technical-reject", code="relation_invalid"),
+    "precheck_without_candidate": _row("technical-reject", code="impact_precheck_rejected"),
+    "precheck_called": _called("technical-reject", code="impact_precheck_rejected"),
+    "verifier_invalid_not_called": _row("technical-reject", code="verifier_reply_invalid", impactCandidateId=IC, proposal=copy.deepcopy(PROPOSAL)),
+    "verifier_reject_not_contradicted": _called("verifier-reject", targetVerdict="supported"),
+    "verifier_reject_with_effects": _called("verifier-reject", targetVerdict="contradicted", effects=_sides(positive=[EV1])),
+    "verifier_reject_with_code": _called("verifier-reject", targetVerdict="contradicted", code="impact_quote_ambiguous"),
+    "verified_contradicted": _verified("positive", "contradicted", positive=[EV1]),
+    "verified_null_target": _called("verified", label="positive", effects=_sides(positive=[EV1])),
+    "verified_with_code": _called("verified", label="positive", targetVerdict="supported", effects=_sides(positive=[EV1]), code="impact_quote_ambiguous"),
+    "verified_not_called": _row("verified", impactCandidateId=IC, label="positive", targetVerdict="supported", effects=_sides(positive=[EV1]), proposal=copy.deepcopy(PROPOSAL)),
+    "verified_null_effects": _called("verified", label="positive", targetVerdict="supported"),
+    "verified_empty_effects": _verified("undetermined"),
+    "withheld_without_code": _called("withheld"),
+    "withheld_with_label": _called("withheld", code="impact_quote_ambiguous", label="positive"),
+    "withheld_with_effects": _called("withheld", code="impact_quote_ambiguous", effects=_sides(positive=[EV1])),
+    "withheld_with_target": _called("withheld", code="impact_quote_ambiguous", targetVerdict="supported"),
+    "withheld_wrong_code": _called("withheld", code="verifier_reply_invalid"),
+    "unknown_status": _row("accepted"),
+    "digest_without_call": _row("not-proposed", verifierRequestDigest=DIGEST),
+    "called_without_digest": _called("verifier-reject", targetVerdict="contradicted", verifierRequestDigest=None),
+    "short_digest": _called("verifier-reject", targetVerdict="contradicted", verifierRequestDigest="b" * 63),
+    "bad_candidate_id": _row("no-evidence", impactCandidateId="ic-short", proposal=copy.deepcopy(PROPOSAL)),
+    "proposal_verification": lambda b: _impact(b)["proposal"].update(verification="verified"),
+    "proposal_direction": lambda b: _impact(b)["proposal"].update(direction="bullish"),
+    "proposal_empty_reason": lambda b: _impact(b)["proposal"].update(reason=""),
+    "proposal_reason_2001_code_points": lambda b: _impact(b)["proposal"].update(reason="😀" * 2001),
+    "proposal_limitations_1001_code_points": lambda b: _impact(b)["proposal"].update(limitations="😀" * 1001),
+    # labels and effects
+    "label_mismatch_positive_as_negative": lambda b: _impact(b).update(label="negative"),
+    "label_mixed_for_one_side": lambda b: _impact(b).update(label="mixed"),
+    "label_not_in_vocabulary": lambda b: _impact(b).update(label="neutral"),
+    "label_positive_for_insufficient": _verified("positive", "insufficient", positive=[EV1]),
+    "label_positive_with_uncertain": _all(_more_evidence, _verified("positive", positive=[EV1], uncertain=[EV2])),
+    "label_undetermined_for_negative": _verified("undetermined", negative=[EV1]),
+    "label_not_mixed": _all(_more_evidence, _verified("positive", positive=[EV1], negative=[EV2])),
+    "effects_foreign_evidence": lambda b: _impact(b)["effects"].update(positive=["ev-" + "9" * 64]),
+    "effects_two_sides": _verified("mixed", positive=[EV1], negative=[EV1]),
+    "effects_duplicate_in_side": _verified("positive", positive=[EV1, EV1]),
+    "effects_unsorted": _all(_more_evidence, _verified("positive", positive=[EV3, EV2])),
+    "effects_same_source_quote": _all(lambda b: (_more_evidence(b), b["evidence"][1]["source"].update(sourceEvidenceId=b["evidence"][0]["source"]["sourceEvidenceId"])),
+                                      _verified("positive", positive=[EV1, EV2])),
+    "effects_other_article_version": _all(lambda b: (_more_evidence(b), b["evidence"][1].update(articleVersion="7" * 64)), _verified("positive", positive=[EV1, EV2])),
+    "effects_over_forty": lambda b: _impact(b)["effects"].update(positive=sorted("ev-" + f"{n:064x}" for n in range(41))),
+    "effects_bad_id": lambda b: _impact(b)["effects"].update(positive=["ev-bad"]),
+    "effects_not_lists": lambda b: _impact(b)["effects"].update(positive=None),
+    "effects_side_missing": lambda b: _impact(b)["effects"].pop("uncertain"),
+}
+
+
+@pytest.mark.parametrize("change", [pytest.param(change, id=name) for name, change in IMPACT_REFUSED.items()])
+def test_an_unclosed_or_forged_impact_row_is_refused_even_with_updated_digests(tmp_path, start, change):
+    ws = workspace(tmp_path)
+    serve(ws, mutated(change))
+    service = start(workspace=ws)
+    for url in (bundle_url(), status_url()):
+        response = get(service, url)
+        assert response.status_code == 500 and error_of(response)["code"] == "runtime_contract_mismatch", response.text[:300]
+        assert "bundle" not in response.json() and "KRX:005930" not in response.text
+
+
+def test_the_same_edge_with_two_source_relations_keeps_two_separate_rows_never_aggregated(tmp_path, start):
+    """Two verified source relations may land on one edge with opposite labels: each keeps its own row, sorted by (edge, job, relation candidate)."""
+    def two(bundle: dict[str, Any]) -> None:
+        _more_evidence(bundle)
+        second = "rc-" + "5" * 64
+        source = bundle["sources"][0]
+        source["reviewUsed"].append({**copy.deepcopy(source["reviewUsed"][0]), "relationCandidateId": second})
+        bundle["relations"][0]["sourceRefs"].append({**bundle["relations"][0]["sourceRefs"][0], "id": second})
+        first = bundle["impacts"][0]
+        bundle["impacts"].append({**copy.deepcopy(first), "sourceRelation": {**first["sourceRelation"], "relationCandidateId": second}, "impactCandidateId": "ic-" + "c" * 64,
+                                  "label": "negative", "effects": _sides(negative=[EV2])})
+        bundle["impacts"].sort(key=lambda r: (r["edgeId"], r["sourceRelation"]["jobId"], r["sourceRelation"]["relationCandidateId"]))
+        bundle["counts"]["impacts"] = 2
+    ws = workspace(tmp_path)
+    bundle = serve(ws, mutated(two))
+    wire = get(start(workspace=ws), bundle_url()).json()
+    assert wire["bundle"] == bundle and sorted(r["label"] for r in wire["bundle"]["impacts"]) == ["negative", "positive"]
 
 
 # ---- withheld, refused and unreadable answers ----------------------------------------------------------------------------------

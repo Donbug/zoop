@@ -6,7 +6,7 @@ ONE canonical public issue-centric projection, validates it strictly and stores 
 `recover` settles a `reserved` handoff from the stored artifact only (it never regenerates). `inspect` is ledger + artifact integrity.
 `export` re-validates CURRENT authority, then prints the bundle; any drift is a content-free `withheld` result.
 
-A ledger row whose stored receipt names another bundle schema than this build's (every `-1`, `-2`, `-3` and `-4` row) is HISTORY: `inspect` shows its stored state, receipt and
+A ledger row whose stored receipt names another bundle schema than this build's (every `-1` to `-5` row) is HISTORY: `inspect` shows its stored state, receipt and
 attempts, `export` is `withheld` (`handoff_contract_changed`), `recover` and a same-id `freeze` are refused with that code. Decided from the ledger alone before
 any operator file, source authority, artifact or writable ledger is touched, and repeated under the lock; the row, its attempts and its artifact are never read
 as a current bundle, resumed, settled or rewritten.
@@ -35,13 +35,15 @@ from .extraction_contracts import CitationFailure, ExtractionFailure, Mention, O
 from .graph_projection import Paths as SourcePaths
 from .graph_projection import Registry, Source, approval_basis, gate, load_registry, review_state
 from .graph_projection_contracts import MAX_REGISTRY, Withheld, entry_key
-from .handoff_contracts import (APP_IMPORT_PENDING, BUNDLE_SCHEMA, EVIDENCE_KIND, EXECUTION_MODES, ISSUE_FIELDS, LEDGER_VERSION, MAX_ATTEMPTS, MAX_BUNDLE,
+from .handoff_contracts import (APP_IMPORT_PENDING, BUNDLE_SCHEMA, EVIDENCE_KIND, EXECUTION_MODES, IMPACT_POLICY_NAME, IMPACT_SIDES, ISSUE_FIELDS, LEDGER_VERSION,
+    MAX_ATTEMPTS, MAX_BUNDLE,
     MAX_EVIDENCE, MAX_EXCLUSIONS, MAX_ISSUES, MAX_OPERATOR_FILE, MAX_RELATIONS, MENTION_IDENTITY, MENTION_VERIFICATION, OFFSET_UNIT, ORIGIN_VERIFICATION, POLICY,
     PRODUCER_CHECKS, SCHEMA, SOURCE_SUPPORT_POLICY, STRUCTURAL_BASIS_TYPES, STRUCTURAL_PATH_UNAVAILABLE, Bindings, Decisions, Manifest, Selector, VERDICT_FIELDS,
-    app_evidence_id, basis_eligibility, content_digest, countries_class, involves_validation, mention_key, mention_time_precision, selected_basis, text_sha256,
-    time_precision,
+    app_evidence_id, basis_eligibility, content_digest, countries_class, impact_label, involves_validation, mention_key, mention_time_precision, selected_basis,
+    text_sha256, time_precision,
     validate_bundle, withheld_fields)
 from .ingestion_contracts import Authority, IngestionFailure, byte_hash, canonical, copy_bounded, digest, now, read_file, reserved_state_roots
+from .relation_rules import impact_verifier_request
 from .source_support import source_support
 
 _SQL = """
@@ -67,7 +69,7 @@ _FILES = {"handoff.sqlite3", "handoff.sqlite3-wal", "handoff.sqlite3-shm", "hand
 NEXT = {"reserved": "recover", "ready": "export", "failed": None}
 USAGE = {"providerCalls": 0, "modelCalls": 0}
 POLICIES = {"geography": "operator-field-verdict", "structural": "manual-operator-review", "sequence": "s2-comparison-with-operator-decision",
-            "sourceSupport": SOURCE_SUPPORT_POLICY}
+            "sourceSupport": SOURCE_SUPPORT_POLICY, "impacts": IMPACT_POLICY_NAME}
 
 
 # ---------------------------------------------------------------------------------------------- ledger -------------------------------
@@ -720,6 +722,8 @@ class Planner:
         self.used_review: dict = {}       # (jobId, rc) -> approvalBasis (revision included) of every S3 relation behind an emitted edge
         self.paths: dict = {}             # structural edge id -> (canonical company chain, canonical (supplier, customer) per basis), resolved to public ids at assembly
         self.not_public: dict = {item.pin.relation.job_id: {} for item in self.loaded}
+        self.impacts: list[dict] = []     # the receipt-only impact rows, one per INVOLVES source relation
+        self.impact_evidence: set = set()  # app evidence ids of VERIFIED impact rows only (added after the whole row was proven)
 
     # ---- helpers ------------------------------------------------------------------------------------------------------------------------
 
@@ -1025,6 +1029,103 @@ class Planner:
                 "decisionRef": None,
                 "sourceRefs": [{"kind": "s3-relation", "jobId": j, "id": rc} for j, rc in sorted(edge["refs"])]})
 
+    # ---- impacts (receipt-only text effects of the quotes of every emitted INVOLVES source relation) -----------------------------------------
+
+    def build_impacts(self) -> None:
+        """ONE closed row per (INVOLVES edge, S3 job, relation) of every emitted edge's `sourceRefs`, in that tuple's order. A row is the S3 result's own words about
+        the relation's impact stage (never a recomputed verdict, never aggregated across the relations of an edge, never a price view); structural SUPPLIES impacts and
+        unpublished relations stay audit-only. Evidence of a verified row joins the bundle only AFTER its whole row was proven, so a refused row can never leave
+        a provisional reference behind."""
+        rows = []
+        for edge in self.relations:                  # only INVOLVES edges exist yet
+            for ref in edge["sourceRefs"]:
+                row, evidence = self.impact_row(edge, self.by_job[ref["jobId"]], ref["id"])
+                rows.append(row)
+                self.impact_evidence.update(evidence)
+        rows.sort(key=lambda row: (row["edgeId"], row["sourceRelation"]["jobId"], row["sourceRelation"]["relationCandidateId"]))
+        if len(rows) > MAX_RELATIONS:
+            raise ExtractionFailure("handoff_limit_exceeded", {"impacts": "count"})
+        self.impacts = rows
+
+    def impact_row(self, edge: dict, loaded: Loaded, rc: str) -> tuple[dict, set]:
+        job = loaded.pin.relation.job_id
+        relation = loaded.relations[rc]
+        operator = self.used_review[(job, rc)]["kind"] == "operator-final-approval"
+        impact = relation["impact"]
+        row = {"edgeId": edge["id"], "issueId": edge["source"], "companyId": edge["target"], "sourceRelation": {"jobId": job, "relationCandidateId": rc},
+               "impactCandidateId": None, "status": None, "code": None, "label": None, "targetVerdict": None, "effects": None, "verifier": "not-called",
+               "verifierRequestDigest": None, "proposal": None}
+        # On-target = the verified relation's own company subject; an off-target candidate (a free-text model id) is never exported.
+        found = [c for c in impact["candidates"] if c["impactedCompanyId"] == relation["subject"]["ref"]]
+        if operator:
+            if impact["status"] != "not-applicable" or impact["candidates"]:
+                raise ExtractionFailure("relation_payload_invalid")
+            return {**row, "status": "not-applicable"}, set()
+        if impact["status"] == "producer-reply-invalid":
+            if impact["candidates"]:
+                raise ExtractionFailure("relation_payload_invalid")
+            return {**row, "status": "technical-reject", "code": "producer_reply_invalid"}, set()
+        if impact["status"] != "complete" or len(found) > 1:
+            raise ExtractionFailure("relation_payload_invalid")        # pending, a missing marker or a duplicate target cannot be a ready automatic relation
+        if not found:
+            return {**row, "status": "not-proposed"}, set()
+        candidate = found[0]
+        verdict = candidate["verdict"]
+        proposal = candidate["proposal"]
+        if verdict is None or not isinstance(candidate["precheck"], dict):
+            raise ExtractionFailure("relation_payload_invalid")
+        row.update(impactCandidateId=candidate["impactCandidateId"], proposal={"direction": proposal["direction"], "reason": proposal["reason"],
+                                                                                "limitations": proposal["limitations"], "verification": "none"})
+        state = candidate["precheck"]["state"]
+        if verdict["verifier"] == "not-called":
+            if state == "reject" and verdict["status"] == "reject":
+                return {**row, "status": "technical-reject", "code": "impact_precheck_rejected", "proposal": None}, set()
+            if state == "no-evidence" and verdict["status"] == "verified" and verdict["label"] == "undetermined":
+                return {**row, "status": "no-evidence"}, set()
+            raise ExtractionFailure("relation_payload_invalid")
+        # A called verdict must be exactly what the pinned impact verifier request digests to, under the policy this S3 job was bound to.
+        attempt = verdict["attempt"]
+        if (state != "pending" or verdict["verifier"] != "called" or attempt.get("policyVersion") != loaded.s3["binding"]["versions"]["impactPolicy"]
+                or verdict["requestDigest"] != digest(impact_verifier_request(candidate, attempt))):
+            raise ExtractionFailure("relation_payload_invalid")
+        called = {**row, "verifier": "called", "verifierRequestDigest": verdict["requestDigest"]}
+        if verdict["status"] == "reject":
+            if verdict["targetVerdict"] == "contradicted":
+                return {**called, "status": "verifier-reject", "targetVerdict": "contradicted"}, set()
+            if (verdict["targetVerdict"] is None and verdict["mapped"] is None and verdict["label"] is None
+                    and [reason["code"] for reason in verdict["reasons"]] == ["verification_reply_invalid"]):
+                return {**called, "status": "technical-reject", "code": "verifier_reply_invalid"}, set()
+            raise ExtractionFailure("relation_payload_invalid")
+        if verdict["status"] != "verified" or verdict["targetVerdict"] not in ("supported", "insufficient") or not isinstance(verdict["mapped"], dict):
+            raise ExtractionFailure("relation_payload_invalid")
+        mapped = {side: list(verdict["mapped"].get(side, [])) for side in IMPACT_SIDES}
+        quotes = {q["quoteId"] for q in candidate["quotes"]}
+        every = [q for side in IMPACT_SIDES for q in mapped[side]]
+        if set(every) != quotes or len(every) != len(quotes) or not quotes or verdict["label"] != impact_label(verdict["targetVerdict"], mapped):
+            raise ExtractionFailure("relation_payload_invalid")        # the S3 verdict must map every quote once and carry the label its own rule yields
+        # An S2 quote id is a hash of the document VERSION and span only: it names ONE document only when exactly one valid citation of the proposal carries it.
+        valid = [c for c in (*proposal["supporting"], *proposal["opposing"]) if "error" not in c]
+        sources: dict = {}
+        for c in valid:
+            sources.setdefault(c["evidenceId"], []).append(c)
+        documents = {q: {(c["documentId"], c["documentVersion"]) for c in sources.get(q, [])} for q in quotes}
+        if any(not found_documents for found_documents in documents.values()):
+            raise ExtractionFailure("relation_payload_invalid")
+        withheld = {**called, "status": "withheld"}
+        if any(len(found_documents) > 1 for found_documents in documents.values()):
+            return {**withheld, "code": "impact_quote_ambiguous"}, set()
+        allowed = {(c["documentId"], c["documentVersion"]) for c in relation["citations"] if "error" not in c}
+        if any(next(iter(found_documents)) not in allowed for found_documents in documents.values()):
+            return {**withheld, "code": "impact_evidence_outside_relation_documents"}, set()
+        try:
+            app_ids = {q: self.cite(loaded, sources[q][0]) for q in sorted(quotes)}
+        except Skip:
+            raise ExtractionFailure("relation_payload_invalid") from None          # a bound relation document always has its app binding
+        effects = {side: sorted({app_ids[q] for q in mapped[side]}) for side in IMPACT_SIDES}
+        if len(set(app_ids.values())) != len(quotes) or any(set(effects[a]) & set(effects[b]) for a in IMPACT_SIDES for b in IMPACT_SIDES if a < b):
+            raise ExtractionFailure("relation_payload_invalid")
+        return {**called, "status": "verified", "label": verdict["label"], "targetVerdict": verdict["targetVerdict"], "effects": effects}, set(app_ids.values())
+
     # ---- STRUCTURALLY_RELATED_TO (manual operator assertion over eligible S3 SUPPLIES basis) -------------------------------------------------
 
     def structural(self, decision) -> dict:
@@ -1174,6 +1275,7 @@ class Planner:
     def run(self) -> dict:
         self.build_issues()
         self.build_involves()
+        self.build_impacts()
         for decision in sorted(self.op.decisions.structural, key=lambda d: (d.issue, d.company)):
             try:
                 self.relations.append(self.structural(decision))
@@ -1193,6 +1295,7 @@ class Planner:
             evidence_ids.update(r["evidenceIds"])
             for b in r["basis"]:
                 evidence_ids.update(b["evidenceIds"])
+        evidence_ids.update(self.impact_evidence)
         if len(evidence_ids) > MAX_EVIDENCE:
             raise ExtractionFailure("handoff_limit_exceeded", {"evidence": "count"})
         evidence = [self.resolver.by_id[i] for i in sorted(evidence_ids)]
@@ -1232,11 +1335,11 @@ class Planner:
                                  "executionMode": execution_mode, "recordingKind": recording_kind},
                   "policy": {"version": POLICY, "files": self.manifest.files.wire(), "evidenceIdKind": EVIDENCE_KIND, "offsetUnit": OFFSET_UNIT, **POLICIES},
                   "sources": sources, "companies": companies, "pathCompanies": path_companies, "issues": issues, "relations": relations, "evidence": evidence,
-                  "articles": articles,
+                  "articles": articles, "impacts": self.impacts,
                   "exclusions": {"counts": dict(sorted(tally.items())), "items": items},
                   "counts": {"companies": len(companies), "pathCompanies": len(path_companies), "issues": len(issues), "relations": {t: sum(r["type"] == t for r in relations) for t in
                                                                                          ("INVOLVES", "STRUCTURALLY_RELATED_TO", "FOLLOWS")},
-                             "evidence": len(evidence), "articles": len(articles), "exclusions": len(items)},
+                             "evidence": len(evidence), "articles": len(articles), "impacts": len(self.impacts), "exclusions": len(items)},
                   "checks": {"producerConfirmed": list(PRODUCER_CHECKS), "appImportPending": list(APP_IMPORT_PENDING)},
                   "readiness": {"app": "import-pending", "evidenceRegistration": "not-registered", "publicActivation": "none", "graphDb": "none"},
                   "digests": {"content": ""}}

@@ -57,7 +57,7 @@ out = json.loads(done.stdout)
 canon = lambda v: json.dumps(v, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 bundle = out["bundle"]
 bundle["policy"]["extraField"] = "nested-unknown"
-bundle["digests"]["content"] = hashlib.sha256(canon({k: bundle[k] for k in ("companies", "pathCompanies", "issues", "relations", "evidence", "articles")}).encode()).hexdigest()
+bundle["digests"]["content"] = hashlib.sha256(canon({k: bundle[k] for k in ("companies", "pathCompanies", "issues", "relations", "impacts", "evidence", "articles")}).encode()).hexdigest()
 data = canon(bundle).encode()
 out["receipt"].update(bundleDigest=hashlib.sha256(data).hexdigest(), bundleBytes=len(data), contentDigest=bundle["digests"]["content"])
 sys.stdout.write(canon(out) + "\\n")
@@ -157,7 +157,7 @@ def run(smoke: Smoke, world: HandoffWorld) -> list[str]:
                         for v in i["fieldVerdicts"])
                 and all(p["sameValueMentions"][f] == [identity(m) for m in i["mentions"] if m[f] == basis[0][f]] != []
                         and i[f] == (None if f in suppressed else basis[0][f]) for f in fields))
-    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5" and all(truthful(i) for i in bundle["issues"]),
+    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-6" and all(truthful(i) for i in bundle["issues"]),
           "every issue states its actual field selection and any operator field verdict: exact same-value lists, withheld recomputed, never an inferred verdict")
     main_ids = {c["id"] for c in bundle["companies"]}
     middles = {m for r in bundle["relations"] if (r["structuralPath"] or {}).get("status") == "complete" for m in r["structuralPath"]["companyIds"][1:-1]}
@@ -166,6 +166,11 @@ def run(smoke: Smoke, world: HandoffWorld) -> list[str]:
           and [c["id"] for c in bundle["pathCompanies"]] == sorted(middles - main_ids) and bundle["counts"]["pathCompanies"] == len(bundle["pathCompanies"])
           and not {c["id"] for c in bundle["pathCompanies"]} & ({i["id"] for i in bundle["issues"]} | main_ids),
           "structural paths are explicit, bases carry scopes, and the private path companies are exactly the unlisted mapped middles, disjoint from public nodes")
+    involves = sorted((r["id"], ref["jobId"], ref["id"]) for r in bundle["relations"] if r["type"] == "INVOLVES" for ref in r["sourceRefs"] if ref["kind"] == "s3-relation")
+    check(world.impacts and bundle["impacts"] == world.impacts and bundle["counts"]["impacts"] == len(bundle["impacts"])
+          and [(i["edgeId"], i["sourceRelation"]["jobId"], i["sourceRelation"]["relationCandidateId"]) for i in bundle["impacts"]] == involves
+          and bundle["policy"]["impacts"] == "s3-independent-verifier-quote-effect",
+          "impact rows equal the pipeline world's hand-written expectation and cover exactly every INVOLVES source relation, one row each, sorted")
     check(smoke.js_digest(response.content) == pins1["bundleDigest"], "another language recomputes the pinned SHA-256 after a plain JSON round trip")
     manifest = wire["manifest"]
     check(manifest == oracle["manifest"] and canonical(manifest) == canonical(oracle["manifest"]), "HTTP manifest equals the CLI export manifest (the ledger's frozen request)")
@@ -178,6 +183,7 @@ def run(smoke: Smoke, world: HandoffWorld) -> list[str]:
     status = smoke.get(service, status_url("handoff-1")).json()
     check("bundle" not in status and "manifest" not in status and status["verification"]["bundleDigest"] == pins1["bundleDigest"] and status["verification"]["counts"] == world.counts,
           "status carries digests and counts only, no manifest")
+    check(not [s for s in ("effects", "proposal", "verifierRequestDigest", "targetVerdict", "impactCandidateId") if s in json.dumps(status)], "status carries no impact content")
     second = smoke.get(service, bundle_url("handoff-2"), "beta").json()
     check(second["bundle"]["handoffId"] == "handoff-2" and digest_of(second["bundle"]) == pins2["bundleDigest"] != pins1["bundleDigest"], "beta reads its own pinned handoff")
     lines.append(f"bundle: status=passed, sources=2, bytes={pins1['bundleBytes']}, equals CLI export + hand-authored expectation + producer validator + JS digest {pins1['bundleDigest'][:12]}")

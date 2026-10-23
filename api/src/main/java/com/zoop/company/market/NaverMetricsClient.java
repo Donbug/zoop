@@ -2,6 +2,7 @@ package com.zoop.company.market;
 
 import java.net.URI;
 import java.time.Instant;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -30,9 +31,13 @@ public class NaverMetricsClient {
     private final RestClient world;
     private final RestClient autocomplete;
     private final ObjectMapper mapper;
+    private final MarketDataCache<String, CompanyMetricsResponse> metricsCache;
+    private final MarketDataConcurrencyLimiter limiter;
 
     public NaverMetricsClient(CompanyMarketSettings settings, ObjectMapper mapper) {
         this.settings = settings; this.mapper = mapper;
+        this.metricsCache = new MarketDataCache<>(settings.cacheMaxEntries());
+        this.limiter = new MarketDataConcurrencyLimiter(settings.providerMaxConcurrentRequests(), settings.timeout());
         var httpClient = java.net.http.HttpClient.newBuilder().connectTimeout(settings.timeout()).build();
         var requestFactory = new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(settings.timeout());
@@ -47,6 +52,14 @@ public class NaverMetricsClient {
         boolean supported = krx || (List.of("NASDAQ", "NYSE", "AMEX").contains(exchange) && code.matches("[A-Z][A-Z0-9.\\-]{0,9}"))
                 || ("TSE".equals(exchange) && code.matches("[0-9A-Z]{4}"));
         if (!supported) return CompanyMetricsResponse.unavailable(id, "unsupported_symbol", "이 종목은 지표 출처에서 제공하지 않아요.");
+        String key = id + "|" + exchange + "|" + code;
+        return metricsCache.get(key, () -> loadMetrics(id, exchange, code), result ->
+                "available".equals(result.status()) ? settings.metricsCacheTtl()
+                        : shorter(settings.metricsCacheTtl(), Duration.ofMinutes(1)));
+    }
+
+    private CompanyMetricsResponse loadMetrics(String id, String exchange, String code) {
+        boolean krx = "KRX".equals(exchange) && code.matches("[0-9A-Z]{6}");
         try {
             JsonNode items;
             JsonNode basic;
@@ -97,7 +110,7 @@ public class NaverMetricsClient {
     }
 
     private JsonNode fetch(RestClient client, String path, Map<String, ?> params) {
-        byte[] bytes = client.get().uri(builder -> { builder.path(path); params.forEach(builder::queryParam); return builder.build(); })
+        byte[] bytes = limiter.execute(() -> client.get().uri(builder -> { builder.path(path); params.forEach(builder::queryParam); return builder.build(); })
                 .accept(MediaType.APPLICATION_JSON).exchange((request, response) -> {
                     int status = response.getStatusCode().value();
                     if (status == 404 || status == 400) throw new MarketDataException(false);
@@ -105,12 +118,15 @@ public class NaverMetricsClient {
                     if (status == 401 || status == 403) throw new MarketDataException(false);
                     if (status < 200 || status >= 300) throw new MarketDataException(false);
                     return response.getBody().readAllBytes();
-                });
+                }));
         try { JsonNode node = mapper.readTree(bytes); if (node == null || !node.isObject()) throw new MarketDataException(false); return node; }
         catch (MarketDataException exception) { throw exception; }
         catch (Exception exception) { throw new MarketDataException(false); }
     }
     private static String string(JsonNode node) { return node == null || node.isNull() || !node.isString() ? null : node.stringValue(); }
+    private static Duration shorter(Duration configured, Duration cap) {
+        return configured.compareTo(cap) < 0 ? configured : cap;
+    }
     private static Instant time(String value) {
         if (value == null) return null;
         try { return OffsetDateTime.parse(value).toInstant(); }

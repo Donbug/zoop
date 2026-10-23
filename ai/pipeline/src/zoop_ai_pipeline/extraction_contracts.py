@@ -23,6 +23,7 @@ LIVE_ADAPTER_VERSION = "zoop-extraction-native-live-1"
 REPLAY_FORMAT = "zoop-analysis-replay-1"
 ARTICLE_PROJECTION = "zoop-article-projection-1"
 CANDIDATE_VERSION = "zoop-event-candidate-1"
+ENQUEUE_FORMAT = "zoop-round-enqueue-1"  # the digest preimage of a round-enqueued job id: changing it re-identifies every enqueued job
 
 TOPIC_PRODUCER = "zoop-topic-replay-producer-1"
 TOPIC_REQUEST = "zoop-topic-request-1"
@@ -152,6 +153,37 @@ class Submit(Wire):
 class Selector(Wire):
     schema_version: Literal["zoop-extraction-s2-2"]
     job_id: str = Field(pattern=r"^[A-Za-z0-9._:-]{1,200}$")
+
+
+def enqueue_job_id(enqueue_id: str, observation: ObservationRef) -> str:
+    """The job id of one observation under one enqueue label: only the label and the exact observation (round, source, page, ordinal, document and
+    raw/document versions) enter it. The descriptor (prompt, catalogue, snapshot, topic, provenance) and the replay/live input never do, so changing
+    any of them for the same label and observation is a `job_input_conflict`, never a second job."""
+    return "s2r-" + digest({"format": ENQUEUE_FORMAT, "enqueueId": enqueue_id, "observation": observation.wire()})
+
+
+class EnqueueRound(Wire):
+    """Registration of one job per planned observation of a COMPLETE ingestion round, under one explicit descriptor. The caller supplies the catalogue
+    and snapshot; nothing is inferred or defaulted. `enqueueId` is scoped to (sourceId, roundId), it is not a global batch."""
+    schema_version: Literal["zoop-extraction-s2-2"]
+    enqueue_id: str = Field(pattern=r"^[A-Za-z0-9._-]{1,120}$")
+    round_id: str = Field(min_length=1, max_length=200)
+    source_id: str = Field(min_length=1, max_length=200)
+    provenance: Provenance
+    prompt_version: str = Field(min_length=1, max_length=200)
+    catalogue: Catalogue
+    snapshot: Snapshot
+    topic: TopicConfig | None
+
+    def observation(self, page: int, ordinal: int, document_id: str, raw_version: str, document_version: str) -> ObservationRef:
+        return ObservationRef.model_validate({"roundId": self.round_id, "sourceId": self.source_id, "page": page, "ordinal": ordinal,
+                                              "documentId": document_id, "rawVersion": raw_version, "documentVersion": document_version})
+
+    def submit(self, observation: ObservationRef) -> Submit:
+        """The one ordinary `Submit` this descriptor means for an observation, byte-identical to a hand-written submit of the same content."""
+        return Submit.model_validate({"schemaVersion": self.schema_version, "jobId": enqueue_job_id(self.enqueue_id, observation), "provenance": self.provenance.wire(),
+                                      "promptVersion": self.prompt_version, "incoming": observation.wire(), "catalogue": self.catalogue.wire(),
+                                      "snapshot": self.snapshot.wire(), "topic": self.topic.wire() if self.topic else None})
 
 
 # ---- Distinct topic producer contract: events + documents in, explicit membership + exact citations out. ----

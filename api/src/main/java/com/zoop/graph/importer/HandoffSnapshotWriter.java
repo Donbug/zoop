@@ -47,7 +47,7 @@ import tools.jackson.databind.node.ObjectNode;
  * always gives the same ids. The representative event resolves to its article version the same way, and is written as
  * {@code null} when that mention is not among the written ones, never as a mention the snapshot lacks. A document identity that
  * matches more than one bundle article is genuinely ambiguous and refused ({@link GraphHandoffFailure#MENTION_ARTICLE_AMBIGUOUS});
- * the verifier of {@code zoop-graph-handoff-bundle-5} already requires exactly one article per mention document version, and every
+ * the verifier of {@code zoop-graph-handoff-bundle-6} already requires exactly one article per mention document version, and every
  * original mention cites evidence of its own article, so under that schema the references cover every mention of an issue. The
  * snapshot does not carry the mention values (title, action, time, assertion status, background, participants): they are the
  * producer's S2 candidate or snapshot values ({@code verification: "none"}) and stay only in the receipt, which keeps the whole
@@ -63,7 +63,11 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code eventTime} has {@code unknown} precision) while the receipt still holds every original mention value and verdict.
  * For {@code zoop-graph-handoff-bundle-1} to {@code -4} the top-level {@code pathCompanies}, every relation's {@code structuralPath}
  * and each basis's {@code businessScope}/{@code productScope} are absent from the receipt: a reader must treat them as unavailable,
- * never as an empty path or an empty scope. The snapshot carries none of them in any version.
+ * never as an empty path or an empty scope. The snapshot carries none of them in any version. For {@code zoop-graph-handoff-bundle-1}
+ * to {@code -5} the top-level {@code impacts} is absent from the receipt: a reader must treat impacts as unavailable, never as
+ * {@code not-proposed} or {@code not-applicable}. From {@code -6} on, {@code impacts} (one row per S3 relation behind an INVOLVES
+ * edge: the producer's unverified proposal, the verifier-mapped quote effects and the recomputed label) live ONLY in the receipt;
+ * the snapshot carries no impact, proposal, effect, label or verifier digest.
  *
  * <p>{@code validUntil} is the last valid day (inclusive) and {@code null} is unknown, never "forever": days are written verbatim
  * or not at all ({@link HandoffTime#dayOrNull}); no midnight and no extra day is ever added.
@@ -352,7 +356,8 @@ final class HandoffSnapshotWriter {
                 "company_ids_exist_with_equal_label", "evidence_ids_follow_app_formula_without_collision",
                 "article_textSha256_equals_app_text_sha256", "source_support_recomputed_from_declared_origins_and_exact_text",
                 "approval_basis_recomputed_and_bound_to_eligibility_revision",
-                "structural_path_closed_over_involves_basis_and_catalog")) {
+                "structural_path_closed_over_involves_basis_and_catalog",
+                "impact_rows_closed_over_involves_sources_approvals_and_labels")) {
             checks.add(check);
         }
         app.put("quoteIntegrity", "app-text-code-point-span-sha256-equals-bundle-quoteSha256");

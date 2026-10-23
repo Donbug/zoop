@@ -7,7 +7,7 @@
 
 Two S2 jobs (two events, one frozen snapshot event with two documents) and two S3 jobs are authored replay: no model, no provider, no original PoC state,
 no network (every CLI subprocess runs under a socket audit hook). Expectations are written by hand from the authored world, never derived from the
-planner under test. `--write-fixture DIR` additionally writes the valid export envelope (bundle `-5`, no operator verdict), the real exports of a hand-reviewed SYNTHETIC world
+planner under test. `--write-fixture DIR` additionally writes the valid export envelope (bundle `-6`, no operator verdict, default `not-proposed` impact rows), the real export of a `rich` impact world, the real exports of a hand-reviewed SYNTHETIC world
 (`export-field-verdicts.json`, handoff `handoff-verdicts-1`, also importable through `verdict_export`) and of a time-withheld one (`export-field-verdicts-time.json`), the
 hand-written expected original mentions (`expected-mentions.json`), field provenance (`expected-field-provenance.json`), verdicts (`expected-field-verdicts.json`) and public
 headline values (`expected-headline-values.json`), the real withheld envelope of a handoff frozen under an earlier bundle schema and negative fixtures the backend import can be tested with.
@@ -38,7 +38,7 @@ sys.path[:0] = [str(PIPELINE)]
 
 from scripts.ingestion_smoke import json_bytes, ownership_env  # noqa: E402
 from scripts.extraction_smoke import page  # noqa: E402
-from scripts.relation_smoke import RelKit, SUP, INV, co, converge, ev, find, proposal, tree, world_cite  # noqa: E402
+from scripts.relation_smoke import RelKit, SUP, INV, co, converge, ev, find, impact_item, impact_verifier_reply, proposal, tree, world_cite  # noqa: E402
 from zoop_ai_pipeline.graph_projection import review_state  # noqa: E402
 from zoop_ai_pipeline.handoff_contracts import POLICY, app_evidence_id, content_digest  # noqa: E402
 from zoop_ai_pipeline.ingestion_contracts import canonical, digest  # noqa: E402
@@ -101,7 +101,7 @@ ORIGINS = {"a": ORIGIN_SHARED, "a2": ORIGIN_SHARED}                             
 
 def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a2_countries: tuple = ("KR",), dated: bool = False,
                 valid_from: str | None = "2026-01-01", valid_until: str | None = "2026-12-31", event_time: str | None = "2026-09-30",
-                a2_event_time=SAME, snapshot_differs: bool = False, approve: bool = False, chain: bool = False) -> SimpleNamespace:
+                a2_event_time=SAME, snapshot_differs: bool = False, approve: bool = False, chain: bool = False, impact: str | None = None) -> SimpleNamespace:
     """The authored world. Variants (each is a REAL ingestion + S2 + S3 world, used by the integrity regressions):
     collide: the two documents of snapshot event-a use the SAME local mention id (S2 scopes member identity by documentVersion + mentionId, so this is legal);
     a2_differs: the second member's title differs (a metadata conflict unless the operator picks a representative); a2_countries: its country field;
@@ -113,7 +113,11 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
     approve: the authored independent verifier HOLDs two relations the issues depend on (rel-a's SUPPLIES basis and rel-b's PARTICIPATES_IN of event-a) and the operator FINALLY
     approves exactly those two through the real S3 review path (effect `approved`, no call): the other relations stay automatic;
     chain: document a also states that SYNTH-4 supplies SYNTH-3 and rel-a holds that eligible SUPPLIES relation (with its own business/product scope), so SYNTH-4 -> SYNTH-3 -> SYNTH-1 is
-    a two-relation structural basis over the supply issue's participant SYNTH-1."""
+    a two-relation structural basis over the supply issue's participant SYNTH-1.
+    impact: `verified` (rel-a's participation: a verified POSITIVE impact over its own sentence plus an uncited sentence of document a; rel-b's participation in `event-a`: a verified
+    NEGATIVE one on the SAME supply edge; the factory participation: `no-evidence`, plus an off-target company that is never exported) or `rejected` (the verifier contradicts the
+    target of rel-a's impact, finds rel-b's `event-a` target insufficient, and the factory impact cites a document outside the relation); default none: every impact stage is complete
+    with no candidate (`not-proposed`)."""
     kit = RelKit(root)
     valid_text = validity_sentence(valid_from, valid_until) if dated else None
     d1, d2, d3 = kit.ingest("docs", [{"supplier": "supplier-a", "html": page(SUP, INV, EVT_A, GEO_A, *((CHAIN,) if chain else ())), "publisher": PUBLISHERS["a"]},
@@ -147,21 +151,26 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
     held = {"rel-a": lambda r: r["type"] == "SUPPLIES" and r["subject"]["ref"] == "SYNTH-3" and r["object"]["ref"] == "SYNTH-1",
             "rel-b": lambda r: r["type"] == "PARTICIPATES_IN" and r["subject"]["ref"] == "SYNTH-1" and r["object"]["ref"] == "event-a"} if approve else {}
     verify = {job: (lambda r, match=match: {"type": "insufficient"} if match(r) else None) for job, match in held.items()}
+    scripts, effects = impact_scripts(impact, wa, wb, evc, cite)
     jobs = {
         "rel-a": converge(wa, "rel-a", [
             proposal("PARTICIPATES_IN", co("SYNTH-1"), ev(evc["a"]), [cite(wa, "a", EVT_A)]),
             proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [cite(wa, "a", SUP)], product="배터리 부품"),
             proposal("INVESTS_IN", co("SYNTH-4"), co("SYNTH-3"), [cite(wa, "a", INV)]),
             proposal("SHARES_ISSUE", co("SYNTH-1"), co("SYNTH-2"), [cite(wa, "a", SUP)]),
-            *([proposal("SUPPLIES", co("SYNTH-4"), co("SYNTH-3"), [cite(wa, "a", CHAIN)], business="소재 사업", product="소재")] if chain else [])], verify=verify.get("rel-a")),
+            *([proposal("PARTICIPATES_IN", co("SYNTH-1"), ev(evc["a"]), [cite(wa, "a", EVT_A)], countries=["KR"])] if impact == "rich" else []),
+            *([proposal("SUPPLIES", co("SYNTH-4"), co("SYNTH-3"), [cite(wa, "a", CHAIN)], business="소재 사업", product="소재")] if chain else [])],
+                        verify=verify.get("rel-a"), impacts=scripts.get("rel-a"), effects=effects),
         "rel-b": converge(wb, "rel-b", [
             proposal("PARTICIPATES_IN", co("SYNTH-1"), ev("event-a"), [cite(wb, "a2", EVT_A2)]),
             proposal("PARTICIPATES_IN", co("SYNTH-1"), ev(evc["b"]), [cite(wb, "b", QB)]),
             proposal("PARTICIPATES_IN", co("SYNTH-2"), ev(evc["b"]), [cite(wb, "b", QB)]),
             proposal("PARTICIPATES_IN", co("SYNTH-1"), ev(evc["b3"]), [cite(wb, "b", QB3)]),
+            *([proposal("PARTICIPATES_IN", co("SYNTH-1"), ev("event-a"), [cite(wb, "a2", EVT_A2)], countries=["KR"]),
+               proposal("PARTICIPATES_IN", co("SYNTH-1"), ev(evc["b"]), [cite(wb, "b", QB)], countries=["US"])] if impact == "rich" else []),
             *([proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [cite(wb, "a", SUP)], product="배터리 부품",
                         validity={"from": valid_from, "until": valid_until, "citations": [cite(wb, "b", valid_text)] if valid_text else []})] if dated else [])],
-                        verify=verify.get("rel-b"))}
+                        verify=verify.get("rel-b"), impacts=scripts.get("rel-b"), effects=effects)}
     for name, out in jobs.items():
         assert out["state"] == "ready", (name, out.get("failure"))
     for job, match in held.items():
@@ -171,7 +180,7 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
                                       "decision": "allow", "reviewer": APPROVER, "note": PRIVATE_NOTE})
         jobs[job] = {**jobs[job], **reviewed}          # the S3 result after the operator's final decision (same job, input digest and binding)
         assert next(r for r in jobs[job]["relations"] if match(r))["eligibility"]["approvalBasis"]["kind"] == "operator-final-approval"
-    world.jobs, world.dated, world.valid_text, world.event_time, world.approve, world.chain = jobs, dated, valid_text, event_time, approve, chain
+    world.jobs, world.dated, world.valid_text, world.event_time, world.approve, world.chain, world.impact = jobs, dated, valid_text, event_time, approve, chain, impact
     return world
 
 
@@ -436,8 +445,9 @@ def expected(world, public_ids: dict | None = None) -> dict:
     pub = lambda company: (public_ids or {}).get(company, company)  # noqa: E731
     e = {"EVT_A": evidence_id(world, "a", EVT_A), "GEO_A": evidence_id(world, "a", GEO_A), "SUP": evidence_id(world, "a", SUP),
          "EVT_A2": evidence_id(world, "a2", EVT_A2), "QB": evidence_id(world, "b", QB), "GEO_B": evidence_id(world, "b", GEO_B)}
+    rows = expected_impacts(world, public_ids)
     return {
-        "evidence": sorted(e.values()),
+        "evidence": sorted([*e.values(), *([evidence_id(world, "a", INV)] if getattr(world, "impact", None) == "rich" else [])]),
         "issues": {"issue:supply-2026q3": {"canonicalId": "issue:supply", "title": "합성 공급 계약", "eventTime": "2026-09-30", "timePrecision": "day",
                                            "geography": "domestic", "evidenceIds": sorted([e["EVT_A"], e["EVT_A2"], e["GEO_A"]])},
                    "issue:factory-2026q4": {"canonicalId": "issue:factory", "title": "합성 공장 착공", "eventTime": "2026-11-15", "timePrecision": "day",
@@ -448,11 +458,109 @@ def expected(world, public_ids: dict | None = None) -> dict:
                       ("FOLLOWS", "issue:factory-2026q4", "issue:supply-2026q3"): sorted([e["QB"], e["EVT_A"]])},
         "basisEvidence": [e["SUP"]],
         "exclusions": {"geography_unproven": 1, "company_unmapped": 1, "issue_not_public": 1},
-        "counts": {"companies": 2, "pathCompanies": 0, "issues": 2, "relations": {"INVOLVES": 2, "STRUCTURALLY_RELATED_TO": 1, "FOLLOWS": 1}, "evidence": 6, "articles": 3, "exclusions": 3}}
+        "counts": {"companies": 2, "pathCompanies": 0, "issues": 2, "relations": {"INVOLVES": 2, "STRUCTURALLY_RELATED_TO": 1, "FOLLOWS": 1},
+                   "evidence": len(e) + (1 if getattr(world, "impact", None) == "rich" else 0), "articles": 3, "impacts": len(rows), "exclusions": 3},
+        "impacts": rows}
+
+
+IMPACT_REASON = "authored impact reason"
+IMPACT_LIMITS = "authored impact limitation 합성 😀"
+IMPACT_OFF_TARGET = "SYNTH-77"         # an impacted-company id the model invented (no company of any source): never exported
+
+
+def impact_scripts(kind: str | None, wa, wb, evc: dict, cite) -> tuple[dict, object]:
+    """The authored S3 impact stage per job: `rich` adds a second participation of SYNTH-1 per event (declared countries make a different relation key) so that one world holds
+    every status the real replay can produce. Returns ({job: impacts(relation) -> items}, effects(candidate) -> verifier reply or {quote text: effect})."""
+    if kind is None:
+        return {}, None
+    assert kind == "rich", kind
+
+    def rel_a(r: dict) -> list:
+        if r["type"] != "PARTICIPATES_IN" or r["subject"]["ref"] != "SYNTH-1" or r["object"]["ref"] != evc["a"]:
+            return []
+        if r["countries"]:          # the second participation: the verifier will contradict its target
+            return [impact_item("SYNTH-1", "positive", [cite(wa, "a", EVT_A)], [])]
+        return [impact_item("SYNTH-1", "positive", [cite(wa, "a", EVT_A), cite(wa, "a", INV)], [], IMPACT_LIMITS)]     # INV is cited by no relation: an impact-only quote
+
+    def rel_b(r: dict) -> list:
+        if r["type"] != "PARTICIPATES_IN" or r["subject"]["ref"] != "SYNTH-1":
+            return []
+        if r["object"]["ref"] == "event-a":
+            if r["countries"]:      # the verifier finds the target insufficient
+                return [impact_item("SYNTH-1", "positive", [cite(wb, "a2", EVT_A2)], [])]
+            return [impact_item("SYNTH-1", "negative", [], [cite(wb, "a2", EVT_A2)])]
+        if r["object"]["ref"] == evc["b"]:
+            if r["countries"]:      # cites a document outside the relation: the deterministic precheck rejects it
+                return [impact_item("SYNTH-1", "negative", [cite(wb, "a", EVT_A)], [])]
+            return [impact_item("SYNTH-1", "undetermined", [], []), impact_item(IMPACT_OFF_TARGET, "negative", [cite(wb, "b", QB)], [])]
+        return []
+
+    def effects(i: dict):
+        texts = {q["text"] for q in i["quotes"]}
+        if texts == {EVT_A}:
+            return impact_verifier_reply(i, {EVT_A: "positive"}, target="contradicted")
+        if texts == {EVT_A2} and i["proposal"]["direction"] == "positive":
+            return impact_verifier_reply(i, {EVT_A2: "positive"}, target="insufficient")
+        return {EVT_A: "positive", INV: "neutral", EVT_A2: "negative"}
+
+    return {"rel-a": rel_a, "rel-b": rel_b}, effects
+
+
+def edge_id(source: str, target: str) -> str:
+    return "edge-" + digest({"type": "INVOLVES", "source": source, "target": target})
+
+
+def expected_impacts(world, public_ids: dict | None = None) -> list:
+    """Hand-written `impacts[]` of the authored world, sorted by (edgeId, jobId, relationCandidateId): ONE row per INVOLVES source relation. Default world: every automatic
+    participation is `not-proposed` (the impact stage completed with no candidate), the operator-approved one (`approve`) `not-applicable`. `rich` world: see `impact_scripts`.
+    Only the candidate id and the verifier request digest are read from the S3 result (they are S3 identities); every status, label, effect and proposal is written out here."""
+    company = (public_ids or {}).get("KRX:005930", "KRX:005930")
+    supply, factory = ("issue:supply-2026q3", edge_id("issue:supply-2026q3", company)), ("issue:factory-2026q4", edge_id("issue:factory-2026q4", company))
+    approved = getattr(world, "approve", False)
+
+    def rc(job: str, obj: str, countries: list) -> str:
+        return find(world.jobs[job], "PARTICIPATES_IN", "SYNTH-1", obj, countries=countries)["relationCandidateId"]
+
+    def candidate(job: str, relation: str) -> dict:
+        found = next(r for r in world.jobs[job]["relations"] if r["relationCandidateId"] == relation)["impact"]["candidates"]
+        return next(c for c in found if c["impactedCompanyId"] == "SYNTH-1")
+
+    def row(edge: tuple, job: str, relation: str, status: str, **change) -> dict:
+        base = {"edgeId": edge[1], "issueId": edge[0], "companyId": company, "sourceRelation": {"jobId": job, "relationCandidateId": relation}, "impactCandidateId": None,
+                "status": status, "code": None, "label": None, "targetVerdict": None, "effects": None, "verifier": "not-called", "verifierRequestDigest": None, "proposal": None}
+        return {**base, **change}
+
+    def own(job: str, relation: str, called: bool) -> dict:
+        c = candidate(job, relation)
+        return {"impactCandidateId": c["impactCandidateId"], **({"verifier": "called", "verifierRequestDigest": c["verdict"]["requestDigest"]} if called else {})}
+
+    def said(direction: str, limitations: str | None = None) -> dict:
+        return {"direction": direction, "reason": IMPACT_REASON, "limitations": limitations, "verification": "none"}
+
+    def effects(**sides) -> dict:
+        return {"positive": [], "negative": [], "neutral": [], "uncertain": [], **{k: sorted(v) for k, v in sides.items()}}
+
+    a1, b1, b3 = rc("rel-a", world.evc["a"], []), rc("rel-b", "event-a", []), rc("rel-b", world.evc["b"], [])
+    if getattr(world, "impact", None) != "rich":
+        rows = [row(supply, "rel-a", a1, "not-proposed"), row(supply, "rel-b", b1, "not-applicable" if approved else "not-proposed"), row(factory, "rel-b", b3, "not-proposed")]
+    else:
+        a2, b2, b4 = rc("rel-a", world.evc["a"], ["KR"]), rc("rel-b", "event-a", ["KR"]), rc("rel-b", world.evc["b"], ["US"])
+        ea, ea2, inv = evidence_id(world, "a", EVT_A), evidence_id(world, "a2", EVT_A2), evidence_id(world, "a", INV)
+        rows = [row(supply, "rel-a", a1, "verified", label="positive", targetVerdict="supported", effects=effects(positive=[ea], neutral=[inv]),
+                    proposal=said("positive", IMPACT_LIMITS), **own("rel-a", a1, True)),
+                row(supply, "rel-a", a2, "verifier-reject", targetVerdict="contradicted", proposal=said("positive"), **own("rel-a", a2, True)),
+                row(supply, "rel-b", b1, "verified", label="negative", targetVerdict="supported", effects=effects(negative=[ea2]), proposal=said("negative"),
+                    **own("rel-b", b1, True)),
+                row(supply, "rel-b", b2, "verified", label="undetermined", targetVerdict="insufficient", effects=effects(positive=[ea2]), proposal=said("positive"),
+                    **own("rel-b", b2, True)),
+                row(factory, "rel-b", b3, "no-evidence", proposal=said("undetermined"), **own("rel-b", b3, False)),
+                row(factory, "rel-b", b4, "technical-reject", code="impact_precheck_rejected", **own("rel-b", b4, False))]
+    return sorted(rows, key=lambda r: (r["edgeId"], r["sourceRelation"]["jobId"], r["sourceRelation"]["relationCandidateId"]))
 
 
 def relation_id(world, job: str, relation_type: str, subject: str, obj: str) -> str:
-    return find(world.jobs[job], relation_type, subject, obj)["relationCandidateId"]
+    match = {"countries": []} if relation_type == "PARTICIPATES_IN" else {}          # a `rich` world also holds a second participation per event, told apart by its declared countries
+    return find(world.jobs[job], relation_type, subject, obj, **match)["relationCandidateId"]
 
 
 def expected_approvals(world) -> dict:
@@ -466,7 +574,11 @@ def expected_approvals(world) -> dict:
     return {("rel-a", relation_id(world, "rel-a", "PARTICIPATES_IN", "SYNTH-1", world.evc["a"])): automatic,
             ("rel-a", relation_id(world, "rel-a", "SUPPLIES", "SYNTH-3", "SYNTH-1")): manual if approved else automatic,
             ("rel-b", relation_id(world, "rel-b", "PARTICIPATES_IN", "SYNTH-1", "event-a")): manual if approved else automatic,
-            ("rel-b", relation_id(world, "rel-b", "PARTICIPATES_IN", "SYNTH-1", world.evc["b"])): automatic}
+            ("rel-b", relation_id(world, "rel-b", "PARTICIPATES_IN", "SYNTH-1", world.evc["b"])): automatic,
+            **({("rel-a", find(world.jobs["rel-a"], "PARTICIPATES_IN", "SYNTH-1", world.evc["a"], countries=["KR"])["relationCandidateId"]): automatic,
+                ("rel-b", find(world.jobs["rel-b"], "PARTICIPATES_IN", "SYNTH-1", "event-a", countries=["KR"])["relationCandidateId"]): automatic,
+                ("rel-b", find(world.jobs["rel-b"], "PARTICIPATES_IN", "SYNTH-1", world.evc["b"], countries=["US"])["relationCandidateId"]): automatic}
+               if getattr(world, "impact", None) == "rich" else {})}
 
 
 def expected_origins(world) -> dict:
@@ -638,6 +750,8 @@ def check_export(world, out: dict, public_ids: dict | None = None) -> None:
     assert all(r["structuralPath"] is None for r in bundle["relations"] if r["type"] != "STRUCTURALLY_RELATED_TO")
     assert structural["provenance"]["origin"] == "manual-operator-review" and structural["provenance"]["s3SemanticValidation"] == "none"
     assert bundle["exclusions"]["counts"] == want["exclusions"] and bundle["counts"] == want["counts"], (bundle["exclusions"], bundle["counts"])
+    assert bundle["policy"]["impacts"] == "s3-independent-verifier-quote-effect" and bundle["impacts"] == want["impacts"], bundle["impacts"]
+    assert IMPACT_OFF_TARGET not in json.dumps(bundle), "an off-target impacted company id must never be exported"
     assert bundle["provenance"] == {"declaredSourceKind": "synthetic", "observedSourceKind": "synthetic", "executionMode": "replay", "recordingKind": "authored-test"}
     assert bundle["readiness"] == {"app": "import-pending", "evidenceRegistration": "not-registered", "publicActivation": "none", "graphDb": "none"}
     assert [c["id"] for c in bundle["companies"]] == sorted((public_ids or {}).get(c, c) for c in ("KRX:000660", "KRX:005930"))
@@ -817,7 +931,7 @@ def check_chain_export(world, bundle: dict, middle: str) -> None:
     """The chain world's export equals the hand-written expectation: published companies, private path companies, every edge's ordered path with directed links,
     the S3 scopes copied exactly, the unchanged edge id formula and the participants the bundle does not publish."""
     want = expected_chain(middle)
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5"
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-6"
     assert [c["id"] for c in bundle["companies"]] == want["companies"] and bundle["pathCompanies"] == want["pathCompanies"], (middle, bundle["pathCompanies"])
     assert not {c["id"] for c in bundle["pathCompanies"]} & ({c["id"] for c in bundle["companies"]} | {i["id"] for i in bundle["issues"]})
     assert bundle["counts"]["companies"] == len(want["companies"]) and bundle["counts"]["pathCompanies"] == len(want["pathCompanies"]), bundle["counts"]
@@ -920,17 +1034,24 @@ BUNDLE_1 = "zoop-graph-handoff-bundle-1"           # before original mentions: n
 BUNDLE_2 = "zoop-graph-handoff-bundle-2"           # before field provenance: `mentions`, no issue `fieldProvenance`
 BUNDLE_3 = "zoop-graph-handoff-bundle-3"           # before field verdicts: `fieldProvenance` without `withheld`, no issue `fieldVerdicts`
 BUNDLE_4 = "zoop-graph-handoff-bundle-4"           # before structural paths: no `pathCompanies`, `structuralPath` or basis scopes
+BUNDLE_5 = "zoop-graph-handoff-bundle-5"           # before impacts: no `impacts`, `counts.impacts` or `policy.impacts`
 LEGACY_AT = "2026-10-15T00:00:00+00:00"
 LEGACY_CODE = "handoff_contract_changed"
 
 
 def legacy_bundle(bundle: dict, manifest: dict, schema: str) -> dict:
-    """The bundle an earlier build froze for this manifest: today's export under that build's schema string, without what that build did not yet write. `-4` has no top-level
+    """The bundle an earlier build froze for this manifest: today's export under that build's schema string, without what that build did not yet write. `-5` has no top-level
+    `impacts`, `counts.impacts` or `policy.impacts` (and its content digest does not cover them); `-4` has no top-level
     `pathCompanies`, no relation `structuralPath`, no basis `businessScope`/`productScope` and no `counts.pathCompanies`; `-3` also has no issue `fieldVerdicts` and no
     `fieldProvenance.withheld`; `-2` has no `fieldProvenance` either; `-1` has none of them nor the issues' `mentions`. The content digest is recomputed over the earlier
     collections (its formula never included `pathCompanies`)."""
-    assert schema in (BUNDLE_1, BUNDLE_2, BUNDLE_3, BUNDLE_4), schema
+    assert schema in (BUNDLE_1, BUNDLE_2, BUNDLE_3, BUNDLE_4, BUNDLE_5), schema
     old = json.loads(json.dumps(bundle))
+    del old["impacts"], old["counts"]["impacts"], old["policy"]["impacts"]          # `-6` added the receipt-only impact rows, their count and policy literal
+    if schema == BUNDLE_5:
+        old.update(schemaVersion=schema, handoffId=manifest["handoffId"], manifestDigest=digest(manifest))
+        old["digests"]["content"] = digest({key: old[key] for key in ("companies", "pathCompanies", "issues", "relations", "evidence", "articles")})
+        return old
     assert not old["pathCompanies"], "an earlier schema cannot carry a private path company"
     del old["pathCompanies"], old["counts"]["pathCompanies"]
     for relation in old["relations"]:
@@ -1033,8 +1154,9 @@ def legacy_history(world, exported: dict) -> tuple[str, dict]:
                                                          ("legacy-failed", BUNDLE_2, "failed", "garbage"), ("legacy-ready-1", BUNDLE_1, "ready", "written"),
                                                          ("legacy-ready-3", BUNDLE_3, "ready", "written"), ("legacy-reserved-3", BUNDLE_3, "reserved", "missing"),
                                                          ("legacy-ready-4", BUNDLE_4, "ready", "written"), ("legacy-reserved-4", BUNDLE_4, "reserved", "missing"),
-                                                         ("legacy-failed-4", BUNDLE_4, "failed", "garbage"))}
-    assert {row["receipt"]["bundleSchema"] for row in planted.values()} == {BUNDLE_1, BUNDLE_2, BUNDLE_3, BUNDLE_4}
+                                                         ("legacy-failed-4", BUNDLE_4, "failed", "garbage"), ("legacy-ready-5", BUNDLE_5, "ready", "written"),
+                                                         ("legacy-reserved-5", BUNDLE_5, "reserved", "missing"))}
+    assert {row["receipt"]["bundleSchema"] for row in planted.values()} == {BUNDLE_1, BUNDLE_2, BUNDLE_3, BUNDLE_4, BUNDLE_5}
     os.chmod(state, 0o755)
     for path in (state / "bundles", *(state / "bundles").iterdir(), state / "handoff.sqlite3", state / "handoff.lock"):
         os.chmod(path, 0o755 if path.is_dir() else 0o644)
@@ -1165,7 +1287,7 @@ def verdict_export(root: Path, public_ids: dict | None = None) -> tuple[SimpleNa
     out = freeze_export(Operator(world), world, VERDICT_HANDOFF, decisions)
     bundle = out["bundle"]
     ids = {name: evidence_id(world, name, quote) for name, quote in (("a", PERIOD_A), ("a2", PERIOD_A2), ("b", PERIOD_B))}
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5" and bundle["handoffId"] == VERDICT_HANDOFF
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-6" and bundle["handoffId"] == VERDICT_HANDOFF
     assert {i["id"]: i["fieldVerdicts"] for i in bundle["issues"]} == expected_verdicts(world, cases)
     assert {i["id"]: i["fieldProvenance"] for i in bundle["issues"]} == expected_field_provenance(world, VERDICT_WITHHELD)
     assert {i["id"]: i["mentions"] for i in bundle["issues"]} == expected_mentions(world, public_ids), "an original mention value was changed by a verdict"
@@ -1198,13 +1320,185 @@ def approved_export(root: Path, public_ids: dict | None = None) -> tuple[SimpleN
         company["publicId"] = (public_ids or {}).get(company["publicId"], company["publicId"])
     out = freeze_export(Operator(world), world, APPROVED_HANDOFF, decisions)
     bundle = out["bundle"]
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5" and bundle["handoffId"] == APPROVED_HANDOFF
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-6" and bundle["handoffId"] == APPROVED_HANDOFF
     check_export(world, out, public_ids)
     kinds = sorted(u["approvalBasis"]["kind"] for s in bundle["sources"] for u in s["reviewUsed"])
     assert kinds == ["automatic-verifier", "automatic-verifier", "operator-final-approval", "operator-final-approval"], kinds
     dumped = json.dumps(out, ensure_ascii=False)
     assert all(text not in dumped for text in PRIVATE), "source text or an S3 review note leaked"
     return world, out
+
+IMPACT_HANDOFF = "handoff-impacts-1"
+RICH_STATUSES = [("verified", None), ("verifier-reject", None), ("verified", None), ("verified", None), ("no-evidence", None), ("technical-reject", "impact_precheck_rejected")]
+
+
+def impact_export(root: Path, public_ids: dict | None = None) -> tuple[SimpleNamespace, dict]:
+    """The real export (handoff `handoff-impacts-1`) of the `rich` impact world through the installed CLI, checked against the hand-written rows: on the supply edge a verified POSITIVE
+    (own sentence + an impact-only sentence of document a), a verifier-rejected (target contradicted), a verified NEGATIVE of the other S3 job and a verified-but-undetermined (target
+    insufficient) row, all four kept apart; on the factory edge a `no-evidence` row (label null) and a precheck-rejected technical reject. The invented off-target company is never exported.
+    The verifier here is an AUTHORED replay, not an independent inference. A SYNTHETIC world."""
+    world = build_world(root, impact="rich")
+    decisions = decisions_doc(world)
+    for company in decisions["companies"]:
+        company["publicId"] = (public_ids or {}).get(company["publicId"], company["publicId"])
+    out = freeze_export(Operator(world), world, IMPACT_HANDOFF, decisions)
+    bundle = out["bundle"]
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-6" and bundle["handoffId"] == IMPACT_HANDOFF
+    check_export(world, out, public_ids)
+    assert sorted(((r["status"], r["code"]) for r in bundle["impacts"]), key=repr) == sorted(RICH_STATUSES, key=repr), [(r["status"], r["code"]) for r in bundle["impacts"]]
+    assert len({r["edgeId"] for r in bundle["impacts"] if r["issueId"] == "issue:supply-2026q3"}) == 1 and sum(r["issueId"] == "issue:supply-2026q3" for r in bundle["impacts"]) == 4
+    assert all(r["label"] is None for r in bundle["impacts"] if r["status"] != "verified") and bundle["counts"]["impacts"] == 6
+    dumped = json.dumps(out, ensure_ascii=False)
+    assert all(text not in dumped for text in PRIVATE), "source text or an S3 review note leaked"
+    return world, out
+
+
+def impact_mutations() -> dict:
+    """name -> (the one change to the `rich` export bundle, the validator location that must refuse it, whether the content digest is recomputed). Every change breaks ONE rule of the
+    closed impact rows (or their counts/policy/digest); the digest is refreshed so that only that rule can refuse it, except the one case about the digest itself."""
+    import copy
+
+    def pick(b, status, code=None, nth=0):
+        return [r for r in b["impacts"] if r["status"] == status and r["code"] == code][nth]
+
+    def count(b):
+        b["counts"]["impacts"] = len(b["impacts"])
+
+    def missing(b):
+        b["impacts"].pop(0)
+        count(b)
+
+    def extra(b):
+        b["impacts"].append({**copy.deepcopy(b["impacts"][0]), "edgeId": "edge-" + "0" * 64, "impactCandidateId": "ic-" + "9" * 64})
+        count(b)
+
+    def structural(b):
+        pick(b, "no-evidence")["edgeId"] = next(r["id"] for r in b["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO")
+
+    def duplicate(b):
+        b["impacts"].append(copy.deepcopy(b["impacts"][-1]))
+        count(b)
+
+    def forged_not_applicable(b):
+        pick(b, "verifier-reject").update(status="not-applicable", impactCandidateId=None, verifier="not-called", verifierRequestDigest=None, proposal=None, targetVerdict=None)
+
+    def forged_manual(b):
+        row = pick(b, "verified")
+        source = next(s for s in b["sources"] if s["relation"]["jobId"] == row["sourceRelation"]["jobId"])
+        used = next(u for u in source["reviewUsed"] if u["relationCandidateId"] == row["sourceRelation"]["relationCandidateId"])
+        used["approvalBasis"].update(kind="operator-final-approval", reviewer="forged-reviewer")
+        for relation in b["relations"]:
+            if relation["id"] == row["edgeId"]:
+                relation["provenance"]["s3SemanticValidation"] = "manual-operator-final-approval"
+
+    def other_article(b):
+        evidence = {e["id"]: e for e in b["evidence"]}
+        row = next(r for r in b["impacts"] if r["status"] == "verified")
+        edge = next(r for r in b["relations"] if r["id"] == row["edgeId"])
+        own = {evidence[x]["articleId"] for x in edge["evidenceIds"]}
+        foreign = next(i for i, e in evidence.items() if e["articleId"] not in own)
+        row["effects"]["uncertain"] = [foreign]
+        row["label"] = "undetermined"          # the label the rules yield for an uncertain effect, so only the article rule can refuse this row
+
+    def both_sides(b):
+        row = next(r for r in b["impacts"] if r["status"] == "verified" and r["effects"]["positive"])
+        row["effects"]["negative"] = list(row["effects"]["positive"])
+
+    def source_evidence_twice(b):
+        row = pick(b, "verified")
+        evidence = {e["id"]: e for e in b["evidence"]}
+        twin = copy.deepcopy(evidence[next(x for side in ("positive", "negative", "neutral", "uncertain") for x in row["effects"][side])])
+        twin.update(start=twin["start"] + 1, end=twin["end"] + 1)
+        twin["id"] = app_evidence_id(twin["articleId"], twin["articleVersion"], twin["start"], twin["end"])
+        b["evidence"] = sorted([*b["evidence"], twin], key=lambda e: e["id"])
+        b["counts"]["evidence"] += 1
+        row["effects"]["uncertain"] = [twin["id"]]
+        row["label"] = "undetermined"
+
+    def live_invalid(b):
+        b["provenance"].update(executionMode="live", recordingKind="provider")
+        for s in b["sources"]:
+            s["provenance"].update(executionMode="live", recordingKind="provider")
+        pick(b, "verifier-reject").update(status="technical-reject", code="verifier_reply_invalid", targetVerdict=None)
+
+    def unsorted_side(b):
+        row = next(r for r in b["impacts"] if r["status"] == "verified" and r["effects"]["positive"])
+        side = "positive"
+        row["effects"][side] = [*row["effects"][side], *row["effects"][side]]
+
+    def insufficient_positive(b):
+        next(r for r in b["impacts"] if r["targetVerdict"] == "insufficient").update(label="positive")
+
+    def shared_candidate(b):
+        reject = pick(b, "verifier-reject")
+        reject["impactCandidateId"] = next(r for r in b["impacts"] if r["status"] == "verified" and r["sourceRelation"]["jobId"] == reject["sourceRelation"]["jobId"])["impactCandidateId"]
+
+    return {
+        "a missing impact row": (missing, "impacts.coverage", True),
+        "a duplicated impact row": (duplicate, "impacts.impactCandidateId.unique", True),
+        "an extra row on no INVOLVES edge": (extra, "impacts.edgeClosure", True),
+        "a row pointing at the STRUCTURAL edge": (structural, "impacts.edgeClosure", True),
+        "a row whose company is not the edge target": (lambda b: pick(b, "no-evidence").update(companyId="KRX:000660"), "impacts.endpoints", True),
+        "rows out of order": (lambda b: b["impacts"].reverse(), "impacts.coverage", True),
+        "a source relation of no emitted edge": (lambda b: pick(b, "no-evidence")["sourceRelation"].update(relationCandidateId="rc-" + "0" * 64), "impacts.sourceClosure", True),
+        "not-applicable on an automatic relation": (forged_not_applicable, "impacts.approval", True),
+        "a verified row forged on an operator-approved relation": (forged_manual, "impacts.approval", True),
+        "a label that does not follow from the effects (mixed)": (lambda b: pick(b, "verified").update(label="mixed"), "impacts.label", True),
+        "a positive label although the verdict is insufficient": (insufficient_positive, "impacts.label", True),
+        "a verified row without effects": (lambda b: pick(b, "verified").update(effects={"positive": [], "negative": [], "neutral": [], "uncertain": []}), "impacts.effects.union", True),
+        "an effect id outside the bundle evidence": (lambda b: pick(b, "verified")["effects"].update(neutral=["ev-" + "1" * 64]), "impacts.effects.neutral", True),
+        "one id on two sides": (both_sides, "impacts.effects.union", True),
+        "an effect side with a duplicate id": (unsorted_side, "impacts.effects.positive", True),
+        "an effect on another article version than the edge's": (other_article, "impacts.effects.articleClosure", True),
+        "two effects of one row with the same source evidence": (source_evidence_twice, "impacts.effects.sourceEvidenceId", True),
+        "verified with the verdict contradicted": (lambda b: pick(b, "verified").update(targetVerdict="contradicted"), "impacts.targetVerdict", True),
+        "a verifier-reject without the contradicted verdict": (lambda b: pick(b, "verifier-reject").update(targetVerdict="supported"), "impacts.targetVerdict", True),
+        "no-evidence carrying a label": (lambda b: pick(b, "no-evidence").update(label="undetermined"), "impacts.verifiedOnly", True),
+        "no-evidence with the verifier called": (lambda b: pick(b, "no-evidence").update(verifier="called", verifierRequestDigest="a" * 64), "impacts.state", True),
+        "a called verifier without a request digest": (lambda b: pick(b, "verifier-reject").update(verifierRequestDigest=None), "impacts.verifierRequestDigest", True),
+        "verifier_reply_invalid in a live bundle": (live_invalid, "impacts.code.replayOnly", True),
+        "a technical reject with an unknown code": (lambda b: pick(b, "technical-reject", "impact_precheck_rejected").update(code="reply_broken"), "impacts.code", True),
+        "a precheck-rejected row carrying a proposal": (lambda b: pick(b, "technical-reject", "impact_precheck_rejected").update(
+            proposal={"direction": "negative", "reason": "r", "limitations": None, "verification": "none"}), "impacts.state", True),
+        "a withheld row carrying a label": (lambda b: pick(b, "verifier-reject").update(status="withheld", code="impact_quote_ambiguous", targetVerdict=None, label="positive"),
+                                            "impacts.verifiedOnly", True),
+        "a proposal that claims verification": (lambda b: pick(b, "verified")["proposal"].update(verification="verified"), "impacts.proposal.verification", True),
+        "a proposal reason over 2000 code points": (lambda b: pick(b, "verified")["proposal"].update(reason="x" * 2001), "impacts.proposal.reason.length", True),
+        "a malformed impact candidate id": (lambda b: pick(b, "verified").update(impactCandidateId="ic-" + "g" * 64), "impacts.impactCandidateId", True),
+        "one impact candidate on two rows of a job": (shared_candidate, "impacts.impactCandidateId.unique", True),
+        "a row with another key": (lambda b: pick(b, "verified").update(note="x"), "impacts", True),
+        "a row without a key": (lambda b: pick(b, "verified").pop("label"), "impacts", True),
+        "an impact count that is wrong": (lambda b: b["counts"].update(impacts=1), "counts", True),
+        "another impact policy": (lambda b: b["policy"].update(impacts="s3-model-label"), "policy.impacts", True),
+        "edited impact rows under the old content digest": (lambda b: pick(b, "verified")["proposal"].update(reason="edited"), "digests.content", False),
+    }
+
+
+
+def unicode_impact_rows(rows: list) -> list:
+    """The hand-authored expected rows of `unicode_impact_bundle`: the first verified row (bundle order = expected order) carries the 2000/1000 code-point proposal."""
+    copy = json.loads(json.dumps(rows))
+    next(r for r in copy if r["status"] == "verified")["proposal"].update(reason="😀" * 2000, limitations="😀" * 1000)
+    return copy
+
+
+def unicode_impact_envelope(out: dict) -> dict:
+    """The export envelope of `unicode_impact_bundle` with the receipt resealed to the new bundle (content digest, artifact bytes and their digest), never the old receipt."""
+    import hashlib
+    bundle = unicode_impact_bundle(out["bundle"])
+    raw = canonical(bundle).encode("utf-8")
+    receipt = {**out["receipt"], "contentDigest": bundle["digests"]["content"], "bundleDigest": hashlib.sha256(raw).hexdigest(), "bundleBytes": len(raw)}
+    return {**out, "bundle": bundle, "receipt": receipt}
+
+def unicode_impact_bundle(bundle: dict) -> dict:
+    """A VALID copy of the `rich` bundle whose first verified proposal states 2000 reason and 1000 limitation code points of astral characters (4000 and 2000 UTF-16 units): the lengths
+    are Unicode code points, never UTF-16 units. The content digest is recomputed."""
+    copy = json.loads(json.dumps(bundle))
+    row = next(r for r in copy["impacts"] if r["status"] == "verified")
+    row["proposal"].update(reason="😀" * 2000, limitations="😀" * 1000)
+    copy["digests"]["content"] = content_digest(copy)
+    return copy
+
 
 
 def expected_headlines(world, withheld: dict | None = None) -> dict:
@@ -1381,20 +1675,25 @@ def smoke(root: Path, fixture: Path | None) -> dict:
     checks.append(participants_across_upstreams(collision_world))
     verdict_checks, verdict_fixtures = field_verdicts(root.parent)
     checks.extend(verdict_checks)
-    path_check, _, path_exports = structural_paths(root)
+    path_check, path_world, path_exports = structural_paths(root)
     checks.append(path_check)
+    impact_world, impact_out = impact_export(root.parent / "impacts")
+    checks.append("receipt-only impact rows: the default world's every automatic participation is `not-proposed` and the approved world's operator-approved one `not-applicable` (hand-written); the "
+                  "`rich` world keeps four rows on the supply edge apart (verified positive with an impact-only sentence, verifier-rejected, verified negative of the other S3 job, "
+                  "verified-but-undetermined) and `no-evidence`/precheck-rejected rows on the factory edge, labels exist only on verified rows, the invented off-target company is never exported")
     legacy_check, legacy_withheld = legacy_history(world, exported)
     checks.append(legacy_check)
 
     if fixture is not None:
-        write_fixture(fixture, world, exported, withheld, legacy_withheld, collision_world, collision, verdict_fixtures, path_exports)
+        write_fixture(fixture, world, exported, withheld, legacy_withheld, collision_world, collision, verdict_fixtures, path_exports, path_world, impact_world, impact_out,
+                      approved_world, approved)
         checks.append(f"fixtures written to {fixture}")
     return {"status": "passed", "providerCalls": 0, "modelCalls": 0, "checks": checks}
 
 
 def write_fixture(directory: Path, world, valid: dict, withheld: dict, legacy_withheld: dict, collision_world, collision: dict, verdict_fixtures: SimpleNamespace,
-                  path_exports: dict) -> None:
-    """The valid export envelope (bundle `-5`, no operator verdict: `fieldVerdicts` empty), the real export of the legal local-mentionId collision world, the real export of the hand-reviewed
+                  path_exports: dict, path_world, impact_world, impact_out: dict, approved_world, approved: dict) -> None:
+    """The valid export envelope (bundle `-6`, no operator verdict: `fieldVerdicts` empty; default `not-proposed` impact rows), the real export of the legal local-mentionId collision world, the real export of the hand-reviewed
     verdict world (`export-field-verdicts.json`) and of the time-withheld world (`export-field-verdicts-time.json`), the hand-written expected original mentions, field provenance and
     verdicts of them, negative bundles (each MUST be refused by an importer; the verdict and structural-path ones keep a recomputed content digest so only their own rule can refuse them),
     the real exports of the structural-path world (`export-path-known|private|unmapped.json`, `expected-structural-paths.json`, one rule broken per `bundle-path-NN.json`)
@@ -1507,6 +1806,25 @@ def write_fixture(directory: Path, world, valid: dict, withheld: dict, legacy_wi
         write(f"bundle-path-{number:02d}.json", {**path_exports[middle], "bundle": copy})
     write("expected-structural-paths.json", {f"export-path-{middle}.json": expected_chain(middle) for middle in path_exports} |
           {f"bundle-path-{number:02d}.json": {"breaks": name, "validatorLocation": at} for number, (name, (_, _, at)) in enumerate(path_mutations().items(), 1)})
+
+    # Impacts: the real export of the `rich` impact world, the approved world's (a `not-applicable` row), a VALID export whose proposal lengths exceed their UTF-16 bounds,
+    # the hand-written rows of every export above and one rule broken per `bundle-impact-NN.json` (content digest recomputed unless the case is about the digest itself).
+    write("export-impacts.json", impact_out)
+    write("export-approved.json", approved)
+    write("export-impacts-unicode.json", unicode_impact_envelope(impact_out))
+    mutations = impact_mutations()
+    for number, (name, (change, at, refresh)) in enumerate(mutations.items(), 1):
+        copy = json.loads(json.dumps(impact_out["bundle"]))
+        change(copy)
+        if refresh:
+            copy["digests"]["content"] = content_digest(copy)
+        write(f"bundle-impact-{number:02d}.json", {**impact_out, "bundle": copy})
+    write("expected-impacts.json", {"export-valid.json": expected_impacts(world), "export-collision.json": expected_impacts(collision_world),
+                                    "export-field-verdicts.json": expected_impacts(vw), "export-field-verdicts-time.json": expected_impacts(tw),
+                                    "export-approved.json": expected_impacts(approved_world), "export-impacts.json": expected_impacts(impact_world),
+                                    "export-impacts-unicode.json": unicode_impact_rows(expected_impacts(impact_world)),
+                                    **{f"export-path-{middle}.json": expected_impacts(path_world) for middle in path_exports},
+                                    **{f"bundle-impact-{number:02d}.json": {"breaks": name, "validatorLocation": at} for number, (name, (_, at, _)) in enumerate(mutations.items(), 1)}})
 
 
 # ---------------------------------------------------------------- retained operator package ----------------------------------------

@@ -19,7 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TossPricesLiveTest {
     private final TossMarketClient toss = new TossMarketClient(new CompanyMarketSettings("toss",
             System.getenv("ZOOP_TOSS_CLIENT_ID"), System.getenv("ZOOP_TOSS_CLIENT_SECRET"), null, "off",
-            null, null, null, Duration.ofSeconds(10)), JsonMapper.builder().build(), Clock.systemUTC());
+            null, null, null, Duration.ofSeconds(10), null, null, null, 0, 0),
+            JsonMapper.builder().build(), Clock.systemUTC());
 
     @Test
     void aggregatedPeriodsLandOnTheirBucketBoundaries() {
