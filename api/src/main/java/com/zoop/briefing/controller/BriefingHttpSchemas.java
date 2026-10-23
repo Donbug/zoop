@@ -82,7 +82,11 @@ public final class BriefingHttpSchemas {
             @Schema(allowableValues = {"available", "suspended", "unavailable", "not_published"}) String status,
             @Schema(nullable = true) String message, @Schema(nullable = true) String reason,
             @Schema(nullable = true) Instant publishedAt, @Schema(nullable = true) Instant dataAsOf,
-            @Schema(nullable = true) String graphVersion, List<String> keyIssueIds, List<String> companyIds, long correctionCount) { }
+            @Schema(nullable = true) String graphVersion, List<String> keyIssueIds, List<String> companyIds, long correctionCount,
+            @Schema(nullable = true, allowableValues = {"snapshot_not_recorded", "snapshot_unavailable", "briefing_targets_unavailable"})
+            String unavailableReason,
+            @Schema(nullable = true, allowableValues = {"publication_snapshot", "reconstructed"}) String graphOrigin,
+            @Schema(nullable = true) Instant reconstructedAt) { }
 
     @Schema(name = "BriefingItem", requiredProperties = {"title", "eventId", "eventTime", "timePrecision", "companies", "evidenceCount",
             "sourceSupport", "matchedCompanyIds", "rank", "reason", "evidenceIds", "summary", "reportedAt", "documentSentiments"})

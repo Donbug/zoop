@@ -85,7 +85,8 @@ public class EventDetailService {
         snapshot.evidence().forEach(e -> inSnapshot.put(e.evidenceId(), e));
         Map<String, Boolean> judged = new HashMap<>();
         Predicate<String> shown = e -> inSnapshot.containsKey(e) && (bundle == null
-                || judged.computeIfAbsent(e, k -> receipts.shownNow(k, versionId, at, requestId)));
+                || judged.computeIfAbsent(e, k -> (round == null ? receipts.shownNow(k, versionId, at, requestId)
+                        : receipts.shownNow(k, round, versionId, at, requestId))));
 
         Map<String, Obj> mentionsById = handoff == null ? Map.of() : mentionsById(handoff, issue, shown);
         // Closed like an issue this read does not show when the head values rest on text that is not wholly shown.
@@ -104,7 +105,7 @@ public class EventDetailService {
         own.addAll(issue.geographyEvidenceIds());
         List<ArticleOut> articles = articles(snapshot,
                 own.stream().filter(shown).map(inSnapshot::get).toList(), mentionsById);
-        Metadata metadata = new Metadata("public_graph_snapshot", pinned.selected().asOf(), versionId, requestId, true,
+        Metadata metadata = new Metadata(pinned.selected().source(), pinned.selected().asOf(), versionId, requestId, true,
                 List.of(new SectionFailure("summary", "SUMMARY_NOT_PRODUCED", SUMMARY_UNAVAILABLE, false,
                         pinned.selected().asOf())));
         return new EventDetail(issue.label(), id, issue.eventTime(), issue.timePrecision(), issue.period(),

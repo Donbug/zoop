@@ -56,7 +56,7 @@ POST 가입·로그인·소셜 가입 완료·명시적 소셜 연결 시작과 
 
 ### publicationVersions
 
-그래프·사건·관계·근거 조회는 선택 graphVersion 또는 asOf를 받는다. 생략하면 한 요청 시작 시 활성 공개 버전을 고정하고 응답 metadata.graphVersion/asOf에 반환한다. 둘을 함께 지정하면 일치해야 한다. asOf는 그 시점 이전 공개 버전을 선택하며 이후 공개 자료는 사용하지 않는다. round는 발행 회차가 고정한 버전을 뜻한다. 고정 버전 부재는 VERSION_UNAVAILABLE이며 최신 자료로 대체하지 않는다. 브리핑은 그래프 버전·자료·시장 지표·긍부정을 발행 시 고정한다. 정정은 원문 밖에 덧붙인다.
+그래프·사건·관계·근거 조회는 선택 graphVersion 또는 asOf를 받는다. 생략하면 한 요청 시작 시 활성 공개 버전을 고정하고 응답 metadata.graphVersion/asOf에 반환한다. 둘을 함께 지정하면 일치해야 한다. asOf는 그 시점 이전 공개 버전을 선택하며 이후 공개 자료는 사용하지 않는다. round는 발행 회차가 고정한 버전과 회차 마감 시각을 함께 뜻한다. round와 graphVersion/asOf를 함께 지정하면 저장된 회차 기준과 정확히 같아야 한다. 회차의 저장 버전은 데이터 마감 이후 발행될 수 있으므로 activeVersionAt(asOf)로 다시 선택하지 않는다. 고정 버전 부재는 VERSION_UNAVAILABLE이며 최신 자료로 대체하지 않는다. 과거 로컬 회차의 별도 재구성본은 graphOrigin=reconstructed로 구분하고 원본 발행 버전·문안을 변경하지 않으며, 재구성 ID는 round 문맥 없이 직접 조회할 수 없다. 브리핑은 그래프 버전·자료·시장 지표·긍부정을 발행 시 고정한다. 정정은 원문 밖에 덧붙인다.
 
 ### partialFailures
 
@@ -1043,7 +1043,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 | kind | query | 선택 | string {news, disclosure} |  |
-| round | query | 선택 | string | 브리핑 회차 ID. 회차의 문서와 기업별 긍부정 발행본을 함께 고정하려는 계약이다. 현재 회차별 그래프 버전 조회가 미구현이므로 전달하면 409 VERSION_UNAVAILABLE을 반환하며 최신 자료로 대체하지 않는다. |
+| round | query | 선택 | string | 브리핑 회차 ID. 회차가 고정한 버전·마감 시각과 선정 이슈 범위의 문서만 반환한다. cursor도 회차·버전·시각에 결속하며 다른 회차로 재사용하면 INVALID_CURSOR다. 현재 접근 권한·정확 인용을 재확인하고 최신 문서나 새 분석으로 대체하지 않는다. 재구성 자료는 metadata.source=briefing_reconstructed_graph로 구분한다. |
 | from | query | 선택 | string (date) / string (date-time) | 차트·타임라인과 같은 조회 시작 조건. 날짜 또는 오프셋을 포함한 시각이다. |
 | to | query | 선택 | string (date) / string (date-time) | 같은 조회 종료 조건이며 이 시각 이후 공개된 기사와 아직 공개되지 않은 사건·기업 관계는 제외한다. 날짜는 KST 그날 전체, 오프셋이 있는 시각은 그 시각을 포함한다. 발행 시각 미상 문서는 제외한다. |
 
@@ -1115,7 +1115,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getEvidence · 원문 인용과 기업별 긍부정 조회
 
-원문 인용과 기업별 긍부정 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+원문 인용 조회. round를 지정하면 해당 회차의 버전·마감 시각과 선정 이슈 범위를 공통 reader에서 고정한다. 원래 그래프의 인용은 선택 버전의 import receipt·정확 span·현재 source grant를 검사한다. 로컬 재구성 그래프의 인용은 보존된 회차 상세·원문 버전·정확 span·현재 발행 권한을 검사하고 metadata.source=briefing_reconstructed_graph로 구분한다. 현재 기업별 감성 판정은 생성하지 않으며 companyId 지정 시 해당 섹션은 unavailable로 안내한다. 최신 그래프나 최신 문서로 대체하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1230,7 +1230,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getBriefingGraphBasis · 발행 당시 그래프 기준 조회
 
-발행 당시 그래프 기준 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+발행본의 graphVersion과 회차 마감 시각을 고정해 핵심 이슈·관련 기업을 조회한다. 저장본과 대상 관계가 실제로 읽히는 경우에만 available이다. 과거 회차의 별도 재구성본은 graphOrigin=reconstructed와 reconstructedAt으로 구분하고 당시 발행본의 graphVersion을 변경하지 않는다. 원본·재구성본 모두 없으면 unavailableReason=snapshot_not_recorded로 구분한다. 최신 그래프로 대체하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -3107,11 +3107,14 @@ answer from that state, never from the newest graph. Any status but ``available`
 | date | 필수 | string (date) |  |
 | edition | 필수 | string {morning, evening} |  |
 | status | 필수 | string {available, suspended, unavailable, not_published} |  |
-| message | 필수 | string / null | User-facing notice for every status but available |
+| message | 필수 | string / null | User-facing status notice, including reconstruction limitations when graphOrigin is reconstructed |
 | reason | 필수 | string / null | Admin-written reason, only for suspended rounds |
 | publishedAt | 필수 | string (date-time) / null |  |
 | dataAsOf | 필수 | string (date-time) / null | End of the round's data window (KST): the reference time of the relations and evidence shown |
-| graphVersion | 필수 | string / null | Graph version the round was published from |
+| graphVersion | 필수 | string / null | Selected graph version: original publication snapshot or a later reconstruction distinguished by graphOrigin. The original published payload is unchanged. |
+| graphOrigin | 선택 | string {publication_snapshot, reconstructed} / null | Original publication snapshot or a separately registered later reconstruction. Reconstruction never overwrites the publication graphVersion. |
+| reconstructedAt | 선택 | string (date-time) / null | When the reconstruction artifact was first registered; not the briefing cutoff or publication time. |
+| unavailableReason | 선택 | string {snapshot_not_recorded, snapshot_unavailable, briefing_targets_unavailable} / null | Unavailable graph detail: no original snapshot was recorded, the recorded snapshot cannot be read, or the briefing targets are no longer visible. Never substitute the newest graph. |
 | keyIssueIds | 필수 | string[] | The round's key issues in rank order; empty unless available |
 | companyIds | 필수 | string[] | Companies related to those issues; empty unless available |
 | correctionCount | 필수 | integer | Corrections registered beside the published original |

@@ -42,7 +42,7 @@ public class CompanyDocumentsService {
             Object documentSummary, Object analysisStatus, Object analysisProvenance, String resultVersion) { }
     public record Response(List<Document> items, Metadata metadata, String nextCursor) { }
     record Cursor(String companyId, String kind, String from, String to, int limit, String graphVersion,
-            String asOf, String pinnedAt, String lastArticleId, String lastPublishedAt) { }
+            String asOf, String pinnedAt, String lastArticleId, String lastPublishedAt, String round) { }
     private record DocumentKey(String articleId, String articleVersion) { }
     private record Candidate(PublicGraphSnapshot.Article snapshot, ArticleRow article, VersionRow version,
             List<EventRef> events, Set<String> evidenceIds, Instant published) { }
@@ -83,17 +83,16 @@ public class CompanyDocumentsService {
         Instant end = to == null ? null : EventListService.bound(to, true);
         if (start != null && end != null && !start.isBefore(end)) throw invalid();
         Instant requestedAsOf = asOf == null ? null : parseAsOf(asOf);
-        // A published briefing-to-graph binding does not exist yet. Never substitute the latest publication.
-        if (round != null) throw new CustomException(ErrorCode.VERSION_UNAVAILABLE);
         Cursor after = cursor == null ? null : decode(cursor);
         if (after != null && (!companyId.equals(after.companyId()) || !Objects.equals(kind, after.kind())
                 || !Objects.equals(from, after.from()) || !Objects.equals(to, after.to())
+                || !Objects.equals(round, after.round())
                 || !Objects.equals(asOf, after.asOf()) || (limit != null && limit != after.limit())
                 || (graphVersion != null && !graphVersion.equals(after.graphVersion())))) {
             throw new CustomException(ErrorCode.INVALID_CURSOR);
         }
         requireCatalog(companyId);
-        PublicGraphReader.Pinned pinned = reader.read(null,
+        PublicGraphReader.Pinned pinned = reader.read(round,
                 after == null ? graphVersion : after.graphVersion(), requestedAsOf);
         DisplayGraph graph = pinned.graph();
         Map<DocumentKey, PublicGraphSnapshot.Article> snapshotArticles = new HashMap<>();
@@ -174,11 +173,12 @@ public class CompanyDocumentsService {
             boolean sourceAuthorized = false;
             for (String evidenceId : candidate.evidenceIds()) {
                 try {
-                    EvidenceResponse visible = evidence.read(evidenceId, null, pinned.selected().version().id(), asOf,
+                    EvidenceResponse visible = evidence.read(evidenceId, round, pinned.selected().version().id(),
+                            round == null ? asOf : pinned.selected().asOf().toString(),
                             companyId, requestId);
-                    boolean sameSnapshot = asOf == null || visible.metadata() != null
+                    boolean sameSnapshot = (asOf == null && round == null) || visible.metadata() != null
                             && pinned.selected().version().id().equals(visible.metadata().graphVersion())
-                            && requestedAsOf.equals(visible.metadata().asOf());
+                            && pinned.selected().asOf().equals(visible.metadata().asOf());
                     boolean sameDocument = sameSnapshot && candidate.snapshot().articleId().equals(visible.articleId())
                             && candidate.snapshot().version().equals(visible.articleVersion());
                     if (sameDocument) {
@@ -198,7 +198,7 @@ public class CompanyDocumentsService {
             Instant publishedAt = "datetime".equals(candidate.version().publicationPrecision())
                     ? candidate.version().publishedAt() : null;
             var analysis = analyses.read(candidate.article(), candidate.version(), companyId, requestId,
-                    requestedAsOf != null || graphVersion != null);
+                    requestedAsOf != null || graphVersion != null || round != null);
             page.add(new Document(candidate.snapshot().articleId(), candidate.snapshot().title(),
                     candidate.version().publisher(), candidate.snapshot().url(), publishedAt, candidate.article().kind(),
                     candidate.events(), List.copyOf(quotes), analysis.sentiment(), candidate.snapshot().version(),
@@ -208,8 +208,8 @@ public class CompanyDocumentsService {
         Candidate last = pageEnd == candidates.size() ? null : candidates.get(pageEnd - 1);
         String next = last == null ? null : encode(new Cursor(companyId, kind, from, to, pageLimit,
                 pinned.selected().version().id(), asOf, pinnedAt, last.snapshot().articleId(),
-                last.published() == null ? null : last.published().toString()));
-        return new Response(List.copyOf(page), new Metadata("public_graph_snapshot", Instant.parse(pinnedAt),
+                last.published() == null ? null : last.published().toString(), round));
+        return new Response(List.copyOf(page), new Metadata(pinned.selected().source(), Instant.parse(pinnedAt),
                 pinned.selected().version().id(), requestId, false, List.of()), next);
     }
 

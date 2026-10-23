@@ -417,8 +417,11 @@ def evidence_read_phase(smoke, db, layout, world, vid2: str, never_activated: tu
         check(code == 404 and error_code(body) == "EVIDENCE_UNAVAILABLE", f"an asOf before the activation must not show the evidence: {code} {body}")
         code, body = get(web, main_id, asOf="2026-10-09T00:00:00Z", graphVersion=vid2)
         check(code == 422 and error_code(body) == "INVALID_REQUEST", f"inconsistent graphVersion and asOf: {code} {body}")
+        # Rounds are supported now. This fixture has no such publication: it is 404, not the old blanket 409.
+        # The same citation was readable above, so ignoring round and falling back to the active version would fail this check.
+        check(db.scalar("SELECT count(*) FROM briefing_rounds WHERE id = 'brf-1'") == 0, "the unknown-round control is not absent")
         code, body = get(web, main_id, round="brf-1")
-        check(code == 409 and error_code(body) == "VERSION_UNAVAILABLE", f"round: {code} {body}")
+        check(code == 404 and error_code(body) == "RESOURCE_NOT_FOUND", f"unknown round must not fall back: {code} {body}")
         for other in never_activated:
             code, body = get(web, main_id, graphVersion=other)
             check(code == 409 and error_code(body) == "VERSION_UNAVAILABLE", f"a never-activated version was readable: {other} {code}")

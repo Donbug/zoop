@@ -12,6 +12,9 @@ import com.zoop.briefing.storage.BriefingChange;
 import com.zoop.briefing.storage.BriefingRound;
 import com.zoop.briefing.storage.BriefingRoundRepository;
 import com.zoop.briefing.replay.BriefingReplayReadPolicy;
+import com.zoop.graph.read.PublicGraphReader;
+import com.zoop.graph.snapshot.GraphSnapshotUnavailableException;
+import com.zoop.graph.version.BriefingGraphUnavailableException;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import org.springframework.dao.DataAccessException;
@@ -33,19 +36,26 @@ public class BriefingQueryService {
     private final Clock clock;
     private final BriefingContentAccess access;
     private final BriefingReplayReadPolicy replay;
+    private final PublicGraphReader graphSnapshots;
     private final JsonMapper mapper = JsonMapper.builder().build();
 
     public BriefingQueryService(BriefingRoundRepository repository, Clock clock, BriefingContentAccess access) {
         this(repository, clock, access, BriefingReplayReadPolicy.disabled());
     }
 
-    @Autowired
     public BriefingQueryService(BriefingRoundRepository repository, Clock clock, BriefingContentAccess access,
             BriefingReplayReadPolicy replay) {
+        this(repository, clock, access, replay, null);
+    }
+
+    @Autowired
+    public BriefingQueryService(BriefingRoundRepository repository, Clock clock, BriefingContentAccess access,
+            BriefingReplayReadPolicy replay, PublicGraphReader graphSnapshots) {
         this.repository = repository;
         this.clock = clock;
         this.access = access;
         this.replay = replay;
+        this.graphSnapshots = graphSnapshots;
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, timeout = 5)
@@ -111,6 +121,7 @@ public class BriefingQueryService {
             out.put("graphVersion", row.publishedAt() == null ? null : row.graphVersion());
             out.putArray("keyIssueIds");
             out.putArray("companyIds");
+            out.putNull("unavailableReason").putNull("graphOrigin").putNull("reconstructedAt");
             out.put("correctionCount", changes.stream().filter(change -> "correction".equals(change.kind())).count());
             if (row.publishedAt() == null) {
                 out.put("status", "not_published").put("message", "아직 발행되지 않은 회차입니다.").putNull("reason");
@@ -120,11 +131,29 @@ public class BriefingQueryService {
                         .put("reason", suspension == null ? null : suspension.reason());
             } else {
                 requireReadable(row, requestId);
-                validateSnapshot(row);
-                // The company reader cannot prove whole-graph readiness. Until that owner is connected,
-                // expose the exact stored basis but never advertise a graph or fall back to the newest one.
-                out.put("status", "unavailable").put("message", "발행 당시 고정 그래프 조회가 아직 연결되지 않았습니다.")
-                        .putNull("reason");
+                if (graphSnapshots == null) {
+                    graphUnavailable(out, row.graphVersion() == null ? "snapshot_not_recorded" : "snapshot_unavailable");
+                } else {
+                    try {
+                        var pinned = graphSnapshots.read(row.id(), row.graphVersion(), row.windowTo(), requestId);
+                        var basis = pinned.selected().briefing();
+                        if (basis == null || !row.id().equals(basis.roundId())) unavailable();
+                        basis.keyIssueIds().forEach(out.withArray("keyIssueIds")::add);
+                        basis.companyIds().forEach(out.withArray("companyIds")::add);
+                        out.put("graphVersion", basis.graphVersion());
+                        out.put("status", "available").putNull("reason");
+                        if (basis.reconstruction() != null) {
+                            out.put("graphOrigin", "reconstructed").put("reconstructedAt", basis.reconstruction().createdAt().toString());
+                            out.put("message", "발행 당시 저장본이 아니라, 회차 마감 이전에 발행된 저장 자료로 나중에 재구성한 그래프입니다. 당시 수집·본문 버전의 동일성을 보장하지 않습니다.");
+                        } else {
+                            out.put("graphOrigin", "publication_snapshot").putNull("message");
+                        }
+                    } catch (BriefingGraphUnavailableException error) {
+                        graphUnavailable(out, error.reason());
+                    } catch (GraphSnapshotUnavailableException error) {
+                        graphUnavailable(out, "snapshot_unavailable");
+                    }
+                }
             }
             return out;
         } catch (DataAccessException | IllegalArgumentException | DateTimeException error) {
@@ -253,6 +282,15 @@ public class BriefingQueryService {
     private void requireReadable(BriefingRound row, String requestId) {
         if (BriefingReplayReadPolicy.marked(row) && !replay.permits(row)) unavailable();
         if (!"published".equals(row.status()) || !access.mayRead(row, requestId)) unavailable();
+    }
+
+    private static void graphUnavailable(ObjectNode out, String reason) {
+        String message = switch (reason) {
+            case "snapshot_not_recorded" -> "이 과거 회차에는 발행 당시 그래프 저장본이 없습니다. 현재 그래프는 별도로 볼 수 있습니다.";
+            case "briefing_targets_unavailable" -> "이 회차의 핵심 이슈·관련 기업을 저장된 그래프에서 확인할 수 없습니다.";
+            default -> "발행 당시 그래프 저장본을 불러올 수 없습니다. 현재 그래프로 대체하지 않습니다.";
+        };
+        out.put("status", "unavailable").put("unavailableReason", reason).put("message", message).putNull("reason");
     }
 
     private void validateSnapshot(BriefingRound row) {

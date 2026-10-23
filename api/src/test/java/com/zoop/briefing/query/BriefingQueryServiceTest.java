@@ -288,6 +288,29 @@ class BriefingQueryServiceTest {
         verifyNoInteractions(access); verify(repository, never()).find(any(), any()); verify(repository, never()).changes(anyString());
     }
 
+    @Test void roundGraphLookupUsesCanonicalPublishedIssueCompanyPairsAndCurrentRights() {
+        var row = published();
+        when(repository.findById(row.id())).thenReturn(Optional.of(row));
+        var lookup = new PublishedBriefingGraphLookup(repository, access,
+                com.zoop.briefing.replay.BriefingReplayReadPolicy.disabled());
+        var basis = lookup.resolve(row.id(), "request");
+        assertEquals("g-original", basis.graphVersion());
+        assertEquals(MORNING, basis.dataAsOf());
+        assertEquals(List.of("event-original"), basis.keyIssueIds());
+        assertEquals(List.of("company-original"), basis.companyIds());
+        assertEquals(List.of("company-original"), basis.issueCompanies().get("event-original"));
+        when(access.mayRead(row, "request")).thenReturn(false);
+        assertUnavailable(() -> lookup.resolve(row.id(), "request"));
+    }
+
+    @Test void malformedPublishedPayloadCannotBeUsedToBypassTheBriefingReadGateViaGraph() {
+        var row = round("morning", "published", p -> ((ObjectNode) p.path("items").get(0)).put("rank", 4));
+        when(repository.findById(row.id())).thenReturn(Optional.of(row));
+        var lookup = new PublishedBriefingGraphLookup(repository, access,
+                com.zoop.briefing.replay.BriefingReplayReadPolicy.disabled());
+        assertUnavailable(() -> lookup.resolve(row.id(), "request"));
+    }
+
     @Test void databaseOutageIs503RatherThanAnEmptySuccessfulRound() {
         when(repository.find(DATE, "morning")).thenThrow(new DataAccessResourceFailureException("private-db-details"));
         assertUnavailable(() -> service.get(DATE, "morning", "request"));
