@@ -16,6 +16,7 @@ CREATE TABLE publication_rules (
     revision bigint NOT NULL DEFAULT 0,
     updated_at timestamptz NOT NULL,
     -- The id carries the definition's version (`<ruleId>@<version>`): a changed definition is a new rule row.
+    -- The same rule as PublicationRuleEvaluator.RULE_ID (com.zoop.graph.rules); a change to one must change the other.
     CONSTRAINT ck_publication_rules_id CHECK (id ~ '^[A-Za-z][A-Za-z0-9_-]{0,63}@[1-9][0-9]{0,8}$'),
     CONSTRAINT ck_publication_rules_title CHECK (length(btrim(title)) BETWEEN 1 AND 200),
     CONSTRAINT ck_publication_rules_summary CHECK (length(btrim(summary)) BETWEEN 1 AND 1000),

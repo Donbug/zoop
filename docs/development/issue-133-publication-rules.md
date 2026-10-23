@@ -36,6 +36,7 @@
   {"kind": "single_source", "minSources": 2, "relationTypes": ["INVOLVES", "STRUCTURALLY_RELATED_TO"]}
   ```
 - **조건:** `relationTypes`에 속한 관계의 출처 기사 수가 `minSources`보다 적으면 숨깁니다.
+- **파라미터 범위:** `minSources`는 2~100입니다(1이면 아무것도 숨기지 않음). `relationTypes`는 `INVOLVES`·`STRUCTURALLY_RELATED_TO` 중 하나 이상이며 중복은 허용하지 않습니다. 범위를 벗어난 정의는 2-3의 fail closed 대상입니다.
 - **출처 기사 수를 세는 방법**
   - 관계 `evidenceIds`가 가리키는 근거의 기사를 셉니다. `STRUCTURALLY_RELATED_TO`는 여기에 구조 `basis[].sourceArticles`도 더합니다.
   - 그 합집합에서 **서로 다른 기사(`articleId`) 수**를 셉니다. 같은 기사의 여러 버전은 1건입니다.
@@ -75,7 +76,7 @@
 
 ### 2-4. 판정 함수 하나
 
-- `RuleEvaluator.apply(snapshot, enabledRules) → snapshot`의 부분집합. 입력은 공개 적격 snapshot이고 출력은 그 부분집합이라, 함수 모양으로 "숨기기만" 하도록 강제합니다.
+- `PublicationRuleEvaluator.apply(snapshot, enabledRules)` → snapshot의 부분집합(`com.zoop.graph.rules`). 입력은 공개 적격 snapshot이고 출력은 그 부분집합이라, 함수 모양으로 "숨기기만" 하도록 강제합니다.
 - 수입 거르기, 재적용, `published*` 집계, `eligible` 집계가 모두 이 함수를 씁니다.
 
 ### 2-5. 숨긴 뒤 연결 정리 (고정 순서)
@@ -83,11 +84,13 @@
 1. 이슈 규칙(규칙 2)으로 이슈를 숨깁니다.
 2. 숨긴 이슈의 관계를 모두 숨깁니다.
 3. 관계 규칙(규칙 1)으로 남은 관계를 숨깁니다.
-4. 회사와 이어진 관계(`INVOLVES`·`STRUCTURALLY_RELATED_TO`)가 하나도 남지 않은 이슈를 숨깁니다.
+4. 원래 회사와 이어진 관계(`INVOLVES`·`STRUCTURALLY_RELATED_TO`)가 있었는데 1~3번으로 모두 숨겨진 이슈를 숨깁니다. 처음부터 회사 관계가 없던 이슈는 이 단계에서 숨기지 않습니다(규칙이 하나도 없으면 결과가 입력과 같아야 하기 때문).
 5. 숨긴 이슈가 끝에 있는 `FOLLOWS`를 숨깁니다.
 6. 보이는 이슈·관계가 하나도 인용하지 않는 근거와 기사 버전을 뺍니다. 회사 노드는 카탈로그라 그대로 둡니다.
 
 4~5번을 한 번 거치면 더 숨길 것이 생기지 않습니다. `FOLLOWS`는 회사 연결 판정에 쓰지 않기 때문입니다.
+
+관계를 숨기는 것은 그 관계 주장(이슈-회사 연결)을 숨기는 것이지 기사 원문을 숨기는 것이 아닙니다. 보이는 이슈가 스스로 인용하는 근거(`evidenceIds`, `geographyEvidenceIds`)는 숨긴 관계가 같은 근거를 인용했더라도 이슈와 함께 남습니다.
 
 ### 2-6. 숫자
 
