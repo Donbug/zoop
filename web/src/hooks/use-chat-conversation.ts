@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '@/apis/auth/ApiService';
+import { exactTime } from '@/components/company/detail-model';
 import {
   cancelQuestionJob,
   createConversation,
@@ -70,11 +71,14 @@ export function contextFromTarget(target: GraphTarget): ChatContextRequest {
   return context;
 }
 
+/** 지도가 실제로 적용한 기준 시각만: 지도와 같이 기업 지도(companyId)의 정확한 시각(시간대 포함)일 때다. */
 function requestedAsOf(url: string | undefined) {
   if (!url) return null;
-  const query = url.includes('?') ? url.slice(url.indexOf('?') + 1) : '';
-  const value = new URLSearchParams(query).get('asOf');
-  return value && !Number.isNaN(Date.parse(value)) ? value : null;
+  const query = new URLSearchParams(
+    url.includes('?') ? url.slice(url.indexOf('?') + 1) : '',
+  );
+  const value = query.get('asOf');
+  return query.get('companyId') && exactTime(value) ? value : null;
 }
 
 export function questionLength(text: string) {
@@ -90,13 +94,18 @@ function asError(error: unknown) {
   return error instanceof Error ? error : new Error(String(error));
 }
 
-/** 응답을 받지 못했거나 서버가 일시적으로 처리하지 못했다: 같은 요청을 다시 보내도 안전하다. */
+/**
+ * 접수됐는지 알 수 없다: 응답을 받지 못했거나(네트워크·408), 일시적으로 처리하지 못했거나(429·5xx), 성공 상태의 본문을
+ * 읽지 못했다(INVALID_RESPONSE). 같은 ID·키로 다시 보내야 하며, 그 밖의 4xx만 확정 거절이다.
+ */
 function unanswered(error: unknown) {
   return (
     !(error instanceof ApiError) ||
     error.status === 0 ||
+    error.status === 408 ||
     error.status === 429 ||
-    error.status >= 500
+    error.status >= 500 ||
+    error.code === 'INVALID_RESPONSE'
   );
 }
 
@@ -143,6 +152,8 @@ export function useChatConversation(memberId: string) {
   const [pending, setPending] = useState<PendingQuestion | null>(null);
   const [pollError, setPollError] = useState<Error | null>(null);
   const [pollRound, setPollRound] = useState(0);
+  const [switching, setSwitching] = useState(false);
+  const [acting, setActing] = useState(0);
   const generation = useRef(0);
   const epoch = useRef(0);
   const session = useRef<string | null>(null);
@@ -307,7 +318,7 @@ export function useChatConversation(memberId: string) {
     [accept, adopt, current, mark, restore],
   );
 
-  const blocked = sending || active !== null || pending !== null;
+  const blocked = sending || switching || active !== null || pending !== null;
 
   const ask = useCallback(
     (question: string, context: ChatContextRequest | null) => {
@@ -361,11 +372,13 @@ export function useChatConversation(memberId: string) {
 
   const act = useCallback(
     async (job: ChatJob, kind: 'retry' | 'cancel') => {
+      if (switching) return;
       const stamp = mark();
       const slot = `${kind}:${job.id}`;
       const key = actionKeys.current.get(slot) ?? newChatId();
       actionKeys.current.set(slot, key);
       setNotice(null);
+      setActing((count) => count + 1);
       try {
         const next =
           kind === 'retry'
@@ -385,31 +398,44 @@ export function useChatConversation(memberId: string) {
             kind === 'retry' ? '다시 처리하지 못했어요.' : '취소하지 못했어요.',
           ),
         );
+      } finally {
+        if (stamp.generation === generation.current)
+          setActing((count) => count - 1);
       }
     },
-    [accept, current, mark],
+    [accept, current, mark, switching],
   );
 
-  /** 새 대화. 성공하면 이전 대화의 늦은 응답을 모두 버리고, 실패하면 기존 대화를 그대로 둔다. */
+  /**
+   * 새 대화. 보내는 중·재시도/취소 중이거나 접수를 확인하지 못한 질문이 있으면 시작하지 않는다(그 질문을 다시 보내거나
+   * 버린 뒤 시작한다). 만드는 동안에는 전송·재시도·취소를 막는다. 성공하면 이전 대화의 늦은 응답을 모두 버리고, 실패하면
+   * 기존 대화를 그대로 둔다.
+   */
+  const canSwitch = !sending && !switching && acting === 0 && pending === null;
   const startNew = useCallback(async () => {
+    if (!canSwitch) return false;
     const stamp = mark();
     const id = newChatId();
     setNotice(null);
+    setSwitching(true);
     try {
       await createConversation(id);
-      if (!current(stamp)) return;
+      if (!current(stamp)) return false;
       epoch.current += 1;
       adopt(id);
       setJobs([]);
-      setPending(null);
-      setSending(false);
       setPollError(null);
       setLoad({ kind: 'ready' });
+      return true;
     } catch (error) {
-      if (!current(stamp)) return;
+      if (!current(stamp)) return false;
       setNotice(noticeFor(error, '새 대화를 만들지 못했어요.'));
+      return false;
+    } finally {
+      // 성공하면 epoch가 바뀌므로 같은 회원인지만 본다.
+      if (stamp.generation === generation.current) setSwitching(false);
     }
-  }, [adopt, current, mark]);
+  }, [adopt, canSwitch, current, mark]);
 
   /** "다시 확인": 저장 상태만 다시 읽는다. 모델을 다시 부르지 않는다. */
   const recheck = useCallback(() => {
@@ -425,8 +451,12 @@ export function useChatConversation(memberId: string) {
     jobs,
     active,
     sending,
+    switching,
+    acting: acting > 0,
+    canSwitch,
     notice,
-    pending,
+    // 보내는 동안은 아직 결과를 모르는 것이지 접수를 확인하지 못한 것이 아니다: 실패한 뒤에만 미확정으로 보여 준다.
+    pending: sending ? null : pending,
     pollError,
     ask,
     reply,

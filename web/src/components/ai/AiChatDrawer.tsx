@@ -170,6 +170,7 @@ function ChatPanel({
   const locked =
     chat.load.kind !== 'ready' ||
     chat.sending ||
+    chat.switching ||
     chat.active !== null ||
     chat.pending !== null;
   const sendable = isSendable(draft) && !locked;
@@ -186,12 +187,21 @@ function ChatPanel({
     }
   }
 
-  /** 미확정 질문을 다시 보내 접수되면 일반 전송과 같이 입력과 답할 확인 질문을 비운다. */
+  /**
+   * 미확정 질문을 다시 보내 접수되면 그 질문의 입력과 답할 확인 질문을 비운다. 기다리는 동안 새로 입력한 글이나 다른 확인
+   * 질문은 그대로 둔다.
+   */
   async function resend() {
-    if (await chat.resend()) {
-      setDraft('');
-      setReplyTo(null);
-    }
+    const sent = chat.pending?.request;
+    if (!sent || !(await chat.resend())) return;
+    if (useAiChatStore.getState().draft === sent.question) setDraft('');
+    setReplyTo((current) =>
+      current && current.id === sent.resolves?.jobId ? null : current,
+    );
+  }
+
+  async function startNew() {
+    if (await chat.startNew()) setReplyTo(null);
   }
 
   const byId = new Map(chat.jobs.map((job) => [job.id, job]));
@@ -211,11 +221,8 @@ function ChatPanel({
         <button
           type="button"
           className={ui.button}
-          disabled={chat.sending}
-          onClick={() => {
-            setReplyTo(null);
-            void chat.startNew();
-          }}
+          disabled={!chat.canSwitch}
+          onClick={() => void startNew()}
         >
           새 대화
         </button>
@@ -264,7 +271,7 @@ function ChatPanel({
           <LoadError
             error={chat.load.error}
             onRecheck={() => void chat.recheck()}
-            onNew={() => void chat.startNew()}
+            onNew={() => void startNew()}
           />
         )}
         {chat.load.kind === 'ready' && chat.jobs.length === 0 && (
@@ -280,7 +287,7 @@ function ChatPanel({
             answers={
               job.resolves ? (byId.get(job.resolves.jobId) ?? null) : null
             }
-            busy={locked}
+            busy={locked || chat.acting}
             onChoose={(clarification, choice) =>
               void chat.reply(clarification, choice)
             }
