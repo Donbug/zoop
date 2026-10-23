@@ -61,10 +61,16 @@ import tools.jackson.databind.node.ObjectNode;
  * nothing until they do.
  */
 public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
-    /** The provisional stage limits of ZOOP-AIG-001 6.3.3 (design summary 5.1), to be re-set from measured p95. */
+    /**
+     * The provisional stage limits of ZOOP-AIG-001 6.3.3 (design summary 5.1), to be re-set from measured p95. The policy's
+     * router 4 s, answer 25 s and verification 6 s are the provider call timeouts the AI runtime applies; a model stage here
+     * also covers the AI service's process start, ledger writes and transport, so each gets the service's own margin of 3 s
+     * (its deadline per stage). A tighter limit cut off calls the provider had already answered and spent their cost. The
+     * worst case (7 + 10 + 28 + 9 + 3 = 57 s) stays within the 60 s job deadline.
+     */
     record StageLimits(Duration router, Duration tools, Duration generate, Duration verify, Duration server) {
-        static final StageLimits POLICY = new StageLimits(Duration.ofSeconds(4), Duration.ofSeconds(10),
-                Duration.ofSeconds(25), Duration.ofSeconds(6), Duration.ofSeconds(3));
+        static final StageLimits POLICY = new StageLimits(Duration.ofSeconds(7), Duration.ofSeconds(10),
+                Duration.ofSeconds(28), Duration.ofSeconds(9), Duration.ofSeconds(3));
     }
     private static final Set<String> SUPPORT = Set.of("supported", "contradicted", "hold");
     private static final Set<String> ADVICE = Set.of("no", "yes", "hold");

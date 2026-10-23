@@ -346,10 +346,15 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     }
 
     private void finish(String execution, String status, ChatStageReply.Receipt receipt, String code) {
+        // A stage the engine cut off arrives here interrupted, and an interrupted thread cannot use its database connection.
+        // The outcome is still recorded: the interrupt is cleared for this one write and restored after it.
+        boolean interrupted = Thread.interrupted();
         try {
             recorder.finish(execution, status, receipt, code);
         } catch (RuntimeException unrecorded) {
             // The stage outcome stands; the running row stays as evidence that the call was made.
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
         }
     }
 
