@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import io
 import json
+import sqlite3
 from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
 
-from zoop_ai import chat_cli, chat_jev, chat_luna
-from zoop_ai.chat_contracts import ChatGrantRegistry, RouterInput, StageRequest, VerificationInput
-from zoop_ai.chat_runtime import LiveSender, ReplaySender, invoke, request_identity, stage_config
+from zoop_ai import chat_cli, chat_jev, chat_luna, chat_runtime
+from zoop_ai.chat_contracts import ChatGrantRegistry, Receipt, RouterInput, StageRequest, VerificationInput
+from zoop_ai.chat_runtime import ChatLedger, LiveSender, ReplaySender, invoke, request_identity, stage_config
+from zoop_ai.provider import ProviderError
 
 EV1 = "ev-" + "1" * 64
 EV2 = "ev-" + "2" * 64
@@ -242,17 +244,118 @@ def test_a_timeout_after_sending_is_unknown_and_never_sent_again(tmp_path):
     assert len(endpoint.calls) == 1
 
 
-def test_a_request_sent_by_a_process_that_died_is_unknown(tmp_path):
-    from zoop_ai.chat_runtime import ChatLedger
+def receipt_for(stage: str) -> Receipt:
+    config = stage_config(stage, "live", LIVE)
+    return Receipt(provider=config.provider, provider_revision=config.provider_revision, model=config.model,
+                   prompt_version=config.prompt_version, execution_mode="live",
+                   usage={"inputTokens": None, "outputTokens": None, "cachedTokens": None, "reasoningTokens": None},
+                   sent_at="2026-10-23T00:00:00+00:00", received_at=None)
+
+
+def test_a_request_claimed_by_a_process_that_died_is_unknown_with_its_receipt(tmp_path):
     req = request("chat-router", router_input())
     ledger = ChatLedger(tmp_path)
-    assert ledger.begin(req, request_identity(req, stage_config("chat-router", "live", LIVE)), 5) is None
-    ledger.mark_sent(req.invocation_id)
+    assert ledger.claim(req, request_identity(req, stage_config("chat-router", "live", LIVE)), 5,
+                        receipt_for("chat-router")) is None
     ledger.close()
     endpoint = Endpoint(jev_all())
     result = run(req, tmp_path, endpoint)
-    assert result.failure.code == "provider_response_unknown" and result.failure.unknown
+    assert result.failure.code == "provider_response_unknown" and result.failure.unknown and result.failure.sent
+    assert result.receipt is not None and result.receipt.model == chat_jev.MODEL
     assert endpoint.calls == []
+
+
+def test_only_one_claimer_sends_and_an_open_claim_counts_against_the_ceiling(tmp_path):
+    req = request("chat-router", router_input())
+    identity = request_identity(req, stage_config("chat-router", "live", LIVE))
+    first, second = ChatLedger(tmp_path), ChatLedger(tmp_path)
+    assert first.claim(req, identity, 5, receipt_for("chat-router")) is None
+    raced = second.claim(req, identity, 5, receipt_for("chat-router"))
+    assert raced is not None and raced.failure.unknown and raced.failure.sent, "the loser never sends"
+    other = request("chat-router", router_input(), invocation="job-2:a1:stage")
+    with pytest.raises(ProviderError, match="chat_budget_exhausted"):
+        second.claim(other, identity, 1, receipt_for("chat-router"))
+    first.close()
+    second.close()
+
+
+def test_a_known_invocation_answers_from_its_record_whatever_the_gate_or_keys_are_now(tmp_path):
+    def timeout(path, body):
+        raise httpx.ReadTimeout("slow")
+    endpoint = Endpoint(timeout)
+    first = run(request("chat-router", router_input()), tmp_path, endpoint)
+    assert first.failure.unknown
+    for env in ({**LIVE, "ZOOP_AI_CHAT_LIVE_ENABLED": "0"}, {**LIVE, "TYPESAFE_API_KEY": ""},
+                {**LIVE, "ZOOP_AI_CHAT_JEV_MODEL": ""}):
+        again = run(request("chat-router", router_input()), tmp_path, endpoint, env=env)
+        assert again == first and again.failure.sent and again.failure.unknown and again.receipt is not None
+    assert len(endpoint.calls) == 1
+
+
+def test_a_stored_answer_whose_grant_was_withdrawn_is_withheld_as_sent(tmp_path):
+    good = {"sections": [{"basis": "evidence_grounded", "text": "HBM 공급", "requirementIds": ["r2"], "evidenceIds": [EV1]}],
+            "insufficientRequirementIds": [], "graphTargetIds": []}
+    endpoint = Endpoint(luna(good))
+    recipient = f"openai-compatible:{stage_config('chat-answer', 'live', LIVE).provider_revision}"
+    assert run(request("chat-answer", answer_input()), tmp_path, endpoint, registry=grants(recipient)).status == "succeeded"
+    withheld = run(request("chat-answer", answer_input()), tmp_path, endpoint, registry=grants(recipient, enabled=False))
+    assert withheld.failure.code == "source_grant_withdrawn" and withheld.failure.sent and not withheld.failure.unknown
+    assert withheld.answer is None and withheld.receipt is not None
+    assert len(endpoint.calls) == 1
+
+
+def stored_row(tmp: Path, invocation: str) -> tuple:
+    db = sqlite3.connect(tmp / "chat.sqlite3")
+    try:
+        return db.execute("SELECT status, raw FROM chat_invocations WHERE invocation_id=?", (invocation,)).fetchone()
+    finally:
+        db.close()
+
+
+def test_the_raw_answer_is_stored_before_it_is_interpreted(tmp_path, monkeypatch):
+    def odd_usage(path, body):
+        return httpx.Response(200, json={"model": chat_jev.MODEL, "answers": {},
+                                         "usage": {"input_tokens": 1, "output_tokens": [3]}})
+    bad = run(request("chat-router", router_input()), tmp_path, Endpoint(odd_usage))
+    assert bad.failure.code == "provider_usage_invalid" and bad.failure.sent and bad.receipt.received_at is not None
+    assert json.loads(stored_row(tmp_path, "job-1:a1:stage")[1])["usage"]["output_tokens"] == [3]
+
+    def details_list(path, body):
+        return httpx.Response(200, json={"model": "gpt-6-luna", "choices": [], "usage": {"prompt_tokens_details": []}})
+    recipient = f"openai-compatible:{stage_config('chat-answer', 'live', LIVE).provider_revision}"
+    odd = run(request("chat-answer", answer_input(), invocation="job-1:a1:odd"), tmp_path, Endpoint(details_list),
+              registry=grants(recipient))
+    assert odd.failure.code == "provider_usage_invalid" and odd.failure.sent
+
+    # The process stops after the raw answer is stored and before the outcome: the record keeps the raw answer and the
+    # invocation is unknown from then on, never sent again.
+    def stop(*args):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(chat_runtime, "interpret", stop)
+    endpoint = Endpoint(jev_all())
+    with pytest.raises(KeyboardInterrupt):
+        run(request("chat-router", router_input(), invocation="job-3:a1:r"), tmp_path, endpoint)
+    status, raw = stored_row(tmp_path, "job-3:a1:r")
+    assert status == "sent" and json.loads(raw)["model"] == chat_jev.MODEL
+    monkeypatch.undo()
+    after = run(request("chat-router", router_input(), invocation="job-3:a1:r"), tmp_path, endpoint)
+    assert after.failure.unknown and after.failure.sent and len(endpoint.calls) == 1
+
+
+def test_the_answer_model_is_pinned_and_the_model_that_answered_is_checked_and_recorded(tmp_path):
+    for env, code in (({**LIVE, "ZOOP_AI_CHAT_ANSWER_MODEL": "gpt-5"}, "answer_model_unsupported"),
+                      ({**LIVE, "ZOOP_AI_CHAT_ANSWER_REASONING_EFFORT": "low"}, "reasoning_effort_unsupported")):
+        refused = run(request("chat-answer", answer_input()), tmp_path, Endpoint(luna({})), env=env)
+        assert refused.failure.code == code and not refused.failure.sent
+    good = {"sections": [], "insufficientRequirementIds": ["r2"], "graphTargetIds": []}
+    recipient = f"openai-compatible:{stage_config('chat-answer', 'live', LIVE).provider_revision}"
+    for i, (model, code) in enumerate((("gpt-6-mini", "provider_model_mismatch"), ("", "provider_model_missing"))):
+        wrong = run(request("chat-answer", answer_input(), invocation=f"job-1:a1:m{i}"), tmp_path,
+                    Endpoint(luna(good, model)), registry=grants(recipient))
+        assert wrong.failure.code == code and wrong.failure.sent and wrong.receipt is not None
+    snapshot = run(request("chat-answer", answer_input(), invocation="job-1:a1:snap"), tmp_path,
+                   Endpoint(luna(good, "gpt-6-luna-2026-09-30")), registry=grants(recipient))
+    assert snapshot.status == "succeeded" and snapshot.receipt.model == "gpt-6-luna-2026-09-30"
 
 
 def test_the_live_ceiling_is_shared_by_all_chat_stages(tmp_path):
