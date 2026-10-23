@@ -242,11 +242,7 @@ final class HandoffSnapshotWriter {
      * the resolved article version makes the id unique within a snapshot.
      */
     static String mentionId(Article article, String sourceMentionId) {
-        ObjectNode preimage = StrictJson.newObject();
-        preimage.put("articleId", article.articleId());
-        preimage.put("articleVersion", article.articleVersion());
-        preimage.put("sourceMentionId", sourceMentionId);
-        return "mention-" + Canonical.digest(preimage);
+        return MentionIds.of(article.articleId(), article.articleVersion(), sourceMentionId);
     }
 
     /**

@@ -10,7 +10,12 @@ export const TH =
 export const TD = 'border-b-[0.667px] border-zoop-line px-2 py-2.5 text-xs';
 export const LINK = `text-xs font-semibold text-zoop-ink underline underline-offset-4 ${FOCUS_RING}`;
 
-export const count = (value: number) => value.toLocaleString('ko-KR');
+// 연결되지 않았거나 모르는 값(null)은 0이 아니라 '–'로 보여 준다(관리자 통계 계약의 availability).
+export const count = (value: number | null) =>
+  value === null ? '–' : value.toLocaleString('ko-KR');
+/** 단위를 붙인 건수. 모르는 값이면 단위 없이 '–' */
+export const countWith = (value: number | null, unit: string) =>
+  value === null ? '–' : `${value.toLocaleString('ko-KR')}${unit}`;
 
 const percent = new Intl.NumberFormat('ko-KR', {
   style: 'percent',

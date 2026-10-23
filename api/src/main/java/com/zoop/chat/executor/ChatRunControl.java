@@ -1,6 +1,8 @@
 package com.zoop.chat.executor;
 
+import com.zoop.chat.repository.ChatToolCallEnd;
 import java.time.Duration;
+import java.util.List;
 
 /**
  * What an engine may do to the job it runs. Every write is fenced by the run's owner token and unexpired lease: after a
@@ -21,4 +23,20 @@ public interface ChatRunControl {
 
     /** Whether this run still owns the job; false after a cancel, an expired lease or a newer run. */
     boolean owned();
+
+    /**
+     * Records a confirmed plan's calls as {@code reserved} {@code chat_tool_calls} rows of this attempt, continuing its call
+     * index, and returns their tool-call ids in order. An attempt holds at most {@link #MAX_TOOL_CALLS} calls across plan
+     * revisions; a plan that would exceed it is refused with {@link IllegalArgumentException} and nothing is reserved.
+     */
+    List<String> reserveToolCalls(int planRevision, List<ChatToolCallReservation> calls);
+
+    /** reserved → running, just before the call is made. */
+    void toolCallStarted(String toolCallId);
+
+    /** running → succeeded|failed. */
+    void toolCallFinished(String toolCallId, ChatToolCallEnd end);
+
+    /** Tool calls one attempt may make, supplementary rounds included (ZOOP-AIG-001 6.3.3). */
+    int MAX_TOOL_CALLS = 12;
 }

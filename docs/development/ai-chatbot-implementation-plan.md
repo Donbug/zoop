@@ -85,6 +85,8 @@ flowchart LR
 
 완료 조건: 예산 초과 계획은 도구 호출 0회와 clarification, 체크포인트 초과 시 다음 단계 호출 0회·생성 호출 0회와 실제 결과 기반 choices, 취소·lease 만료 뒤 신규 호출 0회, 병렬 호출도 최대 4개.
 
+첫 오케스트레이터(`com.zoop.chat.orchestrator`)는 모델 단계를 typed port(라우터·생성·의미 검증)로만 두고 서버 결정을 구현한다. 확률은 `p >= 0.70`을 채택하고, 0.35 이상 검토 구간은 커버리지 검증 stage가 붙기 전까지 명시적 요구에 한해 최고 후보 하나만 쓴다. 투자 판단은 Noul `p > 0.10`(불확실 포함)이면 `investment_advice` limitation이다. 체크포인트는 앞 단계가 찾은 기업 수로 평가하고, 초과 선택지는 `exactly(n)` 조합이 6개 이하일 때만 만든다(이슈 결과는 기업 ID만 가지므로 현재 선택지 표시명은 ID다). 인용은 생성 결과가 아니라 근거 조회 결과로 서버가 만들고, 의미 검증 hold는 해당 요구와 그 요구를 잇는 구간을 함께 제외한다. 추론만 된 요구는 처리할 수 없으면 limitation 없이 뺀다. 일반 지식 구간은 Q02만 가진 요구에만 쓰고, Q02와 사실 유형이 섞인 요구는 조회가 없으면 `out_of_scope`이며 일반 구간에 금액·비율·가격·연도·날짜·‘최근’ 같은 현재 사실 표지가 있으면 1층 검사 실패다. 선택 문맥을 쓰는 요구는 회원이 좁힌 근거(`evidencePool`)만 읽고 인용하며 의존 단계도 그 범위를 이어받는다. 질문이 대상을 직접 지정하면 그 범위를 쓰지 않고 `applied.questionOverrodeContext`를 표시한다. 답변 전체 인용은 서로 다른 근거 20개 이하다(`citation_budget`). 모델 단계는 시작 전 기한 검사에 더해 단계 상한 안에서만 기다리고, 넘기면 중단하고 `response_unknown`이다. 실행 기한 뒤에 돌아온 결과는 실행기가 completed로 저장하지 않는다. 세 모델 adapter가 모두 생기기 전에는 엔진을 bean으로 등록하지 않는다.
+
 ### 단계 3 — Jev router와 Luna coverage-verifier
 
 1. 기존 S1 `semantic-verification`과 분리된 Jev router schema·prompt·kind를 추가한다.
@@ -110,6 +112,8 @@ flowchart LR
 | 8 | Q08 선정 근거 | `selectionRule.read` + evidence | 실제 적용 rule revision·입력 요인 조회 구현 필요 |
 
 모든 어댑터는 공통 요청·결과 봉투를 사용하고 `dataVersion`, `evidenceIds`, `truncated`, `nextAllowed`, 실제 오류를 반환한다. 회원 ID는 모델이나 사용자 입력에서 받지 않고 Java 인증 문맥에서 주입한다.
+
+첫 도구 계층은 레지스트리 `chat-tools/v1`에 `company.read`·`issue.read`·`evidence.resolve`를 앱 공개 그래프 읽기 경로(`PublicGraphReader`) 위의 내부 어댑터로 등록한다. 그래프 버전·asOf는 계획이 아니라 작업의 고정 문맥에서 주입하고, 근거 ID는 공개 근거 조회가 지금 읽을 수 있는 것만 상한(20개) 안에서 전달한다. 상한 때문에 읽지 않은 근거가 있으면 `truncated=true`이며, 근거 상태를 확인할 수 없으면 빈 결과가 아니라 호출 실패(`tool_unavailable`)다. 단계 실행기는 등록되지 않은 기능이 하나라도 있으면 아무것도 예약하지 않고, 시도당 12회·동시 4개·개별 3초·단계 10초(실행 기한 이내)를 강제한다.
 
 ### 단계 5 — Luna 답변 생성과 출력 검증
 

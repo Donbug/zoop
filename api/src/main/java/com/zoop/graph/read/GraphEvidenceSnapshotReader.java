@@ -35,9 +35,11 @@ public class GraphEvidenceSnapshotReader implements GraphEvidenceReader {
     @Override
     public GraphEvidence read(String graphVersion, Instant asOf, String evidenceId) {
         PublicGraphReader.Pinned pinned = reader.read(null, graphVersion, asOf);
-        PublicGraphSnapshot snapshot = pinned.graph().snapshot;
-        String version = pinned.selected().version().id();
-        Instant at = pinned.selected().asOf();
+        return locate(pinned.graph().snapshot, pinned.selected().version().id(), pinned.selected().asOf(), evidenceId);
+    }
+
+    /** The same facts from an already filtered snapshot; activation uses it for a version the selector cannot pin yet. */
+    public static GraphEvidence locate(PublicGraphSnapshot snapshot, String version, Instant at, String evidenceId) {
         Evidence span = snapshot.evidence().stream().filter(e -> e.evidenceId().equals(evidenceId)).findFirst().orElse(null);
         if (span == null) {
             return new GraphEvidence(version, at, null, List.of(), List.of(), List.of());

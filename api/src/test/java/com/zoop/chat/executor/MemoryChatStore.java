@@ -12,7 +12,9 @@ import com.zoop.chat.repository.ChatExecutionRepository;
 import com.zoop.chat.repository.ChatJobRow;
 import com.zoop.chat.repository.ChatRepository;
 import com.zoop.chat.repository.ChatSessionRow;
+import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.repository.NewChatJob;
+import com.zoop.chat.repository.NewChatToolCall;
 
 /**
  * In-memory job store with the executor's fences: a run's writes apply only while the job is running under its owner token
@@ -20,6 +22,18 @@ import com.zoop.chat.repository.NewChatJob;
  */
 final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
     final Map<String, Job> jobs = new LinkedHashMap<>();
+    final List<ToolCall> toolCalls = new ArrayList<>();
+
+    /** A {@code chat_tool_calls} row: the reservation, its status and how it ended. */
+    static final class ToolCall {
+        final NewChatToolCall row;
+        String status = "reserved";
+        ChatToolCallEnd end;
+
+        ToolCall(NewChatToolCall row) {
+            this.row = row;
+        }
+    }
 
     /** A mutable job row: the stored row plus the run columns the executor writes. */
     static final class Job {
@@ -52,6 +66,11 @@ final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
         job.row = with(job.row, "cancelled", null, job.row.runs(), job.row.attempts(), at, at);
         job.ownerToken = null;
         job.leaseUntil = null;
+        closeToolCalls(id);
+    }
+
+    synchronized List<ToolCall> toolCalls(String jobId) {
+        return toolCalls.stream().filter(c -> c.row.jobId().equals(jobId)).toList();
     }
 
     @Override
@@ -108,6 +127,7 @@ final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
         job.messageId = messageId;
         job.routeSummary = routeSummary;
         release(job);
+        closeToolCalls(jobId);
         return true;
     }
 
@@ -143,10 +163,58 @@ final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
         return "running".equals(job.row.status()) && ownerToken.equals(job.ownerToken) && job.leaseUntil.isAfter(at);
     }
 
-    private static void finishFailed(Job job, String failure, String attempts, Instant at) {
+    private void finishFailed(Job job, String failure, String attempts, Instant at) {
         job.row = withOutcome(with(job.row, "failed", null, job.row.runs(), attempts, at, at), null, null, failure);
         job.failure = failure;
         release(job);
+        closeToolCalls(job.row.id());
+    }
+
+    /** Memory waits for nothing. */
+    @Override
+    public void limitWait(java.time.Duration wait) {
+    }
+
+    @Override
+    public synchronized int countToolCalls(String jobId, int attemptNo) {
+        return (int) toolCalls.stream().filter(c -> c.row.jobId().equals(jobId) && c.row.attemptNo() == attemptNo).count();
+    }
+
+    @Override
+    public synchronized void reserveToolCalls(List<NewChatToolCall> calls, Instant at) {
+        calls.forEach(call -> toolCalls.add(new ToolCall(call)));
+    }
+
+    @Override
+    public synchronized boolean startToolCall(String jobId, String ownerToken, int attemptNo, String toolCallId,
+            Instant at) {
+        var call = toolCall(jobId, attemptNo, toolCallId);
+        if (!owned(jobs.get(jobId), ownerToken, at) || !"reserved".equals(call.status)) return false;
+        call.status = "running";
+        return true;
+    }
+
+    @Override
+    public synchronized boolean finishToolCall(String jobId, String ownerToken, int attemptNo, String toolCallId,
+            ChatToolCallEnd end, Instant at) {
+        var call = toolCall(jobId, attemptNo, toolCallId);
+        if (!owned(jobs.get(jobId), ownerToken, at) || !"running".equals(call.status)) return false;
+        call.status = end.status();
+        call.end = end;
+        return true;
+    }
+
+    private ToolCall toolCall(String jobId, int attemptNo, String toolCallId) {
+        return toolCalls.stream().filter(c -> c.row.jobId().equals(jobId) && c.row.attemptNo() == attemptNo
+                && c.row.toolCallId().equals(toolCallId)).findFirst().orElseThrow();
+    }
+
+    /** What the job's end does to its open tool calls. */
+    private synchronized void closeToolCalls(String jobId) {
+        toolCalls.stream().filter(c -> c.row.jobId().equals(jobId)).forEach(c -> {
+            if ("reserved".equals(c.status)) c.status = "cancelled";
+            else if ("running".equals(c.status)) c.status = "unknown";
+        });
     }
 
     private static void release(Job job) {
