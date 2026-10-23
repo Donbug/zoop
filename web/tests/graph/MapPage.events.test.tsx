@@ -5,13 +5,38 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import MapPage from '@/pages/map/MapPage';
 import { getEvent } from '@/apis/graph/events';
 import { getGraph } from '@/apis/graph/graph';
+import { BriefingGraphUnavailableError } from '@/apis/graph/briefing-context';
 import { createMockEvent } from '@/mocks/events/fixture';
 import { createMockGraph } from '@/mocks/graph/response';
 import { createMockRelation } from '@/mocks/relations/fixture';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import { useAiChatStore } from '@/stores/useAiChatStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import type { BriefingGraphBasis } from '@/types/briefing';
 import type { GraphResponse } from '@/types/map/graph';
+
+function unavailableRoundGraph(
+  reason: NonNullable<
+    BriefingGraphBasis['unavailableReason']
+  > = 'snapshot_not_recorded',
+) {
+  const basis: BriefingGraphBasis = {
+    roundId: 'brf-2026-10-15-evening',
+    date: '2026-10-15',
+    edition: 'evening',
+    status: 'unavailable',
+    message: '발행 당시 고정 그래프 조회가 아직 연결되지 않았습니다.',
+    reason: null,
+    publishedAt: '2026-10-15T18:10:00+09:00',
+    unavailableReason: reason,
+    dataAsOf: null,
+    graphVersion: null,
+    keyIssueIds: [],
+    companyIds: [],
+    correctionCount: 0,
+  };
+  return new BriefingGraphUnavailableError(basis);
+}
 
 vi.mock('@/apis/graph/events', async (original) => ({
   ...(await original<typeof import('@/apis/graph/events')>()),
@@ -301,5 +326,54 @@ describe('D-GRP-01 · flow order toggle', () => {
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
+  });
+});
+
+describe('D-BRF-04 · round map that is not provided', () => {
+  it('shows a not-provided notice instead of a failure and retry', async () => {
+    vi.mocked(getGraph).mockRejectedValue(unavailableRoundGraph());
+    setup('/?round=brf-2026-10-15-evening');
+    expect(
+      await screen.findByText('이 회차의 그래프 저장본이 없습니다.'),
+    ).toBeTruthy();
+    expect(screen.queryByText('관계 지도를 불러오지 못했습니다.')).toBeNull();
+    expect(screen.queryByText(/조회 실패/)).toBeNull();
+    expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
+  });
+
+  it('keeps the not-provided notice without retry in the company path panel of a round link', async () => {
+    vi.mocked(getGraph).mockRejectedValue(unavailableRoundGraph());
+    setup('/?round=brf-2026-10-15-evening&path=KRX:005930,KRX:000660');
+    expect(
+      (
+        await screen.findAllByText(
+          '이 회차의 관계 지도는 아직 제공하지 않아요.',
+        )
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText('그래프 조회 실패')).toBeNull();
+    expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
+  });
+
+  it('keeps the failure and retry for a round map that failed to load', async () => {
+    vi.mocked(getGraph).mockRejectedValue(new Error('네트워크 오류'));
+    setup('/?round=brf-2026-10-15-evening');
+    expect(
+      await screen.findByText('관계 지도를 불러오지 못했습니다.'),
+    ).toBeTruthy();
+    expect(screen.getByText(/조회 실패: 네트워크 오류/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeTruthy();
+  });
+
+  it('keeps retry for a recorded round snapshot that is temporarily unreadable', async () => {
+    vi.mocked(getGraph).mockRejectedValue(
+      unavailableRoundGraph('snapshot_unavailable'),
+    );
+    setup('/?round=brf-2026-10-15-evening');
+
+    expect(
+      await screen.findByText('관계 지도를 불러오지 못했습니다.'),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeTruthy();
   });
 });
