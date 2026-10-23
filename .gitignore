@@ -46,3 +46,6 @@ docs/screen-plan/captures/rendered/
 # Stray screenshots left at the root on 2026-09-29 (same PNG twice)
 /a
 /i
+
+# Locally restored briefing corpus (may be several GB with duplicate historical paths)
+/.local/briefing-data/

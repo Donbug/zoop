@@ -1,14 +1,14 @@
 # 팀원: 키 없이 현재 브리핑 3회차 보기
 
-현재 #303의 저장 결과를 자신의 PC에서 **실제 Spring API → 별도 PostgreSQL → React 화면**으로 재생합니다. AI·검색·시세 공급자를 호출하지 않으며 OpenAI/DART/토스 키·AWS·Neo4j·private PoC 설치가 필요하지 않습니다. 운영 scheduler 실행과 구분합니다.
+데이터 공유 브랜치에 포함한 저장 결과를 자신의 PC에서 **실제 Spring API → 별도 PostgreSQL → React 화면**으로 재생합니다. AI·검색·시세 공급자를 호출하지 않으며 OpenAI/DART/토스 키·AWS·Neo4j·private PoC 설치가 필요하지 않습니다. 운영 scheduler 실행과 구분합니다.
 
 ## 1. 브랜치와 준비물
 
 저장소 루트에서 시작합니다. 자신의 미커밋 변경이 있으면 보존하고 별도 worktree에서 실행하세요.
 
 ```sh
-git fetch origin feat/190-briefing-semantic-continuity:refs/remotes/origin/feat/190-briefing-semantic-continuity
-git switch --track origin/feat/190-briefing-semantic-continuity
+git fetch origin feat/142-briefing-data-archive:refs/remotes/origin/feat/142-briefing-data-archive
+git switch --track origin/feat/142-briefing-data-archive
 # 이미 브랜치가 있다면 git switch 후 git pull --ff-only
 ```
 
@@ -58,3 +58,7 @@ python3 scripts/briefing_team_demo.py --api-port 18080 --web-port 13080
 자료는 [`api/demo/briefing-2026-10-21_22`](../demo/briefing-2026-10-21_22/README.md)에 있습니다. 개인 경로·계정·세션·키·원문 전체·모델 호출 원장·원 시세 응답은 포함하지 않습니다. SHA-256은 데이터 변조·실행 결과 일치를 확인하는 것이며 운영 공개 권리나 실제 예측 성과의 증명은 아닙니다. 상세는 데이터 README를 확인하세요.
 
 기존에 생성된 전체 artifact로 재검증·가격 보완·실패 단계 재개가 필요한 담당자는 [연속 회차 실행](BRIEFING_ROUND_SERIES.md)을 사용합니다. 이번 팀원용 보기에는 원본 archive가 필요하지 않습니다.
+
+## 수집 원본과 전체 가공 이력
+
+화면용 3회차 외의 누적 수집 원본·모델 평가/생성·시장 자료·브리핑 전용 DB 결과는 [누적 데이터 사용 방법](BRIEFING_DATA_ARCHIVE.md)에 있습니다. Git에서 함께 내려받고 Python만으로 무결성 검사·선택/전체 복원·JSONL 읽기가 가능합니다.
