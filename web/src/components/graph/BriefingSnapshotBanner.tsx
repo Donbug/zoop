@@ -37,7 +37,7 @@ export default function BriefingSnapshotBanner({
   const edition = basis.data?.edition ?? parsed?.edition;
   const title =
     date && edition
-      ? `${date} ${editionLabel[edition]} 브리핑 기준 그래프`
+      ? `${date} ${editionLabel[edition]} 브리핑 기준 그래프${basis.data?.graphOrigin === 'reconstructed' ? ' · 재구성' : ''}`
       : '브리핑 회차 기준 그래프';
   const briefingHref =
     date && edition ? `/briefing?date=${date}&edition=${edition}` : '/briefing';
@@ -55,7 +55,7 @@ export default function BriefingSnapshotBanner({
       .filter(Boolean)
       .join(' · ');
   else
-    detail = `발행 당시의 관계·근거 · 데이터 기준 ${briefingTime(data?.dataAsOf ?? null)}${
+    detail = `${data?.graphOrigin === 'reconstructed' ? '저장된 발행 자료로 재구성' : '발행 당시의 관계·근거'} · 핵심 이슈 ${data?.keyIssueIds.length ?? 0}개 · 브리핑에 기록된 기업 ${data?.companyIds.length ?? 0}개 · 데이터 기준 ${briefingTime(data?.dataAsOf ?? null)} · 버전 ${data?.graphVersion ?? '미확인'}${
       data?.correctionCount
         ? ` · 정정 ${data.correctionCount}건은 브리핑에서 확인`
         : ''
@@ -70,14 +70,23 @@ export default function BriefingSnapshotBanner({
         <p className="text-[13px] font-bold">{title}</p>
         <p
           role={
-            basis.status === 'error' || (data && data.status !== 'available')
+            basis.status === 'error' ||
+            (data &&
+              data.status !== 'available' &&
+              data.unavailableReason !== 'snapshot_not_recorded')
               ? 'alert'
               : 'status'
           }
-          className="mt-0.5 text-[11px] text-zoop-muted"
+          className="mt-0.5 text-[11px] break-words text-zoop-muted"
         >
           {detail}
         </p>
+        {data?.graphOrigin === 'reconstructed' && (
+          <p className="mt-1 text-[11px] text-zoop-muted">
+            {data.message} 재구성 시각{' '}
+            {briefingTime(data.reconstructedAt ?? null)}
+          </p>
+        )}
       </div>
       <div className="flex flex-wrap gap-2">
         {basis.status === 'error' && (

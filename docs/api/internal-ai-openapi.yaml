@@ -222,6 +222,21 @@
     `service_configuration_invalid`; too many concurrent reads (at most 2 children) is 503 `service_busy`; a missed 45 s deadline or an unreadable answer is 503
     `runtime_unavailable`. All carry `Retry-After`; there is exactly one child per request and no automatic retry. A child answer that is not the contract this service
     knows is 500 `runtime_contract_mismatch` or `runtime_binding_mismatch` (not retryable). A 503 or 500 is never an empty bundle.
+
+    **Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-1`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
+    stage synchronously through the installed `zoop-ai-chat invoke`: `chat-router` (native Jev, typed probabilities per requirement), `chat-answer` (Luna, a strict
+    JSON answer by sections) or `chat-verification` (native Jev, per-section support and prohibited-advice verdicts). It is off unless its all-or-nothing server
+    configuration group is set (otherwise 409 `execution_unavailable` after authentication). The application decides everything a stage only proposes.
+
+    **Once per invocation.** `invocationId` (equal to `Idempotency-Key`) names one stage of one attempt. The runtime sends it at most once: the same id and input
+    return the stored outcome, another input under the same id is the stage failure `invocation_conflict`, and a request whose outcome is unknown stays `unknown`.
+    The id is bound to the calling principal. A **200** carries the stage outcome: `status=succeeded` with the typed `answer`, or `status=failed` with a stable
+    `failure.code`, whether a request was `sent` and whether its fate is `unknown`. A **502/504 `stage_outcome_unknown`** means the runtime may have sent the
+    request: never resend that invocation. A **503** means nothing was sent.
+
+    **Live and rights.** Nothing reaches a provider unless the chat gate is open (`ZOOP_AI_CHAT_LIVE_ENABLED=1` and a positive `ZOOP_AI_CHAT_MAX_CALLS`, shared by
+    the three stages and separate from the S1 and pipeline gates), and quoted spans are sent only under the operator chat grant registry (`model-send`, the stage
+    as purpose and the exact recipient). Stage time limits: router 4 s, answer 25 s, verification 6 s.
 "paths":
   "/internal/v1/analysis-jobs":
     "post":
@@ -7089,8 +7104,257 @@
       "security":
         - "bearerAuth":
             - "handoff.read"
+  "/internal/v1/chat-stages/{stage}":
+    "post":
+      "tags":
+        - "chat-stages"
+      "summary": "Run one chatbot model stage synchronously: router, answer or verification"
+      "operationId": "invokeChatStage"
+      "parameters":
+        - "name": "stage"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "description": "chat-router, chat-answer or chat-verification."
+            "enum":
+              - "chat-router"
+              - "chat-answer"
+              - "chat-verification"
+            "title": "Stage"
+          "description": "chat-router, chat-answer or chat-verification."
+        - "name": "Idempotency-Key"
+          "in": "header"
+          "required": true
+          "schema":
+            "type": "string"
+            "pattern": "^[A-Za-z0-9_.:-]{8,96}$"
+          "description": "Must equal body.invocationId."
+        - "name": "X-Request-ID"
+          "in": "header"
+          "required": false
+          "schema":
+            "type": "string"
+            "pattern": "^[A-Za-z0-9._-]{1,128}$"
+          "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+      "responses":
+        "200":
+          "description": "The stage ran (or its stored outcome was returned). `status=failed` is a stage outcome, not a transport error."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ChatStageResult"
+              "examples":
+                "succeeded":
+                  "summary": "Router probabilities"
+                  "value":
+                    "schemaVersion": "zoop-ai-chat-1"
+                    "invocationId": "job-00000001:1:chat-router"
+                    "stage": "chat-router"
+                    "status": "succeeded"
+                    "answer":
+                      "requirements":
+                        - "requirementId": "r1"
+                          "types":
+                            "Q01": 0.02
+                            "Q02": 0.95
+                            "Q03": 0.04
+                            "Q04": 0.01
+                            "Q05": 0.01
+                            "Q06": 0.01
+                            "Q07": 0.01
+                            "Q08": 0.01
+                          "capabilities": {}
+                          "prohibitedAdvice": 0.02
+                    "failure": null
+                    "receipt":
+                      "provider": "authored-replay"
+                      "providerRevision": "authored-replay-1"
+                      "model": "authored-synthetic-chat-router"
+                      "promptVersion": "zoop-jev-chat-router-0123456789abcdef"
+                      "executionMode": "replay"
+                      "usage":
+                        "inputTokens": null
+                        "outputTokens": null
+                        "cachedTokens": null
+                        "reasoningTokens": null
+                      "sentAt": "2026-10-22T03:00:00+00:00"
+                      "receivedAt": "2026-10-22T03:00:01+00:00"
+                "notSent":
+                  "summary": "A quote without a matching chat grant: nothing was sent"
+                  "value":
+                    "schemaVersion": "zoop-ai-chat-1"
+                    "invocationId": "job-00000001:1:chat-answer"
+                    "stage": "chat-answer"
+                    "status": "failed"
+                    "answer": null
+                    "failure":
+                      "code": "source_grant_denied"
+                      "sent": false
+                      "unknown": false
+                    "receipt": null
+        "401":
+          "description": "authentication_required: missing, malformed or unknown bearer token."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              "examples":
+                "example":
+                  "summary": "Missing, malformed or unknown bearer token"
+                  "value":
+                    "schemaVersion": "zoop-ai-internal-1"
+                    "error":
+                      "code": "authentication_required"
+                      "retryable": false
+                      "requestId": "req-0001"
+                      "runtimeCode": null
+                      "field": null
+                    "status": null
+          "headers":
+            "WWW-Authenticate":
+              "description": "Bearer"
+              "schema":
+                "type": "string"
+        "403":
+          "description": "scope_denied: the principal lacks `chat.invoke`."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              "examples":
+                "example":
+                  "summary": "Principal lacks the route's scope"
+                  "value":
+                    "schemaVersion": "zoop-ai-internal-1"
+                    "error":
+                      "code": "scope_denied"
+                      "retryable": false
+                      "requestId": "req-0001"
+                      "runtimeCode": null
+                      "field": null
+                    "status": null
+        "409":
+          "description": "execution_unavailable: the chat configuration group is not enabled, or a replay request without a configured fixture."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+        "422":
+          "description": "invalid_request: header, path, envelope, or the stage input the runtime refused. Nothing was sent."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              "examples":
+                "example":
+                  "summary": "Runtime validation of the submitted input"
+                  "value":
+                    "schemaVersion": "zoop-ai-internal-1"
+                    "error":
+                      "code": "invalid_request"
+                      "retryable": false
+                      "requestId": "req-0001"
+                      "runtimeCode": "input_or_configuration_invalid"
+                      "field": null
+                    "status": null
+        "500":
+          "description": "internal_error."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+        "502":
+          "description": "stage_outcome_unknown: the runtime ended abnormally or its output was unreadable. It may have sent the request: never resend this invocation."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+        "503":
+          "description": "runtime_unavailable, service_busy or service_configuration_invalid (retryable): nothing was sent."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              "examples":
+                "example":
+                  "summary": "Runtime unavailable: retry with the same key and body"
+                  "value":
+                    "schemaVersion": "zoop-ai-internal-1"
+                    "error":
+                      "code": "runtime_unavailable"
+                      "retryable": true
+                      "requestId": "req-0001"
+                      "runtimeCode": null
+                      "field": null
+                    "status": null
+          "headers":
+            "Retry-After":
+              "description": "Seconds before retrying with the same key and body."
+              "schema":
+                "type": "integer"
+        "504":
+          "description": "stage_outcome_unknown: the stage deadline passed. It may have sent the request: never resend this invocation."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+      "security":
+        - "bearerAuth":
+            - "chat.invoke"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/ChatStageRequest"
+            "examples":
+              "router":
+                "summary": "chat-router replay request (synthetic question)"
+                "value":
+                  "schemaVersion": "zoop-ai-chat-1"
+                  "invocationId": "job-00000001:1:chat-router"
+                  "stage": "chat-router"
+                  "mode": "replay"
+                  "input":
+                    "turns":
+                      - "text": "HBM이 뭐야?"
+                    "requirements":
+                      - "requirementId": "r1"
+                        "text": "HBM이 뭐야"
+                        "explicit": true
+                    "capabilities": []
 "components":
   "schemas":
+    "AnswerSection":
+      "properties":
+        "basis":
+          "type": "string"
+          "enum":
+            - "general_knowledge"
+            - "evidence_grounded"
+          "title": "Basis"
+        "text":
+          "type": "string"
+          "title": "Text"
+        "requirementIds":
+          "items":
+            "type": "string"
+          "type": "array"
+          "title": "Requirementids"
+        "evidenceIds":
+          "items":
+            "type": "string"
+          "type": "array"
+          "title": "Evidenceids"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "basis"
+        - "text"
+        - "requirementIds"
+        - "evidenceIds"
+      "title": "AnswerSection"
     "BApprovalBasis":
       "properties":
         "kind":
@@ -9466,6 +9730,173 @@
         - "cachedTokens"
         - "reasoningTokens"
       "title": "CallUsage"
+    "ChatAnswer":
+      "properties":
+        "sections":
+          "items":
+            "$ref": "#/components/schemas/AnswerSection"
+          "type": "array"
+          "title": "Sections"
+        "insufficientRequirementIds":
+          "items":
+            "type": "string"
+          "type": "array"
+          "title": "Insufficientrequirementids"
+        "graphTargetIds":
+          "items":
+            "type": "string"
+          "type": "array"
+          "title": "Graphtargetids"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "sections"
+        - "insufficientRequirementIds"
+        - "graphTargetIds"
+      "title": "ChatAnswer"
+    "ChatReceipt":
+      "properties":
+        "provider":
+          "type": "string"
+          "title": "Provider"
+        "providerRevision":
+          "type": "string"
+          "title": "Providerrevision"
+        "model":
+          "type": "string"
+          "title": "Model"
+        "promptVersion":
+          "type": "string"
+          "title": "Promptversion"
+        "executionMode":
+          "type": "string"
+          "enum":
+            - "replay"
+            - "live"
+          "title": "Executionmode"
+        "usage":
+          "$ref": "#/components/schemas/ChatUsage"
+        "sentAt":
+          "type": "string"
+          "title": "Sentat"
+        "receivedAt":
+          "anyOf":
+            - "type": "string"
+            - "type": "null"
+          "title": "Receivedat"
+      "type": "object"
+      "required":
+        - "provider"
+        - "providerRevision"
+        - "model"
+        - "promptVersion"
+        - "executionMode"
+        - "usage"
+        - "sentAt"
+        - "receivedAt"
+      "title": "ChatReceipt"
+    "ChatStageFailure":
+      "properties":
+        "code":
+          "type": "string"
+          "pattern": "^[a-z0-9_]{1,64}$"
+          "title": "Code"
+        "sent":
+          "type": "boolean"
+          "title": "Sent"
+          "description": "A request left the runtime for this invocation."
+        "unknown":
+          "type": "boolean"
+          "title": "Unknown"
+          "description": "Sent, and its outcome is unknown (timeout or disconnect): it is never sent again."
+      "type": "object"
+      "required":
+        - "code"
+        - "sent"
+        - "unknown"
+      "title": "ChatStageFailure"
+    "ChatStageResult":
+      "properties":
+        "schemaVersion":
+          "type": "string"
+          "const": "zoop-ai-chat-1"
+          "title": "Schemaversion"
+        "invocationId":
+          "type": "string"
+          "title": "Invocationid"
+        "stage":
+          "type": "string"
+          "enum":
+            - "chat-router"
+            - "chat-answer"
+            - "chat-verification"
+          "title": "Stage"
+        "status":
+          "type": "string"
+          "enum":
+            - "succeeded"
+            - "failed"
+          "title": "Status"
+        "answer":
+          "anyOf":
+            - "$ref": "#/components/schemas/RouterAnswer"
+            - "$ref": "#/components/schemas/ChatAnswer"
+            - "$ref": "#/components/schemas/VerificationAnswer"
+            - "type": "null"
+          "title": "Answer"
+          "description": "The typed stage answer when succeeded: RouterAnswer (chat-router), ChatAnswer (chat-answer) or VerificationAnswer (chat-verification)."
+        "failure":
+          "anyOf":
+            - "$ref": "#/components/schemas/ChatStageFailure"
+            - "type": "null"
+        "receipt":
+          "anyOf":
+            - "$ref": "#/components/schemas/ChatReceipt"
+            - "type": "null"
+          "description": "Who received the request and what they reported; present once a request was sent."
+      "type": "object"
+      "required":
+        - "schemaVersion"
+        - "invocationId"
+        - "stage"
+        - "status"
+        - "answer"
+        - "failure"
+        - "receipt"
+      "title": "ChatStageResult"
+      "description": |-
+        The outcome. Besides the field shapes the door checks the invariants: `succeeded` has an answer of its own stage's model, no failure and a
+        receipt; `failed` has a failure and no answer; `unknown` implies `sent`; a receipt is present exactly when something was sent and names the
+        requested mode.
+    "ChatUsage":
+      "properties":
+        "inputTokens":
+          "anyOf":
+            - "type": "integer"
+            - "type": "null"
+          "title": "Inputtokens"
+        "outputTokens":
+          "anyOf":
+            - "type": "integer"
+            - "type": "null"
+          "title": "Outputtokens"
+        "cachedTokens":
+          "anyOf":
+            - "type": "integer"
+            - "type": "null"
+          "title": "Cachedtokens"
+        "reasoningTokens":
+          "anyOf":
+            - "type": "integer"
+            - "type": "null"
+          "title": "Reasoningtokens"
+      "type": "object"
+      "required":
+        - "inputTokens"
+        - "outputTokens"
+        - "cachedTokens"
+        - "reasoningTokens"
+      "title": "ChatUsage"
     "Delivery":
       "properties":
         "state":
@@ -12195,6 +12626,79 @@
         - "job"
         - "receipts"
       "title": "ResultEnvelope"
+    "RoutedRequirement":
+      "properties":
+        "requirementId":
+          "type": "string"
+          "title": "Requirementid"
+        "types":
+          "additionalProperties":
+            "type": "number"
+          "propertyNames":
+            "enum":
+              - "Q01"
+              - "Q02"
+              - "Q03"
+              - "Q04"
+              - "Q05"
+              - "Q06"
+              - "Q07"
+              - "Q08"
+          "type": "object"
+          "title": "Types"
+        "capabilities":
+          "additionalProperties":
+            "type": "number"
+          "type": "object"
+          "title": "Capabilities"
+        "prohibitedAdvice":
+          "type": "number"
+          "title": "Prohibitedadvice"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "requirementId"
+        - "types"
+        - "capabilities"
+        - "prohibitedAdvice"
+      "title": "RoutedRequirement"
+      "description": "Closed like every stage answer: a key the worker contract does not define is refused, never relayed."
+    "RouterAnswer":
+      "properties":
+        "requirements":
+          "items":
+            "$ref": "#/components/schemas/RoutedRequirement"
+          "type": "array"
+          "title": "Requirements"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "requirements"
+      "title": "RouterAnswer"
+    "SectionVerdict":
+      "properties":
+        "support":
+          "anyOf":
+            - "type": "string"
+              "enum":
+                - "supported"
+                - "contradicted"
+                - "hold"
+            - "type": "null"
+          "title": "Support"
+        "prohibitedAdvice":
+          "type": "string"
+          "enum":
+            - "no"
+            - "yes"
+            - "hold"
+          "title": "Prohibitedadvice"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "support"
+        - "prohibitedAdvice"
+      "title": "SectionVerdict"
     "Usage":
       "properties":
         "providerAttempts":
@@ -12239,6 +12743,18 @@
         - "reasoningTokens"
         - "cost"
       "title": "Usage"
+    "VerificationAnswer":
+      "properties":
+        "sections":
+          "items":
+            "$ref": "#/components/schemas/SectionVerdict"
+          "type": "array"
+          "title": "Sections"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "sections"
+      "title": "VerificationAnswer"
     "RelationSubmit":
       "additionalProperties": false
       "description": "The S3 `Submit` contract (`zoop-relation-s3`). Fixtures, registries and paths cannot be named. `executionMode: live` is accepted only for an upstream the operator listed as live-approved."
@@ -12341,3 +12857,5 @@
     "description": "Read-only, nonpublic S3 graph version status and company focus over operator-listed versions, through the installed zoop-ai-graph pipeline (no write, no model)."
   - "name": "graph-handoffs"
     "description": "Read-only, nonpublic AI handoff status and whole-bundle delivery over operator-pinned handoffs, through the installed zoop-ai-handoff export command (no write, no model, no network)."
+  - "name": "chat-stages"
+    "description": "One chatbot model stage (router, answer or verification) per request, synchronously, through the installed zoop-ai-chat runtime (replay, or live behind the chat gate)."

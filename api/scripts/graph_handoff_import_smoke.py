@@ -58,6 +58,12 @@ private article or tampered receipt bytes. The article's publication boundary is
 activation rows (reason `smoke history:`, reported as `historicalActivations`, never an import or harness activation) at the fixture's own publication instant, so asOf half a second before is 404 although
 graphVersion pins the impact version (a wrong pin would be 422) and half a second after is 200 with that version in metadata. An excluded edge/evidence and a malformed receipt basis need a mutable
 exclusion store / re-registered receipt, so the Java tests (real pinned reader, real service) prove those and this script does not claim them over HTTP.
+The impact phase also inserts ONE explicitly SYNTHETIC published ORIGINAL briefing round using the existing briefing PostgreSQL fixture's payload,
+source-binding and current-grant conventions (not the replay/reconstruction path). It pins only the supply issue to the real imported impact version at a
+cutoff before all structural basis verification and before that version's actual harness activation. Real round-scoped HTTP reads must retain the impact-only
+span with null S1 summary and empty eventIds, refuse wrong pins/cutoffs, withhold the not-yet-verified basis span and the other issue's evidence, and enforce
+both current ingestion rights and current briefing-source rights. Fixture publication SQL is counted separately as syntheticBriefingRounds, never as
+production publication or admin activation proof. No receipt, graph snapshot or AI ledger is synthesized for this round.
 
 On success the last stdout line is {"status": "passed", "steps": N, "providerCalls": 0, "modelCalls": 0, ...}; any failed
 
@@ -260,7 +266,9 @@ class Smoke:
               'evidence', (SELECT md5(coalesce(string_agg(e::text, '|' ORDER BY e.id), '')) FROM evidence e),
               'artifacts', (SELECT md5(coalesce(string_agg(x::text, '|' ORDER BY x.id), '')) FROM artifacts x),
               'articles', (SELECT md5(coalesce(string_agg(a::text, '|' ORDER BY a.id), '')) FROM articles a),
-              'versionsOfArticles', (SELECT md5(coalesce(string_agg(v::text, '|' ORDER BY v.article_id, v.version), '')) FROM article_versions v))"""))
+              'versionsOfArticles', (SELECT md5(coalesce(string_agg(v::text, '|' ORDER BY v.article_id, v.version), '')) FROM article_versions v),
+              'briefingRounds', (SELECT md5(coalesce(string_agg(r::text, '|' ORDER BY r.id), '')) FROM briefing_rounds r),
+              'briefingChanges', (SELECT md5(coalesce(string_agg(c::text, '|' ORDER BY c.id), '')) FROM briefing_changes c))"""))
 
     def set_registry(self, change):
         """Atomically rewrites the one source registry both CLIs read (a reader sees the old or the new file)."""
@@ -426,8 +434,11 @@ def evidence_read_phase(smoke, db, layout, world, vid2: str, never_activated: tu
         check(code == 404 and error_code(body) == "EVIDENCE_UNAVAILABLE", f"an asOf before the activation must not show the evidence: {code} {body}")
         code, body = get(web, main_id, asOf="2026-10-09T00:00:00Z", graphVersion=vid2)
         check(code == 422 and error_code(body) == "INVALID_REQUEST", f"inconsistent graphVersion and asOf: {code} {body}")
+        # Rounds are supported now. This fixture has no such publication: it is 404, not the old blanket 409.
+        # The same citation was readable above, so ignoring round and falling back to the active version would fail this check.
+        check(db.scalar("SELECT count(*) FROM briefing_rounds WHERE id = 'brf-1'") == 0, "the unknown-round control is not absent")
         code, body = get(web, main_id, round="brf-1")
-        check(code == 409 and error_code(body) == "VERSION_UNAVAILABLE", f"round: {code} {body}")
+        check(code == 404 and error_code(body) == "RESOURCE_NOT_FOUND", f"unknown round must not fall back: {code} {body}")
         for other in never_activated:
             code, body = get(web, main_id, graphVersion=other)
             check(code == 409 and error_code(body) == "VERSION_UNAVAILABLE", f"a never-activated version was readable: {other} {code}")
@@ -1147,6 +1158,66 @@ def impact_world_phase(args, db, layout, scratch: Path) -> dict:
     return {"world": world, "layout": layout7, "smoke": smoke7, "vid": vid, "bundle": bundle, "rows": rows, "inv": inv, "private": private}
 
 
+def impact_round_fixture(impact: dict, db) -> dict:
+    """Prepare ONE synthetic ORIGINAL, not a replay reconstruction; only its later INSERT is publication setup.
+
+    Reuse the existing PostgreSQL briefing fixture's DTO and grant shape, replacing every source reference with imported
+    synthetic documents. No copied market figures, summaries, outlooks, receipt or fake graph survives in this fixture.
+    Briefing read grants and ingestion read grants are separate existing authorities; neither bypasses the other.
+    """
+    from datetime import timezone
+
+    world, layout7, bundle = impact["world"], impact["layout"], impact["bundle"]
+    bases = [b for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO" for b in r["basis"]]
+    check(bases, "the impact world has no structural verification boundary")
+    first_verified = min(datetime.fromisoformat(b["verifiedAt"]) for b in bases)
+    cutoff = (first_verified - timedelta(milliseconds=500)).astimezone(timezone.utc)
+    iso = cutoff.isoformat().replace("+00:00", "Z")
+    issue_id = "issue:supply-2026q3"
+    issue = next(i for i in bundle["issues"] if i["id"] == issue_id)
+    refs = [world.refs[name] for name in ("a", "a2")]
+    selected_sources = {(m["articleId"], m["articleVersion"]) for m in issue["mentions"]}
+    check(selected_sources == {(ref["documentId"], ref["documentVersion"]) for ref in refs}, "the selected issue's source documents changed")
+    articles = [a for a in bundle["articles"] if (a["articleId"], a["articleVersion"]) in selected_sources]
+    check(len(articles) == 2 and all(a["publicationPrecision"] == "datetime" and datetime.fromisoformat(a["publishedAt"]) <= cutoff for a in articles),
+          "the round cutoff must follow both selected articles' publication and precede every structural verification")
+
+    fixtures = API_SCRIPTS.parent / "src" / "test" / "resources" / "briefing"
+    records = json.loads((fixtures / "fixture.sql").read_text("utf-8").split("$records$")[1])
+    record = next(r for r in records if r["p"]["id"] == "brf-test-2026-10-15-morning")
+    payload = record["p"]
+    round_id = "brf-smoke-impact-original"
+    generated = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    unavailable = {"status": "unavailable", "reason": "Synthetic scope fixture: no summary producer was run."}
+    evidence_ids = [hs.evidence_id(world, "a", hs.EVT_A), hs.evidence_id(world, "a2", hs.EVT_A2)]
+    company = PUBLIC_IDS["KRX:005930"]
+    item = payload["items"][0]
+    item.update({"title": issue["title"], "eventId": issue_id, "eventTime": issue["eventTime"],
+                 "timePrecision": issue["timePrecision"], "reportedAt": max(a["publishedAt"] for a in articles),
+                 "companies": [{"id": company, "name": COMPANIES[0][1], "role": "issuer", "roleUnconfirmed": False, "relationType": "INVOLVES"}],
+                 "evidenceCount": len(evidence_ids), "sourceSupport": {**hs.expected_support(world)[issue_id], "independentSourceCount": None},
+                 "reason": "Synthetic supply-only round for receipt-backed evidence reads.", "evidenceIds": evidence_ids,
+                 "summary": unavailable, "documentSentiments": []})
+    payload.update({"id": round_id, "date": cutoff.date().isoformat(), "scheduledAt": iso, "generatedAt": generated,
+                    "dataWindow": {"start": None, "end": iso, "openStart": True}, "graphVersion": impact["vid"],
+                    "references": {"eventIds": [issue_id], "evidenceIds": evidence_ids, "companyIds": [company]},
+                    "marketVariables": None, "outlook": None})
+    payload["metadata"].update({"asOf": iso, "graphVersion": impact["vid"], "requestId": "synthetic-impact-original"})
+    grants = json.loads((fixtures / "grants.json").read_text("utf-8"))
+    grant = grants["grants"][0]
+    providers = {db.scalar(f"SELECT provider FROM articles WHERE id = '{ref['documentId']}'") for ref in refs}
+    check(len(providers) == 1 and None not in providers, "the fixture requires one existing imported source provider")
+    grant["sourceId"] = providers.pop()
+    grants_path = layout7.work / "synthetic-briefing-grants.json"
+    grants_path.write_bytes(hs.json_bytes(grants))
+    public_snapshot = {"marketSummary": unavailable,
+                       "sourceBindings": [{"documentId": ref["documentId"], "documentVersion": ref["documentVersion"],
+                                           "grantId": grant["grantId"], "grantRevision": grant["revision"], "recipients": grant["recipients"]}
+                                          for ref in refs]}
+    return {"id": round_id, "cutoff": cutoff, "firstVerifiedAt": first_verified, "payload": payload,
+            "snapshot": public_snapshot, "grantsPath": grants_path, "grantsBytes": grants_path.read_bytes()}
+
+
 def impact_read_phase(impact: dict, db, layout, previous: str) -> dict:
     """The impact version over real HTTP: ONE more TEST-HARNESS activation (psql, now), then GET /api/v1/evidence/{id}.
 
@@ -1158,18 +1229,23 @@ def impact_read_phase(impact: dict, db, layout, previous: str) -> dict:
     smoke, world, layout7, vid = impact["smoke"], impact["world"], impact["layout"], impact["vid"]
     web_env = {"ZOOP_GRAPH_SNAPSHOT_SOURCE": "artifact", "ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT": str(layout.artifacts),
               "ZOOP_DOCUMENT_READ_ARTIFACT_ROOT": str(layout.artifacts), "ZOOP_DOCUMENT_READ_INGESTION_SOURCES": str(layout7.registry_path)}
+    round_fixture = impact_round_fixture(impact, db)
+    web_env["ZOOP_DOCUMENT_READ_GRANTS"] = str(round_fixture["grantsPath"])
+    round_params = {"round": round_fixture["id"], "graphVersion": vid, "asOf": round_fixture["payload"]["dataWindow"]["end"]}
+    ledger_before = {name: fingerprint(path) for name, path in layout7.ledgers.items()}
     inv = impact["inv"]
     inv_span = hs.span(world, "a", hs.INV)
     direct_id = hs.evidence_id(world, "a", hs.EVT_A)
     snapshot = json.loads((layout.artifacts / "graph_snapshot" / f"{vid}.json").read_text("utf-8"))
     direct_events = [i["issueId"] for i in snapshot["issues"] if direct_id in i["evidenceIds"] or direct_id in i["geographyEvidenceIds"]]
     check(direct_events, "the authored direct span is cited by no issue")
-    reads, graph_reads = 0, 0
+    reads, graph_reads, round_reads = 0, 0, 0
     bodies: list[str] = []
 
     def get(web, evidence_id: str, **params) -> tuple[int, dict]:
-        nonlocal reads
+        nonlocal reads, round_reads
         reads += 1
+        round_reads += int("round" in params)
         query = urllib.parse.urlencode(params)
         code, text = web.get(f"/api/v1/evidence/{evidence_id}" + (f"?{query}" if query else ""))
         bodies.append(text)
@@ -1202,6 +1278,22 @@ def impact_read_phase(impact: dict, db, layout, previous: str) -> dict:
                 'smoke harness: synthetic impact activation', '{at.isoformat()}')""")
         check(db.scalar("SELECT id FROM graph_versions WHERE active") == vid and db.scalar("SELECT count(*) FROM graph_activations") == activations_before + 1,
               "the impact harness activation did not apply")
+        check(round_fixture["cutoff"] < round_fixture["firstVerifiedAt"] < at,
+              "the round cutoff must precede structural verification and the actual impact activation")
+        # Explicit SYNTHETIC setup, following briefing/fixture.sql's immutable ORIGINAL insert and PostgreSQL JSONB digest.
+        # No production publisher/admin route is exercised. All source bindings point to the real document import above.
+        payload_sql = json.dumps(round_fixture["payload"], ensure_ascii=False).replace("'", "''")
+        snapshot_sql = json.dumps(round_fixture["snapshot"], ensure_ascii=False).replace("'", "''")
+        rounds_before = db.scalar("SELECT count(*) FROM briefing_rounds")
+        db.run(f"""WITH original AS (SELECT '{payload_sql}'::jsonb AS p, '{snapshot_sql}'::jsonb AS snapshot)
+            INSERT INTO briefing_rounds(id,round_date,edition,scheduled_at,window_from,window_to,open_start,status,
+                graph_version_id,review_revision,rule_revision,published_payload,public_snapshot,schema_version,
+                payload_sha256,generated_at,published_at)
+            SELECT p->>'id',(p->>'date')::date,p->>'edition',(p->>'scheduledAt')::timestamptz,NULL,
+                (p->'dataWindow'->>'end')::timestamptz,true,'published',p->>'graphVersion',1,NULL,p,snapshot,
+                'synthetic-v1',encode(sha256(convert_to(p::text,'UTF8')),'hex'),
+                (p->>'generatedAt')::timestamptz,CURRENT_TIMESTAMP FROM original""")
+        check(db.scalar("SELECT count(*) FROM briefing_rounds") == rounds_before + 1, "the synthetic original was not inserted exactly once")
         harness_fingerprint = smoke.table_fingerprint()
         artifact_tree, registry_bytes = fingerprint(layout.artifacts), layout7.registry_path.read_bytes()
 
@@ -1216,6 +1308,41 @@ def impact_read_phase(impact: dict, db, layout, previous: str) -> dict:
         check(direct["eventIds"] == direct_events and direct["metadata"]["graphVersion"] == vid, f"direct evidence changed: {direct['eventIds']} vs {direct_events}")
         step("impact-only evidence over HTTP: the quote only a verified impact row cites is 200 with eventIds [] (the candidate structural basis of its article does not cite it); "
              "the response shape is unchanged and the directly cited span keeps its event")
+
+        # ORIGINAL round: no structural basis survives this cutoff, so only receipt-proven impact membership can serve INV.
+        for params in ({"round": round_fixture["id"]}, round_params):
+            body = served(web, inv, "impact-only evidence in the published original", **params)
+            check(body["quote"] == hs.INV and body["start"] == inv_span["start"] and body["end"] == inv_span["end"]
+                  and body["articleId"] == inv_span["documentId"] and body["articleVersion"] == inv_span["documentVersion"]
+                  and body["eventIds"] == [] and body["documentSummary"] is None and body["sentiment"] is None
+                  and body["metadata"]["graphVersion"] == vid and body["metadata"]["partial"] is False
+                  and datetime.fromisoformat(body["metadata"]["asOf"].replace("Z", "+00:00")) == round_fixture["cutoff"],
+                  f"round-scoped impact evidence lost its exact source, empty events, null S1 summary or pins: {body}")
+        direct = served(web, direct_id, "the round's ordinary direct evidence", **round_params)
+        check(direct["eventIds"] == ["issue:supply-2026q3"], f"the round's direct event membership changed: {direct}")
+        basis_id, outside_id = hs.evidence_id(world, "a", hs.SUP), hs.evidence_id(world, "b", hs.QB)
+        served(web, basis_id, "the basis span is proven in the unfiltered impact version", graphVersion=vid)
+        served(web, outside_id, "the other issue's span exists in the unfiltered impact version", graphVersion=vid)
+        withheld(web, basis_id, "same-article candidate is not proof before structural verification", **round_params)
+        withheld(web, outside_id, "the factory evidence is outside the supply-only round", **round_params)
+        for change in ({"graphVersion": previous}, {"asOf": (round_fixture["cutoff"] + timedelta(seconds=1)).isoformat()}):
+            code, body = get(web, inv, **{**round_params, **change})
+            check(code == 422 and code_of(body) == "INVALID_REQUEST", f"an inconsistent round pin/cutoff was accepted: {code} {body}")
+        code, body = get(web, inv, graphVersion=vid, asOf=round_params["asOf"])
+        check(code == 422 and code_of(body) == "INVALID_REQUEST", f"removing round must not select the later-activated impact version: {code} {body}")
+        code, text = web.get("/api/v1/graph?" + urllib.parse.urlencode(round_params))
+        bodies.append(text)
+        graph_reads += 1
+        graph = json.loads(text)
+        check(code == 200 and graph["metadata"]["graphVersion"] == vid
+              and datetime.fromisoformat(graph["metadata"]["asOf"].replace("Z", "+00:00")) == round_fixture["cutoff"]
+              and {n["id"] for n in graph["nodes"] if n["kind"] == "issue"} == {"issue:supply-2026q3"}
+              and graph["edges"] and all(e["relationType"] == "INVOLVES" for e in graph["edges"]),
+              f"the original round must retain only the supply issue and INVOLVES, no not-yet-verified structural edge: {text[:500]}")
+        check(smoke.table_fingerprint() == harness_fingerprint, "the round HTTP reads changed application state")
+        step("ONE synthetic published ORIGINAL (psql setup, not production publication): round-only and exact version/cutoff reads serve the impact-only quote "
+             "with eventIds [] and null S1 summary, before structural verification AND actual activation; direct evidence keeps its event; a same-article "
+             "unproven basis span and the other issue's evidence are 404; wrong version/cutoff and removing round are 422; round graph has only supply/INVOLVES")
 
         # asOf and the selected version ----------------------------------------------------------------------------------------------------
         served(web, inv, "asOf now", asOf=at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"))
@@ -1237,9 +1364,19 @@ def impact_read_phase(impact: dict, db, layout, previous: str) -> dict:
             smoke.set_registry(change)
             for eid in every:
                 withheld(web, eid, f"a revoked grant ({label}) must withhold {eid}")
+            withheld(web, inv, f"historical round cannot override current ingestion grant ({label})", **round_params)
             smoke.set_registry(lambda g: (g.clear(), g.update(original)))
             for eid in every:
                 served(web, eid, f"restoring the grant ({label}) must restore {eid}")
+            served(web, inv, f"restoring ingestion grant restores the historical round ({label})", **round_params)
+        # The ORIGINAL's frozen source bindings have their own current briefing-purpose grant, independently of ingestion.
+        revoked = json.loads(round_fixture["grantsBytes"])
+        revoked["grants"][0]["enabled"] = False
+        round_fixture["grantsPath"].write_bytes(hs.json_bytes(revoked))
+        code, body = get(web, inv, **round_params)
+        check(code == 503 and code_of(body) == "SOURCE_UNAVAILABLE", f"revoked briefing authority must withhold the round: {code} {body}")
+        round_fixture["grantsPath"].write_bytes(round_fixture["grantsBytes"])
+        served(web, inv, "restoring the briefing grant restores the original round", **round_params)
         db.run(f"UPDATE articles SET access_status = 'private' WHERE id = '{inv_span['documentId']}'")
         for eid in every:
             withheld(web, eid, f"a private article must withhold {eid}")
@@ -1258,6 +1395,8 @@ def impact_read_phase(impact: dict, db, layout, previous: str) -> dict:
               "a failure scenario was not restored exactly (artifact tree or registry file)")
         step("current gates: a revoked grant (store, quote-display, disabled, revision, grant id), a private article and tampered receipt bytes are 404 for the impact-only AND the direct span; "
              "each restored byte-for-byte and served again")
+        step("historical round current rights: all five ingestion-grant revocations are 404 and restores are 200; the separate briefing-source grant "
+             "revocation is 503 SOURCE_UNAVAILABLE and its byte-for-byte restore is 200; frozen references never replace current authority")
 
         # nothing of an impact row in any public body ----------------------------------------------------------------------------------------
         code, text = web.get(f"/api/v1/graph?graphVersion={vid}")
@@ -1294,6 +1433,7 @@ def impact_read_phase(impact: dict, db, layout, previous: str) -> dict:
                     'smoke history: synthetic historical activation around the article publication', '{stamp(moment)}')""")
         check(db.scalar("SELECT count(*) FROM graph_activations") == history_before + len(history_rows)
               and db.scalar("SELECT id FROM graph_versions WHERE active") == active_now == vid, "the historical rows moved the pointer or were not written")
+        historical_fingerprint = smoke.table_fingerprint()
         before_publication, after_publication = boundary - timedelta(milliseconds=500), boundary + timedelta(milliseconds=500)
         # `graphVersion` together with `asOf` is refused (422) unless it IS the version active at asOf: a 404 here therefore proves the impact version was selected and the
         # publication time alone withheld the span; the 200 side reports the selected version in its own metadata.
@@ -1310,9 +1450,17 @@ def impact_read_phase(impact: dict, db, layout, previous: str) -> dict:
         step(f"publication boundary of the SAME impact version ({historical} test-only historical activation row(s) at the fixture's own instants, reason 'smoke history:'): asOf half a second "
              "before the article's publication is 404 for the impact-only and the direct span although graphVersion pins the impact version (a mismatch would be 422); half a second after "
              "both are 200 with metadata.graphVersion = the impact version; a pin that is not the version active at asOf is 422")
+        check(smoke.table_fingerprint() == historical_fingerprint, "publication-boundary HTTP reads changed application state")
+        check(fingerprint(layout.artifacts) == artifact_tree and layout7.registry_path.read_bytes() == registry_bytes
+              and round_fixture["grantsPath"].read_bytes() == round_fixture["grantsBytes"],
+              "HTTP reads changed artifacts or a current grant registry was not restored")
+        check({name: fingerprint(path) for name, path in layout7.ledgers.items()} == ledger_before, "HTTP reads changed the impact world's AI ledgers")
     check(db.scalar("SELECT count(*) FROM graph_activations WHERE reason LIKE 'smoke harness:%'") == 5, "the harness activation count is not exactly five")
     check(db.scalar("SELECT count(*) FROM graph_activations WHERE reason LIKE 'smoke history:%'") == historical, "the historical activation count is not the inserted one")
-    return {"harnessActivations": 1, "historicalActivations": historical, "evidenceReads": reads, "graphReads": graph_reads}
+    return {"harnessActivations": 1, "historicalActivations": historical, "syntheticBriefingRounds": 1,
+            "roundEvidenceReads": round_reads, "roundGraphReads": 1, "roundCutoff": round_params["asOf"],
+            "roundBeforeStructuralVerification": True, "roundBeforeActualActivation": True, "roundReadOnly": True,
+            "evidenceReads": reads, "graphReads": graph_reads}
 
 
 
@@ -1780,6 +1928,12 @@ def main() -> int:
                       "verdictGraphReads": verdict_read["graphReads"], "approvedRelations": len(approved["approvals"]),
                       "pathGraphReads": path_read["graphReads"], "pathVariants": list(PATH_MIDDLES),
                       "impactRows": len(impact["rows"]), "impactGraphReads": impact_read["graphReads"], "historicalActivations": impact_read.get("historicalActivations", 0),
+                      "syntheticBriefingRounds": impact_read.get("syntheticBriefingRounds", 0),
+                      "roundEvidenceReads": impact_read.get("roundEvidenceReads", 0), "roundGraphReads": impact_read.get("roundGraphReads", 0),
+                      "roundCutoff": impact_read.get("roundCutoff"),
+                      "roundBeforeStructuralVerification": impact_read.get("roundBeforeStructuralVerification", False),
+                      "roundBeforeActualActivation": impact_read.get("roundBeforeActualActivation", False),
+                      "roundReadOnly": impact_read.get("roundReadOnly", False),
                       "importRuns": smoke.runs + smoke2.runs + smoke4.runs + approved["smoke"].runs + paths["smoke"].runs + impact["smoke"].runs,
                       "ledgerReadOnly": True}))
     return 0

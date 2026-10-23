@@ -32,6 +32,16 @@ public final class GraphSnapshotCodec {
     }
 
     public static PublicGraphSnapshot read(byte[] bytes, String expectedVersionId) {
+        return read(bytes, expectedVersionId, false);
+    }
+
+    /** Only a round-bound reconstruction may preserve unclassified geography as null. Public snapshots stay strict. */
+    public static PublicGraphSnapshot readReconstruction(byte[] bytes, String expectedVersionId) {
+        if (!expectedVersionId.matches("brf-reconstructed-[0-9a-f]{64}")) throw invalid("reconstruction_identity");
+        return read(bytes, expectedVersionId, true);
+    }
+
+    private static PublicGraphSnapshot read(byte[] bytes, String expectedVersionId, boolean reconstruction) {
         try {
             Obj root = StrictJson.parseObject(bytes).exactly(Set.of("snapshotFormat", "versionId", "sourceBundleId",
                     "companies", "issues", "relations", "articles", "evidence"));
@@ -44,7 +54,9 @@ public final class GraphSnapshotCodec {
                     root.objects("relations").stream().map(GraphSnapshotCodec::relation).toList(),
                     root.objects("articles").stream().map(GraphSnapshotCodec::article).toList(),
                     root.objects("evidence").stream().map(GraphSnapshotCodec::evidence).toList());
-            validate(snapshot);
+            if (reconstruction && !("briefing-reconstruction-v1:" + expectedVersionId).equals(snapshot.sourceBundleId()))
+                throw invalid("reconstruction_binding");
+            validate(snapshot, reconstruction);
             return snapshot;
         } catch (GraphSnapshotUnavailableException exception) {
             throw exception;
@@ -64,7 +76,7 @@ public final class GraphSnapshotCodec {
                 Set.of("period", "assertionStatus", "action", "target", "representativeMentionId"));
         return new Issue(o.string("issueId"), o.string("label"), o.stringOrNull("eventTime"), o.string("timePrecision"),
                 optional(o, "period"), optional(o, "assertionStatus"), optional(o, "action"), optional(o, "target"),
-                o.string("geography"), o.string("geographyPolicyVersion"), o.strings("geographyEvidenceIds"),
+                o.stringOrNull("geography"), o.string("geographyPolicyVersion"), o.strings("geographyEvidenceIds"),
                 o.strings("articleIds"), o.strings("evidenceIds"), o.objects("mentions").stream().map(m -> {
                     m.exactly(Set.of("mentionId", "articleId", "articleVersion"));
                     return new MentionRef(m.string("mentionId"), m.string("articleId"), m.string("articleVersion"));
@@ -104,7 +116,7 @@ public final class GraphSnapshotCodec {
         return o.has(name) ? o.stringOrNull(name) : null;
     }
 
-    private static void validate(PublicGraphSnapshot s) {
+    private static void validate(PublicGraphSnapshot s, boolean reconstruction) {
         Set<String> companies = unique(s.companies(), Company::companyId, "company");
         Set<String> issues = unique(s.issues(), Issue::issueId, "issue");
         unique(s.relations(), Relation::relationId, "relation");
@@ -132,8 +144,10 @@ public final class GraphSnapshotCodec {
             }
         }
         for (Issue issue : s.issues()) {
-            if (!GEOGRAPHY.contains(issue.geography())) throw invalid("issue_geography");
-            if (issue.geographyEvidenceIds().isEmpty() || !evidence.containsAll(issue.geographyEvidenceIds())) {
+            boolean unclassified = reconstruction && issue.geography() == null
+                    && "not_recorded".equals(issue.geographyPolicyVersion()) && issue.geographyEvidenceIds().isEmpty();
+            if (!unclassified && (issue.geography() == null || !GEOGRAPHY.contains(issue.geography()))) throw invalid("issue_geography");
+            if (!unclassified && (issue.geographyEvidenceIds().isEmpty() || !evidence.containsAll(issue.geographyEvidenceIds()))) {
                 throw invalid("issue_geography_evidence");
             }
             if (!matchesPrecision(issue.eventTime(), issue.timePrecision())) throw invalid("issue_event_time");

@@ -47,4 +47,18 @@ describe('useCompanyData', () => {
     expect(api.getPortfolio).not.toHaveBeenCalled();
     expect(result.current.data?.holding).toBeNull();
   });
+  it('keeps round selectors on documents but leaves latest prices independent', async () => {
+    const context = {
+      round: 'round-old',
+      graphVersion: 'v-old',
+      asOf: '2026-10-08T00:20:00Z',
+    };
+    const { result } = renderHook(() =>
+      useCompanyData('KRX:005930', null, 0, context),
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(api.getCompanyDocuments).toHaveBeenCalledWith('KRX:005930', context);
+    expect(api.getCompanyQuote).toHaveBeenCalledWith('KRX:005930');
+    expect(api.getCompanyPrices).toHaveBeenCalledWith('KRX:005930');
+  });
 });

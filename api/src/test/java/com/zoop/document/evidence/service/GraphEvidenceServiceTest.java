@@ -1552,6 +1552,78 @@ class GraphEvidenceServiceTest {
         assertNull(outcome(EVIDENCE_ID, null, null), "restored");
     }
 
+    private void roundImpactReader(Instant cutoff, java.util.function.Supplier<DisclosureExclusions> exclusions) throws IOException {
+        realImpactReader(exclusions);
+        var basis = new com.zoop.graph.version.BriefingGraphLookup.Basis("brf-1", GRAPH_VERSION, cutoff,
+                Map.of("iss-1", List.of("KRX:A")));
+        realPort = new GraphEvidenceSnapshotReader(new PublicGraphReader(
+                new GraphVersionSelector(new OneVersion(), java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC),
+                        (round, request) -> basis), version -> stackSnapshot(), exclusions::get));
+    }
+
+    private EvidenceResponse getRound() {
+        return service().read(EVIDENCE_ID, "brf-1", null, null, null, "req-round");
+    }
+
+    @Test
+    void anOriginalRoundKeepsImpactOnlyQuotesBeforeAnyStructuralBasisOrActivationWithoutLeakingTheirLabels() throws Exception {
+        Instant cutoff = Instant.parse("2026-10-09T00:00:00Z");
+        DisclosureExclusions[] exclusions = {DisclosureExclusions.NONE};
+        roundImpactReader(cutoff, () -> exclusions[0]);
+        assertEquals(ErrorCode.VERSION_UNAVAILABLE, outcome(EVIDENCE_ID, null, cutoff.toString()),
+                "the ordinary historical selector has no activation at this cutoff");
+
+        EvidenceResponse response = service().read(EVIDENCE_ID, "brf-1", GRAPH_VERSION, cutoff.toString(), null, "req-round");
+        assertEquals(QUOTE, response.quote());
+        assertEquals(List.of(), response.eventIds());
+        assertEquals(GRAPH_VERSION, response.metadata().graphVersion());
+        assertEquals(cutoff, response.metadata().asOf());
+        assertNull(response.documentSummary());
+        assertNull(response.sentiment());
+        assertNull(response.analysisStatus());
+        assertNull(response.analysisProvenance());
+        assertNull(response.resultVersion());
+        var located = realPort.readRound("brf-1", null, null, EVIDENCE_ID, null, "req-round").graph();
+        assertTrue(located.basisRefs().isEmpty(), "the structural basis was not yet verified");
+        assertEquals(List.of(impactRef()), located.impactRefs());
+
+        rewriteRegisteredReceipt(impactReceipt(impactRow(INVOLVES_EDGE, "KRX:A", RC, "no-evidence")));
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, assertThrows(CustomException.class, this::getRound).getErrorCode(),
+                "keeping a candidate article is not permission to serve its quotes");
+        rewriteRegisteredReceipt(verifiedReceipt());
+        assertNotNull(getRound());
+        exclusions[0] = new DisclosureExclusions(1, java.util.Set.of(), java.util.Set.of(), java.util.Set.of(EVIDENCE_ID));
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, assertThrows(CustomException.class, this::getRound).getErrorCode());
+    }
+
+    @Test
+    void anOriginalRoundUsesBothMembershipProofsAndCurrentRightsOfItsSelectedReceipt() throws Exception {
+        roundImpactReader(Instant.parse(AFTER_VERIFICATION), () -> DisclosureExclusions.NONE);
+        assertNotNull(getRound(), "the row points at an earlier receipt; only the round's selected receipt is usable");
+        ObjectNode brokenBasis = verifiedReceipt();
+        ((ObjectNode) relationOf(brokenBasis, 1).get("basis").get(0)).remove("relationKey");
+        rewriteRegisteredReceipt(brokenBasis);
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, assertThrows(CustomException.class, this::getRound).getErrorCode());
+
+        ObjectNode brokenImpact = verifiedReceipt();
+        ((ObjectNode) relationOf(brokenImpact, 1).get("basis").get(0)).putArray("evidenceIds").add(EVIDENCE_ID);
+        rowOf(brokenImpact).remove("proposal");
+        rewriteRegisteredReceipt(brokenImpact);
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, assertThrows(CustomException.class, this::getRound).getErrorCode());
+        rewriteRegisteredReceipt(verifiedReceipt());
+        writeSources(source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, true, "known", List.of("read", "store", "quote-display"),
+                "e", "2026-10-14T00:00:00Z"));
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, assertThrows(CustomException.class, this::getRound).getErrorCode(),
+                "the source was valid at the round cutoff but expired before the request");
+        writeSources(source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, true, "known", List.of("read", "store", "quote-display"),
+                "e", null));
+        assertNotNull(getRound());
+        assertEquals(ErrorCode.INVALID_REQUEST, assertThrows(CustomException.class,
+                () -> service().read(EVIDENCE_ID, "brf-1", GRAPH_VERSION, BEFORE_VERIFICATION, null, "req-round")).getErrorCode());
+        assertEquals(ErrorCode.INVALID_REQUEST, assertThrows(CustomException.class,
+                () -> service().read(EVIDENCE_ID, "brf-1", "gv-other", null, null, "req-round")).getErrorCode());
+    }
+
     @Test
     void theImpactOnlyReadWritesNothingAndCreatesNoFile() throws Exception {
         impactOnly();

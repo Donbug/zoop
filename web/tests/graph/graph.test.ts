@@ -136,6 +136,26 @@ describe('WBS 6.6.21 · D-GRP-01/01b mock/API contract', () => {
     // Collision avoidance may move example coordinates, but remains stable.
     expect(toG6Data(graph, 1245, 705)).toEqual(rendered);
   });
+  it('keeps a focused briefing issue visible even when it relates to only one company', () => {
+    const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const before = toG6Data(graph, 1245, 705);
+    const [issueId, companies] = [...graphSummary(graph).incident].find(
+      ([id, companyIds]) =>
+        companyIds.length === 1 &&
+        !before.nodes?.some((node) => node.id === id),
+    )!;
+    const issue = graph.nodes.find((node) => node.id === issueId)!;
+    const count = graphSummary(graph).folded.get(companies[0])!;
+    issue.isFocus = true;
+    const rendered = toG6Data(graph, 1245, 705);
+    expect(rendered.nodes?.some((node) => node.id === issueId)).toBe(true);
+    expect(
+      rendered.edges?.some(
+        (edge) => edge.source === issueId || edge.target === issueId,
+      ),
+    ).toBe(true);
+    expect(graphSummary(graph).folded.get(companies[0]) ?? 0).toBe(count - 1);
+  });
   it('maps UI scope to personalFilter only for personal API requests', () => {
     expect(graphUrl({ mode: 'all', personalFilter: 'watchlist' })).toBe(
       '/api/v1/graph?mode=all',

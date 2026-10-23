@@ -1,6 +1,7 @@
 package com.zoop.graph.read;
 
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Issue;
+import com.zoop.graph.version.BriefingGraphLookup;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -20,6 +21,23 @@ final class GraphSelection {
     enum Kind { COMPANY, ISSUE }
 
     private GraphSelection() {
+    }
+
+    /** The round's canonical issues and companies related to those issues, without unrelated market issues. */
+    static Result briefing(DisplayGraph g, BriefingGraphLookup.Basis basis, int limit) {
+        Map<String, Kind> nodes = new LinkedHashMap<>();
+        basis.keyIssueIds().forEach(id -> nodes.put(id, Kind.ISSUE));
+        basis.companyIds().forEach(id -> nodes.put(id, Kind.COMPANY));
+        if (nodes.size() > limit) throw new com.zoop.graph.version.BriefingGraphUnavailableException("briefing_targets_unavailable");
+        Set<String> related = new java.util.TreeSet<>();
+        basis.keyIssueIds().forEach(id -> related.addAll(g.issueCompanies.getOrDefault(id, Set.of())));
+        boolean truncated = false;
+        for (String company : related) {
+            if (nodes.containsKey(company)) continue;
+            if (nodes.size() == limit) { truncated = true; break; }
+            nodes.put(company, Kind.COMPANY);
+        }
+        return new Result(nodes, truncated);
     }
 
     static Result select(DisplayGraph g, List<String> focus, Integer depth, int limit) {
@@ -63,7 +81,7 @@ final class GraphSelection {
     static Result neighbourhood(DisplayGraph g, Result selected, String companyId, int hops) {
         Set<String> seen = new LinkedHashSet<>(List.of(companyId));
         Set<String> frontier = Set.of(companyId);
-        for (int hop = 0; hop < hops; hop++) {
+        for (int hop = 0; hop < hops && !frontier.isEmpty(); hop++) {
             Set<String> fresh = new LinkedHashSet<>();
             for (DisplayGraph.Edge e : g.edges.values()) {
                 if (e.derived() || !selected.nodes().containsKey(e.source()) || !selected.nodes().containsKey(e.target())) continue;
