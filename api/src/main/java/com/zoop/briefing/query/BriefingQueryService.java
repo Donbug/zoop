@@ -88,6 +88,67 @@ public class BriefingQueryService {
         }
     }
 
+    /** Read-only recap of the exact prior publication fixed by this round. Never selects a newer fallback. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, timeout = 5)
+    public ObjectNode recap(String id, String requestId) {
+        if (id == null || id.isBlank() || id.length() > 256) throw new CustomException(ErrorCode.INVALID_REQUEST);
+        try {
+            var row = repository.findById(id).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+            var out = mapper.createObjectNode().put("roundId", id).putNull("graphVersion").putNull("dataAsOf");
+            out.putNull("previous");
+            if (row.publishedAt() == null || !"published".equals(row.status())) {
+                return recapState(out, "not_applicable", "not_published", "정상 발행된 회차에서만 이전 내용을 복기합니다.");
+            }
+            requireReadable(row, requestId);
+            validateSnapshot(row);
+            out.put("graphVersion", row.graphVersion()).put("dataAsOf", row.windowTo().toString());
+            if (!row.payload().path("items").isEmpty() || !"no_issues_in_window".equals(row.payload().path("emptyReason").asString())) {
+                return recapState(out, "not_applicable", "has_new_issues", "이번 회차의 핵심 이슈를 확인해 주세요.");
+            }
+            if (repository.changes(id).stream().anyMatch(change -> "correction".equals(change.kind()))) {
+                return recapState(out, "unavailable", "current_corrected", "이번 회차의 정정 내용을 먼저 확인해 주세요.");
+            }
+            boolean evening = "evening".equals(row.edition());
+            JsonNode reference = evening ? row.comparisonSnapshot() : row.publicSnapshot().path("previousComparison");
+            if (reference == null || !"available".equals(reference.path("status").asString())) {
+                return recapState(out, "unavailable", "previous_not_recorded", "발행 시 고정한 이전 회차가 없어 복기할 수 없습니다.");
+            }
+            String prefix = evening ? "morning" : "previous";
+            var previous = repository.findById(reference.path(prefix + "RoundId").asString()).orElse(null);
+            if (previous == null || previous.publishedAt() == null || !"published".equals(previous.status())) {
+                return recapState(out, "unavailable", "previous_not_available", "고정된 이전 회차를 현재 제공할 수 없습니다.");
+            }
+            if (id.equals(previous.id()) || !previous.windowTo().isBefore(row.windowTo())
+                    || (row.windowFrom() != null && previous.windowTo().isAfter(row.windowFrom()))
+                    || !previous.windowTo().equals(Instant.parse(reference.path(prefix + "DataAsOf").asString()))
+                    || (reference.path(prefix + "PublishedAt").isString()
+                        && !previous.publishedAt().equals(Instant.parse(reference.path(prefix + "PublishedAt").asString())))
+                    || (evening && (!previous.date().equals(row.date()) || !"morning".equals(previous.edition())))
+                    || (!evening && reference.has("previousDate")
+                        && (!previous.date().toString().equals(reference.path("previousDate").asString())
+                            || !previous.edition().equals(reference.path("previousEdition").asString())))) {
+                return recapState(out, "unavailable", "previous_basis_changed", "이전 회차의 고정 시점이 일치하지 않아 복기를 제공하지 않습니다.");
+            }
+            requireReadable(previous, requestId);
+            var changes = repository.changes(previous.id());
+            if (changes.stream().anyMatch(change -> "correction".equals(change.kind()))) {
+                return recapState(out, "unavailable", "previous_corrected", "이전 회차에 정정이 있어 과거 문안을 다시 강조하지 않습니다.");
+            }
+            var restored = restore(previous, changes, requestId);
+            if (restored.path("items").isEmpty()) {
+                return recapState(out, "unavailable", "previous_has_no_issues", "고정된 이전 회차에도 복기할 핵심 이슈가 없습니다.");
+            }
+            out.set("previous", restored);
+            return recapState(out, "available", null, "확인한 자료 범위에서 선정 기준을 충족한 새 핵심 이슈가 없습니다. 이전 발행 내용을 복기하며 이번 회차의 새 전망이나 재평가를 뜻하지 않습니다.");
+        } catch (DataAccessException | IllegalArgumentException | DateTimeException error) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        }
+    }
+
+    private ObjectNode recapState(ObjectNode out, String status, String reason, String message) {
+        return out.put("status", status).put("reason", reason).put("message", message);
+    }
+
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, timeout = 5)
     public ObjectNode history(String cursor, Integer requestedLimit) {
         int limit = requestedLimit == null ? 20 : requestedLimit;

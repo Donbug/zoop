@@ -3331,6 +3331,47 @@ paths:
             - "목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다."
         teamQuestions:
           - "핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다."
+  "/api/v1/briefings/{id}/recap":
+    get:
+      tags: ["briefings"]
+      operationId: "getBriefingRecap"
+      summary: "새 핵심 이슈가 없는 회차의 이전 발행본 복기"
+      description: "정상 발행된 빈 회차(no_issues_in_window)의 고정 비교 참조만 사용한다. 저장된 이전 회차 원문을 현재 권한·정정·시점 검증 후 반환한다. 새 이슈·새 전망·재평가가 아니며, 실패·보류 회차를 정상 무소식으로 전환하지 않는다. 고정 참조가 없거나 변경·정정·중단되면 다른 회차로 대체하지 않는다. 읽기 전용이며 기존 payload와 DB 스키마는 변경하지 않는다."
+      parameters:
+        - name: "id"
+          in: "path"
+          required: true
+          schema: {type: "string", minLength: 1, maxLength: 256}
+        - "$ref": "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: "복기 가용 상태와 고정된 과거 발행 원문"
+          content:
+            "application/json":
+              schema: {"$ref": "#/components/schemas/BriefingRecap"}
+        "404":
+          "$ref": "#/components/responses/Error404"
+        "422":
+          "$ref": "#/components/responses/Error422"
+        "500":
+          "$ref": "#/components/responses/Error500"
+        "503":
+          "$ref": "#/components/responses/Error503"
+      security: []
+      x-zoop:
+        fsIds: [FS028, FS029, FS033, FS035]
+        nfsIds: [NFS001, NFS002, NFS004, NFS008]
+        screenIds: [D-BRF-01, D-BRF-02]
+        wbsIds: [6.1.2, 6.11.1]
+        priority: P1
+        authority: 공개
+        errorCodes: [INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR]
+        prototype:
+          method: GET
+          path: null
+          operationId: null
+          differences: ["Spring 공개 조회의 읽기 전용 복기 뷰이며 직접 대응 BFF 없음."]
+        teamQuestions: []
   "/api/v1/briefings/{roundId}/items/{eventId}":
     get:
       tags: ["briefings"]
@@ -9298,6 +9339,24 @@ components:
         - "eventIds"
         - "evidenceIds"
         - "companyIds"
+    BriefingRecap:
+      type: "object"
+      required: [roundId, graphVersion, dataAsOf, status, reason, message, previous]
+      properties:
+        roundId: {type: "string"}
+        graphVersion:
+          anyOf: [{type: "string"}, {type: "null"}]
+        dataAsOf:
+          anyOf: [{type: "string", format: "date-time"}, {type: "null"}]
+        status: {type: "string", enum: [available, unavailable, not_applicable]}
+        reason:
+          anyOf: [{type: "string"}, {type: "null"}]
+        message: {type: "string"}
+        previous:
+          description: "고정 참조의 과거 발행 원문. 이번 회차의 새 평가·새 전망이 아니다. available일 때만 제공하며 기존 데이터·시장 지표의 시점도 과거 그대로다."
+          anyOf:
+            - "$ref": "#/components/schemas/BriefingResponse"
+            - type: "null"
     BriefingResponse:
       properties:
         id:
