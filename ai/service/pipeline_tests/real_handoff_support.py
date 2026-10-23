@@ -24,6 +24,8 @@ HANDOFF_CLI = PIPELINE_BIN / "zoop-ai-handoff"
 BUILD_HANDOFF_WORLD = Path(__file__).resolve().parent / "build_handoff_world.py"
 BUILD_VERDICT_HANDOFF_WORLD = Path(__file__).resolve().parent / "build_verdict_handoff_world.py"
 VERDICT_HANDOFF = "handoff-verdicts-1"
+BUILD_IMPACT_HANDOFF_WORLD = Path(__file__).resolve().parent / "build_impact_world.py"
+IMPACT_HANDOFF = "handoff-impacts-1"
 EXPORTS_SCHEMA = "zoop-ai-handoff-exports-1"
 RUNTIME_SCHEMA = "zoop-ai-handoff-1"
 VALIDATE = ("import json, sys\nfrom zoop_ai_pipeline.handoff_contracts import validate_bundle\n"
@@ -56,6 +58,9 @@ class HandoffWorld:
     private: list[str]
     article_ids: list[str]
     expect: dict[str, Any] = field(default_factory=dict)   # the verdict world's hand-written expectations (the pipeline smoke's own), never derived from the service
+    impacts: list[dict[str, Any]] = field(default_factory=list)   # the pipeline world's hand-written expected impact rows (full 13-key rows), never derived from the service
+    impact_negatives: dict[str, dict[str, Any]] = field(default_factory=dict)   # the pipeline's one-rule-broken bundles of the rich world: name -> {bundle, validatorLocation, digestRefreshed}
+    impact_unicode: dict[str, Any] = field(default_factory=dict)               # a VALID rich bundle whose proposal lengths are in astral code points (2000/1000), digest recomputed
 
     def ledgers(self) -> dict[str, dict]:
         return {name: tree(getattr(self, name)) for name in ("relation", "extraction", "ingestion", "state")}
@@ -70,7 +75,8 @@ def build_handoff_world(root: Path, script: Path = BUILD_HANDOFF_WORLD) -> Hando
     info = json.loads(done.stdout.strip().splitlines()[-1])
     return HandoffWorld(Path(info["root"]), Path(info["relation"]), Path(info["extraction"]), Path(info["ingestion"]), Path(info["sources"]), Path(info["canonical"]),
                         Path(info["decisions"]), Path(info["bindings"]), Path(info["handoffState"]), info["handoffs"], info["counts"], info["evidenceIds"],
-                        info["issueIds"], info["relationEdges"], info["exclusions"], info["private"], info["articleIds"], info.get("expect", {}))
+                        info["issueIds"], info["relationEdges"], info["exclusions"], info["private"], info["articleIds"], info.get("expect", {}), info.get("impacts", []),
+                        info.get("impactNegatives", {}), info.get("impactUnicode", {}))
 
 
 def pin_entry(world: HandoffWorld, principal: str, handoff_id: str, **overrides: Any) -> dict[str, Any]:

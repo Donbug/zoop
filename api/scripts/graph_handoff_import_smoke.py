@@ -27,7 +27,7 @@ not cleaned):
 
 (the Make target runs this script with --jar/--handoff-cli/--ingest-cli; the direct python invocation with those flags and
 --psql-container/--db-user/--db-name still works.) The staged snapshot is the app's current format 3 (PR #217) and carries no original mention value:
-the retained receipt keeps the complete `zoop-graph-handoff-bundle-5` bundle, whose `issues[].mentions[]` the script compares with hand-written S2 values, whose
+the retained receipt keeps the complete `zoop-graph-handoff-bundle-6` bundle, whose `issues[].mentions[]` the script compares with hand-written S2 values, whose
 `issues[].fieldProvenance` (which mentions state each selected headline value, whether the operator's representative or unanimity selected it, and which of
 `eventTime`/`period` an operator verdict withheld; never a verification) it compares with hand-written selection facts and whose `issues[].fieldVerdicts` it compares
 with hand-written operator verdicts.
@@ -49,6 +49,21 @@ text; the receipts keep the complete bundle, the `structural_path_closed_over_in
 TEST-HARNESS activation (BACK-DATED to just after the last activation, so an asOf can fall before the structural basis was verified) serves the private-middle version: the spans only a
 structural basis cites are 200 without eventIds from the selected version's receipt, 404 before the basis was verified or the article published, under a revoked grant, a private article,
 tampered receipt bytes or another version, and no public body names the private company. Disclosure exclusions have no store in the built application, so they are proven by the Java tests.
+A sixth, producer-authored IMPACT world (`graph_handoff_smoke.impact_export`, replay, SYNTHETIC, handoff `handoff-impacts-1`, built after the path worlds) is imported last: the receipt retains
+the closed `impacts[]` (one row per INVOLVES source relation: a verified positive with an impact-only quote, a verifier-rejected, a verified negative of the other S3 job, a verified undetermined,
+a no-evidence and a precheck-rejected row; hand-written in `hs.expected_impacts`), while the snapshot, the import result and every public body carry no proposal, effect, label, candidate id or
+verifier digest. With the evidence-read phase a FIFTH TEST-HARNESS activation serves the impact-only quote (cited by no issue, relation or structural basis): 200 with empty eventIds from the
+selected version's receipt although the one candidate structural basis does not cite it, 404 before the version existed / the article was published, for another version, under a revoked grant, a
+private article or tampered receipt bytes. The article's publication boundary is proven with the IMPACT version itself selected on both sides: at the very end the script adds TEST-ONLY historical
+activation rows (reason `smoke history:`, reported as `historicalActivations`, never an import or harness activation) at the fixture's own publication instant, so asOf half a second before is 404 although
+graphVersion pins the impact version (a wrong pin would be 422) and half a second after is 200 with that version in metadata. An excluded edge/evidence and a malformed receipt basis need a mutable
+exclusion store / re-registered receipt, so the Java tests (real pinned reader, real service) prove those and this script does not claim them over HTTP.
+The impact phase also inserts ONE explicitly SYNTHETIC published ORIGINAL briefing round using the existing briefing PostgreSQL fixture's payload,
+source-binding and current-grant conventions (not the replay/reconstruction path). It pins only the supply issue to the real imported impact version at a
+cutoff before all structural basis verification and before that version's actual harness activation. Real round-scoped HTTP reads must retain the impact-only
+span with null S1 summary and empty eventIds, refuse wrong pins/cutoffs, withhold the not-yet-verified basis span and the other issue's evidence, and enforce
+both current ingestion rights and current briefing-source rights. Fixture publication SQL is counted separately as syntheticBriefingRounds, never as
+production publication or admin activation proof. No receipt, graph snapshot or AI ledger is synthesized for this round.
 
 On success the last stdout line is {"status": "passed", "steps": N, "providerCalls": 0, "modelCalls": 0, ...}; any failed
 
@@ -251,7 +266,9 @@ class Smoke:
               'evidence', (SELECT md5(coalesce(string_agg(e::text, '|' ORDER BY e.id), '')) FROM evidence e),
               'artifacts', (SELECT md5(coalesce(string_agg(x::text, '|' ORDER BY x.id), '')) FROM artifacts x),
               'articles', (SELECT md5(coalesce(string_agg(a::text, '|' ORDER BY a.id), '')) FROM articles a),
-              'versionsOfArticles', (SELECT md5(coalesce(string_agg(v::text, '|' ORDER BY v.article_id, v.version), '')) FROM article_versions v))"""))
+              'versionsOfArticles', (SELECT md5(coalesce(string_agg(v::text, '|' ORDER BY v.article_id, v.version), '')) FROM article_versions v),
+              'briefingRounds', (SELECT md5(coalesce(string_agg(r::text, '|' ORDER BY r.id), '')) FROM briefing_rounds r),
+              'briefingChanges', (SELECT md5(coalesce(string_agg(c::text, '|' ORDER BY c.id), '')) FROM briefing_changes c))"""))
 
     def set_registry(self, change):
         """Atomically rewrites the one source registry both CLIs read (a reader sees the old or the new file)."""
@@ -667,7 +684,7 @@ def approved_world_phase(args, db, layout, scratch: Path) -> dict:
           and result["provenance"]["recordingKind"] == "authored-test" and result["provenance"]["approvalBases"] == kinds
           and result["provenance"]["structuralRelationOrigin"] == "manual-operator-review", f"provenance: {result['provenance']}")
     receipt = json.loads((layout.artifacts / "verification_receipt" / f"{vid}.json").read_text("utf-8"))
-    check(receipt["bundle"] == bundle and receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-5", "the approved receipt does not retain the producer's bundle")
+    check(receipt["bundle"] == bundle and receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-6", "the approved receipt does not retain the producer's bundle")
     check(receipt["appVerification"]["approvalBasis"] == "audit-metadata-not-a-verifier-verdict", "the receipt overclaims what an approval basis is")
     used = {(source["relation"]["jobId"], use["relationCandidateId"]): use for source in bundle["sources"] for use in source["reviewUsed"]}
     check(set(used) == set(approvals), f"the used reviews differ from the hand-written approvals: {sorted(used)} vs {sorted(approvals)}")
@@ -825,7 +842,7 @@ def path_world_phase(args, db, layout, scratch: Path) -> dict:
         decision_docs[middle] = decisions
         exports[middle] = hs.freeze_export(operator, world, f"path-{middle}-1", decisions)
         want, bundle = hs.expected_chain(middle, PATH_IDS), exports[middle]["bundle"]
-        check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5", f"{middle}: the producer's bundle is not schema 5")
+        check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-6", f"{middle}: the producer's bundle is not schema 6")
         check([c["id"] for c in bundle["companies"]] == want["companies"] and bundle["pathCompanies"] == want["pathCompanies"],
               f"{middle}: companies {[c['id'] for c in bundle['companies']]} / path companies {bundle['pathCompanies']} are not the hand-written ones")
         paths = {r["target"]: r["structuralPath"] for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO"}
@@ -1043,6 +1060,409 @@ def path_read_phase(paths: dict, db, layout, previous: str) -> dict:
     check(db.scalar("SELECT count(*) FROM graph_activations WHERE reason LIKE 'smoke harness:%'") == 4, "the harness activation count is not exactly four")
     return {"harnessActivations": 1, "evidenceReads": reads, "graphReads": graph_reads}
 
+IMPACT_KEYS = ("impacts", "proposal", "effects", "verifierRequestDigest", "impactCandidateId", "targetVerdict", "sourceRelation")
+IMPACT_LITERALS = ("verifier-reject", "no-evidence", "technical-reject", "impact_precheck_rejected", "s3-independent-verifier-quote-effect")
+
+
+def impact_leaks(text: str, protected: tuple = ()) -> list:
+    """What of an impact row a public document must never carry, found structurally: a reserved FIELD name (an object key at any depth), a string VALUE that is
+    one of the reserved status/policy literals, or one of the exact `protected` strings (the unverified proposal's reason and limitation text, candidate ids,
+    request digests) inside any string value (in the raw text when the document is not JSON). An identifier that merely contains a reserved word, like the handoff id
+    `handoff-impacts-1` in `sourceBundleId`, is a legitimate value and never a leak."""
+    try:
+        document = json.loads(text)
+    except ValueError:
+        return [f"text {item!r}" for item in protected if item in text]
+    found: list = []
+
+    def walk(node) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key in IMPACT_KEYS:
+                    found.append(f"key {key}")
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+        elif isinstance(node, str):
+            if node in IMPACT_LITERALS:
+                found.append(f"value {node}")
+            found.extend(f"text {item!r}" for item in protected if item in node)
+
+    walk(document)
+    return found
+
+
+def impact_world_phase(args, db, layout, scratch: Path) -> dict:
+    """The producer's `rich` impact world (SYNTHETIC, replay: the verifier is an AUTHORED replay, not an independent inference) frozen by the installed `zoop-ai-handoff` and imported
+    over real processes. Every expected row is written out by hand in `hs.expected_impacts` (only S3 identities, the candidate id and the verifier request digest, are read from
+    the S3 result there); nothing is read back from the importer or the verifier under test. The receipt retains the complete bundle with its six impact rows; the staged snapshot
+    (format 3), the import result and the rows of PostgreSQL carry none of their content, and the one quote only an impact row cites is a registered, verified body span."""
+    world, env = hs.impact_export(scratch / "impacts", PUBLIC_IDS)
+    layout7 = Layout(world, args.ingest_cli)
+    layout7.artifacts = layout.artifacts
+    smoke7 = Smoke(args, db, layout7)
+    status, result, _ = smoke7.jar.run("documents-impacts", [base.item(ref) for ref in world.refs.values()], artifact_root=layout.artifacts)
+    check(status == 0 and result and result["status"] == "succeeded", f"the impact world's document import failed: {result}")
+    ledgers_before = {name: fingerprint(path) for name, path in layout7.ledgers.items()}
+    hid, vid = hs.IMPACT_HANDOFF, version_id(hs.IMPACT_HANDOFF)
+    manifest_digest, bundle_digest = hs.digest(env["manifest"]), sha256(hs.canonical(env["bundle"]).encode("utf-8"))
+    bundle = env["bundle"]
+    rows = hs.expected_impacts(world, PUBLIC_IDS)
+    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-6" and bundle["impacts"] == rows and len(rows) == 6 == bundle["counts"]["impacts"]
+          and bundle["policy"]["impacts"] == "s3-independent-verifier-quote-effect", "the producer's impacts are not the hand-written rows")
+    check(sorted([(r["status"], r["code"]) for r in rows], key=repr) == sorted(hs.RICH_STATUSES, key=repr), f"the authored world does not hold every status: {rows}")
+    inv = hs.evidence_id(world, "a", hs.INV)
+    before = smoke7.table_fingerprint()
+    status, result, output = smoke7.graph_import("impacts", smoke7.request(hid, manifest_digest, bundle_digest))
+    check(status == 0 and result and result["status"] == "succeeded" and result["outcome"] == "staged" and result["graphVersionId"] == vid,
+          f"the impact handoff was not staged: {result} {output[-800:]}")
+    check(result["counts"] == {"companies": 2, "issues": 2, "relations": 4, "articles": 3, "evidence": 7} and result["active"] is False
+          and result["activation"] == "not-activated" and result["publicRead"] == "unavailable", f"the impact import result: {result}")
+    leaked = impact_leaks(json.dumps(result), (hs.IMPACT_REASON, "authored impact limitation"))
+    check(not leaked, f"impact content reached the import result: {leaked}")
+    check(db.scalar("SELECT count(*) FROM graph_versions WHERE active") == 1 and smoke7.table_fingerprint()["activations"] == before["activations"],
+          "the impact import moved the pointer or wrote an activation")
+
+    # the quote only an impact row cites: a registered, verified, exact body span tied to the retained receipt ---------------------------
+    stored = db.rows(f"SELECT quote, quote_verified, input_kind, verification_artifact_id, offset_unit FROM evidence WHERE id = '{inv}'")
+    check(len(stored) == 1 and stored[0]["quote"] == hs.INV and stored[0]["quote_verified"] is True and stored[0]["input_kind"] == "body"
+          and stored[0]["offset_unit"] == "unicode_code_point" and stored[0]["verification_artifact_id"] == f"artifact-receipt-{vid}",
+          f"the impact-only quote is not a verified body span of this receipt: {stored}")
+
+    # the receipt retains every row; the snapshot carries none of their content -----------------------------------------------------------
+    receipt = json.loads((layout.artifacts / "verification_receipt" / f"{vid}.json").read_text("utf-8"))
+    check(receipt["bundle"] == bundle and receipt["bundle"]["impacts"] == rows and receipt["manifest"] == env["manifest"], "the receipt does not retain the producer's impact rows")
+    check("impact_rows_closed_over_involves_sources_approvals_and_labels" in receipt["appVerification"]["checks"]
+          and receipt["appVerification"]["semanticTruth"] == "not-verified" and receipt["appVerification"]["activation"] == "none", "the receipt's statement of the impacts")
+    snapshot_file = layout.artifacts / "graph_snapshot" / f"{vid}.json"
+    snapshot_bytes = snapshot_file.read_bytes()
+    snapshot = json.loads(snapshot_bytes.decode("utf-8"))
+    snapshot_text = snapshot_bytes.decode("utf-8")
+    private = (hs.IMPACT_REASON, "authored impact limitation", *(r["impactCandidateId"] for r in rows if r["impactCandidateId"]),
+               *(r["verifierRequestDigest"] for r in rows if r["verifierRequestDigest"]))
+    check(snapshot["snapshotFormat"] == 3 and set(snapshot) == {"snapshotFormat", "versionId", "sourceBundleId", "companies", "issues", "relations", "articles", "evidence"},
+          "the impact snapshot is not format 3")
+    leaked = impact_leaks(snapshot_text, private)
+    check(snapshot["sourceBundleId"] == hid, "the snapshot's source bundle id is not the impact handoff id (an id containing a reserved word is legitimate)")
+    check(not leaked, f"impact content reached the public snapshot: {leaked}")
+    spans = {e["evidenceId"] for e in snapshot["evidence"]}
+    check(inv in spans and all(inv not in i["evidenceIds"] and inv not in i["geographyEvidenceIds"] for i in snapshot["issues"])
+          and all(inv not in r["evidenceIds"] for r in snapshot["relations"]), "the impact-only quote is cited by an issue or a relation, or is not a snapshot span")
+    status, again, _ = smoke7.graph_import("impacts-again", smoke7.request(hid, manifest_digest, bundle_digest))
+    check(status == 0 and again and again["outcome"] == "unchanged" and snapshot_file.read_bytes() == snapshot_bytes, f"retrying the impact import changed the staged bytes: {again}")
+    check({name: fingerprint(path) for name, path in layout7.ledgers.items()} == ledgers_before, "the impact world's ledgers changed")
+    step("an impact world (SYNTHETIC replay, authored verifier): six hand-written rows (verified positive with an impact-only quote, verifier-reject, verified negative, verified undetermined, "
+         "no-evidence, precheck-rejected) retained in the receipt; the snapshot, import result and database carry no proposal, effect, label, candidate id or verifier digest; the "
+         "impact-only quote is a registered verified body span; a retry is a no-op with identical bytes")
+    return {"world": world, "layout": layout7, "smoke": smoke7, "vid": vid, "bundle": bundle, "rows": rows, "inv": inv, "private": private}
+
+
+def impact_round_fixture(impact: dict, db) -> dict:
+    """Prepare ONE synthetic ORIGINAL, not a replay reconstruction; only its later INSERT is publication setup.
+
+    Reuse the existing PostgreSQL briefing fixture's DTO and grant shape, replacing every source reference with imported
+    synthetic documents. No copied market figures, summaries, outlooks, receipt or fake graph survives in this fixture.
+    Briefing read grants and ingestion read grants are separate existing authorities; neither bypasses the other.
+    """
+    from datetime import timezone
+
+    world, layout7, bundle = impact["world"], impact["layout"], impact["bundle"]
+    bases = [b for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO" for b in r["basis"]]
+    check(bases, "the impact world has no structural verification boundary")
+    first_verified = min(datetime.fromisoformat(b["verifiedAt"]) for b in bases)
+    cutoff = (first_verified - timedelta(milliseconds=500)).astimezone(timezone.utc)
+    iso = cutoff.isoformat().replace("+00:00", "Z")
+    issue_id = "issue:supply-2026q3"
+    issue = next(i for i in bundle["issues"] if i["id"] == issue_id)
+    refs = [world.refs[name] for name in ("a", "a2")]
+    selected_sources = {(m["articleId"], m["articleVersion"]) for m in issue["mentions"]}
+    check(selected_sources == {(ref["documentId"], ref["documentVersion"]) for ref in refs}, "the selected issue's source documents changed")
+    articles = [a for a in bundle["articles"] if (a["articleId"], a["articleVersion"]) in selected_sources]
+    check(len(articles) == 2 and all(a["publicationPrecision"] == "datetime" and datetime.fromisoformat(a["publishedAt"]) <= cutoff for a in articles),
+          "the round cutoff must follow both selected articles' publication and precede every structural verification")
+
+    fixtures = API_SCRIPTS.parent / "src" / "test" / "resources" / "briefing"
+    records = json.loads((fixtures / "fixture.sql").read_text("utf-8").split("$records$")[1])
+    record = next(r for r in records if r["p"]["id"] == "brf-test-2026-10-15-morning")
+    payload = record["p"]
+    round_id = "brf-smoke-impact-original"
+    generated = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    unavailable = {"status": "unavailable", "reason": "Synthetic scope fixture: no summary producer was run."}
+    evidence_ids = [hs.evidence_id(world, "a", hs.EVT_A), hs.evidence_id(world, "a2", hs.EVT_A2)]
+    company = PUBLIC_IDS["KRX:005930"]
+    item = payload["items"][0]
+    item.update({"title": issue["title"], "eventId": issue_id, "eventTime": issue["eventTime"],
+                 "timePrecision": issue["timePrecision"], "reportedAt": max(a["publishedAt"] for a in articles),
+                 "companies": [{"id": company, "name": COMPANIES[0][1], "role": "issuer", "roleUnconfirmed": False, "relationType": "INVOLVES"}],
+                 "evidenceCount": len(evidence_ids), "sourceSupport": {**hs.expected_support(world)[issue_id], "independentSourceCount": None},
+                 "reason": "Synthetic supply-only round for receipt-backed evidence reads.", "evidenceIds": evidence_ids,
+                 "summary": unavailable, "documentSentiments": []})
+    payload.update({"id": round_id, "date": cutoff.date().isoformat(), "scheduledAt": iso, "generatedAt": generated,
+                    "dataWindow": {"start": None, "end": iso, "openStart": True}, "graphVersion": impact["vid"],
+                    "references": {"eventIds": [issue_id], "evidenceIds": evidence_ids, "companyIds": [company]},
+                    "marketVariables": None, "outlook": None})
+    payload["metadata"].update({"asOf": iso, "graphVersion": impact["vid"], "requestId": "synthetic-impact-original"})
+    grants = json.loads((fixtures / "grants.json").read_text("utf-8"))
+    grant = grants["grants"][0]
+    providers = {db.scalar(f"SELECT provider FROM articles WHERE id = '{ref['documentId']}'") for ref in refs}
+    check(len(providers) == 1 and None not in providers, "the fixture requires one existing imported source provider")
+    grant["sourceId"] = providers.pop()
+    grants_path = layout7.work / "synthetic-briefing-grants.json"
+    grants_path.write_bytes(hs.json_bytes(grants))
+    public_snapshot = {"marketSummary": unavailable,
+                       "sourceBindings": [{"documentId": ref["documentId"], "documentVersion": ref["documentVersion"],
+                                           "grantId": grant["grantId"], "grantRevision": grant["revision"], "recipients": grant["recipients"]}
+                                          for ref in refs]}
+    return {"id": round_id, "cutoff": cutoff, "firstVerifiedAt": first_verified, "payload": payload,
+            "snapshot": public_snapshot, "grantsPath": grants_path, "grantsBytes": grants_path.read_bytes()}
+
+
+def impact_read_phase(impact: dict, db, layout, previous: str) -> dict:
+    """The impact version over real HTTP: ONE more TEST-HARNESS activation (psql, now), then GET /api/v1/evidence/{id}.
+
+    The impact-only quote (`INV`, cited by no issue, relation or structural basis) shares its article version with one candidate structural basis whose receipt entry does not cite it
+    (valid non-membership) and with the supply INVOLVES edge whose verified row lists it among the verifier-mapped effects: it is 200 with empty eventIds, no label or proposal in
+    the body. There is no impact time in the S3 result, so no time is invented: the visible edge and the article's publication decide an asOf, exactly as for every other span."""
+    import urllib.parse
+    from datetime import timezone
+    smoke, world, layout7, vid = impact["smoke"], impact["world"], impact["layout"], impact["vid"]
+    web_env = {"ZOOP_GRAPH_SNAPSHOT_SOURCE": "artifact", "ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT": str(layout.artifacts),
+              "ZOOP_DOCUMENT_READ_ARTIFACT_ROOT": str(layout.artifacts), "ZOOP_DOCUMENT_READ_INGESTION_SOURCES": str(layout7.registry_path)}
+    round_fixture = impact_round_fixture(impact, db)
+    web_env["ZOOP_DOCUMENT_READ_GRANTS"] = str(round_fixture["grantsPath"])
+    round_params = {"round": round_fixture["id"], "graphVersion": vid, "asOf": round_fixture["payload"]["dataWindow"]["end"]}
+    ledger_before = {name: fingerprint(path) for name, path in layout7.ledgers.items()}
+    inv = impact["inv"]
+    inv_span = hs.span(world, "a", hs.INV)
+    direct_id = hs.evidence_id(world, "a", hs.EVT_A)
+    snapshot = json.loads((layout.artifacts / "graph_snapshot" / f"{vid}.json").read_text("utf-8"))
+    direct_events = [i["issueId"] for i in snapshot["issues"] if direct_id in i["evidenceIds"] or direct_id in i["geographyEvidenceIds"]]
+    check(direct_events, "the authored direct span is cited by no issue")
+    reads, graph_reads, round_reads = 0, 0, 0
+    bodies: list[str] = []
+
+    def get(web, evidence_id: str, **params) -> tuple[int, dict]:
+        nonlocal reads, round_reads
+        reads += 1
+        round_reads += int("round" in params)
+        query = urllib.parse.urlencode(params)
+        code, text = web.get(f"/api/v1/evidence/{evidence_id}" + (f"?{query}" if query else ""))
+        bodies.append(text)
+        return code, (json.loads(text) if text.startswith("{") else {})
+
+    def code_of(body: dict) -> str:
+        return (body.get("error") or {}).get("code", "")
+
+    def served(web, evidence_id: str, label: str, **params) -> dict:
+        code, body = get(web, evidence_id, **params)
+        check(code == 200 and body["id"] == evidence_id and body["quoteVerified"] is True, f"{label}: {code} {str(body)[:300]}")
+        return body
+
+    def withheld(web, evidence_id: str, label: str, **params) -> None:
+        code, body = get(web, evidence_id, **params)
+        check(code == 404 and code_of(body) == "EVIDENCE_UNAVAILABLE", f"{label}: expected 404 EVIDENCE_UNAVAILABLE, got {code} {str(body)[:300]}")
+
+    with smoke.web(web_env) as web:
+        code, body = get(web, inv, graphVersion=vid)
+        check(code == 409 and code_of(body) == "VERSION_UNAVAILABLE", f"the staged impact version was readable before activation: {code} {body}")
+        activations_before = db.scalar("SELECT count(*) FROM graph_activations")
+        check(activations_before == 6, "unexpected activation history before the impact harness")
+        at = datetime.now(timezone.utc)
+        db.run(f"""SELECT pg_advisory_xact_lock(x'7a6f6f7067726170'::bigint);
+            UPDATE graph_versions SET active = false WHERE active;
+            UPDATE graph_versions SET active = true WHERE id = '{vid}';
+            INSERT INTO graph_activations (version_id, previous_version_id, action, actor_kind, pointer_changed, admin_id,
+                admin_email_snapshot, reason, activated_at)
+            VALUES ('{vid}', '{previous}', 'activate', 'system', true, NULL, 'system',
+                'smoke harness: synthetic impact activation', '{at.isoformat()}')""")
+        check(db.scalar("SELECT id FROM graph_versions WHERE active") == vid and db.scalar("SELECT count(*) FROM graph_activations") == activations_before + 1,
+              "the impact harness activation did not apply")
+        check(round_fixture["cutoff"] < round_fixture["firstVerifiedAt"] < at,
+              "the round cutoff must precede structural verification and the actual impact activation")
+        # Explicit SYNTHETIC setup, following briefing/fixture.sql's immutable ORIGINAL insert and PostgreSQL JSONB digest.
+        # No production publisher/admin route is exercised. All source bindings point to the real document import above.
+        payload_sql = json.dumps(round_fixture["payload"], ensure_ascii=False).replace("'", "''")
+        snapshot_sql = json.dumps(round_fixture["snapshot"], ensure_ascii=False).replace("'", "''")
+        rounds_before = db.scalar("SELECT count(*) FROM briefing_rounds")
+        db.run(f"""WITH original AS (SELECT '{payload_sql}'::jsonb AS p, '{snapshot_sql}'::jsonb AS snapshot)
+            INSERT INTO briefing_rounds(id,round_date,edition,scheduled_at,window_from,window_to,open_start,status,
+                graph_version_id,review_revision,rule_revision,published_payload,public_snapshot,schema_version,
+                payload_sha256,generated_at,published_at)
+            SELECT p->>'id',(p->>'date')::date,p->>'edition',(p->>'scheduledAt')::timestamptz,NULL,
+                (p->'dataWindow'->>'end')::timestamptz,true,'published',p->>'graphVersion',1,NULL,p,snapshot,
+                'synthetic-v1',encode(sha256(convert_to(p::text,'UTF8')),'hex'),
+                (p->>'generatedAt')::timestamptz,CURRENT_TIMESTAMP FROM original""")
+        check(db.scalar("SELECT count(*) FROM briefing_rounds") == rounds_before + 1, "the synthetic original was not inserted exactly once")
+        harness_fingerprint = smoke.table_fingerprint()
+        artifact_tree, registry_bytes = fingerprint(layout.artifacts), layout7.registry_path.read_bytes()
+
+        # impact-only quote: 200, empty eventIds, nothing of the impact row in the body ----------------------------------------------------
+        body = served(web, inv, "the impact-only quote")
+        check(body["quote"] == hs.INV and body["start"] == inv_span["start"] and body["end"] == inv_span["end"] and body["articleId"] == inv_span["documentId"]
+              and body["articleVersion"] == inv_span["documentVersion"] and body["eventIds"] == [] and body["metadata"]["graphVersion"] == vid
+              and body["metadata"]["partial"] is False and body["sentiment"] is None and body["documentSummary"] is None, f"impact-only evidence body: {str(body)[:300]}")
+        check(set(body) == {"id", "quote", "start", "end", "articleId", "articleVersion", "article", "quoteVerified", "eventIds", "metadata", "sentiment", "documentVersion",
+                            "documentSummary", "analysisStatus", "analysisProvenance", "resultVersion"}, f"the evidence response shape changed: {sorted(body)}")
+        direct = served(web, direct_id, "direct evidence")
+        check(direct["eventIds"] == direct_events and direct["metadata"]["graphVersion"] == vid, f"direct evidence changed: {direct['eventIds']} vs {direct_events}")
+        step("impact-only evidence over HTTP: the quote only a verified impact row cites is 200 with eventIds [] (the candidate structural basis of its article does not cite it); "
+             "the response shape is unchanged and the directly cited span keeps its event")
+
+        # ORIGINAL round: no structural basis survives this cutoff, so only receipt-proven impact membership can serve INV.
+        for params in ({"round": round_fixture["id"]}, round_params):
+            body = served(web, inv, "impact-only evidence in the published original", **params)
+            check(body["quote"] == hs.INV and body["start"] == inv_span["start"] and body["end"] == inv_span["end"]
+                  and body["articleId"] == inv_span["documentId"] and body["articleVersion"] == inv_span["documentVersion"]
+                  and body["eventIds"] == [] and body["documentSummary"] is None and body["sentiment"] is None
+                  and body["metadata"]["graphVersion"] == vid and body["metadata"]["partial"] is False
+                  and datetime.fromisoformat(body["metadata"]["asOf"].replace("Z", "+00:00")) == round_fixture["cutoff"],
+                  f"round-scoped impact evidence lost its exact source, empty events, null S1 summary or pins: {body}")
+        direct = served(web, direct_id, "the round's ordinary direct evidence", **round_params)
+        check(direct["eventIds"] == ["issue:supply-2026q3"], f"the round's direct event membership changed: {direct}")
+        basis_id, outside_id = hs.evidence_id(world, "a", hs.SUP), hs.evidence_id(world, "b", hs.QB)
+        served(web, basis_id, "the basis span is proven in the unfiltered impact version", graphVersion=vid)
+        served(web, outside_id, "the other issue's span exists in the unfiltered impact version", graphVersion=vid)
+        withheld(web, basis_id, "same-article candidate is not proof before structural verification", **round_params)
+        withheld(web, outside_id, "the factory evidence is outside the supply-only round", **round_params)
+        for change in ({"graphVersion": previous}, {"asOf": (round_fixture["cutoff"] + timedelta(seconds=1)).isoformat()}):
+            code, body = get(web, inv, **{**round_params, **change})
+            check(code == 422 and code_of(body) == "INVALID_REQUEST", f"an inconsistent round pin/cutoff was accepted: {code} {body}")
+        code, body = get(web, inv, graphVersion=vid, asOf=round_params["asOf"])
+        check(code == 422 and code_of(body) == "INVALID_REQUEST", f"removing round must not select the later-activated impact version: {code} {body}")
+        code, text = web.get("/api/v1/graph?" + urllib.parse.urlencode(round_params))
+        bodies.append(text)
+        graph_reads += 1
+        graph = json.loads(text)
+        check(code == 200 and graph["metadata"]["graphVersion"] == vid
+              and datetime.fromisoformat(graph["metadata"]["asOf"].replace("Z", "+00:00")) == round_fixture["cutoff"]
+              and {n["id"] for n in graph["nodes"] if n["kind"] == "issue"} == {"issue:supply-2026q3"}
+              and graph["edges"] and all(e["relationType"] == "INVOLVES" for e in graph["edges"]),
+              f"the original round must retain only the supply issue and INVOLVES, no not-yet-verified structural edge: {text[:500]}")
+        check(smoke.table_fingerprint() == harness_fingerprint, "the round HTTP reads changed application state")
+        step("ONE synthetic published ORIGINAL (psql setup, not production publication): round-only and exact version/cutoff reads serve the impact-only quote "
+             "with eventIds [] and null S1 summary, before structural verification AND actual activation; direct evidence keeps its event; a same-article "
+             "unproven basis span and the other issue's evidence are 404; wrong version/cutoff and removing round are 422; round graph has only supply/INVOLVES")
+
+        # asOf and the selected version ----------------------------------------------------------------------------------------------------
+        served(web, inv, "asOf now", asOf=at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"))
+        for stamp in ("2026-10-07T00:00:00Z", "2026-10-09T00:00:00Z"):
+            withheld(web, inv, f"asOf {stamp} (before the version and the article's publication in the version active then) must not show the quote", asOf=stamp)
+        withheld(web, inv, "the path version (active before) does not contain the impact-only quote", graphVersion=previous)
+        code, body = get(web, inv, graphVersion=version_id(HANDOFFS[0]))
+        check(code == 409 and code_of(body) == "VERSION_UNAVAILABLE", f"a never-activated version was readable: {code}")
+        step("asOf now is 200; asOf before the version existed is 404 (an earlier version never contained the quote); the previously active version withholds it (404); a never-activated version is 409")
+
+        # current rights, article access and the receipt still decide ---------------------------------------------------------------------
+        original = json.loads(registry_bytes.decode("utf-8"))["sources"][0]["grant"]
+        every = (inv, direct_id)
+        for label, change in (("drop store", lambda g: g.update({"allowedOperations": [o for o in g["allowedOperations"] if o != "store"]})),
+                              ("drop quote-display", lambda g: g.update({"allowedOperations": [o for o in g["allowedOperations"] if o != "quote-display"]})),
+                              ("disabled", lambda g: g.update({"enabled": False})),
+                              ("revision", lambda g: g.update({"revision": g["revision"] + "-next"})),
+                              ("grant id", lambda g: g.update({"grantId": g["grantId"] + "-other"}))):
+            smoke.set_registry(change)
+            for eid in every:
+                withheld(web, eid, f"a revoked grant ({label}) must withhold {eid}")
+            withheld(web, inv, f"historical round cannot override current ingestion grant ({label})", **round_params)
+            smoke.set_registry(lambda g: (g.clear(), g.update(original)))
+            for eid in every:
+                served(web, eid, f"restoring the grant ({label}) must restore {eid}")
+            served(web, inv, f"restoring ingestion grant restores the historical round ({label})", **round_params)
+        # The ORIGINAL's frozen source bindings have their own current briefing-purpose grant, independently of ingestion.
+        revoked = json.loads(round_fixture["grantsBytes"])
+        revoked["grants"][0]["enabled"] = False
+        round_fixture["grantsPath"].write_bytes(hs.json_bytes(revoked))
+        code, body = get(web, inv, **round_params)
+        check(code == 503 and code_of(body) == "SOURCE_UNAVAILABLE", f"revoked briefing authority must withhold the round: {code} {body}")
+        round_fixture["grantsPath"].write_bytes(round_fixture["grantsBytes"])
+        served(web, inv, "restoring the briefing grant restores the original round", **round_params)
+        db.run(f"UPDATE articles SET access_status = 'private' WHERE id = '{inv_span['documentId']}'")
+        for eid in every:
+            withheld(web, eid, f"a private article must withhold {eid}")
+        db.run(f"UPDATE articles SET access_status = 'available' WHERE id = '{inv_span['documentId']}'")
+        receipt_path = layout.artifacts / "verification_receipt" / f"{vid}.json"
+        receipt_info, receipt_original = receipt_path.stat(), receipt_path.read_bytes()
+        receipt_path.write_bytes(receipt_original.replace(b'"activation":"none"', b'"activation":"nope"'))
+        check(receipt_path.read_bytes() != receipt_original, "the receipt tamper did not change any byte")
+        for eid in every:
+            withheld(web, eid, f"tampered receipt bytes must withhold {eid}")
+        receipt_path.write_bytes(receipt_original)
+        os.utime(receipt_path, ns=(receipt_info.st_atime_ns, receipt_info.st_mtime_ns))
+        for eid in every:
+            served(web, eid, f"restoring the receipt must restore {eid}")
+        check(fingerprint(layout.artifacts) == artifact_tree and layout7.registry_path.read_bytes() == registry_bytes,
+              "a failure scenario was not restored exactly (artifact tree or registry file)")
+        step("current gates: a revoked grant (store, quote-display, disabled, revision, grant id), a private article and tampered receipt bytes are 404 for the impact-only AND the direct span; "
+             "each restored byte-for-byte and served again")
+        step("historical round current rights: all five ingestion-grant revocations are 404 and restores are 200; the separate briefing-source grant "
+             "revocation is 503 SOURCE_UNAVAILABLE and its byte-for-byte restore is 200; frozen references never replace current authority")
+
+        # nothing of an impact row in any public body ----------------------------------------------------------------------------------------
+        code, text = web.get(f"/api/v1/graph?graphVersion={vid}")
+        bodies.append(text)
+        graph_reads += 1
+        check(code == 200 and json.loads(text)["metadata"]["graphVersion"] == vid, f"the impact graph read: {code} {text[:300]}")
+        leaked = [item for text_ in bodies for item in impact_leaks(text_, impact["private"])]
+        check(not leaked, f"impact content reached a public body: {leaked}")
+        check(smoke.table_fingerprint() == harness_fingerprint, "a public read changed a table")
+        step("no proposal, effect, label, candidate id or verifier digest in any public graph or evidence body; no read changed a table")
+
+        # the publication boundary of the SAME impact version: TEST-ONLY historical activation rows (psql, at the very end) -----------------------------------
+        # The earlier asOf checks select OLDER versions (the fixtures). To prove the article's publication time with the impact version itself selected on both sides, the
+        # smoke adds history rows in the throwaway database: the selector's own rule is "the last pointer change at or before asOf, newest id first on a tie", the fixture
+        # `fixture-2026-10-08` was seeded at exactly the authored articles' publication instant, so one row an hour before the boundary and one at the same instant (a higher
+        # id wins the tie) make the impact version the selected one on both sides. Nothing else moves: the active pointer, the stored snapshot and the freeze/import
+        # times are untouched, no production selector or activation route changes, and the rows carry their own reason (`smoke history:`), not the harness one.
+        article = next(a for a in impact["bundle"]["articles"] if a["articleId"] == inv_span["documentId"])
+        check(article["publicationPrecision"] == "datetime" and article["publishedAt"], f"the authored article is not published at an instant: {article['publishedAt']}")
+        boundary = datetime.fromisoformat(str(article["publishedAt"]).replace("Z", "+00:00")).astimezone(timezone.utc)
+        stamp = lambda moment: moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f+00:00")   # noqa: E731
+        around = db.rows(f"""SELECT version_id, to_char(activated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US') || '+00:00' AS at FROM graph_activations
+            WHERE pointer_changed AND activated_at > '{stamp(boundary - timedelta(hours=1))}' AND activated_at <= '{stamp(boundary + timedelta(seconds=1))}'
+            ORDER BY activated_at, id""")
+        check(all(row["at"] == stamp(boundary) for row in around) and len(around) <= 1,
+              f"the pointer changes around the publication boundary are not the one fixture seed at exactly {stamp(boundary)}: {around}")
+        history_rows = [boundary - timedelta(hours=1)] + ([boundary] if around else [])
+        history_before = db.scalar("SELECT count(*) FROM graph_activations")
+        active_now = db.scalar("SELECT id FROM graph_versions WHERE active")
+        for moment in history_rows:
+            db.run(f"""INSERT INTO graph_activations (version_id, previous_version_id, action, actor_kind, pointer_changed, admin_id,
+                admin_email_snapshot, reason, activated_at)
+                VALUES ('{vid}', 'fixture-2026-10-01', 'activate', 'system', true, NULL, 'system',
+                    'smoke history: synthetic historical activation around the article publication', '{stamp(moment)}')""")
+        check(db.scalar("SELECT count(*) FROM graph_activations") == history_before + len(history_rows)
+              and db.scalar("SELECT id FROM graph_versions WHERE active") == active_now == vid, "the historical rows moved the pointer or were not written")
+        historical_fingerprint = smoke.table_fingerprint()
+        before_publication, after_publication = boundary - timedelta(milliseconds=500), boundary + timedelta(milliseconds=500)
+        # `graphVersion` together with `asOf` is refused (422) unless it IS the version active at asOf: a 404 here therefore proves the impact version was selected and the
+        # publication time alone withheld the span; the 200 side reports the selected version in its own metadata.
+        for eid in (inv, direct_id):
+            withheld(web, eid, f"asOf {stamp(before_publication)}, the impact version selected, before the article's publication must not show {eid}",
+                     graphVersion=vid, asOf=stamp(before_publication).replace("+00:00", "Z"))
+        body = served(web, inv, "asOf just after the publication, the impact version selected", graphVersion=vid, asOf=stamp(after_publication).replace("+00:00", "Z"))
+        check(body["metadata"]["graphVersion"] == vid and body["eventIds"] == [] and body["quote"] == hs.INV, f"impact-only evidence after the publication: {body['metadata']} {body['eventIds']}")
+        body = served(web, direct_id, "direct evidence just after the publication", graphVersion=vid, asOf=stamp(after_publication).replace("+00:00", "Z"))
+        check(body["metadata"]["graphVersion"] == vid and body["eventIds"] == direct_events, f"direct evidence after the publication: {body['metadata']} {body['eventIds']}")
+        code, body = get(web, inv, graphVersion=previous, asOf=stamp(after_publication).replace("+00:00", "Z"))
+        check(code == 422 and code_of(body) == "INVALID_REQUEST", f"a graphVersion that is not the version active at asOf was not refused: {code} {str(body)[:200]}")
+        historical = len(history_rows)
+        step(f"publication boundary of the SAME impact version ({historical} test-only historical activation row(s) at the fixture's own instants, reason 'smoke history:'): asOf half a second "
+             "before the article's publication is 404 for the impact-only and the direct span although graphVersion pins the impact version (a mismatch would be 422); half a second after "
+             "both are 200 with metadata.graphVersion = the impact version; a pin that is not the version active at asOf is 422")
+        check(smoke.table_fingerprint() == historical_fingerprint, "publication-boundary HTTP reads changed application state")
+        check(fingerprint(layout.artifacts) == artifact_tree and layout7.registry_path.read_bytes() == registry_bytes
+              and round_fixture["grantsPath"].read_bytes() == round_fixture["grantsBytes"],
+              "HTTP reads changed artifacts or a current grant registry was not restored")
+        check({name: fingerprint(path) for name, path in layout7.ledgers.items()} == ledger_before, "HTTP reads changed the impact world's AI ledgers")
+    check(db.scalar("SELECT count(*) FROM graph_activations WHERE reason LIKE 'smoke harness:%'") == 5, "the harness activation count is not exactly five")
+    check(db.scalar("SELECT count(*) FROM graph_activations WHERE reason LIKE 'smoke history:%'") == historical, "the historical activation count is not the inserted one")
+    return {"harnessActivations": 1, "historicalActivations": historical, "syntheticBriefingRounds": 1,
+            "roundEvidenceReads": round_reads, "roundGraphReads": 1, "roundCutoff": round_params["asOf"],
+            "roundBeforeStructuralVerification": True, "roundBeforeActualActivation": True, "roundReadOnly": True,
+            "evidenceReads": reads, "graphReads": graph_reads}
+
+
 
 
 def main() -> int:
@@ -1233,7 +1653,7 @@ def main() -> int:
     check(receipt_issues["issue:factory-2026q4"]["mentions"] == expected_mentions(
         world, ("b", "m-b", hs.QB, "합성 공장 착공", "공장 착공 알림", "2026-11-15", "2026Q4", DOC_B)),
           f"factory mentions: {receipt_issues['issue:factory-2026q4']['mentions']}")
-    check(receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-5", "the retained bundle is not schema 5")
+    check(receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-6", "the retained bundle is not schema 6")
     # The selection facts the receipt retains, hand-written from the authored world: the supply issue's operator-chosen representative (document a) states every
     # headline value, while a2 states the same value in every field but its title; the factory issue's only mention is unanimous. Which mentions state the issue's
     # value is a selection fact, never a verification (`verification` stays `none`).
@@ -1435,7 +1855,7 @@ def main() -> int:
           "a rejected or held value, or a verdict, reached the public snapshot")
     receipt4 = json.loads(receipt_file4.read_text("utf-8"))
     check(receipt4["bundle"] == verdict_env["bundle"] and receipt4["manifest"] == verdict_env["manifest"], "the verdict receipt does not retain the original")
-    check(receipt4["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-5" and receipt4["bundle"]["handoffId"] == hid4, "the verdict receipt is not bundle -5")
+    check(receipt4["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-6" and receipt4["bundle"]["handoffId"] == hid4, "the verdict receipt is not bundle -6")
     receipt_issues4 = {i["id"]: i for i in receipt4["bundle"]["issues"]}
     # The ORIGINAL mentions are untouched by every verdict: the withheld supply time and the held factory period are still stated by their mentions.
     check(receipt_issues4[supply_id]["mentions"] == expected_mentions(
@@ -1482,6 +1902,11 @@ def main() -> int:
     paths = path_world_phase(args, db, layout, scratch)
     if args.with_evidence_read:
         path_read = path_read_phase(paths, db, layout, approved["vid"])
+    # The impact world is built after everything else: its harness activation is a plain current-time one after the back-dated path activation.
+    impact_read = {"harnessActivations": 0, "evidenceReads": 0, "graphReads": 0}
+    impact = impact_world_phase(args, db, layout, scratch)
+    if args.with_evidence_read:
+        impact_read = impact_read_phase(impact, db, layout, paths["vids"]["private"])
 
     # ledgers, logs --------------------------------------------------------------------------------------------------------
     check({name: fingerprint(path) for name, path in layout.ledgers.items()} == ledgers_before,
@@ -1494,14 +1919,23 @@ def main() -> int:
         check(text not in joined, "source or review text reached a process output")
     step("every ledger is byte/mode/mtime identical; no path, secret or source text in any output")
 
-    print(json.dumps({"status": "passed", "steps": len(base.STEPS), "providerCalls": 0, "modelCalls": 0, "handoffs": 5 + len(PATH_MIDDLES),
-                      "evidenceRows": db.scalar("SELECT count(*) FROM evidence"), "stagedVersions": 5 + len(PATH_MIDDLES), "importActivationsWritten": 0,
+    print(json.dumps({"status": "passed", "steps": len(base.STEPS), "providerCalls": 0, "modelCalls": 0, "handoffs": 6 + len(PATH_MIDDLES),
+                      "evidenceRows": db.scalar("SELECT count(*) FROM evidence"), "stagedVersions": 6 + len(PATH_MIDDLES), "importActivationsWritten": 0,
                       "harnessActivations": harness["harnessActivations"] + verdict_read["harnessActivations"] + approved_read["harnessActivations"]
-                      + path_read["harnessActivations"],
-                      "evidenceReads": harness["evidenceReads"] + verdict_read["evidenceReads"] + approved_read["evidenceReads"] + path_read["evidenceReads"],
+                      + path_read["harnessActivations"] + impact_read["harnessActivations"],
+                      "evidenceReads": harness["evidenceReads"] + verdict_read["evidenceReads"] + approved_read["evidenceReads"] + path_read["evidenceReads"]
+                      + impact_read["evidenceReads"],
                       "verdictGraphReads": verdict_read["graphReads"], "approvedRelations": len(approved["approvals"]),
                       "pathGraphReads": path_read["graphReads"], "pathVariants": list(PATH_MIDDLES),
-                      "importRuns": smoke.runs + smoke2.runs + smoke4.runs + approved["smoke"].runs + paths["smoke"].runs, "ledgerReadOnly": True}))
+                      "impactRows": len(impact["rows"]), "impactGraphReads": impact_read["graphReads"], "historicalActivations": impact_read.get("historicalActivations", 0),
+                      "syntheticBriefingRounds": impact_read.get("syntheticBriefingRounds", 0),
+                      "roundEvidenceReads": impact_read.get("roundEvidenceReads", 0), "roundGraphReads": impact_read.get("roundGraphReads", 0),
+                      "roundCutoff": impact_read.get("roundCutoff"),
+                      "roundBeforeStructuralVerification": impact_read.get("roundBeforeStructuralVerification", False),
+                      "roundBeforeActualActivation": impact_read.get("roundBeforeActualActivation", False),
+                      "roundReadOnly": impact_read.get("roundReadOnly", False),
+                      "importRuns": smoke.runs + smoke2.runs + smoke4.runs + approved["smoke"].runs + paths["smoke"].runs + impact["smoke"].runs,
+                      "ledgerReadOnly": True}))
     return 0
 
 

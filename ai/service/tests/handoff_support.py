@@ -66,7 +66,8 @@ def manifest_of(bundle: dict[str, Any]) -> dict[str, Any]:
 def seal(bundle: dict[str, Any]) -> dict[str, Any]:
     """Recompute the manifest and content digests after a mutation, the way the producer does, so only the targeted rule can refuse the bundle."""
     bundle["manifestDigest"] = digest(manifest_of(bundle))
-    bundle["digests"]["content"] = digest({key: bundle[key] for key in ("companies", "pathCompanies", "issues", "relations", "evidence", "articles")})
+    keys = ("companies", "pathCompanies", "issues", "relations", "impacts", "evidence", "articles")
+    bundle["digests"]["content"] = digest({key: bundle[key] for key in keys if key in bundle})   # a dropped list is hashed as absent: only the closed model can refuse it
     return bundle
 
 

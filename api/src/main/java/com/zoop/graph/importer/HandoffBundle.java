@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The parts of a fully validated {@code zoop-graph-handoff-bundle-5} that the import maps. Every field here has passed the
+ * The parts of a fully validated {@code zoop-graph-handoff-bundle-6} that the import maps. Every field here has passed the
  * closed schema, the reference closure and the id formulas of {@link HandoffBundleVerifier}; nothing is trusted from the producer
  * that the verifier did not check. The snapshot writer reads the fields this model does not type ({@code period}, source events,
  * the representative, per-basis relation key, type, countries and source articles) from the verified raw bundle; the issue's
@@ -19,7 +19,12 @@ import java.util.Map;
  * receipt's mentions and verdicts still hold every original value. {@code approvals} is the effective eligibility basis of every S3
  * relation the edges rest on (automatic verdict or an operator's final approval); the verifier recomputed the relation literals
  * from it. Each article's {@code textSha256} and declared {@code origin} are the inputs of the recomputed per-issue
- * {@code sourceSupport}, which (like the approvals) stays in the retained receipt and never reaches the snapshot.
+ * {@code sourceSupport}, which (like the approvals) stays in the retained receipt and never reaches the snapshot. The bundle's
+ * closed {@code impacts[]} (one row per S3 relation behind an INVOLVES edge: the producer's unverified proposal, the independent
+ * verifier's per-quote effects as evidence ids and a recomputed label) is verified by {@link HandoffBundleVerifier} against the
+ * edges, approvals and evidence but is deliberately NOT typed here: no import consumer needs it, so it stays in the retained
+ * receipt only (the snapshot carries no impact, proposal, effect or label) and is read back from there by the evidence membership
+ * gate.
  *
  * <p>{@code pathCompanies} are the PRIVATE support references of structural paths: the mapped middle companies of complete
  * two-hop paths that are not public {@code companies}. They are catalogue-validated beside {@code companies} but are never
