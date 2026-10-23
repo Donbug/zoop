@@ -4,6 +4,7 @@ import com.zoop.graph.snapshot.GraphSnapshotStore;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.version.GraphVersionSelector;
 import com.zoop.graph.version.SelectedGraphVersion;
+import com.zoop.graph.version.BriefingGraphUnavailableException;
 import java.time.Instant;
 import org.springframework.stereotype.Component;
 
@@ -27,10 +28,29 @@ public class PublicGraphReader {
     public record Pinned(SelectedGraphVersion selected, DisplayGraph graph) { }
 
     public Pinned read(String round, String graphVersion, Instant asOf) {
-        SelectedGraphVersion selected = selector.select(round, graphVersion, asOf);
+        return read(round, graphVersion, asOf, null);
+    }
+
+    public Pinned read(String round, String graphVersion, Instant asOf, String requestId) {
+        SelectedGraphVersion selected = selector.select(round, graphVersion, asOf, requestId);
         PublicGraphSnapshot snapshot = store.load(selected.version());
         PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot,
-                selected.asOfRequested() ? selected.asOf() : null, exclusions.current());
+                selected.asOfRequested() ? selected.asOf() : null, exclusions.current(),
+                selected.briefing() != null && selected.briefing().reconstruction() != null);
+        var basis = selected.briefing();
+        if (basis != null) {
+            if (!visible.issues().stream().map(PublicGraphSnapshot.Issue::issueId).toList().containsAll(basis.keyIssueIds())
+                    || !visible.companies().stream().map(PublicGraphSnapshot.Company::companyId).toList().containsAll(basis.companyIds()))
+                throw new BriefingGraphUnavailableException("briefing_targets_unavailable");
+            for (var entry : basis.issueCompanies().entrySet()) {
+                if (!visible.relations().stream().filter(r -> r.source().equals(entry.getKey())
+                        && DisplayGraph.COMPANY_LINKS.contains(r.relationType())).map(PublicGraphSnapshot.Relation::target)
+                        .toList().containsAll(entry.getValue()))
+                    throw new BriefingGraphUnavailableException("briefing_targets_unavailable");
+            }
+            // Restrict the shared snapshot BEFORE deriving edges or serving any detail consumer.
+            visible = GraphSnapshotFilter.briefing(visible, basis);
+        }
         return new Pinned(selected, DisplayGraph.of(visible));
     }
 }

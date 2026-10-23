@@ -52,7 +52,7 @@ public class GraphCompanySnapshotReader implements CompanyGraphSnapshotReader {
         return Optional.of(new CompanyGraphSnapshot(pinned.selected().version().id(), pinned.selected().asOf(),
                 graph.companies.containsKey(companyId),
                 issues(graph, companyId, "INVOLVES", relations, articles, pinned.selected().asOf()),
-                issues(graph, companyId, "STRUCTURALLY_RELATED_TO", relations, articles, pinned.selected().asOf()), null));
+                issues(graph, companyId, "STRUCTURALLY_RELATED_TO", relations, articles, pinned.selected().asOf()), null, pinned.selected().source()));
     }
 
     private static List<CompanyIssueRef> issues(DisplayGraph graph, String companyId, String relationType,

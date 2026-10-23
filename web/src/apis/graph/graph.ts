@@ -1,4 +1,5 @@
 import { getBriefingGraphBasis } from '@/apis/briefing/briefing';
+import { BriefingGraphUnavailableError } from './briefing-context';
 import { assertSnapshot } from './snapshot';
 import { call } from '@/apis/auth/ApiService';
 import { readCompanyResource } from '@/apis/company/company';
@@ -37,9 +38,7 @@ export async function getGraph(request: GraphRequest): Promise<GraphResponse> {
       !basis.graphVersion ||
       !basis.dataAsOf
     )
-      throw new Error(
-        basis.message ?? '이 회차의 그래프를 제공할 수 없습니다.',
-      );
+      throw new BriefingGraphUnavailableError(basis);
     const context = { graphVersion: basis.graphVersion, asOf: basis.dataAsOf };
     if (
       (request.graphVersion && request.graphVersion !== context.graphVersion) ||
@@ -53,6 +52,25 @@ export async function getGraph(request: GraphRequest): Promise<GraphResponse> {
       { skipAuth: true },
     );
     assertSnapshot(graph.metadata, context);
+    if (!request.companyId) {
+      const issueIds = new Set(
+        graph.nodes
+          .filter((node) => node.kind === 'issue')
+          .map((node) => node.id),
+      );
+      const companies = new Set(
+        graph.nodes
+          .filter((node) => node.kind === 'company')
+          .map((node) => node.id),
+      );
+      if (
+        basis.keyIssueIds.some((id) => !issueIds.has(id)) ||
+        basis.companyIds.some((id) => !companies.has(id))
+      )
+        throw new Error(
+          '회차 핵심 이슈·관련 기업과 지도 응답이 일치하지 않습니다.',
+        );
+    }
     return graph;
   }
   if (request.companyId && request.asOf) {

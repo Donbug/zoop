@@ -24,7 +24,7 @@ public record PublicGraphSnapshot(int snapshotFormat, String versionId, String s
     public record Company(String companyId, String label, String brandColor, String logoUrl) { }
 
     /**
-     * Canonical public issue (not a per-document mention or a per-job event candidate). Unresolved geography, or
+     * Canonical public issue (not a per-document mention or a per-job event candidate). For operational snapshots unresolved geography, or
      * geography without its supporting evidence, never reaches a snapshot. {@code eventTime} keeps the precision
      * given by {@code timePrecision} ("2026", "2026-09", "2026-09-22", an instant, or null for unknown).
      * {@code period}, {@code assertionStatus} and the mention references come from the AI handoff issue as given
