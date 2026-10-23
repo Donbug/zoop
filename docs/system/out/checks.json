@@ -2076,7 +2076,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAdminDashboard",
       "severity": "difference",
-      "message": "목표만 695 · BFF만 633 · 형식/필수/권한 변경 7",
+      "message": "목표만 698 · BFF만 633 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -2118,7 +2118,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "listAnalysisCandidates",
       "severity": "difference",
-      "message": "목표만 115 · BFF만 23 · 형식/필수/권한 변경 10",
+      "message": "목표만 118 · BFF만 32 · 형식/필수/권한 변경 11",
       "source": ""
     },
     {
@@ -2132,7 +2132,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAnalysisCandidate",
       "severity": "difference",
-      "message": "목표만 123 · BFF만 30 · 형식/필수/권한 변경 11",
+      "message": "목표만 126 · BFF만 39 · 형식/필수/권한 변경 12",
       "source": ""
     },
     {
@@ -2160,7 +2160,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "listPublicationRules",
       "severity": "difference",
-      "message": "목표만 120 · BFF만 21 · 형식/필수/권한 변경 9",
+      "message": "목표만 126 · BFF만 24 · 형식/필수/권한 변경 9",
       "source": ""
     },
     {
@@ -2174,7 +2174,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "setPublicationRule",
       "severity": "difference",
-      "message": "목표만 160 · BFF만 12 · 형식/필수/권한 변경 11",
+      "message": "목표만 149 · BFF만 24 · 형식/필수/권한 변경 10",
       "source": ""
     },
     {

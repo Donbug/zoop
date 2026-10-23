@@ -29,4 +29,8 @@ public interface AdminAuditRepository {
     void recordReviewDecision(String adminId, String email, String targetId, long reviewDecisionId, String decision,
             String sourceVersion, String sourceRevision, long revision, long globalRevision, String reason, String requestId,
             Instant occurredAt);
+
+    /** A publication rule switch, with the rule's own revision and the app-wide rule log revision it was given. */
+    void recordPublicationRuleSwitch(String adminId, String email, String ruleId, long changeId, boolean beforeEnabled,
+            boolean afterEnabled, long revision, long logRevision, String reason, String requestId, Instant occurredAt);
 }
