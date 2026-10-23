@@ -5,6 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.reset;
 
 import com.zoop.admin.auth.provision.AdminProvisioningService;
 import com.zoop.admin.auth.service.AdminPrincipal;
@@ -20,6 +24,12 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -31,6 +41,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /** Review decisions over the real migration, publication lock, idempotency and audit tables, with a recording AI source. */
 @SpringBootTest(properties = {
@@ -51,14 +62,19 @@ class ReviewDecisionPostgresTest {
         final List<String> calls = new CopyOnWriteArrayList<>();
         final Set<String> recorded = ConcurrentHashMap.newKeySet();
         final Set<String> brokenLookups = ConcurrentHashMap.newKeySet();
+        final AtomicInteger lookups = new AtomicInteger();
         volatile String next;
         volatile boolean loseReply;
+        /** Runs inside {@code review} before it answers (a test holding the call open). */
+        volatile Runnable beforeAnswer;
 
         @Override
         public void review(String sourceJobId, String relationCandidateId, String expectedSourceVersion,
                 String expectedSourceRevision, String decision, String operationId) {
             calls.add(String.join("|", sourceJobId, relationCandidateId, expectedSourceVersion, expectedSourceRevision,
                     decision, operationId));
+            Runnable hold = beforeAnswer;
+            if (hold != null) hold.run();
             String code = next;
             if (code != null) throw new Refused(code);
             recorded.add(operationId);
@@ -67,6 +83,7 @@ class ReviewDecisionPostgresTest {
 
         @Override
         public Lookup lookup(String sourceJobId, String operationId) {
+            lookups.incrementAndGet();
             if (brokenLookups.contains(operationId)) throw new IllegalStateException("broken lookup");
             return recorded.contains(operationId) ? Lookup.RECORDED : Lookup.NOT_FOUND;
         }
@@ -84,6 +101,7 @@ class ReviewDecisionPostgresTest {
     @Autowired ReviewDecisionService decisions;
     @Autowired FakeSource source;
     @Autowired JdbcTemplate jdbc;
+    @MockitoSpyBean JdbcReviewRepository reviews;
     @Autowired AdminProvisioningService provisioning;
 
     private AdminPrincipal admin;
@@ -94,6 +112,9 @@ class ReviewDecisionPostgresTest {
         source.calls.clear();
         source.next = null;
         source.loseReply = false;
+        source.beforeAnswer = null;
+        source.lookups.set(0);
+        reset(reviews);
         suffix = UUID.randomUUID().toString();
         String email = "review-admin-" + suffix + "@example.com";
         String adminId = provisioning.provision(email, "Review Admin", PASSWORD, "review-provision-" + suffix);
@@ -267,6 +288,45 @@ class ReviewDecisionPostgresTest {
     }
 
     @Test
+    void aRetryThatReadTheRecordBeforeARefusalCommittedReplaysTheStoredRefusal() throws Exception {
+        Ids ids = insertCandidateWithRelation("HOLD");
+        CountDownLatch inReview = new CountDownLatch(1);
+        CountDownLatch answer = new CountDownLatch(1);
+        CountDownLatch atIntent = new CountDownLatch(1);
+        CountDownLatch readIntent = new CountDownLatch(1);
+        source.next = "source_revision_conflict";
+        source.beforeAnswer = () -> {
+            inReview.countDown();
+            await(answer);
+        };
+        // Only the retry reads the intent by its record; hold it between its record read and its intent read.
+        doAnswer(call -> {
+            atIntent.countDown();
+            await(readIntent);
+            return call.callRealMethod();
+        }).when(reviews).intentForRecord(anyString(), anyBoolean());
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<ErrorCode> first = pool.submit(() -> code(() -> decide(ids, "race")));
+            assertTrue(inReview.await(10, TimeUnit.SECONDS), "the first request is at the AI source");
+            Future<ErrorCode> retry = pool.submit(() -> code(() -> decide(ids, "race")));
+            assertTrue(atIntent.await(10, TimeUnit.SECONDS), "the retry read the record while it was processing");
+            answer.countDown();
+            assertEquals(ErrorCode.REVISION_CONFLICT, first.get(10, TimeUnit.SECONDS), "the refusal is committed");
+            readIntent.countDown();
+            assertEquals(ErrorCode.REVISION_CONFLICT, retry.get(10, TimeUnit.SECONDS), "the retry replays it, not a 500");
+        } finally {
+            answer.countDown();
+            readIntent.countDown();
+            pool.shutdownNow();
+        }
+        assertEquals("refused", intentStatus("race"));
+        assertEquals(0, source.lookups.get(), "a settled intent is never looked up");
+        assertEquals(1, source.calls.size());
+    }
+
+    @Test
     void aContractMismatchIsNeverResentAndOnlyALookupSettlesIt() {
         Ids ids = insertCandidateWithRelation("HOLD");
         source.next = "idempotency_conflict";
@@ -393,6 +453,15 @@ class ReviewDecisionPostgresTest {
 
     private String operationOf(String key) {
         return intentColumn("operation_id", key);
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("latch timed out");
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(interrupted);
+        }
     }
 
     private static String operation(String call) {

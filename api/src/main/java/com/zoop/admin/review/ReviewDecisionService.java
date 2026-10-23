@@ -239,6 +239,10 @@ public class ReviewDecisionService {
         Intent intent = reviews.intentForRecord(record.id(), false)
                 .orElseThrow(() -> new CustomException(ErrorCode.SOURCE_UNAVAILABLE, true));
         if ("pending".equals(intent.status())) return send(intent);
+        // Settled since the record was read (applied and refused commit with their record): replay what was stored.
+        if (!"blocked".equals(intent.status())) {
+            return replay(idempotency.findById(intent.idempotencyRecordId()).orElseThrow(), null);
+        }
         // Blocked: only the ledger can say whether it was applied.
         Lookup lookup;
         try {
