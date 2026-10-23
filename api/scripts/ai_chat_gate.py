@@ -105,7 +105,8 @@ def author_replay() -> dict[str, Any]:
     answers["r1-cap1"] = _noul(0.84)  # and issue.read
     entry("chat-router", ROUTER_INPUT, {"model": "authored-synthetic-chat-router", "answers": answers})
 
-    entry("chat-answer", ANSWER_INPUT, {"choices": [{"message": {"role": "assistant",
+    entry("chat-answer", ANSWER_INPUT, {"model": "authored-synthetic-chat-answer",
+                                         "choices": [{"message": {"role": "assistant",
                                                                  "content": json.dumps(ANSWER, ensure_ascii=False)}}]})
 
     supported = {"type": "choice", "choice": "supported", "confidence": 0.93,
