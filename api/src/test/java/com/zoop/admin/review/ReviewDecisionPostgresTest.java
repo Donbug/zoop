@@ -351,8 +351,8 @@ class ReviewDecisionPostgresTest {
     @Test
     void anOperationHoldingAnotherCommandUnderTheSameIdIsNeverSettled() {
         // The ledger kept another body under this operation id (e.g. the app ledger was restored on its own): the POST is an
-        // idempotency_conflict and no lookup may turn the other command into this intent's decision.
-        Instant before = Instant.now().plusSeconds(1);
+        // idempotency_conflict and no lookup may turn the other command into this intent's decision. Each reconcile takes its
+        // cutoff after the intent it checks exists (openIntents reads created_at < cutoff), however long the earlier cases took.
         for (Function<Ids, Operation> other : List.<Function<Ids, Operation>>of(
                 ids -> command(ids, Lookup.RECORDED, "reject", "7", true),
                 ids -> command(ids, Lookup.RECORDED, "allow", "6", true),
@@ -367,7 +367,7 @@ class ReviewDecisionPostgresTest {
             source.ledger.put(operationOf(key), other.apply(ids));
 
             assertEquals(ErrorCode.INTERNAL_ERROR, code(() -> decide(ids, key)), "the retry does not settle it");
-            decisions.reconcile(before, 1000);
+            decisions.reconcile(Instant.now().plusSeconds(1), 1000);
             assertEquals("blocked", intentStatus(key), "nor does the reconciler");
             assertEquals(0, decisionCount(ids.relationTarget()));
         }
@@ -379,7 +379,7 @@ class ReviewDecisionPostgresTest {
         source.next = null;
         source.ledger.put(operationOf("mu"), command(ids, Lookup.UNCONFIRMED, "reject", "7", true));
         int calls = source.calls.size();
-        decisions.reconcile(before, 1000);
+        decisions.reconcile(Instant.now().plusSeconds(1), 1000);
         assertEquals("blocked|" + ReviewDecisionService.OPERATION_MISMATCH + ":review_unconfirmed",
                 intentStatus("mu") + "|" + intentCode("mu"), "the answer that left it pending is kept");
         assertEquals(calls, source.calls.size(), "never resent");
