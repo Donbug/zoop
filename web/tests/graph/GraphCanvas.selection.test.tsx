@@ -219,7 +219,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
           '/graph-assets/ai.svg',
         );
         expect(
-          screen.getByRole('button', { name: 'AI질의' }).querySelector('img'),
+          screen.getByRole('button', { name: 'AI 채팅' }).querySelector('img'),
         ).toBeNull();
         const filters = screen.getByRole('group', { name: '그래프 표시 필터' });
         expect(filters.closest('.relationship-toolbar')).toBeTruthy();
