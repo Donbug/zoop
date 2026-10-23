@@ -478,11 +478,11 @@ final class BriefingGroupedSimulationRules {
         require(text.size() == 1, "response_text");
         StrictJson.Obj input = StrictJson.parseObject(request.string("input"));
         String stage = receipt.string("stage");
-        if (!"editorial_freshness".equals(stage)) {
+        if (!Set.of("editorial_freshness", "issue_grounding").contains(stage)) {
             String prompt = SELECTION_STAGE.equals(stage) ? "grouped-selection.md"
                     : stage.endsWith("_verification") ? "grouped-verification.md" : "grouped-generation-" + input.string("edition") + ".md";
             require(Canonical.sha256(request.string("instructions")).equals(input.object("context").object("promptArtifacts").string(prompt)), "request_prompt_binding");
-        } // Editorial freshness has its own frozen-input/schema/resource check in BriefingEditorialRules.
+        } // Editorial freshness and native grounding have their own checks in BriefingEditorialRules / BriefingReferenceSupport.
 
         return new Recording(input, StrictJson.parseObject(text.getFirst()));
     }

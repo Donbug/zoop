@@ -16,10 +16,10 @@ import tools.jackson.databind.node.ObjectNode;
 
 /** Additive quiet-round policy. Importance may fall from 2 to 1; evidence and freshness never do. */
 final class BriefingContinuityRules {
-    static final String VERSION = "importance-continuity-v1";
+    static final String VERSION = "importance-continuity-v2";
     private BriefingContinuityRules() { }
 
-    static ObjectNode build(StrictJson.Obj round, Map<String, JsonNode> receipts, Path output, ArrayNode history) {
+    static ObjectNode build(StrictJson.Obj round, Map<String, JsonNode> receipts, Path output, ArrayNode history, Map<String,BriefingReferenceSupport.Proof> support) {
         ObjectNode out = initial(round);
         String state=round.string("selectionStatus");
         if ("SELECTED".equals(state)) return out.put("mode","core").put("importanceFloor",2)
@@ -35,7 +35,7 @@ final class BriefingContinuityRules {
         answer.object("assessments").exactly(ids);
         if(!answer.objects("selected").isEmpty()) return out.put("mode","validation_failed")
                 .put("message","완료되지 않은 선정 결과를 중요도 완화로 대신하지 않습니다.");
-        List<ObjectNode> choices=references(round,request,answer,history);
+        List<ObjectNode> choices=references(round,request,answer,history,support);
         ArrayNode refs=out.withArray("references"); choices.forEach(refs::add);
         if (!choices.isEmpty()) return out.put("mode","reference").put("importanceFloor",1)
                 .put("message","확인한 자료에서 핵심 기준을 충족한 새 이슈는 선정되지 않았습니다. 중요도 1의 기업 참고 소식을 별도로 전합니다.");
@@ -64,7 +64,7 @@ final class BriefingContinuityRules {
         return out;
     }
 
-    static List<ObjectNode> references(StrictJson.Obj round, StrictJson.Obj request, StrictJson.Obj answer, ArrayNode history) {
+    static List<ObjectNode> references(StrictJson.Obj round, StrictJson.Obj request, StrictJson.Obj answer, ArrayNode history, Map<String,BriefingReferenceSupport.Proof> support) {
         Set<String> registered=Set.copyOf(round.object("identity").strings("publicationCompanyIds"));
         Set<String> old=new HashSet<>(); history.forEach(v->old.add(v.path("issueId").asString()));
         Instant from=Instant.parse(round.object("window").string("from")), cutoff=Instant.parse(round.object("window").string("to"));
@@ -81,6 +81,7 @@ final class BriefingContinuityRules {
             Map<String,StrictJson.Obj> sources=new LinkedHashMap<>(); Map<String,String> companies=new LinkedHashMap<>();
             boolean valid=true;
             for(var mention:issue.objects("newMentions")) {
+                if(!BriefingReferenceSupport.matches(mention,support.get(mention.string("mentionId")))){valid=false;break;}
                 Instant published=Instant.parse(mention.string("publishedAt"));
                 if(!published.isAfter(from)||published.isAfter(cutoff)){valid=false;break;}
                 for(var e:mention.objects("evidence"))sources.putIfAbsent(e.string("evidenceId"),e);
@@ -89,15 +90,17 @@ final class BriefingContinuityRules {
                     companies.put(co.string("companyId"),co.string("name"));
                 }
             }
-            if(!valid||companies.isEmpty()||sources.isEmpty()||sources.values().stream().mapToInt(e->e.string("quote").codePointCount(0,e.string("quote").length())).sum()<80)continue;
+            if(!valid||companies.isEmpty()||sources.isEmpty())continue;
             if("MATERIAL_UPDATE".equals(decision) && (freshness.strings("deltaEvidenceIds").isEmpty()
                     || freshness.strings("deltaEvidenceIds").stream().noneMatch(sources::containsKey)))continue;
             var value=StrictJson.newObject().put("issueId",issue.string("issueId"))
-                    .put("title",issue.string("title"))
+                    .put("title",String.join("·",companies.values())+" 참고 소식")
                     .put("importance",1).put("priority",assessment.count("priority"))
                     .put("originalAssessmentStatus",assessment.string("status")).put("assessmentReason",assessment.string("reason"))
                     .put("freshness",decision).put("label","계획·전망을 포함한 참고 자료 · 확정 결과와 구분");
             var cos=value.putArray("companies");companies.forEach((id,name)->cos.addObject().put("id",id).put("name",name));
+            value.put("supportPolicy","recorded-supported-event-exact-quote-v1");
+            var proofs=value.putArray("supportRequestDigests");issue.objects("newMentions").stream().map(m->support.get(m.string("mentionId")).requestDigest()).distinct().forEach(proofs::add);
             var es=value.putArray("sources");sources.values().forEach(e->{
                 ObjectNode copy=StrictJson.newObject();
                 for(String key:List.of("evidenceId","documentId","documentVersion","bodySha256","quote","start","end","offsetUnit","url"))

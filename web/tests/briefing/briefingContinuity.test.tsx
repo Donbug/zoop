@@ -153,3 +153,18 @@ it('distinguishes retrospective source scope from a real collection outage', () 
     ]),
   ).toBe(false);
 });
+
+it('shows a short verified reference unchanged, including estimated qualifiers', () => {
+  render(
+    <MemoryRouter>
+      <BriefingContinuity
+        value={{ ...base, schemaVersion: 'importance-continuity-v2' }}
+        compact
+      />
+    </MemoryRouter>,
+  );
+  const quotes = screen.getAllByText(
+    '[합성] 원문에 있는 계획이며 완료가 아닙니다.',
+  );
+  expect(quotes.some((q) => q.closest('details') === null)).toBe(true);
+});

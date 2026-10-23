@@ -128,7 +128,7 @@ export type PreviousBriefingComparison =
     }
   | { status: 'unavailable'; reason: string };
 export type BriefingContinuity = {
-  schemaVersion: 'importance-continuity-v1';
+  schemaVersion: 'importance-continuity-v1' | 'importance-continuity-v2';
   roundId: string;
   cutoff: string;
   mode:

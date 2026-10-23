@@ -200,6 +200,8 @@ public final class BriefingReplayImporter {
         PublicationClockRegistry clocks = new PublicationClockRegistry(settings.clocks(), sourceSha, clockSha, sourceNodes);
         BriefingGroupedSimulationRules.Archive groupedArchive = grouped
                 ? BriefingGroupedSimulationRules.archive(bundle, settings.bundle().getParent(), sourceNodes, clocks) : null;
+        Map<String,BriefingReferenceSupport.Proof> referenceSupport=continuityEnabled && grouped
+                ? BriefingReferenceSupport.load(groupedArchive,settings.bundle().getParent()) : Map.of();
         List<StrictJson.Obj> definitions = bundle.objects("rounds");
         boolean explicitSeries = bundle.has("roundSeries");
         if (explicitSeries) BriefingRoundSeriesRules.validate(bundle);
@@ -285,7 +287,7 @@ public final class BriefingReplayImporter {
             }
             String state = definition.string("selectionStatus");
             ObjectNode continuity = continuityEnabled && grouped
-                    ? BriefingContinuityRules.build(definition, receipts, settings.bundle().getParent(), continuityHistory) : null;
+                    ? BriefingContinuityRules.build(definition, receipts, settings.bundle().getParent(), continuityHistory, referenceSupport) : null;
             boolean continuityRound = continuity != null && "HELD_SOURCE_COVERAGE".equals(state)
                     && inputs.size() > 0 && !definition.has("groupedUnresolvedPaidRequest")
                     && ("reference".equals(continuity.path("mode").asString())

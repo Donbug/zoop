@@ -50,9 +50,16 @@ export default function BriefingContinuity({
               {item.companies.map((company) => company.name).join(' · ')} ·{' '}
               {item.label}
             </p>
-            <p className={`${BODY} mt-2`}>
-              전망·계획의 확정과 실제 이행 여부를 확인할 참고 자료입니다.
-            </p>
+            {value.schemaVersion === 'importance-continuity-v2' &&
+            item.sources[0] ? (
+              <blockquote className={`${BODY} mt-2 whitespace-pre-wrap`}>
+                {item.sources[0].quote}
+              </blockquote>
+            ) : (
+              <p className={`${BODY} mt-2`}>
+                전망·계획의 확정과 실제 이행 여부를 확인할 참고 자료입니다.
+              </p>
+            )}
             <details className="mt-2" open={compact ? undefined : true}>
               <summary
                 className={`cursor-pointer text-xs underline ${FOCUS_RING}`}

@@ -37,3 +37,5 @@ The completed BRF-DEV-121 sample preserves its first company result and uses v2 
 ## Explicit eligibility manifest
 
 The guarded selector also receives `selectionEligibility.allowedIssueIds`, generated from the same per-issue provider schema. The importer checks that manifest against the recorded schema. The policy is included in the run/round identity, so a changed selection input cannot silently reuse an old completed round. For an already completed selection with a confirmed allowed-list reading mistake, one explicit correction can retain all original frozen evidence/history/provider contract and cite the existing allowed IDs as a repair hint. Old and corrected responses are both retained. This does not grant eligibility to an unregistered company or supply factual evidence.
+
+BRF-DEV-125: The new quiet/reference layer uses recorded SUPPORTED semantic/evidence bindings instead of an 80-character floor; see BRIEFING_CONTINUITY.md. The paragraph above describes the preserved generated-headline recording contract, not a universal definition of evidence sufficiency.
