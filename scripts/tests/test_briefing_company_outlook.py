@@ -49,4 +49,15 @@ class CompanyOutlookTest(unittest.TestCase):
         d=self.draft();d['companies'][0]['conditions']=[]
         with self.assertRaises(c.base.ReplayError): c.validate(d,self.frozen())
 
+    def test_v4_selected_only_presentation_cannot_invent_background_sources(self):
+        source={'documentId':'d','evidenceId':'a','bodySha256':'a'*64,'quote':'A가 계약 이행을 계획한다.',
+                'publishedAt':'2026-10-22T17:00:00+09:00'}
+        row={'roundId':'r','date':'2026-10-22','edition':'evening','marketEnrichment':{'cutoff':'2026-10-22T17:30:00+09:00'}}
+        effective={'resultSha256':'b'*64,'selected':[{'issueId':'i','companyLinks':[{'companyId':'A','name':'A'}],'sources':[source]}],
+                   'result':{'items':[{'issueId':'i','claims':[{'text':'계약 이행 계획','evidenceIds':['a']}]}]}}
+        frozen=c.freeze(row,effective,{'d':{'title':'원문','url':'https://example.com/source'}},[],version='company-outlook-v4')
+        self.assertEqual(['a'],frozen['targets'][0]['sourceIds']);self.assertEqual({'a'},set(frozen['sources']))
+        self.assertEqual('unavailable',frozen['targets'][0]['previous']['status'])
+        self.assertEqual('edition-bound-v2',frozen['comparisonContract'])
+
 if __name__=='__main__': unittest.main()

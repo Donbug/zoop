@@ -369,4 +369,4 @@ API 앱 검사기는 루트 Makefile(`api-test`/`api-build`/`api-ai-smoke`)과 C
 | 불투명 커서·공개 버전 고정 | 해당 조회 기능 담당 + 데이터 소유 담당 | 해당 조회 API 완료 전 |
 | 쓰기 멱등성·AI 작업 계약·감사 기록 | 해당 쓰기·AI·관리자 기능 담당 | 해당 기능 완료 전 |
 
-기업별 문안 품질 개선과 동일 입력 비교: [판단·새 사실·다음 확인 조건](docs/BRIEFING_COMPANY_READING_V2.md). 새 생성은 company-outlook-v3 / company-reading-v2를 사용하며 기존 발행본은 보존합니다.
+기업별 문안 품질 개선과 동일 입력 비교: [판단·새 사실·다음 확인 조건](docs/BRIEFING_COMPANY_READING_V2.md). 새 생성은 company-outlook-v4 / company-reading-v2를 사용하며 기존 발행본은 보존합니다.

@@ -75,7 +75,13 @@ def run(args):
         for path in sorted((cached / "market" / folder).glob("*")):
             if path.is_file():
                 base.write_once(output / "market" / folder / path.name, base.regular(path))
-    receipts, calls = market.fetch_receipts(output, offline_only)
+    urls=None
+    if bundle.get('roundSeries'):
+        from datetime import date,timedelta
+        series=bundle['roundSeries']['rounds']
+        urls=market.provider_urls((date.fromisoformat(series[0]['date'])-timedelta(days=10)).isoformat(),
+                                  (date.fromisoformat(series[-1]['date'])+timedelta(days=1)).isoformat())
+    receipts, calls = market.fetch_receipts(output, offline_only, urls)
     if calls:
         raise base.ReplayError("presentation_must_not_fetch")
     original = {r["roundId"]: r for r in bundle["rounds"]}

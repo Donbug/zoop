@@ -49,13 +49,15 @@ def run(args, transport=None):
     reading.company.require(source != output and source not in output.parents and output not in source.parents, 'evaluation_separate_output')
     raw = base.regular(source / 'bundle-v2.json')
     bundle = base.strict_load(raw)
-    layer = bundle['marketEnrichment']['seriesCompanyReading']
+    series = 'seriesCompanyReading' in bundle.get('marketEnrichment', {})
+    parent = bundle['marketEnrichment'] if series else bundle['presentationEnrichment']
+    layer = parent['seriesCompanyReading' if series else 'companyReadingLayer']
     reading.company.require(layer['schemaVersion'] == reading.SCHEMA_V2, 'evaluation_v2_required')
     rows = [row for row in layer['rounds'] if row['status'] == 'PASS' and
             (not args.round_id or row['roundId'] == args.round_id) and len(row['draft']['companies']) >= 3 and representative_cases(row['frozen'])]
     reading.company.require(bool(rows), 'evaluation_three_companies_required')
     improved = rows[0]
-    full = next(row for row in bundle['marketEnrichment']['seriesCompanyOutlooks']['rounds'] if row['roundId'] == improved['roundId'])
+    full = next(row for row in parent['seriesCompanyOutlooks' if series else 'companyOutlookLayer']['rounds'] if row['roundId'] == improved['roundId'])
     legacy_frozen = reading.freeze(full, reading.VERSION)
     reading.company.require(compare_input(improved) == {k: v for k, v in legacy_frozen.items() if k != 'schemaVersion'}, 'evaluation_same_input')
     prompts = reading.company.context.PROMPTS.with_name('reading-pairwise-v1')

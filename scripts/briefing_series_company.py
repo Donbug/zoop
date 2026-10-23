@@ -15,6 +15,12 @@ def generate(args):
     raw=base.regular(source/'bundle-v2.json');bundle=base.strict_load(raw)
     if not bundle.get('roundSeries'):raise base.ReplayError('series_required')
     version=getattr(args,'prompt_version','company-outlook-v1')
+    if version is None:
+        # CLI resumes preserve the original completed contract without a key.
+        # Only a new CLI execution adopts the improved prompt by default.
+        proof_path=output/'completed.json'
+        version=(base.strict_load(base.regular(proof_path))['identity'].get('promptVersion','company-outlook-v1')
+                 if proof_path.exists() else 'company-outlook-v4')
     identity={'baselineSha256':base.digest(raw),'authorizationRef':args.authorization_ref,'maximumCalls':args.max_calls}
     if version!='company-outlook-v1':identity['promptVersion']=version
     if not args.execute:
@@ -37,7 +43,7 @@ def generate(args):
         definition=news[market['roundId']]
         row={'roundId':market['roundId'],'date':market['date'],'edition':market['edition'],'marketEnrichment':market}
         frozen=company.freeze(row,definition,metadata,history,version)
-        if getattr(args,'edition_bound_comparison',False) or version in ('company-outlook-v2','company-outlook-v3'):frozen['comparisonContract']='edition-bound-v2'
+        if getattr(args,'edition_bound_comparison',False) or version in ('company-outlook-v2','company-outlook-v3','company-outlook-v4'):frozen['comparisonContract']='edition-bound-v2'
         frozen['promptVersion']=version
         path=output/'company-rounds'/(row['roundId']+'.json');base.private_dir(path.parent)
         if path.exists():
@@ -82,7 +88,8 @@ def run(args):
 def parser():
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('baseline','output','sources','authorization-ref'):p.add_argument('--'+key,required=True)
-    p.add_argument('--prompt-version',choices=['company-outlook-v1','company-outlook-v2','company-outlook-v3'],default='company-outlook-v1')
+    p.add_argument('--prompt-version',choices=['company-outlook-v1','company-outlook-v2','company-outlook-v3','company-outlook-v4'],
+                   help='New runs use v4; completed CLI resumes retain their recorded version')
     p.add_argument('--edition-bound-comparison',action='store_true')
     p.add_argument('--key-file');p.add_argument('--execute',action='store_true')
     p.add_argument('--without-prices', action='store_false', dest='with_prices', default=True,

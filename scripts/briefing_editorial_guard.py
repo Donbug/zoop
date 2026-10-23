@@ -50,7 +50,14 @@ def review_inputs(archive, spec, history):
         evidence, companies = grouped._catalog(c)
         words = set(re.findall(r"[a-z0-9가-힣]{2,}", (c['title']+' '+ ' '.join(e['quote'] for e in evidence.values())).lower()))
         ranked = [r for r in reports if set(r['companyIds']) & set(companies)]
-        ranked.sort(key=lambda r: (-len(words & set(re.findall(r"[a-z0-9가-힣]{2,}", (r.get('title','')+' '+r['quote']).lower()))), r['reportId']))
+        # A bounded lexical match can otherwise bury a reviewed issuer release
+        # under several copies of a later news article. Ranking is retrieval,
+        # never approval: the independent freshness review still checks dates,
+        # quotes and the actual event. Legacy histories keep their exact order.
+        issuer_first = history.get('retrievalPolicy') == 'reviewed-issuer-first-v1'
+        ranked.sort(key=lambda r: (
+            0 if issuer_first and r.get('sourceRole') in ('issuer_release','prior_publication') and r.get('reviewStatus') == 'reviewed' else 1,
+            -len(words & set(re.findall(r"[a-z0-9가-힣]{2,}", (r.get('title','')+' '+r['quote']).lower()))), r['reportId']))
         related = [r['reportId'] for r in ranked[:4]]
         issues.append({'issueId': c['issueId'], 'title': c['title'], 'priorReportIds': related,
                        'mentionEventTimes': [m['eventTime'] for m in c['newMentions']],

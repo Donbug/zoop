@@ -107,7 +107,7 @@ def run(args, transport=None):
         company.require(proof['bundleSha256'] == base.digest(base.regular(output / 'bundle-v2.json')), 'reading_completed_changed')
         return {**proof, 'newPaidCalls': 0, 'reusedCompletedRun': True}
     bundle = base.strict_load(base.regular(baseline / 'bundle-v2.json'))
-    series = 'roundSeries' in bundle
+    series = 'seriesCompanyOutlooks' in bundle.get('marketEnrichment', {})
     layer = bundle['marketEnrichment'] if series else bundle['presentationEnrichment']
     if series: company.require(not args.prices, 'series_reading_price_connection_separate')
     else: company.require(bool(args.prices), 'reading_prices_required')
