@@ -2,18 +2,23 @@ package com.zoop.admin.review;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zoop.admin.auth.provision.AdminProvisioningService;
 import com.zoop.admin.auth.service.AdminPrincipal;
+import com.zoop.admin.review.RelationReviewClient.Lookup;
 import com.zoop.admin.review.RelationReviewClient.Refusal;
 import com.zoop.admin.review.RelationReviewClient.Refused;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -24,6 +29,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Review decisions over the real migration, publication lock, idempotency and audit tables, with a recording AI source. */
@@ -37,18 +43,32 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class ReviewDecisionPostgresTest {
     private static final String PASSWORD = "Secure admin password 2026";
 
-    /** What the AI source was asked, and what it should answer next (null: recorded). */
+    /**
+     * What the AI source was asked and what its ledger holds. {@code next} is the error code it answers before recording
+     * anything (null: it records); {@code loseReply} records and then answers as if the reply were lost.
+     */
     static final class FakeSource implements RelationReviewClient {
         final List<String> calls = new CopyOnWriteArrayList<>();
-        volatile Refusal next;
+        final Set<String> recorded = ConcurrentHashMap.newKeySet();
+        final Set<String> brokenLookups = ConcurrentHashMap.newKeySet();
+        volatile String next;
+        volatile boolean loseReply;
 
         @Override
         public void review(String sourceJobId, String relationCandidateId, String expectedSourceVersion,
                 String expectedSourceRevision, String decision, String operationId) {
             calls.add(String.join("|", sourceJobId, relationCandidateId, expectedSourceVersion, expectedSourceRevision,
                     decision, operationId));
-            Refusal refusal = next;
-            if (refusal != null) throw new Refused(refusal, "fake_" + refusal);
+            String code = next;
+            if (code != null) throw new Refused(code);
+            recorded.add(operationId);
+            if (loseReply) throw new Refused("review_unconfirmed");
+        }
+
+        @Override
+        public Lookup lookup(String sourceJobId, String operationId) {
+            if (brokenLookups.contains(operationId)) throw new IllegalStateException("broken lookup");
+            return recorded.contains(operationId) ? Lookup.RECORDED : Lookup.NOT_FOUND;
         }
     }
 
@@ -73,6 +93,7 @@ class ReviewDecisionPostgresTest {
     void setUp() {
         source.calls.clear();
         source.next = null;
+        source.loseReply = false;
         suffix = UUID.randomUUID().toString();
         String email = "review-admin-" + suffix + "@example.com";
         String adminId = provisioning.provision(email, "Review Admin", PASSWORD, "review-provision-" + suffix);
@@ -100,6 +121,7 @@ class ReviewDecisionPostgresTest {
                 WHERE action = 'review.decision' AND target_id = ?""", String.class, ids.relationTarget()));
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_decisions WHERE target_id = ? AND job_id IS NOT NULL",
                 Integer.class, ids.relationTarget()), "an approval creates no job");
+        assertEquals("applied", intentStatus("key"));
 
         // Same key and body: the stored response, no second call or row. Another body under the key: conflict.
         assertEquals(response, decisions.decide(ids.candidate(), request("allow", ids.relation(), 0, "7"), "key-" + suffix,
@@ -131,30 +153,146 @@ class ReviewDecisionPostgresTest {
 
         assertTrue(source.calls.isEmpty(), "nothing was sent to the AI source");
         assertEquals(0, decisionCount(ids.relationTarget()));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM idempotency_records WHERE idem_key LIKE ?", Integer.class,
+                "%-" + suffix), "a request refused before the source stores nothing, so the same key can be sent again");
     }
 
     @Test
-    void aSourceRefusalRecordsNothingAndMapsToTheContractCodes() {
+    void aDefiniteRefusalClosesTheIntentAndTheKeyReplaysIt() {
         Ids ids = insertCandidateWithRelation("HOLD");
-        source.next = Refusal.STALE;
-        assertEquals(ErrorCode.REVISION_CONFLICT, code(() -> decide(ids, "s1")));
-        source.next = Refusal.IN_FLIGHT;
-        assertEquals(ErrorCode.REVISION_CONFLICT, code(() -> decide(ids, "s2")));
-        source.next = Refusal.INELIGIBLE;
-        assertEquals(ErrorCode.VALIDATION_FAILED, code(() -> decide(ids, "s3")), "a deterministic check is never overridden");
-        source.next = Refusal.UNCONFIRMED;
-        CustomException unconfirmed = assertThrows(CustomException.class, () -> decide(ids, "s4"));
-        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, unconfirmed.getErrorCode());
+        source.next = "source_revision_conflict";
+        assertEquals(ErrorCode.REVISION_CONFLICT, code(() -> decide(ids, "d1")));
+        assertEquals("refused|source_revision_conflict", intentStatus("d1") + "|" + intentCode("d1"));
+        source.next = null;
+        assertEquals(ErrorCode.REVISION_CONFLICT, code(() -> decide(ids, "d1")), "the key replays the refusal");
+        assertEquals(1, source.calls.size(), "and never sends it again");
+
+        source.next = "review_candidate_ineligible";
+        assertEquals(ErrorCode.VALIDATION_FAILED, code(() -> decide(ids, "d2")), "a deterministic check is never overridden");
+        assertEquals("refused", intentStatus("d2"));
 
         assertEquals(0, decisionCount(ids.relationTarget()));
         assertEquals("HOLD", jdbc.queryForObject("SELECT status FROM review_targets WHERE id = ?", String.class,
                 ids.relationTarget()));
-        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM idempotency_records WHERE idem_key LIKE ?", Integer.class,
-                "%-" + suffix), "a refused request leaves no idempotency record, so the same key can be sent again");
+    }
 
-        // The same key after the source recovers goes through.
+    @Test
+    void aTemporaryAnswerKeepsTheIntentOpenAndTheSameKeySendsItAgain() {
+        Ids ids = insertCandidateWithRelation("HOLD");
+        source.next = "review_call_in_flight";
+        CustomException busy = assertThrows(CustomException.class, () -> decide(ids, "t1"));
+        assertEquals(ErrorCode.REVISION_CONFLICT, busy.getErrorCode());
+        assertTrue(busy.isRetryable());
+        assertEquals("pending|review_call_in_flight", intentStatus("t1") + "|" + intentCode("t1"));
+
+        // Not read as a rights revocation: only "unavailable now".
+        source.next = "upstream_unavailable";
+        CustomException unavailable = assertThrows(CustomException.class, () -> decide(ids, "t1"));
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, unavailable.getErrorCode());
+        assertTrue(unavailable.isRetryable());
+
         source.next = null;
-        assertEquals("approved", decide(ids, "s4").decision());
+        assertEquals("approved", decide(ids, "t1").decision());
+        assertEquals(3, source.calls.size(), "the same operation was sent each time");
+        assertEquals(1, source.calls.stream().map(c -> c.substring(c.lastIndexOf('|'))).distinct().count());
+        assertEquals(1, decisionCount(ids.relationTarget()));
+    }
+
+    @Test
+    void aDecisionTheSourceAppliedIsSettledEvenAfterTheProjectionMovedOn() {
+        Ids ids = insertCandidateWithRelation("HOLD");
+        source.loseReply = true;
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, code(() -> decide(ids, "l1")));
+        assertEquals("pending", intentStatus("l1"));
+        assertEquals(0, decisionCount(ids.relationTarget()), "the app has only the intent so far");
+
+        // The sync moves on: a new source version becomes current and the old row's projection changes.
+        jdbc.update("UPDATE review_targets SET is_current = false, source_revision = '9' WHERE id = ?", ids.relationTarget());
+        jdbc.update("""
+                INSERT INTO review_targets (id, target_type, source_job_id, external_id, source_version, candidate_id,
+                                            status, source_revision, updated_at)
+                SELECT ?, target_type, source_job_id, external_id, 'digest-next-' || ?, candidate_id, 'ALLOW', '1', now()
+                FROM review_targets WHERE id = ?""", "rt-" + UUID.randomUUID(), suffix, ids.relationTarget());
+
+        source.loseReply = false;
+        assertTrue(decisions.reconcile(Instant.now().plusSeconds(1), 1000) >= 1);
+        assertEquals("applied", intentStatus("l1"));
+        assertEquals(1, decisionCount(ids.relationTarget()), "settled on the target the intent fixed");
+        assertEquals("ALLOW|1", jdbc.queryForObject("SELECT status || '|' || current_revision FROM review_targets WHERE id = ?",
+                String.class, ids.relationTarget()));
+        assertEquals("digest-" + suffix + "|7", jdbc.queryForObject("""
+                SELECT detail->>'sourceVersion' || '|' || (detail->>'sourceRevision') FROM audit_logs
+                WHERE action = 'review.decision' AND target_id = ?""", String.class, ids.relationTarget()),
+                "the audit keeps what the source checked, not the projection's later revision");
+        int calls = source.calls.size();
+        assertEquals("approved", decide(ids, "l1").decision(), "the key now replays the settled decision");
+        assertEquals(calls, source.calls.size());
+
+        // A lost reply the administrator retries is settled by that retry too.
+        Ids other = insertCandidateWithRelation("HOLD");
+        source.loseReply = true;
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, code(() -> decide(other, "l2")));
+        source.loseReply = false;
+        assertEquals("approved", decide(other, "l2").decision());
+        assertEquals(1, decisionCount(other.relationTarget()));
+    }
+
+    @Test
+    void theReconcilerReachesEveryOpenIntentAndOneFailureStopsNoOther() {
+        // Never seen by the source (refused before recording, then nobody retried): the lookup never settles it.
+        Ids unseen = insertCandidateWithRelation("HOLD");
+        source.next = "review_unconfirmed";
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, code(() -> decide(unseen, "u1")));
+        // Its lookup fails outright.
+        Ids broken = insertCandidateWithRelation("HOLD");
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, code(() -> decide(broken, "u2")));
+        source.brokenLookups.add(operationOf("u2"));
+        // Applied, reply lost: the one the reconciler must settle.
+        Ids lost = insertCandidateWithRelation("HOLD");
+        source.next = null;
+        source.loseReply = true;
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, code(() -> decide(lost, "u3")));
+        source.loseReply = false;
+
+        int open = jdbc.queryForObject("SELECT count(*) FROM review_decision_intents WHERE status IN ('pending', 'blocked')",
+                Integer.class);
+        Instant before = Instant.now().plusSeconds(1);
+        for (int run = 0; run <= open && !"applied".equals(intentStatus("u3")); run++) {
+            decisions.reconcile(before, 1);
+        }
+        assertEquals("applied", intentStatus("u3"), "a batch of one still reaches it behind intents that never settle");
+        assertEquals("pending", intentStatus("u1"), "a decision the source never saw is not sent for the administrator");
+        assertEquals("pending", intentStatus("u2"));
+        source.brokenLookups.clear();
+    }
+
+    @Test
+    void aContractMismatchIsNeverResentAndOnlyALookupSettlesIt() {
+        Ids ids = insertCandidateWithRelation("HOLD");
+        source.next = "idempotency_conflict";
+        assertEquals(ErrorCode.INTERNAL_ERROR, code(() -> decide(ids, "c1")));
+        assertEquals("blocked|idempotency_conflict", intentStatus("c1") + "|" + intentCode("c1"));
+
+        source.next = null;
+        assertEquals(ErrorCode.INTERNAL_ERROR, code(() -> decide(ids, "c1")), "the ledger has no such operation");
+        assertEquals(1, source.calls.size(), "a blocked intent is never resent");
+
+        source.recorded.add(operationOf("c1"));
+        assertEquals("approved", decide(ids, "c1").decision());
+        assertEquals("applied", intentStatus("c1"));
+    }
+
+    @Test
+    void theOperationIdCoversTheWholeIdempotencyScope() {
+        Ids first = insertCandidateWithRelation("HOLD");
+        Ids second = insertCandidateWithRelation("HOLD");
+        decide(first, "same");
+        decide(second, "same");
+        assertEquals(2, source.calls.size());
+        assertNotEquals(operation(source.calls.get(0)), operation(source.calls.get(1)),
+                "one key on two targets is two AI operations");
+        assertNotEquals(ReviewDecisionService.operationId("a", "/p", "k"), ReviewDecisionService.operationId("b", "/p", "k"));
+        assertTrue(ReviewDecisionService.operationId("a", "/p", "k").matches("[A-Za-z0-9_.-]{1,120}"));
     }
 
     @Test
@@ -172,11 +310,41 @@ class ReviewDecisionPostgresTest {
     }
 
     @Test
+    void theTablesKeepTheirHistoryAndIdentity() {
+        Ids ids = insertCandidateWithRelation("HOLD");
+        decide(ids, "h1");
+        String target = ids.relationTarget();
+
+        refusedBy("append-only", "UPDATE review_decisions SET reason = 'x' WHERE target_id = ?", target);
+        refusedBy("append-only", "DELETE FROM review_decisions WHERE target_id = ?", target);
+        refusedBy("identity is immutable", "UPDATE review_targets SET source_version = 'x' WHERE id = ?", target);
+        refusedBy("identity is immutable", "UPDATE review_targets SET external_id = 'x' WHERE id = ?", target);
+        refusedBy("moves by one", "UPDATE review_targets SET current_revision = current_revision + 2 WHERE id = ?", target);
+        jdbc.update("UPDATE review_targets SET source_revision = '8', status = 'HOLD' WHERE id = ?", target);
+        refusedBy("ck_review_decisions_admin", """
+                INSERT INTO review_decisions (target_id, decision, reason, admin_id, decided_at, revision, global_revision, origin)
+                VALUES (?, 'reject', '사유', ?, now(), 2, 999999999, 'admin')""", target, admin.adminId());
+        refusedBy("command is immutable", "UPDATE review_decision_intents SET reason = 'x' WHERE target_id = ?", target);
+        refusedBy("is settled", "UPDATE review_decision_intents SET status = 'pending', decision_id = NULL WHERE target_id = ?",
+                target);
+        refusedBy("are kept", "DELETE FROM review_decision_intents WHERE target_id = ?", target);
+    }
+
+    /** The statement fails, and for the named rule, not for another constraint it happens to break. */
+    private void refusedBy(String rule, String sql, Object... args) {
+        DataAccessException refused = assertThrows(DataAccessException.class, () -> jdbc.update(sql, args), sql);
+        String message = refused.getMostSpecificCause().getMessage();
+        assertTrue(message.contains(rule), () -> sql + " failed for another reason: " + message);
+    }
+
+    @Test
     void withoutAConfiguredSourceADecisionFailsClosed() {
-        Refused refused = assertThrows(Refused.class, () -> new RelationReviewClient.Unconfigured()
-                .review("j", "c", "v", "1", "allow", "op"));
+        var unconfigured = new RelationReviewClient.Unconfigured();
+        Refused refused = assertThrows(Refused.class, () -> unconfigured.review("j", "c", "v", "1", "allow", "op"));
         assertEquals(Refusal.UNCONFIRMED, refused.refusal());
         assertFalse(refused.getMessage().isBlank());
+        assertEquals(Refusal.UNCONFIRMED, assertThrows(Refused.class, () -> unconfigured.lookup("j", "op")).refusal());
+        assertEquals(Refusal.CONTRACT, Refusal.of("a_code_this_app_does_not_know"));
     }
 
     private record Ids(String job, String candidate, String relationTarget, String relation) {
@@ -204,10 +372,31 @@ class ReviewDecisionPostgresTest {
                 VALUES (?, ?, ?, ?, ?, ?, ?, '7', ?)
                 """;
         jdbc.update(sql, candidateTarget, "candidate", job, candidateCandidateId, "digest-" + suffix, candidateCandidateId,
-                "HOLD", java.sql.Timestamp.from(now));
+                "HOLD", Timestamp.from(now));
         jdbc.update(sql, relationTarget, "relation", job, "rel-1", "digest-" + suffix, candidateCandidateId, status,
-                java.sql.Timestamp.from(now));
+                Timestamp.from(now));
         return new Ids(job, candidateTarget, relationTarget, "rel-1");
+    }
+
+    private String intentStatus(String key) {
+        return intentColumn("status", key);
+    }
+
+    private String intentCode(String key) {
+        return intentColumn("source_code", key);
+    }
+
+    private String intentColumn(String column, String key) {
+        return jdbc.queryForObject("SELECT i." + column + " FROM review_decision_intents i JOIN idempotency_records r "
+                + "ON r.id = i.idempotency_record_id WHERE r.idem_key = ?", String.class, key + "-" + suffix);
+    }
+
+    private String operationOf(String key) {
+        return intentColumn("operation_id", key);
+    }
+
+    private static String operation(String call) {
+        return call.substring(call.lastIndexOf('|') + 1);
     }
 
     private long global() {

@@ -1,5 +1,7 @@
 package com.zoop.admin.audit;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
@@ -47,11 +49,14 @@ public class JdbcAdminIdempotencyStore {
                   AND method = 'POST' AND path = :path AND idem_key = :key
                 """ + (lock ? " FOR UPDATE" : ""),
                 new MapSqlParameterSource("adminId", adminId).addValue("path", path).addValue("key", key),
-                (rs, rowNum) -> {
-                    int status = rs.getInt("response_status");
-                    return new Record(rs.getString("id"), rs.getString("request_hash"), rs.getString("status"),
-                            rs.wasNull() ? null : status, rs.getString("response_body"));
-                }).stream().findFirst();
+                JdbcAdminIdempotencyStore::record).stream().findFirst();
+    }
+
+    public Optional<Record> findById(String id) {
+        return jdbc.query("""
+                SELECT id, request_hash, status, response_status, response_body::text AS response_body
+                FROM idempotency_records WHERE id = :id
+                """, new MapSqlParameterSource("id", id), JdbcAdminIdempotencyStore::record).stream().findFirst();
     }
 
     public void complete(String id, int responseStatus, String responseBody) {
@@ -62,5 +67,22 @@ public class JdbcAdminIdempotencyStore {
                 """, new MapSqlParameterSource("id", id).addValue("responseStatus", responseStatus)
                 .addValue("responseBody", responseBody));
         if (changed != 1) throw new IllegalStateException("Idempotency record was not completed");
+    }
+
+    private static Record record(ResultSet rs, int rowNum) throws SQLException {
+        int status = rs.getInt("response_status");
+        return new Record(rs.getString("id"), rs.getString("request_hash"), rs.getString("status"),
+                rs.wasNull() ? null : status, rs.getString("response_body"));
+    }
+
+    /** A definite failure: the same key and request replay it instead of running again. */
+    public void fail(String id, int responseStatus, String responseBody) {
+        int changed = jdbc.update("""
+                UPDATE idempotency_records
+                SET status = 'failed', response_status = :responseStatus, response_body = CAST(:responseBody AS jsonb)
+                WHERE id = :id AND status = 'processing'
+                """, new MapSqlParameterSource("id", id).addValue("responseStatus", responseStatus)
+                .addValue("responseBody", responseBody));
+        if (changed != 1) throw new IllegalStateException("Idempotency record was not failed");
     }
 }
