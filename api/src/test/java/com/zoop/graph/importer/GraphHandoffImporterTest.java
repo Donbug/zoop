@@ -262,7 +262,7 @@ class GraphHandoffImporterTest {
         String versionId = built.versionId();
 
         JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId)));
-        assertEquals("zoop-graph-handoff-bundle-6", receipt.get("bundle").get("schemaVersion").stringValue());
+        assertEquals("zoop-graph-handoff-bundle-7", receipt.get("bundle").get("schemaVersion").stringValue());
         // The hand-written expectation of the issue's field provenance: the one unanimous mention states every value, and the
         // receipt says so without claiming any value was verified (selection, not fact verification).
         JsonNode provenance = receipt.get("bundle").get("issues").get(0).get("fieldProvenance");
@@ -319,6 +319,86 @@ class GraphHandoffImporterTest {
         assertEquals(0, provenance.get("withheld").size());
         assertEquals("2026-09-30", snapshot.issues().get(0).eventTime());
         assertEquals("2026Q3", snapshot.issues().get(0).period());
+    }
+
+    @Test
+    void anAvailableSummaryIsRetainedExactlyInTheReceiptAndNeverReachesTheSnapshotOrTheResult() throws Exception {
+        Built summarized = HandoffFixtures.withSummary(built, HandoffFixtures::availableSummary);
+        handoff.envelope = summarized.envelopeBytes();
+
+        GraphHandoffResult result = importer.run(summarized.request());
+
+        assertTrue(result.succeeded(), () -> String.valueOf(result.failure() == null ? null : result.failure().failure()));
+        String versionId = summarized.versionId();
+        // The receipt keeps the producer's exact object: every claim, id, digest, identity and the job pin.
+        JsonNode retained = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId))).get("bundle").get("issues").get(0).get("summary");
+        assertEquals(summarized.bundle().get("issues").get(0).get("summary"), retained);
+        assertEquals("available", retained.get("status").stringValue());
+        assertEquals(HandoffFixtures.SUMMARY_CLAIM, retained.get("text").stringValue());
+        assertEquals(HandoffFixtures.SUMMARY_JOB, retained.get("source").get("jobId").stringValue());
+        // It is a receipt-only record, not a public snapshot projection: nothing of it is in the snapshot or in the written result.
+        byte[] snapshotBytes = Files.readAllBytes(snapshotFile(versionId));
+        assertEquals(PublicGraphSnapshot.FORMAT, GraphSnapshotCodec.read(snapshotBytes, versionId).snapshotFormat());
+        String snapshotText = new String(snapshotBytes, StandardCharsets.UTF_8);
+        String resultText = new String(GraphHandoffResultWriter.toBytes(result), StandardCharsets.UTF_8);
+        for (String summaryOnly : List.of(HandoffFixtures.SUMMARY_CLAIM, "resultVersion", "isr-", HandoffFixtures.SUMMARY_JOB, "authored-replay",
+                "claims", "basisDigest", "issueSummary")) {
+            assertFalse(snapshotText.contains(summaryOnly), "snapshot: " + summaryOnly);
+            assertFalse(resultText.contains(summaryOnly), "result: " + summaryOnly);
+        }
+
+        // The same pins again: a no-op with the same retained summary.
+        assertEquals(Outcome.UNCHANGED, importer.run(summarized.request()).staged().outcome());
+    }
+
+    @Test
+    void aTemporalPendingOrJobCodedSummaryIsRetainedAsStatedAndANotRequestedOneNeverBecomesAnAvailableOne() throws Exception {
+        Built held = HandoffFixtures.build(Spec.standard().withVerdicts());
+        handoff.envelope = held.envelopeBytes();
+
+        assertTrue(importer.run(held.request()).succeeded());
+        JsonNode retained = HandoffFixtures.parse(Files.readAllBytes(receiptFile(held.versionId()))).get("bundle").get("issues").get(0).get("summary");
+        assertEquals("temporal-review-pending", retained.get("code").stringValue());
+        assertTrue(retained.get("source").isNull());
+        assertFalse(Files.readString(receiptFile(held.versionId())).contains(HandoffFixtures.SUMMARY_CLAIM));
+    }
+
+    @Test
+    void aTamperedSummaryIsRefusedBeforeAnythingIsWrittenWhateverItsDigestsSay() throws Exception {
+        InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+        InMemoryDocumentRegistry.State registryBefore = registry.state();
+        long filesBefore = fileCount();
+        Built summarized = HandoffFixtures.withSummary(built, HandoffFixtures::availableSummary);
+        Built held = HandoffFixtures.build(Spec.standard().withVerdicts());
+        record Forgery(String rule, Built forged) {
+        }
+        List<Forgery> forgeries = List.of(
+                new Forgery("a claim text edited behind the digests", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary").get("claims").get(0)).put("text", "합성기업이 계약을 취소했다."))),
+                new Forgery("a summary text that is not the claims", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary")).put("text", "다른 문장이다."))),
+                new Forgery("an evidence id outside the issue's mention quotes", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary").get("claims").get(0)).putArray("evidenceIds")
+                                .add("ev-" + "0".repeat(64)))),
+                new Forgery("a basis digest of another basis", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary").get("source")).put("basisDigest", "0".repeat(64)))),
+                new Forgery("an available summary on an issue whose time field is held", HandoffFixtures.repinned(held,
+                        b -> ((ObjectNode) b.get("issues").get(0)).set("summary", HandoffFixtures.availableSummary(b)))),
+                new Forgery("not-requested on an issue whose time field is held", HandoffFixtures.repinned(held,
+                        b -> ((ObjectNode) b.get("issues").get(0)).set("summary", HandoffFixtures.unavailable("not-requested")))),
+                new Forgery("temporal-review-pending on an issue nobody held", HandoffFixtures.repinned(built,
+                        b -> ((ObjectNode) b.get("issues").get(0)).set("summary", HandoffFixtures.unavailable("temporal-review-pending")))),
+                new Forgery("a replay summary relabelled as a provider's", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary").get("producer")).put("kind", "provider"))));
+        for (Forgery forgery : forgeries) {
+            handoff.envelope = forgery.forged().envelopeBytes();
+
+            GraphHandoffException failure = failure(importer.run(forgery.forged().request()));
+
+            assertEquals(GraphHandoffFailure.BUNDLE_INVALID, failure.failure(), forgery.rule());
+            assertEquals(0, graph.writes(), forgery.rule());
+            assertNothingWritten(graphBefore, registryBefore, filesBefore);
+        }
     }
 
     @Test
@@ -470,7 +550,7 @@ class GraphHandoffImporterTest {
     @Test
     void anExportOfAnEarlierBundleSchemaIsAnInvalidBundleAndNothingIsWritten() throws Exception {
         for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3",
-                "zoop-graph-handoff-bundle-5")) {
+                "zoop-graph-handoff-bundle-5", "zoop-graph-handoff-bundle-6")) {
             InMemoryGraphHandoffRepository.State graphBefore = graph.state();
             InMemoryDocumentRegistry.State registryBefore = registry.state();
             long filesBefore = fileCount();
@@ -479,8 +559,11 @@ class GraphHandoffImporterTest {
             bundle.put("schemaVersion", schema);
             ObjectNode issue = (ObjectNode) bundle.get("issues").get(0);
             // What each earlier build wrote: -3 has provenance without `withheld` and no verdicts, -2 no provenance, -1 no mentions;
-            // -5 has today's issues, so only its schema string (this build writes impacts, it never did) marks it as earlier.
-            if (!schema.endsWith("-5")) {
+            // -5 has today's issues, so only its schema string marks it as earlier; -6 lacks the issue summary and its policy key.
+            if (schema.endsWith("-6")) {
+                issue.remove("summary");
+                ((ObjectNode) bundle.get("policy")).remove("issueSummary");
+            } else if (!schema.endsWith("-5")) {
                 issue.remove("fieldVerdicts");
                 if (schema.endsWith("-3")) {
                     ((ObjectNode) issue.get("fieldProvenance")).remove("withheld");

@@ -93,6 +93,8 @@ pipeline-smoke:
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/relation_smoke.py
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/dependency_smoke.py
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/graph_handoff_smoke.py
+	$(PIPELINE_PYTHON) ai/pipeline/scripts/handoff_exposure_smoke.py
+	$(PIPELINE_PYTHON) ai/pipeline/scripts/issue_summary_smoke.py
 .PHONY: pipeline-collection-demo
 # Keeps synthetic loopback collection, prepared documents and exports; never collects external news.
 COLLECTION_DEMO_DIR ?= /tmp/zoop-collection-demo

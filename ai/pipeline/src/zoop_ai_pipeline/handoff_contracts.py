@@ -16,6 +16,8 @@ from pydantic import Field, model_validator
 from .extraction_contracts import ExtractionFailure, ObservationRef
 from .graph_projection_contracts import APPROVAL_KEYS, APPROVAL_KINDS
 from .ingestion_contracts import Wire, canonical, digest, timestamp
+from .issue_summary_contracts import POLICY as ISSUE_SUMMARY_POLICY
+from .issue_summary_contracts import check_summary, summary_basis
 from .relation_contracts import LABELS
 from .relation_rules import label_from
 from .source_support import KEYS as SOURCE_SUPPORT_KEYS
@@ -24,8 +26,8 @@ from .source_support import source_support
 __all__ = ["ExtractionFailure", "canonical", "digest"]
 
 SCHEMA = "zoop-ai-handoff-1"
-BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-6"
-DECISIONS_SCHEMA = "zoop-public-decisions-2"
+BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-7"
+DECISIONS_SCHEMA = "zoop-public-decisions-3"
 BINDINGS_SCHEMA = "zoop-app-document-bindings-1"
 LEDGER_VERSION = "zoop-handoff-ledger-1"
 POLICY = "zoop-public-projection-policy-1"
@@ -117,6 +119,14 @@ APP_IMPORT_PENDING = (
 class Pin(Wire):
     job_id: str = Field(pattern=ID)
     input_digest: str = Field(pattern=HASH)
+
+
+class SummaryPin(Wire):
+    """The operator's pin of ONE immutable ready issue-summary job result (`zoop-ai-issue-summary` ledger): the job, its input digest and the digest of its
+    result. Only a pin makes a summary part of a handoff; nothing here says what the summary states."""
+    job_id: str = Field(pattern=ID)
+    input_digest: str = Field(pattern=HASH)
+    result_digest: str = Field(pattern=HASH)
 
 
 class Upstream(Wire):
@@ -226,6 +236,7 @@ class IssueDecision(Wire):
     representative: Representative | None
     decision_ref: str = Field(pattern=ID)
     field_verdicts: list[FieldVerdict] = Field(max_length=2 * MAX_MENTIONS)
+    summary: SummaryPin | None
 
     @model_validator(mode="after")
     def distinct_verdicts(self):
@@ -290,7 +301,7 @@ class Origin(Wire):
 
 
 class Decisions(Wire):
-    schema_version: Literal["zoop-public-decisions-2"]
+    schema_version: Literal["zoop-public-decisions-3"]
     policy_version: Literal["zoop-public-projection-policy-1"]
     companies: list[CompanyDecision] = Field(max_length=MAX_DECISIONS)
     issues: list[IssueDecision] = Field(max_length=MAX_DECISIONS)
@@ -609,6 +620,20 @@ def _field_provenance(issue: dict, mentions: list, verdicts: list) -> None:
     _need("eventTime" in withheld or issue["timePrecision"] == chosen["timePrecision"], "issue.timePrecision.selected")
 
 
+def _issue_summary(issue: dict, evidence: dict, articles: dict, execution: tuple) -> None:
+    """`issue.summary`: recomputed from the bundle ITSELF by the pure `issue_summary_contracts` rules, never trusted. A HOLD/REJECT field verdict anywhere on the issue
+    leaves exactly `unavailable/temporal-review-pending` (and an oversize input exactly `input-too-large`): no summary text exists in the bundle then. Otherwise the
+    summary is `not-requested`, a verified job's `available` object (its claims cite only the issue's own mention evidence, the basis digest, the result version and
+    the producer/verifier kinds are recomputed against the bundle's execution mode) or a job-coded `unavailable` that names its pinned result. The checker raises
+    `ValueError(code)` and nothing else of the summary is read."""
+    try:
+        check_summary(issue, issue["summary"], summary_basis(issue, evidence, articles), execution)
+    except ValueError as exc:
+        _bad(f"issue.{exc}")                  # the checker's own location already starts with `summary.`
+    except (KeyError, TypeError, AttributeError):
+        _bad("issue.summary")
+
+
 def _impact_proposal(value, at: str) -> None:
     proposal = _keys(value, ("direction", "reason", "limitations", "verification"), at)
     _need(proposal["direction"] in LABELS, f"{at}.direction")
@@ -700,10 +725,12 @@ def validate_bundle(bundle: dict) -> None:
     prov = _keys(bundle["provenance"], ("declaredSourceKind", "observedSourceKind", "executionMode", "recordingKind"), "provenance")
     _need(prov["declaredSourceKind"] == prov["observedSourceKind"] and prov["declaredSourceKind"] in ("synthetic", "actual"), "provenance")
     _need((prov["executionMode"], prov["recordingKind"]) in EXECUTION_MODES, "provenance.mode")
-    policy = _keys(bundle["policy"], ("version", "files", "evidenceIdKind", "offsetUnit", "geography", "structural", "sequence", "sourceSupport", "impacts"), "policy")
+    policy = _keys(bundle["policy"], ("version", "files", "evidenceIdKind", "offsetUnit", "geography", "structural", "sequence", "sourceSupport", "impacts",
+                                      "issueSummary"), "policy")
     _need(policy["version"] == POLICY and policy["evidenceIdKind"] == EVIDENCE_KIND and policy["offsetUnit"] == OFFSET_UNIT, "policy")
     for name, expected in (("geography", "operator-field-verdict"), ("structural", "manual-operator-review"),
-                           ("sequence", "s2-comparison-with-operator-decision"), ("sourceSupport", SOURCE_SUPPORT_POLICY), ("impacts", IMPACT_POLICY_NAME)):
+                           ("sequence", "s2-comparison-with-operator-decision"), ("sourceSupport", SOURCE_SUPPORT_POLICY), ("impacts", IMPACT_POLICY_NAME),
+                           ("issueSummary", ISSUE_SUMMARY_POLICY)):
         _need(policy[name] == expected, f"policy.{name}")
     files = _keys(policy["files"], ("canonical", "decisions", "bindings"), "policy.files")
     for value in files.values():
@@ -885,7 +912,7 @@ def validate_bundle(bundle: dict) -> None:
     issues = {}
     for i in _list(bundle["issues"], "issues", MAX_ISSUES):
         _keys(i, ("id", "canonicalId", "title", "action", "target", "eventTime", "timePrecision", "period", "assertionStatus", "geography", "evidenceIds",
-                  "sourceEvents", "decisionRef", "representative", "fieldProvenance", "fieldVerdicts", "mentions", "sourceSupport"), "issue")
+                  "sourceEvents", "decisionRef", "representative", "fieldProvenance", "fieldVerdicts", "mentions", "sourceSupport", "summary"), "issue")
         _text(i["id"], "issue.id", ID)
         _text(i["canonicalId"], "issue", ID)
         _text(i["decisionRef"], "issue", ID)
@@ -944,6 +971,7 @@ def validate_bundle(bundle: dict) -> None:
         _need(support == source_support([{"articleId": a, "textSha256": articles[(a, v)]["textSha256"],
                                           "originId": (articles[(a, v)]["origin"] or {}).get("originId")} for a, v in cited]), "issue.sourceSupport.exact")
         _field_provenance(i, mentions, verdicts)
+        _issue_summary(i, evidence, articles, (prov["executionMode"], prov["recordingKind"]))
         _need(i["id"] not in issues and i["id"] not in companies and i["id"] not in path_companies, "issues.unique")
         issues[i["id"]] = i
 

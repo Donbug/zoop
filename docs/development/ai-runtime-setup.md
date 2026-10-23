@@ -8,8 +8,9 @@
 |---|---|---|
 | S1 문서 요약·감성 생성, 기존 outlook (`zoop-ai`) | live 가능 | **OpenAI-compatible `chat/completions`**. 요청당 정확히 한 번 송신, 재시도 없음, `json_schema` strict, effort는 비면 필드 생략 |
 | S1 의미 검증 (`semantic-verification`) | live 가능 | 기본은 위 chat adapter. `ZOOP_AI_VERIFY_PROVIDER=typesafe-native`를 고르면 네이티브 Jev(아래 행) |
-| S2 추출·비교·topic, S3 관계·impact·검증 (`zoop-ai-extract`, `zoop-ai-relation`) | 기본 replay. **live 경로 구현됨, 기본 꺼짐, 합성 데이터 1회 실측(§10.8)** | `ai/pipeline`의 `live_runtime`이 일곱 stage의 실제 요청 빌더와 한 번만 보내는 transport를 가진다(§10). 호출은 승인된 별도 실행에서만 한다 |
-| 네이티브 TypeSafe Jev | **`semantic-verification` 한정 live 가능(옵트인)** | `POST {TYPESAFE_BASE_URL}/systemone`, 검증 stage당 한 번, 재시도·redirect 없음. 생성·outlook은 Jev가 하지 않는다. Choice/Noul 임계치는 **잠정 공학값(미보정)** (§8) |
+| S2 추출·비교·topic, S3 관계·impact·검증 (`zoop-ai-extract`, `zoop-ai-relation`) | 기본 replay. **live 경로 구현됨, 기본 꺼짐, 합성 데이터 1회 실측(§10.8)** | `ai/pipeline`의 `live_runtime` 기본 family(PIPELINE)가 일곱 stage의 실제 요청 빌더와 한 번만 보내는 transport를 가진다(§10). 호출은 승인된 별도 실행에서만 한다 |
+| 이슈 요약 (`issue-summary`, `verify-issue-summary`) | **별도 family 구현됨(§10.9), 기본 꺼짐, 실제 유료 호출 없음** | 같은 `live_runtime`의 별도 `ISSUE_SUMMARY` family. 합성 단위 검사와 loopback CLI 검증 범위는 §10.9를 따른다 |
+| 네이티브 TypeSafe Jev | **옵트인 검증 전용 live 경로**: S1 `semantic-verification`(`ZOOP_AI_VERIFY_PROVIDER`), S3 `verify-*`(§10.1), 이슈 요약 `verify-issue-summary`(§10.9) | `POST {TYPESAFE_BASE_URL}/systemone`, 검증 stage당 한 번, 재시도·redirect 없음. 생성·outlook은 Jev가 하지 않는다. Choice/Noul 임계치는 **잠정 공학값(미보정)** (§8) |
 | Responses API / 도구 호출 | 미구현 | S1은 도구를 보내지 않는다 |
 
 Jev를 OpenAI 호환 base URL이나 chat 모델 칸에 넣으면 동작하지 않는다. `config-check`는 이를 오류(`native_jev_model_on_openai_compatible_chat`, `native_jev_endpoint_not_openai_compatible`)로 보고한다. 가짜 Jev env를 OpenAI base에 두지 않는다. 기존 검증을 Jev로 자동 전환하지 않는다: `ZOOP_AI_VERIFY_PROVIDER`를 명시한 때만 바뀌고, 이미 저장된 job은 환경이 아니라 submit 때 고정한 설정을 따른다. S1 worker 설정(`ZOOP_AI_LIVE_ENABLED`, `ZOOP_AI_GLOBAL_MAX_CALLS`)과 S2/S3 파이프라인 live 설정(`ZOOP_AI_PIPELINE_LIVE_*`, §10)은 **별개**이며 한쪽을 켜도 다른 쪽이 켜지지 않는다. Jev 임계치는 두 경로 모두 미보정이다.
@@ -213,8 +214,8 @@ provider는 stage가 정한다. endpoint나 모델 이름에서 권한을 추론
 오프라인 점검(네트워크 없음, 파일 생성 없음, 키는 있음/없음만):
 
 ```sh
-python -m zoop_ai_pipeline.live_runtime binding   # 비밀 아님 설정 검증 + binding·identity·stage별 recipient/purpose
-python -m zoop_ai_pipeline.live_runtime check     # 위 + 예산 변수와 두 키 필요
+python -m zoop_ai_pipeline.live_runtime binding [pipeline|issue-summary]   # 비밀 아님 설정 검증 + binding·identity·stage별 recipient/purpose (family 생략 = pipeline)
+python -m zoop_ai_pipeline.live_runtime check [pipeline|issue-summary]     # 위 + 예산 변수와 두 키 필요
 ```
 
 ### 10.3 고정(binding)과 권한
@@ -303,3 +304,22 @@ python -m zoop_ai_pipeline.live_runtime check      # 오프라인: 설정·키 �
 - 증명: 합성 문서에 대해 S2·S3 live 경로(`gpt-6-luna`/`high`, `jev-1.14.0`)가 한 번 끝까지 동작했고, receipt·공유 예산·수동 승인·Neo4j 투영이 이어졌다. 이 한 번의 실행에서 OpenAI strict schema와 Jev 질문 형식이 받아들여졌다.
 - 증명하지 않음: 실제 뉴스·운영 데이터에서의 품질, Jev 임계치의 보정(여전히 잠정), 청구서와 보수 추정의 일치(계정 대시보드와 비교한 적 없음), Jev의 공유 `state` 과금 횟수, 반복 실행의 안정성. 수동 승인은 사람이 한 것이 아니다.
 - **S1 worker의 유료 실행은 이 기록에 포함되지 않으며 검증되었다고 주장하지 않는다**(§7의 S1 smoke는 별개의 승인 대상이다).
+
+### 10.9 이슈 요약 family (`ISSUE_SUMMARY`, 구현됨, 기본 꺼짐, 호출 승인 아님)
+
+이슈 요약은 PIPELINE binding에 stage를 더하지 않고 **별도 family**로 둔다. 저장된 receipt를 decode할 때 `from_binding`이 binding 전체의 일치를 요구하므로 전역 stage 목록에 하나만 더해도 기존 live job을 복구할 수 없게 되기 때문이다. family는 `live_family.py`의 값 타입(`Family`, `Verifier`)이고 `LiveRuntime(..., family=PIPELINE)`가 기본값이다. `from_binding`은 binding의 `version`으로 family를 고르며 모르는 version은 `live_binding_mismatch`다.
+
+| 항목 | 값 |
+|---|---|
+| binding `version` | `zoop-issue-summary-runtime-1` (PIPELINE은 `zoop-live-runtime-1` 그대로) |
+| 생성 stage | `issue-summary`: OpenAI 호환 `chat/completions`, `gpt-6-luna`, strict `json_schema` `{"claims":[{"text","quoteIds"}]}`. 제목(검증되지 않은 라벨, 근거 아님)과 인용문만 `q1…qN` 라벨로 보내며 내부 evidence·기사·문서 id, mention 필드, 시간 값, verdict는 보내지 않는다 (`issue_summary_prompts.py`) |
+| 검증 stage | `verify-issue-summary`: 네이티브 Jev `POST {TYPESAFE_BASE_URL}/systemone`, `jev-1.14.0`. 인용된 quote만 `context`(`report`/`background`)와 함께 보낸다. claim마다 Choice 하나(자기 인용문만으로 `supported`/`contradicted`/`insufficient`), 전체에 대해 투자 조언·근거 없는 인과·시간 틀(`background`만 있는 사건을 새것·현재로 제시했는가) Choice 셋(`absent`/`present`). 임계치는 §10.6과 같은 잠정값(미보정) (`issue_summary_jev.py`) |
+| purpose | `pipeline:issue-summary`, `pipeline:verify-issue-summary` |
+| recipient | 식이 PIPELINE과 같아 생성은 `openai-compatible:<revision>`, 검증은 `typesafe-native:<revision>` 문자열이 같다 |
+| 환경 | **같은 변수·같은 `.env`**(§10.2). 새 변수 없음. family는 환경이 아니라 코드 인자(`from_env(family=ISSUE_SUMMARY)`)와 위 CLI 인자로 고른다 |
+
+- **판정 매핑**: 모든 claim이 `supported`이고 세 검사(`prohibitedAdvice`, `unsupportedCausality`, `backgroundAsCurrent`)가 모두 `absent`일 때만 `available`. `contradicted` claim 또는 `present`는 `verifier-reject`(hold보다 우선), 그 밖은 `verifier-hold`다. 확률·confidence가 임계치 미만이면 claim은 `insufficient`, 세 검사는 `uncertain`이라 hold이며 reject가 되지 않는다. 생성 reply는 `issue_summary_prompts.claims_from`만이 claim으로 바꾸며(1~5개, claim당 280 code point 이하·한글 음절 포함·인용 1~5개), 어긋나면 보정 없이 `producer-invalid`다.
+- **`background` 시간 틀**: 생성 prompt는 `background` 인용을 새 사건으로 쓰지 말라고 지시하고, 검증기는 각 인용의 context를 받아 `background`만으로는 사건이 새것·현재임을 보이지 못한다는 기준으로 claim과 시간 틀 검사(`framing`)를 묻는다. 시간 틀이 어긋난 것으로 판정되면(`present`) 게이트가 `verifier-reject`로 막는다. 이 판단은 Jev가 하며(결정적 규칙이 아님) 정확도는 보정되지 않았다. 합성 시험은 요청에 보이는 context로 저작한 판정을 내는 가짜 transport로 게이트 동작만 확인한다.
+- **PIPELINE 불변 증거**: 기본 family의 binding 바이트·identity·stage별 digest와 일곱 stage의 `prepare` digest를 family 도입 **전** 코드에서 떠서 고정 리터럴로 `ai/pipeline/tests/test_live_families.py`에 넣었다(예산 identity를 고정한 생성자 기준이라 경로와 무관). 리팩터 후 같은 값이 나오는 것을 확인했다. 로컬에 보관된 실제 `live-20261021…` binding으로 `from_binding`을 해 본 것은 아니다.
+- **증거 수준**: 요청 빌더·reply 매핑·판정·family 경계는 합성 `httpx.MockTransport` 시험으로 확인했다. `ai/pipeline/scripts/issue_summary_smoke.py`는 실제 CLI·원장·런타임과 loopback 모의 provider로 응답 유실·중단 복구·권한 철회·예산 소진을 확인한다. live 시험에서 원천 Planner만 대체하며, 실제 Planner 연결은 같은 스크립트의 replay 경로에서 검증한다. 이슈 요약의 **실제 유료 호출은 한 번도 하지 않았다**. 실제 모델 품질과 임계치 보정은 검증되지 않았다.
+- **승인과 예산은 여전히 필요**: 2026-10-21의 USD 10 승인은 그 합성 시험 범위였고 이슈 요약으로 확장되지 않는다. 같은 변수를 쓴다고 승인된 것이 아니다. 실제 호출 전에는 새 명시 승인(대상, 이슈 수 N, 최대 호출 수 2N(생성 1·검증 1), `MAX_USD`)과 **새 예산 디렉터리**(상한은 같은 디렉터리 안에서 줄일 수만 있다, §10.5)가 필요하고, 소스 grant의 `purposes`에 위 두 purpose가 명시적으로 허용되어야 한다(이 문서는 grant를 바꾸지 않는다).

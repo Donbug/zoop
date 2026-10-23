@@ -31,7 +31,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The strict, closed validator of a {@code zoop-graph-handoff-bundle-6} and of its frozen manifest: a Java port of the
+ * The strict, closed validator of a {@code zoop-graph-handoff-bundle-7} and of its frozen manifest: a Java port of the
  * producer's own {@code validate_bundle} ({@code ai/pipeline/.../handoff_contracts.py}), so the app never trusts a producer
  * claim it did not recompute. Every object has exactly the keys the producer writes, every value its type and pattern, every
  * reference is closed (articles, evidence, companies, issues, relations, source pins, review revisions), every id formula
@@ -43,7 +43,7 @@ import tools.jackson.databind.node.ObjectNode;
  */
 final class HandoffBundleVerifier {
     static final String MANIFEST_SCHEMA = "zoop-ai-handoff-1";
-    static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-6";
+    static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-7";
     static final String POLICY = "zoop-public-projection-policy-1";
     static final String EVIDENCE_KIND = "graph-body-span";
     static final String OFFSET_UNIT = "unicode_code_point";
@@ -213,7 +213,7 @@ final class HandoffBundleVerifier {
                 || (executionMode.equals("live") && recordingKind.equals("provider")));
 
         Obj policy = bundle.object("policy").exactly(Set.of("version", "files", "evidenceIdKind", "offsetUnit", "geography",
-                "structural", "sequence", "sourceSupport", "impacts"));
+                "structural", "sequence", "sourceSupport", "impacts", "issueSummary"));
         String policyVersion = policy.string("version");
         need(POLICY.equals(policyVersion) && EVIDENCE_KIND.equals(policy.string("evidenceIdKind"))
                 && OFFSET_UNIT.equals(policy.string("offsetUnit")));
@@ -222,6 +222,7 @@ final class HandoffBundleVerifier {
         need("s2-comparison-with-operator-decision".equals(policy.string("sequence")));
         need(SOURCE_SUPPORT_POLICY.equals(policy.string("sourceSupport")));
         need(IMPACTS_POLICY.equals(policy.string("impacts")));
+        need(HandoffIssueSummary.POLICY.equals(policy.string("issueSummary")));
         Obj filesNode = policy.object("files").exactly(Set.of("canonical", "decisions", "bindings"));
         Map<String, String> files = new LinkedHashMap<>();
         for (String name : List.of("canonical", "decisions", "bindings")) {
@@ -398,7 +399,7 @@ final class HandoffBundleVerifier {
         for (Obj i : issueNodes) {
             i.exactly(Set.of("id", "canonicalId", "title", "action", "target", "eventTime", "timePrecision", "period",
                     "assertionStatus", "geography", "evidenceIds", "sourceEvents", "mentions", "decisionRef",
-                    "representative", "fieldProvenance", "fieldVerdicts", "sourceSupport"));
+                    "representative", "fieldProvenance", "fieldVerdicts", "sourceSupport", "summary"));
             String id = text(i, "id", ID);
             text(i, "canonicalId", ID);
             text(i, "decisionRef", ID);
@@ -459,6 +460,8 @@ final class HandoffBundleVerifier {
                 need(eventKeys.contains(Canonical.write(representative.node())));
             }
             // fieldProvenance and fieldVerdicts were checked above, together with the headline values they decide.
+            // The summary is recomputed from the bundle's own mentions, verdicts, evidence and articles (zero-call decision table).
+            HandoffIssueSummary.verify(i, evidence, articles, executionMode, recordingKind);
             need(!issues.containsKey(id) && !companies.containsKey(id) && !pathCompanies.containsKey(id));
             issues.put(id, new Issue(id, title, action, target, eventTime, timePrecision, assertionStatus,
                     geographyValue, geographyPolicy, geographyEvidence, evidenceIds));
@@ -1385,7 +1388,7 @@ final class HandoffBundleVerifier {
         return Integer.compare(a.length() - i, b.length() - j);
     }
 
-    private static String articleKey(String articleId, String version) {
+    static String articleKey(String articleId, String version) {
         return articleId + "\n" + version;
     }
 

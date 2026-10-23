@@ -1,0 +1,138 @@
+{
+  "dataset": "klue/klue",
+  "annotationStatus": "upstream labels; not independently reviewed by Zoop",
+  "labels": [
+    "no_relation",
+    "org:dissolved",
+    "org:founded",
+    "org:place_of_headquarters",
+    "org:alternate_names",
+    "org:member_of",
+    "org:members",
+    "org:political/religious_affiliation",
+    "org:product",
+    "org:founded_by",
+    "org:top_members/employees",
+    "org:number_of_employees/members",
+    "per:date_of_birth",
+    "per:date_of_death",
+    "per:place_of_birth",
+    "per:place_of_death",
+    "per:place_of_residence",
+    "per:origin",
+    "per:employee_of",
+    "per:schools_attended",
+    "per:alternate_names",
+    "per:parents",
+    "per:children",
+    "per:siblings",
+    "per:spouse",
+    "per:other_family",
+    "per:colleagues",
+    "per:product",
+    "per:religion",
+    "per:title"
+  ],
+  "records": [
+    {
+      "guid": "klue-re-v1_train_00000",
+      "label": 0,
+      "labelName": "no_relation"
+    },
+    {
+      "guid": "klue-re-v1_train_00001",
+      "label": 0,
+      "labelName": "no_relation"
+    },
+    {
+      "guid": "klue-re-v1_train_00002",
+      "label": 5,
+      "labelName": "org:member_of"
+    },
+    {
+      "guid": "klue-re-v1_train_00003",
+      "label": 10,
+      "labelName": "org:top_members/employees"
+    },
+    {
+      "guid": "klue-re-v1_train_00004",
+      "label": 0,
+      "labelName": "no_relation"
+    },
+    {
+      "guid": "klue-re-v1_train_00005",
+      "label": 4,
+      "labelName": "org:alternate_names"
+    },
+    {
+      "guid": "klue-re-v1_train_00006",
+      "label": 0,
+      "labelName": "no_relation"
+    },
+    {
+      "guid": "klue-re-v1_train_00007",
+      "label": 12,
+      "labelName": "per:date_of_birth"
+    },
+    {
+      "guid": "klue-re-v1_train_00008",
+      "label": 3,
+      "labelName": "org:place_of_headquarters"
+    },
+    {
+      "guid": "klue-re-v1_train_00009",
+      "label": 18,
+      "labelName": "per:employee_of"
+    },
+    {
+      "guid": "klue-re-v1_train_00010",
+      "label": 17,
+      "labelName": "per:origin"
+    },
+    {
+      "guid": "klue-re-v1_train_00011",
+      "label": 29,
+      "labelName": "per:title"
+    },
+    {
+      "guid": "klue-re-v1_train_00012",
+      "label": 10,
+      "labelName": "org:top_members/employees"
+    },
+    {
+      "guid": "klue-re-v1_train_00013",
+      "label": 6,
+      "labelName": "org:members"
+    },
+    {
+      "guid": "klue-re-v1_train_00014",
+      "label": 0,
+      "labelName": "no_relation"
+    },
+    {
+      "guid": "klue-re-v1_train_00015",
+      "label": 18,
+      "labelName": "per:employee_of"
+    },
+    {
+      "guid": "klue-re-v1_train_00016",
+      "label": 0,
+      "labelName": "no_relation"
+    },
+    {
+      "guid": "klue-re-v1_train_00017",
+      "label": 5,
+      "labelName": "org:member_of"
+    },
+    {
+      "guid": "klue-re-v1_train_00018",
+      "label": 19,
+      "labelName": "per:schools_attended"
+    },
+    {
+      "guid": "klue-re-v1_train_00019",
+      "label": 0,
+      "labelName": "no_relation"
+    }
+  ]
+}

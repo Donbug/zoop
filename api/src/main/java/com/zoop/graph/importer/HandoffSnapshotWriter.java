@@ -47,7 +47,7 @@ import tools.jackson.databind.node.ObjectNode;
  * always gives the same ids. The representative event resolves to its article version the same way, and is written as
  * {@code null} when that mention is not among the written ones, never as a mention the snapshot lacks. A document identity that
  * matches more than one bundle article is genuinely ambiguous and refused ({@link GraphHandoffFailure#MENTION_ARTICLE_AMBIGUOUS});
- * the verifier of {@code zoop-graph-handoff-bundle-6} already requires exactly one article per mention document version, and every
+ * the verifier of {@code zoop-graph-handoff-bundle-7} already requires exactly one article per mention document version, and every
  * original mention cites evidence of its own article, so under that schema the references cover every mention of an issue. The
  * snapshot does not carry the mention values (title, action, time, assertion status, background, participants): they are the
  * producer's S2 candidate or snapshot values ({@code verification: "none"}) and stay only in the receipt, which keeps the whole
@@ -67,7 +67,12 @@ import tools.jackson.databind.node.ObjectNode;
  * to {@code -5} the top-level {@code impacts} is absent from the receipt: a reader must treat impacts as unavailable, never as
  * {@code not-proposed} or {@code not-applicable}. From {@code -6} on, {@code impacts} (one row per S3 relation behind an INVOLVES
  * edge: the producer's unverified proposal, the verifier-mapped quote effects and the recomputed label) live ONLY in the receipt;
- * the snapshot carries no impact, proposal, effect, label or verifier digest.
+ * the snapshot carries no impact, proposal, effect, label or verifier digest. For {@code zoop-graph-handoff-bundle-1} to {@code -6}
+ * the issue's {@code summary} is absent from the receipt: a reader must treat it as unavailable (never produced), never as
+ * {@code not-requested}. From {@code -7} on, every issue carries a closed {@code summary} (see {@link HandoffIssueSummary}) that lives
+ * ONLY in the receipt as the exact producer object, never in the snapshot or the public graph read: it is not a snapshot projection.
+ * Whoever serves it must apply the current-rights and asOf gate to the issue's whole summary basis (every quote of
+ * {@code mentions[].evidenceIds}), not only to the claims' cited evidence.
  *
  * <p>{@code validUntil} is the last valid day (inclusive) and {@code null} is unknown, never "forever": days are written verbatim
  * or not at all ({@link HandoffTime#dayOrNull}); no midnight and no extra day is ever added.
