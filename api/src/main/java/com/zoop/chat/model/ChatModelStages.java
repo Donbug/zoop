@@ -58,6 +58,8 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     static final int MAX_QUOTE = 2000;
     static final int MAX_LABEL = 300;
     private static final Pattern EVIDENCE = Pattern.compile("ev-[0-9a-f]{64}");
+    /** Item kinds whose label is catalog or graph data (company names, issue titles, relation pairs), not source text. */
+    static final Set<String> SENT_ITEM_KINDS = Set.of("company", "issue", "edge");
 
     /** The S2-1 source id of an article: the {@code articles.provider} the chat grant registry is keyed by. */
     @FunctionalInterface
@@ -84,31 +86,40 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
 
     // ---------------------------------------------------------------- router
 
+    /**
+     * The question chain decides before any limit or ambiguity is judged (design summary: a reply reruns decomposition on the
+     * root question and the answers in order). A free-text reply to a root that had more requirements than allowed replaces
+     * them with its own; a company the member named in a reply, or picked as a choice, resolves a shared name of the root.
+     */
     @Override
     public ChatRouteDecision route(ChatRun run, Set<String> boundCapabilities) {
-        List<ChatRequirementSplitter.Piece> pieces = ChatRequirementSplitter.split(run.turns().getFirst().question());
+        Set<String> picked = new HashSet<>();
+        List<String> replies = new ArrayList<>();
+        for (ChatRun.Turn turn : run.turns().subList(1, run.turns().size())) {
+            if (turn.choiceId() != null) picked.add(turn.choiceId());
+            else replies.add(turn.question());
+        }
+        List<ChatRequirementSplitter.Piece> pieces = effectiveRequirements(run.turns().getFirst().question(), replies);
         if (pieces.size() > MAX_REQUIREMENTS) {
             // More than the planner accepts: it asks the member to narrow the question; the router is not asked.
             return new ChatRouteDecision(pieces.stream().map(p -> requirement(p, Map.of(), Map.of(), List.of(), 0)).toList(), null);
-        }
-        Set<String> chosen = new HashSet<>();
-        List<String> replies = new ArrayList<>();
-        for (ChatRun.Turn turn : run.turns().subList(1, run.turns().size())) {
-            if (turn.choiceId() != null) chosen.add(turn.choiceId());
-            else replies.add(turn.question());
         }
         Map<String, List<String>> targets = new LinkedHashMap<>();
         List<String> fromReplies = new ArrayList<>();
         try {
             for (String reply : replies) {
                 for (var mention : names.mentions(reply)) {
-                    resolved(mention, chosen).ifPresent(fromReplies::add);
+                    resolved(mention, picked).ifPresent(id -> {
+                        if (!fromReplies.contains(id)) fromReplies.add(id);
+                    });
                 }
             }
+            // A name typed in a reply counts as a pick for a shared name of the question.
+            picked.addAll(fromReplies);
             for (var piece : pieces) {
                 List<String> ids = new ArrayList<>();
                 for (var mention : names.mentions(piece.text())) {
-                    Optional<String> id = resolved(mention, chosen);
+                    Optional<String> id = resolved(mention, picked);
                     if (id.isEmpty()) return ambiguous(mention);
                     if (!ids.contains(id.get())) ids.add(id.get());
                 }
@@ -154,6 +165,15 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         });
     }
 
+    /** The root's requirements, replaced in order by a free-text reply's own while they are more than the planner accepts. */
+    static List<ChatRequirementSplitter.Piece> effectiveRequirements(String root, List<String> replies) {
+        List<ChatRequirementSplitter.Piece> pieces = ChatRequirementSplitter.split(root);
+        for (String reply : replies) {
+            if (pieces.size() > MAX_REQUIREMENTS) pieces = ChatRequirementSplitter.split(reply);
+        }
+        return pieces;
+    }
+
     private static ChatRouteDecision.Requirement requirement(ChatRequirementSplitter.Piece piece, Map<ChatQueryType, Double> types,
             Map<String, Double> capabilities, List<String> targets, double advice) {
         return new ChatRouteDecision.Requirement(piece.id(), piece.text(), true, types, capabilities, targets, advice, null);
@@ -191,7 +211,9 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             for (ChatToolResult result : branch.results()) {
                 if (!result.succeeded()) continue;
                 for (ChatToolItem item : result.items()) {
-                    if (items.size() < MAX_ITEMS && seen.add(item.kind() + ":" + item.id())) {
+                    // Only ZOOP's own graph labels travel as items; an evidence item's label is its article's title,
+                    // which may reach a model only inside a quote the source's chat grant allows.
+                    if (SENT_ITEM_KINDS.contains(item.kind()) && items.size() < MAX_ITEMS && seen.add(item.kind() + ":" + item.id())) {
                         items.addObject().put("id", item.id()).put("kind", item.kind()).put("label", clip(item.label()));
                     }
                     branchEvidence.addAll(item.evidenceIds());

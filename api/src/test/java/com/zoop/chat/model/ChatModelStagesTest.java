@@ -47,7 +47,8 @@ class ChatModelStagesTest {
     private static final Company HANMI_PHARM = new Company("c-hanmi-pharm", "한미약품", "128940");
     private static final Company HANMI_SCIENCE = new Company("c-hanmi-science", "한미사이언스", "008930");
     private static final Company SAMSUNG = new Company("c-samsung", "삼성전자", "005930");
-    private static final List<Entry> CATALOG = List.of(new Entry("삼성전자", SAMSUNG), new Entry("한미", HANMI_PHARM),
+    private static final List<Entry> CATALOG = List.of(new Entry("삼성전자", SAMSUNG), new Entry("한미약품", HANMI_PHARM), new Entry("한미사이언스", HANMI_SCIENCE),
+            new Entry("한미", HANMI_PHARM),
             new Entry("한미", HANMI_SCIENCE));
     private static final ChatStageReply.Receipt RECEIPT = new ChatStageReply.Receipt("typesafe", "systemone-v1", "jev",
             "chat-router-1", "replay", 10L, 4L, Instant.parse("2026-10-22T01:00:00Z"), Instant.parse("2026-10-22T01:00:01Z"));
@@ -151,12 +152,42 @@ class ChatModelStagesTest {
     }
 
     @Test
+    void aCompanyNamedInAFreeTextReplyResolvesTheSharedNameOfTheQuestion() {
+        answer = call -> succeeded(call, """
+                {"requirements":[{"requirementId":"r1","types":{"Q03":0.9},"capabilities":{"company.read":0.9},
+                  "prohibitedAdvice":0.0}]}""");
+        ChatRouteDecision typed = stages.route(run(root("한미 관련 공시 알려줘"),
+                new ChatRun.Turn("chat-job-0002", "한미사이언스", null, null)), Set.of("company.read"));
+        assertNull(typed.ambiguity());
+        assertEquals(List.of("c-hanmi-science"), typed.requirements().getFirst().targets());
+    }
+
+    @Test
+    void aFreeTextReplyNarrowsARootWithTooManyRequirements() {
+        String seven = "A가 뭐야? B는? C는? D는? E는? F는? 삼성전자 관련 사건은?";
+        ChatRouteDecision tooMany = stages.route(run(root(seven)), Set.of("company.read"));
+        assertEquals(7, tooMany.requirements().size());
+        assertTrue(calls.isEmpty(), "the router is not asked about more requirements than the planner accepts");
+
+        answer = call -> succeeded(call, """
+                {"requirements":[{"requirementId":"r1","types":{"Q02":0.9},"capabilities":{},"prohibitedAdvice":0.0},
+                  {"requirementId":"r2","types":{"Q03":0.9},"capabilities":{"company.read":0.9},"prohibitedAdvice":0.0}]}""");
+        ChatRouteDecision narrowed = stages.route(run(root(seven),
+                new ChatRun.Turn("chat-job-0002", "A가 뭐야? 삼성전자 관련 사건은?", null, null)), Set.of("company.read"));
+        assertEquals(List.of("A가 뭐야", "삼성전자 관련 사건은"),
+                narrowed.requirements().stream().map(ChatRouteDecision.Requirement::label).toList());
+        assertEquals(List.of("c-samsung"), narrowed.requirements().get(1).targets());
+        assertEquals(seven, calls.getFirst().input().get("turns").get(0).get("text").stringValue(), "the whole chain is sent");
+    }
+
+    @Test
     void theGeneratorGetsQuotesWithTheirSourceAndOnlyReadableEvidence() {
         answer = call -> succeeded(call, """
                 {"sections":[{"basis":"evidence_grounded","text":"공급합니다.","requirementIds":["r1"],"evidenceIds":["%s"]}],
                  "insufficientRequirementIds":[],"graphTargetIds":["c-samsung"]}""".formatted(EV_A));
         var result = new ChatToolResult("chat-tool-1", "tc-1", "company.read", "gv-1",
-                List.of(new ChatToolItem("c-samsung", "company", "삼성전자", List.of("c-samsung"), List.of(EV_A, EV_B))),
+                List.of(new ChatToolItem("c-samsung", "company", "삼성전자", List.of("c-samsung"), List.of(EV_A, EV_B)),
+                        new ChatToolItem(EV_B, "evidence", "허가 없는 기사 제목", List.of(), List.of(EV_B))),
                 List.of(EV_A), false, false, null);
         var branch = new ChatBranchContext.Branch("r1", "삼성전자 관련 사건", Set.of(ChatQueryType.Q03), false, List.of(result), false);
         ChatGeneratedAnswer generated = stages.generate(run(root("삼성전자 관련 사건")),
@@ -168,6 +199,8 @@ class ChatModelStagesTest {
         assertEquals("news-provider-1", sent.get("evidence").get(0).get("sourceId").stringValue());
         assertEquals("삼성전자가 HBM을 공급한다.", sent.get("evidence").get(0).get("quote").stringValue());
         assertEquals("c-samsung", sent.get("items").get(0).get("id").stringValue());
+        assertEquals(1, sent.get("items").size(), "an evidence item (an article title) is never sent as an item");
+        assertTrue(calls.getFirst().input().toString().indexOf("허가 없는 기사 제목") < 0);
         assertEquals(List.of(EV_A), generated.sections().getFirst().evidenceIds());
         assertEquals(List.of("c-samsung"), generated.graphTargetIds());
     }

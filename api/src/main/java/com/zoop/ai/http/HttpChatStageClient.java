@@ -64,10 +64,15 @@ public final class HttpChatStageClient implements ChatStageClient, AutoCloseable
         JsonNode answer = root.raw("answer");
         ChatStageReply.Failure failure = root.optObject("failure").map(f -> new ChatStageReply.Failure(
                 f.string("code", FAILURE_CODE), f.bool("sent"), f.bool("unknown"))).orElse(null);
-        if (succeeded ? (answer == null || !answer.isObject() || failure != null) : (failure == null)) {
+        ChatStageReply.Receipt receipt = root.optObject("receipt").map(HttpChatStageClient::receipt).orElse(null);
+        // The contract's invariants: a success has an answer and a receipt and no failure; a failure has no answer; an
+        // unknown fate was sent; a receipt exists exactly when something was sent and names the requested mode.
+        boolean consistent = succeeded
+                ? answer.isObject() && failure == null && receipt != null
+                : answer.isNull() && failure != null && (!failure.unknown() || failure.sent()) && failure.sent() == (receipt != null);
+        if (!consistent || (receipt != null && !call.mode().equals(receipt.executionMode()))) {
             throw new Malformed("outcome");
         }
-        ChatStageReply.Receipt receipt = root.optObject("receipt").map(HttpChatStageClient::receipt).orElse(null);
         return new ChatStageReply(call.invocationId(), call.stage(), succeeded, succeeded ? answer : null, failure, receipt);
     }
 
