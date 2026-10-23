@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import BriefingPage from '@/pages/briefing/BriefingPage';
 import BriefingSnapshotBanner from '@/components/graph/BriefingSnapshotBanner';
 import { getGraph, graphUrl } from '@/apis/graph/graph';
+import { BriefingGraphUnavailableError } from '@/apis/graph/briefing-context';
 import { createMockGraph } from '@/mocks/graph/response';
 import type {
   BriefingGraphBasis,
@@ -12,6 +13,30 @@ import type {
   BriefingRoundRef,
 } from '@/types/briefing';
 import { apiError, createFakeServer, json } from '../support/fakeServer';
+
+it('회차 기준 그래프를 아직 제공하지 않으면 미제공 오류로 알리고 지도를 조회하지 않는다', async () => {
+  const server = createFakeServer();
+  server.on('GET', '/api/v1/briefings/:id/graph', () =>
+    json(
+      basis({
+        status: 'unavailable',
+        message: '발행 당시 고정 그래프 조회가 아직 연결되지 않았습니다.',
+        dataAsOf: null,
+        graphVersion: null,
+      }),
+    ),
+  );
+  const failure = getGraph({
+    mode: 'all',
+    personalFilter: 'all',
+    round: 'brf-2026-09-17-evening',
+  });
+  await expect(failure).rejects.toBeInstanceOf(BriefingGraphUnavailableError);
+  await expect(failure).rejects.toThrow(
+    '발행 당시 고정 그래프 조회가 아직 연결되지 않았습니다.',
+  );
+  expect(server.calls('GET', '/api/v1/graph')).toHaveLength(0);
+});
 
 it('회차 지도를 개발용 최신 mock으로 바꾸지 않고 회차 API를 조회한다', async () => {
   const server = createFakeServer();

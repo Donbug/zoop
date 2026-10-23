@@ -238,6 +238,10 @@ function MapWorkspace({
     retry,
     prefetch,
   );
+  // 저장본을 일시적으로 읽지 못한 경우만 다시 확인할 수 있다. 미기록·중단·
+  // 미발행·대상 비공개는 같은 요청을 반복해도 달라지지 않는 회차 상태다.
+  const graphErrorRetryable =
+    !unavailableReason || unavailableReason === 'snapshot_unavailable';
   const appliedMode = data?.metadata.mode ?? 'all';
   const target = useMemo(
     () =>
@@ -324,6 +328,8 @@ function MapWorkspace({
     companyNode?.id ??
     null;
   const focusId = params.get('focus');
+  // D-GRP-01 [흐름 순으로 정렬]. 주소(?arrange=flow)에 남겨 새로 고침·공유에도 유지한다.
+  const flowOrder = params.get('arrange') === 'flow';
   const focusHops: 1 | 2 = params.get('hops') === '2' ? 2 : 1;
   const focusNode = data?.nodes.find((node) => node.id === focusId) ?? null;
   const logoOf = (companyId: string) =>
@@ -936,6 +942,11 @@ function MapWorkspace({
                       (historical ? (detailEventId ?? companyId) : null))
                 }
                 focusHops={focusHops}
+                focusLayout={!pathFrom && Boolean(focusId)}
+                flow={flowOrder}
+                onFlowChange={(next) =>
+                  updateQuery({ arrange: next ? 'flow' : null })
+                }
               />
             ) : (
               <div className="relationship-canvas">
@@ -944,7 +955,9 @@ function MapWorkspace({
                     ? '관계 지도를 불러오는 중입니다.'
                     : unavailableReason === 'snapshot_not_recorded'
                       ? '이 회차의 그래프 저장본이 없습니다.'
-                      : '관계 지도를 불러오지 못했습니다.'}
+                      : unavailableReason && !graphErrorRetryable
+                        ? '이 회차의 관계 지도는 아직 제공하지 않아요.'
+                        : '관계 지도를 불러오지 못했습니다.'}
                 </p>
               </div>
             )}
@@ -1089,6 +1102,7 @@ function MapWorkspace({
                   to={pathTo}
                   loading={loading}
                   error={error}
+                  unavailable={Boolean(error) && !graphErrorRetryable}
                   onRetry={() => setRetry((v) => v + 1)}
                   onClose={() => updateQuery({ path: null })}
                   onPick={(id) =>
@@ -1193,7 +1207,7 @@ function MapWorkspace({
               data?.metadata.truncated) && (
               <div
                 className="relationship-notice"
-                role={error ? 'alert' : 'status'}
+                role={error && graphErrorRetryable ? 'alert' : 'status'}
               >
                 {switching && (
                   <p role="status">
@@ -1214,7 +1228,7 @@ function MapWorkspace({
                   <p>
                     {unavailableReason ? error : `조회 실패: ${error}`}
                     {data && ' 직전 정상 그래프를 표시합니다.'}{' '}
-                    {unavailableReason !== 'snapshot_not_recorded' && (
+                    {graphErrorRetryable && (
                       <button
                         data-tutorial-action="retry"
                         onClick={() => setRetry((v) => v + 1)}
