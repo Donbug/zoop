@@ -61,11 +61,55 @@ class ChatStageFailure(ChatView):
     unknown: bool = Field(description="Sent, and its outcome is unknown (timeout or disconnect): it is never sent again.")
 
 
+QueryType = Literal["Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08"]
+
+
+class RoutedRequirement(ChatWire):
+    """Closed like every stage answer: a key the worker contract does not define is refused, never relayed."""
+    requirement_id: str
+    types: dict[QueryType, float]
+    capabilities: dict[str, float]
+    prohibited_advice: float
+
+
+class RouterAnswer(ChatWire):
+    requirements: list[RoutedRequirement]
+
+
+class AnswerSection(ChatWire):
+    basis: Literal["general_knowledge", "evidence_grounded"]
+    text: str
+    requirement_ids: list[str]
+    evidence_ids: list[str]
+
+
+class ChatAnswer(ChatWire):
+    sections: list[AnswerSection]
+    insufficient_requirement_ids: list[str]
+    graph_target_ids: list[str]
+
+
+class SectionVerdict(ChatWire):
+    support: Literal["supported", "contradicted", "hold"] | None
+    prohibited_advice: Literal["no", "yes", "hold"]
+
+
+class VerificationAnswer(ChatWire):
+    sections: list[SectionVerdict]
+
+
+ANSWERS: dict[str, type[ChatWire]] = {"chat-router": RouterAnswer, "chat-answer": ChatAnswer, "chat-verification": VerificationAnswer}
+
+
 class ChatStageResult(ChatView):
+    """The outcome. Besides the field shapes the door checks the invariants: `succeeded` has an answer of its own stage's model, no failure and a
+    receipt; `failed` has a failure and no answer; `unknown` implies `sent`; a receipt is present exactly when something was sent and names the
+    requested mode."""
     schema_version: Literal["zoop-ai-chat-1"]
     invocation_id: str
     stage: ChatStage
     status: Literal["succeeded", "failed"]
-    answer: dict[str, Any] | None = Field(description="The typed stage answer (RouterAnswer, ChatAnswer or VerificationAnswer) when succeeded.")
+    answer: RouterAnswer | ChatAnswer | VerificationAnswer | None = Field(
+        description="The typed stage answer when succeeded: RouterAnswer (chat-router), ChatAnswer (chat-answer) or VerificationAnswer (chat-verification).")
     failure: ChatStageFailure | None
     receipt: ChatReceipt | None = Field(description="Who received the request and what they reported; present once a request was sent.")

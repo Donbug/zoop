@@ -274,6 +274,34 @@ def _prepare_state_dir(path: Path) -> None:
         raise ConfigError(field, "state_dir_unusable") from None
 
 
+CHAT_LEDGER_FILES = ("chat.sqlite3", "chat.sqlite3-wal", "chat.sqlite3-shm")
+
+
+def _prepare_chat_state(path: Path) -> None:
+    """The chat ledger holds raw provider answers and the no-resend and budget records. Like the service state root it must be a real directory
+    owned by this user with no group or world access; an existing one is checked, never repaired by chmod, and a symlink is refused. Ledger files
+    already in it must be regular private files of this user (the worker creates them 0600)."""
+    field = "ZOOP_AI_CHAT_STATE_DIR"
+    try:
+        if not os.path.lexists(path):
+            if not path.parent.is_dir():
+                raise ConfigError(field, "parent_missing")
+            os.mkdir(path, 0o700)
+            os.chmod(path, 0o700)
+        info = os.lstat(path)
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+            raise ConfigError(field, "state_dir_not_private")
+        for name in CHAT_LEDGER_FILES:
+            entry = path / name
+            if not os.path.lexists(entry):
+                continue
+            item = os.lstat(entry)
+            if not stat.S_ISREG(item.st_mode) or item.st_uid != os.getuid() or item.st_mode & 0o077:
+                raise ConfigError(field, "ledger_not_private")
+    except OSError:
+        raise ConfigError(field, "state_dir_unusable") from None
+
+
 def _file(raw: str | None, field: str, *, executable: bool = False) -> Path:
     path = Path(_normalized(raw, field))
     if not path.is_file() or not os.access(path, os.X_OK if executable else os.R_OK):
@@ -527,15 +555,7 @@ def _chat(environ: Mapping[str, str], state_dir: Path, worker_state: Path) -> Ch
     if environ.get("ZOOP_STATE_DIR"):
         roots["ZOOP_STATE_DIR"] = _absolute(environ["ZOOP_STATE_DIR"], "ZOOP_STATE_DIR")
     _disjoint(roots, "chat_roots_overlap")
-    try:
-        if not chat_state.exists():
-            if not chat_state.parent.is_dir():
-                raise ConfigError("ZOOP_AI_CHAT_STATE_DIR", "parent_missing")
-            os.mkdir(chat_state, 0o700)
-        if not chat_state.is_dir():
-            raise ConfigError("ZOOP_AI_CHAT_STATE_DIR", "not_a_directory")
-    except OSError:
-        raise ConfigError("ZOOP_AI_CHAT_STATE_DIR", "state_dir_unusable") from None
+    _prepare_chat_state(chat_state)
     grants_path = _file(environ["ZOOP_AI_SERVICE_CHAT_GRANTS"], "ZOOP_AI_SERVICE_CHAT_GRANTS")
     try:
         registry = json.loads(grants_path.read_text(encoding="utf-8"))

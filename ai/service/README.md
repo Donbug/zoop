@@ -217,13 +217,17 @@ live S2/S3 job은 **서버 운영자가 고정한 것만** 돌아갑니다. 호�
 | 변수 | 규칙 |
 |---|---|
 | `ZOOP_AI_SERVICE_CHAT_COMMAND` | 설치된 `zoop-ai-chat`의 절대 경로(실행 가능) |
-| `ZOOP_AI_CHAT_STATE_DIR` | 호출 원장(`chat.sqlite3`) 디렉터리. 없으면 0700으로 만든다(부모는 있어야 함). 서비스·worker·앱 상태와 겹치면 거부 |
+| `ZOOP_AI_CHAT_STATE_DIR` | 호출 원장(`chat.sqlite3`) 디렉터리. 없으면 0700으로 만든다(부모는 있어야 함). 이미 있으면 이 사용자 소유의 실제 디렉터리(symlink 아님)이고 group·world 권한이 없어야 하며, 그 안의 원장 파일(`chat.sqlite3`, `-wal`, `-shm`)도 이 사용자 소유의 일반 파일이고 비공개여야 한다. 아니면 기동을 거부한다(`state_dir_not_private`, `ledger_not_private`). 기존 경로를 chmod로 고치지 않는다. 서비스·worker·앱 상태와 겹쳐도 거부 |
 | `ZOOP_AI_SERVICE_CHAT_GRANTS` | 운영자 챗봇 grant registry(`schemaVersion: zoop-ai-chat-1`). S1 registry와 별도 |
 | `ZOOP_AI_SERVICE_CHAT_REPLAY` | 선택. authored replay fixture. 없으면 `mode=replay`는 409 `execution_unavailable` |
 | 챗봇 live | `ZOOP_AI_CHAT_LIVE_ENABLED=1`과 양수 `ZOOP_AI_CHAT_MAX_CALLS`가 모두 있을 때만 이 둘과 `ZOOP_AI_API_KEY`·`TYPESAFE_API_KEY`가 **챗봇 child에만** 전달된다. 모델·endpoint 이름(`ZOOP_AI_CHAT_ANSWER_MODEL`·`_REASONING_EFFORT`, `ZOOP_AI_CHAT_JEV_MODEL`, `ZOOP_AI_BASE_URL`, `TYPESAFE_BASE_URL`)은 항상 전달된다. S1·파이프라인 게이트는 이 child를 열지 않는다 |
 
 - 본문은 `StageRequest`(`schemaVersion`, `invocationId`, `stage`, `mode`, `input`)이고 `Idempotency-Key`는 `invocationId`와 같아야 하며 경로의 stage와 본문 stage가 같아야 한다. child는 `<principal>:<invocationId>`를 받으므로 principal끼리 원장 행을 공유하지 않는다.
-- **200**은 stage 결과다. `status=failed`도 200이며 `failure.sent`·`failure.unknown`이 송신 여부와 결과 불명을 말한다. **502/504 `stage_outcome_unknown`**은 child가 보냈을 수 있다는 뜻이므로 그 invocation을 다시 보내지 않는다. **503**(`runtime_unavailable`, `service_busy`, `service_configuration_invalid`)은 보내지 않았다는 뜻이다.
+- **200**은 stage 결과다. `status=failed`도 200이며 `failure.sent`·`failure.unknown`이 송신 여부와 결과 불명을 말한다. **502/504 `stage_outcome_unknown`**은 child가 보냈을 수 있다는 뜻이므로 그 invocation을 다시 보내지 않는다. **503**(`runtime_unavailable`, `service_busy`, `service_configuration_invalid`)은 보내지 않았다는 뜻이다. `runtime_unavailable`은 child가 **시작조차 못 한** 경우에만 쓰고, 시작한 뒤의 출력 상한 초과나 출력 읽기 오류는 502 `stage_outcome_unknown`이다.
+- child 결과는 **고치기 전에** 검사한다. 다음을 모두 만족해야 200이고, 하나라도 어긋나면 caller id로 바꿔 200으로 정규화하지 않고 502 `stage_outcome_unknown`이다.
+  - `invocationId`가 정확히 `<principal>:<invocationId>`이고, stage가 경로와 같으며, receipt의 `executionMode`가 요청 mode와 같다.
+  - answer가 그 stage의 닫힌 모델(`RouterAnswer`/`ChatAnswer`/`VerificationAnswer`, 모르는 키 거절)을 따른다.
+  - 성공에는 answer·receipt가 있고 failure가 없다. 실패에는 failure가 있고 answer가 없다. `unknown`이면 `sent`이고, receipt는 `sent`일 때만 있다.
 - 동시 child 4개, 슬롯을 1초 안에 얻지 못하면 503 `service_busy`. child 기한은 stage 상한 + 3초(라우터 7초, 답변 28초, 검증 9초).
 - 시험: `tests/test_chat_unit.py`(child 없음), `tests/test_chat_http.py`(실제 uvicorn + 기록용 stand-in CLI). 실제 worker CLI는 `ai/worker/tests/test_chat_stages.py`.
 

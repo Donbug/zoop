@@ -57,11 +57,17 @@ class ChatStub:
         return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
 
 
+RECEIPT = {"provider": "authored-replay", "providerRevision": "authored-replay-1", "model": "authored-synthetic-chat-router",
+           "promptVersion": "zoop-jev-chat-router-0", "executionMode": "replay",
+           "usage": {"inputTokens": None, "outputTokens": None, "cachedTokens": None, "reasoningTokens": None},
+           "sentAt": "2026-10-23T00:00:00+00:00", "receivedAt": "2026-10-23T00:00:01+00:00"}
+
+
 def succeeded(status: str = "succeeded") -> dict[str, Any]:
     return {"schemaVersion": "zoop-ai-chat-1", "invocationId": "x", "stage": "chat-router", "status": status,
             "answer": {"requirements": []} if status == "succeeded" else None,
             "failure": None if status == "succeeded" else {"code": "chat_live_disabled", "sent": False, "unknown": False},
-            "receipt": None}
+            "receipt": dict(RECEIPT) if status == "succeeded" else None}
 
 
 def body(invocation: str = "job-00000001:1:chat-router", **change: Any) -> dict[str, Any]:
@@ -92,6 +98,35 @@ def test_the_group_is_all_or_nothing_and_the_keys_reach_only_an_open_chat_child(
     assert config.chat.live_available and config.chat.child_env["TYPESAFE_API_KEY"] == keys["TYPESAFE_API_KEY"]
     # No other child gets them: the S1 child keeps its own environment without the S1 live gate.
     assert "TYPESAFE_API_KEY" not in config.child_env and "ZOOP_AI_CHAT_LIVE_ENABLED" not in config.child_env
+
+
+def test_the_chat_ledger_root_and_files_must_be_private_and_are_never_repaired(tmp_path):
+    ws = Workspace(tmp_path / "ws")
+    stub = ChatStub(tmp_path / "chat")
+    stub.state.mkdir(mode=0o700)
+    os.chmod(stub.state, 0o750)
+    with pytest.raises(ConfigError) as shared:
+        load(ws.env(**stub.env()))
+    assert (shared.value.field, shared.value.reason) == ("ZOOP_AI_CHAT_STATE_DIR", "state_dir_not_private")
+    assert stub.state.stat().st_mode & 0o777 == 0o750, "an existing root is refused, not chmod-ed"
+
+    os.chmod(stub.state, 0o700)
+    ledger = stub.state / "chat.sqlite3"
+    ledger.write_bytes(b"")
+    os.chmod(ledger, 0o644)
+    with pytest.raises(ConfigError) as readable:
+        load(ws.env(**stub.env()))
+    assert readable.value.reason == "ledger_not_private"
+    os.chmod(ledger, 0o600)
+    assert load(ws.env(**stub.env())).chat is not None
+
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir(mode=0o700)
+    link = tmp_path / "linked-state"
+    link.symlink_to(elsewhere, target_is_directory=True)
+    with pytest.raises(ConfigError) as linked:
+        load(ws.env(**stub.env(ZOOP_AI_CHAT_STATE_DIR=str(link))))
+    assert linked.value.reason == "state_dir_not_private"
 
 
 def test_bad_chat_settings_refuse_to_start(tmp_path):
@@ -150,6 +185,28 @@ def test_envelope_key_and_stage_mismatches_never_start_a_child(tmp_path, start):
     for url, payload, headers in cases:
         assert service.request("POST", url, as_="chatter", body=payload, headers=headers).status_code == 422, (url, payload)
     assert stub.calls() == []
+
+
+def test_output_over_the_cap_after_the_child_ran_is_unknown_not_unavailable(tmp_path, start):
+    ws = Workspace(tmp_path / "ws")
+    stub = ChatStub(tmp_path / "chat")
+    service = start(workspace=ws, env=stub.env())
+    stub.answer("x" * (16 * 1024 * 1024 + 16))
+    key = body()["invocationId"]
+    over = service.request("POST", URL, as_="chatter", body=body(), headers={"Idempotency-Key": key})
+    assert over.status_code == 502 and over.json()["error"]["code"] == "stage_outcome_unknown"
+    assert len(stub.calls()) == 1
+
+
+def test_a_relabelled_or_self_contradicting_child_result_is_never_a_200(tmp_path, start):
+    ws = Workspace(tmp_path / "ws")
+    stub = ChatStub(tmp_path / "chat")
+    service = start(workspace=ws, env=stub.env())
+    for i, change in enumerate(({"receipt": None}, {"answer": {"requirements": [], "debug": "x"}})):
+        stub.answer({**succeeded(), **change})
+        key = f"job-0000010{i}:1:chat-router"
+        refused = service.request("POST", URL, as_="chatter", body=body(key), headers={"Idempotency-Key": key})
+        assert refused.status_code == 502 and refused.json()["error"]["code"] == "stage_outcome_unknown"
 
 
 def test_an_abnormal_child_is_an_unknown_outcome_never_a_not_sent_one(tmp_path, start):

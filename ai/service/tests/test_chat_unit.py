@@ -31,11 +31,17 @@ def request(stage: str = "chat-router", *, mode: str = "replay", invocation: str
                                             "input": {"turns": [{"text": "q"}]}})
 
 
+RECEIPT = {"provider": "authored-replay", "providerRevision": "authored-replay-1", "model": "authored-synthetic-chat-router",
+           "promptVersion": "zoop-jev-chat-router-0", "executionMode": "replay",
+           "usage": {"inputTokens": None, "outputTokens": None, "cachedTokens": None, "reasoningTokens": None},
+           "sentAt": "2026-10-23T00:00:00+00:00", "receivedAt": "2026-10-23T00:00:01+00:00"}
+
+
 def result(invocation: str, stage: str = "chat-router", status: str = "succeeded", **extra: Any) -> dict[str, Any]:
     body = {"schemaVersion": "zoop-ai-chat-1", "invocationId": invocation, "stage": stage, "status": status,
             "answer": {"requirements": []} if status == "succeeded" else None,
             "failure": None if status == "succeeded" else {"code": "source_grant_denied", "sent": False, "unknown": False},
-            "receipt": None}
+            "receipt": dict(RECEIPT) if status == "succeeded" else None}
     body.update(extra)
     return body
 
@@ -102,6 +108,8 @@ def test_requests_that_cannot_run_start_no_child(tmp_path):
     (Outcome("timeout"), 504, "stage_outcome_unknown"),
     (Outcome("abnormal", exit_code=-9), 502, "stage_outcome_unknown"),
     (Outcome("unavailable"), 503, "runtime_unavailable"),
+    (Outcome("unavailable", exit_code=0, started=True), 502, "stage_outcome_unknown"),
+    (Outcome("unavailable", started=True), 502, "stage_outcome_unknown"),
     (Outcome("error", code="request_invalid", exit_code=64), 422, "invalid_request"),
     (Outcome("error", code="grant_registry_invalid", exit_code=64), 503, "service_configuration_invalid"),
     (Outcome("error", code="something_else", exit_code=64), 502, "stage_outcome_unknown"),
@@ -119,6 +127,44 @@ def test_a_result_for_another_stage_or_an_unreadable_one_is_unknown(tmp_path):
         with pytest.raises(ApiError) as caught:
             ChatStages(config(tmp_path), Scripted(bad)).invoke("app", "chat-router", request(), Observation())
         assert caught.value.status == 502 and caught.value.code == "stage_outcome_unknown"
+
+
+UNKNOWN_SENT = {"code": "provider_response_unknown", "sent": True, "unknown": True}
+
+
+@pytest.mark.parametrize("change", [
+    lambda r: r.update(invocationId="job-00000001:1:router"),                    # the caller's id without the principal prefix
+    lambda r: r.update(invocationId="app:job-99999999:1:router"),                # another invocation
+    lambda r: r.pop("invocationId"),
+    lambda r: r["receipt"].update(executionMode="live"),                         # not the requested mode
+    lambda r: r.update(receipt=None),                                            # a success without a receipt
+    lambda r: r.update(failure=dict(UNKNOWN_SENT)),                              # a success with a failure
+    lambda r: r.update(answer=None),
+    lambda r: r.update(answer={"requirements": [], "debug": "x"}),               # an unknown key in the answer
+    lambda r: r.update(answer={"requirements": [{"requirementId": "r1", "types": {"Q09": 0.5}, "capabilities": {},
+                                                 "prohibitedAdvice": 0.0}]}),
+    lambda r: r.update(answer={"sections": [], "insufficientRequirementIds": [], "graphTargetIds": []}),  # another stage's answer
+    lambda r: r.update(status="failed", answer=None, failure={"code": "x", "sent": False, "unknown": True}),  # unknown but not sent
+    lambda r: r.update(status="failed", answer=None, failure={"code": "x", "sent": True, "unknown": False}, receipt=None),
+    lambda r: r.update(status="failed", failure={"code": "x", "sent": False, "unknown": False}),  # a failure that carries an answer
+])
+def test_a_child_result_that_does_not_belong_to_the_request_or_contradicts_itself_is_unknown(tmp_path, change):
+    def answer(payload):
+        body = result(payload["invocationId"])
+        change(body)
+        return Outcome("result", result=body, exit_code=0)
+    with pytest.raises(ApiError) as caught:
+        ChatStages(config(tmp_path), Scripted(answer)).invoke("app", "chat-router", request(), Observation())
+    assert (caught.value.status, caught.value.code) == (502, "stage_outcome_unknown")
+
+
+def test_a_consistent_failed_result_with_a_receipt_passes_and_keeps_its_fate(tmp_path):
+    def answer(payload):
+        return Outcome("result", result=result(payload["invocationId"], status="failed", failure=dict(UNKNOWN_SENT),
+                                                receipt=dict(RECEIPT)), exit_code=2)
+    status, body = ChatStages(config(tmp_path), Scripted(answer)).invoke("app", "chat-router", request(), Observation())
+    assert status == 200 and body.failure.unknown and body.receipt.execution_mode == "replay"
+    assert body.invocation_id == "job-00000001:1:router"
 
 
 def test_no_slot_within_the_wait_is_busy_and_starts_nothing(tmp_path):
