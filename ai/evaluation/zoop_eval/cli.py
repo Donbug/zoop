@@ -23,6 +23,7 @@ from .summary_verification import (
     render_summary_score, score_summary_run, write_summary_controls,
 )
 from .materials import DEFAULT_MATERIALS, DATASETS, canonical as material_json, convert_materials
+from .material_retrieval import retrieve_materials, score_material_retrieval
 
 
 def _emit(document: dict[str, Any], fmt: str, renderer, out: Path | None) -> None:
@@ -105,9 +106,20 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--materials", type=Path, default=DEFAULT_MATERIALS)
         if name != "materials-validate":
             p.add_argument("--dataset", choices=DATASETS, required=True)
+    for name in ("materials-retrieve", "materials-retrieval-score"):
+        p = sub.add_parser(name, help="paired-context paragraph retrieval diagnostics, not answer scoring")
+        p.add_argument("--materials", type=Path, default=DEFAULT_MATERIALS)
+        if name == "materials-retrieve":
+            p.add_argument("--top-k", type=int, default=5)
+        else:
+            p.add_argument("run", type=Path, help="finalized zoop-eval-material-retrieval-run-1 JSON")
     try:
         args = parser.parse_args(argv)
-        if args.command.startswith("materials-"):
+        if args.command == "materials-retrieve":
+            print(material_json(retrieve_materials(args.materials, args.top_k)))
+        elif args.command == "materials-retrieval-score":
+            print(material_json(score_material_retrieval(args.run, args.materials)))
+        elif args.command.startswith("materials-"):
             document = convert_materials(args.command, args.materials, getattr(args, "dataset", None))
             print(material_json(document))
         elif args.command == "summary-verify-validate":

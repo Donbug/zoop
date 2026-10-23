@@ -124,6 +124,12 @@ def audited_entrypoint(argv: list[str]) -> int:
     allowed = {str(materials), "manifest.json"}
     if argv[0] == "materials-inputs":
         allowed.add(f"{dataset}.inputs.json")
+    elif argv[0] == "materials-retrieve":
+        allowed.add("tatqa.inputs.json")
+    elif argv[0] == "materials-retrieval-score":
+        # This harness invokes score with its positional run immediately after
+        # the command; the product parser also accepts options before the run.
+        allowed.update(("tatqa.inputs.json", "tatqa.gold.json", argv[1]))
     else:
         allowed.update(FILES)
     opened = []
