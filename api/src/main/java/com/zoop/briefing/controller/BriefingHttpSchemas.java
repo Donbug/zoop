@@ -81,9 +81,11 @@ public final class BriefingHttpSchemas {
             CompanyShortReading reading, CompanyPrice price) { }
 
     @Schema(name = "CompanyShortReading", requiredProperties = {"status", "resultVersion"},
-            description = "검증된 전문과 별도로 생성·검증한 짧은 읽기입니다. PASS일 때만 세 문장을 제공합니다.")
+            description = "검증된 전문과 별도로 생성·검증한 짧은 읽기입니다. PASS일 때만 제공합니다. v2는 판단·새 사실·다음 확인·배경·이전 판단 비교를 구분합니다.")
     public record CompanyShortReading(@Schema(allowableValues = {"PASS", "WITHHELD"}) String status, String resultVersion,
-            CompanyStatement brief, CompanyStatement watch, CompanyStatement change) { }
+            CompanyStatement brief, CompanyStatement watch, CompanyStatement change,
+            @Schema(description = "v2의 버전 표기. 기존 v1에서는 생략.", allowableValues = {"zoop-company-reading-v2"}) String schemaVersion,
+            CompanyStatement fact, CompanyStatement background) { }
     @Schema(name = "CompanyPricePoint", requiredProperties = {"value", "observedAt", "sessionDate", "kind"})
     public record CompanyPricePoint(String value, Instant observedAt, LocalDate sessionDate,
             @Schema(allowableValues = {"five_minute_close", "daily_close"}) String kind) { }

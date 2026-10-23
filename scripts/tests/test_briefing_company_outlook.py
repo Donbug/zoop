@@ -22,6 +22,12 @@ class CompanyOutlookTest(unittest.TestCase):
     def test_evening_never_uses_yesterdays_or_another_company_judgment(self):
         h=[{'status':'PASS','date':'2026-10-07','edition':'evening','draft':{'companies':[{'companyId':'A'}]}}]
         self.assertEqual('unavailable',c.previous_for('A','2026-10-08','evening',h)['status'])
+    def test_v3_morning_does_not_call_an_older_morning_the_previous_evening(self):
+        row={'status':'PASS','date':'2026-10-22','edition':'morning','roundId':'r','cutoff':'2026-10-22T09:20:00+09:00','resultVersion':'old-am','draft':{'companies':[{'companyId':'A'}]}}
+        self.assertEqual('unavailable',c.previous_for('A','2026-10-23','morning',[row],strict=True)['status'])
+        row['edition']='evening';row['resultVersion']='exact-pm'
+        self.assertEqual('exact-pm',c.previous_for('A','2026-10-23','morning',[row],strict=True)['resultVersion'])
+
     def test_exact_previous_version_required(self):
         f=self.frozen();f['targets'][0]['previous']={'status':'available','resultVersion':'new'};d=self.draft();d['companies'][0]['comparison'].update(status='updated',previousResultVersion='old')
         with self.assertRaisesRegex(ValueError,'previous_version'): c.validate(d,f)

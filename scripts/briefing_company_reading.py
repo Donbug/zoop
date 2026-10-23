@@ -14,10 +14,14 @@ spec.loader.exec_module(prices)
 base = company.base
 VERSION = 'company-reading-v1'
 SCHEMA = 'zoop-company-reading-v1'
+V2 = 'company-reading-v2'
+SCHEMA_V2 = 'zoop-company-reading-v2'
+QUALITY = ('specificity', 'newInformation', 'continuity', 'nonRepetition')
 
 
-def freeze(row):
-    return {'schemaVersion': SCHEMA, 'roundId': row['roundId'], 'edition': row['edition'], 'cutoff': row['cutoff'],
+def freeze(row, version=VERSION):
+    company.require(version in (VERSION, V2), 'reading_version')
+    return {'schemaVersion': SCHEMA_V2 if version == V2 else SCHEMA, 'roundId': row['roundId'], 'edition': row['edition'], 'cutoff': row['cutoff'],
             'companyResultVersion': row['resultVersion'], 'draft': row['draft'], 'targets': row['frozen']['targets'],
             'sources': row['frozen']['sources']}
 
@@ -27,8 +31,10 @@ def schema(frozen):
         value = company.statement(sorted(frozen['sources']))
         value['properties']['text']['maxLength'] = length
         return value
+    v2 = frozen.get('schemaVersion', SCHEMA) == SCHEMA_V2
+    fields = {'brief': s(140), 'fact': s(160), 'watch': s(180), 'background': s(240), 'change': s(180)} if v2 else {'brief': s(70), 'watch': s(50), 'change': s(60)}
     item = company.obj({'companyId': {'type': 'string', 'enum': [t['companyId'] for t in frozen['targets']]},
-                        'brief': s(70), 'watch': s(50), 'change': s(60)})
+                        **fields})
     count = len(frozen['targets'])
     return company.obj({'companies': {'type': 'array', 'items': item, 'minItems': count, 'maxItems': count}})
 
@@ -37,11 +43,24 @@ def validate(draft, frozen):
     base.validate_schema(draft, schema(frozen))
     expected = {t['companyId']: t for t in frozen['targets']}
     company.require({c['companyId'] for c in draft['companies']} == set(expected), 'reading_coverage')
+    if frozen.get('schemaVersion', SCHEMA) == SCHEMA_V2:
+        for key in ('brief', 'watch'):
+            normalized = [c[key]['text'].translate(str.maketrans('', '', ' \t\r\n')) for c in draft['companies']]
+            company.require(len(set(normalized)) == len(normalized), 'reading_repeated_' + key)
     for c in draft['companies']:
-        for key in ('brief', 'watch', 'change'):
+        for key in (('brief', 'fact', 'watch', 'background', 'change') if frozen.get('schemaVersion', SCHEMA) == SCHEMA_V2 else ('brief', 'watch', 'change')):
             s = c[key]
             company.require(set(s['evidenceIds']) <= set(expected[c['companyId']]['sourceIds']), 'reading_foreign_source')
             company.require(len(s['evidenceIds']) == len(set(s['evidenceIds'])), 'reading_duplicate_source')
+
+
+def verification_schema(frozen):
+    value = company.verification_schema(frozen)
+    if frozen.get('schemaVersion', SCHEMA) == SCHEMA_V2:
+        item = value['properties']['checks']['items']
+        item['properties']['quality'] = company.obj({k: {'type': 'boolean'} for k in QUALITY})
+        item['required'].append('quality')
+    return value
 
 
 def assess(client, frozen):
@@ -56,27 +75,31 @@ def assess(client, frozen):
         except (ValueError, base.ReplayError) as error:
             attempts.append({'draft': draft, 'generationRequestDigest': gd, 'error': str(error)})
             continue
-        vs = company.verification_schema(frozen)
+        vs = verification_schema(frozen)
         data = {'frozen': frozen, 'draft': draft}
         vd = client.request_digest('company_reading_verification', data, 'verification.md', 'unused', 5000, vs)
         verified = client.call('company_reading_verification', data, 'verification.md', 'unused', 5000, vs)
+        base.validate_schema(verified, vs)
         ids = [c['companyId'] for c in verified['checks']]
         company.require(len(ids) == len(set(ids)) and set(ids) == {t['companyId'] for t in frozen['targets']}, 'reading_verification_coverage')
         attempts.append({'draft': draft, 'generationRequestDigest': gd, 'verificationRequestDigest': vd, 'verification': verified})
-        if all(c['supported'] for c in verified['checks']):
+        if all(c['supported'] and (frozen.get('schemaVersion', SCHEMA) != SCHEMA_V2 or all(c['quality'].values())) for c in verified['checks']):
             return {'status': 'PASS', 'draft': draft, 'attempts': attempts,
                     'generationRequestDigest': gd, 'verificationRequestDigest': vd}
     return {'status': 'WITHHELD', 'draft': None, 'attempts': attempts}
 
 
 def run(args, transport=None):
+    version = getattr(args, 'prompt_version', VERSION)
+    company.require(version in (VERSION, V2), 'reading_version')
     baseline, output = Path(args.baseline).resolve(), Path(args.output).resolve()
     company.require(baseline != output and baseline not in output.parents and output not in baseline.parents, 'reading_separate_output')
     base.private_dir(output)
     identity = {'baselineSha256': base.digest(base.regular(baseline / 'bundle-v2.json')),
                 'pricesSha256': base.digest(base.regular(Path(args.prices).resolve() / 'receipts.json')) if args.prices else None,
                 'authorizationRef': args.authorization_ref, 'runId': args.run_id, 'maximumPaidCalls': args.max_calls,
-                'promptArtifacts': {p.name: base.digest(base.regular(p)) for p in sorted(company.context.PROMPTS.with_name(VERSION).iterdir()) if p.is_file()}}
+                'promptArtifacts': {p.name: base.digest(base.regular(p)) for p in sorted(company.context.PROMPTS.with_name(version).iterdir()) if p.is_file()}}
+    if version != VERSION: identity['promptVersion'] = version
     identity_file = output / 'reading-execution.json'
     if (output / 'reading-proof.json').exists():
         company.require(identity_file.exists() and base.strict_load(base.regular(identity_file)) == identity, 'reading_request_identity_changed')
@@ -115,12 +138,12 @@ def run(args, transport=None):
             target = output / 'company-prices' / file.name
             if not target.exists():
                 os.link(file, target)
-        prompts = company.context.PROMPTS.with_name(VERSION)
+        prompts = company.context.PROMPTS.with_name(version)
         client = company.context.legacy.MarketSummaryClient(output, transport or base.authenticated_transport(Path(args.key_file), timeout=600),
                                                           args.max_calls, prompt_root=prompts)
         completed = []
         for row in rows:
-            frozen = freeze(row)
+            frozen = freeze(row, version)
             path = output / 'reading-rounds' / (row['roundId'] + '.json')
             if path.exists():
                 result = base.strict_load(base.regular(path))
@@ -130,7 +153,7 @@ def run(args, transport=None):
                 result.update(roundId=row['roundId'], cutoff=row['cutoff'], frozen=frozen, generatedAt=base.now())
                 if series: result['pricePolicy'] = 'not_connected'
                 else: result['prices'] = {t['companyId']: prices.snapshot(t['companyId'], row['cutoff'], price_receipts[t['companyId']], output) for t in frozen['targets']}
-                result['resultVersion'] = 'reading-v1-' + base.digest(base.canonical(result))
+                result['resultVersion'] = ('reading-v2-' if version == V2 else 'reading-v1-') + base.digest(base.canonical(result))
                 base.private_dir(path.parent)
                 base.write_once(path, base.canonical(result))
             completed.append(result)
@@ -140,7 +163,7 @@ def run(args, transport=None):
         if not series:
             layer['maximumPaidCallsIncludingPrior'] = args.max_calls
             layer['runId'] = args.run_id
-        layer['seriesCompanyReading' if series else 'companyReadingLayer'] = {'schemaVersion': SCHEMA, 'authorizationRef': args.authorization_ref,
+        layer['seriesCompanyReading' if series else 'companyReadingLayer'] = {'schemaVersion': SCHEMA_V2 if version == V2 else SCHEMA, 'authorizationRef': args.authorization_ref,
                                         'rounds': completed, 'receipts': receipts}
         base.write_once(output / 'bundle-v2.json', base.canonical(bundle))
         proof = {**plan, 'status': 'COMPLETE', 'pass': sum(r['status'] == 'PASS' for r in completed),
@@ -159,6 +182,7 @@ def parser():
     for flag in ('baseline', 'output', 'authorization-ref', 'run-id'):
         p.add_argument('--' + flag, required=True)
     p.add_argument('--prices', help='Archived prices for legacy presentation mode; series short reading keeps prices separate')
+    p.add_argument('--prompt-version', choices=[VERSION, V2], default=V2)
     p.add_argument('--key-file')
     p.add_argument('--max-calls', type=int, default=400)
     p.add_argument('--execute', action='store_true')

@@ -4,6 +4,7 @@ import argparse
 import copy
 import importlib.util
 import os
+from datetime import date, timedelta
 from pathlib import Path
 spec=importlib.util.spec_from_file_location('_company_context',Path(__file__).with_name('briefing_market_context.py'))
 context=importlib.util.module_from_spec(spec);spec.loader.exec_module(context)
@@ -39,15 +40,16 @@ def generation_schema(frozen):
     return obj({'companies':{'type':'array','items':item,'minItems':len(frozen['targets']),'maxItems':len(frozen['targets'])}})
 
 
-def previous_for(company,date,edition,history):
+def previous_for(company,date_value,edition,history,strict=False):
     for row in reversed(history):
-        if row['status']!='PASS' or (edition=='evening' and (row['date']!=date or row['edition']!='morning')): continue
+        if row['status']!='PASS' or (edition=='evening' and (row['date']!=date_value or row['edition']!='morning')): continue
+        if strict and edition == 'morning' and (row['edition'] != 'evening' or row['date'] != (date.fromisoformat(date_value)-timedelta(days=1)).isoformat()): continue
         found=next((c for c in row['draft']['companies'] if c['companyId']==company),None)
         if found: return {'status':'available','roundId':row['roundId'],'cutoff':row['cutoff'],'resultVersion':row['resultVersion'],'judgment':found}
     return {'status':'unavailable','reason':'same_day_morning_company_judgment_missing' if edition=='evening' else 'previous_company_judgment_missing'}
 
 
-def freeze(row,effective,metadata,history):
+def freeze(row,effective,metadata,history,version=VERSION):
     broad=row['marketEnrichment']['marketContext'];cutoff=context.legacy._aware(broad['window']['to'])
     selected={i['issueId']:i for i in effective['selected']};targets={};sources={}
     for item in effective['result']['items']:
@@ -56,7 +58,7 @@ def freeze(row,effective,metadata,history):
         for company in companies:
             cid,name=company['id'],company['name']
             target=targets.setdefault(cid,{'companyId':cid,'companyName':name,'issueIds':[],'facts':[],'sourceIds':[],
-                'previous':previous_for(cid,row['date'],row['edition'],history),
+                'previous':previous_for(cid,row['date'],row['edition'],history,strict=version=='company-outlook-v3'),
                 'observedMovement':{'status':'unavailable','reason':'cutoff_bound_company_price_feed_missing'}})
             target['issueIds'].append(item['issueId']);target['facts'].extend({'text':c['text'],'evidenceIds':c['evidenceIds']} for c in item['claims'])
             own=list(issue['sources']);docs=[d for d in broad['documents'] if set(d['companyNames']) & ({name,'Alphabet'} if cid=='NASDAQ:GOOGL' else {name})]
@@ -73,7 +75,7 @@ def freeze(row,effective,metadata,history):
                 if sid not in target['sourceIds']: target['sourceIds'].append(sid)
     require(targets,'empty_targets')
     return {'schemaVersion':SCHEMA,'roundId':row['roundId'],'date':row['date'],'edition':row['edition'],'cutoff':broad['window']['to'],
-        'newsResultSha256':effective['resultSha256'],'targets':list(targets.values()),'sources':sources,'promptVersion':VERSION,
+        'newsResultSha256':effective['resultSha256'],'targets':list(targets.values()),'sources':sources,'promptVersion':version,
         'scopeNote':'원발행 시각 기준 과거 시뮬레이션입니다. 기업 사업 영향의 조건부 해석이며 주가·목표가 예측이 아닙니다. 당시 수집·본문 동일성은 입증하지 않습니다.'}
 
 

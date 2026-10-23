@@ -8333,7 +8333,7 @@ components:
 
     CompanyShortReading:
       type: object
-      description: 전문을 보존하면서 별도 생성·검증한 짧은 읽기. PASS일 때만 세 문장이 존재합니다.
+      description: 전문을 보존하면서 별도 생성·검증한 짧은 읽기. v2는 판단·새 사실·다음 확인·배경·이전 판단 비교를 구분합니다.
       required: [status, resultVersion]
       properties:
         status: {type: string, enum: [PASS, WITHHELD]}
@@ -8341,6 +8341,9 @@ components:
         brief: {"$ref": "#/components/schemas/CompanyStatement"}
         watch: {"$ref": "#/components/schemas/CompanyStatement"}
         change: {"$ref": "#/components/schemas/CompanyStatement"}
+        schemaVersion: {type: string, enum: [zoop-company-reading-v2], description: v2 표기. 기존 v1에서는 생략.}
+        fact: {"$ref": "#/components/schemas/CompanyStatement"}
+        background: {"$ref": "#/components/schemas/CompanyStatement"}
     CompanyPricePoint:
       type: object
       required: [value, observedAt, sessionDate, kind]

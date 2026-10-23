@@ -65,6 +65,78 @@ function Statement({
   );
 }
 
+/** D-BRF-01/02: separate the judgment, new fact and next observation. */
+function SpecificReading({ company }: { company: CompanyOutlook }) {
+  const reading = company.reading;
+  const allowed = new Set(company.sources.map((s) => s.evidenceId));
+  const statements = [
+    reading?.brief,
+    reading?.fact,
+    reading?.watch,
+    reading?.background,
+    reading?.change,
+  ];
+  if (
+    reading?.status !== 'PASS' ||
+    statements.some(
+      (s) =>
+        !s?.text?.trim() ||
+        !s.evidenceIds.length ||
+        s.evidenceIds.some((id) => !allowed.has(id)),
+    )
+  )
+    return (
+      <p className={`${NOTE} mt-2`}>
+        검증된 새 문안을 표시할 수 없습니다. 전문과 근거를 확인하세요.
+      </p>
+    );
+  return (
+    <div
+      className="mt-3 space-y-3"
+      aria-label={`${company.companyName} 판단과 새 사실`}
+    >
+      <div>
+        <p className="text-xs font-semibold text-zoop-muted">한 줄 판단</p>
+        <p className="mt-1 text-base leading-relaxed font-medium">
+          {reading.brief?.text}
+        </p>
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-zoop-muted">새 사실</p>
+        <p className="mt-1 text-sm leading-relaxed">{reading.fact?.text}</p>
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-zoop-muted">다음 확인 조건</p>
+        <p className="mt-1 text-sm leading-relaxed">{reading.watch?.text}</p>
+      </div>
+      <details>
+        <summary
+          className={`min-h-11 cursor-pointer content-center text-sm font-semibold ${FOCUS_RING}`}
+        >
+          배경·이전 판단과의 연결·문장 근거
+        </summary>
+        <h5 className="mt-2 text-sm font-semibold">비교할 배경</h5>
+        {reading.background && (
+          <Statement value={reading.background} company={company} />
+        )}
+        <h5 className="mt-3 text-sm font-semibold">이전 판단에서 달라진 점</h5>
+        {reading.change && (
+          <Statement value={reading.change} company={company} />
+        )}
+        <h5 className="mt-3 text-sm font-semibold">
+          판단·새 사실·확인 조건의 근거
+        </h5>
+        {statements
+          .slice(0, 3)
+          .map(
+            (value, i) =>
+              value && <Statement key={i} value={value} company={company} />,
+          )}
+      </details>
+    </div>
+  );
+}
+
 /** D-BRF-01·02: selected-company outlooks lead; broad market context remains separate. */
 export default function CompanyOutlooks({
   result,
@@ -128,7 +200,11 @@ export default function CompanyOutlooks({
               <p className={`${NOTE} mt-1`}>
                 {assessments[company.assessment]}
               </p>
+              {company.reading?.schemaVersion === 'zoop-company-reading-v2' && (
+                <SpecificReading company={company} />
+              )}
               {compact &&
+                company.reading?.schemaVersion !== 'zoop-company-reading-v2' &&
                 (company.reading?.status === 'PASS' ? (
                   <div
                     className="mt-3 space-y-2"
@@ -160,8 +236,9 @@ export default function CompanyOutlooks({
                 </summary>
                 {company.price?.status === 'available' && (
                   <p className={`${NOTE} mt-2`}>
-                    아래 전문은 시세 연결 전에 작성한 원문입니다. 가격 정보는
-                    위의 회차 기준 시세로 별도 보완했습니다.
+                    사업 판단과 회차 기준 시세를 함께 확인하세요. 가격이
+                    움직였다는 사실만으로 이 뉴스의 영향이나 전망 적중을
+                    단정하지 않습니다.
                   </p>
                 )}
                 <h5 className="mt-3 text-sm font-semibold">조건부 기업 전망</h5>

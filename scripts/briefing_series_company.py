@@ -36,8 +36,8 @@ def generate(args):
     for market in bundle['marketEnrichment']['rounds']:
         definition=news[market['roundId']]
         row={'roundId':market['roundId'],'date':market['date'],'edition':market['edition'],'marketEnrichment':market}
-        frozen=company.freeze(row,definition,metadata,history)
-        if getattr(args,'edition_bound_comparison',False) or version=='company-outlook-v2':frozen['comparisonContract']='edition-bound-v2'
+        frozen=company.freeze(row,definition,metadata,history,version)
+        if getattr(args,'edition_bound_comparison',False) or version in ('company-outlook-v2','company-outlook-v3'):frozen['comparisonContract']='edition-bound-v2'
         frozen['promptVersion']=version
         path=output/'company-rounds'/(row['roundId']+'.json');base.private_dir(path.parent)
         if path.exists():
@@ -82,7 +82,7 @@ def run(args):
 def parser():
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('baseline','output','sources','authorization-ref'):p.add_argument('--'+key,required=True)
-    p.add_argument('--prompt-version',choices=['company-outlook-v1','company-outlook-v2'],default='company-outlook-v1')
+    p.add_argument('--prompt-version',choices=['company-outlook-v1','company-outlook-v2','company-outlook-v3'],default='company-outlook-v1')
     p.add_argument('--edition-bound-comparison',action='store_true')
     p.add_argument('--key-file');p.add_argument('--execute',action='store_true')
     p.add_argument('--without-prices', action='store_false', dest='with_prices', default=True,

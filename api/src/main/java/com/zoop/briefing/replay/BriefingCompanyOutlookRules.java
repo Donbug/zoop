@@ -36,7 +36,7 @@ final class BriefingCompanyOutlookRules {
             Map<String, BriefingPresentationRules.Evidence> evidence, List<StrictJson.Obj> history,
             Map<String, JsonNode> receipts, Path output, Set<String> owned) {
         StrictJson.Obj frozen = row.object("frozen");
-        require(SCHEMA.equals(frozen.string("schemaVersion")) && Set.of(VERSION, "company-outlook-v2").contains(frozen.string("promptVersion")), "schema");
+        require(SCHEMA.equals(frozen.string("schemaVersion")) && Set.of(VERSION, "company-outlook-v2", "company-outlook-v3").contains(frozen.string("promptVersion")), "schema");
         for (String field : List.of("roundId", "date", "edition", "cutoff")) {
             String value = switch (field) { case "roundId" -> payload.path("id").stringValue();
                 case "cutoff" -> market.string("cutoff"); default -> payload.path(field).stringValue(); };
@@ -148,6 +148,9 @@ final class BriefingCompanyOutlookRules {
             StrictJson.Obj row = history.get(index);
             if (!"PASS".equals(row.string("status")) || ("evening".equals(current.string("edition"))
                     && (!row.string("date").equals(current.string("date")) || !"morning".equals(row.string("edition"))))) continue;
+            boolean strict = current.has("frozen") && "company-outlook-v3".equals(current.object("frozen").string("promptVersion"));
+            if (strict && "morning".equals(current.string("edition"))
+                    && (!"evening".equals(row.string("edition")) || !java.time.LocalDate.parse(current.string("date")).minusDays(1).toString().equals(row.string("date")))) continue;
             for (StrictJson.Obj c : row.object("draft").objects("companies")) if (company.equals(c.string("companyId"))) {
                 ObjectNode out = StrictJson.newObject().put("status", "available").put("roundId", row.string("roundId"))
                         .put("cutoff", row.string("cutoff")).put("resultVersion", row.string("resultVersion")); out.set("judgment", c.node().deepCopy()); return out;
