@@ -29,16 +29,16 @@ const claimLabels: Record<
   outlook: '전망',
 };
 
-function detailError(cause: unknown) {
+function detailError(cause: unknown, roundLabel: string) {
   if (cause instanceof ApiError) {
     if (cause.status === 401 || cause.status === 403)
-      return '이 회차의 상세·근거를 조회할 권한이 없어요.';
+      return `${roundLabel}의 상세·근거를 조회할 권한이 없어요.`;
     if (cause.status === 404)
-      return '이 회차에서 제공할 수 있는 상세·근거가 없어요.';
+      return `${roundLabel}에서 제공할 수 있는 상세·근거가 없어요.`;
     if (cause.status === 503)
-      return '이 회차의 고정 상세·근거를 지금 제공할 수 없어요. 다시 시도해 주세요.';
+      return `${roundLabel}의 고정 상세·근거를 지금 제공할 수 없어요. 다시 시도해 주세요.`;
   }
-  return '상세·근거를 불러오지 못했어요. 다시 시도해 주세요.';
+  return `${roundLabel === '이전 회차' ? '이전 회차의 ' : ''}상세·근거를 불러오지 못했어요. 다시 시도해 주세요.`;
 }
 
 function BodyContext({ evidence }: { evidence: BriefingItemEvidence }) {
@@ -148,11 +148,15 @@ export default function BriefingItemDetails({
   roundId,
   graphVersion,
   item,
+  isRecap = false,
 }: {
   roundId: string;
   graphVersion: string | null;
   item: BriefingItem;
+  isRecap?: boolean;
 }) {
+  const roundLabel = isRecap ? '이전 회차' : '이 회차';
+  const issueLabel = isRecap ? '이전 핵심 이슈' : '핵심 이슈';
   const id = useId();
   const [detailOpen, setDetailOpen] = useState(false);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
@@ -177,7 +181,10 @@ export default function BriefingItemDetails({
       })
       .catch((cause: unknown) => {
         if (active.current)
-          setState({ status: 'error', message: detailError(cause) });
+          setState({
+            status: 'error',
+            message: detailError(cause, roundLabel),
+          });
       })
       .finally(() => {
         pending.current = null;
@@ -211,7 +218,7 @@ export default function BriefingItemDetails({
           ref={detailButton}
           type="button"
           className={ui.button}
-          aria-label={`핵심 이슈 ${item.rank} 자세히 ${detailOpen ? '접기' : '보기'}`}
+          aria-label={`${issueLabel} ${item.rank} 자세히 ${detailOpen ? '접기' : '보기'}`}
           aria-expanded={detailOpen}
           aria-controls={`${id}-detail`}
           onClick={() => {
@@ -225,7 +232,7 @@ export default function BriefingItemDetails({
           ref={evidenceButton}
           type="button"
           className={ui.button}
-          aria-label={`핵심 이슈 ${item.rank} 근거 ${evidenceOpen ? '접기' : '보기'}`}
+          aria-label={`${issueLabel} ${item.rank} 근거 ${evidenceOpen ? '접기' : '보기'}`}
           aria-expanded={evidenceOpen}
           aria-controls={`${id}-evidence`}
           onClick={() => {
@@ -241,7 +248,7 @@ export default function BriefingItemDetails({
         <div className="mt-3" aria-busy={state.status === 'loading'}>
           {state.status === 'loading' && (
             <p role="status" className={EMPTY}>
-              이 회차의 상세·근거를 불러오고 있어요.
+              {roundLabel}의 상세·근거를 불러오고 있어요.
             </p>
           )}
           {state.status === 'error' && (
@@ -252,14 +259,14 @@ export default function BriefingItemDetails({
                 className={`${ui.button} mt-2`}
                 onClick={() => load()}
               >
-                상세·근거 다시 시도
+                {isRecap && '이전 회차 '}상세·근거 다시 시도
               </button>
             </div>
           )}
           {detail && (
             <>
               <p className={NOTE}>
-                이 회차에 저장된 문안·근거 · 데이터 기준{' '}
+                {roundLabel}에 저장된 문안·근거 · 데이터 기준{' '}
                 {briefingTime(detail.metadata.asOf)}
               </p>
             </>
@@ -269,7 +276,7 @@ export default function BriefingItemDetails({
       <section
         id={`${id}-detail`}
         hidden={!detailOpen || !detail}
-        aria-label={`핵심 이슈 ${item.rank} 상세`}
+        aria-label={`${issueLabel} ${item.rank} 상세`}
         className="mt-3 rounded-panel border border-panel-line p-4"
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
@@ -280,7 +287,7 @@ export default function BriefingItemDetails({
       >
         {detail && (
           <>
-            <h5 className={ui.itemTitle}>브리핑 문안</h5>
+            <h5 className={ui.itemTitle}>{isRecap && '이전 '}브리핑 문안</h5>
             <p className={`${BODY} mt-2`}>
               {'text' in detail.summary
                 ? detail.summary.text
@@ -355,7 +362,7 @@ export default function BriefingItemDetails({
       <section
         id={`${id}-evidence`}
         hidden={!evidenceOpen || !detail}
-        aria-label={`핵심 이슈 ${item.rank} 근거`}
+        aria-label={`${issueLabel} ${item.rank} 근거`}
         className="mt-3"
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
@@ -366,7 +373,9 @@ export default function BriefingItemDetails({
       >
         {detail && (
           <>
-            <h5 className={`${ui.itemTitle} mb-2`}>발행 회차에 고정된 근거</h5>
+            <h5 className={`${ui.itemTitle} mb-2`}>
+              {isRecap ? '이전 회차' : '발행 회차'}에 고정된 근거
+            </h5>
             {detail.evidence.length ? (
               <ol className="flex flex-col gap-3">
                 {detail.evidence.map((evidence, index) => (
@@ -380,7 +389,7 @@ export default function BriefingItemDetails({
               </ol>
             ) : (
               <p className={EMPTY}>
-                이 회차에서 제공할 수 있는 원문 근거가 없어요.
+                {roundLabel}에서 제공할 수 있는 원문 근거가 없어요.
               </p>
             )}
           </>

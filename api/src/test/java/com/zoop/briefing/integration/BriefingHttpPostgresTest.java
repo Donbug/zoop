@@ -74,25 +74,26 @@ class BriefingHttpPostgresTest {
     }
 
     @BeforeEach
-    void loadSyntheticFixture(org.junit.jupiter.api.TestInfo info) throws IOException {
+    void loadSyntheticFixture() throws IOException {
+        loadFixture(resource("fixture.sql"));
+    }
+
+    private void loadQuietEveningFixture() throws IOException {
         String fixture = resource("fixture.sql");
-        if (info.getTestMethod().orElseThrow().getName().startsWith("recap")) {
-            int start = fixture.indexOf("$records$") + "$records$".length();
-            int end = fixture.indexOf("$records$", start);
-            var records = JSON.readTree(fixture.substring(start, end));
-            for (var record : records) {
-                if (ROUND.equals(record.path("p").path("id").asString())) {
-                    var payload = (tools.jackson.databind.node.ObjectNode) record.get("p");
-                    payload.putArray("items"); payload.put("emptyReason", "no_issues_in_window").putNull("outlook");
-                    for (var item : record.path("comparison").path("items")) {
-                        ((tools.jackson.databind.node.ObjectNode) item).put("change", "dropped").putNull("rank").putNull("evidenceCount");
-                    }
-                    ((tools.jackson.databind.node.ObjectNode) payload.get("references")).putArray("eventIds");
+        int start = fixture.indexOf("$records$") + "$records$".length();
+        int end = fixture.indexOf("$records$", start);
+        var records = JSON.readTree(fixture.substring(start, end));
+        for (var record : records) {
+            if (ROUND.equals(record.path("p").path("id").asString())) {
+                var payload = (tools.jackson.databind.node.ObjectNode) record.get("p");
+                payload.putArray("items"); payload.put("emptyReason", "no_issues_in_window").putNull("outlook");
+                for (var item : record.path("comparison").path("items")) {
+                    ((tools.jackson.databind.node.ObjectNode) item).put("change", "dropped").putNull("rank").putNull("evidenceCount");
                 }
+                ((tools.jackson.databind.node.ObjectNode) payload.get("references")).putArray("eventIds");
             }
-            fixture = fixture.substring(0, start) + JSON.writeValueAsString(records) + fixture.substring(end);
         }
-        loadFixture(fixture);
+        loadFixture(fixture.substring(0, start) + JSON.writeValueAsString(records) + fixture.substring(end));
     }
 
     private void loadFixture(String sql) throws IOException {
@@ -151,7 +152,8 @@ class BriefingHttpPostgresTest {
     }
 
     @Test
-    void recapRestoresFixedMorningOriginalForAnAuthoredQuietEveningAndPreservesHashes() throws Exception {
+    void quietEveningRestoresFixedMorningRecapAndPreservesHashes() throws Exception {
+        loadQuietEveningFixture();
         String digest = jdbc.queryForObject("SELECT payload_sha256 FROM briefing_rounds WHERE id=?", String.class,
                 "brf-test-2026-10-15-morning");
         var response = get("/api/v1/briefings/" + ROUND + "/recap", "recap-http");
@@ -168,6 +170,7 @@ class BriefingHttpPostgresTest {
 
     @Test
     void recapDoesNotHidePriorRevocationCorrectionOrAnUnpublishedCurrentRound() throws Exception {
+        loadQuietEveningFixture();
         String path = "/api/v1/briefings/" + ROUND + "/recap";
         Files.writeString(GRANTS, "{}");
         assertEquals(503, get(path, "revoked-recap").status());
@@ -188,6 +191,7 @@ class BriefingHttpPostgresTest {
 
     @Test
     void recapAndGraphKeepCurrentEmptyScopeSeparateFromPreservedMorning() throws Exception {
+        loadQuietEveningFixture();
         registerSyntheticGraph();
         var recap = get("/api/v1/briefings/" + ROUND + "/recap", "combined-recap");
         assertEquals(200, recap.status(), recap.body());
