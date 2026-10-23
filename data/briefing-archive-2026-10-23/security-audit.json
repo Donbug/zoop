@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "objectsInspected": 24121,
+  "zipObjectsInspected": 1000,
+  "knownCredentialMatches": 0,
+  "additionalSanitizationChanges": 0,
+  "positiveAndFalsePositiveCases": "PASS",
+  "newAiCalls": 0,
+  "newProviderCalls": 0
+}
