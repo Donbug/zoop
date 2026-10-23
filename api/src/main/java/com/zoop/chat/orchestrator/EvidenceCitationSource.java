@@ -1,25 +1,43 @@
 package com.zoop.chat.orchestrator;
 
 import com.zoop.chat.dto.Citation;
+import com.zoop.chat.service.ChatCompanyProfiles;
 import com.zoop.chat.tool.ChatToolUnavailable;
 import com.zoop.common.exception.CustomException;
 import com.zoop.document.evidence.dto.EvidenceResponse;
 import com.zoop.document.evidence.service.EvidenceService;
 import java.time.Instant;
 import java.util.Optional;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 
-/** {@link ChatCitationSource} through {@code GET /api/v1/evidence/{id}}'s own read, at the pinned version and asOf. */
+/**
+ * {@link ChatCitationSource} through {@code GET /api/v1/evidence/{id}}'s own read, at the pinned version and asOf. A company
+ * profile quote is cited from the catalog as {@code company_profile}: the whole quoted text, the company id as {@code docId}.
+ */
 @Component
 public class EvidenceCitationSource implements ChatCitationSource {
     private final EvidenceService evidence;
+    private final ChatCompanyProfiles profiles;
 
-    public EvidenceCitationSource(EvidenceService evidence) {
+    public EvidenceCitationSource(EvidenceService evidence, ChatCompanyProfiles profiles) {
         this.evidence = evidence;
+        this.profiles = profiles;
     }
 
     @Override
     public Optional<Citation> cite(String evidenceId, String graphVersion, Instant asOf, String traceId) {
+        Optional<ChatCompanyProfiles.Quote> profile;
+        try {
+            profile = profiles.byId(evidenceId);
+        } catch (DataAccessException unavailable) {
+            throw new ChatToolUnavailable("the catalog could not be read for " + evidenceId, unavailable);
+        }
+        if (profile.isPresent()) {
+            var q = profile.get();
+            return Optional.of(new Citation("company_profile", q.evidenceId(), q.text(), null, null, q.companyId(), null, 0,
+                    q.text().codePointCount(0, q.text().length()), q.title(), ChatCompanyProfiles.PUBLISHER, null, q.url()));
+        }
         EvidenceResponse read;
         try {
             read = evidence.read(evidenceId, null, graphVersion, asOf == null ? null : asOf.toString(), null, traceId);
