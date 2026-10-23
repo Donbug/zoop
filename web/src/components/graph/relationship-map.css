@@ -75,8 +75,8 @@
   align-items: center;
   gap: 6px;
   padding: 0 12px;
-  font-size: 13px;
-  line-height: 19.5px;
+  font-size: 15px;
+  line-height: 22px;
   font-weight: 600;
   color: var(--color-zoop-muted);
   white-space: nowrap;
@@ -341,13 +341,10 @@
 }
 .company-price-row > .up,
 .company-price-row > .down {
-  color: #c0362c;
+  color: var(--color-zoop-ink);
   font-size: 12px;
   font-weight: 600;
   line-height: 18px;
-}
-.company-price-row > .down {
-  color: #235fa4;
 }
 .company-quote-meta {
   display: flex;
@@ -432,7 +429,7 @@
 }
 .company-sparkline polyline {
   fill: none;
-  stroke: #315f9e;
+  stroke: var(--color-zoop-ink);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
@@ -649,7 +646,7 @@
   border-top: 0.667px dashed var(--color-zoop-faint);
 }
 .legend-line.follows {
-  background: #c0362c;
+  background: var(--color-zoop-ink);
 }
 .legend-line.arrow::after {
   content: '';
@@ -808,7 +805,7 @@
 /* FS015: 실제 조작 대상만 점선으로 강조한다. */
 .tutorial-target,
 [data-tutorial-evidence='true'] {
-  outline: 2px dashed var(--color-zoop-down);
+  outline: 2px dashed var(--color-zoop-ink);
   outline-offset: 4px;
   border-radius: 5px;
 }

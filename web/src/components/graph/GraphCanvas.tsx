@@ -513,7 +513,7 @@ export default function GraphCanvas({
                     ? appearance.variant === 'improved'
                       ? colors.selected
                       : themeColor('ink')
-                    : '#b75b00',
+                    : themeColor('ink'),
                   strokeOpacity: 1,
                   lineWidth: connectionPath ? 2 : 4,
                 },
@@ -888,9 +888,9 @@ export default function GraphCanvas({
             tutorial: {
               opacity: 1,
               halo: true,
-              stroke: '#2f6fd8',
+              stroke: themeColor('ink'),
               lineDash: [6, 4],
-              haloStroke: '#2f6fd8',
+              haloStroke: themeColor('ink'),
               haloOpacity: 1,
               haloFill: 'transparent',
               haloLineDash: [5, 4],
@@ -1140,7 +1140,7 @@ export default function GraphCanvas({
       </div>
       {tutorialPhase === 'pan' && (
         <button
-          className="absolute z-20 grid size-32 -translate-x-1/2 -translate-y-1/2 touch-none place-items-center rounded-full border-2 border-dashed border-zoop-down bg-zoop-paper/75 px-3 text-center text-xs font-bold text-zoop-down focus-visible:outline-4"
+          className="absolute z-20 grid size-32 -translate-x-1/2 -translate-y-1/2 touch-none place-items-center rounded-full border-2 border-dashed border-zoop-ink bg-zoop-paper/75 px-3 text-center text-xs font-bold text-zoop-ink focus-visible:outline-4"
           style={{
             left: dragAnchor?.x ?? '62.5%',
             top: dragAnchor?.y ?? '71.65%',
@@ -1208,7 +1208,7 @@ export default function GraphCanvas({
           type="button"
           aria-label={`강조된 ${data.nodes.find((node) => node.id === tutorialTargetId)?.label ?? ''} 노드 선택`}
           data-tutorial-action="node"
-          className="absolute z-20 rounded-full border-2 border-dashed border-zoop-down bg-transparent focus-visible:outline-4"
+          className="absolute z-20 rounded-full border-2 border-dashed border-zoop-ink bg-transparent focus-visible:outline-4"
           style={{
             left: tutorialMarker.x,
             top: tutorialMarker.y,
