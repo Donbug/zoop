@@ -101,3 +101,11 @@ D-GRP-01/01b MapPage provides the approved light/dark GraphAppearanceContext and
 Render one GraphLegend group in the top toolbar using the GraphCanvas portal slot. Preserve its member/mode-scoped visibility state, aria-pressed, relationship explanations, camera, selection and at least one visible node kind. The left legend was removed by user request. Let toolbar items scroll horizontally without shrinking or creating vertical clipping.
 
 Company logos use `CompanyLogo`, `logoScale` and `logoBackground` from the shared logo utility. Background marks with checked safe margins fill the circle; other symbols fit the inscribed square (68% diameter) and use object-contain. Preserve brand colors and the Micron/Amazon backgrounds across themes. See [graph UI improvements](GRAPH_UI_IMPROVEMENTS.md) for asset provenance, verification and scope.
+
+## Briefing at-a-glance reading (D-BRF-01/02)
+
+`CompanyOutlooks` uses a native, keyboard-accessible disclosure per selected company in `reading=compact`. Show the complete stored, evidence-linked short judgment first; do not trim text with character counts or line clamps. Do not hardcode particular companies, a positive interpretation, or exactly three companies: one issue may involve several companies.
+
+Opening a company reveals its existing `CompanyPrice`, v2 fact/background/condition reading when provided, and the full `CompanyAnalysis` with the original evidence links. Analysis is already expanded within the company disclosure, so opening it does not require another click just to read the full analysis. `reading=full` retains the expanded full layout and all existing price/baseline, unavailable, cutoff and evidence behavior. Company summaries without a valid stored brief or with missing/foreign v2 evidence show a short unavailable message and still permit access to the original analysis. Round identity/edition/cutoff guards remain required.
+
+Only screen-specific composition changes; reuse `briefingStyles` and existing Tailwind tokens. Do not change shared graph panel styles, API fields or stored text to implement this presentation. Regression: `tests/briefing/companyOutlooks.test.tsx`.

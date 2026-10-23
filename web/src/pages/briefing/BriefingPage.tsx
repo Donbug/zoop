@@ -116,7 +116,7 @@ export default function BriefingPage() {
         aria-label="브리핑 읽기 방식"
       >
         <span className="mr-auto text-[11px] text-zoop-muted">
-          {compact ? '핵심부터 가볍게' : '전체 분석과 근거'}
+          {compact ? '기업별 한눈 요약' : '전체 분석과 근거'}
         </span>
         <button
           type="button"
