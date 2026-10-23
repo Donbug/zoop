@@ -3,12 +3,14 @@
 The same child rules as every other door (`runtime.WorkerProcess`): fixed argv of server-owned paths, request data only through an anonymous stdin
 file, a fixed minimal environment (the chat group's own), stderr discarded, its own session. What this door adds:
 
-  * the invocation id is the caller's; the child sees it prefixed with the principal (`<principal>:<id>`), so two principals never share a ledger row,
-    and the response carries the caller's id again;
+  * the invocation id is the caller's; the child sees it prefixed with the principal (`<principal>:<id>`), so two principals never share a ledger row.
+    The child's result is checked as it came (exactly that prefixed id, the stage, the requested mode in the receipt, the stage's closed answer model
+    and the outcome invariants) and only then answered with the caller's id; any mismatch is `stage_outcome_unknown`, never a relabelled 200;
   * a child that exits 0 or 2 with a `zoop-ai-chat-1` result is a 200 whatever the stage outcome (`status=failed` carries the stage failure and
     whether anything was sent); exit 64 is the runtime refusing the request or its own configuration;
   * a deadline (the stage limit plus a small margin) or an abnormal end means the runtime may have sent: 504/502 `stage_outcome_unknown`, which the
-    caller must never resend. A child that could not start sent nothing: 503 `runtime_unavailable`;
+    caller must never resend. Only a child that provably never started sent nothing: 503 `runtime_unavailable`. An `unavailable` outcome after the
+    child started (output over the cap, an I/O error reading it) is unknown too;
   * at most four children at once; a request that cannot get a slot within one second is 503 `service_busy` and nothing was started.
 """
 from __future__ import annotations
@@ -22,7 +24,7 @@ from pydantic import ValidationError
 from .config import ServiceConfig
 from .jobs import ApiError, Observation
 from .runtime import CODE, Deadlines, Outcome, WorkerProcess
-from .chat_wire import CHAT_SCHEMA, INVOCATION_ID, ChatStageRequest, ChatStageResult
+from .chat_wire import ANSWERS, CHAT_SCHEMA, INVOCATION_ID, ChatStageRequest, ChatStageResult
 
 SLOTS = 4
 SLOT_WAIT = 1.0
@@ -48,6 +50,20 @@ def interpret(code: int, raw: bytes) -> Outcome:
     if code not in (0, 2) or value.get("schemaVersion") != CHAT_SCHEMA or value.get("status") != ("succeeded" if code == 0 else "failed"):
         return Outcome("abnormal", exit_code=code)
     return Outcome("result", result=value, exit_code=code)
+
+
+def consistent(result: ChatStageResult, invocation_id: str, stage: str, mode: str) -> bool:
+    """The child's result belongs to exactly this request and its outcome fields agree with each other."""
+    if result.invocation_id != invocation_id or result.stage != stage:
+        return False
+    failure, receipt = result.failure, result.receipt
+    if receipt is not None and receipt.execution_mode != mode:
+        return False
+    if result.status == "succeeded":
+        return isinstance(result.answer, ANSWERS[stage]) and failure is None and receipt is not None
+    if result.answer is not None or failure is None or (failure.unknown and not failure.sent):
+        return False
+    return failure.sent == (receipt is not None)
 
 
 class ChatProcess:
@@ -87,19 +103,19 @@ class ChatStages:
         seen.runtime.append({"command": "invoke", "kind": outcome.kind, "exit": outcome.exit_code, "code": outcome.code})
         if outcome.kind == "result":
             try:
-                result = ChatStageResult.model_validate({**outcome.result, "invocationId": request.invocation_id})
+                result = ChatStageResult.model_validate(outcome.result)
             except ValidationError:
                 raise ApiError(502, "stage_outcome_unknown") from None
-            if result.stage != stage:
+            if not consistent(result, payload["invocationId"], stage, request.mode):
                 raise ApiError(502, "stage_outcome_unknown")
-            return 200, result
+            return 200, result.model_copy(update={"invocation_id": request.invocation_id})
         if outcome.kind == "error":
             if outcome.code in REQUEST_CODES:
                 raise ApiError(422, "invalid_request", runtime_code=outcome.code)
             if outcome.code in CONFIG_CODES:
                 raise ApiError(503, "service_configuration_invalid", runtime_code=outcome.code, retry_after=5)
             raise ApiError(502, "stage_outcome_unknown", runtime_code=outcome.code)
-        if outcome.kind == "unavailable":
+        if outcome.kind == "unavailable" and not outcome.started:
             raise ApiError(503, "runtime_unavailable", retry_after=2)
         # A deadline, a signal or unreadable output: the child may have sent the request. Never resend it.
         raise ApiError(504 if outcome.kind == "timeout" else 502, "stage_outcome_unknown")

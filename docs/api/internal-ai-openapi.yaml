@@ -7286,6 +7286,35 @@
                     "capabilities": []
 "components":
   "schemas":
+    "AnswerSection":
+      "properties":
+        "basis":
+          "type": "string"
+          "enum":
+            - "general_knowledge"
+            - "evidence_grounded"
+          "title": "Basis"
+        "text":
+          "type": "string"
+          "title": "Text"
+        "requirementIds":
+          "items":
+            "type": "string"
+          "type": "array"
+          "title": "Requirementids"
+        "evidenceIds":
+          "items":
+            "type": "string"
+          "type": "array"
+          "title": "Evidenceids"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "basis"
+        - "text"
+        - "requirementIds"
+        - "evidenceIds"
+      "title": "AnswerSection"
     "BApprovalBasis":
       "properties":
         "kind":
@@ -9468,6 +9497,30 @@
         - "cachedTokens"
         - "reasoningTokens"
       "title": "CallUsage"
+    "ChatAnswer":
+      "properties":
+        "sections":
+          "items":
+            "$ref": "#/components/schemas/AnswerSection"
+          "type": "array"
+          "title": "Sections"
+        "insufficientRequirementIds":
+          "items":
+            "type": "string"
+          "type": "array"
+          "title": "Insufficientrequirementids"
+        "graphTargetIds":
+          "items":
+            "type": "string"
+          "type": "array"
+          "title": "Graphtargetids"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "sections"
+        - "insufficientRequirementIds"
+        - "graphTargetIds"
+      "title": "ChatAnswer"
     "ChatReceipt":
       "properties":
         "provider":
@@ -9553,11 +9606,12 @@
           "title": "Status"
         "answer":
           "anyOf":
-            - "additionalProperties": true
-              "type": "object"
+            - "$ref": "#/components/schemas/RouterAnswer"
+            - "$ref": "#/components/schemas/ChatAnswer"
+            - "$ref": "#/components/schemas/VerificationAnswer"
             - "type": "null"
           "title": "Answer"
-          "description": "The typed stage answer (RouterAnswer, ChatAnswer or VerificationAnswer) when succeeded."
+          "description": "The typed stage answer when succeeded: RouterAnswer (chat-router), ChatAnswer (chat-answer) or VerificationAnswer (chat-verification)."
         "failure":
           "anyOf":
             - "$ref": "#/components/schemas/ChatStageFailure"
@@ -9577,6 +9631,10 @@
         - "failure"
         - "receipt"
       "title": "ChatStageResult"
+      "description": |-
+        The outcome. Besides the field shapes the door checks the invariants: `succeeded` has an answer of its own stage's model, no failure and a
+        receipt; `failed` has a failure and no answer; `unknown` implies `sent`; a receipt is present exactly when something was sent and names the
+        requested mode.
     "ChatUsage":
       "properties":
         "inputTokens":
@@ -12335,6 +12393,79 @@
         - "job"
         - "receipts"
       "title": "ResultEnvelope"
+    "RoutedRequirement":
+      "properties":
+        "requirementId":
+          "type": "string"
+          "title": "Requirementid"
+        "types":
+          "additionalProperties":
+            "type": "number"
+          "propertyNames":
+            "enum":
+              - "Q01"
+              - "Q02"
+              - "Q03"
+              - "Q04"
+              - "Q05"
+              - "Q06"
+              - "Q07"
+              - "Q08"
+          "type": "object"
+          "title": "Types"
+        "capabilities":
+          "additionalProperties":
+            "type": "number"
+          "type": "object"
+          "title": "Capabilities"
+        "prohibitedAdvice":
+          "type": "number"
+          "title": "Prohibitedadvice"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "requirementId"
+        - "types"
+        - "capabilities"
+        - "prohibitedAdvice"
+      "title": "RoutedRequirement"
+      "description": "Closed like every stage answer: a key the worker contract does not define is refused, never relayed."
+    "RouterAnswer":
+      "properties":
+        "requirements":
+          "items":
+            "$ref": "#/components/schemas/RoutedRequirement"
+          "type": "array"
+          "title": "Requirements"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "requirements"
+      "title": "RouterAnswer"
+    "SectionVerdict":
+      "properties":
+        "support":
+          "anyOf":
+            - "type": "string"
+              "enum":
+                - "supported"
+                - "contradicted"
+                - "hold"
+            - "type": "null"
+          "title": "Support"
+        "prohibitedAdvice":
+          "type": "string"
+          "enum":
+            - "no"
+            - "yes"
+            - "hold"
+          "title": "Prohibitedadvice"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "support"
+        - "prohibitedAdvice"
+      "title": "SectionVerdict"
     "Usage":
       "properties":
         "providerAttempts":
@@ -12379,6 +12510,18 @@
         - "reasoningTokens"
         - "cost"
       "title": "Usage"
+    "VerificationAnswer":
+      "properties":
+        "sections":
+          "items":
+            "$ref": "#/components/schemas/SectionVerdict"
+          "type": "array"
+          "title": "Sections"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "sections"
+      "title": "VerificationAnswer"
     "RelationSubmit":
       "additionalProperties": false
       "description": "The S3 `Submit` contract (`zoop-relation-s3`). Fixtures, registries and paths cannot be named. `executionMode: live` is accepted only for an upstream the operator listed as live-approved."
