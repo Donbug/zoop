@@ -143,6 +143,24 @@ afterEach(() => {
   useAuthStore.getState().clearSession();
 });
 
+/**
+ * Types a question in one input event and sends it once the button is enabled. Typing character by character and clicking
+ * at once let a loaded CI runner click before the last render enabled the button, so the question was never sent.
+ */
+async function send(
+  user: ReturnType<typeof userEvent.setup>,
+  question: string,
+) {
+  const box = screen.getByLabelText('질문') as HTMLTextAreaElement;
+  await user.clear(box);
+  await user.click(box);
+  await user.paste(question);
+  await waitFor(() => expect(box.value).toBe(question));
+  const button = screen.getByRole('button', { name: '보내기' });
+  await waitFor(() => expect(button.hasAttribute('disabled')).toBe(false));
+  await user.click(button);
+}
+
 function open(target: GraphTarget | null = SAMSUNG, onViewOnMap = vi.fn()) {
   useAiChatStore.getState().open(target);
   const user = userEvent.setup();
@@ -192,6 +210,12 @@ describe('D-AI-01 · asking with a linked target', () => {
     await screen.findByText(/궁금한 점을 입력해 보세요/);
     expect(screen.getByText('질문 대상: 삼성전자')).toBeTruthy();
     await user.type(screen.getByLabelText('질문'), '삼성전자 최근 이슈는?');
+    // Enter submits only once the last render enabled sending (see `send`).
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: '보내기' }).hasAttribute('disabled'),
+      ).toBe(false),
+    );
     await user.keyboard('{Enter}');
 
     const card = await screen.findByRole('article', {
@@ -276,8 +300,7 @@ describe('D-AI-01 · asking with a linked target', () => {
     });
     const { user } = open(null);
     await screen.findByText(/궁금한 점을 입력해 보세요/);
-    await user.type(screen.getByLabelText('질문'), 'HBM?');
-    await user.click(screen.getByRole('button', { name: '보내기' }));
+    await send(user, 'HBM?');
     expect((await screen.findByRole('alert')).textContent).toContain(
       '답변 기능을 일시적으로 사용할 수 없습니다.',
     );
@@ -308,8 +331,7 @@ describe('D-AI-01 · asking with a linked target', () => {
     });
     const { user } = open(null);
     await screen.findByText(/궁금한 점을 입력해 보세요/);
-    await user.type(screen.getByLabelText('질문'), 'HBM?');
-    await user.click(screen.getByRole('button', { name: '보내기' }));
+    await send(user, 'HBM?');
     await waitFor(() => expect(server.calls('POST', JOBS)).toHaveLength(1));
     expect(screen.queryByText(/접수됐는지 확인하지 못했어요/)).toBeNull();
     accepted.resolve(json(job({ id: sentId, question: 'HBM?' }), 202));
@@ -329,8 +351,7 @@ describe('D-AI-01 · asking with a linked target', () => {
     );
     const { user } = open(null);
     await screen.findByText(/궁금한 점을 입력해 보세요/);
-    await user.type(screen.getByLabelText('질문'), 'HBM?');
-    await user.click(screen.getByRole('button', { name: '보내기' }));
+    await send(user, 'HBM?');
     await screen.findByText(/질문이 접수됐는지 확인하지 못했어요/);
     expect(
       screen.getByRole('button', { name: '같은 질문 다시 보내기' }),
@@ -346,8 +367,7 @@ describe('D-AI-01 · asking with a linked target', () => {
     });
     const { user } = open(null);
     await screen.findByText(/궁금한 점을 입력해 보세요/);
-    await user.type(screen.getByLabelText('질문'), '첫 질문');
-    await user.click(screen.getByRole('button', { name: '보내기' }));
+    await send(user, '첫 질문');
     await screen.findByText(/질문이 접수됐는지 확인하지 못했어요/);
 
     // A different question cannot be sent while the first one may exist on the server.
@@ -404,8 +424,7 @@ describe('D-AI-01 · asking with a linked target', () => {
     );
     const { user } = open(null);
     await screen.findByText(/궁금한 점을 입력해 보세요/);
-    await user.type(screen.getByLabelText('질문'), '질문');
-    await user.click(screen.getByRole('button', { name: '보내기' }));
+    await send(user, '질문');
     await user.click(
       await screen.findByRole('button', { name: '같은 질문 다시 보내기' }),
     );
@@ -462,8 +481,7 @@ describe('D-AI-01 · asking with a linked target', () => {
     );
     const { user } = open(null);
     await screen.findByRole('article', { name: '이전 질문' });
-    await user.type(screen.getByLabelText('질문'), '새 질문');
-    await user.click(screen.getByRole('button', { name: '보내기' }));
+    await send(user, '새 질문');
     await screen.findByRole('article', { name: '처리 중인 질문' });
     expect(reads).toBe(1);
     expect(screen.getByText(/아직 처리 중인 질문이 있어요/)).toBeTruthy();
@@ -528,8 +546,7 @@ describe('D-AI-01b · clarification', () => {
       await screen.findByRole('button', { name: '직접 입력해 답하기' }),
     );
     expect(screen.getByText(/에 답하는 중/)).toBeTruthy();
-    await user.type(screen.getByLabelText('질문'), 'LG에너지솔루션');
-    await user.click(screen.getByRole('button', { name: '보내기' }));
+    await send(user, 'LG에너지솔루션');
     await waitFor(() => expect(server.calls('POST', JOBS)).toHaveLength(1));
     expect(
       (server.calls('POST', JOBS)[0].body as Record<string, unknown>).resolves,
