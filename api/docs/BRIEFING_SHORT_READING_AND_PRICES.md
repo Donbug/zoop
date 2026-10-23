@@ -20,7 +20,7 @@ Java importer는 원래 기업 결과 버전·입력·실제 요청/응답·프�
 
 ## 개발 재생과 운영의 경계
 
-현재 수집기는 2026-10-01~09 구간의 Yahoo Finance 공개 과거 이력을 사용하는 **개발용 재생**입니다. 선택 기업의 KRX 코스피 종목(`.KS`) 및 NASDAQ/NYSE 심볼만 지원합니다. 나중에 조회한 이력은 당시 수집본을 입증하지 않으며, 공급원 수정 이력·조정 정책·거래소 휴장/단축장 달력과 이용 권한을 운영 연결 전에 확정해야 합니다. 실패한 시세를 실시간 값으로 대체하지 않습니다. 주말을 제외하고, 수집된 봉이 존재하는 일반 정규장만 사용합니다.
+현재 수집기는 Yahoo Finance 공개 과거 이력을 사용하는 **개발용 재생**입니다. 구 기록의 기본값은 2026-10-01~09이고, 새 연속 회차는 첫 마감 UTC 날짜 7일 전부터 마지막 마감 UTC 날짜 다음 날까지 명시적으로 요청합니다(최대 31일). 요청한 `period1`/`period2`·URL·원본 SHA를 함께 검증하며 다른 기간으로 같은 캐시를 재사용하지 않습니다. 선택 기업의 KRX 코스피 종목(`.KS`) 및 NASDAQ/NYSE 심볼만 지원합니다. 나중에 조회한 이력은 당시 수집본을 입증하지 않으며, 공급원 수정 이력·조정 정책·거래소 휴장/단축장 달력과 이용 권한을 운영 연결 전에 확정해야 합니다. 실패한 시세를 실시간 값으로 대체하지 않습니다. 주말을 제외하고, 수집된 봉이 존재하는 일반 정규장만 사용합니다.
 
 거래 시간 기준: [KRX 현물 정규장](https://regulation.krx.co.kr/contents/RGL/03/03010100/RGL03010100T1.jsp), [NYSE core session](https://www.nyse.com/trade/trading-information). 미국 시각은 `America/New_York`로 변환합니다. 현재 예제의 10월 7~8일은 일반 정규장 기준입니다.
 
@@ -32,3 +32,21 @@ Java importer는 원래 기업 결과 버전·입력·실제 요청/응답·프�
 4. `/api/v1/briefings?date=...&edition=...`와 같은 React 화면에서 `reading=compact/full`을 확인합니다.
 
 시험은 미완료 09:20 봉·같은 날 미래 종가·현재 terminal 값·다른 종목·원본 변조·미국 새 세션 부재, 짧은 읽기/전문 토글과 실제 4회차 DB→HTTP→화면을 포함합니다.
+
+## 완료된 연속 회차에 시세만 추가하기
+
+초기 `seriesCompanyReading`은 `pricePolicy=not_connected`로 저장되어 있어 짧은 읽기가 정상이어도 기업 시세가 없었습니다. 새 보완 경로는 해당 AI 결과를 수정하거나 재호출하지 않습니다. `seriesCompanyPrices`를 별도 layer로 추가하고 원본 bundle·기업 결과 버전·회차 마감·대상 기업과 결속합니다.
+
+```sh
+python3 scripts/briefing_series_prices.py \
+  --baseline /absolute/private/completed-series \
+  --output /absolute/private/new-series-with-prices \
+  --authorization-ref '<기존 seriesCompanyOutlooks.authorizationRef>'
+```
+
+- 완료된 `seriesCompanyOutlooks`가 있는 명시 연속 회차 전용입니다. 출근·퇴근 1~14개를 지원하며 기업별 5분/일별 원본 각 1건을 조회합니다. 모델 키·유료 AI 호출은 필요 없습니다.
+- 기존 입력·모델 요청/응답·사용량·회사 전망/짧은 읽기 버전·문안은 보존합니다. 시세는 새 `priceVersion`으로 구분하고 별도 DB에 import합니다. 현재 조회 서버나 옛 DB를 SQL UPDATE로 바꾸지 않습니다.
+- 같은 출력의 재실행은 원본 SHA·요청 기간·저장 투영을 검사해 재사용합니다. 원래 실패 영수증을 성공값으로 덮어쓰거나 자동 재조회하지 않습니다. 네트워크 실패도 `httpStatus=0`으로 보존해 정상 빈 이력과 구분합니다.
+- Java importer가 보존한 전체 기존 bundle 원본 바이트의 SHA, 원 기업 전망 버전·대상 집합·시점·가격 원본·정규장 종료 시점·비교 산식을 독립 검증합니다. 원시 시세와 보완 투영을 artifact로 저장하고 공개 응답은 `companyOutlooks.companies[].price`, `companyOutlooks.priceVersion`으로 복원합니다.
+- 미국 기업의 한국 퇴근 회차는 마지막 미국 종가가 있어도 `comparisonStatus=no_new_session`일 수 있습니다. 화면은 종가·관측 시각과 “아침 이후 새 정규장 관측 없음”을 함께 표시하며 0%나 전망 적중률을 만들지 않습니다. 기존 `observedMovement=unavailable` 원문도 새 가격이 생겼다는 이유로 덮어쓰지 않습니다.
+- 브리핑의 회차 고정 시세와 `/api/v1/companies/{id}/quote`의 최신 공급자 시세는 다른 경로입니다. 과거 브리핑을 오늘 가격으로 대체하지 않습니다. 휴장/단축장 달력·분할 조정·운영 이용 권한은 기존 개발 재생의 한계로 남습니다.

@@ -2794,6 +2794,7 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | status | 필수 | string {PASS, WITHHELD} |  |
 | resultVersion | 필수 | string |  |
 | generatedAt | 필수 | string (date-time) |  |
+| priceVersion | 선택 | string | 기존 기업 전망·짧은 읽기를 재생성하지 않고 연결한 회차 시세 보완본의 버전. 과거 발행본에서는 생략할 수 있습니다. |
 | scopeNote | 필수 | string |  |
 | reason | 선택 | string |  |
 | companies | 필수 | [CompanyOutlook](#schema-companyoutlook)[] |  |
@@ -2882,6 +2883,8 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | sha256 | 필수 | string |  |
 | bytes | 필수 | integer |  |
 | collectedAt | 필수 | string (date-time) |  |
+| period1 | 선택 | integer (int64) | 명시적인 수집 시작 UTC Unix 초. 구 고정 기간 기록에는 없을 수 있습니다. |
+| period2 | 선택 | integer (int64) | 수집 종료 UTC Unix 초(미포함). 미래 응답 행은 이 구간과 회차 마감으로 별도 차단합니다. |
 
 <a id="schema-companyprice"></a>
 

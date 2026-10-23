@@ -218,6 +218,8 @@ public final class BriefingReplayImporter {
                 ? bundle.object("marketEnrichment").object("seriesCompanyOutlooks") : null;
         if (seriesCompanies != null) require(settings.userInboxRef().equals(seriesCompanies.string("authorizationRef")), "series_company_authorization");
         Map<String, StrictJson.Obj> seriesCompanyRows = seriesCompanies == null ? Map.of() : BriefingCompanyOutlookRules.rows(seriesCompanies);
+        Map<String, StrictJson.Obj> seriesPriceRows = explicitSeries && bundle.has("marketEnrichment")
+                ? BriefingSeriesPriceRules.rows(bundle, settings.userInboxRef(), seriesCompanyRows, settings.bundle().getParent()) : Map.of();
         Map<String, JsonNode> seriesCompanyReceipts = seriesCompanies == null ? Map.of() : simulationReceiptLedger(seriesCompanies.objects("receipts"));
         StrictJson.Obj seriesReading = explicitSeries && bundle.has("marketEnrichment") && bundle.object("marketEnrichment").has("seriesCompanyReading")
                 ? bundle.object("marketEnrichment").object("seriesCompanyReading") : null;
@@ -457,6 +459,18 @@ public final class BriefingReplayImporter {
                         if (readingFinished.isAfter(published)) published=readingFinished;
                         if (readingFinished.isAfter(created)) created=readingFinished;
                         blobs.put(namespace+"-series-reading-"+index, blob("briefing_input", StrictJson.write(reading.node())));
+                    }
+                    if (seriesPriceRows.containsKey(id)) {
+                        StrictJson.Obj priceRow = seriesPriceRows.get(id);
+                        BriefingSeriesPriceRules.apply(priceRow, (ObjectNode) snapshot.path("companyOutlooks"), settings.bundle().getParent());
+                        blobs.put(namespace + "-series-prices-" + index, blob("briefing_input", StrictJson.write(priceRow.node())));
+                        for (String cid : priceRow.object("prices").node().propertyNames())
+                            for (StrictJson.Obj source : priceRow.object("prices").object(cid).objects("sources"))
+                                blobs.put(namespace + "-series-price-" + source.string("sha256"),
+                                        blob("raw_document", BriefingCompanyPriceRules.raw(source, settings.bundle().getParent())));
+                        Instant recorded = Instant.parse(priceRow.string("recordedAt"));
+                        if (recorded.isAfter(published)) published = recorded;
+                        if (recorded.isAfter(created)) created = recorded;
                     }
                     Instant finished=Instant.parse(company.string("generatedAt"));
                     if (finished.isAfter(generated)) { generated=finished; payload.put("generatedAt", generated.toString()); }

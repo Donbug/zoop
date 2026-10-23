@@ -27,6 +27,13 @@ final class BriefingCompanyPriceRules {
         require(id.matches("(NASDAQ|NYSE):[A-Z]{1,5}"), "company_identity");
         return new Identity(id.substring(id.indexOf(':') + 1), "USD", ZoneId.of("America/New_York"));
     }
+    static long[] period(StrictJson.Obj source) {
+        if (!source.has("period1") && !source.has("period2")) return new long[]{1790812800L, 1791504000L};
+        long start = source.count("period1"), end = source.count("period2");
+        require(start >= 946684800L && end > start && end - start <= 31L * 86400
+                && start % 86400 == 0 && end % 86400 == 0, "source_period");
+        return new long[]{start, end};
+    }
     static byte[] raw(StrictJson.Obj source, Path output) {
         String sha = source.string("sha256"); require(sha.matches("[a-f0-9]{64}"), "raw_sha");
         try {
@@ -39,11 +46,13 @@ final class BriefingCompanyPriceRules {
     }
     static List<Point> points(String cid, Instant cutoff, List<StrictJson.Obj> sources, Path output) {
         Identity identity = identity(cid); List<Point> out = new ArrayList<>(); Set<String> intervals = new HashSet<>();
+        Set<String> ranges = new HashSet<>();
         for (StrictJson.Obj source : sources) {
             String interval = source.string("interval");
             require(Set.of("5m", "1d").contains(interval) && intervals.add(interval) && cid.equals(source.string("companyId")), "source_identity");
+            long[] period = period(source); ranges.add(period[0] + ":" + period[1]);
             String url = "https://query1.finance.yahoo.com/v8/finance/chart/" + identity.symbol()
-                    + "?period1=1790812800&period2=1791504000&interval=" + interval + "&includePrePost=false&events=splits%2Cdiv";
+                    + "?period1=" + period[0] + "&period2=" + period[1] + "&interval=" + interval + "&includePrePost=false&events=splits%2Cdiv";
             require(url.equals(source.string("url")), "source_url");
             byte[] bytes = raw(source, output); if (source.count("httpStatus") != 200) continue;
             StrictJson.Obj chart = StrictJson.parseObject(bytes).object("chart");
@@ -57,7 +66,7 @@ final class BriefingCompanyPriceRules {
             require(stamps.size() == values.size(), "series_length"); Set<Long> seen = new HashSet<>();
             for (int i = 0; i < stamps.size(); i++) {
                 require(stamps.get(i).isIntegralNumber() && seen.add(stamps.get(i).longValue()), "bar_timestamp");
-                if (stamps.get(i).longValue() < 1790812800L || stamps.get(i).longValue() >= 1791504000L) continue;
+                if (stamps.get(i).longValue() < period[0] || stamps.get(i).longValue() >= period[1]) continue;
                 if (values.get(i).isNull()) continue;
                 require(values.get(i).isNumber(), "bar_number");
                 BigDecimal price = values.get(i).decimalValue().setScale(2, RoundingMode.HALF_UP);
@@ -74,7 +83,7 @@ final class BriefingCompanyPriceRules {
                 out.add(new Point(price, end, date, daily ? "daily_close" : "five_minute_close"));
             }
         }
-        require(intervals.equals(Set.of("5m", "1d")), "interval_coverage");
+        require(intervals.equals(Set.of("5m", "1d")) && ranges.size() == 1, "interval_coverage");
         out.sort(Comparator.comparing(Point::at).thenComparing(p -> "daily_close".equals(p.kind()))); return out;
     }
     static ObjectNode apply(StrictJson.Obj price, String cid, Instant cutoff, Path output) {

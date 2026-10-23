@@ -7,7 +7,9 @@
 3. `briefing_grouped_run.py --round-series ... --publication-catalog ...`로 각 회차에 새로 나온 근거를 평가하고 최대3개를 선정·작성·검증한다. 이전 결과의 정확한 해시와 실제 신규 근거만 연결한다. 등록 기업 카탈로그와 원문을 임의로 변경하지 않는다.
 4. `briefing_market_enrichment.py --round-series ... --include-market-context --prompt-version market-context-v3-grounded`로 전체 적격 기업 자료·이전 검증 요약·회차 지표를 묶는다. 지표 요청 구간도 이번 날짜에 맞춘다. 오전에 당일 종가를 넣지 않으며 은행 일별 고시값은 실시간 환율과 구분한다. 공식 세션 달력·관측이 없으면 적중 평가를 만들지 않는다.
 5. `briefing_series_company.py --execute`로 동일 기업의 이전 판단과 회차 이전 근거를 연결한다. 기존 기업 전망 프롬프트와 별도 검증을 사용하고 원문 밖 인과·가격을 만들지 않는다. 회사별 전망이 실패해도 검증된 원래 뉴스·지표를 지우지 않는다.
-6. 새 빈 로컬 replay DB에 최종 bundle을 import한 뒤 저장 근거에서 재구성 지도를 등록한다. 기존 DB·발행 결과·공개 graph 활성화는 변경하지 않는다.
+6. 선택적으로 `briefing_company_reading.py`로 기업별 짧은 읽기를 별도 생성·검증한다. 완료 결과가 있다면 재사용하고, 전문을 잘라 짧은 요약으로 위장하지 않는다.
+7. `briefing_series_prices.py --baseline <완료 폴더> --output <새 폴더> --authorization-ref <기존 참조>`로 해당 회차의 기업 시세를 연결한다. 첫 마감 7일 전~마지막 마감 다음 UTC 날의 원본을 보존하며 AI 호출은 없다. [가격·관측/비교 기준](BRIEFING_SHORT_READING_AND_PRICES.md#완료된-연속-회차에-시세만-추가하기)을 따른다.
+8. 새 빈 로컬 replay DB에 최종 bundle을 import한 뒤 저장 근거에서 재구성 지도를 등록한다. 기존 DB·발행 결과·공개 graph 활성화는 변경하지 않는다.
 
 `series.json`은 `schemaVersion=zoop-briefing-round-series-v1`, `sourceFileSha256`, `retrospectiveBodies=true`, `productionAuthorized=false`, 시간순 `rounds[{date,edition,window:{from,to,openStart:false}}]`를 포함한다. 전체 명세·SHA가 각 모델 입력에 결속되고 Java도 저장 전 독립 검증한다.
 

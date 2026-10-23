@@ -61,7 +61,8 @@ public final class BriefingHttpSchemas {
     @Schema(name = "CompanyOutlooks", requiredProperties = {"schemaVersion", "roundId", "edition", "cutoff", "status", "resultVersion", "generatedAt", "scopeNote", "companies"})
     public record CompanyOutlooks(String schemaVersion, String roundId, String edition, Instant cutoff,
             @Schema(allowableValues = {"PASS", "WITHHELD"}) String status, String resultVersion, Instant generatedAt,
-            String scopeNote, List<CompanyOutlook> companies, String reason) { }
+            String scopeNote, List<CompanyOutlook> companies, String reason,
+            @Schema(description = "기존 기업 전망·짧은 읽기를 재생성하지 않고 연결한 회차 시세 보완본의 버전. 과거 발행본에서는 생략.") String priceVersion) { }
 
     @Schema(name = "CompanyStatement", requiredProperties = {"text", "evidenceIds"})
     public record CompanyStatement(String text, List<String> evidenceIds) { }
@@ -87,7 +88,9 @@ public final class BriefingHttpSchemas {
     public record CompanyPricePoint(String value, Instant observedAt, LocalDate sessionDate,
             @Schema(allowableValues = {"five_minute_close", "daily_close"}) String kind) { }
     @Schema(name = "CompanyPriceSource", requiredProperties = {"companyId", "interval", "url", "httpStatus", "sha256", "bytes", "collectedAt"})
-    public record CompanyPriceSource(String companyId, String interval, String url, int httpStatus, String sha256, long bytes, Instant collectedAt) { }
+    public record CompanyPriceSource(String companyId, String interval, String url, int httpStatus, String sha256, long bytes, Instant collectedAt,
+            @Schema(description = "새 회차 시세 수집의 요청 시작 UTC Unix 초. 구 기록에서는 생략.") Long period1,
+            @Schema(description = "요청 종료 UTC Unix 초(미포함). 가격 관측은 별도로 회차 마감 이하만 허용.") Long period2) { }
     @Schema(name = "CompanyPrice", requiredProperties = {"companyId", "cutoff", "currency", "exchangeTimezone", "source", "official", "note", "sources", "status", "reason", "latest", "baseline", "comparisonStatus", "change", "changeRate"},
             description = "회차 마감 전 완료된 정규장 관측값입니다. 출근은 전일 종가 대비, 퇴근은 같은 날 09:20 기준 대비이며 전망 적중률이 아닙니다.")
     public record CompanyPrice(String companyId, Instant cutoff, String currency, String exchangeTimezone, String source,

@@ -358,6 +358,16 @@
       ]
     },
     "response:200:application/json.companyOutlooks.companies[].price.sources[].interval:required": true,
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].period1": {
+      "type": "integer",
+      "format": "int64"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].period1:required": false,
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].period2": {
+      "type": "integer",
+      "format": "int64"
+    },
+    "response:200:application/json.companyOutlooks.companies[].price.sources[].period2:required": false,
     "response:200:application/json.companyOutlooks.companies[].price.sources[].sha256": {
       "type": "string"
     },
@@ -519,6 +529,10 @@
       "format": "date-time"
     },
     "response:200:application/json.companyOutlooks.generatedAt:required": true,
+    "response:200:application/json.companyOutlooks.priceVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.priceVersion:required": false,
     "response:200:application/json.companyOutlooks.reason": {
       "type": "string"
     },

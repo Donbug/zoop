@@ -17,6 +17,8 @@ LG CNS AM Inspire Camp 5기 2조 금융 도메인 프로젝트입니다. 내 종
 
 백엔드 그래프 조회 개발은 **Spring + 로컬 PostgreSQL + 합성 스냅샷(`ZOOP_GRAPH_SNAPSHOT_SOURCE=fixture`)**으로 진행할 수 있으며, Neo4j·AWS·AI API 키가 필요하지 않습니다. AI 원문 수집·정제·handoff 실행과 Neo4j writer 실행은 별도 경로입니다. 명령과 필수 설정은 [API 실행 안내](api/README.md), [AI 실행 안내](ai/README.md)에 있습니다. 이름 규칙과 리뷰 책임은 [개발 참여 규약](CONTRIBUTING.md)을 따릅니다.
 
+브리핑 DB 저장·공개 API·화면과 실제 수집/AI 회차 재생은 [브리핑 실행 안내](api/README.md#브리핑-db조회와-로컬-생성재생)를 참고하세요. 원문·근거·기업별 전망·짧은 읽기·회차 시세·지도 연결을 포함하며, 정시 운영과 로컬 재생을 구분합니다.
+
 ### 담당자별 바로 실행
 
 | 하려는 작업 | 저장소 루트 명령 | 필요한 것·결과 |

@@ -18,7 +18,7 @@ The old 80-code-point rule was a development heuristic added to reduce under-sup
 
 Before accepting a reference, `BriefingReferenceSupport` verifies the actual completed `issue_grounding` request/response digest, usage/response identity, original prompt hash, authorized source digest, unchanged full article, native mention title/action/assertion status/participants, exact original evidence offsets and SUPPORTED verdict. The current candidate must match that proven document/version/body/span. Missing/HOLD/REJECT support and blank/altered quotations are rejected regardless of length. References introduce no factual paraphrase, target price or inferred outcome; the original qualified quote is the visible content. Source truth itself is not independently certified, and estimates/plans remain estimates/plans.
 
-Existing headline AI request bytes and the grade-2 generated-headline pipeline remain unchanged in this reference-only revision; legacy recording checks keep their recorded contract. A future headline policy change must bind a new input/schema identity and still independently verify generated claims. Old v1 previews and original model recordings are retained.
+The original reference-only revision preserved headline requests. The current opt-in core semantic policy is documented in [BRIEFING_CORE_EVIDENCE](BRIEFING_CORE_EVIDENCE.md): new grouped requests bind a new input/prompt identity, while old recordings keep their recorded contract. Revalidating completed recordings does not rerun selection or upgrade grade-1 candidates. Old previews and original model recordings are retained.
 
 ## 2026-10-21 evening to 2026-10-22 evening replay
 
