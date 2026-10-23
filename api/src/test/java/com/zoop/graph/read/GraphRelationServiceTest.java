@@ -29,6 +29,43 @@ class GraphRelationServiceTest {
     private static final String SHARED = DisplayGraph.edgeId("SHARES_ISSUE", HYNIX, NVDA);
 
     @Test
+    void unknownRoleOnMarketGraphDoesNotImplyABriefingRound() {
+        var edge = unknownRoleService().getRelation(
+                DisplayGraph.edgeId("INVOLVES", HBM_SUPPLY, HYNIX), null, null, null, "r");
+        assertNull(edge.role());
+        assertEquals("저장된 기업·사건 연결입니다. 구체적인 역할은 저장된 근거에서 확인해야 합니다.", edge.explanation());
+        assertEquals("public_graph_snapshot", edge.metadata().source());
+    }
+
+    @Test
+    void unknownRoleInAnOriginalBriefingSnapshotKeepsItsRoundContext() {
+        var edge = unknownRoleService().getRelation(
+                DisplayGraph.edgeId("INVOLVES", HBM_SUPPLY, HYNIX), "round", null, null, "r");
+        assertNull(edge.role());
+        assertEquals("이 회차에 저장된 기업·사건 연결입니다. 구체적인 역할은 저장된 근거에서 확인해야 합니다.", edge.explanation());
+    }
+
+    @Test
+    void knownRoleOnMarketGraphKeepsTheConfirmedRoleExplanation() {
+        var edge = service.getRelation(DisplayGraph.edgeId("INVOLVES", HBM_SUPPLY, HYNIX), null, null, null, "r");
+        assertEquals("공급", edge.role());
+        assertEquals(GraphRelationService.EXPLANATIONS.get("INVOLVES"), edge.explanation());
+    }
+
+    private GraphRelationService unknownRoleService() {
+        var source = GraphReadFixtures.snapshot("fixture-2026-10-08");
+        var relations = source.relations().stream().map(r -> new com.zoop.graph.snapshot.PublicGraphSnapshot.Relation(
+                r.relationId(), r.relationType(), r.source(), r.target(), null, r.assertionStatus(), r.evidenceIds(), r.basis())).toList();
+        var snapshot = new com.zoop.graph.snapshot.PublicGraphSnapshot(source.snapshotFormat(), source.versionId(),
+                source.sourceBundleId(), source.companies(), source.issues(), relations, source.articles(), source.evidence());
+        var basis = new com.zoop.graph.version.BriefingGraphLookup.Basis("round", source.versionId(), NOW,
+                java.util.Map.of(HBM_SUPPLY, List.of(HYNIX, NVDA)));
+        var selector = new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
+                java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC), (id, request) -> basis);
+        return new GraphRelationService(new PublicGraphReader(selector, ignored -> snapshot, () -> DisclosureExclusions.NONE), jdbc);
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void aCompanyEndCarriesTheCatalogLogoAndAnIssueEndNone() {
         org.mockito.Mockito.when(jdbc.query(org.mockito.ArgumentMatchers.anyString(),
