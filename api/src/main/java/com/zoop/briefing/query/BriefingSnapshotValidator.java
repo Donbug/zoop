@@ -122,6 +122,18 @@ final class BriefingSnapshotValidator {
                     }
                 }
             }
+            if (company.has("card")) {
+                JsonNode card = object(field(company, "card"));
+                same(text(card, "schemaVersion"), "zoop-company-card-v1"); text(card, "resultVersion");
+                if ("PASS".equals(choice(card, "status", Set.of("PASS", "WITHHELD")))) {
+                    for (String key : java.util.List.of("topic", "title", "description")) {
+                        companyStatement(field(card, key), ownSources);
+                        String value = text(field(card, key), "text");
+                        int limit = switch (key) { case "topic" -> 12; case "title" -> 32; default -> 64; };
+                        check(value.codePointCount(0, value.length()) <= limit);
+                    }
+                } else check(!card.has("topic") && !card.has("title") && !card.has("description"));
+            }
             if (company.has("price")) companyPrice(object(field(company, "price")), text(company, "companyId"), row.windowTo());
         }
         check(actual.equals(expected));

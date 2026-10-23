@@ -9,6 +9,14 @@ const summaryText = (name: string) =>
   screen.getByLabelText(`${name} 한눈 요약`).querySelector('summary p')!
     .textContent;
 
+const cardText = {
+  schemaVersion: 'zoop-company-card-v1' as const,
+  status: 'PASS' as const,
+  resultVersion: 'card-verified',
+  topic: { text: '공급 계획', evidenceIds: ['e'] },
+  title: { text: '공급 확대 계획', evidenceIds: ['e'] },
+  description: { text: '실제 공급·매출 기여는 미확인', evidenceIds: ['e'] },
+};
 const statement = {
   text: '공급이 이행되는 경우 사업 기회를 검토합니다.',
   evidenceIds: ['e'],
@@ -148,7 +156,7 @@ describe('D-BRF-01·02 company outlook', () => {
         compact
       />,
     );
-    expect(summaryText('합성 기업')).toContain('사업 기회는 있으나');
+    expect(summaryText('합성 기업')).toContain('검증된 한눈 카드가 없습니다');
     const detail = screen.getByLabelText(
       '합성 기업 한눈 요약',
     ) as HTMLDetailsElement;
@@ -162,7 +170,7 @@ describe('D-BRF-01·02 company outlook', () => {
   });
   it('does not replace an unavailable short reading with the full paragraph', () => {
     render(<CompanyOutlooks result={result} compact />);
-    expect(screen.getByText(/검증된 짧은 요약이 없습니다/)).toBeTruthy();
+    expect(screen.getByText(/검증된 한눈 카드가 없습니다/)).toBeTruthy();
     expect(
       (screen.getByLabelText('합성 기업 한눈 요약') as HTMLDetailsElement).open,
     ).toBe(false);
@@ -384,12 +392,46 @@ describe('D-BRF-01/02 specific company reading v2', () => {
 });
 
 describe('D-BRF-01/02 at-a-glance reading', () => {
+  it.each(['WITHHELD', 'wrong-version', 'too-long', 'missing-description'])(
+    'rejects invalid card %s while keeping the full analysis',
+    (kind) => {
+      const card = { ...cardText };
+      if (kind === 'WITHHELD') card.status = 'WITHHELD' as 'PASS';
+      if (kind === 'wrong-version')
+        card.schemaVersion = 'unknown' as typeof card.schemaVersion;
+      if (kind === 'too-long')
+        card.title = { text: '계획'.repeat(20), evidenceIds: ['e'] };
+      if (kind === 'missing-description')
+        card.description = undefined as unknown as typeof card.description;
+      render(
+        <CompanyOutlooks
+          result={{
+            ...result,
+            companyOutlooks: {
+              ...layer,
+              companies: [{ ...layer.companies[0], card }],
+            },
+          }}
+          compact
+        />,
+      );
+      expect(summaryText('합성 기업')).toContain('검증된 한눈 카드가 없습니다');
+      expect(
+        screen.getAllByText(statement.text, { selector: 'p' }).length,
+      ).toBeGreaterThan(0);
+    },
+  );
+
   it('lets readers scan every company before opening prices and the original analysis', async () => {
     const user = userEvent.setup();
     const companies = ['기업 가', '기업 나', '기업 다'].map((name, index) => ({
       ...layer.companies[0],
       companyId: `KRX:TEST${index}`,
       companyName: name,
+      card: {
+        ...cardText,
+        title: { text: `${name} 공급 확대 계획`, evidenceIds: ['e'] },
+      },
       reading: {
         status: 'PASS' as const,
         resultVersion: `reading-${index}`,
@@ -417,7 +459,10 @@ describe('D-BRF-01/02 at-a-glance reading', () => {
         `${company.companyName} 한눈 요약`,
       ) as HTMLDetailsElement;
       expect(card.open).toBe(false);
-      expect(summaryText(company.companyName)).toBe(company.reading.brief.text);
+      expect(summaryText(company.companyName)).toBe(company.card.title.text);
+      expect(card.querySelector('summary')!.textContent).not.toContain(
+        company.reading.brief.text,
+      );
     }
     const first = screen.getByLabelText(
       '기업 가 한눈 요약',
@@ -450,10 +495,10 @@ describe('D-BRF-01/02 at-a-glance reading', () => {
   });
 
   it('keeps full qualifiers and refuses a short sentence with foreign evidence', () => {
-    const text =
-      '약 20개 기업이 도입을 검토할 예정이며, 최대 공급량과 실제 계약·매출 기여는 아직 확정되지 않았습니다.';
+    const text = '약 20개 기업 도입 검토 계획';
     const company = {
       ...layer.companies[0],
+      card: { ...cardText, title: { text, evidenceIds: ['e'] } },
       reading: {
         status: 'PASS' as const,
         resultVersion: 'r',
@@ -479,9 +524,9 @@ describe('D-BRF-01/02 at-a-glance reading', () => {
             companies: [
               {
                 ...company,
-                reading: {
-                  ...company.reading,
-                  brief: { text, evidenceIds: ['foreign'] },
+                card: {
+                  ...cardText,
+                  title: { text, evidenceIds: ['foreign'] },
                 },
               },
             ],
@@ -491,6 +536,6 @@ describe('D-BRF-01/02 at-a-glance reading', () => {
       />,
     );
     expect(summaryText('합성 기업')).not.toContain(text);
-    expect(summaryText('합성 기업')).toContain('검증된 짧은 요약이 없습니다');
+    expect(summaryText('합성 기업')).toContain('검증된 한눈 카드가 없습니다');
   });
 });

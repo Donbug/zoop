@@ -9,20 +9,24 @@ import tools.jackson.databind.node.ObjectNode;
 final class BriefingCompanySchemas {
     private BriefingCompanySchemas() { }
     static ObjectNode format(String prefix, String phase, StrictJson.Obj frozen) {
-        if (!Set.of("company_outlook_", "company_reading_").contains(prefix) || !Set.of("generation", "verification").contains(phase))
+        if (!Set.of("company_outlook_", "company_reading_", "company_card_").contains(prefix) || !Set.of("generation", "verification").contains(phase))
             throw new IllegalArgumentException("Unsupported company response schema");
         List<String> ids = frozen.objects("targets").stream().map(t -> t.string("companyId")).toList();
         List<String> evidence = new ArrayList<>(frozen.object("sources").node().propertyNames()); Collections.sort(evidence);
         ObjectNode fields = StrictJson.newObject(); fields.set("companyId", choice(ids));
+        boolean card = "company_card_".equals(prefix);
         if ("verification".equals(phase)) {
             fields.set("supported", StrictJson.newObject().put("type", "boolean"));
             fields.set("reason", text(700));
-            if ("company_reading_".equals(prefix) && (frozen.has("schemaVersion") && "zoop-company-reading-v2".equals(frozen.string("schemaVersion")))) {
+            if (card || ("company_reading_".equals(prefix) && (frozen.has("schemaVersion") && "zoop-company-reading-v2".equals(frozen.string("schemaVersion"))))) {
                 ObjectNode quality = StrictJson.newObject();
-                for (String key : List.of("specificity", "newInformation", "continuity", "nonRepetition"))
+                for (String key : card ? List.of("concise", "distinctRoles", "qualifiersPreserved", "noUnsupportedClaim") : List.of("specificity", "newInformation", "continuity", "nonRepetition"))
                     quality.set(key, StrictJson.newObject().put("type", "boolean"));
                 fields.set("quality", object(quality));
             }
+        } else if (card) {
+            fields.set("topic", statement(evidence, 12)); fields.set("title", statement(evidence, 32));
+            fields.set("description", statement(evidence, 64));
         } else if ("company_reading_".equals(prefix)) {
             if ((frozen.has("schemaVersion") && "zoop-company-reading-v2".equals(frozen.string("schemaVersion")))) {
                 fields.set("brief", statement(evidence, 140)); fields.set("fact", statement(evidence, 160));

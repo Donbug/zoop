@@ -27,6 +27,75 @@
       ]
     },
     "response:200:application/json.companyOutlooks.companies[].assessment:required": true,
+    "response:200:application/json.companyOutlooks.companies[].card": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].card.description": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].card.description.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].card.description.evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].card.description.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].card.description.text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].card.description.text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].card.description:required": false,
+    "response:200:application/json.companyOutlooks.companies[].card.resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].card.resultVersion:required": true,
+    "response:200:application/json.companyOutlooks.companies[].card.schemaVersion": {
+      "type": "string",
+      "const": "zoop-company-card-v1"
+    },
+    "response:200:application/json.companyOutlooks.companies[].card.schemaVersion:required": true,
+    "response:200:application/json.companyOutlooks.companies[].card.status": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "WITHHELD"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].card.status:required": true,
+    "response:200:application/json.companyOutlooks.companies[].card.title": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].card.title.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].card.title.evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].card.title.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].card.title.text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].card.title.text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].card.title:required": false,
+    "response:200:application/json.companyOutlooks.companies[].card.topic": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].card.topic.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].card.topic.evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].card.topic.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].card.topic.text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].card.topic.text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].card.topic:required": false,
+    "response:200:application/json.companyOutlooks.companies[].card:required": false,
     "response:200:application/json.companyOutlooks.companies[].companyId": {
       "type": "string"
     },

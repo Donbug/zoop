@@ -8308,6 +8308,8 @@ components:
             judgment: {type: object}
         reading:
           "$ref": "#/components/schemas/CompanyShortReading"
+        card:
+          "$ref": "#/components/schemas/CompanyBriefingCard"
         price:
           "$ref": "#/components/schemas/CompanyPrice"
         observedMovement:
@@ -8331,6 +8333,17 @@ components:
               url: {type: string, format: uri}
               publishedAt: {type: string, format: date-time}
 
+    CompanyBriefingCard:
+      type: object
+      description: 전문·짧은 읽기·시세를 보존하면서 별도 생성·독립 검증한 한눈 카드. PASS일 때만 주제·제목·보조 설명을 표시합니다.
+      required: [schemaVersion, status, resultVersion]
+      properties:
+        schemaVersion: {type: string, const: zoop-company-card-v1}
+        status: {type: string, enum: [PASS, WITHHELD]}
+        resultVersion: {type: string}
+        topic: {"$ref": "#/components/schemas/CompanyStatement", description: 12자 이내 주제 태그.}
+        title: {"$ref": "#/components/schemas/CompanyStatement", description: 32자 이내 사건 제목. 계획·추정 한정어를 유지.}
+        description: {"$ref": "#/components/schemas/CompanyStatement", description: 64자 이내 상보적인 확인 조건·불확실성.}
     CompanyShortReading:
       type: object
       description: 전문을 보존하면서 별도 생성·검증한 짧은 읽기. v2는 판단·새 사실·다음 확인·배경·이전 판단 비교를 구분합니다.

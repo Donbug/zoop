@@ -137,33 +137,33 @@ function SpecificReading({ company }: { company: CompanyOutlook }) {
   );
 }
 
-/** D-BRF-01/02: reuse the complete stored sentence; never clip qualifiers. */
-function summaryStatement(
-  company: CompanyOutlook,
-): CompanyStatement | undefined {
-  const reading = company.reading;
-  if (reading?.status !== 'PASS') return;
-  const allowed = new Set(company.sources.map((source) => source.evidenceId));
-  const statements =
-    reading.schemaVersion === 'zoop-company-reading-v2'
-      ? [
-          reading.brief,
-          reading.fact,
-          reading.watch,
-          reading.background,
-          reading.change,
-        ]
-      : [reading.brief];
+/** D-BRF-01/02: only independently verified card fields; no clipping or prose fallback. */
+function verifiedCard(company: CompanyOutlook) {
+  const card = company.card;
   if (
-    statements.some(
-      (value) =>
+    card?.status !== 'PASS' ||
+    card.schemaVersion !== 'zoop-company-card-v1' ||
+    !card.resultVersion?.trim()
+  )
+    return;
+  const allowed = new Set(company.sources.map((source) => source.evidenceId));
+  const fields = [
+    [card.topic, 12],
+    [card.title, 32],
+    [card.description, 64],
+  ] as const;
+  if (
+    fields.some(
+      ([value, limit]) =>
         !value?.text?.trim() ||
+        [...value.text].length > limit ||
         !value.evidenceIds.length ||
+        new Set(value.evidenceIds).size !== value.evidenceIds.length ||
         value.evidenceIds.some((id) => !allowed.has(id)),
     )
   )
     return;
-  return reading.brief;
+  return card;
 }
 
 function CompanyAnalysis({
@@ -254,7 +254,7 @@ function CompanyAtAGlance({
   cutoff: string;
   edition: BriefingResponse['edition'];
 }) {
-  const summary = summaryStatement(company);
+  const card = verifiedCard(company);
   return (
     <details
       className="group rounded-panel border border-panel-line bg-zoop-paper"
@@ -267,6 +267,11 @@ function CompanyAtAGlance({
           <h4 className="min-w-0 break-words text-sm font-bold">
             {company.companyName}
           </h4>
+          {card?.topic && (
+            <span className="border-l border-panel-line pl-2 text-xs text-zoop-muted">
+              {card.topic.text}
+            </span>
+          )}
           <span
             className="ml-auto shrink-0 text-lg leading-none text-zoop-muted"
             aria-hidden="true"
@@ -275,17 +280,42 @@ function CompanyAtAGlance({
             <span className="hidden group-open:inline">−</span>
           </span>
         </div>
-        <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed font-medium">
-          {summary?.text ??
-            '검증된 짧은 요약이 없습니다. 전문·시세·근거를 펼쳐보세요.'}
-        </p>
-        <p className="mt-2 text-xs text-zoop-muted">시세·전체 분석·근거 보기</p>
+        {card?.title && card.description ? (
+          <>
+            <p className="mt-2 break-words text-lg leading-snug font-bold">
+              {card.title.text}
+            </p>
+            <p className="mt-2 break-words text-sm leading-relaxed text-zoop-muted">
+              {card.description.text}
+            </p>
+          </>
+        ) : (
+          <p className={`${NOTE} mt-2`}>
+            검증된 한눈 카드가 없습니다. 전문·시세·근거를 펼쳐보세요.
+          </p>
+        )}
+        <span className="sr-only">시세·전체 분석·근거 보기</span>
       </summary>
       <div className="border-t border-panel-line px-4 pb-4">
         <p className={`${NOTE} mt-3`}>{assessments[company.assessment]}</p>
         <CompanyPrice company={company} cutoff={cutoff} />
         {company.reading?.schemaVersion === 'zoop-company-reading-v2' && (
           <SpecificReading company={company} />
+        )}
+        {card && (
+          <details className="mt-3">
+            <summary
+              className={`min-h-11 cursor-pointer content-center text-sm font-semibold ${FOCUS_RING}`}
+            >
+              한눈 카드의 문장별 근거
+            </summary>
+            {[card.topic, card.title, card.description].map(
+              (value, index) =>
+                value && (
+                  <Statement key={index} value={value} company={company} />
+                ),
+            )}
+          </details>
         )}
         <CompanyAnalysis company={company} edition={edition} />
       </div>

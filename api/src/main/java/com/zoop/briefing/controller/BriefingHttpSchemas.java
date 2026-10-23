@@ -78,7 +78,13 @@ public final class BriefingHttpSchemas {
             @Schema(allowableValues = {"positive", "negative", "mixed", "watch"}) String assessment,
             CompanyStatement impact, CompanyStatement outlook, List<CompanyStatement> conditions, List<CompanyStatement> risks,
             CompanyComparison comparison, JsonNode previous, JsonNode observedMovement, List<CompanyOutlookSource> sources,
-            CompanyShortReading reading, CompanyPrice price) { }
+            CompanyShortReading reading, CompanyPrice price, CompanyBriefingCard card) { }
+
+    @Schema(name = "CompanyBriefingCard", requiredProperties = {"schemaVersion", "status", "resultVersion"},
+            description = "전문을 보존하고 별도 생성·독립 검증한 카드입니다. PASS일 때 주제12자·제목32자·보조 설명64자 이내 문안을 표시합니다.")
+    public record CompanyBriefingCard(@Schema(allowableValues = {"zoop-company-card-v1"}) String schemaVersion,
+            @Schema(allowableValues = {"PASS", "WITHHELD"}) String status, String resultVersion,
+            CompanyStatement topic, CompanyStatement title, CompanyStatement description) { }
 
     @Schema(name = "CompanyShortReading", requiredProperties = {"status", "resultVersion"},
             description = "검증된 전문과 별도로 생성·검증한 짧은 읽기입니다. PASS일 때만 제공합니다. v2는 판단·새 사실·다음 확인·배경·이전 판단 비교를 구분합니다.")

@@ -2827,6 +2827,7 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | previous.resultVersion | 선택 | string |  |
 | previous.judgment | 선택 | object |  |
 | reading | 선택 | [CompanyShortReading](#schema-companyshortreading) |  |
+| card | 선택 | [CompanyBriefingCard](#schema-companybriefingcard) |  |
 | price | 선택 | [CompanyPrice](#schema-companyprice) |  |
 | observedMovement | 필수 | object |  |
 | observedMovement.status | 필수 | string |  |
@@ -2840,6 +2841,21 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | sources[].title | 필수 | string |  |
 | sources[].url | 필수 | string (uri) |  |
 | sources[].publishedAt | 필수 | string (date-time) |  |
+
+<a id="schema-companybriefingcard"></a>
+
+### CompanyBriefingCard
+
+전문·짧은 읽기·시세를 보존하면서 별도 생성·독립 검증한 한눈 카드. PASS일 때만 주제·제목·보조 설명을 표시합니다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 필수 | string |  |
+| status | 필수 | string {PASS, WITHHELD} |  |
+| resultVersion | 필수 | string |  |
+| topic | 선택 | [CompanyStatement](#schema-companystatement) | 12자 이내 주제 태그. |
+| title | 선택 | [CompanyStatement](#schema-companystatement) | 32자 이내 사건 제목. 계획·추정 한정어를 유지. |
+| description | 선택 | [CompanyStatement](#schema-companystatement) | 64자 이내 상보적인 확인 조건·불확실성. |
 
 <a id="schema-companyshortreading"></a>
 

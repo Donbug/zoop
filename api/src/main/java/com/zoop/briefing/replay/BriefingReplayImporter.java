@@ -223,10 +223,20 @@ public final class BriefingReplayImporter {
         Map<String, JsonNode> seriesCompanyReceipts = seriesCompanies == null ? Map.of() : simulationReceiptLedger(seriesCompanies.objects("receipts"));
         StrictJson.Obj seriesReading = explicitSeries && bundle.has("marketEnrichment") && bundle.object("marketEnrichment").has("seriesCompanyReading")
                 ? bundle.object("marketEnrichment").object("seriesCompanyReading") : null;
-        if (seriesReading != null) require(settings.userInboxRef().equals(seriesReading.string("authorizationRef")), "series_reading_authorization");
+        if (seriesReading != null) {
+            require(settings.userInboxRef().equals(seriesReading.string("authorizationRef")), "series_reading_authorization");
+            require(Set.of(BriefingCompanyReadingRules.SCHEMA, BriefingCompanyReadingRules.SCHEMA_V2).contains(seriesReading.string("schemaVersion")), "series_reading_schema");
+        }
         Map<String, StrictJson.Obj> seriesReadingRows = seriesReading == null ? Map.of() : BriefingCompanyReadingRules.rows(seriesReading);
         Map<String, JsonNode> seriesReadingReceipts = seriesReading == null ? Map.of() : simulationReceiptLedger(seriesReading.objects("receipts"));
         require(seriesCompanyRows.keySet().containsAll(seriesReadingRows.keySet()), "series_reading_company_rounds");
+        StrictJson.Obj seriesCards = explicitSeries && bundle.has("marketEnrichment") && bundle.object("marketEnrichment").has("seriesCompanyCards")
+                ? bundle.object("marketEnrichment").object("seriesCompanyCards") : null;
+        if (seriesCards != null) require(settings.userInboxRef().equals(seriesCards.string("authorizationRef")), "series_card_authorization");
+        Map<String, StrictJson.Obj> seriesCardRows = seriesCards == null ? Map.of() : BriefingCompanyReadingRules.rows(seriesCards);
+        Map<String, JsonNode> seriesCardReceipts = seriesCards == null ? Map.of() : simulationReceiptLedger(seriesCards.objects("receipts"));
+        require(seriesCompanyRows.keySet().containsAll(seriesCardRows.keySet()), "series_card_company_rounds");
+        Set<String> seriesCardOwned = new HashSet<>();
         Set<String> seriesReadingOwned = new HashSet<>();
         Set<String> seriesCompanyOwned = new HashSet<>(); List<StrictJson.Obj> seriesCompanyHistory = new ArrayList<>();
         ArrayNode noveltyHistory = StrictJson.newArray(), groupedHistory = StrictJson.newArray(), continuityHistory = StrictJson.newArray();
@@ -460,6 +470,12 @@ public final class BriefingReplayImporter {
                         if (readingFinished.isAfter(created)) created=readingFinished;
                         blobs.put(namespace+"-series-reading-"+index, blob("briefing_input", StrictJson.write(reading.node())));
                     }
+                    if (seriesCardRows.containsKey(id)) {
+                        StrictJson.Obj card = seriesCardRows.get(id);
+                        require(BriefingCompanyReadingRules.SCHEMA_CARD.equals(card.object("frozen").string("schemaVersion")), "series_card_schema");
+                        BriefingCompanyReadingRules.apply(card, company, (ObjectNode) snapshot.path("companyOutlooks"), seriesCardReceipts, seriesCardOwned, settings.bundle().getParent());
+                        blobs.put(namespace+"-series-card-"+index, blob("briefing_input", StrictJson.write(card.node())));
+                    }
                     if (seriesPriceRows.containsKey(id)) {
                         StrictJson.Obj priceRow = seriesPriceRows.get(id);
                         BriefingSeriesPriceRules.apply(priceRow, (ObjectNode) snapshot.path("companyOutlooks"), settings.bundle().getParent());
@@ -605,6 +621,9 @@ public final class BriefingReplayImporter {
         }
         if (bundle.has("marketEnrichment")) for (var receipt : simulationReceiptLedger(bundle.object("marketEnrichment").objects("receipts")).entrySet())
             require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "market_enrichment_receipt_reuses_news_request");
+        require(seriesCardOwned.equals(seriesCardReceipts.keySet()), "series_card_receipt_coverage");
+        for (var receipt : seriesCardReceipts.entrySet())
+            require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "series_card_receipt_unique");
         require(seriesReadingOwned.equals(seriesReadingReceipts.keySet()), "series_reading_receipt_coverage");
         for (var receipt : seriesReadingReceipts.entrySet())
             require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "series_reading_receipt_unique");
@@ -684,7 +703,14 @@ public final class BriefingReplayImporter {
             Map<String, StrictJson.Obj> readingRows = readingLayer == null ? Map.of() : BriefingCompanyReadingRules.rows(readingLayer);
             Map<String, JsonNode> readingReceipts = readingLayer == null ? Map.of() : simulationReceiptLedger(readingLayer.objects("receipts"));
             require(companyRows.keySet().containsAll(readingRows.keySet()), "reading_company_rounds");
+            if (readingLayer != null) require(Set.of(BriefingCompanyReadingRules.SCHEMA, BriefingCompanyReadingRules.SCHEMA_V2).contains(readingLayer.string("schemaVersion")), "reading_layer_schema");
             Set<String> readingOwned = new HashSet<>();
+            StrictJson.Obj cardLayer = presentation.root().has("companyCardLayer") ? presentation.root().object("companyCardLayer") : null;
+            if (cardLayer != null) require(settings.userInboxRef().equals(cardLayer.string("authorizationRef")), "card_authorization");
+            Map<String, StrictJson.Obj> cardRows = cardLayer == null ? Map.of() : BriefingCompanyReadingRules.rows(cardLayer);
+            Map<String, JsonNode> cardReceipts = cardLayer == null ? Map.of() : simulationReceiptLedger(cardLayer.objects("receipts"));
+            require(companyRows.keySet().containsAll(cardRows.keySet()), "card_company_rounds");
+            Set<String> cardOwned = new HashSet<>();
             List<Map<String, StrictJson.Obj>> priorCompanyRows = new ArrayList<>(); List<List<StrictJson.Obj>> priorCompanyHistory = new ArrayList<>();
             if (companyLayer != null && companyLayer.has("previousRuns")) {
                 require(companyLayer.objects("previousRuns").size() <= 2, "company_outlook_history_limit");
@@ -795,6 +821,12 @@ public final class BriefingReplayImporter {
                                 blobs.put(namespace + "-company-price-" + source.string("sha256"), blob("raw_document", BriefingCompanyPriceRules.raw(source, settings.bundle().getParent())));
                     }
                 }
+                if (cardRows.containsKey(base.id())) {
+                    StrictJson.Obj card = cardRows.get(base.id());
+                    require(BriefingCompanyReadingRules.SCHEMA_CARD.equals(card.object("frozen").string("schemaVersion")), "card_schema");
+                    BriefingCompanyReadingRules.apply(card, companyRows.get(base.id()), (ObjectNode) snapshot.path("companyOutlooks"), cardReceipts, cardOwned, settings.bundle().getParent());
+                    blobs.put(namespace+"-company-card-"+enriched.size(), blob("briefing_input", StrictJson.write(card.node())));
+                }
                 ObjectNode lineage = snapshot.putObject("presentationEnrichment").put("schemaVersion", BriefingPresentationRules.SCHEMA)
                         .put("baseBundleSha256", presentation.root().string("baseBundleSha256")).put("baseResultSha256", record.string("baseResultSha256"));
                 lineage.put("comparisonBasis", "event_identity");
@@ -806,6 +838,8 @@ public final class BriefingReplayImporter {
             for (StrictJson.Obj market : validatedMarkets) if (market.has("marketContext")) BriefingMarketContextRules.previous(market, validatedMarkets);
             require(accountedMarket.equals(layerReceipts.keySet()), "presentation_unowned_receipt");
             require(companyOwned.equals(companyReceipts.keySet()), "company_outlook_unowned_receipts");
+            require(cardOwned.equals(cardReceipts.keySet()), "company_card_unowned_receipts");
+            for (var receipt : cardReceipts.entrySet()) require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "company_card_duplicate_receipt");
             require(readingOwned.equals(readingReceipts.keySet()), "company_reading_unowned_receipts");
             for (var receipt : readingReceipts.entrySet()) require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "company_reading_duplicate_receipt");
             for (var receipt : companyReceipts.entrySet()) require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "company_outlook_duplicate_receipts");

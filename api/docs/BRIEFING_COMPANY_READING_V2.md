@@ -43,3 +43,17 @@ python3 scripts/briefing_reading_evaluation.py \
 회차 수를 명시한 series는 항목별 복구와 JVM 수입에서도 원래 전체 roundId 집합을 정확히 유지한다. 과거14회차 기본 계약은 그대로다. 보수적 편집 제외 파일에는 동일 `userInboxRef`와 해당 선정 인용의 `evidenceIds`를 넣으며, Python 사전검사와 Java 수입 모두 이 결속을 확인한다. 이미 생성한 전문·짧은 문안의 frozen 입력이 같으면 원 timestamp/resultVersion/응답을 보존해 재사용하며 판정·모델 원응답을 바꾸지 않는다.
 
 검토 이력을 추가한 뒤에도 기존 완료 호출을 삭제하지 않는다. issuer-first 이력의 과거 호출은 동일 회차·전체 이슈·현재 원문과 검토된 과거 보고서·원 프롬프트 결속을 재검사한 후 사용량 감사 기록으로만 인정한다. 선정에는 현재 회차가 명시한 digest의 판정만 적용하며, 과거 캐시 응답을 대체 판정으로 사용하지 않는다.
+
+## 한눈 카드 (D-BRF-01/02)
+
+`company.card`는 기존 `reading`·전문·시세를 덮어쓰지 않는 선택 계층입니다. `briefing_company_cards.py`가 전문·같은 기업의 원문 근거를 입력으로 `topic`(12자)·`title`(32자)·`description`(64자)을 별도 생성하고, 독립 호출로 사실성·간결성·역할 구분·한정어·근거 밖 주장을 검사합니다. v2 프롬프트는 날짜를 무리하게 제목에 모두 넣지 않고 핵심 사건과 보조 설명의 역할을 나눕니다. 포함한 수치/시점의 약·최대·계획·예정은 유지합니다. 제목은 독립적으로 사실이어야 합니다.
+
+```sh
+python3 scripts/briefing_company_cards.py --baseline /private/completed-reading \
+  --output /private/new-cards --authorization-ref '<원 발행 입력 승인 참조>' \
+  --run-id '<새 실행 ID>' --max-calls '<승인 누적 호출 상한>'
+```
+
+기본은 OFFLINE입니다. 실제 호출은 `--execute --key-file <서버전용 키 파일>`이 필요하며 별도 지출 가드를 함께 적용합니다. 한 회차당 최초 생성·검증2호출, 최대1회 보완으로4호출입니다. `--previous-cards`는 새 출력 폴더에서 통과 회차를 원 타임스탬프/버전 그대로 재사용하고 보류 회차의 원 시도를 보존해 최대2시도만 추가합니다(전체 최대6시도). 미응답 요청은 재전송하지 않습니다. 원문·키·모델 원응답은 공개 PR에 넣지 않습니다.
+
+JVM 수입은 회차·마감·전문 버전·입력 원문·실제 프롬프트/스키마·응답 SHA·사용량·완료시각·독립 검증과 모든 품질 항목을 확인합니다. `companyCardLayer` 또는 `seriesCompanyCards`로 저장하고 카드별 `schemaVersion=zoop-company-card-v1/status/resultVersion`과 각 문장의 evidenceIds를 공개합니다. WITHHELD에는 초안을 공개하지 않으며 간단히 화면에서 긴 문장으로 대체하지 않습니다. 전문·시세·원문 근거는 계속 펼칠 수 있습니다. 기존 DB·발행본을 직접 갱신하는 기능이 아니며 개발 확인은 별도 DB에서 수행합니다. ERD/migration 변경은 없습니다.
