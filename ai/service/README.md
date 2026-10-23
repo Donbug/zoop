@@ -293,6 +293,8 @@ live S2/S3 job은 **서버 운영자가 고정한 것만** 돌아갑니다. 호�
 
 `tests/`는 실제 uvicorn 프로세스(127.0.0.1)에서 HTTP 경계를 검사하며, 목적에 따라 설치된 `zoop-ai` 또는 시험 소유의 CLI 대역을 사용합니다. 대역 시험은 잘못된 출력·시간 초과·권한 변경 등 전송 경계만 증명하며, 실제 pipeline 실행은 `pipeline_tests/`와 각 설치 CLI smoke로 별도 확인합니다. 자격 증명은 시험마다 메모리에서 만든 합성 값이며 저장소에는 토큰도 digest도 없습니다. 모델은 호출하지 않습니다. live 경로 시험은 `127.0.0.1`의 loopback provider를 사용하고 외부 네트워크는 쓰지 않습니다. 프로세스 충돌 시험은 `tests/launcher.py`가 실제 컴포넌트를 감싸 정해진 경계에서 서비스를 SIGKILL하며 프로덕션 코드에는 그런 hook이 없습니다.
 
+CI의 `ai-service` 작업은 전체 시험·loopback smoke·내부 OpenAPI drift 검사를 모두 유지하며 전체 실행 제한은 25분이다. 이는 개별 HTTP 요청이나 CLI child의 timeout을 늘리는 설정이 아니다.
+
 | 파일 | 증명 |
 |---|---|
 | `test_config.py` | 설정 실패 닫힘(exit 78, 값 미출력, listener 없음), 중복 인스턴스, worker 원장 binding |
