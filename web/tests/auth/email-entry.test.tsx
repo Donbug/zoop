@@ -299,6 +299,30 @@ describe('Issue35 · FS003 D-AUT-02', () => {
     expect(document.querySelector('[data-term-id] script')).toBeNull();
     expect(screen.getByText('<script>synthetic text</script>')).toBeTruthy();
   });
+  it('renders Markdown in the D-AUT-02 terms body', async () => {
+    server.on('GET', '/api/v1/auth/terms', () =>
+      json({
+        items: [
+          {
+            ...terms[0],
+            body: '# 주요 내용\n\n**필수 항목**\n\n- 첫째\n- 둘째\n\n| 구분 | 내용 |\n| --- | ---: |\n| 보관 기간 | 1년 |',
+          },
+          terms[1],
+        ],
+        nextCursor: null,
+      }),
+    );
+    open();
+    await screen.findByLabelText('모두 동의');
+    await userEvent.click(screen.getByText('서비스 이용약관 본문 보기'));
+    expect(screen.getByRole('heading', { name: '주요 내용' })).toBeTruthy();
+    expect(screen.getByText('필수 항목').tagName).toBe('STRONG');
+    expect(screen.getByRole('list').querySelectorAll('li')).toHaveLength(2);
+    expect(screen.getByRole('table').querySelectorAll('tbody tr')).toHaveLength(
+      1,
+    );
+    expect(screen.getByRole('columnheader', { name: '구분' })).toBeTruthy();
+  });
   it('shows duplicate email and can retry after correcting it', async () => {
     server.on('POST', '/api/v1/auth/signup', () =>
       apiError(409, 'EMAIL_TAKEN'),

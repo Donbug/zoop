@@ -12,15 +12,22 @@ import com.zoop.admin.dashboard.repository.AdminDashboardRepository;
 import com.zoop.admin.graph.AdminGraphVersionService;
 import com.zoop.admin.graph.GraphVersionActivateRequest;
 import com.zoop.admin.graph.GraphVersionAdminResponse.GraphVersionOut;
+import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
+import com.zoop.auth.service.MemberSettingsService;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
+import com.zoop.common.json.StrictJson;
+import com.zoop.graph.read.EventDetailService;
 import com.zoop.graph.read.GraphQueryService;
+import com.zoop.graph.read.PersonalCompanies;
+import com.zoop.graph.read.dto.EventDetail;
 import com.zoop.graph.snapshot.FixtureGraphVersionSeeder;
 import com.zoop.graph.snapshot.GraphSnapshotStore;
 import com.zoop.graph.version.GraphVersionConflictException;
 import com.zoop.graph.version.GraphVersionSelector;
 import com.zoop.graph.version.JdbcGraphVersionRepository;
 import com.zoop.graph.version.JdbcGraphVersionRepository.NewGraphVersion;
+import com.zoop.portfolio.service.PortfolioService;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -29,8 +36,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +46,8 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** Graph version migration, fixture registration and version pinning against the disposable company test database. */
 @Tag("graph-postgres")
@@ -187,8 +194,77 @@ class GraphVersionPostgresIntegrationTest {
     }
 
     @Test
+    void fs014SavedWatchlistAndMockHoldingsAppearInTheNextPersonalRead() {
+        var tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+        tx.executeWithoutResult(status -> {
+            String memberId = "graph-personal-" + UUID.randomUUID();
+            Timestamp now = Timestamp.from(Instant.now());
+            jdbc.update("""
+                    INSERT INTO members (id, analytics_key, email, email_key, display_name,
+                                         password_hash, signup_method, status, mode, investor,
+                                         completed, tutorial_completed, settings_version,
+                                         created_at, updated_at, blocked_at)
+                    VALUES (?, ?, ?, ?, 'Graph Test', 'test-hash', 'email', 'active', NULL, NULL,
+                            false, false, 1, ?, ?, NULL)
+                    """, memberId, memberId, memberId + "@example.com", memberId + "@example.com", now, now);
+            var member = new MemberPrincipal(memberId, "graph-test-session");
+            var settings = context.getBean(MemberSettingsService.class);
+            var portfolio = context.getBean(PortfolioService.class);
+            var personal = context.getBean(PersonalCompanies.class);
+            var graph = context.getBean(GraphQueryService.class);
+
+            var empty = graph.getGraph("personal", null, 1, null, null, null, null, personal.of(member), "empty");
+            assertEquals("no_personal_stocks", empty.metadata().emptyReason());
+            assertTrue(empty.nodes().isEmpty());
+
+            settings.update(member, StrictJson.parseObject("""
+                    {"version":1,"investor":false,"mode":"watchlist",
+                     "watchlistIds":["NASDAQ:NVDA","KRX:005930"],"completed":true}
+                    """.getBytes(java.nio.charset.StandardCharsets.UTF_8)).node(), "watch-save");
+            var watched = graph.getGraph("personal", null, 1, null, null, null, null, personal.of(member), "watched");
+            assertEquals(List.of("NASDAQ:NVDA", "KRX:005930"), watched.metadata().focusCompanyIds());
+            assertTrue(watched.nodes().stream().filter(node -> node.id().equals("NASDAQ:NVDA"))
+                    .allMatch(node -> node.watch() && !node.holding()));
+
+            var connection = portfolio.connect(member, "demo-balanced", "graph-connect", "connected");
+            var combined = graph.getGraph("personal", null, 1, null, null, null, null, personal.of(member), "combined");
+            assertEquals(List.of("KRX:005930", "KRX:000660", "NASDAQ:NVDA"), combined.metadata().focusCompanyIds());
+            assertTrue(combined.nodes().stream().filter(node -> node.id().equals("KRX:005930"))
+                    .allMatch(node -> node.holding() && node.watch()));
+
+            settings.update(member, StrictJson.parseObject("""
+                    {"version":2,"watchlistIds":[]}
+                    """.getBytes(java.nio.charset.StandardCharsets.UTF_8)).node(), "watch-clear");
+            var held = graph.getGraph("personal", null, 1, null, null, null, null, personal.of(member), "held");
+            assertEquals(List.of("KRX:005930", "KRX:000660"), held.metadata().focusCompanyIds());
+            assertTrue(held.nodes().stream().noneMatch(com.zoop.graph.read.dto.GraphResponse.Node::watch));
+
+            portfolio.disconnect(member, connection.id());
+            var cleared = graph.getGraph("personal", null, 1, null, null, null, null, personal.of(member), "cleared");
+            assertEquals("no_personal_stocks", cleared.metadata().emptyReason());
+            assertTrue(graph.getGraph("all", null, null, null, null, null, null, null, "market").nodes().size() > 0);
+            status.setRollbackOnly();
+        });
+    }
+
+    @Test
     void theDatabaseRejectsTwoActiveVersions() {
         assertThrows(DataAccessException.class, () -> jdbc.update("UPDATE graph_versions SET active = true"));
+    }
+
+    @Test
+    void getEventReadsTheActiveFixtureVersionThroughTheRealContext() {
+        var service = context.getBean(EventDetailService.class);
+
+        var detail = service.get("iss-fixture-hbm-equip", null, null, null, "it-event");
+        assertEquals("fixture-2026-10-08", detail.metadata().graphVersion());
+        assertEquals(List.of("iss-fixture-hbm-supply"),
+                detail.follows().previous().stream().map(EventDetail.FollowRef::id).toList());
+        assertEquals("unavailable", ((EventDetail.Unavailable) detail.summary()).status());
+        // The fixture's articles have no stored article version, so the publisher is unknown rather than invented.
+        assertEquals(null, detail.articles().get(0).publisher());
+        assertThrows(CustomException.class, () -> service.get("iss-fixture-ai-accel", null, null,
+                "2026-10-05T00:00:00Z", "it-event-past"));
     }
 
     @Test

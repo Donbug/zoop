@@ -52,6 +52,7 @@ function member(overrides: Partial<MemberRow> = {}): MemberRow {
     createdAt: '2026-10-01T11:27:00Z',
     lastActiveAt: '2026-10-06T03:43:00Z',
     status: 'active',
+    statusRevision: 3,
     activity: {
       sessions: 6,
       graphSelections: 41,
@@ -237,6 +238,7 @@ describe('A-ADM-05 회원·접근 관리 (FS069)', () => {
 
     expect(await screen.findByText('M-EBF98301을 차단했어요.')).toBeTruthy();
     expect(server.calls('POST', BLOCK)[0].body).toEqual({
+      expectedRevision: 3,
       reason: '이용 약관 위반',
     });
     const [headers] = headersOf('/block');
@@ -245,6 +247,22 @@ describe('A-ADM-05 회원·접근 관리 (FS069)', () => {
     const history = screen.getByRole('table', { name: '차단·해제 이력' });
     expect(within(history).getByText('이용 약관 위반')).toBeTruthy();
     expect(screen.getByRole('button', { name: '차단 해제' })).toBeTruthy();
+  });
+
+  test('그 사이 다른 관리자가 상태를 바꿨으면(409) 새로 고치라고 알린다', async () => {
+    server.on('GET', MEMBER, () => json(detail(member())));
+    server.on('POST', BLOCK, () => apiError(409, 'REVISION_CONFLICT'));
+    const { user } = open('/admin/members/M-EBF98301');
+    await user.click(await screen.findByRole('button', { name: '차단' }));
+    const form = screen.getByRole('form', { name: '회원 차단' });
+    await user.type(
+      within(form).getByLabelText('차단 사유(감사 로그에 남아요)'),
+      '중복 처리',
+    );
+    await user.click(within(form).getByRole('button', { name: '차단하기' }));
+    expect(
+      await within(form).findByText(/그 사이 회원 상태가 바뀌었어요/),
+    ).toBeTruthy();
   });
 
   test('차단 해제가 실패하면 이유를 알리고, 다시 보낼 때 같은 키를 쓴다. 이미 같은 상태면 그렇게 알린다', async () => {

@@ -7,6 +7,14 @@ import {
   adminActionErrorMessage,
 } from '@/components/admin/common/adminStyles';
 import { useIdempotencyKey } from '@/hooks/useIdempotencyKey';
+import { ApiError } from '@/apis/auth/ApiService';
+
+/** 그 사이 다른 관리자가 상태를 바꿨으면(409 REVISION_CONFLICT) 상세를 새로 읽게 안내한다. */
+function memberActionErrorMessage(error: Error) {
+  if (error instanceof ApiError && error.code === 'REVISION_CONFLICT')
+    return '그 사이 회원 상태가 바뀌었어요. 화면을 새로 고친 뒤 다시 확인해 주세요.';
+  return adminActionErrorMessage(error);
+}
 import type { MemberRow, MemberStatusResult } from '@/types/admin/members';
 
 /**
@@ -39,11 +47,16 @@ export default function MemberStatusForm({
     if (!trimmed) return;
     setError(null);
     setPending(true);
-    const idempotencyKey = idempotency.keyFor({ block, reason: trimmed });
+    const revision = member.statusRevision;
+    const idempotencyKey = idempotency.keyFor({
+      block,
+      revision,
+      reason: trimmed,
+    });
     try {
       const result = block
-        ? await blockMember(member.id, trimmed, idempotencyKey)
-        : await unblockMember(member.id, trimmed, idempotencyKey);
+        ? await blockMember(member.id, revision, trimmed, idempotencyKey)
+        : await unblockMember(member.id, revision, trimmed, idempotencyKey);
       onDone(result);
     } catch (submitError) {
       idempotency.settle(submitError);
@@ -91,7 +104,7 @@ export default function MemberStatusForm({
       )}
       {error && (
         <p role="alert" className="text-[11px] text-zoop-alert">
-          {title}에 실패했어요. {adminActionErrorMessage(error)}
+          {title}에 실패했어요. {memberActionErrorMessage(error)}
         </p>
       )}
       <div className="flex flex-wrap justify-end gap-2">

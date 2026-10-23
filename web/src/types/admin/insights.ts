@@ -11,6 +11,10 @@ export type StatsMetric = {
   unit: string;
   /** 산식 설명. 값 옆에 그대로 보여 준다. */
   definition: string;
+  /** 원천이 연결돼 읽을 수 있는지. unavailable이면 값은 null이다(0과 다름). */
+  availability: 'available' | 'unavailable';
+  unavailableReason:
+    'not_integrated' | 'source_unavailable' | 'insufficient_history' | null;
   count: number | null;
   numerator: number | null;
   denominator: number | null;
@@ -26,10 +30,12 @@ export type InsightsOverview = {
   minSample: number;
   metrics: StatsMetric[];
   feedback: {
-    up: number;
-    down: number;
+    up: number | null;
+    down: number | null;
     rate: number | null;
     sampleHidden: boolean;
+    availability: 'available' | 'unavailable';
+    unavailableReason: 'not_integrated' | 'source_unavailable' | null;
   };
   members: { registered: number; active: number; blocked: number };
 };
@@ -40,7 +46,7 @@ export type DailyActivity = {
   nodeSelections: number;
   edgeSelections: number;
   briefingViews: number;
-  aiQuestions: number;
+  aiQuestions: number | null;
 };
 
 export type RoundStat = {
@@ -50,8 +56,8 @@ export type RoundStat = {
   views: number;
   viewers: number;
   issueOpens: number;
-  likes: number;
-  dislikes: number;
+  likes: number | null;
+  dislikes: number | null;
 };
 
 export type StatsSummary = {
@@ -73,8 +79,8 @@ export type CompanyStatRow = {
   watchlistMembers: number;
   holdingMembers: number;
   nodeViews: number;
-  edgeSelections: number;
-  aiQuestions: number;
+  edgeSelections: number | null;
+  aiQuestions: number | null;
 };
 
 export type InsightCompanyRanking = {
@@ -96,17 +102,17 @@ export type InsightCompanyDetail = {
   watchlistMembers: number;
   holdingMembers: number;
   nodeViews: number;
-  edgeSelections: number;
-  issueSelections: number;
-  aiQuestions: number;
+  edgeSelections: number | null;
+  issueSelections: number | null;
+  aiQuestions: number | null;
   viewers: number;
   minSample: number;
   series: {
     date: string;
     nodeViews: number;
-    edgeSelections: number;
-    issueSelections: number;
-    aiQuestions: number;
+    edgeSelections: number | null;
+    issueSelections: number | null;
+    aiQuestions: number | null;
   }[];
   note: string;
 };

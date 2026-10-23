@@ -82,6 +82,7 @@ export const auditOutcomeLabel: Record<AuditEntry['outcome'], string> = {
 
 export const auditActionLabel: Record<string, string> = {
   'auth.login': '로그인',
+  'admin.provision': '관리자 계정 생성',
   'auth.login_failed': '로그인 실패',
   'auth.logout': '로그아웃',
   'review.decide': '검수 결정',

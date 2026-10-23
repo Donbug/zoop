@@ -18,6 +18,7 @@ import {
   TD,
   TH,
   count,
+  countWith,
 } from '@/components/admin/common/adminStyles';
 import {
   parseWindow,
@@ -96,32 +97,32 @@ export default function AdminCompanyStatsPage() {
           <dl className="grid grid-cols-2 gap-x-6 gap-y-5 border-y-[0.667px] border-zoop-line py-5 md:grid-cols-3">
             <Metric
               label="노드 조회"
-              value={`${count(data.nodeViews)}회`}
+              value={countWith(data.nodeViews, '회')}
               detail={`조회한 사용자 ${count(data.viewers)}명`}
             />
             <Metric
               label="간선 선택"
-              value={`${count(data.edgeSelections)}회`}
+              value={countWith(data.edgeSelections, '회')}
               detail="이 기업에 이어진 연결선"
             />
             <Metric
               label="사건 선택"
-              value={`${count(data.issueSelections)}회`}
+              value={countWith(data.issueSelections, '회')}
               detail="이 기업과 연결된 사건 노드"
             />
             <Metric
               label="AI 질문"
-              value={`${count(data.aiQuestions)}회`}
+              value={countWith(data.aiQuestions, '회')}
               detail="질문에 이 기업을 연결한 횟수"
             />
             <Metric
               label="관심 등록"
-              value={`${count(data.watchlistMembers)}명`}
+              value={countWith(data.watchlistMembers, '명')}
               detail="지금 저장된 회원 설정 기준"
             />
             <Metric
               label="가상 보유"
-              value={`${count(data.holdingMembers)}명`}
+              value={countWith(data.holdingMembers, '명')}
               detail="연결한 가상 계좌 기준"
             />
           </dl>

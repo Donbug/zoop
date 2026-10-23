@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { getGraph } from '@/apis/graph/graph';
-import { RoundGraphUnavailableError } from '@/apis/graph/round-graph-error';
+import { BriefingGraphUnavailableError } from '@/apis/graph/briefing-context';
 import type { GraphRequest, GraphResponse } from '@/types/map/graph';
 
 export type GraphPrefetch = { key: string; data: GraphResponse };
@@ -35,15 +35,15 @@ export function useGraphData(
   const [state, setState] = useState<{
     data: GraphResponse | null;
     error: string | null;
-    /** 회차 지도가 실패가 아니라 제공되지 않는 상태(D-BRF-04). 다시 시도를 두지 않는다. */
-    unavailable: boolean;
+    /** 회차 지도가 실패가 아니라 제공되지 않는 상태(D-BRF-04). 값은 API가 준 사유다. */
+    unavailableReason: string | null;
     loading: boolean;
     session: string | null;
     snapshotKey: string;
   }>({
     data: null,
     error: null,
-    unavailable: false,
+    unavailableReason: null,
     loading: true,
     session,
     snapshotKey,
@@ -66,7 +66,7 @@ export function useGraphData(
         snapshotKey,
         loading: true,
         error: null,
-        unavailable: false,
+        unavailableReason: null,
       }));
       try {
         const input = {
@@ -88,7 +88,7 @@ export function useGraphData(
           setState({
             data,
             error: null,
-            unavailable: false,
+            unavailableReason: null,
             loading: false,
             session,
             snapshotKey,
@@ -99,7 +99,10 @@ export function useGraphData(
             ...old,
             data: round ? null : old.data,
             loading: false,
-            unavailable: error instanceof RoundGraphUnavailableError,
+            unavailableReason:
+              error instanceof BriefingGraphUnavailableError
+                ? error.reason
+                : null,
             error:
               error instanceof Error
                 ? error.message
@@ -126,5 +129,11 @@ export function useGraphData(
   // Never flash a previous member's personal response after logout/session replacement.
   return state.session === session && state.snapshotKey === snapshotKey
     ? state
-    : { ...state, data: null, error: null, unavailable: false, loading: true };
+    : {
+        ...state,
+        data: null,
+        error: null,
+        unavailableReason: null,
+        loading: true,
+      };
 }

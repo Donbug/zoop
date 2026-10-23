@@ -739,6 +739,51 @@ class GraphEvidenceServiceTest {
     }
 
     @Test
+    void readabilityKeepsAnOutageApartFromADenial() throws Exception {
+        basisOnly();
+        // A chat tool reports what it found: an outage must not read as "this evidence does not exist".
+        assertEquals(EvidenceService.Readability.READABLE, service().readability(EVIDENCE_ID, GRAPH_VERSION, null, "req-r"));
+
+        ObjectNode notProven = basisReceipt();
+        basisOf(notProven).putArray("evidenceIds").add("ev-" + "d".repeat(64));
+        rewriteRegisteredReceipt(notProven);
+        assertEquals(EvidenceService.Readability.DENIED, service().readability(EVIDENCE_ID, GRAPH_VERSION, null, "req-r"));
+        assertEquals(EvidenceService.Readability.DENIED,
+                service().readability("ev-" + "0".repeat(64), GRAPH_VERSION, null, "req-r"));
+        assertEquals(EvidenceService.Readability.DENIED,
+                service().readability("not-an-evidence-id", GRAPH_VERSION, null, "req-r"));
+
+        rewriteRegisteredReceipt(basisReceipt());
+        graphFailure = new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        assertEquals(EvidenceService.Readability.UNAVAILABLE,
+                service().readability(EVIDENCE_ID, GRAPH_VERSION, null, "req-r"));
+    }
+
+    @Test
+    void shownNowHidesADenialButReportsAnUnverifiableStateAsUnavailable() throws Exception {
+        basisOnly();
+        // getEvent: the same judgement as the read, with "cannot verify now" kept apart from "withheld".
+        assertTrue(service().shownNow(EVIDENCE_ID, GRAPH_VERSION, null, "req-s"));
+
+        ObjectNode notProven = basisReceipt();
+        basisOf(notProven).putArray("evidenceIds").add("ev-" + "d".repeat(64));
+        rewriteRegisteredReceipt(notProven);
+        assertFalse(service().shownNow(EVIDENCE_ID, GRAPH_VERSION, null, "req-s"), "a withheld citation is hidden");
+        assertFalse(service().shownNow("ev-" + "0".repeat(64), GRAPH_VERSION, null, "req-s"), "an unknown id is hidden");
+        assertFalse(service().shownNow("not-an-evidence-id", GRAPH_VERSION, null, "req-s"));
+
+        rewriteRegisteredReceipt(basisReceipt());
+        graphFailure = new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> service().shownNow(EVIDENCE_ID, GRAPH_VERSION, null, "req-s")).getErrorCode(),
+                "an unreadable store is a 503, never a hidden citation");
+        assertFalse(service().readable(EVIDENCE_ID, GRAPH_VERSION, null, "req-s"), "readable keeps its chat meaning");
+        graphFailure = new org.springframework.dao.DataAccessResourceFailureException("database down");
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> service().shownNow(EVIDENCE_ID, GRAPH_VERSION, null, "req-s")).getErrorCode());
+    }
+
+    @Test
     void theRelationsOwnCitationInTheReceiptNeverStandsInForTheBasisCitation() throws Exception {
         basisOnly();
         ObjectNode edited = basisReceipt();

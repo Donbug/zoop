@@ -6,11 +6,12 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Pins the public graph version of one request (OpenAPI {@code publicationVersions}):
  * <ol>
- * <li>{@code round}: the version fixed when the briefing round was published (not available yet: no round store).</li>
+ * <li>{@code round}: the published briefing owner's fixed version and cutoff, after current read-authority checks.</li>
  * <li>{@code asOf}: the version whose pointer change was the last one at or before that time. A given
  * {@code graphVersion} must equal it, otherwise 422.</li>
  * <li>{@code graphVersion} alone: only a version that was publicly active at some point.</li>
@@ -24,20 +25,41 @@ public class GraphVersionSelector {
 
     private final GraphVersionRepository repository;
     private final Clock clock;
+    private final BriefingGraphLookup briefings;
 
     public GraphVersionSelector(GraphVersionRepository repository, Clock clock) {
+        this(repository, clock, (round, request) -> { throw new CustomException(ErrorCode.VERSION_UNAVAILABLE); });
+    }
+
+    @Autowired
+    public GraphVersionSelector(GraphVersionRepository repository, Clock clock, BriefingGraphLookup briefings) {
         this.repository = repository;
         this.clock = clock;
+        this.briefings = briefings;
     }
 
     public SelectedGraphVersion select(String round, String graphVersion, Instant asOf) {
+        return select(round, graphVersion, asOf, null);
+    }
+
+    public SelectedGraphVersion select(String round, String graphVersion, Instant asOf, String requestId) {
         Instant requestStart = clock.instant();
         if (graphVersion != null && !VERSION_ID.matcher(graphVersion).matches()) {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
         if (round != null) {
-            // Briefing rounds do not store a pinned graph version yet; never fall back to another version.
-            throw new CustomException(ErrorCode.VERSION_UNAVAILABLE);
+            var basis = briefings.resolve(round, requestId);
+            if ((graphVersion != null && !graphVersion.equals(basis.graphVersion()))
+                    || (asOf != null && !asOf.equals(basis.dataAsOf())))
+                throw new CustomException(ErrorCode.INVALID_REQUEST);
+            if (basis.reconstruction() != null)
+                return new SelectedGraphVersion(basis.reconstruction().version(), basis.dataAsOf(), true, basis);
+            if (!repository.everActivated(basis.graphVersion()))
+                throw new BriefingGraphUnavailableException("snapshot_unavailable");
+            // A graph can be published after the input cutoff. Use the recorded version, not activeVersionIdAt(cutoff).
+            var version = repository.find(basis.graphVersion())
+                    .orElseThrow(() -> new BriefingGraphUnavailableException("snapshot_unavailable"));
+            return new SelectedGraphVersion(version, basis.dataAsOf(), true, basis);
         }
         if (asOf != null) {
             String pinned = repository.activeVersionIdAt(asOf)

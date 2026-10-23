@@ -88,7 +88,17 @@ export async function getCompanyPrices(id: string): Promise<PriceSeries> {
 
 export async function getCompanyDocuments(
   id: string,
+  context: EventContext = {},
 ): Promise<CompanyDocumentsResponse> {
+  if (context.round) {
+    const documents = await read<
+      CompanyDocumentsResponse & {
+        metadata: { graphVersion: string | null; asOf: string };
+      }
+    >(snapshotUrl(`${companyUrl(id)}/documents?limit=3`, context));
+    assertSnapshot(documents.metadata, context);
+    return documents;
+  }
   if (usesCompanyMock)
     return fixture(async () =>
       (await import('@/mocks/company/fixture')).mockDocuments(id),
