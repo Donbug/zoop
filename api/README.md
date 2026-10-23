@@ -220,6 +220,7 @@ Swagger `/v3/api-docs`의 위 5개 operation과 목표 정본 [`docs/api/openapi
 | DB·권한·공개 HTTP·합성 자료로 프론트 연결 | [BRIEFING_READ](docs/BRIEFING_READ.md) |
 | 실제 수집부터 한 회차 생성·검증·DB·지도 실행 | [BRIEFING_LOCAL_ROUND](docs/BRIEFING_LOCAL_ROUND.md) |
 | 지정 출퇴근 회차를 시간순으로 재생 | [BRIEFING_ROUND_SERIES](docs/BRIEFING_ROUND_SERIES.md) |
+| 완료 AI 결과 재사용·시세 자동 수집·실패 단계부터 DB/지도/화면 재개 | [회차 자동 연결과 재개](docs/BRIEFING_ROUND_SERIES.md#완료-ai-결과부터-시세db지도화면까지-자동-연결) |
 | 중요도·재보도/기업 연결 및 짧은 근거의 실제 의미 검증 | [BRIEFING_EDITORIAL_GUARDS](docs/BRIEFING_EDITORIAL_GUARDS.md), [BRIEFING_CORE_EVIDENCE](docs/BRIEFING_CORE_EVIDENCE.md) |
 | 핵심 → 참고 소식 → 이전 발행본 복기·수집 부족 구분 | [BRIEFING_CONTINUITY](docs/BRIEFING_CONTINUITY.md), [BRIEFING_EMPTY_RECAP](docs/BRIEFING_EMPTY_RECAP.md) |
 | 시장 맥락·이전 판단·기업별 조건부 전망 | [BRIEFING_MARKET_CONTEXT](docs/BRIEFING_MARKET_CONTEXT.md), [BRIEFING_COMPANY_OUTLOOK](docs/BRIEFING_COMPANY_OUTLOOK.md) |

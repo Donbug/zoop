@@ -50,3 +50,5 @@ python3 scripts/briefing_series_prices.py \
 - Java importer가 보존한 전체 기존 bundle 원본 바이트의 SHA, 원 기업 전망 버전·대상 집합·시점·가격 원본·정규장 종료 시점·비교 산식을 독립 검증합니다. 원시 시세와 보완 투영을 artifact로 저장하고 공개 응답은 `companyOutlooks.companies[].price`, `companyOutlooks.priceVersion`으로 복원합니다.
 - 미국 기업의 한국 퇴근 회차는 마지막 미국 종가가 있어도 `comparisonStatus=no_new_session`일 수 있습니다. 화면은 종가·관측 시각과 “아침 이후 새 정규장 관측 없음”을 함께 표시하며 0%나 전망 적중률을 만들지 않습니다. 기존 `observedMovement=unavailable` 원문도 새 가격이 생겼다는 이유로 덮어쓰지 않습니다.
 - 브리핑의 회차 고정 시세와 `/api/v1/companies/{id}/quote`의 최신 공급자 시세는 다른 경로입니다. 과거 브리핑을 오늘 가격으로 대체하지 않습니다. 휴장/단축장 달력·분할 조정·운영 이용 권한은 기존 개발 재생의 한계로 남습니다.
+
+새 회차 CLI `briefing_series_company.py --execute`는 기업 전망 완료 뒤 이 가격 단계를 자동 연결합니다. 기존 완료 AI 결과도 키 없이 재사용하며 `--without-prices`는 기존 회사 전망 전용 모드입니다. [회차 자동 연결 실행기](BRIEFING_ROUND_SERIES.md#완료-ai-결과부터-시세db지도화면까지-자동-연결)는 실패한 가격 요청을 다음 명시적 재실행에서만 새 시도 폴더로 재시도하고 성공한 종목/기간은 재조회하지 않습니다. 위의 단독 `briefing_series_prices.py` 명령은 같은 출력의 실패 영수증까지 그대로 재사용하는 기존 동작을 유지합니다.
