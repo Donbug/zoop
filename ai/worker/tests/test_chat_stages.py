@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -263,6 +264,12 @@ def test_a_request_claimed_by_a_process_that_died_is_unknown_with_its_receipt(tm
     assert result.failure.code == "provider_response_unknown" and result.failure.unknown and result.failure.sent
     assert result.receipt is not None and result.receipt.model == chat_jev.MODEL
     assert endpoint.calls == []
+
+
+@pytest.mark.skipif(not hasattr(os, "getuid"), reason="POSIX file modes")
+def test_the_ledger_file_is_private_from_creation(tmp_path):
+    ChatLedger(tmp_path).close()
+    assert (tmp_path / "chat.sqlite3").stat().st_mode & 0o077 == 0
 
 
 def test_only_one_claimer_sends_and_an_open_claim_counts_against_the_ceiling(tmp_path):

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import extraction_doc, graph_doc, handoff_doc
+from . import chat_doc, extraction_doc, graph_doc, handoff_doc
 from .relation_ledger import OperationRow
 from .relation_review import operation_status
 from .relation_wire import (SCHEMA as RELATION_SCHEMA, RelationErrorEnvelope, RelationJobContent, RelationJobStatus, RelationOperationStatus,
@@ -395,13 +395,15 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     spec = app.openapi()
     sample = examples()
     spec["info"] = {"title": "Zoop internal AI analysis transport", "version": "1.0.0",
-                    "description": (DESCRIPTION + "\n" + extraction_doc.DESCRIPTION + "\n" + graph_doc.DESCRIPTION + "\n" + handoff_doc.DESCRIPTION).strip()}
+                    "description": (DESCRIPTION + "\n" + extraction_doc.DESCRIPTION + "\n" + graph_doc.DESCRIPTION + "\n" + handoff_doc.DESCRIPTION + "\n"
+                                    + chat_doc.DESCRIPTION).strip()}
     spec["servers"] = [{"url": "http://127.0.0.1:8797", "description": "Loopback only. Never exposed directly; reach it through a co-located TLS proxy."}]
     spec["tags"] = [{"name": "analysis-jobs", "description": "S1 analysis jobs over the installed zoop-ai runtime."},
                     {"name": "relation-jobs", "description": "S3 relation/impact candidate jobs over an operator-prepared S2 upstream, through the installed zoop-ai-relation pipeline (replay, or live for an operator-pinned upstream)."},
                     {"name": "extraction-jobs", "description": "S2 event/topic candidate jobs over an operator-approved request, through the installed zoop-ai-extract pipeline (replay, or live for an operator-pinned approval)."},
                     {"name": "graph-versions", "description": "Read-only, nonpublic S3 graph version status and company focus over operator-listed versions, through the installed zoop-ai-graph pipeline (no write, no model)."},
-                    {"name": "graph-handoffs", "description": "Read-only, nonpublic AI handoff status and whole-bundle delivery over operator-pinned handoffs, through the installed zoop-ai-handoff export command (no write, no model, no network)."}]
+                    {"name": "graph-handoffs", "description": "Read-only, nonpublic AI handoff status and whole-bundle delivery over operator-pinned handoffs, through the installed zoop-ai-handoff export command (no write, no model, no network)."},
+                    {"name": "chat-stages", "description": "One chatbot model stage (router, answer or verification) per request, synchronously, through the installed zoop-ai-chat runtime (replay, or live behind the chat gate)."}]
     components = spec["components"]
     components["securitySchemes"] = {"bearerAuth": {"type": "http", "scheme": "bearer",
                                                     "description": "Operator-issued token; the service holds only its SHA-256 digest. Roles are the route scopes."}}
@@ -416,15 +418,18 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
               "submitExtractionJob": "extraction.submit", "getExtractionJobStatus": "extraction.read", "getExtractionJobResult": "extraction.read",
               "cancelExtractionJob": "extraction.cancel", "recoverExtractionJob": "extraction.recover",
               "getGraphVersionStatus": "graph.read", "getGraphVersionFocus": "graph.read",
-              "getGraphHandoffStatus": "handoff.read", "getGraphHandoffBundle": "handoff.read"}
+              "getGraphHandoffStatus": "handoff.read", "getGraphHandoffBundle": "handoff.read", "invokeChatStage": "chat.invoke"}
     for path in spec["paths"].values():
         for operation in path.values():
             operation["security"] = [{"bearerAuth": [scopes[operation["operationId"]]]}]
             for parameter in operation.get("parameters", []):
                 if parameter["name"] == "Idempotency-Key":
-                    parameter.update(required=True, schema={"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,120}$"},
+                    chat = operation["operationId"] == "invokeChatStage"
+                    parameter.update(required=True,
+                                     schema={"type": "string", "pattern": "^[A-Za-z0-9_.:-]{8,96}$" if chat else "^[A-Za-z0-9_.-]{1,120}$"},
                                      description=("The stable id of this review operation: retry any ambiguous request with the same key and body."
-                                                  if operation["operationId"] == "submitRelationReview" else "Must equal body.jobId."))
+                                                  if operation["operationId"] == "submitRelationReview"
+                                                  else "Must equal body.invocationId." if chat else "Must equal body.jobId."))
                 elif parameter["name"] == "X-Request-ID":
                     parameter.update(description="Optional correlation id, echoed on every response and never used as an idempotency key.",
                                      schema={"type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$"})
@@ -467,4 +472,5 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     extraction_doc.document(spec)
     graph_doc.document(spec)
     handoff_doc.document(spec)
+    chat_doc.document(spec)
     return spec

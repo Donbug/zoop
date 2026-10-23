@@ -150,7 +150,11 @@ class ChatLedger:
     """
 
     def __init__(self, state_dir: Path):
-        self.db = sqlite3.connect(state_dir / "chat.sqlite3", isolation_level=None, timeout=5)
+        path = state_dir / "chat.sqlite3"
+        # Private from the first byte: SQLite gives its -wal/-shm files the database file's mode, and the service refuses a ledger
+        # that others can read. An existing file keeps its mode (and is then refused there), a symlink is never followed.
+        os.close(os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600))
+        self.db = sqlite3.connect(path, isolation_level=None, timeout=5)
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("""CREATE TABLE IF NOT EXISTS chat_invocations (
             invocation_id TEXT PRIMARY KEY, stage TEXT NOT NULL, mode TEXT NOT NULL, input_digest TEXT NOT NULL,
