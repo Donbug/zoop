@@ -228,6 +228,8 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
     companyNode?.id ??
     null;
   const focusId = params.get('focus');
+  // D-GRP-01 [흐름 순으로 정렬]. 주소(?arrange=flow)에 남겨 새로 고침·공유에도 유지한다.
+  const flowOrder = params.get('arrange') === 'flow';
   const focusHops: 1 | 2 = params.get('hops') === '2' ? 2 : 1;
   const focusNode = data?.nodes.find((node) => node.id === focusId) ?? null;
   const logoOf = (companyId: string) =>
@@ -742,6 +744,11 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                       (historical ? (detailEventId ?? companyId) : null))
                 }
                 focusHops={focusHops}
+                focusLayout={!pathFrom && Boolean(focusId)}
+                flow={flowOrder}
+                onFlowChange={(next) =>
+                  updateQuery({ arrange: next ? 'flow' : null })
+                }
               />
             ) : (
               <div className="relationship-canvas">

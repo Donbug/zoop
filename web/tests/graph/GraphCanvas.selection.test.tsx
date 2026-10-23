@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -516,7 +517,8 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     act(() => canvas.handlers.get('aftertransform')!({ target: { id: '' } }));
     rerender(<GraphCanvas data={all} memoryOwner="member-a" />);
     await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalledWith(1.8, false));
-    expect(canvas.translateTo).toHaveBeenCalledWith([40, 60], false);
+    // 저장한 화면 위치(40, 60)와 지금 위치(5, 10)의 차이만큼 옮긴다.
+    expect(canvas.translateBy).toHaveBeenCalledWith([35, 50], false);
   });
   it('opens the default layout instead of a saved camera taken at another map size', async () => {
     const all = createMockGraph({ mode: 'all', personalFilter: 'all' });
@@ -534,7 +536,32 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
     expect(canvas.zoomTo).not.toHaveBeenCalled();
     expect(canvas.translateTo).not.toHaveBeenCalled();
+    expect(canvas.translateBy).not.toHaveBeenCalled();
   });
+  it('D-GRP-01 flow order neither reuses nor overwrites the remembered map camera', async () => {
+    const all = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const saved = JSON.stringify({
+      url: '/?mode=all',
+      view: {
+        hidden: [],
+        camera: { zoom: 1.8, position: [40, 60], size: [0, 0] },
+      },
+    });
+    sessionStorage.setItem('zoop.graph.view:member-a:all', saved);
+    const { unmount } = render(
+      <GraphCanvas data={all} memoryOwner="member-a" flow />,
+    );
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    expect(canvas.zoomTo).not.toHaveBeenCalledWith(1.8, false);
+    canvas.getZoom.mockReturnValue(0.4);
+    canvas.getPosition.mockReturnValue([900, 900]);
+    unmount();
+    expect(
+      JSON.parse(sessionStorage.getItem('zoop.graph.view:member-a:all')!).view
+        .camera,
+    ).toEqual({ zoom: 1.8, position: [40, 60], size: [0, 0] });
+  });
+
   it('enables the desktop minimap only above sixty visible nodes', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const { rerender } = render(<GraphCanvas data={data} />);
@@ -736,6 +763,71 @@ describe('D-GRP-02 · canvas selection bridge', () => {
         expect.objectContaining({ 'NASDAQ:NVDA': ['hovered'] }),
       ),
     );
+  });
+
+  it('D-GRP-07b focus mode keeps 1·2-hop nodes and edges at full strength even while the focus company is selected', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(
+      <GraphCanvas
+        data={data}
+        selectedId="NASDAQ:NVDA"
+        focusId="NASDAQ:NVDA"
+        focusHops={2}
+        focusLayout
+      />,
+    );
+    await waitFor(() => expect(canvas.setElementState).toHaveBeenCalled());
+    const states = canvas.setElementState.mock.calls.at(-1)![0] as Record<
+      string,
+      string[]
+    >;
+    expect(states['NASDAQ:NVDA']).toEqual(expect.arrayContaining(['selected']));
+    expect(
+      Object.values(states).some((list) => list.includes('inactive')),
+    ).toBe(false);
+  });
+
+  it('D-GRP-01 outside focus mode a selected company still dims unrelated nodes', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} selectedId="NASDAQ:NVDA" />);
+    await waitFor(() => expect(canvas.setElementState).toHaveBeenCalled());
+    const states = canvas.setElementState.mock.calls.at(-1)![0] as Record<
+      string,
+      string[]
+    >;
+    expect(
+      Object.values(states).some((list) => list.includes('inactive')),
+    ).toBe(true);
+  });
+
+  it('D-GRP-01 shows the flow order toggle in the always-visible zoom controls', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const onFlowChange = vi.fn();
+    const { rerender } = render(
+      <GraphCanvas data={data} onFlowChange={onFlowChange} />,
+    );
+    const zoom = screen.getByLabelText('지도 확대 조절');
+    const toggle = within(zoom).getByRole('button', {
+      name: '흐름 순으로 정렬',
+    });
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    await act(async () => toggle.click());
+    expect(onFlowChange).toHaveBeenCalledWith(true);
+    rerender(
+      <GraphCanvas
+        data={data}
+        onFlowChange={onFlowChange}
+        focusId="NASDAQ:NVDA"
+        focusLayout
+      />,
+    );
+    expect(
+      (
+        within(screen.getByLabelText('지도 확대 조절')).getByRole('button', {
+          name: '흐름 순으로 정렬',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
   });
 
   it('D-GRP-04 selects eligible edges via canvas/keyboard and never recreates the viewport', async () => {
