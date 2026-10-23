@@ -11,6 +11,7 @@ import uvicorn
 
 from . import extraction_access, relation_access
 from .app import create_app
+from .chat_stages import ChatProcess, ChatStages
 from .config import HOST, ConfigError, ServiceConfig, load
 from .dispatch import Dispatcher
 from .jobs import JobService
@@ -49,6 +50,7 @@ class Service:
     extraction_ledger: ExtractionLedger | None = None
     graph: GraphReads | None = None
     handoff: HandoffReads | None = None
+    chat: ChatStages | None = None
 
 
 def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) -> Service:
@@ -101,13 +103,18 @@ def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) 
         starting["graph"] = True
     if config.handoff is not None:
         starting["handoff"] = True
+    # The chat door is synchronous and keeps no ledger of its own: the installed zoop-ai-chat owns the invocation ledger.
+    chat = ChatStages(config, ChatProcess(config, deadlines)) if config.chat is not None else None
+    if config.chat is not None:
+        starting["chat"] = True
+        starting["chatLive"] = config.chat.live_available
     emit(starting)
     return Service(config, lock, ledger, worker, dispatcher, jobs, relation, relation_dispatcher, relation_ledger, extraction, extraction_dispatcher,
-                   extraction_ledger, graph, handoff)
+                   extraction_ledger, graph, handoff, chat)
 
 
 def serve(service: Service) -> None:
-    app = create_app(service.jobs, service.relation, service.extraction, service.graph, service.handoff)
+    app = create_app(service.jobs, service.relation, service.extraction, service.graph, service.handoff, service.chat)
     service.dispatcher.start()
     if service.relation_dispatcher is not None:
         service.relation_dispatcher.start()
