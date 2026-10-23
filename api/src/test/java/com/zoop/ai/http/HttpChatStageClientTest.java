@@ -106,6 +106,28 @@ class HttpChatStageClientTest {
     }
 
     @Test
+    void anOutcomeThatContradictsTheContractIsNeverNormalized() {
+        String unknown = "{\"code\":\"provider_response_unknown\",\"sent\":true,\"unknown\":true}";
+        String notSent = "{\"code\":\"source_grant_denied\",\"sent\":false,\"unknown\":false}";
+        String answer = "{\"requirements\":[]}";
+        for (String body : new String[] {
+                result(INVOCATION, "chat-router", "succeeded", answer, "null", "null"),                       // success without a receipt
+                result(INVOCATION, "chat-router", "succeeded", answer, "null", RECEIPT.replace("\"replay\"", "\"live\"")), // another mode
+                result(INVOCATION, "chat-router", "failed", answer, notSent, "null"),                         // a failure with an answer
+                result(INVOCATION, "chat-router", "failed", "null", unknown, "null"),                         // sent without a receipt
+                result(INVOCATION, "chat-router", "failed", "null", notSent, RECEIPT),                        // a receipt for nothing sent
+                result(INVOCATION, "chat-router", "failed", "null",
+                        "{\"code\":\"x\",\"sent\":false,\"unknown\":true}", "null")}) {                       // unknown but not sent
+            server.respond(Reply.json(200, body));
+            AiTransportException error = assertThrows(AiTransportException.class, () -> client.invoke(call()), body);
+            assertEquals(Failure.RESPONSE_MALFORMED, error.failure());
+            assertTrue(error.requestMaybeProcessed(), "a contradiction is an unknown outcome, never a usable answer");
+        }
+        server.respond(Reply.json(200, result(INVOCATION, "chat-router", "failed", "null", notSent, "null")));
+        assertFalse(client.invoke(call()).failure().sent());
+    }
+
+    @Test
     void serviceErrorsKeepTheirStatusAndCode() {
         server.respond(seen -> Reply.json(502, StubAiServer.error("stage_outcome_unknown", false, seen.requestId(), null, null)));
         AiServiceErrorException unknown = assertThrows(AiServiceErrorException.class, () -> client.invoke(call()));
