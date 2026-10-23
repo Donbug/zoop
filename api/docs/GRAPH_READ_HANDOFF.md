@@ -1,14 +1,14 @@
 # 그래프 읽기 인수 문서 (정세빈 · 앱 상태·공개 조회용)
 
-Spring 백엔드에서 내부 AI 서비스의 그래프 조회 API 두 개를 연결할 때 참고하는 문서입니다. 요청·응답, 오류 처리, 현재 구현 범위와 백엔드 연결 시 확인할 사항을 정리했습니다. 기계 판독 계약은 [`internal-ai-openapi.json`](../../docs/api/internal-ai-openapi.json)의 `graph-versions` 태그이며, 서버 설정은 [AI 서비스 README](../../ai/service/README.md#그래프-버전-읽기-internalv1graph-versions)를 참고하세요.
+Spring 백엔드에서 내부 AI 서비스의 그래프 버전 읽기(`graph.read`), handoff bundle 읽기(`handoff.read`), 공개 영향 ID 조회(`handoff.exposure`)를 연결할 때 참고하는 문서입니다. 요청·응답, 오류 처리, 현재 구현 범위와 앱 소유 경계를 정리했습니다. 기계 판독 계약은 [`internal-ai-openapi.json`](../../docs/api/internal-ai-openapi.json)을, 서버 설정·실행 명령은 [AI 서비스 README](../../ai/service/README.md)를, 생산자 CLI 계약은 [pipeline README](../../ai/pipeline/README.md)를 따릅니다.
 
 ## 지금 상태 (사실)
 
 
-> **구현과 공개 운영을 구분합니다.** 비활성 스냅샷 수입은 PR #229로 병합됐습니다. 본 문서의 추가 구현은 bundle `-4`(원본 언급·선택 provenance·운영자 필드 verdict) 인계와 현재 권한을 검사하는 graph 근거 읽기입니다. 근거 읽기의 계약·운영 조건은 [문서 끝의 해당 절](#2026-10-20-getevidence의-graph-본문-근거-경로-로컬-작업-트리-미게시)을 따르며, 공개 활성화·전체 철회·AWS 배포 완료를 뜻하지 않습니다.
-- **이 AI 서비스는 비공개·미게시·미활성입니다.** 내부 서비스(`127.0.0.1`, 앞단 TLS 프록시는 미배포)의 읽기 전용 API이며 활성 버전 포인터도 없습니다. 응답의 `publication`은 항상 `not-published`입니다. `delivery.state=current`는 “이번 요청에서 검증됨”이지 “앱이 보여 주는 활성 버전”이 아닙니다. 게시·활성화(FS059)·전체 철회(FS081)는 이 서비스에 포함되지 않았습니다.
-- **Spring 구현 기준.** 공개 `GET /api/v1/graph`, 기업·관계·시점 조회, `graph_versions`·`graph_activations`, 버전 선택기와 `PublicGraphReader`가 있습니다. 스냅샷 source는 기본 `none`, local/dev용 `fixture`, 수입된 불변 파일을 검증해 읽는 `artifact`로 구분합니다. Spring은 Neo4j에 직접 접속하지 않고 Neo4j 자격을 받지 않습니다. 공개 활성화·관리 route와 전체 공개 제외 저장소는 별도 후속 범위입니다.
-- **운영자 스테이징 수입.** `com.zoop.graph.importer`는 설치된 handoff·ingestion CLI의 현재 결과와 앱 DB·본문을 대조해 근거 및 비활성 버전을 등록하며, 활성 포인터를 변경하지 않습니다. 스냅샷 형식 3은 읽기용 투영이고 원본 manifest·bundle 전체는 영수증에 보존됩니다. 앱 mention ID는 문서·버전·원천 ID로 결정해 문서 간 같은 로컬 ID를 구분합니다. 현재 bundle은 `-5`입니다: 원래 언급 값은 `verification: none`이고, 운영자의 `eventTime`·`period` verdict(`fieldVerdicts`)는 앱 verifier가 독립 재계산해 보류·거절된 머리 값을 snapshot에서 `null`로 만들며(영수증에는 원본과 verdict가 그대로 남음), `quote_verified`도 인용 무결성이지 의미 검증·공개 승인 자체가 아닙니다([2026-10-21 `-4` 절](#2026-10-21-bundle--4의-운영자-필드-verdict--eventtimeperiod의-보류거절-로컬-작업-트리-미게시)). `-5`는 구조 관계의 순서 있는 회사 경로(`structuralPath`)·비공개 경로 회사(`pathCompanies`)·basis 범위 텍스트를 더하되 이것들은 영수증에만 남고 snapshot·공개 읽기에는 없습니다(아래 2026-10-21 `-5` 절). [API 실행 안내](../README.md#그래프-handoff-스테이징-import)의 명령과 설정을 사용하세요.
+> **구현과 공개 운영을 구분합니다.** 현재 생산자 계약은 bundle `zoop-graph-handoff-bundle-7`, 운영자 판정 파일 `zoop-public-decisions-3`이며, 앱 공개 스냅샷은 형식 3입니다. 비활성 스테이징 수입, 일반 graph 근거·structural basis-only·impact-only 근거 읽기, 읽기 전용 exposure CLI·내부 HTTP가 구현되어 있습니다. 요약·영향 행은 비공개 import receipt에 보존되며, 요약의 공개 `getEvent` 소비는 백엔드 소유의 후속 범위입니다. 이 구현은 전체 철회나 AWS 배포 완료를 뜻하지 않습니다. 아래 날짜별 절은 각 변경 당시의 계약·검증 이력이며 현재 생산자 버전을 대신하지 않습니다.
+- **AI 읽기와 앱 공개 상태는 별개입니다.** 내부 서비스(`127.0.0.1`, 앞단 TLS 프록시는 미배포)에는 활성 버전 포인터가 없습니다. graph 버전 응답의 `publication`은 항상 `not-published`입니다. `delivery.state=current`는 “이번 요청에서 검증됨”이지 “앱이 보여 주는 활성 버전”이 아닙니다. exposure는 별도 `handoff.exposure` scope를 요구하고 기본 비활성화이며, 원문 없이 영향 ID만 반환합니다. 앱의 현재 제외 목록·revision·공개 활성화를 변경하지 않습니다([HTTP 소비 계약](#내부-http-소비-계약)).
+- **Spring 구현 기준.** 공개 `GET /api/v1/graph`, 기업·관계·시점 조회, `graph_versions`·`graph_activations`, 버전 선택기와 `PublicGraphReader`가 있습니다. `AdminGraphVersionController`·서비스와 활성화 사전 검사가 구현되어 있지만, 공개 제외 저장소는 아직 없습니다. 기본 활성화 게이트는 안전 조건이 충족되지 않으면 차단하며, 명시적인 로컬·운영자 플래그는 운영 준비 완료를 뜻하지 않습니다. 스냅샷 source는 기본 `none`, local/dev용 `fixture`, 수입된 불변 파일을 검증해 읽는 `artifact`로 구분합니다. Spring은 Neo4j에 직접 접속하지 않고 Neo4j 자격을 받지 않습니다.
+- **운영자 스테이징 수입.** `com.zoop.graph.importer`는 설치된 handoff·ingestion CLI의 현재 결과와 앱 DB·본문을 대조해 근거 및 비활성 버전을 등록하며, 활성 포인터를 변경하지 않습니다. 스냅샷 형식 3은 읽기용 투영이고 원본 manifest·bundle 전체는 영수증에 보존됩니다. 앱 mention ID는 문서·버전·원천 ID로 결정해 문서 간 같은 로컬 ID를 구분합니다. 원래 언급 값은 `verification: none`이고, 운영자의 `eventTime`·`period` verdict(`fieldVerdicts`)는 앱 verifier가 독립 재계산해 보류·거절된 머리 값을 snapshot에서 `null`로 만듭니다(영수증에는 원본과 verdict가 그대로 남음). `quote_verified`도 인용 무결성이지 의미 검증·공개 승인 자체가 아닙니다([필드 verdict 계약](#2026-10-21-bundle--4의-운영자-필드-verdict--eventtimeperiod의-보류거절)). `structuralPath`·`pathCompanies`·basis 범위 텍스트·`impacts[]`·`issues[].summary`는 snapshot의 공개 필드가 아닙니다. 근거 읽기는 [graph 본문 근거 계약](#2026-10-20-getevidence의-graph-본문-근거-경로)과 아래 `-5`·`-6` 절을, 수입 명령과 설정은 [API 실행 안내](../README.md#그래프-handoff-스테이징-import)를 따릅니다.
 - 운영자가 AI 버전을 만들고 서버 allowlist에 올립니다. 이 AI 읽기 서비스는 버전을 **만들거나 찾거나 나열하지 못합니다**(목록 라우트 없음). 앱의 operator 스테이징 명령은 전달받은 handoff를 별도의 비활성 앱 버전으로 등록합니다.
 - 실제 로컬 HTTP 서버 → 설치된 graph CLI → 격리된 Neo4j 5.26 경로의 smoke를 통과했습니다(2026-10-15 로컬 실행 기록이며 현재 `main`의 재검증이 아닙니다). 1~3홉·권한 분리·digest 불일치·원천 권한 철회·canonical 변경·그래프 변조·원장 잠금·시간 초과를 확인했습니다. 원천 원장 변경과 모델 호출은 없었습니다. 이 서비스 구현은 이후 PR #213에서 `main`에 병합됐지만, 배포·실제 데이터 운영은 하지 않았습니다.
 
@@ -193,17 +193,17 @@ run init        # 멱등 재확인(원장·Neo4j 불변)
 
 위의 비공개 S3 그래프 읽기와 **별개**입니다. 앱이 공개 그래프(`company`/`issue` 노드, `INVOLVES`·`STRUCTURALLY_RELATED_TO`·`FOLLOWS`)를 만들 때 소비하는 **AI 측 산출물**입니다. 설계·근거 규칙 전문은 [AI 설계 문서의 해당 절](../../docs/design/ai-system.md#s2s3--공개-그래프-handoff-bundle-ai-측-생산물-앱-importㆍ활성화는-백엔드-소유)입니다.
 
-| | 현재(AI 구현. PR #213으로 `main` 병합 완료. 아래 시험·smoke 수치는 당시 이력이며 현재 HEAD 재검증이 아님) | 계획/미결정(백엔드·계약 소유) |
+| | 현재 AI 구현 | 앱 구현과 남은 소유 범위 |
 |---|---|---|
-| 생산 | 설치 명령 `zoop-ai-handoff {freeze,inspect,recover,export}`가 둘 이상의 S3 job을 고정해 불변 bundle 생성 | bundle을 앱 `graph_versions`의 실제 스냅샷 행으로 **비활성 등록**하는 operator 비웹 스테이징 import는 로컬 작업 트리에 구현(미게시·최종 검증 대기, [api README](../README.md#그래프-handoff-스테이징-import)). **활성화**는 미결정·미구현(공개 `GET /api/v1/graph`와 fixture 기반 `graph_versions`는 main에 이미 있음) |
+| 생산 | 설치 명령 `zoop-ai-handoff {freeze,inspect,recover,export}`가 둘 이상의 S3 job을 고정해 불변 bundle 생성 | operator 비웹 스테이징 import가 앱 `graph_versions`에 **비활성 등록**합니다([api README](../README.md#그래프-handoff-스테이징-import)). 앱 활성화 관리 API·사전 검사는 별도 구현이며 수입이 활성화를 수행하지 않습니다. |
 | 상태 | `publication=not-published`, `readiness={app:"import-pending", evidenceRegistration:"not-registered", publicActivation:"none", graphDb:"none"}` | `GraphDbStatus`/`Neo4jStatus`/`GraphDbVersionState` 대응 생산자 없음(**만들어 채우지 마세요**) |
-| 근거 | 앱 호환 evidence id를 **제안**하고 좌표·`quoteSha256`·locator를 제공 | 앱 텍스트 기준 인용 해시 검증과 `evidence` 행 등록은 위 로컬 스테이징 import가 수행(인용 무결성만, 의미 검증 아님; 미게시). `getEvidence`의 graph evidence 경로와 공개 제외 오버레이는 없음(현재는 graph 근거를 미등록 취급) |
+| 근거 | 앱 호환 evidence id를 **제안**하고 좌표·`quoteSha256`·locator를 제공 | 스테이징 import가 앱 텍스트 기준 인용 해시 검증과 `evidence` 행 등록을 수행합니다(인용 무결성만, 의미 검증 아님). `getEvidence`의 graph·basis-only·impact-only 읽기는 구현되어 있으며, 앱 공개 제외 저장소는 아직 없습니다. |
 | 시각 | `publishedAt`/`observedAt`/`eventTime`/`verifiedAt`을 따로 보존 | `asOf` 정책(버전 선택 vs 고정 버전 안 disclosure 필터) |
 
 ## 소유 경계
 
 - **AI(pipeline):** 원천(S2/S3) 읽기·권한 재검증·projection·bundle·`recover`. 앱 DB, 공개 route, Neo4j 상태를 쓰지 않습니다.
-- **백엔드(정세빈):** bundle 소비, 앱 article/company 대조, evidence 등록, 그래프 버전 행·활성화, 공개 읽기·상태. 앱에 **가변 후보 사본을 두지 않습니다**(ERD 원천 소유: 후보는 원천에서 읽음). bundle은 import 입력일 뿐 앱의 활성 버전이 아닙니다. 이 중 대조·evidence 등록·**비활성** 버전 행 등록은 로컬 작업 트리(미게시)의 operator 스테이징 import가 담당하고, 활성화·공개 route·`getEvidence` graph 경로·상태 모델은 아직 백엔드 몫으로 남아 있습니다.
+- **백엔드(정세빈):** bundle 소비, 앱 article/company 대조, evidence 등록, 그래프 버전 행·활성화, 공개 읽기·상태. 앱에 **가변 후보 사본을 두지 않습니다**(ERD 원천 소유: 후보는 원천에서 읽음). bundle은 import 입력일 뿐 앱의 활성 버전이 아닙니다. 대조·evidence 등록·**비활성** 버전 행 등록은 operator 스테이징 import가 담당합니다. 공개 graph·근거 읽기와 활성화 관리 API·사전 검사는 앱 구현이며, 공개 요약 소비·제외 저장소·상태 모델은 별도의 백엔드 소유 범위입니다.
 - **운영자(서버 소유):** canonical registry, 공개 결정 파일, 앱 문서 바인딩 파일. 호출자(HTTP/UI)가 고를 수 없습니다.
 
 ## 하위 프로세스 계약
@@ -219,26 +219,27 @@ zoop-ai-handoff inspect --state-dir DIR < {"schemaVersion":"zoop-ai-handoff-1","
 - 재시도 가능: `handoff_busy`, `relation_busy`, `extraction_busy`, `ingestion_busy`(writer가 잡음), `handoff_recovery_required`(강제 종료된 writer 뒤 — 운영자가 `recover`/writer 명령으로 정리). 운영 조치: `handoff_artifact_missing|invalid`(저장 bundle 이상 → 새 handoffId), `operator_file_changed`, `*_invalid`. withheld 코드 예: `canonical_mapping_changed`, `decisions_changed`, `bindings_changed`, `review_revision_changed`, `upstream_changed`, `source_unauthorized`, `grant_revision_changed`, `handoff_content_changed`, `source_pin_missing`. 모르는 코드는 "withheld(원인 불명)"로 처리하세요.
 - 무결성 검증: `receipt.bundleDigest`는 `canonical(bundle)`(Python `json.dumps(sort_keys=True, separators=(",",":"), ensure_ascii=False)`, 앱 `Canonical.write`와 같은 형식)의 UTF-8 바이트 sha256입니다. 받은 bundle을 다시 canonical화해 같은지 확인할 수 있습니다.
 
-## bundle `zoop-graph-handoff-bundle-5` (닫힌 스키마, 모르는 키 거부)
+## bundle `zoop-graph-handoff-bundle-7` (닫힌 스키마, 모르는 키 거부 — 최상위 `impacts[]`는 이 문서의 "bundle `-6`" 절, 이슈 `summary`는 맨 끝 "bundle `-7`" 절)
 
 | 키 | 내용 |
 |---|---|
 | `handoffId`, `manifestDigest`, `provenance` | ID, manifest sha256, `{declaredSourceKind, observedSourceKind, executionMode, recordingKind}` (선언≠관측이면 생산 거부) |
-| `policy` | 정책 버전 `zoop-public-projection-policy-1`, 운영자 파일 3개의 sha256, evidence id 종류 `graph-body-span`, 좌표 단위 `unicode_code_point` |
+| `policy` | 정책 버전 `zoop-public-projection-policy-1`, 운영자 파일 3개의 sha256, evidence id 종류 `graph-body-span`, 좌표 단위 `unicode_code_point`, `issueSummary: "zoop-issue-summary-policy-1"`(`-7`) |
 | `sources[]` | S3 job·S2 upstream(grant revision 포함 digest)·review digest·닫힌 정책 버전과 감사 개수·**사용한 relation의 review revision** |
 | `companies[]` | `{id=companies.id, canonicalId, label, decisionRef}` — import 시 앱 카탈로그에 존재하고 label이 같아야 함 |
 | `pathCompanies[]` | `companies[]`와 같은 닫힌 `{id, canonicalId, label, decisionRef}`, id 오름차순 유일(최대 20000): 완전한 2홉 경로의 **매핑된 중간 회사 중 공개 `companies[]`에 없는 것**의 정확한 폐포입니다. **비공개 지원 참조**이며 공개 그래프 노드·이슈·mention 참여자가 되지 않고 `companies[]`·이슈 id와 서로소입니다. import 때 카탈로그 존재·label 일치를 `companies[]`와 합쳐 확인합니다. |
 | `issues[]` | `{id, canonicalId, title, action, target, eventTime, timePrecision(year|month|day|datetime|unknown), period, assertionStatus, geography{value domestic|international, decisionRef, decisionVersion, policyVersion, countries, verification:"operator-field-verdict", evidenceIds, basis[]}, evidenceIds, sourceEvents[], mentions[], decisionRef, representative, fieldProvenance, fieldVerdicts}`. `sourceEvents[]`는 각각 `{upstream,kind,ref,mentionId,documentId,documentVersion,observation}`이며 `observation`은 정확한 `{roundId,sourceId,page,ordinal,documentId,rawVersion,documentVersion}`입니다. geography의 `basis[]`에도 동일한 원천 식별자와 국가 집합을 기록합니다. 대표 mention을 선택할 때도 이 전체 식별자를 지정해야 합니다. 이슈의 `evidenceIds`는 모든 `mentions[].evidenceIds`와 `geography.evidenceIds`와 `fieldVerdicts[].evidenceIds`의 합집합과 정확히 같습니다. 운영자 verdict가 `eventTime`·`period`를 보류·거절한 선택 기준(대표 mention, 대표가 없으면 모든 mention)에서는 이슈의 그 머리 필드가 `null`이고(`eventTime`이면 `timePrecision`은 `unknown`) 원본 mention 값은 그대로입니다. |
 | `issues[].fieldProvenance` | 닫힌 객체 `{selection:"unanimous"|"operator-representative", verification:"none", withheld:["eventTime"?,"period"?], sameValueMentions:{title, action, target, eventTime, period, assertionStatus}}`이며 각 값은 비어 있지 않은 `{documentId, documentVersion, mentionId}` 배열입니다: **선택된 원본 값**(대표가 있으면 대표 mention의 값, 없으면 모든 mention이 공유하는 값)과 **JSON으로 정확히 같은** 값을 가진 원본 mention을 mention 순서대로 모두 담습니다. 가려져 `null`이 된 값이 아니라 원본 선택 값으로 비교합니다. `selection`은 `representative`가 있을 때만 `operator-representative`(대표가 모든 목록에 있음)이고 아니면 `unanimous`(모든 목록이 모든 mention). `withheld`는 verdict에서 다시 계산되는 `eventTime`·`period`의 부분 집합(필드 순서, 중복 없음)입니다. 선택의 기록이며 검증·근거 지지·승인·`fieldDecisions`가 아닙니다(아래 2026-10-20 `-3`·2026-10-21 `-4` 절). |
 | `issues[].fieldVerdicts[]` | 닫힌 배열(최대 2000개), 항목은 `{documentId, documentVersion, mentionId, field:"eventTime"|"period", value, decision:"ALLOW"|"HOLD"|"REJECT", reasonCode:"stated"|"unstated"|"ambiguous"|"contradicted", evidenceIds[], verification:"operator-field-verdict", reviewer, decisionRef, decisionVersion}`입니다. **운영자 검토**이며 AI·S2·S3 출력이 아닙니다. `value`는 그 원본 mention이 그 필드에 가진 현재 문자열(null 불가)과 정확히 같아야 하고, 허용 조합은 ALLOW/`stated`(근거 ≥1), HOLD/`unstated`(근거 0), HOLD/`ambiguous`(근거 ≥1), REJECT/`contradicted`(근거 ≥1)뿐입니다. `evidenceIds`는 그 mention 자신의 기사 근거만이며 오름차순 유일(최대 20), 자유 서술 필드는 없습니다. (mention, field)당 하나이고 mention 식별자 정규 JSON 순서 다음 필드 순서(`eventTime`, `period`)로 정렬합니다. verdict가 없으면 현재 값이 그대로이며 "검증됨"이 아닙니다. |
+| `issues[].summary` | 닫힌 객체(`-7`부터, 이슈마다 필수). 이슈 `fieldVerdicts`에 HOLD/REJECT가 하나라도 있으면 정확히 `{"status":"unavailable","code":"temporal-review-pending","source":null}`이고(요약 문장이 bundle 어디에도 없음), 입력 인용이 60개를 넘으면 `input-too-large`, 운영자 decisions가 결과를 고정했으면 그 불변 작업 결과(`available` 또는 `producer-invalid`·`verifier-hold`·`verifier-reject`, `source{jobId,inputDigest,resultDigest,basisDigest}`), 아니면 `not-requested`입니다. 자세한 wire·검증 규칙·앱 사용 주의는 맨 끝 "bundle `-7`" 절. **receipt 전용**이며 snapshot에는 없습니다. |
 | `issues[].mentions[]` | 닫힌 배열(최대 1000개). 각 항목은 S2 원본 mention 하나이며 `{documentId, documentVersion, mentionId, articleId, articleVersion, verification:"none", title, action, target, eventTime, timePrecision, period, assertionStatus(occurred|announced|planned|forecast|cancelled|unknown), background(JSON bool), participants[{sourceCompanyId, companyId, name, role}], evidenceIds[]}`입니다. `(documentId, documentVersion, mentionId)`가 식별자이며 S2 local `mentionId`는 한 문서 버전 안에서만 유일합니다(다른 문서가 같은 값을 써도 별개 mention). 이 식별자 집합은 이슈 `sourceEvents[]`의 식별자 집합과 정확히 같고 정규 JSON 오름차순 유일입니다. 각 mention은 같은 문서 버전을 가진 **정확히 하나의** bundle article(`articleId`/`articleVersion`)에 닫히고, `evidenceIds`는 그 기사의 근거만 담습니다(최소 1개, 오름차순). `verification`은 항상 `none`입니다: 값은 S2 후보/snapshot의 **원본**이며 병합된 이슈 필드에서 만들어지지 않고 검증·결정·승인된 값이 아닙니다. `title`·`action`은 S2 문자열 그대로, `target`·`eventTime`·`period`는 S2 값 그대로(null 가능, 문자열은 다시 쓰지 않음)이며 `timePrecision`은 `eventTime`의 형식에서 넓히지 않고 정해집니다. `eventTime` 문법(생산자 `mention_time_precision`과 앱 `HandoffTime.mentionEventTime`이 손으로 같게 구현, 공유 vector `src/test/resources/graph-handoff/mention-time-vectors.json`): ASCII `YYYY`·`YYYY-MM`·`YYYY-MM-DD`·`YYYY-MM-DDTHH:MM[:SS[.f{1,9}]](Z|±HH:MM)`(대문자 `T`·`Z`, offset 필수). 양쪽이 이미 받던 집합이며, 한쪽(Python stdlib)만 받고 앱이 bundle 전체를 거절하던 형식(ISO 주 날짜 `2026-W40-3`, 서수·압축 형식, 쉼표 소수, 콜론 없는/초 있는 offset)과 라이브러리 범위(offset 시간 18 초과, 달력 날짜의 0000년)만 지원하지 않습니다. 지원하지 않는 형식은 생산자가 freeze 전에 이슈를 `mention_event_time_unsupported`로 제외하고 앱은 `temporal_unsupported`로 거절합니다. `participants[]`는 S2 순서이고 `sourceCompanyId`·`name`·`role`은 S2 텍스트 그대로입니다(`role`은 확인된 역할이 아니며 `INVOLVES`도 아님). `companyId`는 모든 운반 upstream이 같은 공개 회사로 매핑하고 그 회사가 이 bundle `companies[]`에 있을 때만 값이 있고, 아니면 null입니다(null이 아니면 `sourceCompanyId`도 null이 아니어야 함). 같은 식별자를 운반하는 upstream끼리 값이 다르면 생산자는 그 이슈를 `mention_values_conflict`로 제외합니다. |
 | `relations[]` | `{id, type INVOLVES|STRUCTURALLY_RELATED_TO|FOLLOWS, source, target, role, assertionStatus, evidenceIds, basis[], structuralPath, provenance{…}, decisionRef, sourceRefs[]}` — INVOLVES/STRUCTURAL은 issue→company, FOLLOWS는 뒤 이슈→앞 이슈. 구조 `basis[]`의 각 항목은 `{sourceRelation{jobId,relationCandidateId},relationKey,relationType,businessScope,productScope,validFrom,validUntil,countries,verifiedAt,sourceArticles[],evidenceIds[]}`이며 직접 관계 인용과 별도 유효기간 인용을 모두 포함하고 두 scope는 S3 텍스트 그대로의 문자열 또는 `null`(최대 500 코드 포인트, 엔티티 ID가 아님)입니다. `structuralPath`는 `STRUCTURALLY_RELATED_TO`에서만 객체이고 INVOLVES·FOLLOWS에서는 `null`입니다(아래 bundle `-5` 절). `SHARES_ISSUE`는 **없음**(소비자가 권한·시간 필터 뒤 파생). |
 | `evidence[]` | `{id, kind:"graph-body-span", articleId, articleVersion, start, end, offsetUnit, quoteSha256, rawLocatorIds[], source{documentId, documentVersion, rawVersion, textArtifactId, sourceEvidenceId(S2 ev-…32hex), inputKind:"body"}}` — 인용문·본문 없음 |
 | `articles[]` | `{articleId, articleVersion, documentId, documentVersion, rawVersion, title, url, publishedAt, publicationPrecision(datetime|day|unknown; `day`는 수집 시 날짜만 선언된 문서이며 `publishedAt`이 `YYYY-MM-DD` 날짜이고 자정으로 바꾸지 않는다. 오프셋 없는 선언 시각은 `unknown`), observations[{roundId, sourceId, page, ordinal, observedAt, grant}]}` — 같은 문서 버전의 **모든 서로 다른 관측**을 보존합니다. 관측별 제목·URL·발행 시각이 다르면 freeze를 거부합니다. |
 | `exclusions` | `{counts{code:n}, items[{kind, id, jobId, code[, detail]}]}` — id·코드만(내용 없음), current export에서만 노출 |
-| `counts`, `checks`, `readiness`, `digests.content` | 개수(`pathCompanies` 포함), `producerConfirmed`/`appImportPending`, 위 상태, 내용 digest(`companies`·`pathCompanies`·`issues`·`relations`·`evidence`·`articles`) |
+| `counts`, `checks`, `readiness`, `digests.content` | 개수(`pathCompanies`·`impacts` 포함), `producerConfirmed`/`appImportPending`, 위 상태, 내용 digest(`companies`·`pathCompanies`·`issues`·`relations`·`evidence`·`articles`·`impacts`) |
 
-> 2026-10-21 갱신: 위 표와 아래 "관계 출처" 문단의 `provenance`·`sources[]`·`articles[]`·`issues[]`·관계 `provenance`에는 이 문서 맨 끝 "2026-10-21: bundle `-4` 확장" 절의 키·의미가 더해집니다(같은 스키마 문자열, 로컬 미게시). 특히 `INVOLVES`가 항상 verifier 지지인 것은 아니며(운영자 최종 승인 가능) 표와 다르면 그 절이 우선합니다.
+> 2026-10-21 변경 이력: 위 표와 아래 "관계 출처" 문단의 `provenance`·`sources[]`·`articles[]`·`issues[]`·관계 `provenance`에는 아래 "2026-10-21: bundle `-4` 확장" 절의 키·의미가 더해졌습니다(당시 미게시였던 `-4`를 같은 스키마 문자열로 확장한 이력이며, 현재 생산자 계약은 `-7`입니다). 특히 `INVOLVES`가 항상 verifier 지지인 것은 아니며(운영자 최종 승인 가능) 표와 다르면 그 절이 우선합니다.
 
 **관계 출처 표시를 소비자는 보존해야 합니다.** `STRUCTURALLY_RELATED_TO.provenance`는 `origin:"manual-operator-review"`, `s3SemanticValidation:"none"`, `status:"operator-asserted"`, `reviewer`, `decisionVersion`, `bindingDigest`입니다 — S3가 자동으로 의미를 검증한 것이 **아닙니다**(공개 표기·수용 여부는 미결정). `FOLLOWS`는 S2 replay 비교+운영자 결정(`s3SemanticValidation:"none"`), `INVOLVES`만 S3 독립 verifier가 모든 claim을 지지한 관계입니다. geography도 AI 자동 검증이 아니라 운영자 field verdict이며 모든 source mention의 국가 필드와 같을 때만 나옵니다.
 
@@ -248,11 +249,11 @@ zoop-ai-handoff inspect --state-dir DIR < {"schemaVersion":"zoop-ai-handoff-1","
 
 ## 앱 import가 해야 할 것 (AI가 확인하지 않은 것 = `appImportPending`)
 
-**현재 상태(로컬 작업 트리, 미게시·최종 검증 대기).** 아래 1·2·4와 3의 `evidence` 행 삽입은 operator 스테이징 import가 수행하며(대조 항목은 article version의 제목·URL·게시 시각 정밀도, 앱 텍스트와 export 텍스트의 byte 일치·인용 코드 포인트 해시, 회사 ID·이름; 정확한 규칙은 [api README](../README.md#그래프-handoff-스테이징-import)) 결과는 **비활성** 버전입니다. 5(활성화·`asOf` 정책·상태 모델)와 3의 `getEvidence` graph 경로는 구현되지 않았습니다. AI가 확인하지 않은 항목이라는 아래 구분은 AI 산출물 기준이며 그대로입니다.
+**현재 상태.** 아래 1·2·4와 3의 `evidence` 행 삽입은 operator 스테이징 import가 수행하며(대조 항목은 article version의 제목·URL·게시 시각 정밀도, 앱 텍스트와 export 텍스트의 byte 일치·인용 코드 포인트 해시, 회사 ID·이름; 정확한 규칙은 [api README](../README.md#그래프-handoff-스테이징-import)) 결과는 **비활성** 버전입니다. `getEvidence` graph 경로와 앱의 활성화 관리 API·사전 검사는 별도 구현되어 있습니다. AI가 확인하지 않은 항목이라는 아래 구분은 AI 산출물 기준이며, 앱의 공개 제외 저장소와 상태 모델이 완료되었다는 뜻은 아닙니다.
 
 1. `articles[]`의 `(articleId, articleVersion)`이 앱 `articles`/`article_versions`에 있고 `title`·`url`·`publishedAt`(+정밀도)이 **그 버전의** 값과 같은지(현재 최신 버전이 아님). 문서 import 매핑: `articles.id=documentId`, `article_versions.version=documentVersion`([문서 import](DOCUMENT_IMPORT.md)).
 2. 각 evidence의 `[start,end)`를 **앱이 저장한 본문**에서 코드 포인트로 잘라 sha256이 `quoteSha256`과 같은지, 바인딩의 `textSha256`(앱 `artifacts.sha256`과 같아야 함)이 앱 저장 텍스트와 같은지. AI는 **원천** 텍스트만 검증했고 앱 텍스트는 보지 않았습니다.
-3. `evidence` 행 등록(불변, `input_kind=body`, `quote_verified`, `raw_locator_ids`)은 이 id로 **import가 직접 삽입하거나 동일성 검증**해야 합니다. 이 id는 "준비됨"이며 등록·공개된 것이 아닙니다. 현재 `getEvidence`는 `ev-`+64hex라도 S1 summary 인용만 제공하므로 graph evidence를 제공하려면 pinned 경로(버전 소속·권한 overlay·인용 표시 grant)가 별도로 필요합니다(**남은 작업**).
+3. `evidence` 행 등록(불변, `input_kind=body`, `quote_verified`, `raw_locator_ids`)은 이 id로 **import가 직접 삽입하거나 동일성 검증**해야 합니다. AI가 제안한 id 자체는 등록·공개 완료를 뜻하지 않습니다. 구현된 `getEvidence` graph 경로는 버전 소속·현재 권한·인용 표시 grant를 검사합니다([graph 본문 근거 계약](#2026-10-20-getevidence의-graph-본문-근거-경로)).
 4. `companies[]` id·label을 앱 카탈로그와 대조, issue id가 `companies.id`와 겹치지 않는지 확인.
 5. 그래프 버전 행·활성화·`asOf` 정책·상태 모델. 이 bundle의 `readiness`를 `reflected`/`active`로 바꾸지 마세요.
 
@@ -326,7 +327,7 @@ Java 스테이징 import에 쓰는 법(기존 계약 그대로, 변경 없음): 
 
 ## 아직 결정되지 않은 공개 계약 (AI가 정하지 않음)
 
-`STRUCTURALLY_RELATED_TO`의 수동 단언 수용과 이슈별 적용성 verifier, geography verdict의 성격, `asOf` 의미, company–company 구조 간선의 공개 유형, graph evidence의 `getEvidence` 경로와 인용 표시 grant, 활성화 전제와 `graphDb` 상태 모델, `FOLLOWS`의 independent verifier 필요 여부.
+`STRUCTURALLY_RELATED_TO`의 수동 단언 수용과 이슈별 적용성 verifier, geography verdict의 성격, company–company 구조 간선의 공개 유형, `graphDb` 상태 모델, `FOLLOWS`의 independent verifier 필요 여부는 AI가 공개 계약으로 정하지 않습니다. `asOf`·graph evidence의 `getEvidence` 경로·인용 표시 grant는 아래 구현 계약을 따르며, 앱 활성화 사전 검사와 공개 제외 저장소의 운영 준비 여부는 별도로 판단해야 합니다.
 
 **유효기간 끝 경계(2026-10-20 확정: 끝 포함).** 생산자의 사건 적용성 판정은 `validFrom <= eventTime의 날짜 <= validUntil`입니다. `validFrom`은 첫 유효일, `validUntil`은 마지막 유효일이며 그날도 유효합니다(공개 FS042와 백엔드 `RelationValidity`의 방향과 같음). `eventTime`은 쓰인 달력 날짜로 비교하며 소스 정책 없이 시간대를 옮기지 않고, 공개 조회의 상태는 asOf(없으면 요청 시각)의 Asia/Seoul 날짜와 비교하므로 두 기준은 서로를 대체하지 않습니다. 날짜는 원래 `YYYY-MM-DD`를 보존하고 자정이나 다음 날을 추정하지 않으며, 원천의 “D일까지”는 그대로 `validUntil = D`이고 null은 종료 시점 미상이지 영구 유효의 보장이 아닙니다. 공개 조회에서 구조 근거는 검증 시각(`verifiedAt`)이 asOf 이하이면 보이며, 유효기간은 표시 여부를 정하지 않고 끝난 근거도 `ended` 상태로 남습니다. 2026-10-17 로컬 수정이 잠시 끝 제외로 바꿨던 규칙은 이 변경으로 되돌렸습니다.
 
@@ -338,7 +339,7 @@ Java 스테이징 import에 쓰는 법(기존 계약 그대로, 변경 없음): 
 
 2026-10-16 AI 측이 위의 하위 프로세스 계약을 **읽기 전용 내부 HTTP**로 감싸 두었고 PR #213으로 `main`에 병합됐습니다(배포 없음; 앞단 TLS 프록시는 미배포). 이는 백엔드 [PR #189](https://github.com/Donbug/zoop/pull/189)(`docs/api/graph-read-contract-proposal.md`)가 "AI 측 인계 묶음"으로 합의한 단위를 **AI가 소유한 읽기 경로로 제공**한 것입니다. **백엔드의 Java 수입기·앱 스냅샷 등록·활성화·관리 API를 대신하지 않으며**, 위 "앱 import가 해야 할 것"은 그대로 백엔드 몫입니다. 이 HTTP는 Neo4j 자격이 필요 없고 `graph.read`는 선택·기본 꺼짐입니다. 기존 비공개 그래프 읽기(`graph-versions`, scope `graph.read`)와는 **별개 가족**입니다(변수·scope·allowlist 공유 없음).
 
-**업데이트(로컬 작업 트리, 미게시).** 위 문단은 그대로 유효합니다. 백엔드의 비활성 스테이징 import(`com.zoop.graph.importer`)는 이 HTTP 읽기를 호출하지 않고 설치된 CLI를 직접 실행하며, 이 HTTP는 변경되지 않았습니다. 활성화·관리 API는 여전히 없습니다.
+**앱 연결 방식.** 백엔드의 비활성 스테이징 import(`com.zoop.graph.importer`)는 이 HTTP 읽기를 호출하지 않고 설치된 CLI를 직접 실행합니다. 앱의 활성화 관리 API·사전 검사는 이 AI 읽기 경로와 별개이며, 수입이나 HTTP 조회가 활성 포인터를 변경하지 않습니다.
 
 | 요청 | scope | 의미 |
 |---|---|---|
@@ -422,7 +423,7 @@ ai/service/.venv/bin/python ai/service/scripts/export_openapi.py [--check]   # d
 - 검토에서 발견한 앱 문서 상태 변경 경합, 미검증 근거 재사용, 응답 유실 후 재시도 시 가변 기업 표시값에 따른 파일 충돌은 회귀 3개가 실패하는 것을 확인한 뒤 수정했습니다. PostgreSQL 시험은 문서 행 잠금과 동시 철회 직렬화도 확인했습니다.
 - 공급자·모델 호출 0건. 임시 DB 컨테이너는 제거했습니다. 실제 뉴스·운영 권한·AWS·공개 활성화·PR #217의 스냅샷 형식 3 연동은 이 결과에 포함되지 않습니다.
 
-## 2026-10-18 마감: CI 검증 경로 연결(로컬, 미게시)
+## 2026-10-18 마감: CI 검증 경로 연결
 
 `make api-graph-handoff-import-smoke`를 추가하고 기존 CI `api` job에 연결했습니다. 기존 PostgreSQL 서비스 안에 전용 빈 `zoop_graph_import_smoke` DB를 만들며, 회사·인증 통합 시험의 DB와 분리합니다. 새 job·외부 서비스·모델 키는 추가하지 않았고, 기존 `companyIntegrationTest`의 graph-postgres 시험도 유지합니다. 설치·빌드는 smoke가 자동으로 수행하지 않으므로 [api README](../README.md)의 선행 명령과 환경변수를 사용하세요.
 
@@ -432,21 +433,21 @@ ai/service/.venv/bin/python ai/service/scripts/export_openapi.py [--check]   # d
 
 검증 결과: pipeline 674개 통과, Java 681개 중 647개 통과·34개 제외 및 빌드 성공, 새 PostgreSQL DB의 통합 시험 40개 통과. 실제 CLI→Spring→PostgreSQL→HTTP smoke 14단계에서 비활성 버전 3개 등록, 다문서 로컬 ID 중복의 정상 수입·대표 언급 선택·동일 바이트 재시도, 기존 공개 조회 유지와 비활성 버전 409를 확인했습니다. AI CLI·handoff HTTP smoke도 통과했고 원장 불변·모델/공급자 호출 0을 확인했습니다. 종료일 포함 회귀 2개, 카탈로그 경합 3개, 언급 ID 회귀 6개는 수정 전 실패를 관측했습니다. 사용했던 DB로 전체 통합 시험을 다시 실행했을 때 기존 카탈로그 건수 기대치가 실패했으며, 새 전용 DB에서 40개가 통과했습니다. 임시 DB 컨테이너는 제거했습니다.
 
-PR #229의 이전 커밋 b593226은 원격 CI 9개를 통과했습니다([실행 기록](https://github.com/Donbug/zoop/actions/runs/39044477309)). 위 최신 main 통합 변경은 아직 원격에 게시하지 않았습니다. 2026-10-17·10-18의 검증 기록은 형식 1·끝 제외 규칙 시점의 이력이며, 공개 활성화·graph 근거 조회·철회 처리는 여전히 후속 범위입니다.
+당시 PR #229의 이전 커밋 b593226은 원격 CI 9개를 통과했습니다([실행 기록](https://github.com/Donbug/zoop/actions/runs/39044477309)). 2026-10-20 기록 시점에는 위 main 통합 변경을 아직 원격에 게시하지 않았고, 공개 활성화·graph 근거 조회·철회 처리는 후속 범위였습니다. 이는 현재 구현 상태가 아니라 당시의 기록입니다. 2026-10-17·10-18의 검증 기록도 형식 1·끝 제외 규칙 시점의 이력입니다.
 
-## 2026-10-20: bundle `-2`의 원본 mention (로컬 작업 트리, 미게시)
+## 2026-10-20: bundle `-2`의 원본 mention
 
 bundle 스키마만 `zoop-graph-handoff-bundle-1` → `-2`로 한 번에 바꿨습니다(manifest·runtime `zoop-ai-handoff-1`, 원장, 정책 `zoop-public-projection-policy-1`, 서비스 `zoop-ai-internal-handoff-1`, import 요청·receipt `zoop-graph-handoff-import-1`/`-receipt-1`, snapshot 형식 3은 그대로). 각 issue에 닫힌 `mentions[]`가 추가되었고(위 표) 앱 verifier는 생산자 검증을 그대로 이식합니다: 식별자 partition(`mentions` = `sourceEvents`), 문서 버전의 기사 하나에 닫힘, mention 근거는 자기 기사의 근거 행, 이슈 `evidenceIds` = mention 근거 ∪ geography 근거, `verification:"none"`, `background`는 실제 bool, 회사 참조는 bundle `companies[]`와 `sourceCompanyId`, 시간은 `HandoffTime.mentionEventTime`(위 문법, `temporal_unsupported`).
 
 **BE가 지금 받는 값.** mention별 원본 S2 값(제목·행위·대상·시각과 정밀도·기간·assertion 상태·background), 참가자의 원본 `sourceCompanyId`·`name`·`role` 텍스트와 (조건부) 공개 `companyId`, mention 자신의 인용 근거 id, mention이 속한 기사 `articleId`/`articleVersion`. 이 값들은 receipt의 완전한 bundle에만 남고 snapshot(형식 3)·공개 읽기는 그대로입니다: snapshot의 mention 참조는 여전히 `{mentionId(앱 id), articleId, articleVersion}`이며 `-2`에서는 모든 mention의 기사가 이슈 근거로 인용되므로 참조가 모든 mention을 덮습니다. 앱 mention id `mention-sha256({articleId, articleVersion, sourceMentionId})`와 같은 local id의 두 문서 매핑은 변하지 않았습니다.
 
-**아직 생산되지 않는 값(없는 것을 만들어 채우지 않습니다).** 어떤 필드도 검증·결정·승인되지 않았습니다. `publisher`, `fieldDecisions`, `sourceSupport`, `approval`, impact·lineage 계열, 확인된 참가자 역할(`roleUnconfirmed` 같은 필드도 없고 `role`을 어떻게 쓸지는 백엔드 소유자가 정합니다), S3가 검증한 참가 관계는 `INVOLVES` relation에만 있습니다. 공개 `EventDetail` endpoint와 OpenAPI 대상 계약은 바뀌지 않았습니다. 이 변경은 `getEvidence`의 graph 본문 근거 경로도 바꾸지 않습니다.
+**bundle `-2` 당시의 한계(이 절 작성 시점의 사실이며 현재 상태가 아닙니다; 값은 없는 것을 만들어 채우지 않았습니다).** 이 `-2` 단계에서는 어떤 필드도 검증·결정·승인되지 않았고 `publisher`, `fieldDecisions`, `sourceSupport`, `approval`, impact·lineage 계열은 bundle에 없었습니다. 이후 단계가 일부를 다른 형태로 구현했습니다: `-3`의 `fieldProvenance`(선택 기록, 검증 아님), `-4`의 `fieldVerdicts`(운영자 필드 verdict)와 같은 `-4` 확장의 `sourceSupport`·`approvalBasis`(감사 메타데이터)·실행 provenance, `-6`의 `impacts[]`(receipt에만 남는 영향 행). 각 절이 정확한 의미와 한계를 말하며, 이 목록은 공개 필드(`EventDetail`·`fieldDecisions`·`SourceSupportOut`·impact 경로 등)로의 매핑이 끝났다는 뜻이 **아닙니다**: 공개 매핑과 공개 노출은 해당 절이 말하듯 백엔드 소유자의 결정이며 구현되지 않았습니다. `-2`에서도 확인된 참가자 역할(`roleUnconfirmed` 같은 필드도 없고 `role`을 어떻게 쓸지는 백엔드 소유자가 정합니다)은 없었고, S3가 검증한 참가 관계는 `INVOLVES` relation에만 있습니다. 공개 `EventDetail` endpoint와 OpenAPI 대상 계약은 바뀌지 않았습니다. 이 변경은 `getEvidence`의 graph 본문 근거 경로도 바꾸지 않습니다.
 
 **이전 산출물.** `-1` export는 `BUNDLE_INVALID`로 거절되고(아무것도 쓰지 않음), 생산자가 `handoff_contract_changed`로 withheld한 이전 handoff는 `HANDOFF_WITHHELD`로 응답합니다(새 handoff id를 freeze해야 함). 이미 import된 버전은 건드리지 않습니다: snapshot 형식 3은 그대로 읽히고 receipt reader(`GraphReceiptGrants`)는 스키마와 무관하게 `bundle.articles[]`만 읽으므로 `-1` receipt의 `getEvidence` 읽기도 유지됩니다(receipt를 새 검증기로 다시 검증하지 않음). 이후 receipt의 mention을 읽는 코드는 `receipt.bundle.schemaVersion`을 먼저 확인해야 하며 `-1`의 mention 값은 **없음**입니다(빈 값도, 이슈 필드 복사도 아님).
 
 **검증(이 절 작성 시점).** Java 시험·smoke는 이 변경에서 실행하지 않았습니다. 시험 fixture와 `src/test/resources/graph-handoff/*.json`은 생산자 변경 뒤 `graph_handoff_smoke.py --write-fixture`로 다시 만들어야 하며(이전 fixture는 `-1` 모양이라 새 verifier가 거절합니다), 그 전의 실패는 이 때문입니다.
 
-## 2026-10-20: bundle `-3`의 `fieldProvenance` — 선택 근거이며 검증이 아님 (로컬 작업 트리, 미게시)
+## 2026-10-20: bundle `-3`의 `fieldProvenance` — 선택 근거이며 검증이 아님
 
 bundle 스키마만 `zoop-graph-handoff-bundle-2` → `-3`으로 한 번에 바꿨습니다(manifest·runtime `zoop-ai-handoff-1`, 원장, 정책, 서비스 `zoop-ai-internal-handoff-1`, import 요청·receipt, snapshot 형식 3, 공개 `EventDetail`·OpenAPI는 그대로). 각 issue에 닫힌 `fieldProvenance`가 추가되었습니다. 앱 verifier는 생산자 `validate_bundle`을 그대로 이식해 다시 계산합니다.
 
@@ -460,7 +461,7 @@ bundle 스키마만 `zoop-graph-handoff-bundle-2` → `-3`으로 한 번에 바�
 
 **검증(이 절 작성 시점).** Java 시험·smoke는 실행하지 않았습니다. `src/test/resources/graph-handoff/*`는 생산자 변경 뒤 `graph_handoff_smoke.py --write-fixture`로 다시 만들어야 하며(이전 fixture는 `-2` 모양이라 새 verifier가 거절), 그 전의 실패는 이 때문입니다. 시험 fixture 빌더(`HandoffFixtures`)는 합법적 대표 선택을 반영하도록 고쳤고, 변형 회귀(같은 값 mention 누락·다른 값 mention 포함·대표 누락·selection 불일치·이슈 값 무근거·순서·중복·알 수 없는 키·`-2`/`-4` 스키마)를 추가했습니다.
 
-## 2026-10-21: bundle `-4`의 운영자 필드 verdict — `eventTime`·`period`의 보류·거절 (로컬 작업 트리, 미게시)
+## 2026-10-21: bundle `-4`의 운영자 필드 verdict — `eventTime`·`period`의 보류·거절
 
 bundle 스키마만 `zoop-graph-handoff-bundle-3` → `-4`로 한 번에 바꿨고(운영자 판정 파일은 `zoop-public-decisions-2`), manifest·runtime `zoop-ai-handoff-1`, 정책, 원장, 서비스, import 요청·receipt, **snapshot 형식 3**, 공개 `EventDetail`·OpenAPI·DB 스키마는 그대로입니다. 새 출처는 **운영자의 필드별 검토**뿐입니다. S2에는 이 두 필드의 검증기가 없고 S3 검증기는 관계 주장을 판정하므로(event 필드를 보지 않음) 그 출력을 재사용하지 않았고, 유료 호출도 만들지 않았습니다. 이 slice는 진짜 출처 경로를 만들지만 **실제 데이터의 검토는 아직 없습니다**(아래 smoke·fixture의 verdict는 합성 시험 검토이며 운영 산출물이 아닙니다).
 
@@ -485,9 +486,9 @@ bundle 스키마만 `zoop-graph-handoff-bundle-3` → `-4`로 한 번에 바꿨�
 
 **검증(이 절 작성 시점).** 시험·smoke는 이 작성 단계에서 실행하지 않았습니다. 앱 쪽 회귀: 합성 bundle의 모든 verdict 규칙(닫힌 키, 조합, 값 일치, 자기 기사 근거, 중복·순서, `withheld` 재계산, 선택 기준·unanimous·대표, 정밀도, 근거 합집합), 실제 export fixture(`export-field-verdicts.json`·`export-field-verdicts-time.json`)의 손으로 쓴 기대값(`expected-field-verdicts.json`·`expected-headline-values.json`·`expected-field-provenance.json`·`expected-mentions.json`)과 위조 거절, 이전 스키마 `-1`~`-3` 거절, `-4` receipt의 `getEvidence` 읽기. `api/scripts/graph_handoff_import_smoke.py`는 생산자가 만든 verdict 세계(`verdict_export`)를 실제 import해 가려진 `eventTime`·`period`가 snapshot·공개 그래프 읽기에는 없고 receipt에는 원본과 verdict 근거가 정확히 남는지를 확인합니다. 활성화는 격리된 smoke 하네스에서만 합니다(import도 운영 경로도 활성화하지 않음).
 
-## 2026-10-20: `getEvidence`의 graph 본문 근거 경로 (로컬 작업 트리, 미게시)
+## 2026-10-20: `getEvidence`의 graph 본문 근거 경로
 
-공개 `GET /api/v1/evidence/{id}`가 스테이징된 graph 본문 근거를 **기존 경로·기존 응답 스키마 그대로** 읽습니다. 위의 "getEvidence graph 경로 없음"·"미등록 취급" 서술(지금 상태, 근거 표, 소유 경계, 앱 import 3번, 미결정 계약)은 이 절로 대체됩니다. OpenAPI·DB 스키마·snapshot 형식은 바뀌지 않았고, 이 경로는 활성화·쓰기·잠금·Neo4j·AI CLI 호출을 하지 않습니다.
+공개 `GET /api/v1/evidence/{id}`가 스테이징된 graph 본문 근거를 **기존 경로·기존 응답 스키마 그대로** 읽습니다. 이 절은 graph 근거를 미등록으로 취급하던 이전 구현을 대체한 변경 이력과 현재 읽기 계약을 설명합니다. OpenAPI·DB 스키마·snapshot 형식은 바뀌지 않았고, 이 경로는 활성화·쓰기·잠금·Neo4j·AI CLI 호출을 하지 않습니다.
 
 **권한 선택(정세빈 확인 대기).** 이 읽기의 권한은 operator의 S2-1 source registry(`zoop-ingestion-s2-1`, handoff import가 `zoop-ai-ingest export --require-store`로 확인하는 바로 그 파일)이며, 요청마다 새로 읽는 엄격한 Java reader(`SourceRegistry`)로 판정합니다. 이 선택은 사용자가 로컬 구현으로 승인한 것이고 `GRAPH_READ_HANDOFF.md`가 이 경로를 백엔드(정세빈) 몫으로 둔 만큼 **백엔드 소유자 확인 전에는 배포하지 않습니다**(승인된 것으로 쓰지 않았습니다). S1 grant registry(`zoop-ai-s1-1`)는 이 경로에서 읽지도 쓰지도 않으며 purpose·recipient 인자도 없습니다.
 
@@ -516,9 +517,9 @@ bundle 스키마만 `zoop-graph-handoff-bundle-3` → `-4`로 한 번에 바꿨�
 
 **발행 매체 검증.** 같은 smoke는 운영자가 실제 수집 매니페스트 항목에 선언한 발행 매체(문서 `a`만 `합성일보 Synthetic Daily`, `a2`·`b`는 선언 없음)가 실제 export → Spring import → `article_versions.publisher` → 공개 `GET /api/v1/evidence/{id}`의 `article.publisher`까지 정확히 같은 문자열로 오고(`a`), 선언이 없는 버전은 DB도 응답도 `null`임을 smoke 안에 손으로 적은 기대값으로 확인합니다. `api/scripts/document_import_smoke.py`는 같은 문서 A의 선언 없는 이전 버전(NULL)이 매체를 선언한 새 버전 import 뒤에도 NULL로 남고, 저장된 NULL과 선언 값이 충돌하면 `version_conflict`임을 확인합니다.
 
-## 2026-10-21: bundle `-4` 확장 — 실행 provenance·승인 근거·sourceSupport (로컬 작업 트리, 미게시)
+## 2026-10-21: bundle `-4` 확장 — 실행 provenance·승인 근거·sourceSupport
 
-아직 게시·활성화되지 않은 `-4`를 **같은 스키마 문자열로 제자리 확장**했습니다(`-1`~`-3`과 이미 import된 receipt는 역사로 두고 건드리지 않음). 이 확장이 없는 이전 로컬 `-4` export는 닫힌 스키마 위반으로 `BUNDLE_INVALID`이며 아무것도 쓰지 않습니다. snapshot 형식 3, 공개 `EventDetail`·`BriefingItem`·OpenAPI·DB 스키마, import 요청·manifest는 **바뀌지 않았습니다**. 아래 값은 모두 retained `verification_receipt`(완전한 bundle)에만 남고 snapshot에는 들어가지 않습니다(시험이 문자열 부재를 확인).
+2026-10-21 당시 아직 게시·활성화되지 않은 `-4`를 **같은 스키마 문자열로 제자리 확장**했습니다(`-1`~`-3`과 이미 import된 receipt는 역사로 두고 건드리지 않음). 이 절은 당시 변경 이력이며 현재 생산자 계약은 `-7`입니다. 당시 이 확장이 없는 이전 로컬 `-4` export는 닫힌 스키마 위반으로 `BUNDLE_INVALID`였으며 아무것도 쓰지 않았습니다. snapshot 형식 3, 공개 `EventDetail`·`BriefingItem`·OpenAPI·DB 스키마, import 요청·manifest는 **바뀌지 않았습니다**. 아래 값은 모두 retained `verification_receipt`(완전한 bundle)에만 남고 snapshot에는 들어가지 않습니다(시험이 문자열 부재를 확인).
 
 **실행 provenance(정직한 짝).** `provenance.executionMode`/`recordingKind`는 `(replay, authored-test)` 또는 `(live, provider)` 두 쌍만 허용하며 `declaredSourceKind`(`synthetic`|`actual`)와 독립입니다: provider 기록이 합성 문서일 수 있고(`live`+`synthetic`), 실제 문서의 replay도 가능합니다. 새 `sources[i].provenance`는 `{sourceKind, executionMode, recordingKind}`이며 **모든 source가 bundle과 정확히 같아야** 합니다. 한 bundle에 모드·종류가 섞이면 생산자가 거절(freeze `provenance_mode_conflict`, export withheld)하고 Java verifier도 `Malformed`로 거절합니다: 첫 job 값을 베끼지 않습니다. import 결과 문서의 `provenance.executionMode`/`recordingKind`는 bundle의 실제 값입니다(항상 `replay`가 아님).
 
@@ -538,7 +539,7 @@ bundle 스키마만 `zoop-graph-handoff-bundle-3` → `-4`로 한 번에 바꿨�
 
 **검증(이 절 작성 시점).** 소스만 작성했고 시험·smoke는 실행하지 않았습니다. 추가한 회귀: `HandoffBundleVerifierTest`(실행 모드 쌍·source provenance 반복, 승인 위조·재라벨·revision·`verifiedAt`, 혼합 승인에서 수동 literal, `sourceSupport` 위조와 PoC 사례(재게재→그룹 1, 동일 텍스트·origin 없음→중복 묶음, 충돌 origin→독립 수 `null`, 한 article의 두 버전 거절)), `GraphHandoffImporterTest`(live/provider+수동 승인+origin의 staging·결과 문서·receipt 보존·snapshot 비노출·재시도 no-op, 위조 bundle과 텍스트 digest drift 거절), `GraphEvidenceServiceTest`(새 키가 담긴 receipt의 `getEvidence`). `src/test/resources/graph-handoff/*`와 `api/scripts/graph_handoff_import_smoke.py`의 실제 생산자 export는 생산자 변경 뒤 Main이 다시 생성해야 합니다(그 전에는 이전 모양이라 거절됩니다). 기본 smoke는 유료 모델 호출 0이며 live/provider 쌍은 단위 시험으로만 확인합니다(실제 provider 기록 handoff는 별도 승인·실행 필요).
 
-## 2026-10-21: bundle `-5` — 구조 경로·비공개 경로 회사·basis 범위, 그리고 basis-only 근거 읽기 (로컬 작업 트리, 미게시)
+## 2026-10-21: bundle `-5` — 구조 경로·비공개 경로 회사·basis 범위, 그리고 basis-only 근거 읽기
 
 bundle 스키마만 `-4` → `-5`로 한 번에 바꿨습니다(manifest·runtime `zoop-ai-handoff-1`, 정책 `zoop-public-projection-policy-1`, 운영자 판정 파일, import 요청·receipt `zoop-graph-handoff-import-1`/`-receipt-1`, snapshot 형식 3, 공개 `EventDetail`·OpenAPI·DB 스키마, 공개 API는 그대로이고 **ImpactPath 공개 구현은 없습니다**). 기존 `-1`~`-4` 원장 행은 history-only이며 앱은 `-5`가 아닌 bundle을 거절합니다(`bundle_invalid`). 이미 staged된 이전 버전의 snapshot·receipt는 바이트 그대로입니다.
 
@@ -556,3 +557,76 @@ bundle 스키마만 `-4` → `-5`로 한 번에 바꿨습니다(manifest·runtim
 **이미 import된 이전 receipt.** 서비스는 receipt의 `bundle.schemaVersion`이 아니라 형태만 봅니다. 따라서 `-4` 등 이전 스키마로 import된 receipt도 `relations[].basis[]`가 `relationKey`·`evidenceIds`를 갖추고 relation의 `id`·`type`·`source`·`target`이 snapshot과 같으면 **지금의 모든 게이트(현재 source registry 권한, 행·본문·span·텍스트 해시, article 가용성, 선택 버전의 등록된 해시·크기)를 그대로 적용한 채** basis-only span을 서비스합니다(`-4` receipt에는 `structuralPath`·`pathCompanies`·basis scope가 없지만 이 읽기는 그것들을 읽지 않습니다). 그 형태가 없는 receipt만 basis-only span에서 404로 fail closed합니다. 한 relation에 basis가 둘 이상이고 asOf가 그중 일부만 검증한 시점이면, 아직 검증되지 않은 basis의 근거는 같은 기사를 가리키는 앞선 basis가 보인다는 이유로 서비스되지 않습니다(후보 basis의 receipt `evidenceIds`에 정확히 그 id가 있어야 함).
 
 **알려진 한계·검증 상태.** 공개 제외 overlay(FS081)는 저장소가 없어 빌드된 jar에서는 relation·issue·evidence 제외를 HTTP로 구동할 수 없습니다. 이 세 제외는 실제 `PublicGraphReader`+`EvidenceService`를 묶은 Java 시험(`GraphEvidenceServiceTest`, `GraphEvidenceSnapshotReaderTest`)이 가변 overlay로 확인합니다. 시험: `HandoffBundleVerifierTest`(알려진·비공개·미매핑 중간, 1홉 unavailable·고아·카운트·scope 크기·비구조 경로 거부, 생산자의 `export-path-*`·`bundle-path-01..22` fixture), `GraphHandoffImporterTest`·`GraphHandoffImportPostgresIntegrationTest`(catalogue ∪ 검증·롤백·snapshot 배제·receipt 문구), `GraphEvidenceServiceTest`(basis 소속·권한·tamper), `make api-graph-handoff-import-smoke`(실제 jar·PostgreSQL·HTTP, 구조 경로 세계를 마지막에 import하고 시험 harness 활성화 1건을 **거꾸로 날짜 지정**해 basis 검증 이전의 asOf를 구동하며 `harnessActivations`는 4가 됩니다). 실행 결과는 Main이 통합 검증에서 확인합니다.
+
+## 2026-10-21: bundle `-6` — 영향 행(`impacts[]`)과 impact-only 근거 읽기
+
+bundle 스키마만 `-5` → `-6`으로 한 번에 바꿨습니다(manifest·runtime `zoop-ai-handoff-1`, 정책 `zoop-public-projection-policy-1`, 운영자 판정 파일 `zoop-public-decisions-2`, import 요청·receipt `zoop-graph-handoff-import-1`/`-receipt-1`, **snapshot 형식 3**, 공개 route·`EventDetail`·OpenAPI·DB 스키마는 그대로이고 **ImpactPath 공개 구현·영향 라벨의 공개 표기는 없습니다**). 최상위에 `impacts`가 더해지고 `counts.impacts`, `policy.impacts = "s3-independent-verifier-quote-effect"`가 필수이며 `digests.content`는 기존 여섯 컬렉션 뒤에 `impacts`까지 덮습니다. 기존 `-1`~`-5` 원장 행은 history-only이며 앱 verifier는 `-6`이 아닌 bundle을 거절합니다(`bundle_invalid`). 이미 staged된 이전 버전의 snapshot·receipt는 바이트 그대로이고 계속 읽힙니다: **receipt에 `impacts`가 없는 것은 "영향 정보 없음(unavailable)"이지 `not-proposed`·`not-applicable`이 아닙니다.**
+
+**닫힌 행(정확히 13개 키).** INVOLVES 간선의 `sourceRefs`(S3 relation) **하나당 정확히 한 행**이며 `(edgeId, jobId, relationCandidateId)` 코드 포인트 순서로 정렬·유일합니다. 같은 간선의 S3 relation이 둘이면 긍정·부정이 서로 달라도 **별개 행**으로 남고 합치지 않습니다(간선 단위 라벨은 없음). 구조(SUPPLIES) 간선의 impact 후보, 공개되지 않은 relation, off-target 후보(모델이 지어낸 회사 id)는 내보내지 않습니다.
+
+| 키 | 내용 |
+|---|---|
+| `edgeId`, `issueId`, `companyId` | INVOLVES relation id, 그 source(이슈)·target(회사)와 같아야 함 |
+| `sourceRelation` | `{jobId, relationCandidateId}` — 그 간선 `sourceRefs`와 `sources[].reviewUsed`에 모두 있어야 함 |
+| `impactCandidateId` | `ic-`+64hex 또는 `null`; `(jobId, impactCandidateId)` 유일 |
+| `status` / `code` | `not-applicable`(운영자 최종 승인)·`not-proposed`·`no-evidence`·`technical-reject`(`producer_reply_invalid`·`impact_precheck_rejected`·`verifier_reply_invalid`)·`verifier-reject`·`verified`·`withheld`(`impact_evidence_outside_relation_documents`·`impact_quote_ambiguous`); 나머지는 `code:null` |
+| `label` | `positive|negative|mixed|undetermined`, **`verified`에만**, 아니면 `null` |
+| `targetVerdict` | `verified`: `supported|insufficient`, `verifier-reject`: `contradicted`, 아니면 `null` |
+| `effects` | `{positive[], negative[], neutral[], uncertain[]}`(앱 `ev-` id), **`verified`에만** |
+| `verifier`, `verifierRequestDigest` | `called`+64hex 또는 `not-called`+`null` |
+| `proposal` | `{direction(4 라벨), reason(1..2000 코드 포인트), limitations(null|≤1000 코드 포인트), verification:"none"}` 또는 `null` |
+
+**앱 verifier(Java `HandoffBundleVerifier`)가 다시 계산하는 규칙(생산자 `validate_bundle`과 같음).** (1) 행 집합 = 모든 INVOLVES `sourceRefs`, 누락·중복·초과·구조 간선 행·끝점 불일치·정렬 위반 거부. (2) `not-applicable` ⇔ 그 relation의 `approvalBasis.kind == operator-final-approval`(양방향): 운영자가 승인한 relation에 verifier 라벨이 붙을 수 없고 자동 relation에 `not-applicable`이 붙을 수 없음(운영자 승인은 impact 호출을 하지 않음). (3) 상태별 (후보 있음, verifier 호출, proposal 있음) 표: `not-applicable`·`not-proposed`·`producer_reply_invalid` = (없음, 아니오, 없음), `impact_precheck_rejected` = (있음, 아니오, 없음, 원시 오류 사유·위치는 내보내지 않음), `no-evidence` = (있음, 아니오, 있음; 독립 `undetermined`가 아니므로 라벨 `null`), `verifier_reply_invalid`·`verifier-reject`·`verified`·`withheld` = (있음, 예, 있음); `verifier_reply_invalid`는 `executionMode == replay`일 때만(라이브 verifier는 원장이 거부한 응답을 판정으로 쓰지 않음). (4) `verified`의 effects 네 면은 각각 정렬·유일, 서로소, 합쳐서 1..40개, 모든 id가 bundle `evidence`에 있고 **그 간선 자신의 근거와 같은 `(articleId, articleVersion)`**, 한 행 안에서 `source.sourceEvidenceId`가 서로 다르며, effects id는 `evidence.noOrphan`에서 참조로 셉니다. (5) 라벨은 신뢰하지 않고 다시 계산: `uncertain`이 하나라도 있거나 `targetVerdict == insufficient`이면 `undetermined`, 아니면 positive·negative 둘 다면 `mixed`, 한쪽이면 그쪽, 둘 다 없으면(중립만) `undetermined`. (6) `proposal` 길이는 UTF-16이 아니라 **유니코드 코드 포인트**(`codePointCount`)로 셉니다. (7) `counts.impacts`, `policy.impacts`, 내용 digest. `proposal`은 생산자 자신의 **검증되지 않은** 말이며 "verified reason"이 아닙니다.
+
+**받은 쪽이 지켜야 할 것.** 이 행은 인용문 텍스트의 효과(verifier가 정한 긍정·부정·중립·불확실)와 대상 회사 적합성만 말합니다. 가격·확률·인과·완전성의 증명이 아니며 공개 집계 라벨도 없습니다. `executionMode: replay`에서 `verifier: called`는 **작성된 fixture의 응답**이지 독립 추론이 아닙니다. impact 검증 시각은 S3 결과에 없으므로 만들어 쓰지 않았고(relation `decidedAt`·freeze·import·활성화 시각도 아님), 가시성은 아래처럼 기존 규칙(활성 버전·보이는 INVOLVES·필터된 span·현재 권한)만 따릅니다. `HandoffBundle`에는 타입 필드를 더하지 않았습니다(소비자가 아직 없음): 행은 검증만 되고 receipt에 **원본 그대로** 남으며, snapshot(형식 3)에는 impact·proposal·effects·라벨·verifier digest가 **없습니다**. receipt `appVerification.checks`에 `impact_rows_closed_over_involves_sources_approvals_and_labels`가 더해집니다.
+
+**impact-only 근거 읽기(`GET /api/v1/evidence/{id}`, 응답 모양 그대로).** span이 필터된 snapshot에 있지만 보이는 issue·relation이 직접 인용하지 않으면, 리더는 기존 `basisRefs`와 함께 **같은 기사 버전을 근거로 가진 보이는 INVOLVES relation**을 후보 `ImpactRef{relationId, relationType, source, target}`로 모읍니다(둘 다 비면 span 없음). 서비스는 선택된 버전의 receipt(한 번만 읽고 파싱)에서 두 가지를 **모두 평가한 뒤** OR로 합칩니다. `GraphReceiptBasis.proves`는 구조적으로 유효하지만 소속이 아니면 `false`, 구조 이상은 예외이고, 새 `GraphReceiptImpact.proves`는 receipt에 `impacts` 키가 없으면(`-1`~`-5`) `false`, 있으면 후보마다 id·type·source·target이 같은 relation이 **정확히 하나**여야 하고, 그 relation의 모든 impact 행이 닫힌 13키·같은 issue/company·그 relation `sourceRefs`에 속하는 `sourceRelation`이며 같은 source relation 행이 중복되지 않아야 하고, **`verified` 행의 `effects`(네 면 중 하나)가 이 id를 포함할 때만** `true`입니다(`not-proposed`·`no-evidence`·`verifier-reject`·`withheld` 등은 아무것도 증명하지 않음). 한쪽이 구조적으로 깨졌으면 다른 쪽이 `true`여도 404 `EVIDENCE_UNAVAILABLE`입니다(깨진 basis는 impact 행으로 우회되지 않고 그 반대도 같음). 후보 basis가 이 id를 인용하지 않는 것은 유효한 비소속이므로 impact 행이 증명할 수 있습니다. 응답은 `eventIds: []`이고 라벨·proposal·effects를 싣지 않으며, 현재 권한·행·본문·span·article 접근·등록된 해시/크기·`asOf`/버전 선택은 모두 그대로입니다(`GraphVersionSelector.select`가 `asOf` 시점의 활성 버전만 고르는 규칙을 바꾸지 않았고, impact 판정은 freeze·import·활성화보다 앞서므로 별도 시각이 필요 없습니다). 이전 `-1`~`-5` receipt는 impact 후보가 있어도 기존 직접·basis-only 읽기를 그대로 서비스합니다. 후보 참조 수집은 span당 한 번 relation·evidence를 색인해 `O(relations)`로 끝나며 receipt도 relation·impact 행을 한 번만 색인합니다.
+
+**검증 범위.** 시험: `HandoffBundleVerifierTest`(행 표·코드·null 규칙, 커버리지·정렬·중복·구조 간선·끝점, 운영자 `not-applicable` 양방향, 라벨 재계산, effects 불변식, 같은 `articleVersion`의 다른 `articleId` 거절, 유니코드 proposal 경계, count·policy·digest, `-5`·`-7` 거절, 생산자의 `export-impacts/-approved/-impacts-unicode` 실제 export와 손으로 쓴 `expected-impacts.json`·`bundle-impact-01..35` fixture), `GraphHandoffImporterTest`·`GraphHandoffImportPostgresIntegrationTest`(receipt가 행을 원본 그대로 보존하고 snapshot에 필드·후보·proposal이 없음, 예약어가 든 handoff id는 정당한 값, impact-only 인용문이 등록된 검증 span), `GraphEvidenceSnapshotReaderTest`(후보 수집·asOf·제외), `GraphEvidenceServiceTest`(basis 비소속 뒤 impact 성공, 깨진 basis·impact의 우회 불가, 비검증 상태, 권한·private·tamper·다른 버전, 실제 `PublicGraphReader`+서비스), `make api-graph-handoff-import-smoke`(실제 jar·PostgreSQL·HTTP: impact 세계를 마지막에 import하고 시험 harness 활성화 1건을 더해 impact-only 인용문 200 `eventIds: []`, 이른 `asOf`·다른 버전·권한 철회·private article·변조된 receipt 404, 복원 후 200; `harnessActivations`는 5가 됩니다). 공개 제외 overlay는 저장소가 없어 relation·evidence 제외는 Java 시험이 가변 overlay로만 확인하며 HTTP로 주장하지 않습니다. 이 절은 실행 결과를 주장하지 않으며, 최종 실행 증거는 기존 실행 계획 문서에 기록됩니다.
+
+## 2026-10-22: bundle `-7` — 이슈 요약(`issues[].summary`)과 decisions `-3`
+
+생성 경로만 `-6` → `-7`로 올렸습니다. **이미 게시된 `-6` 스키마의 모양은 바꾸지 않았고**(조용한 변경 없음) 새로 만드는 bundle만 `zoop-graph-handoff-bundle-7`입니다. 운영자 판정 파일은 `zoop-public-decisions-3`(`-2`·`-1`은 `decisions_invalid`), manifest·runtime `zoop-ai-handoff-1`, 정책 `zoop-public-projection-policy-1`, import 요청·receipt, **snapshot 형식 3**, 공개 route·`EventDetail`·OpenAPI·DB 스키마는 그대로입니다. 기존 `-1`~`-6` 원장 행은 history-only(`export`는 `handoff_contract_changed` withheld, 앱 verifier는 `-7`이 아닌 bundle을 `bundle_invalid`로 거절)이고, 이미 staged된 이전 버전의 snapshot·receipt는 바이트 그대로 계속 읽힙니다. **receipt에 `issues[].summary`가 없는 것(`-6` 이하)은 "요약이 생산된 적 없음(unavailable)"이지 `not-requested`가 아닙니다.** 앞의 `-6` 절 시험 목록에 적힌 "`-7` 거절"은 이 변경으로 "`-8` 거절"이 되었습니다.
+
+**누가 무엇을 만드는가.** 요약 문장은 handoff가 만들지 않습니다. 별도 AI 명령 `zoop-ai-issue-summary`(자기 원장 `issue-summary.sqlite3`, 자기 live binding family)가 이슈 하나의 입력 인용만 모델에 보내 생성·독립 verifier 확인을 하고 불변 결과를 남깁니다. 운영자 decisions(`IssueDecision.summary: {jobId, inputDigest, resultDigest} | null`)가 그 결과를 이슈마다 **고정**하고, `zoop-ai-handoff freeze --issue-summary-state-dir`가 고정한 결과를 원장에서 읽기 전용으로 가져와 bundle에 옮깁니다. `export`는 freeze된 artifact에서 꺼내고 현재 원천으로 basis를 다시 계산해 비교하므로 **요약 원장·새 인자·모델 호출이 필요 없고**(Java `ProcessHandoffExporter`·`ai/service` export 인자 불변) freeze도 모델·provider를 부르지 않습니다. 앱에는 키도 유료 경로도 없습니다.
+
+**이슈별 결정(생산자 Planner가 정하고 Python `validate_bundle`과 Java `HandoffIssueSummary`가 bundle만 보고 다시 계산).** ① 이슈의 `fieldVerdicts`에 `HOLD`/`REJECT`가 하나라도 있으면(어떤 mention이든, 대표가 아니어도, 머리 값을 가리지 않아도) `temporal-review-pending`(`source:null`): 이때 `available`을 포함한 다른 값은 bundle 전체를 거절합니다. ② basis 인용이 60개를 넘으면 `input-too-large`(`source:null`). ③ decisions가 결과를 고정했으면 그 결과. ④ 아니면 `not-requested`(`source:null`). ①·②가 없는데 그 코드가 오는 것, ③이 없는데 job 코드가 오는 것도 거절입니다.
+
+**basis(요약 입력).** `{policy, issueId, title, quotes[{evidenceId, articleId, articleVersion, start, end, quoteSha256, context: report|background}], articles[{articleId, articleVersion, documentId, documentVersion, textSha256}]}`. `quotes`는 이슈 `mentions[].evidenceIds`의 합집합(evidenceId 순)만이며 geography·verdict 근거만 있는 span은 없습니다. `context`는 그 인용을 단 mention이 **모두** `background:true`일 때만 `background`입니다. `basisDigest = digest(basis)`.
+
+**available 객체(닫힌 키 열 개).** `{status, text, claims[{claimId:"c1".., text, evidenceIds}], evidenceIds, generatedAt, resultVersion, language:"ko", source, producer{kind, model, reasoningEffort, promptVersion, schemaDigest, runtimeIdentity}, verifier{kind, model, adapterIdentity, requestDigest}}`. claim 1~5개, 각 1~280 code point·줄바꿈 없음·한글 음절 ≥1, claim의 `evidenceIds` 1~5개(오름차순 유일)는 모두 basis 인용 안, `text` = claim 문장을 `"\n"`으로 이은 것, `evidenceIds` = claim 근거의 정렬된 합집합, `resultVersion = "isr-" + digest({basisDigest, claims})`(내용만의 함수), `generatedAt`은 요약 작업 시각(offset이 있는 ISO; freeze·import·조회 시각이 아님), `source.resultDigest = digest({jobId, inputDigest, basisDigest, result: summary에서 source를 뺀 본문})`. 실행 모드와 짝: `replay/authored-test` → `producer.kind`·`verifier.kind` 모두 `authored-replay`(model·reasoningEffort `null`; **작성된 fixture의 응답이지 독립 모델의 판단이 아님**), `live/provider` → `provider`와 `independent-verifier`(model 문자열 필수). 앱은 이 전부를 다시 계산하며 문장·id·basis·digest·종류·시간 결과 어느 하나를 위조해도 `BUNDLE_INVALID`입니다.
+
+**freeze가 고정을 받아들이는 조건(모두 엄격 거절, 아무것도 쓰지 않음).** 요약 원장 행이 `ready`이고 (jobId, inputDigest, resultDigest)가 핀과 같음(`issue_summary_pin_mismatch`/`issue_summary_not_found`/`issue_summary_not_ready`), job이 요약한 공개 이슈가 같고 이번 freeze에서 공개됨(`issue_summary_issue_not_public`), 지금 다시 계산한 basis digest가 job의 것과 같음(`issue_summary_basis_changed`), 실행 모드·sourceKind가 bundle과 같음(`provenance_mode_conflict`/`provenance_conflict`), 고정한 이슈가 지금 HOLD/REJECT를 갖지 않고 입력이 너무 크지 않음(`issue_summary_temporal_review_pending`/`issue_summary_input_too_large`). `--issue-summary-state-dir`는 freeze 전용이며 decisions가 요약을 고정했을 때만 줍니다(`issue_summary_state_missing`/`issue_summary_state_unused`). export에서는 같은 불일치가 내용 없는 withheld(`issue_summary_pin_mismatch`·`issue_summary_basis_changed`·`handoff_content_changed`)입니다.
+
+**권리의 두 시점과 요약 작업 취소.** 요약 입력의 모델 전송 권리는 요약 작업이 전송 직전·응답 수신 후·최종 완료 때만 확인합니다(이후 철회가 끝난 결과를 소급해 모델 전송 위반으로 만들지 않습니다). 이후의 **전달**은 기존 S2/S3 결과와 같게 현재 read·quote-display 권리(앱 import는 기존 store 규칙)를 요구합니다. 그래서 요약 작업 CLI(`inspect`·`export`)는 `submit`·`run`·`resume`과 같은 일곱 원천·운영자 파일 인자가 필요하고, 원래 manifest로 원천·현재 권리·같은 basis를 다시 확인해 성립하지 않으면 요약 본문 없이 작업 메타데이터와 `delivery.status: withheld`(종료 코드 2)만 냅니다(요약을 decisions에 고정하면 그 파일이 작업 manifest의 고정과 달라지므로 이후 그 작업의 `export`도 withheld이고, 고정할 pin 필드는 고정 전에 읽습니다). 내부 `load_result`는 원장만 읽고, handoff `freeze`는 **자기 새 manifest**로 같은 basis를 다시 증명한 뒤에만 고정을 받습니다(앱·BE가 보는 것은 이 `freeze`·`export`의 receipt뿐입니다). `zoop-ai-issue-summary cancel`은 `queued`·`stopped` 작업만 `failed`(`job_cancelled`)로 만들어 입력 자리를 비우고 새 manifest로 새 작업을 낼 수 있게 하며 `ready`는 취소하지 않습니다(`job_already_terminal`).
+
+**BE(`getEvent`·앱)가 지켜야 할 것(PR #278 소유자 몫, 이 문서는 소스를 바꾸지 않음).** (1) receipt의 `bundle.schemaVersion`이 `-7`이고 `summary.status == available`일 때만 `AnalysisSummary{text, evidenceIds, generatedAt, resultVersion}`를 낼 수 있습니다(`analysis`는 시장 요약 전용). `temporal-review-pending`·작업 쪽 unavailable 코드는 문장 없이 `SUMMARY_WITHHELD`, `not-requested`와 `-6` 이하 receipt는 `SUMMARY_NOT_PRODUCED`입니다. (2) **asOf·현재 grant 가림은 인용된 근거가 아니라 입력 basis 전체**로 판단합니다: 필터되기 전 receipt 이슈의 **모든** `mentions[].evidenceIds`(= basis의 인용 전체)가 지금 보이고 그 기사 버전마다 현재 grant로 읽을 수 있을 때만 요약을 내며, 하나라도 가려지거나 읽을 수 없으면 요약 **전체**를 숨깁니다(일부 claim만 남기지 않습니다). 모델은 인용하지 않은 미래·가려진 기사도 입력으로 봤습니다. 요약이 인용한 근거(`summary.evidenceIds`)만, 또는 snapshot에 보이는 mention만 모은 집합으로 검사하면 가려진 입력이 빠진 채 통과하므로 receipt의 원본 이슈에서 계산해야 합니다(내부 AI 서비스 OpenAPI의 "What a summary rests on"과 `ai/service/README.md`의 "앱 suppression gate"가 같은 규칙입니다). (3) 보류된 시간 값의 **원문 인용**은 지금 정책 그대로 `getEvidence`로 읽힙니다(이 작업은 인용을 지우지 않습니다): 요약이 시간 보류 이슈에 없다는 보장이 있을 뿐, 보류 값이 어디에도 없다는 약속이 아니며 모델·provider 쪽 보존·처리나 모델 판단의 절대적 정확성도 약속하지 않습니다.
+
+**검증 범위.** 시험: `HandoffBundleVerifierTest`(기본·시간 보류 세계의 결정적 요약, 모든 규칙 하나씩의 위조 거절, 실행 모드 짝, code point 길이 경계, 60개 상한, 손으로 만든 basis와 verifier basis 일치, `-6` 모양 거절, 생산자의 실제 `export-summary*.json`·손으로 쓴 `expected-summaries.json`·`bundle-summary-01..15` fixture, 그리고 실제 export의 **인용되지 않은** mention·기사 해시 변조 거절), `HandoffSummaryTimeTest`(공유 `summary-time-vectors.json`: `generatedAt`은 대문자 `T`·`Z`, 초 필수, 소수 1~9자리, `Z` 또는 `±HH:MM`(시 ≤18)만 받으며 `OffsetDateTime.parse`가 판정하지 않음), `GraphHandoffImporterTest`(receipt가 요약을 원본 그대로 보존하고 snapshot·결과에 없음, 변조 요약 거절과 쓰기 없음, `-6` 거절), `make api-graph-handoff-import-smoke`(실제 jar·PostgreSQL: 자기 일관성을 가진 위조 export 4건이 앱의 재계산으로 `bundle_invalid`로 거절되고 정상 export가 staged되며 receipt에 정확히 보존됨. 활성화는 하지 않음). 생산자: `graph_handoff_smoke.py`의 실제 CLI 흐름과 `test_handoff_summary.py`. 통합 요약 세계는 **claim 하나가 첫 기사만 인용하고 이슈의 두 번째 기사(별도 source·별도 grant)는 인용되지 않지만 basis에 들어갑니다**: 인용되지 않은 기사의 binding(article id·version)이 바뀌면 고정이 거절되고(`issue_summary_basis_changed`, 본문 해시 불일치는 이슈 미공개로 거절), 그 기사 source의 grant만 철회해도 요약 job의 `export`와 handoff `export` 전체가 withheld이며 복원하면 같은 출력입니다. 이 문서는 실행 결과를 기록하지 않으며 통합 실행 결과는 별도로 기록됩니다. `src/test/resources/graph-handoff/*`는 `graph_handoff_smoke.py --write-fixture`가 만드는 생성물이므로 요약 세계를 바꾼 뒤에는 다시 생성해야 합니다(이전 fixture의 실패는 그 때문입니다). replay 실행은 작성된 fixture이며 실제 provider 호출·품질·임계값 보정은 검증하지 않았습니다.
+
+## 공개 영향 ID 인계: `zoop-ai-handoff-exposure` (FS081 선행)
+
+AI는 변경된 문서·source·grant 또는 S3 관계 후보를 **명시한 handoff의 공개 ID에 연결하는 읽기 전용 CLI와 내부 HTTP**를 제공합니다. 일반 export가 현재 권리 때문에 withheld여도 고정 기록으로 영향 대상을 찾을 수 있으며, 원문·제목·인용문은 반환하지 않습니다. CLI 계약은 [pipeline README](../../ai/pipeline/README.md), 내부 전송의 설정·오류·검증 명령은 [service README](../../ai/service/README.md)의 Handoff 영향 ID 조회 절을 따릅니다. 앱 제외 저장소·revision·활성화·공개 API는 추가하지 않았습니다.
+
+앱이 소비할 때는 다음 조건을 지켜야 합니다.
+
+1. 결과의 `handoffId`, `manifestDigest`, `bundleDigest`, `contentDigest`를 앱이 보관한 import receipt에 대조합니다. AI가 앱의 `graphVersion`이나 최신 활성 버전을 대신 고르지 않습니다.
+2. `issues`, `relations`, `evidenceIds`는 **제외 검토 대상**이지 적용 완료 기록이 아닙니다. 앱은 자체 결정·revision·저장을 거쳐야 하며, 결과를 읽는 것만으로 활성화 안전 조건이 충족되지는 않습니다.
+3. 이슈·간선 ID는 정정 후 새 handoff에서도 재사용될 수 있습니다. 현재 `DisclosureExclusions`는 전역 집합이므로 여러 결과를 그대로 합쳐 적용하면 정정된 버전까지 숨길 수 있습니다. 버전별 제외 여부와 정정·복구 정책은 앱 저장소 구현에서 결정해야 합니다.
+4. 오류·빈 결과·이전보다 작은 결과로 기존 제외를 해제하지 않습니다. 선택하지 않은 handoff와 이전 schema의 영향이 없다는 뜻도 아닙니다.
+5. 원천 변경은 모델이 본 전체 S2/S3 입력을 따라 보수적으로 관계를 포함합니다. 관계 후보의 의미상 철회는 원문 철회가 아니므로 기사·근거 목록은 비어 있습니다. 이 두 원인을 구분해야 합니다.
+6. `articles`는 별도 기사 목록의 검토에도 쓸 수 있는 식별자입니다. 기존 `GraphSnapshotFilter`에 제외 목록을 넣는 것만으로 기업 문서 목록·S1·브리핑·채팅·캐시·Neo4j까지 처리된 것으로 보지 않습니다.
+
+CLI는 현재 bundle `-7`만 처리하며 하나라도 해석할 수 없는 선택이 있으면 전체를 거절합니다. 실제 권한 판단과 원문 공개는 기존 읽기 게이트를 계속 사용합니다. 이 기능은 공개 제외의 생산자 측 선행 계약이며 **FS081 전체 완료나 앱 exclusion store 구현 완료가 아닙니다.**
+
+### 내부 HTTP 소비 계약
+
+`POST /internal/v1/graph-handoffs/exposure`(`operationId: queryGraphHandoffExposure`)는 별도 `handoff.exposure` scope를 요구합니다. `handoff.read`만으로 조회할 수 없고, exposure 권한만으로 bundle을 읽을 수도 없습니다. 요청은 기존 `zoop-handoff-exposure-1`이며 명시한 고유 handoff ID 1~20개와 변경 신원 하나를 받습니다. 본문은 선언된 길이와 실제 수신량 모두 65,536바이트 이하이고, query parameter·job·idempotency 요구·캐시·자동 재시도·부분 성공은 없습니다.
+
+성공은 `{"schemaVersion":"zoop-ai-internal-handoff-1","report":…}`입니다. report는 newline 포함 최대 6 MiB의 생산자 canonical 출력과 동일한 닫힌 구조입니다. 서비스는 선택 전체와 변경 신원·정렬·개수·고정 한계·호출 0을 검사하고, 각 manifest/bundle digest를 운영자 allowlist에 대조합니다. **bundle 바이트를 받지 않으므로 그 해시를 독립 계산하는 것은 아닙니다.** 앱은 앞의 네 receipt 신원 대조를 계속 수행해야 하며, 이 결과를 현재 source 권리나 import/활성화 승인으로 쓰지 않습니다.
+
+전용 다섯 변수 그룹은 기본 비활성화입니다. 일반 export와 독립적으로 handoff·ingestion·S2 루트, 고정 실행 파일과 pin allowlist만 필요하며 source registry·canonical·decisions·S3 원장을 요구하지 않습니다. 일반 handoff 설정도 있으면 같은 handoff/source 루트와 같은 allowlist 경로여야 합니다. source 변경 조회만 ingestion/S2를 읽고 S3 관계 철회는 handoff만 읽습니다. 일반 export를 선행 호출하지 않으므로 source grant 철회 이후에도 영향 신원을 찾을 수 있습니다.
+
+전체 allowlist는 child 전·gate 대기 후·child 결과/오류 해석 전·응답 직전에 다시 읽습니다. 어느 선택 항목이든 사라지거나 pin이 바뀌면 403 `handoff_not_allowed`로 전체를 거절합니다. 최종 확인 직후의 철회까지 원자적으로 막는 보장은 아닙니다. 미인증은 401, scope 부족은 403, 비활성은 409 `execution_unavailable`, 선택 중 누락/history/손상은 409 `handoff_selection_unmappable`, pin 불일치는 409 `handoff_pin_mismatch`입니다. 모르는 변경 신원·미사용 관계·생산자 출력 한도는 각각 422 `changed_identity_unknown`·`changed_relation_unused`·`exposure_report_limit`이며, 기록되었지만 선택에 연결되지 않은 신원만 완전한 빈 report가 될 수 있습니다. 경합·실행 불가·운영자 설정 오류는 503, 잘못된 출력/요청 결속은 500입니다. 모든 실패는 기존 `HdErrorEnvelope`만 반환하고 report·부분 영향 ID·CLI detail을 포함하지 않습니다.
+
+실제 loopback HTTP/설치 CLI 회귀와 smoke는 synthetic authored replay 자료를 사용합니다(`ai/service/scripts/handoff_exposure_service_smoke.py`). 실기사 품질이나 운영 배포를 증명하지 않으며, 앱의 버전별 제외 적용과 정정·복구 정책은 여전히 앱 소유입니다.

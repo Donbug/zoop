@@ -1,0 +1,105 @@
+{
+  "id": "external-pilot-v1",
+  "collectedAt": "2026-10-22T07:13:48.059373+00:00",
+  "purpose": "Small public data intake and format pilot, not a representative benchmark or held-out test set.",
+  "collectionExecution": {
+    "modelsCalled": false,
+    "upstreamCodeExecuted": false,
+    "adapterOrScorerImplemented": false
+  },
+  "limitations": [
+    "The samples are source-order selections, not random or balanced.",
+    "English financial QA and Korean general-domain relation extraction must not be pooled into a Zoop accuracy score.",
+    "Gold is kept separate from model-visible files; both are development material already inspected by the author.",
+    "Existing zoop_eval score commands do not accept these external dataset shapes."
+  ],
+  "sources": [
+    {
+      "id": "klue-re",
+      "title": "KLUE: Korean Language Understanding Evaluation, Relation Extraction",
+      "creators": [
+        "KLUE authors"
+      ],
+      "upstream": "https://github.com/KLUE-benchmark/KLUE",
+      "dataset": "https://huggingface.co/datasets/klue/klue",
+      "retrievalUrl": "https://datasets-server.huggingface.co/rows?dataset=klue%2Fklue&config=re&split=train&offset=0&length=20",
+      "revisionObserved": "349481ec73fff722f88e0453ca05c77a447d967c",
+      "revisionBindingVerified": false,
+      "revisionNote": "Dataset metadata revision observed separately; row API response does not bind a revision. Stored file hashes pin this collected sample, not equality with the original KLUE distribution.",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "licenseEvidence": "https://github.com/KLUE-benchmark/KLUE/blob/main/License.md",
+      "citation": "https://arxiv.org/abs/2105.09680",
+      "warranty": "No warranties; upstream license terms apply.",
+      "modifications": "Selected train rows 0..19; removed label from input and copied it to separate gold with the response-provided label name; source sentences and entity coordinates unchanged. This selected material remains CC BY-SA 4.0.",
+      "counts": {
+        "records": 20,
+        "entitySpansChecked": 40
+      },
+      "files": [
+        "klue-re.inputs.json",
+        "klue-re.gold.json"
+      ]
+    },
+    {
+      "id": "tatqa",
+      "title": "TAT-QA: A Question Answering Benchmark on a Hybrid of Tabular and Textual Content in Finance",
+      "creators": [
+        "Fengbin Zhu",
+        "Wenqiang Lei",
+        "Youcheng Huang",
+        "Chao Wang",
+        "Shuo Zhang",
+        "Jiancheng Lv",
+        "Fuli Feng",
+        "Tat-Seng Chua"
+      ],
+      "upstream": "https://github.com/NExTplusplus/TAT-QA",
+      "retrievalUrl": "https://raw.githubusercontent.com/NExTplusplus/TAT-QA/master/dataset_raw/tatqa_dataset_dev.json",
+      "sourceBlobSha1": "48075c812af3fe6698b1d5cb50d9dbf358d52784",
+      "sourceBytes": 1637431,
+      "sourceBlobVerified": true,
+      "sourceVerification": "The text reader omitted one trailing LF. Restoring that LF matches the GitHub content API byte count and Git blob SHA-1. Only the first five parsed contexts are stored here.",
+      "license": "CC-BY-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "licenseEvidence": "https://github.com/NExTplusplus/TAT-QA#license",
+      "citation": "https://aclanthology.org/2021.acl-long.254/",
+      "warranty": "No warranties; upstream license terms apply.",
+      "modifications": "Selected first five dev contexts. Inputs retain original table, paragraphs, question UID/order/text. All remaining question annotation fields are stored separately as gold without rewriting answers.",
+      "counts": {
+        "contexts": 5,
+        "questions": 30
+      },
+      "files": [
+        "tatqa.inputs.json",
+        "tatqa.gold.json"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "klue-re.inputs.json",
+      "role": "input",
+      "sha256": "cf7d9a7fb0842e2c1cc057760cceb768c487c37449168a8e754cbff71e3c1092",
+      "bytes": 12730
+    },
+    {
+      "path": "klue-re.gold.json",
+      "role": "gold",
+      "sha256": "3cb0d0065c72a772f81f4d57e293c05ed1ad6077f15fd878a1b212b2ccbf3021",
+      "bytes": 3027
+    },
+    {
+      "path": "tatqa.inputs.json",
+      "role": "input",
+      "sha256": "5164694139d946626af02ffafceaa993db285756752e85fafb63a4350d265e8d",
+      "bytes": 22880
+    },
+    {
+      "path": "tatqa.gold.json",
+      "role": "gold",
+      "sha256": "56fd0f1eae618ffd6dda46ea2a6682b1880cd4ca9ca7f8073a83d69c44924d7e",
+      "bytes": 11644
+    }
+  ]
+}
