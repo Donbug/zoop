@@ -298,6 +298,45 @@ describe('D-AI-01 · asking with a linked target', () => {
     );
   });
 
+  it('does not call a question that is still being sent unconfirmed', async () => {
+    server.on('GET', CURRENT, () => json(conversation([])));
+    const accepted = deferred<Response>();
+    let sentId = '';
+    server.on('POST', JOBS, (request) => {
+      sentId = (request.body as { jobId: string }).jobId;
+      return accepted.promise;
+    });
+    const { user } = open(null);
+    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    await user.type(screen.getByLabelText('질문'), 'HBM?');
+    await user.click(screen.getByRole('button', { name: '보내기' }));
+    await waitFor(() => expect(server.calls('POST', JOBS)).toHaveLength(1));
+    expect(screen.queryByText(/접수됐는지 확인하지 못했어요/)).toBeNull();
+    accepted.resolve(json(job({ id: sentId, question: 'HBM?' }), 202));
+    await screen.findByRole('article', { name: 'HBM?' });
+  });
+
+  it('keeps an accepted status whose body could not be read as unconfirmed, never as refused', async () => {
+    server.on('GET', CURRENT, () => json(conversation([])));
+    server.on(
+      'POST',
+      JOBS,
+      () =>
+        new Response('{"broken', {
+          status: 202,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    const { user } = open(null);
+    await screen.findByText(/궁금한 점을 입력해 보세요/);
+    await user.type(screen.getByLabelText('질문'), 'HBM?');
+    await user.click(screen.getByRole('button', { name: '보내기' }));
+    await screen.findByText(/질문이 접수됐는지 확인하지 못했어요/);
+    expect(
+      screen.getByRole('button', { name: '같은 질문 다시 보내기' }),
+    ).toBeTruthy();
+  });
+
   it('keeps an unconfirmed question pending: no new id until it is resent or discarded', async () => {
     // SESSION also matches /current, so CURRENT is registered last to win that path.
     server.on('GET', SESSION, () => json(conversation([]).conversation));
@@ -318,6 +357,10 @@ describe('D-AI-01 · asking with a linked target', () => {
       screen.getByRole('button', { name: '보내기' }).hasAttribute('disabled'),
     ).toBe(true);
     expect(server.calls('POST', JOBS)).toHaveLength(1);
+    // Nor can a new conversation start: the unconfirmed question is resent or discarded first.
+    expect(
+      screen.getByRole('button', { name: '새 대화' }).hasAttribute('disabled'),
+    ).toBe(true);
 
     await user.click(
       screen.getByRole('button', { name: '보내지 않은 것으로 하기' }),
@@ -581,11 +624,12 @@ describe('D-AI-02 · job states and stored results', () => {
     await user.click(
       within(card).getByRole('button', { name: /지도에서 보기 · SK하이닉스/ }),
     );
+    // Only the cutoff the question named: a version-pinned answer gets no time filter from its data time.
     expect(onViewOnMap).toHaveBeenCalledWith({
       id: 'KRX:000660',
       kind: 'company',
       graphVersion: 'gv-1',
-      asOf: '2026-10-21T00:00:00Z',
+      asOf: null,
     });
     expect(within(card).queryByText(/그대로 열 수 없어요/)).toBeNull();
     onViewOnMap.mockReturnValueOnce(false);
@@ -683,7 +727,7 @@ describe('D-AI-02 · job states and stored results', () => {
     expect(live?.textContent).toContain('답변 작성');
   });
 
-  it('a late retry answer from the previous conversation is not merged into the new one', async () => {
+  it('a new conversation waits for a retry in flight, then starts clean', async () => {
     const failed = job({
       id: 'job-failed02',
       question: '이전 대화의 실패',
@@ -713,10 +757,27 @@ describe('D-AI-02 · job states and stored results', () => {
     await user.click(
       within(card).getByRole('button', { name: '질문 다시 처리' }),
     );
+    // The retry may be accepted: switching now would drop its answer, so the switch waits.
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole('button', { name: '새 대화' })
+          .hasAttribute('disabled'),
+      ).toBe(true),
+    );
+    expect(server.calls('PUT', SESSION)).toHaveLength(0);
+    retried.resolve(
+      json({ ...failed, status: 'queued', failure: null, phase: null }, 202),
+    );
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole('button', { name: '새 대화' })
+          .hasAttribute('disabled'),
+      ).toBe(false),
+    );
     await user.click(screen.getByRole('button', { name: '새 대화' }));
     await screen.findByText(/궁금한 점을 입력해 보세요/);
-    retried.resolve(json({ ...failed, status: 'queued', failure: null }, 202));
-    await new Promise((resolve) => setTimeout(resolve, 50));
     expect(screen.queryByText('이전 대화의 실패')).toBeNull();
   });
 
@@ -851,6 +912,21 @@ describe('contextFromTarget', () => {
       graphVersion: 'gv-old',
       asOf: '2026-10-01T00:00:00Z',
     });
+  });
+
+  it('sends only a cutoff the map itself applies: a company map with an exact time', () => {
+    for (const url of [
+      '/?mode=all&asOf=2026-10-01T00%3A00%3A00Z', // no company map: the map ignores asOf
+      '/?companyId=KRX%3A005930&asOf=2026-10-01', // not an exact time with a zone
+    ]) {
+      expect(
+        contextFromTarget({
+          kind: 'company',
+          id: 'KRX:005930',
+          mapContext: { url, graphVersion: 'gv-old' },
+        }),
+      ).toEqual({ contextIds: ['KRX:005930'], graphVersion: 'gv-old' });
+    }
   });
 
   it('splits an impact path, keeps evidence and the pinned version, and sends no asOf the member did not set', () => {

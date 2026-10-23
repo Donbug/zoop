@@ -335,7 +335,7 @@ function Answer({
   );
 }
 
-// 대상은 답변을 만든 그래프 버전에 묶여 있다: 지금 지도가 다른 버전이면 그 버전으로 열거나, 열 수 없다고 알린다.
+// 대상은 답변을 만든 그래프 버전·기준 시각에 묶여 있다: 지금 지도가 같은 스냅샷이 아니면 그 스냅샷으로 열거나, 열 수 없다고 알린다.
 function MapTargets({
   job,
   result,
@@ -359,7 +359,8 @@ function MapTargets({
                   id: target.id,
                   kind: target.kind,
                   graphVersion: result.applied.graphVersion,
-                  asOf: job.context.asOf ?? result.applied.dataAsOf,
+                  // 질문에 명시된 기준 시각만: 버전만 고정한 답변에 데이터 시점을 시간 필터로 덧붙이지 않는다.
+                  asOf: job.context.asOf ?? null,
                 }),
               )
             }
@@ -370,7 +371,8 @@ function MapTargets({
       </div>
       {unavailable && (
         <p className={ui.muted} role="status">
-          이 답변은 그래프 버전 {result.applied.graphVersion} 기준이라 지금
+          이 답변은 그래프 버전 {result.applied.graphVersion}
+          {job.context.asOf ? ` · ${job.context.asOf}` : ''} 기준이라 지금
           지도에서 그대로 열 수 없어요.
         </p>
       )}
