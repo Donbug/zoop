@@ -297,3 +297,87 @@ describe('D-BRF-01·02 company outlook', () => {
     expect(screen.queryByRole('article')).toBeNull();
   });
 });
+
+const specific = {
+  ...layer.companies[0],
+  reading: {
+    schemaVersion: 'zoop-company-reading-v2' as const,
+    status: 'PASS' as const,
+    resultVersion: 'reading-v2-test',
+    brief: {
+      text: '증설은 장비 공급능력 확대의 조건부 근거입니다.',
+      evidenceIds: ['e'],
+    },
+    fact: {
+      text: '합성 기업이 새 생산라인 증설 계획을 발표했습니다.',
+      evidenceIds: ['e'],
+    },
+    watch: {
+      text: '실제 가동이 확인되면 공급 확대 판단을 강화합니다.',
+      evidenceIds: ['e'],
+    },
+    background: {
+      text: '기존 생산능력 수치는 제공되지 않았습니다.',
+      evidenceIds: ['e'],
+    },
+    change: {
+      text: '비교할 같은 기업의 이전 판단이 없습니다.',
+      evidenceIds: ['e'],
+    },
+  },
+};
+describe('D-BRF-01/02 specific company reading v2', () => {
+  it('shows judgment, new fact and next condition before collapsed background and evidence', () => {
+    render(
+      <CompanyOutlooks
+        result={{
+          ...result,
+          companyOutlooks: { ...layer, companies: [specific] },
+        }}
+        compact
+      />,
+    );
+    const card = screen.getByLabelText('합성 기업 판단과 새 사실');
+    const text = card.textContent!;
+    expect(text.indexOf('한 줄 판단')).toBeLessThan(text.indexOf('새 사실'));
+    expect(text.indexOf('새 사실')).toBeLessThan(
+      text.indexOf('다음 확인 조건'),
+    );
+    expect(
+      screen.getByText('배경·이전 판단과의 연결·문장 근거').closest('details')!
+        .open,
+    ).toBe(false);
+    expect(screen.getAllByText(specific.reading.background.text).length).toBe(
+      1,
+    );
+    expect(
+      screen.getByText('자세히 · 기업 전망 전문과 근거').closest('details')!
+        .open,
+    ).toBe(false);
+  });
+  it.each(['WITHHELD', 'missing_fact', 'foreign_evidence'])(
+    'does not expose unverified v2 text for %s',
+    (state) => {
+      const company = structuredClone(specific);
+      if (state === 'WITHHELD')
+        (company.reading as { status: string }).status = state;
+      if (state === 'missing_fact') company.reading.fact.text = '';
+      if (state === 'foreign_evidence')
+        company.reading.fact.evidenceIds = ['another-company'];
+      render(
+        <CompanyOutlooks
+          result={{
+            ...result,
+            companyOutlooks: { ...layer, companies: [company] },
+          }}
+          compact
+        />,
+      );
+      expect(screen.queryByLabelText('합성 기업 판단과 새 사실')).toBeNull();
+      expect(
+        screen.getByText(/검증된 새 문안을 표시할 수 없습니다/),
+      ).toBeTruthy();
+      expect(screen.getByText('자세히 · 기업 전망 전문과 근거')).toBeTruthy();
+    },
+  );
+});

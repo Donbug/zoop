@@ -2845,7 +2845,7 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 
 ### CompanyShortReading
 
-전문을 보존하면서 별도 생성·검증한 짧은 읽기. PASS일 때만 세 문장이 존재합니다.
+전문을 보존하면서 별도 생성·검증한 짧은 읽기. v2는 판단·새 사실·다음 확인·배경·이전 판단 비교를 구분합니다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -2854,6 +2854,9 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | brief | 선택 | [CompanyStatement](#schema-companystatement) |  |
 | watch | 선택 | [CompanyStatement](#schema-companystatement) |  |
 | change | 선택 | [CompanyStatement](#schema-companystatement) |  |
+| schemaVersion | 선택 | string {zoop-company-reading-v2} | v2 표기. 기존 v1에서는 생략. |
+| fact | 선택 | [CompanyStatement](#schema-companystatement) |  |
+| background | 선택 | [CompanyStatement](#schema-companystatement) |  |
 
 <a id="schema-companypricepoint"></a>
 

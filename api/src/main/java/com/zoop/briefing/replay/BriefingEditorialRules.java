@@ -108,7 +108,53 @@ final class BriefingEditorialRules {
                 require(Canonical.sha256(prompt).equals(Canonical.sha256(request.string("instructions"))), "review_prompt");
             } catch (java.io.IOException error) { throw new IllegalArgumentException("Editorial review missing", error); }
         }
+        // A reviewed history can grow while immutable completed calls remain
+        // in the shared cache. These older calls are accounting only: selection
+        // still reads exactly the active row's digest and decisions above.
+        if (history.has("retrievalPolicy") && "reviewed-issuer-first-v1".equals(history.string("retrievalPolicy"))) {
+            for (var entry : receipts.entrySet()) if (!owned.contains(entry.getKey())) {
+                var call = BriefingGroupedSimulationRules.recording(entry.getValue(), output, true);
+                StrictJson.Obj current = layer.objects("rounds").stream()
+                        .filter(r -> r.object("window").node().equals(call.input().object("window").node()))
+                        .findFirst().orElseThrow(() -> new IllegalArgumentException("Editorial history window absent"));
+                historicalInput(call.input(), current.object("frozen"), reports);
+                Set<String> ids = new HashSet<>(); call.input().objects("issues").forEach(i -> ids.add(i.string("issueId")));
+                call.answer().exactly(ids);
+                for (StrictJson.Obj issue : call.input().objects("issues")) {
+                    var decision=call.answer().object(issue.string("issueId")); Set<String> evidence=new HashSet<>();
+                    issue.objects("newEvidence").forEach(e -> evidence.add(e.string("evidenceId")));
+                    require(Set.of("REPEAT","MATERIAL_UPDATE","DISTINCT_EVENT","UNCERTAIN").contains(decision.string("decision"))
+                            && !decision.string("reason").isBlank() && evidence.containsAll(decision.strings("deltaEvidenceIds"))
+                            && ("MATERIAL_UPDATE".equals(decision.string("decision")) == !decision.strings("deltaEvidenceIds").isEmpty()), "historical_decision");
+                }
+                try {
+                    var request=StrictJson.parseObject(Files.readAllBytes(output.resolve("calls/"+entry.getKey()+".request.json")));
+                    byte[] prompt=BriefingEditorialRules.class.getResourceAsStream("/briefing/prompts/"+layer.string("promptVersion")+"/review.md").readAllBytes();
+                    require(Canonical.sha256(prompt).equals(Canonical.sha256(request.string("instructions"))), "historical_prompt");
+                } catch (java.io.IOException error) { throw new IllegalArgumentException("Editorial history unavailable",error); }
+                owned.add(entry.getKey());
+            }
+        }
         require(owned.equals(receipts.keySet()), "orphan_receipt");
+    }
+
+    static void historicalInput(StrictJson.Obj old, StrictJson.Obj current, Map<String, StrictJson.Obj> reports) {
+        old.exactly(Set.of("window","reports","issues"));
+        require(old.object("window").node().equals(current.object("window").node()), "historical_window");
+        Instant from=Instant.parse(old.object("window").string("from")); Set<String> available=new HashSet<>(), seen=new HashSet<>();
+        for (StrictJson.Obj report : old.objects("reports")) {
+            String id=report.string("reportId");
+            require(available.add(id) && reports.containsKey(id) && reports.get(id).node().equals(report.node())
+                    && !Instant.parse(report.string("availableBefore")).isAfter(from), "historical_report");
+        }
+        for (StrictJson.Obj issue : old.objects("issues")) {
+            String id=issue.string("issueId");
+            var active=current.objects("issues").stream().filter(i -> id.equals(i.string("issueId"))).findFirst().orElseThrow();
+            ObjectNode a=(ObjectNode)issue.node().deepCopy(), b=(ObjectNode)active.node().deepCopy();
+            a.remove("priorReportIds");b.remove("priorReportIds");
+            require(seen.add(id) && a.equals(b) && available.containsAll(issue.strings("priorReportIds")), "historical_current_evidence");
+        }
+        require(seen.size()==current.objects("issues").size(), "historical_population");
     }
 
     static ObjectNode decision(StrictJson.Obj archive, StrictJson.Obj window, String issueId) {

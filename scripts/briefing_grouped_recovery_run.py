@@ -34,6 +34,32 @@ def require(condition, code):
     grouped.require(condition, code)
 
 
+def validate_review(review, inbox):
+    holds=review.get('holds',[])
+    require(review.get('userInboxRef')==inbox and type(holds) is list, 'recovery_review_authorization')
+    seen=set()
+    for hold in holds:
+        require(type(hold) is dict and all(hold.get(k) for k in ('roundId','issueId','code','reason')),
+                'recovery_review_hold_invalid')
+        key=(hold['roundId'],hold['issueId']);ids=hold.get('evidenceIds')
+        require(key not in seen and type(ids) is list and bool(ids)
+                and all(type(i) is str and i for i in ids) and len(ids)==len(set(ids)), 'recovery_review_hold_evidence')
+        seen.add(key)
+    return holds
+
+
+def validate_resume_draft(old, fresh):
+    if old.get('draft') is None:return
+    if old.get('draftOrigin')=='base':
+        # Base drafts retain their original generation contract and exact
+        # recorded bytes; the newer recovery writer's guards cannot relabel it.
+        require(fresh.get('draftOrigin')=='base' and old['draft']==fresh.get('draft')
+                and old.get('draftSourceRequestDigest')==fresh.get('draftSourceRequestDigest'),
+                'recovery_resume_base_draft_changed')
+    else:
+        recovery.validate_item(old['draft'],old['selection'])
+
+
 class CacheOnlyRecoveryClient(recovery.RecoveryClient):
     """Revalidate completed responses without reserving or transmitting a call."""
     def call(self, stage, data, prompt_name, schema_name, max_output=8000, schema_override=None):
@@ -244,7 +270,7 @@ def _run(args, transport=None):
         "previousOutputPolicy": "Original generated prose is not new fact evidence; effective history uses prior published exact quotes only."}
     review_path = getattr(args, "review_holds", None)
     review_raw = base.regular(Path(review_path)) if review_path else None
-    review_holds = base.strict_load(review_raw).get("holds", []) if review_raw else []
+    review_holds = validate_review(base.strict_load(review_raw), args.user_inbox_ref) if review_raw else []
     require(type(review_holds) is list and all(type(h) is dict and h.get("roundId") and h.get("issueId")
             and h.get("code") and h.get("reason") for h in review_holds), "recovery_review_hold_invalid")
     layer["editorialReview"] = {"sha256": base.digest(review_raw) if review_raw else None, "holds": clone(review_holds),
@@ -255,6 +281,11 @@ def _run(args, transport=None):
         prepared.append(entries)
         if record["selectionStatus"] == "SELECTED":
             history.extend(record["selected"])
+    for hold in review_holds:
+        entries=[e for record,items in zip(bundle['rounds'],prepared) if record['roundId']==hold['roundId']
+                 for e in items if e['issueId']==hold['issueId'] and e['selection'] is not None]
+        require(len(entries)==1 and set(hold['evidenceIds']) <= {s['evidenceId'] for s in entries[0]['selection']['sources']},
+                'recovery_review_source_binding')
     output = Path(args.output); base.private_dir(output)
     recordings_from = getattr(args, "recordings_from", None)
     if recordings_from:
@@ -294,8 +325,7 @@ def _run(args, transport=None):
             for old, new in zip(frozen["items"], fresh["items"]):
                 require(all(old.get(k) == new.get(k) for k in ("issueId", "originalRank", "selection", "sourceSelectionRequestDigest")),
                         "recovery_resume_selection_changed")
-                if old.get("draft") is not None:
-                    recovery.validate_item(old["draft"], old["selection"])
+                validate_resume_draft(old,new)
         prepared = [r["items"] for r in prior_plan["rounds"]]
     else:
         base.write_once(output / "plan.json", base.canonical(plan))
@@ -307,6 +337,8 @@ def _run(args, transport=None):
     require(args.user_inbox_ref and (args.key_file or transport or cache_only), "recovery_execution_authorization_required")
     base.write_once(output / "base-bundle-v2.json", raw)
     base.write_once(output / "grouped-issues.json", archive_raw)
+    if (source.parent/'publication-companies.json').exists():
+        base.write_once(output/'publication-companies.json',base.regular(source.parent/'publication-companies.json'))
     if review_raw:
         base.write_once(output / "editorial-review-holds.json", review_raw)
     calls = output / "calls"; base.private_dir(calls)
