@@ -1,4 +1,4 @@
-"""The five S1 `/internal/v1/analysis-jobs` routes, the five S2 `/internal/v1/extraction-jobs` routes, the eight S3 `/internal/v1/relation-jobs` routes (five job routes, three review-operation routes) the two read-only `/internal/v1/graph-versions` routes and the two read-only `/internal/v1/graph-handoffs` routes. HTTP framing only: auth, headers, bounded strict body parsing, error envelope, request id.
+"""The five S1 `/internal/v1/analysis-jobs` routes, the five S2 `/internal/v1/extraction-jobs` routes, the eight S3 `/internal/v1/relation-jobs` routes (five job routes, three review-operation routes) the two read-only `/internal/v1/graph-versions` routes, the two read-only `/internal/v1/graph-handoffs` routes and the synchronous `/internal/v1/chat-stages/{stage}` route. HTTP framing only: auth, headers, bounded strict body parsing, error envelope, request id.
 
 Order is fixed: authentication and scope, then headers, then body. Documentation, CORS, proxy headers and the server header are
 off. An unexpected exception becomes a bare `internal_error` envelope; its text is never sent or logged.
@@ -21,6 +21,8 @@ from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .auth import authenticate
+from .chat_stages import ChatStages
+from .chat_wire import STAGES, ChatStageRequest, ChatStageResult
 from .config import Principal
 from .jobs import ApiError, JobService, Observation, Reply
 from .logs import emit
@@ -126,6 +128,18 @@ def parse_submit(raw: bytes, key: str) -> dict[str, Any]:
     if value["jobId"] != key:
         raise invalid("Idempotency-Key")
     return value
+
+
+def parse_chat_stage(raw: bytes, key: str) -> ChatStageRequest:
+    """Strict UTF-8 JSON object without duplicate keys and exactly the envelope keys; the installed `zoop-ai-chat` validates the stage input."""
+    try:
+        value = json.loads(raw.decode("utf-8"), object_pairs_hook=_duplicate_free, parse_constant=_no_constant)
+        request = ChatStageRequest.model_validate(value)
+    except (UnicodeDecodeError, ValueError, RecursionError, ValidationError):
+        raise invalid("body") from None
+    if request.invocation_id != key:
+        raise invalid("Idempotency-Key")
+    return request
 
 
 def parse_relation_submit(raw: bytes, key: str) -> RelationSubmit:
@@ -305,6 +319,17 @@ GRAPH_ERRORS = {
     503: {"model": GraphErrorEnvelope, "description": "runtime_unavailable, runtime_busy, service_configuration_invalid or service_busy (retryable); never an empty graph."},
 }
 
+CHAT_ERRORS = {
+    401: {"model": ErrorEnvelope, "description": "authentication_required: missing, malformed or unknown bearer token."},
+    403: {"model": ErrorEnvelope, "description": "scope_denied: the principal lacks `chat.invoke`."},
+    409: {"model": ErrorEnvelope, "description": "execution_unavailable: the chat configuration group is not enabled, or a replay request without a configured fixture."},
+    422: {"model": ErrorEnvelope, "description": "invalid_request: header, path, envelope, or the stage input the runtime refused. Nothing was sent."},
+    500: {"model": ErrorEnvelope, "description": "internal_error."},
+    502: {"model": ErrorEnvelope, "description": "stage_outcome_unknown: the runtime ended abnormally or its output was unreadable. It may have sent the request: never resend this invocation."},
+    503: {"model": ErrorEnvelope, "description": "runtime_unavailable, service_busy or service_configuration_invalid (retryable): nothing was sent."},
+    504: {"model": ErrorEnvelope, "description": "stage_outcome_unknown: the stage deadline passed. It may have sent the request: never resend this invocation."},
+}
+
 HANDOFF_ERRORS = {
     401: {"model": HdErrorEnvelope, "description": "authentication_required: missing, malformed or unknown bearer token."},
     403: {"model": HdErrorEnvelope, "description": "scope_denied: the principal lacks `handoff.read`; or handoff_not_allowed: the handoff is not listed for this principal (unknown, unlisted and another principal's answer alike)."},
@@ -317,13 +342,14 @@ HANDOFF_ERRORS = {
 
 
 def create_app(service: JobService | None = None, relation: RelationJobs | None = None, extraction: ExtractionJobs | None = None,
-               graph: GraphReads | None = None, handoff: HandoffReads | None = None) -> FastAPI:
+               graph: GraphReads | None = None, handoff: HandoffReads | None = None, chat: ChatStages | None = None) -> FastAPI:
     """With no service this builds the route skeleton only (OpenAPI export); a service makes it serve requests. `relation` is the
     S3 relation-job family, `extraction` the S2 extraction-job family, `graph` the read-only graph-version family and `handoff` the read-only handoff family; without one, every
     route of that family answers 409 `execution_unavailable` after authentication."""
     app = FastAPI(title="Zoop internal AI analysis transport", version="1.0.0", docs_url=None, redoc_url=None, openapi_url=None,
                   redirect_slashes=False)
     app.state.service, app.state.relation, app.state.extraction, app.state.graph, app.state.handoff, app.state.log = service, relation, extraction, graph, handoff, emit
+    app.state.chat = chat
     app.add_middleware(Gateway)
 
     @app.exception_handler(ApiError)
@@ -648,5 +674,28 @@ def create_app(service: JobService | None = None, relation: RelationJobs | None 
     async def handoff_bundle(request: Request, principal: Annotated[Principal, Depends(require("handoff.read"))],
                              handoff_id: Annotated[str, PATH_HANDOFF_ID], x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
         return await handoff_call(request, "bundle", principal, handoff_id)
+
+    @app.post("/internal/v1/chat-stages/{stage}", operation_id="invokeChatStage", tags=["chat-stages"], status_code=200,
+              response_model=ChatStageResult, summary="Run one chatbot model stage synchronously: router, answer or verification",
+              responses={**CHAT_ERRORS, 200: {"model": ChatStageResult,
+                                                "description": "The stage ran (or its stored outcome was returned). `status=failed` is a stage outcome, not a transport error."}})
+    async def chat_stage(request: Request, principal: Annotated[Principal, Depends(require("chat.invoke"))],
+                         stage: Annotated[str, Path(description="chat-router, chat-answer or chat-verification.",
+                                                    json_schema_extra={"enum": list(STAGES)})],
+                         idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key", description="Must equal body.invocationId.")] = None,
+                         x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        chat_stages = request.app.state.chat
+        if chat_stages is None:
+            raise ApiError(409, "execution_unavailable")  # the all-or-nothing chat configuration group is not enabled
+        if stage not in STAGES:
+            raise invalid("stage")
+        check_content_type(request)
+        key = request.headers.get("idempotency-key", "")
+        body = parse_chat_stage(await read_body(request), key)
+        context = _context(request)
+        context["jobId"] = key
+        seen = context["seen"] = Observation()
+        status, result = await run_in_threadpool(chat_stages.invoke, principal.name, stage, body, seen)
+        return JSONResponse(result.wire(), status_code=status)
 
     return app

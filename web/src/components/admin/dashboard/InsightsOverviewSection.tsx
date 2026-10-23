@@ -9,6 +9,7 @@ import { count, formatPercent } from '@/components/admin/common/adminStyles';
 import {
   MetricBasis,
   MetricValue,
+  unavailableLabel,
 } from '@/components/admin/stats/insightsFormat';
 import { useAsyncData } from '@/hooks/useAsyncData';
 
@@ -53,13 +54,21 @@ export default function InsightsOverviewSection() {
           <Metric
             label="AI 좋아요 비율"
             value={
-              data.feedback.rate === null ? (
+              data.feedback.availability === 'unavailable' ? (
+                <span className="text-zoop-muted">
+                  {unavailableLabel(data.feedback.unavailableReason)}
+                </span>
+              ) : data.feedback.rate === null ? (
                 <span className="text-zoop-muted">표본 부족</span>
               ) : (
                 formatPercent(data.feedback.rate)
               )
             }
-            detail={`좋아요 ${count(data.feedback.up)} · 싫어요 ${count(data.feedback.down)}`}
+            detail={
+              data.feedback.availability === 'unavailable'
+                ? '좋아요·싫어요 집계가 아직 연결되지 않았어요'
+                : `좋아요 ${count(data.feedback.up)} · 싫어요 ${count(data.feedback.down)}`
+            }
           />
           <Metric
             label="등록 회원"

@@ -1,10 +1,13 @@
 package com.zoop.chat.repository;
 
+import java.sql.Array;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -14,6 +17,18 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
     /** The fence of every write a run makes. */
     private static final String OWNED = "status = 'running' AND owner_token = :token AND lease_until > :at";
     private static final String RELEASE = "phase = NULL, owner_token = NULL, lease_until = NULL, deadline_at = NULL";
+    /**
+     * Closes a job's open tool calls when the job ends: a reserved call never ran ({@code cancelled}); a running one ended
+     * without its result being observed ({@code unknown}, never counted as failed or as not called).
+     */
+    static final String CLOSE_TOOL_CALLS = """
+            UPDATE chat_tool_calls SET status = CASE status WHEN 'reserved' THEN 'cancelled' ELSE 'unknown' END,
+                finished_at = GREATEST(:at, started_at)
+             WHERE chat_job_id = :id AND status IN ('reserved', 'running')
+            """;
+    /** The fence of a tool-call write: the call's job is still owned by the run. */
+    private static final String TOOL_CALL_OWNED = "EXISTS (SELECT 1 FROM chat_jobs j WHERE j.id = c.chat_job_id AND "
+            + "j.status = 'running' AND j.owner_token = :token AND j.lease_until > :at)";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -67,7 +82,7 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
                 + " WHERE id = :id AND " + OWNED, params(jobId, ownerToken, at).addValue("outcome", outcome)
                 .addValue("messageId", messageId).addValue("result", result).addValue("resultVersion", resultSchemaVersion)
                 .addValue("route", routeSummary).addValue("routeVersion", routeSchemaVersion)
-                .addValue("attempts", attempts)) == 1;
+                .addValue("attempts", attempts)) == 1 && closeToolCalls(jobId, at);
     }
 
     @Override
@@ -75,7 +90,7 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
         return jdbc.update("UPDATE chat_jobs SET status = 'failed', failure = CAST(:failure AS jsonb), "
                 + "attempts = CAST(:attempts AS jsonb), finished_at = :at, updated_at = :at, " + RELEASE
                 + " WHERE id = :id AND " + OWNED, params(jobId, ownerToken, at).addValue("failure", failure)
-                .addValue("attempts", attempts)) == 1;
+                .addValue("attempts", attempts)) == 1 && closeToolCalls(jobId, at);
     }
 
     @Override
@@ -98,7 +113,69 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
         return jdbc.update("UPDATE chat_jobs SET status = 'failed', failure = CAST(:failure AS jsonb), "
                 + "attempts = CAST(:attempts AS jsonb), finished_at = :at, updated_at = :at, " + RELEASE
                 + " WHERE id = :id AND status = 'running' AND lease_until <= :at", new MapSqlParameterSource().addValue("id", jobId).addValue("at", Timestamp.from(at))
-                .addValue("failure", failure).addValue("attempts", attempts)) == 1;
+                .addValue("failure", failure).addValue("attempts", attempts)) == 1 && closeToolCalls(jobId, at);
+    }
+
+    @Override
+    public void limitWait(Duration wait) {
+        jdbc.queryForObject("SELECT set_config('statement_timeout', :ms, true)",
+                new MapSqlParameterSource("ms", Long.toString(Math.max(1, wait.toMillis()))), String.class);
+    }
+
+    @Override
+    public int countToolCalls(String jobId, int attemptNo) {
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM chat_tool_calls WHERE chat_job_id = :id AND attempt_no = :attempt",
+                new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo), Integer.class);
+        return count == null ? 0 : count;
+    }
+
+    @Override
+    public void reserveToolCalls(List<NewChatToolCall> calls, Instant at) {
+        for (NewChatToolCall call : calls) {
+            jdbc.update("""
+                    INSERT INTO chat_tool_calls (id, chat_job_id, attempt_no, plan_revision, call_index, tool_call_id,
+                        registry_version, registry_group, capability_id, tool_id, schema_version, input_digest, request_meta,
+                        status, started_at)
+                    VALUES (:id, :jobId, :attempt, :revision, :index, :toolCallId, :registryVersion, :registryGroup,
+                        :capabilityId, :toolId, :schemaVersion, :inputDigest, CAST(:requestMeta AS jsonb), 'reserved', :at)
+                    """, new MapSqlParameterSource().addValue("id", call.id()).addValue("jobId", call.jobId())
+                    .addValue("attempt", call.attemptNo()).addValue("revision", call.planRevision())
+                    .addValue("index", call.callIndex()).addValue("toolCallId", call.toolCallId())
+                    .addValue("registryVersion", call.registryVersion()).addValue("registryGroup", call.registryGroup())
+                    .addValue("capabilityId", call.capabilityId()).addValue("toolId", call.toolId())
+                    .addValue("schemaVersion", call.schemaVersion()).addValue("inputDigest", call.inputDigest())
+                    .addValue("requestMeta", call.requestMeta()).addValue("at", Timestamp.from(at)));
+        }
+    }
+
+    @Override
+    public boolean startToolCall(String jobId, String ownerToken, int attemptNo, String toolCallId, Instant at) {
+        return jdbc.update("UPDATE chat_tool_calls c SET status = 'running', started_at = :at"
+                + " WHERE c.chat_job_id = :id AND c.attempt_no = :attempt AND c.tool_call_id = :toolCallId"
+                + " AND c.status = 'reserved' AND " + TOOL_CALL_OWNED, params(jobId, ownerToken, at)
+                .addValue("attempt", attemptNo).addValue("toolCallId", toolCallId)) == 1;
+    }
+
+    @Override
+    public boolean finishToolCall(String jobId, String ownerToken, int attemptNo, String toolCallId, ChatToolCallEnd end,
+            Instant at) {
+        Array evidenceIds = jdbc.getJdbcTemplate().execute((ConnectionCallback<Array>) connection ->
+                connection.createArrayOf("text", end.evidenceIds().toArray()));
+        return jdbc.update("UPDATE chat_tool_calls c SET status = :status, error_code = :error, data_version = :dataVersion,"
+                + " evidence_ids = :evidenceIds, truncated = :truncated, next_allowed = :nextAllowed,"
+                + " finished_at = GREATEST(:at, c.started_at)"
+                + " WHERE c.chat_job_id = :id AND c.attempt_no = :attempt AND c.tool_call_id = :toolCallId"
+                + " AND c.status = 'running' AND " + TOOL_CALL_OWNED, params(jobId, ownerToken, at)
+                .addValue("attempt", attemptNo).addValue("toolCallId", toolCallId).addValue("status", end.status())
+                .addValue("error", end.errorCode()).addValue("dataVersion", end.dataVersion())
+                .addValue("evidenceIds", evidenceIds).addValue("truncated", end.truncated())
+                .addValue("nextAllowed", end.nextAllowed())) == 1;
+    }
+
+    private boolean closeToolCalls(String jobId, Instant at) {
+        jdbc.update(CLOSE_TOOL_CALLS, new MapSqlParameterSource().addValue("id", jobId).addValue("at", Timestamp.from(at)));
+        return true;
     }
 
     private static MapSqlParameterSource params(String jobId, String ownerToken, Instant at) {
