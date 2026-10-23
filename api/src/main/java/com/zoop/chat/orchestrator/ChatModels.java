@@ -11,7 +11,8 @@ import java.util.Set;
  * run, only after {@code ChatRunControl.beforeModelCall()}. None of them sees a tool, a member id or a database: they get
  * structured input and return typed output the server checks.
  *
- * <p>No production adapter exists yet; until all three do, no engine is registered and question intake stays off.
+ * <p>The production adapter is {@code com.zoop.chat.model.ChatModelStages}; the engine is registered only with
+ * {@code zoop.ai.chat-client.enabled=true}, and question intake stays off without it.
  */
 public final class ChatModels {
     private ChatModels() {
@@ -22,9 +23,9 @@ public final class ChatModels {
         ChatRouteDecision route(ChatRun run, Set<String> boundCapabilities);
     }
 
-    /** Luna answer generator: answers the answerable requirements from their branch context. */
+    /** Luna answer generator: answers the answerable requirements of the run from their branch context. */
     public interface Generator {
-        ChatGeneratedAnswer generate(ChatBranchContext context);
+        ChatGeneratedAnswer generate(ChatRun run, ChatBranchContext context);
     }
 
     /** Jev semantic verification of the sections that passed the deterministic checks. */
@@ -35,10 +36,12 @@ public final class ChatModels {
     /**
      * A model stage failed. {@code fate} says whether the provider may have processed the request: {@link Fate#NOT_SENT}
      * (nothing sent, or a confirmed refusal or malformed answer) may be rerun; {@link Fate#UNKNOWN} (sent, then timed out or
-     * disconnected) never is, because the provider may have processed and charged it.
+     * disconnected) never is, because the provider may have processed and charged it; {@link Fate#REFUSED} (a policy or
+     * configuration refusal: no source grant, the live gate closed, the call budget spent) is not rerun because the same run
+     * would be refused again.
      */
     public static final class Failure extends RuntimeException {
-        public enum Fate { NOT_SENT, UNKNOWN }
+        public enum Fate { NOT_SENT, UNKNOWN, REFUSED }
 
         private final Fate fate;
 

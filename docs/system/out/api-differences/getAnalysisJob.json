@@ -441,6 +441,35 @@
         "type": "string"
       }
     },
+    "response:200:application/json.retry.code": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "allowed",
+          "succeeded",
+          "in_progress",
+          "superseded",
+          "newer_attempt",
+          "duplicate_running",
+          "other_running",
+          "dataset_missing",
+          "outcome_unknown"
+        ]
+      },
+      "bff": {
+        "type": "string",
+        "enum": [
+          "allowed",
+          "succeeded",
+          "in_progress",
+          "superseded",
+          "newer_attempt",
+          "duplicate_running",
+          "other_running",
+          "dataset_missing"
+        ]
+      }
+    },
     "response:200:application/json.startedAt<anyOf:0>": {
       "target": {
         "type": "string",

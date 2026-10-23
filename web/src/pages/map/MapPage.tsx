@@ -1,3 +1,4 @@
+import BriefingRoundIssuePanel from '@/components/graph/BriefingRoundIssuePanel';
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   GraphAppearanceContext,
@@ -22,6 +23,7 @@ import EventDetailPanel, {
   type EventAction,
 } from '@/components/graph/EventDetailPanel';
 import AiChatDrawer from '@/components/ai/AiChatDrawer';
+import type { AnswerMapTarget } from '@/components/ai/ChatJobCard';
 import BriefingSnapshotBanner from '@/components/graph/BriefingSnapshotBanner';
 import EvidenceDrawer from '@/components/evidence/EvidenceDrawer';
 import { graphSummary } from '@/components/graph/graph-model';
@@ -156,7 +158,7 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
   const returnTo = params.get('returnTo');
   const round =
     requestedMode === 'all' ? (params.get('round') ?? undefined) : undefined;
-  const { data, error, loading } = useGraphData(
+  const { data, error, loading, unavailableReason } = useGraphData(
     {
       mode: requestedMode,
       personalFilter: filter,
@@ -363,6 +365,40 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
     };
     if (action === 'evidence') useGraphUiStore.getState().openEvidence(target);
     else openAi(target);
+  }
+  /**
+   * D-AI-02 "지도에서 보기": 답변을 만든 스냅샷(그래프 버전과 질문에 명시된 기준 시각)으로 연다.
+   * - 지금 지도가 같은 버전·같은 기준 시각이고 대상 노드가 있으면 그 자리에서 초점을 맞춘다.
+   * - 아니면 기업 대상이고 명시된 시각이 있을 때만 그 버전·시각의 기업 지도로 이동하며, 이전 사건·영향·회차 선택은 지운다.
+   * - 그 밖(사건·관계, 시각 없이 버전만 고정된 답변)은 지금 지도가 그 스냅샷을 열 수 없으므로 false: 시각을 지어내지 않는다.
+   */
+  function viewAnswerTarget(target: AnswerMapTarget) {
+    const shownVersion = data?.metadata.graphVersion ?? null;
+    const sameSnapshot =
+      (!target.graphVersion || target.graphVersion === shownVersion) &&
+      (target.asOf ?? null) === (asOf ?? null);
+    if (sameSnapshot) {
+      if (!data?.nodes.some((node) => node.id === target.id)) return false;
+      updateQuery({ focus: target.id, hops: '1', path: null });
+      return true;
+    }
+    if (target.kind === 'company' && target.graphVersion && target.asOf) {
+      updateQuery({
+        companyId: target.id,
+        asOf: target.asOf,
+        graphVersion: target.graphVersion,
+        select: `node:${target.id}`,
+        focus: null,
+        hops: null,
+        path: null,
+        event: null,
+        impact: null,
+        round: null,
+        id: null,
+      });
+      return true;
+    }
+    return false;
   }
   function eventAction(action: EventAction, event: EventDetail) {
     const target: GraphTarget = {
@@ -675,7 +711,9 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                 data={data}
                 filterHost={filterHost}
                 centerRequest={centerRequest}
-                memoryOwner={memoryOwner}
+                memoryOwner={
+                  round ? `${memoryOwner}:round:${round}` : memoryOwner
+                }
                 onOpenIsolated={() => {
                   updateQuery({
                     select: 'bundle:isolated',
@@ -713,7 +751,9 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                 <p className="relationship-message" role="status">
                   {loading
                     ? '관계 지도를 불러오는 중입니다.'
-                    : '관계 지도를 불러오지 못했습니다.'}
+                    : unavailableReason === 'snapshot_not_recorded'
+                      ? '이 회차의 그래프 저장본이 없습니다.'
+                      : '관계 지도를 불러오지 못했습니다.'}
                 </p>
               </div>
             )}
@@ -791,7 +831,12 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                     if (edge) selectEdge(edge.id);
                   }}
                   onAskAi={() =>
-                    openAi({ kind: 'company', id: companyNode.id })
+                    openAi({
+                      kind: 'company',
+                      id: companyNode.id,
+                      label: companyNode.label,
+                      mapContext: { ...eventContext, url: `/?${params}` },
+                    })
                   }
                 />
               )}
@@ -853,17 +898,27 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                   onAskAi={() => openAi(impactTarget())}
                 />
               )}
-              {eventId && !pathFrom && (
-                <EventDetailPanel
-                  key={eventId}
-                  id={eventId}
-                  context={eventContext}
-                  geography={selectedNode?.geography ?? null}
-                  logoOf={logoOf}
-                  onClose={() => selectNode(null)}
-                  onAction={eventAction}
-                />
-              )}
+              {eventId &&
+                !pathFrom &&
+                (round ? (
+                  <BriefingRoundIssuePanel
+                    key={`${round}:${eventId}`}
+                    roundId={round}
+                    eventId={eventId}
+                    graphVersion={data?.metadata.graphVersion ?? null}
+                    onClose={() => selectNode(null)}
+                  />
+                ) : (
+                  <EventDetailPanel
+                    key={eventId}
+                    id={eventId}
+                    context={eventContext}
+                    geography={selectedNode?.geography ?? null}
+                    logoOf={logoOf}
+                    onClose={() => selectNode(null)}
+                    onAction={eventAction}
+                  />
+                ))}
               {edgeId && !pathFrom && (
                 <RelationDetailPanel
                   key={edgeId}
@@ -905,11 +960,13 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
                 {loading && <p>선택한 그래프 조회 중…</p>}
                 {error && (
                   <p>
-                    조회 실패: {error}
+                    {unavailableReason ? error : `조회 실패: ${error}`}
                     {data && ' 직전 정상 그래프를 표시합니다.'}{' '}
-                    <button onClick={() => setRetry((v) => v + 1)}>
-                      다시 시도
-                    </button>
+                    {unavailableReason !== 'snapshot_not_recorded' && (
+                      <button onClick={() => setRetry((v) => v + 1)}>
+                        다시 시도
+                      </button>
+                    )}
                   </p>
                 )}
                 {loginNeeded && (
@@ -956,7 +1013,7 @@ function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
               </div>
             )}
           </div>
-          <AiChatDrawer />
+          <AiChatDrawer onViewOnMap={viewAnswerTarget} />
           <EvidenceDrawer
             onViewOnMap={(id) =>
               updateQuery({ focus: id, hops: '1', path: null })

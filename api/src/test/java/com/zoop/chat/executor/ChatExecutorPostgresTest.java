@@ -119,6 +119,32 @@ class ChatExecutorPostgresTest {
     }
 
     @Test
+    void aModelStageIsRecordedAsAChatbotExecutionOwnedByTheJob() {
+        String jobId = submit("기록");
+        var recorder = new com.zoop.chat.model.ChatModelRecorder(
+                new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc), Clock.systemUTC());
+        String id = recorder.start(jobId, "chat-router", "replay");
+        assertEquals("running", jdbc.queryForObject("SELECT status FROM ai_executions WHERE id = ?", String.class, id));
+        recorder.finish(id, "succeeded", new com.zoop.ai.chat.ChatStageReply.Receipt("typesafe", "systemone-v1", "jev",
+                "chat-router-1", "replay", 12L, null, Instant.now(), Instant.now()), null);
+        recorder.finish(id, "failed", null, "late");
+        var row = jdbc.queryForMap("SELECT feature, execution_mode, status, chat_job_id, stage, model, input_tokens, "
+                + "output_tokens, error_code, finished_at FROM ai_executions WHERE id = ?", id);
+        assertEquals("chatbot", row.get("feature"));
+        assertEquals("replay", row.get("execution_mode"));
+        assertEquals("succeeded", row.get("status"), "an ended execution is not rewritten");
+        assertEquals(jobId, row.get("chat_job_id"));
+        assertEquals("chat-router", row.get("stage"));
+        assertEquals("jev", row.get("model"));
+        assertEquals(12L, ((Number) row.get("input_tokens")).longValue());
+        assertNull(row.get("output_tokens"));
+        assertNull(row.get("error_code"));
+        assertTrue(row.get("finished_at") != null);
+        // ai_executions keeps its chat job (ON DELETE RESTRICT): remove the record before the member cascade.
+        jdbc.update("DELETE FROM ai_executions WHERE id = ?", id);
+    }
+
+    @Test
     void concurrentExecutorsClaimAQueuedJobOnce() throws Exception {
         String jobId = submit("동시 실행");
         int threads = 4;

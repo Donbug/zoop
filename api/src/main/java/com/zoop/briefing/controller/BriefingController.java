@@ -38,6 +38,17 @@ public class BriefingController {
         return service.get(date, edition, RequestIdFilter.currentId(request));
     }
 
+    @GetMapping("/{id}/recap")
+    @Operation(operationId = "getBriefingRecap", summary = "새 핵심 이슈가 없는 회차의 이전 발행본 복기",
+            description = "정상 발행된 빈 회차의 고정 비교 참조만 사용합니다. 이전 회차의 현재 권한·정정·시점을 검증하고 저장 원문을 반환합니다. 재생성·새 전망·최신 회차 대체는 하지 않습니다.")
+    @ApiResponse(responseCode = "200", description = "복기 가용 상태와 과거 발행 원문",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = BriefingHttpSchemas.BriefingRecap.class)))
+    @ApiResponse(responseCode = "404", description = "회차 없음")
+    @ApiResponse(responseCode = "503", description = "현재 권한 또는 저장 원문 검증 불가")
+    public ObjectNode getBriefingRecap(@PathVariable String id, HttpServletRequest request) {
+        return service.recap(id, RequestIdFilter.currentId(request));
+    }
+
     @GetMapping("/rounds")
     @Operation(operationId = "listBriefingRounds", summary = "공개 브리핑 이력 조회",
             description = "발행·제공 중단 회차의 메타데이터를 최신순으로 반환합니다. nextCursor와 같은 limit으로 다음 페이지를 조회합니다.")
@@ -50,7 +61,7 @@ public class BriefingController {
 
     @GetMapping("/{id}/graph")
     @Operation(operationId = "getBriefingGraphBasis", summary = "발행 당시 그래프 기준 조회",
-            description = "회차의 고정 버전을 반환합니다. 고정 그래프 조회가 준비되지 않았으면 unavailable이며 최신 그래프로 대체하지 않습니다.")
+            description = "회차의 저장 버전과 가용 상태를 반환합니다. 과거 재구성본은 graphOrigin=reconstructed와 reconstructedAt으로 구분하며 원래 발행본의 graphVersion을 변경하지 않습니다. 저장본이 없으면 unavailable이며 최신 그래프로 대체하지 않습니다.")
     @ApiResponse(responseCode = "200", description = "고정 그래프 기준과 가용 상태",
             content = @Content(mediaType = "application/json", schema = @Schema(implementation = BriefingHttpSchemas.BriefingGraphBasis.class)))
     public ObjectNode getBriefingGraphBasis(@PathVariable String id, HttpServletRequest request) {

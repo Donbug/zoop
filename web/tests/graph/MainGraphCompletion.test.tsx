@@ -1,3 +1,4 @@
+import { BriefingGraphUnavailableError } from '@/apis/graph/briefing-context';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
@@ -20,18 +21,21 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
     selectedId,
     focusId,
     focusHops,
+    memoryOwner,
     onSelect,
   }: {
     data: GraphResponse;
     selectedId: string | null;
     focusId: string | null;
     focusHops: 1 | 2;
+    memoryOwner: string;
     onSelect: (id: string) => void;
   }) => (
     <div
       data-testid="graph-canvas"
       data-focus={focusId ?? ''}
       data-hops={focusHops}
+      data-view-owner={memoryOwner}
     >
       {data.nodes.map((node) => (
         <button
@@ -148,6 +152,9 @@ it('D-BRF-04 회차 지도를 최신 main 지도에 연결하고 현재 지도�
   const router = setup(`/?mode=all&round=${roundId}`);
   await screen.findByTestId('graph-canvas');
   expect(
+    screen.getByTestId('graph-canvas').getAttribute('data-view-owner'),
+  ).toContain(`:round:${roundId}`);
+  expect(
     vi
       .mocked(getGraph)
       .mock.calls.some(([request]) => request.round === roundId),
@@ -167,6 +174,44 @@ it('D-BRF-04 회차 지도를 최신 main 지도에 연결하고 현재 지도�
   await waitFor(() =>
     expect(vi.mocked(getGraph).mock.calls.at(-1)?.[0].round).toBeUndefined(),
   );
+  expect(router.state.location.search).not.toContain('round=');
+});
+
+it('과거 회차 저장본 부재는 재시도 오류와 구분하고 현재 그래프로 이동할 수 있다', async () => {
+  anonymous();
+  const basis = {
+    roundId: 'sim-2026-10-08-morning-original',
+    date: '2026-10-08',
+    edition: 'morning' as const,
+    status: 'unavailable' as const,
+    message: '이 회차에는 발행 당시 저장된 그래프가 없습니다.',
+    reason: null,
+    publishedAt: '2026-10-16T00:30:00Z',
+    dataAsOf: '2026-10-08T00:20:00Z',
+    graphVersion: null,
+    keyIssueIds: [],
+    companyIds: [],
+    correctionCount: 0,
+    unavailableReason: 'snapshot_not_recorded' as const,
+  };
+  vi.mocked(getBriefingGraphBasis).mockResolvedValue(basis);
+  vi.mocked(getGraph).mockImplementation(async (request) => {
+    if (request.round) throw new BriefingGraphUnavailableError(basis);
+    return createMockGraph(request);
+  });
+  const router = setup(`/?round=${basis.roundId}`);
+  await screen.findAllByText(basis.message);
+  expect(screen.queryByText(/조회 실패:/)).toBeNull();
+  expect(screen.getByText('이 회차의 그래프 저장본이 없습니다.')).toBeTruthy();
+  expect(screen.queryByText('관계 지도를 불러오지 못했습니다.')).toBeNull();
+  expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
+  expect(
+    screen.getByRole('link', { name: '브리핑으로' }).getAttribute('href'),
+  ).toContain('date=2026-10-08&edition=morning');
+  await userEvent.click(
+    screen.getByRole('button', { name: '현재 그래프로 보기' }),
+  );
+  await screen.findByTestId('graph-canvas');
   expect(router.state.location.search).not.toContain('round=');
 });
 

@@ -320,4 +320,25 @@ class CompanyDocumentsServiceTest {
                 () -> service.list(COMPANY, "filing", null, null, null, null, null, null, null, "req"))
                 .getErrorCode());
     }
+    @Test
+    void roundDocumentsAndCursorKeepOnlySelectedIssuesAndRejectAnotherRound() {
+        var basis = new com.zoop.graph.version.BriefingGraphLookup.Basis("round", "fixture-2026-10-08", NOW,
+                java.util.Map.of(GraphReadFixtures.HBM_SUPPLY, List.of(COMPANY), GraphReadFixtures.HBM_EQUIP, List.of(HANMI)));
+        var reader = new PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
+                java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC), (id, request) -> basis),
+                new com.zoop.graph.snapshot.FixtureGraphSnapshotStore(getClass().getClassLoader()), () -> DisclosureExclusions.NONE);
+        service = new CompanyDocumentsService(reader, jdbc, registry, evidence, analyses, JsonMapper.builder().build());
+        var first = service.list(COMPANY, null, null, null, "round", null, null, null, 1, "req-1");
+        assertNotNull(first.nextCursor());
+        var second = service.list(COMPANY, null, null, null, "round", null, null, first.nextCursor(), 1, "req-1");
+        assertEquals(first.metadata().asOf(), second.metadata().asOf());
+        assertTrue(java.util.stream.Stream.concat(first.items().stream(), second.items().stream())
+                .flatMap(d -> d.events().stream()).allMatch(e -> basis.keyIssueIds().contains(e.eventId())));
+        assertEquals(ErrorCode.INVALID_CURSOR, assertThrows(CustomException.class, () ->
+                service.list(COMPANY, null, null, null, "other", null, null, first.nextCursor(), 1, "req-1")).getErrorCode());
+        assertEquals(ErrorCode.INVALID_CURSOR, assertThrows(CustomException.class, () ->
+                service.list(COMPANY, null, null, null, null, null, null, first.nextCursor(), 1, "req-1")).getErrorCode());
+        verify(evidence, atLeastOnce()).read(anyString(), eq("round"), eq(basis.graphVersion()), eq(NOW.toString()), eq(COMPANY), eq("req-1"));
+    }
+
 }

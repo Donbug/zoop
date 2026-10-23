@@ -7,7 +7,14 @@
       "aliases": [],
       "brand_color": "#000000",
       "logo": "openai.svg",
-      "brand_source": null
+      "brand_source": null,
+      "profile": {
+        "legalName": "OpenAI Group PBC",
+        "representative": "Sam Altman",
+        "foundedDate": "2015-12-08",
+        "websiteUrl": "https://openai.com",
+        "sector": null
+      }
     },
     {
       "company_id": "ORG:ANTHROPIC",
@@ -16,7 +23,14 @@
       "aliases": [],
       "brand_color": "#181818",
       "logo": "anthropic.svg",
-      "brand_source": null
+      "brand_source": null,
+      "profile": {
+        "legalName": "Anthropic PBC",
+        "representative": "Dario Amodei",
+        "foundedDate": null,
+        "websiteUrl": "https://www.anthropic.com",
+        "sector": null
+      }
     },
     {
       "company_id": "NASDAQ:ASML",
@@ -27,7 +41,15 @@
       ],
       "brand_color": "#0F238C",
       "logo": "asml.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "NASDAQ",
+      "profile": {
+        "legalName": "ASML Holding N.V.",
+        "representative": "Christophe Fouquet",
+        "foundedDate": "1984-04-01",
+        "websiteUrl": "https://www.asml.com",
+        "sector": "Special Industry Machinery, NEC"
+      }
     },
     {
       "company_id": "NYSE:TSM",
@@ -39,7 +61,15 @@
       ],
       "brand_color": "#E60012",
       "logo": "tsmc.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "NYSE",
+      "profile": {
+        "legalName": "Taiwan Semiconductor Manufacturing Company Limited",
+        "representative": "C.C. Wei",
+        "foundedDate": "1987-02-21",
+        "websiteUrl": "https://www.tsmc.com",
+        "sector": "Semiconductors & Related Devices"
+      }
     },
     {
       "company_id": "KRX:005930",
@@ -51,7 +81,15 @@
       ],
       "brand_color": "#1428A0",
       "logo": "samsung.svg",
-      "brand_source": "https://www.samsung.com/us/about-us/brand-identity/logo/"
+      "brand_source": "https://www.samsung.com/us/about-us/brand-identity/logo/",
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "전영현, 노태문",
+        "foundedDate": "1969-01-13",
+        "websiteUrl": "https://www.samsung.com/sec",
+        "sector": "통신 및 방송 장비 제조업"
+      }
     },
     {
       "company_id": "NASDAQ:NVDA",
@@ -63,7 +101,15 @@
       ],
       "brand_color": "#76B900",
       "logo": "nvidia.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "NASDAQ",
+      "profile": {
+        "legalName": "NVIDIA Corporation",
+        "representative": "Jen-Hsun Huang",
+        "foundedDate": "1993-04-05",
+        "websiteUrl": "https://www.nvidia.com",
+        "sector": "Semiconductors & Related Devices"
+      }
     },
     {
       "company_id": "NASDAQ:AMD",
@@ -74,7 +120,15 @@
       ],
       "brand_color": "#ED1C24",
       "logo": "amd.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "NASDAQ",
+      "profile": {
+        "legalName": "Advanced Micro Devices, Inc.",
+        "representative": "Lisa T. Su",
+        "foundedDate": "1969-05-01",
+        "websiteUrl": "https://www.amd.com",
+        "sector": "Semiconductors & Related Devices"
+      }
     },
     {
       "company_id": "NASDAQ:AAPL",
@@ -85,7 +139,15 @@
       ],
       "brand_color": "#000000",
       "logo": "apple.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "NASDAQ",
+      "profile": {
+        "legalName": "Apple Inc.",
+        "representative": "John Ternus",
+        "foundedDate": "1976-04-01",
+        "websiteUrl": "https://www.apple.com",
+        "sector": "Electronic Computers"
+      }
     },
     {
       "company_id": "KRX:000660",
@@ -97,7 +159,15 @@
       ],
       "brand_color": "#E1002A",
       "logo": "sk-hynix.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "곽노정",
+        "foundedDate": "1949-10-15",
+        "websiteUrl": "https://www.skhynix.com",
+        "sector": "반도체 제조업"
+      }
     },
     {
       "company_id": "NASDAQ:MU",
@@ -108,7 +178,15 @@
       ],
       "brand_color": "#000000",
       "logo": "micron.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "NASDAQ",
+      "profile": {
+        "legalName": "Micron Technology, Inc.",
+        "representative": "Sanjay Mehrotra",
+        "foundedDate": "1978-10-05",
+        "websiteUrl": "https://www.micron.com",
+        "sector": "Semiconductors & Related Devices"
+      }
     },
     {
       "company_id": "NASDAQ:MSFT",
@@ -119,7 +197,15 @@
       ],
       "brand_color": "#F35325",
       "logo": "microsoft.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "NASDAQ",
+      "profile": {
+        "legalName": "Microsoft Corporation",
+        "representative": "Satya Nadella",
+        "foundedDate": null,
+        "websiteUrl": "https://www.microsoft.com",
+        "sector": "Services-Prepackaged Software"
+      }
     },
     {
       "company_id": "KRX:035420",
@@ -131,7 +217,15 @@
       ],
       "brand_color": "#03C75A",
       "logo": "naver.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "최수연",
+        "foundedDate": "1999-06-02",
+        "websiteUrl": "https://www.navercorp.com",
+        "sector": "자료처리, 호스팅, 포털 및 기타 인터넷 정보매개 서비스업"
+      }
     },
     {
       "company_id": "KRX:035720",
@@ -142,7 +236,15 @@
       ],
       "brand_color": "#FFCD00",
       "logo": "kakao.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "정신아",
+        "foundedDate": "1995-02-16",
+        "websiteUrl": "https://www.kakaocorp.com",
+        "sector": "자료처리, 호스팅, 포털 및 기타 인터넷 정보매개 서비스업"
+      }
     },
     {
       "company_id": "NASDAQ:META",
@@ -154,7 +256,15 @@
       ],
       "brand_color": "#0467DF",
       "logo": "meta.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "NASDAQ",
+      "profile": {
+        "legalName": "Meta Platforms, Inc.",
+        "representative": "Mark Zuckerberg",
+        "foundedDate": "2004-07-29",
+        "websiteUrl": "https://www.meta.com",
+        "sector": "Services-Computer Programming, Data Processing, Etc."
+      }
     },
     {
       "company_id": "NASDAQ:AMZN",
@@ -166,7 +276,15 @@
       ],
       "brand_color": "#FF9900",
       "logo": "amazon.svg",
-      "brand_source": "https://pages.awscloud.com/rs/112-TZM-766/images/Amazon%20Global_Brand%20Guidelines_DF_v3.pdf"
+      "brand_source": "https://pages.awscloud.com/rs/112-TZM-766/images/Amazon%20Global_Brand%20Guidelines_DF_v3.pdf",
+      "market": "NASDAQ",
+      "profile": {
+        "legalName": "Amazon.com, Inc.",
+        "representative": "Andrew R. Jassy",
+        "foundedDate": "1996-05-28",
+        "websiteUrl": "https://www.amazon.com",
+        "sector": "Retail-Catalog & Mail-Order Houses"
+      }
     },
     {
       "company_id": "KRX:064400",
@@ -178,7 +296,15 @@
       ],
       "brand_color": "#A50034",
       "logo": "lg.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "현신균",
+        "foundedDate": "1987-01-14",
+        "websiteUrl": "https://www.lgcns.com",
+        "sector": "컴퓨터 프로그래밍, 시스템 통합 및 관리업"
+      }
     },
     {
       "company_id": "KRX:018260",
@@ -190,7 +316,15 @@
       ],
       "brand_color": "#1428A0",
       "logo": "samsung-sds.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "이준희",
+        "foundedDate": "1985-05-01",
+        "websiteUrl": "https://www.samsungsds.com",
+        "sector": "컴퓨터 프로그래밍, 시스템 통합 및 관리업"
+      }
     },
     {
       "company_id": "KRX:042700",
@@ -201,7 +335,15 @@
       ],
       "brand_color": "#E60021",
       "logo": "hanmi-semiconductor.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "곽동신",
+        "foundedDate": "1980-12-24",
+        "websiteUrl": "https://www.hanmisemi.com",
+        "sector": "특수 목적용 기계 제조업"
+      }
     },
     {
       "company_id": "KRX:000990",
@@ -213,7 +355,15 @@
       ],
       "brand_color": "#F27720",
       "logo": "db-hitek.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "조기석",
+        "foundedDate": "1953-04-28",
+        "websiteUrl": "https://www.dbhitek.co.kr",
+        "sector": "반도체 제조업"
+      }
     },
     {
       "company_id": "KRX:017670",
@@ -225,7 +375,15 @@
       ],
       "brand_color": "#E1002A",
       "logo": "sk-telecom.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "KOSPI",
+      "profile": {
+        "legalName": null,
+        "representative": "정재헌",
+        "foundedDate": "1984-04-20",
+        "websiteUrl": "https://www.sktelecom.com",
+        "sector": "전기 통신업"
+      }
     },
     {
       "company_id": "NASDAQ:GOOGL",
@@ -238,7 +396,15 @@
       ],
       "brand_color": "#4285F4",
       "logo": "alphabet.svg",
-      "brand_source": "https://partnermarketinghub.withgoogle.com"
+      "brand_source": "https://partnermarketinghub.withgoogle.com",
+      "market": "NASDAQ",
+      "profile": {
+        "legalName": "Alphabet Inc.",
+        "representative": "Sundar Pichai",
+        "foundedDate": "2015-07-23",
+        "websiteUrl": "https://abc.xyz",
+        "sector": "Services-Computer Programming, Data Processing, Etc."
+      }
     },
     {
       "company_id": "NASDAQ:INTC",
@@ -249,7 +415,15 @@
       ],
       "brand_color": "#0071C5",
       "logo": "intel.svg",
-      "brand_source": "https://www.intel.com/content/www/us/en/newsroom/resources/press-kits-intel-overview.html"
+      "brand_source": "https://www.intel.com/content/www/us/en/newsroom/resources/press-kits-intel-overview.html",
+      "market": "NASDAQ",
+      "profile": {
+        "legalName": "Intel Corporation",
+        "representative": "Lip-Bu Tan",
+        "foundedDate": "1968-07-18",
+        "websiteUrl": "https://www.intel.com",
+        "sector": "Semiconductors & Related Devices"
+      }
     },
     {
       "company_id": "NASDAQ:AVGO",
@@ -260,7 +434,15 @@
       ],
       "brand_color": "#E31837",
       "logo": "broadcom.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "NASDAQ",
+      "profile": {
+        "legalName": "Broadcom Inc.",
+        "representative": "Hock E. Tan",
+        "foundedDate": "2018-01-17",
+        "websiteUrl": "https://www.broadcom.com",
+        "sector": "Semiconductors & Related Devices"
+      }
     },
     {
       "company_id": "NASDAQ:ARM",
@@ -272,7 +454,15 @@
       ],
       "brand_color": "#0091BD",
       "logo": "arm.svg",
-      "brand_source": null
+      "brand_source": null,
+      "market": "NASDAQ",
+      "profile": {
+        "legalName": "Arm Holdings plc",
+        "representative": "Rene Haas",
+        "foundedDate": "2018-04-09",
+        "websiteUrl": "https://www.arm.com",
+        "sector": "Semiconductors & Related Devices"
+      }
     }
   ]
 }

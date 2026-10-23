@@ -369,7 +369,7 @@ class OrchestratedChatEngineTest {
     void aModelStageThatRunsPastItsLimitIsInterruptedAndNeverRerun() {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()));
         var interrupted = new java.util.concurrent.CountDownLatch(1);
-        ChatModels.Generator slow = context -> {
+        ChatModels.Generator slow = (run, context) -> {
             try {
                 Thread.sleep(5_000);
             } catch (InterruptedException stop) {
@@ -414,7 +414,7 @@ class OrchestratedChatEngineTest {
             if (routerFailure != null) throw routerFailure;
             return decision;
         };
-        ChatModels.Generator generator = context -> {
+        ChatModels.Generator generator = (run, context) -> {
             generated.add(context);
             if (generatorFailure != null) throw generatorFailure;
             return answer;
