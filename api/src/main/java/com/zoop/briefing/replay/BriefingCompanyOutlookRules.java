@@ -36,7 +36,7 @@ final class BriefingCompanyOutlookRules {
             Map<String, BriefingPresentationRules.Evidence> evidence, List<StrictJson.Obj> history,
             Map<String, JsonNode> receipts, Path output, Set<String> owned) {
         StrictJson.Obj frozen = row.object("frozen");
-        require(SCHEMA.equals(frozen.string("schemaVersion")) && VERSION.equals(frozen.string("promptVersion")), "schema");
+        require(SCHEMA.equals(frozen.string("schemaVersion")) && Set.of(VERSION, "company-outlook-v2").contains(frozen.string("promptVersion")), "schema");
         for (String field : List.of("roundId", "date", "edition", "cutoff")) {
             String value = switch (field) { case "roundId" -> payload.path("id").stringValue();
                 case "cutoff" -> market.string("cutoff"); default -> payload.path(field).stringValue(); };
@@ -158,7 +158,7 @@ final class BriefingCompanyOutlookRules {
     }
 
     private static StrictJson.Obj call(String digest, String phase, StrictJson.Obj frozen, Map<String, JsonNode> receipts, Path output, Set<String> owned) {
-        return recordedCall(digest, phase, frozen, receipts, output, owned, "company_outlook_", VERSION);
+        return recordedCall(digest, phase, frozen, receipts, output, owned, "company_outlook_", frozen.string("promptVersion"));
     }
 
     static StrictJson.Obj recordedCall(String digest, String phase, StrictJson.Obj frozen, Map<String, JsonNode> receipts,

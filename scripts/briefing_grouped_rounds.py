@@ -27,7 +27,8 @@ CORRECTABLE_SELECTION_ERRORS = frozenset({
     "grouped_selected_evidence_outside_current_round", "grouped_update_delta_not_current_round_evidence",
     "grouped_repeat_issue_without_supported_material_update", "grouped_material_update_without_delta",
     "grouped_unknown_or_duplicate_company", "grouped_company_without_selected_evidence",
-    "one_source_cannot_create_multiple_headline_issues",
+    "one_source_cannot_create_multiple_headline_issues", "grouped_company_link_omitted",
+    "grouped_editorial_repeat_or_uncertain", "grouped_editorial_delta_missing", "grouped_selected_evidence_too_thin",
 })
 
 
@@ -171,20 +172,63 @@ def build_grouped_candidates(archive, spec, identity_holds=None):
                  "newEvidenceIds": sorted({e["evidenceId"] for m in new for e in m["evidence"]}),
                  "asOfEvidenceIds": sorted({e["evidenceId"] for m in available for e in m["evidence"]}),
                  "window": copied(spec["window"]), "sourceFileSha256": archive.get("sourceFileSha256"),
-                 "historicalSimulation": True, "operationalCollectionGate": False,
+                 "historicalSimulation": not bool(spec.get("localCollection")), "operationalCollectionGate": False,
                  "historicalBodyUnchangedProven": False}
+        if archive.get("editorialReview"):
+            import briefing_editorial_guard as editorial
+            value["freshnessReview"] = editorial.decision(archive, spec, issue_id)
         value["asOfSnapshotSha256"] = base.digest(base.canonical(value))
         result.append(value)
     return result
 
 
-def selection_schema(candidates):
+def evidence_eligible(candidate):
+    if "evidencePolicy" in candidate:
+        import briefing_semantic_support as semantic
+        return semantic.eligible(candidate)
+    # Historical contracts are replayed verbatim. Fresh runs always declare the
+    # semantic policy; this branch cannot authorize a new semantic selection.
+    return "freshnessReview" not in candidate or sum(len(e["quote"]) for eid, e in _catalog(candidate)[0].items()
+        if eid in candidate["newEvidenceIds"]) >= 80
+
+
+def selection_schema(candidates, publication_company_ids=None):
     value = base.strict_load(base.regular(PROMPTS / "selection.schema.json"))
     template = value["properties"]["assessments"]["additionalProperties"]
     ids = sorted(c["issueId"] for c in candidates)
     value["properties"]["assessments"] = {"type": "object", "properties": {key: copied(template) for key in ids},
         "required": ids, "additionalProperties": False}
-    value["properties"]["selected"]["items"]["properties"]["issueId"]["enum"] = ids or ["__no_candidate__"]
+    selected_ids = ids
+    if publication_company_ids is not None:
+        registered = set(publication_company_ids)
+        selected_ids = [c["issueId"] for c in candidates if
+            (linked := {co["companyId"] for m in c["newMentions"] + c["backgroundMentions"] for co in m["companies"]})
+            and linked <= registered]
+        value["properties"]["selected"]["items"]["properties"]["companyIds"]["items"]["enum"] = sorted(registered)
+    selected_ids = [i for i in selected_ids if next(c for c in candidates if c["issueId"] == i).get("freshnessReview", {}).get("decision") not in {"REPEAT", "UNCERTAIN"}]
+    value["properties"]["selected"]["items"]["properties"]["issueId"]["enum"] = selected_ids or ["__no_candidate__"]
+    guarded = any("freshnessReview" in c for c in candidates)
+    selected_ids = [i for i in selected_ids if evidence_eligible(next(c for c in candidates if c["issueId"] == i))]
+    value["properties"]["selected"]["items"]["properties"]["issueId"]["enum"] = selected_ids or ["__no_candidate__"]
+    value["properties"]["selected"]["maxItems"] = min(3, len(selected_ids))
+    if guarded and selected_ids:
+        # The union binds each ID to its own evidence/company set. A different issue's
+        # title/quote can no longer be paired with an arbitrary allowed issue ID.
+        template = copied(value["properties"]["selected"]["items"])
+        variants = []
+        for issue_id in selected_ids:
+            c = next(c for c in candidates if c["issueId"] == issue_id)
+            proof, companies = _catalog(c); ids = c["newEvidenceIds"]
+            ids_companies = sorted(key for key, co in companies.items() if set(co["evidenceIds"]) & set(ids))
+            branch = copied(template); props = branch["properties"]
+            props["issueId"]["enum"] = [issue_id]
+            props["evidenceIds"].update(items={"type":"string", "enum":ids}, minItems=len(ids), maxItems=len(ids))
+            props["companyIds"].update(items={"type":"string", "enum":ids_companies or ["__no_company__"]}, minItems=len(ids_companies), maxItems=len(ids_companies))
+            if c["freshnessReview"]["decision"] == "MATERIAL_UPDATE":
+                props["novelty"]["enum"] = ["MATERIAL_UPDATE"]
+                props["deltaEvidenceIds"].update(items={"type":"string", "enum":c["freshnessReview"]["deltaEvidenceIds"]}, minItems=1)
+            variants.append(branch)
+        value["properties"]["selected"]["items"] = {"anyOf": variants}
     return value
 
 
@@ -273,7 +317,10 @@ def freeze_grouped_selection(reply, candidates, identity_sha, previous_selected=
         -reply["assessments"][c["issueId"]]["priority"], c["issueId"]))
     for choice in choices:
         issue_id = choice["issueId"]
-        require(issue_id not in selected_ids, "grouped_duplicate_selected_issue")
+        if issue_id in selected_ids:
+            if allowed[issue_id].get("freshnessReview") is not None:
+                continue  # rejected duplicate, reported explicitly in groupedRejectedSelections
+            require(False, "grouped_duplicate_selected_issue")
         selected_ids.add(issue_id)
         candidate, assessment = allowed[issue_id], reply["assessments"][issue_id]
         require(assessment["status"] == "SELECTABLE" and assessment["importance"] >= 2,
@@ -283,6 +330,7 @@ def freeze_grouped_selection(reply, candidates, identity_sha, previous_selected=
                     and bool(assessment["transmission"].strip())
                     and (assessment["scope"] != "BROAD_MARKET" or len(set(assessment["affectedSectors"])) >= 2),
                     "importance_three_impact_proof_missing")
+        require(evidence_eligible(candidate), "grouped_selected_semantic_support_missing")
         evidence, companies = _catalog(candidate)
         ids, delta = choice["evidenceIds"], choice["deltaEvidenceIds"]
         require(len(set(ids)) == len(ids) and set(ids).issubset(evidence), "grouped_unknown_or_duplicate_citation")
@@ -299,6 +347,14 @@ def freeze_grouped_selection(reply, candidates, identity_sha, previous_selected=
             require(delta, "grouped_material_update_without_delta")
         require(len(set(choice["companyIds"])) == len(choice["companyIds"])
                 and set(choice["companyIds"]).issubset(companies), "grouped_unknown_or_duplicate_company")
+        # Opt-in v2 closes the gap where a model could drop every known company.
+        if candidate.get("freshnessReview") is not None:
+            review = candidate["freshnessReview"]
+            require(review["decision"] not in {"REPEAT", "UNCERTAIN"}, "grouped_editorial_repeat_or_uncertain")
+            if review["decision"] == "MATERIAL_UPDATE":
+                require(choice["novelty"] == "MATERIAL_UPDATE" and set(delta) & set(review["deltaEvidenceIds"]), "grouped_editorial_delta_missing")
+            expected = {key for key, co in companies.items() if set(co["evidenceIds"]) & set(ids)}
+            require(set(choice["companyIds"]) == expected, "grouped_company_link_omitted")
         links = []
         for key in choice["companyIds"]:
             link = companies[key]
@@ -321,6 +377,15 @@ def freeze_grouped_selection(reply, candidates, identity_sha, previous_selected=
             "novelty": [{"decision": choice["novelty"], "deltaEvidenceIds": delta,
                          "meaning": "Model editorial judgment; exact quotes remain the only fact evidence."}]})
     return selected
+
+
+def rejected_duplicates(reply):
+    seen = set(); rejected = []
+    for index, choice in enumerate(reply["selected"]):
+        if choice["issueId"] in seen:
+            rejected.append({"index":index, "issueId":choice["issueId"], "reason":"duplicate_selected_issue", "choiceSha256":base.digest(base.canonical(choice))})
+        seen.add(choice["issueId"])
+    return rejected
 
 
 class HeldPaidRequest(ReplayError):
@@ -378,8 +443,14 @@ class GroupedSimulationClient(sim.SimulationClient):
             require(prompt_name in allowed_names and schema_name == phase + ".schema.json", "grouped_generation_prompt_name_invalid")
         else:
             return super().request(stage, data, prompt_name, schema_name, max_output, schema_override)
-        instructions = base.regular(PROMPTS / resource_name).decode("utf-8")
         identity = data.get("context", {})
+        prompt_root = PROMPTS.with_name("local-collection") if identity.get("mode") == "local_collection_validation" else PROMPTS
+        resolved_name = resource_name
+        if stage == SELECTION_STAGE and identity.get("selectionEvidencePolicy") is not None:
+            import briefing_semantic_support as semantic
+            require(identity["selectionEvidencePolicy"] == semantic.POLICY, "semantic_evidence_policy_unknown")
+            resolved_name = "selection-semantic-v2.md"
+        instructions = base.regular(prompt_root / resolved_name).decode("utf-8")
         expected = identity.get("promptArtifacts", {}).get("grouped-" + resource_name)
         if stage == SELECTION_STAGE:
             expected = identity.get("groupedPromptSha256") or expected
@@ -398,7 +469,14 @@ class GroupedSimulationClient(sim.SimulationClient):
 
 
 def grouped_selection_data(candidates, context, previous_selected=()):
-    return {**context, "issues": candidates, "maximumIssues": 3,
+    policy = {}
+    if any("freshnessReview" in c for c in candidates):
+        contract = selection_schema(candidates, context.get("context", {}).get("publicationCompanyIds"))
+        items = contract["properties"]["selected"]["items"]
+        allowed = [v["properties"]["issueId"]["enum"][0] for v in items.get("anyOf", [])]
+        policy = {"selectionEligibility": {"allowedIssueIds": allowed,
+            "meaning": "These IDs are allowed by the exact output contract. Eligibility is not importance or publication approval. Do not claim a listed issue is absent from the allowed list."}}
+    return {**context, **policy, "issues": candidates, "maximumIssues": 3,
             "previousSelectedIssues": [{key: row.get(key) for key in ("issueId", "title", "sources")}
                                        for row in previous_selected],
             "operationalCollectionGate": False, "historicalBodyUnchangedProven": False}
@@ -412,20 +490,21 @@ def attempt_grouped_selection(client, candidates, context, identity_sha, previou
     the same client's existing write-ahead call budget for both attempts.
     """
     if not candidates:
-        return {"selected": [], "requestDigest": None, "corrections": [], "failure": None}
+        return {"selected": [], "requestDigest": None, "corrections": [], "failure": None, "rejectedSelections": []}
     # Reject a changed snapshot/history before spending anything. Use one frozen
     # copy for both attempts so another caller cannot alter the correction basis.
     candidates, context, previous_selected = copied(candidates), copied(context), copied(list(previous_selected))
     _frozen_candidate_inputs(candidates, previous_selected)
-    data, output_schema = grouped_selection_data(candidates, context, previous_selected), selection_schema(candidates)
+    data, output_schema = grouped_selection_data(candidates, context, previous_selected), selection_schema(candidates, context.get("context", {}).get("publicationCompanyIds"))
     max_output = selection_output_cap(candidates)
     request_digest = client.request_digest(SELECTION_STAGE, data, "selection.md", "selection.schema.json",
                                            max_output=max_output, schema_override=output_schema)
     reply = client.call(SELECTION_STAGE, data, "selection.md", "selection.schema.json", max_output=max_output,
                         schema_override=output_schema)
     try:
+        base.validate_schema(reply, output_schema)
         selected = freeze_grouped_selection(reply, candidates, identity_sha, previous_selected)
-        return {"selected": selected, "requestDigest": request_digest, "corrections": [], "failure": None}
+        return {"selected": selected, "requestDigest": request_digest, "corrections": [], "failure": None, "rejectedSelections": rejected_duplicates(reply)}
     except ReplayError as error:
         failure = str(error)
         if failure not in CORRECTABLE_SELECTION_ERRORS or client.stopped.is_set():
@@ -451,8 +530,9 @@ def attempt_grouped_selection(client, candidates, context, identity_sha, previou
              "originalResponseSha256": receipt["responseSha256"], "correctedRequestDigest": corrected_digest,
              "sameFrozenInputs": True, "status": "PASS"}
     try:
+        base.validate_schema(corrected_reply, output_schema)
         selected = freeze_grouped_selection(corrected_reply, candidates, identity_sha, previous_selected)
-        return {"selected": selected, "requestDigest": corrected_digest, "corrections": [audit], "failure": None}
+        return {"selected": selected, "requestDigest": corrected_digest, "corrections": [audit], "failure": None, "rejectedSelections": rejected_duplicates(corrected_reply)}
     except ReplayError as error:
         if str(error) not in CORRECTABLE_SELECTION_ERRORS or client.stopped.is_set():
             raise

@@ -46,6 +46,7 @@ export type CompanyOutlooks = {
   cutoff: string;
   status: 'PASS' | 'WITHHELD';
   resultVersion: string;
+  priceVersion?: string;
   generatedAt: string;
   scopeNote: string;
   companies: CompanyOutlook[];
@@ -74,5 +75,11 @@ export type CompanyPrice = {
   comparisonStatus: 'available' | 'unavailable' | 'no_new_session';
   change: string | null;
   changeRate: string | null;
-  sources: { interval: string; url: string; collectedAt: string }[];
+  sources: {
+    interval: string;
+    url: string;
+    collectedAt: string;
+    period1?: number;
+    period2?: number;
+  }[];
 };

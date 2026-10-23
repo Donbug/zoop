@@ -54,7 +54,9 @@ public class BriefingReplayConfiguration {
                 env.getProperty("zoop.briefing.replay.maximum-paid-calls", Integer.class, 400),
                 env.getProperty("zoop.briefing.replay.budget-approval-ref"));
         return arguments -> {
-            BriefingReplayImporter.ImportResult result = new BriefingReplayImporter(jdbc, transactions, settings).importBundle();
+            BriefingReplayImporter.ImportResult result = new BriefingReplayImporter(jdbc, transactions, settings,
+                    env.getProperty("zoop.briefing.replay.continuity-enabled", Boolean.class, false),
+                    env.getProperty("zoop.briefing.replay.core-semantic-enabled", Boolean.class, false)).importBundle();
             System.out.println("Briefing development replay imported: " + result.documents() + " documents, "
                     + result.roundIds().size() + " rounds; existing=" + result.alreadyImported());
         };

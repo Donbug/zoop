@@ -49,6 +49,7 @@ def create(directory, editorial=False):
             "articleVersion": mention["articleVersion"], "quote": quote, "start": 0, "end": len(quote)})
         archive["documents"] = [{k: v for k, v in doc.items() if k != "clockTime"} for doc in archive["documents"]]
         archive.update(sourceFileSha256=source["sourceFileSha256"], clockFileSha256=source["clockFileSha256"])
+        fixture_module.fixtures.record_grounding(archive, directory)
         fixture.archive_path.write_bytes(base.canonical(archive))
 
         class BaseTransport(fixture_module.fixtures.AuthoredTransport):

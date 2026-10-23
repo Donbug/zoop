@@ -10,11 +10,13 @@
 |---|---|
 | `/api/v1/briefings?date=2026-10-15&edition=evening` | 지정 회차의 상태·저장된 내용·시장 지표·퇴근 비교·정정을 제공한다. 날짜를 생략하면 해당 구분의 최신 **DB 저장 회차**를 찾는다. 저장 회차가 없으면 `not_ready`를 반환하며 행을 만들지 않는다. |
 | `/api/v1/briefings/rounds?limit=20` | 발행·제공 중단 회차의 메타데이터를 최신순으로 제공한다. `nextCursor`와 같은 `limit`으로 다음 페이지를 요청한다. 본문이나 원천 권한 파일을 읽지 않는다. |
-| `/api/v1/briefings/{id}/graph` | 저장된 발행 버전과 데이터 기준 시각을 제공한다. 실제 고정 그래프 조회 담당이 아직 연결되지 않아 정상 발행본도 `unavailable`이며 두 ID 배열은 비어 있다. 최신 그래프로 대체하지 않는다. |
+| `/api/v1/briefings/{id}/graph` | 실제 회차 스냅샷이 있으면 핵심 이슈·관련 기업 ID와 고정 버전을 제공한다. 과거 회차에 별도로 등록한 재구성본은 `graphOrigin=reconstructed`·`reconstructedAt`으로 구분하고 원래 발행본은 변경하지 않는다. 저장본이 없으면 `unavailable`과 사유를 제공하며 최신 그래프로 대체하지 않는다. |
+| `/api/v1/briefings/{roundId}/items/{eventId}` | 해당 회차의 저장된 주장·선정 이유·정확 인용·주변 본문·원문 URL/버전을 제공한다. 현재 권한을 다시 검사한다. |
+| `/api/v1/briefings/{id}/recap` | 새 핵심이 없는 정상 발행 회차의 고정된 이전 발행본을 복기한다. 새 생성이나 전망 유지 판정이 아니며 과거 회차의 정정·중단·권한 상태를 다시 검사한다. |
 
-세 경로는 회원 세션 없이 읽을 수 있다. 잘못된 날짜·구분·범위는 `422 INVALID_REQUEST`, 잘못된 커서는 `422 INVALID_CURSOR`, 없는 그래프 기준 회차는 `404 RESOURCE_NOT_FOUND`다. DB 장애·저장 원문 불일치·현재 권한 확인 불가 시 `503 SOURCE_UNAVAILABLE`이며 공개 내용을 반환하지 않는다. 제공 중단 회차에는 실제 중단 사유와 상태만 제공한다.
+다섯 경로는 회원 세션 없이 읽을 수 있다. 잘못된 날짜·구분·범위는 `422 INVALID_REQUEST`, 잘못된 커서는 `422 INVALID_CURSOR`, 없는 그래프 기준 회차는 `404 RESOURCE_NOT_FOUND`다. DB 장애·저장 원문 불일치·현재 권한 확인 불가 시 `503 SOURCE_UNAVAILABLE`이며 공개 내용을 반환하지 않는다. 제공 중단 회차에는 실제 중단 사유와 상태만 제공한다.
 
-API 실행 시 `ZOOP_SWAGGER_ENABLED=true`이면 `/swagger-ui.html`과 `/v3/api-docs`에서 세 operation과 응답 스키마를 확인할 수 있다. 기본 실행·인증 키·CORS 설정은 [API README](../README.md#로컬-http-브라우저-테스트)를 따른다.
+API 실행 시 `ZOOP_SWAGGER_ENABLED=true`이면 `/swagger-ui.html`과 `/v3/api-docs`에서 다섯 operation과 응답 스키마를 확인할 수 있다. 기본 실행·인증 키·CORS 설정은 [API README](../README.md#로컬-http-브라우저-테스트)를 따른다.
 
 ## 저장·권한 계약
 
@@ -22,6 +24,8 @@ API 실행 시 `ZOOP_SWAGGER_ENABLED=true`이면 `/swagger-ui.html`과 `/v3/api-
 
 - `published_payload`: 발행 당시 `BriefingPayload`. 회차·창·버전·이슈 최대 3개·필수 중첩 구조를 검증한다. 공개 후 원문·창·비교 결과는 불변이다.
 - `public_snapshot.marketSummary`: 발행 당시 실제 시장 요약 또는 생산자가 없다는 `unavailable` 사유. 조회 시 생성하지 않는다.
+- `public_snapshot.companyOutlooks`: 선택 기업의 조건부 사업 전망·이전 판단 비교와 근거. 선택적 `reading`은 별도 생성·검증한 짧은 문안이고, `price`는 회차 마감 전 완료된 관측값이다. 시세만 추가한 보완본은 `priceVersion`으로 구분하며 원래 전망·문안을 바꾸지 않는다.
+- `public_snapshot.continuity`: 핵심·참고 소식·이전 발행본 복기·수집 부족/검증 실패의 구분이다. 참고 소식의 원 중요도를 핵심으로 올리거나, 검증 실패를 새 소식 없음으로 처리하지 않는다.
 - `public_snapshot.sourceBindings`: 내부 원천 연결 배열. 각 항목은 `documentId`, `documentVersion`, `grantId`, `grantRevision`, `recipients`를 가진다. 비어 있으면 공개할 수 없으며 이 배열은 공개 응답에 포함하지 않는다.
 - `comparison_snapshot`: 퇴근 회차의 저장된 출근 대비 변화 또는 `unavailable` 사유. 현재 출근 내용을 다시 계산해 비교 결과를 바꾸지 않는다.
 - `briefing_changes`: 원문과 분리한 추가 전용 정정·중단 이력. 중단 상태 변경은 해당 이력과 같은 트랜잭션으로 기록해야 한다.
@@ -34,7 +38,7 @@ encode(sha256(convert_to(published_payload::text, 'UTF8')), 'hex')
 
 `ZOOP_DOCUMENT_READ_GRANTS`는 기존 문서 읽기용 권한 파일의 정규화된 절대 경로다. 발행 내용 조회마다 현재 파일을 읽어 원천·버전·권한 revision·목적·수신자를 검증한다. 현재 문서가 비공개/삭제되거나 권한이 철회·만료되면 과거 발행 당시 허용값으로 우회하지 않는다. 퇴근 비교가 출근 원문을 노출하는 경우 그 출근 원문의 현재 권한도 검증한다.
 
-AI 생성·발행 writer·관리자 변경 API·정시 실행은 아직 이 조회 경로에 연결하지 않았다. 그래프·관리자 정본 테이블의 실제 FK는 해당 담당 테이블이 준비된 후 후속 migration으로 연결한다. 브리핑 조회 화면이 동작하는 것과 전체 자동 발행·그래프·근거 상세 기능 완료를 구분한다.
+실제 수집·AI 생성/검증·발행 DB writer·회차 상세·지도 재구성은 [단일 회차](BRIEFING_LOCAL_ROUND.md)와 [연속 회차](BRIEFING_ROUND_SERIES.md)의 명시적인 로컬 실행으로 연결되어 있다. 운영 scheduler·AWS·관리자 변경 API와 목표 정본 전체 완료는 별개다. 조회 API는 모델·검색·시세 공급자를 호출하지 않는다. 과거 저장본에 없던 자료를 새로 붙일 때는 별도 출력·DB를 사용하며 원래 발행본을 덮어쓰지 않는다.
 
 ## 합성 자료로 수동 연결 확인
 

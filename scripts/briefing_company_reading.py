@@ -74,7 +74,7 @@ def run(args, transport=None):
     company.require(baseline != output and baseline not in output.parents and output not in baseline.parents, 'reading_separate_output')
     base.private_dir(output)
     identity = {'baselineSha256': base.digest(base.regular(baseline / 'bundle-v2.json')),
-                'pricesSha256': base.digest(base.regular(Path(args.prices).resolve() / 'receipts.json')),
+                'pricesSha256': base.digest(base.regular(Path(args.prices).resolve() / 'receipts.json')) if args.prices else None,
                 'authorizationRef': args.authorization_ref, 'runId': args.run_id, 'maximumPaidCalls': args.max_calls,
                 'promptArtifacts': {p.name: base.digest(base.regular(p)) for p in sorted(company.context.PROMPTS.with_name(VERSION).iterdir()) if p.is_file()}}
     identity_file = output / 'reading-execution.json'
@@ -84,9 +84,12 @@ def run(args, transport=None):
         company.require(proof['bundleSha256'] == base.digest(base.regular(output / 'bundle-v2.json')), 'reading_completed_changed')
         return {**proof, 'newPaidCalls': 0, 'reusedCompletedRun': True}
     bundle = base.strict_load(base.regular(baseline / 'bundle-v2.json'))
-    layer = bundle['presentationEnrichment']
-    company.require('companyReadingLayer' not in layer, 'reading_layer_exists')
-    rows = layer['companyOutlookLayer']['rounds']
+    series = 'roundSeries' in bundle
+    layer = bundle['marketEnrichment'] if series else bundle['presentationEnrichment']
+    if series: company.require(not args.prices, 'series_reading_price_connection_separate')
+    else: company.require(bool(args.prices), 'reading_prices_required')
+    company.require(('seriesCompanyReading' if series else 'companyReadingLayer') not in layer, 'reading_layer_exists')
+    rows = layer['seriesCompanyOutlooks' if series else 'companyOutlookLayer']['rounds']
     company.require(len(rows) <= 4 and all(r['status'] == 'PASS' for r in rows), 'reading_valid_company_inputs')
     prior = len(list((baseline / 'calls').glob('*.pending.json')))
     plan = {'priorReservations': prior, 'minimumNewCalls': len(rows) * 2,
@@ -105,10 +108,10 @@ def run(args, transport=None):
                 base.private_dir(target.parent)
                 if not target.exists():
                     os.link(file, target)
-        price_root = Path(args.prices).resolve()
-        price_receipts = base.strict_load(base.regular(price_root / 'receipts.json'))
+        price_root = Path(args.prices).resolve() if args.prices else None
+        price_receipts = base.strict_load(base.regular(price_root / 'receipts.json')) if price_root else {}
         base.private_dir(output / 'company-prices')
-        for file in (price_root / 'company-prices').iterdir():
+        for file in (price_root / 'company-prices').iterdir() if price_root else []:
             target = output / 'company-prices' / file.name
             if not target.exists():
                 os.link(file, target)
@@ -124,9 +127,9 @@ def run(args, transport=None):
                 company.require(result['frozen'] == frozen, 'reading_resume_changed')
             else:
                 result = assess(client, frozen)
-                result.update(roundId=row['roundId'], cutoff=row['cutoff'], frozen=frozen, generatedAt=base.now(),
-                              prices={t['companyId']: prices.snapshot(t['companyId'], row['cutoff'], price_receipts[t['companyId']], output)
-                                      for t in frozen['targets']})
+                result.update(roundId=row['roundId'], cutoff=row['cutoff'], frozen=frozen, generatedAt=base.now())
+                if series: result['pricePolicy'] = 'not_connected'
+                else: result['prices'] = {t['companyId']: prices.snapshot(t['companyId'], row['cutoff'], price_receipts[t['companyId']], output) for t in frozen['targets']}
                 result['resultVersion'] = 'reading-v1-' + base.digest(base.canonical(result))
                 base.private_dir(path.parent)
                 base.write_once(path, base.canonical(result))
@@ -134,9 +137,10 @@ def run(args, transport=None):
             print(base.canonical({'roundId': row['roundId'], 'status': result['status'], 'newCalls': len(client.new_calls)}).decode(), flush=True)
         owned = {a[k] for r in completed for a in r['attempts'] for k in ('generationRequestDigest', 'verificationRequestDigest') if k in a}
         receipts = [r for r in client.receipts() if r['requestDigest'] in owned]
-        layer['maximumPaidCallsIncludingPrior'] = args.max_calls
-        layer['runId'] = args.run_id
-        layer['companyReadingLayer'] = {'schemaVersion': SCHEMA, 'authorizationRef': args.authorization_ref,
+        if not series:
+            layer['maximumPaidCallsIncludingPrior'] = args.max_calls
+            layer['runId'] = args.run_id
+        layer['seriesCompanyReading' if series else 'companyReadingLayer'] = {'schemaVersion': SCHEMA, 'authorizationRef': args.authorization_ref,
                                         'rounds': completed, 'receipts': receipts}
         base.write_once(output / 'bundle-v2.json', base.canonical(bundle))
         proof = {**plan, 'status': 'COMPLETE', 'pass': sum(r['status'] == 'PASS' for r in completed),
@@ -152,8 +156,9 @@ def run(args, transport=None):
 
 def parser():
     p = argparse.ArgumentParser(description=__doc__)
-    for flag in ('baseline', 'output', 'prices', 'authorization-ref', 'run-id'):
+    for flag in ('baseline', 'output', 'authorization-ref', 'run-id'):
         p.add_argument('--' + flag, required=True)
+    p.add_argument('--prices', help='Archived prices for legacy presentation mode; series short reading keeps prices separate')
     p.add_argument('--key-file')
     p.add_argument('--max-calls', type=int, default=400)
     p.add_argument('--execute', action='store_true')

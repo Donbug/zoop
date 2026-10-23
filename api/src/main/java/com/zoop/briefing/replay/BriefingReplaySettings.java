@@ -26,7 +26,8 @@ public record BriefingReplaySettings(Path source, Path bundle, Path artifactRoot
                 || source.equals(bundle) || grants.equals(manifest) || grants.equals(source) || grants.equals(bundle)
                 || manifest.equals(source) || manifest.equals(bundle)) invalid();
         if (expectedSourceSha256 == null || !expectedSourceSha256.matches("[0-9a-f]{64}")
-                || userInboxRef == null || !userInboxRef.matches("inbox/[A-Za-z0-9_.-]+\\.md")) invalid();
+                || userInboxRef == null || !(userInboxRef.matches("inbox/[A-Za-z0-9_.-]+\\.md")
+                    || userInboxRef.matches("local:BRF-[A-Za-z0-9:._-]{1,180}"))) invalid();
         if (maximumPaidCalls < 1 || maximumPaidCalls > 512
                 || (maximumPaidCalls > 400 && (budgetApprovalRef == null
                     || !budgetApprovalRef.matches("inbox/[A-Za-z0-9_.-]+\\.md")))) invalid();

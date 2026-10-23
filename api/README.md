@@ -214,6 +214,35 @@ console.log(response.status); // 활성 회원 세션이 정상 폐기되면 204
 
 모든 요청의 `X-Request-ID`를 응답 헤더에 반환하며, 생략하면 서버가 새 ID를 생성합니다. 오류 본문의 `requestId`는 해당 응답 헤더와 같습니다. 요청 ID를 멱등성 키로 사용하지 마세요. Origin·CSRF 인터셉터의 오류도 같은 형식을 따릅니다.
 
+## 브리핑: DB조회와 로컬 생성·재생
+
+`com.zoop.briefing`은 PostgreSQL에 고정한 발행본을 공개 HTTP로 복원하고, `web/src/pages/briefing/BriefingPage.tsx`가 이를 조회합니다. 조회할 때 AI·검색·최신 시세를 호출하지 않습니다. 생성 시작 기준은 **09:20·17:30 KST**이며, 회차 기준 구현이 운영 scheduler·AWS 자동 실행을 뜻하지는 않습니다.
+
+| 공개 GET | 현재 구현 |
+|---|---|
+| `/api/v1/briefings?date=YYYY-MM-DD&edition=morning` | 저장된 상태·핵심 이슈·시장 요약·3지표·기업 전망·선택적 짧은 읽기/회차 시세·continuity·정정 복원. 퇴근은 `edition=evening` |
+| `/api/v1/briefings/rounds?limit=20` | 공개/제공 중단 회차의 cursor 이력 |
+| `/api/v1/briefings/{id}/items/{eventId}` | 해당 회차의 주장·선정 이유·고정 직접 인용·주변 본문·원문 URL/버전 |
+| `/api/v1/briefings/{id}/graph` | 발행 당시 스냅샷 또는 명시적으로 등록한 재구성본의 기준. 없으면 unavailable이며 최신 그래프로 대체하지 않음 |
+| `/api/v1/briefings/{id}/recap` | 새 핵심이 없는 정상 발행 회차의 고정된 과거 발행본 복기. 현재 권한·정정/중단 상태를 다시 확인 |
+
+Swagger `/v3/api-docs`의 위 5개 operation과 목표 정본 [`docs/api/openapi.yaml`](../docs/api/openapi.yaml)을 구분합니다. 개인화·관리자 정정/중단 등 목표 경로 전체가 구현된 것은 아닙니다. 권한 파일·출처·저장 해시를 확인할 수 없으면 503으로 닫고, 빈 회차·수집 부족·검증 실패를 같은 상태로 바꾸지 않습니다.
+
+| 시작할 작업 | 안내 |
+|---|---|
+| 키 없이 저장된 10/21 퇴근·10/22 출퇴근 3회차를 API·화면에서 보기 | [팀원용 재생 실행](docs/BRIEFING_TEAM_DEMO.md): 저장 결과 포함, 임시 Docker DB, AI·시세 재호출 없음 |
+| DB·권한·공개 HTTP·합성 자료로 프론트 연결 | [BRIEFING_READ](docs/BRIEFING_READ.md) |
+| 실제 수집부터 한 회차 생성·검증·DB·지도 실행 | [BRIEFING_LOCAL_ROUND](docs/BRIEFING_LOCAL_ROUND.md) |
+| 지정 출퇴근 회차를 시간순으로 재생 | [BRIEFING_ROUND_SERIES](docs/BRIEFING_ROUND_SERIES.md) |
+| 완료 AI 결과 재사용·시세 자동 수집·실패 단계부터 DB/지도/화면 재개 | [회차 자동 연결과 재개](docs/BRIEFING_ROUND_SERIES.md#완료-ai-결과부터-시세db지도화면까지-자동-연결) |
+| 중요도·재보도/기업 연결 및 짧은 근거의 실제 의미 검증 | [BRIEFING_EDITORIAL_GUARDS](docs/BRIEFING_EDITORIAL_GUARDS.md), [BRIEFING_CORE_EVIDENCE](docs/BRIEFING_CORE_EVIDENCE.md) |
+| 핵심 → 참고 소식 → 이전 발행본 복기·수집 부족 구분 | [BRIEFING_CONTINUITY](docs/BRIEFING_CONTINUITY.md), [BRIEFING_EMPTY_RECAP](docs/BRIEFING_EMPTY_RECAP.md) |
+| 시장 맥락·이전 판단·기업별 조건부 전망 | [BRIEFING_MARKET_CONTEXT](docs/BRIEFING_MARKET_CONTEXT.md), [BRIEFING_COMPANY_OUTLOOK](docs/BRIEFING_COMPANY_OUTLOOK.md) |
+| 모바일 짧은 읽기·회차 시세 연결(모델 재호출 없음) | [BRIEFING_SHORT_READING_AND_PRICES](docs/BRIEFING_SHORT_READING_AND_PRICES.md) |
+| 회차 지도·과거 재구성/원래 저장본 구분 | [BRIEFING_ROUND_GRAPHS](docs/BRIEFING_ROUND_GRAPHS.md) |
+
+일반 조회는 API 로컬 실행 설정과 실제 DB·현재 원천 권한이 필요합니다. 개인 개발 replay는 추가로 `ZOOP_BRIEFING_REPLAY_READ_ENABLED=true`, 고정 manifest·별도 artifact/grants를 사용합니다. 예전 결과를 새 정책으로 재검증할 때는 별도 DB에서 `ZOOP_BRIEFING_REPLAY_CONTINUITY_ENABLED=true`, `ZOOP_BRIEFING_REPLAY_CORE_SEMANTIC_ENABLED=true`를 명시합니다. 두 기본값은 false이며 기존 저장본을 갱신하는 스위치가 아닙니다. 실행기 전체 승인 호출 상한·결과 불명 재전송 금지·원본/이전 DB 보존은 그대로 적용합니다.
+
 ## AI 분석 transport
 
 `com.zoop.ai`는 `ai/service`의 internal operation을 호출하는 전송 클라이언트입니다. S1 분석 5개(submit/status/result/cancel/recover)에 더해 S2 추출 job(`ExtractionClient`, 서버 사전 승인 digest 참조) 5개와 S3 관계 job(`RelationClient`, 허용된 upstream과 AI 원천 version·revision을 거는 검수 `review`/`operation` 포함) 7개를 별도 가족으로 호출하며, 가족마다 설정은 독립이고 기본 비활성입니다. S2/S3 submit은 호출자가 `ExecutionMode`(replay/live)를 명시해야 하고 live는 요청일 뿐이며 서버 운영자의 승인·핀·gate가 권한입니다. 사람의 `allow`는 최종 승인(HTTP 200, 재검증·`recoverOperation` 없음)입니다. 서비스 principal로 호출하며 앱 저장·사용자 격리·결과 import·공개 endpoint·공개 인증은 포함하지 않습니다. 설정, 의미(202≠완료, withheld, 결과 불명 복구), 요청 ID, 검증 범위와 인계 사항은 [AI 연동](docs/AI_INTEGRATION.md)에 있습니다.

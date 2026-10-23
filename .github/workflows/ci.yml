@@ -254,6 +254,8 @@ jobs:
           enable-cache: false
       - name: Java tests (foundation + AI client against in-process stub servers; no DB, no Python, no secret) and application assemble
         run: make api-test api-build
+      - name: Recorded team briefing replay on its own throwaway DB (no model or price calls)
+        run: python3 scripts/briefing_team_demo.py --api-only --once --api-port 0 --web-port 0
       - name: Company catalog PostgreSQL migrations and search integration tests
         env:
           ZOOP_COMPANY_TEST_DB_URL: jdbc:postgresql://127.0.0.1:${{ job.services.company-postgres.ports['5432'] }}/zoop_company_test_19

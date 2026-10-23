@@ -25,16 +25,39 @@ def identity(company_id):
     raise ValueError('unsupported_company_market')
 
 
-def url(company_id, interval):
+LEGACY_PERIOD = (1790812800, 1791504000)
+
+
+def period(start=None, end=None):
+    if start is None and end is None:
+        return LEGACY_PERIOD
+    if start is None or end is None:
+        raise ValueError('company_price_range')
+    values = tuple(int(market.aware(x).timestamp()) if isinstance(x, str) else x for x in (start, end))
+    if (any(type(x) is not int or x % 86400 for x in values)
+            or not 946684800 <= values[0] < values[1]
+            or values[1] - values[0] > 31 * 86400):
+        raise ValueError('company_price_range')
+    return values
+
+
+def source_period(source):
+    if 'period1' not in source and 'period2' not in source:
+        return LEGACY_PERIOD
+    return period(source.get('period1'), source.get('period2'))
+
+
+def url(company_id, interval, start=None, end=None):
     symbol, _, _ = identity(company_id)
-    # Replay fixture range; an operational collector needs an exchange calendar and licensed feed.
-    start = int(datetime(2026, 10, 1, tzinfo=timezone.utc).timestamp())
-    end = int(datetime(2026, 10, 9, tzinfo=timezone.utc).timestamp())
+    if interval not in ('5m', '1d'):
+        raise ValueError('company_price_interval')
+    start, end = period(start, end)
     return (f'https://query1.finance.yahoo.com/v8/finance/chart/{quote(symbol, safe="")}'
             f'?period1={start}&period2={end}&interval={interval}&includePrePost=false&events=splits%2Cdiv')
 
 
-def collect(company_ids, output, send=market.transport):
+def collect(company_ids, output, send=market.transport, *, start=None, end=None):
+    requested = period(start, end)
     receipts = {}
     for cid in sorted(set(company_ids)):
         values = []
@@ -46,16 +69,22 @@ def collect(company_ids, output, send=market.transport):
             if path.exists():
                 saved = base.strict_load(base.regular(path))
                 raw = base.regular(directory / (saved['sha256'] + '.bin'))
-                if saved['url'] != url(cid, interval) or base.digest(raw) != saved['sha256'] or len(raw) != saved['bytes']:
+                if (source_period(saved) != requested or saved['url'] != url(cid, interval, *requested)
+                        or base.digest(raw) != saved['sha256'] or len(raw) != saved['bytes']):
                     raise ValueError('company_price_cache_changed')
             else:
-                status, raw = send(url(cid, interval))
+                try:
+                    status, raw = send(url(cid, interval, *requested))
+                except (OSError, TimeoutError):
+                    status, raw = 0, b''
                 if len(raw) > 1_000_000:
                     raise ValueError('company_price_response_too_large')
                 sha = base.digest(raw)
                 base.write_once(directory / (sha + '.bin'), raw)
-                saved = {'companyId': cid, 'interval': interval, 'url': url(cid, interval),
+                saved = {'companyId': cid, 'interval': interval, 'url': url(cid, interval, *requested),
                          'httpStatus': status, 'sha256': sha, 'bytes': len(raw), 'collectedAt': base.now()}
+                if start is not None:
+                    saved.update(period1=requested[0], period2=requested[1])
                 base.write_once(path, base.canonical(saved))
             values.append(saved)
         receipts[cid] = values
@@ -66,15 +95,25 @@ def points(cid, cutoff, receipts, output):
     symbol, currency, zone_name = identity(cid)
     zone = ZoneInfo(zone_name)
     found = []
+    intervals = set()
+    ranges = set()
     for receipt in receipts:
-        if receipt['companyId'] != cid or receipt['url'] != url(cid, receipt['interval']):
+        bounds = source_period(receipt)
+        interval = receipt['interval']
+        if (interval not in ('5m', '1d') or interval in intervals or receipt['companyId'] != cid
+                or receipt['url'] != url(cid, interval, *bounds)):
             raise ValueError('company_price_identity')
+        intervals.add(interval)
+        ranges.add(bounds)
         raw = base.regular(output / 'company-prices' / (receipt['sha256'] + '.bin'))
         if base.digest(raw) != receipt['sha256'] or len(raw) != receipt['bytes']:
             raise ValueError('company_price_raw_changed')
         if receipt['httpStatus'] != 200:
             continue
-        result = base.strict_load(raw)['chart']['result'][0]
+        chart = base.strict_load(raw)['chart']
+        if chart['error'] is not None or len(chart['result']) != 1:
+            raise ValueError('company_price_provider_error')
+        result = chart['result'][0]
         meta = result['meta']
         if (meta['symbol'], meta['currency'], meta['exchangeTimezoneName']) != (symbol, currency, zone_name):
             raise ValueError('company_price_provider_identity')
@@ -89,7 +128,7 @@ def points(cid, cutoff, receipts, output):
                 continue
             if type(stamp) is not int:
                 raise ValueError('company_price_timestamp')
-            if not 1790812800 <= stamp < 1791504000:
+            if not bounds[0] <= stamp < bounds[1]:
                 continue
             start = datetime.fromtimestamp(stamp, zone)
             if start.weekday() >= 5:
@@ -109,8 +148,13 @@ def points(cid, cutoff, receipts, output):
             # Do not promote a provider's appended live terminal point to a daily close.
             if receipt['interval'] == '1d' and start != opening:
                 continue
-            found.append({'value': str(market.number(value)), 'observedAt': end.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z'),
+            price = market.number(value)
+            if price <= 0:
+                raise ValueError('company_price_value')
+            found.append({'value': str(price), 'observedAt': end.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z'),
                           'kind': kind, 'sessionDate': start.date().isoformat()})
+    if intervals != {'5m', '1d'} or len(ranges) != 1:
+        raise ValueError('company_price_source_coverage')
     return sorted(found, key=lambda p: (market.aware(p['observedAt']), p['kind'] == 'daily_close'))
 
 

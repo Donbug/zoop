@@ -28,7 +28,11 @@ def statement(ids):
 
 def generation_schema(frozen):
     ids=sorted(frozen['sources']);s=statement(ids)
-    cmp=copy.deepcopy(s);cmp['properties'].update(status={'type':'string','enum':['updated','compared','unavailable']},previousResultVersion={'type':['string','null']});cmp['required']=list(cmp['properties'])
+    statuses = ['updated','compared','unavailable']
+    if frozen.get('comparisonContract') is not None:
+        require(frozen['comparisonContract']=='edition-bound-v2','comparison_contract')
+        statuses = ['updated','unavailable'] if frozen['edition']=='morning' else ['compared','unavailable']
+    cmp=copy.deepcopy(s);cmp['properties'].update(status={'type':'string','enum':statuses},previousResultVersion={'type':['string','null']});cmp['required']=list(cmp['properties'])
     item=obj({'companyId':{'type':'string','enum':[t['companyId'] for t in frozen['targets']]},
         'assessment':{'type':'string','enum':['positive','negative','mixed','watch']},'impact':s,'outlook':s,
         'conditions':{'type':'array','items':s,'minItems':1,'maxItems':3},'risks':{'type':'array','items':s,'minItems':1,'maxItems':3},'comparison':cmp})

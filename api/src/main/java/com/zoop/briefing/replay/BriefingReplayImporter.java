@@ -44,9 +44,23 @@ public final class BriefingReplayImporter {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final BriefingReplaySettings settings;
+    private final boolean continuityEnabled;
+    private final boolean coreSemanticEnabled;
 
     public BriefingReplayImporter(JdbcTemplate jdbc, PlatformTransactionManager transactions, BriefingReplaySettings settings) {
+        this(jdbc, transactions, settings, false);
+    }
+
+    public BriefingReplayImporter(JdbcTemplate jdbc, PlatformTransactionManager transactions, BriefingReplaySettings settings,
+            boolean continuityEnabled) {
+        this(jdbc, transactions, settings, continuityEnabled, false);
+    }
+
+    public BriefingReplayImporter(JdbcTemplate jdbc, PlatformTransactionManager transactions, BriefingReplaySettings settings,
+            boolean continuityEnabled, boolean coreSemanticEnabled) {
+        this.coreSemanticEnabled = coreSemanticEnabled;
         this.jdbc = jdbc; this.transaction = new TransactionTemplate(transactions); this.settings = settings;
+        this.continuityEnabled = continuityEnabled;
         transaction.setTimeout(30);
     }
 
@@ -166,7 +180,9 @@ public final class BriefingReplayImporter {
 
     /** Per-round simulation reuses the same document/evidence/round registries; no migration or operational writer. */
     private ImportResult importSimulation(byte[] sourceBytes, byte[] bundleBytes, StrictJson.Obj suppliedBundle) {
-        String scope = "publication_clock_simulation", sourceSha = Canonical.sha256(sourceBytes), bundleSha = Canonical.sha256(bundleBytes);
+        boolean localCollection = LocalBriefingCollectionRules.enabled(suppliedBundle);
+        String scope = localCollection ? LocalBriefingCollectionRules.MODE : "publication_clock_simulation";
+        String sourceSha = Canonical.sha256(sourceBytes), bundleSha = Canonical.sha256(bundleBytes);
         BriefingPresentationRules.Layer presentation = BriefingPresentationRules.load(suppliedBundle, settings.bundle().getParent(), settings.userInboxRef(), settings.maximumPaidCalls());
         StrictJson.Obj bundle = presentation == null ? suppliedBundle : presentation.baseBundle();
         boolean grouped = BriefingGroupedSimulationRules.SCHEMA.equals(bundle.string("schemaVersion"));
@@ -176,20 +192,44 @@ public final class BriefingReplayImporter {
         String effectiveRun = presentation != null ? presentation.root().string("runId") : recovery == null ? run : recovery.root().string("runId");
         require(run.matches("[A-Za-z0-9_-]{1,96}") && clockSha.matches("[0-9a-f]{64}"), "simulation_identity");
         require(scope.equals(bundle.string("mode")) && sourceSha.equals(bundle.string("sourceFileSha256"))
-                && bundle.bool("retrospectiveBodies") && !bundle.bool("operationalCollectionGate"), "simulation_mode");
+                && bundle.bool("retrospectiveBodies") == !localCollection && !bundle.bool("operationalCollectionGate"), "simulation_mode");
         StrictJson.Obj authorization = bundle.object("authorization");
         require(scope.equals(authorization.string("scope")) && !authorization.bool("productionAuthorized")
                 && sourceSha.equals(authorization.string("sourceSha256"))
                 && (recovery != null || bundle.has("marketEnrichment") || settings.userInboxRef().equals(authorization.string("userInboxRef"))), "simulation_authorization");
+        if (localCollection) {
+            require(grouped && presentation == null && recovery == null, "local_collection_requires_original_grouped_bundle");
+            LocalBriefingCollectionRules.metadata(bundle);
+        } else require(!bundle.has("localCollection"), "unexpected_local_collection");
         Map<String, StrictJson.Obj> marketRounds = validateMarketEnrichment(bundle, settings.userInboxRef(), settings.bundle().getParent());
         Map<String, Source> pool = sources(sourceBytes);
         Map<String, JsonNode> sourceNodes = new LinkedHashMap<>(); pool.forEach((key, value) -> sourceNodes.put(key, value.row().node()));
         PublicationClockRegistry clocks = new PublicationClockRegistry(settings.clocks(), sourceSha, clockSha, sourceNodes);
         BriefingGroupedSimulationRules.Archive groupedArchive = grouped
                 ? BriefingGroupedSimulationRules.archive(bundle, settings.bundle().getParent(), sourceNodes, clocks) : null;
-        List<StrictJson.Obj> definitions = bundle.objects("rounds"); require(definitions.size() == 14, "simulation_fourteen_rounds");
+        Map<String,BriefingReferenceSupport.Proof> referenceSupport=(continuityEnabled || coreSemanticEnabled) && grouped
+                ? BriefingReferenceSupport.load(groupedArchive,settings.bundle().getParent()) : Map.of();
+        List<StrictJson.Obj> definitions = bundle.objects("rounds");
+        boolean explicitSeries = bundle.has("roundSeries");
+        if (explicitSeries) BriefingRoundSeriesRules.validate(bundle);
+        else require(definitions.size() == (localCollection ? 1 : 14), "simulation_round_count");
         boolean qualityV2 = simulationQualityV2(definitions.getFirst().object("identity"));
-        ArrayNode noveltyHistory = StrictJson.newArray(), groupedHistory = StrictJson.newArray();
+        StrictJson.Obj seriesCompanies = explicitSeries && bundle.has("marketEnrichment") && bundle.object("marketEnrichment").has("seriesCompanyOutlooks")
+                ? bundle.object("marketEnrichment").object("seriesCompanyOutlooks") : null;
+        if (seriesCompanies != null) require(settings.userInboxRef().equals(seriesCompanies.string("authorizationRef")), "series_company_authorization");
+        Map<String, StrictJson.Obj> seriesCompanyRows = seriesCompanies == null ? Map.of() : BriefingCompanyOutlookRules.rows(seriesCompanies);
+        Map<String, StrictJson.Obj> seriesPriceRows = explicitSeries && bundle.has("marketEnrichment")
+                ? BriefingSeriesPriceRules.rows(bundle, settings.userInboxRef(), seriesCompanyRows, settings.bundle().getParent()) : Map.of();
+        Map<String, JsonNode> seriesCompanyReceipts = seriesCompanies == null ? Map.of() : simulationReceiptLedger(seriesCompanies.objects("receipts"));
+        StrictJson.Obj seriesReading = explicitSeries && bundle.has("marketEnrichment") && bundle.object("marketEnrichment").has("seriesCompanyReading")
+                ? bundle.object("marketEnrichment").object("seriesCompanyReading") : null;
+        if (seriesReading != null) require(settings.userInboxRef().equals(seriesReading.string("authorizationRef")), "series_reading_authorization");
+        Map<String, StrictJson.Obj> seriesReadingRows = seriesReading == null ? Map.of() : BriefingCompanyReadingRules.rows(seriesReading);
+        Map<String, JsonNode> seriesReadingReceipts = seriesReading == null ? Map.of() : simulationReceiptLedger(seriesReading.objects("receipts"));
+        require(seriesCompanyRows.keySet().containsAll(seriesReadingRows.keySet()), "series_reading_company_rounds");
+        Set<String> seriesReadingOwned = new HashSet<>();
+        Set<String> seriesCompanyOwned = new HashSet<>(); List<StrictJson.Obj> seriesCompanyHistory = new ArrayList<>();
+        ArrayNode noveltyHistory = StrictJson.newArray(), groupedHistory = StrictJson.newArray(), continuityHistory = StrictJson.newArray();
         String namespace = "brf-sim-" + Canonical.sha256(effectiveRun).substring(0, 16);
         Map<String, Source> documents = new LinkedHashMap<>(); Map<String, Citation> citations = new LinkedHashMap<>();
         Map<String, Blob> blobs = new LinkedHashMap<>(); List<Round> publications = new ArrayList<>();
@@ -198,13 +238,19 @@ public final class BriefingReplayImporter {
         Set<String> accounted = new HashSet<>(); String priorId = null, priorSha = null;
         Instant created = pool.values().stream().map(Source::collected).max(Instant::compareTo).orElseThrow();
         for (StrictJson.Obj definition : definitions) {
-            int index = ids.size(); LocalDate date = LocalDate.of(2026, 10, 2).plusDays(index / 2);
-            String edition = index % 2 == 0 ? "morning" : "evening";
+            int index = ids.size();
+            LocalDate date = (localCollection || explicitSeries) ? LocalDate.parse(definition.string("date")) : LocalDate.of(2026, 10, 2).plusDays(index / 2);
+            String edition = (localCollection || explicitSeries) ? definition.string("edition") : index % 2 == 0 ? "morning" : "evening";
             String id = text(definition, "roundId"); require(id.length() <= 256 && !ids.contains(id), "simulation_round_id");
             require(date.toString().equals(definition.string("date")) && edition.equals(definition.string("edition")), "simulation_round_order");
             StrictJson.Obj window = definition.object("window");
-            Instant from = ("morning".equals(edition) ? date.minusDays(1).atTime(17, 30) : date.atTime(9, 20)).atZone(KST).toInstant();
-            Instant cutoff = date.atTime("morning".equals(edition) ? LocalTime.of(9, 20) : LocalTime.of(17, 30)).atZone(KST).toInstant();
+            Instant from = localCollection ? Instant.parse(window.string("from")) : ("morning".equals(edition) ? date.minusDays(1).atTime(17, 30) : date.atTime(9, 20)).atZone(KST).toInstant();
+            Instant cutoff = localCollection ? Instant.parse(window.string("to")) : date.atTime("morning".equals(edition) ? LocalTime.of(9, 20) : LocalTime.of(17, 30)).atZone(KST).toInstant();
+            if (localCollection) {
+                LocalBriefingCollectionRules.window(bundle, definition, sourceNodes, clocks);
+                LocalBriefingCollectionRules.catalogue(definition, settings.bundle().getParent(), jdbc);
+            }
+            if (explicitSeries) LocalBriefingCollectionRules.catalogue(definition, settings.bundle().getParent(), jdbc);
             require(!window.bool("openStart") && from.equals(Instant.parse(window.string("from")))
                     && cutoff.equals(Instant.parse(window.string("to"))), "simulation_window");
             StrictJson.Obj previous = definition.object("previous");
@@ -233,7 +279,9 @@ public final class BriefingReplayImporter {
                     Set<String> resolvedIds = new HashSet<>(); selected.get(item.string("issueId")).companies().forEach(company -> resolvedIds.add(company.id()));
                     require(suppliedIds.equals(resolvedIds), "grouped_company_catalog_identity");
                 }
-                BriefingGroupedSimulationRules.round(bundle, definition, groupedArchive, receipts, settings.bundle().getParent(), groupedHistory);
+                if (coreSemanticEnabled) BriefingGroupedSimulationRules.round(bundle, definition, groupedArchive, receipts,
+                        settings.bundle().getParent(), groupedHistory, true, referenceSupport);
+                else BriefingGroupedSimulationRules.round(bundle, definition, groupedArchive, receipts, settings.bundle().getParent(), groupedHistory);
                 if (definition.has("groupedUnresolvedPaidRequest") && BriefingGroupedSimulationRules.SELECTION_STAGE.equals(
                         definition.object("groupedUnresolvedPaidRequest").string("stage"))) {
                     StrictJson.Obj disposition = definition.object("groupedUnresolvedPaidRequest");
@@ -249,27 +297,37 @@ public final class BriefingReplayImporter {
                     validateSimulationNoveltyRecording(definition, receipts, inputs);
             }
             String state = definition.string("selectionStatus");
+            ObjectNode continuity = continuityEnabled && grouped
+                    ? BriefingContinuityRules.build(definition, receipts, settings.bundle().getParent(), continuityHistory, referenceSupport) : null;
+            boolean continuityRound = continuity != null && "HELD_SOURCE_COVERAGE".equals(state)
+                    && inputs.size() > 0 && !definition.has("groupedUnresolvedPaidRequest")
+                    && ("reference".equals(continuity.path("mode").asString())
+                        || "recap".equals(continuity.path("mode").asString()));
             ObjectNode marker = StrictJson.newObject().put("scope", scope).put("runId", run).put("sourceFileSha256", sourceSha)
                     .put("clockFileSha256", clockSha).put("bundleSha256", bundleSha).put("userInboxRef", settings.userInboxRef())
-                    .put("retrospectiveBodies", true).put("operationalCollectionGate", false)
+                    .put("retrospectiveBodies", !localCollection).put("operationalCollectionGate", false)
                     .put("identitySha256", definition.string("identitySha256")).put("selectionStatus", state);
+            if (coreSemanticEnabled && grouped) marker.set("selectionEvidenceReview",
+                    BriefingCoreEvidenceRules.review(definition, receipts, settings.bundle().getParent(), referenceSupport));
+            if (localCollection) marker.set("localCollection", bundle.object("localCollection").node().deepCopy());
             marker.set("identity", definition.object("identity").node().deepCopy());
             marker.set("previous", previous.node().deepCopy()); marker.set("sourceCoverage", coverage.node().deepCopy());
             marker.set("clockRefs", definition.array("clockRefs").deepCopy());
             ObjectNode input = (ObjectNode) definition.node().deepCopy(); input.remove("result"); input.remove("receipts");
             blobs.put(namespace + "-input-" + index, blob("briefing_input", StrictJson.write(input)));
             documents.putAll(inputs);
-            if (Set.of("HELD_SOURCE_COVERAGE", "HELD_VALIDATION").contains(state)) {
+            if (Set.of("HELD_SOURCE_COVERAGE", "HELD_VALIDATION").contains(state) && !continuityRound) {
                 require(selected.isEmpty() && definition.isNull("result") && definition.isNull("resultSha256"), "simulation_held_not_published");
                 ObjectNode snapshot = StrictJson.newObject(); snapshot.set("replay", marker);
+                if (continuity != null) snapshot.set("continuity", continuity);
                 held.add(new Held(id, date, edition, from, cutoff, "HELD_VALIDATION".equals(state) ? "failed" : "missing", snapshot));
                 priorId = null; priorSha = null;
             } else {
-                boolean emptyConfirmed = "EMPTY_CONFIRMED".equals(state);
+                boolean emptyConfirmed = "EMPTY_CONFIRMED".equals(state) || continuityRound;
                 StrictJson.Obj result;
                 if (emptyConfirmed) {
                     require(selected.isEmpty() && definition.isNull("result") && definition.isNull("resultSha256")
-                            && coverage.count("unconfirmedTotal") == 0 && clocks.verified.size() == pool.size(), "simulation_empty_confirmation");
+                            && (continuityRound || (coverage.count("unconfirmedTotal") == 0 && clocks.verified.size() == pool.size())), "simulation_empty_confirmation");
                     for (JsonNode value : receipts.values()) {
                         String stage = StrictJson.Obj.of(value).string("stage");
                         require(!Set.of("round_simulation_morning_generation", "round_simulation_evening_generation",
@@ -277,11 +335,11 @@ public final class BriefingReplayImporter {
                     }
                     if (!grouped) validateSimulationSuccessRecordings(definition, receipts, inputs);
                     // No generated news text; retain the full source scope and validated assessment/novelty/selection evidence.
-                    Map<String, Source> coverageSources = new LinkedHashMap<>(pool);
+                    Map<String, Source> coverageSources = new LinkedHashMap<>(continuityRound ? inputs : pool);
                     documents.putAll(coverageSources); inputs = coverageSources;
                     Instant determined = created.isAfter(cutoff) ? created : cutoff;
                     ObjectNode empty = StrictJson.newObject().put("generatedAt", determined.toString()); empty.putArray("items");
-                    result = StrictJson.Obj.of(empty); marker.put("emptyConfirmation", "source_coverage_no_selected_issue");
+                    result = StrictJson.Obj.of(empty); marker.put("emptyConfirmation", continuityRound ? "reference_or_recap_not_new_headlines" : "source_coverage_no_selected_issue");
                 } else {
                     require("SELECTED".equals(state) && !inputs.isEmpty() && !selected.isEmpty(), "simulation_selection_state");
                     result = definition.object("result"); validateGeneration(result, selected);
@@ -310,7 +368,36 @@ public final class BriefingReplayImporter {
                 failure(limitations, "dataWindow", "RETROSPECTIVE_BODY", "당시 수집 기록 없이 나중 수집한 본문과 현재 관측한 publisher 발행시각을 사용합니다. 당시 본문 동일성·collection gate 통과를 주장하지 않습니다.");
                 failure(limitations, "graphVersion", "SOURCE_UNAVAILABLE", "운영 권한·공개 그래프 승인이 없는 localhost 과거 시뮬레이션입니다.");
                 failure(limitations, "marketVariables", "SOURCE_UNAVAILABLE", "당시 KOSPI·KOSDAQ·환율 및 실제 전망 성과를 제공하지 않습니다.");
+                if (localCollection) {
+                    payload.put("scheduledAt", cutoff.toString());
+                    metadata.put("asOf", cutoff.toString());
+                    metadata.put("source", "zoop-briefing-local-collection-validation");
+                    ((ObjectNode) metadata.get("selection")).put("reason", "실제 수집 본문과 발행 시각을 고정한 새 로컬 검증 회차입니다. 정규 시각 자동 발행과 시장 전체 수집을 입증하지 않습니다.");
+                    ((ObjectNode) metadata.get("schedule")).put("confirmed", false);
+                    limitations.removeAll();
+                    failure(limitations, "sourceCoverage", "LOCAL_COLLECTION_VALIDATION", "실제 수집이 완료된 시각을 마감으로 사용한 로컬 검증 회차입니다. 정규 17:30 회차로 소급하지 않습니다.");
+                    failure(limitations, "graphVersion", "LOCAL_ONLY", "운영 공개 승인 없이 로컬 수집·발행·지도 연결을 검증합니다.");
+                    failure(limitations, "marketVariables", "SOURCE_UNAVAILABLE", "이 실행에서 지표와 동일 날짜 출근 전망은 아직 연결되지 않았습니다.");
+                }
                 ObjectNode snapshot = base.snapshot(); snapshot.set("replay", marker);
+                if (continuity != null) {
+                    snapshot.set("continuity", continuity);
+                    if (continuityRound) {
+                        // Preserve the model's original HOLD/result bytes. Only exact reference quotations
+                        // are added to a separately labelled, deterministic briefing; no AI fact is invented.
+                        for (JsonNode reference : continuity.path("references")) for (JsonNode e : reference.path("sources")) {
+                            Source source = pool.get(e.path("documentId").asString() + "\u0000" + e.path("bodySha256").asString());
+                            require(source != null && inputs.containsKey(source.key()), "continuity_reference_source");
+                            String eid=e.path("evidenceId").asString();
+                            Citation citation = new Citation(eid, source, e.path("quote").asString(), e.path("start").asInt(), e.path("end").asInt());
+                            Citation old=citations.putIfAbsent(eid,citation); require(old == null || old.equals(citation), "continuity_evidence_conflict");
+                            ArrayNode refs=(ArrayNode)payload.path("references").path("evidenceIds");
+                            if (!java.util.stream.StreamSupport.stream(refs.spliterator(),false).anyMatch(x->eid.equals(x.asString()))) refs.add(eid);
+                        }
+                        metadata.withObject("selection").put("reason", "핵심 중요도 2 이상 미선정 후 중요도 1 참고 자료만 별도로 제공합니다. 원래 AI HOLD와 원문·검증 기록을 보존합니다.");
+                        marker.put("continuityPolicy", BriefingContinuityRules.VERSION);
+                    }
+                }
                 if (grouped) ((ObjectNode) snapshot.get("marketSummary")).put("reason", "이번 이슈 묶음 브리핑에서는 시장 요약을 새로 생성하지 않았습니다.");
                 marker.put("inputArtifactId", namespace + "-input-" + index);
                 if (!emptyConfirmed) {
@@ -326,7 +413,7 @@ public final class BriefingReplayImporter {
                 if (marketRounds.containsKey(id)) {
                     StrictJson.Obj enrichment = marketRounds.get(id);
                     if (enrichment.has("marketContext")) {
-                        List<Citation> extra = marketContextSources(enrichment, definition, pool, clocks);
+                        List<Citation> extra = marketContextSources(enrichment, definition, pool, clocks, groupedArchive);
                         Set<String> referenced = new HashSet<>(); for (JsonNode ref : payload.path("references").path("evidenceIds")) referenced.add(ref.stringValue());
                         Set<String> bound = new HashSet<>(); for (JsonNode binding : snapshot.path("sourceBindings")) bound.add(binding.path("documentId").stringValue());
                         for (Citation citation : extra) {
@@ -349,6 +436,63 @@ public final class BriefingReplayImporter {
                     payload.put("generatedAt", generated.toString());
                     if (times.artifactCreatedAt().isAfter(created)) created = times.artifactCreatedAt();
                 }
+                if (seriesCompanyRows.containsKey(id)) {
+                    StrictJson.Obj company = seriesCompanyRows.get(id);
+                    Map<String, BriefingPresentationRules.Evidence> companyEvidence = new LinkedHashMap<>();
+                    List<Citation> combined = new ArrayList<>(citations.values());
+                    selected.values().forEach(issue -> combined.addAll(issue.citations()));
+                    for (Citation citation : combined) {
+                        Source source=citation.source(); var clock=clocks.verified.get(source.key());
+                        companyEvidence.put(citation.id(), new BriefingPresentationRules.Evidence(citation.id(), source.id(), source.version(), source.bodySha(), source.body(),
+                                citation.quote(), citation.start(), citation.end(), source.title(), source.provider(), source.url(), clock.publishedAt().toString(), source.kind()));
+                    }
+                    snapshot.set("companyOutlooks", BriefingCompanyOutlookRules.apply(company, payload, definition, marketRounds.get(id),
+                            companyEvidence, seriesCompanyHistory, seriesCompanyReceipts, settings.bundle().getParent(), seriesCompanyOwned));
+                    seriesCompanyHistory.add(company);
+                    if (seriesReadingRows.containsKey(id)) {
+                        StrictJson.Obj reading = seriesReadingRows.get(id);
+                        require(!reading.has("prices") && "not_connected".equals(reading.string("pricePolicy")), "series_reading_price_policy");
+                        BriefingCompanyReadingRules.apply(reading, company, (ObjectNode) snapshot.path("companyOutlooks"),
+                                seriesReadingReceipts, seriesReadingOwned, settings.bundle().getParent());
+                        Instant readingFinished = Instant.parse(reading.string("generatedAt"));
+                        if (readingFinished.isAfter(generated)) { generated=readingFinished; payload.put("generatedAt", generated.toString()); }
+                        if (readingFinished.isAfter(published)) published=readingFinished;
+                        if (readingFinished.isAfter(created)) created=readingFinished;
+                        blobs.put(namespace+"-series-reading-"+index, blob("briefing_input", StrictJson.write(reading.node())));
+                    }
+                    if (seriesPriceRows.containsKey(id)) {
+                        StrictJson.Obj priceRow = seriesPriceRows.get(id);
+                        BriefingSeriesPriceRules.apply(priceRow, (ObjectNode) snapshot.path("companyOutlooks"), settings.bundle().getParent());
+                        blobs.put(namespace + "-series-prices-" + index, blob("briefing_input", StrictJson.write(priceRow.node())));
+                        for (String cid : priceRow.object("prices").node().propertyNames())
+                            for (StrictJson.Obj source : priceRow.object("prices").object(cid).objects("sources"))
+                                blobs.put(namespace + "-series-price-" + source.string("sha256"),
+                                        blob("raw_document", BriefingCompanyPriceRules.raw(source, settings.bundle().getParent())));
+                        Instant recorded = Instant.parse(priceRow.string("recordedAt"));
+                        if (recorded.isAfter(published)) published = recorded;
+                        if (recorded.isAfter(created)) created = recorded;
+                    }
+                    Instant finished=Instant.parse(company.string("generatedAt"));
+                    if (finished.isAfter(generated)) { generated=finished; payload.put("generatedAt", generated.toString()); }
+                    if (finished.isAfter(published)) published=finished;
+                    if (finished.isAfter(created)) created=finished;
+                    blobs.put(namespace+"-series-company-"+index, blob("briefing_input",StrictJson.write(company.node())));
+                }
+                if (continuity != null && !"core".equals(continuity.path("mode").asString())) {
+                    Round prior = publications.stream().filter(p -> !p.scheduled().isAfter(from) && !p.payload().path("items").isEmpty())
+                            .max(java.util.Comparator.comparing(Round::scheduled)).orElse(null);
+                    if (prior != null) {
+                        BriefingContinuityRules.recap(continuity, prior.id(), prior.scheduled(), prior.payload(), prior.snapshot());
+                        for (JsonNode binding : prior.snapshot().path("sourceBindings")) {
+                            ArrayNode bindings=(ArrayNode)snapshot.path("sourceBindings");
+                            if (!java.util.stream.StreamSupport.stream(bindings.spliterator(),false).anyMatch(x->x.equals(binding))) bindings.add(binding.deepCopy());
+                        }
+                        ArrayNode refs=(ArrayNode)payload.path("references").path("evidenceIds");
+                        for(JsonNode eid:prior.payload().path("references").path("evidenceIds"))
+                            if(!java.util.stream.StreamSupport.stream(refs.spliterator(),false).anyMatch(x->x.equals(eid)))refs.add(eid.deepCopy());
+                    }
+                }
+                if ((localCollection || explicitSeries) && !emptyConfirmed) localDetails(payload, snapshot, result, selected, clocks);
                 publications.add(new Round(id, date, edition, cutoff, from, generated, published, payload, snapshot, comparison));
                 for (Issue issue : selected.values()) for (Citation citation : issue.citations()) {
                     Citation prior = citations.putIfAbsent(citation.id(), citation); require(prior == null || prior.equals(citation), "simulation_evidence_conflict");
@@ -359,6 +503,10 @@ public final class BriefingReplayImporter {
                     ObjectNode previousIssue = groupedHistory.addObject().put("issueId", item.string("issueId")).put("title", item.string("title"));
                     previousIssue.set("sources", item.array("sources").deepCopy());
                 }
+            }
+            if (continuityEnabled && continuity != null) {
+                for (JsonNode item : continuity.path("references")) continuityHistory.add(item.deepCopy());
+                for (StrictJson.Obj item : definition.objects("selected")) continuityHistory.add(item.node().deepCopy());
             }
             ids.add(id);
         }
@@ -457,6 +605,13 @@ public final class BriefingReplayImporter {
         }
         if (bundle.has("marketEnrichment")) for (var receipt : simulationReceiptLedger(bundle.object("marketEnrichment").objects("receipts")).entrySet())
             require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "market_enrichment_receipt_reuses_news_request");
+        require(seriesReadingOwned.equals(seriesReadingReceipts.keySet()), "series_reading_receipt_coverage");
+        for (var receipt : seriesReadingReceipts.entrySet())
+            require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "series_reading_receipt_unique");
+        require(seriesCompanyOwned.equals(seriesCompanyReceipts.keySet())
+                && seriesCompanyHistory.size() == seriesCompanyRows.size(), "series_company_receipt_coverage");
+        for (var receipt : seriesCompanyReceipts.entrySet())
+            require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "series_company_receipt_ownership");
         if (bundle.has("marketEnrichment") && bundle.object("marketEnrichment").has("comparisonBaselineSha256")) {
             StrictJson.Obj layer = bundle.object("marketEnrichment"); Path output = settings.bundle().getParent();
             byte[] priorBytes = read(output.resolve("market/baselines/" + layer.string("comparisonBaselineSha256") + ".json"));
@@ -505,7 +660,7 @@ public final class BriefingReplayImporter {
                     ObjectNode news = (ObjectNode) original.node().deepCopy();
                     for (String key : List.of("selected", "result", "resultSha256")) news.set(key, effective.raw(key).deepCopy());
                     validateMarketRecord(market, StrictJson.Obj.of(news), settings.userInboxRef(), settings.bundle().getParent());
-                    marketContextSources(market, original, pool, clocks);
+                    marketContextSources(market, original, pool, clocks, groupedArchive);
                     historyMarkets.add(market);
                     for (var receipt : simulationReceiptLedger(market.objects("receipts")).entrySet()) {
                         require(receipt.getValue().equals(historyReceipts.get(receipt.getKey())) && accountedHistory.add(receipt.getKey()), "outlook_history_receipt_owner");
@@ -564,7 +719,7 @@ public final class BriefingReplayImporter {
                     validateMarketRecord(market, StrictJson.Obj.of(news), settings.userInboxRef(), settings.bundle().getParent());
                     validatedMarkets.add(market);
                     if (market.has("marketContext")) {
-                        List<Citation> extra = marketContextSources(market, original, pool, clocks);
+                        List<Citation> extra = marketContextSources(market, original, pool, clocks, groupedArchive);
                         Set<String> referenced = new HashSet<>(); for (JsonNode ref : payload.path("references").path("evidenceIds")) referenced.add(ref.stringValue());
                         Set<String> bound = new HashSet<>(); for (JsonNode binding : snapshot.path("sourceBindings")) bound.add(binding.path("documentId").stringValue());
                         for (Citation citation : extra) {
@@ -708,9 +863,37 @@ public final class BriefingReplayImporter {
         }
     }
 
+    private static void localDetails(ObjectNode payload, ObjectNode snapshot, StrictJson.Obj result,
+            Map<String, Issue> selected, PublicationClockRegistry clocks) {
+        Map<String, BriefingPresentationRules.Evidence> evidence = new LinkedHashMap<>();
+        ObjectNode supplied = StrictJson.newObject();
+        for (Issue issue : selected.values()) {
+            ArrayNode contexts = supplied.putObject(issue.id()).putArray("evidence");
+            for (Citation citation : issue.citations()) {
+                Source source = citation.source();
+                String published = clocks.verified.get(source.key()).publishedAt().toString();
+                evidence.put(citation.id(), new BriefingPresentationRules.Evidence(citation.id(), source.id(), source.version(),
+                        source.bodySha(), source.body(), citation.quote(), citation.start(), citation.end(),
+                        source.title(), source.provider(), source.url(), published, source.kind()));
+                int size = source.body().codePointCount(0, source.body().length());
+                int left = Math.max(0, citation.start() - 400), right = Math.min(size, Math.max(citation.end() + 400, left + 1200));
+                ObjectNode item = contexts.addObject().put("id", citation.id());
+                if (right - left > 2000) item.putNull("bodyContext");
+                else item.putObject("bodyContext").put("text", source.body().substring(source.body().offsetByCodePoints(0,left), source.body().offsetByCodePoints(0,right)))
+                        .put("start",left).put("end",right).put("quoteStart",citation.start()).put("quoteEnd",citation.end()).put("offsetUnit","unicode_code_point");
+            }
+        }
+        BriefingPresentationRules.details(payload, snapshot, result, StrictJson.Obj.of(supplied), evidence);
+    }
+
     /** Independently restore every broad-input span from the source/clock registry before any DB write. */
     private static List<Citation> marketContextSources(StrictJson.Obj record, StrictJson.Obj definition,
             Map<String, Source> pool, PublicationClockRegistry clocks) {
+        return marketContextSources(record, definition, pool, clocks, null);
+    }
+
+    private static List<Citation> marketContextSources(StrictJson.Obj record, StrictJson.Obj definition,
+            Map<String, Source> pool, PublicationClockRegistry clocks, BriefingGroupedSimulationRules.Archive archive) {
         StrictJson.Obj context = record.object("marketContext");
         require("zoop-briefing-market-context-v1".equals(context.string("schemaVersion"))
                 && "publication_clock_simulation".equals(context.string("scope")) && !context.bool("operationalCollectionGate")
@@ -741,6 +924,10 @@ public final class BriefingReplayImporter {
                     names.add(value.path("companyName").stringValue());
             if (source.row().has("companyName") && !source.row().isNull("companyName")) {
                 String name = source.row().string("companyName"); if (!name.isBlank()) names.add(name);
+            }
+            if (context.has("companyMetadataPolicy")) {
+                require(archive != null && BriefingEditorialRules.COMPANY_POLICY.equals(context.string("companyMetadataPolicy")), "market_company_policy");
+                names = BriefingEditorialRules.companies(archive, source.id(), cutoff);
             }
             require(card.strings("companyNames").equals(List.copyOf(names)), "market_context_company_binding"); companyNames.addAll(names);
             int length = source.body().codePointCount(0, source.body().length());
@@ -856,7 +1043,13 @@ public final class BriefingReplayImporter {
         marketArtifact(output, "snapshots", record.string("marketSnapshotSha256"), snapshot.node());
         validateMarketSnapshot(snapshot, record);
         validateMarketRawValues(snapshot, output);
-        StrictJson.Obj context = record.object("context").keys(Set.of("roundId", "date", "edition", "cutoff", "newsResultSha256", "marketSnapshotSha256", "userInboxRef"), Set.of("promptArtifacts", "marketContextSha256", "summaryPromptVersion"));
+        StrictJson.Obj context = record.object("context").keys(Set.of("roundId", "date", "edition", "cutoff", "newsResultSha256", "marketSnapshotSha256", "userInboxRef"), Set.of("promptArtifacts", "marketContextSha256", "summaryPromptVersion", "editorialConstraints"));
+        if (context.has("editorialConstraints")) {
+            require("market-context-v3-grounded".equals(context.string("summaryPromptVersion")), "market_editorial_version");
+            var writing = context.object("editorialConstraints").exactly(Set.of("interpretation", "requiredClaims"));
+            for (String key : List.of("interpretation", "requiredClaims"))
+                require(!writing.string(key).isBlank() && writing.string(key).length() <= 800, "market_editorial_bounds");
+        }
         require(Canonical.digest(context.node()).equals(record.string("contextSha256")) && inbox.equals(context.string("userInboxRef")), "market_enrichment_context_hash");
         if (context.has("promptArtifacts")) {
             StrictJson.Obj prompts = context.object("promptArtifacts").exactly(Set.of("generation.md", "generation.schema.json", "verification.md", "verification.schema.json"));
@@ -1251,7 +1444,9 @@ public final class BriefingReplayImporter {
                 && identity.object("previous").node().equals(round.object("previous").node())
                 && !identity.bool("operationalCollectionGate") && "round-simulation-v1".equals(identity.string("contextVersion"))
                 && Canonical.digest(round.array("inputSources")).equals(identity.string("candidateInputSha256")), "simulation_frozen_context");
-        require(Instant.parse(identity.object("baseline").string("from")).equals(LocalDate.of(2026, 10, 1).atTime(17, 30).atZone(KST).toInstant())
+        if (LocalBriefingCollectionRules.enabled(bundle)) LocalBriefingCollectionRules.identity(bundle, round);
+        else if (bundle.has("roundSeries")) BriefingRoundSeriesRules.identity(bundle, round);
+        else require(Instant.parse(identity.object("baseline").string("from")).equals(LocalDate.of(2026, 10, 1).atTime(17, 30).atZone(KST).toInstant())
                 && "simulation_baseline_not_service_first_round".equals(identity.object("baseline").string("meaning")), "simulation_baseline");
         List<String> names = new ArrayList<>(List.of("importance.md", "selection.md", "generation-morning.md", "generation-evening.md", "verification.md",
                 "importance.schema.json", "selection.schema.json", "generation.schema.json", "verification.schema.json"));
@@ -1262,8 +1457,12 @@ public final class BriefingReplayImporter {
                 "grouped-generation-morning.md", "grouped-generation-evening.md", "grouped-verification.md"));
         StrictJson.Obj prompts = identity.object("promptArtifacts"); prompts.exactly(Set.copyOf(names));
         for (String name : names) {
-            String resource = name.startsWith("grouped-") ? "/briefing/prompts/grouped-issues/" + name.substring("grouped-".length())
+            String resource = name.startsWith("grouped-") ? "/briefing/prompts/" + (LocalBriefingCollectionRules.enabled(bundle) && name.endsWith(".md") ? "local-collection/" : "grouped-issues/") + name.substring("grouped-".length())
                     : "/briefing/prompts/round-simulation/" + name;
+            if ("grouped-selection.md".equals(name) && identity.has("selectionEvidencePolicy")) {
+                require(BriefingCoreEvidenceRules.POLICY.equals(identity.string("selectionEvidencePolicy")), "selection_evidence_policy");
+                resource = resource.replace("/selection.md", "/selection-semantic-v2.md");
+            }
             try (var stream = BriefingReplayImporter.class.getResourceAsStream(resource)) {
                 require(stream != null && Canonical.sha256(stream.readAllBytes()).equals(prompts.string(name)), "simulation_prompt_hash");
             } catch (IOException unavailable) { throw new IllegalArgumentException("Simulation prompt is unavailable", unavailable); }

@@ -82,6 +82,10 @@ def prepare_round(record, archive, calls, original_history):
         return []
     selection_reply, _ = reply(calls, key)
     candidates = grouped.build_grouped_candidates(archive, record)
+    if record.get("identity", {}).get("selectionEvidencePolicy") is not None:
+        import briefing_semantic_support as semantic
+        require(record["identity"]["selectionEvidencePolicy"] == semantic.POLICY, "recovery_semantic_policy_unknown")
+        candidates = semantic.apply(candidates, semantic.load(archive, calls.parent))
     # Sorting and thresholds are identical to the original selector. This only
     # prevents an invalid company mapping on one choice from discarding others.
     choices = sorted(selection_reply["selected"], key=lambda c: (

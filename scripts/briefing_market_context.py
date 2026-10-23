@@ -148,7 +148,7 @@ def evaluate_forecasts(previous, snapshot):
     return evaluations
 
 
-def build_context(rows, round_, snapshot, records=(), calendar=None, unconfirmed_total=0):
+def build_context(rows, round_, snapshot, records=(), calendar=None, unconfirmed_total=0, company_archive=None):
     cutoff, start = legacy._aware(round_["window"]["to"]), legacy._aware(round_["window"]["from"])
     require(snapshot["round"]["date"] == round_["date"] and snapshot["round"]["edition"] == round_["edition"]
             and legacy._aware(snapshot["round"]["cutoff"]) == cutoff, "market_context_round_binding")
@@ -177,7 +177,7 @@ def build_context(rows, round_, snapshot, records=(), calendar=None, unconfirmed
                             **identity, "documentVersion": row["documentVersion"], "quote": body[left:right],
                             "offsetUnit": "unicode_code_point", "publishedAt": row["clockRecord"]["publishedAt"]})
         documents.append({"documentId": row["documentId"], "documentVersion": row["documentVersion"],
-                          "bodySha256": row["bodySha256"], "companyNames": row["companyNames"],
+                          "bodySha256": row["bodySha256"], "companyNames": (__import__("briefing_editorial_guard").company_names(company_archive, row["documentId"], cutoff) if company_archive else row["companyNames"]),
                           "role": role, "sources": sources})
     previous = previous_publication(round_, records)
     targets, target_reason = calendar_targets(calendar, round_, snapshot)
@@ -193,6 +193,8 @@ def build_context(rows, round_, snapshot, records=(), calendar=None, unconfirmed
                             "sectorPriceFeedAvailable": False, "universe": "available_verified_sources",
                             "bodyScope": "exact_prefix600_suffix300", "marketRepresentative": False,
                             "historicalBodyUnchangedProven": False}}
+    if company_archive is not None:
+        context["companyMetadataPolicy"] = "accepted-issue-company-evidence-v1"
     require(len(documents) <= 1000, "market_context_population_limit")
     return context
 

@@ -33,17 +33,36 @@ def run(args, market_transport=None, ai_transport=None):
     baseline, output = Path(args.baseline).resolve(), Path(args.output).resolve()
     if output == baseline or baseline in output.parents:
         raise base.ReplayError("market_enrichment_requires_separate_output")
+    version = getattr(args, "prompt_version", None)
+    if version:
+        context_summary.PROMPTS = context_summary.PROMPTS.with_name(version)
     original_bytes = base.regular(baseline / "bundle-v2.json")
     original = base.strict_load(original_bytes)
-    if original.get("schemaVersion") != "zoop-briefing-round-simulation-v2" or original.get("marketEnrichment"):
+    if original.get("schemaVersion") not in {"zoop-briefing-round-simulation-v2", "zoop-briefing-grouped-simulation-v1"} or original.get("marketEnrichment"):
         raise base.ReplayError("market_enrichment_original_simulation_required")
     if base.digest(base.regular(Path(args.sources))) != original["sourceFileSha256"] \
             or base.digest(base.regular(Path(args.clocks))) != original["clockFileSha256"]:
         raise base.ReplayError("market_enrichment_source_or_clock_mismatch")
+    urls = None
+    if original.get("roundSeries"):
+        import briefing_round_series
+        series = briefing_round_series.load(Path(args.round_series), original["sourceFileSha256"])
+        if series != original["roundSeries"]: raise base.ReplayError("market_series_mismatch")
+        from datetime import date, timedelta
+        urls = market.provider_urls((date.fromisoformat(series["rounds"][0]["date"])-timedelta(days=10)).isoformat(),
+                                   (date.fromisoformat(series["rounds"][-1]["date"])+timedelta(days=1)).isoformat())
     contextual = getattr(args, "include_market_context", False)
     calendar_path = getattr(args, "session_calendar", None)
     calendar = base.strict_load(base.regular(Path(calendar_path))) if calendar_path else None
     context_rows, unknown, _ = context_summary.simulation.load_inputs(Path(args.sources), Path(args.clocks)) if contextual else ([], [], {})
+    company_archive = None
+    if contextual and getattr(args, "grounded_company_metadata", False):
+        if original.get("schemaVersion") != "zoop-briefing-grouped-simulation-v1":
+            raise base.ReplayError("grounded_companies_require_grouped_archive")
+        archive_raw = base.regular(baseline / "grouped-issues.json")
+        if base.digest(archive_raw) != original["groupArchiveSha256"]:
+            raise base.ReplayError("company_archive_digest")
+        company_archive = base.strict_load(archive_raw)
     seed_records = []
     seed_path = getattr(args, "previous_market_bundle", None)
     if seed_path:
@@ -55,7 +74,7 @@ def run(args, market_transport=None, ai_transport=None):
             raise base.ReplayError("market_previous_bundle_baseline_mismatch")
         seed_records = seed["marketEnrichment"]["rounds"]
     rounds = [r for r in original["rounds"] if r["selectionStatus"] == "SELECTED"]
-    if len(original["rounds"]) != 14 or len(rounds) > 14:
+    if (not original.get("roundSeries") and len(original["rounds"]) != 14) or len(rounds) > 14:
         raise base.ReplayError("market_enrichment_round_population_invalid")
     if contextual:
         cutoffs = [context_summary.legacy._aware(r["window"]["to"]) for r in original["rounds"]]
@@ -69,6 +88,8 @@ def run(args, market_transport=None, ai_transport=None):
             "roundIds": [r["roundId"] for r in rounds], "maximumSummaryCalls": 4 * len(rounds),
             "maxCalls": args.max_calls, "sourceFileSha256": original["sourceFileSha256"],
             "clockFileSha256": original["clockFileSha256"], "operationalCollectionGate": False}
+    if company_archive is not None: plan["companyMetadataPolicy"] = "accepted-issue-company-evidence-v1"
+    if getattr(args, "concise_analysis", False): plan["seriesWritingPolicy"] = "complete-short-sentences-v1"
     if contextual:
         plan.update({"summaryPolicy": context_summary.POLICY,
                      "calendarSha256": base.digest(base.canonical(calendar)) if calendar else None,
@@ -111,7 +132,7 @@ def run(args, market_transport=None, ai_transport=None):
                 sha = record["summaryResult"]["frozenInputSha256"]
                 if base.digest(base.regular(output / "market/frozen-inputs" / (sha + ".json"))) != sha:
                     raise base.ReplayError("market_enrichment_cached_frozen_input_changed")
-        market.fetch_receipts(output, lambda _: (_ for _ in ()).throw(base.ReplayError("cached_enrichment_must_not_refetch")))
+        market.fetch_receipts(output, lambda _: (_ for _ in ()).throw(base.ReplayError("cached_enrichment_must_not_refetch")), urls)
         return {"status": "COMPLETE", "rounds": len(rounds), "newHttpCalls": 0, "newPaidCalls": 0,
                 "summaryPass": sum(r["summaryResult"]["verification"]["status"] == "PASS" for r in final["marketEnrichment"]["rounds"]),
                 "bundlePath": str(final_path)}
@@ -124,7 +145,7 @@ def run(args, market_transport=None, ai_transport=None):
     client = None
     original_prompts = context_summary.PROMPTS if contextual else summary.PROMPTS
     try:
-        receipts, http_calls = market.fetch_receipts(output, market_transport or market.transport)
+        receipts, http_calls = market.fetch_receipts(output, market_transport or market.transport, urls)
         ai_output = output / "summary-run"
         base.private_dir(ai_output)
         frozen_prompts = ai_output / "prompts"
@@ -135,7 +156,7 @@ def run(args, market_transport=None, ai_transport=None):
         if not contextual:
             summary.PROMPTS = frozen_prompts
         prompt_artifacts = {p.name: base.digest(base.regular(p)) for p in sorted(frozen_prompts.iterdir()) if p.is_file()}
-        client = summary.MarketSummaryClient(ai_output, ai_transport or base.authenticated_transport(Path(args.key_file)), args.max_calls, prompt_root=frozen_prompts)
+        client = summary.MarketSummaryClient(ai_output, ai_transport or base.authenticated_transport(Path(args.key_file), timeout=600 if original.get("roundSeries") else 180), args.max_calls, prompt_root=frozen_prompts)
         snapshots, summaries = output / "market/snapshots", output / "market/summaries"
         base.private_dir(snapshots)
         base.private_dir(summaries)
@@ -155,9 +176,13 @@ def run(args, market_transport=None, ai_transport=None):
             if contextual:
                 # Prefer this run's immediate predecessor; never use a future or stale fallback.
                 records = [*completed_records, *(x for x in seed_records if x["roundId"] not in {p["roundId"] for p in completed_records})]
-                broad = context_summary.build_context(context_rows, r, snapshot, records, calendar, len(unknown))
+                broad = context_summary.build_context(context_rows, r, snapshot, records, calendar, len(unknown), company_archive)
                 context["marketContextSha256"] = base.digest(base.canonical(broad))
-                context["summaryPromptVersion"] = "market-context-v2"
+                context["summaryPromptVersion"] = version or "market-context-v2"
+            if getattr(args, "concise_analysis", False):
+                context["editorialConstraints"] = {
+                    "interpretation": "Write one complete Korean sentence under 150 characters. Discuss only the business facts named in basisFactIds. Do not include index or FX observations in interpretation; those are already displayed separately. Never end with a cut-off word or unfinished clause.",
+                    "requiredClaims": "Keep every required slot, but use short complete sentences. Do not insert unsupported facts, causes or price predictions."}
             context_sha = base.digest(base.canonical(context))
             data = {"context": context, "contextSha256": context_sha,
                     "selected": r["selected"], "newsItems": r["result"]["items"], "marketSnapshot": snapshot}
@@ -192,6 +217,8 @@ def run(args, market_transport=None, ai_transport=None):
         final = {**original, "marketEnrichment": {"schemaVersion": "zoop-briefing-market-enrichment-v1",
                  "digestScheme": "raw-json-sha256-v1", "userInboxRef": args.user_inbox_ref,
                  "baselineBundleSha256": plan["baselineBundleSha256"], "rounds": components, "receipts": client.receipts()}}
+        for name in ("grouped-issues.json", "publication-companies.json"):
+            if (baseline/name).exists(): base.write_once(output/name, base.regular(baseline/name))
         copy_calls(baseline / "calls", output / "calls")
         copy_calls(ai_output / "calls", output / "calls")
         base.save_json(final_path, final)
@@ -212,7 +239,11 @@ def parser():
     p = argparse.ArgumentParser(description=__doc__)
     for flag in ("baseline", "output", "sources", "clocks", "user-inbox-ref"):
         p.add_argument("--" + flag, required=True)
+    p.add_argument("--concise-analysis", action="store_true")
+    p.add_argument("--round-series")
+    p.add_argument("--prompt-version", choices=("market-context-v3-grounded",))
     p.add_argument("--key-file")
+    p.add_argument("--grounded-company-metadata", action="store_true", help="Use accepted exact issue evidence, not search associations")
     p.add_argument("--include-market-context", action="store_true", help="Use all verified company sources and chronological prior summaries")
     p.add_argument("--previous-market-bundle", help="Frozen same-baseline historical market bundle, never an operating publication")
     p.add_argument("--session-calendar", help="Explicit as-of session calendar; missing calendar disables new price targets")

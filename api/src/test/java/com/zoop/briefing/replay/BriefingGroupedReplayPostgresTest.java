@@ -79,7 +79,8 @@ class BriefingGroupedReplayPostgresTest {
     @Test void acceptedGroupedIssuesReachAllFourteenHttpRoundsAndIdenticalImportIsImmutable() throws Exception {
         assertEquals(14, jdbc.queryForObject("SELECT count(*) FROM briefing_rounds WHERE published_at IS NOT NULL", Integer.class));
         assertEquals(14, jdbc.queryForObject("SELECT count(*) FROM articles", Integer.class));
-        assertEquals(42, jdbc.queryForObject("SELECT count(*) FROM artifacts WHERE kind='ai_call_receipt'", Integer.class));
+        // 42 selection/generation/verification receipts plus one independently recorded semantic grounding.
+        assertEquals(43, jdbc.queryForObject("SELECT count(*) FROM artifacts WHERE kind='ai_call_receipt'", Integer.class));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM artifacts WHERE id LIKE '%-grouped-issues'", Integer.class));
         HttpClient http = HttpClient.newHttpClient();
         for (int index = 0; index < 14; index++) {
@@ -149,14 +150,16 @@ class BriefingGroupedReplayPostgresTest {
             var unknownImporter = new BriefingReplayImporter(database, new DataSourceTransactionManager(datasource), settings);
             unknownImporter.importBundle();
             StrictJson.Obj savedArchive = StrictJson.parseObject(Files.readAllBytes(archive));
-            StrictJson.Obj receipt = savedArchive.objects("receipts").getFirst(); String digest = receipt.string("requestDigest");
+            var unresolved = savedArchive.objects("receipts").stream().filter(r -> "unknown".equals(r.string("status"))).toList();
+            assertEquals(1, unresolved.size());
+            StrictJson.Obj receipt = unresolved.getFirst(); String digest = receipt.string("requestDigest");
             assertFalse(receipt.bool("usageKnown")); assertTrue(receipt.isNull("inputTokens")); assertTrue(receipt.isNull("outputTokens"));
             assertEquals("unknown", receipt.string("status")); assertTrue(receipt.isNull("responseId"));
             byte[] request = Files.readAllBytes(output.resolve("calls").resolve(digest + ".request.json"));
             byte[] pending = Files.readAllBytes(output.resolve("calls").resolve(digest + ".pending.json"));
             assertEquals(digest, ArtifactFileStore.sha256(request));
             assertEquals(13, database.queryForObject("SELECT count(*) FROM briefing_rounds WHERE published_at IS NOT NULL", Integer.class));
-            assertEquals(40, database.queryForObject("SELECT count(*) FROM artifacts WHERE kind='ai_call_receipt'", Integer.class));
+            assertEquals(41, database.queryForObject("SELECT count(*) FROM artifacts WHERE kind='ai_call_receipt'", Integer.class));
             assertEquals(1, database.queryForObject("SELECT count(*) FROM artifacts WHERE kind='ai_submit' AND sha256=?", Integer.class, digest));
             assertEquals(1, database.queryForObject("SELECT count(*) FROM artifacts WHERE kind='briefing_input' AND sha256=?", Integer.class, ArtifactFileStore.sha256(pending)));
             assertEquals(0, database.queryForObject("SELECT count(*) FROM artifacts WHERE id LIKE ?", Integer.class, "%-response-" + digest));
@@ -195,7 +198,7 @@ class BriefingGroupedReplayPostgresTest {
                 caseImporter.importBundle();
                 assertEquals("held".equals(mode) ? 13 : 14,
                         database.queryForObject("SELECT count(*) FROM briefing_rounds WHERE published_at IS NOT NULL", Integer.class));
-                assertEquals("held".equals(mode) ? 41 : 43,
+                assertEquals("held".equals(mode) ? 42 : 44,
                         database.queryForObject("SELECT count(*) FROM artifacts WHERE kind='ai_call_receipt'", Integer.class));
                 if ("held".equals(mode)) assertEquals(1, database.queryForObject("SELECT count(*) FROM briefing_rounds WHERE status='failed' AND published_payload IS NULL", Integer.class));
                 StrictJson.Obj saved = StrictJson.parseObject(Files.readAllBytes(bundleFile)), first = saved.objects("rounds").getFirst();
@@ -241,7 +244,7 @@ class BriefingGroupedReplayPostgresTest {
                     f.clock.root = directory; f.clock.sources = directory / 'sources.jsonl'
                     f.clock.clocks = directory / 'clocks.json'; f.clock.html = directory / 'html'; f.clock.html.mkdir()
                     archive = f.prepare()
-                    archive['identity'] = {'companyProjectionVersion':'canonical-evidence-v1'}
+                    archive.setdefault('identity', {})['companyProjectionVersion'] = 'canonical-evidence-v1'
                     for issue in archive['issues']:
                         for mention in issue['mentions']:
                             audit = []
@@ -260,6 +263,7 @@ class BriefingGroupedReplayPostgresTest {
                         'suppliedName':raw['name'], 'suppliedRole':raw['role'], 'canonicalName':None,
                         'rawParticipant':raw, 'matchedEvidenceIds':[], 'status':'excluded_unknown_company_id'}]}
                     archive['issues'][0]['mentions'].append(future)
+                    m.fixtures.record_grounding(archive, directory)
                     f.archive_path.write_bytes(m.base.canonical(archive))
                     result = f.execute(m.fixtures.AuthoredTransport())
                     assert result['selectedRounds'] == 13, result
@@ -285,7 +289,7 @@ class BriefingGroupedReplayPostgresTest {
             assertEquals(13, database.queryForObject("SELECT count(*) FROM briefing_rounds WHERE published_at IS NOT NULL", Integer.class));
             assertEquals(1, database.queryForObject("SELECT count(*) FROM briefing_rounds WHERE round_date='2026-10-02' AND edition='morning' AND published_payload->'items'->0->>'eventId'='stable-authored-issue-0'", Integer.class));
             assertEquals(1, database.queryForObject("SELECT count(*) FROM briefing_rounds WHERE round_date='2026-10-02' AND edition='evening' AND published_payload IS NULL", Integer.class));
-            assertEquals(39, database.queryForObject("SELECT count(*) FROM artifacts WHERE kind='ai_call_receipt'", Integer.class));
+            assertEquals(40, database.queryForObject("SELECT count(*) FROM artifacts WHERE kind='ai_call_receipt'", Integer.class));
             assertTrue(projectedImporter.importBundle().alreadyImported());
             byte[] originalArchive = Files.readAllBytes(archiveFile), originalBundle = Files.readAllBytes(bundleFile);
             String before = database.queryForObject("SELECT md5(string_agg(row_to_json(r)::text, '' ORDER BY id)) FROM briefing_rounds r", String.class);
