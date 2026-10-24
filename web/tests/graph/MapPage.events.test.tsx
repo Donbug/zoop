@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import MapPage from '@/pages/map/MapPage';
 import { getEvent } from '@/apis/graph/events';
 import { getGraph } from '@/apis/graph/graph';
@@ -12,6 +12,8 @@ import { createMockRelation } from '@/mocks/relations/fixture';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import { useAiChatStore } from '@/stores/useAiChatStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { recordInteractionEvents } from '@/apis/telemetry/telemetry';
+import { flushTelemetry, resetTelemetry } from '@/util/track';
 import type { BriefingGraphBasis } from '@/types/briefing';
 import type { GraphResponse } from '@/types/map/graph';
 
@@ -43,6 +45,10 @@ vi.mock('@/apis/graph/events', async (original) => ({
   getEvent: vi.fn(),
 }));
 vi.mock('@/apis/graph/graph', () => ({ getGraph: vi.fn() }));
+vi.mock('@/apis/telemetry/telemetry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/apis/telemetry/telemetry')>()),
+  recordInteractionEvents: vi.fn(),
+}));
 // Canvas rendering is verified separately; these tests exercise actual routing,
 // data hooks, panel, handoff stores and focus restoration together.
 vi.mock('@/components/graph/GraphCanvas', () => ({
@@ -96,6 +102,10 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
 }));
 
 beforeEach(() => {
+  resetTelemetry();
+  vi.mocked(recordInteractionEvents)
+    .mockReset()
+    .mockResolvedValue({ accepted: 2 });
   vi.mocked(getGraph)
     .mockReset()
     .mockImplementation(async (request) => createMockGraph(request));
@@ -118,6 +128,7 @@ beforeEach(() => {
     onboardingCompleted: null,
   });
 });
+afterEach(() => resetTelemetry());
 function setup(url = '/?mode=all&scope=watchlist') {
   const router = createMemoryRouter([{ path: '/', element: <MapPage /> }], {
     initialEntries: [url],
@@ -150,6 +161,35 @@ describe('D-GRP-02 · map selection and downstream context', () => {
     expect(router.state.location.search).toBe('?mode=all&scope=watchlist');
     expect(screen.getByTestId('graph-canvas')).toBe(canvas);
     expect(getGraph).toHaveBeenCalledTimes(1);
+  });
+  it('records a graph edge selection with the current map view id', async () => {
+    useAuthStore.setState((state) => ({
+      session: state.session && { ...state.session, csrfToken: 'csrf-test' },
+    }));
+    const router = setup();
+    await userEvent.click(
+      await screen.findByRole('button', { name: '사건 공유 연결선 선택' }),
+    );
+    flushTelemetry();
+    await waitFor(() => expect(recordInteractionEvents).toHaveBeenCalled());
+
+    const events = vi.mocked(recordInteractionEvents).mock.calls[0][0];
+    const screenView = events.find((event) => event.type === 'screen_view');
+    const edgeSelection = events.find(
+      (event) => event.type === 'graph_edge_select',
+    );
+    expect(screenView).toMatchObject({ type: 'screen_view', screen: 'main' });
+    expect(edgeSelection?.type).toBe('graph_edge_select');
+    if (
+      screenView?.type !== 'screen_view' ||
+      edgeSelection?.type !== 'graph_edge_select'
+    )
+      throw new Error('expected main view and edge selection telemetry');
+    expect(edgeSelection.targetId).toBeTruthy();
+    expect(edgeSelection.viewId).toBe(screenView.viewId);
+    expect(
+      new URLSearchParams(router.state.location.search).get('select'),
+    ).toBe(`edge:${edgeSelection.targetId}`);
   });
   it('supports direct URLs and sends response version, event and map context to all actions', async () => {
     const router = setup(
