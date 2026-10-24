@@ -10,10 +10,12 @@ import java.time.Instant;
 import java.util.Optional;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.TransactionException;
 
 /**
  * {@link ChatCitationSource} through {@code GET /api/v1/evidence/{id}}'s own read, at the pinned version and asOf. A company
- * profile quote is cited from the catalog as {@code company_profile}: the whole quoted text, the company id as {@code docId}.
+ * profile quote is cited from the catalog as {@code company_profile}: the whole quoted text, the company id as {@code docId},
+ * only while its company is visible at that version and asOf ({@link ChatCompanyProfiles#readability}).
  */
 @Component
 public class EvidenceCitationSource implements ChatCitationSource {
@@ -30,11 +32,16 @@ public class EvidenceCitationSource implements ChatCitationSource {
         Optional<ChatCompanyProfiles.Quote> profile;
         try {
             profile = profiles.byId(evidenceId);
-        } catch (DataAccessException unavailable) {
+        } catch (DataAccessException | TransactionException unavailable) {
             throw new ChatToolUnavailable("the catalog could not be read for " + evidenceId, unavailable);
         }
         if (profile.isPresent()) {
             var q = profile.get();
+            switch (profiles.readability(q, graphVersion, asOf, traceId)) {
+                case DENIED -> { return Optional.empty(); }
+                case UNAVAILABLE -> throw new ChatToolUnavailable("the company of " + evidenceId + " could not be checked");
+                case READABLE -> { }
+            }
             return Optional.of(new Citation("company_profile", q.evidenceId(), q.text(), null, null, q.companyId(), null, 0,
                     q.text().codePointCount(0, q.text().length()), q.title(), ChatCompanyProfiles.PUBLISHER, null, q.url()));
         }
