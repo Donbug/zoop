@@ -208,8 +208,10 @@ class AiChatContractTest {
 
     @Test
     void liveModeIsRefusedWhileTheServiceGateIsClosed() {
+        // The service knows a supported model, so the request reaches the live gate itself; enable, budget and keys are unset.
         assertEquals(Fate.REFUSED, fate(() -> stages(chatToken, "live").route(run(ROUTER_QUESTION), BOUND)));
-        assertEquals("failed execution_unavailable", recorded.getLast());
+        assertEquals("failed chat_live_disabled", recorded.getLast());
+        assertNull(receipts.getLast(), "nothing was sent");
     }
 
     @Test

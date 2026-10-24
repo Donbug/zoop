@@ -7,9 +7,11 @@ any field has no replay entry and is refused (`replay_input_mismatch`), so the g
 `zoop-ai-chat-1` inputs and answers, not only on the envelope. Before any process starts, the fixture is replayed in-process
 through the worker runtime so an authoring mistake fails here and not as a Java mismatch.
 
-Then starts one real `ai/service` (127.0.0.1, fresh temp state, replay only, live gate closed, synthetic in-memory principals,
-no model call, no PostgreSQL) with the chat group, runs `./api/gradlew aiChatContractTest` against it, checks the JUnit report
-(non-zero tests, none skipped or failed) and that no credential or private path reached the service log or the Gradle output.
+Then starts one real `ai/service` (127.0.0.1, fresh temp state, replay only, live gate closed: a supported Jev model name so
+a live request reaches the gate, but no live enable, budget or provider key; synthetic in-memory principals, no model call,
+no PostgreSQL) with the chat group, runs `./api/gradlew aiChatContractTest` against it, checks the JUnit report
+(every contract test named in CONTRACT_TESTS ran, none skipped or failed) and that no credential or private path reached the
+service log or the Gradle output.
 
 Run with the ai/service environment (`make service-install` first): `make api-ai-chat-smoke`. `--check-fixture` only runs the
 in-process fixture check. Needs JDK 21 (JAVA_HOME) like any api build.
@@ -18,11 +20,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import signal
 import shutil
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
@@ -30,12 +35,26 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "ai" / "service" / "tests"))
 
-from support import ServiceProcess, Workspace, remove_tree, terminate_runtime  # noqa: E402
+from support import PGREP, ServiceProcess, Workspace, remove_tree, terminate_runtime  # noqa: E402
 
 API = ROOT / "api"
 RESULTS = API / "build" / "test-results" / "aiChatContractTest"
 GRADLE_TIMEOUT_SECONDS = 900
 SCHEMA = "zoop-ai-chat-1"
+# Not a secret: the one Jev model the worker supports. Set so a live request passes the stage configuration and is refused
+# by the closed live gate itself; live enable, budget and provider keys stay unset.
+LIVE_JEV_MODEL = "jev-1.14.0"
+# One test per contract boundary: a boundary whose test went missing fails the gate even when every remaining test passes.
+CONTRACT_TESTS = frozenset({
+    "theRouterAnswersTheServerSplitRequirementsWithTypedProbabilities",
+    "theAnswerIsGeneratedFromTheGrantedQuote",
+    "theVerifierJudgesEachSection",
+    "theSameInvocationIsAnsweredFromTheLedgerAndNeverSentAgain",
+    "aQuoteWithoutAChatGrantIsRefusedBeforeSending",
+    "anInputTheFixtureDoesNotKnowIsRefusedNotGuessed",
+    "liveModeIsRefusedWhileTheServiceGateIsClosed",
+    "aPrincipalWithoutChatInvokeIsRefused",
+})
 
 # ---- the synthetic scenario; AiChatContractTest builds the same through the production adapters ------------------------------
 # The capability descriptions are ChatCapability's: changing one changes what the router is asked, so the fixture must follow.
@@ -175,21 +194,58 @@ def verify_junit() -> tuple[int, int]:
     if not reports:
         raise GateFailure("aiChatContractTest produced no JUnit report: the contract tests did not run")
     tests = failures = 0
+    names: set[str] = set()
     for report in reports:
         suite = ET.parse(report).getroot()
         tests += int(suite.get("tests", "0"))
         failures += int(suite.get("failures", "0")) + int(suite.get("errors", "0"))
         if int(suite.get("skipped", "0")):
             raise GateFailure("aiChatContractTest skipped tests: a skip is not a pass")
+        names.update(case.get("name", "").removesuffix("()") for case in suite.iter("testcase"))
     if tests == 0:
         raise GateFailure("aiChatContractTest executed zero tests")
+    missing = sorted(CONTRACT_TESTS - names)
+    if missing:
+        raise GateFailure(f"contract tests did not run: {', '.join(missing)}")
     return tests, failures
+
+
+def chat_processes(command: Path, state: Path) -> list[int]:
+    """Pids of live `zoop-ai-chat invoke` children of this run: its own command bound to its own chat state, nothing broader.
+
+    pgrep exit 1 means "no match"; any other failure is an error, never silently "no processes".
+    """
+    pattern = re.escape(str(command)) + r" invoke --state-dir " + re.escape(str(state)) + r"( |$)"
+    found = subprocess.run([PGREP, "-f", "--", pattern], capture_output=True, text=True)
+    if found.returncode == 1:
+        return []
+    if found.returncode != 0:
+        raise RuntimeError(f"pgrep failed with exit {found.returncode}")
+    return [int(pid) for pid in found.stdout.split() if int(pid) != os.getpid()]
+
+
+def terminate_chat(command: Path, state: Path, timeout: float = 10.0) -> None:
+    """Kill the chat children a killed service left behind and prove they are gone, before their state is removed."""
+    end = time.monotonic() + timeout
+    while True:
+        pids = chat_processes(command, state)
+        if not pids:
+            return
+        if time.monotonic() >= end:
+            raise AssertionError(f"chat processes still alive: {pids}")
+        for pid in pids:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        time.sleep(0.1)
 
 
 def main(argv: list[str]) -> int:
     root = Path(tempfile.mkdtemp(prefix="zoop-api-ai-chat-contract-")).resolve()
     root.chmod(0o700)
     service: ServiceProcess | None = None
+    chat_child: tuple[Path, Path] | None = None
     captured: list[str] = []
     try:
         replay, registry = author_replay(), grants()
@@ -210,7 +266,9 @@ def main(argv: list[str]) -> int:
         if not command.is_file():
             raise GateFailure("the installed zoop-ai-chat command is missing: run `make service-install`")
         env = workspace.env(ZOOP_AI_SERVICE_CHAT_COMMAND=str(command), ZOOP_AI_CHAT_STATE_DIR=str(chat / "state"),
-                            ZOOP_AI_SERVICE_CHAT_GRANTS=str(chat_grants), ZOOP_AI_SERVICE_CHAT_REPLAY=str(chat_replay))
+                            ZOOP_AI_SERVICE_CHAT_GRANTS=str(chat_grants), ZOOP_AI_SERVICE_CHAT_REPLAY=str(chat_replay),
+                            ZOOP_AI_CHAT_JEV_MODEL=LIVE_JEV_MODEL)
+        chat_child = (command, chat / "state")
         service = ServiceProcess(workspace, env=env).start()
 
         tokens = workspace.credentials.tokens
@@ -242,6 +300,8 @@ def main(argv: list[str]) -> int:
         if service is not None:
             service.close()
             terminate_runtime(service.workspace.worker)
+        if chat_child is not None:
+            terminate_chat(*chat_child)
         remove_tree(root)
 
 
