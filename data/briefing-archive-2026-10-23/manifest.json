@@ -7,8 +7,8 @@
   "newProviderCalls": 0,
   "files": 132244,
   "uniqueObjects": 24121,
-  "logicalBytes": 11187508660,
-  "uniqueBytes": 1409198837,
+  "logicalBytes": 11187508420,
+  "uniqueBytes": 1409198822,
   "groups": {
     "briefing-data-142": {
       "files": 397,
@@ -40,19 +40,19 @@
     },
     "private-briefing-continuity-122": {
       "files": 571,
-      "logicalBytes": 31875293
+      "logicalBytes": 31875278
     },
     "private-briefing-core-evidence-126": {
       "files": 575,
-      "logicalBytes": 31819661
+      "logicalBytes": 31819646
     },
     "private-briefing-docs-prices-131": {
       "files": 940,
-      "logicalBytes": 50350572
+      "logicalBytes": 50350557
     },
     "private-briefing-evidence-125": {
       "files": 574,
-      "logicalBytes": 31768941
+      "logicalBytes": 31768926
     },
     "private-briefing-graph-110": {
       "files": 6,
@@ -64,11 +64,11 @@
     },
     "private-briefing-integration-128": {
       "files": 587,
-      "logicalBytes": 32052754
+      "logicalBytes": 32052739
     },
     "private-briefing-live-round-119": {
       "files": 940,
-      "logicalBytes": 57355941
+      "logicalBytes": 57355911
     },
     "private-briefing-market-065": {
       "files": 4533,
@@ -84,11 +84,11 @@
     },
     "private-briefing-quality-121": {
       "files": 3982,
-      "logicalBytes": 259139280
+      "logicalBytes": 259139235
     },
     "private-briefing-quality-137": {
       "files": 8770,
-      "logicalBytes": 543297828
+      "logicalBytes": 543297813
     },
     "private-briefing-reading-097": {
       "files": 6635,
@@ -112,11 +112,11 @@
     },
     "private-briefing-round-flow-132": {
       "files": 957,
-      "logicalBytes": 50209192
+      "logicalBytes": 50209177
     },
     "private-briefing-sequence-120": {
       "files": 3405,
-      "logicalBytes": 199965426
+      "logicalBytes": 199965381
     },
     "private-briefing-simulation-063": {
       "files": 3952,
@@ -164,7 +164,7 @@
     },
     "private-main303-preview-135": {
       "files": 952,
-      "logicalBytes": 50205928
+      "logicalBytes": 50205913
     },
     "private-market-051": {
       "files": 6,
@@ -238,8 +238,8 @@
   "shards": [
     {
       "path": "objects-001.tar.gz",
-      "bytes": 18586031,
-      "sha256": "711a41a99344a068ffc917f310a7799f52620fc750b77ef8cead45c0b7d41143",
+      "bytes": 18503956,
+      "sha256": "a10f68ea953827a84ed22c5f98a45ede64dbff6844ebd509ff6d1c6d6a6d5c03",
       "objects": 1541
     },
     {
@@ -375,7 +375,7 @@
       "objects": 25
     }
   ],
-  "redactedFiles": 1937,
+  "redactedFiles": 1953,
   "excludedEntries": 665,
   "roots": [
     "workspaces/codex/private-brf-ai-046",
@@ -447,8 +447,8 @@
   "files.jsonl": {
     "path": "files.jsonl.gz",
     "encoding": "gzip",
-    "sha256": "65cfe93f4f50ad55373fa459d87fcd146dec5a51b641a23055fde79743a9e996",
-    "bytes": 9342003,
+    "sha256": "66ff8009c14abbb61fe4908a462ab7c6e8065a672253fcedd865d4e3e7a52e15",
+    "bytes": 9214000,
     "uncompressedBytes": 58446962
   },
   "excluded.jsonl": {
@@ -456,7 +456,18 @@
     "bytes": 68287
   },
   "redactions.jsonl": {
-    "sha256": "97465d33cca1d328c4b915d90642f1cba0ad98cf387d02fa9a5bf6a5d9867301",
-    "bytes": 436953
+    "sha256": "7224aaf9c096b259b8280fc763c902871e5d7726a22e61fe92dc9b8430b24b1d",
+    "bytes": 442374
+  },
+  "distributionRevision": {
+    "revision": "review-fix-157",
+    "previousManifestSha256": "cc6ac6f3caafd03114f1a441642a54583867c82ef30c187ca84bab0d34d9fff9",
+    "replacedObjectSha256": "03dda6aef183b9937b85cbadc729132f454d2d030f09e2054e94499c4871014c",
+    "replacementObjectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+    "logicalFilesUpdated": 16,
+    "rule": "publisher-browser-analytics-key",
+    "pointer": "/analytics/tags/permutive/workspace_api_key",
+    "redactorSha256": "e3da5bab1beb6d21ff2e2c26160b2f36bbc742ab7b538bbda361790e1d506f50",
+    "reason": "Conservative removal of a captured third-party browser analytics key; no claim about key permissions or project credential exposure."
   }
 }

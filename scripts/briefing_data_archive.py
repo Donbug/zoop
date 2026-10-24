@@ -1,15 +1,88 @@
 #!/usr/bin/env python3
 """Offline, credential-free access to the recorded Zoop briefing corpus."""
 from __future__ import annotations
-import argparse,collections,gzip,hashlib,json,re,sys,tarfile
+import argparse,collections,gzip,hashlib,json,os,re,secrets,stat,sys,tarfile
+from contextlib import contextmanager
 from pathlib import Path,PurePosixPath
 ROOT=Path(__file__).resolve().parents[1]
 DEFAULT=ROOT/'data/briefing-archive-2026-10-23'
+DIR_FD_FUNCTIONS=(os.open,os.mkdir,os.stat,os.link,os.unlink)
 def sha(raw):return hashlib.sha256(raw).hexdigest()
 def safe_path(name):
+ if not isinstance(name,str) or '\x00' in name:raise ValueError('Unsafe logical path')
  p=PurePosixPath(name)
- if not name or p.is_absolute() or '..' in p.parts or '\\' in name:raise ValueError('Unsafe logical path')
+ if not p.parts or p.is_absolute() or '..' in p.parts or '\\' in name or str(p)!=name:raise ValueError('Unsafe logical path')
  return p
+
+def require_atomic_extraction():
+ # Fail closed rather than silently reverting to path-based writes on platforms
+ # without descriptor-relative, no-follow filesystem operations (use WSL there).
+ if (os.name!='posix' or not all(hasattr(os,n) for n in ('O_NOFOLLOW','O_DIRECTORY','O_NONBLOCK'))
+     or not all(f in os.supports_dir_fd for f in DIR_FD_FUNCTIONS)):
+  raise OSError('Atomic extraction requires POSIX dir_fd/O_NOFOLLOW and hard links; use Linux, macOS or WSL')
+
+@contextmanager
+def directory(parts,base=None):
+ """Keep parent handles open: a swapped path cannot redirect a later write."""
+ fds=[];bindings=[]
+ try:
+  fd=os.open('/',os.O_RDONLY|os.O_DIRECTORY) if base is None else os.dup(base)
+  fds.append(fd)
+  for part in parts:
+   try:os.mkdir(part,mode=0o700,dir_fd=fd)
+   except FileExistsError:pass
+   child=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd)
+   bindings.append((fd,part,os.fstat(child)));fds.append(child);fd=child
+  def unchanged():
+   for parent,name,opened in bindings:
+    current=os.stat(name,dir_fd=parent,follow_symlinks=False)
+    if not stat.S_ISDIR(current.st_mode) or (current.st_dev,current.st_ino)!=(opened.st_dev,opened.st_ino):
+     raise ValueError('Output directory changed during extraction')
+  yield fd,unchanged
+ finally:
+  for fd in reversed(fds):os.close(fd)
+
+def existing_file(parent,name,digest,size):
+ try:fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parent)
+ except FileNotFoundError:return False
+ except OSError as error:raise ValueError('Refusing unsafe existing target: '+name) from error
+ try:
+  opened=os.fstat(fd)
+  if not stat.S_ISREG(opened.st_mode) or opened.st_size!=size:
+   raise ValueError('Refusing to overwrite different file: '+name)
+  hashed=hashlib.sha256()
+  while chunk:=os.read(fd,1024*1024):hashed.update(chunk)
+  current=os.stat(name,dir_fd=parent,follow_symlinks=False)
+  if (not stat.S_ISREG(current.st_mode) or (current.st_dev,current.st_ino)!=(opened.st_dev,opened.st_ino)
+      or hashed.hexdigest()!=digest):raise ValueError('Refusing to overwrite different file: '+name)
+  return True
+ finally:os.close(fd)
+
+def publish_file(parent,name,raw,digest,check):
+ check()
+ if existing_file(parent,name,digest,len(raw)):
+  check();return
+ temporary='.zoop-archive-'+secrets.token_hex(16)
+ fd=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=parent)
+ try:
+  try:
+   remaining=memoryview(raw)
+   while remaining:
+    written=os.write(fd,remaining)
+    if written<=0:raise OSError('Incomplete staging write')
+    remaining=remaining[written:]
+   os.fsync(fd)
+  finally:os.close(fd)
+  check()
+  try:
+   # link is an atomic no-clobber commit. rename/replace would overwrite a
+   # competing file. Both names use the same anchored directory/filesystem.
+   os.link(temporary,name,src_dir_fd=parent,dst_dir_fd=parent,follow_symlinks=False)
+  except FileExistsError:
+   if not existing_file(parent,name,digest,len(raw)):
+    raise ValueError('Output target disappeared during extraction')
+  check()
+ finally:os.unlink(temporary,dir_fd=parent)
 class Archive:
  def __init__(self,root):
   self.root=root.resolve();self.manifest=json.loads((self.root/'manifest.json').read_bytes())
@@ -60,21 +133,19 @@ class Archive:
  def extract(self,output,group=None,prefix=None):
   rows=self.selected(group,prefix)
   if not rows:raise ValueError('No matching files')
-  output=output.resolve();output.mkdir(parents=True,exist_ok=True)
+  require_atomic_extraction();output=output.resolve()
   by_digest=collections.defaultdict(list)
   for row in rows:by_digest[row['sha256']].append(row)
   count=0
-  for digest,raw in self.objects():
-   for row in by_digest.pop(digest,[]):
-    if len(raw)!=row['bytes']:raise ValueError('Logical file size mismatch')
-    path=output.joinpath(*safe_path(row['path']).parts)
-    # Resolve each target as well as parents: refuse pre-existing symlinks escaping the destination.
-    if not path.resolve().is_relative_to(output):raise ValueError('Output path escapes destination')
-    if path.exists():
-     if not path.is_file() or path.is_symlink() or sha(path.read_bytes())!=digest:raise ValueError('Refusing to overwrite different file: '+row['path'])
-    else:
-     path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(raw);path.chmod(0o600)
-    count+=1
+  with directory(output.parts[1:]) as (root,root_unchanged):
+   for digest,raw in self.objects():
+    for row in by_digest.pop(digest,[]):
+     if len(raw)!=row['bytes']:raise ValueError('Logical file size mismatch')
+     parts=safe_path(row['path']).parts
+     with directory(parts[:-1],root) as (parent,parent_unchanged):
+      def check():root_unchanged();parent_unchanged()
+      publish_file(parent,parts[-1],raw,digest,check)
+     count+=1
   if by_digest:raise ValueError('Missing selected objects')
   return {'status':'EXTRACTED','files':count,'output':str(output),'newAiCalls':0,'newProviderCalls':0}
 def main():
