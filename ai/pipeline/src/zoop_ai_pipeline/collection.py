@@ -79,7 +79,7 @@ class Rules:
 
 
 def parse_robots(data: bytes, user_agent: str) -> Rules:
-    """Longest-match allow/disallow for our product token. Anything uninterpretable is `robots_malformed`, which denies."""
+    """Longest-match rules for our product; malformed structure or selected rules deny."""
     product = (re.match(r"[A-Za-z0-9_-]+", user_agent) or re.match("", "")).group(0).lower()
     try:
         groups: list[tuple[list[str], list[tuple[str, str]]]] = []
@@ -103,10 +103,6 @@ def parse_robots(data: bytes, user_agent: str) -> Rules:
             elif name in {"allow", "disallow", "crawl-delay"}:
                 if not agents:
                     raise ValueError("orphan rule")
-                if name != "crawl-delay" and value and not value.startswith(("/", "*")):
-                    raise ValueError("path rule")
-                if name == "crawl-delay" and not re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", value):
-                    raise ValueError("delay")
                 directives.append((name, value))
             elif name != "sitemap" and not agents:
                 raise ValueError("unrecognized")
@@ -119,6 +115,11 @@ def parse_robots(data: bytes, user_agent: str) -> Rules:
                 if max(scores) > best:
                     selected, best = [], max(scores)
                 selected.extend(rules)
+        for name, value in selected:
+            if name != "crawl-delay" and value and not value.startswith(("/", "*")):
+                raise ValueError("path rule")
+            if name == "crawl-delay" and not re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", value):
+                raise ValueError("delay")
         return Rules(tuple((n == "allow", _octets(v)) for n, v in selected if n in {"allow", "disallow"} and v),
                      max([float(v) for n, v in selected if n == "crawl-delay"], default=0.0))
     except (UnicodeError, ValueError, OverflowError) as exc:
