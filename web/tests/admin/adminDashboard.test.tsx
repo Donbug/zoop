@@ -234,7 +234,7 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
     expect(screen.getByText('대기 작업 0건')).toBeTruthy();
     expect(screen.getByText('실행 0 · 대기 0')).toBeTruthy();
     expect(screen.getByText('성공 28 · 실패 0')).toBeTruthy();
-    expect(screen.getByText('갱신 2026-10-06 12:43 KST')).toBeTruthy();
+    expect(screen.queryByText('갱신 2026-10-06 12:43 KST')).toBeNull();
     expect(screen.queryByRole('button', { name: '새로 고침' })).toBeNull();
     expect(screen.queryByText('온보딩 완료율')).toBeNull();
 

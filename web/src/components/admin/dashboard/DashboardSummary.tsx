@@ -258,18 +258,7 @@ export default function DashboardSummary() {
   const data = dashboard.data;
   return (
     <div className="flex flex-col gap-6 py-8 text-zoop-ink">
-      <PageHeader
-        title="대시보드"
-        actions={
-          <>
-            {data && (
-              <p className="font-inter text-[11px] text-zoop-muted tabular-nums">
-                갱신 {formatKst(data.generatedAt)}
-              </p>
-            )}
-          </>
-        }
-      />
+      <PageHeader title="대시보드" />
 
       {dashboard.status === 'loading' && (
         <Loading>대시보드를 불러오고 있어요</Loading>
