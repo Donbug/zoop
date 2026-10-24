@@ -346,16 +346,26 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     }
 
     private void finish(String execution, String status, ChatStageReply.Receipt receipt, String code) {
-        // A stage the engine cut off arrives here interrupted, and an interrupted thread cannot use its database connection.
-        // The outcome is still recorded: the interrupt is cleared for this one write and restored after it.
-        boolean interrupted = Thread.interrupted();
-        try {
-            recorder.finish(execution, status, receipt, code);
-        } catch (RuntimeException unrecorded) {
-            // The stage outcome stands; the running row stays as evidence that the call was made.
-        } finally {
-            if (interrupted) Thread.currentThread().interrupt();
+        // A stage the engine cut off is interrupted, before or during this write, and an interrupted thread cannot use its
+        // database connection. The outcome is written on a thread of its own, which the cancellation never reaches, and this
+        // thread waits for it; an interrupt that arrives meanwhile is kept for after.
+        Thread writer = Thread.ofVirtual().name("chat-model-ledger").start(() -> {
+            try {
+                recorder.finish(execution, status, receipt, code);
+            } catch (RuntimeException unrecorded) {
+                // The stage outcome stands; the running row stays as evidence that the call was made.
+            }
+        });
+        boolean interrupted = false;
+        while (true) {
+            try {
+                writer.join();
+                break;
+            } catch (InterruptedException cutOff) {
+                interrupted = true;
+            }
         }
+        if (interrupted) Thread.currentThread().interrupt();
     }
 
     // ---------------------------------------------------------------- wire helpers
