@@ -180,6 +180,11 @@ describe('D-AUT-01 이메일 로그인 (FS002·FS006)', () => {
 
   test.each([
     [
+      '기본 시장 전체 지도에서 기업을 고른 채 왔으면 그 지도·기업으로',
+      '/?select=node%3AKRX%3A005930',
+      '/?select=node%3AKRX%3A005930',
+    ],
+    [
       '시장 전체 지도에서 기업을 고른 채 왔으면 그 지도·기업으로',
       '/?mode=all&select=node%3AKRX%3A005930',
       '/?mode=all&select=node%3AKRX%3A005930',

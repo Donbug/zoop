@@ -12,12 +12,13 @@ import type { MemberSession } from '@/types/auth/session';
 
 /**
  * 로그인 뒤 돌아갈 주소. 지도는 D-AUT-01대로 시장 전체 지도에서 시작하므로, 지도 주소는
- * 시장 전체(mode=all)일 때만 그대로 돌아간다(예: 기업 패널의 '로그인 후 관심 추가'). 그 밖의 지도 주소는 기본 도착지로 보낸다.
+ * 시장 전체(mode 생략 또는 mode=all)일 때만 그대로 돌아간다(예: 기업 패널의 '로그인 후 관심 추가'). 그 밖의 지도 주소는 기본 도착지로 보낸다.
  */
 function returnPath(from: string | null | undefined) {
   if (!from || from === '/') return null;
   if (!from.startsWith('/?')) return from;
-  return new URLSearchParams(from.slice(2)).get('mode') === 'all' ? from : null;
+  const mode = new URLSearchParams(from.slice(2)).get('mode');
+  return mode === null || mode === 'all' ? from : null;
 }
 
 export function useAuthCompletion() {
