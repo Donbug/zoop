@@ -142,6 +142,12 @@ class GraphHandoffImporterTest {
         return root.resolve("graph_snapshot").resolve(versionId + ".json");
     }
 
+    /** The snapshot file the version registered, found through the registry as the public read finds it (the name carries the rules). */
+    private Path storedSnapshotFile(String versionId) {
+        String uri = registry.findArtifact("artifact-" + versionId).orElseThrow().storageUri();
+        return root.resolve(uri.substring(uri.indexOf(':') + 1));
+    }
+
     private Path receiptFile(String versionId) {
         return root.resolve("verification_receipt").resolve(versionId + ".json");
     }
@@ -289,7 +295,7 @@ class GraphHandoffImporterTest {
                 {"ruleRevision":0,"reviewRevision":0,"applied":[],"stored":{"issues":1,"relations":2,"articles":1,"evidence":3},
                  "hidden":{"issues":0,"relations":0},"byRule":{}}
                 """.getBytes(StandardCharsets.UTF_8)), rules(plainResult), "no rule: what is stored is the bundle");
-        byte[] unfiltered = Files.readAllBytes(snapshotFile(built.versionId()));
+        byte[] unfiltered = Files.readAllBytes(storedSnapshotFile(built.versionId()));
         var plain = graph.inserted().get(0);
         assertEquals(0, plain.ruleRevision());
         assertEquals(0, plain.reviewRevision());
@@ -312,7 +318,7 @@ class GraphHandoffImporterTest {
         assertEquals(List.of("cancelled-only@1"), inserted.ruleIds(), "an enabled rule is recorded whether or not it hid anything");
         assertEquals(List.of(CANCELLED_ONLY), graph.versionRules(built.versionId()));
         assertEquals(List.of(1L, 2L, 1L), List.of(inserted.issueCount(), inserted.relationCount(), inserted.articleCount()));
-        assertEquals(sha256(unfiltered), sha256(Files.readAllBytes(snapshotFile(built.versionId()))),
+        assertEquals(sha256(unfiltered), sha256(Files.readAllBytes(storedSnapshotFile(built.versionId()))),
                 "the same bytes as with no rule at all");
     }
 
@@ -324,7 +330,7 @@ class GraphHandoffImporterTest {
 
         assertTrue(result.succeeded());
         String versionId = built.versionId();
-        PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(Files.readAllBytes(snapshotFile(versionId)), versionId);
+        PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(Files.readAllBytes(storedSnapshotFile(versionId)), versionId);
         assertEquals(List.of("STRUCTURALLY_RELATED_TO"), snapshot.relations().stream().map(r -> r.relationType()).toList());
         assertEquals(List.of(ISSUE), snapshot.issues().stream().map(i -> i.issueId()).toList(),
                 "the issue keeps its structural company relation");
@@ -361,7 +367,7 @@ class GraphHandoffImporterTest {
             graph.publication = new PublicationState(3, 0, first);
             GraphHandoffResult staged = importer.run(built.request());
             assertTrue(staged.succeeded());
-            byte[] stored = Files.readAllBytes(snapshotFile(built.versionId()));
+            byte[] stored = Files.readAllBytes(storedSnapshotFile(built.versionId()));
 
             // The switch flips the rule; the staged version is not this import's to change, only the next version's.
             graph.publication = new PublicationState(4, 0, first.isEmpty() ? List.of(INVOLVES_SINGLE) : List.of());
@@ -371,7 +377,7 @@ class GraphHandoffImporterTest {
             assertEquals(Outcome.UNCHANGED, again.staged().outcome(), first.toString());
             assertEquals(rules(staged), rules(again), "the version's own rules and revisions, never the switched ones");
             assertEquals(1, graph.inserted().size());
-            assertEquals(sha256(stored), sha256(Files.readAllBytes(snapshotFile(built.versionId()))));
+            assertEquals(sha256(stored), sha256(Files.readAllBytes(storedSnapshotFile(built.versionId()))));
         }
     }
 
@@ -1113,6 +1119,38 @@ class GraphHandoffImporterTest {
         assertEquals("existing", next.staged().snapshot().file());
         assertEquals("existing", next.staged().receipt().file());
         assertEquals(1, graph.state().versions().size());
+    }
+
+    @Test
+    void aRetryAfterAnUnknownCommitAndARuleSwitchStagesUnderTheNewRulesWithoutAFileConflict() throws Exception {
+        // PR #326 review: the lost attempt left the file of its rules; the switch changes the bytes the retry writes.
+        graph.publication = new PublicationState(3, 0, List.of(INVOLVES_SINGLE));
+        transaction.failCommitOnce = true;
+        assertEquals(GraphHandoffFailure.DATABASE_UNAVAILABLE, failure(importer.run(built.request())).failure());
+        Path lostFile = root.resolve("graph_snapshot")
+                .resolve(GraphHandoffImporter.snapshotFileName(built.versionId(), List.of("involves-single@1")));
+        assertTrue(Files.exists(lostFile), "the unknown outcome keeps the file");
+
+        graph.publication = new PublicationState(4, 0, List.of());
+        GraphHandoffResult retry = importer.run(built.request());
+
+        assertTrue(retry.succeeded(), () -> String.valueOf(retry.failure() == null ? null : retry.failure().failure()));
+        assertEquals(Outcome.STAGED, retry.staged().outcome());
+        assertEquals("created", retry.staged().snapshot().file(), "its own file, not the orphan of the other rule set");
+        assertEquals(List.of(), graph.inserted().get(0).ruleIds());
+        assertEquals(4, graph.inserted().get(0).ruleRevision());
+        assertEquals(2, GraphSnapshotCodec.read(Files.readAllBytes(snapshotFile(built.versionId())), built.versionId())
+                .relations().size(), "the snapshot of the rules read by the retry");
+        assertTrue(Files.exists(lostFile), "the orphan is left alone, never registered");
+
+        // Under the same rules a lost attempt's file is adopted, as without rules.
+        freshSetUp();
+        graph.publication = new PublicationState(3, 0, List.of(INVOLVES_SINGLE));
+        transaction.failCommitOnce = true;
+        importer.run(built.request());
+        GraphHandoffResult same = importer.run(built.request());
+        assertTrue(same.succeeded());
+        assertEquals("existing", same.staged().snapshot().file());
     }
 
     @Test

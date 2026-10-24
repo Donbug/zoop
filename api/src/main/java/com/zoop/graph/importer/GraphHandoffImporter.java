@@ -237,7 +237,8 @@ public final class GraphHandoffImporter {
         if (snapshotBytes.length > ArtifactFileStore.MAX_READ_BYTES || receiptBytes.length > ArtifactFileStore.MAX_READ_BYTES) {
             throw new GraphHandoffException(GraphHandoffFailure.SNAPSHOT_INVALID);
         }
-        ArtifactFileStore.StoredFile snapshotFile = put(session, created, SNAPSHOT_DIRECTORY, versionId + ".json", snapshotBytes);
+        ArtifactFileStore.StoredFile snapshotFile = put(session, created, SNAPSHOT_DIRECTORY,
+                snapshotFileName(versionId, filtered.ruleIds()), snapshotBytes);
         ArtifactFileStore.StoredFile receiptFile = put(session, created, RECEIPT_DIRECTORY, versionId + ".json", receiptBytes);
         registerArtifact(new ArtifactRow(snapshotArtifactId, SNAPSHOT_KIND, snapshotFile.uri(), snapshotFile.sha256(),
                 snapshotFile.bytes(), JSON_MEDIA_TYPE, now));
@@ -505,6 +506,18 @@ public final class GraphHandoffImporter {
         } catch (CharacterCodingException error) {
             throw new GraphHandoffException(GraphHandoffFailure.TEXT_MISMATCH);
         }
+    }
+
+    /**
+     * The snapshot file of a version filtered with {@code ruleIds}: {@code <versionId>.json} with no rule (the name before rules
+     * existed), else suffixed with a digest of the rule set. The same pins and rules always give the same bytes, so a file left
+     * by an attempt whose commit outcome was unknown is adopted by a retry under the same rules; a retry after a switch writes
+     * its own name instead of colliding with it (the public read finds the file through the registry, never by name).
+     * shortcut: a file of the abandoned rule set stays as an unregistered orphan, never read; sweep orphans if the store grows.
+     */
+    static String snapshotFileName(String versionId, List<String> ruleIds) {
+        return ruleIds.isEmpty() ? versionId + ".json"
+                : versionId + "-" + Canonical.sha256(String.join("\n", ruleIds)).substring(0, 16) + ".json";
     }
 
     /** The snapshot file a version stores, what it holds, the rules it was filtered with and what they did. */
