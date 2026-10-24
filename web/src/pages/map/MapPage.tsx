@@ -1295,6 +1295,10 @@ function MapWorkspace({
                   }
                 : undefined
             }
+            onClosed={() => {
+              // 근거를 불러오지 못한 경우에도 창을 확인하고 닫으면 다음 단계로 이어 간다.
+              if (tutorialOpen && tutorialStep === 4) setTutorialStep(5);
+            }}
             onReady={(id) => {
               if (
                 tutorialOpen &&

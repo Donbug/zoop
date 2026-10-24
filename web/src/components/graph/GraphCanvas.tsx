@@ -1233,26 +1233,49 @@ export default function GraphCanvas({
         className={`relationship-zoom ${tutorialPhase === 'zoom' ? 'tutorial-target' : ''}`}
         aria-label="지도 확대 조절"
       >
+        {/* 마우스를 올리거나 키보드로 고르면 버튼 위에 이름을 보인다. 화면 낭독기는 aria-label을 읽는다. */}
         <button
           data-tutorial-action="zoom"
           onClick={() => void control('in')}
           aria-label="확대"
+          className="group relative"
         >
           <GraphIcon name="plus" />
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-[3px] bg-zoop-ink px-1.5 py-0.5 text-[10px] whitespace-nowrap text-zoop-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+          >
+            확대
+          </span>
         </button>
         <button
           data-tutorial-action="zoom"
           onClick={() => void control('out')}
           aria-label="축소"
+          className="group relative"
         >
           <GraphIcon name="minus" />
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-[3px] bg-zoop-ink px-1.5 py-0.5 text-[10px] whitespace-nowrap text-zoop-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+          >
+            축소
+          </span>
         </button>
         <button
-          data-tutorial-action={tutorialCameraEnabled ? 'zoom' : undefined}
+          // 지도 움직이기 단계에서도 확대·축소와 같이 쓸 수 있다.
+          data-tutorial-action="zoom"
           onClick={() => void control('fit')}
           aria-label="전체 그래프 맞춤"
+          className="group relative"
         >
           <GraphIcon name="fit" />
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-[3px] bg-zoop-ink px-1.5 py-0.5 text-[10px] whitespace-nowrap text-zoop-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+          >
+            전체 그래프 맞춤
+          </span>
         </button>
         {onFlowChange && (
           <button
