@@ -5560,7 +5560,7 @@ The three market indicators stored with a published round; never changed after p
 
 ### MockProfileResponse
 
-FS062: one project mock profile with its account id, cash and holdings (no real brokerage account).
+FS062: one project mock profile with its account id, cash, valued holdings and weights. Read-only; it does not create a member connection or access a real brokerage account.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5569,7 +5569,8 @@ FS062: one project mock profile with its account id, cash and holdings (no real 
 | accountId | 필수 | string |  |
 | cash | 필수 | [MockCash](#schema-mockcash) / null | null when the mock does not provide cash; 0 is a real 0 |
 | asOf | 필수 | string (date-time) / null | As-of time of the mock values when the mock gives one |
-| holdings | 필수 | [MockHoldingOut](#schema-mockholdingout)[] |  |
+| holdings | 필수 | [HoldingOut](#schema-holdingout)[] |  |
+| valuation | 필수 | [PortfolioValuation](#schema-portfoliovaluation) |  |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-neo4jstatus"></a>

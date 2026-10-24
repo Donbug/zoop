@@ -54,8 +54,9 @@ public class PortfolioService {
     @Transactional(readOnly = true)
     public MockProfileResponse getProfile(String id, String requestId) {
         MockPortfolio profile = catalog.find(id).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+        var valued = value(profile);
         return new MockProfileResponse(profile.id(), profile.label(), profile.accountId(), profile.cash(), profile.asOf(),
-                profile.holdings().stream().map(com.zoop.portfolio.dto.MockHoldingOut::from).toList(), metadata(requestId));
+                valued.holdings(), valued.valuation(), metadata(requestId));
     }
 
     @Transactional
