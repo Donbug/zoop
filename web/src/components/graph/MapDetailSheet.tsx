@@ -78,6 +78,7 @@ export default function MapDetailSheet({
   if (!mobile) return <>{children}</>;
   return createPortal(
     <div
+      hidden={suspended}
       className={`${appearance ? mapAppearanceStyles(appearance) : ''} ${suspended ? 'hidden' : ''}`}
     >
       <div
