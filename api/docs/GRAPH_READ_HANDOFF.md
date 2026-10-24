@@ -12,6 +12,16 @@ Spring 백엔드에서 내부 AI 서비스의 그래프 버전 읽기(`graph.rea
 - 운영자가 AI 버전을 만들고 서버 allowlist에 올립니다. 이 AI 읽기 서비스는 버전을 **만들거나 찾거나 나열하지 못합니다**(목록 라우트 없음). 앱의 operator 스테이징 명령은 전달받은 handoff를 별도의 비활성 앱 버전으로 등록합니다.
 - 실제 로컬 HTTP 서버 → 설치된 graph CLI → 격리된 Neo4j 5.26 경로의 smoke를 통과했습니다(2026-10-15 로컬 실행 기록이며 현재 `main`의 재검증이 아닙니다). 1~3홉·권한 분리·digest 불일치·원천 권한 철회·canonical 변경·그래프 변조·원장 잠금·시간 초과를 확인했습니다. 원천 원장 변경과 모델 호출은 없었습니다. 이 서비스 구현은 이후 PR #213에서 `main`에 병합됐지만, 배포·실제 데이터 운영은 하지 않았습니다.
 
+### 관리자 활성화 HTTP의 합성 검증 경계
+
+`api/scripts/graph_handoff_activation_smoke.py`는 기존 SQL 활성화 harness와 별도로 실행합니다([실행 명령과 전제](../README.md#관리자-http-활성화의-별도-합성-smoke)). 설치된 CLI의 합성 bundle `-7`을 Spring으로 비활성 수입한 뒤, 첫 JVM에서 기본 활성화가 503 `SOURCE_UNAVAILABLE`로 거절되고 포인터·review revision·이력·감사·멱등 기록이 바뀌지 않는지 확인합니다. 별도의 시험 JVM에서만 기존 개발용 opt-in 플래그를 켜 실제 관리자 HTTP 활성화와 현재 권리 검사, 멱등·stale 조건, 같은 공개 버전의 graph·event·evidence HTTP를 검사합니다.
+
+합성 관리자 세션은 소유한 임시 DB에만 준비하며 실제 세션 조회·CSRF·Origin 검사를 통과합니다. 비밀번호 로그인·OAuth·운영 계정 발급, 권위 있는 공개 제외 저장소나 운영 공개 준비는 증명하지 않습니다. 모델 호출은 없으며, SQL로 활성 포인터를 움직여 HTTP 성공으로 간주하지 않습니다. 기존 `graph_handoff_import_smoke.py`의 `harnessActivations`는 계속 **SQL 시험 활성화**를 뜻하고, 새 명령의 `adminHttpActivations`·`httpPointerChanges` 및 fixture seed 이력과 구분합니다.
+
+최초 smoke에서는 bundle `-7`의 사건 상세가 503 `SOURCE_UNAVAILABLE`로 거절됐습니다. 이후 `EventDetailService`가 소비 필드의 의미가 같은 정확한 bundle `-5`·`-6`·`-7` receipt를 읽도록 수정했고, 새 수입은 계속 `-7`만 허용합니다. 수정 후 새 jar의 실제 HTTP 28단계에서 활성화·graph·event·evidence 조회와 현재 권리 철회/복원을 확인했습니다. 미지원 과거·미래 버전과 접두어 유사값은 거절하며, 요약의 미제공 상태는 바꾸지 않았습니다. 이 로컬 검증은 운영 배포나 수령자의 실행 확인을 뜻하지 않습니다.
+
+
+
 ## 호출
 
 헤더 `Authorization: Bearer <토큰>`(운영자 발급, principal에 scope `graph.read` 필요). 선택 `X-Request-ID`(`^[A-Za-z0-9._-]{1,128}$`, 응답에 그대로 반환). 모든 응답은 `Cache-Control: no-store`.
@@ -587,6 +597,8 @@ bundle 스키마만 `-5` → `-6`으로 한 번에 바꿨습니다(manifest·run
 ## 2026-10-22: bundle `-7` — 이슈 요약(`issues[].summary`)과 decisions `-3`
 
 생성 경로만 `-6` → `-7`로 올렸습니다. **이미 게시된 `-6` 스키마의 모양은 바꾸지 않았고**(조용한 변경 없음) 새로 만드는 bundle만 `zoop-graph-handoff-bundle-7`입니다. 운영자 판정 파일은 `zoop-public-decisions-3`(`-2`·`-1`은 `decisions_invalid`), manifest·runtime `zoop-ai-handoff-1`, 정책 `zoop-public-projection-policy-1`, import 요청·receipt, **snapshot 형식 3**, 공개 route·`EventDetail`·OpenAPI·DB 스키마는 그대로입니다. 기존 `-1`~`-6` 원장 행은 history-only(`export`는 `handoff_contract_changed` withheld, 앱 verifier는 `-7`이 아닌 bundle을 `bundle_invalid`로 거절)이고, 이미 staged된 이전 버전의 snapshot·receipt는 바이트 그대로 계속 읽힙니다. **receipt에 `issues[].summary`가 없는 것(`-6` 이하)은 "요약이 생산된 적 없음(unavailable)"이지 `not-requested`가 아닙니다.** 앞의 `-6` 절 시험 목록에 적힌 "`-7` 거절"은 이 변경으로 "`-8` 거절"이 되었습니다.
+
+**`getEvent`의 기존 receipt 읽기 호환성(2026-10-24).** 새 import는 여전히 정확히 `zoop-graph-handoff-bundle-7`만 받습니다. 이미 import된 버전의 사건 상세는 `-5`·`-6`·`-7` receipt를 읽습니다. 세 형식은 이 소비자가 읽는 `mentions`·`fieldVerdicts`·`sourceSupport`와 머리 값 선택 근거(`representative`·`fieldProvenance`)의 계약이 같으며, `-6`의 `impacts`와 `-7`의 `summary` 추가는 이 읽기를 바꾸지 않습니다. 스키마 누락·타입 오류, `-1`~`-4`, 미지의 후속 형식은 503 `SOURCE_UNAVAILABLE`이며 빈 상세로 대체하지 않습니다. 등록된 receipt의 해시·크기·버전 고정과 현재 권한·인용·asOf·제외·머리 값·FOLLOWS·필드 가림 검사는 그대로 적용합니다. 이는 요약 공개 구현이 아닙니다. receipt에 사용 가능한 요약이 있어도 현재 `getEvent`는 계속 `summary.status=unavailable`, `SUMMARY_NOT_PRODUCED`, `approval=null`을 반환합니다. 아래 요약 소비 조건은 별도 구현의 요구사항입니다.
 
 **누가 무엇을 만드는가.** 요약 문장은 handoff가 만들지 않습니다. 별도 AI 명령 `zoop-ai-issue-summary`(자기 원장 `issue-summary.sqlite3`, 자기 live binding family)가 이슈 하나의 입력 인용만 모델에 보내 생성·독립 verifier 확인을 하고 불변 결과를 남깁니다. 운영자 decisions(`IssueDecision.summary: {jobId, inputDigest, resultDigest} | null`)가 그 결과를 이슈마다 **고정**하고, `zoop-ai-handoff freeze --issue-summary-state-dir`가 고정한 결과를 원장에서 읽기 전용으로 가져와 bundle에 옮깁니다. `export`는 freeze된 artifact에서 꺼내고 현재 원천으로 basis를 다시 계산해 비교하므로 **요약 원장·새 인자·모델 호출이 필요 없고**(Java `ProcessHandoffExporter`·`ai/service` export 인자 불변) freeze도 모델·provider를 부르지 않습니다. 앱에는 키도 유료 경로도 없습니다.
 

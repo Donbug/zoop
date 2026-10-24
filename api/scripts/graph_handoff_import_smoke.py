@@ -74,7 +74,7 @@ On success the last stdout line is {"status": "passed", "steps": N, "providerCal
 
 An evidence-read phase runs by default (turn it off with --no-with-evidence-read): after the collision import it starts the web jar on loopback
 (artifact source, ZOOP_DOCUMENT_READ_INGESTION_SOURCES = the same registry file, S1 grants unset), makes ONE explicit TEST-HARNESS psql activation of the
-second staged version (the import itself never activates; production has no activation route) and reads GET /api/v1/evidence/{id} for the graph body
+second staged version (the import itself never activates; admin HTTP is separately exercised by graph_handoff_activation_smoke.py) and reads GET /api/v1/evidence/{id} for the graph body
 evidence, with CLI parity for the source registry and failure cases; the verdict world then gets its own one TEST-HARNESS activation and public graph reads. The final line
 reports importActivationsWritten: 0 and harnessActivations: 2 separately, plus evidenceReads and verdictGraphReads.
 """
@@ -367,7 +367,7 @@ class WebRun:
 def evidence_read_phase(smoke, db, layout, world, vid2: str, never_activated: tuple, active_before: str) -> dict:
     """Public GET /api/v1/evidence/{id} over real HTTP for the graph body evidence of the second staged handoff.
 
-    The import never activates, and no production activation exists, so a staged version is unreadable by design. This phase therefore adds
+    The import never activates, so a staged version is unreadable by design. This SQL-only phase therefore adds
     ONE explicit TEST-HARNESS activation of `vid2` by psql, mirroring JdbcGraphVersionRepository.activateSystem (same advisory lock, pointer move
     and a `system` history row), in the smoke's own throwaway database. It is reported separately (`harnessActivations`) and is not an import
     result. The evidence rows of `vid2` are shared with the first import, whose receipt they still point at: reading proves the SELECTED version's
@@ -585,7 +585,7 @@ def evidence_read_phase(smoke, db, layout, world, vid2: str, never_activated: tu
 def verdict_read_phase(smoke, db, layout, layout4, world, vid4: str, previous: str, ev4) -> dict:
     """Public graph reads over real HTTP of the VERDICT world's staged version: the rejected/held `eventTime` and `period` are hidden in the real graph output.
 
-    The import never activates, and no production activation exists, so this phase adds ONE explicit TEST-HARNESS activation of `vid4` by psql (the same
+    The import never activates, so this SQL-only phase adds ONE explicit TEST-HARNESS activation of `vid4` by psql (the same
     statement shape as `evidence_read_phase`, moving the pointer from `previous`) in the smoke's own throwaway database. It is reported separately
     (`harnessActivations`) and is not an import result. The web application reads the retained receipt of `vid4` with the verdict world's OWN source registry
     (`layout4`). Everything expected is written out by hand from the authored (SYNTHETIC) review: the supply representative's event time is REJECTed (no time,

@@ -230,7 +230,7 @@ console.log(response.status); // 활성 회원 세션이 정상 폐기되면 204
 
 ## 그래프 handoff 스테이징 import
 
-`com.zoop.graph.importer`는 AI `zoop-ai-handoff`가 동결한 handoff 하나를 **비활성** 그래프 버전으로 올리는 **operator 전용 비웹 실행**입니다(`--spring.main.web-application-type=none`, `ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED=true`). HTTP 경로가 없고 평소 기동은 달라지지 않으며, 문서 import·분석(같은 artifact 잠금)이나 활성화하는 `fixture` 소스와 한 프로세스에서 켜면 기동이 거절됩니다. 실행은 `graph_activations`를 쓰지 않고 `graph_versions.active`와 article의 `current_version`을 바꾸지 않으므로 공개 API는 이 버전을 읽을 수 없습니다(명시 `graphVersion`은 409 `VERSION_UNAVAILABLE`, 기본·asOf 읽기는 기존 활성 포인터 그대로). **활성화 경로는 아직 없습니다**(결과의 `nextActivation=unsupported`).
+`com.zoop.graph.importer`는 AI `zoop-ai-handoff`가 동결한 handoff 하나를 **비활성** 그래프 버전으로 올리는 **operator 전용 비웹 실행**입니다(`--spring.main.web-application-type=none`, `ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED=true`). import 자체에는 HTTP 경로가 없고 평소 기동은 달라지지 않으며, 문서 import·분석(같은 artifact 잠금)이나 활성화하는 `fixture` 소스와 한 프로세스에서 켜면 기동이 거절됩니다. 실행은 `graph_activations`를 쓰지 않고 `graph_versions.active`와 article의 `current_version`을 바꾸지 않으므로 아직 활성화하지 않은 버전을 공개 API로 읽을 수 없습니다(명시 `graphVersion`은 409 `VERSION_UNAVAILABLE`, 기본·asOf 읽기는 기존 활성 포인터 그대로). 별도의 관리자 `POST /api/v1/admin/graph/versions/{versionId}/activate`는 구현되어 있지만, 공개 제외 저장소가 없어 기본으로 503 `SOURCE_UNAVAILABLE`을 반환합니다. import 결과의 `nextActivation=unsupported`는 import의 기존 스테이징 계약이며 관리자 경로의 부재를 뜻하지 않습니다.
 
 요청(`zoop-graph-handoff-import-1`, 닫힌 스키마)은 `handoffId`, 운영자가 고정한 `expectedManifestDigest`·`expectedBundleDigest`(둘 다 필수), `operator`입니다(`created_by=operator:<operator>`, AI 검수 revision이 아닙니다). 실행은 ① 설치된 `zoop-ai-handoff export`의 **현재** 결과(저장 파일이 아님)를 받아 canonical hash 두 개를 직접 다시 계산해 핀과 대조하고, 생산자 `validate_bundle`의 Java 이식으로 bundle 전체(닫힌 스키마·참조 폐쇄·`ev-`/`edge-` 공식·개수·content digest)와 manifest 일치를 검증하며, ② bundle이 기록한 **모든 관측**마다 `zoop-ai-ingest export --require-store`를 새로 실행해(같은 registry·같은 S2-1 원장, `store` 권리 포함) 권리·grant·관측 시각·제목·URL·게시 시각을 대조하고, ③ 한 transaction에서 앱 쪽(article version의 제목·URL·게시 시각 정밀도, 앱 텍스트와 export 텍스트의 byte 일치, 회사 ID·이름)을 검증해 불변 스냅샷·receipt 파일, `artifacts`(`graph_snapshot`·`verification_receipt`), `evidence`, `graph_versions`(inactive, `review_revision` 0, `published_at` 없음)를 등록하고 **commit 직전에 ①②를 다시 실행**합니다(권리가 바뀌면 rollback). id는 `gv-`+SHA-256(handoffId)로 결정되며 같은 핀의 재실행은 `unchanged`, 같은 id의 다른 핀은 `version_conflict`입니다.
 
@@ -243,6 +243,26 @@ console.log(response.status); // 활성 회원 세션이 정상 폐기되면 204
 공개 규칙([규칙 문서](../docs/development/issue-133-publication-rules.md) 2-1): 카탈로그 잠금 바로 다음에 켜진 규칙과 `rule_revision`·`review_revision`을 **한 SQL 문장**으로 읽고, 판정 함수(`PublicationRuleEvaluator`)로 거른 snapshot을 저장합니다. 버전 행에는 두 revision과 거른 뒤의 이슈·관계·기사 수를, `graph_version_rules`에는 적용한 규칙을 남깁니다. receipt와 `evidence` 행은 bundle 전체를 그대로 둡니다. 수입은 정기 회차마다 돌므로 publication lock을 잡지 않으며, 읽은 뒤 커밋된 규칙 전환은 다음 회차 버전에 반영됩니다. 같은 핀을 다시 수입하면 지금 켜진 규칙이 아니라 그 버전의 적용 규칙으로 다시 계산해 `unchanged`를 판단합니다. 켜진 규칙(또는 버전의 적용 규칙)의 정의를 읽을 수 없으면 `rule_definition_invalid`로 아무것도 쓰지 않고 실패합니다. migration이 등록한 `single-source@1`·`speculative-issue@1`은 둘 다 꺼진 상태입니다. 결과 파일의 `counts`는 지금처럼 bundle의 수이고, `publicationRules`가 규칙이 한 일을 따로 알립니다: `ruleRevision`·`reviewRevision`, 적용한 규칙(`applied`), 저장된 snapshot의 수(`stored`), 연결 정리까지 포함해 숨긴 이슈·관계 수(`hidden`), 규칙마다 그 조건에 직접 걸린 수(`byRule`)입니다. id와 내용은 넣지 않습니다. `unchanged`이면 그 버전을 처음 수입할 때의 값이고(지금 켜진 규칙이 아님), 규칙 이전에 수입된 버전은 `ruleRevision`이 `null`입니다.
 
 설정은 `application.yml`의 `zoop.graph-handoff-import.*`(요청·결과 파일, `zoop-ai-handoff`·`zoop-ai-ingest` 실행 파일, handoff·relation·extraction·S2-1 상태 디렉터리, **하나의** source registry, 동결에 쓴 canonical·decisions·bindings 파일, artifact root)이며 값이 틀리면 설정 이름만 알리고 기동을 거절합니다. 하위 CLI에는 DB 자격이 전달되지 않습니다. 결과 파일(`0600`, 이미 있으면 덮어쓰지 않음)에는 경로·본문·비밀이 없고 실패 시 프로세스는 0이 아닌 코드로 끝납니다. 스테이징된 스냅샷을 읽으려면 `ZOOP_GRAPH_SNAPSHOT_SOURCE=artifact`와 `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT`(같은 root)를 씁니다. 실제 CLI·PostgreSQL smoke는 `api/scripts/graph_handoff_import_smoke.py`(파이프라인 venv의 Python으로 실행, 사용법은 파일 머리말)이고 PostgreSQL 통합 시험은 `companyIntegrationTest`에 포함됩니다.
+
+### 관리자 HTTP 활성화의 별도 합성 smoke
+
+기존 `graph_handoff_import_smoke.py`의 SQL harness 활성화와 검사들은 그대로 유지합니다. 관리자 HTTP 경로는 다음 **별도 명령**으로 확인합니다. 설치된 pipeline, 기존 API boot jar, JDK 21 이상, OrbStack과 프로젝트의 캐시된 `postgres:16.13-alpine` 이미지가 필요하며, 이 명령은 빌드·설치·이미지 pull을 하지 않습니다.
+
+```sh
+ai/pipeline/.venv/bin/python -m unittest discover -s api/scripts -p test_graph_handoff_activation_smoke.py
+ai/pipeline/.venv/bin/python api/scripts/graph_handoff_activation_smoke.py \
+  --result /tmp/zoop-graph-activation-result.json
+```
+
+결과 경로는 매번 새 파일을 지정합니다. 명령은 자체 Docker bridge·tmpfs PostgreSQL·loopback JVM과 합성 CLI 원장만 만들고 종료 시 자신의 자원만 정리합니다. PostgreSQL 포트는 `127.0.0.1`에만 엽니다. DB 설정·provider 자격·Spring 설정은 상속하지 않으며 AI 클라이언트는 모두 끕니다. 실제 계정이나 로그인 대신 시험 DB의 합성 관리자·세션을 사용하고, 실제 세션 조회로 받은 CSRF 토큰과 관리자 쿠키·Origin으로 요청합니다. 비밀번호 로그인·OAuth·운영자 계정 발급은 이 시험의 증명 범위가 아닙니다.
+
+첫 JVM은 bundle `-7` 스테이징 뒤 기본 활성화 거절(503)과 활성 포인터·review revision·활성화 이력·감사·멱등 기록의 불변을 확인합니다. 그 JVM을 종료한 뒤 **시험용으로만** `ZOOP_GRAPH_ACTIVATION_ALLOW_WITHOUT_EXCLUSION_STORE=true`인 별도 JVM을 실행합니다. 현재 권리 철회 시 409, 복구 뒤 실제 관리자 HTTP 활성화, 같은 키 재전송·다른 본문 충돌·오래된 활성 포인터·새 키로 이미 활성인 버전 요청을 검사하고, 같은 버전의 공개 graph·event·정확한 evidence span 및 현재 권리 철회·복구를 확인합니다. SQL은 카탈로그·인증 fixture만 준비하며, 양성 HTTP 활성화를 대신하지 않습니다. 기존 fixture seeder의 활성화도 별도로 집계합니다.
+
+마지막 JSON과 `--result`에는 단계별 상태 코드, `importActivationWrites: 0`, `sqlHarnessActivations: 0`, 실제 HTTP 포인터 변경 수, 현재 권리, `modelCalls: 0`, 소스 HEAD·jar hash와 소유 자원 정리 결과를 기록합니다. 실패는 0이 아닌 종료 코드와 실패 JSON으로 남습니다. 이 시험의 성공은 권위 있는 제외 저장소, 실제 기사 권리, 운영 공개 준비 또는 외부 모델 실행을 증명하지 않습니다. `.env`와 운영 기본값은 바꾸지 않습니다.
+
+**bundle 계약 수정 이력:** 최초 실행에서는 `EventDetailService`가 bundle `-5`만 읽어 `-7` 사건 상세가 503 `SOURCE_UNAVAILABLE`로 차단됐습니다. 이후 읽기 소비자가 정확한 `-5`·`-6`·`-7` receipt를 지원하도록 수정했고, 새 수입은 계속 `-7`만 허용합니다. 수정 후 새 jar의 실제 HTTP 28단계가 통과했습니다. 스크립트는 미지원 계약을 성공으로 처리하거나 bundle 버전을 낮추지 않으며, 향후 같은 불일치가 생기면 `blocked`·종료 코드 1로 기록합니다. 로컬 실행 증거와 운영·수령자 확인은 구분합니다.
+
+
 
 ## 기본 기업 카탈로그 적재
 
