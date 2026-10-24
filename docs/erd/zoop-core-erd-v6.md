@@ -25,11 +25,11 @@
 | 문서·근거·분석 | 5 | 분석 내부 주장·인용·긍부정을 한 결과에 저장 |
 | 브리핑 | 3 | 회차에 발행 원문 보관, 정정·중단은 한 이력 테이블 |
 | 채팅 | 3 | 작업에 결과·인용·라우팅 요약을 포함하고 실제 도구 호출은 독립 기록 |
-| 그래프·검수·공개 규칙 | 6 | 실제 조회 이력 유지, 버전 상태·활성 포인터 통합 |
+| 그래프·검수·공개 규칙·공개 제외 | 8 | 실제 조회 이력 유지, 버전 상태·활성 포인터 통합, 버전별 공개 제외 이력 |
 | 평가·작업·통계·감사 | 6 | 독립 집계·조회가 필요한 기록 유지 |
-| **합계** | **36** | Neo4j 노드·관계 및 파일 저장소는 이 개수에 포함하지 않음 |
+| **합계** | **38** | Neo4j 노드·관계 및 파일 저장소는 이 개수에 포함하지 않음 |
 
-36개는 이 설계안의 선택이지 API가 강제하는 최소 개수가 아니다. 개발 일정과 인력 배분은 이 ERD의 범위에서 제외한다.
+38개는 이 설계안의 선택이지 API가 강제하는 최소 개수가 아니다. 개발 일정과 인력 배분은 이 ERD의 범위에서 제외한다.
 
 ## 2. 저장소와 공통 규칙
 
@@ -607,6 +607,18 @@ UNIQUE(chat_job_id, attempt_no, call_index)
 `tool_call_id`는 시도 안의 계획 순서로 `tc-<call_index>`를 쓴다. 앱 내부 읽기 어댑터(`tool_id` `app:<capabilityId>`)는 같은 프로세스의 읽기 전용 조회이므로 개별 3초·단계 10초 상한을 넘긴 호출은 결과를 버리고 `failed`(`error_code=tool_timeout`)로 닫는다. 단계 상한 안에 시작하지 못한 호출은 `reserved`로 남고, 시작 기록이 단계 상한 뒤에 끝난 호출은 실행하지 않는다. 상한을 넘긴 읽기는 중단 신호를 받으며, 실제로 끝날 때까지 앱 전체 동시 읽기 한도(16)를 계속 차지한다. 예약·시작·종료 기록은 작업 실행 기한 안에서만 잠금·DB를 기다리고(`statement_timeout`), 기록하지 못하면 결과를 쓰지 않고 실행을 멈춰 lease 회수로 끝낸다. 작업이 완료·실패·취소·lease 만료 회수로 끝나면 그 작업의 `reserved` 호출은 `cancelled`, `running` 호출은 `unknown`으로 함께 닫는다. `error_code`는 `tool_timeout`, `tool_unavailable`(고정 그래프 없음, 버전·스냅샷·근거 상태 확인 불가), `tool_failed`(어댑터 오류·결과 형식 위반)이며, 실패한 호출을 빈 결과나 “없음”으로 바꾸지 않는다.
 
 `evidence_ids`는 성공 응답에서 답변 후보에 전달한 근거 ID이며 저장 시 현재 공개 문서 버전과 일치하는지 검사한다. 응답의 `data_version`, `truncated`, `next_allowed`와 artifact가 있으면 그 내용이 일치해야 한다. 기본 인덱스는 `(chat_job_id, attempt_no, call_index)`, `(tool_id, started_at)`, `(status, started_at)`이다. 요청당 호출 수·지연·오류·중복 제거율은 이 테이블에서 집계하고 모델 호출·토큰·비용은 `ai_executions`에서 별도로 집계한다.
+
+### 37–38. disclosure_exclusion_changes, disclosure_exclusion_targets — 공개 제외(FS081)
+
+```text
+disclosure_exclusion_changes: revision bigint PK; action text(exclude|lift); cause text(source-change|relation-retraction|operator)
+  report_sha256 text?(exclude만); reason text; operator text; changed_at timestamptz
+disclosure_exclusion_targets: revision FK; graph_version_id FK graph_versions ON DELETE CASCADE
+  target_kind text(issue|relation|evidence|article); target_id text; article_version text(article만, 아니면 '')
+  PRIMARY KEY(revision, graph_version_id, target_kind, target_id, article_version)
+```
+
+공개된 버전의 내용을 **그 버전에서만** 공개 조회에서 뺀다(권리 철회, 관계 오연결). 생산자가 정정한 새 인계 묶음에서 같은 이슈·간선 ID를 다시 쓸 수 있어서 전역 집합으로 두지 않는다. snapshot은 바꾸지 않고, 읽을 때 현재 제외를 overlay로 적용한다. 변경 하나는 운영자 명령 하나(AI 영향 조회 보고서의 `exclude`, 또는 사유를 적은 `lift`)이며, 대상의 현재 상태는 그 대상의 마지막 변경이다. 빈 보고서나 이전보다 작은 보고서로는 해제하지 않는다. `revision`은 앱 전체 제외 카운터(`DisclosureExclusions.revision`)로, 공통 publication_state 잠금 아래 MAX+1로 할당하고 커밋까지 잠금을 유지한다. 읽는 쪽(공개 조회·활성화 사전 검사)은 잠금 없이 한 문장으로 읽는다. 두 테이블은 UPDATE·DELETE를 거절하며, 대상 행만 버전 삭제와 함께 지워진다. 기사(`article`) 대상은 그래프 밖 소비자(기업 문서 목록·S1·브리핑·채팅·캐시·Neo4j)를 위해 기록만 하고, 그래프 조회는 이슈·관계·근거를 적용한다.
 
 ## 4. 핵심 관계도
 

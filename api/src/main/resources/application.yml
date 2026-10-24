@@ -58,8 +58,8 @@ zoop:
       source: ${ZOOP_GRAPH_SNAPSHOT_SOURCE:none}
       artifact-root: ${ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT:}
     activation:
-      # Imported (non-fixture) versions are not activated while no public exclusion store exists (FS081), because "nothing
-      # excluded" cannot be checked. An operator who accepts that may set this to true; synthetic fixtures are not affected.
+      # The public exclusion store (FS081, disclosure_exclusion_*) now always exists, so activation checks the version's current
+      # exclusions and this switch has no effect. It only matters for a DisclosureExclusionReader without a store (tests).
       allow-without-exclusion-store: ${ZOOP_GRAPH_ACTIVATION_ALLOW_WITHOUT_EXCLUSION_STORE:false}
   chat:
     # Accepting new questions and retries needs a ChatEngine, registered by zoop.ai.chat-client.enabled=true. Off by default:
@@ -153,6 +153,14 @@ zoop:
     canonical: ${ZOOP_HANDOFF_CANONICAL:}
     decisions: ${ZOOP_HANDOFF_DECISIONS:}
     bindings: ${ZOOP_HANDOFF_BINDINGS:}
+    artifact-root: ${ZOOP_ARTIFACT_ROOT:}
+  disclosure-exclusion:
+    # Operator-only, non-web write of the public exclusion store (FS081, see api/README.md): `exclude` from an AI exposure report
+    # (zoop-ai-handoff-exposure output, embedded in the request) or an explicit `lift`. Disabled by default. Enabled, it refuses a
+    # web context and any path that is not normalized and absolute. The artifact root is only read (import receipts).
+    enabled: ${ZOOP_DISCLOSURE_EXCLUSION_ENABLED:false}
+    request: ${ZOOP_DISCLOSURE_EXCLUSION_REQUEST:}
+    result: ${ZOOP_DISCLOSURE_EXCLUSION_RESULT:}
     artifact-root: ${ZOOP_ARTIFACT_ROOT:}
   document-read:
     # Public GET /api/v1/evidence/{id} (see api/docs/DOCUMENT_ANALYSIS.md, api/docs/GRAPH_READ_HANDOFF.md). All settings are optional,

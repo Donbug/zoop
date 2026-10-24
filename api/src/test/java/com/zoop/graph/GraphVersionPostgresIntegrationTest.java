@@ -194,6 +194,25 @@ class GraphVersionPostgresIntegrationTest {
     }
 
     @Test
+    void anExclusionInTheStoreHidesTheIssueFromThePublicGraphOfThatVersionOnly() {
+        var service = context.getBean(GraphQueryService.class);
+        var before = service.getGraph("all", null, null, null, null, null, null, null, "it-x1");
+        String issue = before.nodes().stream().filter(node -> "issue".equals(node.kind())).findFirst().orElseThrow().id();
+        // What the operator exclusion command writes (FS081): one change at MAX+1 and its target, in the active version only.
+        long revision = jdbc.queryForObject("SELECT COALESCE(MAX(revision), 0) + 1 FROM disclosure_exclusion_changes", Long.class);
+        jdbc.update("INSERT INTO disclosure_exclusion_changes (revision, action, cause, report_sha256, reason, operator, changed_at) "
+                + "VALUES (?, 'exclude', 'source-change', ?, 'it exclusion', 'it-operator', now())", revision, "9".repeat(64));
+        jdbc.update("INSERT INTO disclosure_exclusion_targets (revision, graph_version_id, target_kind, target_id) "
+                + "VALUES (?, 'fixture-2026-10-08', 'issue', ?)", revision, issue);
+
+        var after = service.getGraph("all", null, null, null, null, null, null, null, "it-x2");
+        assertFalse(after.nodes().stream().anyMatch(node -> node.id().equals(issue)), "the excluded issue is not served");
+        assertTrue(after.nodes().size() < before.nodes().size());
+        var past = service.getGraph("all", null, null, null, null, "2026-10-05T00:00:00Z", null, null, "it-x3");
+        assertEquals("fixture-2026-10-01", past.metadata().graphVersion(), "another version keeps its own (empty) exclusions");
+    }
+
+    @Test
     void fs014SavedWatchlistAndMockHoldingsAppearInTheNextPersonalRead() {
         var tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
         tx.executeWithoutResult(status -> {
@@ -396,18 +415,20 @@ class GraphVersionPostgresIntegrationTest {
     }
 
     @Test
-    void importedVersionIsRefusedWithoutAnExclusionStoreAndThePointerStays() {
-        // An unpublished imported version over a readable snapshot (kind is what the gate looks at).
+    void importedVersionPassesTheExclusionStoreGateAndIsStillCheckedBeforeThePointerMoves() {
+        // An unpublished imported version over a readable snapshot (kind is what the gate looks at). The exclusion store exists
+        // (FS081), so the version is no longer refused for want of one: it goes on to the rights and evidence checks, which a
+        // fixture snapshot without imported evidence rows fails, and the pointer stays.
         unpublish("fixture-2026-10-01");
         jdbc.update("UPDATE graph_versions SET kind = 'snapshot' WHERE id = 'fixture-2026-10-01'");
-        // The snapshot itself is readable, so the refusal below is the exclusion-store gate, not a broken file.
+        // The snapshot itself is readable, so the refusal below is a check of its content, not a broken file.
         context.getBean(GraphSnapshotStore.class).load(repository.find("fixture-2026-10-01").orElseThrow());
 
         var error = assertThrows(CustomException.class, () -> context.getBean(AdminGraphVersionService.class)
                 .activate("fixture-2026-10-01", new GraphVersionActivateRequest("go live",
                         "fixture-2026-10-08"), "graph-key-imported", admin(), "it"));
 
-        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, error.getErrorCode());
+        assertEquals(ErrorCode.REVISION_CONFLICT, error.getErrorCode(), "a withheld citation, not exclusion_store_unavailable");
         assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
         assertNull(jdbc.queryForObject("SELECT published_at FROM graph_versions WHERE id = 'fixture-2026-10-01'",
                 Timestamp.class));
