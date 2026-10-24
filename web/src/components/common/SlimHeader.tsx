@@ -12,11 +12,10 @@ export default function SlimHeader({
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-zoop-line bg-white px-5 text-zoop-ink">
       <Link
         to="/"
-        aria-label="줍 Zoop"
+        aria-label="ZOOP"
         className="flex items-center gap-1.5 no-underline focus-visible:outline-2 focus-visible:outline-offset-2"
       >
-        <strong className="text-base font-extrabold">줍</strong>
-        <span className="font-inter text-[11px] text-zoop-muted">Zoop</span>
+        <strong className="font-inter text-base font-extrabold">ZOOP</strong>
       </Link>
       <div
         aria-label="화면 도구"

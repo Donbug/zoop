@@ -1099,9 +1099,7 @@ export default function GraphCanvas({
       graph.on('edge:pointerenter', (event: IElementEvent) => {
         if (!interactionEnabled()) return;
         hoveredEdge.current = event.target.id;
-        setHoveredIssue(
-          data.edges.find((e) => e.id === event.target.id)?.summary ?? null,
-        );
+        setHoveredIssue(null);
         scheduleReading();
       });
       graph.on('edge:pointerleave', () => {

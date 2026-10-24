@@ -5,9 +5,10 @@ export type LegendKey =
   'company' | 'issue' | GraphResponse['edges'][number]['relationType'];
 /**
  * 지도 기본 배치(graph-model의 좌표계) 버전. 노드 좌표 계산 방식이 바뀌면 올린다.
- * 3: 관계 묶음 사이 여백 압축(#321 후속). 이전 좌표의 카메라는 복원하지 않는다.
+ * 3: 관계 묶음 사이 여백 압축(#321 후속).
+ * 4: 확대된 노드·라벨의 점유 면적 반영(#330). 이전 좌표의 카메라는 복원하지 않는다.
  */
-export const MAP_LAYOUT_REVISION = 3;
+export const MAP_LAYOUT_REVISION = 4;
 export type GraphView = {
   hidden: LegendKey[];
   /**

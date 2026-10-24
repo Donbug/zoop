@@ -29,8 +29,8 @@ export default function ServiceHeader({
   return (
     <header className="relationship-header">
       <NavLink to="/" className="relationship-logo">
-        <strong>줍</strong>
-        <span>Zoop</span>
+        {/* 로고는 영문 ZOOP 한 단어로, 메뉴 타이틀과 같은 색·크기로 둔다. */}
+        <strong className="font-inter">ZOOP</strong>
       </NavLink>
       <nav aria-label={navLabel}>
         {menus.map((menu) => (
