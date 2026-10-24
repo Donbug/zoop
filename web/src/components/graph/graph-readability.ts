@@ -84,31 +84,6 @@ export function readingStyles(
       related.add(String(e.source));
       related.add(String(e.target));
     }
-  const preciseTime = (id: string) => {
-    const node = byId.get(id);
-    return node?.timePrecision && node.timePrecision !== 'unknown'
-      ? (node.eventTime ?? '')
-      : '';
-  };
-  const recent = new Set(
-    (base.edges ?? [])
-      .filter(
-        (e) =>
-          e.style?.visibility !== 'hidden' &&
-          (e.source === context.anchor || e.target === context.anchor),
-      )
-      .sort((a, b) => {
-        const time = (e: typeof a) =>
-          preciseTime(String(e.source)) || preciseTime(String(e.target));
-        return (
-          time(b).localeCompare(time(a)) ||
-          String(a.id).localeCompare(String(b.id))
-        );
-      })
-      .slice(0, 6)
-      .map((e) => String(e.id)),
-  );
-  const edgeData = new Map(data.edges.map((e) => [e.id, e]));
   return {
     nodes: base.nodes?.map((node) => {
       const source = byId.get(String(node.id));
@@ -156,38 +131,15 @@ export function readingStyles(
         },
       };
     }),
-    edges: base.edges?.map((edge) => {
-      const source = edgeData.get(String(edge.id));
-      const emphasized =
-        edge.id === context.edge ||
-        context.path.has(String(edge.id)) ||
-        recent.has(String(edge.id));
-      const visible =
-        edge.style?.visibility !== 'hidden' &&
-        (emphasized ||
-          (!context.anchor &&
-            zoom >= 0.95 &&
-            (base.edges?.length ?? 0) <= 160));
-      return {
-        ...edge,
-        style: {
-          ...edge.style,
-          labelText: source?.summary ?? '',
-          labelVisibility: visible ? 'visible' : 'hidden',
-          labelFontSize: 13 / zoom,
-          labelFontFamily: 'Pretendard Variable',
-          labelFill: base.nodes?.[0]?.style?.labelFill,
-          labelBackground: true,
-          labelBackgroundFill: base.nodes?.[0]?.style?.labelBackgroundFill,
-          labelPadding: [2 / zoom, 4 / zoom],
-          labelOffsetY: -5 / zoom,
-          labelAutoRotate: true,
-          labelWordWrap: true,
-          labelWordWrapWidth: 160 / zoom,
-          labelMaxLines: Math.max(1, (source?.summary ?? '').length),
-        },
-      };
-    }),
+    // D-GRP-01: 사건 이름은 노드에만 표시해요. 호버·선택·확대 뒤에도 선의 태그는 복원하지 않아요.
+    edges: base.edges?.map((edge) => ({
+      ...edge,
+      style: {
+        ...edge.style,
+        labelText: '',
+        labelVisibility: 'hidden',
+      },
+    })),
   };
 }
 

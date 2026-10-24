@@ -37,7 +37,7 @@ test.each([0.1, 0.53, 0.8, 1.5])(
   },
 );
 
-test('G3/G4 selected neighborhoods, full edge summaries and null vs zero counts', () => {
+test('D-GRP-01 selected issue names and zero counts remain, but edge tags stay hidden', () => {
   const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
   const issue = data.nodes.find((n) => n.kind === 'issue')!;
   issue.evidenceCount = 0;
@@ -52,8 +52,11 @@ test('G3/G4 selected neighborhoods, full edge summaries and null vs zero counts'
   expect(selected?.style?.labelVisibility).toBe('visible');
   expect((selected?.style?.badges as { text: string }[])[0].text).toBe('0');
   const edge = result.edges?.find((e) => e.id === data.edges[0].id);
-  expect(edge?.style?.labelText).toBe(data.edges[0].summary);
-  expect(edge?.style?.labelVisibility).toBe('visible');
+  expect(edge?.style?.labelText).toBe('');
+  expect(edge?.style?.labelVisibility).toBe('hidden');
+  expect(data.edges[0].summary).toBe(
+    '승인된 관계의 긴 설명은 생략 없이 줄바꿈해요',
+  );
   issue.evidenceCount = null;
   expect(
     readingStyles(base, data, { ...context, anchor: issue.id }).nodes?.find(
@@ -62,7 +65,7 @@ test('G3/G4 selected neighborhoods, full edge summaries and null vs zero counts'
   ).toEqual([]);
 });
 
-test('G3 dense graphs show only selected/latest six or path/hover labels', () => {
+test('D-GRP-01 dense graphs never show edge tags on zoom, selection, path or hover', () => {
   const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
   const base = toG6Data(data, 1200, 700);
   const edge = base.edges![0];
@@ -84,13 +87,29 @@ test('G3 dense graphs show only selected/latest six or path/hover labels', () =>
       zoom: 2,
       anchor: String(edge.target),
     }).edges?.filter((e) => e.style?.labelVisibility === 'visible'),
-  ).toHaveLength(6);
+  ).toHaveLength(0);
   expect(
     readingStyles(dense, data, {
       ...context,
       path: new Set(['dense-15']),
     }).edges?.find((e) => e.id === 'dense-15')?.style?.labelVisibility,
-  ).toBe('visible');
+  ).toBe('hidden');
+  for (const zoom of [0.1, 0.53, 1, 4]) {
+    const result = readingStyles(base, data, {
+      ...context,
+      zoom,
+      edge: String(edge.id),
+      anchor: String(edge.target),
+      path: new Set([String(edge.id)]),
+    });
+    expect(
+      result.edges?.every(
+        (item) =>
+          item.style?.labelText === '' &&
+          item.style?.labelVisibility === 'hidden',
+      ),
+    ).toBe(true);
+  }
 });
 
 test('R1–R3 culls node and edge labels together, prioritizes selection and avoids other company bodies', () => {

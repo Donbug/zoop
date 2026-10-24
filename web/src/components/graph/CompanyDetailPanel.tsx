@@ -160,6 +160,13 @@ export default function CompanyDetailPanel(props: Props) {
             <h2 className={ui.title} ref={heading} tabIndex={-1}>
               {name}
             </h2>
+            {/* D-GRP-03: 별칭은 기업명 아래에서 펼쳐 확인해요. */}
+            {company && company.aliases.length > 0 && (
+              <details className="company-aliases">
+                <summary>기업명 더 보기</summary>
+                <p>{company.aliases.join(' · ')}</p>
+              </details>
+            )}
             {quote && (
               <>
                 <div className="company-price-row">

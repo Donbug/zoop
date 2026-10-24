@@ -240,6 +240,9 @@ export function toG6Data(
           source: e.source,
           target: e.target,
           style: {
+            // D-GRP-01: 관계 설명은 상세·키보드 목록에 남기고 선 위 이름표는 표시하지 않아요.
+            labelText: '',
+            labelVisibility: 'hidden',
             stroke:
               e.relationType === 'FOLLOWS'
                 ? themeColor('ink')

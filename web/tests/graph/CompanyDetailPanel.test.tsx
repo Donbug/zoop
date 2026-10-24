@@ -77,6 +77,36 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
     vi.mocked(setWatchlistCompany).mockReset();
   });
 
+  it('D-GRP-03 aliases가 있으면 기업명 아래에서 다른 이름을 펼쳐 볼 수 있다', async () => {
+    const view = renderPanel();
+    const summary = screen.getByText('기업명 더 보기');
+    const details = summary.closest('details')!;
+    expect(details.open).toBe(false);
+    await userEvent.click(summary);
+    expect(details.open).toBe(true);
+    expect(details.textContent).toContain(company.aliases.join(' · '));
+    const header = view.container.querySelector('.company-panel-header')!;
+    expect(header.contains(details)).toBe(true);
+    expect(
+      header.querySelector('h2')!.compareDocumentPosition(details) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      details.compareDocumentPosition(
+        header.querySelector('.company-price-row')!,
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('D-GRP-03 aliases가 없으면 기업명 더 보기를 표시하지 않는다', () => {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      data: { ...state.data, company: { ...company, aliases: [] } },
+    });
+    renderPanel();
+    expect(screen.queryByText('기업명 더 보기')).toBeNull();
+  });
+
   it('튜토리얼 잠금 중에도 실제 SectionError 재시도가 작동한다', async () => {
     vi.mocked(useCompanyData).mockReturnValue({
       ...state,
