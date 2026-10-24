@@ -74,6 +74,10 @@ export function styleGraph(
         labelFill: node.data?.kind === 'company' ? colors.muted : colors.ink,
         labelBackgroundFill: colors.paper,
         labelBackgroundStroke: dark ? '#6b6b70' : '#bababa',
+        // Dimmed nodes fade more on a dark map; keep them legible as context.
+        ...(dark && Number(node.style?.opacity ?? 1) < 1
+          ? { opacity: 0.38 }
+          : {}),
       },
     })),
     edges: data.edges?.map((edge) => {
@@ -84,13 +88,7 @@ export function styleGraph(
         ...edge,
         style: {
           ...edge.style,
-          stroke: follows
-            ? dark
-              ? '#efa397'
-              : '#b04b42'
-            : dark
-              ? '#a5a9b1'
-              : '#71757c',
+          stroke: follows ? colors.ink : dark ? '#a5a9b1' : '#71757c',
           lineWidth: shared ? 1.5 : 1.95,
           strokeOpacity: dimmed ? 0.2 : shared ? 0.75 : 0.95,
         },

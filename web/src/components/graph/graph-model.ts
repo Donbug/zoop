@@ -236,7 +236,9 @@ export function toG6Data(
           target: e.target,
           style: {
             stroke:
-              e.relationType === 'FOLLOWS' ? '#c0362c' : themeColor('faint'),
+              e.relationType === 'FOLLOWS'
+                ? themeColor('ink')
+                : themeColor('faint'),
             lineWidth: 0.65,
             strokeOpacity: dimmed
               ? 0.08

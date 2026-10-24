@@ -7,7 +7,7 @@ export const panelStyles = {
   wideShell: 'w-[400px]! max-w-full shadow-[0_25px_50px_-12px_rgb(0_0_0/0.25)]',
   header: 'relative shrink-0 px-4 pt-4 pb-3',
   title:
-    'min-w-0 text-[17px] font-bold leading-[25.5px] tracking-[-0.25px] wrap-anywhere',
+    'min-w-0 text-[17px] font-bold leading-[25.5px] tracking-[-0.25px] wrap-anywhere focus:outline-none',
   close:
     'grid size-8 shrink-0 place-items-center rounded-panel border border-panel-line text-[20px] leading-none text-panel-secondary hover:bg-panel-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-panel-ink',
   scroll:

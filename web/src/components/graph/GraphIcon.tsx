@@ -1,4 +1,5 @@
 // D-GRP-01/01b: same paths as the original toolbar assets, painted by text color.
+// filter-none: the dark theme inverts [data-icon] images; these already follow the text color.
 const colorPaths: Record<string, string[]> = {
   sidebar: [
     'M10.2917 1.625H2.70833C2.11002 1.625 1.625 2.11002 1.625 2.70833V10.2917C1.625 10.89 2.11002 11.375 2.70833 11.375H10.2917C10.89 11.375 11.375 10.89 11.375 10.2917V2.70833C11.375 2.11002 10.89 1.625 10.2917 1.625Z',
@@ -29,7 +30,7 @@ export default function GraphIcon({
         aria-hidden="true"
         data-icon
         focusable="false"
-        className="shrink-0"
+        className="shrink-0 filter-none"
         width={size}
         height={size}
         viewBox="0 0 13 13"

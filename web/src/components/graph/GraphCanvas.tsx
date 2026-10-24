@@ -1126,7 +1126,7 @@ export default function GraphCanvas({
           <span className="block">연결 없는 사건</span>
         </button>
       )}
-      <div className="relationship-source">
+      <div className="relationship-source [&_p]:break-keep">
         <p>SOURCE · {data.metadata.source}</p>
         <p>
           AS OF{' '}
