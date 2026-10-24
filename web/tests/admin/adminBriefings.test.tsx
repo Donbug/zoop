@@ -678,7 +678,7 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
       screen.getByRole('meter', { name: 'AI 기능을 쓴 회원 비율' }),
     ).toBeTruthy();
     const tokens = screen.getByRole('group', {
-      name: '전체 날짜별 토큰 사용량',
+      name: '전체 날짜별 토큰 사용량 (←→로 날짜 이동)',
     });
     // 날짜는 오래된 것부터 그린다.
     const bars = within(tokens).getAllByRole('img');
@@ -692,8 +692,26 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
       screen.getByRole('list', { name: '기능별 토큰 비중' }).textContent,
     ).toContain('80%');
 
+    // 키보드: 그래프는 Tab 한 칸(마지막 날)이고, ←로 앞 날짜로 옮기면 값 읽기 줄도 바뀐다.
+    expect(bars.map((bar) => bar.getAttribute('tabindex'))).toEqual([
+      '-1',
+      '0',
+    ]);
+    bars[1].focus();
+    await user.keyboard('{ArrowLeft}');
+    expect(document.activeElement).toBe(bars[0]);
+    expect(bars[0].getAttribute('tabindex')).toBe('0');
+    expect(bars[1].getAttribute('tabindex')).toBe('-1');
+    expect(tokens.parentElement?.parentElement?.textContent).toContain(
+      '10월 23일 입력 1,000 · 출력 400 · 모델 호출 4',
+    );
+    await user.keyboard('{End}');
+    expect(document.activeElement).toBe(bars[1]);
+
     // 실제 청구액이 있는 기능(브리핑)과 추정만 있는 기능(챗봇)을 함께 더한다.
-    const allCost = screen.getByRole('group', { name: '전체 날짜별 AI 비용' });
+    const allCost = screen.getByRole('group', {
+      name: '전체 날짜별 AI 비용 (←→로 날짜 이동)',
+    });
     expect(
       within(allCost).getAllByRole('img')[1].getAttribute('aria-label'),
     ).toBe('10월 24일 실제+추정 0.04 USD');
@@ -702,13 +720,15 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
     expect(location()).toBe('/admin/ai?view=briefing');
     expect(screen.getByText('측정 안 함 / 전체 200명')).toBeTruthy();
     const briefing = screen.getByRole('group', {
-      name: '브리핑 날짜별 토큰 사용량',
+      name: '브리핑 날짜별 토큰 사용량 (←→로 날짜 이동)',
     });
     const briefingBars = within(briefing).getAllByRole('img');
     expect(briefingBars[0].getAttribute('aria-label')).toBe(
       '10월 23일 입력 자료 없음, 출력 자료 없음, 모델 호출 자료 없음',
     );
-    const cost = screen.getByRole('group', { name: '브리핑 날짜별 AI 비용' });
+    const cost = screen.getByRole('group', {
+      name: '브리핑 날짜별 AI 비용 (←→로 날짜 이동)',
+    });
     expect(within(cost).getAllByRole('img')[1].getAttribute('aria-label')).toBe(
       '10월 24일 실제 0.01 USD',
     );
@@ -721,7 +741,7 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
     await user.click(screen.getByRole('tab', { name: 'AI 챗봇' }));
     expect(screen.getByText('15%')).toBeTruthy();
     const chatCost = screen.getByRole('group', {
-      name: 'AI 챗봇 날짜별 AI 비용',
+      name: 'AI 챗봇 날짜별 AI 비용 (←→로 날짜 이동)',
     });
     expect(
       within(chatCost).getAllByRole('img')[0].getAttribute('aria-label'),

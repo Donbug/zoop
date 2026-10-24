@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Empty, Note, Table } from '@/components/admin/common/AdminUi';
 import { TD, TH, count } from '@/components/admin/common/adminStyles';
 import {
@@ -72,6 +72,9 @@ function DayBars({
   tick: (value: number) => string;
 }) {
   const [active, setActive] = useState<number | null>(null);
+  // 키보드: 그래프 전체가 Tab 한 칸이고, 그 안에서 ←→·Home·End로 날짜를 옮긴다(날짜마다 Tab 칸을 만들지 않는다).
+  const [cursor, setCursor] = useState<number | null>(null);
+  const svg = useRef<SVGSVGElement>(null);
   const totals = days.map((_, index) =>
     segments(index).reduce((total, part) => total + (part.value ?? 0), 0),
   );
@@ -82,7 +85,16 @@ function DayBars({
   const labelEvery = Math.ceil(days.length / 8);
 
   // 고른 날(없으면 마지막 날)의 값을 그래프 위 한 줄에 보여 준다.
-  const shown = active ?? days.length - 1;
+  const focusIndex = Math.min(cursor ?? days.length - 1, days.length - 1);
+  const shown = active ?? focusIndex;
+  const move = (next: number) => {
+    const index = Math.max(0, Math.min(days.length - 1, next));
+    setCursor(index);
+    setActive(index);
+    svg.current
+      ?.querySelector<SVGRectElement>(`[data-day-index="${index}"]`)
+      ?.focus();
+  };
   return (
     <div className="flex flex-col gap-1">
       <p
@@ -98,93 +110,125 @@ function DayBars({
           </>
         )}
       </p>
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        role="group"
-        aria-label={label}
-        className="block h-auto w-full overflow-visible"
-        onMouseLeave={() => setActive(null)}
-      >
-        {[0, 0.5, 1].map((ratio) => (
-          <g key={ratio}>
-            <line
-              x1={PAD.left}
-              x2={W - PAD.right}
-              y1={y(max * ratio)}
-              y2={y(max * ratio)}
-              className="stroke-zoop-line"
-              strokeWidth={ratio === 0 ? 1 : 0.5}
-              strokeDasharray={ratio === 0 ? undefined : '2 3'}
-            />
-            <text
-              x={PAD.left - 6}
-              y={y(max * ratio)}
-              textAnchor="end"
-              dominantBaseline="middle"
-              className="fill-zoop-muted text-[10px] tabular-nums"
-            >
-              {tick(max * ratio)}
-            </text>
-          </g>
-        ))}
-        {days.map((date, index) => {
-          const x = PAD.left + slot * index + (slot - barWidth) / 2;
-          const parts = segments(index).filter(
-            (part): part is { value: number; className: string } =>
-              part.value !== null && part.value > 0,
-          );
-          let base = 0;
-          return (
-            <g key={date}>
-              {parts.map((part, partIndex) => {
-                const top = y(base + part.value);
-                const bottom = y(base) - (partIndex > 0 ? 2 : 0);
-                base += part.value;
-                const height = Math.max(0, bottom - top);
-                return partIndex === parts.length - 1 ? (
-                  <path
-                    key={partIndex}
-                    d={topRounded(x, top, barWidth, height)}
-                    className={part.className}
-                  />
-                ) : (
-                  <rect
-                    key={partIndex}
-                    x={x}
-                    y={top}
-                    width={barWidth}
-                    height={height}
-                    className={part.className}
-                  />
-                );
-              })}
-              {index % labelEvery === 0 && (
-                <text
-                  x={PAD.left + slot * index + slot / 2}
-                  y={H - 6}
-                  textAnchor="middle"
-                  className="fill-zoop-muted text-[10px] tabular-nums"
-                >
-                  {shortDate(date)}
-                </text>
-              )}
-              <rect
-                x={PAD.left + slot * index}
-                y={PAD.top}
-                width={slot}
-                height={PLOT_H}
-                tabIndex={0}
-                role="img"
-                aria-label={`${longDate(date)} ${describe(index).join(', ')}`}
-                onMouseEnter={() => setActive(index)}
-                onFocus={() => setActive(index)}
-                onBlur={() => setActive(null)}
-                className={`fill-transparent outline-none ${active === index ? 'fill-zoop-ink/5' : ''}`}
+      {/* 좁은 창에서는 그래프를 줄이지 않고 가로로 넘긴다. 줄이면 축 글씨(10px)가 함께 작아진다. */}
+      <div className="overflow-x-auto">
+        <svg
+          ref={svg}
+          viewBox={`0 0 ${W} ${H}`}
+          role="group"
+          aria-label={`${label} (←→로 날짜 이동)`}
+          className="block h-auto w-full min-w-[560px] overflow-visible"
+          onMouseLeave={() => setActive(null)}
+          onKeyDown={(event) => {
+            const keys: Record<string, number> = {
+              ArrowLeft: focusIndex - 1,
+              ArrowRight: focusIndex + 1,
+              Home: 0,
+              End: days.length - 1,
+            };
+            if (!(event.key in keys)) return;
+            event.preventDefault();
+            move(keys[event.key]);
+          }}
+        >
+          {[0, 0.5, 1].map((ratio) => (
+            <g key={ratio}>
+              <line
+                x1={PAD.left}
+                x2={W - PAD.right}
+                y1={y(max * ratio)}
+                y2={y(max * ratio)}
+                className="stroke-zoop-line"
+                strokeWidth={ratio === 0 ? 1 : 0.5}
+                strokeDasharray={ratio === 0 ? undefined : '2 3'}
               />
+              <text
+                x={PAD.left - 6}
+                y={y(max * ratio)}
+                textAnchor="end"
+                dominantBaseline="middle"
+                className="fill-zoop-muted text-[10px] tabular-nums"
+              >
+                {tick(max * ratio)}
+              </text>
             </g>
-          );
-        })}
-      </svg>
+          ))}
+          {days.map((date, index) => {
+            const x = PAD.left + slot * index + (slot - barWidth) / 2;
+            const parts = segments(index).filter(
+              (part): part is { value: number; className: string } =>
+                part.value !== null && part.value > 0,
+            );
+            let base = 0;
+            return (
+              <g key={date}>
+                {parts.map((part, partIndex) => {
+                  const top = y(base + part.value);
+                  const bottom = y(base) - (partIndex > 0 ? 2 : 0);
+                  base += part.value;
+                  const height = Math.max(0, bottom - top);
+                  return partIndex === parts.length - 1 ? (
+                    <path
+                      key={partIndex}
+                      d={topRounded(x, top, barWidth, height)}
+                      className={part.className}
+                    />
+                  ) : (
+                    <rect
+                      key={partIndex}
+                      x={x}
+                      y={top}
+                      width={barWidth}
+                      height={height}
+                      className={part.className}
+                    />
+                  );
+                })}
+                {index % labelEvery === 0 && (
+                  <text
+                    x={PAD.left + slot * index + slot / 2}
+                    y={H - 6}
+                    textAnchor="middle"
+                    className="fill-zoop-muted text-[10px] tabular-nums"
+                  >
+                    {shortDate(date)}
+                  </text>
+                )}
+                {active === index && (
+                  // 고른 날: 옅은 바탕만으로는 잘 안 보여 진한 테두리를 함께 그린다.
+                  <rect
+                    aria-hidden="true"
+                    x={PAD.left + slot * index + 1}
+                    y={PAD.top}
+                    width={Math.max(1, slot - 2)}
+                    height={PLOT_H}
+                    rx={3}
+                    className="pointer-events-none fill-zoop-ink/5 stroke-zoop-ink"
+                    strokeWidth={1.5}
+                  />
+                )}
+                <rect
+                  data-day-index={index}
+                  x={PAD.left + slot * index}
+                  y={PAD.top}
+                  width={slot}
+                  height={PLOT_H}
+                  tabIndex={index === focusIndex ? 0 : -1}
+                  role="img"
+                  aria-label={`${longDate(date)} ${describe(index).join(', ')}`}
+                  onMouseEnter={() => setActive(index)}
+                  onFocus={() => {
+                    setCursor(index);
+                    setActive(index);
+                  }}
+                  onBlur={() => setActive(null)}
+                  className="fill-transparent outline-none"
+                />
+              </g>
+            );
+          })}
+        </svg>
+      </div>
     </div>
   );
 }
