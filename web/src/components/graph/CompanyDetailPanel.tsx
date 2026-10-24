@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { setWatchlistCompany } from '@/apis/graph/companies';
 import { useCompanyData } from '@/hooks/useCompanyData';
 import type { GraphNode } from '@/types/map/graph';
+import IssueDocumentSentiments from './IssueDocumentSentiments';
 
 type RelatedCompany = { id: string; name: string; sharedIssueCount: number };
 type Props = {
@@ -406,6 +407,11 @@ export default function CompanyDetailPanel(props: Props) {
                         {issue.evidenceCount}건
                       </span>
                     </button>
+                    <IssueDocumentSentiments
+                      documents={data.documents?.items ?? []}
+                      companyId={company.id}
+                      issueId={issue.issueId}
+                    />
                   </li>
                 ))}
               </ul>
@@ -438,6 +444,11 @@ export default function CompanyDetailPanel(props: Props) {
                       <b>{issue.title}</b>
                       <span>구조적 연관 · 근거 {issue.evidenceCount}건</span>
                     </button>
+                    <IssueDocumentSentiments
+                      documents={data.documents?.items ?? []}
+                      companyId={company.id}
+                      issueId={issue.issueId}
+                    />
                   </li>
                 ))}
               </ul>
