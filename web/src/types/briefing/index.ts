@@ -186,6 +186,7 @@ export type BriefingResponse = {
   graphVersion: string | null;
   items: BriefingItem[];
   continuity?: BriefingContinuity;
+  editionReview?: import('./editionReview').EditionReview;
   judgmentUpdate?: import('./judgmentUpdate').JudgmentUpdate;
   companyOutlooks?: import('./companyOutlook').CompanyOutlooks;
   marketSummary: BriefingMarketSummary;

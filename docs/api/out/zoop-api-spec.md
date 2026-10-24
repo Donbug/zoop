@@ -2779,6 +2779,106 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | text | 필수 | string |  |
 | evidenceIds | 필수 | string[] |  |
 
+<a id="schema-editionstatement"></a>
+
+### EditionStatement
+
+시장 해석·자료 부족 안내는 기사 근거 ID가 없을 수 있으며 검증된 시장 스냅샷과 결속합니다. 기업 사실의 근거 ID는 별도로 필수 검사합니다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| text | 필수 | string |  |
+| evidenceIds | 필수 | string[] |  |
+
+<a id="schema-editionreview"></a>
+
+### EditionReview
+
+출근 오늘 집중·퇴근 장 평가/아침 기업 점검/다음 거래일 시나리오의 원문 대조 편집 검토 스냅샷. 독립 모델 검증 결과와 구분하며 기존 전문·시세·근거를 보존합니다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 필수 | string {zoop-edition-review-v1} |  |
+| status | 필수 | string {REVIEWED} |  |
+| verificationMode | 필수 | string {editorial_source_review} |  |
+| reviewer | 필수 | string |  |
+| resultVersion | 필수 | string |  |
+| roundId | 필수 | string |  |
+| analysisVersion | 필수 | string |  |
+| scopeNote | 필수 | string |  |
+| headline | 필수 | string |  |
+| date | 필수 | string (date) |  |
+| edition | 필수 | string {morning, evening} |  |
+| cutoff | 필수 | string (date-time) |  |
+| reviewedAt | 필수 | string (date-time) |  |
+| previousReview | 필수 | object, null | 실제 직전 편집본의 버전·회차·마감과 원 판단/확인 조건. 없으면 비교 불가를 표시합니다. |
+| sources | 필수 | object |  |
+| marketVariables | 필수 | [MarketVariables](#schema-marketvariables) / [Unavailable](#schema-unavailable) |  |
+| capabilities | 필수 | object |  |
+| capabilities.intraday | 필수 | string {unavailable} |  |
+| capabilities.sectors | 필수 | string {unavailable} |  |
+| capabilities.flows | 필수 | string {unavailable} |  |
+| capabilities.calendar | 필수 | string {unverified} |  |
+| summary | 필수 | [EditionStatement](#schema-editionstatement) |  |
+| marketInterpretation | 필수 | [EditionStatement](#schema-editionstatement) |  |
+| comparison | 필수 | [EditionStatement](#schema-editionstatement) |  |
+| nextSession | 필수 | [EditionStatement](#schema-editionstatement) |  |
+| companies | 필수 | [EditionCompanyReview](#schema-editioncompanyreview)[] |  |
+
+<a id="schema-editioncompanyreview"></a>
+
+### EditionCompanyReview
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyId | 필수 | string |  |
+| companyName | 필수 | string |  |
+| role | 필수 | string {selected, tracked} |  |
+| sourceIds | 필수 | string[] |  |
+| previous | 필수 | object, null |  |
+| price | 필수 | [CompanyPrice](#schema-companyprice) |  |
+| stance | 필수 | string {priority_watch, watch, cautious_watch, deferred} |  |
+| title | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| takeaway | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| newInformation | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| judgment | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| positive | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| negative | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| watch | 필수 | [CompanyStatement](#schema-companystatement)[] |  |
+| checks | 필수 | [EditionConditionCheck](#schema-editionconditioncheck)[] |  |
+
+<a id="schema-editionconditioncheck"></a>
+
+### EditionConditionCheck
+
+직전 확인 조건을 누락·변조하지 않습니다. 확인/반증에는 해당 기업의 비교 마감 이후 근거가 필요하며 가격 등락은 조건 확인을 대체하지 않습니다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| condition | 필수 | string |  |
+| status | 필수 | string {confirmed, contradicted, not_observed} |  |
+| observation | 필수 | [EditionStatement](#schema-editionstatement) |  |
+
+<a id="schema-editionsource"></a>
+
+### EditionSource
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| evidenceId | 필수 | string |  |
+| documentId | 필수 | string |  |
+| documentVersion | 필수 | string |  |
+| bodySha256 | 필수 | string |  |
+| quote | 필수 | string |  |
+| title | 필수 | string |  |
+| publishedAt | 필수 | string (date-time) |  |
+| url | 필수 | string (uri) |  |
+| fullBody | 필수 | string |  |
+
 <a id="schema-judgmentupdate"></a>
 
 ### JudgmentUpdate
@@ -3470,6 +3570,7 @@ The immutable published original of a round (what users saw before any correctio
 | dataAsOf | 필수 | string (date-time) / null |  |
 | graphVersion | 필수 | string / null |  |
 | items | 필수 | [BriefingItem](#schema-briefingitem)[] |  |
+| editionReview | 선택 | [EditionReview](#schema-editionreview) | 출근 집중/퇴근 장·아침 기업 점검·다음 거래일 시나리오의 선택적 편집 검토본. |
 | judgmentUpdate | 선택 | [JudgmentUpdate](#schema-judgmentupdate) | 선택적 비교 판단. 핵심 선정과 별도로 이전 기업의 미해결 조건을 추적하며, 없으면 기존 응답 유지. |
 | companyOutlooks | 선택 | [CompanyOutlooks](#schema-companyoutlooks) | 선정 기업별 사업 전망·조건·근거와 동일 기업의 이전 판단 비교. 과거 발행본에는 없을 수 있습니다. 시장 요약·지표와 별도이며 주가 예측이 아닙니다. |
 | marketSummary | 필수 | [AnalysisSummary](#schema-analysissummary) / [Unavailable](#schema-unavailable) |  |

@@ -719,6 +719,14 @@ public final class BriefingReplayImporter {
                 require(companyRows.containsKey(row.string("roundId")) && judgmentRows.putIfAbsent(row.string("roundId"), row) == null, "judgment_rounds");
             Map<String, JsonNode> judgmentReceipts = judgmentLayer == null ? Map.of() : simulationReceiptLedger(judgmentLayer.objects("receipts"));
             Set<String> judgmentOwned = new HashSet<>();
+            StrictJson.Obj editionLayer = presentation.root().has("editionReviewLayer") ? presentation.root().object("editionReviewLayer") : null;
+            Map<String, StrictJson.Obj> editionRows = new LinkedHashMap<>();
+            if (editionLayer != null) {
+                require(BriefingEditionReviewRules.SCHEMA.equals(editionLayer.string("schemaVersion")) && settings.userInboxRef().equals(editionLayer.string("authorizationRef")), "edition_layer_identity");
+                for (StrictJson.Obj row : editionLayer.objects("rounds")) require(companyRows.containsKey(row.object("frozen").string("roundId")) && editionRows.putIfAbsent(row.object("frozen").string("roundId"), row) == null, "edition_rounds");
+                require(editionRows.keySet().equals(companyRows.keySet()), "edition_full_series");
+            }
+            StrictJson.Obj previousEdition = null;
             List<Map<String, StrictJson.Obj>> priorCompanyRows = new ArrayList<>(); List<List<StrictJson.Obj>> priorCompanyHistory = new ArrayList<>();
             if (companyLayer != null && companyLayer.has("previousRuns")) {
                 require(companyLayer.objects("previousRuns").size() <= 2, "company_outlook_history_limit");
@@ -859,6 +867,25 @@ public final class BriefingReplayImporter {
                     if (finished.isAfter(publishedAt)) publishedAt = finished;
                     if (finished.isAfter(created)) created = finished;
                     blobs.put(namespace + "-judgment-" + enriched.size(), blob("briefing_input", StrictJson.write(judgment.node())));
+                }
+                if (editionRows.containsKey(base.id())) {
+                    StrictJson.Obj edition = editionRows.get(base.id());
+                    snapshot.set("editionReview", BriefingEditionReviewRules.apply(edition, companyRows.get(base.id()), previousEdition,
+                            payload.path("marketVariables"), record.object("marketEnrichment").string("marketSnapshotSha256"), detailEvidence, settings.bundle().getParent()));
+                    for (String sid : edition.object("frozen").object("sources").node().propertyNames()) {
+                        String did = edition.object("frozen").object("sources").object(sid).string("documentId");
+                        boolean bound = false; for (JsonNode binding : snapshot.path("sourceBindings")) if (did.equals(binding.path("documentId").stringValue())) bound = true;
+                        if (!bound) ((ArrayNode) snapshot.path("sourceBindings")).add(enriched.stream().flatMap(r -> r.snapshot().path("sourceBindings").valueStream()).filter(b -> did.equals(b.path("documentId").stringValue())).findFirst().orElseThrow().deepCopy());
+                        boolean referenced = false; for (JsonNode ref : payload.path("references").path("evidenceIds")) if (sid.equals(ref.stringValue())) referenced = true;
+                        if (!referenced) ((ArrayNode) payload.path("references").path("evidenceIds")).add(sid);
+                    }
+                    for (StrictJson.Obj target : edition.object("frozen").objects("targets")) for (StrictJson.Obj source : target.object("price").objects("sources"))
+                        blobs.put(namespace + "-edition-price-" + source.string("sha256"), blob("raw_document", BriefingCompanyPriceRules.raw(source, settings.bundle().getParent())));
+                    Instant reviewed = Instant.parse(edition.string("reviewedAt"));
+                    if (reviewed.isAfter(generated)) { generated = reviewed; payload.put("generatedAt", generated.toString()); }
+                    if (reviewed.isAfter(publishedAt)) publishedAt = reviewed; if (reviewed.isAfter(created)) created = reviewed;
+                    blobs.put(namespace + "-edition-" + enriched.size(), blob("briefing_input", StrictJson.write(edition.node())));
+                    previousEdition = edition;
                 }
                 ObjectNode lineage = snapshot.putObject("presentationEnrichment").put("schemaVersion", BriefingPresentationRules.SCHEMA)
                         .put("baseBundleSha256", presentation.root().string("baseBundleSha256")).put("baseResultSha256", record.string("baseResultSha256"));

@@ -11,6 +11,8 @@ import type { BriefingEdition, BriefingResponse } from '@/types/briefing';
 import { briefingTime } from '@/util/briefingTime';
 import CompanyOutlooks from './CompanyOutlooks';
 import JudgmentUpdate from './JudgmentUpdate';
+import EditionReview from './EditionReview';
+import { validEditionReview } from '@/util/editionReview';
 import { validJudgment } from '@/util/judgmentUpdate';
 import BriefingReadingSection from './BriefingReadingSection';
 import MarketIndicators from './MarketIndicators';
@@ -228,17 +230,31 @@ export default function PublishedBriefing({
 
   const currentContext = result && (
     <>
-      <JudgmentUpdate result={result} compact={compact} />
-      {validJudgment(result) ? (
-        <BriefingReadingSection compact title="기존 생성 전문·시세·근거 보존본">
-          <p className={NOTE}>
-            아래는 비교 분석 추가 전 생성한 문안입니다. 좁은 인용에 따른 과거의
-            ‘일정 미확인’ 표현은 위의 원문 전체 기반 판단을 확인하세요.
-          </p>
+      <EditionReview result={result} compact={compact} />
+      {validEditionReview(result) ? (
+        <BriefingReadingSection compact title="이전 분석·기업 시세·근거 보존본">
+          <JudgmentUpdate result={result} compact={compact} />
           <CompanyOutlooks result={result} compact={false} />
         </BriefingReadingSection>
       ) : (
-        <CompanyOutlooks result={result} compact={compact} />
+        <>
+          <JudgmentUpdate result={result} compact={compact} />
+          {validJudgment(result) ? (
+            <BriefingReadingSection
+              compact
+              title="기존 생성 전문·시세·근거 보존본"
+            >
+              <p className={NOTE}>
+                아래는 비교 분석 추가 전 생성한 문안입니다. 좁은 인용에 따른
+                과거의 ‘일정 미확인’ 표현은 위의 원문 전체 기반 판단을
+                확인하세요.
+              </p>
+              <CompanyOutlooks result={result} compact={false} />
+            </BriefingReadingSection>
+          ) : (
+            <CompanyOutlooks result={result} compact={compact} />
+          )}
+        </>
       )}
       {compact && (
         <MarketIndicators variables={result.marketVariables} compact />

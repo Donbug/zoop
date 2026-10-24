@@ -24,6 +24,7 @@ public final class BriefingHttpSchemas {
             @Schema(nullable = true) String graphVersion, List<BriefingItem> items,
             @Schema(oneOf = {AnalysisSummary.class, Unavailable.class}) JsonNode marketSummary,
             @Schema(description = "선정 기업별 조건부 사업 전망. 과거 발행본에는 없을 수 있습니다.", implementation = CompanyOutlooks.class) JsonNode companyOutlooks,
+            @Schema(nullable = true, description = "출근 오늘 집중·퇴근 장 평가/아침 기업 점검/다음 거래일 관찰. 원문 대조 편집 검토이며 자동 모델 검증으로 표시하지 않습니다.", implementation = EditionReview.class) JsonNode editionReview,
             @Schema(nullable = true, description = "근거·실제 직전 판단에 결속된 산업 판단 갱신. selected와 이전 기업 watch를 구분하고 자동 검증 및 편집 범위를 표시합니다.", implementation = JudgmentUpdate.class) JsonNode judgmentUpdate,
             @Schema(oneOf = {MarketVariables.class, Unavailable.class}) JsonNode marketVariables,
             @Schema(nullable = true, oneOf = {SinceMorning.class, Unavailable.class}) JsonNode sinceMorning,
@@ -34,6 +35,18 @@ public final class BriefingHttpSchemas {
             BriefingReferences references, BriefingMetadata metadata, @Schema(nullable = true) BriefingOutlook outlook,
             @Schema(nullable = true, description = "선택적 조용한 회차 정책. 핵심·참고·복기·수집부족을 구분하며 원 발행 문안을 바꾸지 않습니다.") BriefingContinuity continuity) { }
 
+
+    @Schema(name = "EditionReview")
+    public record EditionReview(String schemaVersion, String status, String verificationMode, String reviewer, Instant reviewedAt,
+            String resultVersion, String roundId, String date, String edition, Instant cutoff, String analysisVersion, String scopeNote,
+            JsonNode previousReview, JsonNode sources, JsonNode marketVariables, JsonNode capabilities,
+            String headline, EditionStatement summary, EditionStatement marketInterpretation, EditionStatement comparison,
+            EditionStatement nextSession, List<EditionCompanyReview> companies) { }
+    public record EditionCompanyReview(String companyId, String companyName, String role, List<String> sourceIds, JsonNode previous, JsonNode price,
+            String stance, CompanyStatement title, CompanyStatement takeaway, CompanyStatement newInformation, CompanyStatement judgment,
+            List<CompanyStatement> watch, CompanyStatement positive, CompanyStatement negative, List<EditionConditionCheck> checks) { }
+    public record EditionStatement(String text, List<String> evidenceIds) { }
+    public record EditionConditionCheck(String condition, String status, EditionStatement observation) { }
 
     @Schema(name = "JudgmentUpdate")
     public record JudgmentUpdate(String schemaVersion, String status, String roundId, String edition, Instant cutoff,

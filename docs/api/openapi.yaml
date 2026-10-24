@@ -8245,6 +8245,258 @@ components:
           type: array
           minItems: 1
           items: {type: string}
+    EditionStatement:
+      type: object
+      required:
+      - text
+      - evidenceIds
+      properties:
+        text:
+          type: string
+          minLength: 1
+        evidenceIds:
+          type: array
+          minItems: 0
+          maxItems: 6
+          items:
+            type: string
+      description: 시장 해석·자료 부족 안내는 기사 근거 ID가 없을 수 있으며 검증된 시장 스냅샷과 결속합니다. 기업 사실의 근거 ID는 별도로 필수 검사합니다.
+    EditionReview:
+      type: object
+      required:
+      - schemaVersion
+      - status
+      - verificationMode
+      - reviewer
+      - reviewedAt
+      - resultVersion
+      - roundId
+      - date
+      - edition
+      - cutoff
+      - analysisVersion
+      - scopeNote
+      - previousReview
+      - sources
+      - marketVariables
+      - capabilities
+      - headline
+      - summary
+      - marketInterpretation
+      - comparison
+      - nextSession
+      - companies
+      description: 출근 오늘 집중·퇴근 장 평가/아침 기업 점검/다음 거래일 시나리오의 원문 대조 편집 검토 스냅샷. 독립 모델 검증 결과와 구분하며 기존 전문·시세·근거를 보존합니다.
+      properties:
+        schemaVersion:
+          type: string
+          enum:
+          - zoop-edition-review-v1
+        status:
+          type: string
+          enum:
+          - REVIEWED
+        verificationMode:
+          type: string
+          enum:
+          - editorial_source_review
+        reviewer:
+          type: string
+        resultVersion:
+          type: string
+        roundId:
+          type: string
+        analysisVersion:
+          type: string
+        scopeNote:
+          type: string
+        headline:
+          type: string
+        date:
+          type: string
+          format: date
+        edition:
+          type: string
+          enum:
+          - morning
+          - evening
+        cutoff:
+          type: string
+          format: date-time
+        reviewedAt:
+          type: string
+          format: date-time
+        previousReview:
+          type:
+          - object
+          - 'null'
+          description: 실제 직전 편집본의 버전·회차·마감과 원 판단/확인 조건. 없으면 비교 불가를 표시합니다.
+          additionalProperties: true
+        sources:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/EditionSource'
+        marketVariables:
+          oneOf:
+            - $ref: '#/components/schemas/MarketVariables'
+            - $ref: '#/components/schemas/Unavailable'
+        capabilities:
+          type: object
+          required:
+          - intraday
+          - sectors
+          - flows
+          - calendar
+          properties:
+            intraday:
+              type: string
+              enum:
+              - unavailable
+            sectors:
+              type: string
+              enum:
+              - unavailable
+            flows:
+              type: string
+              enum:
+              - unavailable
+            calendar:
+              type: string
+              enum:
+              - unverified
+        summary:
+          $ref: '#/components/schemas/EditionStatement'
+        marketInterpretation:
+          $ref: '#/components/schemas/EditionStatement'
+        comparison:
+          $ref: '#/components/schemas/EditionStatement'
+        nextSession:
+          $ref: '#/components/schemas/EditionStatement'
+        companies:
+          type: array
+          maxItems: 12
+          items:
+            $ref: '#/components/schemas/EditionCompanyReview'
+    EditionCompanyReview:
+      type: object
+      required:
+      - companyId
+      - companyName
+      - role
+      - sourceIds
+      - previous
+      - price
+      - stance
+      - title
+      - takeaway
+      - newInformation
+      - judgment
+      - watch
+      - positive
+      - negative
+      - checks
+      properties:
+        companyId:
+          type: string
+        companyName:
+          type: string
+        role:
+          type: string
+          enum:
+          - selected
+          - tracked
+        sourceIds:
+          type: array
+          items:
+            type: string
+        previous:
+          type:
+          - object
+          - 'null'
+          additionalProperties: true
+        price:
+          $ref: '#/components/schemas/CompanyPrice'
+        stance:
+          type: string
+          enum:
+          - priority_watch
+          - watch
+          - cautious_watch
+          - deferred
+        title:
+          $ref: '#/components/schemas/CompanyStatement'
+        takeaway:
+          $ref: '#/components/schemas/CompanyStatement'
+        newInformation:
+          $ref: '#/components/schemas/CompanyStatement'
+        judgment:
+          $ref: '#/components/schemas/CompanyStatement'
+        positive:
+          $ref: '#/components/schemas/CompanyStatement'
+        negative:
+          $ref: '#/components/schemas/CompanyStatement'
+        watch:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/CompanyStatement'
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/EditionConditionCheck'
+    EditionConditionCheck:
+      type: object
+      required:
+      - condition
+      - status
+      - observation
+      properties:
+        condition:
+          type: string
+        status:
+          type: string
+          enum:
+          - confirmed
+          - contradicted
+          - not_observed
+        observation:
+          $ref: '#/components/schemas/EditionStatement'
+      description: 직전 확인 조건을 누락·변조하지 않습니다. 확인/반증에는 해당 기업의 비교 마감 이후 근거가 필요하며 가격 등락은 조건 확인을 대체하지 않습니다.
+    EditionSource:
+      type: object
+      required:
+      - evidenceId
+      - documentId
+      - documentVersion
+      - bodySha256
+      - quote
+      - publishedAt
+      - title
+      - url
+      - fullBody
+      properties:
+        evidenceId:
+          type: string
+        documentId:
+          type: string
+        documentVersion:
+          type: string
+        bodySha256:
+          type: string
+        quote:
+          type: string
+        title:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        url:
+          type: string
+          format: uri
+        fullBody:
+          type: string
+          maxLength: 100000
     JudgmentUpdate:
       type: object
       description: 직전 검증된 회사 판단·회차 마감 이전 보존 원문 전체로 만든 별도 산업 판단 갱신. 같은 기업 비교와 산업 맥락 연결을 구분하고, 이전 기업은 watch로 표시. 과거 원문 수집 시각의 한계와
@@ -9572,6 +9824,9 @@ components:
           items:
             "$ref": "#/components/schemas/BriefingItem"
           type: "array"
+        editionReview:
+          "$ref": "#/components/schemas/EditionReview"
+          description: "출근 집중/퇴근 장·아침 기업 점검·다음 거래일 시나리오의 선택적 편집 검토본."
         judgmentUpdate:
           "$ref": "#/components/schemas/JudgmentUpdate"
           description: "선택적 비교 판단. 핵심 선정과 별도로 이전 기업의 미해결 조건을 추적하며, 없으면 기존 응답 유지."
