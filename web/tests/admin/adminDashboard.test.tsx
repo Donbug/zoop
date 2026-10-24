@@ -314,7 +314,7 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
     await screen.findByText('260건');
     expect(
       screen.getByRole('link', { name: '작업 관제 →' }).getAttribute('href'),
-    ).toBe('/admin/pipeline');
+    ).toBe('/admin/pipeline?tab=jobs');
     expect(
       screen.getByRole('link', { name: 'AI 운영 →' }).getAttribute('href'),
     ).toBe('/admin/ai');

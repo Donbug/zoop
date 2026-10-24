@@ -148,7 +148,7 @@ function Jobs({ data }: { data: Dashboard }) {
   return (
     <Section
       title="최근 작업"
-      link={[{ to: '/admin/pipeline', label: '작업 관제' }]}
+      link={[{ to: '/admin/pipeline?tab=jobs', label: '작업 관제' }]}
     >
       {!jobs ? (
         <Empty>작업 원장을 읽지 못했어요.</Empty>
