@@ -63,14 +63,19 @@ import tools.jackson.databind.node.ObjectNode;
 public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     /**
      * The provisional stage limits of ZOOP-AIG-001 6.3.3 (design summary 5.1), to be re-set from measured p95. The policy's
-     * router 4 s, answer 25 s and verification 6 s are the provider call timeouts the AI runtime applies; a model stage here
-     * also covers the AI service's process start, ledger writes and transport, so each gets the service's own margin of 3 s
-     * (its deadline per stage). A tighter limit cut off calls the provider had already answered and spent their cost. The
-     * worst case (7 + 10 + 28 + 9 + 3 = 57 s) stays within the 60 s job deadline.
+     * router 4 s, answer 25 s and verification 6 s are the provider call timeouts the AI runtime applies; the AI service ends a
+     * stage 3 s after that (its deadline per stage, for process start and ledger writes). A model stage here also covers what
+     * comes outside that deadline: up to 1 s waiting for a free slot before it starts, and the reply's transport and decoding.
+     * A limit equal to the service's would discard answers the service delivered in time, with their cost spent.
+     * Without tools the worst case (9 + 30 + 11 + 3 = 53 s) fits the 60 s job deadline. With tools it would not (63 s): a run
+     * whose router took more than 6 s ends as {@code deadline_guard} before any tool or further model call.
      */
     record StageLimits(Duration router, Duration tools, Duration generate, Duration verify, Duration server) {
-        static final StageLimits POLICY = new StageLimits(Duration.ofSeconds(7), Duration.ofSeconds(10),
-                Duration.ofSeconds(28), Duration.ofSeconds(9), Duration.ofSeconds(3));
+        /** The AI service's slot wait (1 s) and 1 s for transport and decoding, beyond its own stage deadline. */
+        static final Duration SERVICE_HEADROOM = Duration.ofSeconds(2);
+        static final StageLimits POLICY = new StageLimits(Duration.ofSeconds(7).plus(SERVICE_HEADROOM), Duration.ofSeconds(10),
+                Duration.ofSeconds(28).plus(SERVICE_HEADROOM), Duration.ofSeconds(9).plus(SERVICE_HEADROOM),
+                Duration.ofSeconds(3));
     }
     private static final Set<String> SUPPORT = Set.of("supported", "contradicted", "hold");
     private static final Set<String> ADVICE = Set.of("no", "yes", "hold");
