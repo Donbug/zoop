@@ -1331,7 +1331,10 @@ function MapWorkspace({
               </div>
             )}
           </div>
-          <AiChatDrawer onViewOnMap={viewAnswerTarget} />
+          <AiChatDrawer
+            onViewOnMap={viewAnswerTarget}
+            returnFocusTo={mapRegion}
+          />
           <EvidenceDrawer
             onTutorialSkip={
               tutorialOpen && tutorialStep && tutorialStep < 5
