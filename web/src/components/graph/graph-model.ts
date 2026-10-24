@@ -140,6 +140,8 @@ export function toG6Data(
     nodes: visible.map((n) => {
       const company = n.kind === 'company';
       const position = positions.get(n.id)!;
+      // D-GRP-03: 고른 기업의 이름은 주변보다 크고 진하게 보인다.
+      const chosen = company && n.id === expandedId;
       const size = company
         ? companyNodeSize(summary.companyIssueCounts.get(n.id) ?? 0, scale)
         : 7 * scale;
@@ -166,7 +168,7 @@ export function toG6Data(
                 offsetY: 12,
                 fill: themeColor('ink'),
                 backgroundFill: themeColor('soft'),
-                fontSize: 8,
+                fontSize: 10 * scale,
               },
             ]
           : []),
@@ -177,7 +179,7 @@ export function toG6Data(
       return {
         id: n.id,
         type: company ? 'circle' : 'diamond',
-        data: { kind: n.kind },
+        data: { kind: n.kind, chosen },
         style: {
           // Camera and styling remain independent of relationship placement.
           x: width / 2 + position.x,
@@ -208,9 +210,10 @@ export function toG6Data(
           labelText: company ? n.label : shortTitle(n.label, 13 * scale),
           labelPlacement: company ? 'bottom' : 'top',
           labelFontFamily: company ? 'Inter Variable' : 'Pretendard Variable',
-          labelFontSize: (company ? 17.2 : 13) * scale,
-          labelFontWeight: company ? 500 : 700,
-          labelFill: company ? themeColor('muted') : themeColor('ink'),
+          labelFontSize: (company ? (chosen ? 22 : 17.2) : 13) * scale,
+          labelFontWeight: chosen ? 800 : company ? 500 : 700,
+          labelFill:
+            company && !chosen ? themeColor('muted') : themeColor('ink'),
           labelOffsetY: company ? (n.holding || n.watch ? 28 : 10) : -5,
           labelBackground: !company,
           labelBackgroundFill: themeColor('paper'),

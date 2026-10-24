@@ -20,7 +20,10 @@ export function shortTitle(text: string, size = 13, maxWidth = 180) {
 }
 
 /** 화면 맞춤용 이름표 폭(화면 px). graph-readability가 이름표를 배율에 반비례(13/zoom, 줄바꿈 170/zoom)로 그려 화면에서는 크기가 일정하다. */
-const FIT_LABEL_FONT = 13;
+// D-GRP-03: keep the selected company distinguishable after LOD correction.
+export function screenLabelSize(node: NodeData) {
+  return node.data?.chosen ? 16 : 13;
+}
 const FIT_LABEL_WRAP = 170;
 
 /**
@@ -34,14 +37,15 @@ export function fitFootprint(node: NodeData) {
     : [s.size ?? 8, s.size ?? 8];
   const radius = Number(dimensions[1] ?? dimensions[0]) / 2;
   const label = String(s.labelText ?? '');
-  const oneLine = textWidth(label, FIT_LABEL_FONT);
+  const fontSize = screenLabelSize(node);
+  const oneLine = textWidth(label, fontSize);
   const lines = label ? Math.max(1, Math.ceil(oneLine / FIT_LABEL_WRAP)) : 0;
   return {
     x: Number(s.x ?? 0),
     y: Number(s.y ?? 0),
     radius: radius + 4,
     labelWidth: label ? Math.min(oneLine, FIT_LABEL_WRAP) + 24 : 0,
-    labelHeight: label ? lines * FIT_LABEL_FONT * 1.5 + 8 + 10 : 0,
+    labelHeight: label ? lines * fontSize * 1.5 + 8 + 10 : 0,
   };
 }
 
