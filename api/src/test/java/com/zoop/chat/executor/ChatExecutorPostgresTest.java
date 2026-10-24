@@ -298,15 +298,17 @@ class ChatExecutorPostgresTest {
             var results = tools.runStage(run, control, 1,
                     List.of(new ChatToolRequest("company.read", List.of("KRX:000660"), 20)));
             assertEquals(ChatToolRunner.UNAVAILABLE, results.getFirst().error());
-            assertThrows(IllegalArgumentException.class, () -> tools.runStage(run, control, 1,
-                    List.of(new ChatToolRequest("graph.path.read", List.of("KRX:000660"), 20))));
+            var path = tools.runStage(run, control, 1,
+                    List.of(new ChatToolRequest("graph.path.read", List.of("KRX:000660", "NASDAQ:NVDA"), 20)));
+            assertEquals(ChatToolRunner.UNAVAILABLE, path.getFirst().error());
             return new ChatEngineOutcome.Failed("transient", "provider_error", true);
         });
         String jobId = submit("그래프 없이 도구 호출");
         assertTrue(executor.runOnce());
 
-        assertEquals(List.of("failed:tool_unavailable"), jdbc.queryForList(
-                "SELECT status || ':' || error_code FROM chat_tool_calls WHERE chat_job_id = ?", String.class, jobId));
+        assertEquals(List.of("company.read failed:tool_unavailable", "graph.path.read failed:tool_unavailable"),
+                jdbc.queryForList("SELECT capability_id || ' ' || status || ':' || error_code FROM chat_tool_calls "
+                        + "WHERE chat_job_id = ? ORDER BY call_index", String.class, jobId));
     }
 
     private static ChatToolCallReservation reservation(String capability) {
