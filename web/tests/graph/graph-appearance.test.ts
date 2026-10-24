@@ -75,7 +75,7 @@ test.each(['light', 'dark'] as const)(
 );
 
 test.each(['light', 'dark'] as const)(
-  'D-GRP-01: %s background links stay quiet without changing relation shapes or hit areas',
+  'D-GRP-01: %s background links stay thinner than selected links without changing relation shapes or hit areas',
   (theme) => {
     const data = toG6Data(
       createMockGraph({ mode: 'all', personalFilter: 'all' }),
@@ -84,13 +84,58 @@ test.each(['light', 'dark'] as const)(
     );
     const result = styleGraph(data, { variant: 'improved', theme });
     result.edges?.forEach((edge, index) => {
-      expect(Number(edge.style?.strokeOpacity)).toBeLessThanOrEqual(0.5);
       expect(Number(edge.style?.lineWidth)).toBeLessThan(2);
       expect(edge.style?.lineDash).toEqual(data.edges?.[index].style?.lineDash);
       expect(edge.style?.endArrow).toBe(data.edges?.[index].style?.endArrow);
       expect(edge.style?.increasedLineWidthForHitTesting).toBe(
         data.edges?.[index].style?.increasedLineWidthForHitTesting,
       );
+    });
+  },
+);
+
+/** WCAG 대비(상대 휘도). 반투명 선은 지도 바탕과 섞은 색으로 잰다. */
+function contrastOnMap(stroke: string, opacity: number, map: string) {
+  const rgb = (hex: string) =>
+    [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const luminance = (channels: number[]) => {
+    const [r, g, b] = channels.map((value) => {
+      const c = value / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const back = rgb(map);
+  const mixed = rgb(stroke).map(
+    (value, i) => value * opacity + back[i] * (1 - opacity),
+  );
+  const [high, low] = [luminance(mixed), luminance(back)].sort((a, b) => b - a);
+  return (high + 0.05) / (low + 0.05);
+}
+
+test.each([
+  ['light', '#fafafa'],
+  ['dark', '#1c1c1e'],
+] as const)(
+  'D-GRP-01: %s map links keep 3:1 contrast, follow arrows stay strongest and dimmed links never exceed the inactive state',
+  (theme, map) => {
+    const data = toG6Data(
+      createMockGraph({ mode: 'all', personalFilter: 'all' }),
+      1200,
+      700,
+    );
+    const result = styleGraph(data, { variant: 'improved', theme });
+    result.edges?.forEach((edge, index) => {
+      const opacity = Number(edge.style?.strokeOpacity);
+      if (Number(data.edges?.[index].style?.strokeOpacity) < 0.1) {
+        // G6 inactive state is 0.2: becoming inactive must not brighten a dimmed link.
+        expect(opacity).toBeLessThanOrEqual(0.2);
+        return;
+      }
+      expect(
+        contrastOnMap(String(edge.style?.stroke), opacity, map),
+      ).toBeGreaterThanOrEqual(3);
+      if (edge.style?.endArrow) expect(opacity).toBe(0.95);
     });
   },
 );

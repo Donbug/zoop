@@ -90,9 +90,12 @@ export function styleGraph(
           ...edge.style,
           stroke: follows ? colors.ink : dark ? '#a5a9b1' : '#71757c',
           // D-GRP-01: selected/related G6 states and impact paths supply
-          // their own stronger stroke. Keep background links below that level.
+          // their own stronger stroke (2.5px, opacity 1). Background links stay
+          // thinner but keep 3:1 contrast on the map (opacity 0.8: light 3.1, dark 5.1).
+          // Follow arrows keep their stronger ink. Dimmed links match the
+          // inactive state (0.2) so becoming inactive never makes them brighter.
           lineWidth: shared ? 1 : 1.1,
-          strokeOpacity: dimmed ? 0.12 : shared ? 0.4 : 0.5,
+          strokeOpacity: dimmed ? 0.2 : follows ? 0.95 : 0.8,
         },
       };
     }),
