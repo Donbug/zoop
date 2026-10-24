@@ -126,118 +126,24 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     expect(canvas.destroyed).not.toHaveBeenCalled();
   });
 
-  it('D-GRP-01 stores dragged coordinates, suppresses the drag click and restores after a redraw', async () => {
+  it('D-GRP-01 does not move nodes by dragging; only the map camera moves', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
-    const select = vi.fn();
-    const view = render(
-      <GraphCanvas data={data} memoryOwner="drag-owner" onSelect={select} />,
-    );
-    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
-    const node = canvas.setData.mock.lastCall![0].nodes.find(
-      (n: { id: string }) => n.id === 'KRX:005930',
-    );
-    const other = canvas.setData.mock.lastCall![0].nodes.find(
-      (n: { id: string }) => n.id === 'NASDAQ:NVDA',
-    );
-    const originalOther = [other.style.x, other.style.y];
-    await act(async () => {
-      canvas.handlers.get('node:dragstart')!({ target: { id: node.id } });
-      node.style.x = 1234;
-      node.style.y = 567;
-      canvas.handlers.get('node:dragend')!({ target: { id: node.id } });
-      canvas.handlers.get('node:click')!({ target: { id: node.id } });
-    });
-    expect(select).not.toHaveBeenCalled();
-    view.rerender(
-      <GraphCanvas
-        data={data}
-        memoryOwner="drag-owner"
-        onSelect={select}
-        selectedId="NASDAQ:NVDA"
-      />,
-    );
-    await waitFor(() => {
-      const nodes = canvas.setData.mock.lastCall![0].nodes;
-      expect(nodes.find((n: { id: string }) => n.id === node.id).style.x).toBe(
-        1234,
-      );
-      expect(nodes.find((n: { id: string }) => n.id === node.id).style.y).toBe(
-        567,
-      );
-      const unchanged = nodes.find((n: { id: string }) => n.id === other.id);
-      expect([unchanged.style.x, unchanged.style.y]).toEqual(originalOther);
-    });
-    view.unmount();
-    render(<GraphCanvas data={data} memoryOwner="drag-owner" />);
-    await waitFor(() =>
-      expect(
-        canvas.setData.mock.lastCall![0].nodes.find(
-          (n: { id: string }) => n.id === node.id,
-        ).style.x,
-      ).toBe(1234),
-    );
+    render(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.created).toHaveBeenCalled());
+    const behaviors = canvas.created.mock.lastCall![0].behaviors as (
+      string | { type?: string }
+    )[];
+    expect(
+      behaviors.some(
+        (b) =>
+          b === 'drag-element' ||
+          (typeof b === 'object' && b.type === 'drag-element'),
+      ),
+    ).toBe(false);
+    expect(canvas.handlers.has('node:dragend')).toBe(false);
   });
 
-  it('D-GRP-01 restores a dragged single-company issue after it folds and expands again', async () => {
-    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
-    const issue = data.nodes.find(
-      (n) =>
-        n.kind === 'issue' &&
-        !n.isFocus &&
-        data.edges.filter((e) => e.source === n.id || e.target === n.id)
-          .length === 1 &&
-        !data.edges.some(
-          (e) =>
-            e.relationType === 'FOLLOWS' &&
-            (e.source === n.id || e.target === n.id),
-        ),
-    )!;
-    expect(issue).toBeTruthy();
-    const view = render(
-      <GraphCanvas
-        data={data}
-        memoryOwner="folded-owner"
-        selectedId={issue.id}
-      />,
-    );
-    const rendered = () =>
-      canvas.setData.mock.lastCall?.[0].nodes as NonNullable<
-        GraphData['nodes']
-      >;
-    await waitFor(() =>
-      expect(rendered()?.some((n) => n.id === issue.id)).toBe(true),
-    );
-    await act(async () => {
-      canvas.handlers.get('node:dragstart')!({ target: { id: issue.id } });
-      const node = rendered().find((n) => n.id === issue.id)!;
-      node.style!.x = 970;
-      node.style!.y = 880;
-      canvas.handlers.get('node:dragend')!({ target: { id: issue.id } });
-    });
-    view.rerender(
-      <GraphCanvas
-        data={data}
-        memoryOwner="folded-owner"
-        selectedId="KRX:005930"
-      />,
-    );
-    await waitFor(() =>
-      expect(rendered().some((n) => n.id === issue.id)).toBe(false),
-    );
-    view.rerender(
-      <GraphCanvas
-        data={data}
-        memoryOwner="folded-owner"
-        selectedId={issue.id}
-      />,
-    );
-    await waitFor(() => {
-      const node = rendered().find((n) => n.id === issue.id);
-      expect([node?.style?.x, node?.style?.y]).toEqual([970, 880]);
-    });
-  });
-
-  it('D-GRP-01 double click fits the visible neighborhood and tutorial blocks drag and double click', async () => {
+  it('D-GRP-01 double click fits the visible neighborhood and the tutorial blocks double click', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const view = render(<GraphCanvas data={data} />);
     const host = screen.getByRole('img');
@@ -269,13 +175,8 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     canvas.zoomTo.mockClear();
     await act(async () => {
       canvas.handlers.get('node:dblclick')!({ target: { id: 'KRX:005930' } });
-      canvas.handlers.get('node:dragend')!({ target: { id: 'KRX:005930' } });
     });
     expect(canvas.zoomTo).not.toHaveBeenCalled();
-    const behavior = canvas.created.mock.lastCall![0].behaviors.find(
-      (b: { type?: string }) => b.type === 'drag-element',
-    );
-    expect(behavior.enable()).toBe(false);
   });
 
   it('M-GRP-01 folds path details into a compact bar and reopens the sheet without losing the path', async () => {
@@ -868,12 +769,12 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       );
       expect(canvas.created).toHaveBeenCalledOnce();
 
-      // Fit uses the expanded viewport through the camera, preserving saved node positions.
+      // An explicit fit can still use the full, newly expanded graph surface.
       await userEvent.click(
         screen.getByRole('button', { name: '전체 그래프 맞춤' }),
       );
       await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalled());
-      expect(positions()).toEqual(before);
+      expect(positions()).not.toEqual(before);
     },
   );
   it('keeps a user-placed view centered when a sidebar narrows the map', async () => {

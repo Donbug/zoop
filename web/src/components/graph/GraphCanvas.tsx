@@ -31,12 +31,6 @@ import {
 import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { arrangeFlow, arrangeFocus } from './graph-arrange';
 import { applyGraphReading } from './graph-readability';
-import {
-  positionKey,
-  readPositions,
-  restorePositions,
-  savePositions,
-} from './graph-positions';
 import GraphMobileTools from './GraphMobileTools';
 import { freeViewport, nodeRect, type Rect } from './graph-geometry';
 
@@ -164,7 +158,6 @@ export default function GraphCanvas({
   const hovered = useRef<string | null>(null);
   const hoveredEdge = useRef<string | null>(null);
   const readingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dragged = useRef<{ id: string; until: number } | null>(null);
   const renderedData = useRef<ReturnType<typeof toG6Data> | null>(null);
   const lastArrangement = useRef('map');
   const [renderError, setRenderError] = useState(false);
@@ -214,39 +207,6 @@ export default function GraphCanvas({
   const interactionEnabled = useEffectEvent(
     () => !tutorialLocked && !tutorialPhase && !tutorialCenterId,
   );
-  const rememberNodes = useEffectEvent((graph: Graph) => {
-    const host = container.current;
-    if (
-      !host ||
-      !interactionEnabled() ||
-      graph.destroyed ||
-      instance.current !== graph
-    )
-      return;
-    const nodes = graph.getNodeData();
-    savePositions(
-      positionKey(memoryOwner, data, lastArrangement.current),
-      nodes,
-      host.clientWidth,
-      host.clientHeight,
-      new Set(data.nodes.map((node) => node.id)),
-    );
-    if (renderedData.current) {
-      const positions = new Map(nodes.map((n) => [n.id, n.style]));
-      renderedData.current = {
-        ...renderedData.current,
-        nodes: renderedData.current.nodes?.map((n) => ({
-          ...n,
-          style: {
-            ...n.style,
-            x: positions.get(n.id)?.x ?? n.style?.x,
-            y: positions.get(n.id)?.y ?? n.style?.y,
-          },
-        })),
-      };
-    }
-    scheduleReading();
-  });
   const [hoveredIssue, setHoveredIssue] = useState<string | null>(null);
   const fitPending = useRef(false);
   const defaultZoomPending = useRef(false);
@@ -299,12 +259,6 @@ export default function GraphCanvas({
   // 지금 적용한 배치(원래 지도·포커스·흐름 순). 바뀌면 화면을 새 배치에 맞춘다.
   function handleNodeSelect(id: string | null) {
     if (tutorialPhase || (tutorialLocked && id !== tutorialTargetId)) return;
-    if (
-      id &&
-      dragged.current?.id === id &&
-      performance.now() < dragged.current.until
-    )
-      return;
     if (id === '__isolated__') return onOpenIsolated?.();
     // 이미 선택한 노드를 다시 눌러도 수동 이동한 지도에서 중앙으로 돌아온다.
     centerTarget.current = id;
@@ -736,15 +690,6 @@ export default function GraphCanvas({
           );
         }
         if (arrangement !== 'map') arrangedHidden.add('__isolated__');
-        if (!isTutorial()) {
-          const restored = restorePositions(
-            rendered,
-            readPositions(positionKey(memoryOwner, data, arrangement)),
-            host.clientWidth,
-            host.clientHeight,
-          );
-          rendered.nodes = restored.nodes;
-        }
         // Closing details changes the available width, but must not rearrange
         // the graph the user just centered (including its surrounding nodes).
         if (
@@ -858,14 +803,6 @@ export default function GraphCanvas({
         }
         tutorialCentered.current = tutorialCenterId;
         syncTutorialMarker();
-        if (!isTutorial())
-          savePositions(
-            positionKey(memoryOwner, data, arrangement),
-            rendered.nodes ?? [],
-            host.clientWidth,
-            host.clientHeight,
-            new Set(data.nodes.map((node) => node.id)),
-          );
         scheduleReading();
       })
       .catch(() => {
@@ -1052,11 +989,6 @@ export default function GraphCanvas({
             trigger: ['pinch'],
             enable: () => pinchEnabled(),
           },
-          {
-            type: 'drag-element',
-            enable: () => interactionEnabled(),
-            animation: false,
-          },
         ],
         zoomRange: [0.01, 4],
         edge: {
@@ -1117,25 +1049,6 @@ export default function GraphCanvas({
             },
           },
         },
-      });
-      graph.on('node:dragstart', (event: IElementEvent) => {
-        if (!interactionEnabled()) return;
-        dragged.current = { id: event.target.id, until: Infinity };
-        followFit.current = false;
-        centerTarget.current = null;
-        fitPending.current = false;
-        if (readingTimer.current !== null) clearTimeout(readingTimer.current);
-      });
-      graph.on('node:dragend', (event: IElementEvent) => {
-        if (!interactionEnabled()) return;
-        dragged.current = {
-          id: event.target.id,
-          until: performance.now() + 250,
-        };
-        rememberNodes(graph!);
-      });
-      graph.on('canvas:pointercancel', () => {
-        dragged.current = null;
       });
       graph.on('node:dblclick', (event: IElementEvent) =>
         zoomNeighborhood(event.target.id),
