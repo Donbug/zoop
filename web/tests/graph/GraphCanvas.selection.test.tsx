@@ -1230,6 +1230,17 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     ).toBe(true);
   });
 
+  it('D-GRP-01 shows each zoom control name on hover and lets the tutorial camera step use fit', () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} />);
+    const zoom = screen.getByLabelText('지도 확대 조절');
+    for (const name of ['확대', '축소', '전체 그래프 맞춤']) {
+      const button = within(zoom).getByRole('button', { name });
+      expect(button.textContent).toContain(name);
+      expect(button.getAttribute('data-tutorial-action')).toBe('zoom');
+    }
+  });
+
   it('D-GRP-01 shows the flow order toggle in the always-visible zoom controls', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const onFlowChange = vi.fn();
