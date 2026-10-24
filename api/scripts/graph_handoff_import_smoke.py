@@ -1675,8 +1675,11 @@ def main() -> int:
     check(row["kind"] == "snapshot" and row["active"] is False and row["review_revision"] == 0 and row["unpublished"] is True
           and row["created_by"] == "operator:smoke-operator" and row["policy_version"] == "zoop-public-projection-policy-1"
           and row["source_label"] == f"graph-handoff:{hid}" and (row["issue_count"], row["relation_count"], row["article_count"]) == (2, 4, 3)
-          and row["snapshot_artifact_id"] == f"artifact-{vid}" and row["rule_revision"] is None and row["candidate_count"] is None,
+          and row["snapshot_artifact_id"] == f"artifact-{vid}" and row["rule_revision"] == 0 and row["candidate_count"] is None,
           f"version row: {row}")
+    # Publication rules (#133): the seeded rules are off, so the version fixed rule_revision 0 and was filtered with no rule.
+    check(db.scalar(f"SELECT count(*) FROM graph_version_rules WHERE graph_version_id = '{vid}'") == 0,
+          "a version staged with every rule off records no applied rule")
     check(db.scalar("SELECT id FROM graph_versions WHERE active") == active_before, "the active pointer moved")
     check(db.scalar("SELECT count(*) FROM graph_versions WHERE active") == 1, "not exactly one active version")
     check(db.scalar("SELECT coalesce(md5(string_agg(a::text, '|' ORDER BY a.id)), '') FROM graph_activations a") == history_before,

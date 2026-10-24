@@ -1,6 +1,10 @@
 package com.zoop.graph.importer;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
 
 /**
  * Outcome of one operator run: either the staged (or already staged) version or the one failure that stopped it. A failed run has
@@ -49,10 +53,30 @@ public record GraphHandoffResult(Staged staged, GraphHandoffException failure) {
     public record Staged(String handoffId, String versionId, Outcome outcome, String manifestDigest, String bundleDigest,
             String contentDigest, String sourceKind, String executionMode, String recordingKind, Map<String, Integer> origins,
             Map<String, Integer> approvalBases, int companies, int issues, int relations, int articles, int evidence,
-            int evidenceRegistered, int evidenceExisting, StoredFileFact snapshot, StoredFileFact receipt) {
+            int evidenceRegistered, int evidenceExisting, StoredFileFact snapshot, StoredFileFact receipt, RuleFacts rules) {
         public Staged {
             origins = Map.copyOf(origins);
             approvalBases = Map.copyOf(approvalBases);
+            Objects.requireNonNull(rules);
         }
+    }
+
+    /**
+     * What the publication rules did to the stored version, beside the bundle's own {@code counts}: the two revisions and the rules
+     * the version fixed, what its snapshot holds, how many issues and relations they hid (the cascade included) and, per rule,
+     * what its own condition matched. Counts only, never ids or content. For an {@code unchanged} import these are the version's
+     * own facts (its staging rules, re-applied), never the rules enabled now; {@code ruleRevision} is {@code null} only for a
+     * version staged before rules existed.
+     */
+    public record RuleFacts(Long ruleRevision, long reviewRevision, List<String> applied, int storedIssues, int storedRelations,
+            int storedArticles, int storedEvidence, int hiddenIssues, int hiddenRelations, Map<String, RuleHits> byRule) {
+        public RuleFacts {
+            applied = List.copyOf(applied);
+            byRule = Collections.unmodifiableMap(new TreeMap<>(byRule));
+        }
+    }
+
+    /** One rule's own matches (before the cascade), as counts. */
+    public record RuleHits(int issues, int relations) {
     }
 }
