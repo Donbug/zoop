@@ -21,7 +21,8 @@ import java.util.Set;
 /**
  * Runs a confirmed plan's stages in order and evaluates each dependent requirement's checkpoint before its stage (design
  * summary 5.2). Requirements of one stage run together; the same read (capability, targets and evidence scope) asked by two
- * requirements is made once.
+ * requirements is made once. Targets go out in batches of five; {@code graph.path.read} reads from its first target, so each
+ * of its calls carries that target and at most four of the others.
  *
  * <ul>
  * <li>A failed call (timeout, unavailable data, adapter fault) ends retrieval at once: no checkpoint is evaluated and no
@@ -77,8 +78,7 @@ final class ChatRetrieval {
                     targets = List.copyOf(found.companies().keySet());
                 }
                 for (ChatCapability capability : p.capabilities()) {
-                    for (int from = 0; from < targets.size(); from += ChatToolRequest.MAX_TARGETS) {
-                        var chunk = targets.subList(from, Math.min(targets.size(), from + ChatToolRequest.MAX_TARGETS));
+                    for (List<String> chunk : batches(capability, targets)) {
                         String key = capability.id() + "\u0000" + String.join("\u0000", chunk) + "\u0001"
                                 + (p.evidenceScope() == null ? "*" : String.join("\u0000", p.evidenceScope()));
                         Integer index = callIndex.get(key);
@@ -108,6 +108,26 @@ final class ChatRetrieval {
             }
         }
         return new Outcome(results, limitations, noneFound, null, null);
+    }
+
+    /** The target lists of one capability's calls; {@link ChatPlanner#chunks} counts them. */
+    static List<List<String>> batches(ChatCapability capability, List<String> targets) {
+        List<List<String>> batches = new ArrayList<>();
+        if (capability == ChatCapability.GRAPH_PATH_READ && targets.size() > 1) {
+            String first = targets.getFirst();
+            int per = ChatToolRequest.MAX_TARGETS - 1;
+            for (int from = 1; from < targets.size(); from += per) {
+                List<String> batch = new ArrayList<>();
+                batch.add(first);
+                batch.addAll(targets.subList(from, Math.min(targets.size(), from + per)));
+                batches.add(List.copyOf(batch));
+            }
+            return batches;
+        }
+        for (int from = 0; from < targets.size(); from += ChatToolRequest.MAX_TARGETS) {
+            batches.add(targets.subList(from, Math.min(targets.size(), from + ChatToolRequest.MAX_TARGETS)));
+        }
+        return batches;
     }
 
     enum Checkpoint { MET, UNDER, EXCESS }

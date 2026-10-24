@@ -30,8 +30,10 @@ import org.springframework.transaction.TransactionException;
  * <li>A pair that is proven unconnected adds nothing; when no pair connects, the result is empty and not truncated, so the
  * answer may say no connection was found in the graph. A pair whose search reached the hop limit marks the result
  * truncated: a longer connection may exist, so it is never "none".</li>
- * <li>A target that is not a visible company or issue is absent. With a single visible target there is no pair: the target
- * itself is returned so the answer can say which second target is missing.</li>
+ * <li>The first target is the anchor and is never replaced: when it is not a visible company or issue, no pair is read and
+ * the visible others are returned alone, so the answer can say the anchor is missing instead of describing other
+ * companies' connections. Any other target that is not visible is absent. With no other visible target there is no pair:
+ * the anchor itself is returned so the answer can say which second target is missing.</li>
  * <li>Evidence passed on is what the public evidence read can read now at the version: edges first in path order, then the
  * issues on the path, deduplicated, within the request's evidence scope and capped at the request limit.</li>
  * </ul>
@@ -71,15 +73,19 @@ public class GraphPathTool implements ChatTool {
             throw new ChatToolUnavailable("graph version " + scope.graphVersionId() + " cannot be read", unavailable);
         }
 
-        List<String> visible = request.targets().stream().filter(paths::isNode).toList();
+        String anchor = request.targets().getFirst();
+        List<String> others = request.targets().stream().skip(1).filter(paths::isNode).toList();
         Map<String, GraphContextLookup.Target> nodes = new LinkedHashMap<>();
         Map<String, GraphContextLookup.Target> edges = new LinkedHashMap<>();
         boolean truncated = false;
-        if (visible.size() == 1) {
-            lookup.find(visible.getFirst()).ifPresent(target -> nodes.put(target.id(), target));
+        if (!paths.isNode(anchor) || others.isEmpty()) {
+            // No pair to read: what is visible is returned alone and the missing side stays missing.
+            for (String id : paths.isNode(anchor) ? List.of(anchor) : others) {
+                lookup.find(id).ifPresent(target -> nodes.put(target.id(), target));
+            }
         }
-        for (String other : visible.size() < 2 ? List.<String>of() : visible.subList(1, visible.size())) {
-            var result = paths.shortest(visible.getFirst(), other, MAX_HOPS);
+        for (String other : paths.isNode(anchor) ? others : List.<String>of()) {
+            var result = paths.shortest(anchor, other, MAX_HOPS);
             if (result.status() == GraphPathLookup.Status.CUT) truncated = true;
             var path = result.path().orElse(null);
             if (path == null) continue;

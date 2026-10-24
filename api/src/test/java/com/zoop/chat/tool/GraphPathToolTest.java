@@ -123,6 +123,16 @@ class GraphPathToolTest {
     }
 
     @Test
+    void anInvisibleFirstTargetIsNeverReplacedByAnotherTarget() {
+        var out = tool().read(SCOPE, request(20, "KRX:999999", HYNIX, NVDA));
+        assertEquals(List.of(HYNIX, NVDA), out.items().stream().map(ChatToolItem::id).toList(),
+                "the visible others are returned alone, with no path between them");
+        assertTrue(ids(out, "edge").isEmpty());
+        assertTrue(out.evidenceIds().isEmpty());
+        assertFalse(out.truncated());
+    }
+
+    @Test
     void evidenceIsCappedAndFilteredWithoutDroppingTheConnection() {
         var capped = tool().read(SCOPE, request(1, NVDA, HANMI));
         assertEquals(1, capped.evidenceIds().size());

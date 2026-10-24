@@ -84,19 +84,27 @@ public class ChatPlanner {
         return plan;
     }
 
-    /** Calls the plan can make at most: every capability per chunk of five targets, a dependent stage at its checkpoint's most. */
+    /**
+     * Calls the plan can make at most: every capability per batch of its targets ({@link ChatRetrieval#batches}), a dependent
+     * stage at its checkpoint's most.
+     */
     static int worstCaseCalls(ChatPlan.Run plan) {
         int calls = 0;
         for (Planned p : plan.requirements()) {
             if (p.mode() != Mode.TOOLS) continue;
             int targets = p.dependsOn() == null ? p.targets().size()
                     : "atLeast".equals(p.dependsOn().cardinality()) ? ChatToolRequest.MAX_TARGETS : p.dependsOn().count();
-            calls += p.capabilities().size() * chunks(targets);
+            for (ChatCapability capability : p.capabilities()) calls += chunks(capability, targets);
         }
         return calls;
     }
 
-    static int chunks(int targets) {
+    static int chunks(ChatCapability capability, int targets) {
+        if (capability == ChatCapability.GRAPH_PATH_READ) {
+            // Every call carries the first target and at most four of the others.
+            int per = ChatToolRequest.MAX_TARGETS - 1;
+            return Math.max(1, (targets - 1 + per - 1) / per);
+        }
         return Math.max(1, (targets + ChatToolRequest.MAX_TARGETS - 1) / ChatToolRequest.MAX_TARGETS);
     }
 

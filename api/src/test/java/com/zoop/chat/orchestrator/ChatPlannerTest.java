@@ -132,6 +132,24 @@ class ChatPlannerTest {
     }
 
     @Test
+    void aPathReadIsCountedAndSplitWithItsFirstTargetInEveryCall() {
+        List<String> seven = java.util.stream.IntStream.range(0, 7).mapToObj(i -> "KRX:" + i).toList();
+        assertEquals(List.of(seven.subList(0, 5), List.of("KRX:0", "KRX:5", "KRX:6")),
+                ChatRetrieval.batches(ChatCapability.GRAPH_PATH_READ, seven));
+        assertEquals(List.of(seven.subList(0, 5), List.of("KRX:0", "KRX:5")),
+                ChatRetrieval.batches(ChatCapability.GRAPH_PATH_READ, seven.subList(0, 6)));
+        assertEquals(List.of(List.of("KRX:0")), ChatRetrieval.batches(ChatCapability.GRAPH_PATH_READ, seven.subList(0, 1)));
+        assertEquals(List.of(seven.subList(0, 5), seven.subList(5, 7)), ChatRetrieval.batches(ChatCapability.COMPANY_READ, seven));
+        for (int n = 1; n <= 16; n++) {
+            List<String> targets = java.util.stream.IntStream.range(0, n).mapToObj(i -> "KRX:" + i).toList();
+            for (ChatCapability capability : List.of(ChatCapability.GRAPH_PATH_READ, ChatCapability.COMPANY_READ)) {
+                assertEquals(ChatRetrieval.batches(capability, targets).size(), ChatPlanner.chunks(capability, n),
+                        "the budget counts the calls retrieval makes: " + capability + " × " + n);
+            }
+        }
+    }
+
+    @Test
     void stagesFollowDependenciesUpToThree() {
         var three = run(planner.plan(run(0, "v1"), decision(
                 req("a", Map.of(ChatQueryType.Q03, 0.9), Map.of("issue.read", 0.9), List.of("iss-1")),
