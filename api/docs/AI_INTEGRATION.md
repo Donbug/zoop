@@ -1,17 +1,18 @@
 # AI 분석 transport 클라이언트 (api → ai/service)
 
-앱 백엔드가 S1 분석(`document-summary`, `document-sentiment`, `semantic-verification`, `briefing-outlook`, 계약 `zoop-ai-s1-1`)과 S2 추출·S3 관계 job(별도 가족, [아래](#s2-추출s3-관계-클라이언트))을 제출·조회·취소·복구하는 **전송 계층 클라이언트**입니다. 서버 쪽 정본은 [`ai/service/README.md`](../../ai/service/README.md)와 [`docs/api/internal-ai-openapi.yaml`](../../docs/api/internal-ai-openapi.yaml), 작업 JSON 스키마는 [`docs/api/ai-contract.schema.json`](../../docs/api/ai-contract.schema.json)입니다. 이 문서는 그 계약을 복제하지 않고 Java 쪽 책임·설정·소비 규칙만 적습니다.
+앱 백엔드가 S1 분석, S2 추출·S3 관계 job, 챗봇 모델 단계와 [실행 계획 접수](#계획-접수-클라이언트)를 호출하는 **전송 계층 클라이언트**입니다. 서버 쪽 정본은 [`ai/service/README.md`](../../ai/service/README.md)와 [`docs/api/internal-ai-openapi.yaml`](../../docs/api/internal-ai-openapi.yaml), 작업 JSON 스키마는 [`docs/api/ai-contract.schema.json`](../../docs/api/ai-contract.schema.json)입니다. 이 문서는 Java 쪽 책임·설정·소비 규칙을 설명합니다.
 
 ## 지금 있는 것과 없는 것
 
-| 구현됨 (실제 서비스로 검증) | 아직 없음 (소유자가 정해지면 첫 소비 기능이 추가) |
+| 제공하는 기능 | 소비 기능·운영 경계 |
 |---|---|
-| `AiAnalysisClient`의 `submit` / `status` / `result` / `cancel` / `recover` 5개 operation 전부 | 공개 인증·세션·회원/관리자 권한 서비스(인증 저장 스키마 `members`·`member_sessions`와 문서 등록·문서 분석 저장의 migration·Entity는 있음), 그 밖의 도메인 controller·entity·Flyway migration |
-| 4개 kind의 요청 봉투(`schemaVersion=zoop-ai-s1-1`)·타입 있는 응답·AI 오류 해석. S2 추출 5개·S3 관계 7개(`review`/`operation` 포함) operation과 **호출자가 명시하는 실행 모드**(`ExecutionMode.REPLAY`/`LIVE`, 서버의 승인·핀이 권한), 실제 pipeline replay 종단 시험(`make api-ai-pipeline-smoke`) | 공개 관리자 작업 저장소(`analysis_jobs`)와 그 jobId 연결, 스케줄러, 문서 분석 외 기능의 앱 쪽 jobId 생성·재시도 정책. 문서 분석은 AI jobId를 prepare에서 한 번 발급해 `document_analyses.ai_job_id`와 불변 `ai_submit` artifact로 먼저 커밋합니다([문서 분석](DOCUMENT_ANALYSIS.md)). 나머지 ERD v6 연결은 [아래](#erd-v6-설계와의-관계) |
-| 설정 기반 bean(가족별 기본 비활성), 닫힘 실패 검증 | S1 외 결과 import: S2 추출·S3 관계 후보와 `briefing-outlook`의 앱 저장. 문서 요약·기업 판정의 S1 결과 import는 [문서 분석](DOCUMENT_ANALYSIS.md)(operator 전용 비웹 실행)에 있고 이 클라이언트의 첫 소비자입니다 |
-| 실제 `ai/service` + 설치된 `zoop-ai` replay 종단 시험 | S2-1 수집은 서비스에 HTTP 명령이 **없어** 지원하지 않음. S2/S3 클라이언트도 앱 저장·결과 import·사용자 격리 없이 전송 계층만 있음([S2·S3 절](#s2-추출s3-관계-클라이언트)) |
+| `AiAnalysisClient`의 `submit` / `status` / `result` / `cancel` / `recover` | 최종 사용자 인증·세션·회원/관리자 권한은 앱 소유이며 이 클라이언트가 판정하지 않습니다. |
+| S2 추출 5개·S3 관계 7개 operation과 실행 모드 기대값, 엄격한 응답 결속 | 앱의 `analysis_jobs` 테이블과 조회·재시도·취소 경로는 있지만 계획 등록·큐 worker·정기 실행 연결은 아직 없습니다. 전송 클라이언트만으로 스케줄러가 동작하지 않습니다. |
+| `PlanAdmissionClient`의 정확한 계획 접수·조회, 불변 manifest와 정책 권한 상태 검증 | 앱은 운영자 정책을 바꾸거나 허가 파일을 쓰지 않습니다. 접수 자체는 S2/S3 실행·예산 승인·공개 활성화가 아닙니다. |
+| 가족별 독립 설정과 기본 비활성 bean | 결과의 앱 저장·사용자 격리·현재 권리 재확인·공개 여부는 소비 기능이 소유합니다. S1은 [문서 분석](DOCUMENT_ANALYSIS.md), 그래프는 [handoff 인계](GRAPH_READ_HANDOFF.md)를 참고합니다. |
+| 실제 서비스·설치된 pipeline을 사용하는 합성 replay 연동 검사 | S2-1 수집 HTTP, 운영 정책·유료 실행·처리량별 정기 발행 보장은 이 전송 계층의 기능이 아닙니다. |
 
-public `ErrorCode`, 인증 필터, `RequestIdFilter`, `GlobalExceptionHandler`는 수정하지 않았습니다. 클라이언트는 서비스 주체(service principal)로 호출하는 **앱**이며 최종 사용자를 모릅니다.
+클라이언트는 서비스 주체(service principal)로 호출하는 **앱**이며 최종 사용자를 모릅니다. AI 오류를 공개 `ErrorCode`로 바꾸거나 앱의 인증·공개 권한을 대신하지 않습니다.
 
 ## 코드 위치
 
@@ -19,10 +20,11 @@ public `ErrorCode`, 인증 필터, `RequestIdFilter`, `GlobalExceptionHandler`�
 |---|---|
 | `com.zoop.ai` | S1 공개 타입: `AiAnalysisClient`, `AnalysisSubmission`, `AnalysisJobStatus`, `AnalysisResult`, `AnalysisAcknowledgement`, `UntrustedAnalysisPayload`, `AiClientSettings`. 공통: `AiOperation`, `PipelineJob`(S2/S3 공통 상태·dispatch·delivery 어휘), 예외(`AiClientException` → `AiServiceRejectionException` → `AiServiceErrorException`/`ExtractionServiceErrorException`/`RelationServiceErrorException`, `AiTransportException`, `AiClientConfigurationException`). sealed 계층이라 예외는 한 패키지에 둡니다 |
 | `com.zoop.ai.extraction`, `com.zoop.ai.relation` | S2 `ExtractionClient`·`ExtractionSubmission`·`ExtractionJobStatus`·`ExtractionResult`·`UntrustedExtractionPayload`, S3 `RelationClient`·`RelationSubmission`·`RelationJobStatus`·`RelationResult`·`UntrustedRelationPayload`·`RelationReviewRequest`·`RelationOperationStatus` 등 |
-| `com.zoop.ai.http` | JDK 21 `java.net.http.HttpClient` 공통 전송(`AiHttpTransport`)과 가족별 구현(`HttpAiAnalysisClient`, `HttpExtractionClient`, `HttpRelationClient`)·엄격한 JSON 해석. 새 라이브러리 없음 |
-| `com.zoop.ai.config` | `@ConfigurationProperties("zoop.ai.client")`·`("zoop.ai.extraction-client")`·`("zoop.ai.relation-client")`와 가족별 조건부 bean |
+| `com.zoop.ai.plan` | `PlanAdmissionClient`, `PlanReference`, `PlanAdmission`, `PlanManifest`: 정확한 계획 참조·접수·현재 정책 권한과 단위별 S2/S3 실행 참조 |
+| `com.zoop.ai.http` | JDK 21 `java.net.http.HttpClient` 공통 전송(`AiHttpTransport`)과 가족별 구현·엄격한 JSON 해석. 계획은 `HttpPlanAdmissionClient`·`PlanAdmissionWire`가 담당합니다. 새 라이브러리는 필요하지 않습니다. |
+| `com.zoop.ai.config` | 가족별 `@ConfigurationProperties`와 조건부 bean. 계획 클라이언트의 prefix는 `zoop.ai.plan-admission-client`입니다. |
 
-`HttpClient` 주입, 경로·명령·소유자 override 경로는 없습니다. 경로는 코드에 고정된 `/internal/v1/analysis-jobs[...]`, `/internal/v1/extraction-jobs[...]`, `/internal/v1/relation-jobs[...]`뿐입니다.
+호출자가 경로·명령·소유자를 바꾸는 인터페이스는 없습니다. 각 클라이언트는 계약에 정해진 내부 HTTP 경로만 사용하며, 앱의 계획 클라이언트에는 운영자 정책 변경 메서드가 없습니다.
 
 ## 설정
 
@@ -42,6 +44,8 @@ public `ErrorCode`, 인증 필터, `RequestIdFilter`, `GlobalExceptionHandler`�
 HTTP/1.1, 프록시 없음, 쿠키 없음, **리다이렉트 안 따름**, 자동 재시도 없음, 호출당 요청 1개입니다. bearer 토큰은 설정한 base URI로만 가고 3xx를 받으면 `REDIRECT_REFUSED`로 끝납니다. 응답은 크기 상한에서 읽기를 멈춥니다.
 
 ## 호출 규칙
+
+아래는 S1 작업의 호출 규칙입니다. S2/S3, 챗봇 단계와 계획 접수의 키·상태 의미는 각각의 절을 따르며, 모든 가족이 같은 전송 제한과 응답 무결성 검사를 공유합니다.
 
 - `Idempotency-Key`는 항상 `jobId`입니다(`AnalysisSubmission`이 jobId만 받고 키를 따로 받지 않음). jobId는 서버 규칙 `[A-Za-z0-9_.-]{1,120}`에서 경로 세그먼트 `.`·`..`를 뺀 값이며 네트워크 호출 전에 검사합니다.
 - `inputJson`/`provenanceJson`은 계약의 `Submit` 객체를 그대로 담은 JSON 객체이며 클라이언트는 **중복 키 없는 JSON 객체인지만** 확인하고 바이트를 바꾸지 않고 보냅니다. 내용 검증은 런타임이 합니다(422 `invalid_request`).
@@ -99,11 +103,11 @@ HTTP/1.1, 프록시 없음, 쿠키 없음, **리다이렉트 안 따름**, 자�
 | 가족 | operation | 호출자가 보낼 수 있는 것 |
 |---|---|---|
 | S2 `ExtractionClient` | `submit`/`status`/`result`/`cancel`/`recover` | `jobId`와 **서버 운영자가 이 principal·jobId에 사전 승인한 요청의 digest**(`ExtractionSubmission`)뿐. 스냅샷·카탈로그·관측·토픽 요청·fixture·실행 모드는 보낼 수도 지정할 수도 없고, 승인에 없는 digest는 `403 request_not_approved` |
-| S3 `RelationClient` | `submit`/`status`/`result`/`cancel`/`recover` + `review`/`operation` | `jobId`, 출처 구분(`synthetic`/`actual`, **replay·authored-test 고정**: live 작업은 이 클라이언트가 만들지 않고 서버 운영자의 upstream 허용 항목에 `liveRuntimeIdentity`를 고정해야만 서비스가 받습니다), 허용된 S2 upstream `{jobId, inputDigest}`(`RelationSubmission`). 허용 목록은 서버의 운영자 파일이 정하며 이름을 적는다고 권한이 생기지 않습니다(`403 upstream_not_allowed`). status는 `executionMode`(`replay`/`live`)를 읽기 전용으로 노출하며 live 쌍은 `(live, provider)`만 유효합니다 |
+| S3 `RelationClient` | `submit`/`status`/`result`/`cancel`/`recover` + `review`/`operation` | `jobId`, 출처·실행 provenance, S2 upstream `{jobId, inputDigest}`를 전달합니다. 수동 모드에서는 운영자 허용 목록, 온라인 모드에서는 admission manifest의 정확한 S3 ID·provenance·upstream이 권한을 정합니다. live는 서버의 runtime pin·live gate·원천 권리·예산 조건이 별도로 필요하며, 호출자가 모드를 적는 것만으로 허용되지 않습니다. |
 
 - **응답 결속.** 모든 응답은 요청한 `jobId`(검수는 `operationId`까지)에 묶입니다. submit 응답은 보낸 `approvedRequestDigest`(S2) 또는 출처·upstream(S3)을, review 응답은 보낸 후보·결정·`expectedSourceVersion`·`expectedSourceRevision`을 그대로 되돌려야 하고, 하나라도 어긋나면 `RESPONSE_MALFORMED`입니다. result의 `delivery`는 status의 `delivery`와 같아야 하고 내용은 `available`일 때만 있습니다. 후보 payload는 `UntrustedExtractionPayload`/`UntrustedRelationPayload`로만 나오며 `jobId`·`inputDigest` 일치만 확인된 **신뢰하지 않는** 모델 출력입니다(`approved=false`). S3 payload는 후보마다 `(relationCandidateId, sourceVersion, sourceRevision)`을 읽고 모든 `sourceVersion`이 job의 `inputDigest`와 같아야 합니다.
 - **원천 version·revision.** 검수(`RelationReviewRequest`)는 AI **원천** 기대값 `expectedSourceVersion`(= S3 job의 `inputDigest`)과 `expectedSourceRevision`(후보의 런타임 이벤트 체인 revision, 십진 문자열, 1 이상)만 가집니다. 앱의 `expectedRevision`을 넣을 필드가 없습니다(전달 금지). 서버가 둘을 원자적으로 비교하고 어긋나면 `source_version_conflict`/`source_revision_conflict`로 **아무것도 기록하지 않으며** 같은 key를 다시 쓸 수 있습니다. `operationId`는 `Idempotency-Key`이며 reviewer는 인증된 principal입니다. operation 상태는 `review`(결정이 런타임 원장에 기록됐는가: `UNCONFIRMED`/`APPLIED`, 기록 후 revision = expected+1), `revalidation`(현재 계약에서는 항상 `not_requested`; 이전 계약의 allow 이력만 `verified`+verdict·`superseded`·`contract_changed`, 결과 revision = expected+2), 게시(항상 `not_published`), `limitation`(이전 계약 이력이면 `review_contract_changed`)을 따로 보여 주며 서로 모순되면 `RESPONSE_MALFORMED`입니다. 사람의 allow는 정확히 그 `approved` 이벤트를 채택하는 최종 승인이고 이 클라이언트는 그 위에 게시나 재검증을 더하지 않습니다.
-- **현재 권한은 서버가 응답마다 다시 읽습니다.** 원천 권리 철회, S2 사전 승인 제거·변경(`approval_revoked`/`approval_changed`/`fixture_changed`), S3 upstream 목록 제거(`upstream_not_allowed`)는 다음 `result`부터 `WITHHELD`(내용 없음, 영수증만)이고 복원하면 다시 전달됩니다. 클라이언트는 어떤 권한도 저장하거나 캐시하지 않습니다.
+- **현재 권한은 서버가 사용 시 다시 검사합니다.** 원천 권리 철회나 수동 파일의 승인·upstream 제거는 결과를 `WITHHELD`로 만듭니다. 온라인 모드는 해당 작업의 불변 admission origin도 검사하며, 정책 교체·비활성화·관측된 만료로 종료된 admission은 옛 정책을 다시 넣어도 되살아나지 않습니다. 원천 권리 복원과 admission 재승인은 다른 일입니다. 클라이언트는 권한을 저장하거나 캐시하지 않습니다.
 - **수락 경계(변경 성공·phase·영수증).** `READY`가 아닌 job의 `delivery=available`은 모순이라 status·result 모두 `RESPONSE_MALFORMED`입니다(`READY`+`withheld`는 정상). 영수증은 런타임 호출마다 하나라서 개수 상한이 없고(응답 크기 상한만 적용) withheld 결과에서도 모두 보존됩니다. **사람의 `allow`는 최종 승인입니다.** 검수 성공 응답은 항상 HTTP 200이고 기록된(`APPLIED`) operation이어야 합니다. 재검증·dispatch·모델 호출이 없으므로 `revalidation.state`는 `not_requested`, `next`는 `none`, `limitation`은 없음입니다. **200이 아닌 성공 상태(202 포함)는 이 계약이 정하지 않은 상태라 `UNEXPECTED_RESPONSE`이고 요청이 처리됐을 수 있어 `requestMaybeProcessed()=true`**입니다. 상태가 200이어도 본문이 이 계약과 어긋나면(예: `QUEUED`/`RUNNING` 재검증, `next≠none`, `UNCONFIRMED`) `RESPONSE_MALFORMED`입니다. `UNCONFIRMED` operation은 읽기·오류 봉투에서만 유효하고(`next`는 `retry_review`) 검수 성공이 될 수 없어 모호성이 보존됩니다. 이전 계약(allow 뒤 재검증)으로 기록된 operation은 `limitation=review_contract_changed`인 **이력**으로만 읽히며(`revalidation.state`는 `verified`/`superseded`/`contract_changed`, `next=none`, 정착했다면 `expected+2` 결속은 그대로 검사) 승인으로 재해석하거나 다시 보내지 않습니다. 같은 key의 재전송은 `409 review_contract_changed`를 받을 수 있습니다.
 - **오류.** 새 예외 두 개(`ExtractionServiceErrorException`, `RelationServiceErrorException`)는 `AiServiceRejectionException`(S1의 `AiServiceErrorException`과 같은 부모)을 상속하고 전송 실패는 `AiTransportException`을 그대로 씁니다. S2/S3 오류의 409가 싣는 `status`(S3는 `operationStatus()`도)는 도메인 타입으로 해석합니다. **변경 operation의 모호성은 S1과 같은 규칙으로 보존됩니다**: 연결 전 실패와 확정된 4xx만 `requestMaybeProcessed()=false`, 그 밖의 전송 실패와 모든 5xx는 `true`입니다. 복구: S2/S3는 `status(jobId)`를 먼저 읽고, 검수는 **같은 key로 `operation(jobId, operationId)`를 먼저 읽은 뒤** 같은 요청(같은 key·같은 본문)을 되풀이합니다. 새 jobId·operationId를 만들지 않습니다. 새 `AiOperation` 값은 `REVIEW`·`OPERATION`입니다(`recoverOperation`은 최종 승인 계약에서 제거). 새 검수 거절 코드는 `review_call_in_flight`·`review_candidate_ineligible`·`review_contract_changed`이고 `review_already_pending`은 없어졌습니다.
 - **취소·복구.** ready 작업의 cancel은 `409 job_already_terminal`(작업은 ready로 남음), 취소된 작업의 recover는 `409 job_not_recoverable`(상태 포함), 중단·정지 작업은 **명시적 `recover`로만** 이어지며 서비스는 미응답 호출을 다시 보내지 않고(`reconcile_required`는 운영자 판단) 저장된 stage·영수증을 재사용합니다. 대기 중 dispatch가 있을 때 recover는 `RECOVERY_COALESCED`입니다.
@@ -115,7 +119,37 @@ HTTP/1.1, 프록시 없음, 쿠키 없음, **리다이렉트 안 따름**, 자�
 | `ZOOP_AI_EXTRACTION_CLIENT_ENABLED` / `ZOOP_AI_RELATION_CLIENT_ENABLED` | `false` | `true`일 때만 해당 bean(`HttpExtractionClient`/`HttpRelationClient`) 생성 |
 | `…_BASE_URL`, `…_TOKEN`, `…_CONNECT_TIMEOUT`, `…_REQUEST_TIMEOUT`, `…_MAX_RESPONSE_BYTES` | 없음, 없음, `3s`, `30s`, `8388608` | S1 표와 같은 규칙(`ZOOP_AI_EXTRACTION_CLIENT_*`, `ZOOP_AI_RELATION_CLIENT_*`) |
 
-**없는 것(명시).** S2·S3 쪽에는 앱 DB·작업 저장소·jobId/operationId의 사용자·문서·회차 결속·후보의 앱 검증(문서 버전·인용 오프셋·현재 권리)·결과 import·공개 endpoint·스케줄러·AI 오류→공개 `ErrorCode` 매핑이 없습니다(S1 문서 요약·기업 판정만 [문서 분석](DOCUMENT_ANALYSIS.md)이 앱 DB로 import합니다). S3 검수 결정을 앱 검수 흐름(앱의 `expectedRevision`·승인·게시)과 잇는 일은 첫 소비 기능 소유자의 몫이며, 이 클라이언트는 AI 원천 expectation만 전달합니다. live 모드·모델 호출·실제 토큰은 사용하지 않았습니다.
+**소비 기능의 책임.** 이 클라이언트는 앱 DB, jobId/operationId의 사용자·문서·회차 결속, 후보의 앱 검증·저장, 공개 활성화나 스케줄러를 구현하지 않습니다. S3 검수와 앱의 검수 revision·공개 흐름 연결도 소비 기능이 맡습니다. 계획 접수는 아래의 별도 전송 기능이며, 앱의 `analysis_jobs` 큐 worker나 공개 `JobCreate` 구현을 대신하지 않습니다.
+
+## 계획 접수 클라이언트
+
+`PlanAdmissionClient`(`com.zoop.ai.plan`, 구현 `HttpPlanAdmissionClient`)는 `admit(PlanReference)`와 `status(PlanReference)`를 제공합니다. `PlanReference`에는 서버가 이미 보관한 `planId`·`planDigest`만 넣습니다. 접수의 `Idempotency-Key`는 `planId`이고 조회에도 정확한 digest가 필요합니다. 경로·원문·S2 요청 본문·정책·예산을 보낼 수 없으며, 앱 principal에는 `plan.admit`·`plan.read`와 필요한 S2/S3 scope만 부여합니다. **`plan.policy`는 별도 운영자 권한**입니다.
+
+| 환경 변수 | 기본값 | 규칙 |
+|---|---|---|
+| `ZOOP_AI_PLAN_ADMISSION_CLIENT_ENABLED` | `false` | 명시적으로 켰을 때만 bean을 만듭니다. 다른 AI 클라이언트 설정과 독립입니다. |
+| `…_BASE_URL`, `…_TOKEN` | 없음 | 활성화 시 필수이며 위의 TLS·토큰 규칙을 따릅니다. |
+| `…_CONNECT_TIMEOUT`, `…_REQUEST_TIMEOUT` | `3s`, `30s` | 기존 공통 전송 제한을 사용하며 자동 재시도하지 않습니다. |
+| `…_MAX_RESPONSE_BYTES` | `16000000` | 전체 응답의 바이트 상한입니다. 단위 목록을 잘라 성공으로 반환하지 않습니다. |
+
+응답은 계획·receipt·manifest digest, admission ID, 단위별 S2 요청과 결정적 S3 ID를 함께 검증한 `PlanAdmission`입니다. `authority.state=ACTIVE`는 **현재 admission 정책이 이 작업을 허용한다는 뜻**이며, 현재 원천 권리·예산·작업 준비 완료를 증명하지 않습니다. `INACTIVE`인 과거 응답도 기록 조회에 사용할 수 있지만 실행해서는 안 됩니다.
+
+소비자는 manifest의 S2/S3 참조를 사용하고 첫 호출 전에 계획·단위 ID를 앱 작업에 불변으로 저장해야 합니다. 응답 유실 시 같은 `PlanReference`로 조회하며, 새 plan/job ID를 만들어 재실행하지 않습니다. S2 결과를 소비할 때 실제 결과에 포함된 status의 승인·입력 digest와 provenance·사용량을 확인하고, S3는 정확한 upstream과 이미 관측한 S3 input digest까지 대조합니다. 이전 status가 맞았다는 이유로 다른 result를 받아들이면 안 됩니다.
+
+`PlanAdmissionServiceErrorException`과 기존 `AiTransportException`은 확정 거절과 결과 불명을 구분합니다. 201/200 접수는 실행 시작이 아니며, 클라이언트가 임의로 정책을 갱신하거나 job을 submit하지 않습니다. 운영자 정책과 누적 quota·종료 규칙은 [서비스 안내](../../ai/service/README.md#온라인-plan-admission선택-기본-꺼짐)를 따릅니다. plan/unit 제한은 금액이나 모델 호출 수 제한이 아닙니다.
+
+### 실제 Java 소비 검사
+
+설치된 worker·pipeline·service와 JDK가 필요합니다. 다음 명령은 새 합성 상태에만 정책을 설정하며 실제 운영 파일·키·원문을 쓰지 않습니다.
+
+```sh
+./api/gradlew -p api preparePlanAdmissionProof
+ai/service/.venv/bin/python ai/service/scripts/online_admission_actual_smoke.py \
+  --java-classpath-file api/build/plan-admission-proof-classpath.txt \
+  --evidence-dir /absolute/new-proof-evidence
+```
+
+이 검사는 서비스 재시작 없이 두 회차를 Java 클라이언트로 접수·소비하고, 정확한 재요청, 정책·quota·현재 권리·중단 복구를 확인합니다. 원본 상태는 보존하고 시험 소유 프로세스·상태를 정리합니다. authored replay이므로 실제 모델 품질이나 정기 발행 SLA 검증은 아닙니다.
 
 ## 챗봇 모델 단계 클라이언트
 
@@ -144,7 +178,7 @@ JUnit 보고서(0건·skip 금지)와 자격 증명 누출도 확인합니다. �
 
 ## 소유와 격리
 
-AI 서비스의 소유자는 **인증된 principal 하나**(이 앱)이며 최종 사용자(tenant) 식별이 없습니다. 같은 principal의 작업은 모두 같은 소유자라서 **사용자 간 격리는 이 클라이언트가 하지 않습니다.** 앱이 jobId를 사용자·문서·회차에 결속해 저장하고 접근 시 직접 확인해야 합니다. 이 결속을 담을 열은 ERD v6에도 정해져 있지 않습니다([아래](#erd-v6-설계와의-관계)). 다른 principal의 작업은 404와 동일하게 보입니다.
+AI 서비스의 소유자는 **인증된 principal 하나**(이 앱)이며 최종 사용자(tenant) 식별이 없습니다. 같은 principal의 작업은 모두 같은 소유자라서 **사용자 간 격리는 이 클라이언트가 하지 않습니다.** 앱이 jobId를 사용자·문서·회차에 결속해 저장하고 접근 시 직접 확인해야 합니다. ERD v6의 공개 앱 job과 내부 AI job 구분을 따르며([아래](#erd-v6-설계와의-관계)), 다른 principal의 작업은 404와 동일하게 보입니다.
 
 결과를 앱 데이터로 쓰기 전(소비 기능 책임)에 모두 필요합니다. S1 문서 분석([문서 분석](DOCUMENT_ANALYSIS.md))은 2–4를 구현했습니다(1은 최종 사용자가 없는 operator 실행이라 해당하지 않고, 4는 파일 쓰기가 transaction 앞에 있으며 DB 쓰기가 한 transaction입니다). 그 밖의 소비 기능은 각자 해야 합니다.
 
@@ -155,13 +189,13 @@ AI 서비스의 소유자는 **인증된 principal 하나**(이 앱)이며 최�
 
 ## ERD v6 설계와의 관계
 
-최신 DB 설계 기준은 [ERD v6](../../docs/erd/zoop-core-erd-v6.md)(2026-10-13)입니다. main `91113ce`(PR #18)의 v6는 AI 작업 식별·영수증·grant snapshot·검수 원천 버전 규칙을 정했습니다. 이 클라이언트 자체는 앱 DB 없이 동작합니다. 문서 쪽 `artifacts`·`articles`·`article_versions`는 `V20261014120000`으로 있고 [문서 import](DOCUMENT_IMPORT.md)의 operator 실행이 쓰며, `document_analyses`·`evidence`·`ai_executions`는 `V20261014130000`과 Entity로 있고 [문서 분석](DOCUMENT_ANALYSIS.md)의 operator 실행이 S1 결과를 저장합니다(`analysis_jobs`·챗봇·브리핑 테이블은 없고 그 FK 열은 일반 text입니다). v6도 아래 항목을 닫지 않았습니다. 전체 대조는 [AI 저장 책임 대조](../../docs/design/ai-system.md#erd-v6와-ai-저장-책임-대조)에 있으며 여기에는 Java 소비 기능이 알아야 할 것만 적습니다.
+[ERD v6](../../docs/erd/zoop-core-erd-v6.md)는 공개 앱 작업 ID와 내부 AI job ID, 영수증과 검수 원천 버전을 구분합니다. 이 전송 클라이언트 자체는 앱 DB 없이 동작합니다. S1 결과의 영속화는 [문서 분석](DOCUMENT_ANALYSIS.md), 그래프 수입·공개 읽기는 [handoff 인계](GRAPH_READ_HANDOFF.md)를 따릅니다. 앱에는 `analysis_jobs` 저장·조회·재시도·취소가 있지만, 계획 등록과 S2/S3를 진행시키는 큐 worker는 아직 연결되지 않았습니다. 아래의 날짜별 설계 근거와 현재 런타임 구현을 구분합니다.
 
-> **병합된 기준(2026-10-13, main `91113ce`).** 팀의 `fix/17-erd-v6-alignment`(`af2f0e3`)는 PR #18로 main에 병합됐고, 병합된 ERD v6와 공개 OpenAPI가 이전에 ‘닫지 않은 것’이던 항목 중 일부를 **문서로** 정했습니다. 내부 AI `jobId`는 공개 `analysis_jobs.id`와 별개이고 한 앱 작업이 여러 AI 작업을 가질 수 있으며, `analysis_jobs.checkpoint.aiUnits[]`(`{unitKey, aiJobId, submitArtifactId, runtimeInputDigest?}`)·`document_analyses.ai_job_id`·`briefing_attempts.stages`에 submit 전에 ID와 불변 요청 artifact를 커밋해 저장합니다. 호출 영수증의 `jobId`·`attemptId`는 `ai_executions.ai_job_id`·`ai_attempt_id`·`receipt_artifact_id`에 그대로 저장하고 같은 시도는 한 행입니다. 실행 당시 권리는 `grant_id`·`grant_revision`·`grant_checked_at`·`grant_scope` snapshot일 뿐이며 현재 권한은 매번 grant registry에서 다시 평가합니다. 검수 결정은 앱 `expectedRevision`과 별개로 AI 원천의 `expectedSourceVersion`·`expectedSourceRevision`을 비교합니다. 이 저장소에서 Java 쪽 구현이나 SQL 확인은 없고 앱 migration도 인증 스키마뿐입니다. 아래 목록은 병합된 v6 기준으로 남은 항목만 적었으며 이 클라이언트 코드는 남은 항목도 추정해 채우지 않습니다. S3 검수의 내부 HTTP 계약(`sourceVersion`=S3 job의 `inputDigest`, `sourceRevision`=relation 이벤트 수)은 [`ai/service/README.md`](../../ai/service/README.md)의 S3 절에 있으며 앱의 대상별 검수 revision과 다른 런타임 값입니다. S3용 Java 클라이언트는 없습니다.
+> **ERD 설계 근거(2026-10-13).** 내부 AI `jobId`는 공개 `analysis_jobs.id`와 별개이며 한 앱 작업에 여러 AI 작업이 대응할 수 있습니다. `analysis_jobs.checkpoint.aiUnits[]`(`{unitKey, aiJobId, submitArtifactId, runtimeInputDigest?}`)·`document_analyses.ai_job_id`·`briefing_attempts.stages`에는 submit 전에 ID와 불변 요청을 저장하는 방향이 정의돼 있습니다. 호출 영수증의 `jobId`·`attemptId`와 실행 당시 grant snapshot은 현재 접근권한을 대신하지 않습니다. 검수는 앱의 `expectedRevision`과 AI 원천의 `expectedSourceVersion`·`expectedSourceRevision`을 구분합니다. S3 내부 값은 `sourceVersion`=S3 input digest, `sourceRevision`=후보 이벤트 revision이며, Java 전송과 현재 정책 검사는 위 S2/S3·계획 접수 절을 따릅니다.
 
 - **v6와 이 문서가 같은 방향인 것:** GET은 모델을 호출하지 않습니다. 현재 접근권한·원문 철회는 응답 때 다시 검사하며 저장된 `available`로 대신하지 않습니다. 완료된 결과는 불변이고 새 요청은 새 행입니다. 저장만 복구하는 `save_only`는 live 호출 수에 넣지 않습니다. 위 4단계 import(권한·문서 버전·인용·현재 grant·단일 transaction)는 v6의 저장 규칙과 모순되지 않는 것으로 읽었습니다. S1 문서 분석 저장은 PostgreSQL 17.11에서 실제 SQL·transaction으로 실행해 확인했고([문서 분석](DOCUMENT_ANALYSIS.md#검증)), S2·S3·`briefing-outlook` 저장은 구현이 없어 확인할 것이 없습니다.
 - **병합된 v6도 닫지 않은 것(첫 소비 기능이 소유자와 합의):** (1) 작업 수준 `inputDigest`의 고정·대조 위치(v6는 `runtimeInputDigest?`를 선택 항목으로만 적습니다)와 `jobId`의 사용자·문서·회차 결속. v6 `analysis_jobs`는 관리자 `ingest`/`revalidate`/`project` 작업이라 AI 런타임 job을 대신하지 않습니다. (2) 현재 grant registry의 위치와 grant 발급·회수 계약(v6 §8 항목 4), `grant_reference`·`grant_scope`에 담는 값의 형식. (3) 이 문서의 `receipts`(provider 호출 기록)와 v6 `ai_call_receipt`, 그리고 검증 영수증 `exact_receipt`/`semantic_receipt`의 대응과 파일 형식. (4) 사용량 귀속의 적용 방법(v6와 공개 OpenAPI는 `document-summary`·`semantic-verification`을 `news-analysis`에 귀속합니다)과 `replay`의 의미. 클라이언트 코드는 이 중 어느 것도 추정해 채우지 않습니다.
-- **구현되지 않은 것:** `analysis_jobs`와 S2/S3·`briefing-outlook` 결과의 앱 저장, 그래프·공개 반영, `getEvidence` 외의 분석을 읽는 공개 경로는 없습니다(`getEvidence`는 그래프 없는 **부분 구현**, 아래 2026-10-15 갱신). S1 문서 요약·기업 판정 결과의 앱 DB 저장·import는 [문서 분석](DOCUMENT_ANALYSIS.md)(operator 전용 비웹 실행)에 있습니다. 이 클라이언트 자체는 DB를 쓰지 않고, 저장은 그 소비자가 합니다.
+- **남은 계획 연결:** 앱의 계획 등록·단위별 불변 실행 참조 저장·큐 worker·스케줄 실행과 공개 결과 전환을 연결해야 합니다. 작업 테이블이 존재한다는 사실이나 내부 AI 접수 성공만으로 이 흐름이 완성된 것은 아닙니다. 이 클라이언트는 DB를 쓰지 않으며, 저장·사용자 권한·공개 결정은 각 소비 기능의 책임입니다.
 
 ## 검증
 

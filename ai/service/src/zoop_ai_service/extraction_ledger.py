@@ -18,9 +18,9 @@ it); the job id is spent on the pins it was reserved under.
 Dispatch: the initial intent is one `pending` row that a dispatcher claims once. Every later dispatch is an explicit `recover`. A row left `in_flight`
 by a dead process is never made `pending` again: it ends `idle` as `service_restarted`, because whether its child already ran is unknown.
 
-Schema `zoop-ai-extraction-jobs-ledger-2`; the ledger is bound to the realpath of the extraction state directory, and any other schema or binding is
-refused at start. A `-1` ledger gains its new columns in place (ALTER ADD COLUMN: a live-runtime pin per job, whose absence reads as a replay job,
-and an `explicit` mark per dispatch, whose absence reads as the automatic initial dispatch); no row is rewritten or removed.
+Schema `zoop-ai-extraction-jobs-ledger-3`; the ledger is bound to the realpath of the extraction state directory. Supported `-1` and `-2` ledgers
+migrate forward in place, preserving live-runtime pins and explicit-dispatch marks. Existing manual rows keep a null authority_ref; online rows
+pin an immutable admission origin. No row is rebound or removed, and foreign or future schemas and changed bindings are refused.
 """
 from __future__ import annotations
 
@@ -38,8 +38,8 @@ from .config import ConfigError
 from .ledger import stamp
 from .relation_ledger import DispatchRow, Update
 
-LEDGER_SCHEMA = "zoop-ai-extraction-jobs-ledger-2"
-MIGRATES_FROM = ("zoop-ai-extraction-jobs-ledger-1",)
+LEDGER_SCHEMA = "zoop-ai-extraction-jobs-ledger-3"
+MIGRATES_FROM = ("zoop-ai-extraction-jobs-ledger-1", "zoop-ai-extraction-jobs-ledger-2")
 FILE = "extraction-jobs.sqlite3"
 
 DDL = """
@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS extraction_jobs (
  reserved_at TEXT NOT NULL,
  accepted_at TEXT,
  live_binding TEXT,
+ authority_ref TEXT,
  CHECK ((state='reserved' AND accepted_at IS NULL) OR (state='accepted' AND accepted_at IS NOT NULL)));
 CREATE TRIGGER IF NOT EXISTS extraction_jobs_release_only BEFORE DELETE ON extraction_jobs
  WHEN OLD.state<>'reserved'
@@ -79,13 +80,14 @@ CREATE TRIGGER IF NOT EXISTS extraction_dispatch_undeletable BEFORE DELETE ON ex
 NEXT_SEQ = "(SELECT COALESCE(MAX(seq),0)+1 FROM extraction_dispatch)"
 ACTIVE = "(SELECT COUNT(*) FROM extraction_dispatch WHERE state IN ('pending','in_flight'))"
 
-ADDED_COLUMNS = (("extraction_jobs", "live_binding", "TEXT"),
+ADDED_COLUMNS = (("extraction_jobs", "authority_ref", "TEXT"), ("extraction_jobs", "live_binding", "TEXT"),
                  ("extraction_dispatch", "explicit", "INTEGER NOT NULL DEFAULT 0 CHECK (explicit IN (0,1))"))
 # The pinned identity of a reservation is immutable, the live runtime pin included. Created (replaced) at every start so an older ledger gets it too.
 JOBS_IMMUTABLE = """CREATE TRIGGER extraction_jobs_immutable BEFORE UPDATE ON extraction_jobs
  WHEN NOT (OLD.job_id=NEW.job_id AND OLD.owner=NEW.owner AND OLD.request_digest=NEW.request_digest
        AND OLD.approved_digest=NEW.approved_digest AND OLD.producer_digest=NEW.producer_digest AND OLD.topic_digest IS NEW.topic_digest
        AND OLD.live_binding IS NEW.live_binding
+       AND OLD.authority_ref IS NEW.authority_ref
        AND OLD.input_digest=NEW.input_digest AND OLD.reserved_at=NEW.reserved_at AND OLD.state='reserved'
        AND ((NEW.state='reserved' AND NEW.submit_attempts=OLD.submit_attempts+1)
          OR (NEW.state='accepted' AND NEW.submit_attempts=OLD.submit_attempts)))
@@ -116,6 +118,7 @@ class ExtractionRow:
     state: str
     submit_attempts: int
     accepted_at: str | None
+    authority_ref: str | None = None
 
     @property
     def input_digest(self) -> str:
@@ -129,6 +132,7 @@ class Claim:
     pins: Pins
     busy_count: int
     explicit: bool = False
+    authority_ref: str | None = None
 
 
 class ExtractionLedger:
@@ -196,19 +200,20 @@ class ExtractionLedger:
 
     @staticmethod
     def _row(row: sqlite3.Row) -> ExtractionRow:
-        return ExtractionRow(row["job_id"], row["owner"], row["request_digest"], _pins(row), row["state"], row["submit_attempts"], row["accepted_at"])
+        return ExtractionRow(row["job_id"], row["owner"], row["request_digest"], _pins(row), row["state"], row["submit_attempts"], row["accepted_at"],
+                             row["authority_ref"])
 
     def job(self, job_id: str) -> ExtractionRow | None:
         with self._guard:
             row = self._db.execute("SELECT * FROM extraction_jobs WHERE job_id=?", (job_id,)).fetchone()
         return None if row is None else self._row(row)
 
-    def reserve(self, job_id: str, owner: str, request_digest: str, pins: Pins) -> ExtractionRow:
+    def reserve(self, job_id: str, owner: str, request_digest: str, pins: Pins, authority_ref: str | None = None) -> ExtractionRow:
         with self._tx() as db:
             db.execute("INSERT OR IGNORE INTO extraction_jobs(job_id,owner,request_digest,approved_digest,producer_digest,topic_digest,input_digest,"
-                       "state,reserved_at,live_binding) VALUES (?,?,?,?,?,?,?,'reserved',?,?)",
+                       "state,reserved_at,live_binding,authority_ref) VALUES (?,?,?,?,?,?,?,'reserved',?,?,?)",
                        (job_id, owner, request_digest, pins.approved_digest, pins.producer_digest or "", pins.topic_digest, pins.input_digest,
-                        stamp(self._clock()), pins.live_binding))
+                        stamp(self._clock()), pins.live_binding, authority_ref))
         row = self.job(job_id)
         assert row is not None
         return row
@@ -263,7 +268,7 @@ class ExtractionLedger:
                 return None
             db.execute("UPDATE extraction_dispatch SET state='in_flight', dispatch_count=dispatch_count+1, not_before=NULL, updated_at=? WHERE job_id=?",
                        (stamp(now), row["job_id"]))
-            return Claim(row["job_id"], row["owner"], _pins(row), row["busy_count"], bool(row["explicit"]))
+            return Claim(row["job_id"], row["owner"], _pins(row), row["busy_count"], bool(row["explicit"]), row["authority_ref"])
 
     def finish(self, job_id: str, update: Update) -> bool:
         now = self._clock()
