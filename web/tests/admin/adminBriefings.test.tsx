@@ -683,7 +683,7 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
     // 날짜는 오래된 것부터 그린다.
     const bars = within(tokens).getAllByRole('img');
     expect(bars[0].getAttribute('aria-label')).toBe(
-      '10월 23일 입력 1,000, 출력 400, 모델 호출 4',
+      '10월 23일 입력 자료 없음, 출력 자료 없음, 모델 호출 자료 없음',
     );
     expect(bars[1].getAttribute('aria-label')).toBe(
       '10월 24일 입력 2,500, 출력 650, 모델 호출 7',
@@ -703,7 +703,7 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
     expect(bars[0].getAttribute('tabindex')).toBe('0');
     expect(bars[1].getAttribute('tabindex')).toBe('-1');
     expect(tokens.parentElement?.parentElement?.textContent).toContain(
-      '10월 23일 입력 1,000 · 출력 400 · 모델 호출 4',
+      '10월 23일 입력 자료 없음 · 출력 자료 없음 · 모델 호출 자료 없음',
     );
     await user.keyboard('{End}');
     expect(document.activeElement).toBe(bars[1]);
@@ -749,5 +749,48 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
     expect(
       screen.getByText(/추정 비용이에요. 실제 청구액과 다를 수 있어요/),
     ).toBeTruthy();
+  });
+
+  test('일부 기능의 토큰을 모르면 부분합으로 기능 비중을 만들지 않는다', async () => {
+    server.on('GET', AI_USAGE, () =>
+      json({
+        ...aiUsage,
+        features: [
+          feature({
+            usage: {
+              modelCalls: 2,
+              inputTokens: 900,
+              outputTokens: 100,
+              replayCalls: 0,
+              retries: 0,
+            },
+          }),
+          feature({
+            feature: 'news-analysis',
+            label: '뉴스 분석',
+            usage: {
+              modelCalls: null,
+              inputTokens: null,
+              outputTokens: null,
+              replayCalls: 0,
+              retries: 0,
+            },
+          }),
+        ],
+      }),
+    );
+    open('/admin/ai');
+
+    const share = await screen.findByRole('list', {
+      name: '기능별 토큰 비중',
+    });
+    expect(
+      screen.getByText(
+        '일부 기능의 토큰 자료가 없어 전체 토큰과 기능별 비중을 계산하지 않아요.',
+      ),
+    ).toBeTruthy();
+    expect(share.textContent).toContain('1천');
+    expect(share.textContent).toContain('자료 없음');
+    expect(share.textContent).not.toContain('%');
   });
 });

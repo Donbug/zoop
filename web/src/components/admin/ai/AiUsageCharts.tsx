@@ -454,24 +454,39 @@ export function FeatureShare({ features }: { features: AiFeatureUsage[] }) {
       tokens: sum([feature.usage.inputTokens, feature.usage.outputTokens]),
     }))
     .sort((a, b) => (b.tokens ?? -1) - (a.tokens ?? -1));
-  const total = rows.reduce((value, row) => value + (row.tokens ?? 0), 0);
-  if (total === 0) return <Empty>이 기간에 기록된 토큰 사용량이 없어요.</Empty>;
+  const total = sum(rows.map((row) => row.tokens));
+  if (!rows.some((row) => row.tokens !== null) || total === 0)
+    return <Empty>이 기간에 기록된 토큰 사용량이 없어요.</Empty>;
   return (
-    <ul aria-label="기능별 토큰 비중" className="flex flex-col gap-2.5">
-      {rows.map(({ feature, tokens }) => (
-        <li
-          key={feature.feature}
-          className="grid grid-cols-[8rem_minmax(0,1fr)_7rem] items-center gap-3 text-xs"
-        >
-          <span className="truncate font-semibold">{feature.label}</span>
-          <Bar ratio={tokens === null ? null : tokens / total} />
-          <span className="text-right text-zoop-muted tabular-nums">
-            {tokens === null
-              ? '자료 없음'
-              : `${percent.format(tokens / total)} · ${compact.format(tokens)}`}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-3">
+      {total === null && (
+        <Note>
+          일부 기능의 토큰 자료가 없어 전체 토큰과 기능별 비중을 계산하지
+          않아요.
+        </Note>
+      )}
+      <ul aria-label="기능별 토큰 비중" className="flex flex-col gap-2.5">
+        {rows.map(({ feature, tokens }) => {
+          const ratio =
+            total !== null && tokens !== null ? tokens / total : null;
+          return (
+            <li
+              key={feature.feature}
+              className="grid grid-cols-[8rem_minmax(0,1fr)_7rem] items-center gap-3 text-xs"
+            >
+              <span className="truncate font-semibold">{feature.label}</span>
+              <Bar ratio={ratio} />
+              <span className="text-right text-zoop-muted tabular-nums">
+                {tokens === null
+                  ? '자료 없음'
+                  : ratio === null
+                    ? compact.format(tokens)
+                    : `${percent.format(ratio)} · ${compact.format(tokens)}`}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
