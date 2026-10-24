@@ -242,7 +242,7 @@
 | BFF_PATH_DIFFERENCE | difference | listVirtualAccountProfiles | 목표 /api/v1/portfolio/mock-portfolios ↔ BFF /api/portfolio/mock-portfolios |  |
 | BFF_FIELD_DIFFERENCE | difference | listVirtualAccountProfiles | 목표만 138 · BFF만 32 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | getVirtualAccountProfile | 목표 /api/v1/portfolio/mock-portfolios/{id} ↔ BFF /api/portfolio/mock-portfolios/{id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getVirtualAccountProfile | 목표만 132 · BFF만 32 · 형식/필수/권한 변경 8 |  |
+| BFF_FIELD_DIFFERENCE | difference | getVirtualAccountProfile | 목표만 177 · BFF만 32 · 형식/필수/권한 변경 8 |  |
 | BFF_PATH_DIFFERENCE | difference | connectVirtualAccount | 목표 /api/v1/portfolio/connections ↔ BFF /api/portfolio/connections |  |
 | BFF_FIELD_DIFFERENCE | difference | connectVirtualAccount | 목표만 180 · BFF만 23 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | getMyPortfolio | 목표 /api/v1/portfolio ↔ BFF /api/portfolio |  |
