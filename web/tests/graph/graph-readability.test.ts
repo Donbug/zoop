@@ -17,8 +17,8 @@ const context: ReadingContext = {
   path: new Set(),
 };
 
-test.each([0.1, 0.53, 0.8, 1.5])(
-  'D-GRP-01 LOD at %s keeps visible text >=13px without moving or recoloring nodes',
+test.each([0.1, 0.4, 0.53, 0.8, 1.5])(
+  'D-GRP-01 company and issue labels stay visible at zoom %s with text >=13px without moving or recoloring nodes',
   (zoom) => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const base = toG6Data(data, 1200, 700);
@@ -29,13 +29,21 @@ test.each([0.1, 0.53, 0.8, 1.5])(
       );
       for (const key of ['x', 'y', 'fill', 'iconSrc', 'size'] as const)
         expect(node.style?.[key]).toEqual(base.nodes?.[i].style?.[key]);
-      if (node.data?.kind === 'issue')
-        expect(node.style?.labelVisibility).toBe(
-          zoom < 0.55 ? 'hidden' : 'visible',
-        );
+      expect(node.style?.labelVisibility).toBe('visible');
     }
   },
 );
+
+test('D-GRP-01 always-visible issue names do not reveal nodes hidden by filters', () => {
+  const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const base = toG6Data(data, 1200, 700);
+  const issue = base.nodes!.find((node) => node.data?.kind === 'issue')!;
+  issue.style = { ...issue.style, visibility: 'hidden' };
+  const result = readingStyles(base, data, { ...context, zoom: 0.4 });
+  expect(
+    result.nodes!.find((node) => node.id === issue.id)?.style?.labelVisibility,
+  ).toBe('hidden');
+});
 
 test('D-GRP-01 selected issue names and zero counts remain, but edge tags stay hidden', () => {
   const data = createMockGraph({ mode: 'all', personalFilter: 'all' });

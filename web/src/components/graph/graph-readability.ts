@@ -101,11 +101,9 @@ export function readingStyles(
         style: {
           ...node.style,
           labelText: source?.label ?? node.style?.labelText,
+          // D-GRP-01: 기업·사건 이름은 배율로 숨기지 않고 같은 겹침 처리 기준을 사용해요.
           labelVisibility:
-            node.style?.visibility !== 'hidden' &&
-            (source?.kind !== 'issue' || zoom >= 0.55 || emphasized)
-              ? 'visible'
-              : 'hidden',
+            node.style?.visibility !== 'hidden' ? 'visible' : 'hidden',
           labelFontSize: size,
           labelWordWrap: true,
           labelWordWrapWidth: 170 / zoom,
