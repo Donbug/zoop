@@ -472,7 +472,7 @@ id text PK; title text; summary text; definition jsonb
 default_enabled boolean; enabled boolean; revision bigint; updated_at timestamptz
 ```
 
-rule ID의 버전을 유지한다. eligible/publishedCandidates/publishedEvents는 고정 그래프/후보에서 계산한다. 규칙 정의는 불변 버전으로 관리하고 enabled 상태만 수정한다.
+rule ID의 버전을 유지한다. 규칙은 앱 공개 정책으로, 이미 공개 적격인 내용을 공개에서 빼는 방향으로만 작동하며 HOLD를 공개하거나 AI 판정 입력을 바꾸지 않는다(AI 담당 2026-10-22). eligible은 활성 버전이 참조하는 원천 job 범위에서 현재 규칙에 해당하는 HOLD 수(정보용 현재 대기 건수, 공개 수 아님)로, review_targets·원천 revision에서 조회할 때 계산하며 그 투영이 없으면 null이다. publishedCandidates/publishedEvents는 활성 그래프 버전에서 규칙 적용 후 공개 상태로 남은 수로, 버전을 만들 때 세어 버전과 함께 고정한다(규칙 변경은 다음 버전부터 반영, 고정 값이 없으면 null). 버전 고정 당시 통계와 현재 대기 건수를 구분한다. 규칙 정의는 불변 버전으로 관리하고 enabled 상태만 수정한다.
 
 ### 29. publication_rule_changes — 규칙 변경 이력
 

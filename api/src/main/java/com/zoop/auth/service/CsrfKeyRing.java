@@ -47,7 +47,8 @@ public final class CsrfKeyRing {
     }
 
     /** The cursors allowed to borrow these keys; each signs under its own purpose, so one never verifies as another. */
-    private static final Set<String> CURSOR_PURPOSES = Set.of("admin-audit-cursor-v1", "admin-job-cursor-v1");
+    private static final Set<String> CURSOR_PURPOSES = Set.of("admin-audit-cursor-v1", "admin-job-cursor-v1",
+            "admin-rule-cursor-v1");
 
     public String activeKeyId() {
         return activeKeyId;
