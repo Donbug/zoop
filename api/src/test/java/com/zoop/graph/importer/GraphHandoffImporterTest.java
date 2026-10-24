@@ -8,6 +8,7 @@ import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.function.Function;
@@ -20,6 +21,8 @@ import com.zoop.document.importer.IngestionExportParser;
 import com.zoop.document.importer.Observation;
 import com.zoop.document.repository.ArtifactRow;
 import com.zoop.document.service.InMemoryDocumentRegistry;
+import com.zoop.graph.importer.GraphHandoffRepository.PublicationState;
+import com.zoop.graph.importer.GraphHandoffRepository.RuleRow;
 import com.zoop.graph.importer.GraphHandoffResult.Outcome;
 import com.zoop.graph.importer.GraphHandoffResult.Staged;
 import com.zoop.graph.importer.HandoffFixtures.Built;
@@ -112,9 +115,22 @@ class GraphHandoffImporterTest {
         importer = newImporter();
     }
 
+    /** {@link #setUp()} again within one test: a new store, registry and database, as if nothing had been imported. */
+    private void freshSetUp() throws IOException {
+        try (Stream<Path> files = Files.walk(root)) {
+            files.sorted(Comparator.reverseOrder()).forEach(path -> path.toFile().delete());
+        }
+        setUp();
+    }
+
     private GraphHandoffImporter newImporter() {
         return new GraphHandoffImporter(handoff, ingestion, new IngestionExportParser(), store, registry, graph, transaction,
                 Clock.fixed(NOW, ZoneOffset.UTC));
+    }
+
+    /** The {@code publicationRules} object of the written result file. */
+    private static JsonNode rules(GraphHandoffResult result) {
+        return HandoffFixtures.parse(GraphHandoffResultWriter.toBytes(result)).get("publicationRules");
     }
 
     private static GraphHandoffException failure(GraphHandoffResult result) {
@@ -254,6 +270,128 @@ class GraphHandoffImporterTest {
         assertEquals(1, written.get("provenance").get("approvalBases").get("automatic-verifier").intValue());
         assertFalse(written.get("provenance").get("approvalBases").has("operator-final-approval"));
         assertEquals(3, written.get("evidenceRows").get("registered").intValue());
+    }
+
+    // ------------------------------------------------------------------------------------------------ publication rules ----
+
+    /** Hides the fixture's INVOLVES (one article) and keeps its structural relation, so the issue stays. */
+    private static final RuleRow INVOLVES_SINGLE = new RuleRow("involves-single@1",
+            "{\"kind\": \"single_source\", \"minSources\": 2, \"relationTypes\": [\"INVOLVES\"]}");
+    /** Enabled, readable, and matches nothing in the fixture (its issue is announced). */
+    private static final RuleRow CANCELLED_ONLY = new RuleRow("cancelled-only@1",
+            "{\"kind\": \"assertion_status\", \"hide\": [\"cancelled\"]}");
+
+    @Test
+    void theVersionFixesBothRevisionsAndARuleThatMatchesNothingLeavesTheWritersBytes() throws Exception {
+        GraphHandoffResult plainResult = importer.run(built.request());
+        assertTrue(plainResult.succeeded());
+        assertEquals(HandoffFixtures.parse("""
+                {"ruleRevision":0,"reviewRevision":0,"applied":[],"stored":{"issues":1,"relations":2,"articles":1,"evidence":3},
+                 "hidden":{"issues":0,"relations":0},"byRule":{}}
+                """.getBytes(StandardCharsets.UTF_8)), rules(plainResult), "no rule: what is stored is the bundle");
+        byte[] unfiltered = Files.readAllBytes(snapshotFile(built.versionId()));
+        var plain = graph.inserted().get(0);
+        assertEquals(0, plain.ruleRevision());
+        assertEquals(0, plain.reviewRevision());
+        assertEquals(List.of(), plain.ruleIds());
+        assertEquals(List.of(), graph.versionRules(built.versionId()));
+
+        freshSetUp();
+        graph.publication = new PublicationState(7, 4, List.of(CANCELLED_ONLY));
+        GraphHandoffResult matchedNothing = importer.run(built.request());
+        assertTrue(matchedNothing.succeeded());
+        assertEquals(HandoffFixtures.parse("""
+                {"ruleRevision":7,"reviewRevision":4,"applied":["cancelled-only@1"],
+                 "stored":{"issues":1,"relations":2,"articles":1,"evidence":3},"hidden":{"issues":0,"relations":0},
+                 "byRule":{"cancelled-only@1":{"issues":0,"relations":0}}}
+                """.getBytes(StandardCharsets.UTF_8)), rules(matchedNothing));
+
+        var inserted = graph.inserted().get(0);
+        assertEquals(7, inserted.ruleRevision());
+        assertEquals(4, inserted.reviewRevision());
+        assertEquals(List.of("cancelled-only@1"), inserted.ruleIds(), "an enabled rule is recorded whether or not it hid anything");
+        assertEquals(List.of(CANCELLED_ONLY), graph.versionRules(built.versionId()));
+        assertEquals(List.of(1L, 2L, 1L), List.of(inserted.issueCount(), inserted.relationCount(), inserted.articleCount()));
+        assertEquals(sha256(unfiltered), sha256(Files.readAllBytes(snapshotFile(built.versionId()))),
+                "the same bytes as with no rule at all");
+    }
+
+    @Test
+    void anEnabledRuleFiltersTheStoredSnapshotWhileTheReceiptAndTheEvidenceRowsKeepTheWholeBundle() throws Exception {
+        graph.publication = new PublicationState(3, 0, List.of(INVOLVES_SINGLE));
+
+        GraphHandoffResult result = importer.run(built.request());
+
+        assertTrue(result.succeeded());
+        String versionId = built.versionId();
+        PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(Files.readAllBytes(snapshotFile(versionId)), versionId);
+        assertEquals(List.of("STRUCTURALLY_RELATED_TO"), snapshot.relations().stream().map(r -> r.relationType()).toList());
+        assertEquals(List.of(ISSUE), snapshot.issues().stream().map(i -> i.issueId()).toList(),
+                "the issue keeps its structural company relation");
+        assertEquals(2, snapshot.companies().size(), "companies are the catalogue and always stay");
+        var inserted = graph.inserted().get(0);
+        assertEquals(List.of(1L, 1L, 1L), List.of(inserted.issueCount(), inserted.relationCount(), inserted.articleCount()),
+                "the version counts what the stored snapshot holds");
+        assertEquals(List.of("involves-single@1"), inserted.ruleIds());
+        assertEquals(3, inserted.ruleRevision());
+        // The result file says what the rules did; its counts stay the bundle's.
+        JsonNode written = HandoffFixtures.parse(GraphHandoffResultWriter.toBytes(result));
+        assertEquals(2, written.get("counts").get("relations").intValue());
+        JsonNode rules = rules(result);
+        assertEquals(3, rules.get("ruleRevision").intValue());
+        assertEquals("[\"involves-single@1\"]", rules.get("applied").toString());
+        assertEquals(1, rules.get("stored").get("relations").intValue());
+        assertEquals(1, rules.get("stored").get("issues").intValue());
+        assertEquals(snapshot.evidence().size(), rules.get("stored").get("evidence").intValue());
+        assertEquals(1, rules.get("hidden").get("relations").intValue());
+        assertEquals(0, rules.get("hidden").get("issues").intValue());
+        assertEquals(1, rules.get("byRule").get("involves-single@1").get("relations").intValue());
+
+        // The receipt is the complete bundle and every span is registered: a rule changes the public projection only.
+        assertEquals(built.bundle(), HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId))).get("bundle"));
+        assertEquals(3, graph.evidenceRows().size());
+        assertEquals(3, HandoffFixtures.parse(GraphHandoffResultWriter.toBytes(result)).get("evidenceRows").get("registered")
+                .intValue());
+    }
+
+    @Test
+    void aRepeatedImportFiltersWithTheRulesItsVersionWasStagedWithWhateverWasSwitchedSince() throws Exception {
+        for (List<RuleRow> first : List.of(List.of(INVOLVES_SINGLE), List.<RuleRow>of())) {
+            freshSetUp();
+            graph.publication = new PublicationState(3, 0, first);
+            GraphHandoffResult staged = importer.run(built.request());
+            assertTrue(staged.succeeded());
+            byte[] stored = Files.readAllBytes(snapshotFile(built.versionId()));
+
+            // The switch flips the rule; the staged version is not this import's to change, only the next version's.
+            graph.publication = new PublicationState(4, 0, first.isEmpty() ? List.of(INVOLVES_SINGLE) : List.of());
+            GraphHandoffResult again = importer.run(built.request());
+
+            assertTrue(again.succeeded(), first.toString());
+            assertEquals(Outcome.UNCHANGED, again.staged().outcome(), first.toString());
+            assertEquals(rules(staged), rules(again), "the version's own rules and revisions, never the switched ones");
+            assertEquals(1, graph.inserted().size());
+            assertEquals(sha256(stored), sha256(Files.readAllBytes(snapshotFile(built.versionId()))));
+        }
+    }
+
+    @Test
+    void anEnabledRuleThisAppCannotReadFailsTheImportBeforeAnythingIsWritten() throws Exception {
+        InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+        InMemoryDocumentRegistry.State registryBefore = registry.state();
+        long filesBefore = fileCount();
+        for (RuleRow unreadable : List.of(
+                new RuleRow("regex@1", "{\"kind\": \"regex\", \"pattern\": \".*\"}"),
+                new RuleRow("too-small@1", "{\"kind\": \"single_source\", \"minSources\": 1, \"relationTypes\": [\"INVOLVES\"]}"),
+                new RuleRow("not-a-rule-id", CANCELLED_ONLY.definition()))) {
+            graph.publication = new PublicationState(1, 0, List.of(CANCELLED_ONLY, unreadable));
+
+            GraphHandoffException failure = failure(importer.run(built.request()));
+
+            assertEquals(GraphHandoffFailure.RULE_DEFINITION_INVALID, failure.failure(), unreadable.id());
+            assertEquals(0, graph.writes(), unreadable.id());
+            assertNothingWritten(graphBefore, registryBefore, filesBefore);
+        }
     }
 
     @Test

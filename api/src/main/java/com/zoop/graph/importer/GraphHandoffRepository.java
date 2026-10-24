@@ -2,6 +2,7 @@ package com.zoop.graph.importer;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -41,8 +42,33 @@ public interface GraphHandoffRepository {
     /** The version row with the snapshot artifact it points at, or empty. */
     Optional<StagedVersion> findVersion(String id);
 
-    /** Inserts one INACTIVE {@code snapshot} version at {@code review_revision} 0 with no publication time. */
+    /**
+     * The enabled publication rules with {@code rule_revision} (MAX {@code publication_rule_changes.log_revision}) and
+     * {@code review_revision} (MAX {@code review_decisions.global_revision}), read by ONE statement and without the publication
+     * lock: imports run every round and must never hold up a switch, a review decision or an activation. Both counters are taken
+     * as MAX+1 under that lock, which is held to the commit, so one statement sees a committed prefix of each and the rules it
+     * returns are exactly the state at that {@code rule_revision}. A switch committed later is the next import's.
+     */
+    PublicationState publicationState();
+
+    /** The rules a staged version was filtered with, in id order; empty when it was staged with none enabled or before rules. */
+    List<RuleRow> versionRules(String versionId);
+
+    /**
+     * Inserts one INACTIVE {@code snapshot} version with no publication time, its two revisions and the rules it was filtered
+     * with ({@code graph_version_rules}).
+     */
     void insertStagedVersion(NewStagedVersion version);
+
+    /** One publication rule: its versioned id and its definition as stored (JSON text). */
+    record RuleRow(String id, String definition) {
+    }
+
+    record PublicationState(long ruleRevision, long reviewRevision, List<RuleRow> enabledRules) {
+        public PublicationState {
+            enabledRules = List.copyOf(enabledRules);
+        }
+    }
 
     /** One catalog company: {@code name} is what a bundle label must equal. */
     record CompanyRow(String id, String name) {
@@ -57,7 +83,9 @@ public interface GraphHandoffRepository {
             Boolean quoteVerified, String verificationKind) {
     }
 
-    record StagedVersion(String id, String kind, boolean active, String snapshotArtifactId, String createdBy) {
+    /** {@code ruleRevision} is {@code null} for a version staged before rules existed (or a fixture). */
+    record StagedVersion(String id, String kind, boolean active, String snapshotArtifactId, String createdBy, Long ruleRevision,
+            long reviewRevision) {
     }
 
     /**
@@ -65,8 +93,16 @@ public interface GraphHandoffRepository {
      * @param reason         why the row exists (staged, not activated)
      * @param sourceLabel    the handoff id the version was imported from
      * @param policyVersion  the projection policy of the bundle
+     * @param issueCount     what the stored snapshot holds after the rules, as are the other two counts
+     * @param ruleRevision   {@link PublicationState#ruleRevision()} the rules were read at
+     * @param reviewRevision {@link PublicationState#reviewRevision()} read with them
+     * @param ruleIds        the rules the snapshot was filtered with
      */
     record NewStagedVersion(String id, String createdBy, String reason, String sourceLabel, String policyVersion,
-            String snapshotArtifactId, long issueCount, long relationCount, long articleCount, Instant createdAt) {
+            String snapshotArtifactId, long issueCount, long relationCount, long articleCount, Instant createdAt,
+            long ruleRevision, long reviewRevision, List<String> ruleIds) {
+        public NewStagedVersion {
+            ruleIds = List.copyOf(ruleIds);
+        }
     }
 }
