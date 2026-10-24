@@ -202,6 +202,9 @@ describe('D-STK-01 종목 목록·검색 (FS037)', () => {
 
     const row = await rowOf('삼성전자');
     expect(
+      within(row).getByRole('link', { name: '삼성전자' }).getAttribute('href'),
+    ).toBe('/companies/cmp-samsung');
+    expect(
       within(row)
         .getByRole('link', { name: '삼성전자 기업 상세' })
         .getAttribute('href'),
@@ -274,7 +277,9 @@ describe('D-STK-01 관심 종목 (FS027)', () => {
     const names = async () =>
       within(await list())
         .getAllByRole('listitem')
-        .map((item) => item.querySelector('p')?.textContent);
+        .map(
+          (item) => item.querySelector('a[href^="/companies/"]')?.textContent,
+        );
     await waitFor(async () =>
       expect(await names()).toEqual(['NVIDIA', '삼성전자']),
     );
