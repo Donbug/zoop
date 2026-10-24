@@ -10,6 +10,16 @@ import {
 import { ApiError } from '@/apis/auth/ApiService';
 import type { MemberSession } from '@/types/auth/session';
 
+/**
+ * 로그인 뒤 돌아갈 주소. 지도는 D-AUT-01대로 시장 전체 지도에서 시작하므로, 지도 주소는
+ * 시장 전체(mode=all)일 때만 그대로 돌아간다(예: 기업 패널의 '로그인 후 관심 추가'). 그 밖의 지도 주소는 기본 도착지로 보낸다.
+ */
+function returnPath(from: string | null | undefined) {
+  if (!from || from === '/') return null;
+  if (!from.startsWith('/?')) return from;
+  return new URLSearchParams(from.slice(2)).get('mode') === 'all' ? from : null;
+}
+
 export function useAuthCompletion() {
   const navigate = useNavigate();
   const active = useRef(true);
@@ -61,12 +71,7 @@ export function useAuthCompletion() {
         throw new ApiError(0, 'SESSION_CHANGED', '계정이 변경되었어요.');
       if (active.current)
         navigate(
-          verified.setup.completed &&
-            from &&
-            !from.startsWith('/?') &&
-            from !== '/'
-            ? from
-            : destination,
+          (verified.setup.completed && returnPath(from)) || destination,
           { replace: true },
         );
     } catch (e) {
