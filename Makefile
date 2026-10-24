@@ -123,7 +123,7 @@ pipeline-build:
 service-install:
 	$(UV) sync --project ai/service --frozen --group dev
 service-test:
-	$(SERVICE_PYTHON) -m pytest ai/service/tests
+	$(SERVICE_PYTHON) -m pytest ai/service/tests -n 4 --dist load --durations=30
 service-smoke:
 	$(SERVICE_PYTHON) ai/service/scripts/service_smoke.py
 # S2 extraction jobs and the S3 relation jobs over the real installed pipeline (needs `make pipeline-install` AND `make service-install`; fails, never skips, without them).

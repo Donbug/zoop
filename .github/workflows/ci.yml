@@ -233,7 +233,7 @@ jobs:
           enable-cache: false
       - name: Bootstrap the service's own locked runtime and the test-only worker (public dependencies, no token)
         run: make service-install
-      - name: Offline service tests, real loopback smoke and internal OpenAPI drift (no model token, external network or real state)
+      - name: Offline service tests (4 workers), real loopback smoke and internal OpenAPI drift (no model token, external network or real state)
         run: make service-test service-smoke service-openapi-check
 
   api-container:
