@@ -89,12 +89,12 @@ function RoundDetailView({
         <dd className={`${DD} tabular-nums`}>{count(round.attempts)}회</dd>
       </dl>
       {round.failureReason && (
-        <p className="rounded-[3px] border-[0.667px] border-zoop-alert px-3 py-2 text-xs">
+        <p className="rounded-2xl bg-zoop-soft px-4 py-3 text-xs text-zoop-alert">
           실패 사유: {round.failureReason}
         </p>
       )}
       {round.suspension && (
-        <p className="rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-wash px-3 py-2 text-xs">
+        <p className="rounded-2xl bg-zoop-soft px-4 py-3 text-xs">
           제공 중단: {round.suspension.reason}{' '}
           <span className="text-[11px] text-zoop-muted">
             ({formatKst(round.suspension.at)} · {round.suspension.adminEmail})
@@ -393,7 +393,7 @@ export default function BriefingOperations() {
                           onClick={() =>
                             updateQuery({ round: round.id }, { replace: true })
                           }
-                          className={`whitespace-nowrap text-left font-semibold tabular-nums hover:underline ${FOCUS_RING}`}
+                          className={`whitespace-nowrap rounded-full px-3 py-2 text-left font-semibold tabular-nums hover:bg-zoop-soft aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper ${FOCUS_RING}`}
                         >
                           {round.date} {editionLabel[round.edition]}
                         </button>

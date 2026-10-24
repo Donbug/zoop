@@ -473,6 +473,7 @@ function MapWorkspace({
     )
       opener.current = document.activeElement;
     updateQuery({ select: `edge:${id}`, id: null, impact: null, path: null });
+    track({ type: 'graph_edge_select', targetId: id, viewId });
   }
   useEffect(() => {
     if (

@@ -256,7 +256,6 @@ function Usage({ data }: { data: Dashboard }) {
 export default function DashboardSummary() {
   const dashboard = useAsyncData(getAdminDashboard);
   const data = dashboard.data;
-
   return (
     <div className="flex flex-col gap-6 py-8 text-zoop-ink">
       <PageHeader
@@ -289,7 +288,7 @@ export default function DashboardSummary() {
           {data.ledger.status === 'unavailable' && (
             <p
               role="status"
-              className="rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-wash px-3 py-2 text-[11px] text-zoop-muted"
+              className="rounded-2xl bg-zoop-soft px-4 py-3 text-[11px] text-zoop-muted"
             >
               원장에 연결하지 못해 검수 현황을 표시하지 못했어요.
               {data.ledger.error && ` (${data.ledger.error.message})`}
