@@ -25,6 +25,8 @@ from .graph_reads import GraphReads
 from .graph_runtime import GraphProcess
 from .handoff_reads import HandoffReads
 from .handoff_runtime import HandoffProcess
+from .handoff_exposure_reads import HandoffExposureReads
+from .handoff_exposure_runtime import HandoffExposureProcess
 from .relation_dispatch import RelationDispatcher
 from .relation_jobs import RelationJobs
 from .relation_ledger import RelationLedger
@@ -50,6 +52,7 @@ class Service:
     extraction_ledger: ExtractionLedger | None = None
     graph: GraphReads | None = None
     handoff: HandoffReads | None = None
+    handoff_exposure: HandoffExposureReads | None = None
     chat: ChatStages | None = None
 
 
@@ -93,6 +96,8 @@ def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) 
     graph = GraphReads(config, GraphProcess(config, deadlines), gate if config.graph.shared_gate else None) if config.graph is not None else None
     # The handoff door is read-only too and has no ledger of its own; it shares the same S2/S3 gate under the same rule.
     handoff = HandoffReads(config, HandoffProcess(config, deadlines), gate if config.handoff.shared_gate else None) if config.handoff is not None else None
+    exposure = (HandoffExposureReads(config, HandoffExposureProcess(config, deadlines), gate if config.handoff_exposure.shared_gate else None)
+                if config.handoff_exposure is not None else None)
     starting: dict[str, object] = {"event": "service_starting", "principals": len(config.principals), "live": config.live_available,
                                    "replay": config.replay_path is not None, "requeuedInFlight": requeued}
     if config.relation is not None:  # a disabled feature leaves the S1 startup line exactly as it was
@@ -103,6 +108,8 @@ def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) 
         starting["graph"] = True
     if config.handoff is not None:
         starting["handoff"] = True
+    if config.handoff_exposure is not None:
+        starting["handoffExposure"] = True
     # The chat door is synchronous and keeps no ledger of its own: the installed zoop-ai-chat owns the invocation ledger.
     chat = ChatStages(config, ChatProcess(config, deadlines)) if config.chat is not None else None
     if config.chat is not None:
@@ -110,11 +117,12 @@ def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) 
         starting["chatLive"] = config.chat.live_available
     emit(starting)
     return Service(config, lock, ledger, worker, dispatcher, jobs, relation, relation_dispatcher, relation_ledger, extraction, extraction_dispatcher,
-                   extraction_ledger, graph, handoff, chat)
+                   extraction_ledger, graph, handoff, handoff_exposure=exposure, chat=chat)
 
 
 def serve(service: Service) -> None:
-    app = create_app(service.jobs, service.relation, service.extraction, service.graph, service.handoff, service.chat)
+    app = create_app(service.jobs, service.relation, service.extraction, service.graph, service.handoff,
+                     handoff_exposure=service.handoff_exposure, chat=service.chat)
     service.dispatcher.start()
     if service.relation_dispatcher is not None:
         service.relation_dispatcher.start()

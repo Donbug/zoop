@@ -1,11 +1,17 @@
+import { BriefingGraphUnavailableError } from '@/apis/graph/briefing-context';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import MapPage from '@/pages/map/MapPage';
+import * as impactApi from '@/apis/graph/impact';
+import * as companyDataHook from '@/hooks/useCompanyData';
+import * as evidenceApi from '@/apis/evidence/evidence';
 import { getGraph } from '@/apis/graph/graph';
 import { getBriefingGraphBasis } from '@/apis/briefing/briefing';
 import { setTutorialCompleted } from '@/apis/graph/tutorial';
+import { useGraphUiStore } from '@/stores/useGraphUiStore';
+import { useAiChatStore } from '@/stores/useAiChatStore';
 import { focusNeighborhood } from '@/components/graph/graph-model';
 import { createMockGraph } from '@/mocks/graph/response';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -20,22 +26,49 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
     selectedId,
     focusId,
     focusHops,
+    memoryOwner,
     onSelect,
+    onTutorialAction,
+    tutorialTargetId,
   }: {
+    tutorialTargetId?: string;
+    onTutorialAction?: (action: 'pan' | 'zoom') => void;
     data: GraphResponse;
     selectedId: string | null;
     focusId: string | null;
     focusHops: 1 | 2;
+    memoryOwner: string;
     onSelect: (id: string) => void;
   }) => (
     <div
       data-testid="graph-canvas"
+      data-tutorial-target={tutorialTargetId}
       data-focus={focusId ?? ''}
       data-hops={focusHops}
+      data-view-owner={memoryOwner}
     >
+      {onTutorialAction && (
+        <>
+          <button
+            data-tutorial-action="move"
+            onClick={() => onTutorialAction('pan')}
+          >
+            지도 이동 실습
+          </button>
+          <button
+            data-tutorial-action="zoom"
+            onClick={() => onTutorialAction('zoom')}
+          >
+            지도 확대 실습
+          </button>
+        </>
+      )}
       {data.nodes.map((node) => (
         <button
           key={node.id}
+          data-tutorial-action={
+            node.id === tutorialTargetId ? 'node' : undefined
+          }
           onClick={() => onSelect(node.id)}
           aria-pressed={selectedId === node.id}
         >
@@ -148,6 +181,9 @@ it('D-BRF-04 회차 지도를 최신 main 지도에 연결하고 현재 지도�
   const router = setup(`/?mode=all&round=${roundId}`);
   await screen.findByTestId('graph-canvas');
   expect(
+    screen.getByTestId('graph-canvas').getAttribute('data-view-owner'),
+  ).toContain(`:round:${roundId}`);
+  expect(
     vi
       .mocked(getGraph)
       .mock.calls.some(([request]) => request.round === roundId),
@@ -170,8 +206,244 @@ it('D-BRF-04 회차 지도를 최신 main 지도에 연결하고 현재 지도�
   expect(router.state.location.search).not.toContain('round=');
 });
 
+it('과거 회차 저장본 부재는 재시도 오류와 구분하고 현재 그래프로 이동할 수 있다', async () => {
+  anonymous();
+  const basis = {
+    roundId: 'sim-2026-10-08-morning-original',
+    date: '2026-10-08',
+    edition: 'morning' as const,
+    status: 'unavailable' as const,
+    message: '이 회차에는 발행 당시 저장된 그래프가 없습니다.',
+    reason: null,
+    publishedAt: '2026-10-16T00:30:00Z',
+    dataAsOf: '2026-10-08T00:20:00Z',
+    graphVersion: null,
+    keyIssueIds: [],
+    companyIds: [],
+    correctionCount: 0,
+    unavailableReason: 'snapshot_not_recorded' as const,
+  };
+  vi.mocked(getBriefingGraphBasis).mockResolvedValue(basis);
+  vi.mocked(getGraph).mockImplementation(async (request) => {
+    if (request.round) throw new BriefingGraphUnavailableError(basis);
+    return createMockGraph(request);
+  });
+  const router = setup(`/?round=${basis.roundId}`);
+  await screen.findAllByText(basis.message);
+  expect(screen.queryByText(/조회 실패:/)).toBeNull();
+  expect(screen.getByText('이 회차의 그래프 저장본이 없습니다.')).toBeTruthy();
+  expect(screen.queryByText('관계 지도를 불러오지 못했습니다.')).toBeNull();
+  expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
+  expect(
+    screen.getByRole('link', { name: '브리핑으로' }).getAttribute('href'),
+  ).toContain('date=2026-10-08&edition=morning');
+  await userEvent.click(
+    screen.getByRole('button', { name: '현재 그래프로 보기' }),
+  );
+  await screen.findByTestId('graph-canvas');
+  expect(router.state.location.search).not.toContain('round=');
+});
+
 describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
+  it('이미 열린 5단계에서 다시 보기해도 경로와 상세를 정리하고 처음부터 시작한다', async () => {
+    const router = setup('/?mode=all&tour=1');
+    await screen.findByRole('heading', { name: '지도 움직이기' });
+    await act(async () => {
+      useGraphUiStore.getState().setTutorialStep(5);
+      await router.navigate(
+        '/?mode=all&tour=1&path=KRX:005930,NASDAQ:NVDA&select=node:KRX:005930',
+      );
+    });
+    await userEvent.click(
+      screen.getByRole('button', { name: '튜토리얼 다시 보기' }),
+    );
+    await screen.findByRole('heading', { name: '지도 움직이기' });
+    expect(router.state.location.search).toBe('?mode=all&tour=1');
+    expect(
+      screen.queryByRole('complementary', { name: '두 기업 사이 경로' }),
+    ).toBeNull();
+  });
+  it('같은 계정의 재진입도 선택·경로·과거 pin과 열린 근거/AI를 정리한다', async () => {
+    member();
+    const session = useAuthStore.getState().session!;
+    useAuthStore.setState({
+      session: {
+        ...session,
+        setup: { completed: true, tutorialCompleted: true },
+      },
+    });
+    vi.mocked(getGraph).mockImplementation(async (request) =>
+      createMockGraph(request),
+    );
+    const router = setup('/?mode=all');
+    await screen.findByTestId('graph-canvas');
+    useGraphUiStore.getState().openEvidence({
+      kind: 'issue',
+      id: 'old',
+      label: 'old',
+      evidenceIds: [],
+    });
+    useAiChatStore.getState().open();
+    await act(async () => {
+      await router.navigate(
+        '/?mode=personal&tour=1&path=KRX:005930,NASDAQ:NVDA&select=node:KRX:005930&impact=KRX:005930,mock-issue-1&companyId=KRX:005930&event=old&asOf=2020-01-01T00:00:00Z&graphVersion=old&round=old&focus=old&hops=2',
+      );
+    });
+    await screen.findByRole('heading', { name: '지도 움직이기' });
+    expect(router.state.location.search).toBe('?mode=all&tour=1');
+    expect(useGraphUiStore.getState().evidenceTarget).toBeNull();
+    expect(useAiChatStore.getState().isOpen).toBe(false);
+    expect(
+      screen.queryByRole('complementary', { name: '두 기업 사이 경로' }),
+    ).toBeNull();
+    await userEvent.click(
+      screen.getByRole('button', { name: '지도 이동 실습' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: '지도 확대 실습' }),
+    );
+    expect(screen.getByText('튜토리얼 2/5')).toBeTruthy();
+  });
+
+  it('튜토리얼 조회 맥락은 URL의 과거 pin 대신 표시된 현재 지도에서 가져온다', async () => {
+    const spy = vi.spyOn(impactApi, 'getCompanyIssueImpact');
+    const companySpy = vi.spyOn(companyDataHook, 'useCompanyData');
+    const evidenceSpy = vi.spyOn(evidenceApi, 'getEvidence');
+    const router = setup(
+      '/?mode=all&tour=1&round=old&asOf=2020-01-01T00:00:00Z&graphVersion=old',
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: '지도 이동 실습' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: '지도 확대 실습' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: '삼성전자 선택' }),
+    );
+    const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const { tutorialTarget } =
+      await import('@/components/graph/tutorial/tutorial-target');
+    const target = tutorialTarget(graph, true)!;
+    // Even a stale pin inserted while the tutorial is already active cannot change its snapshot.
+    await act(async () => {
+      await router.navigate(
+        `${router.state.location.search}&round=old&asOf=2020-01-01T00:00:00Z&graphVersion=old`,
+      );
+    });
+    await userEvent.click(
+      screen.getByRole('button', { name: `${target.issue.label} 선택` }),
+    );
+    await screen.findByText('튜토리얼 4/5');
+    expect(spy).toHaveBeenLastCalledWith(target.company.id, target.issue.id, {
+      round: undefined,
+      asOf: graph.metadata.asOf,
+      graphVersion: graph.metadata.graphVersion,
+    });
+    expect(companySpy.mock.calls.at(-1)?.[3]).toEqual({
+      asOf: graph.metadata.asOf,
+      graphVersion: graph.metadata.graphVersion,
+    });
+    await userEvent.click(
+      screen.getAllByRole('button', { name: /근거 .*건 보기/ })[0],
+    );
+    await waitFor(() =>
+      expect(evidenceSpy).toHaveBeenCalledWith(expect.any(String), {
+        round: undefined,
+        asOf: graph.metadata.asOf,
+        graphVersion: graph.metadata.graphVersion,
+      }),
+    );
+  });
+
+  it('3단계 부분 응답 재조회 후 같은 상세 사건 버튼을 복원하고 다음 단계로 진행한다', async () => {
+    const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const partial = {
+      ...graph,
+      metadata: { ...graph.metadata, partial: true },
+    };
+    vi.mocked(getGraph).mockResolvedValue(partial);
+    const router = setup('/?mode=all&tour=1');
+    await userEvent.click(
+      await screen.findByRole('button', { name: '지도 이동 실습' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: '지도 확대 실습' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: '삼성전자 선택' }),
+    );
+    const panel = await screen.findByRole('complementary', {
+      name: '삼성전자 기업 상세',
+    });
+    const issue = await within(panel).findByRole('button', {
+      name: /^HBM4 공급 계약/,
+    });
+    await waitFor(() =>
+      expect((issue as HTMLButtonElement).disabled).toBe(false),
+    );
+    let finish!: (value: GraphResponse) => void;
+    vi.mocked(getGraph).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    await waitFor(() => {
+      expect(issue.getAttribute('data-tutorial-action')).toBeNull();
+      expect((issue as HTMLButtonElement).disabled).toBe(true);
+      expect(issue.getAttribute('tabindex')).toBe('-1');
+    });
+    expect(screen.getByText('튜토리얼 3/5')).toBeTruthy();
+    await act(async () => finish(partial));
+    await waitFor(() => {
+      expect(
+        within(panel).getByRole('button', { name: /^HBM4 공급 계약/ }),
+      ).toBe(issue);
+      expect(issue.getAttribute('data-tutorial-action')).toBe('issue');
+      expect((issue as HTMLButtonElement).disabled).toBe(false);
+      expect(issue.getAttribute('aria-disabled')).toBeNull();
+      expect(issue.getAttribute('tabindex')).toBeNull();
+    });
+    issue.focus();
+    expect(document.activeElement).toBe(issue);
+    await userEvent.click(issue);
+    await screen.findByText('튜토리얼 4/5');
+    expect(
+      new URLSearchParams(router.state.location.search).get('impact'),
+    ).toBe('KRX:005930,mock-issue-1');
+  });
+
+  it.each(['error', 'partial', 'no-target'] as const)(
+    '%s 상태에서 실제 지도 재시도를 허용한다',
+    async (scenario) => {
+      const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+      if (scenario === 'error')
+        vi.mocked(getGraph).mockRejectedValueOnce(
+          new Error('retry-map-offline'),
+        );
+      else
+        vi.mocked(getGraph).mockResolvedValueOnce(
+          scenario === 'partial'
+            ? { ...graph, metadata: { ...graph.metadata, partial: true } }
+            : { ...graph, nodes: [], edges: [] },
+        );
+      setup('/?mode=all&tour=1');
+      const retry =
+        scenario === 'no-target'
+          ? await screen.findByRole('button', { name: '지도 다시 불러오기' })
+          : await screen.findByRole('button', { name: '다시 시도' });
+      expect((retry as HTMLButtonElement).disabled).toBe(false);
+      const count = vi.mocked(getGraph).mock.calls.length;
+      await userEvent.click(retry);
+      await waitFor(() =>
+        expect(vi.mocked(getGraph).mock.calls.length).toBeGreaterThan(count),
+      );
+    },
+  );
   beforeEach(() => {
+    useGraphUiStore.getState().reset();
     anonymous();
     vi.mocked(getGraph).mockImplementation(async (request) =>
       createMockGraph(request),
@@ -179,17 +451,13 @@ describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
     vi.mocked(setTutorialCompleted).mockReset();
   });
 
-  it('5단계를 왕복하고 비회원은 저장 없이 건너뛴다', async () => {
+  it('버튼으로 단계를 넘기지 못하고 비회원은 저장 없이 건너뛴다', async () => {
     const router = setup('/?mode=all&tour=1');
     expect(
       await screen.findByRole('heading', { name: '지도 움직이기' }),
     ).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: '다음' }));
-    expect(
-      screen.getByRole('heading', { name: '기업이나 사건 고르기' }),
-    ).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: '이전' }));
-    expect(screen.getByText('튜토리얼 1/5')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '다음' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '이전' })).toBeNull();
     await userEvent.click(
       screen.getByRole('button', { name: '튜토리얼 건너뛰기' }),
     );
@@ -261,6 +529,171 @@ describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
     );
   });
 
+  it.each(['all', 'holdings', 'watchlist'])(
+    '회원의 개인 %s 필터로 들어와도 전체 그래프로만 튜토리얼을 진행한다',
+    async (scope) => {
+      member();
+      setup(`/?mode=personal&scope=${scope}&companyId=NASDAQ%3ANVDA&tour=1`);
+      await screen.findByTestId('graph-canvas');
+      expect(
+        vi
+          .mocked(getGraph)
+          .mock.calls.every(
+            ([request]) =>
+              request.mode === 'all' && request.companyId === undefined,
+          ),
+      ).toBe(true);
+      expect(screen.getByText(/실제 시장 전체 지도/)).toBeTruthy();
+    },
+  );
+
+  it('비회원도 개인 종목 조회 없이 같은 전체 그래프로 시작한다', async () => {
+    setup('/?mode=personal&scope=holdings&tour=1');
+    await screen.findByTestId('graph-canvas');
+    expect(
+      vi
+        .mocked(getGraph)
+        .mock.calls.every(
+          ([request]) =>
+            request.mode === 'all' && request.companyId === undefined,
+        ),
+    ).toBe(true);
+  });
+
+  it('전체 그래프 조회 실패 시 개인 그래프로 바꾸지 않고 오류를 유지한다', async () => {
+    member();
+    vi.mocked(getGraph).mockRejectedValue(new Error('market-source-offline'));
+    setup('/?mode=personal&tour=1');
+    await screen.findByText(/market-source-offline/);
+    expect(
+      vi
+        .mocked(getGraph)
+        .mock.calls.every(([request]) => request.mode === 'all'),
+    ).toBe(true);
+    expect(screen.queryByRole('button', { name: '다음' })).toBeNull();
+  });
+
+  it('확대만 하거나 다른 기업을 눌러 단계 완료를 우회할 수 없다', async () => {
+    member();
+    setup('/?mode=all&tour=1');
+    await userEvent.click(
+      await screen.findByRole('button', { name: '지도 확대 실습' }),
+    );
+    expect(screen.getByText('튜토리얼 1/5')).toBeTruthy();
+    await userEvent.click(
+      screen.getByRole('button', { name: '지도 이동 실습' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: '지도 확대 실습' }),
+    );
+    const { tutorialTarget } =
+      await import('@/components/graph/tutorial/tutorial-target');
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const target = tutorialTarget(data, true)!;
+    const other = data.nodes.find(
+      (node) => node.kind === 'company' && node.id !== target.company.id,
+    )!;
+    await userEvent.click(
+      screen.getByRole('button', { name: `${other.label} 선택` }),
+    );
+    expect(screen.getByText('튜토리얼 2/5')).toBeTruthy();
+  });
+
+  it('3단계는 지도 위 실제 사건을 강조하고 클릭하면 영향 경로 성공 후 4단계로 진행한다', async () => {
+    anonymous();
+    const router = setup('/?mode=all&tour=1');
+    await userEvent.click(
+      await screen.findByRole('button', { name: '지도 이동 실습' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: '지도 확대 실습' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: '삼성전자 선택' }),
+    );
+    const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const { tutorialTarget } =
+      await import('@/components/graph/tutorial/tutorial-target');
+    const target = tutorialTarget(graph, true)!;
+    expect(
+      screen.getByTestId('graph-canvas').getAttribute('data-tutorial-target'),
+    ).toBe(target.issue.id);
+    const other = graph.nodes.find(
+      (node) => node.kind === 'issue' && node.id !== target.issue.id,
+    )!;
+    await userEvent.click(
+      screen.getByRole('button', { name: `${other.label} 선택` }),
+    );
+    expect(screen.getByText('튜토리얼 3/5')).toBeTruthy();
+    await userEvent.click(
+      screen.getByRole('button', { name: `${target.issue.label} 선택` }),
+    );
+    await screen.findByText('튜토리얼 4/5');
+    expect(
+      new URLSearchParams(router.state.location.search).get('impact'),
+    ).toBe(`${target.company.id},${target.issue.id}`);
+  });
+
+  it.each(['impact', 'evidence'] as const)(
+    '%s 조회 실패는 다음 단계로 진행하지 않는다',
+    async (failure) => {
+      member();
+      const spy =
+        failure === 'impact'
+          ? vi
+              .spyOn(impactApi, 'getCompanyIssueImpact')
+              .mockRejectedValue(new Error('tutorial-impact-offline'))
+          : vi
+              .spyOn(evidenceApi, 'getEvidence')
+              .mockRejectedValue(new Error('tutorial-evidence-offline'));
+      try {
+        setup('/?mode=personal&tour=1');
+        await userEvent.click(
+          await screen.findByRole('button', { name: '지도 이동 실습' }),
+        );
+        await userEvent.click(
+          screen.getByRole('button', { name: '지도 확대 실습' }),
+        );
+        const { tutorialTarget } =
+          await import('@/components/graph/tutorial/tutorial-target');
+        const target = tutorialTarget(
+          createMockGraph({ mode: 'all', personalFilter: 'all' }),
+          true,
+        )!;
+        await userEvent.click(
+          screen.getByRole('button', { name: `${target.company.label} 선택` }),
+        );
+        const panel = await screen.findByRole('complementary', {
+          name: `${target.company.label} 기업 상세`,
+        });
+        await userEvent.click(
+          await within(panel).findByRole('button', {
+            name: new RegExp(target.issue.label),
+          }),
+        );
+        if (failure === 'impact') {
+          await screen.findByText('tutorial-impact-offline');
+          expect(screen.getByText('튜토리얼 3/5')).toBeTruthy();
+        } else {
+          await screen.findByText('튜토리얼 4/5');
+          const path = screen.getByRole('complementary', { name: /영향 경로/ });
+          await userEvent.click(
+            (
+              await within(path).findAllByRole('button', {
+                name: /근거 .*건 보기/,
+              })
+            )[0],
+          );
+          await screen.findByText(/tutorial-evidence-offline/);
+          expect(screen.getByText('튜토리얼 4/5')).toBeTruthy();
+        }
+        expect(setTutorialCompleted).not.toHaveBeenCalled();
+      } finally {
+        spy.mockRestore();
+      }
+    },
+  );
+
   it('회원 완료는 상태 API 성공 후에만 화면을 닫는다', async () => {
     member();
     vi.mocked(setTutorialCompleted).mockResolvedValue(
@@ -268,10 +701,53 @@ describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
     );
     const router = setup('/?mode=all&tour=1');
     await screen.findByRole('heading', { name: '지도 움직이기' });
-    for (let step = 1; step < 5; step += 1)
-      await userEvent.click(screen.getByRole('button', { name: '다음' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: '지도 이동 실습' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: '지도 확대 실습' }),
+    );
+    const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const { tutorialTarget } =
+      await import('@/components/graph/tutorial/tutorial-target');
+    const target = tutorialTarget(graph, true)!;
+    await userEvent.click(
+      screen.getByRole('button', { name: `${target.company.label} 선택` }),
+    );
+    await userEvent.click(
+      await within(
+        await screen.findByRole('complementary', {
+          name: `${target.company.label} 기업 상세`,
+        }),
+      ).findByRole('button', {
+        name: new RegExp(target.issue.label),
+      }),
+    );
+    await screen.findByText('튜토리얼 4/5');
+    const impactPanel = screen.getByRole('complementary', {
+      name: /영향 경로/,
+    });
+    await userEvent.click(
+      (
+        await within(impactPanel).findAllByRole('button', {
+          name: /근거 .*건 보기/,
+        })
+      )[0],
+    );
+    await screen.findByRole('heading', { name: '근거 문서' });
+    await screen.findByText('튜토리얼 5/5');
+    await userEvent.click(screen.getByRole('button', { name: '근거 창 닫기' }));
     expect(screen.getByRole('heading', { name: 'AI에게 묻기' })).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: '마치기' }));
+    expect(
+      screen.queryByRole('button', { name: '튜토리얼 건너뛰기' }),
+    ).toBeNull();
+    const askAi = within(impactPanel).getByRole('button', {
+      name: 'AI에게 묻기',
+    });
+    expect(askAi.classList.contains('tutorial-target')).toBe(true);
+    useAiChatStore.getState().close();
+    await userEvent.click(askAi);
+    expect(useAiChatStore.getState().isOpen).toBe(false);
     await waitFor(() =>
       expect(setTutorialCompleted).toHaveBeenCalledWith(true),
     );

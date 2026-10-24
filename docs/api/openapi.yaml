@@ -20,7 +20,7 @@ x-zoop-common-rules:
   pagination: "목록은 cursor·limit와 nextCursor를 사용한다. nextCursor=null은 마지막 페이지다. 커서는 불투명하며 정렬 키·필터·주체·고정 버전에 결합한다. 필터/버전을 바꾸면 첫 페이지부터 읽는다. 검색은 사용자가 명시적으로 실행하며 코드 정확 일치→이름 정확 일치→부분 일치 정렬을 유지한다. 고정 페이지 크기·상한·보존 기간은 실측/팀 확인 전 확정하지 않는다. 사용자가 전체를 순회할 수 있으며 임의 결과 상한으로 검색 결과를 버리지 않는다."
   timeAndAsOf: "정확한 시각은 RFC 3339 date-time으로 UTC Z 또는 명시적 오프셋을 쓴다. 오프셋 없는 시각은 거절한다. 날짜는 YYYY-MM-DD이고 날짜 경계는 Asia/Seoul이다. asOf는 자료 기준 시점이며 응답 생성 시각과 다르다. 사건의 year/month/day/unknown 정밀도는 timePrecision과 함께 제공하고 미상 날짜를 정확한 시각으로 만들지 않는다. 차트와 타임라인에는 같은 from/to를 전달하고 재무 기간은 별도다."
   chartResolution: "가격 차트의 봉 해상도는 기간별로 고정한다: 1d=5m, 1w=1h, 1m=1d, 1y=1wk(주봉). PriceSeries.interval은 응답 봉의 해상도이며 다른 해상도의 값을 이름만 바꿔 담지 않는다. 공급자가 목표 해상도를 직접 주지 않으면 같은 공급자의 더 촘촘한 봉(1분봉·일봉)을 거래소 현지 시각 기준 구간으로 집계해 만든다: 시가는 첫 봉 시가, 고가·저가는 최대·최소, 종가는 마지막 봉 종가, 거래량은 합. 5m·1h 구간은 시각을 그 단위로 내림한 봉 시작 시각이고, 1wk는 거래소 현지 날짜의 월요일에 시작하는 주다. 각 점의 time은 구간 시작 시각이다. 더 성긴 봉을 쪼개거나 빈 구간을 보간하지 않으며, 거래가 없는 구간은 점을 만들지 않는다. 집계할 원천도 없으면 200 unavailable(no_data)로 정상 자료 부재를 표현한다. 공급자 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE이다. 기계 판독용 매핑은 x-zoop-approvals.chartResolution이다."
-  publicationVersions: "그래프·사건·관계·근거 조회는 선택 graphVersion 또는 asOf를 받는다. 생략하면 한 요청 시작 시 활성 공개 버전을 고정하고 응답 metadata.graphVersion/asOf에 반환한다. 둘을 함께 지정하면 일치해야 한다. asOf는 그 시점 이전 공개 버전을 선택하며 이후 공개 자료는 사용하지 않는다. round는 발행 회차가 고정한 버전을 뜻한다. 고정 버전 부재는 VERSION_UNAVAILABLE이며 최신 자료로 대체하지 않는다. 브리핑은 그래프 버전·자료·시장 지표·긍부정을 발행 시 고정한다. 정정은 원문 밖에 덧붙인다."
+  publicationVersions: "그래프·사건·관계·근거 조회는 선택 graphVersion 또는 asOf를 받는다. 생략하면 한 요청 시작 시 활성 공개 버전을 고정하고 응답 metadata.graphVersion/asOf에 반환한다. 둘을 함께 지정하면 일치해야 한다. asOf는 그 시점 이전 공개 버전을 선택하며 이후 공개 자료는 사용하지 않는다. round는 발행 회차가 고정한 버전과 회차 마감 시각을 함께 뜻한다. round와 graphVersion/asOf를 함께 지정하면 저장된 회차 기준과 정확히 같아야 한다. 회차의 저장 버전은 데이터 마감 이후 발행될 수 있으므로 activeVersionAt(asOf)로 다시 선택하지 않는다. 고정 버전 부재는 VERSION_UNAVAILABLE이며 최신 자료로 대체하지 않는다. 과거 로컬 회차의 별도 재구성본은 graphOrigin=reconstructed로 구분하고 원본 발행 버전·문안을 변경하지 않으며, 재구성 ID는 round 문맥 없이 직접 조회할 수 없다. 브리핑은 그래프 버전·자료·시장 지표·긍부정을 발행 시 고정한다. 정정은 원문 밖에 덧붙인다."
   partialFailures: "영역별 API는 독립 조회한다. 집계 결과의 일부 영역만 실패하면 200과 metadata.partial=true/failures를 반환하고 성공 영역을 유지한다. 자료 미제공은 unavailable, 실제 장애는 failed 또는 failures로 표현한다. 요청 전체를 처리하지 못한 경우에만 비2xx 오류다. 재시도는 실패 조회만 하며 저장/분석 재실행을 암묵적으로 수행하지 않는다."
   aiJobs: "질문은 대화 ID·작업 ID·질문·대상·기간·asOf·graphVersion을 최초 접수 시 고정한다. 202는 접수, completed는 검증 및 결과 저장 완료다. queued/running/completed/failed/cancelled와 실패 종류·retryable·저장 결과를 회수한다. 되묻기·조건 부족·근거 부족은 기술 오류와 다르다. 생성 중 대화당 추가 질문을 거절한다. 검증 실패는 재생성하지 않고, 보존된 검증 결과의 저장 실패는 저장만 복구한다. 창 닫기는 취소가 아니다. AI v2 FS045~051이 현재 상세이며 옛 FS046(권한·중복 작업 통제)에는 대응하는 단일 신규 FS가 없다. 로그인·대화 소유·근거 접근 권한은 접수·상태 조회·결과 회수마다 재검증하고, 같은 작업 ID의 내용 불일치는 409로 거절하며, 서로 다른 작업 ID가 동시에 와도 같은 대화에는 처리 중 신규 작업을 하나만 접수한다. 상태 조회·결과 회수는 신규 접수와 구분한다(FS045·FS047·FS051·FS060과 NFS001/003의 공통 서버 의무)."
   sentiment: "DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이다. label은 positive/negative/mixed/undetermined(긍정/부정/혼재/판단 보류)이며 확률·점수를 제공하지 않는다. null은 아직 판정하지 않음이고 undetermined와 다르다. 원문 인용과 이유·판정 시각·모델·프롬프트 버전을 보존한다. 브리핑의 documentSentiments/outlook은 발행 시점에 고정한다. 이슈 자체의 종합 방향이나 투자 수익률로 확장하지 않는다."
@@ -2719,7 +2719,7 @@ paths:
           name: "round"
           in: "query"
           required: false
-          description: "브리핑 회차 ID. 회차의 문서와 기업별 긍부정 발행본을 함께 고정하려는 계약이다. 현재 회차별 그래프 버전 조회가 미구현이므로 전달하면 409 VERSION_UNAVAILABLE을 반환하며 최신 자료로 대체하지 않는다."
+          description: "브리핑 회차 ID. 회차가 고정한 버전·마감 시각과 선정 이슈 범위의 문서만 반환한다. cursor도 회차·버전·시각에 결속하며 다른 회차로 재사용하면 INVALID_CURSOR다. 현재 접근 권한·정확 인용을 재확인하고 최신 문서나 새 분석으로 대체하지 않는다. 재구성 자료는 metadata.source=briefing_reconstructed_graph로 구분한다."
           schema:
             type: "string"
         -
@@ -3102,7 +3102,7 @@ paths:
           "$ref": "#/components/responses/Error500"
         "503":
           "$ref": "#/components/responses/Error503"
-      description: "원문 인용과 기업별 긍부정 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "원문 인용 조회. round를 지정하면 해당 회차의 버전·마감 시각과 선정 이슈 범위를 공통 reader에서 고정한다. 원래 그래프의 인용은 선택 버전의 import receipt·정확 span·현재 source grant를 검사한다. 로컬 재구성 그래프의 인용은 보존된 회차 상세·원문 버전·정확 span·현재 발행 권한을 검사하고 metadata.source=briefing_reconstructed_graph로 구분한다. 현재 기업별 감성 판정은 생성하지 않으며 companyId 지정 시 해당 섹션은 unavailable로 안내한다. 최신 그래프나 최신 문서로 대체하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
       security: []
       x-zoop:
         fsIds:
@@ -3331,6 +3331,47 @@ paths:
             - "목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다."
         teamQuestions:
           - "핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다."
+  "/api/v1/briefings/{id}/recap":
+    get:
+      tags: ["briefings"]
+      operationId: "getBriefingRecap"
+      summary: "새 핵심 이슈가 없는 회차의 이전 발행본 복기"
+      description: "정상 발행된 빈 회차(no_issues_in_window)의 고정 비교 참조만 사용한다. 저장된 이전 회차 원문을 현재 권한·정정·시점 검증 후 반환한다. 새 이슈·새 전망·재평가가 아니며, 실패·보류 회차를 정상 무소식으로 전환하지 않는다. 고정 참조가 없거나 변경·정정·중단되면 다른 회차로 대체하지 않는다. 읽기 전용이며 기존 payload와 DB 스키마는 변경하지 않는다."
+      parameters:
+        - name: "id"
+          in: "path"
+          required: true
+          schema: {type: "string", minLength: 1, maxLength: 256}
+        - "$ref": "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: "복기 가용 상태와 고정된 과거 발행 원문"
+          content:
+            "application/json":
+              schema: {"$ref": "#/components/schemas/BriefingRecap"}
+        "404":
+          "$ref": "#/components/responses/Error404"
+        "422":
+          "$ref": "#/components/responses/Error422"
+        "500":
+          "$ref": "#/components/responses/Error500"
+        "503":
+          "$ref": "#/components/responses/Error503"
+      security: []
+      x-zoop:
+        fsIds: [FS028, FS029, FS033, FS035]
+        nfsIds: [NFS001, NFS002, NFS004, NFS008]
+        screenIds: [D-BRF-01, D-BRF-02]
+        wbsIds: [6.1.2, 6.11.1]
+        priority: P1
+        authority: 공개
+        errorCodes: [INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR]
+        prototype:
+          method: GET
+          path: null
+          operationId: null
+          differences: ["Spring 공개 조회의 읽기 전용 복기 뷰이며 직접 대응 BFF 없음."]
+        teamQuestions: []
   "/api/v1/briefings/{roundId}/items/{eventId}":
     get:
       tags: ["briefings"]
@@ -3412,7 +3453,7 @@ paths:
       tags:
         - "briefings"
       summary: "발행 당시 그래프 기준 조회"
-      description: "발행 당시 그래프 기준 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "발행본의 graphVersion과 회차 마감 시각을 고정해 핵심 이슈·관련 기업을 조회한다. 저장본과 대상 관계가 실제로 읽히는 경우에만 available이다. 과거 회차의 별도 재구성본은 graphOrigin=reconstructed와 reconstructedAt으로 구분하고 당시 발행본의 graphVersion을 변경하지 않는다. 원본·재구성본 모두 없으면 unavailableReason=snapshot_not_recorded로 구분한다. 최신 그래프로 대체하지 않는다."
       operationId: "getBriefingGraphBasis"
       parameters:
         -
@@ -4847,6 +4888,8 @@ paths:
           differences:
             - "/api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용."
             - "목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다."
+            - "``rule``(CandidateRule)은 숨김 방향이다. 프로토타입 R1의 withheldParticipants/withheldRelations/droppedRelations와 notAppliedReason=not_published는 없고 hiddenRelations를 둔다. applied=true는 결정 전 HOLD를 포함해 공개되면 숨겨진다는 뜻이다(규칙은 HOLD를 공개하지 않음, AI 5-A)."
+            - "notAppliedReason=admin_decision은 관리자가 거절한 후보만 뜻한다(HOLD 여부와 무관, 프로토타입은 허용·거절 모든 결정). 허용한 HOLD는 applied=true이고, AI REJECT 후보와 비활성 후보(active=false)는 rule=null이다."
         teamQuestions:
           - "대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다."
   "/api/v1/admin/pipeline/candidates/{candidate_id}":
@@ -4926,6 +4969,8 @@ paths:
           operationId: "candidate_api_admin_pipeline_candidates__candidate_id__get"
           differences:
             - "/api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용."
+            - "``rule``(CandidateRule)은 숨김 방향이다. 프로토타입 R1의 withheldParticipants/withheldRelations/droppedRelations와 notAppliedReason=not_published는 없고 hiddenRelations를 둔다. applied=true는 결정 전 HOLD를 포함해 공개되면 숨겨진다는 뜻이다(규칙은 HOLD를 공개하지 않음, AI 5-A)."
+            - "notAppliedReason=admin_decision은 관리자가 거절한 후보만 뜻한다(HOLD 여부와 무관, 프로토타입은 허용·거절 모든 결정). 허용한 HOLD는 applied=true이고, AI REJECT 후보와 비활성 후보(active=false)는 rule=null이다."
         teamQuestions:
           - "대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다."
   "/api/v1/admin/pipeline/candidates/{candidate_id}/decision":
@@ -5109,13 +5154,14 @@ paths:
           differences:
             - "/api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용."
             - "목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다."
+            - "publishedCandidates/publishedEvents는 활성 그래프 버전을 만들 때 세어 버전과 함께 고정한다(규칙 변경은 다음 버전부터 반영). 프로토타입은 조회할 때마다 overlay로 다시 계산한다."
         teamQuestions: []
   "/api/v1/admin/pipeline/rules/{rule_id}":
     put:
       tags:
         - "admin-pipeline"
       summary: "검증 규칙 목표 상태 설정"
-      description: "검증 규칙 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "검증 규칙 목표 상태 설정. 규칙은 앱 공개 정책이며 이미 공개 적격인 내용을 공개에서 빼는 방향으로만 작동한다. 규칙을 켜도 HOLD는 공개되지 않고 AI 판정 입력도 바뀌지 않는다. 이미 같은 상태면 아무것도 기록하지 않고 idempotent=true를 돌려준다. 변경은 공통 공개 잠금 아래 규칙 revision과 전역 rule log revision을 올리고 이력·감사를 같은 트랜잭션에 남긴다. reviewRevision은 응답 시점의 COALESCE(MAX(review_decisions.global_revision),0)이다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
       operationId: "setPublicationRule"
       parameters:
         -
@@ -5152,8 +5198,6 @@ paths:
           "$ref": "#/components/responses/Error403"
         "404":
           "$ref": "#/components/responses/Error404"
-        "409":
-          "$ref": "#/components/responses/Error409"
         "422":
           "$ref": "#/components/responses/Error422"
         "429":
@@ -5195,8 +5239,6 @@ paths:
           - "AUTH_REQUIRED"
           - "MEMBER_REQUIRED"
           - "ACCESS_DENIED"
-          - "REVISION_CONFLICT"
-          - "IDEMPOTENCY_CONFLICT"
           - "RATE_LIMITED"
         prototype:
           method: "PUT"
@@ -5204,6 +5246,7 @@ paths:
           operationId: "switch_rule_api_admin_pipeline_rules__rule_id__put"
           differences:
             - "/api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용."
+            - "publishedCandidates/publishedEvents는 활성 그래프 버전을 만들 때 세어 버전과 함께 고정한다(규칙 변경은 다음 버전부터 반영). 프로토타입은 조회할 때마다 overlay로 다시 계산한다."
         teamQuestions:
           - "대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다."
   "/api/v1/admin/graph/versions":
@@ -5742,7 +5785,7 @@ paths:
       tags:
         - "admin-jobs"
       summary: "허용된 분석 작업 재시도"
-      description: "허용된 분석 작업 재시도.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "허용된 분석 작업 재시도. RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 작업(같은 종류·라벨·입력)으로 대기열에 넣고 202를 돌려준다. 허용되지 않으면 REVISION_CONFLICT/409이고 아무것도 만들지 않는다. AI 요청을 직접 다시 보내지 않으며, 새 모델 실행이 필요하면 작업 실행 시 새 AI jobId를 쓴다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
       operationId: "retryAnalysisJob"
       parameters:
         -
@@ -5886,7 +5929,7 @@ paths:
           "$ref": "#/components/responses/Error500"
         "503":
           "$ref": "#/components/responses/Error503"
-      description: "분석 작업 명시적 취소.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "분석 작업 명시적 취소. queued는 즉시 cancelled, running은 cancelRequested=true로 표시하고 소유 worker가 종료한다(진행 중인 AI 하위 실행은 죽이지 않는다). 이미 cancelled면 같은 작업을 돌려준다. succeeded·failed는 끝난 작업이라 REVISION_CONFLICT/409이며, 취소는 완료된 결과의 철회나 공개 버전 비활성화를 대신하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
       security:
         -
           adminSession: []
@@ -8872,7 +8915,7 @@ components:
               type: "string"
             -
               type: "null"
-          description: "User-facing notice for every status but available"
+          description: "User-facing status notice, including reconstruction limitations when graphOrigin is reconstructed"
         reason:
           anyOf:
             -
@@ -8901,7 +8944,25 @@ components:
               type: "string"
             -
               type: "null"
-          description: "Graph version the round was published from"
+          description: "Selected graph version: original publication snapshot or a later reconstruction distinguished by graphOrigin. The original published payload is unchanged."
+        graphOrigin:
+          anyOf:
+            - type: "string"
+              enum: ["publication_snapshot", "reconstructed"]
+            - type: "null"
+          description: "Original publication snapshot or a separately registered later reconstruction. Reconstruction never overwrites the publication graphVersion."
+        reconstructedAt:
+          anyOf:
+            - type: "string"
+              format: "date-time"
+            - type: "null"
+          description: "When the reconstruction artifact was first registered; not the briefing cutoff or publication time."
+        unavailableReason:
+          anyOf:
+            - type: "string"
+              enum: ["snapshot_not_recorded", "snapshot_unavailable", "briefing_targets_unavailable"]
+            - type: "null"
+          description: "Unavailable graph detail: no original snapshot was recorded, the recorded snapshot cannot be read, or the briefing targets are no longer visible. Never substitute the newest graph."
         keyIssueIds:
           items:
             type: "string"
@@ -9280,6 +9341,24 @@ components:
         - "eventIds"
         - "evidenceIds"
         - "companyIds"
+    BriefingRecap:
+      type: "object"
+      required: [roundId, graphVersion, dataAsOf, status, reason, message, previous]
+      properties:
+        roundId: {type: "string"}
+        graphVersion:
+          anyOf: [{type: "string"}, {type: "null"}]
+        dataAsOf:
+          anyOf: [{type: "string", format: "date-time"}, {type: "null"}]
+        status: {type: "string", enum: [available, unavailable, not_applicable]}
+        reason:
+          anyOf: [{type: "string"}, {type: "null"}]
+        message: {type: "string"}
+        previous:
+          description: "고정 참조의 과거 발행 원문. 이번 회차의 새 평가·새 전망이 아니다. available일 때만 제공하며 기존 데이터·시장 지표의 시점도 과거 그대로다."
+          anyOf:
+            - "$ref": "#/components/schemas/BriefingResponse"
+            - type: "null"
     BriefingResponse:
       properties:
         id:
@@ -9973,8 +10052,10 @@ components:
       properties:
         ruleId:
           type: "string"
+          description: "The publication rule whose condition covers this candidate (``<ruleId>@<version>``)."
         applied:
           type: "boolean"
+          description: "True when the rule is enabled and its condition matches, whatever the candidate's publication state: its\n``hiddenRelations`` are kept off the public graph once it is published (AI pass, or an administrator allow followed by a\nnew import). For a HOLD nobody has decided yet it tells the administrator that allowing it will not make those\nrelations public. It never means the rule published anything: a rule never publishes a HOLD and never turns a HOLD\ninto an approval (AI owner 2026-10-22, 5-A)."
         notAppliedReason:
           anyOf:
             -
@@ -9982,33 +10063,21 @@ components:
               enum:
                 - "admin_decision"
                 - "rule_disabled"
-                - "not_published"
             -
               type: "null"
-        withheldParticipants:
-          items:
-            type: "integer"
-          type: "array"
-          description: "Indexes into the candidate's mention participants whose role is left out"
-        withheldRelations:
+          description: "Why the rule hides nothing here: rule_disabled (switched off), admin_decision (an administrator rejected\nthe candidate, HOLD or not, so it is never published; an allowed HOLD is applied). Null when applied."
+        hiddenRelations:
           items:
             type: "string"
           type: "array"
-          description: "Relation ids whose role is left out"
-        droppedRelations:
-          items:
-            type: "string"
-          type: "array"
-          description: "Relation ids the rule does not publish at all (a FOLLOWS whose follow-side event did not occur yet)"
+          description: "Relation ids of the candidate the rule keeps off the public graph once it is published. Empty when not\napplied."
       type: "object"
       required:
         - "ruleId"
         - "applied"
         - "notAppliedReason"
-        - "withheldParticipants"
-        - "withheldRelations"
-        - "droppedRelations"
-      description: "A candidate a publication rule covers: whether it is on the user graph through the rule, and what it leaves out."
+        - "hiddenRelations"
+      description: "How an application publication rule affects a candidate. Hide-only: see ``ReviewRuleOut``. The candidate's\n``rule`` is null when no rule's condition covers it and when it can never be published (an AI REJECT, or an inactive\ncandidate replaced by a newer job), since a rule has nothing to hide there."
     ChatAction:
       properties:
         kind:
@@ -13250,7 +13319,11 @@ components:
             -
               type: "null"
         unresolvedFailures:
-          type: "integer"
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
       type: "object"
       required:
         - "at"
@@ -13258,7 +13331,7 @@ components:
         - "outcome"
         - "newArticles"
         - "unresolvedFailures"
-      description: "The checkpoint the next article-processing run starts from: the start time of the latest run that\nfinished normally, also when it found nothing new. Failed and cancelled runs never move it.\n``unresolved_failures`` counts article files whose latest run failed or was cancelled."
+      description: "The checkpoint the next article-processing run starts from: the start time of the latest run that\nfinished normally, also when it found nothing new. Failed and cancelled runs never move it.\n``unresolved_failures`` counts article files whose latest run failed or was cancelled; null while no\nper-article run record exists (it is never a job count)."
     IngestOutcome:
       properties:
         outcome:
@@ -15170,6 +15243,8 @@ components:
             - "duplicate_running"
             - "other_running"
             - "dataset_missing"
+            - "outcome_unknown"
+          description: "재시도 판정. in_progress(대기·실행 중), succeeded(이미 성공), duplicate_running(이 작업의 재시도가 대기·실행 중), newer_attempt(더 새 재시도가 있어 가장 최근 시도만 재시도 가능), superseded(같은 종류·같은 입력의 더 나중 작업이 성공), outcome_unknown(외부 실행 결과를 확인할 수 없음: 응답 유실로 실행·과금 여부를 모르므로 자동 재시도하지 않음), dataset_missing(작업의 실행 계획이나 입력 연결이 없거나 철회됨, 일시적 조회 장애는 해당하지 않음), allowed. other_running은 대기열 정책상 다른 작업 실행만으로 재시도를 거절하지 않으므로 반환하지 않는다. blockedBy는 막고 있는 작업 ID다."
         reason:
           type: "string"
         blockedBy:
@@ -15284,12 +15359,26 @@ components:
             -
               type: "null"
         eligible:
-          type: "integer"
-          description: "HOLD candidates of the active version the rule covers (ignoring the switch and admin decisions)"
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
+          description: "Information only, not a publication count: HOLD review targets in the source jobs the active version references that the rule currently covers (counted from review_targets and AI source revisions, ignoring the switch and admin decisions). The current pending count, not the statistics frozen with a version. Null while that source projection does not exist yet."
         publishedCandidates:
-          type: "integer"
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
+          description: "Candidates in the rule's scope that are still public after the rule is applied in the active graph version (not candidates the rule published: a rule never publishes). Counted when that version is built and frozen with it (the statistics at freeze time, AI owner 5-A), so a switch changes it only from the next version. Null while the active version has no frozen count."
         publishedEvents:
-          type: "integer"
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
+          description: "Events in the rule's scope that are still public after the rule is applied in the active graph version (not events the rule published). Frozen with that version like ``publishedCandidates``. Null while the active version has no frozen count."
         history:
           items:
             "$ref": "#/components/schemas/RuleChangeOut"
@@ -15308,7 +15397,7 @@ components:
         - "publishedCandidates"
         - "publishedEvents"
         - "history"
-      description: "A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@2``."
+      description: "An application publication rule; the id carries its version (``<ruleId>@<version>``). A rule can only keep\nalready eligible content off the public graph. It never publishes a HOLD, never turns a HOLD into an approval and never\nchanges an AI judgement input: content is published only by an AI pass inside a handoff or by an administrator allow\nfollowed by a new handoff, import and activation. ``changedAt``/``changedBy``/``reason`` are the latest change, null\nonly while the rule has never been changed (a rule switched back to its default keeps its latest change).\n``history`` is every change, newest first."
     RoundDetail:
       properties:
         id:
@@ -15670,6 +15759,7 @@ components:
         reason:
           type: "string"
           minLength: 1
+          description: "Stored with surrounding whitespace stripped; 1 to 500 characters after stripping (longer is 422\nINVALID_REQUEST)."
       type: "object"
       required:
         - "enabled"

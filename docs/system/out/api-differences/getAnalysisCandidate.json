@@ -21,6 +21,13 @@
       "type": "string"
     },
     "response:200:application/json.relations[].sourceVersion:required": true,
+    "response:200:application/json.rule<anyOf:0>.hiddenRelations": {
+      "type": "array"
+    },
+    "response:200:application/json.rule<anyOf:0>.hiddenRelations:required": true,
+    "response:200:application/json.rule<anyOf:0>.hiddenRelations[]": {
+      "type": "string"
+    },
     "response:200:application/json.sourceRevision": {
       "type": "string"
     },
@@ -313,6 +320,27 @@
     "response:200:application/json.articles[].title<anyOf:1>": {
       "type": "null"
     },
+    "response:200:application/json.rule<anyOf:0>.droppedRelations": {
+      "type": "array"
+    },
+    "response:200:application/json.rule<anyOf:0>.droppedRelations:required": true,
+    "response:200:application/json.rule<anyOf:0>.droppedRelations[]": {
+      "type": "string"
+    },
+    "response:200:application/json.rule<anyOf:0>.withheldParticipants": {
+      "type": "array"
+    },
+    "response:200:application/json.rule<anyOf:0>.withheldParticipants:required": true,
+    "response:200:application/json.rule<anyOf:0>.withheldParticipants[]": {
+      "type": "integer"
+    },
+    "response:200:application/json.rule<anyOf:0>.withheldRelations": {
+      "type": "array"
+    },
+    "response:200:application/json.rule<anyOf:0>.withheldRelations:required": true,
+    "response:200:application/json.rule<anyOf:0>.withheldRelations[]": {
+      "type": "string"
+    },
     "response:200:application/json.verification.observations[].confidence:required": true,
     "response:200:application/json.verification.observations[].confidence<anyOf:0>": {
       "type": "number"
@@ -422,6 +450,23 @@
       },
       "bff": {
         "type": "string"
+      }
+    },
+    "response:200:application/json.rule<anyOf:0>.notAppliedReason<anyOf:0>": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "admin_decision",
+          "rule_disabled"
+        ]
+      },
+      "bff": {
+        "type": "string",
+        "enum": [
+          "admin_decision",
+          "rule_disabled",
+          "not_published"
+        ]
       }
     },
     "response:401:application/json.error.code": {

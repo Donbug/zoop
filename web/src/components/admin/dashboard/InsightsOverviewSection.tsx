@@ -39,18 +39,20 @@ export default function InsightsOverviewSection() {
       )}
       {data && (
         <dl className="grid grid-cols-2 gap-x-6 gap-y-5 py-2 md:grid-cols-3 lg:grid-cols-6">
-          {data.metrics.map((metric) => (
-            <Metric
-              key={metric.key}
-              label={metric.label}
-              value={<MetricValue metric={metric} />}
-              detail={
-                metric.kind === 'ratio' ? (
-                  <MetricBasis metric={metric} minSample={data.minSample} />
-                ) : undefined
-              }
-            />
-          ))}
+          {data.metrics
+            .filter((metric) => metric.key !== 'onboarding')
+            .map((metric) => (
+              <Metric
+                key={metric.key}
+                label={metric.label}
+                value={<MetricValue metric={metric} />}
+                detail={
+                  metric.kind === 'ratio' ? (
+                    <MetricBasis metric={metric} minSample={data.minSample} />
+                  ) : undefined
+                }
+              />
+            ))}
           <Metric
             label="AI 좋아요 비율"
             value={

@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CompanyDetailPanel from '@/components/graph/CompanyDetailPanel';
 import { useCompanyData } from '@/hooks/useCompanyData';
+import { useTutorialInteractionLock } from '@/components/graph/tutorial/useTutorialInteractionLock';
 import { setWatchlistCompany } from '@/apis/graph/companies';
 import {
   mockCompany,
@@ -46,6 +47,10 @@ const fallback = {
   geography: null,
 };
 
+function RetryLock() {
+  useTutorialInteractionLock(3, true);
+  return null;
+}
 function renderPanel(token: string | null = null) {
   return render(
     <MemoryRouter>
@@ -70,6 +75,21 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
   beforeEach(() => {
     vi.mocked(useCompanyData).mockReturnValue(state);
     vi.mocked(setWatchlistCompany).mockReset();
+  });
+
+  it('튜토리얼 잠금 중에도 실제 SectionError 재시도가 작동한다', async () => {
+    vi.mocked(useCompanyData).mockReturnValue({
+      ...state,
+      errors: { quote: 'offline' },
+    });
+    render(<RetryLock />);
+    renderPanel();
+    const retry = await screen.findByRole('button', { name: '다시 시도' });
+    expect((retry as HTMLButtonElement).disabled).toBe(false);
+    const calls = vi.mocked(useCompanyData).mock.calls.length;
+    await userEvent.click(retry);
+    expect(vi.mocked(useCompanyData).mock.calls.length).toBeGreaterThan(calls);
+    expect(vi.mocked(useCompanyData).mock.calls.at(-1)?.[2]).toBe(1);
   });
 
   it('기업·시세·차트·사건·관련 기업·뉴스 섹션을 표시한다', () => {

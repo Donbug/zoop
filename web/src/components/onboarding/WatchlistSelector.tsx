@@ -167,7 +167,6 @@ export default function WatchlistSelector() {
     saving.current = true;
     draft.setSavingWatchlist(true);
     setSaveError(false);
-    const hasStocks = lookup.portfolio.holdings.length > 0 || ids.length > 0;
     try {
       const result = await completeInitialSettings({
         version: lookup.settings.version,
@@ -179,8 +178,22 @@ export default function WatchlistSelector() {
           : {}),
       });
       if (!mounted.current || currentSessionOwner() !== owner) return;
-      useAuthStore.setState({ onboardingCompleted: result.completed });
-      navigate(hasStocks ? '/?mode=personal' : '/?mode=all', { replace: true });
+      useAuthStore.setState((state) => ({
+        onboardingCompleted: result.completed,
+        session:
+          state.session?.kind === 'member'
+            ? {
+                ...state.session,
+                setup: {
+                  completed: result.completed,
+                  tutorialCompleted: result.tutorialCompleted,
+                },
+              }
+            : state.session,
+      }));
+      navigate(result.tutorialCompleted ? '/?mode=all' : '/?mode=all&tour=1', {
+        replace: true,
+      });
     } catch {
       if (mounted.current && currentSessionOwner() === owner)
         setSaveError(true);

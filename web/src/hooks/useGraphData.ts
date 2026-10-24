@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { getGraph } from '@/apis/graph/graph';
+import { BriefingGraphUnavailableError } from '@/apis/graph/briefing-context';
 import type { GraphRequest, GraphResponse } from '@/types/map/graph';
 
 export type GraphPrefetch = { key: string; data: GraphResponse };
@@ -34,10 +35,19 @@ export function useGraphData(
   const [state, setState] = useState<{
     data: GraphResponse | null;
     error: string | null;
+    /** 회차 지도가 실패가 아니라 제공되지 않는 상태(D-BRF-04). 값은 API가 준 사유다. */
+    unavailableReason: string | null;
     loading: boolean;
     session: string | null;
     snapshotKey: string;
-  }>({ data: null, error: null, loading: true, session, snapshotKey });
+  }>({
+    data: null,
+    error: null,
+    unavailableReason: null,
+    loading: true,
+    session,
+    snapshotKey,
+  });
   const latest = useRef(0);
   const { mode, personalFilter, companyId, asOf, graphVersion, depth, round } =
     request;
@@ -56,6 +66,7 @@ export function useGraphData(
         snapshotKey,
         loading: true,
         error: null,
+        unavailableReason: null,
       }));
       try {
         const input = {
@@ -74,13 +85,24 @@ export function useGraphData(
             : await getGraph(input);
         if (cached && prefetched?.current === cached) prefetched.current = null;
         if (sequence === latest.current)
-          setState({ data, error: null, loading: false, session, snapshotKey });
+          setState({
+            data,
+            error: null,
+            unavailableReason: null,
+            loading: false,
+            session,
+            snapshotKey,
+          });
       } catch (error) {
         if (sequence === latest.current)
           setState((old) => ({
             ...old,
             data: round ? null : old.data,
             loading: false,
+            unavailableReason:
+              error instanceof BriefingGraphUnavailableError
+                ? error.reason
+                : null,
             error:
               error instanceof Error
                 ? error.message
@@ -107,5 +129,11 @@ export function useGraphData(
   // Never flash a previous member's personal response after logout/session replacement.
   return state.session === session && state.snapshotKey === snapshotKey
     ? state
-    : { ...state, data: null, error: null, loading: true };
+    : {
+        ...state,
+        data: null,
+        error: null,
+        unavailableReason: null,
+        loading: true,
+      };
 }

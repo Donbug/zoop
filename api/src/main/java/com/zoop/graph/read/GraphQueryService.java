@@ -15,6 +15,8 @@ import java.util.Map;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 /**
  * {@code getGraph} (all and personal) and {@code getCompanyGraphAsOf}: one pinned version read through {@link PublicGraphReader}, then
@@ -37,6 +39,7 @@ public class GraphQueryService {
      * personal is the member's own companies, read by the caller after authentication; null in all mode. Personal
      * mode centres on them (or on companyId) and marks holding/watch; all mode carries no personal data.
      */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, timeout = 5)
     public GraphResponse getGraph(String mode, String companyId, Integer depth, String round, String graphVersion,
             String asOf, String personalFilter, PersonalCompanies.Ids personal, String requestId) {
         String resolvedMode = mode == null ? "all" : mode;
@@ -60,11 +63,23 @@ public class GraphQueryService {
             focus = companyId != null ? List.of(companyId) : own;
         }
 
-        PublicGraphReader.Pinned pinned = reader.read(round, graphVersion, requestedAsOf);
+        PublicGraphReader.Pinned pinned = reader.read(round, graphVersion, requestedAsOf, requestId);
         // No own companies: an empty personal graph, never the whole market presented as personal.
-        GraphSelection.Result selection = isPersonal && focus.isEmpty()
-                ? new GraphSelection.Result(Map.of(), false)
-                : GraphSelection.select(pinned.graph(), focus, depth, NODE_LIMIT);
+        GraphSelection.Result selection;
+        if (pinned.selected().briefing() != null) {
+            var basis = pinned.selected().briefing();
+            selection = GraphSelection.briefing(pinned.graph(), basis, NODE_LIMIT);
+            if (companyId != null) {
+                if (!selection.nodes().containsKey(companyId) || !pinned.graph().companies.containsKey(companyId)) throw invalid();
+                selection = GraphSelection.neighbourhood(pinned.graph(), selection, companyId,
+                        depth == null ? NODE_LIMIT : 2 * Math.min(depth, NODE_LIMIT));
+            }
+            focus = companyId == null ? basis.companyIds() : List.of(companyId);
+        } else {
+            selection = isPersonal && focus.isEmpty()
+                    ? new GraphSelection.Result(Map.of(), false)
+                    : GraphSelection.select(pinned.graph(), focus, depth, NODE_LIMIT);
+        }
         withAppearance(catalog, selection);
         GraphResponse response = response(pinned, selection, catalog, focus, resolvedMode, depth, requestId,
                 isPersonal ? personal : null, isPersonal ? filter : null);
@@ -107,7 +122,8 @@ public class GraphQueryService {
         SelectedGraphVersion selected = pinned.selected();
         Map<String, Kind> picked = selection.nodes();
         List<GraphResponse.Node> nodes = picked.entrySet().stream()
-                .map(e -> e.getValue() == Kind.ISSUE ? issueNode(graph.issues.get(e.getKey()))
+                .map(e -> e.getValue() == Kind.ISSUE ? issueNode(graph.issues.get(e.getKey()),
+                        selected.briefing() != null && selected.briefing().keyIssueIds().contains(e.getKey()))
                         : companyNode(CompanyAppearance.fill(graph.companies.get(e.getKey()), catalog.get(e.getKey())),
                                 focus.contains(e.getKey()), personal))
                 .toList();
@@ -119,7 +135,9 @@ public class GraphQueryService {
                         RelationValidity.of(graph.basesOf(e), selected.asOf())))
                 .toList();
         String emptyReason = edges.isEmpty() ? (focus.isEmpty() ? "no_approved_issues" : "no_related_issues") : null;
-        return new GraphResponse(nodes, edges, new GraphResponse.Metadata("public_graph_snapshot",
+        String source = selected.briefing() != null && selected.briefing().reconstruction() != null
+                ? "briefing_reconstructed_graph" : "public_graph_snapshot";
+        return new GraphResponse(nodes, edges, new GraphResponse.Metadata(source,
                 selected.asOf().toString(), selected.version().id(), mode, selection.truncated(), emptyReason,
                 focus, depth, NODE_LIMIT, requestId, false, List.of(), personalFilter));
     }
@@ -158,8 +176,8 @@ public class GraphQueryService {
                 c.logoUrl(), null, null, null, null, null, null);
     }
 
-    private static GraphResponse.Node issueNode(Issue i) {
-        return new GraphResponse.Node(i.issueId(), "issue", i.label(), false, false, false, null, null, i.eventTime(),
+    private static GraphResponse.Node issueNode(Issue i, boolean focus) {
+        return new GraphResponse.Node(i.issueId(), "issue", i.label(), focus, false, false, null, null, i.eventTime(),
                 i.timePrecision(), i.action(), i.target(), i.evidenceIds().size(), i.geography());
     }
 

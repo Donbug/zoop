@@ -507,10 +507,13 @@
       "type": "boolean"
     },
     "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].defaultEnabled:required": true,
-    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].eligible": {
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].eligible:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].eligible<anyOf:0>": {
       "type": "integer"
     },
-    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].eligible:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].eligible<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].enabled": {
       "type": "boolean"
     },
@@ -547,14 +550,20 @@
       "type": "string"
     },
     "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].id:required": true,
-    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].publishedCandidates": {
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].publishedCandidates:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].publishedCandidates<anyOf:0>": {
       "type": "integer"
     },
-    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].publishedCandidates:required": true,
-    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].publishedEvents": {
-      "type": "integer"
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].publishedCandidates<anyOf:1>": {
+      "type": "null"
     },
     "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].publishedEvents:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].publishedEvents<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].publishedEvents<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].reason:required": true,
     "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].reason<anyOf:0>": {
       "type": "string"
@@ -906,7 +915,8 @@
         "newer_attempt",
         "duplicate_running",
         "other_running",
-        "dataset_missing"
+        "dataset_missing",
+        "outcome_unknown"
       ]
     },
     "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.code:required": true,
@@ -1278,7 +1288,8 @@
         "newer_attempt",
         "duplicate_running",
         "other_running",
-        "dataset_missing"
+        "dataset_missing",
+        "outcome_unknown"
       ]
     },
     "response:200:application/json.jobs<anyOf:0>.recent[].retry.code:required": true,

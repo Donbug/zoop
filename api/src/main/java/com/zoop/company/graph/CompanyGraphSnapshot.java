@@ -6,7 +6,11 @@ import java.util.Objects;
 
 /** Public, immutable graph data needed by getCompany after snapshot selection and disclosure filtering. */
 public record CompanyGraphSnapshot(String graphVersion, Instant asOf, boolean companyFound,
-        List<CompanyIssueRef> directIssues, List<CompanyIssueRef> structuralIssues, Summary summary) {
+        List<CompanyIssueRef> directIssues, List<CompanyIssueRef> structuralIssues, Summary summary, String source) {
+    public CompanyGraphSnapshot(String graphVersion, Instant asOf, boolean companyFound,
+            List<CompanyIssueRef> directIssues, List<CompanyIssueRef> structuralIssues, Summary summary) {
+        this(graphVersion, asOf, companyFound, directIssues, structuralIssues, summary, "public_graph_snapshot");
+    }
     public CompanyGraphSnapshot {
         Objects.requireNonNull(graphVersion, "graphVersion");
         Objects.requireNonNull(asOf, "asOf");

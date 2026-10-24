@@ -131,7 +131,6 @@ function MemberDetail({ memberId }: { memberId: string }) {
             <Metric
               label="최근 활동"
               value={row.lastActiveAt ? formatKst(row.lastActiveAt) : '–'}
-              detail="1분 단위로 기록돼요"
             />
             <Metric
               label="로그인 세션(누적)"
@@ -140,7 +139,6 @@ function MemberDetail({ memberId }: { memberId: string }) {
             <Metric
               label="그래프 선택"
               value={countWith(row.activity.graphSelections, '회')}
-              detail="노드·간선"
             />
             <Metric
               label="AI 질문"
@@ -153,7 +151,6 @@ function MemberDetail({ memberId }: { memberId: string }) {
             <Metric
               label="평가"
               value={`${count(data.feedbackUp)} / ${count(data.feedbackDown)}`}
-              detail="좋아요 / 싫어요"
             />
             <Metric
               label="초기 설정"
@@ -166,14 +163,10 @@ function MemberDetail({ memberId }: { memberId: string }) {
             <Metric
               label="관심 종목"
               value={`${count(data.watchlistCount)}개`}
-              detail="종목 이름은 보이지 않아요"
             />
             <Metric
               label="가상 보유 종목"
               value={countWith(data.holdingCount, '개')}
-              detail={
-                data.accountConnected ? '가상 계좌 연결됨' : '가상 계좌 없음'
-              }
             />
           </dl>
           <Section title="차단·해제 이력">

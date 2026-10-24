@@ -262,7 +262,7 @@ class GraphHandoffImporterTest {
         String versionId = built.versionId();
 
         JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId)));
-        assertEquals("zoop-graph-handoff-bundle-5", receipt.get("bundle").get("schemaVersion").stringValue());
+        assertEquals("zoop-graph-handoff-bundle-7", receipt.get("bundle").get("schemaVersion").stringValue());
         // The hand-written expectation of the issue's field provenance: the one unanimous mention states every value, and the
         // receipt says so without claiming any value was verified (selection, not fact verification).
         JsonNode provenance = receipt.get("bundle").get("issues").get(0).get("fieldProvenance");
@@ -319,6 +319,86 @@ class GraphHandoffImporterTest {
         assertEquals(0, provenance.get("withheld").size());
         assertEquals("2026-09-30", snapshot.issues().get(0).eventTime());
         assertEquals("2026Q3", snapshot.issues().get(0).period());
+    }
+
+    @Test
+    void anAvailableSummaryIsRetainedExactlyInTheReceiptAndNeverReachesTheSnapshotOrTheResult() throws Exception {
+        Built summarized = HandoffFixtures.withSummary(built, HandoffFixtures::availableSummary);
+        handoff.envelope = summarized.envelopeBytes();
+
+        GraphHandoffResult result = importer.run(summarized.request());
+
+        assertTrue(result.succeeded(), () -> String.valueOf(result.failure() == null ? null : result.failure().failure()));
+        String versionId = summarized.versionId();
+        // The receipt keeps the producer's exact object: every claim, id, digest, identity and the job pin.
+        JsonNode retained = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId))).get("bundle").get("issues").get(0).get("summary");
+        assertEquals(summarized.bundle().get("issues").get(0).get("summary"), retained);
+        assertEquals("available", retained.get("status").stringValue());
+        assertEquals(HandoffFixtures.SUMMARY_CLAIM, retained.get("text").stringValue());
+        assertEquals(HandoffFixtures.SUMMARY_JOB, retained.get("source").get("jobId").stringValue());
+        // It is a receipt-only record, not a public snapshot projection: nothing of it is in the snapshot or in the written result.
+        byte[] snapshotBytes = Files.readAllBytes(snapshotFile(versionId));
+        assertEquals(PublicGraphSnapshot.FORMAT, GraphSnapshotCodec.read(snapshotBytes, versionId).snapshotFormat());
+        String snapshotText = new String(snapshotBytes, StandardCharsets.UTF_8);
+        String resultText = new String(GraphHandoffResultWriter.toBytes(result), StandardCharsets.UTF_8);
+        for (String summaryOnly : List.of(HandoffFixtures.SUMMARY_CLAIM, "resultVersion", "isr-", HandoffFixtures.SUMMARY_JOB, "authored-replay",
+                "claims", "basisDigest", "issueSummary")) {
+            assertFalse(snapshotText.contains(summaryOnly), "snapshot: " + summaryOnly);
+            assertFalse(resultText.contains(summaryOnly), "result: " + summaryOnly);
+        }
+
+        // The same pins again: a no-op with the same retained summary.
+        assertEquals(Outcome.UNCHANGED, importer.run(summarized.request()).staged().outcome());
+    }
+
+    @Test
+    void aTemporalPendingOrJobCodedSummaryIsRetainedAsStatedAndANotRequestedOneNeverBecomesAnAvailableOne() throws Exception {
+        Built held = HandoffFixtures.build(Spec.standard().withVerdicts());
+        handoff.envelope = held.envelopeBytes();
+
+        assertTrue(importer.run(held.request()).succeeded());
+        JsonNode retained = HandoffFixtures.parse(Files.readAllBytes(receiptFile(held.versionId()))).get("bundle").get("issues").get(0).get("summary");
+        assertEquals("temporal-review-pending", retained.get("code").stringValue());
+        assertTrue(retained.get("source").isNull());
+        assertFalse(Files.readString(receiptFile(held.versionId())).contains(HandoffFixtures.SUMMARY_CLAIM));
+    }
+
+    @Test
+    void aTamperedSummaryIsRefusedBeforeAnythingIsWrittenWhateverItsDigestsSay() throws Exception {
+        InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+        InMemoryDocumentRegistry.State registryBefore = registry.state();
+        long filesBefore = fileCount();
+        Built summarized = HandoffFixtures.withSummary(built, HandoffFixtures::availableSummary);
+        Built held = HandoffFixtures.build(Spec.standard().withVerdicts());
+        record Forgery(String rule, Built forged) {
+        }
+        List<Forgery> forgeries = List.of(
+                new Forgery("a claim text edited behind the digests", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary").get("claims").get(0)).put("text", "합성기업이 계약을 취소했다."))),
+                new Forgery("a summary text that is not the claims", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary")).put("text", "다른 문장이다."))),
+                new Forgery("an evidence id outside the issue's mention quotes", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary").get("claims").get(0)).putArray("evidenceIds")
+                                .add("ev-" + "0".repeat(64)))),
+                new Forgery("a basis digest of another basis", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary").get("source")).put("basisDigest", "0".repeat(64)))),
+                new Forgery("an available summary on an issue whose time field is held", HandoffFixtures.repinned(held,
+                        b -> ((ObjectNode) b.get("issues").get(0)).set("summary", HandoffFixtures.availableSummary(b)))),
+                new Forgery("not-requested on an issue whose time field is held", HandoffFixtures.repinned(held,
+                        b -> ((ObjectNode) b.get("issues").get(0)).set("summary", HandoffFixtures.unavailable("not-requested")))),
+                new Forgery("temporal-review-pending on an issue nobody held", HandoffFixtures.repinned(built,
+                        b -> ((ObjectNode) b.get("issues").get(0)).set("summary", HandoffFixtures.unavailable("temporal-review-pending")))),
+                new Forgery("a replay summary relabelled as a provider's", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary").get("producer")).put("kind", "provider"))));
+        for (Forgery forgery : forgeries) {
+            handoff.envelope = forgery.forged().envelopeBytes();
+
+            GraphHandoffException failure = failure(importer.run(forgery.forged().request()));
+
+            assertEquals(GraphHandoffFailure.BUNDLE_INVALID, failure.failure(), forgery.rule());
+            assertEquals(0, graph.writes(), forgery.rule());
+            assertNothingWritten(graphBefore, registryBefore, filesBefore);
+        }
     }
 
     @Test
@@ -469,7 +549,8 @@ class GraphHandoffImporterTest {
 
     @Test
     void anExportOfAnEarlierBundleSchemaIsAnInvalidBundleAndNothingIsWritten() throws Exception {
-        for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3")) {
+        for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3",
+                "zoop-graph-handoff-bundle-5", "zoop-graph-handoff-bundle-6")) {
             InMemoryGraphHandoffRepository.State graphBefore = graph.state();
             InMemoryDocumentRegistry.State registryBefore = registry.state();
             long filesBefore = fileCount();
@@ -477,15 +558,21 @@ class GraphHandoffImporterTest {
             ObjectNode bundle = (ObjectNode) envelope.get("bundle");
             bundle.put("schemaVersion", schema);
             ObjectNode issue = (ObjectNode) bundle.get("issues").get(0);
-            // What each earlier build wrote: -3 has provenance without `withheld` and no verdicts, -2 no provenance, -1 no mentions.
-            issue.remove("fieldVerdicts");
-            if (schema.endsWith("-3")) {
-                ((ObjectNode) issue.get("fieldProvenance")).remove("withheld");
-            } else {
-                issue.remove("fieldProvenance");
-            }
-            if (schema.endsWith("-1")) {
-                issue.remove("mentions");
+            // What each earlier build wrote: -3 has provenance without `withheld` and no verdicts, -2 no provenance, -1 no mentions;
+            // -5 has today's issues, so only its schema string marks it as earlier; -6 lacks the issue summary and its policy key.
+            if (schema.endsWith("-6")) {
+                issue.remove("summary");
+                ((ObjectNode) bundle.get("policy")).remove("issueSummary");
+            } else if (!schema.endsWith("-5")) {
+                issue.remove("fieldVerdicts");
+                if (schema.endsWith("-3")) {
+                    ((ObjectNode) issue.get("fieldProvenance")).remove("withheld");
+                } else {
+                    issue.remove("fieldProvenance");
+                }
+                if (schema.endsWith("-1")) {
+                    issue.remove("mentions");
+                }
             }
             ((ObjectNode) bundle.get("digests")).put("content", HandoffBundleVerifier.contentDigest(bundle));
             ((ObjectNode) envelope.get("receipt")).put("bundleSchema", schema);
@@ -1060,6 +1147,83 @@ class GraphHandoffImporterTest {
             }
         }
         throw new AssertionError("no structural relation");
+    }
+
+    // ------------------------------------------------------------------------------------------------ impacts --------------
+
+    @Test
+    void aVerifiedImpactIsRetainedRawInTheReceiptWhileTheSnapshotCarriesOnlyItsQuoteSpan() throws Exception {
+        Built impact = HandoffFixtures.build(Spec.standard().withImpact());
+        handoff.envelope = impact.envelopeBytes();
+
+        GraphHandoffResult result = importer.run(impact.request());
+
+        assertTrue(result.succeeded(), () -> String.valueOf(result.failure() == null ? null : result.failure().failure()));
+        String versionId = impact.versionId();
+        JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId)));
+        assertEquals(impact.bundle().get("impacts"), receipt.get("bundle").get("impacts"), "the receipt retains every row raw");
+        assertEquals(impact.bundle(), receipt.get("bundle"));
+        assertEquals(1, receipt.get("bundle").get("counts").get("impacts").intValue());
+        assertTrue(strings(receipt.get("appVerification").get("checks"))
+                .contains("impact_rows_closed_over_involves_sources_approvals_and_labels"));
+        assertEquals("audit-metadata-not-a-verifier-verdict", receipt.get("appVerification").get("approvalBasis").stringValue());
+
+        String quote = impact.bundle().get("impacts").get(0).get("effects").get("positive").get(0).stringValue();
+        String snapshotText = Files.readString(snapshotFile(versionId));
+        PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(Files.readAllBytes(snapshotFile(versionId)), versionId);
+        assertEquals(3, snapshot.snapshotFormat());
+        assertEquals(4, snapshot.evidence().size());
+        assertTrue(snapshot.evidence().stream().anyMatch(e -> e.evidenceId().equals(quote)),
+                "the quote's span is a public span, nothing more");
+        // No impact content of any kind reaches the public snapshot: no reserved field name at any depth, no reserved literal value and none of
+        // the exact proposal/candidate strings. (The raw text is NOT searched for words: an id may legitimately contain one.)
+        String candidateId = impact.bundle().get("impacts").get(0).get("impactCandidateId").stringValue();
+        assertEquals(List.of(), HandoffFixtures.impactLeaks(snapshotText, candidateId, "합성 영향"));
+        assertEquals(4, HandoffFixtures.parse(GraphHandoffResultWriter.toBytes(result)).get("evidenceRows").get("registered").intValue());
+    }
+
+    @Test
+    void aDefaultAndAnOperatorApprovedHandoffRetainTheirNotProposedAndNotApplicableRowsOnlyInTheReceipt() throws Exception {
+        // The handoff id is the snapshot's sourceBundleId and may legitimately contain a reserved word ("impacts"): only object keys and
+        // exact protected values are leaks, never an identifier's substring.
+        for (Spec spec : List.of(Spec.standard().withHandoffId("handoff-default-impacts"),
+                Spec.standard().withHandoffId("handoff-manual-impacts").withManualApproval())) {
+            Built world = HandoffFixtures.build(spec);
+            handoff.envelope = world.envelopeBytes();
+
+            assertTrue(importer.run(world.request()).succeeded(), spec.handoffId());
+
+            JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(world.versionId())));
+            JsonNode rows = receipt.get("bundle").get("impacts");
+            assertEquals(1, rows.size(), spec.handoffId());
+            assertEquals(spec.manualApproval() ? "not-applicable" : "not-proposed", rows.get(0).get("status").stringValue());
+            String snapshotText = Files.readString(snapshotFile(world.versionId()));
+            assertTrue(snapshotText.contains("\"sourceBundleId\":\"" + spec.handoffId() + "\""), spec.handoffId());
+            assertEquals(List.of(), HandoffFixtures.impactLeaks(snapshotText), spec.handoffId());
+        }
+    }
+
+    @Test
+    void anImpactRowThatContradictsItsEdgeOrApprovalIsRefusedBeforeAnythingIsWritten() throws Exception {
+        InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+        InMemoryDocumentRegistry.State registryBefore = registry.state();
+        long filesBefore = fileCount();
+        Built manual = HandoffFixtures.build(Spec.standard().withHandoffId("handoff-manual-forged").withManualApproval());
+        List<Built> forged = List.of(
+                HandoffFixtures.repinned(built, b -> ((ObjectNode) b.get("impacts").get(0)).put("status", "not-applicable")),
+                HandoffFixtures.repinned(manual, b -> ((ObjectNode) b.get("impacts").get(0)).put("status", "not-proposed")),
+                HandoffFixtures.repinned(built, b -> ((ObjectNode) b.get("impacts").get(0)).put("companyId", COMPANY_B)));
+        for (Built world : forged) {
+            handoff.envelope = world.envelopeBytes();
+
+            GraphHandoffException failure = failure(importer.run(world.request()));
+
+            assertEquals(GraphHandoffFailure.BUNDLE_INVALID, failure.failure());
+            assertEquals(0, graph.writes());
+            assertEquals(graphBefore, graph.state());
+            assertEquals(registryBefore, registry.state());
+            assertEquals(filesBefore, fileCount());
+        }
     }
 
     @Test

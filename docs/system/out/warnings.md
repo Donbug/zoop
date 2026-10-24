@@ -275,9 +275,10 @@
 | BFF_FIELD_DIFFERENCE | difference | getBriefing | 목표만 721 · BFF만 60 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | listBriefingRounds | 목표 /api/v1/briefings/rounds ↔ BFF /api/briefings/rounds |  |
 | BFF_FIELD_DIFFERENCE | difference | listBriefingRounds | 목표만 84 · BFF만 39 · 형식/필수/권한 변경 6 |  |
+| TARGET_ONLY_API | difference | getBriefingRecap | GET /api/v1/briefings/{id}/recap: 직접 대응 BFF 없음 |  |
 | TARGET_ONLY_API | difference | getBriefingItemDetail | GET /api/v1/briefings/{roundId}/items/{eventId}: 직접 대응 BFF 없음 |  |
 | BFF_PATH_DIFFERENCE | difference | getBriefingGraphBasis | 목표 /api/v1/briefings/{id}/graph ↔ BFF /api/briefings/{id}/graph |  |
-| BFF_FIELD_DIFFERENCE | difference | getBriefingGraphBasis | 목표만 97 · BFF만 30 · 형식/필수/권한 변경 7 |  |
+| BFF_FIELD_DIFFERENCE | difference | getBriefingGraphBasis | 목표만 106 · BFF만 30 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | createConversation | 목표 /api/v1/chat/sessions/{id} ↔ BFF /api/chat/sessions/{id} |  |
 | BFF_FIELD_DIFFERENCE | difference | createConversation | 목표만 161 · BFF만 12 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | getConversation | 목표 /api/v1/chat/sessions/{id} ↔ BFF /api/chat/sessions/{id} |  |
@@ -299,21 +300,21 @@
 | BFF_PATH_DIFFERENCE | difference | logOutAdmin | 목표 /api/v1/admin/auth/logout ↔ BFF /api/admin/auth/logout |  |
 | BFF_FIELD_DIFFERENCE | difference | logOutAdmin | 목표만 162 · BFF만 0 · 형식/필수/권한 변경 1 |  |
 | BFF_PATH_DIFFERENCE | difference | getAdminDashboard | 목표 /api/v1/admin/dashboard ↔ BFF /api/admin/dashboard |  |
-| BFF_FIELD_DIFFERENCE | difference | getAdminDashboard | 목표만 695 · BFF만 633 · 형식/필수/권한 변경 7 |  |
+| BFF_FIELD_DIFFERENCE | difference | getAdminDashboard | 목표만 698 · BFF만 633 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | listAuditRecords | 목표 /api/v1/admin/audit-log ↔ BFF /api/admin/audit-log |  |
 | BFF_FIELD_DIFFERENCE | difference | listAuditRecords | 목표만 119 · BFF만 31 · 형식/필수/권한 변경 8 |  |
 | BFF_PATH_DIFFERENCE | difference | getPipelineOverview | 목표 /api/v1/admin/pipeline/overview ↔ BFF /api/admin/pipeline/overview |  |
-| BFF_FIELD_DIFFERENCE | difference | getPipelineOverview | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 12 |  |
+| BFF_FIELD_DIFFERENCE | difference | getPipelineOverview | 목표만 116 · BFF만 22 · 형식/필수/권한 변경 12 |  |
 | BFF_PATH_DIFFERENCE | difference | listAnalysisCandidates | 목표 /api/v1/admin/pipeline/candidates ↔ BFF /api/admin/pipeline/candidates |  |
-| BFF_FIELD_DIFFERENCE | difference | listAnalysisCandidates | 목표만 115 · BFF만 23 · 형식/필수/권한 변경 10 |  |
+| BFF_FIELD_DIFFERENCE | difference | listAnalysisCandidates | 목표만 118 · BFF만 32 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | getAnalysisCandidate | 목표 /api/v1/admin/pipeline/candidates/{candidate_id} ↔ BFF /api/admin/pipeline/candidates/{candidate_id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getAnalysisCandidate | 목표만 123 · BFF만 30 · 형식/필수/권한 변경 11 |  |
+| BFF_FIELD_DIFFERENCE | difference | getAnalysisCandidate | 목표만 126 · BFF만 39 · 형식/필수/권한 변경 12 |  |
 | BFF_PATH_DIFFERENCE | difference | decideAnalysisCandidate | 목표 /api/v1/admin/pipeline/candidates/{candidate_id}/decision ↔ BFF /api/admin/pipeline/candidates/{candidate_id}/decision |  |
 | BFF_FIELD_DIFFERENCE | difference | decideAnalysisCandidate | 목표만 174 · BFF만 38 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | listPublicationRules | 목표 /api/v1/admin/pipeline/rules ↔ BFF /api/admin/pipeline/rules |  |
-| BFF_FIELD_DIFFERENCE | difference | listPublicationRules | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 9 |  |
+| BFF_FIELD_DIFFERENCE | difference | listPublicationRules | 목표만 126 · BFF만 24 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | setPublicationRule | 목표 /api/v1/admin/pipeline/rules/{rule_id} ↔ BFF /api/admin/pipeline/rules/{rule_id} |  |
-| BFF_FIELD_DIFFERENCE | difference | setPublicationRule | 목표만 160 · BFF만 12 · 형식/필수/권한 변경 11 |  |
+| BFF_FIELD_DIFFERENCE | difference | setPublicationRule | 목표만 149 · BFF만 24 · 형식/필수/권한 변경 10 |  |
 | BFF_PATH_DIFFERENCE | difference | listGraphVersions | 목표 /api/v1/admin/graph/versions ↔ BFF /api/admin/graph/versions |  |
 | BFF_FIELD_DIFFERENCE | difference | listGraphVersions | 목표만 120 · BFF만 23 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | publishGraphVersion | 목표 /api/v1/admin/graph/versions ↔ BFF /api/admin/graph/versions |  |
@@ -321,15 +322,15 @@
 | BFF_PATH_DIFFERENCE | difference | activateGraphVersion | 목표 /api/v1/admin/graph/versions/{version_id}/activate ↔ BFF /api/admin/graph/versions/{version_id}/activate |  |
 | BFF_FIELD_DIFFERENCE | difference | activateGraphVersion | 목표만 165 · BFF만 12 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | listAnalysisJobs | 목표 /api/v1/admin/jobs ↔ BFF /api/admin/jobs |  |
-| BFF_FIELD_DIFFERENCE | difference | listAnalysisJobs | 목표만 118 · BFF만 92 · 형식/필수/권한 변경 19 |  |
+| BFF_FIELD_DIFFERENCE | difference | listAnalysisJobs | 목표만 120 · BFF만 93 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | createAnalysisJob | 목표 /api/v1/admin/jobs ↔ BFF /api/admin/jobs |  |
-| BFF_FIELD_DIFFERENCE | difference | createAnalysisJob | 목표만 167 · BFF만 39 · 형식/필수/권한 변경 15 |  |
+| BFF_FIELD_DIFFERENCE | difference | createAnalysisJob | 목표만 167 · BFF만 39 · 형식/필수/권한 변경 16 |  |
 | BFF_PATH_DIFFERENCE | difference | getAnalysisJob | 목표 /api/v1/admin/jobs/{job_id} ↔ BFF /api/admin/jobs/{job_id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getAnalysisJob | 목표만 114 · BFF만 39 · 형식/필수/권한 변경 13 |  |
+| BFF_FIELD_DIFFERENCE | difference | getAnalysisJob | 목표만 114 · BFF만 39 · 형식/필수/권한 변경 14 |  |
 | BFF_PATH_DIFFERENCE | difference | retryAnalysisJob | 목표 /api/v1/admin/jobs/{job_id}/retry ↔ BFF /api/admin/jobs/{job_id}/retry |  |
-| BFF_FIELD_DIFFERENCE | difference | retryAnalysisJob | 목표만 162 · BFF만 36 · 형식/필수/권한 변경 15 |  |
+| BFF_FIELD_DIFFERENCE | difference | retryAnalysisJob | 목표만 162 · BFF만 36 · 형식/필수/권한 변경 16 |  |
 | BFF_PATH_DIFFERENCE | difference | cancelAnalysisJob | 목표 /api/v1/admin/jobs/{job_id}/cancel ↔ BFF /api/admin/jobs/{job_id}/cancel |  |
-| BFF_FIELD_DIFFERENCE | difference | cancelAnalysisJob | 목표만 162 · BFF만 30 · 형식/필수/권한 변경 15 |  |
+| BFF_FIELD_DIFFERENCE | difference | cancelAnalysisJob | 목표만 162 · BFF만 30 · 형식/필수/권한 변경 16 |  |
 | BFF_PATH_DIFFERENCE | difference | getAiUsage | 목표 /api/v1/admin/ai-usage ↔ BFF /api/admin/ai-usage |  |
 | BFF_FIELD_DIFFERENCE | difference | getAiUsage | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 10 |  |
 | BFF_PATH_DIFFERENCE | difference | listAdminBriefingRounds | 목표 /api/v1/admin/briefings ↔ BFF /api/admin/briefings |  |

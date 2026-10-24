@@ -16,6 +16,24 @@
       "minimum": 1
     },
     "query.limit:required": false,
+    "response:200:application/json.items[].eligible<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.items[].eligible<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.items[].publishedCandidates<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.items[].publishedCandidates<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.items[].publishedEvents<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.items[].publishedEvents<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.nextCursor": {
       "type": [
         "string",
@@ -297,6 +315,15 @@
     }
   },
   "bffOnly": {
+    "response:200:application/json.items[].eligible": {
+      "type": "integer"
+    },
+    "response:200:application/json.items[].publishedCandidates": {
+      "type": "integer"
+    },
+    "response:200:application/json.items[].publishedEvents": {
+      "type": "integer"
+    },
     "response:401:application/json.error.details<anyOf:0>": {
       "type": "object"
     },

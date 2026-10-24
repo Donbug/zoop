@@ -7,7 +7,8 @@ import pytest
 
 from extraction_support import ExtractionService, ExtractionWorkspace, make_service, terminate_extraction
 from relation_support import RelationService, RelationWorkspace, World, build_world, terminate_relation, tree
-from real_handoff_support import BUILD_VERDICT_HANDOFF_WORLD, HandoffWorld, RealWorkspace, build_handoff_world
+from real_handoff_support import (BUILD_IMPACT_HANDOFF_WORLD, BUILD_SUMMARY_HANDOFF_WORLD, BUILD_VERDICT_HANDOFF_WORLD, HandoffWorld, RealWorkspace,
+                                  build_handoff_world)
 from support import ServiceProcess, remove_tree
 
 
@@ -107,13 +108,23 @@ def verdict_world(tmp_path_factory: pytest.TempPathFactory) -> HandoffWorld:
     return build_handoff_world(tmp_path_factory.mktemp("verdict-world"), BUILD_VERDICT_HANDOFF_WORLD)
 
 
+@pytest.fixture(scope="session")
+def impact_world(tmp_path_factory: pytest.TempPathFactory) -> HandoffWorld:
+    """One fresh actual two-S3-job world with REAL impact states (verified positive/negative/undetermined, verifier reject, no-evidence, precheck reject), ONE handoff frozen
+    and exported through the installed CLI. `impacts` holds the pipeline smoke's hand-written expected rows."""
+    return build_handoff_world(tmp_path_factory.mktemp("impact-world"), BUILD_IMPACT_HANDOFF_WORLD)
+
+
 def _handoff_services(tmp_path: Path, world: HandoffWorld):
     before = world.ledgers()
     started: list[ServiceProcess] = []
 
-    def factory(exports: list[dict], *, env: dict[str, str | None] | None = None, launcher_env: dict[str, str] | None = None) -> tuple[RealWorkspace, ServiceProcess]:
+    def factory(exports: list[dict], *, env: dict[str, str | None] | None = None, launcher_env: dict[str, str] | None = None,
+                command: Path | None = None) -> tuple[RealWorkspace, ServiceProcess]:
         root = tmp_path / f"hws{len(started)}"
         workspace = RealWorkspace(root, world, exports)
+        if command is not None:
+            workspace.command = command        # a wrapper over the real command (forged answers); the service still sees only an installed-looking executable
         service = ServiceProcess(workspace, env=workspace.env(**(env or {})), launcher=bool(launcher_env), launcher_env=launcher_env)
         started.append(service)
         return workspace, service.start()
@@ -136,3 +147,35 @@ def start_handoff(tmp_path: Path, handoff_world: HandoffWorld) -> Callable[..., 
 def start_verdict_handoff(tmp_path: Path, verdict_world: HandoffWorld) -> Callable[..., tuple[RealWorkspace, ServiceProcess]]:
     """The same factory over the reviewed (verdict) world and its own ledgers."""
     yield from _handoff_services(tmp_path, verdict_world)
+
+
+
+@pytest.fixture
+def start_impact_handoff(tmp_path: Path, impact_world: HandoffWorld) -> Callable[..., tuple[RealWorkspace, ServiceProcess]]:
+    """The same factory over the real impact world and its own ledgers."""
+    yield from _handoff_services(tmp_path, impact_world)
+
+
+@pytest.fixture(scope="session")
+def summary_world(tmp_path_factory: pytest.TempPathFactory) -> HandoffWorld:
+    """One fresh actual two-S3-job world whose decisions pin an AVAILABLE authored-replay issue summary (supply) next to a HOLD-verdict issue (factory, `temporal-review-pending`),
+    ONE handoff frozen and exported through the installed CLI. `expect` holds the pipeline smoke's hand-written expectations; `summaries` is the job ledger the freeze read."""
+    return build_handoff_world(tmp_path_factory.mktemp("summary-world"), BUILD_SUMMARY_HANDOFF_WORLD, ("available",))
+
+
+@pytest.fixture(scope="session")
+def summary_withheld_world(tmp_path_factory: pytest.TempPathFactory) -> HandoffWorld:
+    """The same world with the verifier's `verifier-hold` result pinned (a job-coded unavailable summary with its source) and the factory issue `not-requested`."""
+    return build_handoff_world(tmp_path_factory.mktemp("summary-withheld-world"), BUILD_SUMMARY_HANDOFF_WORLD, ("verifier-hold",))
+
+
+@pytest.fixture
+def start_summary_handoff(tmp_path: Path, summary_world: HandoffWorld) -> Callable[..., tuple[RealWorkspace, ServiceProcess]]:
+    """The same factory over the summary world and its own ledgers (the summary ledger is checked byte for byte too)."""
+    yield from _handoff_services(tmp_path, summary_world)
+
+
+@pytest.fixture
+def start_summary_withheld_handoff(tmp_path: Path, summary_withheld_world: HandoffWorld) -> Callable[..., tuple[RealWorkspace, ServiceProcess]]:
+    """The same factory over the verifier-hold summary world."""
+    yield from _handoff_services(tmp_path, summary_withheld_world)

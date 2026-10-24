@@ -46,6 +46,7 @@ class CompanyMarketClientsTest {
     private volatile boolean calendarPreviousWithoutEnd;
     private final List<String> candleQueries = new java.util.concurrent.CopyOnWriteArrayList<>();
     private final List<String> calendarQueries = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final java.util.concurrent.ConcurrentHashMap<String, AtomicInteger> requestCounts = new java.util.concurrent.ConcurrentHashMap<>();
 
     @BeforeEach
     void startProviderStub() throws IOException {
@@ -54,6 +55,7 @@ class CompanyMarketClientsTest {
         server.setExecutor(executor);
         server.createContext("/", exchange -> {
             String path = exchange.getRequestURI().getPath();
+            requestCounts.computeIfAbsent(path, ignored -> new AtomicInteger()).incrementAndGet();
             // Count before replying: once the client has the response the test may assert immediately.
             if (path.equals("/oauth2/token")) tokenRequests.incrementAndGet();
             int status = path.equals("/oauth2/token") ? tokenStatus : providerStatus;
@@ -96,6 +98,44 @@ class CompanyMarketClientsTest {
         assertEquals(1000.0, result.quote().sharesOutstanding());
         assertEquals(700_000.0, result.quote().marketCap());
         assertEquals(1, tokenRequests.get());
+    }
+
+    @Test
+    void tossQuoteReusesSuccessfulProviderResponseWithinTtl() {
+        var client = tossClient("test-client", "test-secret");
+        assertEquals(700.0, client.quote("KRX:005930", "KRX", "005930").quote().price());
+        lastPriceJson = "800";
+
+        var cached = client.quote("KRX:005930", "KRX", "005930");
+
+        assertEquals(700.0, cached.quote().price());
+        assertEquals(1, requestCounts.get("/api/v1/prices").get());
+        assertEquals(1, requestCounts.get("/api/v1/stocks").get());
+    }
+
+    @Test
+    void naverMetricsReusesTheWholeResultWithinTtl() {
+        var client = naverClient();
+        assertEquals("available", client.metrics("KRX:005930", "KRX", "005930").status());
+        assertEquals("available", client.metrics("KRX:005930", "KRX", "005930").status());
+
+        assertEquals(1, requestCounts.get("/api/stock/005930/integration").get());
+        assertEquals(1, requestCounts.get("/api/stock/005930/basic").get());
+    }
+
+    @Test
+    void settledExplicitPriceRangeReusesCompleteResponseWithinTtl() {
+        exchangeDaily = true;
+        var client = tossClient("test-client", "test-secret");
+        var from = kst("2026-10-14T00:00");
+        var to = kst("2026-10-15T00:00");
+        var first = client.prices("KRX:005930", "KRX", "005930", "1m", from, to);
+        int providerCalls = requestCounts.values().stream().mapToInt(AtomicInteger::get).sum();
+
+        var second = client.prices("KRX:005930", "KRX", "005930", "1m", from, to);
+
+        assertEquals(first, second);
+        assertEquals(providerCalls, requestCounts.values().stream().mapToInt(AtomicInteger::get).sum());
     }
 
     @Test
@@ -465,13 +505,13 @@ class CompanyMarketClientsTest {
 
     private TossMarketClient tossClient(String clientId, String clientSecret) {
         var settings = new CompanyMarketSettings("toss", clientId, clientSecret, baseUrl(), "naver",
-                baseUrl(), baseUrl(), baseUrl(), Duration.ofSeconds(2));
+                baseUrl(), baseUrl(), baseUrl(), Duration.ofSeconds(2), null, null, null, 0, 0);
         return new TossMarketClient(settings, JsonMapper.builder().build(), CLOCK);
     }
 
     private NaverMetricsClient naverClient() {
         var settings = new CompanyMarketSettings("toss", "", "", baseUrl(), "naver",
-                baseUrl(), baseUrl(), baseUrl(), Duration.ofSeconds(2));
+                baseUrl(), baseUrl(), baseUrl(), Duration.ofSeconds(2), null, null, null, 0, 0);
         return new NaverMetricsClient(settings, JsonMapper.builder().build());
     }
 

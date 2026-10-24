@@ -31,7 +31,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The strict, closed validator of a {@code zoop-graph-handoff-bundle-5} and of its frozen manifest: a Java port of the
+ * The strict, closed validator of a {@code zoop-graph-handoff-bundle-7} and of its frozen manifest: a Java port of the
  * producer's own {@code validate_bundle} ({@code ai/pipeline/.../handoff_contracts.py}), so the app never trusts a producer
  * claim it did not recompute. Every object has exactly the keys the producer writes, every value its type and pattern, every
  * reference is closed (articles, evidence, companies, issues, relations, source pins, review revisions), every id formula
@@ -43,7 +43,7 @@ import tools.jackson.databind.node.ObjectNode;
  */
 final class HandoffBundleVerifier {
     static final String MANIFEST_SCHEMA = "zoop-ai-handoff-1";
-    static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-5";
+    static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-7";
     static final String POLICY = "zoop-public-projection-policy-1";
     static final String EVIDENCE_KIND = "graph-body-span";
     static final String OFFSET_UNIT = "unicode_code_point";
@@ -112,6 +112,19 @@ final class HandoffBundleVerifier {
     static final String UNMAPPED_MIDDLE = "intermediate_company_unmapped";
     /** The longest business or product scope text of one structural basis, in Unicode code points. */
     private static final int MAX_SCOPE_CODE_POINTS = 500;
+    /** The policy literal of the closed {@code impacts[]} collection: the independent verifier's per-quote effect, never a price claim. */
+    static final String IMPACTS_POLICY = "s3-independent-verifier-quote-effect";
+    private static final Set<String> IMPACT_KEYS = Set.of("edgeId", "issueId", "companyId", "sourceRelation",
+            "impactCandidateId", "status", "code", "label", "targetVerdict", "effects", "verifier", "verifierRequestDigest",
+            "proposal");
+    private static final Set<String> PROPOSAL_KEYS = Set.of("direction", "reason", "limitations", "verification");
+    private static final List<String> EFFECT_SIDES = List.of("positive", "negative", "neutral", "uncertain");
+    private static final List<String> IMPACT_LABELS = List.of("positive", "negative", "mixed", "undetermined");
+    private static final Pattern IMPACT_CANDIDATE = Pattern.compile("ic-[a-f0-9]{64}");
+    /** The most evidence ids one verified impact row may list across its four effect sides. */
+    private static final int MAX_IMPACT_EVIDENCE = 40;
+    private static final int MAX_PROPOSAL_REASON_CODE_POINTS = 2_000;
+    private static final int MAX_PROPOSAL_LIMITATIONS_CODE_POINTS = 1_000;
 
     private HandoffBundleVerifier() {
     }
@@ -163,7 +176,7 @@ final class HandoffBundleVerifier {
     /** SHA-256 of the canonical JSON of the five public collections: the bundle's {@code digests.content}. */
     static String contentDigest(JsonNode bundle) {
         ObjectNode subset = StrictJson.newObject();
-        for (String key : List.of("companies", "pathCompanies", "issues", "relations", "evidence", "articles")) {
+        for (String key : List.of("companies", "pathCompanies", "issues", "relations", "evidence", "articles", "impacts")) {
             subset.set(key, bundle.get(key));
         }
         return Canonical.digest(subset);
@@ -183,7 +196,7 @@ final class HandoffBundleVerifier {
     static HandoffBundle verify(JsonNode node) {
         Obj bundle = Obj.of(node).exactly(Set.of("schemaVersion", "handoffId", "manifestDigest", "provenance", "policy",
                 "sources", "companies", "pathCompanies", "issues", "relations", "evidence", "articles", "exclusions", "counts",
-                "checks", "readiness", "digests"));
+                "checks", "readiness", "digests", "impacts"));
         need(BUNDLE_SCHEMA.equals(bundle.string("schemaVersion")));
         String handoffId = text(bundle, "handoffId", ID);
         String manifestDigest = text(bundle, "manifestDigest", HASH);
@@ -200,7 +213,7 @@ final class HandoffBundleVerifier {
                 || (executionMode.equals("live") && recordingKind.equals("provider")));
 
         Obj policy = bundle.object("policy").exactly(Set.of("version", "files", "evidenceIdKind", "offsetUnit", "geography",
-                "structural", "sequence", "sourceSupport"));
+                "structural", "sequence", "sourceSupport", "impacts", "issueSummary"));
         String policyVersion = policy.string("version");
         need(POLICY.equals(policyVersion) && EVIDENCE_KIND.equals(policy.string("evidenceIdKind"))
                 && OFFSET_UNIT.equals(policy.string("offsetUnit")));
@@ -208,6 +221,8 @@ final class HandoffBundleVerifier {
         need("manual-operator-review".equals(policy.string("structural")));
         need("s2-comparison-with-operator-decision".equals(policy.string("sequence")));
         need(SOURCE_SUPPORT_POLICY.equals(policy.string("sourceSupport")));
+        need(IMPACTS_POLICY.equals(policy.string("impacts")));
+        need(HandoffIssueSummary.POLICY.equals(policy.string("issueSummary")));
         Obj filesNode = policy.object("files").exactly(Set.of("canonical", "decisions", "bindings"));
         Map<String, String> files = new LinkedHashMap<>();
         for (String name : List.of("canonical", "decisions", "bindings")) {
@@ -384,7 +399,7 @@ final class HandoffBundleVerifier {
         for (Obj i : issueNodes) {
             i.exactly(Set.of("id", "canonicalId", "title", "action", "target", "eventTime", "timePrecision", "period",
                     "assertionStatus", "geography", "evidenceIds", "sourceEvents", "mentions", "decisionRef",
-                    "representative", "fieldProvenance", "fieldVerdicts", "sourceSupport"));
+                    "representative", "fieldProvenance", "fieldVerdicts", "sourceSupport", "summary"));
             String id = text(i, "id", ID);
             text(i, "canonicalId", ID);
             text(i, "decisionRef", ID);
@@ -445,6 +460,8 @@ final class HandoffBundleVerifier {
                 need(eventKeys.contains(Canonical.write(representative.node())));
             }
             // fieldProvenance and fieldVerdicts were checked above, together with the headline values they decide.
+            // The summary is recomputed from the bundle's own mentions, verdicts, evidence and articles (zero-call decision table).
+            HandoffIssueSummary.verify(i, evidence, articles, executionMode, recordingKind);
             need(!issues.containsKey(id) && !companies.containsKey(id) && !pathCompanies.containsKey(id));
             issues.put(id, new Issue(id, title, action, target, eventTime, timePrecision, assertionStatus,
                     geographyValue, geographyPolicy, geographyEvidence, evidenceIds));
@@ -460,6 +477,7 @@ final class HandoffBundleVerifier {
         Set<String> linkedCompanies = new HashSet<>();
         List<Relation> relations = new ArrayList<>();
         Map<String, Set<String>> participants = new HashMap<>();
+        Map<String, InvolvesFact> involves = new LinkedHashMap<>();
         List<PendingPath> pendingPaths = new ArrayList<>();
         List<Obj> relationNodes = bundle.objects("relations");
         need(relationNodes.size() <= MAX_RELATIONS);
@@ -537,6 +555,7 @@ final class HandoffBundleVerifier {
                 basis.add(new Basis(verifiedAt, validFrom, validUntil));
             }
             boolean allAutomatic = true;
+            List<String> sourcePairs = new ArrayList<>();
             List<Obj> refs = r.objects("sourceRefs");
             need(refs.size() >= 1 && refs.size() <= MAX_RELATIONS);
             List<String> refKeys = new ArrayList<>();
@@ -553,6 +572,7 @@ final class HandoffBundleVerifier {
                     need(kind.equals("s3-relation") && RC.matcher(refId).matches() && jobs.contains(jobId)
                             && usedReviews.get(jobId).containsKey(refId));
                     allAutomatic &= AUTOMATIC.equals(usedReviews.get(jobId).get(refId).kind());
+                    sourcePairs.add(pair(jobId, refId));
                 }
                 refKeys.add(kind + "\n" + jobId + "\n" + refId);
             }
@@ -608,11 +628,21 @@ final class HandoffBundleVerifier {
                 need(r.isNull("structuralPath"));
             }
             need(id.equals("edge-" + Canonical.digest(preimage)));
+            if (type.equals("INVOLVES")) {
+                Set<String> articleVersions = new HashSet<>();
+                for (String evidenceId : evidenceIds) {
+                    Evidence cited = evidence.get(evidenceId);
+                    articleVersions.add(articleKey(cited.articleId(), cited.articleVersion()));
+                }
+                involves.put(id, new InvolvesFact(source, target, new HashSet<>(sourcePairs), articleVersions));
+            }
             relations.add(new Relation(id, type, source, target, role, assertionStatus, evidenceIds, basis,
                     provenance.string("origin")));
         }
         need(issues.keySet().equals(linkedIssues));
         need(companies.keySet().equals(linkedCompanies));
+        // Impacts close over the INVOLVES sourceRefs and are the only other referrers of evidence: they run before the orphan check.
+        int impactCount = impacts(bundle, involves, usedReviews, evidence, referenced, executionMode);
         need(evidence.keySet().equals(referenced));
         // The structural paths close over the INVOLVES participants of their issue, the public companies and the private support
         // references: no orphan middle company, no public node is invented for a path.
@@ -654,10 +684,11 @@ final class HandoffBundleVerifier {
         }
 
         Obj counts = bundle.object("counts").exactly(Set.of("companies", "pathCompanies", "issues", "relations", "evidence",
-                "articles", "exclusions"));
+                "articles", "exclusions", "impacts"));
         need(counts.count("companies") == companies.size() && counts.count("pathCompanies") == pathCompanies.size()
                 && counts.count("issues") == issues.size() && counts.count("evidence") == evidence.size()
-                && counts.count("articles") == articles.size() && counts.count("exclusions") == items.size());
+                && counts.count("articles") == articles.size() && counts.count("exclusions") == items.size()
+                && counts.count("impacts") == impactCount);
         Obj relationCounts = counts.object("relations").exactly(Set.copyOf(PUBLIC_TYPES));
         for (String type : PUBLIC_TYPES) {
             need(relationCounts.count(type) == typeCounts.get(type));
@@ -679,6 +710,180 @@ final class HandoffBundleVerifier {
                 pins, new ArrayList<>(companies.values()), new ArrayList<>(pathCompanies.values()),
                 new ArrayList<>(issues.values()), relations, new ArrayList<>(evidence.values()),
                 new ArrayList<>(articles.values()), approvals);
+    }
+
+    /** One emitted INVOLVES edge as the impact rows must close over it: endpoints, S3 source refs and evidence article versions. */
+    private record InvolvesFact(String source, String target, Set<String> sourcePairs, Set<String> articleVersions) {
+    }
+
+    /**
+     * The closed {@code impacts[]} of a bundle-6: exactly one row per S3 relation behind an INVOLVES edge ({@code sourceRefs}), sorted
+     * by {@code (edgeId, jobId, relationCandidateId)}, never aggregated per edge. A row's status, code and nullability follow the
+     * producer's S3 state table; {@code not-applicable} is the operator's final approval and nothing else (and only then), so a
+     * verifier label can never be claimed for a human-approved relation. A {@code verified} row lists the verifier-mapped quote
+     * effects as app evidence ids of the edge's own article versions; its label is recomputed, never trusted, and every effect id
+     * counts as referenced (no orphan evidence). The proposal is the producer's own unverified content ({@code verification: none}).
+     * A {@code verifier_reply_invalid} row can only come from a replay; a replay's {@code called} is an authored fixture.
+     *
+     * @return the number of rows, for {@code counts.impacts}
+     */
+    private static int impacts(Obj bundle, Map<String, InvolvesFact> involves, Map<String, Map<String, Approval>> usedReviews,
+            Map<String, Evidence> evidence, Set<String> referenced, String executionMode) {
+        List<Obj> nodes = bundle.objects("impacts");
+        need(nodes.size() <= MAX_RELATIONS);
+        Set<String> covered = new HashSet<>();
+        Set<String> candidates = new HashSet<>();
+        String[] previous = null;
+        for (Obj row : nodes) {
+            row.exactly(IMPACT_KEYS);
+            String edgeId = text(row, "edgeId", ID);
+            InvolvesFact fact = involves.get(edgeId);
+            need(fact != null);
+            need(fact.source().equals(row.string("issueId")) && fact.target().equals(row.string("companyId")));
+            Obj sourceRelation = row.object("sourceRelation").exactly(Set.of("jobId", "relationCandidateId"));
+            String jobId = text(sourceRelation, "jobId", ID);
+            String relationCandidateId = text(sourceRelation, "relationCandidateId", RC);
+            String[] key = {edgeId, jobId, relationCandidateId};
+            need(previous == null || compareTuples(previous, key) < 0);
+            previous = key;
+            need(fact.sourcePairs().contains(pair(jobId, relationCandidateId)));
+            Approval approval = usedReviews.get(jobId).get(relationCandidateId);
+            need(approval != null);
+            need(covered.add(pair(edgeId, pair(jobId, relationCandidateId))));
+
+            String status = row.string("status");
+            String code = row.stringOrNull("code");
+            String candidate = row.isNull("impactCandidateId") ? null : text(row, "impactCandidateId", IMPACT_CANDIDATE);
+            String verifier = row.string("verifier");
+            need(verifier.equals("called") || verifier.equals("not-called"));
+            boolean called = verifier.equals("called");
+            String requestDigest = row.isNull("verifierRequestDigest") ? null : text(row, "verifierRequestDigest", HASH);
+            Obj proposal = row.isNull("proposal") ? null : row.object("proposal");
+            if (proposal != null) {
+                proposal(proposal);
+            }
+            // The operator's final approval made no impact call: not-applicable if and only if it decided the relation.
+            need(OPERATOR_FINAL.equals(approval.kind()) == status.equals("not-applicable"));
+
+            boolean hasCandidate = false;
+            boolean verifierCalled = false;
+            boolean hasProposal = false;
+            switch (status) {
+                case "not-applicable", "not-proposed" -> need(code == null);
+                case "technical-reject" -> {
+                    need(code != null);
+                    switch (code) {
+                        case "producer_reply_invalid" -> {
+                        }
+                        case "impact_precheck_rejected" -> hasCandidate = true;
+                        case "verifier_reply_invalid" -> {
+                            // A live verifier cannot answer with a reply the S3 ledger refused; only an authored replay holds one.
+                            need("replay".equals(executionMode));
+                            hasCandidate = true;
+                            verifierCalled = true;
+                            hasProposal = true;
+                        }
+                        default -> need(false);
+                    }
+                }
+                case "no-evidence" -> {
+                    need(code == null);
+                    hasCandidate = true;
+                    hasProposal = true;
+                }
+                case "verifier-reject", "verified" -> {
+                    need(code == null);
+                    hasCandidate = true;
+                    verifierCalled = true;
+                    hasProposal = true;
+                }
+                case "withheld" -> {
+                    need("impact_evidence_outside_relation_documents".equals(code) || "impact_quote_ambiguous".equals(code));
+                    hasCandidate = true;
+                    verifierCalled = true;
+                    hasProposal = true;
+                }
+                default -> need(false);
+            }
+            need((candidate != null) == hasCandidate && called == verifierCalled && (requestDigest != null) == verifierCalled
+                    && (proposal != null) == hasProposal);
+            // (jobId, impactCandidateId) names one S3 impact candidate; two relations of one job never share it.
+            need(candidate == null || candidates.add(pair(jobId, candidate)));
+
+            String label = row.stringOrNull("label");
+            String targetVerdict = row.stringOrNull("targetVerdict");
+            switch (status) {
+                case "verified" -> need("supported".equals(targetVerdict) || "insufficient".equals(targetVerdict));
+                case "verifier-reject" -> need("contradicted".equals(targetVerdict));
+                default -> need(targetVerdict == null);
+            }
+            if (!status.equals("verified")) {
+                need(label == null && row.isNull("effects"));
+                continue;
+            }
+            need(label != null && IMPACT_LABELS.contains(label));
+            Obj effects = row.object("effects").exactly(Set.copyOf(EFFECT_SIDES));
+            Map<String, List<String>> sides = new LinkedHashMap<>();
+            Set<String> union = new HashSet<>();
+            Set<String> sourceEvidence = new HashSet<>();
+            for (String side : EFFECT_SIDES) {
+                List<String> ids = strings(effects, side, MAX_IMPACT_EVIDENCE);
+                need(sortedUnique(ids));
+                for (String id : ids) {
+                    need(EVIDENCE_ID.matcher(id).matches());
+                    Evidence cited = evidence.get(id);
+                    need(cited != null && union.add(id));
+                    // Impact evidence sits on the edge's own article versions, so the visibility and rights of the edge cover it.
+                    need(fact.articleVersions().contains(articleKey(cited.articleId(), cited.articleVersion())));
+                    need(sourceEvidence.add(cited.sourceEvidenceId()));
+                }
+                sides.put(side, ids);
+            }
+            need(union.size() >= 1 && union.size() <= MAX_IMPACT_EVIDENCE);
+            need(label.equals(impactLabel(targetVerdict, sides)));
+            referenced.addAll(union);
+        }
+        // Exact coverage: every INVOLVES source ref has its row, and (rows being strictly sorted and bound to a ref) no other exists.
+        Set<String> expected = new HashSet<>();
+        involves.forEach((edgeId, fact) -> fact.sourcePairs().forEach(sourcePair -> expected.add(pair(edgeId, sourcePair))));
+        need(covered.equals(expected));
+        return nodes.size();
+    }
+
+    /**
+     * The label of a verified impact, recomputed from what the verifier said: an uncertain quote effect or an insufficient target is
+     * {@code undetermined} (no label comes out of the remaining quotes); otherwise both sides cited is {@code mixed}, one side is that
+     * side, and neither (neutral only) is {@code undetermined}. Never a probability and never a price direction.
+     */
+    static String impactLabel(String targetVerdict, Map<String, List<String>> sides) {
+        if (!sides.get("uncertain").isEmpty() || "insufficient".equals(targetVerdict)) {
+            return "undetermined";
+        }
+        boolean positive = !sides.get("positive").isEmpty();
+        boolean negative = !sides.get("negative").isEmpty();
+        return positive && negative ? "mixed" : positive ? "positive" : negative ? "negative" : "undetermined";
+    }
+
+    /** The producer's proposal, unverified: closed, lengths counted in Unicode code points (not UTF-16 units). */
+    private static void proposal(Obj proposal) {
+        proposal.exactly(PROPOSAL_KEYS);
+        need(IMPACT_LABELS.contains(proposal.string("direction")));
+        String reason = proposal.string("reason");
+        int reasonLength = reason.codePointCount(0, reason.length());
+        need(reasonLength >= 1 && reasonLength <= MAX_PROPOSAL_REASON_CODE_POINTS);
+        String limitations = proposal.stringOrNull("limitations");
+        need(limitations == null || limitations.codePointCount(0, limitations.length()) <= MAX_PROPOSAL_LIMITATIONS_CODE_POINTS);
+        need("none".equals(proposal.string("verification")));
+    }
+
+    private static int compareTuples(String[] a, String[] b) {
+        for (int index = 0; index < a.length; index++) {
+            int order = compareCodePoints(a[index], b[index]);
+            if (order != 0) {
+                return order;
+            }
+        }
+        return 0;
     }
 
     /** One closed company object: the id, the label the app catalogue must hold, and the producer's own canonical id and ref. */
@@ -1183,7 +1388,7 @@ final class HandoffBundleVerifier {
         return Integer.compare(a.length() - i, b.length() - j);
     }
 
-    private static String articleKey(String articleId, String version) {
+    static String articleKey(String articleId, String version) {
         return articleId + "\n" + version;
     }
 

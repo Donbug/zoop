@@ -152,6 +152,8 @@ class GraphEvidenceSnapshotReaderTest {
         assertEquals(List.of(), found.eventIds(), "a basis is not an event");
         assertEquals(List.of(new GraphEvidence.BasisRef(RELATION, "STRUCTURALLY_RELATED_TO", "iss-1", "KRX:B", BASIS_ID)),
                 found.basisRefs());
+        assertEquals(List.of(new GraphEvidence.ImpactRef("rel-involves", "INVOLVES", "iss-1", "KRX:A")), found.impactRefs(),
+                "the visible INVOLVES relation of the same article version is a candidate for an impact quote too");
     }
 
     @Test
@@ -160,6 +162,7 @@ class GraphEvidenceSnapshotReaderTest {
 
         assertEquals(List.of("iss-1"), found.eventIds());
         assertEquals(List.of(), found.basisRefs());
+        assertEquals(List.of(), found.impactRefs(), "a directly cited span needs no receipt membership at all");
         assertEquals(List.of("iss-1"), basisReader(DisclosureExclusions.NONE).read(null, null, GEO).eventIds());
     }
 
@@ -169,6 +172,7 @@ class GraphEvidenceSnapshotReaderTest {
 
         assertNull(found.span());
         assertEquals(List.of(), found.basisRefs());
+        assertEquals(List.of(), found.impactRefs());
     }
 
     @Test
@@ -177,8 +181,9 @@ class GraphEvidenceSnapshotReaderTest {
         Instant after = Instant.parse("2026-10-06T00:00:00Z");
 
         GraphEvidence early = basisReader(DisclosureExclusions.NONE).read(null, before, BASIS_ONLY);
-        assertNull(early.span(), "the basis was verified after asOf, so its relation and its evidence are not yet public");
-        assertEquals(List.of(), early.basisRefs());
+        assertEquals(List.of(), early.basisRefs(), "the basis was verified after asOf, so its relation is not yet public");
+        assertEquals(List.of(new GraphEvidence.ImpactRef("rel-involves", "INVOLVES", "iss-1", "KRX:A")), early.impactRefs(),
+                "the INVOLVES relation does not depend on the basis time; only the receipt can prove the span for it");
         assertEquals(List.of("iss-1"), basisReader(DisclosureExclusions.NONE).read(null, before, DIRECT).eventIds(),
                 "directly cited evidence is unaffected by the basis time");
 
@@ -189,13 +194,99 @@ class GraphEvidenceSnapshotReaderTest {
 
     @Test
     void anExcludedRelationIssueOrEvidenceWithdrawsTheBasisOnlySpan() {
-        assertNull(basisReader(new DisclosureExclusions(1, Set.of(), Set.of(RELATION), Set.of())).read(null, null, BASIS_ONLY).span(),
-                "the structural relation is excluded");
+        // The structural relation is excluded: its basis candidate is gone, but the visible INVOLVES relation of the same article version still makes
+        // the span an IMPACT candidate. The reader only offers candidates; the service serves it only if the receipt proves membership (a receipt without
+        // verified impact rows, like this one's basis-only world, proves nothing), so nothing that was withheld becomes readable.
+        GraphEvidence withoutStructural = basisReader(new DisclosureExclusions(1, Set.of(), Set.of(RELATION), Set.of())).read(null, null, BASIS_ONLY);
+        assertEquals(List.of(), withoutStructural.basisRefs(), "the excluded structural relation offers no basis candidate");
+        assertEquals(List.of(new GraphEvidence.ImpactRef("rel-involves", "INVOLVES", "iss-1", "KRX:A")), withoutStructural.impactRefs());
+        assertEquals(List.of(), withoutStructural.eventIds());
         assertNull(basisReader(new DisclosureExclusions(1, Set.of("iss-1"), Set.of(), Set.of())).read(null, null, BASIS_ONLY).span(),
                 "the issue is excluded, so its relations go with it");
         assertNull(basisReader(new DisclosureExclusions(1, Set.of(), Set.of(), Set.of(BASIS_ONLY))).read(null, null, BASIS_ONLY).span(),
                 "the evidence itself is excluded");
         assertNotNull(basisReader(new DisclosureExclusions(1, Set.of(), Set.of("rel-involves"), Set.of())).read(null, null, BASIS_ONLY).span(),
                 "an unrelated relation exclusion changes nothing");
+    }
+
+    // ---- impact-only spans --------------------------------------------------------------------------------------------------
+
+    private static final String IMPACT_ONLY = "ev-impact-only";
+    private static final String ASSERTED = "2026-10-05";
+    private static final GraphEvidence.ImpactRef INVOLVES_A = new GraphEvidence.ImpactRef("rel-involves", "INVOLVES", "iss-1", "KRX:A");
+
+    /**
+     * One issue (article {@code art-1}, published {@code published}) with INVOLVES edges to KRX:A (citing DIRECT of art-1) and KRX:B
+     * (citing the span of art-2), and NO structural edge: the span {@link #IMPACT_ONLY} of art-1 is cited by nothing, so only the
+     * visible INVOLVES edge of its article version can make it a candidate.
+     */
+    private static PublicGraphSnapshot impactSnapshot(String published) {
+        return new PublicGraphSnapshot(PublicGraphSnapshot.FORMAT, ACTIVE, "bundle-unit",
+                List.of(new PublicGraphSnapshot.Company("KRX:A", "A", null, null), new PublicGraphSnapshot.Company("KRX:B", "B", null, null)),
+                List.of(new PublicGraphSnapshot.Issue("iss-1", "이슈", "2026-09-01", "day", null, null, null, null, "domestic", "geo-1",
+                        List.of(GEO), List.of("art-1"), List.of(DIRECT, GEO), List.of(), null, published)),
+                List.of(new PublicGraphSnapshot.Relation("rel-involves", "INVOLVES", "iss-1", "KRX:A", null, null, List.of(DIRECT), List.of()),
+                        new PublicGraphSnapshot.Relation("rel-involves-b", "INVOLVES", "iss-1", "KRX:B", null, null,
+                                List.of(OTHER_ARTICLE), List.of())),
+                List.of(new PublicGraphSnapshot.Article("art-1", "v1", "제목", "https://example.invalid/1", published),
+                        new PublicGraphSnapshot.Article("art-2", "v1", "다른 제목", "https://example.invalid/2", published)),
+                List.of(new Evidence(DIRECT, "art-1", "v1", 0, 5), new Evidence(GEO, "art-1", "v1", 6, 9),
+                        new Evidence(IMPACT_ONLY, "art-1", "v1", 10, 20), new Evidence(OTHER_ARTICLE, "art-2", "v1", 0, 3)));
+    }
+
+    private static GraphEvidenceSnapshotReader impactReader(DisclosureExclusions exclusions) {
+        PublicGraphSnapshot snapshot = impactSnapshot("2026-09-01");
+        return new GraphEvidenceSnapshotReader(new PublicGraphReader(
+                new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
+                        java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)),
+                version -> snapshot, () -> exclusions));
+    }
+
+    @Test
+    void aSpanNothingCitesButAVisibleInvolvesRelationOfItsArticleVersionIsAnImpactCandidateWithoutEventIds() {
+        GraphEvidence found = impactReader(DisclosureExclusions.NONE).read(null, null, IMPACT_ONLY);
+
+        assertEquals(new GraphEvidence.Span("art-1", "v1", 10, 20), found.span());
+        assertEquals(List.of(), found.eventIds(), "an impact quote is not an event citation");
+        assertEquals(List.of(), found.basisRefs());
+        assertEquals(List.of(INVOLVES_A), found.impactRefs(),
+                "only the INVOLVES relation of the same article version; the edge of another article is not a candidate");
+    }
+
+    @Test
+    void aSpanThatARelationOrAnIssueCitesDirectlyNeverBecomesAnImpactCandidate() {
+        GraphEvidence relation = impactReader(DisclosureExclusions.NONE).read(null, null, OTHER_ARTICLE);
+        assertNotNull(relation.span());
+        assertEquals(List.of(), relation.impactRefs());
+        assertEquals(List.of("iss-1"), impactReader(DisclosureExclusions.NONE).read(null, null, DIRECT).eventIds());
+        assertEquals(List.of(), impactReader(DisclosureExclusions.NONE).read(null, null, DIRECT).impactRefs());
+    }
+
+    @Test
+    void anExcludedInvolvesRelationIssueOrSpanWithdrawsTheImpactOnlySpan() {
+        assertNull(impactReader(new DisclosureExclusions(1, Set.of(), Set.of("rel-involves"), Set.of())).read(null, null, IMPACT_ONLY).span(),
+                "the only INVOLVES relation of the article version is excluded");
+        assertNull(impactReader(new DisclosureExclusions(1, Set.of("iss-1"), Set.of(), Set.of())).read(null, null, IMPACT_ONLY).span(),
+                "the issue is excluded, so its relations go with it");
+        assertNull(impactReader(new DisclosureExclusions(1, Set.of(), Set.of(), Set.of(IMPACT_ONLY))).read(null, null, IMPACT_ONLY).span(),
+                "the span itself is excluded");
+        assertNull(impactReader(new DisclosureExclusions(1, Set.of(), Set.of(), Set.of(DIRECT))).read(null, null, IMPACT_ONLY).span(),
+                "the INVOLVES relation's own evidence is excluded, so the relation is gone");
+        assertNotNull(impactReader(new DisclosureExclusions(1, Set.of(), Set.of("rel-involves-b"), Set.of())).read(null, null, IMPACT_ONLY).span(),
+                "an unrelated relation exclusion changes nothing");
+    }
+
+    @Test
+    void anAsOfBeforeThePublicationOfTheArticleMakesTheImpactOnlySpanInvisible() {
+        PublicGraphSnapshot snapshot = impactSnapshot(ASSERTED);
+        GraphEvidenceSnapshotReader reader = new GraphEvidenceSnapshotReader(new PublicGraphReader(
+                new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
+                        java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)),
+                version -> snapshot, () -> DisclosureExclusions.NONE));
+
+        assertNull(reader.read(null, Instant.parse("2026-10-03T00:00:00Z"), IMPACT_ONLY).span(),
+                "the article was published after asOf, so neither the span nor the INVOLVES relation is visible");
+        GraphEvidence later = reader.read(null, Instant.parse("2026-10-07T00:00:00Z"), IMPACT_ONLY);
+        assertEquals(List.of(INVOLVES_A), later.impactRefs());
     }
 }

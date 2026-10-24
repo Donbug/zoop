@@ -44,8 +44,9 @@ export function graphSummary(data: GraphResponse) {
     ]),
   );
   const folded = new Map<string, number>();
-  incident.forEach((ids) => {
-    if (ids.length === 1) folded.set(ids[0], (folded.get(ids[0]) ?? 0) + 1);
+  incident.forEach((ids, issueId) => {
+    if (ids.length === 1 && !nodesById.get(issueId)?.isFocus)
+      folded.set(ids[0], (folded.get(ids[0]) ?? 0) + 1);
   });
   return {
     companyNodes,
@@ -143,6 +144,7 @@ export function toG6Data(
     (n) =>
       forcedNodes.includes(n.id) ||
       n.kind === 'company' ||
+      n.isFocus ||
       n.id === expandedId ||
       (summary.incident.get(n.id)?.length ?? 0) > 1 ||
       followsIds.has(n.id),
@@ -236,8 +238,9 @@ export function toG6Data(
         type: company ? 'circle' : 'diamond',
         data: { kind: n.kind },
         style: {
-          x: x * sx,
-          y: y * sy,
+          // Spread positions without inflating node icons or labels.
+          x: width / 2 + (x * sx - width / 2) * 1.75,
+          y: height / 2 + (y * sy - height / 2) * 1.65,
           size,
           fill: company
             ? logo
@@ -292,7 +295,9 @@ export function toG6Data(
           target: e.target,
           style: {
             stroke:
-              e.relationType === 'FOLLOWS' ? '#c0362c' : themeColor('faint'),
+              e.relationType === 'FOLLOWS'
+                ? themeColor('ink')
+                : themeColor('faint'),
             lineWidth: 0.65,
             strokeOpacity: dimmed
               ? 0.08

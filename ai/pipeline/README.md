@@ -3,12 +3,14 @@
 | 명령 | 모듈 | wire schema | 상태 파일 |
 | --- | --- | --- | --- |
 | `zoop-ai-collect run` | `zoop_ai_pipeline.collection_cli` | `zoop-collection-1` (policy `zoop-collection-policy-1`) | 상태 DB 없음. source `inputRoot/collections/<collectionId>/`에만 원본 bytes·receipt·manifest를 쓴다 |
-| `zoop-ai-ingest {run,resume,inspect,export}` | `zoop_ai_pipeline.ingestion_cli` | `zoop-ingestion-s2-1` | `ingestion.sqlite3` |
-| `zoop-ai-extract {run,submit,resume,inspect,cancel}` | `zoop_ai_pipeline.extraction_cli` | `zoop-extraction-s2-2` | `extraction.sqlite3` |
+| `zoop-ai-ingest {run,tick,resume,inspect,export}` | `zoop_ai_pipeline.ingestion_cli` | `zoop-ingestion-s2-1` | `ingestion.sqlite3` |
+| `zoop-ai-extract {run,submit,enqueue-round,plan-round,resume,inspect,cancel}` | `zoop_ai_pipeline.extraction_cli` | `zoop-extraction-s2-2` | `extraction.sqlite3` (`plan-round`는 원장을 열지 않고 새 계획 디렉터리 하나만 씀) |
 | `zoop-ai-relation {run,submit,inspect,resume,review,cancel,live-binding}` | `zoop_ai_pipeline.relation_cli` | `zoop-relation-s3` | `relation.sqlite3` |
 | `zoop-ai-dependents` (하위 명령 없음, stdin 변경 1건) | `zoop_ai_pipeline.dependency_cli` | `zoop-dependency-s4` | 위 세 원장을 읽기 전용으로만 연다(쓰는 상태 파일 없음) |
 | `zoop-ai-graph {init,freeze,project,recover,inspect,read,focus}` | `zoop_ai_pipeline.graph_projection_cli` | `zoop-graph-projection-1` (plan `zoop-graph-plan-2`) | `graph.sqlite3` + 이 원장 하나에 묶인 별도 Neo4j 5 database의 **비공개** version(공개 아님) |
-| `zoop-ai-handoff {freeze,recover,inspect,export}` | `zoop_ai_pipeline.handoff_cli` | `zoop-ai-handoff-1` (bundle `zoop-graph-handoff-bundle-5`, 운영자 decisions `zoop-public-decisions-2`) | `handoff.sqlite3` + `bundles/<sha256>.json`; 위 세 원장을 읽기 전용으로만 열고 Neo4j는 쓰지 않음 |
+| `zoop-ai-issue-summary {submit,run,resume,inspect,export,cancel,live-binding}` | `zoop_ai_pipeline.issue_summary_cli` | `zoop-issue-summary-1` (policy `zoop-issue-summary-policy-1`) | `issue-summary.sqlite3`; 위 세 원장과 운영자 파일을 읽기 전용으로만 열고 handoff·Neo4j·app은 쓰지 않음 |
+| `zoop-ai-handoff {freeze,recover,inspect,export}` | `zoop_ai_pipeline.handoff_cli` | `zoop-ai-handoff-1` (bundle `zoop-graph-handoff-bundle-7`, 운영자 decisions `zoop-public-decisions-3`) | `handoff.sqlite3` + `bundles/<sha256>.json`; 위 세 원장을 읽기 전용으로만 열고(요약을 고정한 freeze만 `--issue-summary-state-dir`의 요약 원장도 읽기 전용) Neo4j는 쓰지 않음 |
+| `zoop-ai-handoff-exposure` | `zoop_ai_pipeline.handoff_exposure_cli` | `zoop-handoff-exposure-1` | handoff 원장·고정 artifact를 읽기만 함. 원천 변경 조회는 ingestion·extraction 원장도 읽으며 relation·Neo4j·앱 원장은 열지 않음 |
 
 세 원장(ingestion/extraction/relation)은 서로의 디렉터리를 `--ingestion-state-dir`/`--extraction-state-dir` 경로로 읽기 전용으로 엽니다(그래서 한 프로젝트입니다). ingestion과 handoff·graph·dependents는 모델·provider 호출이 없고, S2·S3는 기본이 authored replay이며 명시적 live 게이트(`ZOOP_AI_PIPELINE_LIVE_ENABLED`, S1의 `ZOOP_AI_LIVE_ENABLED`와 별개)와 허용된 단계에서만 provider를 한 번씩 호출합니다. live 설정·예산·receipt·실패 코드는 [`docs/development/ai-runtime-setup.md`](../../docs/development/ai-runtime-setup.md)(§10)를 따르고, 모듈은 `live_runtime.py`(전송·binding·예산 gate; 오프라인 `python -m zoop_ai_pipeline.live_runtime binding|check`)·`live_prompts.py`·`live_jev.py`·`live_budget.py`입니다. 공개 route, 앱 문서 등록·게시, S1 DB 쓰기는 하지 않습니다. `zoop-ai-dependents`는 세 원장을 읽기만 하는 S4의 일부(영향 대상 조회)이며 철회·재생성은 하지 않습니다. `zoop-ai-graph`는 이들 위에서 **완료된 S3 job 하나**를 읽기 전용으로만 소비해 `graph.sqlite3`와 원장에 묶인 Neo4j 한 곳에만 쓰며(아래 절), 그 밖의 네트워크·모델·provider 호출은 없습니다. `zoop-ai-ingest export`는 기본으로 `read`·`quote-display`만 요구하며, 앱 문서 import처럼 내보낸 텍스트를 **저장**하는 소비자는 `--require-store`(export 전용)로 현재 grant의 `store`까지 요구합니다. 이 확인도 호출마다 현재 registry로 CLI 안에서 하며 소비자가 registry를 읽지 않습니다.
 
@@ -36,20 +38,55 @@
 
 **구조 경로(bundle `-5`, 운영자 decisions는 그대로 `zoop-public-decisions-2`).** 모든 relation에 `structuralPath`가 있습니다. `INVOLVES`·`FOLLOWS`는 항상 `null`이고, `STRUCTURALLY_RELATED_TO`는 운영자가 attest한 basis relation의 **순서 있는 회사 체인**입니다. 완전한 경로는 `{status: "complete", companyIds: [P, C] 또는 [P, M, C], links: [{supplierCompanyId, customerCompanyId}, …]}`입니다. P는 같은 이슈의 `INVOLVES` 참여자, C는 edge 대상(참여자가 아님)이고 모든 ID가 서로 다르며, `links`는 basis와 같은 순서로 basis 하나당 하나이고 각 link의 두 끝점은 `companyIds`의 인접한 둘입니다. 방향은 S3 `SUPPLIES`의 공급자→고객 방향 그대로이며(체인을 찾는 걷기만 무방향), 생산자는 `connected()`가 아니라 `chain()`이 돌려주는 정규(canonical) 체인을 보존해 회사 확정 뒤에 공개 ID로 바꿉니다. 중간 회사 M을 운영자가 `companies` 결정으로 매핑했는데 이 bundle이 `companies`로 게시하지 않으면, M은 최상위 `pathCompanies`에 **비공개 지원 참조**로만 실립니다(`companies`와 같은 닫힌 `{id, canonicalId, label, decisionRef}`, id 오름차순·유일, `companies`·`issues`와 서로소, 최대 20,000). 그래프 노드도, relation의 target도, mention 참여자의 `companyId`도 되지 않으며(참여자는 여전히 `companies`로만 풀립니다) `pathCompanies`는 완전한 2단계 경로의 중간 회사에서 `companies`를 뺀 집합과 **정확히** 같고 `counts.pathCompanies`와 content digest에 포함됩니다. 운영자가 매핑하지 않은 중간 회사는 공개 ID를 만들지 않고 `{status: "unavailable", reason: "intermediate_company_unmapped"}`이며 basis가 2개인 edge에만 허용됩니다(1단계 경로는 항상 완전). 경로를 자르거나 지어내지 않고, 기존 제외 코드와 edge ID 공식도 그대로입니다(`structuralPath`는 ID 입력이 아닙니다). 각 basis에는 `businessScope`·`productScope`(S3 값을 그대로 복사, null 가능, 최대 500 코드포인트)가 더해집니다. 둘은 엔티티 ID가 아니라 텍스트입니다. 이 경로는 **운영자가 매핑한 basis 체인**이지 인과나 가격 방향이 아니며, 매핑과 방향은 운영자가 attest한 값이고 export가 고정된 원천을 다시 확인할 뿐 독립 출처 증명이 아닙니다. 닫힌 validator(Python `validate_bundle`, Java verifier)가 모양·연결·참여자 시작·대상 비참여·카탈로그 폐쇄·개수를 강제합니다.
 
-**이전 bundle의 이력.** 저장된 receipt의 `bundleSchema`가 현재 스키마가 아닌 행(`-1`: mention 이전, `-2`: `fieldProvenance` 이전, `-3`: 필드 verdict 이전, `-4`: 구조 경로 이전)은 이력입니다. 운영자 파일·원천 원장·grant·artifact·쓰기 가능한 ledger에 손대기 **전에** 원장만 읽어 판별하고(각 `Handoff` 메서드가 잠금 아래에서 다시 확인), `inspect`는 저장된 상태·receipt·attempt와 `next: null`·`delivery: withheld/handoff_contract_changed`(artifact는 읽지 않음), `export`는 내용 없는 withheld, `recover`와 같은 ID의 `freeze`는 `handoff_contract_changed` 오류입니다. 행·attempt·artifact의 바이트와 권한은 바뀌지 않고 `recover`가 이 행을 `failed`로 만들지도 않으므로, 다시 만들려면 새 `handoffId`로 freeze합니다. 이미 받은 `-4` 이하 bundle 파일이나 `--verify-package`용 package도 같은 이유로 이력이 되므로 `make pipeline-handoff-package`로 새 package를 만듭니다. 운영자 decisions 파일도 `zoop-public-decisions-1`은 `decisions_invalid`이므로 `-2`(이슈마다 `fieldVerdicts`, 비어 있어도 필수)로 옮겨야 합니다(`-5`는 decisions 스키마를 바꾸지 않습니다). 새 ID는 같은 원장에서 정상 동작합니다. 이전 빌드를 이 원장에 실행하지 마십시오(옛 `recover`가 `-5` 행을 invalid로 판정합니다). 손으로 쓴 기대값과 설치된 CLI 확인은 `ai/pipeline/scripts/graph_handoff_smoke.py`가 맡습니다. 이 smoke는 `-4` ready·reserved·failed 행, `-3` ready·reserved 행, `-2` 행 셋(ready·reserved·failed)과 `-1` ready 행 하나를 실제 원장에 심어 위 이력 응답과 바이트·권한·mtime 불변을 확인하고, 구조 경로는 rel-a가 SYNTH-4→SYNTH-3 `SUPPLIES`도 갖는 `chain` 세계에서 게시된 중간(`known`)·비공개 중간(`private`)·매핑 없는 중간(`unmapped`)을 실제 CLI로 내보내 손으로 쓴 기대값과 대조합니다. `--write-fixture`는 mention·선택 근거·verdict·머리 값 기대값(`expected-mentions.json`·`expected-field-provenance.json`·`expected-field-verdicts.json`·`expected-headline-values.json`), verdict가 든 실제 export(`export-field-verdicts.json`, `export-field-verdicts-time.json`), verdict 규칙만 깨는 음성 bundle(`bundle-verdict-*.json`), 구조 경로의 실제 export(`export-path-known.json`·`export-path-private.json`·`export-path-unmapped.json`)와 규칙 하나만 깨는 음성 bundle(`bundle-path-NN.json`, 깨진 규칙·validator 위치는 `expected-structural-paths.json`)과 이전 schema의 withheld 봉투(`export-withheld-legacy.json`)도 새 디렉터리에 씁니다. 기존 `export-valid.json`·`export-collision.json`은 verdict가 비어 있는 `-5`입니다.
+**이전 bundle의 이력.** 저장된 receipt의 `bundleSchema`가 현재 스키마가 아닌 행(`-1`: mention 이전, `-2`: `fieldProvenance` 이전, `-3`: 필드 verdict 이전, `-4`: 구조 경로 이전, `-5`: impact 행 이전, `-6`: 이슈 요약 이전)은 이력입니다. 운영자 파일·원천 원장·grant·artifact·쓰기 가능한 ledger에 손대기 **전에** 원장만 읽어 판별하고(각 `Handoff` 메서드가 잠금 아래에서 다시 확인), `inspect`는 저장된 상태·receipt·attempt와 `next: null`·`delivery: withheld/handoff_contract_changed`(artifact는 읽지 않음), `export`는 내용 없는 withheld, `recover`와 같은 ID의 `freeze`는 `handoff_contract_changed` 오류입니다. 행·attempt·artifact의 바이트와 권한은 바뀌지 않고 `recover`가 이 행을 `failed`로 만들지도 않으므로, 다시 만들려면 새 `handoffId`로 freeze합니다. 이미 받은 `-6` 이하 bundle 파일이나 `--verify-package`용 package도 같은 이유로 이력이 되므로 `make pipeline-handoff-package`로 새 package를 만듭니다. 이미 게시된 `-6` bundle과 그 이력의 모양은 바뀌지 않았고(`-6`을 조용히 고쳐 쓰지 않음) 이번 변경은 **새로 만드는 bundle만** `-7`로 올립니다. 운영자 decisions 파일도 `zoop-public-decisions-1`·`-2`는 `decisions_invalid`이므로 `-3`(이슈마다 `fieldVerdicts`와 `summary`, 둘 다 비어 있어도 필수이고 `summary`는 고정한 결과가 없으면 `null`)로 옮겨야 합니다. 새 ID는 같은 원장에서 정상 동작합니다. 이전 빌드를 이 원장에 실행하지 마십시오(옛 `recover`가 `-7` 행을 invalid로 판정합니다). 손으로 쓴 기대값과 설치된 CLI 확인은 `ai/pipeline/scripts/graph_handoff_smoke.py`가 맡습니다. 이 smoke는 `-6` ready·reserved 행, `-5` ready·reserved 행, `-4` ready·reserved·failed 행, `-3` ready·reserved 행, `-2` 행 셋(ready·reserved·failed)과 `-1` ready 행 하나를 실제 원장에 심어 위 이력 응답과 바이트·권한·mtime 불변을 확인하고, 구조 경로는 rel-a가 SYNTH-4→SYNTH-3 `SUPPLIES`도 갖는 `chain` 세계에서 게시된 중간(`known`)·비공개 중간(`private`)·매핑 없는 중간(`unmapped`)을 실제 CLI로 내보내 손으로 쓴 기대값과 대조합니다. `--write-fixture`는 mention·선택 근거·verdict·머리 값 기대값(`expected-mentions.json`·`expected-field-provenance.json`·`expected-field-verdicts.json`·`expected-headline-values.json`), verdict가 든 실제 export(`export-field-verdicts.json`, `export-field-verdicts-time.json`), verdict 규칙만 깨는 음성 bundle(`bundle-verdict-*.json`), 구조 경로의 실제 export(`export-path-known.json`·`export-path-private.json`·`export-path-unmapped.json`)와 규칙 하나만 깨는 음성 bundle(`bundle-path-NN.json`, 깨진 규칙·validator 위치는 `expected-structural-paths.json`), impact 세계의 실제 export(`export-impacts.json`·`export-approved.json`·astral 문자 길이 경계의 유효 export `export-impacts-unicode.json`), 모든 export의 impact 행 기대값과 규칙 하나만 깨는 음성 bundle 35개(`bundle-impact-NN.json`, 깨진 규칙·validator 위치는 `expected-impacts.json`), 이슈 요약 세계의 실제 export(`export-summary.json`: available 요약과 `temporal-review-pending`, `export-summary-withheld.json`: `verifier-hold`와 `not-requested`), 모든 export의 요약 기대값(`expected-summaries.json`)과 규칙 하나만 깨는 음성 bundle(`bundle-summary-NN.json`)과 이전 schema의 withheld 봉투(`export-withheld-legacy.json`)도 새 디렉터리에 씁니다. 기존 `export-valid.json`·`export-collision.json`은 verdict가 비어 있고 impact 행이 모두 `not-proposed`이며 요약이 모두 `not-requested`인 `-7`입니다.
+
+**영향 행(`impacts`, bundle `-6`에서 추가, receipt 전용).** 방출된 모든 INVOLVES 간선의 `sourceRefs`마다 **정확히 한 행**(`(edgeId, jobId, relationCandidateId)` 정렬, 최대 10,000)을 둡니다. 같은 간선 뒤의 두 S3 relation은 한 행으로 합치지 않으며 긍정·부정이 함께 남고 간선 단위 라벨도 없습니다. 행은 S3 결과의 impact 단계가 말한 것 그대로의 13개 닫힌 키(`edgeId`·`issueId`·`companyId`·`sourceRelation`·`impactCandidateId`·`status`·`code`·`label`·`targetVerdict`·`effects`·`verifier`·`verifierRequestDigest`·`proposal`)이고 상태는 `not-applicable`(운영자 최종 승인 relation: S3가 호출하지 않았고 후보도 없음)·`not-proposed`(자동 relation에 대상 후보 없음)·`no-evidence`(인용 없음: 검증기를 부르지 않았으므로 라벨 없음)·`technical-reject`(`producer_reply_invalid`·`impact_precheck_rejected`·재생(replay) 전용 `verifier_reply_invalid`)·`verifier-reject`(대상 `contradicted`)·`verified`·`withheld`(`impact_evidence_outside_relation_documents`·`impact_quote_ambiguous`: 증거를 정확히 실을 수 없으면 일부로 라벨을 다시 계산하지 않고 비움)입니다. `verified` 행만 `label`·`targetVerdict`·`effects{positive,negative,neutral,uncertain}`(앱 `ev-` ID)를 갖고, 라벨은 검증기가 매핑한 효과에서만 결정적으로 계산됩니다(uncertain이 있거나 대상이 insufficient이면 `undetermined`, 아니면 positive만·negative만·둘 다=`mixed`). 호출된 verdict는 `impact_verifier_request`의 digest와 job에 묶인 impact policy 버전, 라벨을 다시 계산해 일치할 때만 받고, 어긋나거나 자동 relation의 마커 없음·verdict 없는 후보·대상 후보 중복·후보가 있는 수동 relation은 `relation_payload_invalid`로 freeze 전체가 실패합니다. S2 quote ID는 문서 version과 구간만의 hash라 한 문서로만 풀리는 인용에서만 쓰며(둘 이상이면 `impact_quote_ambiguous`), relation 자신의 인용 문서 밖이면 `impact_evidence_outside_relation_documents`입니다. 앱 evidence는 한 행의 증거가 모두 증명된 **뒤에만** bundle에 더해져 거절된 행이 임시 참조를 남기지 않습니다. 대상이 아닌 후보(모델이 만든 회사 ID)는 내보내지 않고 생산자의 `supporting`/`opposing` 묶음도 내보내지 않으며, `proposal`(방향·이유·한계)은 `verification: "none"`인 **검증되지 않은** 비공개 영수증 내용입니다(이유 ≤2000, 한계 ≤1000 **Unicode code point**). 검증기는 대상 회사 지지 여부와 인용문의 텍스트 효과만 증명하며 가격·확률·인과·근거 완전성은 증명하지 않고, replay 실행의 `verifier: called`는 작성된 fixture의 응답이지 독립 추론이 아닙니다. S3에는 영향 검증 시각이 없어 시각을 만들어 넣지 않습니다. 공개 집계 라벨이나 공개 영향 경로는 없습니다.
+
+**이슈 요약(`issues[].summary`, bundle `-7`에서 추가, receipt 전용, decisions `zoop-public-decisions-3`).** 여러 기사에 걸친 이슈 요약 문장은 handoff가 만들지 않습니다. **별도 명령 `zoop-ai-issue-summary`**(자기 원장·자기 live binding family)가 이슈 하나의 입력 인용을 모델에 한 번 보내 생성하고 독립 verifier로 한 번 확인하며, 그 **불변 결과**를 operator decisions가 `IssueDecision.summary: {jobId, inputDigest, resultDigest}`로 이슈마다 고정합니다(`null`이면 고정 없음). `freeze`는 고정한 결과를 요약 원장에서 **읽기 전용**으로 가져와 bundle에 옮기고(`--issue-summary-state-dir`는 **freeze 전용이며 decisions가 요약을 고정했을 때만** 줍니다: 고정이 있는데 없으면 `issue_summary_state_missing`, 고정이 없는데 주면 `issue_summary_state_unused`), `export`는 freeze된 artifact에서 꺼내 현재 원천으로 입력 basis를 다시 계산해 비교합니다. 그래서 **freeze와 export는 모델·provider를 한 번도 부르지 않고**, export는 요약 원장·새 인자·요약 job 모듈 없이 동작하며 Java·`ai/service` export 인자도 그대로입니다. 원장의 `failed`(provider 결과 불명 등)는 고정할 수 없고, 실패한 job을 빈 요약으로 바꾸지 않습니다.
+
+*이슈별 결정 순서(생산자 Planner가 정하고 Python validator와 Java verifier가 bundle만 보고 다시 계산).* ① 이슈의 `fieldVerdicts`에 `HOLD`/`REJECT`가 하나라도 있으면(대표 mention이 아니어도) 정확히 `{"status":"unavailable","code":"temporal-review-pending","source":null}`이고 **bundle 어디에도 그 이슈의 요약 문장이 없습니다**(`available`도 거절). ② 입력 인용이 60개(`MAX_QUOTES`, policy 문자열 `zoop-issue-summary-policy-1`의 일부)를 넘으면 `input-too-large`. ③ 그 밖에 decisions가 결과를 고정했으면 그 결과. ④ 아니면 `not-requested`. ①②④는 `source: null`이고 호출이 없습니다. 작업 쪽 unavailable은 `producer-invalid`·`verifier-hold`·`verifier-reject` 셋뿐이며 `source: {jobId, inputDigest, resultDigest, basisDigest}`로 결과를 가리킵니다(한글 음절이 없는 출력은 `producer-invalid`). 고정이 있는데 ①이나 ②가 해당되면 freeze 전체를 `issue_summary_temporal_review_pending`/`issue_summary_input_too_large`로 거절하고 조용히 무시하지 않습니다.
+
+*basis(요약 입력의 고정).* `{policy, issueId, title, quotes:[{evidenceId, articleId, articleVersion, start, end, quoteSha256, context}], articles:[{articleId, articleVersion, documentId, documentVersion, textSha256}]}`. `quotes`는 이슈 `mentions[].evidenceIds`의 **합집합만**(evidenceId 순)이며 geography 근거나 verdict 근거만 있는 span은 넣지 않습니다. `context`는 그 인용을 단 mention이 **모두** `background: true`일 때만 `background`이고 아니면 `report`입니다. 기사 버전과 `quoteSha256`·`textSha256`이 정확히 고정되므로 이 모든 입력(인용되지 않은 것 포함)이 앱의 current-rights/asOf 가림 판단 입력입니다.
+
+*available 객체(닫힌 키).* `{status, text, claims:[{claimId:"c1".., text, evidenceIds}], evidenceIds, generatedAt, resultVersion, language:"ko", source, producer{kind, model, reasoningEffort, promptVersion, schemaDigest, runtimeIdentity}, verifier{kind, model, adapterIdentity, requestDigest}}`. claim은 1~5개, 각 1~280 code point·줄바꿈 없음·한글 음절 1개 이상이고 `evidenceIds`는 1~5개의 정렬·유일 id이며 모두 basis 인용 안에 있어야 합니다. **claim이 인용하지 않은 basis 인용도 이 요약이 의존하는 입력입니다**(모델은 둘 다 봤고 `source.basisDigest`가 모두를 고정합니다). `text`는 claim 문장을 `"\n"`으로 이은 것, `evidenceIds`는 claim 근거의 정렬된 합집합, `resultVersion`은 `"isr-"+digest({basisDigest, claims})`(내용만의 함수, 시각·job id 아님), `generatedAt`은 요약 작업 시각이며 문법은 **하나**입니다: 대문자 `T`·`Z`, 초 필수, 소수 1~9자리(뒤의 0 허용), `Z` 또는 `±HH:MM`(시 ≤18, 18은 `:00`만), 실제 그레고리력 날짜, 윤초 없음. 생산자 `issue_summary_contracts.validate_generated_at`과 앱 Java `HandoffIssueSummary.generatedAt`이 공유 벡터 `api/src/test/resources/graph-handoff/summary-time-vectors.json`으로 같은 문자열을 받고 거절하며 라이브러리 파서(`fromisoformat`·`OffsetDateTime.parse`)는 기준이 아닙니다. 엔진은 `datetime.now(UTC).isoformat()` 모양(`YYYY-MM-DDTHH:MM:SS[.ffffff]+00:00`)만 만듭니다. `source.resultDigest`는 job 신원과 basis, `source`를 뺀 본문의 digest라서 문장·id·신원 어느 하나를 바꿔도 맞지 않습니다. `producer.kind`/`verifier.kind`는 bundle 실행 모드와 짝입니다: replay는 둘 다 `authored-replay`(model·reasoningEffort는 null, 작성된 fixture의 응답이지 독립 모델의 판단이 아님), live는 `provider`와 `independent-verifier`(모델 이름 필수). Python `validate_bundle`과 Java `HandoffBundleVerifier`가 같은 순수 규칙(`issue_summary_contracts.py` ↔ `HandoffIssueSummary.java`)으로 각각 다시 계산하며 위조된 문장·id·basis·시간 결과는 bundle 전체가 `handoff_bundle_invalid`/`BUNDLE_INVALID`입니다.
+
+*freeze가 고정을 받아들이는 조건(모두 엄격 거절, 아무것도 쓰지 않음).* 요약 원장 행이 `ready`이고 핀의 (jobId, inputDigest, resultDigest)와 같음(`issue_summary_pin_mismatch`), 그 job이 이 **공개** 이슈를 요약했음, 이슈가 이번 freeze에서 공개됨(`issue_summary_issue_not_public`), 지금 다시 계산한 basis digest가 job의 것과 같음(`issue_summary_basis_changed`), job의 실행 모드·sourceKind가 bundle과 같음(`provenance_mode_conflict`/`provenance_conflict`). 권리는 새로 만들지 않고 기존 경로가 지킵니다: freeze·export 모두 모든 원천 문서를 현재 grant로 다시 읽고(`current()`), export는 freeze된 요약이 여전히 고정 결과이고 같은 basis에 의존하는지(`issue_summary_pin_mismatch`/`issue_summary_basis_changed` withheld)와 content digest가 같은지(`handoff_content_changed`)를 확인합니다.
+
+*권리는 두 시점으로 나뉩니다.* 요약 입력의 **모델 전송 권리**(live)는 요약 job이 전송 직전·응답 수신 후·최종 완료 때만 확인합니다(그 뒤에 철회돼도 이미 끝난 결과를 소급해 모델 전송 위반으로 만들지 않으며 이 명령들도 다시 확인하지 않습니다). **이후의 전달**은 기존 S2/S3 결과와 같은 규칙으로 **현재 read·quote-display 권리**를 요구하고(앱 import의 store는 기존 import 규칙), 소급 모델 전송 검사가 아닙니다. 그래서 공개 CLI `zoop-ai-issue-summary inspect`·`export`는 `submit`·`run`·`resume`과 **같은 일곱 원천·운영자 파일 인자**(`--relation-state-dir`·`--extraction-state-dir`·`--ingestion-state-dir`·`--sources`·`--canonical`·`--decisions`·`--bindings`)가 필요하고, 원래 요청의 manifest를 지금 다시 읽어 원천·현재 권리·같은 basis가 더는 성립하지 않으면 요약 본문을 내지 않고 `delivery: {status: "withheld", code}`(종료 코드 2)와 job 메타데이터(신원·상태·사용량)만 남깁니다. 요약을 decisions에 고정하면 그 파일이 job manifest가 고정한 파일과 달라지므로 이후 그 job의 공개 `export`는 withheld입니다(고정할 pin 필드는 고정 **전**에 읽습니다). 내부 `issue_summary.load_result`는 원장만 읽는 handoff용 함수로 원천·권리를 보지 않으며(원천 독립), handoff `freeze`는 요약 job의 옛 manifest가 아니라 **자기 새 manifest**로 원천과 현재 권리를 다시 증명하고 **같은 basis digest**일 때만 고정을 받습니다.
+
+*취소.* `zoop-ai-issue-summary cancel --state-dir D …`(기존 원장이 있어야 하며 원장을 만들지 않음)는 `queued`·`stopped` job만 `failed`(`job_cancelled`, 종료)로 만들어 그 입력이 차지하던 자리를 비우므로 현재 manifest로 같은 입력의 새 job을 낼 수 있습니다. 원천·키·모델은 건드리지 않고 저장된 receipt는 감사 기록으로 남으며, `ready`나 이미 `failed`인 job은 `job_already_terminal`로 거절합니다(고정할 결과를 지우는 취소는 없습니다).
+
+*앱.* Java importer는 `-7`만 받아(`-6`은 `BUNDLE_INVALID`) 요약을 같은 규칙으로 다시 검증하고 **retained receipt에 그 객체 그대로** 보관합니다. 공개 graph snapshot(format 3)에는 싣지 않으며 공개 `getEvent`의 `summary` 매핑·asOf·현재 grant 가림은 BE 소유입니다(입력 basis **전체**가 보이고 읽을 수 있을 때만 `AnalysisSummary`, `temporal-review-pending`·작업 쪽 unavailable은 문장 없음, `-6` 이하 receipt는 요약이 생산된 적 없음). 이 문서는 PR #278의 소스를 바꾸지 않습니다. replay 실행은 작성된 fixture이며 실제 provider 호출·품질·임계값 보정은 검증하지 않았습니다.
 
 판별은 세 갈래입니다. **증명된 없음/현재**(디렉터리·원장 파일이 없거나 행이 없거나 현재 스키마)일 때만 기존 쓰기 경로로 넘어가고, **이력**이면 읽기 전용 보기를 쓰며, **판단 불가**(writer 사용 중 `handoff_busy`, 낯선·손상된 namespace/원장, receipt에 schema 없음 `handoff_state_invalid`, 과대 파일)는 그 오류를 그대로 내고 쓰기 가능한 open으로 넘어가지 않습니다(쓰기 open은 권한 재설정·WAL checkpoint·DDL을 하므로 이력 원장을 바꿀 수 있습니다). writer가 죽어 비어 있지 않은 WAL에만 커밋된 행은 읽기 전용 immutable open에 보이지 않으므로, 소유를 먼저 증명한 뒤 shared lock 아래에서 원장 파일과 WAL을 128 MiB 한도로 임시 0700 디렉터리에 **복사**해 그 복사본만 SQLite로 엽니다(원본 파일·`-shm`·WAL·권한·mtime 불변, 임시 디렉터리는 닫을 때 삭제). 현재 스키마 행의 hot WAL 복구(`recover`)는 그대로 쓰기 경로이고 읽기 명령은 `handoff_recovery_required`를 냅니다.
 
 복사 한도는 파일마다 **128 MiB**이며 원본이 일반 파일이 아니거나(심볼릭 링크 포함) 한도를 넘으면 잘라 읽지 않고 `handoff_state_invalid` 오류로 닫힙니다. 임시 디렉터리는 `mkdtemp`로 만든 0700 비공개 위치이고, 정상·오류 어느 경로에서도 보기를 닫을 때 삭제하며 원장 디렉터리 안에는 아무것도 만들지 않습니다.
 
-**의존성.** 전체 패키지(`zoop-ai-pipeline`)는 공개 패키지(pydantic 2.13.5·httpx 0.28.1·lxml 6.1.3·pypdf 6.19.0·neo4j 6.3.1)만 쓰며 collect·ingest·extract·relation·dependents·graph·handoff 일곱 명령 모두 **private PoC·git 인증·토큰 없이** 설치·실행됩니다. 원본 PoC(`investmate`)는 이 프로젝트의 어떤 소스·스크립트·시험에서도 import하지 않고 manifest·lock에도 없습니다(옛 `poc` extra, `poc_guard`, `pinned_poc_unavailable` 코드 제거). `prototype/bff`만 별도로 private PoC를 고정해 쓰며, CI에서 그 token을 쓰는 job은 `bff` 하나뿐입니다.
+**의존성.** 전체 패키지(`zoop-ai-pipeline`)는 공개 패키지(pydantic 2.13.5·httpx 0.28.1·lxml 6.1.3·pypdf 6.19.0·neo4j 6.3.1)만 쓰며 collect·ingest·extract·relation·dependents·graph·issue-summary·handoff 명령 모두 **private PoC·git 인증·토큰 없이** 설치·실행됩니다. 원본 PoC(`investmate`)는 이 프로젝트의 어떤 소스·스크립트·시험에서도 import하지 않고 manifest·lock에도 없습니다(옛 `poc` extra, `poc_guard`, `pinned_poc_unavailable` 코드 제거). `prototype/bff`만 별도로 private PoC를 고정해 쓰며, CI에서 그 token을 쓰는 job은 `bff` 하나뿐입니다.
 
 ```bash
 make pipeline-install   # uv sync --project ai/pipeline --frozen --group dev  (공개 의존성만, 토큰 불필요)
 make pipeline-test      # ai/pipeline/.venv/bin/python -m pytest ai/pipeline/tests
-make pipeline-smoke     # ingestion/collection/extraction/relation/dependents/handoff 실제 CLI 프로세스 smoke, 모델·외부 네트워크 호출 0
+make pipeline-smoke     # 수집·회차·추출·등록·관계·의존 조회·인계·이슈 요약 CLI 검사. 외부 모델 호출 없음; 요약 live 경로는 loopback 모의 서버만 사용
 make pipeline-build
 ```
+
+### 이슈 요약 검증기 벤치마크
+
+아래 명령은 저장소 루트에서 실행합니다. `loopback`은 작성된 응답을 돌려주는 로컬 HTTP 서버와 실제 native verifier 경로를 연결하며, 실제 모델의 품질·지연 시간을 측정하지 않습니다. 입력·정답·점수 계약과 한계는 [평가 패키지](../evaluation/README.md)와 [벤치마크 설계](../../docs/design/ai-benchmark.md)를 따릅니다.
+
+```bash
+ai/pipeline/.venv/bin/python ai/pipeline/scripts/summary_verify_bench.py loopback \
+  --script ai/evaluation/fixtures/summary-verification/oracle.script.json --out /tmp/summary-oracle.run.json
+ai/pipeline/.venv/bin/python ai/pipeline/scripts/summary_verify_bench.py assemble \
+  --out-dir /tmp/summary-oracle.run.json.journal --out /tmp/summary-assembled.run.json
+ai/pipeline/.venv/bin/python ai/pipeline/scripts/summary_verify_bench.py smoke
+ai/pipeline/.venv/bin/python -m pytest ai/pipeline/tests/test_summary_verify_bench.py
+```
+
+출력과 journal은 새 경로여야 합니다. 중단된 journal은 `assemble`로 읽기만 하며 재전송하지 않습니다. `run --mode live --confirm-inputs-sha256 <bundled-inputs-sha256> --check --out-dir NEW --run-id ID`는 기존 live 환경 설정·고정 모델·새 예산·명시적 실제 endpoint를 검사할 뿐 파일이나 요청을 만들지 않습니다. **플래그는 승인 자체가 아니며 실제 호출마다 별도 실험 승인이 필요합니다.** `--check`를 뺀 실제 provider 경로는 이 로컬 검사로 검증되지 않습니다. 보수적 예산 추정은 청구액이 아니며, native receipt의 비정상 UTF-8 원본을 `bodyText`에서 복원할 수 없으면 점수를 내지 않고 `receipt_body_mismatch`로 거절합니다.
+
+Journal 파일은 비공개 임시 파일에 완전히 기록·동기화한 뒤, 기존 경로를 덮어쓰지 않고 최종 파일 이름으로 원자적으로 확정합니다. 중단으로 남은 `.pending` 파일은 `assemble`이 읽지 않지만, 확정된 파일이 손상되었으면 오류를 그대로 반환합니다. 웹 공개나 앱 버전 활성화를 뜻하지 않습니다.
 
 ### 2026-10-16 전체 네이티브 이행 검증
 
@@ -203,6 +240,131 @@ PYTHONDONTWRITEBYTECODE=1 ai/pipeline/.venv/bin/python ai/pipeline/scripts/inges
 
 wire schema는 `zoop-ingestion-s2-1`이며 공용 OpenAPI나 S1 schema를 바꾸지 않았다. 정확한 문서/version을 고른 `inspect`만 현재 read 권한으로 내부 S1 `Document` projection을 반환한다. 원문 span 해석에는 quote-display도 요구한다. S2-2가 쓰도록 정확한 관측(round/source/page/ordinal/document/rawVersion/documentVersion)의 서버 소유 URL·title·publishedAt과 grant를 반환하는 읽기 전용 `ingestion_cli export`를 추가했다. HTML 위치는 decoded DOM text/tail 좌표이고 PDF 위치는 frozen page-extracted text 좌표이지 raw byte·glyph geometry가 아니다. 이 문서는 앱 Dataset에 등록되거나 게시되지 않는다. 실제 공급원/정기 수집·기업/이슈 연결·공개 등록/게시·유료 의미 검증은 구현 완료로 주장하지 않는다. 명령·registry·manifest·한계와 실행 증거는 [AI 실행 계약의 S2-1 절](../../docs/design/ai-system.md#s2-1-독립-오프라인-원문-준비와-검사)을 따른다.
 
+## 정기 회차 컨트롤러 (S2-1 `tick`, FS058·요구 70의 오프라인 일부)
+
+`zoop-ai-ingest tick`은 시계 한 번의 읽기를 **가장 최근에 도래한 slot 하나**로 바꾸고, 그 slot의 회차를 기존 engine으로 **최대 한 번** 진행한다. 새 DB·table·column·migration·console script가 없고 기존 engine 동작도 바꾸지 않으며 새 서비스·모델·provider·네트워크·cron·AWS도 없다. **이 명령은 trigger를 배포하지 않는다.** 누가 언제 `tick`을 부를지(cron·AWS 등)는 이 저장소에 없고 FS058은 완료되지 않았다(아래 "하지 않는 일").
+
+| 규칙 | 값 |
+| --- | --- |
+| slot | KST 고정 UTC+09의 09:05, 09:35, … 17:35(하루 18개). **요일·공휴일 구분 없이 매일**이다(스펙에 요일·휴일 규칙이 없다: FS058 `09-데이터-관리.csv` 109–143행, NFS012 377·392행, 요구 70) |
+| 선택 | 같은 날의 가장 늦게 도래한 slot, 단 `09:00 <= now < 18:00`. 09:00:00–09:04:59.999999는 `before_first_slot`, 그 밖은 `outside_operating_window`로 **not-due**다. 09:20→09:05, 10:04:59→09:35, 17:59:59.999999→17:35, 18:00→not-due. 늦게 도착한 trigger도 도래한 slot을 놓치지 않는다 |
+| window | `from` = 저장된 마지막 **성공** 경계(`through_time`)의 문자열 그대로, `through` = slot(`YYYY-MM-DDTHH:MM:00+09:00`). 겹침·lookback을 만들지 않는다. fixture manifest 마지막 page의 `coverageThrough`가 이 slot 문자열과 **정확히 같아야** 완료이고, 아니면 `coverage_incomplete`다 |
+| roundId | `slot-` + sha256(canonical JSON `{sourceId, scopeId, slot}`). 길이가 고정이라 200자 scope도 쓴다. 읽을 수 있는 slot은 출력의 `tick.slot`이다 |
+| catchUp | 저장된 window의 `from`이 slot보다 **30분을 넘게** 앞일 때만 `true`다(전날 17:35 경계에서 시작한 09:05 slot은 true, 명시한 5분 창과 정확히 30분은 false). 컨트롤러가 요청한 창의 길이 표지일 뿐 공급원의 coverage나 "놓친 뉴스 없음"의 주장이 아니다. 재실행은 저장된 창으로 같은 값을 낸다 |
+
+입력은 stdin JSON `{schemaVersion:"zoop-ingestion-s2-1", sourceId, scopeId, initialFrom?, now?}`(strict, 알 수 없는 키 거부)이고 `initialFrom`·`now`는 timezone이 있어야 한다. 명령은 `zoop-ai-ingest tick --state-dir DIR --sources REG [--fixture-manifest M]`이며 `--require-store`는 여전히 `export` 전용이다.
+
+**`now`는 sandbox가 아니다.** 시험·시연용 결정적 시계 override이며 실제 시계보다 미래이면 `clock_in_future`다. 과거로 주입한 `now`와 유효한 manifest가 있으면 `--state-dir`로 지정한 **그 밖에 유효한 ledger에는 실제로 기록된다**(주입 시계를 위한 격리·표지·marker는 없다). 그래서 시연과 시험은 항상 **새 격리 `--state-dir`**를 쓴다. grant `expiresAt`은 주입한 `now`가 아니라 **실제 UTC 시계**로 판정한다(주입 시계에서는 유효해도 실제로 만료됐으면 `source_unauthorized`).
+
+**한 번의 tick이 하는 일(순서).**
+
+1. stdin 해석 → 시계(`clock_in_future`) → due 판정을 **registry·manifest·state에 손대기 전에** 한다. not-due는 아무것도 읽거나 만들지 않고 exit 0이며, 넘긴 manifest 경로는 무시한다.
+2. due이면 ledger 독점 lock(tick 내내 유지)을 잡고 registry의 현재 grant·scope 권한을 확인한다(`source_unauthorized`).
+3. 그 slot의 round가 이미 있으면 저장된 request와 `window.through`가 이 slot과 같은지, manifest를 줬다면 SHA-256이 frozen hash와, `initialFrom`을 줬다면 저장된 `from`과 같은 시각인지 확인한다(불일치는 `slot_input_conflict`, 아무것도 쓰지 않음). 현재 registry 설정이 저장된 설정과 같은지도 먼저 확인한다(`scope_configuration_conflict`). 그다음 `running`이면 `resume`을 **한 번**(`recovered`; 독점 lock이 이전 프로세스가 죽었음을 증명), `complete`·`incomplete`이면 저장된 결과만 돌려준다(`replayed`). **숨은 재시도는 없다.** 복구 가능한 incomplete(예: 없던 body 파일이 복원됨)도 같은 slot의 tick은 계속 incomplete로 replay하고, 완료는 명시적 `zoop-ai-ingest resume`만 한다.
+4. 새 slot이면 baseline은 저장된 `through_time`이고, 없을 때만 `initialFrom`을 쓴다. 둘 다 있으면 `initial_baseline_conflict`, 둘 다 없으면 `initial_baseline_required`, baseline이 slot 이후이면 `slot_not_after_baseline`, manifest가 없으면 `fixture_manifest_required`다. 통과하면 `run`을 **한 번** 한다(`started`).
+5. 오래된 unfinished slot은 자동으로 resume하지 않는다. 새 slot은 마지막 성공 경계에서 시작하고 이전 round의 checkpoint는 기존 engine 규칙대로 stale이 되며, 명시적 `resume`이 `checkpoint_stale`을 기록하거나(아직 현재면) 완료한다.
+
+출력은 canonical JSON이다.
+
+```json
+{"schemaVersion":"zoop-ingestion-s2-1",
+ "tick":{"action":"<not-due|started|recovered|replayed>","at":"<now를 KST로>","slot":"<slot|null>","roundId":"<id|null>",
+         "reason":"<outside_operating_window|before_first_slot|null>","catchUp":"<true|false|null>"},
+ "round":"<기존 run/resume 출력 그대로|null>"}
+```
+
+| 종료 코드 | 뜻 |
+| --- | --- |
+| 0 | not-due, 또는 round가 `complete` |
+| 3 | round가 기록됐지만 `complete`가 아니다. `run`은 incomplete도 0이지만 scheduler가 실패한 회차를 성공으로 보지 않도록 tick만 다르게 둔다 |
+| 2 | 오류. 기존 `{schemaVersion,error:{code}}`이며 새 코드는 `clock_in_future`·`initial_baseline_required`·`initial_baseline_conflict`·`slot_not_after_baseline`·`slot_input_conflict`뿐이다 |
+
+실패·partial page는 `through_time`을 옮기지 않는다(page를 끝낸 round의 revision·cursor는 기존 engine대로 움직일 수 있다). 선언된 coverage가 있는 0건 round는 유효한 성공이라 경계를 옮기고, coverage 없는 0건은 `coverage_incomplete`·exit 3으로 경계를 옮기지 않는다. `collected-http` source는 수집기가 `coverageThrough`를 항상 null로 쓰므로 tick은 정직하게 incomplete(exit 3)이며 어댑터별 우회는 없다.
+
+**CLI 절차 — 첫 tick, 그다음 정규 tick(합성 authored fixture, 외부 접속 없음).** 아래는 새 격리 디렉터리에서 그대로 실행하는 절차다. 실제 운영 시계를 쓸 때는 JSON에서 `now`를 뺀다.
+
+```sh
+BIN="$PWD/ai/pipeline/.venv/bin"
+WORK="$(cd "$(mktemp -d /tmp/zoop-round-demo.XXXXXX)" && pwd -P)"   # 항상 새 디렉터리(ledger도 여기에 생긴다). state 경로에 symlink가 있으면 거부하므로 pwd -P로 실제 경로를 쓴다(macOS의 /tmp). 저장소나 앱/S1/worker 상태 디렉터리 안에 두지 않는다
+mkdir -p "$WORK/inputs"
+
+cat > "$WORK/sources.json" <<EOF
+{"schemaVersion":"zoop-ingestion-s2-1","revision":"operator-1","sources":[{
+  "sourceId":"synthetic-source","adapter":"authored-files","inputRoot":"$WORK/inputs","allowedHosts":["example.invalid"],
+  "scopes":[{"scopeId":"body","selection":"authored source slice","initialCursor":null,"articleXPath":null,
+             "timestampLimitations":["authored fixtures; no real provider late-registration guarantee"]}],
+  "grant":{"grantId":"operator-grant","revision":"rights-1","sourceId":"synthetic-source","enabled":true,"rights":"known",
+           "allowedOperations":["read","store","quote-display"],"recipients":[],"purposes":[],
+           "evidence":["operator-owned authored synthetic fixtures"],"expiresAt":null}}]}
+EOF
+
+# slot마다 manifest 하나: 마지막 page의 coverageThrough가 그 slot 문자열과 정확히 같아야 한다. 아래는 첫 slot에 기사 1건, 다음 slot은 0건(coverage 선언)이다.
+"$BIN/python" - "$WORK" <<'PY'
+import hashlib, json, sys
+from pathlib import Path
+work = Path(sys.argv[1])
+def dump(value):
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+def put(name, raw):
+    (work / "inputs" / name).write_bytes(raw)
+    return {"file": name, "sha256": hashlib.sha256(raw).hexdigest()}
+def manifest(name, slot, items=(), bodies=None):
+    documents = {key: put(f"{name}-{key}.html", body) for key, body in (bodies or {}).items()}
+    response = put(f"{name}-page.json", dump({"items": list(items), "more": False, "nextCursor": None}))
+    page = {"pageId": "page-0", "cursor": None, "response": response, "status": "ok", "nextCursor": None, "terminal": True, "coverageThrough": slot}
+    (work / f"{name}-manifest.json").write_bytes(dump({"schemaVersion": "zoop-ingestion-s2-1", "sourceId": "synthetic-source", "scopeId": "body", "pages": [page], "documents": documents}))
+article = {"candidateId": "a", "supplierDocumentId": "supplier-a", "url": "https://example.invalid/a", "bodyRef": "a", "mediaType": "text/html",
+           "title": "합성 기사", "publishedAt": "2026-10-17T09:00:00+09:00", "modifiedAt": None, "sourceRevision": None}
+manifest("m-0905", "2026-10-17T09:05:00+09:00", [article], {"a": "<html><body><article><p>합성 본문</p></article></body></html>".encode()})
+manifest("m-0935", "2026-10-17T09:35:00+09:00")
+PY
+
+TICK() { "$BIN/zoop-ai-ingest" tick --state-dir "$WORK/state" --sources "$WORK/sources.json" "$@"; }
+
+# 1) 첫 tick(토요일 09:05:30 KST). 저장된 성공 경계가 아직 없으므로 initialFrom으로 시작 경계를 명시한다(없으면 initial_baseline_required).
+#    기대: 종료 0, tick.action=started, tick.slot=2026-10-17T09:05:00+09:00, catchUp=false(5분 창), round.state=complete, round.counts.newTextVersions=1
+TICK --fixture-manifest "$WORK/m-0905-manifest.json" <<'EOF'
+{"schemaVersion":"zoop-ingestion-s2-1","sourceId":"synthetic-source","scopeId":"body","initialFrom":"2026-10-17T09:00:00+09:00","now":"2026-10-17T09:05:30+09:00"}
+EOF
+
+# 2) 같은 slot의 두 번째 trigger(09:20). 재실행이 아니라 저장된 결과의 replay다. 기대: 종료 0, tick.action=replayed, round는 1)과 같다.
+TICK <<'EOF'
+{"schemaVersion":"zoop-ingestion-s2-1","sourceId":"synthetic-source","scopeId":"body","now":"2026-10-17T09:20:00+09:00"}
+EOF
+
+# 3) 정규 tick(09:35). initialFrom 없음: 저장된 성공 경계(2026-10-17T09:05:00+09:00)가 window.from이다.
+#    기대: 종료 0, tick.action=started, catchUp=false(정확히 30분), round.completion=source-zero, round.checkpoint.through=2026-10-17T09:35:00+09:00
+TICK --fixture-manifest "$WORK/m-0935-manifest.json" <<'EOF'
+{"schemaVersion":"zoop-ingestion-s2-1","sourceId":"synthetic-source","scopeId":"body","now":"2026-10-17T09:35:00+09:00"}
+EOF
+
+# 4) 운영 시간 밖(18:00). 기대: 종료 0, tick.action=not-due, reason=outside_operating_window. registry·manifest·state를 읽거나 만들지 않으므로 manifest 인자가 필요 없다.
+TICK <<'EOF'
+{"schemaVersion":"zoop-ingestion-s2-1","sourceId":"synthetic-source","scopeId":"body","now":"2026-10-17T18:00:00+09:00"}
+EOF
+```
+
+기대값은 이 절차의 설계값이다. 위 **복사용 셸 명령 자체는 실행해 확인하지 않았다**(같은 흐름을 아래 smoke가 실제 CLI로 검증한다). 모든 slot의 정규 trigger는 같은 모양의 한 줄이고 manifest 경로만 해당 slot의 것으로 바뀐다.
+
+**검증(`ai/pipeline/scripts/round_smoke.py`, `make pipeline-smoke`에 포함).** 모두 실제 `zoop-ai-ingest` subprocess이고 시계는 토요일 2026-10-17·일요일 2026-10-18의 주입 `now`다. 기대 slot·window·roundId는 스펙과 계약의 authored literal이며 schedule 구현을 import하지 않는다. 모든 자식은 소켓·DNS를 거부하는 audit hook 아래 실행되고, 충돌·정지·"엔진 호출 금지"는 throwaway wrapper의 monkeypatch일 뿐 production hook이 아니다.
+
+- **slot 경계:** 11개 not-due 시각(초 단위, 자정, 일요일, UTC·-05:00 표기)은 exit 0이고 실제 registry·manifest·ledger를 열지 않으며(관찰 hook이 `sqlite3.connect`·`flock`·`mkdir`·해당 파일 open을 막는다) state 디렉터리를 만들지 않는다. 읽을 수 없는 registry도 not-due에는 무관하다. 10개 due 시각은 literal slot·catchUp(29:59·30:00 false, 30:01 true)로 대응된다.
+- **기준선과 시계:** `initial_baseline_required`·`initial_baseline_conflict`·`slot_not_after_baseline`(baseline 이전의 시계, 되돌려진 시계 포함)·`fixture_manifest_required`·`clock_in_future`(2099와 실제보다 1분 앞)·timezone 없는 시각·알 수 없는 키·`--require-store`는 쓰기 전에 거부된다.
+- **같은 slot 반복:** 저장된 결과의 replay이며 engine 진입점을 막아도 바이트가 같다(다르게 표기한 같은 baseline 포함). 다른 baseline·다른 manifest는 `slot_input_conflict`이고 ledger는 변하지 않는다.
+- **교차 round 중복·수정:** 다음 slot은 정확한 저장 경계에서 시작하고 같은 기사는 같은 버전을 재사용하며 다른 기사는 별개 ID다. 본문이 바뀐 기사는 같은 `documentId`의 새 version이다(자정을 넘겨도).
+- **실패·partial·zero:** failed·partial page는 exit 3이고 경계가 그대로이며 중복 trigger가 재시도하지 않는다. coverage가 있는 0건은 경계를 옮기고 없는 0건은 옮기지 않는다. 다음 slot은 공백을 덮고 partial round가 준비한 text는 재사용된다.
+- **숨은 재시도 없음(복구 가능한 incomplete):** 두 번째 page의 body 파일이 없어 incomplete가 된 round에서 파일을 복원해도 같은 slot tick(manifest 유무 무관)은 engine을 막은 채 `incomplete`를 replay하고 ledger가 변하지 않으며, 명시적 `resume`만 완료한다.
+- **늦은 trigger·주말:** 13:05–14:35가 비어도 15:20은 15:05 한 round를, 17:59:59.999999는 17:35를 시작한다. 18:00·자정은 ledger 바이트를 바꾸지 않고, 일요일 09:05는 토요일 17:35 경계에서 시작하며 slot 12개는 정확히 12개 round다.
+- **crash:** round 등록 전 종료(ledger 비어 있음, 같은 slot 정상 시작), 첫 page commit 뒤 종료(page 입력 파일을 지운 뒤 `recovered` 한 번, 중복 page·후보 없음, 이후 replay), page 저장 직후 종료한 오래된 slot은 다음 slot이 자동 resume하지 않고 명시적 `resume`은 `checkpoint_stale`이다. 종료된 `running` round는 변경된 scope 설정이나 철회된 grant에서 거부되고 `running`으로 남는다.
+- **동시성:** 한 tick이 ledger lock을 쥔 채 멈춘 동안 같은 slot의 두 tick은 기다리거나 쓰지 않고 `ingestion_busy`이며, 쥔 tick만 한 번 시작하고 다음 tick은 replay한다.
+- **권리:** 철회·제거·실제 시계 기준 만료 grant에서 due tick과 replay 모두 본문 없이 `source_unauthorized`이고 ledger는 변하지 않는다. not-due는 registry를 열지 않고 exit 0이며 권리를 되살리면 같은 ledger가 정상 동작한다.
+
+**실행 결과(2026-10-21, 로컬 작업 트리·미커밋).** `tests/test_ingestion_schedule.py` **37 passed**, pipeline 전체 시험 **1461 passed**, `make pipeline-smoke`의 모든 명령이 통과했다. 새 `round_smoke.py`는 자식 프로세스 **94개**(tick 92·resume 2), 검사 묶음 **20개**, not-due 시각 **11개**·due 시각 **10개**를 실행했고 네트워크 audit 거부 아래에서 `providerCalls=0`·`modelCalls=0`, 임시 상태 정리 `true`였다. 합성 입력·격리 상태에서 검증했으며, 시간 경계는 주입한 시계로 재현했다. 실제 공급원, 원격 CI, trigger 배포, 성능, 운영 지연 보장을 뜻하지 않는다.
+
+**하지 않는 일(FS058·#55·#72는 이것으로 완료되지 않는다).** 실제 공급원 탐색·변경 cursor·검증된 겹침 범위(권리 확인 대기), trigger 배포(cron·AWS 보류), round마다 분석(S2-2/S3 dispatch) 실행, 05분 회차 10분·35분 회차 40분까지의 조회 반영 기한(정기 갱신 반영 시간, `12-비기능-상세.csv` 356–392행), 18:00 종료 때 사유 기록(NFS009 7번), 재시도 정책(스펙의 열린 질문)은 구현하지 않았다. provider coverage·누락 없음·운영 지연 보장도 주장하지 않는다.
+
+**`enqueue-round`와의 관계(추가).** `tick`은 여전히 round를 등록하거나 분석하지 않는다. 완료된 회차를 S2-2 job으로 등록하는 별도 operator 명령 `zoop-ai-extract enqueue-round`가 생겼지만(아래 S2-2 절의 "완료된 회차의 S2-2 등록") `tick`은 그것을 부르지 않고, 자동 주기 실행·trigger 배포(cron·AWS)·교차 회차 중복 제거는 여전히 없다.
+
 ## 이벤트·SAME·주제 후보 (S2-2: authored replay 또는 live provider)
 
 `zoop_ai_pipeline.extraction_cli`의 `run/submit/resume/inspect/cancel`(`--initial-only`는 `run`·`resume` 전용)은 S2-1 ingestion 상태를 **읽기 전용**으로 소비하고 전용 `--state-dir`의 `extraction.sqlite3`에만 쓴다. 분석 규칙(기사 projection, 요청 preimage·digest, 인용 해석, 엄격한 응답 검증, SAME 규칙, 후보 ID)은 네이티브 계약(`extraction_replay.py`, `extraction_contracts.py`)이며 replay와 live가 **같은 규칙**을 쓴다(`ADAPTER_VERSION`은 replay, `LIVE_ADAPTER_VERSION`=`zoop-extraction-native-live-1`은 live이고 공유 규칙을 바꾸면 둘 다 올린다). Postgres·Neo4j·앱/S1 상태, 원본 PoC 코드·프롬프트에는 연결하지 않는다. authored replay는 독립 AI 추론이 아니다. live job(`provenance.executionMode:"live"`, `recordingKind:"provider"`)만 명시적 게이트 뒤에서 provider를 부르며 아래 live 절을 따른다. `live-binding` 하위 명령은 S2에 없다(S3의 `zoop-ai-relation live-binding`이나 `python -m zoop_ai_pipeline.live_runtime binding`이 같은 binding을 출력하며 S2·S3 binding은 동일하다). 결과는 승인·게시가 아닌 event/topic **후보**다. 이벤트 후보는 정확한 인용(S1 exact와 같은 mapped-run 규칙 + ingestion resolver), whole-event 비교(all-member 충돌·근거 부재·multi-SAME hold), 문서/mention/event 별도 ID를 갖고 topic 후보는 별도 `zoop-topic-*` 계약·영수증으로 만든다. 저장소 루트에서 재현한다.
@@ -227,6 +389,34 @@ PYTHONDONTWRITEBYTECODE=1 ai/pipeline/.venv/bin/python -m pytest ai/pipeline/tes
 ai/pipeline/.venv/bin/python ai/pipeline/scripts/extraction_smoke.py                  # replay smoke(socket audit hook)
 ai/pipeline/.venv/bin/python ai/pipeline/scripts/extraction_smoke.py --live-loopback   # live 경로 전체를 실제 CLI subprocess로, 127.0.0.1 결정적 시뮬레이터·가짜 키, 유료 호출 0
 ```
+
+**완료된 회차의 S2-2 등록 `enqueue-round`(CLI 전용, S2-1 회차와 S2-2 job을 잇는 등록 절반. 실행·주기 실행·교차 회차 중복 제거가 아니다).** `zoop-ai-extract enqueue-round --state-dir X --ingestion-state-dir I --sources R [--replay F]`는 **완료된** ingestion 회차 하나를 읽어 준비된 관측마다 `submit`과 **같은 `Extractor.freeze`**로 `queued` job 하나를 등록한다. 실행(`resume`)·호출 예약·후보 쓰기·네트워크·새 ledger·table·column·migration은 없다. stdin은 모든 키가 필수인 `{schemaVersion:"zoop-extraction-s2-2", enqueueId, roundId, sourceId, provenance, promptVersion, catalogue, snapshot, topic}`(`topic`만 `null` 가능)이고 `enqueueId`는 `^[A-Za-z0-9._-]{1,120}$`다. catalogue와 snapshot은 **호출자가 명시**하며 자동으로 만들거나 비워 두지 않는다. `--replay`는 replay provenance에 필수(`replay_fixture_required`), live에는 금지(`fixture_not_allowed`)이고 `--topic-replay`(`fixture_not_allowed`)와 `--initial-only`(`initial_only_not_allowed`)는 받지 않는다. 기존 `run/submit/resume/inspect/cancel`의 동작은 바뀌지 않는다.
+
+**job ID와 멱등.** `"s2r-" + digest({format:"zoop-round-enqueue-1", enqueueId, observation:{roundId, sourceId, page, ordinal, documentId, rawVersion, documentVersion}})`(68자)이다. `enqueueId`는 (sourceId, roundId) 안에서만 뜻이 있고 전역 batch가 아니다. 설명자(prompt·catalogue·snapshot·topic·provenance)와 replay/live 입력은 ID에 들어가지 않는다. 그래서 같은 `enqueueId`와 같은 관측에 다른 설명자·replay bytes·live runtime을 주면 새 job이 아니라 `job_input_conflict`이고(걸러질 관측이어도 같다) 다른 분석은 새 `enqueueId`로 명시한다. 같은 documentVersion이 다른 회차에서 다시 나오면 **다른 job**이다. 교차 회차 중복 제거나 분석·유료 호출 재사용은 없고 주장하지도 않는다.
+
+**순서.** (1) 순수 검증: stdin·플래그와 replay면 헤더(`replay_fixture_*`), live면 비밀 아닌 runtime 설정(`live_*`)을 **관측이 0건이어도** 먼저 검증한다(키·네트워크 없음). (2) `--sources` registry를 한 번 고정하고 ingestion을 공유 읽기 전용(`Store(existing=True)`)으로 열어 `Ingestor.authorize_round`로 저장된 회차의 원래 source·scope·설정을 현재 registry와 대조한다(`round_not_found`가 권한 오류보다 먼저이고, `source_unauthorized`·`scope_configuration_conflict`·`registry_changed`, 만료는 실제 UTC 시계). `read`+`store`는 **요약·참조를 읽기 전에** 확인하고 참조를 100개씩 끝까지 읽은 뒤 준비된 문서가 하나라도 있으면 `quote-display`도 확인한다. 권한 오류는 0건·전부 held인 회차에도 회차·skip 메타데이터를 드러내지 않는다. ingestion은 extraction 락을 잡기 전에 닫는다(`ingestion_busy`·`ingestion_recovery_required`). (3) 회차가 `complete`가 아니면 `round_not_complete`, 참조 수·순서·상태가 모순이면 `round_refs_inconsistent`다. (4) 준비된 모든 관측(모호·snapshot·중복으로 걸러질 것 포함)의 ID를 필터보다 먼저 만들고 `(page, ordinal)` 순서로 **첫 일치 규칙**을 적용한다: `held`(detail=hold 코드, documentVersion null), `ambiguous`(detail=ambiguity 코드), `in_snapshot`(documentVersion이 어느 snapshot member의 것, detail null), `duplicate_in_round`(같은 documentId·documentVersion이 앞서 계획된 것, detail=그 jobId). ID·근거·catalogue를 만들어 내지 않는다. (5) 원장 선점검: 계획된 job이 있으면 extraction 쓰기 원장을 열고, 계획은 없고 준비된 관측만 있으면 **읽기 전용**으로 연다. extraction 상태가 **완전히 없을 때**, 곧 디렉터리가 없거나 빈 디렉터리일 때만 "이전 job 없음"이며 아무것도 만들지 않는다. 쓰는 중이면 `extraction_busy`, 중단된 writer의 비어 있지 않은 WAL이면 `extraction_recovery_required`이고, 잠금이나 DB 중 하나만 있는 디렉터리·외부 파일·symlink 같은 **불완전하거나 외부의 상태는 "이전 job 없음"으로 읽지 않고 닫힌다**(`extraction_state_missing`·`state_namespace_conflict`·`state_namespace_invalid`). 준비된 관측이 없으면 extraction 원장에 접근하지 않는다. 준비된 모든 ID를 조회해 같은 입력이면 `existing`, 다른 입력이면 필터된 관측이어도 `job_input_conflict`(snapshot을 바꿔 이전 binding을 가리는 우회 차단), 옛 어댑터 binding이면 `analysis_contract_changed`, 필터된 관측의 ID가 같은 입력으로 이미 있으면(손으로 만든 `submit`만 가능) `enqueue_plan_conflict`다. 새 계획 job은 원천 context와 snapshot member의 정확한 인용을 쓰기 전에 검사한다. (6) 새 job을 순서대로 `freeze`한다. 각 job은 자기 transaction이고 첫 실패에서 멈추며 이후는 `not-attempted`다. 이미 있는 job은 resume하지 않고 상태(ready·cancelled·stopped)도 바꾸지 않는다. 원장을 닫다가 실패하면(commit 뒤여도) 실제 등록 개수는 그대로 둔 채 그 코드(정제된 `persistence_failed` 등)가 이 batch의 `error`가 되어 `incomplete`로 보고되며, 쓰기 전 거부는 닫기 오류로 가려지지 않는다. (7) **어떤 보고도(complete·incomplete·0건) 내기 직전에** 현재 registry로 권한을 다시 확인한다. 실패하면 `{schemaVersion, error:{code, partialRegistration}}`만 내고 exit 2이며 `partialRegistration`은 **이번 호출이 commit한** job이 있는지만 말하고(이미 있던 job은 세지 않는다) ID·회차 데이터는 담지 않는다. 닫기 실패가 있었어도 이 재확인이 보고보다 먼저 적용된다.
+
+**출력과 종료 코드.** 정규 JSON `{schemaVersion, enqueueId, round:{roundId, sourceId, inputDigest, provenance, completion}, outcome:"complete"|"incomplete", jobs:[{jobId,page,ordinal,documentId,rawVersion,documentVersion,registration:"registered"|"existing"|"failed"|"not-attempted"}], skipped:[{page,ordinal,documentId,documentVersion,code,detail}], counts:{refs,jobs,registered,existing,failed,notAttempted,skipped}, error:null|{code}}`이다(`round`의 값은 ingestion 결과의 것). exit 0은 complete(0건·전부 existing 포함)이고 exit 2는 (a) 쓰기 전 거부의 일반 `{schemaVersion,error:{code}}`, (b) 일부만 등록된 incomplete의 **전체 보고**, (c) 마지막 권한 재확인 실패의 위 오류다. `existing`은 "이 입력의 job이 이미 저장돼 있다"는 보고일 뿐 queued 상태를 꾸며 말하지 않는다.
+
+**일부 등록은 정직하게 남는다(전부-아니면-전무가 아니다).** 선점검을 통과해도 등록 중에 권한이나 원천이 바뀌면 일부만 durable할 수 있다. 롤백·cancel·자동 재시도는 없고 같은 명령을 다시 실행하면 이미 등록된 prefix는 `existing`, 나머지는 `registered`로 보고된다. 이 저장소 밖에서 같은 ID를 손으로 `submit`한 job이 있으면 엄격한 prefix도 보장하지 않는다. 쓰기 원장을 연 호출은 SQLite 파일(WAL 생성·삭제)을 건드릴 수 있으므로 약속은 job 행·호출 수 불변이지 쓰기 원장 파일의 byte 불변이 아니며, ingestion은 언제나 byte·mode·mtime이 그대로다. 첫 freeze가 실패해 행이 하나도 없으면 빈 원장만 남고 같은 `enqueueId`에 다른 설정이 허용된다. 이 명령은 ingestion checkpoint를 움직이지 않는다.
+
+**live.** live provenance의 등록은 게이트(`ZOOP_AI_PIPELINE_LIVE_ENABLED=1`)와 비밀 아닌 runtime 설정(절대 경로의 예산 디렉터리 포함, 만들지 않는다)만 필요하고 키·한도·네트워크는 필요 없다. 등록은 model-send 권한·예산을 쓰지 않으며 실제 전송(`resume`)에서 기존 규칙(권한·키·예산·`live_config_changed`)이 그대로 적용된다.
+
+**HTTP 비채택.** 이 명령으로 만든 job은 CLI job이며 `ai/service`의 `/internal/v1/extraction-jobs`가 채택하지 않는다. 같은 id를 서버 승인 파일에 적어도 첫 `submit`이 pipeline에 이미 있는 id를 보고 409 `job_id_unavailable`(승인 항목이 없으면 403 `request_not_approved`)이고, 읽기는 서비스 원장에 accepted 행이 없어 404 `job_not_found`이며, dispatcher는 서비스 원장의 pending 행만 claim하므로 이 job을 실행하지 않는다. 소스 근거는 `ai/service/src/zoop_ai_service/extraction_jobs.py`의 `_refuse_adoption`·`_owned`와 `extraction_ledger.py`의 `claim_next`이며 이 smoke는 HTTP를 실행하지 않는다.
+
+**하지 않는 일.** `tick`이 이 명령을 부르거나 회차 완료 뒤 자동으로 등록·실행하지 않는다(trigger·cron·AWS 없음, 주기 실행이 아니다). 이 명령은 job을 `queued`로만 만들며 `resume`은 운영자가 따로 한다. 교차 회차 중복 제거, 분석·유료 호출 재사용, snapshot·catalogue 자동 구성이나 retrieval 완전성은 주장하지 않는다(catalogue와 snapshot은 호출자가 얼린 입력이다). 실제 공급원·실제 모델 품질·S3/graph/handoff 자동 연결·앱 등록·공개는 이 범위가 아니며 FS058·FS074·FS076 전체는 이것으로 완료되지 않았다.
+
+**검증 결과(2026-10-22, 로컬).** `tests/test_round_enqueue.py` 75개와 pipeline 전체 1,537개가 통과했다. 기존 서비스→pipeline 통합 시험 125개도 통과했다. 손상된 원장을 없는 원장으로 처리하던 경우와 등록 후 close 오류가 결과를 가리던 경우는 실패를 재현한 뒤 수정해 회귀 검사를 통과시켰다.
+
+**종단 검사.** `scripts/round_enqueue_smoke.py`와 이를 포함한 `make pipeline-smoke`가 통과했다. 실제 자식 프로세스 141개에서 230개 참조·3페이지를 읽어 219개 작업과 11개 제외 항목을 확인했다. 최초 등록은 모두 `queued`·호출 0건이고 재접수는 219개 `existing`이었다. 입력 충돌·현재 권한·손상 상태·중단 복구·부분 등록·등록 후 close 실패의 결과 보존을 확인했으며, live 설정도 키·네트워크·예산 파일 생성 없이 3개 작업을 등록했다. 별도 명시적 replay 실행으로 두 작업을 `ready`로 만들고 취소·중단된 작업과 함께 재접수해도 상태·호출 수가 바뀌지 않음을 확인했다. 수집 원장의 바이트·권한·수정 시각은 유지됐고 다음 `tick`은 정상 진행했다. 모델·공급자 호출은 0건이며 실제 모델 품질이나 운영 스케줄 검증은 아니다.
+
+**완료 회차의 서비스 실행 계획 `plan-round`(CLI 전용, 오프라인).** `zoop-ai-extract plan-round --ingestion-state-dir I --sources R --principal P --output DIR [--replay F [--topic-replay T]]`는 완료된 회차를 `enqueue-round`와 같은 계획기로 읽어 새 디렉터리에 계획 파일만 만듭니다. `--state-dir`은 받지 않으며 extraction 원장·작업 등록·모델·네트워크를 사용하지 않습니다. 출력은 `approvals.json`(S2 승인 항목), `relation-upstreams.json`(S3가 허용할 `{jobId,inputDigest}`), `manifest.json`(앱에 전달할 계획 ID·digest·S2 제출 필드), `receipt.json`(앞 세 파일의 digest)입니다. manifest에는 분석 입력 본문·비밀·원문을 싣지 않습니다. 운영자가 검토한 뒤 두 registry 파일을 설치해야 하며, 이 명령 자체는 설치·배포·유료 호출을 승인하지 않습니다.
+
+작업 ID는 계획 ID와 정확한 관측에서 유도한 `s2p-` 접두를 사용하여 `enqueue-round`의 `s2r-` 작업과 구분합니다. 서비스는 기존 CLI 작업을 HTTP 작업으로 재사용하지 않습니다. replay 계획은 분석 fixture와 필요한 topic fixture의 해시를, live 계획은 런타임 identity를 고정합니다(live에 fixture를 주면 `fixture_not_allowed`). 같은 입력을 같은 출력 경로에 다시 주면 기존 파일을 바꾸지 않고, 다른 입력은 거절합니다. 기존 경로를 덮어쓰지 않는 원자적 이름 변경을 지원하지 않는 플랫폼도 거절합니다. 계획 생성 시에는 구문·현재 원천 권한을 확인하며, snapshot 근거와 실행 문맥은 실제 dispatch에서 검사합니다.
+
+**하지 않는 일.** 설치된 approvals를 자동으로 만들거나 바꾸지 않고, 유료 호출 승인·예산도 내지 않는다. 공개 `JobCreate`의 `planId` 처리는 구현했다고 주장하지 않는다(BE 대기). 실제 공급원·모델 품질·자동 주기 실행은 이 범위가 아니다.
+
+**검증(2026-10-22, 로컬, 모델 호출 0).** 단위 시험 6개와 설치된 `plan-round`를 쓰는 실제 HTTP 시험 2개(주제 단계와 S3 `ready` 포함)가 통과했다.
 
 ## 관계·영향 후보와 HOLD 최종 승인 (S3, FS078·FS079)
 
@@ -312,3 +502,47 @@ cd ai/pipeline
 ```
 
 **2026-10-15 최종 실행(로컬 작업 트리·미커밋, Main 실행. 커밋·푸시·원격 CI 없음).** `ai/pipeline` 시험 전체 265개가 통과했다. 실제 Neo4j 5.26 Community(격리된 `--rm` tmpfs 임시 컨테이너, 종료·정리 완료)에서 R1–R4 회귀 11개는 수정 전 11개 모두 RED로 재현됐고 수정 뒤 모두 통과했다. 새 빈 database의 정상 smoke는 다섯 관계 유형 전부, 노드 6·간선 6의 `v1`, 노드를 공유하지 않는 `v2`(`v1` 원본 바이트 불변), 깊이 1·2·3 focus, 반복 `init` 멱등, 권한 철회 withheld, unknown commit·SIGKILL 뒤 rollback·변조 fail-closed를 모두 통과했다. provider·모델 호출은 0이었고 원천 원장은 읽기 전용이었다. 활성 공개 상태는 없다(FS080 일부, FS081 철회 아님). **성능·지연·부하는 측정하지 않았고** 이 검증은 기능에 한정된다. 자세한 기록과 남은 범위는 위 AI 실행 계약의 시험 절을 따른다.
+
+## 공개 영향 대상 조회 (handoff exposure, FS081 일부)
+
+`zoop-ai-handoff-exposure`는 문서·출처·권한 변경이나 S3 관계의 오연결이 **지정한 handoff의 어느 공개 항목에 영향을 주는지** ID만 반환합니다. 권한 철회로 일반 `zoop-ai-handoff export`가 막힌 뒤에도 운영자가 고정 기록을 조사할 수 있습니다. 현재 읽기 권한을 승인하거나 원문·제목·인용문을 반환하는 명령은 아닙니다.
+
+```sh
+# document/source/grant 변경: 세 원장을 모두 명시합니다.
+zoop-ai-handoff-exposure --state-dir HANDOFF \
+  --ingestion-state-dir INGESTION --extraction-state-dir EXTRACTION < change.json
+
+# S3 관계 오연결: handoff 원장만 사용하며 위 두 source 원장 인자는 거절합니다.
+zoop-ai-handoff-exposure --state-dir HANDOFF < relation-change.json
+```
+
+입력은 65,536바이트 이하의 닫힌 JSON입니다. `handoffIds`는 중복 없는 1~20개이며 자동으로 전체 원장이나 최신 활성 버전을 선택하지 않습니다.
+
+```json
+{
+  "schemaVersion": "zoop-handoff-exposure-1",
+  "handoffIds": ["handoff-summary-1"],
+  "changed": {"kind": "source", "sourceId": "synthetic-source-uncited"}
+}
+```
+
+`changed`는 아래 네 형식 중 하나입니다. `null`을 허용하는 키도 생략하지 않습니다.
+
+| kind | 추가 필드 | 의미 |
+|---|---|---|
+| `document` | `documentId`, `documentVersion`, `rawVersion` | 버전이 `null`이면 해당 ID에 고정된 모든 버전입니다. 최신 버전을 뜻하지 않습니다. |
+| `source` | `sourceId` | 해당 출처로 고정된 입력입니다. |
+| `grant` | `grantId`, `revision` | revision이 `null`이면 고정된 모든 revision입니다. 현재 registry를 읽어 대체하지 않습니다. |
+| `s3-relation` | `jobId`, `relationCandidateId` | 지정한 작업의 관계 후보 하나입니다. 후보 ID만으로 조회할 수 없습니다. |
+
+**결과와 영향 범위.** 각 handoff의 manifest·bundle·content digest, 영향받는 기사 버전·이슈·간선·근거 ID와 사유를 반환합니다. 원천 변경은 S2의 고정 입력을 따라가며, 영향을 받은 upstream을 사용한 S3 작업의 공개 관계 전체에 `upstream-input` 사유를 붙입니다. 모델은 인용하지 않은 문서의 사건·주제 정보도 읽었으므로 직접 인용만 추적하지 않습니다. 이슈 요약 역시 실제로 인용한 부분이 아니라 입력 전체를 보호합니다. 구조 근거와 impact-only 근거도 포함하며, 원문 근거 ID는 직접 영향받은 기사 버전의 것만 반환합니다.
+
+관계 오연결은 지정한 `(jobId, relationCandidateId)`만 추적하고 `articles`·`evidenceIds`는 비워 둡니다. 관계를 취소한다고 원문 인용까지 철회하는 것은 아닙니다. 마지막 참여 관계가 사라지는 이슈와 연결된 FOLLOWS·구조 경로를 함께 찾고, 시작 기업을 확정할 수 없는 경로는 `anchor-undetermined`로 보수적으로 포함합니다.
+
+**완전성과 실패.** `bound`는 선택된 입력에 연결됐는지, `exposed`는 공개 항목에 영향이 있는지를 구분합니다. 알 수 없는 원천 신원은 `changed_identity_unknown`이며, ingestion에만 기록되고 선택된 handoff에는 연결되지 않은 신원은 명시적인 빈 결과가 됩니다. 선택 중 하나라도 누락·미완료·손상·해석 불가이면 전체를 `handoff_selection_unmappable`로 거절하고 영향 목록 일부를 성공으로 내보내지 않습니다. 현재 bundle `-7`만 지원하며 `-1`~`-6`은 artifact를 열지 않고 `handoff_contract_changed`로 분류합니다. 원천 조회는 고정된 S2 입력 digest·결과 digest·ready 상태까지 대조합니다. 현재 영수증의 필드·digest·source pin·정수 타입도 검사합니다.
+
+**적용 효과는 없습니다.** 출력은 선택한 handoff에 한정된 제안입니다. `effect`와 `scope.notCovered`가 그 한계를 명시하며, 앱 exclusion revision·`graphVersion`·활성 버전·전체 합집합을 만들지 않습니다. 빈 결과나 이전보다 작은 목록을 기존 제외 해제로 사용하면 안 됩니다. 앱 목록·S1·브리핑·채팅·캐시·Neo4j, 이전 schema와 선택하지 않은 handoff, 운영자 canonical/decisions/bindings 변경은 이 명령의 적용 대상이 아닙니다. 실제 제외 저장·현재 조회 반영·복구는 앱 담당 범위입니다.
+
+공유 잠금은 결과 출력이 끝날 때까지 유지합니다. 원장·artifact를 변경하지 않고 모델·네트워크도 호출하지 않습니다. 결과는 시각 없는 정렬된 canonical JSON 한 줄이며 6 MiB를 넘으면 `exposure_report_limit`로 거절합니다. 자르거나 부분 보고하지 않습니다. 실행 검증은 `scripts/handoff_exposure_smoke.py`이며 `make pipeline-smoke`에도 포함됩니다. 앱 소비 시 주의사항은 [그래프 인수 문서](../../api/docs/GRAPH_READ_HANDOFF.md)를 따릅니다.
+
+같은 질의를 인증된 내부 HTTP로 전달하려면 [service README의 Handoff 영향 ID 조회](../service/README.md#handoff-영향-id-조회-post-internalv1graph-handoffsexposure)를 따릅니다. 전용 scope·서버 설정·선택 전체의 허용 검사는 서비스가 담당하며, CLI의 원장 읽기와 앱의 실제 제외 적용 경계는 유지됩니다.

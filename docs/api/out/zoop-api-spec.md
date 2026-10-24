@@ -56,7 +56,7 @@ POST 가입·로그인·소셜 가입 완료·명시적 소셜 연결 시작과 
 
 ### publicationVersions
 
-그래프·사건·관계·근거 조회는 선택 graphVersion 또는 asOf를 받는다. 생략하면 한 요청 시작 시 활성 공개 버전을 고정하고 응답 metadata.graphVersion/asOf에 반환한다. 둘을 함께 지정하면 일치해야 한다. asOf는 그 시점 이전 공개 버전을 선택하며 이후 공개 자료는 사용하지 않는다. round는 발행 회차가 고정한 버전을 뜻한다. 고정 버전 부재는 VERSION_UNAVAILABLE이며 최신 자료로 대체하지 않는다. 브리핑은 그래프 버전·자료·시장 지표·긍부정을 발행 시 고정한다. 정정은 원문 밖에 덧붙인다.
+그래프·사건·관계·근거 조회는 선택 graphVersion 또는 asOf를 받는다. 생략하면 한 요청 시작 시 활성 공개 버전을 고정하고 응답 metadata.graphVersion/asOf에 반환한다. 둘을 함께 지정하면 일치해야 한다. asOf는 그 시점 이전 공개 버전을 선택하며 이후 공개 자료는 사용하지 않는다. round는 발행 회차가 고정한 버전과 회차 마감 시각을 함께 뜻한다. round와 graphVersion/asOf를 함께 지정하면 저장된 회차 기준과 정확히 같아야 한다. 회차의 저장 버전은 데이터 마감 이후 발행될 수 있으므로 activeVersionAt(asOf)로 다시 선택하지 않는다. 고정 버전 부재는 VERSION_UNAVAILABLE이며 최신 자료로 대체하지 않는다. 과거 로컬 회차의 별도 재구성본은 graphOrigin=reconstructed로 구분하고 원본 발행 버전·문안을 변경하지 않으며, 재구성 ID는 round 문맥 없이 직접 조회할 수 없다. 브리핑은 그래프 버전·자료·시장 지표·긍부정을 발행 시 고정한다. 정정은 원문 밖에 덧붙인다.
 
 ### partialFailures
 
@@ -157,6 +157,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | [getEvidence](#getevidence) | GET | /api/v1/evidence/{id} | 공개 | P1 |
 | [getBriefing](#getbriefing) | GET | /api/v1/briefings | 공개 | P1 |
 | [listBriefingRounds](#listbriefingrounds) | GET | /api/v1/briefings/rounds | 공개 | P1 |
+| [getBriefingRecap](#getbriefingrecap) | GET | /api/v1/briefings/{id}/recap | 공개 | P1 |
 | [getBriefingItemDetail](#getbriefingitemdetail) | GET | /api/v1/briefings/{roundId}/items/{eventId} | 공개 | P1 |
 | [getBriefingGraphBasis](#getbriefinggraphbasis) | GET | /api/v1/briefings/{id}/graph | 공개 | P1 |
 | [createConversation](#createconversation) | PUT | /api/v1/chat/sessions/{id} | 회원(본인) | P1 |
@@ -1043,7 +1044,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 | kind | query | 선택 | string {news, disclosure} |  |
-| round | query | 선택 | string | 브리핑 회차 ID. 회차의 문서와 기업별 긍부정 발행본을 함께 고정하려는 계약이다. 현재 회차별 그래프 버전 조회가 미구현이므로 전달하면 409 VERSION_UNAVAILABLE을 반환하며 최신 자료로 대체하지 않는다. |
+| round | query | 선택 | string | 브리핑 회차 ID. 회차가 고정한 버전·마감 시각과 선정 이슈 범위의 문서만 반환한다. cursor도 회차·버전·시각에 결속하며 다른 회차로 재사용하면 INVALID_CURSOR다. 현재 접근 권한·정확 인용을 재확인하고 최신 문서나 새 분석으로 대체하지 않는다. 재구성 자료는 metadata.source=briefing_reconstructed_graph로 구분한다. |
 | from | query | 선택 | string (date) / string (date-time) | 차트·타임라인과 같은 조회 시작 조건. 날짜 또는 오프셋을 포함한 시각이다. |
 | to | query | 선택 | string (date) / string (date-time) | 같은 조회 종료 조건이며 이 시각 이후 공개된 기사와 아직 공개되지 않은 사건·기업 관계는 제외한다. 날짜는 KST 그날 전체, 오프셋이 있는 시각은 그 시각을 포함한다. 발행 시각 미상 문서는 제외한다. |
 
@@ -1115,7 +1116,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getEvidence · 원문 인용과 기업별 긍부정 조회
 
-원문 인용과 기업별 긍부정 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+원문 인용 조회. round를 지정하면 해당 회차의 버전·마감 시각과 선정 이슈 범위를 공통 reader에서 고정한다. 원래 그래프의 인용은 선택 버전의 import receipt·정확 span·현재 source grant를 검사한다. 로컬 재구성 그래프의 인용은 보존된 회차 상세·원문 버전·정확 span·현재 발행 권한을 검사하고 metadata.source=briefing_reconstructed_graph로 구분한다. 현재 기업별 감성 판정은 생성하지 않으며 companyId 지정 시 해당 섹션은 unavailable로 안내한다. 최신 그래프나 최신 문서로 대체하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1198,6 +1199,33 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
 | limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
 
+<a id="getbriefingrecap"></a>
+
+## getBriefingRecap · 새 핵심 이슈가 없는 회차의 이전 발행본 복기
+
+정상 발행된 빈 회차(no_issues_in_window)의 고정 비교 참조만 사용한다. 저장된 이전 회차 원문을 현재 권한·정정·시점 검증 후 반환한다. 새 이슈·새 전망·재평가가 아니며, 실패·보류 회차를 정상 무소식으로 전환하지 않는다. 고정 참조가 없거나 변경·정정·중단되면 다른 회차로 대체하지 않는다. 읽기 전용이며 기존 payload와 DB 스키마는 변경하지 않는다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/briefings/{id}/recap` |
+| 권한·우선순위 | 공개 · P1 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [BriefingRecap](#schema-briefingrecap), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
+| FS/NFS | [FS028](../../system/out/feature-FS028.md) · [FS029](../../system/out/feature-FS029.md) · [FS033](../../system/out/feature-FS033.md) · [FS035](../../system/out/feature-FS035.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) |
+| WBS | 6.1.2, 6.11.1 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | Spring 공개 조회의 읽기 전용 복기 뷰이며 직접 대응 BFF 없음. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| id | path | 필수 | string |  |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+
 <a id="getbriefingitemdetail"></a>
 
 ## getBriefingItemDetail · 회차에 고정된 브리핑 항목과 근거 조회
@@ -1230,7 +1258,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getBriefingGraphBasis · 발행 당시 그래프 기준 조회
 
-발행 당시 그래프 기준 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+발행본의 graphVersion과 회차 마감 시각을 고정해 핵심 이슈·관련 기업을 조회한다. 저장본과 대상 관계가 실제로 읽히는 경우에만 available이다. 과거 회차의 별도 재구성본은 graphOrigin=reconstructed와 reconstructedAt으로 구분하고 당시 발행본의 graphVersion을 변경하지 않는다. 원본·재구성본 모두 없으면 unavailableReason=snapshot_not_recorded로 구분한다. 최신 그래프로 대체하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1632,7 +1660,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
 | WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.7, 6.10.16 |
 | 프로토타입 대응 | /api/admin/pipeline/candidates |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다., ``rule``(CandidateRule)은 숨김 방향이다. 프로토타입 R1의 withheldParticipants/withheldRelations/droppedRelations와 notAppliedReason=not_published는 없고 hiddenRelations를 둔다. applied=true는 결정 전 HOLD를 포함해 공개되면 숨겨진다는 뜻이다(규칙은 HOLD를 공개하지 않음, AI 5-A)., notAppliedReason=admin_decision은 관리자가 거절한 후보만 뜻한다(HOLD 여부와 무관, 프로토타입은 허용·거절 모든 결정). 허용한 HOLD는 applied=true이고, AI REJECT 후보와 비활성 후보(active=false)는 rule=null이다. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
 
 ### 요청 필드
@@ -1666,7 +1694,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
 | WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.7, 6.10.16 |
 | 프로토타입 대응 | /api/admin/pipeline/candidates/{candidate_id} |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., ``rule``(CandidateRule)은 숨김 방향이다. 프로토타입 R1의 withheldParticipants/withheldRelations/droppedRelations와 notAppliedReason=not_published는 없고 hiddenRelations를 둔다. applied=true는 결정 전 HOLD를 포함해 공개되면 숨겨진다는 뜻이다(규칙은 HOLD를 공개하지 않음, AI 5-A)., notAppliedReason=admin_decision은 관리자가 거절한 후보만 뜻한다(HOLD 여부와 무관, 프로토타입은 허용·거절 모든 결정). 허용한 HOLD는 applied=true이고, AI REJECT 후보와 비활성 후보(active=false)는 rule=null이다. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
 
 ### 요청 필드
@@ -1726,7 +1754,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
 | WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.5 |
 | 프로토타입 대응 | /api/admin/pipeline/rules |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다., publishedCandidates/publishedEvents는 활성 그래프 버전을 만들 때 세어 버전과 함께 고정한다(규칙 변경은 다음 버전부터 반영). 프로토타입은 조회할 때마다 overlay로 다시 계산한다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
 
 ### 요청 필드
@@ -1741,20 +1769,20 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## setPublicationRule · 검증 규칙 목표 상태 설정
 
-검증 규칙 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+검증 규칙 목표 상태 설정. 규칙은 앱 공개 정책이며 이미 공개 적격인 내용을 공개에서 빼는 방향으로만 작동한다. 규칙을 켜도 HOLD는 공개되지 않고 AI 판정 입력도 바뀌지 않는다. 이미 같은 상태면 아무것도 기록하지 않고 idempotent=true를 돌려준다. 변경은 공통 공개 잠금 아래 규칙 revision과 전역 rule log revision을 올리고 이력·감사를 같은 트랜잭션에 남긴다. reviewRevision은 응답 시점의 COALESCE(MAX(review_decisions.global_revision),0)이다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `PUT /api/v1/admin/pipeline/rules/{rule_id}` |
 | 권한·우선순위 | 관리자(작업별 권한) · P1 |
 | 요청 본문 | [RuleSwitchRequest](#schema-ruleswitchrequest) |
-| 응답 | 200: [RuleSwitchResponse](#schema-ruleswitchresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
+| 응답 | 200: [RuleSwitchResponse](#schema-ruleswitchresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, RATE_LIMITED |
 | FS/NFS | [FS059](../../system/out/feature-FS059.md) · [FS067-02](../../system/out/feature-FS067-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS012](../../system/out/feature-NFS012.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
 | WBS | 6.1.2, 6.11.1, 6.10.7, 6.10.16, 6.5.5 |
 | 프로토타입 대응 | /api/admin/pipeline/rules/{rule_id} |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., publishedCandidates/publishedEvents는 활성 그래프 버전을 만들 때 세어 버전과 함께 고정한다(규칙 변경은 다음 버전부터 반영). 프로토타입은 조회할 때마다 overlay로 다시 계산한다. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
 
 ### 요청 필드
@@ -1946,7 +1974,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## retryAnalysisJob · 허용된 분석 작업 재시도
 
-허용된 분석 작업 재시도.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+허용된 분석 작업 재시도. RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 작업(같은 종류·라벨·입력)으로 대기열에 넣고 202를 돌려준다. 허용되지 않으면 REVISION_CONFLICT/409이고 아무것도 만들지 않는다. AI 요청을 직접 다시 보내지 않으며, 새 모델 실행이 필요하면 작업 실행 시 새 AI jobId를 쓴다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1977,7 +2005,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## cancelAnalysisJob · 분석 작업 명시적 취소
 
-분석 작업 명시적 취소.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+분석 작업 명시적 취소. queued는 즉시 cancelled, running은 cancelRequested=true로 표시하고 소유 worker가 종료한다(진행 중인 AI 하위 실행은 죽이지 않는다). 이미 cancelled면 같은 작업을 돌려준다. succeeded·failed는 끝난 작업이라 REVISION_CONFLICT/409이며, 취소는 완료된 결과의 철회나 공개 버전 비활성화를 대신하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -3107,11 +3135,14 @@ answer from that state, never from the newest graph. Any status but ``available`
 | date | 필수 | string (date) |  |
 | edition | 필수 | string {morning, evening} |  |
 | status | 필수 | string {available, suspended, unavailable, not_published} |  |
-| message | 필수 | string / null | User-facing notice for every status but available |
+| message | 필수 | string / null | User-facing status notice, including reconstruction limitations when graphOrigin is reconstructed |
 | reason | 필수 | string / null | Admin-written reason, only for suspended rounds |
 | publishedAt | 필수 | string (date-time) / null |  |
 | dataAsOf | 필수 | string (date-time) / null | End of the round's data window (KST): the reference time of the relations and evidence shown |
-| graphVersion | 필수 | string / null | Graph version the round was published from |
+| graphVersion | 필수 | string / null | Selected graph version: original publication snapshot or a later reconstruction distinguished by graphOrigin. The original published payload is unchanged. |
+| graphOrigin | 선택 | string {publication_snapshot, reconstructed} / null | Original publication snapshot or a separately registered later reconstruction. Reconstruction never overwrites the publication graphVersion. |
+| reconstructedAt | 선택 | string (date-time) / null | When the reconstruction artifact was first registered; not the briefing cutoff or publication time. |
+| unavailableReason | 선택 | string {snapshot_not_recorded, snapshot_unavailable, briefing_targets_unavailable} / null | Unavailable graph detail: no original snapshot was recorded, the recorded snapshot cannot be read, or the briefing targets are no longer visible. Never substitute the newest graph. |
 | keyIssueIds | 필수 | string[] | The round's key issues in rank order; empty unless available |
 | companyIds | 필수 | string[] | Companies related to those issues; empty unless available |
 | correctionCount | 필수 | integer | Corrections registered beside the published original |
@@ -3312,6 +3343,22 @@ The immutable published original of a round (what users saw before any correctio
 | eventIds | 필수 | string[] |  |
 | evidenceIds | 필수 | string[] |  |
 | companyIds | 필수 | string[] |  |
+
+<a id="schema-briefingrecap"></a>
+
+### BriefingRecap
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| roundId | 필수 | string |  |
+| graphVersion | 필수 | string / null |  |
+| dataAsOf | 필수 | string (date-time) / null |  |
+| status | 필수 | string {available, unavailable, not_applicable} |  |
+| reason | 필수 | string / null |  |
+| message | 필수 | string |  |
+| previous | 필수 | [BriefingResponse](#schema-briefingresponse) / null | 고정 참조의 과거 발행 원문. 이번 회차의 새 평가·새 전망이 아니다. available일 때만 제공하며 기존 데이터·시장 지표의 시점도 과거 그대로다. |
 
 <a id="schema-briefingresponse"></a>
 
@@ -3578,16 +3625,16 @@ The immutable published original of a round (what users saw before any correctio
 
 ### CandidateRule
 
-A candidate a publication rule covers: whether it is on the user graph through the rule, and what it leaves out.
+How an application publication rule affects a candidate. Hide-only: see ``ReviewRuleOut``. The candidate's
+``rule`` is null when no rule's condition covers it and when it can never be published (an AI REJECT, or an inactive
+candidate replaced by a newer job), since a rule has nothing to hide there.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| ruleId | 필수 | string |  |
-| applied | 필수 | boolean |  |
-| notAppliedReason | 필수 | string {admin_decision, rule_disabled, not_published} / null |  |
-| withheldParticipants | 필수 | integer[] | Indexes into the candidate's mention participants whose role is left out |
-| withheldRelations | 필수 | string[] | Relation ids whose role is left out |
-| droppedRelations | 필수 | string[] | Relation ids the rule does not publish at all (a FOLLOWS whose follow-side event did not occur yet) |
+| ruleId | 필수 | string | The publication rule whose condition covers this candidate (``<ruleId>@<version>``). |
+| applied | 필수 | boolean | True when the rule is enabled and its condition matches, whatever the candidate's publication state: its<br>``hiddenRelations`` are kept off the public graph once it is published (AI pass, or an administrator allow followed by a<br>new import). For a HOLD nobody has decided yet it tells the administrator that allowing it will not make those<br>relations public. It never means the rule published anything: a rule never publishes a HOLD and never turns a HOLD<br>into an approval (AI owner 2026-10-22, 5-A). |
+| notAppliedReason | 필수 | string {admin_decision, rule_disabled} / null | Why the rule hides nothing here: rule_disabled (switched off), admin_decision (an administrator rejected<br>the candidate, HOLD or not, so it is never published; an allowed HOLD is applied). Null when applied. |
+| hiddenRelations | 필수 | string[] | Relation ids of the candidate the rule keeps off the public graph once it is published. Empty when not<br>applied. |
 
 <a id="schema-chataction"></a>
 
@@ -4991,7 +5038,8 @@ same request again never toggles anything.
 
 The checkpoint the next article-processing run starts from: the start time of the latest run that
 finished normally, also when it found nothing new. Failed and cancelled runs never move it.
-``unresolved_failures`` counts article files whose latest run failed or was cancelled.
+``unresolved_failures`` counts article files whose latest run failed or was cancelled; null while no
+per-article run record exists (it is never a job count).
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -4999,7 +5047,7 @@ finished normally, also when it found nothing new. Failed and cancelled runs nev
 | jobId | 필수 | string / null |  |
 | outcome | 필수 | string {collected, empty} / null |  |
 | newArticles | 필수 | integer / null |  |
-| unresolvedFailures | 필수 | integer |  |
+| unresolvedFailures | 필수 | integer / null |  |
 
 <a id="schema-ingestoutcome"></a>
 
@@ -5890,7 +5938,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | allowed | 필수 | boolean |  |
-| code | 필수 | string {allowed, succeeded, in_progress, superseded, newer_attempt, duplicate_running, other_running, dataset_missing} |  |
+| code | 필수 | string {allowed, succeeded, in_progress, superseded, newer_attempt, duplicate_running, other_running, dataset_missing, outcome_unknown} | 재시도 판정. in_progress(대기·실행 중), succeeded(이미 성공), duplicate_running(이 작업의 재시도가 대기·실행 중), newer_attempt(더 새 재시도가 있어 가장 최근 시도만 재시도 가능), superseded(같은 종류·같은 입력의 더 나중 작업이 성공), outcome_unknown(외부 실행 결과를 확인할 수 없음: 응답 유실로 실행·과금 여부를 모르므로 자동 재시도하지 않음), dataset_missing(작업의 실행 계획이나 입력 연결이 없거나 철회됨, 일시적 조회 장애는 해당하지 않음), allowed. other_running은 대기열 정책상 다른 작업 실행만으로 재시도를 거절하지 않으므로 반환하지 않는다. blockedBy는 막고 있는 작업 ID다. |
 | reason | 필수 | string |  |
 | blockedBy | 필수 | string / null |  |
 
@@ -5932,7 +5980,12 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 
 ### ReviewRuleOut
 
-A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@2``.
+An application publication rule; the id carries its version (``<ruleId>@<version>``). A rule can only keep
+already eligible content off the public graph. It never publishes a HOLD, never turns a HOLD into an approval and never
+changes an AI judgement input: content is published only by an AI pass inside a handoff or by an administrator allow
+followed by a new handoff, import and activation. ``changedAt``/``changedBy``/``reason`` are the latest change, null
+only while the rule has never been changed (a rule switched back to its default keeps its latest change).
+``history`` is every change, newest first.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5944,9 +5997,9 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 | changedAt | 필수 | string (date-time) / null |  |
 | changedBy | 필수 | string / null |  |
 | reason | 필수 | string / null |  |
-| eligible | 필수 | integer | HOLD candidates of the active version the rule covers (ignoring the switch and admin decisions) |
-| publishedCandidates | 필수 | integer |  |
-| publishedEvents | 필수 | integer |  |
+| eligible | 필수 | integer / null | Information only, not a publication count: HOLD review targets in the source jobs the active version references that the rule currently covers (counted from review_targets and AI source revisions, ignoring the switch and admin decisions). The current pending count, not the statistics frozen with a version. Null while that source projection does not exist yet. |
+| publishedCandidates | 필수 | integer / null | Candidates in the rule's scope that are still public after the rule is applied in the active graph version (not candidates the rule published: a rule never publishes). Counted when that version is built and frozen with it (the statistics at freeze time, AI owner 5-A), so a switch changes it only from the next version. Null while the active version has no frozen count. |
+| publishedEvents | 필수 | integer / null | Events in the rule's scope that are still public after the rule is applied in the active graph version (not events the rule published). Frozen with that version like ``publishedCandidates``. Null while the active version has no frozen count. |
 | history | 필수 | [RuleChangeOut](#schema-rulechangeout)[] |  |
 
 <a id="schema-rounddetail"></a>
@@ -6086,7 +6139,7 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | enabled | 필수 | boolean |  |
-| reason | 필수 | string |  |
+| reason | 필수 | string | Stored with surrounding whitespace stripped; 1 to 500 characters after stripping (longer is 422<br>INVALID_REQUEST). |
 
 <a id="schema-ruleswitchresponse"></a>
 

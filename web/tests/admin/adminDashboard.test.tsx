@@ -56,6 +56,21 @@ function overview(): InsightsOverview {
         unavailableReason: null,
       },
       {
+        key: 'onboarding',
+        group: 'usage',
+        label: '온보딩 완료율',
+        kind: 'ratio',
+        unit: '명',
+        definition: '',
+        count: null,
+        numerator: 3,
+        denominator: 3,
+        rate: 1,
+        sampleHidden: false,
+        availability: 'available',
+        unavailableReason: null,
+      },
+      {
         key: 'briefingRate',
         group: 'interest',
         label: '브리핑 조회율',
@@ -219,7 +234,9 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
     expect(screen.getByText('대기 작업 0건')).toBeTruthy();
     expect(screen.getByText('실행 0 · 대기 0')).toBeTruthy();
     expect(screen.getByText('성공 28 · 실패 0')).toBeTruthy();
-    expect(screen.getByText('갱신 2026-10-06 12:43 KST')).toBeTruthy();
+    expect(screen.queryByText('갱신 2026-10-06 12:43 KST')).toBeNull();
+    expect(screen.queryByRole('button', { name: '새로 고침' })).toBeNull();
+    expect(screen.queryByText('온보딩 완료율')).toBeNull();
 
     const briefings = screen.getByRole('table', { name: '브리핑 회차 목록' });
     expect(within(briefings).getByText('2026-10-06 출근')).toBeTruthy();
@@ -314,7 +331,7 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
     await screen.findByText('260건');
     expect(
       screen.getByRole('link', { name: '작업 관제 →' }).getAttribute('href'),
-    ).toBe('/admin/pipeline');
+    ).toBe('/admin/pipeline?tab=jobs');
     expect(
       screen.getByRole('link', { name: 'AI 운영 →' }).getAttribute('href'),
     ).toBe('/admin/ai');
@@ -447,15 +464,5 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
     expect(await screen.findByText('관리자 로그인 화면')).toBeTruthy();
     expect(location()).toBe('/admin/login');
     expect(useAdminSessionStore.getState().admin).toBeNull();
-  });
-
-  test('새로 고침은 대시보드를 다시 조회한다', async () => {
-    server.on('GET', DASHBOARD, () => json(dashboard()));
-    const { user } = openDashboard();
-
-    await screen.findByText('260건');
-    await user.click(screen.getByRole('button', { name: '새로 고침' }));
-    await screen.findByText('260건');
-    expect(server.calls('GET', DASHBOARD)).toHaveLength(2);
   });
 });

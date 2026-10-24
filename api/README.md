@@ -24,8 +24,21 @@ set -a
 set +a
 
 docker compose --env-file api/.env -f api/compose.local.yaml up -d --wait
-./api/gradlew -p api bootRun
+SPRING_PROFILES_ACTIVE=local ./api/gradlew -p api bootRun
 ```
+```sh
+# 윈도우용
+Copy-Item api/.env.example api/.env
+# api/.env의 필수 값 확인 후 아래 환경변수에도 설정합니다.
+$env:ZOOP_AUTH_CSRF_KEYS = "local-v1=<생성한 키>"
+$env:ZOOP_AUTH_ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:8080"
+$env:SPRING_PROFILES_ACTIVE = "local"
+
+docker compose --env-file api/.env -f api/compose.local.yaml up -d --wait
+.\api\gradlew.bat -p api bootRun
+```
+
+application-local.yml 파일을 설정하세요.
 
 Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경변수를 내보낸 후 실행하거나 IDE Run Configuration에 아래 변수를 직접 등록하세요. Compose의 `--env-file`은 DB 컨테이너 설정에만 적용됩니다.
 
@@ -87,8 +100,8 @@ set -a
 set +a
 export SPRING_PROFILES_ACTIVE=local
 export ZOOP_SWAGGER_ENABLED=true
-export ZOOP_AUTH_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
-export ZOOP_API_CORS_ALLOWED_ORIGINS=http://localhost:3000
+export ZOOP_AUTH_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:8080
+export ZOOP_API_CORS_ALLOWED_ORIGINS=http://localhost:5173
 docker compose --env-file api/.env -f api/compose.local.yaml up -d --wait
 ./api/gradlew -p api bootRun
 ```
@@ -241,7 +254,7 @@ DB 환경변수(`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`)를 설정하고 API를 �
 .\gradlew.bat bootRun --args="--spring.profiles.active=catalog-import --spring.main.web-application-type=none --zoop.catalog.import-file=src/main/resources/company/demo-companies.json"
 ```
 
-이 수동 명령은 입력 전체를 검증한 뒤 확정 목록을 `companies`에 삽입하거나 같은 ID의 이름·종목 코드·거래소·별칭·브랜드 색상·로고 경로·내부 출처(`brand_source`)를 갱신합니다. `brand_source`의 `null`은 기존 출처를 비우며, 생략하면 기존 값을 보존합니다. 다른 기업은 삭제하지 않습니다. OpenAI·Anthropic의 `market`은 NULL로 바로잡고 다른 기업의 `market`과 `profile`은 보존합니다. 재실행 시 동일한 행은 쓰지 않아 `company_catalog_revision`도 바뀌지 않습니다. 완료 로그의 `total`, `changed`, `unchanged`로 결과를 확인하세요. 기존 Flyway migration은 수정하지 않습니다. 일부 SVG는 프론트엔드가 같은 이름으로 `web/public/graph-assets`에 추가할 예정입니다.
+이 수동 명령은 입력 전체를 검증한 뒤 확정 목록을 `companies`에 삽입하거나 같은 ID의 이름·종목 코드·거래소·별칭·브랜드 색상·로고 경로·내부 출처(`brand_source`)를 갱신합니다. `brand_source`의 `null`은 기존 출처를 비우며, 생략하면 기존 값을 보존합니다. 다른 기업은 삭제하지 않습니다. 항목에 `market`(상장사만)이나 `profile`(`legalName`·`representative`·`foundedDate`·`websiteUrl`·`sector`만 허용, `foundedDate`는 `YYYY-MM-DD`, `websiteUrl`은 `https://`)이 있으면 그 값으로 바꾸고, 키를 생략하면 기존 값을 보존합니다. `profile` 안의 `null`은 저장하지 않아 API에서 `null`로 나옵니다. `"profile": null`은 프로필 전체를 비웁니다(`market`·`brand_source`의 `null`과 같음). 값은 공식 자료(KIND 기업개요, SEC 연차보고서, 각 사 공식 사이트)로 확인된 것만 넣고 추정하지 않습니다. 해외 기업 설립일(15곳 중 13곳)의 출처와 창립·법인 설립 기준은 [설립일 근거](docs/company-founded-date-sources.md)에 기록했습니다. OpenAI·Anthropic의 `market`은 항상 NULL입니다. 재실행 시 동일한 행은 쓰지 않아 `company_catalog_revision`도 바뀌지 않습니다. 완료 로그의 `total`, `changed`, `unchanged`로 결과를 확인하세요. 기존 Flyway migration은 수정하지 않습니다. 일부 SVG는 프론트엔드가 같은 이름으로 `web/public/graph-assets`에 추가할 예정입니다.
 
 ```sql
 SELECT count(*) FROM companies;

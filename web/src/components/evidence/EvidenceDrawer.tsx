@@ -9,6 +9,8 @@ import type { EvidenceResponse } from '@/types/evidence';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 
 interface Props {
+  onReady?: (targetId: string) => void;
+  onTutorialSkip?: () => void;
   onViewOnMap?: (eventId: string) => void;
 }
 
@@ -93,7 +95,11 @@ function EvidenceCard({
 }
 
 // D-GRP-05 · Figma 619:8225 · FS024 · ERD v6 evidence/article_versions.
-export default function EvidenceDrawer({ onViewOnMap }: Props) {
+export default function EvidenceDrawer({
+  onReady,
+  onViewOnMap,
+  onTutorialSkip,
+}: Props) {
   const target = useGraphUiStore((state) => state.evidenceTarget);
   const close = useGraphUiStore((state) => state.closeEvidence);
   const [retry, setRetry] = useState(0);
@@ -110,6 +116,11 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
     retry,
     target?.mapContext,
   );
+
+  useEffect(() => {
+    if (target && !loading && items.some((item) => item.article !== null))
+      onReady?.(target.id);
+  }, [target, loading, items, onReady]);
 
   useEffect(() => {
     if (!target) return;
@@ -198,6 +209,15 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
           >
             ×
           </button>
+          {onTutorialSkip && (
+            <button
+              data-tutorial-action="skip"
+              onClick={onTutorialSkip}
+              className="mb-2 underline"
+            >
+              튜토리얼 건너뛰기
+            </button>
+          )}
           <h2
             id="evidence-title"
             ref={heading}
@@ -268,6 +288,7 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
               {retryable && (
                 <button
                   type="button"
+                  data-tutorial-action="retry"
                   onClick={() => setRetry((value) => value + 1)}
                 >
                   다시 시도

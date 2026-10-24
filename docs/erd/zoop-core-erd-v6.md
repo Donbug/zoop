@@ -421,14 +421,16 @@ actor_kind=admin이면 admin_id 필수 및 당시 관리자 이메일을 저장�
 ### 26. review_targets — 검수 대상 등록부·목록 투영
 
 ```text
-id text PK; target_type text; external_id text; source_version text
+id text PK; target_type text; source_job_id text; external_id text; source_version text
 candidate_id text; current_revision bigint; status text; active boolean; is_current boolean
 company_ids text[]; relation_types text[]; source_revision text; source_updated_at timestamptz?
 verification_artifact_id text? FK artifacts; updated_at timestamptz
-UNIQUE(target_type, external_id, source_version)
-UNIQUE(candidate_id) WHERE target_type='candidate' AND is_current=true
-UNIQUE(candidate_id, external_id) WHERE target_type='relation' AND is_current=true
+UNIQUE(target_type, source_job_id, external_id, source_version)
+UNIQUE(source_job_id, candidate_id) WHERE target_type='candidate' AND is_current=true
+UNIQUE(source_job_id, candidate_id, external_id) WHERE target_type='relation' AND is_current=true
 ```
+
+`source_job_id`는 후보를 만든 내부 S3 job이다(AI 담당 합의 2026-10-22). AI 후보 ID는 그 job과 고정 입력 안에서만 안정하므로 앱의 대상 키는 job ID와 후보 ID를 함께 쓰고, 결정은 그 job의 review 경로로 보낸다. 서로 다른 job의 같은 후보 ID는 서로를 대체하지 않는다. 그래서 동기화의 is_current 전환은 같은 `(source_job_id, candidate_id)`(relation은 `external_id`까지) 안에서만 일어나고, 다른 job의 행은 건드리지 않는다. 대상 행의 신원(`id`, `target_type`, `source_job_id`, `external_id`, `source_version`, `candidate_id`)은 DB trigger로 변경을 막고, `current_revision`은 결정과 함께 1씩만 증가한다.
 
 detail JSON 복제를 제거한다. 근거·관계·검증 상세는 source_version/source_revision으로 고정한 분석 후보 원천에서 조회하고 RDB 결정 이력을 조합한다. RDB의 status/active/company_ids/relation_types는 목록 필터용 투영이며 권위 원천이 아니다. 원천 revision이 달라지면 동기화 후 반환하거나 명시적으로 실패 처리하며 오래된 투영과 새 상세를 섞지 않는다. 목록 커서도 source revision에 결합하고 원천이 그 snapshot을 지원하지 않으면 커서를 무효화한다.
 
@@ -446,8 +448,12 @@ admin_id text? FK admins; admin_email_snapshot text; verification_artifact_id te
 decided_at timestamptz; revision bigint; global_revision bigint UNIQUE; origin text; job_id text? FK analysis_jobs
 UNIQUE(target_id, revision)
 CHECK(revision >= 1 AND global_revision >= 1)
-CHECK(origin <> 'admin' OR admin_id IS NOT NULL)
+CHECK(origin <> 'admin' OR (admin_id IS NOT NULL AND admin_email_snapshot IS NOT NULL))
 ```
+
+결정 이력은 추가만 허용한다(UPDATE·DELETE는 DB trigger가 거절).
+
+AI 원천에 결정을 보내기 전에 앱은 별도의 짧은 트랜잭션으로 멱등 키(processing)와 결정 의도 `review_decision_intents`를 먼저 저장한다. 의도는 AI operation id(관리자·method·path·멱등 키 전체 범위에서 만든 값), 대상 행, 요청(결정·사유·기대값 3개), 관리자 email snapshot을 고정하고, 상태는 pending에서 applied(정산한 결정 행), refused(원천이 아무것도 기록하지 않은 확정 거절), blocked(계약 불일치, operation 조회로만 정산)로만 바뀐다. AI가 결정을 적용했다면 응답 유실·앱 중단·DB 실패가 있어도 의도만으로 결정·감사·멱등 응답을 정산한다. 이때 현재 투영이 여전히 HOLD인지나 같은 행이 current인지는 묻지 않는다(권위는 AI 원천). 확정 거절만 의도를 닫고 같은 키가 그 오류를 재생한다. 일시 불가·미확인 응답은 의도를 열어 두어 같은 키가 같은 요청을 다시 보내고, 정산 작업은 `GET …/reviews/{operationId}`로 기록된 operation을 정산하며 원천이 모르는 operation은 관리자를 대신해 보내지 않는다. 의도 행은 삭제하지 않는다.
 
 candidate와 relation 결정을 모두 보존한다. revision은 결정 대상별 값이며 current_revision은 최초 0이다. relationId가 없으면 candidate 대상, 있으면 해당 후보에 속하는 relation 대상을 해석하고 expectedRevision을 그 대상의 current_revision과 비교한다. 공개 응답의 decision/history에 대상별 revision을 제공해 클라이언트가 같은 대상의 값을 보내도록 한다. 공통 publication_state advisory lock→대상 행 잠금 순으로 획득하고 `current_revision=expectedRevision` 조건부 UPDATE로 +1한 값과 동일 revision의 결정을 INSERT한다. UPDATE 0건 또는 UNIQUE(target_id,revision) 충돌은 REVISION_CONFLICT/409다. origin=admin이면 admin_id 필수, verification_artifact_id는 실제 자동 검증 결과가 있을 때만 채운다. decision=allow는 2026-10-21 사용자 정책에 따라 현재 HOLD인 대상에 대한 운영자 최종 승인이며(DecisionResponse.decision=approved) 재검증 접수가 아니다. 결정·감사·멱등성 완료 기록만 저장하고 analysis_jobs(kind=revalidate) 행이나 모델·검증 호출을 만들지 않는다. DecisionResponse는 publicChanged=false를 반환하며 jobId는 없다(승인은 그래프 투영·활성화가 아니다). 스키마·endpoint·정확한 인용·현재 원천 권리 검사는 사람이 덮어쓸 수 없고, 이전 자동 판정과 claim 분포는 AI 원천에서 불변으로 남는다. `job_id`는 이전 계약이 allow로 접수한 재검증 job의 이력 링크로 nullable을 유지한다. 신규 approved와 reject는 항상 NULL이다. 이전 allow 행과 그 재검증 job은 삭제·이관하지 않으며 신규 승인으로 재해석하지 않는다. 현재 승인 여부는 최신 원천 revision에 대해 AI 원천이 반환하는 approvalBasis(kind=operator-final-approval)로만 판단하고 review_decisions 행만으로 추정하지 않는다. 다른 관리자 작업이 running이어도 결정 접수에는 영향이 없으며 결정 API에 JOB_IN_PROGRESS를 추가하지 않는다. 동일 멱등성 요청은 기존 결정 응답을 재생한다.
 
@@ -466,7 +472,7 @@ id text PK; title text; summary text; definition jsonb
 default_enabled boolean; enabled boolean; revision bigint; updated_at timestamptz
 ```
 
-rule ID의 버전을 유지한다. eligible/publishedCandidates/publishedEvents는 고정 그래프/후보에서 계산한다. 규칙 정의는 불변 버전으로 관리하고 enabled 상태만 수정한다.
+rule ID의 버전을 유지한다. 규칙은 앱 공개 정책으로, 이미 공개 적격인 내용을 공개에서 빼는 방향으로만 작동하며 HOLD를 공개하거나 AI 판정 입력을 바꾸지 않는다(AI 담당 2026-10-22). eligible은 활성 버전이 참조하는 원천 job 범위에서 현재 규칙에 해당하는 HOLD 수(정보용 현재 대기 건수, 공개 수 아님)로, review_targets·원천 revision에서 조회할 때 계산하며 그 투영이 없으면 null이다. publishedCandidates/publishedEvents는 활성 그래프 버전에서 규칙 적용 후 공개 상태로 남은 수로, 버전을 만들 때 세어 버전과 함께 고정한다(규칙 변경은 다음 버전부터 반영, 고정 값이 없으면 null). 버전 고정 당시 통계와 현재 대기 건수를 구분한다. 규칙 정의는 불변 버전으로 관리하고 enabled 상태만 수정한다.
 
 ### 29. publication_rule_changes — 규칙 변경 이력
 
@@ -722,7 +728,7 @@ API DTO를 그대로 노출하는 DB 엔티티로 만들지는 않는다. 저장
 | `getAdminSession`, `logInAdmin`, `logOutAdmin` | admins, admin_sessions, 코드 권한 매핑 | 별도 쿠키와 유휴/절대 만료 |
 | `getAdminDashboard`, `getPipelineOverview` | 회원·후보·작업·브리핑·그래프·AI·감사 원천의 집계, Neo4j 상태 | 별도 dashboard 테이블 없음. 외부 상태 조회 실패를 실제로 표현 |
 | `listAuditRecords` | audit_logs | 필터·커서로 조회 |
-| `listAnalysisCandidates`, `getAnalysisCandidate`, `decideAnalysisCandidate` | review_targets, 분석 후보 원천, review_decisions, audit_logs (이전 계약 이력 조회 시 analysis_jobs) | revision·원천 CAS, allow는 HOLD 최종 승인이며 job·모델 호출 없음 |
+| `listAnalysisCandidates`, `getAnalysisCandidate`, `decideAnalysisCandidate` | review_targets, 분석 후보 원천, review_decisions, review_decision_intents, audit_logs (이전 계약 이력 조회 시 analysis_jobs) | revision·원천 CAS, allow는 HOLD 최종 승인이며 job·모델 호출 없음 |
 | `listPublicationRules`, `setPublicationRule` | publication_rules, publication_rule_changes, review_targets, graph_versions | 현재 상태·history·집계와 변경 직렬화 |
 | `listGraphVersions`, `publishGraphVersion`, `activateGraphVersion` | graph_versions, graph_activations, artifacts, analysis_jobs, audit_logs | 검증된 snapshot·투영 성공·활성화 이력 |
 | `listAnalysisJobs`, `createAnalysisJob`, `getAnalysisJob`, `retryAnalysisJob`, `cancelAnalysisJob` | analysis_jobs, audit_logs, idempotency_records | scope=admin의 ingest/revalidate/project, retryOf·checkpoint·취소 |

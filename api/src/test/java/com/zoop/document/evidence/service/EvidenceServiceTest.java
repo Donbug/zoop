@@ -716,4 +716,28 @@ class EvidenceServiceTest {
             return entries;
         }
     }
+    @Test
+    void legacyBriefingCitationIdsAreAcceptedOnlyThroughTheRoundBoundReader() throws Exception {
+        EvidenceWorld world = new EvidenceWorld(temp);
+        String savedId = "evidence-grouped-94b3ffb5802ce7c7eae029378b56";
+        var port = new com.zoop.document.evidence.graph.GraphEvidenceReader() {
+            public com.zoop.document.evidence.graph.GraphEvidence read(String version, Instant at, String id) {
+                throw new AssertionError("a round must not be dropped");
+            }
+            public RoundRead readRound(String round, String version, Instant at, String id, String company, String request) {
+                if (!savedId.equals(id)) throw new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE);
+                assertEquals("saved-round", round);
+                var facts = new com.zoop.document.evidence.graph.GraphEvidence("reconstructed", EvidenceWorld.NOW, null, List.of(), List.of(), List.of());
+                var response = new com.zoop.document.evidence.dto.EvidenceResponse(id, "saved quote", 0, 11, "article", "v1",
+                        null, true, List.of("issue"), null, null, "v1", null, null, null, null);
+                return new RoundRead(facts, response);
+            }
+        };
+        var service = world.service(null, null, world.store, port);
+        assertEquals("saved quote", service.read(savedId, "saved-round", null, null, null, "r").quote());
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, failure(() -> service.read(savedId, null, null, null, null, "r")));
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, failure(() -> service.read("not-in-round", "saved-round", null, null, null, "r")));
+        assertEquals(0, world.read.calls, "round membership and its preserved source own the legacy read");
+    }
+
 }

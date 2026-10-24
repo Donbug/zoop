@@ -29,9 +29,22 @@ export const jobStatusLabel: Record<DashboardJobStatus, string> = {
 };
 
 export const jobKindLabel: Record<string, string> = {
+  // 본개발 작업 API(#292)의 종류
+  ingest: '신규 기사 처리',
+  revalidate: '후보 재검증',
+  project: 'GraphDB 반영',
+  // 프로토타입 작업 원장의 종류(대시보드 최근 작업)
   'flush-graph': 'GraphDB 반영 재시도',
   'retry-model-errors': '모델 오류 재처리',
   'ingest-run': '신규 기사 처리',
+};
+
+/** 기사 처리 결과(FS058). empty는 새 기사가 없었던 정상 종료다. */
+export const ingestOutcomeLabel: Record<string, string> = {
+  collected: '새 기사 처리',
+  empty: '새 기사 없음',
+  failed: '실패',
+  cancelled: '취소됨',
 };
 
 export const graphDbStatusLabel: Record<DashboardGraphDbStatus, string> = {
@@ -88,7 +101,8 @@ export const auditActionLabel: Record<string, string> = {
   'review.decide': '검수 결정',
   'review.rule': '검수 규칙 전환',
   'graph.publish': '그래프 게시',
-  'graph.activate': '그래프 버전 전환',
+  // 백엔드가 실제로 남기는 그래프 전환 동작 코드(#275). 감사 로그 동작 필터도 이 값으로 조회한다.
+  'graph.version.activate': '그래프 버전 전환',
   'graph.seed': '그래프 최초 등록',
   'job.create': '작업 실행',
   'job.retry': '작업 재시도',

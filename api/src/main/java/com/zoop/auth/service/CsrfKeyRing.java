@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -45,6 +46,10 @@ public final class CsrfKeyRing {
         this.keys = Collections.unmodifiableMap(parsed);
     }
 
+    /** The cursors allowed to borrow these keys; each signs under its own purpose, so one never verifies as another. */
+    private static final Set<String> CURSOR_PURPOSES = Set.of("admin-audit-cursor-v1", "admin-job-cursor-v1",
+            "admin-rule-cursor-v1");
+
     public String activeKeyId() {
         return activeKeyId;
     }
@@ -53,7 +58,7 @@ public final class CsrfKeyRing {
     public Optional<byte[]> sign(String keyId, String purpose, byte[] payload) {
         byte[] key = keys.get(keyId);
         if (key == null) return Optional.empty();
-        if (!"admin-audit-cursor-v1".equals(purpose)) throw new IllegalArgumentException("Invalid MAC purpose");
+        if (!CURSOR_PURPOSES.contains(purpose)) throw new IllegalArgumentException("Invalid MAC purpose");
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(key, "HmacSHA256"));

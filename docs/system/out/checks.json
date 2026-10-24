@@ -1899,6 +1899,13 @@
     },
     {
       "code": "TARGET_ONLY_API",
+      "target": "getBriefingRecap",
+      "severity": "difference",
+      "message": "GET /api/v1/briefings/{id}/recap: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
       "target": "getBriefingItemDetail",
       "severity": "difference",
       "message": "GET /api/v1/briefings/{roundId}/items/{eventId}: 직접 대응 BFF 없음",
@@ -1915,7 +1922,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getBriefingGraphBasis",
       "severity": "difference",
-      "message": "목표만 97 · BFF만 30 · 형식/필수/권한 변경 7",
+      "message": "목표만 106 · BFF만 30 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -2069,7 +2076,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAdminDashboard",
       "severity": "difference",
-      "message": "목표만 695 · BFF만 633 · 형식/필수/권한 변경 7",
+      "message": "목표만 698 · BFF만 633 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -2097,7 +2104,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getPipelineOverview",
       "severity": "difference",
-      "message": "목표만 114 · BFF만 21 · 형식/필수/권한 변경 12",
+      "message": "목표만 116 · BFF만 22 · 형식/필수/권한 변경 12",
       "source": ""
     },
     {
@@ -2111,7 +2118,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "listAnalysisCandidates",
       "severity": "difference",
-      "message": "목표만 115 · BFF만 23 · 형식/필수/권한 변경 10",
+      "message": "목표만 118 · BFF만 32 · 형식/필수/권한 변경 11",
       "source": ""
     },
     {
@@ -2125,7 +2132,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAnalysisCandidate",
       "severity": "difference",
-      "message": "목표만 123 · BFF만 30 · 형식/필수/권한 변경 11",
+      "message": "목표만 126 · BFF만 39 · 형식/필수/권한 변경 12",
       "source": ""
     },
     {
@@ -2153,7 +2160,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "listPublicationRules",
       "severity": "difference",
-      "message": "목표만 120 · BFF만 21 · 형식/필수/권한 변경 9",
+      "message": "목표만 126 · BFF만 24 · 형식/필수/권한 변경 9",
       "source": ""
     },
     {
@@ -2167,7 +2174,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "setPublicationRule",
       "severity": "difference",
-      "message": "목표만 160 · BFF만 12 · 형식/필수/권한 변경 11",
+      "message": "목표만 149 · BFF만 24 · 형식/필수/권한 변경 10",
       "source": ""
     },
     {
@@ -2223,7 +2230,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "listAnalysisJobs",
       "severity": "difference",
-      "message": "목표만 118 · BFF만 92 · 형식/필수/권한 변경 19",
+      "message": "목표만 120 · BFF만 93 · 형식/필수/권한 변경 21",
       "source": ""
     },
     {
@@ -2237,7 +2244,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "createAnalysisJob",
       "severity": "difference",
-      "message": "목표만 167 · BFF만 39 · 형식/필수/권한 변경 15",
+      "message": "목표만 167 · BFF만 39 · 형식/필수/권한 변경 16",
       "source": ""
     },
     {
@@ -2251,7 +2258,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAnalysisJob",
       "severity": "difference",
-      "message": "목표만 114 · BFF만 39 · 형식/필수/권한 변경 13",
+      "message": "목표만 114 · BFF만 39 · 형식/필수/권한 변경 14",
       "source": ""
     },
     {
@@ -2265,7 +2272,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "retryAnalysisJob",
       "severity": "difference",
-      "message": "목표만 162 · BFF만 36 · 형식/필수/권한 변경 15",
+      "message": "목표만 162 · BFF만 36 · 형식/필수/권한 변경 16",
       "source": ""
     },
     {
@@ -2279,7 +2286,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "cancelAnalysisJob",
       "severity": "difference",
-      "message": "목표만 162 · BFF만 30 · 형식/필수/권한 변경 15",
+      "message": "목표만 162 · BFF만 30 · 형식/필수/권한 변경 16",
       "source": ""
     },
     {
@@ -2654,28 +2661,28 @@
     "BFF_CACHED_OBSERVATION": 1,
     "BFF_PATH_DIFFERENCE": 81,
     "BFF_FIELD_DIFFERENCE": 81,
-    "TARGET_ONLY_API": 6,
+    "TARGET_ONLY_API": 7,
     "PROTOTYPE_ONLY_API": 3
   },
   "severityCounts": {
     "warning": 205,
-    "difference": 171
+    "difference": 172
   },
   "xlsxReadback": {
     "status": "passed",
     "sheetDataRows": {
-      "추적표": 652,
-      "화면→기능→API": 1421,
+      "추적표": 660,
+      "화면→기능→API": 1437,
       "기능→WBS→구현 상태": 500,
-      "API 목록": 87,
+      "API 목록": 88,
       "오류 코드": 28,
-      "경고": 376,
+      "경고": 377,
       "원문 WBS": 173,
       "원문 제안·유효 기준": 8,
       "범위 예외·상세 권한": 34,
       "수용 기준": 121
     },
-    "cells": 47934
+    "cells": 48298
   },
   "acceptanceCoverage": {
     "status": "passed",
@@ -2720,15 +2727,15 @@
       "BE": 82,
       "FE": 33
     },
-    "targetOperations": 87
+    "targetOperations": 88
   },
   "sheetDataRows": {
-    "추적표": 652,
-    "화면→기능→API": 1421,
+    "추적표": 660,
+    "화면→기능→API": 1437,
     "기능→WBS→구현 상태": 500,
-    "API 목록": 87,
+    "API 목록": 88,
     "오류 코드": 28,
-    "경고": 376,
+    "경고": 377,
     "원문 WBS": 173,
     "원문 제안·유효 기준": 8,
     "범위 예외·상세 권한": 34,
