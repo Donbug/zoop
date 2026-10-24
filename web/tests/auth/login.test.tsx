@@ -178,6 +178,37 @@ describe('D-AUT-01 이메일 로그인 (FS002·FS006)', () => {
     expect((await screen.findByTestId('destination')).textContent).toBe('/my');
   });
 
+  test.each([
+    [
+      '시장 전체 지도에서 기업을 고른 채 왔으면 그 지도·기업으로',
+      '/?mode=all&select=node%3AKRX%3A005930',
+      '/?mode=all&select=node%3AKRX%3A005930',
+    ],
+    [
+      '시장 전체가 아닌 지도에서 왔으면 시장 전체 지도로',
+      '/?mode=personal',
+      '/?mode=all',
+    ],
+  ])(
+    'D-AUT-01 · D-GRP-03 %s 돌아간다(관심 추가는 돌아와서 다시 누른다)',
+    async (_label, from, expected) => {
+      server.on('POST', '/api/v1/auth/login', () =>
+        json({ ...memberSession(true), metadata }),
+      );
+      const [pathname, search] = from.split('?');
+      renderApp({
+        pathname: '/login',
+        state: { from: { pathname, search: `?${search}`, hash: '' } },
+      });
+      await screen.findByRole('heading', { name: '이메일로 로그인' });
+      await fillAndSubmit('member@zoop.test', 'secret-pass');
+
+      expect((await screen.findByTestId('destination')).textContent).toBe(
+        expected,
+      );
+    },
+  );
+
   test('빈 입력은 요청하지 않고 안내한다', async () => {
     renderApp();
     await screen.findByRole('heading', { name: '이메일로 로그인' });

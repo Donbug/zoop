@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CompanyDetailPanel from '@/components/graph/CompanyDetailPanel';
 import { useCompanyData } from '@/hooks/useCompanyData';
@@ -103,6 +103,64 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
     expect(screen.getByText('직접 관련 사건')).toBeTruthy();
     expect(screen.getByText('NVIDIA')).toBeTruthy();
     expect(screen.getByText('뉴스·공시')).toBeTruthy();
+  });
+
+  it('D-GRP-03 로고·종목코드·기업명·가격·등락·기준 시각을 머리에 모으고, 거래량 등 중요 정보는 회색 박스에 둔다', () => {
+    const view = renderPanel();
+    const header = view.container.querySelector('.company-panel-header')!;
+    const quote = state.data.quote;
+    if (quote.status !== 'available') throw new Error('fixture');
+    expect(header.querySelector('h2')!.textContent).toBe(company.name);
+    expect(header.textContent).toContain(company.ticker!);
+    expect(header.querySelector('.company-price-row')).toBeTruthy();
+    expect(header.querySelector('.company-quote-meta')!.textContent).toContain(
+      '기준',
+    );
+    expect(header.querySelector('.company-stat-grid')).toBeNull();
+    const box = view.container.querySelector('.company-quote')!;
+    expect(box.querySelector('.company-stat-grid')!.textContent).toContain(
+      '거래량',
+    );
+    expect(box.querySelector('.company-price-row')).toBeNull();
+  });
+
+  it('D-GRP-03 비회원의 로그인 후 관심 추가는 지금 지도 주소를 로그인 화면에 넘긴다', async () => {
+    function LoginProbe() {
+      const location = useLocation();
+      const from = (
+        location.state as { from?: { pathname: string; search: string } }
+      )?.from;
+      return <p>{`login from ${from?.pathname}${from?.search}`}</p>;
+    }
+    render(
+      <MemoryRouter initialEntries={['/?mode=all&select=node%3AKRX%3A005930']}>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <CompanyDetailPanel
+                companyId={company.id}
+                fallback={fallback}
+                relatedCompanies={[]}
+                token={null}
+                onClose={vi.fn()}
+                onSelectIssue={vi.fn()}
+                onFocus={vi.fn()}
+                onConnections={vi.fn()}
+                onAskAi={vi.fn()}
+              />
+            }
+          />
+          <Route path="/login" element={<LoginProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await userEvent.click(
+      screen.getByRole('link', { name: '로그인 후 관심 추가' }),
+    );
+    expect(
+      screen.getByText('login from /?mode=all&select=node%3AKRX%3A005930'),
+    ).toBeTruthy();
   });
 
   it('관심기업 저장 중 중복 입력을 막고 성공 응답으로 상태를 확정한다', async () => {

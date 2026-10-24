@@ -3,7 +3,7 @@ import CompanyLogo from '@/components/common/CompanyLogo';
 import type { EventContext } from '@/types/map/event';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { setWatchlistCompany } from '@/apis/graph/companies';
 import { useCompanyData } from '@/hooks/useCompanyData';
 import type { GraphNode } from '@/types/map/graph';
@@ -79,6 +79,8 @@ function SectionError({
 
 // WBS 6.6.23 · D-GRP-03 · Figma 619:6729
 export default function CompanyDetailPanel(props: Props) {
+  // 로그인 뒤 같은 지도·같은 기업으로 돌아와 관심 추가를 다시 누를 수 있게 지금 위치를 넘긴다.
+  const location = useLocation();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.focus();
@@ -138,10 +140,68 @@ export default function CompanyDetailPanel(props: Props) {
       }}
     >
       <header className="company-panel-header">
-        <div className="company-panel-title">
-          <h2 className={ui.title} ref={heading} tabIndex={-1}>
-            {name}
-          </h2>
+        {/* D-GRP-03: 로고·종목코드·기업명·가격·등락을 한 덩어리로 모은다(증권 앱의 종목 머리와 같은 순서). */}
+        <div className="flex items-start gap-3">
+          <CompanyLogo
+            name={name}
+            logoUrl={logoUrl}
+            className="size-14 shrink-0 rounded-full border border-zoop-line bg-zoop-paper text-[18px] font-extrabold"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="company-code">
+              {[
+                company?.ticker ?? props.companyId.split(':')[1],
+                company?.market,
+                company?.sector,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+            <h2 className={ui.title} ref={heading} tabIndex={-1}>
+              {name}
+            </h2>
+            {quote && (
+              <>
+                <div className="company-price-row">
+                  <strong>
+                    {number(quote.quote.price, currency)}{' '}
+                    <small>{currency}</small>
+                  </strong>
+                  <p className={changePositive ? 'up' : 'down'}>
+                    {changePositive ? '▲ +' : '▼ '}
+                    {number(quote.quote.change, currency)} (
+                    {changePositive ? '+' : ''}
+                    {((quote.quote.changeRate ?? 0) * 100).toFixed(2)}%)
+                  </p>
+                </div>
+                {/* 언제 기준의 값인지 알려 주는 보조 정보라 아래 중요 정보보다 작게 둔다. */}
+                <div className="company-quote-meta">
+                  <span>
+                    {quote.quote.asOf
+                      ? `${new Date(quote.quote.asOf).toLocaleString('ko-KR', {
+                          month: 'numeric',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        })} 기준`
+                      : '기준 시각 미제공'}{' '}
+                    · 전일 대비 · {quote.source.name}
+                    {quote.source.delayNote ? ' · 지연 가능' : ''}
+                  </span>
+                  <details className="company-source">
+                    <summary aria-label={`시세 출처: ${quote.source.name}`}>
+                      i
+                    </summary>
+                    <p>
+                      {quote.source.name} ·{' '}
+                      {quote.source.official ? '공식' : '공개 자료'} · 종목 기호{' '}
+                      {quote.source.symbol}
+                    </p>
+                  </details>
+                </div>
+              </>
+            )}
+          </div>
           <button
             className={ui.close}
             onClick={props.onClose}
@@ -151,29 +211,13 @@ export default function CompanyDetailPanel(props: Props) {
           </button>
         </div>
         <div className="company-identity">
-          <CompanyLogo
-            name={name}
-            logoUrl={logoUrl}
-            className="size-[30px] rounded-full border border-zoop-line bg-zoop-paper text-[11.4px] font-extrabold"
-          />
-          <div className="company-identity-meta">
-            <p>{company?.ticker ?? props.companyId.split(':')[1]}</p>
-            <div className="company-statuses">
-              {(company?.holding || props.fallback.holding) && (
-                <span>보유 종목</span>
-              )}
-              {(company?.watch || props.fallback.watch) && (
-                <span>관심 종목</span>
-              )}
-            </div>
+          <div className="company-statuses">
+            {(company?.holding || props.fallback.holding) && (
+              <span>보유 종목</span>
+            )}
+            {(company?.watch || props.fallback.watch) && <span>관심 종목</span>}
           </div>
         </div>
-        {company && company.aliases.length > 0 && (
-          <details className="company-aliases">
-            <summary>기업명 더 보기</summary>
-            <p>{company.aliases.join(' · ')}</p>
-          </details>
-        )}
       </header>
       {loading && (
         <p className="company-panel-loading" role="status">
@@ -190,42 +234,46 @@ export default function CompanyDetailPanel(props: Props) {
       )}
       {company && (
         <div className={`company-panel-scroll ${ui.scroll}`}>
+          {/* 기업 머리 바로 아래에 주요 동작을 둔다(시세 박스보다 먼저). */}
+          <div
+            className={`company-actions ${ui.actions} [&>:last-child]:col-span-2`}
+          >
+            <Link to={`/companies/${encodeURIComponent(company.id)}`}>
+              기업 상세
+            </Link>
+            {props.token ? (
+              <button
+                onClick={() => void toggleWatch()}
+                disabled={saving}
+                aria-pressed={watch}
+              >
+                {saving ? '저장 중…' : watch ? '★ 관심 해제' : '☆ 관심 추가'}
+              </button>
+            ) : (
+              <Link to="/login" state={{ from: location }}>
+                로그인 후 관심 추가
+              </Link>
+            )}
+            <button onClick={props.onFocus}>이 기업 중심으로 보기</button>
+            <button onClick={props.onConnections}>다른 기업과 연결 보기</button>
+            <button
+              className={`col-span-2 bg-panel-ink! text-white! ${props.tutorialAi ? 'tutorial-target tutorial-ai-target' : ''}`}
+              disabled={props.tutorialSaving}
+              onClick={props.onAskAi}
+            >
+              AI에게 이 기업 묻기
+            </button>
+          </div>
+          {watchError && (
+            <p className="company-watch-error" role="alert">
+              {watchError}{' '}
+              <button onClick={() => void toggleWatch()}>재시도</button>
+            </p>
+          )}
           <section className={`company-quote ${ui.sectionFrame}`}>
             <h3 className="sr-only">시세</h3>
             {quote ? (
               <>
-                <div className="company-price-row">
-                  <strong>
-                    {number(quote.quote.price, currency)}{' '}
-                    <small>{currency}</small>
-                  </strong>
-                  <p className={changePositive ? 'up' : 'down'}>
-                    {changePositive ? '▲ +' : '▼ '}
-                    {number(quote.quote.change, currency)} (
-                    {changePositive ? '+' : ''}
-                    {((quote.quote.changeRate ?? 0) * 100).toFixed(2)}%)
-                  </p>
-                </div>
-                <div className="company-quote-meta">
-                  <span>
-                    전일 대비 · 기준{' '}
-                    {quote.quote.asOf
-                      ? new Date(quote.quote.asOf).toLocaleString('ko-KR')
-                      : '미제공'}{' '}
-                    · {quote.source.name}
-                    {quote.source.delayNote ? ' · 지연 가능' : ''}
-                  </span>
-                  <details className="company-source">
-                    <summary aria-label={`시세 출처: ${quote.source.name}`}>
-                      i
-                    </summary>
-                    <p>
-                      {quote.source.name} ·{' '}
-                      {quote.source.official ? '공식' : '공개 자료'} · 종목 기호{' '}
-                      {quote.source.symbol}
-                    </p>
-                  </details>
-                </div>
                 <div className="company-stat-grid">
                   <span>
                     거래량 <b>{number(quote.quote.volume)}</b>
@@ -304,8 +352,10 @@ export default function CompanyDetailPanel(props: Props) {
             </div>
             {!props.token ? (
               <p className="company-unavailable">
-                <Link to="/login">로그인</Link>하면 보유 정보를 확인할 수
-                있습니다.
+                <Link to="/login" state={{ from: location }}>
+                  로그인
+                </Link>
+                하면 보유 정보를 확인할 수 있습니다.
               </p>
             ) : data.holding ? (
               <div className="company-holding">
@@ -346,39 +396,6 @@ export default function CompanyDetailPanel(props: Props) {
               retry={() => setRetry((value) => value + 1)}
             />
           </section>
-          <div
-            className={`company-actions ${ui.actions} [&>:last-child]:col-span-2`}
-          >
-            <Link to={`/companies/${encodeURIComponent(company.id)}`}>
-              기업 상세
-            </Link>
-            {props.token ? (
-              <button
-                onClick={() => void toggleWatch()}
-                disabled={saving}
-                aria-pressed={watch}
-              >
-                {saving ? '저장 중…' : watch ? '★ 관심 해제' : '☆ 관심 추가'}
-              </button>
-            ) : (
-              <Link to="/login">로그인 후 관심 추가</Link>
-            )}
-            <button onClick={props.onFocus}>이 기업 중심으로 보기</button>
-            <button onClick={props.onConnections}>다른 기업과 연결 보기</button>
-            <button
-              className={`col-span-2 bg-panel-ink! text-white! ${props.tutorialAi ? 'tutorial-target tutorial-ai-target' : ''}`}
-              disabled={props.tutorialSaving}
-              onClick={props.onAskAi}
-            >
-              AI에게 이 기업 묻기
-            </button>
-          </div>
-          {watchError && (
-            <p className="company-watch-error" role="alert">
-              {watchError}{' '}
-              <button onClick={() => void toggleWatch()}>재시도</button>
-            </p>
-          )}
           <section className={ui.sectionFrame}>
             <div className="company-section-title">
               <h3>직접 관련 사건</h3>
