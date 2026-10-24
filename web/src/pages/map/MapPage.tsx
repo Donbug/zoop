@@ -773,7 +773,8 @@ function MapWorkspace({
               onClick={() => setSidebarOpen((open) => !open)}
               title="내가 보유 중인 종목 보기"
             >
-              <GraphIcon name="sidebar" inheritColor />내 종목
+              <GraphIcon name="sidebar" inheritColor />
+              보유 종목
             </button>
             <div className="relationship-mode" aria-label="그래프 모드">
               <button

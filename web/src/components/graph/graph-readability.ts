@@ -1,6 +1,6 @@
 import type { Graph, GraphData } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
-import { intersects, type Rect } from './graph-geometry';
+import { intersects, screenLabelSize, type Rect } from './graph-geometry';
 
 export type ReadingContext = {
   zoom: number;
@@ -117,7 +117,10 @@ export function readingStyles(
         node.id === context.focus ||
         context.path.has(String(node.id)) ||
         related.has(String(node.id));
-      const size = Math.max(Number(node.style?.labelFontSize ?? 13), 13 / zoom);
+      const size = Math.max(
+        Number(node.style?.labelFontSize ?? 13),
+        screenLabelSize(node) / zoom,
+      );
       return {
         ...node,
         style: {

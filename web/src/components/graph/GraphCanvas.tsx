@@ -15,7 +15,12 @@ import {
 import { createPortal } from 'react-dom';
 import GraphLegend from './GraphLegend';
 import { themeColor } from '@/util/theme-color';
-import { Graph, type GraphData, type IElementEvent } from '@antv/g6';
+import {
+  Graph,
+  type GraphData,
+  type IElementEvent,
+  type NodeData,
+} from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
 import { isSelectableRelation } from '@/types/map/relation';
 import GraphIcon from './GraphIcon';
@@ -893,11 +898,14 @@ export default function GraphCanvas({
     } | null = null;
     let wheelPending = false;
     let previousZoom = 1;
+    // 누른 뒤 일정 거리 이상 움직였으면 지도 이동이다. 손을 뗄 때 생기는 클릭으로 노드·연결을 고르지 않는다.
+    let dragged = false;
     const pointerDown = (event: PointerEvent) => {
       if (!graph || event.button !== 0) return;
       const bounds = host.getBoundingClientRect();
       const position = graph.getPosition();
       wheelPending = false;
+      dragged = false;
       pointerStart = {
         x: event.clientX,
         y: event.clientY,
@@ -921,6 +929,7 @@ export default function GraphCanvas({
       ) {
         followFit.current = false;
         centerTarget.current = null;
+        dragged = true;
       }
     };
     const pointerUp = (event: PointerEvent) => {
@@ -1005,8 +1014,9 @@ export default function GraphCanvas({
           toG6Data(data, host.clientWidth, host.clientHeight),
           appearance,
         ),
+        // D-GRP-01: 빈 곳뿐 아니라 노드·연결 위에서 끌어도 지도를 움직인다(노드 자체는 옮기지 않는다).
         behaviors: [
-          'drag-canvas',
+          { type: 'drag-canvas', enable: true },
           'zoom-canvas',
           {
             type: 'zoom-canvas',
@@ -1071,6 +1081,11 @@ export default function GraphCanvas({
               halo: true,
               haloStroke: themeColor('ink'),
               haloFill: 'transparent',
+              // G6 기본 테마의 selected는 이름표를 12px로 줄인다. 노드에 정한 크기·굵기를 그대로 쓴다.
+              labelFontSize: (datum: NodeData) =>
+                Number(datum.style?.labelFontSize ?? 12),
+              labelFontWeight: (datum: NodeData) =>
+                datum.style?.labelFontWeight ?? 700,
             },
           },
         },
@@ -1094,9 +1109,9 @@ export default function GraphCanvas({
         setHoveredIssue(null);
         scheduleReading();
       });
-      graph.on('node:click', (event: IElementEvent) =>
-        selectNode(event.target.id),
-      );
+      graph.on('node:click', (event: IElementEvent) => {
+        if (!dragged) selectNode(event.target.id);
+      });
       graph.on('node:pointerenter', (event: IElementEvent) =>
         hoverNode(event.target.id),
       );
@@ -1104,10 +1119,12 @@ export default function GraphCanvas({
         leaveNode(event.target.id),
       );
       graph.on('canvas:pointerleave', clearHover);
-      graph.on('canvas:click', () => selectNode(null));
-      graph.on('edge:click', (event: IElementEvent) =>
-        selectEdge(event.target.id),
-      );
+      graph.on('canvas:click', () => {
+        if (!dragged) selectNode(null);
+      });
+      graph.on('edge:click', (event: IElementEvent) => {
+        if (!dragged) selectEdge(event.target.id);
+      });
       graph.on('aftertransform', () => {
         if (!graph || disposed) return;
         try {
@@ -1483,7 +1500,8 @@ export default function GraphCanvas({
         </output>
       </div>
       {selectedNode && (
-        <p className="relationship-selection" role="status">
+        // 선택 안내는 화면에 띄우지 않고 보조 기술에만 알린다(선택 내용은 상세 패널이 보여 준다).
+        <p className="relationship-selection sr-only" role="status">
           {selectedNode.label}
           {selectedNode.geography
             ? ` · ${selectedNode.geography === 'domestic' ? '국내' : '국제'}`
