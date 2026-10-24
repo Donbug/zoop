@@ -15,11 +15,24 @@ from pathlib import Path
 from typing import Any
 
 from support import Workspace, canonical, merged_grants
-from zoop_ai_service.handoff_doc import CHECKED, HANDOFF, digest, example_bundle, pins
+from zoop_ai_service.handoff_doc import CHECKED, HANDOFF, digest, example_bundle, pins, summary_of
+from zoop_ai_service.handoff_wire import result_digest, result_version, summary_basis
 
 EXPORTS_SCHEMA = "zoop-ai-handoff-exports-1"
 RUNTIME_SCHEMA = "zoop-ai-handoff-1"
 USAGE = {"providerCalls": 0, "modelCalls": 0}
+# The keys that carry a summary. Privacy checks look at STRUCTURE (a forbidden key at any depth), never at a word an allowed handoff id such as `handoff-summary-1` contains.
+SUMMARY_KEYS = frozenset({"summary", "claims", "resultVersion", "generatedAt", "issueSummary", "producer", "verifier"})
+
+
+def json_keys(value: Any) -> set[str]:
+    """Every object key at every depth of a JSON value."""
+    if isinstance(value, dict):
+        return set(value) | {key for item in value.values() for key in json_keys(item)}
+    if isinstance(value, list):
+        return {key for item in value for key in json_keys(item)}
+    return set()
+
 HANDOFF_VARS = ("ZOOP_AI_SERVICE_HANDOFF_COMMAND", "ZOOP_AI_HANDOFF_STATE_DIR", "ZOOP_AI_HANDOFF_RELATION_STATE_DIR", "ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR",
                 "ZOOP_AI_HANDOFF_INGESTION_STATE_DIR", "ZOOP_AI_SERVICE_HANDOFF_SOURCES", "ZOOP_AI_SERVICE_HANDOFF_CANONICAL", "ZOOP_AI_SERVICE_HANDOFF_DECISIONS",
                 "ZOOP_AI_SERVICE_HANDOFF_BINDINGS", "ZOOP_AI_SERVICE_HANDOFF_EXPORTS")
@@ -66,7 +79,8 @@ def manifest_of(bundle: dict[str, Any]) -> dict[str, Any]:
 def seal(bundle: dict[str, Any]) -> dict[str, Any]:
     """Recompute the manifest and content digests after a mutation, the way the producer does, so only the targeted rule can refuse the bundle."""
     bundle["manifestDigest"] = digest(manifest_of(bundle))
-    bundle["digests"]["content"] = digest({key: bundle[key] for key in ("companies", "pathCompanies", "issues", "relations", "evidence", "articles")})
+    keys = ("companies", "pathCompanies", "issues", "relations", "impacts", "evidence", "articles")
+    bundle["digests"]["content"] = digest({key: bundle[key] for key in keys if key in bundle})   # a dropped list is hashed as absent: only the closed model can refuse it
     return bundle
 
 
@@ -105,6 +119,266 @@ def mutated(change) -> dict[str, Any]:
     bundle = copy.deepcopy(example_bundle())
     change(bundle)
     return seal(bundle)
+
+
+def resummarize(bundle: dict[str, Any], outcome: str | None = None, *, index: int = 0) -> dict[str, Any]:
+    """Re-pin the summary of issue `index` to the basis the issue has NOW, the way the producer would have written it (default: the same outcome as before), and re-seal the
+    outer digests. A test that changes what a summary rests on and still wants an accepted bundle calls this; a test that wants the stale summary refused does not."""
+    current = bundle["issues"][index]["summary"]
+    bundle["issues"][index]["summary"] = summary_of(bundle, outcome or (current["code"] if current["status"] == "unavailable" else "available"), index=index)
+    return seal(bundle)
+
+
+def with_quotes(bundle: dict[str, Any], extra: int) -> dict[str, Any]:
+    """Add `extra` more evidence spans of the issue's one article, cited by its one mention (so `extra` more input quotes of the issue's summary), in place. The summary is
+    NOT re-pinned: it now rests on a stale basis until `resummarize`."""
+    base, issue = bundle["evidence"][0], bundle["issues"][0]
+    for n in range(extra):
+        start = 100 + 40 * n
+        ident = "ev-" + digest({"kind": "graph-body-span", "articleId": base["articleId"], "articleVersion": base["articleVersion"], "start": start, "end": start + 30})
+        bundle["evidence"].append({**copy.deepcopy(base), "id": ident, "start": start, "end": start + 30, "quoteSha256": digest({"quote": n}), "rawLocatorIds": [f"loc-extra-{n}"],
+                                   "source": {**base["source"], "sourceEvidenceId": "ev-" + digest({"source": n})[:32]}})
+        issue["mentions"][0]["evidenceIds"].append(ident)
+        issue["evidenceIds"].append(ident)
+    issue["mentions"][0]["evidenceIds"].sort()
+    issue["evidenceIds"].sort()
+    bundle["counts"]["evidence"] = len(bundle["evidence"])
+    return bundle
+
+
+def live_bundle() -> dict[str, Any]:
+    """The example bundle as a LIVE export: bundle and source provenance say live/provider and the summary carries provider and independent-verifier identities."""
+    bundle = copy.deepcopy(example_bundle())
+    bundle["provenance"].update(executionMode="live", recordingKind="provider")
+    bundle["sources"][0]["provenance"].update(executionMode="live", recordingKind="provider")
+    return resummarize(bundle)
+
+
+HIDDEN_EVIDENCE = "ev-" + "9" * 64      # an evidence id no bundle of these tests holds
+
+
+def issue_summary(bundle: dict[str, Any], index: int = 0) -> dict[str, Any]:
+    return bundle["issues"][index]["summary"]
+
+
+def basis_of(bundle: dict[str, Any], index: int = 0) -> dict[str, Any]:
+    """The input basis of issue `index` as the pure rules derive it from the bundle's own evidence rows and articles."""
+    return summary_basis(bundle["issues"][index], {e["id"]: e for e in bundle["evidence"]}, {(a["articleId"], a["articleVersion"]): a for a in bundle["articles"]})
+
+
+def assemble(bundle: dict[str, Any], texts: list[str], cited: list[list[str]] | None = None) -> dict[str, Any]:
+    """An `available` summary over the bundle's basis with these claim texts (each cites the first input quote unless `cited` names the ids of every claim) and EVERY identity
+    recomputed (result version, result digest), so only a rule about the content itself can refuse it."""
+    base = summary_of(bundle, "available")
+    quotes = [q["evidenceId"] for q in basis_of(bundle)["quotes"]]
+    claims = [{"claimId": f"c{n}", "text": text, "evidenceIds": sorted(set(cited[n - 1] if cited else [quotes[0]]))} for n, text in enumerate(texts, 1)]
+    body = {key: value for key, value in base.items() if key != "source"}
+    body.update(text="\n".join(texts), claims=claims, evidenceIds=sorted({i for c in claims for i in c["evidenceIds"]}),
+                resultVersion=result_version(base["source"]["basisDigest"], claims))
+    source = base["source"]
+    return {**body, "source": {**source, "resultDigest": result_digest(source["jobId"], source["inputDigest"], source["basisDigest"], body)}}
+
+
+def reseal(bundle: dict[str, Any], index: int = 0) -> dict[str, Any]:
+    """Recompute the result version and the result digest of the bundle's AVAILABLE summary after a test edited its content, so only the targeted rule can refuse it."""
+    value = issue_summary(bundle, index)
+    value["resultVersion"] = result_version(value["source"]["basisDigest"], value["claims"])
+    body = {key: item for key, item in value.items() if key != "source"}
+    value["source"]["resultDigest"] = result_digest(value["source"]["jobId"], value["source"]["inputDigest"], value["source"]["basisDigest"], body)
+    return bundle
+
+
+def with_side_evidence(bundle: dict[str, Any], where: str) -> str:
+    """One more evidence row of the issue that its mention does NOT cite: only its geography (or its first verdict) does. It is an evidence id of the issue, but not an input
+    quote of its summary."""
+    base, issue = bundle["evidence"][0], bundle["issues"][0]
+    ident = "ev-" + digest({"kind": "graph-body-span", "articleId": base["articleId"], "articleVersion": base["articleVersion"], "start": 200, "end": 230})
+    bundle["evidence"].append({**copy.deepcopy(base), "id": ident, "start": 200, "end": 230, "quoteSha256": digest({"quote": where}), "rawLocatorIds": ["loc-side"],
+                               "source": {**base["source"], "sourceEvidenceId": "ev-" + digest({"source": where})[:32]}})
+    issue["evidenceIds"] = sorted([*issue["evidenceIds"], ident])
+    target = issue["geography"] if where == "geography" else issue["fieldVerdicts"][0]
+    target["evidenceIds"] = sorted([*target["evidenceIds"], ident])
+    bundle["counts"]["evidence"] = len(bundle["evidence"])
+    return ident
+
+
+def summary_edit(path: str, value: Any):
+    """A change function that sets `path` (dotted, list indexes numeric) inside the example issue's summary."""
+    keys = path.split(".")
+
+    def change(bundle: dict[str, Any]) -> None:
+        node: Any = issue_summary(bundle)
+        for key in keys[:-1]:
+            node = node[int(key)] if isinstance(node, list) else node[key]
+        node[int(keys[-1]) if isinstance(node, list) else keys[-1]] = value
+    return change
+
+
+def edit_claim_text(bundle: dict[str, Any], index: int, text: str) -> None:
+    """Rewrite claim `index` and the summary `text` consistently WITHOUT recomputing the result version or the result digest."""
+    issue_summary(bundle)["claims"][index]["text"] = text
+    issue_summary(bundle)["text"] = "\n".join(c["text"] for c in issue_summary(bundle)["claims"])
+
+
+HANGUL = "가"
+# The `generatedAt` grammar shared with the producer and the app (`api/src/test/resources/graph-handoff/summary-time-vectors.json`): YYYY-MM-DDTHH:MM:SS[.f{1,9}](Z|+HH:MM|-HH:MM),
+# ASCII, uppercase T and Z, years 1..9999, a real calendar day, offset at most 18:00. The lists are authored here (they never come from the code under test); the shared file
+# is read by `test_handoff_summary_unit.py` as well.
+SUMMARY_TIME_ACCEPTED = ["2026-10-16T02:30:00Z", "2026-10-16T02:30:00+00:00", "2026-10-16T02:30:00-00:00", "2026-10-16T11:30:00+09:00", "2026-10-16T02:30:00.1Z",
+                         "2026-10-16T02:30:00.123456789-05:30", "2026-10-16T02:30:00.100Z", "0001-01-01T00:00:00Z", "9999-12-31T23:59:59+18:00",
+                         "2024-02-29T23:59:59-18:00", "2000-02-29T00:00:00Z"]
+SUMMARY_TIME_REFUSED = ["2026-10-16T02:30:00", "2026-10-16", "20261016T023000Z", "2026-10-16t02:30:00Z", "2026-10-16T02:30:00z", "2026-10-16 02:30:00Z", "2026-10-16T02:30Z",
+                        "2026-10-16T02:30:00+0900", "2026-10-16T02:30:00+09", "2026-10-16T02:30:00+18:01", "2026-10-16T02:30:00-19:00", "2026-10-16T02:30:00+09:60",
+                        "0000-01-01T00:00:00Z", "2026-02-29T00:00:00Z", "1900-02-29T00:00:00Z", "2026-13-01T00:00:00Z", "2026-04-31T00:00:00Z", "2026-10-16T24:00:00Z",
+                        "2026-10-16T23:60:00Z", "2026-10-16T23:59:60Z", "2026-10-16T02:30:00.Z", "2026-10-16T02:30:00.1234567890Z", "2026-10-16T02:30:00,5Z",
+                        "2026-W42-5T02:30:00Z", "2026-289T02:30:00Z", "２０２６-10-16T02:30:00Z", "2026-10-16T02:30:00Z ", " 2026-10-16T02:30:00Z", "2026-10-16T02:30:00Z\n",
+                        "2026-10-16T02:30:00 Z"]
+# One illegal edit of the example's AVAILABLE summary per rule. Each leaves the other identities as they were, so an edit that also moves a digest is refused twice; the
+# rules that could hide behind another are isolated by the tests that recompute identities (`assemble`, `reseal`).
+SUMMARY_TAMPER = {
+    "text-edited": summary_edit("text", "다른 본문이다."),
+    "text-appended": lambda b: issue_summary(b).update(text=issue_summary(b)["text"] + "\n"),
+    "claim-text-edited-with-text": lambda b: edit_claim_text(b, 0, "합성기업이 계약을 취소했다."),      # consistent text, but resultVersion and the result digest were not recomputed
+    "claim-id-gap": summary_edit("claims.1.claimId", "c3"),
+    "claim-id-upper": summary_edit("claims.0.claimId", "C1"),
+    "claim-id-zero": summary_edit("claims.0.claimId", "c0"),
+    "claim-without-hangul": lambda b: edit_claim_text(b, 0, "Synthetic supply contract announced"),
+    "claim-with-newline": lambda b: edit_claim_text(b, 0, "첫 줄이다.\n둘째 줄이다."),
+    "claim-with-carriage-return": lambda b: edit_claim_text(b, 0, "첫 줄이다.\r둘째 줄이다."),
+    "claim-too-long": lambda b: edit_claim_text(b, 0, HANGUL * 281),
+    "claim-empty": lambda b: edit_claim_text(b, 0, ""),
+    "claims-empty": lambda b: issue_summary(b).update(claims=[], text=""),
+    "claims-six": lambda b: issue_summary(b).update(claims=[{**c, "claimId": f"c{n}"} for n, c in enumerate(issue_summary(b)["claims"] * 2, 1)]),
+    "claim-evidence-hidden": summary_edit("claims.0.evidenceIds", [HIDDEN_EVIDENCE]),
+    "claim-evidence-duplicate": lambda b: issue_summary(b)["claims"][0].update(evidenceIds=[issue_summary(b)["claims"][0]["evidenceIds"][0]] * 2),
+    "claim-evidence-empty": summary_edit("claims.0.evidenceIds", []),
+    "claim-evidence-over-five": lambda b: issue_summary(b)["claims"][0].update(evidenceIds=sorted("ev-" + str(n) * 64 for n in range(1, 7))),
+    "claim-evidence-not-an-id": summary_edit("claims.0.evidenceIds", ["x"]),
+    "union-empty": summary_edit("evidenceIds", []),
+    "union-extra-hidden": lambda b: issue_summary(b).update(evidenceIds=sorted([*issue_summary(b)["evidenceIds"], HIDDEN_EVIDENCE])),
+    "generated-naive": summary_edit("generatedAt", "2026-10-16T02:30:00"),
+    "generated-date": summary_edit("generatedAt", "2026-10-16"),
+    "generated-not-a-time": summary_edit("generatedAt", "yesterday"),
+    "generated-not-a-string": summary_edit("generatedAt", 1760581800),
+    "generated-basic-iso": summary_edit("generatedAt", "20261016T023000+0000"),
+    "generated-lowercase": summary_edit("generatedAt", "2026-10-16t02:30:00z"),
+    "generated-space": summary_edit("generatedAt", "2026-10-16 02:30:00+00:00"),
+    "generated-no-seconds": summary_edit("generatedAt", "2026-10-16T02:30+00:00"),
+    "generated-offset-over": summary_edit("generatedAt", "2026-10-16T02:30:00+18:01"),
+    "generated-year-zero": summary_edit("generatedAt", "0000-01-01T00:00:00Z"),
+    "language-en": summary_edit("language", "en"),
+    "language-null": summary_edit("language", None),
+    "version-zero": summary_edit("resultVersion", "isr-" + "0" * 64),
+    "version-prefix": lambda b: issue_summary(b).update(resultVersion="res-" + issue_summary(b)["resultVersion"][4:]),
+    "version-short": summary_edit("resultVersion", "isr-abc"),
+    "basis-digest-other": summary_edit("source.basisDigest", "0" * 64),
+    "result-digest-other": summary_edit("source.resultDigest", "0" * 64),
+    "job-id-edited": summary_edit("source.jobId", "isum-forged-1"),
+    "input-digest-edited": summary_edit("source.inputDigest", "1" * 64),
+    "source-null": summary_edit("source", None),
+    "source-extra-key": summary_edit("source.extra", 1),
+    "producer-provider-in-replay": summary_edit("producer.kind", "provider"),
+    "producer-unknown-kind": summary_edit("producer.kind", "model"),
+    "verifier-independent-in-replay": summary_edit("verifier.kind", "independent-verifier"),
+    "producer-model-in-replay": summary_edit("producer.model", "model-x"),
+    "producer-effort-in-replay": summary_edit("producer.reasoningEffort", "high"),
+    "verifier-model-in-replay": summary_edit("verifier.model", "model-x"),
+    "producer-extra-key": summary_edit("producer.extra", 1),
+    "verifier-key-missing": lambda b: issue_summary(b)["verifier"].pop("adapterIdentity"),
+    "producer-prompt-empty": summary_edit("producer.promptVersion", ""),
+    "producer-schema-digest-short": summary_edit("producer.schemaDigest", "abc"),
+    "verifier-request-digest-short": summary_edit("verifier.requestDigest", "abc"),
+    "available-with-code": summary_edit("code", "verifier-hold"),
+    "status-other": summary_edit("status", "ready"),
+    "text-key-missing": lambda b: issue_summary(b).pop("text"),
+}
+# Changes to what the summary RESTS ON (its basis): every one leaves a stale summary behind, and `resummarize` re-derives it.
+SUMMARY_BASIS_CHANGES = {
+    "issue-title": lambda b: (b["issues"][0].update(title="합성 공급 계약 (정정)"), b["issues"][0]["mentions"][0].update(title="합성 공급 계약 (정정)")),   # headline = selected mention
+    "issue-id": lambda b: b["issues"][0].update(id="issue:synthetic-other"),
+    "quote-hash": lambda b: b["evidence"][0].update(quoteSha256="f" * 64),
+    "quote-start": lambda b: b["evidence"][0].update(start=13),
+    "quote-end": lambda b: b["evidence"][0].update(end=49),
+    "article-text-hash": lambda b: b["articles"][0].update(textSha256="6" * 64),
+    "article-document-id": lambda b: b["articles"][0].update(documentId="synthetic-doc-9"),
+    "article-document-version": lambda b: b["articles"][0].update(documentVersion="d" * 64),
+    "mention-background": lambda b: b["issues"][0]["mentions"][0].update(background=True),
+    "one-more-quote": lambda b: with_quotes(b, 1),
+}
+# Changes to everything ELSE of the bundle: the summary stays exactly valid.
+SUMMARY_NOT_BASIS = {
+    "article-title-and-url": lambda b: b["articles"][0].update(title="다른 기사 제목", url="https://example.invalid/news/2"),
+    "article-published-at": lambda b: b["articles"][0].update(publishedAt="2026-09-29T01:00:00+00:00"),
+    "mention-values": lambda b: b["issues"][0]["mentions"][0].update(title="다른 멘션 제목", action="다른 행위", participants=[]),
+    "company-label": lambda b: b["companies"][0].update(label="다른 라벨"),
+    "geography-countries": lambda b: b["issues"][0]["geography"].update(countries=["KR", "US"]),
+    "verdict-removed": lambda b: b["issues"][0].update(fieldVerdicts=[]),
+    "impact-proposal": lambda b: b["impacts"][0]["proposal"].update(reason="다른 제안"),
+}
+
+
+# The edits below are legal for the PRODUCER's own validator apart from the summary rule they target (an edit of the issue id, an evidence offset or an article's document id
+# would also break referential closure the service never checks), so they are the ones the differential corpus may use.
+DIFFERENTIAL_BASIS_CHANGES = ("issue-title", "quote-hash", "article-text-hash", "mention-background", "one-more-quote")
+
+
+def summary_corpus() -> dict[str, dict[str, Any]]:
+    """name -> a bundle (every outer digest re-sealed), covering every summary rule with legal and illegal values: each outcome, live provenance, a multi-quote summary, the
+    quote cap at 60/61, a held issue with every other outcome, every content tamper, a stale and a re-pinned summary per basis change, side evidence and cross-mode swaps.
+    The service's closed model and the producer's `validate_bundle` must agree on EVERY entry (`pipeline_tests/test_handoff_real_cli.py`)."""
+    corpus: dict[str, dict[str, Any]] = {}
+    for outcome in ("available", "not-requested", "temporal-review-pending", "verifier-hold", "producer-invalid", "verifier-reject"):
+        corpus[f"outcome:{outcome}"] = example_bundle(outcome)
+    live = live_bundle()
+    corpus["live"] = live
+    corpus["multi-quote"] = resummarize(with_quotes(copy.deepcopy(example_bundle()), 4))
+    for name, change in SUMMARY_TAMPER.items():
+        tampered = copy.deepcopy(example_bundle())
+        change(tampered)
+        corpus[f"tamper:{name}"] = seal(tampered)
+    for name in DIFFERENTIAL_BASIS_CHANGES:
+        for outcome in ("available", "verifier-hold"):
+            changed = copy.deepcopy(example_bundle(outcome))
+            SUMMARY_BASIS_CHANGES[name](changed)
+            corpus[f"stale:{name}:{outcome}"] = seal(copy.deepcopy(changed))
+            corpus[f"repinned:{name}:{outcome}"] = resummarize(changed)
+    held = example_bundle("temporal-review-pending")
+    for outcome in ("available", "not-requested", "input-too-large", "verifier-hold", "producer-invalid", "verifier-reject"):
+        other = copy.deepcopy(held)
+        other["issues"][0]["summary"] = summary_of(other, outcome)
+        corpus[f"held:{outcome}"] = seal(other)
+    for quotes in (59, 60, 61):
+        grown = with_quotes(copy.deepcopy(example_bundle()), quotes - 1)
+        for outcome in ("available", "not-requested", "verifier-hold", "input-too-large", "temporal-review-pending"):
+            other = copy.deepcopy(grown)
+            other["issues"][0]["summary"] = summary_of(other, outcome)
+            corpus[f"quotes:{quotes}:{outcome}"] = seal(other)
+    for where in ("geography", "verdict"):
+        side = copy.deepcopy(example_bundle())
+        ident = with_side_evidence(side, where)
+        corpus[f"side:{where}:unused"] = seal(copy.deepcopy(side))
+        side["issues"][0]["summary"] = assemble(side, ["합성기업이 공급 계약을 발표했다."], [[ident]])
+        corpus[f"side:{where}:cited"] = seal(side)
+    replay_in_live = copy.deepcopy(live)
+    replay_in_live["issues"][0]["summary"] = copy.deepcopy(example_bundle()["issues"][0]["summary"])
+    corpus["swap:replay-summary-in-live-bundle"] = seal(replay_in_live)
+    live_in_replay = copy.deepcopy(example_bundle())
+    live_in_replay["issues"][0]["summary"] = copy.deepcopy(live["issues"][0]["summary"])
+    corpus["swap:live-summary-in-replay-bundle"] = seal(live_in_replay)
+    for index, change in enumerate((lambda s: s["producer"].update(model=None), lambda s: s["producer"].update(reasoningEffort=None), lambda s: s["verifier"].update(model=None),
+                                    lambda s: s["producer"].update(kind="authored-replay"), lambda s: s["verifier"].update(kind="authored-replay"))):
+        broken = copy.deepcopy(live)
+        change(broken["issues"][0]["summary"])
+        corpus[f"live-identity:{index}"] = seal(reseal(broken))
+    for index, value in enumerate(SUMMARY_TIME_ACCEPTED):               # the strict `generatedAt` grammar, identities recomputed: only the time can decide
+        timed = copy.deepcopy(example_bundle())
+        issue_summary(timed)["generatedAt"] = value
+        corpus[f"time:accept:{index}"] = seal(reseal(timed))
+    for index, value in enumerate(SUMMARY_TIME_REFUSED):
+        timed = copy.deepcopy(example_bundle())
+        issue_summary(timed)["generatedAt"] = value
+        corpus[f"time:refuse:{index}"] = seal(reseal(timed))
+    return corpus
 
 
 def envelope(bundle: dict[str, Any] | None = None, handoff_id: str = HANDOFF, *, receipt: dict[str, Any] | None = None, **overrides: Any) -> dict[str, Any]:
@@ -219,7 +493,8 @@ def bundle_url(handoff: str = HANDOFF) -> str:
 def full_bundle() -> dict[str, Any]:
     """The example bundle enriched with every variant the closed model has to accept: a structural and a FOLLOWS relation, a representative source event, a second
     source and every exclusion detail shape. It is STRUCTURALLY complete but not semantically closed (the producer's validator would refuse it): the service
-    never judges semantics, so this is what the model-level tests mutate."""
+    judges no semantics but the impact rows and the issue summary, so this is what the model-level tests mutate. Its issue carries a HOLD verdict (on the second,
+    non-selected mention), so its summary is exactly `temporal-review-pending`."""
     bundle = copy.deepcopy(example_bundle())
     job, evidence_id = bundle["sources"][0]["relation"], bundle["evidence"][0]["id"]
     article = bundle["articles"][0]
@@ -261,4 +536,6 @@ def full_bundle() -> dict[str, Any]:
                                        "detail": {"expectedBindingDigest": "f" * 64}}]}
     bundle["counts"]["relations"] = {name: sum(r["type"] == name for r in bundle["relations"]) for name in ("INVOLVES", "STRUCTURALLY_RELATED_TO", "FOLLOWS")}
     bundle["counts"]["exclusions"] = len(bundle["exclusions"]["items"])
+    # a HOLD verdict on ANY mention (here the non-selected one) leaves the issue exactly `temporal-review-pending`: no summary text exists for it
+    bundle["issues"][0]["summary"] = summary_of(bundle, "temporal-review-pending")
     return seal(bundle)

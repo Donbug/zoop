@@ -200,6 +200,23 @@ class Resume(Wire):
     source_id: str = Field(min_length=1, max_length=200)
 
 
+class Tick(Wire):
+    """Scheduler tick for one source scope. `now` is a deterministic clock override (never later than the real clock); `initialFrom` is the
+    explicit first baseline, only valid while the scope has no stored successful `through` time."""
+    schema_version: Literal["zoop-ingestion-s2-1"]
+    source_id: str = Field(min_length=1, max_length=200)
+    scope_id: str = Field(min_length=1, max_length=200)
+    initial_from: str | None = None
+    now: str | None = None
+
+    @model_validator(mode="after")
+    def offsets(self):
+        for value in (self.initial_from, self.now):
+            if value is not None:
+                timestamp(value)
+        return self
+
+
 class Export(Wire):
     """Exact candidate observation selector for authorized downstream consumers (never a client metadata claim)."""
     schema_version: Literal["zoop-ingestion-s2-1"]

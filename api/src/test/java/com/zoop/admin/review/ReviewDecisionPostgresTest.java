@@ -5,10 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.reset;
 
 import com.zoop.admin.auth.provision.AdminProvisioningService;
 import com.zoop.admin.auth.service.AdminPrincipal;
 import com.zoop.admin.review.RelationReviewClient.Lookup;
+import com.zoop.admin.review.RelationReviewClient.Operation;
 import com.zoop.admin.review.RelationReviewClient.Refusal;
 import com.zoop.admin.review.RelationReviewClient.Refused;
 import com.zoop.common.exception.CustomException;
@@ -16,10 +21,18 @@ import com.zoop.common.exception.ErrorCode;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -31,6 +44,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /** Review decisions over the real migration, publication lock, idempotency and audit tables, with a recording AI source. */
 @SpringBootTest(properties = {
@@ -44,31 +58,39 @@ class ReviewDecisionPostgresTest {
     private static final String PASSWORD = "Secure admin password 2026";
 
     /**
-     * What the AI source was asked and what its ledger holds. {@code next} is the error code it answers before recording
-     * anything (null: it records); {@code loseReply} records and then answers as if the reply were lost.
+     * What the AI source was asked and what its ledger holds (operation id -> the operation it reports). {@code next} is the error
+     * code it answers before recording anything (null: it records); {@code loseReply} records and then answers as if the reply
+     * were lost.
      */
     static final class FakeSource implements RelationReviewClient {
         final List<String> calls = new CopyOnWriteArrayList<>();
-        final Set<String> recorded = ConcurrentHashMap.newKeySet();
+        final Map<String, Operation> ledger = new ConcurrentHashMap<>();
         final Set<String> brokenLookups = ConcurrentHashMap.newKeySet();
+        final AtomicInteger lookups = new AtomicInteger();
         volatile String next;
         volatile boolean loseReply;
+        /** Runs inside {@code review} before it answers (a test holding the call open). */
+        volatile Runnable beforeAnswer;
 
         @Override
         public void review(String sourceJobId, String relationCandidateId, String expectedSourceVersion,
                 String expectedSourceRevision, String decision, String operationId) {
             calls.add(String.join("|", sourceJobId, relationCandidateId, expectedSourceVersion, expectedSourceRevision,
                     decision, operationId));
+            Runnable hold = beforeAnswer;
+            if (hold != null) hold.run();
             String code = next;
             if (code != null) throw new Refused(code);
-            recorded.add(operationId);
+            ledger.putIfAbsent(operationId, new Operation(Lookup.RECORDED, sourceJobId, relationCandidateId, decision,
+                    expectedSourceVersion, expectedSourceRevision, true));
             if (loseReply) throw new Refused("review_unconfirmed");
         }
 
         @Override
-        public Lookup lookup(String sourceJobId, String operationId) {
+        public Operation lookup(String sourceJobId, String operationId) {
+            lookups.incrementAndGet();
             if (brokenLookups.contains(operationId)) throw new IllegalStateException("broken lookup");
-            return recorded.contains(operationId) ? Lookup.RECORDED : Lookup.NOT_FOUND;
+            return ledger.getOrDefault(operationId, Operation.notFound());
         }
     }
 
@@ -84,6 +106,7 @@ class ReviewDecisionPostgresTest {
     @Autowired ReviewDecisionService decisions;
     @Autowired FakeSource source;
     @Autowired JdbcTemplate jdbc;
+    @MockitoSpyBean JdbcReviewRepository reviews;
     @Autowired AdminProvisioningService provisioning;
 
     private AdminPrincipal admin;
@@ -94,6 +117,9 @@ class ReviewDecisionPostgresTest {
         source.calls.clear();
         source.next = null;
         source.loseReply = false;
+        source.beforeAnswer = null;
+        source.lookups.set(0);
+        reset(reviews);
         suffix = UUID.randomUUID().toString();
         String email = "review-admin-" + suffix + "@example.com";
         String adminId = provisioning.provision(email, "Review Admin", PASSWORD, "review-provision-" + suffix);
@@ -267,6 +293,45 @@ class ReviewDecisionPostgresTest {
     }
 
     @Test
+    void aRetryThatReadTheRecordBeforeARefusalCommittedReplaysTheStoredRefusal() throws Exception {
+        Ids ids = insertCandidateWithRelation("HOLD");
+        CountDownLatch inReview = new CountDownLatch(1);
+        CountDownLatch answer = new CountDownLatch(1);
+        CountDownLatch atIntent = new CountDownLatch(1);
+        CountDownLatch readIntent = new CountDownLatch(1);
+        source.next = "source_revision_conflict";
+        source.beforeAnswer = () -> {
+            inReview.countDown();
+            await(answer);
+        };
+        // Only the retry reads the intent by its record; hold it between its record read and its intent read.
+        doAnswer(call -> {
+            atIntent.countDown();
+            await(readIntent);
+            return call.callRealMethod();
+        }).when(reviews).intentForRecord(anyString(), anyBoolean());
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<ErrorCode> first = pool.submit(() -> code(() -> decide(ids, "race")));
+            assertTrue(inReview.await(10, TimeUnit.SECONDS), "the first request is at the AI source");
+            Future<ErrorCode> retry = pool.submit(() -> code(() -> decide(ids, "race")));
+            assertTrue(atIntent.await(10, TimeUnit.SECONDS), "the retry read the record while it was processing");
+            answer.countDown();
+            assertEquals(ErrorCode.REVISION_CONFLICT, first.get(10, TimeUnit.SECONDS), "the refusal is committed");
+            readIntent.countDown();
+            assertEquals(ErrorCode.REVISION_CONFLICT, retry.get(10, TimeUnit.SECONDS), "the retry replays it, not a 500");
+        } finally {
+            answer.countDown();
+            readIntent.countDown();
+            pool.shutdownNow();
+        }
+        assertEquals("refused", intentStatus("race"));
+        assertEquals(0, source.lookups.get(), "a settled intent is never looked up");
+        assertEquals(1, source.calls.size());
+    }
+
+    @Test
     void aContractMismatchIsNeverResentAndOnlyALookupSettlesIt() {
         Ids ids = insertCandidateWithRelation("HOLD");
         source.next = "idempotency_conflict";
@@ -277,9 +342,66 @@ class ReviewDecisionPostgresTest {
         assertEquals(ErrorCode.INTERNAL_ERROR, code(() -> decide(ids, "c1")), "the ledger has no such operation");
         assertEquals(1, source.calls.size(), "a blocked intent is never resent");
 
-        source.recorded.add(operationOf("c1"));
+        // The wire's upper-case decision is the same command as the intent's.
+        source.ledger.put(operationOf("c1"), command(ids, Lookup.RECORDED, "ALLOW", "7", true));
         assertEquals("approved", decide(ids, "c1").decision());
         assertEquals("applied", intentStatus("c1"));
+    }
+
+    @Test
+    void anOperationHoldingAnotherCommandUnderTheSameIdIsNeverSettled() {
+        // The ledger kept another body under this operation id (e.g. the app ledger was restored on its own): the POST is an
+        // idempotency_conflict and no lookup may turn the other command into this intent's decision. Each reconcile takes its
+        // cutoff after the intent it checks exists (openIntents reads created_at < cutoff), however long the earlier cases took.
+        for (Function<Ids, Operation> other : List.<Function<Ids, Operation>>of(
+                ids -> command(ids, Lookup.RECORDED, "reject", "7", true),
+                ids -> command(ids, Lookup.RECORDED, "allow", "6", true),
+                ids -> command(ids, Lookup.RECORDED, "allow", "7", false),
+                ids -> new Operation(Lookup.RECORDED, "job-other", "rel-1", "allow", "digest-" + suffix, "7", true),
+                ids -> new Operation(Lookup.RECORDED, ids.job(), "rel-other", "allow", "digest-" + suffix, "7", true))) {
+            Ids ids = insertCandidateWithRelation("HOLD");
+            String key = "m" + source.calls.size();
+            source.next = "idempotency_conflict";
+            assertEquals(ErrorCode.INTERNAL_ERROR, code(() -> decide(ids, key)));
+            source.next = null;
+            source.ledger.put(operationOf(key), other.apply(ids));
+
+            assertEquals(ErrorCode.INTERNAL_ERROR, code(() -> decide(ids, key)), "the retry does not settle it");
+            decisions.reconcile(Instant.now().plusSeconds(1), 1000);
+            assertEquals("blocked", intentStatus(key), "nor does the reconciler");
+            assertEquals(0, decisionCount(ids.relationTarget()));
+        }
+
+        // A pending intent whose id the ledger reports, unconfirmed, for another command is blocked instead of resent.
+        Ids ids = insertCandidateWithRelation("HOLD");
+        source.next = "review_unconfirmed";
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, code(() -> decide(ids, "mu")));
+        source.next = null;
+        source.ledger.put(operationOf("mu"), command(ids, Lookup.UNCONFIRMED, "reject", "7", true));
+        int calls = source.calls.size();
+        decisions.reconcile(Instant.now().plusSeconds(1), 1000);
+        assertEquals("blocked|" + ReviewDecisionService.OPERATION_MISMATCH + ":review_unconfirmed",
+                intentStatus("mu") + "|" + intentCode("mu"), "the answer that left it pending is kept");
+        assertEquals(calls, source.calls.size(), "never resent");
+        assertEquals(ErrorCode.INTERNAL_ERROR, code(() -> decide(ids, "mu")));
+        assertEquals(0, decisionCount(ids.relationTarget()));
+    }
+
+    @Test
+    void theRetryableServiceAnswersKeepTheIntentOpenForTheSameKey() {
+        for (String code : List.of("runtime_busy", "runtime_unavailable", "service_busy", "queue_full",
+                "service_configuration_invalid")) {
+            Ids ids = insertCandidateWithRelation("HOLD");
+            source.next = code;
+            CustomException refused = assertThrows(CustomException.class, () -> decide(ids, "t-" + code));
+            assertEquals(ErrorCode.SOURCE_UNAVAILABLE, refused.getErrorCode(), code);
+            assertTrue(refused.isRetryable(), code);
+            assertEquals("pending|" + code, intentStatus("t-" + code) + "|" + intentCode("t-" + code));
+
+            source.next = null;
+            assertEquals("approved", decide(ids, "t-" + code).decision(), code + ": the same key sends it again");
+        }
+        assertEquals(Refusal.CONTRACT, Refusal.of("a_code_this_app_does_not_know"), "unknown codes stay blocked");
     }
 
     @Test
@@ -391,8 +513,23 @@ class ReviewDecisionPostgresTest {
                 + "ON r.id = i.idempotency_record_id WHERE r.idem_key = ?", String.class, key + "-" + suffix);
     }
 
+    /** The command the intents of {@link #decide(Ids, String)} send, as the ledger would report it. */
+    private Operation command(Ids ids, Lookup state, String decision, String sourceRevision, boolean currentContract) {
+        return new Operation(state, ids == null ? null : ids.job(), "rel-1", decision, "digest-" + suffix, sourceRevision,
+                currentContract);
+    }
+
     private String operationOf(String key) {
         return intentColumn("operation_id", key);
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("latch timed out");
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(interrupted);
+        }
     }
 
     private static String operation(String call) {

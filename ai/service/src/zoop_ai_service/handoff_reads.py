@@ -40,7 +40,7 @@ from .wire import ErrorBody
 
 CLI_SLOTS = 2        # a bundle is parsed, validated and re-serialised in memory (up to the producer's 6 MiB): fewer concurrent children than the graph door
 BUSY_WAIT = 10.0
-CONTENT_KEYS = ("companies", "pathCompanies", "issues", "relations", "evidence", "articles")
+CONTENT_KEYS = ("companies", "pathCompanies", "issues", "relations", "impacts", "evidence", "articles")
 # Pipeline refusals that mean "a writer holds a ledger right now", never "your request is wrong": retry later, never an empty answer.
 BUSY_CODES = frozenset({"handoff_busy", "relation_busy", "extraction_busy", "ingestion_busy"})
 # The server's own configuration or the operator's state is unusable (damaged or altered artifact, operator file, ownership, ledger) and needs an operator.
@@ -92,7 +92,7 @@ def _withheld(state: str, reason: str) -> Fetched:
 
 
 def content_digest(bundle: dict[str, Any]) -> str:
-    """The producer's `content_digest`: SHA-256 of the canonical form of the six content lists."""
+    """The producer's `content_digest`: SHA-256 of the canonical form of the seven content lists."""
     return hashlib.sha256(canonical({key: bundle[key] for key in CONTENT_KEYS}).encode("utf-8")).hexdigest()
 
 

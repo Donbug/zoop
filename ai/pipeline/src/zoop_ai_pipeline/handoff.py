@@ -6,7 +6,13 @@ ONE canonical public issue-centric projection, validates it strictly and stores 
 `recover` settles a `reserved` handoff from the stored artifact only (it never regenerates). `inspect` is ledger + artifact integrity.
 `export` re-validates CURRENT authority, then prints the bundle; any drift is a content-free `withheld` result.
 
-A ledger row whose stored receipt names another bundle schema than this build's (every `-1`, `-2`, `-3` and `-4` row) is HISTORY: `inspect` shows its stored state, receipt and
+Each issue carries a `summary` (bundle `-7`): `not-requested` unless the operator's decisions (`zoop-public-decisions-3`) pin one immutable ready result of the separate
+`zoop-ai-issue-summary` job ledger, a deterministic `temporal-review-pending` (any HOLD/REJECT field verdict on the issue) or `input-too-large` (more than the quote cap),
+decided before anything else and without any job. `freeze` reads a pinned result from that ledger read-only (the one thing `--issue-summary-state-dir` is for) and
+refuses the whole freeze when the pin, the basis, the execution mode or the issue does not match; `export` takes the summary from the frozen artifact, so it needs no summary
+ledger, runs no job and makes no model call.
+
+A ledger row whose stored receipt names another bundle schema than this build's (every `-1` to `-6` row) is HISTORY: `inspect` shows its stored state, receipt and
 attempts, `export` is `withheld` (`handoff_contract_changed`), `recover` and a same-id `freeze` are refused with that code. Decided from the ledger alone before
 any operator file, source authority, artifact or writable ledger is touched, and repeated under the lock; the row, its attempts and its artifact are never read
 as a current bundle, resumed, settled or rewritten.
@@ -16,6 +22,7 @@ write any source ledger. The producer confirms only SOURCE-side facts; app-side 
 """
 from __future__ import annotations
 
+import copy
 import fcntl
 import json
 import os
@@ -35,13 +42,17 @@ from .extraction_contracts import CitationFailure, ExtractionFailure, Mention, O
 from .graph_projection import Paths as SourcePaths
 from .graph_projection import Registry, Source, approval_basis, gate, load_registry, review_state
 from .graph_projection_contracts import MAX_REGISTRY, Withheld, entry_key
-from .handoff_contracts import (APP_IMPORT_PENDING, BUNDLE_SCHEMA, EVIDENCE_KIND, EXECUTION_MODES, ISSUE_FIELDS, LEDGER_VERSION, MAX_ATTEMPTS, MAX_BUNDLE,
+from .handoff_contracts import (APP_IMPORT_PENDING, BUNDLE_SCHEMA, EVIDENCE_KIND, EXECUTION_MODES, IMPACT_POLICY_NAME, IMPACT_SIDES, ISSUE_FIELDS, LEDGER_VERSION,
+    MAX_ATTEMPTS, MAX_BUNDLE,
     MAX_EVIDENCE, MAX_EXCLUSIONS, MAX_ISSUES, MAX_OPERATOR_FILE, MAX_RELATIONS, MENTION_IDENTITY, MENTION_VERIFICATION, OFFSET_UNIT, ORIGIN_VERIFICATION, POLICY,
     PRODUCER_CHECKS, SCHEMA, SOURCE_SUPPORT_POLICY, STRUCTURAL_BASIS_TYPES, STRUCTURAL_PATH_UNAVAILABLE, Bindings, Decisions, Manifest, Selector, VERDICT_FIELDS,
-    app_evidence_id, basis_eligibility, content_digest, countries_class, involves_validation, mention_key, mention_time_precision, selected_basis, text_sha256,
-    time_precision,
+    app_evidence_id, basis_eligibility, content_digest, countries_class, impact_label, involves_validation, mention_key, mention_time_precision, selected_basis,
+    text_sha256, time_precision,
     validate_bundle, withheld_fields)
 from .ingestion_contracts import Authority, IngestionFailure, byte_hash, canonical, copy_bounded, digest, now, read_file, reserved_state_roots
+from .issue_summary_contracts import POLICY as ISSUE_SUMMARY_POLICY
+from .issue_summary_contracts import basis_digest, deterministic_code, deterministic_summary, summary_basis
+from .relation_rules import impact_verifier_request
 from .source_support import source_support
 
 _SQL = """
@@ -67,7 +78,7 @@ _FILES = {"handoff.sqlite3", "handoff.sqlite3-wal", "handoff.sqlite3-shm", "hand
 NEXT = {"reserved": "recover", "ready": "export", "failed": None}
 USAGE = {"providerCalls": 0, "modelCalls": 0}
 POLICIES = {"geography": "operator-field-verdict", "structural": "manual-operator-review", "sequence": "s2-comparison-with-operator-decision",
-            "sourceSupport": SOURCE_SUPPORT_POLICY}
+            "sourceSupport": SOURCE_SUPPORT_POLICY, "impacts": IMPACT_POLICY_NAME, "issueSummary": ISSUE_SUMMARY_POLICY}
 
 
 # ---------------------------------------------------------------------------------------------- ledger -------------------------------
@@ -431,6 +442,7 @@ class HandoffPaths:
     canonical: Path
     decisions: Path
     bindings: Path
+    summaries: Path | None = None            # the issue-summary ledger root: given exactly when the decisions pin a summary result (freeze only; export never reads it)
 
     def source(self) -> SourcePaths:
         return SourcePaths(self.relation, self.extraction, self.ingestion, self.sources, self.canonical)
@@ -547,6 +559,77 @@ def current(source: Source, paths: HandoffPaths, manifest: Manifest, op: Operato
     loaded = [load_source(source, paths, manifest, pin, strict=strict) for pin in sorted(manifest.sources, key=lambda p: p.relation.job_id)]
     single_mode(loaded)
     return loaded
+
+
+# ---------------------------------------------------------------------------------------------- issue summaries -----------------------
+
+_PIN_REFUSALS = {"temporal-review-pending": "issue_summary_temporal_review_pending", "input-too-large": "issue_summary_input_too_large"}
+
+
+class Summaries:
+    """Where the Planner takes the already PRODUCED summary of an issue whose decision pins one. Never a model call, never a provider, never a new summary: the
+    summary job is a separate command and its immutable result is only read here. `refuse` is the error type of the command: a strict refusal at freeze
+    (nothing written), a content-free `withheld` answer at export. `verifies` is False only for a read that ignores pins (the input of a summary job itself)."""
+    refuse: type = ExtractionFailure
+    verifies = True
+
+    def result(self, issue: dict, basis: dict, pin, execution: tuple, source_kind: str) -> dict:
+        raise NotImplementedError
+
+
+class IgnoredSummaries(Summaries):
+    """No pin is honored or checked (`plan_summary_input`): every issue that no deterministic rule decides reads as `not-requested`."""
+    verifies = False
+
+    def result(self, issue: dict, basis: dict, pin, execution: tuple, source_kind: str) -> dict:
+        return deterministic_summary("not-requested")
+
+
+class LedgerSummaries(Summaries):
+    """FREEZE: the immutable `ready` job results of the issue-summary ledger, opened read-only per pin (shared lock, nothing created or written). The pin must be
+    the exact job, input digest and result digest; the job must have summarised THIS public issue under the bundle's own execution mode and source kind, for exactly
+    the basis the bundle recomputes now. Anything else refuses the whole freeze: a pin is never repaired, skipped or replaced."""
+
+    def __init__(self, root: Path, *upstream_roots: Path):
+        self.root, self.upstream_roots = root, upstream_roots
+
+    def result(self, issue: dict, basis: dict, pin, execution: tuple, source_kind: str) -> dict:
+        from .issue_summary import load_result      # imported here: the summary job module reads the planned issue through `plan_summary_input` below
+
+        found = load_result(self.root, *self.upstream_roots, job_id=pin.job_id)
+        summary = found.summary
+        if ((found.job_id, found.input_digest, found.result_digest) != (pin.job_id, pin.input_digest, pin.result_digest) or found.issue_id != issue["id"]
+                or not isinstance(summary, dict) or not isinstance(summary.get("source"), dict)
+                or (summary["source"].get("jobId"), summary["source"].get("inputDigest"), summary["source"].get("resultDigest")) !=
+                (pin.job_id, pin.input_digest, pin.result_digest)):
+            raise ExtractionFailure("issue_summary_pin_mismatch")
+        if tuple(found.execution) != tuple(execution):
+            raise ExtractionFailure("provenance_mode_conflict")             # a replayed summary never enters a live bundle, nor a provider one a replay bundle
+        if found.source_kind != source_kind:
+            raise ExtractionFailure("provenance_conflict")
+        if summary["source"].get("basisDigest") != basis_digest(basis):
+            raise ExtractionFailure("issue_summary_basis_changed")
+        return copy.deepcopy(summary)
+
+
+class FrozenSummaries(Summaries):
+    """EXPORT: the summaries of the frozen artifact itself, so no summary ledger, job module, model or provider is needed. The artifact's summary must still be the
+    pinned result and still rest on the basis recomputed from today's sources; a changed pin or basis is a content-free `withheld` answer."""
+    refuse = Withheld
+
+    def __init__(self, bundle: dict):
+        self.frozen = {issue["id"]: issue["summary"] for issue in bundle["issues"]}
+
+    def result(self, issue: dict, basis: dict, pin, execution: tuple, source_kind: str) -> dict:
+        summary = self.frozen.get(issue["id"])
+        if summary is None:
+            raise Withheld("handoff_content_changed")
+        source = summary.get("source")
+        if not isinstance(source, dict) or (source["jobId"], source["inputDigest"], source["resultDigest"]) != (pin.job_id, pin.input_digest, pin.result_digest):
+            raise Withheld("issue_summary_pin_mismatch")
+        if source["basisDigest"] != basis_digest(basis):
+            raise Withheld("issue_summary_basis_changed")
+        return copy.deepcopy(summary)
 
 
 # ---------------------------------------------------------------------------------------------- planning ---------------------------
@@ -699,7 +782,7 @@ class Planner:
     """The pure (given loaded sources and operator files) projection. Every S3/S2 item the operator intended to publish is either emitted or excluded
     with a visible code; nothing is guessed, merged by last-wins or inferred from company/ticker/exchange/language."""
 
-    def __init__(self, manifest: Manifest, handoff_id: str, input_digest: str, loaded: list[Loaded], op: Operator):
+    def __init__(self, manifest: Manifest, handoff_id: str, input_digest: str, loaded: list[Loaded], op: Operator, summaries: Summaries | None = None):
         self.manifest, self.handoff_id, self.input_digest, self.op = manifest, handoff_id, input_digest, op
         self.loaded = sorted(loaded, key=lambda item: item.pin.relation.job_id)
         self.by_job = {item.pin.relation.job_id: item for item in self.loaded}
@@ -720,6 +803,9 @@ class Planner:
         self.used_review: dict = {}       # (jobId, rc) -> approvalBasis (revision included) of every S3 relation behind an emitted edge
         self.paths: dict = {}             # structural edge id -> (canonical company chain, canonical (supplier, customer) per basis), resolved to public ids at assembly
         self.not_public: dict = {item.pin.relation.job_id: {} for item in self.loaded}
+        self.impacts: list[dict] = []     # the receipt-only impact rows, one per INVOLVES source relation
+        self.impact_evidence: set = set()  # app evidence ids of VERIFIED impact rows only (added after the whole row was proven)
+        self.summaries = summaries         # where a pinned issue summary is read from (None: no decision may pin one)
 
     # ---- helpers ------------------------------------------------------------------------------------------------------------------------
 
@@ -1025,6 +1111,103 @@ class Planner:
                 "decisionRef": None,
                 "sourceRefs": [{"kind": "s3-relation", "jobId": j, "id": rc} for j, rc in sorted(edge["refs"])]})
 
+    # ---- impacts (receipt-only text effects of the quotes of every emitted INVOLVES source relation) -----------------------------------------
+
+    def build_impacts(self) -> None:
+        """ONE closed row per (INVOLVES edge, S3 job, relation) of every emitted edge's `sourceRefs`, in that tuple's order. A row is the S3 result's own words about
+        the relation's impact stage (never a recomputed verdict, never aggregated across the relations of an edge, never a price view); structural SUPPLIES impacts and
+        unpublished relations stay audit-only. Evidence of a verified row joins the bundle only AFTER its whole row was proven, so a refused row can never leave
+        a provisional reference behind."""
+        rows = []
+        for edge in self.relations:                  # only INVOLVES edges exist yet
+            for ref in edge["sourceRefs"]:
+                row, evidence = self.impact_row(edge, self.by_job[ref["jobId"]], ref["id"])
+                rows.append(row)
+                self.impact_evidence.update(evidence)
+        rows.sort(key=lambda row: (row["edgeId"], row["sourceRelation"]["jobId"], row["sourceRelation"]["relationCandidateId"]))
+        if len(rows) > MAX_RELATIONS:
+            raise ExtractionFailure("handoff_limit_exceeded", {"impacts": "count"})
+        self.impacts = rows
+
+    def impact_row(self, edge: dict, loaded: Loaded, rc: str) -> tuple[dict, set]:
+        job = loaded.pin.relation.job_id
+        relation = loaded.relations[rc]
+        operator = self.used_review[(job, rc)]["kind"] == "operator-final-approval"
+        impact = relation["impact"]
+        row = {"edgeId": edge["id"], "issueId": edge["source"], "companyId": edge["target"], "sourceRelation": {"jobId": job, "relationCandidateId": rc},
+               "impactCandidateId": None, "status": None, "code": None, "label": None, "targetVerdict": None, "effects": None, "verifier": "not-called",
+               "verifierRequestDigest": None, "proposal": None}
+        # On-target = the verified relation's own company subject; an off-target candidate (a free-text model id) is never exported.
+        found = [c for c in impact["candidates"] if c["impactedCompanyId"] == relation["subject"]["ref"]]
+        if operator:
+            if impact["status"] != "not-applicable" or impact["candidates"]:
+                raise ExtractionFailure("relation_payload_invalid")
+            return {**row, "status": "not-applicable"}, set()
+        if impact["status"] == "producer-reply-invalid":
+            if impact["candidates"]:
+                raise ExtractionFailure("relation_payload_invalid")
+            return {**row, "status": "technical-reject", "code": "producer_reply_invalid"}, set()
+        if impact["status"] != "complete" or len(found) > 1:
+            raise ExtractionFailure("relation_payload_invalid")        # pending, a missing marker or a duplicate target cannot be a ready automatic relation
+        if not found:
+            return {**row, "status": "not-proposed"}, set()
+        candidate = found[0]
+        verdict = candidate["verdict"]
+        proposal = candidate["proposal"]
+        if verdict is None or not isinstance(candidate["precheck"], dict):
+            raise ExtractionFailure("relation_payload_invalid")
+        row.update(impactCandidateId=candidate["impactCandidateId"], proposal={"direction": proposal["direction"], "reason": proposal["reason"],
+                                                                                "limitations": proposal["limitations"], "verification": "none"})
+        state = candidate["precheck"]["state"]
+        if verdict["verifier"] == "not-called":
+            if state == "reject" and verdict["status"] == "reject":
+                return {**row, "status": "technical-reject", "code": "impact_precheck_rejected", "proposal": None}, set()
+            if state == "no-evidence" and verdict["status"] == "verified" and verdict["label"] == "undetermined":
+                return {**row, "status": "no-evidence"}, set()
+            raise ExtractionFailure("relation_payload_invalid")
+        # A called verdict must be exactly what the pinned impact verifier request digests to, under the policy this S3 job was bound to.
+        attempt = verdict["attempt"]
+        if (state != "pending" or verdict["verifier"] != "called" or attempt.get("policyVersion") != loaded.s3["binding"]["versions"]["impactPolicy"]
+                or verdict["requestDigest"] != digest(impact_verifier_request(candidate, attempt))):
+            raise ExtractionFailure("relation_payload_invalid")
+        called = {**row, "verifier": "called", "verifierRequestDigest": verdict["requestDigest"]}
+        if verdict["status"] == "reject":
+            if verdict["targetVerdict"] == "contradicted":
+                return {**called, "status": "verifier-reject", "targetVerdict": "contradicted"}, set()
+            if (verdict["targetVerdict"] is None and verdict["mapped"] is None and verdict["label"] is None
+                    and [reason["code"] for reason in verdict["reasons"]] == ["verification_reply_invalid"]):
+                return {**called, "status": "technical-reject", "code": "verifier_reply_invalid"}, set()
+            raise ExtractionFailure("relation_payload_invalid")
+        if verdict["status"] != "verified" or verdict["targetVerdict"] not in ("supported", "insufficient") or not isinstance(verdict["mapped"], dict):
+            raise ExtractionFailure("relation_payload_invalid")
+        mapped = {side: list(verdict["mapped"].get(side, [])) for side in IMPACT_SIDES}
+        quotes = {q["quoteId"] for q in candidate["quotes"]}
+        every = [q for side in IMPACT_SIDES for q in mapped[side]]
+        if set(every) != quotes or len(every) != len(quotes) or not quotes or verdict["label"] != impact_label(verdict["targetVerdict"], mapped):
+            raise ExtractionFailure("relation_payload_invalid")        # the S3 verdict must map every quote once and carry the label its own rule yields
+        # An S2 quote id is a hash of the document VERSION and span only: it names ONE document only when exactly one valid citation of the proposal carries it.
+        valid = [c for c in (*proposal["supporting"], *proposal["opposing"]) if "error" not in c]
+        sources: dict = {}
+        for c in valid:
+            sources.setdefault(c["evidenceId"], []).append(c)
+        documents = {q: {(c["documentId"], c["documentVersion"]) for c in sources.get(q, [])} for q in quotes}
+        if any(not found_documents for found_documents in documents.values()):
+            raise ExtractionFailure("relation_payload_invalid")
+        withheld = {**called, "status": "withheld"}
+        if any(len(found_documents) > 1 for found_documents in documents.values()):
+            return {**withheld, "code": "impact_quote_ambiguous"}, set()
+        allowed = {(c["documentId"], c["documentVersion"]) for c in relation["citations"] if "error" not in c}
+        if any(next(iter(found_documents)) not in allowed for found_documents in documents.values()):
+            return {**withheld, "code": "impact_evidence_outside_relation_documents"}, set()
+        try:
+            app_ids = {q: self.cite(loaded, sources[q][0]) for q in sorted(quotes)}
+        except Skip:
+            raise ExtractionFailure("relation_payload_invalid") from None          # a bound relation document always has its app binding
+        effects = {side: sorted({app_ids[q] for q in mapped[side]}) for side in IMPACT_SIDES}
+        if len(set(app_ids.values())) != len(quotes) or any(set(effects[a]) & set(effects[b]) for a in IMPACT_SIDES for b in IMPACT_SIDES if a < b):
+            raise ExtractionFailure("relation_payload_invalid")
+        return {**called, "status": "verified", "label": verdict["label"], "targetVerdict": verdict["targetVerdict"], "effects": effects}, set(app_ids.values())
+
     # ---- STRUCTURALLY_RELATED_TO (manual operator assertion over eligible S3 SUPPLIES basis) -------------------------------------------------
 
     def structural(self, decision) -> dict:
@@ -1169,11 +1352,45 @@ class Planner:
                 "decisionRef": decision.decision_ref,
                 "sourceRefs": [{"kind": "s2-comparison", "jobId": s.upstream.job_id, "id": f"{s.event_candidate_id}>{s.target_event_id}"}]}
 
+    # ---- issue summaries -------------------------------------------------------------------------------------------------------------------
+
+    def attach_summaries(self, evidence: list, articles: list) -> None:
+        """`issue.summary` of every public issue, decided by the pure zero-call table of `issue_summary_contracts`, in this order: a HOLD/REJECT field verdict anywhere
+        on the issue leaves `temporal-review-pending` (no summary text ever exists for it), an oversize basis `input-too-large`, a decision that pins a produced result
+        takes that result from the summary source, anything else is `not-requested`. A pin the rules cannot honor (the issue is not public, is held, is too large, or
+        the job's result does not match this basis, mode or pin) is refused by the source's own error type; it is never ignored, repaired or replaced by another
+        value. No model, provider or ledger write happens here."""
+        by_evidence = {e["id"]: e for e in evidence}
+        by_article = {(a["articleId"], a["articleVersion"]): a for a in articles}
+        execution = single_mode(self.loaded)
+        observed = {item.s3["provenance"]["sourceKind"] for item in self.loaded}
+        source_kind = next(iter(observed)) if len(observed) == 1 else "mixed"
+        pins = {d.public_id: d.summary for d in self.op.decisions.issues if d.summary is not None}
+        verifying = self.summaries is not None and self.summaries.verifies
+        if verifying:
+            for public_id in sorted(pins):
+                if public_id not in self.issues:
+                    raise self.summaries.refuse("issue_summary_issue_not_public")
+        for issue in self.issues.values():
+            basis = summary_basis(issue, by_evidence, by_article)
+            code, pin = deterministic_code(issue, basis), pins.get(issue["id"])
+            if code is not None:
+                if verifying and pin is not None:
+                    raise self.summaries.refuse(_PIN_REFUSALS[code])
+                issue["summary"] = deterministic_summary(code)
+            elif pin is None:
+                issue["summary"] = deterministic_summary("not-requested")
+            elif self.summaries is None:
+                raise ExtractionFailure("issue_summary_state_missing")
+            else:
+                issue["summary"] = self.summaries.result(issue, basis, pin, execution, source_kind)
+
     # ---- assembly -------------------------------------------------------------------------------------------------------------------------
 
     def run(self) -> dict:
         self.build_issues()
         self.build_involves()
+        self.build_impacts()
         for decision in sorted(self.op.decisions.structural, key=lambda d: (d.issue, d.company)):
             try:
                 self.relations.append(self.structural(decision))
@@ -1193,6 +1410,7 @@ class Planner:
             evidence_ids.update(r["evidenceIds"])
             for b in r["basis"]:
                 evidence_ids.update(b["evidenceIds"])
+        evidence_ids.update(self.impact_evidence)
         if len(evidence_ids) > MAX_EVIDENCE:
             raise ExtractionFailure("handoff_limit_exceeded", {"evidence": "count"})
         evidence = [self.resolver.by_id[i] for i in sorted(evidence_ids)]
@@ -1208,6 +1426,7 @@ class Planner:
         published = {c["id"] for c in companies}
         path_companies = sorted(({"id": c.public_id, "canonicalId": c.canonical_id, "label": c.label, "decisionRef": c.decision_ref} for c in self.companies.values()
                                  if c.public_id in middles and c.public_id not in published), key=lambda c: c["id"])
+        self.attach_summaries(evidence, articles)
         issues = [self.issues[i] for i in sorted(self.issues)]
         tally: dict[str, int] = {}
         for item in self.exclusions:
@@ -1232,11 +1451,11 @@ class Planner:
                                  "executionMode": execution_mode, "recordingKind": recording_kind},
                   "policy": {"version": POLICY, "files": self.manifest.files.wire(), "evidenceIdKind": EVIDENCE_KIND, "offsetUnit": OFFSET_UNIT, **POLICIES},
                   "sources": sources, "companies": companies, "pathCompanies": path_companies, "issues": issues, "relations": relations, "evidence": evidence,
-                  "articles": articles,
+                  "articles": articles, "impacts": self.impacts,
                   "exclusions": {"counts": dict(sorted(tally.items())), "items": items},
                   "counts": {"companies": len(companies), "pathCompanies": len(path_companies), "issues": len(issues), "relations": {t: sum(r["type"] == t for r in relations) for t in
                                                                                          ("INVOLVES", "STRUCTURALLY_RELATED_TO", "FOLLOWS")},
-                             "evidence": len(evidence), "articles": len(articles), "exclusions": len(items)},
+                             "evidence": len(evidence), "articles": len(articles), "impacts": len(self.impacts), "exclusions": len(items)},
                   "checks": {"producerConfirmed": list(PRODUCER_CHECKS), "appImportPending": list(APP_IMPORT_PENDING)},
                   "readiness": {"app": "import-pending", "evidenceRegistration": "not-registered", "publicActivation": "none", "graphDb": "none"},
                   "digests": {"content": ""}}
@@ -1261,6 +1480,42 @@ def withheld_result(row, code: str) -> dict:
             "delivery": {"status": "withheld", "code": code}, "usage": USAGE}
 
 
+@dataclass(frozen=True)
+class PlannedIssue:
+    """What an issue-summary job reads of ONE public issue, exactly as the handoff Planner would publish it (the issue WITHOUT its `summary`): the bundle's own
+    evidence records and articles, the one execution pair and observed source kind of the sources, and the current ingestion exports with their observations
+    (`documents`: (documentId, documentVersion) -> ((ObservationRef, export), ...); `export["document"]["text"]` is the exact body) with the `Sources` reader whose
+    `export(ref, send=(purpose, recipient))` is the live model-send check. A value object of one read; nothing in it is written anywhere."""
+    handoff_id: str
+    issue: dict
+    evidence: dict
+    articles: dict
+    execution: tuple
+    source_kind: str
+    documents: dict
+    sources: Sources
+
+
+def plan_summary_input(paths: HandoffPaths, manifest: Manifest, issue_id: str) -> PlannedIssue:
+    """The read-only planned data of one public issue for a summary job: the same strict `current()` gates as `freeze` (operator files byte-identical to the
+    manifest, every source ready/delivered/rights-current at the pinned review state) and the same Planner, with NO summary source (a pin in the decisions is not
+    read) and nothing written, reserved or settled. An issue the Planner did not publish is `issue_not_public`. The caller applies `deterministic_code` to
+    `summary_basis(...)`; this seam decides nothing about a summary."""
+    op = load_operator(paths)
+    with Source(paths.source()) as source:
+        loaded = current(source, paths, manifest, op, strict=True)
+        planner = Planner(manifest, manifest.handoff_id, digest(manifest.wire()), loaded, op, IgnoredSummaries())
+        bundle = planner.run()
+        issue = next((i for i in bundle["issues"] if i["id"] == issue_id), None)
+        if issue is None:
+            raise ExtractionFailure("issue_not_public")
+        operator_unchanged(op, paths)
+        return PlannedIssue(manifest.handoff_id, {key: value for key, value in issue.items() if key != "summary"},
+                            {e["id"]: e for e in bundle["evidence"]}, {(a["articleId"], a["articleVersion"]): a for a in bundle["articles"]},
+                            (bundle["provenance"]["executionMode"], bundle["provenance"]["recordingKind"]), bundle["provenance"]["observedSourceKind"],
+                            {key: tuple(entries) for key, entries in planner.resolver.docs.items()}, planner.loaded[0].sources)
+
+
 class Handoff:
     def __init__(self, store: Store, paths: HandoffPaths | None = None):
         self.store, self.paths = store, paths
@@ -1277,6 +1532,16 @@ class Handoff:
         if row is None:
             raise ExtractionFailure("handoff_not_found")
         return row
+
+    def summary_source(self, op: Operator) -> Summaries | None:
+        """The issue-summary ledger of a freeze, given EXACTLY when the decisions pin a produced result (`issue_summary_state_missing` when a pin has none,
+        `issue_summary_state_unused` when one is given without a pin): a handoff that pins nothing never opens it, and `export` never does."""
+        pinned = any(d.summary is not None for d in op.decisions.issues)
+        if pinned != (self.paths.summaries is not None):
+            raise ExtractionFailure("issue_summary_state_missing" if pinned else "issue_summary_state_unused")
+        if not pinned:
+            return None
+        return LedgerSummaries(self.paths.summaries, self.paths.relation, self.paths.extraction, self.paths.ingestion, self.store.root)
 
     def result(self, row) -> dict:
         failure = {"code": row["failure"]} if row["failure"] else None
@@ -1297,6 +1562,7 @@ class Handoff:
         if stored is not None and not contract_current(stored):
             raise ExtractionFailure("handoff_contract_changed")            # history: nothing is read or written, the operator freezes a new handoff ID
         op = load_operator(paths)
+        summaries = self.summary_source(op)
         with Source(paths.source()) as source:
             row = self.store.handoff(manifest.handoff_id)
             if row is not None:
@@ -1306,7 +1572,7 @@ class Handoff:
                     current(source, paths, manifest, op, strict=True)
                 return self.result(row)
             loaded = current(source, paths, manifest, op, strict=True)
-            bundle = Planner(manifest, manifest.handoff_id, input_digest, loaded, op).run()
+            bundle = Planner(manifest, manifest.handoff_id, input_digest, loaded, op, summaries).run()
             validate_bundle(bundle)
             raw = canonical(bundle).encode("utf-8")
             if len(raw) > MAX_BUNDLE:
@@ -1377,7 +1643,7 @@ class Handoff:
             with Source(paths.source()) as source:
                 loaded = current(source, paths, manifest, op, strict=False)
                 self.used_reviews(loaded, bundle)
-                fresh = Planner(manifest, manifest.handoff_id, row["input_digest"], loaded, op).run()
+                fresh = Planner(manifest, manifest.handoff_id, row["input_digest"], loaded, op, FrozenSummaries(bundle)).run()
                 if fresh["digests"]["content"] != bundle["digests"]["content"]:
                     raise Withheld("handoff_content_changed")
                 review_matches = all(digest(review_state(item.s3)) == item.pin.review_digest for item in loaded)

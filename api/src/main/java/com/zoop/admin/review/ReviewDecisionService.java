@@ -7,6 +7,7 @@ import com.zoop.admin.auth.service.AdminPrincipal;
 import com.zoop.admin.review.JdbcReviewRepository.Intent;
 import com.zoop.admin.review.JdbcReviewRepository.Target;
 import com.zoop.admin.review.RelationReviewClient.Lookup;
+import com.zoop.admin.review.RelationReviewClient.Operation;
 import com.zoop.admin.review.RelationReviewClient.Refused;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
@@ -52,6 +53,8 @@ import tools.jackson.databind.node.ObjectNode;
 public class ReviewDecisionService {
     private static final Logger log = LoggerFactory.getLogger(ReviewDecisionService.class);
     private static final String METHOD = "POST";
+    /** The source code of an intent whose operation id holds another command in the AI ledger. */
+    static final String OPERATION_MISMATCH = "operation_mismatch";
 
     private final JdbcReviewRepository reviews;
     private final JdbcAdminIdempotencyStore idempotency;
@@ -110,19 +113,32 @@ public class ReviewDecisionService {
      * unconfirmed one is resent (the source never appends twice), and an operation the source never saw is left alone, since
      * only the administrator's own retry may send a decision. Intents are taken least recently looked at first, and each one
      * left open goes to the back, so intents that never settle cannot keep the others out of a batch. One intent's failure
-     * never stops the rest. Returns how many were settled.
+     * never stops the rest. An operation under the intent's id that holds another command (or one of the earlier contract) is never
+     * settled or resent: a pending intent becomes blocked with {@code operation_mismatch} (followed by {@code :<last code>} when
+     * it had one). Returns how many were settled.
      */
     public int reconcile(Instant before, int limit) {
         int settled = 0;
         for (Intent intent : reviews.openIntents(before, limit)) {
             try {
-                Lookup lookup = source.lookup(intent.sourceJobId(), intent.operationId());
-                if (lookup == Lookup.RECORDED) {
+                Operation operation = source.lookup(intent.sourceJobId(), intent.operationId());
+                if (operation.state() != Lookup.NOT_FOUND && !holdsIntent(operation, intent)) {
+                    if ("pending".equals(intent.status())) {
+                        // Keep the answer that left it pending beside the reason it is blocked now.
+                        String code = intent.sourceCode() == null ? OPERATION_MISMATCH
+                                : OPERATION_MISMATCH + ":" + intent.sourceCode();
+                        reviews.markUnsettled(intent.id(), "blocked", code, clock.instant());
+                    } else {
+                        reviews.touch(intent.id(), clock.instant());
+                    }
+                    continue;
+                }
+                if (operation.state() == Lookup.RECORDED) {
                     settle(intent.id());
                     settled++;
                     continue;
                 }
-                if (lookup == Lookup.UNCONFIRMED && "pending".equals(intent.status())) {
+                if (operation.state() == Lookup.UNCONFIRMED && "pending".equals(intent.status())) {
                     send(intent);
                     settled++;
                     continue;
@@ -239,15 +255,25 @@ public class ReviewDecisionService {
         Intent intent = reviews.intentForRecord(record.id(), false)
                 .orElseThrow(() -> new CustomException(ErrorCode.SOURCE_UNAVAILABLE, true));
         if ("pending".equals(intent.status())) return send(intent);
-        // Blocked: only the ledger can say whether it was applied.
-        Lookup lookup;
+        // Settled since the record was read (applied and refused commit with their record): replay what was stored.
+        if (!"blocked".equals(intent.status())) {
+            return replay(idempotency.findById(intent.idempotencyRecordId()).orElseThrow(), null);
+        }
+        // Blocked: only the ledger can say whether it was applied, and only an operation holding this intent's command settles it.
+        Operation operation;
         try {
-            lookup = source.lookup(intent.sourceJobId(), intent.operationId());
+            operation = source.lookup(intent.sourceJobId(), intent.operationId());
         } catch (Refused refused) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, true);
         }
-        if (lookup == Lookup.RECORDED) return settle(intent.id());
+        if (operation.state() == Lookup.RECORDED && holdsIntent(operation, intent)) return settle(intent.id());
         throw new CustomException(ErrorCode.INTERNAL_ERROR);
+    }
+
+    /** The operation under the intent's id holds the intent's own command, under the current contract. */
+    private static boolean holdsIntent(Operation operation, Intent intent) {
+        return operation.holds(intent.sourceJobId(), intent.relationCandidateId(), intent.decision(),
+                intent.expectedSourceVersion(), intent.expectedSourceRevision());
     }
 
     /** A completed record's response, or a failed record's error. {@code requestHash} null: already checked. */

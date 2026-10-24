@@ -5,13 +5,38 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import MapPage from '@/pages/map/MapPage';
 import { getEvent } from '@/apis/graph/events';
 import { getGraph } from '@/apis/graph/graph';
+import { BriefingGraphUnavailableError } from '@/apis/graph/briefing-context';
 import { createMockEvent } from '@/mocks/events/fixture';
 import { createMockGraph } from '@/mocks/graph/response';
 import { createMockRelation } from '@/mocks/relations/fixture';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import { useAiChatStore } from '@/stores/useAiChatStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import type { BriefingGraphBasis } from '@/types/briefing';
 import type { GraphResponse } from '@/types/map/graph';
+
+function unavailableRoundGraph(
+  reason: NonNullable<
+    BriefingGraphBasis['unavailableReason']
+  > = 'snapshot_not_recorded',
+) {
+  const basis: BriefingGraphBasis = {
+    roundId: 'brf-2026-10-15-evening',
+    date: '2026-10-15',
+    edition: 'evening',
+    status: 'unavailable',
+    message: '발행 당시 고정 그래프 조회가 아직 연결되지 않았습니다.',
+    reason: null,
+    publishedAt: '2026-10-15T18:10:00+09:00',
+    unavailableReason: reason,
+    dataAsOf: null,
+    graphVersion: null,
+    keyIssueIds: [],
+    companyIds: [],
+    correctionCount: 0,
+  };
+  return new BriefingGraphUnavailableError(basis);
+}
 
 vi.mock('@/apis/graph/events', async (original) => ({
   ...(await original<typeof import('@/apis/graph/events')>()),
@@ -26,13 +51,28 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
     selectedId,
     onSelect,
     onSelectEdge,
+    flow,
+    onFlowChange,
+    focusLayout,
   }: {
     data: GraphResponse;
     selectedId: string | null;
     onSelect: (id: string) => void;
     onSelectEdge: (id: string) => void;
+    flow?: boolean;
+    onFlowChange?: (flow: boolean) => void;
+    focusLayout?: boolean;
   }) => (
     <div data-testid="graph-canvas">
+      {onFlowChange && (
+        <button
+          aria-pressed={flow}
+          disabled={focusLayout}
+          onClick={() => onFlowChange(!flow)}
+        >
+          흐름 순으로 정렬
+        </button>
+      )}
       {data.nodes.map((node) => (
         <button
           key={node.id}
@@ -250,5 +290,90 @@ describe('D-GRP-04 · map navigation and evidence handoff', () => {
     expect(
       new URLSearchParams(router.state.location.search).get('select'),
     ).toBe(`edge:${edge.id}`);
+  });
+});
+
+describe('D-GRP-01 · flow order toggle', () => {
+  it('toggles flow order in the address and is unavailable in focus mode', async () => {
+    const router = setup('/?mode=all');
+    const toggle = await screen.findByRole('button', {
+      name: '흐름 순으로 정렬',
+    });
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    await userEvent.click(toggle);
+    expect(
+      new URLSearchParams(router.state.location.search).get('arrange'),
+    ).toBe('flow');
+    expect(
+      screen
+        .getByRole('button', { name: '흐름 순으로 정렬' })
+        .getAttribute('aria-pressed'),
+    ).toBe('true');
+    await userEvent.click(
+      screen.getByRole('button', { name: '흐름 순으로 정렬' }),
+    );
+    expect(
+      new URLSearchParams(router.state.location.search).get('arrange'),
+    ).toBeNull();
+
+    await act(async () => {
+      await router.navigate('/?mode=all&focus=KRX:005930&hops=1');
+    });
+    expect(
+      (
+        screen.getByRole('button', {
+          name: '흐름 순으로 정렬',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+  });
+});
+
+describe('D-BRF-04 · round map that is not provided', () => {
+  it('shows a not-provided notice instead of a failure and retry', async () => {
+    vi.mocked(getGraph).mockRejectedValue(unavailableRoundGraph());
+    setup('/?round=brf-2026-10-15-evening');
+    expect(
+      await screen.findByText('이 회차의 그래프 저장본이 없습니다.'),
+    ).toBeTruthy();
+    expect(screen.queryByText('관계 지도를 불러오지 못했습니다.')).toBeNull();
+    expect(screen.queryByText(/조회 실패/)).toBeNull();
+    expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
+  });
+
+  it('keeps the not-provided notice without retry in the company path panel of a round link', async () => {
+    vi.mocked(getGraph).mockRejectedValue(unavailableRoundGraph());
+    setup('/?round=brf-2026-10-15-evening&path=KRX:005930,KRX:000660');
+    expect(
+      (
+        await screen.findAllByText(
+          '이 회차의 관계 지도는 아직 제공하지 않아요.',
+        )
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText('그래프 조회 실패')).toBeNull();
+    expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
+  });
+
+  it('keeps the failure and retry for a round map that failed to load', async () => {
+    vi.mocked(getGraph).mockRejectedValue(new Error('네트워크 오류'));
+    setup('/?round=brf-2026-10-15-evening');
+    expect(
+      await screen.findByText('관계 지도를 불러오지 못했습니다.'),
+    ).toBeTruthy();
+    expect(screen.getByText(/조회 실패: 네트워크 오류/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeTruthy();
+  });
+
+  it('keeps retry for a recorded round snapshot that is temporarily unreadable', async () => {
+    vi.mocked(getGraph).mockRejectedValue(
+      unavailableRoundGraph('snapshot_unavailable'),
+    );
+    setup('/?round=brf-2026-10-15-evening');
+
+    expect(
+      await screen.findByText('관계 지도를 불러오지 못했습니다.'),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeTruthy();
   });
 });

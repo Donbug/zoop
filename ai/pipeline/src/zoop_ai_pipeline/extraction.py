@@ -299,6 +299,15 @@ class Context:
         return found[0] if found else None
 
 
+@dataclass
+class Admitted:
+    """The prepared values of a job `freeze` is about to register. `Extractor.admission` discards them."""
+    ctx: Context
+    binding: dict
+    input_digest: str
+    frozen_hash: str
+
+
 def doc_key(ref: ObservationRef) -> str:
     return digest(ref.wire())
 
@@ -509,15 +518,13 @@ class Extractor:
         if current(json.loads(self._job(job_id)["binding"])):
             raise ExtractionFailure("job_binding_changed")
 
-    def freeze(self, request: Submit, fixtures: Fixtures) -> None:
-        """The only registration path: durably freeze the exact bound input as `queued`, with no provider/replay call or candidate effect.
-
-        A replay job's replay file is part of the frozen input (its hash is in the input digest and the binding), so it is required here, but only its
-        header is read; its records are validated by the first lookup. A live job freezes the complete secret-free runtime binding instead (current
-        environment, no network, no key) and takes no fixture. A job that already exists is not touched at all: same input returns without re-freezing,
-        resuming, resetting a stopped job or reading authority; another input is `job_input_conflict` with nothing written. Execution is `resume`'s business."""
-        existing = self.store.one("SELECT binding FROM jobs WHERE job_id=?", (request.job_id,))
-        if existing is not None and not current(json.loads(existing["binding"])):
+    def _admit(self, request: Submit, fixtures: Fixtures) -> "Admitted | None":
+        """Everything `freeze` decides before its write transaction, in `freeze`'s order, against whichever Store this extractor holds (a read-only one
+        suffices): the stored legacy binding is refused first, then the job's identity (replay fixture header or live runtime binding) and input
+        digest. None means the job already exists with this very input. Only for a NEW job it also builds and validates the source context, the
+        grounded snapshot members and the frozen binding, and returns them for `freeze` to register. Nothing is written here."""
+        row = self.store.one("SELECT * FROM jobs WHERE job_id=?", (request.job_id,))
+        if row is not None and not current(json.loads(row["binding"])):
             # A stored legacy job is history: say so before its fixture bytes (old format or none) are looked at.
             raise ExtractionFailure("analysis_contract_changed")
         live = request.provenance.execution_mode == "live"
@@ -532,21 +539,38 @@ class Extractor:
             identity = analysis.identity(fixtures.require(), request.provenance, request.prompt_version)
             input_digest = digest({"request": request.wire(), "replayFixtureHash": fixtures.replay_hash})
             frozen_hash = fixtures.replay_hash
-        row = self.store.one("SELECT * FROM jobs WHERE job_id=?", (request.job_id,))
         if row is not None:
             if row["input_digest"] != input_digest:
                 raise ExtractionFailure("job_input_conflict")
-            return
+            return None
         ctx = self._context(request)
         self._ground_members(ctx)
         if live:
             binding = self._binding(ctx, {**identity, "runtime": runtime, "bindingDigest": runtime["identity"]}, live=True)
         else:
             binding = self._binding(ctx, {**identity, "fixtureHash": fixtures.replay_hash})
+        return Admitted(ctx, binding, input_digest, frozen_hash)
+
+    def admission(self, request: Submit, fixtures: Fixtures) -> str:
+        """`new` when `freeze` of this request would register a job, `existing` when the job is already stored with exactly this input. Every refusal
+        `freeze` would raise before its transaction is raised here (`analysis_contract_changed`, `job_input_conflict`, fixture/runtime, source and
+        snapshot-grounding failures); nothing is written, so it also works on a read-only Store."""
+        return "existing" if self._admit(request, fixtures) is None else "new"
+
+    def freeze(self, request: Submit, fixtures: Fixtures) -> None:
+        """The only registration path: durably freeze the exact bound input as `queued`, with no provider/replay call or candidate effect.
+
+        A replay job's replay file is part of the frozen input (its hash is in the input digest and the binding), so it is required here, but only its
+        header is read; its records are validated by the first lookup. A live job freezes the complete secret-free runtime binding instead (current
+        environment, no network, no key) and takes no fixture. A job that already exists is not touched at all: same input returns without re-freezing,
+        resuming, resetting a stopped job or reading authority; another input is `job_input_conflict` with nothing written. Execution is `resume`'s business."""
+        admitted = self._admit(request, fixtures)
+        if admitted is None:
+            return
         # The exact binding is durable before any replay/provider call; nothing below can change it.
-        with self.store.transaction(lambda: self._verify(ctx)):
+        with self.store.transaction(lambda: self._verify(admitted.ctx)):
             self.db.execute("INSERT INTO jobs(job_id,input_digest,request,binding,replay_hash,state,phase,resume_mode,created_at,updated_at) VALUES(?,?,?,?,?,'queued','extract','resume',?,?)",
-                (request.job_id, input_digest, canonical(request.wire()), canonical(binding), frozen_hash, now(), now()))
+                (request.job_id, admitted.input_digest, canonical(request.wire()), canonical(admitted.binding), admitted.frozen_hash, now(), now()))
 
     def run(self, request: Submit, fixtures: Fixtures, *, initial_only: bool = False) -> dict:
         """Convenience: `freeze` then `resume` the same job."""

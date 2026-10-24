@@ -51,7 +51,7 @@ def main() -> dict:
         "sources": str(world.kit.registry_path), "canonical": str(ROOT / "canonical.json"), "decisions": str(ROOT / "decisions.json"),
         "bindings": str(ROOT / "bindings.json"), "handoffState": str(operator.state), "handoffs": described, "counts": want["counts"],
         "evidenceIds": want["evidence"], "issueIds": sorted(want["issues"]), "relationEdges": sorted([*key, ids] for key, ids in want["relations"].items()),
-        "exclusions": want["exclusions"], "private": list(PRIVATE),
+        "exclusions": want["exclusions"], "private": list(PRIVATE), "impacts": want["impacts"],
         "articleIds": sorted(ref["documentId"] for ref in world.refs.values())}
 
 
