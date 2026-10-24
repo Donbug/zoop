@@ -36,6 +36,9 @@ import org.springframework.transaction.TransactionException;
  * the anchor itself is returned so the answer can say which second target is missing.</li>
  * <li>Evidence passed on is what the public evidence read can read now at the version: edges first in path order, then the
  * issues on the path, deduplicated, within the request's evidence scope and capped at the request limit.</li>
+ * <li>Each pair read is also reported on its own ({@link ChatToolPath}): found with its steps in order (edge, stored
+ * direction, relation, role and that edge's evidence passed on), none, or cut. So a pair cut by the hop limit stays apart
+ * from a pair proven unconnected even when another pair was found, and the answer can tie each step to its own evidence.</li>
  * </ul>
  * A run without a frozen graph, an unreadable version or database and an evidence state that could not be checked are
  * {@link ChatToolUnavailable}, never an empty result.
@@ -74,7 +77,8 @@ public class GraphPathTool implements ChatTool {
         }
 
         String anchor = request.targets().getFirst();
-        List<String> others = request.targets().stream().skip(1).filter(paths::isNode).toList();
+        List<String> others = request.targets().stream().skip(1).filter(id -> !id.equals(anchor)).filter(paths::isNode)
+                .distinct().toList();
         Map<String, GraphContextLookup.Target> nodes = new LinkedHashMap<>();
         Map<String, GraphContextLookup.Target> edges = new LinkedHashMap<>();
         boolean truncated = false;
@@ -84,8 +88,10 @@ public class GraphPathTool implements ChatTool {
                 lookup.find(id).ifPresent(target -> nodes.put(target.id(), target));
             }
         }
+        Map<String, GraphPathLookup.Result> pairs = new LinkedHashMap<>();
         for (String other : paths.isNode(anchor) ? others : List.<String>of()) {
             var result = paths.shortest(anchor, other, MAX_HOPS);
+            pairs.putIfAbsent(other, result);
             if (result.status() == GraphPathLookup.Status.CUT) truncated = true;
             var path = result.path().orElse(null);
             if (path == null) continue;
@@ -133,7 +139,26 @@ public class GraphPathTool implements ChatTool {
             items.add(new ChatToolItem(target.id(), target.kind(), target.label(), target.companyIds(),
                     carried.getOrDefault(target.id(), List.of())));
         }
-        return new ChatToolOutput(version, items, List.copyOf(passed), truncated, false);
+        List<ChatToolPath> read = new ArrayList<>();
+        pairs.forEach((other, result) -> read.add(path(paths, anchor, other, result, carried)));
+        return new ChatToolOutput(version, items, List.copyOf(passed), truncated, false, read);
+    }
+
+    private static ChatToolPath path(GraphPathLookup paths, String anchor, String other, GraphPathLookup.Result result,
+            Map<String, List<String>> carried) {
+        return switch (result.status()) {
+            case NONE -> new ChatToolPath(anchor, other, ChatToolPath.NONE, List.of());
+            case CUT -> new ChatToolPath(anchor, other, ChatToolPath.CUT, List.of());
+            case FOUND -> {
+                List<ChatToolPath.Step> steps = new ArrayList<>();
+                for (String edgeId : result.path().orElseThrow().edgeIds()) {
+                    var edge = paths.edge(edgeId).orElseThrow();
+                    steps.add(new ChatToolPath.Step(edgeId, edge.source(), edge.target(), edge.relationType(), edge.role(),
+                            carried.getOrDefault(edgeId, List.of())));
+                }
+                yield new ChatToolPath(anchor, other, ChatToolPath.FOUND, steps);
+            }
+        };
     }
 
     private boolean readable(ChatToolScope scope, String version, String evidenceId) {

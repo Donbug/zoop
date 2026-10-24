@@ -411,3 +411,35 @@ def test_cli_prints_the_result_and_exits_by_outcome(tmp_path, monkeypatch, capsy
     monkeypatch.setattr("sys.stdin", io.StringIO('{"schemaVersion":"zoop-ai-chat-1"}'))
     assert chat_cli.main(["invoke", "--state-dir", str(state)]) == 64
     assert json.loads(capsys.readouterr().out) == {"error": "request_invalid"}
+
+
+def path_branch(*paths: dict[str, Any]) -> dict[str, Any]:
+    payload = answer_input()
+    payload["branches"][0]["paths"] = list(paths)
+    return payload
+
+
+def step(edge: str, evidence: list[str]) -> dict[str, Any]:
+    return {"edgeId": edge, "sourceId": "iss-hbm", "targetId": "KRX:000660", "relation": "INVOLVES", "role": None,
+            "evidenceIds": evidence}
+
+
+def test_path_pairs_keep_their_status_and_steps_name_only_quoted_evidence():
+    found = {"fromId": "KRX:000660", "toId": "NASDAQ:NVDA", "status": "found", "steps": [step("e-1", [EV1])]}
+    cut = {"fromId": "KRX:000660", "toId": "NASDAQ:AMD", "status": "cut", "steps": []}
+    none = {**cut, "status": "none"}
+    with_cut = request("chat-answer", path_branch(found, cut)).parsed().wire()
+    with_none = request("chat-answer", path_branch(found, none)).parsed().wire()
+    assert with_cut["branches"][0]["paths"][1]["status"] == "cut"
+    assert with_cut != with_none, "a pair cut by the limit never reads like a pair proven unconnected"
+    assert request("chat-answer", answer_input()).parsed().wire()["branches"][0]["paths"] == []
+
+    for bad in ({**found, "steps": []}, {**cut, "steps": [step("e-1", [EV1])]},
+                {**found, "steps": [step("e-1", ["ev-" + "9" * 64])]}):
+        with pytest.raises(ValueError):
+            request("chat-answer", path_branch(bad)).parsed()
+
+
+def test_the_answer_prompt_explains_paths_and_its_version_moved():
+    assert "status=cut" in chat_luna.PROMPT and "evidenceIds" in chat_luna.PROMPT
+    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-10-24-1-")

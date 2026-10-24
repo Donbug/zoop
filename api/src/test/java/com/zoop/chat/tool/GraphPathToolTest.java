@@ -123,12 +123,42 @@ class GraphPathToolTest {
     }
 
     @Test
+    void eachPairIsReportedWithItsOrderedStepsAndEachStepsOwnEvidence() {
+        var out = tool().read(SCOPE, request(20, HYNIX, NVDA, SAMSUNG));
+        assertEquals(List.of(NVDA, SAMSUNG), out.paths().stream().map(ChatToolPath::toId).toList());
+        assertTrue(out.paths().stream().allMatch(p -> p.fromId().equals(HYNIX)));
+
+        var found = out.paths().getFirst();
+        assertEquals(ChatToolPath.FOUND, found.status());
+        List<String> walk = List.of(HYNIX, HBM_SUPPLY, NVDA);
+        assertEquals(2, found.steps().size());
+        for (int i = 0; i < found.steps().size(); i++) {
+            var step = found.steps().get(i);
+            assertEquals(Set.of(walk.get(i), walk.get(i + 1)), Set.of(step.sourceId(), step.targetId()),
+                    "step " + i + " joins the path's nodes in order");
+            assertTrue(Set.of("INVOLVES", "STRUCTURALLY_RELATED_TO").contains(step.relation()));
+            var edge = out.items().stream().filter(item -> item.id().equals(step.edgeId())).findFirst().orElseThrow();
+            assertEquals(edge.evidenceIds(), step.evidenceIds(), "a step carries its own edge's evidence");
+            assertFalse(step.evidenceIds().isEmpty());
+        }
+        assertEquals(new ChatToolPath(HYNIX, SAMSUNG, ChatToolPath.NONE, List.of()), out.paths().get(1),
+                "a proven unconnected pair is reported, not only left out");
+        assertFalse(out.truncated());
+
+        denied.add(found.steps().getFirst().evidenceIds().getFirst());
+        var refused = tool().read(SCOPE, request(20, HYNIX, NVDA));
+        assertFalse(refused.paths().getFirst().steps().getFirst().evidenceIds()
+                .contains(found.steps().getFirst().evidenceIds().getFirst()), "a step names only evidence passed on");
+    }
+
+    @Test
     void anInvisibleFirstTargetIsNeverReplacedByAnotherTarget() {
         var out = tool().read(SCOPE, request(20, "KRX:999999", HYNIX, NVDA));
         assertEquals(List.of(HYNIX, NVDA), out.items().stream().map(ChatToolItem::id).toList(),
                 "the visible others are returned alone, with no path between them");
         assertTrue(ids(out, "edge").isEmpty());
         assertTrue(out.evidenceIds().isEmpty());
+        assertTrue(out.paths().isEmpty(), "no pair was read");
         assertFalse(out.truncated());
     }
 

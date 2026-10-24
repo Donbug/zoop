@@ -49,6 +49,11 @@ public final class GraphPathLookup {
         sorted.forEach((node, links) -> adjacency.put(node, List.copyOf(links.values())));
     }
 
+    /** A display edge of this graph by id. */
+    public Optional<DisplayGraph.Edge> edge(String id) {
+        return Optional.ofNullable(graph.edges.get(id));
+    }
+
     /** A visible company or issue of this graph. */
     public boolean isNode(String id) {
         return graph.companies.containsKey(id) || graph.issues.containsKey(id);
