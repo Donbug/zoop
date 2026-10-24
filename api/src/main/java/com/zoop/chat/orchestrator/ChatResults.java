@@ -73,7 +73,8 @@ final class ChatResults {
         List<ChatAnswerSection> publicSections = sections.stream()
                 .map(s -> new ChatAnswerSection(s.basis(), s.text(), s.evidenceIds())).toList();
         Set<String> sources = new LinkedHashSet<>();
-        citations.forEach(c -> sources.add(c.articleId()));
+        // Sources are articles; a catalog profile quote has none.
+        citations.stream().filter(c -> c.articleId() != null).forEach(c -> sources.add(c.articleId()));
         return new ChatResult("answered", PENDING_MESSAGE, ChatAnswerCheck.joined(sections), publicSections,
                 answerBasis(sections), null, List.copyOf(sources), List.copyOf(citations), List.copyOf(targets),
                 applied(run, companies, issues, questionOverrodeContext, now), List.of(), null, List.copyOf(limitations),
