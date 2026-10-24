@@ -253,8 +253,11 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     expect(server.calls('GET', VERSIONS)).toHaveLength(1);
   });
 
-  test('목록을 불러오지 못하면 다시 시도할 수 있고, 후보·작업 탭은 준비 중으로 보인다', async () => {
+  test('목록을 불러오지 못하면 다시 시도할 수 있고, 후보 탭은 준비 중으로 보인다', async () => {
     server.on('GET', VERSIONS, () => apiError(503, 'SOURCE_UNAVAILABLE'));
+    server.on('GET', '/api/v1/admin/jobs', () =>
+      apiError(503, 'SOURCE_UNAVAILABLE'),
+    );
     const { user, location } = open();
 
     expect(
@@ -266,8 +269,9 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     expect(location()).toBe('/admin/pipeline?tab=candidates');
     expect(screen.getByText(/후보 검수는 아직 준비 중이에요/)).toBeTruthy();
     await user.click(screen.getByRole('tab', { name: '작업' }));
+    expect(location()).toBe('/admin/pipeline?tab=jobs');
     expect(
-      screen.getByText(/분석 작업 관리는 아직 준비 중이에요/),
+      await screen.findByText('작업 목록을 불러오지 못했어요'),
     ).toBeTruthy();
   });
 
