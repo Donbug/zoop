@@ -14,7 +14,9 @@ public enum AiOperation {
     REVIEW(true),
     OPERATION(false),
     /** One chatbot model stage (router, answer or verification); it may send a model request. */
-    CHAT_STAGE(true);
+    CHAT_STAGE(true),
+    /** Commits reference-only plan authority; never enqueues model work. */
+    PLAN_ADMIT(true);
 
     private final boolean mutating;
 
