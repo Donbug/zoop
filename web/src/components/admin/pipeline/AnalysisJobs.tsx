@@ -363,7 +363,12 @@ function JobDetail({
         </dd>
         <dt className="text-[11px] text-zoop-muted">시작·종료</dt>
         <dd className="font-inter tabular-nums">
-          {formatKst(job.startedAt)} ~ {formatKst(job.finishedAt)}
+          {job.startedAt ? formatKst(job.startedAt) : '시작 전'} ~{' '}
+          {job.finishedAt
+            ? formatKst(job.finishedAt)
+            : active
+              ? '진행 중'
+              : '–'}
         </dd>
         <dt className="text-[11px] text-zoop-muted">걸린 시간</dt>
         <dd className="tabular-nums">{formatDuration(job.durationSeconds)}</dd>
