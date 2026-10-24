@@ -106,7 +106,20 @@ sys.path[:0] = [str(PIPELINE), str(API_SCRIPTS)]
 import document_import_smoke as base  # noqa: E402  (database, jar and step helpers)
 from scripts import graph_handoff_smoke as hs  # noqa: E402  (the authored AI world and its operator documents)
 
-check, step = base.check, base.step
+check = base.check
+_last_step_at = time.monotonic()
+_last_step_label = "setup"
+
+
+def step(label: str) -> str:
+    global _last_step_at, _last_step_label
+    now = time.monotonic()
+    print(f"[timing] {_last_step_label}: {now - _last_step_at:.1f}s", file=sys.stderr, flush=True)
+    _last_step_at = now
+    _last_step_label = label
+    return base.step(label)
+
+
 PUBLIC_IDS = {"KRX:005930": "SYNTH:000001", "KRX:000660": "SYNTH:000002"}   # the catalog's seeded ids are never reused
 SCHEMA = "zoop-graph-handoff-import-1"
 COMPANIES = (("SYNTH:000001", "합성기업"), ("SYNTH:000002", "합성부품"))
@@ -233,12 +246,14 @@ class Smoke:
         request_path = self.layout.requests / f"{stem}-request.json"
         result_path = self.layout.requests / f"{stem}-result.json"
         request_path.write_bytes(request if isinstance(request, bytes) else json.dumps(request).encode("utf-8"))
+        started_at = time.monotonic()
         try:
             done = subprocess.run(self.jar.argv("--spring.main.web-application-type=none"), env=self.graph_env(request_path, result_path, cli),
                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=420)
         except subprocess.TimeoutExpired as expired:
             base.OUTPUT.append((expired.stdout or b"").decode("utf-8", "replace"))
             raise AssertionError(f"{label}: the import JVM did not exit within 420s (result file exists: {result_path.exists()})")
+        print(f"[timing] graph import {label}: {time.monotonic() - started_at:.1f}s", file=sys.stderr, flush=True)
         output = done.stdout.decode("utf-8", "replace")
         base.OUTPUT.append(output)
         parsed = None
@@ -308,6 +323,7 @@ class Smoke:
 class WebRun:
     def __init__(self, jar, extra_env: dict, ready: str | None = None):
         self.ready = ready
+        self.started_at = time.monotonic()
         with socket.socket() as probe:
             probe.bind(("127.0.0.1", 0))
             self.port = probe.getsockname()[1]
@@ -328,6 +344,7 @@ class WebRun:
         while time.monotonic() < deadline and self.process.poll() is None and not any(marker in l for l in self.lines):
             time.sleep(0.5)
         check(any(marker in l for l in self.lines), "the web application did not become ready:\n" + "".join(self.lines)[-1500:])
+        print(f"[timing] graph smoke web startup: {time.monotonic() - self.started_at:.1f}s", file=sys.stderr, flush=True)
         return self
 
     def __exit__(self, *exc):

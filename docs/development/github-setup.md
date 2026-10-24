@@ -69,11 +69,16 @@ runner는 `ubuntu-24.04`로 명시합니다. 공식 [runner image 도구 목록]
 | `web` | `prototype/web`의 frozen pnpm 설치, typecheck, Vitest, Vite build | 없음 |
 | `app-web` | 루트 `web/`의 frozen pnpm 10.34.6 설치(`HUSKY=0`으로 git hook 설치 생략), ESLint, Prettier check, `tsc -b` + Vite build, Vitest | 없음 |
 | `bff` | App 등록 preflight, private pinned PoC 설치, worker 설치(토큰 없음), offline pytest, worker portable fixture 및 BFF→web type 생성 drift | 필요 |
-| `ai-pipeline` | 공개 의존성만 `make pipeline-install`(private Git 접근·App token 없음)로 설치한 환경에서 offline pytest 전체와 collection/ingestion/extraction/relation/dependents/handoff 실제 CLI smoke(`make pipeline-test pipeline-smoke`). 이 환경에는 `investmate`가 설치되지 않으며 시험은 PoC import를 막은 자식 프로세스에서도 모든 pipeline 모듈·명령이 동작함을 확인한다. 이 job의 success는 `required-ci`와 릴리스 게이트(`scripts/require_ci.py`의 `REQUIRED_JOBS`)가 요구하고, 브랜치 보호의 required status check 등록은 관리자의 수동 항목이다. 이전의 별도 `ai-pipeline-public` job과 `pipeline-public-*` target은 이 job으로 합쳐 제거했다 | 없음 |
+| `ai-pipeline-tests` | 공개 의존성 설치 후 offline pytest 전체(`make pipeline-test`, 파일 단위 4-worker 병렬 실행과 느린 30개 테스트 시간 출력) | 없음 |
+| `ai-pipeline-smoke` | 별도 러너에서 공개 의존성 설치 후 collection/ingestion/extraction/relation/dependents/handoff 실제 CLI smoke(`make pipeline-smoke`, 스크립트별 시간 출력). `investmate`·App token·모델 호출 없음 | 없음 |
+| `ai-pipeline` | 위 두 job의 성공을 요구하는 기존 이름의 집계 체크. skipped/cancelled/failure를 거부 | 없음 |
 | `ai-worker` | worker 자신의 manifest 설치, offline pytest, S1 schema drift, stdlib portable fixture validation | 없음 |
 | `ai-service` | service 자신의 manifest 설치(worker는 test 의존성), offline pytest(실제 uvicorn+설치된 `zoop-ai`+authored replay), 실제 loopback smoke, 내부 OpenAPI drift. 로컬 준비 상태이며 배포 승인이 아니다 | 없음 |
-| `api` | 러너의 JDK 21(`JAVA_HOME_21_X64`, 없으면 실패), `make api-test api-build`(foundation + AI 클라이언트 시험, DB·Python 불필요), `make service-install`, `make api-ai-smoke`(실제 Java→uvicorn ai/service→설치된 zoop-ai replay, 합성 인메모리 토큰, 모델 호출 0). 로컬 준비 상태이며 배포 승인이 아니다 | 없음 |
-| `required-ci` | 위 여덟 job이 모두 success인지 확인; skipped/cancelled/failure도 실패 | 없음 |
+| `api-container` | API 컨테이너를 자격 증명 없이 빌드 | 없음 |
+| `api-tests` | JDK 21, PostgreSQL 통합 시험, `make api-test api-build`, `make service-install`, 실제 Java→ai/service replay 검사(`make api-ai-smoke`) | 없음 |
+| `api-graph-smoke` | 별도 러너에서 JDK 21과 전용 PostgreSQL을 사용해 jar 빌드 및 실제 그래프 handoff 가져오기 스모크. 단계별 시간 출력 | 없음 |
+| `api` | 위 두 API job의 성공을 요구하는 기존 이름의 집계 체크. skipped/cancelled/failure를 거부 | 없음 |
+| `required-ci` | 모든 개별 job과 집계 job이 success인지 확인; skipped/cancelled/failure도 실패 | 없음 |
 
 2026-10-12 읽기 전용 원격 관측: [`6272d3c7a7f7128bb8260e54a98c488f4f44bca8`의 CI 실행](https://github.com/Donbug/zoop/actions/runs/38193448624)은 main push의 completed/failure입니다. **public-config / web / ai-worker는 success**, **bff / required-ci는 failure**였습니다. BFF의 private PoC 등록 preflight가 실패했고 App token 발급·의존성 설치·BFF 시험은 skipped였습니다. 같은 조회에서 repository Actions secrets와 variables는 각각 이름 목록이 비어 있었습니다. 조직에서 상속되는 항목은 조회하지 않았습니다. 따라서 **전체 CI 통과·배포 완료는 아닙니다**. 이 원격 실행은 해당 SHA의 증거이며 이후 미커밋 변경을 검증하지 않습니다. 자격 증명이나 저장소 규칙을 자동 등록하지 않았습니다.
 
@@ -83,7 +88,7 @@ runner는 `ubuntu-24.04`로 명시합니다. 공식 [runner image 도구 목록]
 
 `contracts-check`는 별도로 표준 JSON Schema validator와 format checker를 사용해 worker 입력·grant·응답 표본 16개를 검증합니다. `*.schema.json`만 스키마 정의로 검사하고, 디자인 토큰처럼 `$schema`로 형식을 가리키는 데이터 문서를 스키마 정의로 오인하지 않습니다. worker의 무의존성 부분집합 검사와 전체 표준 검사를 구분합니다.
 
-Fork PR은 private credential을 받을 수 없으므로 `bff` preflight가 명확히 실패합니다. `ai-pipeline`도 같은 이유로 실패합니다. 나머지 public-config/web/ai-worker는 독립 실행 가능합니다. fork 전체 CI가 통과했다고 표시하지 않습니다. 관리자가 기여 내용을 검토한 뒤 신뢰할 수 있는 same-repository branch/PR로 옮겨 전체 CI를 수행합니다. 승인 없는 fork 코드를 secret이 있는 trigger로 우회 실행하지 않습니다. 같은 저장소 PR도 secret 접근 가능한 trusted collaborator만 작성하도록 접근 권한을 관리합니다.
+Fork PR은 private credential을 받을 수 없으므로 `bff` preflight가 명확히 실패합니다. 공개 의존성만 쓰는 pipeline·API 검사들은 독립적으로 실행되지만 `required-ci`는 `bff` 실패를 거부합니다. fork 전체 CI가 통과했다고 표시하지 않습니다. 관리자가 기여 내용을 검토한 뒤 신뢰할 수 있는 same-repository branch/PR로 옮겨 전체 CI를 수행합니다. 승인 없는 fork 코드를 secret이 있는 trigger로 우회 실행하지 않습니다. 같은 저장소 PR도 secret 접근 가능한 trusted collaborator만 작성하도록 접근 권한을 관리합니다.
 
 **필수 선행 결정:** same-repository PR 작성자는 PR의 workflow와 실행 스크립트를 바꿀 수 있으므로 현재 구조에서는 App installation token뿐 아니라 repository secret에 둔 App private key에도 접근할 수 있습니다. 위의 step별 환경 범위·token revoke·로그 마스킹은 정상 workflow의 노출을 줄이는 조치이며 악의적인 PR 작성자를 격리하는 장치가 아닙니다. `main`의 PR 승인, branch protection, CODEOWNERS 리뷰는 **PR workflow 실행 전 credential 접근을 차단하지 않습니다.**
 
@@ -105,7 +110,7 @@ Fork PR은 private credential을 받을 수 없으므로 `bff` preflight가 명�
 3. **Donbug/zoop variable 등록 승인 후:** App settings의 숫자 **App ID**를 확인합니다. Client ID나 installation ID가 아닙니다. `Donbug/zoop`의 **Settings → Secrets and variables → Actions → Variables → New repository variable**에서 Name `POC_APP_ID`, 해당 App ID를 입력하고 **Add variable**을 누릅니다.
 4. **key 발급·Donbug/zoop secret 등록 승인 후:** 해당 App의 **Edit → Credentials → Key pairs → New key**에서 사람이 PEM을 발급합니다. `Donbug/zoop`의 **Settings → Secrets and variables → Actions → Secrets → New repository secret**에서 Name `POC_APP_PRIVATE_KEY`, PEM을 입력하고 **Add secret**을 누릅니다. 키는 agent/chat/이슈/저장소 파일/실제 `.env`/CI 출력으로 전달하지 않습니다. private key는 자동 만료되지 않으므로 승인된 보관·회전·폐기 방식을 기록합니다.
 5. Actions 사용 정책에서 아래 고정 action들과 runner bootstrap 통신이 허용되는지 확인합니다. 정책 변경이 필요하면 별도 승인받으며 민감한 자격 증명을 전달하는 Actions debug 로그를 켜지 않습니다.
-6. **CI 실행 승인 후:** 승인된 main의 **Actions → CI → Run workflow**를 사용하거나 해당 SHA의 실패 run을 재실행합니다. `bff` preflight 이후 App token 발급·private 고정 커밋 fetch·BFF 시험 진입을 확인하고 **public-config/web/app-web/bff/ai-pipeline/ai-worker/ai-service/api/required-ci 전부 success**를 같은 SHA/run/attempt로 기록합니다. 실패하면 설치 범위·Contents 권한·조직 승인·revision 존재를 확인하며 skip/continue-on-error로 성공 처리하지 않습니다.
+6. **CI 실행 승인 후:** 승인된 main의 **Actions → CI → Run workflow**를 사용하거나 해당 SHA의 실패 run을 재실행합니다. `bff` preflight 이후 App token 발급·private 고정 커밋 fetch·BFF 시험 진입을 확인하고 **`scripts/require_ci.py`의 `REQUIRED_JOBS` 전부 success**를 같은 SHA/run/attempt로 기록합니다. 실패하면 설치 범위·Contents 권한·조직 승인·revision 존재를 확인하며 skip/continue-on-error로 성공 처리하지 않습니다.
 7. fork PR과 App 미등록 상태의 전체 CI는 성공으로 주장하지 않습니다. 해당 실패 분기 검증도 별도 승인된 실행에서 확인하고 CI 링크를 팀에 기록합니다. 노출/회수 시 repository secret 삭제만으로 유출된 key가 무효화되지는 않으므로 담당자가 대상별 승인 후 App key 삭제/회전 및 필요한 installation 중단을 수행합니다.
 
 `scripts/private_poc_sync.py`는 토큰을 command line/remote URL/git config에 넣지 않습니다. 임시 askpass helper는 환경에서만 읽고 preflight stderr/토큰을 출력하지 않으며 작업 종료 시 삭제합니다. App token은 action의 post step에서 revoke됩니다. 로컬 사용자는 기존 [프로토타입 실행 가이드](../../prototype/README.md)의 조직 인증 절차를 사용하며 이 CI용 secret을 개인 환경으로 복사하지 않습니다.
@@ -165,7 +170,7 @@ python3 scripts/pr_watchdog.py --state-dir "$STATE" --resume Donbug/zoop#236
 배포 대상과 클라우드 권한이 미정이므로 CD deployment job, production 환경, 가짜 deploy 성공 step을 만들지 않습니다. `.github/workflows/release-artifacts.yml`은 `workflow_dispatch`만 받으며 **main만** 허용합니다.
 
 1. dispatch 시 GitHub가 정한 `github.sha`를 checkout합니다. 사용자가 넘긴 임의 ref/쉘 입력을 받지 않습니다.
-2. GitHub REST API에서 **동일 main SHA의 최신 CI push run**이 완료·success인지 확인합니다. 다른 커밋/PR run/다른 workflow, 과거 성공 뒤 최신 실패·진행 중 run은 인정하지 않습니다. 해당 attempt의 `public-config/web/app-web/bff/ai-pipeline/ai-worker/ai-service/api/required-ci`가 모두 success여야 합니다.
+2. GitHub REST API에서 **동일 main SHA의 최신 CI push run**이 완료·success인지 확인합니다. 다른 커밋/PR run/다른 workflow, 과거 성공 뒤 최신 실패·진행 중 run은 인정하지 않습니다. 해당 attempt의 `scripts/require_ci.py`에 열거된 개별·집계 job이 모두 success여야 합니다.
 3. 동일 커밋의 web을 frozen install/build합니다. CI 증거가 없으면 source-only 아티팩트로 우회하지 않습니다.
 4. allowlist로 prototype 소스·web dist·앱 manifest/lock·목표 OpenAPI·AI JSON Schema·토큰 원본만 ZIP에 담고 각 파일과 ZIP/manifest의 SHA-256을 생성합니다. `manifest.json`에 commit과 CI run ID를 기록합니다.
 5. 해당 ZIP, `manifest.json`, `SHA256SUMS`만 Actions artifact에 14일 보관합니다. cloud upload/deploy, GitHub Release 발행, DB migration, runtime 가동은 수행하지 않습니다.
