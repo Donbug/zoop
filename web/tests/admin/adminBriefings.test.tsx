@@ -579,4 +579,155 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
     expect(within(errors).getByText('MODEL_TIMEOUT')).toBeTruthy();
     expect(within(errors).getByText('응답 시간 초과')).toBeTruthy();
   });
+
+  test('날짜별·회원 수 자료가 아직 없으면 그래프 대신 아직 제공하지 않는다고 알린다', async () => {
+    server.on('GET', AI_USAGE, () => json(aiUsage));
+    open('/admin/ai');
+    await screen.findByRole('table', { name: 'AI 기능별 사용량' });
+    expect(
+      screen.getAllByText('AI 사용량 API가 아직 이 값을 주지 않아요.'),
+    ).toHaveLength(3);
+    expect(screen.queryByRole('group', { name: /날짜별/ })).toBeNull();
+  });
+
+  test('전체·브리핑·AI 챗봇 보기로 회원 사용 비율과 날짜별 토큰·비용을 나눠 보여 준다', async () => {
+    server.on('GET', AI_USAGE, () =>
+      json({
+        ...aiUsage,
+        cost: { ...aiUsage.cost, currency: 'USD' },
+        features: [
+          feature({
+            usage: {
+              modelCalls: 10,
+              inputTokens: 3000,
+              outputTokens: 1000,
+              replayCalls: 0,
+              retries: 0,
+            },
+          }),
+          feature({
+            feature: 'briefing',
+            label: '출퇴근 브리핑',
+            usage: {
+              modelCalls: 2,
+              inputTokens: 900,
+              outputTokens: 100,
+              replayCalls: 0,
+              retries: 0,
+            },
+          }),
+        ],
+        members: {
+          totalMembers: 200,
+          aiMembers: 50,
+          chatbotMembers: 30,
+          briefingMembers: null,
+          note: null,
+        },
+        daily: [
+          {
+            date: '2026-10-24',
+            features: [
+              {
+                feature: 'chatbot',
+                modelCalls: 6,
+                inputTokens: 2000,
+                outputTokens: 600,
+                actualCost: null,
+                estimatedCost: 0.03,
+              },
+              {
+                feature: 'briefing',
+                modelCalls: 1,
+                inputTokens: 500,
+                outputTokens: 50,
+                actualCost: 0.01,
+                estimatedCost: 0.012,
+              },
+            ],
+          },
+          {
+            date: '2026-10-23',
+            features: [
+              {
+                feature: 'chatbot',
+                modelCalls: 4,
+                inputTokens: 1000,
+                outputTokens: 400,
+                actualCost: null,
+                estimatedCost: 0.02,
+              },
+              {
+                feature: 'briefing',
+                modelCalls: null,
+                inputTokens: null,
+                outputTokens: null,
+                actualCost: null,
+                estimatedCost: null,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const { user, location } = open('/admin/ai');
+
+    expect(await screen.findByText('25%')).toBeTruthy();
+    expect(screen.getByText('50명 / 전체 200명')).toBeTruthy();
+    expect(
+      screen.getByRole('meter', { name: 'AI 기능을 쓴 회원 비율' }),
+    ).toBeTruthy();
+    const tokens = screen.getByRole('group', {
+      name: '전체 날짜별 토큰 사용량',
+    });
+    // 날짜는 오래된 것부터 그린다.
+    const bars = within(tokens).getAllByRole('img');
+    expect(bars[0].getAttribute('aria-label')).toBe(
+      '10월 23일 입력 1,000, 출력 400, 모델 호출 4',
+    );
+    expect(bars[1].getAttribute('aria-label')).toBe(
+      '10월 24일 입력 2,500, 출력 650, 모델 호출 7',
+    );
+    expect(
+      screen.getByRole('list', { name: '기능별 토큰 비중' }).textContent,
+    ).toContain('80%');
+
+    // 실제 청구액이 있는 기능(브리핑)과 추정만 있는 기능(챗봇)을 함께 더한다.
+    const allCost = screen.getByRole('group', { name: '전체 날짜별 AI 비용' });
+    expect(
+      within(allCost).getAllByRole('img')[1].getAttribute('aria-label'),
+    ).toBe('10월 24일 실제+추정 0.04 USD');
+
+    await user.click(screen.getByRole('tab', { name: '브리핑' }));
+    expect(location()).toBe('/admin/ai?view=briefing');
+    expect(screen.getByText('측정 안 함 / 전체 200명')).toBeTruthy();
+    const briefing = screen.getByRole('group', {
+      name: '브리핑 날짜별 토큰 사용량',
+    });
+    const briefingBars = within(briefing).getAllByRole('img');
+    expect(briefingBars[0].getAttribute('aria-label')).toBe(
+      '10월 23일 입력 자료 없음, 출력 자료 없음, 모델 호출 자료 없음',
+    );
+    const cost = screen.getByRole('group', { name: '브리핑 날짜별 AI 비용' });
+    expect(within(cost).getAllByRole('img')[1].getAttribute('aria-label')).toBe(
+      '10월 24일 실제 0.01 USD',
+    );
+    expect(screen.getByText(/실제 청구 비용이에요/)).toBeTruthy();
+    const table = screen.getByRole('table', { name: 'AI 기능별 사용량' });
+    expect(within(table).getByText('출퇴근 브리핑')).toBeTruthy();
+    expect(within(table).queryByText('AI 챗봇')).toBeNull();
+    expect(screen.queryByRole('list', { name: '기능별 토큰 비중' })).toBeNull();
+
+    await user.click(screen.getByRole('tab', { name: 'AI 챗봇' }));
+    expect(screen.getByText('15%')).toBeTruthy();
+    const chatCost = screen.getByRole('group', {
+      name: 'AI 챗봇 날짜별 AI 비용',
+    });
+    expect(
+      within(chatCost).getAllByRole('img')[0].getAttribute('aria-label'),
+    ).toBe('10월 23일 추정 0.02 USD');
+    expect(
+      screen.getByText(/추정 비용이에요. 실제 청구액과 다를 수 있어요/),
+    ).toBeTruthy();
+  });
 });
