@@ -7,6 +7,68 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "response:200:application/json.holdings[].marketValue:required": true,
+    "response:200:application/json.holdings[].marketValue<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.holdings[].marketValue<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.holdings[].quote:required": true,
+    "response:200:application/json.holdings[].quote<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.holdings[].quote<anyOf:0>.asOf:required": true,
+    "response:200:application/json.holdings[].quote<anyOf:0>.asOf<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.holdings[].quote<anyOf:0>.asOf<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.holdings[].quote<anyOf:0>.currency": {
+      "type": "string"
+    },
+    "response:200:application/json.holdings[].quote<anyOf:0>.currency:required": true,
+    "response:200:application/json.holdings[].quote<anyOf:0>.price": {
+      "type": "number"
+    },
+    "response:200:application/json.holdings[].quote<anyOf:0>.price:required": true,
+    "response:200:application/json.holdings[].quote<anyOf:0>.sourceName": {
+      "type": "string"
+    },
+    "response:200:application/json.holdings[].quote<anyOf:0>.sourceName:required": true,
+    "response:200:application/json.holdings[].quote<anyOf:0>.status": {
+      "type": "string",
+      "const": "available"
+    },
+    "response:200:application/json.holdings[].quote<anyOf:0>.status:required": true,
+    "response:200:application/json.holdings[].quote<anyOf:1>": {
+      "type": "object"
+    },
+    "response:200:application/json.holdings[].quote<anyOf:1>.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.holdings[].quote<anyOf:1>.reason:required": true,
+    "response:200:application/json.holdings[].quote<anyOf:1>.status": {
+      "type": "string",
+      "const": "unavailable"
+    },
+    "response:200:application/json.holdings[].quote<anyOf:1>.status:required": true,
+    "response:200:application/json.holdings[].ticker:required": true,
+    "response:200:application/json.holdings[].ticker<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.holdings[].ticker<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.holdings[].weight:required": true,
+    "response:200:application/json.holdings[].weight<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.holdings[].weight<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.metadata.failures": {
       "type": "array"
     },
@@ -52,6 +114,56 @@
       "type": "string"
     },
     "response:200:application/json.metadata.requestId:required": true,
+    "response:200:application/json.valuation": {
+      "type": "object"
+    },
+    "response:200:application/json.valuation.calculatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.valuation.calculatedAt:required": true,
+    "response:200:application/json.valuation.currency:required": true,
+    "response:200:application/json.valuation.currency<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.valuation.currency<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.valuation.totalMarketValue:required": true,
+    "response:200:application/json.valuation.totalMarketValue<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.valuation.totalMarketValue<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.valuation.weightStatus": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.valuation.weightStatus:required": true,
+    "response:200:application/json.valuation.weightUnavailableCode:required": true,
+    "response:200:application/json.valuation.weightUnavailableCode<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "missing_price",
+        "mixed_currency",
+        "zero_total"
+      ]
+    },
+    "response:200:application/json.valuation.weightUnavailableCode<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.valuation.weightUnavailableReason:required": true,
+    "response:200:application/json.valuation.weightUnavailableReason<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.valuation.weightUnavailableReason<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.valuation:required": true,
     "response:200:header:X-Request-ID": {
       "type": "string"
     },

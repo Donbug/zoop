@@ -1,6 +1,7 @@
 import { call } from '@/apis/auth/ApiService';
 import type {
   MockPortfolioOption,
+  MockPortfolioPreview,
   Portfolio,
   PortfolioConnection,
 } from '@/types/portfolio';
@@ -25,6 +26,16 @@ type ConnectionResponse = PortfolioConnection & {
 
 /** PortfolioResponse. metadata는 생략한다. */
 type PortfolioResponse = Portfolio;
+
+/** 연결하지 않고 모의 계좌 구성과 평가 비중을 조회한다. */
+export function getMockPortfolioPreview(
+  id: string,
+): Promise<MockPortfolioPreview> {
+  return call<MockPortfolioPreview>(
+    `${PORTFOLIO_API}/mock-portfolios/${encodeURIComponent(id)}`,
+    'GET',
+  );
+}
 
 /** 연결할 수 있는 가상 계좌 목록. 첫 페이지만 쓴다(목록이 짧은 모의 데이터). */
 export function getMockPortfolios(): Promise<MockPortfolioListResponse> {

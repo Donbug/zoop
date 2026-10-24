@@ -74,7 +74,7 @@ export default function MemberStatusForm({
       noValidate
       aria-label={title}
       onSubmit={(event) => void submit(event)}
-      className="flex flex-col gap-3 rounded-[3px] border-[0.667px] border-zoop-ink bg-zoop-paper p-4"
+      className="flex flex-col gap-3 rounded-2xl bg-zoop-soft p-5"
     >
       <p className="text-sm font-bold">{title}</p>
       <p className="text-[11px] leading-relaxed text-zoop-muted">

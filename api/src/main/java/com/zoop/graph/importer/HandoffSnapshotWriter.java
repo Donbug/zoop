@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 
 import com.zoop.common.json.Canonical;
 import com.zoop.common.json.StrictJson;
@@ -20,6 +21,7 @@ import com.zoop.graph.importer.HandoffBundle.Issue;
 import com.zoop.graph.importer.HandoffBundle.Relation;
 import com.zoop.graph.importer.HandoffExportParser.VerifiedHandoff;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -235,6 +237,46 @@ final class HandoffSnapshotWriter {
             node.put("end", item.end());
         }
         return Canonical.bytes(root);
+    }
+
+    /**
+     * The snapshot written by {@link #snapshot} with only the issues, relations, article versions and evidence {@code visible} (a
+     * subset of it, from {@code PublicationRuleEvaluator.apply}) still holds, each kept element byte-for-byte as written and in its
+     * order. Every other key is copied unchanged, so a snapshot no rule filtered is the same bytes.
+     */
+    static byte[] keepOnly(byte[] snapshot, PublicGraphSnapshot visible) {
+        Set<String> issues = new HashSet<>();
+        visible.issues().forEach(issue -> issues.add(issue.issueId()));
+        Set<String> relations = new HashSet<>();
+        visible.relations().forEach(relation -> relations.add(relation.relationId()));
+        Set<String> articles = new HashSet<>();
+        visible.articles().forEach(article -> articles.add(article.articleId() + "\n" + article.version()));
+        Set<String> evidence = new HashSet<>();
+        visible.evidence().forEach(item -> evidence.add(item.evidenceId()));
+
+        Obj source = StrictJson.parseObject(snapshot);
+        ObjectNode root = StrictJson.newObject();
+        for (String key : source.node().propertyNames()) {
+            root.set(key, switch (key) {
+                case "issues" -> kept(source.array(key), node -> issues.contains(Obj.of(node).string("issueId")));
+                case "relations" -> kept(source.array(key), node -> relations.contains(Obj.of(node).string("relationId")));
+                case "articles" -> kept(source.array(key), node -> articles.contains(
+                        Obj.of(node).string("articleId") + "\n" + Obj.of(node).string("version")));
+                case "evidence" -> kept(source.array(key), node -> evidence.contains(Obj.of(node).string("evidenceId")));
+                default -> source.raw(key);
+            });
+        }
+        return Canonical.bytes(root);
+    }
+
+    private static ArrayNode kept(JsonNode array, Predicate<JsonNode> keep) {
+        ArrayNode out = StrictJson.newArray();
+        for (JsonNode node : array) {
+            if (keep.test(node)) {
+                out.add(node);
+            }
+        }
+        return out;
     }
 
     /** The written mentions of one issue (app mention id to its article version, ascending) and the representative's app id, if written. */

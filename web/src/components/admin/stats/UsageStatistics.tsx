@@ -75,15 +75,16 @@ export function StatsSummaryPanel({ window }: { window: StatsWindow }) {
     );
   const data = summary.data;
   const byGroup = (group: StatsMetric['group']) =>
-    data.metrics.filter((metric) => metric.group === group);
+    data.metrics.filter(
+      (metric) => metric.key !== 'onboarding' && metric.group === group,
+    );
   const trend = [...data.trend].reverse();
 
   return (
     <>
       <Note>
         집계 시각 {formatKst(data.asOf)} · 비율은 분모가 {data.minSample}{' '}
-        미만이면 숨기고 건수만 보여 줘요 · 온보딩은 {data.membersScope}{' '}
-        기준이에요.
+        미만이면 숨기고 건수만 보여 줘요.
       </Note>
       <Section title="서비스 이용">
         <MetricTable

@@ -19,6 +19,71 @@ export function shortTitle(text: string, size = 13, maxWidth = 180) {
   return result + '…';
 }
 
+/** 화면 맞춤용 이름표 폭(화면 px). graph-readability가 이름표를 배율에 반비례(13/zoom, 줄바꿈 170/zoom)로 그려 화면에서는 크기가 일정하다. */
+// D-GRP-03: keep the selected company distinguishable after LOD correction.
+export function screenLabelSize(node: NodeData) {
+  return node.data?.chosen ? 16 : 13;
+}
+const FIT_LABEL_WRAP = 170;
+
+/**
+ * 맞춤 경계: 노드 원은 지도 좌표, 이름표는 화면 px로 따로 잰다.
+ * 이름표 크기가 지금 배율에 따라 바뀌므로 지도 좌표에 섞으면 맞춤을 반복할수록 더 축소될 수 있다.
+ */
+export function fitFootprint(node: NodeData) {
+  const s = node.style ?? {};
+  const dimensions = Array.isArray(s.size)
+    ? s.size
+    : [s.size ?? 8, s.size ?? 8];
+  const radius = Number(dimensions[1] ?? dimensions[0]) / 2;
+  const label = String(s.labelText ?? '');
+  const fontSize = screenLabelSize(node);
+  const oneLine = textWidth(label, fontSize);
+  const lines = label ? Math.max(1, Math.ceil(oneLine / FIT_LABEL_WRAP)) : 0;
+  return {
+    x: Number(s.x ?? 0),
+    y: Number(s.y ?? 0),
+    radius: radius + 4,
+    labelWidth: label ? Math.min(oneLine, FIT_LABEL_WRAP) + 24 : 0,
+    labelHeight: label ? lines * fontSize * 1.5 + 8 + 10 : 0,
+  };
+}
+
+/**
+ * 맞춤 배율: 노드 원 범위(지도 좌표)에 이름표가 차지하는 화면 여백을 더해 화면에 들어가는 가장 큰 배율.
+ * 지금 배율을 입력으로 쓰지 않아 같은 노드를 다시 맞춰도 같은 값이 나온다.
+ */
+export function fitZoom(
+  footprints: ReturnType<typeof fitFootprint>[],
+  safe: { width: number; height: number },
+  maxZoom: number,
+) {
+  const left = Math.min(...footprints.map((f) => f.x - f.radius)),
+    right = Math.max(...footprints.map((f) => f.x + f.radius)),
+    top = Math.min(...footprints.map((f) => f.y - f.radius)),
+    bottom = Math.max(...footprints.map((f) => f.y + f.radius));
+  const labelWidth = Math.max(...footprints.map((f) => f.labelWidth));
+  const labelHeight = Math.max(...footprints.map((f) => f.labelHeight));
+  const solve = (scale: number) =>
+    Math.max(
+      0.01,
+      Math.min(
+        maxZoom,
+        Math.max(1, safe.width - labelWidth * scale) /
+          Math.max(1, right - left),
+        Math.max(1, safe.height - labelHeight * scale) /
+          Math.max(1, bottom - top),
+      ),
+    );
+  // 배율 1 이상에서는 이름표가 기본 크기(13)로 함께 커지므로 그만큼 한 번 더 여백을 잡는다.
+  const first = solve(1);
+  const zoom = first > 1 ? solve(first) : first;
+  return {
+    zoom,
+    center: [(left + right) / 2, (top + bottom) / 2] as [number, number],
+  };
+}
+
 // Conservative world-space footprints include the label background and badges.
 export function nodeRect(node: NodeData): Rect {
   const s = node.style ?? {};
