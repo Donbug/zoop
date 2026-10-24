@@ -56,6 +56,21 @@ function overview(): InsightsOverview {
         unavailableReason: null,
       },
       {
+        key: 'onboarding',
+        group: 'usage',
+        label: '온보딩 완료율',
+        kind: 'ratio',
+        unit: '명',
+        definition: '',
+        count: null,
+        numerator: 3,
+        denominator: 3,
+        rate: 1,
+        sampleHidden: false,
+        availability: 'available',
+        unavailableReason: null,
+      },
+      {
         key: 'briefingRate',
         group: 'interest',
         label: '브리핑 조회율',
@@ -221,6 +236,7 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
     expect(screen.getByText('성공 28 · 실패 0')).toBeTruthy();
     expect(screen.getByText('갱신 2026-10-06 12:43 KST')).toBeTruthy();
     expect(screen.queryByRole('button', { name: '새로 고침' })).toBeNull();
+    expect(screen.queryByText('온보딩 완료율')).toBeNull();
 
     const briefings = screen.getByRole('table', { name: '브리핑 회차 목록' });
     expect(within(briefings).getByText('2026-10-06 출근')).toBeTruthy();
