@@ -94,7 +94,9 @@ it.each([
         );
         expect(node?.style?.iconSrc).toBeUndefined();
         expect(node?.style?.iconText).toBe('새');
-        expect(node?.style?.fill).toBe(paper);
+        expect(node?.style?.fill).toBe(
+          variant === 'improved' && theme === 'dark' ? '#262626' : paper,
+        );
         expect(node?.style?.iconFill).toBe(ink);
         expect(node?.style?.fill).not.toBe(node?.style?.iconFill);
       }

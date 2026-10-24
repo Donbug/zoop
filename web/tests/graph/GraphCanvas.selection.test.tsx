@@ -206,9 +206,9 @@ describe('D-GRP-02 · canvas selection bridge', () => {
         const direct = rendered.edges?.find(
           (edge) => !edge.style?.lineDash && !edge.style?.endArrow,
         );
-        expect(direct?.style?.lineWidth).toBe(1.5);
+        expect(direct?.style?.lineWidth).toBe(1.95);
         expect(direct?.style?.stroke).toBe(
-          theme === 'dark' ? '#a3a3a3' : '#777773',
+          theme === 'dark' ? '#a5a9b1' : '#71757c',
         );
         const label = rendered.nodes?.find(
           (node) => node.id === 'NASDAQ:NVDA',

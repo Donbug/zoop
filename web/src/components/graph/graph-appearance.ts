@@ -21,8 +21,15 @@ export function appearanceColors(appearance: GraphAppearance) {
     ink: dark ? '#f5f5f5' : '#1a1a1a',
     paper: dark ? '#262626' : '#ffffff',
     muted: dark ? '#d4d4d4' : '#55554f',
-    line: dark ? '#737373' : '#94948f',
-    selected: dark ? '#f5f5f5' : '#1a1a1a',
+    line: dark ? '#a5a9b1' : '#71757c',
+    selected:
+      appearance.variant === 'improved'
+        ? dark
+          ? '#d4d4d8'
+          : '#414146'
+        : dark
+          ? '#f5f5f5'
+          : '#1a1a1a',
   };
 }
 export function styleGraph(
@@ -38,17 +45,35 @@ export function styleGraph(
       ...node,
       style: {
         ...node.style,
+        size:
+          Number(node.style?.size ?? 20) *
+          (node.data?.kind === 'company' ? 1.15 : 1.1),
+        ...(node.data?.kind === 'company'
+          ? {
+              iconWidth:
+                Number(node.style?.iconWidth ?? node.style?.size ?? 20) * 1.15,
+              iconHeight:
+                Number(node.style?.iconHeight ?? node.style?.size ?? 20) * 1.15,
+              iconRadius: Number(node.style?.iconRadius ?? 0) * 1.15,
+              iconFontSize: Number(node.style?.iconFontSize ?? 12) * 1.15,
+              shadowColor: dark ? 'rgba(0,0,0,0.35)' : 'rgba(24,24,27,0.14)',
+              shadowBlur: 5,
+              shadowOffsetY: 2,
+            }
+          : {}),
         labelFontSize: Number(node.style?.labelFontSize ?? 13) * 1.15,
         labelFontWeight: 600,
         fill:
           node.data?.kind === 'company'
-            ? (node.style?.fill ?? '#ffffff')
+            ? node.style?.iconSrc
+              ? (node.style?.fill ?? '#ffffff')
+              : colors.paper
             : colors.ink,
-        stroke: colors.ink,
+        stroke: dark ? '#747478' : '#b8b8b6',
         haloStroke: colors.ink,
         labelFill: node.data?.kind === 'company' ? colors.muted : colors.ink,
         labelBackgroundFill: colors.paper,
-        labelBackgroundStroke: dark ? '#737373' : '#1a1a1a',
+        labelBackgroundStroke: dark ? '#6b6b70' : '#bababa',
       },
     })),
     edges: data.edges?.map((edge) => {
@@ -59,9 +84,15 @@ export function styleGraph(
         ...edge,
         style: {
           ...edge.style,
-          stroke: follows ? colors.ink : dark ? '#a3a3a3' : '#777773',
-          lineWidth: shared ? 1.2 : 1.5,
-          strokeOpacity: dimmed ? 0.2 : shared ? 0.65 : 0.9,
+          stroke: follows
+            ? dark
+              ? '#efa397'
+              : '#b04b42'
+            : dark
+              ? '#a5a9b1'
+              : '#71757c',
+          lineWidth: shared ? 1.5 : 1.95,
+          strokeOpacity: dimmed ? 0.2 : shared ? 0.75 : 0.95,
         },
       };
     }),
