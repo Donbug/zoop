@@ -25,11 +25,11 @@
 | 문서·근거·분석 | 5 | 분석 내부 주장·인용·긍부정을 한 결과에 저장 |
 | 브리핑 | 3 | 회차에 발행 원문 보관, 정정·중단은 한 이력 테이블 |
 | 채팅 | 3 | 작업에 결과·인용·라우팅 요약을 포함하고 실제 도구 호출은 독립 기록 |
-| 그래프·검수·공개 규칙 | 6 | 실제 조회 이력 유지, 버전 상태·활성 포인터 통합 |
+| 그래프·검수·공개 규칙 | 7 | 실제 조회 이력 유지, 버전 상태·활성 포인터 통합, 버전별 적용 규칙 |
 | 평가·작업·통계·감사 | 6 | 독립 집계·조회가 필요한 기록 유지 |
-| **합계** | **36** | Neo4j 노드·관계 및 파일 저장소는 이 개수에 포함하지 않음 |
+| **합계** | **37** | Neo4j 노드·관계 및 파일 저장소는 이 개수에 포함하지 않음 |
 
-36개는 이 설계안의 선택이지 API가 강제하는 최소 개수가 아니다. 개발 일정과 인력 배분은 이 ERD의 범위에서 제외한다.
+37개는 이 설계안의 선택이지 API가 강제하는 최소 개수가 아니다. 개발 일정과 인력 배분은 이 ERD의 범위에서 제외한다.
 
 ## 2. 저장소와 공통 규칙
 
@@ -402,7 +402,14 @@ UNIQUE(active) WHERE active=true
 
 활성화는 공통 DB advisory lock 안에서 기존 active=false, 대상 active=true, graph_activations INSERT, 감사 기록을 한 트랜잭션으로 수행한다. 읽는 쪽은 요청 시작에 버전 하나를 고정한다. 투영 성공과 검증 통과 전에는 활성화하지 않는다. 버전 없는 최신 그래프로 fallback하지 않는다.
 
-review_revision은 버전 생성 트랜잭션의 공통 publication_state 잠금 아래 읽은 `COALESCE(MAX(review_decisions.global_revision),0)`를 snapshot과 함께 고정한다. 외부 snapshot 생성은 잠금 밖에서 수행하되 커밋 시 입력 revision과 현재 revision의 일치를 검사한다. 이후 새 결정이 생겨도 고정값을 수정하지 않는다. rule_revision은 publication_rule_changes.log_revision의 별도 카운터다.
+review_revision(`COALESCE(MAX(review_decisions.global_revision),0)`)과 rule_revision(`COALESCE(MAX(publication_rule_changes.log_revision),0)`)은 인계 묶음 수입 트랜잭션이 켜진 규칙과 함께 **한 SQL 문장**으로 읽어 snapshot과 함께 고정한다. 수입은 정기 회차(30분)마다 돌므로 공통 publication_state 잠금을 잡지 않는다. 두 카운터는 그 잠금 아래 MAX+1로 할당되고 잠금이 커밋까지 유지되므로, 한 문장은 각각의 커밋된 앞부분을 보고 그때의 규칙 상태와 어긋나지 않는다. 읽은 뒤 커밋된 결정·규칙 전환은 다음 회차 버전에 반영한다. 이후 새 결정이 생겨도 고정값을 수정하지 않는다. 규칙 이전에 수입된 버전은 rule_revision NULL이며 규칙을 적용하지 않았다.
+
+```text
+graph_version_rules: graph_version_id text FK graph_versions ON DELETE CASCADE; rule_id text FK publication_rules
+PRIMARY KEY(graph_version_id, rule_id)
+```
+
+graph_version_rules는 그 버전 snapshot을 거른 규칙(수입 시점에 켜져 있던 규칙)이다. 같은 고정값으로 다시 수입하면 지금 켜진 규칙이 아니라 이 규칙으로 다시 계산해 비교한다. 행은 버전과 함께 쓰고 UPDATE를 거절한다. `published*`는 receipt와 이 규칙으로 언제든 같은 판정 함수로 다시 계산할 수 있어 따로 저장하지 않는다.
 
 activated_at 컬럼은 제거한다. GraphVersionOut.activatedAt은 graph_activations에서 이 버전의 pointer_changed=true인 마지막 시각으로 계산한다. active 컬럼은 현재 포인터의 권위값이며 그 변경·동일 변경 이력·감사는 공통 잠금 아래 하나의 트랜잭션에서만 기록한다. 일반 UPDATE 권한으로 active를 수정하지 못하게 한다. 이력을 현재 active와 경쟁하는 별도 쓰기 경로로 사용하지 않는다.
 
@@ -675,7 +682,7 @@ erDiagram
 | feedback | feedback | 유효 평가·취소·집계 유지 |
 | chat_sessions | chat_sessions | 대화 소유권 유지 |
 | chat_jobs, chat_attempts, chat_results, chat_citations | chat_jobs + chat_tool_calls | 질문·결과·계획 요약은 작업에 통합하고 실제 읽기 도구 호출은 독립 관측 |
-| graph_versions, graph_version_db_state, graph_active_version | graph_versions | 3→1, 활성 버전 유일성 유지 |
+| graph_versions, graph_version_db_state, graph_active_version | graph_versions + graph_version_rules | 3→1, 활성 버전 유일성 유지. 버전별 적용 규칙은 규칙 FK가 필요해 하위 테이블 |
 | graph_activations | graph_activations | 버전 활성화 이력 유지 |
 | review_targets, review_decisions | 동일 2개 | 대상과 결정 이력 유지 |
 | publication_rules, publication_rule_changes | 동일 2개 | 규칙 API의 history 유지 |

@@ -696,7 +696,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getVirtualAccountProfile · 가상 계좌 프로필 조회
 
-서비스 시연용 고정 Mock 프로필을 조회한다. 실제 증권계좌·자격 증명 연동이 아니며 프로필의 예수금·보유종목 값은 변경하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+서비스 시연용 고정 Mock 프로필을 연결 없이 읽기 전용으로 미리 본다. 현재 시세로 평가 금액과 비중을 계산하며, 조회는 회원 계좌 연결 상태를 변경하지 않는다. 실제 증권계좌·자격 증명 연동이 아니며 프로필 값도 변경하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2999,6 +2999,46 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | recentErrors | 필수 | [RecentError](#schema-recenterror)[] |  |
 | note | 필수 | string |  |
 
+<a id="schema-aiusageday"></a>
+
+### AiUsageDay
+
+하루(KST) 동안의 기능별 모델 사용량(getAiUsage.daily). 집계 window 경계 이상 asOf 이하의 ai_executions를 started_at 기준으로 고른 뒤, started_at을 KST 날짜로 변환해 귀속한다. 자정을 넘어 끝나거나 나중에 영수증이 확인된 실행도 시작일에 남는다. running·unknown 실행은 호출 수 모집단에 포함하되 아직 모르는 토큰·비용은 0이 아니라 null이다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| date | 필수 | string (date) | KST 날짜 YYYY-MM-DD |
+| features | 필수 | [AiUsageDayFeature](#schema-aiusagedayfeature)[] |  |
+
+<a id="schema-aiusagedayfeature"></a>
+
+### AiUsageDayFeature
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| feature | 필수 | string | ai_executions.feature (chatbot, briefing, briefing-outlook, news-analysis, document-sentiment). 귀속 규칙은 getAiUsage 설명과 같다. |
+| modelCalls | 필수 | integer / null | execution_mode=live인 실제 외부 모델 시도 수. replay·save_only는 넣지 않는다. 모르면 null |
+| inputTokens | 필수 | integer / null |  |
+| outputTokens | 필수 | integer / null |  |
+| actualCost | 필수 | number / null | 실제 청구액. 모르면 0이 아니라 null. 통화는 AiUsageResponse.cost.currency |
+| estimatedCost | 필수 | number / null | 추정액. 모르면 0이 아니라 null |
+
+<a id="schema-aiusagemembers"></a>
+
+### AiUsageMembers
+
+AI 사용 회원 수(getAiUsage.members). 화면은 각 값을 totalMembers로 나눠 비율을 보여 준다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| totalMembers | 필수 | integer | 집계 기간 끝 기준 가입 회원 수(탈퇴 제외) |
+| aiMembers | 필수 | integer / null | 기간 안에 회원 단위로 셀 수 있는 AI 기능을 한 번이라도 쓴 회원 수(중복 제거). 측정하지 않으면 null |
+| chatbotMembers | 필수 | integer / null | 기간 안에 챗봇 질문을 한 회원 수(chat_sessions.member_id 중복 제거). 측정하지 않으면 null |
+| briefingMembers | 필수 | integer / null | 기간 안에 브리핑을 읽은 회원 수. 회원별 읽음 기록이 없으면 null |
+| note | 필수 | string / null | 집계 기준 설명(예: 게스트 제외) |
+
 <a id="schema-aiusageresponse"></a>
 
 ### AiUsageResponse
@@ -3012,6 +3052,8 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | features | 필수 | [AiFeature](#schema-aifeature)[] |  |
 | pastRuns | 필수 | [PastRun](#schema-pastrun)[] |  |
 | cost | 필수 | [FeatureCost](#schema-featurecost) |  |
+| daily | 선택 | [AiUsageDay](#schema-aiusageday)[] / null | 제안(2026-10-24, A-ADM-04b 날짜별 그래프): 집계 기간의 KST 날짜별·기능별 모델 사용량. ai_executions.started_at이 요청 window 경계 이상 asOf 이하인 실행을 started_at의 KST 날짜에 귀속한다. 24h·7d·30d의 첫날과 마지막 날은 window 경계에 따라 일부 시간만 포함할 수 있다. 오래된 날짜부터 정렬하고, 사용 기록이 없는 날도 빠뜨리지 않는다. 서버가 아직 집계하지 않으면 필드를 생략하거나 null이다. |
+| members | 선택 | [AiUsageMembers](#schema-aiusagemembers) / null | 제안(2026-10-24, A-ADM-04b 사용 회원 비율): 집계 기간에 AI 기능을 쓴 회원 수. 서버가 아직 집계하지 않으면 필드를 생략하거나 null이다. |
 
 <a id="schema-approvalout"></a>
 
@@ -3657,7 +3699,7 @@ answered 본문의 근거 수준별 구간.
 | --- | --- | --- | --- |
 | basis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded} | 이 구간의 근거 수준. general_knowledge 구간은 서버가 고정 안내 문장 '일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.'로 시작하고 최신 사실·수치·전망·투자 판단을 담지 않는다. |
 | text | 필수 | string |  |
-| evidenceIds | 필수 | string[] (uniqueItems) | 이 구간의 사실 주장이 연결된 근거. 모두 result.citations의 evidenceId여야 하며 general_knowledge 구간은 빈 배열이다. zoop_documented 구간은 sourceKind=zoop_doc, evidence_grounded 구간은 sourceKind=article 인용만 가리킨다. |
+| evidenceIds | 필수 | string[] (uniqueItems) | 이 구간의 사실 주장이 연결된 근거. 모두 result.citations의 evidenceId여야 하며 general_knowledge 구간은 빈 배열이다. zoop_documented 구간은 sourceKind=zoop_doc, evidence_grounded 구간은 sourceKind=article 또는 company_profile 인용만 가리킨다. |
 
 <a id="schema-chatapplied"></a>
 
@@ -3899,8 +3941,8 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| sourceKind | 필수 | string {article, zoop_doc} | article: 뉴스·공시 원문(articleId·articleVersion 필수, docId·docVersion null). zoop_doc: 승인된 ZOOP 도움말·화면 명세·정책 문서(docId·docVersion 필수, articleId·articleVersion·publisher·publishedAt·url은 null, articleTitle에는 문서 제목). zoop_documented 구간은 zoop_doc 인용만, evidence_grounded 구간은 article 인용만 쓴다. |
-| evidenceId | 필수 | string | 인용 식별자. article이면 evidence ID, zoop_doc이면 서버가 문서 ID·버전·구간으로 만든 결정적 ID다. sections[].evidenceIds가 이 값을 가리킨다. |
+| sourceKind | 필수 | string {article, zoop_doc, company_profile} | article: 뉴스·공시 원문(articleId·articleVersion 필수, docId·docVersion null). zoop_doc: 승인된 ZOOP 도움말·화면 명세·정책 문서(docId·docVersion 필수, articleId·articleVersion·publisher·publishedAt·url은 null, articleTitle에는 문서 제목). company_profile: 줍이 검수한 기업 카탈로그 프로필(사업 개요·법인명·대표·설립일·업종·홈페이지) 전문(docId는 기업 ID, articleId·articleVersion·docVersion·publishedAt은 null, start=0·end는 quote의 code point 길이, articleTitle은 '<기업명> 기업 개요', publisher는 '줍 기업 카탈로그', url은 기업 홈페이지 또는 null). 카탈로그가 인용한 문장을 바꾸면 그 인용은 더 이상 읽을 수 없다. zoop_documented 구간은 zoop_doc 인용만, evidence_grounded 구간은 article·company_profile 인용만 쓴다. |
+| evidenceId | 필수 | string | 인용 식별자. article이면 evidence ID, company_profile이면 기업 ID와 인용 문장으로 만든 결정적 ID(ev- 형식), zoop_doc이면 서버가 문서 ID·버전·구간으로 만든 결정적 ID다. sections[].evidenceIds가 이 값을 가리킨다. |
 | quote | 필수 | string |  |
 | articleId | 필수 | string, null |  |
 | articleVersion | 필수 | string, null |  |
@@ -5560,7 +5602,7 @@ The three market indicators stored with a published round; never changed after p
 
 ### MockProfileResponse
 
-FS062: one project mock profile with its account id, cash and holdings (no real brokerage account).
+FS062: one project mock profile with its account id, cash, valued holdings and weights. Read-only; it does not create a member connection or access a real brokerage account.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5569,7 +5611,8 @@ FS062: one project mock profile with its account id, cash and holdings (no real 
 | accountId | 필수 | string |  |
 | cash | 필수 | [MockCash](#schema-mockcash) / null | null when the mock does not provide cash; 0 is a real 0 |
 | asOf | 필수 | string (date-time) / null | As-of time of the mock values when the mock gives one |
-| holdings | 필수 | [MockHoldingOut](#schema-mockholdingout)[] |  |
+| holdings | 필수 | [HoldingOut](#schema-holdingout)[] |  |
+| valuation | 필수 | [PortfolioValuation](#schema-portfoliovaluation) |  |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-neo4jstatus"></a>

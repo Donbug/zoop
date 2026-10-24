@@ -84,11 +84,45 @@ class ChatPlannerTest {
     }
 
     @Test
+    void namedCompaniesGetTheServerDefaultReadsWhateverTheCapabilityProbabilities() {
+        Set<String> bound = Set.of("company.read", "issue.read", "evidence.resolve", "graph.path.read");
+        var plan = run(planner.plan(run(0, "v1"), decision(
+                req("about", Map.of(ChatQueryType.Q03, 0.6), Map.of("issue.read", 0.1), List.of("KRX:005930")),
+                req("relation", Map.of(ChatQueryType.Q04, 0.99), Map.of("graph.path.read", 0.3),
+                        List.of("KRX:005930", "NASDAQ:ASML")),
+                req("issue", Map.of(ChatQueryType.Q03, 0.9), Map.of("issue.read", 0.9), List.of("iss-1"))), bound));
+        assertEquals(List.of(ChatCapability.COMPANY_READ), plan.requirements().get(0).capabilities(),
+                "a company question reads the company even when no capability reached the review band");
+        assertEquals(List.of(ChatCapability.GRAPH_PATH_READ), plan.requirements().get(1).capabilities());
+        assertEquals(List.of(ChatCapability.ISSUE_READ), plan.requirements().get(2).capabilities(),
+                "an issue target gets no company read");
+
+        var unbound = run(planner.plan(run(0, "v1"), decision(req("about", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("issue.read", 0.9), List.of("KRX:005930"))), Set.of("issue.read")));
+        assertEquals(List.of(ChatCapability.ISSUE_READ), unbound.requirements().getFirst().capabilities(),
+                "a default runs only when bound");
+    }
+
+    @Test
+    void aConceptQuestionNamingACompanyIsAlsoACompanyQuestion() {
+        var plan = run(planner.plan(run(0, "v1"), decision(req("r", Map.of(ChatQueryType.Q02, 0.72,
+                ChatQueryType.Q03, 0.54), Map.of(), List.of("KRX:005930"))), BOUND));
+        var r = plan.requirements().getFirst();
+        assertEquals(ChatPlan.Mode.TOOLS, r.mode());
+        assertEquals(List.of(ChatCapability.COMPANY_READ), r.capabilities());
+
+        var concept = run(planner.plan(run(0, "v1"), decision(req("r", Map.of(ChatQueryType.Q02, 0.9,
+                ChatQueryType.Q03, 0.2), Map.of(), List.of("KRX:005930"))), BOUND));
+        assertEquals(ChatPlan.Mode.GENERAL, concept.requirements().getFirst().mode(),
+                "below the review band it stays a concept");
+    }
+
+    @Test
     void gatesLimitWhatTheModelCannotDecide() {
         var plan = run(planner.plan(run(0, "v1"), decision(
                 req("advice", Map.of(ChatQueryType.Q02, 0.9), Map.of()).withAdvice(0.2),
                 req("path", Map.of(ChatQueryType.Q04, 0.9), Map.of("graph.path.read", 0.95), List.of("KRX:000660")),
-                req("free", Map.of(ChatQueryType.Q03, 0.9), Map.of("graph.delete", 0.99), List.of("KRX:000660")),
+                req("free", Map.of(ChatQueryType.Q03, 0.9), Map.of("graph.delete", 0.99), List.of("iss-1")),
                 req("concept", Map.of(ChatQueryType.Q02, 0.9), Map.of())), BOUND));
         assertEquals(Arrays.asList("investment_advice", "out_of_scope", "out_of_scope", null),
                 plan.requirements().stream().map(ChatPlan.Planned::limitation).toList(),
@@ -129,6 +163,24 @@ class ChatPlannerTest {
                         "evidence.resolve", 0.9), sixteen),
                 req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9, "issue.read", 0.9,
                         "evidence.resolve", 0.9)).dependingOn(new Dependency("r1", "atLeast", 1))), BOUND));
+    }
+
+    @Test
+    void aPathReadIsCountedAndSplitWithItsFirstTargetInEveryCall() {
+        List<String> seven = java.util.stream.IntStream.range(0, 7).mapToObj(i -> "KRX:" + i).toList();
+        assertEquals(List.of(seven.subList(0, 5), List.of("KRX:0", "KRX:5", "KRX:6")),
+                ChatRetrieval.batches(ChatCapability.GRAPH_PATH_READ, seven));
+        assertEquals(List.of(seven.subList(0, 5), List.of("KRX:0", "KRX:5")),
+                ChatRetrieval.batches(ChatCapability.GRAPH_PATH_READ, seven.subList(0, 6)));
+        assertEquals(List.of(List.of("KRX:0")), ChatRetrieval.batches(ChatCapability.GRAPH_PATH_READ, seven.subList(0, 1)));
+        assertEquals(List.of(seven.subList(0, 5), seven.subList(5, 7)), ChatRetrieval.batches(ChatCapability.COMPANY_READ, seven));
+        for (int n = 1; n <= 16; n++) {
+            List<String> targets = java.util.stream.IntStream.range(0, n).mapToObj(i -> "KRX:" + i).toList();
+            for (ChatCapability capability : List.of(ChatCapability.GRAPH_PATH_READ, ChatCapability.COMPANY_READ)) {
+                assertEquals(ChatRetrieval.batches(capability, targets).size(), ChatPlanner.chunks(capability, n),
+                        "the budget counts the calls retrieval makes: " + capability + " × " + n);
+            }
+        }
     }
 
     @Test

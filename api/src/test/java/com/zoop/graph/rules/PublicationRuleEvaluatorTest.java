@@ -9,6 +9,7 @@ import com.zoop.graph.rules.PublicationRuleEvaluator.EnabledRule;
 import com.zoop.graph.rules.PublicationRuleEvaluator.Outcome;
 import com.zoop.graph.rules.RuleDefinition.AssertionStatus;
 import com.zoop.graph.rules.RuleDefinition.SingleSource;
+import com.zoop.graph.read.GraphEvidenceSnapshotReader;
 import com.zoop.graph.snapshot.GraphSnapshotCodec;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Article;
@@ -20,6 +21,7 @@ import com.zoop.graph.snapshot.PublicGraphSnapshot.Issue;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.MentionRef;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Relation;
 import java.io.InputStream;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -232,6 +234,28 @@ class PublicationRuleEvaluatorTest {
                     .noneMatch(r -> r.evidenceIds().contains(basisOnly) || r.evidenceIds().contains(impactOnly)),
                     "an indirect citation is never added to a relation's evidenceIds");
         }
+    }
+
+    @Test
+    void aSpanKeptForASharedArticleIsOfferedToTheReceiptOnlyThroughRelationsLeftVisible() {
+        // Two structural relations share basis article art-9; only rel-proving's basis would prove the span in the receipt.
+        // A rule hides rel-proving: the span stays (rel-kept still cites art-9), but the evidence read may only offer the
+        // receipt rel-kept, so the receipt cannot prove the span through the hidden relation (#308 review).
+        Fixture f = new Fixture();
+        f.issue("iss-a", "occurred", "art-1", "art-2");
+        f.structural("rel-proving", "iss-a", "C2", List.of(new ArticleRef("art-9", "v1")));
+        f.structural("rel-kept", "iss-a", "C3", List.of(new ArticleRef("art-9", "v1")), f.evidence("art-1", "v1"));
+        String span = f.evidence("art-9", "v1");
+        f.relation("rel-involves", "INVOLVES", "iss-a", "C1", f.evidence("art-1", "v1"), f.evidence("art-2", "v1"));
+
+        Outcome outcome = apply(f, SINGLE_SOURCE);
+
+        assertEquals(Set.of("rel-proving"), outcome.hiddenRelationIds(), "basis art-9 alone is one source");
+        var read = GraphEvidenceSnapshotReader.locate(outcome.snapshot(), "gv-test", Instant.parse("2026-10-24T00:00:00Z"), span);
+        assertTrue(read.span() != null, "the span stays as an indirect candidate");
+        assertEquals(List.of("rel-kept"), read.basisRefs().stream().map(ref -> ref.relationId()).toList(),
+                "the hidden relation is never offered to the receipt check");
+        assertEquals(List.of(), read.eventIds());
     }
 
     @Test

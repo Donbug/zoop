@@ -12,6 +12,25 @@ const xy = (node: Node): Point => ({
   x: Number(node.style?.x ?? 0),
   y: Number(node.style?.y ?? 0),
 });
+/** 노드의 세로 반지름과 위·아래 이름표 높이(스타일 반영 후 크기 기준). size는 숫자 또는 [너비, 높이]다. */
+function verticalExtent(node: Node) {
+  const size = node.style?.size;
+  const height = Array.isArray(size)
+    ? Number(size[1] ?? size[0] ?? 20)
+    : Number(size ?? 20);
+  const label = node.style?.labelText
+    ? Number(node.style?.labelFontSize ?? 12) * 1.4 +
+      Math.abs(Number(node.style?.labelOffsetY ?? 0))
+    : 0;
+  const top = node.style?.labelPlacement === 'top';
+  return {
+    radius: (Number.isFinite(height) ? height : 20) / 2,
+    above: top ? label : 0,
+    below: top ? 0 : label,
+  };
+}
+/** 노드 사이 최소 여백 */
+const NODE_GAP = 12;
 const place = (node: Node, point: Point): Node => ({
   ...node,
   style: { ...node.style, x: point.x, y: point.y },
@@ -161,6 +180,22 @@ export function arrangeFlow(
       );
   const last = directed.size ? Math.max(0, ...rank.values()) : -1;
   const original = new Map(nodes.map((node) => [String(node.id), xy(node)]));
+  const extent = new Map(
+    nodes.map((node) => [String(node.id), verticalExtent(node)]),
+  );
+  /** 한 열의 노드를 위에서부터 쌓은 y. 기본 간격과 이웃한 두 노드의 실제 크기·이름표 중 큰 쪽을 쓴다. */
+  const stack = (members: string[], baseGap: number) => {
+    const offsets = [0];
+    for (let index = 1; index < members.length; index += 1) {
+      const upper = extent.get(members[index - 1])!;
+      const lower = extent.get(members[index])!;
+      const need =
+        upper.radius + upper.below + lower.above + lower.radius + NODE_GAP;
+      offsets.push(offsets[index - 1] + Math.max(baseGap, need));
+    }
+    const total = offsets.at(-1) ?? 0;
+    return offsets.map((offset) => height / 2 - total / 2 + offset);
+  };
   const order = new Map<string, number>();
   const targets = new Map<string, Point>();
   const margin = 80;
@@ -200,29 +235,26 @@ export function arrangeFlow(
         (a, b) =>
           a.barycenter - b.barycenter || a.y - b.y || a.id.localeCompare(b.id),
       );
-    const rowGap = rowGapOf(members.length);
-    const top = height / 2 - (rowGap * (members.length - 1)) / 2;
+    const ys = stack(
+      members.map((member) => member.id),
+      rowGapOf(members.length),
+    );
     members.forEach((member, index) => {
       order.set(member.id, index);
       targets.set(member.id, {
         x: margin + column * colGap,
-        y: top + index * rowGap,
+        y: ys[index],
       });
     });
   }
-  loose.forEach((id, index) => {
-    const column = last + 1 + Math.floor(index / rows);
-    const inColumn = Math.min(
-      rows,
-      loose.length - Math.floor(index / rows) * rows,
+  for (let start = 0; start < loose.length; start += rows) {
+    const members = loose.slice(start, start + rows);
+    const ys = stack(members, rowGapOf(rows));
+    const column = last + 1 + start / rows;
+    members.forEach((id, index) =>
+      targets.set(id, { x: margin + column * colGap, y: ys[index] }),
     );
-    const rowGap = rowGapOf(rows);
-    const top = height / 2 - (rowGap * (inColumn - 1)) / 2;
-    targets.set(id, {
-      x: margin + column * colGap,
-      y: top + (index % rows) * rowGap,
-    });
-  });
+  }
   return nodes.map((node) => {
     const target = targets.get(String(node.id));
     return target ? place(node, target) : node;

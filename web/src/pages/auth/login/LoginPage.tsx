@@ -234,8 +234,8 @@ export default function LoginPage() {
     <LoginFrame>
       <section className="mx-auto flex w-full max-w-[340px] flex-col gap-6 text-zoop-ink">
         <header className="mb-5 text-center">
-          <p className="text-[30px] leading-none font-[750] tracking-[-0.045em]">
-            줍
+          <p className="text-[30px] leading-none font-[750] tracking-[-0.045em] font-inter">
+            ZOOP
           </p>
           <p className="mt-4 text-[13px] leading-6 text-zoop-muted">
             내 종목 주변의 사건을 하나의 그래프로 봐요

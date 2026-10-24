@@ -31,7 +31,7 @@ import type { FeedbackPeriod, TranscriptFilter } from '@/types/admin/insights';
 import { formatKst } from '@/util/format';
 import { transcriptPath } from './transcriptPath';
 
-const INPUT = `h-9 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 text-xs text-zoop-ink focus:border-zoop-ink ${FOCUS_RING}`;
+const INPUT = `h-10 rounded-full border border-transparent bg-zoop-soft px-4 text-xs text-zoop-ink focus:border-zoop-ink ${FOCUS_RING}`;
 const FIELD_LABEL = 'flex flex-col gap-1 text-[11px] text-zoop-muted';
 
 /** 지금 적용된 기간을 한 줄로: 직접 고른 날짜가 있으면 그것, 아니면 미리 정한 기간 */

@@ -36,6 +36,7 @@ tasks.named('test') {
 	useJUnitPlatform {
 		excludeTags 'ai-contract'
 		excludeTags 'ai-pipeline-contract'
+		excludeTags 'ai-chat-contract'
 		excludeTags 'company-postgres'
 		excludeTags 'briefing-postgres'
 		excludeTags 'briefing-replay-postgres'
@@ -140,6 +141,25 @@ tasks.register('aiPipelineContractTest', Test) {
 	classpath = sourceSets.test.runtimeClasspath
 	useJUnitPlatform {
 		includeTags 'ai-pipeline-contract'
+	}
+	outputs.upToDateWhen { false }
+	testLogging {
+		events 'passed', 'failed'
+		exceptionFormat 'full'
+	}
+}
+
+// Real cross-language gate for the chatbot model stages: the production ChatModelStages adapters talk to a running ai/service
+// and the installed zoop-ai-chat over an authored replay fixture (no model, no network, no PostgreSQL). Run it through
+// `make api-ai-chat-smoke`; that script authors the fixture, starts the service and exports ZOOP_AI_CHAT_CONTRACT_MANIFEST.
+// Without the manifest the tests fail; they never skip.
+tasks.register('aiChatContractTest', Test) {
+	group = 'verification'
+	description = 'Runs the chatbot model stage cross-language tests against a live ai/service (see make api-ai-chat-smoke).'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform {
+		includeTags 'ai-chat-contract'
 	}
 	outputs.upToDateWhen { false }
 	testLogging {

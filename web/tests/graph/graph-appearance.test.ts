@@ -1,7 +1,12 @@
 import { expect, test } from 'vitest';
 import { createMockGraph } from '@/mocks/graph/response';
 import { toG6Data } from '@/components/graph/graph-model';
-import { intersects, nodeRect } from '@/components/graph/graph-geometry';
+import {
+  fitFootprint,
+  intersects,
+  nodeRect,
+} from '@/components/graph/graph-geometry';
+import { readingStyles } from '@/components/graph/graph-readability';
 import {
   defaultAppearance,
   styleGraph,
@@ -18,7 +23,7 @@ test('D-GRP-01: default comparison does not change the existing graph', () => {
 });
 
 test.each(['light', 'dark'] as const)(
-  'D-GRP-01: %s candidate preserves graph identities, node sizes and direction while enlarging labels',
+  'D-GRP-01: %s candidate preserves graph identities and direction while enlarging nodes and labels',
   (theme) => {
     const data = toG6Data(
       createMockGraph({ mode: 'all', personalFilter: 'all' }),
@@ -28,11 +33,15 @@ test.each(['light', 'dark'] as const)(
     const before = structuredClone(data);
     const candidate = styleGraph(data, { variant: 'improved', theme });
     expect(data).toEqual(before);
-    expect(
-      candidate.nodes?.map((n) => [n.id, n.style?.size, n.style?.iconSrc]),
-    ).toEqual(data.nodes?.map((n) => [n.id, n.style?.size, n.style?.iconSrc]));
+    expect(candidate.nodes?.map((n) => [n.id, n.style?.iconSrc])).toEqual(
+      data.nodes?.map((n) => [n.id, n.style?.iconSrc]),
+    );
     const nodes = candidate.nodes ?? [];
     for (const [index, node] of nodes.entries()) {
+      expect(Number(node.style?.size)).toBeCloseTo(
+        Number(data.nodes?.[index].style?.size) *
+          (node.data?.kind === 'company' ? 1.15 : 1.1),
+      );
       expect(Number(node.style?.labelFontSize)).toBeGreaterThan(
         Number(data.nodes?.[index].style?.labelFontSize),
       );
@@ -60,12 +69,88 @@ test.each(['light', 'dark'] as const)(
     expect(
       candidate.edges
         ?.filter((e) => !e.style?.lineDash)
-        .every((e) => e.style?.lineWidth === 1.5),
+        .every((e) => e.style?.lineWidth === 1.1),
     ).toBe(true);
     expect(
       candidate.edges
         ?.filter((e) => e.style?.lineDash)
-        .every((e) => e.style?.lineWidth === 1.2),
+        .every((e) => e.style?.lineWidth === 1),
     ).toBe(true);
+  },
+);
+
+test('D-GRP-03: the chosen company label is larger and bolder than its neighbours', () => {
+  const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const [chosen, other] = graph.nodes.filter((node) => node.kind === 'company');
+  const data = styleGraph(toG6Data(graph, 1200, 700, chosen.id), {
+    variant: 'improved',
+    theme: 'light',
+  });
+  const styleOf = (id: string) =>
+    data.nodes!.find((node) => node.id === id)!.style!;
+  expect(Number(styleOf(chosen.id).labelFontSize)).toBeGreaterThan(
+    Number(styleOf(other.id).labelFontSize),
+  );
+  expect(styleOf(chosen.id).labelFontWeight).toBe(800);
+  expect(styleOf(other.id).labelFontWeight).toBe(600);
+  expect(styleOf(chosen.id).labelFill).not.toBe(styleOf(other.id).labelFill);
+});
+
+test.each([0.1, 0.37, 0.53, 1])(
+  'D-GRP-03: selected emphasis survives main readability correction at zoom %s',
+  (zoom) => {
+    const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const [chosen, other] = graph.nodes.filter(
+      (node) => node.kind === 'company',
+    );
+    const base = styleGraph(toG6Data(graph, 1200, 700, chosen.id), {
+      variant: 'improved',
+      theme: 'light',
+    });
+    const result = readingStyles(base, graph, {
+      zoom,
+      anchor: chosen.id,
+      focus: null,
+      edge: null,
+      path: new Set(),
+    });
+    const label = (id: string) =>
+      result.nodes!.find((node) => node.id === id)!.style!;
+    expect(Number(label(chosen.id).labelFontSize)).toBeGreaterThan(
+      Number(label(other.id).labelFontSize),
+    );
+    expect(
+      Number(label(chosen.id).labelFontSize) * zoom,
+    ).toBeGreaterThanOrEqual(16);
+    expect(label(chosen.id).labelFontWeight).toBe(800);
+    expect(label(chosen.id).x).toBe(
+      base.nodes!.find((node) => node.id === chosen.id)!.style!.x,
+    );
+    const selected = base.nodes!.find((node) => node.id === chosen.id)!;
+    expect(fitFootprint(selected).labelHeight).toBeGreaterThan(
+      fitFootprint({ ...selected, data: { ...selected.data, chosen: false } })
+        .labelHeight,
+    );
+  },
+);
+
+test.each(['light', 'dark'] as const)(
+  'D-GRP-01: %s background links stay quiet without changing relation shapes or hit areas',
+  (theme) => {
+    const data = toG6Data(
+      createMockGraph({ mode: 'all', personalFilter: 'all' }),
+      1200,
+      700,
+    );
+    const result = styleGraph(data, { variant: 'improved', theme });
+    result.edges?.forEach((edge, index) => {
+      expect(Number(edge.style?.strokeOpacity)).toBeLessThanOrEqual(0.5);
+      expect(Number(edge.style?.lineWidth)).toBeLessThan(2);
+      expect(edge.style?.lineDash).toEqual(data.edges?.[index].style?.lineDash);
+      expect(edge.style?.endArrow).toBe(data.edges?.[index].style?.endArrow);
+      expect(edge.style?.increasedLineWidthForHitTesting).toBe(
+        data.edges?.[index].style?.increasedLineWidthForHitTesting,
+      );
+    });
   },
 );

@@ -26,6 +26,9 @@ it('M-GRP-01 supports half/full keyboard snaps, escape, focus return and viewpor
   const dialog = screen.getByRole('dialog', { name: '지도 상세' });
   await waitFor(() => expect(document.activeElement).toBe(dialog));
   expect(dialog.getAttribute('data-snap')).toBe('half');
+  // 시트 자체 제목줄·닫기는 없다. 닫기는 안의 패널 ×와 Esc로 한다(닫기 ×가 겹쳐 보이지 않게).
+  expect(screen.queryByRole('button', { name: '모바일 상세 닫기' })).toBeNull();
+  expect(screen.queryByText('지도 상세')).toBeNull();
   await userEvent.click(screen.getByRole('button', { name: '시트 크게 보기' }));
   expect(dialog.getAttribute('data-snap')).toBe('full');
   fireEvent.keyDown(screen.getByRole('button', { name: '시트 작게 보기' }), {

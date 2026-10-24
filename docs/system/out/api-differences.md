@@ -21,7 +21,7 @@
 | setWatchlistCompany | /api/v1/me/watchlist/{id} | /api/me/watchlist/{id} | 목표만 180 · BFF만 24 · 형식/필수/권한 변경 9 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | listRecommendations | /api/v1/me/recommendations | /api/me/recommendations | 목표만 158 · BFF만 32 · 형식/필수/권한 변경 9 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. / 추천 종목·산업·테마는 활성 사용자 기능에서 제외됐다. 작업은 삭제하지 않고 현재 BFF 동작을 유지한다. 산업·테마 추천의 생산자는 BFF에 없다. |
 | listVirtualAccountProfiles | /api/v1/portfolio/mock-portfolios | /api/portfolio/mock-portfolios | 목표만 138 · BFF만 32 · 형식/필수/권한 변경 7 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
-| getVirtualAccountProfile | /api/v1/portfolio/mock-portfolios/{id} | /api/portfolio/mock-portfolios/{id} | 목표만 132 · BFF만 32 · 형식/필수/권한 변경 8 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| getVirtualAccountProfile | /api/v1/portfolio/mock-portfolios/{id} | /api/portfolio/mock-portfolios/{id} | 목표만 177 · BFF만 32 · 형식/필수/권한 변경 8 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | connectVirtualAccount | /api/v1/portfolio/connections | /api/portfolio/connections | 목표만 180 · BFF만 23 · 형식/필수/권한 변경 9 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | getMyPortfolio | /api/v1/portfolio | /api/portfolio | 목표만 132 · BFF만 32 · 형식/필수/권한 변경 10 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | disconnectVirtualAccount | /api/v1/portfolio/connections/{id} | /api/portfolio/connections/{id} | 목표만 160 · BFF만 12 · 형식/필수/권한 변경 7 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
@@ -67,7 +67,7 @@
 | getAnalysisJob | /api/v1/admin/jobs/{job_id} | /api/admin/jobs/{job_id} | 목표만 114 · BFF만 39 · 형식/필수/권한 변경 14 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 로컬 PoC 명령·샌드박스·호출 예산 필드는 정식 서버 계약에서 제외한다. |
 | retryAnalysisJob | /api/v1/admin/jobs/{job_id}/retry | /api/admin/jobs/{job_id}/retry | 목표만 162 · BFF만 36 · 형식/필수/권한 변경 16 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 로컬 PoC 명령·샌드박스·호출 예산 필드는 정식 서버 계약에서 제외한다. |
 | cancelAnalysisJob | /api/v1/admin/jobs/{job_id}/cancel | /api/admin/jobs/{job_id}/cancel | 목표만 162 · BFF만 30 · 형식/필수/권한 변경 16 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 로컬 PoC 명령·샌드박스·호출 예산 필드는 정식 서버 계약에서 제외한다. |
-| getAiUsage | /api/v1/admin/ai-usage | /api/admin/ai-usage | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 10 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| getAiUsage | /api/v1/admin/ai-usage | /api/admin/ai-usage | 목표만 157 · BFF만 21 · 형식/필수/권한 변경 10 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | listAdminBriefingRounds | /api/v1/admin/briefings | /api/admin/briefings | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 12 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | getAdminBriefingRound | /api/v1/admin/briefings/{round_id} | /api/admin/briefings/{round_id} | 목표만 309 · BFF만 37 · 형식/필수/권한 변경 27 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | reprocessBriefingRound | /api/v1/admin/briefings/{round_id}/reprocess | /api/admin/briefings/{round_id}/reprocess | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 13 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
