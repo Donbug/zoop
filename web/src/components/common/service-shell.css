@@ -65,9 +65,9 @@
   gap: 6px;
   padding: 0 12px;
   color: var(--zoop-muted);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
-  line-height: 19.5px;
+  line-height: 22px;
   white-space: nowrap;
 }
 
