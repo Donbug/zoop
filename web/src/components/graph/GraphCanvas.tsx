@@ -15,7 +15,7 @@ import {
 import { createPortal } from 'react-dom';
 import GraphLegend from './GraphLegend';
 import { themeColor } from '@/util/theme-color';
-import { Graph, type IElementEvent } from '@antv/g6';
+import { Graph, type GraphData, type IElementEvent } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
 import { isSelectableRelation } from '@/types/map/relation';
 import GraphIcon from './GraphIcon';
@@ -32,7 +32,12 @@ import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { arrangeFlow, arrangeFocus } from './graph-arrange';
 import { applyGraphReading } from './graph-readability';
 import GraphMobileTools from './GraphMobileTools';
-import { freeViewport, nodeRect, type Rect } from './graph-geometry';
+import {
+  fitFootprint,
+  fitZoom,
+  freeViewport,
+  type Rect,
+} from './graph-geometry';
 
 const noHighlightedEdges: string[] = [];
 
@@ -502,35 +507,19 @@ export default function GraphCanvas({
       });
     const safe = freeViewport(host.clientWidth, host.clientHeight, obstacles);
     if (safe.width < 40 || safe.height < 40) return;
-    const rects = graph
+    const footprints = graph
       .getNodeData()
       .filter(
         (node) =>
           node.style?.visibility !== 'hidden' &&
           (!ids || ids.has(String(node.id))),
       )
-      .map(nodeRect);
-    if (!rects.length) return;
-    const left = Math.min(...rects.map((r) => r.x)),
-      top = Math.min(...rects.map((r) => r.y));
-    const right = Math.max(...rects.map((r) => r.x + r.width)),
-      bottom = Math.max(...rects.map((r) => r.y + r.height));
-    await graph.zoomTo(
-      Math.max(
-        0.01,
-        Math.min(
-          maxZoom,
-          safe.width / Math.max(1, right - left),
-          safe.height / Math.max(1, bottom - top),
-        ),
-      ),
-      false,
-    );
+      .map(fitFootprint);
+    if (!footprints.length) return;
+    const fit = fitZoom(footprints, safe, maxZoom);
+    await graph.zoomTo(fit.zoom, false);
     if (graph.destroyed) return;
-    const center = graph.getViewportByCanvas([
-      (left + right) / 2,
-      (top + bottom) / 2,
-    ]);
+    const center = graph.getViewportByCanvas(fit.center);
     await graph.translateBy(
       [
         safe.x + safe.width / 2 - center[0],
@@ -542,11 +531,46 @@ export default function GraphCanvas({
   const [neighborhoodRequest, setNeighborhoodRequest] = useState<{
     id: string;
   } | null>(null);
+  /** 접힌 사건에서 Shift+Enter를 누르면 먼저 펼쳐 그리고, 그 그리기가 끝난 뒤 이웃 맞춤을 한다. */
+  const pendingNeighborhood = useRef<string | null>(null);
   const zoomNeighborhood = useEffectEvent((id: string) => {
     const graph = instance.current;
     if (!interactionEnabled() || !graph || graph.destroyed) return;
     const base = renderedData.current;
     if (!base) return;
+    const drawn =
+      base.nodes?.some(
+        (node) => node.id === id && node.style?.visibility !== 'hidden',
+      ) || base.edges?.some((edge) => edge.id === id);
+    if (!drawn) return;
+    const current = graph;
+    centerTarget.current = null;
+    followFit.current = false;
+    fitPending.current = false;
+    drawing.current = drawing.current
+      .then(async () => {
+        if (!current.destroyed) {
+          await fitVisibleGraph(current, neighborhoodIds(base, id), 1.8);
+          scheduleReading();
+        }
+      })
+      .catch(() => {
+        if (!current.destroyed) setRenderError(true);
+      });
+  });
+  /** 키보드 Shift+Enter. 지금 그려지지 않은(접힌) 노드면 먼저 골라 펼치고, 다음 그리기 뒤에 맞춘다. */
+  function requestNeighborhood(id: string) {
+    const drawn = renderedData.current?.nodes?.some(
+      (node) => node.id === id && node.style?.visibility !== 'hidden',
+    );
+    if (!drawn && data.nodes.some((node) => node.id === id)) {
+      pendingNeighborhood.current = id;
+      handleNodeSelect(id);
+      return;
+    }
+    setNeighborhoodRequest({ id });
+  }
+  function neighborhoodIds(base: GraphData, id: string) {
     const ids = new Set([id]);
     const edge = base.edges?.find((e) => e.id === id);
     if (edge) {
@@ -561,21 +585,8 @@ export default function GraphCanvas({
         ids.add(String(e.source));
         ids.add(String(e.target));
       }
-    centerTarget.current = null;
-    followFit.current = false;
-    fitPending.current = false;
-    const current = graph;
-    drawing.current = drawing.current
-      .then(async () => {
-        if (!current.destroyed) {
-          await fitVisibleGraph(current, ids, 1.8);
-          scheduleReading();
-        }
-      })
-      .catch(() => {
-        if (!current.destroyed) setRenderError(true);
-      });
-  });
+    return ids;
+  }
   useEffect(() => {
     if (neighborhoodRequest) zoomNeighborhood(neighborhoodRequest.id);
   }, [neighborhoodRequest]);
@@ -783,6 +794,18 @@ export default function GraphCanvas({
         // Resize changes layout coordinates. Center only after the new draw,
         // never on the previous layout before the detail rail has resized it.
         if (centerTarget.current) await centerSelectedNode(graph, rendered);
+        const pending = pendingNeighborhood.current;
+        if (
+          pending &&
+          rendered.nodes?.some(
+            (node) =>
+              node.id === pending && node.style?.visibility !== 'hidden',
+          )
+        ) {
+          pendingNeighborhood.current = null;
+          centerTarget.current = null;
+          await fitVisibleGraph(graph, neighborhoodIds(rendered, pending), 1.8);
+        }
         if (fitPending.current) {
           fitPending.current = false;
           await fitVisibleGraph(graph);
@@ -1495,7 +1518,7 @@ export default function GraphCanvas({
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && event.shiftKey) {
                   event.preventDefault();
-                  setNeighborhoodRequest({ id: node.id });
+                  requestNeighborhood(node.id);
                 }
               }}
               onClick={() => handleNodeSelect(node.id)}

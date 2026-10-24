@@ -179,6 +179,44 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     expect(canvas.zoomTo).not.toHaveBeenCalled();
   });
 
+  it('D-GRP-01 Shift+Enter on a folded event expands it first and fits its neighborhood after that draw', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const onSelect = vi.fn();
+    const view = render(<GraphCanvas data={data} onSelect={onSelect} />);
+    const host = screen.getByRole('img');
+    Object.defineProperty(host, 'clientWidth', {
+      configurable: true,
+      value: 1200,
+    });
+    Object.defineProperty(host, 'clientHeight', {
+      configurable: true,
+      value: 700,
+    });
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    const drawnIds = () =>
+      (
+        canvas.setData.mock.lastCall![0] as { nodes: { id: string }[] }
+      ).nodes.map((node) => node.id);
+    expect(drawnIds()).not.toContain('mock-issue-20');
+    canvas.zoomTo.mockClear();
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: '사건: 삼성전자 개별 공시 (예시)' }),
+      { key: 'Enter', shiftKey: true },
+    );
+    await waitFor(() => expect(onSelect).toHaveBeenCalledWith('mock-issue-20'));
+    expect(canvas.zoomTo).not.toHaveBeenCalled();
+    view.rerender(
+      <GraphCanvas
+        data={data}
+        onSelect={onSelect}
+        selectedId="mock-issue-20"
+      />,
+    );
+    await waitFor(() => expect(drawnIds()).toContain('mock-issue-20'));
+    await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalled());
+    expect(canvas.zoomTo.mock.lastCall![0]).toBeLessThanOrEqual(1.8);
+  });
+
   it('M-GRP-01 folds path details into a compact bar and reopens the sheet without losing the path', async () => {
     vi.stubGlobal('matchMedia', () => ({
       matches: true,
