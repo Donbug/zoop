@@ -3,10 +3,23 @@ import type { MapMode } from '@/types/map';
 
 export type LegendKey =
   'company' | 'issue' | GraphResponse['edges'][number]['relationType'];
+/**
+ * 지도 기본 배치(graph-model의 좌표계) 버전. 노드 좌표 계산 방식이 바뀌면 올린다.
+ * 3: 관계 묶음 사이 여백 압축(#321 후속). 이전 좌표의 카메라는 복원하지 않는다.
+ */
+export const MAP_LAYOUT_REVISION = 3;
 export type GraphView = {
   hidden: LegendKey[];
-  /** size: 저장할 때의 지도 크기. 크기가 달라지면 위치를 복원하지 않고 기본 배치로 연다. */
-  camera?: { zoom: number; position: [number, number]; size: [number, number] };
+  /**
+   * size: 저장할 때의 지도 크기. 크기가 달라지면 위치를 복원하지 않고 기본 배치로 연다.
+   * layout: 저장할 때의 배치 버전(MAP_LAYOUT_REVISION). 다르면 위치를 복원하지 않는다.
+   */
+  camera?: {
+    zoom: number;
+    position: [number, number];
+    size: [number, number];
+    layout: number;
+  };
 };
 export type ModeEntry = { url: string; view: GraphView };
 export const emptyView = (): GraphView => ({ hidden: [] });
@@ -47,7 +60,8 @@ export function readModeEntry(owner: string, mode: MapMode): ModeEntry | null {
         camera.position.every(Number.isFinite) &&
         Array.isArray(camera.size) &&
         camera.size.length === 2 &&
-        camera.size.every(Number.isFinite)
+        camera.size.every(Number.isFinite) &&
+        camera.layout === MAP_LAYOUT_REVISION
           ? { camera }
           : {}),
       },

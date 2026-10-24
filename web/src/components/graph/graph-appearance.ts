@@ -92,8 +92,10 @@ export function styleGraph(
         style: {
           ...edge.style,
           stroke: follows ? colors.ink : dark ? '#a5a9b1' : '#71757c',
-          lineWidth: shared ? 1.5 : 1.95,
-          strokeOpacity: dimmed ? 0.2 : shared ? 0.75 : 0.95,
+          // D-GRP-01: selected/related G6 states and impact paths supply
+          // their own stronger stroke. Keep background links below that level.
+          lineWidth: shared ? 1 : 1.1,
+          strokeOpacity: dimmed ? 0.12 : shared ? 0.4 : 0.5,
         },
       };
     }),
@@ -101,37 +103,4 @@ export function styleGraph(
   // Enlarged labels participate in fitting and collision separation.
   result.nodes = separateNodes(result.nodes ?? []);
   return result;
-}
-
-/** 화면에서 이름표가 이보다 작아지지 않게 한다(px). 사건은 간선 위 짧은 이름이라 조금 작게 둔다. */
-export const MIN_LABEL_PX = { company: 12, issue: 11 } as const;
-
-/**
- * D-GRP-01: 지도를 축소해도 이름표를 읽을 수 있게 화면 기준 최소 크기를 지킨다.
- * 흐리게 처리한(선택과 관련 없는) 노드는 원래 크기를 두어 선택 주변 이름이 먼저 읽히게 한다.
- * 노드 크기·좌표·카메라는 바꾸지 않는다. 원래 크기는 data.labelBase에 남겨 확대 수준이 바뀌면 다시 계산한다.
- */
-export function readableLabels(data: GraphData, zoom: number): GraphData {
-  if (!(zoom > 0)) return data;
-  return {
-    ...data,
-    nodes: data.nodes?.map((node) => {
-      const base = Number(
-        node.data?.labelBase ?? node.style?.labelFontSize ?? 13,
-      );
-      const dimmed = Number(node.style?.opacity ?? 1) < 1;
-      const min =
-        node.data?.kind === 'company'
-          ? MIN_LABEL_PX.company
-          : MIN_LABEL_PX.issue;
-      return {
-        ...node,
-        data: { ...node.data, labelBase: base },
-        style: {
-          ...node.style,
-          labelFontSize: dimmed ? base : Math.max(base, min / zoom),
-        },
-      };
-    }),
-  };
 }

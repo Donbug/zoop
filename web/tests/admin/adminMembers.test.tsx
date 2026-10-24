@@ -173,7 +173,12 @@ describe('A-ADM-05 회원·접근 관리 (FS069)', () => {
     await user.click(within(table).getByRole('link', { name: 'M-EBF98301' }));
     expect(location()).toBe('/admin/members/M-EBF98301');
     expect(await screen.findByText('41회')).toBeTruthy();
-    expect(screen.getByText('종목 이름은 보이지 않아요')).toBeTruthy();
+    expect(screen.queryByText('1분 단위로 기록돼요')).toBeNull();
+    expect(screen.queryByText('노드·간선')).toBeNull();
+    expect(screen.queryByText('좋아요 / 싫어요')).toBeNull();
+    expect(screen.queryByText('종목 이름은 보이지 않아요')).toBeNull();
+    expect(screen.queryByText('가상 계좌 연결됨')).toBeNull();
+    expect(screen.queryByText('가상 계좌 없음')).toBeNull();
     expect(screen.getByText('차단하거나 해제한 기록이 없어요.')).toBeTruthy();
   });
 

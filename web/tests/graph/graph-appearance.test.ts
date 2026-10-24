@@ -3,9 +3,7 @@ import { createMockGraph } from '@/mocks/graph/response';
 import { toG6Data } from '@/components/graph/graph-model';
 import { intersects, nodeRect } from '@/components/graph/graph-geometry';
 import {
-  MIN_LABEL_PX,
   defaultAppearance,
-  readableLabels,
   styleGraph,
 } from '@/components/graph/graph-appearance';
 
@@ -66,51 +64,15 @@ test.each(['light', 'dark'] as const)(
     expect(
       candidate.edges
         ?.filter((e) => !e.style?.lineDash)
-        .every((e) => e.style?.lineWidth === 1.95),
+        .every((e) => e.style?.lineWidth === 1.1),
     ).toBe(true);
     expect(
       candidate.edges
         ?.filter((e) => e.style?.lineDash)
-        .every((e) => e.style?.lineWidth === 1.5),
+        .every((e) => e.style?.lineWidth === 1),
     ).toBe(true);
   },
 );
-
-test('D-GRP-01: zoomed-out labels keep a readable screen size and return to their base when zoomed in', () => {
-  const data = styleGraph(
-    toG6Data(
-      createMockGraph({ mode: 'all', personalFilter: 'all' }),
-      1200,
-      700,
-    ),
-    { variant: 'improved', theme: 'light' },
-  );
-  const company = data.nodes!.find((node) => node.data?.kind === 'company')!;
-  const issue = data.nodes!.find((node) => node.data?.kind === 'issue')!;
-  const zoomedOut = readableLabels(data, 0.4);
-  const size = (graph: typeof data, id: unknown) =>
-    Number(graph.nodes!.find((node) => node.id === id)!.style?.labelFontSize);
-  expect(size(zoomedOut, company.id) * 0.4).toBeCloseTo(MIN_LABEL_PX.company);
-  expect(size(zoomedOut, issue.id) * 0.4).toBeCloseTo(MIN_LABEL_PX.issue);
-  const zoomedIn = readableLabels(zoomedOut, 2);
-  expect(size(zoomedIn, company.id)).toBe(company.style?.labelFontSize);
-  expect(size(zoomedIn, issue.id)).toBe(issue.style?.labelFontSize);
-  // 위치·노드 크기는 바꾸지 않는다.
-  expect(
-    zoomedOut.nodes!.map((node) => [node.style?.x, node.style?.size]),
-  ).toEqual(data.nodes!.map((node) => [node.style?.x, node.style?.size]));
-});
-
-test('D-GRP-01: dimmed context nodes are not enlarged', () => {
-  const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
-  const focus = graph.nodes.find((node) => node.kind === 'company')!;
-  const data = toG6Data(graph, 1200, 700, focus.id, [], new Set([focus.id]));
-  const dimmed = data.nodes!.find((node) => Number(node.style?.opacity) < 1)!;
-  const result = readableLabels(data, 0.3);
-  expect(
-    result.nodes!.find((node) => node.id === dimmed.id)!.style?.labelFontSize,
-  ).toBe(dimmed.style?.labelFontSize);
-});
 
 test('D-GRP-03: the chosen company label is larger and bolder than its neighbours', () => {
   const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
@@ -128,3 +90,24 @@ test('D-GRP-03: the chosen company label is larger and bolder than its neighbour
   expect(styleOf(other.id).labelFontWeight).toBe(600);
   expect(styleOf(chosen.id).labelFill).not.toBe(styleOf(other.id).labelFill);
 });
+
+test.each(['light', 'dark'] as const)(
+  'D-GRP-01: %s background links stay quiet without changing relation shapes or hit areas',
+  (theme) => {
+    const data = toG6Data(
+      createMockGraph({ mode: 'all', personalFilter: 'all' }),
+      1200,
+      700,
+    );
+    const result = styleGraph(data, { variant: 'improved', theme });
+    result.edges?.forEach((edge, index) => {
+      expect(Number(edge.style?.strokeOpacity)).toBeLessThanOrEqual(0.5);
+      expect(Number(edge.style?.lineWidth)).toBeLessThan(2);
+      expect(edge.style?.lineDash).toEqual(data.edges?.[index].style?.lineDash);
+      expect(edge.style?.endArrow).toBe(data.edges?.[index].style?.endArrow);
+      expect(edge.style?.increasedLineWidthForHitTesting).toBe(
+        data.edges?.[index].style?.increasedLineWidthForHitTesting,
+      );
+    });
+  },
+);

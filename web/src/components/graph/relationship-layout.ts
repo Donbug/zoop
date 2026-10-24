@@ -3,6 +3,68 @@ import type { GraphResponse } from '@/types/map/graph';
 type Point = { x: number; y: number };
 const cache = new WeakMap<GraphResponse, Map<string, Point>>();
 
+// D-GRP-01/01b: translate whole disconnected groups, never scale their interior.
+// Bounds include folded issues so expanding one does not move neighboring groups.
+export function compactRelationshipGroups(
+  points: Map<string, Point>,
+  groups: string[][],
+) {
+  if (groups.length < 2) return;
+  const gap = 200;
+  const boxes = groups
+    .map((ids) => {
+      const members = ids.map((id) => points.get(id)!);
+      const minX = Math.min(...members.map((p) => p.x));
+      const minY = Math.min(...members.map((p) => p.y));
+      const width = Math.max(120, Math.max(...members.map((p) => p.x)) - minX);
+      const height = Math.max(120, Math.max(...members.map((p) => p.y)) - minY);
+      return { ids, minX, minY, width, height };
+    })
+    .sort(
+      (a, b) =>
+        b.width * b.height - a.width * a.height ||
+        a.ids[0].localeCompare(b.ids[0]),
+    );
+  const area = boxes.reduce(
+    (sum, b) => sum + (b.width + gap) * (b.height + gap),
+    0,
+  );
+  const rowWidth = Math.max(
+    ...boxes.map((b) => b.width),
+    Math.sqrt(area * 1.8),
+  );
+  let x = 0,
+    y = 0,
+    rowHeight = 0;
+  for (const box of boxes) {
+    if (x > 0 && x + box.width > rowWidth) {
+      x = 0;
+      y += rowHeight + gap;
+      rowHeight = 0;
+    }
+    for (const id of box.ids) {
+      const point = points.get(id)!;
+      point.x += x - box.minX;
+      point.y += y - box.minY;
+    }
+    x += box.width + gap;
+    rowHeight = Math.max(rowHeight, box.height);
+  }
+  const values = [...points.values()];
+  const centerX =
+    (Math.min(...values.map((p) => p.x)) +
+      Math.max(...values.map((p) => p.x))) /
+    2;
+  const centerY =
+    (Math.min(...values.map((p) => p.y)) +
+      Math.max(...values.map((p) => p.y))) /
+    2;
+  for (const point of values) {
+    point.x -= centerX;
+    point.y -= centerY;
+  }
+}
+
 // D-GRP-01/01b: topology determines proximity, never company names or sectors.
 // Solve once in world space, independent of theme, camera and selection.
 export function relationshipPositions(data: GraphResponse): Map<string, Point> {
@@ -160,6 +222,25 @@ export function relationshipPositions(data: GraphResponse): Map<string, Point> {
       y: (parent?.y ?? 0) + Math.sin(angle) * radius,
     });
   }
+  const groups: string[][] = [];
+  const visited = new Set<string>();
+  for (const node of ordered) {
+    if (visited.has(node.id)) continue;
+    const group: string[] = [];
+    const queue = [node.id];
+    visited.add(node.id);
+    for (let index = 0; index < queue.length; index++) {
+      const id = queue[index];
+      group.push(id);
+      for (const neighbor of [...neighbors.get(id)!].sort()) {
+        if (visited.has(neighbor)) continue;
+        visited.add(neighbor);
+        queue.push(neighbor);
+      }
+    }
+    groups.push(group);
+  }
+  compactRelationshipGroups(points, groups);
   cache.set(data, points);
   return points;
 }
