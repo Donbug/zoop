@@ -65,69 +65,79 @@ final class HandoffFixtures {
      */
     record Spec(String handoffId, String canonicalPin, String publishedAt, String precision, String eventTime,
             String eventPrecision, String validFrom, String validUntil, boolean utf16Offsets, boolean verdicts,
-            boolean manualApproval, boolean live, boolean origin, Shape shape) {
+            boolean manualApproval, boolean live, boolean origin, Shape shape, boolean impact) {
         static Spec standard() {
             return new Spec(HANDOFF_ID, "4".repeat(64), PUBLISHED_AT, "datetime", "2026-09-30", "day", "2026-01-01",
-                    "2026-12-31", false, false, false, false, false, Shape.ONE_HOP);
+                    "2026-12-31", false, false, false, false, false, Shape.ONE_HOP, false);
         }
 
         Spec withHandoffId(String value) {
             return new Spec(value, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, origin, shape);
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape, impact);
         }
 
         Spec withCanonicalPin(String value) {
             return new Spec(handoffId, value, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, origin, shape);
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape, impact);
         }
 
         Spec withPublication(String value, String valuePrecision) {
             return new Spec(handoffId, canonicalPin, value, valuePrecision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, origin, shape);
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape, impact);
         }
 
         Spec withEvent(String value, String valuePrecision) {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, value, valuePrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, origin, shape);
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape, impact);
         }
 
         Spec withValidity(String from, String until) {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, from, until,
-                    utf16Offsets, verdicts, manualApproval, live, origin, shape);
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape, impact);
         }
 
         Spec withUtf16Offsets() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    true, verdicts, manualApproval, live, origin, shape);
+                    true, verdicts, manualApproval, live, origin, shape, impact);
         }
 
         Spec withVerdicts() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, true, manualApproval, live, origin, shape);
+                    utf16Offsets, true, manualApproval, live, origin, shape, impact);
         }
 
         /** The one S3 relation the edges rest on became eligible by an operator's final approval of a HOLD, not by the verifier. */
         Spec withManualApproval() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, true, live, origin, shape);
+                    utf16Offsets, verdicts, true, live, origin, shape, impact);
         }
 
         /** Provider-recorded live provenance ({@code executionMode: live}, {@code recordingKind: provider}). */
         Spec withLive() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, true, origin, shape);
+                    utf16Offsets, verdicts, manualApproval, true, origin, shape, impact);
         }
 
         /** The article's document version carries an operator-declared origin. */
         Spec withOrigin() {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, true, shape);
+                    utf16Offsets, verdicts, manualApproval, live, true, shape, impact);
         }
 
         /** The shape of the one structural edge's company chain. */
         Spec withShape(Shape value) {
             return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
-                    utf16Offsets, verdicts, manualApproval, live, origin, value);
+                    utf16Offsets, verdicts, manualApproval, live, origin, value, impact);
+        }
+
+        /**
+         * Every INVOLVES source relation has a {@code verified} positive impact whose one quote is the {@link #BASIS2} sentence: a
+         * span no issue, mention, relation or structural basis of a one-hop world cites. Ignored under a manual approval, which
+         * makes no impact call ({@code not-applicable}).
+         */
+        Spec withImpact() {
+            return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
+                    utf16Offsets, verdicts, manualApproval, live, origin, shape, true);
         }
     }
 
@@ -174,7 +184,8 @@ final class HandoffFixtures {
         ObjectNode basis = span(spec, BASIS);
         ObjectNode basis2 = span(spec, BASIS2);
         List<ObjectNode> evidence = new ArrayList<>(List.of(event, geo, basis));
-        if (spec.shape().twoHop()) {
+        boolean verifiedImpact = spec.impact() && !spec.manualApproval();
+        if (spec.shape().twoHop() || verifiedImpact) {
             evidence.add(basis2);
         }
         evidence.sort((a, b) -> a.get("id").stringValue().compareTo(b.get("id").stringValue()));
@@ -204,6 +215,8 @@ final class HandoffFixtures {
         policy.put("structural", "manual-operator-review");
         policy.put("sequence", "s2-comparison-with-operator-decision");
         policy.put("sourceSupport", HandoffBundleVerifier.SOURCE_SUPPORT_POLICY);
+        policy.put("impacts", HandoffBundleVerifier.IMPACTS_POLICY);
+        policy.put("issueSummary", HandoffIssueSummary.POLICY);
 
         ObjectNode pin = StrictJson.newObject();
         pin.putObject("relation").put("jobId", relationJob).put("inputDigest", "f".repeat(64));
@@ -247,7 +260,7 @@ final class HandoffFixtures {
         eligibility.put("reject", 0);
         eligibility.put("pending", 0);
         audit.put("reviewPending", 0);
-        audit.put("impactCandidates", 0);
+        audit.put("impactCandidates", verifiedImpact ? (spec.shape() == Shape.TWO_HOP_PUBLIC ? 2 : 1) : 0);
         audit.putObject("eligibleNotPublicByType");
 
         List<String[]> publicCompanies = new ArrayList<>(List.of(new String[] {COMPANY_B, "co:b", "합성부품"},
@@ -352,6 +365,8 @@ final class HandoffFixtures {
             verdicts.add(verdict("period", "2026Q3", "HOLD", "ambiguous", basisId));
         }
         issue.set("sourceSupport", sourceSupport(spec.origin()));
+        // A HOLD/REJECT verdict anywhere leaves exactly temporal-review-pending; otherwise no job was pinned: not-requested.
+        issue.set("summary", unavailable(spec.verdicts() ? HandoffIssueSummary.TEMPORAL_PENDING : HandoffIssueSummary.NOT_REQUESTED));
         ObjectNode sameValue = provenanceOfIssue.putObject("sameValueMentions");
         for (String field : List.of("title", "action", "target", "eventTime", "period", "assertionStatus")) {
             ObjectNode reference = sameValue.putArray(field).addObject();
@@ -446,6 +461,17 @@ final class HandoffFixtures {
             return type != 0 ? type : a.get("id").stringValue().compareTo(b.get("id").stringValue());
         });
         relationNodes.forEach(relations::add);
+        // One row per S3 relation behind an INVOLVES edge (never aggregated per edge), sorted by (edgeId, jobId, relationCandidateId).
+        List<ObjectNode> impactRows = new ArrayList<>();
+        for (ObjectNode relationNode : relationNodes) {
+            if ("INVOLVES".equals(relationNode.get("type").stringValue())) {
+                impactRows.add(impactRow(relationNode.get("id").stringValue(), relationNode.get("target").stringValue(),
+                        relationJob, candidate, spec, basis2Id));
+            }
+        }
+        impactRows.sort((a, b) -> a.get("edgeId").stringValue().compareTo(b.get("edgeId").stringValue()));
+        ArrayNode impacts = bundle.putArray("impacts");
+        impactRows.forEach(impacts::add);
 
         ArrayNode evidenceNodes = bundle.putArray("evidence");
         evidence.forEach(evidenceNodes::add);
@@ -485,9 +511,10 @@ final class HandoffFixtures {
         relationCounts.put("INVOLVES", spec.shape() == Shape.TWO_HOP_PUBLIC ? 2 : 1);
         relationCounts.put("STRUCTURALLY_RELATED_TO", 1);
         relationCounts.put("FOLLOWS", 0);
-        counts.put("evidence", spec.shape().twoHop() ? 4 : 3);
+        counts.put("evidence", spec.shape().twoHop() || verifiedImpact ? 4 : 3);
         counts.put("articles", 1);
         counts.put("exclusions", 0);
+        counts.put("impacts", impactRows.size());
         ObjectNode checks = bundle.putObject("checks");
         HandoffBundleVerifier.PRODUCER_CHECKS.forEach(checks.putArray("producerConfirmed")::add);
         HandoffBundleVerifier.APP_IMPORT_PENDING.forEach(checks.putArray("appImportPending")::add);
@@ -644,6 +671,49 @@ final class HandoffFixtures {
         return node;
     }
 
+    /**
+     * The impact row of one INVOLVES source relation in the closed 13-key shape: {@code not-applicable} for an operator's final
+     * approval (no impact call), {@code verified} (positive, one quote effect, {@code supported}) for {@link Spec#withImpact()}, and
+     * otherwise {@code not-proposed} (the automatic relation completed without an on-target candidate). SYNTHETIC: a replay.
+     */
+    static ObjectNode impactRow(String edgeId, String company, String jobId, String relationCandidateId, Spec spec,
+            String quoteEvidenceId) {
+        ObjectNode row = StrictJson.newObject();
+        row.put("edgeId", edgeId);
+        row.put("issueId", ISSUE);
+        row.put("companyId", company);
+        row.putObject("sourceRelation").put("jobId", jobId).put("relationCandidateId", relationCandidateId);
+        boolean verified = spec.impact() && !spec.manualApproval();
+        row.put("status", spec.manualApproval() ? "not-applicable" : verified ? "verified" : "not-proposed");
+        row.putNull("code");
+        if (verified) {
+            row.put("impactCandidateId", "ic-" + Canonical.sha256(company));
+            row.put("label", "positive");
+            row.put("targetVerdict", "supported");
+            ObjectNode effects = row.putObject("effects");
+            effects.putArray("positive").add(quoteEvidenceId);
+            effects.putArray("negative");
+            effects.putArray("neutral");
+            effects.putArray("uncertain");
+            row.put("verifier", "called");
+            row.put("verifierRequestDigest", Canonical.sha256("verify-impact:" + company));
+            ObjectNode proposal = row.putObject("proposal");
+            proposal.put("direction", "positive");
+            proposal.put("reason", "합성 영향: 두 번째 구조 근거 문장이 대상 회사의 긍정적 효과를 보인다.");
+            proposal.putNull("limitations");
+            proposal.put("verification", "none");
+        } else {
+            row.putNull("impactCandidateId");
+            row.putNull("label");
+            row.putNull("targetVerdict");
+            row.putNull("effects");
+            row.put("verifier", "not-called");
+            row.putNull("verifierRequestDigest");
+            row.putNull("proposal");
+        }
+        return row;
+    }
+
     /** The time of the event that made the one S3 relation eligible: the structural basis's {@code verifiedAt} too. */
     static final String VERIFIED_AT = "2026-10-16T12:00:00.123456+00:00";
 
@@ -672,6 +742,140 @@ final class HandoffFixtures {
         }
         node.putArray("duplicateGroups");
         return node;
+    }
+
+    // ---------------------------------------------------------------------------------------------- issue summary ------------------------
+
+    static final String SUMMARY_JOB = "summary-job-1";
+    /** The one claim of the standard issue's available summary: a Hangul sentence that restates its one mention quote. */
+    static final String SUMMARY_CLAIM = "합성기업이 계약을 발표했다.";
+
+    /** An {@code unavailable} summary with {@code source: null}: {@code not-requested}, {@code temporal-review-pending} or {@code input-too-large}. */
+    static ObjectNode unavailable(String code) {
+        ObjectNode node = StrictJson.newObject();
+        node.put("status", "unavailable");
+        node.put("code", code);
+        node.putNull("source");
+        return node;
+    }
+
+    /**
+     * The summary basis of the standard issue, built by hand from the bundle's own fields (not through the verifier's code): its
+     * title, its ONE mention quote ({@code report}: the mention is not a background one) and that quote's article version.
+     */
+    static ObjectNode summaryBasis(ObjectNode bundle) {
+        JsonNode issue = bundle.get("issues").get(0);
+        JsonNode mention = issue.get("mentions").get(0);
+        String quoteId = mention.get("evidenceIds").get(0).stringValue();
+        JsonNode record = null;
+        for (JsonNode candidate : bundle.get("evidence")) {
+            if (candidate.get("id").stringValue().equals(quoteId)) {
+                record = candidate;
+            }
+        }
+        JsonNode article = bundle.get("articles").get(0);
+        ObjectNode basis = StrictJson.newObject();
+        basis.put("policy", HandoffIssueSummary.POLICY);
+        basis.put("issueId", issue.get("id").stringValue());
+        basis.put("title", issue.get("title").stringValue());
+        ObjectNode quote = basis.putArray("quotes").addObject();
+        quote.put("evidenceId", quoteId);
+        quote.put("articleId", record.get("articleId").stringValue());
+        quote.put("articleVersion", record.get("articleVersion").stringValue());
+        quote.put("start", record.get("start").intValue());
+        quote.put("end", record.get("end").intValue());
+        quote.put("quoteSha256", record.get("quoteSha256").stringValue());
+        quote.put("context", mention.get("background").booleanValue() ? "background" : "report");
+        ObjectNode used = basis.putArray("articles").addObject();
+        used.put("articleId", article.get("articleId").stringValue());
+        used.put("articleVersion", article.get("articleVersion").stringValue());
+        used.put("documentId", article.get("documentId").stringValue());
+        used.put("documentVersion", article.get("documentVersion").stringValue());
+        used.put("textSha256", article.get("textSha256").stringValue());
+        return basis;
+    }
+
+    /** The {@code source} pin of a job result: its identity, the basis it was written for and the digest of {@code body} around them. */
+    private static ObjectNode summarySource(ObjectNode body, String basisDigest) {
+        ObjectNode preimage = StrictJson.newObject();
+        preimage.put("jobId", SUMMARY_JOB);
+        preimage.put("inputDigest", "9".repeat(64));
+        preimage.put("basisDigest", basisDigest);
+        preimage.set("result", body);
+        ObjectNode source = StrictJson.newObject();
+        source.put("jobId", SUMMARY_JOB);
+        source.put("inputDigest", "9".repeat(64));
+        source.put("resultDigest", Canonical.digest(preimage));
+        source.put("basisDigest", basisDigest);
+        return source;
+    }
+
+    /**
+     * The AVAILABLE summary of the standard issue's one quote with every digest recomputed the way the producer does (basis digest,
+     * {@code isr-} result version, result digest). The producer and verifier kinds pair with the bundle's execution mode: authored
+     * replay with no model, or a provider with an independent verifier and named models.
+     */
+    static ObjectNode availableSummary(ObjectNode bundle) {
+        boolean live = bundle.get("provenance").get("executionMode").stringValue().equals("live");
+        ObjectNode basis = summaryBasis(bundle);
+        String basisDigest = Canonical.digest(basis);
+        String quoteId = basis.get("quotes").get(0).get("evidenceId").stringValue();
+        ArrayNode claims = StrictJson.newArray();
+        ObjectNode claim = claims.addObject();
+        claim.put("claimId", "c1");
+        claim.put("text", SUMMARY_CLAIM);
+        claim.putArray("evidenceIds").add(quoteId);
+        ObjectNode body = StrictJson.newObject();
+        body.put("status", "available");
+        body.put("text", SUMMARY_CLAIM);
+        body.set("claims", claims.deepCopy());
+        body.putArray("evidenceIds").add(quoteId);
+        body.put("generatedAt", "2026-10-22T01:02:03+00:00");
+        ObjectNode version = StrictJson.newObject();
+        version.put("basisDigest", basisDigest);
+        version.set("claims", claims);
+        body.put("resultVersion", "isr-" + Canonical.digest(version));
+        body.put("language", "ko");
+        ObjectNode producer = body.putObject("producer");
+        producer.put("kind", live ? "provider" : "authored-replay");
+        if (live) {
+            producer.put("model", "gpt-6-luna");
+            producer.put("reasoningEffort", "high");
+        } else {
+            producer.putNull("model");
+            producer.putNull("reasoningEffort");
+        }
+        producer.put("promptVersion", "zoop-issue-summary-prompt-1");
+        producer.put("schemaDigest", "7".repeat(64));
+        producer.put("runtimeIdentity", "8".repeat(64));
+        ObjectNode verifier = body.putObject("verifier");
+        verifier.put("kind", live ? "independent-verifier" : "authored-replay");
+        if (live) {
+            verifier.put("model", "jev-1.14.0");
+        } else {
+            verifier.putNull("model");
+        }
+        verifier.put("adapterIdentity", "a".repeat(64));
+        verifier.put("requestDigest", "b".repeat(64));
+        ObjectNode summary = body.deepCopy();
+        summary.set("source", summarySource(body, basisDigest));
+        return summary;
+    }
+
+    /** A job-coded {@code unavailable} summary ({@code producer-invalid}, {@code verifier-hold} or {@code verifier-reject}) of the standard issue. */
+    static ObjectNode withheldSummary(ObjectNode bundle, String code) {
+        String basisDigest = Canonical.digest(summaryBasis(bundle));
+        ObjectNode body = StrictJson.newObject();
+        body.put("status", "unavailable");
+        body.put("code", code);
+        ObjectNode summary = body.deepCopy();
+        summary.set("source", summarySource(body, basisDigest));
+        return summary;
+    }
+
+    /** The same handoff whose one issue carries the summary {@code make} builds from the built bundle (content digest and bundle pins recomputed). */
+    static Built withSummary(Built built, Function<ObjectNode, ObjectNode> make) {
+        return repinned(built, bundle -> ((ObjectNode) bundle.get("issues").get(0)).set("summary", make.apply(bundle)));
     }
 
     private static List<String> sorted(String... ids) {
@@ -865,5 +1069,48 @@ final class HandoffFixtures {
 
     static JsonNode parse(byte[] bytes) {
         return JSON.readTree(bytes);
+    }
+
+    /** The impact FIELD names no public document may carry (an object key at any depth). */
+    static final List<String> IMPACT_KEYS = List.of("impacts", "proposal", "effects", "verifierRequestDigest", "impactCandidateId",
+            "targetVerdict", "sourceRelation");
+    /** Status and policy literals that, as a string VALUE, only an impact row carries. */
+    static final List<String> IMPACT_LITERALS = List.of("verifier-reject", "no-evidence", "technical-reject", "impact_precheck_rejected",
+            "s3-independent-verifier-quote-effect");
+
+    /**
+     * What of an impact row a public JSON document carries, found structurally: a reserved field name at any depth, a string value that IS
+     * a reserved literal, or one of the exact {@code protectedText} strings inside any string value. An identifier that merely contains a
+     * reserved word (the handoff id {@code handoff-impacts-1} in {@code sourceBundleId}) is a legitimate value and never a leak.
+     */
+    static List<String> impactLeaks(String json, String... protectedText) {
+        List<String> found = new ArrayList<>();
+        collectImpactLeaks(JSON.readTree(json), found, protectedText);
+        return found;
+    }
+
+    private static void collectImpactLeaks(JsonNode node, List<String> found, String[] protectedText) {
+        if (node.isObject()) {
+            for (String name : node.propertyNames()) {
+                if (IMPACT_KEYS.contains(name)) {
+                    found.add("key " + name);
+                }
+                collectImpactLeaks(node.get(name), found, protectedText);
+            }
+        } else if (node.isArray()) {
+            for (JsonNode item : node.values()) {
+                collectImpactLeaks(item, found, protectedText);
+            }
+        } else if (node.isString()) {
+            String value = node.stringValue();
+            if (IMPACT_LITERALS.contains(value)) {
+                found.add("value " + value);
+            }
+            for (String text : protectedText) {
+                if (value.contains(text)) {
+                    found.add("text '" + text + "'");
+                }
+            }
+        }
     }
 }

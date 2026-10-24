@@ -335,9 +335,11 @@ public class EvidenceService {
      * One verified body citation of a pinned public graph version. The pinned, filtered snapshot decides visibility and the span;
      * the app's own article rows decide that the quote is still readable (access, selected version, stored text); the selected
      * version's own import receipt, verified against its registered hash and size and read ONCE, names the grants the version was
-     * imported under (and, for a span no visible issue or relation cites but a visible structural basis references, proves that
-     * exactly that relation's basis cites it: such a basis-only citation has no {@code eventIds}); and the CURRENT S2-1 source
-     * registry, read now, decides whether those grants still allow it. The receipt grants nothing and the S1 registry is not
+     * imported under (and, for a span no visible issue or relation cites directly, proves membership: either a visible structural
+     * basis cites it or a visible INVOLVES relation has a verified impact row listing it among its verifier-mapped effects; both
+     * receipt checks run before they are combined, so a malformed one is never hidden by a true other; such a basis-only or
+     * impact-only citation has no {@code eventIds}, and no impact label, effect or proposal is ever returned); and the CURRENT S2-1
+     * source registry, read now, decides whether those grants still allow it. The receipt grants nothing and the S1 registry is not
      * involved. Any denial is {@code EVIDENCE_UNAVAILABLE} without a reason on the wire.
      */
     private EvidenceResponse serveGraph(EvidenceView row, String graphVersion, Instant asOf, String companyId, String requestId,
@@ -356,7 +358,7 @@ public class EvidenceService {
             article = readable.article();
             version = readable.version();
             // The receipt of the SELECTED version, not the row's own: a row shared by several imports points at the first one. Its
-            // bytes are read and parsed once for the grant pins and, for a basis-only span, for the basis membership.
+            // bytes are read and parsed once for the grant pins and, for a span no visible issue or relation cites, for the membership.
             StrictJson.Obj receiptBundle = GraphReceiptGrants.bundle(receipt(found.graphVersion(), requestId), found.graphVersion());
             requireAllowed(pinnedGrants(receiptBundle, row, found, article), sources.registry(requestId), now);
         } catch (GraphReceiptGrants.Malformed malformed) {
@@ -399,7 +401,7 @@ public class EvidenceService {
     /**
      * Activation precheck (FS059, graph read contract section 0): the same gates {@link #read} applies to a graph body citation,
      * run against a version that is not active yet, in two steps. This call runs every time-independent gate (row, verified
-     * body span, article access, version text, receipt pins, basis, provider) over all of {@code visible}, which maps each
+     * body span, article access, version text, receipt pins, basis/impact membership, provider) over all of {@code visible}, which maps each
      * evidence id the version would show to what its snapshot says about it, and reads the version's receipt once. It returns
      * the time-dependent last step: given the activation time, it reads the S2-1 registry and judges every collected grant pin
      * at exactly that time, so a grant that expires while the slow step runs is caught (PR #275 follow-up review). The caller
@@ -470,12 +472,17 @@ public class EvidenceService {
         return new Readable(article, version);
     }
 
-    /** The grants the selected version's receipt pins for this article version (basis membership and provider checked). */
+    /** The grants the selected version's receipt pins for this article version (basis/impact membership and provider checked). */
     private static Set<GraphReceiptGrants.Pin> pinnedGrants(StrictJson.Obj receiptBundle, EvidenceView row,
             GraphEvidence found, ArticleRow article) {
         Set<GraphReceiptGrants.Pin> pins = GraphReceiptGrants.pins(receiptBundle, row.articleId(), row.articleVersion());
-        if (!found.basisRefs().isEmpty()) {
-            GraphReceiptBasis.require(receiptBundle, row.id(), found.basisRefs());
+        if (!found.basisRefs().isEmpty() || !found.impactRefs().isEmpty()) {
+            // Evaluate both seams before combining them: malformed membership must not hide behind a valid other seam.
+            boolean basisProven = GraphReceiptBasis.proves(receiptBundle, row.id(), found.basisRefs());
+            boolean impactProven = GraphReceiptImpact.proves(receiptBundle, row.id(), found.impactRefs());
+            if (!basisProven && !impactProven) {
+                throw new GraphReceiptGrants.Malformed("receipt_membership_missing");
+            }
         }
         for (GraphReceiptGrants.Pin pin : pins) {
             if (!pin.sourceId().equals(article.provider())) {

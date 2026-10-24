@@ -8,15 +8,23 @@ import java.util.List;
  * flags: it is never an empty result, so "nothing found" is only ever reported by a call that succeeded.
  */
 public record ChatToolResult(String schemaVersion, String toolCallId, String capabilityId, String dataVersion,
-        List<ChatToolItem> items, List<String> evidenceIds, Boolean truncated, Boolean nextAllowed, String error) {
+        List<ChatToolItem> items, List<String> evidenceIds, Boolean truncated, Boolean nextAllowed, String error,
+        List<ChatToolPath> paths) {
     public ChatToolResult {
         items = List.copyOf(items);
         evidenceIds = List.copyOf(evidenceIds);
+        paths = List.copyOf(paths);
+    }
+
+    public ChatToolResult(String schemaVersion, String toolCallId, String capabilityId, String dataVersion,
+            List<ChatToolItem> items, List<String> evidenceIds, Boolean truncated, Boolean nextAllowed, String error) {
+        this(schemaVersion, toolCallId, capabilityId, dataVersion, items, evidenceIds, truncated, nextAllowed, error,
+                List.of());
     }
 
     static ChatToolResult succeeded(String toolCallId, String capabilityId, ChatToolOutput output) {
         return new ChatToolResult(ChatToolRegistry.SCHEMA_VERSION, toolCallId, capabilityId, output.dataVersion(),
-                output.items(), output.evidenceIds(), output.truncated(), output.nextAllowed(), null);
+                output.items(), output.evidenceIds(), output.truncated(), output.nextAllowed(), null, output.paths());
     }
 
     static ChatToolResult failed(String toolCallId, String capabilityId, String error) {

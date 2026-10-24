@@ -8,6 +8,7 @@ import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.function.Function;
@@ -20,6 +21,8 @@ import com.zoop.document.importer.IngestionExportParser;
 import com.zoop.document.importer.Observation;
 import com.zoop.document.repository.ArtifactRow;
 import com.zoop.document.service.InMemoryDocumentRegistry;
+import com.zoop.graph.importer.GraphHandoffRepository.PublicationState;
+import com.zoop.graph.importer.GraphHandoffRepository.RuleRow;
 import com.zoop.graph.importer.GraphHandoffResult.Outcome;
 import com.zoop.graph.importer.GraphHandoffResult.Staged;
 import com.zoop.graph.importer.HandoffFixtures.Built;
@@ -112,9 +115,22 @@ class GraphHandoffImporterTest {
         importer = newImporter();
     }
 
+    /** {@link #setUp()} again within one test: a new store, registry and database, as if nothing had been imported. */
+    private void freshSetUp() throws IOException {
+        try (Stream<Path> files = Files.walk(root)) {
+            files.sorted(Comparator.reverseOrder()).forEach(path -> path.toFile().delete());
+        }
+        setUp();
+    }
+
     private GraphHandoffImporter newImporter() {
         return new GraphHandoffImporter(handoff, ingestion, new IngestionExportParser(), store, registry, graph, transaction,
                 Clock.fixed(NOW, ZoneOffset.UTC));
+    }
+
+    /** The {@code publicationRules} object of the written result file. */
+    private static JsonNode rules(GraphHandoffResult result) {
+        return HandoffFixtures.parse(GraphHandoffResultWriter.toBytes(result)).get("publicationRules");
     }
 
     private static GraphHandoffException failure(GraphHandoffResult result) {
@@ -124,6 +140,12 @@ class GraphHandoffImporterTest {
 
     private Path snapshotFile(String versionId) {
         return root.resolve("graph_snapshot").resolve(versionId + ".json");
+    }
+
+    /** The snapshot file the version registered, found through the registry as the public read finds it (the name carries the rules). */
+    private Path storedSnapshotFile(String versionId) {
+        String uri = registry.findArtifact("artifact-" + versionId).orElseThrow().storageUri();
+        return root.resolve(uri.substring(uri.indexOf(':') + 1));
     }
 
     private Path receiptFile(String versionId) {
@@ -256,13 +278,135 @@ class GraphHandoffImporterTest {
         assertEquals(3, written.get("evidenceRows").get("registered").intValue());
     }
 
+    // ------------------------------------------------------------------------------------------------ publication rules ----
+
+    /** Hides the fixture's INVOLVES (one article) and keeps its structural relation, so the issue stays. */
+    private static final RuleRow INVOLVES_SINGLE = new RuleRow("involves-single@1",
+            "{\"kind\": \"single_source\", \"minSources\": 2, \"relationTypes\": [\"INVOLVES\"]}");
+    /** Enabled, readable, and matches nothing in the fixture (its issue is announced). */
+    private static final RuleRow CANCELLED_ONLY = new RuleRow("cancelled-only@1",
+            "{\"kind\": \"assertion_status\", \"hide\": [\"cancelled\"]}");
+
+    @Test
+    void theVersionFixesBothRevisionsAndARuleThatMatchesNothingLeavesTheWritersBytes() throws Exception {
+        GraphHandoffResult plainResult = importer.run(built.request());
+        assertTrue(plainResult.succeeded());
+        assertEquals(HandoffFixtures.parse("""
+                {"ruleRevision":0,"reviewRevision":0,"applied":[],"stored":{"issues":1,"relations":2,"articles":1,"evidence":3},
+                 "hidden":{"issues":0,"relations":0},"byRule":{}}
+                """.getBytes(StandardCharsets.UTF_8)), rules(plainResult), "no rule: what is stored is the bundle");
+        byte[] unfiltered = Files.readAllBytes(storedSnapshotFile(built.versionId()));
+        var plain = graph.inserted().get(0);
+        assertEquals(0, plain.ruleRevision());
+        assertEquals(0, plain.reviewRevision());
+        assertEquals(List.of(), plain.ruleIds());
+        assertEquals(List.of(), graph.versionRules(built.versionId()));
+
+        freshSetUp();
+        graph.publication = new PublicationState(7, 4, List.of(CANCELLED_ONLY));
+        GraphHandoffResult matchedNothing = importer.run(built.request());
+        assertTrue(matchedNothing.succeeded());
+        assertEquals(HandoffFixtures.parse("""
+                {"ruleRevision":7,"reviewRevision":4,"applied":["cancelled-only@1"],
+                 "stored":{"issues":1,"relations":2,"articles":1,"evidence":3},"hidden":{"issues":0,"relations":0},
+                 "byRule":{"cancelled-only@1":{"issues":0,"relations":0}}}
+                """.getBytes(StandardCharsets.UTF_8)), rules(matchedNothing));
+
+        var inserted = graph.inserted().get(0);
+        assertEquals(7, inserted.ruleRevision());
+        assertEquals(4, inserted.reviewRevision());
+        assertEquals(List.of("cancelled-only@1"), inserted.ruleIds(), "an enabled rule is recorded whether or not it hid anything");
+        assertEquals(List.of(CANCELLED_ONLY), graph.versionRules(built.versionId()));
+        assertEquals(List.of(1L, 2L, 1L), List.of(inserted.issueCount(), inserted.relationCount(), inserted.articleCount()));
+        assertEquals(sha256(unfiltered), sha256(Files.readAllBytes(storedSnapshotFile(built.versionId()))),
+                "the same bytes as with no rule at all");
+    }
+
+    @Test
+    void anEnabledRuleFiltersTheStoredSnapshotWhileTheReceiptAndTheEvidenceRowsKeepTheWholeBundle() throws Exception {
+        graph.publication = new PublicationState(3, 0, List.of(INVOLVES_SINGLE));
+
+        GraphHandoffResult result = importer.run(built.request());
+
+        assertTrue(result.succeeded());
+        String versionId = built.versionId();
+        PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(Files.readAllBytes(storedSnapshotFile(versionId)), versionId);
+        assertEquals(List.of("STRUCTURALLY_RELATED_TO"), snapshot.relations().stream().map(r -> r.relationType()).toList());
+        assertEquals(List.of(ISSUE), snapshot.issues().stream().map(i -> i.issueId()).toList(),
+                "the issue keeps its structural company relation");
+        assertEquals(2, snapshot.companies().size(), "companies are the catalogue and always stay");
+        var inserted = graph.inserted().get(0);
+        assertEquals(List.of(1L, 1L, 1L), List.of(inserted.issueCount(), inserted.relationCount(), inserted.articleCount()),
+                "the version counts what the stored snapshot holds");
+        assertEquals(List.of("involves-single@1"), inserted.ruleIds());
+        assertEquals(3, inserted.ruleRevision());
+        // The result file says what the rules did; its counts stay the bundle's.
+        JsonNode written = HandoffFixtures.parse(GraphHandoffResultWriter.toBytes(result));
+        assertEquals(2, written.get("counts").get("relations").intValue());
+        JsonNode rules = rules(result);
+        assertEquals(3, rules.get("ruleRevision").intValue());
+        assertEquals("[\"involves-single@1\"]", rules.get("applied").toString());
+        assertEquals(1, rules.get("stored").get("relations").intValue());
+        assertEquals(1, rules.get("stored").get("issues").intValue());
+        assertEquals(snapshot.evidence().size(), rules.get("stored").get("evidence").intValue());
+        assertEquals(1, rules.get("hidden").get("relations").intValue());
+        assertEquals(0, rules.get("hidden").get("issues").intValue());
+        assertEquals(1, rules.get("byRule").get("involves-single@1").get("relations").intValue());
+
+        // The receipt is the complete bundle and every span is registered: a rule changes the public projection only.
+        assertEquals(built.bundle(), HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId))).get("bundle"));
+        assertEquals(3, graph.evidenceRows().size());
+        assertEquals(3, HandoffFixtures.parse(GraphHandoffResultWriter.toBytes(result)).get("evidenceRows").get("registered")
+                .intValue());
+    }
+
+    @Test
+    void aRepeatedImportFiltersWithTheRulesItsVersionWasStagedWithWhateverWasSwitchedSince() throws Exception {
+        for (List<RuleRow> first : List.of(List.of(INVOLVES_SINGLE), List.<RuleRow>of())) {
+            freshSetUp();
+            graph.publication = new PublicationState(3, 0, first);
+            GraphHandoffResult staged = importer.run(built.request());
+            assertTrue(staged.succeeded());
+            byte[] stored = Files.readAllBytes(storedSnapshotFile(built.versionId()));
+
+            // The switch flips the rule; the staged version is not this import's to change, only the next version's.
+            graph.publication = new PublicationState(4, 0, first.isEmpty() ? List.of(INVOLVES_SINGLE) : List.of());
+            GraphHandoffResult again = importer.run(built.request());
+
+            assertTrue(again.succeeded(), first.toString());
+            assertEquals(Outcome.UNCHANGED, again.staged().outcome(), first.toString());
+            assertEquals(rules(staged), rules(again), "the version's own rules and revisions, never the switched ones");
+            assertEquals(1, graph.inserted().size());
+            assertEquals(sha256(stored), sha256(Files.readAllBytes(storedSnapshotFile(built.versionId()))));
+        }
+    }
+
+    @Test
+    void anEnabledRuleThisAppCannotReadFailsTheImportBeforeAnythingIsWritten() throws Exception {
+        InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+        InMemoryDocumentRegistry.State registryBefore = registry.state();
+        long filesBefore = fileCount();
+        for (RuleRow unreadable : List.of(
+                new RuleRow("regex@1", "{\"kind\": \"regex\", \"pattern\": \".*\"}"),
+                new RuleRow("too-small@1", "{\"kind\": \"single_source\", \"minSources\": 1, \"relationTypes\": [\"INVOLVES\"]}"),
+                new RuleRow("not-a-rule-id", CANCELLED_ONLY.definition()))) {
+            graph.publication = new PublicationState(1, 0, List.of(CANCELLED_ONLY, unreadable));
+
+            GraphHandoffException failure = failure(importer.run(built.request()));
+
+            assertEquals(GraphHandoffFailure.RULE_DEFINITION_INVALID, failure.failure(), unreadable.id());
+            assertEquals(0, graph.writes(), unreadable.id());
+            assertNothingWritten(graphBefore, registryBefore, filesBefore);
+        }
+    }
+
     @Test
     void theReceiptKeepsTheOriginalMentionsRawWhileTheSnapshotStaysFormat3WithoutMentionValues() throws Exception {
         assertTrue(importer.run(built.request()).succeeded());
         String versionId = built.versionId();
 
         JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId)));
-        assertEquals("zoop-graph-handoff-bundle-5", receipt.get("bundle").get("schemaVersion").stringValue());
+        assertEquals("zoop-graph-handoff-bundle-7", receipt.get("bundle").get("schemaVersion").stringValue());
         // The hand-written expectation of the issue's field provenance: the one unanimous mention states every value, and the
         // receipt says so without claiming any value was verified (selection, not fact verification).
         JsonNode provenance = receipt.get("bundle").get("issues").get(0).get("fieldProvenance");
@@ -319,6 +463,86 @@ class GraphHandoffImporterTest {
         assertEquals(0, provenance.get("withheld").size());
         assertEquals("2026-09-30", snapshot.issues().get(0).eventTime());
         assertEquals("2026Q3", snapshot.issues().get(0).period());
+    }
+
+    @Test
+    void anAvailableSummaryIsRetainedExactlyInTheReceiptAndNeverReachesTheSnapshotOrTheResult() throws Exception {
+        Built summarized = HandoffFixtures.withSummary(built, HandoffFixtures::availableSummary);
+        handoff.envelope = summarized.envelopeBytes();
+
+        GraphHandoffResult result = importer.run(summarized.request());
+
+        assertTrue(result.succeeded(), () -> String.valueOf(result.failure() == null ? null : result.failure().failure()));
+        String versionId = summarized.versionId();
+        // The receipt keeps the producer's exact object: every claim, id, digest, identity and the job pin.
+        JsonNode retained = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId))).get("bundle").get("issues").get(0).get("summary");
+        assertEquals(summarized.bundle().get("issues").get(0).get("summary"), retained);
+        assertEquals("available", retained.get("status").stringValue());
+        assertEquals(HandoffFixtures.SUMMARY_CLAIM, retained.get("text").stringValue());
+        assertEquals(HandoffFixtures.SUMMARY_JOB, retained.get("source").get("jobId").stringValue());
+        // It is a receipt-only record, not a public snapshot projection: nothing of it is in the snapshot or in the written result.
+        byte[] snapshotBytes = Files.readAllBytes(snapshotFile(versionId));
+        assertEquals(PublicGraphSnapshot.FORMAT, GraphSnapshotCodec.read(snapshotBytes, versionId).snapshotFormat());
+        String snapshotText = new String(snapshotBytes, StandardCharsets.UTF_8);
+        String resultText = new String(GraphHandoffResultWriter.toBytes(result), StandardCharsets.UTF_8);
+        for (String summaryOnly : List.of(HandoffFixtures.SUMMARY_CLAIM, "resultVersion", "isr-", HandoffFixtures.SUMMARY_JOB, "authored-replay",
+                "claims", "basisDigest", "issueSummary")) {
+            assertFalse(snapshotText.contains(summaryOnly), "snapshot: " + summaryOnly);
+            assertFalse(resultText.contains(summaryOnly), "result: " + summaryOnly);
+        }
+
+        // The same pins again: a no-op with the same retained summary.
+        assertEquals(Outcome.UNCHANGED, importer.run(summarized.request()).staged().outcome());
+    }
+
+    @Test
+    void aTemporalPendingOrJobCodedSummaryIsRetainedAsStatedAndANotRequestedOneNeverBecomesAnAvailableOne() throws Exception {
+        Built held = HandoffFixtures.build(Spec.standard().withVerdicts());
+        handoff.envelope = held.envelopeBytes();
+
+        assertTrue(importer.run(held.request()).succeeded());
+        JsonNode retained = HandoffFixtures.parse(Files.readAllBytes(receiptFile(held.versionId()))).get("bundle").get("issues").get(0).get("summary");
+        assertEquals("temporal-review-pending", retained.get("code").stringValue());
+        assertTrue(retained.get("source").isNull());
+        assertFalse(Files.readString(receiptFile(held.versionId())).contains(HandoffFixtures.SUMMARY_CLAIM));
+    }
+
+    @Test
+    void aTamperedSummaryIsRefusedBeforeAnythingIsWrittenWhateverItsDigestsSay() throws Exception {
+        InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+        InMemoryDocumentRegistry.State registryBefore = registry.state();
+        long filesBefore = fileCount();
+        Built summarized = HandoffFixtures.withSummary(built, HandoffFixtures::availableSummary);
+        Built held = HandoffFixtures.build(Spec.standard().withVerdicts());
+        record Forgery(String rule, Built forged) {
+        }
+        List<Forgery> forgeries = List.of(
+                new Forgery("a claim text edited behind the digests", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary").get("claims").get(0)).put("text", "합성기업이 계약을 취소했다."))),
+                new Forgery("a summary text that is not the claims", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary")).put("text", "다른 문장이다."))),
+                new Forgery("an evidence id outside the issue's mention quotes", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary").get("claims").get(0)).putArray("evidenceIds")
+                                .add("ev-" + "0".repeat(64)))),
+                new Forgery("a basis digest of another basis", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary").get("source")).put("basisDigest", "0".repeat(64)))),
+                new Forgery("an available summary on an issue whose time field is held", HandoffFixtures.repinned(held,
+                        b -> ((ObjectNode) b.get("issues").get(0)).set("summary", HandoffFixtures.availableSummary(b)))),
+                new Forgery("not-requested on an issue whose time field is held", HandoffFixtures.repinned(held,
+                        b -> ((ObjectNode) b.get("issues").get(0)).set("summary", HandoffFixtures.unavailable("not-requested")))),
+                new Forgery("temporal-review-pending on an issue nobody held", HandoffFixtures.repinned(built,
+                        b -> ((ObjectNode) b.get("issues").get(0)).set("summary", HandoffFixtures.unavailable("temporal-review-pending")))),
+                new Forgery("a replay summary relabelled as a provider's", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary").get("producer")).put("kind", "provider"))));
+        for (Forgery forgery : forgeries) {
+            handoff.envelope = forgery.forged().envelopeBytes();
+
+            GraphHandoffException failure = failure(importer.run(forgery.forged().request()));
+
+            assertEquals(GraphHandoffFailure.BUNDLE_INVALID, failure.failure(), forgery.rule());
+            assertEquals(0, graph.writes(), forgery.rule());
+            assertNothingWritten(graphBefore, registryBefore, filesBefore);
+        }
     }
 
     @Test
@@ -469,7 +693,8 @@ class GraphHandoffImporterTest {
 
     @Test
     void anExportOfAnEarlierBundleSchemaIsAnInvalidBundleAndNothingIsWritten() throws Exception {
-        for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3")) {
+        for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3",
+                "zoop-graph-handoff-bundle-5", "zoop-graph-handoff-bundle-6")) {
             InMemoryGraphHandoffRepository.State graphBefore = graph.state();
             InMemoryDocumentRegistry.State registryBefore = registry.state();
             long filesBefore = fileCount();
@@ -477,15 +702,21 @@ class GraphHandoffImporterTest {
             ObjectNode bundle = (ObjectNode) envelope.get("bundle");
             bundle.put("schemaVersion", schema);
             ObjectNode issue = (ObjectNode) bundle.get("issues").get(0);
-            // What each earlier build wrote: -3 has provenance without `withheld` and no verdicts, -2 no provenance, -1 no mentions.
-            issue.remove("fieldVerdicts");
-            if (schema.endsWith("-3")) {
-                ((ObjectNode) issue.get("fieldProvenance")).remove("withheld");
-            } else {
-                issue.remove("fieldProvenance");
-            }
-            if (schema.endsWith("-1")) {
-                issue.remove("mentions");
+            // What each earlier build wrote: -3 has provenance without `withheld` and no verdicts, -2 no provenance, -1 no mentions;
+            // -5 has today's issues, so only its schema string marks it as earlier; -6 lacks the issue summary and its policy key.
+            if (schema.endsWith("-6")) {
+                issue.remove("summary");
+                ((ObjectNode) bundle.get("policy")).remove("issueSummary");
+            } else if (!schema.endsWith("-5")) {
+                issue.remove("fieldVerdicts");
+                if (schema.endsWith("-3")) {
+                    ((ObjectNode) issue.get("fieldProvenance")).remove("withheld");
+                } else {
+                    issue.remove("fieldProvenance");
+                }
+                if (schema.endsWith("-1")) {
+                    issue.remove("mentions");
+                }
             }
             ((ObjectNode) bundle.get("digests")).put("content", HandoffBundleVerifier.contentDigest(bundle));
             ((ObjectNode) envelope.get("receipt")).put("bundleSchema", schema);
@@ -891,6 +1122,38 @@ class GraphHandoffImporterTest {
     }
 
     @Test
+    void aRetryAfterAnUnknownCommitAndARuleSwitchStagesUnderTheNewRulesWithoutAFileConflict() throws Exception {
+        // PR #326 review: the lost attempt left the file of its rules; the switch changes the bytes the retry writes.
+        graph.publication = new PublicationState(3, 0, List.of(INVOLVES_SINGLE));
+        transaction.failCommitOnce = true;
+        assertEquals(GraphHandoffFailure.DATABASE_UNAVAILABLE, failure(importer.run(built.request())).failure());
+        Path lostFile = root.resolve("graph_snapshot")
+                .resolve(GraphHandoffImporter.snapshotFileName(built.versionId(), List.of("involves-single@1")));
+        assertTrue(Files.exists(lostFile), "the unknown outcome keeps the file");
+
+        graph.publication = new PublicationState(4, 0, List.of());
+        GraphHandoffResult retry = importer.run(built.request());
+
+        assertTrue(retry.succeeded(), () -> String.valueOf(retry.failure() == null ? null : retry.failure().failure()));
+        assertEquals(Outcome.STAGED, retry.staged().outcome());
+        assertEquals("created", retry.staged().snapshot().file(), "its own file, not the orphan of the other rule set");
+        assertEquals(List.of(), graph.inserted().get(0).ruleIds());
+        assertEquals(4, graph.inserted().get(0).ruleRevision());
+        assertEquals(2, GraphSnapshotCodec.read(Files.readAllBytes(snapshotFile(built.versionId())), built.versionId())
+                .relations().size(), "the snapshot of the rules read by the retry");
+        assertTrue(Files.exists(lostFile), "the orphan is left alone, never registered");
+
+        // Under the same rules a lost attempt's file is adopted, as without rules.
+        freshSetUp();
+        graph.publication = new PublicationState(3, 0, List.of(INVOLVES_SINGLE));
+        transaction.failCommitOnce = true;
+        importer.run(built.request());
+        GraphHandoffResult same = importer.run(built.request());
+        assertTrue(same.succeeded());
+        assertEquals("existing", same.staged().snapshot().file());
+    }
+
+    @Test
     void aDifferentFileAtTheSnapshotNameIsAConflictAndStaysUntouched() throws Exception {
         Files.createDirectory(root.resolve("graph_snapshot"), java.nio.file.attribute.PosixFilePermissions.asFileAttribute(
                 java.nio.file.attribute.PosixFilePermissions.fromString("rwx------")));
@@ -1060,6 +1323,83 @@ class GraphHandoffImporterTest {
             }
         }
         throw new AssertionError("no structural relation");
+    }
+
+    // ------------------------------------------------------------------------------------------------ impacts --------------
+
+    @Test
+    void aVerifiedImpactIsRetainedRawInTheReceiptWhileTheSnapshotCarriesOnlyItsQuoteSpan() throws Exception {
+        Built impact = HandoffFixtures.build(Spec.standard().withImpact());
+        handoff.envelope = impact.envelopeBytes();
+
+        GraphHandoffResult result = importer.run(impact.request());
+
+        assertTrue(result.succeeded(), () -> String.valueOf(result.failure() == null ? null : result.failure().failure()));
+        String versionId = impact.versionId();
+        JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId)));
+        assertEquals(impact.bundle().get("impacts"), receipt.get("bundle").get("impacts"), "the receipt retains every row raw");
+        assertEquals(impact.bundle(), receipt.get("bundle"));
+        assertEquals(1, receipt.get("bundle").get("counts").get("impacts").intValue());
+        assertTrue(strings(receipt.get("appVerification").get("checks"))
+                .contains("impact_rows_closed_over_involves_sources_approvals_and_labels"));
+        assertEquals("audit-metadata-not-a-verifier-verdict", receipt.get("appVerification").get("approvalBasis").stringValue());
+
+        String quote = impact.bundle().get("impacts").get(0).get("effects").get("positive").get(0).stringValue();
+        String snapshotText = Files.readString(snapshotFile(versionId));
+        PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(Files.readAllBytes(snapshotFile(versionId)), versionId);
+        assertEquals(3, snapshot.snapshotFormat());
+        assertEquals(4, snapshot.evidence().size());
+        assertTrue(snapshot.evidence().stream().anyMatch(e -> e.evidenceId().equals(quote)),
+                "the quote's span is a public span, nothing more");
+        // No impact content of any kind reaches the public snapshot: no reserved field name at any depth, no reserved literal value and none of
+        // the exact proposal/candidate strings. (The raw text is NOT searched for words: an id may legitimately contain one.)
+        String candidateId = impact.bundle().get("impacts").get(0).get("impactCandidateId").stringValue();
+        assertEquals(List.of(), HandoffFixtures.impactLeaks(snapshotText, candidateId, "합성 영향"));
+        assertEquals(4, HandoffFixtures.parse(GraphHandoffResultWriter.toBytes(result)).get("evidenceRows").get("registered").intValue());
+    }
+
+    @Test
+    void aDefaultAndAnOperatorApprovedHandoffRetainTheirNotProposedAndNotApplicableRowsOnlyInTheReceipt() throws Exception {
+        // The handoff id is the snapshot's sourceBundleId and may legitimately contain a reserved word ("impacts"): only object keys and
+        // exact protected values are leaks, never an identifier's substring.
+        for (Spec spec : List.of(Spec.standard().withHandoffId("handoff-default-impacts"),
+                Spec.standard().withHandoffId("handoff-manual-impacts").withManualApproval())) {
+            Built world = HandoffFixtures.build(spec);
+            handoff.envelope = world.envelopeBytes();
+
+            assertTrue(importer.run(world.request()).succeeded(), spec.handoffId());
+
+            JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(world.versionId())));
+            JsonNode rows = receipt.get("bundle").get("impacts");
+            assertEquals(1, rows.size(), spec.handoffId());
+            assertEquals(spec.manualApproval() ? "not-applicable" : "not-proposed", rows.get(0).get("status").stringValue());
+            String snapshotText = Files.readString(snapshotFile(world.versionId()));
+            assertTrue(snapshotText.contains("\"sourceBundleId\":\"" + spec.handoffId() + "\""), spec.handoffId());
+            assertEquals(List.of(), HandoffFixtures.impactLeaks(snapshotText), spec.handoffId());
+        }
+    }
+
+    @Test
+    void anImpactRowThatContradictsItsEdgeOrApprovalIsRefusedBeforeAnythingIsWritten() throws Exception {
+        InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+        InMemoryDocumentRegistry.State registryBefore = registry.state();
+        long filesBefore = fileCount();
+        Built manual = HandoffFixtures.build(Spec.standard().withHandoffId("handoff-manual-forged").withManualApproval());
+        List<Built> forged = List.of(
+                HandoffFixtures.repinned(built, b -> ((ObjectNode) b.get("impacts").get(0)).put("status", "not-applicable")),
+                HandoffFixtures.repinned(manual, b -> ((ObjectNode) b.get("impacts").get(0)).put("status", "not-proposed")),
+                HandoffFixtures.repinned(built, b -> ((ObjectNode) b.get("impacts").get(0)).put("companyId", COMPANY_B)));
+        for (Built world : forged) {
+            handoff.envelope = world.envelopeBytes();
+
+            GraphHandoffException failure = failure(importer.run(world.request()));
+
+            assertEquals(GraphHandoffFailure.BUNDLE_INVALID, failure.failure());
+            assertEquals(0, graph.writes());
+            assertEquals(graphBefore, graph.state());
+            assertEquals(registryBefore, registry.state());
+            assertEquals(filesBefore, fileCount());
+        }
     }
 
     @Test

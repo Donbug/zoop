@@ -10,7 +10,7 @@ zoop-ai-service = "zoop_ai_service.main:main"
 
 [dependency-groups]
 # Test-only: the real installed `zoop-ai` console script plus public fixtures. The service never imports zoop_ai.
-dev = ["pytest==9.1.1", "httpx==0.28.1", "zoop-ai-worker"]
+dev = ["pytest==9.1.1", "pytest-xdist==3.8.0", "httpx==0.28.1", "zoop-ai-worker"]
 
 [tool.uv.sources]
 zoop-ai-worker = { path = "../worker" }

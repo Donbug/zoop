@@ -16,14 +16,18 @@ from pydantic import Field, model_validator
 from .extraction_contracts import ExtractionFailure, ObservationRef
 from .graph_projection_contracts import APPROVAL_KEYS, APPROVAL_KINDS
 from .ingestion_contracts import Wire, canonical, digest, timestamp
+from .issue_summary_contracts import POLICY as ISSUE_SUMMARY_POLICY
+from .issue_summary_contracts import check_summary, summary_basis
+from .relation_contracts import LABELS
+from .relation_rules import label_from
 from .source_support import KEYS as SOURCE_SUPPORT_KEYS
 from .source_support import source_support
 
 __all__ = ["ExtractionFailure", "canonical", "digest"]
 
 SCHEMA = "zoop-ai-handoff-1"
-BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-5"
-DECISIONS_SCHEMA = "zoop-public-decisions-2"
+BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-7"
+DECISIONS_SCHEMA = "zoop-public-decisions-3"
 BINDINGS_SCHEMA = "zoop-app-document-bindings-1"
 LEDGER_VERSION = "zoop-handoff-ledger-1"
 POLICY = "zoop-public-projection-policy-1"
@@ -32,7 +36,7 @@ OFFSET_UNIT = "unicode_code_point"
 STRUCTURAL_BASIS_TYPES = ("SUPPLIES",)       # the only S3 type inside the PoC structural basis set (PRODUCES/SUPPLIES/USES/...); others are rejected
 PUBLIC_TYPES = ("INVOLVES", "STRUCTURALLY_RELATED_TO", "FOLLOWS")
 STRUCTURAL_PATH_UNAVAILABLE = "intermediate_company_unmapped"      # the ONLY reason a structural path is unavailable: a middle company the operator did not map to a public id
-CONTENT_KEYS = ("companies", "pathCompanies", "issues", "relations", "evidence", "articles")      # the public collections `digests.content` covers
+CONTENT_KEYS = ("companies", "pathCompanies", "issues", "relations", "evidence", "articles", "impacts")      # the public collections `digests.content` covers
 MAX_SCOPE = 500                                                      # Unicode code points of an S3 `businessScope`/`productScope` (S3's own bound)
 TIME_PRECISIONS = ("year", "month", "day", "datetime", "unknown")
 ASSERTION_STATUSES = ("occurred", "announced", "planned", "forecast", "cancelled", "unknown")     # S2 `Mention.assertion_status`, copied as is
@@ -62,6 +66,18 @@ BASIS_MANUAL = "s3-operator-final-approval"
 SOURCE_SUPPORT_POLICY = "origin-or-exact-text-union"
 ORIGIN_VERIFICATION = "operator-declared-origin"
 ORIGIN_KEYS = ("originId", "reviewer", "decisionRef", "decisionVersion", "verification")
+# Receipt-only impact rows (S3 independent-verifier quote effects), exactly ONE per emitted INVOLVES source relation. Text effect of cited statements only.
+IMPACT_POLICY_NAME = "s3-independent-verifier-quote-effect"
+IMPACT_KEYS = ("edgeId", "issueId", "companyId", "sourceRelation", "impactCandidateId", "status", "code", "label", "targetVerdict", "effects", "verifier",
+               "verifierRequestDigest", "proposal")
+IMPACT_STATUSES = ("not-applicable", "not-proposed", "no-evidence", "technical-reject", "verifier-reject", "verified", "withheld")
+IMPACT_TECHNICAL_CODES = ("producer_reply_invalid", "impact_precheck_rejected", "verifier_reply_invalid")
+IMPACT_WITHHELD_CODES = ("impact_evidence_outside_relation_documents", "impact_quote_ambiguous")
+IMPACT_SIDES = ("positive", "negative", "neutral", "uncertain")
+IMPACT_CANDIDATE_ID = r"^ic-[a-f0-9]{64}$"
+MAX_IMPACT_EFFECTS = 40                      # 20 supporting + 20 opposing citations of one S3 impact proposal
+MAX_IMPACT_REASON = 2000                     # Unicode code points (never UTF-16 units)
+MAX_IMPACT_LIMITATIONS = 1000
 
 MAX_COMMAND = 65_536
 MAX_OPERATOR_FILE = 4_000_000
@@ -103,6 +119,14 @@ APP_IMPORT_PENDING = (
 class Pin(Wire):
     job_id: str = Field(pattern=ID)
     input_digest: str = Field(pattern=HASH)
+
+
+class SummaryPin(Wire):
+    """The operator's pin of ONE immutable ready issue-summary job result (`zoop-ai-issue-summary` ledger): the job, its input digest and the digest of its
+    result. Only a pin makes a summary part of a handoff; nothing here says what the summary states."""
+    job_id: str = Field(pattern=ID)
+    input_digest: str = Field(pattern=HASH)
+    result_digest: str = Field(pattern=HASH)
 
 
 class Upstream(Wire):
@@ -212,6 +236,7 @@ class IssueDecision(Wire):
     representative: Representative | None
     decision_ref: str = Field(pattern=ID)
     field_verdicts: list[FieldVerdict] = Field(max_length=2 * MAX_MENTIONS)
+    summary: SummaryPin | None
 
     @model_validator(mode="after")
     def distinct_verdicts(self):
@@ -276,7 +301,7 @@ class Origin(Wire):
 
 
 class Decisions(Wire):
-    schema_version: Literal["zoop-public-decisions-2"]
+    schema_version: Literal["zoop-public-decisions-3"]
     policy_version: Literal["zoop-public-projection-policy-1"]
     companies: list[CompanyDecision] = Field(max_length=MAX_DECISIONS)
     issues: list[IssueDecision] = Field(max_length=MAX_DECISIONS)
@@ -410,6 +435,14 @@ def countries_class(countries: list[str]) -> str:
 
 def content_digest(bundle: dict) -> str:
     return digest({key: bundle[key] for key in CONTENT_KEYS})
+
+
+def impact_label(target_verdict: str | None, effects: dict) -> str:
+    """The deterministic label of a VERIFIED impact row from the verifier's own mapping: one uncertain quote effect or an insufficient target verdict leaves no
+    label to compute (`undetermined`); otherwise positive-only, negative-only, both (`mixed`) or neither. A text effect of cited statements, never a price view."""
+    if effects["uncertain"] or target_verdict == "insufficient":
+        return "undetermined"
+    return label_from(effects["positive"], effects["negative"])
 
 
 # ---------------------------------------------------------------------------------------------- bundle validator --------------------
@@ -587,21 +620,117 @@ def _field_provenance(issue: dict, mentions: list, verdicts: list) -> None:
     _need("eventTime" in withheld or issue["timePrecision"] == chosen["timePrecision"], "issue.timePrecision.selected")
 
 
+def _issue_summary(issue: dict, evidence: dict, articles: dict, execution: tuple) -> None:
+    """`issue.summary`: recomputed from the bundle ITSELF by the pure `issue_summary_contracts` rules, never trusted. A HOLD/REJECT field verdict anywhere on the issue
+    leaves exactly `unavailable/temporal-review-pending` (and an oversize input exactly `input-too-large`): no summary text exists in the bundle then. Otherwise the
+    summary is `not-requested`, a verified job's `available` object (its claims cite only the issue's own mention evidence, the basis digest, the result version and
+    the producer/verifier kinds are recomputed against the bundle's execution mode) or a job-coded `unavailable` that names its pinned result. The checker raises
+    `ValueError(code)` and nothing else of the summary is read."""
+    try:
+        check_summary(issue, issue["summary"], summary_basis(issue, evidence, articles), execution)
+    except ValueError as exc:
+        _bad(f"issue.{exc}")                  # the checker's own location already starts with `summary.`
+    except (KeyError, TypeError, AttributeError):
+        _bad("issue.summary")
+
+
+def _impact_proposal(value, at: str) -> None:
+    proposal = _keys(value, ("direction", "reason", "limitations", "verification"), at)
+    _need(proposal["direction"] in LABELS, f"{at}.direction")
+    _text(proposal["reason"], f"{at}.reason")
+    _need(1 <= len(proposal["reason"]) <= MAX_IMPACT_REASON, f"{at}.reason.length")              # Unicode code points, as in the S3 wire and the app's codePointCount
+    _text(proposal["limitations"], f"{at}.limitations", nullable=True)
+    _need(proposal["limitations"] is None or len(proposal["limitations"]) <= MAX_IMPACT_LIMITATIONS, f"{at}.limitations.length")
+    _need(proposal["verification"] == "none", f"{at}.verification")          # the producer's own words are never verified here
+
+
+def _impacts(rows, involves: dict, used_reviews: dict, evidence: dict, evidence_ids, execution_mode: str, jobs: set) -> list:
+    """`impacts`: the receipt-only text effects of the quotes of every emitted INVOLVES source relation, closed. Exactly one row per (edge, S3 job, relation) of an
+    INVOLVES `sourceRefs`, sorted by that tuple; the status/code/null table, the approval basis (`not-applicable` iff an operator final approval), the replay-only
+    technical `verifier_reply_invalid`, unique impact candidates per job, and for a verified row: the verifier's effect sides (sorted, unique, disjoint, 1..40 in total,
+    app evidence of the edge's own article versions, distinct source evidence ids) with the label recomputed from them. Verified effect ids count as referenced
+    evidence. Called AFTER every INVOLVES edge is known and BEFORE the evidence orphan rule."""
+    at = "impacts"
+    rows = _list(rows, at, MAX_RELATIONS)
+    expected = sorted((edge_id, ref["jobId"], ref["id"]) for edge_id, (_, refs) in involves.items() for ref in refs)
+    keys, candidates = [], set()
+    for row in rows:
+        _keys(row, IMPACT_KEYS, at)
+        _text(row["edgeId"], f"{at}.edgeId", ID)
+        _need(row["edgeId"] in involves, f"{at}.edgeClosure")
+        edge = involves[row["edgeId"]][0]
+        _need(row["issueId"] == edge["source"] and row["companyId"] == edge["target"], f"{at}.endpoints")
+        source = _keys(row["sourceRelation"], ("jobId", "relationCandidateId"), f"{at}.sourceRelation")
+        _text(source["jobId"], f"{at}.sourceRelation", ID)
+        _text(source["relationCandidateId"], f"{at}.sourceRelation", RC)
+        job, rc = source["jobId"], source["relationCandidateId"]
+        _need(job in jobs and rc in used_reviews[job], f"{at}.sourceClosure")
+        keys.append((row["edgeId"], job, rc))
+        operator = used_reviews[job][rc]["kind"] == "operator-final-approval"
+        status, code = row["status"], row["code"]
+        _need(status in IMPACT_STATUSES, f"{at}.status")
+        _need((status == "not-applicable") == operator, f"{at}.approval")                  # both ways: no label may exist on a human-approved relation
+        ic = row["impactCandidateId"]
+        _text(ic, f"{at}.impactCandidateId", IMPACT_CANDIDATE_ID, nullable=True)
+        _need(row["verifier"] in ("called", "not-called"), f"{at}.verifier")
+        called = row["verifier"] == "called"
+        _text(row["verifierRequestDigest"], f"{at}.verifierRequestDigest", HASH, nullable=True)
+        _need((row["verifierRequestDigest"] is not None) == called, f"{at}.verifierRequestDigest")
+        if row["proposal"] is not None:
+            _impact_proposal(row["proposal"], f"{at}.proposal")
+        # The state table: (impact candidate present, verifier called, proposal present) per status and technical/withheld code.
+        if status == "technical-reject":
+            _need(code in IMPACT_TECHNICAL_CODES, f"{at}.code")
+            shape = {"producer_reply_invalid": (False, False, False), "impact_precheck_rejected": (True, False, False),
+                     "verifier_reply_invalid": (True, True, True)}[code]
+            _need(code != "verifier_reply_invalid" or execution_mode == "replay", f"{at}.code.replayOnly")      # a live verifier reply that is no judgment writes no verdict
+        elif status == "withheld":
+            _need(code in IMPACT_WITHHELD_CODES, f"{at}.code")
+            shape = (True, True, True)
+        else:
+            _need(code is None, f"{at}.code")
+            shape = {"not-applicable": (False, False, False), "not-proposed": (False, False, False), "no-evidence": (True, False, True),
+                     "verifier-reject": (True, True, True), "verified": (True, True, True)}[status]
+        _need((ic is not None, called, row["proposal"] is not None) == shape, f"{at}.state")
+        if status != "verified":
+            _need(row["targetVerdict"] == ("contradicted" if status == "verifier-reject" else None), f"{at}.targetVerdict")
+        if ic is not None:
+            _need((job, ic) not in candidates, f"{at}.impactCandidateId.unique")
+            candidates.add((job, ic))
+        if status != "verified":
+            _need(row["label"] is None and row["effects"] is None, f"{at}.verifiedOnly")
+            continue
+        _need(row["targetVerdict"] in ("supported", "insufficient"), f"{at}.targetVerdict")
+        effects = _keys(row["effects"], IMPACT_SIDES, f"{at}.effects")
+        everything: list = []
+        for side in IMPACT_SIDES:
+            everything.extend(evidence_ids(effects[side], f"{at}.effects.{side}", 0))
+        _need(1 <= len(everything) <= MAX_IMPACT_EFFECTS and len(set(everything)) == len(everything), f"{at}.effects.union")        # disjoint sides, 1..40 in total
+        allowed = {(evidence[x]["articleId"], evidence[x]["articleVersion"]) for x in edge["evidenceIds"]}
+        _need(all((evidence[x]["articleId"], evidence[x]["articleVersion"]) in allowed for x in everything), f"{at}.effects.articleClosure")
+        _need(len({evidence[x]["source"]["sourceEvidenceId"] for x in everything}) == len(everything), f"{at}.effects.sourceEvidenceId")
+        _need(row["label"] == impact_label(row["targetVerdict"], effects), f"{at}.label")
+    _need(keys == expected, f"{at}.coverage")              # exactly the INVOLVES source relations: none missing, duplicated or extra, in code point order
+    return rows
+
+
 def validate_bundle(bundle: dict) -> None:
     """Strict, closed validation of a bundle: exact key sets, types, patterns, referential closure, id formulas, counts and the content digest. Anything
     else is `handoff_bundle_invalid` (a damaged or hand-edited artifact), never a partial read."""
     _keys(bundle, ("schemaVersion", "handoffId", "manifestDigest", "provenance", "policy", "sources", "companies", "pathCompanies", "issues", "relations",
-                   "evidence", "articles", "exclusions", "counts", "checks", "readiness", "digests"), "bundle")
+                   "evidence", "articles", "impacts", "exclusions", "counts", "checks", "readiness", "digests"), "bundle")
     _need(bundle["schemaVersion"] == BUNDLE_SCHEMA, "schemaVersion")
     _text(bundle["handoffId"], "handoffId", ID)
     _text(bundle["manifestDigest"], "manifestDigest", HASH)
     prov = _keys(bundle["provenance"], ("declaredSourceKind", "observedSourceKind", "executionMode", "recordingKind"), "provenance")
     _need(prov["declaredSourceKind"] == prov["observedSourceKind"] and prov["declaredSourceKind"] in ("synthetic", "actual"), "provenance")
     _need((prov["executionMode"], prov["recordingKind"]) in EXECUTION_MODES, "provenance.mode")
-    policy = _keys(bundle["policy"], ("version", "files", "evidenceIdKind", "offsetUnit", "geography", "structural", "sequence", "sourceSupport"), "policy")
+    policy = _keys(bundle["policy"], ("version", "files", "evidenceIdKind", "offsetUnit", "geography", "structural", "sequence", "sourceSupport", "impacts",
+                                      "issueSummary"), "policy")
     _need(policy["version"] == POLICY and policy["evidenceIdKind"] == EVIDENCE_KIND and policy["offsetUnit"] == OFFSET_UNIT, "policy")
     for name, expected in (("geography", "operator-field-verdict"), ("structural", "manual-operator-review"),
-                           ("sequence", "s2-comparison-with-operator-decision"), ("sourceSupport", SOURCE_SUPPORT_POLICY)):
+                           ("sequence", "s2-comparison-with-operator-decision"), ("sourceSupport", SOURCE_SUPPORT_POLICY), ("impacts", IMPACT_POLICY_NAME),
+                           ("issueSummary", ISSUE_SUMMARY_POLICY)):
         _need(policy[name] == expected, f"policy.{name}")
     files = _keys(policy["files"], ("canonical", "decisions", "bindings"), "policy.files")
     for value in files.values():
@@ -783,7 +912,7 @@ def validate_bundle(bundle: dict) -> None:
     issues = {}
     for i in _list(bundle["issues"], "issues", MAX_ISSUES):
         _keys(i, ("id", "canonicalId", "title", "action", "target", "eventTime", "timePrecision", "period", "assertionStatus", "geography", "evidenceIds",
-                  "sourceEvents", "decisionRef", "representative", "fieldProvenance", "fieldVerdicts", "mentions", "sourceSupport"), "issue")
+                  "sourceEvents", "decisionRef", "representative", "fieldProvenance", "fieldVerdicts", "mentions", "sourceSupport", "summary"), "issue")
         _text(i["id"], "issue.id", ID)
         _text(i["canonicalId"], "issue", ID)
         _text(i["decisionRef"], "issue", ID)
@@ -842,6 +971,7 @@ def validate_bundle(bundle: dict) -> None:
         _need(support == source_support([{"articleId": a, "textSha256": articles[(a, v)]["textSha256"],
                                           "originId": (articles[(a, v)]["origin"] or {}).get("originId")} for a, v in cited]), "issue.sourceSupport.exact")
         _field_provenance(i, mentions, verdicts)
+        _issue_summary(i, evidence, articles, (prov["executionMode"], prov["recordingKind"]))
         _need(i["id"] not in issues and i["id"] not in companies and i["id"] not in path_companies, "issues.unique")
         issues[i["id"]] = i
 
@@ -849,6 +979,7 @@ def validate_bundle(bundle: dict) -> None:
     counts = {name: 0 for name in PUBLIC_TYPES}
     linked: dict[str, set] = {name: set() for name in ("issue", "company")}
     participants: dict[str, set] = {}          # public issue -> the companies an INVOLVES edge of that issue names
+    involves: dict[str, tuple] = {}            # INVOLVES edge id -> (edge, sourceRefs): what every impact row must cover exactly
     structural_paths: list = []                # (relation, path) of every STRUCTURALLY_RELATED_TO edge, checked once every INVOLVES edge is known
     for r in _list(bundle["relations"], "relations", MAX_RELATIONS):
         _keys(r, ("id", "type", "source", "target", "role", "assertionStatus", "evidenceIds", "basis", "structuralPath", "provenance", "decisionRef",
@@ -921,6 +1052,7 @@ def validate_bundle(bundle: dict) -> None:
             _need(r["structuralPath"] is None, "relation.structuralPath")
         if r["type"] == "INVOLVES":
             participants.setdefault(r["source"], set()).add(r["target"])
+            involves[r["id"]] = (r, refs)
             _keys(provenance, ("origin", "s3SemanticValidation"), "relation.provenance")
             _need(provenance["origin"] == "s3-relation" and provenance["s3SemanticValidation"] ==
                   involves_validation([used_reviews[ref["jobId"]][ref["id"]] for ref in refs]), "relation.provenance")
@@ -949,6 +1081,7 @@ def validate_bundle(bundle: dict) -> None:
             _need(r["decisionRef"] == provenance["decisionRef"] and r["role"] is None and r["assertionStatus"] is None
                   and len(refs) == 1 and not basis, "relation.follows")
         _need(r["id"] == "edge-" + digest(preimage), "relation.idFormula")
+    impacts = _impacts(bundle["impacts"], involves, used_reviews, evidence, evidence_ids, prov["executionMode"], jobs)
     _need(isinstance(bundle["counts"], dict) and counts == bundle["counts"].get("relations"), "counts.relations")
     _need(set(issues) == linked["issue"], "issues.noOrphan")
     _need(set(companies) == linked["company"], "companies.noOrphan")
@@ -1002,7 +1135,7 @@ def validate_bundle(bundle: dict) -> None:
         tally[item["code"]] = tally.get(item["code"], 0) + 1
     _need(ex["counts"] == tally, "exclusions.counts")
     expected = {"companies": len(companies), "pathCompanies": len(path_companies), "issues": len(issues), "relations": counts, "evidence": len(evidence),
-                "articles": len(articles), "exclusions": len(items)}
+                "articles": len(articles), "impacts": len(impacts), "exclusions": len(items)}
     _need(bundle["counts"] == expected, "counts")
     checks = _keys(bundle["checks"], ("producerConfirmed", "appImportPending"), "checks")
     _need(checks["producerConfirmed"] == list(PRODUCER_CHECKS) and checks["appImportPending"] == list(APP_IMPORT_PENDING), "checks")

@@ -89,7 +89,7 @@ def test_the_edge_id_formula_and_the_basis_evidence_are_not_changed_by_a_path(ch
 def test_the_receipt_counts_the_private_companies_and_a_stored_artifact_is_the_exported_bundle(chain_world, tmp_path):
     rig = chain_rig(chain_world, tmp_path, "private")
     frozen = rig.freeze("path-1")
-    assert frozen["receipt"]["counts"]["pathCompanies"] == 1 and frozen["receipt"]["bundleSchema"] == "zoop-graph-handoff-bundle-5"
+    assert frozen["receipt"]["counts"]["pathCompanies"] == 1 and frozen["receipt"]["bundleSchema"] == "zoop-graph-handoff-bundle-7"
     out = rig.run("export", rig.sel("path-1"))
     assert out["bundle"]["counts"] == frozen["receipt"]["counts"] and out["delivery"]["status"] == "current"
     assert hs.canonical(out["bundle"]).encode() == (rig.state / "bundles" / f"{frozen['receipt']['bundleDigest']}.json").read_bytes()

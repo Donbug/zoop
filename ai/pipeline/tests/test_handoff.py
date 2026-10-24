@@ -110,12 +110,14 @@ class Rig:
     def manifest(self, handoff_id: str = "h1", **override) -> dict:
         return {**hs.manifest_doc(self.world, handoff_id, self.hashes()), **override}
 
-    def run(self, command: str, request, *, expected: int = 0, state: Path | None = None, raw: bytes | None = None):
+    def run(self, command: str, request, *, expected: int = 0, state: Path | None = None, raw: bytes | None = None, summaries: Path | None = None):
         argv = ["zoop-ai-handoff", command, "--state-dir", str(state or self.state)]
         if command in cli.SOURCED:
             argv += ["--relation-state-dir", str(self.root / "relation"), "--extraction-state-dir", str(self.root / "extraction"),
                      "--ingestion-state-dir", str(self.root / "ingestion"), "--sources", str(self.sources), "--canonical", str(self.root / "canonical.json"),
                      "--decisions", str(self.root / "decisions.json"), "--bindings", str(self.root / "bindings.json")]
+        if summaries is not None:
+            argv += ["--issue-summary-state-dir", str(summaries)]
         out = io.StringIO()
         data = raw if raw is not None else json_bytes(request)
         with mock.patch.object(sys, "argv", argv), mock.patch.object(sys, "stdin", io.TextIOWrapper(io.BytesIO(data))), contextlib.redirect_stdout(out):
@@ -1217,10 +1219,10 @@ def keys_of(value):
 
 def test_every_public_issue_carries_its_hand_written_original_mentions_with_reachable_evidence(rig):
     bundle = rig.bundle()
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5"
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7"
     assert mentions_of(bundle) == hs.expected_mentions(rig.world)
     hs.assert_mentions_reachable(bundle)
-    assert rig.run("inspect", rig.sel())["receipt"]["bundleSchema"] == "zoop-graph-handoff-bundle-5"
+    assert rig.run("inspect", rig.sel())["receipt"]["bundleSchema"] == "zoop-graph-handoff-bundle-7"
 
 
 def test_a_mention_is_a_closed_unverified_source_record_and_no_decision_support_approval_publisher_or_impact_is_invented(rig):
@@ -1344,7 +1346,7 @@ def test_a_members_coarser_event_time_keeps_its_own_precision_and_is_never_widen
 
 def test_counts_policy_and_attestations_are_the_earlier_bundles_so_operator_decisions_still_bind(rig):
     bundle = rig.bundle()
-    assert set(bundle["counts"]) == {"companies", "pathCompanies", "issues", "relations", "evidence", "articles", "exclusions"} and bundle["counts"] == hs.expected(rig.world)["counts"]
+    assert set(bundle["counts"]) == {"companies", "pathCompanies", "issues", "relations", "evidence", "articles", "impacts", "exclusions"} and bundle["counts"] == hs.expected(rig.world)["counts"]
     assert bundle["policy"]["version"] == POLICY
     edge = next(r for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO")
     assert edge["provenance"]["bindingDigest"] == hs.structural_binding(rig.world)         # the operator's hand-computed digest over the source events alone still binds
@@ -1468,7 +1470,7 @@ def test_every_issue_records_how_its_values_were_selected_and_exactly_which_ment
     assert {i["id"]: i["fieldProvenance"] for i in bundle["issues"]} == hs.expected_field_provenance(rig.world)
     hs.assert_field_provenance_closed(bundle)
     assert set(supply) == {"id", "canonicalId", "title", "action", "target", "eventTime", "timePrecision", "period", "assertionStatus", "geography", "evidenceIds",
-                           "sourceEvents", "decisionRef", "representative", "fieldProvenance", "fieldVerdicts", "mentions", "sourceSupport"}              # per-field verdicts exist only where an operator wrote them
+                           "sourceEvents", "decisionRef", "representative", "fieldProvenance", "fieldVerdicts", "mentions", "sourceSupport", "summary"}      # per-field verdicts exist only where an operator wrote them
     assert supply["fieldVerdicts"] == [] and factory["fieldVerdicts"] == []
 
 
@@ -1635,15 +1637,19 @@ def test_field_provenance_that_follows_exact_value_equality_is_accepted(valid_bu
     validate_bundle(rehashed(valid_bundle, change))
 
 
-@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4])
+@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4, hs.BUNDLE_5, hs.BUNDLE_6])
 def test_a_bundle_of_an_earlier_schema_is_never_a_valid_current_bundle(rig, valid_bundle, schema):
     old = hs.legacy_bundle(valid_bundle, rig.manifest("old"), schema)
-    later = schema in (hs.BUNDLE_3, hs.BUNDLE_4)
-    assert old["schemaVersion"] == schema and all(("fieldProvenance" in i) == later and ("mentions" in i) == (schema != hs.BUNDLE_1)
-                                                  and ("fieldVerdicts" in i) == (schema == hs.BUNDLE_4) for i in old["issues"])
-    assert "pathCompanies" not in old and "pathCompanies" not in old["counts"] and all("structuralPath" not in r for r in old["relations"])
-    assert all("businessScope" not in b and "productScope" not in b for r in old["relations"] for b in r["basis"])
-    for broken in (old, {**old, "schemaVersion": "zoop-graph-handoff-bundle-5"}):          # nor does the current schema string make the earlier shape valid
+    assert old["schemaVersion"] == schema and "issueSummary" not in old["policy"] and all("summary" not in i for i in old["issues"])          # `-7` added the summary
+    # `-6` already had the impact rows (the content digest covered seven collections); every earlier schema had none.
+    assert (schema == hs.BUNDLE_6) == ("impacts" in old) == ("impacts" in old["counts"]) == ("impacts" in old["policy"])
+    if schema not in (hs.BUNDLE_5, hs.BUNDLE_6):
+        later = schema in (hs.BUNDLE_3, hs.BUNDLE_4)
+        assert all(("fieldProvenance" in i) == later and ("mentions" in i) == (schema != hs.BUNDLE_1)
+                   and ("fieldVerdicts" in i) == (schema == hs.BUNDLE_4) for i in old["issues"])
+        assert "pathCompanies" not in old and "pathCompanies" not in old["counts"] and all("structuralPath" not in r for r in old["relations"])
+        assert all("businessScope" not in b and "productScope" not in b for r in old["relations"] for b in r["basis"])
+    for broken in (old, {**old, "schemaVersion": "zoop-graph-handoff-bundle-7"}):          # nor does the current schema string make the earlier shape valid
         with pytest.raises(ExtractionFailure) as exc:
             validate_bundle(broken)
         assert exc.value.code == "handoff_bundle_invalid"
@@ -1665,7 +1671,7 @@ def legacy_rig(rig, rows: dict | None = None, **plant) -> dict:
             for name, (state, artifact) in (rows or LEGACY_ROWS).items()}
 
 
-@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4])
+@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4, hs.BUNDLE_5, hs.BUNDLE_6])
 def test_a_handoff_frozen_under_an_earlier_bundle_schema_is_history_answered_from_the_ledger_alone(rig, schema):
     planted = legacy_rig(rig, schema=schema)
     assert {row["receipt"]["bundleSchema"] for row in planted.values()} == {schema}
@@ -1693,7 +1699,7 @@ def test_a_handoff_frozen_under_an_earlier_bundle_schema_is_history_answered_fro
     assert hs.ledger_snapshot(rig.state) == before          # no byte, mode, mtime or file changed: nothing was opened for writing, created, settled or marked failed
 
 
-@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4])
+@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4, hs.BUNDLE_5, hs.BUNDLE_6])
 def test_the_methods_recheck_the_contract_under_their_own_lock_without_the_cli_preflight(rig, schema):
     planted = legacy_rig(rig, schema=schema)
     manifests = {name: Manifest.model_validate(rig.manifest(name)) for name in planted}
@@ -1716,7 +1722,7 @@ def test_the_methods_recheck_the_contract_under_their_own_lock_without_the_cli_p
     assert stored(rig) == before          # no attempt was added, no state settled, no file written
 
 
-@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4])
+@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4, hs.BUNDLE_5, hs.BUNDLE_6])
 def test_a_new_handoff_id_freezes_and_exports_beside_the_legacy_history_which_stays_as_it_was(rig, schema):
     planted = legacy_rig(rig, schema=schema)
 
@@ -1727,7 +1733,7 @@ def test_a_new_handoff_id_freezes_and_exports_beside_the_legacy_history_which_st
 
     before = history()
     bundle = rig.bundle("h2")
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5" and bundle["handoffId"] == "h2"
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["handoffId"] == "h2"
     assert history() == before
 
 

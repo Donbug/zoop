@@ -8,6 +8,11 @@ Seven stages, two providers (the stage decides the provider; nothing is inferred
 * `verify-relation`, `verify-impact`: native TypeSafe Jev `POST /systemone`, model `jev-1.14.0`, an independent verifier that
   answers typed Choice questions about exact quotes (`live_jev`).
 
+A `Family` (`live_family`) is one frozen stage set with its own binding `version`: PIPELINE (the seven stages above, the default; its
+binding, prepared requests and receipts are byte-identical to before families existed) and ISSUE_SUMMARY (`issue-summary` on
+`gpt-6-luna`, `verify-issue-summary` on Jev; `issue_summary_prompts`, `issue_summary_jev`). Stages never cross families, the budget
+directory and keys are shared, and `from_binding` picks the family from the binding's `version`.
+
 Ordering contract of the owner (S2/S3): `prepare` (pure) -> owner rechecks rights -> owner reserves its own durable attempt ->
 `send(prepared, attempt_id=..., authorize=...)` -> owner persists the returned receipt BEFORE `answer(stage, receipt)` decodes it.
 `send` reserves the shared budget, calls `authorize()` immediately before the socket, sends exactly once (no retry, no redirect, no
@@ -31,8 +36,9 @@ from typing import Any
 
 import httpx
 
-from . import live_jev, live_prompts
+from . import issue_summary_jev, issue_summary_prompts, live_jev, live_prompts
 from .live_budget import Budget, BudgetError, nano_from_usd, usd
+from .live_family import Family, Verifier
 from .relation_contracts import canonical, digest
 
 VERSION = "zoop-live-runtime-1"
@@ -42,6 +48,16 @@ RECEIPT = "zoop-live-receipt-1"
 GENERATION_STAGES = ("extract", "compare", "topic", "relation", "impact")
 VERIFY_STAGES = ("verify-relation", "verify-impact")
 STAGES = GENERATION_STAGES + VERIFY_STAGES
+
+# A family is one frozen stage set with its own binding `version`. PIPELINE is the default and its binding/prepare/receipt bytes are
+# unchanged by the family mechanism; every other family has stages no other family has, so a stage never crosses families.
+PIPELINE = Family(VERSION, live_prompts.SPECS, Verifier(
+    live_jev.API, live_jev.MODEL, live_jev.ADAPTER_REVISION, live_jev.identity, live_jev.policy, "zoop-jev-pipeline-",
+    {"verify-relation": live_jev.build_relation_request, "verify-impact": live_jev.build_impact_request},
+    {"verify-relation": live_jev.interpret_relation, "verify-impact": live_jev.interpret_impact}))
+ISSUE_SUMMARY = Family("zoop-issue-summary-runtime-1", issue_summary_prompts.SPECS, issue_summary_jev.VERIFIER)
+FAMILIES = {PIPELINE.version: PIPELINE, ISSUE_SUMMARY.version: ISSUE_SUMMARY}
+FAMILY_NAMES = {"pipeline": PIPELINE, "issue-summary": ISSUE_SUMMARY}
 
 GATE = "ZOOP_AI_PIPELINE_LIVE_ENABLED"
 MODEL_VAR = "ZOOP_AI_PIPELINE_LIVE_MODEL"
@@ -181,17 +197,18 @@ class LiveRuntime:
     (decode/prepare only)."""
 
     def __init__(self, *, model: str, effort: str, max_output: int, timeout: int, openai_url: str, jev_url: str, jev_model: str,
-                 budget_identity: str, send: dict[str, Any] | None, send_code: str):
+                 budget_identity: str, send: dict[str, Any] | None, send_code: str, family: Family = PIPELINE):
         if model != MODEL:
             raise LiveFailure("live_model_unsupported")
         if effort not in EFFORTS:
             raise LiveFailure("live_reasoning_effort_invalid")
-        if jev_model != live_jev.MODEL:
+        if jev_model != family.verifier.model:
             raise LiveFailure("live_jev_model_unsupported")
         if not 1_000 <= max_output <= 100_000 or not 10 <= timeout <= 900:
             raise LiveFailure("live_limit_invalid")
         if not isinstance(budget_identity, str) or len(budget_identity) != 64 or any(c not in "0123456789abcdef" for c in budget_identity):
             raise LiveFailure("live_budget_config_invalid")
+        self._family = family
         self._model, self._effort, self._max_output, self._timeout = model, effort, max_output, timeout
         self._openai_url, self._jev_url = _base_url(openai_url), _base_url(jev_url)
         self._send, self._send_code, self._budget_identity_value = send, send_code, budget_identity
@@ -204,12 +221,13 @@ class LiveRuntime:
     # ------------------------------------------------------------ construction ------------------------------------------
 
     @classmethod
-    def from_env(cls, *, need_send: bool = False, transport: httpx.BaseTransport | None = None) -> LiveRuntime:
+    def from_env(cls, *, need_send: bool = False, transport: httpx.BaseTransport | None = None, family: Family = PIPELINE) -> LiveRuntime:
         """Validate the explicit live gate and configuration from this process's environment only; no network, no file, no dotenv.
         Mandatory and non-secret: the budget DIRECTORY (`ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR`, absolute) is required here and pinned into
         the binding (nothing is created). Send-only: the keys and the ceilings (`MAX_USD`, `MAX_CALLS`) are NOT needed to freeze,
         `accepts`, `prepare` or `answer`; they are required only by `send`, which fails before any reservation or socket when one is
-        missing. `need_send=True` makes that check up front (the operator `check` command). `transport` is a test seam."""
+        missing. `need_send=True` makes that check up front (the operator `check` command). `transport` is a test seam. `family`
+        selects the stage set (default PIPELINE, whose binding is unchanged); the environment variables are the same for every family."""
         env = os.environ
         if env.get(GATE) != "1":
             raise LiveFailure("live_not_enabled")
@@ -223,7 +241,7 @@ class LiveRuntime:
                    timeout=_positive_int(env.get(TIMEOUT_VAR) or str(DEFAULT_TIMEOUT), 0, 10**9, "live_limit_invalid"),
                    openai_url=env.get(OPENAI_URL_VAR, "").strip() or DEFAULT_OPENAI_URL,
                    jev_url=env.get(JEV_URL_VAR, "").strip() or DEFAULT_JEV_URL, jev_model=env.get(JEV_MODEL_VAR, "").strip(),
-                   budget_identity=identity, send={**send, "directory": directory}, send_code="live_send_unavailable")
+                   budget_identity=identity, send={**send, "directory": directory}, send_code="live_send_unavailable", family=family)
 
     @staticmethod
     def _budget_identity(directory: str) -> str:
@@ -258,13 +276,15 @@ class LiveRuntime:
     @classmethod
     def from_binding(cls, binding: dict) -> LiveRuntime:
         """Env-less runtime rebuilt from a frozen binding, for decoding stored receipts and preparing requests. Refuses a binding
-        that this code would not itself produce (forged, or frozen by different code). It can never send."""
+        that this code would not itself produce (forged, or frozen by different code). It can never send. The binding's `version`
+        selects the family; an unknown version is a mismatch."""
         try:
+            family = FAMILIES[binding["version"]]
             generation, verifier = binding["generation"], binding["verifier"]
             runtime = cls(model=generation["model"], effort=generation["reasoningEffort"], max_output=generation["maxOutputTokens"],
                           timeout=DEFAULT_TIMEOUT, openai_url=generation["endpoint"], jev_url=verifier["endpoint"],
                           jev_model=verifier["model"], budget_identity=binding["budget"]["directoryIdentity"], send=None,
-                          send_code="live_send_unavailable")
+                          send_code="live_send_unavailable", family=family)
         except (KeyError, TypeError, LiveFailure):
             raise LiveFailure("live_binding_mismatch") from None
         if runtime.binding() != binding:
@@ -273,26 +293,32 @@ class LiveRuntime:
 
     # ------------------------------------------------------------ frozen identity ---------------------------------------
 
+    @property
+    def family(self) -> Family:
+        return self._family
+
     def _stage_entry(self, stage: str) -> dict[str, Any]:
-        if stage in GENERATION_STAGES:
-            spec = live_prompts.SPECS[stage]
+        family = self._family
+        if stage in family.generation_stages:
+            spec = family.generation[stage]
             return {"purpose": f"pipeline:{stage}", "recipient": "openai-compatible:" + digest({"endpoint": self._openai_url}),
                     "provider": "openai-compatible", "promptVersion": spec.prompt_version, "schemaDigest": spec.schema_digest,
                     "maxOutputTokens": self._max_output}
-        return {"purpose": f"pipeline:{stage}", "recipient": "typesafe-native:" + digest({"api": live_jev.API, "endpoint": self._jev_url}),
-                "provider": "typesafe-native", "promptVersion": "zoop-jev-pipeline-" + live_jev.identity()[:16],
-                "questionsDigest": live_jev.identity(), "maxOutputTokens": None}
+        verifier = family.verifier
+        return {"purpose": f"pipeline:{stage}", "recipient": "typesafe-native:" + digest({"api": verifier.api, "endpoint": self._jev_url}),
+                "provider": "typesafe-native", "promptVersion": verifier.prompt_prefix + verifier.identity()[:16],
+                "questionsDigest": verifier.identity(), "maxOutputTokens": None}
 
     def _build_binding(self) -> dict[str, Any]:
-        body = {"version": VERSION,
+        family, verifier = self._family, self._family.verifier
+        body = {"version": family.version,
                 "generation": {"provider": "openai-compatible", "api": "chat.completions", "endpoint": self._openai_url,
                                "endpointRevision": digest({"endpoint": self._openai_url}), "model": self._model,
                                "reasoningEffort": self._effort, "maxOutputTokens": self._max_output},
-                "verifier": {"provider": "typesafe-native", "api": live_jev.API, "endpoint": self._jev_url,
-                             "endpointRevision": digest({"api": live_jev.API, "endpoint": self._jev_url}), "model": live_jev.MODEL,
-                             "adapterRevision": live_jev.ADAPTER_REVISION, "adapterIdentity": live_jev.identity(),
-                             "policy": live_jev.policy()},
-                "stages": {stage: self._stage_entry(stage) for stage in STAGES},
+                "verifier": {"provider": "typesafe-native", "api": verifier.api, "endpoint": self._jev_url,
+                             "endpointRevision": digest({"api": verifier.api, "endpoint": self._jev_url}), "model": verifier.model,
+                             "adapterRevision": verifier.revision, "adapterIdentity": verifier.identity(), "policy": verifier.policy()},
+                "stages": {stage: self._stage_entry(stage) for stage in family.stages},
                 "pricing": PRICING,
                 "budget": {"scope": "directory", "directoryIdentity": self._budget_identity_value, "unit": "nanoUsd"},
                 "limits": {"maxRequestBytes": MAX_REQUEST_BYTES, "maxVerifierRequestBytes": MAX_VERIFIER_REQUEST_BYTES,
@@ -315,17 +341,16 @@ class LiveRuntime:
         return self._entry(stage)["purpose"]
 
     def _entry(self, stage: str) -> dict[str, Any]:
-        if stage not in STAGES:
+        if stage not in self._family.stages:
             raise LiveFailure("live_stage_unsupported")
         return self._binding["stages"][stage]
 
     # ------------------------------------------------------------ prepare (pure) ----------------------------------------
 
-    @staticmethod
-    def _questions(stage: str, body: Any) -> int:
+    def _questions(self, stage: str, body: Any) -> int:
         """Number of questions a Jev request carries (1 for a chat request). Jev's billing of the shared `state` is not documented as
         once per request, so the reservation assumes the whole request is billed once PER question."""
-        return max(1, len(body["questions"])) if stage in VERIFY_STAGES else 1
+        return max(1, len(body["questions"])) if stage in self._family.verify_stages else 1
 
     def _worst_case(self, stage: str, request_bytes: int, questions: int) -> dict[str, int | str]:
         provider = self._entry(stage)["provider"]
@@ -342,15 +367,14 @@ class LiveRuntime:
             raise LiveFailure("live_payload_invalid")
         expect = None
         try:
-            if stage in GENERATION_STAGES:
-                spec = live_prompts.SPECS[stage]
+            if stage in self._family.generation_stages:
+                spec = self._family.generation[stage]
                 body = {"model": self._model, "messages": spec.messages(payload),
                         "response_format": {"type": "json_schema", "json_schema": {"name": spec.schema_name, "strict": True, "schema": spec.schema}},
                         "max_completion_tokens": self._max_output, "reasoning_effort": self._effort}
                 path, limit, schema_digest = "chat/completions", MAX_REQUEST_BYTES, entry["schemaDigest"]
             else:
-                build = live_jev.build_relation_request if stage == "verify-relation" else live_jev.build_impact_request
-                body, expect = build(payload, live_jev.MODEL)
+                body, expect = self._family.verifier.build[stage](payload, self._family.verifier.model)
                 path, limit, schema_digest = "systemone", MAX_VERIFIER_REQUEST_BYTES, entry["questionsDigest"]
             size = len(canonical(body).encode("utf-8"))
         except (KeyError, TypeError, ValueError, AttributeError):
@@ -374,7 +398,7 @@ class LiveRuntime:
                      and prepared["requestBytes"] == size and prepared["bindingIdentity"] == self._identity
                      and prepared["provider"] == entry["provider"] and prepared["recipient"] == entry["recipient"]
                      and prepared["purpose"] == entry["purpose"] and prepared["reservation"] == self._worst_case(stage, size, self._questions(stage, body))
-                     and prepared["path"] == ("chat/completions" if stage in GENERATION_STAGES else "systemone"))
+                     and prepared["path"] == ("chat/completions" if stage in self._family.generation_stages else "systemone"))
         except (KeyError, TypeError, AttributeError):
             raise LiveFailure("live_prepared_invalid") from None
         if not sound:
@@ -473,10 +497,9 @@ class LiveRuntime:
 
     # ------------------------------------------------------------ decode (pure, receipt only) ---------------------------
 
-    @staticmethod
-    def _receipt(stage: str, receipt: Any) -> tuple[dict, dict]:
+    def _receipt(self, stage: str, receipt: Any) -> tuple[dict, dict]:
         try:
-            if stage not in STAGES or receipt["format"] != RECEIPT or receipt["stage"] != stage:
+            if stage not in self._family.stages or receipt["format"] != RECEIPT or receipt["stage"] != stage:
                 raise LiveFailure("live_receipt_invalid")
             http = receipt["http"]
             if type(http["status"]) is not int or not isinstance(http["bodyText"], str) or not isinstance(receipt["model"]["requested"], str):
@@ -485,9 +508,8 @@ class LiveRuntime:
             raise LiveFailure("live_receipt_invalid") from None
         return receipt, http
 
-    @staticmethod
-    def _decode(stage: str, receipt: Any) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-        receipt, http = LiveRuntime._receipt(stage, receipt)
+    def _decode(self, stage: str, receipt: Any) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        receipt, http = self._receipt(stage, receipt)
         if not 200 <= http["status"] < 300:
             raise LiveFailure(f"live_http_{http['status']}")
         if http.get("truncated") is True:
@@ -499,10 +521,10 @@ class LiveRuntime:
             raw = json.loads(http["bodyText"])
         except (ValueError, RecursionError, MemoryError):
             raise LiveFailure("live_reply_not_json") from None
-        if stage in VERIFY_STAGES:
+        if stage in self._family.verify_stages:
             try:
                 expect = receipt["expect"]
-                interpret = live_jev.interpret_relation if stage == "verify-relation" else live_jev.interpret_impact
+                interpret = self._family.verifier.interpret[stage]
                 if expect["kind"] != stage:
                     raise LiveFailure("live_receipt_invalid")
                 return interpret(raw, expect, receipt["model"]["requested"])
@@ -556,20 +578,22 @@ class LiveRuntime:
 # ---------------------------------------------------------------- offline operator CLI -----------------------------------
 
 def main(argv: list[str] | None = None) -> int:
-    """`python -m zoop_ai_pipeline.live_runtime binding|check`: offline, no network, no file, keys only as presence booleans.
-    `binding` validates the non-secret configuration; `check` additionally requires the budget variables and both keys."""
+    """`python -m zoop_ai_pipeline.live_runtime binding|check [pipeline|issue-summary]`: offline, no network, no file, keys only as
+    presence booleans. `binding` validates the non-secret configuration; `check` additionally requires the budget variables and both
+    keys. The optional family defaults to `pipeline`."""
     args = sys.argv[1:] if argv is None else argv
-    if len(args) != 1 or args[0] not in {"binding", "check"}:
-        print("usage: python -m zoop_ai_pipeline.live_runtime binding|check", file=sys.stderr)
+    if not 1 <= len(args) <= 2 or args[0] not in {"binding", "check"} or (len(args) == 2 and args[1] not in FAMILY_NAMES):
+        print("usage: python -m zoop_ai_pipeline.live_runtime binding|check [pipeline|issue-summary]", file=sys.stderr)
         return 2
     try:
-        runtime = LiveRuntime.from_env(need_send=args[0] == "check")
+        runtime = LiveRuntime.from_env(need_send=args[0] == "check", family=FAMILY_NAMES[args[1]] if len(args) == 2 else PIPELINE)
     except LiveFailure as exc:
         print(canonical({"ok": False, "error": exc.code, "kind": exc.kind}))
         return 2
     binding = runtime.binding()
+    stages = runtime.family.stages
     print(canonical({"ok": True, "check": args[0] == "check", "binding": binding, "identity": binding["identity"],
-                     "recipients": {s: runtime.recipient(s) for s in STAGES}, "purposes": {s: runtime.purpose(s) for s in STAGES},
+                     "recipients": {s: runtime.recipient(s) for s in stages}, "purposes": {s: runtime.purpose(s) for s in stages},
                      "keysPresent": {"openai": bool(os.environ.get(OPENAI_KEY_VAR)), "typesafe": bool(os.environ.get(JEV_KEY_VAR))},
                      "network": "none"}))
     return 0

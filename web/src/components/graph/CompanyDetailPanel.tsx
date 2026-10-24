@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { setWatchlistCompany } from '@/apis/graph/companies';
 import { useCompanyData } from '@/hooks/useCompanyData';
 import type { GraphNode } from '@/types/map/graph';
+import IssueDocumentSentiments from './IssueDocumentSentiments';
 
 type RelatedCompany = { id: string; name: string; sharedIssueCount: number };
 type Props = {
@@ -17,6 +18,9 @@ type Props = {
   token: string | null;
   onClose: () => void;
   onSelectIssue: (id: string) => void;
+  tutorialIssueId?: string;
+  tutorialAi?: boolean;
+  tutorialSaving?: boolean;
   onFocus: () => void;
   onConnections: () => void;
   onSelectRelation?: (companyId: string) => void;
@@ -66,7 +70,9 @@ function SectionError({
   return (
     <p className="company-section-error" role="alert">
       일부 정보를 불러오지 못했습니다.{' '}
-      <button onClick={retry}>다시 시도</button>
+      <button data-tutorial-action="retry" onClick={retry}>
+        다시 시도
+      </button>
     </p>
   );
 }
@@ -360,7 +366,8 @@ export default function CompanyDetailPanel(props: Props) {
             <button onClick={props.onFocus}>이 기업 중심으로 보기</button>
             <button onClick={props.onConnections}>다른 기업과 연결 보기</button>
             <button
-              className="col-span-2 bg-panel-ink! text-white!"
+              className={`col-span-2 bg-panel-ink! text-white! ${props.tutorialAi ? 'tutorial-target tutorial-ai-target' : ''}`}
+              disabled={props.tutorialSaving}
               onClick={props.onAskAi}
             >
               AI에게 이 기업 묻기
@@ -381,13 +388,30 @@ export default function CompanyDetailPanel(props: Props) {
               <ul className="company-list">
                 {company.directIssues.map((issue) => (
                   <li key={issue.issueId}>
-                    <button onClick={() => props.onSelectIssue(issue.issueId)}>
+                    <button
+                      className={
+                        props.tutorialIssueId === issue.issueId
+                          ? 'tutorial-target'
+                          : undefined
+                      }
+                      data-tutorial-action={
+                        props.tutorialIssueId === issue.issueId
+                          ? 'issue'
+                          : undefined
+                      }
+                      onClick={() => props.onSelectIssue(issue.issueId)}
+                    >
                       <b>{issue.title}</b>
                       <span>
                         {issue.eventTime ?? '시각 미상'} · 근거{' '}
                         {issue.evidenceCount}건
                       </span>
                     </button>
+                    <IssueDocumentSentiments
+                      documents={data.documents?.items ?? []}
+                      companyId={company.id}
+                      issueId={issue.issueId}
+                    />
                   </li>
                 ))}
               </ul>
@@ -404,10 +428,27 @@ export default function CompanyDetailPanel(props: Props) {
               <ul className="company-list">
                 {company.structuralIssues.map((issue) => (
                   <li key={issue.issueId}>
-                    <button onClick={() => props.onSelectIssue(issue.issueId)}>
+                    <button
+                      className={
+                        props.tutorialIssueId === issue.issueId
+                          ? 'tutorial-target'
+                          : undefined
+                      }
+                      data-tutorial-action={
+                        props.tutorialIssueId === issue.issueId
+                          ? 'issue'
+                          : undefined
+                      }
+                      onClick={() => props.onSelectIssue(issue.issueId)}
+                    >
                       <b>{issue.title}</b>
                       <span>구조적 연관 · 근거 {issue.evidenceCount}건</span>
                     </button>
+                    <IssueDocumentSentiments
+                      documents={data.documents?.items ?? []}
+                      companyId={company.id}
+                      issueId={issue.issueId}
+                    />
                   </li>
                 ))}
               </ul>

@@ -34,7 +34,7 @@ export default function HoldingsSidebar({
         <button
           type="button"
           onClick={onClose}
-          aria-label="내 종목 사이드바 닫기"
+          aria-label="보유 종목 사이드바 닫기"
           className="grid size-7 place-items-center rounded text-zoop-muted hover:bg-zoop-soft focus-visible:outline-2"
         >
           ×

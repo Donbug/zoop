@@ -696,7 +696,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getVirtualAccountProfile · 가상 계좌 프로필 조회
 
-서비스 시연용 고정 Mock 프로필을 조회한다. 실제 증권계좌·자격 증명 연동이 아니며 프로필의 예수금·보유종목 값은 변경하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+서비스 시연용 고정 Mock 프로필을 연결 없이 읽기 전용으로 미리 본다. 현재 시세로 평가 금액과 비중을 계산하며, 조회는 회원 계좌 연결 상태를 변경하지 않는다. 실제 증권계좌·자격 증명 연동이 아니며 프로필 값도 변경하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1660,7 +1660,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
 | WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.7, 6.10.16 |
 | 프로토타입 대응 | /api/admin/pipeline/candidates |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다., ``rule``(CandidateRule)은 숨김 방향이다. 프로토타입 R1의 withheldParticipants/withheldRelations/droppedRelations와 notAppliedReason=not_published는 없고 hiddenRelations를 둔다. applied=true는 결정 전 HOLD를 포함해 공개되면 숨겨진다는 뜻이다(규칙은 HOLD를 공개하지 않음, AI 5-A)., notAppliedReason=admin_decision은 관리자가 거절한 후보만 뜻한다(HOLD 여부와 무관, 프로토타입은 허용·거절 모든 결정). 허용한 HOLD는 applied=true이고, AI REJECT 후보와 비활성 후보(active=false)는 rule=null이다. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
 
 ### 요청 필드
@@ -1694,7 +1694,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
 | WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.7, 6.10.16 |
 | 프로토타입 대응 | /api/admin/pipeline/candidates/{candidate_id} |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., ``rule``(CandidateRule)은 숨김 방향이다. 프로토타입 R1의 withheldParticipants/withheldRelations/droppedRelations와 notAppliedReason=not_published는 없고 hiddenRelations를 둔다. applied=true는 결정 전 HOLD를 포함해 공개되면 숨겨진다는 뜻이다(규칙은 HOLD를 공개하지 않음, AI 5-A)., notAppliedReason=admin_decision은 관리자가 거절한 후보만 뜻한다(HOLD 여부와 무관, 프로토타입은 허용·거절 모든 결정). 허용한 HOLD는 applied=true이고, AI REJECT 후보와 비활성 후보(active=false)는 rule=null이다. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
 
 ### 요청 필드
@@ -1754,7 +1754,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
 | WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.5 |
 | 프로토타입 대응 | /api/admin/pipeline/rules |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다., publishedCandidates/publishedEvents는 활성 그래프 버전을 만들 때 세어 버전과 함께 고정한다(규칙 변경은 다음 버전부터 반영). 프로토타입은 조회할 때마다 overlay로 다시 계산한다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
 
 ### 요청 필드
@@ -1769,20 +1769,20 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## setPublicationRule · 검증 규칙 목표 상태 설정
 
-검증 규칙 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+검증 규칙 목표 상태 설정. 규칙은 앱 공개 정책이며 이미 공개 적격인 내용을 공개에서 빼는 방향으로만 작동한다. 규칙을 켜도 HOLD는 공개되지 않고 AI 판정 입력도 바뀌지 않는다. 이미 같은 상태면 아무것도 기록하지 않고 idempotent=true를 돌려준다. 변경은 공통 공개 잠금 아래 규칙 revision과 전역 rule log revision을 올리고 이력·감사를 같은 트랜잭션에 남긴다. reviewRevision은 응답 시점의 COALESCE(MAX(review_decisions.global_revision),0)이다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `PUT /api/v1/admin/pipeline/rules/{rule_id}` |
 | 권한·우선순위 | 관리자(작업별 권한) · P1 |
 | 요청 본문 | [RuleSwitchRequest](#schema-ruleswitchrequest) |
-| 응답 | 200: [RuleSwitchResponse](#schema-ruleswitchresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
+| 응답 | 200: [RuleSwitchResponse](#schema-ruleswitchresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, RATE_LIMITED |
 | FS/NFS | [FS059](../../system/out/feature-FS059.md) · [FS067-02](../../system/out/feature-FS067-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS012](../../system/out/feature-NFS012.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
 | WBS | 6.1.2, 6.11.1, 6.10.7, 6.10.16, 6.5.5 |
 | 프로토타입 대응 | /api/admin/pipeline/rules/{rule_id} |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., publishedCandidates/publishedEvents는 활성 그래프 버전을 만들 때 세어 버전과 함께 고정한다(규칙 변경은 다음 버전부터 반영). 프로토타입은 조회할 때마다 overlay로 다시 계산한다. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
 
 ### 요청 필드
@@ -1974,7 +1974,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## retryAnalysisJob · 허용된 분석 작업 재시도
 
-허용된 분석 작업 재시도.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+허용된 분석 작업 재시도. RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 작업(같은 종류·라벨·입력)으로 대기열에 넣고 202를 돌려준다. 허용되지 않으면 REVISION_CONFLICT/409이고 아무것도 만들지 않는다. AI 요청을 직접 다시 보내지 않으며, 새 모델 실행이 필요하면 작업 실행 시 새 AI jobId를 쓴다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2005,7 +2005,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## cancelAnalysisJob · 분석 작업 명시적 취소
 
-분석 작업 명시적 취소.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+분석 작업 명시적 취소. queued는 즉시 cancelled, running은 cancelRequested=true로 표시하고 소유 worker가 종료한다(진행 중인 AI 하위 실행은 죽이지 않는다). 이미 cancelled면 같은 작업을 돌려준다. succeeded·failed는 끝난 작업이라 REVISION_CONFLICT/409이며, 취소는 완료된 결과의 철회나 공개 버전 비활성화를 대신하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -3625,16 +3625,16 @@ The immutable published original of a round (what users saw before any correctio
 
 ### CandidateRule
 
-A candidate a publication rule covers: whether it is on the user graph through the rule, and what it leaves out.
+How an application publication rule affects a candidate. Hide-only: see ``ReviewRuleOut``. The candidate's
+``rule`` is null when no rule's condition covers it and when it can never be published (an AI REJECT, or an inactive
+candidate replaced by a newer job), since a rule has nothing to hide there.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| ruleId | 필수 | string |  |
-| applied | 필수 | boolean |  |
-| notAppliedReason | 필수 | string {admin_decision, rule_disabled, not_published} / null |  |
-| withheldParticipants | 필수 | integer[] | Indexes into the candidate's mention participants whose role is left out |
-| withheldRelations | 필수 | string[] | Relation ids whose role is left out |
-| droppedRelations | 필수 | string[] | Relation ids the rule does not publish at all (a FOLLOWS whose follow-side event did not occur yet) |
+| ruleId | 필수 | string | The publication rule whose condition covers this candidate (``<ruleId>@<version>``). |
+| applied | 필수 | boolean | True when the rule is enabled and its condition matches, whatever the candidate's publication state: its<br>``hiddenRelations`` are kept off the public graph once it is published (AI pass, or an administrator allow followed by a<br>new import). For a HOLD nobody has decided yet it tells the administrator that allowing it will not make those<br>relations public. It never means the rule published anything: a rule never publishes a HOLD and never turns a HOLD<br>into an approval (AI owner 2026-10-22, 5-A). |
+| notAppliedReason | 필수 | string {admin_decision, rule_disabled} / null | Why the rule hides nothing here: rule_disabled (switched off), admin_decision (an administrator rejected<br>the candidate, HOLD or not, so it is never published; an allowed HOLD is applied). Null when applied. |
+| hiddenRelations | 필수 | string[] | Relation ids of the candidate the rule keeps off the public graph once it is published. Empty when not<br>applied. |
 
 <a id="schema-chataction"></a>
 
@@ -5038,7 +5038,8 @@ same request again never toggles anything.
 
 The checkpoint the next article-processing run starts from: the start time of the latest run that
 finished normally, also when it found nothing new. Failed and cancelled runs never move it.
-``unresolved_failures`` counts article files whose latest run failed or was cancelled.
+``unresolved_failures`` counts article files whose latest run failed or was cancelled; null while no
+per-article run record exists (it is never a job count).
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5046,7 +5047,7 @@ finished normally, also when it found nothing new. Failed and cancelled runs nev
 | jobId | 필수 | string / null |  |
 | outcome | 필수 | string {collected, empty} / null |  |
 | newArticles | 필수 | integer / null |  |
-| unresolvedFailures | 필수 | integer |  |
+| unresolvedFailures | 필수 | integer / null |  |
 
 <a id="schema-ingestoutcome"></a>
 
@@ -5559,7 +5560,7 @@ The three market indicators stored with a published round; never changed after p
 
 ### MockProfileResponse
 
-FS062: one project mock profile with its account id, cash and holdings (no real brokerage account).
+FS062: one project mock profile with its account id, cash, valued holdings and weights. Read-only; it does not create a member connection or access a real brokerage account.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5568,7 +5569,8 @@ FS062: one project mock profile with its account id, cash and holdings (no real 
 | accountId | 필수 | string |  |
 | cash | 필수 | [MockCash](#schema-mockcash) / null | null when the mock does not provide cash; 0 is a real 0 |
 | asOf | 필수 | string (date-time) / null | As-of time of the mock values when the mock gives one |
-| holdings | 필수 | [MockHoldingOut](#schema-mockholdingout)[] |  |
+| holdings | 필수 | [HoldingOut](#schema-holdingout)[] |  |
+| valuation | 필수 | [PortfolioValuation](#schema-portfoliovaluation) |  |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-neo4jstatus"></a>
@@ -5937,7 +5939,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | allowed | 필수 | boolean |  |
-| code | 필수 | string {allowed, succeeded, in_progress, superseded, newer_attempt, duplicate_running, other_running, dataset_missing} |  |
+| code | 필수 | string {allowed, succeeded, in_progress, superseded, newer_attempt, duplicate_running, other_running, dataset_missing, outcome_unknown} | 재시도 판정. in_progress(대기·실행 중), succeeded(이미 성공), duplicate_running(이 작업의 재시도가 대기·실행 중), newer_attempt(더 새 재시도가 있어 가장 최근 시도만 재시도 가능), superseded(같은 종류·같은 입력의 더 나중 작업이 성공), outcome_unknown(외부 실행 결과를 확인할 수 없음: 응답 유실로 실행·과금 여부를 모르므로 자동 재시도하지 않음), dataset_missing(작업의 실행 계획이나 입력 연결이 없거나 철회됨, 일시적 조회 장애는 해당하지 않음), allowed. other_running은 대기열 정책상 다른 작업 실행만으로 재시도를 거절하지 않으므로 반환하지 않는다. blockedBy는 막고 있는 작업 ID다. |
 | reason | 필수 | string |  |
 | blockedBy | 필수 | string / null |  |
 
@@ -5979,7 +5981,12 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 
 ### ReviewRuleOut
 
-A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@2``.
+An application publication rule; the id carries its version (``<ruleId>@<version>``). A rule can only keep
+already eligible content off the public graph. It never publishes a HOLD, never turns a HOLD into an approval and never
+changes an AI judgement input: content is published only by an AI pass inside a handoff or by an administrator allow
+followed by a new handoff, import and activation. ``changedAt``/``changedBy``/``reason`` are the latest change, null
+only while the rule has never been changed (a rule switched back to its default keeps its latest change).
+``history`` is every change, newest first.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5991,9 +5998,9 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 | changedAt | 필수 | string (date-time) / null |  |
 | changedBy | 필수 | string / null |  |
 | reason | 필수 | string / null |  |
-| eligible | 필수 | integer | HOLD candidates of the active version the rule covers (ignoring the switch and admin decisions) |
-| publishedCandidates | 필수 | integer |  |
-| publishedEvents | 필수 | integer |  |
+| eligible | 필수 | integer / null | Information only, not a publication count: HOLD review targets in the source jobs the active version references that the rule currently covers (counted from review_targets and AI source revisions, ignoring the switch and admin decisions). The current pending count, not the statistics frozen with a version. Null while that source projection does not exist yet. |
+| publishedCandidates | 필수 | integer / null | Candidates in the rule's scope that are still public after the rule is applied in the active graph version (not candidates the rule published: a rule never publishes). Counted when that version is built and frozen with it (the statistics at freeze time, AI owner 5-A), so a switch changes it only from the next version. Null while the active version has no frozen count. |
+| publishedEvents | 필수 | integer / null | Events in the rule's scope that are still public after the rule is applied in the active graph version (not events the rule published). Frozen with that version like ``publishedCandidates``. Null while the active version has no frozen count. |
 | history | 필수 | [RuleChangeOut](#schema-rulechangeout)[] |  |
 
 <a id="schema-rounddetail"></a>
@@ -6133,7 +6140,7 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | enabled | 필수 | boolean |  |
-| reason | 필수 | string |  |
+| reason | 필수 | string | Stored with surrounding whitespace stripped; 1 to 500 characters after stripping (longer is 422<br>INVALID_REQUEST). |
 
 <a id="schema-ruleswitchresponse"></a>
 

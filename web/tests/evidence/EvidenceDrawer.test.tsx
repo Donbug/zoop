@@ -6,6 +6,7 @@ import { getEvidence } from '@/apis/evidence/evidence';
 import EvidenceDrawer from '@/components/evidence/EvidenceDrawer';
 import { createMockEvidence } from '@/mocks/evidence/fixture';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
+import { useTutorialInteractionLock } from '@/components/graph/tutorial/useTutorialInteractionLock';
 
 vi.mock('@/apis/evidence/evidence', async (original) => ({
   ...(await original<typeof import('@/apis/evidence/evidence')>()),
@@ -42,6 +43,25 @@ beforeEach(() => {
 });
 
 describe('D-GRP-05 · evidence drawer states and interactions', () => {
+  it('문서 제공 불가 응답만 있으면 완료하지 않고 새 요청의 표시 가능한 문서를 기다린다', async () => {
+    const onReady = vi.fn();
+    mocked.mockImplementation(async (id) => ({
+      ...createMockEvidence(id),
+      article: null,
+    }));
+    useGraphUiStore.getState().openEvidence(target);
+    render(<EvidenceDrawer onReady={onReady} />);
+    await screen.findAllByText('근거 문서를 제공할 수 없습니다.');
+    expect(onReady).not.toHaveBeenCalled();
+    mocked.mockImplementation(async (id) => createMockEvidence(id));
+    useGraphUiStore.getState().openEvidence({
+      ...target,
+      id: 'new-target',
+      evidenceIds: ['mock-evidence-1'],
+    });
+    await waitFor(() => expect(onReady).toHaveBeenCalledWith('new-target'));
+    expect(onReady).not.toHaveBeenCalledWith(target.id);
+  });
   it('traps reverse Tab from the heading and restores background interaction on close', async () => {
     mocked.mockImplementation(async (id) => createMockEvidence(id));
     render(<Harness />);
@@ -163,5 +183,27 @@ describe('D-GRP-05 · evidence drawer states and interactions', () => {
     await userEvent.click(screen.getByRole('button', { name: '근거 창 닫기' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(opener));
+  });
+
+  it('D-GRP-T4 튜토리얼 4단계에서 근거를 불러오지 못해도 닫기 버튼으로 창을 닫고 다음 단계로 이어 간다', async () => {
+    mocked.mockImplementation(async (id) => ({
+      ...createMockEvidence(id),
+      article: null,
+    }));
+    const onClosed = vi.fn();
+    function Step4() {
+      useTutorialInteractionLock(4, false);
+      return <EvidenceDrawer onClosed={onClosed} />;
+    }
+    useGraphUiStore.getState().openEvidence(target);
+    render(<Step4 />);
+    await screen.findAllByText('근거 문서를 제공할 수 없습니다.');
+    const close = screen.getByRole('button', {
+      name: '근거 창 닫기',
+    }) as HTMLButtonElement;
+    await waitFor(() => expect(close.disabled).toBe(false));
+    await userEvent.click(close);
+    expect(onClosed).toHaveBeenCalledOnce();
+    expect(useGraphUiStore.getState().evidenceTarget ?? null).toBeNull();
   });
 });

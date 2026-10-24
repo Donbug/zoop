@@ -35,6 +35,7 @@ export function useGraphData(
   const [state, setState] = useState<{
     data: GraphResponse | null;
     error: string | null;
+    /** 회차 지도가 실패가 아니라 제공되지 않는 상태(D-BRF-04). 값은 API가 준 사유다. */
     unavailableReason: string | null;
     loading: boolean;
     session: string | null;

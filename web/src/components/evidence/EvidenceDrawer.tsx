@@ -7,8 +7,13 @@ import { useEvidenceData } from '@/hooks/useEvidenceData';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import type { EvidenceResponse } from '@/types/evidence';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import EvidenceAnalysis from './EvidenceAnalysis';
 
 interface Props {
+  onReady?: (targetId: string) => void;
+  /** 사용자가 창을 닫았을 때. 튜토리얼은 근거를 불러오지 못해도 닫으면 다음 단계로 넘어간다. */
+  onClosed?: () => void;
+  onTutorialSkip?: () => void;
   onViewOnMap?: (eventId: string) => void;
 }
 
@@ -60,6 +65,7 @@ function EvidenceCard({
             {evidence.article.title ?? '문서 제목 미제공'}
           </h3>
           <blockquote>{evidence.quote}</blockquote>
+          <EvidenceAnalysis evidence={evidence} />
           <div className={`${ui.textActions} mt-3`}>
             {href ? (
               <a href={href} target="_blank" rel="noopener noreferrer">
@@ -93,7 +99,12 @@ function EvidenceCard({
 }
 
 // D-GRP-05 · Figma 619:8225 · FS024 · ERD v6 evidence/article_versions.
-export default function EvidenceDrawer({ onViewOnMap }: Props) {
+export default function EvidenceDrawer({
+  onReady,
+  onClosed,
+  onViewOnMap,
+  onTutorialSkip,
+}: Props) {
   const target = useGraphUiStore((state) => state.evidenceTarget);
   const close = useGraphUiStore((state) => state.closeEvidence);
   const [retry, setRetry] = useState(0);
@@ -110,6 +121,11 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
     retry,
     target?.mapContext,
   );
+
+  useEffect(() => {
+    if (target && !loading && items.some((item) => item.article !== null))
+      onReady?.(target.id);
+  }, [target, loading, items, onReady]);
 
   useEffect(() => {
     if (!target) return;
@@ -193,11 +209,25 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
           <button
             type="button"
             className={`absolute top-5 right-5 ${ui.close}`}
-            onClick={close}
+            // 튜토리얼 4단계(근거 확인)에서도 창을 닫을 수 있다.
+            data-tutorial-action="evidence"
+            onClick={() => {
+              close();
+              onClosed?.();
+            }}
             aria-label="근거 창 닫기"
           >
             ×
           </button>
+          {onTutorialSkip && (
+            <button
+              data-tutorial-action="skip"
+              onClick={onTutorialSkip}
+              className="mb-2 underline"
+            >
+              튜토리얼 건너뛰기
+            </button>
+          )}
           <h2
             id="evidence-title"
             ref={heading}
@@ -268,6 +298,7 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
               {retryable && (
                 <button
                   type="button"
+                  data-tutorial-action="retry"
                   onClick={() => setRetry((value) => value + 1)}
                 >
                   다시 시도

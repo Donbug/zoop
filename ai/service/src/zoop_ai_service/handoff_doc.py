@@ -11,7 +11,8 @@ import hashlib
 from typing import Any
 
 from .handoff_runtime import canonical
-from .handoff_wire import Bundle, HandoffManifest, HdBundle, HdErrorEnvelope, HdStatus
+from .handoff_wire import (SUMMARY_DETERMINISTIC, Bundle, HandoffManifest, HdBundle, HdErrorEnvelope, HdStatus, basis_digest, result_digest, result_version,
+                           summary_basis)
 from .wire import ErrorBody
 
 STAMP = "2026-10-16T03:00:00Z"
@@ -38,8 +39,46 @@ def example_manifest() -> dict[str, Any]:
                                            "files": {"canonical": "6" * 64, "decisions": "7" * 64, "bindings": "8" * 64}}).wire()
 
 
-def example_bundle() -> dict[str, Any]:
-    """One company, one issue with its one original mention, one INVOLVES relation, one evidence span, one article, one S3 job over one S2 upstream."""
+PROMPT_VERSION = "zoop-issue-summary-prompt-1"
+SUMMARY_CLAIMS = ["합성기업이 2026년 9월 30일 공급 계약을 발표했다.", "계약의 수요자 역할은 합성 협력사가 맡는다.", "발표 내용은 두 문장 모두 같은 기사 인용에서 확인된다."]
+
+
+def summary_of(bundle: dict[str, Any], outcome: str = "available", *, index: int = 0) -> dict[str, Any]:
+    """The authored `issues[index].summary` for `outcome` over the issue AS IT STANDS in `bundle`: every digest is derived from the bundle's own basis by the pure rules of
+    `handoff_wire` (the producer's `issue_summary_contracts`), so the value is exactly what the producer would have pinned for that basis. `outcome` is `available`, a
+    deterministic code (`not-requested`, `temporal-review-pending`, `input-too-large`: no job, `source` null) or a job code (`producer-invalid`, `verifier-hold`,
+    `verifier-reject`). It does not check that the outcome is LEGAL for the issue (a held issue may not be `available`): tests build wrong values on purpose.
+    Claims cite the basis quotes, `c1` the first, `c2` the last and `c3` all of them (at most five). A replay bundle gets authored-replay identities, a live one provider ones."""
+    if outcome in SUMMARY_DETERMINISTIC:
+        return {"status": "unavailable", "code": outcome, "source": None}
+    issue = bundle["issues"][index]
+    evidence = {e["id"]: e for e in bundle["evidence"]}
+    articles = {(a["articleId"], a["articleVersion"]): a for a in bundle["articles"]}
+    basis = summary_basis(issue, evidence, articles)
+    pinned = basis_digest(basis)
+    job_id, input_digest = f"isum-synthetic-{index + 1}", digest({"authored": "issue-summary-input", "basisDigest": pinned})
+    if outcome == "available":
+        quotes = [q["evidenceId"] for q in basis["quotes"]]
+        cited = [[quotes[0]], [quotes[-1]], quotes[:5]]
+        claims = [{"claimId": f"c{n}", "text": text, "evidenceIds": sorted(set(ids))} for n, (text, ids) in enumerate(zip(SUMMARY_CLAIMS, cited), 1)]
+        live = (bundle["provenance"]["executionMode"], bundle["provenance"]["recordingKind"]) == ("live", "provider")
+        producer = {"kind": "provider" if live else "authored-replay", "model": "synthetic-provider-model" if live else None,
+                    "reasoningEffort": "high" if live else None, "promptVersion": PROMPT_VERSION, "schemaDigest": digest({"schema": "zoop-issue-summary-1"}),
+                    "runtimeIdentity": digest({"runtime": "zoop-issue-summary-runtime-1", "live": live})}
+        verifier = {"kind": "independent-verifier" if live else "authored-replay", "model": "synthetic-verifier-model" if live else None,
+                    "adapterIdentity": digest({"adapter": "zoop-jev-issue-summary-1", "live": live}), "requestDigest": digest({"verifies": job_id, "basisDigest": pinned})}
+        body: dict[str, Any] = {"status": "available", "text": "\n".join(c["text"] for c in claims), "claims": claims,
+                                "evidenceIds": sorted({i for c in claims for i in c["evidenceIds"]}), "generatedAt": "2026-10-16T02:30:00+00:00",
+                                "resultVersion": result_version(pinned, claims), "language": "ko", "producer": producer, "verifier": verifier}
+    else:
+        body = {"status": "unavailable", "code": outcome}
+    return {**body, "source": {"jobId": job_id, "inputDigest": input_digest, "resultDigest": result_digest(job_id, input_digest, pinned, body), "basisDigest": pinned}}
+
+
+def example_bundle(summary: str = "available") -> dict[str, Any]:
+    """One company, one issue with its one original mention, one INVOLVES relation, one evidence span, one article, one S3 job over one S2 upstream. `summary` is the
+    authored outcome of the issue's `summary`: `available` (default; two claims over the one quote of the issue's only article), `not-requested`, a job-coded
+    `producer-invalid|verifier-hold|verifier-reject`, or `temporal-review-pending` (the issue's event time carries an operator HOLD, so no summary exists)."""
     doc_version, raw_version, article_id = "a" * 64, "b" * 64, "doc-" + "c" * 64
     start, end = 12, 48
     evidence_id = "ev-" + digest({"kind": "graph-body-span", "articleId": article_id, "articleVersion": doc_version, "start": start, "end": end})
@@ -63,12 +102,19 @@ def example_bundle() -> dict[str, Any]:
     # one operator ALLOW on the mention's own eventTime (synthetic); a HOLD/REJECT on a selected value would instead null the issue field and list it in `withheld`
     verdict = {**mention_ref, "field": "eventTime", "value": "2026-09-30", "decision": "ALLOW", "reasonCode": "stated", "evidenceIds": [evidence_id],
                "verification": "operator-field-verdict", "reviewer": "reviewer-1", "decisionRef": "field-2026-10-21:1", "decisionVersion": "v1"}
+    if summary == "temporal-review-pending":
+        # an operator HOLD on the representative-less issue's own event time: the headline is withheld (null, precision `unknown`; the original mention keeps its value)
+        # and an issue with any HOLD/REJECT verdict has NO summary text at all
+        verdict.update(decision="HOLD", reasonCode="ambiguous")
+        provenance["withheld"] = ["eventTime"]
+    held = summary == "temporal-review-pending"
     bundle: dict[str, Any] = {
-        "schemaVersion": "zoop-graph-handoff-bundle-5", "handoffId": HANDOFF, "manifestDigest": digest(example_manifest()),
+        "schemaVersion": "zoop-graph-handoff-bundle-7", "handoffId": HANDOFF, "manifestDigest": digest(example_manifest()),
         "provenance": {"declaredSourceKind": "synthetic", "observedSourceKind": "synthetic", "executionMode": "replay", "recordingKind": "authored-test"},
         "policy": {"version": "zoop-public-projection-policy-1", "files": {"canonical": "6" * 64, "decisions": "7" * 64, "bindings": "8" * 64},
                    "evidenceIdKind": "graph-body-span", "offsetUnit": "unicode_code_point", "geography": "operator-field-verdict",
-                   "structural": "manual-operator-review", "sequence": "s2-comparison-with-operator-decision", "sourceSupport": "origin-or-exact-text-union"},
+                   "structural": "manual-operator-review", "sequence": "s2-comparison-with-operator-decision", "sourceSupport": "origin-or-exact-text-union",
+                   "impacts": "s3-independent-verifier-quote-effect", "issueSummary": "zoop-issue-summary-policy-1"},
         "sources": [{"relation": job, "upstream": {**upstream, "digest": "9" * 64}, "reviewDigest": "d" * 64,
                      "provenance": {"sourceKind": "synthetic", "executionMode": "replay", "recordingKind": "authored-test"},
                      "policies": {"producer": "zoop-relation-producer-1", "verifier": "zoop-relation-verifier-1", "impactProducer": "zoop-impact-producer-1",
@@ -77,11 +123,11 @@ def example_bundle() -> dict[str, Any]:
                      "reviewUsed": [{"relationCandidateId": relation_candidate, "revision": 1,
                                      "approvalBasis": {"kind": "automatic-verifier", "revision": 1, "reviewer": None, "decidedAt": "2026-10-13T00:00:01+00:00"}}],
                      "audit": {"s3Relations": 1, "eligibility": {"eligible": 1, "hold": 0, "reject": 0, "pending": 0}, "reviewPending": 0,
-                               "impactCandidates": 0, "eligibleNotPublicByType": {"SUPPLIES": 0}}}],
+                               "impactCandidates": 1, "eligibleNotPublicByType": {"SUPPLIES": 0}}}],
         "companies": [{"id": "KRX:005930", "canonicalId": "co:synth-1", "label": "합성기업", "decisionRef": "canon-2026-10-16:company"}],
         "pathCompanies": [],
         "issues": [{"id": "issue:synthetic-supply", "canonicalId": "issue:supply", "title": "합성 공급 계약", "action": "공급 계약 발표", "target": None,
-                    "eventTime": "2026-09-30", "timePrecision": "day", "period": None, "assertionStatus": "announced",
+                    "eventTime": None if held else "2026-09-30", "timePrecision": "unknown" if held else "day", "period": None, "assertionStatus": "announced",
                     "geography": {"value": "domestic", "decisionRef": "geo-2026-10-16:1", "decisionVersion": "v1", "policyVersion": "zoop-public-projection-policy-1",
                                   "countries": ["KR"], "verification": "operator-field-verdict", "evidenceIds": [evidence_id], "basis": [{**event, "countries": ["KR"]}]},
                     "evidenceIds": [evidence_id], "sourceEvents": [event], "mentions": [mention], "decisionRef": "issue-2026-10-16:1", "representative": None,
@@ -94,6 +140,12 @@ def example_bundle() -> dict[str, Any]:
                        "structuralPath": None,
                        "provenance": {"origin": "s3-relation", "s3SemanticValidation": "independent-verifier-supported-all-claims"}, "decisionRef": None,
                        "sourceRefs": [{"kind": "s3-relation", "jobId": job["jobId"], "id": relation_candidate}]}],
+        "impacts": [{"edgeId": "edge-" + digest({"type": "INVOLVES", "source": "issue:synthetic-supply", "target": "KRX:005930"}), "issueId": "issue:synthetic-supply",
+                     "companyId": "KRX:005930", "sourceRelation": {"jobId": job["jobId"], "relationCandidateId": relation_candidate},
+                     "impactCandidateId": "ic-" + "a" * 64, "status": "verified", "code": None, "label": "positive", "targetVerdict": "supported",
+                     "effects": {"positive": [evidence_id], "negative": [], "neutral": [], "uncertain": []}, "verifier": "called",
+                     "verifierRequestDigest": "b" * 64,
+                     "proposal": {"direction": "positive", "reason": "합성 공급 계약이 합성기업의 매출에 긍정적일 수 있다는 제안", "limitations": None, "verification": "none"}}],
         "evidence": [{"id": evidence_id, "kind": "graph-body-span", "articleId": article_id, "articleVersion": doc_version, "start": start, "end": end,
                       "offsetUnit": "unicode_code_point", "quoteSha256": "e" * 64, "rawLocatorIds": ["loc-1"],
                       "source": {"documentId": "synthetic-doc-1", "documentVersion": doc_version, "rawVersion": raw_version, "textArtifactId": "text-artifact-1",
@@ -105,12 +157,13 @@ def example_bundle() -> dict[str, Any]:
                       "observations": [{"roundId": "round-1", "sourceId": "source-1", "page": 1, "ordinal": 0, "observedAt": "2026-09-30T02:00:00+00:00",
                                         "grant": {"grantId": "grant-1", "revision": "1"}}]}],
         "exclusions": {"counts": {}, "items": []},
-        "counts": {"companies": 1, "pathCompanies": 0, "issues": 1, "relations": {"INVOLVES": 1, "STRUCTURALLY_RELATED_TO": 0, "FOLLOWS": 0}, "evidence": 1, "articles": 1,
-                   "exclusions": 0},
+        "counts": {"companies": 1, "pathCompanies": 0, "impacts": 1, "issues": 1, "relations": {"INVOLVES": 1, "STRUCTURALLY_RELATED_TO": 0, "FOLLOWS": 0}, "evidence": 1,
+                   "articles": 1, "exclusions": 0},
         "checks": {"producerConfirmed": list(PRODUCER_CHECKS), "appImportPending": list(APP_IMPORT_PENDING)},
         "readiness": {"app": "import-pending", "evidenceRegistration": "not-registered", "publicActivation": "none", "graphDb": "none"},
         "digests": {"content": ""}}
-    bundle["digests"]["content"] = digest({key: bundle[key] for key in ("companies", "pathCompanies", "issues", "relations", "evidence", "articles")})
+    bundle["issues"][0]["summary"] = summary_of(bundle, summary)
+    bundle["digests"]["content"] = digest({key: bundle[key] for key in ("companies", "pathCompanies", "issues", "relations", "impacts", "evidence", "articles")})
     return Bundle.model_validate(bundle).wire()
 
 
@@ -127,7 +180,7 @@ def verification(bundle: dict[str, Any]) -> dict[str, Any]:
 DESCRIPTION = """\
 **Graph handoff bundles (`/internal/v1/graph-handoffs`, schema `zoop-ai-internal-handoff-1`, scope `handoff.read`).** A fourth, separate, strictly read-only
 family over the installed `zoop-ai-handoff export` command: the verified status of one AI handoff and, only while it verifies now, the whole versioned bundle
-(`zoop-graph-handoff-bundle-5`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
+(`zoop-graph-handoff-bundle-7`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
 writes nothing (no handoff, no ledger, no cache, no source write, no model or network call), cannot freeze, recover, activate or publish, runs no caller-supplied
 path, command or query and has no list route. It is off unless its all-or-nothing server configuration group is set (otherwise both routes answer 409
 `execution_unavailable` after authentication). `publication` is always `not-published` and `appImport` always `pending`: this service delivers the AI-side
@@ -144,8 +197,10 @@ bytes of the bundle it received, requires the result to equal the producer's rec
 fields are refused at every level) and requires the model to dump back to exactly those canonical bytes. Otherwise the answer is **200 with
 `delivery.state=withheld`**, a reason code (`source_unauthorized`, `upstream_changed`, `source_pin_missing`, `review_revision_changed`,
 `canonical_mapping_changed`, `decisions_changed`, `bindings_changed`, `handoff_content_changed`, `handoff_not_ready`, `handoff_pin_mismatch`,
+`issue_summary_pin_mismatch`, `issue_summary_basis_changed`, `issue_summary_issue_not_public`, `issue_summary_temporal_review_pending`,
+`issue_summary_input_too_large`,
 `handoff_contract_changed` ...) and nothing else: no `verification` (so no count, source id or digest) and no `bundle`. `handoff_contract_changed` means the
-handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1`, `-2`, `-3` or `-4`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.
+handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1` ... `-6`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.
 A withheld answer is not an error and not an empty bundle; do not import it and do not treat it as "no data". The checks are separate reads at separate instants,
 so a revocation that lands between them and the response is not covered and nothing recalls content a caller already received.
 
@@ -169,6 +224,38 @@ reviewed `value`, `decision` ALLOW|HOLD|REJECT, a closed `reasonCode`, `evidence
 `verification` always `operator-field-verdict`). They are never AI output, carry no free-text note, and exist only where an operator reviewed; an empty list means
 "no field verdict exists", not "verified". This service neither derives nor judges them and checks only the shapes (decision/reason/evidence-count combinations:
 ALLOW+stated needs spans, HOLD+unstated none, HOLD+ambiguous spans, REJECT+contradicted spans). Original `mentions[]` values are never changed.
+
+**Impacts.** `impacts[]` has exactly one closed row per emitted `INVOLVES` source relation `(edgeId, sourceRelation.jobId, sourceRelation.relationCandidateId)`, sorted by
+that tuple. It never aggregates: two source relations of one edge stay two rows. A row says what the S3 independent verifier mapped for the company, or why there is
+none: `status` is `not-applicable` (an operator-final-approval source: no impact candidate exists), `not-proposed`, `no-evidence`, `technical-reject` or
+`verifier-reject` (`targetVerdict` contradicted), `verified` or `withheld` (`code` explains a withheld or technically rejected row). Only a `verified` row carries `effects`
+(`positive`, `negative`, `neutral`, `uncertain`: sorted, disjoint app evidence ids, 1..40 in all, each of an article version the edge cites, with distinct source
+evidence per row) and the deterministic `label` (`uncertain` effects or an `insufficient` target give `undetermined`; positive and negative together give `mixed`; one
+side gives that side; neutral only gives `undetermined`). `proposal` is the producer's UNVERIFIED private proposal (`verification` always `none`): never a verified
+reason. The label belongs to one source relation's quote evidence, never to the event as a whole, and is neither a causal claim nor a price probability. This service checks
+the rows' shape and the closure its closed models can see (coverage of every `INVOLVES` source relation, endpoints, source approval kind, evidence ids and article
+versions, counts, policy, label); the producer owns everything else. An earlier-schema handoff has no `impacts`: that absence means "unavailable", never "not proposed".
+
+**Issue summary.** Every issue carries a closed `summary` (bundle `-7`, `policy.issueSummary` = `zoop-issue-summary-policy-1`); it is never absent and never an empty
+text. It is `available` (a summary of the issue's whole input: `text` = the 1..5 `claims` joined by a newline, each claim `{claimId c1..cn, text, evidenceIds}` with one
+line of 1..280 code points containing a Hangul syllable and 1..5 sorted unique evidence ids; `evidenceIds` the sorted union; `generatedAt` in the closed grammar
+`YYYY-MM-DDTHH:MM:SS[.d{1,9}](Z|+HH:MM|-HH:MM)` (ASCII digits, uppercase `T` and `Z`, a mandatory offset of at most 18:00, a real calendar day in years 0001..9999, no leap second,
+no compact, space, week or ordinal form: the same rule in the producer, the application verifier and this service);
+`resultVersion` = `isr-` + digest of the basis digest and the claims; `language` `ko`; `source {jobId, inputDigest, resultDigest, basisDigest}`; the `producer` and
+`verifier` identities) or `unavailable` with a `code`: `not-requested`, `temporal-review-pending` and `input-too-large` have no job behind them (`source` null);
+`producer-invalid`, `verifier-hold` and `verifier-reject` name the pinned result of the summary job that did not produce a verified text. A claim is a sentence a verifier
+checked against the quotes, never a fact, advice, a causal claim or a price probability.
+
+**What a summary rests on.** Its basis is the issue `title` and the union of every `mentions[].evidenceIds` quote (sorted by evidence id, each pinned to its article
+version, offsets and `quoteSha256`; `context` is `background` only when every mention citing it is a background mention). Geography-only and verdict-only evidence is not
+part of it. `source.basisDigest` is the digest of that exact basis. **The summary depends on ALL of these evidence ids and article versions, not only the ones its claims
+cite: an application that decides whether a summary may be shown (as-of time, current source rights, readable article versions) MUST require every basis evidence id and
+article version to pass, and otherwise suppress the whole summary.** Any HOLD or REJECT operator field verdict on the issue (on any mention) leaves exactly `unavailable /
+temporal-review-pending`: no summary text then exists anywhere in the bundle, an `available` value on such an issue is refused, and so is a deterministic code while its
+condition does not hold. More than 60 basis quotes is `input-too-large`. In a replay bundle producer and verifier are both `authored-replay` (an authored answer, no model
+and no independent verdict); only a live bundle carries a `provider` producer and an `independent-verifier`. This service recomputes the basis digest, the deterministic
+code, the claim and result identities and the provenance kinds from the bundle itself, and refuses (500 `runtime_contract_mismatch`) a bundle whose summary does not
+follow. A handoff frozen under an earlier schema has no summary: that absence is "unavailable", never `not-requested`.
 
 **The bundle bytes.** `bundle` is the producer's artifact, relayed with exactly its keys and values. `verification.bundleDigest` is the SHA-256 of its canonical
 UTF-8 bytes, where canonical means JSON with keys sorted by code point, separators `,` and `:` without whitespace and non-ASCII characters not escaped (Python
@@ -221,6 +308,7 @@ def bundle_result(**overrides: Any) -> dict[str, Any]:
 
 
 def examples() -> dict[str, Any]:
+    held = example_bundle("temporal-review-pending")
     withheld = {"state": "withheld", "reason": "source_unauthorized"}
     return {
         "status": {"current": {"summary": "The handoff verifies now and matches the operator's pins", "value": status()},
@@ -230,9 +318,14 @@ def examples() -> dict[str, Any]:
                                    "value": status(delivery={"state": "withheld", "reason": "handoff_pin_mismatch"}, verification=None)},
                    "notReady": {"summary": "The handoff is reserved (an interrupted freeze) and not exportable until the operator recovers it",
                                 "value": status(state="reserved", delivery={"state": "withheld", "reason": "handoff_not_ready"}, verification=None)},
+                   "summaryBasisChanged": {"summary": "The sources or operator decisions no longer match the summary the handoff froze (its basis or pin changed): withheld, no content",
+                                           "value": status(delivery={"state": "withheld", "reason": "issue_summary_basis_changed"}, verification=None)},
                    "legacyContract": {"summary": "The handoff was frozen under the earlier bundle schema: withheld, never reinterpreted (freeze a new handoff id)",
                                       "value": status(delivery={"state": "withheld", "reason": "handoff_contract_changed"}, verification=None)}},
-        "bundle": {"current": {"summary": "The whole bundle, only while every delivery gate holds at this moment", "value": bundle_result()},
+        "bundle": {"current": {"summary": "The whole bundle, only while every delivery gate holds at this moment. Its issue carries an AVAILABLE summary", "value": bundle_result()},
+                   "currentSummaryHeld": {"summary": "A current bundle whose issue has an operator HOLD on its event time: the headline time is null and the summary is "
+                                                     "`unavailable/temporal-review-pending` (no summary text exists anywhere in the bundle)",
+                                          "value": bundle_result(bundle=held, verification=verification(held))},
                    "withheld": {"summary": "Source rights were revoked: no manifest, no bundle, no counts",
                                 "value": bundle_result(delivery=withheld, verification=None, manifest=None, bundle=None)}},
         "errors": {

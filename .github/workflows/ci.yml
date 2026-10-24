@@ -141,8 +141,8 @@ jobs:
       - name: Check BFF-generated web type drift without a running server
         run: make web-install bff-types-check
 
-  ai-pipeline:
-    name: ai-pipeline
+  ai-pipeline-tests:
+    name: ai-pipeline-tests
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -157,8 +157,42 @@ jobs:
           enable-cache: false
       - name: Install the pipeline runtime (public dependencies only, no private Git access or token)
         run: make pipeline-install
-      - name: Offline pipeline tests and actual CLI smokes (native replay only, investmate is not installed; no model token, provider call or real state)
-        run: make pipeline-test pipeline-smoke
+      - name: Offline pipeline tests (native replay only, no model token, provider call or real state)
+        run: make pipeline-test
+
+  ai-pipeline-smoke:
+    name: ai-pipeline-smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          enable-cache: false
+      - name: Install the pipeline runtime (public dependencies only, no private Git access or token)
+        run: make pipeline-install
+      - name: Actual pipeline CLI smokes (native replay only, no model token, provider call or real state)
+        run: make pipeline-smoke
+
+  ai-pipeline:
+    name: ai-pipeline
+    if: always()
+    needs: [ai-pipeline-tests, ai-pipeline-smoke]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require pipeline tests and CLI smokes
+        env:
+          TESTS_RESULT: ${{ needs.ai-pipeline-tests.result }}
+          SMOKE_RESULT: ${{ needs.ai-pipeline-smoke.result }}
+        run: |
+          test "$TESTS_RESULT" = success
+          test "$SMOKE_RESULT" = success
 
   ai-worker:
     name: ai-worker
@@ -186,7 +220,7 @@ jobs:
   ai-service:
     name: ai-service
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -199,7 +233,7 @@ jobs:
           enable-cache: false
       - name: Bootstrap the service's own locked runtime and the test-only worker (public dependencies, no token)
         run: make service-install
-      - name: Offline service tests, real loopback smoke and internal OpenAPI drift (no model token, external network or real state)
+      - name: Offline service tests (4 workers), real loopback smoke and internal OpenAPI drift (no model token, external network or real state)
         run: make service-test service-smoke service-openapi-check
 
   api-container:
@@ -217,8 +251,8 @@ jobs:
             --tag "zoop-api:ci-${GITHUB_SHA}" \
             api
 
-  api:
-    name: api
+  api-tests:
+    name: api-tests
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     services:
@@ -282,9 +316,46 @@ jobs:
         run: make service-install
       - name: Real Java client -> ai/service -> zoop-ai replay gate (synthetic in-memory credentials, no model call, no PostgreSQL)
         run: make api-ai-smoke
+      - name: Real Java chat adapters -> ai/service -> zoop-ai-chat replay gate (authored synthetic fixture, no model call, no PostgreSQL)
+        run: make api-ai-chat-smoke
 
-
-
+  api-graph-smoke:
+    name: api-graph-smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      company-postgres:
+        image: postgres:16.13-alpine
+        env:
+          POSTGRES_USER: company_test
+          POSTGRES_DB: zoop_company_test_19
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U company_test -d zoop_company_test_19"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Use the runner's preinstalled JDK 21
+        run: |
+          if [ -z "${JAVA_HOME_21_X64:-}" ] || [ ! -x "${JAVA_HOME_21_X64}/bin/java" ]; then
+            printf '%s\n' 'JAVA_HOME_21_X64 is not available on this runner image; the api build requires JDK 21.' >&2
+            exit 1
+          fi
+          printf 'JAVA_HOME=%s\n' "${JAVA_HOME_21_X64}" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          enable-cache: false
+      - name: Build the application jar for the graph handoff import smoke
+        run: make api-build
       - name: Bootstrap the ai/pipeline runtime for the graph handoff import smoke (public dependencies, no token)
         run: make pipeline-install
       - name: Create a dedicated empty database for the graph handoff import smoke (the shared test database is never reused)
@@ -300,6 +371,21 @@ jobs:
           GRAPH_IMPORT_DB_USER: company_test
           GRAPH_IMPORT_DB_NAME: zoop_graph_import_smoke
         run: make api-graph-handoff-import-smoke
+
+  api:
+    name: api
+    if: always()
+    needs: [api-tests, api-graph-smoke]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require API tests and graph handoff smoke
+        env:
+          TESTS_RESULT: ${{ needs.api-tests.result }}
+          GRAPH_RESULT: ${{ needs.api-graph-smoke.result }}
+        run: |
+          test "$TESTS_RESULT" = success
+          test "$GRAPH_RESULT" = success
   required-ci:
     name: required-ci
     if: always()
@@ -308,10 +394,14 @@ jobs:
       - web
       - app-web
       - bff
+      - ai-pipeline-tests
+      - ai-pipeline-smoke
       - ai-pipeline
       - ai-worker
       - ai-service
       - api-container
+      - api-tests
+      - api-graph-smoke
       - api
     runs-on: ubuntu-24.04
     timeout-minutes: 2
@@ -322,18 +412,26 @@ jobs:
           WEB_RESULT: ${{ needs.web.result }}
           APP_WEB_RESULT: ${{ needs.app-web.result }}
           BFF_RESULT: ${{ needs.bff.result }}
+          AI_PIPELINE_TESTS_RESULT: ${{ needs.ai-pipeline-tests.result }}
+          AI_PIPELINE_SMOKE_RESULT: ${{ needs.ai-pipeline-smoke.result }}
           AI_PIPELINE_RESULT: ${{ needs.ai-pipeline.result }}
           AI_RESULT: ${{ needs.ai-worker.result }}
           AI_SERVICE_RESULT: ${{ needs.ai-service.result }}
           API_CONTAINER_RESULT: ${{ needs.api-container.result }}
+          API_TESTS_RESULT: ${{ needs.api-tests.result }}
+          API_GRAPH_RESULT: ${{ needs.api-graph-smoke.result }}
           API_RESULT: ${{ needs.api.result }}
         run: |
           test "$PUBLIC_RESULT" = success
           test "$WEB_RESULT" = success
           test "$APP_WEB_RESULT" = success
           test "$BFF_RESULT" = success
+          test "$AI_PIPELINE_TESTS_RESULT" = success
+          test "$AI_PIPELINE_SMOKE_RESULT" = success
           test "$AI_PIPELINE_RESULT" = success
           test "$AI_RESULT" = success
           test "$AI_SERVICE_RESULT" = success
           test "$API_CONTAINER_RESULT" = success
+          test "$API_TESTS_RESULT" = success
+          test "$API_GRAPH_RESULT" = success
           test "$API_RESULT" = success

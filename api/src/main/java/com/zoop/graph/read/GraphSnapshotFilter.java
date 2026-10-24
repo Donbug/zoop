@@ -39,12 +39,21 @@ public final class GraphSnapshotFilter {
         Set<String> cited = new HashSet<>();
         issues.forEach(i -> { cited.addAll(i.evidenceIds()); cited.addAll(i.geographyEvidenceIds()); });
         relations.forEach(r -> cited.addAll(r.evidenceIds()));
-        Set<String> basisArticles = new HashSet<>();
+        Set<String> membershipArticles = new HashSet<>();
         relations.forEach(r -> r.basis().forEach(b -> b.articles().forEach(a ->
-                basisArticles.add(a.articleId() + "@" + a.articleVersion()))));
+                membershipArticles.add(a.articleId() + "@" + a.articleVersion()))));
+        Set<String> impactCitations = relations.stream().filter(r -> "INVOLVES".equals(r.relationType()))
+                .flatMap(r -> r.evidenceIds().stream()).collect(Collectors.toSet());
+        // Preserve candidates for receipt-proven impact quotes, but only for INVOLVES edges inside this round.
+        // These spans are not added to an issue or relation's evidence ids and confer no membership on their own.
+        for (Evidence span : s.evidence()) {
+            if (impactCitations.contains(span.evidenceId())) {
+                membershipArticles.add(span.articleId() + "@" + span.articleVersion());
+            }
+        }
         var evidence = s.evidence().stream().filter(e -> cited.contains(e.evidenceId())
-                || basisArticles.contains(e.articleId() + "@" + e.articleVersion())).toList();
-        Set<String> articles = new HashSet<>(basisArticles);
+                || membershipArticles.contains(e.articleId() + "@" + e.articleVersion())).toList();
+        Set<String> articles = new HashSet<>(membershipArticles);
         evidence.forEach(e -> articles.add(e.articleId() + "@" + e.articleVersion()));
         issues.forEach(i -> i.mentions().forEach(m -> articles.add(m.articleId() + "@" + m.articleVersion())));
         return new PublicGraphSnapshot(s.snapshotFormat(), s.versionId(), s.sourceBundleId(),

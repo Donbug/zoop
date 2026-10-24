@@ -22,11 +22,15 @@ export default function MapDetailSheet({
   children,
   onClose,
   suspended = false,
+  tutorial,
+  tutorialLocked = false,
 }: {
   open: boolean;
   children: ReactNode;
   onClose: () => void;
   suspended?: boolean;
+  tutorial?: ReactNode;
+  tutorialLocked?: boolean;
 }) {
   const appearance = useContext(GraphAppearanceContext);
   const mobile = useSyncExternalStore(subscribe, mobileSnapshot, () => false);
@@ -74,6 +78,7 @@ export default function MapDetailSheet({
   if (!mobile) return <>{children}</>;
   return createPortal(
     <div
+      hidden={suspended}
       className={`${appearance ? mapAppearanceStyles(appearance) : ''} ${suspended ? 'hidden' : ''}`}
     >
       <div
@@ -88,8 +93,8 @@ export default function MapDetailSheet({
         aria-modal="true"
         aria-label="지도 상세"
         data-screen-id="M-GRP-01"
-        data-snap={full ? 'full' : 'half'}
-        className={`fixed inset-x-0 bottom-0 z-50 flex flex-col overflow-hidden rounded-t-xl border border-panel-line bg-white font-panel text-panel-ink shadow-xl outline-none motion-reduce:transition-none [&>aside]:min-h-0! [&>aside]:w-full! [&>aside]:flex-1! ${full ? 'h-[90dvh]' : 'h-[50dvh]'}`}
+        data-snap={full || tutorialLocked ? 'full' : 'half'}
+        className={`fixed inset-x-0 bottom-0 z-50 flex flex-col overflow-hidden rounded-t-xl border border-panel-line bg-white font-panel text-panel-ink shadow-xl outline-none motion-reduce:transition-none [&>aside]:min-h-0! [&>aside]:w-full! [&>aside]:flex-1! ${full || tutorialLocked ? 'h-[90dvh]' : 'h-[50dvh]'}`}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             event.stopPropagation();
@@ -118,7 +123,9 @@ export default function MapDetailSheet({
       >
         <button
           type="button"
-          aria-label={full ? '시트 작게 보기' : '시트 크게 보기'}
+          aria-label={
+            full || tutorialLocked ? '시트 작게 보기' : '시트 크게 보기'
+          }
           className="flex min-h-8 shrink-0 touch-none items-center justify-center focus-visible:outline-2"
           onClick={() => {
             if (dragged.current) {
@@ -174,6 +181,7 @@ export default function MapDetailSheet({
             ×
           </button>
         </div>
+        {tutorial}
         {children}
       </div>
     </div>,

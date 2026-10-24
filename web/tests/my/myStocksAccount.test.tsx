@@ -9,7 +9,8 @@ import {
   type MockInstance,
 } from 'vitest';
 import MyStocksPage from '@/pages/my/MyStocksPage';
-import { apiError, createFakeServer } from '../support/fakeServer';
+import { connectedPortfolioBody, SAMSUNG_HOLDING } from '../support/fixtures';
+import { apiError, createFakeServer, json } from '../support/fakeServer';
 import { myMember } from '../support/myMember';
 import { renderRoutes } from '../support/renderRoutes';
 
@@ -103,6 +104,27 @@ describe('D-MY-01 / 01b 내 종목: 보유 종목과 계좌 연결', () => {
         .getByRole('link', { name: '삼성전자 기업 상세' })
         .getAttribute('href'),
     ).toBe('/companies/cmp-samsung');
+  });
+
+  test('보유 종목의 알려진 기업 ID에 해당하는 로고를 표시한다', async () => {
+    const server = createFakeServer();
+    myMember(server, { connected: true });
+    server.on('GET', '/api/v1/portfolio', () =>
+      json(
+        connectedPortfolioBody([
+          { ...SAMSUNG_HOLDING, companyId: 'KRX:005930' },
+        ]),
+      ),
+    );
+    openMy();
+
+    const section = await holdingsSection();
+    const logo = await within(section).findByRole('link', {
+      name: '삼성전자, 지도에서 보기',
+    });
+    expect(logo.querySelector('img')?.getAttribute('src')).toBe(
+      '/graph-assets/samsung.svg',
+    );
   });
 
   test('연결하기는 내 종목 안에서 연결 기능을 열고, 연결하면 돌아와 보유 종목을 보여 준다', async () => {

@@ -19,8 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class JdbcGraphVersionRepository implements GraphVersionRepository {
-    /** Shared publication lock (ERD v6 section 24): pointer changes and their history are serialized. */
-    static final long PUBLICATION_LOCK = 0x7a6f6f7067726170L;
+    /**
+     * Shared publication lock (ERD v6 section 24): pointer changes and their history are serialized, and review decisions
+     * (global revision) take the same lock.
+     */
+    public static final long PUBLICATION_LOCK = 0x7a6f6f7067726170L;
     private static final String SELECT = """
             SELECT v.id, v.sequence, v.kind, v.snapshot_artifact_id, a.storage_uri, a.sha256, v.active
             FROM graph_versions v JOIN artifacts a ON a.id = v.snapshot_artifact_id
