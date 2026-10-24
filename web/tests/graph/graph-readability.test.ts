@@ -7,7 +7,7 @@ import {
 } from '@/components/graph/graph-readability';
 import { toG6Data } from '@/components/graph/graph-model';
 import { createMockGraph } from '@/mocks/graph/response';
-import type { Graph } from '@antv/g6';
+import type { Graph, GraphData } from '@antv/g6';
 
 const context: ReadingContext = {
   zoom: 0.53,
@@ -165,4 +165,32 @@ test('R1 renderer integration measures actual label bounds and hides labels with
   expect(graph.updateNodeData).toHaveBeenCalledWith(
     expect.arrayContaining([expect.objectContaining({ id: 'KRX:005930' })]),
   );
+});
+
+test('R1 queued reading updates preserve live drag coordinates and current edge styles', async () => {
+  const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const base = toG6Data(data, 1200, 700);
+  const node = base.nodes![0];
+  const edge = base.edges![0];
+  const live = { ...node.style, x: 900, y: 777 };
+  const liveEdge = { ...edge.style, stroke: '#123456', lineWidth: 7 };
+  const graph = {
+    destroyed: false,
+    updateNodeData: (updates: NonNullable<GraphData['nodes']>) => {
+      Object.assign(live, updates.find((n) => n.id === node.id)?.style);
+    },
+    updateEdgeData: (updates: NonNullable<GraphData['edges']>) => {
+      Object.assign(liveEdge, updates.find((e) => e.id === edge.id)?.style);
+    },
+    draw: async () => {},
+    getCanvas: () => ({ document: { getElementById: () => null } }),
+  } as unknown as Graph;
+  // The reading queue still holds base while drag has already moved the live model.
+  await Promise.resolve().then(() =>
+    applyGraphReading(graph, base, data, context),
+  );
+  expect([live.x, live.y]).toEqual([900, 777]);
+  expect(live.labelFontSize).toBeGreaterThanOrEqual(13 / context.zoom);
+  expect(liveEdge.stroke).toBe('#123456');
+  expect(liveEdge.lineWidth).toBe(7);
 });

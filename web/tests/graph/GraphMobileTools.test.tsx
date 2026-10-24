@@ -40,3 +40,28 @@ test('M-GRP-01 mobile menu switches arrangement, respects focus lock and closes 
     ).disabled,
   ).toBe(true);
 });
+
+test('M-GRP-01 keyboard arrangement returns focus to the visible disclosure trigger', async () => {
+  vi.stubGlobal('matchMedia', () => ({
+    matches: true,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+  const change = vi.fn();
+  render(
+    <GraphMobileTools flow={false} onFlowChange={change} focusActive={false} />,
+  );
+  const user = userEvent.setup();
+  await user.tab();
+  const summary = screen.getByText('···').closest('summary')!;
+  expect(document.activeElement).toBe(summary);
+  await user.keyboard('{Enter}');
+  await user.tab();
+  expect(document.activeElement).toBe(
+    screen.getByRole('button', { name: '흐름 순으로 정렬' }),
+  );
+  await user.keyboard('{Enter}');
+  expect(change).toHaveBeenCalledWith(true);
+  expect(summary.closest('details')!.open).toBe(false);
+  expect(document.activeElement).toBe(summary);
+});

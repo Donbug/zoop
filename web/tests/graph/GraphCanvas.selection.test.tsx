@@ -178,6 +178,65 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     );
   });
 
+  it('D-GRP-01 restores a dragged single-company issue after it folds and expands again', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const issue = data.nodes.find(
+      (n) =>
+        n.kind === 'issue' &&
+        !n.isFocus &&
+        data.edges.filter((e) => e.source === n.id || e.target === n.id)
+          .length === 1 &&
+        !data.edges.some(
+          (e) =>
+            e.relationType === 'FOLLOWS' &&
+            (e.source === n.id || e.target === n.id),
+        ),
+    )!;
+    expect(issue).toBeTruthy();
+    const view = render(
+      <GraphCanvas
+        data={data}
+        memoryOwner="folded-owner"
+        selectedId={issue.id}
+      />,
+    );
+    const rendered = () =>
+      canvas.setData.mock.lastCall?.[0].nodes as NonNullable<
+        GraphData['nodes']
+      >;
+    await waitFor(() =>
+      expect(rendered()?.some((n) => n.id === issue.id)).toBe(true),
+    );
+    await act(async () => {
+      canvas.handlers.get('node:dragstart')!({ target: { id: issue.id } });
+      const node = rendered().find((n) => n.id === issue.id)!;
+      node.style!.x = 970;
+      node.style!.y = 880;
+      canvas.handlers.get('node:dragend')!({ target: { id: issue.id } });
+    });
+    view.rerender(
+      <GraphCanvas
+        data={data}
+        memoryOwner="folded-owner"
+        selectedId="KRX:005930"
+      />,
+    );
+    await waitFor(() =>
+      expect(rendered().some((n) => n.id === issue.id)).toBe(false),
+    );
+    view.rerender(
+      <GraphCanvas
+        data={data}
+        memoryOwner="folded-owner"
+        selectedId={issue.id}
+      />,
+    );
+    await waitFor(() => {
+      const node = rendered().find((n) => n.id === issue.id);
+      expect([node?.style?.x, node?.style?.y]).toEqual([970, 880]);
+    });
+  });
+
   it('D-GRP-01 double click fits the visible neighborhood and tutorial blocks drag and double click', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const view = render(<GraphCanvas data={data} />);

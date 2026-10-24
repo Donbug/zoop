@@ -197,11 +197,25 @@ export async function applyGraphReading(
 ) {
   if (graph.destroyed || typeof graph.getCanvas !== 'function') return;
   const styles = readingStyles(base, data, context);
+  // Reading work can run after a drag. Never replay cached geometry or relation
+  // presentation into the current model; only labels and badges belong here.
+  const labelStyle = (
+    style: Record<string, unknown> | undefined,
+    badges = false,
+  ) =>
+    Object.fromEntries(
+      Object.entries(style ?? {}).filter(
+        ([key]) => key.startsWith('label') || (badges && key === 'badges'),
+      ),
+    );
   graph.updateNodeData(
-    (styles.nodes ?? []).map((n) => ({ id: n.id, style: n.style })),
+    (styles.nodes ?? []).map((n) => ({
+      id: n.id,
+      style: labelStyle(n.style, true),
+    })),
   );
   graph.updateEdgeData(
-    (styles.edges ?? []).map((e) => ({ id: e.id, style: e.style })),
+    (styles.edges ?? []).map((e) => ({ id: e.id, style: labelStyle(e.style) })),
   );
   await graph.draw();
   if (graph.destroyed) return;

@@ -33,12 +33,19 @@ export function savePositions(
   nodes: NonNullable<GraphData['nodes']>,
   width: number,
   height: number,
+  graphNodeIds: ReadonlySet<string>,
 ) {
-  const points = Object.fromEntries(
+  // A rendered subset omits folded issues. Retain those coordinates while the
+  // full response still contains them, and prune nodes removed from this snapshot.
+  const retained = Object.fromEntries(
+    Object.entries(readPositions(key)).filter(([id]) => graphNodeIds.has(id)),
+  );
+  const updated = Object.fromEntries(
     nodes
       .filter(
         (n) =>
           n.id !== '__isolated__' &&
+          graphNodeIds.has(String(n.id)) &&
           Number.isFinite(n.style?.x) &&
           Number.isFinite(n.style?.y),
       )
@@ -48,7 +55,7 @@ export function savePositions(
       ]),
   );
   try {
-    sessionStorage.setItem(key, JSON.stringify(points));
+    sessionStorage.setItem(key, JSON.stringify({ ...retained, ...updated }));
   } catch {
     /* Disabled/quota-limited storage must not break map input. */
   }

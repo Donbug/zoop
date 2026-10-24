@@ -61,7 +61,10 @@ export default function GraphMobileTools({
             className="block! h-auto! min-h-11! w-full! rounded border! border-zoop-line px-3! text-left! text-[13px]! whitespace-nowrap disabled:opacity-50"
             onClick={() => {
               onFlowChange(!flow);
-              if (menu.current) menu.current.open = false;
+              if (menu.current) {
+                menu.current.open = false;
+                menu.current.querySelector('summary')?.focus();
+              }
             }}
           >
             흐름 순으로 정렬

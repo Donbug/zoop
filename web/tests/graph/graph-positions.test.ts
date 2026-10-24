@@ -10,7 +10,13 @@ import { createMockGraph } from '@/mocks/graph/response';
 test('D-GRP-01 coordinate memory isolates owner, scope, snapshot and arrangement', () => {
   const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
   const key = positionKey('member-a', data, 'map');
-  savePositions(key, [{ id: 'a', style: { x: 450, y: 300 } }], 800, 600);
+  savePositions(
+    key,
+    [{ id: 'a', style: { x: 450, y: 300 } }],
+    800,
+    600,
+    new Set(['a']),
+  );
   expect(readPositions(key)).toEqual({ a: [50, 0] });
   expect(readPositions(positionKey('member-b', data, 'map'))).toEqual({});
   expect(readPositions(positionKey('member-a', data, 'flow'))).toEqual({});
@@ -52,4 +58,34 @@ test('R4 adding a node places it near known neighbors without moving the known n
     ),
   ).toBeLessThan(400);
   expect(base.nodes[0].style).toEqual({ x: -5000, y: -5000 });
+});
+
+test('D-GRP-01 keeps folded issue coordinates in the snapshot and prunes removed response nodes', () => {
+  const key = 'folded-snapshot';
+  savePositions(
+    key,
+    [
+      { id: 'company', style: { x: 420, y: 330 } },
+      { id: 'issue', style: { x: 650, y: 480 } },
+      { id: 'removed', style: { x: 200, y: 200 } },
+    ],
+    800,
+    600,
+    new Set(['company', 'issue', 'removed']),
+  );
+  savePositions(
+    key,
+    [{ id: 'company', style: { x: 440, y: 340 } }],
+    800,
+    600,
+    new Set(['company', 'issue']),
+  );
+  expect(readPositions(key)).toEqual({ company: [40, 40], issue: [250, 180] });
+  const restored = restorePositions(
+    { nodes: [{ id: 'issue', style: { x: 0, y: 0 } }] },
+    readPositions(key),
+    1000,
+    800,
+  );
+  expect(restored.nodes?.[0].style).toEqual({ x: 750, y: 580 });
 });

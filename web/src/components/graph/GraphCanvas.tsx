@@ -229,6 +229,7 @@ export default function GraphCanvas({
       nodes,
       host.clientWidth,
       host.clientHeight,
+      new Set(data.nodes.map((node) => node.id)),
     );
     if (renderedData.current) {
       const positions = new Map(nodes.map((n) => [n.id, n.style]));
@@ -863,6 +864,7 @@ export default function GraphCanvas({
             rendered.nodes ?? [],
             host.clientWidth,
             host.clientHeight,
+            new Set(data.nodes.map((node) => node.id)),
           );
         scheduleReading();
       })
