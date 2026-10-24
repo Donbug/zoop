@@ -73,7 +73,7 @@ export default function GraphVersions() {
         {stale && (
           <div
             role="alert"
-            className="flex flex-wrap items-center gap-3 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-wash px-4 py-3"
+            className="flex flex-wrap items-center gap-3 rounded-2xl bg-zoop-soft px-4 py-3"
           >
             <p className="min-w-0 flex-1 text-xs">
               목록을 읽는 사이 표시 버전이 바뀌었어요. 다시 불러와서 확인해
@@ -141,13 +141,13 @@ export default function GraphVersions() {
                 <tr
                   key={version.id}
                   className={
-                    version.id === activeVersionId ? 'bg-zoop-wash' : undefined
+                    version.id === activeVersionId ? 'bg-zoop-soft' : undefined
                   }
                 >
                   <td className={`${TD} font-inter font-semibold break-all`}>
                     {version.id}
                     {version.kind === 'fixture' && (
-                      <span className="ml-2 rounded-[3px] border-[0.667px] border-zoop-line px-1.5 py-0.5 text-[10px] font-normal text-zoop-muted">
+                      <span className="ml-2 rounded-full bg-zoop-soft px-2 py-1 text-[10px] font-normal text-zoop-muted">
                         합성
                       </span>
                     )}

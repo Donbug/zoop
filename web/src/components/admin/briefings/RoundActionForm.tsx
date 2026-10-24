@@ -142,7 +142,7 @@ export default function RoundActionForm({
       noValidate
       aria-label={copy.title}
       onSubmit={(event) => void submit(event)}
-      className="flex flex-col gap-3 rounded-[3px] border-[0.667px] border-zoop-ink bg-zoop-paper p-4"
+      className="flex flex-col gap-3 rounded-2xl bg-zoop-soft p-5"
     >
       <div className="flex flex-col gap-0.5">
         <p className="text-sm font-bold">{copy.title}</p>
