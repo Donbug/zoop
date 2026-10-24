@@ -35,7 +35,7 @@ public class PublicGraphReader {
         SelectedGraphVersion selected = selector.select(round, graphVersion, asOf, requestId);
         PublicGraphSnapshot snapshot = store.load(selected.version());
         PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot,
-                selected.asOfRequested() ? selected.asOf() : null, exclusions.current(),
+                selected.asOfRequested() ? selected.asOf() : null, exclusions.current(selected.version().id()),
                 selected.briefing() != null && selected.briefing().reconstruction() != null);
         var basis = selected.briefing();
         if (basis != null) {

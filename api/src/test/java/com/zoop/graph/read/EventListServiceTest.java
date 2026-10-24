@@ -44,7 +44,7 @@ class EventListServiceTest {
             Object id = ((MapSqlParameterSource) call.getArgument(1)).getValue("id");
             return Set.of(HYNIX, HANMI).contains(id) ? 1 : 0;
         });
-        service = new EventListService(GraphReadFixtures.reader(NOW, () -> DisclosureExclusions.NONE), jdbc,
+        service = new EventListService(GraphReadFixtures.reader(NOW, pinned -> DisclosureExclusions.NONE), jdbc,
                 JsonMapper.builder().build());
     }
 
@@ -125,7 +125,7 @@ class EventListServiceTest {
             public Instant instant() { return NOW.plusSeconds(ticks.incrementAndGet()); }
         };
         var reader = new PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
-                clock), version -> snapshot, () -> DisclosureExclusions.NONE);
+                clock), version -> snapshot, pinned -> DisclosureExclusions.NONE);
         NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
         var paged = new EventListService(reader, jdbc, JsonMapper.builder().build());
 
