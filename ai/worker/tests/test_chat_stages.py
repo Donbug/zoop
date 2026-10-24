@@ -164,6 +164,15 @@ def test_nothing_is_sent_without_the_live_gate_or_a_key(tmp_path):
     assert run(request("chat-router", router_input()), tmp_path, endpoint).status == "succeeded"
 
 
+def test_a_key_that_cannot_travel_in_a_header_is_refused_before_anything_is_reserved(tmp_path):
+    endpoint = Endpoint(jev_all())
+    for bad in ("jev-key-synthetic ", " jev-key-synthetic", "jev-key	synthetic"):
+        refused = run(request("chat-router", router_input()), tmp_path, endpoint, env={**LIVE, "TYPESAFE_API_KEY": bad})
+        assert refused.failure.code == "provider_key_invalid" and not refused.failure.sent and not refused.failure.unknown
+    assert endpoint.calls == []
+    assert run(request("chat-router", router_input()), tmp_path, endpoint).status == "succeeded", "nothing was reserved"
+
+
 def test_the_router_goes_to_jev_with_the_jev_key_and_records_a_receipt(tmp_path):
     endpoint = Endpoint(jev_all(0.9))
     result = run(request("chat-router", router_input()), tmp_path, endpoint)

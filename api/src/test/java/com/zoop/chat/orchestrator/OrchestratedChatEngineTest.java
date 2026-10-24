@@ -309,12 +309,12 @@ class OrchestratedChatEngineTest {
     void aModelStageStartsOnlyWhenTheTimeLeftCoversItAndEverythingAfterIt() {
         decision = ChatPlannerTest.decision(req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
                 List.of(HYNIX)));
-        var tooLate = new Control(Duration.ofSeconds(37));
+        var tooLate = new Control(Duration.ofSeconds(52));
         assertFailed("transient", "deadline_guard", true, engine().answer(run(), tooLate));
         assertEquals(0, tooLate.modelCalls);
 
-        // Enough for router + generation + verification + server (38 s), not for tools + generation + verification + server (44 s).
-        var noTools = new Control(Duration.ofSeconds(40));
+        // Enough for router + generation + verification + server (53 s), not for tools + generation + verification + server (54 s).
+        var noTools = new Control(Duration.ofSeconds(53));
         assertFailed("transient", "deadline_guard", true, engine().answer(run(), noTools));
         assertEquals(1, noTools.modelCalls);
         assertTrue(noTools.reserved.isEmpty());
