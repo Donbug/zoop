@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import tools.jackson.databind.JsonNode;
@@ -23,6 +24,7 @@ public final class BriefingHttpSchemas {
             @Schema(nullable = true) String graphVersion, List<BriefingItem> items,
             @Schema(oneOf = {AnalysisSummary.class, Unavailable.class}) JsonNode marketSummary,
             @Schema(description = "선정 기업별 조건부 사업 전망. 과거 발행본에는 없을 수 있습니다.", implementation = CompanyOutlooks.class) JsonNode companyOutlooks,
+            @Schema(nullable = true, description = "근거·실제 직전 판단에 결속된 산업 판단 갱신. selected와 이전 기업 watch를 구분하고 자동 검증 및 편집 범위를 표시합니다.", implementation = JudgmentUpdate.class) JsonNode judgmentUpdate,
             @Schema(oneOf = {MarketVariables.class, Unavailable.class}) JsonNode marketVariables,
             @Schema(nullable = true, oneOf = {SinceMorning.class, Unavailable.class}) JsonNode sinceMorning,
             @Schema(nullable = true, oneOf = {PreviousComparison.class, Unavailable.class},
@@ -32,6 +34,15 @@ public final class BriefingHttpSchemas {
             BriefingReferences references, BriefingMetadata metadata, @Schema(nullable = true) BriefingOutlook outlook,
             @Schema(nullable = true, description = "선택적 조용한 회차 정책. 핵심·참고·복기·수집부족을 구분하며 원 발행 문안을 바꾸지 않습니다.") BriefingContinuity continuity) { }
 
+
+    @Schema(name = "JudgmentUpdate")
+    public record JudgmentUpdate(String schemaVersion, String status, String roundId, String edition, Instant cutoff,
+            String previousRoundId, Instant previousCutoff, String companyResultVersion, String previousResultVersion,
+            String resultVersion, Instant generatedAt, String scopeNote, CompanyStatement conclusion, CompanyStatement industryChange,
+            CompanyStatement limits, List<JudgmentCompany> companies, Map<String, JsonNode> sources, JsonNode editorialReview, String reason) { }
+    public record JudgmentCompany(String companyId, String companyName, String role, String decision, List<String> sourceIds,
+            JsonNode previousJudgment, String previousResultVersion, CompanyStatement newEvidence, CompanyStatement reason,
+            CompanyStatement strengthenIf, CompanyStatement weakenIf, CompanyStatement topic, CompanyStatement title, CompanyStatement description) { }
 
     @Schema(name = "BriefingContinuity")
     public record BriefingContinuity(String schemaVersion, String roundId, Instant cutoff,

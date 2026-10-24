@@ -370,3 +370,13 @@ API 앱 검사기는 루트 Makefile(`api-test`/`api-build`/`api-ai-smoke`)과 C
 | 쓰기 멱등성·AI 작업 계약·감사 기록 | 해당 쓰기·AI·관리자 기능 담당 | 해당 기능 완료 전 |
 
 기업별 문안 품질 개선과 동일 입력 비교: [판단·새 사실·다음 확인 조건](docs/BRIEFING_COMPANY_READING_V2.md). 새 생성은 company-outlook-v4 / company-reading-v2를 사용하며 기존 발행본은 보존합니다.
+
+### 비교 판단 갱신과 이전 기업 추적
+
+선정 목록의 `previousComparison`/`sinceMorning`은 그대로 사건 포함 여부 비교입니다. 선택적 `judgmentUpdate`는 별도 저장 스냅샷으로, 실제 직전 회사 판단 → 전체 보존 원문 → 이번 해석 → 강화/약화 확인 조건을 제공합니다. `selected`는 현재 핵심 기업, `watch`는 직전 기업의 미해결 조건 추적이며 신규 선정으로 취급하지 않습니다. 이전 판단이 없으면 `initial/unassessable`, 추가 근거가 없는 watch는 `maintained/unassessable`만 허용합니다.
+
+`scripts/briefing_judgment_update.py --baseline <완료 bundle 폴더> --sources <고정 sources.jsonl> --output <새 private 폴더> --round-id <현재 회차> --authorization-ref <기존 실행 승인 참조> --run-id <새 실행 ID> --max-calls <승인된 전체 상한>`으로 먼저 유료 호출 없는 입력 계획을 확인합니다. 명시적 `--execute --key-file <서버 전용 키 파일>` 실행은 생성1·독립검증1회이며 실패 시 초안은 공개하지 않고 자동 재호출하지 않습니다. 완료 실행은 요청 identity와 bundle SHA가 같을 때 0회 재사용합니다. 승인 call/비용 상한은 기존 전체 원장과 함께 관리해야 합니다.
+
+짧은 인용만 모델에 전달하지 않습니다. 기존 인용과 동일한 문서 SHA의 전체 본문을 넣고 길이 초과를 묵시적으로 자르지 않습니다. 원문 조건 완전성·과거 판단 실재성·해석 범위·카드 일치를 사실 지지와 별도로 검증합니다. 원발행 시각으로 재생하는 자료는 늦은 수집/당시 본문 동일성 미입증 표시를 유지합니다. 기록된 요청/응답/스키마/프롬프트/토큰과 이전 판단·원문 SHA를 import 때 다시 대조합니다.
+
+수동 편집은 원 AI 초안과 시도를 수정하지 않고 `editorialReview`에 전후 문장·근거 ID·검토자·시각·입력 SHA를 남깁니다. 편집 적용 문구를 독립 모델 검증 통과라고 표시하지 않습니다. 기존 발행본/ERD/migration은 덮어쓰지 않으며 개발 재생은 별도 DB에서 실행합니다.

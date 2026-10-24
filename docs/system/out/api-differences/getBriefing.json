@@ -1194,6 +1194,289 @@
       "const": "unavailable"
     },
     "response:200:application/json.items[].summary<anyOf:1>.status:required": true,
+    "response:200:application/json.judgmentUpdate": {
+      "type": "object"
+    },
+    "response:200:application/json.judgmentUpdate.companies": {
+      "type": "array"
+    },
+    "response:200:application/json.judgmentUpdate.companies:required": false,
+    "response:200:application/json.judgmentUpdate.companies[]": {
+      "type": "object"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].companyId": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].companyId:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].companyName": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].companyName:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].decision": {
+      "type": "string",
+      "enum": [
+        "initial",
+        "maintained",
+        "strengthened",
+        "weakened",
+        "unassessable"
+      ]
+    },
+    "response:200:application/json.judgmentUpdate.companies[].decision:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].description": {
+      "type": "object"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].description.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.judgmentUpdate.companies[].description.evidenceIds:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].description.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].description.text": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].description.text:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].description:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].newEvidence": {
+      "type": "object"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].newEvidence.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.judgmentUpdate.companies[].newEvidence.evidenceIds:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].newEvidence.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].newEvidence.text": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].newEvidence.text:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].newEvidence:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].previousJudgment": {
+      "type": "object"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].previousJudgment:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].previousResultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].previousResultVersion:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].reason": {
+      "type": "object"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].reason.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.judgmentUpdate.companies[].reason.evidenceIds:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].reason.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].reason.text": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].reason.text:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].reason:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].role": {
+      "type": "string",
+      "enum": [
+        "selected",
+        "watch"
+      ]
+    },
+    "response:200:application/json.judgmentUpdate.companies[].role:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].sourceIds": {
+      "type": "array"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].sourceIds:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].sourceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].strengthenIf": {
+      "type": "object"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].strengthenIf.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.judgmentUpdate.companies[].strengthenIf.evidenceIds:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].strengthenIf.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].strengthenIf.text": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].strengthenIf.text:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].strengthenIf:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].title": {
+      "type": "object"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].title.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.judgmentUpdate.companies[].title.evidenceIds:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].title.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].title.text": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].title.text:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].title:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].topic": {
+      "type": "object"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].topic.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.judgmentUpdate.companies[].topic.evidenceIds:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].topic.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].topic.text": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].topic.text:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].topic:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].weakenIf": {
+      "type": "object"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].weakenIf.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.judgmentUpdate.companies[].weakenIf.evidenceIds:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].weakenIf.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].weakenIf.text": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companies[].weakenIf.text:required": true,
+    "response:200:application/json.judgmentUpdate.companies[].weakenIf:required": true,
+    "response:200:application/json.judgmentUpdate.companyResultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.companyResultVersion:required": true,
+    "response:200:application/json.judgmentUpdate.conclusion": {
+      "type": "object"
+    },
+    "response:200:application/json.judgmentUpdate.conclusion.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.judgmentUpdate.conclusion.evidenceIds:required": true,
+    "response:200:application/json.judgmentUpdate.conclusion.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.conclusion.text": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.conclusion.text:required": true,
+    "response:200:application/json.judgmentUpdate.conclusion:required": false,
+    "response:200:application/json.judgmentUpdate.cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.judgmentUpdate.cutoff:required": true,
+    "response:200:application/json.judgmentUpdate.edition": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.edition:required": true,
+    "response:200:application/json.judgmentUpdate.editorialReview": {
+      "type": "object"
+    },
+    "response:200:application/json.judgmentUpdate.editorialReview:required": false,
+    "response:200:application/json.judgmentUpdate.generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.judgmentUpdate.generatedAt:required": true,
+    "response:200:application/json.judgmentUpdate.industryChange": {
+      "type": "object"
+    },
+    "response:200:application/json.judgmentUpdate.industryChange.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.judgmentUpdate.industryChange.evidenceIds:required": true,
+    "response:200:application/json.judgmentUpdate.industryChange.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.industryChange.text": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.industryChange.text:required": true,
+    "response:200:application/json.judgmentUpdate.industryChange:required": false,
+    "response:200:application/json.judgmentUpdate.limits": {
+      "type": "object"
+    },
+    "response:200:application/json.judgmentUpdate.limits.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.judgmentUpdate.limits.evidenceIds:required": true,
+    "response:200:application/json.judgmentUpdate.limits.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.limits.text": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.limits.text:required": true,
+    "response:200:application/json.judgmentUpdate.limits:required": false,
+    "response:200:application/json.judgmentUpdate.previousCutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.judgmentUpdate.previousCutoff:required": true,
+    "response:200:application/json.judgmentUpdate.previousResultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.previousResultVersion:required": true,
+    "response:200:application/json.judgmentUpdate.previousRoundId": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.previousRoundId:required": true,
+    "response:200:application/json.judgmentUpdate.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.reason:required": false,
+    "response:200:application/json.judgmentUpdate.resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.resultVersion:required": true,
+    "response:200:application/json.judgmentUpdate.roundId": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.roundId:required": true,
+    "response:200:application/json.judgmentUpdate.schemaVersion": {
+      "type": "string",
+      "enum": [
+        "zoop-judgment-update-v1"
+      ]
+    },
+    "response:200:application/json.judgmentUpdate.schemaVersion:required": true,
+    "response:200:application/json.judgmentUpdate.scopeNote": {
+      "type": "string"
+    },
+    "response:200:application/json.judgmentUpdate.scopeNote:required": true,
+    "response:200:application/json.judgmentUpdate.sources": {
+      "type": "object"
+    },
+    "response:200:application/json.judgmentUpdate.sources:required": false,
+    "response:200:application/json.judgmentUpdate.status": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "WITHHELD"
+      ]
+    },
+    "response:200:application/json.judgmentUpdate.status:required": true,
+    "response:200:application/json.judgmentUpdate:required": false,
     "response:200:application/json.marketSummary<anyOf:0>": {
       "type": "object"
     },

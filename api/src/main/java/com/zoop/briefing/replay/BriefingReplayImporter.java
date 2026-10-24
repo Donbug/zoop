@@ -711,6 +711,14 @@ public final class BriefingReplayImporter {
             Map<String, JsonNode> cardReceipts = cardLayer == null ? Map.of() : simulationReceiptLedger(cardLayer.objects("receipts"));
             require(companyRows.keySet().containsAll(cardRows.keySet()), "card_company_rounds");
             Set<String> cardOwned = new HashSet<>();
+            StrictJson.Obj judgmentLayer = presentation.root().has("judgmentUpdateLayer") ? presentation.root().object("judgmentUpdateLayer") : null;
+            if (judgmentLayer != null) require(BriefingJudgmentUpdateRules.SCHEMA.equals(judgmentLayer.string("schemaVersion"))
+                    && settings.userInboxRef().equals(judgmentLayer.string("authorizationRef")), "judgment_authorization");
+            Map<String, StrictJson.Obj> judgmentRows = new LinkedHashMap<>();
+            if (judgmentLayer != null) for (StrictJson.Obj row : judgmentLayer.objects("rounds"))
+                require(companyRows.containsKey(row.string("roundId")) && judgmentRows.putIfAbsent(row.string("roundId"), row) == null, "judgment_rounds");
+            Map<String, JsonNode> judgmentReceipts = judgmentLayer == null ? Map.of() : simulationReceiptLedger(judgmentLayer.objects("receipts"));
+            Set<String> judgmentOwned = new HashSet<>();
             List<Map<String, StrictJson.Obj>> priorCompanyRows = new ArrayList<>(); List<List<StrictJson.Obj>> priorCompanyHistory = new ArrayList<>();
             if (companyLayer != null && companyLayer.has("previousRuns")) {
                 require(companyLayer.objects("previousRuns").size() <= 2, "company_outlook_history_limit");
@@ -827,6 +835,31 @@ public final class BriefingReplayImporter {
                     BriefingCompanyReadingRules.apply(card, companyRows.get(base.id()), (ObjectNode) snapshot.path("companyOutlooks"), cardReceipts, cardOwned, settings.bundle().getParent());
                     blobs.put(namespace+"-company-card-"+enriched.size(), blob("briefing_input", StrictJson.write(card.node())));
                 }
+                if (judgmentRows.containsKey(base.id())) {
+                    StrictJson.Obj judgment = judgmentRows.get(base.id());
+                    StrictJson.Obj prior = companyHistory.stream().filter(c -> Instant.parse(c.string("cutoff")).isBefore(base.scheduled()))
+                            .max(java.util.Comparator.comparing(c -> Instant.parse(c.string("cutoff")))).orElseThrow();
+                    snapshot.set("judgmentUpdate", BriefingJudgmentUpdateRules.apply(judgment, companyRows.get(base.id()), prior,
+                            detailEvidence, judgmentReceipts, settings.bundle().getParent(), judgmentOwned));
+                    // Watch companies retain their source authority as well as their previous judgment.
+                    if ("PASS".equals(judgment.string("status"))) for (StrictJson.Obj source : judgment.object("frozen").object("sources").node().propertyNames().stream()
+                            .map(id -> judgment.object("frozen").object("sources").object(id)).toList()) {
+                        String sid = source.string("evidenceId"), did = source.string("documentId");
+                        boolean bound = false; for (JsonNode binding : snapshot.path("sourceBindings")) if (did.equals(binding.path("documentId").stringValue())) bound = true;
+                        if (!bound) {
+                            JsonNode binding = enriched.stream().flatMap(r -> r.snapshot().path("sourceBindings").valueStream())
+                                    .filter(b -> did.equals(b.path("documentId").stringValue())).findFirst().orElseThrow();
+                            ((ArrayNode) snapshot.path("sourceBindings")).add(binding.deepCopy());
+                        }
+                        boolean referenced = false; for (JsonNode ref : payload.path("references").path("evidenceIds")) if (sid.equals(ref.stringValue())) referenced = true;
+                        if (!referenced) ((ArrayNode) payload.path("references").path("evidenceIds")).add(sid);
+                    }
+                    Instant finished = Instant.parse(judgment.has("editorialReview") ? judgment.object("editorialReview").string("reviewedAt") : judgment.string("generatedAt"));
+                    if (finished.isAfter(generated)) { generated = finished; payload.put("generatedAt", generated.toString()); }
+                    if (finished.isAfter(publishedAt)) publishedAt = finished;
+                    if (finished.isAfter(created)) created = finished;
+                    blobs.put(namespace + "-judgment-" + enriched.size(), blob("briefing_input", StrictJson.write(judgment.node())));
+                }
                 ObjectNode lineage = snapshot.putObject("presentationEnrichment").put("schemaVersion", BriefingPresentationRules.SCHEMA)
                         .put("baseBundleSha256", presentation.root().string("baseBundleSha256")).put("baseResultSha256", record.string("baseResultSha256"));
                 lineage.put("comparisonBasis", "event_identity");
@@ -838,6 +871,8 @@ public final class BriefingReplayImporter {
             for (StrictJson.Obj market : validatedMarkets) if (market.has("marketContext")) BriefingMarketContextRules.previous(market, validatedMarkets);
             require(accountedMarket.equals(layerReceipts.keySet()), "presentation_unowned_receipt");
             require(companyOwned.equals(companyReceipts.keySet()), "company_outlook_unowned_receipts");
+            require(judgmentOwned.equals(judgmentReceipts.keySet()), "judgment_unowned_receipts");
+            for (var receipt : judgmentReceipts.entrySet()) require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "judgment_duplicate_receipt");
             require(cardOwned.equals(cardReceipts.keySet()), "company_card_unowned_receipts");
             for (var receipt : cardReceipts.entrySet()) require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "company_card_duplicate_receipt");
             require(readingOwned.equals(readingReceipts.keySet()), "company_reading_unowned_receipts");

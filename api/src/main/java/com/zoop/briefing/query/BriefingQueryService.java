@@ -261,6 +261,8 @@ public class BriefingQueryService {
         out.put("status", "published").put("publishedAt", row.publishedAt().toString());
         out.set("dataAsOf", payload.get("dataWindow").get("end").deepCopy());
         out.set("marketSummary", row.publicSnapshot().get("marketSummary").deepCopy());
+        JsonNode judgment = row.publicSnapshot().get("judgmentUpdate");
+        if (judgment != null) out.set("judgmentUpdate", judgment.deepCopy());
         JsonNode companyOutlooks = row.publicSnapshot().get("companyOutlooks");
         if (companyOutlooks != null) out.set("companyOutlooks", companyOutlooks.deepCopy());
         var market = payload.get("marketVariables");

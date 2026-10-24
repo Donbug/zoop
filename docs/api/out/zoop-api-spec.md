@@ -2779,6 +2779,75 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | text | 필수 | string |  |
 | evidenceIds | 필수 | string[] |  |
 
+<a id="schema-judgmentupdate"></a>
+
+### JudgmentUpdate
+
+직전 검증된 회사 판단·회차 마감 이전 보존 원문 전체로 만든 별도 산업 판단 갱신. 같은 기업 비교와 산업 맥락 연결을 구분하고, 이전 기업은 watch로 표시. 과거 원문 수집 시각의 한계와 편집 검토 범위를 보존합니다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 필수 | string {zoop-judgment-update-v1} |  |
+| status | 필수 | string {PASS, WITHHELD} |  |
+| roundId | 필수 | string |  |
+| edition | 필수 | string |  |
+| previousRoundId | 필수 | string |  |
+| companyResultVersion | 필수 | string |  |
+| previousResultVersion | 필수 | string |  |
+| resultVersion | 필수 | string |  |
+| scopeNote | 필수 | string |  |
+| reason | 선택 | string |  |
+| cutoff | 필수 | string (date-time) |  |
+| previousCutoff | 필수 | string (date-time) |  |
+| generatedAt | 필수 | string (date-time) |  |
+| conclusion | 선택 | [CompanyStatement](#schema-companystatement) |  |
+| industryChange | 선택 | [CompanyStatement](#schema-companystatement) |  |
+| limits | 선택 | [CompanyStatement](#schema-companystatement) |  |
+| companies | 선택 | [JudgmentCompany](#schema-judgmentcompany)[] |  |
+| sources | 선택 | object |  |
+| editorialReview | 선택 | object | 선택적 원문 대조 편집 이력. reviewer/reviewedAt/frozenSha256/changes를 보존하며 modelVerificationAppliesTo=pre_edit_draft는 자동 검증이 편집 전 초안에만 적용됐음을 뜻합니다. 편집 뒤 자동검증으로 표현하지 않습니다. |
+
+<a id="schema-judgmentcompany"></a>
+
+### JudgmentCompany
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyId | 필수 | string |  |
+| companyName | 필수 | string |  |
+| role | 필수 | string {selected, watch} |  |
+| decision | 필수 | string {initial, maintained, strengthened, weakened, unassessable} |  |
+| sourceIds | 필수 | string[] |  |
+| previousJudgment | 필수 | object |  |
+| previousResultVersion | 필수 | string |  |
+| newEvidence | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| reason | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| strengthenIf | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| weakenIf | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| topic | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| title | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| description | 필수 | [CompanyStatement](#schema-companystatement) |  |
+
+<a id="schema-judgmentsource"></a>
+
+### JudgmentSource
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| evidenceId | 필수 | string |  |
+| documentId | 필수 | string |  |
+| documentVersion | 필수 | string |  |
+| bodySha256 | 필수 | string |  |
+| quote | 필수 | string |  |
+| publishedAt | 필수 | string (date-time) |  |
+| title | 필수 | string |  |
+| url | 필수 | string (uri) |  |
+| fullBody | 필수 | string | 생성·검증에 실제 사용한 SHA 고정 보존 원문 전체. 당시 수집 본문 동일성을 주장하지 않습니다. |
+
 <a id="schema-companyoutlooks"></a>
 
 ### CompanyOutlooks
@@ -3401,6 +3470,7 @@ The immutable published original of a round (what users saw before any correctio
 | dataAsOf | 필수 | string (date-time) / null |  |
 | graphVersion | 필수 | string / null |  |
 | items | 필수 | [BriefingItem](#schema-briefingitem)[] |  |
+| judgmentUpdate | 선택 | [JudgmentUpdate](#schema-judgmentupdate) | 선택적 비교 판단. 핵심 선정과 별도로 이전 기업의 미해결 조건을 추적하며, 없으면 기존 응답 유지. |
 | companyOutlooks | 선택 | [CompanyOutlooks](#schema-companyoutlooks) | 선정 기업별 사업 전망·조건·근거와 동일 기업의 이전 판단 비교. 과거 발행본에는 없을 수 있습니다. 시장 요약·지표와 별도이며 주가 예측이 아닙니다. |
 | marketSummary | 필수 | [AnalysisSummary](#schema-analysissummary) / [Unavailable](#schema-unavailable) |  |
 | marketVariables | 필수 | [MarketVariables](#schema-marketvariables) / [Unavailable](#schema-unavailable) | KOSPI, KOSDAQ and USD/KRW stored with the published round; unavailable (with the reason) when the round has none |

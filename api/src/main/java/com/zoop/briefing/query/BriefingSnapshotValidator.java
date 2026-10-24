@@ -75,6 +75,7 @@ final class BriefingSnapshotValidator {
         JsonNode snapshot = object(row.publicSnapshot());
         summary(field(snapshot, "marketSummary"), evidence);
         marketAnalysis(field(snapshot, "marketSummary"), row);
+        if (snapshot.has("judgmentUpdate")) com.zoop.briefing.replay.BriefingJudgmentUpdateRules.validateProjection(snapshot.get("judgmentUpdate"), row.id(), row.edition(), row.windowTo());
         if (snapshot.has("companyOutlooks")) companyOutlooks(snapshot.get("companyOutlooks"), row, evidence);
         JsonNode market = field(p, "marketVariables");
         if (!market.isNull()) market(market, row.windowTo());

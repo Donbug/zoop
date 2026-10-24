@@ -9,6 +9,7 @@ import tools.jackson.databind.node.ObjectNode;
 final class BriefingCompanySchemas {
     private BriefingCompanySchemas() { }
     static ObjectNode format(String prefix, String phase, StrictJson.Obj frozen) {
+        if ("judgment_update_".equals(prefix)) return BriefingJudgmentUpdateRules.format(phase, frozen);
         if (!Set.of("company_outlook_", "company_reading_", "company_card_").contains(prefix) || !Set.of("generation", "verification").contains(phase))
             throw new IllegalArgumentException("Unsupported company response schema");
         List<String> ids = frozen.objects("targets").stream().map(t -> t.string("companyId")).toList();
@@ -56,20 +57,20 @@ final class BriefingCompanySchemas {
         ObjectNode format = StrictJson.newObject().put("type", "json_schema").put("name", prefix + phase).put("strict", true);
         format.set("schema", object(outer)); return format;
     }
-    private static ObjectNode object(ObjectNode properties) {
+    static ObjectNode object(ObjectNode properties) {
         ObjectNode schema = StrictJson.newObject().put("type", "object"); schema.set("properties", properties);
         var required = schema.putArray("required"); properties.propertyNames().forEach(required::add);
         schema.put("additionalProperties", false); return schema;
     }
-    private static ObjectNode text(int maximum) { return StrictJson.newObject().put("type", "string").put("minLength", 1).put("maxLength", maximum); }
-    private static ObjectNode choice(List<String> values) {
+    static ObjectNode text(int maximum) { return StrictJson.newObject().put("type", "string").put("minLength", 1).put("maxLength", maximum); }
+    static ObjectNode choice(List<String> values) {
         ObjectNode schema = StrictJson.newObject().put("type", "string"); var options = schema.putArray("enum"); values.forEach(options::add); return schema;
     }
-    private static ObjectNode array(JsonNode item, int minimum, int maximum) {
+    static ObjectNode array(JsonNode item, int minimum, int maximum) {
         ObjectNode schema = StrictJson.newObject().put("type", "array"); schema.set("items", item);
         return schema.put("minItems", minimum).put("maxItems", maximum);
     }
-    private static ObjectNode statement(List<String> evidence, int maximum) {
+    static ObjectNode statement(List<String> evidence, int maximum) {
         ObjectNode props = StrictJson.newObject(); props.set("text", text(maximum));
         props.set("evidenceIds", array(choice(evidence), 1, 6)); return object(props);
     }
