@@ -45,6 +45,18 @@ class PortfolioServiceTest {
     }
 
     @Test
+    void profilePreviewValuesHoldingsWithoutCreatingMemberConnection() {
+        quotes.result = holding -> PortfolioQuoteProvider.QuoteResult.available(
+                new java.math.BigDecimal("100"), "USD", NOW, "Synthetic quotes");
+
+        var preview = service.getProfile("demo-growth", "preview-1");
+
+        assertEquals(2, preview.holdings().size());
+        assertEquals("available", preview.valuation().weightStatus());
+        assertTrue(repository.connections.isEmpty());
+    }
+
+    @Test
     void connectionIsIdempotentAndKeyReuseForDifferentProfileConflicts() {
         var first = service.connect(MEMBER, "demo-growth", "connect-1", "req-1");
         var retry = service.connect(MEMBER, "demo-growth", "connect-1", "req-2");
