@@ -773,21 +773,21 @@ function MapWorkspace({
               onClick={() => setSidebarOpen((open) => !open)}
               title="내가 보유 중인 종목 보기"
             >
-              <GraphIcon name="sidebar" />내 종목
+              <GraphIcon name="sidebar" inheritColor />내 종목
             </button>
             <div className="relationship-mode" aria-label="그래프 모드">
               <button
                 aria-pressed={appliedMode === 'all'}
                 onClick={() => void changeMode('all')}
               >
-                <GraphIcon name="globe" />
+                <GraphIcon name="globe" inheritColor />
                 시장 전체
               </button>
               <button
                 aria-pressed={appliedMode === 'personal'}
                 onClick={() => void changeMode('personal')}
               >
-                <GraphIcon name="personal" />내 종목
+                <GraphIcon name="personal" inheritColor />내 종목
               </button>
             </div>
             <span className="relationship-divider" />

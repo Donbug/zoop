@@ -18,7 +18,7 @@ test('D-GRP-01: default comparison does not change the existing graph', () => {
 });
 
 test.each(['light', 'dark'] as const)(
-  'D-GRP-01: %s candidate preserves graph identities, node sizes and direction while enlarging labels',
+  'D-GRP-01: %s candidate preserves graph identities and direction while enlarging nodes and labels',
   (theme) => {
     const data = toG6Data(
       createMockGraph({ mode: 'all', personalFilter: 'all' }),
@@ -28,11 +28,15 @@ test.each(['light', 'dark'] as const)(
     const before = structuredClone(data);
     const candidate = styleGraph(data, { variant: 'improved', theme });
     expect(data).toEqual(before);
-    expect(
-      candidate.nodes?.map((n) => [n.id, n.style?.size, n.style?.iconSrc]),
-    ).toEqual(data.nodes?.map((n) => [n.id, n.style?.size, n.style?.iconSrc]));
+    expect(candidate.nodes?.map((n) => [n.id, n.style?.iconSrc])).toEqual(
+      data.nodes?.map((n) => [n.id, n.style?.iconSrc]),
+    );
     const nodes = candidate.nodes ?? [];
     for (const [index, node] of nodes.entries()) {
+      expect(Number(node.style?.size)).toBeCloseTo(
+        Number(data.nodes?.[index].style?.size) *
+          (node.data?.kind === 'company' ? 1.15 : 1.1),
+      );
       expect(Number(node.style?.labelFontSize)).toBeGreaterThan(
         Number(data.nodes?.[index].style?.labelFontSize),
       );
@@ -60,12 +64,33 @@ test.each(['light', 'dark'] as const)(
     expect(
       candidate.edges
         ?.filter((e) => !e.style?.lineDash)
-        .every((e) => e.style?.lineWidth === 1.5),
+        .every((e) => e.style?.lineWidth === 1.1),
     ).toBe(true);
     expect(
       candidate.edges
         ?.filter((e) => e.style?.lineDash)
-        .every((e) => e.style?.lineWidth === 1.2),
+        .every((e) => e.style?.lineWidth === 1),
     ).toBe(true);
+  },
+);
+
+test.each(['light', 'dark'] as const)(
+  'D-GRP-01: %s background links stay quiet without changing relation shapes or hit areas',
+  (theme) => {
+    const data = toG6Data(
+      createMockGraph({ mode: 'all', personalFilter: 'all' }),
+      1200,
+      700,
+    );
+    const result = styleGraph(data, { variant: 'improved', theme });
+    result.edges?.forEach((edge, index) => {
+      expect(Number(edge.style?.strokeOpacity)).toBeLessThanOrEqual(0.5);
+      expect(Number(edge.style?.lineWidth)).toBeLessThan(2);
+      expect(edge.style?.lineDash).toEqual(data.edges?.[index].style?.lineDash);
+      expect(edge.style?.endArrow).toBe(data.edges?.[index].style?.endArrow);
+      expect(edge.style?.increasedLineWidthForHitTesting).toBe(
+        data.edges?.[index].style?.increasedLineWidthForHitTesting,
+      );
+    });
   },
 );

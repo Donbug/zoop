@@ -27,6 +27,7 @@ import {
   type GraphView,
   type LegendKey,
   sameViewport,
+  MAP_LAYOUT_REVISION,
 } from './graph-view';
 import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { arrangeFlow, arrangeFocus } from './graph-arrange';
@@ -984,6 +985,7 @@ export default function GraphCanvas({
             zoom: graph.getZoom(),
             position: [position[0], position[1]],
             size: [host.clientWidth, host.clientHeight],
+            layout: MAP_LAYOUT_REVISION,
           },
         },
       });
@@ -1302,7 +1304,7 @@ export default function GraphCanvas({
           <span className="block">연결 없는 사건</span>
         </button>
       )}
-      <div className="relationship-source">
+      <div className="relationship-source [&_p]:break-keep">
         <p>SOURCE · {data.metadata.source}</p>
         <p>
           AS OF{' '}

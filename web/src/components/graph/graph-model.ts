@@ -1,7 +1,7 @@
 import type { GraphData } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
 import { isSelectableRelation } from '@/types/map/relation';
-import layouts from './figma-layout.json';
+import { relationshipPositions } from './relationship-layout';
 import { companyLogo, logoScale, logoBackground } from '@/util/company-logo';
 import { themeColor } from '@/util/theme-color';
 import { separateNodes, shortTitle } from './graph-geometry';
@@ -109,18 +109,6 @@ export function focusNeighborhood(
   return visible;
 }
 
-// Figma 619:1819 / 619:2374 presentation only; API DTOs never contain x/y.
-const issueLayout: Record<string, [number, number, number, number]> = {
-  'HBM4 공급 계약': [559, 218, 302, 301],
-  'HBM3E 12단 경쟁': [756, 113, 341, 261],
-  'ASML 제조 협력 확대': [773, 346, 367, 347],
-  '램프 10억 달러 투자': [951, 329, 527, 234],
-  'FSD 칩 위탁 생산': [832, 426, 334, 178],
-  'AI 통신망 MOU': [1120, 490, 706, 299],
-  'TSMC 2나노 증설': [497, 128, 200, 280],
-  '스냅드래곤 엑시노스 경쟁': [472, 211, 200, 300],
-  'Azure GPU 증설': [517, 543, 400, 400],
-};
 export function toG6Data(
   data: GraphResponse,
   width: number,
@@ -131,10 +119,8 @@ export function toG6Data(
 ): GraphData {
   const summary = graphSummary(data);
   const personal = data.metadata.mode === 'personal';
-  const layout = personal ? layouts.personal : layouts.all;
-  const sx = width / 1245.33,
-    sy = height / 705.33,
-    scale = personal ? 0.69 : 1;
+  const scale = personal ? 0.69 : 1;
+  const positions = relationshipPositions(data);
   const followsIds = new Set(
     data.edges
       .filter((e) => e.relationType === 'FOLLOWS')
@@ -150,55 +136,10 @@ export function toG6Data(
       followsIds.has(n.id),
   );
   const nodeIds = new Set(visible.map((n) => n.id));
-  const positions = new Map<
-    string,
-    { x: number; y: number; size: number; symbol: string | null }
-  >();
-  summary.companyNodes.forEach((n, i) => {
-    const found = layout.find((p) => p.label === n.label);
-    // Real API companies outside the fixture use a deterministic ring layout.
-    positions.set(
-      n.id,
-      found ??
-        (n.label === 'KT'
-          ? {
-              x: personal ? 657 : 1029,
-              y: personal ? 384 : 405,
-              size: 22 * scale,
-              symbol: 'K',
-            }
-          : {
-              x: 623 + Math.cos(i * 2.4) * 360,
-              y: 353 + Math.sin(i * 2.4) * 250,
-              size: 26 * scale,
-              symbol: n.label.slice(0, 1),
-            }),
-    );
-  });
   const result: GraphData = {
-    nodes: visible.map((n, i) => {
-      const company = n.kind === 'company',
-        p = positions.get(n.id),
-        planned = issueLayout[n.label];
-      const neighbors = (summary.incident.get(n.id) ?? [])
-        .map((id) => positions.get(id))
-        .filter((v) => v !== undefined);
-      const x =
-        p?.x ??
-        (planned
-          ? planned[personal ? 2 : 0]
-          : (neighbors.length
-              ? neighbors.reduce((v, n) => v + n.x, 0) / neighbors.length
-              : 1000) +
-            Math.cos(i) * 50);
-      const y =
-        p?.y ??
-        (planned
-          ? planned[personal ? 3 : 1]
-          : (neighbors.length
-              ? neighbors.reduce((v, n) => v + n.y, 0) / neighbors.length
-              : 400) +
-            Math.sin(i) * 50);
+    nodes: visible.map((n) => {
+      const company = n.kind === 'company';
+      const position = positions.get(n.id)!;
       const size = company
         ? companyNodeSize(summary.companyIssueCounts.get(n.id) ?? 0, scale)
         : 7 * scale;
@@ -238,9 +179,9 @@ export function toG6Data(
         type: company ? 'circle' : 'diamond',
         data: { kind: n.kind },
         style: {
-          // Spread positions without inflating node icons or labels.
-          x: width / 2 + (x * sx - width / 2) * 1.75,
-          y: height / 2 + (y * sy - height / 2) * 1.65,
+          // Camera and styling remain independent of relationship placement.
+          x: width / 2 + position.x,
+          y: height / 2 + position.y,
           size,
           fill: company
             ? logo
@@ -256,7 +197,7 @@ export function toG6Data(
           haloStrokeOpacity: 1,
           icon: company,
           iconSrc: logo ?? undefined,
-          iconText: logo ? undefined : (p?.symbol ?? n.label.slice(0, 1)),
+          iconText: logo ? undefined : n.label.slice(0, 1),
           iconWidth: iconSize,
           iconHeight: iconSize,
           iconRadius: logoScale(logo) === 1 ? size / 2 : 0,
