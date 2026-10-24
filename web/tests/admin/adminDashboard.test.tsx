@@ -220,6 +220,7 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
     expect(screen.getByText('실행 0 · 대기 0')).toBeTruthy();
     expect(screen.getByText('성공 28 · 실패 0')).toBeTruthy();
     expect(screen.getByText('갱신 2026-10-06 12:43 KST')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '새로 고침' })).toBeNull();
 
     const briefings = screen.getByRole('table', { name: '브리핑 회차 목록' });
     expect(within(briefings).getByText('2026-10-06 출근')).toBeTruthy();
@@ -447,15 +448,5 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
     expect(await screen.findByText('관리자 로그인 화면')).toBeTruthy();
     expect(location()).toBe('/admin/login');
     expect(useAdminSessionStore.getState().admin).toBeNull();
-  });
-
-  test('새로 고침은 대시보드를 다시 조회한다', async () => {
-    server.on('GET', DASHBOARD, () => json(dashboard()));
-    const { user } = openDashboard();
-
-    await screen.findByText('260건');
-    await user.click(screen.getByRole('button', { name: '새로 고침' }));
-    await screen.findByText('260건');
-    expect(server.calls('GET', DASHBOARD)).toHaveLength(2);
   });
 });
