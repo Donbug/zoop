@@ -5,9 +5,9 @@ export type LegendKey =
   'company' | 'issue' | GraphResponse['edges'][number]['relationType'];
 /**
  * 지도 기본 배치(graph-model의 좌표계) 버전. 노드 좌표 계산 방식이 바뀌면 올린다.
- * 2: 관계 기반 배치(#321). 다른 버전에서 저장한 카메라는 새 좌표에 맞지 않아 버린다.
+ * 3: 관계 묶음 사이 여백 압축(#321 후속). 이전 좌표의 카메라는 복원하지 않는다.
  */
-export const MAP_LAYOUT_REVISION = 2;
+export const MAP_LAYOUT_REVISION = 3;
 export type GraphView = {
   hidden: LegendKey[];
   /**
