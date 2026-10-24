@@ -63,7 +63,8 @@ export type ChatAnswerSection = {
 };
 
 export type ChatCitation = {
-  sourceKind: 'article' | 'zoop_doc';
+  /** company_profile: ZOOP's reviewed company catalog text; docId is the company id. */
+  sourceKind: 'article' | 'zoop_doc' | 'company_profile';
   evidenceId: string;
   quote: string;
   articleId: string | null;
