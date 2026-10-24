@@ -83,18 +83,18 @@ worker-build:
 pipeline-install:
 	$(UV) sync --project ai/pipeline --frozen --group dev
 pipeline-test:
-	$(PIPELINE_PYTHON) -m pytest ai/pipeline/tests
+	$(PIPELINE_PYTHON) -m pytest ai/pipeline/tests -n 4 --dist loadfile --durations=30
 pipeline-smoke:
-	$(PIPELINE_PYTHON) ai/pipeline/scripts/ingestion_smoke.py
-	$(PIPELINE_PYTHON) ai/pipeline/scripts/round_smoke.py
-	$(PIPELINE_PYTHON) ai/pipeline/scripts/collection_smoke.py
-	$(PIPELINE_PYTHON) ai/pipeline/scripts/extraction_smoke.py
-	$(PIPELINE_PYTHON) ai/pipeline/scripts/round_enqueue_smoke.py
-	$(PIPELINE_PYTHON) ai/pipeline/scripts/relation_smoke.py
-	$(PIPELINE_PYTHON) ai/pipeline/scripts/dependency_smoke.py
-	$(PIPELINE_PYTHON) ai/pipeline/scripts/graph_handoff_smoke.py
-	$(PIPELINE_PYTHON) ai/pipeline/scripts/handoff_exposure_smoke.py
-	$(PIPELINE_PYTHON) ai/pipeline/scripts/issue_summary_smoke.py
+	time $(PIPELINE_PYTHON) ai/pipeline/scripts/ingestion_smoke.py
+	time $(PIPELINE_PYTHON) ai/pipeline/scripts/round_smoke.py
+	time $(PIPELINE_PYTHON) ai/pipeline/scripts/collection_smoke.py
+	time $(PIPELINE_PYTHON) ai/pipeline/scripts/extraction_smoke.py
+	time $(PIPELINE_PYTHON) ai/pipeline/scripts/round_enqueue_smoke.py
+	time $(PIPELINE_PYTHON) ai/pipeline/scripts/relation_smoke.py
+	time $(PIPELINE_PYTHON) ai/pipeline/scripts/dependency_smoke.py
+	time $(PIPELINE_PYTHON) ai/pipeline/scripts/graph_handoff_smoke.py
+	time $(PIPELINE_PYTHON) ai/pipeline/scripts/handoff_exposure_smoke.py
+	time $(PIPELINE_PYTHON) ai/pipeline/scripts/issue_summary_smoke.py
 .PHONY: pipeline-collection-demo
 # Keeps synthetic loopback collection, prepared documents and exports; never collects external news.
 COLLECTION_DEMO_DIR ?= /tmp/zoop-collection-demo
@@ -123,7 +123,7 @@ pipeline-build:
 service-install:
 	$(UV) sync --project ai/service --frozen --group dev
 service-test:
-	$(SERVICE_PYTHON) -m pytest ai/service/tests
+	$(SERVICE_PYTHON) -m pytest ai/service/tests -n 4 --dist load --durations=30
 service-smoke:
 	$(SERVICE_PYTHON) ai/service/scripts/service_smoke.py
 # S2 extraction jobs and the S3 relation jobs over the real installed pipeline (needs `make pipeline-install` AND `make service-install`; fails, never skips, without them).
