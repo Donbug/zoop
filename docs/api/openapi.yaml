@@ -8587,6 +8587,108 @@ components:
         - "source"
         - "recentErrors"
         - "note"
+    AiUsageDay:
+      properties:
+        date:
+          type: "string"
+          format: "date"
+          description: "KST 날짜 YYYY-MM-DD"
+        features:
+          items:
+            "$ref": "#/components/schemas/AiUsageDayFeature"
+          type: "array"
+      type: "object"
+      required:
+        - "date"
+        - "features"
+      description: "하루(KST) 동안의 기능별 모델 사용량(getAiUsage.daily). 집계 window 경계 이상 asOf 이하의 ai_executions를 started_at 기준으로 고른 뒤, started_at을 KST 날짜로 변환해 귀속한다. 자정을 넘어 끝나거나 나중에 영수증이 확인된 실행도 시작일에 남는다. running·unknown 실행은 호출 수 모집단에 포함하되 아직 모르는 토큰·비용은 0이 아니라 null이다."
+    AiUsageDayFeature:
+      properties:
+        feature:
+          type: "string"
+          description: "ai_executions.feature (chatbot, briefing, briefing-outlook, news-analysis, document-sentiment). 귀속 규칙은 getAiUsage 설명과 같다."
+        modelCalls:
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
+          description: "execution_mode=live인 실제 외부 모델 시도 수. replay·save_only는 넣지 않는다. 모르면 null"
+        inputTokens:
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
+        outputTokens:
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
+        actualCost:
+          anyOf:
+            -
+              type: "number"
+            -
+              type: "null"
+          description: "실제 청구액. 모르면 0이 아니라 null. 통화는 AiUsageResponse.cost.currency"
+        estimatedCost:
+          anyOf:
+            -
+              type: "number"
+            -
+              type: "null"
+          description: "추정액. 모르면 0이 아니라 null"
+      type: "object"
+      required:
+        - "feature"
+        - "modelCalls"
+        - "inputTokens"
+        - "outputTokens"
+        - "actualCost"
+        - "estimatedCost"
+    AiUsageMembers:
+      properties:
+        totalMembers:
+          type: "integer"
+          description: "집계 기간 끝 기준 가입 회원 수(탈퇴 제외)"
+        aiMembers:
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
+          description: "기간 안에 회원 단위로 셀 수 있는 AI 기능을 한 번이라도 쓴 회원 수(중복 제거). 측정하지 않으면 null"
+        chatbotMembers:
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
+          description: "기간 안에 챗봇 질문을 한 회원 수(chat_sessions.member_id 중복 제거). 측정하지 않으면 null"
+        briefingMembers:
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
+          description: "기간 안에 브리핑을 읽은 회원 수. 회원별 읽음 기록이 없으면 null"
+        note:
+          anyOf:
+            -
+              type: "string"
+            -
+              type: "null"
+          description: "집계 기준 설명(예: 게스트 제외)"
+      type: "object"
+      required:
+        - "totalMembers"
+        - "aiMembers"
+        - "chatbotMembers"
+        - "briefingMembers"
+        - "note"
+      description: "AI 사용 회원 수(getAiUsage.members). 화면은 각 값을 totalMembers로 나눠 비율을 보여 준다."
     AiUsageResponse:
       properties:
         asOf:
@@ -8609,6 +8711,22 @@ components:
           type: "array"
         cost:
           "$ref": "#/components/schemas/FeatureCost"
+        daily:
+          anyOf:
+            -
+              items:
+                "$ref": "#/components/schemas/AiUsageDay"
+              type: "array"
+            -
+              type: "null"
+          description: "제안(2026-10-24, A-ADM-04b 날짜별 그래프): 집계 기간의 KST 날짜별·기능별 모델 사용량. ai_executions.started_at이 요청 window 경계 이상 asOf 이하인 실행을 started_at의 KST 날짜에 귀속한다. 24h·7d·30d의 첫날과 마지막 날은 window 경계에 따라 일부 시간만 포함할 수 있다. 오래된 날짜부터 정렬하고, 사용 기록이 없는 날도 빠뜨리지 않는다. 서버가 아직 집계하지 않으면 필드를 생략하거나 null이다."
+        members:
+          anyOf:
+            -
+              "$ref": "#/components/schemas/AiUsageMembers"
+            -
+              type: "null"
+          description: "제안(2026-10-24, A-ADM-04b 사용 회원 비율): 집계 기간에 AI 기능을 쓴 회원 수. 서버가 아직 집계하지 않으면 필드를 생략하거나 null이다."
       type: "object"
       required:
         - "asOf"

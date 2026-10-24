@@ -2999,6 +2999,46 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | recentErrors | 필수 | [RecentError](#schema-recenterror)[] |  |
 | note | 필수 | string |  |
 
+<a id="schema-aiusageday"></a>
+
+### AiUsageDay
+
+하루(KST) 동안의 기능별 모델 사용량(getAiUsage.daily). 집계 window 경계 이상 asOf 이하의 ai_executions를 started_at 기준으로 고른 뒤, started_at을 KST 날짜로 변환해 귀속한다. 자정을 넘어 끝나거나 나중에 영수증이 확인된 실행도 시작일에 남는다. running·unknown 실행은 호출 수 모집단에 포함하되 아직 모르는 토큰·비용은 0이 아니라 null이다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| date | 필수 | string (date) | KST 날짜 YYYY-MM-DD |
+| features | 필수 | [AiUsageDayFeature](#schema-aiusagedayfeature)[] |  |
+
+<a id="schema-aiusagedayfeature"></a>
+
+### AiUsageDayFeature
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| feature | 필수 | string | ai_executions.feature (chatbot, briefing, briefing-outlook, news-analysis, document-sentiment). 귀속 규칙은 getAiUsage 설명과 같다. |
+| modelCalls | 필수 | integer / null | execution_mode=live인 실제 외부 모델 시도 수. replay·save_only는 넣지 않는다. 모르면 null |
+| inputTokens | 필수 | integer / null |  |
+| outputTokens | 필수 | integer / null |  |
+| actualCost | 필수 | number / null | 실제 청구액. 모르면 0이 아니라 null. 통화는 AiUsageResponse.cost.currency |
+| estimatedCost | 필수 | number / null | 추정액. 모르면 0이 아니라 null |
+
+<a id="schema-aiusagemembers"></a>
+
+### AiUsageMembers
+
+AI 사용 회원 수(getAiUsage.members). 화면은 각 값을 totalMembers로 나눠 비율을 보여 준다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| totalMembers | 필수 | integer | 집계 기간 끝 기준 가입 회원 수(탈퇴 제외) |
+| aiMembers | 필수 | integer / null | 기간 안에 회원 단위로 셀 수 있는 AI 기능을 한 번이라도 쓴 회원 수(중복 제거). 측정하지 않으면 null |
+| chatbotMembers | 필수 | integer / null | 기간 안에 챗봇 질문을 한 회원 수(chat_sessions.member_id 중복 제거). 측정하지 않으면 null |
+| briefingMembers | 필수 | integer / null | 기간 안에 브리핑을 읽은 회원 수. 회원별 읽음 기록이 없으면 null |
+| note | 필수 | string / null | 집계 기준 설명(예: 게스트 제외) |
+
 <a id="schema-aiusageresponse"></a>
 
 ### AiUsageResponse
@@ -3012,6 +3052,8 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | features | 필수 | [AiFeature](#schema-aifeature)[] |  |
 | pastRuns | 필수 | [PastRun](#schema-pastrun)[] |  |
 | cost | 필수 | [FeatureCost](#schema-featurecost) |  |
+| daily | 선택 | [AiUsageDay](#schema-aiusageday)[] / null | 제안(2026-10-24, A-ADM-04b 날짜별 그래프): 집계 기간의 KST 날짜별·기능별 모델 사용량. ai_executions.started_at이 요청 window 경계 이상 asOf 이하인 실행을 started_at의 KST 날짜에 귀속한다. 24h·7d·30d의 첫날과 마지막 날은 window 경계에 따라 일부 시간만 포함할 수 있다. 오래된 날짜부터 정렬하고, 사용 기록이 없는 날도 빠뜨리지 않는다. 서버가 아직 집계하지 않으면 필드를 생략하거나 null이다. |
+| members | 선택 | [AiUsageMembers](#schema-aiusagemembers) / null | 제안(2026-10-24, A-ADM-04b 사용 회원 비율): 집계 기간에 AI 기능을 쓴 회원 수. 서버가 아직 집계하지 않으면 필드를 생략하거나 null이다. |
 
 <a id="schema-approvalout"></a>
 
