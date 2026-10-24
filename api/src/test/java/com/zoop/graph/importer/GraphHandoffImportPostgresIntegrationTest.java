@@ -115,6 +115,9 @@ class GraphHandoffImportPostgresIntegrationTest {
         jdbc.update("DELETE FROM artifacts WHERE kind = 'graph_snapshot' AND id LIKE 'artifact-fixture-%'");
         jdbc.update("DELETE FROM companies WHERE id LIKE 'SYNTH:%'");
         jdbc.update("DELETE FROM companies WHERE id = ?", HandoffFixtures.ISSUE);
+        // A rule a test switched on goes back off (rules are kept, so this is a switch, not a delete).
+        jdbc.update("UPDATE publication_rules SET enabled = false, revision = revision + 1, updated_at = now() "
+                + "WHERE enabled AND id IN ('single-source@1', 'speculative-issue@1')");
     }
 
     @BeforeEach
@@ -213,7 +216,8 @@ class GraphHandoffImportPostgresIntegrationTest {
         assertEquals(2L, ((Number) row.get("relation_count")).longValue());
         assertEquals(1L, ((Number) row.get("article_count")).longValue());
         assertEquals("artifact-" + versionId, row.get("snapshot_artifact_id"));
-        assertEquals(null, row.get("rule_revision"));
+        // Fixed with the rules it was filtered with (none enabled here): never NULL, which marks a version staged before rules.
+        assertEquals(0L, ((Number) row.get("rule_revision")).longValue());
 
         // Both artifacts are registered at their stored files; the evidence points at the retained receipt.
         assertEquals(1, count("SELECT count(*) FROM artifacts WHERE id = ? AND kind = 'graph_snapshot'", "artifact-" + versionId));
@@ -630,6 +634,95 @@ class GraphHandoffImportPostgresIntegrationTest {
             assertEquals(0, count("SELECT count(*) FROM evidence WHERE article_id = ?", HandoffFixtures.ARTICLE_ID));
         } finally {
             pool.shutdownNow();
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------------ publication rules ----
+
+    @Test
+    void theSeededRulesAreOffSoAnImportFixesBothRevisionsAndFiltersNothing() {
+        assertEquals(List.of(Map.of("id", "single-source@1", "enabled", false, "default_enabled", false),
+                Map.of("id", "speculative-issue@1", "enabled", false, "default_enabled", false)),
+                jdbc.queryForList("SELECT id, enabled, default_enabled FROM publication_rules "
+                        + "WHERE id IN ('single-source@1', 'speculative-issue@1') ORDER BY id"));
+        long ruleRevision = jdbc.queryForObject("SELECT COALESCE(MAX(log_revision), 0) FROM publication_rule_changes", Long.class);
+        long reviewRevision = jdbc.queryForObject("SELECT COALESCE(MAX(global_revision), 0) FROM review_decisions", Long.class);
+
+        assertTrue(importer.run(built.request()).succeeded());
+
+        assertEquals(Map.of("rule_revision", ruleRevision, "review_revision", reviewRevision, "issue_count", 1L,
+                "relation_count", 2L), jdbc.queryForMap("SELECT rule_revision, review_revision, issue_count, relation_count "
+                        + "FROM graph_versions WHERE id = ?", built.versionId()));
+        assertEquals(0, count("SELECT count(*) FROM graph_version_rules WHERE graph_version_id = ?", built.versionId()));
+    }
+
+    @Test
+    void anEnabledRuleIsRecordedWithItsVersionAndTheStoredSnapshotIsFiltered() throws Exception {
+        // The fixture's INVOLVES and structural relation both rest on one article: single-source@1 hides both, and the issue with them.
+        jdbc.update("UPDATE publication_rules SET enabled = true, revision = revision + 1, updated_at = now() "
+                + "WHERE id = 'single-source@1'");
+
+        GraphHandoffResult result = importer.run(built.request());
+
+        assertTrue(result.succeeded(), () -> String.valueOf(result.failure() == null ? null : result.failure().failure()));
+        String versionId = built.versionId();
+        assertEquals(List.of("single-source@1"), jdbc.queryForList(
+                "SELECT rule_id FROM graph_version_rules WHERE graph_version_id = ? ORDER BY rule_id", String.class, versionId));
+        assertEquals(Map.of("issue_count", 0L, "relation_count", 0L, "article_count", 0L), jdbc.queryForMap(
+                "SELECT issue_count, relation_count, article_count FROM graph_versions WHERE id = ?", versionId));
+        assertEquals(3, count("SELECT count(*) FROM evidence WHERE article_id = ?", HandoffFixtures.ARTICLE_ID),
+                "every span is registered, hidden or not");
+        assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update(
+                "UPDATE graph_version_rules SET rule_id = 'speculative-issue@1' WHERE graph_version_id = ?", versionId));
+
+        // Switched off again, the same pins are the same version: it keeps the rule it was filtered with.
+        jdbc.update("UPDATE publication_rules SET enabled = false, revision = revision + 1, updated_at = now() "
+                + "WHERE id = 'single-source@1'");
+        GraphHandoffResult again = importer.run(built.request());
+        assertTrue(again.succeeded());
+        assertEquals(GraphHandoffResult.Outcome.UNCHANGED, again.staged().outcome());
+        // The result reports the version's own facts, read back from its row and its rules, not the switched state.
+        assertEquals(List.of("single-source@1"), again.staged().rules().applied());
+        assertEquals(jdbc.queryForObject("SELECT rule_revision FROM graph_versions WHERE id = ?", Long.class, versionId),
+                again.staged().rules().ruleRevision());
+        assertEquals(2, again.staged().rules().hiddenRelations());
+        assertEquals(0L, jdbc.queryForObject("SELECT relation_count FROM graph_versions WHERE id = ?", Long.class, versionId));
+    }
+
+    @Test
+    void anImportNeverWaitsForThePublicationLock() throws Exception {
+        // Held by another session for the whole import, as a rule switch, a review decision or an activation would hold it.
+        try (java.sql.Connection other = context.getBean(javax.sql.DataSource.class).getConnection();
+                java.sql.Statement statement = other.createStatement()) {
+            statement.execute("SELECT pg_advisory_lock(" + JdbcGraphVersionRepository.PUBLICATION_LOCK + ")");
+            ExecutorService pool = Executors.newSingleThreadExecutor();
+            try {
+                GraphHandoffResult result = pool.submit(() -> importer.run(built.request())).get(30, TimeUnit.SECONDS);
+                assertTrue(result.succeeded(), "the import finished while the publication lock was held elsewhere");
+            } finally {
+                pool.shutdownNow();
+                statement.execute("SELECT pg_advisory_unlock(" + JdbcGraphVersionRepository.PUBLICATION_LOCK + ")");
+            }
+        }
+    }
+
+    @Test
+    void theEvaluatorsRuleIdPatternIsTheTablesIdCheck() {
+        // Ids no row has yet (an existing id would be refused by the primary key, not by the check).
+        for (String id : List.of("probe-rule@1", "a@1", "A_b-9@123456789", "r@0", "r@01", "r@1234567890", "1r@1", "-r@1",
+                "r", "@1", "r@", "r@1@2", "r s@1", "가@1", "r@1\n", "a".repeat(64) + "@1", "a".repeat(65) + "@1")) {
+            boolean accepted;
+            try {
+                accepted = Boolean.TRUE.equals(transaction.execute(status -> {
+                    status.setRollbackOnly();
+                    jdbc.update("INSERT INTO publication_rules (id, title, summary, definition, default_enabled, enabled, "
+                            + "updated_at) VALUES (?, 't', 's', '{}', false, false, now())", id);
+                    return true;
+                }));
+            } catch (org.springframework.dao.DataIntegrityViolationException refused) {
+                accepted = false;
+            }
+            assertEquals(com.zoop.graph.rules.PublicationRuleEvaluator.RULE_ID.matcher(id).matches(), accepted, id);
         }
     }
 }

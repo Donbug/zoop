@@ -7,6 +7,7 @@ import {
   within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useRef } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AiChatDrawer from '@/components/ai/AiChatDrawer';
@@ -670,6 +671,55 @@ describe('D-AI-02 · job states and stored results', () => {
     ).toBeTruthy();
   });
 
+  it('shows a company profile citation with its catalog title and publisher and links only a safe homepage', async () => {
+    const profile = (evidenceId: string, url: string | null) => ({
+      sourceKind: 'company_profile' as const,
+      evidenceId,
+      quote: '삼성전자(KRX:005930) 사업 개요: 메모리 반도체 기업이다.',
+      articleId: null,
+      articleVersion: null,
+      docId: 'KRX:005930',
+      docVersion: null,
+      start: 0,
+      end: 30,
+      articleTitle: '삼성전자 기업 개요',
+      publisher: '줍 기업 카탈로그',
+      publishedAt: null,
+      url,
+    });
+    const answered = job({
+      question: '삼성전자는 어떤 기업이야?',
+      result: result({
+        answer: 'x',
+        answerBasis: 'evidence_grounded',
+        sections: [
+          {
+            basis: 'evidence_grounded',
+            text: '삼성전자는 메모리 반도체 기업입니다.',
+            evidenceIds: ['ev-p1', 'ev-p2'],
+          },
+        ],
+        citations: [
+          profile('ev-p1', 'https://www.samsung.com/sec/'),
+          profile('ev-p2', 'javascript:alert(1)'),
+        ],
+      }),
+    });
+    server.on('GET', CURRENT, () => json(conversation([answered])));
+    await open();
+    const card = await screen.findByRole('article', {
+      name: '삼성전자는 어떤 기업이야?',
+    });
+    expect(
+      within(card).getAllByText(/삼성전자 기업 개요 · 줍 기업 카탈로그/),
+    ).toHaveLength(2);
+    const links = within(card).getAllByRole('link', { name: /기업 홈페이지/ });
+    expect(links.map((link) => link.getAttribute('href'))).toEqual([
+      'https://www.samsung.com/sec/',
+    ]);
+    expect(within(card).queryByRole('link', { name: /원문 보기/ })).toBeNull();
+  });
+
   it('shows a withheld answer as the server sent it, without a basis badge', async () => {
     const withheld = job({
       result: result({
@@ -894,6 +944,40 @@ describe('D-AI-02b · conversation read failure', () => {
     await screen.findByRole('article', { name: '회수된 질문' });
     expect(server.calls('GET', CURRENT)).toHaveLength(2);
     expect(server.calls('POST', JOBS)).toHaveLength(0);
+  });
+});
+
+describe('focus', () => {
+  it('returns focus to the map when the opener is gone, as when another screen opened the drawer', async () => {
+    server.on('GET', CURRENT, () => json(conversation([])));
+    function MapStub() {
+      const region = useRef<HTMLElement>(null);
+      return (
+        <>
+          <section ref={region} tabIndex={-1} aria-label="관계 지도" />
+          <AiChatDrawer returnFocusTo={region} />
+        </>
+      );
+    }
+    (document.activeElement as HTMLElement | null)?.blur();
+    useAiChatStore.getState().open(undefined);
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <MapStub />
+      </MemoryRouter>,
+    );
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('heading', { name: 'AI에게 묻기' }),
+      ),
+    );
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('region', { name: '관계 지도' }),
+      ),
+    );
   });
 });
 

@@ -13,7 +13,7 @@ const dark =
 
 // D-GRP-01/03: restore the local matte treatment with Tailwind, without CSS blocks.
 const matte =
-  '[&_.relationship-header_nav_a]:text-[13px]! [&_.relationship-header_nav_a]:leading-[19.5px]! [&_.company-price-row>.up]:text-zoop-up! [&_.company-price-row>.down]:text-zoop-down! [&_.company-panel]:border-zoop-line [&_.relationship-canvas]:bg-linear-to-br [&_.relationship-canvas]:from-zoop-paper/20 [&_.relationship-canvas]:to-transparent [&_.relationship-canvas]:shadow-inner [&_:is(.relationship-header,.company-panel,.event-panel,.relation-panel)]:bg-linear-to-br [&_:is(.relationship-header,.company-panel,.event-panel,.relation-panel)]:from-zoop-paper/10 [&_:is(.relationship-header,.company-panel,.event-panel,.relation-panel)]:to-transparent [&_:is(.relationship-header,.company-panel,.event-panel,.relation-panel)]:shadow-sm [&_:is(.relationship-mode,.relationship-zoom,.company-panel_button)]:shadow-sm';
+  '[&_.company-price-row>.up]:text-zoop-up! [&_.company-price-row>.down]:text-zoop-down! [&_.company-panel]:border-zoop-line [&_.relationship-canvas]:bg-linear-to-br [&_.relationship-canvas]:from-zoop-paper/20 [&_.relationship-canvas]:to-transparent [&_.relationship-canvas]:shadow-inner [&_:is(.relationship-header,.company-panel,.event-panel,.relation-panel)]:bg-linear-to-br [&_:is(.relationship-header,.company-panel,.event-panel,.relation-panel)]:from-zoop-paper/10 [&_:is(.relationship-header,.company-panel,.event-panel,.relation-panel)]:to-transparent [&_:is(.relationship-header,.company-panel,.event-panel,.relation-panel)]:shadow-sm [&_:is(.relationship-mode,.relationship-zoom,.company-panel_button)]:shadow-sm';
 
 export function mapAppearanceStyles(appearance: GraphAppearance) {
   return appearance.variant === 'improved'

@@ -773,7 +773,8 @@ function MapWorkspace({
               onClick={() => setSidebarOpen((open) => !open)}
               title="내가 보유 중인 종목 보기"
             >
-              <GraphIcon name="sidebar" inheritColor />내 종목
+              <GraphIcon name="sidebar" inheritColor />
+              보유 종목
             </button>
             <div className="relationship-mode" aria-label="그래프 모드">
               <button
@@ -844,10 +845,10 @@ function MapWorkspace({
                 onClick={() => setNotice(notice === 'info' ? '' : 'info')}
                 aria-label="지도 데이터 안내"
               >
-                <GraphIcon name="info" size={15} />
+                <GraphIcon name="info" size={19} />
               </button>
               <button onClick={onStartTutorial} aria-label="튜토리얼 다시 보기">
-                <GraphIcon name="help" size={15} />
+                <GraphIcon name="help" size={19} />
               </button>
             </div>
           </div>
@@ -1330,7 +1331,10 @@ function MapWorkspace({
               </div>
             )}
           </div>
-          <AiChatDrawer onViewOnMap={viewAnswerTarget} />
+          <AiChatDrawer
+            onViewOnMap={viewAnswerTarget}
+            returnFocusTo={mapRegion}
+          />
           <EvidenceDrawer
             onTutorialSkip={
               tutorialOpen && tutorialStep && tutorialStep < 5

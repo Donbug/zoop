@@ -1670,7 +1670,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getVirtualAccountProfile",
       "severity": "difference",
-      "message": "목표만 132 · BFF만 32 · 형식/필수/권한 변경 8",
+      "message": "목표만 177 · BFF만 32 · 형식/필수/권한 변경 8",
       "source": ""
     },
     {

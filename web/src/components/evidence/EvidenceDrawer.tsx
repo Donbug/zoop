@@ -7,6 +7,7 @@ import { useEvidenceData } from '@/hooks/useEvidenceData';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import type { EvidenceResponse } from '@/types/evidence';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import EvidenceAnalysis from './EvidenceAnalysis';
 
 interface Props {
   onReady?: (targetId: string) => void;
@@ -64,6 +65,7 @@ function EvidenceCard({
             {evidence.article.title ?? '문서 제목 미제공'}
           </h3>
           <blockquote>{evidence.quote}</blockquote>
+          <EvidenceAnalysis evidence={evidence} />
           <div className={`${ui.textActions} mt-3`}>
             {href ? (
               <a href={href} target="_blank" rel="noopener noreferrer">

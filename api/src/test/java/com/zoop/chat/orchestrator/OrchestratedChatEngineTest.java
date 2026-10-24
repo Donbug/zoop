@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiFunction;
 
 import com.zoop.chat.dto.ChatResult;
@@ -107,6 +108,28 @@ class OrchestratedChatEngineTest {
         assertEquals(3, control.modelCalls, "router, generator and verifier, each announced");
         assertEquals(List.of("writing", "verifying"), control.phases);
         assertTrue(control.reserved.isEmpty());
+    }
+
+    @Test
+    void everyPathReadCarriesTheFirstTargetWhenTheTargetsAreSplit() {
+        List<List<String>> asked = Collections.synchronizedList(new ArrayList<>());
+        tools.put(ChatCapability.GRAPH_PATH_READ, (scope, request) -> {
+            asked.add(request.targets());
+            return new ChatToolOutput(scope.graphVersionId(), List.of(), List.of(), false, false);
+        });
+        answer = new ChatGeneratedAnswer(List.of(), List.of("r1"), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of());
+        for (int count : List.of(6, 7)) {
+            asked.clear();
+            List<String> targets = java.util.stream.IntStream.range(0, count).mapToObj(i -> "KRX:00000" + i).toList();
+            decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q04, 0.9), Map.of("graph.path.read", 0.9),
+                    targets));
+            engine().answer(run(), new Control(Duration.ofSeconds(60)));
+            assertEquals(Set.of(targets.subList(0, 5), List.copyOf(
+                    java.util.stream.Stream.concat(java.util.stream.Stream.of(targets.getFirst()),
+                            targets.subList(5, count).stream()).toList())), Set.copyOf(asked),
+                    count + " targets: the anchor goes with the rest, never a later target in its place");
+        }
     }
 
     @Test

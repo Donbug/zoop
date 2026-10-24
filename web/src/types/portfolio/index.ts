@@ -67,6 +67,17 @@ export type Portfolio = {
   valuation: PortfolioValuation | null;
 };
 
+/** 연결 전에도 선택한 모의 계좌를 읽기 전용으로 미리 본다. */
+export type MockPortfolioPreview = {
+  id: string;
+  label: string;
+  accountId: string;
+  cash: MockCash | null;
+  asOf: string | null;
+  holdings: Holding[];
+  valuation: PortfolioValuation;
+};
+
 /** 계좌 연결 화면에 들어온 곳. 초기 설정(D-ONB-02)과 내 종목(D-MY-01)을 구분한다. */
 export type PortfolioConnectSource = 'onboarding' | 'my';
 

@@ -17,8 +17,8 @@ const context: ReadingContext = {
   path: new Set(),
 };
 
-test.each([0.1, 0.53, 0.8, 1.5])(
-  'D-GRP-01 LOD at %s keeps visible text >=13px without moving or recoloring nodes',
+test.each([0.1, 0.4, 0.53, 0.8, 1.5])(
+  'D-GRP-01 company and issue labels stay visible at zoom %s with text >=13px without moving or recoloring nodes',
   (zoom) => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const base = toG6Data(data, 1200, 700);
@@ -29,15 +29,23 @@ test.each([0.1, 0.53, 0.8, 1.5])(
       );
       for (const key of ['x', 'y', 'fill', 'iconSrc', 'size'] as const)
         expect(node.style?.[key]).toEqual(base.nodes?.[i].style?.[key]);
-      if (node.data?.kind === 'issue')
-        expect(node.style?.labelVisibility).toBe(
-          zoom < 0.55 ? 'hidden' : 'visible',
-        );
+      expect(node.style?.labelVisibility).toBe('visible');
     }
   },
 );
 
-test('G3/G4 selected neighborhoods, full edge summaries and null vs zero counts', () => {
+test('D-GRP-01 always-visible issue names do not reveal nodes hidden by filters', () => {
+  const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const base = toG6Data(data, 1200, 700);
+  const issue = base.nodes!.find((node) => node.data?.kind === 'issue')!;
+  issue.style = { ...issue.style, visibility: 'hidden' };
+  const result = readingStyles(base, data, { ...context, zoom: 0.4 });
+  expect(
+    result.nodes!.find((node) => node.id === issue.id)?.style?.labelVisibility,
+  ).toBe('hidden');
+});
+
+test('D-GRP-01 selected issue names and zero counts remain, but edge tags stay hidden', () => {
   const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
   const issue = data.nodes.find((n) => n.kind === 'issue')!;
   issue.evidenceCount = 0;
@@ -52,8 +60,11 @@ test('G3/G4 selected neighborhoods, full edge summaries and null vs zero counts'
   expect(selected?.style?.labelVisibility).toBe('visible');
   expect((selected?.style?.badges as { text: string }[])[0].text).toBe('0');
   const edge = result.edges?.find((e) => e.id === data.edges[0].id);
-  expect(edge?.style?.labelText).toBe(data.edges[0].summary);
-  expect(edge?.style?.labelVisibility).toBe('visible');
+  expect(edge?.style?.labelText).toBe('');
+  expect(edge?.style?.labelVisibility).toBe('hidden');
+  expect(data.edges[0].summary).toBe(
+    '승인된 관계의 긴 설명은 생략 없이 줄바꿈해요',
+  );
   issue.evidenceCount = null;
   expect(
     readingStyles(base, data, { ...context, anchor: issue.id }).nodes?.find(
@@ -62,7 +73,7 @@ test('G3/G4 selected neighborhoods, full edge summaries and null vs zero counts'
   ).toEqual([]);
 });
 
-test('G3 dense graphs show only selected/latest six or path/hover labels', () => {
+test('D-GRP-01 dense graphs never show edge tags on zoom, selection, path or hover', () => {
   const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
   const base = toG6Data(data, 1200, 700);
   const edge = base.edges![0];
@@ -84,13 +95,29 @@ test('G3 dense graphs show only selected/latest six or path/hover labels', () =>
       zoom: 2,
       anchor: String(edge.target),
     }).edges?.filter((e) => e.style?.labelVisibility === 'visible'),
-  ).toHaveLength(6);
+  ).toHaveLength(0);
   expect(
     readingStyles(dense, data, {
       ...context,
       path: new Set(['dense-15']),
     }).edges?.find((e) => e.id === 'dense-15')?.style?.labelVisibility,
-  ).toBe('visible');
+  ).toBe('hidden');
+  for (const zoom of [0.1, 0.53, 1, 4]) {
+    const result = readingStyles(base, data, {
+      ...context,
+      zoom,
+      edge: String(edge.id),
+      anchor: String(edge.target),
+      path: new Set([String(edge.id)]),
+    });
+    expect(
+      result.edges?.every(
+        (item) =>
+          item.style?.labelText === '' &&
+          item.style?.labelVisibility === 'hidden',
+      ),
+    ).toBe(true);
+  }
 });
 
 test('R1–R3 culls node and edge labels together, prioritizes selection and avoids other company bodies', () => {

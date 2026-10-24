@@ -62,7 +62,7 @@ export function styleGraph(
             }
           : {}),
         labelFontSize: Number(node.style?.labelFontSize ?? 13) * 1.15,
-        labelFontWeight: 600,
+        labelFontWeight: node.data?.chosen ? 800 : 600,
         fill:
           node.data?.kind === 'company'
             ? node.style?.iconSrc
@@ -71,7 +71,10 @@ export function styleGraph(
             : colors.ink,
         stroke: dark ? '#747478' : '#b8b8b6',
         haloStroke: colors.ink,
-        labelFill: node.data?.kind === 'company' ? colors.muted : colors.ink,
+        labelFill:
+          node.data?.kind === 'company' && !node.data?.chosen
+            ? colors.muted
+            : colors.ink,
         labelBackgroundFill: colors.paper,
         labelBackgroundStroke: dark ? '#6b6b70' : '#bababa',
         // Dimmed nodes fade more on a dark map; keep them legible as context.

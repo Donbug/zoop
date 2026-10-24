@@ -1,6 +1,6 @@
 import type { Graph, GraphData } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
-import { intersects, type Rect } from './graph-geometry';
+import { intersects, screenLabelSize, type Rect } from './graph-geometry';
 
 export type ReadingContext = {
   zoom: number;
@@ -84,31 +84,6 @@ export function readingStyles(
       related.add(String(e.source));
       related.add(String(e.target));
     }
-  const preciseTime = (id: string) => {
-    const node = byId.get(id);
-    return node?.timePrecision && node.timePrecision !== 'unknown'
-      ? (node.eventTime ?? '')
-      : '';
-  };
-  const recent = new Set(
-    (base.edges ?? [])
-      .filter(
-        (e) =>
-          e.style?.visibility !== 'hidden' &&
-          (e.source === context.anchor || e.target === context.anchor),
-      )
-      .sort((a, b) => {
-        const time = (e: typeof a) =>
-          preciseTime(String(e.source)) || preciseTime(String(e.target));
-        return (
-          time(b).localeCompare(time(a)) ||
-          String(a.id).localeCompare(String(b.id))
-        );
-      })
-      .slice(0, 6)
-      .map((e) => String(e.id)),
-  );
-  const edgeData = new Map(data.edges.map((e) => [e.id, e]));
   return {
     nodes: base.nodes?.map((node) => {
       const source = byId.get(String(node.id));
@@ -117,17 +92,18 @@ export function readingStyles(
         node.id === context.focus ||
         context.path.has(String(node.id)) ||
         related.has(String(node.id));
-      const size = Math.max(Number(node.style?.labelFontSize ?? 13), 13 / zoom);
+      const size = Math.max(
+        Number(node.style?.labelFontSize ?? 13),
+        screenLabelSize(node) / zoom,
+      );
       return {
         ...node,
         style: {
           ...node.style,
           labelText: source?.label ?? node.style?.labelText,
+          // D-GRP-01: 기업·사건 이름은 배율로 숨기지 않고 같은 겹침 처리 기준을 사용해요.
           labelVisibility:
-            node.style?.visibility !== 'hidden' &&
-            (source?.kind !== 'issue' || zoom >= 0.55 || emphasized)
-              ? 'visible'
-              : 'hidden',
+            node.style?.visibility !== 'hidden' ? 'visible' : 'hidden',
           labelFontSize: size,
           labelWordWrap: true,
           labelWordWrapWidth: 170 / zoom,
@@ -153,38 +129,15 @@ export function readingStyles(
         },
       };
     }),
-    edges: base.edges?.map((edge) => {
-      const source = edgeData.get(String(edge.id));
-      const emphasized =
-        edge.id === context.edge ||
-        context.path.has(String(edge.id)) ||
-        recent.has(String(edge.id));
-      const visible =
-        edge.style?.visibility !== 'hidden' &&
-        (emphasized ||
-          (!context.anchor &&
-            zoom >= 0.95 &&
-            (base.edges?.length ?? 0) <= 160));
-      return {
-        ...edge,
-        style: {
-          ...edge.style,
-          labelText: source?.summary ?? '',
-          labelVisibility: visible ? 'visible' : 'hidden',
-          labelFontSize: 13 / zoom,
-          labelFontFamily: 'Pretendard Variable',
-          labelFill: base.nodes?.[0]?.style?.labelFill,
-          labelBackground: true,
-          labelBackgroundFill: base.nodes?.[0]?.style?.labelBackgroundFill,
-          labelPadding: [2 / zoom, 4 / zoom],
-          labelOffsetY: -5 / zoom,
-          labelAutoRotate: true,
-          labelWordWrap: true,
-          labelWordWrapWidth: 160 / zoom,
-          labelMaxLines: Math.max(1, (source?.summary ?? '').length),
-        },
-      };
-    }),
+    // D-GRP-01: 사건 이름은 노드에만 표시해요. 호버·선택·확대 뒤에도 선의 태그는 복원하지 않아요.
+    edges: base.edges?.map((edge) => ({
+      ...edge,
+      style: {
+        ...edge.style,
+        labelText: '',
+        labelVisibility: 'hidden',
+      },
+    })),
   };
 }
 
