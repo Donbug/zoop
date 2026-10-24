@@ -574,7 +574,8 @@ def _target_item(target: Target, fetched: Fetched, collected: Collected) -> Item
                                 "collection": collected.wire()})
 
 
-def collect(registry: Path, policy: Policy, request: Request, resolver: Resolver = system_resolver) -> dict:
+def collect(registry: Path, policy: Policy, request: Request, resolver: Resolver = system_resolver, *,
+            fetcher: Fetcher | None = None, validate_response: Callable[[Target, Fetched], None] | None = None) -> dict:
     """Run (or replay) one immutable collection. Returns the stored result plus where the ingestion manifest is."""
     _require_sync_context()
     authority = Authority(registry)
@@ -604,27 +605,37 @@ def collect(registry: Path, policy: Policy, request: Request, resolver: Resolver
             except (ValidationError, KeyError, TypeError) as exc:
                 raise IngestionFailure("collection_namespace_conflict") from exc
             authority.check(request.source_id, request.scope_id, config=config)
+            if fetcher is not None and fetcher.authority_guard is not None:
+                fetcher.authority_guard()
             return {**previous, "replayed": True, "manifestPath": str(Path(source.input_root) / manifest.file)}
-        return _run(authority, source, scope, config, grant, policy, request, request_digest, output, resolver)
+        if fetcher is not None and (fetcher.policy.wire() != policy.wire() or fetcher.hosts != frozenset(source.allowed_hosts)):
+            raise IngestionFailure("collector_fetcher_conflict")
+        return _run(authority, source, scope, config, grant, policy, request, request_digest, output, resolver, fetcher, validate_response)
     finally:
         output.close()
 
 
 
-def _run(authority, source, scope, config, grant, policy, request, request_digest, output: Output, resolver) -> dict:
+def _run(authority, source, scope, config, grant, policy, request, request_digest, output: Output, resolver, fetcher=None, validate_response=None) -> dict:
     started = now()
 
     def current_grant() -> None:
         try:
             authority.check(request.source_id, request.scope_id, config=config)
+            if previous_guard is not None:
+                previous_guard()
         except IngestionFailure as exc:
             raise _AuthorityChanged(exc.code) from exc
 
-    fetcher = Fetcher(policy, source.allowed_hosts, resolver, authority_guard=current_grant)
+    fetcher = fetcher or Fetcher(policy, source.allowed_hosts, resolver)
+    previous_guard = fetcher.authority_guard
+    initial_requests, initial_bytes = fetcher.requests, fetcher.downloaded
+
+    fetcher.authority_guard = current_grant
     base = f"collections/{request.collection_id}"
     outcomes, items, documents = [], [], {}
-    output.begin(request.collection_id)
     try:
+        output.begin(request.collection_id)
         for target in request.targets:
             outcome = {"candidateId": target.candidate_id, "url": canonical_url(target.url)[0], "outcome": "failed", "code": None,
                        "bodySha256": None, "receiptSha256": None}
@@ -633,6 +644,8 @@ def _run(authority, source, scope, config, grant, policy, request, request_diges
             try:
                 fetched = fetcher.fetch(target.url)
                 current_grant()  # Never materialize fetched bytes under a grant revoked during the response.
+                if validate_response is not None:
+                    validate_response(target, fetched)  # Same response, before either receipt or raw body publication.
                 body_hash = byte_hash(fetched.body)
                 # Loopback is reachable only through the explicit synthetic switch; say so instead of calling it an external document.
                 network = "synthetic_loopback" if LOOPBACK_HOSTS & {canonical_url(fetched.requested_url)[1], canonical_url(fetched.final_url)[1]} else "external"
@@ -683,7 +696,7 @@ def _run(authority, source, scope, config, grant, policy, request, request_diges
         result = {"schemaVersion": SCHEMA, "collectionId": request.collection_id, "requestDigest": request_digest, "sourceId": source.source_id,
                   "scopeId": scope.scope_id, "provenance": "collected_http", "state": state, "startedAt": started, "completedAt": now(), "grant": grant,
                   "manifest": {"file": f"{base}/manifest.json", "sha256": byte_hash(manifest_bytes)}, "targets": outcomes,
-                  "usage": {"requests": fetcher.requests, "bytes": fetcher.downloaded, "targets": len(outcomes), "collected": collected_count}}
+                  "usage": {"requests": fetcher.requests - initial_requests, "bytes": fetcher.downloaded - initial_bytes, "targets": len(outcomes), "collected": collected_count}}
         output.write("manifest.json", manifest_bytes)
         output.write("collection.json", canonical(result).encode("utf-8"))
         output.commit(request.collection_id, current_grant)
@@ -691,3 +704,5 @@ def _run(authority, source, scope, config, grant, policy, request, request_diges
     except BaseException:
         output.abort()
         raise
+    finally:
+        fetcher.authority_guard = previous_guard

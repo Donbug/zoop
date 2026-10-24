@@ -247,6 +247,16 @@ python3 -B scripts/materials_smoke.py
 smoke는 실제 수집 파일과 임시 invalid fixture를 실제 CLI로 처리하고 성공 시 관측된 20행·30문항과 proof scope를 출력한다. gold 부재/접근 금지, canonical binding, 잘못된 label·paragraph·annotation 거부를 다룬다. audit 범위는 Python import 이후 command seam의 파일 접근·쓰기·네트워크·자식 프로세스·애플리케이션 환경 조회다. Python 시작이나 argparse의 locale·화면 크기 조회까지 환경 읽기 0으로 주장하지 않는다. 이는 자료 변환 확인이지 정확도나 모델 품질 결과가 아니다. 사람 합의 한국어 gold, 무모델 어휘 검색·방향/시점 순회 baseline, 외부 자료 run/채점 연결과 승인된 live 측정은 남아 있다.
 
 
+### Native corpus의 로컬 사람 검토 준비
+
+`zoop_ai_pipeline.corpus_review_cli prepare`는 현재 native export 권한으로 문서 전체를 휴대 패키지에 보존하고, 채널·ISO 발행 주차별 quota와 round-robin으로 유한한 사람 검토 배치를 만든다. 실행 명령과 닫힌 binding/주석 계약은 [pipeline README의 사람 검토 패키지](../../ai/pipeline/README.md#로컬-사람-검토용-휴대-패키지-corpus_review_cli)를 따른다. native 권한 확인은 pipeline이 담당하며 stdlib evaluation의 기존 scorer나 material adapter에 새 의존성을 넣지 않는다.
+
+`inputs.json`에는 불변 문서·선정 reference만 있고 gold는 없다. 별도 `annotations.template.json`은 `unreviewed`와 `null` 판단으로 시작한다. 사람이 패키지 밖에 복사한 주석을 작성하면 `annotations-check`가 입력 digest·case ID·필수 사람 필드·정확한 Unicode 근거 범위만 확인하고 미검토/검토/제외 건수를 보고한다. 미상 판단은 notes에 기록할 수 있으며 미검토를 오답이나 reject로 계산하지 않는다. 작성된 주석도 운영자 주장이지 사람 독립 검수·합의가 확인된 gold는 아니다.
+
+이는 **사람 검토 준비 기능이며 측정된 품질 결과가 아니다.** 전체 자료는 제한된 수집의 산출물이고 검토 배치도 대표 표본·held-out test·dev/test split이 아니다. 정책브리핑 텍스트를 한국어 기업 공시 gold로 바꿔 부르지 않는다. 자동 entity·edge·정답·score·adjudication은 만들지 않으며 기존 `score`·`verify-score`·`summary-verify-score`의 입력 형식도 아니다. 실제 사람 검토·합의와 평가용 run/채점 연결은 별도 작업이다.
+
+생성 당시 native `read`·`store`·`quote-display`와 외부 권리 증거 pin을 확인하지만 모델 전송·업로드·공개 게시 권한을 부여하지 않는다. corpus plan의 알려진 gate 2·3도 버전 문자열만 믿지 않고, 실제 저장 native body·receipt와 `rights.json`의 모든 사실을 현재 parser로 읽기 전용 재검사해야 한다. 과거 plan을 수정하거나 native 획득·복구를 다시 실행하지 않는다. 옮긴 패키지의 `verify`는 원래 원장·환경·네트워크와 mutable annotation 없이 내부 무결성만 검사한다. 이것을 현재 원격 이용 허가나 발행자 진위 검증으로 해석하지 않는다. 실제 본문과 작성된 주석은 Git 밖에 유지한다.
+
 ### 자료 후보 6종과 권리 경계
 
 | 자료·1차 출처 | 평가 용도 | 현재 상태와 권리·한계 |
