@@ -89,8 +89,10 @@ export function styleGraph(
         style: {
           ...edge.style,
           stroke: follows ? colors.ink : dark ? '#a5a9b1' : '#71757c',
-          lineWidth: shared ? 1.5 : 1.95,
-          strokeOpacity: dimmed ? 0.2 : shared ? 0.75 : 0.95,
+          // D-GRP-01: selected/related G6 states and impact paths supply
+          // their own stronger stroke. Keep background links below that level.
+          lineWidth: shared ? 1 : 1.1,
+          strokeOpacity: dimmed ? 0.12 : shared ? 0.4 : 0.5,
         },
       };
     }),

@@ -1,10 +1,40 @@
 import { expect, test } from 'vitest';
-import { relationshipPositions } from '@/components/graph/relationship-layout';
+import {
+  compactRelationshipGroups,
+  relationshipPositions,
+} from '@/components/graph/relationship-layout';
 import { toG6Data } from '@/components/graph/graph-model';
 import { createMockGraph } from '@/mocks/graph/response';
 
 const distance = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   Math.hypot(a.x - b.x, a.y - b.y);
+
+test('D-GRP-01: packing closes empty space between groups without shrinking internal spacing', () => {
+  const points = new Map([
+    ['a', { x: 0, y: 0 }],
+    ['b', { x: 320, y: 220 }],
+    ['c', { x: 3000, y: 0 }],
+    ['d', { x: 3320, y: 220 }],
+  ]);
+  const before = structuredClone(points);
+  compactRelationshipGroups(points, [
+    ['a', 'b'],
+    ['c', 'd'],
+  ]);
+  for (const [first, second] of [
+    ['a', 'b'],
+    ['c', 'd'],
+  ]) {
+    expect(points.get(second)!.x - points.get(first)!.x).toBeCloseTo(
+      before.get(second)!.x - before.get(first)!.x,
+    );
+    expect(points.get(second)!.y - points.get(first)!.y).toBeCloseTo(
+      before.get(second)!.y - before.get(first)!.y,
+    );
+  }
+  expect(distance(points.get('a')!, points.get('c')!)).toBeLessThan(1000);
+  expect(distance(points.get('a')!, points.get('c')!)).toBeGreaterThan(320);
+});
 
 test('D-GRP-01: connected communities stay closer than disconnected communities', () => {
   const fixture = createMockGraph({ mode: 'all', personalFilter: 'all' });
