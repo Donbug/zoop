@@ -110,6 +110,11 @@ export type CompanyDocument = {
   publishedAt: string | null;
   kind: 'news' | 'disclosure';
   documentSummary?: { text?: string } | null;
+  /** getCompanyDocuments; absent on older/local fixtures, never inferred. */
+  events?: { eventId: string; title: string; relationType: string | null }[];
+  sentiment?: import('@/types/evidence').DocumentSentiment | null;
+  analysisStatus?: import('@/types/evidence').DocumentAnalysisStatus | null;
+  analysisProvenance?: import('@/types/evidence').AnalysisProvenance | null;
 };
 
 export type CompanyDocumentsResponse = {
