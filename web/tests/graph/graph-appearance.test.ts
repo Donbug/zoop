@@ -124,12 +124,20 @@ test.each([
       1200,
       700,
     );
-    const result = styleGraph(data, { variant: 'improved', theme });
+    const dimmedData = structuredClone(data);
+    const dimmedEdge = dimmedData.edges?.[0];
+    if (!dimmedEdge) throw new Error('D-GRP-01 dimmed edge fixture is missing');
+    dimmedEdge.style = { ...dimmedEdge.style, strokeOpacity: 0.05 };
+
+    const result = styleGraph(dimmedData, {
+      variant: 'improved',
+      theme,
+    });
     result.edges?.forEach((edge, index) => {
       const opacity = Number(edge.style?.strokeOpacity);
-      if (Number(data.edges?.[index].style?.strokeOpacity) < 0.1) {
+      if (Number(dimmedData.edges?.[index].style?.strokeOpacity) < 0.1) {
         // G6 inactive state is 0.2: becoming inactive must not brighten a dimmed link.
-        expect(opacity).toBeLessThanOrEqual(0.2);
+        expect(opacity).toBe(0.2);
         return;
       }
       expect(
