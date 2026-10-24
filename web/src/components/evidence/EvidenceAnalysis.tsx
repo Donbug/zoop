@@ -10,8 +10,13 @@ export default function EvidenceAnalysis({
   if (!evidence.article) return null;
   const summaryStatus = evidence.analysisStatus?.summary.status;
   const sentimentStatus = evidence.analysisStatus?.sentiment.status;
+  // 실제 getEvidence는 검증된 저장 요약이 있어도 analysisStatus를 null로 보낸다(EvidenceResponse).
+  // 상태가 없으면 아래 스키마·문서/결과 버전·provenance 검사를 거쳐 보이고, 상태가 명시적으로
+  // available이 아니면(failed·withheld·not_requested 등) 요약을 쓰지 않는다.
   const stored =
-    summaryStatus === 'available' ? evidence.documentSummary : null;
+    summaryStatus == null || summaryStatus === 'available'
+      ? evidence.documentSummary
+      : null;
   const provenance = stored?.provenance ?? evidence.analysisProvenance;
   const authoredReplay =
     provenance?.executionMode === 'replay' &&

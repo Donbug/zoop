@@ -359,6 +359,38 @@ describe('D-GRP-05 · saved document analysis', () => {
     },
   );
 
+  it('31: shows a validated stored summary when the real API omits analysisStatus (null)', async () => {
+    // Real getEvidence (EvidenceResponse/EvidenceService) always sends analysisStatus: null,
+    // even when the latest stored summary is validated.
+    const evidence = evidenceWithAnalysis();
+    evidence.analysisStatus = null;
+    renderEvidence(evidence);
+    await screen.findByText('합성 시험의 문서 내용');
+    expect(screen.getByText('해석 ·')).toBeTruthy();
+  });
+
+  it.each(['document', 'result'] as const)(
+    '31: a null-status summary still needs matching document and result versions (%s)',
+    async (kind) => {
+      const evidence = evidenceWithAnalysis();
+      evidence.analysisStatus = null;
+      if (kind === 'document')
+        evidence.documentSummary!.documentVersion = 'other-version';
+      if (kind === 'result') evidence.resultVersion = 'other-result';
+      renderEvidence(evidence);
+      await screen.findByText(evidence.article!.title!);
+      expect(screen.queryByText('합성 시험의 문서 내용')).toBeNull();
+    },
+  );
+
+  it('31: an explicit non-available summary status keeps the stored summary hidden', async () => {
+    const evidence = evidenceWithAnalysis();
+    evidence.analysisStatus!.summary.status = 'not_requested';
+    renderEvidence(evidence);
+    await screen.findByText(evidence.article!.title!);
+    expect(screen.queryByText('합성 시험의 문서 내용')).toBeNull();
+  });
+
   it('31: shows failure states, not saved hidden result bodies', async () => {
     const evidence = evidenceWithAnalysis();
     evidence.analysisStatus = {
