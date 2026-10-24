@@ -682,7 +682,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
         url: '/?mode=all',
         view: {
           hidden: [],
-          camera: { zoom: 1, position: [0, 0], size: [0, 0] },
+          camera: { zoom: 1, position: [0, 0], size: [0, 0], layout: 2 },
         },
       }),
     );
@@ -815,7 +815,12 @@ describe('D-GRP-02 · canvas selection bridge', () => {
         url: '/?mode=all',
         view: {
           hidden: [],
-          camera: { zoom: 1.8, position: [40, 60], size: [1600, 900] },
+          camera: {
+            zoom: 1.8,
+            position: [40, 60],
+            size: [1600, 900],
+            layout: 2,
+          },
         },
       }),
     );
@@ -833,7 +838,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       url: '/?mode=all',
       view: {
         hidden: [],
-        camera: { zoom: 1.8, position: [40, 60], size: [0, 0] },
+        camera: { zoom: 1.8, position: [40, 60], size: [0, 0], layout: 2 },
       },
     });
     sessionStorage.setItem('zoop.graph.view:member-a:all', saved);
@@ -848,7 +853,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     expect(
       JSON.parse(sessionStorage.getItem('zoop.graph.view:member-a:all')!).view
         .camera,
-    ).toEqual({ zoom: 1.8, position: [40, 60], size: [0, 0] });
+    ).toEqual({ zoom: 1.8, position: [40, 60], size: [0, 0], layout: 2 });
   });
 
   it('enables the desktop minimap only above sixty visible nodes', async () => {

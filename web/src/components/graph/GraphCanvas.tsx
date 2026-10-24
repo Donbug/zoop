@@ -20,6 +20,7 @@ import {
   type GraphView,
   type LegendKey,
   sameViewport,
+  MAP_LAYOUT_REVISION,
 } from './graph-view';
 import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { arrangeFlow, arrangeFocus } from './graph-arrange';
@@ -841,6 +842,7 @@ export default function GraphCanvas({
             zoom: graph.getZoom(),
             position: [position[0], position[1]],
             size: [host.clientWidth, host.clientHeight],
+            layout: MAP_LAYOUT_REVISION,
           },
         },
       });
