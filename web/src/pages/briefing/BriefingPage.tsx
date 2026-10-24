@@ -65,26 +65,11 @@ export default function BriefingPage() {
       >
         <BriefingRoundPicker
           date={date}
-          onChange={(next) => updateQuery({ date: next || null })}
+          edition={edition}
+          onChange={(next, nextEdition) =>
+            updateQuery({ date: next || null, edition: nextEdition })
+          }
         />
-        <div className="flex h-[38px] rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-soft p-[3px] max-sm:w-full">
-          <button
-            type="button"
-            aria-pressed={edition === 'morning'}
-            onClick={() => updateQuery({ edition: 'morning' })}
-            className={EDITION_BUTTON}
-          >
-            ☼ 출근
-          </button>
-          <button
-            type="button"
-            aria-pressed={edition === 'evening'}
-            onClick={() => updateQuery({ edition: 'evening' })}
-            className={EDITION_BUTTON}
-          >
-            ◔ 퇴근
-          </button>
-        </div>
       </div>
 
       <div
