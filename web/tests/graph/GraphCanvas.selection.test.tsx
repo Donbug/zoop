@@ -44,8 +44,8 @@ const canvas = vi.hoisted(() => ({
 vi.mock('@antv/g6', () => ({
   Graph: class {
     destroyed = false;
-    constructor() {
-      canvas.created();
+    constructor(options?: unknown) {
+      canvas.created(options);
     }
     on(name: string, handler: (event: { target: { id: string } }) => void) {
       canvas.handlers.set(name, handler);
@@ -1238,5 +1238,57 @@ describe('D-GRP-02 · canvas selection bridge', () => {
         (edge) => ids.has(edge.source) && ids.has(edge.target),
       ),
     ).toBe(true);
+  });
+
+  it('D-GRP-01 노드 위에서 끌어도 지도를 옮기고, 끈 뒤 손을 뗄 때의 클릭으로 노드를 고르지 않는다', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const onSelect = vi.fn();
+    render(<GraphCanvas data={data} onSelect={onSelect} />);
+    await waitFor(() => expect(canvas.handlers.has('node:click')).toBe(true));
+    const options = canvas.created.mock.lastCall?.[0] as {
+      behaviors: unknown[];
+      node: {
+        state: Record<string, Record<string, unknown>>;
+      };
+    };
+    expect(options.behaviors[0]).toEqual({ type: 'drag-canvas', enable: true });
+    const surface = screen.getByRole('img', { name: /관계 지도:/ });
+
+    fireEvent.pointerDown(surface, { button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(surface, { clientX: 140, clientY: 125 });
+    fireEvent.pointerUp(window, { clientX: 140, clientY: 125 });
+    act(() =>
+      canvas.handlers.get('node:click')!({ target: { id: data.nodes[0].id } }),
+    );
+    act(() => canvas.handlers.get('canvas:click')!({ target: { id: '' } }));
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.pointerDown(surface, { button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerUp(window, { clientX: 101, clientY: 100 });
+    act(() =>
+      canvas.handlers.get('node:click')!({ target: { id: data.nodes[0].id } }),
+    );
+    expect(onSelect).toHaveBeenCalledWith(data.nodes[0].id);
+  });
+
+  it('D-GRP-03 선택 상태가 G6 기본 12px로 이름표를 줄이지 않고, 흐린 노드는 원래 크기로 둔다', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.created).toHaveBeenCalled());
+    const { state } = (
+      canvas.created.mock.lastCall?.[0] as {
+        node: {
+          state: Record<string, Record<string, (datum: unknown) => unknown>>;
+        };
+      }
+    ).node;
+    const datum = {
+      id: 'n',
+      data: { labelBase: 19 },
+      style: { labelFontSize: 26, labelFontWeight: 800 },
+    };
+    expect(state.selected.labelFontSize(datum)).toBe(26);
+    expect(state.selected.labelFontWeight(datum)).toBe(800);
+    expect(state.inactive.labelFontSize(datum)).toBe(19);
   });
 });

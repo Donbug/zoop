@@ -4,11 +4,12 @@ import {
   defaultAppearance,
   appearanceColors,
   styleGraph,
+  readableLabels,
 } from './graph-appearance';
 import { createPortal } from 'react-dom';
 import GraphLegend from './GraphLegend';
 import { themeColor } from '@/util/theme-color';
-import { Graph, type IElementEvent } from '@antv/g6';
+import { Graph, type IElementEvent, type NodeData } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
 import { isSelectableRelation } from '@/types/map/relation';
 import GraphIcon from './GraphIcon';
@@ -149,6 +150,8 @@ export default function GraphCanvas({
   const centerTarget = useRef<string | null>(null);
   const previousSelected = useRef<string | null>(null);
   const preservePositions = useRef(false);
+  // 이름표 최소 크기를 마지막으로 맞춘 확대 수준
+  const labelZoom = useRef(1);
   const [centerSequence, setCenterSequence] = useState(0);
   const renderedData = useRef<ReturnType<typeof toG6Data> | null>(null);
   const syncTutorialMarker = useEffectEvent(() => {
@@ -480,29 +483,33 @@ export default function GraphCanvas({
     drawing.current = drawing.current
       .then(async () => {
         if (graph.destroyed) return;
-        const rendered = styleGraph(
-          toG6Data(
-            data,
-            host.clientWidth,
-            host.clientHeight,
-            selected ?? focusId,
-            [
-              ...(tutorialTargetId ? [tutorialTargetId] : []),
-              ...data.edges
-                .filter((edge) => highlightedEdgeIds.includes(edge.id))
-                .flatMap((edge) => [edge.source, edge.target]),
-              ...(arrangeFocusNow ? focusedNodes : []),
-            ],
-            connectionPath && highlightedEdgeIds.length
-              ? new Set(
-                  data.edges
-                    .filter((e) => highlightedEdgeIds.includes(e.id))
-                    .flatMap((e) => [e.source, e.target]),
-                )
-              : focusedNodes,
+        const rendered = readableLabels(
+          styleGraph(
+            toG6Data(
+              data,
+              host.clientWidth,
+              host.clientHeight,
+              selected ?? focusId,
+              [
+                ...(tutorialTargetId ? [tutorialTargetId] : []),
+                ...data.edges
+                  .filter((edge) => highlightedEdgeIds.includes(edge.id))
+                  .flatMap((edge) => [edge.source, edge.target]),
+                ...(arrangeFocusNow ? focusedNodes : []),
+              ],
+              connectionPath && highlightedEdgeIds.length
+                ? new Set(
+                    data.edges
+                      .filter((e) => highlightedEdgeIds.includes(e.id))
+                      .flatMap((e) => [e.source, e.target]),
+                  )
+                : focusedNodes,
+            ),
+            appearance,
           ),
-          appearance,
+          graph.getZoom(),
         );
+        labelZoom.current = graph.getZoom();
         rendered.edges = rendered.edges?.map((edge) =>
           highlightedEdgeIds.includes(String(edge.id))
             ? {
@@ -740,6 +747,31 @@ export default function GraphCanvas({
     let observer: ResizeObserver | null = null;
     let resizeFrame: number | null = null;
     const clearHover = () => hoverNode(null);
+    // 확대 수준이 바뀌면 이름표 최소 크기를 다시 맞춘다. 좌표·카메라·선택 상태는 그대로 둔다.
+    const refitLabels = () => {
+      const current = graph;
+      if (!current || disposed || current.destroyed) return;
+      labelZoom.current = current.getZoom();
+      drawing.current = drawing.current
+        .then(async () => {
+          if (disposed || current.destroyed) return;
+          const zoom = current.getZoom();
+          labelZoom.current = zoom;
+          const nodes =
+            readableLabels({ nodes: current.getNodeData() }, zoom).nodes ?? [];
+          current.updateNodeData(
+            nodes.map((node) => ({
+              id: node.id,
+              data: node.data,
+              style: { labelFontSize: node.style?.labelFontSize },
+            })),
+          );
+          await current.draw();
+        })
+        .catch(() => {
+          /* the graph may be destroyed while labels are refitted */
+        });
+    };
     let pointerStart: {
       x: number;
       y: number;
@@ -749,11 +781,14 @@ export default function GraphCanvas({
     } | null = null;
     let wheelPending = false;
     let previousZoom = 1;
+    // 누른 뒤 일정 거리 이상 움직였으면 지도 이동이다. 손을 뗄 때 생기는 클릭으로 노드·연결을 고르지 않는다.
+    let dragged = false;
     const pointerDown = (event: PointerEvent) => {
       if (!graph || event.button !== 0) return;
       const bounds = host.getBoundingClientRect();
       const position = graph.getPosition();
       wheelPending = false;
+      dragged = false;
       pointerStart = {
         x: event.clientX,
         y: event.clientY,
@@ -777,6 +812,7 @@ export default function GraphCanvas({
       ) {
         followFit.current = false;
         centerTarget.current = null;
+        dragged = true;
       }
     };
     const pointerUp = (event: PointerEvent) => {
@@ -860,7 +896,8 @@ export default function GraphCanvas({
           toG6Data(data, host.clientWidth, host.clientHeight),
           appearance,
         ),
-        behaviors: ['drag-canvas', 'zoom-canvas'],
+        // D-GRP-01: 빈 곳뿐 아니라 노드·연결 위에서 끌어도 지도를 움직인다(노드 자체는 옮기지 않는다).
+        behaviors: [{ type: 'drag-canvas', enable: true }, 'zoom-canvas'],
         zoomRange: [0.01, 4],
         edge: {
           state: {
@@ -903,7 +940,14 @@ export default function GraphCanvas({
               lineWidth: 1.4,
               labelFill: themeColor('ink'),
             },
-            inactive: { opacity: 0.35 },
+            // 선택과 관련 없는 노드는 최소 크기 보정 없이 원래 이름표 크기로 둔다.
+            inactive: {
+              opacity: 0.35,
+              labelFontSize: (datum: NodeData) =>
+                Number(
+                  datum.data?.labelBase ?? datum.style?.labelFontSize ?? 12,
+                ),
+            },
             hovered: {
               opacity: 1,
               lineWidth: 2,
@@ -917,13 +961,18 @@ export default function GraphCanvas({
               halo: true,
               haloStroke: themeColor('ink'),
               haloFill: 'transparent',
+              // G6 기본 테마의 selected는 이름표를 12px로 줄인다. 노드에 정한 크기·굵기를 그대로 쓴다.
+              labelFontSize: (datum: NodeData) =>
+                Number(datum.style?.labelFontSize ?? 12),
+              labelFontWeight: (datum: NodeData) =>
+                datum.style?.labelFontWeight ?? 700,
             },
           },
         },
       });
-      graph.on('node:click', (event: IElementEvent) =>
-        selectNode(event.target.id),
-      );
+      graph.on('node:click', (event: IElementEvent) => {
+        if (!dragged) selectNode(event.target.id);
+      });
       graph.on('node:pointerenter', (event: IElementEvent) =>
         hoverNode(event.target.id),
       );
@@ -931,10 +980,12 @@ export default function GraphCanvas({
         leaveNode(event.target.id),
       );
       graph.on('canvas:pointerleave', () => hoverNode(null));
-      graph.on('canvas:click', () => selectNode(null));
-      graph.on('edge:click', (event: IElementEvent) =>
-        selectEdge(event.target.id),
-      );
+      graph.on('canvas:click', () => {
+        if (!dragged) selectNode(null);
+      });
+      graph.on('edge:click', (event: IElementEvent) => {
+        if (!dragged) selectEdge(event.target.id);
+      });
       graph.on('aftertransform', () => {
         if (!graph || disposed) return;
         try {
@@ -951,6 +1002,8 @@ export default function GraphCanvas({
           previousZoom = nextZoom;
           syncTutorialMarker();
           rememberCamera();
+          if (Math.abs(nextZoom - labelZoom.current) > labelZoom.current * 0.03)
+            refitLabels();
         } catch {
           /* transform may fire before canvas init */
         }
@@ -1273,7 +1326,8 @@ export default function GraphCanvas({
         <output>{Math.round(zoom * 100)}% · 드래그로 이동 · 휠로 확대</output>
       </div>
       {selectedNode && (
-        <p className="relationship-selection" role="status">
+        // 선택 안내는 화면에 띄우지 않고 보조 기술에만 알린다(선택 내용은 상세 패널이 보여 준다).
+        <p className="relationship-selection sr-only" role="status">
           {selectedNode.label}
           {selectedNode.geography
             ? ` · ${selectedNode.geography === 'domestic' ? '국내' : '국제'}`

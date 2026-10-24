@@ -62,7 +62,7 @@ export function styleGraph(
             }
           : {}),
         labelFontSize: Number(node.style?.labelFontSize ?? 13) * 1.15,
-        labelFontWeight: 600,
+        labelFontWeight: node.data?.chosen ? 800 : 600,
         fill:
           node.data?.kind === 'company'
             ? node.style?.iconSrc
@@ -71,7 +71,10 @@ export function styleGraph(
             : colors.ink,
         stroke: dark ? '#747478' : '#b8b8b6',
         haloStroke: colors.ink,
-        labelFill: node.data?.kind === 'company' ? colors.muted : colors.ink,
+        labelFill:
+          node.data?.kind === 'company' && !node.data?.chosen
+            ? colors.muted
+            : colors.ink,
         labelBackgroundFill: colors.paper,
         labelBackgroundStroke: dark ? '#6b6b70' : '#bababa',
         // Dimmed nodes fade more on a dark map; keep them legible as context.
@@ -98,4 +101,37 @@ export function styleGraph(
   // Enlarged labels participate in fitting and collision separation.
   result.nodes = separateNodes(result.nodes ?? []);
   return result;
+}
+
+/** 화면에서 이름표가 이보다 작아지지 않게 한다(px). 사건은 간선 위 짧은 이름이라 조금 작게 둔다. */
+export const MIN_LABEL_PX = { company: 12, issue: 11 } as const;
+
+/**
+ * D-GRP-01: 지도를 축소해도 이름표를 읽을 수 있게 화면 기준 최소 크기를 지킨다.
+ * 흐리게 처리한(선택과 관련 없는) 노드는 원래 크기를 두어 선택 주변 이름이 먼저 읽히게 한다.
+ * 노드 크기·좌표·카메라는 바꾸지 않는다. 원래 크기는 data.labelBase에 남겨 확대 수준이 바뀌면 다시 계산한다.
+ */
+export function readableLabels(data: GraphData, zoom: number): GraphData {
+  if (!(zoom > 0)) return data;
+  return {
+    ...data,
+    nodes: data.nodes?.map((node) => {
+      const base = Number(
+        node.data?.labelBase ?? node.style?.labelFontSize ?? 13,
+      );
+      const dimmed = Number(node.style?.opacity ?? 1) < 1;
+      const min =
+        node.data?.kind === 'company'
+          ? MIN_LABEL_PX.company
+          : MIN_LABEL_PX.issue;
+      return {
+        ...node,
+        data: { ...node.data, labelBase: base },
+        style: {
+          ...node.style,
+          labelFontSize: dimmed ? base : Math.max(base, min / zoom),
+        },
+      };
+    }),
+  };
 }
