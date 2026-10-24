@@ -486,6 +486,36 @@ class BriefingQueryServiceTest {
         assertUnavailable(() -> service.get(DATE, "morning", "request"));
     }
 
+    @Test void publicReadKeepsOptionalCardAndOriginalReadingSeparate() {
+        var row = companyReading("zoop-company-reading-v2");
+        var company = (ObjectNode) row.publicSnapshot().at("/companyOutlooks/companies/0");
+        var original = company.get("reading").deepCopy();
+        var card = company.putObject("card").put("schemaVersion", "zoop-company-card-v1")
+                .put("status", "PASS").put("resultVersion", "card-original");
+        for (String key : List.of("topic", "title", "description"))
+            card.putObject(key).put("text", "도입 계획").putArray("evidenceIds").add("e-original");
+        assertEquals(card, service.get(DATE, "morning", "request").at("/companyOutlooks/companies/0/card"));
+        assertEquals(original, company.get("reading"));
+        ((ObjectNode) card.get("title")).put("text", "가".repeat(33));
+        assertUnavailable(() -> service.get(DATE, "morning", "request"));
+    }
+    @Test void publicReadRejectsForeignCardEvidenceMissingRolesAndWithheldDrafts() {
+        var row = companyReading("zoop-company-reading-v2");
+        var company = (ObjectNode) row.publicSnapshot().at("/companyOutlooks/companies/0");
+        var card = company.putObject("card").put("schemaVersion", "zoop-company-card-v1")
+                .put("status", "PASS").put("resultVersion", "card-original");
+        for (String key : List.of("topic", "title", "description"))
+            card.putObject(key).put("text", "도입 계획").putArray("evidenceIds").add("e-original");
+        var description = card.remove("description"); assertUnavailable(() -> service.get(DATE, "morning", "request"));
+        card.set("description", description);
+        ((ObjectNode) card.get("topic")).putArray("evidenceIds").add("foreign");
+        assertUnavailable(() -> service.get(DATE, "morning", "request"));
+        ((ObjectNode) card.get("topic")).putArray("evidenceIds").add("e-original");
+        card.put("status", "WITHHELD"); assertUnavailable(() -> service.get(DATE, "morning", "request"));
+        card.remove("topic"); card.remove("title"); card.remove("description");
+        assertEquals("WITHHELD", service.get(DATE, "morning", "request").at("/companyOutlooks/companies/0/card/status").asString());
+    }
+
     private void assertUnavailable(Runnable action) {
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class, action::run).getErrorCode());
     }

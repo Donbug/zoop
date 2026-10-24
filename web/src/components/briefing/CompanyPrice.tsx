@@ -11,7 +11,7 @@ export default function CompanyPrice({
   company,
   cutoff,
 }: {
-  company: CompanyOutlook;
+  company: Pick<CompanyOutlook, 'companyId' | 'companyName' | 'price'>;
   cutoff: string;
 }) {
   const price = company.price;
