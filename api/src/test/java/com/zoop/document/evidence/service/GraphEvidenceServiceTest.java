@@ -27,6 +27,8 @@ import com.zoop.document.repository.VersionRow;
 import com.zoop.graph.read.DisclosureExclusions;
 import com.zoop.graph.read.GraphEvidenceSnapshotReader;
 import com.zoop.graph.read.PublicGraphReader;
+import com.zoop.graph.rules.PublicationRuleEvaluator;
+import com.zoop.graph.rules.RuleDefinition;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.version.GraphVersionRecord;
 import com.zoop.graph.version.GraphVersionRepository;
@@ -1763,5 +1765,107 @@ class GraphEvidenceServiceTest {
         atActivation.accept(NOW);
         assertEquals(ErrorCode.REVISION_CONFLICT, assertThrows(CustomException.class,
                 () -> atActivation.accept(NOW.plusSeconds(2))).getErrorCode(), "impact grants are judged at activation time");
+    }
+
+    // ---- a publication rule's output under the real reader (#146) ----------------------------------------------------------------
+
+    private static final String HIDDEN_EDGE = "edge-hidden";
+
+    /**
+     * The stack snapshot plus a forecast issue whose own INVOLVES edge is the only citation of {@link #EVIDENCE_ID} (same article
+     * version as the stack). {@code structural}/{@code involves} keep the stack's structural edge (a basis candidate on that
+     * article) and its INVOLVES edge (an impact candidate on it).
+     */
+    private static PublicGraphSnapshot withForecastIssue(boolean structural, boolean involves) {
+        PublicGraphSnapshot stack = stackSnapshot();
+        List<PublicGraphSnapshot.Issue> issues = new ArrayList<>(stack.issues());
+        issues.add(new PublicGraphSnapshot.Issue("iss-2", "전망 이슈", "2026-10-01", "day", null, "forecast", null, null, "domestic",
+                "geo-1", List.of(EVIDENCE_ID), List.of(ARTICLE), List.of(EVIDENCE_ID), List.of(), null, "2026-10-01T00:00:00Z"));
+        List<PublicGraphSnapshot.Relation> relations = new ArrayList<>();
+        for (PublicGraphSnapshot.Relation relation : stack.relations()) {
+            boolean keep = "INVOLVES".equals(relation.relationType()) ? involves : structural;
+            if (keep) relations.add(relation);
+        }
+        relations.add(new PublicGraphSnapshot.Relation(HIDDEN_EDGE, "INVOLVES", "iss-2", "KRX:A", null, null, List.of(EVIDENCE_ID),
+                List.of()));
+        return new PublicGraphSnapshot(stack.snapshotFormat(), stack.versionId(), stack.sourceBundleId(), stack.companies(), issues,
+                relations, stack.articles(), stack.evidence());
+    }
+
+    /** What the importer stores for that snapshot with {@code speculative-issue@1} enabled. */
+    private static PublicGraphSnapshot ruleApplied(boolean structural, boolean involves) {
+        PublicationRuleEvaluator.Outcome outcome = PublicationRuleEvaluator.apply(withForecastIssue(structural, involves),
+                List.of(new PublicationRuleEvaluator.EnabledRule("speculative-issue@1",
+                        new RuleDefinition.AssertionStatus(java.util.Set.of("forecast")))));
+        assertEquals(java.util.Set.of("iss-2"), outcome.hiddenIssueIds());
+        assertEquals(java.util.Set.of(HIDDEN_EDGE), outcome.hiddenRelationIds());
+        assertTrue(outcome.snapshot().evidence().stream().anyMatch(e -> e.evidenceId().equals(EVIDENCE_ID)),
+                "the span stays in the snapshot as an indirect candidate: its article version is still cited");
+        return outcome.snapshot();
+    }
+
+    /** A receipt whose basis cites OTHER evidence and whose verified INVOLVES row lists OTHER evidence: it proves no span. */
+    private static ObjectNode receiptProvingNothing() {
+        return impactReceipt(impactRow(INVOLVES_EDGE, "KRX:A", RC, "verified", OTHER_ID));
+    }
+
+    @Test
+    void aSpanOnlyItsHiddenRelationCitedIsServedBeforeTheRuleAndWithheldAfterItUnlessTheReceiptProvesIt() throws Exception {
+        realReader(() -> DisclosureExclusions.NONE, withForecastIssue(true, true));
+        rewriteRegisteredReceipt(receiptProvingNothing());
+        assertNull(outcome(EVIDENCE_ID, null, null), "before the rule the hidden edge cites it directly");
+
+        PublicGraphSnapshot filtered = ruleApplied(true, true);
+        GraphEvidence located = GraphEvidenceSnapshotReader.locate(filtered, GRAPH_VERSION, NOW, EVIDENCE_ID);
+        assertEquals(List.of(), located.eventIds());
+        assertFalse(located.basisRefs().isEmpty(), "a basis candidate on the same article version");
+        assertFalse(located.impactRefs().isEmpty(), "an impact candidate on the same article version");
+
+        // The same world and receipt, now pinned to what the importer stores with the rule on.
+        realPort = new GraphEvidenceSnapshotReader(new PublicGraphReader(
+                new GraphVersionSelector(new OneVersion(), java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)), version -> filtered,
+                () -> DisclosureExclusions.NONE));
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null),
+                "a candidate the receipt does not prove is never served once its own relation is hidden");
+        assertNull(outcome(DIRECT_ID, null, null), "the visible issue's own evidence is untouched by the rule");
+
+        rewriteRegisteredReceipt(basisReceipt());
+        assertNull(outcome(EVIDENCE_ID, null, null), "a visible basis the receipt proves still serves it");
+        rewriteRegisteredReceipt(verifiedReceipt());
+        assertNull(outcome(EVIDENCE_ID, null, null), "a visible INVOLVES row the receipt proves still serves it");
+    }
+
+    @Test
+    void aStructuralBasisOnlyCandidateLeftByTheRuleNeedsTheReceiptsBasisAndNeverAnImpactRow() throws Exception {
+        PublicGraphSnapshot filtered = ruleApplied(true, false);
+        GraphEvidence located = GraphEvidenceSnapshotReader.locate(filtered, GRAPH_VERSION, NOW, EVIDENCE_ID);
+        assertFalse(located.basisRefs().isEmpty());
+        assertEquals(List.of(), located.impactRefs(), "no visible INVOLVES edge cites the article version");
+
+        realReader(() -> DisclosureExclusions.NONE, filtered);
+        rewriteRegisteredReceipt(receiptProvingNothing());
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null));
+        rewriteRegisteredReceipt(verifiedReceipt());
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null),
+                "an impact row of an edge that is not visible proves nothing");
+        rewriteRegisteredReceipt(basisReceipt());
+        assertNull(outcome(EVIDENCE_ID, null, null));
+    }
+
+    @Test
+    void anImpactOnlyCandidateLeftByTheRuleNeedsAVerifiedRowAndNeverABasis() throws Exception {
+        PublicGraphSnapshot filtered = ruleApplied(false, true);
+        GraphEvidence located = GraphEvidenceSnapshotReader.locate(filtered, GRAPH_VERSION, NOW, EVIDENCE_ID);
+        assertEquals(List.of(), located.basisRefs(), "no visible structural edge has a basis on the article version");
+        assertFalse(located.impactRefs().isEmpty());
+
+        realReader(() -> DisclosureExclusions.NONE, filtered);
+        rewriteRegisteredReceipt(receiptProvingNothing());
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null));
+        rewriteRegisteredReceipt(basisReceipt());
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null),
+                "a basis of an edge that is not visible proves nothing");
+        rewriteRegisteredReceipt(verifiedReceipt());
+        assertNull(outcome(EVIDENCE_ID, null, null));
     }
 }
