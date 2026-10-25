@@ -57,8 +57,8 @@ import tools.jackson.databind.node.ObjectNode;
  * when it cannot be served.</li>
  * </ul>
  *
- * <p>It is not registered as a bean: no production router, generator or verifier exists yet, and the executor must claim
- * nothing until they do.
+ * <p>{@code ChatModelConfiguration} registers this engine only when the internal chat-stage client is enabled. Question
+ * intake has its own flag and startup refuses to enable it without this engine; both flags are off by default.
  */
 public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     /**

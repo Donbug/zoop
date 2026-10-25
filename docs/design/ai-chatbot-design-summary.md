@@ -1,10 +1,10 @@
 # ZOOP AI 챗봇 설계 요약
 
-문서 상태: 팀 공유용 목표 설계 요약 · 초기 구현 결정 반영
+문서 상태: 팀 공유용 목표 설계 요약 · 2026-10-25 구현 현황 반영
 
 문서 버전: 1.5 / 기준 정책: ZOOP-AIG-001 v0.9
 
-기준일: 2026년 10월 25일
+최초 기준일: 2026년 10월 21일 / 구현 상태 갱신: 2026년 10월 25일
 
 상세 정책: [ZOOP AI 거버넌스 정책](../ZOOP_AI_거버넌스_정책.md)
 
@@ -16,7 +16,7 @@
 
 ## 1. 핵심 요약
 
-ZOOP 챗봇은 하나의 LLM이 질문 해석, 데이터 검색, 답변 생성을 모두 자율적으로 수행하는 구조가 아니다. 질문을 구조화하고 Jev가 필요한 유형과 논리 기능 후보를 typed 판정한 뒤, Luna의 분리된 `coverage-verifier` stage가 사용자 요구의 누락 여부를 검토한다. 실제 도구 선택과 실행 권한은 서버가 가진다. 조회 결과는 Luna의 `answer-generator` stage가 답변으로 만들고, 자동 검증을 통과한 결과만 저장·전달한다.
+ZOOP 챗봇은 하나의 LLM이 질문 해석, 데이터 검색, 답변 생성을 모두 자율적으로 수행하는 구조가 아니다. 질문을 구조화하고 Jev가 필요한 유형과 논리 기능 후보를 typed 판정하며, 실제 도구 선택과 실행 권한은 서버가 가진다. 조회 결과는 Luna의 `answer-generator` stage가 답변으로 만들고, 결정론적 검사와 Jev 의미 검증을 통과한 결과만 저장·전달한다. 목표 설계의 분리된 Luna `coverage-verifier` stage는 아직 구현되지 않았으며, 현재 서버는 0.70/0.35 임계값과 allowlist로 계획을 확정한다.
 
 핵심 결정은 다음과 같다.
 
@@ -247,6 +247,8 @@ Jev는 자유 문장 대신 정해진 질문에 typed 판정을 돌려주는 모
 
 ### 8.1 도구 호출 전 계획 검증
 
+아래는 목표 계약이다. 현재 구현은 requirement ID, Q type·capability allowlist, 등록 여부, 호출·단계 예산과 의존 순서를 서버가 검사하지만 별도 Luna `coverage-verifier` 호출과 보완 뒤 재확인은 수행하지 않는다.
+
 - 모든 `requirementId`가 후보 계획에 포함됐는지 검사한다.
 - 커버리지 검증 LLM은 `coveredRequirements`, `missingRequirements`, `unnecessaryCapabilities`, `requiresClarification`을 반환한다.
 - 서버가 allowlist와 예산 안에서 계획을 보완하거나 축소한다.
@@ -301,22 +303,26 @@ Q02 일반 개념은 권위 자료가 없으므로 두 번째 모델의 동의�
 
 ## 10. 현재 구현과 목표 설계의 경계
 
-이 문서의 Jev 라우터·Luna 커버리지 검증·도구 오케스트레이션·Luna 챗봇 생성은 목표 설계다.
+2026-10-25 main 코드 기준 구현 경계는 다음과 같다.
 
-현재 저장소의 네이티브 Jev 어댑터는 S1 문서 `semantic-verification`에서 고정 claim을 `supported / contradicted / insufficient`로 판정하는 용도다. 현재 구현이 Q01~Q08 라우팅, 동적 도구 선택·호출 또는 Luna 챗봇 답변 생성을 이미 제공한다고 간주하지 않는다.
+| 영역 | 현재 구현 | 목표와의 차이 |
+| --- | --- | --- |
+| 공개 수명주기 | 회원 전용 세션·질문 job API, PostgreSQL 저장, 멱등성, 단일 활성 job, 취소·재시도·lease fence | recovery artifact와 실제 `save_only` 복구 없음 |
+| 모델 단계 | `chat-router` Jev, `chat-answer` Luna, `chat-verification` Jev의 별도 계약·원장·grant·영수증 | 임계값 미보정, 실제 호출·배포 승인 아님 |
+| 계획 | Q01~Q08·capability registry, 서버 allowlist·예산·체크포인트, 질문이 지목한 기업의 기본 조회 | 별도 Luna `coverage-verifier`와 보완 라운드 없음 |
+| 도구 | 앱 내부 읽기 어댑터 `company.read`(기업 카탈로그 개요를 `company_profile` 인용으로 포함), `issue.read`, `evidence.resolve`, `graph.path.read` | Q01·Q05·Q06·Q07·Q08와 `document.search` 미연결. 외부 웹 검색은 [설계 초안](ai-chatbot-web-search.md)만 있음 |
+| 생성·검증 | `BranchContext`, typed 생성, 서버 citation, 결정론적 검사, section 단위 Jev support·투자 판단 | claim 단위 `unsupportedCausality`, 일부 수치·그래프 의미 검사, 24k/2k token guard 없음 |
+| 권한 | 고정 graphVersion/asOf, 현재 evidence 접근 재검사, 응답 시 철회 재검사 | `zoop_doc` registry와 회원 종목 도구 미연결 |
+| 웹 | D-AI-01~02b가 공개 Chat API로 대화 생성·복원, 질문 접수·polling·취소·재시도, 답변·인용(`article`·`company_profile`)·확인 질문·실패를 렌더링 | 타입은 손으로 쓴 `web/src/types/ai`이며 OpenAPI 생성 seam 없음. 실제 백엔드·모델과의 종단 시험 없음 |
 
-출시 전에 최소한 다음 항목이 필요하다.
+따라서 구현 코드를 “단지 목표 설계”로 취급해서도 안 되고, 코드 존재를 출시 완료로 해석해서도 안 된다. 출시 전에 최소한 다음 항목이 필요하다.
 
-- Jev 챗봇 라우터 요청·응답 스키마와 확정 임계값 적용
-- Q 유형 및 논리 기능 레지스트리
-- Luna `coverage-verifier`의 분리된 구조화 계약과 실패 처리
-- 논리 기능과 읽기 어댑터의 버전 매핑
-- 도구별 읽기 전용 권한·입출력 스키마·타임아웃
-- `BranchContext`와 Luna 챗봇 생성 stage
-- 사전 계획 검증과 사후 출력 검증 구현
-- 확정된 호출 수·시간·조회량·토큰 예산의 서버 강제
-- 복합 질문·권한·근거 부족·공격 입력을 포함한 고정 평가 세트
+- Luna `coverage-verifier`의 분리 계약을 구현하거나 승인된 대체 coverage 절차를 확정
+- claim 단위 의미 검증과 `unsupportedCausality`, Luna 입력 24,000·출력 2,000 token guard
+- 미연결 Q 유형별 데이터 소유 도구
+- 복합 질문·권한·근거 부족·공격 입력을 포함한 고정 평가 세트와 임계값 보정
 - PostgreSQL evidence 수입과 handoff → 앱 공개 스냅샷 활성화 → 챗봇 그래프 조회 → 철회 반영의 종단 시험
+- 실제 배포 환경, live 호출 비용·권한 승인과 단계적 기능 플래그 활성화
 
 ## 11. 확정된 초기 구현 결정
 
@@ -333,6 +339,6 @@ Q02 일반 개념은 권위 자료가 없으므로 두 번째 모델의 동의�
 - 한 질문의 명시적 요구는 최대 6개이며 넘으면 계획 시점 `clarification`이다.
 - 확인 질문 사슬은 루트 질문부터 최대 2회다. 깊이 2 확인 답 작업도 정상 처리하며, 추가 확인이 필요할 때만 `clarification` 대신 `guidance`로 끝난다.
 
-남은 일은 제품 선택이 아니라 구현과 출시 증명이다. 도구별 세부 스키마·소유 서비스, 배포 모델의 정확한 버전과 외부 전송 승인, 담당자 실명, 보관 기간, 비용 경보액, 종단 연동 시험 결과는 출시 전에 등록해야 한다.
+남은 일은 미구현 경계의 완성과 출시 증명이다. 도구별 세부 스키마·소유 서비스, 배포 모델의 정확한 버전과 외부 전송 승인, 담당자 실명, 보관 기간, 비용 경보액, 평가 보정과 종단 연동 시험 결과는 출시 전에 등록해야 한다.
 
-이 문서는 구현 완료 선언이 아니라 팀 합의와 구현 계획을 위한 요약이다. 세부 예외, 데이터 공개·철회, 감사·장애 대응 기준은 AI 거버넌스 정책을 따른다.
+이 문서의 현재 구현 표는 코드 기준 스냅샷이며 출시 완료 선언이 아니다. 세부 예외, 데이터 공개·철회, 감사·장애 대응 기준은 AI 거버넌스 정책을 따른다.
