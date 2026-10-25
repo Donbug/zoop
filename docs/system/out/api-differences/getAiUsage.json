@@ -7,6 +7,106 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "response:200:application/json.daily:required": false,
+    "response:200:application/json.daily<anyOf:0>": {
+      "type": "array"
+    },
+    "response:200:application/json.daily<anyOf:0>[]": {
+      "type": "object"
+    },
+    "response:200:application/json.daily<anyOf:0>[].date": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.daily<anyOf:0>[].date:required": true,
+    "response:200:application/json.daily<anyOf:0>[].features": {
+      "type": "array"
+    },
+    "response:200:application/json.daily<anyOf:0>[].features:required": true,
+    "response:200:application/json.daily<anyOf:0>[].features[]": {
+      "type": "object"
+    },
+    "response:200:application/json.daily<anyOf:0>[].features[].actualCost:required": true,
+    "response:200:application/json.daily<anyOf:0>[].features[].actualCost<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.daily<anyOf:0>[].features[].actualCost<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.daily<anyOf:0>[].features[].estimatedCost:required": true,
+    "response:200:application/json.daily<anyOf:0>[].features[].estimatedCost<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.daily<anyOf:0>[].features[].estimatedCost<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.daily<anyOf:0>[].features[].feature": {
+      "type": "string"
+    },
+    "response:200:application/json.daily<anyOf:0>[].features[].feature:required": true,
+    "response:200:application/json.daily<anyOf:0>[].features[].inputTokens:required": true,
+    "response:200:application/json.daily<anyOf:0>[].features[].inputTokens<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.daily<anyOf:0>[].features[].inputTokens<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.daily<anyOf:0>[].features[].modelCalls:required": true,
+    "response:200:application/json.daily<anyOf:0>[].features[].modelCalls<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.daily<anyOf:0>[].features[].modelCalls<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.daily<anyOf:0>[].features[].outputTokens:required": true,
+    "response:200:application/json.daily<anyOf:0>[].features[].outputTokens<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.daily<anyOf:0>[].features[].outputTokens<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.daily<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.members:required": false,
+    "response:200:application/json.members<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.members<anyOf:0>.aiMembers:required": true,
+    "response:200:application/json.members<anyOf:0>.aiMembers<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.members<anyOf:0>.aiMembers<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.members<anyOf:0>.briefingMembers:required": true,
+    "response:200:application/json.members<anyOf:0>.briefingMembers<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.members<anyOf:0>.briefingMembers<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.members<anyOf:0>.chatbotMembers:required": true,
+    "response:200:application/json.members<anyOf:0>.chatbotMembers<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.members<anyOf:0>.chatbotMembers<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.members<anyOf:0>.note:required": true,
+    "response:200:application/json.members<anyOf:0>.note<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.members<anyOf:0>.note<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.members<anyOf:0>.totalMembers": {
+      "type": "integer"
+    },
+    "response:200:application/json.members<anyOf:0>.totalMembers:required": true,
+    "response:200:application/json.members<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },

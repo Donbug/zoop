@@ -4,7 +4,11 @@ import CompanyLogo from '@/components/common/CompanyLogo';
 import { useRelationData } from '@/hooks/useRelationData';
 import type { EventContext } from '@/types/map/event';
 import type { RelationDetail } from '@/types/map/relation';
-import { formatEventTime, formatPublishedAt } from './event-format';
+import {
+  formatEventTime,
+  formatPublishedAt,
+  safeArticleUrl,
+} from './event-format';
 import GraphIcon from './GraphIcon';
 
 interface Props {
@@ -131,6 +135,35 @@ export default function RelationDetailPanel({
                 </dd>
                 <dt className={ui.muted}>검증 상태</dt>
                 <dd>{data.verification.note ?? data.verification.status}</dd>
+                {(data.roles.length > 0 || data.role) && (
+                  <>
+                    <dt className={ui.muted}>역할</dt>
+                    <dd>
+                      {data.roles.length ? data.roles.join(', ') : data.role}
+                    </dd>
+                  </>
+                )}
+                {!data.derived && (
+                  <>
+                    <dt className={ui.muted}>보도 표현</dt>
+                    <dd>
+                      {(
+                        {
+                          occurred: '발생',
+                          announced: '보도 언급',
+                          planned: '계획',
+                          forecast: '전망',
+                        } as Record<string, string>
+                      )[data.assertionStatus ?? ''] ?? '확인 필요'}
+                    </dd>
+                    <dt className={ui.muted}>인용 검증</dt>
+                    <dd>
+                      {data.verification.status === 'ALLOW'
+                        ? '통과'
+                        : '해당 없음'}
+                    </dd>
+                  </>
+                )}
               </dl>
             </section>
             <div className={ui.actions}>
@@ -225,6 +258,41 @@ export default function RelationDetailPanel({
                 </p>
               )}
             </section>
+            {/* D-GRP-04 · gap 30: basis links are supplied by getCompanyRelation. */}
+            {data.basis.length > 0 && (
+              <section className={ui.section} aria-label="관계 기준 문서">
+                <h3>관계 기준 문서</h3>
+                {data.basis.length ? (
+                  <ul className={ui.list}>
+                    {data.basis.map((basis) => {
+                      const href = safeArticleUrl(basis.sourceUrl);
+                      return (
+                        <li key={basis.edgeId}>
+                          {href ? (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-zoop-ink underline underline-offset-4 focus-visible:outline-2"
+                            >
+                              기준 문서 열기{' '}
+                              <span className="sr-only">(새 창에서 열림)</span>
+                            </a>
+                          ) : (
+                            <p>기준 문서 링크 없음</p>
+                          )}
+                          <p className={ui.muted}>
+                            검증{' '}
+                            {formatPublishedAt(basis.verifiedAt) ??
+                              '확인 시점 미제공'}
+                          </p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+              </section>
+            )}
             <footer className={ui.footer}>
               <p>{data.metadata.source}</p>
               <p>조회 기준 · {formatPublishedAt(data.metadata.asOf)}</p>

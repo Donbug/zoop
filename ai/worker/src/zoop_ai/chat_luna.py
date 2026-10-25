@@ -11,7 +11,7 @@ from typing import Any
 from .chat_contracts import AnswerInput, ChatAnswer
 from .contracts import canonical, digest
 
-PROMPT_REVISION = "zoop-chat-answer-2026-10-22-1"
+PROMPT_REVISION = "zoop-chat-answer-2026-10-24-1"
 # Pinned like the pipeline (cost and behaviour are only known for it); a live configuration naming another is refused.
 MODEL = "gpt-6-luna"
 REASONING_EFFORT = "high"
@@ -23,6 +23,10 @@ PROMPT = (
     "general=true인 branch만 일반 개념 구간(general_knowledge)으로 설명할 수 있고, 그 구간에는 근거를 넣지 않으며 최신 "
     "기업·시장 사실, 수치, 날짜, 가격, 전망을 쓰지 않는다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다. "
     "noneFound=true인 branch는 조회 범위에서 찾지 못했다고만 쓰고 없는 이유를 추측하지 않는다. "
+    "branch paths는 fromId에서 toId까지의 관계 경로 조회 결과다. status=found는 steps 순서대로 이어지며, 각 step은 "
+    "sourceId에서 targetId로 저장된 관계(relation·role)이고 그 step의 evidenceIds 인용문만 그 연결의 근거로 쓴다. "
+    "status=none은 조회 한도 안에서 연결이 없음이 확인된 것이고, status=cut은 한도 때문에 확인하지 못한 것이므로 연결이 "
+    "없다고 쓰지 않는다. "
     "각 구간의 requirementIds는 그 구간이 답하는 요구 하나다. 여러 요구를 잇는 문장만 별도 구간으로 두고 관련 요구를 "
     "모두 적는다. 근거가 부족해 답할 수 없는 요구는 구간 없이 insufficientRequirementIds에 넣는다. 모든 요구는 구간과 "
     "insufficientRequirementIds 중 정확히 한 곳에 속한다. 전체 인용은 서로 다른 evidenceId maxCitations개 이하다. "

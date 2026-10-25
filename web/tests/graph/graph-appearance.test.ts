@@ -1,7 +1,12 @@
 import { expect, test } from 'vitest';
 import { createMockGraph } from '@/mocks/graph/response';
 import { toG6Data } from '@/components/graph/graph-model';
-import { intersects, nodeRect } from '@/components/graph/graph-geometry';
+import {
+  fitFootprint,
+  intersects,
+  nodeRect,
+} from '@/components/graph/graph-geometry';
+import { readingStyles } from '@/components/graph/graph-readability';
 import {
   defaultAppearance,
   styleGraph,
@@ -18,7 +23,7 @@ test('D-GRP-01: default comparison does not change the existing graph', () => {
 });
 
 test.each(['light', 'dark'] as const)(
-  'D-GRP-01: %s candidate preserves graph identities, node sizes and direction while enlarging labels',
+  'D-GRP-01: %s candidate preserves graph identities and direction while enlarging nodes and labels',
   (theme) => {
     const data = toG6Data(
       createMockGraph({ mode: 'all', personalFilter: 'all' }),
@@ -28,11 +33,15 @@ test.each(['light', 'dark'] as const)(
     const before = structuredClone(data);
     const candidate = styleGraph(data, { variant: 'improved', theme });
     expect(data).toEqual(before);
-    expect(
-      candidate.nodes?.map((n) => [n.id, n.style?.size, n.style?.iconSrc]),
-    ).toEqual(data.nodes?.map((n) => [n.id, n.style?.size, n.style?.iconSrc]));
+    expect(candidate.nodes?.map((n) => [n.id, n.style?.iconSrc])).toEqual(
+      data.nodes?.map((n) => [n.id, n.style?.iconSrc]),
+    );
     const nodes = candidate.nodes ?? [];
     for (const [index, node] of nodes.entries()) {
+      expect(Number(node.style?.size)).toBeCloseTo(
+        Number(data.nodes?.[index].style?.size) *
+          (node.data?.kind === 'company' ? 1.15 : 1.1),
+      );
       expect(Number(node.style?.labelFontSize)).toBeGreaterThan(
         Number(data.nodes?.[index].style?.labelFontSize),
       );
@@ -60,12 +69,141 @@ test.each(['light', 'dark'] as const)(
     expect(
       candidate.edges
         ?.filter((e) => !e.style?.lineDash)
-        .every((e) => e.style?.lineWidth === 1.5),
+        .every((e) => e.style?.lineWidth === 1.1),
     ).toBe(true);
     expect(
       candidate.edges
         ?.filter((e) => e.style?.lineDash)
-        .every((e) => e.style?.lineWidth === 1.2),
+        .every((e) => e.style?.lineWidth === 1),
     ).toBe(true);
+  },
+);
+
+test('D-GRP-03: the chosen company label is larger and bolder than its neighbours', () => {
+  const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const [chosen, other] = graph.nodes.filter((node) => node.kind === 'company');
+  const data = styleGraph(toG6Data(graph, 1200, 700, chosen.id), {
+    variant: 'improved',
+    theme: 'light',
+  });
+  const styleOf = (id: string) =>
+    data.nodes!.find((node) => node.id === id)!.style!;
+  expect(Number(styleOf(chosen.id).labelFontSize)).toBeGreaterThan(
+    Number(styleOf(other.id).labelFontSize),
+  );
+  expect(styleOf(chosen.id).labelFontWeight).toBe(800);
+  expect(styleOf(other.id).labelFontWeight).toBe(600);
+  expect(styleOf(chosen.id).labelFill).not.toBe(styleOf(other.id).labelFill);
+});
+
+test.each([0.1, 0.37, 0.53, 1])(
+  'D-GRP-03: selected emphasis survives main readability correction at zoom %s',
+  (zoom) => {
+    const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const [chosen, other] = graph.nodes.filter(
+      (node) => node.kind === 'company',
+    );
+    const base = styleGraph(toG6Data(graph, 1200, 700, chosen.id), {
+      variant: 'improved',
+      theme: 'light',
+    });
+    const result = readingStyles(base, graph, {
+      zoom,
+      anchor: chosen.id,
+      focus: null,
+      edge: null,
+      path: new Set(),
+    });
+    const label = (id: string) =>
+      result.nodes!.find((node) => node.id === id)!.style!;
+    expect(Number(label(chosen.id).labelFontSize)).toBeGreaterThan(
+      Number(label(other.id).labelFontSize),
+    );
+    expect(
+      Number(label(chosen.id).labelFontSize) * zoom,
+    ).toBeGreaterThanOrEqual(16);
+    expect(label(chosen.id).labelFontWeight).toBe(800);
+    expect(label(chosen.id).x).toBe(
+      base.nodes!.find((node) => node.id === chosen.id)!.style!.x,
+    );
+    const selected = base.nodes!.find((node) => node.id === chosen.id)!;
+    expect(fitFootprint(selected).labelHeight).toBeGreaterThan(
+      fitFootprint({ ...selected, data: { ...selected.data, chosen: false } })
+        .labelHeight,
+    );
+  },
+);
+
+test.each(['light', 'dark'] as const)(
+  'D-GRP-01: %s background links stay thinner than selected links without changing relation shapes or hit areas',
+  (theme) => {
+    const data = toG6Data(
+      createMockGraph({ mode: 'all', personalFilter: 'all' }),
+      1200,
+      700,
+    );
+    const result = styleGraph(data, { variant: 'improved', theme });
+    result.edges?.forEach((edge, index) => {
+      expect(Number(edge.style?.lineWidth)).toBeLessThan(2);
+      expect(edge.style?.lineDash).toEqual(data.edges?.[index].style?.lineDash);
+      expect(edge.style?.endArrow).toBe(data.edges?.[index].style?.endArrow);
+      expect(edge.style?.increasedLineWidthForHitTesting).toBe(
+        data.edges?.[index].style?.increasedLineWidthForHitTesting,
+      );
+    });
+  },
+);
+
+/** WCAG 대비(상대 휘도). 반투명 선은 지도 바탕과 섞은 색으로 잰다. */
+function contrastOnMap(stroke: string, opacity: number, map: string) {
+  const rgb = (hex: string) =>
+    [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const luminance = (channels: number[]) => {
+    const [r, g, b] = channels.map((value) => {
+      const c = value / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const back = rgb(map);
+  const mixed = rgb(stroke).map(
+    (value, i) => value * opacity + back[i] * (1 - opacity),
+  );
+  const [high, low] = [luminance(mixed), luminance(back)].sort((a, b) => b - a);
+  return (high + 0.05) / (low + 0.05);
+}
+
+test.each([
+  ['light', '#fafafa'],
+  ['dark', '#1c1c1e'],
+] as const)(
+  'D-GRP-01: %s map links keep 3:1 contrast, follow arrows stay strongest and dimmed links never exceed the inactive state',
+  (theme, map) => {
+    const data = toG6Data(
+      createMockGraph({ mode: 'all', personalFilter: 'all' }),
+      1200,
+      700,
+    );
+    const dimmedData = structuredClone(data);
+    const dimmedEdge = dimmedData.edges?.[0];
+    if (!dimmedEdge) throw new Error('D-GRP-01 dimmed edge fixture is missing');
+    dimmedEdge.style = { ...dimmedEdge.style, strokeOpacity: 0.05 };
+
+    const result = styleGraph(dimmedData, {
+      variant: 'improved',
+      theme,
+    });
+    result.edges?.forEach((edge, index) => {
+      const opacity = Number(edge.style?.strokeOpacity);
+      if (Number(dimmedData.edges?.[index].style?.strokeOpacity) < 0.1) {
+        // G6 inactive state is 0.2: becoming inactive must not brighten a dimmed link.
+        expect(opacity).toBe(0.2);
+        return;
+      }
+      expect(
+        contrastOnMap(String(edge.style?.stroke), opacity, map),
+      ).toBeGreaterThanOrEqual(3);
+      if (edge.style?.endArrow) expect(opacity).toBe(0.95);
+    });
   },
 );

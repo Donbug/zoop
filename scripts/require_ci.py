@@ -9,7 +9,10 @@ import urllib.parse
 import urllib.request
 
 
-REQUIRED_JOBS = {"public-config", "web", "app-web", "bff", "ai-worker", "ai-pipeline", "ai-service", "api", "required-ci"}
+REQUIRED_JOBS = {
+    "public-config", "web", "app-web", "bff", "ai-worker", "ai-pipeline-tests", "ai-pipeline-smoke",
+    "ai-pipeline", "ai-service", "api-container", "api-tests", "api-graph-smoke", "api", "required-ci",
+}
 
 
 def select_run(payload: dict, sha: str, repository: str) -> dict:
@@ -30,7 +33,7 @@ def select_run(payload: dict, sha: str, repository: str) -> dict:
 def require_jobs(jobs: list[dict]) -> None:
     observed = {job["name"]: job.get("conclusion") for job in jobs}
     if any(observed.get(name) != "success" for name in REQUIRED_JOBS):
-        raise ValueError("CI job evidence missing or not successful: require public-config, web, app-web, bff, ai-worker, ai-pipeline, ai-service, api and required-ci.")
+        raise ValueError("CI job evidence missing or not successful: require " + ", ".join(sorted(REQUIRED_JOBS)) + ".")
 
 
 def get_json(path: str, token: str) -> dict:

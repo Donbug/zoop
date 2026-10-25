@@ -89,7 +89,9 @@ public class ChatResponseGuard {
         Set<String> articles = new LinkedHashSet<>();
         Set<String> documents = new LinkedHashSet<>();
         for (Citation citation : nullSafe(result.citations())) {
-            ("article".equals(citation.sourceKind()) ? articles : documents).add(citation.evidenceId());
+            // A catalog profile quote is checked like an article: readable while the catalog still holds its text.
+            boolean checkable = "article".equals(citation.sourceKind()) || "company_profile".equals(citation.sourceKind());
+            (checkable ? articles : documents).add(citation.evidenceId());
         }
         if (!documents.isEmpty()) return false;
         Set<String> cited = new LinkedHashSet<>(articles);

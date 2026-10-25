@@ -3,6 +3,7 @@ import ConfirmDialog from '@/components/common/ConfirmDialog';
 import ErrorNotice from '@/components/common/ErrorNotice';
 import StockRow from '@/components/my/StockRow';
 import { disconnectPortfolio, getPortfolio } from '@/apis/portfolio/portfolio';
+import { companyLogo } from '@/util/company-logo';
 import {
   formatKst,
   formatMoney,
@@ -164,6 +165,7 @@ export default function HoldingsSection({
                   key={holding.companyId}
                   id={holding.companyId}
                   name={holding.name}
+                  logoUrl={companyLogo(holding.companyId)}
                   description={holdingDescription(holding)}
                   trailing={
                     holding.quote.status === 'available'

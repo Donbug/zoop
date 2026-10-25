@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import uvicorn
 
-from . import extraction_access, relation_access
+from . import extraction_access, plan_install, relation_access
 from .app import create_app
 from .chat_stages import ChatProcess, ChatStages
 from .config import HOST, ConfigError, ServiceConfig, load
@@ -32,6 +32,8 @@ from .relation_jobs import RelationJobs
 from .relation_ledger import RelationLedger
 from .relation_runtime import RelationGate, RelationProcess
 from .runtime import Deadlines, WorkerProcess
+from .plan_authority import PlanAuthority, startup_mode, lock_creation_allowed
+from .plan_admission import PlanAdmissionService
 
 CONFIG_EXIT = 78
 
@@ -54,14 +56,26 @@ class Service:
     handoff: HandoffReads | None = None
     handoff_exposure: HandoffExposureReads | None = None
     chat: ChatStages | None = None
+    plans: PlanAdmissionService | None = None
 
 
 def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) -> Service:
     """Startup order: process lock, ledger, worker-ledger binding, then recovery of rows the previous process left in flight.
     The relation family (only when its configuration group is enabled) follows the same order on its own ledger, but a row left in
     flight is ended as `service_restarted` and never run again automatically."""
-    lock = ProcessLock(config.state_dir)
-    ledger = ServiceLedger(config.state_dir, config.worker_state_dir)
+    lock = ProcessLock(config.state_dir, create=lock_creation_allowed(config))
+    try:
+        startup_mode(config, lock=lock)
+        online = PlanAuthority(config) if config.plan_root is not None else None
+        lock.validate()
+        if online is not None and list(lock.identity) != online._binding["serviceLock"]:
+            raise ConfigError("ZOOP_AI_SERVICE_STATE_DIR", "authority_unavailable")
+        if online is None:
+            plan_install.startup_barrier(config)
+    except BaseException:
+        lock.close()
+        raise
+    ledger = ServiceLedger(config.state_dir, config.worker_state_dir, existing_only=online is not None)
     requeued = ledger.requeue_in_flight()
     worker = WorkerProcess(config, deadlines)
     dispatcher = Dispatcher(config, ledger, worker, emit)
@@ -72,25 +86,29 @@ def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) 
     # ONE gate for both pipeline families: the S2 writer and the S3 reader of its ledger (and each family's own ledger lock, which does not
     # wait) must never have two children at once, so every S2 and S3 child of this process runs behind this single lock.
     gate = RelationGate()
+    plans = PlanAdmissionService(config, online) if online is not None else None
+    if config.extraction is not None:
+        extraction_ledger = ExtractionLedger(config.state_dir, config.extraction.state_dir, existing_only=online is not None)
+        extraction_interrupted = extraction_ledger.interrupt_in_flight()
     if config.relation is not None:
-        relation_ledger = RelationLedger(config.state_dir, config.relation.state_dir)
+        relation_ledger = RelationLedger(config.state_dir, config.relation.state_dir, existing_only=online is not None)
         interrupted = relation_ledger.interrupt_in_flight()
         process = RelationProcess(config, deadlines)
         names = [principal.name for principal in config.principals]
         upstreams = config.relation.upstreams_path
         relation_dispatcher = RelationDispatcher(
             relation_ledger, process, gate, emit,
-            lambda owner, job_id, digest, identity: relation_access.refusal(upstreams, names, owner, job_id, digest, identity))
-        relation = RelationJobs(config, relation_ledger, process, relation_dispatcher, gate)
+            (lambda owner, job_id, digest, identity: relation_access.refusal(upstreams, names, owner, job_id, digest, identity)) if online is None else None,
+            online_authority=online)
+        relation = RelationJobs(config, relation_ledger, process, relation_dispatcher, gate, online_authority=online, extraction_ledger=extraction_ledger)
     if config.extraction is not None:
-        extraction_ledger = ExtractionLedger(config.state_dir, config.extraction.state_dir)
-        extraction_interrupted = extraction_ledger.interrupt_in_flight()
         extraction_process = ExtractionProcess(config, deadlines)
-        authority = extraction_access.Authority(config.extraction.approvals_path, [principal.name for principal in config.principals],
+        authority = (extraction_access.Authority(config.extraction.approvals_path, [principal.name for principal in config.principals],
                                                 config.extraction.producer_replay, config.extraction.topic_replay, config.pipeline_live is not None)
+                     if online is None else None)
         extraction_dispatcher = ExtractionDispatcher(extraction_ledger, extraction_process, gate, emit,
-                                                     lambda owner, pins, job_id: authority.refusal(owner, job_id, pins.approval))
-        extraction = ExtractionJobs(config, extraction_ledger, extraction_process, extraction_dispatcher, gate, authority)
+                                                     lambda owner, pins, job_id: authority.refusal(owner, job_id, pins.approval), online_authority=online)
+        extraction = ExtractionJobs(config, extraction_ledger, extraction_process, extraction_dispatcher, gate, authority, online_authority=online)
     # The graph door is read-only and has no ledger of its own. When an S2/S3 group of this process is configured it shares THEIR gate (they write the
     # ledgers the graph reads and a pipeline writer lock does not wait); without one the graph children run side by side behind a small slot limit.
     graph = GraphReads(config, GraphProcess(config, deadlines), gate if config.graph.shared_gate else None) if config.graph is not None else None
@@ -117,12 +135,12 @@ def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) 
         starting["chatLive"] = config.chat.live_available
     emit(starting)
     return Service(config, lock, ledger, worker, dispatcher, jobs, relation, relation_dispatcher, relation_ledger, extraction, extraction_dispatcher,
-                   extraction_ledger, graph, handoff, handoff_exposure=exposure, chat=chat)
+                   extraction_ledger, graph, handoff, handoff_exposure=exposure, chat=chat, plans=plans)
 
 
 def serve(service: Service) -> None:
     app = create_app(service.jobs, service.relation, service.extraction, service.graph, service.handoff,
-                     handoff_exposure=service.handoff_exposure, chat=service.chat)
+                     handoff_exposure=service.handoff_exposure, chat=service.chat, plans=service.plans)
     service.dispatcher.start()
     if service.relation_dispatcher is not None:
         service.relation_dispatcher.start()

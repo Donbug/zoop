@@ -30,9 +30,13 @@ import com.zoop.document.repository.DocumentRegistryRepository;
 import com.zoop.document.repository.VersionRow;
 import com.zoop.graph.importer.GraphHandoffRepository.CompanyRow;
 import com.zoop.graph.importer.GraphHandoffRepository.NewStagedVersion;
+import com.zoop.graph.importer.GraphHandoffRepository.PublicationState;
+import com.zoop.graph.importer.GraphHandoffRepository.RuleRow;
 import com.zoop.graph.importer.GraphHandoffRepository.StagedVersion;
 import com.zoop.graph.importer.GraphHandoffRepository.StoredEvidence;
 import com.zoop.graph.importer.GraphHandoffResult.Outcome;
+import com.zoop.graph.importer.GraphHandoffResult.RuleFacts;
+import com.zoop.graph.importer.GraphHandoffResult.RuleHits;
 import com.zoop.graph.importer.GraphHandoffResult.Staged;
 import com.zoop.graph.importer.GraphHandoffResult.StoredFileFact;
 import com.zoop.graph.importer.HandoffBundle.Article;
@@ -41,6 +45,10 @@ import com.zoop.graph.importer.HandoffBundle.Evidence;
 import com.zoop.graph.importer.HandoffBundle.Relation;
 import com.zoop.graph.importer.HandoffExportParser.VerifiedHandoff;
 import com.zoop.graph.importer.HandoffObservationVerifier.ObservationFacts;
+import com.zoop.graph.rules.InvalidRuleDefinitionException;
+import com.zoop.graph.rules.PublicationRuleEvaluator;
+import com.zoop.graph.rules.PublicationRuleEvaluator.EnabledRule;
+import com.zoop.graph.rules.RuleDefinition;
 import com.zoop.graph.snapshot.GraphSnapshotCodec;
 import com.zoop.graph.snapshot.GraphSnapshotUnavailableException;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
@@ -67,6 +75,13 @@ import org.springframework.transaction.support.TransactionOperations;
  * add rows: it never writes {@code graph_activations}, never sets {@code graph_versions.active} (it does not take the
  * publication lock, because it cannot move the pointer) and never changes an article's current version. A version staged here is
  * unreadable through the public API until a separate activation exists.
+ *
+ * <p>Publication rules (rules doc 2-1): right after the catalog lock the transaction reads the enabled rules, {@code rule_revision}
+ * and {@code review_revision} in one statement ({@link GraphHandoffRepository#publicationState()}) and stores the snapshot those
+ * rules leave ({@link PublicationRuleEvaluator}); the version keeps both revisions, the rules and the counts after them. Imports
+ * run every round, so the publication lock is still not taken: a rule switch, a review decision or an activation never waits for
+ * an import, and a switch committed meanwhile reaches the next round's version. The receipt and the evidence rows keep the whole
+ * bundle, hidden content included.
  *
  * <p>Catalog lock: the company names, and that no company has the id of an issue, are read once and are only true at the commit
  * when no catalog write can land in between. The transaction therefore starts with {@link GraphHandoffRepository#lockCatalog()}
@@ -199,6 +214,9 @@ public final class GraphHandoffImporter {
         // First statement of the transaction: the catalog table lock comes before every row lock (articles) and every read of the
         // catalog (verifyApp), the order of the catalog import, and holds until the commit.
         graph.lockCatalog();
+        // The rules and both revisions this version fixes, in one statement and without the publication lock (imports run every
+        // round): a switch committed after this read is the next import's.
+        PublicationState publication = graph.publicationState();
         HandoffBundle bundle = checked.handoff().bundle();
         Instant now = clock.instant();
         String snapshotArtifactId = "artifact-" + versionId;
@@ -211,28 +229,33 @@ public final class GraphHandoffImporter {
         }
         AppFacts app = verifyApp(session, bundle, checked, receiptArtifactId, now);
         if (staged.isPresent()) {
-            return unchanged(session, request, checked, app, snapshotArtifactId, receiptArtifactId);
+            return unchanged(session, request, checked, app, staged.get(), snapshotArtifactId, receiptArtifactId);
         }
 
-        byte[] snapshotBytes = snapshotBytes(versionId, checked.handoff());
+        Filtered filtered = filtered(versionId, checked.handoff(), publication.enabledRules());
+        byte[] snapshotBytes = filtered.bytes();
         if (snapshotBytes.length > ArtifactFileStore.MAX_READ_BYTES || receiptBytes.length > ArtifactFileStore.MAX_READ_BYTES) {
             throw new GraphHandoffException(GraphHandoffFailure.SNAPSHOT_INVALID);
         }
-        ArtifactFileStore.StoredFile snapshotFile = put(session, created, SNAPSHOT_DIRECTORY, versionId + ".json", snapshotBytes);
+        ArtifactFileStore.StoredFile snapshotFile = put(session, created, SNAPSHOT_DIRECTORY,
+                snapshotFileName(versionId, filtered.ruleIds()), snapshotBytes);
         ArtifactFileStore.StoredFile receiptFile = put(session, created, RECEIPT_DIRECTORY, versionId + ".json", receiptBytes);
         registerArtifact(new ArtifactRow(snapshotArtifactId, SNAPSHOT_KIND, snapshotFile.uri(), snapshotFile.sha256(),
                 snapshotFile.bytes(), JSON_MEDIA_TYPE, now));
         registerArtifact(new ArtifactRow(receiptArtifactId, RECEIPT_KIND, receiptFile.uri(), receiptFile.sha256(),
                 receiptFile.bytes(), JSON_MEDIA_TYPE, now));
         int[] counts = registerEvidence(app.evidence(), true);
+        PublicGraphSnapshot visible = filtered.snapshot();
         graph.insertStagedVersion(new NewStagedVersion(versionId, "operator:" + request.operator(), REASON,
-                "graph-handoff:" + bundle.handoffId(), bundle.policyVersion(), snapshotArtifactId, bundle.issues().size(),
-                bundle.relations().size(), bundle.articles().size(), now));
+                "graph-handoff:" + bundle.handoffId(), bundle.policyVersion(), snapshotArtifactId, visible.issues().size(),
+                visible.relations().size(), visible.articles().size(), now, publication.ruleRevision(),
+                publication.reviewRevision(), filtered.ruleIds()));
         // The last word before the commit: the same checks, run again. A change rolls everything above back. The article rows are
         // still locked (verifyApp took them FOR UPDATE), so no withdrawal can slip in between this look and the commit.
         recheck(request, checked);
         revalidateArticles(bundle);
-        return result(Outcome.STAGED, checked, bundle, counts, fact(snapshotArtifactId, snapshotFile),
+        return result(Outcome.STAGED, checked, bundle, counts,
+                filtered.facts(publication.ruleRevision(), publication.reviewRevision()), fact(snapshotArtifactId, snapshotFile),
                 fact(receiptArtifactId, receiptFile));
     }
 
@@ -253,10 +276,12 @@ public final class GraphHandoffImporter {
 
     /**
      * Identical pins, already staged: nothing is written. The registered snapshot and receipt files must still be intact (hash and
-     * size), the snapshot must be this handoff's, and every evidence row must exist exactly as the bundle's spans produce it.
+     * size), the snapshot must be this handoff's and hold what the bundle gives under the rules the version was filtered with
+     * ({@code graph_version_rules}, never the rules enabled now: a later switch is a new version's, not this one's), and every
+     * evidence row must exist exactly as the bundle's spans produce it (every span, hidden or not, as on the first import).
      */
     private Staged unchanged(ArtifactFileStore.Session session, GraphHandoffRequest request, Checked checked, AppFacts app,
-            String snapshotArtifactId, String receiptArtifactId) {
+            StagedVersion version, String snapshotArtifactId, String receiptArtifactId) {
         HandoffBundle bundle = checked.handoff().bundle();
         ArtifactRow snapshot = registry.findArtifact(snapshotArtifactId).orElseThrow(
                 () -> new GraphHandoffException(GraphHandoffFailure.VERSION_CONFLICT));
@@ -270,13 +295,17 @@ public final class GraphHandoffImporter {
         } catch (GraphSnapshotUnavailableException invalid) {
             throw new GraphHandoffException(GraphHandoffFailure.VERSION_CONFLICT);
         }
-        if (!request.handoffId().equals(stored.sourceBundleId()) || stored.issues().size() != bundle.issues().size()
-                || stored.relations().size() != bundle.relations().size() || stored.articles().size() != bundle.articles().size()
-                || stored.evidence().size() != bundle.evidence().size()) {
+        Filtered staging = filtered(stored.versionId(), checked.handoff(), graph.versionRules(stored.versionId()));
+        PublicGraphSnapshot expected = staging.snapshot();
+        if (!request.handoffId().equals(stored.sourceBundleId()) || stored.issues().size() != expected.issues().size()
+                || stored.relations().size() != expected.relations().size()
+                || stored.articles().size() != expected.articles().size()
+                || stored.evidence().size() != expected.evidence().size()) {
             throw new GraphHandoffException(GraphHandoffFailure.VERSION_CONFLICT);
         }
         int[] counts = registerEvidence(app.evidence(), false);
-        return result(Outcome.UNCHANGED, checked, bundle, counts, new StoredFileFact(snapshotArtifactId, snapshot.sha256(),
+        return result(Outcome.UNCHANGED, checked, bundle, counts,
+                staging.facts(version.ruleRevision(), version.reviewRevision()), new StoredFileFact(snapshotArtifactId, snapshot.sha256(),
                 snapshot.bytes(), "existing"), new StoredFileFact(receiptArtifactId, receipt.sha256(), receipt.bytes(), "existing"));
     }
 
@@ -479,12 +508,60 @@ public final class GraphHandoffImporter {
         }
     }
 
-    private static byte[] snapshotBytes(String versionId, VerifiedHandoff handoff) {
+    /**
+     * The snapshot file of a version filtered with {@code ruleIds}: {@code <versionId>.json} with no rule (the name before rules
+     * existed), else suffixed with a digest of the rule set. The same pins and rules always give the same bytes, so a file left
+     * by an attempt whose commit outcome was unknown is adopted by a retry under the same rules; a retry after a switch writes
+     * its own name instead of colliding with it (the public read finds the file through the registry, never by name).
+     * shortcut: a file of the abandoned rule set stays as an unregistered orphan, never read; sweep orphans if the store grows.
+     */
+    static String snapshotFileName(String versionId, List<String> ruleIds) {
+        return ruleIds.isEmpty() ? versionId + ".json"
+                : versionId + "-" + Canonical.sha256(String.join("\n", ruleIds)).substring(0, 16) + ".json";
+    }
+
+    /** The snapshot file a version stores, what it holds, the rules it was filtered with and what they did. */
+    private record Filtered(byte[] bytes, PublicGraphSnapshot snapshot, List<String> ruleIds,
+            PublicationRuleEvaluator.Outcome outcome) {
+        RuleFacts facts(Long ruleRevision, long reviewRevision) {
+            Map<String, RuleHits> byRule = new TreeMap<>();
+            outcome.byRule().forEach((id, hits) -> byRule.put(id, new RuleHits(hits.issueIds().size(),
+                    hits.relationIds().size())));
+            return new RuleFacts(ruleRevision, reviewRevision, ruleIds, snapshot.issues().size(), snapshot.relations().size(),
+                    snapshot.articles().size(), snapshot.evidence().size(), outcome.hiddenIssueIds().size(),
+                    outcome.hiddenRelationIds().size(), byRule);
+        }
+    }
+
+    /**
+     * The bundle's snapshot with {@code rules} applied (rules doc 2-1: filtered at import, never at read). Every rule must be
+     * readable first, whether or not it would hide anything (fail closed). With no rule, or none that matches, the bytes are the
+     * writer's own; otherwise only the hidden elements are left out of them ({@link HandoffSnapshotWriter#keepOnly}).
+     */
+    private static Filtered filtered(String versionId, VerifiedHandoff handoff, List<RuleRow> rules) {
+        List<EnabledRule> enabled = new ArrayList<>();
+        try {
+            for (RuleRow rule : rules) {
+                enabled.add(new EnabledRule(rule.id(), RuleDefinition.parse(rule.definition())));
+            }
+        } catch (InvalidRuleDefinitionException | IllegalArgumentException unreadable) {
+            throw new GraphHandoffException(GraphHandoffFailure.RULE_DEFINITION_INVALID);
+        }
         try {
             byte[] bytes = HandoffSnapshotWriter.snapshot(versionId, handoff);
             // The reader of the public API must be able to read exactly this file; anything it would refuse is refused here.
-            GraphSnapshotCodec.read(bytes, versionId);
-            return bytes;
+            PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(bytes, versionId);
+            PublicationRuleEvaluator.Outcome outcome = PublicationRuleEvaluator.apply(snapshot, enabled);
+            PublicGraphSnapshot visible = outcome.snapshot();
+            List<String> ruleIds = enabled.stream().map(EnabledRule::ruleId).toList();
+            if (visible.equals(snapshot)) {
+                return new Filtered(bytes, snapshot, ruleIds, outcome);
+            }
+            byte[] kept = HandoffSnapshotWriter.keepOnly(bytes, visible);
+            if (!GraphSnapshotCodec.read(kept, versionId).equals(visible)) {
+                throw new GraphHandoffException(GraphHandoffFailure.SNAPSHOT_INVALID);
+            }
+            return new Filtered(kept, visible, ruleIds, outcome);
         } catch (StrictJson.Malformed | GraphSnapshotUnavailableException invalid) {
             throw new GraphHandoffException(GraphHandoffFailure.SNAPSHOT_INVALID);
         }
@@ -495,7 +572,7 @@ public final class GraphHandoffImporter {
     }
 
     private static Staged result(Outcome outcome, Checked checked, HandoffBundle bundle, int[] evidenceCounts,
-            StoredFileFact snapshot, StoredFileFact receipt) {
+            RuleFacts rules, StoredFileFact snapshot, StoredFileFact receipt) {
         Map<String, Integer> origins = new TreeMap<>();
         for (Relation relation : bundle.relations()) {
             origins.merge(relation.origin(), 1, Integer::sum);
@@ -509,6 +586,6 @@ public final class GraphHandoffImporter {
                 handoff.manifestDigest(), handoff.bundleDigest(), handoff.contentDigest(), bundle.sourceKind(),
                 bundle.executionMode(), bundle.recordingKind(), origins, approvalBases, bundle.companies().size(),
                 bundle.issues().size(), bundle.relations().size(), bundle.articles().size(), bundle.evidence().size(),
-                evidenceCounts[0], evidenceCounts[1], Objects.requireNonNull(snapshot), Objects.requireNonNull(receipt));
+                evidenceCounts[0], evidenceCounts[1], Objects.requireNonNull(snapshot), Objects.requireNonNull(receipt), rules);
     }
 }

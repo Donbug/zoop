@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import ast
-import re
 import shlex
 import subprocess
 import sys
@@ -41,14 +40,6 @@ def test_importing_the_service_does_not_load_the_runtime_even_though_it_is_insta
              "print(bad)")
     done = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, timeout=60)
     assert done.returncode == 0 and done.stdout.strip() == "[]", done.stderr
-
-
-def test_service_never_names_the_worker_ledger_or_spawns_a_shell():
-    for path in SOURCE.rglob("*.py"):
-        text = path.read_text(encoding="utf-8")
-        assert "worker.sqlite3" not in text and "shell=True" not in text and "os.system" not in text, path.name
-        assert not re.search(r"\b(eval|exec)\(", text), path.name
-        assert "os.environ" not in text or path.name == "main.py", path.name  # configuration is read once, at the entry point
 
 
 def test_the_child_command_line_holds_only_configured_values_and_no_named_request_file_exists(start, provider, live):

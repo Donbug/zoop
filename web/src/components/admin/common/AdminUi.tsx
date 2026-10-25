@@ -40,7 +40,7 @@ export function ErrorBox({
   return (
     <div
       role="alert"
-      className="flex flex-wrap items-center gap-3 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-wash px-4 py-3"
+      className="flex flex-wrap items-center gap-3 rounded-2xl bg-zoop-soft px-4 py-3"
     >
       <div className="min-w-0 flex-1">
         <p className="text-xs font-semibold">{title}</p>
@@ -59,7 +59,7 @@ export function ErrorBox({
 
 export function Empty({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-wash px-3 py-4 text-[11px] text-zoop-muted">
+    <p className="rounded-2xl bg-zoop-soft px-4 py-4 text-[11px] text-zoop-muted">
       {children}
     </p>
   );
@@ -163,7 +163,7 @@ export function Segmented<T extends string>({
     <div
       role="group"
       aria-label={label}
-      className="inline-flex rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-soft p-[3px]"
+      className="inline-flex rounded-full bg-zoop-soft p-1"
     >
       {options.map((option) => (
         <button
@@ -171,7 +171,7 @@ export function Segmented<T extends string>({
           type="button"
           aria-pressed={option.value === value}
           onClick={() => onChange(option.value)}
-          className={`h-7 rounded-[2px] px-3 text-xs text-zoop-muted aria-pressed:bg-zoop-paper aria-pressed:font-semibold aria-pressed:text-zoop-ink aria-pressed:ring-[0.5px] aria-pressed:ring-zoop-ink/8 ${FOCUS_RING}`}
+          className={`min-h-8 rounded-full px-4 text-xs text-zoop-muted transition-colors aria-pressed:bg-zoop-ink aria-pressed:font-semibold aria-pressed:text-zoop-paper ${FOCUS_RING}`}
         >
           {option.label}
         </button>
@@ -196,7 +196,7 @@ export function Tabs<T extends string>({
     <div
       role="tablist"
       aria-label={label}
-      className="flex border-b-[0.667px] border-zoop-line"
+      className="inline-flex max-w-full overflow-x-auto rounded-full bg-zoop-soft p-1"
     >
       {options.map((option) => (
         <button
@@ -205,7 +205,7 @@ export function Tabs<T extends string>({
           role="tab"
           aria-selected={option.value === value}
           onClick={() => onChange(option.value)}
-          className={`-mb-[0.667px] min-w-24 border-b-2 border-transparent px-4 py-2.5 text-xs text-zoop-muted aria-selected:border-zoop-ink aria-selected:font-bold aria-selected:text-zoop-ink ${FOCUS_RING}`}
+          className={`min-h-9 shrink-0 rounded-full px-4 text-xs text-zoop-muted transition-colors aria-selected:bg-zoop-ink aria-selected:font-bold aria-selected:text-zoop-paper ${FOCUS_RING}`}
         >
           {option.label}
         </button>

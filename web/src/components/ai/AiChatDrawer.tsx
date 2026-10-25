@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import ChatJobCard, { type AnswerMapTarget } from '@/components/ai/ChatJobCard';
@@ -30,16 +36,18 @@ const TARGET_KIND: Record<GraphTarget['kind'], string> = {
 type Props = {
   /** 답변이 가리키는 대상을 답변의 그래프 버전 기준으로 지도에 연다. 열 수 없으면 false. */
   onViewOnMap?: (target: AnswerMapTarget) => boolean;
+  /** 닫을 때 연 요소가 더는 없으면(다른 화면 헤더에서 열고 지도로 이동한 경우) 포커스를 돌려줄 지도 영역. */
+  returnFocusTo?: RefObject<HTMLElement | null>;
 };
 
-export default function AiChatDrawer({ onViewOnMap }: Props) {
+export default function AiChatDrawer({ onViewOnMap, returnFocusTo }: Props) {
   const isOpen = useAiChatStore((state) => state.isOpen);
   const close = useAiChatStore((state) => state.close);
   const { checking, isAuthenticated, member } = useAuth();
   const location = useLocation();
   if (!isOpen) return null;
   return (
-    <DrawerShell onClose={close}>
+    <DrawerShell onClose={close} returnFocusTo={returnFocusTo}>
       {checking ? (
         <p className={ui.state} role="status">
           로그인 상태를 확인하고 있어요.
@@ -68,9 +76,11 @@ export default function AiChatDrawer({ onViewOnMap }: Props) {
 
 function DrawerShell({
   onClose,
+  returnFocusTo,
   children,
 }: {
   onClose: () => void;
+  returnFocusTo?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }) {
   const dialog = useRef<HTMLElement>(null);
@@ -81,11 +91,16 @@ function DrawerShell({
     opener.current = document.activeElement as HTMLElement | null;
     const frame = requestAnimationFrame(() => heading.current?.focus());
     const returnTo = opener;
+    const fallback = returnFocusTo;
     return () => {
       cancelAnimationFrame(frame);
-      if (returnTo.current?.isConnected) returnTo.current.focus();
+      const target = returnTo.current;
+      // The opener may be gone: a header on another screen opened the drawer and unmounted on the way to the map.
+      if (target && target !== document.body && target.isConnected)
+        target.focus();
+      else fallback?.current?.focus();
     };
-  }, []);
+  }, [returnFocusTo]);
 
   return (
     <div className="absolute inset-0 z-20 flex justify-end">
