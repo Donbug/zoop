@@ -411,6 +411,34 @@ class OrchestratedChatEngineTest {
         assertEquals(0, verifierCalls);
     }
 
+    @Test
+    void aPolicyQuestionIsAnsweredFromTheApprovedPoliciesWithoutAGraph() {
+        List<List<String>> asked = Collections.synchronizedList(new ArrayList<>());
+        tools.put(ChatCapability.ZOOP_POLICY_READ, (scope, request) -> {
+            asked.add(request.targets());
+            return new ChatToolOutput("zoop-docs/policy.privacy@2026-10-13.1", List.of(new ChatToolItem("policy.privacy",
+                    "zoop_doc", "개인정보 처리방침", List.of(), List.of("ev-doc"))), List.of("ev-doc"), false, false);
+        });
+        readable.put("ev-doc", new Citation("zoop_doc", "ev-doc", "## 2. 보유 기간과 파기\n\n탈퇴하면 지웁니다.", null, null,
+                "policy.privacy", "2026-10-13.1", 100, 125, "개인정보 처리방침 · 2. 보유 기간과 파기", "줍", null, null));
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q01, 0.9), Map.of("zoopPolicy.read", 0.9)));
+        answer = new ChatGeneratedAnswer(List.of(new Section("zoop_documented", "탈퇴하면 대화 기록이 지워집니다.",
+                List.of("r1"), List.of("ev-doc"))), List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+
+        ChatResult result = completed(engine().answer(ChatPlannerTest.run(0, null), new Control(Duration.ofSeconds(60))));
+        assertEquals("answered", result.outcome());
+        assertEquals("zoop_documented", result.answerBasis());
+        assertEquals(List.of("zoop_doc"), result.citations().stream().map(Citation::sourceKind).toList());
+        assertTrue(result.sources().isEmpty(), "a ZOOP document is not an article source");
+        assertEquals(List.of(com.zoop.chat.service.ChatZoopDocs.POLICIES), asked, "the fixed policies, in one call");
+
+        // The read passed it on as a ZOOP document, but the record now says otherwise: the answer cannot stand on it.
+        readable.put("ev-doc", readable.get(evidence(HYNIX)));
+        assertFailed("validation_failed", null, false,
+                engine().answer(ChatPlannerTest.run(0, null), new Control(Duration.ofSeconds(60))));
+    }
+
     // ---- fixtures -------------------------------------------------------------------------------------------------------
 
     private ChatRouteDecision dependent(String cardinality, int count) {

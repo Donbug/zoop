@@ -31,8 +31,11 @@ public sealed interface ChatPlan {
     /** How a requirement is served: a Q02 general section, tool reads, or a server limitation (never a model's choice). */
     enum Mode { GENERAL, TOOLS, LIMITED }
 
-    /** Where a TOOLS requirement's targets came from. */
-    enum TargetSource { QUESTION, CONTEXT, DEPENDENCY }
+    /**
+     * Where a TOOLS requirement's targets came from. {@code SERVER}: it reads only ZOOP documents, whose targets are fixed
+     * ({@link com.zoop.chat.tool.ChatCapability#documents()}).
+     */
+    enum TargetSource { QUESTION, CONTEXT, DEPENDENCY, SERVER }
 
     /**
      * One planned requirement. TOOLS requirements read {@code capabilities} on {@code targets}, or, when

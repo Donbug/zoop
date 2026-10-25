@@ -1,6 +1,8 @@
 package com.zoop.chat.tool;
 
+import com.zoop.chat.service.ChatZoopDocs;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -11,7 +13,7 @@ import java.util.Optional;
 public enum ChatCapability {
     HELP_SEARCH("help.search", "zoop-help-read", "ZOOP 도움말 검색"),
     SCREEN_SPEC_READ("screenSpec.read", "zoop-help-read", "ZOOP 화면 설명 읽기"),
-    ZOOP_POLICY_READ("zoopPolicy.read", "zoop-help-read", "ZOOP 정책 문서 읽기"),
+    ZOOP_POLICY_READ("zoopPolicy.read", "zoop-help-read", "ZOOP 서비스 이용약관과 개인정보 처리방침 읽기"),
     COMPANY_READ("company.read", "zoop-core-read", "기업과 그 기업의 승인된 관계, 관계를 뒷받침하는 근거 읽기"),
     DOCUMENT_SEARCH("document.search", "zoop-core-read", "기업 뉴스·공시 문서 검색"),
     ISSUE_READ("issue.read", "zoop-core-read", "사건(이슈)과 관련 기업, 사건 근거 읽기"),
@@ -45,6 +47,19 @@ public enum ChatCapability {
 
     public String group() {
         return group;
+    }
+
+    /** Whether its reads need the run's pinned public graph; ZOOP's own documents do not. */
+    public boolean readsGraph() {
+        return !"zoop-help-read".equals(group);
+    }
+
+    /**
+     * The documents a ZOOP document capability always reads, whatever the question or the selection names (the router cannot
+     * name a document); none for any other capability, which reads the requirement's targets.
+     */
+    public List<String> documents() {
+        return this == ZOOP_POLICY_READ ? ChatZoopDocs.POLICIES : List.of();
     }
 
     public static Optional<ChatCapability> of(String id) {

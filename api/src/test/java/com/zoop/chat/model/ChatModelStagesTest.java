@@ -227,6 +227,19 @@ class ChatModelStagesTest {
     }
 
     @Test
+    void aZoopDocumentQuoteIsSentUnderTheZoopDocumentGrant() {
+        answer = call -> succeeded(call, """
+                {"sections":[{"support":"supported","prohibitedAdvice":"no"}]}""");
+        var doc = new Citation("zoop_doc", EV_B, "## 2. 보유 기간\n\n탈퇴하면 지웁니다.", null, null, "policy.privacy",
+                "2026-10-13.1", 10, 30, "개인정보 처리방침 · 2. 보유 기간", "줍", null, null);
+        stages.verify(run(root("q")), List.of(new ChatGeneratedAnswer.Section("zoop_documented", "탈퇴하면 지워집니다.",
+                List.of("r1"), List.of(EV_B))), List.of(doc));
+        JsonNode sent = calls.getFirst().input();
+        assertEquals("zoop-docs", sent.get("citations").get(0).get("sourceId").stringValue());
+        assertEquals("zoop_documented", sent.get("sections").get(0).get("basis").stringValue());
+    }
+
+    @Test
     void theGeneratorGetsEachPathPairWithItsStatusAndEachStepWithItsOwnQuotedEvidence() {
         answer = call -> succeeded(call, """
                 {"sections":[],"insufficientRequirementIds":["r1"],"graphTargetIds":[]}""");
