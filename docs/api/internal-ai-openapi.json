@@ -10529,6 +10529,7 @@
             "type": "string",
             "enum": [
               "general_knowledge",
+              "zoop_documented",
               "evidence_grounded"
             ],
             "title": "Basis"
