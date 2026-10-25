@@ -65,6 +65,10 @@ class Config(Wire):
         return self
 
     @property
+    def effective_user_agent(self):
+        return self.user_agent
+
+    @property
     def origin(self):
         return self.synthetic_base_url if self.synthetic_loopback else OFFICIAL_ORIGIN
 
