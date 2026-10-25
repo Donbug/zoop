@@ -36,6 +36,11 @@ abstract class GraphTargetTool implements ChatTool {
     /** The visible target of this tool's kind, or empty. */
     abstract Optional<GraphContextLookup.Target> find(GraphContextLookup lookup, String id);
 
+    /** Evidence passed on for a found target ahead of its graph evidence; none by default. */
+    List<String> ownEvidence(GraphContextLookup.Target target) {
+        return List.of();
+    }
+
     /** Whether a found target is reported even when none of its evidence is passed on. */
     boolean keptWithoutEvidence() {
         return true;
@@ -63,7 +68,9 @@ abstract class GraphTargetTool implements ChatTool {
             var target = find(lookup, id);
             if (target.isEmpty()) continue;
             List<String> evidence = new ArrayList<>();
-            for (String evidenceId : target.get().evidenceIds()) {
+            List<String> candidates = new ArrayList<>(ownEvidence(target.get()));
+            candidates.addAll(target.get().evidenceIds());
+            for (String evidenceId : candidates) {
                 // The runner interrupts a read that ran out of time: stop instead of reading on.
                 if (Thread.currentThread().isInterrupted()) throw new ChatToolUnavailable("read interrupted");
                 if (request.evidenceScope() != null && !request.evidenceScope().contains(evidenceId)) continue;

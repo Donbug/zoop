@@ -35,10 +35,10 @@ it('keeps mode and member viewport memories separate and rejects malformed camer
   );
   expect(readModeEntry('member-a', 'all')?.view.camera).toBeUndefined();
 });
-it('D-GRP-01 drops cameras from before group compaction but keeps the address and display settings', () => {
-  // Review #321: the relationship layout changed node coordinates. Replaying an older
+it('D-GRP-01 drops cameras from before the current layout but keeps the address and display settings', () => {
+  // Reviews #321/#330: relationship compaction and larger text changed node coordinates. Replaying an older
   // camera on the new coordinates can push every node off screen on first open.
-  for (const layout of [undefined, 1, 2]) {
+  for (const layout of [undefined, 1, 2, 3]) {
     sessionStorage.setItem(
       'zoop.graph.view:member-a:all',
       JSON.stringify({

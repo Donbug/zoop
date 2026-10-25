@@ -65,7 +65,7 @@ def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) 
     flight is ended as `service_restarted` and never run again automatically."""
     lock = ProcessLock(config.state_dir, create=lock_creation_allowed(config))
     try:
-        startup_mode(config)
+        startup_mode(config, lock=lock)
         online = PlanAuthority(config) if config.plan_root is not None else None
         lock.validate()
         if online is not None and list(lock.identity) != online._binding["serviceLock"]:
@@ -75,7 +75,7 @@ def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) 
     except BaseException:
         lock.close()
         raise
-    ledger = ServiceLedger(config.state_dir, config.worker_state_dir)
+    ledger = ServiceLedger(config.state_dir, config.worker_state_dir, existing_only=online is not None)
     requeued = ledger.requeue_in_flight()
     worker = WorkerProcess(config, deadlines)
     dispatcher = Dispatcher(config, ledger, worker, emit)
@@ -88,10 +88,10 @@ def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) 
     gate = RelationGate()
     plans = PlanAdmissionService(config, online) if online is not None else None
     if config.extraction is not None:
-        extraction_ledger = ExtractionLedger(config.state_dir, config.extraction.state_dir)
+        extraction_ledger = ExtractionLedger(config.state_dir, config.extraction.state_dir, existing_only=online is not None)
         extraction_interrupted = extraction_ledger.interrupt_in_flight()
     if config.relation is not None:
-        relation_ledger = RelationLedger(config.state_dir, config.relation.state_dir)
+        relation_ledger = RelationLedger(config.state_dir, config.relation.state_dir, existing_only=online is not None)
         interrupted = relation_ledger.interrupt_in_flight()
         process = RelationProcess(config, deadlines)
         names = [principal.name for principal in config.principals]

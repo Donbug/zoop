@@ -170,17 +170,7 @@ export default function MapDetailSheet({
         >
           <span className="h-1 w-9 rounded-full bg-zoop-muted" />
         </button>
-        <div className="flex shrink-0 items-center justify-between border-b border-panel-line px-3">
-          <span className="text-xs">지도 상세</span>
-          <button
-            type="button"
-            className="min-h-11 min-w-11"
-            onClick={onClose}
-            aria-label="모바일 상세 닫기"
-          >
-            ×
-          </button>
-        </div>
+        {/* 닫기는 안에 든 상세 패널의 ×와 Esc·바깥 누르기·아래로 끌기로 한다. 시트 자체 제목줄·닫기는 두지 않는다. */}
         {tutorial}
         {children}
       </div>

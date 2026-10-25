@@ -31,7 +31,9 @@ public class CompanyCatalogImportService {
     private static final Pattern LOGO_FILE = Pattern.compile("[a-z0-9]+(?:-[a-z0-9]+)*\\.svg");
     private static final Set<String> EXCHANGES = Set.of("KRX", "NASDAQ", "NYSE", "TSE");
     private static final Set<String> PROFILE_KEYS = Set.of("legalName", "representative", "foundedDate", "websiteUrl",
-            "sector");
+            "sector", "businessSummary");
+    /** The chatbot cites a business summary as one quote, so it stays well within the quote limit. */
+    private static final int MAX_BUSINESS_SUMMARY = 600;
     private static final Pattern WEBSITE = Pattern.compile("https://[^\\s]+");
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
@@ -209,6 +211,10 @@ public class CompanyCatalogImportService {
             }
             if (key.equals("websiteUrl") && !WEBSITE.matcher(value).matches()) {
                 throw new IllegalArgumentException("websiteUrl must be an https URL for " + id);
+            }
+            if (key.equals("businessSummary") && value.codePointCount(0, value.length()) > MAX_BUSINESS_SUMMARY) {
+                throw new IllegalArgumentException("businessSummary must be at most " + MAX_BUSINESS_SUMMARY
+                        + " characters for " + id);
             }
             profile.put(key, value);
         }
