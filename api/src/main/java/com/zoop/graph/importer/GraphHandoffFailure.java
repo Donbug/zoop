@@ -46,6 +46,11 @@ public enum GraphHandoffFailure {
      */
     MENTION_ARTICLE_AMBIGUOUS("mention_article_ambiguous"),
     SNAPSHOT_INVALID("snapshot_invalid"),
+    /**
+     * An enabled publication rule (or a rule a staged version was filtered with) has a definition this app cannot read: the import
+     * fails instead of skipping it, so nothing a rule should hide is published (rules doc 2-3, fail closed).
+     */
+    RULE_DEFINITION_INVALID("rule_definition_invalid"),
     /** The graph version id exists with other pins (another receipt) or another kind. */
     VERSION_CONFLICT("version_conflict"),
     ARTIFACT_CONFLICT("artifact_conflict"),

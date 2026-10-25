@@ -94,7 +94,7 @@ export default function GraphVersionForm({
       noValidate
       aria-label="그래프 버전 전환"
       onSubmit={(event) => void submit(event)}
-      className="flex flex-col gap-3 rounded-[3px] border-[0.667px] border-zoop-ink bg-zoop-paper p-4"
+      className="flex flex-col gap-3 rounded-2xl bg-zoop-soft p-5"
     >
       <p className="text-sm font-bold">그래프 버전 전환</p>
       <p className="text-[11px] leading-relaxed text-zoop-muted">

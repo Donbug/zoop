@@ -22,7 +22,8 @@ EXTRACTION_SCOPES = ("extraction.submit", "extraction.read", "extraction.cancel"
 GRAPH_SCOPES = ("graph.read",)
 HANDOFF_SCOPES = ("handoff.read", "handoff.exposure")
 CHAT_SCOPES = ("chat.invoke",)
-SCOPES = (*ANALYSIS_SCOPES, *RELATION_SCOPES, *EXTRACTION_SCOPES, *GRAPH_SCOPES, *HANDOFF_SCOPES, *CHAT_SCOPES)
+PLAN_SCOPES = ("plan.admit", "plan.read", "plan.policy")
+SCOPES = (*ANALYSIS_SCOPES, *RELATION_SCOPES, *EXTRACTION_SCOPES, *GRAPH_SCOPES, *HANDOFF_SCOPES, *CHAT_SCOPES, *PLAN_SCOPES)
 PRINCIPAL = re.compile(r"[a-z][a-z0-9-]{0,62}")
 DIGEST = re.compile(r"[0-9a-f]{64}")
 HOST = "127.0.0.1"
@@ -130,7 +131,7 @@ class RelationConfig:
     sources_path: Path
     producer_replay: Path
     verifier_replay: Path
-    upstreams_path: Path
+    upstreams_path: Path | None
     child_env: Mapping[str, str]
 
 
@@ -142,7 +143,7 @@ class ExtractionConfig:
     sources_path: Path
     producer_replay: Path       # the one authored replay fixture; its digest is pinned in every approval
     topic_replay: Path | None   # optional topic fixture; its digest is pinned only in approvals that request a topic stage
-    approvals_path: Path
+    approvals_path: Path | None
     child_env: Mapping[str, str]
 
 
@@ -215,6 +216,7 @@ class ServiceConfig:
     pipeline_live: PipelineLive | None = None
     handoff_exposure: HandoffExposureConfig | None = None
     chat: ChatConfig | None = None
+    plan_root: Path | None = None
 
     @property
     def transport_dir(self) -> Path:
@@ -245,6 +247,8 @@ def _principals(raw: str | None) -> tuple[Principal, ...]:
         if (not isinstance(scopes, list) or not scopes or not all(isinstance(s, str) and s in SCOPES for s in scopes)
                 or len(set(scopes)) != len(scopes)):
             raise ConfigError(field, "scope_invalid")
+        if "plan.policy" in scopes and any(s in scopes for s in (*EXTRACTION_SCOPES, *RELATION_SCOPES, "plan.admit")):
+            raise ConfigError(field, "policy_scope_separation")
         names.add(name)
         digests.update(hashes)
         principals.append(Principal(name, tuple(hashes), frozenset(scopes)))
@@ -370,7 +374,8 @@ def _relation(environ: Mapping[str, str], principals: tuple[Principal, ...], sta
     group do not by themselves switch the relation group on when the S2 group is configured."""
     if not enabled:
         return None
-    for name in RELATION_VARS:
+    online = environ.get("ZOOP_AI_SERVICE_PLAN_ADMISSION") == "1"
+    for name in (n for n in RELATION_VARS if not online or n != "ZOOP_AI_SERVICE_RELATION_UPSTREAMS"):
         if name not in environ:
             raise ConfigError(name, "relation_group_incomplete")
     command = _file(environ["ZOOP_AI_SERVICE_RELATION_COMMAND"], "ZOOP_AI_SERVICE_RELATION_COMMAND", executable=True)
@@ -388,11 +393,13 @@ def _relation(environ: Mapping[str, str], principals: tuple[Principal, ...], sta
     sources = _file(environ["ZOOP_AI_SERVICE_SOURCES"], "ZOOP_AI_SERVICE_SOURCES")
     producer = _file(environ["ZOOP_AI_SERVICE_RELATION_REPLAY"], "ZOOP_AI_SERVICE_RELATION_REPLAY")
     verifier = _file(environ["ZOOP_AI_SERVICE_RELATION_VERIFIER_REPLAY"], "ZOOP_AI_SERVICE_RELATION_VERIFIER_REPLAY")
-    upstreams = _file(environ["ZOOP_AI_SERVICE_RELATION_UPSTREAMS"], "ZOOP_AI_SERVICE_RELATION_UPSTREAMS")
-    try:
-        relation_access.load(upstreams, [p.name for p in principals])
-    except relation_access.AccessError as error:
-        raise ConfigError("ZOOP_AI_SERVICE_RELATION_UPSTREAMS", error.code) from None
+    upstreams = None
+    if not online:
+        upstreams = _file(environ["ZOOP_AI_SERVICE_RELATION_UPSTREAMS"], "ZOOP_AI_SERVICE_RELATION_UPSTREAMS")
+        try:
+            relation_access.load(upstreams, [p.name for p in principals])
+        except relation_access.AccessError as error:
+            raise ConfigError("ZOOP_AI_SERVICE_RELATION_UPSTREAMS", error.code) from None
     return RelationConfig(command, relation_state, extraction, ingestion, sources, producer, verifier, upstreams, _child_env(app_state, worker_state))
 
 
@@ -401,7 +408,8 @@ def _extraction(environ: Mapping[str, str], principals: tuple[Principal, ...], s
     topic fixture); the fixture digests themselves are checked against the pins on every use, not at start."""
     if not any(name in environ for name in (*EXTRACTION_OWN, EXTRACTION_TOPIC)):
         return None
-    for name in EXTRACTION_VARS:
+    online = environ.get("ZOOP_AI_SERVICE_PLAN_ADMISSION") == "1"
+    for name in (n for n in EXTRACTION_VARS if not online or n != "ZOOP_AI_SERVICE_EXTRACTION_APPROVALS"):
         if name not in environ:
             raise ConfigError(name, "extraction_group_incomplete")
     command = _file(environ["ZOOP_AI_SERVICE_EXTRACTION_COMMAND"], "ZOOP_AI_SERVICE_EXTRACTION_COMMAND", executable=True)
@@ -413,12 +421,14 @@ def _extraction(environ: Mapping[str, str], principals: tuple[Principal, ...], s
     sources = _file(environ["ZOOP_AI_SERVICE_SOURCES"], "ZOOP_AI_SERVICE_SOURCES")
     producer = _file(environ["ZOOP_AI_SERVICE_EXTRACTION_REPLAY"], "ZOOP_AI_SERVICE_EXTRACTION_REPLAY")
     topic = _file(environ[EXTRACTION_TOPIC], EXTRACTION_TOPIC) if EXTRACTION_TOPIC in environ else None
-    approvals = _file(environ["ZOOP_AI_SERVICE_EXTRACTION_APPROVALS"], "ZOOP_AI_SERVICE_EXTRACTION_APPROVALS")
-    live_available = environ.get(PIPELINE_LIVE_SWITCH) == "1" and environ.get(PIPELINE_LIVE_GATE) == "1"
-    try:
-        extraction_access.load(approvals, [p.name for p in principals], topic_available=topic is not None, live_available=live_available)
-    except extraction_access.AccessError as error:
-        raise ConfigError("ZOOP_AI_SERVICE_EXTRACTION_APPROVALS", error.code) from None
+    approvals = None
+    if not online:
+        approvals = _file(environ["ZOOP_AI_SERVICE_EXTRACTION_APPROVALS"], "ZOOP_AI_SERVICE_EXTRACTION_APPROVALS")
+        live_available = environ.get(PIPELINE_LIVE_SWITCH) == "1" and environ.get(PIPELINE_LIVE_GATE) == "1"
+        try:
+            extraction_access.load(approvals, [p.name for p in principals], topic_available=topic is not None, live_available=live_available)
+        except extraction_access.AccessError as error:
+            raise ConfigError("ZOOP_AI_SERVICE_EXTRACTION_APPROVALS", error.code) from None
     return ExtractionConfig(command, extraction, ingestion, sources, producer, topic, approvals, _child_env(app_state, worker_state))
 
 
@@ -649,6 +659,11 @@ def _chat(environ: Mapping[str, str], state_dir: Path, worker_state: Path, *,
 
 def load(environ: Mapping[str, str]) -> ServiceConfig:
     principals = _principals(environ.get("ZOOP_AI_SERVICE_PRINCIPALS"))
+    admission = environ.get("ZOOP_AI_SERVICE_PLAN_ADMISSION")
+    root = environ.get("ZOOP_AI_SERVICE_PLAN_ROOT")
+    if (admission is not None or root is not None) and (admission != "1" or not root):
+        raise ConfigError("ZOOP_AI_SERVICE_PLAN_ADMISSION", "plan_group_incomplete")
+    plan_root = _existing_dir(root, "ZOOP_AI_SERVICE_PLAN_ROOT") if admission == "1" else None
     state_dir = _absolute(environ.get("ZOOP_AI_SERVICE_STATE_DIR"), "ZOOP_AI_SERVICE_STATE_DIR")
     worker_state = _absolute(environ.get("ZOOP_AI_WORKER_STATE_DIR"), "ZOOP_AI_WORKER_STATE_DIR")
     if _overlaps(state_dir, worker_state):
@@ -679,10 +694,15 @@ def load(environ: Mapping[str, str]) -> ServiceConfig:
     relation_enabled = any(name in environ for name in RELATION_OWN) or (not extraction_enabled and any(name in environ for name in SHARED_VARS))
     relation = _relation(environ, principals, state_dir, worker_state, relation_enabled)
     extraction = _extraction(environ, principals, state_dir, worker_state)
+    if plan_root is not None:
+        if extraction is None or relation is None:
+            raise ConfigError("ZOOP_AI_SERVICE_PLAN_ADMISSION", "plan_execution_groups_required")
+        if any(_overlaps(plan_root, p) for p in (state_dir, worker_state, extraction.state_dir, extraction.ingestion_state_dir, relation.state_dir)):
+            raise ConfigError("ZOOP_AI_SERVICE_PLAN_ROOT", "plan_roots_overlap")
     graph = _graph(environ, principals, state_dir, worker_state, relation, extraction)
     handoff = _handoff(environ, principals, state_dir, worker_state, relation, extraction, graph)
     pipeline_live = _pipeline_live(environ, state_dir, relation, extraction)
     exposure = _handoff_exposure(environ, principals, state_dir, worker_state, relation, extraction, graph, handoff)
     chat = _chat(environ, state_dir, worker_state, relation=relation, extraction=extraction, graph=graph, handoff=handoff, exposure=exposure)
     return ServiceConfig(principals, state_dir, worker_state, command, grants_path, replay, port, live, child, relation, extraction, graph, handoff,
-                         pipeline_live, handoff_exposure=exposure, chat=chat)
+                         pipeline_live, handoff_exposure=exposure, chat=chat, plan_root=plan_root)

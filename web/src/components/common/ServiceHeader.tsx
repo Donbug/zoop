@@ -1,6 +1,7 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { toggleTheme } from '@/util/theme-color';
 import GraphIcon from '@/components/graph/GraphIcon';
+import { useAiChatStore } from '@/stores/useAiChatStore';
 import AccountMenu from './AccountMenu';
 import './service-shell.css';
 
@@ -17,11 +18,19 @@ export default function ServiceHeader({
 }: {
   navLabel?: string;
 }) {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  /** D-AI-01: the AI drawer lives on the map. Elsewhere, go to the map first; the selected target is kept as it is. */
+  function openAiChat() {
+    if (pathname !== '/') navigate('/');
+    useAiChatStore.getState().open(undefined);
+  }
+
   return (
     <header className="relationship-header">
       <NavLink to="/" className="relationship-logo">
-        <strong>줍</strong>
-        <span>Zoop</span>
+        {/* 로고는 영문 ZOOP 한 단어로, 메뉴 타이틀과 같은 색·크기로 둔다. */}
+        <strong className="font-inter">ZOOP</strong>
       </NavLink>
       <nav aria-label={navLabel}>
         {menus.map((menu) => (
@@ -29,7 +38,9 @@ export default function ServiceHeader({
             {menu.label}
           </NavLink>
         ))}
-        <button>AI 채팅</button>
+        <button type="button" onClick={openAiChat}>
+          AI 채팅
+        </button>
       </nav>
       <div className="relationship-user-tools">
         <button

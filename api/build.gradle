@@ -33,9 +33,12 @@ dependencies {
 
 // Default `test`: foundation tests and the AI client tests against in-process stub servers. No Python, no network.
 tasks.named('test') {
+	// The proof regression launches the actual test-owned CLI in a separate JVM (System.exit must not stop the test worker).
+	systemProperty 'zoop.ai.proof.classpath', sourceSets.test.runtimeClasspath.asPath
 	useJUnitPlatform {
 		excludeTags 'ai-contract'
 		excludeTags 'ai-pipeline-contract'
+		excludeTags 'ai-chat-contract'
 		excludeTags 'company-postgres'
 		excludeTags 'briefing-postgres'
 		excludeTags 'briefing-replay-postgres'
@@ -146,4 +149,41 @@ tasks.register('aiPipelineContractTest', Test) {
 		events 'passed', 'failed'
 		exceptionFormat 'full'
 	}
+}
+
+// Real cross-language gate for the chatbot model stages: the production ChatModelStages adapters talk to a running ai/service
+// and the installed zoop-ai-chat over an authored replay fixture (no model, no network, no PostgreSQL). Run it through
+// `make api-ai-chat-smoke`; that script authors the fixture, starts the service and exports ZOOP_AI_CHAT_CONTRACT_MANIFEST.
+// Without the manifest the tests fail; they never skip.
+tasks.register('aiChatContractTest', Test) {
+	group = 'verification'
+	description = 'Runs the chatbot model stage cross-language tests against a live ai/service (see make api-ai-chat-smoke).'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform {
+		includeTags 'ai-chat-contract'
+	}
+	outputs.upToDateWhen { false }
+	testLogging {
+		events 'passed', 'failed'
+		exceptionFormat 'full'
+	}
+}
+
+// Test-owned synthetic consumer. No Spring app queue, policy control, publication or provider calls.
+tasks.register('preparePlanAdmissionProof') {
+	group = 'verification'
+	description = 'Compiles the synthetic admission proof client and writes its direct JVM classpath.'
+	dependsOn tasks.named('testClasses')
+	doLast {
+		layout.buildDirectory.file('plan-admission-proof-classpath.txt').get().asFile.text = sourceSets.test.runtimeClasspath.asPath
+	}
+}
+
+tasks.register('planAdmissionProof', JavaExec) {
+	group = 'verification'
+	description = 'Runs the test-owned synthetic exact-plan consumer: config.json reference.json evidence-directory.'
+	dependsOn tasks.named('testClasses')
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = 'com.zoop.ai.PlanAdmissionProof'
 }

@@ -27,8 +27,10 @@ import com.zoop.chat.orchestrator.ChatModels.Failure.Fate;
 import com.zoop.chat.orchestrator.ChatQueryType;
 import com.zoop.chat.orchestrator.ChatRouteDecision;
 import com.zoop.chat.orchestrator.ChatSemanticVerdicts;
+import com.zoop.chat.service.ChatCompanyProfiles;
 import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatToolItem;
+import com.zoop.chat.tool.ChatToolPath;
 import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.common.json.StrictJson;
 import tools.jackson.databind.JsonNode;
@@ -57,6 +59,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     static final int MAX_QUOTES = 20;
     static final int MAX_QUOTE = 2000;
     static final int MAX_LABEL = 300;
+    static final int MAX_PATHS = 20;
     private static final Pattern EVIDENCE = Pattern.compile("ev-[0-9a-f]{64}");
     /** Item kinds whose label is catalog or graph data (company names, issue titles, relation pairs), not source text. */
     static final Set<String> SENT_ITEM_KINDS = Set.of("company", "issue", "edge");
@@ -220,15 +223,18 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
                 }
                 branchEvidence.addAll(result.evidenceIds());
             }
+            Set<String> sent = new HashSet<>();
             for (String id : branchEvidence) {
                 if (evidence.size() >= MAX_QUOTES) break;
                 if (!quoted.contains(id) && quoted.size() >= Math.min(MAX_QUOTES, context.maxCitations())) continue;
                 Optional<ObjectNode> quote = quotes.computeIfAbsent(id, key -> quote(run, key));
                 if (quote.isPresent()) {
                     quoted.add(id);
+                    sent.add(id);
                     evidence.add(quote.get().deepCopy());
                 }
             }
+            paths(wire, branch, sent);
         }
         input.put("maxCitations", Math.min(MAX_QUOTES, context.maxCitations()));
         JsonNode answer = call(run, ANSWER, "answer", input);
@@ -250,11 +256,19 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     }
 
     private Optional<ObjectNode> quote(Citation citation) {
-        if (!"article".equals(citation.sourceKind()) || citation.articleId() == null || citation.quote() == null
-                || citation.quote().isEmpty() || citation.quote().length() > MAX_QUOTE) {
+        if (citation.quote() == null || citation.quote().isEmpty() || citation.quote().length() > MAX_QUOTE) {
             return Optional.empty();
         }
-        return sources.sourceOf(citation.articleId()).map(source -> {
+        Optional<String> sourceId;
+        if ("company_profile".equals(citation.sourceKind())) {
+            // ZOOP's own catalog text: its grant is the catalog's, not an article provider's.
+            sourceId = Optional.of(ChatCompanyProfiles.SOURCE_ID);
+        } else if ("article".equals(citation.sourceKind()) && citation.articleId() != null) {
+            sourceId = sources.sourceOf(citation.articleId());
+        } else {
+            return Optional.empty();
+        }
+        return sourceId.map(source -> {
             ObjectNode quote = StrictJson.newObject().put("evidenceId", citation.evidenceId()).put("sourceId", source)
                     .put("quote", citation.quote());
             if (citation.articleTitle() != null && citation.articleTitle().length() <= 500) {
@@ -346,10 +360,52 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     }
 
     private void finish(String execution, String status, ChatStageReply.Receipt receipt, String code) {
-        try {
-            recorder.finish(execution, status, receipt, code);
-        } catch (RuntimeException unrecorded) {
-            // The stage outcome stands; the running row stays as evidence that the call was made.
+        // A stage the engine cut off is interrupted, before or during this write, and an interrupted thread cannot use its
+        // database connection. The outcome is written on a thread of its own, which the cancellation never reaches, and this
+        // thread waits for it; an interrupt that arrives meanwhile is kept for after.
+        Thread writer = Thread.ofVirtual().name("chat-model-ledger").start(() -> {
+            try {
+                recorder.finish(execution, status, receipt, code);
+            } catch (RuntimeException unrecorded) {
+                // The stage outcome stands; the running row stays as evidence that the call was made.
+            }
+        });
+        boolean interrupted = false;
+        while (true) {
+            try {
+                writer.join();
+                break;
+            } catch (InterruptedException cutOff) {
+                interrupted = true;
+            }
+        }
+        if (interrupted) Thread.currentThread().interrupt();
+    }
+
+    /**
+     * The pairs a path read reported, each with its own status and its steps in order: a pair cut by the hop limit never
+     * looks like one proven unconnected, and a step names only evidence quoted in this branch, so each hop is explained by
+     * its own quotes. Sent only when the branch has a path read.
+     */
+    private static void paths(ObjectNode wire, ChatBranchContext.Branch branch, Set<String> sent) {
+        ArrayNode paths = null;
+        for (ChatToolResult result : branch.results()) {
+            if (!result.succeeded()) continue;
+            for (ChatToolPath path : result.paths()) {
+                if (paths == null) paths = wire.putArray("paths");
+                if (paths.size() >= MAX_PATHS) return;
+                ObjectNode p = paths.addObject().put("fromId", path.fromId()).put("toId", path.toId())
+                        .put("status", path.status());
+                ArrayNode steps = p.putArray("steps");
+                for (ChatToolPath.Step step : path.steps()) {
+                    ObjectNode s = steps.addObject().put("edgeId", step.edgeId()).put("sourceId", step.sourceId())
+                            .put("targetId", step.targetId()).put("relation", step.relation());
+                    if (step.role() == null) s.putNull("role");
+                    else s.put("role", clip(step.role()));
+                    ArrayNode ids = s.putArray("evidenceIds");
+                    step.evidenceIds().stream().filter(sent::contains).forEach(ids::add);
+                }
+            }
         }
     }
 

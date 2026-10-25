@@ -1,6 +1,7 @@
 package com.zoop.chat.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,6 +14,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 import com.zoop.ai.AiOperation;
@@ -34,6 +38,7 @@ import com.zoop.chat.orchestrator.ChatRouteDecision;
 import com.zoop.chat.orchestrator.ChatSemanticVerdicts;
 import com.zoop.chat.service.FrozenSelection;
 import com.zoop.chat.tool.ChatToolItem;
+import com.zoop.chat.tool.ChatToolPath;
 import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.common.json.StrictJson;
 import org.junit.jupiter.api.Test;
@@ -57,10 +62,24 @@ class ChatModelStagesTest {
     private final List<String> recorded = new ArrayList<>();
     private Function<ChatStageCall, ChatStageReply> answer = call -> { throw new AssertionError("no call expected"); };
 
-    private final ChatModelStages stages = new ChatModelStages(call -> {
-        calls.add(call);
-        return answer.apply(call);
-    }, "replay", new CompanyNameResolver(null) {
+    private final ChatModelStages stages = stages(new ChatModelRecorder(null, Clock.systemUTC()) {
+        @Override
+        public String start(String jobId, String stage, String mode) {
+            recorded.add("start " + jobId + " " + stage + " " + mode);
+            return "aix-1";
+        }
+
+        @Override
+        public void finish(String id, String status, ChatStageReply.Receipt receipt, String errorCode) {
+            recorded.add("finish " + status + " " + (receipt == null ? "-" : receipt.model()) + " " + errorCode);
+        }
+    });
+
+    private ChatModelStages stages(ChatModelRecorder recorder) {
+        return new ChatModelStages(call -> {
+            calls.add(call);
+            return answer.apply(call);
+        }, "replay", new CompanyNameResolver(null) {
         @Override
         public List<Mention> mentions(String text) {
             return match(text, CATALOG);
@@ -68,19 +87,8 @@ class ChatModelStagesTest {
     }, (evidenceId, graphVersion, asOf, traceId) -> evidenceId.equals(EV_A)
             ? Optional.of(citation(EV_A, "삼성전자가 HBM을 공급한다."))
             : Optional.empty(),
-            articleId -> Optional.of("news-provider-1"),
-            new ChatModelRecorder(null, Clock.systemUTC()) {
-                @Override
-                public String start(String jobId, String stage, String mode) {
-                    recorded.add("start " + jobId + " " + stage + " " + mode);
-                    return "aix-1";
-                }
-
-                @Override
-                public void finish(String id, String status, ChatStageReply.Receipt receipt, String errorCode) {
-                    recorded.add("finish " + status + " " + (receipt == null ? "-" : receipt.model()) + " " + errorCode);
-                }
-            });
+            articleId -> Optional.of("news-provider-1"), recorder);
+    }
 
     private static Citation citation(String id, String quote) {
         return new Citation("article", id, quote, "art-1", "v1", null, null, 0, quote.length(), "기사 제목", "언론사",
@@ -194,6 +202,7 @@ class ChatModelStagesTest {
                 new ChatBranchContext(List.of(), null, List.of(branch), 20));
 
         JsonNode sent = calls.getFirst().input().get("branches").get(0);
+        assertNull(sent.get("paths"), "a branch without a path read sends no paths");
         assertEquals(JOB + ".1.answer", calls.getFirst().invocationId());
         assertEquals(1, sent.get("evidence").size(), "unreadable evidence is not offered");
         assertEquals("news-provider-1", sent.get("evidence").get(0).get("sourceId").stringValue());
@@ -215,6 +224,46 @@ class ChatModelStagesTest {
         assertEquals(new ChatSemanticVerdicts.Verdict(null, "no"), verdicts.sections().get(0));
         assertEquals(new ChatSemanticVerdicts.Verdict("supported", "hold"), verdicts.sections().get(1));
         assertEquals("news-provider-1", calls.getFirst().input().get("citations").get(0).get("sourceId").stringValue());
+    }
+
+    @Test
+    void theGeneratorGetsEachPathPairWithItsStatusAndEachStepWithItsOwnQuotedEvidence() {
+        answer = call -> succeeded(call, """
+                {"sections":[],"insufficientRequirementIds":["r1"],"graphTargetIds":[]}""");
+        var step1 = new ChatToolPath.Step("e-1", "iss-hbm", "c-samsung", "INVOLVES", "공급사", List.of(EV_A, EV_B));
+        var step2 = new ChatToolPath.Step("e-2", "iss-hbm", "c-nvda", "INVOLVES", null, List.of());
+        var found = new ChatToolPath("c-samsung", "c-nvda", ChatToolPath.FOUND, List.of(step1, step2));
+        JsonNode cut = pathsSent(found, new ChatToolPath("c-samsung", "c-amd", ChatToolPath.CUT, List.of()));
+        JsonNode none = pathsSent(found, new ChatToolPath("c-samsung", "c-amd", ChatToolPath.NONE, List.of()));
+
+        assertEquals(2, cut.size());
+        JsonNode first = cut.get(0);
+        assertEquals("found", first.get("status").stringValue());
+        assertEquals("c-samsung", first.get("fromId").stringValue());
+        assertEquals(List.of("e-1", "e-2"), first.get("steps").valueStream().map(s -> s.get("edgeId").stringValue()).toList());
+        JsonNode s1 = first.get("steps").get(0);
+        assertEquals("iss-hbm", s1.get("sourceId").stringValue());
+        assertEquals("INVOLVES", s1.get("relation").stringValue());
+        assertEquals("공급사", s1.get("role").stringValue());
+        assertEquals(1, s1.get("evidenceIds").size(), "only evidence quoted in the branch is named");
+        assertEquals(EV_A, s1.get("evidenceIds").get(0).stringValue());
+        assertTrue(first.get("steps").get(1).get("role").isNull());
+
+        assertEquals("cut", cut.get(1).get("status").stringValue());
+        assertEquals("none", none.get(1).get("status").stringValue());
+        assertEquals(cut.get(0), none.get(0), "the found pair is the same; only the second pair's status tells them apart");
+    }
+
+    private JsonNode pathsSent(ChatToolPath... paths) {
+        calls.clear();
+        var result = new ChatToolResult("chat-tools/v1", "tc-1", "graph.path.read", "gv-1",
+                List.of(new ChatToolItem("c-samsung", "company", "삼성전자", List.of("c-samsung"), List.of()),
+                        new ChatToolItem("e-1", "edge", "HBM 공급 – 삼성전자", List.of("c-samsung"), List.of(EV_A, EV_B))),
+                List.of(EV_A), false, false, null, List.of(paths));
+        var branch = new ChatBranchContext.Branch("r1", "삼성전자와 엔비디아의 관계", Set.of(ChatQueryType.Q04), false,
+                List.of(result), false);
+        stages.generate(run(root("삼성전자와 엔비디아의 관계")), new ChatBranchContext(List.of(), null, List.of(branch), 20));
+        return calls.getFirst().input().get("branches").get(0).get("paths");
     }
 
     @Test
@@ -242,6 +291,49 @@ class ChatModelStagesTest {
         answer = call -> { throw new AiTransportException(AiOperation.CHAT_STAGE, "r", AiTransportException.Failure.TIMEOUT,
                 OptionalInt.empty(), null); };
         assertEquals(Fate.UNKNOWN, fate(() -> stages.route(run, Set.of())));
+    }
+
+    @Test
+    void aStageCutOffWhileItsOutcomeIsBeingWrittenIsStillRecorded() throws Exception {
+        var writing = new CountDownLatch(1);
+        var cutOff = new CountDownLatch(1);
+        var writerInterrupted = new AtomicBoolean();
+        var stages = stages(new ChatModelRecorder(null, Clock.systemUTC()) {
+            @Override
+            public String start(String jobId, String stage, String mode) {
+                return "aix-1";
+            }
+
+            @Override
+            public void finish(String id, String status, ChatStageReply.Receipt receipt, String errorCode) {
+                writing.countDown();
+                try {
+                    // The engine's cancellation lands here, in the middle of the write.
+                    assertTrue(cutOff.await(5, TimeUnit.SECONDS));
+                } catch (InterruptedException e) {
+                    writerInterrupted.set(true);
+                    return;
+                }
+                writerInterrupted.set(Thread.currentThread().isInterrupted());
+                recorded.add("finish " + status);
+            }
+        });
+        answer = call -> succeeded(call, """
+                {"requirements":[{"requirementId":"r1","types":{"Q02":0.9},"capabilities":{},"prohibitedAdvice":0.0}]}""");
+        var restored = new AtomicBoolean();
+        Thread stage = Thread.ofPlatform().start(() -> {
+            stages.route(run(root("PER이 뭐야")), Set.of());
+            restored.set(Thread.currentThread().isInterrupted());
+        });
+
+        assertTrue(writing.await(5, TimeUnit.SECONDS));
+        stage.interrupt();
+        cutOff.countDown();
+        stage.join(5000);
+
+        assertEquals(List.of("finish succeeded"), recorded);
+        assertFalse(writerInterrupted.get(), "the write never sees the stage's interrupt");
+        assertTrue(restored.get(), "the stage thread keeps its interrupt for the engine");
     }
 
     private static AiServiceErrorException rejection(int status) {

@@ -2,6 +2,7 @@ import { beforeEach, expect, it } from 'vitest';
 import {
   emptyView,
   isolatedIssues,
+  MAP_LAYOUT_REVISION,
   readModeEntry,
   saveModeEntry,
   restoreTargets,
@@ -17,6 +18,7 @@ it('keeps mode and member viewport memories separate and rejects malformed camer
         zoom: 1.5,
         position: [30, 40] as [number, number],
         size: [1200, 700] as [number, number],
+        layout: MAP_LAYOUT_REVISION,
       },
     },
   };
@@ -32,6 +34,31 @@ it('keeps mode and member viewport memories separate and rejects malformed camer
     }),
   );
   expect(readModeEntry('member-a', 'all')?.view.camera).toBeUndefined();
+});
+it('D-GRP-01 drops cameras from before the current layout but keeps the address and display settings', () => {
+  // Reviews #321/#330: relationship compaction and larger text changed node coordinates. Replaying an older
+  // camera on the new coordinates can push every node off screen on first open.
+  for (const layout of [undefined, 1, 2, 3]) {
+    sessionStorage.setItem(
+      'zoop.graph.view:member-a:all',
+      JSON.stringify({
+        url: '/?mode=all&select=node%3ANAVER',
+        view: {
+          hidden: ['SHARES_ISSUE'],
+          camera: {
+            zoom: 1,
+            position: [-940, 0],
+            size: [1245, 705],
+            ...(layout === undefined ? {} : { layout }),
+          },
+        },
+      }),
+    );
+    const entry = readModeEntry('member-a', 'all');
+    expect(entry?.url).toBe('/?mode=all&select=node%3ANAVER');
+    expect(entry?.view.hidden).toEqual(['SHARES_ISSUE']);
+    expect(entry?.view.camera).toBeUndefined();
+  }
 });
 it('restores real selection, focus and path only, and reports removed targets', () => {
   const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });

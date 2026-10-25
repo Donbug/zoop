@@ -7882,6 +7882,912 @@
                         "text": "HBM이 뭐야"
                         "explicit": true
                     "capabilities": []
+  "/internal/v1/plan-admissions":
+    "post":
+      "tags":
+        - "plan-admissions"
+      "summary": "Admit one exact verified plan; never dispatch"
+      "operationId": "admitPlan"
+      "parameters":
+        - "name": "Idempotency-Key"
+          "in": "header"
+          "required": true
+          "schema":
+            "type": "string"
+            "pattern": "^s2plan-[0-9a-f]{64}$"
+          "description": "Must equal body.planId."
+        - "name": "X-Request-ID"
+          "in": "header"
+          "required": false
+          "schema":
+            "type": "string"
+            "pattern": "^[A-Za-z0-9._-]{1,128}$"
+          "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+      "responses":
+        "201":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanAdmissionEnvelope"
+              "examples":
+                "admitted":
+                  "summary": "Immutable synthetic admission and current policy authority"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "admissionId": "pa-d9844fbc9dd1163e91c554296692ef475d19843707f71688a1e02a834d663a70"
+                    "acceptedAt": "2026-10-12T03:00:00Z"
+                    "policyRevision": 1
+                    "policyDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                    "manifest":
+                      "schemaVersion": "zoop-ai-plan-manifest-1"
+                      "planId": "s2plan-0000000000000000000000000000000000000000000000000000000000000000"
+                      "planDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                      "receiptSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+                      "principal": "synthetic-app"
+                      "round":
+                        "sourceId": "synthetic-source"
+                        "roundId": "synthetic-round-1"
+                        "ingestionInputDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                      "provenance":
+                        "sourceKind": "synthetic"
+                        "executionMode": "replay"
+                        "recordingKind": "authored-test"
+                      "units":
+                        - "unitKey": "synthetic-plan-unit-1"
+                          "extractionSubmit":
+                            "schemaVersion": "zoop-extraction-s2-2"
+                            "jobId": "synthetic-plan-unit-1"
+                            "approvedRequestDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                          "extractionInputDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                          "relationSubmit":
+                            "schemaVersion": "zoop-relation-s3"
+                            "jobId": "s3p-722addb3c5f002a37596f99fb40ac9abb0a1bedeb583d38de9535e49e5e4aff6"
+                            "provenance":
+                              "sourceKind": "synthetic"
+                              "executionMode": "replay"
+                              "recordingKind": "authored-test"
+                            "upstream":
+                              "jobId": "synthetic-plan-unit-1"
+                              "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                      "manifestDigest": "83e871d948c87d365de191a7c21f86d69589b09ea8fe10311beca0844ce44647"
+                    "authority":
+                      "state": "active"
+                      "reason": null
+          "headers":
+            "Location":
+              "description": "Exact query URL including planDigest."
+              "schema":
+                "type": "string"
+        "401":
+          "description": "authentication_required."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "authentication_required"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "authentication_required"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+          "headers":
+            "WWW-Authenticate":
+              "description": "Bearer"
+              "schema":
+                "type": "string"
+        "403":
+          "description": "scope_denied or policy_denied."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "scope_denied"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "scope_denied"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "404":
+          "description": "admission_not_found or plan_not_found; other-principal records are indistinguishable from missing."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "admission_not_found"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "admission_not_found"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "409":
+          "description": "execution_unavailable, admission_disabled, policy_expired, policy_changed, policy_mismatch, quota_exhausted, authority_collision, idempotency_conflict or plan_verification_failed."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "admission_disabled"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "admission_disabled"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "413":
+          "description": "request_too_large: body exceeds 2,000,000 bytes."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "request_too_large"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "request_too_large"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "415":
+          "description": "unsupported_media_type: requires application/json with UTF-8."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "unsupported_media_type"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "unsupported_media_type"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "422":
+          "description": "invalid_request: exact body, header, path or query shape."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "invalid_request"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "invalid_request"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "500":
+          "description": "internal_error; no diagnostic text is disclosed."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "internal_error"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "internal_error"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "503":
+          "description": "service_busy, plan_verifier_unavailable, service_configuration_invalid or authority_unavailable."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "authority_unavailable"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "authority_unavailable"
+                      "retryable": true
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+          "headers":
+            "Retry-After":
+              "description": "Seconds before retrying with the same key and body."
+              "schema":
+                "type": "integer"
+        "200":
+          "description": "Original immutable admission, including an inactive historical admission."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanAdmissionEnvelope"
+              "examples":
+                "admitted":
+                  "summary": "Immutable synthetic admission and current policy authority"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "admissionId": "pa-d9844fbc9dd1163e91c554296692ef475d19843707f71688a1e02a834d663a70"
+                    "acceptedAt": "2026-10-12T03:00:00Z"
+                    "policyRevision": 1
+                    "policyDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                    "manifest":
+                      "schemaVersion": "zoop-ai-plan-manifest-1"
+                      "planId": "s2plan-0000000000000000000000000000000000000000000000000000000000000000"
+                      "planDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                      "receiptSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+                      "principal": "synthetic-app"
+                      "round":
+                        "sourceId": "synthetic-source"
+                        "roundId": "synthetic-round-1"
+                        "ingestionInputDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                      "provenance":
+                        "sourceKind": "synthetic"
+                        "executionMode": "replay"
+                        "recordingKind": "authored-test"
+                      "units":
+                        - "unitKey": "synthetic-plan-unit-1"
+                          "extractionSubmit":
+                            "schemaVersion": "zoop-extraction-s2-2"
+                            "jobId": "synthetic-plan-unit-1"
+                            "approvedRequestDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                          "extractionInputDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                          "relationSubmit":
+                            "schemaVersion": "zoop-relation-s3"
+                            "jobId": "s3p-722addb3c5f002a37596f99fb40ac9abb0a1bedeb583d38de9535e49e5e4aff6"
+                            "provenance":
+                              "sourceKind": "synthetic"
+                              "executionMode": "replay"
+                              "recordingKind": "authored-test"
+                            "upstream":
+                              "jobId": "synthetic-plan-unit-1"
+                              "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                      "manifestDigest": "83e871d948c87d365de191a7c21f86d69589b09ea8fe10311beca0844ce44647"
+                    "authority":
+                      "state": "active"
+                      "reason": null
+          "headers":
+            "Location":
+              "description": "Exact query URL including planDigest."
+              "schema":
+                "type": "string"
+      "security":
+        - "bearerAuth":
+            - "plan.admit"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/PlanReference"
+            "examples":
+              "exactReference":
+                "summary": "Synthetic exact reference; Idempotency-Key equals planId"
+                "value":
+                  "schemaVersion": "zoop-ai-plan-admission-1"
+                  "planId": "s2plan-0000000000000000000000000000000000000000000000000000000000000000"
+                  "planDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+      "description": "Scope plan.admit. Resolve only the configured plan root and completely verify the installed plan. Admission atomically persists paired S2/S3 references and cumulative quota, but never submits or dispatches either job. 201 is a first commit; 200 is the original immutable receipt, including inactive history, without regeneration or quota debit. An admission is not present source-rights proof, readiness, spending permission, publication or activation. Manual and online authorities are exclusive; absent online configuration returns execution_unavailable after authentication. Requests are bounded at 2,000,000 bytes. Complete replies are bounded at 16,000,000 bytes; units are never truncated. Revisions, counters and limits are signed 64-bit nonnegative integers (positive for a revision or policy limit)."
+  "/internal/v1/plan-admissions/{planId}":
+    "get":
+      "tags":
+        - "plan-admissions"
+      "summary": "Read an immutable exact admission and current policy authority"
+      "operationId": "getPlanAdmission"
+      "parameters":
+        - "name": "planId"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "pattern": "^s2plan-[0-9a-f]{64}$"
+            "title": "Planid"
+        - "name": "planDigest"
+          "in": "query"
+          "required": true
+          "schema":
+            "type": "string"
+            "pattern": "^[0-9a-f]{64}$"
+          "description": "Required exact lowercase SHA-256 plan digest."
+        - "name": "X-Request-ID"
+          "in": "header"
+          "required": false
+          "schema":
+            "type": "string"
+            "pattern": "^[A-Za-z0-9._-]{1,128}$"
+          "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanAdmissionEnvelope"
+              "examples":
+                "admitted":
+                  "summary": "Immutable synthetic admission and current policy authority"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "admissionId": "pa-d9844fbc9dd1163e91c554296692ef475d19843707f71688a1e02a834d663a70"
+                    "acceptedAt": "2026-10-12T03:00:00Z"
+                    "policyRevision": 1
+                    "policyDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                    "manifest":
+                      "schemaVersion": "zoop-ai-plan-manifest-1"
+                      "planId": "s2plan-0000000000000000000000000000000000000000000000000000000000000000"
+                      "planDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                      "receiptSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+                      "principal": "synthetic-app"
+                      "round":
+                        "sourceId": "synthetic-source"
+                        "roundId": "synthetic-round-1"
+                        "ingestionInputDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                      "provenance":
+                        "sourceKind": "synthetic"
+                        "executionMode": "replay"
+                        "recordingKind": "authored-test"
+                      "units":
+                        - "unitKey": "synthetic-plan-unit-1"
+                          "extractionSubmit":
+                            "schemaVersion": "zoop-extraction-s2-2"
+                            "jobId": "synthetic-plan-unit-1"
+                            "approvedRequestDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                          "extractionInputDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                          "relationSubmit":
+                            "schemaVersion": "zoop-relation-s3"
+                            "jobId": "s3p-722addb3c5f002a37596f99fb40ac9abb0a1bedeb583d38de9535e49e5e4aff6"
+                            "provenance":
+                              "sourceKind": "synthetic"
+                              "executionMode": "replay"
+                              "recordingKind": "authored-test"
+                            "upstream":
+                              "jobId": "synthetic-plan-unit-1"
+                              "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+                      "manifestDigest": "83e871d948c87d365de191a7c21f86d69589b09ea8fe10311beca0844ce44647"
+                    "authority":
+                      "state": "active"
+                      "reason": null
+          "headers":
+            "Location":
+              "description": "Exact query URL including planDigest."
+              "schema":
+                "type": "string"
+        "401":
+          "description": "authentication_required."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "authentication_required"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "authentication_required"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+          "headers":
+            "WWW-Authenticate":
+              "description": "Bearer"
+              "schema":
+                "type": "string"
+        "403":
+          "description": "scope_denied or policy_denied."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "scope_denied"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "scope_denied"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "404":
+          "description": "admission_not_found or plan_not_found; other-principal records are indistinguishable from missing."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "admission_not_found"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "admission_not_found"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "409":
+          "description": "execution_unavailable, admission_disabled, policy_expired, policy_changed, policy_mismatch, quota_exhausted, authority_collision, idempotency_conflict or plan_verification_failed."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "admission_disabled"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "admission_disabled"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "422":
+          "description": "invalid_request: exact body, header, path or query shape."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "invalid_request"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "invalid_request"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "500":
+          "description": "internal_error; no diagnostic text is disclosed."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "internal_error"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "internal_error"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "503":
+          "description": "service_busy, plan_verifier_unavailable, service_configuration_invalid or authority_unavailable."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "authority_unavailable"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "authority_unavailable"
+                      "retryable": true
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+          "headers":
+            "Retry-After":
+              "description": "Seconds before retrying with the same key and body."
+              "schema":
+                "type": "integer"
+      "security":
+        - "bearerAuth":
+            - "plan.read"
+      "description": "Scope plan.read. Exactly one planDigest query is required; no listing/search. Unknown and other-principal records answer alike. The manifest is persisted immutable history; only current admission-policy authority changes. No dispatch."
+  "/internal/v1/plan-admission-policy":
+    "get":
+      "tags":
+        - "plan-admission-policy"
+      "summary": "Operator-only current policy and cumulative usage"
+      "operationId": "getPlanAdmissionPolicy"
+      "parameters":
+        - "name": "X-Request-ID"
+          "in": "header"
+          "required": false
+          "schema":
+            "type": "string"
+            "pattern": "^[A-Za-z0-9._-]{1,128}$"
+          "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanPolicyState"
+              "examples":
+                "unconfigured":
+                  "summary": "Default: no policy"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-policy-state-1"
+                    "revision": 0
+                    "policyDigest": null
+                    "policy": null
+                    "status": "unconfigured"
+                    "usage":
+                      "plans": 0
+                      "units": 0
+          "headers":
+            "ETag":
+              "description": "Exact quoted current policy identity; initially \"plan-policy-0-none\"."
+              "schema":
+                "type": "string"
+        "401":
+          "description": "authentication_required."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "authentication_required"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "authentication_required"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+          "headers":
+            "WWW-Authenticate":
+              "description": "Bearer"
+              "schema":
+                "type": "string"
+        "403":
+          "description": "scope_denied or policy_denied."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "scope_denied"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "scope_denied"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "409":
+          "description": "execution_unavailable, admission_disabled, policy_expired, policy_changed, policy_mismatch, quota_exhausted, authority_collision, idempotency_conflict or plan_verification_failed."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "admission_disabled"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "admission_disabled"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "422":
+          "description": "invalid_request: exact body, header, path or query shape."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "invalid_request"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "invalid_request"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "500":
+          "description": "internal_error; no diagnostic text is disclosed."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "internal_error"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "internal_error"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "503":
+          "description": "service_busy, plan_verifier_unavailable, service_configuration_invalid or authority_unavailable."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "authority_unavailable"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "authority_unavailable"
+                      "retryable": true
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+          "headers":
+            "Retry-After":
+              "description": "Seconds before retrying with the same key and body."
+              "schema":
+                "type": "integer"
+      "security":
+        - "bearerAuth":
+            - "plan.policy"
+      "description": "Scope plan.policy, never assigned to the application admission/execution principal. Current policy status and cumulative usage; initial revision zero has no policy. ETag is quoted plan-policy-<revision>-<digest or none>."
+    "put":
+      "tags":
+        - "plan-admission-policy"
+      "summary": "Operator-only idempotent policy CAS; retires prior admissions"
+      "operationId": "setPlanAdmissionPolicy"
+      "parameters":
+        - "name": "Idempotency-Key"
+          "in": "header"
+          "required": true
+          "schema":
+            "type": "string"
+            "pattern": "^[A-Za-z0-9_.-]{1,120}$"
+          "description": "Stable operator-scoped operation id; retry identical body and If-Match."
+        - "name": "If-Match"
+          "in": "header"
+          "required": true
+          "schema":
+            "type": "string"
+          "description": "Exact quoted policy ETag from GET; initially \"plan-policy-0-none\"."
+        - "name": "X-Request-ID"
+          "in": "header"
+          "required": false
+          "schema":
+            "type": "string"
+            "pattern": "^[A-Za-z0-9._-]{1,128}$"
+          "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanPolicyUpdate"
+              "examples":
+                "disabled":
+                  "summary": "Historical operation receipt, not current policy"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-policy-update-1"
+                    "operationId": "synthetic-policy-disable-1"
+                    "revision": 1
+                    "policyDigest": "cf8ec2ebb2ad01560f9a402a1080deed59b55be4ffe1f6c61dad467aeb10700e"
+                    "changed": true
+        "401":
+          "description": "authentication_required."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "authentication_required"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "authentication_required"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+          "headers":
+            "WWW-Authenticate":
+              "description": "Bearer"
+              "schema":
+                "type": "string"
+        "403":
+          "description": "scope_denied or policy_denied."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "scope_denied"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "scope_denied"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "409":
+          "description": "execution_unavailable, admission_disabled, policy_expired, policy_changed, policy_mismatch, quota_exhausted, authority_collision, idempotency_conflict or plan_verification_failed."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "admission_disabled"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "admission_disabled"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "412":
+          "description": "policy_conflict: a new policy operation used a stale If-Match."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "policy_conflict"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "policy_conflict"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "413":
+          "description": "request_too_large: body exceeds 2,000,000 bytes."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "request_too_large"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "request_too_large"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "415":
+          "description": "unsupported_media_type: requires application/json with UTF-8."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "unsupported_media_type"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "unsupported_media_type"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "422":
+          "description": "invalid_request: exact body, header, path or query shape."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "invalid_request"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "invalid_request"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "500":
+          "description": "internal_error; no diagnostic text is disclosed."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "internal_error"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "internal_error"
+                      "retryable": false
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+        "503":
+          "description": "service_busy, plan_verifier_unavailable, service_configuration_invalid or authority_unavailable."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/PlanErrorEnvelope"
+              "examples":
+                "error":
+                  "summary": "authority_unavailable"
+                  "value":
+                    "schemaVersion": "zoop-ai-plan-admission-1"
+                    "error":
+                      "code": "authority_unavailable"
+                      "retryable": true
+                      "requestId": "req-plan-0001"
+                      "runtimeCode": null
+                      "field": null
+          "headers":
+            "Retry-After":
+              "description": "Seconds before retrying with the same key and body."
+              "schema":
+                "type": "integer"
+      "security":
+        - "bearerAuth":
+            - "plan.policy"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "oneOf":
+                - "$ref": "#/components/schemas/PlanPolicyDisabled"
+                - "$ref": "#/components/schemas/PlanPolicyEnabled"
+            "examples":
+              "disabled":
+                "summary": "Synthetic disable operation, not an operating grant"
+                "value":
+                  "schemaVersion": "zoop-ai-plan-policy-1"
+                  "enabled": false
+      "description": "Scope plan.policy. Raw closed policy document; exact If-Match and stable operation Idempotency-Key are required. Exact operator/key/body/If-Match retries return their historical receipt, even after another update. Changed body or If-Match with the same key conflicts (409); a new stale CAS conflicts (412). Identical current bytes do not renew revision/expiry or reset usage. A changed policy terminally retires all prior admissions. A replay receipt is not current state: GET current policy rather than treating it as the latest revision. Policy changes never refund usage and never authorize source/model spending. Application clients have no policy-write method."
 "components":
   "schemas":
     "AnswerSection":
@@ -11887,6 +12793,32 @@
         - "stage"
         - "state"
       "title": "ExtractionStage"
+    "ExtractionSubmit":
+      "additionalProperties": false
+      "description": |-
+        The S2 submit reference. It names a request the operator preapproved for this principal; it carries no snapshot, catalogue, observation,
+        path, fixture or live mode, and the pipeline's `Submit` body is never accepted from a caller.
+      "properties":
+        "schemaVersion":
+          "const": "zoop-extraction-s2-2"
+          "title": "Schemaversion"
+          "type": "string"
+        "jobId":
+          "description": "Equals the Idempotency-Key. The server-owned approval is looked up by this principal and job id."
+          "pattern": "^[A-Za-z0-9_.-]{1,120}$"
+          "title": "Jobid"
+          "type": "string"
+        "approvedRequestDigest":
+          "description": "SHA-256 of the canonical JSON of the operator-approved S2 request. It must be the digest the operator listed for this principal and job id."
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Approvedrequestdigest"
+          "type": "string"
+      "required":
+        - "schemaVersion"
+        - "jobId"
+        - "approvedRequestDigest"
+      "title": "ExtractionSubmit"
+      "type": "object"
     "ExtractionUsage":
       "properties":
         "replayCalls":
@@ -12733,6 +13665,439 @@
         - "acceptedAt"
         - "observedAt"
       "title": "JobStatus"
+    "PlanAdmissionEnvelope":
+      "properties":
+        "schemaVersion":
+          "type": "string"
+          "const": "zoop-ai-plan-admission-1"
+          "title": "Schemaversion"
+          "default": "zoop-ai-plan-admission-1"
+        "admissionId":
+          "type": "string"
+          "pattern": "^pa-[0-9a-f]{64}$"
+          "title": "Admissionid"
+        "acceptedAt":
+          "type": "string"
+          "title": "Acceptedat"
+        "policyRevision":
+          "type": "integer"
+          "maximum": 9.223372036854776e+18
+          "exclusiveMinimum": 0.0
+          "title": "Policyrevision"
+        "policyDigest":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Policydigest"
+        "manifest":
+          "$ref": "#/components/schemas/PublicManifest"
+        "authority":
+          "$ref": "#/components/schemas/PlanAuthorityState"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "admissionId"
+        - "acceptedAt"
+        - "policyRevision"
+        - "policyDigest"
+        - "manifest"
+        - "authority"
+      "title": "PlanAdmissionEnvelope"
+    "PlanAuthorityState":
+      "properties":
+        "state":
+          "type": "string"
+          "enum":
+            - "active"
+            - "inactive"
+          "title": "State"
+        "reason":
+          "anyOf":
+            - "type": "string"
+            - "type": "null"
+          "title": "Reason"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "state"
+        - "reason"
+      "title": "PlanAuthorityState"
+    "PlanErrorEnvelope":
+      "properties":
+        "schemaVersion":
+          "type": "string"
+          "const": "zoop-ai-plan-admission-1"
+          "title": "Schemaversion"
+          "default": "zoop-ai-plan-admission-1"
+        "error":
+          "$ref": "#/components/schemas/ErrorBody"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "error"
+      "title": "PlanErrorEnvelope"
+    "PlanLiveRuntime":
+      "properties":
+        "kind":
+          "type": "string"
+          "const": "live"
+          "title": "Kind"
+        "liveRuntimeIdentity":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Liveruntimeidentity"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "kind"
+        - "liveRuntimeIdentity"
+      "title": "PlanLiveRuntime"
+    "PlanPolicyDisabled":
+      "additionalProperties": false
+      "properties":
+        "schemaVersion":
+          "const": "zoop-ai-plan-policy-1"
+          "title": "Schemaversion"
+          "type": "string"
+        "enabled":
+          "const": false
+          "title": "Enabled"
+          "type": "boolean"
+      "required":
+        - "schemaVersion"
+        - "enabled"
+      "title": "PlanPolicyDisabled"
+      "type": "object"
+    "PlanPolicyEnabled":
+      "additionalProperties": false
+      "properties":
+        "schemaVersion":
+          "const": "zoop-ai-plan-policy-1"
+          "title": "Schemaversion"
+          "type": "string"
+        "enabled":
+          "const": true
+          "title": "Enabled"
+          "type": "boolean"
+        "principal":
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          "title": "Principal"
+          "type": "string"
+        "sourceIds":
+          "items":
+            "maxLength": 200
+            "minLength": 1
+            "type": "string"
+          "maxItems": 10000
+          "minItems": 1
+          "title": "Sourceids"
+          "type": "array"
+          "uniqueItems": true
+        "sourceKind":
+          "enum":
+            - "synthetic"
+            - "actual"
+          "title": "Sourcekind"
+          "type": "string"
+        "expiresAt":
+          "title": "Expiresat"
+          "type": "string"
+        "promptVersion":
+          "maxLength": 200
+          "minLength": 1
+          "title": "Promptversion"
+          "type": "string"
+        "catalogueDigest":
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Cataloguedigest"
+          "type": "string"
+        "snapshotDigest":
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Snapshotdigest"
+          "type": "string"
+        "topic":
+          "anyOf":
+            - "$ref": "#/components/schemas/PlanPolicyTopic"
+            - "type": "null"
+        "runtime":
+          "discriminator":
+            "mapping":
+              "live": "#/components/schemas/PlanLiveRuntime"
+              "replay": "#/components/schemas/PlanReplayRuntime"
+            "propertyName": "kind"
+          "oneOf":
+            - "$ref": "#/components/schemas/PlanReplayRuntime"
+            - "$ref": "#/components/schemas/PlanLiveRuntime"
+          "title": "Runtime"
+        "limits":
+          "$ref": "#/components/schemas/PlanPolicyLimits"
+      "required":
+        - "schemaVersion"
+        - "enabled"
+        - "principal"
+        - "sourceIds"
+        - "sourceKind"
+        - "expiresAt"
+        - "promptVersion"
+        - "catalogueDigest"
+        - "snapshotDigest"
+        - "topic"
+        - "runtime"
+        - "limits"
+      "title": "PlanPolicyEnabled"
+      "type": "object"
+    "PlanPolicyLimits":
+      "properties":
+        "maxPlans":
+          "type": "integer"
+          "maximum": 9.223372036854776e+18
+          "exclusiveMinimum": 0.0
+          "title": "Maxplans"
+        "maxUnits":
+          "type": "integer"
+          "maximum": 9.223372036854776e+18
+          "exclusiveMinimum": 0.0
+          "title": "Maxunits"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "maxPlans"
+        - "maxUnits"
+      "title": "PlanPolicyLimits"
+    "PlanPolicyState":
+      "properties":
+        "schemaVersion":
+          "type": "string"
+          "const": "zoop-ai-plan-policy-state-1"
+          "title": "Schemaversion"
+          "default": "zoop-ai-plan-policy-state-1"
+        "revision":
+          "type": "integer"
+          "maximum": 9.223372036854776e+18
+          "minimum": 0.0
+          "title": "Revision"
+        "policyDigest":
+          "anyOf":
+            - "type": "string"
+              "pattern": "^[a-f0-9]{64}$"
+            - "type": "null"
+          "title": "Policydigest"
+        "policy":
+          "anyOf":
+            - "oneOf":
+                - "$ref": "#/components/schemas/PlanPolicyDisabled"
+                - "$ref": "#/components/schemas/PlanPolicyEnabled"
+              "discriminator":
+                "propertyName": "enabled"
+                "mapping":
+                  "False": "#/components/schemas/PlanPolicyDisabled"
+                  "True": "#/components/schemas/PlanPolicyEnabled"
+            - "type": "null"
+          "title": "Policy"
+        "status":
+          "type": "string"
+          "enum":
+            - "unconfigured"
+            - "enabled"
+            - "disabled"
+            - "expired"
+          "title": "Status"
+        "usage":
+          "$ref": "#/components/schemas/PlanPolicyUsage"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "revision"
+        - "policyDigest"
+        - "policy"
+        - "status"
+        - "usage"
+      "title": "PlanPolicyState"
+    "PlanPolicyTopic":
+      "properties":
+        "producerVersion":
+          "type": "string"
+          "const": "zoop-topic-replay-producer-1"
+          "title": "Producerversion"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "producerVersion"
+      "title": "PlanPolicyTopic"
+    "PlanPolicyUpdate":
+      "properties":
+        "schemaVersion":
+          "type": "string"
+          "const": "zoop-ai-plan-policy-update-1"
+          "title": "Schemaversion"
+          "default": "zoop-ai-plan-policy-update-1"
+        "operationId":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9_.-]{1,120}$"
+          "title": "Operationid"
+        "revision":
+          "type": "integer"
+          "maximum": 9.223372036854776e+18
+          "exclusiveMinimum": 0.0
+          "title": "Revision"
+        "policyDigest":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Policydigest"
+        "changed":
+          "type": "boolean"
+          "title": "Changed"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "operationId"
+        - "revision"
+        - "policyDigest"
+        - "changed"
+      "title": "PlanPolicyUpdate"
+    "PlanPolicyUsage":
+      "properties":
+        "plans":
+          "type": "integer"
+          "maximum": 9.223372036854776e+18
+          "minimum": 0.0
+          "title": "Plans"
+        "units":
+          "type": "integer"
+          "maximum": 9.223372036854776e+18
+          "minimum": 0.0
+          "title": "Units"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "plans"
+        - "units"
+      "title": "PlanPolicyUsage"
+    "PlanReplayRuntime":
+      "properties":
+        "kind":
+          "type": "string"
+          "const": "replay"
+          "title": "Kind"
+        "producerReplayDigest":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Producerreplaydigest"
+        "topicReplayDigest":
+          "anyOf":
+            - "type": "string"
+              "pattern": "^[a-f0-9]{64}$"
+            - "type": "null"
+          "title": "Topicreplaydigest"
+        "relationReplayDigest":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Relationreplaydigest"
+        "relationVerifierReplayDigest":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Relationverifierreplaydigest"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "kind"
+        - "producerReplayDigest"
+        - "topicReplayDigest"
+        - "relationReplayDigest"
+        - "relationVerifierReplayDigest"
+      "title": "PlanReplayRuntime"
+    "PlanRound":
+      "properties":
+        "sourceId":
+          "type": "string"
+          "maxLength": 200
+          "minLength": 1
+          "title": "Sourceid"
+        "roundId":
+          "type": "string"
+          "maxLength": 200
+          "minLength": 1
+          "title": "Roundid"
+        "ingestionInputDigest":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Ingestioninputdigest"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "sourceId"
+        - "roundId"
+        - "ingestionInputDigest"
+      "title": "PlanRound"
+    "PlanUnit":
+      "properties":
+        "unitKey":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9_.-]{1,120}$"
+          "title": "Unitkey"
+        "extractionSubmit":
+          "$ref": "#/components/schemas/ExtractionSubmit"
+        "extractionInputDigest":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Extractioninputdigest"
+        "relationSubmit":
+          "$ref": "#/components/schemas/RelationSubmit"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "unitKey"
+        - "extractionSubmit"
+        - "extractionInputDigest"
+        - "relationSubmit"
+      "title": "PlanUnit"
+    "PublicManifest":
+      "properties":
+        "schemaVersion":
+          "type": "string"
+          "const": "zoop-ai-plan-manifest-1"
+          "title": "Schemaversion"
+        "planId":
+          "type": "string"
+          "pattern": "^s2plan-[0-9a-f]{64}$"
+          "title": "Planid"
+        "planDigest":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Plandigest"
+        "receiptSha256":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Receiptsha256"
+        "principal":
+          "type": "string"
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          "title": "Principal"
+        "round":
+          "$ref": "#/components/schemas/PlanRound"
+        "provenance":
+          "$ref": "#/components/schemas/RelationProvenance"
+        "units":
+          "items":
+            "$ref": "#/components/schemas/PlanUnit"
+          "type": "array"
+          "title": "Units"
+        "manifestDigest":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Manifestdigest"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "schemaVersion"
+        - "planId"
+        - "planDigest"
+        - "receiptSha256"
+        - "principal"
+        - "round"
+        - "provenance"
+        - "units"
+        - "manifestDigest"
+      "title": "PublicManifest"
     "RcApprovalBasis":
       "properties":
         "kind":
@@ -13755,6 +15120,30 @@
       "description": |-
         Acceptance: whether the decision is recorded in the AI relation ledger. `unconfirmed` means the request was reserved but the service has no
         proof yet that the event was appended; retry the same request (same key and body) to reconcile it.
+    "RelationSubmit":
+      "additionalProperties": false
+      "description": "The S3 `Submit` contract (`zoop-relation-s3`). Fixtures, registries and paths cannot be named. `executionMode: live` is accepted only for an upstream the operator listed as live-approved."
+      "properties":
+        "schemaVersion":
+          "const": "zoop-relation-s3"
+          "title": "Schemaversion"
+          "type": "string"
+        "jobId":
+          "description": "Equals the Idempotency-Key."
+          "pattern": "^[A-Za-z0-9_.-]{1,120}$"
+          "title": "Jobid"
+          "type": "string"
+        "provenance":
+          "$ref": "#/components/schemas/RelationProvenance"
+        "upstream":
+          "$ref": "#/components/schemas/RelationUpstream"
+      "required":
+        - "schemaVersion"
+        - "jobId"
+        - "provenance"
+        - "upstream"
+      "title": "RelationSubmit"
+      "type": "object"
     "RelationUpstream":
       "properties":
         "jobId":
@@ -13969,30 +15358,6 @@
       "required":
         - "sections"
       "title": "VerificationAnswer"
-    "RelationSubmit":
-      "additionalProperties": false
-      "description": "The S3 `Submit` contract (`zoop-relation-s3`). Fixtures, registries and paths cannot be named. `executionMode: live` is accepted only for an upstream the operator listed as live-approved."
-      "properties":
-        "schemaVersion":
-          "const": "zoop-relation-s3"
-          "title": "Schemaversion"
-          "type": "string"
-        "jobId":
-          "description": "Equals the Idempotency-Key."
-          "pattern": "^[A-Za-z0-9_.-]{1,120}$"
-          "title": "Jobid"
-          "type": "string"
-        "provenance":
-          "$ref": "#/components/schemas/RelationProvenance"
-        "upstream":
-          "$ref": "#/components/schemas/RelationUpstream"
-      "required":
-        - "schemaVersion"
-        - "jobId"
-        - "provenance"
-        - "upstream"
-      "title": "RelationSubmit"
-      "type": "object"
     "RelationReview":
       "additionalProperties": false
       "description": |-
@@ -14025,32 +15390,6 @@
         - "expectedSourceRevision"
         - "decision"
       "title": "RelationReview"
-      "type": "object"
-    "ExtractionSubmit":
-      "additionalProperties": false
-      "description": |-
-        The S2 submit reference. It names a request the operator preapproved for this principal; it carries no snapshot, catalogue, observation,
-        path, fixture or live mode, and the pipeline's `Submit` body is never accepted from a caller.
-      "properties":
-        "schemaVersion":
-          "const": "zoop-extraction-s2-2"
-          "title": "Schemaversion"
-          "type": "string"
-        "jobId":
-          "description": "Equals the Idempotency-Key. The server-owned approval is looked up by this principal and job id."
-          "pattern": "^[A-Za-z0-9_.-]{1,120}$"
-          "title": "Jobid"
-          "type": "string"
-        "approvedRequestDigest":
-          "description": "SHA-256 of the canonical JSON of the operator-approved S2 request. It must be the digest the operator listed for this principal and job id."
-          "pattern": "^[a-f0-9]{64}$"
-          "title": "Approvedrequestdigest"
-          "type": "string"
-      "required":
-        - "schemaVersion"
-        - "jobId"
-        - "approvedRequestDigest"
-      "title": "ExtractionSubmit"
       "type": "object"
     "ExposureQuery":
       "additionalProperties": false
@@ -14125,6 +15464,27 @@
         - "input"
       "title": "ChatStageRequest"
       "type": "object"
+    "PlanReference":
+      "additionalProperties": false
+      "properties":
+        "schemaVersion":
+          "const": "zoop-ai-plan-admission-1"
+          "title": "Schemaversion"
+          "type": "string"
+        "planId":
+          "pattern": "^s2plan-[0-9a-f]{64}$"
+          "title": "Planid"
+          "type": "string"
+        "planDigest":
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Plandigest"
+          "type": "string"
+      "required":
+        - "schemaVersion"
+        - "planId"
+        - "planDigest"
+      "title": "PlanReference"
+      "type": "object"
   "securitySchemes":
     "bearerAuth":
       "type": "http"
@@ -14146,3 +15506,7 @@
     "description": "Read-only, nonpublic AI handoff status and whole-bundle delivery over operator-pinned handoffs, through the installed zoop-ai-handoff export command (no write, no model, no network)."
   - "name": "chat-stages"
     "description": "One chatbot model stage (router, answer or verification) per request, synchronously, through the installed zoop-ai-chat runtime (replay, or live behind the chat gate)."
+  - "name": "plan-admissions"
+    "description": "Bounded exact plan admission and immutable reference reads; no dispatch."
+  - "name": "plan-admission-policy"
+    "description": "Separate operator-only policy CAS control; never application authority."

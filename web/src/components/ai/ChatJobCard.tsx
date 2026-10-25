@@ -389,8 +389,11 @@ function labelOf(result: ChatResult, id: string) {
 }
 
 function Citation({ n, citation }: { n: number; citation: ChatCitation }) {
+  const profile = citation.sourceKind === 'company_profile';
   const href =
-    citation.sourceKind === 'article' ? safeArticleUrl(citation.url) : null;
+    citation.sourceKind === 'article' || profile
+      ? safeArticleUrl(citation.url)
+      : null;
   const published = formatPublishedAt(citation.publishedAt);
   return (
     <li>
@@ -410,7 +413,8 @@ function Citation({ n, citation }: { n: number; citation: ChatCitation }) {
           rel="noopener noreferrer"
           className="underline"
         >
-          ↗ 원문 보기 <span className="sr-only">(새 창에서 열림)</span>
+          {profile ? '↗ 기업 홈페이지' : '↗ 원문 보기'}{' '}
+          <span className="sr-only">(새 창에서 열림)</span>
         </a>
       )}
     </li>

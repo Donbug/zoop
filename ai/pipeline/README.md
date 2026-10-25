@@ -575,13 +575,27 @@ ai/pipeline/.venv/bin/python ai/pipeline/scripts/extraction_smoke.py --live-loop
 
 **종단 검사.** `scripts/round_enqueue_smoke.py`와 이를 포함한 `make pipeline-smoke`가 통과했다. 실제 자식 프로세스 141개에서 230개 참조·3페이지를 읽어 219개 작업과 11개 제외 항목을 확인했다. 최초 등록은 모두 `queued`·호출 0건이고 재접수는 219개 `existing`이었다. 입력 충돌·현재 권한·손상 상태·중단 복구·부분 등록·등록 후 close 실패의 결과 보존을 확인했으며, live 설정도 키·네트워크·예산 파일 생성 없이 3개 작업을 등록했다. 별도 명시적 replay 실행으로 두 작업을 `ready`로 만들고 취소·중단된 작업과 함께 재접수해도 상태·호출 수가 바뀌지 않음을 확인했다. 수집 원장의 바이트·권한·수정 시각은 유지됐고 다음 `tick`은 정상 진행했다. 모델·공급자 호출은 0건이며 실제 모델 품질이나 운영 스케줄 검증은 아니다.
 
-**완료 회차의 서비스 실행 계획 `plan-round`(CLI 전용, 오프라인).** `zoop-ai-extract plan-round --ingestion-state-dir I --sources R --principal P --output DIR [--replay F [--topic-replay T]]`는 완료된 회차를 `enqueue-round`와 같은 계획기로 읽어 새 디렉터리에 계획 파일만 만듭니다. `--state-dir`은 받지 않으며 extraction 원장·작업 등록·모델·네트워크를 사용하지 않습니다. 출력은 `approvals.json`(S2 승인 항목), `relation-upstreams.json`(S3가 허용할 `{jobId,inputDigest}`), `manifest.json`(앱에 전달할 계획 ID·digest·S2 제출 필드), `receipt.json`(앞 세 파일의 digest)입니다. manifest에는 분석 입력 본문·비밀·원문을 싣지 않습니다. 운영자가 검토한 뒤 두 registry 파일을 설치해야 하며, 이 명령 자체는 설치·배포·유료 호출을 승인하지 않습니다.
+**완료 회차의 서비스 실행 계획 `plan-round`(CLI 전용, 오프라인).** `zoop-ai-extract plan-round --ingestion-state-dir I --sources R --principal P --output DIR [--replay F [--topic-replay T]]`는 완료된 회차를 `enqueue-round`와 같은 계획기로 읽어 새 디렉터리에 계획 파일만 만듭니다. `--state-dir`은 받지 않으며 extraction 원장·작업 등록·모델·네트워크를 사용하지 않습니다. 출력은 `approvals.json`(S2 승인 항목), `relation-upstreams.json`(S3 입력 쌍), `manifest.json`(계획 ID·digest·S2 제출 필드), `receipt.json`(앞 세 파일의 digest)입니다. manifest에는 분석 입력 본문·비밀·원문을 싣지 않습니다. 수동 모드에서는 사람이 계획을 검토해 오프라인 설치하고, 별도 온라인 모드에서는 사람이 미리 정한 정책 안에서 같은 계획을 접수합니다([서비스 안내](../service/README.md)). 계획 생성 자체는 설치·배포·유료 호출을 승인하지 않습니다.
 
 작업 ID는 계획 ID와 정확한 관측에서 유도한 `s2p-` 접두를 사용하여 `enqueue-round`의 `s2r-` 작업과 구분합니다. 서비스는 기존 CLI 작업을 HTTP 작업으로 재사용하지 않습니다. replay 계획은 분석 fixture와 필요한 topic fixture의 해시를, live 계획은 런타임 identity를 고정합니다(live에 fixture를 주면 `fixture_not_allowed`). 같은 입력을 같은 출력 경로에 다시 주면 기존 파일을 바꾸지 않고, 다른 입력은 거절합니다. 기존 경로를 덮어쓰지 않는 원자적 이름 변경을 지원하지 않는 플랫폼도 거절합니다. 계획 생성 시에는 구문·현재 원천 권한을 확인하며, snapshot 근거와 실행 문맥은 실제 dispatch에서 검사합니다.
 
 **하지 않는 일.** 설치된 approvals를 자동으로 만들거나 바꾸지 않고, 유료 호출 승인·예산도 내지 않는다. 공개 `JobCreate`의 `planId` 처리는 구현했다고 주장하지 않는다(BE 대기). 실제 공급원·모델 품질·자동 주기 실행은 이 범위가 아니다.
 
 **검증(2026-10-22, 로컬, 모델 호출 0).** 단위 시험 6개와 설치된 `plan-round`를 쓰는 실제 HTTP 시험 2개(주제 단계와 S3 `ready` 포함)가 통과했다.
+
+**기존 계획의 읽기 전용 검사 `verify-plan`.** 서비스의 오프라인 설치와 온라인 접수가 함께 사용하는 내부 CLI이며 HTTP API가 아닙니다. stdin은 정확히 `{}`이고 `--state-dir`·출력 디렉터리·계획 생성 옵션을 받지 않습니다.
+
+```sh
+printf '%s\n' '{}' | zoop-ai-extract verify-plan \
+  --plan-dir /absolute/reviewed-plan --expected-receipt-sha256 RECEIPT_SHA256 \
+  --ingestion-state-dir /absolute/ingestion --sources /absolute/sources.json \
+  --replay /absolute/extraction-replay.json
+# 주제 replay 계획에는 --topic-replay가 필요합니다. live 계획에는 fixture를 전달하지 않습니다.
+```
+
+검사는 네 파일의 정확한 바이트·hash·길이·schema를 확인하고 현재 완료 회차와 같은 계획기로 다시 계산해 비교합니다. incoming과 snapshot의 모든 고유 관측도 현재 source-read/export 권한으로 다시 읽습니다. 성공 응답 `zoop-extraction-service-plan-verification-1`은 계획 ID·digest, receipt hash, principal·mode·pins·파일별 hash/크기·counts, 현재 source registry hash와 source binding digest만 반환합니다. 원문·요청 본문·비밀을 응답하지 않으며, 임시 계획·extraction 원장·job·예산을 만들거나 모델·네트워크를 호출하지 않습니다. live 검사는 공개 런타임 설정과 예산 디렉터리 신원만 고정하며 키·호출 상한을 요구하지 않습니다.
+
+이 검사는 현재 읽기 권한과 계획 일치의 증거이지 model-send·비용·HOLD 최종 승인·앱 공개 허가가 아닙니다. snapshot 언급의 근거 일치와 실제 freeze 가능성은 기존 submit에서, 현재 원천 및 모델 전송 권한은 실제 사용 시 다시 검사합니다. 온라인 접수는 별도의 정책·누적 quota·불변 admission origin을 서비스 SQLite에 함께 기록하며 설치 파일을 실행 중에 교체하지 않습니다. 수동/온라인 권한은 섞이지 않습니다. 정책에 맞는 계획의 접수 구현과 실제 정책 설치·05/35 주기 실행·공개 반영은 구분합니다. 앱/AI의 역할과 10/40 새 조회 목표는 [공개 스케줄 책임](../../api/docs/GRAPH_READ_HANDOFF.md#수집분석-실행과-공개-스케줄의-책임)을 따릅니다.
 
 ## 관계·영향 후보와 HOLD 최종 승인 (S3, FS078·FS079)
 

@@ -29,9 +29,22 @@ export const jobStatusLabel: Record<DashboardJobStatus, string> = {
 };
 
 export const jobKindLabel: Record<string, string> = {
+  // 본개발 작업 API(#292)의 종류
+  ingest: '신규 기사 처리',
+  revalidate: '후보 재검증',
+  project: 'GraphDB 반영',
+  // 프로토타입 작업 원장의 종류(대시보드 최근 작업)
   'flush-graph': 'GraphDB 반영 재시도',
   'retry-model-errors': '모델 오류 재처리',
   'ingest-run': '신규 기사 처리',
+};
+
+/** 기사 처리 결과(FS058). empty는 새 기사가 없었던 정상 종료다. */
+export const ingestOutcomeLabel: Record<string, string> = {
+  collected: '새 기사 처리',
+  empty: '새 기사 없음',
+  failed: '실패',
+  cancelled: '취소됨',
 };
 
 export const graphDbStatusLabel: Record<DashboardGraphDbStatus, string> = {

@@ -77,6 +77,7 @@ function openAdmin(path: string) {
             element: <AdminLayout />,
             children: [
               { path: '/admin', element: <Destination /> },
+              { path: '/admin/stats', element: <Destination /> },
               { path: '/admin/members', element: <Destination /> },
             ],
           },
@@ -211,6 +212,41 @@ describe('A-ADM-05c 관리자 로그인 (FS073)', () => {
     expect((await screen.findByTestId('destination')).textContent).toBe(
       '/admin',
     );
+  });
+});
+
+describe('A-ADM-01 관리자 공통 메뉴', () => {
+  test('현재 메뉴를 표시하고 사이드바를 숨겼다가 다시 연다', async () => {
+    server.on('GET', SESSION, () => json(signedIn()));
+    const { user } = openAdmin('/admin');
+
+    await screen.findByTestId('destination');
+    expect(
+      screen
+        .getByRole('link', { name: '대시보드' })
+        .getAttribute('aria-current'),
+    ).toBe('page');
+
+    await user.click(screen.getByRole('link', { name: '이용 통계' }));
+    expect((await screen.findByTestId('destination')).textContent).toBe(
+      '/admin/stats',
+    );
+    expect(
+      screen
+        .getByRole('link', { name: '이용 통계' })
+        .getAttribute('aria-current'),
+    ).toBe('page');
+
+    await user.click(screen.getByRole('button', { name: '메뉴 숨기기' }));
+    expect(
+      screen.queryByRole('navigation', { name: '관리자 메뉴' }),
+    ).toBeNull();
+    await user.click(screen.getByRole('button', { name: '메뉴 열기' }));
+    expect(
+      screen
+        .getByRole('link', { name: '이용 통계' })
+        .getAttribute('aria-current'),
+    ).toBe('page');
   });
 });
 

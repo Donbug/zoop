@@ -7,6 +7,7 @@ import {
   connectionBody,
   disconnectedPortfolioBody,
   mockPortfoliosBody,
+  SAMSUNG_HOLDING,
 } from '../support/fixtures';
 import {
   apiError,
@@ -20,11 +21,36 @@ import { renderRoutes } from '../support/renderRoutes';
 const OPTIONS = '/api/v1/portfolio/mock-portfolios';
 const PORTFOLIO = '/api/v1/portfolio';
 const CONNECTIONS = '/api/v1/portfolio/connections';
+const PROFILE_PREVIEW = `${OPTIONS}/mock-1`;
+
+function profilePreviewBody(id = 'mock-1') {
+  const selected = id === 'mock-2';
+  return {
+    id,
+    label: selected ? '배당주 계좌' : '성장주 계좌',
+    accountId: selected ? 'MOCK-0002' : 'MOCK-0001',
+    cash: { amount: 500000, currency: 'KRW' },
+    asOf: '2026-10-06T03:41:00Z',
+    holdings: [{ ...SAMSUNG_HOLDING, weight: 0.6 }],
+    valuation: {
+      calculatedAt: '2026-10-06T03:41:00Z',
+      currency: 'KRW',
+      totalMarketValue: 9050000,
+      weightStatus: 'available',
+      weightUnavailableCode: null,
+      weightUnavailableReason: null,
+    },
+    metadata: { source: 'test' },
+  };
+}
 
 /** 미연결 회원. 연결하면 이후 GET /portfolio가 연결된 상태를 돌려준다. */
 function notConnectedMember(server: FakeServer) {
   let connected = false;
   server.on('GET', OPTIONS, () => json(mockPortfoliosBody()));
+  server.on('GET', `${OPTIONS}/:id`, ({ params }) =>
+    json(profilePreviewBody(params.id)),
+  );
   server.on('GET', PORTFOLIO, () =>
     json(connected ? connectedPortfolioBody() : disconnectedPortfolioBody()),
   );
@@ -65,6 +91,20 @@ const connectButton = () =>
   });
 
 describe('D-ONB-02 가상 계좌 연결', () => {
+  test('계좌를 선택하면 연결 전에 종목과 비중을 조회 전용으로 보여 준다', async () => {
+    const server = createFakeServer();
+    notConnectedMember(server);
+    openAccountStep();
+
+    const holdings = await screen.findByRole('list', {
+      name: '미리보기 보유 종목',
+    });
+    expect(within(holdings).getByText('삼성전자')).toBeTruthy();
+    expect(within(holdings).getByText('비중 60%')).toBeTruthy();
+    expect(server.calls('GET', PROFILE_PREVIEW)).toHaveLength(1);
+    expect(server.calls('POST', CONNECTIONS)).toHaveLength(0);
+  });
+
   test('고른 계좌를 연결하면 보유 종목을 보여 주고 [관심 종목 고르기]로만 넘어간다', async () => {
     const server = createFakeServer();
     notConnectedMember(server);
