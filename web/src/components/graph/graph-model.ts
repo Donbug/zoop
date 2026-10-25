@@ -207,10 +207,12 @@ export function toG6Data(
           iconFontFamily: 'Inter Variable',
           iconFontWeight: 700,
           iconFill: n.brandColor ?? themeColor('ink'),
-          labelText: company ? n.label : shortTitle(n.label, 13 * scale),
+          labelText: company
+            ? n.label
+            : shortTitle(n.label, 15 * scale, 220 * scale),
           labelPlacement: company ? 'bottom' : 'top',
           labelFontFamily: company ? 'Inter Variable' : 'Pretendard Variable',
-          labelFontSize: (company ? (chosen ? 22 : 17.2) : 13) * scale,
+          labelFontSize: (company ? (chosen ? 24 : 19) : 15) * scale,
           labelFontWeight: chosen ? 800 : company ? 500 : 700,
           labelFill:
             company && !chosen ? themeColor('muted') : themeColor('ink'),
@@ -220,7 +222,7 @@ export function toG6Data(
           labelBackgroundStroke: themeColor('ink'),
           labelBackgroundLineWidth: 0.5,
           labelBackgroundRadius: 8,
-          labelPadding: [2, 7],
+          labelPadding: [3, 8],
           badges,
           cursor: 'pointer',
           opacity: dimmed ? 0.16 : 1,
@@ -238,6 +240,9 @@ export function toG6Data(
           source: e.source,
           target: e.target,
           style: {
+            // D-GRP-01: 관계 설명은 상세·키보드 목록에 남기고 선 위 이름표는 표시하지 않아요.
+            labelText: '',
+            labelVisibility: 'hidden',
             stroke:
               e.relationType === 'FOLLOWS'
                 ? themeColor('ink')

@@ -24,7 +24,7 @@ zoop-ai-issue-summary = "zoop_ai_pipeline.issue_summary_cli:main"
 
 [dependency-groups]
 # The S1 worker is only a test dependency: citation parity checks compare against its public exact() rule.
-dev = ["pytest==9.1.1", "zoop-ai-worker"]
+dev = ["pytest==9.1.1", "pytest-xdist==3.8.0", "zoop-ai-worker"]
 
 [tool.uv]
 package = true

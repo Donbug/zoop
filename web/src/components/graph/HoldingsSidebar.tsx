@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import CompanyLogo from '@/components/common/CompanyLogo';
 import StockQuote from '@/components/stocks/StockQuote';
 import { getPortfolio } from '@/apis/portfolio/portfolio';
@@ -19,6 +19,7 @@ export default function HoldingsSidebar({
   onPick: (companyId: string) => void;
   onClose: () => void;
 }) {
+  const location = useLocation();
   return (
     <aside
       aria-labelledby="holdings-sidebar-title"
@@ -45,7 +46,11 @@ export default function HoldingsSidebar({
       ) : (
         <p className={`${ui.muted} px-4 py-4`}>
           로그인하면 가상 계좌의 보유 종목을 볼 수 있어요.{' '}
-          <Link to="/login" className="font-semibold underline">
+          <Link
+            to="/login"
+            state={{ from: location }}
+            className="font-semibold underline"
+          >
             로그인
           </Link>
         </p>

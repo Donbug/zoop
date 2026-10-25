@@ -144,12 +144,17 @@ class CiGateTests(unittest.TestCase):
 
     def test_missing_or_skipped_job_fails_for_every_required_job(self):
         self.assertIn("ai-pipeline", require_ci.REQUIRED_JOBS)
+        self.assertIn("ai-pipeline-tests", require_ci.REQUIRED_JOBS)
+        self.assertIn("ai-pipeline-smoke", require_ci.REQUIRED_JOBS)
         self.assertNotIn("ai-pipeline-public", require_ci.REQUIRED_JOBS)
         self.assertIn("ai-worker", require_ci.REQUIRED_JOBS)
         self.assertIn("ai-service", require_ci.REQUIRED_JOBS)
         self.assertIn("api", require_ci.REQUIRED_JOBS)
+        self.assertIn("api-tests", require_ci.REQUIRED_JOBS)
+        self.assertIn("api-graph-smoke", require_ci.REQUIRED_JOBS)
+        self.assertIn("api-container", require_ci.REQUIRED_JOBS)
         self.assertIn("app-web", require_ci.REQUIRED_JOBS)
-        self.assertEqual(len(require_ci.REQUIRED_JOBS), 9)
+        self.assertEqual(len(require_ci.REQUIRED_JOBS), 14)
         for skipped in sorted(require_ci.REQUIRED_JOBS):
             with self.subTest(skipped=skipped), self.assertRaisesRegex(ValueError, "CI job evidence"):
                 require_ci.require_jobs([{"name": name, "conclusion": "skipped" if name == skipped else "success"}
