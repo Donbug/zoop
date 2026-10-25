@@ -12,7 +12,14 @@ public enum ExclusionFailure {
     RECEIPT_UNAVAILABLE("receipt_unavailable"),
     /** The report's handoff id or a digest is not the one the app imported (exposure consumption rule 1). */
     RECEIPT_MISMATCH("receipt_mismatch"),
+    /** The request id was recorded for another request. */
+    REQUEST_CONFLICT("request_conflict"),
+    /** A lift target changed after the lift's {@code expectedRevision}, or that revision is ahead of the store. */
+    REVISION_STALE("revision_stale"),
+    /** Known rollback: nothing was written. */
     DATABASE_UNAVAILABLE("database_unavailable"),
+    /** The commit may or may not have happened: re-run the same request (same requestId) to read its recorded result. */
+    OUTCOME_UNKNOWN("outcome_unknown"),
     INTERNAL_ERROR("internal_error");
 
     private final String code;

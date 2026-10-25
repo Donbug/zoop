@@ -17,6 +17,11 @@ final class ExclusionResultWriter {
     }
 
     static byte[] toBytes(ExclusionResult result) {
+        if (result.replay()) {
+            ObjectNode stored = (ObjectNode) StrictJson.parseObject(result.recorded()).node();
+            stored.put("replayed", true);
+            return StrictJson.write(stored);
+        }
         ObjectNode root = StrictJson.newObject();
         root.put("schemaVersion", ExclusionRequestParser.SCHEMA_VERSION);
         root.put("status", result.succeeded() ? "succeeded" : "failed");
@@ -26,6 +31,7 @@ final class ExclusionResultWriter {
             return StrictJson.write(root);
         }
         root.put("outcome", result.outcome());
+        root.put("replayed", false);
         root.put("revision", result.revision());
         root.put("scope", "per-graph-version");
         root.put("snapshots", "unchanged");

@@ -52,6 +52,24 @@ CREATE TABLE disclosure_exclusion_targets (
 CREATE INDEX ix_disclosure_exclusion_targets_version ON disclosure_exclusion_targets
     (graph_version_id, target_kind, target_id, article_version, revision DESC);
 
+-- One operator command that ran to an outcome (applied or unchanged), written in the transaction of its change under the
+-- publication lock. A re-run of the same request_id returns the stored result and changes nothing again, so a re-run after a lost
+-- result never lifts or re-excludes what changed in between; the same id with another request is refused. A failed command is not
+-- recorded (it wrote nothing). `revision` is the exclusion revision the command left (its change, or the current one).
+CREATE TABLE disclosure_exclusion_requests (
+    request_id text PRIMARY KEY,
+    -- SHA-256 of the canonical request file
+    request_sha256 text NOT NULL,
+    action text NOT NULL,
+    revision bigint NOT NULL,
+    result jsonb NOT NULL,
+    recorded_at timestamptz NOT NULL,
+    CONSTRAINT ck_disclosure_exclusion_requests_id CHECK (request_id ~ '^[A-Za-z0-9._:-]{1,200}$'),
+    CONSTRAINT ck_disclosure_exclusion_requests_sha256 CHECK (request_sha256 ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT ck_disclosure_exclusion_requests_action CHECK (action IN ('exclude', 'lift')),
+    CONSTRAINT ck_disclosure_exclusion_requests_revision CHECK (revision >= 0)
+);
+
 -- History: appended to, never rewritten. A target row goes only with its version (graph_versions has no delete guard).
 CREATE FUNCTION disclosure_exclusions_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
@@ -65,4 +83,6 @@ $$;
 CREATE TRIGGER tr_disclosure_exclusion_changes_guard BEFORE UPDATE OR DELETE ON disclosure_exclusion_changes
     FOR EACH ROW EXECUTE FUNCTION disclosure_exclusions_guard();
 CREATE TRIGGER tr_disclosure_exclusion_targets_guard BEFORE UPDATE OR DELETE ON disclosure_exclusion_targets
+    FOR EACH ROW EXECUTE FUNCTION disclosure_exclusions_guard();
+CREATE TRIGGER tr_disclosure_exclusion_requests_guard BEFORE UPDATE OR DELETE ON disclosure_exclusion_requests
     FOR EACH ROW EXECUTE FUNCTION disclosure_exclusions_guard();

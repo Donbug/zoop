@@ -2,18 +2,31 @@ package com.zoop.graph.exclusion;
 
 import java.util.List;
 
-/** One run of the exclusion command: an {@code exclude} from an AI exposure report, or an explicit {@code lift}. */
+/**
+ * One run of the exclusion command: an {@code exclude} from an AI exposure report, or an explicit {@code lift}. {@code requestId}
+ * names the command and {@code requestSha256} is the SHA-256 of the canonical request: a re-run of a recorded command returns its
+ * stored result and never changes anything again.
+ */
 public sealed interface ExclusionRequest {
+    String requestId();
+
+    String requestSha256();
+
     String operator();
 
     String reason();
 
     /** Excludes what the report proposes, per handoff, in the graph version imported from that handoff. */
-    record Exclude(String operator, String reason, Report report) implements ExclusionRequest {
+    record Exclude(String requestId, String requestSha256, String operator, String reason, Report report)
+            implements ExclusionRequest {
     }
 
-    /** Lifts these targets of one version: the only way an exclusion ends (an empty or smaller report never lifts). */
-    record Lift(String operator, String reason, String graphVersionId, List<Target> targets) implements ExclusionRequest {
+    /**
+     * Lifts these targets of one version: the only way an exclusion ends (an empty or smaller report never lifts). Refused when a
+     * target changed after {@code expectedRevision}, the exclusion revision the operator decided on.
+     */
+    record Lift(String requestId, String requestSha256, String operator, String reason, String graphVersionId,
+            long expectedRevision, List<Target> targets) implements ExclusionRequest {
         public Lift {
             targets = List.copyOf(targets);
         }

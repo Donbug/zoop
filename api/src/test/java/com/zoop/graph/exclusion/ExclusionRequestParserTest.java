@@ -56,6 +56,37 @@ class ExclusionRequestParserTest {
                 r -> ((ObjectNode) r.get("handoffs").get(0).get("counts")).put("issues", 9),
                 r -> ((ObjectNode) r.get("handoffs").get(0)).put("exposed", false),
                 r -> ((ObjectNode) r.get("handoffs").get(0)).put("manifestDigest", "A".repeat(64)),
+                // Types, nullability, enums, consts and caps of the closed schema, not only its keys.
+                r -> ((ObjectNode) r.get("changed")).putNull("sourceId"),
+                r -> ((ObjectNode) r.get("changed")).put("sourceId", ""),
+                r -> ((ObjectNode) r.get("identity")).put("recordedInIngestion", "yes"),
+                r -> ((ObjectNode) r.get("handoffs").get(0).get("articles").get(0)).put("documentVersion", "v1"),
+                r -> ((ObjectNode) r.get("handoffs").get(0).get("articles").get(0)).put("documentId", 7),
+                r -> ((ObjectNode) r.get("handoffs").get(0).get("issues").get(0)).putArray("reasons").add("made-up"),
+                r -> r.put("consistency", "no locks"),
+                r -> r.put("effect", "excluded everything"),
+                r -> {
+                    ObjectNode changed = r.putObject("changed");
+                    changed.put("kind", "document");
+                    changed.put("documentId", "doc");
+                    changed.put("documentVersion", "x");
+                    changed.putNull("rawVersion");
+                },
+                r -> {
+                    ObjectNode changed = r.putObject("changed");
+                    changed.put("kind", "grant");
+                    changed.put("grantId", "grant");
+                    changed.put("revision", 3);
+                },
+                r -> {
+                    var issues = ((ObjectNode) r.get("handoffs").get(0)).putArray("issues");
+                    for (int i = 0; i < 2001; i++) {
+                        ObjectNode issue = issues.addObject();
+                        issue.put("id", "issue-" + i);
+                        issue.putArray("reasons").add("source-document");
+                    }
+                    ((ObjectNode) r.get("handoffs").get(0).get("counts")).put("issues", 2001);
+                },
                 // A relation retraction never withdraws article text or quotes (consumption rule 5).
                 r -> {
                     r.put("cause", "relation-retraction");
@@ -64,7 +95,15 @@ class ExclusionRequestParserTest {
                     changed.put("jobId", "s3-job");
                     changed.put("relationCandidateId", "rc-" + "5".repeat(64));
                 },
-                r -> r.put("cause", "relation-retraction"));
+                r -> r.put("cause", "relation-retraction"),
+                r -> {
+                    // A relation retraction with a relation candidate id that is not rc-<64 hex>.
+                    r.put("cause", "relation-retraction");
+                    ObjectNode changed = r.putObject("changed");
+                    changed.put("kind", "s3-relation");
+                    changed.put("jobId", "s3-job");
+                    changed.put("relationCandidateId", "candidate");
+                });
         for (Consumer<ObjectNode> forgery : forgeries) {
             ObjectNode report = ExposureReports.report(ExposureReports.handoff("handoff-1", List.of("issue-a"), List.of(), true));
             forgery.accept(report);
@@ -75,20 +114,54 @@ class ExclusionRequestParserTest {
     }
 
     @Test
+    void nullableFieldsOfTheSchemaMayBeNull() {
+        ObjectNode report = ExposureReports.report(ExposureReports.handoff("handoff-1", List.of("issue-a"), List.of(), true));
+        ((ObjectNode) report.get("identity")).putNull("recordedInIngestion");
+        ObjectNode changed = report.putObject("changed");
+        changed.put("kind", "grant");
+        changed.put("grantId", "grant-1");
+        changed.putNull("revision");
+        assertInstanceOf(Exclude.class, parser.parse(ExposureReports.exclude(report)));
+    }
+
+    @Test
+    void theRequestIdNamesTheCommandAndTheHashCoversTheWholeRequest() {
+        ObjectNode report = ExposureReports.report(ExposureReports.handoff("handoff-1", List.of("issue-a"), List.of(), false));
+        Exclude one = (Exclude) parser.parse(ExposureReports.exclude("cmd-1", report));
+        assertEquals("cmd-1", one.requestId());
+        assertEquals(one.requestSha256(), parser.parse(ExposureReports.exclude("cmd-1", report.deepCopy())).requestSha256());
+        ObjectNode otherReason = (ObjectNode) StrictJson.parseObject(ExposureReports.exclude("cmd-1", report)).node();
+        otherReason.put("reason", "다른 사유");
+        assertNotEquals(one.requestSha256(), parser.parse(StrictJson.write(otherReason)).requestSha256());
+
+        for (String field : List.of("requestId", "expectedRevision")) {
+            ObjectNode lift = (ObjectNode) StrictJson.parseObject(ExposureReports.lift("gv-test", 0, "issue-a")).node();
+            lift.remove(field);
+            assertEquals(ExclusionFailure.REQUEST_INVALID,
+                    assertThrows(ExclusionException.class, () -> parser.parse(StrictJson.write(lift))).failure());
+        }
+        ObjectNode negative = (ObjectNode) StrictJson.parseObject(ExposureReports.lift("gv-test", 0, "issue-a")).node();
+        negative.put("expectedRevision", -1);
+        assertEquals(ExclusionFailure.REQUEST_INVALID,
+                assertThrows(ExclusionException.class, () -> parser.parse(StrictJson.write(negative))).failure());
+    }
+
+    @Test
     void aLiftNamesOneVersionAndItsTargetsAndAnythingElseIsAnInvalidRequest() {
-        Lift lift = assertInstanceOf(Lift.class, parser.parse(ExposureReports.lift("gv-test", "issue-a", "issue-b")));
+        Lift lift = assertInstanceOf(Lift.class, parser.parse(ExposureReports.lift("gv-test", 4, "issue-a", "issue-b")));
         assertEquals("gv-test", lift.graphVersionId());
+        assertEquals(4, lift.expectedRevision());
         assertEquals(2, lift.targets().size());
         assertEquals("정정 확인 후 해제", lift.reason());
 
-        for (byte[] invalid : List.of(ExposureReports.lift("gv-test"), ExposureReports.lift("gv-test", "issue-a", "issue-a"),
-                ExposureReports.utf8("{\"schemaVersion\":\"zoop-disclosure-exclusion-1\",\"action\":\"delete\","
-                        + "\"operator\":\"a\",\"reason\":\"r\"}"),
+        for (byte[] invalid : List.of(ExposureReports.lift("gv-test", 0), ExposureReports.lift("gv-test", 0, "issue-a", "issue-a"),
+                ExposureReports.utf8("{\"schemaVersion\":\"zoop-disclosure-exclusion-1\",\"requestId\":\"cmd\","
+                        + "\"action\":\"delete\",\"operator\":\"a\",\"reason\":\"r\"}"),
                 ExposureReports.utf8("not json"))) {
             assertEquals(ExclusionFailure.REQUEST_INVALID,
                     assertThrows(ExclusionException.class, () -> parser.parse(invalid)).failure());
         }
-        ObjectNode blankReason = (ObjectNode) StrictJson.parseObject(ExposureReports.lift("gv-test", "issue-a")).node();
+        ObjectNode blankReason = (ObjectNode) StrictJson.parseObject(ExposureReports.lift("gv-test", 0, "issue-a")).node();
         blankReason.put("reason", "   ");
         assertEquals(ExclusionFailure.REQUEST_INVALID,
                 assertThrows(ExclusionException.class, () -> parser.parse(StrictJson.write(blankReason))).failure());

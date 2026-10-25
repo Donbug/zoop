@@ -19,7 +19,9 @@ import com.zoop.graph.exclusion.ExclusionRequest.Target;
  * Reads the request file ({@code zoop-disclosure-exclusion-1}, closed). An {@code exclude} embeds the exposure report exactly as
  * {@code zoop-ai-handoff-exposure} printed it; the report is checked against the closed {@code ExposureReport} schema of
  * {@code docs/api/internal-ai-openapi.yaml} ({@code zoop-handoff-exposure-1}), so a report of another version or a hand-edited one
- * with an unknown key is refused whole. Nothing is read from the AI side here: the report is the operator's input.
+ * with an unknown key, a value of the wrong type, a reason or text outside its enum or const, or a list over its cap is refused
+ * whole. Nothing is read from the AI side here: the report is the operator's input. {@code requestId} names the command (a re-run
+ * of the same request returns the recorded result); a {@code lift} also names the {@code expectedRevision} it was decided on.
  */
 public final class ExclusionRequestParser {
     public static final String SCHEMA_VERSION = "zoop-disclosure-exclusion-1";
@@ -32,7 +34,14 @@ public final class ExclusionRequestParser {
     private static final Pattern EVIDENCE = Pattern.compile("ev-[a-f0-9]{64}");
     private static final Pattern ARTICLE = Pattern.compile("doc-[a-f0-9]{64}");
     private static final Pattern OPERATOR = Pattern.compile("[A-Za-z0-9._@-]{1,100}");
+    private static final Pattern RELATION_CANDIDATE = Pattern.compile("rc-[a-f0-9]{64}");
     private static final int MAX_LIFT_TARGETS = 20_000;
+    static final String CONSISTENCY = "shared locks on every opened ledger were held from the first read until this output";
+    static final String EFFECT = "none: identity-only proposal for the selected handoffs; nothing was excluded, revised, overlaid, "
+            + "activated or written, and an empty or smaller result never clears or narrows any existing exclusion";
+    private static final Set<String> ISSUE_REASONS = Set.of("disposition-input", "involvement-lost", "source-document");
+    private static final Set<String> RELATION_REASONS = Set.of("anchor", "anchor-undetermined", "basis-evidence", "evidence", "issue",
+            "source-relation", "upstream-input");
 
     public ExclusionRequest parse(byte[] bytes) {
         Obj root;
@@ -40,10 +49,12 @@ public final class ExclusionRequestParser {
             root = StrictJson.parseObject(bytes);
             String action = root.string("action");
             if (!SCHEMA_VERSION.equals(root.string("schemaVersion"))) throw new StrictJson.Malformed();
+            String requestId = id(root.string("requestId"));
             String operator = operator(root.string("operator"));
             String reason = reason(root.string("reason"));
             if ("lift".equals(action)) {
-                root.exactly(Set.of("schemaVersion", "action", "operator", "reason", "graphVersionId", "targets"));
+                root.exactly(Set.of("schemaVersion", "requestId", "action", "operator", "reason", "graphVersionId",
+                        "expectedRevision", "targets"));
                 List<Target> targets = new ArrayList<>();
                 for (Obj target : root.objects("targets")) {
                     targets.add(target(target));
@@ -51,15 +62,17 @@ public final class ExclusionRequestParser {
                 if (targets.isEmpty() || targets.size() > MAX_LIFT_TARGETS || new LinkedHashSet<>(targets).size() != targets.size()) {
                     throw new StrictJson.Malformed();
                 }
-                return new Lift(operator, reason, id(root.string("graphVersionId")), targets);
+                return new Lift(requestId, Canonical.digest(root.node()), operator, reason, id(root.string("graphVersionId")),
+                        root.count("expectedRevision"), targets);
             }
             if (!"exclude".equals(action)) throw new StrictJson.Malformed();
-            root.exactly(Set.of("schemaVersion", "action", "operator", "reason", "report"));
+            root.exactly(Set.of("schemaVersion", "requestId", "action", "operator", "reason", "report"));
         } catch (StrictJson.Malformed | IllegalArgumentException invalid) {
             throw new ExclusionException(ExclusionFailure.REQUEST_INVALID);
         }
         try {
-            return new Exclude(root.string("operator"), reason(root.string("reason")), report(root.object("report")));
+            return new Exclude(root.string("requestId"), Canonical.digest(root.node()), root.string("operator"),
+                    reason(root.string("reason")), report(root.object("report")));
         } catch (StrictJson.Malformed | IllegalArgumentException invalid) {
             throw new ExclusionException(ExclusionFailure.REPORT_INVALID);
         }
@@ -72,14 +85,16 @@ public final class ExclusionRequestParser {
         String cause = report.string("cause");
         if (!Set.of("source-change", "relation-retraction").contains(cause)) throw new StrictJson.Malformed();
         changed(report.object("changed"), cause);
-        report.object("identity").exactly(Set.of("boundInSelection", "recordedInIngestion"));
-        report.object("identity").bool("boundInSelection");
+        Obj identity = report.object("identity").exactly(Set.of("boundInSelection", "recordedInIngestion"));
+        identity.bool("boundInSelection");
+        if (!identity.isNull("recordedInIngestion")) identity.bool("recordedInIngestion");
         Obj scope = report.object("scope").exactly(Set.of("selection", "handoffIds", "notCovered"));
         if (!"explicit".equals(scope.string("selection"))) throw new StrictJson.Malformed();
         scope.strings("notCovered");
         report.string("basis");
-        report.string("consistency");
-        report.string("effect");
+        if (!CONSISTENCY.equals(report.string("consistency")) || !EFFECT.equals(report.string("effect"))) {
+            throw new StrictJson.Malformed();
+        }
         Obj usage = report.object("usage").exactly(Set.of("providerCalls", "modelCalls"));
         if (usage.count("providerCalls") != 0 || usage.count("modelCalls") != 0) throw new StrictJson.Malformed();
 
@@ -100,10 +115,23 @@ public final class ExclusionRequestParser {
     private static void changed(Obj changed, String cause) {
         String kind = changed.string("kind");
         switch (kind) {
-            case "document" -> changed.exactly(Set.of("kind", "documentId", "documentVersion", "rawVersion"));
-            case "source" -> changed.exactly(Set.of("kind", "sourceId"));
-            case "grant" -> changed.exactly(Set.of("kind", "grantId", "revision"));
-            case "s3-relation" -> changed.exactly(Set.of("kind", "jobId", "relationCandidateId"));
+            case "document" -> {
+                changed.exactly(Set.of("kind", "documentId", "documentVersion", "rawVersion"));
+                text(changed.string("documentId"));
+                digestOrNull(changed, "documentVersion");
+                digestOrNull(changed, "rawVersion");
+            }
+            case "source" -> text(changed.exactly(Set.of("kind", "sourceId")).string("sourceId"));
+            case "grant" -> {
+                changed.exactly(Set.of("kind", "grantId", "revision"));
+                text(changed.string("grantId"));
+                if (!changed.isNull("revision")) text(changed.string("revision"));
+            }
+            case "s3-relation" -> {
+                changed.exactly(Set.of("kind", "jobId", "relationCandidateId"));
+                id(changed.string("jobId"));
+                match(RELATION_CANDIDATE, changed.string("relationCandidateId"));
+            }
             default -> throw new StrictJson.Malformed();
         }
         // A relation retraction is exactly an s3-relation change; every source change is one of the other three.
@@ -114,23 +142,29 @@ public final class ExclusionRequestParser {
         handoff.exactly(Set.of("handoffId", "bundleSchema", "manifestDigest", "bundleDigest", "contentDigest", "bound", "exposed",
                 "articles", "issues", "relations", "evidenceIds", "counts"));
         if (!"zoop-graph-handoff-bundle-7".equals(handoff.string("bundleSchema"))) throw new StrictJson.Malformed();
+        if (handoff.array("articles").size() > 1000 || handoff.array("issues").size() > 2000
+                || handoff.array("relations").size() > 10_000 || handoff.array("evidenceIds").size() > 20_000) {
+            throw new StrictJson.Malformed();
+        }
         List<Target> targets = new ArrayList<>();
         for (Obj article : handoff.objects("articles")) {
             article.exactly(Set.of("articleId", "articleVersion", "documentId", "documentVersion"));
+            text(article.string("documentId"));
+            match(DIGEST, article.string("documentVersion"));
             targets.add(new Target("article", match(ARTICLE, article.string("articleId")),
                     match(DIGEST, article.string("articleVersion"))));
         }
         for (Obj issue : handoff.objects("issues")) {
             issue.exactly(Set.of("id", "reasons"));
-            if (issue.strings("reasons").isEmpty()) throw new StrictJson.Malformed();
+            reasons(issue, ISSUE_REASONS);
             targets.add(new Target("issue", id(issue.string("id")), ""));
         }
         for (Obj relation : handoff.objects("relations")) {
             relation.exactly(Set.of("id", "type", "reasons"));
-            if (!Set.of("INVOLVES", "STRUCTURALLY_RELATED_TO", "FOLLOWS").contains(relation.string("type"))
-                    || relation.strings("reasons").isEmpty()) {
+            if (!Set.of("INVOLVES", "STRUCTURALLY_RELATED_TO", "FOLLOWS").contains(relation.string("type"))) {
                 throw new StrictJson.Malformed();
             }
+            reasons(relation, RELATION_REASONS);
             targets.add(new Target("relation", id(relation.string("id")), ""));
         }
         for (String evidenceId : handoff.strings("evidenceIds")) {
@@ -162,6 +196,22 @@ public final class ExclusionRequestParser {
         target.exactly(Set.of("kind", "id"));
         String id = "evidence".equals(kind) ? match(EVIDENCE, target.string("id")) : id(target.string("id"));
         return new Target(kind, id, "");
+    }
+
+    /** At least one reason, each from the schema's enum. */
+    private static void reasons(Obj target, Set<String> allowed) {
+        List<String> reasons = target.strings("reasons");
+        if (reasons.isEmpty() || !allowed.containsAll(reasons)) throw new StrictJson.Malformed();
+    }
+
+    /** A producer id of 1 to 200 characters ({@code minLength}/{@code maxLength} count code points, as JSON Schema does). */
+    private static void text(String value) {
+        int length = value.codePointCount(0, value.length());
+        if (length < 1 || length > 200) throw new StrictJson.Malformed();
+    }
+
+    private static void digestOrNull(Obj object, String name) {
+        if (!object.isNull(name)) match(DIGEST, object.string(name));
     }
 
     private static String operator(String value) {

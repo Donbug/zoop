@@ -4,7 +4,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.artifact.storage.ArtifactStoreException;
@@ -22,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.TransactionException;
+import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionOperations;
 
 /**
@@ -30,8 +33,12 @@ import org.springframework.transaction.support.TransactionOperations;
  * <li>{@code exclude}: every handoff of an AI exposure report must be a graph version this app imported, and the receipt of that
  *     version must carry the report's handoff id and all three digests (rule 1). Its proposed ids are then excluded in THAT
  *     version only (rule 3). Targets already excluded are left as they are, so the same report twice changes nothing.</li>
- * <li>{@code lift}: the only way an exclusion ends. A report never lifts anything, however small or empty (rule 4).</li>
+ * <li>{@code lift}: the only way an exclusion ends. A report never lifts anything, however small or empty (rule 4). Refused when
+ *     a target changed after the lift's {@code expectedRevision}: a lift never undoes a change its operator did not see.</li>
  * </ul>
+ * Every command that ran to an outcome is recorded by its {@code requestId} in the transaction of its change. A re-run of the same
+ * request (an empty result file, {@code outcome_unknown}) returns that stored result and changes nothing again; the same id with
+ * another request is refused. A commit that may or may not have happened is {@code outcome_unknown}, never "nothing written".
  * A change is one transaction under the shared publication lock (rule switches, review decisions and activation take it too):
  * {@code revision} is MAX+1 and the lock is held to the commit, so readers see a committed prefix without the lock. The receipts are
  * read and checked before that transaction: they are immutable, verified files and the lock is held only for the short write.
@@ -62,18 +69,22 @@ public final class DisclosureExclusionService {
         String action = request instanceof Lift ? "lift" : "exclude";
         try {
             ExclusionResult result = request instanceof Exclude exclude ? exclude(exclude) : lift((Lift) request);
-            log.info("disclosure exclusion {} {} at revision {}", action, result.outcome(), result.revision());
+            log.info("disclosure exclusion {} {} at revision {}{}", action, result.outcome(), result.revision(),
+                    result.replay() ? " (recorded result)" : "");
             return result;
         } catch (ExclusionException failure) {
             log.warn("disclosure exclusion {} failed: {}", action, failure.failure().code());
             return ExclusionResult.failed(action, failure);
-        } catch (DataAccessException | TransactionException database) {
+        } catch (DataAccessException database) {
+            // A read before the transaction: nothing was written.
             log.error("disclosure exclusion database failure: {}", database.getClass().getSimpleName());
             return ExclusionResult.failed(action, new ExclusionException(ExclusionFailure.DATABASE_UNAVAILABLE));
         }
     }
 
     private ExclusionResult exclude(Exclude request) {
+        Optional<ExclusionResult> recorded = recorded(request);
+        if (recorded.isPresent()) return recorded.get();
         Map<String, Handoff> byVersion = new LinkedHashMap<>();
         for (Handoff handoff : request.report().handoffs()) {
             String versionId = versionId(handoff.handoffId());
@@ -83,8 +94,7 @@ public final class DisclosureExclusionService {
             verifyReceipt(versionId, handoff);
             byVersion.put(versionId, handoff);
         }
-        return transaction.execute(status -> {
-            repository.lockPublication();
+        return commit(request, () -> {
             List<VersionChange> versions = new ArrayList<>();
             Map<String, List<Target>> fresh = new LinkedHashMap<>();
             for (Map.Entry<String, Handoff> entry : byVersion.entrySet()) {
@@ -100,11 +110,17 @@ public final class DisclosureExclusionService {
     }
 
     private ExclusionResult lift(Lift request) {
+        Optional<ExclusionResult> recorded = recorded(request);
+        if (recorded.isPresent()) return recorded.get();
         if (repository.versionKind(request.graphVersionId()).isEmpty()) {
             throw new ExclusionException(ExclusionFailure.VERSION_UNKNOWN);
         }
-        return transaction.execute(status -> {
-            repository.lockPublication();
+        return commit(request, () -> {
+            if (request.expectedRevision() > repository.revision()) throw new ExclusionException(ExclusionFailure.REVISION_STALE);
+            Map<Target, Long> lastChanged = repository.lastChanged(request.graphVersionId());
+            if (request.targets().stream().anyMatch(t -> lastChanged.getOrDefault(t, 0L) > request.expectedRevision())) {
+                throw new ExclusionException(ExclusionFailure.REVISION_STALE);
+            }
             Set<Target> current = repository.excluded(request.graphVersionId());
             List<Target> lifted = request.targets().stream().filter(current::contains).toList();
             List<Target> notExcluded = request.targets().stream().filter(t -> !current.contains(t)).toList();
@@ -114,16 +130,54 @@ public final class DisclosureExclusionService {
         });
     }
 
+    /** The stored result of this request id, if it already ran; the same id with another request is refused. */
+    private Optional<ExclusionResult> recorded(ExclusionRequest request) {
+        return repository.recorded(request.requestId()).map(found -> {
+            if (!found.requestSha256().equals(request.requestSha256())) {
+                throw new ExclusionException(ExclusionFailure.REQUEST_CONFLICT);
+            }
+            return ExclusionResult.replayed(request instanceof Lift ? "lift" : "exclude", found.result());
+        });
+    }
+
+    /**
+     * Runs {@code work} under the publication lock and records its result by request id in the same transaction. A statement that
+     * fails inside is a known rollback; a failure of the transaction itself (the commit) leaves the outcome unknown.
+     */
+    private ExclusionResult commit(ExclusionRequest request, Supplier<ExclusionResult> work) {
+        TransactionCallback<ExclusionResult> callback = status -> {
+            try {
+                repository.lockPublication();
+                // Checked again under the lock: a concurrent run of the same request may have recorded it meanwhile.
+                Optional<ExclusionResult> recorded = recorded(request);
+                if (recorded.isPresent()) return recorded.get();
+                ExclusionResult result = work.get();
+                repository.insertRequest(request.requestId(), request.requestSha256(), result.action(), result.revision(),
+                        ExclusionResultWriter.toBytes(result));
+                return result;
+            } catch (DataAccessException failure) {
+                log.error("disclosure exclusion database failure: {}", failure.getClass().getSimpleName());
+                throw new ExclusionException(ExclusionFailure.DATABASE_UNAVAILABLE);
+            }
+        };
+        try {
+            return transaction.execute(callback);
+        } catch (DataAccessException | TransactionException unknownOutcome) {
+            log.error("disclosure exclusion commit failure: {}", unknownOutcome.getClass().getSimpleName());
+            throw new ExclusionException(ExclusionFailure.OUTCOME_UNKNOWN);
+        }
+    }
+
     /** One change with every target that moves, or nothing at all when none does. Runs under the publication lock. */
     private ExclusionResult write(String action, String cause, String reportSha256, ExclusionRequest request,
             Map<String, List<Target>> targets, List<VersionChange> versions) {
         if (targets.values().stream().allMatch(List::isEmpty)) {
-            return new ExclusionResult(action, ExclusionResult.UNCHANGED, repository.revision(), versions, null);
+            return new ExclusionResult(action, ExclusionResult.UNCHANGED, repository.revision(), versions);
         }
         long revision = repository.revision() + 1;
         repository.insertChange(revision, action, cause, reportSha256, request.reason(), request.operator());
         targets.forEach((versionId, list) -> list.forEach(target -> repository.insertTarget(revision, versionId, target)));
-        return new ExclusionResult(action, ExclusionResult.APPLIED, revision, versions, null);
+        return new ExclusionResult(action, ExclusionResult.APPLIED, revision, versions);
     }
 
     /** Rule 1: the report's handoff id and its three digests are exactly what the app's import receipt of the version holds. */

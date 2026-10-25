@@ -1,6 +1,9 @@
 package com.zoop.graph.exclusion;
 
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -46,6 +49,37 @@ public class JdbcDisclosureExclusionRepository {
         return new LinkedHashSet<>(jdbc.query(EXCLUDED, new MapSqlParameterSource("version", versionId),
                 (result, index) -> new Target(result.getString("target_kind"), result.getString("target_id"),
                         result.getString("article_version"))));
+    }
+
+    /** The latest revision that changed each target of this version, whatever the change was. */
+    public Map<Target, Long> lastChanged(String versionId) {
+        Map<Target, Long> last = new HashMap<>();
+        jdbc.query("""
+                SELECT target_kind, target_id, article_version, MAX(revision) AS revision FROM disclosure_exclusion_targets
+                WHERE graph_version_id = :version GROUP BY target_kind, target_id, article_version
+                """, new MapSqlParameterSource("version", versionId), result -> {
+            last.put(new Target(result.getString("target_kind"), result.getString("target_id"),
+                    result.getString("article_version")), result.getLong("revision"));
+        });
+        return last;
+    }
+
+    /** A command recorded under this request id: the hash of its request and its stored result. */
+    public record Recorded(String requestSha256, byte[] result) {
+    }
+
+    public Optional<Recorded> recorded(String requestId) {
+        return jdbc.query("SELECT request_sha256, result::text AS result FROM disclosure_exclusion_requests WHERE request_id = :id",
+                new MapSqlParameterSource("id", requestId), (result, index) -> new Recorded(result.getString("request_sha256"),
+                        result.getString("result").getBytes(StandardCharsets.UTF_8))).stream().findFirst();
+    }
+
+    public void insertRequest(String requestId, String requestSha256, String action, long revision, byte[] result) {
+        jdbc.update("""
+                INSERT INTO disclosure_exclusion_requests (request_id, request_sha256, action, revision, result, recorded_at)
+                VALUES (:id, :sha256, :action, :revision, CAST(:result AS jsonb), statement_timestamp())
+                """, new MapSqlParameterSource("id", requestId).addValue("sha256", requestSha256).addValue("action", action)
+                .addValue("revision", revision).addValue("result", new String(result, StandardCharsets.UTF_8)));
     }
 
     public long revision() {

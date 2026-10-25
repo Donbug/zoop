@@ -42,6 +42,9 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionSystemException;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -196,14 +199,15 @@ class DisclosureExclusionPostgresTest {
         }
         assertEquals(excludedAt, revision());
 
-        ExclusionResult lifted = run(ExposureReports.lift(v1, "issue-a", "issue-never"));
+        ExclusionResult lifted = run(ExposureReports.lift(v1, revision(), "issue-a", "issue-never"));
         assertEquals(ExclusionResult.APPLIED, lifted.outcome());
         assertEquals(excludedAt + 1, lifted.revision());
         assertEquals(Map.of("issue", 1), lifted.versions().get(0).changed());
         assertEquals(Map.of("issue", 1), lifted.versions().get(0).unchanged(), "a target that was not excluded is reported");
         assertEquals(Set.of("issue-b"), reader.current(v1).issueIds());
 
-        assertEquals(ExclusionResult.UNCHANGED, run(ExposureReports.lift(v1, "issue-a")).outcome(), "lifting twice is a no-op");
+        assertEquals(ExclusionResult.UNCHANGED, run(ExposureReports.lift(v1, revision(), "issue-a")).outcome(),
+                "lifting twice is a no-op");
         // A later report may exclude a lifted target again: the latest change of a target decides.
         assertEquals(ExclusionResult.APPLIED, run(ExposureReports.exclude(ExposureReports.report(
                 ExposureReports.handoff(HANDOFF_1, List.of("issue-a"), List.of(), false)))).outcome());
@@ -223,7 +227,7 @@ class DisclosureExclusionPostgresTest {
         ExclusionResult unknown = run(ExposureReports.exclude(ExposureReports.report(
                 ExposureReports.handoff("exclusion-test-never-imported", List.of("issue-a"), List.of(), false))));
         assertEquals(ExclusionFailure.VERSION_UNKNOWN, unknown.failure().failure());
-        assertEquals(ExclusionFailure.VERSION_UNKNOWN, run(ExposureReports.lift("gv-none", "issue-a")).failure().failure());
+        assertEquals(ExclusionFailure.VERSION_UNKNOWN, run(ExposureReports.lift("gv-none", 0, "issue-a")).failure().failure());
 
         assertEquals(before, revision(), "the whole report is refused: nothing of the matching handoff is written either");
         assertEquals(Set.of(), reader.current(v1).issueIds());
@@ -243,12 +247,99 @@ class DisclosureExclusionPostgresTest {
                 "UPDATE disclosure_exclusion_targets SET target_id = 'issue-z' WHERE revision = ?", revision));
         assertThrows(DataAccessException.class, () -> jdbc.update(
                 "DELETE FROM disclosure_exclusion_targets WHERE revision = ?", revision));
+        assertThrows(DataAccessException.class, () -> jdbc.update(
+                "UPDATE disclosure_exclusion_requests SET result = '{}'::jsonb WHERE revision = ?", revision));
+        assertThrows(DataAccessException.class, () -> jdbc.update(
+                "DELETE FROM disclosure_exclusion_requests WHERE revision = ?", revision));
 
         jdbc.update("DELETE FROM graph_versions WHERE id = ?", v1);
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM disclosure_exclusion_targets WHERE graph_version_id = ?",
                 Integer.class, v1));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM disclosure_exclusion_changes WHERE revision = ?",
                 Integer.class, revision), "the change itself is history");
+    }
+
+    /** The review's sequence: exclude X, lift L whose result is lost, X excluded again, L re-run. */
+    @Test
+    void aReRunOfARecordedLiftReturnsItsResultAndNeverLiftsALaterExclusion() {
+        run(ExposureReports.exclude(ExposureReports.report(ExposureReports.handoff(HANDOFF_1, List.of("issue-a"), List.of(), false))));
+        byte[] lift = ExposureReports.lift(v1, revision(), "issue-a");
+        ExclusionResult first = run(lift);
+        assertEquals(ExclusionResult.APPLIED, first.outcome());
+        run(ExposureReports.exclude(ExposureReports.report(ExposureReports.handoff(HANDOFF_1, List.of("issue-a"), List.of(), false))));
+        long excludedAgain = revision();
+
+        ExclusionResult rerun = run(lift);
+
+        assertTrue(rerun.succeeded(), () -> String.valueOf(rerun.failure()));
+        assertTrue(rerun.replay());
+        assertEquals(ExclusionResult.APPLIED, rerun.outcome(), "the recorded outcome of the first run");
+        assertEquals(first.revision(), rerun.revision());
+        assertEquals(excludedAgain, revision(), "nothing written");
+        assertEquals(Set.of("issue-a"), reader.current(v1).issueIds(), "the later exclusion stands");
+        ObjectNode document = (ObjectNode) StrictJson.parseObject(ExclusionResultWriter.toBytes(rerun)).node();
+        assertTrue(document.get("replayed").booleanValue());
+        assertEquals(1, document.get("versions").get(0).get("changed").get("issue").intValue());
+    }
+
+    @Test
+    void aLiftDecidedBeforeTheTargetLastChangedIsStale() {
+        run(ExposureReports.exclude(ExposureReports.report(ExposureReports.handoff(HANDOFF_1, List.of("issue-a"), List.of(), false))));
+        long seen = revision();
+        run(ExposureReports.lift(v1, seen, "issue-a"));
+        run(ExposureReports.exclude(ExposureReports.report(ExposureReports.handoff(HANDOFF_1, List.of("issue-a"), List.of(), false))));
+        long before = revision();
+
+        assertEquals(ExclusionFailure.REVISION_STALE, run(ExposureReports.lift(v1, seen, "issue-a")).failure().failure());
+        assertEquals(ExclusionFailure.REVISION_STALE, run(ExposureReports.lift(v1, before + 1, "issue-a")).failure().failure(),
+                "a revision the store has not reached");
+        assertEquals(before, revision());
+        assertEquals(Set.of("issue-a"), reader.current(v1).issueIds());
+        // A change of another target after the decision does not make it stale.
+        run(ExposureReports.exclude(ExposureReports.report(ExposureReports.handoff(HANDOFF_2, List.of("issue-z"), List.of(), false))));
+        assertEquals(ExclusionResult.APPLIED, run(ExposureReports.lift(v1, before, "issue-a")).outcome());
+    }
+
+    @Test
+    void theSameRequestIdForAnotherRequestIsRefused() {
+        String id = ExposureReports.requestId();
+        run(ExposureReports.exclude(id, ExposureReports.report(
+                ExposureReports.handoff(HANDOFF_1, List.of("issue-a"), List.of(), false))));
+        long before = revision();
+
+        ExclusionResult other = run(ExposureReports.exclude(id, ExposureReports.report(
+                ExposureReports.handoff(HANDOFF_1, List.of("issue-b"), List.of(), false))));
+
+        assertEquals(ExclusionFailure.REQUEST_CONFLICT, other.failure().failure());
+        assertEquals(before, revision());
+        assertEquals(Set.of("issue-a"), reader.current(v1).issueIds());
+    }
+
+    @Test
+    void aCommitWhoseOutcomeIsUnknownIsReportedAsSuchAndTheReRunReadsTheRecordedResult() {
+        TransactionTemplate real = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+        TransactionOperations lostCommitReply = new TransactionOperations() {
+            @Override
+            public <T> T execute(TransactionCallback<T> action) {
+                real.execute(action);
+                throw new TransactionSystemException("commit reply lost");
+            }
+        };
+        DisclosureExclusionService unsure = new DisclosureExclusionService(
+                new JdbcDisclosureExclusionRepository(context.getBean(NamedParameterJdbcTemplate.class)), registry, store,
+                lostCommitReply);
+        byte[] request = ExposureReports.exclude(ExposureReports.report(
+                ExposureReports.handoff(HANDOFF_1, List.of("issue-a"), List.of(), false)));
+
+        ExclusionResult unknown = unsure.run(parser.parse(request));
+        assertEquals(ExclusionFailure.OUTCOME_UNKNOWN, unknown.failure().failure(), "not database_unavailable: it did commit");
+        long committed = revision();
+
+        ExclusionResult rerun = run(request);
+        assertTrue(rerun.replay());
+        assertEquals(ExclusionResult.APPLIED, rerun.outcome());
+        assertEquals(committed, rerun.revision());
+        assertEquals(committed, revision());
     }
 
     @Test

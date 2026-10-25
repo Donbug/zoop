@@ -2,6 +2,7 @@ package com.zoop.graph.exclusion;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.UUID;
 
 import com.zoop.common.json.StrictJson;
 import tools.jackson.databind.node.ArrayNode;
@@ -91,9 +92,19 @@ final class ExposureReports {
         return report;
     }
 
+    /** A new command every call: a fresh {@code requestId}. */
+    static String requestId() {
+        return "test-" + UUID.randomUUID();
+    }
+
     static byte[] exclude(ObjectNode report) {
+        return exclude(requestId(), report);
+    }
+
+    static byte[] exclude(String requestId, ObjectNode report) {
         ObjectNode request = StrictJson.newObject();
         request.put("schemaVersion", "zoop-disclosure-exclusion-1");
+        request.put("requestId", requestId);
         request.put("action", "exclude");
         request.put("operator", "operator-a");
         request.put("reason", "권리 철회에 따른 공개 제외");
@@ -101,13 +112,16 @@ final class ExposureReports {
         return StrictJson.write(request);
     }
 
-    static byte[] lift(String versionId, String... issueIds) {
+    /** A lift decided on exclusion revision {@code expectedRevision}. */
+    static byte[] lift(String versionId, long expectedRevision, String... issueIds) {
         ObjectNode request = StrictJson.newObject();
         request.put("schemaVersion", "zoop-disclosure-exclusion-1");
+        request.put("requestId", requestId());
         request.put("action", "lift");
         request.put("operator", "operator-a");
         request.put("reason", "정정 확인 후 해제");
         request.put("graphVersionId", versionId);
+        request.put("expectedRevision", expectedRevision);
         ArrayNode targets = request.putArray("targets");
         for (String id : issueIds) {
             ObjectNode target = targets.addObject();
