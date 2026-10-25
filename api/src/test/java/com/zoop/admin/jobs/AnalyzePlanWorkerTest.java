@@ -1,6 +1,7 @@
 package com.zoop.admin.jobs;
 
 import java.time.*;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -412,7 +413,8 @@ class AnalyzePlanWorkerTest {
     }
 
     static final class MutableClock extends Clock {
-        private Instant now = Instant.now();
+        // Shared auth timestamps round-trip through PostgreSQL at microsecond precision.
+        private Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         Runnable afterAdvance = () -> {};
         void advance(Duration duration) {
             now = now.plus(duration);
@@ -457,7 +459,8 @@ class AnalyzePlanWorkerTest {
             var manifest = new PlanManifest(reference, D, "app", new PlanManifest.Round("probe", "round", D),
                     new PipelineJob.Provenance(PipelineJob.SourceKind.SYNTHETIC, ExecutionMode.REPLAY),
                     List.of(new PlanManifest.Unit(s2.jobId(), s2, D, s3)), D);
-            accepted = new PlanAdmission(PlanIdentity.admissionId("app", reference), clock.instant(), 1, D, manifest,
+            // The real AI service's ledger.stamp emits whole-second admission timestamps.
+            accepted = new PlanAdmission(PlanIdentity.admissionId("app", reference), clock.instant().truncatedTo(ChronoUnit.SECONDS), 1, D, manifest,
                     new PlanAdmission.Authority(PlanAdmission.State.ACTIVE, Optional.empty()));
             mode = Mode.NORMAL;
             retirementCode = "policy_disabled";
