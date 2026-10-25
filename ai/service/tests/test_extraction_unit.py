@@ -463,13 +463,14 @@ def test_a_first_schema_ledger_gains_its_columns_in_place_and_reads_every_old_jo
     database = sqlite3.connect(tmp_path / "extraction-jobs.sqlite3")  # what a `-1` ledger looks like
     database.execute("DROP TRIGGER extraction_jobs_immutable")
     database.execute("ALTER TABLE extraction_jobs DROP COLUMN live_binding")
+    database.execute("ALTER TABLE extraction_jobs DROP COLUMN authority_ref")
     database.execute("ALTER TABLE extraction_dispatch DROP COLUMN explicit")
     database.execute("UPDATE meta SET value=? WHERE key='schema'", (MIGRATES_FROM[0],))
     database.commit()
     database.close()
     migrated = ExtractionLedger(tmp_path, tmp_path / "extraction")
     old = migrated.job("old")
-    assert old is not None and old.pins == PINS and old.pins.live_binding is None and old.state == "accepted"
+    assert old is not None and old.pins == PINS and old.pins.live_binding is None and old.state == "accepted" and old.authority_ref is None
     claim = migrated.claim_next()
     assert claim is not None and claim.explicit is False
     migrated.close()
@@ -491,7 +492,7 @@ def test_the_ledger_is_bound_to_its_extraction_root_and_schema(tmp_path):
     database.close()
     with pytest.raises(ConfigError) as foreign:
         ExtractionLedger(tmp_path, tmp_path / "extraction")
-    assert foreign.value.reason == "extraction_ledger_schema_mismatch" and LEDGER_SCHEMA == "zoop-ai-extraction-jobs-ledger-2"
+    assert foreign.value.reason == "extraction_ledger_schema_mismatch" and LEDGER_SCHEMA == "zoop-ai-extraction-jobs-ledger-3"
 
 
 # ---- dispatch policy: S2's busy codes, nothing else is retried ----------------------------------------------------------------

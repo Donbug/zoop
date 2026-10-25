@@ -2,8 +2,8 @@
 
 `plan-round` reads a COMPLETE ingestion round through the ordinary enqueue planner and writes ONE immutable plan directory, and nothing else: no
 extraction ledger is opened, no job is frozen, no provider, replay or network call is made, and no installed service file is touched. The operator
-reviews the directory and installs its two registry files by hand; deploying them and approving a model budget are separate decisions this plan
-never makes. The directory holds
+reviews the directory before the separate offline service installer merges its registries. Deployment and model-budget approval remain separate
+decisions this plan never makes. The directory holds
 
   * `approvals.json`           `zoop-ai-extraction-approvals-1` (what `zoop_ai_service.extraction_access.load` reads): one entry per planned unit,
   * `relation-upstreams.json`  `zoop-ai-relation-upstreams-1` (what `relation_access.load` reads): the same `{jobId, inputDigest}` pairs,
@@ -19,16 +19,18 @@ from __future__ import annotations
 import ctypes
 import errno
 import json
+import math
 import os
 import re
 import shutil
 import stat
 import sys
 import tempfile
+from contextlib import ExitStack
 from pathlib import Path
 
 from . import extraction_replay as analysis
-from .extraction import Fixtures, LiveAccess
+from .extraction import Fixtures, LiveAccess, Sources, doc_key
 from .extraction_contracts import EnqueueRound, ExtractionFailure, Submit, canonical, digest
 from .extraction_enqueue import _read_round, plan
 from .ingestion_contracts import Authority, IngestionFailure, byte_hash
@@ -190,13 +192,11 @@ def _sync(directory: Path) -> None:
         os.close(fd)
 
 
-def plan_round(request: EnqueueRound, fixtures: Fixtures, principal: str, ingestion_dir: Path, sources: Path, output: Path,
-               live: LiveAccess | None = None) -> dict:
-    """Plan one complete round into `output`. Returns the stdout body (the receipt plus `outcome` created|existing). Every refusal raises before any
-    file exists; the ledger of any extraction state is never opened."""
+def _prepare(request: EnqueueRound, fixtures: Fixtures, principal: str, ingestion_dir: Path, sources: Authority | Path,
+             live: LiveAccess | None = None) -> tuple[dict[str, bytes], list, Authority, tuple]:
+    """Shared read-only planning path; publication and source export authority remain separate operations."""
     if not PRINCIPAL.fullmatch(principal):
         raise ExtractionFailure("plan_principal_invalid")
-    target = _output(output)
     live = live or LiveAccess()
     identity = None
     if request.provenance.execution_mode == "live":
@@ -207,13 +207,197 @@ def plan_round(request: EnqueueRound, fixtures: Fixtures, principal: str, ingest
         analysis.identity(fixtures.require(), request.provenance, request.prompt_version)
         if (request.topic is None) != (fixtures.topic_raw is None):
             raise ExtractionFailure("fixture_not_allowed" if request.topic is None else "topic_replay_required")
-    authority = Authority(sources)
+    authority = sources if isinstance(sources, Authority) else Authority(sources)
     head, refs, scope_id, saved, operations = _read_round(request, ingestion_dir, authority)
     entries = plan(request, head, refs)
     files = build(request, entries, head, fixtures, principal, identity)
+    return files, entries, authority, (request.source_id, scope_id, operations, saved)
+
+
+def plan_round(request: EnqueueRound, fixtures: Fixtures, principal: str, ingestion_dir: Path, sources: Path, output: Path,
+               live: LiveAccess | None = None) -> dict:
+    """Publish one immutable plan without opening an extraction ledger or freezing a job."""
+    if not PRINCIPAL.fullmatch(principal):
+        raise ExtractionFailure("plan_principal_invalid")
+    target = _output(output)
+    files, _, authority, check = _prepare(request, fixtures, principal, ingestion_dir, sources, live)
     try:
-        authority.check(request.source_id, scope_id, operations, saved)  # the round's authority must still hold when the plan is written
+        authority.check(*check)
     except OSError as exc:
         raise IngestionFailure("registry_changed") from exc
     outcome = commit(target, files)
     return {**json.loads(files["receipt.json"]), "outcome": outcome}
+
+
+VERIFICATION_SCHEMA = "zoop-extraction-service-plan-verification-1"
+MAX_RECEIPT = 4_096
+
+
+def strict_json(raw: bytes):
+    """Duplicate-free finite JSON; neither parser coercion nor last-key-wins is plan authority."""
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate key")
+            result[key] = value
+        return result
+
+    def constant(_):
+        raise ValueError("nonfinite value")
+
+    def finite(value):
+        parsed = float(value)
+        if not math.isfinite(parsed):
+            raise ValueError("nonfinite value")
+        return parsed
+
+    try:
+        return json.loads(raw.decode("utf-8"), object_pairs_hook=unique, parse_constant=constant, parse_float=finite)
+    except (ValueError, UnicodeError, RecursionError) as exc:
+        raise ExtractionFailure("plan_input_invalid") from exc
+
+
+def _stamp(info):
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_nlink, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+
+def _directory_identity(info):
+    return (info.st_dev, info.st_ino, info.st_mode)
+
+
+class _PlanFiles:
+    """Pin each no-follow path component and regular leaf; recheck names, identities and bytes before returning."""
+
+    def __init__(self, path: Path):
+        self.path = path
+        self.stack = ExitStack()
+        self.links = []
+        self.leaves = {}
+
+    def _own(self, fd):
+        self.stack.callback(os.close, fd)
+        return fd
+
+    def __enter__(self):
+        try:
+            if ".." in self.path.parts:
+                raise ExtractionFailure("plan_path_invalid")
+            absolute = Path(os.path.abspath(self.path))
+            parent = self._own(os.open("/", os.O_RDONLY | os.O_DIRECTORY))
+            for part in absolute.parts[1:]:
+                child = self._own(os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent))
+                self.links.append((parent, part, child, _directory_identity(os.fstat(child))))
+                parent = child
+            self.directory = parent
+            limits = {"approvals.json": MAX_APPROVALS, "relation-upstreams.json": MAX_UPSTREAMS,
+                      "manifest.json": MAX_MANIFEST, "receipt.json": MAX_RECEIPT}
+            if set(os.listdir(parent)) != set(limits):
+                raise ExtractionFailure("plan_input_invalid")
+            files = {}
+            for name, maximum in limits.items():
+                fd = self._own(os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent))
+                info = os.fstat(fd)
+                if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or not 0 < info.st_size <= maximum:
+                    raise ExtractionFailure("plan_input_invalid")
+                raw = os.pread(fd, maximum + 1, 0)
+                if len(raw) != info.st_size or _stamp(os.fstat(fd)) != _stamp(info):
+                    raise ExtractionFailure("plan_files_changed")
+                files[name] = raw
+                self.leaves[name] = (fd, _stamp(info), maximum, raw)
+            self.files = files
+            self.check()
+            return self
+        except OSError as exc:
+            self.stack.close()
+            raise ExtractionFailure("plan_path_invalid") from exc
+        except BaseException:
+            self.stack.close()
+            raise
+
+    def check(self):
+        try:
+            for parent, part, child, stamp in self.links:
+                if (_directory_identity(os.stat(part, dir_fd=parent, follow_symlinks=False)) != stamp
+                        or _directory_identity(os.fstat(child)) != stamp):
+                    raise ExtractionFailure("plan_files_changed")
+            if set(os.listdir(self.directory)) != set(self.leaves):
+                raise ExtractionFailure("plan_files_changed")
+            for name, (fd, stamp, maximum, raw) in self.leaves.items():
+                if (_stamp(os.stat(name, dir_fd=self.directory, follow_symlinks=False)) != stamp
+                        or _stamp(os.fstat(fd)) != stamp or os.pread(fd, maximum + 1, 0) != raw
+                        or _stamp(os.fstat(fd)) != stamp):
+                    raise ExtractionFailure("plan_files_changed")
+        except OSError as exc:
+            raise ExtractionFailure("plan_files_changed") from exc
+
+    def __exit__(self, *_):
+        self.stack.close()
+
+
+def _receipt(files: dict[str, bytes], expected: str) -> dict:
+    if not isinstance(expected, str) or re.fullmatch(r"[a-f0-9]{64}", expected) is None:
+        raise ExtractionFailure("plan_input_invalid")
+    if byte_hash(files["receipt.json"]) != expected:
+        raise ExtractionFailure("plan_receipt_mismatch")
+    docs = {name: strict_json(raw) for name, raw in files.items()}
+    receipt = docs["receipt.json"]
+    if (not isinstance(receipt, dict) or set(receipt) != {"schemaVersion", "planId", "planDigest", "files"}
+            or receipt["schemaVersion"] != RECEIPT_SCHEMA or not isinstance(receipt["files"], dict)
+            or set(receipt["files"]) != set(files) - {"receipt.json"}):
+        raise ExtractionFailure("plan_input_invalid")
+    for name, pin in receipt["files"].items():
+        if (not isinstance(pin, dict) or set(pin) != {"sha256", "bytes"} or type(pin["bytes"]) is not int
+                or pin["bytes"] != len(files[name]) or pin["sha256"] != byte_hash(files[name])):
+            raise ExtractionFailure("plan_receipt_mismatch")
+    return docs
+
+
+def verify_plan(plan_dir: Path, expected_receipt_sha256: str, fixtures: Fixtures, ingestion_dir: Path, sources: Path,
+                live: LiveAccess | None = None) -> dict:
+    """Reconstruct exact original bytes and current read-only source bindings. Never freeze or confer send/publication authority."""
+    with _PlanFiles(plan_dir) as pinned:
+        docs = _receipt(pinned.files, expected_receipt_sha256)
+        try:
+            manifest = docs["manifest.json"]
+            approvals = docs["approvals.json"]["approvals"]
+            if not isinstance(approvals, list) or not approvals:
+                raise ExtractionFailure("plan_has_no_units")
+            first = Submit.model_validate(approvals[0]["request"])
+            shared = first.wire()
+            request = EnqueueRound.model_validate({
+                **{key: shared[key] for key in ("schemaVersion", "provenance", "promptVersion", "catalogue", "snapshot", "topic")},
+                "enqueueId": manifest["enqueueId"], "roundId": manifest["round"]["roundId"], "sourceId": manifest["round"]["sourceId"]})
+            principal = manifest["principal"]
+            if not isinstance(principal, str):
+                raise ExtractionFailure("plan_principal_invalid")
+        except (ValueError, TypeError, KeyError, IndexError) as exc:
+            raise ExtractionFailure("plan_input_invalid") from exc
+        authority = Authority(sources)
+        files, entries, _, check = _prepare(request, fixtures, principal, ingestion_dir, authority, live)
+        if files != pinned.files:
+            raise ExtractionFailure("plan_content_mismatch")
+        refs = {doc_key(e.ref): e.ref for e in entries if e.skip is None}
+        for event in request.snapshot.events:
+            for member in event.members:
+                refs[doc_key(member.observation)] = member.observation
+        reader = Sources(ingestion_dir, authority)
+        synthetic = request.provenance.source_kind == "synthetic"
+
+        def bindings():
+            result = []
+            for key, ref in sorted(refs.items()):
+                exported = reader.export(ref)
+                result.append({"observation": ref.wire(), "binding": analysis.bind(exported, analysis.article(exported, synthetic))})
+            return digest({"format": "zoop-extraction-service-plan-source-bindings-1", "documents": result})
+
+        source_digest = bindings()
+        if bindings() != source_digest:
+            raise ExtractionFailure("plan_sources_changed")
+        authority.check(*check)
+        pinned.check()
+        receipt = docs["receipt.json"]
+        return {"schemaVersion": VERIFICATION_SCHEMA, "planId": receipt["planId"], "planDigest": receipt["planDigest"],
+                "receiptSha256": expected_receipt_sha256, "principal": principal, "mode": manifest["mode"],
+                "pins": manifest["pins"], "files": receipt["files"], "counts": manifest["counts"],
+                "sourceRegistrySha256": byte_hash(authority.raw), "sourceBindingsDigest": source_digest}
