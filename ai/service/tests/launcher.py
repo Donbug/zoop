@@ -31,10 +31,13 @@ ZOOP_TEST_EXTRACTION_HOLD_FILE = path  the extraction dispatcher claims nothing 
 from __future__ import annotations
 
 import os
+import runpy
 import signal
+import socket
 import time
 import sqlite3
 import sys
+from pathlib import Path
 
 from zoop_ai_service import main as entry
 from zoop_ai_service.config import ConfigError, load
@@ -139,5 +142,40 @@ def main() -> int:
     return 0
 
 
+def run_script() -> int:
+    # Match `python path.py args`, including sibling imports; run_path alone leaves this launcher's directory on sys.path.
+    previous_argv, previous_path = sys.argv, list(sys.path)
+    sys.argv = sys.argv[2:]
+    sys.path[0] = str(Path(sys.argv[0]).resolve().parent)
+    try:
+        runpy.run_path(sys.argv[0], run_name="__main__")
+        return 0
+    finally:
+        sys.argv = previous_argv
+        sys.path[:] = previous_path
+
+
+def launch() -> int:
+    # Normal fixtures call the actual production main; fault fixtures keep their existing construction and hooks. Only the
+    # socket supplied to the real Server.run changes: production serve still owns app wiring, dispatchers, limits and shutdown.
+    start = run_script if sys.argv[1:2] == ["--script"] else (entry.main if sys.argv[1:] == ["--production-entrypoint"] else main)
+    descriptor = os.environ.get("ZOOP_TEST_LISTENER_FD")
+    if descriptor is None:
+        return start()
+    with socket.socket(fileno=int(descriptor)) as listener:
+        real_run = entry.uvicorn.Server.run
+
+        def run(server) -> None:
+            # Startup script wrappers may exec the actual entrypoint first; stop inheriting once serving begins.
+            listener.set_inheritable(False)
+            real_run(server, sockets=[listener])
+
+        entry.uvicorn.Server.run = run
+        try:
+            return start()
+        finally:
+            entry.uvicorn.Server.run = real_run
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(launch())
