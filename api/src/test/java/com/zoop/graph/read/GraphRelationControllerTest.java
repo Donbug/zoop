@@ -13,7 +13,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class GraphRelationControllerTest {
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new GraphRelationController(new GraphRelationService(
-                    GraphReadFixtures.reader(Instant.parse("2026-10-16T12:00:00Z"), () -> DisclosureExclusions.NONE),
+                    GraphReadFixtures.reader(Instant.parse("2026-10-16T12:00:00Z"), pinned -> DisclosureExclusions.NONE),
                     org.mockito.Mockito.mock(org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate.class))))
             .setControllerAdvice(new GlobalExceptionHandler()).addFilters(new RequestIdFilter()).build();
 

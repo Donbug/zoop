@@ -29,7 +29,7 @@ class BriefingReconstructedDetailsTest {
         var basis = new BriefingGraphLookup.Basis("round", source.versionId(), NOW, Map.of(HBM_SUPPLY, List.of(HYNIX, NVDA)),
                 new BriefingGraphLookup.Reconstruction(version, NOW));
         return new PublicGraphReader(new GraphVersionSelector(repository(), Clock.fixed(NOW, ZoneOffset.UTC),
-                (id, request) -> basis), ignored -> snapshot, () -> DisclosureExclusions.NONE);
+                (id, request) -> basis), ignored -> snapshot, pinned -> DisclosureExclusions.NONE);
     }
     @Test void relationCompanyAndEventKeepReconstructedSourceAndUnknownRole() {
         var reader = reader();

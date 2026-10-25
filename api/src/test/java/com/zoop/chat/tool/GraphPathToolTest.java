@@ -201,7 +201,7 @@ class GraphPathToolTest {
     private PublicGraphReader reader() {
         var selector = new GraphVersionSelector(repository(), Clock.fixed(NOW, ZoneOffset.UTC));
         return new PublicGraphReader(selector, new FixtureGraphSnapshotStore(GraphPathToolTest.class.getClassLoader()),
-                () -> DisclosureExclusions.NONE);
+                pinned -> DisclosureExclusions.NONE);
     }
 
     private ChatEvidenceAccess access() {

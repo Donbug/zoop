@@ -27,7 +27,7 @@ class BriefingRoundGraphTest {
     void setup() {
         basis = new BriefingGraphLookup.Basis("round", "fixture-2026-10-08", NOW, Map.of(HBM_EQUIP, List.of(HANMI)));
         var selector = new GraphVersionSelector(repository(), Clock.fixed(NOW, ZoneOffset.UTC), (id, request) -> basis);
-        var reader = new PublicGraphReader(selector, new FixtureGraphSnapshotStore(getClass().getClassLoader()), () -> exclusions);
+        var reader = new PublicGraphReader(selector, new FixtureGraphSnapshotStore(getClass().getClassLoader()), pinned -> exclusions);
         var jdbc = mock(NamedParameterJdbcTemplate.class);
         when(jdbc.query(anyString(), any(SqlParameterSource.class), any(RowMapper.class))).thenAnswer(call -> {
             List<String> ids = (List<String>) ((SqlParameterSource) call.getArgument(1)).getValue("ids");

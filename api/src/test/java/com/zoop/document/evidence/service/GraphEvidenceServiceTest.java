@@ -990,7 +990,7 @@ class GraphEvidenceServiceTest {
         basisOnly();
         realPort = new GraphEvidenceSnapshotReader(new PublicGraphReader(
                 new GraphVersionSelector(new OneVersion(), java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)), version -> snapshot,
-                exclusions::get));
+                pinned -> exclusions.get()));
         world.read.evidence.put(DIRECT_ID, new EvidenceView(DIRECT_ID, ARTICLE, VERSION, TEXT, QUOTE, EvidenceWorld.START,
                 EvidenceWorld.END, "body", Boolean.TRUE, EARLIER_RECEIPT));
     }
@@ -1558,7 +1558,7 @@ class GraphEvidenceServiceTest {
                 Map.of("iss-1", List.of("KRX:A")));
         realPort = new GraphEvidenceSnapshotReader(new PublicGraphReader(
                 new GraphVersionSelector(new OneVersion(), java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC),
-                        (round, request) -> basis), version -> stackSnapshot(), exclusions::get));
+                        (round, request) -> basis), version -> stackSnapshot(), pinned -> exclusions.get()));
     }
 
     private EvidenceResponse getRound() {
