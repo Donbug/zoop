@@ -129,8 +129,9 @@ def settings(environ: Mapping[str, str], *, recovery: bool = False) -> Settings:
     """No writes, config.load, provider keys, or budget reads; recovery needs only path identity."""
     state = config._absolute(environ.get("ZOOP_AI_SERVICE_STATE_DIR"), "ZOOP_AI_SERVICE_STATE_DIR")
     private_dir(state)
+    from .online_bootstrap import present
     if environ.get("ZOOP_AI_SERVICE_PLAN_ADMISSION") is not None or os.path.lexists(state / "plan-authority.sqlite3") \
-            or os.path.lexists(state / "authority-mode.json"):
+            or os.path.lexists(state / "authority-mode.json") or present(state):
         raise InstallError("authority_mode_mismatch")
     targets = tuple(config._absolute(environ.get(name), name) for name in
                     ("ZOOP_AI_SERVICE_EXTRACTION_APPROVALS", "ZOOP_AI_SERVICE_RELATION_UPSTREAMS"))
@@ -328,6 +329,9 @@ def ensure_clear(root: Path, cfg: Settings) -> None:
 def startup_barrier(service: config.ServiceConfig) -> None:
     """Run under ProcessLock, before ledgers, in-flight recovery, or dispatchers."""
     root = service.state_dir / ROOT
+    from .online_bootstrap import present
+    if present(service.state_dir):
+        raise config.ConfigError("ZOOP_AI_SERVICE_STATE_DIR", "authority_mode_mismatch")
     try:
         names = tuple(p.name for p in service.principals)
         if service.extraction is not None and service.relation is not None:

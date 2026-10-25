@@ -74,7 +74,8 @@ def binding(config):
 
 def lock_creation_allowed(config):
     """Pre-lock guard: only a fresh online profile may create its first lock inode."""
-    if any(os.path.lexists(config.state_dir / name) for name in (FILE, "authority-mode.json")):
+    from .online_bootstrap import present
+    if present(config.state_dir) or any(os.path.lexists(config.state_dir / name) for name in (FILE, "authority-mode.json")):
         return False
     if config.plan_root is not None and any(
             p.name != "service.lock" and not (p.name == "transport" and p.is_dir() and not any(p.iterdir()))
@@ -83,15 +84,31 @@ def lock_creation_allowed(config):
     return True
 
 
-def startup_mode(config):
-    """Called under the lifetime lock before any job-ledger writes/recovery."""
+def startup_mode(config, *, lock=None):
+    """Classify and finish owned initialization before any runtime-ledger writes."""
     path = config.state_dir / FILE
     marker = config.state_dir / "authority-mode.json"
     online = config.plan_root is not None
     try:
-        if marker.exists():
+        from . import online_bootstrap
+        initializing = online_bootstrap.present(config.state_dir)
+        if initializing or online and not os.path.lexists(marker):
+            if not online:
+                raise ConfigError("ZOOP_AI_SERVICE_STATE_DIR", "authority_mode_mismatch")
+            if lock is None:
+                raise ValueError("initialization requires held process lock")
+            online_bootstrap.initialize(config, lock)
+        if os.path.lexists(marker):
             value = decode(read_file(marker, 4096, owned=True))
-            if value != {"schemaVersion": "zoop-ai-authority-mode-1", "mode": "online" if online else "manual"}:
+            legacy = {"schemaVersion": "zoop-ai-authority-mode-1", "mode": "online" if online else "manual"}
+            if value == online_bootstrap.MODE:
+                if not online or not os.path.lexists(config.state_dir / online_bootstrap.ROOT):
+                    raise ConfigError("ZOOP_AI_SERVICE_STATE_DIR", "authority_mode_mismatch")
+                if lock is None:
+                    raise ValueError("online startup requires held process lock")
+                if not initializing:
+                    online_bootstrap.initialize(config, lock)
+            elif value != legacy or initializing:
                 raise ConfigError("ZOOP_AI_SERVICE_STATE_DIR", "authority_mode_mismatch")
             if online and not path.exists():
                 raise ConfigError("ZOOP_AI_SERVICE_STATE_DIR", "authority_unavailable")
@@ -100,7 +117,7 @@ def startup_mode(config):
                                         ("relation-jobs.sqlite3", "relation_jobs")):
                     ledger = config.state_dir / filename
                     info = ledger.lstat()
-                    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_uid != os.getuid():
                         raise ValueError("missing control ledger")
                     db = sqlite3.connect(ledger.as_uri() + "?mode=ro", uri=True)
                     try:
@@ -119,7 +136,7 @@ def startup_mode(config):
             raise ConfigError("ZOOP_AI_SERVICE_STATE_DIR", "authority_mode_mismatch")
         if online and os.path.lexists(config.state_dir / "plan-install"):
             raise ConfigError("ZOOP_AI_SERVICE_STATE_DIR", "authority_mode_mismatch")
-    except (OSError, ValueError, sqlite3.Error, plan_verify.InstallError):
+    except (OSError, ValueError, KeyError, TypeError, sqlite3.Error, plan_verify.InstallError):
         raise ConfigError("ZOOP_AI_SERVICE_STATE_DIR", "authority_unavailable") from None
     return marker
 
@@ -162,6 +179,23 @@ CREATE TRIGGER operation_delete BEFORE DELETE ON policy_operations BEGIN SELECT 
 """
 
 
+def prepare_authority(config, directory):
+    """Create a private empty image; no runtime caller can initialize authority."""
+    path = directory / FILE
+    db = sqlite3.connect(path, isolation_level=None)
+    try:
+        os.chmod(path, 0o600)
+        db.execute("PRAGMA journal_mode=DELETE")
+        db.execute("PRAGMA synchronous=FULL")
+        db.executescript("BEGIN IMMEDIATE;" + DDL)
+        for key, value in {"schema": SCHEMA, "binding": canonical(binding(config)), "revision": "0",
+                           "plans": "0", "units": "0", "expired_revision": "0"}.items():
+            db.execute("INSERT INTO meta VALUES (?,?)", (key, value))
+        db.execute("COMMIT")
+    finally:
+        db.close()
+
+
 class PlanAuthority:
     def __init__(self, config: ServiceConfig, *, clock=time.time):
         self.config, self.clock = config, clock
@@ -170,25 +204,18 @@ class PlanAuthority:
         existing = os.path.lexists(path)
         try:
             self._binding = binding(config)
-            if not existing and (os.path.lexists(config.state_dir / "authority-mode.json")
-                                 or any(p.name != "service.lock" and not (p.name == "transport" and p.is_dir() and not any(p.iterdir()))
-                                        for p in config.state_dir.iterdir())):
-                raise ValueError("missing or populated authority state")
+            if not existing:
+                raise ValueError("missing authority state")
             if existing:
                 info = path.lstat()
                 if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_uid != os.getuid():
                     raise ValueError("unsafe store")
-            self._db = sqlite3.connect(path, timeout=10, isolation_level=None, check_same_thread=False)
+            self._db = sqlite3.connect(path.as_uri() + "?mode=rw", uri=True, timeout=10, isolation_level=None, check_same_thread=False)
             os.chmod(path, 0o600)
             self._db.row_factory = sqlite3.Row
             self._db.execute("PRAGMA foreign_keys=ON")
             self._db.execute("PRAGMA journal_mode=WAL")
             self._db.execute("PRAGMA synchronous=FULL")
-            if not existing:
-                self._db.executescript("BEGIN IMMEDIATE;" + DDL)
-                for key, value in {"schema": SCHEMA, "binding": canonical(self._binding), "revision": "0", "plans": "0", "units": "0", "expired_revision": "0"}.items():
-                    self._db.execute("INSERT INTO meta VALUES (?,?)", (key, value))
-                self._db.execute("COMMIT")
             if self._meta("schema") != SCHEMA or self._meta("binding") != canonical(self._binding):
                 raise ValueError("foreign store")
             if self._db.execute("PRAGMA quick_check").fetchone()[0] != "ok":
@@ -202,18 +229,6 @@ class PlanAuthority:
             self.current()
             info = path.lstat()
             self._store_identity = (info.st_dev, info.st_ino)
-            marker = config.state_dir / "authority-mode.json"
-            if not marker.exists():
-                with marker.open("xb") as stream:
-                    stream.write(canonical({"schemaVersion": "zoop-ai-authority-mode-1", "mode": "online"}).encode())
-                    stream.flush()
-                    os.fsync(stream.fileno())
-                os.chmod(marker, 0o600)
-                fd = os.open(config.state_dir, os.O_RDONLY | os.O_DIRECTORY)
-                try:
-                    os.fsync(fd)
-                finally:
-                    os.close(fd)
         except (OSError, ValueError, sqlite3.Error, KeyError, TypeError):
             raise ConfigError("ZOOP_AI_SERVICE_STATE_DIR", "authority_unavailable") from None
 

@@ -245,12 +245,13 @@ class Update:
 
 
 class RelationLedger:
-    def __init__(self, directory: Path, relation_state_dir: Path, clock=time.time):
+    def __init__(self, directory: Path, relation_state_dir: Path, clock=time.time, *, existing_only=False):
         self._clock = clock
         self._guard = threading.RLock()
         path = directory / FILE
         try:
-            self._db = sqlite3.connect(path, timeout=30, isolation_level=None, check_same_thread=False)
+            self._db = sqlite3.connect(path.as_uri() + "?mode=rw" if existing_only else path,
+                                       uri=existing_only, timeout=30, isolation_level=None, check_same_thread=False)
             os.chmod(path, 0o600)
             self._db.row_factory = sqlite3.Row
             self._db.execute("PRAGMA journal_mode=WAL")

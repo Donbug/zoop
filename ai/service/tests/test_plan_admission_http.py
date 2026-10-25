@@ -20,7 +20,7 @@ from zoop_ai_service.config import load
 from zoop_ai_service.ledger import ProcessLock
 from zoop_ai_service.openapi_doc import plan_examples
 from zoop_ai_service.plan_admission import PlanAdmissionService
-from zoop_ai_service.plan_authority import PlanAuthority
+from zoop_ai_service.plan_authority import PlanAuthority, startup_mode
 from zoop_ai_service.plan_wire import (MAX_BODY, MAX_COUNTER, PlanAdmissionEnvelope, PlanErrorEnvelope, PlanPolicyState,
                                        PlanPolicyUpdate, parse_plan_policy)
 
@@ -53,8 +53,8 @@ def online(tmp_path):
     env.pop("ZOOP_AI_SERVICE_EXTRACTION_APPROVALS")
     env.pop("ZOOP_AI_SERVICE_RELATION_UPSTREAMS")
     config = load(env)
-    with ProcessLock(config.state_dir):
-        pass
+    with ProcessLock(config.state_dir) as lock:
+        startup_mode(config, lock=lock)
     authority = PlanAuthority(config)
     app = create_app(SimpleNamespace(config=config), plans=PlanAdmissionService(config, authority))
     with TestClient(app) as client:
@@ -140,13 +140,33 @@ def test_bounded_headers_media_type_and_exact_admission_key(online):
     error(client.post(ADMIT, content=b"{}", headers=repeated_length), 422, "invalid_request")
 
 
-def test_configured_without_policy_refuses_without_verifier_or_quota(online):
+def test_configured_without_policy_refuses_without_verifier_or_quota(online, monkeypatch):
+    import sqlite3
+    from zoop_ai_service import plan_verify
+
     ws, client, authority = online
+
+    def forbidden_verifier(*args, **kwargs):
+        pytest.fail("unconfigured admission must not invoke the verifier")
+
+    monkeypatch.setattr(plan_verify, "verify_plan", forbidden_verifier)
     response = client.post(ADMIT, json=REFERENCE, headers=headers(ws, **{"Idempotency-Key": REFERENCE["planId"]}))
     assert error(response, 409, "admission_disabled")["retryable"] is False
     assert authority.policy_status()["usage"] == {"plans": 0, "units": 0}
     assert list((ws.root / "plans").iterdir()) == []
-    assert not list(ws.state.glob("*jobs.sqlite3"))
+    for table in ("policies", "policy_operations", "admissions", "grants"):
+        assert authority._db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0
+    for filename, tables in (
+        ("service.sqlite3", ("analysis_jobs", "analysis_dispatch")),
+        ("extraction-jobs.sqlite3", ("extraction_jobs", "extraction_dispatch")),
+        ("relation-jobs.sqlite3", ("relation_jobs", "relation_dispatch", "relation_operations")),
+    ):
+        db = sqlite3.connect((ws.state / filename).as_uri() + "?mode=ro", uri=True)
+        try:
+            for table in tables:
+                assert db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0
+        finally:
+            db.close()
 
 
 def test_real_policy_cas_historical_receipt_and_exact_operation_identity(online):

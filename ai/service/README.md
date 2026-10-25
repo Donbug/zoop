@@ -76,6 +76,12 @@ Admission은 `<plan-root>/<planId>`의 네 plan 파일만 읽고 receipt를 내�
 
 온라인 profile의 최초 lock 파일은 새 profile에서만 생성합니다. 이후 시작에서는 기존 `service.lock`이 반드시 있어야 하며, authority binding에 원래 lock의 device/inode를 고정합니다. 파일이 사라졌거나 다른 inode로 바뀌면 새 lock으로 대체하거나 원장을 복구하지 않고 시작을 거부합니다.
 
+최초 온라인 시작은 네 DB와 최종 marker를 `.authority-prepare-*` 비공개 디렉터리에 완성한 뒤, WAL을 checkpoint하고 DELETE journal 모드로 봉인합니다. 모든 정책·작업·dispatch·검수 이력이 비어 있고 누적 수량이 0인지 확인한 후, 파일의 바이트·device/inode·크기와 원래 디렉터리·lock·설정 binding을 불변 manifest에 고정합니다. 준비 디렉터리를 `authority-initialization`으로 덮어쓰기 없이 원자적으로 게시한 시점부터 자동 재시작 복구가 가능합니다. 복구는 고정된 네 DB inode를 기존 서비스 경로로 옮기고, 준비된 `authority-mode.json` inode를 **마지막에** 옮깁니다. 이 marker(`zoop-ai-authority-mode-2`)가 게시되기 전에는 일반 원장 생성자·작업 복구·dispatch·HTTP 처리를 시작하지 않습니다.
+
+중단된 초기화는 각 고정 파일이 준비 경로와 최종 경로 중 정확히 한 곳에 남아 있고, 아직 사용되지 않은 봉인 상태일 때만 이어 갑니다. 파일 누락·교체·중복·hardlink·journal sidecar·binding 변경·사용 이력은 자동 채택하거나 정리하지 않고 거부합니다. **`authority-initialization` 게시 전의 중단으로 `.authority-prepare-*`만 남았다면 자동 복구 대상이 아닙니다.** 운영자가 상태를 확인해야 하며, 서비스는 잔여 디렉터리를 삭제하거나 새 DB로 덮어쓰지 않습니다. 파일시스템의 전원 장애로 소유권 증거가 모호해진 경우에도 복구를 보장하지 않고 닫힌 상태로 거부합니다.
+
+완료된 v2 profile은 manifest와 원래 marker·DB inode를 계속 보존해야 합니다. 이후 정상 사용으로 바뀐 DB 바이트나 이력을 초기화 당시 해시·빈 상태와 다시 비교하지는 않습니다. 기존 v1 marker와 네 DB가 모두 있는 profile은 기존 검증을 유지하지만, v1 marker만 있는 불완전한 상태는 새 초기화로 해석하지 않습니다. 초기화 대기 상태에서도 수동 시작과 offline installer는 허용하지 않습니다. 이 복구는 정책 설치·grant 부활·quota 환불이나 사용한 원장의 재생성 기능이 아닙니다.
+
 오류는 안정적인 코드만 반환합니다. 정책·quota·ID 거부는 자동 재시도 대상으로 표시하지 않으며, 검증의 실질적 거부(`plan_verification_failed`)와 verifier 전송 불능(`plan_verifier_unavailable`)을 구분합니다. 실제 정책·source grant·예산 설치, 유료 호출, 공개 JobCreate/queue/scheduler, HOLD 승인·게시·활성화는 이 기능의 범위가 아닙니다.
 
 Verifier가 종료 코드 2와 닫힌 `zoop-extraction-s2-2` 오류 envelope를 함께 반환할 때만 409 `plan_verification_failed`로 분류합니다. 비정상 종료·signal·비JSON/빈/불일치 응답·출력 초과·deadline은 503 `plan_verifier_unavailable`이며, raw child 출력 없이 재시도 가능한 전송 불능으로 구분합니다. 출력 크기·deadline·kill/reap 한도는 그대로 유지하고 자동 재시도는 하지 않습니다.

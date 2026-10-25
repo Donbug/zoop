@@ -38,8 +38,8 @@ def world(tmp_path):
                            tmp_path / "service", tmp_path / "worker", command, registry, None, 8797, False, {},
                            relation=relations, extraction=extraction, plan_root=tmp_path / "plans")
     from zoop_ai_service.ledger import ProcessLock
-    with ProcessLock(config.state_dir):
-        pass
+    with ProcessLock(config.state_dir) as lock:
+        startup_mode(config, lock=lock)
     clock = [1000.0]
     authority = PlanAuthority(config, clock=lambda: clock[0])
     policy = {"schemaVersion": "zoop-ai-plan-policy-1", "enabled": True, "principal": "app", "sourceIds": ["synthetic"],
@@ -271,15 +271,26 @@ def test_service_reservations_and_dispatch_claims_keep_immutable_origin(world):
 
 
 def test_populated_manual_and_online_profiles_cannot_switch_origins(world, tmp_path):
+    from zoop_ai_service.main import build_service
+
     with pytest.raises(ConfigError, match="ZOOP_AI_SERVICE_STATE_DIR") as caught:
-        startup_mode(replace(world.config, plan_root=None))
+        build_service(replace(world.config, plan_root=None))
     assert caught.value.reason == "authority_mode_mismatch"
     manual = tmp_path / "manual"
     manual.mkdir(mode=0o700)
-    (manual / "service.sqlite3").write_bytes(b"manual history")
-    with pytest.raises(ConfigError) as caught:
-        startup_mode(replace(world.config, state_dir=manual))
-    assert caught.value.reason == "authority_mode_mismatch"
+    manual_service = build_service(replace(world.config, state_dir=manual, plan_root=None,
+                                           extraction=None, relation=None))
+    try:
+        saved = manual_service.ledger.reserve("manual-job", "app", "f" * 64, "analysis", "replay")
+        startup_mode(manual_service.config, lock=manual_service.lock)
+        manual_service.lock.validate()
+        with pytest.raises(ConfigError) as caught:
+            build_service(replace(world.config, state_dir=manual))
+        assert caught.value.reason == "authority_mode_mismatch"
+        assert manual_service.ledger.job("manual-job") == saved
+        assert not (manual / FILE).exists()
+    finally:
+        _close_bootstrap_service(manual_service)
 
 
 def test_missing_authority_store_never_resets_usage(world):
@@ -440,3 +451,286 @@ def test_replacement_lock_inode_cannot_rebind_an_existing_authority_profile(worl
     finally:
         retained.rename(path)
     assert world.authority.policy_status()["usage"] == {"plans": 1, "units": 1}
+
+
+def _bootstrap_crash(config, constructor, when):
+    """A real first startup dies without closing SQLite connections or the lock."""
+    import os
+    from zoop_ai_service import main, online_bootstrap
+
+    if constructor == "publication" and when == "after":
+        def interrupted(*args, **kwargs):
+            os._exit(73)
+
+        online_bootstrap._recover = interrupted
+    elif constructor == "publication":
+        original = online_bootstrap.plan_install.publish_directory
+
+        def interrupted(source, target, directories):
+            if target.name == online_bootstrap.ROOT and when == "before":
+                os._exit(73)
+            original(source, target, directories)
+            if target.name == online_bootstrap.ROOT and when == "after":
+                os._exit(73)
+
+        online_bootstrap.plan_install.publish_directory = interrupted
+    elif constructor in online_bootstrap.FILES:
+        original = online_bootstrap._move
+
+        def interrupted(source, target, lock, directories):
+            if source.name == constructor and when == "before":
+                os._exit(73)
+            original(source, target, lock, directories)
+            if source.name == constructor and when == "after":
+                os._exit(73)
+
+        online_bootstrap._move = interrupted
+    else:
+        original = getattr(main, constructor)
+
+        def interrupted(*args, **kwargs):
+            if when == "before":
+                os._exit(73)
+            original(*args, **kwargs)
+            os._exit(73)
+
+        setattr(main, constructor, interrupted)
+    main.build_service(config)
+    os._exit(74)
+
+
+def _interrupt_bootstrap(config, constructor, when):
+    import multiprocessing
+
+    child = multiprocessing.get_context("spawn").Process(target=_bootstrap_crash, args=(config, constructor, when))
+    child.start()
+    try:
+        child.join(10)
+        assert child.exitcode == 73, "the child must reach the assigned startup crash boundary"
+    finally:
+        if child.is_alive():
+            child.kill()
+            child.join(10)
+        child.close()
+
+
+def _close_bootstrap_service(service):
+    if service.plans is not None:
+        service.plans.authority.close()
+    for ledger in (service.relation_ledger, service.extraction_ledger, service.ledger):
+        if ledger is not None:
+            ledger.close()
+    service.lock.close()
+
+
+@pytest.fixture
+def bootstrap_config(world):
+    directory = world.root / "bootstrap-service"
+    directory.mkdir(mode=0o700)
+    return replace(world.config, state_dir=directory)
+
+
+@pytest.mark.parametrize("constructor", ["ServiceLedger", "ExtractionLedger", "RelationLedger"])
+@pytest.mark.parametrize("when", ["before", "after"])
+def test_first_online_startup_resumes_its_own_interrupted_initialization(bootstrap_config, constructor, when):
+    from zoop_ai_service.main import build_service
+
+    _interrupt_bootstrap(bootstrap_config, constructor, when)
+    before = {path.name: path.stat().st_ino for path in bootstrap_config.state_dir.glob("*.sqlite3")}
+    for _ in range(2):
+        service = build_service(bootstrap_config)
+        try:
+            assert service.plans.authority.policy_status() == {
+                "schemaVersion": "zoop-ai-plan-policy-state-1", "revision": 0, "policyDigest": None,
+                "policy": None, "status": "unconfigured", "usage": {"plans": 0, "units": 0}}
+            for ledger, tables in (
+                (service.ledger, ("analysis_jobs", "analysis_dispatch")),
+                (service.extraction_ledger, ("extraction_jobs", "extraction_dispatch")),
+                (service.relation_ledger, ("relation_jobs", "relation_dispatch", "relation_operations")),
+            ):
+                for table in tables:
+                    assert ledger._db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0
+            assert all((bootstrap_config.state_dir / name).stat().st_ino == inode for name, inode in before.items())
+        finally:
+            _close_bootstrap_service(service)
+
+
+@pytest.mark.parametrize("filename", [FILE, "service.sqlite3", "extraction-jobs.sqlite3", "relation-jobs.sqlite3"])
+def test_committed_online_startup_never_recreates_a_missing_control_store(bootstrap_config, filename):
+    from zoop_ai_service.main import build_service
+
+    service = build_service(bootstrap_config)
+    _close_bootstrap_service(service)
+    missing = bootstrap_config.state_dir / filename
+    missing.unlink()
+    with pytest.raises(ConfigError):
+        build_service(bootstrap_config)
+    assert not missing.exists()
+
+
+def test_committed_online_startup_preserves_used_history_and_quota(bootstrap_config, world):
+    from zoop_ai_service.main import build_service
+
+    service = build_service(bootstrap_config)
+    try:
+        authority = service.plans.authority
+        authority.clock = lambda: world.clock[0]
+        committed = SimpleNamespace(config=bootstrap_config, authority=authority, policy=world.policy)
+        install(committed)
+        _, accepted = admit(committed)
+        service.ledger._db.execute(
+            "INSERT INTO analysis_jobs(job_id,owner,request_digest,kind,mode,state,reserved_at) "
+            "VALUES ('existing-job','app',?,'analysis','replay','reserved','1970-01-01T00:16:40Z')", ("f" * 64,))
+        before = {path.name: path.stat().st_ino for path in bootstrap_config.state_dir.glob("*.sqlite3")}
+    finally:
+        _close_bootstrap_service(service)
+    restarted = build_service(bootstrap_config)
+    try:
+        assert restarted.plans.authority.policy_status()["usage"] == {"plans": 1, "units": 1}
+        assert restarted.plans.authority._db.execute("SELECT id FROM admissions").fetchall()[0][0] == accepted["admissionId"]
+        assert restarted.plans.authority._db.execute("SELECT COUNT(*) FROM policy_operations").fetchone()[0] == 1
+        assert restarted.ledger._db.execute("SELECT job_id,state FROM analysis_jobs").fetchall()[0][:] == ("existing-job", "reserved")
+        assert all((bootstrap_config.state_dir / name).stat().st_ino == inode for name, inode in before.items())
+    finally:
+        _close_bootstrap_service(restarted)
+
+
+@pytest.mark.parametrize("boundary", ["publication", FILE, "service.sqlite3", "extraction-jobs.sqlite3",
+                                     "relation-jobs.sqlite3", "authority-mode.json"])
+def test_published_initialization_resumes_each_durable_inode_move(bootstrap_config, boundary):
+    from zoop_ai_service.main import build_service
+    from zoop_ai_service.online_bootstrap import FILES, ROOT
+
+    _interrupt_bootstrap(bootstrap_config, boundary, "after")
+    root = bootstrap_config.state_dir
+    before = {name: next(p for p in (root / name, root / ROOT / name) if p.exists()).stat().st_ino for name in FILES}
+    service = build_service(bootstrap_config)
+    try:
+        assert all((root / name).stat().st_ino == inode for name, inode in before.items())
+        assert service.plans.authority.policy_status()["status"] == "unconfigured"
+        assert service.plans.authority.policy_status()["usage"] == {"plans": 0, "units": 0}
+    finally:
+        _close_bootstrap_service(service)
+
+
+@pytest.mark.parametrize("tamper", ["missing-db", "missing-marker", "missing-manifest", "missing-lock",
+    "replaced-db", "replaced-marker", "replaced-manifest", "replaced-lock", "duplicate-db", "hardlink",
+    "wal", "shm", "journal", "used-control", "used-authority",
+    "binding", "foreign-target"])
+def test_pending_initialization_never_adopts_foreign_or_used_state(bootstrap_config, tamper):
+    from zoop_ai_service.main import build_service
+    from zoop_ai_service.online_bootstrap import MARKER, MANIFEST, ROOT
+
+    _interrupt_bootstrap(bootstrap_config, "publication", "after")
+    root = bootstrap_config.state_dir
+    initialization = root / ROOT
+    path = initialization / "service.sqlite3"
+    missing = None
+    if tamper.startswith("missing-"):
+        missing = {"missing-db": path, "missing-marker": initialization / MARKER,
+                   "missing-manifest": initialization / MANIFEST, "missing-lock": root / "service.lock"}[tamper]
+        missing.unlink()
+    elif tamper.startswith("replaced-"):
+        target = {"replaced-db": path, "replaced-marker": initialization / MARKER,
+                  "replaced-manifest": initialization / MANIFEST, "replaced-lock": root / "service.lock"}[tamper]
+        replacement = root.parent / "replacement-file"
+        replacement.write_bytes(target.read_bytes())
+        replacement.chmod(0o600)
+        replacement.replace(target)
+    elif tamper == "duplicate-db":
+        (root / path.name).write_bytes(path.read_bytes())
+        (root / path.name).chmod(0o600)
+    elif tamper == "hardlink":
+        import os
+        os.link(path, root.parent / "retained-control")
+    elif tamper in {"wal", "shm", "journal"}:
+        (initialization / (path.name + "-" + tamper)).write_bytes(b"unresolved journal")
+    elif tamper in {"used-control", "binding"}:
+        db = sqlite3.connect(path)
+        try:
+            if tamper == "used-control":
+                db.execute("INSERT INTO analysis_jobs(job_id,owner,request_digest,kind,mode,state,reserved_at) "
+                           "VALUES ('foreign','app',?,'analysis','replay','reserved','1970-01-01T00:16:40Z')", ("f" * 64,))
+            else:
+                db.execute("UPDATE meta SET value='foreign-binding' WHERE key='workerLedger'")
+            db.commit()
+        finally:
+            db.close()
+    elif tamper == "used-authority":
+        db = sqlite3.connect(initialization / FILE)
+        try:
+            db.execute("INSERT INTO policy_operations VALUES ('operator','prior',?,'prior-etag','{}')", ("f" * 64,))
+            db.commit()
+        finally:
+            db.close()
+    else:
+        (root / path.name).write_bytes(b"foreign target")
+    before = {p: p.read_bytes() for parent in (root, initialization) for p in parent.iterdir() if p.is_file()}
+    with pytest.raises(ConfigError):
+        build_service(bootstrap_config)
+    assert all(p.exists() and p.read_bytes() == raw for p, raw in before.items())
+    if missing is not None:
+        assert not missing.exists()
+    assert not (root / MARKER).exists()
+
+
+def test_unpublished_initialization_is_not_automatically_adopted(bootstrap_config):
+    from zoop_ai_service.main import build_service
+    from zoop_ai_service.online_bootstrap import PREFIX, ROOT
+
+    _interrupt_bootstrap(bootstrap_config, "publication", "before")
+    residues = [p for p in bootstrap_config.state_dir.iterdir() if p.name.startswith(PREFIX)]
+    assert len(residues) == 1 and not (bootstrap_config.state_dir / ROOT).exists()
+    before = {p.name: p.read_bytes() for p in residues[0].iterdir()}
+    with pytest.raises(ConfigError):
+        build_service(bootstrap_config)
+    assert {p.name: p.read_bytes() for p in residues[0].iterdir()} == before
+
+
+@pytest.mark.parametrize("remove", ["authority-mode.json", "initialization.json"])
+def test_committed_marker_and_manifest_cannot_be_deleted_into_freshness(bootstrap_config, remove):
+    from zoop_ai_service.main import build_service
+    from zoop_ai_service.online_bootstrap import ROOT
+
+    service = build_service(bootstrap_config)
+    _close_bootstrap_service(service)
+    path = bootstrap_config.state_dir / (ROOT if remove == "initialization.json" else "") / remove
+    path.unlink()
+    with pytest.raises(ConfigError):
+        build_service(bootstrap_config)
+    assert not path.exists()
+
+
+def test_pending_online_initialization_excludes_manual_startup_and_installer(bootstrap_config):
+    from zoop_ai_service import plan_install
+    from zoop_ai_service.main import build_service
+    from zoop_ai_service.plan_verify import InstallError
+
+    _interrupt_bootstrap(bootstrap_config, "publication", "after")
+    with pytest.raises(ConfigError) as manual:
+        build_service(replace(bootstrap_config, plan_root=None))
+    assert manual.value.reason == "authority_mode_mismatch"
+    with pytest.raises(InstallError, match="authority_mode_mismatch"):
+        plan_install.settings({"ZOOP_AI_SERVICE_STATE_DIR": str(bootstrap_config.state_dir)})
+
+
+@pytest.mark.parametrize("partial", [False, True])
+def test_legacy_online_profiles_keep_strict_complete_state_requirement(bootstrap_config, partial):
+    from zoop_ai_service.main import build_service
+    from zoop_ai_service.online_bootstrap import MANIFEST, MARKER, ROOT
+
+    service = build_service(bootstrap_config)
+    _close_bootstrap_service(service)
+    root = bootstrap_config.state_dir
+    (root / ROOT / MANIFEST).unlink()
+    (root / ROOT).rmdir()
+    (root / MARKER).write_text(canonical({"schemaVersion": "zoop-ai-authority-mode-1", "mode": "online"}))
+    if partial:
+        missing = root / "service.sqlite3"
+        missing.unlink()
+        with pytest.raises(ConfigError):
+            build_service(bootstrap_config)
+        assert not missing.exists()
+    else:
+        restarted = build_service(bootstrap_config)
+        _close_bootstrap_service(restarted)
