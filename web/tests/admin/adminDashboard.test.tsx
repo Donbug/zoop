@@ -221,7 +221,33 @@ beforeEach(() => {
 
 describe('A-ADM-01 운영 대시보드 (FS072)', () => {
   test('요약 지표 5개와 각 영역을 와이어프레임대로 보여 준다', async () => {
-    server.on('GET', DASHBOARD, () => json(dashboard()));
+    server.on('GET', DASHBOARD, () =>
+      json(
+        dashboard({
+          jobs: {
+            running: 0,
+            queued: 0,
+            failed24h: 0,
+            recent: [
+              {
+                id: 'job-plan',
+                kind: 'analyze_plan',
+                label: 'analyze_plan',
+                status: 'succeeded',
+                requestedAt: '2026-10-06T03:00:00Z',
+              },
+              {
+                id: 'job-ingest',
+                kind: 'ingest',
+                label: 'ingest',
+                status: 'succeeded',
+                requestedAt: '2026-10-06T02:00:00Z',
+              },
+            ],
+          },
+        }),
+      ),
+    );
     openDashboard();
 
     expect(await screen.findByText('260건')).toBeTruthy();
@@ -233,6 +259,10 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
     expect(screen.getByText('반영됨')).toBeTruthy();
     expect(screen.getByText('대기 작업 0건')).toBeTruthy();
     expect(screen.getByText('실행 0 · 대기 0')).toBeTruthy();
+    // A-ADM-03's distinct kind remains distinct in the existing dashboard consumer.
+    expect(screen.getByText('분석계획')).toBeTruthy();
+    expect(screen.getByText('신규 기사 처리')).toBeTruthy();
+    expect(screen.queryByText('analyze_plan')).toBeNull();
     expect(screen.getByText('성공 28 · 실패 0')).toBeTruthy();
     expect(screen.queryByText('갱신 2026-10-06 12:43 KST')).toBeNull();
     expect(screen.queryByRole('button', { name: '새로 고침' })).toBeNull();

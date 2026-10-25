@@ -1,6 +1,45 @@
 // A-ADM-03 작업 탭 (FS058·FS067-01·FS067-03, docs/api/openapi.yaml listAnalysisJobs·getAnalysisJob·retryAnalysisJob·cancelAnalysisJob)
 
-export type JobKind = 'ingest' | 'revalidate' | 'project';
+export type LegacyJobKind = 'ingest' | 'revalidate' | 'project';
+export type JobKind = LegacyJobKind | 'analyze_plan';
+
+export type AnalyzePlanJobCreate = {
+  kind: 'analyze_plan';
+  reason: string;
+  plan: { planId: string; planDigest: string };
+};
+
+export type JobCreate =
+  | AnalyzePlanJobCreate
+  | {
+      kind: LegacyJobKind;
+      reason: string;
+      sourceId?: string | null;
+      candidateIds?: string[];
+    };
+
+export type PlanRun = {
+  planId: string;
+  planDigest: string;
+  admissionId: string | null;
+  manifestDigest: string | null;
+  sourceId: string | null;
+  roundId: string | null;
+  phase:
+    | 'awaiting_admission'
+    | 'admitting'
+    | 'extracting'
+    | 'relating'
+    | 'cancelling'
+    | 'ready'
+    | 'failed'
+    | 'cancelled';
+  totalUnits: number | null;
+  readyUnits: number;
+  activeUnit: number | null;
+  completion: 'ai_processing_handoff';
+  publicChanged: false;
+};
 export type JobStatus =
   'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 
@@ -13,7 +52,9 @@ export type RetryCode =
   | 'duplicate_running'
   | 'other_running'
   | 'dataset_missing'
-  | 'outcome_unknown';
+  | 'outcome_unknown'
+  | 'worker_unavailable'
+  | 'plan_not_reusable';
 
 export type RetryState = {
   allowed: boolean;
@@ -60,9 +101,8 @@ export type RunReport = {
   usage: JobUsage;
 };
 
-export type AnalysisJob = {
+type JobCommon = {
   id: string;
-  kind: JobKind;
   label: string;
   status: JobStatus;
   reason: string;
@@ -83,6 +123,25 @@ export type AnalysisJob = {
   ledgerBefore: unknown;
   ledgerAfter: unknown;
 };
+
+export type LegacyAnalysisJob = JobCommon & {
+  kind: LegacyJobKind;
+};
+
+export type AnalyzePlanJob = Omit<
+  JobCommon,
+  'ingest' | 'report' | 'flush' | 'ledgerBefore' | 'ledgerAfter'
+> & {
+  kind: 'analyze_plan';
+  planRun: PlanRun;
+  ingest: null;
+  report: null;
+  flush: null;
+  ledgerBefore: null;
+  ledgerAfter: null;
+};
+
+export type AnalysisJob = LegacyAnalysisJob | AnalyzePlanJob;
 
 export type JobLock = {
   /** 관리자 작업이 실행 중일 때만 잠긴다. 대기 중인 작업은 잠그지 않는다. */

@@ -1,10 +1,16 @@
-import { screen, within } from '@testing-library/react';
+import { act, cleanup, screen, within } from '@testing-library/react';
+import type { UserEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, test } from 'vitest';
 import AdminProtectedRoute from '@/components/admin/common/AdminProtectedRoute';
 import AdminPipelinePage from '@/pages/admin/pipeline/AdminPipelinePage';
 import { useAdminSessionStore } from '@/stores/useAdminSessionStore';
 import type { AdminSession } from '@/types/admin';
-import type { AnalysisJob, JobList } from '@/types/admin/jobs';
+import type {
+  AnalysisJob,
+  AnalyzePlanJob,
+  LegacyAnalysisJob,
+  JobList,
+} from '@/types/admin/jobs';
 import {
   apiError,
   createFakeServer,
@@ -39,7 +45,7 @@ const signedIn: AdminSession = {
   csrfToken: 'csrf-admin',
 };
 
-function job(overrides: Partial<AnalysisJob> = {}): AnalysisJob {
+function job(overrides: Partial<LegacyAnalysisJob> = {}): LegacyAnalysisJob {
   return {
     id: 'job-failed',
     kind: 'revalidate',
@@ -116,6 +122,43 @@ const running = job({
   report: null,
   error: null,
 });
+
+const planRef = {
+  planId: `s2plan-${'a'.repeat(64)}`,
+  planDigest: 'b'.repeat(64),
+};
+function planJob(overrides: Partial<AnalyzePlanJob> = {}): AnalyzePlanJob {
+  return {
+    ...job(),
+    kind: 'analyze_plan',
+    id: 'job-plan',
+    status: 'queued',
+    startedAt: null,
+    finishedAt: null,
+    durationSeconds: null,
+    ingest: null,
+    report: null,
+    flush: null,
+    ledgerBefore: null,
+    ledgerAfter: null,
+    error: null,
+    retry: { allowed: false, code: 'in_progress', reason: '', blockedBy: null },
+    planRun: {
+      ...planRef,
+      admissionId: null,
+      manifestDigest: null,
+      sourceId: null,
+      roundId: null,
+      phase: 'awaiting_admission',
+      totalUnits: null,
+      readyUnits: 0,
+      activeUnit: null,
+      completion: 'ai_processing_handoff',
+      publicChanged: false,
+    },
+    ...overrides,
+  };
+}
 
 function list(items: AnalysisJob[] = [running, job()]): JobList {
   const active = items.find((item) => item.status === 'running') ?? null;
@@ -437,5 +480,317 @@ describe('A-ADM-03 작업 탭 (FS058·FS067)', () => {
     expect(
       await screen.findByText('작업 상세를 불러오지 못했어요'),
     ).toBeTruthy();
+  });
+});
+
+async function fillPlan(user: UserEvent) {
+  const form = await screen.findByRole('form', { name: '분석계획 접수' });
+  await user.type(within(form).getByLabelText('planId'), planRef.planId);
+  await user.type(
+    within(form).getByLabelText('planDigest'),
+    planRef.planDigest,
+  );
+  await user.type(
+    within(form).getByLabelText('접수 사유(감사 로그에 남아요)'),
+    '합성 계획 처리',
+  );
+  return form;
+}
+
+describe('A-ADM-03 분석계획 접수의 불확실성과 참조 불변식', () => {
+  test('잘못된 참조는 전송하지 않고 오류 필드로 초점을 옮기며 입력을 유지한다', async () => {
+    server.on('GET', JOBS, () => json(list([])));
+    const { user } = open();
+    const form = await screen.findByRole('form', { name: '분석계획 접수' });
+    const input = within(form).getByLabelText('planId');
+    await user.type(input, 'not-a-plan');
+    await user.tab();
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(
+      document.getElementById(input.getAttribute('aria-describedby')!),
+    ).toBeTruthy();
+    await user.click(
+      within(form).getByRole('button', { name: '분석계획 접수' }),
+    );
+    expect(document.activeElement).toBe(input);
+    expect((input as HTMLInputElement).value).toBe('not-a-plan');
+    expect(server.calls('POST', JOBS)).toHaveLength(0);
+  });
+
+  test('응답 손실 후에는 입력을 잠그고 동일 본문과 키로만 접수 여부를 확인한다', async () => {
+    server.on('GET', JOBS, () => json(list([])));
+    server.on('GET', JOB, () => json(planJob()));
+    const response = deferred<Response>();
+    server.on('POST', JOBS, () => response.promise);
+    const { user, location } = open();
+    const form = await fillPlan(user);
+    const submit = within(form).getByRole('button', { name: '분석계획 접수' });
+    await user.dblClick(submit);
+    expect(server.calls('POST', JOBS)).toHaveLength(1);
+    await act(async () =>
+      response.resolve(apiError(503, 'SOURCE_UNAVAILABLE')),
+    );
+    const confirm = await within(form).findByRole('button', {
+      name: '같은 요청 확인',
+    });
+    expect(
+      (within(form).getByLabelText('planId') as HTMLInputElement).disabled,
+    ).toBe(true);
+    expect(
+      (
+        within(form).getByLabelText(
+          '접수 사유(감사 로그에 남아요)',
+        ) as HTMLTextAreaElement
+      ).value,
+    ).toBe('합성 계획 처리');
+    expect(location()).toBe('/admin/pipeline?tab=jobs');
+    server.on('POST', JOBS, () =>
+      json({ job: planJob(), deduplicated: false }, 202),
+    );
+    await user.click(confirm);
+    await screen.findByRole('heading', { name: /분석계획.*job-plan/ });
+    const calls = server.calls('POST', JOBS);
+    expect(calls).toHaveLength(2);
+    expect(calls[0].body).toEqual({
+      kind: 'analyze_plan',
+      plan: planRef,
+      reason: '합성 계획 처리',
+    });
+    expect(calls[1].body).toEqual(calls[0].body);
+    const keys = headersOf('/admin/jobs').filter((headers) =>
+      headers.has('Idempotency-Key'),
+    );
+    expect(keys).toHaveLength(2);
+    expect(keys[0].get('Idempotency-Key')).toBe(keys[1].get('Idempotency-Key'));
+    expect(keys[0].get('X-CSRF-Token')).toBe('csrf-admin');
+    expect(location()).toBe('/admin/pipeline?tab=jobs&job=job-plan');
+  });
+
+  test.each(['kind', 'digest'] as const)(
+    '다른 %s에 묶인 생성 응답은 선택하지 않고 원래 접수 요청을 유지한다',
+    async (mismatch) => {
+      server.on('GET', JOBS, () => json(list([])));
+      server.on('POST', JOBS, () =>
+        json(
+          {
+            job:
+              mismatch === 'kind'
+                ? job()
+                : planJob({
+                    planRun: {
+                      ...planJob().planRun,
+                      planDigest: 'c'.repeat(64),
+                    },
+                  }),
+            deduplicated: false,
+          },
+          202,
+        ),
+      );
+      const { user, location } = open();
+      const form = await fillPlan(user);
+      await user.click(
+        within(form).getByRole('button', { name: '분석계획 접수' }),
+      );
+      await within(form).findByRole('button', { name: '같은 요청 확인' });
+      expect(location()).toBe('/admin/pipeline?tab=jobs');
+      expect(server.calls('GET', JOB)).toHaveLength(0);
+      expect(
+        (within(form).getByLabelText('planDigest') as HTMLInputElement).value,
+      ).toBe(planRef.planDigest);
+    },
+  );
+
+  test.each(['session', 'disposal'] as const)(
+    '%s 이후 도착한 접수 응답은 선택·결과에 반영하지 않는다',
+    async (change) => {
+      server.on('GET', JOBS, () => json(list([])));
+      const response = deferred<Response>();
+      server.on('POST', JOBS, () => response.promise);
+      const rendered = open();
+      const form = await fillPlan(rendered.user);
+      await rendered.user.click(
+        within(form).getByRole('button', { name: '분석계획 접수' }),
+      );
+      if (change === 'session') {
+        act(() => useAdminSessionStore.getState().setSession(signedIn));
+        const fresh = await screen.findByRole('form', {
+          name: '분석계획 접수',
+        });
+        expect(
+          (within(fresh).getByLabelText('planId') as HTMLInputElement).value,
+        ).toBe('');
+      } else cleanup();
+      await act(async () =>
+        response.resolve(json({ job: planJob(), deduplicated: false }, 202)),
+      );
+      expect(rendered.location()).toBe('/admin/pipeline?tab=jobs');
+      expect(
+        screen.queryByText(
+          '분석계획을 대기열에 접수했어요. 아직 AI 처리 완료는 아니에요.',
+        ),
+      ).toBeNull();
+      expect(server.calls('GET', JOB)).toHaveLength(0);
+    },
+  );
+
+  test.each([
+    'worker_unavailable',
+    'plan_not_reusable',
+    'outcome_unknown',
+  ] as const)(
+    '%s 상태에서 새 실행을 보내지 않고 부분 진행과 기존 수집 기준을 보존한다',
+    async (code) => {
+      const failed = planJob({
+        status: 'failed',
+        retry: { allowed: false, code, reason: code, blockedBy: null },
+        planRun: {
+          ...planJob().planRun,
+          phase: 'failed',
+          readyUnits: 1,
+          totalUnits: 3,
+        },
+      });
+      server.on('GET', JOBS, () => json(list([failed])));
+      server.on('GET', JOB, () => json(failed));
+      const { user } = open('/admin/pipeline?tab=jobs&job=job-plan');
+      const retry = await screen.findByRole('button', { name: '이어서 처리' });
+      expect((retry as HTMLButtonElement).disabled).toBe(true);
+      await user.click(retry);
+      expect(server.calls('POST', RETRY)).toHaveLength(0);
+      const detail = screen.getByRole('complementary', { name: '작업 상세' });
+      expect(within(detail).getByText('1 / 3')).toBeTruthy();
+      expect(within(detail).getByText('없음')).toBeTruthy();
+      expect(
+        within(detail).queryByRole('region', { name: '기사 처리 결과' }),
+      ).toBeNull();
+      expect(
+        within(detail).queryByRole('region', { name: '모델 사용량' }),
+      ).toBeNull();
+      expect(screen.getByText(/새 기사 없음/)).toBeTruthy();
+    },
+  );
+
+  test('접수 전 전체 단위와 진행 순번은 0으로 추정하지 않는다', async () => {
+    server.on('GET', JOBS, () => json(list([planJob()])));
+    server.on('GET', JOB, () => json(planJob()));
+    open('/admin/pipeline?tab=jobs&job=job-plan');
+    const detail = await screen.findByRole('complementary', {
+      name: '작업 상세',
+    });
+    expect(await within(detail).findByText('0 / –')).toBeTruthy();
+    expect(
+      within(detail).getByText('진행 단위 순번').nextElementSibling
+        ?.textContent,
+    ).toBe('–');
+  });
+});
+
+describe('A-ADM-03 분석계획 계속 처리·취소 불변식', () => {
+  test('계속 처리 응답 손실은 사유와 키를 유지하고 완료된 원본 계획의 참조를 바꾸지 않는다', async () => {
+    const failed = planJob({
+      status: 'failed',
+      retry: { allowed: true, code: 'allowed', reason: '', blockedBy: null },
+      planRun: {
+        ...planJob().planRun,
+        phase: 'failed',
+        readyUnits: 1,
+        totalUnits: 2,
+      },
+    });
+    const queued = planJob({ id: 'job-plan-retry', retryOf: failed.id });
+    server.on('GET', JOBS, () => json(list([failed])));
+    server.on('GET', JOB, ({ params }) =>
+      json(params.jobId === queued.id ? queued : failed),
+    );
+    server.on('POST', RETRY, () => apiError(503, 'SOURCE_UNAVAILABLE'));
+    const { user, location } = open('/admin/pipeline?tab=jobs&job=job-plan');
+    await user.click(
+      await screen.findByRole('button', { name: '이어서 처리' }),
+    );
+    const form = screen.getByRole('form', { name: '분석계획 이어서 처리' });
+    const reason = within(form).getByLabelText('처리 사유(감사 로그에 남아요)');
+    await user.type(reason, '일시 장애 후 계속 처리');
+    await user.click(
+      within(form).getByRole('button', { name: '이어서 처리하기' }),
+    );
+    await within(form).findByRole('button', { name: '같은 요청 확인' });
+    expect((reason as HTMLTextAreaElement).disabled).toBe(true);
+    expect(
+      (within(form).getByRole('button', { name: '닫기' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (
+        screen.getByRole('button', {
+          name: '진행 상태 새로 고침',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    server.on('POST', RETRY, () =>
+      json({ job: queued, deduplicated: false }, 202),
+    );
+    await user.click(
+      within(form).getByRole('button', { name: '같은 요청 확인' }),
+    );
+    await screen.findByRole('heading', { name: /job-plan-retry/ });
+    const calls = server.calls('POST', RETRY);
+    expect(calls).toHaveLength(2);
+    expect(calls[0].body).toEqual({ reason: '일시 장애 후 계속 처리' });
+    expect(calls[1].body).toEqual(calls[0].body);
+    expect(calls[0].headers.get('Idempotency-Key')).toBe(
+      calls[1].headers.get('Idempotency-Key'),
+    );
+    expect(location()).toBe('/admin/pipeline?tab=jobs&job=job-plan-retry');
+  });
+
+  test('실행 중 취소 응답은 종료로 바꾸지 않고 새 조회에서만 종료와 부분 진행을 반영한다', async () => {
+    let current = planJob({
+      status: 'running',
+      startedAt: '2026-10-23T01:00:05Z',
+      planRun: {
+        ...planJob().planRun,
+        phase: 'relating',
+        readyUnits: 1,
+        totalUnits: 2,
+        activeUnit: 2,
+      },
+    });
+    server.on('GET', JOBS, () => json(list([current])));
+    server.on('GET', JOB, () => json(current));
+    server.on('POST', CANCEL, () => {
+      current = {
+        ...current,
+        cancelRequested: true,
+        planRun: { ...current.planRun, phase: 'cancelling' },
+      };
+      return json(current);
+    });
+    const { user } = open('/admin/pipeline?tab=jobs&job=job-plan');
+    await user.click(await screen.findByRole('button', { name: '작업 취소' }));
+    const form = screen.getByRole('form', { name: '작업 취소' });
+    await user.type(
+      within(form).getByLabelText('취소 사유(감사 로그에 남아요)'),
+      '처리 중단 요청',
+    );
+    await user.click(
+      within(form).getByRole('button', { name: '작업 취소하기' }),
+    );
+    expect(
+      await screen.findByRole('button', { name: '취소 요청됨' }),
+    ).toBeTruthy();
+    const detail = screen.getByRole('complementary', { name: '작업 상세' });
+    expect(within(detail).getByText('1 / 2')).toBeTruthy();
+    expect(within(detail).queryByText('취소됨')).toBeNull();
+    current = {
+      ...current,
+      status: 'cancelled',
+      planRun: { ...current.planRun, phase: 'cancelled' },
+    };
+    await user.click(
+      within(detail).getByRole('button', { name: '진행 상태 새로 고침' }),
+    );
+    expect(await within(detail).findByText('취소됨')).toBeTruthy();
+    expect(within(detail).getByText('1 / 2')).toBeTruthy();
   });
 });

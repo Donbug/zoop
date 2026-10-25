@@ -70,6 +70,18 @@ zoop:
       # Claims queued jobs and recovers expired leases in the web application; runs nothing while no ChatEngine exists.
       enabled: ${ZOOP_CHAT_EXECUTOR_ENABLED:true}
       workers: ${ZOOP_CHAT_EXECUTOR_WORKERS:2}
+  analysis:
+    analyze-plan:
+      # Executes fixed admitted S2/S3 units only; completion does not collect or publish data.
+      # Enabling requires all three HTTP clients, a common base URL and the expected AI principal.
+      enabled: ${ZOOP_ANALYSIS_ANALYZE_PLAN_ENABLED:false}
+      expected-principal: ${ZOOP_ANALYSIS_ANALYZE_PLAN_EXPECTED_PRINCIPAL:}
+      poll-interval: ${ZOOP_ANALYSIS_ANALYZE_PLAN_POLL_INTERVAL:2s}
+      attempt-deadline: ${ZOOP_ANALYSIS_ANALYZE_PLAN_ATTEMPT_DEADLINE:30m}
+      lease: ${ZOOP_ANALYSIS_ANALYZE_PLAN_LEASE:150s}
+      max-consecutive-failures: ${ZOOP_ANALYSIS_ANALYZE_PLAN_MAX_CONSECUTIVE_FAILURES:5}
+      max-recovery-dispatches: ${ZOOP_ANALYSIS_ANALYZE_PLAN_MAX_RECOVERY_DISPATCHES:3}
+      max-reclaims: ${ZOOP_ANALYSIS_ANALYZE_PLAN_MAX_RECLAIMS:16}
   ai:
     client:
       # Internal S1 AI transport client. Disabled by default; the application starts without any AI setting.
@@ -96,6 +108,14 @@ zoop:
       connect-timeout: ${ZOOP_AI_RELATION_CLIENT_CONNECT_TIMEOUT:3s}
       request-timeout: ${ZOOP_AI_RELATION_CLIENT_REQUEST_TIMEOUT:30s}
       max-response-bytes: ${ZOOP_AI_RELATION_CLIENT_MAX_RESPONSE_BYTES:8388608}
+    plan-admission-client:
+      # Exact-plan admission transport only. Active admission is not source rights, execution readiness or spending authority.
+      enabled: ${ZOOP_AI_PLAN_ADMISSION_CLIENT_ENABLED:false}
+      base-url: ${ZOOP_AI_PLAN_ADMISSION_CLIENT_BASE_URL:}
+      token: ${ZOOP_AI_PLAN_ADMISSION_CLIENT_TOKEN:}
+      connect-timeout: ${ZOOP_AI_PLAN_ADMISSION_CLIENT_CONNECT_TIMEOUT:3s}
+      request-timeout: ${ZOOP_AI_PLAN_ADMISSION_CLIENT_REQUEST_TIMEOUT:30s}
+      max-response-bytes: ${ZOOP_AI_PLAN_ADMISSION_CLIENT_MAX_RESPONSE_BYTES:16000000}
     chat-client:
       # Chatbot model stages through ai/service (POST /internal/v1/chat-stages/{stage}). Disabled by default. Enabled, it
       # registers the chat engine, so zoop.chat.questions-enabled may be turned on. mode: replay (AI-side fixtures, no network)

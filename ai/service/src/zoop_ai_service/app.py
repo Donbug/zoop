@@ -11,7 +11,7 @@ import re
 import time
 import uuid
 from collections.abc import Awaitable, Callable
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import Depends, FastAPI, Header, Path, Query, Request
 from fastapi.concurrency import run_in_threadpool
@@ -37,6 +37,11 @@ from .handoff_exposure_wire import MAX_COMMAND as EXPOSURE_MAX_BODY, ExposureQue
 from .relation_jobs import RelationError, RelationJobs
 from .relation_wire import RelationErrorEnvelope, RelationJobStatus, RelationOperationStatus, RelationResultEnvelope, RelationReview, RelationSubmit
 from .wire import KINDS, ErrorBody, ErrorEnvelope, JobStatus, ResultEnvelope
+from .plan_wire import (MAX_BODY as PLAN_MAX_BODY, MAX_COUNTER, PLAN_ID_PATTERN, POLICY_ETAG_PATTERN, PlanAdmissionEnvelope,
+                        PlanErrorEnvelope, PlanPolicyState, PlanPolicyUpdate, parse_plan_policy, parse_plan_reference)
+
+if TYPE_CHECKING:
+    from .plan_admission import PlanAdmissionService
 
 JOB_ID = re.compile(r"[A-Za-z0-9_.-]{1,120}")
 REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{1,128}")
@@ -56,6 +61,10 @@ EXTRACTION_PREFIX = "/internal/v1/extraction-jobs"
 GRAPH_PREFIX = "/internal/v1/graph-versions"
 HANDOFF_PREFIX = "/internal/v1/graph-handoffs"
 VERSION_ID = re.compile(VERSION_ID_PATTERN)
+PLAN_PREFIX = "/internal/v1/plan-admissions"
+POLICY_PATH = "/internal/v1/plan-admission-policy"
+PLAN_ID = re.compile(PLAN_ID_PATTERN)
+POLICY_ETAG = re.compile(POLICY_ETAG_PATTERN)
 HANDOFF_ID = re.compile(HANDOFF_ID_PATTERN)
 
 
@@ -248,6 +257,8 @@ class Gateway:
                     envelope = GraphErrorEnvelope(error=body)
                 elif str(scope.get("path", "")).startswith(HANDOFF_PREFIX):
                     envelope = HdErrorEnvelope(error=body)
+                elif str(scope.get("path", "")).startswith((PLAN_PREFIX, POLICY_PATH)):
+                    envelope = PlanErrorEnvelope(error=body)
                 else:
                     envelope = ErrorEnvelope(error=body)
                 await JSONResponse(envelope.wire(), status_code=500)(scope, watch, relay)
@@ -270,6 +281,11 @@ class Gateway:
 def _error_response(error: ApiError, request: Request) -> JSONResponse:
     context = _context(request)
     context["error"] = error.code
+    if request.url.path.startswith((PLAN_PREFIX, POLICY_PATH)):
+        body = ErrorBody(code=error.code, retryable=error.code in {
+            "service_busy", "plan_verifier_unavailable", "service_configuration_invalid", "authority_unavailable"},
+            request_id=context["requestId"], runtime_code=error.runtime_code, field=error.field)
+        return JSONResponse(PlanErrorEnvelope(error=body).wire(), status_code=error.status, headers=error.headers)
     if request.url.path.startswith(RELATION_PREFIX) and not isinstance(error, RelationError):
         # Framework-level refusals (auth, headers, body, unknown route) on the relation family use its own envelope schema.
         error = RelationError(error.status, error.code, runtime_code=error.runtime_code, field=error.field, headers=error.headers)
@@ -353,10 +369,28 @@ EXPOSURE_ERRORS = {
 }
 EXPOSURE_ERRORS.pop(404)
 
+PLAN_ERRORS = {
+    code: {"model": PlanErrorEnvelope, "description": description}
+    for code, description in {
+        401: "authentication_required.",
+        403: "scope_denied or policy_denied.",
+        404: "admission_not_found or plan_not_found; other-principal records are indistinguishable from missing.",
+        409: "execution_unavailable, admission_disabled, policy_expired, policy_changed, policy_mismatch, quota_exhausted, authority_collision, idempotency_conflict or plan_verification_failed.",
+        412: "policy_conflict: a new policy operation used a stale If-Match.",
+        413: "request_too_large: body exceeds 2,000,000 bytes.",
+        415: "unsupported_media_type: requires application/json with UTF-8.",
+        422: "invalid_request: exact body, header, path or query shape.",
+        500: "internal_error; no diagnostic text is disclosed.",
+        503: "service_busy, plan_verifier_unavailable, service_configuration_invalid or authority_unavailable.",
+    }.items()
+}
+
+
 
 def create_app(service: JobService | None = None, relation: RelationJobs | None = None, extraction: ExtractionJobs | None = None,
                graph: GraphReads | None = None, handoff: HandoffReads | None = None,
-               handoff_exposure: HandoffExposureReads | None = None, chat: ChatStages | None = None) -> FastAPI:
+               handoff_exposure: HandoffExposureReads | None = None, chat: ChatStages | None = None, *,
+               plans: PlanAdmissionService | None = None) -> FastAPI:
     """With no service this builds the route skeleton only (OpenAPI export); a service makes it serve requests. `relation` is the
     S3 relation-job family, `extraction` the S2 extraction-job family, `graph` the read-only graph-version family and `handoff` the read-only handoff family; without one, every
     route of that family answers 409 `execution_unavailable` after authentication."""
@@ -365,6 +399,7 @@ def create_app(service: JobService | None = None, relation: RelationJobs | None 
     app.state.service, app.state.relation, app.state.extraction, app.state.graph, app.state.handoff, app.state.log = service, relation, extraction, graph, handoff, emit
     app.state.handoff_exposure = handoff_exposure
     app.state.chat = chat
+    app.state.plans = plans
     app.add_middleware(Gateway)
 
     @app.exception_handler(ApiError)
@@ -730,5 +765,88 @@ def create_app(service: JobService | None = None, relation: RelationJobs | None 
         seen = context["seen"] = Observation()
         status, result = await run_in_threadpool(chat_stages.invoke, principal.name, stage, body, seen)
         return JSONResponse(result.wire(), status_code=status)
+
+    def plan_service(request: Request) -> PlanAdmissionService:
+        facade = request.app.state.plans
+        if facade is None:
+            raise ApiError(409, "execution_unavailable")
+        return facade
+
+    def plan_headers(request: Request, *required: str) -> None:
+        # Headers with authority/framing meaning must occur exactly once, never
+        # use a proxy/framework's arbitrary choice among duplicate values.
+        for name in ("content-type", "content-length", "idempotency-key", "if-match"):
+            values = request.headers.getlist(name)
+            if len(values) > 1 or (name in required and len(values) != 1):
+                raise invalid(name)
+        if "transfer-encoding" in request.headers and "content-length" in request.headers:
+            raise invalid("Content-Length")
+
+    @app.post(PLAN_PREFIX, operation_id="admitPlan", tags=["plan-admissions"], status_code=201,
+              response_model=PlanAdmissionEnvelope, summary="Admit one exact verified plan; never dispatch",
+              responses={**{code: value for code, value in PLAN_ERRORS.items() if code != 412},
+                         200: {"model": PlanAdmissionEnvelope, "description": "Original immutable admission, including an inactive historical admission."}})
+    async def plan_admit(request: Request, principal: Annotated[Principal, Depends(require("plan.admit"))],
+                         idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+                         x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        facade = plan_service(request)
+        graph_query(request, ())
+        plan_headers(request, "idempotency-key")
+        key = request.headers.get("idempotency-key", "")
+        if not PLAN_ID.fullmatch(key):
+            raise invalid("Idempotency-Key")
+        check_content_type(request)
+        reference = parse_plan_reference(await read_body(request, PLAN_MAX_BODY), key)
+        seen = _context(request)["seen"] = Observation()
+        return respond(await run_in_threadpool(facade.admit, principal.name, reference, seen))
+
+    @app.get(PLAN_PREFIX + "/{planId}", operation_id="getPlanAdmission", tags=["plan-admissions"],
+             response_model=PlanAdmissionEnvelope, summary="Read an immutable exact admission and current policy authority",
+             responses={code: value for code, value in PLAN_ERRORS.items() if code not in (412, 413, 415)})
+    async def plan_status(request: Request, principal: Annotated[Principal, Depends(require("plan.read"))],
+                          plan_id: Annotated[str, Path(alias="planId", json_schema_extra={"pattern": PLAN_ID_PATTERN})],
+                          plan_digest: Annotated[str | None, Query(alias="planDigest", description="Required exact lowercase SHA-256 plan digest.")] = None,
+                          x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        facade = plan_service(request)
+        graph_query(request, ("planDigest",))
+        plan_headers(request)
+        if not PLAN_ID.fullmatch(plan_id):
+            raise invalid("planId")
+        if plan_digest is None or not re.fullmatch(r"[0-9a-f]{64}", plan_digest):
+            raise invalid("planDigest")
+        seen = _context(request)["seen"] = Observation()
+        return respond(await run_in_threadpool(facade.status, principal.name, plan_id, plan_digest, seen))
+
+    @app.get(POLICY_PATH, operation_id="getPlanAdmissionPolicy", tags=["plan-admission-policy"],
+             response_model=PlanPolicyState, summary="Operator-only current policy and cumulative usage",
+             responses={code: value for code, value in PLAN_ERRORS.items() if code not in (404, 412, 413, 415)})
+    async def plan_policy_status(request: Request, principal: Annotated[Principal, Depends(require("plan.policy"))],
+                                 x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        facade = plan_service(request)
+        graph_query(request, ())
+        plan_headers(request)
+        seen = _context(request)["seen"] = Observation()
+        return respond(await run_in_threadpool(facade.policy_status, principal.name, seen))
+
+    @app.put(POLICY_PATH, operation_id="setPlanAdmissionPolicy", tags=["plan-admission-policy"],
+             response_model=PlanPolicyUpdate, summary="Operator-only idempotent policy CAS; retires prior admissions",
+             responses={code: value for code, value in PLAN_ERRORS.items() if code != 404})
+    async def plan_policy_update(request: Request, principal: Annotated[Principal, Depends(require("plan.policy"))],
+                                 idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+                                 if_match: Annotated[str | None, Header(alias="If-Match")] = None,
+                                 x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        facade = plan_service(request)
+        graph_query(request, ())
+        plan_headers(request, "idempotency-key", "if-match")
+        key = request.headers.get("idempotency-key", "")
+        expected = request.headers.get("if-match", "")
+        if not JOB_ID.fullmatch(key):
+            raise invalid("Idempotency-Key")
+        if len(expected) > 100 or not POLICY_ETAG.fullmatch(expected) or int(expected.split("-")[2]) > MAX_COUNTER:
+            raise invalid("If-Match")
+        check_content_type(request)
+        document = parse_plan_policy(await read_body(request, PLAN_MAX_BODY))
+        seen = _context(request)["seen"] = Observation()
+        return respond(await run_in_threadpool(facade.set_policy, principal.name, key, document, expected, seen))
 
     return app
