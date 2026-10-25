@@ -30,6 +30,7 @@ export const jobStatusLabel: Record<DashboardJobStatus, string> = {
 
 export const jobKindLabel: Record<string, string> = {
   // 본개발 작업 API(#292)의 종류
+  analyze_plan: '분석계획',
   ingest: '신규 기사 처리',
   revalidate: '후보 재검증',
   project: 'GraphDB 반영',
@@ -105,6 +106,7 @@ export const auditActionLabel: Record<string, string> = {
   'graph.version.activate': '그래프 버전 전환',
   'graph.seed': '그래프 최초 등록',
   'job.create': '작업 실행',
+  'analysis.job.create': '분석계획 접수',
   'job.retry': '작업 재시도',
   'job.cancel': '작업 취소',
   'job.recover': '작업 복구',

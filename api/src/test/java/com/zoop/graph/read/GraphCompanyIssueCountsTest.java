@@ -18,7 +18,7 @@ class GraphCompanyIssueCountsTest {
     private static final Instant NOW = Instant.parse("2026-10-16T12:00:00Z");
     private static final String TSMC = "NYSE:TSM";
     private DisclosureExclusions exclusions = DisclosureExclusions.NONE;
-    private final GraphCompanyIssueCounts counts = new GraphCompanyIssueCounts(GraphReadFixtures.reader(NOW, () -> exclusions));
+    private final GraphCompanyIssueCounts counts = new GraphCompanyIssueCounts(GraphReadFixtures.reader(NOW, pinned -> exclusions));
 
     @Test
     void countsDistinctLinkedIssuesInTheActiveVersion() {

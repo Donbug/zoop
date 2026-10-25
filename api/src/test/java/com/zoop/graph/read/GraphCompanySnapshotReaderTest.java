@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 class GraphCompanySnapshotReaderTest {
     private static final Instant NOW = Instant.parse("2026-10-16T12:00:00Z");
     private final GraphCompanySnapshotReader reader =
-            new GraphCompanySnapshotReader(GraphReadFixtures.reader(NOW, () -> DisclosureExclusions.NONE));
+            new GraphCompanySnapshotReader(GraphReadFixtures.reader(NOW, pinned -> DisclosureExclusions.NONE));
 
     private com.zoop.company.graph.CompanyGraphSnapshot read(String companyId, Instant asOf) {
         return reader.read(new CompanyGraphReadRequest(companyId, null, null, asOf)).orElseThrow();

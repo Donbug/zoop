@@ -1,5 +1,6 @@
 package com.zoop.admin.jobs;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 import java.util.Map;
 
@@ -15,11 +16,21 @@ public final class AnalysisJobResponse {
     public record JobOut(String id, String kind, String label, String status, String reason, String requestedBy,
             String requestedAt, String startedAt, String finishedAt, Double durationSeconds, String retryOf,
             boolean cancelRequested, boolean recovered, RetryState retry, IngestOutcome ingest, RunReport report,
-            FlushResult flush, JobError error, LedgerCounts ledgerBefore, LedgerCounts ledgerAfter) {
+            FlushResult flush, JobError error, LedgerCounts ledgerBefore, LedgerCounts ledgerAfter,
+            @JsonInclude(JsonInclude.Include.NON_NULL) PlanRunOut planRun) {
+        public JobOut {
+            if ("analyze_plan".equals(kind) != (planRun != null)) {
+                throw new IllegalArgumentException("planRun belongs exactly to analyze_plan");
+            }
+        }
     }
 
     public record JobCreated(JobOut job, boolean deduplicated) {
     }
+
+    public record PlanRunOut(String planId, String planDigest, String admissionId, String manifestDigest,
+            String sourceId, String roundId, String phase, Integer totalUnits, int readyUnits, Integer activeUnit,
+            String completion, boolean publicChanged) {}
 
     /** {@code blockedBy} is the job that keeps this one from being retried (a running retry, a newer attempt, a successor). */
     public record RetryState(boolean allowed, String code, String reason, String blockedBy) {

@@ -23,7 +23,7 @@ class GraphEvidenceSnapshotReaderTest {
     private static final String OLD = "fixture-2026-10-01";
 
     private static GraphEvidenceSnapshotReader reader(DisclosureExclusions exclusions) {
-        return new GraphEvidenceSnapshotReader(GraphReadFixtures.reader(NOW, () -> exclusions));
+        return new GraphEvidenceSnapshotReader(GraphReadFixtures.reader(NOW, pinned -> exclusions));
     }
 
     private static Evidence evidenceOf(String articleId, int start) {
@@ -141,7 +141,7 @@ class GraphEvidenceSnapshotReaderTest {
         return new GraphEvidenceSnapshotReader(new PublicGraphReader(
                 new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
                         java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)),
-                version -> snapshot, () -> exclusions));
+                version -> snapshot, pinned -> exclusions));
     }
 
     @Test
@@ -239,7 +239,7 @@ class GraphEvidenceSnapshotReaderTest {
         return new GraphEvidenceSnapshotReader(new PublicGraphReader(
                 new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
                         java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)),
-                version -> snapshot, () -> exclusions));
+                version -> snapshot, pinned -> exclusions));
     }
 
     @Test
@@ -282,7 +282,7 @@ class GraphEvidenceSnapshotReaderTest {
         GraphEvidenceSnapshotReader reader = new GraphEvidenceSnapshotReader(new PublicGraphReader(
                 new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
                         java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)),
-                version -> snapshot, () -> DisclosureExclusions.NONE));
+                version -> snapshot, pinned -> DisclosureExclusions.NONE));
 
         assertNull(reader.read(null, Instant.parse("2026-10-03T00:00:00Z"), IMPACT_ONLY).span(),
                 "the article was published after asOf, so neither the span nor the INVOLVES relation is visible");

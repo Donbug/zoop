@@ -18,7 +18,7 @@ public interface AdminAuditRepository {
     void recordGraphActivation(String adminId, String email, String versionId, String previousVersionId,
             boolean pointerChanged, String reason, String requestId, Instant occurredAt);
 
-    /** {@code action} is {@code analysis.job.cancel} or {@code analysis.job.retry}; {@code createdJobId} only for a retry. */
+    /** DB-only create/cancel/retry actions; {@code createdJobId} identifies a newly created root or retry row. */
     void recordAnalysisJobAction(String adminId, String email, String action, String jobId, String beforeStatus,
             String afterStatus, String createdJobId, String reason, String requestId, Instant occurredAt);
 

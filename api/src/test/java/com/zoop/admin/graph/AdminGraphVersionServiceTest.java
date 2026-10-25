@@ -377,13 +377,13 @@ class AdminGraphVersionServiceTest {
     }
 
     private static DisclosureExclusionReader storeExists() {
-        return () -> DisclosureExclusions.NONE;
+        return pinned -> DisclosureExclusions.NONE;
     }
 
     private static DisclosureExclusionReader noStore() {
         return new DisclosureExclusionReader() {
             @Override
-            public DisclosureExclusions current() {
+            public DisclosureExclusions current(String versionId) {
                 return DisclosureExclusions.NONE;
             }
 

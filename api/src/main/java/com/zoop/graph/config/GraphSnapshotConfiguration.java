@@ -4,7 +4,7 @@ import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.artifact.storage.ArtifactStoreException;
 import com.zoop.document.repository.DocumentRegistryRepository;
 import com.zoop.graph.read.DisclosureExclusionReader;
-import com.zoop.graph.read.DisclosureExclusions;
+import com.zoop.graph.read.JdbcDisclosureExclusionReader;
 import com.zoop.graph.snapshot.ArtifactGraphSnapshotStore;
 import com.zoop.graph.snapshot.FixtureGraphSnapshotStore;
 import com.zoop.graph.snapshot.FixtureGraphVersionSeeder;
@@ -18,6 +18,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 /**
  * Chooses the snapshot source with {@code zoop.graph.snapshot.source}: {@code none} (default), {@code fixture} (local/dev
@@ -70,21 +71,11 @@ public class GraphSnapshotConfiguration {
         }
     }
 
-    /** No exclusion store exists yet (FS081 slice); nothing is excluded until it does. */
+    /** The public exclusion store (FS081): per version, written only by the operator exclusion command. */
     @Bean
     @ConditionalOnMissingBean(DisclosureExclusionReader.class)
-    DisclosureExclusionReader noDisclosureExclusions() {
-        return new DisclosureExclusionReader() {
-            @Override
-            public DisclosureExclusions current() {
-                return DisclosureExclusions.NONE;
-            }
-
-            @Override
-            public boolean authoritative() {
-                return false;
-            }
-        };
+    DisclosureExclusionReader disclosureExclusions(NamedParameterJdbcTemplate jdbc) {
+        return new JdbcDisclosureExclusionReader(jdbc);
     }
 
     /** No source configured: a registered version cannot be read, which is 503 and never an empty graph. */

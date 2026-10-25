@@ -162,6 +162,12 @@ API_JAR ?= api/build/libs/zoop-api-0.0.1-SNAPSHOT.jar
 .PHONY: api-graph-handoff-import-smoke
 api-graph-handoff-import-smoke:
 	$(PIPELINE_PYTHON) api/scripts/graph_handoff_import_smoke.py --jar $(API_JAR) --handoff-cli "$(CURDIR)/ai/pipeline/.venv/bin/zoop-ai-handoff" --ingest-cli "$(CURDIR)/ai/pipeline/.venv/bin/zoop-ai-ingest" $(if $(GRAPH_IMPORT_PSQL_CONTAINER),--psql-container $(GRAPH_IMPORT_PSQL_CONTAINER)) $(if $(GRAPH_IMPORT_DB_USER),--db-user $(GRAPH_IMPORT_DB_USER)) $(if $(GRAPH_IMPORT_DB_NAME),--db-name $(GRAPH_IMPORT_DB_NAME))
+# Real admin HTTP -> durable PostgreSQL queue -> installed S2/S3 replay. Requires a built jar, frozen AI environments and
+# a cached PostgreSQL image. Output must be a fresh directory outside the checkout; no provider calls or public activation.
+.PHONY: api-analyze-plan-smoke
+api-analyze-plan-smoke:
+	@test -n "$(ANALYZE_PLAN_SMOKE_OUTPUT)" || { printf '%s\n' 'Set ANALYZE_PLAN_SMOKE_OUTPUT to a fresh directory outside the checkout.'; exit 2; }
+	$(SERVICE_PYTHON) api/scripts/analyze_plan_queue_smoke.py --jar "$(API_JAR)" --output "$(ANALYZE_PLAN_SMOKE_OUTPUT)"
 # Temporary local graph API with bundled fixtures. Requires a built jar and a locally cached PostgreSQL image; never pulls.
 .PHONY: api-graph-dev
 api-graph-dev:

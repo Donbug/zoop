@@ -193,7 +193,7 @@ public class AdminGraphVersionService {
                     version.id(), requestId);
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         }
-        PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot, null, exclusions.current());
+        PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot, null, exclusions.current(version.id()));
         Instant at = clock.instant();
         Map<String, GraphEvidence> found = new LinkedHashMap<>();
         Set<String> articles = new TreeSet<>();

@@ -248,7 +248,13 @@ class AdminAuthPostgresTest {
                 .andExpect(jsonPath("$.metadata.asOf").isNotEmpty())
                 .andExpect(jsonPath("$.members.source").value("zoop-db"))
                 .andExpect(jsonPath("$.audit.last24h").isNumber())
-                .andExpect(jsonPath("$.jobs").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.jobs.running").isNumber())
+                .andExpect(jsonPath("$.jobs.queued").isNumber())
+                .andExpect(jsonPath("$.jobs.failed24h").isNumber())
+                .andExpect(jsonPath("$.jobs.recent").isArray())
+                .andExpect(jsonPath("$.candidates").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.ai").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.briefings").value(org.hamcrest.Matchers.nullValue()))
                 .andReturn();
 
         Instant asOf = Instant.parse(com.jayway.jsonpath.JsonPath.read(
