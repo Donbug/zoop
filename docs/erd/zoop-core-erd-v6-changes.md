@@ -27,7 +27,7 @@
 
 ## 2026-10-17 추가 변경 — 챗봇 동적 라우팅·도구 호출 관측
 
-- PostgreSQL 테이블 수를 35개에서 36개로 변경하고 `chat_tool_calls`를 추가했다. 질문 결과와 함께 읽는 분류·계획 요약은 `chat_jobs.route_summary` JSONB에 유지하되, 실제 MCP/서버 읽기 호출은 요청당 상한·지연·오류·중복 제거를 독립 집계할 수 있도록 행으로 분리했다.
+- PostgreSQL 테이블 수를 35개에서 36개로 변경하고 `chat_tool_calls`를 추가했다. 질문 결과와 함께 읽는 분류·계획 요약은 `chat_jobs.route_summary` JSONB에 유지하되, 실제 도구(서버 내부 읽기 어댑터) 호출은 요청당 상한·지연·오류·중복 제거를 독립 집계할 수 있도록 행으로 분리했다.
 - `chat_jobs`에 `route_schema_version`, `route_summary`를 추가했다. 요구 ID, Q01~Q08 multi-label, 논리 기능, Luna 커버리지, 계획 revision, 예약·사용 예산, 답변 근거 수준과 검증 결과만 저장하며 자유 형식 내부 추론은 저장하지 않는다.
 - `chat_tool_calls`는 레지스트리·논리 기능·실제 도구·스키마 버전과 입력 digest, 허용된 요청 메타데이터, 결과 artifact·근거·dataVersion, timeout을 포함한 실제 상태를 고정한다. 모델 출력의 도구명을 직접 실행하지 않으며 회원 ID·인증값·질문 원문·개인 포트폴리오 전문은 기본 메타데이터에서 제외한다.
 - 모델 호출은 기존 `ai_executions(feature=chatbot)`에 router, coverage-verifier, answer-generator, semantic-verification stage로 기록하고 도구 호출과 중복 집계하지 않는다.

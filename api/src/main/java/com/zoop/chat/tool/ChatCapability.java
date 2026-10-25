@@ -4,7 +4,7 @@ import java.util.Arrays;
 import java.util.Optional;
 
 /**
- * The logical read capabilities of the chatbot and the MCP registry group each belongs to (design summary 5.1). Listing a
+ * The logical read capabilities of the chatbot and the tool registry group each belongs to (design summary 5.1). Listing a
  * capability does not make it callable: only one bound to a tool in {@link ChatToolRegistry} is executed, and a model's
  * free-form tool name is never mapped to anything.
  */

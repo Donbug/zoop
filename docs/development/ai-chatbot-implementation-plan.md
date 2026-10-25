@@ -2,7 +2,7 @@
 
 기준일: 2026년 10월 21일
 
-기준 정책: `ZOOP-AIG-001 v0.8`
+기준 정책: `ZOOP-AIG-001 v0.9`
 
 화면 추적: `D-AI-01`, `D-AI-01b`, `D-AI-02`, `D-AI-02b`
 
@@ -29,7 +29,7 @@
 | 데이터 기반 | 기업·문서 등록·S1 분석·evidence·그래프 버전·관심 종목·포트폴리오 migration은 일부 존재 | Q03/Q04/Q07의 기반은 부분 존재. 이슈·브리핑·선정 규칙·철회 전파 종단은 추가 구현 필요 |
 | 와이어프레임 | 네 정적 화면은 질문·되묻기·회수·조회 오류의 시각 기준을 제공하지만 동작 상태를 증명하지 않음 | 별도 상태 계약으로 로딩·오류·근거 수준·복구를 고정함 |
 
-결론적으로 “채팅 UI가 있으니 모델만 연결하면 되는 상태”가 아니다. 재사용할 수 있는 것은 공개 DTO 골격, 프로토타입의 job 불변식, 기존 인증·문서·그래프 일부 기반이다. 본개발의 저장·공개 API·라우터·오케스트레이터·MCP 레지스트리·Luna 생성·검증·웹 연결은 아직 구현 대상이다.
+결론적으로 “채팅 UI가 있으니 모델만 연결하면 되는 상태”가 아니다. 재사용할 수 있는 것은 공개 DTO 골격, 프로토타입의 job 불변식, 기존 인증·문서·그래프 일부 기반이다. 본개발의 저장·공개 API·라우터·오케스트레이터·도구 레지스트리·Luna 생성·검증·웹 연결은 아직 구현 대상이다.
 
 ## 2. 구현 경계와 소유권
 
@@ -40,7 +40,7 @@ flowchart LR
     app --> orch[Chat Orchestrator]
     orch --> jev[Jev router]
     orch --> luna1[Luna coverage-verifier]
-    orch --> registry[서버 MCP registry]
+    orch --> registry[서버 도구 registry]
     registry --> adapters[읽기 전용 adapters]
     adapters --> stores[(문서·그래프·브리핑·회원 범위)]
     orch --> luna2[Luna answer-generator]
@@ -52,7 +52,7 @@ flowchart LR
 - 웹은 분류·도구 선택·인용 유효성을 결정하지 않는다.
 - Java API는 인증·소유권·멱등성·상태 전이·내구 저장·공개 DTO의 권위자다.
 - 챗봇 오케스트레이터는 typed 요구 분해·라우팅·계획·호출 조정·생성·검증을 담당하지만 회원 권한을 발급하지 않는다.
-- MCP 레지스트리는 논리 기능을 실제 읽기 도구로 매핑한다. 모델 출력 문자열을 직접 실행하지 않는다.
+- 도구 레지스트리는 논리 기능을 실제 읽기 도구로 매핑한다. 모델 출력 문자열을 직접 실행하지 않는다.
 - 문서·그래프·브리핑 서비스는 공개·철회·버전 경계를 자신의 조회 시점에도 검사한다.
 
 ## 3. 권장 구현 순서
@@ -61,7 +61,7 @@ flowchart LR
 
 1. `ChatResult.answerBasis`, `ChatChoice.kind`, 확인 질문 답 `resolves`(`ChatClarificationReply`), 답하지 않은 요구 `limitations`(`ChatLimitation`), 근거 수준별 `sections`, 진행 단계 `phase`, 입력·조회 상한과 `transient`·`budget_exceeded`의 `reason` 코드, `Citation.sourceKind`(`article`·`zoop_doc`)를 Java DTO·웹 타입·프로토타입 호환 fixture에 반영한다.
 2. 내부 `ChatRouteSummary v1`, `ChatToolRequest v1`, `ChatToolResult v1` JSON Schema를 만든다.
-3. Q01~Q08, 논리 capability, MCP registry group을 코드 enum/registry로 한 곳에서 버전 관리한다.
+3. Q01~Q08, 논리 capability, 도구 registry group을 코드 enum/registry로 한 곳에서 버전 관리한다.
 4. 실제 모델 없이도 전체 상태 머신을 시험할 deterministic fake router·coverage·tool·generator를 만든다.
 
 완료 조건: 공개 OpenAPI 검사 통과, schema fixture round-trip, 예전 BFF와 목표 API의 의도된 차이 목록 갱신.
@@ -77,11 +77,11 @@ flowchart LR
 
 ### 단계 2 — 오케스트레이터 골격
 
-1. 입력 정규화와 `requirementId` 분해를 구현한다. 질문에 명시된 대상·기간은 선택 문맥보다 우선한다. 명시적 요구가 6개를 넘으면 모델 라우팅·MCP 호출 전에 `clarification`으로 범위를 나눈다.
+1. 입력 정규화와 `requirementId` 분해를 구현한다. 질문에 명시된 대상·기간은 선택 문맥보다 우선한다. 명시적 요구가 6개를 넘으면 모델 라우팅·도구 호출 전에 `clarification`으로 범위를 나눈다.
 2. `route_summary`를 단계별로 쓰되 자유 형식 chain-of-thought는 저장하지 않는다.
 3. 계획 검증 전에는 도구 호출을 예약하지 않고, 확정 계획은 `chat_tool_calls(status=reserved)`로 원자 저장한다.
 4. 의존 실행은 `stages[]`와 `checkpoint`로 선언하고, 단계가 끝날 때마다 서버가 개수 조건을 평가해 진행·`clarification`(초과)·제한 답변(미달)·없음 답변(0개, 잘림 없음)·근거 부족(0개, 오류 없이 잘림)으로 나눈다. 단계의 도구 호출이 timeout·장애·권한 오류로 끝나면 개수 조건을 평가하지 않고 해당 `ChatFailure`로 먼저 종료한다. 체크포인트에서 멈추면 남은 예약 호출을 취소하고 생성 stage를 호출하지 않는다.
-5. 단계별 시간 상한(라우터 4초, 커버리지 회당 6초, MCP 단계 10초·개별 3초, 생성 25초, 의미 검증 6초, 서버 처리 3초)과 계획 경로별 실행 기한(실행할 단계 상한의 합, 최대 60초), 동시 4개, 최대 12회, 의존 3단계·fan-out 5개와 보충 1라운드를 서버에서 강제한다. 모델 단계 시작 전 잔여 기한이 그 단계와 이후 남은 필수 단계 상한의 합보다 적으면 호출하지 않고 `transient`(`deadline_guard`)로 끝낸다. 커버리지 재확인도 이 조건을 만족할 때만 실행한다. 실행 단계마다 `phase`를 owner token 조건부로 갱신한다. 예산은 체크포인트 조건의 최악의 경우로 계산한다.
+5. 단계별 시간 상한(라우터 4초, 커버리지 회당 6초, 도구 단계 10초·개별 3초, 생성 25초, 의미 검증 6초, 서버 처리 3초)과 계획 경로별 실행 기한(실행할 단계 상한의 합, 최대 60초), 동시 4개, 최대 12회, 의존 3단계·fan-out 5개와 보충 1라운드를 서버에서 강제한다. 모델 단계 시작 전 잔여 기한이 그 단계와 이후 남은 필수 단계 상한의 합보다 적으면 호출하지 않고 `transient`(`deadline_guard`)로 끝낸다. 커버리지 재확인도 이 조건을 만족할 때만 실행한다. 실행 단계마다 `phase`를 owner token 조건부로 갱신한다. 예산은 체크포인트 조건의 최악의 경우로 계산한다.
 
 완료 조건: 예산 초과 계획은 도구 호출 0회와 clarification, 체크포인트 초과 시 다음 단계 호출 0회·생성 호출 0회와 실제 결과 기반 choices, 취소·lease 만료 뒤 신규 호출 0회, 병렬 호출도 최대 4개.
 
@@ -98,7 +98,7 @@ flowchart LR
 
 모델 연결의 잠정 결정(2026-10-22, 사용자 승인, 평가 세트로 보정 전): (1) 명시적 요구 분해는 규칙 기반(`?`·“그리고”·“~하고”·쉼표 등)이며 확실하지 않으면 질문 전체를 요구 하나로 둔다. (2) 질문에 적힌 기업 이름은 앱이 기업 카탈로그의 정확한 이름 일치로만 ID로 해석하고, 후보가 여럿이면 `clarification`이다. Jev는 이름을 해석하지 않는다. (3) 생성·검증에 보내는 인용문은 운영자 챗봇 grant(`model-send`·stage 목적·정확한 수신자)가 있을 때만 보내고 없으면 보내지 않고 실패한다. (4) 라우터·검증 Jev 질문 집합은 새로 작성하고 임계치는 S1 잠정값을 쓴다. 모델 단계 실행은 `ai/worker`의 `zoop-ai-chat`([AI 런타임 준비 §11](ai-runtime-setup.md))이 맡고 앱은 `ai/service`를 거쳐서만 부른다.
 
-### 단계 4 — MCP 레지스트리와 읽기 어댑터
+### 단계 4 — 도구 레지스트리와 읽기 어댑터
 
 레지스트리를 한 번에 모두 구현하지 말고 아래 수직 순서로 연동한다.
 
@@ -184,7 +184,7 @@ Q04 `graph.path.read`(`GraphPathTool`, 경로 탐색 `GraphPathLookup`)를 같�
 5. D-AI-01~02b API 연결의 최소 세로 기능
 6. Java 통합 테스트, 웹 Vitest, migration/PostgreSQL 동시성 테스트
 
-이 PR에서 Jev·Luna·실제 MCP까지 동시에 붙이지 않는다. 먼저 계약과 상태 머신이 고정돼야 이후 모델·도구 오류가 데이터 손상이나 중복 과금으로 번지지 않는다.
+이 PR에서 Jev·Luna·실제 읽기 도구까지 동시에 붙이지 않는다. 먼저 계약과 상태 머신이 고정돼야 이후 모델·도구 오류가 데이터 손상이나 중복 과금으로 번지지 않는다.
 
 ## 6. 필수 테스트 목록
 
@@ -202,7 +202,7 @@ Q04 `graph.path.read`(`GraphPathTool`, 경로 탐색 `GraphPathLookup`)를 같�
 | 제한 | 투자 판단 혼합 질문의 `investment_advice`, 체크포인트 미달 `precondition_unmet`, 문서 20개 잘림 `results_truncated`, 한 요구만 근거 부족, 요구 누락·중복 소속·본문의 제한 요구 답변 시 `validation_failed`, 모델이 근거 없이 제안한 제한 거부, 도구 timeout이 limitation이 아닌 failed, answered 외 outcome의 빈 배열 |
 | 확인 답 | 선택지 답·자유 입력 답, 없는 choiceId·clarification 아닌 원 작업·다른 대화 원 작업 422/404, resolves+context 422, 원 고정 문맥 복사, 원 작업 불변, 같은 확인 질문 재답변, 깊이 2 작업의 모호·체크포인트 초과는 `guidance`와 다음 단계·생성 호출 0회, 깊이 2에서 모호함이 해소되면 `answered`·도구 장애는 `failed`(guidance로 바꾸지 않음), 확인 답의 답이 루트 질문과 사슬의 답을 순서대로 합쳐 재실행 |
 | 의미 검증 | 1층 실패 시 Jev 0회, 일반 개념 구간은 Choice 없이 `prohibitedAdvice`만 판정하고 예이면 전체 실패, 전부 supported 통과, contradicted·prohibitedAdvice 예 전체 실패, 한 요구 hold 시 그 구간·통합 구간 제외와 limitation 및 answer·answerBasis·citations 재계산, 모든 요구 hold 시 insufficient_evidence, 응답 형식 오류 시 영수증 저장 후 transient |
-| 장애 | Jev/Luna/MCP timeout, unknown 호출, 저장 실패, result_lost, save_only |
-| 기한·한도 | 경로별 기한 계산(Q02 단독 44초·단순 조회 54초·복합 60초), 모든 경로 합 60초 이하, MCP 상한 초과 `tool_timeout`(rerun), 모델 송신 전 연결 실패 `provider_error`(rerun), 모델 송신 후 상한 초과·연결 끊김 `response_unknown`(retry null, 호출 `unknown`, 자동·수동 재전송 0회), 남은 필수 단계 합보다 기한이 부족하면 모델 호출 0회와 `deadline_guard`(생성 뒤 의미 검증 직전 중단 없음), 커버리지 재확인 생략 조건, 요구 7개 질문의 계획 시점 clarification, `save_only`가 실행 횟수에 포함되지 않음, 입력 24k 초과 `budget_exceeded`·`context_too_large`(retry null), 출력 상한 도달 `output_limit`, 실행 3회 뒤 retry null, lease 만료 뒤 늦은 완료 거부, `phase` 전이와 종료 시 null |
+| 장애 | Jev/Luna/도구 timeout, unknown 호출, 저장 실패, result_lost, save_only |
+| 기한·한도 | 경로별 기한 계산(Q02 단독 44초·단순 조회 54초·복합 60초), 모든 경로 합 60초 이하, 도구 상한 초과 `tool_timeout`(rerun), 모델 송신 전 연결 실패 `provider_error`(rerun), 모델 송신 후 상한 초과·연결 끊김 `response_unknown`(retry null, 호출 `unknown`, 자동·수동 재전송 0회), 남은 필수 단계 합보다 기한이 부족하면 모델 호출 0회와 `deadline_guard`(생성 뒤 의미 검증 직전 중단 없음), 커버리지 재확인 생략 조건, 요구 7개 질문의 계획 시점 clarification, `save_only`가 실행 횟수에 포함되지 않음, 입력 24k 초과 `budget_exceeded`·`context_too_large`(retry null), 출력 상한 도달 `output_limit`, 실행 3회 뒤 retry null, lease 만료 뒤 늦은 완료 거부, `phase` 전이와 종료 시 null |
 | UI | 새로고침 복구, 조회 오류 재확인, late response 폐기, 접근성·모바일 |
 | 관측 | 모델·도구 호출 중복 집계 없음, 미보고 비용 NULL, 요청 ID 연계 |

@@ -6,7 +6,7 @@
 
 ## 1. 결정 요약
 
-**PostgreSQL 36개 테이블.** 함께 저장하고 읽는 결과는 JSON으로 통합하고 독립 조회·집계·무결성에 필요한 관계는 테이블로 유지한다. v0.7 챗봇 오케스트레이션의 실제 MCP 호출은 독립 관측·예산 집계를 위해 `chat_tool_calls`로 분리한다.
+**PostgreSQL 36개 테이블.** 함께 저장하고 읽는 결과는 JSON으로 통합하고 독립 조회·집계·무결성에 필요한 관계는 테이블로 유지한다. v0.7 챗봇 오케스트레이션의 실제 도구 호출은 독립 관측·예산 집계를 위해 `chat_tool_calls`로 분리한다.
 
 기존 설계는 회원과 1:1인 비밀번호·설정, 분석 결과 내부의 주장·인용, 발행본 내부 항목·판정, 응답과 함께 읽는 채팅 인용까지 분리했다. API가 독립 수정·검색을 요구하지 않는 구성 요소에도 별도 테이블을 배정한 것이 개수 증가의 큰 원인이다. 재시도·정정·감사 등 명세가 실제로 요구하는 기능도 개수에 영향을 준다.
 
@@ -607,7 +607,7 @@ UNIQUE(chat_job_id, attempt_no, tool_call_id)
 UNIQUE(chat_job_id, attempt_no, call_index)
 ```
 
-읽기 전용 MCP 또는 같은 논리 계약의 서버 내부 어댑터 호출을 한 행씩 기록한다. `call_index`는 계획의 안정된 순서이며 실제 병렬 완료 순서를 뜻하지 않는다. `registry_group`, `capability_id`, `tool_id`, `schema_version`은 호출 시점 레지스트리의 값을 고정한다. 모델이 만든 자유 문자열 도구명은 저장·실행하지 않는다. `request_meta`는 대상 ID·기간·asOf·graphVersion·limit처럼 허용된 구조만 포함하고 회원 ID·질문 원문·인증 토큰·개인 포트폴리오 전문을 넣지 않는다. 전체 요청·응답을 보존해야 할 때만 접근 통제와 보존 정책을 충족한 불변 artifact를 연결한다.
+읽기 전용 도구(서버 내부 어댑터) 호출을 한 행씩 기록한다. `call_index`는 계획의 안정된 순서이며 실제 병렬 완료 순서를 뜻하지 않는다. `registry_group`, `capability_id`, `tool_id`, `schema_version`은 호출 시점 레지스트리의 값을 고정한다. 모델이 만든 자유 문자열 도구명은 저장·실행하지 않는다. `request_meta`는 대상 ID·기간·asOf·graphVersion·limit처럼 허용된 구조만 포함하고 회원 ID·질문 원문·인증 토큰·개인 포트폴리오 전문을 넣지 않는다. 전체 요청·응답을 보존해야 할 때만 접근 통제와 보존 정책을 충족한 불변 artifact를 연결한다.
 
 상태는 `reserved`, `running`, `succeeded`, `failed`, `cancelled`, `unknown`이다. 계획 확정 시 호출 예산을 `reserved`로 먼저 기록하고 소유 토큰을 확인한 실행만 전이한다. timeout 등으로 외부 완료 여부를 모르면 `unknown`을 실패나 호출 0회로 바꾸지 않는다. 같은 논리 조회를 재사용한 경우 새 성공 호출을 만들지 않고 원 호출 ID를 `route_summary`에 참조한다. 추가 조회 라운드는 `plan_revision`을 증가시키며 최대 횟수는 정책 버전과 함께 검증한다.
 
