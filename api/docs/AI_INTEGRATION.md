@@ -1,13 +1,13 @@
 # AI 분석 transport 클라이언트 (api → ai/service)
 
-앱 백엔드가 S1 분석, S2 추출·S3 관계 job, 챗봇 모델 단계와 [실행 계획 접수](#계획-접수-클라이언트)를 호출하는 **전송 계층 클라이언트**입니다. 서버 쪽 정본은 [`ai/service/README.md`](../../ai/service/README.md)와 [`docs/api/internal-ai-openapi.yaml`](../../docs/api/internal-ai-openapi.yaml), 작업 JSON 스키마는 [`docs/api/ai-contract.schema.json`](../../docs/api/ai-contract.schema.json)입니다. 이 문서는 Java 쪽 책임·설정·소비 규칙을 설명합니다.
+앱 백엔드가 S1 분석, S2 추출·S3 관계 job, 챗봇 모델 단계와 [실행 계획 접수](#계획-접수-클라이언트)를 호출하는 **전송 계층 클라이언트**와 [관리자 계획 분석 큐](#관리자-계획-분석-큐)를 설명합니다. 서버 쪽 정본은 [`ai/service/README.md`](../../ai/service/README.md)와 [`docs/api/internal-ai-openapi.yaml`](../../docs/api/internal-ai-openapi.yaml), 작업 JSON 스키마는 [`docs/api/ai-contract.schema.json`](../../docs/api/ai-contract.schema.json)입니다.
 
 ## 지금 있는 것과 없는 것
 
 | 제공하는 기능 | 소비 기능·운영 경계 |
 |---|---|
 | `AiAnalysisClient`의 `submit` / `status` / `result` / `cancel` / `recover` | 최종 사용자 인증·세션·회원/관리자 권한은 앱 소유이며 이 클라이언트가 판정하지 않습니다. |
-| S2 추출 5개·S3 관계 7개 operation과 실행 모드 기대값, 엄격한 응답 결속 | 앱의 `analysis_jobs` 테이블과 조회·재시도·취소 경로는 있지만 계획 등록·큐 worker·정기 실행 연결은 아직 없습니다. 전송 클라이언트만으로 스케줄러가 동작하지 않습니다. |
+| S2 추출 5개·S3 관계 7개 operation과 실행 모드 기대값, 엄격한 응답 결속 | 별도 `analyze_plan` 큐가 고정 S2/S3를 진행시켜 내용 없는 처리 인계를 저장합니다. 수집·재검증·투영 실행기나 공개 발행 스케줄러는 구현하지 않습니다. |
 | `PlanAdmissionClient`의 정확한 계획 접수·조회, 불변 manifest와 정책 권한 상태 검증 | 앱은 운영자 정책을 바꾸거나 허가 파일을 쓰지 않습니다. 접수 자체는 S2/S3 실행·예산 승인·공개 활성화가 아닙니다. |
 | 가족별 독립 설정과 기본 비활성 bean | 결과의 앱 저장·사용자 격리·현재 권리 재확인·공개 여부는 소비 기능이 소유합니다. S1은 [문서 분석](DOCUMENT_ANALYSIS.md), 그래프는 [handoff 인계](GRAPH_READ_HANDOFF.md)를 참고합니다. |
 | 실제 서비스·설치된 pipeline을 사용하는 합성 replay 연동 검사 | S2-1 수집 HTTP, 운영 정책·유료 실행·처리량별 정기 발행 보장은 이 전송 계층의 기능이 아닙니다. |
@@ -189,13 +189,64 @@ AI 서비스의 소유자는 **인증된 principal 하나**(이 앱)이며 최�
 
 ## ERD v6 설계와의 관계
 
-[ERD v6](../../docs/erd/zoop-core-erd-v6.md)는 공개 앱 작업 ID와 내부 AI job ID, 영수증과 검수 원천 버전을 구분합니다. 이 전송 클라이언트 자체는 앱 DB 없이 동작합니다. S1 결과의 영속화는 [문서 분석](DOCUMENT_ANALYSIS.md), 그래프 수입·공개 읽기는 [handoff 인계](GRAPH_READ_HANDOFF.md)를 따릅니다. 앱에는 `analysis_jobs` 저장·조회·재시도·취소가 있지만, 계획 등록과 S2/S3를 진행시키는 큐 worker는 아직 연결되지 않았습니다. 아래의 날짜별 설계 근거와 현재 런타임 구현을 구분합니다.
+[ERD v6](../../docs/erd/zoop-core-erd-v6.md)는 공개 앱 작업 ID와 내부 AI job ID, 영수증과 검수 원천 버전을 구분합니다. 전송 클라이언트 자체는 앱 DB 없이 동작합니다. S1 결과의 영속화는 [문서 분석](DOCUMENT_ANALYSIS.md), 그래프 수입·공개 읽기는 [handoff 인계](GRAPH_READ_HANDOFF.md)를 따릅니다. 앱의 별도 `analyze_plan` 소비자는 아래의 정규화된 원장에 처리 관측만 저장합니다. 다음 날짜별 설계 근거와 현재 구현 범위를 구분합니다.
 
 > **ERD 설계 근거(2026-10-13).** 내부 AI `jobId`는 공개 `analysis_jobs.id`와 별개이며 한 앱 작업에 여러 AI 작업이 대응할 수 있습니다. `analysis_jobs.checkpoint.aiUnits[]`(`{unitKey, aiJobId, submitArtifactId, runtimeInputDigest?}`)·`document_analyses.ai_job_id`·`briefing_attempts.stages`에는 submit 전에 ID와 불변 요청을 저장하는 방향이 정의돼 있습니다. 호출 영수증의 `jobId`·`attemptId`와 실행 당시 grant snapshot은 현재 접근권한을 대신하지 않습니다. 검수는 앱의 `expectedRevision`과 AI 원천의 `expectedSourceVersion`·`expectedSourceRevision`을 구분합니다. S3 내부 값은 `sourceVersion`=S3 input digest, `sourceRevision`=후보 이벤트 revision이며, Java 전송과 현재 정책 검사는 위 S2/S3·계획 접수 절을 따릅니다.
 
-- **v6와 이 문서가 같은 방향인 것:** GET은 모델을 호출하지 않습니다. 현재 접근권한·원문 철회는 응답 때 다시 검사하며 저장된 `available`로 대신하지 않습니다. 완료된 결과는 불변이고 새 요청은 새 행입니다. 저장만 복구하는 `save_only`는 live 호출 수에 넣지 않습니다. 위 4단계 import(권한·문서 버전·인용·현재 grant·단일 transaction)는 v6의 저장 규칙과 모순되지 않는 것으로 읽었습니다. S1 문서 분석 저장은 PostgreSQL 17.11에서 실제 SQL·transaction으로 실행해 확인했고([문서 분석](DOCUMENT_ANALYSIS.md#검증)), S2·S3·`briefing-outlook` 저장은 구현이 없어 확인할 것이 없습니다.
-- **병합된 v6도 닫지 않은 것(첫 소비 기능이 소유자와 합의):** (1) 작업 수준 `inputDigest`의 고정·대조 위치(v6는 `runtimeInputDigest?`를 선택 항목으로만 적습니다)와 `jobId`의 사용자·문서·회차 결속. v6 `analysis_jobs`는 관리자 `ingest`/`revalidate`/`project` 작업이라 AI 런타임 job을 대신하지 않습니다. (2) 현재 grant registry의 위치와 grant 발급·회수 계약(v6 §8 항목 4), `grant_reference`·`grant_scope`에 담는 값의 형식. (3) 이 문서의 `receipts`(provider 호출 기록)와 v6 `ai_call_receipt`, 그리고 검증 영수증 `exact_receipt`/`semantic_receipt`의 대응과 파일 형식. (4) 사용량 귀속의 적용 방법(v6와 공개 OpenAPI는 `document-summary`·`semantic-verification`을 `news-analysis`에 귀속합니다)과 `replay`의 의미. 클라이언트 코드는 이 중 어느 것도 추정해 채우지 않습니다.
-- **남은 계획 연결:** 앱의 계획 등록·단위별 불변 실행 참조 저장·큐 worker·스케줄 실행과 공개 결과 전환을 연결해야 합니다. 작업 테이블이 존재한다는 사실이나 내부 AI 접수 성공만으로 이 흐름이 완성된 것은 아닙니다. 이 클라이언트는 DB를 쓰지 않으며, 저장·사용자 권한·공개 결정은 각 소비 기능의 책임입니다.
+- **현재 같은 방향인 것:** GET은 모델을 호출하지 않고 저장된 available로 현재 권리를 대신하지 않습니다. S1 도메인 결과 저장은 [문서 분석](DOCUMENT_ANALYSIS.md#검증)의 실행 증거를 따릅니다. `analyze_plan`의 정규화된 원장은 S2/S3 input digest와 처리 관측만 고정하며 후보 도메인 결과 import는 하지 않습니다.
+- **별도 소비 기능에 남은 것:** 검수 adapter·원천 동기화, 현재 grant registry의 도메인 import 적용, HTTP receipt와 안정적인 runtime attempt 회계 ID의 대응, 기능별 사용량 대시보드 통합은 이 큐에서 추정해 채우지 않습니다. `analysis_jobs`는 AI runtime job 자체가 아니며 S3 inputDigest·후보 이벤트 revision·앱 검수 revision은 독립적입니다.
+- **남은 소비 기능:** 실제 검수 adapter·후보 mapping·review target 동기화·현재 권리 검증·공개 전환은 기존 소유자의 별도 작업입니다. `analyze_plan` 성공은 이 기능의 완료나 FS058/FS059/FS063/FS064/FS067 전체 구현을 뜻하지 않습니다.
+
+## 관리자 계획 분석 큐
+
+`POST /api/v1/admin/jobs`의 `kind=analyze_plan`은 관리자 세션·CSRF·Idempotency-Key로 정확한 `{reason,plan:{planId,planDigest}}`를 접수합니다. 새 요청 객체 두 개는 닫혀 있으며 UTF-8 64 KiB, 중복 키·후행 JSON·형변환 거절과 기존 감사 사유 정책을 적용합니다. `ingest/revalidate/project` 요청 형태는 그대로지만 아직 실행기가 없어 새 접수는 503 SOURCE_UNAVAILABLE(retryable=false), 재시도는 worker_unavailable로 거절합니다.
+
+접수 transaction은 AI를 전혀 호출하지 않고 등록·root job·analysis.job.create 감사·정확한 202 멱등성 응답을 함께 커밋합니다. Location은 작업 상세 경로입니다. 같은 키/본문은 기능 비활성화 뒤에도 당시 응답을 재생합니다. 접수가 활성화된 상태에서 다른 키로 같은 계획을 접수하면 root job과 deduplicated=true를 반환하며 실패한 작업을 몰래 재시도하지 않습니다. 비활성화 상태의 새 키 요청은 기존 계획이라도 503으로 거절하며 새 기록을 만들지 않습니다. 다른 digest나 서비스 결속으로 같은 planId를 덮어쓰면 409입니다.
+
+`zoop.analysis.analyze-plan` 설정은 기본 비활성입니다. 환경 변수는 다음과 같습니다.
+
+| 환경 변수 | 기본값 | 의미 |
+|---|---|---|
+| `ZOOP_ANALYSIS_ANALYZE_PLAN_ENABLED` | `false` | 새 접수와 worker 활성화. 비활성화는 기존 이력·진행 의도를 보존하는 일시 정지입니다. |
+| `ZOOP_ANALYSIS_ANALYZE_PLAN_EXPECTED_PRINCIPAL` | 빈 값 | 활성화 시 필수 서비스 principal |
+| `ZOOP_ANALYSIS_ANALYZE_PLAN_POLL_INTERVAL` | `2s` | 유한 poll 간격 |
+| `ZOOP_ANALYSIS_ANALYZE_PLAN_ATTEMPT_DEADLINE` | `30m` | 앱 시도 deadline. lease 회수로 연장하지 않습니다. |
+| `ZOOP_ANALYSIS_ANALYZE_PLAN_LEASE` | `150s` | 가장 긴 단일 HTTP timeout보다 안전 여유를 두는 임대 |
+| `ZOOP_ANALYSIS_ANALYZE_PLAN_MAX_CONSECUTIVE_FAILURES` | `5` | 연속 원격 관측 실패 상한 |
+| `ZOOP_ANALYSIS_ANALYZE_PLAN_MAX_RECOVERY_DISPATCHES` | `3` | 단계별 앱 시도의 durable recover intent 상한 |
+| `ZOOP_ANALYSIS_ANALYZE_PLAN_MAX_RECLAIMS` | `16` | 같은 앱 작업의 자동 임대 회수 상한 |
+
+활성화에는 실제 PlanAdmissionClient·ExtractionClient·RelationClient bean, 공통 canonical base URL과 명시적 principal이 필요합니다. 누락·다른 endpoint·유한하지 않은 시간 설정은 시작 시 거절합니다. `ServiceBinding`은 정규화된 URL/principal의 공개 설정 identity를 SHA-256으로 고정하며 자격 증명은 저장하거나 해시하지 않습니다. 이 설정과 누적 AI 접수 quota는 통화·모델 호출 예산이나 운영 허가가 아닙니다.
+
+`analysis_plans`는 불변 참조와 write-once 접수/manifest를, `analysis_plan_units`는 검증된 순서의 고정 S2/S3 submit·digest·내용 없는 typed 상태를 저장합니다. 접수와 전체 unit set을 한 transaction으로 고정한 뒤에만 단계를 시작합니다. `nextStage`는 단위 한 행을 읽으며 매 poll마다 전체 manifest를 job checkpoint로 복사하지 않습니다. 최초 S3 runtime input digest는 write-once입니다. 원문·후보 payload는 보관하지 않고 정확한 결과 문자열의 UTF-8 SHA-256·관측 시각·receipt만 남깁니다.
+
+worker의 DB transaction은 짧고 HTTP 동안 잠금을 유지하지 않습니다. 실행 advisory lock → job → plan → unit 순서를 지키며 모든 쓰기는 현재 owner token·실제 미만료 lease·취소 상태로 fence합니다. 잠금 대기 뒤 시간을 다시 읽습니다. 전송 전 의도를 먼저 커밋하고 응답 유실·재시작은 같은 AI ID의 상태 조회로 조정합니다. 불명확한 실행은 outcome_unknown으로 남기며 새 ID·정책 재접수·숨은 nonce로 우회하지 않습니다.
+
+queued 취소는 즉시 cancelled와 불변 planRun 요약을 저장합니다. running 취소는 요청만 기록하고 worker가 알려진 자식 상태를 조정합니다. provider 중단·환불을 약속하지 않습니다. retry는 같은 plan_id와 고정 S2/S3 ID를 사용하는 새 앱 작업이며 이미 완료된 단위를 보존합니다. 영구 비활성 접수·불변 결속 충돌·취소된 AI 단계는 plan_not_reusable, 미해결 실행은 outcome_unknown입니다.
+
+이미 전송한 자식 작업의 상태 조회나 취소가 권한 거절로 끝나면, 그 응답만으로 자식 종료를 확정하지 않습니다. 미해결 전송이 남아 있는 앱 취소는 `cancelled/outcome_unknown`으로 기록하고 공개 재시도를 거절합니다. 전송 전 권한 거절은 이 경우와 구분합니다.
+
+성공은 모든 쌍의 결과 envelope 자체가 READY·AVAILABLE이고 저장된 identity와 일치함을 관측한 **ai_processing_handoff**입니다. 새 종류에만 필수 planRun을 반환하며 publicChanged=false, report/ingest/flush/ledgerBefore/ledgerAfter는 NULL입니다. 종결 요약은 과거 관측으로 고정됩니다. `readyUnits(planId,afterOrdinal,limit)`은 계획/접수/manifest pins, ordinal/unitKey, S2/S3 ID와 input digest, provenance, 결과 관측 시각/해시만 내부 소비자에게 넘깁니다. 이것은 현재 권리나 앱 후보 검증의 증거가 아니며 후속 실제 결과 사용은 새 권리 검사를 요구합니다.
+
+수집 baseline 쿼리(kind=ingest), review_targets/decisions, ai_executions, graph version, Neo4j, internal_projection과 공개 활성화는 변경하지 않습니다. HTTP receipt에는 안정적인 runtime attempt accounting ID가 없으므로 회계 행이나 가짜 토큰/비용 0을 만들지 않습니다.
+
+관리자 대시보드의 작업 집계·최근 작업도 같은 `analysis_jobs`를 읽습니다. 관리자 범위의 앱 작업만 집계하고, 최근 5개와 실행 중 작업에는 목록·상세와 같은 JobOut 변환을 적용합니다. `failed24h`는 조회 기준 시각 직전 24시간이며 끝 경계는 포함하지 않습니다. DB를 읽지 못하면 jobs=null로 응답하고, 검수·AI 사용량·브리핑의 미연결 영역을 이 작업 수로 대신 채우지 않습니다.
+
+### 실제 합성 큐 검사 실행
+
+빌드된 jar, 이미 설치한 service/pipeline/worker 환경과 캐시된 PostgreSQL이 필요합니다. 전용 새 외부 디렉터리와 합성 replay 상태만 사용하며 운영 정책·실제 사용자 DB·모델·배포는 사용하지 않습니다. 아래는 실행 명령이며 그 자체가 통과 기록은 아닙니다.
+
+```sh
+make api-analyze-plan-smoke ANALYZE_PLAN_SMOKE_OUTPUT=/external/fresh-dir
+# 같은 검사 직접 실행:
+ai/service/.venv/bin/python api/scripts/analyze_plan_queue_smoke.py \
+  --jar api/build/libs/zoop-api-0.0.1-SNAPSHOT.jar --output /external/fresh-dir \
+  --postgres-bin /cached/pg/bin
+# Java 선택: --java /absolute/java
+# 캐시된 컨테이너 사용 시 --postgres-bin 대신: --image postgres:16.13-alpine
+```
+
+실제 A-ADM-03 `/admin/pipeline` 브라우저 검사는 `--serve-ui --ui-origin http://127.0.0.1:<port> --ui-hold-stage s2`로 앱·서비스를 유지할 수 있습니다(admission/s3/none도 지원). bootstrap 정보는 출력 디렉터리의 private 0600 파일로만 제공합니다. 실제 브라우저 관측을 기록한 파일은 `--ui-proof`로 전달하며, 이 증거가 없으면 backend 검사가 통과해도 전체 결과는 inconclusive(exit 2)입니다. backend 단위/PostgreSQL 회귀와 실제 서비스·브라우저 검사는 서로 대체하지 않습니다. 공개 계약 생성은 저장소 루트에서 `uv run --with pyyaml --with openpyxl python docs/system/build.py`를 실행합니다.
 
 ## 검증
 

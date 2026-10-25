@@ -216,7 +216,7 @@ console.log(response.status); // 활성 회원 세션이 정상 폐기되면 204
 
 ## AI 분석 transport
 
-`com.zoop.ai`는 `ai/service`를 호출하는 전송 계층입니다. S1 분석, S2 추출, S3 관계·최종 검수, 챗봇 모델 단계와 정확한 계획 접수·조회(`PlanAdmissionClient`)를 가족별 독립 설정으로 제공합니다. 모두 기본 비활성이며 클라이언트 설정만으로 원천 사용·모델 비용·HOLD 승인·공개 권한이 생기지 않습니다. 계획 접수는 실행 중인 AI 서비스의 사전 정책 안에서 불변 S2/S3 참조를 받는 기능이며, 앱의 계획 등록·`analysis_jobs` 큐 worker·정기 발행을 구현한 것은 아닙니다. 설정·오류·실제 합성 연동 검사와 소비자 책임은 [AI 연동](docs/AI_INTEGRATION.md)에 있습니다.
+`zoop.ai.plan-admission-client`·S2/S3 전송 클라이언트와 별도로 `zoop.analysis.analyze-plan`은 관리자 계획 분석 큐를 제공합니다. 모두 기본 비활성이며 클라이언트나 큐 설정만으로 원천 사용·모델 비용·HOLD 승인·공개 권한이 생기지 않습니다. `POST /api/v1/admin/jobs`의 analyze_plan만 실제 계획 등록·PostgreSQL 단위 원장·worker에 연결됩니다. 성공은 고정 S2/S3 결과의 내용 없는 처리 인계(publicChanged=false)이며 수집·검수 동기화·발행을 하지 않습니다. 기존 ingest/revalidate/project 요청 형태와 이력은 유지하지만 새 접수와 retry는 실행기 미연결로 거절합니다. 설정 환경 변수, 재시작·취소·continuation 의미, 실제 합성 `make api-analyze-plan-smoke ANALYZE_PLAN_SMOKE_OUTPUT=/external/fresh-dir` 명령은 [AI 연동의 관리자 계획 분석 큐](docs/AI_INTEGRATION.md#관리자-계획-분석-큐)를 참고하세요.
 
 ## 문서 등록 import
 

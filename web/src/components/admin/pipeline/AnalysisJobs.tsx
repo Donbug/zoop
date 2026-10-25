@@ -19,6 +19,8 @@ import {
 import JobActionForm, {
   type JobAction,
 } from '@/components/admin/pipeline/JobActionForm';
+import AnalyzePlanCreateForm from '@/components/admin/pipeline/AnalyzePlanCreateForm';
+import { useAdminSessionStore } from '@/stores/useAdminSessionStore';
 import {
   ingestOutcomeLabel,
   jobKindLabel,
@@ -27,7 +29,13 @@ import {
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { useCursorPages } from '@/hooks/useCursorPages';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
-import type { AnalysisJob, IngestBaseline, JobList } from '@/types/admin/jobs';
+import type {
+  AnalysisJob,
+  IngestBaseline,
+  JobList,
+  PlanRun,
+  RetryCode,
+} from '@/types/admin/jobs';
 import { formatKst } from '@/util/format';
 
 const jobName = (job: AnalysisJob) => jobKindLabel[job.kind] ?? job.label;
@@ -35,6 +43,26 @@ const isActive = (job: AnalysisJob) =>
   job.status === 'queued' || job.status === 'running';
 const isClosed = (job: AnalysisJob) =>
   job.status === 'failed' || job.status === 'cancelled';
+
+const planPhaseLabel: Record<PlanRun['phase'], string> = {
+  awaiting_admission: 'AI 접수 대기',
+  admitting: 'AI 접수 확인 중',
+  extracting: 'S2 추출 중',
+  relating: 'S3 관계 분석 중',
+  cancelling: '취소 처리 중',
+  ready: 'AI 처리 인계 준비 완료',
+  failed: '분석계획 처리 실패',
+  cancelled: '분석계획 처리 취소됨',
+};
+
+const planRetryRefusal: Partial<Record<RetryCode, string>> = {
+  worker_unavailable:
+    '분석계획 실행기가 연결되지 않았거나 비활성화되어 있어요.',
+  plan_not_reusable:
+    '이 계획의 고정된 AI 작업을 재사용할 수 없어요. 별도로 준비한 새 계획이 필요해요.',
+  outcome_unknown:
+    '이전 실행 결과가 불확실해요. 권한 있는 절차로 결과를 확인하기 전에는 새 시도를 만들 수 없어요.',
+};
 
 /** 걸린 시간: 1분 넘으면 '3분 5초', 아니면 '42초' */
 function formatDuration(seconds: number | null) {
@@ -127,9 +155,14 @@ function ActiveLine({
 
 // A-ADM-03 작업 탭 (FS058·FS067-01·FS067-03, listAnalysisJobs·getAnalysisJob·retryAnalysisJob·cancelAnalysisJob)
 // - 프로토타입 admin/pipeline/jobs.tsx를 옮겼다. 고른 작업은 주소(?job=)에 남는다.
-// - 작업 만들기(createAnalysisJob)·유료 실행 확인은 main API가 없어 옮기지 않았다.
+// - 분석계획은 별도 analyze_plan 작업이며, 기존 기사 처리 기준 시점을 옮기지 않는다.
 // - 호출 상한·실행 명령·로그 줄은 정식 계약에서 빠진 로컬 PoC 필드라 보여 주지 않는다.
 export default function AnalysisJobs() {
+  const revision = useAdminSessionStore((state) => state.revision);
+  return <AnalysisJobsSession key={revision} />;
+}
+
+function AnalysisJobsSession() {
   const { params, updateQuery } = useRouteQuery();
   const selectedId = params.get('job');
   const jobs = useCursorPages(listAnalysisJobs);
@@ -158,10 +191,19 @@ export default function AnalysisJobs() {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,460px)]">
       <Section title="작업">
-        <Note>
-          작업 만들기는 아직 지원하지 않아요. 실패하거나 취소된 작업을 다시
-          실행하거나, 진행 중인 작업을 취소할 수 있어요.
-        </Note>
+        <AnalyzePlanCreateForm
+          disabled={pending}
+          onPendingChange={setPending}
+          onCreated={(result) => {
+            setNotice(
+              result.deduplicated
+                ? '이 분석계획은 이미 접수돼 있어요. 기존 작업을 보여 줘요.'
+                : '분석계획을 대기열에 접수했어요. 아직 AI 처리 완료는 아니에요.',
+            );
+            updateQuery({ job: result.job.id });
+            jobs.reload();
+          }}
+        />
         {first && (
           <>
             <ActiveLine data={first} disabled={pending} onSelect={select} />
@@ -216,6 +258,13 @@ export default function AnalysisJobs() {
                         취소 요청됨
                       </span>
                     )}
+                    {job.kind === 'analyze_plan' && (
+                      <span className="block text-[11px] text-zoop-muted">
+                        {planPhaseLabel[job.planRun.phase]} · 완료 단위{' '}
+                        {count(job.planRun.readyUnits)} /{' '}
+                        {count(job.planRun.totalUnits)}
+                      </span>
+                    )}
                     {job.ingest?.newArticles != null && (
                       <span className="block text-[11px] text-zoop-muted">
                         신규 기사 {count(job.ingest.newArticles)}건
@@ -261,7 +310,9 @@ export default function AnalysisJobs() {
               setNotice(
                 result.deduplicated
                   ? '같은 다시 실행 요청이 이미 접수돼 있어요.'
-                  : `${jobName(result.job)} 작업을 다시 실행하도록 대기열에 넣었어요.`,
+                  : result.job.kind === 'analyze_plan'
+                    ? '고정된 AI 작업 ID로 분석계획을 이어서 처리하도록 대기열에 넣었어요.'
+                    : `${jobName(result.job)} 작업을 다시 실행하도록 대기열에 넣었어요.`,
               );
               updateQuery({ job: result.job.id });
               jobs.reload();
@@ -341,6 +392,16 @@ function JobDetail({
           ×
         </button>
       </div>
+      {job.kind === 'analyze_plan' && (
+        <button
+          type="button"
+          disabled={pending || action !== null}
+          onClick={detail.reload}
+          className={BUTTON}
+        >
+          진행 상태 새로 고침
+        </button>
+      )}
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-xs">
         <dt className="text-[11px] text-zoop-muted">상태</dt>
@@ -410,7 +471,7 @@ function JobDetail({
                 onClick={() => setAction('retry')}
                 className={BUTTON}
               >
-                다시 실행
+                {job.kind === 'analyze_plan' ? '이어서 처리' : '다시 실행'}
               </button>
             )}
             {closed && job.retry.blockedBy && (
@@ -436,10 +497,14 @@ function JobDetail({
           </div>
           {closed && !job.retry.allowed && (
             <p role="status" className="text-[11px] text-zoop-muted">
-              다시 실행할 수 없어요. {job.retry.reason}
+              {job.kind === 'analyze_plan'
+                ? `이어서 처리할 수 없어요. ${planRetryRefusal[job.retry.code] ?? job.retry.reason}`
+                : `다시 실행할 수 없어요. ${job.retry.reason}`}
             </p>
           )}
-          {closed && retryRule && <Note>{retryRule}</Note>}
+          {closed && job.kind !== 'analyze_plan' && retryRule && (
+            <Note>{retryRule}</Note>
+          )}
         </div>
       )}
 
@@ -460,6 +525,46 @@ function JobDetail({
         />
       )}
 
+      {job.kind === 'analyze_plan' && (
+        <Section title="분석계획 진행">
+          <div role="status" aria-live="polite" className="text-xs">
+            {planPhaseLabel[job.planRun.phase]}
+            {job.cancelRequested &&
+              active &&
+              ' · 취소 요청을 처리 중이며 아직 종료되지 않았어요.'}
+          </div>
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-xs">
+            <dt>planId</dt>
+            <dd className="break-all">{job.planRun.planId}</dd>
+            <dt>planDigest</dt>
+            <dd className="break-all">{job.planRun.planDigest}</dd>
+            <dt>접수 ID</dt>
+            <dd className="break-all">{job.planRun.admissionId ?? '–'}</dd>
+            <dt>매니페스트</dt>
+            <dd className="break-all">{job.planRun.manifestDigest ?? '–'}</dd>
+            <dt>출처·회차</dt>
+            <dd className="break-all">
+              {job.planRun.sourceId ?? '–'} · {job.planRun.roundId ?? '–'}
+            </dd>
+            <dt>완료 단위 / 전체 단위</dt>
+            <dd>
+              {count(job.planRun.readyUnits)} / {count(job.planRun.totalUnits)}
+            </dd>
+            <dt>진행 단위 순번</dt>
+            <dd>{count(job.planRun.activeUnit)}</dd>
+            <dt>공개 변경</dt>
+            <dd>없음</dd>
+          </dl>
+          <Note>
+            완료 단위는 S2·S3 결과 전달이 모두 확인된 쌍이에요. 기사·후보 수가
+            아니에요. 준비 완료는 AI 처리 인계이며, 검수 승인·그래프 반영·공개
+            완료가 아니에요. 기사 처리 기준 시점은 바뀌지 않아요.
+          </Note>
+          {job.status === 'cancelled' && !job.startedAt && (
+            <Note>대기 중 취소되어 이 작업은 AI 실행을 시작하지 않았어요.</Note>
+          )}
+        </Section>
+      )}
       {job.ingest && (
         <Section title="기사 처리 결과">
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-xs">

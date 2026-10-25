@@ -71,7 +71,7 @@ class AnalysisJobPostgresTest {
         mvc.perform(get("/api/v1/admin/jobs/{id}", failed).cookie(login.cookie()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(failed))
-                .andExpect(jsonPath("$.retry.code").value("allowed"))
+                .andExpect(jsonPath("$.retry.code").value("worker_unavailable"))
                 .andExpect(jsonPath("$.report").isEmpty())
                 .andExpect(jsonPath("$.error.code").value("provider_error"));
         mvc.perform(get("/api/v1/admin/jobs/{id}", projection).cookie(login.cookie()))
@@ -178,36 +178,42 @@ class AnalysisJobPostgresTest {
     }
 
     @Test
-    void retryQueuesOneNewJobWithRetryOfAndThenBlocksTheSameJob() throws Exception {
+    void legacyRetryRefusesAnUnconnectedExecutorWithoutNewRows() throws Exception {
         String suffix = UUID.randomUUID().toString();
         Login login = login(suffix);
         String failed = insertJob("failed", "admin", "ingest", null, suffix + "-retry");
-
-        MockHttpServletResponse created = retry(login, failed, "retry-" + suffix, "일시 장애 후 재시도")
-                .andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.job.retryOf").value(failed))
-                .andExpect(jsonPath("$.job.status").value("queued"))
-                .andExpect(jsonPath("$.deduplicated").value(false))
-                .andReturn().getResponse();
-        String newId = JsonPath.read(created.getContentAsString(), "$.job.id");
-        assertEquals(failed, jdbc.queryForObject("SELECT retry_of FROM analysis_jobs WHERE id = ?", String.class, newId));
-        assertEquals(1, auditCount("analysis.job.retry", failed));
-
-        // The same request replays; a new key is refused because the retry is waiting.
-        retry(login, failed, "retry-" + suffix, "일시 장애 후 재시도").andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.job.id").value(newId));
-        retry(login, failed, "retry-again-" + suffix, "한 번 더").andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("REVISION_CONFLICT"));
+        retry(login, failed, "retry-" + suffix, "일시 장애 후 재시도").andExpect(status().isConflict());
         mvc.perform(get("/api/v1/admin/jobs/{id}", failed).cookie(login.cookie()))
-                .andExpect(jsonPath("$.retry.code").value("duplicate_running"))
-                .andExpect(jsonPath("$.retry.blockedBy").value(newId));
-        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM analysis_jobs WHERE retry_of = ?", Integer.class, failed));
-
-        // Writes need the admin CSRF token.
+                .andExpect(jsonPath("$.retry.code").value("worker_unavailable"))
+                .andExpect(jsonPath("$.planRun").doesNotExist());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM analysis_jobs WHERE retry_of = ?", Integer.class, failed));
+        assertEquals(0, auditCount("analysis.job.retry", failed));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM idempotency_records WHERE idem_key = ?",
+                Integer.class, "retry-" + suffix));
         mvc.perform(post("/api/v1/admin/jobs/{id}/retry", failed).cookie(login.cookie()).header("Origin", ORIGIN)
                         .header("Idempotency-Key", "no-csrf-" + suffix).contentType("application/json")
                         .content("{\"reason\":\"x\"}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void disabledAndUnsupportedCreateLeaveNoJobPlanIdempotencyOrAuditRows() throws Exception {
+        Login login = login(UUID.randomUUID().toString());
+        String plan = "s2plan-" + UUID.randomUUID().toString().replace("-", "") + "b".repeat(32);
+        for (String kind : List.of("ingest", "revalidate", "project", "analyze_plan")) {
+            String key = "disabled-" + UUID.randomUUID();
+            String body = "analyze_plan".equals(kind)
+                    ? "{\"kind\":\"analyze_plan\",\"reason\":\"시험\",\"plan\":{\"planId\":\"" + plan + "\",\"planDigest\":\"" + "b".repeat(64) + "\"}}"
+                    : "{\"kind\":\"" + kind + "\",\"reason\":\"시험\",\"candidateIds\":[],\"unknownLegacyProperty\":true}";
+            mvc.perform(post("/api/v1/admin/jobs").cookie(login.cookie()).header("Origin", ORIGIN)
+                            .header("X-CSRF-Token", login.csrf()).header("Idempotency-Key", key)
+                            .contentType("application/json").content(body))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(jsonPath("$.error.retryable").value(false));
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM idempotency_records WHERE idem_key=?", Integer.class,key));
+        }
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM analysis_plans WHERE plan_id=?",Integer.class,plan));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM analysis_jobs WHERE plan_id=?",Integer.class,plan));
     }
 
     @Test
