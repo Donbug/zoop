@@ -43,7 +43,7 @@ class AnalyzePlanMigrationPostgresTest {
                     """);
             String beforeJobs=db.queryForObject("SELECT jsonb_agg(to_jsonb(j) ORDER BY id)::text FROM analysis_jobs j",String.class);
             String beforeReview=db.queryForObject("SELECT jsonb_agg(to_jsonb(t) ORDER BY id)::text FROM review_targets t",String.class);
-            Flyway upgrade=Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).load();
+            Flyway upgrade=Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).target("20261025120000").load();
             assertEquals(1,upgrade.migrate().migrationsExecuted);
             assertEquals(beforeJobs,db.queryForObject("SELECT jsonb_agg(to_jsonb(j)-'plan_id' ORDER BY id)::text FROM analysis_jobs j",String.class));
             assertEquals(beforeReview,db.queryForObject("SELECT jsonb_agg(to_jsonb(t) ORDER BY id)::text FROM review_targets t",String.class));
