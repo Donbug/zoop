@@ -113,6 +113,8 @@ flowchart LR
 | 7 | Q07 내 종목 | `portfolio.scope.read` + Q03/Q04 | watchlist·portfolio 기반 존재. 인증 서버 문맥 주입과 범위 전파 필요 |
 | 8 | Q08 선정 근거 | `selectionRule.read` + evidence | 실제 적용 rule revision·입력 요인 조회 구현 필요 |
 
+웹 검색 대체 경로(`web.search`)는 위 순서와 별개로, 내부 도구로 답할 수 없는 Q03 요구에만 보충 라운드로 부르는 검색 API 직접 어댑터로 설계했다(MCP 미사용). 공급자·비용·개인정보 처리방침 개정이 결정되기 전에는 구현하지 않는다. [웹 검색 대체 경로 설계](../design/ai-chatbot-web-search.md)
+
 모든 어댑터는 공통 요청·결과 봉투를 사용하고 `dataVersion`, `evidenceIds`, `truncated`, `nextAllowed`, 실제 오류를 반환한다. 회원 ID는 모델이나 사용자 입력에서 받지 않고 Java 인증 문맥에서 주입한다.
 
 첫 도구 계층은 레지스트리 `chat-tools/v1`에 `company.read`·`issue.read`·`evidence.resolve`를 앱 공개 그래프 읽기 경로(`PublicGraphReader`) 위의 내부 어댑터로 등록한다. 그래프 버전·asOf는 계획이 아니라 작업의 고정 문맥에서 주입하고, 근거 ID는 공개 근거 조회가 지금 읽을 수 있는 것만 상한(20개) 안에서 전달한다. 상한 때문에 읽지 않은 근거가 있으면 `truncated=true`이며, 근거 상태를 확인할 수 없으면 빈 결과가 아니라 호출 실패(`tool_unavailable`)다. 단계 실행기는 등록되지 않은 기능이 하나라도 있으면 아무것도 예약하지 않고, 시도당 12회·동시 4개·개별 3초·단계 10초(실행 기한 이내)를 강제한다.
