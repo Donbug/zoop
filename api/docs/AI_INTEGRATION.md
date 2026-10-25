@@ -224,6 +224,8 @@ worker의 DB transaction은 짧고 HTTP 동안 잠금을 유지하지 않습니�
 
 queued 취소는 즉시 cancelled와 불변 planRun 요약을 저장합니다. running 취소는 요청만 기록하고 worker가 알려진 자식 상태를 조정합니다. provider 중단·환불을 약속하지 않습니다. retry는 같은 plan_id와 고정 S2/S3 ID를 사용하는 새 앱 작업이며 이미 완료된 단위를 보존합니다. 영구 비활성 접수·불변 결속 충돌·취소된 AI 단계는 plan_not_reusable, 미해결 실행은 outcome_unknown입니다.
 
+이미 전송한 자식 작업의 상태 조회나 취소가 권한 거절로 끝나면, 그 응답만으로 자식 종료를 확정하지 않습니다. 미해결 전송이 남아 있는 앱 취소는 `cancelled/outcome_unknown`으로 기록하고 공개 재시도를 거절합니다. 전송 전 권한 거절은 이 경우와 구분합니다.
+
 성공은 모든 쌍의 결과 envelope 자체가 READY·AVAILABLE이고 저장된 identity와 일치함을 관측한 **ai_processing_handoff**입니다. 새 종류에만 필수 planRun을 반환하며 publicChanged=false, report/ingest/flush/ledgerBefore/ledgerAfter는 NULL입니다. 종결 요약은 과거 관측으로 고정됩니다. `readyUnits(planId,afterOrdinal,limit)`은 계획/접수/manifest pins, ordinal/unitKey, S2/S3 ID와 input digest, provenance, 결과 관측 시각/해시만 내부 소비자에게 넘깁니다. 이것은 현재 권리나 앱 후보 검증의 증거가 아니며 후속 실제 결과 사용은 새 권리 검사를 요구합니다.
 
 수집 baseline 쿼리(kind=ingest), review_targets/decisions, ai_executions, graph version, Neo4j, internal_projection과 공개 활성화는 변경하지 않습니다. HTTP receipt에는 안정적인 runtime attempt accounting ID가 없으므로 회계 행이나 가짜 토큰/비용 0을 만들지 않습니다.

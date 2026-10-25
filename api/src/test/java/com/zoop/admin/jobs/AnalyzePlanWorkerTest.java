@@ -277,6 +277,54 @@ class AnalyzePlanWorkerTest {
                 this::assertPublicRetryDenied);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"CANCEL_STATUS_REFUSED_ACCEPTED", "CANCEL_STATUS_REFUSED_ISSUED", "CANCEL_COMMAND_REFUSED"})
+    void cancellationNonretryableRefusalKeepsIssuedChildUnknownAndDeniesPublicRetry(String mode) throws Exception {
+        script.mode = Mode.valueOf(mode);
+        script.afterSubmit = this::cancelPublic;
+        assertTrue(worker.runOnce());
+        assertAll(
+                () -> terminal("cancelled", "outcome_unknown"),
+                () -> assertEquals(1, script.s2Submits),
+                () -> assertEquals(0, script.s3Submits),
+                () -> assertEquals(0, script.recoveries),
+                () -> assertEquals(script.mode == Mode.CANCEL_COMMAND_REFUSED ? 1 : 0, script.cancels),
+                () -> assertFalse(script.cancelled, "a refusal does not establish that the remote child stopped"),
+                () -> assertEquals(script.mode != Mode.CANCEL_STATUS_REFUSED_ISSUED, jdbc.queryForObject(
+                        "SELECT s2_checkpoint->>'acceptedObservedAt' IS NOT NULL FROM analysis_plan_units WHERE plan_id=?",
+                        Boolean.class, script.reference.planId())),
+                () -> assertEquals("authority:scope_denied", jdbc.queryForObject(
+                        "SELECT (s2_checkpoint->>'failureCategory') || ':' || (s2_checkpoint->>'failureCode')"
+                                + " FROM analysis_plan_units WHERE plan_id=?",
+                        String.class, script.reference.planId())),
+                () -> mvc.perform(get("/api/v1/admin/jobs/{id}", job).cookie(cookie))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.error.code").value("outcome_unknown"))
+                        .andExpect(jsonPath("$.retry.allowed").value(false))
+                        .andExpect(jsonPath("$.retry.code").value("outcome_unknown")),
+                this::assertPublicRetryDenied);
+    }
+
+    @Test
+    void preSendScopeDenialWithoutIssuedWorkStillAllowsSamePlanContinuation() throws Exception {
+        script.mode = Mode.PRE_SEND_SCOPE_DENIED;
+        assertTrue(worker.runOnce());
+        terminal("failed", "scope_denied");
+        assertEquals(0, script.s2Submits);
+        assertEquals(0, script.s3Submits);
+        mvc.perform(get("/api/v1/admin/jobs/{id}", job).cookie(cookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.retry.allowed").value(true))
+                .andExpect(jsonPath("$.retry.code").value("allowed"));
+        script.mode = Mode.NORMAL;
+        var retried = mutate("retry").andExpect(status().isAccepted()).andReturn().getResponse();
+        job = JsonPath.read(retried.getContentAsString(), "$.job.id");
+        assertTrue(worker.runOnce());
+        terminal("succeeded", null);
+        assertEquals(1, script.s2Submits);
+        assertEquals(1, script.s3Submits);
+    }
+
     @Test
     void finalCurrentAdmissionRefusalRetainsPairedHistoryButCannotSucceed() {
         script.mode = Mode.FINAL_INACTIVE;
@@ -394,6 +442,7 @@ class AnalyzePlanWorkerTest {
     enum Mode { NORMAL, LOST_ACCEPTED_SUBMIT, RESERVED_SUBMIT, ACCEPTED_THEN_MISSING, RESULT_WRONG_BINDING,
         RESULT_WITHHELD, RESULT_UNKNOWN_USAGE, S3_RESULT_REBOUND, RECOVERY_LIMIT, RECONCILE_ONLY,
         CANCEL_RUNNING, CANCEL_UNKNOWN, CANCEL_READY_RACE, CANCEL_STATUS_FAILURES, FINAL_INACTIVE, WAIT_FOREVER,
+        CANCEL_STATUS_REFUSED_ACCEPTED, CANCEL_STATUS_REFUSED_ISSUED, CANCEL_COMMAND_REFUSED, PRE_SEND_SCOPE_DENIED,
         S3_POLICY_RETIRED, S3_PERMISSION_REFUSED }
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -491,6 +540,11 @@ class AnalyzePlanWorkerTest {
             return new ExtractionClient() {
                 public ExtractionJobStatus status(String id) {
                     remoteCalls.incrementAndGet(); assertEquals(s2.jobId(), id);
+                    if (mode == Mode.PRE_SEND_SCOPE_DENIED
+                            || s2Exists && (mode == Mode.CANCEL_STATUS_REFUSED_ACCEPTED
+                                    || mode == Mode.CANCEL_STATUS_REFUSED_ISSUED)) {
+                        throw s2Error(AiOperation.STATUS, 403, "scope_denied");
+                    }
                     if (!s2Exists || mode == Mode.ACCEPTED_THEN_MISSING) throw s2Error(AiOperation.STATUS, 404, "job_not_found");
                     if (mode == Mode.CANCEL_STATUS_FAILURES) throw s2Error(AiOperation.STATUS, 503, "runtime_unavailable");
                     return s2Status(D, false, false);
@@ -500,7 +554,9 @@ class AnalyzePlanWorkerTest {
                     s2Exists = mode != Mode.CANCEL_UNKNOWN && !(mode == Mode.RESERVED_SUBMIT && s2Submits == 1);
                     afterSubmit.run();
                     if ((mode == Mode.LOST_ACCEPTED_SUBMIT || mode == Mode.RESERVED_SUBMIT) && s2Submits == 1
-                            || mode == Mode.CANCEL_UNKNOWN) throw s2Error(AiOperation.SUBMIT, 503, "runtime_unavailable");
+                            || mode == Mode.CANCEL_UNKNOWN || mode == Mode.CANCEL_STATUS_REFUSED_ISSUED) {
+                        throw s2Error(AiOperation.SUBMIT, 503, "runtime_unavailable");
+                    }
                     return new ExtractionAcknowledgement(PipelineJob.Disposition.NEWLY_ACCEPTED, s2Status(D, false, false));
                 }
                 public ExtractionResult result(String id) {
@@ -513,6 +569,7 @@ class AnalyzePlanWorkerTest {
                 }
                 public ExtractionJobStatus cancel(String id) {
                     remoteCalls.incrementAndGet(); assertEquals(s2.jobId(), id); cancels++;
+                    if (mode == Mode.CANCEL_COMMAND_REFUSED) throw s2Error(AiOperation.CANCEL, 403, "scope_denied");
                     if (mode == Mode.CANCEL_READY_RACE) {
                         readyOnCancel = true;
                         throw new ExtractionServiceErrorException(AiOperation.CANCEL, "probe", 409, "job_already_terminal", false,
@@ -561,7 +618,9 @@ class AnalyzePlanWorkerTest {
             boolean recovering = mode == Mode.RECOVERY_LIMIT;
             boolean reconcile = mode == Mode.RECONCILE_ONLY;
             boolean running = (mode == Mode.CANCEL_RUNNING || mode == Mode.WAIT_FOREVER
-                    || mode == Mode.CANCEL_READY_RACE || mode == Mode.CANCEL_STATUS_FAILURES) && !cancelled && !readyOnCancel;
+                    || mode == Mode.CANCEL_READY_RACE || mode == Mode.CANCEL_STATUS_FAILURES
+                    || mode == Mode.CANCEL_STATUS_REFUSED_ACCEPTED || mode == Mode.CANCEL_STATUS_REFUSED_ISSUED
+                    || mode == Mode.CANCEL_COMMAND_REFUSED) && !cancelled && !readyOnCancel;
             var state = cancelled ? PipelineJob.State.CANCELLED : recovering || reconcile ? PipelineJob.State.STOPPED
                     : running ? PipelineJob.State.RUNNING : PipelineJob.State.READY;
             var next = cancelled ? PipelineJob.Next.NONE : reconcile ? PipelineJob.Next.OPERATOR_RECONCILE

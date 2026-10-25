@@ -123,7 +123,11 @@ public final class AnalyzePlanWorker {
                 if (work.isPresent()) checked(repository.recordObservation(claim, work.get(),
                         StageObservation.failure(failure.category, failure.code)));
                 if (!failure.retry) {
-                    finish(claim, owned(claim).cancelRequested() ? "cancelled" : "failed", failure.category, failure.code);
+                    boolean cancellingNow = owned(claim).cancelRequested();
+                    boolean unknown = cancellingNow
+                            && repository.hasUnsettledIssuedWork(claim).orElseThrow(Stopped::new);
+                    finish(claim, cancellingNow ? "cancelled" : "failed",
+                            unknown ? "outcome_unknown" : failure.category, unknown ? "outcome_unknown" : failure.code);
                     return;
                 }
                 failures++;
