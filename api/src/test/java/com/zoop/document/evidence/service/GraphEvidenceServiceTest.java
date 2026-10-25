@@ -1824,7 +1824,7 @@ class GraphEvidenceServiceTest {
         // The same world and receipt, now pinned to what the importer stores with the rule on.
         realPort = new GraphEvidenceSnapshotReader(new PublicGraphReader(
                 new GraphVersionSelector(new OneVersion(), java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)), version -> filtered,
-                () -> DisclosureExclusions.NONE));
+                pinned -> DisclosureExclusions.NONE));
         assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null),
                 "a candidate the receipt does not prove is never served once its own relation is hidden");
         assertNull(outcome(DIRECT_ID, null, null), "the visible issue's own evidence is untouched by the rule");
