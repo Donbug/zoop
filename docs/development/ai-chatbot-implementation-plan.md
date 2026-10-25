@@ -126,6 +126,17 @@ Q04 `graph.path.read`(`GraphPathTool`, 경로 탐색 `GraphPathLookup`)를 같�
   - 3 hop 안에서 판정하지 못한 경로와 노드·간선 50개 초과는 `truncated=true`이며, "없음"으로 말하지 않는다.
 - 근거는 경로 간선의 근거를 먼저, 그다음 경로 위 사건의 근거를 지금 읽을 수 있는 것만 상한 안에서 전달한다.
 
+Q01 `zoopPolicy.read`(`ZoopPolicyReadTool`, 문서 원천 `ChatZoopDocs`)를 같은 레지스트리에 추가했다(2026-10-25). `help.search`·`screenSpec.read`는 승인된 문서가 없어 연결하지 않았다. 초안과 승인 순서는 [도움말 초안](../help/README.md)에 있다.
+- 원천: `term_versions`에 등록된 승인 약관(`policy.service` 서비스 이용약관, `policy.privacy` 개인정보 처리방침). 본문의 `##` 절 하나가 인용 하나이며 `Citation.sourceKind=zoop_doc`, `docId`·`docVersion`·code point `[start,end)`를 가진다.
+  - 인용 ID는 `ev-` + SHA-256(문서 ID·버전·구간·본문)이라 결정적이다.
+- 읽기 가능 판단: 그 버전이 run의 asOf(없으면 현재)에 시행 중이어야 한다.
+  - 새 버전으로 바뀌거나 약관이 폐지되면 저장된 답변도 응답 guard가 숨긴다.
+  - 등록을 읽지 못하면 빈 결과가 아니라 `tool_unavailable`이다.
+- 대상: 질문·선택 대상이 아니라 서버가 고정한 두 문서를 한 번에 읽는다(라우터는 문서를 지목하지 않는다). 그래프를 읽지 않으므로 문서만 읽는 요구는 고정 그래프가 없어도 실행된다. 그래프 도구와 함께면 기존처럼 `graph_unavailable`이다.
+- 결정론 검사 `document_section`: `zoop_documented` 구간은 문서 도구가 전달한 근거만, `evidence_grounded` 구간은 그 밖의 근거만 인용한다. 인용 단계에서 구간 basis와 `sourceKind`가 어긋나면 `validation_failed`다.
+- 모델 단계: 인용문은 grant 원천 `zoop-docs`로 보낸다. 운영자 챗봇 grant 파일에 이 원천의 `model-send` grant가 없으면 보내지 않고 실패한다. Luna 프롬프트(`zoop-chat-answer-2026-10-25-1`)가 `zoop_documented` 구간을 알고, Jev 검증은 일반 개념이 아닌 모든 구간에 지지 판정을 한다.
+- 시험: 단위(`ChatZoopDocsTest`·`ZoopPolicyReadToolTest`·계획·검사·엔진·모델 단계), 실제 migration을 읽는 PostgreSQL 시험(`ChatZoopDocsPostgresTest`, 두 약관 19개 절). 실제 데이터 기반이지만 모델 호출 없는 검증이다.
+
 ### 단계 5 — Luna 답변 생성과 출력 검증
 
 1. `BranchContext`는 요구 ID별로 도구 결과·근거·버전·제한을 구조화하며 원문 전문을 무제한 합치지 않는다.
