@@ -253,7 +253,10 @@ console.log(response.status); // 활성 회원 세션이 정상 폐기되면 204
 - **`exclude`**: `requestId`, `operator`, `reason`, 그리고 `zoop-ai-handoff-exposure`가 출력한 보고서(`zoop-handoff-exposure-1`, 내부 계약 `ExposureReport`)를 `report`에 그대로 넣습니다. 보고서는 닫힌 스키마의 키·타입·null 허용·enum·고정 문장·배열 상한까지 모두 검사하고, 선택한 handoff마다 앱이 수입한 버전(`gv-` + handoffId의 SHA-256)이 있어야 하며 그 버전 receipt의 `handoffId`·manifest·bundle·content digest가 보고서와 같아야 합니다(하나라도 다르면 전체 거절, 아무것도 쓰지 않음). 보고서가 제안한 이슈·관계·근거·기사를 **그 버전에서만** 제외합니다. 이미 제외된 대상은 그대로 두므로 같은 보고서를 다시 넣어도 바뀌는 것이 없습니다(`unchanged`). 관계 오연결(`relation-retraction`)은 기사·근거를 제안할 수 없습니다.
 - **`lift`**: `requestId`, `operator`, `reason`, `graphVersionId`, `expectedRevision`, `targets[{kind, id[, articleVersion]}]`. 제외를 끝내는 유일한 방법입니다. 빈 보고서나 이전보다 작은 보고서로는 해제하지 않습니다. `expectedRevision`은 운영자가 해제를 결정할 때 본 제외 revision이며, 대상 중 하나라도 그 뒤에 바뀌었거나 저장소가 아직 그 revision에 이르지 않았으면 `revision_stale`로 거절합니다.
 
-**재실행.** 결과(`applied`·`unchanged`)에 이른 명령은 변경과 같은 트랜잭션에 `requestId`·요청 SHA-256·결과를 기록합니다. 결과 파일이 비어 있거나 `outcome_unknown`(커밋 여부를 알 수 없음)이면 **같은 요청 파일**을 새 결과 경로로 다시 실행합니다. 이미 커밋됐으면 기록한 결과를 `replayed: true`로 돌려주고 아무것도 바꾸지 않으며, 커밋되지 않았으면 처음 실행처럼 처리합니다. 같은 `requestId`로 다른 요청을 보내면 `request_conflict`, 새 결정에는 새 `requestId`를 씁니다. 실패한 명령(`database_unavailable` 등)은 아무것도 쓰지 않았고 기록도 남지 않습니다.
+**재실행.** 결과(`applied`·`unchanged`)에 이른 명령은 변경과 같은 트랜잭션에 `requestId`·요청 SHA-256·결과를 기록합니다. 같은 `requestId`로 다른 요청을 보내면 `request_conflict`이고, 새 결정에는 새 `requestId`를 씁니다.
+
+- **아무것도 쓰지 않은 실패:** `request_invalid`, `report_invalid`, `version_unknown`, `receipt_unavailable`, `receipt_mismatch`, `request_conflict`, `revision_stale`, `database_unavailable`(커밋 전 문장 실패, 롤백됨). 기록도 남지 않으므로, 원인을 고친 뒤 같은 `requestId`로 다시 실행할 수 있습니다.
+- **결과를 알 수 없는 경우:** `outcome_unknown`(커밋 여부 불명), `result_unavailable`, `internal_error`, 그리고 결과 파일이 없거나 비었거나 일부만 있거나 읽을 수 없는 경우. 결과 파일은 DB 커밋이 **끝난 뒤** 쓰므로, `result_unavailable`이나 불완전한 결과 파일은 변경이 이미 커밋됐을 수 있습니다. 이 경우에는 롤백이나 무기록을 가정하지 말고, **같은 `requestId`·같은 본문의 요청 파일**을 새 결과 경로로 다시 실행합니다. 이미 커밋됐으면 기록한 결과를 `replayed: true`로 돌려주고 아무것도 바꾸지 않으며, 커밋되지 않았으면 처음 실행처럼 처리합니다.
 
 변경 하나는 공통 publication lock 아래 한 트랜잭션이며 `revision`은 MAX+1입니다. 공개 조회와 활성화 사전 검사는 잠금 없이 그 버전의 현재 제외를 한 문장으로 읽어 이슈·관계·근거에 적용하며, 저장소를 읽지 못하면 빈 제외로 대신하지 않고 503 `SOURCE_UNAVAILABLE`입니다. 기사 대상은 기록만 하며, 기업 문서 목록·S1·브리핑·채팅·캐시·Neo4j의 제외 반영은 이 범위가 아닙니다.
 

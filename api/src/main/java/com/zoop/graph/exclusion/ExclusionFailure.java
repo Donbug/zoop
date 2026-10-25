@@ -3,6 +3,7 @@ package com.zoop.graph.exclusion;
 /** Closed set of operator-visible failure codes of the exclusion command; a code is all that reaches the result file and the log. */
 public enum ExclusionFailure {
     REQUEST_INVALID("request_invalid"),
+    /** The result file could not be reserved or written; written after the commit, so the change may have been made. */
     RESULT_UNAVAILABLE("result_unavailable"),
     /** The embedded exposure report is not exactly {@code zoop-handoff-exposure-1}, or contradicts itself. */
     REPORT_INVALID("report_invalid"),

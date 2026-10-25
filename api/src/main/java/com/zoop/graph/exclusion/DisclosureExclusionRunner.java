@@ -19,10 +19,11 @@ import org.springframework.boot.ApplicationRunner;
 /**
  * The operator entry point, like the graph import's: runs once at startup when {@code zoop.disclosure-exclusion.enabled=true} in a
  * non-web application. It reserves the result file exclusively (an existing file is never overwritten, {@code 0600}), reads and
- * validates the request, runs it, writes the result and, when it failed, ends with an exception so the process exits non-zero. A
- * reserved but empty result file, like {@code outcome_unknown}, means the outcome is unknown: re-run the SAME request file (same
- * {@code requestId}) with a new result path. If the first run committed, the re-run returns its recorded result
- * ({@code replayed: true}) and changes nothing; a new decision needs a new {@code requestId}.
+ * validates the request, runs it, writes the result and, when it failed, ends with an exception so the process exits non-zero.
+ * The result is written only AFTER the change committed, so a missing, empty, partial or unreadable result file, like
+ * {@code result_unavailable}, {@code outcome_unknown} or {@code internal_error}, never means "nothing was written": re-run the SAME
+ * request file (same {@code requestId} and body) with a new result path. If the first run committed, the re-run returns its
+ * recorded result ({@code replayed: true}) and changes nothing; a new decision needs a new {@code requestId}.
  */
 public final class DisclosureExclusionRunner implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(DisclosureExclusionRunner.class);
