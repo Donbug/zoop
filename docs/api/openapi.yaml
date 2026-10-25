@@ -5611,8 +5611,8 @@ paths:
     post:
       tags:
         - "admin-jobs"
-      summary: "수집·재검증·투영 작업 접수"
-      description: "수집·재검증·투영 작업 접수.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      summary: "계획 분석 작업 접수"
+      description: "analyze_plan은 계획 참조를 PostgreSQL에 등록하고 처리 대기열에 넣는다. 접수 경로는 AI를 호출하지 않으며 202는 로컬 영속 접수만 뜻한다. 같은 멱등성 키는 당시 응답을 그대로 재생하고, 다른 키로 같은 계획을 접수하면 원래 root 작업과 deduplicated=true를 반환한다. ingest/revalidate/project의 기존 요청 형태는 유지하지만 실행기가 없어 SOURCE_UNAVAILABLE/503, retryable=false로 거절하고 어떤 행도 만들지 않는다. analyze_plan 비활성 상태도 같다. 새 요청은 UTF-8 JSON 64 KiB 이하이며 중복 키·후행 JSON·알 수 없는 속성·형변환을 거절한다."
       operationId: "createAnalysisJob"
       requestBody:
         required: true
@@ -5628,6 +5628,10 @@ paths:
               schema:
                 "$ref": "#/components/schemas/JobCreated"
           headers:
+            Location:
+              description: "접수되거나 중복으로 확인된 원래 작업의 상세 경로"
+              schema:
+                type: "string"
             X-Request-ID:
               description: "실제 사용한 전송별 요청 ID"
               schema:
@@ -5785,7 +5789,7 @@ paths:
       tags:
         - "admin-jobs"
       summary: "허용된 분석 작업 재시도"
-      description: "허용된 분석 작업 재시도. RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 작업(같은 종류·라벨·입력)으로 대기열에 넣고 202를 돌려준다. 허용되지 않으면 REVISION_CONFLICT/409이고 아무것도 만들지 않는다. AI 요청을 직접 다시 보내지 않으며, 새 모델 실행이 필요하면 작업 실행 시 새 AI jobId를 쓴다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 앱 작업(같은 종류·라벨·입력)으로 대기열에 넣고 202를 반환한다. 거절은 REVISION_CONFLICT/409이며 아무것도 만들지 않는다. analyze_plan은 기존 계획과 고정 S2/S3 ID를 이어서 처리하며 완료된 단위를 다시 실행하지 않는다. 다른 미래 실행기에서 새 모델 실행이 필요할 때 새 AI jobId를 쓰는 조건은 유지한다. 실행기가 없는 기존 종류와 비활성 analyze_plan은 worker_unavailable이다. 같은 키는 현재 기능 상태와 무관하게 저장된 응답을 재생한다."
       operationId: "retryAnalysisJob"
       parameters:
         -
@@ -13517,6 +13521,41 @@ components:
         - "relations"
         - "articles"
     JobCreate:
+      oneOf:
+        - "$ref": "#/components/schemas/AnalyzePlanJobCreate"
+        - "$ref": "#/components/schemas/LegacyJobCreate"
+      discriminator:
+        propertyName: "kind"
+        mapping:
+          analyze_plan: "#/components/schemas/AnalyzePlanJobCreate"
+          ingest: "#/components/schemas/LegacyJobCreate"
+          revalidate: "#/components/schemas/LegacyJobCreate"
+          project: "#/components/schemas/LegacyJobCreate"
+    AnalyzePlanJobCreate:
+      type: "object"
+      additionalProperties: false
+      properties:
+        kind:
+          type: "string"
+          const: "analyze_plan"
+        reason:
+          type: "string"
+          minLength: 1
+          maxLength: 500
+          description: "앞뒤 공백을 제거한 감사 사유에 기존 AuditReasonPolicy를 적용한다."
+        plan:
+          type: "object"
+          additionalProperties: false
+          properties:
+            planId:
+              type: "string"
+              pattern: "^s2plan-[0-9a-f]{64}$"
+            planDigest:
+              type: "string"
+              pattern: "^[0-9a-f]{64}$"
+          required: ["planId", "planDigest"]
+      required: ["kind", "reason", "plan"]
+    LegacyJobCreate:
       type: "object"
       properties:
         kind:
@@ -13641,15 +13680,82 @@ components:
         - "jobId"
         - "reason"
     JobOut:
+      oneOf:
+        - "$ref": "#/components/schemas/LegacyJobOut"
+        - "$ref": "#/components/schemas/AnalyzePlanJobOut"
+      discriminator:
+        propertyName: "kind"
+    LegacyJobOut:
+      allOf:
+        - "$ref": "#/components/schemas/JobCommonOut"
+        - type: "object"
+          properties:
+            kind:
+              enum: ["ingest", "revalidate", "project"]
+          not:
+            required: ["planRun"]
+    AnalyzePlanJobOut:
+      allOf:
+        - "$ref": "#/components/schemas/JobCommonOut"
+        - type: "object"
+          properties:
+            kind:
+              const: "analyze_plan"
+            planRun:
+              "$ref": "#/components/schemas/PlanRunOut"
+            ingest:
+              type: "null"
+            report:
+              type: "null"
+            flush:
+              type: "null"
+            ledgerBefore:
+              type: "null"
+            ledgerAfter:
+              type: "null"
+          required: ["planRun"]
+    PlanRunOut:
+      type: "object"
+      additionalProperties: false
+      description: "내용 없는 AI 처리 인계 관측이다. 수집·검수 원천 동기화·HOLD 승인·그래프 수입·공개 활성화나 지속적인 읽기 권한을 뜻하지 않는다. 종결 작업의 요약은 불변이다."
+      properties:
+        planId:
+          type: "string"
+          pattern: "^s2plan-[0-9a-f]{64}$"
+        planDigest:
+          type: "string"
+          pattern: "^[0-9a-f]{64}$"
+        admissionId:
+          type: ["string", "null"]
+        manifestDigest:
+          type: ["string", "null"]
+          pattern: "^[0-9a-f]{64}$"
+        sourceId:
+          type: ["string", "null"]
+        roundId:
+          type: ["string", "null"]
+        phase:
+          enum: ["awaiting_admission", "admitting", "extracting", "relating", "cancelling", "ready", "failed", "cancelled"]
+        totalUnits:
+          type: ["integer", "null"]
+          minimum: 0
+        readyUnits:
+          type: "integer"
+          minimum: 0
+        activeUnit:
+          type: ["integer", "null"]
+          minimum: 1
+        completion:
+          const: "ai_processing_handoff"
+        publicChanged:
+          const: false
+      required: ["planId", "planDigest", "admissionId", "manifestDigest", "sourceId", "roundId", "phase", "totalUnits", "readyUnits", "activeUnit", "completion", "publicChanged"]
+    JobCommonOut:
       properties:
         id:
           type: "string"
         kind:
           type: "string"
-          enum:
-            - "ingest"
-            - "revalidate"
-            - "project"
         label:
           type: "string"
         status:
@@ -15247,7 +15353,9 @@ components:
             - "other_running"
             - "dataset_missing"
             - "outcome_unknown"
-          description: "재시도 판정. in_progress(대기·실행 중), succeeded(이미 성공), duplicate_running(이 작업의 재시도가 대기·실행 중), newer_attempt(더 새 재시도가 있어 가장 최근 시도만 재시도 가능), superseded(같은 종류·같은 입력의 더 나중 작업이 성공), outcome_unknown(외부 실행 결과를 확인할 수 없음: 응답 유실로 실행·과금 여부를 모르므로 자동 재시도하지 않음), dataset_missing(작업의 실행 계획이나 입력 연결이 없거나 철회됨, 일시적 조회 장애는 해당하지 않음), allowed. other_running은 대기열 정책상 다른 작업 실행만으로 재시도를 거절하지 않으므로 반환하지 않는다. blockedBy는 막고 있는 작업 ID다."
+            - "worker_unavailable"
+            - "plan_not_reusable"
+          description: "기존 in_progress/succeeded/duplicate_running/newer_attempt/superseded/outcome_unknown 판정 순서를 유지한다. dataset_missing은 등록된 계획·서비스 결속이 없거나 사용할 수 없는 경우이며 일시적 조회 장애가 아니다. plan_not_reusable은 영구 비활성 접수·불변 식별자 충돌·재시작할 수 없는 취소 AI 단계다. worker_unavailable은 연결된 실행기가 없는 종류나 비활성 analyze_plan이다. 다른 실행 작업은 새 작업을 대기시킬 뿐 other_running을 반환하지 않는다."
         reason:
           type: "string"
         blockedBy:

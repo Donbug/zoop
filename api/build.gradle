@@ -31,6 +31,12 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+// Cached Spring test contexts share one disposable database; each pool must stay bounded.
+tasks.withType(Test).configureEach {
+	systemProperty 'spring.datasource.hikari.maximum-pool-size', '4'
+	systemProperty 'spring.datasource.hikari.minimum-idle', '0'
+}
+
 // Default `test`: foundation tests and the AI client tests against in-process stub servers. No Python, no network.
 tasks.named('test') {
 	// The proof regression launches the actual test-owned CLI in a separate JVM (System.exit must not stop the test worker).
