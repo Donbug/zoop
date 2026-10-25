@@ -160,11 +160,51 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
         Instant at = clock.instant();
         atActivation.accept(at);
         Activation activation = activateLocked(versionId, "activate", adminId, adminEmail, reason, at);
+        markPublished(activation, versionId);
+        return activation;
+    }
+
+    /**
+     * The newest imported version that was imported at or after {@code since}, was never the public pointer and comes after the
+     * active version (FS059: an older import never replaces a newer public version). Imports are ordered by {@code sequence},
+     * the import order.
+     */
+    public Optional<GraphVersionRecord> autoActivationCandidate(Instant since) {
+        return first(jdbc.query(SELECT + """
+                WHERE v.kind = 'snapshot' AND v.created_at >= :since
+                  AND NOT EXISTS (SELECT 1 FROM graph_activations g WHERE g.version_id = v.id AND g.pointer_changed)
+                  AND v.sequence > COALESCE((SELECT c.sequence FROM graph_versions c WHERE c.active), 0)
+                ORDER BY v.sequence DESC LIMIT 1
+                """, new MapSqlParameterSource("since", Timestamp.from(since)), JdbcGraphVersionRepository::row));
+    }
+
+    /**
+     * The automatic activation after an import: {@link #activateByAdmin}'s order (lock, checks, activation time, last check,
+     * pointer, {@code published_at}) for the system actor, but only while {@code versionId} is still
+     * {@link #autoActivationCandidate the candidate} and the pointer is still {@code expectedActiveVersionId}. Otherwise another
+     * activation or a newer import won and nothing changes (empty).
+     */
+    @Transactional
+    public Optional<Activation> activateBySystem(String versionId, String expectedActiveVersionId, Instant since,
+            String reason, Supplier<Consumer<Instant>> publishable) {
+        jdbc.getJdbcTemplate().execute("SELECT pg_advisory_xact_lock(" + PUBLICATION_LOCK + ")");
+        if (!Objects.equals(expectedActiveVersionId, active().map(GraphVersionRecord::id).orElse(null))
+                || !autoActivationCandidate(since).map(GraphVersionRecord::id).filter(versionId::equals).isPresent()) {
+            return Optional.empty();
+        }
+        Consumer<Instant> atActivation = publishable.get();
+        Instant at = clock.instant();
+        atActivation.accept(at);
+        Activation activation = activateLocked(versionId, "activate", null, "system", reason, at);
+        markPublished(activation, versionId);
+        return Optional.of(activation);
+    }
+
+    private void markPublished(Activation activation, String versionId) {
         if (activation.pointerChanged()) {
             jdbc.update("UPDATE graph_versions SET published_at = :at WHERE id = :id AND published_at IS NULL",
-                    new MapSqlParameterSource("id", versionId).addValue("at", Timestamp.from(at)));
+                    new MapSqlParameterSource("id", versionId).addValue("at", Timestamp.from(activation.activatedAt())));
         }
-        return activation;
     }
 
     private Activation activateLocked(String versionId, String action, String adminId, String adminEmail,

@@ -61,6 +61,13 @@ zoop:
       # The public exclusion store (FS081, disclosure_exclusion_*) now always exists, so activation checks the version's current
       # exclusions and this switch has no effect. It only matters for a DisclosureExclusionReader without a store (tests).
       allow-without-exclusion-store: ${ZOOP_GRAPH_ACTIVATION_ALLOW_WITHOUT_EXCLUSION_STORE:false}
+    auto-activation:
+      # FS059: the web application makes the newest version an operator import staged public once it passes the same checks as an
+      # admin activation (system actor in the activation history). Off by default; a restart changes it. Only versions imported
+      # after start count. A refused version is retried after retry-after.
+      enabled: ${ZOOP_GRAPH_AUTO_ACTIVATION_ENABLED:false}
+      interval: ${ZOOP_GRAPH_AUTO_ACTIVATION_INTERVAL:PT15S}
+      retry-after: ${ZOOP_GRAPH_AUTO_ACTIVATION_RETRY_AFTER:PT5M}
   chat:
     # Accepting new questions and retries needs a ChatEngine, registered by zoop.ai.chat-client.enabled=true. Off by default:
     # submit and retry answer 503 MODEL_UNAVAILABLE instead of leaving a job queued forever, and startup refuses intake on

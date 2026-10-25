@@ -454,6 +454,72 @@ class GraphVersionPostgresIntegrationTest {
                 "SELECT count(*) FROM idempotency_records WHERE idem_key = 'graph-key-ghost'", Integer.class));
     }
 
+    // ---- automatic activation after an import (FS059) -------------------------------------------------------------------------
+
+    /** An unpublished imported version row over a placeholder artifact; only its row matters to the repository's choice. */
+    private static void imported(String id, long sequence, Instant createdAt) {
+        jdbc.update("""
+                INSERT INTO artifacts (id, kind, storage_uri, sha256, bytes, media_type, created_at)
+                VALUES (?, 'graph_snapshot', ?, ?, 1, 'application/json', now())
+                """, "artifact-fixture-" + id, "artifact:" + id, "4".repeat(64));
+        jdbc.update("""
+                INSERT INTO graph_versions (id, sequence, kind, created_at, created_by, source_label, issue_count,
+                    relation_count, article_count, snapshot_artifact_id, review_revision)
+                VALUES (?, ?, 'snapshot', ?, 'operator:test', 'auto', 0, 0, 0, ?, 0)
+                """, id, sequence, Timestamp.from(createdAt), "artifact-fixture-" + id);
+    }
+
+    @Test
+    void autoActivationTakesOnlyTheNewestImportSinceStartAndRecordsTheSystemActor() {
+        Instant since = Instant.now().minusSeconds(60);
+        imported("auto-1", 91, since.plusSeconds(1));
+        imported("auto-2", 92, since.plusSeconds(2));
+        imported("auto-before-start", 93, since.minusSeconds(3600));
+
+        assertEquals("auto-2", repository.autoActivationCandidate(since).orElseThrow().id(),
+                "the newest import since start; one staged while it was off never counts");
+        assertTrue(repository.activateBySystem("auto-1", "fixture-2026-10-08", since, "auto", () -> at -> { }).isEmpty(),
+                "an older import is never activated over the newest");
+        assertTrue(repository.activateBySystem("auto-2", "fixture-2026-10-01", since, "auto", () -> at -> { }).isEmpty(),
+                "the pointer moved meanwhile: nothing changes");
+        assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
+
+        var activation = repository.activateBySystem("auto-2", "fixture-2026-10-08", since, "auto-activation after import",
+                () -> at -> { }).orElseThrow();
+
+        assertEquals("fixture-2026-10-08", activation.previousVersionId());
+        assertEquals("auto-2", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
+        var row = jdbc.queryForMap("""
+                SELECT actor_kind, admin_id, admin_email_snapshot, action, reason, pointer_changed, activated_at
+                FROM graph_activations WHERE version_id = 'auto-2'
+                """);
+        assertEquals("system", row.get("actor_kind"));
+        assertNull(row.get("admin_id"));
+        assertEquals("system", row.get("admin_email_snapshot"));
+        assertEquals("activate", row.get("action"));
+        assertEquals("auto-activation after import", row.get("reason"));
+        assertEquals(Boolean.TRUE, row.get("pointer_changed"));
+        assertEquals(row.get("activated_at"), jdbc.queryForObject(
+                "SELECT published_at FROM graph_versions WHERE id = 'auto-2'", Timestamp.class));
+        assertTrue(repository.autoActivationCandidate(since).isEmpty(), "auto-1 is older than the public version now");
+    }
+
+    @Test
+    void aRefusedCheckUnderTheLockKeepsThePointerAndWritesNoHistory() {
+        Instant since = Instant.now().minusSeconds(60);
+        imported("auto-3", 94, since.plusSeconds(1));
+
+        var error = assertThrows(CustomException.class, () -> repository.activateBySystem("auto-3", "fixture-2026-10-08",
+                since, "auto", () -> { throw new CustomException(ErrorCode.REVISION_CONFLICT); }));
+
+        assertEquals(ErrorCode.REVISION_CONFLICT, error.getErrorCode());
+        assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM graph_activations WHERE version_id = 'auto-3'",
+                Integer.class));
+        assertNull(jdbc.queryForObject("SELECT published_at FROM graph_versions WHERE id = 'auto-3'", Timestamp.class));
+        assertEquals("auto-3", repository.autoActivationCandidate(since).orElseThrow().id(), "still the candidate");
+    }
+
     /** A snapshot file names its own version id, so tests reuse a seeded version and clear its publication stamp. */
     private static void unpublish(String versionId) {
         jdbc.update("UPDATE graph_versions SET published_at = NULL WHERE id = ?", versionId);
