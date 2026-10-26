@@ -301,6 +301,11 @@ class AnalyzePlanWorkerTest {
             var refused = assertThrows(CustomException.class, () -> stale.get(candidateId, "r-6"));
             assertEquals(ErrorCode.SOURCE_UNAVAILABLE, refused.getErrorCode());
         }
+
+        // A relation that left the latest complete reading (the sync marked it inactive) is not the candidate's any more.
+        jdbc.update("UPDATE review_targets SET active = false WHERE source_job_id = ? AND external_id = ?",
+                script.s3.jobId(), "rc-" + "1".repeat(64));
+        assertEquals(List.of(), service.get(candidateId, "r-7").relations(), "an inactive relation is not shown");
     }
 
     private int listed(String q, String filter, String value) throws Exception {

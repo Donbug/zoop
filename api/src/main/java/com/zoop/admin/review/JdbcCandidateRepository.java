@@ -73,8 +73,8 @@ public class JdbcCandidateRepository {
         if (filter.decision() != null) {
             String latest = """
                     (SELECT d.decision FROM review_decisions d JOIN review_targets r ON r.id = d.target_id
-                      WHERE r.target_type = 'relation' AND r.is_current AND r.source_job_id = t.source_job_id
-                        AND r.candidate_id = t.candidate_id
+                      WHERE r.target_type = 'relation' AND r.is_current AND r.active
+                        AND r.source_job_id = t.source_job_id AND r.candidate_id = t.candidate_id
                       ORDER BY d.id DESC LIMIT 1)""";
             if (filter.decision().equals("none")) sql.append(" AND ").append(latest).append(" IS NULL");
             else {
@@ -87,7 +87,7 @@ public class JdbcCandidateRepository {
                     EXISTS (SELECT 1 FROM review_targets r
                               JOIN unnest(CAST(:relJobs AS text[]), CAST(:relIds AS text[])) AS p(job, id)
                                 ON p.job = r.source_job_id AND p.id = r.external_id
-                             WHERE r.target_type = 'relation' AND r.is_current AND r.source_job_id = t.source_job_id
+                             WHERE r.target_type = 'relation' AND r.is_current AND r.active AND r.source_job_id = t.source_job_id
                                AND r.candidate_id = t.candidate_id)
                     OR EXISTS (SELECT 1 FROM unnest(CAST(:evJobs AS text[]), CAST(:evIds AS text[])) AS e(job, id)
                                 WHERE e.job = u.s2_job_id AND e.id = t.candidate_id))""");
@@ -115,7 +115,10 @@ public class JdbcCandidateRepository {
                 new MapSqlParameterSource("id", id), JdbcCandidateRepository::candidate).stream().findFirst();
     }
 
-    /** Current relation rows of these candidates, keyed by candidate row id, in external id order. */
+    /**
+     * Current relation rows of these candidates still in their job's latest complete reading ({@code active}, set by the sync's
+     * markPresentRelations), keyed by candidate row id, in external id order: the ones the candidate's status is derived from.
+     */
     public Map<String, List<Relation>> relations(List<Candidate> candidates) {
         Map<String, List<Relation>> byCandidate = new LinkedHashMap<>();
         if (candidates.isEmpty()) return byCandidate;
@@ -130,7 +133,7 @@ public class JdbcCandidateRepository {
                   FROM review_targets r
                   JOIN unnest(CAST(:jobs AS text[]), CAST(:ids AS text[])) AS c(job, id)
                     ON c.job = r.source_job_id AND c.id = r.candidate_id
-                 WHERE r.target_type = 'relation' AND r.is_current
+                 WHERE r.target_type = 'relation' AND r.is_current AND r.active
                  ORDER BY r.external_id
                 """, new MapSqlParameterSource("jobs", candidates.stream().map(Candidate::s3JobId).toArray(String[]::new))
                 .addValue("ids", candidates.stream().map(Candidate::candidateId).toArray(String[]::new)), rs -> {
