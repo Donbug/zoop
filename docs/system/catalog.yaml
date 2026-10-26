@@ -24,20 +24,20 @@ fingerprints:
   docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv: 41995ded3b10043dc379c8afab1e3e9f341c26941cc59b67b550ddccb5f552e4
   docs/evidence/raw/functional-spec_2026-10-18/13-변경-내역.csv: 52b0d0606bea399de6d6b71e38dd6be4e8c5fc9b506e26600702d3e0d986d61f
   docs/evidence/raw/functional-spec_2026-10-18/14-제안-확인-사항.csv: 4c588d550b2146c8ae5c90144442392c7bdff20e42cc648eaa0dec9f2fd7d131
-  docs/evidence/raw/functional-spec_2026-10-18/_collection-manifest.json: f978fb221ead7ec86e28fef67b45154635b298ee1eb58d094b52508fe9080756
+  docs/evidence/raw/functional-spec_2026-10-18/_collection-manifest.json: d71774715d111f7ba40068cba8e45f297b5d4ed901f7a550c14d08c0c0911f70
   docs/evidence/raw/functional-spec_2026-10-18/zoop-functional-spec_2026-10-18.xlsx: a659bd514c654fa487926c2e61e349cde6201aee81ceefdc4ae3a2bc95690273
   docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv: 79661cfc0bc2643f7222158c1fdc4c5652216954892e622b34f0de6ceb637d23
   docs/evidence/raw/requirements-sheet_2026-10-06/2-검증-기준.csv: 03202210c85c90d837225fce10888257a0566856ac920ad52719ac586711252b
   docs/evidence/raw/requirements-sheet_2026-10-06/3-정책-결정.csv: 3dc355e4d3204ab8a42a838e6d28e91665bb0910170956c28eebebdccb1ab4ed
-  docs/evidence/raw/requirements-sheet_2026-10-06/_collection-manifest.json: f74f299d78dc3f7baa2d1e99a9cd34bce4be8ec62d0a472b32185402363aad07
+  docs/evidence/raw/requirements-sheet_2026-10-06/_collection-manifest.json: c2f62cdc931ebcbc4fe674847864eb30a9003b1a3350768037156c5078448e90
   docs/evidence/raw/requirements-sheet_2026-10-06/zoop-requirements_2026-10-06.xlsx: cc91b251b5b930cfc005c0aa533b5fe873ac29f6ad85e086f29a9a5293c26d18
   docs/evidence/raw/wbs_2026-10-12/00-표지-변경이력.csv: 902057ccd1b7587c0cc0340de3f743eedaa6cebf02d47ac63da4686195da305f
   docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv: 4b349b6ec84cb64bfef621c160257d47da11cea82533c9e53ac813893ac9940d
   docs/evidence/raw/wbs_2026-10-12/02-개발-일정-요약.csv: f2432fb1f0fa626536f637e1727a56c87d51cde60317df703134286a8273c1c3
-  docs/evidence/raw/wbs_2026-10-12/_collection-manifest.json: f5d9f81927fbb0ea006d357751f3951c06f4d9dcd96b31743610bf880b9fb9a0
+  docs/evidence/raw/wbs_2026-10-12/_collection-manifest.json: b8627b5f335fbe8c9a819d22e25ba76345a0edb5e379102847ef98df2d1f0701
   docs/evidence/raw/wbs_2026-10-12/zoop-wbs_2026-10-12.xlsx: a77905d5830c09031263c0063bbf466cb41cdc02ff04898363c23a466d0a907e
-  docs/evidence/spec-v1.2-gap.md: 83ec3c4f591d5e5801cfa194d36c530851a4e3813d43104cd9f96e808e7440dc
-  docs/screen-plan/captures/slide-index.json: a47948331193003fcefb8f7c01151bcc729b77d74498beaf36400ddda1ea4b8c
+  docs/evidence/spec-v1.2-gap.md: 8e9e87b7dca6169d7c0bd8e42ede6652c85be46909dc91f2f28a366867d125ab
+  docs/screen-plan/captures/slide-index.json: b41f5b5eda36d478eed80164415db923d0ae4338d848d5aa82603c64a9391d10
 specs:
 - id: FS001
   title: 서비스 시작 방식 선택
