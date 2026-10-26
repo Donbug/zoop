@@ -3629,6 +3629,7 @@ The immutable published original of a round (what users saw before any correctio
 | relationId | 필수 | string |  |
 | sourceVersion | 필수 | string | 이 relation AI 원천 버전. relation 결정 요청에 사용한다. |
 | sourceRevision | 필수 | string | 이 relation AI 원천 revision. relation 결정 요청에 사용한다. |
+| revision | 필수 | integer | 이 관계 검수 대상의 현재 revision. decideAnalysisCandidate의 expectedRevision으로 sourceVersion·sourceRevision과 함께 보낸다. |
 | relationType | 필수 | string |  |
 | source | 필수 | string |  |
 | target | 필수 | string |  |

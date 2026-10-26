@@ -66,6 +66,16 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import tools.jackson.databind.ObjectMapper;
+import com.jayway.jsonpath.JsonPath;
+import com.zoop.admin.auth.service.AdminSessionCookie;
+import com.zoop.common.request.RequestIdFilter;
+import jakarta.servlet.http.Cookie;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Review decisions over the real migration, publication lock, idempotency and audit tables, with a recording AI source. */
 @SpringBootTest(properties = {
@@ -135,6 +145,10 @@ class ReviewDecisionPostgresTest {
     @Autowired ObjectMapper objectMapper;
 
     private AdminPrincipal admin;
+    private String adminEmail;
+    private static final String ORIGIN = "https://zoop.example";
+    @Autowired WebApplicationContext context;
+    @Autowired RequestIdFilter requestIds;
     private String suffix;
 
     @BeforeEach
@@ -149,6 +163,81 @@ class ReviewDecisionPostgresTest {
         String email = "review-admin-" + suffix + "@example.com";
         String adminId = provisioning.provision(email, "Review Admin", PASSWORD, "review-provision-" + suffix);
         admin = new AdminPrincipal(adminId, email, "Review Admin", "admin", "session-" + suffix);
+        adminEmail = email;
+    }
+
+    // ---- over HTTP (decideAnalysisCandidate) -------------------------------------------------------------------------------
+
+    @Test
+    void theDecisionOverHttpIsTheServicesAnswerUnderTheAdminSessionCsrfAndKey() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(requestIds).build();
+        var login = mvc.perform(post("/api/v1/admin/auth/login").header("Origin", ORIGIN).contentType("application/json")
+                .content("{\"email\":\"" + adminEmail + "\",\"password\":\"" + PASSWORD + "\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse();
+        Cookie cookie = login.getCookie(AdminSessionCookie.NAME);
+        String csrf = JsonPath.read(login.getContentAsString(), "$.csrfToken");
+        Ids ids = insertCandidateWithRelation("HOLD");
+        String path = "/api/v1/admin/pipeline/candidates/" + ids.candidate() + "/decision";
+        String allow = decisionBody("allow", ids.relation(), 0);
+
+        mvc.perform(post(path).cookie(cookie).header("Origin", ORIGIN).header("Idempotency-Key", "h0-" + suffix)
+                .contentType("application/json").content(allow)).andExpect(status().isForbidden());
+        mvc.perform(post(path).cookie(cookie).header("Origin", ORIGIN).header("X-CSRF-Token", csrf)
+                .contentType("application/json").content(allow)).andExpect(status().isUnprocessableContent());
+        mvc.perform(post(path).cookie(cookie).header("Origin", ORIGIN).header("X-CSRF-Token", csrf)
+                .header("Idempotency-Key", "h1-" + suffix).contentType("application/json")
+                .content(decisionBody("allow", ids.relation(), 5))).andExpect(status().isConflict());
+        mvc.perform(post(path).cookie(cookie).header("Origin", ORIGIN).header("X-CSRF-Token", csrf)
+                .header("Idempotency-Key", "h2-" + suffix).contentType("application/json")
+                .content(decisionBody("allow", null, 0))).andExpect(status().isUnprocessableContent());
+        assertEquals(0, source.calls.size(), "nothing was sent for a refused request");
+
+        for (int attempt = 0; attempt < 2; attempt++) {
+            mvc.perform(post(path).cookie(cookie).header("Origin", ORIGIN).header("X-CSRF-Token", csrf)
+                    .header("Idempotency-Key", "h3-" + suffix).contentType("application/json").content(allow))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.candidateId").value(ids.candidate()))
+                    .andExpect(jsonPath("$.decision").value("approved"))
+                    .andExpect(jsonPath("$.publicChanged").value(false));
+        }
+        assertEquals(1, source.calls.size(), "the replayed key answers again without sending again");
+        assertEquals(1, decisionCount(ids.relationTarget()));
+        mvc.perform(post(path).cookie(cookie).header("Origin", ORIGIN).header("X-CSRF-Token", csrf)
+                .header("Idempotency-Key", "h3-" + suffix).contentType("application/json")
+                .content(decisionBody("reject", ids.relation(), 0))).andExpect(status().isConflict());
+
+        // No session: refused before the service.
+        mvc.perform(post(path).header("Origin", ORIGIN).header("X-CSRF-Token", csrf).header("Idempotency-Key", "h4-" + suffix)
+                .contentType("application/json").content(allow)).andExpect(status().isUnauthorized());
+        // An id far longer than a target id names no candidate: 404, never a failed idempotency write.
+        mvc.perform(post("/api/v1/admin/pipeline/candidates/" + "x".repeat(300) + "/decision").cookie(cookie)
+                .header("Origin", ORIGIN).header("X-CSRF-Token", csrf).header("Idempotency-Key", "h5-" + suffix)
+                .contentType("application/json").content(allow)).andExpect(status().isNotFound());
+
+        Ids rejected = insertCandidateWithRelation("HOLD");
+        mvc.perform(post("/api/v1/admin/pipeline/candidates/" + rejected.candidate() + "/decision").cookie(cookie)
+                .header("Origin", ORIGIN).header("X-CSRF-Token", csrf).header("Idempotency-Key", "h6-" + suffix)
+                .contentType("application/json").content(decisionBody("reject", rejected.relation(), 0)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.decision").value("rejected"))
+                .andExpect(jsonPath("$.publicChanged").value(false));
+
+        // A relation the sync marked inactive (it left the latest AI reading) is refused before anything is sent.
+        Ids left = insertCandidateWithRelation("HOLD");
+        jdbc.update("UPDATE review_targets SET active = false WHERE id = ?", left.relationTarget());
+        int sent = source.calls.size();
+        mvc.perform(post("/api/v1/admin/pipeline/candidates/" + left.candidate() + "/decision").cookie(cookie)
+                .header("Origin", ORIGIN).header("X-CSRF-Token", csrf).header("Idempotency-Key", "h7-" + suffix)
+                .contentType("application/json").content(decisionBody("allow", left.relation(), 0)))
+                .andExpect(status().isConflict());
+        assertEquals(sent, source.calls.size());
+        assertEquals(0, decisionCount(left.relationTarget()));
+    }
+
+    private String decisionBody(String decision, String relationId, long expectedRevision) {
+        return "{\"decision\":\"" + decision + "\",\"reason\":\"검수 사유\","
+                + (relationId == null ? "" : "\"relationId\":\"" + relationId + "\",")
+                + "\"expectedRevision\":" + expectedRevision + ",\"expectedSourceVersion\":\"digest-" + suffix
+                + "\",\"expectedSourceRevision\":\"7\"}";
     }
 
     @Test

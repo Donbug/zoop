@@ -46,8 +46,8 @@ import tools.jackson.databind.node.ObjectNode;
  * can be decided: the AI source has no candidate-level review yet, so a candidate-level decision is refused (AI owner,
  * 2026-10-22: keep candidate review in the structure, do not offer it before it is connected).
  *
- * <p>Not exposed over HTTP yet: the candidate list and detail it depends on need the AI source sync (stage 4), which also
- * schedules {@link #reconcile}.
+ * <p>Exposed as {@code POST /api/v1/admin/pipeline/candidates/{candidateId}/decision}: the administrator reads the three
+ * expected values of a relation from the candidate detail ({@code relations[].revision/sourceVersion/sourceRevision}).
  */
 @Service
 public class ReviewDecisionService {
@@ -55,6 +55,7 @@ public class ReviewDecisionService {
     private static final String METHOD = "POST";
     /** The source code of an intent whose operation id holds another command in the AI ledger. */
     static final String OPERATION_MISMATCH = "operation_mismatch";
+    private static final int MAX_ID = 200;
 
     private final JdbcReviewRepository reviews;
     private final JdbcAdminIdempotencyStore idempotency;
@@ -79,6 +80,8 @@ public class ReviewDecisionService {
     public ReviewDecision.Response decide(String candidateId, ReviewDecision.Request request, String idempotencyKey,
             AdminPrincipal admin, String requestId) {
         validateKey(idempotencyKey);
+        // A target id is short (rt- and a UUID): anything longer names no candidate and never reaches the idempotency index.
+        if (candidateId.length() > MAX_ID) throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
         String reason = request.reason().strip();
         if (!AuditReasonPolicy.safeMemberReason(reason)) throw new CustomException(ErrorCode.INVALID_REQUEST);
         String path = "/api/v1/admin/pipeline/candidates/" + candidateId + "/decision";
@@ -305,8 +308,11 @@ public class ReviewDecisionService {
         Target candidate = reviews.currentCandidate(candidateId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
         if (request.relationId() == null) throw new CustomException(ErrorCode.INVALID_REQUEST);
-        return reviews.currentRelation(candidate, request.relationId())
+        Target relation = reviews.currentRelation(candidate, request.relationId())
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+        // A relation that left the latest AI reading (inactive, no longer in the detail) is not the state the administrator saw.
+        if (!relation.active()) throw new CustomException(ErrorCode.REVISION_CONFLICT);
+        return relation;
     }
 
     /** All three expected values must match, and only a HOLD can be decided (an ALLOW or a settled reject is out of scope). */
