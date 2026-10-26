@@ -13,6 +13,7 @@ import com.zoop.ai.AiTransportException;
 import com.zoop.ai.RelationServiceErrorException;
 import com.zoop.ai.relation.RelationClient;
 import com.zoop.ai.relation.RelationDecision;
+import com.zoop.ai.relation.RelationOperationAcknowledgement;
 import com.zoop.ai.relation.RelationOperationStatus;
 import com.zoop.ai.relation.RelationReviewRequest;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,7 @@ class AiRelationReviewClientTest {
 
     @Test
     void theDecisionIsSentAsTheContractsRequestUnderTheOperationId() {
+        when(relations.review(eq(JOB), any())).thenReturn(acknowledged(Optional.empty()));
         client.review(JOB, CANDIDATE, VERSION, "3", "allow", OPERATION);
 
         ArgumentCaptor<RelationReviewRequest> sent = ArgumentCaptor.forClass(RelationReviewRequest.class);
@@ -92,6 +94,16 @@ class AiRelationReviewClientTest {
         doThrow(new IllegalArgumentException("decoded record")).when(relations).review(eq(JOB), any());
         Refused refused = assertThrows(Refused.class, () -> client.review(JOB, CANDIDATE, VERSION, "3", "allow", OPERATION));
         assertEquals(Refusal.CONTRACT, refused.refusal(), "it may be recorded: only a lookup settles it");
+    }
+
+    @Test
+    void aReplayedOperationOfTheEarlierContractIsBlockedNeverSettledAsTheCurrentApproval() {
+        // relation_jobs: the same key and command of an applied legacy operation answers 200 with its stored history.
+        when(relations.review(eq(JOB), any())).thenReturn(
+                acknowledged(Optional.of(RelationOperationStatus.Limitation.REVIEW_CONTRACT_CHANGED)));
+        Refused refused = assertThrows(Refused.class, () -> client.review(JOB, CANDIDATE, VERSION, "3", "allow", OPERATION));
+        assertEquals(Refusal.CONTRACT, refused.refusal());
+        assertEquals(AiRelationReviewClient.CONTRACT_CHANGED, refused.sourceCode());
     }
 
     @Test
@@ -153,6 +165,11 @@ class AiRelationReviewClientTest {
 
     private static AiTransportException transport(AiOperation operation, AiTransportException.Failure failure) {
         return new AiTransportException(operation, "req-1", failure, OptionalInt.empty(), "IOException");
+    }
+
+    private static RelationOperationAcknowledgement acknowledged(Optional<RelationOperationStatus.Limitation> limitation) {
+        return new RelationOperationAcknowledgement(RelationOperationAcknowledgement.Disposition.REVIEW_RECORDED_OR_REPLAYED,
+                status(RelationOperationStatus.ReviewState.APPLIED, limitation));
     }
 
     private static RelationOperationStatus status(RelationOperationStatus.ReviewState state,

@@ -7,6 +7,7 @@ import com.zoop.ai.AiTransportException;
 import com.zoop.ai.PipelineJob;
 import com.zoop.ai.relation.RelationClient;
 import com.zoop.ai.relation.RelationDecision;
+import com.zoop.ai.relation.RelationOperationAcknowledgement;
 import com.zoop.ai.relation.RelationOperationStatus;
 import com.zoop.ai.relation.RelationReviewRequest;
 
@@ -29,6 +30,7 @@ public final class AiRelationReviewClient implements RelationReviewClient {
     static final String LOOKUP_UNANSWERED = "relation_review_lookup_unanswered";
     static final String MALFORMED = "relation_review_response_malformed";
     static final String REQUEST_INVALID = "relation_review_request_invalid";
+    static final String CONTRACT_CHANGED = "review_contract_changed";
     private static final String OPERATION_NOT_FOUND = "operation_not_found";
 
     private final RelationClient relations;
@@ -48,8 +50,9 @@ public final class AiRelationReviewClient implements RelationReviewClient {
         } catch (IllegalArgumentException | NullPointerException invalid) {
             throw invalidCommand();
         }
+        RelationOperationAcknowledgement answer;
         try {
-            relations.review(sourceJobId, request);
+            answer = relations.review(sourceJobId, request);
         } catch (AiServiceRejectionException rejected) {
             throw new Refused(rejected.code());
         } catch (AiTransportException failed) {
@@ -59,6 +62,11 @@ public final class AiRelationReviewClient implements RelationReviewClient {
         } catch (IllegalArgumentException unreadable) {
             // Raised after sending (decoding the answer): it may be recorded, so only a lookup settles it.
             throw new Refused(Refusal.CONTRACT, MALFORMED);
+        }
+        // The same key and command replaying an operation of the earlier contract answers 200 with its stored history: as in
+        // lookup, that is never the current final approval, so it is blocked rather than settled.
+        if (answer.status().limitation().filter(RelationOperationStatus.Limitation.REVIEW_CONTRACT_CHANGED::equals).isPresent()) {
+            throw new Refused(Refusal.CONTRACT, CONTRACT_CHANGED);
         }
     }
 

@@ -29,6 +29,8 @@ import com.zoop.ai.AiTransportException;
 import com.zoop.ai.relation.RelationClient;
 import com.zoop.ai.relation.RelationDecision;
 import com.zoop.ai.relation.RelationOperationStatus;
+import com.zoop.ai.relation.RelationReviewRequest;
+import com.zoop.ai.relation.RelationOperationAcknowledgement;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.json.Canonical;
@@ -578,6 +580,36 @@ class ReviewDecisionPostgresTest {
                 .review(any(), any());
         assertEquals(refused.getErrorCode(), assertThrows(CustomException.class,
                 () -> decideOver(service, ids, "a2", "0")).getErrorCode(), "the key replays the refusal");
+    }
+
+    @Test
+    void aReplayedLegacyOperationOverTheRealAdapterIsBlockedAndNeverSettled() {
+        Ids ids = insertContractCandidate("7");
+        var relations = mock(RelationClient.class);
+        Instant at = Instant.now();
+        // The service's 200 for the same key and command of an operation applied under the earlier contract.
+        when(relations.review(eq(ids.job()), any())).thenAnswer(call -> {
+            RelationReviewRequest sent = call.getArgument(1);
+            return new RelationOperationAcknowledgement(RelationOperationAcknowledgement.Disposition.REVIEW_RECORDED_OR_REPLAYED,
+                    new RelationOperationStatus(sent.operationId(), ids.job(), ids.relation(), RelationDecision.ALLOW, "reviewer",
+                            contractVersion(), "7",
+                            new RelationOperationStatus.Review(RelationOperationStatus.ReviewState.APPLIED, Optional.of("8"),
+                                    Optional.of(at)),
+                            new RelationOperationStatus.Revalidation(RelationOperationStatus.RevalidationState.VERIFIED, 1,
+                                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()),
+                            RelationOperationStatus.Next.NONE,
+                            Optional.of(RelationOperationStatus.Limitation.REVIEW_CONTRACT_CHANGED), at, at, Optional.empty()));
+        });
+        ReviewDecisionService service = overTransport(relations);
+
+        assertThrows(CustomException.class, () -> decideOver(service, ids, "a3", "7"));
+
+        assertEquals("blocked|" + AiRelationReviewClient.CONTRACT_CHANGED, intentStatus("a3") + "|" + intentCode("a3"));
+        assertEquals(0, decisionCount(ids.relationTarget()), "history of the earlier contract is never an approval");
+        assertEquals("HOLD", jdbc.queryForObject("SELECT status FROM review_targets WHERE id = ?", String.class,
+                ids.relationTarget()));
+        service.reconcile(Instant.now().plusSeconds(60), 1000);
+        assertEquals(0, decisionCount(ids.relationTarget()), "nor does the reconciler settle it");
     }
 
     private record Ids(String job, String candidate, String relationTarget, String relation) {
