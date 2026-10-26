@@ -12861,7 +12861,7 @@ components:
         - "previous"
         - "next"
     GraphDbStatus:
-      description: "getPipelineOverview: the active version's recorded graph state (unavailable without an active version or a recognized state). The graph database itself is the AI side's: neo4j, oldestPendingAt and lastCompletedAt are null there."
+      description: "getPipelineOverview: the graph state recorded with the active version, never a current reading. The app never updates it and the importer records none, so an imported version is unavailable (also without an active version). The graph database itself is the AI side's: pendingJobs, neo4j, oldestPendingAt and lastCompletedAt are null there."
       properties:
         status:
           type: "string"
@@ -14832,7 +14832,7 @@ components:
         - "role"
         - "roleUnconfirmed"
     PastRun:
-      description: "getPipelineOverview: runId is the analysis job id. An analyze_plan job counts its units (processed) and its review targets by status so far (null until it has targets; pending and errorCount null); other jobs answer from their run report, null without one. usage is 0 where the app holds no usage (analyze_plan usage stays with the AI service)."
+      description: "getPipelineOverview: runId is the analysis job id. An analyze_plan job counts its units (processed) and its review targets by status so far (null until it has targets; pending and errorCount null); other jobs answer from their run report, null without one. usage is null where the app holds no usage (analyze_plan usage stays with the AI service), never a guessed 0."
       properties:
         runId:
           anyOf:
@@ -14891,7 +14891,11 @@ components:
             -
               type: "null"
         usage:
-          "$ref": "#/components/schemas/UsageOut"
+          anyOf:
+            -
+              "$ref": "#/components/schemas/UsageOut"
+            -
+              type: "null"
       type: "object"
       required:
         - "runId"
@@ -15496,6 +15500,7 @@ components:
         - "reason"
         - "blockedBy"
     ReviewCounts:
+      description: "decisions, allowed and rejected count administrators' decisions only (origin admin); a migrated decision is not a review. revision is the app-wide global decision revision."
       properties:
         revision:
           type: "integer"

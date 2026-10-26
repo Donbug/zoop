@@ -8,7 +8,6 @@ import java.util.Objects;
 
 import com.zoop.admin.jobs.AnalysisJobResponse.JobOut;
 import com.zoop.admin.jobs.AnalysisJobResponse.RunReport;
-import com.zoop.admin.jobs.AnalysisJobResponse.UsageOut;
 import com.zoop.admin.jobs.AnalysisJobService;
 import com.zoop.admin.pipeline.JdbcPipelineOverviewReader.ActiveVersion;
 import com.zoop.admin.pipeline.PipelineOverviewResponse.GraphDbStatus;
@@ -37,7 +36,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <li>{@code policy}: only the active version's policy version; the AI decision policy and model are not the app's, and the app
  *     never verifies on the web.</li>
  * <li>{@code ruleCandidates}/{@code ruleEvents} are 0: a publication rule never publishes a HOLD (AI answer 5-A).</li>
- * <li>{@code projection}: the active version's recorded graph state; the graph database itself is the AI side's.</li>
+ * <li>{@code projection}: the graph state recorded with the active version, never a current reading (the importer records none,
+ *     so an imported version is {@code unavailable}); {@code pendingJobs} is null, the app cannot count them now.</li>
+ * <li>{@code review} counts administrators' decisions only, never migrated ones.</li>
+ * <li>{@code runs[].usage} is null where the app holds no usage, never a guessed 0.</li>
  * <li>{@code ledgerMatchesActive}: the most recent import is the active version. Issue lists between versions are not compared.</li>
  * </ul>
  */
@@ -45,7 +47,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class PipelineOverviewService {
     static final String DATABASE = "zoop-app";
     static final int RUNS = 10;
-    private static final UsageOut NO_USAGE = new UsageOut(0, 0, 0, 0, 0, null);
 
     private final JdbcPipelineOverviewReader reader;
     private final AnalysisJobService jobs;
@@ -98,9 +99,7 @@ public class PipelineOverviewService {
             case "pending" -> "pending";
             default -> "unavailable";
         };
-        Long pending = active.graphDbPending() != null && active.graphDbPending().matches("[0-9]{1,18}")
-                ? Long.valueOf(active.graphDbPending()) : null;
-        return new GraphDbStatus(status, pending, null, null, null, asOf);
+        return new GraphDbStatus(status, null, null, null, null, asOf);
     }
 
     /**
@@ -112,15 +111,15 @@ public class PipelineOverviewService {
         if (job.planRun() != null) {
             Map<String, Long> counts = statuses.get(job.planRun().planId());
             return new PastRun(job.id(), job.label(), "admin-job", "job-runner", job.planRun().totalUnits(),
-                    count(counts, "ALLOW"), count(counts, "HOLD"), count(counts, "REJECT"), null, null, NO_USAGE);
+                    count(counts, "ALLOW"), count(counts, "HOLD"), count(counts, "REJECT"), null, null, null);
         }
         RunReport report = job.report();
         if (report == null) {
-            return new PastRun(job.id(), job.label(), "admin-job", "job-runner", null, null, null, null, null, null, NO_USAGE);
+            return new PastRun(job.id(), job.label(), "admin-job", "job-runner", null, null, null, null, null, null, null);
         }
         return new PastRun(job.id(), job.label(), "admin-job", "job-runner",
                 report.processed(), report.approved(), report.held(), report.rejected(), report.pending(), report.errorCount(),
-                report.usage() == null ? NO_USAGE : report.usage());
+                report.usage());
     }
 
     private static Integer count(Map<String, Long> counts, String status) {

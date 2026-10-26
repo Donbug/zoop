@@ -34,32 +34,35 @@ public class JdbcPipelineOverviewReader {
     public record Decisions(long revision, long total, long allowed, long rejected, long holdPending) {
     }
 
-    /** The decision history and the HOLD relations still waiting for one (active, current). */
+    /**
+     * The administrators' decisions ({@code origin='admin'}; a migrated decision is not a review) and the HOLD relations still
+     * waiting for one (active, current). {@code revision} is the app-wide global revision, whatever the origin.
+     */
     public Decisions decisions() {
         return jdbc.getJdbcTemplate().queryForObject("""
                 SELECT COALESCE((SELECT max(global_revision) FROM review_decisions), 0) AS revision,
-                       (SELECT count(*) FROM review_decisions) AS total,
-                       (SELECT count(*) FROM review_decisions WHERE decision = 'allow') AS allowed,
-                       (SELECT count(*) FROM review_decisions WHERE decision = 'reject') AS rejected,
+                       (SELECT count(*) FROM review_decisions WHERE origin = 'admin') AS total,
+                       (SELECT count(*) FROM review_decisions WHERE origin = 'admin' AND decision = 'allow') AS allowed,
+                       (SELECT count(*) FROM review_decisions WHERE origin = 'admin' AND decision = 'reject') AS rejected,
                        (SELECT count(*) FROM review_targets
                          WHERE target_type = 'relation' AND is_current AND active AND status = 'HOLD') AS hold_pending
                 """, (rs, row) -> new Decisions(rs.getLong("revision"), rs.getLong("total"), rs.getLong("allowed"),
                 rs.getLong("rejected"), rs.getLong("hold_pending")));
     }
 
-    /** {@code graphDbStatus}/{@code graphDbPending} are the version's recorded projection state, unchecked text. */
+    /** {@code graphDbStatus} is the projection state recorded with the version (unchecked text); the app never updates it. */
     public record ActiveVersion(String id, String policyVersion, long issues, long relations, long articles,
-            String graphDbStatus, String graphDbPending) {
+            String graphDbStatus) {
     }
 
     public Optional<ActiveVersion> activeVersion() {
         return jdbc.getJdbcTemplate().query("""
                 SELECT id, policy_version, issue_count, relation_count, article_count,
-                       graph_db_state->>'status' AS graph_db_status, graph_db_state->>'pendingJobsAtCreation' AS graph_db_pending
+                       graph_db_state->>'status' AS graph_db_status
                 FROM graph_versions WHERE active
                 """, (rs, row) -> new ActiveVersion(rs.getString("id"), rs.getString("policy_version"), rs.getLong("issue_count"),
-                rs.getLong("relation_count"), rs.getLong("article_count"), rs.getString("graph_db_status"),
-                rs.getString("graph_db_pending"))).stream().findFirst();
+                rs.getLong("relation_count"), rs.getLong("article_count"), rs.getString("graph_db_status")))
+                .stream().findFirst();
     }
 
     /** The most recently imported version (import order), active or not. */

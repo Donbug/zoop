@@ -4869,7 +4869,7 @@ same request again never toggles anything.
 
 ### GraphDbStatus
 
-getPipelineOverview: the active version's recorded graph state (unavailable without an active version or a recognized state). The graph database itself is the AI side's: neo4j, oldestPendingAt and lastCompletedAt are null there.
+getPipelineOverview: the graph state recorded with the active version, never a current reading. The app never updates it and the importer records none, so an imported version is unavailable (also without an active version). The graph database itself is the AI side's: pendingJobs, neo4j, oldestPendingAt and lastCompletedAt are null there.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5786,7 +5786,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 
 ### PastRun
 
-getPipelineOverview: runId is the analysis job id. An analyze_plan job counts its units (processed) and its review targets by status so far (null until it has targets; pending and errorCount null); other jobs answer from their run report, null without one. usage is 0 where the app holds no usage (analyze_plan usage stays with the AI service).
+getPipelineOverview: runId is the analysis job id. An analyze_plan job counts its units (processed) and its review targets by status so far (null until it has targets; pending and errorCount null); other jobs answer from their run report, null without one. usage is null where the app holds no usage (analyze_plan usage stays with the AI service), never a guessed 0.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5800,7 +5800,7 @@ getPipelineOverview: runId is the analysis job id. An analyze_plan job counts it
 | rejected | 필수 | integer / null |  |
 | pending | 필수 | integer / null |  |
 | errorCount | 필수 | integer / null |  |
-| usage | 필수 | [UsageOut](#schema-usageout) |  |
+| usage | 필수 | [UsageOut](#schema-usageout) / null |  |
 
 <a id="schema-policyinfo"></a>
 
@@ -6056,7 +6056,7 @@ ledgerMatchesActive: the most recently imported version is the active version (f
 
 ### ReviewCounts
 
-
+decisions, allowed and rejected count administrators' decisions only (origin admin); a migrated decision is not a review. revision is the app-wide global decision revision.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
