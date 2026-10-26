@@ -240,6 +240,41 @@ class OrchestratedChatEngineTest {
     }
 
     @Test
+    void anAnswerWithNothingToStandOnSaysWhyAndShowsWhatWasLookedAt() {
+        var scoped = tools.get(ChatCapability.COMPANY_READ);
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
+                List.of(HYNIX)));
+        answer = new ChatGeneratedAnswer(List.of(), List.of("r1"), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of());
+
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(),
+                List.of(new ChatToolItem(HYNIX, "company", "SK하이닉스", List.of(HYNIX), List.of())), List.of(), false, false));
+        var found = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertEquals("insufficient_evidence", found.result().outcome());
+        assertEquals(ChatResults.insufficientReason(run(), ChatResults.InsufficientCause.EVIDENCE_INSUFFICIENT),
+                found.result().reason());
+        assertTrue(found.result().reason().startsWith("관련 항목은 찾았지만"), found.result().reason());
+        assertEquals(List.of("SK하이닉스"), found.result().applied().companies().stream().map(c -> c.label()).toList(),
+                "the scope shows what was looked at, not 'none'");
+        assertEquals("evidence_insufficient", found.routeSummary().path("reason").asString());
+
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(), List.of(),
+                List.of(), false, false));
+        var none = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertTrue(none.result().reason().startsWith("조회한 범위에서 관련된 공개 자료를 찾지 못했어요."), none.result().reason());
+        assertEquals("nothing_found", none.routeSummary().path("reason").asString());
+
+        tools.put(ChatCapability.COMPANY_READ, scoped);
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9)));
+        var narrowed = ChatPlannerTest.run(0, "v1", List.of(HYNIX), List.of("ev-other"), List.of("ev-other"));
+        ChatResult selection = completed(engine().answer(narrowed, new Control(Duration.ofSeconds(60))));
+        assertEquals("insufficient_evidence", selection.outcome());
+        assertTrue(selection.reason().endsWith("선택을 해제하고 다시 물으면 더 넓게 찾아볼 수 있어요."), selection.reason());
+    }
+
+    @Test
     void anInvestmentDecisionIsALimitationOrGuidanceButNeverGenerated() {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()),
                 req("r2", Map.of(ChatQueryType.Q02, 0.9), Map.of()).withAdvice(0.97));
@@ -402,12 +437,16 @@ class OrchestratedChatEngineTest {
         assertEquals(List.of(evidence(NVDA)), held.citations().stream().map(Citation::evidenceId).toList());
         assertEquals(List.of("evidence_insufficient"), held.limitations().stream().map(l -> l.kind()).toList());
         assertEquals("요구 r2", held.limitations().getFirst().label());
+        assertEquals("이 부분은 답변 내용이 근거와 맞는지 충분히 확인하지 못해 뺐어요.", held.limitations().getFirst().message(),
+                "the kind stays, the message says why");
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "hold"), new Verdict("hold", "no"),
                 new Verdict("hold", "no"), supported));
         ChatResult none = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
         assertEquals("insufficient_evidence", none.outcome());
         assertEquals("none", none.answerBasis());
+        assertTrue(none.reason().startsWith("근거는 찾았지만"), none.reason());
+        assertEquals(List.of("SK하이닉스", "NVIDIA"), none.applied().companies().stream().map(c -> c.label()).toList());
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no")));
         assertFailed("transient", "provider_error", true, engine().answer(run(), new Control(Duration.ofSeconds(60))));

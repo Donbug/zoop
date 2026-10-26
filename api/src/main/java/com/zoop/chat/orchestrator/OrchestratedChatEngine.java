@@ -1,5 +1,7 @@
 package com.zoop.chat.orchestrator;
 
+import static com.zoop.chat.orchestrator.ChatResults.InsufficientCause.*;
+
 import com.zoop.chat.dto.ChatAppliedItem;
 import com.zoop.chat.dto.ChatLimitation;
 import com.zoop.chat.dto.ChatResult;
@@ -11,7 +13,7 @@ import com.zoop.chat.executor.ChatRunControl;
 import com.zoop.chat.orchestrator.ChatBranchContext.Branch;
 import com.zoop.chat.orchestrator.ChatPlan.Mode;
 import com.zoop.chat.orchestrator.ChatPlan.Planned;
-import com.zoop.chat.tool.ChatToolItem;
+import com.zoop.chat.orchestrator.ChatResults.InsufficientCause;
 import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.chat.tool.ChatToolRunner;
@@ -181,9 +183,13 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         route.set("limited", json(limited));
         if (branches.isEmpty()) {
             boolean unanswerable = limited.values().stream().allMatch(k -> k.equals("investment_advice") || k.equals("out_of_scope"));
-            return stopped(run, route, new ChatPlan.Stop(unanswerable ? "guidance" : "insufficient_evidence",
-                    unanswerable ? (limited.containsValue("investment_advice") ? "investment_advice" : "out_of_scope")
-                            : "evidence_insufficient", List.of()));
+            if (unanswerable) {
+                return stopped(run, route, new ChatPlan.Stop("guidance",
+                        limited.containsValue("investment_advice") ? "investment_advice" : "out_of_scope", List.of()));
+            }
+            return insufficient(run, route, limited.containsValue("results_truncated") ? RESULTS_TRUNCATED
+                    : limited.containsValue("precondition_unmet") ? PRECONDITION_UNMET : EVIDENCE_INSUFFICIENT,
+                    confirmed, retrieved);
         }
 
         control.phase("writing");
@@ -229,7 +235,13 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         // A requirement still answered by a kept section of its own is answered; a joining section goes with any held part.
         insufficient.removeIf(id -> kept.stream().anyMatch(s -> s.requirementIds().contains(id)));
         if (kept.isEmpty()) {
-            return stopped(run, route, new ChatPlan.Stop("insufficient_evidence", "evidence_insufficient", List.of()));
+            // The most specific cause the server knows: a limit it hit, then a verdict, then a lookup that found nothing.
+            List<String> unanswered = insufficient.stream().filter(id -> byId.get(id).parent() == null).toList();
+            InsufficientCause cause = limited.containsValue("results_truncated") ? RESULTS_TRUNCATED
+                    : unanswered.stream().anyMatch(held::contains) ? EVIDENCE_HELD
+                    : !unanswered.isEmpty() && retrieved.noneFound().containsAll(unanswered) ? NOTHING_FOUND
+                    : limited.containsValue("precondition_unmet") ? PRECONDITION_UNMET : EVIDENCE_INSUFFICIENT;
+            return insufficient(run, route, cause, confirmed, retrieved);
         }
 
         Set<String> keptEvidence = new HashSet<>();
@@ -241,36 +253,56 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             if (explicit(decision, p.id())) limitations.add(ChatResults.limitation(entry.getValue(), p.label()));
         }
         for (String id : insufficient) {
-            if (explicit(decision, id)) limitations.add(ChatResults.limitation("evidence_insufficient", byId.get(id).label()));
+            if (!explicit(decision, id)) continue;
+            InsufficientCause cause = held.contains(id) ? EVIDENCE_HELD
+                    : retrieved.noneFound().contains(id) ? NOTHING_FOUND : EVIDENCE_INSUFFICIENT;
+            limitations.add(ChatResults.insufficient(cause, byId.get(id).label()));
         }
 
-        Map<String, ChatAppliedItem> companies = new LinkedHashMap<>();
-        Map<String, ChatAppliedItem> issues = new LinkedHashMap<>();
         Set<String> answered = new HashSet<>();
         kept.forEach(s -> answered.addAll(s.requirementIds()));
-        for (Branch b : branches) {
-            if (!answered.contains(b.requirementId())) continue;
-            for (ChatToolResult r : b.results()) {
-                for (ChatToolItem item : r.items()) {
-                    if ("company".equals(item.kind())) companies.putIfAbsent(item.id(), new ChatAppliedItem(item.id(), item.label()));
-                    if ("issue".equals(item.kind())) issues.putIfAbsent(item.id(), new ChatAppliedItem(item.id(), item.label()));
-                }
-            }
-        }
         // A map target stays only while a requirement whose tools returned it is still answered.
         Set<String> reachable = new HashSet<>();
         branches.stream().filter(b -> answered.contains(b.requirementId()))
                 .forEach(b -> b.results().forEach(r -> r.items().forEach(i -> reachable.add(i.id()))));
         var targets = passed.graphTargets().stream().filter(g -> reachable.contains(g.id())).toList();
-        // The question replaced the selection when an answered requirement read targets the member had not selected.
-        Set<String> selected = Set.copyOf(run.selection().contextIds());
-        boolean overrode = !selected.isEmpty() && confirmed.requirements().stream()
-                .anyMatch(p -> answered.contains(p.id()) && p.targetSource() == ChatPlan.TargetSource.QUESTION
-                        && !selected.containsAll(p.targets()));
         ChatResult result = ChatResults.answered(run, kept, keptCitations, targets,
-                List.copyOf(companies.values()), List.copyOf(issues.values()), limitations, overrode, clock.instant());
+                items(retrieved, answered, "company"), items(retrieved, answered, "issue"), limitations,
+                overrode(run, confirmed, answered), clock.instant());
         route.put("outcome", "answered");
         return new ChatEngineOutcome.Completed(result, route);
+    }
+
+    /**
+     * Nothing could be answered: the reason says why and what to try, and {@code applied} shows what the reads looked at
+     * (every requirement's, since none was answered).
+     */
+    private ChatEngineOutcome insufficient(ChatRun run, ObjectNode route, InsufficientCause cause, ChatPlan.Run plan,
+            ChatRetrieval.Outcome retrieved) {
+        route.put("outcome", "insufficient_evidence").put("reason", cause.code());
+        Set<String> all = new HashSet<>();
+        plan.requirements().forEach(p -> all.add(p.id()));
+        return new ChatEngineOutcome.Completed(ChatResults.insufficient(run, cause, items(retrieved, all, "company"),
+                items(retrieved, all, "issue"), overrode(run, plan, all), clock.instant()), route);
+    }
+
+    /** The items of one kind the reads of these requirements returned, once each, in read order. */
+    private static List<ChatAppliedItem> items(ChatRetrieval.Outcome retrieved, Set<String> requirements, String kind) {
+        Map<String, ChatAppliedItem> items = new LinkedHashMap<>();
+        retrieved.results().forEach((requirement, results) -> {
+            if (!requirements.contains(requirement)) return;
+            results.forEach(r -> r.items().stream().filter(i -> kind.equals(i.kind()))
+                    .forEach(i -> items.putIfAbsent(i.id(), new ChatAppliedItem(i.id(), i.label()))));
+        });
+        return List.copyOf(items.values());
+    }
+
+    /** The question replaced the selection when one of these requirements read targets the member had not selected. */
+    private static boolean overrode(ChatRun run, ChatPlan.Run plan, Set<String> requirements) {
+        Set<String> selected = Set.copyOf(run.selection().contextIds());
+        return !selected.isEmpty() && plan.requirements().stream()
+                .anyMatch(p -> requirements.contains(p.id()) && p.targetSource() == ChatPlan.TargetSource.QUESTION
+                        && !selected.containsAll(p.targets()));
     }
 
     /**
