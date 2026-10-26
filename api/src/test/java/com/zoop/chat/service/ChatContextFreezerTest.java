@@ -175,6 +175,9 @@ class ChatContextFreezerTest {
                 return Optional.of(asOf.isBefore(Instant.parse("2026-10-08T00:00:00Z")) ? OLD : ACTIVE);
             }
             public boolean everActivated(String id) { return known.containsKey(id); }
+            public Optional<Instant> firstActivatedAt(String id) {
+                return known.containsKey(id) ? Optional.of(NOW) : Optional.empty();
+            }
         };
     }
 

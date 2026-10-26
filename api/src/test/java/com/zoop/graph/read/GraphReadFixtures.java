@@ -56,6 +56,11 @@ final class GraphReadFixtures {
                 return Optional.of(asOf.isBefore(Instant.parse("2026-10-08T00:00:00Z")) ? "fixture-2026-10-01" : "fixture-2026-10-08");
             }
             public boolean everActivated(String id) { return versions.containsKey(id); }
+            public Optional<Instant> firstActivatedAt(String id) {
+                // The fixture activation history: each fixture became active on its own date.
+                return versions.containsKey(id) ? Optional.of(Instant.parse(id.substring("fixture-".length()) + "T00:00:00Z"))
+                        : Optional.empty();
+            }
         };
     }
 

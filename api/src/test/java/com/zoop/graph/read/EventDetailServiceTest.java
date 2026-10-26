@@ -454,6 +454,9 @@ class EventDetailServiceTest {
             public Optional<GraphVersionRecord> active() { return Optional.of(record); }
             public Optional<String> activeVersionIdAt(Instant asOf) { return Optional.of(record.id()); }
             public boolean everActivated(String id) { return record.id().equals(id); }
+            public Optional<Instant> firstActivatedAt(String id) {
+                return record.id().equals(id) ? Optional.of(NOW) : Optional.empty();
+            }
         };
         PublicGraphReader reader = new PublicGraphReader(new GraphVersionSelector(versions, Clock.fixed(NOW, ZoneOffset.UTC)),
                 version -> snapshot, pinned -> exclusions);

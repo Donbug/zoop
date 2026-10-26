@@ -15,4 +15,10 @@ public interface GraphVersionRepository {
 
     /** True when the version was ever the active pointer; only such versions are publicly readable. */
     boolean everActivated(String versionId);
+
+    /**
+     * When the version first became the active pointer (its earliest pointer change): the time a read of that version alone is
+     * pinned to (#88). Empty when it never was the pointer, so it is not publicly readable by id.
+     */
+    Optional<Instant> firstActivatedAt(String versionId);
 }

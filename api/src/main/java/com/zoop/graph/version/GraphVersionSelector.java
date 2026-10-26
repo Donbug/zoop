@@ -4,6 +4,7 @@ import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +15,10 @@ import org.springframework.beans.factory.annotation.Autowired;
  * <li>{@code round}: the published briefing owner's fixed version and cutoff, after current read-authority checks.</li>
  * <li>{@code asOf}: the version whose pointer change was the last one at or before that time. A given
  * {@code graphVersion} must equal it, otherwise 422.</li>
- * <li>{@code graphVersion} alone: only a version that was publicly active at some point.</li>
+ * <li>{@code graphVersion} alone: only a version that was publicly active at some point, read as of the moment it was first
+ * published (its first activation), exactly as {@code asOf} at that moment with that version (#88): the version, the bases verified
+ * by then, the articles published by then and the relation status at that time. The pinned time is returned as
+ * {@code metadata.asOf}, so it can be sent back with the version and open the same view.</li>
  * <li>nothing: the current active pointer, read once.</li>
  * </ol>
  * A missing version is 409 VERSION_UNAVAILABLE and is never replaced by the newest graph.
@@ -70,12 +74,26 @@ public class GraphVersionSelector {
             return new SelectedGraphVersion(found(pinned), asOf, true);
         }
         if (graphVersion != null) {
-            if (!repository.everActivated(graphVersion)) throw new CustomException(ErrorCode.VERSION_UNAVAILABLE);
-            return new SelectedGraphVersion(found(graphVersion), requestStart, false);
+            Instant first = repository.firstActivatedAt(graphVersion)
+                    .orElseThrow(() -> new CustomException(ErrorCode.VERSION_UNAVAILABLE));
+            GraphVersionRecord version = found(graphVersion);
+            // Whole milliseconds, rounded up: clients keep millisecond times (a browser Date), and one just before the activation
+            // would pick the version before it. Pinned only when sending it back with the version opens this version.
+            Instant pinned = upToMillis(first);
+            if (graphVersion.equals(repository.activeVersionIdAt(pinned).orElse(null))) {
+                return new SelectedGraphVersion(version, pinned, true);
+            }
+            // Another pointer change in that same millisecond won it: no time opens this version, so read it as of the request.
+            return new SelectedGraphVersion(version, requestStart, false);
         }
         GraphVersionRecord active = repository.active()
                 .orElseThrow(() -> new CustomException(ErrorCode.VERSION_UNAVAILABLE));
         return new SelectedGraphVersion(active, requestStart, false);
+    }
+
+    static Instant upToMillis(Instant at) {
+        Instant whole = at.truncatedTo(ChronoUnit.MILLIS);
+        return whole.equals(at) ? at : whole.plusMillis(1);
     }
 
     private GraphVersionRecord found(String versionId) {
