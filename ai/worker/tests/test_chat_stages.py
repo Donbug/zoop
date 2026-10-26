@@ -145,6 +145,17 @@ def test_verification_policy_holds_whatever_is_uncertain():
     assert verdicts(choice("supported"), 0.5)[0]["prohibitedAdvice"] == "hold"
 
 
+def test_a_zoop_document_section_is_checked_against_its_quotes_like_evidence():
+    payload = VerificationInput.model_validate({
+        "sections": [{"basis": "zoop_documented", "text": "탈퇴하면 대화 기록이 지워집니다.", "evidenceIds": [EV2]}],
+        "citations": [{"evidenceId": EV2, "sourceId": "zoop-docs", "quote": "## 2. 보유 기간\n\n탈퇴하면 지웁니다."}]})
+    body = chat_jev.build_verification_request(payload, chat_jev.MODEL)
+    assert set(body["questions"]) == {"s0-support", "s0-advice"}
+    raw = {"model": chat_jev.MODEL, "answers": {"s0-support": choice("insufficient"), "s0-advice": noul(0.02)}}
+    assert [v.wire() for v in chat_jev.interpret_verification(raw, payload, chat_jev.MODEL).sections] == [
+        {"support": "hold", "prohibitedAdvice": "no"}]
+
+
 def test_stage_identities_are_separate_from_s1_and_from_each_other():
     versions = {chat_jev.prompt_version("chat-router"), chat_jev.prompt_version("chat-verification"),
                 chat_luna.prompt_version()}
@@ -451,4 +462,10 @@ def test_path_pairs_keep_their_status_and_steps_name_only_quoted_evidence():
 
 def test_the_answer_prompt_explains_paths_and_its_version_moved():
     assert "status=cut" in chat_luna.PROMPT and "evidenceIds" in chat_luna.PROMPT
-    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-10-24-1-")
+    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-10-25-1-")
+
+
+def test_the_answer_prompt_and_schema_know_zoop_document_sections():
+    assert "zoop_documented" in chat_luna.PROMPT and "zoop-docs" in chat_luna.PROMPT
+    basis = json.dumps(chat_luna.schema(), ensure_ascii=False)
+    assert "zoop_documented" in basis

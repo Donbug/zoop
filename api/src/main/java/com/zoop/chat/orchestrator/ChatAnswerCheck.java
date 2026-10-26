@@ -2,6 +2,7 @@ package com.zoop.chat.orchestrator;
 
 import com.zoop.chat.dto.GraphTarget;
 import com.zoop.chat.orchestrator.ChatBranchContext.Branch;
+import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolResult;
 import java.util.ArrayList;
@@ -26,7 +27,9 @@ import java.util.regex.Pattern;
  * states no current fact: no amount, percentage, price, year or calendar date (design summary 8.2: Q02 is never a way around
  * a lookup).</li>
  * <li>{@code evidence_section}: an {@code evidence_grounded} section cites only evidence its own requirements' tool results
- * passed on, and cites some unless all its requirements found nothing.</li>
+ * passed on, and cites some unless all its requirements found nothing. ZOOP document reads do not count here.</li>
+ * <li>{@code document_section}: a {@code zoop_documented} section does the same with what its requirements' ZOOP document
+ * reads (Q01) passed on, and nothing else: approved ZOOP text and public evidence never share a section.</li>
  * <li>{@code citation_budget}: all sections together cite at most 20 distinct evidence ids ({@code ChatResult.citations}).</li>
  * <li>{@code graph_targets}: at most 50, each a company or issue a tool returned.</li>
  * <li>{@code length}: the joined answer, general notice included, is at most 12,000 characters.</li>
@@ -41,7 +44,7 @@ final class ChatAnswerCheck {
     static final int MAX_CITATIONS = 20;
     static final int MAX_GRAPH_TARGETS = 50;
     static final int MAX_ANSWER = 12_000;
-    private static final Set<String> BASES = Set.of("general_knowledge", "evidence_grounded");
+    private static final Set<String> BASES = Set.of("general_knowledge", "zoop_documented", "evidence_grounded");
     /** Current-fact markers a general explanation must not carry. */
     private static final Pattern CURRENT_FACT = Pattern.compile(
             "\\d[\\d,.]*\\s*(%|퍼센트|원|달러|엔|위안|억|조|만\\s*원|USD|KRW|bp)|[$₩€¥]\\s*\\d|(19|20)\\d{2}\\s*년"
@@ -99,12 +102,15 @@ final class ChatAnswerCheck {
                         text.startsWith(GENERAL_NOTICE) ? text : GENERAL_NOTICE + " " + text, section.requirementIds(),
                         List.of()));
             } else {
+                boolean documented = "zoop_documented".equals(section.basis());
                 Set<String> passedOn = new HashSet<>();
-                owners.forEach(b -> b.results().forEach(r -> passedOn.addAll(r.evidenceIds())));
+                owners.forEach(b -> b.results().forEach(r -> {
+                    if (documentRead(r) == documented) passedOn.addAll(r.evidenceIds());
+                }));
                 boolean nothingFound = owners.stream().allMatch(Branch::noneFound);
                 if (owners.stream().anyMatch(Branch::general) || !passedOn.containsAll(section.evidenceIds())
                         || (section.evidenceIds().isEmpty() && !nothingFound)) {
-                    return Result.fail("evidence_section");
+                    return Result.fail(documented ? "document_section" : "evidence_section");
                 }
                 sections.add(section);
             }
@@ -132,6 +138,11 @@ final class ChatAnswerCheck {
         if (joined(sections).length() > MAX_ANSWER) return Result.fail("length");
         if (sections.stream().anyMatch(s -> ADVICE.matcher(s.text()).find())) return Result.fail("investment_wording");
         return new Result(new Passed(List.copyOf(sections), List.copyOf(insufficient), List.copyOf(targets)), null);
+    }
+
+    /** A read of ZOOP's own documents: a capability that reads no graph. */
+    static boolean documentRead(ChatToolResult result) {
+        return ChatCapability.of(result.capabilityId()).map(c -> !c.readsGraph()).orElse(false);
     }
 
     /** The public answer: section texts in order. */
