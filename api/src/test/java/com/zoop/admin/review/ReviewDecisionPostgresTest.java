@@ -198,13 +198,19 @@ class ReviewDecisionPostgresTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.candidateId").value(ids.candidate()))
                     .andExpect(jsonPath("$.decision").value("approved"))
+                    .andExpect(jsonPath("$.revision").value(1))
                     .andExpect(jsonPath("$.publicChanged").value(false));
         }
         assertEquals(1, source.calls.size(), "the replayed key answers again without sending again");
         assertEquals(1, decisionCount(ids.relationTarget()));
+        assertEquals("ALLOW", jdbc.queryForObject("SELECT status FROM review_targets WHERE id = ?", String.class,
+                ids.relationTarget()));
+        assertEquals("ALLOW", jdbc.queryForObject("SELECT status FROM review_targets WHERE id = ?", String.class,
+                ids.candidate()), "the candidate follows its relations at once");
         mvc.perform(post(path).cookie(cookie).header("Origin", ORIGIN).header("X-CSRF-Token", csrf)
                 .header("Idempotency-Key", "h3-" + suffix).contentType("application/json")
-                .content(decisionBody("reject", ids.relation(), 0))).andExpect(status().isConflict());
+                .content(decisionBody("reject", ids.relation(), 0))).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("IDEMPOTENCY_CONFLICT"));
 
         // No session: refused before the service.
         mvc.perform(post(path).header("Origin", ORIGIN).header("X-CSRF-Token", csrf).header("Idempotency-Key", "h4-" + suffix)

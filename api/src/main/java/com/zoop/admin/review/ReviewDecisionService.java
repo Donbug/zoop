@@ -303,7 +303,7 @@ public class ReviewDecisionService {
         return mapper.writeValueAsString(body);
     }
 
-    /** The decided target: a relation of the candidate when {@code relationId} is set; a candidate-level decision is refused. */
+    /** The decided target: a relation of the candidate ({@code relationId} is required: the AI source decides relations only). */
     private Target resolve(String candidateId, ReviewDecision.Request request) {
         Target candidate = reviews.currentCandidate(candidateId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
