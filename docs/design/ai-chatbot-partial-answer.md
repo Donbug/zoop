@@ -1,6 +1,6 @@
 # ZOOP AI 챗봇 부분 답변 분기와 일반 지식 대체 경로 설계 (초안)
 
-문서 상태: 설계 초안 · 구현 전 · 2부(일반 지식 대체 경로)는 거버넌스 정책 개정과 팀 승인 필요
+문서 상태: 1부 구현됨(2026-10-26, 브랜치 `feat/chat-partial-answer-fallback`) · 2부(일반 지식 대체 경로)는 구현 전, 거버넌스 정책 개정과 팀 승인 필요
 
 기준일: 2026년 10월 26일 / 기준 코드: main `3eba73af` / 기준 정책: [ZOOP-AIG-001 v0.9](../ZOOP_AI_거버넌스_정책.md) / 설계 요약: [AI 챗봇 설계 요약](ai-chatbot-design-summary.md)
 
@@ -54,14 +54,15 @@
 - route 요약(`chat_jobs.route`)의 요구 항목에 `origin`(`router` / `concept` / `background`)과 `parent`를 남겨 감사할 수 있게 한다.
 - 상한:
   - 하위 요구는 원래 요구마다 최대 1개다. 명시 요구 상한 6개(`MAX_REQUIREMENTS`)에는 세지 않는다.
-  - 생성 branch가 구간 상한 12개(`ChatAnswerCheck.MAX_SECTIONS`)를 넘게 되면, 배경 하위 요구를 뒤에서부터 빼고 그다음 개념 하위 요구를 뺀다.
+  - 생성 단계는 branch를 최대 6개 받는다(워커 계약 `zoop-ai-chat-1`의 `branches` 상한, `ChatPlanner.MAX_BRANCHES`). 그래서 limitation이 아닌 라우터 요구와 하위 요구를 합쳐 6개가 될 때까지만, 앞 요구부터 하위 요구를 만든다. 남는 자리가 없으면 만들지 않는다. 2부의 배경 하위 요구는 개념 하위 요구 뒤에 같은 자리를 나눠 쓴다.
 
 ### 3.1 하위 요구 구간의 추가 검사
 
 `general_knowledge` 구간의 기존 검사(`general_section`: 인용 없음, 순수 일반 요구만, 금액·비율·연도·날짜·"최근" 같은 최신 사실 표지 금지)와 고정 안내 문장, Jev `prohibitedAdvice` 판정은 그대로 적용한다. 하위 요구 구간에는 다음을 더한다.
 
 - **대상 이름 금지(새 검사 `general_names`):** 하위 요구 구간에는 원래 요구가 지목한 기업·사건의 표시 이름이 들어가면 안 된다.
-  - 이름의 출처는 원래 요구의 도구 결과 `items`(company·issue)의 label이고, 없으면 기업 카탈로그 이름이다.
+  - 이름의 출처는 원래 요구의 도구 결과 `items`(company·issue)의 label이다. 띄어쓰기는 무시하고 비교한다.
+  - 알려진 빈틈(1부 구현): 원래 요구가 limitation(`out_of_scope` 등)이라 조회를 하지 않았으면 막을 이름이 없다. 이 경우는 프롬프트 규칙(3.2)과 최신 사실 표지 검사에만 기댄다. 카탈로그 이름까지 막으려면 엔진에 기업 이름 조회를 연결해야 한다.
   - 숫자가 없는 특정 기업 사실(예: "OO는 HBM을 주로 △△에 공급한다")은 최신 사실 표지 검사로는 걸러지지 않는다. 그래서 이름 자체를 막는다.
 - **실패 처리:** 하위 요구 구간이 `general_section`이나 `general_names`에 걸리면, 실행 전체를 `validation_failed`로 끝내지 않고 **그 구간만 뺀다.** 빠진 하위 요구는 limitation을 만들지 않고, route 요약에 `droppedGeneral`로 남긴다.
   - 하위 요구는 회원이 직접 요구한 것이 아니라 서버가 덧붙인 보조 설명이기 때문이다. 원래 요구 구간의 검사 실패는 지금처럼 실행 전체 실패다.
@@ -70,10 +71,11 @@
 
 ### 3.2 Luna 프롬프트
 
-계약은 그대로 두고 시스템 프롬프트에 두 문장을 더한다. 프롬프트 개정이므로 `PROMPT_REVISION`을 올리고 replay fixture를 함께 갱신한다.
+계약은 그대로 두고 시스템 프롬프트에 문장을 더한다. 프롬프트 개정이므로 `PROMPT_REVISION`을 올린다. authored replay는 프롬프트 문장에 묶인 고정 fixture가 없어 갱신할 fixture가 없다.
 
-- "일반 branch의 구간에는 다른 branch의 기업·사건 이름을 쓰지 않는다."
-- "라벨이 '일반 배경'인 branch는 특정 기업·사건의 사실을 쓰지 않고, 그 질문을 이해하는 데 필요한 개념과 일반적인 구조만 설명한다. 쓸 내용이 없으면 insufficientRequirementIds에 넣는다."
+- 1부(구현됨, `zoop-chat-answer-2026-10-26-1`): "label이 '— 개념 설명'으로 끝나는 branch는 서버가 같은 질문의 다른 요구에서 떼어 낸 개념 부분이다. 그 구간에는 기업·사건 이름을 쓰지 않고 개념만 설명하며, 쓸 내용이 없으면 insufficientRequirementIds에 넣는다."
+  - 라우터가 따로 나눈 순수 개념 요구에는 이 규칙을 걸지 않는다. 지금 동작을 바꾸지 않기 위해서다.
+- 2부(구현 전): "라벨이 '일반 배경'인 branch는 특정 기업·사건의 사실을 쓰지 않고, 그 질문을 이해하는 데 필요한 개념과 일반적인 구조만 설명한다. 쓸 내용이 없으면 insufficientRequirementIds에 넣는다."
 
 ## 4. 1부: 부분 답변 분기(A안)
 
@@ -161,7 +163,7 @@ Luna가 배경으로 쓸 내용이 없다고 판단하면 배경 하위 요구�
 | `ChatAnswerCheck` | `general_names` 검사, 하위 요구 구간 실패를 구간 단위로 돌려줌 | ○ | ○ |
 | `ChatResults` / outcome | 5.3 규칙(하위 요구 구간만 남아도 `answered`) | ○ | ○ |
 | 설정 | `zoop.chat.general-fallback.enabled`(기본 `false`) | | ○ |
-| `ai/worker` `chat_luna.py` | 프롬프트 두 문장(3.2), `PROMPT_REVISION` 올림, replay fixture 갱신 | ○ | ○ |
+| `ai/worker` `chat_luna.py` | 프롬프트 문장(3.2), `PROMPT_REVISION` 올림 | ○ | ○ |
 | 공개 OpenAPI, 워커 계약, 웹 | 변경 없음 | | |
 | 문서 | 설계 요약 5·7·8장, 구현 계획, 거버넌스(2부만) | ○ | ○ |
 
@@ -184,7 +186,7 @@ Luna가 배경으로 쓸 내용이 없다고 판단하면 배경 하위 요구�
   - 하위 요구 구간이 최신 사실 표지나 대상 이름에 걸리면 그 구간만 빠지고 실행은 `answered` 또는 `insufficient_evidence`
   - 원래 요구 구간이 같은 검사에 걸리면 지금처럼 `validation_failed`
   - 하위 요구 구간에 투자 권유 문구가 있으면 `validation_failed`
-- `ChatAnswerCheckTest`: `general_names`가 company·issue label과 카탈로그 이름을 잡고, 대상과 무관한 일반 명사는 통과시킴
+- `ChatAnswerCheckTest`: `general_names`가 company·issue label을 띄어쓰기와 무관하게 잡고, 대상과 무관한 일반 명사는 통과시킴. 라우터의 순수 개념 요구에는 이름 검사를 하지 않음
 - `ai/worker` `test_chat_stages.py`: 새 프롬프트 개정의 replay fixture
 - 평가 세트(구현 계획 우선순위 5): 질문별로 `fallback` 종류와 하위 요구 구간이 빠진 비율을 기록한다. 실제 데이터가 오면 근거 부족 비율을 대체 경로 전후로 비교한다.
 
