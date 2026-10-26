@@ -51,6 +51,14 @@ zoop:
     session:
       idle-timeout: ${ZOOP_ADMIN_IDLE_TIMEOUT:30m}
       absolute-timeout: ${ZOOP_ADMIN_ABSOLUTE_TIMEOUT:8h}
+    review:
+      reconcile:
+        # Settles review decisions whose AI answer was lost, from the AI ledger, in the web application on its own thread. Runs
+        # only while the AI relation client is configured (zoop.ai.relation-client.enabled=true); on by default then.
+        enabled: ${ZOOP_ADMIN_REVIEW_RECONCILE_ENABLED:true}
+        interval: ${ZOOP_ADMIN_REVIEW_RECONCILE_INTERVAL:PT1M}
+        min-age: ${ZOOP_ADMIN_REVIEW_RECONCILE_MIN_AGE:PT2M}
+        batch: ${ZOOP_ADMIN_REVIEW_RECONCILE_BATCH:50}
   graph:
     snapshot:
       # Public graph snapshot source: none (default; reads fail closed), fixture (local/dev synthetic data only) or artifact
