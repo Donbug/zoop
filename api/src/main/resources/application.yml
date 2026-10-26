@@ -82,6 +82,10 @@ zoop:
       max-consecutive-failures: ${ZOOP_ANALYSIS_ANALYZE_PLAN_MAX_CONSECUTIVE_FAILURES:5}
       max-recovery-dispatches: ${ZOOP_ANALYSIS_ANALYZE_PLAN_MAX_RECOVERY_DISPATCHES:3}
       max-reclaims: ${ZOOP_ANALYSIS_ANALYZE_PLAN_MAX_RECLAIMS:16}
+    review-sync:
+      # Runs only with analyze-plan: re-reads observed units' S2/S3 results into the admin review targets.
+      interval: ${ZOOP_ANALYSIS_REVIEW_SYNC_INTERVAL:60s}
+      batch: ${ZOOP_ANALYSIS_REVIEW_SYNC_BATCH:20}
   ai:
     client:
       # Internal S1 AI transport client. Disabled by default; the application starts without any AI setting.

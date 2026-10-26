@@ -60,10 +60,9 @@ public final class AnalyzePlanState {
         }
     }
 
-    /** {@code s2ResultSha256} is the S2 result content hash the unit's S2 checkpoint recorded (null until observed). */
     public record StageWork(String planId, int ordinal, StageKind stage, ExtractionSubmission extractionSubmit,
             RelationSubmission relationSubmit, String extractionInputDigest, String s3InputDigest,
-            StageCheckpoint checkpoint, String s2ResultSha256) {
+            StageCheckpoint checkpoint) {
         public String jobId() { return stage == StageKind.S2 ? extractionSubmit.jobId() : relationSubmit.jobId(); }
     }
 

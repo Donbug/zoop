@@ -97,6 +97,45 @@ public class JdbcReviewRepository {
                 .addValue("revision", row.sourceRevision()).addValue("at", Timestamp.from(at))) == 1;
     }
 
+    /**
+     * An analyze-plan unit whose S3 result the worker observed: what the review-target sync reads. {@code s2ResultSha256} is the
+     * S2 result content hash the unit recorded, so the S2 result read again can be proven to be that content.
+     */
+    public record SyncUnit(String planId, int ordinal, String s3JobId, String s3InputDigest, String s2JobId,
+            String s2InputDigest, String s2ResultSha256) {
+    }
+
+    private static final String SYNC_UNIT = """
+            SELECT u.plan_id, u.ordinal, u.s3_job_id, u.s3_input_digest, u.s2_job_id, u.s2_input_digest,
+                   u.s2_checkpoint->>'resultContentSha256' AS s2_result_sha256
+            FROM analysis_plan_units u
+            WHERE u.s3_checkpoint->>'state' = 'result_observed' AND u.s3_input_digest IS NOT NULL
+              AND u.s2_checkpoint->>'resultContentSha256' IS NOT NULL
+            """;
+
+    /** Observed units with no review target yet (never synced, or a sync that failed or found nothing decided), oldest first. */
+    public List<SyncUnit> unsyncedUnits(int limit) {
+        return jdbc.query(SYNC_UNIT + """
+                  AND NOT EXISTS (SELECT 1 FROM review_targets t WHERE t.source_job_id = u.s3_job_id)
+                ORDER BY u.s3_checkpoint->>'resultObservedAt', u.plan_id, u.ordinal LIMIT :limit
+                """, new MapSqlParameterSource("limit", limit), JdbcReviewRepository::syncUnit);
+    }
+
+    /** Observed units after ({@code planId}, {@code ordinal}) in key order: one page of the round-robin refresh. */
+    public List<SyncUnit> unitsAfter(String planId, int ordinal, int limit) {
+        return jdbc.query(SYNC_UNIT + """
+                  AND (u.plan_id, u.ordinal) > (:plan, :ordinal)
+                ORDER BY u.plan_id, u.ordinal LIMIT :limit
+                """, new MapSqlParameterSource("plan", planId).addValue("ordinal", ordinal).addValue("limit", limit),
+                JdbcReviewRepository::syncUnit);
+    }
+
+    private static SyncUnit syncUnit(ResultSet rs, int rowNumber) throws SQLException {
+        return new SyncUnit(rs.getString("plan_id"), rs.getInt("ordinal"), rs.getString("s3_job_id"),
+                rs.getString("s3_input_digest"), rs.getString("s2_job_id"), rs.getString("s2_input_digest"),
+                rs.getString("s2_result_sha256"));
+    }
+
     /** The shared publication lock: decisions get their global revision in commit order (ERD v6 section 27). */
     public void lockPublication() {
         jdbc.getJdbcTemplate().execute("SELECT pg_advisory_xact_lock(" + JdbcGraphVersionRepository.PUBLICATION_LOCK + ")");

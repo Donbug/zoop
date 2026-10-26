@@ -8,7 +8,9 @@ import java.util.Locale;
 
 import com.zoop.admin.jobs.AnalyzePlanState.ServiceBinding;
 import com.zoop.admin.review.JdbcReviewRepository;
+import com.zoop.admin.review.ReviewSyncProperties;
 import com.zoop.admin.review.ReviewTargetSync;
+import com.zoop.admin.review.ReviewTargetSyncScheduler;
 import com.zoop.ai.AiClientSettings;
 import com.zoop.ai.config.AiExtractionClientProperties;
 import com.zoop.ai.config.AiPlanAdmissionClientProperties;
@@ -28,7 +30,7 @@ public class AnalyzePlanConfiguration {
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnProperty(prefix = "zoop.analysis.analyze-plan", name = "enabled", havingValue = "true")
     @EnableConfigurationProperties({AiPlanAdmissionClientProperties.class, AiExtractionClientProperties.class,
-            AiRelationClientProperties.class})
+            AiRelationClientProperties.class, ReviewSyncProperties.class})
     static class Enabled {
         @Bean
         ServiceBinding analyzePlanServiceBinding(AnalyzePlanProperties properties,
@@ -44,15 +46,26 @@ public class AnalyzePlanConfiguration {
         @Bean
         AnalyzePlanWorker analyzePlanWorker(JdbcAnalyzePlanRepository repository, HttpPlanAdmissionClient admission,
                 HttpExtractionClient extraction, HttpRelationClient relation, Clock clock,
-                AnalyzePlanProperties properties, ServiceBinding binding, JdbcReviewRepository reviews,
-                PlatformTransactionManager transactions) {
-            return new AnalyzePlanWorker(repository, admission, extraction, relation, clock, properties, binding,
-                    new ReviewTargetSync(reviews, extraction, transactions, clock));
+                AnalyzePlanProperties properties, ServiceBinding binding) {
+            return new AnalyzePlanWorker(repository, admission, extraction, relation, clock, properties, binding);
         }
 
         @Bean
         AnalyzePlanScheduler analyzePlanScheduler(AnalyzePlanWorker worker, AnalyzePlanProperties properties) {
             return new AnalyzePlanScheduler(worker, properties.pollInterval());
+        }
+
+        /** Reads the results of the units this worker observed into the administrator's review targets (#133). */
+        @Bean
+        ReviewTargetSync reviewTargetSync(JdbcReviewRepository reviews, HttpExtractionClient extraction,
+                HttpRelationClient relation, PlatformTransactionManager transactions, Clock clock,
+                ReviewSyncProperties properties) {
+            return new ReviewTargetSync(reviews, extraction, relation, transactions, clock, properties.batch());
+        }
+
+        @Bean
+        ReviewTargetSyncScheduler reviewTargetSyncScheduler(ReviewTargetSync sync, ReviewSyncProperties properties) {
+            return new ReviewTargetSyncScheduler(sync, properties.interval());
         }
     }
 

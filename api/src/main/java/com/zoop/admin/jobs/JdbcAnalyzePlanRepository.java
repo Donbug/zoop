@@ -259,8 +259,7 @@ public class JdbcAnalyzePlanRepository {
                                 saved.resultContentSha256(), saved.receipts(), saved.failureCategory(), saved.failureCode(),
                                 saved.consecutiveFailures(), recoveryCount(j.attempts(), stageJobId));
                         return new StageWork(claim.planId(),rs.getInt("ordinal"),stage,s2submit,s3submit,
-                                rs.getString("s2_input_digest"),rs.getString("s3_input_digest"),current,
-                                s2.resultContentSha256());
+                                rs.getString("s2_input_digest"),rs.getString("s3_input_digest"),current);
                     }).stream().findFirst();
         });
     }

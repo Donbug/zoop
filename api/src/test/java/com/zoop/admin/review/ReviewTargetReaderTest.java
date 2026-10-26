@@ -125,13 +125,77 @@ class ReviewTargetReaderTest {
     }
 
     @Test
-    void anUnreadableDocumentWritesNothing() {
+    void onlyAMissingArrayRefusesTheWholeDocument() {
         String good = relation(rel('1'), "SUPPLIES", endpoint("company", "A"), endpoint("company", "B"), "hold", "1");
         assertThrows(Malformed.class, () -> ReviewTargetReader.read("{}", s3(good)));
-        assertThrows(Malformed.class, () -> ReviewTargetReader.read(s2(), s3(good.replace("\"hold\"", "\"maybe\""))));
-        assertThrows(Malformed.class, () -> ReviewTargetReader.read(s2(), s3(good.replace(rel('1'), "rc-short"))));
-        assertThrows(Malformed.class, () -> ReviewTargetReader.read(s2(), s3(good.replace("\"company\"", "\"person\""))));
-        assertThrows(Malformed.class, () -> ReviewTargetReader.read(
-                s2(event(EVENT_A, "candidate", "x"), event(EVENT_A, "candidate", "x")), s3(good)), "duplicate event id");
+        assertThrows(Malformed.class, () -> ReviewTargetReader.read(s2(), "{}"));
+    }
+
+    @Test
+    void anUnreadableRelationIsLeftOutAndTheRestOfTheJobIsKept() {
+        String good = relation(rel('1'), "SUPPLIES", endpoint("company", "A"), endpoint("company", "B"), "hold", "1");
+        Projection projection = ReviewTargetReader.read(s2(), s3(good,
+                relation(rel('2'), "SUPPLIES", endpoint("company", "A"), endpoint("company", "B"), "maybe", "1"),
+                relation("rc-short", "SUPPLIES", endpoint("company", "A"), endpoint("company", "B"), "hold", "1"),
+                relation(rel('3'), "SUPPLIES", endpoint("person", "A"), endpoint("company", "B"), "hold", "1"),
+                "42"));
+
+        assertEquals(4, projection.skipped());
+        assertEquals(List.of(rel('1'), rel('1')), projection.rows().stream().map(Row::externalId).toList());
+    }
+
+    @Test
+    void anUnreadableEventKeepsItsRelationsOut() {
+        String broken = "{\"eventCandidateId\":\"" + EVENT_A + "\",\"state\":\"candidate\"}";
+        Projection projection = ReviewTargetReader.read(s2(broken, event(EVENT_B, "candidate", "x", "A")),
+                s3(relation(rel('1'), "PARTICIPATES_IN", endpoint("company", "A"), endpoint("event", EVENT_A), "hold", "1"),
+                        relation(rel('2'), "PARTICIPATES_IN", endpoint("company", "A"), endpoint("event", EVENT_B), "hold", "1")));
+
+        assertEquals(1, projection.skipped());
+        assertEquals(List.of(EVENT_B), projection.rows().stream().filter(r -> r.type().equals("candidate"))
+                .map(Row::externalId).toList(), "the readable event and its relation stay");
+    }
+
+    @Test
+    void anEventWithoutAReadableIdMakesUnknownEventRelationsUnsafeToShow() {
+        Projection projection = ReviewTargetReader.read(s2("{\"eventCandidateId\":\"bad\"}"),
+                s3(relation(rel('1'), "PARTICIPATES_IN", endpoint("company", "A"), endpoint("event", "evc-unseen"), "hold", "1"),
+                        relation(rel('2'), "SUPPLIES", endpoint("company", "A"), endpoint("company", "B"), "hold", "1")));
+
+        assertEquals(1, projection.skipped());
+        assertEquals(1, projection.unknownEvents());
+        assertEquals(List.of(rel('2'), rel('2')), projection.rows().stream().map(Row::externalId).toList(),
+                "a relation without events is unaffected");
+    }
+
+    @Test
+    void twoEventsUnderOneIdAreNeitherListed() {
+        Projection projection = ReviewTargetReader.read(
+                s2(event(EVENT_A, "candidate", "x"), event(EVENT_A, "candidate", "x")),
+                s3(relation(rel('1'), "PARTICIPATES_IN", endpoint("company", "A"), endpoint("event", EVENT_A), "hold", "1")));
+
+        assertEquals(List.of(), projection.rows());
+        assertEquals(1, projection.skipped());
+    }
+
+    @Test
+    void anEventToEventRelationNeedsEveryEventEndpointListed() {
+        Map<String, Row> rows = byKey(ReviewTargetReader.read(
+                s2(event(EVENT_A, "candidate", "x"), event(EVENT_B, "candidate", "x"), event(EVENT_HELD, "candidate", "held")),
+                s3(relation(rel('1'), "FOLLOWS", endpoint("event", EVENT_A), endpoint("event", EVENT_HELD), "hold", "1"),
+                        relation(rel('2'), "FOLLOWS", endpoint("event", EVENT_HELD), endpoint("event", EVENT_A), "hold", "1"),
+                        relation(rel('3'), "FOLLOWS", endpoint("event", EVENT_B), endpoint("event", EVENT_A), "hold", "1"))));
+
+        assertEquals(java.util.Set.of("candidate:" + EVENT_B, "relation:" + rel('3')), rows.keySet(),
+                "a held endpoint on either side keeps the relation out; otherwise the first event owns it");
+    }
+
+    @Test
+    void sourceIdsInAnyLanguageAndTypesWithDigitsAreRead() {
+        Map<String, Row> rows = byKey(ReviewTargetReader.read(s2(),
+                s3(relation(rel('1'), "SUPPLIES_V2", endpoint("company", "삼성전자"), endpoint("company", "B"), "hold", "1"))));
+
+        assertEquals(List.of("B", "삼성전자"), rows.get("candidate:" + rel('1')).companyIds());
+        assertEquals(List.of("SUPPLIES_V2"), rows.get("relation:" + rel('1')).relationTypes());
     }
 }

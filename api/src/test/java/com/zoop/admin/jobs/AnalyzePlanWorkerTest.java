@@ -9,6 +9,8 @@ import com.jayway.jsonpath.JsonPath;
 import com.zoop.admin.auth.provision.AdminProvisioningService;
 import com.zoop.admin.auth.service.AdminSessionCookie;
 import com.zoop.admin.jobs.AnalyzePlanState.*;
+import com.zoop.admin.review.JdbcReviewRepository;
+import com.zoop.admin.review.ReviewTargetSync;
 import com.zoop.ai.*;
 import com.zoop.ai.extraction.*;
 import com.zoop.ai.plan.*;
@@ -29,11 +31,16 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -59,6 +66,8 @@ class AnalyzePlanWorkerTest {
     @Autowired AnalyzePlanWorker worker;
     @Autowired Script script;
     @Autowired MutableClock clock;
+    @Autowired JdbcReviewRepository reviews;
+    @Autowired PlatformTransactionManager transactions;
     private MockMvc mvc;
     private Cookie cookie;
     private String csrf;
@@ -105,12 +114,44 @@ class AnalyzePlanWorkerTest {
     }
 
     @Test
-    void theFetchedRelationResultReachesTheListenerOnceAndItsFailureLeavesTheJobAlone() {
-        script.listenerFails = true;
+    void reviewTargetSyncRoundsReadTheObservedUnitAgainUntilItsSourceSettles() {
+        String hold = "{\"relationCandidateId\":\"rc-" + "1".repeat(64) + "\",\"sourceRevision\":\"%s\",\"type\":\"SUPPLIES\","
+                + "\"subject\":{\"kind\":\"company\",\"ref\":\"A\"},\"object\":{\"kind\":\"company\",\"ref\":\"B\"},"
+                + "\"eligibility\":{\"status\":\"%s\"}}";
+        script.relations = "[" + hold.formatted("1", "pending") + "]";
         assertTrue(worker.runOnce());
         terminal("succeeded", null);
-        assertEquals(List.of(script.s2.jobId() + "|" + Canonical.sha256(script.payload(script.s2.jobId(), D)) + "|"
-                + script.s3.jobId()), script.fetched, "the recorded S2 result hash goes with the S3 result");
+        // Units other tests left observed in this database answer as unavailable; only this test's jobs reach the script.
+        ExtractionClient s2 = mock(ExtractionClient.class);
+        when(s2.result(anyString())).thenThrow(new IllegalStateException("other unit"));
+        doAnswer(call -> script.extraction().result(script.s2.jobId())).when(s2).result(script.s2.jobId());
+        RelationClient s3 = mock(RelationClient.class);
+        when(s3.result(anyString())).thenThrow(new IllegalStateException("other unit"));
+        doAnswer(call -> script.relation().result(script.s3.jobId())).when(s3).result(script.s3.jobId());
+        ReviewTargetSync sync = new ReviewTargetSync(reviews, s2, s3, transactions, clock, 500);
+
+        sync.runOnce();
+        assertEquals(0, targets(), "nothing decided yet: no target, so the unit stays in the unsynced pass");
+
+        script.relations = "[" + hold.formatted("2", "hold") + "]";
+        sync.runOnce();
+        assertEquals("HOLD", targetStatus("candidate"), "a later round picks the verdict up without the worker");
+        assertEquals("HOLD", targetStatus("relation"));
+
+        script.relations = "[" + hold.formatted("3", "eligible") + "]";
+        sync.runOnce();
+        assertEquals("ALLOW", targetStatus("relation"), "an approval in the AI source reaches the projection");
+        assertEquals("ALLOW", targetStatus("candidate"), "and the candidate's status follows");
+        assertEquals(2, targets());
+    }
+
+    private int targets() {
+        return jdbc.queryForObject("SELECT count(*) FROM review_targets WHERE source_job_id = ?", Integer.class, script.s3.jobId());
+    }
+
+    private String targetStatus(String type) {
+        return jdbc.queryForObject("SELECT status FROM review_targets WHERE source_job_id = ? AND target_type = ?", String.class,
+                script.s3.jobId(), type);
     }
 
     @Test
@@ -466,7 +507,7 @@ class AnalyzePlanWorkerTest {
         @Bean AnalyzePlanWorker worker(JdbcAnalyzePlanRepository repository, Script script, MutableClock clock,
                 AnalyzePlanProperties properties, ServiceBinding binding) {
             return new AnalyzePlanWorker(repository, script.admission(), script.extraction(), script.relation(), clock,
-                    properties, binding, clock::advance, script.listener());
+                    properties, binding, clock::advance);
         }
     }
 
@@ -508,18 +549,12 @@ class AnalyzePlanWorkerTest {
         int cancels;
         int admissionReads;
         Runnable afterSubmit;
-        final List<String> fetched = new ArrayList<>();
-        boolean listenerFails;
+        String eventCandidates;
+        String relations;
         Script(MutableClock clock) { this.clock = clock; }
-        RelationResultListener listener() {
-            return (upstream, s2ResultSha256, payload) -> {
-                fetched.add(upstream.jobId() + "|" + s2ResultSha256 + "|" + payload.jobId());
-                if (listenerFails) throw new IllegalStateException("projection failed");
-            };
-        }
         void reset() {
-            fetched.clear();
-            listenerFails = false;
+            eventCandidates = "[]";
+            relations = "[]";
             reference = new PlanReference("s2plan-" + Canonical.sha256(UUID.randomUUID().toString()), D);
             s2 = new ExtractionSubmission("probe-" + UUID.randomUUID(), D, ExecutionMode.REPLAY);
             s3 = new RelationSubmission(PlanIdentity.relationJobId(reference, s2.jobId(), D), PipelineJob.SourceKind.SYNTHETIC,
@@ -662,7 +697,9 @@ class AnalyzePlanWorkerTest {
                     PipelineJob.Next.FETCH_RESULT, accepted.acceptedAt(), clock.instant(), Optional.empty());
         }
         String payload(String id, String digest) {
-            return "{\"jobId\":\"" + id + "\",\"inputDigest\":\"" + digest + "\",\"modelText\":\"secret-model-text\"}";
+            String content = id.equals(s2.jobId()) ? "\"eventCandidates\":" + eventCandidates : "\"relations\":" + relations;
+            return "{\"jobId\":\"" + id + "\",\"inputDigest\":\"" + digest + "\",\"modelText\":\"secret-model-text\","
+                    + content + "}";
         }
         ExtractionServiceErrorException s2Error(AiOperation operation, int status, String code) {
             return new ExtractionServiceErrorException(operation, "probe", status, code, status >= 500,

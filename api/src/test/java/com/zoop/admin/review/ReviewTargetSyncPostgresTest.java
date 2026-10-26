@@ -17,6 +17,7 @@ import static org.mockito.Mockito.when;
 import com.zoop.ai.extraction.ExtractionClient;
 import com.zoop.ai.extraction.ExtractionResult;
 import com.zoop.ai.extraction.UntrustedExtractionPayload;
+import com.zoop.ai.relation.RelationClient;
 import com.zoop.ai.relation.RelationUpstream;
 import com.zoop.ai.relation.UntrustedRelationPayload;
 import com.zoop.common.json.Canonical;
@@ -65,7 +66,7 @@ class ReviewTargetSyncPostgresTest {
         s3Job = "s3-" + suffix;
         s2Json = s2(event(EVENT_A, "candidate", "new-event-candidate", "SK"), event(EVENT_HELD, "candidate", "held", "SK"));
         recorded = Canonical.sha256(s2Json);
-        sync = new ReviewTargetSync(reviews, extraction, transactions, Clock.systemUTC());
+        sync = new ReviewTargetSync(reviews, extraction, mock(RelationClient.class), transactions, Clock.systemUTC(), 10);
         upstreamResult(Optional.of(new UntrustedExtractionPayload(upstream.jobId(), S2_DIGEST, s2Json)));
     }
 
