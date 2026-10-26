@@ -3523,7 +3523,7 @@ The immutable published original of a round (what users saw before any correctio
 
 ### CandidateCounts
 
-
+Current candidate review targets: total = active + inactive (inactive = no relation of it is in the latest AI result). allow/hold/reject count active candidates only.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -4869,7 +4869,7 @@ same request again never toggles anything.
 
 ### GraphDbStatus
 
-
+getPipelineOverview: the active version's recorded graph state (unavailable without an active version or a recognized state). The graph database itself is the AI side's: neo4j, oldestPendingAt and lastCompletedAt are null there.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5388,7 +5388,7 @@ and the baseline stays where it was.
 
 ### LedgerRef
 
-
+getPipelineOverview: database is the app database (zoop-app) read at checkedAt (= asOf). The AI side's ledger is not read here.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5747,7 +5747,7 @@ FS062: one project mock profile with its account id, cash, valued holdings and w
 
 ### OverviewJobs
 
-Analysis jobs next to the ledger state: what is in progress and what failed (details: jobs tab).
+Analysis jobs next to the ledger state: what is in progress and what failed (details: jobs tab). ingest is the same baseline as listAnalysisJobs.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5786,7 +5786,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 
 ### PastRun
 
-
+getPipelineOverview: runId is the analysis job id. An analyze_plan job counts its units (processed) and its review targets by status so far (null until it has targets; pending and errorCount null); other jobs answer from their run report, null without one. usage is 0 where the app holds no usage (analyze_plan usage stays with the AI service).
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5806,7 +5806,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 
 ### PolicyInfo
 
-
+getPipelineOverview: version is the active graph version's policy version (null without one). decisionPolicy and validationModel belong to the AI side and are always null; the app never verifies on the web, so webVerification is always false.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5908,7 +5908,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 
 ### PublicationState
 
-
+ledgerMatchesActive: the most recently imported version is the active version (false while a newer import waits or was refused). issuesOnlyInLedger and issuesOnlyInActive are not compared yet and are always empty.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -6065,8 +6065,8 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 | allowed | 필수 | integer |  |
 | rejected | 필수 | integer |  |
 | holdPendingReview | 필수 | integer |  |
-| ruleCandidates | 필수 | integer | Candidates on the user graph through a publication rule right now |
-| ruleEvents | 필수 | integer | Events on the user graph that exist only because of a publication rule |
+| ruleCandidates | 필수 | integer | Candidates on the user graph through a publication rule right now. A rule never publishes a HOLD (AI answer 5-A), so this is 0. |
+| ruleEvents | 필수 | integer | Events on the user graph that exist only because of a publication rule. 0, as for ruleCandidates. |
 
 <a id="schema-reviewdecisionout"></a>
 
