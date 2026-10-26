@@ -43,6 +43,8 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "zoop.graph.auto-activation.enabled", havingValue = "true")
 public class GraphAutoActivationScheduler implements SmartLifecycle {
     private static final Logger log = LoggerFactory.getLogger(GraphAutoActivationScheduler.class);
+    /** How long a stop waits for a run in progress before the context goes on closing (its DataSource with it). */
+    static final Duration STOP_WAIT = Duration.ofSeconds(10);
 
     private final AdminGraphVersionService service;
     private final Clock clock;
@@ -71,16 +73,35 @@ public class GraphAutoActivationScheduler implements SmartLifecycle {
     public synchronized void start() {
         if (executor != null) return;
         executor = Executors.newSingleThreadScheduledExecutor(task -> new Thread(task, "graph-auto-activation"));
-        executor.scheduleWithFixedDelay(this::runOnce, interval.toMillis(), interval.toMillis(), TimeUnit.MILLISECONDS);
+        executor.scheduleWithFixedDelay(this::tick, interval.toMillis(), interval.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * The scheduled task. A scheduled executor silently cancels a task that throws, so not even an {@link Error} may escape:
+     * it is logged and the next run tries again.
+     */
+    void tick() {
+        try {
+            runOnce();
+        } catch (Throwable unexpected) {
+            log.error("Graph auto-activation run failed; the schedule continues", unexpected);
+        }
     }
 
     @Override
     public synchronized void stop() {
-        if (executor != null) {
-            // An activation in progress is one transaction: it commits or rolls back on its own; never interrupt it.
-            executor.shutdown();
-            executor = null;
+        if (executor == null) return;
+        // An activation in progress is one transaction: it commits or rolls back on its own; never interrupt it, but let it
+        // finish before the context closes the DataSource under it.
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(STOP_WAIT.toMillis(), TimeUnit.MILLISECONDS)) {
+                log.warn("Graph auto-activation run still in progress after {}; the context goes on closing", STOP_WAIT);
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
         }
+        executor = null;
     }
 
     @Override

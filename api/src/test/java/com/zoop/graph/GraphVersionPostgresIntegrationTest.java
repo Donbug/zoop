@@ -528,6 +528,21 @@ class GraphVersionPostgresIntegrationTest {
     }
 
     @Test
+    void anAdminRollbackIsNeverUndoneByAnImportThatWasAlreadyWaitingOnlyByALaterOne() {
+        Instant since = Instant.now().minusSeconds(600);
+        imported("auto-waiting", 96, Instant.now().minusSeconds(5));
+        // The administrator moves the pointer back to an older version: the waiting import is newer than it, but staged before.
+        repository.activateByAdmin("fixture-2026-10-01", "fixture-2026-10-08", "graph-admin-rollback", "rollback@example.com",
+                "rollback", () -> at -> { });
+
+        assertTrue(repository.autoActivationCandidate(since).isEmpty(),
+                "an import staged before the admin's choice never undoes it");
+
+        imported("auto-later", 97, Instant.now().plusSeconds(5));
+        assertEquals("auto-later", repository.autoActivationCandidate(since).orElseThrow().id(), "the next import counts again");
+    }
+
+    @Test
     void aRefusedCheckUnderTheLockKeepsThePointerAndWritesNoHistory() {
         Instant since = Instant.now().minusSeconds(60);
         imported("auto-3", 94, since.plusSeconds(1));

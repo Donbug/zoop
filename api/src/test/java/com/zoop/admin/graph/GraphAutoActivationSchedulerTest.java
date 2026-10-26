@@ -121,6 +121,16 @@ class GraphAutoActivationSchedulerTest {
     }
 
     @Test
+    void evenAnErrorNeverEscapesTheScheduledTaskSoTheScheduleKeepsRunning() {
+        when(service.importedCandidate(SINCE)).thenThrow(new StackOverflowError("synthetic"));
+
+        scheduler.tick();
+        scheduler.tick();
+
+        verify(service, times(2)).importedCandidate(SINCE);
+    }
+
+    @Test
     void itRunsOnlyInTheWebApplicationAndOnlyWhenEnabled() {
         // As the application does (SpringApplication registers it): "PT5M" → Duration for the @Value.
         var web = new WebApplicationContextRunner()
