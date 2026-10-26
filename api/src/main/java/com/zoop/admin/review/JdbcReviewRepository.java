@@ -147,6 +147,14 @@ public class JdbcReviewRepository {
                 JdbcReviewRepository::intent);
     }
 
+    /** How many intents are still open (pending or blocked) and were created before {@code before}. */
+    public long countOpenIntents(Instant before) {
+        Long count = jdbc.queryForObject("""
+                SELECT count(*) FROM review_decision_intents WHERE status IN ('pending', 'blocked') AND created_at < :before
+                """, new MapSqlParameterSource("before", Timestamp.from(before)), Long.class);
+        return count == null ? 0 : count;
+    }
+
     /** Sends an open intent to the back of {@link #openIntents} after a lookup that did not settle it. */
     public void touch(String intentId, Instant at) {
         jdbc.update("""
