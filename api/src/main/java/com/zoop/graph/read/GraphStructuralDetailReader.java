@@ -12,6 +12,7 @@ import com.zoop.graph.read.dto.StructuralDetails.Path;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Basis;
 import java.time.DateTimeException;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -119,7 +120,7 @@ public class GraphStructuralDetailReader {
                 Basis visible = visibleBases.get(basisId);
                 if (visible == null) { pathVisible = false; continue; }
                 require(visible.relationType().equals(b.string("relationType"))
-                        && visible.verifiedAt().equals(b.string("verifiedAt"))
+                        && visible.verifiedAt().equals(instantText(b.string("verifiedAt")))
                         && Objects.equals(visible.validFrom(), b.stringOrNull("validFrom"))
                         && Objects.equals(visible.validUntil(), b.stringOrNull("validUntil"))
                         && visible.countries().equals(b.strings("countries")));
@@ -157,6 +158,7 @@ public class GraphStructuralDetailReader {
         return result;
     }
     private static String articleKey(Obj article) { return article.string("articleId") + "@" + article.string("articleVersion"); }
+    private static String instantText(String value) { return OffsetDateTime.parse(value).toInstant().toString(); }
     private static String scope(Obj basis, String key) {
         String value = basis.stringOrNull(key);
         require(value == null || value.codePointCount(0, value.length()) <= 500);
