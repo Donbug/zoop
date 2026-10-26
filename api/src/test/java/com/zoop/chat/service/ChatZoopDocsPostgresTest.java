@@ -12,11 +12,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** The approved policies the migrations register in {@code term_versions}, read as citable sections. */
+/**
+ * The approved policies the migrations register in {@code term_versions}, read as citable sections. It only reads, so it
+ * uses the plain auth-postgres properties and shares their cached context instead of opening one more connection pool.
+ */
 @SpringBootTest(properties = {
         "ZOOP_AUTH_CSRF_ACTIVE_KEY_ID=test",
-        "ZOOP_AUTH_CSRF_KEYS=test=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        "zoop.chat.executor.enabled=false"
+        "ZOOP_AUTH_CSRF_KEYS=test=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 })
 @EnabledIfEnvironmentVariable(named = "DB_URL", matches = "jdbc:postgresql:.*")
 @Tag("auth-postgres")
