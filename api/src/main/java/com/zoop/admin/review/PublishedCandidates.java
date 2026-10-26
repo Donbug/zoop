@@ -5,15 +5,16 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import com.zoop.common.json.StrictJson;
 import com.zoop.common.json.StrictJson.Obj;
 import com.zoop.document.evidence.service.EvidenceService;
 import com.zoop.graph.read.DisclosureExclusionReader;
+import com.zoop.graph.read.EventDetailService;
 import com.zoop.graph.read.PublicGraphReader;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.version.GraphVersionSelector;
@@ -25,9 +26,9 @@ import org.springframework.stereotype.Component;
  * Which AI candidates users can see right now (#132 {@code onUserGraph}/{@code graphDb}). The active graph version's import
  * receipt keeps the AI source of every public relation ({@code sourceRefs}: S3 job and relation candidate) and of every public
  * issue ({@code sourceEvents}: S2 job and event candidate). An item counts as shown only when users can read it now: it is in the
- * snapshot after the current disclosure exclusions (the publication rules were applied at import) AND every evidence it cites
- * passes the same read gates the event detail applies ({@link EvidenceService#shownNow}: article access, source grant,
- * registry). An item of the receipt that fails either is {@code excluded}: it was published and is hidden now.
+ * snapshot after the current disclosure exclusions (the publication rules were applied at import) AND it passes the event
+ * detail's read gates ({@link EvidenceService#shownNow}: article access, source grant, registry): a relation needs every evidence
+ * it cites, an issue its head mentions ({@link EventDetailService#readable}). An item of the receipt that fails either is {@code excluded}: it was published and is hidden now.
  *
  * <p>Empty means it cannot be told: no active version, a synthetic fixture version (no receipt), an unreadable receipt or an
  * evidence gate that cannot be verified right now. The caller shows that as unknown, never as "not shown".
@@ -91,41 +92,51 @@ public class PublishedCandidates {
         try {
             String activeId = selector.select(null, null, null, requestId).version().id();
             long revision = exclusions.current(activeId).revision();
-            Instant now = clock.instant();
             Cached hit = cached;
-            if (hit != null && hit.versionId().equals(activeId) && hit.exclusionRevision() == revision
-                    && now.isBefore(hit.at().plus(TTL))) {
-                return Optional.of(hit.shown());
+            if (fresh(hit, activeId, revision)) return Optional.of(hit.shown());
+            // One reader computes; the others wait for its answer instead of gating the whole graph again in parallel.
+            synchronized (this) {
+                hit = cached;
+                if (fresh(hit, activeId, revision)) return Optional.of(hit.shown());
+                return compute(activeId, revision, requestId);
             }
-            PublicGraphReader.Pinned pinned = reader.read(null, null, null, requestId);
-            if (!IMPORTED.equals(pinned.selected().version().kind())) return Optional.empty();
-            String versionId = pinned.selected().version().id();
-            PublicGraphSnapshot snapshot = pinned.graph().snapshot();
-            Map<String, Boolean> judged = new HashMap<>();
-            Set<String> relationIds = new HashSet<>();
-            for (PublicGraphSnapshot.Relation r : snapshot.relations()) {
-                if (readable(r.evidenceIds(), versionId, requestId, judged)) relationIds.add(r.relationId());
-            }
-            Set<String> issueIds = new HashSet<>();
-            for (PublicGraphSnapshot.Issue i : snapshot.issues()) {
-                if (readable(i.evidenceIds(), versionId, requestId, judged)) issueIds.add(i.issueId());
-            }
-            Shown shown = read(receipts.graphImportBundle(versionId, requestId), versionId, relationIds, issueIds);
-            // Keyed by what was actually read: an activation or exclusion between the two reads is caught next time.
-            if (versionId.equals(activeId)) cached = new Cached(versionId, revision, now, shown);
-            return Optional.of(shown);
         } catch (RuntimeException unavailable) {
             log.warn("published candidates unknown: {}", unavailable.getClass().getSimpleName());
             return Optional.empty();
         }
     }
 
-    /** Every evidence passes the read gates now; a gate that cannot be verified throws (the whole answer is unknown). */
-    private boolean readable(List<String> evidenceIds, String versionId, String requestId, Map<String, Boolean> judged) {
-        for (String id : evidenceIds) {
-            if (!judged.computeIfAbsent(id, k -> receipts.shownNow(k, versionId, null, requestId))) return false;
+    private boolean fresh(Cached hit, String activeId, long revision) {
+        return hit != null && hit.versionId().equals(activeId) && hit.exclusionRevision() == revision
+                && clock.instant().isBefore(hit.at().plus(TTL));
+    }
+
+    private Optional<Shown> compute(String activeId, long revision, String requestId) {
+        Instant now = clock.instant();
+        PublicGraphReader.Pinned pinned = reader.read(null, null, null, requestId);
+        if (!IMPORTED.equals(pinned.selected().version().kind())) return Optional.empty();
+        String versionId = pinned.selected().version().id();
+        PublicGraphSnapshot snapshot = pinned.graph().snapshot();
+        Obj bundle = receipts.graphImportBundle(versionId, requestId);
+        // The event detail's evidence predicate: still in the filtered snapshot and readable now, asked once per id.
+        Set<String> inSnapshot = new HashSet<>();
+        snapshot.evidence().forEach(e -> inSnapshot.add(e.evidenceId()));
+        Map<String, Boolean> judged = new HashMap<>();
+        Predicate<String> shownNow = id -> inSnapshot.contains(id)
+                && judged.computeIfAbsent(id, k -> receipts.shownNow(k, versionId, null, requestId));
+        Set<String> relationIds = new HashSet<>();
+        for (PublicGraphSnapshot.Relation r : snapshot.relations()) {
+            if (r.evidenceIds().stream().allMatch(shownNow)) relationIds.add(r.relationId());
         }
-        return true;
+        // An issue is shown when a direct read of it is (getEvent's head check), not only when every evidence still is.
+        Set<String> issueIds = new HashSet<>();
+        for (PublicGraphSnapshot.Issue i : snapshot.issues()) {
+            if (EventDetailService.readable(bundle, i, shownNow)) issueIds.add(i.issueId());
+        }
+        Shown shown = read(bundle, versionId, relationIds, issueIds);
+        // Keyed by what was actually read: an activation or exclusion between the two reads is caught next time.
+        if (versionId.equals(activeId)) cached = new Cached(versionId, revision, now, shown);
+        return Optional.of(shown);
     }
 
     /** Pure: the receipt bundle and the ids users can read now; every other receipt item is excluded. */

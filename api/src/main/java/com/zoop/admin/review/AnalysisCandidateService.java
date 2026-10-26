@@ -4,7 +4,6 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -136,6 +135,15 @@ public class AnalysisCandidateService {
     }
 
     public CandidateDetail get(String candidateId, String requestId) {
+        try {
+            return detail(candidateId, requestId);
+        } catch (DataAccessException | StrictJson.Malformed unavailable) {
+            // The app store or an AI item this detail reads strictly: retryable, never a 500.
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, unavailable);
+        }
+    }
+
+    private CandidateDetail detail(String candidateId, String requestId) {
         Candidate candidate;
         try {
             candidate = candidates.candidate(candidateId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
@@ -155,13 +163,13 @@ public class AnalysisCandidateService {
         if (stale && refresher != null) {
             try {
                 refresher.sync(sources.unit().upstream(), sources.unit().s2ResultSha256(), sources.s3Payload());
-                candidate = candidates.candidate(candidateId)
-                        .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
-                rows = candidates.relations(List.of(candidate)).get(candidate.id());
             } catch (RuntimeException notRefreshed) {
                 // The projection stays as it was; a decision with its older expected values is refused (409), never wrong.
                 log.warn("candidate {} projection not refreshed: {}", candidateId, notRefreshed.getClass().getSimpleName());
             }
+            // Read again either way: a refresh that left the candidate no longer current is a 404, as the list no longer has it.
+            candidate = candidates.candidate(candidateId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+            rows = candidates.relations(List.of(candidate)).get(candidate.id());
         }
         Obj event = event(sources.s2(), candidate.candidateId());
         Obj mention = event == null ? null : event.object("mention");
@@ -312,17 +320,13 @@ public class AnalysisCandidateService {
             Optional<Shown> shown) {
         Obj subject = item.object("subject");
         Obj object = item.object("object");
+        // The subject company's role when it takes part, else the object company's: never another participant's.
         String role = null;
         if (mention != null) {
-            Set<String> companies = new LinkedHashSet<>();
             for (Obj endpoint : List.of(subject, object)) {
-                if ("company".equals(endpoint.string("kind"))) companies.add(endpoint.string("ref"));
-            }
-            for (Obj p : mention.objects("participants")) {
-                if (p.has("companyId") && !p.isNull("companyId") && companies.contains(p.string("companyId"))) {
-                    role = p.string("role");
-                    break;
-                }
+                if (!"company".equals(endpoint.string("kind"))) continue;
+                role = participantRole(mention, endpoint.string("ref"));
+                if (role != null) break;
             }
         }
         List<ReviewDecisionOut> own = decisions.getOrDefault(r.id(), List.of());
@@ -331,6 +335,15 @@ public class AnalysisCandidateService {
                 mention == null ? null : mention.stringOrNull("assertionStatus"), item.objects("citations").size(),
                 shown.map(s -> s.relation(r.s3JobId(), r.relationCandidateId())).orElse(false),
                 own.isEmpty() ? null : own.getFirst());
+    }
+
+    private static String participantRole(Obj mention, String companyId) {
+        for (Obj p : mention.objects("participants")) {
+            if (p.has("companyId") && !p.isNull("companyId") && companyId.equals(p.string("companyId"))) {
+                return p.has("role") ? p.stringOrNull("role") : null;
+            }
+        }
+        return null;
     }
 
     /** The automatic verdicts in the relation's AI event chain ({@code history[].kind=verdict}), oldest first. */

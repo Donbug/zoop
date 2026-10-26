@@ -73,7 +73,8 @@ public class JdbcCandidateRepository {
         if (filter.decision() != null) {
             String latest = """
                     (SELECT d.decision FROM review_decisions d JOIN review_targets r ON r.id = d.target_id
-                      WHERE r.target_type = 'relation' AND r.source_job_id = t.source_job_id AND r.candidate_id = t.candidate_id
+                      WHERE r.target_type = 'relation' AND r.is_current AND r.source_job_id = t.source_job_id
+                        AND r.candidate_id = t.candidate_id
                       ORDER BY d.id DESC LIMIT 1)""";
             if (filter.decision().equals("none")) sql.append(" AND ").append(latest).append(" IS NULL");
             else {
