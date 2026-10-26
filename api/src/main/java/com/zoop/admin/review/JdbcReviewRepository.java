@@ -5,6 +5,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -98,6 +99,44 @@ public class JdbcReviewRepository {
     }
 
     /**
+     * Marks which relation targets of an S3 job are in its latest complete reading: a relation that left it (back to no verdict,
+     * or no longer in the result) is inactive rather than listed with its last status, and active again when it comes back.
+     *
+     * @return the rows whose {@code active} flag changed
+     */
+    public int markPresentRelations(String sourceJobId, String sourceVersion, List<String> relationIds, Instant at) {
+        return jdbc.update("""
+                UPDATE review_targets SET active = (external_id = ANY(CAST(:ids AS text[]))), updated_at = :at
+                WHERE target_type = 'relation' AND source_job_id = :job AND source_version = :version
+                  AND active IS DISTINCT FROM (external_id = ANY(CAST(:ids AS text[])))
+                """, new MapSqlParameterSource("ids", relationIds.toArray(String[]::new)).addValue("job", sourceJobId)
+                .addValue("version", sourceVersion).addValue("at", Timestamp.from(at)));
+    }
+
+    /**
+     * Derives each candidate target of an S3 job from its active current relation targets: HOLD while any is, else ALLOW while
+     * any is, else REJECT; a candidate with none left is inactive. Run after the sync wrote the relations and after a decision
+     * settled one, so the candidate follows both without waiting for the next reading.
+     *
+     * @return the candidate rows that changed
+     */
+    public int refreshCandidates(String sourceJobId, Instant at) {
+        return jdbc.update("""
+                UPDATE review_targets c SET status = d.status, active = d.active, updated_at = :at
+                FROM (SELECT c2.id,
+                             CASE WHEN bool_or(r.status = 'HOLD') THEN 'HOLD' WHEN bool_or(r.status = 'ALLOW') THEN 'ALLOW'
+                                  WHEN count(r.id) > 0 THEN 'REJECT' ELSE c2.status END AS status,
+                             count(r.id) > 0 AS active
+                      FROM review_targets c2
+                      LEFT JOIN review_targets r ON r.target_type = 'relation' AND r.active AND r.is_current
+                           AND r.source_job_id = c2.source_job_id AND r.candidate_id = c2.candidate_id
+                      WHERE c2.target_type = 'candidate' AND c2.source_job_id = :job AND c2.is_current
+                      GROUP BY c2.id, c2.status) d
+                WHERE c.id = d.id AND (c.status, c.active) IS DISTINCT FROM (d.status, d.active)
+                """, new MapSqlParameterSource("job", sourceJobId).addValue("at", Timestamp.from(at)));
+    }
+
+    /**
      * An analyze-plan unit whose S3 result the worker observed: what the review-target sync reads. {@code s2ResultSha256} is the
      * S2 result content hash the unit recorded, so the S2 result read again can be proven to be that content.
      */
@@ -113,12 +152,17 @@ public class JdbcReviewRepository {
               AND u.s2_checkpoint->>'resultContentSha256' IS NOT NULL
             """;
 
-    /** Observed units with no review target yet (never synced, or a sync that failed or found nothing decided), oldest first. */
-    public List<SyncUnit> unsyncedUnits(int limit) {
+    /**
+     * Observed units with no review target yet (never synced, or a sync that failed or found nothing decided), oldest first,
+     * except the S3 jobs in {@code skipJobIds}: units tried a moment ago that yielded nothing must not hold the pass forever.
+     */
+    public List<SyncUnit> unsyncedUnits(int limit, Collection<String> skipJobIds) {
         return jdbc.query(SYNC_UNIT + """
                   AND NOT EXISTS (SELECT 1 FROM review_targets t WHERE t.source_job_id = u.s3_job_id)
+                  AND NOT (u.s3_job_id = ANY(CAST(:skip AS text[])))
                 ORDER BY u.s3_checkpoint->>'resultObservedAt', u.plan_id, u.ordinal LIMIT :limit
-                """, new MapSqlParameterSource("limit", limit), JdbcReviewRepository::syncUnit);
+                """, new MapSqlParameterSource("limit", limit).addValue("skip", skipJobIds.toArray(String[]::new)),
+                JdbcReviewRepository::syncUnit);
     }
 
     /** Observed units after ({@code planId}, {@code ordinal}) in key order: one page of the round-robin refresh. */

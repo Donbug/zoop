@@ -9,6 +9,7 @@ import static com.zoop.admin.review.ReviewTargetReaderTest.relation;
 import static com.zoop.admin.review.ReviewTargetReaderTest.s2;
 import static com.zoop.admin.review.ReviewTargetReaderTest.s3;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -153,6 +154,44 @@ class ReviewTargetSyncPostgresTest {
         sync.sync(upstream, recorded, result("hold", "2"));
 
         assertEquals("ALLOW", status("relation", rel('2')));
+    }
+
+    @Test
+    void aRelationThatLeftTheResultIsInactiveAndTheCandidateFollowsWhatIsLeft() {
+        sync.sync(upstream, recorded, result("hold", "2"));
+
+        sync.sync(upstream, recorded, result("pending", "3"));
+        assertFalse(active("relation", rel('2')), "no verdict any more: not listed with its last HOLD");
+        assertEquals("ALLOW", status("candidate", EVENT_A), "only the allowed relation is left");
+        assertTrue(active("candidate", EVENT_A));
+
+        sync.sync(upstream, recorded, new UntrustedRelationPayload(s3Job, S3_DIGEST, s3(
+                relation(rel('4'), "SUPPLIES", endpoint("company", "A"), endpoint("company", "B"), "hold", "1")), List.of()));
+        assertFalse(active("candidate", EVENT_A), "no relation left: the candidate is not listed either");
+        assertTrue(active("candidate", rel('4')), "the standalone one is untouched");
+
+        sync.sync(upstream, recorded, result("hold", "4"));
+        assertTrue(active("relation", rel('2')), "back in the result: listed again");
+        assertEquals("HOLD", status("candidate", EVENT_A));
+        assertTrue(active("candidate", EVENT_A));
+    }
+
+    @Test
+    void anUnreadableRelationLeavesEveryRowAsItWas() {
+        sync.sync(upstream, recorded, result("hold", "2"));
+
+        sync.sync(upstream, recorded, new UntrustedRelationPayload(s3Job, S3_DIGEST, s3(
+                relation(rel('1'), "PARTICIPATES_IN", endpoint("company", "SK"), endpoint("event", EVENT_A), "eligible", "1"),
+                relation(rel('2'), "PARTICIPATES_IN", endpoint("company", "SS"), endpoint("event", EVENT_A), "unknown", "3")),
+                List.of()));
+
+        assertTrue(active("relation", rel('2')), "it may still be there: only a complete reading deactivates");
+        assertEquals("HOLD", status("candidate", EVENT_A));
+    }
+
+    private boolean active(String type, String external) {
+        return jdbc.queryForObject("SELECT active FROM review_targets WHERE source_job_id = ? AND target_type = ? "
+                + "AND external_id = ?", Boolean.class, s3Job, type, external);
     }
 
     @Test

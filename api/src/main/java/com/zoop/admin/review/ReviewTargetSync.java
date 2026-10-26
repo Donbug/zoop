@@ -1,9 +1,13 @@
 package com.zoop.admin.review;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import com.zoop.admin.review.JdbcReviewRepository.SyncUnit;
 import com.zoop.ai.extraction.ExtractionClient;
@@ -25,11 +29,15 @@ import org.springframework.transaction.support.TransactionTemplate;
  * ({@link ReviewTargetReader}), and it must be exactly the content the unit recorded.
  *
  * <p>It runs on its own schedule, never inside the analyze-plan worker's lease, so a failed or missed sync is simply tried again on
- * a later round. Each round reads every unit that has no target yet, then the next page of all observed units in key order.
+ * a later round. Each round reads the units that have no target yet (one that yielded nothing waits {@link #RETRY_AFTER} before the
+ * first pass reads it again), then the next page of all observed units in key order. Each reading also marks the relations that
+ * left the result inactive and derives every candidate's status from its active relations.
  * Nothing here is the authority: whether a relation is approved stays the AI source's {@code approvalBasis}.
  */
 public final class ReviewTargetSync {
     private static final Logger log = LoggerFactory.getLogger(ReviewTargetSync.class);
+    /** How long a unit that still has no target stays out of the first pass (the key-order pass still reads it). */
+    public static final Duration RETRY_AFTER = Duration.ofMinutes(5);
 
     private final JdbcReviewRepository reviews;
     private final ExtractionClient extraction;
@@ -39,6 +47,8 @@ public final class ReviewTargetSync {
     private final int batch;
     private String afterPlan = "";
     private int afterOrdinal;
+    /** S3 job id of a unit the first pass tried without a result, and when it may try again; in memory, a restart retries all. */
+    private final Map<String, Instant> retryAt = new HashMap<>();
 
     public ReviewTargetSync(JdbcReviewRepository reviews, ExtractionClient extraction, RelationClient relation,
             PlatformTransactionManager transactions, Clock clock, int batch) {
@@ -54,9 +64,16 @@ public final class ReviewTargetSync {
     /** One round. A unit that fails is logged and left for the next round; it never stops the others. */
     public synchronized int runOnce() {
         int synced = 0;
-        for (SyncUnit unit : reviews.unsyncedUnits(batch)) synced += attempt(unit);
+        Instant now = clock.instant();
+        retryAt.values().removeIf(at -> !now.isBefore(at));
+        for (SyncUnit unit : reviews.unsyncedUnits(batch, Set.copyOf(retryAt.keySet()))) {
+            Optional<Integer> written = attempt(unit);
+            if (written.isPresent()) synced++;
+            // Still no target (failed, withheld, nothing decided or nothing listed): let the newer units have the pass for a while.
+            if (written.orElse(0) == 0) retryAt.put(unit.s3JobId(), now.plus(RETRY_AFTER));
+        }
         List<SyncUnit> page = reviews.unitsAfter(afterPlan, afterOrdinal, batch);
-        for (SyncUnit unit : page) synced += attempt(unit);
+        for (SyncUnit unit : page) if (attempt(unit).isPresent()) synced++;
         if (page.size() < batch) {
             afterPlan = "";
             afterOrdinal = 0;
@@ -67,12 +84,12 @@ public final class ReviewTargetSync {
         return synced;
     }
 
-    private int attempt(SyncUnit unit) {
+    private Optional<Integer> attempt(SyncUnit unit) {
         try {
-            return syncUnit(unit).isPresent() ? 1 : 0;
+            return syncUnit(unit);
         } catch (RuntimeException failed) {
             log.warn("review-target sync of {} failed: {}", unit.s3JobId(), failed.getClass().getSimpleName());
-            return 0;
+            return Optional.empty();
         }
     }
 
@@ -115,9 +132,21 @@ public final class ReviewTargetSync {
                     payload.jobId(), projection.unknownEvents());
         }
         Instant at = clock.instant();
-        int written = transaction.execute(status -> (int) projection.rows().stream()
-                .filter(row -> reviews.upsertTarget(payload.jobId(), payload.inputDigest(), row, at)).count());
-        log.info("review-target sync of {}: {} of {} row(s) written", payload.jobId(), written, projection.rows().size());
+        int written = transaction.execute(status -> {
+            int rows = (int) projection.rows().stream()
+                    .filter(row -> reviews.upsertTarget(payload.jobId(), payload.inputDigest(), row, at)).count();
+            // An unreadable item may be a relation still there: only a complete reading tells which ones left.
+            if (projection.skipped() == 0) {
+                rows += reviews.markPresentRelations(payload.jobId(), payload.inputDigest(), projection.rows().stream()
+                        .filter(row -> row.type().equals("relation")).map(ReviewTargetReader.Row::externalId).toList(), at);
+            }
+            return rows + reviews.refreshCandidates(payload.jobId(), at);
+        });
+        if (written > 0) {
+            log.info("review-target sync of {}: {} row(s) changed", payload.jobId(), written);
+        } else {
+            log.debug("review-target sync of {}: unchanged", payload.jobId());
+        }
         return Optional.of(written);
     }
 }

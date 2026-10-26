@@ -131,9 +131,10 @@ class AnalyzePlanWorkerTest {
         ReviewTargetSync sync = new ReviewTargetSync(reviews, s2, s3, transactions, clock, 500);
 
         sync.runOnce();
-        assertEquals(0, targets(), "nothing decided yet: no target, so the unit stays in the unsynced pass");
+        assertEquals(0, targets(), "nothing decided yet: no target, so the unit comes back to the unsynced pass after a while");
 
         script.relations = "[" + hold.formatted("2", "hold") + "]";
+        clock.advance(ReviewTargetSync.RETRY_AFTER);
         sync.runOnce();
         assertEquals("HOLD", targetStatus("candidate"), "a later round picks the verdict up without the worker");
         assertEquals("HOLD", targetStatus("relation"));
