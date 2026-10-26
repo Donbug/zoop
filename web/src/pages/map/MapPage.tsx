@@ -20,7 +20,10 @@ import { companyPath } from '@/components/graph/company-path';
 import ImpactPathPanel from '@/components/graph/ImpactPathPanel';
 import CompanyDetailPanel from '@/components/graph/CompanyDetailPanel';
 import RelationDetailPanel from '@/components/graph/RelationDetailPanel';
-import type { RelationDetail, StructuralSupplyLink } from '@/types/map/relation';
+import type {
+  RelationDetail,
+  StructuralSupplyLink,
+} from '@/types/map/relation';
 import EventDetailPanel, {
   type EventAction,
 } from '@/components/graph/EventDetailPanel';
