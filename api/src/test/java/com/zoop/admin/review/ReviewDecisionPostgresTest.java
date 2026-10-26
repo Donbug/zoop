@@ -15,11 +15,22 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.zoop.admin.audit.JdbcAdminIdempotencyStore;
 import com.zoop.admin.auth.provision.AdminProvisioningService;
 import com.zoop.admin.auth.repository.AdminAuditRepository;
 import com.zoop.admin.auth.service.AdminPrincipal;
+import com.zoop.admin.auth.service.AdminSessionCookie;
+import com.zoop.common.request.RequestIdFilter;
+import com.jayway.jsonpath.JsonPath;
+import jakarta.servlet.http.Cookie;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 import com.zoop.admin.review.RelationReviewClient.Lookup;
 import com.zoop.admin.review.RelationReviewClient.Operation;
 import com.zoop.admin.review.RelationReviewClient.Refusal;
@@ -77,6 +88,7 @@ import tools.jackson.databind.ObjectMapper;
 @Tag("auth-postgres")
 class ReviewDecisionPostgresTest {
     private static final String PASSWORD = "Secure admin password 2026";
+    private static final String ORIGIN = "https://zoop.example";
 
     /**
      * What the AI source was asked and what its ledger holds (operation id -> the operation it reports). {@code next} is the error
@@ -133,6 +145,8 @@ class ReviewDecisionPostgresTest {
     @Autowired AdminAuditRepository auditRepository;
     @Autowired PlatformTransactionManager transactions;
     @Autowired ObjectMapper objectMapper;
+    @Autowired WebApplicationContext context;
+    @Autowired RequestIdFilter requestIds;
 
     private AdminPrincipal admin;
     private String suffix;
@@ -611,6 +625,100 @@ class ReviewDecisionPostgresTest {
         service.reconcile(Instant.now().plusSeconds(60), 1000);
         assertEquals(0, decisionCount(ids.relationTarget()), "nor does the reconciler settle it");
     }
+
+    @Test
+    void theDecisionRouteSendsAnApprovalOfOneHoldRelationAndTheCandidateFollows() throws Exception {
+        Ids ids = insertCandidateWithRelation("HOLD");
+        Http http = http();
+        String body = decisionBody("allow", ids.relation(), 0, "7");
+
+        http.mvc().perform(http.decide(ids.candidate(), "route-" + suffix).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.candidateId").value(ids.candidate()))
+                .andExpect(jsonPath("$.decision").value("approved"))
+                .andExpect(jsonPath("$.revision").value(1))
+                .andExpect(jsonPath("$.publicChanged").value(false));
+        assertEquals(1, source.calls.size());
+        assertEquals("ALLOW", jdbc.queryForObject("SELECT status FROM review_targets WHERE id = ?", String.class,
+                ids.relationTarget()));
+        assertEquals("ALLOW", jdbc.queryForObject("SELECT status FROM review_targets WHERE id = ?", String.class,
+                ids.candidate()), "the candidate follows its relations at once");
+
+        // The same key and body replay the stored answer without a second AI call; another body under it is a conflict.
+        http.mvc().perform(http.decide(ids.candidate(), "route-" + suffix).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.revision").value(1));
+        assertEquals(1, source.calls.size());
+        http.mvc().perform(http.decide(ids.candidate(), "route-" + suffix)
+                        .content(decisionBody("reject", ids.relation(), 0, "7")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.error.code").value("IDEMPOTENCY_CONFLICT"));
+    }
+
+    @Test
+    void theDecisionRouteRefusesWhatTheContractDoesNotCarryBeforeTheSource() throws Exception {
+        Ids ids = insertCandidateWithRelation("HOLD");
+        Http http = http();
+        String body = decisionBody("allow", ids.relation(), 0, "7");
+        String route = "/api/v1/admin/pipeline/candidates/{id}/decision";
+
+        http.mvc().perform(post(route, ids.candidate()).header("Origin", ORIGIN).contentType("application/json")
+                .content(body)).andExpect(status().isUnauthorized());
+        http.mvc().perform(post(route, ids.candidate()).cookie(http.cookie()).header("Origin", ORIGIN)
+                .header("Idempotency-Key", "no-csrf-" + suffix).contentType("application/json").content(body))
+                .andExpect(status().isForbidden());
+        http.mvc().perform(post(route, ids.candidate()).cookie(http.cookie()).header("Origin", ORIGIN)
+                .header("X-CSRF-Token", http.csrf()).contentType("application/json").content(body))
+                .andExpect(status().isUnprocessableContent()).andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        // relationId is required: the AI source decides relations only, never a whole candidate.
+        http.mvc().perform(http.decide(ids.candidate(), "no-relation-" + suffix).content(
+                        "{\"decision\":\"allow\",\"reason\":\"검수 사유\",\"expectedRevision\":0,"
+                        + "\"expectedSourceVersion\":\"digest-" + suffix + "\",\"expectedSourceRevision\":\"7\"}"))
+                .andExpect(status().isUnprocessableContent()).andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        http.mvc().perform(http.decide("rt-missing-" + suffix, "missing-" + suffix).content(body))
+                .andExpect(status().isNotFound());
+        http.mvc().perform(http.decide(ids.candidate(), "stale-" + suffix)
+                        .content(decisionBody("allow", ids.relation(), 0, "6")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.error.code").value("REVISION_CONFLICT"));
+        assertEquals(0, source.calls.size(), "none of these reached the AI source");
+        assertEquals("HOLD", jdbc.queryForObject("SELECT status FROM review_targets WHERE id = ?", String.class,
+                ids.relationTarget()));
+    }
+
+    @Test
+    void aRelationThatLeftTheLatestAiResultIsAConflictNotADecision() throws Exception {
+        Ids ids = insertCandidateWithRelation("HOLD");
+        jdbc.update("UPDATE review_targets SET active = false WHERE id = ?", ids.relationTarget());
+        Http http = http();
+
+        http.mvc().perform(http.decide(ids.candidate(), "inactive-" + suffix)
+                        .content(decisionBody("allow", ids.relation(), 0, "7")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.error.code").value("REVISION_CONFLICT"));
+        assertEquals(0, source.calls.size(), "not listed any more: never sent");
+        assertEquals(0, decisionCount(ids.relationTarget()));
+    }
+
+    private record Http(MockMvc mvc, Cookie cookie, String csrf) {
+        MockHttpServletRequestBuilder decide(String candidate, String key) {
+            return post("/api/v1/admin/pipeline/candidates/{id}/decision", candidate).cookie(cookie).header("Origin", ORIGIN)
+                    .header("X-CSRF-Token", csrf).header("Idempotency-Key", key).contentType("application/json");
+        }
+    }
+
+    private Http http() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(requestIds).build();
+        String email = "decision-route-" + UUID.randomUUID() + "@example.com";
+        provisioning.provision(email, "Decision Route", PASSWORD, "decision-route-provision-" + UUID.randomUUID());
+        var login = mvc.perform(post("/api/v1/admin/auth/login").header("Origin", ORIGIN).contentType("application/json")
+                .content("{\"email\":\"" + email + "\",\"password\":\"" + PASSWORD + "\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse();
+        return new Http(mvc, login.getCookie(AdminSessionCookie.NAME), JsonPath.read(login.getContentAsString(), "$.csrfToken"));
+    }
+
+    private String decisionBody(String decision, String relationId, long revision, String sourceRevision) {
+        return "{\"decision\":\"" + decision + "\",\"reason\":\"검수 사유\",\"relationId\":\"" + relationId
+                + "\",\"expectedRevision\":" + revision + ",\"expectedSourceVersion\":\"digest-" + suffix
+                + "\",\"expectedSourceRevision\":\"" + sourceRevision + "\"}";
+    }
+
 
     private record Ids(String job, String candidate, String relationTarget, String relation) {
     }

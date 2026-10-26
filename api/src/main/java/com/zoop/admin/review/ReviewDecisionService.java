@@ -300,13 +300,18 @@ public class ReviewDecisionService {
         return mapper.writeValueAsString(body);
     }
 
-    /** The decided target: a relation of the candidate when {@code relationId} is set; a candidate-level decision is refused. */
+    /**
+     * The decided target: a relation of the candidate ({@code relationId} is required: the AI source decides relations only). A
+     * relation that left the latest AI result (inactive, not listed) no longer matches the state the administrator saw.
+     */
     private Target resolve(String candidateId, ReviewDecision.Request request) {
         Target candidate = reviews.currentCandidate(candidateId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
         if (request.relationId() == null) throw new CustomException(ErrorCode.INVALID_REQUEST);
-        return reviews.currentRelation(candidate, request.relationId())
+        Target relation = reviews.currentRelation(candidate, request.relationId())
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+        if (!relation.active()) throw new CustomException(ErrorCode.REVISION_CONFLICT);
+        return relation;
     }
 
     /** All three expected values must match, and only a HOLD can be decided (an ALLOW or a settled reject is out of scope). */
