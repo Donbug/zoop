@@ -1,12 +1,13 @@
 package com.zoop.admin.review;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -24,6 +25,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -59,13 +63,19 @@ class ReviewTargetSyncTest {
     }
 
     @Test
-    void anErrorInARoundNeverEndsTheSchedule() {
+    void anErrorInARoundNeverEndsTheSchedule() throws Exception {
         ReviewTargetSync sync = mock(ReviewTargetSync.class);
-        when(sync.runOnce()).thenThrow(new AssertionError("unexpected")).thenReturn(0);
+        AtomicInteger rounds = new AtomicInteger();
+        CountDownLatch next = new CountDownLatch(1);
+        doAnswer(call -> {
+            if (rounds.incrementAndGet() == 1) throw new Error("unexpected");
+            next.countDown();
+            return 0;
+        }).when(sync).runOnce();
         var scheduler = new ReviewTargetSyncScheduler(sync, Duration.ofMillis(10));
         scheduler.start();
         try {
-            verify(sync, timeout(5_000).atLeast(2)).runOnce();
+            assertTrue(next.await(30, TimeUnit.SECONDS), "a round after the failed one still ran");
         } finally {
             scheduler.stop();
         }
