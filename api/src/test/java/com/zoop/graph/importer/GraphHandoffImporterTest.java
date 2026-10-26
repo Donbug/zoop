@@ -533,7 +533,19 @@ class GraphHandoffImporterTest {
         mvc.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.status").value("available"));
         Files.writeString(receiptFile(versionId), "{}");
-        mvc.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isServiceUnavailable());
+        mvc.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.relationType")
+                        .value("STRUCTURALLY_RELATED_TO"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.status")
+                        .value("unavailable"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.reason")
+                        .value("details_not_available"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.metadata.partial")
+                        .value(true))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.metadata.failures[0].code")
+                        .value("STRUCTURAL_DETAIL_UNAVAILABLE"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.metadata.failures[0].retryable")
+                        .value(false));
     }
 
     @Test
