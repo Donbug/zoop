@@ -130,7 +130,7 @@ flowchart LR
 
 웹 검색 대체 경로(`web.search`)는 위 순서와 별개로, 내부 도구로 답할 수 없는 Q03 요구에만 보충 라운드로 부르는 검색 API 직접 어댑터로 설계했다(MCP 미사용). 공급자·비용·개인정보 처리방침 개정이 결정되기 전에는 구현하지 않는다. [웹 검색 대체 경로 설계](../design/ai-chatbot-web-search.md)
 
-근거가 일부만 있는 질문의 처리는 [부분 답변 분기와 일반 지식 대체 경로 설계](../design/ai-chatbot-partial-answer.md)에 있다. 1부(개념과 사실이 섞인 요구에서 서버가 개념 하위 요구 `<id>-c`를 나눔)는 현재 정책 안이라 기능 플래그 없이 구현했다(2026-10-26, `ChatPlanner.withConcepts`). 2부(Q03 근거 0개일 때 대상 이름·사실 없는 일반 배경 구간)는 구현 전이며 거버넌스 개정 승인 뒤에 켠다.
+근거가 일부만 있는 질문의 처리는 [부분 답변 분기와 근거 부족 안내 설계](../design/ai-chatbot-partial-answer.md)에 있다(2026-10-26 구현). 1부는 개념과 사실이 섞인 요구에서 서버가 개념 하위 요구 `<id>-c`를 나눠 개념은 답한다(`ChatPlanner.withConcepts`, 기능 플래그 없음). Q03 근거 0개일 때 일반 배경을 붙이는 2부는 동문서답 위험으로 채택하지 않았다. 대신 근거 부족 결과의 `reason`을 원인별 서버 문장과 다음에 해 볼 일로 나누고, `applied`에 실제로 확인한 대상을 담는다(`ChatResults.InsufficientCause`).
 
 모든 어댑터는 공통 요청·결과 봉투를 사용하고 `dataVersion`, `evidenceIds`, `truncated`, `nextAllowed`, 실제 오류를 반환한다. 회원 ID는 모델이나 사용자 입력에서 받지 않고 Java 인증 문맥에서 주입한다.
 
