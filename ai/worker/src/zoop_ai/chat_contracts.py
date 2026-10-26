@@ -6,7 +6,8 @@ versions, purposes, receipts and failure states apart from S1):
 - `chat-router`: native Jev, typed Noul probabilities per requirement for the Q01-Q08 tags, the bound capabilities and
   prohibited advice.
 - `chat-answer`: Luna `answer-generator`, a strict JSON answer by sections over the branch context.
-- `chat-verification`: native Jev, per section a support Choice (evidence sections only) and a prohibited-advice Noul.
+- `chat-verification`: native Jev, per section a support Choice (sections with quotes only: evidence and ZOOP document
+  sections) and a prohibited-advice Noul.
 
 The application never sends member ids, emails, account data or full article texts. Quoted spans carry their `sourceId` so the
 operator chat grant registry decides whether they may be sent to a recipient.
@@ -23,7 +24,8 @@ from .contracts import Wire
 CHAT_SCHEMA_VERSION = "zoop-ai-chat-1"
 ChatStage = Literal["chat-router", "chat-answer", "chat-verification"]
 QueryType = Literal["Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08"]
-Basis = Literal["general_knowledge", "evidence_grounded"]
+# `zoop_documented` rests on ZOOP's own approved documents (policies), `evidence_grounded` on public evidence.
+Basis = Literal["general_knowledge", "zoop_documented", "evidence_grounded"]
 
 MAX_REQUIREMENTS = 6
 MAX_SECTIONS = 12

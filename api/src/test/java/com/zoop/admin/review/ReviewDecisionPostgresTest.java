@@ -5,23 +5,42 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import com.zoop.admin.audit.JdbcAdminIdempotencyStore;
 import com.zoop.admin.auth.provision.AdminProvisioningService;
+import com.zoop.admin.auth.repository.AdminAuditRepository;
 import com.zoop.admin.auth.service.AdminPrincipal;
 import com.zoop.admin.review.RelationReviewClient.Lookup;
 import com.zoop.admin.review.RelationReviewClient.Operation;
 import com.zoop.admin.review.RelationReviewClient.Refusal;
 import com.zoop.admin.review.RelationReviewClient.Refused;
+import com.zoop.ai.AiOperation;
+import com.zoop.ai.AiTransportException;
+import com.zoop.ai.relation.RelationClient;
+import com.zoop.ai.relation.RelationDecision;
+import com.zoop.ai.relation.RelationOperationStatus;
+import com.zoop.ai.relation.RelationReviewRequest;
+import com.zoop.ai.relation.RelationOperationAcknowledgement;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
+import com.zoop.common.json.Canonical;
 import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -45,6 +64,8 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import tools.jackson.databind.ObjectMapper;
 
 /** Review decisions over the real migration, publication lock, idempotency and audit tables, with a recording AI source. */
 @SpringBootTest(properties = {
@@ -108,6 +129,10 @@ class ReviewDecisionPostgresTest {
     @Autowired JdbcTemplate jdbc;
     @MockitoSpyBean JdbcReviewRepository reviews;
     @Autowired AdminProvisioningService provisioning;
+    @Autowired JdbcAdminIdempotencyStore idempotencyStore;
+    @Autowired AdminAuditRepository auditRepository;
+    @Autowired PlatformTransactionManager transactions;
+    @Autowired ObjectMapper objectMapper;
 
     private AdminPrincipal admin;
     private String suffix;
@@ -469,6 +494,122 @@ class ReviewDecisionPostgresTest {
         assertFalse(refused.getMessage().isBlank());
         assertEquals(Refusal.UNCONFIRMED, assertThrows(Refused.class, () -> unconfigured.lookup("j", "op")).refusal());
         assertEquals(Refusal.CONTRACT, Refusal.of("a_code_this_app_does_not_know"));
+    }
+
+    // ---- the real AI adapter over the S3 transport (4-C) ---------------------------------------------------------------------
+
+    /** The service with {@link AiRelationReviewClient} over a stubbed S3 transport, instead of the fake source. */
+    private ReviewDecisionService overTransport(RelationClient relations) {
+        return new ReviewDecisionService(reviews, idempotencyStore, auditRepository, new AiRelationReviewClient(relations),
+                transactions, objectMapper, Clock.systemUTC());
+    }
+
+    /** A candidate and one HOLD relation whose ids, version and revision fit the AI review contract. */
+    private Ids insertContractCandidate(String sourceRevision) {
+        String job = "job-s3-" + UUID.randomUUID();
+        String candidateCandidateId = "cand-" + UUID.randomUUID();
+        String candidateTarget = "rt-" + UUID.randomUUID();
+        String relationTarget = "rt-" + UUID.randomUUID();
+        String relation = "rc-" + Canonical.sha256(suffix + relationTarget);
+        Instant now = Instant.now();
+        String sql = """
+                INSERT INTO review_targets (id, target_type, source_job_id, external_id, source_version, candidate_id,
+                                            status, source_revision, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'HOLD', ?, ?)
+                """;
+        jdbc.update(sql, candidateTarget, "candidate", job, candidateCandidateId, contractVersion(), candidateCandidateId,
+                sourceRevision, Timestamp.from(now));
+        jdbc.update(sql, relationTarget, "relation", job, relation, contractVersion(), candidateCandidateId, sourceRevision,
+                Timestamp.from(now));
+        return new Ids(job, candidateTarget, relationTarget, relation);
+    }
+
+    private String contractVersion() {
+        return Canonical.sha256("version-" + suffix);
+    }
+
+    private ReviewDecision.Response decideOver(ReviewDecisionService service, Ids ids, String key, String sourceRevision) {
+        return service.decide(ids.candidate(), new ReviewDecision.Request("allow", "검수 사유", ids.relation(), 0L,
+                contractVersion(), sourceRevision), key + "-" + suffix, admin, "r");
+    }
+
+    @Test
+    void aLostReplyOverTheRealAdapterStaysOpenAndTheReconcilerSettlesItFromTheLedger() {
+        Ids ids = insertContractCandidate("7");
+        var relations = mock(RelationClient.class);
+        when(relations.review(eq(ids.job()), any()))
+                .thenThrow(new AiTransportException(AiOperation.REVIEW, "req-1",
+                        AiTransportException.Failure.TIMEOUT, OptionalInt.empty(), "HttpTimeoutException"));
+        ReviewDecisionService service = overTransport(relations);
+
+        CustomException lost = assertThrows(CustomException.class, () -> decideOver(service, ids, "a1", "7"));
+
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, lost.getErrorCode());
+        assertEquals("pending|" + AiRelationReviewClient.UNANSWERED, intentStatus("a1") + "|" + intentCode("a1"));
+        assertEquals(0, decisionCount(ids.relationTarget()));
+
+        String operationId = operationOf("a1");
+        Instant at = Instant.now();
+        when(relations.operation(ids.job(), operationId)).thenReturn(
+                new RelationOperationStatus(operationId, ids.job(), ids.relation(),
+                        RelationDecision.ALLOW, "reviewer", contractVersion(), "7",
+                        new RelationOperationStatus.Review(
+                                RelationOperationStatus.ReviewState.APPLIED, Optional.of("8"), Optional.of(at)),
+                        new RelationOperationStatus.Revalidation(
+                                RelationOperationStatus.RevalidationState.NOT_REQUESTED, 0, Optional.empty(),
+                                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()),
+                        RelationOperationStatus.Next.NONE, Optional.empty(), at, at, Optional.empty()));
+
+        service.reconcile(Instant.now().plusSeconds(60), 1000);
+
+        assertEquals("applied", intentStatus("a1"), "settled from the ledger, not resent blindly");
+        assertEquals(1, decisionCount(ids.relationTarget()));
+    }
+
+    @Test
+    void aStoredCommandTheContractCannotCarryIsADefiniteRefusalAndIsNeverSent() {
+        Ids ids = insertContractCandidate("0");
+        var relations = mock(RelationClient.class);
+        ReviewDecisionService service = overTransport(relations);
+
+        CustomException refused = assertThrows(CustomException.class, () -> decideOver(service, ids, "a2", "0"));
+
+        assertEquals(ErrorCode.VALIDATION_FAILED, refused.getErrorCode());
+        assertEquals("refused|" + AiRelationReviewClient.REQUEST_INVALID, intentStatus("a2") + "|" + intentCode("a2"));
+        verify(relations, never())
+                .review(any(), any());
+        assertEquals(refused.getErrorCode(), assertThrows(CustomException.class,
+                () -> decideOver(service, ids, "a2", "0")).getErrorCode(), "the key replays the refusal");
+    }
+
+    @Test
+    void aReplayedLegacyOperationOverTheRealAdapterIsBlockedAndNeverSettled() {
+        Ids ids = insertContractCandidate("7");
+        var relations = mock(RelationClient.class);
+        Instant at = Instant.now();
+        // The service's 200 for the same key and command of an operation applied under the earlier contract.
+        when(relations.review(eq(ids.job()), any())).thenAnswer(call -> {
+            RelationReviewRequest sent = call.getArgument(1);
+            return new RelationOperationAcknowledgement(RelationOperationAcknowledgement.Disposition.REVIEW_RECORDED_OR_REPLAYED,
+                    new RelationOperationStatus(sent.operationId(), ids.job(), ids.relation(), RelationDecision.ALLOW, "reviewer",
+                            contractVersion(), "7",
+                            new RelationOperationStatus.Review(RelationOperationStatus.ReviewState.APPLIED, Optional.of("8"),
+                                    Optional.of(at)),
+                            new RelationOperationStatus.Revalidation(RelationOperationStatus.RevalidationState.VERIFIED, 1,
+                                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()),
+                            RelationOperationStatus.Next.NONE,
+                            Optional.of(RelationOperationStatus.Limitation.REVIEW_CONTRACT_CHANGED), at, at, Optional.empty()));
+        });
+        ReviewDecisionService service = overTransport(relations);
+
+        assertThrows(CustomException.class, () -> decideOver(service, ids, "a3", "7"));
+
+        assertEquals("blocked|" + AiRelationReviewClient.CONTRACT_CHANGED, intentStatus("a3") + "|" + intentCode("a3"));
+        assertEquals(0, decisionCount(ids.relationTarget()), "history of the earlier contract is never an approval");
+        assertEquals("HOLD", jdbc.queryForObject("SELECT status FROM review_targets WHERE id = ?", String.class,
+                ids.relationTarget()));
+        service.reconcile(Instant.now().plusSeconds(60), 1000);
+        assertEquals(0, decisionCount(ids.relationTarget()), "nor does the reconciler settle it");
     }
 
     private record Ids(String job, String candidate, String relationTarget, String relation) {

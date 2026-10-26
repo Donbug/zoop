@@ -57,8 +57,8 @@ import tools.jackson.databind.node.ObjectNode;
  * when it cannot be served.</li>
  * </ul>
  *
- * <p>It is not registered as a bean: no production router, generator or verifier exists yet, and the executor must claim
- * nothing until they do.
+ * <p>{@code ChatModelConfiguration} registers this engine only when the internal chat-stage client is enabled. Question
+ * intake has its own flag and startup refuses to enable it without this engine; both flags are off by default.
  */
 public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     /**
@@ -194,11 +194,18 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         Map<String, Citation> cited = new LinkedHashMap<>();
         for (var section : passed.sections()) {
             for (String id : section.evidenceIds()) {
-                if (cited.containsKey(id)) continue;
-                Optional<Citation> citation = citations.cite(id, run.graphVersionId(), run.context().asOf(), run.jobId());
-                // Readable when the tool passed it on and not now: the answer cannot stand on it.
-                if (citation.isEmpty()) return validationFailed();
-                cited.put(id, citation.get());
+                Citation citation = cited.get(id);
+                if (citation == null) {
+                    Optional<Citation> read = citations.cite(id, run.graphVersionId(), run.context().asOf(), run.jobId());
+                    // Readable when the tool passed it on and not now: the answer cannot stand on it.
+                    if (read.isEmpty()) return validationFailed();
+                    citation = read.get();
+                    cited.put(id, citation);
+                }
+                // A ZOOP document section quotes ZOOP documents only, and no other section quotes them.
+                if ("zoop_documented".equals(section.basis()) != "zoop_doc".equals(citation.sourceKind())) {
+                    return validationFailed();
+                }
             }
         }
 

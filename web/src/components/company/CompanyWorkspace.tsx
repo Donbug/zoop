@@ -39,7 +39,7 @@ import {
 } from './detail-model';
 
 const workspaceClasses =
-  'company-workspace grid grid-cols-[200px_minmax(0,1fr)_280px] gap-0 m-0 overflow-hidden rounded-[5px] border border-zoop-line bg-zoop-soft text-zoop-ink max-[1000px]:grid-cols-[160px_minmax(0,1fr)] max-md:flex max-md:flex-col [&_section]:border-b [&_section]:border-zoop-line [&_section]:py-4 [&_h1]:text-[26px] [&_h1]:font-bold [&_h1]:tracking-[-0.035em] [&_h2]:mb-3 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:tracking-[-0.025em] [&_h3]:font-semibold [&_p]:text-xs [&_p]:text-zoop-muted [&_p]:leading-[1.7] [&_button]:cursor-pointer [&_button]:rounded-[3px] [&_button]:border [&_button]:border-zoop-line [&_button]:bg-white [&_button]:min-h-[34px] [&_button]:px-[9px] [&_button]:py-1.5 [&_button]:text-xs! [&_button[aria-pressed=true]]:bg-zoop-ink [&_button[aria-pressed=true]]:text-white [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-default [&_a]:cursor-pointer [&_a]:px-[9px] [&_a]:py-1.5 [&_a]:text-xs [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-zoop-ink [&_nav]:my-3 [&_nav]:flex [&_nav]:flex-wrap [&_nav]:gap-1 [&_article]:border-b [&_article]:border-zoop-line [&_article]:py-3 [&_table]:w-full [&_table]:text-xs [&_table]:wrap-anywhere [&_[role=alert]]:text-[#a12828] [&_details]:my-3 [&_input]:max-w-full [&_input]:rounded-[3px] [&_input]:border [&_input]:border-zoop-line [&_input]:bg-white [&_input]:px-2 [&_input]:py-1.5 [&_input]:min-h-[34px] [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-2 [&_summary:focus-visible]:outline-zoop-ink max-md:[&_table]:block max-md:[&_table]:overflow-auto max-md:[&_section]:min-w-0 max-md:[&_section]:wrap-anywhere';
+  'company-workspace grid grid-cols-[200px_minmax(0,1fr)_280px] gap-3 m-0 overflow-visible text-zoop-ink max-[1000px]:grid-cols-[160px_minmax(0,1fr)] max-md:flex max-md:flex-col [&_section]:border-b [&_section]:border-zoop-line [&_section]:py-4 [&_h1]:text-[26px] [&_h1]:font-bold [&_h1]:tracking-[-0.035em] [&_h2]:mb-3 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:tracking-[-0.025em] [&_h3]:font-semibold [&_p]:text-xs [&_p]:text-zoop-muted [&_p]:leading-[1.7] [&_button]:cursor-pointer [&_button]:rounded-full [&_button]:border [&_button]:border-zoop-line [&_button]:bg-white [&_button]:min-h-[36px] [&_button]:px-4 [&_button]:py-2 [&_button]:text-xs! [&_button[aria-pressed=true]]:bg-zoop-ink [&_button[aria-pressed=true]]:text-white [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-default [&_a]:cursor-pointer [&_a]:px-[9px] [&_a]:py-1.5 [&_a]:text-xs [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-zoop-ink [&_nav]:my-3 [&_nav]:flex [&_nav]:flex-wrap [&_nav]:gap-1.5 [&_article]:border-b [&_article]:border-zoop-line [&_article]:py-3 [&_table]:w-full [&_table]:text-xs [&_table]:wrap-anywhere [&_[role=alert]]:text-zoop-alert [&_details]:my-3 [&_input]:max-w-full [&_input]:rounded-xl [&_input]:border [&_input]:border-zoop-line [&_input]:bg-white [&_input]:px-3 [&_input]:py-2 [&_input]:min-h-[38px] [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-2 [&_summary:focus-visible]:outline-zoop-ink max-md:[&_table]:block max-md:[&_table]:overflow-auto max-md:[&_section]:min-w-0 max-md:[&_section]:wrap-anywhere';
 
 function Status<T>({
   resource,
@@ -366,7 +366,7 @@ export default function CompanyWorkspace() {
         currentCompany={company.data}
         portfolio={portfolio}
       />
-      <main className="min-w-0 bg-white p-6 max-md:p-4">
+      <main className="min-w-0 rounded-2xl bg-white p-6 shadow-sm max-md:p-4">
         {versionOnly && (
           <p role="alert" className="mb-4 text-[13px] text-zoop-alert">
             이 주소에는 기준 시점 없이 그래프 버전({version})만 있어, 그 버전의
@@ -840,7 +840,7 @@ export default function CompanyWorkspace() {
         </section>
       </main>
       <aside
-        className="min-w-0 border-l border-zoop-line p-4 [&_li]:text-xs [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full [&_svg]:bg-zoop-line max-[1000px]:col-start-2 max-[1000px]:border-l-0 max-[1000px]:border-t max-md:w-full"
+        className="min-w-0 rounded-2xl bg-white p-4 shadow-sm [&_li]:text-xs [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full [&_svg]:bg-zoop-line max-[1000px]:col-start-2 max-md:w-full"
         aria-label="시점 기반 관계 그래프"
         data-screen-id="D-COM-04"
       >

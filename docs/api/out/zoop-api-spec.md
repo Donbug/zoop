@@ -1380,7 +1380,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.6.10, 6.9.1, 6.9.2, 6.9.3, 6.9.4, 6.9.5, 6.9.6, 6.9.10, 6.9.11, 6.9.12, 6.9.13, 6.9.14, 6.5.7 |
 | 프로토타입 대응 | /api/chat/sessions/{id}/jobs |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다., Jev 0.70/0.35, MCP 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.8을 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다. |
+| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다., Jev 0.70/0.35, 도구 호출 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.9를 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다. |
 
 ### 요청 필드
 
@@ -3819,7 +3819,7 @@ What the member had selected when asking: graph targets, optional evidence refer
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | kind | 필수 | string {validation_failed, save_failed, result_lost, transient, budget_exceeded, permission_denied, internal} | transient: 같은 고정 문맥으로 다시 실행하면 달라질 수 있는 시간 초과·공급자 오류. 재실행 가능 여부는 retry로 판단하며, 모델 응답 불명(response_unknown)은 중복 호출·과금을 막기 위해 retry=null이다. budget_exceeded: 같은 입력이면 반드시 다시 넘는 크기 한도(rerun 불가, 범위를 좁힌 새 질문 안내). |
-| reason | 필수 | string / null | 기계 판독용 원인 코드. transient: deadline_guard(시작 전 잔여 기한 부족), provider_error(송신 전 연결 실패·처리 거부가 명시된 오류·형식 불일치 응답), tool_timeout(읽기 전용 MCP 조회 상한 초과), response_unknown(모델 송신 후 응답 불명, retry=null). budget_exceeded: context_too_large, output_limit. UI 문구와 관리자 집계의 기준이다. |
+| reason | 필수 | string / null | 기계 판독용 원인 코드. transient: deadline_guard(시작 전 잔여 기한 부족), provider_error(송신 전 연결 실패·처리 거부가 명시된 오류·형식 불일치 응답), tool_timeout(읽기 전용 도구 조회 상한 초과), response_unknown(모델 송신 후 응답 불명, retry=null). budget_exceeded: context_too_large, output_limit. UI 문구와 관리자 집계의 기준이다. |
 | message | 필수 | string |  |
 | retry | 필수 | string {rerun, save_only} / null | What 'retry' would do: rerun the same job with its frozen context, or only save the kept verified result. null = not allowed. rerun은 작업당 실행 3회(runs ≤ 3)까지이며 이후에는 null이다. reason=response_unknown이면 처음부터 null이다. |
 
