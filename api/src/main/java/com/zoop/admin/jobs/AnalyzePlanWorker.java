@@ -30,19 +30,20 @@ public final class AnalyzePlanWorker {
     private final AnalyzePlanProperties properties;
     private final ServiceBinding binding;
     private final Sleeper sleeper;
+    private final RelationResultListener results;
     private final AtomicBoolean running = new AtomicBoolean();
     private final AtomicBoolean stopping = new AtomicBoolean();
 
     public AnalyzePlanWorker(JdbcAnalyzePlanRepository repository, PlanAdmissionClient admission,
             ExtractionClient extraction, RelationClient relation, Clock clock, AnalyzePlanProperties properties,
-            ServiceBinding binding) {
+            ServiceBinding binding, RelationResultListener results) {
         this(repository, admission, extraction, relation, clock, properties, binding,
-                duration -> Thread.sleep(duration.toMillis()));
+                duration -> Thread.sleep(duration.toMillis()), results);
     }
 
     AnalyzePlanWorker(JdbcAnalyzePlanRepository repository, PlanAdmissionClient admission,
             ExtractionClient extraction, RelationClient relation, Clock clock, AnalyzePlanProperties properties,
-            ServiceBinding binding, Sleeper sleeper) {
+            ServiceBinding binding, Sleeper sleeper, RelationResultListener results) {
         this.repository = repository;
         this.admission = admission;
         this.extraction = extraction;
@@ -51,6 +52,7 @@ public final class AnalyzePlanWorker {
         this.properties = properties;
         this.binding = binding;
         this.sleeper = sleeper;
+        this.results = results;
     }
 
     @FunctionalInterface
@@ -275,6 +277,7 @@ public final class AnalyzePlanWorker {
         if (view(earlier).state != PipelineJob.State.READY) throw fail("contract", "ai_contract_mismatch");
         currentAdmission(claim, owned(claim), false);
         requireNormal(claim);
+        UntrustedRelationPayload fetched = null;
         try {
             StageObservation observation;
             if (stage.stage() == StageKind.S2) {
@@ -300,6 +303,7 @@ public final class AnalyzePlanWorker {
                     throw fail("contract", "ai_binding_mismatch");
                 }
                 observation = new StageObservation(own, Canonical.sha256(payload.untrustedJson()), result.receipts(), null, null);
+                fetched = payload;
             }
             checked(repository.recordObservation(claim, stage, observation));
         } catch (AiServiceRejectionException error) {
@@ -307,6 +311,16 @@ public final class AnalyzePlanWorker {
             throw remote(error, false);
         } catch (AiClientException error) {
             throw remote(error, false);
+        }
+        if (fetched != null) notifyResult(stage, fetched);
+    }
+
+    /** The review-target projection is a reader of this result, never part of the job: its failure is only logged. */
+    private void notifyResult(StageWork stage, UntrustedRelationPayload payload) {
+        try {
+            results.relationResultFetched(stage.relationSubmit().upstream(), stage.s2ResultSha256(), payload);
+        } catch (RuntimeException failed) {
+            log.warn("relation result listener failed for {}: {}", payload.jobId(), failed.getClass().getSimpleName());
         }
     }
 

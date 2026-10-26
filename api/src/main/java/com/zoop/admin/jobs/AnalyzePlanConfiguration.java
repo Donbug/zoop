@@ -7,6 +7,8 @@ import java.time.Duration;
 import java.util.Locale;
 
 import com.zoop.admin.jobs.AnalyzePlanState.ServiceBinding;
+import com.zoop.admin.review.JdbcReviewRepository;
+import com.zoop.admin.review.ReviewTargetSync;
 import com.zoop.ai.AiClientSettings;
 import com.zoop.ai.config.AiExtractionClientProperties;
 import com.zoop.ai.config.AiPlanAdmissionClientProperties;
@@ -18,6 +20,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(AnalyzePlanProperties.class)
@@ -41,8 +44,10 @@ public class AnalyzePlanConfiguration {
         @Bean
         AnalyzePlanWorker analyzePlanWorker(JdbcAnalyzePlanRepository repository, HttpPlanAdmissionClient admission,
                 HttpExtractionClient extraction, HttpRelationClient relation, Clock clock,
-                AnalyzePlanProperties properties, ServiceBinding binding) {
-            return new AnalyzePlanWorker(repository, admission, extraction, relation, clock, properties, binding);
+                AnalyzePlanProperties properties, ServiceBinding binding, JdbcReviewRepository reviews,
+                PlatformTransactionManager transactions) {
+            return new AnalyzePlanWorker(repository, admission, extraction, relation, clock, properties, binding,
+                    new ReviewTargetSync(reviews, extraction, transactions, clock));
         }
 
         @Bean

@@ -105,6 +105,15 @@ class AnalyzePlanWorkerTest {
     }
 
     @Test
+    void theFetchedRelationResultReachesTheListenerOnceAndItsFailureLeavesTheJobAlone() {
+        script.listenerFails = true;
+        assertTrue(worker.runOnce());
+        terminal("succeeded", null);
+        assertEquals(List.of(script.s2.jobId() + "|" + Canonical.sha256(script.payload(script.s2.jobId(), D)) + "|"
+                + script.s3.jobId()), script.fetched, "the recorded S2 result hash goes with the S3 result");
+    }
+
+    @Test
     void lostAcceptedSubmitIsReconciledByStatusWithoutAnotherSubmit() {
         script.mode = Mode.LOST_ACCEPTED_SUBMIT;
         assertTrue(worker.runOnce());
@@ -457,7 +466,7 @@ class AnalyzePlanWorkerTest {
         @Bean AnalyzePlanWorker worker(JdbcAnalyzePlanRepository repository, Script script, MutableClock clock,
                 AnalyzePlanProperties properties, ServiceBinding binding) {
             return new AnalyzePlanWorker(repository, script.admission(), script.extraction(), script.relation(), clock,
-                    properties, binding, clock::advance);
+                    properties, binding, clock::advance, script.listener());
         }
     }
 
@@ -499,8 +508,18 @@ class AnalyzePlanWorkerTest {
         int cancels;
         int admissionReads;
         Runnable afterSubmit;
+        final List<String> fetched = new ArrayList<>();
+        boolean listenerFails;
         Script(MutableClock clock) { this.clock = clock; }
+        RelationResultListener listener() {
+            return (upstream, s2ResultSha256, payload) -> {
+                fetched.add(upstream.jobId() + "|" + s2ResultSha256 + "|" + payload.jobId());
+                if (listenerFails) throw new IllegalStateException("projection failed");
+            };
+        }
         void reset() {
+            fetched.clear();
+            listenerFails = false;
             reference = new PlanReference("s2plan-" + Canonical.sha256(UUID.randomUUID().toString()), D);
             s2 = new ExtractionSubmission("probe-" + UUID.randomUUID(), D, ExecutionMode.REPLAY);
             s3 = new RelationSubmission(PlanIdentity.relationJobId(reference, s2.jobId(), D), PipelineJob.SourceKind.SYNTHETIC,

@@ -7,6 +7,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -67,6 +68,33 @@ public class JdbcReviewRepository {
     public Optional<Target> target(String id, boolean lock) {
         return jdbc.query(TARGET + " WHERE id = :id" + (lock ? " FOR UPDATE" : ""), new MapSqlParameterSource("id", id),
                 JdbcReviewRepository::target).stream().findFirst();
+    }
+
+    /**
+     * Registers a target of an S3 job, or refreshes its projection when this reading is newer. The key is the source identity
+     * ({@code target_type}, job, external id, source version), so the identity columns are never touched. A reading only replaces
+     * the stored one when its AI source revision is greater: an older reading that arrives late, or one taken before a decision
+     * this app settled, never moves the status back.
+     *
+     * @return true when a row was inserted or refreshed
+     */
+    public boolean upsertTarget(String sourceJobId, String sourceVersion, ReviewTargetReader.Row row, Instant at) {
+        return jdbc.update("""
+                INSERT INTO review_targets (id, target_type, source_job_id, external_id, source_version, candidate_id, status,
+                                            company_ids, relation_types, source_revision, updated_at)
+                VALUES (:id, :type, :job, :external, :version, :candidate, :status, CAST(:companies AS text[]),
+                        CAST(:types AS text[]), :revision, :at)
+                ON CONFLICT (target_type, source_job_id, external_id, source_version) DO UPDATE
+                   SET status = EXCLUDED.status, company_ids = EXCLUDED.company_ids,
+                       relation_types = EXCLUDED.relation_types, source_revision = EXCLUDED.source_revision,
+                       updated_at = EXCLUDED.updated_at
+                 WHERE CAST(EXCLUDED.source_revision AS numeric) > CAST(review_targets.source_revision AS numeric)
+                """, new MapSqlParameterSource("id", "rt-" + UUID.randomUUID()).addValue("type", row.type())
+                .addValue("job", sourceJobId).addValue("external", row.externalId()).addValue("version", sourceVersion)
+                .addValue("candidate", row.candidateId()).addValue("status", row.status())
+                .addValue("companies", row.companyIds().toArray(String[]::new))
+                .addValue("types", row.relationTypes().toArray(String[]::new))
+                .addValue("revision", row.sourceRevision()).addValue("at", Timestamp.from(at))) == 1;
     }
 
     /** The shared publication lock: decisions get their global revision in commit order (ERD v6 section 27). */
