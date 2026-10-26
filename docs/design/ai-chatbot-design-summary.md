@@ -310,10 +310,10 @@ Q02 일반 개념은 권위 자료가 없으므로 두 번째 모델의 동의�
 | 공개 수명주기 | 회원 전용 세션·질문 job API, PostgreSQL 저장, 멱등성, 단일 활성 job, 취소·재시도·lease fence | recovery artifact와 실제 `save_only` 복구 없음 |
 | 모델 단계 | `chat-router` Jev, `chat-answer` Luna, `chat-verification` Jev의 별도 계약·원장·grant·영수증 | 임계값 미보정, 실제 호출·배포 승인 아님 |
 | 계획 | Q01~Q08·capability registry, 서버 allowlist·예산·체크포인트, 질문이 지목한 기업의 기본 조회 | 별도 Luna `coverage-verifier`와 보완 라운드 없음 |
-| 도구 | 앱 내부 읽기 어댑터 `company.read`(기업 카탈로그 개요를 `company_profile` 인용으로 포함), `issue.read`, `evidence.resolve`, `graph.path.read` | Q01·Q05·Q06·Q07·Q08와 `document.search` 미연결. 외부 웹 검색은 [설계 초안](ai-chatbot-web-search.md)만 있음 |
+| 도구 | 앱 내부 읽기 어댑터 `company.read`(기업 카탈로그 개요를 `company_profile` 인용으로 포함), `issue.read`, `evidence.resolve`, `graph.path.read`, `zoopPolicy.read`(승인 약관·개인정보 처리방침, `zoop_doc` 인용) | Q01의 `help.search`·`screenSpec.read`(승인 문서 없음), Q05·Q06·Q07·Q08와 `document.search` 미연결. 외부 웹 검색은 [설계 초안](ai-chatbot-web-search.md)만 있음 |
 | 생성·검증 | `BranchContext`, typed 생성, 서버 citation, 결정론적 검사, section 단위 Jev support·투자 판단 | claim 단위 `unsupportedCausality`, 일부 수치·그래프 의미 검사, 24k/2k token guard 없음 |
-| 권한 | 고정 graphVersion/asOf, 현재 evidence 접근 재검사, 응답 시 철회 재검사 | `zoop_doc` registry와 회원 종목 도구 미연결 |
-| 웹 | D-AI-01~02b가 공개 Chat API로 대화 생성·복원, 질문 접수·polling·취소·재시도, 답변·인용(`article`·`company_profile`)·확인 질문·실패를 렌더링 | 타입은 손으로 쓴 `web/src/types/ai`이며 OpenAPI 생성 seam 없음. 실제 백엔드·모델과의 종단 시험 없음 |
+| 권한 | 고정 graphVersion/asOf, 현재 evidence 접근 재검사, 응답 시 철회 재검사 | `zoop_doc`은 `term_versions`의 승인 약관만 연결(도움말·화면 명세 미연결), 회원 종목 도구 미연결 |
+| 웹 | D-AI-01~02b가 공개 Chat API로 대화 생성·복원, 질문 접수·polling·취소·재시도, 답변·인용(`article`·`zoop_doc`·`company_profile`)·확인 질문·실패를 렌더링 | 타입은 손으로 쓴 `web/src/types/ai`이며 OpenAPI 생성 seam 없음. 실제 백엔드·모델과의 종단 시험 없음 |
 
 따라서 구현 코드를 “단지 목표 설계”로 취급해서도 안 되고, 코드 존재를 출시 완료로 해석해서도 안 된다. 출시 전에 최소한 다음 항목이 필요하다.
 
