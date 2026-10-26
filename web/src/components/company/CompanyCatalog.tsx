@@ -149,7 +149,7 @@ export default function CompanyCatalog({
   return (
     <aside
       aria-label="기업 선택"
-      className="min-w-0 border-r border-zoop-line bg-zoop-soft p-3 font-panel max-md:max-h-[320px] max-md:overflow-auto max-md:border-r-0 max-md:border-b [&_section]:py-3!"
+      className="min-w-0 rounded-2xl bg-white p-4 font-panel shadow-sm max-md:max-h-[320px] max-md:overflow-auto [&_section]:py-3!"
     >
       <CompanyCatalogRow
         id={id}
