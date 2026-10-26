@@ -420,7 +420,7 @@ class OrchestratedChatEngineTest {
                     "zoop_doc", "개인정보 처리방침", List.of(), List.of("ev-doc"))), List.of("ev-doc"), false, false);
         });
         readable.put("ev-doc", new Citation("zoop_doc", "ev-doc", "## 2. 보유 기간과 파기\n\n탈퇴하면 지웁니다.", null, null,
-                "policy.privacy", "2026-10-13.1", 100, 125, "개인정보 처리방침 · 2. 보유 기간과 파기", "줍", null, null));
+                "policy.privacy", "2026-10-13.1", 100, 125, "개인정보 처리방침 · 2. 보유 기간과 파기", null, null, null));
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q01, 0.9), Map.of("zoopPolicy.read", 0.9)));
         answer = new ChatGeneratedAnswer(List.of(new Section("zoop_documented", "탈퇴하면 대화 기록이 지워집니다.",
                 List.of("r1"), List.of("ev-doc"))), List.of(), List.of());
@@ -437,6 +437,45 @@ class OrchestratedChatEngineTest {
         readable.put("ev-doc", readable.get(evidence(HYNIX)));
         assertFailed("validation_failed", null, false,
                 engine().answer(ChatPlannerTest.run(0, null), new Control(Duration.ofSeconds(60))));
+    }
+
+    @Test
+    void aNarrowedEvidenceSelectionBoundsTheCompanyReadButNotTheFixedPolicies() {
+        List<ChatToolRequest> asked = Collections.synchronizedList(new ArrayList<>());
+        tools.put(ChatCapability.ZOOP_POLICY_READ, (scope, request) -> {
+            asked.add(request);
+            // Like the real adapter: evidence outside the request's scope is never passed on.
+            List<String> evidence = request.evidenceScope() == null || request.evidenceScope().contains("ev-doc")
+                    ? List.of("ev-doc") : List.of();
+            return new ChatToolOutput("zoop-docs/policy.privacy@2026-10-13.1", List.of(new ChatToolItem("policy.privacy",
+                    "zoop_doc", "개인정보 처리방침", List.of(), evidence)), evidence, false, false);
+        });
+        var companyRead = tools.get(ChatCapability.COMPANY_READ);
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> {
+            asked.add(request);
+            return companyRead.apply(scope, request);
+        });
+        readable.put("ev-doc", new Citation("zoop_doc", "ev-doc", "## 2. 보유 기간과 파기\n\n탈퇴하면 지웁니다.", null, null,
+                "policy.privacy", "2026-10-13.1", 100, 125, "개인정보 처리방침 · 2. 보유 기간과 파기", null, null, null));
+        // One Q01+Q03 requirement with no company named: its targets come from the selection, narrowed to one evidence.
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q01, 0.9, ChatQueryType.Q03, 0.9),
+                Map.of("zoopPolicy.read", 0.9, "company.read", 0.9)));
+        answer = new ChatGeneratedAnswer(List.of(new Section("zoop_documented", "탈퇴하면 대화 기록이 지워집니다.",
+                List.of("r1"), List.of("ev-doc")), grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r1"), evidence(HYNIX))),
+                List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no"), new Verdict("supported", "no")));
+        var run = ChatPlannerTest.run(0, "v1", List.of(HYNIX), List.of(evidence(HYNIX)), List.of(evidence(HYNIX)));
+
+        ChatResult result = completed(engine().answer(run, new Control(Duration.ofSeconds(60))));
+        var policy = asked.stream().filter(r -> r.capabilityId().equals("zoopPolicy.read")).toList();
+        var company = asked.stream().filter(r -> r.capabilityId().equals("company.read")).toList();
+        assertEquals(1, policy.size());
+        assertNull(policy.getFirst().evidenceScope(), "the article selection does not bound the fixed policies");
+        assertEquals(List.of(evidence(HYNIX)), company.getFirst().evidenceScope(), "it still bounds the selected company");
+        assertEquals("answered", result.outcome());
+        assertEquals("mixed", result.answerBasis());
+        assertEquals(Set.of("zoop_doc", "article"),
+                result.citations().stream().map(Citation::sourceKind).collect(java.util.stream.Collectors.toSet()));
     }
 
     // ---- fixtures -------------------------------------------------------------------------------------------------------

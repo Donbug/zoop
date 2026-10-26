@@ -79,16 +79,19 @@ final class ChatRetrieval {
                     targets = List.copyOf(found.companies().keySet());
                 }
                 for (ChatCapability capability : p.capabilities()) {
-                    var read = capability.documents().isEmpty() ? targets : capability.documents();
+                    // The member's narrowed evidence selection bounds the reads of the requirement's own targets, never
+                    // the fixed ZOOP documents, which it is not about.
+                    boolean fixed = !capability.documents().isEmpty();
+                    var read = fixed ? capability.documents() : targets;
+                    List<String> scope = fixed ? null : p.evidenceScope();
                     for (List<String> chunk : batches(capability, read)) {
                         String key = capability.id() + "\u0000" + String.join("\u0000", chunk) + "\u0001"
-                                + (p.evidenceScope() == null ? "*" : String.join("\u0000", p.evidenceScope()));
+                                + (scope == null ? "*" : String.join("\u0000", scope));
                         Integer index = callIndex.get(key);
                         if (index == null) {
                             index = calls.size();
                             callIndex.put(key, index);
-                            calls.add(new ChatToolRequest(capability.id(), chunk, ChatToolRequest.MAX_LIMIT,
-                                    p.evidenceScope()));
+                            calls.add(new ChatToolRequest(capability.id(), chunk, ChatToolRequest.MAX_LIMIT, scope));
                         }
                         owned.computeIfAbsent(p.id(), k -> new ArrayList<>()).add(index);
                     }
