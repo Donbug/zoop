@@ -177,15 +177,19 @@ public class AdminGraphVersionService {
     /**
      * The automatic activation after an import (FS059, scheduler {@link GraphAutoActivationScheduler}): {@code candidate} gets the
      * same snapshot read and current-eligibility checks as an admin activation and becomes public for the system actor. Empty when
-     * another activation or a newer import won meanwhile. A refusal is the same {@link CustomException} the admin path answers,
-     * and the pointer stays.
+     * another activation or a newer import won meanwhile. A refusal is the same {@link CustomException} the admin path answers
+     * (a database failure too: {@code SOURCE_UNAVAILABLE}), and the pointer stays.
      */
     @Transactional
     public Optional<Activation> activateImported(GraphVersionRecord candidate, Instant since, String requestId) {
-        String expected = versions.active().map(GraphVersionRecord::id).orElse(null);
-        PublicGraphSnapshot snapshot = snapshots.load(candidate);
-        return versions.activateBySystem(candidate.id(), expected, since, AUTO_REASON,
-                () -> publishableNow(candidate, snapshot, requestId));
+        try {
+            String expected = versions.active().map(GraphVersionRecord::id).orElse(null);
+            PublicGraphSnapshot snapshot = snapshots.load(candidate);
+            return versions.activateBySystem(candidate.id(), expected, since, AUTO_REASON,
+                    () -> publishableNow(candidate, snapshot, requestId));
+        } catch (DataAccessException exception) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception);
+        }
     }
 
     /**

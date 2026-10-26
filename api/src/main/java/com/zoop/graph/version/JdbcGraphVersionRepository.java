@@ -156,12 +156,7 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
         if (!Objects.equals(expectedActiveVersionId, active().map(GraphVersionRecord::id).orElse(null))) {
             throw new CustomException(ErrorCode.REVISION_CONFLICT);
         }
-        Consumer<Instant> atActivation = publishable.get();
-        Instant at = clock.instant();
-        atActivation.accept(at);
-        Activation activation = activateLocked(versionId, "activate", adminId, adminEmail, reason, at);
-        markPublished(activation, versionId);
-        return activation;
+        return activateChecked(versionId, adminId, adminEmail, reason, publishable);
     }
 
     /**
@@ -192,19 +187,24 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
                 || !autoActivationCandidate(since).map(GraphVersionRecord::id).filter(versionId::equals).isPresent()) {
             return Optional.empty();
         }
+        return Optional.of(activateChecked(versionId, null, "system", reason, publishable));
+    }
+
+    /**
+     * The shared tail of both activations, under the publication lock the caller holds: the slow checks, then the activation time,
+     * then the last check at that time, the pointer, the history and the first {@code published_at}, all at that one time.
+     */
+    private Activation activateChecked(String versionId, String adminId, String adminEmail, String reason,
+            Supplier<Consumer<Instant>> publishable) {
         Consumer<Instant> atActivation = publishable.get();
         Instant at = clock.instant();
         atActivation.accept(at);
-        Activation activation = activateLocked(versionId, "activate", null, "system", reason, at);
-        markPublished(activation, versionId);
-        return Optional.of(activation);
-    }
-
-    private void markPublished(Activation activation, String versionId) {
+        Activation activation = activateLocked(versionId, "activate", adminId, adminEmail, reason, at);
         if (activation.pointerChanged()) {
             jdbc.update("UPDATE graph_versions SET published_at = :at WHERE id = :id AND published_at IS NULL",
-                    new MapSqlParameterSource("id", versionId).addValue("at", Timestamp.from(activation.activatedAt())));
+                    new MapSqlParameterSource("id", versionId).addValue("at", Timestamp.from(at)));
         }
+        return activation;
     }
 
     private Activation activateLocked(String versionId, String action, String adminId, String adminEmail,

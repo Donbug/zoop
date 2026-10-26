@@ -29,64 +29,95 @@ import static org.mockito.Mockito.when;
 
 class GraphAutoActivationSchedulerTest {
     private static final Instant START = Instant.parse("2026-10-26T00:05:00Z");
+    /** One round (lookback) before the start: an import of the current round from just before a restart still counts. */
+    private static final Instant SINCE = START.minus(Duration.ofMinutes(30));
     private static final GraphVersionRecord IMPORTED = new GraphVersionRecord(
             "gv-2", 7, "snapshot", "artifact-2", "artifact://gv-2.json", "a".repeat(64), false);
+    private static final GraphVersionRecord NEWER = new GraphVersionRecord(
+            "gv-3", 8, "snapshot", "artifact-3", "artifact://gv-3.json", "b".repeat(64), false);
 
     private final AdminGraphVersionService service = mock(AdminGraphVersionService.class);
     private final MovingClock clock = new MovingClock(START);
-    private final GraphAutoActivationScheduler scheduler = new GraphAutoActivationScheduler(service, clock, Duration.ofMinutes(5));
+    private final GraphAutoActivationScheduler scheduler = new GraphAutoActivationScheduler(service, clock,
+            Duration.ofSeconds(15), Duration.ofMinutes(30), Duration.ofMinutes(5), Duration.ofMinutes(1));
 
     @Test
-    void onlyVersionsImportedAfterItStartedAreCandidatesAndNothingIsTriedWithoutOne() {
-        when(service.importedCandidate(START)).thenReturn(Optional.empty());
+    void versionsFromOneLookbackBeforeTheStartAreCandidatesAndNothingIsTriedWithoutOne() {
+        when(service.importedCandidate(SINCE)).thenReturn(Optional.empty());
         clock.advance(Duration.ofMinutes(1));
 
         scheduler.runOnce();
 
-        verify(service).importedCandidate(START);
+        verify(service).importedCandidate(SINCE);
         verify(service, never()).activateImported(any(), any(), anyString());
     }
 
     @Test
-    void theCandidateIsActivatedWithTheStartTime() {
-        when(service.importedCandidate(START)).thenReturn(Optional.of(IMPORTED));
-        when(service.activateImported(eq(IMPORTED), eq(START), anyString()))
+    void theCandidateIsActivatedWithTheSameWindowStart() {
+        when(service.importedCandidate(SINCE)).thenReturn(Optional.of(IMPORTED));
+        when(service.activateImported(eq(IMPORTED), eq(SINCE), anyString()))
                 .thenReturn(Optional.of(new Activation("gv-1", true, START.plusSeconds(15))));
 
         scheduler.runOnce();
 
-        verify(service).activateImported(eq(IMPORTED), eq(START), anyString());
+        verify(service).activateImported(eq(IMPORTED), eq(SINCE), anyString());
     }
 
     @Test
     void aRefusedVersionIsRetriedOnlyAfterRetryAfter() {
-        when(service.importedCandidate(START)).thenReturn(Optional.of(IMPORTED));
-        when(service.activateImported(eq(IMPORTED), eq(START), anyString()))
+        when(service.importedCandidate(SINCE)).thenReturn(Optional.of(IMPORTED));
+        when(service.activateImported(eq(IMPORTED), eq(SINCE), anyString()))
                 .thenThrow(new CustomException(ErrorCode.REVISION_CONFLICT));
 
         scheduler.runOnce();
         clock.advance(Duration.ofMinutes(4));
         scheduler.runOnce();
-        verify(service, times(1)).activateImported(eq(IMPORTED), eq(START), anyString());
+        verify(service, times(1)).activateImported(eq(IMPORTED), eq(SINCE), anyString());
 
         clock.advance(Duration.ofMinutes(1));
         scheduler.runOnce();
-        verify(service, times(2)).activateImported(eq(IMPORTED), eq(START), anyString());
+        verify(service, times(2)).activateImported(eq(IMPORTED), eq(SINCE), anyString());
     }
 
     @Test
-    void anUnavailableSourceIsRetriedOnTheNextRunAndAnyOtherFailureNeverEscapes() {
-        when(service.importedCandidate(START)).thenReturn(Optional.of(IMPORTED));
-        when(service.activateImported(eq(IMPORTED), eq(START), anyString()))
+    void anUnavailableSourceOrAnyOtherFailureWaitsUnavailableRetryAfterAndNeverEscapes() {
+        when(service.importedCandidate(SINCE)).thenReturn(Optional.of(IMPORTED));
+        when(service.activateImported(eq(IMPORTED), eq(SINCE), anyString()))
                 .thenThrow(new CustomException(ErrorCode.SOURCE_UNAVAILABLE))
                 .thenThrow(new IllegalStateException("database"))
                 .thenReturn(Optional.empty());
 
         scheduler.runOnce();
-        scheduler.run();
+        clock.advance(Duration.ofSeconds(15));
         scheduler.runOnce();
+        verify(service, times(1)).activateImported(eq(IMPORTED), eq(SINCE), anyString());
+        clock.advance(Duration.ofMinutes(1));
+        scheduler.runOnce();
+        verify(service, times(2)).activateImported(eq(IMPORTED), eq(SINCE), anyString());
+        clock.advance(Duration.ofMinutes(1));
+        scheduler.runOnce();
+        verify(service, times(3)).activateImported(eq(IMPORTED), eq(SINCE), anyString());
 
-        verify(service, times(3)).activateImported(eq(IMPORTED), eq(START), anyString());
+        when(service.importedCandidate(SINCE)).thenThrow(new IllegalStateException("database"));
+        scheduler.runOnce();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked") // consecutive Optional answers: a generic varargs call
+    void aNewerImportIsTriedAtOnceWhileAnOlderOneWaitsAndASuccessForgetsEveryWait() {
+        when(service.importedCandidate(SINCE)).thenReturn(Optional.of(IMPORTED), Optional.of(NEWER), Optional.of(IMPORTED));
+        when(service.activateImported(eq(IMPORTED), eq(SINCE), anyString()))
+                .thenThrow(new CustomException(ErrorCode.REVISION_CONFLICT))
+                .thenReturn(Optional.empty());
+        when(service.activateImported(eq(NEWER), eq(SINCE), anyString()))
+                .thenReturn(Optional.of(new Activation("gv-1", true, START)));
+
+        scheduler.runOnce();
+        scheduler.runOnce();
+        verify(service).activateImported(eq(NEWER), eq(SINCE), anyString());
+
+        scheduler.runOnce();
+        verify(service, times(2)).activateImported(eq(IMPORTED), eq(SINCE), anyString());
     }
 
     @Test

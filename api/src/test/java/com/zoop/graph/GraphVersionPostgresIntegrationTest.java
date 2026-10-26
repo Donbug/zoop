@@ -505,6 +505,29 @@ class GraphVersionPostgresIntegrationTest {
     }
 
     @Test
+    void activateImportedRunsTheSameRealChecksInsideTheLockAndARefusalMovesNothing() {
+        // A seeded fixture made an unpublished imported version after the active one: its snapshot is readable, but it has no
+        // imported evidence rows, so the real current-rights gate (the admin path's) refuses it.
+        jdbc.update("DELETE FROM graph_activations WHERE version_id = 'fixture-2026-10-01'");
+        unpublish("fixture-2026-10-01");
+        jdbc.update("UPDATE graph_versions SET kind = 'snapshot', sequence = 1000, created_at = now() "
+                + "WHERE id = 'fixture-2026-10-01'");
+        Instant since = Instant.now().minusSeconds(60);
+        AdminGraphVersionService service = context.getBean(AdminGraphVersionService.class);
+        var candidate = service.importedCandidate(since).orElseThrow();
+        assertEquals("fixture-2026-10-01", candidate.id());
+
+        var error = assertThrows(CustomException.class, () -> service.activateImported(candidate, since, "it-auto"));
+
+        assertEquals(ErrorCode.REVISION_CONFLICT, error.getErrorCode(), "a withheld citation, as for an admin activation");
+        assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM graph_activations WHERE version_id = 'fixture-2026-10-01'", Integer.class));
+        assertNull(jdbc.queryForObject("SELECT published_at FROM graph_versions WHERE id = 'fixture-2026-10-01'",
+                Timestamp.class));
+    }
+
+    @Test
     void aRefusedCheckUnderTheLockKeepsThePointerAndWritesNoHistory() {
         Instant since = Instant.now().minusSeconds(60);
         imported("auto-3", 94, since.plusSeconds(1));
