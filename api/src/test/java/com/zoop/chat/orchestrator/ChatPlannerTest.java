@@ -236,6 +236,34 @@ class ChatPlannerTest {
         }
     }
 
+    @Test
+    void aPolicyQuestionReadsTheFixedPoliciesWithoutATargetOrAGraph() {
+        Set<String> bound = Set.of("company.read", "zoopPolicy.read");
+        var plan = run(planner.plan(run(0, null, List.of("iss-selected")), decision(req("r1",
+                Map.of(ChatQueryType.Q01, 0.9), Map.of("zoopPolicy.read", 0.8, "company.read", 0.9))), bound));
+        var r1 = plan.requirements().getFirst();
+        assertEquals(Mode.TOOLS, r1.mode());
+        assertEquals(List.of(ChatCapability.ZOOP_POLICY_READ), r1.capabilities(), "Q01 does not allow company.read");
+        assertEquals(ChatPlan.TargetSource.SERVER, r1.targetSource(), "the selection is not what a policy read reads");
+        assertTrue(r1.targets().isEmpty());
+        assertEquals(1, ChatPlanner.worstCaseCalls(plan), "both policies go in one call");
+
+        var withCompany = run(planner.plan(run(0, null), decision(req("r1", Map.of(ChatQueryType.Q01, 0.9),
+                Map.of("zoopPolicy.read", 0.8), List.of("KRX:000660"))), bound)).requirements().getFirst();
+        assertEquals(ChatPlan.TargetSource.SERVER, withCompany.targetSource(), "a named company is not a policy");
+    }
+
+    @Test
+    void aPolicyReadAlongsideAGraphLookupStillNeedsTheGraph() {
+        Set<String> bound = Set.of("company.read", "zoopPolicy.read");
+        assertStop("guidance", "graph_unavailable", planner.plan(run(0, null), decision(
+                req("r1", Map.of(ChatQueryType.Q01, 0.9), Map.of("zoopPolicy.read", 0.8)),
+                req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of("KRX:000660"))), bound));
+        // An unbound Q01 tool never runs.
+        assertStop("guidance", "out_of_scope", planner.plan(run(0, null), decision(req("r1",
+                Map.of(ChatQueryType.Q01, 0.9), Map.of("help.search", 0.9))), bound));
+    }
+
     // ---- fixtures -------------------------------------------------------------------------------------------------------
 
     static ChatPlan.Run run(ChatPlan plan) {

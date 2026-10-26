@@ -10,9 +10,11 @@ import com.zoop.admin.dashboard.dto.AdminDashboardResponse;
 import com.zoop.admin.dashboard.dto.AdminDashboardResponse.DashboardAudit;
 import com.zoop.admin.dashboard.dto.AdminDashboardResponse.DashboardError;
 import com.zoop.admin.dashboard.dto.AdminDashboardResponse.DashboardGraph;
+import com.zoop.admin.dashboard.dto.AdminDashboardResponse.DashboardJobs;
 import com.zoop.admin.dashboard.dto.AdminDashboardResponse.DashboardLedger;
 import com.zoop.admin.dashboard.dto.AdminDashboardResponse.DashboardMembers;
 import com.zoop.admin.dashboard.repository.AdminDashboardRepository;
+import com.zoop.admin.jobs.AnalysisJobService;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.response.SectionFailure;
@@ -20,16 +22,19 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionException;
 
 @Service
 public class AdminDashboardService {
     private static final String UNAVAILABLE_MESSAGE = "이 영역의 원천 데이터를 아직 조회할 수 없습니다.";
 
     private final AdminDashboardRepository repository;
+    private final AnalysisJobService analysisJobs;
     private final Clock clock;
 
-    public AdminDashboardService(AdminDashboardRepository repository, Clock clock) {
+    public AdminDashboardService(AdminDashboardRepository repository, AnalysisJobService analysisJobs, Clock clock) {
         this.repository = repository;
+        this.analysisJobs = analysisJobs;
         this.clock = clock;
     }
 
@@ -68,6 +73,16 @@ public class AdminDashboardService {
             failures.add(databaseFailure("graph", generatedAt, exception));
         }
 
+        DashboardJobs jobs = null;
+        try {
+            var overview = analysisJobs.dashboardAt(generatedAt);
+            jobs = new DashboardJobs(overview.running(), overview.queued(), overview.failed24h(),
+                    overview.active(), overview.recent());
+            successfulSourceReads++;
+        } catch (DataAccessException | TransactionException exception) {
+            failures.add(databaseFailure("jobs", generatedAt, exception));
+        }
+
         if (successfulSourceReads == 0) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE,
                     failures.stream().anyMatch(SectionFailure::retryable));
@@ -75,7 +90,6 @@ public class AdminDashboardService {
 
         failures.add(notConnected("ledger", generatedAt));
         failures.add(notConnected("candidates", generatedAt));
-        failures.add(notConnected("jobs", generatedAt));
         failures.add(notConnected("ai", generatedAt));
         failures.add(notConnected("briefings", generatedAt));
         if (graph != null) {
@@ -85,16 +99,21 @@ public class AdminDashboardService {
 
         return AdminDashboardResponse.partial(generatedAt, requestId,
                 new DashboardLedger("unavailable", new DashboardError("SOURCE_UNAVAILABLE", UNAVAILABLE_MESSAGE)),
-                graph, members, audit, List.copyOf(failures));
+                graph, jobs, members, audit, List.copyOf(failures));
     }
 
     private static SectionFailure notConnected(String section, Instant asOf) {
         return new SectionFailure(section, "SOURCE_UNAVAILABLE", UNAVAILABLE_MESSAGE, false, asOf);
     }
 
-    private static SectionFailure databaseFailure(String section, Instant asOf, DataAccessException exception) {
-        boolean retryable = exception instanceof TransientDataAccessException
-                || exception instanceof DataAccessResourceFailureException;
+    private static SectionFailure databaseFailure(String section, Instant asOf, RuntimeException exception) {
+        Throwable databaseCause = exception;
+        while (!(databaseCause instanceof DataAccessException) && databaseCause.getCause() != null) {
+            databaseCause = databaseCause.getCause();
+        }
+        boolean retryable = databaseCause instanceof TransientDataAccessException
+                || databaseCause instanceof DataAccessResourceFailureException
+                || (!(databaseCause instanceof DataAccessException) && exception instanceof TransactionException);
         return new SectionFailure(section, "SOURCE_UNAVAILABLE", "이 영역을 조회하는 중 오류가 발생했습니다.",
                 retryable, asOf);
     }

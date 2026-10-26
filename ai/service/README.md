@@ -49,6 +49,44 @@ ai/service/.venv/bin/python -m zoop_ai_service.main   # 또는 zoop-ai-service (
 
 잘못된 설정은 종료 코드 78과 `{"error":"service_config_invalid","field":"<VAR>","reason":"<code>"}`만 출력합니다(값 출력 없음). child 환경은 `PATH=/usr/bin:/bin`, `LANG=C.UTF-8`, `PYTHON*` 몇 개와 위 통과 값뿐입니다. 요청이 경로·명령·환경·provider URL·모델·fixture·grant registry를 고를 수는 없습니다.
 
+### 온라인 plan admission(선택, 기본 꺼짐)
+
+`ZOOP_AI_SERVICE_PLAN_ADMISSION=1`과 운영자 소유 절대 디렉터리 `ZOOP_AI_SERVICE_PLAN_ROOT`를 함께 설정하면, 실행 중인 서비스가 이미 생성된 정확한 S2 plan을 받아 S2 승인과 단위별 S3 ID를 한 트랜잭션으로 등록합니다. S2·S3 실행 설정 그룹이 모두 필요하지만 온라인 모드에서는 `ZOOP_AI_SERVICE_EXTRACTION_APPROVALS`와 `ZOOP_AI_SERVICE_RELATION_UPSTREAMS`를 읽거나 요구하지 않습니다. 두 설정이 없으면 기존 수동 파일 모드를 유지하며, 일부만 설정하면 시작을 거부합니다.
+
+권한의 유일한 저장소는 서비스 상태 디렉터리의 `plan-authority.sqlite3`(스키마 `zoop-ai-plan-authority-1`)입니다. 현재 정책과 불변 정책 이력, 운영자 CAS 작업 영수증, 누적 사용량, admission manifest, 짝을 이룬 S2·S3 권한을 함께 보관합니다. 새 저장소의 정책 revision은 0이고 정책은 없습니다. 정책 파일 자동 로드나 기본 허용 정책은 없으며, 앱의 admission 요청은 정책을 설치하지 못합니다.
+
+| 경로 | scope | 동작 |
+|---|---|---|
+| `POST /internal/v1/plan-admissions` | `plan.admit` | `planId`·`planDigest`만 받습니다. `Idempotency-Key=planId`가 필수이며 최초 등록은 201, 정확한 재요청은 200입니다. |
+| `GET /internal/v1/plan-admissions/{planId}?planDigest=…` | `plan.read` | 저장된 불변 manifest와 현재 admission-policy 권한 상태를 반환합니다. 목록·검색은 없습니다. |
+| `GET /internal/v1/plan-admission-policy` | `plan.policy` | 현재 revision·정책 digest·정책·상태·누적 사용량과 정확한 ETag를 반환합니다. |
+| `PUT /internal/v1/plan-admission-policy` | `plan.policy` | 별도 운영자가 닫힌 정책 문서, 작업 `Idempotency-Key`, 정확한 `If-Match`로 정책을 변경합니다. 앱 실행 principal에는 이 scope를 함께 부여할 수 없습니다. |
+
+정책은 principal, 모든 입력·snapshot 문서의 source ID, synthetic/actual 구분, 만료 시각, prompt·catalogue·snapshot·topic과 replay fixture 또는 공개 live runtime 신원을 정확히 제한합니다. `maxPlans`·`maxUnits`는 모든 revision에 걸친 누적 admission 수와 S2 단위 수입니다. 취소·실패·만료·정책 변경은 사용량을 환불하지 않습니다. **이 수량 제한은 provider 호출 수나 금액 예산이 아닙니다.** 기존 source rights, live gate와 송신 시점의 독립적인 dollar/call cap이 그대로 필요합니다.
+
+정책 PUT의 같은 운영자·키·문서 digest·If-Match 재요청은 이후 정책이 바뀌었어도 원래 영수증을 반환합니다. 같은 키로 문서나 If-Match를 바꾸면 409 `idempotency_conflict`, 새로운 작업의 오래된 If-Match는 412 `policy_conflict`입니다. 같은 문서를 새 작업으로 다시 제출해도 revision·만료·사용량은 갱신하지 않습니다. 실제 정책 변경은 이전 admission을 모두 영구 비활성화합니다. 만료를 한 번 관측하면 해당 revision과 admission은 시계를 되돌리거나 예전 정책 바이트를 복원해도 살아나지 않습니다.
+
+운영자 정책 작업의 신원과 과거 영수증은 키를 퇴출하거나 재사용하지 않고 계속 보존합니다. Admission 수량 제한 때문에 정책 비활성화나 교체를 막지 않으며, 개별 요청 크기 제한과 admission 저장량 제한은 별도로 유지합니다.
+
+Admission은 `<plan-root>/<planId>`의 네 plan 파일만 읽고 receipt를 내부에서 고정한 뒤, 수동 installer와 공유하는 제한된 실제 `zoop-ai-extract verify-plan` subprocess로 전체 내용을 재구성·검증합니다. 자격 증명·송신 cap은 verifier에 전달하지 않습니다. 검증은 쓰기 트랜잭션 밖에서 수행하며, commit 직전에 정책 revision·만료·설정/디렉터리 신원·plan/registry/fixture pin·충돌·quota를 다시 확인합니다. 검증 중 정책이 바뀌면 409 `policy_changed`로 거부하며, 다른 revision으로 자동 재평가하지 않습니다. Admission과 조회는 실행을 enqueue하거나 dispatch하지 않습니다.
+
+반환 manifest의 각 S2 단위에는 정확히 하나의 결정적 S3 ID가 들어갑니다. S3는 그 ID·provenance·upstream·runtime만 허용하며, 같은 admission origin으로 서비스가 수락한 S2 row가 먼저 있어야 합니다. 운영자가 pipeline에 따로 만든 S2 job은 채택하지 않습니다. S2·S3 예약과 dispatch claim은 불변 `authority_ref`를 보관하며, 제출 후 gate 대기 직후·replay를 포함한 모든 dispatch·명시적 recover·내용 전달·S3 검수 시 현재 권한을 다시 확인합니다. 내용 없는 상태·안전한 취소·과거 작업 영수증 조회는 권한을 갱신하지 않습니다. 이미 실행 중인 child를 정책 만료 순간에 회수하거나 이미 전달한 내용을 취소하는 기능은 아닙니다.
+
+서비스는 process lock을 먼저 잡고, 모든 서비스 원장 복구·중단 처리보다 앞서 모드와 저장소를 확인합니다. 사용 중인 수동 profile을 온라인으로 전환하거나 온라인 flag를 제거해 수동 권한으로 바꾸면 `authority_mode_mismatch`로 시작을 거부합니다. **별도의 서비스 상태 profile을 사용해야 합니다.** 온라인 marker가 있는데 authority DB나 필수 control DB가 사라졌거나 손상되면 닫힌 상태로 거부하며 quota·이력을 재생성하지 않습니다. 온라인 상태에서 offline installer를 실행할 수도 없습니다. S2 서비스 원장은 `zoop-ai-extraction-jobs-ledger-3`, S3는 `zoop-ai-relation-jobs-ledger-4`로 전진하며, 기존 수동 row의 origin은 null로 남고 온라인 origin으로 재해석하지 않습니다.
+
+온라인 profile의 최초 lock 파일은 새 profile에서만 생성합니다. 이후 시작에서는 기존 `service.lock`이 반드시 있어야 하며, authority binding에 원래 lock의 device/inode를 고정합니다. 파일이 사라졌거나 다른 inode로 바뀌면 새 lock으로 대체하거나 원장을 복구하지 않고 시작을 거부합니다.
+
+최초 온라인 시작은 네 DB와 최종 marker를 `.authority-prepare-*` 비공개 디렉터리에 완성한 뒤, WAL을 checkpoint하고 DELETE journal 모드로 봉인합니다. 모든 정책·작업·dispatch·검수 이력이 비어 있고 누적 수량이 0인지 확인한 후, 파일의 바이트·device/inode·크기와 원래 디렉터리·lock·설정 binding을 불변 manifest에 고정합니다. 준비 디렉터리를 `authority-initialization`으로 덮어쓰기 없이 원자적으로 게시한 시점부터 자동 재시작 복구가 가능합니다. 복구는 고정된 네 DB inode를 기존 서비스 경로로 옮기고, 준비된 `authority-mode.json` inode를 **마지막에** 옮깁니다. 이 marker(`zoop-ai-authority-mode-2`)가 게시되기 전에는 일반 원장 생성자·작업 복구·dispatch·HTTP 처리를 시작하지 않습니다.
+
+중단된 초기화는 각 고정 파일이 준비 경로와 최종 경로 중 정확히 한 곳에 남아 있고, 아직 사용되지 않은 봉인 상태일 때만 이어 갑니다. 파일 누락·교체·중복·hardlink·journal sidecar·binding 변경·사용 이력은 자동 채택하거나 정리하지 않고 거부합니다. **`authority-initialization` 게시 전의 중단으로 `.authority-prepare-*`만 남았다면 자동 복구 대상이 아닙니다.** 운영자가 상태를 확인해야 하며, 서비스는 잔여 디렉터리를 삭제하거나 새 DB로 덮어쓰지 않습니다. 파일시스템의 전원 장애로 소유권 증거가 모호해진 경우에도 복구를 보장하지 않고 닫힌 상태로 거부합니다.
+
+완료된 v2 profile은 manifest와 원래 marker·DB inode를 계속 보존해야 합니다. 이후 정상 사용으로 바뀐 DB 바이트나 이력을 초기화 당시 해시·빈 상태와 다시 비교하지는 않습니다. 기존 v1 marker와 네 DB가 모두 있는 profile은 기존 검증을 유지하지만, v1 marker만 있는 불완전한 상태는 새 초기화로 해석하지 않습니다. 초기화 대기 상태에서도 수동 시작과 offline installer는 허용하지 않습니다. 이 복구는 정책 설치·grant 부활·quota 환불이나 사용한 원장의 재생성 기능이 아닙니다.
+
+오류는 안정적인 코드만 반환합니다. 정책·quota·ID 거부는 자동 재시도 대상으로 표시하지 않으며, 검증의 실질적 거부(`plan_verification_failed`)와 verifier 전송 불능(`plan_verifier_unavailable`)을 구분합니다. 실제 정책·source grant·예산 설치, 유료 호출, 공개 JobCreate/queue/scheduler, HOLD 승인·게시·활성화는 이 기능의 범위가 아닙니다.
+
+Verifier가 종료 코드 2와 닫힌 `zoop-extraction-s2-2` 오류 envelope를 함께 반환할 때만 409 `plan_verification_failed`로 분류합니다. 비정상 종료·signal·비JSON/빈/불일치 응답·출력 초과·deadline은 503 `plan_verifier_unavailable`이며, raw child 출력 없이 재시도 가능한 전송 불능으로 구분합니다. 출력 크기·deadline·kill/reap 한도는 그대로 유지하고 자동 재시도는 하지 않습니다.
+
+
 ### 운영자 토큰 절차(수동, 에이전트가 실행하지 않음)
 
 서비스와 이 저장소는 비밀을 생성하지 않습니다. 운영자가 서비스 밖에서 토큰을 만들어 비밀 저장소에 보관하고 **digest만** 설정에 넣습니다.
@@ -144,7 +182,37 @@ live S2/S3 job은 **서버 운영자가 고정한 것만** 돌아갑니다. 호�
 
 **서버 사전 승인(`ZOOP_AI_SERVICE_EXTRACTION_APPROVALS`).** 호출자는 pipeline의 S2 `Submit`을 보내지 못합니다. 운영자 파일(`{"schemaVersion":"zoop-ai-extraction-approvals-1","approvals":[{"principal","jobId","approvedRequestDigest","request","producerReplayDigest","topicReplayDigest"}]}`, live 항목은 `producerReplayDigest`·`topicReplayDigest` 대신 `liveRuntimeIdentity`, 알 수 없는 키·중복 `(principal, jobId)`·모르는 principal 거부)이 principal+jobId+digest를 **정확한 S2 `Submit` 본문**(스냅샷·카탈로그·incoming 관측·토픽 요청)과, replay 항목이면 그것이 실행될 fixture 바이트의 SHA-256에, live 항목이면 그 요청이 비용을 쓸 수 있는 런타임 binding 신원에 대응시킵니다. 서비스는 읽을 때마다 `request`의 정규 JSON digest가 `approvedRequestDigest`와 같은지, `request.jobId`가 항목의 `jobId`와 같은지, provenance 쌍이 `(replay, authored-test)`(fixture digest 필수) 또는 `(live, provider)`(fixture 없음, `liveRuntimeIdentity` 필수)인지, `topic` 요청과 `topicReplayDigest`가 정확히 짝인지(replay에서 `topic`이 있으면 선택 fixture가 설정돼 있어야 함)를 검증하고, 하나라도 어긋나면 시작을 거부하거나 닫힙니다. 목록에 없으면 존재 여부와 관계없이 같은 403 `request_not_approved`를 ledger·child 이전에 돌려줍니다. live 항목은 live 그룹이 없으면 409 `live_unavailable`입니다. **승인은 pipeline이 허용하는 것을 좁힐 뿐입니다.** pipeline은 내용을 다루는 모든 명령에서 운영자 source registry를 다시 읽으므로 승인이 있어도 registry가 막으면 읽히지 않습니다. 파일은 사용할 때마다 다시 읽고 읽을 수 없으면 닫힙니다(503 `service_configuration_invalid`).
 
-**회차 계획 파일(`zoop-ai-extract plan-round`).** pipeline의 [오프라인 계획 명령](../pipeline/README.md#이벤트same주제-후보-s2-2-authored-replay-또는-live-provider)은 완료 회차에서 `approvals.json`, `relation-upstreams.json`, `manifest.json`, `receipt.json`을 만듭니다. 서비스는 계획 생성이나 설치를 자동 수행하지 않습니다. 운영자가 검토한 승인 파일 두 개를 `ZOOP_AI_SERVICE_EXTRACTION_APPROVALS`와 `ZOOP_AI_SERVICE_RELATION_UPSTREAMS`가 가리키는 경로에 반영하면 다음 요청부터 적용됩니다. 이는 유료 호출 승인·예산 설정과 별개입니다. 앱용 manifest에는 계획 ID·digest·단위별 S2 제출 필드만 있으며, 승인 항목의 분석 입력·스냅샷·카탈로그·비밀·원문은 없습니다. 계획 작업은 `s2p-` ID를 사용하며 기존 CLI 작업을 HTTP 작업으로 재사용하지 않습니다. 계획 생성은 구문·현재 원천 권한까지만 검사하고 snapshot 근거·실행 문맥은 dispatch 때 확인합니다. 앱의 계획 등록과 `JobCreate.planId` 처리는 BE에 제안한 후속 작업이며 아직 구현되지 않았습니다. `pipeline_tests/test_extraction_plan.py`는 계획 파일을 실제 로더에 넣고 HTTP로 S2 주제 단계와 S3의 `ready` 도달까지 확인합니다.
+**회차 계획 파일(`zoop-ai-extract plan-round`).** pipeline의 [오프라인 계획 명령](../pipeline/README.md#이벤트same주제-후보-s2-2-authored-replay-또는-live-provider)은 완료 회차에서 `approvals.json`, `relation-upstreams.json`, `manifest.json`, `receipt.json`을 만듭니다. 계획 생성은 설치·유료 호출·예산 설정과 별개입니다. 앱용 manifest에는 계획 ID·digest·단위별 S2 제출 필드만 있으며, 승인 항목의 분석 입력·스냅샷·카탈로그·비밀·원문은 없습니다. 계획 작업은 `s2p-` ID를 사용하며 기존 CLI 작업을 HTTP 작업으로 재사용하지 않습니다. 검토한 계획은 아래 운영자 전용 명령으로 설치합니다. 앱의 계획 등록과 `JobCreate.planId` 처리는 BE에 제안한 후속 작업이며 아직 구현되지 않았습니다.
+
+**검토한 계획을 오프라인으로 설치합니다.** 먼저 서비스를 중지하고 서비스와 같은 운영자 환경을 사용합니다. 서비스 상태 디렉터리는 미리 존재하는 현재 사용자 소유의 `0700` 디렉터리여야 합니다. S2·S3 설정 그룹, 알려진 principal, 기존 두 registry가 필요합니다. 처음에는 기존 형식의 빈 `approvals`·`upstreams` 배열을 운영자가 준비합니다. registry와 fixture·명령 파일은 서비스·앱·worker·ingestion·extraction·relation 상태 루트 밖에 두고, symlink와 겹치는 경로는 사용하지 않습니다. 한 destination 쌍을 다른 서비스 상태 디렉터리나 관리되지 않는 reader/writer와 공유하면 안 됩니다.
+
+```bash
+# 서비스 가상환경의 python을 사용합니다. inspect/status는 설치 파일이나 상태 디렉터리를 만들지 않습니다.
+ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli inspect --plan-dir /absolute/reviewed-plan
+# 출력의 currentDigest, reviewDigest와 정확한 변경 내용을 사람이 검토한 뒤에만 실행합니다.
+ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli install \
+  --plan-dir /absolute/reviewed-plan \
+  --expected-current-digest CURRENT_DIGEST --expected-review-digest REVIEW_DIGEST
+ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli status \
+  --installation-id plan-install-REVIEW_DIGEST
+# status의 transactionDigest를 확인한 뒤, 중단된 설치만 명시적으로 복구합니다.
+ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli recover \
+  --installation-id plan-install-REVIEW_DIGEST --expected-transaction-digest TRANSACTION_DIGEST
+```
+
+`inspect`는 bounded·duplicate-free JSON, receipt의 정확한 파일 hash/길이, manifest digest, 기존 서비스 로더의 principal·요청 digest·fixture/runtime pin을 검사합니다. 설치된 `zoop-ai-extract verify-plan`을 읽기 전용으로 호출해 전체 `Submit` 스키마와 현재 회차로 계획을 재생성하고, incoming·snapshot 문서의 현재 source-read/export 권한과 source binding도 확인합니다. plan 파일·현재 registry 바이트·설정·source registry/binding·병합 결과를 모두 `reviewDigest`에 묶습니다. digest는 검토 대상의 무결성 식별자이지 사람의 승인 증명이나 인증 토큰이 아닙니다. 설치 권한은 보호된 운영자 실행 환경과 파일 권한에 있습니다.
+
+검토 대상에는 서비스 상태 디렉터리와 각 target의 부모 디렉터리의 device/inode도 포함됩니다. 같은 경로에 같은 바이트를 복사했어도 디렉터리 자체가 교체되면 기존 검토·journal로 설치하거나 복구하지 않습니다. 설치·복구는 확인한 디렉터리 FD를 유지하고 파일 생성·교체·journal 게시를 그 FD에 상대적으로 수행합니다. 디렉터리의 mtime·크기나 target 파일의 교체 전 inode는 고정하지 않으므로, 무관한 형제 파일 작업이나 정상적인 원자 교체 때문에 검토가 무효가 되지는 않습니다.
+
+`install`은 서비스와 같은 `ProcessLock`을 잡고 현재 바이트와 검토 digest를 다시 검사합니다. `(principal, jobId)` 승인과 `(principal, jobId, inputDigest)` upstream은 동일하면 유지하고 새 항목만 추가합니다. 같은 키의 다른 내용은 전체 거부하며, 다른 principal·이전 회차·standalone S3 항목을 제거하지 않습니다. 병합 뒤에도 기존 크기 제한과 replay fixture pin을 만족해야 합니다. fixture 회전이나 기존 승인 정리는 이 명령의 기능이 아닙니다.
+
+설치 journal은 `$ZOOP_AI_SERVICE_STATE_DIR/plan-install/`의 `binding.json`, `pending.json`, `transactions/<installationId>/`에 저장합니다. transaction에는 보호된 before/after 이미지·`intent.json`·최종 `receipt.json`이 남습니다. 파일과 디렉터리를 fsync하고 **두 target 중 하나라도 바꾸기 전에** pending marker를 영속합니다. 두 파일 교체 자체는 물리적으로 원자적이지 않습니다. 서비스는 lock 직후, 어떤 원장 생성·중단 작업 복구·dispatch보다 먼저 미해결·손상 journal을 검사해 `plan_install_unresolved`로 시작을 거부합니다. 이 보장은 동일한 상태 소유자의 lock과 시작 차단에 의존합니다.
+
+미완료 transaction의 `recover`는 각 target이 기록된 before 또는 after 바이트일 때만 before 쌍으로 돌리고 `aborted` receipt를 남깁니다. committed receipt와 남은 pending marker가 있으면 정확한 after 쌍을 확인한 뒤 marker만 정리합니다. 수동 철회나 다른 세 번째 바이트, 손상 journal, 바뀐 destination은 덮어쓰지 않습니다. `status`·`recover`는 전체 `config.load()`를 호출하지 않으며 source registry·fixture·원문·provider key·budget이 없어도 저장된 transaction의 경로와 이미지로 판단합니다.
+
+정상 설치와 재호출의 출력은 `schemaVersion`, `installationId`, `transactionDigest`, `outcome`, `appliedNow`, `installationCurrent`입니다. 최초 commit만 `appliedNow:true`이며, committed·aborted ID를 재사용해 새 승인을 만들 수 없습니다. 이후 계획이 추가되어도 기존 receipt 재호출은 registry를 다시 쓰지 않습니다. 따로 철회된 항목이 있으면 과거 receipt metadata와 `appliedNow:false`, `installationCurrent:false`, `error.code:installation_not_current`를 함께 반환하고 exit 78로 끝납니다. 이 상태의 `installationCurrent`는 **기록된 정확한 항목이 현재 registry에 남아 있는지**만 뜻하며 현재 원천 권한이나 실행 가능성을 보증하지 않습니다. 일반 성공은 exit 0, 거부는 exit 78, 잘못된 CLI 인자는 argparse의 exit 2입니다. 주요 거부 코드는 `stale_current`, `stale_review`, `service_state_busy`, `plan_conflict`, `fixture_changed`, `installation_pending`, `journal_target_drift`, `journal_binding_changed`입니다.
+
+설치는 source 권한·model-send 권한·예산·HOLD allow·앱 공개 권한을 만들지 않고, job을 submit/resume/cancel하거나 서비스를 시작하지도 않습니다. snapshot mention grounding과 실제 freeze 가능성은 submit에서, 현재 source/model-send 권한은 실제 사용과 dispatch에서 다시 검사합니다. 검증과 파일 게시 사이의 권한 변경은 하나의 transaction이 아니므로 이 재검사를 유지해야 합니다. 이 운영자 도구는 상시 자동 승인 정책이나 05/35 수집·10/40 확인 보장의 구현이 아닙니다. 단위 transaction 검사는 `tests/test_plan_install.py`, 실제 CLI·HTTP 흐름과 중단 복구는 `scripts/plan_install_service_smoke.py`에서 다룹니다.
 
 **소유권·고정된 신원.** job은 제출한 principal의 것이고 다른 principal의 job·예약만 된 job·없는 job은 모두 같은 404, 같은 jobId를 다른 principal이 제출하면 409 `job_id_unavailable`입니다. pipeline의 `submit`은 이미 있는 id에 대해 저장된 job을 그대로 보고하므로 첫 시도는 먼저 `inspect`로 그 id가 pipeline 원장에 없음을 확인하고, 있으면 예약을 풀고 409(운영자가 만든 job을 채택해 읽는 일을 막음)입니다. **예약은 `submit` 전에 영속합니다**: 소유자·호출자 본문 digest와 함께 그 순간 승인이 고정한 값, 즉 승인된 요청 digest, producer fixture digest, (있으면) 토픽 fixture digest, 그리고 pipeline이 보고해야 하는 `inputDigest`(`digest({request, replayFixtureHash})`를 **서비스가 승인 바이트로 계산**, pipeline이 말한 값을 받아 적지 않음)를 원장에 씁니다. 고정 열은 불변입니다(DB trigger). 정확히 같은 본문의 재전송은 고정된 값을 그대로 쓰고(200), 같은 jobId에 다른 digest는 409 `idempotency_conflict`, 승인 항목이나 fixture 파일이 그사이 바뀌었으면 409 `approval_changed`·`fixture_changed`(또는 withheld)로 같은 job id를 새 바이트에 다시 묶지 않습니다. 고쳐 쓰려면 새 jobId를 승인해야 합니다.
 

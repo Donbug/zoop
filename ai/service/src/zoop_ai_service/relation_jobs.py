@@ -72,10 +72,12 @@ def is_config_code(code: str) -> bool:
 
 class RelationJobs:
     def __init__(self, config: ServiceConfig, ledger: RelationLedger, process: RelationProcess, dispatcher: RelationDispatcher,
-                 gate: RelationGate, *, clock: Callable[[], float] = time.time, busy_wait: float = BUSY_WAIT):
+                 gate: RelationGate, *, clock: Callable[[], float] = time.time, busy_wait: float = BUSY_WAIT,
+                 online_authority=None, extraction_ledger=None):
         assert config.relation is not None
         self.config, self.relation = config, config.relation
         self.ledger, self.process, self.dispatcher, self.gate = ledger, process, dispatcher, gate
+        self.online_authority, self.extraction_ledger = online_authority, extraction_ledger
         self._clock, self._busy_wait = clock, busy_wait
         self._locks = KeyedLocks()
         self._slots = threading.BoundedSemaphore(CLI_SLOTS)
@@ -122,6 +124,22 @@ class RelationJobs:
         except relation_access.AccessError as error:
             raise self._fault(seen, error.code) from None
 
+    def _online_submit(self, owner, job_id, body):
+        try:
+            grant = self.online_authority.resolve_s3(owner, job_id, body)
+        except ApiError as error:
+            raise RelationError(error.status, error.code) from None
+        upstream = self.extraction_ledger.job(body.upstream.job_id)
+        if (upstream is None or upstream.owner != owner or upstream.state != "accepted"
+                or upstream.input_digest != body.upstream.input_digest or upstream.authority_ref != grant.authority_ref):
+            raise RelationError(403, "upstream_not_allowed")
+        return grant
+
+    def _online_refusal(self, row):
+        if self.online_authority is not None:
+            return self.online_authority.refuse_s3(row)
+        return "authority_origin_mismatch" if row.authority_ref is not None else None
+
     @staticmethod
     def _log(seen: Observation, command: str, outcome: Outcome) -> None:
         seen.runtime.append({"command": command, "kind": outcome.kind, "exit": outcome.exit_code, "code": outcome.code})
@@ -154,8 +172,7 @@ class RelationJobs:
             raise RelationError(500, "internal_error", runtime_code=code)
         return self._bound(outcome, row)
 
-    @staticmethod
-    def _bound(outcome: Outcome, row: RelationRow) -> tuple[RelationView, dict[str, Any]]:
+    def _bound(self, outcome: Outcome, row: RelationRow) -> tuple[RelationView, dict[str, Any]]:
         """A result outcome as a view bound to the row's job, digest and upstream. Anything else is unreadable (503) or a binding mismatch (500)."""
         if outcome.kind != "result" or outcome.result is None:
             raise RelationError(503, "runtime_unavailable", retry_after=2)
@@ -167,6 +184,10 @@ class RelationJobs:
         if (view.job_id != row.job_id or view.input_digest != row.input_digest
                 or (upstream.job_id, upstream.input_digest) != (row.upstream_job_id, row.upstream_input_digest)):
             raise RelationError(500, "runtime_binding_mismatch")
+        if self.online_authority is not None:
+            problem = self.online_authority.refuse_s3_result(row, outcome.result)
+            if problem is not None:
+                view.delivery.status, view.delivery.code = "withheld", problem
         return view, outcome.result
 
     def _read(self, row: RelationRow, seen: Observation) -> tuple[RelationView, dict[str, Any]]:
@@ -185,6 +206,11 @@ class RelationJobs:
             return RelationDelivery(state="withheld", reason=view.delivery.code or "withheld")
         if view.state != "ready":
             return RelationDelivery(state="withheld", reason="job_not_ready")
+        refusal = self._online_refusal(row)
+        if refusal is not None:
+            return RelationDelivery(state="withheld", reason=refusal)
+        if self.online_authority is not None:
+            return RelationDelivery(state="available")
         access = self._access(seen)
         if not access.allows(row.owner, row.upstream_job_id, row.upstream_input_digest):
             return RelationDelivery(state="withheld", reason="upstream_not_allowed")
@@ -238,7 +264,11 @@ class RelationJobs:
         live = body.provenance.execution_mode == "live"
         location = {"Location": f"/internal/v1/relation-jobs/{job_id}"}
         with self._locks.hold(job_id):
+            grant = self._online_submit(owner, job_id, body) if self.online_authority is not None else None
+            origin = None if grant is None else grant.authority_ref
             row = self.ledger.job(job_id)
+            if row is not None and row.authority_ref != origin:
+                raise RelationError(409, "authority_origin_mismatch")
             if row is not None:
                 if row.owner != owner:
                     raise RelationError(409, "job_id_unavailable")
@@ -249,18 +279,19 @@ class RelationJobs:
                     status = self._status(row, view, seen)
                     return Reply(200, status, self._headers(status, **location))
             # Unknown upstream: refused before any ledger row or child exists, and the same answer whether or not it exists.
-            access = self._access(seen)
-            if not access.allows(owner, body.upstream.job_id, body.upstream.input_digest):
-                raise RelationError(403, "upstream_not_allowed")
             pin = None
-            if live:
-                # A live job spends money: the service must have the live group, and the operator's allowlist must pin the runtime identity it
-                # approved for exactly this owner and upstream (a reservation made earlier keeps the pin it was made under).
-                if self.config.pipeline_live is None:
-                    raise RelationError(409, "live_unavailable")
-                pin = access.live_identity(owner, body.upstream.job_id, body.upstream.input_digest)
-                if pin is None or (row is not None and row.live_binding != pin):
-                    raise RelationError(403, "live_not_approved")
+            if grant is not None:
+                pin = grant.runtime.get("liveRuntimeIdentity")
+            else:
+                access = self._access(seen)
+                if not access.allows(owner, body.upstream.job_id, body.upstream.input_digest):
+                    raise RelationError(403, "upstream_not_allowed")
+                if live:
+                    if self.config.pipeline_live is None:
+                        raise RelationError(409, "live_unavailable")
+                    pin = access.live_identity(owner, body.upstream.job_id, body.upstream.input_digest)
+                    if pin is None or (row is not None and row.live_binding != pin):
+                        raise RelationError(403, "live_not_approved")
             if self.ledger.active_count() >= MAX_PENDING:
                 raise RelationError(503, "queue_full", retry_after=30)
             problem = self.preflight()
@@ -268,7 +299,13 @@ class RelationJobs:
                 raise self._fault(seen, problem)
             with self._cli():
                 # Owner intent first (durable). Then the pipeline registers, then accepted + dispatch intent, then 202.
-                row = row or self.ledger.reserve(job_id, owner, digest, body.upstream.job_id, body.upstream.input_digest, pin)
+                if self.online_authority is not None:
+                    self._online_submit(owner, job_id, body)
+                else:
+                    access = self._access(seen)
+                    if not access.allows(owner, body.upstream.job_id, body.upstream.input_digest):
+                        raise RelationError(403, "upstream_not_allowed")
+                row = row or self.ledger.reserve(job_id, owner, digest, body.upstream.job_id, body.upstream.input_digest, pin, authority_ref=origin)
                 if row.submit_attempts == 0:
                     self._refuse_adoption(job_id, owner, digest, seen)
                 self.ledger.begin_attempt(job_id)
@@ -376,6 +413,9 @@ class RelationJobs:
 
     def recover(self, owner: str, job_id: str, seen: Observation) -> Reply:
         row = self._owned(owner, job_id)
+        refusal = self._online_refusal(row)
+        if refusal is not None:
+            raise RelationError(409, refusal)
         view, _ = self._read(row, seen)
         dispatch = self.ledger.dispatch(job_id)
         assert dispatch is not None
@@ -389,7 +429,7 @@ class RelationJobs:
             raise RelationError(409, "reconcile_required", job_status=status)
         if view.state not in ("queued", "running", "stopped"):
             raise RelationError(409, "job_not_recoverable", job_status=status)
-        if row.live_binding is not None:
+        if row.live_binding is not None and self.online_authority is None:
             # A live recover spends money again: the owner and the pinned runtime must still be approved NOW.
             refusal = self._live_refusal(row, self._access(seen))
             if refusal is not None:
@@ -417,6 +457,13 @@ class RelationJobs:
 
     def _permit(self, owner: str, row: RelationRow, seen: Observation) -> None:
         """A write to the AI ledger (a review or a recovery) needs the upstream to be listed for the owner NOW. A plain lookup does not."""
+        if self.online_authority is not None:
+            refusal = self.online_authority.refuse_s3(row)
+            if refusal is not None:
+                raise RelationError(409, refusal)
+            return
+        if row.authority_ref is not None:
+            raise RelationError(409, "authority_origin_mismatch")
         if not self._access(seen).allows(owner, row.upstream_job_id, row.upstream_input_digest):
             raise RelationError(403, "upstream_not_allowed")
 
@@ -561,6 +608,12 @@ class RelationJobs:
             if problem:
                 raise self._fault(seen, problem)
             with self._cli():
+                self._permit(owner, row, seen)
+                if self.online_authority is not None:
+                    outcome = self.process.inspect(row.job_id)
+                    view, _ = self._parse(outcome, row, seen, "inspect")
+                    if view.delivery.status != "current":
+                        raise RelationError(409, view.delivery.code or "upstream_unavailable")
                 # Owner intent first (durable, a reserved row), then the pipeline appends, then the exact event is proven and recorded.
                 op = self.ledger.reserve_operation(key, owner, job_id, body.relation_candidate_id, body.decision, body.expected_source_version,
                                                    int(body.expected_source_revision), digest)

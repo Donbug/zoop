@@ -80,6 +80,11 @@ def load(path: Path, principals: Collection[str], *, topic_available: bool, live
             raw = handle.read(MAX_BYTES + 1)
     except OSError:
         raise AccessError("extraction_approvals_unreadable") from None
+    return parse(raw, principals, topic_available=topic_available, live_available=live_available)
+
+
+def parse(raw: bytes, principals: Collection[str], *, topic_available: bool, live_available: bool = False) -> Approvals:
+    """Validate bounded registry bytes without opening or creating a file."""
     if len(raw) > MAX_BYTES:
         raise AccessError("extraction_approvals_too_large")
     try:

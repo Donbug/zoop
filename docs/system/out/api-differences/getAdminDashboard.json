@@ -593,96 +593,96 @@
       "type": "object"
     },
     "response:200:application/json.jobs<anyOf:0>.active:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.cancelRequested": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.cancelRequested": {
       "type": "boolean"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.cancelRequested:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.durationSeconds:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.durationSeconds<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.cancelRequested:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.durationSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.durationSeconds<anyOf:0>": {
       "type": "number"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.durationSeconds<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.durationSeconds<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.error:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.error<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.error:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.error<anyOf:0>": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.error<anyOf:0>.code": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.error<anyOf:0>.code": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.error<anyOf:0>.code:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.error<anyOf:0>.message": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.error<anyOf:0>.code:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.error<anyOf:0>.message": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.error<anyOf:0>.message:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.error<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.error<anyOf:0>.message:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.error<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.finishedAt:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.finishedAt<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.finishedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.finishedAt<anyOf:0>": {
       "type": "string",
       "format": "date-time"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.finishedAt<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.finishedAt<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.flush:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.flush<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.flush:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.flush<anyOf:0>": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.flush<anyOf:0>.completedProjectionJobs": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.flush<anyOf:0>.completedProjectionJobs": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.flush<anyOf:0>.completedProjectionJobs:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.flush<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.flush<anyOf:0>.completedProjectionJobs:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.flush<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.id": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.id": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.id:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.id:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.baselineAdvanced": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.baselineAdvanced": {
       "type": "boolean"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.baselineAdvanced:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.baselineAfter:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.baselineAfter<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.baselineAdvanced:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.baselineAfter:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.baselineAfter<anyOf:0>": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.baselineAfter<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.baselineAfter<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.baselineBefore:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.baselineBefore<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.baselineBefore:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.baselineBefore<anyOf:0>": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.baselineBefore<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.baselineBefore<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.duplicateArticles:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.duplicateArticles<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.duplicateArticles:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.duplicateArticles<anyOf:0>": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.duplicateArticles<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.duplicateArticles<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.newArticles:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.newArticles<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.newArticles:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.newArticles<anyOf:0>": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.newArticles<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.newArticles<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.outcome:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.outcome<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.outcome:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.outcome<anyOf:0>": {
       "type": "string",
       "enum": [
         "collected",
@@ -691,221 +691,216 @@
         "cancelled"
       ]
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.outcome<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:0>.outcome<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ingest<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.kind": {
-      "type": "string",
-      "enum": [
-        "ingest",
-        "revalidate",
-        "project"
-      ]
-    },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.kind:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.label": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.kind": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.label:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.kind:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.label": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.label:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerAfter:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerAfter<anyOf:0>": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.candidates": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.candidates": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.candidates:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.capturedAt": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.candidates:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.capturedAt": {
       "type": "string",
       "format": "date-time"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.capturedAt:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.issues": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.capturedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.issues": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.issues:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.pendingProjections:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.pendingProjections<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.issues:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.pendingProjections:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.pendingProjections<anyOf:0>": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.pendingProjections<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.pendingProjections<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.relations": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.relations": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.relations:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.relations:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerAfter<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerBefore:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerBefore<anyOf:0>": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.candidates": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.candidates": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.candidates:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.capturedAt": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.candidates:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.capturedAt": {
       "type": "string",
       "format": "date-time"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.capturedAt:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.issues": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.capturedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.issues": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.issues:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.pendingProjections:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.pendingProjections<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.issues:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.pendingProjections:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.pendingProjections<anyOf:0>": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.pendingProjections<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.pendingProjections<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.relations": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.relations": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.relations:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.relations:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.ledgerBefore<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.reason": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.reason": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.reason:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.recovered": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.reason:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.recovered": {
       "type": "boolean"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.recovered:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.recovered:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.approved": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.approved": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.approved:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.collectionErrorCount": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.approved:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.collectionErrorCount": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.collectionErrorCount:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.collectionErrors": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.collectionErrorCount:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.collectionErrors": {
       "type": "array"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.collectionErrors:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.collectionErrors[]": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.collectionErrors:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.collectionErrors[]": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.elapsedSeconds": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.elapsedSeconds": {
       "type": "number"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.elapsedSeconds:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.errorCount": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.elapsedSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.errorCount": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.errorCount:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.errors": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.errorCount:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.errors": {
       "type": "array"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.errors:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.errors[]": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.errors:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.errors[]": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.executionMode:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.executionMode<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.executionMode:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.executionMode<anyOf:0>": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.executionMode<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.executionMode<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.held": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.held": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.held:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.pending": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.held:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.pending": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.pending:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.processed": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.pending:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.processed": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.processed:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.rejected": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.processed:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.rejected": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.rejected:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.runId:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.runId<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.rejected:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.runId:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.runId<anyOf:0>": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.runId<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.runId<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.skipped": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.skipped": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.skipped:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.skipped:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.usage": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.calls": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.usage.calls": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.calls:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.elapsedSeconds": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.usage.calls:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.usage.elapsedSeconds": {
       "type": "number"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.elapsedSeconds:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.estimatedCost:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.estimatedCost<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.usage.elapsedSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.usage.estimatedCost:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.usage.estimatedCost<anyOf:0>": {
       "type": "number"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.estimatedCost<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.usage.estimatedCost<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.inputTokens": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.usage.inputTokens": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.inputTokens:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.outputTokens": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.usage.inputTokens:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.usage.outputTokens": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.outputTokens:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.replayCalls": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.usage.outputTokens:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.usage.replayCalls": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.replayCalls:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.usage.replayCalls:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:0>.usage:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.report<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.requestedAt": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.requestedAt": {
       "type": "string",
       "format": "date-time"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.requestedAt:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.requestedBy": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.requestedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.requestedBy": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.requestedBy:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.requestedBy:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.retry": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.allowed": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.retry.allowed": {
       "type": "boolean"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.allowed:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.blockedBy:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.blockedBy<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.retry.allowed:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.retry.blockedBy:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.retry.blockedBy<anyOf:0>": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.blockedBy<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.retry.blockedBy<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.code": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.retry.code": {
       "type": "string",
       "enum": [
         "allowed",
@@ -916,31 +911,33 @@
         "duplicate_running",
         "other_running",
         "dataset_missing",
-        "outcome_unknown"
+        "outcome_unknown",
+        "worker_unavailable",
+        "plan_not_reusable"
       ]
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.code:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.reason": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.retry.code:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.retry.reason": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.reason:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retryOf:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retryOf<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.retry.reason:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.retry:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.retryOf:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.retryOf<anyOf:0>": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retryOf<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.retryOf<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.startedAt:required": true,
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.startedAt<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.startedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.startedAt<anyOf:0>": {
       "type": "string",
       "format": "date-time"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.startedAt<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.startedAt<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.status": {
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.status": {
       "type": "string",
       "enum": [
         "queued",
@@ -950,7 +947,482 @@
         "cancelled"
       ]
     },
-    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.status:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:0>.status:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:1>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:1>.kind": {
+      "enum": [
+        "ingest",
+        "revalidate",
+        "project"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:0><allOf:1>.kind:required": false,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.cancelRequested": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.cancelRequested:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.durationSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.durationSeconds<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.durationSeconds<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.error:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.error<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.error<anyOf:0>.code": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.error<anyOf:0>.code:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.error<anyOf:0>.message": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.error<anyOf:0>.message:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.error<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.finishedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.finishedAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.finishedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.flush:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.flush<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.flush<anyOf:0>.completedProjectionJobs": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.flush<anyOf:0>.completedProjectionJobs:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.flush<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.id": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.id:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.baselineAdvanced": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.baselineAdvanced:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.baselineAfter:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.baselineAfter<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.baselineAfter<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.baselineBefore:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.baselineBefore<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.baselineBefore<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.duplicateArticles:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.duplicateArticles<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.duplicateArticles<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.newArticles:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.newArticles<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.newArticles<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.outcome:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.outcome<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "collected",
+        "empty",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:0>.outcome<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ingest<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.kind": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.kind:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.label": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.label:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerAfter:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerAfter<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.candidates": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.candidates:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.capturedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.capturedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.issues": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.issues:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.pendingProjections:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.pendingProjections<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.pendingProjections<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.relations": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.relations:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerAfter<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerBefore:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerBefore<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.candidates": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.candidates:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.capturedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.capturedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.issues": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.issues:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.pendingProjections:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.pendingProjections<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.pendingProjections<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.relations": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.relations:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.ledgerBefore<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.reason:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.recovered": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.recovered:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.approved": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.approved:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.collectionErrorCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.collectionErrorCount:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.collectionErrors": {
+      "type": "array"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.collectionErrors:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.collectionErrors[]": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.elapsedSeconds": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.elapsedSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.errorCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.errorCount:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.errors": {
+      "type": "array"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.errors:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.errors[]": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.executionMode:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.executionMode<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.executionMode<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.held": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.held:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.pending": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.pending:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.processed": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.processed:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.rejected": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.rejected:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.runId:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.runId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.runId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.skipped": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.skipped:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.usage": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.usage.calls": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.usage.calls:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.usage.elapsedSeconds": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.usage.elapsedSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.usage.estimatedCost:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.usage.estimatedCost<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.usage.estimatedCost<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.usage.inputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.usage.inputTokens:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.usage.outputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.usage.outputTokens:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.usage.replayCalls": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.usage.replayCalls:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:0>.usage:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.report<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.requestedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.requestedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.requestedBy": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.requestedBy:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.retry": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.retry.allowed": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.retry.allowed:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.retry.blockedBy:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.retry.blockedBy<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.retry.blockedBy<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.retry.code": {
+      "type": "string",
+      "enum": [
+        "allowed",
+        "succeeded",
+        "in_progress",
+        "superseded",
+        "newer_attempt",
+        "duplicate_running",
+        "other_running",
+        "dataset_missing",
+        "outcome_unknown",
+        "worker_unavailable",
+        "plan_not_reusable"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.retry.code:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.retry.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.retry.reason:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.retry:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.retryOf:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.retryOf<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.retryOf<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.startedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.startedAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.startedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:0>.status:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.flush": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.flush:required": false,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.ingest": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.ingest:required": false,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.kind": {
+      "const": "analyze_plan"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.kind:required": false,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.ledgerAfter": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.ledgerAfter:required": false,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.ledgerBefore": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.ledgerBefore:required": false,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.activeUnit": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.activeUnit:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.admissionId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.admissionId:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.completion": {
+      "const": "ai_processing_handoff"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.completion:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.manifestDigest": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.manifestDigest:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.phase": {
+      "enum": [
+        "awaiting_admission",
+        "admitting",
+        "extracting",
+        "relating",
+        "cancelling",
+        "ready",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.phase:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.planDigest": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.planDigest:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.planId": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.planId:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.publicChanged": {
+      "const": false
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.publicChanged:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.readyUnits": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.readyUnits:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.roundId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.roundId:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.sourceId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.sourceId:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.totalUnits": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun.totalUnits:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.planRun:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.report": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0><oneOf:1><allOf:1>.report:required": false,
     "response:200:application/json.jobs<anyOf:0>.active<anyOf:1>": {
       "type": "null"
     },
@@ -966,96 +1438,96 @@
       "type": "array"
     },
     "response:200:application/json.jobs<anyOf:0>.recent:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[]": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].cancelRequested": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.cancelRequested": {
       "type": "boolean"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].cancelRequested:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].durationSeconds:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].durationSeconds<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.cancelRequested:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.durationSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.durationSeconds<anyOf:0>": {
       "type": "number"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].durationSeconds<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.durationSeconds<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].error:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].error<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.error:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.error<anyOf:0>": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].error<anyOf:0>.code": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.error<anyOf:0>.code": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].error<anyOf:0>.code:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].error<anyOf:0>.message": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.error<anyOf:0>.code:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.error<anyOf:0>.message": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].error<anyOf:0>.message:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].error<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.error<anyOf:0>.message:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.error<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].finishedAt:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].finishedAt<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.finishedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.finishedAt<anyOf:0>": {
       "type": "string",
       "format": "date-time"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].finishedAt<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.finishedAt<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].flush:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].flush<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.flush:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.flush<anyOf:0>": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].flush<anyOf:0>.completedProjectionJobs": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.flush<anyOf:0>.completedProjectionJobs": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].flush<anyOf:0>.completedProjectionJobs:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].flush<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.flush<anyOf:0>.completedProjectionJobs:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.flush<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].id": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.id": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].id:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.id:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.baselineAdvanced": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.baselineAdvanced": {
       "type": "boolean"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.baselineAdvanced:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.baselineAfter:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.baselineAfter<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.baselineAdvanced:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.baselineAfter:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.baselineAfter<anyOf:0>": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.baselineAfter<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.baselineAfter<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.baselineBefore:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.baselineBefore<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.baselineBefore:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.baselineBefore<anyOf:0>": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.baselineBefore<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.baselineBefore<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.duplicateArticles:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.duplicateArticles<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.duplicateArticles:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.duplicateArticles<anyOf:0>": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.duplicateArticles<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.duplicateArticles<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.newArticles:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.newArticles<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.newArticles:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.newArticles<anyOf:0>": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.newArticles<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.newArticles<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.outcome:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.outcome<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.outcome:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.outcome<anyOf:0>": {
       "type": "string",
       "enum": [
         "collected",
@@ -1064,221 +1536,216 @@
         "cancelled"
       ]
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.outcome<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:0>.outcome<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ingest<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].kind": {
-      "type": "string",
-      "enum": [
-        "ingest",
-        "revalidate",
-        "project"
-      ]
-    },
-    "response:200:application/json.jobs<anyOf:0>.recent[].kind:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].label": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.kind": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].label:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.kind:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.label": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.label:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerAfter:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerAfter<anyOf:0>": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.candidates": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.candidates": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.candidates:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.capturedAt": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.candidates:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.capturedAt": {
       "type": "string",
       "format": "date-time"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.capturedAt:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.issues": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.capturedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.issues": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.issues:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.pendingProjections:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.pendingProjections<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.issues:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.pendingProjections:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.pendingProjections<anyOf:0>": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.pendingProjections<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.pendingProjections<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.relations": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.relations": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.relations:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerAfter<anyOf:0>.relations:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerAfter<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerBefore:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerBefore<anyOf:0>": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.candidates": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.candidates": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.candidates:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.capturedAt": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.candidates:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.capturedAt": {
       "type": "string",
       "format": "date-time"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.capturedAt:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.issues": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.capturedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.issues": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.issues:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.pendingProjections:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.pendingProjections<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.issues:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.pendingProjections:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.pendingProjections<anyOf:0>": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.pendingProjections<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.pendingProjections<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.relations": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.relations": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.relations:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerBefore<anyOf:0>.relations:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.ledgerBefore<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].reason": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.reason": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].reason:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].recovered": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.reason:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.recovered": {
       "type": "boolean"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].recovered:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.recovered:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.approved": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.approved": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.approved:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.collectionErrorCount": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.approved:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.collectionErrorCount": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.collectionErrorCount:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.collectionErrors": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.collectionErrorCount:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.collectionErrors": {
       "type": "array"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.collectionErrors:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.collectionErrors[]": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.collectionErrors:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.collectionErrors[]": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.elapsedSeconds": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.elapsedSeconds": {
       "type": "number"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.elapsedSeconds:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.errorCount": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.elapsedSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.errorCount": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.errorCount:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.errors": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.errorCount:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.errors": {
       "type": "array"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.errors:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.errors[]": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.errors:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.errors[]": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.executionMode:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.executionMode<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.executionMode:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.executionMode<anyOf:0>": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.executionMode<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.executionMode<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.held": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.held": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.held:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.pending": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.held:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.pending": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.pending:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.processed": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.pending:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.processed": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.processed:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.rejected": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.processed:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.rejected": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.rejected:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.runId:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.runId<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.rejected:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.runId:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.runId<anyOf:0>": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.runId<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.runId<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.skipped": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.skipped": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.skipped:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.skipped:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.usage": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.calls": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.usage.calls": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.calls:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.elapsedSeconds": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.usage.calls:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.usage.elapsedSeconds": {
       "type": "number"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.elapsedSeconds:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.estimatedCost:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.estimatedCost<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.usage.elapsedSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.usage.estimatedCost:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.usage.estimatedCost<anyOf:0>": {
       "type": "number"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.estimatedCost<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.usage.estimatedCost<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.inputTokens": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.usage.inputTokens": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.inputTokens:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.outputTokens": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.usage.inputTokens:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.usage.outputTokens": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.outputTokens:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.replayCalls": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.usage.outputTokens:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.usage.replayCalls": {
       "type": "integer"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.replayCalls:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.usage.replayCalls:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:0>.usage:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.report<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].requestedAt": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.requestedAt": {
       "type": "string",
       "format": "date-time"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].requestedAt:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].requestedBy": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.requestedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.requestedBy": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].requestedBy:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].retry": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.requestedBy:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.retry": {
       "type": "object"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].retry.allowed": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.retry.allowed": {
       "type": "boolean"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].retry.allowed:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].retry.blockedBy:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].retry.blockedBy<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.retry.allowed:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.retry.blockedBy:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.retry.blockedBy<anyOf:0>": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].retry.blockedBy<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.retry.blockedBy<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].retry.code": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.retry.code": {
       "type": "string",
       "enum": [
         "allowed",
@@ -1289,31 +1756,33 @@
         "duplicate_running",
         "other_running",
         "dataset_missing",
-        "outcome_unknown"
+        "outcome_unknown",
+        "worker_unavailable",
+        "plan_not_reusable"
       ]
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].retry.code:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].retry.reason": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.retry.code:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.retry.reason": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].retry.reason:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].retry:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].retryOf:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].retryOf<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.retry.reason:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.retry:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.retryOf:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.retryOf<anyOf:0>": {
       "type": "string"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].retryOf<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.retryOf<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].startedAt:required": true,
-    "response:200:application/json.jobs<anyOf:0>.recent[].startedAt<anyOf:0>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.startedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.startedAt<anyOf:0>": {
       "type": "string",
       "format": "date-time"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].startedAt<anyOf:1>": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.startedAt<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].status": {
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.status": {
       "type": "string",
       "enum": [
         "queued",
@@ -1323,7 +1792,482 @@
         "cancelled"
       ]
     },
-    "response:200:application/json.jobs<anyOf:0>.recent[].status:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:0>.status:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:1>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:1>.kind": {
+      "enum": [
+        "ingest",
+        "revalidate",
+        "project"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:0><allOf:1>.kind:required": false,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.cancelRequested": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.cancelRequested:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.durationSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.durationSeconds<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.durationSeconds<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.error:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.error<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.error<anyOf:0>.code": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.error<anyOf:0>.code:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.error<anyOf:0>.message": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.error<anyOf:0>.message:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.error<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.finishedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.finishedAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.finishedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.flush:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.flush<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.flush<anyOf:0>.completedProjectionJobs": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.flush<anyOf:0>.completedProjectionJobs:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.flush<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.id": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.id:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.baselineAdvanced": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.baselineAdvanced:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.baselineAfter:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.baselineAfter<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.baselineAfter<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.baselineBefore:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.baselineBefore<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.baselineBefore<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.duplicateArticles:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.duplicateArticles<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.duplicateArticles<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.newArticles:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.newArticles<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.newArticles<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.outcome:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.outcome<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "collected",
+        "empty",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:0>.outcome<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ingest<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.kind": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.kind:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.label": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.label:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerAfter:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerAfter<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.candidates": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.candidates:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.capturedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.capturedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.issues": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.issues:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.pendingProjections:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.pendingProjections<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.pendingProjections<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.relations": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerAfter<anyOf:0>.relations:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerAfter<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerBefore:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerBefore<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.candidates": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.candidates:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.capturedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.capturedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.issues": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.issues:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.pendingProjections:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.pendingProjections<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.pendingProjections<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.relations": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerBefore<anyOf:0>.relations:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.ledgerBefore<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.reason:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.recovered": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.recovered:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.approved": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.approved:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.collectionErrorCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.collectionErrorCount:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.collectionErrors": {
+      "type": "array"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.collectionErrors:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.collectionErrors[]": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.elapsedSeconds": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.elapsedSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.errorCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.errorCount:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.errors": {
+      "type": "array"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.errors:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.errors[]": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.executionMode:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.executionMode<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.executionMode<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.held": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.held:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.pending": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.pending:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.processed": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.processed:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.rejected": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.rejected:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.runId:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.runId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.runId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.skipped": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.skipped:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.usage": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.usage.calls": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.usage.calls:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.usage.elapsedSeconds": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.usage.elapsedSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.usage.estimatedCost:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.usage.estimatedCost<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.usage.estimatedCost<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.usage.inputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.usage.inputTokens:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.usage.outputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.usage.outputTokens:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.usage.replayCalls": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.usage.replayCalls:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:0>.usage:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.report<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.requestedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.requestedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.requestedBy": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.requestedBy:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.retry": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.retry.allowed": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.retry.allowed:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.retry.blockedBy:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.retry.blockedBy<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.retry.blockedBy<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.retry.code": {
+      "type": "string",
+      "enum": [
+        "allowed",
+        "succeeded",
+        "in_progress",
+        "superseded",
+        "newer_attempt",
+        "duplicate_running",
+        "other_running",
+        "dataset_missing",
+        "outcome_unknown",
+        "worker_unavailable",
+        "plan_not_reusable"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.retry.code:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.retry.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.retry.reason:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.retry:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.retryOf:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.retryOf<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.retryOf<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.startedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.startedAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.startedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:0>.status:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.flush": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.flush:required": false,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.ingest": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.ingest:required": false,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.kind": {
+      "const": "analyze_plan"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.kind:required": false,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.ledgerAfter": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.ledgerAfter:required": false,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.ledgerBefore": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.ledgerBefore:required": false,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.activeUnit": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.activeUnit:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.admissionId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.admissionId:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.completion": {
+      "const": "ai_processing_handoff"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.completion:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.manifestDigest": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.manifestDigest:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.phase": {
+      "enum": [
+        "awaiting_admission",
+        "admitting",
+        "extracting",
+        "relating",
+        "cancelling",
+        "ready",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.phase:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.planDigest": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.planDigest:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.planId": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.planId:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.publicChanged": {
+      "const": false
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.publicChanged:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.readyUnits": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.readyUnits:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.roundId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.roundId:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.sourceId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.sourceId:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.totalUnits": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun.totalUnits:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.planRun:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.report": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[]<oneOf:1><allOf:1>.report:required": false,
     "response:200:application/json.jobs<anyOf:0>.running": {
       "type": "integer"
     },

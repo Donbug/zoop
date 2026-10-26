@@ -81,10 +81,12 @@ def is_config_code(code: str) -> bool:
 
 class ExtractionJobs:
     def __init__(self, config: ServiceConfig, ledger: ExtractionLedger, process: ExtractionProcess, dispatcher: ExtractionDispatcher,
-                 gate: RelationGate, authority: extraction_access.Authority, *, clock: Callable[[], float] = time.time, busy_wait: float = BUSY_WAIT):
+                 gate: RelationGate, authority: extraction_access.Authority | None, *, clock: Callable[[], float] = time.time, busy_wait: float = BUSY_WAIT,
+                 online_authority=None):
         assert config.extraction is not None
         self.config, self.extraction = config, config.extraction
         self.ledger, self.process, self.dispatcher, self.gate, self.authority = ledger, process, dispatcher, gate, authority
+        self.online_authority = online_authority
         self._clock, self._busy_wait = clock, busy_wait
         self._locks = KeyedLocks()
         self._slots = threading.BoundedSemaphore(CLI_SLOTS)
@@ -112,7 +114,9 @@ class ExtractionJobs:
             return "extraction_command_unavailable"
         if not (extraction.state_dir.is_dir() and os.access(extraction.state_dir, os.R_OK | os.W_OK | os.X_OK) and extraction.ingestion_state_dir.is_dir()):
             return "extraction_state_unavailable"
-        paths = [extraction.sources_path, extraction.producer_replay, extraction.approvals_path]
+        paths = [extraction.sources_path, extraction.producer_replay]
+        if extraction.approvals_path is not None:
+            paths.append(extraction.approvals_path)
         if extraction.topic_replay is not None:
             paths.append(extraction.topic_replay)
         for path in paths:
@@ -125,14 +129,28 @@ class ExtractionJobs:
         seen.problem = problem
         return ExtractionError(503, "service_configuration_invalid", retry_after=30)
 
-    def _approval(self, seen: Observation, owner: str, job_id: str) -> extraction_access.Approval | None:
+    def _approval(self, seen: Observation, owner: str, job_id: str, approved_digest: str) -> extraction_access.Approval | None:
+        if self.online_authority is not None:
+            try:
+                return self.online_authority.resolve_s2(owner, job_id, approved_digest).approval
+            except ApiError as error:
+                raise ExtractionError(error.status, error.code) from None
         try:
             return self.authority.approvals().find(owner, job_id)
         except extraction_access.AccessError as error:
             raise self._fault(seen, error.code) from None
 
+    def _row_refusal(self, row):
+        if self.online_authority is not None:
+            return self.online_authority.refuse_s2(row)
+        if row.authority_ref is not None:
+            return "authority_origin_mismatch"
+        return self.authority.refusal(row.owner, row.job_id, row.pins.approval)
+
     def _authority_error(self, refusal: str, seen: Observation) -> ExtractionError:
         """A refusal of `Authority.refusal` as the error a caller sees."""
+        if self.online_authority is not None:
+            return ExtractionError(503 if refusal == "authority_unavailable" else 409, refusal)
         if refusal == "approval_revoked":
             return ExtractionError(403, "request_not_approved")
         if refusal in ("approval_changed", "fixture_changed"):
@@ -195,8 +213,8 @@ class ExtractionJobs:
             return ExtractionDelivery(state="withheld", reason=view.delivery.code or "withheld")
         if view.state != "ready":
             return ExtractionDelivery(state="withheld", reason="job_not_ready")
-        refusal = self.authority.refusal(row.owner, row.job_id, row.pins.approval)
-        if refusal == "service_configuration_invalid":
+        refusal = self._row_refusal(row)
+        if refusal == "service_configuration_invalid" and self.online_authority is None:
             raise self._fault(seen, "extraction_approvals_unreadable")
         if refusal is None:
             refusal = call_pin_problem(view, row.pins)
@@ -241,10 +259,18 @@ class ExtractionJobs:
         digest = request_digest(body.wire())
         location = {"Location": f"/internal/v1/extraction-jobs/{job_id}"}
         with self._locks.hold(job_id):
+            origin = None
+            if self.online_authority is not None:
+                try:
+                    origin = self.online_authority.resolve_s2(owner, job_id, body.approved_request_digest).authority_ref
+                except ApiError as error:
+                    raise ExtractionError(error.status, error.code) from None
             row = self.ledger.job(job_id)
+            if row is not None and row.authority_ref != origin:
+                raise ExtractionError(409, "authority_origin_mismatch")
             if row is not None:
                 if row.owner != owner:
-                    approval = self._approval(seen, owner, job_id)
+                    approval = self._approval(seen, owner, job_id, body.approved_request_digest)
                     if approval is None or approval.approved_digest != body.approved_request_digest:
                         raise ExtractionError(403, "request_not_approved")
                     raise ExtractionError(409, "job_id_unavailable")
@@ -255,7 +281,7 @@ class ExtractionJobs:
                     status = self._status(row, view, seen)
                     return Reply(200, status, self._headers(status, **location))
             # Not approved for this principal: refused before any ledger row or child exists, and the same answer whether or not the job exists.
-            approval = self._approval(seen, owner, job_id)
+            approval = self._approval(seen, owner, job_id, body.approved_request_digest)
             if approval is None or approval.approved_digest != body.approved_request_digest:
                 raise ExtractionError(403, "request_not_approved")
             pins = Pins(approval.approved_digest, approval.producer_digest, approval.topic_digest, approval.input_digest, approval.live_identity)
@@ -263,7 +289,8 @@ class ExtractionJobs:
                 raise ExtractionError(409, "live_unavailable")
             if row is not None and row.pins != pins:
                 raise ExtractionError(409, "approval_changed")  # the reserved identity is never rebound to a rotated approval
-            problem = self.authority.fixtures(pins.producer_digest, pins.topic_digest)
+            problem = (self.online_authority._fixtures(self.online_authority.current()[2]["runtime"]) if self.online_authority is not None
+                       else self.authority.fixtures(pins.producer_digest, pins.topic_digest))
             if problem is not None:
                 raise self._fault(seen, problem)
             if self.ledger.active_count() >= MAX_PENDING:
@@ -273,7 +300,12 @@ class ExtractionJobs:
                 raise self._fault(seen, problem)
             with self._cli():
                 # Owner intent first (durable). Then the pipeline registers, then accepted + dispatch intent, then 202.
-                row = row or self.ledger.reserve(job_id, owner, digest, pins)
+                # Reauthorize after waiting for the shared child gate, before reservation or child.
+                self._approval(seen, owner, job_id, body.approved_request_digest)
+                row = row or self.ledger.reserve(job_id, owner, digest, pins, authority_ref=origin)
+                refusal = self._row_refusal(row)
+                if refusal is not None:
+                    raise ExtractionError(409, refusal)
                 if row.submit_attempts == 0:
                     self._refuse_adoption(job_id, owner, digest, seen)
                 self.ledger.begin_attempt(job_id)
@@ -382,7 +414,7 @@ class ExtractionJobs:
         row = self._owned(owner, job_id)
         if row.pins.live_binding is not None and self.config.pipeline_live is None:
             raise ExtractionError(409, "live_unavailable", job_status=self._status(row, self._read(row, seen), seen))
-        refusal = self.authority.refusal(owner, job_id, row.pins.approval)  # a recovery is a content-bearing use: the approval is read NOW
+        refusal = self._row_refusal(row)
         if refusal is not None:
             raise self._authority_error(refusal, seen)
         view = self._read(row, seen)

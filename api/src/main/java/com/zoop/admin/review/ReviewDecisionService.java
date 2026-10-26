@@ -234,6 +234,8 @@ public class ReviewDecisionService {
             long revision = target.revision() + 1;
             long global = reviews.nextGlobalRevision();
             reviews.settleTarget(target.id(), target.revision(), "allow".equals(intent.decision()) ? "ALLOW" : "REJECT", now);
+            // The candidate's status follows its relations at once, not at the sync's next reading of this job.
+            reviews.refreshCandidates(target.sourceJobId(), now);
             long decisionId = reviews.insertDecision(target.id(), intent.decision(), intent.reason(), intent.adminId(),
                     intent.adminEmail(), now, revision, global);
             // The source version and revision the AI source checked the decision against.

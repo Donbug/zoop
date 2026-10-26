@@ -6,6 +6,9 @@ import com.zoop.admin.jobs.AnalysisJobResponse.JobCreated;
 import com.zoop.admin.jobs.AnalysisJobResponse.JobList;
 import com.zoop.admin.jobs.AnalysisJobResponse.JobOut;
 import com.zoop.common.request.RequestIdFilter;
+import java.io.IOException;
+import java.net.URI;
+import org.springframework.http.ResponseEntity;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -20,7 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Admin analysis jobs (#132 list/get, #133 cancel/retry). {@code createAnalysisJob} waits for the job worker. */
+/** Admin job intake, reads and mutations; external execution belongs to the durable worker. */
 @RestController
 @RequestMapping("/api/v1/admin/jobs")
 public class AnalysisJobController {
@@ -28,6 +31,16 @@ public class AnalysisJobController {
 
     public AnalysisJobController(AnalysisJobService service) {
         this.service = service;
+    }
+
+    @PostMapping
+    @Operation(operationId = "createAnalysisJob", summary = "고정 계획 분석 작업 접수")
+    public ResponseEntity<JobCreated> create(@RequestHeader("Idempotency-Key") String idempotencyKey,
+            HttpServletRequest request) throws IOException {
+        AdminPrincipal admin = principal(request);
+        AnalyzePlanCommand command = AnalyzePlanRequestParser.parse(request.getInputStream());
+        JobCreated result = service.create(command, idempotencyKey, admin, RequestIdFilter.currentId(request));
+        return ResponseEntity.accepted().location(URI.create("/api/v1/admin/jobs/" + result.job().id())).body(result);
     }
 
     @GetMapping

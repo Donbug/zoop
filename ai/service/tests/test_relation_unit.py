@@ -589,13 +589,14 @@ def test_a_ledger_of_the_first_schema_migrates_forward_and_an_unknown_schema_is_
     raw.execute("DROP TRIGGER relation_jobs_immutable")
     raw.execute("ALTER TABLE relation_jobs DROP COLUMN execution_mode")
     raw.execute("ALTER TABLE relation_jobs DROP COLUMN live_binding")
+    raw.execute("ALTER TABLE relation_jobs DROP COLUMN authority_ref")
     raw.execute("ALTER TABLE relation_dispatch DROP COLUMN explicit")
     raw.execute("UPDATE meta SET value=? WHERE key='schema'", (MIGRATES_FROM[0],))
     raw.commit()
     raw.close()
     migrated = RelationLedger(directory, tmp_path / "relation")
     job = migrated.job("job-1")
-    assert (job.state, job.execution_mode, job.live_binding) == ("accepted", "replay", None) and migrated.dispatch("job-1").state == "pending"
+    assert (job.state, job.execution_mode, job.live_binding, job.authority_ref) == ("accepted", "replay", None, None) and migrated.dispatch("job-1").state == "pending"
     assert migrated.claim_next().explicit is False  # an old dispatch row reads as the automatic initial dispatch
     assert migrated.reserve_operation("op-1", "alpha", "job-1", RC, "allow", JOB_DIGEST, 1, "a" * 64) is not None
     migrated.close()
