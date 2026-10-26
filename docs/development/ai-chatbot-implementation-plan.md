@@ -1,8 +1,8 @@
 # ZOOP AI 챗봇 구현 준비·개발 계획
 
-기준일: 2026년 10월 21일
+최초 기준일: 2026년 10월 21일 / 구현 상태 갱신: 2026년 10월 25일
 
-기준 정책: `ZOOP-AIG-001 v0.8`
+기준 정책: `ZOOP-AIG-001 v0.9`
 
 화면 추적: `D-AI-01`, `D-AI-01b`, `D-AI-02`, `D-AI-02b`
 
@@ -19,17 +19,17 @@
 
 | 영역 | 현재 확인된 상태 | 구현 판단 |
 | --- | --- | --- |
-| 공개 챗봇 계약 | 세션 생성·조회, 최신 대화 복원, 질문 job 접수·조회·재시도·취소와 `ChatResult`/`ChatFailure`가 목표 OpenAPI에 있음 | 골격 사용 가능. 10-17 검토에서 입력 상한, 범용 선택지, `answerBasis`, `budget_exceeded`를, 10-20 검토에서 확인 답 `resolves`, `limitations`, `sections`, `phase`, `ChatFailure.reason` 코드, `Citation.sourceKind`를 보완함 |
-| ERD | `chat_sessions`, `chat_jobs` 목표 설계는 있으나 실제 Flyway migration은 없음 | 새 migration부터 필요. 라우팅 요약과 도구 호출 관측을 추가함 |
+| 공개 챗봇 계약 | 목표 OpenAPI에 더해 Spring `ChatController`가 세션 생성·조회, 최신 대화 복원, 질문 job 접수·조회·재시도·취소를 구현함 | 공개 producer 구현됨. 배포 활성화는 별도 |
+| ERD | `V20261021120000__create_chat_jobs.sql`이 `chat_sessions`, `chat_jobs`, `chat_tool_calls`와 `ai_executions.chat_job_id` FK를 생성함 | 저장·제약·동시성 시험 구현됨. 적용된 migration은 수정하지 않음 |
 | 프로토타입 BFF | `prototype/bff`에 규칙 기반 질문 해석, 기간 처리, 세션·job·복구·save_only와 테스트가 있음 | 상태 머신·불변식의 참고 구현. 운영 AI 답변 엔진으로 승격하지 않음 |
-| 본개발 Java API | `api/src/main/java`에 공개 챗봇 controller/service/repository가 없음. 인증 설정만 `/api/v1/chat/**`를 보호함 | 공개 API producer 전체 구현 필요 |
-| 루트 웹 | `AiChatDrawer`와 Zustand UI 상태만 있고 질문 전송·polling·결과 렌더링은 “준비 중” | D-AI-01~02b 상태 계약에 따라 query 계층과 UI 구현 필요 |
-| AI worker | 네이티브 Jev는 S1 `semantic-verification` 고정 claim 판정에만 사용 | 챗봇 router를 별도 kind/stage·스키마·평가로 추가해야 함 |
-| AI 내부 서비스 | S1 분석 HTTP와 S2/S3 그래프·추출 관련 경계가 있으나 챗봇 오케스트레이션 endpoint는 없음 | 현재 생성 OpenAPI를 손으로 바꾸지 말고 서비스 코드에 endpoint를 구현한 뒤 재생성해야 함 |
-| 데이터 기반 | 기업·문서 등록·S1 분석·evidence·그래프 버전·관심 종목·포트폴리오 migration은 일부 존재 | Q03/Q04/Q07의 기반은 부분 존재. 이슈·브리핑·선정 규칙·철회 전파 종단은 추가 구현 필요 |
+| 본개발 Java API | controller/service/repository, 고정 문맥, 작업 executor, 오케스트레이터, 모델 단계 adapter와 읽기 도구 실행기가 있음 | 백엔드 수직 경로 구현됨. recovery artifact·`save_only` 저장 복구는 미구현 |
+| 루트 웹 | `web/src/apis/chat`, `use-chat-conversation`, `AiChatDrawer`·`ChatJobCard`가 대화 생성·복원, 질문 접수·polling·취소·재시도와 답변·인용·확인 질문·실패 렌더링을 구현함(Vitest) | 구현됨. 타입은 손으로 쓴 `web/src/types/ai`이고 실제 백엔드·모델 종단 시험은 없음 |
+| AI worker | `zoop-ai-chat`이 `chat-router`(Jev), `chat-answer`(Luna), `chat-verification`(Jev)을 별도 계약·원장·grant·live gate로 실행함 | 구현됨, 기본 비활성. 임계값 보정과 실제 승인 호출은 별도 |
+| AI 내부 서비스 | `/internal/v1/chat-stages/{stage}`가 인증된 synchronous stage door로 구현되고 생성 OpenAPI에 포함됨 | 구현됨. 앱은 `HttpChatStageClient`로만 호출 |
+| 데이터 기반 | 기업·문서·evidence·공개 그래프 버전과 현재 권리 재검사 경로가 있고 `company.read`·`issue.read`·`evidence.resolve`·`graph.path.read`·`zoopPolicy.read`가 연결됨(`company.read`는 기업 카탈로그 개요를 `company_profile` 인용으로, `zoopPolicy.read`는 승인 약관을 `zoop_doc` 인용으로 전달) | Q01(정책 문서만)·Q03/Q04 일부 구현. Q01 도움말·화면 명세, Q05·Q06·Q07·Q08 도구와 종단 공개 시험은 추가 필요 |
 | 와이어프레임 | 네 정적 화면은 질문·되묻기·회수·조회 오류의 시각 기준을 제공하지만 동작 상태를 증명하지 않음 | 별도 상태 계약으로 로딩·오류·근거 수준·복구를 고정함 |
 
-결론적으로 “채팅 UI가 있으니 모델만 연결하면 되는 상태”가 아니다. 재사용할 수 있는 것은 공개 DTO 골격, 프로토타입의 job 불변식, 기존 인증·문서·그래프 일부 기반이다. 본개발의 저장·공개 API·라우터·오케스트레이터·MCP 레지스트리·Luna 생성·검증·웹 연결은 아직 구현 대상이다.
+결론적으로 백엔드의 저장·공개 API·작업 실행기·라우터·오케스트레이터·도구 레지스트리·Luna 생성·Jev 검증과 웹 D-AI-01~02b 연결은 구현돼 있다. 다만 분리된 coverage-verifier, claim 단위 `unsupportedCausality`, 24k/2k token guard, recovery artifact·`save_only`, 미연결 Q 유형 도구, 평가 보정과 출시 증명은 남아 있다. 기능 플래그와 live gate는 기본적으로 꺼져 있으므로 “코드가 있음”은 “출시됨”이나 “실제 모델 호출 승인됨”을 뜻하지 않는다.
 
 ## 2. 구현 경계와 소유권
 
@@ -39,8 +39,8 @@ flowchart LR
     app --> db[(PostgreSQL chat jobs/tool calls)]
     app --> orch[Chat Orchestrator]
     orch --> jev[Jev router]
-    orch --> luna1[Luna coverage-verifier]
-    orch --> registry[서버 MCP registry]
+    orch -. 목표·미구현 .-> luna1[Luna coverage-verifier]
+    orch --> registry[서버 도구 registry]
     registry --> adapters[읽기 전용 adapters]
     adapters --> stores[(문서·그래프·브리핑·회원 범위)]
     orch --> luna2[Luna answer-generator]
@@ -52,16 +52,27 @@ flowchart LR
 - 웹은 분류·도구 선택·인용 유효성을 결정하지 않는다.
 - Java API는 인증·소유권·멱등성·상태 전이·내구 저장·공개 DTO의 권위자다.
 - 챗봇 오케스트레이터는 typed 요구 분해·라우팅·계획·호출 조정·생성·검증을 담당하지만 회원 권한을 발급하지 않는다.
-- MCP 레지스트리는 논리 기능을 실제 읽기 도구로 매핑한다. 모델 출력 문자열을 직접 실행하지 않는다.
+- 도구 레지스트리는 논리 기능을 실제 읽기 도구로 매핑한다. 모델 출력 문자열을 직접 실행하지 않는다.
 - 문서·그래프·브리핑 서비스는 공개·철회·버전 경계를 자신의 조회 시점에도 검사한다.
 
-## 3. 권장 구현 순서
+## 3. 권장 구현 순서와 현재 상태
+
+| 단계 | 2026-10-25 main 상태 | 남은 핵심 |
+| --- | --- | --- |
+| 0 계약·fixture | 부분 구현 | 목표 내부 schema 전체와 고정 평가 fixture 정리 |
+| 1 저장·job 수명주기 | 부분 구현 | recovery artifact와 실제 `save_only` 복구 |
+| 2 오케스트레이터 | 부분 구현 | 경로별 동적 deadline, 보충 라운드와 coverage 재확인 |
+| 3 router·coverage | 부분 구현 | Jev router는 구현, Luna coverage-verifier는 미구현 |
+| 4 읽기 도구 | 부분 구현 | Q03 일부와 Q04 경로 구현, Q01·Q05~Q08 미연결 |
+| 5 생성·출력 검증 | 부분 구현 | 구간 단위 생성·검증은 구현, claim 단위 검증·token guard 미구현 |
+| 6 웹 | 구현 | OpenAPI 타입 생성 seam, 실제 백엔드와의 종단 확인 |
+| 7 평가·출시 | 미완료 | 한국어 금융 평가 보정, 보안·종단·배포 증명 |
 
 ### 단계 0 — 계약 고정과 fixture
 
 1. `ChatResult.answerBasis`, `ChatChoice.kind`, 확인 질문 답 `resolves`(`ChatClarificationReply`), 답하지 않은 요구 `limitations`(`ChatLimitation`), 근거 수준별 `sections`, 진행 단계 `phase`, 입력·조회 상한과 `transient`·`budget_exceeded`의 `reason` 코드, `Citation.sourceKind`(`article`·`zoop_doc`)를 Java DTO·웹 타입·프로토타입 호환 fixture에 반영한다.
 2. 내부 `ChatRouteSummary v1`, `ChatToolRequest v1`, `ChatToolResult v1` JSON Schema를 만든다.
-3. Q01~Q08, 논리 capability, MCP registry group을 코드 enum/registry로 한 곳에서 버전 관리한다.
+3. Q01~Q08, 논리 capability, 도구 registry group을 코드 enum/registry로 한 곳에서 버전 관리한다.
 4. 실제 모델 없이도 전체 상태 머신을 시험할 deterministic fake router·coverage·tool·generator를 만든다.
 
 완료 조건: 공개 OpenAPI 검사 통과, schema fixture round-trip, 예전 BFF와 목표 API의 의도된 차이 목록 갱신.
@@ -75,17 +86,19 @@ flowchart LR
 
 완료 조건: 동시 접수 한 건만 성공, 다른 회원 접근 차단, 같은 jobId 같은 본문 재전송은 같은 작업 반환, 다른 본문은 409, save_only 모델 호출 0회, 깊이 2 작업의 clarification 저장 0건.
 
+현재 상태: migration, 공개 API, 멱등성·소유권, 단일 활성 job, lease/owner fence, 취소·만료 회수와 최대 3회 rerun은 구현됐다. recovery artifact 저장소가 없어 `save_only` 시도는 현재 `result_lost`로 닫히므로 이 단계의 완료 조건 전체를 충족한 것은 아니다.
+
 ### 단계 2 — 오케스트레이터 골격
 
-1. 입력 정규화와 `requirementId` 분해를 구현한다. 질문에 명시된 대상·기간은 선택 문맥보다 우선한다. 명시적 요구가 6개를 넘으면 모델 라우팅·MCP 호출 전에 `clarification`으로 범위를 나눈다.
+1. 입력 정규화와 `requirementId` 분해를 구현한다. 질문에 명시된 대상·기간은 선택 문맥보다 우선한다. 명시적 요구가 6개를 넘으면 모델 라우팅·도구 호출 전에 `clarification`으로 범위를 나눈다.
 2. `route_summary`를 단계별로 쓰되 자유 형식 chain-of-thought는 저장하지 않는다.
 3. 계획 검증 전에는 도구 호출을 예약하지 않고, 확정 계획은 `chat_tool_calls(status=reserved)`로 원자 저장한다.
 4. 의존 실행은 `stages[]`와 `checkpoint`로 선언하고, 단계가 끝날 때마다 서버가 개수 조건을 평가해 진행·`clarification`(초과)·제한 답변(미달)·없음 답변(0개, 잘림 없음)·근거 부족(0개, 오류 없이 잘림)으로 나눈다. 단계의 도구 호출이 timeout·장애·권한 오류로 끝나면 개수 조건을 평가하지 않고 해당 `ChatFailure`로 먼저 종료한다. 체크포인트에서 멈추면 남은 예약 호출을 취소하고 생성 stage를 호출하지 않는다.
-5. 단계별 시간 상한(라우터 4초, 커버리지 회당 6초, MCP 단계 10초·개별 3초, 생성 25초, 의미 검증 6초, 서버 처리 3초)과 계획 경로별 실행 기한(실행할 단계 상한의 합, 최대 60초), 동시 4개, 최대 12회, 의존 3단계·fan-out 5개와 보충 1라운드를 서버에서 강제한다. 모델 단계 시작 전 잔여 기한이 그 단계와 이후 남은 필수 단계 상한의 합보다 적으면 호출하지 않고 `transient`(`deadline_guard`)로 끝낸다. 커버리지 재확인도 이 조건을 만족할 때만 실행한다. 실행 단계마다 `phase`를 owner token 조건부로 갱신한다. 예산은 체크포인트 조건의 최악의 경우로 계산한다.
+5. 단계별 시간 상한(라우터 4초, 커버리지 회당 6초, 도구 단계 10초·개별 3초, 생성 25초, 의미 검증 6초, 서버 처리 3초)과 계획 경로별 실행 기한(실행할 단계 상한의 합, 최대 60초), 동시 4개, 최대 12회, 의존 3단계·fan-out 5개와 보충 1라운드를 서버에서 강제한다. 모델 단계 시작 전 잔여 기한이 그 단계와 이후 남은 필수 단계 상한의 합보다 적으면 호출하지 않고 `transient`(`deadline_guard`)로 끝낸다. 커버리지 재확인도 이 조건을 만족할 때만 실행한다. 실행 단계마다 `phase`를 owner token 조건부로 갱신한다. 예산은 체크포인트 조건의 최악의 경우로 계산한다.
 
 완료 조건: 예산 초과 계획은 도구 호출 0회와 clarification, 체크포인트 초과 시 다음 단계 호출 0회·생성 호출 0회와 실제 결과 기반 choices, 취소·lease 만료 뒤 신규 호출 0회, 병렬 호출도 최대 4개.
 
-첫 오케스트레이터(`com.zoop.chat.orchestrator`)는 모델 단계를 typed port(라우터·생성·의미 검증)로만 두고 서버 결정을 구현한다. 확률은 `p >= 0.70`을 채택하고, 0.35 이상 검토 구간은 커버리지 검증 stage가 붙기 전까지 명시적 요구에 한해 최고 후보 하나만 쓴다. 투자 판단은 Noul `p > 0.10`(불확실 포함)이면 `investment_advice` limitation이다. 체크포인트는 앞 단계가 찾은 기업 수로 평가하고, 초과 선택지는 `exactly(n)` 조합이 6개 이하일 때만 만든다(이슈 결과는 기업 ID만 가지므로 현재 선택지 표시명은 ID다). 인용은 생성 결과가 아니라 근거 조회 결과로 서버가 만들고, 의미 검증 hold는 해당 요구와 그 요구를 잇는 구간을 함께 제외한다. 추론만 된 요구는 처리할 수 없으면 limitation 없이 뺀다. 일반 지식 구간은 Q02만 가진 요구에만 쓰고, Q02와 사실 유형이 섞인 요구는 조회가 없으면 `out_of_scope`이며 일반 구간에 금액·비율·가격·연도·날짜·‘최근’ 같은 현재 사실 표지가 있으면 1층 검사 실패다. 선택 문맥을 쓰는 요구는 회원이 좁힌 근거(`evidencePool`)만 읽고 인용하며 의존 단계도 그 범위를 이어받는다. 질문이 대상을 직접 지정하면 그 범위를 쓰지 않고 `applied.questionOverrodeContext`를 표시한다. 답변 전체 인용은 서로 다른 근거 20개 이하다(`citation_budget`). 모델 단계는 시작 전 기한 검사에 더해 단계 상한 안에서만 기다리고, 넘기면 중단하고 `response_unknown`이다. 실행 기한 뒤에 돌아온 결과는 실행기가 completed로 저장하지 않는다. 세 모델 adapter가 모두 생기기 전에는 엔진을 bean으로 등록하지 않는다.
+현재 오케스트레이터(`com.zoop.chat.orchestrator`)는 모델 단계를 typed port(라우터·생성·의미 검증)로만 두고 서버 결정을 구현한다. 확률은 `p >= 0.70`을 채택하고, 0.35 이상 검토 구간은 별도 coverage-verifier가 붙기 전까지 명시적 요구에 한해 최고 후보 하나만 쓴다. 투자 판단은 Noul `p > 0.10`(불확실 포함)이면 `investment_advice` limitation이다. 체크포인트는 앞 단계가 찾은 기업 수로 평가하고, 초과 선택지는 `exactly(n)` 조합이 6개 이하일 때만 만든다(이슈 결과는 기업 ID만 가지므로 현재 선택지 표시명은 ID다). 인용은 생성 결과가 아니라 근거 조회 결과로 서버가 만들고, 의미 검증 hold는 해당 요구와 그 요구를 잇는 구간을 함께 제외한다. 추론만 된 요구는 처리할 수 없으면 limitation 없이 뺀다. 일반 지식 구간은 Q02만 가진 요구에만 쓰고, Q02와 사실 유형이 섞인 요구는 조회가 없으면 `out_of_scope`이며 일반 구간에 금액·비율·가격·연도·날짜·‘최근’ 같은 현재 사실 표지가 있으면 1층 검사 실패다. 선택 문맥을 쓰는 요구는 회원이 좁힌 근거(`evidencePool`)만 읽고 인용하며 의존 단계도 그 범위를 이어받는다. 질문이 대상을 직접 지정하면 그 범위를 쓰지 않고 `applied.questionOverrodeContext`를 표시한다. 답변 전체 인용은 서로 다른 근거 20개 이하다(`citation_budget`). 모델 단계는 시작 전 기한 검사에 더해 단계 상한 안에서만 기다리고, 넘기면 중단하고 `response_unknown`이다. 실행 기한 뒤에 돌아온 결과는 실행기가 completed로 저장하지 않는다. 세 adapter는 `ZOOP_AI_CHAT_CLIENT_ENABLED=true`일 때 `ChatModelConfiguration`이 엔진과 함께 등록하며, 질문 접수는 별도 `ZOOP_CHAT_QUESTIONS_ENABLED=true`가 있어야 열린다.
 
 ### 단계 3 — Jev router와 Luna coverage-verifier
 
@@ -96,9 +109,11 @@ flowchart LR
 
 완료 조건: multi-label macro F1·유형별 recall 기준, 명시적 필수 요구 누락 0건, 미등록 capability·인자 실행 0건.
 
+현재 상태: Jev router와 단계별 `ai_executions(feature=chatbot)` 기록은 구현됐다. 별도 Luna coverage-verifier와 그 보완·재확인 라운드는 없으며, 0.70/0.35와 투자 판단 0.10은 평가 세트로 보정되지 않은 잠정값이다.
+
 모델 연결의 잠정 결정(2026-10-22, 사용자 승인, 평가 세트로 보정 전): (1) 명시적 요구 분해는 규칙 기반(`?`·“그리고”·“~하고”·쉼표 등)이며 확실하지 않으면 질문 전체를 요구 하나로 둔다. (2) 질문에 적힌 기업 이름은 앱이 기업 카탈로그의 정확한 이름 일치로만 ID로 해석하고, 후보가 여럿이면 `clarification`이다. Jev는 이름을 해석하지 않는다. (3) 생성·검증에 보내는 인용문은 운영자 챗봇 grant(`model-send`·stage 목적·정확한 수신자)가 있을 때만 보내고 없으면 보내지 않고 실패한다. (4) 라우터·검증 Jev 질문 집합은 새로 작성하고 임계치는 S1 잠정값을 쓴다. 모델 단계 실행은 `ai/worker`의 `zoop-ai-chat`([AI 런타임 준비 §11](ai-runtime-setup.md))이 맡고 앱은 `ai/service`를 거쳐서만 부른다.
 
-### 단계 4 — MCP 레지스트리와 읽기 어댑터
+### 단계 4 — 도구 레지스트리와 읽기 어댑터
 
 레지스트리를 한 번에 모두 구현하지 말고 아래 수직 순서로 연동한다.
 
@@ -106,12 +121,14 @@ flowchart LR
 | ---: | --- | --- | --- |
 | 1 | Q02 일반 개념 | 도구 없음 | Luna 제한 답변을 `general_knowledge` 구간으로 저장, 서버 고정 안내·근거 없음·정책 검사, Jev `prohibitedAdvice` 판정 |
 | 2 | Q01 서비스 안내 | `help.search`, `screenSpec.read`, `zoopPolicy.read` | 승인된 제품 문서 registry와 버전·철회 상태가 필요. 인용은 `Citation.sourceKind=zoop_doc`(docId·docVersion·code point 구간)으로 만들고 결정적 인용 ID를 발급 |
-| 3 | Q03 기업·사건 | `company.read`, `document.search`, `issue.read`, `evidence.resolve` | 기업·문서·evidence 기반 일부 존재. 공개 이슈 조회와 철회 전파 보완 |
-| 4 | Q04 관계·경로 | `graph.path.read` | 앱 `PublicGraphReader`(버전 고정·스냅샷·asOf·공개 제외 결정) 재사용. 그 위에 기업 간 관계 hop 기준 최대 3-hop 경로 탐색·노드/간선 50개 절단을 추가하고 간선별 evidence 종단 검증 필요. Neo4j·AI 내부 그래프 API는 호출하지 않음 |
+| 3 | Q03 기업·사건 | `company.read`, `document.search`, `issue.read`, `evidence.resolve` | `company.read`·`issue.read`·`evidence.resolve` 구현. `document.search`와 검색형 기간 조건은 미구현 |
+| 4 | Q04 관계·경로 | `graph.path.read` | `PublicGraphReader` 위 최대 3-hop·노드/간선 50개·현재 evidence 재검사를 구현. Neo4j·AI 내부 그래프 API는 호출하지 않음 |
 | 5 | Q05 기간 비교 | `period.compare`, `graph.version.diff` | 두 `graph_versions` 스냅샷을 `PublicGraphReader`로 각각 읽어 서버가 diff 계산. 버전 diff 계약·어댑터 추가 필요 |
 | 6 | Q06 브리핑 | `briefing.read`, `briefing.evidence` | briefing migration·발행 조회·회차 고정 구현 필요 |
 | 7 | Q07 내 종목 | `portfolio.scope.read` + Q03/Q04 | watchlist·portfolio 기반 존재. 인증 서버 문맥 주입과 범위 전파 필요 |
 | 8 | Q08 선정 근거 | `selectionRule.read` + evidence | 실제 적용 rule revision·입력 요인 조회 구현 필요 |
+
+웹 검색 대체 경로(`web.search`)는 위 순서와 별개로, 내부 도구로 답할 수 없는 Q03 요구에만 보충 라운드로 부르는 검색 API 직접 어댑터로 설계했다(MCP 미사용). 공급자·비용·개인정보 처리방침 개정이 결정되기 전에는 구현하지 않는다. [웹 검색 대체 경로 설계](../design/ai-chatbot-web-search.md)
 
 모든 어댑터는 공통 요청·결과 봉투를 사용하고 `dataVersion`, `evidenceIds`, `truncated`, `nextAllowed`, 실제 오류를 반환한다. 회원 ID는 모델이나 사용자 입력에서 받지 않고 Java 인증 문맥에서 주입한다.
 
@@ -150,6 +167,8 @@ Q01 `zoopPolicy.read`(`ZoopPolicyReadTool`, 문서 원천 `ChatZoopDocs`)를 같
 
 완료 조건: 모든 중요 사실 주장에 유효 근거와 Jev supported 판정, 1층 실패 시 Jev 호출 0회, 일반 개념 구간의 Choice 판정 0건과 `prohibitedAdvice` 판정 100%, Q02 최신 사실 우회 0건, 철회 근거 노출 0건, 다른 회원 종목 노출 0건.
 
+현재 상태: `ChatModelStages`, `ChatAnswerCheck`, `OrchestratedChatEngine`이 생성, 서버 인용 구성, 결정론적 검사, 구간 단위 Jev 검증과 hold 제외를 구현한다. 아직 claim 분해·`unsupportedCausality`, 수치·날짜와 그래프 경로 의미의 독립 검증, Luna 입력 24,000·출력 2,000 token guard는 구현되지 않았다. 현재 verifier 결과는 section별 `support`와 `prohibitedAdvice`뿐이다.
+
 ### 단계 6 — 웹 연결
 
 1. 목표 OpenAPI에서 웹 타입을 생성할 전용 seam을 만든다. 현재 `prototype/web/src/api/schema.d.ts`는 BFF 관측본이므로 루트 웹에 그대로 복사하지 않는다.
@@ -160,6 +179,8 @@ Q01 `zoopPolicy.read`(`ZoopPolicyReadTool`, 문서 원천 `ChatZoopDocs`)를 같
 
 완료 조건: 새로고침 복구, GET 재확인이 모델을 재호출하지 않음, 키보드·aria-live, 모바일 동일 정보, 401/403에서 질문 미전송.
 
+현재 상태: 공개 Chat API client(`web/src/apis/chat`)와 대화 hook(`use-chat-conversation`)이 대화 생성·최신 대화 복원, 질문 접수·polling·취소·재시도를 하고, `ChatJobCard`가 답변·인용(`article`·`company_profile`)·확인 질문·실패를 렌더링한다(`web/tests/ai`). 타입은 목표 OpenAPI에서 생성하지 않고 `web/src/types/ai`에 손으로 썼으며, 실제 백엔드·모델과 함께 완료 조건 전체를 확인한 기록은 없다.
+
 ### 단계 7 — 평가·관측·점진 출시
 
 1. 단일 Q 유형보다 복합·모호·공격·장애 질문을 먼저 고정 평가에 포함한다.
@@ -167,9 +188,11 @@ Q01 `zoopPolicy.read`(`ZoopPolicyReadTool`, 문서 원천 `ChatZoopDocs`)를 같
 3. Q02 → Q01 → Q03 → Q04/Q07 → Q05/Q06/Q08 순으로 feature flag를 연다. 준비되지 않은 유형을 일반 LLM으로 우회하지 않는다. Q02 단독 답변도 Jev `prohibitedAdvice` 판정을 쓰므로 Q02를 포함한 모든 유형은 Jev 의미 검증 연결과 임계값 보정이 선행 조건이다. Q02에 필요한 것은 Noul 하나뿐이라 가장 먼저 보정할 수 있다.
 4. 고정 평가와 보안 시험을 통과한 registry/model/prompt/policy 조합만 활성화한다.
 
+현재 상태: 모델·도구 호출 원장과 다수의 단위·PostgreSQL 시험은 있으나, 챗봇 한국어 금융 평가 보정과 실제 배포·종단 출시 증명은 없다. live gate와 질문 접수 플래그는 기본 비활성이다.
+
 ## 4. 내부 챗봇 계약에 필요한 최소 스키마
 
-현재 `internal-ai-openapi.yaml`은 서비스 코드에서 생성되는 구현 계약이므로 손으로 수정하지 않는다. 챗봇 endpoint를 추가할 때 다음 의미를 코드의 Pydantic/Java DTO와 JSON Schema로 먼저 구현하고 생성 문서를 갱신한다.
+`internal-ai-openapi.yaml`은 서비스 코드에서 생성되는 구현 계약이므로 손으로 수정하지 않는다. 현재 구현 계약은 stage별 `StageRequest`/`StageResult`이고, 아래 표는 coverage·claim 검증까지 포함한 목표 상위 계약이다. 표의 항목이 모두 현재 wire에 존재한다고 해석하지 않는다.
 
 | 계약 | 필수 내용 |
 | --- | --- |
@@ -185,20 +208,21 @@ Q01 `zoopPolicy.read`(`ZoopPolicyReadTool`, 문서 원천 `ChatZoopDocs`)를 같
 
 내부 응답에는 provider 원문 응답·비밀·자유 형식 추론을 넣지 않는다. 앱 completed는 AI 서비스가 ready를 반환한 시점이 아니라 Java가 artifact·영수증·도구 호출·검증 결과를 확인하고 DB에 원자 저장한 뒤에만 전이한다.
 
-## 5. 첫 구현 PR 권장 범위
+## 5. 초기 구현 기준점과 다음 PR 범위
 
-첫 PR은 외부 모델 연결보다 상태·저장 경계를 만드는 것이 안전하다.
+초기 권장 범위 중 공개 DTO, migration, repository/service, 작업 executor와 Java/PostgreSQL 시험은 여러 PR에 걸쳐 구현됐다. 모델 단계, 첫 읽기 도구와 웹 D-AI-01~02b 연결도 뒤이어 구현됐다. 아직 남은 PR은 다음 경계를 한 번에 섞지 않는다.
 
-1. 공개 Chat DTO와 목표 OpenAPI 반영
-2. `chat_sessions`, `chat_jobs`, `chat_tool_calls` migration
-3. repository/service의 소유권·멱등성·활성 job 하나·상태 전이
-4. deterministic fake orchestrator로 Q02 answered, clarification, failed, cancel, save_only 경로
-5. D-AI-01~02b API 연결의 최소 세로 기능
-6. Java 통합 테스트, 웹 Vitest, migration/PostgreSQL 동시성 테스트
+1. coverage-verifier 또는 이를 대체하는 승인된 결정론적 coverage 계약
+2. recovery artifact와 `save_only` 저장 복구
+3. claim 단위 검증·token guard와 정책 버전 상승
+4. Q01·Q05·Q06·Q07·Q08의 데이터 소유 도구를 각각 독립 수직 경로로 연결
+5. 평가 보정, 실제 배포 환경 종단 시험과 기능 플래그 단계적 활성화
 
-이 PR에서 Jev·Luna·실제 MCP까지 동시에 붙이지 않는다. 먼저 계약과 상태 머신이 고정돼야 이후 모델·도구 오류가 데이터 손상이나 중복 과금으로 번지지 않는다.
+각 PR은 현재 저장·멱등·권한·호출 원장 경계를 유지하고, 준비되지 않은 유형을 일반 LLM 답변으로 우회하지 않는다.
 
 ## 6. 필수 테스트 목록
+
+아래는 목표 완료 matrix다. 기존 테스트가 일부 행을 다루더라도 행 전체가 통과했다고 자동 선언하지 않는다.
 
 | 구분 | 필수 사례 |
 | --- | --- |
@@ -214,7 +238,7 @@ Q01 `zoopPolicy.read`(`ZoopPolicyReadTool`, 문서 원천 `ChatZoopDocs`)를 같
 | 제한 | 투자 판단 혼합 질문의 `investment_advice`, 체크포인트 미달 `precondition_unmet`, 문서 20개 잘림 `results_truncated`, 한 요구만 근거 부족, 요구 누락·중복 소속·본문의 제한 요구 답변 시 `validation_failed`, 모델이 근거 없이 제안한 제한 거부, 도구 timeout이 limitation이 아닌 failed, answered 외 outcome의 빈 배열 |
 | 확인 답 | 선택지 답·자유 입력 답, 없는 choiceId·clarification 아닌 원 작업·다른 대화 원 작업 422/404, resolves+context 422, 원 고정 문맥 복사, 원 작업 불변, 같은 확인 질문 재답변, 깊이 2 작업의 모호·체크포인트 초과는 `guidance`와 다음 단계·생성 호출 0회, 깊이 2에서 모호함이 해소되면 `answered`·도구 장애는 `failed`(guidance로 바꾸지 않음), 확인 답의 답이 루트 질문과 사슬의 답을 순서대로 합쳐 재실행 |
 | 의미 검증 | 1층 실패 시 Jev 0회, 일반 개념 구간은 Choice 없이 `prohibitedAdvice`만 판정하고 예이면 전체 실패, 전부 supported 통과, contradicted·prohibitedAdvice 예 전체 실패, 한 요구 hold 시 그 구간·통합 구간 제외와 limitation 및 answer·answerBasis·citations 재계산, 모든 요구 hold 시 insufficient_evidence, 응답 형식 오류 시 영수증 저장 후 transient |
-| 장애 | Jev/Luna/MCP timeout, unknown 호출, 저장 실패, result_lost, save_only |
-| 기한·한도 | 경로별 기한 계산(Q02 단독 44초·단순 조회 54초·복합 60초), 모든 경로 합 60초 이하, MCP 상한 초과 `tool_timeout`(rerun), 모델 송신 전 연결 실패 `provider_error`(rerun), 모델 송신 후 상한 초과·연결 끊김 `response_unknown`(retry null, 호출 `unknown`, 자동·수동 재전송 0회), 남은 필수 단계 합보다 기한이 부족하면 모델 호출 0회와 `deadline_guard`(생성 뒤 의미 검증 직전 중단 없음), 커버리지 재확인 생략 조건, 요구 7개 질문의 계획 시점 clarification, `save_only`가 실행 횟수에 포함되지 않음, 입력 24k 초과 `budget_exceeded`·`context_too_large`(retry null), 출력 상한 도달 `output_limit`, 실행 3회 뒤 retry null, lease 만료 뒤 늦은 완료 거부, `phase` 전이와 종료 시 null |
+| 장애 | Jev/Luna/도구 timeout, unknown 호출, 저장 실패, result_lost, save_only |
+| 기한·한도 | 경로별 기한 계산(Q02 단독 44초·단순 조회 54초·복합 60초), 모든 경로 합 60초 이하, 도구 상한 초과 `tool_timeout`(rerun), 모델 송신 전 연결 실패 `provider_error`(rerun), 모델 송신 후 상한 초과·연결 끊김 `response_unknown`(retry null, 호출 `unknown`, 자동·수동 재전송 0회), 남은 필수 단계 합보다 기한이 부족하면 모델 호출 0회와 `deadline_guard`(생성 뒤 의미 검증 직전 중단 없음), 커버리지 재확인 생략 조건, 요구 7개 질문의 계획 시점 clarification, `save_only`가 실행 횟수에 포함되지 않음, 입력 24k 초과 `budget_exceeded`·`context_too_large`(retry null), 출력 상한 도달 `output_limit`, 실행 3회 뒤 retry null, lease 만료 뒤 늦은 완료 거부, `phase` 전이와 종료 시 null |
 | UI | 새로고침 복구, 조회 오류 재확인, late response 폐기, 접근성·모바일 |
 | 관측 | 모델·도구 호출 중복 집계 없음, 미보고 비용 NULL, 요청 ID 연계 |
