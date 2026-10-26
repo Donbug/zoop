@@ -19,6 +19,8 @@ import com.zoop.ai.extraction.*;
 import com.zoop.ai.plan.*;
 import com.zoop.ai.relation.*;
 import com.zoop.auth.service.CsrfKeyRing;
+import com.zoop.common.exception.CustomException;
+import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.json.Canonical;
 import com.zoop.common.request.RequestIdFilter;
 import com.zoop.document.repository.ArticleRow;
@@ -171,8 +173,9 @@ class AnalyzePlanWorkerTest {
                   "mention":{"mentionId":"m-1","title":"제목-%s","action":"공급 계약","target":null,"eventTime":"2026-10-20",
                    "period":null,"assertionStatus":"announced","background":false,"countries":["KR"],"keywords":["공급"],
                    "participants":[{"companyId":"SK-%s","name":"에스케이","role":"subject"}]},
-                  "citations":[{"documentId":"%s","documentVersion":"%s","start":0,"end":4,"quote":"원문 인용"}]}]"""
-                .formatted(event, tag, tag, doc, version);
+                  "citations":[{"documentId":"%s","documentVersion":"%s","start":0,"end":4,"quote":"원문 인용"},
+                               {"documentId":"%s","documentVersion":"%s","start":5,"end":9,"quote":null}]}]"""
+                .formatted(event, tag, tag, doc, version, doc, version);
         String relation = """
                 {"relationCandidateId":"%s","sourceRevision":"%s","type":"%s","subject":{"kind":"company","ref":"%s"},
                  "object":{"kind":"%s","ref":"%s"},"eligibility":{"status":"hold","reasons":[{"code":"claim_insufficient"}]},
@@ -205,7 +208,7 @@ class AnalyzePlanWorkerTest {
         var titled = mvc.perform(get("/api/v1/admin/pipeline/candidates").cookie(cookie).param("q", "제목-" + tag))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         assertEquals(List.of("공급 계약"), JsonPath.read(titled, "$.items[*].action"));
-        assertEquals(List.of(1), JsonPath.read(titled, "$.items[*].evidenceCount"));
+        assertEquals(List.of(2), JsonPath.read(titled, "$.items[*].evidenceCount"));
         assertEquals(List.of("에스케이"), JsonPath.read(titled, "$.items[0].companies[*].name"));
         String candidateId = JsonPath.<List<String>>read(titled, "$.items[*].candidateId").getFirst();
         assertEquals(2, listed(tag, "decision", "none"), "no decision yet on either candidate");
@@ -221,6 +224,11 @@ class AnalyzePlanWorkerTest {
         mvc.perform(get("/api/v1/admin/pipeline/candidates").cookie(cookie).param("published", "true"))
                 .andExpect(status().isServiceUnavailable());
         mvc.perform(get("/api/v1/admin/pipeline/candidates")).andExpect(status().isUnauthorized());
+        // No search and the text "null" are different filters: a cursor of one is refused for the other.
+        var unfiltered = mvc.perform(get("/api/v1/admin/pipeline/candidates").cookie(cookie).param("limit", "1"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        mvc.perform(get("/api/v1/admin/pipeline/candidates").cookie(cookie).param("q", "null")
+                .param("cursor", JsonPath.<String>read(unfiltered, "$.nextCursor"))).andExpect(status().isUnprocessableContent());
         mvc.perform(get("/api/v1/admin/pipeline/candidates").cookie(cookie).param("status", "MAYBE"))
                 .andExpect(status().isUnprocessableContent());
         // Without the AI clients this context has, the detail cannot read its source: 503, never a guessed detail.
@@ -248,6 +256,7 @@ class AnalyzePlanWorkerTest {
         assertEquals(List.of("KR"), detail.mention().countries());
         assertEquals("기사 제목", detail.evidence().getFirst().articleTitle());
         assertEquals("원문 인용", detail.evidence().getFirst().quote());
+        assertNull(detail.evidence().get(1).quote(), "the producer withheld it: kept null, the detail still answers");
         assertEquals(1, detail.relations().size(), "only the relation that names this event");
         assertEquals("2", detail.relations().getFirst().sourceRevision(), "the value a decision sends as expected");
         assertEquals("subject", detail.relations().getFirst().role(), "the S2 participant's role of the company endpoint");
@@ -267,6 +276,31 @@ class AnalyzePlanWorkerTest {
         assertNull(standalone.mention(), "no event: no mention");
         assertNull(standalone.evidence().getFirst().quote(), "a withdrawn article's quote is hidden");
         assertEquals("철회", standalone.evidence().getFirst().articleTitle());
+        // The cited version was never imported but the article is withdrawn: still hidden, with no title to show.
+        when(registry.findVersion(withdrawn, version)).thenReturn(Optional.empty());
+        var unimported = service.get(alone, "r-5");
+        assertNull(unimported.evidence().getFirst().quote());
+        assertNull(unimported.evidence().getFirst().articleTitle());
+
+        // A projection older than the S3 result whose refresh fails or finds S2 withheld: 503, never old status with new verdicts.
+        jdbc.update("UPDATE review_targets SET source_revision = '1' WHERE source_job_id = ? AND external_id = ?",
+                script.s3.jobId(), "rc-" + "1".repeat(64));
+        for (boolean throwing : List.of(true, false)) {
+            ExtractionClient unreadable = mock(ExtractionClient.class);
+            if (throwing) when(unreadable.result(anyString())).thenThrow(new IllegalStateException("S2 unreadable"));
+            else {
+                ExtractionResult withheld = mock(ExtractionResult.class);
+                when(withheld.readyPayload()).thenReturn(Optional.empty());
+                when(unreadable.result(anyString())).thenReturn(withheld);
+            }
+            ReviewTargetSync failing = new ReviewTargetSync(reviews, unreadable, s3, transactions, clock, 500);
+            var refreshing = new StaticListableBeanFactory(Map.of("s2", s2, "s3", s3, "sync", failing));
+            AnalysisCandidateService stale = new AnalysisCandidateService(candidateRepository, reviews, published, registry,
+                    refreshing.getBeanProvider(ExtractionClient.class), refreshing.getBeanProvider(RelationClient.class),
+                    refreshing.getBeanProvider(ReviewTargetSync.class), mapper, keys, clock);
+            var refused = assertThrows(CustomException.class, () -> stale.get(candidateId, "r-6"));
+            assertEquals(ErrorCode.SOURCE_UNAVAILABLE, refused.getErrorCode());
+        }
     }
 
     private int listed(String q, String filter, String value) throws Exception {

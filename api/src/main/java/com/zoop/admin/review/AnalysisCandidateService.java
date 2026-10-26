@@ -2,6 +2,7 @@ package com.zoop.admin.review;
 
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -102,8 +103,8 @@ public class AnalysisCandidateService {
         }
         String query = q == null || q.isBlank() ? null : q.strip();
         if (query != null && query.length() > 200) throw new CustomException(ErrorCode.INVALID_REQUEST);
-        String filters = String.join("|", String.valueOf(status), String.valueOf(decision), String.valueOf(active),
-                String.valueOf(onGraph), String.valueOf(rule), String.valueOf(query));
+        // Structured, so an absent filter (JSON null) never signs the same as the text "null".
+        String filters = mapper.writeValueAsString(Arrays.asList(status, decision, active, onGraph, rule, query));
         var position = CandidateCursor.decode(mapper, keys, cursor, adminId, filters, requestedLimit, MAX_LIMIT);
         int limit = requestedLimit != null ? requestedLimit : position == null ? DEFAULT_LIMIT : position.limit();
         Optional<Shown> shown = published.current(requestId);
@@ -156,20 +157,23 @@ public class AnalysisCandidateService {
         for (Obj item : sources.s3().objects("relations")) {
             if (item.has("relationCandidateId")) s3.put(item.string("relationCandidateId"), item);
         }
-        // A newer AI revision than the projection: refresh it first, so the expected values a decision sends are current.
-        boolean stale = rows.stream().anyMatch(r -> s3.containsKey(r.relationCandidateId())
-                && !r.sourceRevision().equals(s3.get(r.relationCandidateId()).string("sourceRevision")));
-        ReviewTargetSync refresher = sync.getIfUnique();
-        if (stale && refresher != null) {
+        // A newer AI revision than the projection: refresh it first, so the status, reasons and expected values match the S3
+        // result this detail shows. ERD v6 section 26: answer after the sync or fail, never mix the two source states.
+        if (stale(rows, s3)) {
+            ReviewTargetSync refresher = sync.getIfUnique();
+            Optional<Integer> refreshed;
             try {
-                refresher.sync(sources.unit().upstream(), sources.unit().s2ResultSha256(), sources.s3Payload());
+                refreshed = refresher == null ? Optional.empty()
+                        : refresher.sync(sources.unit().upstream(), sources.unit().s2ResultSha256(), sources.s3Payload());
             } catch (RuntimeException notRefreshed) {
-                // The projection stays as it was; a decision with its older expected values is refused (409), never wrong.
                 log.warn("candidate {} projection not refreshed: {}", candidateId, notRefreshed.getClass().getSimpleName());
+                refreshed = Optional.empty();
             }
-            // Read again either way: a refresh that left the candidate no longer current is a 404, as the list no longer has it.
+            if (refreshed.isEmpty()) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+            // A refresh that left the candidate no longer current is a 404, as the list no longer has it.
             candidate = candidates.candidate(candidateId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
             rows = candidates.relations(List.of(candidate)).get(candidate.id());
+            if (stale(rows, s3)) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         }
         Obj event = event(sources.s2(), candidate.candidateId());
         Obj mention = event == null ? null : event.object("mention");
@@ -203,6 +207,12 @@ public class AnalysisCandidateService {
                         .map(Article::out).toList(), evidence, relationsOut,
                 new VerificationOut(null, null, null, null, verdicts, List.of(), List.of()), null, history,
                 graphDb(candidate, rows, row.onUserGraph(), shown));
+    }
+
+    /** A projected relation whose AI source revision is not the one in the S3 result just read. */
+    private static boolean stale(List<Relation> rows, Map<String, Obj> s3) {
+        return rows.stream().anyMatch(r -> s3.containsKey(r.relationCandidateId())
+                && !r.sourceRevision().equals(s3.get(r.relationCandidateId()).string("sourceRevision")));
     }
 
     // ---- list row
@@ -295,9 +305,13 @@ public class AnalysisCandidateService {
 
     private Article article(String documentId, String documentVersion, Map<String, Article> articles) {
         return articles.computeIfAbsent(documentId + "\n" + documentVersion, key -> {
-            Optional<VersionRow> version = registry.findVersion(documentId, documentVersion);
-            if (version.isEmpty()) return new Article(null, false);
+            // Access is the article's, not the version's: a withdrawn article hides its quotes even when the cited version was
+            // never imported. A document the app never had is not withdrawn (its source rights are the AI side's).
             Optional<ArticleRow> article = registry.findArticle(documentId);
+            Optional<VersionRow> version = registry.findVersion(documentId, documentVersion);
+            if (version.isEmpty()) {
+                return new Article(null, article.isPresent() && !AVAILABLE.equals(article.get().accessStatus()));
+            }
             boolean withdrawn = article.isEmpty() || !AVAILABLE.equals(article.get().accessStatus());
             VersionRow v = version.get();
             // The contract's publishedAt is a date-time; a day-precision version is never widened to a guessed midnight.
@@ -312,7 +326,8 @@ public class AnalysisCandidateService {
         Article article = article(documentId, documentVersion, articles);
         CandidateArticle out = article.out();
         return new CandidateEvidence(documentId, documentVersion, citation.count("start"), citation.count("end"),
-                article.withdrawn() ? null : citation.string("quote"), out == null ? null : out.title(),
+                // Null too when the producer withheld it (a citation that failed its check): kept as given, never filled in.
+                article.withdrawn() || citation.isNull("quote") ? null : citation.string("quote"), out == null ? null : out.title(),
                 out == null ? null : out.url());
     }
 

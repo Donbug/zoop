@@ -105,6 +105,7 @@ public class JdbcReviewRepository {
                        reasons = CASE WHEN """ + NEWER + """
                                        OR review_targets.reasons IS NULL THEN EXCLUDED.reasons ELSE review_targets.reasons END,
                        operator_approved = CASE WHEN """ + NEWER + """
+                                                      OR """ + FILL_APPROVAL + """
                                                  THEN EXCLUDED.operator_approved ELSE review_targets.operator_approved END,
                        issue_id = EXCLUDED.issue_id, title = EXCLUDED.title, action = EXCLUDED.action, target = EXCLUDED.target,
                        event_time = EXCLUDED.event_time, evidence_count = EXCLUDED.evidence_count,
@@ -115,6 +116,7 @@ public class JdbcReviewRepository {
                        IS DISTINCT FROM (EXCLUDED.issue_id, EXCLUDED.title, EXCLUDED.action, EXCLUDED.target, EXCLUDED.event_time,
                         EXCLUDED.evidence_count, EXCLUDED.companies)
                     OR review_targets.reasons IS NULL
+                    OR """ + FILL_APPROVAL + """
                 """, new MapSqlParameterSource("id", "rt-" + UUID.randomUUID()).addValue("type", row.type())
                 .addValue("job", sourceJobId).addValue("external", row.externalId()).addValue("version", sourceVersion)
                 .addValue("candidate", row.candidateId()).addValue("status", row.status())
@@ -131,6 +133,13 @@ public class JdbcReviewRepository {
     /** The incoming reading is a later AI source revision than the stored one. */
     private static final String NEWER =
             " CAST(EXCLUDED.source_revision AS numeric) > CAST(review_targets.source_revision AS numeric) ";
+
+    /**
+     * A row synced before {@code operator_approved} existed gets it from a reading of the same AI revision; an older reading
+     * never overwrites it.
+     */
+    private static final String FILL_APPROVAL = " (review_targets.operator_approved IS NULL AND EXCLUDED.operator_approved IS NOT NULL"
+            + " AND CAST(EXCLUDED.source_revision AS numeric) = CAST(review_targets.source_revision AS numeric)) ";
 
     private static String companiesJson(List<ReviewTargetReader.Company> companies) {
         ArrayNode array = StrictJson.newArray();

@@ -3567,7 +3567,7 @@ The immutable published original of a round (what users saw before any correctio
 | verification | 필수 | [VerificationOut](#schema-verificationout) |  |
 | invalidationReason | 필수 | string / null |  |
 | history | 필수 | [ReviewDecisionOut](#schema-reviewdecisionout)[] |  |
-| graphDb | 필수 | string {reflected, pending, not_stored, unknown, excluded} | 현재 공개 그래프 버전 기준 상태(사용자가 지금 읽을 수 있는지). reflected: 활성 버전에서 이 후보의 관계나 사건을 사용자가 읽을 수 있음(공개 제외와 근거 읽기 검사—기사 접근·원천 grant—를 모두 통과), excluded: 활성 버전에 공개됐지만 지금은 공개 제외나 근거 읽기 검사로 숨겨짐, pending: 운영자가 최종 승인(approvalBasis=operator-final-approval)한 관계가 아직 공개 버전에 없음(다음 인계·수입 대기), not_stored: 그 밖(자동 검증만 통과하고 인계되지 않은 관계 포함), unknown: 활성 버전·수입 영수증을 읽을 수 없거나 근거 읽기 검사를 지금 확인할 수 없음. 별도 그래프 DB 투영이 아니라 공개 snapshot 기준이다. 목록의 onUserGraph는 reflected일 때만 true다. |
+| graphDb | 필수 | string {reflected, pending, not_stored, unknown, excluded} | 현재 공개 그래프 버전 기준 상태(사용자가 지금 읽을 수 있는지). reflected: 활성 버전에서 이 후보의 관계나 사건을 사용자가 읽을 수 있음(공개 제외와 근거 읽기 검사—기사 접근·원천 grant—를 모두 통과), excluded: 활성 버전에 공개됐지만 지금은 공개 제외나 근거 읽기 검사로 숨겨짐, pending: 운영자가 최종 승인(approvalBasis=operator-final-approval)한 관계가 아직 공개 버전에 없음(다음 인계·수입 대기), not_stored: 그 밖(자동 검증만 통과하고 인계되지 않은 관계 포함), unknown: 활성 버전·수입 영수증을 읽을 수 없거나 근거 읽기 검사를 지금 확인할 수 없음. 별도 그래프 DB 투영이 아니라 공개 snapshot 기준이다. 목록의 onUserGraph는 reflected일 때만 true다. 판정은 (활성 버전, 공개 제외 revision)이 같으면 최대 60초 동안 재사용되므로, 같은 버전 안에서 기사 접근이나 원천 grant가 바뀐 결과는 최대 60초 늦게 반영될 수 있다(버전 활성화나 공개 제외 변경은 바로 반영). |
 
 <a id="schema-candidateevidence"></a>
 
@@ -3581,7 +3581,7 @@ The immutable published original of a round (what users saw before any correctio
 | articleVersion | 필수 | string |  |
 | start | 필수 | integer |  |
 | end | 필수 | integer |  |
-| quote | 필수 | string / null | 원문 인용. 앱 기사 저장소에서 접근 권한이 철회된 기사의 인용은 null. |
+| quote | 필수 | string / null | 원문 인용. 앱 기사 저장소에서 접근 권한이 철회된 기사의 인용은 인용 버전이 앱에 수입됐는지와 관계없이 null. AI 생성자가 인용 검증 실패로 quote를 null로 준 경우도 null(복원·빈 문자열 대체 없음). |
 | articleTitle | 필수 | string / null |  |
 | url | 필수 | string / null |  |
 
@@ -3596,7 +3596,7 @@ The immutable published original of a round (what users saw before any correctio
 | items | 필수 | [CandidateRow](#schema-candidaterow)[] |  |
 | nextCursor | 필수 | string / null |  |
 | counts | 필수 | object |  |
-| asOf | 필수 | string (date-time) |  |
+| asOf | 필수 | string (date-time) | 응답을 만든 시각. 각 행의 onUserGraph 판정은 이 시각 기준 최대 60초 전에 확인한 결과일 수 있다(graphDb 설명 참조). |
 
 <a id="schema-candidatemention"></a>
 
