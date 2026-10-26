@@ -54,7 +54,8 @@ import tools.jackson.databind.node.ObjectNode;
  * <li>A failed deterministic check, a contradicted claim or prohibited advice is {@code validation_failed}; nothing is
  * regenerated. A section held by the verifier drops the requirements it answers as {@code evidence_insufficient}.</li>
  * <li>Limitations are recorded for the requirements the member stated; one the router only inferred is dropped silently
- * when it cannot be served.</li>
+ * when it cannot be served. So is a concept requirement the planner split off ({@link ChatPlan.Origin#CONCEPT}): its
+ * general section is answered beside its parent's result or limitation, and dropped when it breaks a general rule.</li>
  * </ul>
  *
  * <p>{@code ChatModelConfiguration} registers this engine only when the internal chat-stage client is enabled. Question
@@ -171,8 +172,11 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         List<Branch> branches = new ArrayList<>();
         for (Planned p : confirmed.requirements()) {
             if (p.mode() == Mode.LIMITED || limited.containsKey(p.id())) continue;
+            List<String> avoid = p.parent() == null ? List.of()
+                    : labels(retrieved.results().getOrDefault(p.parent(), List.of()));
             branches.add(new Branch(p.id(), p.label(), p.types(), p.mode() == Mode.GENERAL,
-                    retrieved.results().getOrDefault(p.id(), List.of()), retrieved.noneFound().contains(p.id())));
+                    retrieved.results().getOrDefault(p.id(), List.of()), retrieved.noneFound().contains(p.id()),
+                    p.parent(), avoid));
         }
         route.set("limited", json(limited));
         if (branches.isEmpty()) {
@@ -190,6 +194,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         route.put("deterministicCheck", checked.failedCheck() == null ? "passed" : checked.failedCheck());
         if (checked.failedCheck() != null) return validationFailed();
         var passed = checked.passed();
+        if (!passed.dropped().isEmpty()) route.putArray("droppedGeneral").addAll(strings(passed.dropped()));
 
         Map<String, Citation> cited = new LinkedHashMap<>();
         for (var section : passed.sections()) {
@@ -359,7 +364,16 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             node.putArray("types").addAll(strings(p.types().stream().map(Enum::name).sorted().toList()));
             node.putArray("capabilities").addAll(strings(p.capabilities().stream().map(c -> c.id()).toList()));
             if (p.limitation() != null) node.put("limitation", p.limitation());
+            if (p.parent() != null) node.put("origin", p.origin().name().toLowerCase()).put("parent", p.parent());
         }
+    }
+
+    /** The company and issue labels a requirement's reads returned. */
+    private static List<String> labels(List<ChatToolResult> results) {
+        Set<String> labels = new LinkedHashSet<>();
+        results.forEach(r -> r.items().stream().filter(i -> "company".equals(i.kind()) || "issue".equals(i.kind()))
+                .forEach(i -> labels.add(i.label())));
+        return List.copyOf(labels);
     }
 
     private static ArrayNode strings(Iterable<String> values) {

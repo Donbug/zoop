@@ -462,7 +462,7 @@ def test_path_pairs_keep_their_status_and_steps_name_only_quoted_evidence():
 
 def test_the_answer_prompt_explains_paths_and_its_version_moved():
     assert "status=cut" in chat_luna.PROMPT and "evidenceIds" in chat_luna.PROMPT
-    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-10-25-1-")
+    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-10-26-1-")
 
 
 def test_the_answer_prompt_and_schema_know_zoop_document_sections():

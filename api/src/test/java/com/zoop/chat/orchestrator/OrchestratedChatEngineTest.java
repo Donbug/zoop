@@ -155,6 +155,91 @@ class OrchestratedChatEngineTest {
     }
 
     @Test
+    void aConceptAskedWithAFactInOneRequirementIsAnsweredBesideTheFact() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9), List.of(HYNIX)));
+        answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리 칩을 쌓은 메모리입니다.", "r1-c"),
+                grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r1"), evidence(HYNIX))), List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no"), new Verdict("supported", "no")));
+
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult result = outcome.result();
+        assertEquals("answered", result.outcome());
+        assertEquals("mixed", result.answerBasis());
+        assertTrue(result.limitations().isEmpty());
+        assertEquals(List.of(readable.get(evidence(HYNIX))), result.citations());
+
+        var concept = generated.getFirst().branches().get(1);
+        assertEquals("r1-c", concept.requirementId());
+        assertTrue(concept.general() && concept.results().isEmpty());
+        assertEquals("r1", concept.parent());
+        assertEquals(List.of("SK하이닉스"), concept.avoidNames(), "what the parent's read returned");
+        var route = outcome.routeSummary().path("requirements").get(1);
+        assertEquals("general", route.path("mode").asString());
+        assertEquals("concept", route.path("origin").asString());
+        assertEquals("r1", route.path("parent").asString());
+    }
+
+    @Test
+    void whenTheFactPartHasNoEvidenceOrNoLookupTheConceptIsStillAnswered() {
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(),
+                List.of(new ChatToolItem(HYNIX, "company", "SK하이닉스", List.of(HYNIX), List.of())), List.of(), false, false));
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9), List.of(HYNIX)));
+        answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리 칩을 쌓은 메모리입니다.", "r1-c")), List.of("r1"),
+                List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no")));
+        ChatResult noEvidence = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertEquals("answered", noEvidence.outcome(), "it used to be insufficient_evidence with no concept either");
+        assertEquals("general_knowledge", noEvidence.answerBasis());
+        assertEquals(List.of("evidence_insufficient"), noEvidence.limitations().stream().map(l -> l.kind()).toList());
+        assertEquals("요구 r1", noEvidence.limitations().getFirst().label());
+
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9), Map.of()));
+        answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리 칩을 쌓은 메모리입니다.", "r1-c")), List.of(),
+                List.of());
+        var control = new Control(Duration.ofSeconds(60));
+        ChatResult noLookup = completed(engine().answer(run(), control));
+        assertEquals("answered", noLookup.outcome(), "it used to be guidance");
+        assertEquals(List.of("out_of_scope"), noLookup.limitations().stream().map(l -> l.kind()).toList());
+        assertEquals(3, control.modelCalls, "like a pure concept: router, generator and verifier");
+        assertTrue(control.reserved.isEmpty());
+    }
+
+    @Test
+    void aConceptSectionThatBreaksAGeneralRuleIsDroppedWithoutFailingTheAnswer() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9), List.of(HYNIX)));
+        for (String text : List.of("SK 하이닉스의 HBM은 메모리입니다.", "HBM 시장은 2026년에 커졌습니다.")) {
+            answer = new ChatGeneratedAnswer(List.of(general(text, "r1-c"),
+                    grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r1"), evidence(HYNIX))), List.of(), List.of());
+            verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+            var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                    engine().answer(run(), new Control(Duration.ofSeconds(60))));
+            assertEquals("evidence_grounded", outcome.result().answerBasis(), text);
+            assertEquals(1, outcome.result().sections().size(), text);
+            assertTrue(outcome.result().limitations().isEmpty(), "the concept is the server's own addition: " + text);
+            assertEquals("r1-c", outcome.routeSummary().path("droppedGeneral").get(0).asString(), text);
+        }
+
+        answer = new ChatGeneratedAnswer(List.of(general("HBM 시장은 2026년에 커졌습니다.", "r1-c")), List.of("r1"),
+                List.of());
+        verdicts = new ChatSemanticVerdicts(List.of());
+        ChatResult nothingLeft = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertEquals("insufficient_evidence", nothingLeft.outcome());
+
+        answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리입니다. 지금 매수하세요.", "r1-c"),
+                grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r1"), evidence(HYNIX))), List.of(), List.of());
+        assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+
+        // A general section of the router's own requirement still fails the answer.
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()));
+        answer = new ChatGeneratedAnswer(List.of(general("HBM 시장은 2026년에 커졌습니다.", "r1")), List.of(), List.of());
+        assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+    }
+
+    @Test
     void anInvestmentDecisionIsALimitationOrGuidanceButNeverGenerated() {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()),
                 req("r2", Map.of(ChatQueryType.Q02, 0.9), Map.of()).withAdvice(0.97));
