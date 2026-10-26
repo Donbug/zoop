@@ -131,18 +131,8 @@ export function createMockRelation(
       asOf: graph.metadata.asOf,
       graphVersion: graph.metadata.graphVersion,
       requestId: `mock-relation-${id}`,
-      partial: structural,
-      failures: structural
-        ? [
-            {
-              section: 'structuralDetails',
-              code: 'STRUCTURAL_DETAIL_UNAVAILABLE',
-              message: '사업 관계 상세 정보가 기록되어 있지 않습니다.',
-              retryable: false,
-              asOf: graph.metadata.asOf,
-            },
-          ]
-        : [],
+      partial: false,
+      failures: [],
     },
   };
 }

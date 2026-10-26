@@ -152,10 +152,10 @@ class GraphStructuralDetailReaderTest {
             assertEquals("available", read().status());
         }
         bundle.put("schemaVersion", "zoop-graph-handoff-bundle-8");
-        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class, this::read).getErrorCode());
+        assertEquals("details_not_available", read().reason());
         bundle.put("schemaVersion", "zoop-graph-handoff-bundle-7");
         rawRelation.put("target", "wrong");
-        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class, this::read).getErrorCode());
+        assertEquals("details_not_available", read().reason());
     }
     @Test void unmappedPathIsNotAnEmptyOrShortenedPath() {
         twoHops(NVDA, "2026-09-30T00:00:00Z");
@@ -164,10 +164,10 @@ class GraphStructuralDetailReaderTest {
     }
     @Test void rejectsDuplicateRelationsAndWrongBasisArticles() {
         bundle.set("relations", StrictJson.newArray().add(rawRelation).add(rawRelation));
-        assertThrows(CustomException.class, this::read);
+        assertEquals("details_not_available", read().reason());
         bundle.set("relations", StrictJson.newArray().add(rawRelation));
         ((ObjectNode) Obj.of(rawRelation).objects("basis").getFirst().node()).set("sourceArticles", StrictJson.newArray());
-        assertThrows(CustomException.class, this::read);
+        assertEquals("details_not_available", read().reason());
     }
     @Test void passesRoundAndRequestedAsOfToRightsChecks() {
         var pinned = pinned(NOW, DisclosureExclusions.NONE);

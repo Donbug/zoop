@@ -1,7 +1,5 @@
 package com.zoop.graph.read;
 
-import com.zoop.common.exception.CustomException;
-import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.json.StrictJson;
 import com.zoop.common.json.StrictJson.Obj;
 import com.zoop.document.evidence.service.EvidenceService;
@@ -10,6 +8,8 @@ import com.zoop.graph.read.dto.StructuralDetails.Company;
 import com.zoop.graph.read.dto.StructuralDetails.Link;
 import com.zoop.graph.read.dto.StructuralDetails.Path;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Basis;
+import com.zoop.graph.snapshot.PublicGraphSnapshot.Evidence;
+import com.zoop.graph.snapshot.PublicGraphSnapshot.Relation;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -21,6 +21,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -30,6 +33,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class GraphStructuralDetailReader {
+    private static final Logger log = LoggerFactory.getLogger(GraphStructuralDetailReader.class);
     private static final Set<String> SUPPORTED = Set.of("zoop-graph-handoff-bundle-5",
             "zoop-graph-handoff-bundle-6", "zoop-graph-handoff-bundle-7");
     private static final Set<String> LEGACY = Set.of("zoop-graph-handoff-bundle-1",
@@ -45,7 +49,9 @@ public class GraphStructuralDetailReader {
         try {
             return imported(pinned, edge, round, requestId);
         } catch (StrictJson.Malformed | DateTimeException malformed) {
-            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+            log.warn("Structural relation receipt details are malformed (graphVersion={}, edgeId={}, requestId={})",
+                    pinned.selected().version().id(), edge.id(), requestId);
+            return StructuralDetails.unavailable("details_not_available");
         }
     }
 
@@ -60,10 +66,20 @@ public class GraphStructuralDetailReader {
         Map<String, Obj> publicCompanies = index(bundle.objects("companies"), "id");
         Map<String, Obj> privateCompanies = index(bundle.objects("pathCompanies"), "id");
         DisplayGraph graph = pinned.graph();
+        Map<String, Relation> snapshotRelations = new HashMap<>();
+        Map<String, Evidence> snapshotEvidence = new HashMap<>();
+        Map<RelationEndpoints, List<Relation>> involvesByEndpoints = new HashMap<>();
+        for (Relation relation : graph.snapshot.relations()) {
+            require(snapshotRelations.putIfAbsent(relation.relationId(), relation) == null);
+            if ("INVOLVES".equals(relation.relationType())) {
+                involvesByEndpoints.computeIfAbsent(new RelationEndpoints(relation.source(), relation.target()),
+                        ignored -> new ArrayList<>()).add(relation);
+            }
+        }
+        for (Evidence item : graph.snapshot.evidence()) require(snapshotEvidence.putIfAbsent(item.evidenceId(), item) == null);
         Map<String, Boolean> checked = new HashMap<>();
         Instant at = pinned.selected().asOfRequested() ? pinned.selected().asOf() : null;
-        Set<String> visibleEvidence = new HashSet<>();
-        graph.snapshot.evidence().forEach(e -> visibleEvidence.add(e.evidenceId()));
+        Set<String> visibleEvidence = snapshotEvidence.keySet();
         Predicate<String> shown = id -> visibleEvidence.contains(id) && checked.computeIfAbsent(id,
                 key -> evidence.shownNow(key, round, version, at, requestId));
         List<Path> result = new ArrayList<>();
@@ -72,8 +88,8 @@ public class GraphStructuralDetailReader {
             Obj relation = relations.get(relationId);
             require(relation != null && relation.string("type").equals(edge.relationType())
                     && relation.string("source").equals(edge.source()) && relation.string("target").equals(edge.target()));
-            var visibleRelation = graph.snapshot.relations().stream().filter(r -> r.relationId().equals(relationId))
-                    .findFirst().orElseThrow(StrictJson.Malformed::new);
+            var visibleRelation = snapshotRelations.get(relationId);
+            require(visibleRelation != null);
             List<Obj> bases = relation.objects("basis");
             require(bases.size() >= 1 && bases.size() <= 2);
             Map<String, Obj> baseIndex = index(bases, "relationKey");
@@ -86,6 +102,8 @@ public class GraphStructuralDetailReader {
             if ("unavailable".equals(path.string("status"))) {
                 path.exactly(Set.of("status", "reason"));
                 require(bases.size() == 2 && "intermediate_company_unmapped".equals(path.string("reason")));
+                log.info("Structural relation path withheld by producer mapping (graphVersion={}, edgeId={}, reason=intermediate_company_unmapped, requestId={})",
+                        version, edge.id(), requestId);
                 available = false;
                 continue;
             }
@@ -101,9 +119,8 @@ public class GraphStructuralDetailReader {
                         && graph.companies.containsKey(id);
             }
             // The participating company must still be connected to this issue, with readable direct evidence.
-            boolean participantVisible = graph.snapshot.relations().stream()
-                    .filter(r -> "INVOLVES".equals(r.relationType()) && r.source().equals(edge.source())
-                            && r.target().equals(ids.getFirst()))
+            boolean participantVisible = involvesByEndpoints
+                    .getOrDefault(new RelationEndpoints(edge.source(), ids.getFirst()), List.of()).stream()
                     .anyMatch(r -> !r.evidenceIds().isEmpty() && r.evidenceIds().stream().allMatch(shown));
             pathVisible &= participantVisible;
             List<Link> outputLinks = new ArrayList<>();
@@ -127,15 +144,15 @@ public class GraphStructuralDetailReader {
                 Set<String> articleKeys = new HashSet<>();
                 b.objects("sourceArticles").forEach(a -> require(articleKeys.add(articleKey(a))));
                 require(articleKeys.equals(visible.articles().stream()
-                        .map(a -> a.articleId() + "@" + a.articleVersion()).collect(java.util.stream.Collectors.toSet())));
+                        .map(a -> a.articleId() + "@" + a.articleVersion()).collect(Collectors.toSet())));
                 Set<String> citedArticles = new HashSet<>();
                 for (String id : citations) {
                     Obj span = spans.get(id);
                     require(span != null);
                     citedArticles.add(articleKey(span));
-                    var inSnapshot = graph.snapshot.evidence().stream().filter(e -> e.evidenceId().equals(id)).findFirst();
-                    if (inSnapshot.isPresent()) require(articleKey(span).equals(
-                            inSnapshot.get().articleId() + "@" + inSnapshot.get().articleVersion()));
+                    Evidence inSnapshot = snapshotEvidence.get(id);
+                    if (inSnapshot != null) require(articleKey(span).equals(
+                            inSnapshot.articleId() + "@" + inSnapshot.articleVersion()));
                     pathVisible &= shown.test(id);
                 }
                 require(citedArticles.equals(articleKeys));
@@ -157,6 +174,7 @@ public class GraphStructuralDetailReader {
         for (Obj row : rows) require(result.putIfAbsent(row.string(key), row) == null);
         return result;
     }
+    private record RelationEndpoints(String source, String target) { }
     private static String articleKey(Obj article) { return article.string("articleId") + "@" + article.string("articleVersion"); }
     private static String instantText(String value) { return OffsetDateTime.parse(value).toInstant().toString(); }
     private static String scope(Obj basis, String key) {

@@ -8,6 +8,7 @@ import com.zoop.graph.read.dto.EdgeDetail;
 import com.zoop.graph.read.dto.EdgeDetail.EndpointRef;
 import com.zoop.graph.read.dto.EdgeDetail.Verification;
 import com.zoop.graph.read.dto.EdgeDetail.ViaIssue;
+import com.zoop.graph.read.dto.StructuralDetails;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Article;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Relation;
@@ -18,6 +19,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +31,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class GraphRelationService {
+    private static final Logger log = LoggerFactory.getLogger(GraphRelationService.class);
     static final String DERIVED_EXPLANATION = "두 기업이 같은 사건에 함께 등장했다는 뜻이에요. 직접 거래나 영향 관계는 아니에요.";
     static final Map<String, String> EXPLANATIONS = Map.of(
             "INVOLVES", "기사에 이 기업의 역할이 직접 적혀 있어요.",
@@ -57,12 +61,24 @@ public class GraphRelationService {
         List<Relation> sources = edge.relationIds().stream().map(relations::get).toList();
         Map<String, PublicGraphSnapshot.Company> catalog = CompanyAppearance.of(jdbc,
                 List.of(edge.source(), edge.target()).stream().filter(graph.companies::containsKey).toList());
-        var structural = structuralDetails.read(pinned, edge, round, requestId);
-        boolean partial = "unavailable".equals(structural.status());
+        StructuralDetails structural;
+        boolean retryableStructuralFailure = false;
+        try {
+            structural = structuralDetails.read(pinned, edge, round, requestId);
+        } catch (CustomException failure) {
+            if (failure.getErrorCode() != ErrorCode.SOURCE_UNAVAILABLE) throw failure;
+            retryableStructuralFailure = failure.isRetryable();
+            log.warn("Structural relation detail is unavailable (graphVersion={}, edgeId={}, retryable={}, requestId={})",
+                    pinned.selected().version().id(), edge.id(), retryableStructuralFailure, requestId);
+            structural = StructuralDetails.unavailable("details_not_available");
+        }
+        boolean partial = "unavailable".equals(structural.status())
+                && "details_not_available".equals(structural.reason());
         Metadata metadata = new Metadata(pinned.selected().source(), pinned.selected().asOf(),
                 pinned.selected().version().id(), requestId, partial,
-                partial ? List.of(new SectionFailure("structuralDetails", "STRUCTURAL_DETAIL_UNAVAILABLE",
-                        "사업 관계 상세 정보를 제공할 수 없습니다.", false, pinned.selected().asOf())) : List.of());
+                partial ? List.of(new SectionFailure("structuralDetails",
+                        retryableStructuralFailure ? "SOURCE_UNAVAILABLE" : "STRUCTURAL_DETAIL_UNAVAILABLE",
+                        "사업 관계 상세 정보를 제공할 수 없습니다.", retryableStructuralFailure, pinned.selected().asOf())) : List.of());
         return new EdgeDetail(edge.id(), edge.relationType(), edge.derived(), !edge.derived(),
                 endpoint(graph, catalog, edge.source()), endpoint(graph, catalog, edge.target()), edge.role(), edge.summary(),
                 sources.stream().map(Relation::role).filter(Objects::nonNull).map(RoleLabels::display).distinct().toList(),

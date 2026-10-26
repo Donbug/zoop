@@ -4490,7 +4490,7 @@ allow는 HOLD 대상의 운영자 최종 승인(approved)이며 재검증이나 
 
 ### StructuralDetails
 
-FS023 공급 관계 상세. 구서버에는 필드가 없을 수 있다. available일 때만 완전한 paths를 제공하며 일부 경로를 잘라 공개하지 않는다. unavailable은 관계 없음이 아니다. 비공개 pathCompanies는 공개하지 않는다. unavailable이면 metadata.partial과 STRUCTURAL_DETAIL_UNAVAILABLE 실패 항목을 제공한다.
+FS023 공급 관계 상세. 새 서버는 항상 반환하지만 구서버와 혼재 배포될 수 있어 기존 consumer 호환이 필요한 동안 OpenAPI 및 웹 타입에서 선택 필드로 유지한다. 혼재 배포 지원 종료 시 필수 여부를 다시 결정한다. available일 때만 완전한 paths를 제공하며 일부 경로를 잘라 공개하지 않는다. unavailable은 관계 없음이 아니다. 비공개 pathCompanies는 공개하지 않는다. legacy_data·not_recorded는 기록 부재이므로 metadata.partial/failures에 넣지 않는다. details_not_available은 확인 가능한 상세를 제공하지 못한 상태로 metadata.partial과 STRUCTURAL_DETAIL_UNAVAILABLE을 제공한다. 조회 중 일시 장애는 기본 관계 상세를 유지하고 metadata.failures에 SOURCE_UNAVAILABLE, retryable=true로 기록한다. receipt 구조 손상은 로그를 남기고 details_not_available 및 retryable=false로 기록한다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |

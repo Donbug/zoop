@@ -99,6 +99,10 @@ class GraphRelationServiceTest {
         assertEquals("active", edge.basis().get(0).validity());
         assertEquals("active", edge.validity());
         assertEquals(GraphRelationService.EXPLANATIONS.get("STRUCTURALLY_RELATED_TO"), edge.explanation());
+        assertEquals("unavailable", edge.structuralDetails().status());
+        assertEquals("not_recorded", edge.structuralDetails().reason());
+        assertFalse(edge.metadata().partial());
+        assertTrue(edge.metadata().failures().isEmpty());
         assertTrue(edge.via().isEmpty());
         assertEquals("fixture-2026-10-08", edge.metadata().graphVersion());
     }
