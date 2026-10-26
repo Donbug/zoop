@@ -94,6 +94,17 @@ public class JdbcAnalysisJobRepository {
                 JdbcAnalysisJobRepository::row).stream().findFirst();
     }
 
+    /** The newest administrator job that failed by {@code asOf}. */
+    public Optional<JobRow> latestFailedAt(Instant asOf) {
+        return jdbc.query("SELECT " + COLUMNS + """
+                 FROM analysis_jobs
+                WHERE scope = 'admin' AND status = 'failed' AND finished_at <= :asOf
+                ORDER BY finished_at DESC, id DESC
+                LIMIT 1
+                """, new MapSqlParameterSource("asOf", Timestamp.from(asOf)), JdbcAnalysisJobRepository::row)
+                .stream().findFirst();
+    }
+
     /** The newest administrator ingest that finished normally: the next run's baseline. */
     public Optional<JobRow> latestSucceededIngest() {
         return jdbc.query("SELECT " + COLUMNS + """
