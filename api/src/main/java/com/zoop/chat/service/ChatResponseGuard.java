@@ -27,8 +27,8 @@ import org.springframework.stereotype.Component;
  * <li>A result citing any evidence that is not readable now (withdrawn, private, rights changed, excluded from the pinned
  * graph, or not verifiable) returns no answer text, sections, sources, citations or graph targets; {@code answer} carries
  * a fixed notice and {@code answerBasis} is {@code none}. An approved ZOOP document ({@code zoop_doc}) is checked the same
- * way: it stays readable while the version it quoted is still in effect ({@link ChatZoopDocs}). A citation of any other
- * kind cannot be verified and is withheld.</li>
+ * way: it stays readable while the version it quoted is still in effect now, whatever the stored asOf ({@link ChatZoopDocs}).
+ * A citation of any other kind cannot be verified and is withheld.</li>
  * </ul>
  *
  * <p>It runs outside the chat transaction because the evidence read has its own.

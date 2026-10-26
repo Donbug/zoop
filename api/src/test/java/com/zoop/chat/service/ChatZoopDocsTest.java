@@ -86,6 +86,32 @@ class ChatZoopDocsTest {
     }
 
     @Test
+    void aVersionChosenAtAPastAsOfIsWithheldOnceItIsReplacedOrItsPolicyRetired() {
+        Instant asOf = NOW.minusSeconds(86_400);
+        var then = new AtomicReference<>("v1");
+        var now = new AtomicReference<>("v1");
+        var docs = new ChatZoopDocs(registry(then, now), Clock.fixed(NOW, ZoneOffset.UTC));
+        var quote = docs.inEffect("policy.privacy", asOf).orElseThrow().quotes().getFirst();
+        assertEquals(Readability.READABLE, docs.check(quote.evidenceId(), asOf).orElseThrow(), "v1 then and now");
+
+        now.set("v2");
+        assertTrue(docs.inEffect("policy.privacy", asOf).isEmpty(), "v1 was in effect then but is replaced now");
+        assertEquals(Readability.DENIED, docs.check(quote.evidenceId(), asOf).orElseThrow(),
+                "a stored answer keeps its past asOf, and is still withheld");
+        assertEquals("v1", docs.byId(quote.evidenceId()).orElseThrow().docVersion(),
+                "the quote stays the v1 text; it is never swapped for v2");
+
+        now.set(null);
+        assertTrue(docs.inEffect("policy.privacy", asOf).isEmpty(), "the policy is retired now");
+        assertEquals(Readability.DENIED, docs.check(quote.evidenceId(), asOf).orElseThrow());
+
+        now.set("v1");
+        then.set(null);
+        assertEquals(Readability.DENIED, docs.check(quote.evidenceId(), asOf).orElseThrow(),
+                "v1 in effect now does not make it readable at an asOf before it took effect");
+    }
+
+    @Test
     void anotherIdIsNotAZoopDocumentAndAnOutageIsUnavailable() {
         var docs = new ChatZoopDocs(registry(new AtomicReference<>("v1")), Clock.fixed(NOW, ZoneOffset.UTC));
         assertTrue(docs.check("ev-" + "f".repeat(64), null).isEmpty());
@@ -100,8 +126,13 @@ class ChatZoopDocsTest {
     }
 
     /** A registry of {@code privacy} with versions v1 and v2 of {@link #BODY}; {@code effective} is the one in effect. */
-    @SuppressWarnings("unchecked")
     private static NamedParameterJdbcTemplate registry(AtomicReference<String> effective) {
+        return registry(effective, effective);
+    }
+
+    /** As {@link #registry(AtomicReference)}, with {@code then} in effect before {@link #NOW} and {@code now} from it. */
+    @SuppressWarnings("unchecked")
+    private static NamedParameterJdbcTemplate registry(AtomicReference<String> then, AtomicReference<String> now) {
         var jdbc = mock(NamedParameterJdbcTemplate.class);
         when(jdbc.query(anyString(), any(SqlParameterSource.class), any(RowMapper.class))).thenAnswer(i -> {
             String sql = i.getArgument(0);
@@ -109,7 +140,9 @@ class ChatZoopDocsTest {
             List<String[]> rows = new ArrayList<>();
             var rs = mock(java.sql.ResultSet.class);
             if (sql.contains("effective_at")) {
-                assertEquals("privacy", ((MapSqlParameterSource) i.getArgument(1)).getValue("term"));
+                var params = (MapSqlParameterSource) i.getArgument(1);
+                assertEquals("privacy", params.getValue("term"));
+                var effective = ((java.sql.Timestamp) params.getValue("at")).toInstant().isBefore(NOW) ? then : now;
                 if (effective.get() == null) return rows;
                 when(rs.getString("version")).thenReturn(effective.get());
                 when(rs.getString("title_snapshot")).thenReturn("개인정보 처리방침");

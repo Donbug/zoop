@@ -29,15 +29,16 @@ import org.springframework.transaction.TransactionException;
  * body. Its id has the evidence id shape and is the SHA-256 of the document id, version, span and text, so the same section
  * of the same version always has the same id and an answer stays tied to the version it quoted.
  *
- * <p>A quote is readable while its version is in effect at the run's asOf, or now without one: effective, not retired, and
- * its term not retired. Once a new version replaces it, a stored answer citing the old one is withheld. An approved body is
- * never changed in place (docs/legal/README.md), so a version's sections are read once and kept.
+ * <p>A version is chosen at the run's asOf, or now without one: effective, not retired, and its term not retired. It is
+ * read and cited only while it is also the version in effect now, so a version that was later replaced or whose term was
+ * retired is never shown, not even in an answer stored while it was in effect; that answer is withheld, and its quote is
+ * never swapped for the newer text. An approved body is never changed in place (docs/legal/README.md), so a version's
+ * sections are read once and kept.
  */
 @Component
 public class ChatZoopDocs {
     /** The chat grant registry's source id for ZOOP's own approved documents. */
     public static final String SOURCE_ID = "zoop-docs";
-    public static final String PUBLISHER = "줍";
     private static final String POLICY = "policy.";
     /** Every policy document {@code zoopPolicy.read} reads: {@code policy.} and the term id. */
     public static final List<String> POLICIES = List.of(POLICY + "service", POLICY + "privacy");
@@ -62,20 +63,33 @@ public class ChatZoopDocs {
         this.clock = clock;
     }
 
-    /** The version of {@code docId} in effect at {@code asOf} (now when null), or empty when none is. */
+    /**
+     * The version of {@code docId} in effect at {@code asOf} (now when null), or empty when none is or when it is no longer
+     * the version in effect now (replaced, or its term retired, since {@code asOf}).
+     */
     public Optional<Document> inEffect(String docId, Instant asOf) {
         if (docId == null || !docId.startsWith(POLICY)) return Optional.empty();
         String term = docId.substring(POLICY.length());
+        Instant now = clock.instant();
+        var then = versionAt(term, asOf != null ? asOf : now);
+        if (then.isEmpty()) return Optional.empty();
+        if (asOf != null && !versionAt(term, now).map(v -> v[0].equals(then.get()[0])).orElse(false)) {
+            return Optional.empty();
+        }
+        String version = then.get()[0];
+        String title = then.get()[1];
+        return Optional.of(new Document(docId, version, title, sections(term, version, title)));
+    }
+
+    /** The version and title of {@code term} in effect at {@code at}. */
+    private Optional<String[]> versionAt(String term, Instant at) {
         var rows = jdbc.query("""
                 SELECT v.version, v.title_snapshot FROM term_versions v JOIN terms t ON t.id = v.term_id
                 WHERE v.term_id = :term AND v.effective_at <= :at AND (v.retired_at IS NULL OR v.retired_at > :at)
                   AND (t.retired_at IS NULL OR t.retired_at > :at)
-                """, new MapSqlParameterSource("term", term).addValue("at", at(asOf)),
+                """, new MapSqlParameterSource("term", term).addValue("at", Timestamp.from(at)),
                 (rs, n) -> new String[] {rs.getString("version"), rs.getString("title_snapshot")});
-        if (rows.isEmpty()) return Optional.empty();
-        String version = rows.getFirst()[0];
-        String title = rows.getFirst()[1];
-        return Optional.of(new Document(docId, version, title, sections(term, version, title)));
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.getFirst());
     }
 
     /** The quote an id names in any registered version, or empty when it names none. */
@@ -92,7 +106,10 @@ public class ChatZoopDocs {
         return Optional.empty();
     }
 
-    /** Whether a quote may be shown at {@code asOf} (now when null): its version is the one in effect then. */
+    /**
+     * Whether a quote may be shown for {@code asOf} (now when null): its version is the one in effect then and is still the
+     * one in effect now ({@link #inEffect}).
+     */
     public Readability readability(Quote quote, Instant asOf) {
         try {
             return inEffect(quote.docId(), asOf).filter(d -> d.version().equals(quote.docVersion())).isPresent()
@@ -114,10 +131,6 @@ public class ChatZoopDocs {
             return Optional.of(Readability.UNAVAILABLE);
         }
         return quote.map(q -> readability(q, asOf));
-    }
-
-    private Timestamp at(Instant asOf) {
-        return Timestamp.from(asOf != null ? asOf : clock.instant());
     }
 
     private List<Quote> sections(String term, String version, String title) {

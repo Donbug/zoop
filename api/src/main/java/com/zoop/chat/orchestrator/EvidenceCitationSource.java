@@ -17,8 +17,8 @@ import org.springframework.transaction.TransactionException;
  * {@link ChatCitationSource} through {@code GET /api/v1/evidence/{id}}'s own read, at the pinned version and asOf. A company
  * profile quote is cited from the catalog as {@code company_profile}: the whole quoted text, the company id as {@code docId},
  * only while its company is visible at that version and asOf ({@link ChatCompanyProfiles#readability}). A ZOOP document
- * section is cited as {@code zoop_doc} with its document id, version and code-point span, only while that version is in
- * effect at the asOf ({@link ChatZoopDocs#readability}).
+ * section is cited as {@code zoop_doc} with its document id, version and code-point span and no publisher (the public
+ * contract leaves it null), only while that version is in effect at the asOf and still now ({@link ChatZoopDocs#readability}).
  */
 @Component
 public class EvidenceCitationSource implements ChatCitationSource {
@@ -64,7 +64,7 @@ public class EvidenceCitationSource implements ChatCitationSource {
                 case READABLE -> { }
             }
             return Optional.of(new Citation("zoop_doc", q.evidenceId(), q.text(), null, null, q.docId(), q.docVersion(),
-                    q.start(), q.end(), q.title(), ChatZoopDocs.PUBLISHER, null, null));
+                    q.start(), q.end(), q.title(), null, null, null));
         }
         EvidenceResponse read;
         try {

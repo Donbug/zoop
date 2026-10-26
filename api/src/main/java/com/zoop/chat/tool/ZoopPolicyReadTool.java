@@ -11,7 +11,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.TransactionException;
 
 /**
- * {@code zoopPolicy.read}: the approved ZOOP policies in effect at the run's asOf (now without one), each as an item with its
+ * {@code zoopPolicy.read}: the approved ZOOP policies in effect at the run's asOf (now without one) and still in effect now
+ * ({@link ChatZoopDocs#inEffect}), each as an item with its
  * sections passed on as evidence in body order, kept within the request's evidence scope and capped at the request limit.
  * Its targets are always {@link ChatZoopDocs#POLICIES} ({@link ChatCapability#documents()}); a target that is not a policy
  * in effect is absent. It reads no graph. The data version names each policy version read. A registry that cannot be read

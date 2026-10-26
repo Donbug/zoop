@@ -84,7 +84,7 @@ class ChatResponseGuardTest {
         return new ChatResult("answered", "msg-1", "ZOOP 안내 본문",
                 List.of(new ChatAnswerSection("zoop_documented", "ZOOP 안내 본문", List.of("doc-1"))), "zoop_documented",
                 null, List.of(), List.of(new Citation(sourceKind, "doc-1", "구간", null, null, "policy.privacy", "v1", 0, 2,
-                        "개인정보 처리방침 · 1. 처리 목적과 항목", "줍", null, null)), List.of(), applied(), List.of(), null,
+                        "개인정보 처리방침 · 1. 처리 목적과 항목", null, null, null)), List.of(), applied(), List.of(), null,
                 List.of(), metadata());
     }
 
