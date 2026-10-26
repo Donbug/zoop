@@ -108,6 +108,38 @@ class GraphRelationServiceTest {
     }
 
     @Test
+    void transientStructuralDetailFailurePreservesBaseRelationAndMarksRetryablePartialResponse() {
+        assertStructuralDetailFailure(true, "SOURCE_UNAVAILABLE");
+    }
+
+    @Test
+    void permanentStructuralDetailFailurePreservesBaseRelationAndMarksNonRetryablePartialResponse() {
+        assertStructuralDetailFailure(false, "STRUCTURAL_DETAIL_UNAVAILABLE");
+    }
+
+    private void assertStructuralDetailFailure(boolean retryable, String failureCode) {
+        var details = org.mockito.Mockito.mock(GraphStructuralDetailReader.class);
+        org.mockito.Mockito.when(details.read(org.mockito.ArgumentMatchers.any(PublicGraphReader.Pinned.class),
+                org.mockito.ArgumentMatchers.any(DisplayGraph.Edge.class), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq("r")))
+                .thenThrow(new CustomException(ErrorCode.SOURCE_UNAVAILABLE, retryable));
+        var subject = new GraphRelationService(GraphReadFixtures.reader(NOW, ignored -> DisclosureExclusions.NONE), jdbc, details);
+
+        var edge = subject.getRelation(STRUCTURAL, null, null, null, "r");
+
+        assertEquals("STRUCTURALLY_RELATED_TO", edge.relationType());
+        assertEquals("ALLOW", edge.verification().status());
+        assertEquals("SUPPLIES", edge.basis().get(0).relationType());
+        assertEquals("unavailable", edge.structuralDetails().status());
+        assertEquals("details_not_available", edge.structuralDetails().reason());
+        assertTrue(edge.metadata().partial());
+        assertEquals(1, edge.metadata().failures().size());
+        assertEquals("structuralDetails", edge.metadata().failures().get(0).section());
+        assertEquals(failureCode, edge.metadata().failures().get(0).code());
+        assertEquals(retryable, edge.metadata().failures().get(0).retryable());
+    }
+
+    @Test
     void derivedEdgeIsNotVerifiedAndListsTheSharedIssueWithItsEvidence() {
         var edge = service.getRelation(SHARED, null, null, null, "r");
         assertTrue(edge.derived());

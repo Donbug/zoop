@@ -20,7 +20,7 @@ import { companyPath } from '@/components/graph/company-path';
 import ImpactPathPanel from '@/components/graph/ImpactPathPanel';
 import CompanyDetailPanel from '@/components/graph/CompanyDetailPanel';
 import RelationDetailPanel from '@/components/graph/RelationDetailPanel';
-import type { RelationDetail } from '@/types/map/relation';
+import type { RelationDetail, StructuralSupplyLink } from '@/types/map/relation';
 import EventDetailPanel, {
   type EventAction,
 } from '@/components/graph/EventDetailPanel';
@@ -507,7 +507,7 @@ function MapWorkspace({
     action: 'evidence' | 'ai',
     relation: RelationDetail,
     issueId?: string,
-    supplyLink?: import('@/types/map/relation').StructuralSupplyLink,
+    supplyLink?: StructuralSupplyLink,
   ) {
     const issue = relation.via.find((item) => item.id === issueId);
     const target: GraphTarget = {
