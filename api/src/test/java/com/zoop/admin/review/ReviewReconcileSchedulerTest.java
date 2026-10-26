@@ -4,6 +4,9 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.zoop.ai.relation.RelationClient;
 import org.junit.jupiter.api.Test;
@@ -63,6 +66,26 @@ class ReviewReconcileSchedulerTest {
         scheduler(provider(relations)).runOnce();
 
         verify(decisions).reconcile(BEFORE, 50);
+    }
+
+    @Test
+    void anErrorInARunNeverEndsTheSchedule() throws Exception {
+        AtomicInteger runs = new AtomicInteger();
+        CountDownLatch next = new CountDownLatch(1);
+        when(decisions.reconcile(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt())).thenAnswer(call -> {
+            if (runs.incrementAndGet() == 1) throw new Error("unexpected");
+            next.countDown();
+            return 0;
+        });
+        var scheduler = new ReviewReconcileScheduler(decisions, reviews, provider(relations), Clock.systemUTC(),
+                Duration.ofMillis(10), Duration.ofMinutes(2), 50);
+        scheduler.start();
+        try {
+            assertTrue(next.await(30, TimeUnit.SECONDS), "a run after the failed one still ran");
+        } finally {
+            scheduler.stop();
+        }
+        assertFalse(scheduler.isRunning());
     }
 
     @Test

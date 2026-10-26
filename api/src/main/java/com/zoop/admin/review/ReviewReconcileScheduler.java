@@ -34,6 +34,8 @@ import org.springframework.stereotype.Component;
 public class ReviewReconcileScheduler implements SmartLifecycle {
     private static final Logger log = LoggerFactory.getLogger(ReviewReconcileScheduler.class);
     static final Duration REPEAT_WARNING = Duration.ofHours(1);
+    /** How long a stop waits for a run in progress before the context goes on closing (its DataSource with it). */
+    static final Duration STOP_WAIT = Duration.ofSeconds(10);
 
     private final ReviewDecisionService decisions;
     private final JdbcReviewRepository reviews;
@@ -70,15 +72,34 @@ public class ReviewReconcileScheduler implements SmartLifecycle {
             return;
         }
         executor = Executors.newSingleThreadScheduledExecutor(task -> new Thread(task, "review-reconcile"));
-        executor.scheduleWithFixedDelay(this::runOnce, interval.toMillis(), interval.toMillis(), TimeUnit.MILLISECONDS);
+        executor.scheduleWithFixedDelay(this::tick, interval.toMillis(), interval.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * The scheduled task. A scheduled executor silently cancels a task that throws, so not even an {@link Error} may escape:
+     * it is logged and the next run tries again.
+     */
+    void tick() {
+        try {
+            runOnce();
+        } catch (Throwable unexpected) {
+            log.error("Review reconciliation run failed; the schedule continues", unexpected);
+        }
     }
 
     @Override
     public synchronized void stop() {
-        if (executor != null) {
-            executor.shutdown();
-            executor = null;
+        if (executor == null) return;
+        // A settlement in progress is one transaction: never interrupt it, but let it finish before the DataSource closes.
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(STOP_WAIT.toMillis(), TimeUnit.MILLISECONDS)) {
+                log.warn("Review reconciliation run still in progress after {}; the context goes on closing", STOP_WAIT);
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
         }
+        executor = null;
     }
 
     @Override
