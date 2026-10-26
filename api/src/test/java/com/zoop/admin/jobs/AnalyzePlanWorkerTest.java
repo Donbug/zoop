@@ -9,14 +9,21 @@ import com.jayway.jsonpath.JsonPath;
 import com.zoop.admin.auth.provision.AdminProvisioningService;
 import com.zoop.admin.auth.service.AdminSessionCookie;
 import com.zoop.admin.jobs.AnalyzePlanState.*;
+import com.zoop.admin.review.AnalysisCandidateService;
+import com.zoop.admin.review.JdbcCandidateRepository;
 import com.zoop.admin.review.JdbcReviewRepository;
+import com.zoop.admin.review.PublishedCandidates;
 import com.zoop.admin.review.ReviewTargetSync;
 import com.zoop.ai.*;
 import com.zoop.ai.extraction.*;
 import com.zoop.ai.plan.*;
 import com.zoop.ai.relation.*;
+import com.zoop.auth.service.CsrfKeyRing;
 import com.zoop.common.json.Canonical;
 import com.zoop.common.request.RequestIdFilter;
+import com.zoop.document.repository.ArticleRow;
+import com.zoop.document.repository.DocumentRegistryRepository;
+import com.zoop.document.repository.VersionRow;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -25,6 +32,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -35,8 +43,10 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -67,7 +77,10 @@ class AnalyzePlanWorkerTest {
     @Autowired Script script;
     @Autowired MutableClock clock;
     @Autowired JdbcReviewRepository reviews;
+    @Autowired JdbcCandidateRepository candidateRepository;
     @Autowired PlatformTransactionManager transactions;
+    @Autowired ObjectMapper mapper;
+    @Autowired CsrfKeyRing keys;
     private MockMvc mvc;
     private Cookie cookie;
     private String csrf;
@@ -117,7 +130,7 @@ class AnalyzePlanWorkerTest {
     void reviewTargetSyncRoundsReadTheObservedUnitAgainUntilItsSourceSettles() {
         String hold = "{\"relationCandidateId\":\"rc-" + "1".repeat(64) + "\",\"sourceRevision\":\"%s\",\"type\":\"SUPPLIES\","
                 + "\"subject\":{\"kind\":\"company\",\"ref\":\"A\"},\"object\":{\"kind\":\"company\",\"ref\":\"B\"},"
-                + "\"eligibility\":{\"status\":\"%s\"}}";
+                + "\"eligibility\":{\"status\":\"%s\"},\"citations\":[]}";
         script.relations = "[" + hold.formatted("1", "pending") + "]";
         assertTrue(worker.runOnce());
         terminal("succeeded", null);
@@ -144,6 +157,122 @@ class AnalyzePlanWorkerTest {
         assertEquals("ALLOW", targetStatus("relation"), "an approval in the AI source reaches the projection");
         assertEquals("ALLOW", targetStatus("candidate"), "and the candidate's status follows");
         assertEquals(2, targets());
+    }
+
+    @Test
+    void candidateListAndDetailReadTheProjectionThenTheSourceAgain() throws Exception {
+        String tag = UUID.randomUUID().toString().substring(0, 8);
+        String event = "evc-" + Canonical.sha256(tag);
+        String doc = "doc-" + "7".repeat(64);
+        String withdrawn = "doc-" + "8".repeat(64);
+        String version = "9".repeat(64);
+        script.eventCandidates = """
+                [{"eventCandidateId":"%s","state":"candidate","disposition":{"status":"new-event-candidate","targetEventId":null},
+                  "mention":{"mentionId":"m-1","title":"제목-%s","action":"공급 계약","target":null,"eventTime":"2026-10-20",
+                   "period":null,"assertionStatus":"announced","background":false,"countries":["KR"],"keywords":["공급"],
+                   "participants":[{"companyId":"SK-%s","name":"에스케이","role":"subject"}]},
+                  "citations":[{"documentId":"%s","documentVersion":"%s","start":0,"end":4,"quote":"원문 인용"}]}]"""
+                .formatted(event, tag, tag, doc, version);
+        String relation = """
+                {"relationCandidateId":"%s","sourceRevision":"%s","type":"%s","subject":{"kind":"company","ref":"%s"},
+                 "object":{"kind":"%s","ref":"%s"},"eligibility":{"status":"hold","reasons":[{"code":"claim_insufficient"}]},
+                 "history":[{"seq":1,"kind":"verdict","eligibility":"hold","reasons":[{"code":"claim_insufficient"}]}],
+                 "citations":[{"documentId":"%s","documentVersion":"%s","start":0,"end":2,"quote":"숨길 인용"}]}""";
+        script.relations = "[" + relation.formatted("rc-" + "1".repeat(64), "2", "PARTICIPATES_IN", "SK-" + tag, "event", event,
+                doc, version) + "," + relation.formatted("rc-" + "2".repeat(64), "1", "SUPPLIES", "A-" + tag, "company",
+                "B-" + tag, withdrawn, version) + "]";
+        assertTrue(worker.runOnce());
+        terminal("succeeded", null);
+        ExtractionClient s2 = mock(ExtractionClient.class);
+        when(s2.result(anyString())).thenThrow(new IllegalStateException("other unit"));
+        doAnswer(call -> script.extraction().result(script.s2.jobId())).when(s2).result(script.s2.jobId());
+        RelationClient s3 = mock(RelationClient.class);
+        when(s3.result(anyString())).thenThrow(new IllegalStateException("other unit"));
+        doAnswer(call -> script.relation().result(script.s3.jobId())).when(s3).result(script.s3.jobId());
+        new ReviewTargetSync(reviews, s2, s3, transactions, clock, 500).runOnce();
+
+        // The list over HTTP: the projection only (no AI call), searched by a company id both candidates carry, paged by one.
+        var first = mvc.perform(get("/api/v1/admin/pipeline/candidates").cookie(cookie).param("q", tag).param("limit", "1"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        List<String> ids = new ArrayList<>(JsonPath.<List<String>>read(first, "$.items[*].candidateId"));
+        String next = JsonPath.read(first, "$.nextCursor");
+        assertNotNull(next);
+        var second = mvc.perform(get("/api/v1/admin/pipeline/candidates").cookie(cookie).param("q", tag)
+                .param("cursor", next)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        ids.addAll(JsonPath.<List<String>>read(second, "$.items[*].candidateId"));
+        assertNull(JsonPath.read(second, "$.nextCursor"));
+        assertEquals(2, ids.stream().distinct().count(), "two candidates over two pages");
+        var titled = mvc.perform(get("/api/v1/admin/pipeline/candidates").cookie(cookie).param("q", "제목-" + tag))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertEquals(List.of("공급 계약"), JsonPath.read(titled, "$.items[*].action"));
+        assertEquals(List.of(1), JsonPath.read(titled, "$.items[*].evidenceCount"));
+        assertEquals(List.of("에스케이"), JsonPath.read(titled, "$.items[0].companies[*].name"));
+        String candidateId = JsonPath.<List<String>>read(titled, "$.items[*].candidateId").getFirst();
+        assertEquals(2, listed(tag, "decision", "none"), "no decision yet on either candidate");
+        assertEquals(0, listed(tag, "decision", "allow"));
+        assertEquals(0, listed(tag, "active", "false"));
+        assertEquals(2, listed(tag, "status", "HOLD"));
+        assertEquals(0, listed(tag, "rule", "true"), "no rule is evaluated on candidates yet");
+        assertNotNull(JsonPath.read(first, "$.counts.HOLD"));
+        var byKey = mvc.perform(get("/api/v1/admin/pipeline/candidates").cookie(cookie).param("q", "sourceId"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertEquals(List.of(), JsonPath.read(byKey, "$.items"), "the search reads company values, not the JSON keys");
+        // This context has no imported active version: whether a candidate is shown cannot be told, so filtering by it is 503.
+        mvc.perform(get("/api/v1/admin/pipeline/candidates").cookie(cookie).param("published", "true"))
+                .andExpect(status().isServiceUnavailable());
+        mvc.perform(get("/api/v1/admin/pipeline/candidates")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/admin/pipeline/candidates").cookie(cookie).param("status", "MAYBE"))
+                .andExpect(status().isUnprocessableContent());
+        // Without the AI clients this context has, the detail cannot read its source: 503, never a guessed detail.
+        mvc.perform(get("/api/v1/admin/pipeline/candidates/" + candidateId).cookie(cookie))
+                .andExpect(status().isServiceUnavailable());
+
+        // The detail reads S2/S3 again and the cited articles from the registry: one registered, one withdrawn.
+        DocumentRegistryRepository registry = mock(DocumentRegistryRepository.class);
+        when(registry.findVersion(anyString(), anyString())).thenReturn(Optional.empty());
+        when(registry.findVersion(doc, version)).thenReturn(Optional.of(new VersionRow(doc, version, "기사 제목", "언론사",
+                "https://news.example/1", null, null, "unknown", null, "text-1", clock.instant())));
+        when(registry.findArticle(doc)).thenReturn(Optional.of(new ArticleRow(doc, "news", "p", version, "available")));
+        when(registry.findVersion(withdrawn, version)).thenReturn(Optional.of(new VersionRow(withdrawn, version, "철회", null,
+                null, null, null, "unknown", null, "text-2", clock.instant())));
+        when(registry.findArticle(withdrawn)).thenReturn(Optional.of(new ArticleRow(withdrawn, "news", "p", version, "withdrawn")));
+        PublishedCandidates published = mock(PublishedCandidates.class);
+        when(published.current(any())).thenReturn(Optional.empty());
+        var beans = new StaticListableBeanFactory(Map.of("s2", s2, "s3", s3));
+        AnalysisCandidateService service = new AnalysisCandidateService(candidateRepository, reviews, published, registry,
+                beans.getBeanProvider(ExtractionClient.class), beans.getBeanProvider(RelationClient.class),
+                beans.getBeanProvider(ReviewTargetSync.class), mapper, keys, clock);
+
+        var detail = service.get(candidateId, "r-1");
+        assertEquals("제목-" + tag, detail.mention().title());
+        assertEquals(List.of("KR"), detail.mention().countries());
+        assertEquals("기사 제목", detail.evidence().getFirst().articleTitle());
+        assertEquals("원문 인용", detail.evidence().getFirst().quote());
+        assertEquals(1, detail.relations().size(), "only the relation that names this event");
+        assertEquals("2", detail.relations().getFirst().sourceRevision(), "the value a decision sends as expected");
+        assertEquals("subject", detail.relations().getFirst().role(), "the S2 participant's role of the company endpoint");
+        assertEquals("hold", detail.verification().verdicts().getFirst().decision());
+        assertEquals("unknown", detail.graphDb(), "no readable active version: unknown, never not_stored");
+        assertNull(detail.sourceRevision());
+        when(published.current(any())).thenReturn(Optional.of(new PublishedCandidates.Shown("v", Set.of(), Set.of(),
+                Set.of(script.s3.jobId() + "\n" + "rc-" + "1".repeat(64)), Set.of())));
+        assertEquals("excluded", service.get(candidateId, "r-3").graphDb(), "published, hidden now");
+        when(published.current(any())).thenReturn(Optional.of(new PublishedCandidates.Shown("v", Set.of(), Set.of(),
+                Set.of(), Set.of())));
+        assertEquals("not_stored", service.get(candidateId, "r-4").graphDb(), "a HOLD nobody approved is not pending");
+
+        String alone = candidateRepository.page(new JdbcCandidateRepository.Filter(null, null, null, null, "B-" + tag,
+                List.of(), List.of()), null, null, 10).getFirst().id();
+        var standalone = service.get(alone, "r-2");
+        assertNull(standalone.mention(), "no event: no mention");
+        assertNull(standalone.evidence().getFirst().quote(), "a withdrawn article's quote is hidden");
+        assertEquals("철회", standalone.evidence().getFirst().articleTitle());
+    }
+
+    private int listed(String q, String filter, String value) throws Exception {
+        var body = mvc.perform(get("/api/v1/admin/pipeline/candidates").cookie(cookie).param("q", q).param(filter, value))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return JsonPath.<List<Object>>read(body, "$.items").size();
     }
 
     private int targets() {
