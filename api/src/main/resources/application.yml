@@ -69,6 +69,17 @@ zoop:
       # The public exclusion store (FS081, disclosure_exclusion_*) now always exists, so activation checks the version's current
       # exclusions and this switch has no effect. It only matters for a DisclosureExclusionReader without a store (tests).
       allow-without-exclusion-store: ${ZOOP_GRAPH_ACTIVATION_ALLOW_WITHOUT_EXCLUSION_STORE:false}
+    auto-activation:
+      # FS059: the web application makes the newest version an operator import staged public once it passes the same checks as an
+      # admin activation (system actor in the activation history). Off by default; a restart changes it. Versions imported from
+      # lookback (one round) before start count, so a restart or deploy does not drop the current round. A refused version is
+      # retried after retry-after, an unavailable source or another failure after unavailable-retry-after. It runs on its own
+      # thread, never the shared scheduling thread.
+      enabled: ${ZOOP_GRAPH_AUTO_ACTIVATION_ENABLED:false}
+      interval: ${ZOOP_GRAPH_AUTO_ACTIVATION_INTERVAL:PT15S}
+      lookback: ${ZOOP_GRAPH_AUTO_ACTIVATION_LOOKBACK:PT30M}
+      retry-after: ${ZOOP_GRAPH_AUTO_ACTIVATION_RETRY_AFTER:PT5M}
+      unavailable-retry-after: ${ZOOP_GRAPH_AUTO_ACTIVATION_UNAVAILABLE_RETRY_AFTER:PT1M}
   chat:
     # Accepting new questions and retries needs a ChatEngine, registered by zoop.ai.chat-client.enabled=true. Off by default:
     # submit and retry answer 503 MODEL_UNAVAILABLE instead of leaving a job queued forever, and startup refuses intake on
@@ -90,6 +101,10 @@ zoop:
       max-consecutive-failures: ${ZOOP_ANALYSIS_ANALYZE_PLAN_MAX_CONSECUTIVE_FAILURES:5}
       max-recovery-dispatches: ${ZOOP_ANALYSIS_ANALYZE_PLAN_MAX_RECOVERY_DISPATCHES:3}
       max-reclaims: ${ZOOP_ANALYSIS_ANALYZE_PLAN_MAX_RECLAIMS:16}
+    review-sync:
+      # Runs only with analyze-plan: re-reads observed units' S2/S3 results into the admin review targets.
+      interval: ${ZOOP_ANALYSIS_REVIEW_SYNC_INTERVAL:60s}
+      batch: ${ZOOP_ANALYSIS_REVIEW_SYNC_BATCH:20}
   ai:
     client:
       # Internal S1 AI transport client. Disabled by default; the application starts without any AI setting.

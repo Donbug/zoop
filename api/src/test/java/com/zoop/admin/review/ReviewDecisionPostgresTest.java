@@ -161,6 +161,8 @@ class ReviewDecisionPostgresTest {
         assertTrue(source.calls.get(0).startsWith(ids.job() + "|rel-1|digest-" + suffix + "|7|allow|zoop-review-"));
         assertEquals("ALLOW", jdbc.queryForObject("SELECT status FROM review_targets WHERE id = ?", String.class,
                 ids.relationTarget()));
+        assertEquals("ALLOW", jdbc.queryForObject("SELECT status FROM review_targets WHERE id = ?", String.class,
+                ids.candidate()), "the candidate follows its relations at once, before the sync reads the job again");
         assertEquals(1L, jdbc.queryForObject("SELECT current_revision FROM review_targets WHERE id = ?", Long.class,
                 ids.relationTarget()));
         assertEquals(globalBefore + 1, global());
