@@ -1,0 +1,166 @@
+package com.zoop.graph.read;
+
+import com.zoop.common.exception.CustomException;
+import com.zoop.common.exception.ErrorCode;
+import com.zoop.common.json.StrictJson;
+import com.zoop.common.json.StrictJson.Obj;
+import com.zoop.document.evidence.service.EvidenceService;
+import com.zoop.graph.read.dto.StructuralDetails;
+import com.zoop.graph.read.dto.StructuralDetails.Company;
+import com.zoop.graph.read.dto.StructuralDetails.Link;
+import com.zoop.graph.read.dto.StructuralDetails.Path;
+import com.zoop.graph.snapshot.PublicGraphSnapshot.Basis;
+import java.time.DateTimeException;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Predicate;
+import org.springframework.stereotype.Component;
+
+/**
+ * FS023 / D-GRP-04. Reads only the pinned import receipt; never AI storage or a newer graph.
+ * The whole structural section is withheld if any constituent path cannot be shown intact.
+ * pathCompanies remain private support references, including their identifiers and labels.
+ */
+@Component
+public class GraphStructuralDetailReader {
+    private static final Set<String> SUPPORTED = Set.of("zoop-graph-handoff-bundle-5",
+            "zoop-graph-handoff-bundle-6", "zoop-graph-handoff-bundle-7");
+    private static final Set<String> LEGACY = Set.of("zoop-graph-handoff-bundle-1",
+            "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3", "zoop-graph-handoff-bundle-4");
+    private final EvidenceService evidence;
+
+    public GraphStructuralDetailReader(EvidenceService evidence) { this.evidence = evidence; }
+
+    public StructuralDetails read(PublicGraphReader.Pinned pinned, DisplayGraph.Edge edge, String round, String requestId) {
+        if (!"STRUCTURALLY_RELATED_TO".equals(edge.relationType())) return StructuralDetails.notApplicable();
+        if (pinned.selected().reconstructed() || !"snapshot".equals(pinned.selected().version().kind()))
+            return StructuralDetails.unavailable("not_recorded");
+        try {
+            return imported(pinned, edge, round, requestId);
+        } catch (StrictJson.Malformed | DateTimeException malformed) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        }
+    }
+
+    private StructuralDetails imported(PublicGraphReader.Pinned pinned, DisplayGraph.Edge edge, String round, String requestId) {
+        String version = pinned.selected().version().id();
+        Obj bundle = evidence.graphImportBundle(version, requestId);
+        String schema = bundle.string("schemaVersion");
+        if (LEGACY.contains(schema)) return StructuralDetails.unavailable("legacy_data");
+        require(SUPPORTED.contains(schema));
+        Map<String, Obj> relations = index(bundle.objects("relations"), "id");
+        Map<String, Obj> spans = index(bundle.objects("evidence"), "id");
+        Map<String, Obj> publicCompanies = index(bundle.objects("companies"), "id");
+        Map<String, Obj> privateCompanies = index(bundle.objects("pathCompanies"), "id");
+        DisplayGraph graph = pinned.graph();
+        Map<String, Boolean> checked = new HashMap<>();
+        Instant at = pinned.selected().asOfRequested() ? pinned.selected().asOf() : null;
+        Set<String> visibleEvidence = new HashSet<>();
+        graph.snapshot.evidence().forEach(e -> visibleEvidence.add(e.evidenceId()));
+        Predicate<String> shown = id -> visibleEvidence.contains(id) && checked.computeIfAbsent(id,
+                key -> evidence.shownNow(key, round, version, at, requestId));
+        List<Path> result = new ArrayList<>();
+        boolean available = true;
+        for (String relationId : edge.relationIds().stream().sorted().toList()) {
+            Obj relation = relations.get(relationId);
+            require(relation != null && relation.string("type").equals(edge.relationType())
+                    && relation.string("source").equals(edge.source()) && relation.string("target").equals(edge.target()));
+            var visibleRelation = graph.snapshot.relations().stream().filter(r -> r.relationId().equals(relationId))
+                    .findFirst().orElseThrow(StrictJson.Malformed::new);
+            List<Obj> bases = relation.objects("basis");
+            require(bases.size() >= 1 && bases.size() <= 2);
+            Map<String, Obj> baseIndex = index(bases, "relationKey");
+            require(visibleRelation.basis().stream().allMatch(b -> baseIndex.containsKey(b.basisId())));
+            // A later basis removed by asOf must not be recovered via a different readable citation.
+            boolean pathVisible = bases.size() == visibleRelation.basis().size();
+            Map<String, Basis> visibleBases = new HashMap<>();
+            visibleRelation.basis().forEach(b -> visibleBases.put(b.basisId(), b));
+            Obj path = relation.object("structuralPath");
+            if ("unavailable".equals(path.string("status"))) {
+                path.exactly(Set.of("status", "reason"));
+                require(bases.size() == 2 && "intermediate_company_unmapped".equals(path.string("reason")));
+                available = false;
+                continue;
+            }
+            path.exactly(Set.of("status", "companyIds", "links"));
+            require("complete".equals(path.string("status")));
+            List<String> ids = path.strings("companyIds");
+            List<Obj> links = path.objects("links");
+            require(ids.size() == bases.size() + 1 && new HashSet<>(ids).size() == ids.size()
+                    && links.size() == bases.size() && ids.getLast().equals(edge.target()));
+            for (String id : ids) {
+                require(publicCompanies.containsKey(id) || privateCompanies.containsKey(id));
+                pathVisible &= publicCompanies.containsKey(id) && !privateCompanies.containsKey(id)
+                        && graph.companies.containsKey(id);
+            }
+            // The participating company must still be connected to this issue, with readable direct evidence.
+            boolean participantVisible = graph.snapshot.relations().stream()
+                    .filter(r -> "INVOLVES".equals(r.relationType()) && r.source().equals(edge.source())
+                            && r.target().equals(ids.getFirst()))
+                    .anyMatch(r -> !r.evidenceIds().isEmpty() && r.evidenceIds().stream().allMatch(shown));
+            pathVisible &= participantVisible;
+            List<Link> outputLinks = new ArrayList<>();
+            for (int i = 0; i < bases.size(); i++) {
+                Obj b = bases.get(i);
+                Obj link = links.get(i).exactly(Set.of("supplierCompanyId", "customerCompanyId"));
+                String supplier = link.string("supplierCompanyId"), customer = link.string("customerCompanyId");
+                require(!supplier.equals(customer) && Set.of(supplier, customer).equals(Set.of(ids.get(i), ids.get(i + 1))));
+                String basisId = b.string("relationKey");
+                require("SUPPLIES".equals(b.string("relationType")));
+                String business = scope(b, "businessScope"), product = scope(b, "productScope");
+                List<String> citations = b.strings("evidenceIds");
+                require(!citations.isEmpty() && new HashSet<>(citations).size() == citations.size());
+                Basis visible = visibleBases.get(basisId);
+                if (visible == null) { pathVisible = false; continue; }
+                require(visible.relationType().equals(b.string("relationType"))
+                        && visible.verifiedAt().equals(b.string("verifiedAt"))
+                        && Objects.equals(visible.validFrom(), b.stringOrNull("validFrom"))
+                        && Objects.equals(visible.validUntil(), b.stringOrNull("validUntil"))
+                        && visible.countries().equals(b.strings("countries")));
+                Set<String> articleKeys = new HashSet<>();
+                b.objects("sourceArticles").forEach(a -> require(articleKeys.add(articleKey(a))));
+                require(articleKeys.equals(visible.articles().stream()
+                        .map(a -> a.articleId() + "@" + a.articleVersion()).collect(java.util.stream.Collectors.toSet())));
+                Set<String> citedArticles = new HashSet<>();
+                for (String id : citations) {
+                    Obj span = spans.get(id);
+                    require(span != null);
+                    citedArticles.add(articleKey(span));
+                    var inSnapshot = graph.snapshot.evidence().stream().filter(e -> e.evidenceId().equals(id)).findFirst();
+                    if (inSnapshot.isPresent()) require(articleKey(span).equals(
+                            inSnapshot.get().articleId() + "@" + inSnapshot.get().articleVersion()));
+                    pathVisible &= shown.test(id);
+                }
+                require(citedArticles.equals(articleKeys));
+                outputLinks.add(new Link(basisId, "SUPPLIES", supplier, customer, business, product,
+                        visible.validFrom(), visible.validUntil(), RelationValidity.of(visible, pinned.selected().asOf()),
+                        Instant.parse(visible.verifiedAt()), visible.countries(), citations));
+            }
+            if (pathVisible) result.add(new Path(relationId, ids.stream()
+                    .map(id -> new Company(id, graph.companies.get(id).label())).toList(), outputLinks));
+            available &= pathVisible;
+        }
+        require(!edge.relationIds().isEmpty());
+        return available ? new StructuralDetails("available", null, result)
+                : StructuralDetails.unavailable("details_not_available");
+    }
+
+    private static Map<String, Obj> index(List<Obj> rows, String key) {
+        Map<String, Obj> result = new HashMap<>();
+        for (Obj row : rows) require(result.putIfAbsent(row.string(key), row) == null);
+        return result;
+    }
+    private static String articleKey(Obj article) { return article.string("articleId") + "@" + article.string("articleVersion"); }
+    private static String scope(Obj basis, String key) {
+        String value = basis.stringOrNull(key);
+        require(value == null || value.codePointCount(0, value.length()) <= 500);
+        return value;
+    }
+    private static void require(boolean condition) { if (!condition) throw new StrictJson.Malformed(); }
+}

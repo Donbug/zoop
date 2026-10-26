@@ -3,6 +3,7 @@ package com.zoop.graph.read;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.response.Metadata;
+import com.zoop.common.response.SectionFailure;
 import com.zoop.graph.read.dto.EdgeDetail;
 import com.zoop.graph.read.dto.EdgeDetail.EndpointRef;
 import com.zoop.graph.read.dto.EdgeDetail.Verification;
@@ -35,10 +36,12 @@ public class GraphRelationService {
 
     private final PublicGraphReader reader;
     private final NamedParameterJdbcTemplate jdbc;
+    private final GraphStructuralDetailReader structuralDetails;
 
-    public GraphRelationService(PublicGraphReader reader, NamedParameterJdbcTemplate jdbc) {
+    public GraphRelationService(PublicGraphReader reader, NamedParameterJdbcTemplate jdbc, GraphStructuralDetailReader structuralDetails) {
         this.reader = reader;
         this.jdbc = jdbc;
+        this.structuralDetails = structuralDetails;
     }
 
     public EdgeDetail getRelation(String edgeId, String round, String graphVersion, String asOf, String requestId) {
@@ -54,8 +57,12 @@ public class GraphRelationService {
         List<Relation> sources = edge.relationIds().stream().map(relations::get).toList();
         Map<String, PublicGraphSnapshot.Company> catalog = CompanyAppearance.of(jdbc,
                 List.of(edge.source(), edge.target()).stream().filter(graph.companies::containsKey).toList());
+        var structural = structuralDetails.read(pinned, edge, round, requestId);
+        boolean partial = "unavailable".equals(structural.status());
         Metadata metadata = new Metadata(pinned.selected().source(), pinned.selected().asOf(),
-                pinned.selected().version().id(), requestId, false, List.of());
+                pinned.selected().version().id(), requestId, partial,
+                partial ? List.of(new SectionFailure("structuralDetails", "STRUCTURAL_DETAIL_UNAVAILABLE",
+                        "사업 관계 상세 정보를 제공할 수 없습니다.", false, pinned.selected().asOf())) : List.of());
         return new EdgeDetail(edge.id(), edge.relationType(), edge.derived(), !edge.derived(),
                 endpoint(graph, catalog, edge.source()), endpoint(graph, catalog, edge.target()), edge.role(), edge.summary(),
                 sources.stream().map(Relation::role).filter(Objects::nonNull).map(RoleLabels::display).distinct().toList(),
@@ -73,7 +80,7 @@ public class GraphRelationService {
                                 ? (pinned.selected().briefing() != null ? "이 회차에 저장된" : "저장된")
                                         + " 기업·사건 연결입니다. 구체적인 역할은 저장된 근거에서 확인해야 합니다."
                                 : EXPLANATIONS.get(edge.relationType()),
-                RelationValidity.of(graph.basesOf(edge), pinned.selected().asOf()), metadata);
+                RelationValidity.of(graph.basesOf(edge), pinned.selected().asOf()), structural, metadata);
     }
 
     /** For a derived edge: each shared issue with the evidence on its links to the two companies. */

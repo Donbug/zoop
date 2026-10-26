@@ -47,8 +47,13 @@ export function createMockRelation(
   const source = graph.nodes.find((node) => node.id === edge.source)!;
   const target = graph.nodes.find((node) => node.id === edge.target)!;
   const shared = edge.relationType === 'SHARES_ISSUE';
+  const structural = edge.relationType === 'STRUCTURALLY_RELATED_TO';
   const via = (
-    scenario === 'empty' ? [] : shared ? edge.via : [edge.source, edge.target]
+    scenario === 'empty' || structural
+      ? []
+      : shared
+        ? edge.via
+        : [edge.source, edge.target]
   ).map((issueId) => {
     const event = createMockEvent(
       issueId,
@@ -88,10 +93,18 @@ export function createMockRelation(
     source: { id: source.id, kind: source.kind, label: source.label },
     target: { id: target.id, kind: target.kind, label: target.label },
     role: edge.role,
-    summary: shared ? `같은 사건 ${via.length}건` : '후속 사건',
+    summary: shared
+      ? `같은 사건 ${via.length}건`
+      : structural
+        ? '구조적 관계'
+        : '후속 사건',
     roles: [],
     assertionStatus: edge.assertionStatus,
     evidenceIds,
+    validity: structural ? 'unknown' : null,
+    structuralDetails: structural
+      ? { status: 'unavailable', reason: 'not_recorded', paths: [] }
+      : { status: 'not_applicable', reason: null, paths: [] },
     basis: basisEdges.map((item) => ({
       edgeId: item.id,
       relationType: item.relationType,
@@ -100,6 +113,7 @@ export function createMockRelation(
       validFrom: null,
       validUntil: null,
       countries: [],
+      validity: 'unknown',
     })),
     relationIds: basisEdges.map((item) => item.id),
     verification: {
@@ -109,14 +123,26 @@ export function createMockRelation(
     via,
     explanation: shared
       ? '두 기업이 같은 사건에 함께 등장했다는 뜻입니다. 직접 거래나 영향 관계는 아닙니다.'
-      : '출발 사건에서 도착 사건으로 이어지는 후속 관계입니다. 주가 영향이나 인과관계를 의미하지 않습니다.',
+      : structural
+        ? '사업 관계로 이 사건과 연결됩니다. 합성 목업에는 공급 경로가 기록되어 있지 않습니다.'
+        : '출발 사건에서 도착 사건으로 이어지는 후속 관계입니다. 주가 영향이나 인과관계를 의미하지 않습니다.',
     metadata: {
       source: graph.metadata.source,
       asOf: graph.metadata.asOf,
       graphVersion: graph.metadata.graphVersion,
       requestId: `mock-relation-${id}`,
-      partial: false,
-      failures: [],
+      partial: structural,
+      failures: structural
+        ? [
+            {
+              section: 'structuralDetails',
+              code: 'STRUCTURAL_DETAIL_UNAVAILABLE',
+              message: '사업 관계 상세 정보가 기록되어 있지 않습니다.',
+              retryable: false,
+              asOf: graph.metadata.asOf,
+            },
+          ]
+        : [],
     },
   };
 }

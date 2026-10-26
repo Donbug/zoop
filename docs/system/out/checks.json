@@ -1,6 +1,41 @@
 {
   "findings": [
     {
+      "code": "SOURCE_CHANGED",
+      "target": "docs/evidence/raw/functional-spec_2026-10-18/_collection-manifest.json",
+      "severity": "error",
+      "message": "가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다.",
+      "source": ""
+    },
+    {
+      "code": "SOURCE_CHANGED",
+      "target": "docs/evidence/raw/requirements-sheet_2026-10-06/_collection-manifest.json",
+      "severity": "error",
+      "message": "가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다.",
+      "source": ""
+    },
+    {
+      "code": "SOURCE_CHANGED",
+      "target": "docs/evidence/raw/wbs_2026-10-12/_collection-manifest.json",
+      "severity": "error",
+      "message": "가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다.",
+      "source": ""
+    },
+    {
+      "code": "SOURCE_CHANGED",
+      "target": "docs/evidence/spec-v1.2-gap.md",
+      "severity": "error",
+      "message": "가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다.",
+      "source": ""
+    },
+    {
+      "code": "SOURCE_CHANGED",
+      "target": "docs/screen-plan/captures/slide-index.json",
+      "severity": "error",
+      "message": "가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다.",
+      "source": ""
+    },
+    {
       "code": "SPEC_NOT_IN_INDEX",
       "target": "FS050-01",
       "severity": "warning",
@@ -1740,7 +1775,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getCompanyRelation",
       "severity": "difference",
-      "message": "목표만 135 · BFF만 43 · 형식/필수/권한 변경 6",
+      "message": "목표만 182 · BFF만 43 · 형식/필수/권한 변경 6",
       "source": ""
     },
     {
@@ -2641,6 +2676,7 @@
     }
   ],
   "counts": {
+    "SOURCE_CHANGED": 5,
     "SPEC_NOT_IN_INDEX": 5,
     "MULTIPLE_SPEC_DEFINITIONS": 1,
     "WBS_COVER_BODY_CONFLICT": 2,
@@ -2665,6 +2701,7 @@
     "PROTOTYPE_ONLY_API": 3
   },
   "severityCounts": {
+    "error": 5,
     "warning": 205,
     "difference": 172
   },
@@ -2676,13 +2713,13 @@
       "기능→WBS→구현 상태": 500,
       "API 목록": 88,
       "오류 코드": 28,
-      "경고": 377,
+      "경고": 382,
       "원문 WBS": 173,
       "원문 제안·유효 기준": 8,
       "범위 예외·상세 권한": 34,
       "수용 기준": 121
     },
-    "cells": 48298
+    "cells": 48323
   },
   "acceptanceCoverage": {
     "status": "passed",
@@ -2735,7 +2772,7 @@
     "기능→WBS→구현 상태": 500,
     "API 목록": 88,
     "오류 코드": 28,
-    "경고": 377,
+    "경고": 382,
     "원문 WBS": 173,
     "원문 제안·유효 기준": 8,
     "범위 예외·상세 권한": 34,

@@ -84,6 +84,149 @@
     "response:200:application/json.source.logoUrl<anyOf:1>": {
       "type": "null"
     },
+    "response:200:application/json.structuralDetails": {
+      "type": "object"
+    },
+    "response:200:application/json.structuralDetails.paths": {
+      "type": "array"
+    },
+    "response:200:application/json.structuralDetails.paths:required": true,
+    "response:200:application/json.structuralDetails.paths[]": {
+      "type": "object"
+    },
+    "response:200:application/json.structuralDetails.paths[].companies": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 3
+    },
+    "response:200:application/json.structuralDetails.paths[].companies:required": true,
+    "response:200:application/json.structuralDetails.paths[].companies[]": {
+      "type": "object"
+    },
+    "response:200:application/json.structuralDetails.paths[].companies[].id": {
+      "type": "string"
+    },
+    "response:200:application/json.structuralDetails.paths[].companies[].id:required": true,
+    "response:200:application/json.structuralDetails.paths[].companies[].label": {
+      "type": "string"
+    },
+    "response:200:application/json.structuralDetails.paths[].companies[].label:required": true,
+    "response:200:application/json.structuralDetails.paths[].links": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2
+    },
+    "response:200:application/json.structuralDetails.paths[].links:required": true,
+    "response:200:application/json.structuralDetails.paths[].links[]": {
+      "type": "object"
+    },
+    "response:200:application/json.structuralDetails.paths[].links[].basisId": {
+      "type": "string"
+    },
+    "response:200:application/json.structuralDetails.paths[].links[].basisId:required": true,
+    "response:200:application/json.structuralDetails.paths[].links[].businessScope": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 500
+    },
+    "response:200:application/json.structuralDetails.paths[].links[].businessScope:required": true,
+    "response:200:application/json.structuralDetails.paths[].links[].countries": {
+      "type": "array"
+    },
+    "response:200:application/json.structuralDetails.paths[].links[].countries:required": true,
+    "response:200:application/json.structuralDetails.paths[].links[].countries[]": {
+      "type": "string"
+    },
+    "response:200:application/json.structuralDetails.paths[].links[].customerCompanyId": {
+      "type": "string"
+    },
+    "response:200:application/json.structuralDetails.paths[].links[].customerCompanyId:required": true,
+    "response:200:application/json.structuralDetails.paths[].links[].evidenceIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "response:200:application/json.structuralDetails.paths[].links[].evidenceIds:required": true,
+    "response:200:application/json.structuralDetails.paths[].links[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.structuralDetails.paths[].links[].productScope": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 500
+    },
+    "response:200:application/json.structuralDetails.paths[].links[].productScope:required": true,
+    "response:200:application/json.structuralDetails.paths[].links[].relationType": {
+      "type": "string",
+      "enum": [
+        "SUPPLIES"
+      ]
+    },
+    "response:200:application/json.structuralDetails.paths[].links[].relationType:required": true,
+    "response:200:application/json.structuralDetails.paths[].links[].supplierCompanyId": {
+      "type": "string"
+    },
+    "response:200:application/json.structuralDetails.paths[].links[].supplierCompanyId:required": true,
+    "response:200:application/json.structuralDetails.paths[].links[].validFrom": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.structuralDetails.paths[].links[].validFrom:required": true,
+    "response:200:application/json.structuralDetails.paths[].links[].validUntil": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.structuralDetails.paths[].links[].validUntil:required": true,
+    "response:200:application/json.structuralDetails.paths[].links[].validity": {
+      "type": "string",
+      "enum": [
+        "scheduled",
+        "active",
+        "ended",
+        "unknown"
+      ]
+    },
+    "response:200:application/json.structuralDetails.paths[].links[].validity:required": true,
+    "response:200:application/json.structuralDetails.paths[].links[].verifiedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.structuralDetails.paths[].links[].verifiedAt:required": true,
+    "response:200:application/json.structuralDetails.paths[].relationId": {
+      "type": "string"
+    },
+    "response:200:application/json.structuralDetails.paths[].relationId:required": true,
+    "response:200:application/json.structuralDetails.reason": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "legacy_data",
+        "not_recorded",
+        "details_not_available",
+        null
+      ]
+    },
+    "response:200:application/json.structuralDetails.reason:required": true,
+    "response:200:application/json.structuralDetails.status": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable",
+        "not_applicable"
+      ]
+    },
+    "response:200:application/json.structuralDetails.status:required": true,
+    "response:200:application/json.structuralDetails:required": false,
     "response:200:application/json.target.brandColor:required": true,
     "response:200:application/json.target.brandColor<anyOf:0>": {
       "type": "string"

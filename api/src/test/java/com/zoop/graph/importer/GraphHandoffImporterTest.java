@@ -466,6 +466,77 @@ class GraphHandoffImporterTest {
     }
 
     @Test
+    void importedSupplyScopeReachesRelationHttpOnlyWhileItsBasisIsReadable() throws Exception {
+        assertTrue(importer.run(built.request()).succeeded());
+        String versionId = built.versionId();
+        ArtifactRow stored = registry.findArtifact("artifact-" + versionId).orElseThrow();
+        var version = new com.zoop.graph.version.GraphVersionRecord(versionId, 3, "snapshot", stored.id(),
+                stored.storageUri(), stored.sha256(), true);
+        var versions = org.mockito.Mockito.mock(com.zoop.graph.version.GraphVersionRepository.class);
+        org.mockito.Mockito.when(versions.find(versionId)).thenReturn(java.util.Optional.of(version));
+        org.mockito.Mockito.when(versions.everActivated(versionId)).thenReturn(true);
+        Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+        var publicReader = new com.zoop.graph.read.PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(versions, clock),
+                new com.zoop.graph.snapshot.ArtifactGraphSnapshotStore(store, registry, null),
+                ignoredVersion -> com.zoop.graph.read.DisclosureExclusions.NONE);
+        var evidenceRows = org.mockito.Mockito.mock(com.zoop.document.evidence.repository.EvidenceReadRepository.class);
+        for (EvidenceRow row : graph.evidenceRows().values()) {
+            org.mockito.Mockito.when(evidenceRows.findEvidence(row.id())).thenReturn(java.util.Optional.of(
+                    new com.zoop.document.evidence.repository.EvidenceView(row.id(), row.articleId(), row.articleVersion(),
+                            row.textArtifactId(), row.quote(), row.startOffset(), row.endOffset(), "body", true, row.verificationArtifactId())));
+        }
+        Path sourceFile = temp.toRealPath().resolve("relation-read-sources.json");
+        String sources = """
+                {"schemaVersion":"zoop-ingestion-s2-1","revision":"relation-read-1","sources":[{
+                  "sourceId":"synthetic-source","adapter":"authored-files","inputRoot":"/synthetic",
+                  "allowedHosts":["example.invalid"],"scopes":[{"scopeId":"body","selection":"authored fixture",
+                    "initialCursor":null,"articleXPath":null,"timestampLimitations":["authored fixture"]}],
+                  "grant":{"grantId":"operator-grant","revision":"rights-1","sourceId":"synthetic-source",
+                    "enabled":true,"rights":"known","allowedOperations":["read","store","quote-display"],
+                    "recipients":[],"purposes":[],"evidence":["authored synthetic fixture"],"expiresAt":null}}]}
+                """;
+        Files.writeString(sourceFile, sources);
+        var evidenceService = new com.zoop.document.evidence.service.EvidenceService(evidenceRows, registry, null,
+                new com.zoop.document.evidence.service.DocumentReadSources(sourceFile),
+                new com.zoop.graph.read.GraphEvidenceSnapshotReader(publicReader),
+                new com.zoop.document.evidence.service.EvidenceArtifactReader(store), clock, transaction);
+        var pinned = publicReader.read(null, versionId, null);
+        // Resolve the display ID using its stable public formula, not the producer's full source relation ID.
+        String edgeId = "edge-" + sha256(("STRUCTURALLY_RELATED_TO|" + ISSUE + "|" + COMPANY_B).getBytes(StandardCharsets.UTF_8)).substring(0, 16);
+        var service = new com.zoop.graph.read.GraphRelationService(publicReader,
+                org.mockito.Mockito.mock(org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate.class),
+                new com.zoop.graph.read.GraphStructuralDetailReader(evidenceService));
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
+                new com.zoop.graph.read.GraphRelationController(service))
+                .setControllerAdvice(new com.zoop.common.exception.GlobalExceptionHandler())
+                .addFilters(new com.zoop.common.request.RequestIdFilter()).build();
+        var request = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/graph/edges/" + edgeId)
+                .param("graphVersion", versionId);
+        var response = mvc.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.status").value("available"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.metadata.partial").value(false))
+                .andReturn();
+        JsonNode body = HandoffFixtures.parse(response.getResponse().getContentAsByteArray());
+        JsonNode sourceRelation = built.bundle().get("relations").values().stream()
+                .filter(r -> r.get("type").stringValue().equals("STRUCTURALLY_RELATED_TO")).findFirst().orElseThrow();
+        JsonNode link = body.get("structuralDetails").get("paths").get(0).get("links").get(0);
+        assertEquals(sourceRelation.get("basis").get(0).get("businessScope"), link.get("businessScope"));
+        assertEquals(sourceRelation.get("structuralPath").get("links").get(0).get("supplierCompanyId"), link.get("supplierCompanyId"));
+        assertEquals(sourceRelation.get("basis").get(0).get("evidenceIds"), link.get("evidenceIds"));
+        // A source grant is checked now, not only when the bundle was imported.
+        Files.writeString(sourceFile, sources.replace("\"enabled\":true", "\"enabled\":false"));
+        mvc.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.status").value("unavailable"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.paths").isEmpty())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.metadata.partial").value(true));
+        Files.writeString(sourceFile, sources);
+        mvc.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.status").value("available"));
+        Files.writeString(receiptFile(versionId), "{}");
+        mvc.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isServiceUnavailable());
+    }
+
+    @Test
     void anAvailableSummaryIsRetainedExactlyInTheReceiptAndNeverReachesTheSnapshotOrTheResult() throws Exception {
         Built summarized = HandoffFixtures.withSummary(built, HandoffFixtures::availableSummary);
         handoff.envelope = summarized.envelopeBytes();

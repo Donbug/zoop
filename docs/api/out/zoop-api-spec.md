@@ -4486,6 +4486,62 @@ allow는 HOLD 대상의 운영자 최종 승인(approved)이며 재검증이나 
 | quote | 필수 | string |  |
 | quoteVerified | 필수 | boolean / null |  |
 
+<a id="schema-structuraldetails"></a>
+
+### StructuralDetails
+
+FS023 공급 관계 상세. 구서버에는 필드가 없을 수 있다. available일 때만 완전한 paths를 제공하며 일부 경로를 잘라 공개하지 않는다. unavailable은 관계 없음이 아니다. 비공개 pathCompanies는 공개하지 않는다. unavailable이면 metadata.partial과 STRUCTURAL_DETAIL_UNAVAILABLE 실패 항목을 제공한다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {available, unavailable, not_applicable} |  |
+| reason | 필수 | string, null {legacy_data, not_recorded, details_not_available, None} |  |
+| paths | 필수 | [StructuralRelationPath](#schema-structuralrelationpath)[] |  |
+
+<a id="schema-structuralrelationpath"></a>
+
+### StructuralRelationPath
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| relationId | 필수 | string | 표시 간선 뒤 원본 공개 relation ID. 경로를 합치지 않고 relationId 순으로 반환한다. |
+| companies | 필수 | [StructuralCompany](#schema-structuralcompany)[] | 운영자가 매핑한 P→…→C 순서이며 공급 방향이 아니다. 모두 현재 공개된 기업이다. |
+| links | 필수 | [StructuralSupplyLink](#schema-structuralsupplylink)[] | basis 순서. 인과·가격 방향·독립 원천 증명을 뜻하지 않는다. |
+
+<a id="schema-structuralcompany"></a>
+
+### StructuralCompany
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| label | 필수 | string |  |
+
+<a id="schema-structuralsupplylink"></a>
+
+### StructuralSupplyLink
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| basisId | 필수 | string | receipt relationKey, 기존 basis.edgeId에 대응. |
+| relationType | 필수 | string {SUPPLIES} |  |
+| supplierCompanyId | 필수 | string |  |
+| customerCompanyId | 필수 | string |  |
+| businessScope | 필수 | string, null | S3 원문 텍스트. null은 미상이며 전체 사업이 아니다. |
+| productScope | 필수 | string, null | S3 원문 텍스트. 제품 엔티티 ID가 아니다. |
+| validFrom | 필수 | string, null | 효력 시작일 YYYY-MM-DD. null은 미상. |
+| validUntil | 필수 | string, null | 마지막 유효일 YYYY-MM-DD, 당일 포함. null은 영구 유효가 아니다. |
+| validity | 필수 | string {scheduled, active, ended, unknown} | metadata.asOf의 Asia/Seoul 날짜 기준, BasisOut.validity와 동일. |
+| verifiedAt | 필수 | string (date-time) | 관계를 eligible하게 만든 판정 시각. 기사 발행 시각과 구분한다. |
+| countries | 필수 | string[] |  |
+| evidenceIds | 필수 | string[] (uniqueItems) | 이 basis에 속하며 현재 읽을 수 있는 근거. EdgeDetail.evidenceIds에 합치지 않는다. |
+
 <a id="schema-edgedetail"></a>
 
 ### EdgeDetail
@@ -4494,6 +4550,7 @@ allow는 HOLD 대상의 운영자 최종 승인(approved)이며 재검증이나 
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| structuralDetails | 선택 | [StructuralDetails](#schema-structuraldetails) |  |
 | id | 필수 | string |  |
 | relationType | 필수 | string {INVOLVES, STRUCTURALLY_RELATED_TO, FOLLOWS, SHARES_ISSUE} |  |
 | derived | 필수 | boolean |  |
