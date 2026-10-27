@@ -2,13 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   cancelQuestionJob,
   createConversation,
+  deleteConversation,
   getConversation,
   getCurrentConversation,
+  listConversations,
   retryQuestionJob,
   submitQuestion,
 } from '@/apis/chat/chat';
 import type { ChatJob } from '@/types/ai';
-import { createFakeServer, json } from '../support/fakeServer';
+import { createFakeServer, json, noContent } from '../support/fakeServer';
 
 // D-AI-01 · D-AI-02 — 경로의 ID와 다른 성공 응답이 현재 대화 상태를 오염시키지 않아야 한다.
 
@@ -115,6 +117,33 @@ describe('chat API response identity', () => {
 
     await expect(request(JOB_ID, 'idem-key')).rejects.toThrow(
       '요청한 질문 작업과 응답이 일치하지 않습니다.',
+    );
+  });
+});
+
+describe('D-AI-02 · conversation history API', () => {
+  it('passes the cursor through and deletes with the member CSRF token', async () => {
+    const server = createFakeServer();
+    server.on('GET', '/api/v1/chat/sessions', () =>
+      json({ items: [], nextCursor: null, deleteEnabled: false }),
+    );
+    server.on('DELETE', '/api/v1/chat/sessions/:id', () => noContent());
+
+    expect(await listConversations()).toEqual({
+      items: [],
+      nextCursor: null,
+      deleteEnabled: false,
+    });
+    await listConversations('a b.c');
+    expect(
+      server
+        .calls('GET', '/api/v1/chat/sessions')
+        .map((call) => call.query.get('cursor')),
+    ).toEqual([null, 'a b.c']);
+
+    await deleteConversation(SESSION_ID);
+    expect(server.calls('DELETE', '/api/v1/chat/sessions/:id')[0].path).toBe(
+      '/api/v1/chat/sessions/conv-0001',
     );
   });
 });

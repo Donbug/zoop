@@ -83,7 +83,7 @@ flowchart LR
 1. 새 Flyway migration으로 `chat_sessions`, `chat_jobs`, `chat_tool_calls` 및 부분 UNIQUE·CHECK·인덱스를 만든다.
 2. Java에 chat controller/service/repository와 멱등성·소유권·대화당 활성 job 하나 제약을 구현한다. `resolves`가 있으면 원 작업의 같은 대화·clarification·choice 존재를 같은 트랜잭션에서 검사하고 원 고정 문맥을 복사한다. 확인 질문 사슬 깊이(`clarification_depth`, 원 작업 + 1, 최대 2)를 함께 고정한다.
 3. `queued → running → completed|failed|cancelled`, lease/owner token(lease = 시작 시각 + 실행 기한 + 여유), 늦은 완료 차단, lease 만료 회수(모델 요청을 보낸 실행은 `response_unknown`·retry 없음, 보내기 전이면 `deadline_guard`·rerun 가능), recovery artifact와 `save_only`, 작업당 실행 3회 상한(`runs` ≤ 3, 이후 `retry=null`, 모델을 호출하지 않는 `save_only`는 횟수에서 제외)을 구현한다.
-4. `getCurrentConversation`은 최신 저장 대화만 복원하고 모델을 호출하지 않게 한다.
+4. `getCurrentConversation`은 최신 저장 대화만 복원하고 모델을 호출하지 않게 한다. 대화 목록(`listConversations`)과 대화 삭제(`deleteConversation`)는 2026-10-27 구현했다. 삭제는 즉시 실제 삭제이고, 승인된 처리방침·약관이 개별 채팅 삭제 미제공이라 개정 시행 전까지 `zoop.chat.delete-enabled=false`로 꺼 둔다([개정 초안](../legal/drafts/revision-chat-deletion.md)). 같은 변경에서 모델 실행 원장이 대화·회원 삭제를 막던 FK를 고쳤다(`V20261027120000`).
 
 완료 조건: 동시 접수 한 건만 성공, 다른 회원 접근 차단, 같은 jobId 같은 본문 재전송은 같은 작업 반환, 다른 본문은 409, save_only 모델 호출 0회, 깊이 2 작업의 clarification 저장 0건.
 

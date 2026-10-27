@@ -1,5 +1,6 @@
 import type { EventContext } from '@/types/map/event';
 import { useEffect, useState } from 'react';
+import { ApiError } from '@/apis/auth/ApiService';
 import {
   getCompanyIssueImpact,
   getTutorialImpact,
@@ -28,14 +29,33 @@ export function useImpactPath(
     data: Impact | null;
     loading: boolean;
     error: string | null;
-  }>({ key: '', data: null, loading: false, error: null });
+    errorCode: string | null;
+    errorStatus: number | null;
+    retryable: boolean;
+  }>({
+    key: '',
+    data: null,
+    loading: false,
+    error: null,
+    errorCode: null,
+    errorStatus: null,
+    retryable: false,
+  });
 
   useEffect(() => {
     if (!companyId || !issueId) return;
     let active = true;
     void Promise.resolve().then(async () => {
       if (!active) return;
-      setState({ key, data: null, loading: true, error: null });
+      setState({
+        key,
+        data: null,
+        loading: true,
+        error: null,
+        errorCode: null,
+        errorStatus: null,
+        retryable: false,
+      });
       try {
         const snapshot = { round, asOf, graphVersion };
         const data =
@@ -47,9 +67,19 @@ export function useImpactPath(
                 snapshot,
               )
             : await getCompanyIssueImpact(companyId, issueId, snapshot);
-        if (active) setState({ key, data, loading: false, error: null });
-      } catch (error) {
         if (active)
+          setState({
+            key,
+            data,
+            loading: false,
+            error: null,
+            errorCode: null,
+            errorStatus: null,
+            retryable: false,
+          });
+      } catch (error) {
+        if (active) {
+          const apiError = error instanceof ApiError ? error : null;
           setState({
             key,
             data: null,
@@ -58,7 +88,14 @@ export function useImpactPath(
               error instanceof Error
                 ? error.message
                 : '영향 경로를 불러오지 못했습니다.',
+            errorCode: apiError?.code ?? null,
+            errorStatus: apiError?.status ?? null,
+            retryable: apiError
+              ? apiError.status === 503 ||
+                (apiError.retryable ?? apiError.status >= 500)
+              : true,
           });
+        }
       }
     });
     return () => {
@@ -78,7 +115,15 @@ export function useImpactPath(
   const current =
     state.key === key
       ? state
-      : { key, data: null, loading: Boolean(key), error: null };
+      : {
+          key,
+          data: null,
+          loading: Boolean(key),
+          error: null,
+          errorCode: null,
+          errorStatus: null,
+          retryable: false,
+        };
   return {
     ...current,
     retry: () => setAttempt((value) => value + 1),

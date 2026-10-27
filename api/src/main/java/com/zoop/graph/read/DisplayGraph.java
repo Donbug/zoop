@@ -52,6 +52,11 @@ public final class DisplayGraph {
         this.snapshot = snapshot;
     }
 
+    /** The snapshot this graph shows: after the asOf filter and the current disclosure exclusions. */
+    public PublicGraphSnapshot snapshot() {
+        return snapshot;
+    }
+
     public static DisplayGraph of(PublicGraphSnapshot snapshot) {
         DisplayGraph g = new DisplayGraph(snapshot);
         snapshot.issues().forEach(i -> g.issues.put(i.issueId(), i));
