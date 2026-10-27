@@ -297,6 +297,30 @@ bundle `-7` 스테이징 뒤, 공개 제외 저장소가 연결된 기본 설정
 
 변경 하나는 공통 publication lock 아래 한 트랜잭션이며 `revision`은 MAX+1입니다. 공개 조회와 활성화 사전 검사는 잠금 없이 그 버전의 현재 제외를 한 문장으로 읽어 이슈·관계·근거에 적용하며, 저장소를 읽지 못하면 빈 제외로 대신하지 않고 503 `SOURCE_UNAVAILABLE`입니다. 기사 대상은 기록만 하며, 기업 문서 목록·S1·브리핑·채팅·캐시·Neo4j의 제외 반영은 이 범위가 아닙니다.
 
+### 공개 제외 왕복의 별도 합성 smoke
+
+설치된 exposure CLI의 실제 보고서가 앱의 운영자 명령과 공개 HTTP 조회까지 이어지는 경로는 다음 명령으로 검사합니다. 위 [관리자 HTTP 활성화 smoke](#관리자-http-활성화의-별도-합성-smoke)와 같은 전제인 JDK 21 이상, 현재 소스로 미리 빌드한 API boot jar, 설치된 pipeline, 로컬 OrbStack과 캐시된 `postgres:16.13-alpine` 이미지가 필요합니다. pipeline Python과 `zoop-ai-handoff`·`zoop-ai-ingest`·`zoop-ai-handoff-exposure`의 설치 코드가 현재 checkout의 Python 소스와 다르면 거절합니다. 명령 자체는 빌드·설치·이미지 pull을 하지 않으며 기존 DB를 받지 않습니다.
+
+```sh
+ai/pipeline/.venv/bin/python api/scripts/graph_handoff_exclusion_smoke.py \
+  --jar api/build/libs/zoop-api-0.0.1-SNAPSHOT.jar \
+  --result /tmp/zoop-graph-exclusion-result.json
+```
+
+`--result`는 매번 새 파일로 지정합니다. 기존 합성 world builder와 설치된 CLI로 같은 내용의 handoff 두 개를 동결하고, Spring 문서·handoff import로 비활성 버전을 등록합니다. 합성 관리자 세션의 실제 CSRF·Origin 검사를 거쳐 두 버전을 HTTP로 활성화한 뒤 다음을 검사합니다. SQL은 카탈로그·인증 fixture를 준비하고 상태를 읽는 용도로만 사용하며, 제외·해제·활성화 행을 삽입하지 않습니다.
+
+- 같은 버전의 graph·event·정확한 evidence span이 공개되었다가 실제 source-change 보고서를 운영자 runner에 넣으면 숨겨지는지 확인합니다. 선택하지 않은 다른 공개 버전의 같은 ID는 계속 읽을 수 있어야 합니다.
+- 두 버전을 선택한 진짜 보고서에서 두 번째 버전의 manifest·bundle·content pin을 하나씩 바꾼 **음성 입력**은 `receipt_mismatch`로 전체 거절되어야 합니다. revision·대상·명령 기록이 모두 그대로인지 대조하며, 이 변조 입력을 생산자 성공 증거로 세지 않습니다.
+- 동일 명령 재실행, 진짜 작은 문서 보고서, 수집 원장에 있지만 어떤 S2 입력에도 묶이지 않은 별도 합성 문서의 **진짜 빈 보고서**가 기존 제외를 해제하지 않는지 확인합니다. 빈 보고서를 직접 만들거나 생산자 출력을 줄여서 성공으로 간주하지 않습니다.
+- 관측한 revision과 명시적인 typed target 목록을 담은 `lift`만 해당 버전의 범위를 복구해야 합니다. 새 명령으로 다시 제외한 뒤 과거에 성공한 `lift`를 재실행하면 과거 결과만 반환하고 새 제외는 유지되어야 합니다. 같은 과거 revision으로 새 해제 명령을 보내면 `revision_stale`이어야 합니다.
+
+이 시험은 source-change를 가정한 합성 검토입니다. source registry의 권리는 처음부터 끝까지 바꾸지 않으며, 제외 해제가 실제로 철회된 권리를 복구하거나 재공개를 승인한다는 뜻이 아닙니다. 실제 원문 수집·모델 호출·내부 exposure HTTP 전송·운영자 계정 발급, 기사 목록·S1·브리핑·채팅·캐시·Neo4j의 제외는 증명하지 않습니다.
+
+마지막 stdout JSON과 결과 파일에는 실제 운영자 결과 문서, 생산자의 원본 보고서와 hash, HTTP 상태·응답 hash, 의미 검사의 pass/fail, 호출 0, 최종 revision, HEAD·실행 스크립트·설치 package 소스·jar·PostgreSQL 이미지 pin, 소유 자원 이름과 정리 결과가 남습니다. jar hash는 실행한 바이트의 식별자이며 checkout에서 빌드했다는 별도 attestation은 아닙니다. 실패하면 종료 코드는 1이고 실패 단계가 기록됩니다. 실행은 활성화 smoke의 allowlist 환경과 정리 경로를 재사용합니다. 상속된 DB·provider·Spring 설정은 버리고, AI 클라이언트는 끈 채 새 bridge·tmpfs PostgreSQL·loopback JVM·합성 원장·artifact root만 사용합니다. 종료 시 자기가 만든 프로세스·컨테이너·network·임시 디렉터리만 정리하며, 외부의 새 결과 파일만 남깁니다.
+
+강제 종료로 정리가 실행되지 않았다면 `docker ps -a --filter label=com.zoop.graph-exclusion-smoke=1`과 `docker network ls --filter label=com.zoop.graph-exclusion-smoke=1`로 후보를 확인한 뒤, 해당 실행의 JSON `resources`에 기록된 정확한 이름만 대상으로 `docker rm -f -v <container>`와 `docker network rm <network>`를 실행합니다. 다른 실행이나 개발 DB를 일괄 삭제하지 않습니다.
+
+
 ## 기본 기업 카탈로그 적재
 
 `src/main/resources/company/demo-companies.json`은 팀이 확정한 24개 기업 목록입니다. `prototype/` 파일이나 DB를 실행 중에 읽지 않습니다. 종목 코드가 없는 OpenAI·Anthropic은 `ORG:OPENAI`, `ORG:ANTHROPIC` ID를 사용하며 `ticker`, `exchange_code`, `market`은 비워 둡니다. `brand_source`는 색상·로고 출처가 확인된 경우에만 넣고, 단순 홈페이지 주소는 `null`로 둡니다. 향후 GraphDB에서도 같은 회사 ID를 써야 합니다.
