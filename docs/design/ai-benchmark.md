@@ -221,7 +221,7 @@ S3 관계 생산 계약(`relation_contracts.MAX_PATH=2`)은 **관계 후보로 �
 - **KLUE RE:** HF train의 첫 20행이다. 고유 행 20개와 원래 inclusive 좌표의 entity span 40개가 일치했다. 관측한 HF metadata revision은 `349481ec73fff722f88e0453ca05c77a447d967c`이나 row 응답과 이 revision의 결합은 **미검증**이다. 로컬 해시는 저장 표본을 고정할 뿐 공식 배포본과의 동일성을 증명하지 않는다.
 - **TAT-QA:** 공식 dev 파일의 첫 5개 context, 고유 질문 30개다. reader가 생략한 마지막 LF 하나를 복원한 원본은 1,637,431바이트이며 Git blob `48075c812af3fe6698b1d5cb50d9dbf358d52784`와 일치했다.
 - **수집 무결성 확인:** 네 파일의 저장 해시·크기, 고유 ID, KLUE 좌표를 확인했다. 입력과 gold를 합치면 선택한 원래 행/질문과 정확히 같고, 시스템에 보이는 입력의 gold annotation 키는 0개였다. 이는 수집·분리 확인이지 기존 scorer로 채점한 결과가 아니다.
-- **사용 한계:** 원자료 순서로 고른 표본이며 무작위·균형·대표 표본이 아니다. 이미 열람한 개발용 자료이므로 held-out test로 승격하지 않는다. `materials-*`는 자료 변환만 지원한다. 기존 `score`·`verify-score`·`summary-verify-score`는 원자료와 `zoop-eval-material-{inputs,gold,validation}-1`을 받지 않는다. 외부 자료 전용 run/채점 계약과 B1–B4 실행 연결은 별도 작업이다.
+- **사용 한계:** 원자료 순서로 고른 표본이며 무작위·균형·대표 표본이 아니다. 이미 열람한 개발용 자료이므로 held-out test로 승격하지 않는다. material adapter와 별도로 TAT-QA context 내부의 BM25 문단 검색·support 진단 명령을 제공한다. 이는 B1의 검색 단계 준비일 뿐 전체 B1–B4 연결이나 생성 품질 측정이 아니다. 기존 `score`·`verify-score`·`summary-verify-score`는 원자료·material artifact·새 retrieval run을 받지 않는다.
 
 ### Material adapter의 계약과 확인 범위
 
@@ -244,8 +244,38 @@ python3 -B scripts/materials_smoke.py
 - **TAT-QA 입력/정답:** table UID/셀과 paragraph UID/order/text를 context로 유지하고 question UID/order/text가 이를 참조한다. 입력에서 정답·유형·출처·식·scale·support annotation 키를 배제하되 원래 문맥의 단어·숫자는 지우지 않는다. gold는 `answer`, `answer_type`, `answer_from`, `scale`, `derivation`, `req_comparison`, `rel_paragraphs`를 보존하고 paragraph order를 같은 context의 UID로 연결한다. 빈 값·null·알 수 없는 문자열 annotation을 추정하지 않고 table-cell gold도 만들지 않는다. 숫자는 Decimal로 읽고 내보내 정밀도와 음수·원래 단위를 유지한다. 번역·날짜 보충·식 실행·답 추론은 하지 않는다.
 - **Binding과 출처:** `inputsSha256`은 `materials-inputs`의 키 정렬·공백 없는 UTF-8 JSON 전체(마지막 LF 제외)의 digest이며 원본 파일 SHA256과 구분한다. 배열은 원자료 순서를 유지한다. 원저자·라이선스·URL·수집/변경 provenance·파일 해시와 `development-intake` 상태를 유지한다. manifest의 `collectionExecution`은 수집 당시 기록이지 현재 adapter 구현 상태가 아니다. HF row/revision 결합은 여전히 미검증이고 upstream annotation은 Zoop 사람 합의 gold가 아니다. 해시 일치만으로 출판자 진위·법적 이용권·모델 전송 승인이 생기지 않는다.
 
-smoke는 실제 수집 파일과 임시 invalid fixture를 실제 CLI로 처리하고 성공 시 관측된 20행·30문항과 proof scope를 출력한다. gold 부재/접근 금지, canonical binding, 잘못된 label·paragraph·annotation 거부를 다룬다. audit 범위는 Python import 이후 command seam의 파일 접근·쓰기·네트워크·자식 프로세스·애플리케이션 환경 조회다. Python 시작이나 argparse의 locale·화면 크기 조회까지 환경 읽기 0으로 주장하지 않는다. 이는 자료 변환 확인이지 정확도나 모델 품질 결과가 아니다. 사람 합의 한국어 gold, 무모델 어휘 검색·방향/시점 순회 baseline, 외부 자료 run/채점 연결과 승인된 live 측정은 남아 있다.
+material adapter smoke는 실제 수집 파일과 임시 invalid fixture를 실제 CLI로 처리하고 성공 시 관측된 20행·30문항과 proof scope를 출력한다. gold 부재/접근 금지, canonical binding, 잘못된 label·paragraph·annotation 거부를 다룬다. audit 범위는 Python/stdlib 시작 이후 application import와 command seam의 파일 접근·쓰기·네트워크·자식 프로세스·애플리케이션 환경 조회다. Python 시작이나 argparse의 locale·화면 크기 조회까지 환경 읽기 0으로 주장하지 않는다. 이는 자료 변환 확인이지 정확도나 모델 품질 결과가 아니다. 사람 합의 한국어 gold, 방향/시점 순회 baseline, 생성형 외부 자료 run/채점 연결과 승인된 live 측정은 남아 있다.
 
+### B1 준비: 주어진 context 안의 문단 검색
+
+`materials-retrieve [--top-k 5]`와 `materials-retrieval-score RUN.json`은 TAT-QA 입력→BM25 문단 순위→별도 gold support 진단의 읽기 전용 CLI다. 입력은 기존 adapter로 정규화하고, 검색은 manifest와 `tatqa.inputs.json`만 연다. **후보 범위는 질문에 원래 붙어 있는 context의 문단**이며 전체 문서 검색·표 셀 검색·답변 생성은 하지 않는다. 빈 후보에서 답이나 후보를 만들지 않는다.
+
+토큰화는 `str.lower()` 뒤 ASCII `[a-z0-9]+`이며 stemming·stopword 제거는 없다. query token은 중복 제거 후 사전순으로 합산한다. BM25는 `k1=1.2`, `b=0.75`, `IDF=ln(1+(N-df+0.5)/(df+0.5))`로 고정하며 `N`과 `df`는 해당 context의 문단만으로 계산한다. 토큰 길이 `dl`, 빈 문단을 포함한 평균 길이 `avgdl`, 문단 내 빈도 `tf`에 대해 기여도는 `IDF * tf * (k1+1) / (tf+k1*(1-b+b*dl/avgdl))`이다. 등장하지 않은 토큰의 기여도는 0이므로 모든 문단이 비어 있어도 나누기를 하지 않는다. 점수 내림차순·동점 UID 오름차순으로 최대 K개를 선택하며 0점 후보도 남긴다. 기본 K는 5이고 양의 정수만 받는다.
+
+`zoop-eval-material-retrieval-run-1`은 finalized 상태, exact normalized input digest, dataset·출처·정규화·알고리즘·설정, 전체 query ID와 context별 candidate ID를 묶는 닫힌 계약이다. 결정적 ranking과 실측 `elapsedNs`는 분리한다. 질문별 시간은 토큰화·로컬 색인·점수·정렬의 단일 실행이며 로딩·검증·직렬화·digest는 제외한다. warmup·cache·색인 재사용은 없고 이 시간을 모델 지연이나 운영 성능으로 해석하지 않는다. run은 모든 질문이 끝난 뒤에만 반환하며 명령 자체는 파일을 쓰지 않는다. 측정 metadata만으로 실행 진위가 증명되는 것은 아니다.
+
+producer와 scorer의 공통 run 크기 상한은 **8 MiB(8,388,608바이트)**다. producer는 성공 출력 전에 canonical UTF-8 JSON과 마지막 LF의 정확한 합계 바이트를 확인하고, scorer는 공백·LF를 포함한 입력 파일 전체에 같은 상한을 적용한다. 초과하면 `materials_retrieval_run_size`로 거부하며 성공한 finalized run을 내지 않는다. K에 임의 상한을 두거나 특정 dataset만 예외로 처리하지 않는다.
+
+scorer는 run과 입력 binding·ID·순위를 확인한 뒤에만 gold를 연다. 중복/외부 query·candidate ID, 다른 context의 후보, 추가 필드와 malformed record는 전체 거부한다. `ok` 순위는 동결 알고리즘으로 재계산해 확인한다. `zoop-eval-material-retrieval-score-1`은 다음 **custom paragraph-support 진단**을 낸다.
+
+- **Recall@K:** 회수한 paragraph support 수 / annotation의 전체 paragraph support 수.
+- **MRR@K:** 첫 support의 순위 역수. K 안에서 찾지 못하면 0.
+- **Exact support coverage@K:** annotation의 모든 paragraph support를 회수하면 1, 아니면 0. 추가 후보를 허용하므로 두 집합의 완전 일치 지표는 아니다.
+- 세 지표는 채점 가능한 질문의 macro 평균이며 numerator·denominator·value를 보존한다. table-only 또는 paragraph gold 부재는 이유와 null로 표시한다. 채점 가능한 질문이 없으면 분모는 0, 값은 null이다.
+- 전체 질문별 결과와 전체·기록·성공·오류·누락·채점 가능/불가 수를 낸다. record 누락과 명시적 오류는 채점 가능한 질문의 분모에서 빼지 않고 0점으로 처리한다. 실패 record의 계약은 `status=error`, 빈 ranking, `error=retrieval-error`다. producer는 예외를 이 record로 숨기지 않는다.
+
+이는 공식 TAT-QA answer EM/F1, held-out 평가, 한국어 금융 품질, QA·그래프·경로·모델 품질의 증거가 아니다. 원출처·CC BY 4.0·개발용 순서 표본·Zoop 미합의 annotation 한계를 유지한다. 명령과 실행 방법은 [evaluation README](../../ai/evaluation/README.md#tat-qa-문단-검색과-별도-채점)에 있다. `scripts/materials_retrieval_smoke.py`는 gold를 제거한 상태에서 저장 dev 30문항을 실제 CLI로 검색하고, producer 종료와 run 저장 후 gold를 복원하여 채점하도록 구성했다. audit는 검색의 gold 접근과 양쪽 명령의 네트워크·모델 경로·프로세스·애플리케이션 환경 조회·파일 변경을 차단한다. fixture/run 저장은 harness의 임시 디렉터리에서만 수행한다. 여기에는 실행 결과 수치나 authored 기대값을 실측으로 제시하지 않는다.
+
+
+### Native corpus의 로컬 사람 검토 준비
+
+`zoop_ai_pipeline.corpus_review_cli prepare`는 현재 native export 권한으로 문서 전체를 휴대 패키지에 보존하고, 채널·ISO 발행 주차별 quota와 round-robin으로 유한한 사람 검토 배치를 만든다. 실행 명령과 닫힌 binding/주석 계약은 [pipeline README의 사람 검토 패키지](../../ai/pipeline/README.md#로컬-사람-검토용-휴대-패키지-corpus_review_cli)를 따른다. native 권한 확인은 pipeline이 담당하며 stdlib evaluation의 기존 scorer나 material adapter에 새 의존성을 넣지 않는다.
+
+`inputs.json`에는 불변 문서·선정 reference만 있고 gold는 없다. 별도 `annotations.template.json`은 `unreviewed`와 `null` 판단으로 시작한다. 사람이 패키지 밖에 복사한 주석을 작성하면 `annotations-check`가 입력 digest·case ID·필수 사람 필드·정확한 Unicode 근거 범위만 확인하고 미검토/검토/제외 건수를 보고한다. 미상 판단은 notes에 기록할 수 있으며 미검토를 오답이나 reject로 계산하지 않는다. 작성된 주석도 운영자 주장이지 사람 독립 검수·합의가 확인된 gold는 아니다.
+
+이는 **사람 검토 준비 기능이며 측정된 품질 결과가 아니다.** 전체 자료는 제한된 수집의 산출물이고 검토 배치도 대표 표본·held-out test·dev/test split이 아니다. 정책브리핑 텍스트를 한국어 기업 공시 gold로 바꿔 부르지 않는다. 자동 entity·edge·정답·score·adjudication은 만들지 않으며 기존 `score`·`verify-score`·`summary-verify-score`의 입력 형식도 아니다. 실제 사람 검토·합의와 평가용 run/채점 연결은 별도 작업이다.
+
+생성 당시 native `read`·`store`·`quote-display`와 외부 권리 증거 pin을 확인하지만 모델 전송·업로드·공개 게시 권한을 부여하지 않는다. corpus plan의 알려진 gate 2·3도 버전 문자열만 믿지 않고, 실제 저장 native body·receipt와 `rights.json`의 모든 사실을 현재 parser로 읽기 전용 재검사해야 한다. 과거 plan을 수정하거나 native 획득·복구를 다시 실행하지 않는다. 옮긴 패키지의 `verify`는 원래 원장·환경·네트워크와 mutable annotation 없이 내부 무결성만 검사한다. 이것을 현재 원격 이용 허가나 발행자 진위 검증으로 해석하지 않는다. 실제 본문과 작성된 주석은 Git 밖에 유지한다.
 
 ### 자료 후보 6종과 권리 경계
 
@@ -329,7 +359,7 @@ dev에서 한 번에 한 요인만 바꾸어 선택한 뒤 모든 설정과 실�
 
 1. **자료 intake:** 수집한 개발용 두 자료의 manifest를 사용하고, 한국어 공시는 키·등록 이용 범위·외부 전송 권리를 확인한 뒤 수집한다.
 2. **사람 gold:** 사건 그룹별 split과 실제 근거 경로를 정하고 두 사람의 독립 라벨링·합의를 마친다. 공개 annotation의 복사를 Zoop 한국어 gold 합의로 간주하지 않는다.
-3. **Adapter:** 수집된 KLUE/TAT-QA의 읽기 전용 입력/gold 정규화·ID·좌표·단위 보존은 `materials-*`로 제공한다. 외부 실행 기록과 채점 계약은 별도로 구현해야 하며 material artifact를 기존 `score`에 넣지 않는다. 이 변환을 전체 benchmark 완료로 표시하지 않는다.
+3. **Adapter와 검색 진단:** 수집된 KLUE/TAT-QA의 읽기 전용 입력/gold 정규화·ID·좌표·단위 보존은 material adapter로 제공한다. TAT-QA의 주어진 context 안에서 문단을 검색하는 별도 run/채점 계약도 제공하지만 기존 `score`와 섞지 않는다. 이는 B1 검색 단계 준비이며 전체 문서 검색·답변 생성·공식 QA 채점·전체 benchmark 완료가 아니다.
 4. **오프라인 대조군:** B0 하네스 점검과 무모델 어휘 검색·방향/시점 고정 순회의 기록 경로를 먼저 확인한다. 이는 전체 생성형 B1/B3 품질 평가가 아니다.
 5. **제한된 live 승인:** 대상 자료·전송 권리·모델/버전·endpoint·호출 수·금액 상한을 정해 실행별 승인을 받는다. 기존 설정·키 존재·과거 승인은 새 지출 승인이 아니다.
 6. **동결 실행·보고:** dev 선택을 마친 뒤 승인된 test 캠페인과 계획된 반복만 실행하고, 트랙·언어·실패·비용 출처·표본 한계를 분리해 보고한다. 외부 공개는 별도 승인을 받는다.

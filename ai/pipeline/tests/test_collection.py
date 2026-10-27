@@ -15,10 +15,12 @@ from pydantic import ValidationError
 
 from scripts.collection_smoke import NEWS, PROXY_ENV, ROBOTS, CollectionKit, LocalSite
 from scripts.ingestion_smoke import OfflineFixture, authored_pdf, exact_check, sha
+from scripts.korea_corpus_smoke import config as corpus_config
 from zoop_ai_pipeline.collection import Fetcher, parse_robots
 from zoop_ai_pipeline.collection_contracts import Policy, Request
 from zoop_ai_pipeline.ingestion_contracts import IngestionFailure, canonical
 from zoop_ai_pipeline.ingestion_url import canonical_url
+from zoop_ai_pipeline.korea_corpus import Config as CorpusConfig
 
 UA = "ZoopSyntheticCollector/1.0 (+synthetic-local-test)"
 
@@ -82,6 +84,125 @@ def test_robots_longest_match_product_token_wildcards_and_delay():
 def test_uninterpretable_robots_denies_instead_of_allowing(body):
     with pytest.raises(IngestionFailure, match="robots_malformed"):
         parse_robots(body, UA)
+
+
+@pytest.mark.parametrize("rule", [
+    b"Allow: https://other.invalid/news/a",
+    b"Disallow: https://other.invalid/news/a",
+    b"Crawl-delay: soon",
+], ids=["absolute-allow", "absolute-disallow", "invalid-delay"])
+def test_unrelated_malformed_robots_rules_do_not_block_wildcard_collection(kit, site, rule):
+    body = b"User-agent: OtherBot\n" + rule + b"\nUser-agent: *\nAllow: /\nDisallow:\n"
+    site.route("/robots.txt", body, content_type="text/plain")
+    site.route("/news/a", NEWS)
+    result = kit.collect("robots-unrelated", [kit.target(site.url("/news/a"), "n1")])
+    assert result["state"] == "complete" and codes(result) == {"n1": None}
+    assert [entry["path"] for entry in site.log] == ["/robots.txt", "/news/a"]
+
+
+@pytest.mark.parametrize("agent", [b"Unrelated Search 6.0 Robot", b"Other Bot/2.0", b"OtherBot (crawler)"])
+def test_unrelated_nonstandard_robots_identity_is_isolated(kit, site, agent):
+    body = b"User-agent: *\nAllow: /\nDisallow: /private/\nUser-agent: " + agent + b"\nDisallow: /\nCrawl-delay: soon\n"
+    site.route("/robots.txt", body, content_type="text/plain")
+    site.route("/news/a", NEWS)
+    result = kit.collect("robots-nonstandard", [kit.target(site.url("/news/a"), "n1")])
+    assert result["state"] == "complete" and codes(result) == {"n1": None}
+    assert [entry["path"] for entry in site.log] == ["/robots.txt", "/news/a"]
+
+
+@pytest.mark.parametrize("agent,expected", [
+    (b"ZoopSyntheticCollector/1.0 (crawler)", "robots_malformed"),
+    (b"zoopsyntheticcollector crawler", "robots_malformed"),
+    (b"* (all bots)", "robots_malformed"),
+    (b"ZoopSyntheticCollector/1.0", "robots_denied"),
+    (b"OtherBot/1.0 (crawler)", None),
+    (b"ZoopSyntheticCollectorOther/1.0 (crawler)", None),
+], ids=["own-product-version", "own-product-case-insensitive", "malformed-wildcard", "supported-version", "unrelated", "different-whole-product"])
+def test_malformed_own_product_header_cannot_fall_back_to_wildcard_allow(kit, site, agent, expected):
+    body = b"User-agent: *\nAllow: /\nUser-agent: " + agent + b"\nDisallow: /secret\n"
+    site.route("/robots.txt", body, content_type="text/plain")
+    site.route("/secret", NEWS)
+    result = kit.collect("robots-ambiguous-product", [kit.target(site.url("/secret"), "n1")], expected=2 if expected else 0)
+    assert codes(result) == {"n1": expected}
+    assert result["state"] == ("failed" if expected else "complete")
+    assert [entry["path"] for entry in site.log] == (["/robots.txt"] if expected else ["/robots.txt", "/secret"])
+
+
+@pytest.mark.parametrize("body", [
+    b"User-agent: *\nUser-agent: unrelated bot\nDisallow: /\nUser-agent: OtherBot\nAllow: /\n",
+    b"User-agent: OtherBot\nDisallow: /\nUser-agent: unrelated bot\nDisallow: /\nUser-agent: *\nAllow: /\n",
+    b"User-agent: unrelated bot\nAllow: /\nUser-agent: *\nDisallow: /private/\n",
+], ids=["invalid-after-empty-wildcard", "wildcard-after-invalid", "invalid-before-wildcard"])
+def test_invalid_robots_headers_do_not_leak_rules(body):
+    rules = parse_robots(body, UA)
+    assert rules.permits("https://h.invalid/news/a")
+    if b"Disallow: /private/" in body:
+        assert not rules.permits("https://h.invalid/private/a")
+
+
+def test_selected_malformed_rule_before_invalid_header_still_prevents_body_requests(kit, site):
+    site.route("/robots.txt", b"User-agent: *\nDisallow: not-a-path\nUser-agent: unrelated bot\nAllow: /\n", content_type="text/plain")
+    site.route("/news/a", NEWS)
+    result = kit.collect("robots-selected-before-invalid", [kit.target(site.url("/news/a"), "n1")], expected=2)
+    assert result["state"] == "failed" and codes(result) == {"n1": "robots_malformed"}
+    assert [entry["path"] for entry in site.log] == ["/robots.txt"]
+
+
+@pytest.mark.parametrize("group", [
+    b"User-agent: *\n",
+    b"User-agent: ZoopSyntheticCollector\n",
+    b"User-agent: OtherBot\nUser-agent: ZoopSyntheticCollector\n",
+    b"User-agent: ZoopSyntheticCollector\nAllow: /\nUser-agent: zoopsyntheticcollector\n",
+], ids=["wildcard", "product", "shared-group", "duplicate-group"])
+@pytest.mark.parametrize("rule", [
+    b"Allow: https://other.invalid/news/a",
+    b"Disallow: https://other.invalid/news/a",
+    b"Crawl-delay: soon",
+], ids=["absolute-allow", "absolute-disallow", "invalid-delay"])
+def test_applicable_malformed_robots_rules_prevent_body_requests(kit, site, group, rule):
+    site.route("/robots.txt", group + rule + b"\n", content_type="text/plain")
+    site.route("/news/a", NEWS)
+    result = kit.collect("robots-applicable-malformed", [kit.target(site.url("/news/a"), "n1")], expected=2)
+    assert result["state"] == "failed" and codes(result) == {"n1": "robots_malformed"}
+    assert [entry["path"] for entry in site.log] == ["/robots.txt"]
+
+
+@pytest.mark.parametrize("group", [
+    b"User-agent: OtherBot\nUser-agent: ZoopSyntheticCollector\n",
+    b"User-agent: ZoopSyntheticCollector\nAllow: /\nUser-agent: zoopsyntheticcollector\n",
+], ids=["shared-group", "duplicate-group"])
+def test_applicable_merged_robots_disallow_prevents_body_requests(kit, site, group):
+    site.route("/robots.txt", group + b"Disallow: /news/\nUser-agent: *\nAllow: /\n", content_type="text/plain")
+    site.route("/news/a", NEWS)
+    result = kit.collect("robots-applicable-denied", [kit.target(site.url("/news/a"), "n1")], expected=2)
+    assert result["state"] == "failed" and codes(result) == {"n1": "robots_denied"}
+    assert [entry["path"] for entry in site.log] == ["/robots.txt"]
+
+
+@pytest.mark.parametrize("malformed", [
+    b"User-agent OtherBot\n",
+    b"Disallow: /orphan\n",
+    b"\xff\n",
+], ids=["missing-header-colon", "orphan-rule", "invalid-encoding"])
+def test_malformed_robots_structure_cannot_be_bypassed_by_wildcard_allow(kit, site, malformed):
+    site.route("/robots.txt", malformed + b"User-agent: *\nAllow: /\n", content_type="text/plain")
+    site.route("/news/a", NEWS)
+    result = kit.collect("robots-structure-malformed", [kit.target(site.url("/news/a"), "n1")], expected=2)
+    assert result["state"] == "failed" and codes(result) == {"n1": "robots_malformed"}
+    assert [entry["path"] for entry in site.log] == ["/robots.txt"]
+
+
+def test_selected_product_groups_merge_rules_and_maximum_delay_without_wildcard_rules():
+    body = (b"User-agent: *\nDisallow: https://other.invalid/\nCrawl-delay: soon\n"
+            b"User-agent: ZOOPSYNTHETICCOLLECTOR\nDisallow: /news/\nCrawl-delay: 2.5\n"
+            b"User-agent: zoopsyntheticcollector\nAllow: /news/open\nDisallow: /news/open?private=1$\nCrawl-delay: 1\n"
+            b"User-agent: zoopsyntheticcollector\nDisallow: /news/open\n")
+    rules = parse_robots(body, UA)
+    assert rules.delay == 2.5
+    assert not rules.permits("https://h.invalid/news/closed")
+    assert rules.permits("https://h.invalid/news/open")
+    assert not rules.permits("https://h.invalid/news/open?private=1")
+    assert rules.permits("https://h.invalid/news/open?private=10")
 
 
 @pytest.mark.parametrize("status,body,expected", [(500, b"down", "robots_unavailable"), (200, b"nonsense", "robots_malformed"), (403, b"no", "http_403")])
@@ -296,6 +417,128 @@ def test_immutable_collection_id_replays_without_refetch_and_refuses_changed_inp
     kit.policy["userAgent"] = "AnotherAgent/1.0"
     kit.save_policy()
     assert kit.collect("fixed-id", mixed, expected=2)["error"]["code"] == "collection_input_conflict"
+
+
+def test_contact_url_preserves_legacy_policy_and_request_identity(kit, site):
+    site.route("/news/a", NEWS)
+    targets = [kit.target(site.url("/news/a"), "n1")]
+    # The pre-contact Policy already serialized this float field as 0.0, even when its input was integer 0.
+    legacy_policy = canonical({**kit.policy, "minIntervalSeconds": 0.0})
+    assert canonical(Policy.model_validate_json(legacy_policy).wire()) == legacy_policy
+    assert canonical(Policy.model_validate({**kit.policy, "contactUrl": None}).wire()) == legacy_policy
+    first = kit.collect("legacy-contact-absent", targets)
+    folder = kit.inputs / "collections" / "legacy-contact-absent"
+    original = {str(p.relative_to(folder)): p.read_bytes() for p in folder.rglob("*") if p.is_file()}
+    receipt = _receipts(kit, "legacy-contact-absent")[0]
+    assert receipt["userAgent"] == kit.policy["userAgent"] and receipt["etag"] is None
+    assert "contactUrl" not in receipt and "userAgent" not in first
+    seen = len(site.log)
+    kit.policy["contactUrl"] = None
+    kit.save_policy()
+    replay = kit.collect("legacy-contact-absent", targets)
+    assert replay["replayed"] is True and replay["requestDigest"] == first["requestDigest"]
+    assert "userAgent" not in replay and len(site.log) == seen
+    assert {str(p.relative_to(folder)): p.read_bytes() for p in folder.rglob("*") if p.is_file()} == original
+
+
+def test_contact_url_preserves_nested_corpus_policy_bytes(kit, site, tmp_path):
+    value, _ = corpus_config(tmp_path / "nested-corpus", site)
+    legacy = canonical(value)
+    assert canonical(CorpusConfig.model_validate(value).wire()) == legacy
+    value["policy"]["contactUrl"] = None
+    assert canonical(CorpusConfig.model_validate(value).wire()) == legacy
+    value["policy"]["contactUrl"] = "https://example.org/bot#collector-contact"
+    configured = CorpusConfig.model_validate(value)
+    assert canonical(configured.wire()) == canonical(value)
+    assert configured.policy.effective_user_agent == "ZoopSyntheticCorpus/1.0 (+https://example.org/bot#collector-contact)"
+
+
+def test_contact_url_preserves_effective_header_length_bound(kit):
+    policy = {**kit.policy, "userAgent": "ZoopSyntheticCollector/1.0", "contactUrl": "https://example.org/" + "a" * 200}
+    with pytest.raises(ValidationError):
+        Policy.model_validate(policy)
+
+
+def test_contact_url_is_sent_and_recorded_by_cli(kit, site):
+    site.route("/robots.txt", b"User-agent: *\nAllow: /\n", content_type="text/plain")
+    site.route("/go", b"", status=302, headers={"Location": "/news/a"})
+    site.route("/news/a", NEWS)
+    kit.policy.update(userAgent="ZoopSyntheticCollector/1.0", contactUrl="https://example.org/bot")
+    kit.save_policy()
+    result = kit.collect("contact-enabled", [kit.target(site.url("/go"), "n1")])
+    identity = "ZoopSyntheticCollector/1.0 (+https://example.org/bot)"
+    assert result["state"] == "complete" and result["userAgent"] == identity
+    assert [entry["path"] for entry in site.log] == ["/robots.txt", "/go", "/news/a"]
+    assert all(entry["headers"]["user-agent"] == identity for entry in site.log)
+    assert _receipts(kit, "contact-enabled")[0]["userAgent"] == identity
+    stored = json.loads((kit.inputs / "collections" / "contact-enabled" / "collection.json").read_bytes())
+    assert stored["userAgent"] == identity
+    manifest = Path(result["manifestPath"])
+    ingested = kit.cli("run", kit.request(manifest, "contact-round"), manifest=manifest)
+    assert ingested["state"] == "complete" and ingested["counts"]["textReady"] == 1
+    seen = len(site.log)
+    replay = kit.collect("contact-enabled", [kit.target(site.url("/go"), "n1")])
+    assert replay["replayed"] is True and replay["userAgent"] == identity and len(site.log) == seen
+
+
+def test_contact_url_is_auditable_even_when_no_receipt_is_created(kit, site):
+    site.route("/robots.txt", b"User-agent: *\nDisallow: /\n", content_type="text/plain")
+    kit.policy.update(userAgent="ZoopSyntheticCollector/1.0", contactUrl="https://example.org/bot")
+    kit.save_policy()
+    result = kit.collect("contact-denied", [kit.target(site.url("/news/a"), "n1")], expected=2)
+    assert result["state"] == "failed" and codes(result) == {"n1": "robots_denied"}
+    assert result["userAgent"] == "ZoopSyntheticCollector/1.0 (+https://example.org/bot)"
+    assert [entry["path"] for entry in site.log] == ["/robots.txt"]
+    assert not (kit.inputs / "collections" / "contact-denied" / "receipts").exists()
+
+
+def test_contact_url_change_conflicts_without_refetch(kit, site):
+    site.route("/news/a", NEWS)
+    kit.policy["userAgent"] = "ZoopSyntheticCollector/1.0"
+    kit.save_policy()
+    targets = [kit.target(site.url("/news/a"), "n1")]
+    kit.collect("contact-fixed", targets)
+    seen = len(site.log)
+    kit.policy["contactUrl"] = "https://example.org/bot"
+    kit.save_policy()
+    assert kit.collect("contact-fixed", targets, expected=2)["error"]["code"] == "collection_input_conflict"
+    assert len(site.log) == seen
+    kit.collect("contact-new", targets)
+    seen = len(site.log)
+    kit.policy["contactUrl"] = "https://example.org/another-bot"
+    kit.save_policy()
+    assert kit.collect("contact-new", targets, expected=2)["error"]["code"] == "collection_input_conflict"
+    assert len(site.log) == seen
+
+
+@pytest.mark.parametrize("contact", [
+    "", "http://example.org/bot", "https://operator@example.org/bot", "https://example.org/bot\r\nX-Injected: yes",
+    "https://example.org/bot name", "https://example.org/bot)", "https://example.org/bot(about)", "https://example.org/<bot>",
+    "https://example.org/봇", "https://example.org/😀", "https://example.org/\\bot", "https://127.0.0.1/bot", "https://localhost/bot",
+], ids=["empty", "non-https", "credentials", "header-injection", "space", "comment-close", "comment-open", "html",
+        "unicode", "emoji", "backslash", "private-ip", "localhost"])
+def test_contact_url_validation_rejects_unsafe_identity(kit, site, contact):
+    kit.policy.update(userAgent="ZoopSyntheticCollector/1.0", contactUrl=contact)
+    kit.save_policy()
+    with pytest.raises(ValidationError):
+        Policy.model_validate(kit.policy)
+    result = kit.collect("contact-invalid", [kit.target(site.url("/news/a"), "n1")], expected=2)
+    assert result["error"]["code"] == "input_or_configuration_invalid" and site.log == []
+
+
+@pytest.mark.parametrize("agent", ["Mozilla/5.0 (compatible; OtherBot/1.0)", "OtherBot/1.0 extra", "OtherBot", "OtherBot/1.0\r\nX: yes"])
+def test_contact_url_cannot_override_or_disguise_the_product(kit, agent):
+    with pytest.raises(ValidationError):
+        Policy.model_validate({**kit.policy, "userAgent": agent, "contactUrl": "https://example.org/bot"})
+
+
+def test_contact_url_does_not_change_robots_product_selection(kit, site):
+    site.route("/robots.txt", b"User-agent: ZoopSyntheticCollector\nDisallow: /\nUser-agent: *\nAllow: /\n", content_type="text/plain")
+    kit.policy.update(userAgent="ZoopSyntheticCollector/1.0", contactUrl="https://example.org/bot")
+    kit.save_policy()
+    result = kit.collect("contact-product", [kit.target(site.url("/news/a"), "n1")], expected=2)
+    assert result["state"] == "failed" and codes(result) == {"n1": "robots_denied"}
+    assert [entry["path"] for entry in site.log] == ["/robots.txt"]
 
 
 def test_symlinked_roots_foreign_files_and_foreign_directories_are_never_adopted(kit, site, tmp_path):

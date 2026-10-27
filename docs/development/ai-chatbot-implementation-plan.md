@@ -9,6 +9,7 @@
 관련 문서:
 
 - [AI 챗봇 설계 요약](../design/ai-chatbot-design-summary.md)
+- [AI 챗봇 고정 평가 세트](ai-chatbot-eval-set.md)
 - [AI 거버넌스 정책](../ZOOP_AI_거버넌스_정책.md)
 - [공개 목표 API](../api/openapi.yaml)
 - [ERD v6](../erd/zoop-core-erd-v6.md)
@@ -66,7 +67,7 @@ flowchart LR
 | 4 읽기 도구 | 부분 구현 | Q03 일부와 Q04 경로 구현, Q01·Q05~Q08 미연결 |
 | 5 생성·출력 검증 | 부분 구현 | 구간 단위 생성·검증은 구현, claim 단위 검증·token guard 미구현 |
 | 6 웹 | 구현 | OpenAPI 타입 생성 seam, 실제 백엔드와의 종단 확인 |
-| 7 평가·출시 | 미완료 | 한국어 금융 평가 보정, 보안·종단·배포 증명 |
+| 7 평가·출시 | 부분 구현 | 고정 평가 세트 v1(대본 실행)만 있음. 실제 모델·데이터 평가와 임계값 보정, 보안·종단·배포 증명 |
 
 ### 단계 0 — 계약 고정과 fixture
 
@@ -113,6 +114,8 @@ flowchart LR
 
 모델 연결의 잠정 결정(2026-10-22, 사용자 승인, 평가 세트로 보정 전): (1) 명시적 요구 분해는 규칙 기반(`?`·“그리고”·“~하고”·쉼표 등)이며 확실하지 않으면 질문 전체를 요구 하나로 둔다. (2) 질문에 적힌 기업 이름은 앱이 기업 카탈로그의 정확한 이름 일치로만 ID로 해석하고, 후보가 여럿이면 `clarification`이다. Jev는 이름을 해석하지 않는다. (3) 생성·검증에 보내는 인용문은 운영자 챗봇 grant(`model-send`·stage 목적·정확한 수신자)가 있을 때만 보내고 없으면 보내지 않고 실패한다. (4) 라우터·검증 Jev 질문 집합은 새로 작성하고 임계치는 S1 잠정값을 쓴다. 모델 단계 실행은 `ai/worker`의 `zoop-ai-chat`([AI 런타임 준비 §11](ai-runtime-setup.md))이 맡고 앱은 `ai/service`를 거쳐서만 부른다.
 
+사건 지목의 잠정 결정(2026-10-27, 사용자 승인, 평가 세트로 보정 전): (5) 질문에 적힌 사건은 앱이 작업이 고정한 공개 그래프의 사건으로만 해석한다(`IssueNameResolver`). 공백과 라틴 대소문자를 무시하고 사건 제목 전체가 들어 있거나, 그 사건의 `target`과 `action`이 둘 다 들어 있으면 그 사건이다. 같은 말(같은 제목, 또는 같은 target·action)에 맞는 사건이 여럿이면 `clarification`(선택지 종류 `other`, 표시명은 제목과 사건 시점)이고, 제목이 적힌 사건은 target·action이 같은 다른 사건을 부르지 않는다. 질문 대상은 기업 다음에 사건 순이다. 기업 이름은 라우터 전에, 사건 이름은 라우터 뒤에 어떤 요구가 그래프를 읽는 바인딩된 능력을 허용하는 유형을 검토 구간(0.35) 이상으로 가질 때만 해석한다. Q02는 능력이 없고 Q01은 ZOOP 문서만 읽으므로 해당하지 않는다. 그래서 순수 개념 질문과 정책 문서만 읽는 Q01 질문은 활성 버전이 고정돼 있어도 고정 그래프를 읽지 않고 그래프 장애 중에도 답하며, 같은 말에 맞는 사건의 확인 질문은 라우터 호출 뒤에 나온다. 사건 해석에서 고정 그래프를 읽을 수 없으면 조회 장애(transient)로 끝난다. 이름 지목된 사건은 Q03일 때 `issue.read` 기본 조회를 받는다(기업의 `company.read` 기본 조회와 같은 규칙). (6) `issue.read`에 기업 ID를 주면 그 기업이 관여하거나 구조적으로 연결된 공개 사건을 최신순으로 돌려준다. 대상 읽기 한 번은 항목을 50개(생성 단계가 branch 하나에 받는 수)까지 돌려주고, 넘치면 `truncated=true`라 남은 사건을 "없음"으로 보지 않는다(`GraphTargetTool.MAX_ITEMS`). 도구 출력의 의미가 바뀌었으므로 레지스트리는 `chat-tools/v2`다.
+
 ### 단계 4 — 도구 레지스트리와 읽기 어댑터
 
 레지스트리를 한 번에 모두 구현하지 말고 아래 수직 순서로 연동한다.
@@ -130,9 +133,11 @@ flowchart LR
 
 웹 검색 대체 경로(`web.search`)는 위 순서와 별개로, 내부 도구로 답할 수 없는 Q03 요구에만 보충 라운드로 부르는 검색 API 직접 어댑터로 설계했다(MCP 미사용). 공급자·비용·개인정보 처리방침 개정이 결정되기 전에는 구현하지 않는다. [웹 검색 대체 경로 설계](../design/ai-chatbot-web-search.md)
 
+근거가 일부만 있는 질문의 처리는 [부분 답변 분기와 근거 부족 안내 설계](../design/ai-chatbot-partial-answer.md)에 있다(2026-10-26 구현). 1부는 개념과 사실이 섞인 요구에서 서버가 개념 하위 요구 `<id>-c`를 나눠 개념은 답한다(`ChatPlanner.withConcepts`, 기능 플래그 없음). Q03 근거 0개일 때 일반 배경을 붙이는 2부는 동문서답 위험으로 채택하지 않았다. 대신 근거 부족 결과의 `reason`을 원인별 서버 문장과 다음에 해 볼 일로 나누고, `applied`에 실제로 확인한 대상을 담는다(`ChatResults.InsufficientCause`).
+
 모든 어댑터는 공통 요청·결과 봉투를 사용하고 `dataVersion`, `evidenceIds`, `truncated`, `nextAllowed`, 실제 오류를 반환한다. 회원 ID는 모델이나 사용자 입력에서 받지 않고 Java 인증 문맥에서 주입한다.
 
-첫 도구 계층은 레지스트리 `chat-tools/v1`에 `company.read`·`issue.read`·`evidence.resolve`를 앱 공개 그래프 읽기 경로(`PublicGraphReader`) 위의 내부 어댑터로 등록한다. 그래프 버전·asOf는 계획이 아니라 작업의 고정 문맥에서 주입하고, 근거 ID는 공개 근거 조회가 지금 읽을 수 있는 것만 상한(20개) 안에서 전달한다. 상한 때문에 읽지 않은 근거가 있으면 `truncated=true`이며, 근거 상태를 확인할 수 없으면 빈 결과가 아니라 호출 실패(`tool_unavailable`)다. 단계 실행기는 등록되지 않은 기능이 하나라도 있으면 아무것도 예약하지 않고, 시도당 12회·동시 4개·개별 3초·단계 10초(실행 기한 이내)를 강제한다.
+첫 도구 계층은 레지스트리 `chat-tools/v1`(2026-10-27부터 `chat-tools/v2`, 결정 (6))에 `company.read`·`issue.read`·`evidence.resolve`를 앱 공개 그래프 읽기 경로(`PublicGraphReader`) 위의 내부 어댑터로 등록한다. 그래프 버전·asOf는 계획이 아니라 작업의 고정 문맥에서 주입하고, 근거 ID는 공개 근거 조회가 지금 읽을 수 있는 것만 상한(20개) 안에서 전달한다. 상한 때문에 읽지 않은 근거가 있으면 `truncated=true`이며, 근거 상태를 확인할 수 없으면 빈 결과가 아니라 호출 실패(`tool_unavailable`)다. 단계 실행기는 등록되지 않은 기능이 하나라도 있으면 아무것도 예약하지 않고, 시도당 12회·동시 4개·개별 3초·단계 10초(실행 기한 이내)를 강제한다.
 
 Q04 `graph.path.read`(`GraphPathTool`, 경로 탐색 `GraphPathLookup`)를 같은 레지스트리에 추가했다(2026-10-23).
 - 첫 대상에서 나머지 각 대상까지의 최단 경로를 같은 고정 버전·asOf·공개 제외의 표시 그래프에서 찾는다.
@@ -163,7 +168,7 @@ Q01 `zoopPolicy.read`(`ZoopPolicyReadTool`, 문서 원천 `ChatZoopDocs`)를 같
 4. 3의 검사는 [설계 요약 8.2절](../design/ai-chatbot-design-summary.md)의 1층 결정론적 검사 표를 check ID 단위로 구현한다. 하나라도 실패하면 Jev를 호출하지 않는다.
 5. 1층을 통과하면 Jev `semantic-verification` stage를 1회 호출한다. 챗봇 전용 질문 집합(근거 구간 claim별 Choice와 Noul `prohibitedAdvice`·`unsupportedCausality`, `general_knowledge` 구간별 Noul `prohibitedAdvice`만)과 정책 버전을 쓰고, S1 어댑터의 엄격한 응답 검사·영수증 선저장·무재시도 원칙을 재사용한다. 일반 개념 구간의 판정은 사실 검증 통과로 기록하지 않는다.
 6. 판정 처리: `contradicted` 또는 Noul 예 → 전체 `validation_failed`; hold → 해당 요구 구간 제외와 `evidence_insufficient` limitation, 남은 요구가 없으면 `insufficient_evidence`; Jev 송신 전 장애·응답을 받은 확정 실패 → `transient`(`provider_error`, retry=`rerun`), 송신 후 timeout·연결 끊김으로 응답 불명 → `transient`(`response_unknown`, retry=null, 호출 `unknown`·운영자 정산). 구간 제외 뒤 `answer`·`answerBasis`·`citations`를 서버가 다시 계산한다.
-7. 검증 실패는 `validation_failed`; 자동 재생성·부분 답변·근거 부족 성공으로 바꾸지 않는다.
+7. 검증 실패는 `validation_failed`; 자동 재생성·부분 답변·근거 부족 성공으로 바꾸지 않는다. 예외는 서버가 떼어 낸 개념 하위 요구의 일반 구간 하나다. 이 구간이 일반 구간 규칙(`general_section`)이나 대상 이름 금지(`general_names`)에 걸리면 그 구간만 빼고 route에 `droppedGeneral`로 남긴다. 투자 권유 문구는 이 구간에서도 전체 실패다([부분 답변 설계](../design/ai-chatbot-partial-answer.md) 3.1).
 
 완료 조건: 모든 중요 사실 주장에 유효 근거와 Jev supported 판정, 1층 실패 시 Jev 호출 0회, 일반 개념 구간의 Choice 판정 0건과 `prohibitedAdvice` 판정 100%, Q02 최신 사실 우회 0건, 철회 근거 노출 0건, 다른 회원 종목 노출 0건.
 
@@ -188,7 +193,7 @@ Q01 `zoopPolicy.read`(`ZoopPolicyReadTool`, 문서 원천 `ChatZoopDocs`)를 같
 3. Q02 → Q01 → Q03 → Q04/Q07 → Q05/Q06/Q08 순으로 feature flag를 연다. 준비되지 않은 유형을 일반 LLM으로 우회하지 않는다. Q02 단독 답변도 Jev `prohibitedAdvice` 판정을 쓰므로 Q02를 포함한 모든 유형은 Jev 의미 검증 연결과 임계값 보정이 선행 조건이다. Q02에 필요한 것은 Noul 하나뿐이라 가장 먼저 보정할 수 있다.
 4. 고정 평가와 보안 시험을 통과한 registry/model/prompt/policy 조합만 활성화한다.
 
-현재 상태: 모델·도구 호출 원장과 다수의 단위·PostgreSQL 시험은 있으나, 챗봇 한국어 금융 평가 보정과 실제 배포·종단 출시 증명은 없다. live gate와 질문 접수 플래그는 기본 비활성이다.
+현재 상태: 모델·도구 호출 원장과 다수의 단위·PostgreSQL 시험은 있다. 고정 평가 세트 `chat-eval-v1`(34문항: Q01~Q08·복합·투자 판단·공격·확인 질문·장애)은 질문 문장부터 실제 요구 분해·이름 해석·계획·읽기 도구·검사를 거치고 모델 세 단계만 대본으로 바꿔 기본 `test`에서 돈다([고정 평가 세트](ai-chatbot-eval-set.md)). 흐름 회귀만 확인하며, 실제 모델·데이터로 잰 챗봇 한국어 금융 평가 보정과 실제 배포·종단 출시 증명은 없다. live gate와 질문 접수 플래그는 기본 비활성이다.
 
 ## 4. 내부 챗봇 계약에 필요한 최소 스키마
 

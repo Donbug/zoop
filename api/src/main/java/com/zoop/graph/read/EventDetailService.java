@@ -53,8 +53,9 @@ public class EventDetailService {
     static final String SUMMARY_UNAVAILABLE = "사건 요약은 아직 제공되지 않습니다.";
     private static final String IMPORTED = "snapshot";
     private static final Set<String> WITHHELD = Set.of("HOLD", "REJECT");
-    /** The only receipt bundle schema whose mentions and field verdicts this service reads. */
-    private static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-5";
+    /** Immutable receipt formats with the same mention, field-verdict, source-support and headline-selection contract. */
+    private static final Set<String> BUNDLE_SCHEMAS = Set.of(
+            "zoop-graph-handoff-bundle-5", "zoop-graph-handoff-bundle-6", "zoop-graph-handoff-bundle-7");
 
     private final PublicGraphReader reader;
     private final EvidenceService receipts;
@@ -76,7 +77,7 @@ public class EventDetailService {
         String versionId = pinned.selected().version().id();
         // Synthetic fixtures have no receipt; an imported version must be describable or the read is 503.
         Obj bundle = IMPORTED.equals(pinned.selected().version().kind())
-                ? currentBundle(receipts.graphImportBundle(versionId, requestId)) : null;
+                ? supportedBundle(receipts.graphImportBundle(versionId, requestId)) : null;
         Obj handoff = bundle == null ? null : handoffIssue(bundle, id);
 
         // Evidence the filtered snapshot still shows (asOf, exclusions); for an imported version also readable right now under
@@ -117,9 +118,8 @@ public class EventDetailService {
     }
 
     /**
-     * The handoff issue behind this snapshot issue (same id); its absence means the receipt does not describe the version. Only
-     * the current bundle schema carries the mentions and verdicts read here: an older receipt ({@code -1} has no mentions,
-     * {@code -2}/{@code -3} no field verdicts) is SOURCE_UNAVAILABLE, never read as empty lists.
+     * The handoff issue behind this snapshot issue (same id); its absence means the receipt does not describe the version.
+     * Unsupported older receipts are SOURCE_UNAVAILABLE, never read as empty mentions or verdicts.
      */
     private static Obj handoffIssue(Obj bundle, String issueId) {
         for (Obj candidate : bundle.objects("issues")) {
@@ -128,9 +128,13 @@ public class EventDetailService {
         throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
     }
 
-    /** Only the current bundle schema carries the mentions and verdicts read here (see {@link #handoffIssue}). */
-    private static Obj currentBundle(Obj bundle) {
-        if (!bundle.has("schemaVersion") || !BUNDLE_SCHEMA.equals(bundle.string("schemaVersion"))) {
+    /**
+     * Formats 5, 6 and 7 retain every field read here; 6 adds receipt-only impacts and 7 adds a receipt-only summary.
+     * Neither addition is exposed by this service. New imports still require the importer's current schema.
+     */
+    private static Obj supportedBundle(Obj bundle) {
+        if (!bundle.has("schemaVersion") || !bundle.raw("schemaVersion").isString()
+                || !BUNDLE_SCHEMAS.contains(bundle.string("schemaVersion"))) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         }
         return bundle;
@@ -153,7 +157,7 @@ public class EventDetailService {
      * #132 candidate publication state. {@code shown} is the same evidence predicate: in the filtered snapshot and readable now.
      */
     public static boolean readable(Obj bundle, Issue issue, Predicate<String> shown) {
-        return headShown(issue, mentionsById(handoffIssue(currentBundle(bundle), issue.issueId()), issue, shown));
+        return headShown(issue, mentionsById(handoffIssue(supportedBundle(bundle), issue.issueId()), issue, shown));
     }
 
     /** The event on the other end of a FOLLOWS relation passes the same head check as a direct read of it. */

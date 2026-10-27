@@ -107,6 +107,39 @@
     "response:200:application/json.members<anyOf:1>": {
       "type": "null"
     },
+    "response:200:application/json.pastRuns[].usage<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.pastRuns[].usage<anyOf:0>.calls": {
+      "type": "integer"
+    },
+    "response:200:application/json.pastRuns[].usage<anyOf:0>.calls:required": true,
+    "response:200:application/json.pastRuns[].usage<anyOf:0>.elapsedSeconds": {
+      "type": "number"
+    },
+    "response:200:application/json.pastRuns[].usage<anyOf:0>.elapsedSeconds:required": true,
+    "response:200:application/json.pastRuns[].usage<anyOf:0>.estimatedCost:required": true,
+    "response:200:application/json.pastRuns[].usage<anyOf:0>.estimatedCost<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.pastRuns[].usage<anyOf:0>.estimatedCost<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.pastRuns[].usage<anyOf:0>.inputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.pastRuns[].usage<anyOf:0>.inputTokens:required": true,
+    "response:200:application/json.pastRuns[].usage<anyOf:0>.outputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.pastRuns[].usage<anyOf:0>.outputTokens:required": true,
+    "response:200:application/json.pastRuns[].usage<anyOf:0>.replayCalls": {
+      "type": "integer"
+    },
+    "response:200:application/json.pastRuns[].usage<anyOf:0>.replayCalls:required": true,
+    "response:200:application/json.pastRuns[].usage<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -381,6 +414,36 @@
     }
   },
   "bffOnly": {
+    "response:200:application/json.pastRuns[].usage": {
+      "type": "object"
+    },
+    "response:200:application/json.pastRuns[].usage.calls": {
+      "type": "integer"
+    },
+    "response:200:application/json.pastRuns[].usage.calls:required": true,
+    "response:200:application/json.pastRuns[].usage.elapsedSeconds": {
+      "type": "number"
+    },
+    "response:200:application/json.pastRuns[].usage.elapsedSeconds:required": true,
+    "response:200:application/json.pastRuns[].usage.estimatedCost:required": true,
+    "response:200:application/json.pastRuns[].usage.estimatedCost<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.pastRuns[].usage.estimatedCost<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.pastRuns[].usage.inputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.pastRuns[].usage.inputTokens:required": true,
+    "response:200:application/json.pastRuns[].usage.outputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.pastRuns[].usage.outputTokens:required": true,
+    "response:200:application/json.pastRuns[].usage.replayCalls": {
+      "type": "integer"
+    },
+    "response:200:application/json.pastRuns[].usage.replayCalls:required": true,
     "response:401:application/json.error.details<anyOf:0>": {
       "type": "object"
     },

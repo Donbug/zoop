@@ -155,6 +155,136 @@ class OrchestratedChatEngineTest {
     }
 
     @Test
+    void aConceptAskedWithAFactInOneRequirementIsAnsweredBesideTheFact() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9), List.of(HYNIX)));
+        answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리 칩을 쌓은 메모리입니다.", "r1-c"),
+                grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r1"), evidence(HYNIX))), List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no"), new Verdict("supported", "no")));
+
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult result = outcome.result();
+        assertEquals("answered", result.outcome());
+        assertEquals("mixed", result.answerBasis());
+        assertTrue(result.limitations().isEmpty());
+        assertEquals(List.of(readable.get(evidence(HYNIX))), result.citations());
+
+        var concept = generated.getFirst().branches().get(1);
+        assertEquals("r1-c", concept.requirementId());
+        assertTrue(concept.general() && concept.results().isEmpty());
+        assertEquals("r1", concept.parent());
+        assertEquals(List.of("SK하이닉스"), concept.avoidNames(), "what the parent's read returned");
+        var route = outcome.routeSummary().path("requirements").get(1);
+        assertEquals("general", route.path("mode").asString());
+        assertEquals("concept", route.path("origin").asString());
+        assertEquals("r1", route.path("parent").asString());
+    }
+
+    @Test
+    void whenTheFactPartHasNoEvidenceOrNoLookupTheConceptIsStillAnswered() {
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(),
+                List.of(new ChatToolItem(HYNIX, "company", "SK하이닉스", List.of(HYNIX), List.of())), List.of(), false, false));
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9), List.of(HYNIX)));
+        answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리 칩을 쌓은 메모리입니다.", "r1-c")), List.of("r1"),
+                List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no")));
+        ChatResult noEvidence = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertEquals("answered", noEvidence.outcome(), "it used to be insufficient_evidence with no concept either");
+        assertEquals("general_knowledge", noEvidence.answerBasis());
+        assertEquals(List.of("evidence_insufficient"), noEvidence.limitations().stream().map(l -> l.kind()).toList());
+        assertEquals("요구 r1", noEvidence.limitations().getFirst().label());
+
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9), Map.of()));
+        answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리 칩을 쌓은 메모리입니다.", "r1-c")), List.of(),
+                List.of());
+        var control = new Control(Duration.ofSeconds(60));
+        ChatResult noLookup = completed(engine().answer(run(), control));
+        assertEquals("answered", noLookup.outcome(), "it used to be guidance");
+        assertEquals(List.of("out_of_scope"), noLookup.limitations().stream().map(l -> l.kind()).toList());
+        assertEquals(3, control.modelCalls, "like a pure concept: router, generator and verifier");
+        assertTrue(control.reserved.isEmpty());
+    }
+
+    @Test
+    void aConceptSectionThatBreaksAGeneralRuleIsDroppedWithoutFailingTheAnswer() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9), List.of(HYNIX)));
+        for (String text : List.of("SK 하이닉스의 HBM은 메모리입니다.", "HBM 시장은 2026년에 커졌습니다.")) {
+            answer = new ChatGeneratedAnswer(List.of(general(text, "r1-c"),
+                    grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r1"), evidence(HYNIX))), List.of(), List.of());
+            verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+            var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                    engine().answer(run(), new Control(Duration.ofSeconds(60))));
+            assertEquals("evidence_grounded", outcome.result().answerBasis(), text);
+            assertEquals(1, outcome.result().sections().size(), text);
+            assertTrue(outcome.result().limitations().isEmpty(), "the concept is the server's own addition: " + text);
+            assertEquals("r1-c", outcome.routeSummary().path("droppedGeneral").get(0).asString(), text);
+        }
+
+        answer = new ChatGeneratedAnswer(List.of(general("HBM 시장은 2026년에 커졌습니다.", "r1-c")), List.of("r1"),
+                List.of());
+        verdicts = new ChatSemanticVerdicts(List.of());
+        ChatResult nothingLeft = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertEquals("insufficient_evidence", nothingLeft.outcome());
+
+        answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리입니다. 지금 매수하세요.", "r1-c"),
+                grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r1"), evidence(HYNIX))), List.of(), List.of());
+        assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+
+        // A general section of the router's own requirement still fails the answer.
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()));
+        answer = new ChatGeneratedAnswer(List.of(general("HBM 시장은 2026년에 커졌습니다.", "r1")), List.of(), List.of());
+        assertFailed("validation_failed", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+    }
+
+    @Test
+    void anAnswerWithNothingToStandOnSaysWhyAndShowsWhatWasLookedAt() {
+        var scoped = tools.get(ChatCapability.COMPANY_READ);
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
+                List.of(HYNIX)));
+        answer = new ChatGeneratedAnswer(List.of(), List.of("r1"), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of());
+
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(),
+                List.of(new ChatToolItem(HYNIX, "company", "SK하이닉스", List.of(HYNIX), List.of())), List.of(), false, false));
+        var found = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertEquals("insufficient_evidence", found.result().outcome());
+        assertEquals(ChatResults.insufficientReason(run(), ChatResults.InsufficientCause.EVIDENCE_INSUFFICIENT, false),
+                found.result().reason());
+        assertTrue(found.result().reason().startsWith("관련 항목은 찾았지만"), found.result().reason());
+        assertEquals(List.of("SK하이닉스"), found.result().applied().companies().stream().map(c -> c.label()).toList(),
+                "the scope shows what was looked at, not 'none'");
+        assertEquals("evidence_insufficient", found.routeSummary().path("reason").asString());
+
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(), List.of(),
+                List.of(), false, false));
+        var none = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertTrue(none.result().reason().startsWith("조회한 범위에서 관련된 공개 자료를 찾지 못했어요."), none.result().reason());
+        assertEquals("nothing_found", none.routeSummary().path("reason").asString());
+
+        tools.put(ChatCapability.COMPANY_READ, scoped);
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9)));
+        var narrowed = ChatPlannerTest.run(0, "v1", List.of(HYNIX), List.of("ev-other"), List.of("ev-other"));
+        ChatResult selection = completed(engine().answer(narrowed, new Control(Duration.ofSeconds(60))));
+        assertEquals("insufficient_evidence", selection.outcome());
+        assertTrue(selection.reason().endsWith("선택을 해제하고 다시 물으면 더 넓게 찾아볼 수 있어요."), selection.reason());
+
+        // The same selection, but the question names another company: that read was not narrowed, so neither is the hint.
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(), List.of(),
+                List.of(), false, false));
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
+                List.of(NVDA)));
+        ChatResult elsewhere = completed(engine().answer(narrowed, new Control(Duration.ofSeconds(60))));
+        assertEquals("insufficient_evidence", elsewhere.outcome());
+        assertFalse(elsewhere.reason().contains("선택한 근거 안에서만"), elsewhere.reason());
+        assertTrue(elsewhere.reason().endsWith("지도에서 대상을 고른 뒤 다시 물어봐 주세요."), elsewhere.reason());
+    }
+
+    @Test
     void anInvestmentDecisionIsALimitationOrGuidanceButNeverGenerated() {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()),
                 req("r2", Map.of(ChatQueryType.Q02, 0.9), Map.of()).withAdvice(0.97));
@@ -317,12 +447,16 @@ class OrchestratedChatEngineTest {
         assertEquals(List.of(evidence(NVDA)), held.citations().stream().map(Citation::evidenceId).toList());
         assertEquals(List.of("evidence_insufficient"), held.limitations().stream().map(l -> l.kind()).toList());
         assertEquals("요구 r2", held.limitations().getFirst().label());
+        assertEquals("이 부분은 답변 내용이 근거와 맞는지 충분히 확인하지 못해 뺐어요.", held.limitations().getFirst().message(),
+                "the kind stays, the message says why");
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "hold"), new Verdict("hold", "no"),
                 new Verdict("hold", "no"), supported));
         ChatResult none = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
         assertEquals("insufficient_evidence", none.outcome());
         assertEquals("none", none.answerBasis());
+        assertTrue(none.reason().startsWith("근거는 찾았지만"), none.reason());
+        assertEquals(List.of("SK하이닉스", "NVIDIA"), none.applied().companies().stream().map(c -> c.label()).toList());
 
         verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no")));
         assertFailed("transient", "provider_error", true, engine().answer(run(), new Control(Duration.ofSeconds(60))));

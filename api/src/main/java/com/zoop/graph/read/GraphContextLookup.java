@@ -70,6 +70,20 @@ public final class GraphContextLookup {
         return cited.contains(id) ? listedEvidence(id) : Optional.empty();
     }
 
+    /** The visible issues in snapshot order, for resolving issue names written in a question. */
+    public List<PublicGraphSnapshot.Issue> issues() {
+        return List.copyOf(graph.issues.values());
+    }
+
+    /**
+     * The visible issues a visible company is involved in or structurally related to, newest first (as the public company
+     * detail lists them); none for any other id.
+     */
+    public List<Target> issuesOf(String companyId) {
+        if (!graph.companies.containsKey(companyId)) return List.of();
+        return graph.issuesOf(companyId).stream().map(i -> find(i.issueId()).orElseThrow()).toList();
+    }
+
     /**
      * A span the filtered snapshot lists, whether or not a visible issue or relation cites it. This is NOT proof of
      * visibility: a basis-only span is public only when the evidence read proves its structural-basis membership in the

@@ -24,6 +24,7 @@ import com.zoop.chat.orchestrator.ChatCitationSource;
 import com.zoop.chat.orchestrator.ChatGeneratedAnswer;
 import com.zoop.chat.orchestrator.ChatModels;
 import com.zoop.chat.orchestrator.ChatModels.Failure.Fate;
+import com.zoop.chat.orchestrator.ChatPlanner;
 import com.zoop.chat.orchestrator.ChatQueryType;
 import com.zoop.chat.orchestrator.ChatRouteDecision;
 import com.zoop.chat.orchestrator.ChatSemanticVerdicts;
@@ -41,8 +42,11 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * The three orchestrator model ports over the AI service's chat stages ({@code zoop-ai-chat-1}). The server decides what is
  * sent: the router gets the question chain, the requirements split by {@link ChatRequirementSplitter} and the descriptions of
- * the bound capabilities; company names are resolved here, never by the model, and a name that fits several companies becomes
- * a clarification without any model call. The generator and verifier get quotes built from the evidence records, each with the
+ * the bound capabilities; company and issue names are resolved here, never by the model. Company names
+ * ({@link CompanyNameResolver}) are resolved before the router, so a name that fits several companies becomes a clarification
+ * without any model call. Issue names ({@link IssueNameResolver}, over the run's pinned graph) are resolved after it and only
+ * when a requirement may look something up, so a concept question never reads the graph; a shared issue name is then a
+ * clarification after the router call. The generator and verifier get quotes built from the evidence records, each with the
  * {@code sourceId} the AI side's chat grant registry checks. No member id, account data or article text is sent.
  *
  * <p>Failures map to {@link ChatModels.Failure}: a stage whose request may have reached the provider is {@link Fate#UNKNOWN}
@@ -77,15 +81,17 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     private final ChatStageClient client;
     private final String mode;
     private final CompanyNameResolver names;
+    private final IssueNameResolver issues;
     private final ChatCitationSource citations;
     private final ArticleSources sources;
     private final ChatModelRecorder recorder;
 
-    public ChatModelStages(ChatStageClient client, String mode, CompanyNameResolver names, ChatCitationSource citations,
-            ArticleSources sources, ChatModelRecorder recorder) {
+    public ChatModelStages(ChatStageClient client, String mode, CompanyNameResolver names, IssueNameResolver issues,
+            ChatCitationSource citations, ArticleSources sources, ChatModelRecorder recorder) {
         this.client = client;
         this.mode = mode;
         this.names = names;
+        this.issues = issues;
         this.citations = citations;
         this.sources = sources;
         this.recorder = recorder;
@@ -96,7 +102,8 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     /**
      * The question chain decides before any limit or ambiguity is judged (design summary: a reply reruns decomposition on the
      * root question and the answers in order). A free-text reply to a root that had more requirements than allowed replaces
-     * them with its own; a company the member named in a reply, or picked as a choice, resolves a shared name of the root.
+     * them with its own; a company or issue the member named in a reply, or picked as a choice, resolves a shared name of the
+     * root.
      */
     @Override
     public ChatRouteDecision route(ChatRun run, Set<String> boundCapabilities) {
@@ -111,30 +118,10 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             // More than the planner accepts: it asks the member to narrow the question; the router is not asked.
             return new ChatRouteDecision(pieces.stream().map(p -> requirement(p, Map.of(), Map.of(), List.of(), 0)).toList(), null);
         }
-        Map<String, List<String>> targets = new LinkedHashMap<>();
-        List<String> fromReplies = new ArrayList<>();
-        try {
-            for (String reply : replies) {
-                for (var mention : names.mentions(reply)) {
-                    resolved(mention, picked).ifPresent(id -> {
-                        if (!fromReplies.contains(id)) fromReplies.add(id);
-                    });
-                }
-            }
-            // A name typed in a reply counts as a pick for a shared name of the question.
-            picked.addAll(fromReplies);
-            for (var piece : pieces) {
-                List<String> ids = new ArrayList<>();
-                for (var mention : names.mentions(piece.text())) {
-                    Optional<String> id = resolved(mention, picked);
-                    if (id.isEmpty()) return ambiguous(mention);
-                    if (!ids.contains(id.get())) ids.add(id.get());
-                }
-                targets.put(piece.id(), ids.isEmpty() ? List.copyOf(fromReplies) : List.copyOf(ids));
-            }
-        } catch (RuntimeException unreadable) {
-            throw new ChatModels.Failure(Fate.NOT_SENT, "company names could not be resolved");
-        }
+        // Companies are resolved before the router, so a shared company name asks without any model call.
+        Resolved companies = resolve(pieces, replies, picked, IssueNameResolver.NONE);
+        if (companies.ambiguity() != null) return new ChatRouteDecision(List.of(), companies.ambiguity());
+        Map<String, List<String>> targets = companies.targets();
 
         ObjectNode input = StrictJson.newObject();
         input.set("turns", turns(run));
@@ -149,7 +136,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             }
         }
         JsonNode answer = call(run, ROUTER, "router", input);
-        return decode(() -> {
+        ChatRouteDecision decision = decode(() -> {
             Map<String, JsonNode> routed = new HashMap<>();
             for (JsonNode r : array(answer, "requirements")) {
                 if (routed.put(text(r, "requirementId"), r) != null) throw new IllegalArgumentException("duplicate");
@@ -170,6 +157,64 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             }
             return new ChatRouteDecision(decided, null);
         });
+
+        // Issues are resolved only for a question that may read the pinned graph: a concept question or one that reads only
+        // ZOOP's own documents (Q01) never does, so it is answered while the graph cannot be read. A graph that cannot be
+        // read here is the reads' outage too, and ends the run as such, not as a model failure.
+        if (decision.requirements().stream().noneMatch(r -> mayReadGraph(r, boundCapabilities))) return decision;
+        Resolved named = resolve(pieces, replies, picked, issues.at(run.graphVersionId(), run.context().asOf()));
+        if (named.ambiguity() != null) return new ChatRouteDecision(List.of(), named.ambiguity());
+        return new ChatRouteDecision(decision.requirements().stream().map(r -> new ChatRouteDecision.Requirement(r.id(),
+                r.label(), r.explicit(), r.types(), r.capabilities(), named.targets().get(r.id()), r.prohibitedAdvice(),
+                r.dependsOn())).toList(), null);
+    }
+
+    /**
+     * Whether the planner may give a requirement a read of the pinned graph: a type at its lowest band that allows a bound
+     * capability reading the graph. It is the band at which a concept question naming a company or an issue also becomes a
+     * question about it. Q02 allows no capability and Q01 only ZOOP document reads, which need no graph.
+     */
+    private static boolean mayReadGraph(ChatRouteDecision.Requirement requirement, Set<String> bound) {
+        return requirement.types().entrySet().stream().filter(t -> t.getValue() >= ChatPlanner.REVIEW)
+                .anyMatch(t -> t.getKey().capabilities().stream().anyMatch(c -> c.readsGraph() && bound.contains(c.id())));
+    }
+
+    /** Targets by requirement, or the shared name to ask about. */
+    private record Resolved(Map<String, List<String>> targets, ChatRouteDecision.Ambiguity ambiguity) { }
+
+    /**
+     * The companies, and the issues {@code issueNames} knows, that each requirement names, in order; a requirement that names
+     * none takes what the replies named. A name typed in a reply counts as a pick for a shared name of the question.
+     */
+    private Resolved resolve(List<ChatRequirementSplitter.Piece> pieces, List<String> replies, Set<String> chosen,
+            IssueNameResolver.Names issueNames) {
+        Set<String> picked = new HashSet<>(chosen);
+        Map<String, List<String>> targets = new LinkedHashMap<>();
+        List<String> fromReplies = new ArrayList<>();
+        try {
+            for (String reply : replies) {
+                for (var mention : named(reply, issueNames)) {
+                    resolved(mention, picked).ifPresent(id -> {
+                        if (!fromReplies.contains(id)) fromReplies.add(id);
+                    });
+                }
+            }
+            picked.addAll(fromReplies);
+            for (var piece : pieces) {
+                List<String> ids = new ArrayList<>();
+                for (var mention : named(piece.text(), issueNames)) {
+                    Optional<String> id = resolved(mention, picked);
+                    if (id.isEmpty()) {
+                        return new Resolved(null, new ChatRouteDecision.Ambiguity(mention.kind(), mention.candidates()));
+                    }
+                    if (!ids.contains(id.get())) ids.add(id.get());
+                }
+                targets.put(piece.id(), ids.isEmpty() ? List.copyOf(fromReplies) : List.copyOf(ids));
+            }
+        } catch (RuntimeException unreadable) {
+            throw new ChatModels.Failure(Fate.NOT_SENT, "company or issue names could not be resolved");
+        }
+        return new Resolved(targets, null);
     }
 
     /** The root's requirements, replaced in order by a free-text reply's own while they are more than the planner accepts. */
@@ -186,17 +231,30 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         return new ChatRouteDecision.Requirement(piece.id(), piece.text(), true, types, capabilities, targets, advice, null);
     }
 
-    /** The company a mention names: its only candidate, or the one the member picked in a clarification. */
-    private static Optional<String> resolved(CompanyNameResolver.Mention mention, Set<String> chosen) {
-        if (!mention.ambiguous()) return Optional.of(mention.companies().getFirst().id());
-        List<String> picked = mention.companies().stream().map(CompanyNameResolver.Company::id).filter(chosen::contains).toList();
-        return picked.size() == 1 ? Optional.of(picked.getFirst()) : Optional.empty();
+    /**
+     * A name in the text and what it may mean, as a clarification would offer it: companies (choice kind {@code company})
+     * first, then issues (kind {@code other}; the public choice kinds have none for issues).
+     */
+    private record Named(String kind, List<ChatRouteDecision.Option> candidates) { }
+
+    private List<Named> named(String text, IssueNameResolver.Names issueNames) {
+        List<Named> named = new ArrayList<>();
+        for (var mention : names.mentions(text)) {
+            named.add(new Named("company", mention.companies().stream()
+                    .map(c -> new ChatRouteDecision.Option(c.id(), c.label())).toList()));
+        }
+        for (var mention : issueNames.mentions(text)) {
+            named.add(new Named("other", mention.issues().stream()
+                    .map(i -> new ChatRouteDecision.Option(i.id(), i.label())).toList()));
+        }
+        return named;
     }
 
-    private static ChatRouteDecision ambiguous(CompanyNameResolver.Mention mention) {
-        List<ChatRouteDecision.Option> options = mention.companies().stream()
-                .map(c -> new ChatRouteDecision.Option(c.id(), c.label())).toList();
-        return new ChatRouteDecision(List.of(), new ChatRouteDecision.Ambiguity("company", options));
+    /** The company or issue a name means: its only candidate, or the one the member picked in a clarification. */
+    private static Optional<String> resolved(Named mention, Set<String> chosen) {
+        if (mention.candidates().size() == 1) return Optional.of(mention.candidates().getFirst().id());
+        List<String> picked = mention.candidates().stream().map(ChatRouteDecision.Option::id).filter(chosen::contains).toList();
+        return picked.size() == 1 ? Optional.of(picked.getFirst()) : Optional.empty();
     }
 
     // ---------------------------------------------------------------- generator
