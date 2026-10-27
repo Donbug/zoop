@@ -15,21 +15,24 @@ import static org.junit.jupiter.api.Assertions.*;
 /** D-AI-02 insufficient-evidence wording: server sentences chosen from the cause and the run's own scope. */
 class ChatResultsTest {
     @Test
-    void theHintFollowsTheRunsScopeAndANarrowedSelectionComesFirst() {
+    void theHintFollowsTheReadsScopeAndANarrowedReadComesFirst() {
         var plain = run(null, FrozenSelection.NONE);
         var period = run(new ChatPeriod("2026-10-01", "2026-10-21"), FrozenSelection.NONE);
-        var narrowed = run(new ChatPeriod("2026-10-01", "2026-10-21"),
+        var selected = run(new ChatPeriod("2026-10-01", "2026-10-21"),
                 new FrozenSelection(List.of("KRX:000660"), List.of("ev-1"), List.of("ev-1")));
 
+        assertTrue(ChatResults.insufficientReason(selected, InsufficientCause.NOTHING_FOUND, false).endsWith("기간을 넓히거나 "
+                + "다른 기업·사건을 지목해 다시 물어봐 주세요."), "a selection the reads did not keep to is not the reason");
         assertEquals("조회한 범위에서 관련된 공개 자료를 찾지 못했어요. 다른 기업이나 사건을 지목하거나, 지도에서 대상을 고른 뒤 다시 "
-                + "물어봐 주세요.", ChatResults.insufficientReason(plain, InsufficientCause.NOTHING_FOUND));
-        assertTrue(ChatResults.insufficientReason(period, InsufficientCause.NOTHING_FOUND).endsWith("기간을 넓히거나 다른 "
+                + "물어봐 주세요.", ChatResults.insufficientReason(plain, InsufficientCause.NOTHING_FOUND, false));
+        assertTrue(ChatResults.insufficientReason(period, InsufficientCause.NOTHING_FOUND, false).endsWith("기간을 넓히거나 다른 "
                 + "기업·사건을 지목해 다시 물어봐 주세요."));
-        assertTrue(ChatResults.insufficientReason(period, InsufficientCause.RESULTS_TRUNCATED).endsWith("대상이나 기간을 좁혀 "
+        assertTrue(ChatResults.insufficientReason(period, InsufficientCause.RESULTS_TRUNCATED, false).endsWith("대상이나 기간을 좁혀 "
                 + "다시 물어봐 주세요."), "a cut read asks for less, not more");
-        assertTrue(ChatResults.insufficientReason(narrowed, InsufficientCause.RESULTS_TRUNCATED).contains("선택한 근거 안에서만"));
+        assertTrue(ChatResults.insufficientReason(selected, InsufficientCause.RESULTS_TRUNCATED, true)
+                .contains("선택한 근거 안에서만"));
         for (var cause : InsufficientCause.values()) {
-            assertTrue(ChatResults.insufficientReason(plain, cause).length() <= 500, cause.name());
+            assertTrue(ChatResults.insufficientReason(plain, cause, false).length() <= 500, cause.name());
         }
     }
 
