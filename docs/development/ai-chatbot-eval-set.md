@@ -97,16 +97,16 @@ export JAVA_HOME=<JDK 21>
 
 ## 5. v1 사례와 드러난 공백
 
-34개 사례: Q01 2, Q02 2, Q03 7, Q04 2, Q05~Q08 각 1, 복합 6, 투자 판단 4, 공격 3, 확인 질문 1, 장애 3. 2026-10-27 기준 모두 통과한다(대본 실행).
+36개 사례: Q01 2, Q02 2, Q03 8, Q04 2, Q05~Q08 각 1, 복합 6, 투자 판단 4, 공격 3, 확인 질문 1, 장애 4. 2026-10-27 기준 모두 통과한다(대본 실행).
 
 세트를 만들며 확인한 현재 공백(`gap` 표시 사례):
 
 | 사례 | 공백 |
 | --- | --- |
-| `q03-issue-named-without-selection` | 사건 이름은 해석하지 않아 선택 없이 사건을 물으면 `ambiguous_target` 확인 질문이 된다. 사건 지목 시 `issue.read` 기본 조회가 필요하다. |
-| `q03-company-issues-by-name` | `issue.read`는 사건 ID만 대상으로 받아, 기업을 지목한 질문에서는 빈 결과다. 사건 목록은 `company.read`의 관계 근거로만 답한다. |
 | `q03-catalog-only-company` | 카탈로그에만 있고 공개 그래프에 없는 기업은 `nothing_found`다. 실제 데이터에서 근거 부족의 주원인인지 잰다. |
 | `q01-help-unbound`, `q05`~`q08` | 도구 미연결·미구현으로 `out_of_scope` 안내다. |
+
+v1에서 찾은 공백 중 사건 이름 미해석과 기업 대상 `issue.read`의 빈 결과는 2026-10-27에 고쳤다(구현 계획 사건 지목 결정 (5)·(6)). `q03-issue-named`, `q03-issue-and-company-named`, `q03-company-issues-by-name`이 그 동작을 고정하고, `failure-graph-unreadable-concept`는 그래프를 읽을 수 없어도 순수 개념 질문은 답하는지(사건 이름을 필요할 때만 해석하는지) 확인한다. 같은 말에 맞는 사건이 여럿인 확인 질문은 fixture에 그런 사건이 없어 `IssueNameResolverTest`·`ChatModelStagesTest`가 다룬다.
 
 세트에 넣지 못한 것:
 

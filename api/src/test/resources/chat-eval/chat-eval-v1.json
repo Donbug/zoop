@@ -129,9 +129,9 @@
       "expect": {
         "tools": ["company.read", "issue.read"],
         "outcome": "answered",
-        "appliedIssues": []
-      },
-      "gap": "issue.read는 사건 ID만 대상으로 받아 기업을 지목한 질문에서는 빈 결과다. 사건 목록은 company.read가 돌려준 관계 근거로만 답한다."
+        "citationKinds": ["article", "company_profile"],
+        "appliedIssues": ["iss-fixture-hbm-equip", "iss-fixture-hbm-supply"]
+      }
     },
     {
       "id": "q03-catalog-only-company",
@@ -152,20 +152,39 @@
       "gap": "카탈로그에는 있지만 공개 그래프에 없는 기업. 실제 데이터에서 이런 기업의 비율이 근거 부족의 주원인인지 잰다(document.search 미연결)."
     },
     {
-      "id": "q03-issue-named-without-selection",
+      "id": "q03-issue-named",
       "group": "Q03",
       "question": "HBM 공급 계약 사건에 대해 알려줘",
       "script": {
-        "router": {"r1": {"types": {"Q03": 0.9}, "capabilities": {"issue.read": 0.9}}}
+        "router": {"r1": {"types": {"Q03": 0.9}, "capabilities": {}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "차세대 GPU용 HBM 공급 계약은 SK하이닉스가 NVIDIA에 HBM을 공급하기로 한 사건입니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch"]}], "graphTargetIds": ["iss-fixture-hbm-supply"]}
       },
       "expect": {
-        "targets": {"r1": []},
-        "stages": ["router"],
-        "tools": [],
-        "outcome": "clarification",
-        "reason": "ambiguous_target"
+        "targets": {"r1": ["iss-fixture-hbm-supply"]},
+        "stages": ["router", "answer", "verify"],
+        "tools": ["issue.read"],
+        "outcome": "answered",
+        "answerBasis": "evidence_grounded",
+        "citationKinds": ["article"],
+        "appliedIssues": ["iss-fixture-hbm-supply"],
+        "graphTargets": ["iss-fixture-hbm-supply"]
+      }
+    },
+    {
+      "id": "q03-issue-and-company-named",
+      "group": "Q03",
+      "question": "HBM 장비 증설에서 한미반도체는 어떤 역할이야?",
+      "script": {
+        "router": {"r1": {"types": {"Q03": 0.9}, "capabilities": {}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "한미반도체는 HBM 생산 장비 증설 발표에서 장비 공급사로 나옵니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch"]}]}
       },
-      "gap": "사건 이름은 해석하지 않아 대상을 묻는다. 사건 지목 시 issue.read 기본 조회(인계 메모 다음 작업 2)가 필요하다."
+      "expect": {
+        "targets": {"r1": ["KRX:042700", "iss-fixture-hbm-equip"]},
+        "tools": ["company.read", "issue.read"],
+        "outcome": "answered",
+        "appliedCompanies": ["KRX:042700"],
+        "appliedIssues": ["iss-fixture-hbm-equip"]
+      }
     },
     {
       "id": "q03-selected-issue",
@@ -500,9 +519,25 @@
       },
       "expect": {
         "stages": ["router"],
-        "tools": ["company.read"],
+        "tools": [],
         "outcome": "failed",
         "failure": {"kind": "transient", "reason": null, "rerunnable": true}
+      }
+    },
+    {
+      "id": "failure-graph-unreadable-concept",
+      "group": "failure",
+      "question": "HBM이 뭐야?",
+      "graphVersion": "fixture-unknown",
+      "script": {
+        "router": {"r1": {"types": {"Q02": 0.95}, "capabilities": {}}},
+        "answer": {"sections": [{"basis": "general_knowledge", "text": "HBM은 메모리 칩을 수직으로 쌓아 대역폭을 높인 메모리입니다.", "requirementIds": ["r1"], "evidenceIds": []}]}
+      },
+      "expect": {
+        "stages": ["router", "answer", "verify"],
+        "tools": [],
+        "outcome": "answered",
+        "answerBasis": "general_knowledge"
       }
     },
     {
