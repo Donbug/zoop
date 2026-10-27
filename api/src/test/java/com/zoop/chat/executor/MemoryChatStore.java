@@ -246,6 +246,9 @@ final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
     @Override public boolean insertSession(ChatSessionRow session) { throw new UnsupportedOperationException(); }
     @Override public void touchSession(String sessionId, Instant at) { throw new UnsupportedOperationException(); }
     @Override public Optional<ChatSessionRow> latestSession(String memberId) { throw new UnsupportedOperationException(); }
+    @Override public List<com.zoop.chat.repository.ChatSessionSummaryRow> sessions(String memberId, Instant afterUpdatedAt,
+            String afterId, int limit) { throw new UnsupportedOperationException(); }
+    @Override public boolean deleteSession(String sessionId) { throw new UnsupportedOperationException(); }
     @Override public int countJobs(String sessionId) { throw new UnsupportedOperationException(); }
     @Override public List<ChatJobRow> jobs(String sessionId) { throw new UnsupportedOperationException(); }
     @Override public Optional<ChatJobRow> activeJob(String sessionId) { throw new UnsupportedOperationException(); }
