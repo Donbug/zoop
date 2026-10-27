@@ -464,6 +464,13 @@
     },
     {
       "code": "TEAM_DECISION_REQUIRED",
+      "target": "listConversations",
+      "severity": "warning",
+      "message": "와이어프레임에 대화 목록 화면이 없다. 웹은 D-AI-02 드로어 안의 '대화 기록' 보기로 임시 구현했으며 화면 설계 확정이 필요하다.",
+      "source": ""
+    },
+    {
+      "code": "TEAM_DECISION_REQUIRED",
       "target": "createConversation",
       "severity": "warning",
       "message": "대화·작업·멱등성 키의 실제 보존 기간과 운영 담당자를 출시 전에 등록해야 한다. 대화 소유권·활성 작업 하나·최초 요청 고정은 확정 계약이다.",
@@ -474,6 +481,13 @@
       "target": "getConversation",
       "severity": "warning",
       "message": "대화·작업의 실제 보존 기간과 마스킹·철회 전파 운영값을 출시 전에 등록해야 한다.",
+      "source": ""
+    },
+    {
+      "code": "TEAM_DECISION_REQUIRED",
+      "target": "deleteConversation",
+      "severity": "warning",
+      "message": "개별 대화 삭제를 고지하는 개인정보 처리방침·이용약관 개정본(docs/legal/drafts) 승인과 시행 전까지 zoop.chat.delete-enabled를 켜지 않는다.",
       "source": ""
     },
     {
@@ -1926,6 +1940,13 @@
       "source": ""
     },
     {
+      "code": "TARGET_ONLY_API",
+      "target": "listConversations",
+      "severity": "difference",
+      "message": "GET /api/v1/chat/sessions: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
       "code": "BFF_PATH_DIFFERENCE",
       "target": "createConversation",
       "severity": "difference",
@@ -1951,6 +1972,13 @@
       "target": "getConversation",
       "severity": "difference",
       "message": "목표만 175 · BFF만 32 · 형식/필수/권한 변경 23",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "deleteConversation",
+      "severity": "difference",
+      "message": "DELETE /api/v1/chat/sessions/{id}: 직접 대응 BFF 없음",
       "source": ""
     },
     {
@@ -2650,7 +2678,7 @@
     "RESERVED_REQUIREMENT_UNMAPPED": 1,
     "INDEX_DETAIL_RANGE_STALE": 17,
     "INDEX_REQUIREMENT_META_MISMATCH": 4,
-    "TEAM_DECISION_REQUIRED": 37,
+    "TEAM_DECISION_REQUIRED": 39,
     "REQUIREMENT_TITLE_REVIEW": 42,
     "REQUIREMENT_BINDING_BY_MEANING": 12,
     "CONTRACT_UNDECIDED": 1,
@@ -2661,28 +2689,28 @@
     "BFF_CACHED_OBSERVATION": 1,
     "BFF_PATH_DIFFERENCE": 81,
     "BFF_FIELD_DIFFERENCE": 81,
-    "TARGET_ONLY_API": 7,
+    "TARGET_ONLY_API": 9,
     "PROTOTYPE_ONLY_API": 3
   },
   "severityCounts": {
-    "warning": 205,
-    "difference": 172
+    "warning": 207,
+    "difference": 174
   },
   "xlsxReadback": {
     "status": "passed",
     "sheetDataRows": {
-      "추적표": 660,
-      "화면→기능→API": 1437,
+      "추적표": 680,
+      "화면→기능→API": 1457,
       "기능→WBS→구현 상태": 500,
-      "API 목록": 88,
+      "API 목록": 90,
       "오류 코드": 28,
-      "경고": 377,
+      "경고": 381,
       "원문 WBS": 173,
       "원문 제안·유효 기준": 8,
       "범위 예외·상세 권한": 34,
       "수용 기준": 121
     },
-    "cells": 48298
+    "cells": 48988
   },
   "acceptanceCoverage": {
     "status": "passed",
@@ -2727,15 +2755,15 @@
       "BE": 82,
       "FE": 33
     },
-    "targetOperations": 88
+    "targetOperations": 90
   },
   "sheetDataRows": {
-    "추적표": 660,
-    "화면→기능→API": 1437,
+    "추적표": 680,
+    "화면→기능→API": 1457,
     "기능→WBS→구현 상태": 500,
-    "API 목록": 88,
+    "API 목록": 90,
     "오류 코드": 28,
-    "경고": 377,
+    "경고": 381,
     "원문 WBS": 173,
     "원문 제안·유효 기준": 8,
     "범위 예외·상세 권한": 34,

@@ -7,6 +7,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 
+import com.zoop.auth.service.CsrfKeyRing;
 import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
 import com.zoop.chat.dto.ChatApplied;
 import com.zoop.chat.dto.ChatChoice;
@@ -276,6 +277,78 @@ class ChatServiceTest {
         assertNotEquals(ChatService.requestHash(SESSION, empty), ChatService.requestHash(SESSION,
                 new ChatJobRequest("job-00001", "질문", new ChatContextRequest(List.of(), List.of(), null,
                         Instant.parse("2026-10-20T00:00:00Z"), null), null)));
+    }
+
+    @Test
+    void historyListsConversationsWithQuestionsLatestFirstTitledByTheFirstQuestion() {
+        var history = history(false);
+        assertTrue(history.list(MEMBER, null, null).items().isEmpty(), "a conversation without a question is not listed");
+
+        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "  HBM이 뭐야?  "), "req-test");
+        service.cancel(MEMBER, "job-00001", "cancel-1");
+        clock.advance(Duration.ofMinutes(1));
+        service.createSession(MEMBER, "conv-0002");
+        service.submit(MEMBER, "conv-0002", "job-00002", question("job-00002", "가".repeat(120)), "req-test");
+        service.cancel(MEMBER, "job-00002", "cancel-2");
+        service.submit(MEMBER, "conv-0002", "job-00003", question("job-00003", "후속 질문"), "req-test");
+        service.createSession(OTHER, "conv-other");
+        service.submit(OTHER, "conv-other", "job-00009", question("job-00009", "남의 질문"), "req-test");
+
+        var list = history.list(MEMBER, null, null);
+        assertEquals(List.of("conv-0002", SESSION), list.items().stream().map(i -> i.id()).toList());
+        assertEquals("가".repeat(ChatHistoryService.MAX_TITLE - 1) + "…", list.items().getFirst().title());
+        assertEquals(2, list.items().getFirst().jobs());
+        assertEquals("HBM이 뭐야?", list.items().get(1).title());
+        assertNull(list.nextCursor());
+        assertFalse(list.deleteEnabled());
+    }
+
+    @Test
+    void historyPagesWithACursorBoundToTheMemberAndThePageSize() {
+        var history = history(false);
+        for (int i = 1; i <= 3; i++) {
+            String id = "conv-p000" + i;
+            String job = "job-p000" + i;
+            clock.advance(Duration.ofMinutes(1));
+            service.createSession(MEMBER, id);
+            service.submit(MEMBER, id, job, question(job, "질문 " + i), "req-test");
+        }
+        var first = history.list(MEMBER, null, 2);
+        assertEquals(List.of("conv-p0003", "conv-p0002"), first.items().stream().map(i -> i.id()).toList());
+        var second = history.list(MEMBER, first.nextCursor(), 2);
+        assertEquals(List.of("conv-p0001"), second.items().stream().map(i -> i.id()).toList());
+        assertNull(second.nextCursor());
+
+        assertError(ErrorCode.INVALID_CURSOR, () -> history.list(OTHER, first.nextCursor(), 2));
+        assertError(ErrorCode.INVALID_CURSOR, () -> history.list(MEMBER, first.nextCursor(), 3));
+        assertError(ErrorCode.INVALID_CURSOR, () -> history.list(MEMBER, "not-a-cursor", 2));
+        assertError(ErrorCode.INVALID_REQUEST, () -> history.list(MEMBER, null, 0));
+        assertError(ErrorCode.INVALID_REQUEST, () -> history.list(MEMBER, null, ChatHistoryService.MAX_LIMIT + 1));
+    }
+
+    @Test
+    void deletionIsOffUntilEnabledThenRemovesAnIdleConversationOfItsOwnerAtOnce() {
+        service.submit(MEMBER, SESSION, "job-00001", question("job-00001", "HBM이 뭐야?"), "req-test");
+        assertError(ErrorCode.RESOURCE_NOT_FOUND, () -> history(false).delete(MEMBER, SESSION));
+        assertTrue(repository.sessions.containsKey(SESSION));
+
+        var history = history(true);
+        assertTrue(history.list(MEMBER, null, null).deleteEnabled());
+        assertError(ErrorCode.JOB_IN_PROGRESS, () -> history.delete(MEMBER, SESSION));
+        service.cancel(MEMBER, "job-00001", "cancel-1");
+        assertError(ErrorCode.ACCESS_DENIED, () -> history.delete(OTHER, SESSION));
+        assertError(ErrorCode.INVALID_REQUEST, () -> history.delete(MEMBER, "short"));
+
+        history.delete(MEMBER, SESSION);
+        assertFalse(repository.sessions.containsKey(SESSION));
+        assertTrue(repository.jobs.isEmpty(), "its jobs go with it");
+        assertError(ErrorCode.RESOURCE_NOT_FOUND, () -> history.delete(MEMBER, SESSION));
+        assertError(ErrorCode.RESOURCE_NOT_FOUND, () -> service.getConversation(MEMBER, SESSION));
+        assertNull(service.getCurrentConversation(MEMBER).conversation());
+    }
+
+    private ChatHistoryService history(boolean deleteEnabled) {
+        return new ChatHistoryService(repository, mapper, new CsrfKeyRing("test", "test=" + "A".repeat(43)), deleteEnabled);
     }
 
     private ChatService service(boolean enabled) {
