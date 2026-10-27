@@ -2679,7 +2679,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 ## getCompanyIssueImpact · 기업 맥락 이슈 영향 경로 조회
 
-기업 패널에서 여는 영향 경로다. 데이터에 없는 산업·제품 단계나 관계 유형을 만들지 않는다.
+고정된 공개 그래프에서 보이는 기업과 이슈 사이의 직접 INVOLVES 관계만 반환한다. 관계가 없으면 200과 빈 steps를 반환한다. 각 근거 ID에는 getEvidence와 같은 현재 공개 권리 검사를 적용한다. 권리 때문에 근거가 빠지면 metadata.partial=true와 evidence 실패 항목을 반환하고, 권한 원천을 확인할 수 없으면 SOURCE_UNAVAILABLE/503이다. 구조 관계는 전체 receipt 경로의 공개 적격성과 basis별 근거를 검증할 수 있을 때만 이후 확장할 수 있으며, 현재 이 operation은 추정·탐색 경로를 만들지 않는다. 기업·이슈가 선택 버전에 없거나 공개 필터 뒤에 보이지 않으면 404다. round·graphVersion·asOf는 getGraph와 같은 공개 버전 선택 규칙을 따른다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2701,6 +2701,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string |  |
 | issueId | path | 필수 | string |  |
+| round | query | 선택 | string | 이 브리핑 회차의 공개 그래프를 고정한다. graphVersion과 함께 쓰면 해당 회차와 일치해야 한다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
@@ -7117,7 +7118,7 @@ S1 실제 문서 요약. exact citation+별도 semantic supported 영수증을 �
 
 ### ImpactPath
 
-기업 패널에서 여는 영향 경로다. 데이터에 없는 산업·제품 단계나 관계 유형을 만들지 않는다.
+기업 패널에서 여는 공개 영향 경로다. 현재 steps는 선택된 공개 스냅샷의 직접 INVOLVES 연결만 담으며 연결이 없으면 빈 배열이다. 근거 ID는 getEvidence의 현재 권리 검사를 통과한 항목만 포함한다. 관계가 보이더라도 구조 경로의 receipt 검증이 완료되지 않은 경우 추정 단계를 만들지 않는다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |

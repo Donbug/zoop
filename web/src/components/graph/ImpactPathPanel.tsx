@@ -95,18 +95,22 @@ export default function ImpactPathPanel({
           {company?.label ?? companyId} · 영향 경로
         </h2>
         <p className={ui.muted}>
-          {graph.edges.some(
-            (edge) =>
-              edge.relationType === 'INVOLVES' &&
-              [edge.source, edge.target].includes(companyId) &&
-              [edge.source, edge.target].includes(issueId),
-          )
-            ? '직접 관련'
-            : '구조적 관련'}{' '}
+          {loading
+            ? '연결 확인 중'
+            : error
+              ? '연결 확인 불가'
+              : impact?.steps.length
+                ? '직접 연결 확인'
+                : '직접 연결 미확인'}{' '}
           · 지도 기준 {new Date(graph.metadata.asOf).toLocaleString('ko-KR')}
         </p>
       </header>
       <div className={ui.scroll} aria-busy={loading}>
+        {impact?.metadata.partial && (
+          <p className="px-4 py-2 text-[11px] text-zoop-alert" role="status">
+            현재 공개 권한을 확인할 수 있는 근거만 표시합니다.
+          </p>
+        )}
         {loading && (
           <div className={ui.state} role="status">
             <span className="block h-14 rounded-panel bg-panel-line motion-safe:animate-pulse" />
@@ -215,8 +219,7 @@ export default function ImpactPathPanel({
                           {connected?.label}
                         </strong>
                         <p className={ui.muted}>
-                          {edge.summary || '직접 관련'} · 근거{' '}
-                          {edge.evidenceIds.length}건
+                          {edge.summary || '공개 그래프 연결'}
                         </p>
                       </div>
                     </li>
