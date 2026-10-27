@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class ChatToolRegistry {
     /** Changes whenever a binding or a tool's input or output meaning changes. */
-    public static final String VERSION = "chat-tools/v3";
+    public static final String VERSION = "chat-tools/v4";
     /** The common request and result envelope. */
     public static final String SCHEMA_VERSION = "chat-tool/v1";
 

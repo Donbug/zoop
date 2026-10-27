@@ -68,7 +68,8 @@ class ChatToolRunnerTest {
         assertTrue(results.stream().allMatch(ChatToolResult::succeeded));
         assertEquals(List.of("ev-1", "ev-2"), results.get(0).evidenceIds());
         assertEquals("fixture-2026-10-01", results.get(0).dataVersion());
-        assertEquals(new ChatToolScope("job-1", "fixture-2026-10-01", AS_OF), scopes.getFirst());
+        assertEquals(new ChatToolScope("job-1", "fixture-2026-10-01", AS_OF, "member-a"), scopes.getFirst(),
+                "the member is the job's, injected by the server");
 
         var reserved = control.reserved.get(0);
         assertEquals(ChatToolRegistry.VERSION, reserved.registryVersion());
