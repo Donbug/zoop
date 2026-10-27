@@ -108,6 +108,21 @@ class GraphVersionSelectorTest {
     }
 
     @Test
+    void anAlreadyPinnedVersionIsKeptAsItWasReadNotReinterpretedAsAVersionAlone() {
+        Instant firstPage = Instant.parse("2026-10-16T11:00:00Z");
+        SelectedGraphVersion kept = selector.pinned("v1", firstPage, false);
+        assertEquals("v1", kept.version().id());
+        assertEquals(firstPage, kept.asOf(), "the first page's time, not the first activation");
+        assertFalse(kept.asOfRequested(), "the first page was not filtered, so neither is this one");
+        assertTrue(selector.pinned("v1", Instant.parse("2026-10-01T00:00:00Z"), true).asOfRequested());
+        assertEquals(NOW, selector.pinned("v1", null, false).asOf());
+        assertEquals(ErrorCode.VERSION_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> selector.pinned("registered-only", firstPage, false)).getErrorCode());
+        assertEquals(ErrorCode.INVALID_REQUEST, assertThrows(CustomException.class,
+                () -> selector.pinned("bad id", firstPage, false)).getErrorCode());
+    }
+
+    @Test
     void malformedVersionIdIsInvalid() {
         assertEquals(ErrorCode.INVALID_REQUEST, failure(null, "bad id/..", null));
     }

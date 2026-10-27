@@ -32,7 +32,15 @@ public class PublicGraphReader {
     }
 
     public Pinned read(String round, String graphVersion, Instant asOf, String requestId) {
-        SelectedGraphVersion selected = selector.select(round, graphVersion, asOf, requestId);
+        return read(selector.select(round, graphVersion, asOf, requestId));
+    }
+
+    /** A version an earlier step of this read already pinned, kept as it was ({@link GraphVersionSelector#pinned}). */
+    public Pinned readPinned(String versionId, Instant asOf, boolean asOfRequested) {
+        return read(selector.pinned(versionId, asOf, asOfRequested));
+    }
+
+    private Pinned read(SelectedGraphVersion selected) {
         PublicGraphSnapshot snapshot = store.load(selected.version());
         PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot,
                 selected.asOfRequested() ? selected.asOf() : null, exclusions.current(selected.version().id()),

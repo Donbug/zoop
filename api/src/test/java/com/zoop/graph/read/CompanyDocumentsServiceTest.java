@@ -119,6 +119,37 @@ class CompanyDocumentsServiceTest {
         assertEquals(list(null, null, null, null).items().stream().map(CompanyDocumentsService.Document::id).toList(), ids);
     }
 
+    private static List<String> documents(CompanyDocumentsService with, String graphVersion, String cursor, Integer limit) {
+        List<String> all = new ArrayList<>();
+        String next = cursor;
+        do {
+            var page = with.list(COMPANY, null, null, null, null, next == null ? graphVersion : null, null, next, limit, "req-1");
+            all.addAll(page.items().stream().map(CompanyDocumentsService.Document::id).toList());
+            next = limit == null ? null : page.nextCursor();
+        } while (next != null);
+        return all;
+    }
+
+    @Test
+    void aLaterPageKeepsTheFirstPagesReadAndIsNeverReReadAsAVersionAlone() throws Exception {
+        var paged = new CompanyDocumentsService(GraphReadFixtures.undatedReader(NOW), jdbc, registry, evidence, analyses,
+                JsonMapper.builder().build());
+        List<String> unfiltered = documents(paged, null, null, null);
+        List<String> filtered = documents(paged, "fixture-2026-10-08", null, null);
+        org.junit.jupiter.api.Assertions.assertFalse(filtered.containsAll(unfiltered), "the fixture must make the two reads differ");
+
+        assertEquals(unfiltered, documents(paged, null, null, 1), "default first page: later pages stay unfiltered");
+        assertEquals(filtered, documents(paged, "fixture-2026-10-08", null, 1), "version-only first page: later pages filtered");
+
+        // A cursor issued before the filter flag existed reads its version unfiltered, as it did then.
+        String first = paged.list(COMPANY, null, null, null, null, null, null, null, 1, "req-1").nextCursor();
+        var mapper = JsonMapper.builder().build();
+        var json = (tools.jackson.databind.node.ObjectNode) mapper.readTree(java.util.Base64.getUrlDecoder().decode(first));
+        assertNotNull(json.remove("filtered"));
+        String old = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(mapper.writeValueAsBytes(json));
+        assertEquals(unfiltered.subList(1, unfiltered.size()), documents(paged, null, old, 1));
+    }
+
     @Test
     void dateOnlyPublicationOverlapsItsWholeKstDay() {
         // HANMI's direct INVOLVES edge was already visible that day. HYNIX's structural basis was verified later.

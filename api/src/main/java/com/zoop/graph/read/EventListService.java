@@ -52,7 +52,7 @@ public class EventListService {
      * resolved, sent back as metadata.asOf on every page so a later page does not report a new request time.
      */
     record Cursor(String companyId, Integer depth, String from, String to, Integer limit, String versionId, String asOf,
-            String pinnedAt, int offset) { }
+            String pinnedAt, int offset, Boolean filtered) { }
 
     public EventListResponse list(String companyId, Integer depth, String from, String to, String cursor, Integer limit,
             String graphVersion, String asOf) {
@@ -74,7 +74,11 @@ public class EventListService {
                 || !Objects.equals(after.asOf(), asOf))) {
             throw new CustomException(ErrorCode.INVALID_CURSOR);
         }
-        PublicGraphReader.Pinned pinned = reader.read(null, after != null ? after.versionId() : graphVersion, requestedAsOf);
+        // A later page without an asOf keeps the first page's pinned read (its time and whether it was filtered at it); it is
+        // never re-read as a version-only address, which would filter a list the first page did not.
+        PublicGraphReader.Pinned pinned = after != null && requestedAsOf == null
+                ? reader.readPinned(after.versionId(), Instant.parse(after.pinnedAt()), Boolean.TRUE.equals(after.filtered()))
+                : reader.read(null, graphVersion, requestedAsOf);
         DisplayGraph graph = pinned.graph();
 
         Collection<Issue> scope = companyId == null ? graph.issues.values() : companyIssues(graph, companyId, hops);
@@ -105,7 +109,7 @@ public class EventListService {
         String pinnedAt = after != null && asOf == null ? after.pinnedAt() : pinned.selected().asOf().toString();
         String next = pageEnd < count
                 ? encode(new Cursor(companyId, hops, from, to, pageLimit, pinned.selected().version().id(), asOf,
-                        pinnedAt, pageEnd))
+                        pinnedAt, pageEnd, pinned.selected().asOfRequested()))
                 : null;
 
         var metadata = new EventListResponse.Metadata("public_graph_snapshot", pinnedAt,

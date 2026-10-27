@@ -84,8 +84,9 @@ public class EventDetailService {
         Map<String, PublicGraphSnapshot.Evidence> inSnapshot = new LinkedHashMap<>();
         snapshot.evidence().forEach(e -> inSnapshot.put(e.evidenceId(), e));
         Map<String, Boolean> judged = new HashMap<>();
+        Instant filteredAt = pinned.selected().asOfRequested() ? pinned.selected().asOf() : null;
         Predicate<String> shown = e -> inSnapshot.containsKey(e) && (bundle == null
-                || judged.computeIfAbsent(e, k -> (round == null ? receipts.shownNow(k, versionId, at, requestId)
+                || judged.computeIfAbsent(e, k -> (round == null ? receipts.shownNow(k, versionId, filteredAt, requestId)
                         : receipts.shownNow(k, round, versionId, at, requestId))));
 
         Map<String, Obj> mentionsById = handoff == null ? Map.of() : mentionsById(handoff, issue, shown);

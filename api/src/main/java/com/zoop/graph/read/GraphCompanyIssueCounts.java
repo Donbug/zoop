@@ -28,7 +28,10 @@ public class GraphCompanyIssueCounts implements CompanyIssueCountQuery {
             boolean asOfRequested) {
         PublicGraphReader.Pinned pinned;
         try {
-            pinned = reader.read(null, graphVersion, asOfRequested ? asOf : null);
+            // A later page's read time (asOf without asOfRequested) keeps the first page's unfiltered read of its version.
+            pinned = !asOfRequested && asOf != null && graphVersion != null
+                    ? reader.readPinned(graphVersion, asOf, false)
+                    : reader.read(null, graphVersion, asOfRequested ? asOf : null);
         } catch (CustomException exception) {
             // searchCompanies has no 409: without a public version the counts are simply unavailable.
             if (exception.getErrorCode() == ErrorCode.VERSION_UNAVAILABLE) {
@@ -41,6 +44,6 @@ public class GraphCompanyIssueCounts implements CompanyIssueCountQuery {
             counts.put(id, (long) pinned.graph().companyIssues.getOrDefault(id, Set.of()).size());
         }
         Instant readAt = asOf != null ? asOf : pinned.selected().asOf();
-        return new CompanyIssueCountSnapshot(pinned.selected().version().id(), readAt, counts);
+        return new CompanyIssueCountSnapshot(pinned.selected().version().id(), readAt, counts, pinned.selected().asOfRequested());
     }
 }

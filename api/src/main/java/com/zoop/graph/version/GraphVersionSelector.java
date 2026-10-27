@@ -91,6 +91,20 @@ public class GraphVersionSelector {
         return new SelectedGraphVersion(active, requestStart, false);
     }
 
+    /**
+     * A version an earlier step of the same read already pinned (a cursor's next page, a frozen question, a citation check):
+     * kept exactly as that step read it, never reinterpreted as a version-only address. {@code asOf} is the time that step
+     * reported (or {@code null} for now), and the snapshot is filtered at it only when that step filtered ({@code asOfRequested}).
+     */
+    public SelectedGraphVersion pinned(String versionId, Instant asOf, boolean asOfRequested) {
+        if (versionId == null || !VERSION_ID.matcher(versionId).matches()) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+        if (!repository.everActivated(versionId)) throw new CustomException(ErrorCode.VERSION_UNAVAILABLE);
+        Instant at = asOf != null ? asOf : clock.instant();
+        return new SelectedGraphVersion(found(versionId), at, asOfRequested && asOf != null);
+    }
+
     static Instant upToMillis(Instant at) {
         Instant whole = at.truncatedTo(ChronoUnit.MILLIS);
         return whole.equals(at) ? at : whole.plusMillis(1);
