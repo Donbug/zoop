@@ -3525,6 +3525,90 @@ paths:
             - "/api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용."
         teamQuestions:
           - "핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다."
+  "/api/v1/chat/sessions":
+    get:
+      tags:
+        - "chat"
+      summary: "대화 목록"
+      description: "질문이 하나 이상 있는 본인 대화를 최근 질문 순(updatedAt, id 내림차순)으로 회수한다. 제목은 첫 질문(100자 초과 시 잘라 '…')이다. '새 대화'로 만들고 질문하지 않은 대화는 나오지 않는다. 모델을 호출하지 않는다. 기본 20개, 최대 50개. nextCursor는 회원과 limit에 묶이며 다른 limit으로 쓰면 INVALID_CURSOR다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      operationId: "listConversations"
+      parameters:
+        -
+          "$ref": "#/components/parameters/Cursor"
+        -
+          name: "limit"
+          in: "query"
+          required: false
+          description: "페이지 크기. 기본 20, 최대 50."
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 50
+        -
+          "$ref": "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: "정상 응답"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/ChatConversationList"
+          headers:
+            X-Request-ID:
+              description: "실제 사용한 전송별 요청 ID"
+              schema:
+                type: "string"
+        "401":
+          "$ref": "#/components/responses/Error401"
+        "403":
+          "$ref": "#/components/responses/Error403"
+        "422":
+          "$ref": "#/components/responses/Error422"
+        "500":
+          "$ref": "#/components/responses/Error500"
+        "503":
+          "$ref": "#/components/responses/Error503"
+      security:
+        -
+          memberSession: []
+      x-zoop:
+        fsIds:
+          - "FS050"
+          - "FS051"
+        nfsIds:
+          - "NFS001"
+          - "NFS002"
+          - "NFS004"
+          - "NFS008"
+          - "NFS003"
+          - "NFS009"
+          - "NFS005"
+          - "NFS006"
+        screenIds:
+          - "D-AI-02"
+        wbsIds:
+          - "6.1.2"
+          - "6.11.1"
+          - "6.9.7"
+          - "6.9.8"
+          - "6.9.14"
+        priority: "P2"
+        authority: "회원(본인)"
+        errorCodes:
+          - "INVALID_REQUEST"
+          - "INVALID_CURSOR"
+          - "SOURCE_UNAVAILABLE"
+          - "INTERNAL_ERROR"
+          - "AUTH_REQUIRED"
+          - "MEMBER_REQUIRED"
+        prototype:
+          method: null
+          path: null
+          operationId: null
+          differences:
+            - "직접 대응 BFF 작업 없음. 본인 대화 목록은 정식 API에서 구현한다."
+        teamQuestions:
+          - "와이어프레임에 대화 목록 화면이 없다. 웹은 D-AI-02 드로어 안의 '대화 기록' 보기로 임시 구현했으며 화면 설계 확정이 필요하다."
   "/api/v1/chat/sessions/{id}":
     put:
       tags:
@@ -3724,6 +3808,89 @@ paths:
             - "BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다."
         teamQuestions:
           - "대화·작업의 실제 보존 기간과 마스킹·철회 전파 운영값을 출시 전에 등록해야 한다."
+    delete:
+      tags:
+        - "chat"
+      summary: "대화 삭제"
+      description: "본인 대화와 그 질문 작업·도구 호출을 즉시 삭제한다(삭제 표시·보관 기간 없음). 모델 실행 원장(ai_executions)의 비용 메타데이터는 작업 연결 없이 남는다. 대기·실행 중인 질문이 있으면 JOB_IN_PROGRESS로 거부하므로 먼저 취소한다. 승인된 개인정보 처리방침·이용약관(2026-10-13.1)은 개별 채팅 삭제를 제공하지 않는다고 고지하므로, 개정본이 시행될 때까지 서버 설정 zoop.chat.delete-enabled=false이며 이때는 RESOURCE_NOT_FOUND다. 클라이언트는 listConversations의 deleteEnabled로 노출 여부를 정한다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      operationId: "deleteConversation"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+            pattern: "^[A-Za-z0-9_-]{8,64}$"
+            description: "Conversation id made by the client"
+          description: "Conversation id made by the client"
+        -
+          "$ref": "#/components/parameters/RequestId"
+        -
+          "$ref": "#/components/parameters/CsrfToken"
+      responses:
+        "204":
+          description: "삭제됨"
+          headers:
+            X-Request-ID:
+              description: "실제 사용한 전송별 요청 ID"
+              schema:
+                type: "string"
+        "401":
+          "$ref": "#/components/responses/Error401"
+        "403":
+          "$ref": "#/components/responses/Error403"
+        "404":
+          "$ref": "#/components/responses/Error404"
+        "409":
+          "$ref": "#/components/responses/Error409"
+        "422":
+          "$ref": "#/components/responses/Error422"
+        "500":
+          "$ref": "#/components/responses/Error500"
+        "503":
+          "$ref": "#/components/responses/Error503"
+      security:
+        -
+          memberSession: []
+      x-zoop:
+        fsIds:
+          - "FS050"
+          - "FS051"
+        nfsIds:
+          - "NFS001"
+          - "NFS002"
+          - "NFS004"
+          - "NFS008"
+          - "NFS003"
+          - "NFS009"
+          - "NFS005"
+          - "NFS006"
+        screenIds:
+          - "D-AI-02"
+        wbsIds:
+          - "6.1.2"
+          - "6.11.1"
+          - "6.9.14"
+        priority: "P2"
+        authority: "회원(본인)"
+        errorCodes:
+          - "INVALID_REQUEST"
+          - "RESOURCE_NOT_FOUND"
+          - "JOB_IN_PROGRESS"
+          - "SOURCE_UNAVAILABLE"
+          - "INTERNAL_ERROR"
+          - "AUTH_REQUIRED"
+          - "MEMBER_REQUIRED"
+          - "ACCESS_DENIED"
+        prototype:
+          method: null
+          path: null
+          operationId: null
+          differences:
+            - "직접 대응 BFF 작업 없음. 대화 즉시 삭제는 정식 API에서 구현한다."
+        teamQuestions:
+          - "개별 대화 삭제를 고지하는 개인정보 처리방침·이용약관 개정본(docs/legal/drafts) 승인과 시행 전까지 zoop.chat.delete-enabled를 켜지 않는다."
   "/api/v1/chat/sessions/current":
     get:
       tags:
@@ -10411,6 +10578,51 @@ components:
       type: "object"
       required:
         - "session"
+        - "jobs"
+    ChatConversationList:
+      properties:
+        items:
+          type: "array"
+          items:
+            "$ref": "#/components/schemas/ChatConversationSummary"
+        nextCursor:
+          anyOf:
+            -
+              type: "string"
+            -
+              type: "null"
+          description: "다음 페이지 커서. 마지막 페이지면 null"
+        deleteEnabled:
+          type: "boolean"
+          description: "deleteConversation이 열려 있는지. 거짓이면 클라이언트는 삭제를 보여 주지 않는다"
+      type: "object"
+      required:
+        - "items"
+        - "nextCursor"
+        - "deleteEnabled"
+    ChatConversationSummary:
+      properties:
+        id:
+          type: "string"
+        title:
+          type: "string"
+          description: "첫 질문. 100자를 넘으면 99자와 '…'"
+        createdAt:
+          type: "string"
+          format: "date-time"
+        updatedAt:
+          type: "string"
+          format: "date-time"
+          description: "마지막으로 질문한 시각"
+        jobs:
+          type: "integer"
+          description: "질문 작업 수(확인 질문의 답 포함)"
+      type: "object"
+      required:
+        - "id"
+        - "title"
+        - "createdAt"
+        - "updatedAt"
         - "jobs"
     ChatCurrentResponse:
       properties:
