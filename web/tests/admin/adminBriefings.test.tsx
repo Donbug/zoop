@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test } from 'vitest';
 import AdminProtectedRoute from '@/components/admin/common/AdminProtectedRoute';
 import AdminBriefingsPage from '@/pages/admin/briefings/AdminBriefingsPage';
@@ -303,12 +303,19 @@ describe('A-ADM-04 브리핑 운영 (FS070·FS071)', () => {
 
     await user.click(within(panel).getByRole('button', { name: '재처리' }));
     const form = within(panel).getByRole('form', { name: '브리핑 재처리' });
-    await user.click(within(form).getByRole('button', { name: '재처리 요청' }));
+    expect(
+      within(form).getByText(/무료\(모델을 다시 부르지 않아요\)/),
+    ).toBeTruthy();
+    await user.click(
+      within(form).getByRole('button', { name: '재처리 요청(무료)' }),
+    );
     expect(within(form).getByText('사유를 입력해 주세요.')).toBeTruthy();
     expect(server.calls('POST', REPROCESS)).toHaveLength(0);
 
     await user.type(within(form).getByLabelText('재처리 사유'), '원장 복구됨');
-    await user.click(within(form).getByRole('button', { name: '재처리 요청' }));
+    await user.click(
+      within(form).getByRole('button', { name: '재처리 요청(무료)' }),
+    );
 
     expect(await within(panel).findByText('재처리를 요청했어요.')).toBeTruthy();
     expect(server.calls('POST', REPROCESS)[0].body).toEqual({
@@ -332,7 +339,9 @@ describe('A-ADM-04 브리핑 운영 (FS070·FS071)', () => {
     const form = within(panel).getByRole('form', { name: '브리핑 재처리' });
     await user.type(within(form).getByLabelText('재처리 사유'), reason);
     const submit = () =>
-      user.click(within(form).getByRole('button', { name: '재처리 요청' }));
+      user.click(
+        within(form).getByRole('button', { name: '재처리 요청(무료)' }),
+      );
     await submit();
     return { user, panel, form, submit };
   }
@@ -416,6 +425,22 @@ describe('A-ADM-04 브리핑 운영 (FS070·FS071)', () => {
       await within(panel).findByRole('button', { name: '정정 등록' }),
     );
     const form = within(panel).getByRole('form', { name: '정정 등록' });
+    const correction = within(form).getByLabelText(
+      '정정 내용',
+    ) as HTMLTextAreaElement;
+    const reasonInput = within(form).getByLabelText(
+      '정정 사유',
+    ) as HTMLTextAreaElement;
+    expect(correction.maxLength).toBe(2000);
+    expect(reasonInput.maxLength).toBe(500);
+    fireEvent.change(correction, { target: { value: 'x'.repeat(2001) } });
+    fireEvent.change(reasonInput, { target: { value: '사유' } });
+    fireEvent.submit(form);
+    expect(
+      within(form).getByText('사유 2/500자 · 정정 2001/2000자'),
+    ).toBeTruthy();
+    fireEvent.change(correction, { target: { value: '' } });
+    fireEvent.change(reasonInput, { target: { value: '' } });
 
     await user.selectOptions(
       within(form).getByLabelText('정정할 항목'),
