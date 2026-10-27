@@ -10,7 +10,8 @@ export function compactRelationshipGroups(
   groups: string[][],
 ) {
   if (groups.length < 2) return;
-  const gap = 360;
+  // 최종 1.5배 확대를 적용하면 묶음 사이 여백은 180이 돼요.
+  const gap = 120;
   const boxes = groups
     .map((ids) => {
       const members = ids.map((id) => points.get(id)!);

@@ -15,6 +15,7 @@ async function read(path: string) {
 function Panel({
   owner = 'a',
   editing = false,
+  hiddenEditing = false,
   interval = 10000,
   pages = false,
 }) {
@@ -30,7 +31,11 @@ function Panel({
   useAdminRefresh(result.reload, interval);
   return (
     <>
-      {editing && <form data-admin-editing="true" aria-label="변경 사유" />}
+      {editing && (
+        <div hidden={hiddenEditing}>
+          <form data-admin-editing="true" aria-label="변경 사유" />
+        </div>
+      )}
       <p>{result.status}</p>
       <p>{(pages ? many.items : one.data?.items)?.join(',')}</p>
       {result.refreshError && <p role="alert">이전 결과 유지</p>}
@@ -186,4 +191,28 @@ describe('A-ADM-01~05 관리자 주기 갱신', () => {
     expect(screen.getByText('new owner')).toBeTruthy();
     expect(server.calls('GET', '/pages/b')).toHaveLength(1);
   });
+  test('A-ADM-03 hidden 조상 안의 편집 폼은 주기 갱신을 막지 않아요', async () => {
+    render(<Panel editing hiddenEditing />);
+    await flush();
+    server.on('GET', '/data/a', () =>
+      json({ items: ['숨은 폼 갱신'], nextCursor: null }),
+    );
+    await tick();
+    expect(server.calls('GET', '/data/a')).toHaveLength(2);
+    expect(screen.getByText('숨은 폼 갱신')).toBeTruthy();
+  });
+  test.each([false, true])(
+    'A-ADM-03 응답 도착 시 숨은 폼만 있으면 결과를 적용해요 (cursor=%s)',
+    async (pages) => {
+      const view = render(<Panel pages={pages} />);
+      await flush();
+      const pending = deferred<Response>();
+      server.on('GET', pages ? '/pages/a' : '/data/a', () => pending.promise);
+      await tick();
+      view.rerender(<Panel pages={pages} editing hiddenEditing />);
+      pending.resolve(json({ items: ['도착한 결과'], nextCursor: null }));
+      await flush();
+      expect(screen.getByText('도착한 결과')).toBeTruthy();
+    },
+  );
 });

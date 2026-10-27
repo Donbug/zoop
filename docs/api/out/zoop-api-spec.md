@@ -1088,7 +1088,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getEvent · 사건 상세와 근거 참조 조회
 
-사건 상세와 근거 참조 조회. round·graphVersion·asOf로 공개 버전 하나를 고정하고(그래프 조회와 같은 규칙) 그 버전에서 현재 제외를 적용한 뒤 보이는 사건만 반환하며, 보이지 않으면 RESOURCE_NOT_FOUND/404다. relations·companies·articles·follows·evidenceIds와 사건 머리 필드는 스냅샷에서 읽는다. asOf는 그래프와 같이 사건의 기사가 하나라도 asOf 이후에 공개됐으면 사건 전체를 가리며(404), 일부 기사만 남긴 상세는 만들지 않는다. articles는 이 사건의 보이는 근거가 가리키는 정확한 (기사 ID, 기사 버전)만 담고 같은 기사의 다른 버전은 넣지 않으며, 최신 공개순이다(FS021의 관련도 우선 정렬은 관련도 원천이 없어 미구현). relations[].edgeId는 그래프 표시 간선 ID와 같다. follows는 FOLLOWS 관계(뒤 사건→앞 사건)에서 이 버전에 보이는 사건만 담는다. 수입한 버전은 그 버전의 import receipt(AI 인계 묶음)에서 mentions(원본 S2 언급, verification none)·fieldDecisions(운영자 필드 판정의 필드·결정·사유 코드만, 판정 대상 값은 싣지 않음, candidateId는 null)·sourceSupport(인계 값을 그대로 복사)를 읽고, receipt를 읽을 수 없거나, 그 사건을 담지 않거나, 인계 묶음 스키마가 현재(zoop-graph-handoff-bundle-5)가 아니면(이전 묶음은 언급·필드 판정이 없으므로 빈 목록으로 대신하지 않음) SOURCE_UNAVAILABLE/503이다. 수입한 버전은 근거마다 getEvidence와 같은 현재 공개 게이트(기사 접근 상태·현재 source grant·registry)를 지금 다시 적용해, 언급은 그 근거가 모두 보일 때만 참가자와 함께 내보내고(일부라도 가려지면 언급 전체를 뺌), 관계는 근거가 모두 보일 때만, 기사는 보이는 근거가 가리킬 때만 남긴다. 머리 필드는 운영자가 고른 대표 언급(fieldProvenance.selection=operator-representative)의 값이거나, 대표가 없으면(unanimous) 모든 언급이 같은 값이므로, 대표 언급 또는 모든 언급이 온전히 보이지 않으면 사건 전체를 RESOURCE_NOT_FOUND/404로 닫는다. follows와 FOLLOWS 관계의 상대 사건도 같은 머리 검사를 통과해야 하며, 통과하지 못하면 관계와 참조 모두에서 뺀다. 운영자가 보류·거절(HOLD·REJECT)한 언급의 eventTime(이때 timePrecision=unknown)·period는 null이며 어떤 필드로도 내보내지 않는다. 현재 권한·제외로 기사 일부가 빠지면 sourceSupport는 articleCount를 보이는 기사 수로 하고 가려진 기사에 의존하는 knownLineageCount·independentSourceCount는 null, 목록은 보이는 기사만 남긴다. 합성 fixture 버전은 receipt가 없어 mentions·fieldDecisions가 빈 배열이고 sourceSupport는 모든 기사의 출처가 알려지지 않은 것으로 표시한다(개수는 0이 아니라 null). articles[].publisher는 고정된 기사 버전의 저장된 article_versions 값이며 없으면 null, relationType은 그 기사의 보이는 언급이 모두 background면 PROVIDES_BACKGROUND, 아니면 REPORTS, 언급 정보가 없으면 null이다(앱 결정). role이 있는 companies·relations·참가자는 roleUnconfirmed=true다(인계가 확인된 역할을 생산하지 않음). summary는 아직 사건 요약 생산자가 없어 Unavailable이고 metadata.partial=true·failures에 summary를 남기며, approval은 null이다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+사건 상세와 근거 참조 조회. round·graphVersion·asOf로 공개 버전 하나를 고정하고(그래프 조회와 같은 규칙) 그 버전에서 현재 제외를 적용한 뒤 보이는 사건만 반환하며, 보이지 않으면 RESOURCE_NOT_FOUND/404다. relations·companies·articles·follows·evidenceIds와 사건 머리 필드는 스냅샷에서 읽는다. asOf는 그래프와 같이 사건의 기사가 하나라도 asOf 이후에 공개됐으면 사건 전체를 가리며(404), 일부 기사만 남긴 상세는 만들지 않는다. articles는 이 사건의 보이는 근거가 가리키는 정확한 (기사 ID, 기사 버전)만 담고 같은 기사의 다른 버전은 넣지 않으며, 최신 공개순이다(FS021의 관련도 우선 정렬은 관련도 원천이 없어 미구현). relations[].edgeId는 그래프 표시 간선 ID와 같다. follows는 FOLLOWS 관계(뒤 사건→앞 사건)에서 이 버전에 보이는 사건만 담는다. 수입한 버전은 그 버전의 import receipt(AI 인계 묶음)에서 mentions(원본 S2 언급, verification none)·fieldDecisions(운영자 필드 판정의 필드·결정·사유 코드만, 판정 대상 값은 싣지 않음, candidateId는 null)·sourceSupport(인계 값을 그대로 복사)를 읽고, receipt를 읽을 수 없거나, 그 사건을 담지 않거나, 인계 묶음 스키마가 현재(zoop-graph-handoff-bundle-5)가 아니면(이전 묶음은 언급·필드 판정이 없으므로 빈 목록으로 대신하지 않음) SOURCE_UNAVAILABLE/503이다. receipt 미등록·고정 바이트 손상·형식 오류는 재시도로 복구되지 않아 error.retryable=false다. receipt 저장소의 일시 읽기 장애는 error.retryable=true다. 수입한 버전은 근거마다 getEvidence와 같은 현재 공개 게이트(기사 접근 상태·현재 source grant·registry)를 지금 다시 적용해, 언급은 그 근거가 모두 보일 때만 참가자와 함께 내보내고(일부라도 가려지면 언급 전체를 뺌), 관계는 근거가 모두 보일 때만, 기사는 보이는 근거가 가리킬 때만 남긴다. 머리 필드는 운영자가 고른 대표 언급(fieldProvenance.selection=operator-representative)의 값이거나, 대표가 없으면(unanimous) 모든 언급이 같은 값이므로, 대표 언급 또는 모든 언급이 온전히 보이지 않으면 사건 전체를 RESOURCE_NOT_FOUND/404로 닫는다. follows와 FOLLOWS 관계의 상대 사건도 같은 머리 검사를 통과해야 하며, 통과하지 못하면 관계와 참조 모두에서 뺀다. 운영자가 보류·거절(HOLD·REJECT)한 언급의 eventTime(이때 timePrecision=unknown)·period는 null이며 어떤 필드로도 내보내지 않는다. 현재 권한·제외로 기사 일부가 빠지면 sourceSupport는 articleCount를 보이는 기사 수로 하고 가려진 기사에 의존하는 knownLineageCount·independentSourceCount는 null, 목록은 보이는 기사만 남긴다. 합성 fixture 버전은 receipt가 없어 mentions·fieldDecisions가 빈 배열이고 sourceSupport는 모든 기사의 출처가 알려지지 않은 것으로 표시한다(개수는 0이 아니라 null). articles[].publisher는 고정된 기사 버전의 저장된 article_versions 값이며 없으면 null, relationType은 그 기사의 보이는 언급이 모두 background면 PROVIDES_BACKGROUND, 아니면 REPORTS, 언급 정보가 없으면 null이다(앱 결정). role이 있는 companies·relations·참가자는 roleUnconfirmed=true다(인계가 확인된 역할을 생산하지 않음). summary는 아직 사건 요약 생산자가 없어 Unavailable이고 metadata.partial=true·failures에 summary를 남기며, approval은 null이다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -4572,6 +4572,62 @@ allow는 HOLD 대상의 운영자 최종 승인(approved)이며 재검증이나 
 | quote | 필수 | string |  |
 | quoteVerified | 필수 | boolean / null |  |
 
+<a id="schema-structuraldetails"></a>
+
+### StructuralDetails
+
+FS023 공급 관계 상세. 새 서버는 항상 반환하지만 구서버와 혼재 배포될 수 있어 기존 consumer 호환이 필요한 동안 OpenAPI 및 웹 타입에서 선택 필드로 유지한다. 혼재 배포 지원 종료 시 필수 여부를 다시 결정한다. available일 때만 완전한 paths를 제공하며 일부 경로를 잘라 공개하지 않는다. unavailable은 관계 없음이 아니다. 비공개 pathCompanies는 공개하지 않는다. legacy_data·not_recorded는 기록 부재이므로 metadata.partial/failures에 넣지 않는다. details_not_available은 확인 가능한 상세를 제공하지 못한 상태로 metadata.partial과 STRUCTURAL_DETAIL_UNAVAILABLE을 제공한다. 조회 중 일시 장애는 기본 관계 상세를 유지하고 metadata.failures에 SOURCE_UNAVAILABLE, retryable=true로 기록한다. receipt 구조 손상은 로그를 남기고 details_not_available 및 retryable=false로 기록한다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {available, unavailable, not_applicable} |  |
+| reason | 필수 | string, null {legacy_data, not_recorded, details_not_available, None} |  |
+| paths | 필수 | [StructuralRelationPath](#schema-structuralrelationpath)[] |  |
+
+<a id="schema-structuralrelationpath"></a>
+
+### StructuralRelationPath
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| relationId | 필수 | string | 표시 간선 뒤 원본 공개 relation ID. 경로를 합치지 않고 relationId 순으로 반환한다. |
+| companies | 필수 | [StructuralCompany](#schema-structuralcompany)[] | 운영자가 매핑한 P→…→C 순서이며 공급 방향이 아니다. 모두 현재 공개된 기업이다. |
+| links | 필수 | [StructuralSupplyLink](#schema-structuralsupplylink)[] | basis 순서. 인과·가격 방향·독립 원천 증명을 뜻하지 않는다. |
+
+<a id="schema-structuralcompany"></a>
+
+### StructuralCompany
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| label | 필수 | string |  |
+
+<a id="schema-structuralsupplylink"></a>
+
+### StructuralSupplyLink
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| basisId | 필수 | string | receipt relationKey, 기존 basis.edgeId에 대응. |
+| relationType | 필수 | string {SUPPLIES} |  |
+| supplierCompanyId | 필수 | string |  |
+| customerCompanyId | 필수 | string |  |
+| businessScope | 필수 | string, null | S3 원문 텍스트. null은 미상이며 전체 사업이 아니다. |
+| productScope | 필수 | string, null | S3 원문 텍스트. 제품 엔티티 ID가 아니다. |
+| validFrom | 필수 | string, null | 효력 시작일 YYYY-MM-DD. null은 미상. |
+| validUntil | 필수 | string, null | 마지막 유효일 YYYY-MM-DD, 당일 포함. null은 영구 유효가 아니다. |
+| validity | 필수 | string {scheduled, active, ended, unknown} | metadata.asOf의 Asia/Seoul 날짜 기준, BasisOut.validity와 동일. |
+| verifiedAt | 필수 | string (date-time) | 관계를 eligible하게 만든 판정 시각. 기사 발행 시각과 구분한다. |
+| countries | 필수 | string[] |  |
+| evidenceIds | 필수 | string[] (uniqueItems) | 이 basis에 속하며 현재 읽을 수 있는 근거. EdgeDetail.evidenceIds에 합치지 않는다. |
+
 <a id="schema-edgedetail"></a>
 
 ### EdgeDetail
@@ -4580,6 +4636,7 @@ allow는 HOLD 대상의 운영자 최종 승인(approved)이며 재검증이나 
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| structuralDetails | 선택 | [StructuralDetails](#schema-structuraldetails) |  |
 | id | 필수 | string |  |
 | relationType | 필수 | string {INVOLVES, STRUCTURALLY_RELATED_TO, FOLLOWS, SHARES_ISSUE} |  |
 | derived | 필수 | boolean |  |

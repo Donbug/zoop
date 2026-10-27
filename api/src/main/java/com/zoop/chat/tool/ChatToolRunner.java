@@ -96,7 +96,7 @@ public class ChatToolRunner implements AutoCloseable {
         List<ChatToolRegistry.Binding> bindings = calls.stream().map(call -> registry.bind(call.capabilityId())
                 .orElseThrow(() -> new IllegalArgumentException("unbound chat capability: " + call.capabilityId())))
                 .toList();
-        ChatToolScope scope = new ChatToolScope(run.jobId(), run.graphVersionId(), run.context().asOf());
+        ChatToolScope scope = new ChatToolScope(run.jobId(), run.graphVersionId(), run.context().asOf(), run.memberId());
         List<ChatToolCallReservation> reservations = new ArrayList<>();
         for (int i = 0; i < calls.size(); i++) reservations.add(reservation(bindings.get(i), scope, calls.get(i)));
         List<String> ids = control.reserveToolCalls(planRevision, reservations);
@@ -259,6 +259,7 @@ public class ChatToolRunner implements AutoCloseable {
             var evidence = meta.putArray("evidenceScope");
             call.evidenceScope().forEach(evidence::add);
         }
+        if (call.since() != null) meta.put("since", call.since().toString());
         ObjectNode input = StrictJson.newObject();
         input.put("capabilityId", binding.capability().id());
         input.set("request", meta);

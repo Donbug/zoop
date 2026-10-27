@@ -281,8 +281,22 @@ class EventDetailServiceTest {
     void anUnreadableReceiptIsUnavailable() {
         when(receipts.graphImportBundle(anyString(), anyString()))
                 .thenThrow(new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
-        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
-                () -> imported(null).get(EUV, null, null, null, "r")).getErrorCode());
+        CustomException failure = assertThrows(CustomException.class,
+                () -> imported(null).get(EUV, null, null, null, "r"));
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, failure.getErrorCode());
+        assertTrue(failure.isRetryable());
+    }
+
+    @Test
+    void aMalformedPinnedReceiptIsUnavailableWithoutRetryingIt() {
+        when(receipts.graphImportBundle(anyString(), anyString()))
+                .thenThrow(new CustomException(ErrorCode.SOURCE_UNAVAILABLE, false));
+
+        CustomException failure = assertThrows(CustomException.class,
+                () -> imported(null).get(EUV, null, null, null, "r"));
+
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, failure.getErrorCode());
+        assertFalse(failure.isRetryable());
     }
 
     @Test

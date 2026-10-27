@@ -75,6 +75,10 @@ public class ChatPlanner {
         for (var requirement : kept) {
             Planned p = serve(run, requirement, bound, planned);
             if (p == null) return clarify(run, "ambiguous_target", List.of());
+            if (p.onScope()) {
+                Planned scope = p.scope();
+                planned.put(scope.id(), scope);
+            }
             planned.put(p.id(), p);
         }
         if (planned.values().stream().anyMatch(p -> p.mode() == Mode.TOOLS
@@ -101,7 +105,8 @@ public class ChatPlanner {
     private static List<Planned> withConcepts(ChatRouteDecision decision, Collection<Planned> planned) {
         Set<String> ids = new HashSet<>();
         decision.requirements().forEach(r -> ids.add(r.id()));
-        long room = MAX_BRANCHES - planned.stream().filter(p -> p.mode() != Mode.LIMITED).count();
+        long room = MAX_BRANCHES - planned.stream()
+                .filter(p -> p.mode() != Mode.LIMITED && p.origin() != ChatPlan.Origin.SCOPE).count();
         List<Planned> requirements = new ArrayList<>();
         for (Planned p : planned) {
             requirements.add(p);
@@ -192,6 +197,12 @@ public class ChatPlanner {
         long issues = r.dependsOn() == null ? r.targets().size() - companies : 0;
         if (companies > 0 && all.contains(ChatQueryType.Q03)) defaults.add(ChatCapability.COMPANY_READ);
         if (issues > 0 && all.contains(ChatQueryType.Q03)) defaults.add(ChatCapability.ISSUE_READ);
+        // A period comparison compares the public graph, with or without a named target.
+        if (r.dependsOn() == null && all.contains(ChatQueryType.Q05)) defaults.add(ChatCapability.GRAPH_VERSION_DIFF);
+        // "My stocks" that names no company reads the member's own companies first, and a company fact reads them.
+        boolean mine = r.dependsOn() == null && r.targets().isEmpty() && all.contains(ChatQueryType.Q07);
+        if (mine) defaults.add(ChatCapability.PORTFOLIO_SCOPE_READ);
+        if (mine && all.contains(ChatQueryType.Q03)) defaults.add(ChatCapability.COMPANY_READ);
         if (companies >= 2 && all.contains(ChatQueryType.Q04)) defaults.add(ChatCapability.GRAPH_PATH_READ);
         for (ChatCapability c : defaults) {
             if (permitted.contains(c) && bound.contains(c.id()) && !capabilities.contains(c)) capabilities.add(c);
@@ -199,6 +210,19 @@ public class ChatPlanner {
         capabilities.sort(Comparator.comparing(ChatCapability::id));
         // A fact requirement without a lookup it may make is out of scope, even when it also asks about a concept.
         if (capabilities.isEmpty()) return base.limited("out_of_scope");
+
+        // Q07: the member's companies come from their own scope, read by the server for the authenticated member. The rest
+        // of the requirement reads on them in the next stage (at least one, at most the fan-out the scope read passes on).
+        if (mine && capabilities.contains(ChatCapability.PORTFOLIO_SCOPE_READ)) {
+            List<ChatCapability> rest = capabilities.stream().filter(c -> c != ChatCapability.PORTFOLIO_SCOPE_READ).toList();
+            if (rest.isEmpty()) {
+                return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities,
+                        ChatCapability.PORTFOLIO_SCOPE_READ.untargeted(), TargetSource.SERVER, null, null, 1);
+            }
+            var scope = new ChatRouteDecision.Dependency(r.id() + Planned.SCOPE_ID, "atLeast", 1);
+            return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, rest, List.of(), TargetSource.DEPENDENCY, null,
+                    scope, 2);
+        }
 
         // ZOOP documents are read whatever the question names, so a requirement that reads only them needs no target.
         if (r.dependsOn() == null && capabilities.stream().noneMatch(c -> c.documents().isEmpty())) {
@@ -217,7 +241,14 @@ public class ChatPlanner {
         // The selected context: its targets, or the selected evidence alone, narrowed to the evidence the member chose.
         var selection = run.selection();
         List<String> targets = !selection.contextIds().isEmpty() ? selection.contextIds() : selection.evidenceIds();
-        if (targets.isEmpty()) return null;
+        if (targets.isEmpty()) {
+            // Reads that can cover the whole public graph ("what changed on the map") need no target.
+            if (capabilities.stream().allMatch(c -> !c.untargeted().isEmpty())) {
+                return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities,
+                        capabilities.getFirst().untargeted(), TargetSource.SERVER, null, null, 1);
+            }
+            return null;
+        }
         List<String> scope = selection.evidenceIds().isEmpty() ? null : selection.evidencePool();
         return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities, targets, TargetSource.CONTEXT, scope,
                 null, 1);
