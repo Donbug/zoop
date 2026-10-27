@@ -967,7 +967,7 @@ def main() -> int:
         + table(["분류", "대상", "원문 A 출처", "원문 A", "원문 B 출처", "원문 B", "작업자 가결정", "담당자 수정 요청", "상태"], correction_rows))
     (OUT / "effective-authority.json").write_text(json.dumps({
         "authority": authority, "valid": authority_valid,
-        "sourceSha256": hashlib.sha256(authority_source.read_bytes()).hexdigest() if authority_source.is_file() else None,
+        "sourceSha256": hashlib.sha256(fingerprint_bytes(authority_source)).hexdigest() if authority_source.is_file() else None,
         "scopeExceptions": exceptions,
         "reservedRequirements": reserved_requirements,
         "detailAuthority": {"historicalSheets": list(historical_files.values()), "historicalOnlySpecIds": sorted(historical_only),
