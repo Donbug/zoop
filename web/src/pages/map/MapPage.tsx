@@ -53,6 +53,7 @@ import { useImpactPath } from '@/hooks/useImpactPath';
 import { companyUrl } from '@/apis/company/company';
 import { setTutorialCompleted } from '@/apis/graph/tutorial';
 import { impactEdges, exactTime } from '@/components/company/detail-model';
+import { companyDetailRouteFromMap } from '@/util/company-detail-route';
 import type { Impact } from '@/types/company/detail';
 import { useAuth } from '@/hooks/useAuth';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
@@ -739,8 +740,15 @@ function MapWorkspace({
       )}
       {historicalImpact.error && (
         <p role="alert">
-          영향 경로 조회 실패. 관계를 임의 강조하지 않았어요.
-          <button onClick={historicalImpact.retry}>영향 경로 다시 조회</button>
+          {historicalImpact.errorCode === 'VERSION_UNAVAILABLE'
+            ? '사건 시점의 그래프 버전을 사용할 수 없어요. 관계를 임의 강조하지 않았어요.'
+            : '영향 경로 조회 실패. 관계를 임의 강조하지 않았어요.'}
+          {historicalImpact.errorRetryable !== false &&
+            historicalImpact.errorCode !== 'VERSION_UNAVAILABLE' && (
+              <button onClick={historicalImpact.retry}>
+                영향 경로 다시 조회
+              </button>
+            )}
         </p>
       )}
       {round && <BriefingSnapshotBanner roundId={round} />}
@@ -1090,6 +1098,9 @@ function MapWorkspace({
                 <CompanyDetailPanel
                   key={companyNode.id}
                   companyId={companyNode.id}
+                  companyDetailHref={(id) =>
+                    companyDetailRouteFromMap(id, params.toString())
+                  }
                   context={round || tutorialOpen ? eventContext : undefined}
                   fallback={companyNode}
                   relatedCompanies={relatedCompanies}
@@ -1235,6 +1246,9 @@ function MapWorkspace({
                   <EventDetailPanel
                     key={eventId}
                     id={eventId}
+                    companyDetailHref={(id) =>
+                      companyDetailRouteFromMap(id, params.toString())
+                    }
                     context={eventContext}
                     geography={selectedNode?.geography ?? null}
                     logoOf={logoOf}

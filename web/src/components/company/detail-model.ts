@@ -148,7 +148,7 @@ export function impactEdges(
         : null;
   return edge &&
     !edge.derived &&
-    edge.assertionStatus === 'confirmed' &&
+    edge.evidenceIds.length > 0 &&
     edge.relationType === expectedRelation &&
     edge.source === impact.issueId &&
     edge.target === impact.companyId
