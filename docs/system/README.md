@@ -66,7 +66,7 @@ uv run --with pyyaml python docs/system/import_sources.py \
   --requirements-dir docs/evidence/raw/requirements-sheet_2026-10-06
 ```
 
-세 디렉터리와 이력 탭 파일을 생략해도 위 최신 조합이 기본값이다. 기본 화면 인덱스는 `docs/screen-plan/captures/slide-index.json`, 구현 판정은 `docs/evidence/spec-v1.2-gap.md`다. `--spec-dir`, `--wbs-dir`, `--requirements-dir`, `--screens`, `--gap`으로 명시적 대안을 지정할 수 있다. 모든 CSV·보존 XLSX·수집 manifest와 두 입력 문서의 SHA-256을 기록한다. 상세 구획의 제목 행·메타 행과 WBS 표지/일정 요약의 비어 있지 않은 원문 행, 본문 열 헤더도 보존한다. 가져오기는 `catalog.yaml`만 교체한다. `scripts/repo_checks.py docs`는 importer의 암묵적 기본값이 아니라 catalog의 `sources`/`fingerprints`를 복사·명시 전달해 같은 고정본으로 재생성한다.
+세 디렉터리와 이력 탭 파일을 생략해도 위 최신 조합이 기본값이다. 기본 화면 인덱스는 `docs/screen-plan/captures/slide-index.json`, 구현 판정은 `docs/evidence/spec-v1.2-gap.md`다. `--spec-dir`, `--wbs-dir`, `--requirements-dir`, `--screens`, `--gap`으로 명시적 대안을 지정할 수 있다. 모든 CSV·보존 XLSX·수집 manifest와 두 입력 문서의 SHA-256을 기록한다. 텍스트 원본(CSV/JSON/Markdown)은 LF로 정규화해 해시하므로 Windows와 Linux 체크아웃의 줄바꿈 차이는 변경으로 취급하지 않는다. XLSX는 원본 바이트를 해시한다. 상세 구획의 제목 행·메타 행과 WBS 표지/일정 요약의 비어 있지 않은 원문 행, 본문 열 헤더도 보존한다. 가져오기는 `catalog.yaml`만 교체한다. `scripts/repo_checks.py docs`는 importer의 암묵적 기본값이 아니라 catalog의 `sources`/`fingerprints`를 복사·명시 전달해 같은 고정본으로 재생성한다.
 
 ### 3. ID 연결과 목표 계약을 편집한다
 

@@ -23,6 +23,15 @@ SYSTEM = ROOT / "docs/system"
 OUT = SYSTEM / "out"
 API_OUT = ROOT / "docs/api/out"
 METHODS = {"get", "post", "put", "patch", "delete", "head", "options"}
+TEXT_FINGERPRINT_SUFFIXES = {".csv", ".json", ".md"}
+
+
+def fingerprint_bytes(path: Path) -> bytes:
+    """Hash text sources independently of the checkout's newline convention."""
+    content = path.read_bytes()
+    if path.suffix.lower() in TEXT_FINGERPRINT_SUFFIXES:
+        return content.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return content
 
 
 def load(path: Path) -> dict:
@@ -406,7 +415,7 @@ def main() -> int:
     catalog_warnings = catalog["warnings"]
     for path, digest in catalog["fingerprints"].items():
         actual = ROOT / path
-        if not actual.exists() or hashlib.sha256(actual.read_bytes()).hexdigest() != digest:
+        if not actual.exists() or hashlib.sha256(fingerprint_bytes(actual)).hexdigest() != digest:
             finding("SOURCE_CHANGED", path, "가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다.", "error")
     specs = {r["id"]: r for r in catalog["specs"]}
     screens = {r["id"]: r for r in catalog["screens"]}
