@@ -158,10 +158,10 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             return new ChatRouteDecision(decided, null);
         });
 
-        // Issues are resolved only for a question that may look something up: a concept question never reads the pinned
-        // graph, so it is answered while the graph cannot be read. A graph that cannot be read here is the reads' outage
-        // too, and ends the run as such, not as a model failure.
-        if (decision.requirements().stream().noneMatch(ChatModelStages::mayLookUp)) return decision;
+        // Issues are resolved only for a question that may read the pinned graph: a concept question or one that reads only
+        // ZOOP's own documents (Q01) never does, so it is answered while the graph cannot be read. A graph that cannot be
+        // read here is the reads' outage too, and ends the run as such, not as a model failure.
+        if (decision.requirements().stream().noneMatch(r -> mayReadGraph(r, boundCapabilities))) return decision;
         Resolved named = resolve(pieces, replies, picked, issues.at(run.graphVersionId(), run.context().asOf()));
         if (named.ambiguity() != null) return new ChatRouteDecision(List.of(), named.ambiguity());
         return new ChatRouteDecision(decision.requirements().stream().map(r -> new ChatRouteDecision.Requirement(r.id(),
@@ -170,12 +170,13 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     }
 
     /**
-     * Whether the planner may give a requirement a lookup: a type other than a concept (Q02) at its lowest band. It is the
-     * band at which a concept question naming a company or an issue also becomes a question about it.
+     * Whether the planner may give a requirement a read of the pinned graph: a type at its lowest band that allows a bound
+     * capability reading the graph. It is the band at which a concept question naming a company or an issue also becomes a
+     * question about it. Q02 allows no capability and Q01 only ZOOP document reads, which need no graph.
      */
-    private static boolean mayLookUp(ChatRouteDecision.Requirement requirement) {
-        return requirement.types().entrySet().stream()
-                .anyMatch(t -> t.getKey() != ChatQueryType.Q02 && t.getValue() >= ChatPlanner.REVIEW);
+    private static boolean mayReadGraph(ChatRouteDecision.Requirement requirement, Set<String> bound) {
+        return requirement.types().entrySet().stream().filter(t -> t.getValue() >= ChatPlanner.REVIEW)
+                .anyMatch(t -> t.getKey().capabilities().stream().anyMatch(c -> c.readsGraph() && bound.contains(c.id())));
     }
 
     /** Targets by requirement, or the shared name to ask about. */

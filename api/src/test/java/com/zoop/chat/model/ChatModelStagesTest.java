@@ -217,6 +217,28 @@ class ChatModelStagesTest {
     }
 
     @Test
+    void aZoopDocumentQuestionNeverReadsTheGraphSoItIsRoutedWhileThePinnedGraphIsDown() {
+        // run() pins an active version, as the context freezer does without a selection; Q01 needs only ZOOP's documents.
+        issueCatalog = List.of(new IssueNameResolver.Entry("iss-supply", "차세대 HBM 공급 계약", "HBM", "공급 계약", null));
+        issueOutage = true;
+        answer = call -> succeeded(call, """
+                {"requirements":[{"requirementId":"r1","types":{"Q01":0.9},"capabilities":{"zoopPolicy.read":0.9},
+                  "prohibitedAdvice":0.0}]}""");
+        ChatRouteDecision policy = stages.route(run(root("탈퇴하면 HBM 공급 계약 대화 기록은 어떻게 돼?")),
+                Set.of("zoopPolicy.read", "issue.read"));
+        assertEquals(1, policy.requirements().size());
+        assertEquals(List.of(), policy.requirements().getFirst().targets());
+        assertEquals(0, issueReads, "a document question is not held up by the graph");
+
+        // A graph type none of whose capabilities is bound reads no graph either.
+        answer = call -> succeeded(call, """
+                {"requirements":[{"requirementId":"r1","types":{"Q01":0.9,"Q06":0.9},"capabilities":{"zoopPolicy.read":0.9},
+                  "prohibitedAdvice":0.0}]}""");
+        stages.route(run(root("HBM 공급 계약 브리핑과 약관")), Set.of("zoopPolicy.read", "issue.read"));
+        assertEquals(0, issueReads);
+    }
+
+    @Test
     void aCompanyNamedInAFreeTextReplyResolvesTheSharedNameOfTheQuestion() {
         answer = call -> succeeded(call, """
                 {"requirements":[{"requirementId":"r1","types":{"Q03":0.9},"capabilities":{"company.read":0.9},
