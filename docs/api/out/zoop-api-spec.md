@@ -2737,7 +2737,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 ## getCompanyIssueImpact · 기업 맥락 이슈 영향 경로 조회
 
-기업 패널에서 여는 영향 경로다. 데이터에 없는 산업·제품 단계나 관계 유형을 만들지 않는다.
+D-GRP-06·D-GRP-05 / FS022. FS079 오프라인 검증 결과를 소비하지만 FS079 자체에 공개 HTTP 작업을 새로 배정하지 않는다. 선택한 공개 버전·asOf·현재 공개 제외를 함께 적용한다. 보이는 INVOLVES가 있으면 direct, 그렇지 않고 보이는 STRUCTURALLY_RELATED_TO가 있으면 structural이다. 다른 이슈를 경유하거나 SHARES_ISSUE를 경로로 쓰지 않는다. 구조 연결만으로 이슈의 긍정·부정 영향을 주장하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2745,7 +2745,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | 권한·우선순위 | 공개 · P1 |
 | 요청 본문 | 없음 |
 | 응답 | 200: [ImpactPath](#schema-impactpath), 409: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
+| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE |
 | FS/NFS | [FS022](../../system/out/feature-FS022.md) · [FS024](../../system/out/feature-FS024.md) · [FS055](../../system/out/feature-FS055.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-GRP-06](../../system/out/screen-D-GRP-06.md) · [D-GRP-05](../../system/out/screen-D-GRP-05.md) |
 | WBS | 6.1.2, 6.11.1, 6.6.6, 6.6.7, 6.6.9, 6.6.22, 6.6.24, 6.6.25, 6.6.26, 6.5.1 |
@@ -2759,6 +2759,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string |  |
 | issueId | path | 필수 | string |  |
+| round | query | 선택 | string | 브리핑 회차가 고정한 그래프를 읽는다. graphVersion/asOf를 함께 지정하면 저장된 회차의 버전·자료 시점과 정확히 일치해야 하며 최신 그래프로 대체하지 않는다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
@@ -7144,18 +7145,88 @@ S1 실제 문서 요약. exact citation+별도 semantic supported 영수증을 �
 
 ### ImpactPath
 
-기업 패널에서 여는 영향 경로다. 데이터에 없는 산업·제품 단계나 관계 유형을 만들지 않는다.
+pathStatus=none은 기업·이슈가 모두 공개됐지만 공개 연결이 없는 200 결과다. 대상이 없거나 공개되지 않으면 404다. direct가 structural보다 우선한다. structural의 완전한 공개 사슬 후보가 여러 개면 단계 수, 원천 관계 ID, 근거 ID 오름차순으로 하나만 선택한다. available 경로의 steps는 정확히 [issue, company]이고 none에서는 비어 있다. 현재 판정 없이 산업·제품 단계나 긍정·부정 영향을 만들지 않는다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | companyId | 필수 | string |  |
 | issueId | 필수 | string |  |
-| steps | 필수 | object[] |  |
+| pathStatus | 필수 | string {available, none} |  |
+| pathType | 필수 | string, null {direct, structural, None} |  |
+| edgeId | 필수 | string, null | 선택 버전의 필터된 공개 그래프에서 고른 표시 간선 ID. 경로가 없으면 null. |
+| steps | 필수 | object[] | available이면 공개 이슈, 선택 기업 순서의 두 노드다. none이면 빈 배열이다. 중간 사업 관계 기업은 이 목록에 넣지 않는다. |
 | steps[].id | 필수 | string |  |
-| steps[].kind | 필수 | string {company, issue, industry, product} |  |
+| steps[].kind | 필수 | string {company, issue} |  |
 | steps[].reason | 필수 | string |  |
 | steps[].evidenceIds | 필수 | string[] |  |
+| businessPath | 필수 | [ImpactBusinessPath](#schema-impactbusinesspath) / null | structural에서만 객체다. 시작 기업의 공개 INVOLVES와 모든 단계·근거·중간 기업의 공개 조건을 통과해야 complete다. direct/none은 null. |
+| impact | 필수 | [CompanyIssueImpactAssessment](#schema-companyissueimpactassessment) |  |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
+
+<a id="schema-impactbusinesspath"></a>
+
+### ImpactBusinessPath
+
+구조 연결의 운영자 매핑 사업 관계 사슬이다. 공급 방향은 관계 사실이며 이슈 영향·인과·가격 방향이 아니다. fixture·재구성 버전은 영수증을 읽지 않고 not_recorded를 반환한다. complete는 공개 시작 INVOLVES, 선택 시점에 보이는 모든 basis의 영수증·snapshot 일치, 현재 읽을 수 있는 단계별 근거, 공개 중간 기업이 모두 확인된 경우에만 허용한다. 후보 관계 중 하나라도 완전하게 공개할 수 없으면 사슬 전체를 unavailable로 둔다. 지원 bundle은 5~7이며 1~4는 legacy_data, 미지원·손상 영수증은 503이다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {complete, unavailable} |  |
+| reason | 필수 | string, null {not_recorded, legacy_data, intermediate_company_unmapped, not_public, evidence_unavailable, incomplete, None} | complete에서는 null이다. 비공개 지원 참조의 ID나 내부 원장 내용은 제공하지 않는다. |
+| companyIds | 필수 | string[] | complete에서만 이슈에 직접 참여한 공개 기업부터 선택 기업까지 2~3개 ID. unavailable에서는 빈 배열. |
+| links | 필수 | [ImpactBusinessLink](#schema-impactbusinesslink)[] | complete에서만 companyIds의 인접 쌍별 공급자·고객 관계와 공개 근거. unavailable에서는 빈 배열. |
+
+<a id="schema-impactbusinesslink"></a>
+
+### ImpactBusinessLink
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| supplierCompanyId | 필수 | string |  |
+| customerCompanyId | 필수 | string |  |
+| reason | 필수 | string | 검증된 사업 관계 유형·범위에서 표시할 설명. 원천에 없는 인과 해석을 만들지 않는다. |
+| evidenceIds | 필수 | string[] |  |
+
+<a id="schema-companyissueimpactassessment"></a>
+
+### CompanyIssueImpactAssessment
+
+snapshot 버전의 영수증 손상·선택 버전 불일치는 503이다. fixture·재구성 버전은 영수증이 없는 정상 자료 상태이므로 영향 판정은 not_recorded, 구조 상세는 not_recorded다. 공개 경로가 없으면 no_public_path, structural에 이슈별 판정 생산 계약이 없으면 issue_impact_not_produced, direct의 구버전 영수증에 impacts[]가 없으면 not_recorded, 검증 행은 있지만 공개 가능한 판정이 없으면 not_verified다. 검증 행 중 하나라도 필수 근거를 현재 열 수 없으면 다른 행도 내보내지 않고 evidence_unavailable이다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {available, unavailable} |  |
+| reason | 필수 | string, null {no_public_path, not_recorded, not_verified, evidence_unavailable, issue_impact_not_produced, None} | available에서는 null이다. none 경로는 no_public_path, 구조적 이슈 영향 생산 전은 issue_impact_not_produced, impacts[]가 없는 구버전은 not_recorded다. 선택 버전 영수증 손상·불일치는 503으로 처리한다. |
+| results | 필수 | [CompanyIssueImpactResult](#schema-companyissueimpactresult)[] | available일 때 하나 이상, unavailable일 때 빈 배열. 공개 간선의 원천 판정별로 유지하고 합산하지 않는다. 검증 행 하나라도 필수 근거를 열 수 없으면 전체를 evidence_unavailable로 둔다. |
+
+<a id="schema-companyissueimpactresult"></a>
+
+### CompanyIssueImpactResult
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| impactId | 필수 | string | 원천 판정을 구별하는 공개용 불투명 ID. 같은 그래프 버전 안에서 안정적이고 유일하며 내부 원천 참조를 드러내지 않는다. |
+| status | 필수 | string {verified} |  |
+| label | 필수 | string {positive, negative, mixed, undetermined} | 선택 이슈의 선택 기업에 대한 검증 결과. 구조 관계 자체의 영향 판정을 복사하지 않는다. 주가·확률 예측이 아니다. |
+| evidenceIds | 필수 | string[] | effects 네 목록의 중복 없는 합집합. 모두 현재 getEvidence에서 읽을 수 있어야 한다. |
+| effects | 필수 | [CompanyIssueImpactEffects](#schema-companyissueimpacteffects) |  |
+
+<a id="schema-companyissueimpacteffects"></a>
+
+### CompanyIssueImpactEffects
+
+검증기가 각 인용에 지정한 효과별 근거. 서로 겹치지 않고 합집합은 result.evidenceIds와 같다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| positive | 필수 | string[] |  |
+| negative | 필수 | string[] |  |
+| neutral | 필수 | string[] |  |
+| uncertain | 필수 | string[] |  |
 
 <a id="schema-errorcode"></a>
 

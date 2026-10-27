@@ -31,7 +31,8 @@ describe('FS015 실제 지도 간선 기반 튜토리얼 경로', () => {
       context,
     );
     expect(getRelation).toHaveBeenCalledWith('actual-edge', context);
-    expect(impact.steps.map((step) => step.id)).toEqual(['company', 'issue']);
+    // D-GRP-06 contract: path steps are ordered from the issue to the selected company.
+    expect(impact.steps.map((step) => step.id)).toEqual(['issue', 'company']);
     expect(
       impact.steps.every((step) => step.evidenceIds[0] === 'evidence-a'),
     ).toBe(true);
