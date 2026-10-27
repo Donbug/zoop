@@ -3705,7 +3705,7 @@ answered 본문의 근거 수준별 구간.
 
 ### ChatApplied
 
-What the answer was actually built on.
+What the answer was actually built on. For insufficient_evidence, nothing was answered, so companies and issues are what this run's reads looked at.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |

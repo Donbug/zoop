@@ -50,6 +50,34 @@ class ChatAnswerCheckTest {
     }
 
     @Test
+    void aSplitConceptSectionNamingWhatItsParentReadIsDroppedNotFailed() {
+        var parent = branch("f", List.of("ev-f"));
+        var split = new Branch("f-c", "요구 f — 개념 설명", Set.of(ChatQueryType.Q02), true, List.of(), false, "f",
+                List.of("SK하이닉스", "HBM 공급 확대"));
+        for (String text : List.of("SK하이닉스의 HBM은 메모리입니다.", "SK 하이닉스는 메모리 회사입니다.",
+                "HBM 공급확대는 수요에서 옵니다.", "HBM 수요는 2026년에 컸습니다.")) {
+            var answer = new ChatGeneratedAnswer(List.of(new Section("general_knowledge", text, List.of("f-c"), List.of()),
+                    new Section("evidence_grounded", "본문", List.of("f"), List.of("ev-f"))), List.of(), List.of());
+            var passed = ChatAnswerCheck.check(List.of(parent, split), answer).passed();
+            assertNotNull(passed, text);
+            assertEquals(1, passed.sections().size(), text);
+            assertEquals(List.of("f-c"), passed.dropped(), text);
+            assertEquals(List.of("f-c"), passed.insufficient(), text);
+        }
+        var plain = new ChatGeneratedAnswer(List.of(new Section("general_knowledge", "HBM은 메모리 반도체입니다.",
+                List.of("f-c"), List.of())), List.of("f"), List.of());
+        var passed = ChatAnswerCheck.check(List.of(parent, split), plain).passed();
+        assertEquals(List.of(), passed.dropped());
+        assertEquals(ChatAnswerCheck.GENERAL_NOTICE + " HBM은 메모리 반도체입니다.", passed.sections().getFirst().text());
+
+        // Names are the split requirement's rule only; a router concept is held to the general rules alone.
+        var concept = new Branch("c", "개념", Set.of(ChatQueryType.Q02), true, List.of(), false);
+        var named = new ChatGeneratedAnswer(List.of(new Section("general_knowledge", "SK하이닉스는 메모리 회사입니다.",
+                List.of("c"), List.of())), List.of(), List.of());
+        assertNull(ChatAnswerCheck.check(List.of(concept), named).failedCheck());
+    }
+
+    @Test
     void zoopDocumentTextAndPublicEvidenceNeverShareASection() {
         // Q01 + Q03 in one requirement: a policy read and a company read.
         var policy = new ChatToolResult("chat-tool/v1", "tc-1", "zoopPolicy.read", "zoop-docs/policy.privacy@v1",

@@ -10272,7 +10272,7 @@ components:
         - "graphVersion"
         - "dataAsOf"
         - "questionOverrodeContext"
-      description: "What the answer was actually built on."
+      description: "What the answer was actually built on. For insufficient_evidence, nothing was answered, so companies and issues are what this run's reads looked at."
     ChatAppliedItem:
       properties:
         id:
