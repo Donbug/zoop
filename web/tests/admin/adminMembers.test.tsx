@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test } from 'vitest';
 import AdminProtectedRoute from '@/components/admin/common/AdminProtectedRoute';
 import AdminMembersPage from '@/pages/admin/members/AdminMembersPage';
@@ -232,7 +232,17 @@ describe('A-ADM-05 회원·접근 관리 (FS069)', () => {
       within(form).getByText(/열려 있는 모든 세션이 지금 끝나고/),
     ).toBeTruthy();
     await user.click(within(form).getByRole('button', { name: '차단하기' }));
-    expect(within(form).getByText('사유를 입력해 주세요.')).toBeTruthy();
+    expect(
+      within(form).getByText('사유를 1~500자로 입력해 주세요.'),
+    ).toBeTruthy();
+    const limitedReason = within(form).getByLabelText(
+      '차단 사유(감사 로그에 남아요)',
+    ) as HTMLTextAreaElement;
+    expect(limitedReason.maxLength).toBe(500);
+    fireEvent.change(limitedReason, { target: { value: 'x'.repeat(501) } });
+    fireEvent.submit(form);
+    expect(within(form).getByText('사유 501/500자')).toBeTruthy();
+    fireEvent.change(limitedReason, { target: { value: '' } });
     expect(server.calls('POST', BLOCK)).toHaveLength(0);
 
     await user.type(

@@ -1,3 +1,4 @@
+import { useAdminRefresh } from '@/hooks/useAdminRefresh';
 import { useCallback, useState } from 'react';
 import { getAnalysisJob, listAnalysisJobs } from '@/apis/admin/jobs';
 import {
@@ -169,6 +170,10 @@ function AnalysisJobsSession() {
   const [notice, setNotice] = useState<string | null>(null);
   // 다시 실행·취소 요청이 진행 중인지. 진행 중에는 다른 작업을 고르거나 폼을 닫지 못하게 한다.
   const [pending, setPending] = useState(false);
+  useAdminRefresh(
+    jobs.reload,
+    !pending && jobs.items.some(isActive) ? 5000 : false,
+  );
   const first = jobs.pages[0];
 
   const select = (id: string | null) => {
@@ -191,6 +196,11 @@ function AnalysisJobsSession() {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,460px)]">
       <Section title="작업">
+        {jobs.refreshError && (
+          <p role="status" className="text-[11px] text-zoop-muted">
+            새로 고치지 못했어요. 이전 결과를 표시해요.
+          </p>
+        )}
         <AnalyzePlanCreateForm
           disabled={pending}
           onPendingChange={setPending}
@@ -356,6 +366,10 @@ function JobDetail({
   const load = useCallback(() => getAnalysisJob(id), [id]);
   const detail = useAsyncData(load);
   const [action, setAction] = useState<JobAction | null>(null);
+  useAdminRefresh(
+    detail.reload,
+    !action && detail.data && isActive(detail.data) ? 5000 : false,
+  );
 
   if (detail.status === 'loading')
     return <Loading>작업 상세를 불러오고 있어요</Loading>;
@@ -375,6 +389,11 @@ function JobDetail({
 
   return (
     <article aria-labelledby="job-title" className="flex flex-col gap-4">
+      {detail.refreshError && (
+        <p role="status" className="text-[11px] text-zoop-muted">
+          새로 고치지 못했어요. 이전 결과를 표시해요.
+        </p>
+      )}
       <div className="flex items-start gap-2">
         <h2 id="job-title" className="min-w-0 flex-1 text-sm font-bold">
           {jobName(job)}
