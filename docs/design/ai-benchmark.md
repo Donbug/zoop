@@ -267,6 +267,16 @@ scorer는 run과 입력 binding·ID·순위를 확인한 뒤에만 gold를 연�
 이는 공식 TAT-QA answer EM/F1, held-out 평가, 한국어 금융 품질, QA·그래프·경로·모델 품질의 증거가 아니다. 원출처·CC BY 4.0·개발용 순서 표본·Zoop 미합의 annotation 한계를 유지한다. 명령과 실행 방법은 [evaluation README](../../ai/evaluation/README.md#tat-qa-문단-검색과-별도-채점)에 있다. `scripts/materials_retrieval_smoke.py`는 gold를 제거한 상태에서 저장 dev 30문항을 실제 CLI로 검색하고, producer 종료와 run 저장 후 gold를 복원하여 채점하도록 구성했다. audit는 검색의 gold 접근과 양쪽 명령의 네트워크·모델 경로·프로세스·애플리케이션 환경 조회·파일 변경을 차단한다. fixture/run 저장은 harness의 임시 디렉터리에서만 수행한다. 여기에는 실행 결과 수치나 authored 기대값을 실측으로 제시하지 않는다.
 
 
+### Native corpus의 로컬 사람 검토 준비
+
+`zoop_ai_pipeline.corpus_review_cli prepare`는 현재 native export 권한으로 문서 전체를 휴대 패키지에 보존하고, 채널·ISO 발행 주차별 quota와 round-robin으로 유한한 사람 검토 배치를 만든다. 실행 명령과 닫힌 binding/주석 계약은 [pipeline README의 사람 검토 패키지](../../ai/pipeline/README.md#로컬-사람-검토용-휴대-패키지-corpus_review_cli)를 따른다. native 권한 확인은 pipeline이 담당하며 stdlib evaluation의 기존 scorer나 material adapter에 새 의존성을 넣지 않는다.
+
+`inputs.json`에는 불변 문서·선정 reference만 있고 gold는 없다. 별도 `annotations.template.json`은 `unreviewed`와 `null` 판단으로 시작한다. 사람이 패키지 밖에 복사한 주석을 작성하면 `annotations-check`가 입력 digest·case ID·필수 사람 필드·정확한 Unicode 근거 범위만 확인하고 미검토/검토/제외 건수를 보고한다. 미상 판단은 notes에 기록할 수 있으며 미검토를 오답이나 reject로 계산하지 않는다. 작성된 주석도 운영자 주장이지 사람 독립 검수·합의가 확인된 gold는 아니다.
+
+이는 **사람 검토 준비 기능이며 측정된 품질 결과가 아니다.** 전체 자료는 제한된 수집의 산출물이고 검토 배치도 대표 표본·held-out test·dev/test split이 아니다. 정책브리핑 텍스트를 한국어 기업 공시 gold로 바꿔 부르지 않는다. 자동 entity·edge·정답·score·adjudication은 만들지 않으며 기존 `score`·`verify-score`·`summary-verify-score`의 입력 형식도 아니다. 실제 사람 검토·합의와 평가용 run/채점 연결은 별도 작업이다.
+
+생성 당시 native `read`·`store`·`quote-display`와 외부 권리 증거 pin을 확인하지만 모델 전송·업로드·공개 게시 권한을 부여하지 않는다. corpus plan의 알려진 gate 2·3도 버전 문자열만 믿지 않고, 실제 저장 native body·receipt와 `rights.json`의 모든 사실을 현재 parser로 읽기 전용 재검사해야 한다. 과거 plan을 수정하거나 native 획득·복구를 다시 실행하지 않는다. 옮긴 패키지의 `verify`는 원래 원장·환경·네트워크와 mutable annotation 없이 내부 무결성만 검사한다. 이것을 현재 원격 이용 허가나 발행자 진위 검증으로 해석하지 않는다. 실제 본문과 작성된 주석은 Git 밖에 유지한다.
+
 ### 자료 후보 6종과 권리 경계
 
 | 자료·1차 출처 | 평가 용도 | 현재 상태와 권리·한계 |

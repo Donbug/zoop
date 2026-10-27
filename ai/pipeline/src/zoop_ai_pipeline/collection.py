@@ -85,6 +85,7 @@ def parse_robots(data: bytes, user_agent: str) -> Rules:
         groups: list[tuple[list[str], list[tuple[str, str]]]] = []
         agents: list[str] = []
         directives: list[tuple[str, str]] = []
+        invalid_group = False
         for raw in data.decode("utf-8-sig").splitlines():
             line = raw.split("#", 1)[0].strip()
             if not line:
@@ -94,17 +95,25 @@ def parse_robots(data: bytes, user_agent: str) -> Rules:
             if not separator or not re.fullmatch(r"[a-z-]+", name):
                 raise ValueError("directive")
             if name == "user-agent":
-                if directives:
-                    groups.append((agents, directives))
+                valid_agent = re.fullmatch(r"[A-Za-z0-9_.*-]+(?:/[A-Za-z0-9_.-]+)?", value) is not None
+                if not valid_agent:
+                    leading_identity = re.match(r"[A-Za-z0-9_.*-]+", value)
+                    # Conservative refusal only: an unsupported header cannot hide potentially applicable restrictions.
+                    if leading_identity and leading_identity[0].lower() in (product, "*"):
+                        raise ValueError("ambiguous applicable agent")
+                # An unrelated nonstandard identity is a boundary, never a continuation of another group.
+                if directives or invalid_group or not valid_agent:
+                    if agents:
+                        groups.append((agents, directives))
                     agents, directives = [], []
-                if not re.fullmatch(r"[A-Za-z0-9_.*-]+(?:/[A-Za-z0-9_.-]+)?", value):
-                    raise ValueError("agent")
-                agents.append(value.split("/")[0].lower())
+                invalid_group = not valid_agent
+                if valid_agent:
+                    agents.append(value.split("/")[0].lower())
             elif name in {"allow", "disallow", "crawl-delay"}:
-                if not agents:
+                if not agents and not invalid_group:
                     raise ValueError("orphan rule")
                 directives.append((name, value))
-            elif name != "sitemap" and not agents:
+            elif name != "sitemap" and not agents and not invalid_group:
                 raise ValueError("unrecognized")
         if agents:
             groups.append((agents, directives))
@@ -286,7 +295,7 @@ class Fetcher:
             time.sleep(wait)
         target = httpx.URL(url)
         pinned = target.copy_with(host=self._pin(target, host, deadline))
-        headers = {"User-Agent": self.policy.user_agent, "Accept": "text/html, application/pdf;q=0.9", "Accept-Encoding": "identity",
+        headers = {"User-Agent": self.policy.effective_user_agent, "Accept": "text/html, application/pdf;q=0.9", "Accept-Encoding": "identity",
                    "Host": target.netloc.decode("ascii")}
         extensions = {"sni_hostname": host, "timeout": dict.fromkeys(("connect", "read", "write", "pool"), self._remaining(deadline))}
 
@@ -574,7 +583,8 @@ def _target_item(target: Target, fetched: Fetched, collected: Collected) -> Item
                                 "collection": collected.wire()})
 
 
-def collect(registry: Path, policy: Policy, request: Request, resolver: Resolver = system_resolver) -> dict:
+def collect(registry: Path, policy: Policy, request: Request, resolver: Resolver = system_resolver, *,
+            fetcher: Fetcher | None = None, validate_response: Callable[[Target, Fetched], None] | None = None) -> dict:
     """Run (or replay) one immutable collection. Returns the stored result plus where the ingestion manifest is."""
     _require_sync_context()
     authority = Authority(registry)
@@ -604,27 +614,37 @@ def collect(registry: Path, policy: Policy, request: Request, resolver: Resolver
             except (ValidationError, KeyError, TypeError) as exc:
                 raise IngestionFailure("collection_namespace_conflict") from exc
             authority.check(request.source_id, request.scope_id, config=config)
+            if fetcher is not None and fetcher.authority_guard is not None:
+                fetcher.authority_guard()
             return {**previous, "replayed": True, "manifestPath": str(Path(source.input_root) / manifest.file)}
-        return _run(authority, source, scope, config, grant, policy, request, request_digest, output, resolver)
+        if fetcher is not None and (fetcher.policy.wire() != policy.wire() or fetcher.hosts != frozenset(source.allowed_hosts)):
+            raise IngestionFailure("collector_fetcher_conflict")
+        return _run(authority, source, scope, config, grant, policy, request, request_digest, output, resolver, fetcher, validate_response)
     finally:
         output.close()
 
 
 
-def _run(authority, source, scope, config, grant, policy, request, request_digest, output: Output, resolver) -> dict:
+def _run(authority, source, scope, config, grant, policy, request, request_digest, output: Output, resolver, fetcher=None, validate_response=None) -> dict:
     started = now()
 
     def current_grant() -> None:
         try:
             authority.check(request.source_id, request.scope_id, config=config)
+            if previous_guard is not None:
+                previous_guard()
         except IngestionFailure as exc:
             raise _AuthorityChanged(exc.code) from exc
 
-    fetcher = Fetcher(policy, source.allowed_hosts, resolver, authority_guard=current_grant)
+    fetcher = fetcher or Fetcher(policy, source.allowed_hosts, resolver)
+    previous_guard = fetcher.authority_guard
+    initial_requests, initial_bytes = fetcher.requests, fetcher.downloaded
+
+    fetcher.authority_guard = current_grant
     base = f"collections/{request.collection_id}"
     outcomes, items, documents = [], [], {}
-    output.begin(request.collection_id)
     try:
+        output.begin(request.collection_id)
         for target in request.targets:
             outcome = {"candidateId": target.candidate_id, "url": canonical_url(target.url)[0], "outcome": "failed", "code": None,
                        "bodySha256": None, "receiptSha256": None}
@@ -633,6 +653,8 @@ def _run(authority, source, scope, config, grant, policy, request, request_diges
             try:
                 fetched = fetcher.fetch(target.url)
                 current_grant()  # Never materialize fetched bytes under a grant revoked during the response.
+                if validate_response is not None:
+                    validate_response(target, fetched)  # Same response, before either receipt or raw body publication.
                 body_hash = byte_hash(fetched.body)
                 # Loopback is reachable only through the explicit synthetic switch; say so instead of calling it an external document.
                 network = "synthetic_loopback" if LOOPBACK_HOSTS & {canonical_url(fetched.requested_url)[1], canonical_url(fetched.final_url)[1]} else "external"
@@ -643,7 +665,7 @@ def _run(authority, source, scope, config, grant, policy, request, request_diges
                     "contentType": fetched.content_type, "mediaType": fetched.media_type,
                     "contentLength": fetched.headers["content-length"], "etag": fetched.headers["etag"],
                     "lastModified": fetched.headers["last-modified"], "serverDate": fetched.headers["date"],
-                    "bodySha256": body_hash, "bodyBytes": len(fetched.body), "fetchedAt": fetched.fetched_at, "userAgent": policy.user_agent,
+                    "bodySha256": body_hash, "bodyBytes": len(fetched.body), "fetchedAt": fetched.fetched_at, "userAgent": policy.effective_user_agent,
                     "network": network, "robots": fetched.robots, "requestCount": max(fetched.requests, 1)})
                 receipt_bytes = canonical(receipt.wire()).encode("utf-8")
                 receipt_hash = byte_hash(receipt_bytes)
@@ -683,7 +705,9 @@ def _run(authority, source, scope, config, grant, policy, request, request_diges
         result = {"schemaVersion": SCHEMA, "collectionId": request.collection_id, "requestDigest": request_digest, "sourceId": source.source_id,
                   "scopeId": scope.scope_id, "provenance": "collected_http", "state": state, "startedAt": started, "completedAt": now(), "grant": grant,
                   "manifest": {"file": f"{base}/manifest.json", "sha256": byte_hash(manifest_bytes)}, "targets": outcomes,
-                  "usage": {"requests": fetcher.requests, "bytes": fetcher.downloaded, "targets": len(outcomes), "collected": collected_count}}
+                  "usage": {"requests": fetcher.requests - initial_requests, "bytes": fetcher.downloaded - initial_bytes, "targets": len(outcomes), "collected": collected_count}}
+        if policy.contact_url is not None:
+            result["userAgent"] = policy.effective_user_agent
         output.write("manifest.json", manifest_bytes)
         output.write("collection.json", canonical(result).encode("utf-8"))
         output.commit(request.collection_id, current_grant)
@@ -691,3 +715,5 @@ def _run(authority, source, scope, config, grant, policy, request, request_diges
     except BaseException:
         output.abort()
         raise
+    finally:
+        fetcher.authority_guard = previous_guard
