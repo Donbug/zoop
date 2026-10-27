@@ -44,21 +44,34 @@ final class ReviewTargetReader {
 
     /** One review target as the sync writes it; {@code sourceJobId} and {@code sourceVersion} are the S3 job's. */
     record Row(String type, String externalId, String candidateId, String status, List<String> companyIds,
-            List<String> relationTypes, String sourceRevision) {
+            List<String> relationTypes, String sourceRevision, Display display, Boolean operatorApproved) {
+    }
+
+    /**
+     * What the candidate list shows without calling the AI service. {@code issueId}, {@code title}, {@code action} and
+     * {@code eventTime} come from the S2 event candidate and are null for a relation row and for a candidate without an event.
+     */
+    record Display(String issueId, String title, String action, String target, String eventTime, int evidenceCount,
+            List<Company> companies, List<String> reasons) {
+    }
+
+    /** A company as the source names it: {@code sourceId} is the AI source company id (not an app id), {@code role} may be null. */
+    record Company(String sourceId, String name, String role) {
     }
 
     record Projection(List<Row> rows, int unknownEvents, int skipped) {
     }
 
-    private record Event(boolean listed, Set<String> companies) {
-        static final Event UNLISTED = new Event(false, Set.of());
+    private record Event(boolean listed, Set<String> companies, String issueId, String title, String action, String target,
+            String eventTime, int citations, List<Company> participants) {
+        static final Event UNLISTED = new Event(false, Set.of(), null, null, null, null, null, 0, List.of());
     }
 
     private record Events(Map<String, Event> byId, int skipped, boolean unidentified) {
     }
 
     private record Relation(String id, String type, String status, String revision, Set<String> companies,
-            List<String> events) {
+            List<String> events, int citations, List<String> reasons, boolean operatorApproved) {
     }
 
     /**
@@ -67,8 +80,13 @@ final class ReviewTargetReader {
      * @throws Malformed when either document is not an object with its array ({@code eventCandidates}, {@code relations})
      */
     static Projection read(String s2Json, String s3Json) {
-        Events events = events(StrictJson.parseObject(s2Json));
-        JsonNode items = StrictJson.parseObject(s3Json).array("relations");
+        return read(StrictJson.parseObject(s2Json), StrictJson.parseObject(s3Json));
+    }
+
+    /** {@link #read(String, String)} over documents already parsed (the candidate detail's own reads). */
+    static Projection read(Obj s2, Obj s3) {
+        Events events = events(s2);
+        JsonNode items = s3.array("relations");
         Map<String, List<Relation>> grouped = new LinkedHashMap<>();
         List<Relation> alone = new ArrayList<>();
         int unknown = 0;
@@ -100,8 +118,8 @@ final class ReviewTargetReader {
             else alone.add(relation);
         }
         List<Row> rows = new ArrayList<>();
-        grouped.forEach((event, relations) -> candidate(rows, event, events.byId().get(event).companies(), relations));
-        for (Relation relation : alone) candidate(rows, relation.id(), Set.of(), List.of(relation));
+        grouped.forEach((event, relations) -> candidate(rows, event, events.byId().get(event), relations));
+        for (Relation relation : alone) candidate(rows, relation.id(), null, List.of(relation));
         return new Projection(rows, unknown, skipped);
     }
 
@@ -139,21 +157,31 @@ final class ReviewTargetReader {
     }
 
     private static Event event(Obj item) {
-        boolean listed = "candidate".equals(item.string("state"))
-                && !"held".equals(item.object("disposition").string("status"));
+        Obj disposition = item.object("disposition");
+        boolean listed = "candidate".equals(item.string("state")) && !"held".equals(disposition.string("status"));
+        Obj mention = item.object("mention");
         Set<String> companies = new TreeSet<>();
-        for (Obj participant : item.object("mention").objects("participants")) {
-            if (participant.has("companyId") && !participant.isNull("companyId")) {
-                companies.add(matching(participant.string("companyId"), REF));
-            }
+        List<Company> participants = new ArrayList<>();
+        for (Obj participant : mention.objects("participants")) {
+            String sourceId = participant.has("companyId") && !participant.isNull("companyId")
+                    ? matching(participant.string("companyId"), REF) : null;
+            if (sourceId != null) companies.add(sourceId);
+            participants.add(new Company(sourceId, participant.string("name"), participant.string("role")));
         }
-        return new Event(listed, companies);
+        String issueId = disposition.has("targetEventId") ? disposition.stringOrNull("targetEventId") : null;
+        return new Event(listed, companies, issueId, mention.string("title"), mention.string("action"), mention.stringOrNull("target"),
+                mention.stringOrNull("eventTime"), item.array("citations").size(), List.copyOf(participants));
     }
 
     private static Relation relation(Obj item) {
         String id = matching(item.string("relationCandidateId"), RelationReviewRequest.CANDIDATE_ID);
-        String eligibility = item.object("eligibility").string("status");
-        if (!eligibility.equals("pending") && !STATUS.containsKey(eligibility)) throw new Malformed();
+        Obj eligibility = item.object("eligibility");
+        String status = eligibility.string("status");
+        if (!status.equals("pending") && !STATUS.containsKey(status)) throw new Malformed();
+        Set<String> reasons = new TreeSet<>();
+        if (eligibility.has("reasons")) {
+            for (Obj reason : eligibility.objects("reasons")) reasons.add(reason.string("code"));
+        }
         Set<String> companies = new TreeSet<>();
         List<String> events = new ArrayList<>();
         for (String role : List.of("subject", "object")) {
@@ -166,32 +194,69 @@ final class ReviewTargetReader {
                 default -> throw new Malformed();
             }
         }
-        return new Relation(id, matching(item.string("type"), TYPE), STATUS.get(eligibility),
-                matching(item.string("sourceRevision"), SOURCE_REVISION), companies, events);
+        int citations = item.array("citations").size();
+        return new Relation(id, matching(item.string("type"), TYPE), STATUS.get(status),
+                matching(item.string("sourceRevision"), SOURCE_REVISION), companies, events, citations, List.copyOf(reasons),
+                operatorApproved(eligibility));
+    }
+
+    /** The AI eligibility rests on an operator's final approval ({@code approvalBasis.kind}), not an automatic verdict. */
+    private static boolean operatorApproved(Obj eligibility) {
+        if (!eligibility.has("approvalBasis") || eligibility.isNull("approvalBasis")) return false;
+        return "operator-final-approval".equals(eligibility.object("approvalBasis").string("kind"));
     }
 
     /**
      * The candidate row and one relation row per relation. The candidate is HOLD while any relation is, else ALLOW while any is,
      * else REJECT. Its source revision is the sum of its relations' revisions: each only grows, so the sum grows whenever one
-     * of them changes, which is all the sync needs to tell a newer reading from an older one.
+     * of them changes, which is all the sync needs to tell a newer reading from an older one. {@code event} is null for a
+     * relation that is a candidate of its own.
      */
-    private static void candidate(List<Row> rows, String candidateId, Set<String> participants, List<Relation> relations) {
-        Set<String> companies = new TreeSet<>(participants);
+    private static void candidate(List<Row> rows, String candidateId, Event event, List<Relation> relations) {
+        Set<String> companies = new TreeSet<>(event == null ? Set.of() : event.companies());
         Set<String> types = new TreeSet<>();
+        Set<String> reasons = new TreeSet<>();
         long revision = 0;
         for (Relation relation : relations) {
             companies.addAll(relation.companies());
             types.add(relation.type());
+            reasons.addAll(relation.reasons());
             revision += Long.parseLong(relation.revision());
         }
         String status = relations.stream().anyMatch(r -> r.status().equals("HOLD")) ? "HOLD"
                 : relations.stream().anyMatch(r -> r.status().equals("ALLOW")) ? "ALLOW" : "REJECT";
+        Display display = event == null
+                ? new Display(null, null, null, null, null, relations.getFirst().citations(), named(List.of(), companies, true),
+                        List.copyOf(reasons))
+                : new Display(event.issueId(), event.title(), event.action(), event.target(), event.eventTime(), event.citations(),
+                        named(event.participants(), companies, true), List.copyOf(reasons));
         rows.add(new Row("candidate", candidateId, candidateId, status, List.copyOf(companies), List.copyOf(types),
-                Long.toString(revision)));
+                Long.toString(revision), display, null));
+        List<Company> participants = event == null ? List.of() : event.participants();
         for (Relation relation : relations) {
             rows.add(new Row("relation", relation.id(), candidateId, relation.status(),
-                    List.copyOf(relation.companies()), List.of(relation.type()), relation.revision()));
+                    List.copyOf(relation.companies()), List.of(relation.type()), relation.revision(),
+                    new Display(null, null, null, null, null, relation.citations(),
+                            named(participants, relation.companies(), false), relation.reasons()),
+                    relation.operatorApproved()));
         }
+    }
+
+    /**
+     * Companies with the S2 participant's name and role where it names the id; any other id stands in for its own name. With
+     * {@code everyParticipant} the participants the S2 mention lists without a relation come first too.
+     */
+    private static List<Company> named(List<Company> participants, Set<String> ids, boolean everyParticipant) {
+        List<Company> named = new ArrayList<>();
+        Set<String> listed = new TreeSet<>();
+        for (Company company : participants) {
+            if (everyParticipant || (company.sourceId() != null && ids.contains(company.sourceId()))) {
+                named.add(company);
+                if (company.sourceId() != null) listed.add(company.sourceId());
+            }
+        }
+        for (String id : ids) if (!listed.contains(id)) named.add(new Company(id, id, null));
+        return List.copyOf(named);
     }
 
     private static String matching(String value, Pattern pattern) {
