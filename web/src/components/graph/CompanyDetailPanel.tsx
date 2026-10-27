@@ -12,6 +12,7 @@ import IssueDocumentSentiments from './IssueDocumentSentiments';
 type RelatedCompany = { id: string; name: string; sharedIssueCount: number };
 type Props = {
   companyId: string;
+  companyDetailHref?: (id: string) => string;
   context?: EventContext;
   fallback: GraphNode;
   relatedCompanies: RelatedCompany[];
@@ -245,7 +246,12 @@ export default function CompanyDetailPanel(props: Props) {
           <div
             className={`company-actions ${ui.actions} [&>:last-child]:col-span-2`}
           >
-            <Link to={`/companies/${encodeURIComponent(company.id)}`}>
+            <Link
+              to={
+                props.companyDetailHref?.(company.id) ??
+                `/companies/${encodeURIComponent(company.id)}`
+              }
+            >
               기업 상세
             </Link>
             {props.token ? (
