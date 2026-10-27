@@ -1,6 +1,7 @@
 package com.zoop.chat.orchestrator;
 
 import com.zoop.chat.dto.ChatChoice;
+import com.zoop.chat.dto.ChatJobRequest;
 import com.zoop.chat.tool.ChatCapability;
 import java.util.List;
 import java.util.Set;
@@ -57,6 +58,8 @@ public sealed interface ChatPlan {
         /** Id and label suffixes of a concept requirement. */
         static final String CONCEPT_ID = "-c";
         static final String CONCEPT_LABEL = " — 개념 설명";
+        /** The longest label the answer stage takes, in code points (zoop-ai-chat-1 {@code Branch.label}). */
+        static final int MAX_LABEL = ChatJobRequest.MAX_QUESTION;
 
         public Planned {
             types = Set.copyOf(types);
@@ -78,9 +81,15 @@ public sealed interface ChatPlan {
                     origin, parent);
         }
 
-        /** The Q02 part of this requirement as a general requirement of its own. */
+        /**
+         * The Q02 part of this requirement as a general requirement of its own. Only the derived label is cut, by code
+         * points, so that with its suffix it stays within {@link #MAX_LABEL}; the parent keeps its own.
+         */
         Planned concept() {
-            return new Planned(id + CONCEPT_ID, label + CONCEPT_LABEL, Set.of(ChatQueryType.Q02), Mode.GENERAL, null,
+            int room = MAX_LABEL - CONCEPT_LABEL.codePointCount(0, CONCEPT_LABEL.length());
+            String base = label.codePointCount(0, label.length()) <= room ? label
+                    : label.substring(0, label.offsetByCodePoints(0, room));
+            return new Planned(id + CONCEPT_ID, base + CONCEPT_LABEL, Set.of(ChatQueryType.Q02), Mode.GENERAL, null,
                     List.of(), List.of(), null, null, null, 1, Origin.CONCEPT, id);
         }
     }
