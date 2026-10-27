@@ -84,6 +84,78 @@ def test_uninterpretable_robots_denies_instead_of_allowing(body):
         parse_robots(body, UA)
 
 
+@pytest.mark.parametrize("rule", [
+    b"Allow: https://other.invalid/news/a",
+    b"Disallow: https://other.invalid/news/a",
+    b"Crawl-delay: soon",
+], ids=["absolute-allow", "absolute-disallow", "invalid-delay"])
+def test_unrelated_malformed_robots_rules_do_not_block_wildcard_collection(kit, site, rule):
+    body = b"User-agent: OtherBot\n" + rule + b"\nUser-agent: *\nAllow: /\nDisallow:\n"
+    site.route("/robots.txt", body, content_type="text/plain")
+    site.route("/news/a", NEWS)
+    result = kit.collect("robots-unrelated", [kit.target(site.url("/news/a"), "n1")])
+    assert result["state"] == "complete" and codes(result) == {"n1": None}
+    assert [entry["path"] for entry in site.log] == ["/robots.txt", "/news/a"]
+
+
+@pytest.mark.parametrize("group", [
+    b"User-agent: *\n",
+    b"User-agent: ZoopSyntheticCollector\n",
+    b"User-agent: OtherBot\nUser-agent: ZoopSyntheticCollector\n",
+    b"User-agent: ZoopSyntheticCollector\nAllow: /\nUser-agent: zoopsyntheticcollector\n",
+], ids=["wildcard", "product", "shared-group", "duplicate-group"])
+@pytest.mark.parametrize("rule", [
+    b"Allow: https://other.invalid/news/a",
+    b"Disallow: https://other.invalid/news/a",
+    b"Crawl-delay: soon",
+], ids=["absolute-allow", "absolute-disallow", "invalid-delay"])
+def test_applicable_malformed_robots_rules_prevent_body_requests(kit, site, group, rule):
+    site.route("/robots.txt", group + rule + b"\n", content_type="text/plain")
+    site.route("/news/a", NEWS)
+    result = kit.collect("robots-applicable-malformed", [kit.target(site.url("/news/a"), "n1")], expected=2)
+    assert result["state"] == "failed" and codes(result) == {"n1": "robots_malformed"}
+    assert [entry["path"] for entry in site.log] == ["/robots.txt"]
+
+
+@pytest.mark.parametrize("group", [
+    b"User-agent: OtherBot\nUser-agent: ZoopSyntheticCollector\n",
+    b"User-agent: ZoopSyntheticCollector\nAllow: /\nUser-agent: zoopsyntheticcollector\n",
+], ids=["shared-group", "duplicate-group"])
+def test_applicable_merged_robots_disallow_prevents_body_requests(kit, site, group):
+    site.route("/robots.txt", group + b"Disallow: /news/\nUser-agent: *\nAllow: /\n", content_type="text/plain")
+    site.route("/news/a", NEWS)
+    result = kit.collect("robots-applicable-denied", [kit.target(site.url("/news/a"), "n1")], expected=2)
+    assert result["state"] == "failed" and codes(result) == {"n1": "robots_denied"}
+    assert [entry["path"] for entry in site.log] == ["/robots.txt"]
+
+
+@pytest.mark.parametrize("malformed", [
+    b"User-agent OtherBot\n",
+    b"User-agent: invalid bot\n",
+    b"Disallow: /orphan\n",
+    b"\xff\n",
+], ids=["missing-header-colon", "invalid-agent", "orphan-rule", "invalid-encoding"])
+def test_malformed_robots_structure_cannot_be_bypassed_by_wildcard_allow(kit, site, malformed):
+    site.route("/robots.txt", malformed + b"User-agent: *\nAllow: /\n", content_type="text/plain")
+    site.route("/news/a", NEWS)
+    result = kit.collect("robots-structure-malformed", [kit.target(site.url("/news/a"), "n1")], expected=2)
+    assert result["state"] == "failed" and codes(result) == {"n1": "robots_malformed"}
+    assert [entry["path"] for entry in site.log] == ["/robots.txt"]
+
+
+def test_selected_product_groups_merge_rules_and_maximum_delay_without_wildcard_rules():
+    body = (b"User-agent: *\nDisallow: https://other.invalid/\nCrawl-delay: soon\n"
+            b"User-agent: ZOOPSYNTHETICCOLLECTOR\nDisallow: /news/\nCrawl-delay: 2.5\n"
+            b"User-agent: zoopsyntheticcollector\nAllow: /news/open\nDisallow: /news/open?private=1$\nCrawl-delay: 1\n"
+            b"User-agent: zoopsyntheticcollector\nDisallow: /news/open\n")
+    rules = parse_robots(body, UA)
+    assert rules.delay == 2.5
+    assert not rules.permits("https://h.invalid/news/closed")
+    assert rules.permits("https://h.invalid/news/open")
+    assert not rules.permits("https://h.invalid/news/open?private=1")
+    assert rules.permits("https://h.invalid/news/open?private=10")
+
+
 @pytest.mark.parametrize("status,body,expected", [(500, b"down", "robots_unavailable"), (200, b"nonsense", "robots_malformed"), (403, b"no", "http_403")])
 def test_unavailable_or_malformed_robots_blocks_the_whole_origin(kit, site, status, body, expected):
     site.route("/robots.txt", body, status=status, content_type="text/plain")
