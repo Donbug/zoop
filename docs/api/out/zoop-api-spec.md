@@ -160,8 +160,10 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | [getBriefingRecap](#getbriefingrecap) | GET | /api/v1/briefings/{id}/recap | 공개 | P1 |
 | [getBriefingItemDetail](#getbriefingitemdetail) | GET | /api/v1/briefings/{roundId}/items/{eventId} | 공개 | P1 |
 | [getBriefingGraphBasis](#getbriefinggraphbasis) | GET | /api/v1/briefings/{id}/graph | 공개 | P1 |
+| [listConversations](#listconversations) | GET | /api/v1/chat/sessions | 회원(본인) | P2 |
 | [createConversation](#createconversation) | PUT | /api/v1/chat/sessions/{id} | 회원(본인) | P1 |
 | [getConversation](#getconversation) | GET | /api/v1/chat/sessions/{id} | 회원(본인) | P1 |
+| [deleteConversation](#deleteconversation) | DELETE | /api/v1/chat/sessions/{id} | 회원(본인) | P2 |
 | [getCurrentConversation](#getcurrentconversation) | GET | /api/v1/chat/sessions/current | 회원(본인) | P1 |
 | [submitQuestion](#submitquestion) | POST | /api/v1/chat/sessions/{id}/jobs | 회원(본인) | P1 |
 | [getQuestionJob](#getquestionjob) | GET | /api/v1/chat/jobs/{job_id} | 회원(본인) | P1 |
@@ -1281,6 +1283,34 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | id | path | 필수 | string |  |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
+<a id="listconversations"></a>
+
+## listConversations · 대화 목록
+
+질문이 하나 이상 있는 본인 대화를 최근 질문 순(updatedAt, id 내림차순)으로 회수한다. 제목은 첫 질문(100자 초과 시 잘라 '…')이다. '새 대화'로 만들고 질문하지 않은 대화는 나오지 않는다. 모델을 호출하지 않는다. 기본 20개, 최대 50개. nextCursor는 회원과 limit에 묶이며 다른 limit으로 쓰면 INVALID_CURSOR다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/chat/sessions` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [ChatConversationList](#schema-chatconversationlist), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, INVALID_CURSOR, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED |
+| FS/NFS | [FS050](../../system/out/feature-FS050.md) · [FS051](../../system/out/feature-FS051.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| 화면 | [D-AI-02](../../system/out/screen-D-AI-02.md) |
+| WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.8, 6.9.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 직접 대응 BFF 작업 없음. 본인 대화 목록은 정식 API에서 구현한다. |
+| 팀 확인 필요 | 와이어프레임에 대화 목록 화면이 없다. 웹은 D-AI-02 드로어 안의 '대화 기록' 보기로 임시 구현했으며 화면 설계 확정이 필요하다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
+| limit | query | 선택 | integer | 페이지 크기. 기본 20, 최대 50. |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+
 <a id="createconversation"></a>
 
 ## createConversation · 새 대화 생성
@@ -1335,6 +1365,34 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string | Conversation id made by the client |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+
+<a id="deleteconversation"></a>
+
+## deleteConversation · 대화 삭제
+
+본인 대화와 그 질문 작업·도구 호출을 즉시 삭제한다(삭제 표시·보관 기간 없음). 모델 실행 원장(ai_executions)의 비용 메타데이터는 작업 연결 없이 남는다. 대기·실행 중인 질문이 있으면 JOB_IN_PROGRESS로 거부하므로 먼저 취소한다. 승인된 개인정보 처리방침·이용약관(2026-10-13.1)은 개별 채팅 삭제를 제공하지 않는다고 고지하므로, 개정본이 시행될 때까지 서버 설정 zoop.chat.delete-enabled=false이며 이때는 RESOURCE_NOT_FOUND다. 클라이언트는 listConversations의 deleteEnabled로 노출 여부를 정한다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `DELETE /api/v1/chat/sessions/{id}` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | 없음 |
+| 응답 | 204: 본문 없음, 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, JOB_IN_PROGRESS, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
+| FS/NFS | [FS050](../../system/out/feature-FS050.md) · [FS051](../../system/out/feature-FS051.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| 화면 | [D-AI-02](../../system/out/screen-D-AI-02.md) |
+| WBS | 6.1.2, 6.11.1, 6.9.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 직접 대응 BFF 작업 없음. 대화 즉시 삭제는 정식 API에서 구현한다. |
+| 팀 확인 필요 | 개별 대화 삭제를 고지하는 개인정보 처리방침·이용약관 개정본(docs/legal/drafts) 승인과 시행 전까지 zoop.chat.delete-enabled를 켜지 않는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| id | path | 필수 | string | Conversation id made by the client |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
 
 <a id="getcurrentconversation"></a>
 
@@ -3799,6 +3857,32 @@ What the member had selected when asking: graph targets, optional evidence refer
 | --- | --- | --- | --- |
 | session | 필수 | [ChatSessionResponse](#schema-chatsessionresponse) |  |
 | jobs | 필수 | [ChatJob](#schema-chatjob)[] |  |
+
+<a id="schema-chatconversationlist"></a>
+
+### ChatConversationList
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| items | 필수 | [ChatConversationSummary](#schema-chatconversationsummary)[] |  |
+| nextCursor | 필수 | string / null | 다음 페이지 커서. 마지막 페이지면 null |
+| deleteEnabled | 필수 | boolean | deleteConversation이 열려 있는지. 거짓이면 클라이언트는 삭제를 보여 주지 않는다 |
+
+<a id="schema-chatconversationsummary"></a>
+
+### ChatConversationSummary
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| title | 필수 | string | 첫 질문. 100자를 넘으면 99자와 '…' |
+| createdAt | 필수 | string (date-time) |  |
+| updatedAt | 필수 | string (date-time) | 마지막으로 질문한 시각 |
+| jobs | 필수 | integer | 질문 작업 수(확인 질문의 답 포함) |
 
 <a id="schema-chatcurrentresponse"></a>
 
