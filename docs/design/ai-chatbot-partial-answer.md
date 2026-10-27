@@ -50,6 +50,7 @@
 - 라벨은 서버가 쓴다.
   - 개념: `<원 라벨> — 개념 설명`
   - 배경: `<원 라벨> — 일반 배경(특정 기업·사건의 사실 제외)`
+  - 워커 계약 `Branch.label`은 4,000자(code point) 이하다. 접미사를 붙여 넘치면 원래 라벨이 아니라 **하위 요구 라벨의 앞부분만** code point 단위로 잘라 접미사 자리를 만든다(`ChatPlan.Planned.MAX_LABEL`). 원래 요구는 그대로 둔다.
 - 공개 `ChatResult.sections`에는 요구 ID가 나가지 않는다(`ChatResults.answered`). 그래서 **공개 OpenAPI는 바뀌지 않는다.** limitation 종류도 기존 것만 쓴다.
 - 워커 계약 `zoop-ai-chat-1`도 바뀌지 않는다. 하위 요구는 기존 `general=true` branch로 간다.
 - route 요약(`chat_jobs.route`)의 요구 항목에 `origin`(`router` / `concept` / `background`)과 `parent`를 남겨 감사할 수 있게 한다.
@@ -67,6 +68,7 @@
   - 숫자가 없는 특정 기업 사실(예: "OO는 HBM을 주로 △△에 공급한다")은 최신 사실 표지 검사로는 걸러지지 않는다. 그래서 이름 자체를 막는다.
 - **실패 처리:** 하위 요구 구간이 `general_section`이나 `general_names`에 걸리면, 실행 전체를 `validation_failed`로 끝내지 않고 **그 구간만 뺀다.** 빠진 하위 요구는 limitation을 만들지 않고, route 요약에 `droppedGeneral`로 남긴다.
   - 하위 요구는 회원이 직접 요구한 것이 아니라 서버가 덧붙인 보조 설명이기 때문이다. 원래 요구 구간의 검사 실패는 지금처럼 실행 전체 실패다.
+  - 이름 검사와 구간 삭제 조건은 따로 본다. 하위 요구를 하나라도 맡은 일반 구간은 그 부모의 이름을 검사한다. 하위 요구만 맡은 구간이 걸리면 구간만 뺀다. 라우터 요구(예: 순수 Q02 `r2`)를 함께 맡은 구간(`["r1-c","r2"]`)이 걸리면 조용히 빼지 않고 `validation_failed`로 끝낸다. 빼면 회원이 직접 물은 `r2`까지 사라지기 때문이다.
   - 투자 권유 문구(`investment_wording`)와 Jev `prohibitedAdvice=yes`는 하위 요구 구간이어도 지금처럼 실행 전체 실패다.
 - **Jev hold:** 하위 요구 구간이 hold되면 기존 규칙대로 그 구간만 빠진다. `explicit=false`라 limitation은 생기지 않는다.
 
@@ -196,7 +198,7 @@ Luna가 배경으로 쓸 내용이 없다고 판단하면 배경 하위 요구�
   - 하위 요구 구간이 최신 사실 표지나 대상 이름에 걸리면 그 구간만 빠지고 실행은 `answered` 또는 `insufficient_evidence`
   - 원래 요구 구간이 같은 검사에 걸리면 지금처럼 `validation_failed`
   - 하위 요구 구간에 투자 권유 문구가 있으면 `validation_failed`
-- `ChatAnswerCheckTest`: `general_names`가 company·issue label을 띄어쓰기와 무관하게 잡고, 대상과 무관한 일반 명사는 통과시킴. 라우터의 순수 개념 요구에는 이름 검사를 하지 않음
+- `ChatAnswerCheckTest`: `general_names`가 company·issue label을 띄어쓰기와 무관하게 잡고, 대상과 무관한 일반 명사는 통과시킴. 라우터의 순수 개념 요구에는 이름 검사를 하지 않음. 하위 요구와 라우터 요구를 함께 맡은 구간이 이름이나 최신 사실 표지에 걸리면 빼지 않고 실패함
 - `ai/worker` `test_chat_stages.py`: 새 프롬프트 개정의 replay fixture
 - 평가 세트(구현 계획 우선순위 5): 질문별로 `fallback` 종류와 하위 요구 구간이 빠진 비율을 기록한다. 실제 데이터가 오면 근거 부족 비율을 대체 경로 전후로 비교한다.
 
@@ -248,18 +250,23 @@ Luna가 배경으로 쓸 내용이 없다고 판단하면 배경 하위 요구�
 
 ### 12.3 다음에 해 볼 일 (reason 둘째 문장)
 
-실행의 고정 문맥만 보고 고른다.
+실행의 고정 문맥과 실제로 실행한 조회의 범위만 보고 고른다.
 
 | 조건(위가 먼저) | 문장 |
 | --- | --- |
-| 회원이 근거를 골라 좁힘 | 선택한 근거 안에서만 확인했어요. 선택을 해제하고 다시 물으면 더 넓게 찾아볼 수 있어요. |
+| 실행한 조회가 모두 선택한 근거로 좁혀짐(`evidenceScope` 있음) | 선택한 근거 안에서만 확인했어요. 선택을 해제하고 다시 물으면 더 넓게 찾아볼 수 있어요. |
 | 원인이 `results_truncated` | 대상이나 기간을 좁혀 다시 물어봐 주세요. |
 | 기간이 정해져 있음 | 기간을 넓히거나 다른 기업·사건을 지목해 다시 물어봐 주세요. |
 | 그 밖 | 다른 기업이나 사건을 지목하거나, 지도에서 대상을 고른 뒤 다시 물어봐 주세요. |
 
+- 근거를 선택했다는 사실만으로 첫 줄을 고르지 않는다. 질문이 다른 기업을 직접 지목하면 그 조회는 선택 범위를 쓰지 않는다(`TargetSource.QUESTION`, `evidenceScope=null`). 이때 선택을 해제하라는 안내는 효과가 없다. 좁힌 조회와 넓은 조회가 섞여도 첫 줄을 쓰지 않는다(`OrchestratedChatEngine.narrowed`).
+
 ### 12.4 적용 범위
 
 `insufficient_evidence` 결과의 `applied.companies·issues`에 이번 실행의 조회가 돌려준 기업·사건을 넣는다(답한 요구가 없으므로 모든 요구의 조회 결과). `questionOverrodeContext`도 같은 기준으로 계산한다. `answered`에서는 지금처럼 답한 요구의 조회 결과만 넣는다. OpenAPI `ChatApplied` 설명에 이 뜻을 적었다.
+
+- 근거 부족 결과는 인용이 없어 기존 응답 가드의 근거 재확인에 걸리지 않는다. 그래서 저장 결과를 돌려줄 때마다(작업·대화 조회, 최신 대화 복원 등) `ChatResponseGuard`가 `applied`의 기업·사건도 다시 확인한다. 고정한 `graphVersion`·asOf에 현재 공개 제외를 적용한 공개 그래프에서 지금 보이지 않는 대상은 응답에서 뺀다. 그래프를 읽지 못해 확인할 수 없으면 모두 뺀다(`ChatTargetAccess`, `GraphTargetAccess`). `answered` 결과에도 같은 규칙을 쓴다. 저장된 결과는 바꾸지 않는다.
+  - 예: 두 기업 사이 경로 조회(`graph.path.read`)가 중간 사건을 돌려주고 답이 근거 부족으로 끝났다. 그 뒤 그 사건이 공개 제외되면, 대화를 복원해도 그 사건 이름은 다시 나오지 않는다.
 
 ### 12.5 limitation 문장
 
