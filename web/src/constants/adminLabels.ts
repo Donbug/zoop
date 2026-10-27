@@ -100,6 +100,7 @@ export const auditActionLabel: Record<string, string> = {
   'auth.login_failed': '로그인 실패',
   'auth.logout': '로그아웃',
   'review.decide': '검수 결정',
+  'publication.rule.switch': '공개 규칙 전환',
   'review.rule': '검수 규칙 전환',
   'graph.publish': '그래프 게시',
   // 백엔드가 실제로 남기는 그래프 전환 동작 코드(#275). 감사 로그 동작 필터도 이 값으로 조회한다.
