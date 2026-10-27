@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import java.util.Optional;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.common.json.Canonical;
 import com.zoop.document.analysis.repository.EvidenceRow;
@@ -24,6 +25,11 @@ import com.zoop.document.service.InMemoryDocumentRegistry;
 import com.zoop.graph.importer.GraphHandoffRepository.PublicationState;
 import com.zoop.graph.importer.GraphHandoffRepository.RuleRow;
 import com.zoop.graph.importer.GraphHandoffResult.Outcome;
+import com.zoop.document.evidence.repository.EvidenceReadRepository;
+import com.zoop.document.evidence.repository.EvidenceView;
+import com.zoop.document.evidence.service.DocumentReadSources;
+import com.zoop.document.evidence.service.EvidenceArtifactReader;
+import com.zoop.document.evidence.service.EvidenceService;
 import com.zoop.graph.importer.GraphHandoffResult.Staged;
 import com.zoop.graph.importer.HandoffFixtures.Built;
 import com.zoop.graph.importer.HandoffFixtures.FakeHandoff;
@@ -31,6 +37,15 @@ import com.zoop.graph.importer.HandoffFixtures.FakeIngestion;
 import com.zoop.graph.importer.HandoffFixtures.Shape;
 import com.zoop.graph.importer.HandoffFixtures.Spec;
 import com.zoop.graph.snapshot.GraphSnapshotCodec;
+import com.zoop.graph.read.DisclosureExclusions;
+import com.zoop.graph.read.EventController;
+import com.zoop.graph.read.EventDetailService;
+import com.zoop.graph.read.GraphEvidenceSnapshotReader;
+import com.zoop.graph.read.PublicGraphReader;
+import com.zoop.graph.snapshot.ArtifactGraphSnapshotStore;
+import com.zoop.graph.version.GraphVersionRecord;
+import com.zoop.graph.version.GraphVersionRepository;
+import com.zoop.graph.version.GraphVersionSelector;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,6 +75,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * The whole import with the real strict parsers, the real artifact file store and the real importer; only the two installed
@@ -463,6 +483,72 @@ class GraphHandoffImporterTest {
         assertEquals(0, provenance.get("withheld").size());
         assertEquals("2026-09-30", snapshot.issues().get(0).eventTime());
         assertEquals("2026Q3", snapshot.issues().get(0).period());
+    }
+
+    @Test
+    void aCurrentImportReceiptServesEventMetadataOverTheConsumerRouteWithoutExposingItsSummary() throws Exception {
+        Built summarized = HandoffFixtures.withSummary(built, HandoffFixtures::availableSummary);
+        handoff.envelope = summarized.envelopeBytes();
+        assertTrue(importer.run(summarized.request()).succeeded());
+        String versionId = summarized.versionId();
+        ArtifactRow snapshot = registry.findArtifact("artifact-" + versionId).orElseThrow();
+        GraphVersionRecord version = new GraphVersionRecord(versionId, 3, "snapshot", snapshot.id(),
+                snapshot.storageUri(), snapshot.sha256(), true);
+        // Only the read-side version port models an activated version; the importer never activates anything.
+        GraphVersionRepository versions = mock(GraphVersionRepository.class);
+        when(versions.find(versionId)).thenReturn(Optional.of(version));
+        when(versions.everActivated(versionId)).thenReturn(true);
+        Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+        PublicGraphReader reader = new PublicGraphReader(new GraphVersionSelector(versions, clock),
+                new ArtifactGraphSnapshotStore(store, registry, null), ignoredVersion -> DisclosureExclusions.NONE);
+        EvidenceReadRepository evidence = mock(EvidenceReadRepository.class);
+        for (EvidenceRow row : graph.evidenceRows().values()) {
+            when(evidence.findEvidence(row.id())).thenReturn(Optional.of(new EvidenceView(row.id(), row.articleId(),
+                    row.articleVersion(), row.textArtifactId(), row.quote(), row.startOffset(), row.endOffset(),
+                    "body", true, row.verificationArtifactId())));
+        }
+        Path sources = temp.toRealPath().resolve("event-read-sources.json");
+        String sourceRegistry = """
+                {"schemaVersion":"zoop-ingestion-s2-1","revision":"event-read-1","sources":[{
+                  "sourceId":"synthetic-source","adapter":"authored-files","inputRoot":"/synthetic",
+                  "allowedHosts":["example.invalid"],"scopes":[{"scopeId":"body","selection":"authored fixture",
+                    "initialCursor":null,"articleXPath":null,"timestampLimitations":["authored fixture"]}],
+                  "grant":{"grantId":"operator-grant","revision":"rights-1","sourceId":"synthetic-source",
+                    "enabled":true,"rights":"known","allowedOperations":["read","store","quote-display"],
+                    "recipients":[],"purposes":[],"evidence":["authored synthetic fixture"],"expiresAt":null}}]}
+                """;
+        Files.writeString(sources, sourceRegistry);
+        EvidenceService receipts = new EvidenceService(evidence, registry, null, new DocumentReadSources(sources),
+                new GraphEvidenceSnapshotReader(reader), new EvidenceArtifactReader(store), clock, transaction);
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
+                new EventController(null, new EventDetailService(reader, receipts, registry)))
+                .setControllerAdvice(new com.zoop.common.exception.GlobalExceptionHandler())
+                .addFilters(new com.zoop.common.request.RequestIdFilter()).build();
+
+        mvc.perform(get("/api/v1/events/" + ISSUE).param("graphVersion", versionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ISSUE))
+                .andExpect(jsonPath("$.mentions[0].title").value("합성 공급 계약"))
+                .andExpect(jsonPath("$.mentions[0].eventTime").value("2026-09-30"))
+                .andExpect(jsonPath("$.sourceSupport.articleCount").value(1))
+                .andExpect(jsonPath("$.metadata.graphVersion").value(versionId))
+                .andExpect(jsonPath("$.metadata.source").value("public_graph_snapshot"))
+                .andExpect(jsonPath("$.metadata.partial").value(true))
+                .andExpect(jsonPath("$.metadata.failures[0].code").value("SUMMARY_NOT_PRODUCED"))
+                .andExpect(jsonPath("$.summary.status").value("unavailable"))
+                .andExpect(jsonPath("$.summary.text").doesNotExist())
+                .andExpect(jsonPath("$.approval").isEmpty());
+
+        // The same supported receipt still cannot bypass current source rights or its registry-pinned bytes.
+        Files.writeString(sources, sourceRegistry.replace("\"enabled\":true", "\"enabled\":false"));
+        mvc.perform(get("/api/v1/events/" + ISSUE).param("graphVersion", versionId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+        Files.writeString(sources, sourceRegistry);
+        Files.writeString(receiptFile(versionId), "{}");
+        mvc.perform(get("/api/v1/events/" + ISSUE).param("graphVersion", versionId))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error.code").value("SOURCE_UNAVAILABLE"));
     }
 
     @Test
