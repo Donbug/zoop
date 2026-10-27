@@ -343,6 +343,44 @@ class AdminGraphVersionServiceTest {
      * The repository mock runs the caller's checks where the real one does: the slow part under the lock, then the last part at
      * the activation time it reports, before the pointer moves.
      */
+    @Test
+    void anImportedCandidateGetsTheSameChecksAndBecomesPublicForTheSystemActor() {
+        when(versions.active()).thenReturn(Optional.of(new GraphVersionRecord(ACTIVE, 2, "fixture", "artifact-active",
+                "classpath:a", "c".repeat(64), true)));
+        when(snapshots.load(IMPORTED)).thenReturn(fixtureSnapshot());
+        List<Instant> judgedAt = new java.util.ArrayList<>();
+        when(evidence.prepareGraphActivation(eq("gv-1"), anyMap(), eq("auto-1"))).thenReturn(judgedAt::add);
+        when(versions.activateBySystem(eq("gv-1"), eq(ACTIVE), eq(NOW), eq(AdminGraphVersionService.AUTO_REASON), any()))
+                .thenAnswer(invocation -> {
+                    invocation.<Supplier<Consumer<Instant>>>getArgument(4).get().accept(LATER);
+                    return Optional.of(new Activation(ACTIVE, true, LATER));
+                });
+
+        var activation = service(storeExists(), false, "artifact").activateImported(IMPORTED, NOW, "auto-1");
+
+        assertEquals(Optional.of(new Activation(ACTIVE, true, LATER)), activation);
+        assertEquals(List.of(LATER), judgedAt, "grants are judged at the activation time");
+        verify(repository).shareLockArticles(argThat(ids -> !ids.isEmpty()));
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void anImportedCandidateThatFailsTheChecksIsRefusedLikeAnAdminActivation() {
+        when(versions.active()).thenReturn(Optional.empty());
+        when(snapshots.load(IMPORTED)).thenReturn(fixtureSnapshot());
+        when(evidence.prepareGraphActivation(eq("gv-1"), anyMap(), eq("auto-1")))
+                .thenThrow(new CustomException(ErrorCode.REVISION_CONFLICT));
+        when(versions.activateBySystem(eq("gv-1"), isNull(), eq(NOW), anyString(), any())).thenAnswer(invocation -> {
+            invocation.<Supplier<Consumer<Instant>>>getArgument(4).get();
+            return Optional.of(new Activation(null, true, LATER));
+        });
+
+        var error = assertThrows(CustomException.class,
+                () -> service(storeExists(), false, "artifact").activateImported(IMPORTED, NOW, "auto-1"));
+
+        assertEquals(ErrorCode.REVISION_CONFLICT, error.getErrorCode());
+    }
+
     private void activating(String versionId, String expected, String reason, Activation activation) {
         when(versions.activateByAdmin(eq(versionId), eq(expected), eq("admin-1"), eq("admin@example.com"), eq(reason),
                 any())).thenAnswer(invocation -> {
@@ -377,13 +415,13 @@ class AdminGraphVersionServiceTest {
     }
 
     private static DisclosureExclusionReader storeExists() {
-        return () -> DisclosureExclusions.NONE;
+        return pinned -> DisclosureExclusions.NONE;
     }
 
     private static DisclosureExclusionReader noStore() {
         return new DisclosureExclusionReader() {
             @Override
-            public DisclosureExclusions current() {
+            public DisclosureExclusions current(String versionId) {
                 return DisclosureExclusions.NONE;
             }
 

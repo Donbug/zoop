@@ -7,6 +7,8 @@
 - 현재 저장소는 `audit_logs`에 관리자 로그인·실패·로그아웃·프로비저닝·회원 차단/해제를 기록한다. 여기서 다른 관리자 작업이나 AI 작업이 이미 기록된 것으로 간주하지 않는다.
 - 현재 관리 화면은 `outcome=ok|denied|failed`를 소비한다. DB의 기존 값은 `succeeded|denied|failed`다.
 
+> 후속 상태 갱신(2026-10-24): 이 문서의 Task 5·6 판단은 작성 당시의 스냅샷이다. 챗봇 쪽은 이후 `/api/v1/chat/**`, `V20261021120000__create_chat_jobs.sql`, executor와 `ai_executions.chat_job_id` FK가 구현돼 실제 질문 작업 상태와 모델 단계 기록을 보존한다. 브리핑 생성 `briefing_attempts` 경로는 여전히 없어 NFS008 전체 종단 충족을 선언하지 않는다.
+
 ## 응답 투영
 
 | `AuditEntry` | `audit_logs` | 규칙 |

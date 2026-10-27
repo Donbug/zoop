@@ -57,14 +57,32 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 | `ZOOP_AUTH_TRUSTED_PROXIES` | `X-Forwarded-For`를 제공할 수 있는 프록시의 숫자 IP 목록(쉼표 구분). 빈 값은 전달 헤더 무시 |
 | `ZOOP_CHAT_QUESTIONS_ENABLED` | 선택. AI 챗봇 질문·재시도 접수(기본 `false`). 꺼져 있으면 `submitQuestion`·`retryQuestionJob`이 503 `MODEL_UNAVAILABLE`을 반환해 실행되지 않을 작업을 만들지 않습니다. 대화 생성·조회·복원과 작업 조회·취소는 플래그와 무관하게 동작하며 모델을 호출하지 않습니다. 켜려면 `ChatEngine`(오케스트레이터)이 등록돼 있어야 하며(`ZOOP_AI_CHAT_CLIENT_ENABLED=true`가 등록) 없으면 기동을 거절합니다. `ZOOP_CHAT_EXECUTOR_ENABLED`(기본 `true`)·`ZOOP_CHAT_EXECUTOR_WORKERS`(기본 2)는 대기 작업을 집어 실행하고 만료된 lease를 회수하는 실행기이며, 엔진이 없으면 아무 작업도 집지 않습니다 |
 | `ZOOP_AI_CLIENT_*` `ZOOP_AI_EXTRACTION_CLIENT_*` `ZOOP_AI_RELATION_CLIENT_*` `ZOOP_AI_CHAT_CLIENT_*` `ZOOP_AI_PLAN_ADMISSION_CLIENT_*` | 선택. 내부 AI transport 클라이언트는 가족별로 독립이며 기본 비활성입니다. 설정은 [AI 연동](docs/AI_INTEGRATION.md#설정), [S2·S3](docs/AI_INTEGRATION.md#s2-추출s3-관계-클라이언트), [챗봇](docs/AI_INTEGRATION.md#챗봇-모델-단계-클라이언트), [계획 접수](docs/AI_INTEGRATION.md#계획-접수-클라이언트)를 따릅니다. |
+| `ZOOP_ADMIN_REVIEW_RECONCILE_ENABLED` `ZOOP_ADMIN_REVIEW_RECONCILE_*` | 선택, 기본 `true`이지만 **AI 관계 클라이언트(`ZOOP_AI_RELATION_CLIENT_ENABLED=true`)가 있을 때만** 동작합니다. 관리자 HOLD 검수 결정의 AI 응답을 잃었을 때(미확인·blocked) 웹 애플리케이션이 전용 스레드에서 AI 원장을 조회해 정리합니다(`ReviewDecisionService.reconcile`). 미확인 결정은 같은 operation으로 다시 보내며, 원천은 두 번 기록하지 않습니다. 주기 `INTERVAL`(기본 `PT1M`), 만든 지 `MIN_AGE`(기본 `PT2M`)가 지난 의도부터, 한 번에 `BATCH`(기본 50)건. 열린 의도가 남으면 수가 바뀔 때와 1시간마다 경고합니다. `false`로 끌 수 있고, 비웹 실행에서는 동작하지 않습니다. |
 | `ZOOP_DOCUMENT_IMPORT_*` `ZOOP_INGESTION_*` `ZOOP_ARTIFACT_ROOT` | 선택. operator 전용 비웹 문서 import(기본 비활성, 설정 없이도 기동). 이름·규칙은 [문서 import](docs/DOCUMENT_IMPORT.md#실행) |
 | `ZOOP_DOCUMENT_ANALYSIS_*` | 선택. operator 전용 비웹 문서 분석(기본 비활성, 설정 없이도 기동). S1 AI 클라이언트(`ZOOP_AI_CLIENT_*`)와 위 `ZOOP_INGESTION_*`·`ZOOP_ARTIFACT_ROOT`도 필요하고 문서 import와 한 프로세스에서 함께 켤 수 없습니다. 이름·규칙은 [문서 분석](docs/DOCUMENT_ANALYSIS.md#실행) |
 | `ZOOP_DOCUMENT_READ_GRANTS` `ZOOP_DOCUMENT_READ_INGESTION_SOURCES` `ZOOP_DOCUMENT_READ_ARTIFACT_ROOT` | 선택. 공개 `GET /api/v1/evidence/{id}`(운영 플래그와 독립, 읽기 전용). `GRANTS`는 operator의 flat S1 grant registry 파일로 S1 요약 근거에만 쓰이고 요청마다 읽으며 미설정이면 그 읽기는 503입니다. `INGESTION_SOURCES`는 graph 본문 근거용 S2-1 source registry(`zoop-ingestion-s2-1`)로 **handoff import의 `ZOOP_INGESTION_SOURCES`와 같은 파일**을 operator가 지정하며, 요청마다 읽고 기본값·S1 fallback이 없어 미설정이면 graph 근거 읽기는 503입니다. `ARTIFACT_ROOT`는 캐시로 돌려준 요약의 exact receipt, 그리고 graph 근거의 선택된 버전 import receipt 한 건을 읽을 때만 필요합니다(미설정이면 그 경우만 503). 값이 있는데 정규화된 절대 경로가 아니거나 없으면 기동 실패. 이 권한 선택은 백엔드 소유자(정세빈) 확인 전까지 배포하지 않습니다. 규칙은 [문서 분석 § 근거 읽기](docs/DOCUMENT_ANALYSIS.md#근거-읽기-getevidence-부분-구현)와 [graph 본문 근거 경로](docs/GRAPH_READ_HANDOFF.md#2026-10-20-getevidence의-graph-본문-근거-경로-로컬-작업-트리-미게시) |
 | `ZOOP_GRAPH_SNAPSHOT_SOURCE` `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT` | 선택. 공개 그래프 스냅샷을 어디서 읽을지 정합니다. 기본 `none`: 등록된 버전이 있어도 스냅샷 읽기는 503 `SOURCE_UNAVAILABLE`이고, 버전이 없으면 409 `VERSION_UNAVAILABLE`입니다(빈 그래프로 대체하지 않음). `fixture`: **local/dev 전용**이며, 기동 시 `src/main/resources/graph-fixtures/`의 합성 스냅샷 2개를 `graph_versions`에 등록·활성화합니다(제목 `[합성]`, 실제 뉴스 아님). 이미 가져온(non-fixture) 버전이 있는 DB에서는 기동을 거절합니다. `artifact`: `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT`(정규화된 절대 경로)의 스냅샷 파일을 레지스트리 hash·크기로 검증해 읽기 전용으로 읽고, 이미 등록된 fixture 버전(classpath 위치)은 기존 fixture 읽기 경로가 그대로 읽어 기존 읽기가 달라지지 않습니다(아래 [그래프 handoff 스테이징 import](#그래프-handoff-스테이징-import)). 어떤 버전을 공개로 보여 줄지는 여전히 선택기와 활성 포인터가 정하며 `artifact`가 등록·활성화하지 않습니다. 규칙은 [그래프 조회 계약 결정](../docs/api/graph-read-contract-proposal.md) §0 |
-| `ZOOP_GRAPH_ACTIVATION_ALLOW_WITHOUT_EXCLUSION_STORE` | 선택, 기본 `false`. 공개 제외 저장소(FS081)가 아직 없어서, 관리자 활성화(`activateGraphVersion`)는 수입한(non-fixture) 버전을 기본으로 503 `SOURCE_UNAVAILABLE`로 거절합니다. "제외할 항목이 없음"을 확인할 수 없기 때문입니다. 운영자가 이 한계를 알고 `true`로 켜면 허용합니다. 이때도 활성화 직전의 권리·근거 검사(기사 접근 상태, 선택 버전 receipt의 grant, 현재 S2-1 원천 registry)는 그대로 적용됩니다. 합성 fixture 버전에는 영향이 없습니다. 대신 fixture 버전은 `ZOOP_GRAPH_SNAPSHOT_SOURCE=fixture`일 때만 활성화할 수 있고, `artifact`·`none`에서는 422로 거절합니다(운영 DB에 남은 `[합성]` 행이 공개 그래프가 되지 않도록). |
+| `ZOOP_GRAPH_ACTIVATION_ALLOW_WITHOUT_EXCLUSION_STORE` | 선택, 기본 `false`. **이제 효과가 없습니다.** 공개 제외 저장소(FS081, 아래 "공개 제외 명령")가 생겨서 관리자 활성화(`activateGraphVersion`)는 항상 그 버전의 현재 제외를 적용해 사전 검사합니다. 저장소가 없는 reader(시험용)에서만, 수입한(non-fixture) 버전을 기본으로 503 `SOURCE_UNAVAILABLE`로 거절하고 `true`면 허용합니다. 이때도 활성화 직전의 권리·근거 검사(기사 접근 상태, 선택 버전 receipt의 grant, 현재 S2-1 원천 registry)는 그대로 적용됩니다. 합성 fixture 버전에는 영향이 없습니다. 대신 fixture 버전은 `ZOOP_GRAPH_SNAPSHOT_SOURCE=fixture`일 때만 활성화할 수 있고, `artifact`·`none`에서는 422로 거절합니다(운영 DB에 남은 `[합성]` 행이 공개 그래프가 되지 않도록). |
+| `ZOOP_GRAPH_AUTO_ACTIVATION_ENABLED` `ZOOP_GRAPH_AUTO_ACTIVATION_*` | 선택, 기본 `false`. 켜면 **웹 애플리케이션**이 운영자 수입이 등록한 비활성 snapshot 버전 중 가장 최근 하나를 관리자 활성화(`activateGraphVersion`)와 **같은 사전 검사**(권리·근거·공개 제외·snapshot 읽기)를 거쳐 system 주체로 활성화합니다(FS059, 활성화 이력 `actor_kind=system`). 현재 공개 버전보다 앞선(`sequence`가 작은) 수입은 활성화하지 않고, 시작 시각에서 `LOOKBACK`(기본 `PT30M`, 한 회차)만큼 되돌아본 뒤에 수입된 버전만 대상입니다. 확인 주기 `INTERVAL`(기본 `PT15S`), 검사 거절 뒤 재시도 `RETRY_AFTER`(기본 `PT5M`), 소스 장애·그 밖의 실패 뒤 재시도 `UNAVAILABLE_RETRY_AFTER`(기본 `PT1M`). 전용 스레드에서 돌고, 수입·제외 명령 같은 비웹 실행에서는 동작하지 않습니다. 바꾸려면 재시작합니다. 관리자가 수동으로 활성화(되돌리기 포함)하면 그보다 먼저 수입돼 기다리던 버전은 자동으로 활성화하지 않고, **그 뒤에 수입된** 버전이 검사를 통과하면 그 버전으로 바뀝니다. |
 | `ZOOP_GRAPH_HANDOFF_IMPORT_*` `ZOOP_HANDOFF_*` `ZOOP_RELATION_STATE_DIR` `ZOOP_EXTRACTION_STATE_DIR` | 선택. operator 전용 비웹 그래프 handoff 스테이징 import(기본 비활성, 설정 없이도 기동). 위 `ZOOP_INGESTION_*`·`ZOOP_ARTIFACT_ROOT`도 필요하고 문서 import·분석, `fixture` 소스와 한 프로세스에서 함께 켤 수 없습니다. 이름·규칙은 [그래프 handoff 스테이징 import](#그래프-handoff-스테이징-import) |
 
 `DB_PORT`나 `DB_NAME`을 바꾸면 `DB_URL`도 일치하게 수정하세요. `.env.example`의 비밀번호는 로컬 전용 예시이며 운영용이 아닙니다. 실제 `.env`는 Git에서 제외됩니다. 이미 초기화된 DB 볼륨의 계정·비밀번호는 환경변수만 바꿔도 변경되지 않습니다.
+
+### 프로세스 생존 확인
+
+인증 없이 `GET /health`를 호출하면 HTTP 200과 `{"status":"UP"}`만 반환합니다. 쿠키·Authorization·CSRF 토큰은 필요하지 않으며, 응답 본문에 비밀 값이나 내부 오류·연결 정보를 포함하지 않습니다.
+
+```sh
+curl --fail-with-body -i http://localhost:8080/health
+```
+
+이 엔드포인트는 요청을 처리하는 프로세스의 생존(liveness)만 확인합니다. DB·AI·외부 서비스에 요청하거나 준비 상태(readiness)를 집계하지 않으므로, **정상 기동 후 DB 연결이 끊겨도 프로세스가 HTTP 요청을 처리하는 동안에는 200을 반환합니다.** 다른 API의 정상 동작이나 시작 작업의 완료를 보장하지 않습니다.
+
+이는 **DB 없이 전체 애플리케이션이 기동한다는 뜻이 아닙니다.** 일반 기동에는 `DB_URL`·`DB_USERNAME`·`DB_PASSWORD`, 접근 가능한 PostgreSQL, Flyway 마이그레이션·JPA 스키마 검증, 시작 시 기업 카탈로그 import가 필요합니다. 필수 CSRF 서명 키 설정도 그대로 필요합니다. AI 클라이언트는 기본 비활성입니다. DB 자동 설정을 제외하거나 별도 프로필로 웹 서버만 띄우는 우회 경로는 제공하지 않습니다.
+
+메서드 처리는 기존 Spring MVC 설정을 유지합니다. `HEAD /health`는 200과 빈 본문, `OPTIONS /health`는 200과 `Allow: GET, HEAD, OPTIONS`를 반환합니다. `POST`·`PUT`·`PATCH`·`DELETE`는 405이며, 오류 본문은 기존 공통 오류 처리의 `INVALID_REQUEST` 형식입니다.
+
+컨트롤러 테스트는 HTTP 응답 계약을 검증하며 전체 애플리케이션이나 컨테이너 기동의 증거는 아닙니다. 실제 이미지의 8080 포트와 기동 후 DB 중단 시나리오는 [API Dev 배포 절차의 로컬 컨테이너 검증](../docs/development/api-dev-deployment.md#51-로컬-컨테이너-생존-확인)을 따릅니다.
 
 ### 그래프 읽기 로컬 빠른 시작 (합성 fixture, 일회용)
 
@@ -216,7 +234,7 @@ console.log(response.status); // 활성 회원 세션이 정상 폐기되면 204
 
 ## AI 분석 transport
 
-`com.zoop.ai`는 `ai/service`를 호출하는 전송 계층입니다. S1 분석, S2 추출, S3 관계·최종 검수, 챗봇 모델 단계와 정확한 계획 접수·조회(`PlanAdmissionClient`)를 가족별 독립 설정으로 제공합니다. 모두 기본 비활성이며 클라이언트 설정만으로 원천 사용·모델 비용·HOLD 승인·공개 권한이 생기지 않습니다. 계획 접수는 실행 중인 AI 서비스의 사전 정책 안에서 불변 S2/S3 참조를 받는 기능이며, 앱의 계획 등록·`analysis_jobs` 큐 worker·정기 발행을 구현한 것은 아닙니다. 설정·오류·실제 합성 연동 검사와 소비자 책임은 [AI 연동](docs/AI_INTEGRATION.md)에 있습니다.
+`zoop.ai.plan-admission-client`·S2/S3 전송 클라이언트와 별도로 `zoop.analysis.analyze-plan`은 관리자 계획 분석 큐를 제공합니다. 모두 기본 비활성이며 클라이언트나 큐 설정만으로 원천 사용·모델 비용·HOLD 승인·공개 권한이 생기지 않습니다. `POST /api/v1/admin/jobs`의 analyze_plan만 실제 계획 등록·PostgreSQL 단위 원장·worker에 연결됩니다. 성공은 고정 S2/S3 결과의 내용 없는 처리 인계(publicChanged=false)이며 수집·검수 동기화·발행을 하지 않습니다. 기존 ingest/revalidate/project 요청 형태와 이력은 유지하지만 새 접수와 retry는 실행기 미연결로 거절합니다. 설정 환경 변수, 재시작·취소·continuation 의미, 실제 합성 `make api-analyze-plan-smoke ANALYZE_PLAN_SMOKE_OUTPUT=/external/fresh-dir` 명령은 [AI 연동의 관리자 계획 분석 큐](docs/AI_INTEGRATION.md#관리자-계획-분석-큐)를 참고하세요.
 
 ## 문서 등록 import
 
@@ -243,6 +261,22 @@ console.log(response.status); // 활성 회원 세션이 정상 폐기되면 204
 공개 규칙([규칙 문서](../docs/development/issue-133-publication-rules.md) 2-1): 카탈로그 잠금 바로 다음에 켜진 규칙과 `rule_revision`·`review_revision`을 **한 SQL 문장**으로 읽고, 판정 함수(`PublicationRuleEvaluator`)로 거른 snapshot을 저장합니다. 버전 행에는 두 revision과 거른 뒤의 이슈·관계·기사 수를, `graph_version_rules`에는 적용한 규칙을 남깁니다. receipt와 `evidence` 행은 bundle 전체를 그대로 둡니다. 수입은 정기 회차마다 돌므로 publication lock을 잡지 않으며, 읽은 뒤 커밋된 규칙 전환은 다음 회차 버전에 반영됩니다. 같은 핀을 다시 수입하면 지금 켜진 규칙이 아니라 그 버전의 적용 규칙으로 다시 계산해 `unchanged`를 판단합니다. 켜진 규칙(또는 버전의 적용 규칙)의 정의를 읽을 수 없으면 `rule_definition_invalid`로 아무것도 쓰지 않고 실패합니다. migration이 등록한 `single-source@1`·`speculative-issue@1`은 둘 다 꺼진 상태입니다. 결과 파일의 `counts`는 지금처럼 bundle의 수이고, `publicationRules`가 규칙이 한 일을 따로 알립니다: `ruleRevision`·`reviewRevision`, 적용한 규칙(`applied`), 저장된 snapshot의 수(`stored`), 연결 정리까지 포함해 숨긴 이슈·관계 수(`hidden`), 규칙마다 그 조건에 직접 걸린 수(`byRule`)입니다. id와 내용은 넣지 않습니다. `unchanged`이면 그 버전을 처음 수입할 때의 값이고(지금 켜진 규칙이 아님), 규칙 이전에 수입된 버전은 `ruleRevision`이 `null`입니다.
 
 설정은 `application.yml`의 `zoop.graph-handoff-import.*`(요청·결과 파일, `zoop-ai-handoff`·`zoop-ai-ingest` 실행 파일, handoff·relation·extraction·S2-1 상태 디렉터리, **하나의** source registry, 동결에 쓴 canonical·decisions·bindings 파일, artifact root)이며 값이 틀리면 설정 이름만 알리고 기동을 거절합니다. 하위 CLI에는 DB 자격이 전달되지 않습니다. 결과 파일(`0600`, 이미 있으면 덮어쓰지 않음)에는 경로·본문·비밀이 없고 실패 시 프로세스는 0이 아닌 코드로 끝납니다. 스테이징된 스냅샷을 읽으려면 `ZOOP_GRAPH_SNAPSHOT_SOURCE=artifact`와 `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT`(같은 root)를 씁니다. 실제 CLI·PostgreSQL smoke는 `api/scripts/graph_handoff_import_smoke.py`(파이프라인 venv의 Python으로 실행, 사용법은 파일 머리말)이고 PostgreSQL 통합 시험은 `companyIntegrationTest`에 포함됩니다.
+
+## 공개 제외 명령 (FS081)
+
+`com.zoop.graph.exclusion`은 공개 제외 저장소(`disclosure_exclusion_changes`·`disclosure_exclusion_targets`·`disclosure_exclusion_requests`, ERD 37–39절)에 쓰는 **operator 전용 비웹 실행**입니다(`--spring.main.web-application-type=none`, `ZOOP_DISCLOSURE_EXCLUSION_ENABLED=true`, `ZOOP_DISCLOSURE_EXCLUSION_REQUEST`·`ZOOP_DISCLOSURE_EXCLUSION_RESULT`, receipt를 읽을 `ZOOP_ARTIFACT_ROOT`). HTTP 경로가 없고, artifact 저장소는 읽기만 해서(`readVerified`, 잠금 없음) 정기 수입과 같은 시간에도 실행할 수 있습니다. 결과 파일(`0600`, 이미 있으면 덮어쓰지 않음)에는 결과·`replayed`·revision·버전별 개수만 남고 대상 ID는 남지 않습니다.
+
+요청(`zoop-disclosure-exclusion-1`, 닫힌 스키마)은 둘 중 하나이며, 둘 다 명령 ID `requestId`(`[A-Za-z0-9._:-]{1,200}`)를 가집니다.
+
+- **`exclude`**: `requestId`, `operator`, `reason`, 그리고 `zoop-ai-handoff-exposure`가 출력한 보고서(`zoop-handoff-exposure-1`, 내부 계약 `ExposureReport`)를 `report`에 그대로 넣습니다. 보고서는 닫힌 스키마의 키·타입·null 허용·enum·고정 문장·배열 상한까지 모두 검사하고, 선택한 handoff마다 앱이 수입한 버전(`gv-` + handoffId의 SHA-256)이 있어야 하며 그 버전 receipt의 `handoffId`·manifest·bundle·content digest가 보고서와 같아야 합니다(하나라도 다르면 전체 거절, 아무것도 쓰지 않음). 보고서가 제안한 이슈·관계·근거·기사를 **그 버전에서만** 제외합니다. 이미 제외된 대상은 그대로 두므로 같은 보고서를 다시 넣어도 바뀌는 것이 없습니다(`unchanged`). 관계 오연결(`relation-retraction`)은 기사·근거를 제안할 수 없습니다.
+- **`lift`**: `requestId`, `operator`, `reason`, `graphVersionId`, `expectedRevision`, `targets[{kind, id[, articleVersion]}]`. 제외를 끝내는 유일한 방법입니다. 빈 보고서나 이전보다 작은 보고서로는 해제하지 않습니다. `expectedRevision`은 운영자가 해제를 결정할 때 본 제외 revision이며, 대상 중 하나라도 그 뒤에 바뀌었거나 저장소가 아직 그 revision에 이르지 않았으면 `revision_stale`로 거절합니다.
+
+**재실행.** 결과(`applied`·`unchanged`)에 이른 명령은 변경과 같은 트랜잭션에 `requestId`·요청 SHA-256·결과를 기록합니다. 같은 `requestId`로 다른 요청을 보내면 `request_conflict`이고, 새 결정에는 새 `requestId`를 씁니다.
+
+- **아무것도 쓰지 않은 실패:** `request_invalid`, `report_invalid`, `version_unknown`, `receipt_unavailable`, `receipt_mismatch`, `request_conflict`, `revision_stale`, `database_unavailable`(커밋 전 문장 실패, 롤백됨). 기록도 남지 않으므로, 원인을 고친 뒤 같은 `requestId`로 다시 실행할 수 있습니다.
+- **결과를 알 수 없는 경우:** `outcome_unknown`(커밋 여부 불명), `result_unavailable`, `internal_error`, 그리고 결과 파일이 없거나 비었거나 일부만 있거나 읽을 수 없는 경우. 결과 파일은 DB 커밋이 **끝난 뒤** 쓰므로, `result_unavailable`이나 불완전한 결과 파일은 변경이 이미 커밋됐을 수 있습니다. 이 경우에는 롤백이나 무기록을 가정하지 말고, **같은 `requestId`·같은 본문의 요청 파일**을 새 결과 경로로 다시 실행합니다. 이미 커밋됐으면 기록한 결과를 `replayed: true`로 돌려주고 아무것도 바꾸지 않으며, 커밋되지 않았으면 처음 실행처럼 처리합니다.
+
+변경 하나는 공통 publication lock 아래 한 트랜잭션이며 `revision`은 MAX+1입니다. 공개 조회와 활성화 사전 검사는 잠금 없이 그 버전의 현재 제외를 한 문장으로 읽어 이슈·관계·근거에 적용하며, 저장소를 읽지 못하면 빈 제외로 대신하지 않고 503 `SOURCE_UNAVAILABLE`입니다. 기사 대상은 기록만 하며, 기업 문서 목록·S1·브리핑·채팅·캐시·Neo4j의 제외 반영은 이 범위가 아닙니다.
 
 ## 기본 기업 카탈로그 적재
 

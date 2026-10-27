@@ -223,7 +223,7 @@ class GraphTargetToolTest {
     private PublicGraphReader reader() {
         var selector = new GraphVersionSelector(repository(), Clock.fixed(NOW, ZoneOffset.UTC));
         return new PublicGraphReader(selector, new FixtureGraphSnapshotStore(GraphTargetToolTest.class.getClassLoader()),
-                () -> exclusions);
+                pinned -> exclusions);
     }
 
     private PublicGraphReader failingReader(RuntimeException failure) {
@@ -234,7 +234,7 @@ class GraphTargetToolTest {
             public boolean everActivated(String id) { throw failure; }
         };
         return new PublicGraphReader(new GraphVersionSelector(failing, Clock.fixed(NOW, ZoneOffset.UTC)),
-                new FixtureGraphSnapshotStore(GraphTargetToolTest.class.getClassLoader()), () -> exclusions);
+                new FixtureGraphSnapshotStore(GraphTargetToolTest.class.getClassLoader()), pinned -> exclusions);
     }
 
     private ChatEvidenceAccess access() {

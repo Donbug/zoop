@@ -22,7 +22,8 @@ import java.util.Set;
  * Runs a confirmed plan's stages in order and evaluates each dependent requirement's checkpoint before its stage (design
  * summary 5.2). Requirements of one stage run together; the same read (capability, targets and evidence scope) asked by two
  * requirements is made once. Targets go out in batches of five; {@code graph.path.read} reads from its first target, so each
- * of its calls carries that target and at most four of the others.
+ * of its calls carries that target and at most four of the others. A ZOOP document capability reads its fixed documents
+ * instead of the requirement's targets.
  *
  * <ul>
  * <li>A failed call (timeout, unavailable data, adapter fault) ends retrieval at once: no checkpoint is evaluated and no
@@ -78,15 +79,19 @@ final class ChatRetrieval {
                     targets = List.copyOf(found.companies().keySet());
                 }
                 for (ChatCapability capability : p.capabilities()) {
-                    for (List<String> chunk : batches(capability, targets)) {
+                    // The member's narrowed evidence selection bounds the reads of the requirement's own targets, never
+                    // the fixed ZOOP documents, which it is not about.
+                    boolean fixed = !capability.documents().isEmpty();
+                    var read = fixed ? capability.documents() : targets;
+                    List<String> scope = fixed ? null : p.evidenceScope();
+                    for (List<String> chunk : batches(capability, read)) {
                         String key = capability.id() + "\u0000" + String.join("\u0000", chunk) + "\u0001"
-                                + (p.evidenceScope() == null ? "*" : String.join("\u0000", p.evidenceScope()));
+                                + (scope == null ? "*" : String.join("\u0000", scope));
                         Integer index = callIndex.get(key);
                         if (index == null) {
                             index = calls.size();
                             callIndex.put(key, index);
-                            calls.add(new ChatToolRequest(capability.id(), chunk, ChatToolRequest.MAX_LIMIT,
-                                    p.evidenceScope()));
+                            calls.add(new ChatToolRequest(capability.id(), chunk, ChatToolRequest.MAX_LIMIT, scope));
                         }
                         owned.computeIfAbsent(p.id(), k -> new ArrayList<>()).add(index);
                     }

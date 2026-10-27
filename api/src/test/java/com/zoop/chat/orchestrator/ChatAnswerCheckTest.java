@@ -49,6 +49,32 @@ class ChatAnswerCheckTest {
         assertEquals("general_section", ChatAnswerCheck.check(List.of(lookup), general).failedCheck());
     }
 
+    @Test
+    void zoopDocumentTextAndPublicEvidenceNeverShareASection() {
+        // Q01 + Q03 in one requirement: a policy read and a company read.
+        var policy = new ChatToolResult("chat-tool/v1", "tc-1", "zoopPolicy.read", "zoop-docs/policy.privacy@v1",
+                List.of(new ChatToolItem("policy.privacy", "zoop_doc", "개인정보 처리방침", List.of(), List.of("ev-doc"))),
+                List.of("ev-doc"), false, false, null);
+        var both = new Branch("q", "요구 q", Set.of(ChatQueryType.Q01, ChatQueryType.Q03), false,
+                List.of(policy, result(List.of("ev-news"))), false);
+
+        var split = new ChatGeneratedAnswer(List.of(
+                new Section("zoop_documented", "탈퇴하면 대화 기록이 지워집니다.", List.of("q"), List.of("ev-doc")),
+                new Section("evidence_grounded", "SK하이닉스는 HBM을 공급합니다.", List.of("q"), List.of("ev-news"))),
+                List.of(), List.of());
+        assertNull(ChatAnswerCheck.check(List.of(both), split).failedCheck());
+
+        var newsAsDocument = new ChatGeneratedAnswer(List.of(new Section("zoop_documented", "본문", List.of("q"),
+                List.of("ev-news"))), List.of(), List.of());
+        assertEquals("document_section", ChatAnswerCheck.check(List.of(both), newsAsDocument).failedCheck());
+        var documentAsNews = new ChatGeneratedAnswer(List.of(new Section("evidence_grounded", "본문", List.of("q"),
+                List.of("ev-doc"))), List.of(), List.of());
+        assertEquals("evidence_section", ChatAnswerCheck.check(List.of(both), documentAsNews).failedCheck());
+        var uncited = new ChatGeneratedAnswer(List.of(new Section("zoop_documented", "본문", List.of("q"), List.of())),
+                List.of(), List.of());
+        assertEquals("document_section", ChatAnswerCheck.check(List.of(both), uncited).failedCheck());
+    }
+
     private static Branch branch(String id, List<String> evidence) {
         return new Branch(id, "요구 " + id, Set.of(ChatQueryType.Q03), false, List.of(result(evidence)), false);
     }

@@ -1380,7 +1380,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.6.10, 6.9.1, 6.9.2, 6.9.3, 6.9.4, 6.9.5, 6.9.6, 6.9.10, 6.9.11, 6.9.12, 6.9.13, 6.9.14, 6.5.7 |
 | 프로토타입 대응 | /api/chat/sessions/{id}/jobs |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다., Jev 0.70/0.35, MCP 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.8을 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다. |
+| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다., Jev 0.70/0.35, 도구 호출 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.9를 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다. |
 
 ### 요청 필드
 
@@ -1915,9 +1915,9 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 <a id="createanalysisjob"></a>
 
-## createAnalysisJob · 수집·재검증·투영 작업 접수
+## createAnalysisJob · 계획 분석 작업 접수
 
-수집·재검증·투영 작업 접수.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+analyze_plan은 계획 참조를 PostgreSQL에 등록하고 처리 대기열에 넣는다. 접수 경로는 AI를 호출하지 않으며 202는 로컬 영속 접수만 뜻한다. 같은 멱등성 키는 당시 응답을 그대로 재생하고, 다른 키로 같은 계획을 접수하면 원래 root 작업과 deduplicated=true를 반환한다. ingest/revalidate/project의 기존 요청 형태는 유지하지만 실행기가 없어 SOURCE_UNAVAILABLE/503, retryable=false로 거절하고 어떤 행도 만들지 않는다. analyze_plan 비활성 상태도 같다. 새 요청은 UTF-8 JSON 64 KiB 이하이며 중복 키·후행 JSON·알 수 없는 속성·형변환을 거절한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1974,7 +1974,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## retryAnalysisJob · 허용된 분석 작업 재시도
 
-허용된 분석 작업 재시도. RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 작업(같은 종류·라벨·입력)으로 대기열에 넣고 202를 돌려준다. 허용되지 않으면 REVISION_CONFLICT/409이고 아무것도 만들지 않는다. AI 요청을 직접 다시 보내지 않으며, 새 모델 실행이 필요하면 작업 실행 시 새 AI jobId를 쓴다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 앱 작업(같은 종류·라벨·입력)으로 대기열에 넣고 202를 반환한다. 거절은 REVISION_CONFLICT/409이며 아무것도 만들지 않는다. analyze_plan은 기존 계획과 고정 S2/S3 ID를 이어서 처리하며 완료된 단위를 다시 실행하지 않는다. 다른 미래 실행기에서 새 모델 실행이 필요할 때 새 AI jobId를 쓰는 조건은 유지한다. 실행기가 없는 기존 종류와 비활성 analyze_plan은 worker_unavailable이다. 같은 키는 현재 기능 상태와 무관하게 저장된 응답을 재생한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -3819,7 +3819,7 @@ What the member had selected when asking: graph targets, optional evidence refer
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | kind | 필수 | string {validation_failed, save_failed, result_lost, transient, budget_exceeded, permission_denied, internal} | transient: 같은 고정 문맥으로 다시 실행하면 달라질 수 있는 시간 초과·공급자 오류. 재실행 가능 여부는 retry로 판단하며, 모델 응답 불명(response_unknown)은 중복 호출·과금을 막기 위해 retry=null이다. budget_exceeded: 같은 입력이면 반드시 다시 넘는 크기 한도(rerun 불가, 범위를 좁힌 새 질문 안내). |
-| reason | 필수 | string / null | 기계 판독용 원인 코드. transient: deadline_guard(시작 전 잔여 기한 부족), provider_error(송신 전 연결 실패·처리 거부가 명시된 오류·형식 불일치 응답), tool_timeout(읽기 전용 MCP 조회 상한 초과), response_unknown(모델 송신 후 응답 불명, retry=null). budget_exceeded: context_too_large, output_limit. UI 문구와 관리자 집계의 기준이다. |
+| reason | 필수 | string / null | 기계 판독용 원인 코드. transient: deadline_guard(시작 전 잔여 기한 부족), provider_error(송신 전 연결 실패·처리 거부가 명시된 오류·형식 불일치 응답), tool_timeout(읽기 전용 도구 조회 상한 초과), response_unknown(모델 송신 후 응답 불명, retry=null). budget_exceeded: context_too_large, output_limit. UI 문구와 관리자 집계의 기준이다. |
 | message | 필수 | string |  |
 | retry | 필수 | string {rerun, save_only} / null | What 'retry' would do: rerun the same job with its frozen context, or only save the kept verified result. null = not allowed. rerun은 작업당 실행 3회(runs ≤ 3)까지이며 이후에는 null이다. reason=response_unknown이면 처음부터 null이다. |
 
@@ -5182,6 +5182,28 @@ and the baseline stays where it was.
 
 
 
+[AnalyzePlanJobCreate](#schema-analyzeplanjobcreate) / [LegacyJobCreate](#schema-legacyjobcreate)
+
+<a id="schema-analyzeplanjobcreate"></a>
+
+### AnalyzePlanJobCreate
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| kind | 필수 | string |  |
+| reason | 필수 | string | 앞뒤 공백을 제거한 감사 사유에 기존 AuditReasonPolicy를 적용한다. |
+| plan | 필수 | object |  |
+| plan.planId | 필수 | string |  |
+| plan.planDigest | 필수 | string |  |
+
+<a id="schema-legacyjobcreate"></a>
+
+### LegacyJobCreate
+
+
+
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | kind | 필수 | string {ingest, revalidate, project} |  |
@@ -5258,10 +5280,55 @@ and the baseline stays where it was.
 
 
 
+[LegacyJobOut](#schema-legacyjobout) / [AnalyzePlanJobOut](#schema-analyzeplanjobout)
+
+<a id="schema-legacyjobout"></a>
+
+### LegacyJobOut
+
+
+
+[JobCommonOut](#schema-jobcommonout) / object
+
+<a id="schema-analyzeplanjobout"></a>
+
+### AnalyzePlanJobOut
+
+
+
+[JobCommonOut](#schema-jobcommonout) / object
+
+<a id="schema-planrunout"></a>
+
+### PlanRunOut
+
+내용 없는 AI 처리 인계 관측이다. 수집·검수 원천 동기화·HOLD 승인·그래프 수입·공개 활성화나 지속적인 읽기 권한을 뜻하지 않는다. 종결 작업의 요약은 불변이다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| planId | 필수 | string |  |
+| planDigest | 필수 | string |  |
+| admissionId | 필수 | string, null |  |
+| manifestDigest | 필수 | string, null |  |
+| sourceId | 필수 | string, null |  |
+| roundId | 필수 | string, null |  |
+| phase | 필수 | object {awaiting_admission, admitting, extracting, relating, cancelling, ready, failed, cancelled} |  |
+| totalUnits | 필수 | integer, null |  |
+| readyUnits | 필수 | integer |  |
+| activeUnit | 필수 | integer, null |  |
+| completion | 필수 | object |  |
+| publicChanged | 필수 | object |  |
+
+<a id="schema-jobcommonout"></a>
+
+### JobCommonOut
+
+
+
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | id | 필수 | string |  |
-| kind | 필수 | string {ingest, revalidate, project} |  |
+| kind | 필수 | string |  |
 | label | 필수 | string |  |
 | status | 필수 | string {queued, running, succeeded, failed, cancelled} |  |
 | reason | 필수 | string |  |
@@ -5981,7 +6048,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | allowed | 필수 | boolean |  |
-| code | 필수 | string {allowed, succeeded, in_progress, superseded, newer_attempt, duplicate_running, other_running, dataset_missing, outcome_unknown} | 재시도 판정. in_progress(대기·실행 중), succeeded(이미 성공), duplicate_running(이 작업의 재시도가 대기·실행 중), newer_attempt(더 새 재시도가 있어 가장 최근 시도만 재시도 가능), superseded(같은 종류·같은 입력의 더 나중 작업이 성공), outcome_unknown(외부 실행 결과를 확인할 수 없음: 응답 유실로 실행·과금 여부를 모르므로 자동 재시도하지 않음), dataset_missing(작업의 실행 계획이나 입력 연결이 없거나 철회됨, 일시적 조회 장애는 해당하지 않음), allowed. other_running은 대기열 정책상 다른 작업 실행만으로 재시도를 거절하지 않으므로 반환하지 않는다. blockedBy는 막고 있는 작업 ID다. |
+| code | 필수 | string {allowed, succeeded, in_progress, superseded, newer_attempt, duplicate_running, other_running, dataset_missing, outcome_unknown, worker_unavailable, plan_not_reusable} | 기존 in_progress/succeeded/duplicate_running/newer_attempt/superseded/outcome_unknown 판정 순서를 유지한다. dataset_missing은 등록된 계획·서비스 결속이 없거나 사용할 수 없는 경우이며 일시적 조회 장애가 아니다. plan_not_reusable은 영구 비활성 접수·불변 식별자 충돌·재시작할 수 없는 취소 AI 단계다. worker_unavailable은 연결된 실행기가 없는 종류나 비활성 analyze_plan이다. 다른 실행 작업은 새 작업을 대기시킬 뿐 other_running을 반환하지 않는다. |
 | reason | 필수 | string |  |
 | blockedBy | 필수 | string / null |  |
 

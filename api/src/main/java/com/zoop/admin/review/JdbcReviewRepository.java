@@ -5,8 +5,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -67,6 +69,115 @@ public class JdbcReviewRepository {
     public Optional<Target> target(String id, boolean lock) {
         return jdbc.query(TARGET + " WHERE id = :id" + (lock ? " FOR UPDATE" : ""), new MapSqlParameterSource("id", id),
                 JdbcReviewRepository::target).stream().findFirst();
+    }
+
+    /**
+     * Registers a target of an S3 job, or refreshes its projection when this reading is newer. The key is the source identity
+     * ({@code target_type}, job, external id, source version), so the identity columns are never touched. A reading only replaces
+     * the stored one when its AI source revision is greater: an older reading that arrives late, or one taken before a decision
+     * this app settled, never moves the status back.
+     *
+     * @return true when a row was inserted or refreshed
+     */
+    public boolean upsertTarget(String sourceJobId, String sourceVersion, ReviewTargetReader.Row row, Instant at) {
+        return jdbc.update("""
+                INSERT INTO review_targets (id, target_type, source_job_id, external_id, source_version, candidate_id, status,
+                                            company_ids, relation_types, source_revision, updated_at)
+                VALUES (:id, :type, :job, :external, :version, :candidate, :status, CAST(:companies AS text[]),
+                        CAST(:types AS text[]), :revision, :at)
+                ON CONFLICT (target_type, source_job_id, external_id, source_version) DO UPDATE
+                   SET status = EXCLUDED.status, company_ids = EXCLUDED.company_ids,
+                       relation_types = EXCLUDED.relation_types, source_revision = EXCLUDED.source_revision,
+                       updated_at = EXCLUDED.updated_at
+                 WHERE CAST(EXCLUDED.source_revision AS numeric) > CAST(review_targets.source_revision AS numeric)
+                """, new MapSqlParameterSource("id", "rt-" + UUID.randomUUID()).addValue("type", row.type())
+                .addValue("job", sourceJobId).addValue("external", row.externalId()).addValue("version", sourceVersion)
+                .addValue("candidate", row.candidateId()).addValue("status", row.status())
+                .addValue("companies", row.companyIds().toArray(String[]::new))
+                .addValue("types", row.relationTypes().toArray(String[]::new))
+                .addValue("revision", row.sourceRevision()).addValue("at", Timestamp.from(at))) == 1;
+    }
+
+    /**
+     * Marks which relation targets of an S3 job are in its latest complete reading: a relation that left it (back to no verdict,
+     * or no longer in the result) is inactive rather than listed with its last status, and active again when it comes back.
+     *
+     * @return the rows whose {@code active} flag changed
+     */
+    public int markPresentRelations(String sourceJobId, String sourceVersion, List<String> relationIds, Instant at) {
+        return jdbc.update("""
+                UPDATE review_targets SET active = (external_id = ANY(CAST(:ids AS text[]))), updated_at = :at
+                WHERE target_type = 'relation' AND source_job_id = :job AND source_version = :version
+                  AND active IS DISTINCT FROM (external_id = ANY(CAST(:ids AS text[])))
+                """, new MapSqlParameterSource("ids", relationIds.toArray(String[]::new)).addValue("job", sourceJobId)
+                .addValue("version", sourceVersion).addValue("at", Timestamp.from(at)));
+    }
+
+    /**
+     * Derives each candidate target of an S3 job from its active current relation targets: HOLD while any is, else ALLOW while
+     * any is, else REJECT; a candidate with none left is inactive. Run after the sync wrote the relations and after a decision
+     * settled one, so the candidate follows both without waiting for the next reading.
+     *
+     * @return the candidate rows that changed
+     */
+    public int refreshCandidates(String sourceJobId, Instant at) {
+        return jdbc.update("""
+                UPDATE review_targets c SET status = d.status, active = d.active, updated_at = :at
+                FROM (SELECT c2.id,
+                             CASE WHEN bool_or(r.status = 'HOLD') THEN 'HOLD' WHEN bool_or(r.status = 'ALLOW') THEN 'ALLOW'
+                                  WHEN count(r.id) > 0 THEN 'REJECT' ELSE c2.status END AS status,
+                             count(r.id) > 0 AS active
+                      FROM review_targets c2
+                      LEFT JOIN review_targets r ON r.target_type = 'relation' AND r.active AND r.is_current
+                           AND r.source_job_id = c2.source_job_id AND r.candidate_id = c2.candidate_id
+                      WHERE c2.target_type = 'candidate' AND c2.source_job_id = :job AND c2.is_current
+                      GROUP BY c2.id, c2.status) d
+                WHERE c.id = d.id AND (c.status, c.active) IS DISTINCT FROM (d.status, d.active)
+                """, new MapSqlParameterSource("job", sourceJobId).addValue("at", Timestamp.from(at)));
+    }
+
+    /**
+     * An analyze-plan unit whose S3 result the worker observed: what the review-target sync reads. {@code s2ResultSha256} is the
+     * S2 result content hash the unit recorded, so the S2 result read again can be proven to be that content.
+     */
+    public record SyncUnit(String planId, int ordinal, String s3JobId, String s3InputDigest, String s2JobId,
+            String s2InputDigest, String s2ResultSha256) {
+    }
+
+    private static final String SYNC_UNIT = """
+            SELECT u.plan_id, u.ordinal, u.s3_job_id, u.s3_input_digest, u.s2_job_id, u.s2_input_digest,
+                   u.s2_checkpoint->>'resultContentSha256' AS s2_result_sha256
+            FROM analysis_plan_units u
+            WHERE u.s3_checkpoint->>'state' = 'result_observed' AND u.s3_input_digest IS NOT NULL
+              AND u.s2_checkpoint->>'resultContentSha256' IS NOT NULL
+            """;
+
+    /**
+     * Observed units with no review target yet (never synced, or a sync that failed or found nothing decided), oldest first,
+     * except the S3 jobs in {@code skipJobIds}: units tried a moment ago that yielded nothing must not hold the pass forever.
+     */
+    public List<SyncUnit> unsyncedUnits(int limit, Collection<String> skipJobIds) {
+        return jdbc.query(SYNC_UNIT + """
+                  AND NOT EXISTS (SELECT 1 FROM review_targets t WHERE t.source_job_id = u.s3_job_id)
+                  AND NOT (u.s3_job_id = ANY(CAST(:skip AS text[])))
+                ORDER BY u.s3_checkpoint->>'resultObservedAt', u.plan_id, u.ordinal LIMIT :limit
+                """, new MapSqlParameterSource("limit", limit).addValue("skip", skipJobIds.toArray(String[]::new)),
+                JdbcReviewRepository::syncUnit);
+    }
+
+    /** Observed units after ({@code planId}, {@code ordinal}) in key order: one page of the round-robin refresh. */
+    public List<SyncUnit> unitsAfter(String planId, int ordinal, int limit) {
+        return jdbc.query(SYNC_UNIT + """
+                  AND (u.plan_id, u.ordinal) > (:plan, :ordinal)
+                ORDER BY u.plan_id, u.ordinal LIMIT :limit
+                """, new MapSqlParameterSource("plan", planId).addValue("ordinal", ordinal).addValue("limit", limit),
+                JdbcReviewRepository::syncUnit);
+    }
+
+    private static SyncUnit syncUnit(ResultSet rs, int rowNumber) throws SQLException {
+        return new SyncUnit(rs.getString("plan_id"), rs.getInt("ordinal"), rs.getString("s3_job_id"),
+                rs.getString("s3_input_digest"), rs.getString("s2_job_id"), rs.getString("s2_input_digest"),
+                rs.getString("s2_result_sha256"));
     }
 
     /** The shared publication lock: decisions get their global revision in commit order (ERD v6 section 27). */
@@ -145,6 +256,14 @@ public class JdbcReviewRepository {
                 LIMIT :limit
                 """, new MapSqlParameterSource("before", Timestamp.from(before)).addValue("limit", limit),
                 JdbcReviewRepository::intent);
+    }
+
+    /** How many intents are still open (pending or blocked) and were created before {@code before}. */
+    public long countOpenIntents(Instant before) {
+        Long count = jdbc.queryForObject("""
+                SELECT count(*) FROM review_decision_intents WHERE status IN ('pending', 'blocked') AND created_at < :before
+                """, new MapSqlParameterSource("before", Timestamp.from(before)), Long.class);
+        return count == null ? 0 : count;
     }
 
     /** Sends an open intent to the back of {@link #openIntents} after a lookup that did not settle it. */
