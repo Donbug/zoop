@@ -19,13 +19,18 @@ import org.springframework.transaction.TransactionException;
  * ({@link PublicGraphReader}: pinned version, asOf filter, current exclusions) and never Neo4j or an AI-internal graph. A
  * target that is not visible there is absent from the result. The evidence passed on is what the public evidence read can
  * read now at that version, in target order, deduplicated, kept within the request's evidence scope and capped at the
- * request limit.
+ * request limit. At most {@value #MAX_ITEMS} items are returned, as many as the answer stage takes for one branch; more
+ * marks the result truncated, so the targets left out are never taken for none (a company read as its issues can have
+ * many).
  *
  * <p>The data version is the pinned graph version. A run without a frozen graph, an unavailable version or snapshot, a
  * database that cannot be read and an evidence state that could not be checked are {@link ChatToolUnavailable}, never an
  * empty result; any other error stays an adapter fault.
  */
 abstract class GraphTargetTool implements ChatTool {
+    /** Items one read returns at most (zoop-ai-chat-1 {@code Branch.items}). */
+    static final int MAX_ITEMS = 50;
+
     private final PublicGraphReader reader;
     private final ChatEvidenceAccess access;
 
@@ -77,6 +82,10 @@ abstract class GraphTargetTool implements ChatTool {
             targets(lookup, id).stream().filter(t -> found.add(t.id())).forEach(targets::add);
         }
         for (var target : targets) {
+            if (items.size() >= MAX_ITEMS) {
+                truncated = true;
+                break;
+            }
             List<String> evidence = new ArrayList<>();
             List<String> candidates = new ArrayList<>(ownEvidence(target));
             candidates.addAll(target.evidenceIds());

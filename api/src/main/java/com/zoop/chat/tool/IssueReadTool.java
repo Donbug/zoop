@@ -10,7 +10,8 @@ import org.springframework.stereotype.Component;
 /**
  * {@code issue.read}: an issue visible in the pinned graph, its companies and its evidence. A company id reads the visible
  * issues that company is involved in or structurally related to, newest first (decision of 2026-10-27), so a question that
- * names only a company can still be answered from its issues.
+ * names only a company can still be answered from its issues. Like every target read it returns at most
+ * {@value GraphTargetTool#MAX_ITEMS} items and marks the rest as truncated.
  */
 @Component
 public class IssueReadTool extends GraphTargetTool {

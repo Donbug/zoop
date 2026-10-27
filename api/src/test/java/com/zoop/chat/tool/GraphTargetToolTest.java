@@ -17,6 +17,7 @@ import com.zoop.chat.service.ChatCompanyProfiles;
 import com.zoop.chat.service.ChatEvidenceAccess;
 import com.zoop.document.evidence.service.EvidenceService.Readability;
 import com.zoop.graph.read.DisclosureExclusions;
+import com.zoop.graph.read.GraphContextLookup;
 import com.zoop.graph.read.PublicGraphReader;
 import com.zoop.graph.snapshot.FixtureGraphSnapshotStore;
 import com.zoop.graph.version.GraphVersionRecord;
@@ -131,6 +132,40 @@ class GraphTargetToolTest {
         assertEquals(List.of(HBM_SUPPLY, "iss-fixture-hbm-equip"), both.items().stream().map(i -> i.id()).toList(),
                 "an issue asked for and read again through its company is reported once, where it was first asked");
         assertTrue(issue().read(SCOPE, new ChatToolRequest("issue.read", List.of("KRX:999999"), 20)).items().isEmpty());
+    }
+
+    @Test
+    void aCompanyWithManyIssuesReturnsAtMostTheItemCapAndSaysTheRestWasCut() {
+        var many = expanding(GraphTargetTool.MAX_ITEMS + 10).read(SCOPE,
+                new ChatToolRequest("issue.read", List.of(HYNIX), 20));
+        assertEquals(GraphTargetTool.MAX_ITEMS, many.items().size());
+        assertEquals("iss-many-0", many.items().getFirst().id(), "the newest are kept, in order");
+        assertTrue(many.truncated(), "the issues left out are never taken for none");
+
+        var exact = expanding(GraphTargetTool.MAX_ITEMS).read(SCOPE, new ChatToolRequest("issue.read", List.of(HYNIX), 20));
+        assertEquals(GraphTargetTool.MAX_ITEMS, exact.items().size());
+        assertFalse(exact.truncated(), "exactly the cap leaves nothing out");
+    }
+
+    /** A target read whose one requested id expands to {@code count} issues, as a company with that many issues does. */
+    private GraphTargetTool expanding(int count) {
+        return new GraphTargetTool(reader(), access()) {
+            @Override
+            public ChatCapability capability() {
+                return ChatCapability.ISSUE_READ;
+            }
+
+            @Override
+            Optional<GraphContextLookup.Target> find(GraphContextLookup lookup, String id) {
+                return Optional.empty();
+            }
+
+            @Override
+            List<GraphContextLookup.Target> targets(GraphContextLookup lookup, String id) {
+                return java.util.stream.IntStream.range(0, count).mapToObj(i -> new GraphContextLookup.Target(
+                        "iss-many-" + i, "issue", "사건 " + i, List.of(id), List.of())).toList();
+            }
+        };
     }
 
     @Test
