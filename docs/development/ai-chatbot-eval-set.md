@@ -26,6 +26,8 @@
 - 세트: `api/src/test/resources/chat-eval/chat-eval-v1.json`
 - 실행기: `api/src/test/java/com/zoop/chat/model/ChatEvalSetTest.java` (사례마다 JUnit 동적 시험 하나)
 - 결과: `api/build/reports/chat-eval/chat-eval-v1.json`(사례별 관측값), `chat-eval-v1.md`(요약 표)
+  - 실행이나 관측 중 예외로 끝난 사례도 실패로 보고한다. `observed.outcome=error`이고, `error`에 던져진 예외, `observed.stages`에 도달한 단계를 남긴 뒤 예외를 다시 던진다. 예: 대본에 없는 생성 단계가 호출된 경우.
+  - 요약의 `setCases`는 세트 전체 사례 수, `cases`는 보고된 사례 수, `errors`는 예외로 끝난 사례 수다. 세트에는 있는데 보고되지 않은 사례 ID는 `notReported`에 적고 표 위에 따로 표시한다. 필터로 일부만 돌렸거나 시작하지 못한 사례이며 통과로 세지 않는다.
 
 실행 경로는 운영과 같다. 질문 → `ChatModelStages`(요구 분해·이름 해석, 모델 단계 wire) → `OrchestratedChatEngine`(계획·조회·검사·결과) → 실제 읽기 도구(`company.read`, `issue.read`, `evidence.resolve`, `graph.path.read`, `zoopPolicy.read`). 다른 점은 세 가지뿐이다.
 
