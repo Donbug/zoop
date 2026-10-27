@@ -68,6 +68,22 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 
 `DB_PORT`나 `DB_NAME`을 바꾸면 `DB_URL`도 일치하게 수정하세요. `.env.example`의 비밀번호는 로컬 전용 예시이며 운영용이 아닙니다. 실제 `.env`는 Git에서 제외됩니다. 이미 초기화된 DB 볼륨의 계정·비밀번호는 환경변수만 바꿔도 변경되지 않습니다.
 
+### 프로세스 생존 확인
+
+인증 없이 `GET /health`를 호출하면 HTTP 200과 `{"status":"UP"}`만 반환합니다. 쿠키·Authorization·CSRF 토큰은 필요하지 않으며, 응답 본문에 비밀 값이나 내부 오류·연결 정보를 포함하지 않습니다.
+
+```sh
+curl --fail-with-body -i http://localhost:8080/health
+```
+
+이 엔드포인트는 요청을 처리하는 프로세스의 생존(liveness)만 확인합니다. DB·AI·외부 서비스에 요청하거나 준비 상태(readiness)를 집계하지 않으므로, **정상 기동 후 DB 연결이 끊겨도 프로세스가 HTTP 요청을 처리하는 동안에는 200을 반환합니다.** 다른 API의 정상 동작이나 시작 작업의 완료를 보장하지 않습니다.
+
+이는 **DB 없이 전체 애플리케이션이 기동한다는 뜻이 아닙니다.** 일반 기동에는 `DB_URL`·`DB_USERNAME`·`DB_PASSWORD`, 접근 가능한 PostgreSQL, Flyway 마이그레이션·JPA 스키마 검증, 시작 시 기업 카탈로그 import가 필요합니다. 필수 CSRF 서명 키 설정도 그대로 필요합니다. AI 클라이언트는 기본 비활성입니다. DB 자동 설정을 제외하거나 별도 프로필로 웹 서버만 띄우는 우회 경로는 제공하지 않습니다.
+
+메서드 처리는 기존 Spring MVC 설정을 유지합니다. `HEAD /health`는 200과 빈 본문, `OPTIONS /health`는 200과 `Allow: GET, HEAD, OPTIONS`를 반환합니다. `POST`·`PUT`·`PATCH`·`DELETE`는 405이며, 오류 본문은 기존 공통 오류 처리의 `INVALID_REQUEST` 형식입니다.
+
+컨트롤러 테스트는 HTTP 응답 계약을 검증하며 전체 애플리케이션이나 컨테이너 기동의 증거는 아닙니다. 실제 이미지의 8080 포트와 기동 후 DB 중단 시나리오는 [API Dev 배포 절차의 로컬 컨테이너 검증](../docs/development/api-dev-deployment.md#51-로컬-컨테이너-생존-확인)을 따릅니다.
+
 ### 그래프 읽기 로컬 빠른 시작 (합성 fixture, 일회용)
 
 백엔드 그래프 읽기(`GET /api/v1/graph`, `asOf`, `GET /api/v1/graph/edges/{id}`)를 AWS·Neo4j·AI 모델·`api/.env` 없이 개발할 때 쓰는 **명시적 옵트인** 런처입니다. 일회용 PostgreSQL 컨테이너 하나와 **빌드된 jar**를 띄우고, 앱의 기존 `ZOOP_GRAPH_SNAPSHOT_SOURCE=fixture`로 jar에 들어 있는 합성 스냅샷 2개(`fixture-2026-10-01`, `fixture-2026-10-08`, 제목 `[합성]`)를 등록·활성화합니다. 실제 뉴스나 AI handoff import가 아니라 **임시 개발용 합성 데이터**이며, 멈추면 DB째 사라집니다. 그래프 handoff import(`com.zoop.graph.importer`)와는 별개이고, `fixture` 소스는 import된 버전이 있는 DB를 거절하므로 이 런처는 매번 새 DB만 씁니다.
