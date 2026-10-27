@@ -24,7 +24,7 @@ function switchError(error: Error) {
   if (error instanceof ApiError && error.status === 409)
     return '규칙 상태가 달라졌어요. 목록을 다시 읽고 확인해 주세요.';
   if (error instanceof ApiError && error.status === 422)
-    return '사유와 규칙 정보를 확인해 주세요. 사유는 1~500자여야 해요.';
+    return '사유를 확인해 주세요. 1~500자 한 줄로 쓰고, 이메일(@)·웹 주소(http)·비밀번호나 인증 관련 단어·토큰처럼 보이는 긴 문자열은 넣지 마세요.';
   return adminActionErrorMessage(error);
 }
 
@@ -96,13 +96,17 @@ function RuleSwitchForm({
         value={reason}
         maxLength={500}
         aria-invalid={invalid}
-        aria-describedby={`${id}-count`}
+        aria-describedby={`${id}-count ${id}-guide`}
         disabled={pending}
         onChange={(event) => setReason(event.target.value)}
         className={TEXTAREA}
       />
       <p id={`${id}-count`} className="text-[11px] text-zoop-muted">
         {reason.length}/500자
+      </p>
+      <p id={`${id}-guide`} className="text-[11px] text-zoop-muted">
+        1~500자 한 줄로 써 주세요. 이메일·웹 주소·비밀번호/인증 관련
+        단어·토큰처럼 긴 문자열은 넣지 마세요.
       </p>
       {invalid && (
         <p role="alert" className="text-xs text-zoop-alert">
