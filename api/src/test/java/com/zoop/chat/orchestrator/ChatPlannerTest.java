@@ -194,6 +194,23 @@ class ChatPlannerTest {
     }
 
     @Test
+    void aPeriodComparisonReadsTheMapDiffForTheNamedTargetsOrTheWholeMap() {
+        Set<String> bound = Set.of("company.read", "graph.version.diff");
+        var plan = run(planner.plan(run(0, "v1"), decision(
+                req("whole", Map.of(ChatQueryType.Q05, 0.9), Map.of()),
+                req("named", Map.of(ChatQueryType.Q05, 0.8), Map.of("graph.version.diff", 0.2), List.of("KRX:005930"))),
+                bound));
+        var whole = plan.requirements().get(0);
+        assertEquals(List.of(ChatCapability.GRAPH_VERSION_DIFF), whole.capabilities(),
+                "the comparison is read whatever the capability probabilities");
+        assertEquals(List.of(ChatCapability.WHOLE_GRAPH), whole.targets());
+        assertEquals(List.of("KRX:005930"), plan.requirements().get(1).targets());
+
+        assertStop("guidance", "out_of_scope", planner.plan(run(0, "v1"), decision(req("whole",
+                Map.of(ChatQueryType.Q05, 0.9), Map.of())), Set.of("company.read")));
+    }
+
+    @Test
     void aConceptQuestionNamingACompanyIsAlsoACompanyQuestion() {
         var plan = run(planner.plan(run(0, "v1"), decision(req("r", Map.of(ChatQueryType.Q02, 0.72,
                 ChatQueryType.Q03, 0.54), Map.of(), List.of("KRX:005930"))), BOUND));

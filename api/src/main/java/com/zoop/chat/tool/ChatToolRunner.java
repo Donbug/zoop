@@ -259,6 +259,7 @@ public class ChatToolRunner implements AutoCloseable {
             var evidence = meta.putArray("evidenceScope");
             call.evidenceScope().forEach(evidence::add);
         }
+        if (call.since() != null) meta.put("since", call.since().toString());
         ObjectNode input = StrictJson.newObject();
         input.put("capabilityId", binding.capability().id());
         input.set("request", meta);

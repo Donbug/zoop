@@ -62,6 +62,7 @@ import com.zoop.chat.tool.ChatToolRunner;
 import com.zoop.chat.tool.CompanyReadTool;
 import com.zoop.chat.tool.EvidenceResolveTool;
 import com.zoop.chat.tool.GraphPathTool;
+import com.zoop.chat.tool.GraphVersionDiffTool;
 import com.zoop.chat.tool.IssueReadTool;
 import com.zoop.chat.tool.ZoopPolicyReadTool;
 import com.zoop.common.json.StrictJson;
@@ -90,12 +91,15 @@ import tools.jackson.databind.node.ObjectNode;
 class ChatEvalSetTest {
     static final String SET = "chat-eval/chat-eval-v1.json";
     static final String GRAPH = "fixture-2026-10-08";
+    /** The fixture published before {@link #GRAPH}, for period comparisons. */
+    static final String EARLIER = "fixture-2026-10-01";
     static final Instant NOW = Instant.parse("2026-10-21T03:00:00Z");
     static final Path REPORT = Path.of("build", "reports", "chat-eval");
     /** The expectations a case may state; any other key is a typo, not a skipped check. */
     static final Set<String> EXPECTATIONS = Set.of("requirements", "targets", "stages", "tools", "outcome", "reason", "failure",
             "deterministicCheck", "answerBasis", "citationKinds", "limitations", "planned", "droppedGeneral",
-            "heldRequirements", "appliedCompanies", "appliedIssues", "graphTargets", "questionOverrodeContext", "choices");
+            "heldRequirements", "appliedCompanies", "appliedIssues", "appliedPeriod", "graphTargets", "questionOverrodeContext",
+            "choices");
     /** What an {@code evidence_insufficient} limitation's message says for each cause the server names. */
     static final Map<String, String> CAUSE_WORDING = Map.of("evidence_held", "확인하지 못해 뺐어요", "nothing_found",
             "찾지 못했어요");
@@ -366,6 +370,12 @@ class ChatEvalSetTest {
         o.putArray("appliedIssues").addAll(strings(applied == null ? List.of()
                 : applied.issues().stream().map(ChatAppliedItem::id).toList()));
         o.put("questionOverrodeContext", applied != null && applied.questionOverrodeContext());
+        if (applied != null && applied.period() != null) {
+            o.putObject("appliedPeriod").put("start", applied.period().start()).put("end", applied.period().end())
+                    .put("basis", applied.period().basis()).put("expression", applied.period().expression());
+        } else {
+            o.putNull("appliedPeriod");
+        }
         o.putArray("graphTargets").addAll(strings(result.graphTargets().stream().map(GraphTarget::id).toList()));
         o.putArray("choices").addAll(strings(result.choices() == null ? List.<String>of()
                 : result.choices().stream().map(ChatChoice::id).toList()));
@@ -562,7 +572,10 @@ class ChatEvalSetTest {
                     "회원 탈퇴 시 질문 기록은 30일 동안 보관한 뒤 지웁니다.", "제3자 제공", "법령이 정한 경우 외에는 제3자에게 제공하지 않습니다.");
 
             citations = (evidenceId, graphVersion, asOf, traceId) -> Optional.ofNullable(byId.get(evidenceId));
-            PublicGraphReader reader = reader();
+            GraphVersionRepository versions = versions();
+            PublicGraphReader reader = new PublicGraphReader(new GraphVersionSelector(versions, Clock.fixed(NOW,
+                    ZoneOffset.UTC)), new FixtureGraphSnapshotStore(ChatEvalSetTest.class.getClassLoader()),
+                    pinned -> DisclosureExclusions.NONE);
             issues = new IssueNameResolver(reader);
             ChatEvidenceAccess access = (evidenceId, graphVersion, asOf, requestId) -> true;
             var companyProfiles = new ChatCompanyProfiles(null, null, reader) {
@@ -579,7 +592,8 @@ class ChatEvalSetTest {
             };
             registry = new ChatToolRegistry(List.of(new CompanyReadTool(reader, access, companyProfiles),
                     new IssueReadTool(reader, access), new EvidenceResolveTool(reader, access),
-                    new GraphPathTool(reader, access), new ZoopPolicyReadTool(docs)));
+                    new GraphPathTool(reader, access), new ZoopPolicyReadTool(docs),
+                    new GraphVersionDiffTool(reader, versions, access, Clock.fixed(NOW, ZoneOffset.UTC))));
         }
 
         private static void policy(Map<String, ChatZoopDocs.Document> policies, Map<String, Citation> citations, String docId,
@@ -597,18 +611,29 @@ class ChatEvalSetTest {
         }
 
         /** Only {@link #GRAPH} exists, active since 2026-10-08; any other version cannot be read. */
-        private static PublicGraphReader reader() {
-            var record = new GraphVersionRecord(GRAPH, 1, "fixture", "artifact-" + GRAPH,
-                    FixtureGraphSnapshotStore.URI_PREFIX + GRAPH + ".json",
-                    FixtureGraphSnapshotStore.sha256(bytes("graph-fixtures/" + GRAPH + ".json")), true);
-            GraphVersionRepository versions = new GraphVersionRepository() {
-                public Optional<GraphVersionRecord> find(String id) { return Optional.of(record).filter(r -> r.id().equals(id)); }
-                public Optional<GraphVersionRecord> active() { return Optional.of(record); }
-                public Optional<String> activeVersionIdAt(Instant asOf) { return Optional.of(GRAPH); }
-                public boolean everActivated(String id) { return GRAPH.equals(id); }
+        /**
+         * The fixtures as published: {@link #EARLIER} from 2026-10-01, then {@link #GRAPH} from 2026-10-08 (active). Any
+         * other version cannot be read.
+         */
+        private static GraphVersionRepository versions() {
+            Map<String, GraphVersionRecord> known = Map.of(EARLIER, record(EARLIER, false), GRAPH, record(GRAPH, true));
+            return new GraphVersionRepository() {
+                public Optional<GraphVersionRecord> find(String id) { return Optional.ofNullable(known.get(id)); }
+                public Optional<GraphVersionRecord> active() { return Optional.of(known.get(GRAPH)); }
+                public Optional<String> activeVersionIdAt(Instant asOf) {
+                    if (asOf.isBefore(Instant.parse("2026-10-01T00:00:00Z"))) return Optional.empty();
+                    return Optional.of(asOf.isBefore(Instant.parse("2026-10-08T00:00:00Z")) ? EARLIER : GRAPH);
+                }
+                public boolean everActivated(String id) { return known.containsKey(id); }
+                public Optional<String> previousVersionId(String id, Instant at) {
+                    return GRAPH.equals(id) ? Optional.of(EARLIER) : Optional.empty();
+                }
             };
-            return new PublicGraphReader(new GraphVersionSelector(versions, Clock.fixed(NOW, ZoneOffset.UTC)),
-                    new FixtureGraphSnapshotStore(ChatEvalSetTest.class.getClassLoader()), pinned -> DisclosureExclusions.NONE);
+        }
+
+        private static GraphVersionRecord record(String id, boolean active) {
+            return new GraphVersionRecord(id, 1, "fixture", "artifact-" + id, FixtureGraphSnapshotStore.URI_PREFIX + id + ".json",
+                    FixtureGraphSnapshotStore.sha256(bytes("graph-fixtures/" + id + ".json")), active);
         }
     }
 

@@ -79,7 +79,7 @@
 | `limitations` | `{kind, label, cause}` 목록. `cause`(`evidence_held`, `nothing_found`)는 문구에 원인이 드러나는지 본다 |
 | `planned` | 계획된 요구와 방식(`r1:tools`, `r1-c:general` 등). 개념 하위 요구 유무를 여기서 본다 |
 | `droppedGeneral`, `heldRequirements` | 1층 검사로 뺀 개념 구간, 의미 검증이 보류한 요구 |
-| `appliedCompanies`, `appliedIssues`, `questionOverrodeContext`, `graphTargets`, `choices` | 결과의 `applied`, 지도 대상, 확인 질문 선택지 ID |
+| `appliedCompanies`, `appliedIssues`, `appliedPeriod`, `questionOverrodeContext`, `graphTargets`, `choices` | 결과의 `applied`, 지도 대상, 확인 질문 선택지 ID |
 
 ## 4. 실행
 
@@ -97,14 +97,14 @@ export JAVA_HOME=<JDK 21>
 
 ## 5. v1 사례와 드러난 공백
 
-36개 사례: Q01 2, Q02 2, Q03 8, Q04 2, Q05~Q08 각 1, 복합 6, 투자 판단 4, 공격 3, 확인 질문 1, 장애 4. 2026-10-27 기준 모두 통과한다(대본 실행).
+38개 사례: Q01 2, Q02 2, Q03 8, Q04 2, Q05 3, Q06~Q08 각 1, 복합 6, 투자 판단 4, 공격 3, 확인 질문 1, 장애 4. 2026-10-27 기준 모두 통과한다(대본 실행).
 
 세트를 만들며 확인한 현재 공백(`gap` 표시 사례):
 
 | 사례 | 공백 |
 | --- | --- |
 | `q03-catalog-only-company` | 카탈로그에만 있고 공개 그래프에 없는 기업은 `nothing_found`다. 실제 데이터에서 근거 부족의 주원인인지 잰다. |
-| `q01-help-unbound`, `q05`~`q08` | 도구 미연결·미구현으로 `out_of_scope` 안내다. |
+| `q01-help-unbound`, `q06`~`q08` | 도구 미연결·미구현으로 `out_of_scope` 안내다. |
 
 v1에서 찾은 공백 중 사건 이름 미해석과 기업 대상 `issue.read`의 빈 결과는 2026-10-27에 고쳤다(구현 계획 사건 지목 결정 (5)·(6)). `q03-issue-named`, `q03-issue-and-company-named`, `q03-company-issues-by-name`이 그 동작을 고정하고, `failure-graph-unreadable-concept`는 그래프를 읽을 수 없어도 순수 개념 질문은 답하는지(사건 이름을 필요할 때만 해석하는지) 확인한다. 같은 말에 맞는 사건이 여럿인 확인 질문은 fixture에 그런 사건이 없어 `IssueNameResolverTest`·`ChatModelStagesTest`가 다룬다.
 
