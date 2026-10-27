@@ -303,10 +303,33 @@ class AnalyzePlanWorkerTest {
             assertEquals(ErrorCode.SOURCE_UNAVAILABLE, refused.getErrorCode());
         }
 
-        // A relation that left the latest complete reading (the sync marked it inactive) is not the candidate's any more.
+        jdbc.update("UPDATE review_targets SET source_revision = '2' WHERE source_job_id = ? AND external_id = ?",
+                script.s3.jobId(), "rc-" + "1".repeat(64));
+        ReviewTargetSync working = new ReviewTargetSync(reviews, s2, s3, transactions, clock, 500);
+        var refreshable = new StaticListableBeanFactory(Map.of("s2", s2, "s3", s3, "sync", working));
+        AnalysisCandidateService refreshing = new AnalysisCandidateService(candidateRepository, reviews, published, registry,
+                refreshable.getBeanProvider(ExtractionClient.class), refreshable.getBeanProvider(RelationClient.class),
+                refreshable.getBeanProvider(ReviewTargetSync.class), mapper, keys, clock);
+        // Same revisions, but the S3 result groups a relation under this candidate the projection does not show (added):
+        // never an answer from the old relation set. Without a refresher it is 503; a refresh brings the relation back.
         jdbc.update("UPDATE review_targets SET active = false WHERE source_job_id = ? AND external_id = ?",
                 script.s3.jobId(), "rc-" + "1".repeat(64));
-        assertEquals(List.of(), service.get(candidateId, "r-7").relations(), "an inactive relation is not shown");
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE,
+                assertThrows(CustomException.class, () -> service.get(candidateId, "r-7")).getErrorCode());
+        String relationId = "rc-" + "1".repeat(64);
+        assertEquals(List.of(relationId), refreshing.get(candidateId, "r-8").relations().stream()
+                .map(r -> r.relationId()).toList(), "refreshed to the S3 result's relations");
+        // The projection shows a relation the S3 result no longer has under this candidate (gone): refreshed away as well.
+        jdbc.update("""
+                INSERT INTO review_targets
+                SELECT (jsonb_populate_record(NULL::review_targets, to_jsonb(t) || jsonb_build_object(
+                        'id', t.id || '-gone', 'external_id', ?))).* FROM review_targets t
+                WHERE t.source_job_id = ? AND t.external_id = ?""",
+                "rc-" + "3".repeat(64), script.s3.jobId(), "rc-" + "1".repeat(64));
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE,
+                assertThrows(CustomException.class, () -> service.get(candidateId, "r-9")).getErrorCode());
+        assertEquals(List.of(relationId), refreshing.get(candidateId, "r-10").relations().stream()
+                .map(r -> r.relationId()).toList(), "the gone relation is no longer the candidate's");
     }
 
     private int listed(String q, String filter, String value) throws Exception {

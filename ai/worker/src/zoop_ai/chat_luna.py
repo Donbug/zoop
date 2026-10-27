@@ -11,7 +11,7 @@ from typing import Any
 from .chat_contracts import AnswerInput, ChatAnswer
 from .contracts import canonical, digest
 
-PROMPT_REVISION = "zoop-chat-answer-2026-10-25-1"
+PROMPT_REVISION = "zoop-chat-answer-2026-10-26-1"
 # Pinned like the pipeline (cost and behaviour are only known for it); a live configuration naming another is refused.
 MODEL = "gpt-6-luna"
 REASONING_EFFORT = "high"
@@ -25,6 +25,8 @@ PROMPT = (
     "근거 기반 구간을 한 구간에 섞지 않는다. "
     "general=true인 branch만 일반 개념 구간(general_knowledge)으로 설명할 수 있고, 그 구간에는 근거를 넣지 않으며 최신 "
     "기업·시장 사실, 수치, 날짜, 가격, 전망을 쓰지 않는다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다. "
+    "label이 '— 개념 설명'으로 끝나는 branch는 서버가 같은 질문의 다른 요구에서 떼어 낸 개념 부분이다. 그 구간에는 "
+    "기업·사건 이름을 쓰지 않고 개념만 설명하며, 쓸 내용이 없으면 insufficientRequirementIds에 넣는다. "
     "noneFound=true인 branch는 조회 범위에서 찾지 못했다고만 쓰고 없는 이유를 추측하지 않는다. "
     "branch paths는 fromId에서 toId까지의 관계 경로 조회 결과다. status=found는 steps 순서대로 이어지며, 각 step은 "
     "sourceId에서 targetId로 저장된 관계(relation·role)이고 그 step의 evidenceIds 인용문만 그 연결의 근거로 쓴다. "

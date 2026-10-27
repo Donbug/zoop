@@ -159,7 +159,7 @@ public class AnalysisCandidateService {
         }
         // A newer AI revision than the projection: refresh it first, so the status, reasons and expected values match the S3
         // result this detail shows. ERD v6 section 26: answer after the sync or fail, never mix the two source states.
-        if (stale(rows, s3)) {
+        if (stale(candidate, rows, sources, s3)) {
             ReviewTargetSync refresher = sync.getIfUnique();
             Optional<Integer> refreshed;
             try {
@@ -173,7 +173,7 @@ public class AnalysisCandidateService {
             // A refresh that left the candidate no longer current is a 404, as the list no longer has it.
             candidate = candidates.candidate(candidateId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
             rows = candidates.relations(List.of(candidate)).get(candidate.id());
-            if (stale(rows, s3)) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+            if (stale(candidate, rows, sources, s3)) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         }
         Obj event = event(sources.s2(), candidate.candidateId());
         Obj mention = event == null ? null : event.object("mention");
@@ -209,10 +209,18 @@ public class AnalysisCandidateService {
                 graphDb(candidate, rows, row.onUserGraph(), shown));
     }
 
-    /** A projected relation whose AI source revision is not the one in the S3 result just read. */
-    private static boolean stale(List<Relation> rows, Map<String, Obj> s3) {
-        return rows.stream().anyMatch(r -> s3.containsKey(r.relationCandidateId())
-                && !r.sourceRevision().equals(s3.get(r.relationCandidateId()).string("sourceRevision")));
+    /**
+     * The projection is not the S2/S3 results just read: a projected relation's AI source revision differs, or the relations
+     * the sync's own rules group under this candidate now are not the projected ones (one added, or one gone).
+     */
+    private static boolean stale(Candidate candidate, List<Relation> rows, Sources sources, Map<String, Obj> s3) {
+        if (rows.stream().anyMatch(r -> s3.containsKey(r.relationCandidateId())
+                && !r.sourceRevision().equals(s3.get(r.relationCandidateId()).string("sourceRevision")))) return true;
+        Set<String> projected = rows.stream().map(Relation::relationCandidateId).collect(java.util.stream.Collectors.toSet());
+        Set<String> current = ReviewTargetReader.read(sources.s2(), sources.s3()).rows().stream()
+                .filter(r -> "relation".equals(r.type()) && candidate.candidateId().equals(r.candidateId()))
+                .map(ReviewTargetReader.Row::externalId).collect(java.util.stream.Collectors.toSet());
+        return !projected.equals(current);
     }
 
     // ---- list row
@@ -224,7 +232,9 @@ public class AnalysisCandidateService {
                 || (c.s2JobId() != null && s.event(c.s2JobId(), c.candidateId()))).orElse(false);
         ReviewDecisionOut latest = own.stream().flatMap(r -> decisions.getOrDefault(r.id(), List.of()).stream())
                 .max((a, b) -> Long.compare(a.id(), b.id())).orElse(null);
-        return new CandidateRow(c.title(), c.id(), c.issueId(), c.status(), c.active(), null, c.action(), c.target(),
+        // The stored issue id is the AI snapshot event id; the contract's issueId is the public one it maps to now.
+        String issueId = shown.map(s -> s.publicIssueId(c.issueId())).orElse(null);
+        return new CandidateRow(c.title(), c.id(), issueId, c.status(), c.active(), null, c.action(), c.target(),
                 c.eventTime(), companies(c.companiesJson()), c.relationTypes(),
                 c.evidenceCount() == null ? 0 : c.evidenceCount(), c.reasons(), onGraph, latest, null);
     }

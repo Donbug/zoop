@@ -2,7 +2,7 @@
 
 기준 화면: `D-AI-01`, `D-AI-01b`, `D-AI-02`, `D-AI-02b`
 
-기준 API: [`docs/api/openapi.yaml`](../api/openapi.yaml)의 `createConversation`, `getConversation`, `getCurrentConversation`, `submitQuestion`, `getQuestionJob`, `retryQuestionJob`, `cancelQuestionJob`
+기준 API: [`docs/api/openapi.yaml`](../api/openapi.yaml)의 `createConversation`, `getConversation`, `getCurrentConversation`, `submitQuestion`, `getQuestionJob`, `retryQuestionJob`, `cancelQuestionJob`, `listConversations`, `deleteConversation`
 
 상세 처리 정책: [`ZOOP AI 거버넌스 정책 v0.9`](../ZOOP_AI_거버넌스_정책.md), [`AI 챗봇 설계 요약`](../design/ai-chatbot-design-summary.md)
 
@@ -59,6 +59,22 @@
 `failure.retry=save_only`이면 “저장 다시 시도”, `rerun`이면 “질문 다시 처리”로 구분한다. `retry=null`이면 재시도 버튼을 만들지 않고 새 질문 또는 지원 안내만 제공한다. 작업당 실행이 3회에 도달하면 서버가 `retry=null`을 내려주므로 UI가 횟수를 따로 세지 않는다. 출력 검증 실패는 자동 재생성하지 않는다.
 
 진행 단계는 `phase`만 사용하고 경과 시간으로 단계를 추정하지 않는다. 단계 표시는 `aria-live=polite`로 알리되 단계마다 포커스를 옮기지 않는다.
+
+### D-AI-02 · 대화 기록 (와이어프레임 없음, 2026-10-27 임시 설계)
+
+와이어프레임에는 대화 목록 화면이 없다(FS050은 목록·삭제를 P2로 미뤘다). 웹은 질문 창 머리글의 “대화 기록” 버튼으로 같은 드로어의 본문을 목록으로 바꾸고 “← 대화로 돌아가기”로 되돌린다. 화면 설계가 확정되면 이 절을 바꾼다.
+
+| API 상태 | UI 상태 |
+| --- | --- |
+| `listConversations` 응답 전 | “대화 기록을 불러오고 있어요” |
+| 실패 | “대화 기록을 불러오지 못했어요”와 “다시 시도”(목록 조회만 다시) |
+| 빈 목록 | “아직 질문한 대화가 없어요”. 질문하지 않은 “새 대화”는 목록에 없다 |
+| 항목 | 첫 질문(제목)·마지막 질문 시각(KST)·질문 수. 지금 대화는 `aria-current`와 “지금 대화” |
+| `nextCursor` | “더 보기”로 다음 쪽을 잇는다. 커서가 만료되면 첫 쪽부터 다시 읽는다 |
+
+- 항목을 고르면 `getConversation`으로 그 대화를 연다(모델 호출 없음). “새 대화”와 같은 조건(보내는 중·확인하지 못한 질문이 없을 때)에서만 바꾸고, 바꾼 뒤에는 이전 대화의 늦은 응답을 반영하지 않는다. 열지 못하면 지금 대화를 그대로 두고 안내한다.
+- 삭제는 `deleteEnabled`가 참일 때만 보인다. 항목의 “삭제” → 확인(“되돌릴 수 없어요”) → `deleteConversation`. 처리 중인 질문이 있으면(`JOB_IN_PROGRESS`) 지우지 않고 취소한 뒤 삭제하라고 안내한다. 지금 대화를 지우면 질문 창을 빈 상태로 바꾸고 다음 질문이 새 대화를 만든다.
+- `deleteEnabled`가 거짓이면(승인된 처리방침·약관은 개별 채팅 삭제 미제공) “대화 기록은 회원 탈퇴 시 모두 삭제돼요”만 안내한다. 개정 초안: [`docs/legal/drafts/revision-chat-deletion.md`](../legal/drafts/revision-chat-deletion.md).
 
 ### D-AI-02b · 대화 조회 오류
 

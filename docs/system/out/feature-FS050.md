@@ -40,12 +40,14 @@
 
 ## 화면·목표 API
 
-[D-AI-01](screen-D-AI-01.md) · [M-AI-01](screen-M-AI-01.md) · [D-AI-02b](screen-D-AI-02b.md) · [D-AI-01b](screen-D-AI-01b.md)
+[D-AI-02](screen-D-AI-02.md) · [D-AI-01](screen-D-AI-01.md) · [M-AI-01](screen-M-AI-01.md) · [D-AI-02b](screen-D-AI-02b.md) · [D-AI-01b](screen-D-AI-01b.md)
 
 | 작업 | 메서드·목표 경로 | WBS | 권한 |
 | --- | --- | --- | --- |
+| [listConversations](../../api/out/zoop-api-spec.md#listconversations) | GET /api/v1/chat/sessions | 6.1.2, 6.11.1, 6.9.7, 6.9.8, 6.9.14 | 회원(본인) |
 | [createConversation](../../api/out/zoop-api-spec.md#createconversation) | PUT /api/v1/chat/sessions/{id} | 6.1.2, 6.11.1, 6.9.6, 6.9.10, 6.9.11, 6.9.14 | 회원(본인) |
 | [getConversation](../../api/out/zoop-api-spec.md#getconversation) | GET /api/v1/chat/sessions/{id} | 6.1.2, 6.11.1, 6.9.6, 6.9.7, 6.9.8, 6.9.10, 6.9.11, 6.9.14 | 회원(본인) |
+| [deleteConversation](../../api/out/zoop-api-spec.md#deleteconversation) | DELETE /api/v1/chat/sessions/{id} | 6.1.2, 6.11.1, 6.9.14 | 회원(본인) |
 | [submitQuestion](../../api/out/zoop-api-spec.md#submitquestion) | POST /api/v1/chat/sessions/{id}/jobs | 6.1.2, 6.11.1, 6.6.10, 6.9.1, 6.9.2, 6.9.3, 6.9.4, 6.9.5, 6.9.6, 6.9.10, 6.9.11, 6.9.12, 6.9.13, 6.9.14, 6.5.7 | 회원(본인) |
 
 ## 확인 필요

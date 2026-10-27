@@ -34,7 +34,8 @@ import org.springframework.stereotype.Component;
  * evidence gate that cannot be verified right now. The caller shows that as unknown, never as "not shown".
  *
  * <p>The answer is kept for {@link #TTL} per (active version, exclusion revision): the snapshot and receipt never change for a
- * version, but a source grant can expire with time, so the evidence gates are judged again at least that often.
+ * version, but a source grant can expire with time, so the evidence gates are judged again at least that often. While one
+ * reader recomputes an expired answer, the others get that expired answer for the same version and exclusion revision.
  */
 @Component
 public class PublishedCandidates {
@@ -48,6 +49,7 @@ public class PublishedCandidates {
     private final DisclosureExclusionReader exclusions;
     private final Clock clock;
     private volatile Cached cached;
+    private final java.util.concurrent.locks.ReentrantLock computing = new java.util.concurrent.locks.ReentrantLock();
 
     private record Cached(String versionId, long exclusionRevision, Instant at, Shown shown) {
     }
@@ -66,7 +68,20 @@ public class PublishedCandidates {
      * receipt's sources whose public item users cannot read now.
      */
     public record Shown(String versionId, Set<String> relations, Set<String> events, Set<String> excludedRelations,
-            Set<String> excludedEvents) {
+            Set<String> excludedEvents, Map<String, String> publicIssueIds) {
+        public Shown(String versionId, Set<String> relations, Set<String> events, Set<String> excludedRelations,
+                Set<String> excludedEvents) {
+            this(versionId, relations, events, excludedRelations, excludedEvents, Map.of());
+        }
+
+        /**
+         * The active version's public issue id for an AI snapshot event id (S2 {@code disposition.targetEventId}): the receipt
+         * issue whose {@code sourceEvents} name it as a {@code snapshot-event}. Null when no issue, or more than one, does.
+         */
+        public String publicIssueId(String aiEventId) {
+            return aiEventId == null ? null : publicIssueIds.get(aiEventId);
+        }
+
         public boolean relation(String s3JobId, String relationCandidateId) {
             return relations.contains(key(s3JobId, relationCandidateId));
         }
@@ -94,11 +109,20 @@ public class PublishedCandidates {
             long revision = exclusions.current(activeId).revision();
             Cached hit = cached;
             if (fresh(hit, activeId, revision)) return Optional.of(hit.shown());
-            // One reader computes; the others wait for its answer instead of gating the whole graph again in parallel.
-            synchronized (this) {
+            // Expired for the same version and exclusion revision: one reader recomputes and the others keep the last answer
+            // meanwhile, so no list or detail waits on a whole-graph gate. Another version or revision is always waited for.
+            boolean sameState = hit != null && hit.versionId().equals(activeId) && hit.exclusionRevision() == revision;
+            if (sameState) {
+                if (!computing.tryLock()) return Optional.of(hit.shown());
+            } else {
+                computing.lock();
+            }
+            try {
                 hit = cached;
                 if (fresh(hit, activeId, revision)) return Optional.of(hit.shown());
                 return compute(activeId, revision, requestId);
+            } finally {
+                computing.unlock();
             }
         } catch (RuntimeException unavailable) {
             log.warn("published candidates unknown: {}", unavailable.getClass().getSimpleName());
@@ -151,19 +175,26 @@ public class PublishedCandidates {
         }
         Set<String> events = new HashSet<>();
         Set<String> excludedEvents = new HashSet<>();
+        Map<String, String> publicIssueIds = new HashMap<>();
+        Set<String> ambiguous = new HashSet<>();
         for (Obj issue : bundle.objects("issues")) {
             Set<String> into = issueIds.contains(issue.string("id")) ? events : excludedEvents;
             for (Obj event : issue.objects("sourceEvents")) {
                 if ("event-candidate".equals(event.string("kind"))) {
                     into.add(key(event.object("upstream").string("jobId"), event.string("ref")));
+                } else if ("snapshot-event".equals(event.string("kind"))) {
+                    // The AI writes the same group event id here and in S2 disposition.targetEventId (extraction/handoff).
+                    String previous = publicIssueIds.putIfAbsent(event.string("ref"), issue.string("id"));
+                    if (previous != null && !previous.equals(issue.string("id"))) ambiguous.add(event.string("ref"));
                 }
             }
         }
+        ambiguous.forEach(publicIssueIds::remove);
         // One source behind a shown item and a hidden one at once is shown.
         excludedRelations.removeAll(relations);
         excludedEvents.removeAll(events);
         return new Shown(versionId, Set.copyOf(relations), Set.copyOf(events), Set.copyOf(excludedRelations),
-                Set.copyOf(excludedEvents));
+                Set.copyOf(excludedEvents), Map.copyOf(publicIssueIds));
     }
 
     /** For a test or a caller holding JSON text. */

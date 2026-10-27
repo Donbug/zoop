@@ -310,7 +310,7 @@ public class ReviewDecisionService {
         if (request.relationId() == null) throw new CustomException(ErrorCode.INVALID_REQUEST);
         Target relation = reviews.currentRelation(candidate, request.relationId())
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
-        // A relation that left the latest AI reading (inactive, no longer in the detail) is not the state the administrator saw.
+        // A relation that left the latest AI reading (inactive: the detail refreshes before showing it) is not the state decided on.
         if (!relation.active()) throw new CustomException(ErrorCode.REVISION_CONFLICT);
         return relation;
     }
