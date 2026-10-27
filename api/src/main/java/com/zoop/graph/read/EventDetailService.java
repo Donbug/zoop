@@ -152,6 +152,14 @@ public class EventDetailService {
         return !basis.isEmpty() && shownMentions.keySet().containsAll(basis);
     }
 
+    /**
+     * Whether a direct read of this issue would show it now (the head check above), for callers outside this read such as the
+     * #132 candidate publication state. {@code shown} is the same evidence predicate: in the filtered snapshot and readable now.
+     */
+    public static boolean readable(Obj bundle, Issue issue, Predicate<String> shown) {
+        return headShown(issue, mentionsById(handoffIssue(supportedBundle(bundle), issue.issueId()), issue, shown));
+    }
+
     /** The event on the other end of a FOLLOWS relation passes the same head check as a direct read of it. */
     private static boolean otherHeadShown(DisplayGraph graph, Obj bundle, String id, Relation r, Predicate<String> shown) {
         Issue other = graph.issues.get(r.source().equals(id) ? r.target() : r.source());
