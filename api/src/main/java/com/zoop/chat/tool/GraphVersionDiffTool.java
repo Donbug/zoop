@@ -26,9 +26,10 @@ import org.springframework.transaction.TransactionException;
  * <ul>
  * <li>The earlier graph is the one public at {@link ChatToolRequest#since()} (the period the question wrote), or without one,
  * the version public just before the pinned one became public. There being no earlier public graph is reported as a cut
- * read ({@code truncated}), never as "nothing changed"; the same version on both sides is a read that found no change.</li>
+ * read ({@code truncated}), never as "nothing changed"; so is a period that starts after the moment the run reads the map
+ * at (its asOf), whose map would be the newer one. The same version on both sides is a read that found no change.</li>
  * <li>Targets narrow the changes to those companies and issues and the relations of those companies;
- * {@link ChatCapability#WHOLE_GRAPH} keeps every change. At most {@link #MAX_CHANGES} changes are reported, additions
+ * {@link ChatCapability#WHOLE_GRAPH}, or evidence ids alone (a selection of evidence), keep every change. At most {@link #MAX_CHANGES} changes are reported, additions
  * first; more is {@code truncated}.</li>
  * <li>Each change is an item of its kind ({@code company}, {@code issue}, {@code edge}) whose label starts with
  * {@code [새로 생김]} or {@code [사라짐]}. Only additions carry evidence: what the pinned graph shows for them, readable now,
@@ -40,6 +41,7 @@ import org.springframework.transaction.TransactionException;
 @Component
 public class GraphVersionDiffTool implements ChatTool {
     static final int MAX_CHANGES = 40;
+    private static final java.util.regex.Pattern EVIDENCE = java.util.regex.Pattern.compile("ev-[0-9a-f]{64}");
 
     private final PublicGraphReader reader;
     private final GraphVersionRepository versions;
@@ -69,6 +71,10 @@ public class GraphVersionDiffTool implements ChatTool {
             var pinned = reader.read(null, scope.graphVersionId(), scope.asOf());
             version = pinned.selected().version().id();
             Instant at = scope.asOf() != null ? scope.asOf() : clock.instant();
+            if (request.since() != null && request.since().isAfter(at)) {
+                // A period after the moment the run reads the map at: the "earlier" map would be the newer one.
+                return new ChatToolOutput(version, List.of(), List.of(), true, false);
+            }
             Optional<String> baseline = request.since() != null ? versions.activeVersionIdAt(request.since())
                     : versions.previousVersionId(version, at);
             if (baseline.isEmpty()) return new ChatToolOutput(version, List.of(), List.of(), true, false);
@@ -81,8 +87,10 @@ public class GraphVersionDiffTool implements ChatTool {
             throw new ChatToolUnavailable("graph versions around " + scope.graphVersionId() + " cannot be read", unavailable);
         }
 
-        boolean whole = request.targets().equals(List.of(ChatCapability.WHOLE_GRAPH));
-        Set<String> targets = Set.copyOf(request.targets());
+        // Selected evidence names no company or issue: a comparison over evidence alone covers the whole map.
+        Set<String> targets = request.targets().stream().filter(t -> !EVIDENCE.matcher(t).matches())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        boolean whole = targets.isEmpty() || targets.equals(Set.of(ChatCapability.WHOLE_GRAPH));
         List<GraphChanges.Change> kept = changes.stream().filter(c -> whole || targets.contains(c.id())
                 || c.companyIds().stream().anyMatch(targets::contains)).toList();
         boolean truncated = kept.size() > MAX_CHANGES;

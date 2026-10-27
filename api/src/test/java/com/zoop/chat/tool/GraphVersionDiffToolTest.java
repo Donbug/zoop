@@ -74,6 +74,24 @@ class GraphVersionDiffToolTest {
     }
 
     @Test
+    void aPeriodAfterThePinnedMomentIsNeverComparedTheWrongWayRound() {
+        // The run reads the map as of 2026-10-05 (10-01); "since 10-09" would make 10-08 the "earlier" map.
+        var pinnedPast = new ChatToolScope("job-1", OLD, Instant.parse("2026-10-05T00:00:00Z"));
+        var out = tool().read(pinnedPast, whole(Instant.parse("2026-10-09T00:00:00Z")));
+        assertTrue(out.items().isEmpty(), "no additions shown as removals");
+        assertTrue(out.truncated(), "it cannot be compared, which is not \"nothing changed\"");
+        assertEquals(OLD, out.dataVersion());
+    }
+
+    @Test
+    void selectedEvidenceAloneComparesTheWholeMap() {
+        var evidence = "ev-" + "a".repeat(64);
+        var out = tool().read(SCOPE, new ChatToolRequest("graph.version.diff", List.of(evidence), 20));
+        assertEquals(tool().read(SCOPE, whole(null)).items(), out.items(),
+                "evidence names no company or issue, so nothing is narrowed away");
+    }
+
+    @Test
     void targetsNarrowTheChangesToThoseCompaniesAndIssues() {
         var tsmc = tool().read(SCOPE, new ChatToolRequest("graph.version.diff", List.of(TSMC), 20));
         assertEquals(List.of("issue", "edge"), tsmc.items().stream().map(ChatToolItem::kind).toList(),
