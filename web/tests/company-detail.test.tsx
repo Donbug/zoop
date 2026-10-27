@@ -676,6 +676,9 @@ test('buckets follow exact five-minute/hour/day/week resolutions and never inven
   const impact: Impact = {
     companyId: id,
     issueId: 'issue-a',
+    pathStatus: 'available',
+    pathType: 'direct',
+    edgeId: 'edge-a',
     steps: [
       {
         id: 'issue-a',
@@ -685,6 +688,8 @@ test('buckets follow exact five-minute/hour/day/week resolutions and never inven
       },
       { id, kind: 'company', reason: 'confirmed', evidenceIds: ['ev-a'] },
     ],
+    businessPath: null,
+    impact: { status: 'unavailable', reason: 'not_recorded', results: [] },
     metadata,
   };
   expect(impactEdges(graph, impact)).toEqual(['edge-a']);
@@ -873,6 +878,9 @@ test('unconfirmed business assertions are excluded from actual impact paths', ()
   const impact: Impact = {
     companyId: id,
     issueId: 'issue-a',
+    pathStatus: 'available',
+    pathType: 'direct',
+    edgeId: 'edge-a',
     steps: [
       {
         id: 'issue-a',
@@ -882,6 +890,8 @@ test('unconfirmed business assertions are excluded from actual impact paths', ()
       },
       { id, kind: 'company', reason: '합성 근거', evidenceIds: ['ev-a'] },
     ],
+    businessPath: null,
+    impact: { status: 'unavailable', reason: 'not_recorded', results: [] },
     metadata,
   };
   expect(
