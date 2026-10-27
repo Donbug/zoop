@@ -5,45 +5,16 @@ membership is the input, not a claim that native S2/S3 relation extraction was r
 is the preserved quote context, not a reconstructed full article or a price forecast.
 """
 from __future__ import annotations
-import argparse, hashlib, json, os, sys, urllib.request
-from datetime import datetime, timezone
+import argparse, json, os, sys, urllib.request
 from pathlib import Path
-from dotenv import dotenv_values
+from briefing_s3_source import REPO, canonical, sha, now, native_version, once
 
-REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / 'ai/pipeline/src'))
 from zoop_ai_pipeline import relation_rules as rules
 from zoop_ai_pipeline.live_runtime import LiveRuntime, LiveFailure
 from zoop_ai_pipeline.extraction_contracts import CitationFailure
 
 ROUNDS = [('2026-10-21','evening'),('2026-10-22','morning'),('2026-10-22','evening'),('2026-10-23','morning')]
-
-def canonical(v):
-    return json.dumps(v, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()
-
-def sha(raw):
-    return hashlib.sha256(raw).hexdigest()
-
-def now():
-    return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
-
-def native_version(value):
-    """Lossless public version wrapper -> the native pipeline's SHA-256 identity."""
-    raw=value.removeprefix('sha256-')
-    if len(raw)!=64 or any(c not in '0123456789abcdef' for c in raw):
-        raise RuntimeError('document_version_not_sha256')
-    return raw
-
-def once(path, value):
-    raw = value if isinstance(value, bytes) else canonical(value)
-    path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
-    if path.exists():
-        if path.read_bytes() != raw:
-            raise RuntimeError('immutable_result_conflict')
-        return
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os,'O_NOFOLLOW',0), 0o600)
-    with os.fdopen(fd, 'wb') as f:
-        f.write(raw);f.flush();os.fsync(f.fileno())
 
 def get(api, path):
     with urllib.request.urlopen(api + path, timeout=15) as f:
@@ -76,6 +47,8 @@ def freeze(api):
     return result
 
 def configure(args):
+    from dotenv import dotenv_values
+
     approval=json.loads(args.approval.read_text())
     assert approval['additionalCallsMaximum']==16 and approval['aggregateCallsMaximum']==212
     assert approval['previousCallsReserved']==196 and approval['aggregateUsdMaximum']==3

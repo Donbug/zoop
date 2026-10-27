@@ -11,7 +11,7 @@ import json
 import re
 from pathlib import Path
 
-import briefing_s3_review as base
+import briefing_s3_source as base
 
 POLICY = 'complete-source-paragraph-1'
 
@@ -103,7 +103,9 @@ def expanded_facts(case, generated):
 
 
 def candidate_for(case, company, generated, facts):
-    _, relation, originals = base.payload(case, company)
+    import briefing_s3_review as live
+
+    _, relation, originals = live.payload(case, company)
     # Include the already maintained catalogue aliases, never an invented company relationship.
     names = company_names(company)
     relation['facts']['subject']['names'] = names
@@ -118,13 +120,15 @@ def candidate_for(case, company, generated, facts):
     proposal['direction'] = 'undetermined'
     proposal['reason'] = 'Source paragraph context for independent reassessment; original proposal is preserved separately.'
     proposal['limitations'] = source.get('limitations')
-    candidates = base.rules.evaluate_impacts(base.rules.parse_impacts(wire), relation, set(originals), lambda c:base.resolve(c, originals))
+    candidates = live.rules.evaluate_impacts(live.rules.parse_impacts(wire), relation, set(originals), lambda c:live.resolve(c, originals))
     if len(candidates)!=1 or candidates[0]['precheck']['state']!='pending':
         raise RuntimeError('complete_context_precheck_failed')
     return candidates[0]
 
 
 def main():
+    import briefing_s3_review as live
+
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--previous',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)
@@ -154,7 +158,7 @@ def main():
     for name in ['attempts','receipts','requests']:
         for file in (args.previous/name).glob('*.json'):
             base.once(args.output/name/file.name,file.read_bytes())
-    runtime,approval=base.configure(args)
+    runtime,approval=live.configure(args)
     reviews=[]
     for case,old,facts,candidate in plans:
         path=args.output/'completed'/f"{case['inputDigest']}.json"
@@ -164,9 +168,9 @@ def main():
         current['citationRepair']={'policy':POLICY,'previousResultSha256':base.sha(base.canonical(old)),
             'generation':'reused','effects':'reused' if assessment['label']=='positive' else 'independent_recheck'}
         if assessment['label']!='positive':
-            request=base.rules.impact_verifier_request(candidate,{'policyVersion':'zoop-impact-policy-1'})
-            verified,proof=base.send(args,runtime,approval,'verify-impact',request,case)
-            decision=base.rules.decide_impact(candidate,runtime.answer('verify-impact',verified))
+            request=live.rules.impact_verifier_request(candidate,{'policyVersion':'zoop-impact-policy-1'})
+            verified,proof=live.send(args,runtime,approval,'verify-impact',request,case)
+            decision=live.rules.decide_impact(candidate,runtime.answer('verify-impact',verified))
             base.once(args.output/'verdicts'/f"{case['inputDigest']}.json",{'decision':decision,'audit':runtime.audit('verify-impact',verified)})
             assessment.update(status='verified' if decision['status']=='verified' else 'verifier-reject',label=decision['label'],
                               targetVerdict=decision['targetVerdict'],evidence=[])

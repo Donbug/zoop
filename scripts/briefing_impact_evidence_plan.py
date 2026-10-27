@@ -10,9 +10,8 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
-import briefing_s3_review as base
+import briefing_s3_source as base
 import briefing_s3_citation_context as context
-from zoop_ai_pipeline.live_jev import build_impact_request
 
 
 def excerpt(source, text, anchor):
@@ -32,6 +31,9 @@ def excerpt(source, text, anchor):
 
 
 def build(parent, index, specs, prepared_at=None):
+    import briefing_s3_review as live
+    from zoop_ai_pipeline.live_jev import build_impact_request
+
     result=copy.deepcopy(parent);requests=[];queue=[]
     prepared_at=prepared_at or base.now()
     for review in result['reviews']:
@@ -61,7 +63,7 @@ def build(parent, index, specs, prepared_at=None):
               'impacts':[{'impactedCompanyId':company['id'],'direction':'undetermined','reason':'Offline evidence preparation only.',
                           'limitations':None,'supporting':[],'opposing':[]}]}
         candidate=context.candidate_for(case,company,seed,facts)
-        body,expect=build_impact_request(base.rules.impact_verifier_request(candidate,{'policyVersion':'zoop-impact-policy-1'}),'jev-1.14.0')
+        body,expect=build_impact_request(live.rules.impact_verifier_request(candidate,{'policyVersion':'zoop-impact-policy-1'}),'jev-1.14.0')
         requests.append({'companyId':company['id'],'roundId':basis['roundId'],'eventId':basis['eventId'],
              'status':'prepared_not_sent','basisInputDigest':review['inputDigest'],
              'expandedInputDigest':base.sha(base.canonical({'basis':basis,'facts':facts})),
