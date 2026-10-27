@@ -30,6 +30,7 @@ final class BriefingCompanyReadingRules {
         boolean v2 = SCHEMA_V2.equals(frozen.string("schemaVersion"));
         boolean card = SCHEMA_CARD.equals(frozen.string("schemaVersion"));
         require(card || v2 || SCHEMA.equals(frozen.string("schemaVersion")), "schema");
+        if (card) require(!row.has("prices") && "not_connected".equals(row.string("pricePolicy")), "card_prices_forbidden");
         List<String> fields = card ? List.of("topic", "title", "description") : v2 ? List.of("brief", "fact", "watch", "background", "change") : List.of("brief", "watch", "change");
         ObjectNode expected = StrictJson.newObject().put("schemaVersion", card ? SCHEMA_CARD : v2 ? SCHEMA_V2 : SCHEMA).put("roundId", original.string("roundId"))
                 .put("edition", original.string("edition")).put("cutoff", original.string("cutoff"))

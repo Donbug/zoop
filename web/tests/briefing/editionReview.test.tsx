@@ -177,6 +177,67 @@ describe('D-BRF-01/02 edition reviews', () => {
     expect(c.hasAttribute('open')).toBe(true);
     expect(screen.getByText('실제 아침 판단입니다.')).toBeTruthy();
   });
+  it('D-BRF-01/02 renders prices inside the company outlook and retains the original business statement', () => {
+    const r = fixture(),
+      review = r.editionReview!;
+    r.companyPriceContext = {
+      schemaVersion: 'zoop-company-price-context-v1',
+      status: 'derived',
+      authorship: 'deterministic_price_observation',
+      roundId: r.id,
+      date: review.date,
+      edition: review.edition,
+      cutoff: review.cutoff,
+      reviewVersion: review.resultVersion,
+      resultVersion: 'synthetic',
+      generatedAt: '2026-10-24T00:00:00Z',
+      scopeNote: '합성',
+      outlookIntegrationVersion: 'zoop-company-price-outlook-v1',
+      marketReference: {
+        status: 'unavailable',
+        snapshotSha256: 'a'.repeat(64),
+        indicators: [],
+        note: '시장 참고 미확보',
+      },
+      companies: review.companies.map((c) => ({
+        companyId: c.companyId,
+        companyName: c.companyName,
+        currency: 'USD',
+        provider: 'toss',
+        cutoff: review.cutoff,
+        responseSha256s: [],
+        status: 'unavailable',
+        reason: '합성 시세 미확보',
+        outlook: {
+          schemaVersion: 'zoop-company-price-outlook-v1',
+          authorship: 'source_bound_composition',
+          stance: c.stance,
+          businessJudgment: c.judgment,
+          priceObservation: '회차 가격 미확보.',
+          nextCheck: '가격으로 사업 판단을 바꾸지 않습니다.',
+          takeaway: c.takeaway.text + ' 회차 가격 미확보.',
+          evidenceIds: c.judgment.evidenceIds,
+          text:
+            c.judgment.text +
+            ' 가격 측면에서는 회차 가격 미확보. 가격으로 사업 판단을 바꾸지 않습니다.',
+          marketNote: '비교 기간은 구분합니다.',
+        },
+      })),
+    };
+    render(<EditionReview result={r} compact={false} />);
+    expect(screen.getAllByText('사업과 가격을 함께 본 기업 전망')).toHaveLength(
+      2,
+    );
+    expect(
+      screen.getAllByText(
+        '현재 판단 가격 측면에서는 회차 가격 미확보. 가격으로 사업 판단을 바꾸지 않습니다.',
+      ),
+    ).toHaveLength(2);
+    expect(
+      screen.getAllByText('계획의 실행을 봅니다. 회차 가격 미확보.'),
+    ).toHaveLength(2);
+    expect(review.companies[0].judgment.text).toBe('현재 판단');
+  });
   it('does not treat a two-day comparison or stale close as today performance', () => {
     const r = fixture().editionReview!;
     expect(marketCoverage(r).todayClose).toBe(true);

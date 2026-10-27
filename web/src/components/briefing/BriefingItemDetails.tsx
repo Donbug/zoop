@@ -149,11 +149,13 @@ export default function BriefingItemDetails({
   graphVersion,
   item,
   isRecap = false,
+  evidenceOnly = false,
 }: {
   roundId: string;
   graphVersion: string | null;
   item: BriefingItem;
   isRecap?: boolean;
+  evidenceOnly?: boolean;
 }) {
   const roundLabel = isRecap ? '이전 회차' : '이 회차';
   const issueLabel = isRecap ? '이전 핵심 이슈' : '핵심 이슈';
@@ -214,20 +216,22 @@ export default function BriefingItemDetails({
   return (
     <div className="mt-2">
       <div className="flex flex-wrap gap-2">
-        <button
-          ref={detailButton}
-          type="button"
-          className={ui.button}
-          aria-label={`${issueLabel} ${item.rank} 자세히 ${detailOpen ? '접기' : '보기'}`}
-          aria-expanded={detailOpen}
-          aria-controls={`${id}-detail`}
-          onClick={() => {
-            setDetailOpen(!detailOpen);
-            if (!detailOpen) load(!visible);
-          }}
-        >
-          자세히 {detailOpen ? '접기' : '보기'}
-        </button>
+        {!evidenceOnly && (
+          <button
+            ref={detailButton}
+            type="button"
+            className={ui.button}
+            aria-label={`${issueLabel} ${item.rank} 자세히 ${detailOpen ? '접기' : '보기'}`}
+            aria-expanded={detailOpen}
+            aria-controls={`${id}-detail`}
+            onClick={() => {
+              setDetailOpen(!detailOpen);
+              if (!detailOpen) load(!visible);
+            }}
+          >
+            자세히 {detailOpen ? '접기' : '보기'}
+          </button>
+        )}
         <button
           ref={evidenceButton}
           type="button"

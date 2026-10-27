@@ -138,18 +138,46 @@ public class EvidenceService {
         try {
             return transaction.execute(status -> {
                 if (round == null) return dispatch(id, graphVersion, pinnedAt, companyId, requestId, now, false);
-                var selected = graph.readRound(round, graphVersion, pinnedAt, id, companyId, requestId);
-                if (selected.preserved() != null) return selected.preserved();
-                var row = evidence.findEvidence(id).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
-                var verification = row.verificationArtifactId() == null ? null
-                        : registry.findArtifact(row.verificationArtifactId()).orElse(null);
-                if (verification == null || !GRAPH_RECEIPT.equals(verification.kind()))
-                    throw new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE);
-                return serveGraph(row, companyId, requestId, now, selected.graph());
+                return readRoundGraph(id, round, graphVersion, pinnedAt, companyId, requestId, now);
             });
         } catch (DataAccessException | TransactionException error) {
             log.warn("Evidence read failed in the database (cause={}, requestId={})", error.getClass().getSimpleName(), requestId);
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, error);
+        }
+    }
+
+    private EvidenceResponse readRoundGraph(String id, String round, String version, Instant at,
+            String company, String requestId, Instant now) {
+        var selected = graph.readRound(round, version, at, id, company, requestId);
+        if (selected.preserved() != null) return selected.preserved();
+        var row = evidence.findEvidence(id).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+        var verification = row.verificationArtifactId() == null ? null
+                : registry.findArtifact(row.verificationArtifactId()).orElse(null);
+        if (verification == null || !GRAPH_RECEIPT.equals(verification.kind()))
+            throw new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE);
+        return serveGraph(row, company, requestId, now, selected.graph());
+    }
+
+    /** Same graph evidence gates, but an expected denial is handled INSIDE the transaction callback.
+     * A caller building a read projection may withhold one row without marking its outer read transaction rollback-only.
+     * Outages/malformed storage remain errors. No S1 or latest-version fallback is allowed. */
+    public EvidenceResponse readImpactCitation(String id, String round, String version, Instant at, String requestId) {
+        if (id == null || id.isBlank() || id.length() > 256 || version == null || version.isBlank())
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        Instant now = clock.instant();
+        try {
+            return transaction.execute(status -> {
+                try {
+                    return round == null ? dispatch(id, version, at, null, requestId, now, true)
+                            : readRoundGraph(id, round, version, at, null, requestId, now);
+                } catch (CustomException failure) {
+                    if (failure.getErrorCode() == ErrorCode.RESOURCE_NOT_FOUND || failure.getErrorCode() == ErrorCode.EVIDENCE_UNAVAILABLE)
+                        return null;
+                    throw failure;
+                }
+            });
+        } catch (DataAccessException | TransactionException unavailable) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, unavailable);
         }
     }
 

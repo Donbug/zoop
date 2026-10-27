@@ -25,6 +25,8 @@ public final class BriefingHttpSchemas {
             @Schema(oneOf = {AnalysisSummary.class, Unavailable.class}) JsonNode marketSummary,
             @Schema(description = "선정 기업별 조건부 사업 전망. 과거 발행본에는 없을 수 있습니다.", implementation = CompanyOutlooks.class) JsonNode companyOutlooks,
             @Schema(nullable = true, description = "출근 오늘 집중·퇴근 장 평가/아침 기업 점검/다음 거래일 관찰. 원문 대조 편집 검토이며 자동 모델 검증으로 표시하지 않습니다.", implementation = EditionReview.class) JsonNode editionReview,
+            @Schema(nullable = true, description = "토스 보존 시세로 계산한 회차별 기업 흐름과 기사 전후 관측. 사업 판단·인과·예측 적중과 구분합니다.", implementation = BriefingPriceContext.class) JsonNode companyPriceContext,
+            @Schema(nullable = true, description = "실제 가격과 원문으로 새로 생성·독립 검증한 v5 기업 전망. 기존 편집 검토본과 구분합니다.", implementation = AiPriceOutlooks.class) JsonNode aiPriceOutlooks,
             @Schema(nullable = true, description = "근거·실제 직전 판단에 결속된 산업 판단 갱신. selected와 이전 기업 watch를 구분하고 자동 검증 및 편집 범위를 표시합니다.", implementation = JudgmentUpdate.class) JsonNode judgmentUpdate,
             @Schema(oneOf = {MarketVariables.class, Unavailable.class}) JsonNode marketVariables,
             @Schema(nullable = true, oneOf = {SinceMorning.class, Unavailable.class}) JsonNode sinceMorning,
@@ -36,6 +38,41 @@ public final class BriefingHttpSchemas {
             @Schema(nullable = true, description = "선택적 조용한 회차 정책. 핵심·참고·복기·수집부족을 구분하며 원 발행 문안을 바꾸지 않습니다.") BriefingContinuity continuity) { }
 
 
+    @Schema(name = "AiPriceOutlooks")
+    public record AiPriceOutlooks(String schemaVersion, String model, String promptVersion, String verificationMode, String status,
+            String roundId, LocalDate date, String edition, Instant cutoff, String resultVersion, Instant generatedAt,
+            String inputSha256, String reviewVersion, String priceContextVersion, List<AiPriceCompany> companies,
+            @Schema(nullable = true) String generationRequestDigest, @Schema(nullable = true) String verificationRequestDigest,
+            @Schema(nullable = true) String projectionSha256, @Schema(nullable = true) String historyNote,
+            @Schema(nullable = true) String supersedesResultVersion) { }
+    public record AiPriceCompany(String companyId, String companyName, String role, String assessment,
+            CompanyStatement impact, CompanyStatement outlook, List<CompanyStatement> conditions, List<CompanyStatement> risks,
+            JsonNode comparison, JsonNode previous) { }
+
+    @Schema(name = "BriefingPriceContext")
+    public record BriefingPriceContext(String schemaVersion, String status, String roundId, LocalDate date, String edition,
+            Instant cutoff, String reviewVersion, String resultVersion, Instant generatedAt, String authorship,
+            String scopeNote, List<PriceContextCompany> companies,
+            @Schema(nullable = true) String outlookIntegrationVersion, @Schema(nullable = true) PriceMarketReference marketReference) { }
+    public record PriceContextPoint(String value, Instant observedAt, String kind) { }
+    public record PriceContextDay(@Schema(nullable = true) String baselineDate, @Schema(nullable = true) String baselineClose,
+            @Schema(nullable = true) String changeRatePercent, String kind, String open, String high, String low, String closeOrLast,
+            @Schema(nullable = true) String volume, Instant from, Instant to) { }
+    public record PriceContextNews(String evidenceId, Instant publishedAt, String timing, String status, Integer postNewsBars,
+            @Schema(nullable = true) PriceContextPoint before, @Schema(nullable = true) String changeRatePercent, String observation) { }
+    public record PriceContextMorning(String status, String observation, @Schema(nullable = true) PriceContextPoint before,
+            @Schema(nullable = true) String changeRatePercent) { }
+    public record PriceContextCompany(String companyId, String companyName, String currency, String provider, Instant cutoff,
+            List<String> responseSha256s, String status, @Schema(nullable = true) String reason, LocalDate sessionDate,
+            String exchangeTimezone, Boolean completeSession, Integer barCount, PriceContextPoint latest, PriceContextDay day,
+            String summary, String flow, List<PriceContextNews> news, PriceContextMorning sinceMorning, String interpretation, String limitation,
+            @Schema(nullable = true) PriceAwareOutlook outlook) { }
+    public record PriceAwareOutlook(String schemaVersion, String authorship, String stance, CompanyStatement businessJudgment,
+            String priceObservation, String nextCheck, String takeaway, String text, String marketNote, List<String> evidenceIds) { }
+    public record PriceMarketReference(String status, String snapshotSha256, List<PriceMarketIndicator> indicators, String note) { }
+    public record PriceMarketIndicator(String id, String label, BigDecimal value, String unit, String valueKind, LocalDate observedDate,
+            @Schema(nullable = true) Instant observedAt, String status, JsonNode source, @Schema(nullable = true) LocalDate baselineDate,
+            @Schema(nullable = true) String changeRatePercent, String text) { }
     @Schema(name = "EditionReview")
     public record EditionReview(String schemaVersion, String status, String verificationMode, String reviewer, Instant reviewedAt,
             String resultVersion, String roundId, String date, String edition, Instant cutoff, String analysisVersion, String scopeNote,

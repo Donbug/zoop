@@ -158,6 +158,8 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | [getBriefing](#getbriefing) | GET | /api/v1/briefings | 공개 | P1 |
 | [listBriefingRounds](#listbriefingrounds) | GET | /api/v1/briefings/rounds | 공개 | P1 |
 | [getBriefingRecap](#getbriefingrecap) | GET | /api/v1/briefings/{id}/recap | 공개 | P1 |
+| [getBriefingItemImpacts](#getbriefingitemimpacts) | GET | /api/v1/briefings/{roundId}/items/{eventId}/impacts | 공개 | P1 |
+| [getBriefingItemImpactReviews](#getbriefingitemimpactreviews) | GET | /api/v1/briefings/{roundId}/items/{eventId}/impact-reviews | 공개 | P1 |
 | [getBriefingItemDetail](#getbriefingitemdetail) | GET | /api/v1/briefings/{roundId}/items/{eventId} | 공개 | P1 |
 | [getBriefingGraphBasis](#getbriefinggraphbasis) | GET | /api/v1/briefings/{id}/graph | 공개 | P1 |
 | [createConversation](#createconversation) | PUT | /api/v1/chat/sessions/{id} | 회원(본인) | P1 |
@@ -1224,6 +1226,64 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string |  |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+
+<a id="getbriefingitemimpacts"></a>
+
+## getBriefingItemImpacts · 회차 이슈의 기업별 S3 영향 평가와 검증 인용
+
+발행 당시 고정 그래프 receipt를 현재 원문·권한으로 검증하여 읽는다. 별개 S3 평가를 합산하지 않으며 producer proposal은 제공하지 않는다. 신규 모델 호출·DB 쓰기 없음. 원래 그래프 없는 과거 회차는 unavailable이며 재구성/최신 그래프로 대체하지 않는다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/briefings/{roundId}/items/{eventId}/impacts` |
+| 권한·우선순위 | 공개 · P1 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [BriefingImpacts](#schema-briefingimpacts), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
+| FS/NFS | [FS030](../../system/out/feature-FS030.md) · [FS033](../../system/out/feature-FS033.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
+| WBS | 6.1.2, 6.11.1 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 기존 BFF 대응 없이 고정 그래프 S3 receipt를 Spring API로 읽는다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| roundId | path | 필수 | string |  |
+| eventId | path | 필수 | string |  |
+| graphVersion | query | 선택 | string | 발행 회차의 고정 버전과 일치해야 한다. |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+
+<a id="getbriefingitemimpactreviews"></a>
+
+## getBriefingItemImpactReviews · 기존 브리핑의 인용·주변 문맥으로 수행한 S3 사후 재평가
+
+원래 발행본을 변경하지 않는 별도 사후 평가다. 고정 manifest·생성/독립 검증 receipt·원본 발행 해시·현재 근거 권한을 확인한다. reviewContext의 생성 시각과 범위를 표시한다. 조회 중 AI 호출·기록 변경은 없다. 명시적으로 설정한 실행 결과가 없으면 unavailable이다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/briefings/{roundId}/items/{eventId}/impact-reviews` |
+| 권한·우선순위 | 공개 · P1 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [BriefingImpacts](#schema-briefingimpacts), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
+| FS/NFS | [FS030](../../system/out/feature-FS030.md) · [FS033](../../system/out/feature-FS033.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
+| WBS | 6.1.2, 6.11.1 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 기존 BFF 직접 대응 없음. Spring에서 불변 사후 평가 기록을 현재 원문 권한으로 읽는다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| roundId | path | 필수 | string |  |
+| eventId | path | 필수 | string |  |
+| graphVersion | query | 선택 | string | 발행 회차의 고정 버전과 일치해야 한다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
 <a id="getbriefingitemdetail"></a>
@@ -2790,6 +2850,229 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | text | 필수 | string |  |
 | evidenceIds | 필수 | string[] |  |
 
+<a id="schema-aipriceoutlooks"></a>
+
+### AiPriceOutlooks
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 필수 | string |  |
+| model | 필수 | string |  |
+| promptVersion | 필수 | string |  |
+| verificationMode | 필수 | string |  |
+| status | 필수 | string {PASS, WITHHELD} |  |
+| roundId | 필수 | string |  |
+| date | 필수 | string (date) |  |
+| edition | 필수 | string {morning, evening} |  |
+| cutoff | 필수 | string (date-time) |  |
+| resultVersion | 필수 | string |  |
+| generatedAt | 필수 | string (date-time) |  |
+| inputSha256 | 필수 | string |  |
+| reviewVersion | 필수 | string |  |
+| priceContextVersion | 필수 | string |  |
+| generationRequestDigest | 선택 | string |  |
+| verificationRequestDigest | 선택 | string |  |
+| projectionSha256 | 선택 | string |  |
+| historyNote | 선택 | string |  |
+| supersedesResultVersion | 선택 | string |  |
+| companies | 필수 | [AiPriceCompany](#schema-aipricecompany)[] |  |
+
+<a id="schema-aipricecompany"></a>
+
+### AiPriceCompany
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyId | 필수 | string |  |
+| companyName | 필수 | string |  |
+| role | 필수 | string {selected, tracked} |  |
+| assessment | 필수 | string {positive, negative, mixed, watch} |  |
+| impact | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| outlook | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| conditions | 필수 | [CompanyStatement](#schema-companystatement)[] |  |
+| risks | 필수 | [CompanyStatement](#schema-companystatement)[] |  |
+| comparison | 필수 | [CompanyStatement](#schema-companystatement) / object |  |
+| comparison.status | 필수 | string {updated, compared, unavailable} |  |
+| comparison.previousResultVersion | 필수 | string, null |  |
+| previous | 필수 | object |  |
+| previous.status | 필수 | string {available, unavailable} |  |
+| previous.kind | 선택 | string {verified_ai_price_outlook, preserved_editorial_review} |  |
+| previous.roundId | 선택 | string |  |
+| previous.resultVersion | 선택 | string |  |
+| previous.judgment | 선택 | object |  |
+
+<a id="schema-briefingpricecontext"></a>
+
+### BriefingPriceContext
+
+회차 마감 이전 토스 일봉/완료 분봉과 실제 기사 시각으로 계산한 별도 관측. 규칙 기반 문장이고 모델 검증·기사 인과·사업 조건 확인·예측 적중을 뜻하지 않는다. 기존 분석/시세를 보존하며 과거 재생은 사후 수집 한계를 표시한다. 선택적 outlookIntegrationVersion이 있으면 사업 근거 원문·가격 관측·다음 조건을 묶은 전망 및 관측일/비교일이 고정된 시장 참고 지표를 제공한다. 가격으로 사업 판단을 바꾸거나 인과/적중/초과성과를 주장하지 않는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 필수 | string |  |
+| status | 필수 | string |  |
+| roundId | 필수 | string |  |
+| date | 필수 | string (date) |  |
+| edition | 필수 | string {morning, evening} |  |
+| cutoff | 필수 | string (date-time) |  |
+| reviewVersion | 필수 | string |  |
+| resultVersion | 필수 | string |  |
+| generatedAt | 필수 | string (date-time) |  |
+| authorship | 필수 | string |  |
+| scopeNote | 필수 | string |  |
+| companies | 필수 | [CompanyPriceObservation](#schema-companypriceobservation)[] |  |
+| outlookIntegrationVersion | 선택 | object |  |
+| marketReference | 선택 | [PriceMarketReference](#schema-pricemarketreference) |  |
+
+<a id="schema-companypriceobservation"></a>
+
+### CompanyPriceObservation
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyId | 필수 | string |  |
+| companyName | 필수 | string |  |
+| currency | 필수 | string {KRW, USD} |  |
+| provider | 필수 | string |  |
+| cutoff | 필수 | string (date-time) |  |
+| responseSha256s | 필수 | string[] |  |
+| status | 필수 | string {available, unavailable} |  |
+| reason | 선택 | string |  |
+| sessionDate | 선택 | string (date) |  |
+| exchangeTimezone | 선택 | string |  |
+| completeSession | 선택 | boolean |  |
+| barCount | 선택 | integer |  |
+| latest | 선택 | [PriceContextPoint](#schema-pricecontextpoint) |  |
+| day | 선택 | [PriceContextDay](#schema-pricecontextday) |  |
+| summary | 선택 | string |  |
+| flow | 선택 | string |  |
+| news | 선택 | [PriceContextNews](#schema-pricecontextnews)[] |  |
+| sinceMorning | 선택 | [PriceContextMorning](#schema-pricecontextmorning) |  |
+| interpretation | 선택 | string |  |
+| limitation | 선택 | string |  |
+| outlook | 선택 | [PriceAwareOutlook](#schema-priceawareoutlook) |  |
+
+<a id="schema-priceawareoutlook"></a>
+
+### PriceAwareOutlook
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 필수 | object |  |
+| authorship | 필수 | object |  |
+| stance | 필수 | string |  |
+| businessJudgment | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| priceObservation | 필수 | string |  |
+| nextCheck | 필수 | string |  |
+| takeaway | 필수 | string |  |
+| text | 필수 | string |  |
+| marketNote | 필수 | string |  |
+| evidenceIds | 필수 | string[] |  |
+
+<a id="schema-pricemarketreference"></a>
+
+### PriceMarketReference
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | object {available, unavailable} |  |
+| snapshotSha256 | 필수 | string |  |
+| indicators | 필수 | [PriceMarketIndicator](#schema-pricemarketindicator)[] |  |
+| note | 필수 | string |  |
+
+<a id="schema-pricemarketindicator"></a>
+
+### PriceMarketIndicator
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | object {kospi, kosdaq, usdkrw} |  |
+| label | 필수 | string |  |
+| value | 필수 | number |  |
+| unit | 필수 | string |  |
+| valueKind | 필수 | string |  |
+| observedDate | 필수 | string (date) |  |
+| observedAt | 필수 | string (date-time) / null |  |
+| status | 필수 | object {ok, delayed} |  |
+| source | 필수 | object |  |
+| baselineDate | 필수 | string (date) / null |  |
+| changeRatePercent | 필수 | string / null |  |
+| text | 필수 | string |  |
+
+<a id="schema-pricecontextpoint"></a>
+
+### PriceContextPoint
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| value | 필수 | string |  |
+| observedAt | 필수 | string (date-time) |  |
+| kind | 필수 | string {daily_close, five_minute_close} |  |
+
+<a id="schema-pricecontextday"></a>
+
+### PriceContextDay
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| baselineDate | 필수 | string (date) / null |  |
+| baselineClose | 필수 | string / null |  |
+| changeRatePercent | 필수 | string / null |  |
+| kind | 필수 | string {provider_daily_bar, completed_five_minute_bars} |  |
+| open | 필수 | string |  |
+| high | 필수 | string |  |
+| low | 필수 | string |  |
+| closeOrLast | 필수 | string |  |
+| volume | 필수 | string / null |  |
+| from | 필수 | string (date-time) |  |
+| to | 필수 | string (date-time) |  |
+
+<a id="schema-pricecontextnews"></a>
+
+### PriceContextNews
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| evidenceId | 필수 | string |  |
+| publishedAt | 필수 | string (date-time) |  |
+| timing | 필수 | string {before_session, during_session, after_session} |  |
+| status | 필수 | string {observed, no_post_news_trade, event_window_unavailable} |  |
+| postNewsBars | 필수 | integer |  |
+| before | 필수 | [PriceContextPoint](#schema-pricecontextpoint) / null |  |
+| changeRatePercent | 필수 | string / null |  |
+| observation | 필수 | string |  |
+
+<a id="schema-pricecontextmorning"></a>
+
+### PriceContextMorning
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {available, unavailable, no_new_session, revised_observation} |  |
+| observation | 필수 | string |  |
+| before | 선택 | [PriceContextPoint](#schema-pricecontextpoint) |  |
+| changeRatePercent | 선택 | string |  |
+
 <a id="schema-editionreview"></a>
 
 ### EditionReview
@@ -2920,8 +3203,8 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | role | 필수 | string {selected, watch} |  |
 | decision | 필수 | string {initial, maintained, strengthened, weakened, unassessable} |  |
 | sourceIds | 필수 | string[] |  |
-| previousJudgment | 필수 | object |  |
-| previousResultVersion | 필수 | string |  |
+| previousJudgment | 필수 | object, null |  |
+| previousResultVersion | 필수 | string, null |  |
 | newEvidence | 필수 | [CompanyStatement](#schema-companystatement) |  |
 | reason | 필수 | [CompanyStatement](#schema-companystatement) |  |
 | strengthenIf | 필수 | [CompanyStatement](#schema-companystatement) |  |
@@ -3363,6 +3646,234 @@ answer from that state, never from the newest graph. Any status but ``available`
 | documentSentiments[].articleId | 필수 | string |  |
 | documentSentiments[].sentiment | 필수 | [DocumentSentiment](#schema-documentsentiment) |  |
 
+<a id="schema-briefingimpacts"></a>
+
+### BriefingImpacts
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| roundId | 필수 | string |  |
+| eventId | 필수 | string |  |
+| graphVersion | 필수 | string, null |  |
+| dataAsOf | 필수 | string (date-time) |  |
+| status | 필수 | string {available, unavailable} |  |
+| reason | 필수 | string, null |  |
+| companies | 필수 | [CompanyImpact](#schema-companyimpact)[] |  |
+| metadata | 필수 | [Metadata](#schema-metadata) |  |
+| reviewContext | 선택 | [BriefingImpactReviewContext](#schema-briefingimpactreviewcontext) / null | 사후 재평가 경로에만 존재한다. 원래 발행 당시 S3 평가를 의미하지 않는다. |
+
+<a id="schema-briefingimpactreviewcontext"></a>
+
+### BriefingImpactReviewContext
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| mode | 필수 | string |  |
+| assessedAt | 필수 | string (date-time) |  |
+| inputScope | 필수 | string |  |
+| generationModel | 필수 | string |  |
+| verifierModel | 필수 | string |  |
+| resultVersion | 필수 | string |  |
+| citationPolicy | 선택 | string, null {complete-source-paragraph-1, None} |  |
+
+<a id="schema-companyimpact"></a>
+
+### CompanyImpact
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyId | 필수 | string |  |
+| companyName | 필수 | string |  |
+| status | 필수 | string {available, unavailable} |  |
+| reason | 필수 | string, null |  |
+| assessments | 필수 | [Assessment](#schema-assessment)[] |  |
+
+<a id="schema-assessment"></a>
+
+### Assessment
+
+별개 원장 행을 유지한다. verified만 label/evidence를 제공한다. facts는 방향 판단과 분리된 정확 원문이며 유보/평가 미제시에도 제공할 수 있다. 평가 부재와 실제 undetermined를 구분한다. proposal/사설 경로/작업 ID/검증 digest는 제공하지 않는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| relationId | 필수 | string |  |
+| status | 필수 | string {verified, not-applicable, not-proposed, no-evidence, technical-reject, verifier-reject, withheld} |  |
+| label | 필수 | string, null {positive, negative, mixed, undetermined, None} |  |
+| provenance | 필수 | [Provenance](#schema-provenance) |  |
+| evidence | 필수 | [EffectEvidence](#schema-effectevidence)[] |  |
+| facts | 선택 | [FactEvidence](#schema-factevidence)[] | 사실 확인용 원문 문맥. 검증된 긍부정 효과와 구분하며 effect/label을 포함하지 않는다. |
+| evidencePlan | 선택 | [ImpactEvidencePlan](#schema-impactevidenceplan) / null | 기존 원문 보강 및 추가 수집 계획. 새 AI 평가나 기존 라벨 변경을 의미하지 않는다. |
+| supplementalReview | 선택 | [SupplementalImpactReview](#schema-supplementalimpactreview) / null | 추가 공식 근거로 나중에 독립 검증한 별도 결과. 기존 label/evidence와 발행본은 보존하며 GET에서 모델을 호출하지 않는다. |
+
+<a id="schema-supplementalimpactreview"></a>
+
+### SupplementalImpactReview
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| mode | 필수 | string |  |
+| assessedAt | 필수 | string (date-time) |  |
+| previousLabel | 필수 | string {positive, negative, mixed, undetermined} |  |
+| label | 필수 | string {positive, negative, mixed, undetermined} |  |
+| targetVerdict | 필수 | string {supported, insufficient} |  |
+| verifierModel | 필수 | string |  |
+| summary | 필수 | string | 검증 결과와 원문에 근거해 편집한 한국어 설명. 모델이 작성한 이유라고 주장하지 않음. |
+| limitations | 필수 | string |  |
+| confirmedFacts | 필수 | object[] |  |
+| confirmedFacts[].text | 필수 | string |  |
+| confirmedFacts[].evidenceIds | 필수 | string[] (uniqueItems) |  |
+| evidence | 필수 | [EffectEvidence](#schema-effectevidence)[] |  |
+| resultVersion | 필수 | string |  |
+| historicalVersionVerified | 필수 | boolean |  |
+
+<a id="schema-factevidence"></a>
+
+### FactEvidence
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| quote | 필수 | string |  |
+| articleId | 필수 | string |  |
+| articleVersion | 필수 | string |  |
+| title | 필수 | string |  |
+| url | 필수 | string |  |
+| publishedAt | 필수 | string (date-time) |  |
+| start | 필수 | integer |  |
+| end | 필수 | integer |  |
+
+<a id="schema-impactevidenceplan"></a>
+
+### ImpactEvidencePlan
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string |  |
+| preparedAt | 필수 | string (date-time) |  |
+| reason | 필수 | string |  |
+| existingEvidence | 필수 | [SupportingFact](#schema-supportingfact)[] |  |
+| collectionNeeds | 필수 | [CollectionNeed](#schema-collectionneed)[] |  |
+| research | 선택 | [ResearchSupplement](#schema-researchsupplement) / null | 사후 확인한 공식 참고자료. 발행 당시 근거/AI 영향 판정과 분리하며 GET은 AI를 실행하지 않음. |
+
+<a id="schema-researchsupplement"></a>
+
+### ResearchSupplement
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string |  |
+| linkedAt | 필수 | string (date-time) |  |
+| sources | 필수 | [LinkedSource](#schema-linkedsource)[] |  |
+| timeCheck | 필수 | [PublicationTimeCheck](#schema-publicationtimecheck) / null |  |
+
+<a id="schema-linkedsource"></a>
+
+### LinkedSource
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| companyId | 필수 | string |  |
+| title | 필수 | string |  |
+| url | 필수 | string (uri) |  |
+| publishedAt | 필수 | string (date-time) |  |
+| timeBasis | 필수 | string {issuer_html_jsonld, SEC_index_accepted_America_New_York} |  |
+| summary | 필수 | string | 출처를 확인해 작성한 편집 요약. 독립 AI 효과 검증 결과가 아님. |
+| limitations | 필수 | string |  |
+| excerpt | 필수 | string |  |
+| transport | 필수 | string {direct_http, web_tool_extract} |  |
+| textSha256 | 필수 | string | 확인한 로컬 본문/웹 추출 텍스트 SHA. 원본 HTML SHA와 구분. |
+| historicalVersionVerified | 필수 | boolean |  |
+
+<a id="schema-publicationtimecheck"></a>
+
+### PublicationTimeCheck
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string |  |
+| summary | 필수 | string |  |
+| limitation | 필수 | string |  |
+| storedPublishedAt | 필수 | string (date-time) |  |
+| distributionPublishedAt | 필수 | string (date-time) |  |
+| storedUrl | 필수 | string (uri) |  |
+| distributionUrl | 필수 | string (uri) |  |
+
+<a id="schema-supportingfact"></a>
+
+### SupportingFact
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| scope | 필수 | string {direct, issuer_explanation, conditional_risk, background} |  |
+| note | 필수 | string |  |
+| source | 필수 | [FactEvidence](#schema-factevidence) |  |
+
+<a id="schema-collectionneed"></a>
+
+### CollectionNeed
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| kind | 필수 | string {before_cutoff_gap, future_followup} |  |
+| what | 필수 | string |  |
+| why | 필수 | string |  |
+| preferredSource | 필수 | string |  |
+
+<a id="schema-provenance"></a>
+
+### Provenance
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| sourceKind | 필수 | string {collected, synthetic} |  |
+| executionMode | 필수 | string {live, replay} |  |
+| recordingKind | 필수 | string {provider, authored-test} |  |
+
+<a id="schema-effectevidence"></a>
+
+### EffectEvidence
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| effect | 필수 | string {positive, negative, neutral, uncertain} |  |
+| quote | 필수 | string |  |
+| articleId | 필수 | string |  |
+| articleVersion | 필수 | string |  |
+| title | 필수 | string, null |  |
+| url | 필수 | string, null |  |
+| publishedAt | 필수 | string, null (date-time) |  |
+| start | 필수 | integer |  |
+| end | 필수 | integer |  |
+
 <a id="schema-briefingitemdetail"></a>
 
 ### BriefingItemDetail
@@ -3570,6 +4081,8 @@ The immutable published original of a round (what users saw before any correctio
 | dataAsOf | 필수 | string (date-time) / null |  |
 | graphVersion | 필수 | string / null |  |
 | items | 필수 | [BriefingItem](#schema-briefingitem)[] |  |
+| aiPriceOutlooks | 선택 | [AiPriceOutlooks](#schema-aipriceoutlooks) | v5 실제 가격·원문 입력으로 새로 생성·독립 모델 검증한 기업 전망. 보류 시 새 문안을 표시하지 않고 기존 기록을 유지합니다. |
+| companyPriceContext | 선택 | [BriefingPriceContext](#schema-briefingpricecontext) |  |
 | editionReview | 선택 | [EditionReview](#schema-editionreview) | 출근 집중/퇴근 장·아침 기업 점검·다음 거래일 시나리오의 선택적 편집 검토본. |
 | judgmentUpdate | 선택 | [JudgmentUpdate](#schema-judgmentupdate) | 선택적 비교 판단. 핵심 선정과 별도로 이전 기업의 미해결 조건을 추적하며, 없으면 기존 응답 유지. |
 | companyOutlooks | 선택 | [CompanyOutlooks](#schema-companyoutlooks) | 선정 기업별 사업 전망·조건·근거와 동일 기업의 이전 판단 비교. 과거 발행본에는 없을 수 있습니다. 시장 요약·지표와 별도이며 주가 예측이 아닙니다. |

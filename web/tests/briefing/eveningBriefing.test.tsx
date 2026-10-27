@@ -139,6 +139,9 @@ function evening(overrides: Partial<BriefingResponse> = {}): BriefingResponse {
 }
 
 function setup(response: BriefingResponse, url: string) {
+  // These regressions exercise the preserved full view.
+  if (!new URL(url, 'http://localhost').searchParams.has('reading'))
+    url += (url.includes('?') ? '&' : '?') + 'reading=full';
   const server = createFakeServer();
   server.on('GET', '/api/v1/briefings', () => json(response));
   render(
@@ -280,7 +283,9 @@ describe('D-BRF-02 회차 전환 및 재조회 회귀', () => {
     );
     render(
       <MemoryRouter
-        initialEntries={['/briefing?date=2026-09-17&edition=evening']}
+        initialEntries={[
+          '/briefing?date=2026-09-17&edition=evening&reading=full',
+        ]}
       >
         <BriefingPage />
       </MemoryRouter>,

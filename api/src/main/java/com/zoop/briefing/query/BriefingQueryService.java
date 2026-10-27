@@ -250,6 +250,27 @@ public class BriefingQueryService {
         }
     }
 
+    /** Read authority and immutable selection basis shared by the S3 impact endpoint; no item-detail snapshot required. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, timeout = 5)
+    public BriefingRound impactBasis(String roundId, String eventId, String requestId) {
+        if (roundId == null || roundId.isBlank() || roundId.length() > 256
+                || eventId == null || eventId.isBlank() || eventId.length() > 256)
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        try {
+            var row = repository.findById(roundId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+            if (row.publishedAt() == null) throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+            requireReadable(row, requestId);
+            validateSnapshot(row);
+            int count = 0;
+            for (JsonNode item : row.payload().path("items"))
+                if (eventId.equals(item.path("eventId").asString())) count++;
+            if (count != 1) throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+            return row;
+        } catch (DataAccessException | IllegalArgumentException | DateTimeException | com.zoop.common.json.StrictJson.Malformed error) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        }
+    }
+
     private ObjectNode restore(BriefingRound row, List<BriefingChange> changes, String requestId) {
         validateSnapshot(row);
         var payload = row.payload();
@@ -263,6 +284,10 @@ public class BriefingQueryService {
         out.set("marketSummary", row.publicSnapshot().get("marketSummary").deepCopy());
         JsonNode editionReview = row.publicSnapshot().get("editionReview");
         if (editionReview != null) out.set("editionReview", editionReview.deepCopy());
+        JsonNode aiPrice = row.publicSnapshot().get("aiPriceOutlooks");
+        if (aiPrice != null) out.set("aiPriceOutlooks", aiPrice.deepCopy());
+        JsonNode priceContext = row.publicSnapshot().get("companyPriceContext");
+        if (priceContext != null) out.set("companyPriceContext", priceContext.deepCopy());
         JsonNode judgment = row.publicSnapshot().get("judgmentUpdate");
         if (judgment != null) out.set("judgmentUpdate", judgment.deepCopy());
         JsonNode companyOutlooks = row.publicSnapshot().get("companyOutlooks");

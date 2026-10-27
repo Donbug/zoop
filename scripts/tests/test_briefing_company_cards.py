@@ -2,10 +2,37 @@ from pathlib import Path
 import copy
 import sys
 import unittest
+import tempfile
+from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import briefing_company_reading as r
+import briefing_company_cards as cards
 
 class CompanyCardsTest(unittest.TestCase):
+    def previous_fixture(self,root):
+        baseline=root/'baseline';previous=root/'previous';baseline.mkdir();previous.mkdir()
+        layer={'maximumPaidCallsIncludingPrior':160,'companyOutlookLayer':{'rounds':[{'roundId':'r','status':'PASS'}]}}
+        bundle={'presentationEnrichment':layer}
+        (baseline/'bundle-v2.json').write_bytes(r.base.canonical(bundle))
+        old=copy.deepcopy(bundle);old['presentationEnrichment']['maximumPaidCallsIncludingPrior']=180
+        old['presentationEnrichment']['companyCardLayer']={'rounds':[{'roundId':'r','status':'PASS'}]}
+        (previous/'bundle-v2.json').write_bytes(r.base.canonical(old))
+        args=SimpleNamespace(baseline=str(baseline),previous_cards=str(previous),output=str(root/'out'),
+            prompt_version='company-card-v2',run_id='test',authorization_ref='authored-test',max_calls=180,execute=False)
+        return args,previous,old
+    def test_previous_presentation_cards_survive_only_accounting_ceiling_change(self):
+        with tempfile.TemporaryDirectory() as temp:
+            args,_,_=self.previous_fixture(Path(temp));plan=cards.run(args)
+            self.assertEqual(plan['minimumNewCalls'],0);self.assertEqual(plan['newPaidCalls'],0)
+    def test_accounting_exception_does_not_accept_changed_analysis_or_lower_budget(self):
+        for changed in ('content','ceiling'):
+            with tempfile.TemporaryDirectory() as temp:
+                args,path,old=self.previous_fixture(Path(temp))
+                if changed=='content':
+                    old['presentationEnrichment']['companyOutlookLayer']['rounds'][0]['resultVersion']='different'
+                    (path/'bundle-v2.json').write_bytes(r.base.canonical(old))
+                else:args.max_calls=160
+                with self.assertRaisesRegex(ValueError,'card_previous_'):cards.run(args)
     def frozen(self):
         return {'schemaVersion':r.SCHEMA_CARD, 'targets':[{'companyId':'A','sourceIds':['a']}], 'sources':{'a':{},'b':{}}}
     def draft(self):

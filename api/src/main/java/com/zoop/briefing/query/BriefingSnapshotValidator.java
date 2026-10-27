@@ -81,6 +81,13 @@ final class BriefingSnapshotValidator {
             com.zoop.briefing.replay.BriefingEditionReviewRules.validateProjection(snapshot.get("editionReview"), row.id(), row.edition(), row.windowTo(), p.path("marketVariables"), snapshot.path("companyOutlooks").path("resultVersion").stringValue(), selectedCompanies);
         }
         if (snapshot.has("judgmentUpdate")) com.zoop.briefing.replay.BriefingJudgmentUpdateRules.validateProjection(snapshot.get("judgmentUpdate"), row.id(), row.edition(), row.windowTo());
+        if (snapshot.has("aiPriceOutlooks")) com.zoop.briefing.replay.BriefingAiPriceOutlookRules.validateProjection(
+                com.zoop.common.json.StrictJson.Obj.of(snapshot.get("aiPriceOutlooks")),
+                com.zoop.common.json.StrictJson.Obj.of(snapshot.get("editionReview")),
+                com.zoop.common.json.StrictJson.Obj.of(snapshot.get("companyPriceContext")));
+        if (snapshot.has("companyPriceContext")) com.zoop.briefing.replay.BriefingPriceContextRules.validateProjection(
+                com.zoop.common.json.StrictJson.Obj.of(snapshot.get("companyPriceContext")),
+                com.zoop.common.json.StrictJson.Obj.of(snapshot.get("editionReview")));
         if (snapshot.has("companyOutlooks")) companyOutlooks(snapshot.get("companyOutlooks"), row, evidence);
         JsonNode market = field(p, "marketVariables");
         if (!market.isNull()) market(market, row.windowTo());

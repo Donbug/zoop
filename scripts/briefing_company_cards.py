@@ -32,7 +32,14 @@ def run(args, transport=None):
         prior_bundle = base.strict_load(base.regular(previous / 'bundle-v2.json'))
         original = dict(prior_bundle['marketEnrichment'] if series else prior_bundle['presentationEnrichment'])
         previous_rows = {r['roundId']: r for r in original.pop(key)['rounds']}
-        reading.company.require(original == layer, 'card_previous_input_changed')
+        # Only the presentation accounting ceiling is mutable. All content, sources and analysis stay bound.
+        expected = dict(layer)
+        if not series:
+            for value in (original, expected):
+                ceiling = value.pop('maximumPaidCallsIncludingPrior', None)
+                reading.company.require(type(ceiling) is int and 0 < ceiling <= 512 and ceiling <= args.max_calls,
+                                        'card_previous_call_ceiling')
+        reading.company.require(original == expected, 'card_previous_input_changed')
     inherited = previous or baseline
     prior = len(list((inherited / 'calls').glob('*.pending.json')))
     needed = sum(previous_rows.get(r['roundId'], {}).get('status') != 'PASS' for r in rows)

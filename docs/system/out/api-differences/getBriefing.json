@@ -7,6 +7,276 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "response:200:application/json.aiPriceOutlooks": {
+      "type": "object"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies": {
+      "type": "array",
+      "maxItems": 24
+    },
+    "response:200:application/json.aiPriceOutlooks.companies:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[]": {
+      "type": "object"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].assessment": {
+      "type": "string",
+      "enum": [
+        "positive",
+        "negative",
+        "mixed",
+        "watch"
+      ]
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].assessment:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].companyId": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].companyId:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].companyName": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].companyName:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].comparison:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].comparison<allOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].comparison<allOf:0>.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].comparison<allOf:0>.evidenceIds:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].comparison<allOf:0>.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].comparison<allOf:0>.text": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].comparison<allOf:0>.text:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].comparison<allOf:1>": {
+      "type": "object"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].comparison<allOf:1>.previousResultVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].comparison<allOf:1>.previousResultVersion:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].comparison<allOf:1>.status": {
+      "type": "string",
+      "enum": [
+        "updated",
+        "compared",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].comparison<allOf:1>.status:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].conditions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].conditions:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].conditions[]": {
+      "type": "object"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].conditions[].evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].conditions[].evidenceIds:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].conditions[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].conditions[].text": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].conditions[].text:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].impact": {
+      "type": "object"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].impact.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].impact.evidenceIds:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].impact.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].impact.text": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].impact.text:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].impact:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].outlook": {
+      "type": "object"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].outlook.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].outlook.evidenceIds:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].outlook.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].outlook.text": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].outlook.text:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].outlook:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].previous": {
+      "type": "object"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].previous.judgment": {
+      "type": "object"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].previous.judgment:required": false,
+    "response:200:application/json.aiPriceOutlooks.companies[].previous.kind": {
+      "type": "string",
+      "enum": [
+        "verified_ai_price_outlook",
+        "preserved_editorial_review"
+      ]
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].previous.kind:required": false,
+    "response:200:application/json.aiPriceOutlooks.companies[].previous.resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].previous.resultVersion:required": false,
+    "response:200:application/json.aiPriceOutlooks.companies[].previous.roundId": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].previous.roundId:required": false,
+    "response:200:application/json.aiPriceOutlooks.companies[].previous.status": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].previous.status:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].previous:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].risks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].risks:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].risks[]": {
+      "type": "object"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].risks[].evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].risks[].evidenceIds:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].risks[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].risks[].text": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].risks[].text:required": true,
+    "response:200:application/json.aiPriceOutlooks.companies[].role": {
+      "type": "string",
+      "enum": [
+        "selected",
+        "tracked"
+      ]
+    },
+    "response:200:application/json.aiPriceOutlooks.companies[].role:required": true,
+    "response:200:application/json.aiPriceOutlooks.cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.aiPriceOutlooks.cutoff:required": true,
+    "response:200:application/json.aiPriceOutlooks.date": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.aiPriceOutlooks.date:required": true,
+    "response:200:application/json.aiPriceOutlooks.edition": {
+      "type": "string",
+      "enum": [
+        "morning",
+        "evening"
+      ]
+    },
+    "response:200:application/json.aiPriceOutlooks.edition:required": true,
+    "response:200:application/json.aiPriceOutlooks.generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.aiPriceOutlooks.generatedAt:required": true,
+    "response:200:application/json.aiPriceOutlooks.generationRequestDigest": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.generationRequestDigest:required": false,
+    "response:200:application/json.aiPriceOutlooks.historyNote": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.historyNote:required": false,
+    "response:200:application/json.aiPriceOutlooks.inputSha256": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.inputSha256:required": true,
+    "response:200:application/json.aiPriceOutlooks.model": {
+      "type": "string",
+      "const": "gpt-6-luna"
+    },
+    "response:200:application/json.aiPriceOutlooks.model:required": true,
+    "response:200:application/json.aiPriceOutlooks.priceContextVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.priceContextVersion:required": true,
+    "response:200:application/json.aiPriceOutlooks.projectionSha256": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.projectionSha256:required": false,
+    "response:200:application/json.aiPriceOutlooks.promptVersion": {
+      "type": "string",
+      "const": "company-outlook-v5"
+    },
+    "response:200:application/json.aiPriceOutlooks.promptVersion:required": true,
+    "response:200:application/json.aiPriceOutlooks.resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.resultVersion:required": true,
+    "response:200:application/json.aiPriceOutlooks.reviewVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.reviewVersion:required": true,
+    "response:200:application/json.aiPriceOutlooks.roundId": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.roundId:required": true,
+    "response:200:application/json.aiPriceOutlooks.schemaVersion": {
+      "type": "string",
+      "const": "zoop-ai-price-outlooks-v1"
+    },
+    "response:200:application/json.aiPriceOutlooks.schemaVersion:required": true,
+    "response:200:application/json.aiPriceOutlooks.status": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "WITHHELD"
+      ]
+    },
+    "response:200:application/json.aiPriceOutlooks.status:required": true,
+    "response:200:application/json.aiPriceOutlooks.supersedesResultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.supersedesResultVersion:required": false,
+    "response:200:application/json.aiPriceOutlooks.verificationMode": {
+      "type": "string",
+      "const": "independent_model"
+    },
+    "response:200:application/json.aiPriceOutlooks.verificationMode:required": true,
+    "response:200:application/json.aiPriceOutlooks.verificationRequestDigest": {
+      "type": "string"
+    },
+    "response:200:application/json.aiPriceOutlooks.verificationRequestDigest:required": false,
+    "response:200:application/json.aiPriceOutlooks:required": false,
     "response:200:application/json.companyOutlooks": {
       "type": "object"
     },
@@ -671,6 +941,522 @@
     },
     "response:200:application/json.companyOutlooks.status:required": true,
     "response:200:application/json.companyOutlooks:required": false,
+    "response:200:application/json.companyPriceContext": {
+      "type": "object"
+    },
+    "response:200:application/json.companyPriceContext.authorship": {
+      "type": "string",
+      "const": "deterministic_price_observation"
+    },
+    "response:200:application/json.companyPriceContext.authorship:required": true,
+    "response:200:application/json.companyPriceContext.companies": {
+      "type": "array",
+      "maxItems": 12
+    },
+    "response:200:application/json.companyPriceContext.companies:required": true,
+    "response:200:application/json.companyPriceContext.companies[]": {
+      "type": "object"
+    },
+    "response:200:application/json.companyPriceContext.companies[].barCount": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "response:200:application/json.companyPriceContext.companies[].barCount:required": false,
+    "response:200:application/json.companyPriceContext.companies[].companyId": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].companyId:required": true,
+    "response:200:application/json.companyPriceContext.companies[].companyName": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].companyName:required": true,
+    "response:200:application/json.companyPriceContext.companies[].completeSession": {
+      "type": "boolean"
+    },
+    "response:200:application/json.companyPriceContext.companies[].completeSession:required": false,
+    "response:200:application/json.companyPriceContext.companies[].currency": {
+      "type": "string",
+      "enum": [
+        "KRW",
+        "USD"
+      ]
+    },
+    "response:200:application/json.companyPriceContext.companies[].currency:required": true,
+    "response:200:application/json.companyPriceContext.companies[].cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyPriceContext.companies[].cutoff:required": true,
+    "response:200:application/json.companyPriceContext.companies[].day": {
+      "type": "object"
+    },
+    "response:200:application/json.companyPriceContext.companies[].day.baselineClose:required": true,
+    "response:200:application/json.companyPriceContext.companies[].day.baselineClose<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].day.baselineClose<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.companyPriceContext.companies[].day.baselineDate:required": true,
+    "response:200:application/json.companyPriceContext.companies[].day.baselineDate<anyOf:0>": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.companyPriceContext.companies[].day.baselineDate<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.companyPriceContext.companies[].day.changeRatePercent:required": true,
+    "response:200:application/json.companyPriceContext.companies[].day.changeRatePercent<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].day.changeRatePercent<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.companyPriceContext.companies[].day.closeOrLast": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].day.closeOrLast:required": true,
+    "response:200:application/json.companyPriceContext.companies[].day.from": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyPriceContext.companies[].day.from:required": true,
+    "response:200:application/json.companyPriceContext.companies[].day.high": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].day.high:required": true,
+    "response:200:application/json.companyPriceContext.companies[].day.kind": {
+      "type": "string",
+      "enum": [
+        "provider_daily_bar",
+        "completed_five_minute_bars"
+      ]
+    },
+    "response:200:application/json.companyPriceContext.companies[].day.kind:required": true,
+    "response:200:application/json.companyPriceContext.companies[].day.low": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].day.low:required": true,
+    "response:200:application/json.companyPriceContext.companies[].day.open": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].day.open:required": true,
+    "response:200:application/json.companyPriceContext.companies[].day.to": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyPriceContext.companies[].day.to:required": true,
+    "response:200:application/json.companyPriceContext.companies[].day.volume:required": true,
+    "response:200:application/json.companyPriceContext.companies[].day.volume<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].day.volume<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.companyPriceContext.companies[].day:required": false,
+    "response:200:application/json.companyPriceContext.companies[].exchangeTimezone": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].exchangeTimezone:required": false,
+    "response:200:application/json.companyPriceContext.companies[].flow": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].flow:required": false,
+    "response:200:application/json.companyPriceContext.companies[].interpretation": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].interpretation:required": false,
+    "response:200:application/json.companyPriceContext.companies[].latest": {
+      "type": "object"
+    },
+    "response:200:application/json.companyPriceContext.companies[].latest.kind": {
+      "type": "string",
+      "enum": [
+        "daily_close",
+        "five_minute_close"
+      ]
+    },
+    "response:200:application/json.companyPriceContext.companies[].latest.kind:required": true,
+    "response:200:application/json.companyPriceContext.companies[].latest.observedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyPriceContext.companies[].latest.observedAt:required": true,
+    "response:200:application/json.companyPriceContext.companies[].latest.value": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].latest.value:required": true,
+    "response:200:application/json.companyPriceContext.companies[].latest:required": false,
+    "response:200:application/json.companyPriceContext.companies[].limitation": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].limitation:required": false,
+    "response:200:application/json.companyPriceContext.companies[].news": {
+      "type": "array"
+    },
+    "response:200:application/json.companyPriceContext.companies[].news:required": false,
+    "response:200:application/json.companyPriceContext.companies[].news[]": {
+      "type": "object"
+    },
+    "response:200:application/json.companyPriceContext.companies[].news[].before:required": true,
+    "response:200:application/json.companyPriceContext.companies[].news[].before<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.companyPriceContext.companies[].news[].before<anyOf:0>.kind": {
+      "type": "string",
+      "enum": [
+        "daily_close",
+        "five_minute_close"
+      ]
+    },
+    "response:200:application/json.companyPriceContext.companies[].news[].before<anyOf:0>.kind:required": true,
+    "response:200:application/json.companyPriceContext.companies[].news[].before<anyOf:0>.observedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyPriceContext.companies[].news[].before<anyOf:0>.observedAt:required": true,
+    "response:200:application/json.companyPriceContext.companies[].news[].before<anyOf:0>.value": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].news[].before<anyOf:0>.value:required": true,
+    "response:200:application/json.companyPriceContext.companies[].news[].before<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.companyPriceContext.companies[].news[].changeRatePercent:required": true,
+    "response:200:application/json.companyPriceContext.companies[].news[].changeRatePercent<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].news[].changeRatePercent<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.companyPriceContext.companies[].news[].evidenceId": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].news[].evidenceId:required": true,
+    "response:200:application/json.companyPriceContext.companies[].news[].observation": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].news[].observation:required": true,
+    "response:200:application/json.companyPriceContext.companies[].news[].postNewsBars": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.companyPriceContext.companies[].news[].postNewsBars:required": true,
+    "response:200:application/json.companyPriceContext.companies[].news[].publishedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyPriceContext.companies[].news[].publishedAt:required": true,
+    "response:200:application/json.companyPriceContext.companies[].news[].status": {
+      "type": "string",
+      "enum": [
+        "observed",
+        "no_post_news_trade",
+        "event_window_unavailable"
+      ]
+    },
+    "response:200:application/json.companyPriceContext.companies[].news[].status:required": true,
+    "response:200:application/json.companyPriceContext.companies[].news[].timing": {
+      "type": "string",
+      "enum": [
+        "before_session",
+        "during_session",
+        "after_session"
+      ]
+    },
+    "response:200:application/json.companyPriceContext.companies[].news[].timing:required": true,
+    "response:200:application/json.companyPriceContext.companies[].outlook": {
+      "type": "object"
+    },
+    "response:200:application/json.companyPriceContext.companies[].outlook.authorship": {
+      "const": "source_bound_composition"
+    },
+    "response:200:application/json.companyPriceContext.companies[].outlook.authorship:required": true,
+    "response:200:application/json.companyPriceContext.companies[].outlook.businessJudgment": {
+      "type": "object"
+    },
+    "response:200:application/json.companyPriceContext.companies[].outlook.businessJudgment.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyPriceContext.companies[].outlook.businessJudgment.evidenceIds:required": true,
+    "response:200:application/json.companyPriceContext.companies[].outlook.businessJudgment.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].outlook.businessJudgment.text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].outlook.businessJudgment.text:required": true,
+    "response:200:application/json.companyPriceContext.companies[].outlook.businessJudgment:required": true,
+    "response:200:application/json.companyPriceContext.companies[].outlook.evidenceIds": {
+      "type": "array"
+    },
+    "response:200:application/json.companyPriceContext.companies[].outlook.evidenceIds:required": true,
+    "response:200:application/json.companyPriceContext.companies[].outlook.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].outlook.marketNote": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].outlook.marketNote:required": true,
+    "response:200:application/json.companyPriceContext.companies[].outlook.nextCheck": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].outlook.nextCheck:required": true,
+    "response:200:application/json.companyPriceContext.companies[].outlook.priceObservation": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].outlook.priceObservation:required": true,
+    "response:200:application/json.companyPriceContext.companies[].outlook.schemaVersion": {
+      "const": "zoop-company-price-outlook-v1"
+    },
+    "response:200:application/json.companyPriceContext.companies[].outlook.schemaVersion:required": true,
+    "response:200:application/json.companyPriceContext.companies[].outlook.stance": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].outlook.stance:required": true,
+    "response:200:application/json.companyPriceContext.companies[].outlook.takeaway": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].outlook.takeaway:required": true,
+    "response:200:application/json.companyPriceContext.companies[].outlook.text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].outlook.text:required": true,
+    "response:200:application/json.companyPriceContext.companies[].outlook:required": false,
+    "response:200:application/json.companyPriceContext.companies[].provider": {
+      "type": "string",
+      "const": "toss"
+    },
+    "response:200:application/json.companyPriceContext.companies[].provider:required": true,
+    "response:200:application/json.companyPriceContext.companies[].reason": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].reason:required": false,
+    "response:200:application/json.companyPriceContext.companies[].responseSha256s": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "response:200:application/json.companyPriceContext.companies[].responseSha256s:required": true,
+    "response:200:application/json.companyPriceContext.companies[].responseSha256s[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].sessionDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.companyPriceContext.companies[].sessionDate:required": false,
+    "response:200:application/json.companyPriceContext.companies[].sinceMorning": {
+      "type": "object"
+    },
+    "response:200:application/json.companyPriceContext.companies[].sinceMorning.before": {
+      "type": "object"
+    },
+    "response:200:application/json.companyPriceContext.companies[].sinceMorning.before.kind": {
+      "type": "string",
+      "enum": [
+        "daily_close",
+        "five_minute_close"
+      ]
+    },
+    "response:200:application/json.companyPriceContext.companies[].sinceMorning.before.kind:required": true,
+    "response:200:application/json.companyPriceContext.companies[].sinceMorning.before.observedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyPriceContext.companies[].sinceMorning.before.observedAt:required": true,
+    "response:200:application/json.companyPriceContext.companies[].sinceMorning.before.value": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].sinceMorning.before.value:required": true,
+    "response:200:application/json.companyPriceContext.companies[].sinceMorning.before:required": false,
+    "response:200:application/json.companyPriceContext.companies[].sinceMorning.changeRatePercent": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].sinceMorning.changeRatePercent:required": false,
+    "response:200:application/json.companyPriceContext.companies[].sinceMorning.observation": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].sinceMorning.observation:required": true,
+    "response:200:application/json.companyPriceContext.companies[].sinceMorning.status": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable",
+        "no_new_session",
+        "revised_observation"
+      ]
+    },
+    "response:200:application/json.companyPriceContext.companies[].sinceMorning.status:required": true,
+    "response:200:application/json.companyPriceContext.companies[].sinceMorning:required": false,
+    "response:200:application/json.companyPriceContext.companies[].status": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.companyPriceContext.companies[].status:required": true,
+    "response:200:application/json.companyPriceContext.companies[].summary": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.companies[].summary:required": false,
+    "response:200:application/json.companyPriceContext.companies[]<oneOf:0>.status": {
+      "const": "unavailable"
+    },
+    "response:200:application/json.companyPriceContext.companies[]<oneOf:0>.status:required": false,
+    "response:200:application/json.companyPriceContext.companies[]<oneOf:1>.status": {
+      "const": "available"
+    },
+    "response:200:application/json.companyPriceContext.companies[]<oneOf:1>.status:required": false,
+    "response:200:application/json.companyPriceContext.cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyPriceContext.cutoff:required": true,
+    "response:200:application/json.companyPriceContext.date": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.companyPriceContext.date:required": true,
+    "response:200:application/json.companyPriceContext.edition": {
+      "type": "string",
+      "enum": [
+        "morning",
+        "evening"
+      ]
+    },
+    "response:200:application/json.companyPriceContext.edition:required": true,
+    "response:200:application/json.companyPriceContext.generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyPriceContext.generatedAt:required": true,
+    "response:200:application/json.companyPriceContext.marketReference": {
+      "type": "object"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators": {
+      "type": "array"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators:required": true,
+    "response:200:application/json.companyPriceContext.marketReference.indicators[]": {
+      "type": "object"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].baselineDate:required": true,
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].baselineDate<anyOf:0>": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].baselineDate<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].changeRatePercent:required": true,
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].changeRatePercent<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].changeRatePercent<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].id": {
+      "enum": [
+        "kospi",
+        "kosdaq",
+        "usdkrw"
+      ]
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].id:required": true,
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].label": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].label:required": true,
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].observedAt:required": true,
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].observedAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].observedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].observedDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].observedDate:required": true,
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].source": {
+      "type": "object"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].source:required": true,
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].status": {
+      "enum": [
+        "ok",
+        "delayed"
+      ]
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].status:required": true,
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].text:required": true,
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].unit": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].unit:required": true,
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].value": {
+      "type": "number"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].value:required": true,
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].valueKind": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.indicators[].valueKind:required": true,
+    "response:200:application/json.companyPriceContext.marketReference.note": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.note:required": true,
+    "response:200:application/json.companyPriceContext.marketReference.snapshotSha256": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.marketReference.snapshotSha256:required": true,
+    "response:200:application/json.companyPriceContext.marketReference.status": {
+      "enum": [
+        "available",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.companyPriceContext.marketReference.status:required": true,
+    "response:200:application/json.companyPriceContext.marketReference:required": false,
+    "response:200:application/json.companyPriceContext.outlookIntegrationVersion": {
+      "const": "zoop-company-price-outlook-v1"
+    },
+    "response:200:application/json.companyPriceContext.outlookIntegrationVersion:required": false,
+    "response:200:application/json.companyPriceContext.resultVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.resultVersion:required": true,
+    "response:200:application/json.companyPriceContext.reviewVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.reviewVersion:required": true,
+    "response:200:application/json.companyPriceContext.roundId": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.roundId:required": true,
+    "response:200:application/json.companyPriceContext.schemaVersion": {
+      "type": "string",
+      "const": "zoop-company-price-context-v1"
+    },
+    "response:200:application/json.companyPriceContext.schemaVersion:required": true,
+    "response:200:application/json.companyPriceContext.scopeNote": {
+      "type": "string"
+    },
+    "response:200:application/json.companyPriceContext.scopeNote:required": true,
+    "response:200:application/json.companyPriceContext.status": {
+      "type": "string",
+      "const": "derived"
+    },
+    "response:200:application/json.companyPriceContext.status:required": true,
+    "response:200:application/json.companyPriceContext:required": false,
     "response:200:application/json.editionReview": {
       "type": "object"
     },
@@ -2048,11 +2834,17 @@
     "response:200:application/json.judgmentUpdate.companies[].newEvidence.text:required": true,
     "response:200:application/json.judgmentUpdate.companies[].newEvidence:required": true,
     "response:200:application/json.judgmentUpdate.companies[].previousJudgment": {
-      "type": "object"
+      "type": [
+        "object",
+        "null"
+      ]
     },
     "response:200:application/json.judgmentUpdate.companies[].previousJudgment:required": true,
     "response:200:application/json.judgmentUpdate.companies[].previousResultVersion": {
-      "type": "string"
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "response:200:application/json.judgmentUpdate.companies[].previousResultVersion:required": true,
     "response:200:application/json.judgmentUpdate.companies[].reason": {

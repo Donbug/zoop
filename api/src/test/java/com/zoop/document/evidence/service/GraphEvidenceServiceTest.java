@@ -214,6 +214,22 @@ class GraphEvidenceServiceTest {
     // ---- the served answer -----------------------------------------------------------------------------------------------
 
     @Test
+    void impactProjectionUsesTheSameQuoteAndReturnsDenialsInsideItsTransactionCallback() throws Exception {
+        setUp();
+        assertEquals(QUOTE, service().readImpactCitation(EVIDENCE_ID, null, GRAPH_VERSION, SELECTED_AS_OF, "impact-read").quote());
+        writeSources(source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, false, "known", List.of("read", "store", "quote-display"), "authored", null));
+        assertNull(service().readImpactCitation(EVIDENCE_ID, null, GRAPH_VERSION, SELECTED_AS_OF, "impact-denied"));
+        assertNull(service().readImpactCitation("ev-" + "0".repeat(64), null, GRAPH_VERSION, SELECTED_AS_OF, "impact-missing"));
+    }
+
+    @Test
+    void impactProjectionNeverTurnsAnOutageIntoAnAbsentAssessment() throws Exception {
+        setUp(); graphFailure = new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> service().readImpactCitation(EVIDENCE_ID, null, GRAPH_VERSION, SELECTED_AS_OF, "impact-outage")).getErrorCode());
+    }
+
+    @Test
     void servesTheGraphBodyEvidenceFromTheSelectedVersionWithoutTheS1Registry() throws Exception {
         setUp();
         List<String> files = snapshot(world.root);

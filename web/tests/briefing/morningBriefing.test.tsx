@@ -89,7 +89,7 @@ function round(overrides: Partial<BriefingResponse> = {}): BriefingResponse {
     ...overrides,
   };
 }
-function setup(response = round(), url = '/briefing') {
+function setup(response = round(), url = '/briefing?reading=full') {
   const server = createFakeServer();
   server.on('GET', '/api/v1/briefings', () => json(response));
   render(
@@ -228,7 +228,7 @@ describe('D-BRF-01 / FS028 FS030 FS031 FS033 FS035', () => {
     const server = createFakeServer();
     server.on('GET', '/api/v1/briefings', () => apiError(503, 'TEMPORARY'));
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/briefing?reading=full']}>
         <BriefingPage />
       </MemoryRouter>,
     );
@@ -241,7 +241,7 @@ describe('D-BRF-01 / FS028 FS030 FS031 FS033 FS035', () => {
     const server = createFakeServer();
     server.on('GET', '/api/v1/briefings', () => apiError(status, 'FIXTURE'));
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/briefing?reading=full']}>
         <BriefingPage />
       </MemoryRouter>,
     );
@@ -256,7 +256,7 @@ describe('D-BRF-01 / FS028 FS030 FS031 FS033 FS035', () => {
       query.get('date') === '2026-10-13' ? pending.promise : json(round()),
     );
     render(
-      <MemoryRouter initialEntries={['/briefing?date=2026-10-13']}>
+      <MemoryRouter initialEntries={['/briefing?date=2026-10-13&reading=full']}>
         <BriefingPage />
       </MemoryRouter>,
     );
@@ -402,14 +402,12 @@ describe('mobile reading layout', () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     }));
-    const server = setup();
+    const server = setup(round(), '/briefing');
     await screen.findByRole('heading', { name: '출근 브리핑' });
     expect(
       document.querySelector('article')?.getAttribute('data-reading'),
     ).toBe('compact');
-    expect(
-      document.querySelector('#market-summary-title')?.closest('details')?.open,
-    ).toBe(false);
+    expect(screen.queryByRole('heading', { name: '시장 요약' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '전체 보기' }));
     expect(
       document.querySelector('article')?.getAttribute('data-reading'),
@@ -424,7 +422,30 @@ describe('mobile reading layout', () => {
     expect(server.calls('GET', '/api/v1/briefings')).toHaveLength(1);
   });
 
-  it('defaults to the existing full desktop view and allows compact without losing issues', async () => {
+  it('defaults to issue-centered reading on desktop and preserves full content behind the explicit full view', async () => {
+    const server = setup(round(), '/briefing');
+    await screen.findByRole('heading', { name: '출근 브리핑' });
+    expect(
+      document.querySelector('[data-presentation="issue-centered"]'),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getAllByRole('heading')
+        .map((x) => x.textContent)
+        .slice(-4),
+    ).toEqual([
+      '출근 브리핑',
+      '주요 시장 지표',
+      '핵심 이슈',
+      '이 브리핑은 어땠나요?',
+    ]);
+    expect(screen.queryByText('합성 시장 요약')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '전체 보기' }));
+    expect(screen.getByText('합성 시장 요약')).toBeTruthy();
+    expect(server.calls('GET', '/api/v1/briefings')).toHaveLength(1);
+  });
+
+  it('preserves an explicitly selected full view and switches to issue-centered compact without refetching', async () => {
     const server = setup();
     await screen.findByRole('heading', { name: '출근 브리핑' });
     expect(
@@ -434,10 +455,10 @@ describe('mobile reading layout', () => {
     expect(
       document.querySelector('article')?.getAttribute('data-reading'),
     ).toBe('compact');
-    const summary = screen.getByText('1. 합성 핵심 이슈 · 근거 1건');
+    const summary = screen.getByText('합성 핵심 이슈');
     expect(summary.closest('details')?.open).toBe(false);
-    fireEvent.click(summary);
-    expect(summary.closest('details')?.open).toBe(true);
+    fireEvent.click(summary.closest('summary')!);
+    await waitFor(() => expect(summary.closest('details')?.open).toBe(true));
     expect(
       screen.getByRole('button', { name: '핵심 이슈 1 근거 보기' }),
     ).toBeTruthy();

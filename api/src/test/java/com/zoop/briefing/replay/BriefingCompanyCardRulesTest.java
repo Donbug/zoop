@@ -28,6 +28,18 @@ class BriefingCompanyCardRulesTest {
         var f = fixture(false, "PASS");
         assertThatThrownBy(() -> apply(f)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("quality_check");
     }
+    @Test void cardCannotReplacePricesEvenWhenWithheldOrGivenANewVersion() throws Exception {
+        for(String status:List.of("PASS","WITHHELD"))for(boolean attach:List.of(true,false)) {
+            var f=fixture(true,status);ObjectNode row=(ObjectNode)f.row.node().deepCopy();
+            var before=f.projection.deepCopy();
+            if(attach)row.putObject("prices").putObject("A").put("value","999.00");
+            else row.put("pricePolicy","connected");
+            row.remove("resultVersion");row.put("resultVersion","card-v1-"+Canonical.digest(row));
+            assertThatThrownBy(()->apply(new Fixture(StrictJson.Obj.of(row),f.original,f.projection,f.receipts)))
+                .hasMessageContaining("card_prices_forbidden");
+            assertThat(f.projection).isEqualTo(before);
+        }
+    }
     @Test void withheldQualityNeverProjectsDraftSentences() throws Exception {
         var f = fixture(false, "WITHHELD");
         apply(f);

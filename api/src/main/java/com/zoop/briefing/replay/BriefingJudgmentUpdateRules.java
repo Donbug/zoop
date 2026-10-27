@@ -89,6 +89,11 @@ public final class BriefingJudgmentUpdateRules {
         require(("judgment-v1-" + Canonical.digest(version)).equals(row.string("resultVersion")), "version");
         List<StrictJson.Obj> attempts = row.objects("attempts"); require(attempts.size() == 1, "attempt_count");
         StrictJson.Obj attempt = attempts.getFirst();
+        boolean passed = "PASS".equals(row.string("status")); require(passed || "WITHHELD".equals(row.string("status")), "status");
+        if (passed) require(attempt.has("generationRequestDigest") && attempt.has("verificationRequestDigest"), "pass_call_digests_required");
+        if (attempt.has("verificationRequestDigest")) require(attempt.has("generationRequestDigest"), "verification_without_generation");
+        if (!attempt.has("generationRequestDigest") || !attempt.has("verificationRequestDigest"))
+            require(!passed && attempt.has("error") && !attempt.string("error").isBlank(), "incomplete_attempt_requires_error");
         for (String phase : List.of("generation", "verification")) {
             String key = phase + "RequestDigest"; if (!attempt.has(key)) continue;
             StrictJson.Obj actual = BriefingCompanyOutlookRules.recordedCall(attempt.string(key), phase, frozen, receipts, output, owned, "judgment_update_", "judgment-update-v1");
@@ -99,7 +104,6 @@ public final class BriefingJudgmentUpdateRules {
                 require(StrictJson.parseObject(request.string("input")).object("draft").node().equals(attempt.object("draft").node()), "verification_binding");
             } catch (java.io.IOException e) { throw new IllegalArgumentException("Judgment recording missing", e); }
         }
-        boolean passed = "PASS".equals(row.string("status")); require(passed || "WITHHELD".equals(row.string("status")), "status");
         ObjectNode out = StrictJson.newObject().put("schemaVersion", SCHEMA).put("status", row.string("status"));
         for (String k : List.of("roundId", "edition", "cutoff", "previousRoundId", "previousCutoff", "companyResultVersion", "previousResultVersion", "scopeNote")) out.put(k, frozen.string(k));
         out.put("resultVersion", row.string("resultVersion")).put("generatedAt", row.string("generatedAt"));

@@ -727,6 +727,41 @@ public final class BriefingReplayImporter {
                 require(editionRows.keySet().equals(companyRows.keySet()), "edition_full_series");
             }
             StrictJson.Obj previousEdition = null;
+            StrictJson.Obj priceLayer = presentation.root().has("priceContextLayer") ? presentation.root().object("priceContextLayer") : null;
+            Map<String, StrictJson.Obj> priceRows = new LinkedHashMap<>();
+            if (priceLayer != null) {
+                require(BriefingPriceContextRules.SCHEMA.equals(priceLayer.string("schemaVersion"))
+                        && settings.userInboxRef().equals(priceLayer.string("authorizationRef")), "price_context_layer");
+                Set<String> owned = new HashSet<>(), receipts = new HashSet<>();
+                for (StrictJson.Obj row : priceLayer.objects("rounds")) {
+                    require(priceRows.putIfAbsent(row.string("roundId"), row) == null, "price_context_round_duplicate");
+                    for (StrictJson.Obj c : row.objects("companies")) { owned.add(c.string("daily")); owned.add(c.string("intraday")); }
+                }
+                require(priceRows.keySet().equals(editionRows.keySet()), "price_context_full_series");
+                for (StrictJson.Obj receipt : priceLayer.objects("receipts")) {
+                    require(receipts.add(receipt.string("id")), "price_context_duplicate_receipt");
+                    blobs.put(namespace + "-toss-price-" + receipt.string("sha256"),
+                            blob("raw_document", BriefingPriceContextRules.raw(receipt, settings.bundle().getParent())));
+                }
+                require(owned.equals(receipts), "price_context_receipt_ownership");
+            }
+            StrictJson.Obj aiPriceLayer = presentation.root().has("aiPriceOutlookLayer") ? presentation.root().object("aiPriceOutlookLayer") : null;
+            Map<String, StrictJson.Obj> aiPriceRows = new LinkedHashMap<>();
+            Map<String, JsonNode> aiPriceReceipts = aiPriceLayer == null ? Map.of() : simulationReceiptLedger(aiPriceLayer.objects("receipts"));
+            Set<String> aiPriceOwned = new HashSet<>(); List<StrictJson.Obj> aiPriceHistory = new ArrayList<>();
+            Map<String, StrictJson.Obj> aiPriceAmendments = new LinkedHashMap<>();
+            if (aiPriceLayer != null) {
+                require(BriefingAiPriceOutlookRules.SCHEMA.equals(aiPriceLayer.string("schemaVersion")), "ai_price_layer");
+                for (var row : aiPriceLayer.objects("rounds")) require(aiPriceRows.putIfAbsent(row.string("roundId"), row) == null, "ai_price_duplicate");
+                require(aiPriceRows.keySet().equals(priceRows.keySet()), "ai_price_full_series");
+                if (aiPriceLayer.has("amendments")) for (var row : aiPriceLayer.objects("amendments")) {
+                    require(aiPriceAmendments.putIfAbsent(row.string("roundId"), row) == null
+                            && aiPriceRows.containsKey(row.string("roundId"))
+                            && row.raw("frozen").equals(aiPriceRows.get(row.string("roundId")).raw("frozen")), "ai_price_amendment_binding");
+                }
+                blobs.put(namespace + "-ai-price-layer", blob("briefing_input", StrictJson.write(aiPriceLayer.node())));
+            }
+            JsonNode previousPriceContext = null;
             List<Map<String, StrictJson.Obj>> priorCompanyRows = new ArrayList<>(); List<List<StrictJson.Obj>> priorCompanyHistory = new ArrayList<>();
             if (companyLayer != null && companyLayer.has("previousRuns")) {
                 require(companyLayer.objects("previousRuns").size() <= 2, "company_outlook_history_limit");
@@ -887,6 +922,31 @@ public final class BriefingReplayImporter {
                     blobs.put(namespace + "-edition-" + enriched.size(), blob("briefing_input", StrictJson.write(edition.node())));
                     previousEdition = edition;
                 }
+                if (priceRows.containsKey(base.id())) {
+                    ObjectNode context = BriefingPriceContextRules.apply(priceRows.get(base.id()), priceLayer,
+                            StrictJson.Obj.of(snapshot.path("editionReview")), previousPriceContext, settings.bundle().getParent());
+                    snapshot.set("companyPriceContext", context); previousPriceContext = context;
+                    if (aiPriceRows.containsKey(base.id())) {
+                        var row = aiPriceRows.get(base.id());
+                        ObjectNode aiResult = BriefingAiPriceOutlookRules.apply(row, StrictJson.Obj.of(snapshot.path("editionReview")),
+                                StrictJson.Obj.of(context), aiPriceHistory, aiPriceReceipts, settings.bundle().getParent(), aiPriceOwned);
+                        var amended = aiPriceAmendments.get(base.id());
+                        if (amended != null) {
+                            aiResult = BriefingAiPriceOutlookRules.apply(amended, StrictJson.Obj.of(snapshot.path("editionReview")),
+                                    StrictJson.Obj.of(context), aiPriceHistory, aiPriceReceipts, settings.bundle().getParent(), aiPriceOwned);
+                        }
+                        aiPriceHistory.add(row);
+                        if (!aiPriceAmendments.isEmpty()) {
+                            aiResult.put("historyNote", "비교는 각 문안 생성 당시의 이전 AI 판본 기준입니다. 후속 보완판은 다른 회차 입력에 소급 적용하지 않았습니다.");
+                            if (amended != null) aiResult.put("supersedesResultVersion", row.string("resultVersion"));
+                            if (aiResult.has("projectionSha256")) { aiResult.remove("projectionSha256"); aiResult.put("projectionSha256", Canonical.sha256(Canonical.appBytes(aiResult))); }
+                        }
+                        snapshot.set("aiPriceOutlooks", aiResult);
+                        var aiAt = Instant.parse((amended != null ? amended : row).string("generatedAt"));
+                        if (aiAt.isAfter(generated)) { generated = aiAt; payload.put("generatedAt", generated.toString()); }
+                        if (aiAt.isAfter(publishedAt)) publishedAt = aiAt; if (aiAt.isAfter(created)) created = aiAt;
+                    }
+                }
                 ObjectNode lineage = snapshot.putObject("presentationEnrichment").put("schemaVersion", BriefingPresentationRules.SCHEMA)
                         .put("baseBundleSha256", presentation.root().string("baseBundleSha256")).put("baseResultSha256", record.string("baseResultSha256"));
                 lineage.put("comparisonBasis", "event_identity");
@@ -896,6 +956,8 @@ public final class BriefingReplayImporter {
                 if ("morning".equals(base.edition())) mornings.put(base.date(), previous);
             }
             for (StrictJson.Obj market : validatedMarkets) if (market.has("marketContext")) BriefingMarketContextRules.previous(market, validatedMarkets);
+            require(aiPriceOwned.equals(aiPriceReceipts.keySet()), "ai_price_unowned_receipt");
+            for (var receipt : aiPriceReceipts.entrySet()) require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "ai_price_duplicate_receipt");
             require(accountedMarket.equals(layerReceipts.keySet()), "presentation_unowned_receipt");
             require(companyOwned.equals(companyReceipts.keySet()), "company_outlook_unowned_receipts");
             require(judgmentOwned.equals(judgmentReceipts.keySet()), "judgment_unowned_receipts");

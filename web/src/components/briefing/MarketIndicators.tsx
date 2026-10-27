@@ -75,9 +75,11 @@ function Change({ item }: { item: MarketIndicator }) {
 export default function MarketIndicators({
   variables,
   compact = false,
+  showBaseline = false,
 }: {
   variables?: BriefingResponse['marketVariables'];
   compact?: boolean;
+  showBaseline?: boolean;
 }) {
   return (
     <section className={SECTION} aria-labelledby="market-indicators-title">
@@ -123,7 +125,9 @@ export default function MarketIndicators({
               {hasValue ? (
                 <>
                   <p className={`${NOTE} mt-1`}>{observed(item)}</p>
-                  {!compact && <p className={NOTE}>{baseline(item)}</p>}
+                  {(!compact || showBaseline) && (
+                    <p className={NOTE}>{baseline(item)}</p>
+                  )}
                   <p
                     className={
                       compact

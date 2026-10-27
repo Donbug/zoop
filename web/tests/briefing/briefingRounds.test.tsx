@@ -251,7 +251,7 @@ describe('D-BRF-01·02 회차 이력 (FS033·FS035, listBriefingRounds)', () => 
     server.on('GET', '/api/v1/briefings/rounds', () =>
       json({ items: [], nextCursor: null }),
     );
-    renderAt('/briefing', <BriefingPage />);
+    renderAt('/briefing?reading=full', <BriefingPage />);
 
     const link = await screen.findByRole('link', {
       name: '이 회차 전체 관계 그래프',
