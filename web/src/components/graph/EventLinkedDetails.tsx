@@ -4,7 +4,7 @@ import { formatEventTime } from './event-format';
 
 // D-GRP-02 · gap 27. Port of node-panel.tsx's ordered follows list.
 export default function EventLinkedDetails({ event }: { event: EventDetail }) {
-  if (event.metadata.failures.some((failure) => failure.section === 'follows'))
+  if (event.metadata.failures?.some((failure) => failure.section === 'follows'))
     return null;
   const follows = [
     ...event.follows.previous.map((issue) => ({

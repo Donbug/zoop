@@ -35,11 +35,9 @@ export async function getCompanyIssueImpact(
       skipAuth: true,
     },
   );
-  if (context.round) {
-    if (impact.companyId !== companyId || impact.issueId !== issueId)
-      throw new Error('요청한 영향 경로와 응답이 일치하지 않습니다.');
-    assertSnapshot(impact.metadata, context);
-  }
+  if (impact.companyId !== companyId || impact.issueId !== issueId)
+    throw new Error('요청한 영향 경로와 응답이 일치하지 않습니다.');
+  assertSnapshot(impact.metadata, context);
   return impact;
 }
 
@@ -66,15 +64,35 @@ export async function getTutorialImpact(
   return {
     companyId,
     issueId,
+    pathStatus: 'available',
+    pathType: relation.relationType === 'INVOLVES' ? 'direct' : 'structural',
+    edgeId: relation.id,
     steps: [
+      { id: issueId, kind: 'issue', reason: relation.summary, evidenceIds },
       {
         id: companyId,
         kind: 'company',
         reason: relation.role ?? relation.summary,
         evidenceIds,
       },
-      { id: issueId, kind: 'issue', reason: relation.summary, evidenceIds },
     ],
+    businessPath:
+      relation.relationType === 'INVOLVES'
+        ? null
+        : {
+            status: 'unavailable',
+            reason: 'not_recorded',
+            companyIds: [],
+            links: [],
+          },
+    impact: {
+      status: 'unavailable',
+      reason:
+        relation.relationType === 'INVOLVES'
+          ? 'not_recorded'
+          : 'issue_impact_not_produced',
+      results: [],
+    },
     metadata: relation.metadata,
   };
 }
