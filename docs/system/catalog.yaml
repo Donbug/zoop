@@ -9,31 +9,31 @@ sources:
   - docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
   - docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv
 fingerprints:
-  docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv: f12f4de4e9987c3e7ff3a001786f823bad0695c37e82f05c7d5ca6d27daff67d
-  docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv: c17d26d4d6f3f868b81db406fbb13a2dda9f172c584fc3a8b5a771c9c31c07c6
-  docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv: 4d5505aad267724a958436db9304e4fb62ccaf49bedfcce0aa2c4dd80ab045a2
-  docs/evidence/raw/functional-spec_2026-10-18/01-회원가입-로그인.csv: c2feed59a5232e310de8c7e54fe21953cae4816bc6f3ee08fd5d4c8a66c08a74
-  docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv: c07b0ddcf3a055b9c087c295bb03ac637da872f630e7360ccbaa3bd8313e5541
-  docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv: dd707d3eb708f6426c3a5f4328d0f4742ac58495362b6d74091ee6f2df516a05
-  docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv: 647627f382ee1eb63fd1e67157fe2834b46be2f09d4e237587fec71530bf0647
-  docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv: 437b6826c5e374b095885a2d2076df638f21dccda95fbe7a644b03af3e2eca20
-  docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv: 5836c1bb98c4b7377da26af75283aeddf85edbf55d33a8b396f167f31f4bfb90
-  docs/evidence/raw/functional-spec_2026-10-18/09-데이터-관리.csv: ac09b5a762d039d23e826997faf19a36a5d21f788719136db0f70ed10a23d4d5
-  docs/evidence/raw/functional-spec_2026-10-18/10-외부-연동.csv: 8ac603b6c53641c6d808e8eba8911669e7aaf96b53733dd5f32f0d4894943fe6
-  docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv: 97679445a88a3714b5a7a11665b89c60482f2cccf9edbc1912179956904206c2
-  docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv: 41995ded3b10043dc379c8afab1e3e9f341c26941cc59b67b550ddccb5f552e4
-  docs/evidence/raw/functional-spec_2026-10-18/13-변경-내역.csv: 52b0d0606bea399de6d6b71e38dd6be4e8c5fc9b506e26600702d3e0d986d61f
-  docs/evidence/raw/functional-spec_2026-10-18/14-제안-확인-사항.csv: 4c588d550b2146c8ae5c90144442392c7bdff20e42cc648eaa0dec9f2fd7d131
+  docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv: 6b679c82cb9d8a07bf3e3c028c7d11f9e03ad67413becc3ed3c2fc1fce93a974
+  docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv: 9eb71ac8c8bdf31d323ceb458ff5822abb3d7ad7e0612d18ae804cae3ad4f69a
+  docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv: 8d33d485e13a41d1550f1c1d16e675642a6591b13b3dce27a6ce7265ad0b6841
+  docs/evidence/raw/functional-spec_2026-10-18/01-회원가입-로그인.csv: d4a2e236d4e65a8698d6f77d684e7648f3db9d96c11739acec59a3af9adf6866
+  docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv: 67980af423445fabb7d3e7e0ddd072f09cf53536b93b5abd1855a64a6c507a5a
+  docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv: d1c14611b8e46f2407e7e31c689e391d4540a3d3c729ed3f6a91d6499ef21f19
+  docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv: dc97377106ba96dd268fce814907b3e0b3cf1e28e176bb9d64db772a3b049c8e
+  docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv: c596048d49d0cf62625c7bacf904aa1ae64b98463ead20219c9579edffee3af5
+  docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv: ddc043a0937f58a5b8b3f37a08c83f03b5d10254eedf72904d4a9c8bf357b5f4
+  docs/evidence/raw/functional-spec_2026-10-18/09-데이터-관리.csv: cac1d9faf37b908c829955af45cfd7b4d06f198b73f98f6cc3eb8afbfb3118df
+  docs/evidence/raw/functional-spec_2026-10-18/10-외부-연동.csv: f8093ad3e782829129af45b9e52141e26089f247a4772498a24ca68d559c8692
+  docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv: 7bdf3d41e2fba982f7ae5910abb48a957204c31fd13886a4ce47aa118e5de8b9
+  docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv: 481cecedd6624bb4e50c83261aabba8a8ce9d06749d3399a443144f1b661422b
+  docs/evidence/raw/functional-spec_2026-10-18/13-변경-내역.csv: 8f195d7b643828eb03cea0f5cfeab61addef618bf187cebf281c3638b20b5153
+  docs/evidence/raw/functional-spec_2026-10-18/14-제안-확인-사항.csv: fb14ab2d57be306ca22162a342a85c86b21be7d00ad28d66ab3f821658c107dd
   docs/evidence/raw/functional-spec_2026-10-18/_collection-manifest.json: d71774715d111f7ba40068cba8e45f297b5d4ed901f7a550c14d08c0c0911f70
   docs/evidence/raw/functional-spec_2026-10-18/zoop-functional-spec_2026-10-18.xlsx: a659bd514c654fa487926c2e61e349cde6201aee81ceefdc4ae3a2bc95690273
-  docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv: 79661cfc0bc2643f7222158c1fdc4c5652216954892e622b34f0de6ceb637d23
-  docs/evidence/raw/requirements-sheet_2026-10-06/2-검증-기준.csv: 03202210c85c90d837225fce10888257a0566856ac920ad52719ac586711252b
-  docs/evidence/raw/requirements-sheet_2026-10-06/3-정책-결정.csv: 3dc355e4d3204ab8a42a838e6d28e91665bb0910170956c28eebebdccb1ab4ed
+  docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv: 3cff0f4712fa60843edc2425a62bdbb1bc56770b166f662b8fc0f5a69df6d8cf
+  docs/evidence/raw/requirements-sheet_2026-10-06/2-검증-기준.csv: 757cd0f85243dbc93d6005362006653f81ef55274997dee782c2f398fef5b037
+  docs/evidence/raw/requirements-sheet_2026-10-06/3-정책-결정.csv: 3df186b4ea59017eff0adba5901f7a7a8099b3c445bf646c85dccb467b477466
   docs/evidence/raw/requirements-sheet_2026-10-06/_collection-manifest.json: c2f62cdc931ebcbc4fe674847864eb30a9003b1a3350768037156c5078448e90
   docs/evidence/raw/requirements-sheet_2026-10-06/zoop-requirements_2026-10-06.xlsx: cc91b251b5b930cfc005c0aa533b5fe873ac29f6ad85e086f29a9a5293c26d18
-  docs/evidence/raw/wbs_2026-10-12/00-표지-변경이력.csv: 902057ccd1b7587c0cc0340de3f743eedaa6cebf02d47ac63da4686195da305f
-  docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv: 4b349b6ec84cb64bfef621c160257d47da11cea82533c9e53ac813893ac9940d
-  docs/evidence/raw/wbs_2026-10-12/02-개발-일정-요약.csv: f2432fb1f0fa626536f637e1727a56c87d51cde60317df703134286a8273c1c3
+  docs/evidence/raw/wbs_2026-10-12/00-표지-변경이력.csv: 4add68a5fe1f334b49a1f1f2eceafeb713691252eeea977a420b5a6f1b200f9c
+  docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv: b3bff0ca00f08226ea34b23f544967bbb2b464938a79e8258fc727ee53e6dca9
+  docs/evidence/raw/wbs_2026-10-12/02-개발-일정-요약.csv: c2264ca02c2e64dff359b0464bbf14674531663475a96bf0c1e794cdfc041e95
   docs/evidence/raw/wbs_2026-10-12/_collection-manifest.json: b8627b5f335fbe8c9a819d22e25ba76345a0edb5e379102847ef98df2d1f0701
   docs/evidence/raw/wbs_2026-10-12/zoop-wbs_2026-10-12.xlsx: a77905d5830c09031263c0063bbf466cb41cdc02ff04898363c23a466d0a907e
   docs/evidence/spec-v1.2-gap.md: 8e9e87b7dca6169d7c0bd8e42ede6652c85be46909dc91f2f28a366867d125ab

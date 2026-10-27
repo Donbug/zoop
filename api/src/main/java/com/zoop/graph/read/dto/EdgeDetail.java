@@ -11,7 +11,7 @@ import java.util.List;
 public record EdgeDetail(String id, String relationType, boolean derived, boolean directed, EndpointRef source,
         EndpointRef target, String role, String summary, List<String> roles, String assertionStatus,
         List<String> evidenceIds, List<BasisOut> basis, List<String> relationIds, Verification verification,
-        List<ViaIssue> via, String explanation, String validity, Metadata metadata) {
+        List<ViaIssue> via, String explanation, String validity, StructuralDetails structuralDetails, Metadata metadata) {
 
     /** logoUrl and brandColor are set for a company end (null when the catalog has none) and null for an issue end. */
     public record EndpointRef(String id, String kind, String label, String logoUrl, String brandColor) { }

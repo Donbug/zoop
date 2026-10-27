@@ -1754,7 +1754,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getCompanyRelation",
       "severity": "difference",
-      "message": "목표만 135 · BFF만 43 · 형식/필수/권한 변경 6",
+      "message": "목표만 182 · BFF만 43 · 형식/필수/권한 변경 6",
       "source": ""
     },
     {

@@ -1,9 +1,13 @@
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import CompanyLogo from '@/components/common/CompanyLogo';
 import GraphIcon from '@/components/graph/GraphIcon';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useRelationData } from '@/hooks/useRelationData';
 import type { Impact } from '@/types/company/detail';
+import type { EventContext } from '@/types/map/event';
 import type { GraphResponse } from '@/types/map/graph';
+import type { StructuralSupplyLink } from '@/types/map/relation';
+import StructuralRelationSection from './StructuralRelationSection';
 
 type Props = {
   tutorialEvidence?: boolean;
@@ -11,6 +15,7 @@ type Props = {
   tutorialSaving?: boolean;
   companyId: string;
   issueId: string;
+  context: EventContext;
   graph: GraphResponse;
   impact: Impact | null;
   loading: boolean;
@@ -72,6 +77,7 @@ export default function ImpactPathPanel({
   tutorialAi = false,
   tutorialSaving = false,
   issueId,
+  context,
   graph,
   impact,
   loading,
@@ -90,6 +96,13 @@ export default function ImpactPathPanel({
     heading.current?.focus();
   }, [companyId, issueId]);
   const company = graph.nodes.find((node) => node.id === companyId);
+  const structuralEdge = graph.edges.find(
+    (edge) =>
+      !edge.derived &&
+      edge.relationType === 'STRUCTURALLY_RELATED_TO' &&
+      [edge.source, edge.target].includes(companyId) &&
+      [edge.source, edge.target].includes(issueId),
+  );
   const evidenceIds = unique([
     ...(impact?.steps.flatMap((step) => step.evidenceIds) ?? []),
     ...(impact?.businessPath?.links.flatMap((link) => link.evidenceIds) ?? []),
@@ -353,6 +366,14 @@ export default function ImpactPathPanel({
                 </p>
               )}
             </section>
+            {structuralEdge && (
+              <StructuralImpactDetails
+                key={`${structuralEdge.id}:${JSON.stringify(context)}`}
+                edgeId={structuralEdge.id}
+                context={context}
+                onEvidence={(link) => onEvidence(unique(link.evidenceIds))}
+              />
+            )}
             <section
               className={ui.section}
               aria-labelledby="impact-company-title"
@@ -415,5 +436,36 @@ export default function ImpactPathPanel({
         )}
       </div>
     </aside>
+  );
+}
+
+function StructuralImpactDetails({
+  edgeId,
+  context,
+  onEvidence,
+}: {
+  edgeId: string;
+  context: EventContext;
+  onEvidence: (link: StructuralSupplyLink) => void;
+}) {
+  const [retry, setRetry] = useState(0);
+  const { data, loading } = useRelationData(edgeId, context, retry);
+  const failure = data?.metadata.failures.find(
+    (item) => item.section === 'structuralDetails',
+  );
+  if (loading && !data)
+    return (
+      <section className={ui.section} aria-label="사업 관계 상세" role="status">
+        사업 관계 상세를 불러오는 중입니다.
+      </section>
+    );
+  if (!data) return null;
+  return (
+    <StructuralRelationSection
+      details={data.structuralDetails}
+      failure={failure}
+      onRetry={() => setRetry((value) => value + 1)}
+      onEvidence={onEvidence}
+    />
   );
 }

@@ -20,7 +20,10 @@ import { companyPath } from '@/components/graph/company-path';
 import ImpactPathPanel from '@/components/graph/ImpactPathPanel';
 import CompanyDetailPanel from '@/components/graph/CompanyDetailPanel';
 import RelationDetailPanel from '@/components/graph/RelationDetailPanel';
-import type { RelationDetail } from '@/types/map/relation';
+import type {
+  RelationDetail,
+  StructuralSupplyLink,
+} from '@/types/map/relation';
 import EventDetailPanel, {
   type EventAction,
 } from '@/components/graph/EventDetailPanel';
@@ -507,6 +510,7 @@ function MapWorkspace({
     action: 'evidence' | 'ai',
     relation: RelationDetail,
     issueId?: string,
+    supplyLink?: StructuralSupplyLink,
   ) {
     const issue = relation.via.find((item) => item.id === issueId);
     const target: GraphTarget = {
@@ -514,14 +518,17 @@ function MapWorkspace({
       id: issue?.id ?? relation.id,
       label:
         issue?.title ?? `${relation.source.label} – ${relation.target.label}`,
-      evidenceIds: issue?.evidenceIds ?? relation.evidenceIds,
-      verifiedAt: issue
-        ? null
-        : (relation.basis
-            .map((basis) => basis.verifiedAt)
-            .filter((value): value is string => Boolean(value))
-            .sort()
-            .at(-1) ?? null),
+      evidenceIds:
+        supplyLink?.evidenceIds ?? issue?.evidenceIds ?? relation.evidenceIds,
+      verifiedAt: supplyLink
+        ? supplyLink.verifiedAt
+        : issue
+          ? null
+          : (relation.basis
+              .map((basis) => basis.verifiedAt)
+              .filter((value): value is string => Boolean(value))
+              .sort()
+              .at(-1) ?? null),
       mapContext: {
         ...eventContext,
         graphVersion: relation.metadata.graphVersion ?? undefined,
@@ -1180,6 +1187,7 @@ function MapWorkspace({
                 <ImpactPathPanel
                   companyId={impactCompanyId}
                   issueId={impactIssueId}
+                  context={eventContext}
                   graph={data}
                   impact={impact.data}
                   loading={impact.loading}
