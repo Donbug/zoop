@@ -1,5 +1,7 @@
 package com.zoop.chat.model;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -71,6 +73,7 @@ import com.zoop.graph.version.GraphVersionRepository;
 import com.zoop.graph.version.GraphVersionSelector;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -121,10 +124,34 @@ class ChatEvalSetTest {
         cases.sort((a, b) -> a.get("id").stringValue().compareTo(b.get("id").stringValue()));
         ObjectNode report = StrictJson.newObject().put("setVersion", set.get("setVersion").stringValue())
                 .put("mode", "replay");
-        report.set("summary", summary(cases));
+        List<String> ids = new ArrayList<>();
+        set.get("cases").forEach(c -> ids.add(c.get("id").stringValue()));
+        report.set("summary", summary(ids, cases));
         report.putArray("cases").addAll(cases);
         Files.write(REPORT.resolve("chat-eval-v1.json"), StrictJson.write(report));
         Files.writeString(REPORT.resolve("chat-eval-v1.md"), markdown(report), StandardCharsets.UTF_8);
+    }
+
+    @Test
+    void aCaseThatThrowsIsReportedAsFailedAndACaseNeverReportedIsNamed() {
+        JsonNode first = StrictJson.newObject().put("id", "A01").put("group", "concept").put("question", "질문 1");
+        JsonNode second = StrictJson.newObject().put("id", "A02").put("group", "concept").put("question", "질문 2");
+        ObjectNode observed = StrictJson.newObject().put("outcome", "answered");
+        observed.putArray("tools");
+        var passed = entry(first, observed, List.of());
+        var thrown = errored(second, List.of("router", "answer"),
+                new AssertionError("the script has no answer stage"));
+        assertFalse(thrown.get("passed").booleanValue());
+        assertEquals("error", thrown.get("observed").get("outcome").stringValue());
+        assertTrue(thrown.get("error").stringValue().contains("the script has no answer stage"));
+
+        var summary = summary(List.of("A01", "A02", "A03"), List.of(passed, thrown));
+        assertEquals(3, summary.get("setCases").asInt());
+        assertEquals(2, summary.get("cases").asInt());
+        assertEquals(1, summary.get("passed").asInt());
+        assertEquals(1, summary.get("failed").asInt(), "a thrown case is a failure, not a missing row");
+        assertEquals(1, summary.get("errors").asInt());
+        assertEquals("[\"A03\"]", summary.get("notReported").toString());
     }
 
     // ---------------------------------------------------------------- one case
@@ -169,22 +196,44 @@ class ChatEvalSetTest {
             return answer;
         };
         var control = new Control();
-        ChatEngineOutcome outcome;
-        try (var runner = new ChatToolRunner(world.registry);
-                var engine = new OrchestratedChatEngine(router, generator, modelStages, world.registry, runner,
-                        world.citations, Clock.fixed(NOW, ZoneOffset.UTC))) {
-            outcome = engine.answer(run, control);
+        ObjectNode observed;
+        List<String> mismatches;
+        try {
+            ChatEngineOutcome outcome;
+            try (var runner = new ChatToolRunner(world.registry);
+                    var engine = new OrchestratedChatEngine(router, generator, modelStages, world.registry, runner,
+                            world.citations, Clock.fixed(NOW, ZoneOffset.UTC))) {
+                outcome = engine.answer(run, control);
+            }
+            observed = observe(run, outcome, stages, decisions, failedChecks, control);
+            mismatches = compare(c.path("expect"), observed);
+        } catch (Throwable thrown) {
+            // A case that throws (an unscripted stage, a broken observation) is still a failed case of the report.
+            reported.add(errored(c, stages, thrown));
+            throw thrown;
         }
+        reported.add(entry(c, observed, mismatches));
+        assertTrue(mismatches.isEmpty(), id + ":\n  " + String.join("\n  ", mismatches));
+    }
 
-        ObjectNode observed = observe(run, outcome, stages, decisions, failedChecks, control);
-        List<String> mismatches = compare(c.path("expect"), observed);
-        ObjectNode entry = StrictJson.newObject().put("id", id).put("group", c.get("group").stringValue())
-                .put("question", c.get("question").stringValue()).put("passed", mismatches.isEmpty());
+    static ObjectNode entry(JsonNode c, ObjectNode observed, List<String> mismatches) {
+        ObjectNode entry = StrictJson.newObject().put("id", c.get("id").stringValue())
+                .put("group", c.get("group").stringValue()).put("question", c.get("question").stringValue())
+                .put("passed", mismatches.isEmpty());
         if (c.has("gap")) entry.put("gap", c.get("gap").stringValue());
         entry.set("observed", observed);
         entry.putArray("mismatches").addAll(strings(mismatches));
-        reported.add(entry);
-        assertTrue(mismatches.isEmpty(), id + ":\n  " + String.join("\n  ", mismatches));
+        return entry;
+    }
+
+    /** A case that ended in an exception: failed, with outcome {@code error}, the stages it reached and what was thrown. */
+    static ObjectNode errored(JsonNode c, List<String> stages, Throwable thrown) {
+        ObjectNode observed = StrictJson.newObject().put("outcome", "error");
+        observed.putArray("stages").addAll(strings(stages));
+        observed.putArray("tools");
+        ObjectNode entry = entry(c, observed, List.of("threw " + thrown));
+        entry.put("error", String.valueOf(thrown));
+        return entry;
     }
 
     private static FrozenSelection selection(JsonNode selection) {
@@ -374,10 +423,19 @@ class ChatEvalSetTest {
      * a question that read data ends without evidence, and how often a concept part the server split off is dropped. On the
      * replay they only show that the counting works.
      */
-    static ObjectNode summary(List<ObjectNode> cases) {
+    /**
+     * The counts over the reported cases, checked against the set: {@code setCases} is every case of the set and
+     * {@code notReported} the ids no run reported (a filtered run, or a case that never started), so a missing case is never
+     * read as passed.
+     */
+    static ObjectNode summary(List<String> setIds, List<ObjectNode> cases) {
         ObjectNode summary = StrictJson.newObject();
         long passed = cases.stream().filter(c -> c.get("passed").booleanValue()).count();
-        summary.put("cases", cases.size()).put("passed", passed).put("failed", cases.size() - passed);
+        Set<String> seen = new TreeSet<>();
+        cases.forEach(c -> seen.add(c.get("id").stringValue()));
+        summary.put("setCases", setIds.size()).put("cases", cases.size()).put("passed", passed)
+                .put("failed", cases.size() - passed).put("errors", cases.stream().filter(c -> c.has("error")).count());
+        summary.putArray("notReported").addAll(strings(setIds.stream().filter(id -> !seen.contains(id)).toList()));
         Map<String, Integer> outcomes = new TreeMap<>();
         Map<String, Integer> groups = new TreeMap<>();
         int read = 0;
@@ -416,8 +474,15 @@ class ChatEvalSetTest {
         StringBuilder md = new StringBuilder("# 챗봇 평가 결과 (").append(report.get("setVersion").stringValue())
                 .append(", ").append(report.get("mode").stringValue()).append(")\n\n");
         md.append("대본 응답(replay)은 흐름 회귀만 확인한다. 아래 비율은 집계가 동작하는지 보이는 값이며 품질 지표가 아니다.\n\n");
-        md.append("- 사례 ").append(s.get("cases").asInt()).append("건, 통과 ").append(s.get("passed").asInt())
-                .append("건, 실패 ").append(s.get("failed").asInt()).append("건\n");
+        md.append("- 세트 ").append(s.get("setCases").asInt()).append("건 중 보고 ").append(s.get("cases").asInt())
+                .append("건, 통과 ").append(s.get("passed").asInt()).append("건, 실패 ").append(s.get("failed").asInt())
+                .append("건(예외 ").append(s.get("errors").asInt()).append("건 포함)\n");
+        if (!s.get("notReported").isEmpty()) {
+            List<String> missing = new ArrayList<>();
+            s.get("notReported").forEach(n -> missing.add(n.stringValue()));
+            md.append("- **보고되지 않은 사례 ").append(missing.size()).append("건**: ").append(String.join(", ", missing))
+                    .append(" (통과로 세지 않는다)\n");
+        }
         md.append("- 결과 분포: ").append(s.get("outcomes")).append('\n');
         JsonNode ins = s.get("insufficientEvidence");
         md.append("- 근거 부족: 조회한 사례 ").append(ins.get("casesThatRead").asInt()).append("건 중 ")
