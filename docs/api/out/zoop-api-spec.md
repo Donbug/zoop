@@ -1397,7 +1397,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getQuestionJob · 질문 작업 상태·저장 결과 회수
 
-질문 작업 상태·저장 결과 회수. 결과를 돌려줄 때마다(작업·대화 조회, 최신 대화 복원, 멱등 재전송, 취소·재시도 응답) 현재 근거 접근 권한을 공개 근거 조회(getEvidence)와 같은 기준으로 다시 확인한다. 저장된 결과는 바꾸지 않으며, 인용 근거가 철회·비공개·권리 변경·공개 제외로 지금 읽을 수 없거나 확인할 수 없으면 응답에서 answer를 고정 안내 문장으로 바꾸고 sections·sources·citations·graphTargets를 비우며 answerBasis=none으로 보낸다. 지금 읽을 수 없는 선택 근거(context.items의 evidence)는 id·kind만 남기고 label을 '표시할 수 없는 근거'로 보낸다. 모델을 호출하지 않는다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+질문 작업 상태·저장 결과 회수. 결과를 돌려줄 때마다(작업·대화 조회, 최신 대화 복원, 멱등 재전송, 취소·재시도 응답) 현재 근거 접근 권한을 공개 근거 조회(getEvidence)와 같은 기준으로 다시 확인한다. 저장된 결과는 바꾸지 않으며, 인용 근거가 철회·비공개·권리 변경·공개 제외로 지금 읽을 수 없거나 확인할 수 없으면 응답에서 answer를 고정 안내 문장으로 바꾸고 sections·sources·citations·graphTargets를 비우며 answerBasis=none으로 보낸다. 지금 읽을 수 없는 선택 근거(context.items의 evidence)는 id·kind만 남기고 label을 '표시할 수 없는 근거'로 보낸다. result.applied의 companies·issues는 결과 종류와 관계없이 고정한 graphVersion·asOf에 현재 공개 제외를 적용한 공개 그래프에서 지금 보이는 기업·사건만 남기고, 확인할 수 없으면 모두 뺀다. 모델을 호출하지 않는다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
