@@ -54,6 +54,16 @@ MATERIAL_CASE_FIELDS = {
                                     "scale", "derivation", "req_comparison", "rel_paragraphs", "paragraphIds"),
 }
 
+# Retrieval diagnostics have their own closed family; never graph/QA answer runs.
+SCHEMA_MATERIAL_RETRIEVAL_RUN = "zoop-eval-material-retrieval-run-1"
+SCHEMA_MATERIAL_RETRIEVAL_SCORE = "zoop-eval-material-retrieval-score-1"
+MATERIAL_RETRIEVAL_RUN_FIELDS = (
+    "schema", "ok", "materialsId", "dataset", "status", "finalized", "inputsSha256",
+    "provenance", "normalization", "limits", "algorithm", "config", "measurement",
+    "queryIds", "candidatePools", "records",
+)
+MATERIAL_RETRIEVAL_RECORD_FIELDS = ("queryId", "contextId", "status", "ranking", "elapsedNs", "error")
+
 # Public KLUE RE ClassLabel order, not learned from the selected gold rows.
 # https://github.com/KLUE-benchmark/KLUE/wiki/KLUE-RE-dataset-description
 # https://huggingface.co/datasets/klue/klue (configuration re, label feature)
