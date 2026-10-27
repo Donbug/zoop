@@ -146,7 +146,7 @@ class ChatEvalSetTest {
         var modelStages = new ChatModelStages(call -> {
             stages.add(STAGE_NAMES.get(call.stage()));
             return reply(call, script);
-        }, "replay", world.names, world.citations, articleId -> Optional.of("fixture-news"), new ChatModelRecorder(null,
+        }, "replay", world.names, world.issues, world.citations, articleId -> Optional.of("fixture-news"), new ChatModelRecorder(null,
                 Clock.systemUTC()) {
             @Override
             public String start(String jobId, String stage, String mode) {
@@ -445,6 +445,7 @@ class ChatEvalSetTest {
      */
     static final class World {
         final CompanyNameResolver names;
+        final IssueNameResolver issues;
         final ChatCitationSource citations;
         final ChatToolRegistry registry;
 
@@ -497,6 +498,7 @@ class ChatEvalSetTest {
 
             citations = (evidenceId, graphVersion, asOf, traceId) -> Optional.ofNullable(byId.get(evidenceId));
             PublicGraphReader reader = reader();
+            issues = new IssueNameResolver(reader);
             ChatEvidenceAccess access = (evidenceId, graphVersion, asOf, requestId) -> true;
             var companyProfiles = new ChatCompanyProfiles(null, null, reader) {
                 @Override

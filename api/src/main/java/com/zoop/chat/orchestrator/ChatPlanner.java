@@ -163,8 +163,8 @@ public class ChatPlanner {
 
         if (r.prohibitedAdvice() > ADVICE) return base.limited("investment_advice");
         if (all.isEmpty()) return base.limited("out_of_scope");
-        // A question that names a company asks about that company, not only a concept, once Q03 reaches the review band.
-        if (all.equals(Set.of(ChatQueryType.Q02)) && r.targets().stream().anyMatch(ChatPlanner::companyId)
+        // A question that names a company or an issue asks about it, not only a concept, once Q03 reaches the review band.
+        if (all.equals(Set.of(ChatQueryType.Q02)) && !r.targets().isEmpty()
                 && r.types().getOrDefault(ChatQueryType.Q03, 0.0) >= REVIEW) {
             all.add(ChatQueryType.Q03);
         }
@@ -184,12 +184,14 @@ public class ChatPlanner {
             best(allowed).filter(e -> e.getValue() >= REVIEW)
                     .ifPresent(e -> capabilities.add(ChatCapability.of(e.getKey()).orElseThrow()));
         }
-        // Server defaults for companies the question names (never for a dependent stage), whatever the capability
-        // probabilities: a company fact reads the company, and a relation between two or more of them reads the path.
-        // Each still has to be allowed by the type and bound.
+        // Server defaults for companies and issues the question names (never for a dependent stage), whatever the capability
+        // probabilities: a company fact reads the company, an issue fact reads the issue, and a relation between two or
+        // more companies reads the path. Each still has to be allowed by the type and bound.
         Set<ChatCapability> defaults = EnumSet.noneOf(ChatCapability.class);
         long companies = r.dependsOn() == null ? r.targets().stream().filter(ChatPlanner::companyId).count() : 0;
+        long issues = r.dependsOn() == null ? r.targets().size() - companies : 0;
         if (companies > 0 && all.contains(ChatQueryType.Q03)) defaults.add(ChatCapability.COMPANY_READ);
+        if (issues > 0 && all.contains(ChatQueryType.Q03)) defaults.add(ChatCapability.ISSUE_READ);
         if (companies >= 2 && all.contains(ChatQueryType.Q04)) defaults.add(ChatCapability.GRAPH_PATH_READ);
         for (ChatCapability c : defaults) {
             if (permitted.contains(c) && bound.contains(c.id()) && !capabilities.contains(c)) capabilities.add(c);

@@ -153,6 +153,17 @@ class ChatPlannerTest {
         assertEquals(List.of(ChatCapability.ISSUE_READ), plan.requirements().get(2).capabilities(),
                 "an issue target gets no company read");
 
+        var issue = run(planner.plan(run(0, "v1"), decision(
+                req("named", Map.of(ChatQueryType.Q03, 0.6), Map.of(), List.of("iss-1")),
+                req("both", Map.of(ChatQueryType.Q03, 0.9), Map.of(), List.of("KRX:005930", "iss-1")),
+                req("concept", Map.of(ChatQueryType.Q02, 0.8, ChatQueryType.Q03, 0.4), Map.of(), List.of("iss-1"))), bound));
+        assertEquals(List.of(ChatCapability.ISSUE_READ), issue.requirements().get(0).capabilities(),
+                "a named issue reads the issue even when no capability reached the review band");
+        assertEquals(List.of(ChatCapability.COMPANY_READ, ChatCapability.ISSUE_READ),
+                issue.requirements().get(1).capabilities());
+        assertEquals(ChatPlan.Mode.TOOLS, issue.requirements().get(2).mode(),
+                "a concept question naming an issue is also an issue question");
+
         var unbound = run(planner.plan(run(0, "v1"), decision(req("about", Map.of(ChatQueryType.Q03, 0.9),
                 Map.of("issue.read", 0.9), List.of("KRX:005930"))), Set.of("issue.read")));
         assertEquals(List.of(ChatCapability.ISSUE_READ), unbound.requirements().getFirst().capabilities(),
@@ -180,7 +191,8 @@ class ChatPlannerTest {
         var plan = run(planner.plan(run(0, "v1"), decision(
                 req("advice", Map.of(ChatQueryType.Q02, 0.9), Map.of()).withAdvice(0.2),
                 req("path", Map.of(ChatQueryType.Q04, 0.9), Map.of("graph.path.read", 0.95), List.of("KRX:000660")),
-                req("free", Map.of(ChatQueryType.Q03, 0.9), Map.of("graph.delete", 0.99), List.of("iss-1")),
+                // Q08 has no server default for a named issue, so only the unknown capability is left.
+                req("free", Map.of(ChatQueryType.Q08, 0.9), Map.of("graph.delete", 0.99), List.of("iss-1")),
                 req("concept", Map.of(ChatQueryType.Q02, 0.9), Map.of())), BOUND));
         assertEquals(Arrays.asList("investment_advice", "out_of_scope", "out_of_scope", null),
                 plan.requirements().stream().map(ChatPlan.Planned::limitation).toList(),

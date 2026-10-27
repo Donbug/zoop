@@ -39,6 +39,7 @@ import com.zoop.chat.orchestrator.ChatSemanticVerdicts;
 import com.zoop.chat.service.FrozenSelection;
 import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolPath;
+import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.common.json.StrictJson;
 import org.junit.jupiter.api.Test;
@@ -59,6 +60,7 @@ class ChatModelStagesTest {
             "chat-router-1", "replay", 10L, 4L, Instant.parse("2026-10-22T01:00:00Z"), Instant.parse("2026-10-22T01:00:01Z"));
 
     private final List<ChatStageCall> calls = new ArrayList<>();
+    private List<IssueNameResolver.Entry> issueCatalog = List.of();
     private final List<String> recorded = new ArrayList<>();
     private Function<ChatStageCall, ChatStageReply> answer = call -> { throw new AssertionError("no call expected"); };
 
@@ -83,6 +85,11 @@ class ChatModelStagesTest {
         @Override
         public List<Mention> mentions(String text) {
             return match(text, CATALOG);
+        }
+    }, new IssueNameResolver(null) {
+        @Override
+        public Names at(String graphVersion, Instant asOf) {
+            return text -> match(text, issueCatalog);
         }
     }, (evidenceId, graphVersion, asOf, traceId) -> evidenceId.equals(EV_A)
             ? Optional.of(citation(EV_A, "삼성전자가 HBM을 공급한다."))
@@ -157,6 +164,32 @@ class ChatModelStagesTest {
         assertNull(picked.ambiguity());
         assertEquals(List.of("c-hanmi-science"), picked.requirements().getFirst().targets());
         assertEquals("한미사이언스 (008930)", calls.getFirst().input().get("turns").get(1).get("choiceLabel").stringValue());
+    }
+
+    @Test
+    void issuesNamedInTheQuestionAreTargetsAfterItsCompaniesAndSharedWordsAskWhichOne() {
+        var supply = new IssueNameResolver.Entry("iss-supply", "차세대 HBM 공급 계약", "HBM", "공급 계약", "2026-09-22");
+        var again = new IssueNameResolver.Entry("iss-supply-2", "HBM 추가 공급 계약", "HBM", "공급 계약", "2026-10-02");
+        answer = call -> succeeded(call, """
+                {"requirements":[{"requirementId":"r1","types":{"Q03":0.9},"capabilities":{},"prohibitedAdvice":0.0}]}""");
+        issueCatalog = List.of(supply);
+        ChatRouteDecision named = stages.route(run(root("HBM 공급 계약에 삼성전자가 엮였어")), Set.of("issue.read"));
+        assertEquals(List.of(SAMSUNG.id(), "iss-supply"), named.requirements().getFirst().targets());
+        assertTrue(calls.getFirst().input().toString().indexOf("iss-supply") < 0, "issue ids are never sent to the router");
+
+        calls.clear();
+        issueCatalog = List.of(supply, again);
+        ChatRouteDecision shared = stages.route(run(root("HBM 공급 계약 사건 알려줘")), Set.of("issue.read"));
+        assertTrue(calls.isEmpty());
+        assertEquals("other", shared.ambiguity().kind(), "the public choice kinds have none for issues");
+        assertEquals(List.of("차세대 HBM 공급 계약 (2026-09-22)", "HBM 추가 공급 계약 (2026-10-02)"),
+                shared.ambiguity().options().stream().map(ChatRouteDecision.Option::label).toList());
+
+        ChatRouteDecision picked = stages.route(run(root("HBM 공급 계약 사건 알려줘"),
+                new ChatRun.Turn("chat-job-0002", "HBM 추가 공급 계약", "iss-supply-2", "HBM 추가 공급 계약 (2026-10-02)")),
+                Set.of("issue.read"));
+        assertNull(picked.ambiguity());
+        assertEquals(List.of("iss-supply-2"), picked.requirements().getFirst().targets());
     }
 
     @Test
@@ -269,7 +302,7 @@ class ChatModelStagesTest {
 
     private JsonNode pathsSent(ChatToolPath... paths) {
         calls.clear();
-        var result = new ChatToolResult("chat-tools/v1", "tc-1", "graph.path.read", "gv-1",
+        var result = new ChatToolResult(ChatToolRegistry.VERSION, "tc-1", "graph.path.read", "gv-1",
                 List.of(new ChatToolItem("c-samsung", "company", "삼성전자", List.of("c-samsung"), List.of()),
                         new ChatToolItem("e-1", "edge", "HBM 공급 – 삼성전자", List.of("c-samsung"), List.of(EV_A, EV_B))),
                 List.of(EV_A), false, false, null, List.of(paths));
