@@ -547,6 +547,66 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
     expect(server.calls('GET', AI_USAGE)[0].query.get('window')).toBe('7d');
   });
 
+  test('뉴스 분석 실행 기록에서 미측정 사용량은 0이 아니라 –로, 측정된 실행은 값 그대로 보여 준다', async () => {
+    server.on('GET', AI_USAGE, () =>
+      json({
+        ...aiUsage,
+        pastRuns: [
+          {
+            runId: 'job-plan',
+            label: '계획 분석',
+            policyGroup: 'admin-job',
+            source: 'job-runner',
+            processed: 3,
+            approved: null,
+            held: null,
+            rejected: null,
+            pending: null,
+            errorCount: null,
+            usage: null,
+          },
+          {
+            runId: 'job-run',
+            label: '기사 분석',
+            policyGroup: 'admin-job',
+            source: 'job-runner',
+            processed: 4,
+            approved: 2,
+            held: 1,
+            rejected: 1,
+            pending: 0,
+            errorCount: 0,
+            usage: {
+              calls: 3,
+              replayCalls: 3,
+              inputTokens: 1500,
+              outputTokens: 5,
+              elapsedSeconds: 1.5,
+              estimatedCost: null,
+            },
+          },
+        ],
+      }),
+    );
+    open('/admin/ai');
+
+    const table = await screen.findByRole('table', {
+      name: '뉴스 분석 실행 기록',
+    });
+    const rows = within(table).getAllByRole('row');
+    const unmeasured = within(rows[1]);
+    expect(unmeasured.getByText('계획 분석')).toBeTruthy();
+    expect(unmeasured.getByText('3')).toBeTruthy();
+    // 승인·보류·거부·오류 4칸 + 모델 호출·입력 토큰·걸린 시간 3칸이 모두 미측정
+    expect(unmeasured.getAllByText('–')).toHaveLength(7);
+    expect(unmeasured.queryByText('0')).toBeNull();
+
+    const measured = within(rows[2]);
+    expect(measured.getByText('기사 분석')).toBeTruthy();
+    expect(measured.getByText('1,500')).toBeTruthy();
+    expect(measured.getByText('1.5초')).toBeTruthy();
+  });
+
   test('기간을 바꾸면 다시 조회하고, 최근 오류를 기능과 함께 보여 준다', async () => {
     server.on('GET', AI_USAGE, (request) =>
       json({

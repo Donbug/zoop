@@ -115,6 +115,23 @@ public class AnalysisJobService {
                 running == null ? null : out(running, context), recent.stream().map(j -> out(j, context)).toList());
     }
 
+    /** The pipeline overview's job part: counts, the newest failure, the ingest baseline and the newest jobs. */
+    public record PipelineJobs(long running, long queued, long failed24h, JobOut lastFailure, IngestBaseline ingest,
+            List<JobOut> recent) { }
+
+    /** One DB snapshot, the same public JobOut mapping as list/detail (joins the caller's read transaction). */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public PipelineJobs pipelineAt(Instant asOf, int recentLimit) {
+        var counts = repository.dashboardCountsAt(asOf);
+        List<JobRow> recent = repository.dashboardRecentAt(asOf, recentLimit);
+        JobRow failed = repository.latestFailedAt(asOf).orElse(null);
+        List<JobRow> judged = new ArrayList<>(recent);
+        if (failed != null) judged.add(failed);
+        List<JobRow> context = repository.retryContext(judged);
+        return new PipelineJobs(counts.running(), counts.queued(), counts.failed24h(),
+                failed == null ? null : out(failed, context), baseline(), recent.stream().map(j -> out(j, context)).toList());
+    }
+
     @Transactional(readOnly = true)
     public JobOut get(String id) {
         try {

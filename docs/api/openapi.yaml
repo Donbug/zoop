@@ -9776,6 +9776,7 @@ components:
         - "name"
         - "role"
     CandidateCounts:
+      description: "Current candidate review targets: total = active + inactive (inactive = no relation of it is in the latest AI result). allow/hold/reject count active candidates only."
       properties:
         total:
           type: "integer"
@@ -12860,6 +12861,7 @@ components:
         - "previous"
         - "next"
     GraphDbStatus:
+      description: "getPipelineOverview: the graph state recorded with the active version, never a current reading. The app never updates it and the importer records none, so an imported version is unavailable (also without an active version). The graph database itself is the AI side's: pendingJobs, neo4j, oldestPendingAt and lastCompletedAt are null there."
       properties:
         status:
           type: "string"
@@ -14030,6 +14032,7 @@ components:
         - "relations"
         - "pendingProjections"
     LedgerRef:
+      description: "getPipelineOverview: database is the app database (zoop-app) read at checkedAt (= asOf). The AI side's ledger is not read here."
       properties:
         database:
           type: "string"
@@ -14787,7 +14790,7 @@ components:
         - "failed24h"
         - "lastFailure"
         - "ingest"
-      description: "Analysis jobs next to the ledger state: what is in progress and what failed (details: jobs tab)."
+      description: "Analysis jobs next to the ledger state: what is in progress and what failed (details: jobs tab). ingest is the same baseline as listAnalysisJobs."
     OverviewMembers:
       properties:
         registered:
@@ -14829,6 +14832,7 @@ components:
         - "role"
         - "roleUnconfirmed"
     PastRun:
+      description: "getPipelineOverview: runId is the analysis job id. An analyze_plan job counts its units (processed) and its review targets by status so far (null until it has targets; pending and errorCount null); other jobs answer from their run report, null without one. usage is null where the app holds no usage (analyze_plan usage stays with the AI service), never a guessed 0."
       properties:
         runId:
           anyOf:
@@ -14887,7 +14891,11 @@ components:
             -
               type: "null"
         usage:
-          "$ref": "#/components/schemas/UsageOut"
+          anyOf:
+            -
+              "$ref": "#/components/schemas/UsageOut"
+            -
+              type: "null"
       type: "object"
       required:
         - "runId"
@@ -14902,6 +14910,7 @@ components:
         - "errorCount"
         - "usage"
     PolicyInfo:
+      description: "getPipelineOverview: version is the active graph version's policy version (null without one). decisionPolicy and validationModel belong to the AI side and are always null; the app never verifies on the web, so webVerification is always false."
       properties:
         version:
           anyOf:
@@ -15146,6 +15155,7 @@ components:
         - "reasonCode"
         - "reason"
     PublicationState:
+      description: "ledgerMatchesActive: the most recently imported version is the active version (false while a newer import waits or was refused). issuesOnlyInLedger and issuesOnlyInActive are not compared yet and are always empty."
       properties:
         activeVersionId:
           anyOf:
@@ -15490,6 +15500,7 @@ components:
         - "reason"
         - "blockedBy"
     ReviewCounts:
+      description: "decisions, allowed and rejected count administrators' decisions only (origin admin); a migrated decision is not a review. revision is the app-wide global decision revision."
       properties:
         revision:
           type: "integer"
@@ -15503,10 +15514,10 @@ components:
           type: "integer"
         ruleCandidates:
           type: "integer"
-          description: "Candidates on the user graph through a publication rule right now"
+          description: "Candidates on the user graph through a publication rule right now. A rule never publishes a HOLD (AI answer 5-A), so this is 0."
         ruleEvents:
           type: "integer"
-          description: "Events on the user graph that exist only because of a publication rule"
+          description: "Events on the user graph that exist only because of a publication rule. 0, as for ruleCandidates."
       type: "object"
       required:
         - "revision"
