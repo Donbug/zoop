@@ -41,8 +41,10 @@
 | getBriefingRecap | /api/v1/briefings/{id}/recap | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
 | getBriefingItemDetail | /api/v1/briefings/{roundId}/items/{eventId} | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
 | getBriefingGraphBasis | /api/v1/briefings/{id}/graph | /api/briefings/{id}/graph | 목표만 106 · BFF만 30 · 형식/필수/권한 변경 7 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| listConversations | /api/v1/chat/sessions | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
 | createConversation | /api/v1/chat/sessions/{id} | /api/chat/sessions/{id} | 목표만 161 · BFF만 12 · 형식/필수/권한 변경 9 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
 | getConversation | /api/v1/chat/sessions/{id} | /api/chat/sessions/{id} | 목표만 175 · BFF만 32 · 형식/필수/권한 변경 23 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
+| deleteConversation | /api/v1/chat/sessions/{id} | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
 | getCurrentConversation | /api/v1/chat/sessions/current | /api/chat/sessions/current | 목표만 175 · BFF만 32 · 형식/필수/권한 변경 23 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
 | submitQuestion | /api/v1/chat/sessions/{id}/jobs | /api/chat/sessions/{id}/jobs | 목표만 295 · BFF만 34 · 형식/필수/권한 변경 42 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
 | getQuestionJob | /api/v1/chat/jobs/{job_id} | /api/chat/jobs/{job_id} | 목표만 192 · BFF만 23 · 형식/필수/권한 변경 23 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |

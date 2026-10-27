@@ -8,6 +8,8 @@
 
 | 기능 | 목표 API | 경로 | 우선순위 |
 | --- | --- | --- | --- |
+| [FS050](feature-FS050.md) · [FS051](feature-FS051.md) | [listConversations](../../api/out/zoop-api-spec.md#listconversations) | GET /api/v1/chat/sessions | P2 |
+| [FS050](feature-FS050.md) · [FS051](feature-FS051.md) | [deleteConversation](../../api/out/zoop-api-spec.md#deleteconversation) | DELETE /api/v1/chat/sessions/{id} | P2 |
 | [FS048](feature-FS048.md) · [FS049](feature-FS049.md) · [FS051](feature-FS051.md) | [getQuestionJob](../../api/out/zoop-api-spec.md#getquestionjob) | GET /api/v1/chat/jobs/{job_id} | P1 |
 | [FS051](feature-FS051.md) | [retryQuestionJob](../../api/out/zoop-api-spec.md#retryquestionjob) | POST /api/v1/chat/jobs/{job_id}/retry | P1 |
 | [FS051](feature-FS051.md) | [cancelQuestionJob](../../api/out/zoop-api-spec.md#cancelquestionjob) | POST /api/v1/chat/jobs/{job_id}/cancel | P1 |

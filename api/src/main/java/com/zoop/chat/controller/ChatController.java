@@ -3,10 +3,12 @@ package com.zoop.chat.controller;
 import com.zoop.auth.config.MemberAuthorizationInterceptor;
 import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
 import com.zoop.chat.dto.ChatConversation;
+import com.zoop.chat.dto.ChatConversationList;
 import com.zoop.chat.dto.ChatCurrentResponse;
 import com.zoop.chat.dto.ChatJob;
 import com.zoop.chat.dto.ChatJobRequest;
 import com.zoop.chat.dto.ChatSessionResponse;
+import com.zoop.chat.service.ChatHistoryService;
 import com.zoop.chat.service.ChatResponseGuard;
 import com.zoop.chat.service.ChatService;
 import com.zoop.common.request.RequestIdFilter;
@@ -14,6 +16,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 
@@ -32,11 +36,29 @@ import tools.jackson.databind.JsonNode;
 @RequestMapping("/api/v1/chat")
 public class ChatController {
     private final ChatService service;
+    private final ChatHistoryService history;
     private final ChatResponseGuard guard;
 
-    public ChatController(ChatService service, ChatResponseGuard guard) {
+    public ChatController(ChatService service, ChatHistoryService history, ChatResponseGuard guard) {
         this.service = service;
+        this.history = history;
         this.guard = guard;
+    }
+
+    @GetMapping("/sessions")
+    @Operation(operationId = "listConversations", summary = "대화 목록",
+            description = "질문이 하나 이상 있는 본인 대화를 최근 질문 순으로 회수한다. 모델을 호출하지 않는다.")
+    public ChatConversationList listConversations(@RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit, HttpServletRequest request) {
+        return history.list(principal(request), cursor, limit);
+    }
+
+    @DeleteMapping("/sessions/{id}")
+    @Operation(operationId = "deleteConversation", summary = "대화 삭제",
+            description = "대화와 그 질문 작업을 즉시 삭제한다. 처리 중인 질문이 있으면 거부한다. zoop.chat.delete-enabled가 꺼져 있으면 404다.")
+    public ResponseEntity<Void> deleteConversation(@PathVariable String id, HttpServletRequest request) {
+        history.delete(principal(request), id);
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/sessions/{id}")
