@@ -343,10 +343,15 @@ export default function AiUsageOverview() {
                       <td className={NUM}>{known(run.held)}</td>
                       <td className={NUM}>{known(run.rejected)}</td>
                       <td className={NUM}>{known(run.errorCount)}</td>
-                      <td className={NUM}>{count(run.usage.calls)}</td>
-                      <td className={NUM}>{count(run.usage.inputTokens)}</td>
+                      {/* 미측정 사용량(null)은 0이 아니라 –로 둔다. */}
+                      <td className={NUM}>{known(run.usage?.calls ?? null)}</td>
                       <td className={NUM}>
-                        {duration(run.usage.elapsedSeconds * 1000)}
+                        {known(run.usage?.inputTokens ?? null)}
+                      </td>
+                      <td className={NUM}>
+                        {duration(
+                          run.usage ? run.usage.elapsedSeconds * 1000 : null,
+                        )}
                       </td>
                       <td className={`${TD} text-zoop-muted`}>
                         {aiSourceLabel[run.source] ?? run.source}

@@ -4,6 +4,11 @@
 
 | 분류 | 수준 | 대상 ID | 경고 내용 | 출처 |
 | --- | --- | --- | --- | --- |
+| SOURCE_CHANGED | error | docs/evidence/raw/functional-spec_2026-10-18/_collection-manifest.json | 가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다. |  |
+| SOURCE_CHANGED | error | docs/evidence/raw/requirements-sheet_2026-10-06/_collection-manifest.json | 가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다. |  |
+| SOURCE_CHANGED | error | docs/evidence/raw/wbs_2026-10-12/_collection-manifest.json | 가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다. |  |
+| SOURCE_CHANGED | error | docs/evidence/spec-v1.2-gap.md | 가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다. |  |
+| SOURCE_CHANGED | error | docs/screen-plan/captures/slide-index.json | 가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다. |  |
 | SPEC_NOT_IN_INDEX | warning | FS050-01 | 상세 시트에만 있는 ID를 원문 그대로 보존했다. | docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:79 (xlsx-row) |
 | SPEC_NOT_IN_INDEX | warning | FS050-02 | 상세 시트에만 있는 ID를 원문 그대로 보존했다. | docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:93 (xlsx-row) |
 | SPEC_NOT_IN_INDEX | warning | FS052-01 | 상세 시트에만 있는 ID를 원문 그대로 보존했다. | docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:121 (xlsx-row) |
@@ -304,7 +309,7 @@
 | BFF_PATH_DIFFERENCE | difference | listAuditRecords | 목표 /api/v1/admin/audit-log ↔ BFF /api/admin/audit-log |  |
 | BFF_FIELD_DIFFERENCE | difference | listAuditRecords | 목표만 119 · BFF만 31 · 형식/필수/권한 변경 8 |  |
 | BFF_PATH_DIFFERENCE | difference | getPipelineOverview | 목표 /api/v1/admin/pipeline/overview ↔ BFF /api/admin/pipeline/overview |  |
-| BFF_FIELD_DIFFERENCE | difference | getPipelineOverview | 목표만 116 · BFF만 22 · 형식/필수/권한 변경 12 |  |
+| BFF_FIELD_DIFFERENCE | difference | getPipelineOverview | 목표만 131 · BFF만 36 · 형식/필수/권한 변경 12 |  |
 | BFF_PATH_DIFFERENCE | difference | listAnalysisCandidates | 목표 /api/v1/admin/pipeline/candidates ↔ BFF /api/admin/pipeline/candidates |  |
 | BFF_FIELD_DIFFERENCE | difference | listAnalysisCandidates | 목표만 118 · BFF만 32 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | getAnalysisCandidate | 목표 /api/v1/admin/pipeline/candidates/{candidate_id} ↔ BFF /api/admin/pipeline/candidates/{candidate_id} |  |
@@ -332,7 +337,7 @@
 | BFF_PATH_DIFFERENCE | difference | cancelAnalysisJob | 목표 /api/v1/admin/jobs/{job_id}/cancel ↔ BFF /api/admin/jobs/{job_id}/cancel |  |
 | BFF_FIELD_DIFFERENCE | difference | cancelAnalysisJob | 목표만 504 · BFF만 180 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | getAiUsage | 목표 /api/v1/admin/ai-usage ↔ BFF /api/admin/ai-usage |  |
-| BFF_FIELD_DIFFERENCE | difference | getAiUsage | 목표만 157 · BFF만 21 · 형식/필수/권한 변경 10 |  |
+| BFF_FIELD_DIFFERENCE | difference | getAiUsage | 목표만 172 · BFF만 35 · 형식/필수/권한 변경 10 |  |
 | BFF_PATH_DIFFERENCE | difference | listAdminBriefingRounds | 목표 /api/v1/admin/briefings ↔ BFF /api/admin/briefings |  |
 | BFF_FIELD_DIFFERENCE | difference | listAdminBriefingRounds | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 12 |  |
 | BFF_PATH_DIFFERENCE | difference | getAdminBriefingRound | 목표 /api/v1/admin/briefings/{round_id} ↔ BFF /api/admin/briefings/{round_id} |  |

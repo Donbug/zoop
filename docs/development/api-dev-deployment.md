@@ -67,6 +67,27 @@ docker build \
 - ECS Service 갱신
 - 실제 애플리케이션 배포
 
+### 5.1. 로컬 컨테이너 생존 확인
+
+이미지 빌드 성공만으로 API 기동이나 `/health` 응답을 확인할 수는 없다. `/health`는 인증 없는 프로세스 생존 확인용이며, 응답·메서드·DB 기동 조건은 [API 실행 환경](../../api/README.md#프로세스-생존-확인)에 정의한다.
+
+실제 배포 전에 다음 시나리오를 로컬에서 별도로 확인한다. 이 절차는 검증 방법이며, 검증 완료 기록이나 AWS 배포 승인이 아니다.
+
+1. 위 Docker 명령으로 이미지를 빌드하고, 검증용 일회용 PostgreSQL을 준비한다. Flyway와 시작 시 기업 카탈로그 import가 DB를 변경하므로 공유 DB나 보존할 DB를 사용하지 않는다.
+2. API 컨테이너에 해당 DB의 `DB_URL`·`DB_USERNAME`·`DB_PASSWORD`와 검증용 `ZOOP_AUTH_CSRF_ACTIVE_KEY_ID`·`ZOOP_AUTH_CSRF_KEYS`를 주입한다. 기존 `.env`나 운영 Secret을 복사하지 않는다. `ZOOP_AI_CLIENT_ENABLED`·`ZOOP_AI_EXTRACTION_CLIENT_ENABLED`·`ZOOP_AI_RELATION_CLIENT_ENABLED`·`ZOOP_AI_CHAT_CLIENT_ENABLED`는 모두 `false`로 두고 AI 서비스는 띄우지 않는다.
+3. `SERVER_PORT=8080`, 포트 매핑 `127.0.0.1:8080:8080`으로 실제 API 이미지를 실행한다. DB 자동 설정·Flyway·JPA를 제외하지 않는다. 앱 기동과 `Confirmed company catalog ready` 로그를 확인한 뒤 아래 요청을 인증 헤더나 쿠키 없이 실행한다.
+
+   ```sh
+   curl --fail-with-body --max-time 5 -i http://127.0.0.1:8080/health
+   curl --max-time 5 -I http://127.0.0.1:8080/health
+   curl --max-time 5 -i -X OPTIONS http://127.0.0.1:8080/health
+   curl --max-time 5 -i -X POST http://127.0.0.1:8080/health
+   ```
+
+   GET은 200과 `{"status":"UP"}`, HEAD는 200과 빈 본문, OPTIONS는 200과 GET·HEAD·OPTIONS 허용, POST는 기존 오류 형식의 405여야 한다.
+4. **이 검증에서 직접 만든 DB 컨테이너만** 중지하고, API 컨테이너는 재시작하지 않은 채 같은 GET을 다시 실행한다. 여전히 200과 동일한 최소 본문을 반환하는지 확인한다. 이 결과는 기동 후 DB 장애와 생존 응답의 독립성을 보여 주며, DB가 없는 상태에서 전체 API를 처음 기동할 수 있다는 증거는 아니다.
+5. 검증용 API·DB 컨테이너와 직접 만든 임시 자원만 정리한다. 응답과 종료 상태를 기록하되 Secret·쿠키·연결 자격 증명을 증거에 포함하지 않는다.
+
 ## 6. GitHub Environment 설정
 
 실제 워크플로 실행 전 GitHub `dev` Environment에 다음 변수가 필요하다.
@@ -94,7 +115,7 @@ docker build \
 - [ ] API 런타임 환경변수 연결
 - [ ] DB 접속 Secret 연결
 - [ ] CSRF 서명 관련 Secret 연결
-- [ ] API `/health` 엔드포인트 구현
+- [ ] 배포 대상 이미지의 API `/health` 응답 및 기동 후 DB 중단 시 독립성 확인
 - [ ] ALB Target Group Health Check 확인
 - [ ] ECS Desired Count 1 이상
 - [ ] Flyway Migration 검토
@@ -124,7 +145,7 @@ ECS 배포 실패 시 다음 항목을 확인한다.
 현재 다음 항목이 완료되기 전까지 실제 배포를 수행하지 않는다.
 
 - API 런타임 환경변수와 Secret 연결
-- `/health` 엔드포인트 구현
+- 실제 API 컨테이너 8080 포트의 `/health` 응답 및 기동 후 DB 중단 시 독립성 검증
 - Terraform 실제 적용
 - GitHub `dev` Environment 보호 규칙 설정
 - 프론트엔드와 백엔드 배포 준비 완료

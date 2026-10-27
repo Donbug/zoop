@@ -125,6 +125,7 @@ export type PastRun = {
   rejected: number | null;
   pending: number | null;
   errorCount: number | null;
+  /** 앱에 사용량 기록이 없는 실행(analyze_plan 등)은 null: 0이 아니라 미측정이다. */
   usage: {
     calls: number;
     replayCalls: number;
@@ -132,7 +133,7 @@ export type PastRun = {
     outputTokens: number;
     elapsedSeconds: number;
     estimatedCost: number | null;
-  };
+  } | null;
 };
 
 /**

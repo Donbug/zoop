@@ -215,7 +215,7 @@ Jev는 자유 문장 대신 정해진 질문에 typed 판정을 돌려주는 모
 | `answered` | 허용된 필수 요구를 완결되게 답했고 자동 검증을 통과한 경우 |
 | `clarification` | 기업·기간·회차가 모호하거나 최소 충분 계획이 실행 예산을 초과해 범위 선택이 필요한 경우. 계획 시점 또는 체크포인트 초과(답변 생성 전)에만 반환 |
 | `guidance` | 지원 범위 밖 요청, 필요한 ZOOP 내부 문서 부재, 금지된 투자 판단만 요청한 경우 |
-| `insufficient_evidence` | 조회는 성공했지만 공개 근거가 부족한 경우 |
+| `insufficient_evidence` | 조회는 성공했지만 공개 근거가 부족한 경우. `reason`은 서버가 원인(조회 상한·검증 보류·찾은 것 없음·선행 조건·근거 부족)과 다음에 해 볼 일을 두 문장으로 쓰고, `applied`에는 이번 조회가 확인한 기업·사건을 담는다([부분 답변 설계](ai-chatbot-partial-answer.md) 12장) |
 | `failed` + `ChatFailure` | 기술 장애, 권한 오류 또는 출력 검증 실패 등 작업 실패 |
 
 `answered`에서 답하지 않은 요구는 `ChatResult.limitations`의 항목(`kind`, `label`, `message`)으로 기록한다.
@@ -270,6 +270,7 @@ Jev는 자유 문장 대신 정해진 질문에 typed 판정을 돌려주는 모
 | 수치·날짜 | 주장의 숫자·날짜·통화·기간이 인용 원문 또는 도구의 구조화 데이터와 같은지 |
 | 그래프 | 관계 endpoint·유형·방향·hop 수와 간선별 근거가 `graph.path.read` 결과와 같은지, `graphTargets`가 같은 `graphVersion`의 지도(`/api/v1/graph`의 companyId·depth)에서 열리는지 |
 | 버전·범위 | graphVersion·dataAsOf·브리핑 회차가 고정 문맥과 같은지, Q07 종목이 본인 범위 안인지, 개인정보가 없는지 |
+| 서버 개념 구간 | 서버가 떼어 낸 개념 하위 요구(`<id>-c`)의 일반 구간이 원래 요구의 도구 결과가 돌려준 기업·사건 이름을 쓰지 않는지. 이 구간이 일반 구간 규칙이나 이 검사에 걸리면 실행 전체가 아니라 그 구간만 뺀다([부분 답변 설계](ai-chatbot-partial-answer.md) 3.1) |
 | 투자 표현 | 매수·매도 권유 표현을 어휘·패턴 규칙으로 1차 검사(2층 Jev `prohibitedAdvice`가 모든 구간에 2차 적용) |
 
 **2층 — Jev 의미 검증 (1층 통과 시에만, 최대 1회)**
@@ -309,7 +310,7 @@ Q02 일반 개념은 권위 자료가 없으므로 두 번째 모델의 동의�
 | --- | --- | --- |
 | 공개 수명주기 | 회원 전용 세션·질문 job API, PostgreSQL 저장, 멱등성, 단일 활성 job, 취소·재시도·lease fence | recovery artifact와 실제 `save_only` 복구 없음 |
 | 모델 단계 | `chat-router` Jev, `chat-answer` Luna, `chat-verification` Jev의 별도 계약·원장·grant·영수증 | 임계값 미보정, 실제 호출·배포 승인 아님 |
-| 계획 | Q01~Q08·capability registry, 서버 allowlist·예산·체크포인트, 질문이 지목한 기업의 기본 조회 | 별도 Luna `coverage-verifier`와 보완 라운드 없음 |
+| 계획 | Q01~Q08·capability registry, 서버 allowlist·예산·체크포인트, 질문이 지목한 기업의 기본 조회 | 별도 Luna `coverage-verifier`와 보완 라운드 없음. 개념과 사실이 섞인 요구 하나는 서버가 개념 하위 요구를 나눠 근거가 없어도 개념은 답함([부분 답변 설계](ai-chatbot-partial-answer.md) 1부). Q03 근거 0개일 때 일반 배경을 붙이는 2부는 동문서답 위험으로 미채택 |
 | 도구 | 앱 내부 읽기 어댑터 `company.read`(기업 카탈로그 개요를 `company_profile` 인용으로 포함), `issue.read`, `evidence.resolve`, `graph.path.read`, `zoopPolicy.read`(승인 약관·개인정보 처리방침, `zoop_doc` 인용) | Q01의 `help.search`·`screenSpec.read`(승인 문서 없음), Q05·Q06·Q07·Q08와 `document.search` 미연결. 외부 웹 검색은 [설계 초안](ai-chatbot-web-search.md)만 있음 |
 | 생성·검증 | `BranchContext`, typed 생성, 서버 citation, 결정론적 검사, section 단위 Jev support·투자 판단 | claim 단위 `unsupportedCausality`, 일부 수치·그래프 의미 검사, 24k/2k token guard 없음 |
 | 권한 | 고정 graphVersion/asOf, 현재 evidence 접근 재검사, 응답 시 철회 재검사 | `zoop_doc`은 `term_versions`의 승인 약관만 연결(도움말·화면 명세 미연결), 회원 종목 도구 미연결 |

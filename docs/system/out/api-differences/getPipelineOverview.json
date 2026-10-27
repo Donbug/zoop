@@ -13,6 +13,39 @@
     "response:200:application/json.jobs.ingest.unresolvedFailures<anyOf:1>": {
       "type": "null"
     },
+    "response:200:application/json.runs[].usage<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.runs[].usage<anyOf:0>.calls": {
+      "type": "integer"
+    },
+    "response:200:application/json.runs[].usage<anyOf:0>.calls:required": true,
+    "response:200:application/json.runs[].usage<anyOf:0>.elapsedSeconds": {
+      "type": "number"
+    },
+    "response:200:application/json.runs[].usage<anyOf:0>.elapsedSeconds:required": true,
+    "response:200:application/json.runs[].usage<anyOf:0>.estimatedCost:required": true,
+    "response:200:application/json.runs[].usage<anyOf:0>.estimatedCost<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.runs[].usage<anyOf:0>.estimatedCost<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.runs[].usage<anyOf:0>.inputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.runs[].usage<anyOf:0>.inputTokens:required": true,
+    "response:200:application/json.runs[].usage<anyOf:0>.outputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.runs[].usage<anyOf:0>.outputTokens:required": true,
+    "response:200:application/json.runs[].usage<anyOf:0>.replayCalls": {
+      "type": "integer"
+    },
+    "response:200:application/json.runs[].usage<anyOf:0>.replayCalls:required": true,
+    "response:200:application/json.runs[].usage<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -290,6 +323,36 @@
     "response:200:application/json.jobs.ingest.unresolvedFailures": {
       "type": "integer"
     },
+    "response:200:application/json.runs[].usage": {
+      "type": "object"
+    },
+    "response:200:application/json.runs[].usage.calls": {
+      "type": "integer"
+    },
+    "response:200:application/json.runs[].usage.calls:required": true,
+    "response:200:application/json.runs[].usage.elapsedSeconds": {
+      "type": "number"
+    },
+    "response:200:application/json.runs[].usage.elapsedSeconds:required": true,
+    "response:200:application/json.runs[].usage.estimatedCost:required": true,
+    "response:200:application/json.runs[].usage.estimatedCost<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.runs[].usage.estimatedCost<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.runs[].usage.inputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.runs[].usage.inputTokens:required": true,
+    "response:200:application/json.runs[].usage.outputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.runs[].usage.outputTokens:required": true,
+    "response:200:application/json.runs[].usage.replayCalls": {
+      "type": "integer"
+    },
+    "response:200:application/json.runs[].usage.replayCalls:required": true,
     "response:401:application/json.error.details<anyOf:0>": {
       "type": "object"
     },
