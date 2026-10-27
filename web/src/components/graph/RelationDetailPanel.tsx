@@ -51,6 +51,9 @@ export default function RelationDetailPanel({
     heading.current?.focus();
   }, [id]);
   const shared = data?.relationType === 'SHARES_ISSUE';
+  const structuralFailure = data?.metadata.failures.find(
+    (failure) => failure.section === 'structuralDetails',
+  );
   const count = new Set(data?.evidenceIds).size;
   const verifiedAt = data?.basis
     .map((basis) => basis.verifiedAt)
@@ -178,6 +181,8 @@ export default function RelationDetailPanel({
             {data.relationType === 'STRUCTURALLY_RELATED_TO' && (
               <StructuralRelationSection
                 details={data.structuralDetails}
+                failure={structuralFailure}
+                onRetry={() => setRetry((value) => value + 1)}
                 onEvidence={(link) =>
                   onAction('evidence', data, undefined, link)
                 }

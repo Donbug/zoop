@@ -1397,7 +1397,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getQuestionJob · 질문 작업 상태·저장 결과 회수
 
-질문 작업 상태·저장 결과 회수. 결과를 돌려줄 때마다(작업·대화 조회, 최신 대화 복원, 멱등 재전송, 취소·재시도 응답) 현재 근거 접근 권한을 공개 근거 조회(getEvidence)와 같은 기준으로 다시 확인한다. 저장된 결과는 바꾸지 않으며, 인용 근거가 철회·비공개·권리 변경·공개 제외로 지금 읽을 수 없거나 확인할 수 없으면 응답에서 answer를 고정 안내 문장으로 바꾸고 sections·sources·citations·graphTargets를 비우며 answerBasis=none으로 보낸다. 지금 읽을 수 없는 선택 근거(context.items의 evidence)는 id·kind만 남기고 label을 '표시할 수 없는 근거'로 보낸다. 모델을 호출하지 않는다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+질문 작업 상태·저장 결과 회수. 결과를 돌려줄 때마다(작업·대화 조회, 최신 대화 복원, 멱등 재전송, 취소·재시도 응답) 현재 근거 접근 권한을 공개 근거 조회(getEvidence)와 같은 기준으로 다시 확인한다. 저장된 결과는 바꾸지 않으며, 인용 근거가 철회·비공개·권리 변경·공개 제외로 지금 읽을 수 없거나 확인할 수 없으면 응답에서 answer를 고정 안내 문장으로 바꾸고 sections·sources·citations·graphTargets를 비우며 answerBasis=none으로 보낸다. 지금 읽을 수 없는 선택 근거(context.items의 evidence)는 id·kind만 남기고 label을 '표시할 수 없는 근거'로 보낸다. result.applied의 companies·issues와 result.graphTargets는 결과 종류와 관계없이 고정한 graphVersion·asOf에 현재 공개 제외를 적용한 공개 그래프에서 지금 보이는 기업·사건만 남기고, 확인할 수 없으면 모두 뺀다. 제외된 사건의 근거가 다른 공개 대상의 인용으로 계속 읽혀 답변이 유지돼도 그 사건은 graphTargets에서 빠진다. 모델을 호출하지 않는다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -3524,7 +3524,7 @@ The immutable published original of a round (what users saw before any correctio
 
 ### CandidateCounts
 
-
+Current candidate review targets: total = active + inactive (inactive = no relation of it is in the latest AI result). allow/hold/reject count active candidates only.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -3706,7 +3706,7 @@ answered 본문의 근거 수준별 구간.
 
 ### ChatApplied
 
-What the answer was actually built on.
+What the answer was actually built on. For insufficient_evidence, nothing was answered, so companies and issues are what this run's reads looked at.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -4927,7 +4927,7 @@ same request again never toggles anything.
 
 ### GraphDbStatus
 
-
+getPipelineOverview: the graph state recorded with the active version, never a current reading. The app never updates it and the importer records none, so an imported version is unavailable (also without an active version). The graph database itself is the AI side's: pendingJobs, neo4j, oldestPendingAt and lastCompletedAt are null there.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5446,7 +5446,7 @@ and the baseline stays where it was.
 
 ### LedgerRef
 
-
+getPipelineOverview: database is the app database (zoop-app) read at checkedAt (= asOf). The AI side's ledger is not read here.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5805,7 +5805,7 @@ FS062: one project mock profile with its account id, cash, valued holdings and w
 
 ### OverviewJobs
 
-Analysis jobs next to the ledger state: what is in progress and what failed (details: jobs tab).
+Analysis jobs next to the ledger state: what is in progress and what failed (details: jobs tab). ingest is the same baseline as listAnalysisJobs.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5844,7 +5844,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 
 ### PastRun
 
-
+getPipelineOverview: runId is the analysis job id. An analyze_plan job counts its units (processed) and its review targets by status so far (null until it has targets; pending and errorCount null); other jobs answer from their run report, null without one. usage is null where the app holds no usage (analyze_plan usage stays with the AI service), never a guessed 0.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5858,13 +5858,13 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 | rejected | 필수 | integer / null |  |
 | pending | 필수 | integer / null |  |
 | errorCount | 필수 | integer / null |  |
-| usage | 필수 | [UsageOut](#schema-usageout) |  |
+| usage | 필수 | [UsageOut](#schema-usageout) / null |  |
 
 <a id="schema-policyinfo"></a>
 
 ### PolicyInfo
 
-
+getPipelineOverview: version is the active graph version's policy version (null without one). decisionPolicy and validationModel belong to the AI side and are always null; the app never verifies on the web, so webVerification is always false.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5966,7 +5966,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 
 ### PublicationState
 
-
+ledgerMatchesActive: the most recently imported version is the active version (false while a newer import waits or was refused). issuesOnlyInLedger and issuesOnlyInActive are not compared yet and are always empty.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -6114,7 +6114,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 
 ### ReviewCounts
 
-
+decisions, allowed and rejected count administrators' decisions only (origin admin); a migrated decision is not a review. revision is the app-wide global decision revision.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -6123,8 +6123,8 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 | allowed | 필수 | integer |  |
 | rejected | 필수 | integer |  |
 | holdPendingReview | 필수 | integer |  |
-| ruleCandidates | 필수 | integer | Candidates on the user graph through a publication rule right now |
-| ruleEvents | 필수 | integer | Events on the user graph that exist only because of a publication rule |
+| ruleCandidates | 필수 | integer | Candidates on the user graph through a publication rule right now. A rule never publishes a HOLD (AI answer 5-A), so this is 0. |
+| ruleEvents | 필수 | integer | Events on the user graph that exist only because of a publication rule. 0, as for ruleCandidates. |
 
 <a id="schema-reviewdecisionout"></a>
 

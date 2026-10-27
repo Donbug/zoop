@@ -174,6 +174,35 @@ class EventDetailServiceTest {
     }
 
     @Test
+    void knownReceiptFormatsKeepEventMetadataAndTheSameFieldAndHeadGates() {
+        for (String schema : List.of("zoop-graph-handoff-bundle-5", "zoop-graph-handoff-bundle-6",
+                "zoop-graph-handoff-bundle-7")) {
+            String json = bundle(false).node().toString().replace("zoop-graph-handoff-bundle-5", schema);
+            EventDetailService service = imported(StrictJson.parseObject(json));
+            EventDetail detail = service.get(EUV, null, "gv-imported", null, "req-compatible");
+
+            assertEquals(EUV, detail.id(), schema);
+            assertEquals("gv-imported", detail.metadata().graphVersion(), schema);
+            assertEquals("req-compatible", detail.metadata().requestId(), schema);
+            assertEquals(List.of(M1, M2), detail.mentions().stream().map(MentionOut::mentionId).toList(), schema);
+            assertEquals(1, detail.sourceSupport().articleCount(), schema);
+            assertNull(detail.mentions().get(1).eventTime(), schema);
+            assertNull(detail.mentions().get(1).period(), schema);
+            assertEquals(List.of(new EventDetail.FieldOutcome("eventTime", "HOLD", "unstated"),
+                    new EventDetail.FieldOutcome("period", "REJECT", "contradicted")),
+                    detail.fieldDecisions().get(1).outcomes(), schema);
+            assertNull(detail.approval(), schema);
+            assertEquals(new EventDetail.Unavailable("unavailable", EventDetailService.SUMMARY_UNAVAILABLE),
+                    detail.summary(), schema);
+            assertEquals("SUMMARY_NOT_PRODUCED", detail.metadata().failures().get(0).code(), schema);
+
+            when(receipts.shownNow(eq(VISIBLE_EVIDENCE), anyString(), any(), anyString())).thenReturn(false);
+            assertEquals(ErrorCode.RESOURCE_NOT_FOUND, assertThrows(CustomException.class,
+                    () -> service.get(EUV, null, "gv-imported", null, "req-withdrawn")).getErrorCode(), schema);
+        }
+    }
+
+    @Test
     void participantsKeepS2TextAndOnlyAMappedCompanyId() {
         MentionOut first = imported(bundle(false)).get(EUV, null, null, null, "r").mentions().get(0);
 
@@ -410,9 +439,10 @@ class EventDetailServiceTest {
     }
 
     @Test
-    void anOlderReceiptSchemaIsUnavailableNotEmpty() {
-        for (String schema : new String[] {"zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-3",
-                "zoop-graph-handoff-bundle-4"}) {
+    void anUnsupportedReceiptSchemaIsUnavailableNotEmpty() {
+        for (String schema : new String[] {"zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2",
+                "zoop-graph-handoff-bundle-3", "zoop-graph-handoff-bundle-4", "zoop-graph-handoff-bundle-8",
+                "zoop-graph-handoff-bundle-7-extra", "zoop-graph-handoff-bundle-70", ""}) {
             String old = bundle(false).node().toString().replace("zoop-graph-handoff-bundle-5", schema);
             assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
                     () -> imported(StrictJson.parseObject(old)).get(EUV, null, null, null, "r")).getErrorCode(), schema);
@@ -420,6 +450,16 @@ class EventDetailServiceTest {
         String unnamed = bundle(false).node().toString().replace("\"schemaVersion\":\"zoop-graph-handoff-bundle-5\",", "");
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
                 () -> imported(StrictJson.parseObject(unnamed)).get(EUV, null, null, null, "r")).getErrorCode());
+    }
+
+    @Test
+    void aCorruptReceiptVersionIsUnavailableNotEmpty() {
+        for (String corrupt : List.of("null", "7", "true", "[]", "{}")) {
+            String json = bundle(false).node().toString()
+                    .replace("\"schemaVersion\":\"zoop-graph-handoff-bundle-5\"", "\"schemaVersion\":" + corrupt);
+            assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                    () -> imported(StrictJson.parseObject(json)).get(EUV, null, null, null, "r")).getErrorCode(), corrupt);
+        }
     }
 
     @Test

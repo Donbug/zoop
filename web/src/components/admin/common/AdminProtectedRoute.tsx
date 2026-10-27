@@ -76,5 +76,5 @@ export default function AdminProtectedRoute() {
     return <Navigate to="/admin/login" replace state={state} />;
   }
 
-  return <Outlet />;
+  return <Outlet key={admin.id} />;
 }

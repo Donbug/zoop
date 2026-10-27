@@ -1179,6 +1179,7 @@ function MapWorkspace({
                 <ImpactPathPanel
                   companyId={impactCompanyId}
                   issueId={impactIssueId}
+                  context={eventContext}
                   graph={data}
                   impact={impact.data}
                   loading={impact.loading}

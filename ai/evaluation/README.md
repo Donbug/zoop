@@ -6,9 +6,9 @@
 
 [`corpus/external-pilot-v1/manifest.json`](corpus/external-pilot-v1/manifest.json)에 KLUE RE train 첫 20행과 TAT-QA 공식 dev 첫 5개 context·30개 질문의 출처·권리·원본 식별·파일 해시를 기록했다. 입력/gold 네 파일을 분리해 저장했고 해시·크기·고유 ID·KLUE entity span 40개·원래 annotation 복원 일치·입력의 gold annotation 키 부재를 확인했다. 번역·모델 호출은 없었다.
 
-이 자료는 **원자료 순서로 선택해 이미 열람한 개발용 표본**이며 대표 표본이나 held-out test가 아니다. KLUE row 응답과 관측한 HF revision의 결합은 미검증이다. `materials-*`는 이 두 자료를 읽기 전용으로 검증·정규화하는 adapter다. 모델 runner나 채점 연결은 아니다. 기존 `score`·`verify-score`·`summary-verify-score`는 원자료와 새 material artifact 모두 받지 않으며 0점으로 대신 처리하지 않는다.
+이 자료는 **원자료 순서로 선택해 이미 열람한 개발용 표본**이며 대표 표본이나 held-out test가 아니다. KLUE row 응답과 관측한 HF revision의 결합은 미검증이다. `materials-validate`·`materials-inputs`·`materials-gold`는 읽기 전용 adapter이며, `materials-retrieve`·`materials-retrieval-score`는 TAT-QA의 주어진 context 안에서 문단을 선택하고 별도로 채점한다. 모델 runner나 답변 채점은 아니다. 기존 `score`·`verify-score`·`summary-verify-score`는 원자료·material artifact·새 retrieval run 모두 받지 않으며 0점으로 대신 처리하지 않는다.
 
-한국어 실제 공시의 사람 합의 gold를 주 평가로 삼고 영어 QA는 별도 보조 평가로 둔다. 자료 후보·권리 조건, G/R/A/J 트랙, B0–B4 대조군, `gpt-6-luna High`·`jev-1.14.0` 고정, dev/test 동결과 실행 순서는 [설계 문서의 실제 자료·gold 제작 프로토콜](../../docs/design/ai-benchmark.md#실제-자료와-gold-제작-프로토콜)을 따른다. 공개 표본의 material 변환과 별개로 **한국어 공시 수집 승인·사람 합의 gold·외부 자료 전용 run/채점 계약·무모델 검색/고정 순회 baseline·제한된 live 승인·동결 실행**이 남아 있다. material 변환 구현을 전체 벤치마크 완성이나 모델 품질 측정으로 표시하지 않는다.
+한국어 실제 공시의 사람 합의 gold를 주 평가로 삼고 영어 QA는 별도 보조 평가로 둔다. 자료 후보·권리 조건, G/R/A/J 트랙, B0–B4 대조군, `gpt-6-luna High`·`jev-1.14.0` 고정, dev/test 동결과 실행 순서는 [설계 문서의 실제 자료·gold 제작 프로토콜](../../docs/design/ai-benchmark.md#실제-자료와-gold-제작-프로토콜)을 따른다. 현재 문단 검색은 **B1의 검색 단계 준비**다. 한국어 공시 수집 승인·사람 합의 gold·전체 문서 검색·방향/시점 고정 순회·생성기 연결·제한된 live 승인·동결 실행은 남아 있다. 이 구현을 전체 RAG/벤치마크 완성이나 한국어 금융·모델 품질 측정으로 표시하지 않는다.
 
 ### 읽기 전용 material 명령
 
@@ -38,6 +38,29 @@ python3 -B scripts/materials_smoke.py
 - 출력은 원저자·URL·라이선스·변경 내역·원본/로컬 해시와 `development-intake` 상태를 보존한다. manifest의 `collectionExecution`은 수집 당시 기록이므로 `adapterOrScorerImplemented=false`를 현재 adapter 상태로 해석하지 않는다. upstream annotation은 Zoop 사람 합의 gold가 아니다. 해시 일치는 출판자 진위·법적 이용 가능성·외부 모델 전송 승인을 증명하지 않는다.
 
 smoke는 실제 저장 자료와 임시 디렉터리의 잘못된 fixture를 실제 CLI로 처리한다. 성공 시 관측한 20행·30문항과 검증 범위를 출력하며 정확도를 내지 않는다. command seam의 audit는 gold 접근·네트워크·자식 프로세스·파일 쓰기와 애플리케이션 환경 조회를 감시한다. Python 시작/import와 argparse의 locale·화면 크기 조회까지 환경 읽기 0으로 주장하지 않는다. 시험 fixture 변경은 임시 디렉터리에만 한정된다.
+
+### TAT-QA 문단 검색과 별도 채점
+
+`materials-retrieve`는 adapter가 정규화한 TAT-QA 입력만 사용한다. 후보는 **각 질문에 원래 주어진 context의 paragraph 전체**다. 다른 context의 문서나 표 셀을 검색하지 않으며 정답·도출식·support annotation은 열지 않는다. 표가 입력 digest에 포함되더라도 순위 계산에는 질문 문자열과 문단 텍스트만 쓴다. 후보가 없으면 빈 순위를 내고 답을 만들지 않는다.
+
+```bash
+python3 -B -m zoop_eval materials-retrieve --top-k 5
+# 위 stdout을 호출자가 RUN.json으로 보관한 뒤 별도 실행한다.
+python3 -B -m zoop_eval materials-retrieval-score RUN.json
+python3 -B -m unittest discover -s tests -p 'test_material_retrieval.py'
+python3 -B scripts/materials_retrieval_smoke.py
+```
+
+두 명령은 stdout canonical JSON만 내며 `--materials` 기본값은 기존 adapter와 같다. `--top-k`는 양의 정수이고 기본값은 5다. run 파일 보관은 호출자 책임이며 명령 자체는 파일을 쓰지 않는다. 잘못된 입력은 `Rejected` JSON과 종료 코드 2로 전체 거부한다.
+
+run의 공통 크기 상한은 **8 MiB(8,388,608바이트)**다. producer는 canonical JSON의 UTF-8 바이트와 마지막 LF를 합쳐 이 상한 이하인지 성공 출력 전에 확인한다. scorer도 같은 상한으로 파일 전체 바이트를 제한하며 공백·LF를 포함한다. 초과하면 양쪽 모두 `materials_retrieval_run_size`로 거부한다. 이는 run 크기 계약이지 별도의 K 상한이 아니며, 질문·후보 수가 많아 결과가 커지면 작은 K로 새 실행을 요청해야 한다.
+
+- **동결 알고리즘:** `stdlib-bm25-paired-paragraph-1`. `str.lower()` 뒤 ASCII `[a-z0-9]+`를 토큰으로 삼으며 stemming·stopword 제거는 없다. 중복 query token은 한 번만 쓰고 사전순으로 합산한다. context 안의 문단 수를 `N`, 해당 토큰이 있는 문단 수를 `df`로 하여 `IDF=ln(1+(N-df+0.5)/(df+0.5))`, `k1=1.2`, `b=0.75`인 BM25를 계산한다. 길이는 토큰 수, 평균 길이는 빈 문단을 포함한 전체 후보의 평균이다. 모든 문단이 비어 있으면 점수는 0이다. 점수 내림차순, 동점이면 paragraph UID의 Unicode code point 오름차순으로 최대 K개를 남긴다. 0점 후보도 남기므로 빈 query token은 UID 순으로 정렬된다.
+- **run 계약:** `zoop-eval-material-retrieval-run-1`은 닫힌 필드와 `finalized=true`를 요구한다. exact normalized `inputsSha256`, 자료 ID·출처·정규화 정보·알고리즘·설정·전체 query ID·context별 candidate ID를 묶는다. 순위와 실측 `elapsedNs`는 별도 필드다. 시간은 `perf_counter_ns`로 질문마다 토큰화·로컬 색인·점수·정렬을 한 번 측정하며 입력 로딩·검증·digest·직렬화는 제외한다. warmup·색인 재사용·검색 cache는 없다. 시간은 순위의 결정성 비교에서 제외하며 모델 지연이 아니다.
+- **scorer 계약:** `zoop-eval-material-retrieval-score-1`은 finalized run과 입력 binding·전체 ID·각 record를 확인한 뒤에만 gold를 연다. `ok` 순위는 동결 알고리즘으로 재계산해 확인한다(점수에는 `1e-12` 상대 오차만 허용). 중복·외부 ID, 다른 context의 후보, 추가 필드, 비유한 점수, 잘못된 상태·시간은 거부한다. 누락 record는 `missing`, 명시적 실패 record(`status=error`, 빈 ranking, `error=retrieval-error`)는 `error`로 세며 채점 가능한 질문의 분모에 남겨 0점을 준다. producer는 전체 질문 처리 후에만 run을 반환하고 예외를 가짜 성공이나 실패 record로 바꾸지 않는다. schema의 측정 표시는 서명이나 실행 진위의 증명이 아니며, 시험에서 편집한 run은 authored fixture다.
+- **지표:** paragraph gold가 비어 있지 않은 비-table-only 질문마다 `Recall@K=회수한 support 수/전체 support 수`, `MRR@K=첫 support의 순위 역수`(미회수는 0), `exactSupportCoverageAtK=모든 support 회수 여부`를 계산한다. 마지막 지표는 추가 후보를 허용하는 전체 support 포함 여부이지 retrieved 집합과 gold 집합의 완전 일치는 아니다. 세 지표 모두 채점 가능한 질문의 macro 평균이며 numerator·denominator·value를 함께 낸다. table-only 또는 paragraph annotation 부재는 이유를 붙여 `notScorable`로 남기고 지표는 null이다. 원래 null support 수와 빈 배열의 0도 구분한다. 채점 가능한 질문이 0개면 분모 0·값 null이며, 전체 질문·기록·성공·실패·누락·채점 가능/불가 수와 모든 질문별 결과를 보존한다.
+
+이 지표는 **공식 TAT-QA 답변 EM/F1가 아닌 custom paragraph-support 진단**이다. 답변·계산·그래프·경로·모델 품질 capability는 없다. CC BY 4.0 출처와 upstream annotation의 비합의 상태를 그대로 유지한다. smoke는 30개 저장 dev 질문의 실제 CLI retrieval→scoring을 실행하도록 구성되어 있다. gold 파일을 제거한 상태에서 검색하고, producer 종료와 run 보관 뒤 gold를 복원해 채점한다. 기존 command-seam audit를 재사용해 허용 파일 외 접근·네트워크·프로세스·파일 변경·애플리케이션 환경 조회를 차단하고 관측 counts·지표·시간을 출력한다. 이 문서는 실행 결과나 authored 기대값을 실측으로 제시하지 않는다.
 
 
 ## 명령

@@ -4,6 +4,7 @@ import { adminMenus } from '@/constants/navigation';
 import { logoutAdmin } from '@/apis/admin/auth';
 import { useAdminSessionStore } from '@/stores/useAdminSessionStore';
 import { BUTTON, FOCUS_RING } from './adminStyles';
+import { toggleTheme } from '@/util/theme-color';
 
 function SidebarChevron({ direction }: { direction: 'left' | 'right' }) {
   return (
@@ -34,6 +35,13 @@ export default function AdminLayout() {
     <div
       className={`admin-surface min-h-dvh grid grid-cols-1 bg-zoop-paper text-zoop-ink ${sidebarOpen ? 'md:grid-cols-[14rem_1fr]' : 'md:grid-cols-1'}`}
     >
+      <a
+        href="#admin-main"
+        onClick={() => document.getElementById('admin-main')?.focus()}
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-full focus:bg-zoop-paper focus:px-4 focus:py-2"
+      >
+        본문으로 건너뛰기
+      </a>
       <aside
         id="admin-sidebar"
         hidden={!sidebarOpen}
@@ -71,6 +79,14 @@ export default function AdminLayout() {
             </NavLink>
           ))}
         </nav>
+        <button
+          type="button"
+          className={`${BUTTON} mt-4`}
+          onClick={toggleTheme}
+          aria-label="화면 모드 전환"
+        >
+          테마 전환
+        </button>
         {admin && (
           <div className="mt-8 flex flex-col gap-2 border-t-[0.667px] border-zoop-line pt-4">
             <p className="flex flex-col gap-0.5">
@@ -89,7 +105,11 @@ export default function AdminLayout() {
           </div>
         )}
       </aside>
-      <main className="min-w-0 px-4 md:px-8">
+      <main
+        id="admin-main"
+        tabIndex={-1}
+        className="min-w-0 px-4 outline-none md:px-8"
+      >
         {!sidebarOpen && (
           <div className="pt-4">
             <button

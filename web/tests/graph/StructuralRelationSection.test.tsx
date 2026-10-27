@@ -96,10 +96,10 @@ describe('D-GRP-04 structural supply details', () => {
     expect(screen.queryByText('기업 C → 기업 A')).toBeNull();
     expect(screen.getAllByRole('button')).toHaveLength(4);
   });
-  it('allows structural selection without making issue links selectable', () => {
+  it('keeps issue-company edges non-selectable and does not infer supplies from shared issues', () => {
     expect(
       isSelectableRelation({ relationType: 'STRUCTURALLY_RELATED_TO' }),
-    ).toBe(true);
+    ).toBe(false);
     expect(isSelectableRelation({ relationType: 'INVOLVES' })).toBe(false);
     const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const shared = graph.edges.find((e) => e.relationType === 'SHARES_ISSUE')!;

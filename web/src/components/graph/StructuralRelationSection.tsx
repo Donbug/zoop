@@ -15,9 +15,16 @@ const validityLabels = {
 // D-GRP-04 / FS023. Chain order is not supplier→customer direction.
 export default function StructuralRelationSection({
   details,
+  failure,
+  onRetry,
   onEvidence,
 }: {
   details?: StructuralDetails;
+  failure?: {
+    message: string;
+    retryable: boolean;
+  };
+  onRetry?: () => void;
   onEvidence: (link: StructuralSupplyLink) => void;
 }) {
   if (details?.status === 'not_applicable') return null;
@@ -32,6 +39,14 @@ export default function StructuralRelationSection({
     return (
       <section className={ui.section} aria-label="사업 관계 상세">
         <h3>사업 관계 상세</h3>
+        {failure?.retryable && (
+          <div role="status" className="mb-2">
+            <p className={ui.muted}>{failure.message}</p>
+            <button className={ui.button} onClick={onRetry}>
+              다시 시도
+            </button>
+          </div>
+        )}
         <p className={ui.muted}>{message}</p>
       </section>
     );

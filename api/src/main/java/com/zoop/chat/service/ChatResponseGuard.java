@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.zoop.chat.dto.ChatApplied;
+import com.zoop.chat.dto.ChatAppliedItem;
 import com.zoop.chat.dto.ChatContextItem;
 import com.zoop.chat.dto.ChatConversation;
 import com.zoop.chat.dto.ChatCurrentResponse;
@@ -15,6 +17,7 @@ import com.zoop.chat.dto.ChatFrozenContext;
 import com.zoop.chat.dto.ChatJob;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.dto.Citation;
+import com.zoop.chat.dto.GraphTarget;
 import org.springframework.stereotype.Component;
 
 /**
@@ -29,6 +32,10 @@ import org.springframework.stereotype.Component;
  * a fixed notice and {@code answerBasis} is {@code none}. An approved ZOOP document ({@code zoop_doc}) is checked the same
  * way: it stays readable while the version it quoted is still in effect now, whatever the stored asOf ({@link ChatZoopDocs}).
  * A citation of any other kind cannot be verified and is withheld.</li>
+ * <li>A company or issue in {@code applied} or {@code graphTargets} that is not visible now in the pinned graph at the job's
+ * asOf with the current exclusions ({@link ChatTargetAccess}) is left out, whatever the outcome. The evidence check alone
+ * would not hide it: an insufficient-evidence result cites nothing, and an excluded issue's evidence can stay readable
+ * through another public object that cites it. When visibility cannot be checked, none is shown.</li>
  * </ul>
  *
  * <p>It runs outside the chat transaction because the evidence read has its own.
@@ -41,19 +48,22 @@ public class ChatResponseGuard {
     private static final Set<String> CHECKABLE = Set.of("article", "company_profile", "zoop_doc");
 
     private final ChatEvidenceAccess access;
+    private final ChatTargetAccess targets;
 
-    public ChatResponseGuard(ChatEvidenceAccess access) {
+    public ChatResponseGuard(ChatEvidenceAccess access, ChatTargetAccess targets) {
         this.access = access;
+        this.targets = targets;
     }
 
     public ChatJob job(ChatJob job, String requestId) {
-        return protect(job, requestId, new HashMap<>());
+        return protect(job, requestId, new HashMap<>(), new HashMap<>());
     }
 
     public ChatConversation conversation(ChatConversation conversation, String requestId) {
         Map<String, Boolean> checked = new HashMap<>();
+        Map<String, Boolean> seen = new HashMap<>();
         List<ChatJob> jobs = new ArrayList<>();
-        for (ChatJob job : conversation.jobs()) jobs.add(protect(job, requestId, checked));
+        for (ChatJob job : conversation.jobs()) jobs.add(protect(job, requestId, checked, seen));
         return new ChatConversation(conversation.session(), List.copyOf(jobs));
     }
 
@@ -62,7 +72,7 @@ public class ChatResponseGuard {
                 : new ChatCurrentResponse(conversation(current.conversation(), requestId));
     }
 
-    private ChatJob protect(ChatJob job, String requestId, Map<String, Boolean> checked) {
+    private ChatJob protect(ChatJob job, String requestId, Map<String, Boolean> checked, Map<String, Boolean> seen) {
         ChatFrozenContext context = job.context();
         String version = context == null ? null : context.graphVersion();
         var asOf = context == null ? null : context.asOf();
@@ -78,8 +88,10 @@ public class ChatResponseGuard {
             }
         }
         ChatResult result = job.result();
-        ChatResult shownResult = result == null || citesOnlyReadable(result, version, asOf, requestId, checked) ? result
-                : withheld(result);
+        ChatResult shownResult = result == null ? null : withVisibleTargets(result, version, asOf, requestId, seen);
+        if (shownResult != null && !citesOnlyReadable(shownResult, version, asOf, requestId, checked)) {
+            shownResult = withheld(shownResult);
+        }
         if (shownContext == context && shownResult == result) return job;
         return new ChatJob(job.id(), job.sessionId(), job.seq(), job.question(), job.status(), job.phase(), job.outcome(),
                 job.askedAt(), shownContext, job.resolves(), job.failure(), shownResult, job.runs(), job.createdAt(),
@@ -108,6 +120,51 @@ public class ChatResponseGuard {
             Map<String, Boolean> checked) {
         return checked.computeIfAbsent(id + "@" + version + "@" + asOf,
                 key -> access.readable(id, version, asOf, requestId));
+    }
+
+    /**
+     * The result with only the applied companies and issues, and the map targets, visible now; the same instance when all
+     * are.
+     */
+    private ChatResult withVisibleTargets(ChatResult r, String version, Instant asOf, String requestId,
+            Map<String, Boolean> seen) {
+        ChatApplied applied = r.applied();
+        Set<String> ids = new LinkedHashSet<>();
+        if (applied != null) {
+            nullSafe(applied.companies()).forEach(i -> ids.add(i.id()));
+            nullSafe(applied.issues()).forEach(i -> ids.add(i.id()));
+        }
+        nullSafe(r.graphTargets()).forEach(g -> ids.add(g.id()));
+        String at = "@" + version + "@" + asOf;
+        Set<String> unchecked = new LinkedHashSet<>();
+        ids.forEach(id -> {
+            if (!seen.containsKey(id + at)) unchecked.add(id);
+        });
+        if (!unchecked.isEmpty()) {
+            Set<String> visible = targets.visible(Set.copyOf(unchecked), version, asOf, requestId).orElse(Set.of());
+            unchecked.forEach(id -> seen.put(id + at, visible.contains(id)));
+        }
+        List<GraphTarget> graphTargets = nullSafe(r.graphTargets()).stream()
+                .filter(g -> seen.getOrDefault(g.id() + at, false)).toList();
+        boolean targetsKept = graphTargets.size() == nullSafe(r.graphTargets()).size();
+        ChatApplied shown = applied;
+        if (applied != null) {
+            List<ChatAppliedItem> companies = visibleOnly(applied.companies(), seen, at);
+            List<ChatAppliedItem> issues = visibleOnly(applied.issues(), seen, at);
+            if (companies.size() != nullSafe(applied.companies()).size()
+                    || issues.size() != nullSafe(applied.issues()).size()) {
+                shown = new ChatApplied(companies, issues, applied.period(), applied.graphVersion(), applied.dataAsOf(),
+                        applied.questionOverrodeContext());
+            }
+        }
+        if (targetsKept && shown == applied) return r;
+        return new ChatResult(r.outcome(), r.messageId(), r.answer(), r.sections(), r.answerBasis(), r.reason(), r.sources(),
+                r.citations(), targetsKept ? r.graphTargets() : graphTargets, shown, r.choices(), r.action(),
+                r.limitations(), r.metadata());
+    }
+
+    private static List<ChatAppliedItem> visibleOnly(List<ChatAppliedItem> items, Map<String, Boolean> seen, String at) {
+        return nullSafe(items).stream().filter(i -> seen.getOrDefault(i.id() + at, false)).toList();
     }
 
     private static ChatResult withheld(ChatResult r) {
