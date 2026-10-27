@@ -165,6 +165,7 @@ export default function JobActionForm({
 
   return (
     <form
+      data-admin-editing="true"
       noValidate
       aria-label={copy.title}
       onSubmit={(event) => void submit(event)}
