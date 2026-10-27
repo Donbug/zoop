@@ -109,6 +109,7 @@ export type ChatLimitationKind =
   | 'investment_advice'
   | 'precondition_unmet'
   | 'results_truncated'
+  | 'not_in_member_scope'
   | 'evidence_insufficient'
   | 'out_of_scope';
 
