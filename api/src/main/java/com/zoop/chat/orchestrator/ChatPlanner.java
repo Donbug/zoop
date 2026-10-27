@@ -192,6 +192,8 @@ public class ChatPlanner {
         long issues = r.dependsOn() == null ? r.targets().size() - companies : 0;
         if (companies > 0 && all.contains(ChatQueryType.Q03)) defaults.add(ChatCapability.COMPANY_READ);
         if (issues > 0 && all.contains(ChatQueryType.Q03)) defaults.add(ChatCapability.ISSUE_READ);
+        // A period comparison compares the public graph, with or without a named target.
+        if (r.dependsOn() == null && all.contains(ChatQueryType.Q05)) defaults.add(ChatCapability.GRAPH_VERSION_DIFF);
         if (companies >= 2 && all.contains(ChatQueryType.Q04)) defaults.add(ChatCapability.GRAPH_PATH_READ);
         for (ChatCapability c : defaults) {
             if (permitted.contains(c) && bound.contains(c.id()) && !capabilities.contains(c)) capabilities.add(c);
@@ -217,7 +219,14 @@ public class ChatPlanner {
         // The selected context: its targets, or the selected evidence alone, narrowed to the evidence the member chose.
         var selection = run.selection();
         List<String> targets = !selection.contextIds().isEmpty() ? selection.contextIds() : selection.evidenceIds();
-        if (targets.isEmpty()) return null;
+        if (targets.isEmpty()) {
+            // Reads that can cover the whole public graph ("what changed on the map") need no target.
+            if (capabilities.stream().allMatch(c -> !c.untargeted().isEmpty())) {
+                return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities,
+                        capabilities.getFirst().untargeted(), TargetSource.SERVER, null, null, 1);
+            }
+            return null;
+        }
         List<String> scope = selection.evidenceIds().isEmpty() ? null : selection.evidencePool();
         return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities, targets, TargetSource.CONTEXT, scope,
                 null, 1);

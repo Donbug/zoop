@@ -62,6 +62,17 @@ public enum ChatCapability {
         return this == ZOOP_POLICY_READ ? ChatZoopDocs.POLICIES : List.of();
     }
 
+    /** What a capability that can read the whole public graph reads when its requirement names nothing. */
+    public static final String WHOLE_GRAPH = "graph:public";
+
+    /**
+     * The targets the capability reads when the requirement names none and nothing is selected: the whole public graph for
+     * {@code graph.version.diff} ("what changed on the map"); none for any other capability, which then needs a target.
+     */
+    public List<String> untargeted() {
+        return this == GRAPH_VERSION_DIFF ? List.of(WHOLE_GRAPH) : List.of();
+    }
+
     public static Optional<ChatCapability> of(String id) {
         return Arrays.stream(values()).filter(c -> c.id.equals(id)).findFirst();
     }

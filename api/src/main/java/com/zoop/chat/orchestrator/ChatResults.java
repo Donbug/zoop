@@ -106,7 +106,7 @@ final class ChatResults {
             List<ChatAppliedItem> issues, boolean questionOverrodeContext, Instant now) {
         return new ChatResult("insufficient_evidence", PENDING_MESSAGE, "", List.of(), "none",
                 insufficientReason(run, cause, narrowed), List.of(), List.of(), List.of(),
-                applied(run, companies, issues, questionOverrodeContext, now), List.of(), null, List.of(), metadata(run, now));
+                applied(run, companies, issues, questionOverrodeContext, null, now), List.of(), null, List.of(), metadata(run, now));
     }
 
     static String reason(String code) {
@@ -124,13 +124,13 @@ final class ChatResults {
     /** A clarification or guidance result: no sections, citations or limitations. */
     static ChatResult withoutAnswer(ChatRun run, String outcome, String reasonCode, List<ChatChoice> choices, Instant now) {
         return new ChatResult(outcome, PENDING_MESSAGE, "", List.of(), "none", reason(reasonCode), List.of(), List.of(),
-                List.of(), applied(run, List.of(), List.of(), false, now), List.copyOf(choices), null, List.of(),
+                List.of(), applied(run, List.of(), List.of(), false, null, now), List.copyOf(choices), null, List.of(),
                 metadata(run, now));
     }
 
     static ChatResult answered(ChatRun run, List<ChatGeneratedAnswer.Section> sections, List<Citation> citations,
             List<GraphTarget> targets, List<ChatAppliedItem> companies, List<ChatAppliedItem> issues,
-            List<ChatLimitation> limitations, boolean questionOverrodeContext, Instant now) {
+            List<ChatLimitation> limitations, boolean questionOverrodeContext, ChatAppliedPeriod writtenPeriod, Instant now) {
         List<ChatAnswerSection> publicSections = sections.stream()
                 .map(s -> new ChatAnswerSection(s.basis(), s.text(), s.evidenceIds())).toList();
         Set<String> sources = new LinkedHashSet<>();
@@ -138,7 +138,8 @@ final class ChatResults {
         citations.stream().filter(c -> c.articleId() != null).forEach(c -> sources.add(c.articleId()));
         return new ChatResult("answered", PENDING_MESSAGE, ChatAnswerCheck.joined(sections), publicSections,
                 answerBasis(sections), null, List.copyOf(sources), List.copyOf(citations), List.copyOf(targets),
-                applied(run, companies, issues, questionOverrodeContext, now), List.of(), null, List.copyOf(limitations),
+                applied(run, companies, issues, questionOverrodeContext, writtenPeriod, now), List.of(), null,
+                List.copyOf(limitations),
                 metadata(run, now));
     }
 
@@ -149,10 +150,11 @@ final class ChatResults {
         return bases.isEmpty() ? "none" : bases.size() == 1 ? bases.iterator().next() : "mixed";
     }
 
+    /** The period applied: the one the question wrote, when a read used it, else the one the member selected. */
     private static ChatApplied applied(ChatRun run, List<ChatAppliedItem> companies, List<ChatAppliedItem> issues,
-            boolean questionOverrodeContext, Instant now) {
+            boolean questionOverrodeContext, ChatAppliedPeriod writtenPeriod, Instant now) {
         var context = run.context();
-        ChatAppliedPeriod period = context.period() == null ? null
+        ChatAppliedPeriod period = writtenPeriod != null ? writtenPeriod : context.period() == null ? null
                 : new ChatAppliedPeriod(context.period().start(), context.period().end(), "context", null);
         return new ChatApplied(List.copyOf(companies), List.copyOf(issues), period, run.graphVersionId(),
                 context.asOf() != null ? context.asOf() : now, questionOverrodeContext);

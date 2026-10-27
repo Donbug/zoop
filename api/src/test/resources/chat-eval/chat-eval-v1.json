@@ -252,14 +252,54 @@
       }
     },
     {
-      "id": "q05-period-compare",
+      "id": "q05-changes-since-a-date",
       "group": "Q05",
-      "question": "지난주와 이번 주 지도에서 달라진 관계는?",
+      "question": "10월 5일 이후 지도에서 달라진 관계는?",
       "script": {
-        "router": {"r1": {"types": {"Q05": 0.9}, "capabilities": {"graph.version.diff": 0.9, "period.compare": 0.8}}}
+        "router": {"r1": {"types": {"Q05": 0.9}, "capabilities": {"graph.version.diff": 0.9, "period.compare": 0.8}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "10월 5일 이후 AI 가속기 신제품 출시 사건이 생기며 AMD와 TSMC가 새로 연결됐습니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch"]}], "graphTargetIds": ["iss-fixture-ai-accel"]}
       },
-      "expect": {"stages": ["router"], "tools": [], "outcome": "guidance", "reason": "out_of_scope"},
-      "gap": "Q05 도구(graph.version.diff·period.compare) 미구현."
+      "expect": {
+        "stages": ["router", "answer", "verify"],
+        "tools": ["graph.version.diff"],
+        "outcome": "answered",
+        "citationKinds": ["article"],
+        "appliedCompanies": ["NASDAQ:AMD"],
+        "appliedIssues": ["iss-fixture-ai-accel"],
+        "appliedPeriod": {"start": "2026-10-05", "end": "2026-10-05", "basis": "question", "expression": "10월 5일"},
+        "graphTargets": ["iss-fixture-ai-accel"]
+      }
+    },
+    {
+      "id": "q05-changes-since-the-previous-map",
+      "group": "Q05",
+      "question": "지도에서 TSMC와 관련해 새로 생긴 게 있어?",
+      "script": {
+        "router": {"r1": {"types": {"Q05": 0.85}, "capabilities": {}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "직전 공개 지도와 비교하면 TSMC는 AI 가속기 신제품 출시 사건과 새로 연결됐습니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch"]}]}
+      },
+      "expect": {
+        "targets": {"r1": ["NYSE:TSM"]},
+        "tools": ["graph.version.diff"],
+        "outcome": "answered",
+        "appliedIssues": ["iss-fixture-ai-accel"],
+        "appliedPeriod": null
+      }
+    },
+    {
+      "id": "q05-same-map-since",
+      "group": "Q05",
+      "question": "어제와 비교해 지도에서 달라진 게 있어?",
+      "script": {
+        "router": {"r1": {"types": {"Q05": 0.9}, "capabilities": {"graph.version.diff": 0.9}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "어제 이후 공개 지도는 바뀌지 않았습니다.", "requirementIds": ["r1"], "evidenceIds": []}]}
+      },
+      "expect": {
+        "tools": ["graph.version.diff"],
+        "outcome": "answered",
+        "citationKinds": [],
+        "appliedPeriod": {"start": "2026-10-20", "end": "2026-10-20", "basis": "question", "expression": "어제"}
+      }
     },
     {
       "id": "q06-briefing",
