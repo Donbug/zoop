@@ -66,8 +66,6 @@ export interface RelationDetail {
 
 export function isSelectableRelation(edge: Pick<GraphEdge, 'relationType'>) {
   return (
-    edge.relationType === 'SHARES_ISSUE' ||
-    edge.relationType === 'FOLLOWS' ||
-    edge.relationType === 'STRUCTURALLY_RELATED_TO'
+    edge.relationType === 'SHARES_ISSUE' || edge.relationType === 'FOLLOWS'
   );
 }

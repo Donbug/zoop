@@ -1,10 +1,7 @@
 import { ApiError } from '@/apis/auth/ApiService';
 import { createMockGraph } from '@/mocks/graph/response';
 import { createMockEvent } from '@/mocks/events/fixture';
-import {
-  isSelectableRelation,
-  type RelationDetail,
-} from '@/types/map/relation';
+import { type RelationDetail } from '@/types/map/relation';
 import type { EventContext } from '@/types/map/event';
 
 export type RelationMockScenario =
@@ -38,7 +35,14 @@ export function createMockRelation(
       '해당 시점·회차의 목업 데이터가 없습니다. 최신 데이터로 대체하지 않습니다.',
     );
   const edge = graph.edges.find((candidate) => candidate.id === id);
-  if (!edge || !isSelectableRelation(edge))
+  // The API can read structural issue-company edges from the company→issue
+  // path even though the map intentionally does not make those edges clickable.
+  if (
+    !edge ||
+    !['SHARES_ISSUE', 'FOLLOWS', 'STRUCTURALLY_RELATED_TO'].includes(
+      edge.relationType,
+    )
+  )
     throw new ApiError(
       404,
       'RESOURCE_NOT_FOUND',
