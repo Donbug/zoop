@@ -175,12 +175,15 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         limited.putAll(retrieved.limitations());
         List<Branch> branches = new ArrayList<>();
         for (Planned p : confirmed.requirements()) {
-            if (p.mode() == Mode.LIMITED || limited.containsKey(p.id())) continue;
+            // A member-scope source is no branch: its companies go with the requirement it serves.
+            if (p.mode() == Mode.LIMITED || limited.containsKey(p.id()) || p.origin() == ChatPlan.Origin.SCOPE) continue;
             List<String> avoid = p.parent() == null ? List.of()
                     : labels(retrieved.results().getOrDefault(p.parent(), List.of()));
-            branches.add(new Branch(p.id(), p.label(), p.types(), p.mode() == Mode.GENERAL,
-                    retrieved.results().getOrDefault(p.id(), List.of()), retrieved.noneFound().contains(p.id()),
-                    p.parent(), avoid));
+            List<ChatToolResult> results = new ArrayList<>();
+            if (p.onScope()) results.addAll(retrieved.results().getOrDefault(p.dependsOn().requirementId(), List.of()));
+            results.addAll(retrieved.results().getOrDefault(p.id(), List.of()));
+            branches.add(new Branch(p.id(), p.label(), p.types(), p.mode() == Mode.GENERAL, results,
+                    retrieved.noneFound().contains(p.id()), p.parent(), avoid));
         }
         route.set("limited", json(limited));
         if (branches.isEmpty()) {
@@ -259,6 +262,12 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             InsufficientCause cause = held.contains(id) ? EVIDENCE_HELD
                     : retrieved.noneFound().contains(id) ? NOTHING_FOUND : EVIDENCE_INSUFFICIENT;
             limitations.add(ChatResults.insufficient(cause, byId.get(id).label()));
+        }
+        for (String id : retrieved.cut()) {
+            // Answered on only the first of the member's companies: say so beside the answer.
+            if (explicit(decision, id) && kept.stream().anyMatch(s -> s.requirementIds().contains(id))) {
+                limitations.add(ChatResults.scopeCut(byId.get(id).label()));
+            }
         }
 
         Set<String> answered = new HashSet<>();

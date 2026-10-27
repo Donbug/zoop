@@ -16,6 +16,7 @@ import com.zoop.auth.config.MemberCsrfInterceptor;
 import com.zoop.auth.service.AuthOriginPolicy;
 import com.zoop.auth.service.MemberSessionService;
 import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
+import com.zoop.auth.service.MemberSettingsService;
 import com.zoop.auth.service.SessionCookie;
 import com.zoop.chat.controller.ChatController;
 import com.zoop.chat.dto.ChatAnswerSection;
@@ -25,12 +26,15 @@ import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.dto.Citation;
 import com.zoop.chat.dto.GraphTarget;
 import com.zoop.chat.executor.ChatEngine;
+import com.zoop.chat.service.ChatMemberScope;
 import com.zoop.chat.service.ChatResponseGuard;
 import com.zoop.chat.service.ChatService;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.exception.GlobalExceptionHandler;
+import com.zoop.common.json.StrictJson;
 import com.zoop.common.request.RequestIdFilter;
+import com.zoop.portfolio.service.PortfolioService;
 import com.zoop.common.response.Metadata;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Tag;
@@ -71,6 +75,9 @@ class ChatPostgresTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired MemberSessionService sessions;
     @Autowired ChatService service;
+    @Autowired ChatMemberScope scope;
+    @Autowired MemberSettingsService settings;
+    @Autowired PortfolioService portfolio;
     @Autowired ChatController controller;
     @Autowired ObjectMapper mapper;
 
@@ -331,6 +338,26 @@ class ChatPostgresTest {
         } finally {
             jdbc.update("DELETE FROM members WHERE id = ?", memberId);
         }
+    }
+
+    @Test
+    @Transactional
+    void myStocksAreTheHoldingsThenTheWatchlistTheMemberSavedWithCatalogNames() {
+        String memberId = insertMember();
+        var member = new MemberPrincipal(memberId, "chat-scope");
+        assertEquals(List.of(), scope.of(memberId), "nothing saved yet");
+
+        settings.update(member, StrictJson.parseObject("""
+                {"version":1,"investor":false,"mode":"watchlist","watchlistIds":["NASDAQ:NVDA","KRX:005930"],"completed":true}
+                """.getBytes(java.nio.charset.StandardCharsets.UTF_8)).node(), "chat-scope-watch");
+        portfolio.connect(member, "demo-balanced", "chat-scope-connect", "chat-scope-connected");
+
+        var companies = scope.of(memberId);
+        assertEquals(List.of("KRX:005930", "KRX:000660", "NASDAQ:NVDA"),
+                companies.stream().map(ChatMemberScope.Company::id).toList(), "holdings in account order, then the watchlist");
+        assertEquals(List.of("보유·관심", "보유", "관심"), companies.stream().map(ChatMemberScope.Company::relation).toList());
+        assertEquals("삼성전자", companies.getFirst().name());
+        assertEquals(List.of(), scope.of(insertMember()), "another member's are not read");
     }
 
     private String insertJob(String session, int seq, String status, String resolves, int depth) {

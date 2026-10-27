@@ -55,6 +55,7 @@ import com.zoop.chat.orchestrator.OrchestratedChatEngine;
 import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.service.ChatCompanyProfiles;
 import com.zoop.chat.service.ChatEvidenceAccess;
+import com.zoop.chat.service.ChatMemberScope;
 import com.zoop.chat.service.ChatZoopDocs;
 import com.zoop.chat.service.FrozenSelection;
 import com.zoop.chat.tool.ChatToolRegistry;
@@ -63,6 +64,7 @@ import com.zoop.chat.tool.CompanyReadTool;
 import com.zoop.chat.tool.EvidenceResolveTool;
 import com.zoop.chat.tool.GraphPathTool;
 import com.zoop.chat.tool.GraphVersionDiffTool;
+import com.zoop.chat.tool.PortfolioScopeReadTool;
 import com.zoop.chat.tool.IssueReadTool;
 import com.zoop.chat.tool.ZoopPolicyReadTool;
 import com.zoop.common.json.StrictJson;
@@ -102,7 +104,7 @@ class ChatEvalSetTest {
             "choices");
     /** What an {@code evidence_insufficient} limitation's message says for each cause the server names. */
     static final Map<String, String> CAUSE_WORDING = Map.of("evidence_held", "확인하지 못해 뺐어요", "nothing_found",
-            "찾지 못했어요");
+            "찾지 못했어요", "scope_cut", "만 확인했어요");
     private static final Map<String, String> STAGE_NAMES = Map.of(ChatModelStages.ROUTER, "router", ChatModelStages.ANSWER,
             "answer", ChatModelStages.VERIFICATION, "verify");
     private static final ChatStageReply.Receipt RECEIPT = new ChatStageReply.Receipt("replay", "chat-eval", "scripted",
@@ -166,6 +168,7 @@ class ChatEvalSetTest {
         String graph = c.has("graphVersion") ? (c.get("graphVersion").isNull() ? null : c.get("graphVersion").stringValue())
                 : GRAPH;
         String job = "chat-eval-" + id;
+        world.memberScope = memberScope(c.path("memberScope"));
         ChatRun run = new ChatRun(job, "chat-eval-session", "chat-eval-member", 1, "run",
                 List.of(new ChatRun.Turn(job, c.get("question").stringValue(), null, null)),
                 new ChatFrozenContext(List.of(), 0, null, null, graph), selection(c.path("selection")), graph, 0, NOW,
@@ -238,6 +241,14 @@ class ChatEvalSetTest {
         ObjectNode entry = entry(c, observed, List.of("threw " + thrown));
         entry.put("error", String.valueOf(thrown));
         return entry;
+    }
+
+    /** The case's own companies of the member (Q07): {@code [{id, name, held, watched}]}, none by default. */
+    private static List<ChatMemberScope.Company> memberScope(JsonNode scope) {
+        List<ChatMemberScope.Company> companies = new ArrayList<>();
+        scope.forEach(c -> companies.add(new ChatMemberScope.Company(c.get("id").stringValue(), c.get("name").stringValue(),
+                c.path("held").asBoolean(false), c.path("watched").asBoolean(false))));
+        return companies;
     }
 
     private static FrozenSelection selection(JsonNode selection) {
@@ -523,6 +534,8 @@ class ChatEvalSetTest {
         final IssueNameResolver issues;
         final ChatCitationSource citations;
         final ChatToolRegistry registry;
+        /** The member's companies for the case being run (cases run one after another). */
+        volatile List<ChatMemberScope.Company> memberScope = List.of();
 
         World(JsonNode set) {
             List<Entry> catalog = new ArrayList<>();
@@ -593,7 +606,13 @@ class ChatEvalSetTest {
             registry = new ChatToolRegistry(List.of(new CompanyReadTool(reader, access, companyProfiles),
                     new IssueReadTool(reader, access), new EvidenceResolveTool(reader, access),
                     new GraphPathTool(reader, access), new ZoopPolicyReadTool(docs),
-                    new GraphVersionDiffTool(reader, versions, access, Clock.fixed(NOW, ZoneOffset.UTC))));
+                    new GraphVersionDiffTool(reader, versions, access, Clock.fixed(NOW, ZoneOffset.UTC)),
+                    new PortfolioScopeReadTool(new ChatMemberScope(null, null) {
+                        @Override
+                        public List<Company> of(String memberId) {
+                            return memberScope;
+                        }
+                    })));
         }
 
         private static void policy(Map<String, ChatZoopDocs.Document> policies, Map<String, Citation> citations, String docId,
