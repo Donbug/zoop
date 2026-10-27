@@ -252,14 +252,54 @@
       }
     },
     {
-      "id": "q05-period-compare",
+      "id": "q05-changes-since-a-date",
       "group": "Q05",
-      "question": "지난주와 이번 주 지도에서 달라진 관계는?",
+      "question": "10월 5일 이후 지도에서 달라진 관계는?",
       "script": {
-        "router": {"r1": {"types": {"Q05": 0.9}, "capabilities": {"graph.version.diff": 0.9, "period.compare": 0.8}}}
+        "router": {"r1": {"types": {"Q05": 0.9}, "capabilities": {"graph.version.diff": 0.9, "period.compare": 0.8}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "10월 5일 이후 AI 가속기 신제품 출시 사건이 생기며 AMD와 TSMC가 새로 연결됐습니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch"]}], "graphTargetIds": ["iss-fixture-ai-accel"]}
       },
-      "expect": {"stages": ["router"], "tools": [], "outcome": "guidance", "reason": "out_of_scope"},
-      "gap": "Q05 도구(graph.version.diff·period.compare) 미구현."
+      "expect": {
+        "stages": ["router", "answer", "verify"],
+        "tools": ["graph.version.diff"],
+        "outcome": "answered",
+        "citationKinds": ["article"],
+        "appliedCompanies": ["NASDAQ:AMD"],
+        "appliedIssues": ["iss-fixture-ai-accel"],
+        "appliedPeriod": {"start": "2026-10-05", "end": "2026-10-05", "basis": "question", "expression": "10월 5일"},
+        "graphTargets": ["iss-fixture-ai-accel"]
+      }
+    },
+    {
+      "id": "q05-changes-since-the-previous-map",
+      "group": "Q05",
+      "question": "지도에서 TSMC와 관련해 새로 생긴 게 있어?",
+      "script": {
+        "router": {"r1": {"types": {"Q05": 0.85}, "capabilities": {}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "직전 공개 지도와 비교하면 TSMC는 AI 가속기 신제품 출시 사건과 새로 연결됐습니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch"]}]}
+      },
+      "expect": {
+        "targets": {"r1": ["NYSE:TSM"]},
+        "tools": ["graph.version.diff"],
+        "outcome": "answered",
+        "appliedIssues": ["iss-fixture-ai-accel"],
+        "appliedPeriod": null
+      }
+    },
+    {
+      "id": "q05-same-map-since",
+      "group": "Q05",
+      "question": "어제와 비교해 지도에서 달라진 게 있어?",
+      "script": {
+        "router": {"r1": {"types": {"Q05": 0.9}, "capabilities": {"graph.version.diff": 0.9}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "어제 이후 공개 지도는 바뀌지 않았습니다.", "requirementIds": ["r1"], "evidenceIds": []}]}
+      },
+      "expect": {
+        "tools": ["graph.version.diff"],
+        "outcome": "answered",
+        "citationKinds": [],
+        "appliedPeriod": {"start": "2026-10-20", "end": "2026-10-20", "basis": "question", "expression": "어제"}
+      }
     },
     {
       "id": "q06-briefing",
@@ -272,14 +312,79 @@
       "gap": "Q06 도구(briefing.read) 미구현."
     },
     {
-      "id": "q07-portfolio",
+      "id": "q07-my-stocks-issues",
       "group": "Q07",
-      "question": "내 보유 종목 중에 HBM 사건과 연결된 게 있어?",
+      "question": "내 종목 중에 HBM 사건과 연결된 게 있어?",
+      "memberScope": [
+        {"id": "KRX:000660", "name": "SK하이닉스", "held": true},
+        {"id": "KRX:005930", "name": "삼성전자", "held": true, "watched": true},
+        {"id": "NASDAQ:NVDA", "name": "NVIDIA", "watched": true}
+      ],
       "script": {
-        "router": {"r1": {"types": {"Q07": 0.9}, "capabilities": {"portfolio.scope.read": 0.9}}}
+        "router": {"r1": {"types": {"Q07": 0.9, "Q03": 0.8}, "capabilities": {"portfolio.scope.read": 0.9, "issue.read": 0.8}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "보유한 SK하이닉스와 관심 종목 NVIDIA가 차세대 GPU용 HBM 공급 계약 사건에 연결돼 있습니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch"]}]}
       },
-      "expect": {"stages": ["router"], "tools": [], "outcome": "guidance", "reason": "out_of_scope"},
-      "gap": "Q07 도구(portfolio.scope.read, 인증 문맥 주입) 미구현."
+      "expect": {
+        "stages": ["router", "answer", "verify"],
+        "tools": ["company.read", "issue.read", "portfolio.scope.read"],
+        "planned": ["r1-s:tools", "r1:tools"],
+        "outcome": "answered",
+        "appliedCompanies": ["KRX:000660", "KRX:005930", "NASDAQ:NVDA"],
+        "limitations": []
+      }
+    },
+    {
+      "id": "q07-list-my-stocks",
+      "group": "Q07",
+      "question": "내 관심 종목이 뭐였지?",
+      "memberScope": [{"id": "NASDAQ:NVDA", "name": "NVIDIA", "watched": true}],
+      "script": {
+        "router": {"r1": {"types": {"Q07": 0.9}, "capabilities": {}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "관심 종목은 NVIDIA입니다.", "requirementIds": ["r1"], "evidenceIds": []}]}
+      },
+      "expect": {
+        "tools": ["portfolio.scope.read"],
+        "planned": ["r1:tools"],
+        "outcome": "answered",
+        "citationKinds": []
+      }
+    },
+    {
+      "id": "q07-no-stocks",
+      "group": "Q07",
+      "question": "내 종목 관련 사건 알려줘",
+      "script": {
+        "router": {"r1": {"types": {"Q07": 0.9, "Q03": 0.8}, "capabilities": {"issue.read": 0.8}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "등록된 보유·관심 종목이 없어요.", "requirementIds": ["r1"], "evidenceIds": []}]}
+      },
+      "expect": {
+        "tools": ["portfolio.scope.read"],
+        "outcome": "answered",
+        "limitations": []
+      }
+    },
+    {
+      "id": "q07-many-stocks",
+      "group": "Q07",
+      "question": "내 종목 관련 사건 알려줘",
+      "memberScope": [
+        {"id": "KRX:000660", "name": "SK하이닉스", "held": true},
+        {"id": "KRX:005930", "name": "삼성전자", "held": true},
+        {"id": "KRX:035720", "name": "카카오", "held": true},
+        {"id": "NASDAQ:NVDA", "name": "NVIDIA", "watched": true},
+        {"id": "NYSE:TSM", "name": "TSMC", "watched": true},
+        {"id": "NASDAQ:AMD", "name": "AMD", "watched": true},
+        {"id": "NASDAQ:ASML", "name": "ASML", "watched": true}
+      ],
+      "script": {
+        "router": {"r1": {"types": {"Q07": 0.9, "Q03": 0.8}, "capabilities": {"issue.read": 0.8}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "SK하이닉스와 NVIDIA는 HBM 공급 계약, 삼성전자는 EUV 수출 규제 사건에 연결돼 있습니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch"]}]}
+      },
+      "expect": {
+        "outcome": "answered",
+        "appliedCompanies": ["KRX:000660", "KRX:005930", "NASDAQ:NVDA", "NYSE:TSM"],
+        "limitations": [{"kind": "results_truncated", "label": "내 종목 관련 사건 알려줘", "cause": "scope_cut"}]
+      }
     },
     {
       "id": "q08-selection-rule",

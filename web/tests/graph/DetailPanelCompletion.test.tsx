@@ -251,6 +251,7 @@ describe('D-GRP-04 · prototype relation fields', () => {
     relation.basis = [
       {
         edgeId: 'safe',
+        validity: 'unknown',
         relationType: 'FOLLOWS',
         sourceUrl: 'https://example.com/test',
         verifiedAt: context.asOf,
@@ -260,6 +261,7 @@ describe('D-GRP-04 · prototype relation fields', () => {
       },
       {
         edgeId: 'unsafe',
+        validity: 'unknown',
         relationType: 'FOLLOWS',
         sourceUrl: 'javascript:alert(1)',
         verifiedAt: null,

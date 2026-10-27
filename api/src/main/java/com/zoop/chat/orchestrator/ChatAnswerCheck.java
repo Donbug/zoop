@@ -33,7 +33,8 @@ import java.util.regex.Pattern;
  * answer. One that also answers a router requirement fails like any other section, so that requirement is never lost
  * silently.</li>
  * <li>{@code evidence_section}: an {@code evidence_grounded} section cites only evidence its own requirements' tool results
- * passed on, and cites some unless all its requirements found nothing. ZOOP document reads do not count here.</li>
+ * passed on, and cites some unless all its requirements found nothing or read only the member's own companies (Q07, which
+ * have no public evidence). ZOOP document reads do not count here.</li>
  * <li>{@code document_section}: a {@code zoop_documented} section does the same with what its requirements' ZOOP document
  * reads (Q01) passed on, and nothing else: approved ZOOP text and public evidence never share a section.</li>
  * <li>{@code citation_budget}: all sections together cite at most 20 distinct evidence ids ({@code ChatResult.citations}).</li>
@@ -123,7 +124,8 @@ final class ChatAnswerCheck {
                 owners.forEach(b -> b.results().forEach(r -> {
                     if (documentRead(r) == documented) passedOn.addAll(r.evidenceIds());
                 }));
-                boolean nothingFound = owners.stream().allMatch(Branch::noneFound);
+                // Nothing found, or only the member's own companies read: neither has public evidence to cite.
+                boolean nothingFound = owners.stream().allMatch(b -> b.noneFound() || memberOnly(b));
                 if (owners.stream().anyMatch(Branch::general) || !passedOn.containsAll(section.evidenceIds())
                         || (section.evidenceIds().isEmpty() && !nothingFound)) {
                     return Result.fail(documented ? "document_section" : "evidence_section");
@@ -169,6 +171,12 @@ final class ChatAnswerCheck {
         String flat = text.replaceAll("\\s+", "");
         return owners.stream().flatMap(b -> b.avoidNames().stream()).map(n -> n.replaceAll("\\s+", ""))
                 .anyMatch(n -> !n.isEmpty() && flat.contains(n));
+    }
+
+    /** A requirement that read only the member's own scope ({@code portfolio.scope.read}), which carries no evidence. */
+    static boolean memberOnly(Branch branch) {
+        return !branch.results().isEmpty() && branch.results().stream().allMatch(r -> ChatCapability.of(r.capabilityId())
+                .map(c -> c == ChatCapability.PORTFOLIO_SCOPE_READ).orElse(false));
     }
 
     /** A read of ZOOP's own documents: a capability that reads no graph. */

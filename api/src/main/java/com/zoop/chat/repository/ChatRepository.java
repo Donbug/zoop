@@ -17,6 +17,15 @@ public interface ChatRepository {
 
     Optional<ChatSessionRow> latestSession(String memberId);
 
+    /**
+     * The member's conversations that hold at least one question, latest change first ({@code updated_at}, then id, both
+     * descending), strictly after the given position when one is given.
+     */
+    List<ChatSessionSummaryRow> sessions(String memberId, Instant afterUpdatedAt, String afterId, int limit);
+
+    /** Deletes the conversation with its jobs and their tool calls; false when it no longer exists. */
+    boolean deleteSession(String sessionId);
+
     int countJobs(String sessionId);
 
     List<ChatJobRow> jobs(String sessionId);

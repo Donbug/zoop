@@ -41,9 +41,11 @@ public sealed interface ChatPlan {
     /**
      * Who asked for a requirement. {@code ROUTER}: the route decision. {@code CONCEPT}: the server split the Q02 part off a
      * router requirement that also asks for a fact (partial-answer design, part 1). The member never stated it as such, so
-     * leaving it unanswered is no limitation.
+     * leaving it unanswered is no limitation. {@code SCOPE}: the server reads the member's own companies first for a Q07
+     * requirement that names none, which then reads the rest on them; it is no branch of its own, its reads go with the
+     * requirement it serves.
      */
-    enum Origin { ROUTER, CONCEPT }
+    enum Origin { ROUTER, CONCEPT, SCOPE }
 
     /**
      * One planned requirement. TOOLS requirements read {@code capabilities} on {@code targets}, or, when
@@ -58,6 +60,9 @@ public sealed interface ChatPlan {
         /** Id and label suffixes of a concept requirement. */
         static final String CONCEPT_ID = "-c";
         static final String CONCEPT_LABEL = " — 개념 설명";
+        /** Id and label suffixes of a member-scope source. */
+        static final String SCOPE_ID = "-s";
+        static final String SCOPE_LABEL = " — 내 종목";
         /** The longest label the answer stage takes, in code points (zoop-ai-chat-1 {@code Branch.label}). */
         static final int MAX_LABEL = ChatJobRequest.MAX_QUESTION;
 
@@ -79,6 +84,21 @@ public sealed interface ChatPlan {
         Planned limited(String kind) {
             return new Planned(id, label, types, Mode.LIMITED, kind, List.of(), List.of(), null, null, dependsOn, stage,
                     origin, parent);
+        }
+
+        /** The member-scope source this requirement depends on: a stage-1 read of the member's own companies. */
+        Planned scope() {
+            int room = MAX_LABEL - SCOPE_LABEL.codePointCount(0, SCOPE_LABEL.length());
+            String base = label.codePointCount(0, label.length()) <= room ? label
+                    : label.substring(0, label.offsetByCodePoints(0, room));
+            return new Planned(id + SCOPE_ID, base + SCOPE_LABEL, Set.of(ChatQueryType.Q07), Mode.TOOLS, null,
+                    List.of(ChatCapability.PORTFOLIO_SCOPE_READ), ChatCapability.PORTFOLIO_SCOPE_READ.untargeted(),
+                    TargetSource.SERVER, null, null, 1, Origin.SCOPE, id);
+        }
+
+        /** Whether this requirement reads on the companies of its member-scope source. */
+        boolean onScope() {
+            return dependsOn != null && dependsOn.requirementId().equals(id + SCOPE_ID);
         }
 
         /**

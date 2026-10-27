@@ -3,6 +3,7 @@ package com.zoop.chat.orchestrator;
 import static com.zoop.chat.orchestrator.ChatResults.InsufficientCause.*;
 
 import com.zoop.chat.dto.ChatAppliedItem;
+import com.zoop.chat.dto.ChatAppliedPeriod;
 import com.zoop.chat.dto.ChatLimitation;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.dto.Citation;
@@ -14,6 +15,7 @@ import com.zoop.chat.orchestrator.ChatBranchContext.Branch;
 import com.zoop.chat.orchestrator.ChatPlan.Mode;
 import com.zoop.chat.orchestrator.ChatPlan.Planned;
 import com.zoop.chat.orchestrator.ChatResults.InsufficientCause;
+import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.chat.tool.ChatToolRunner;
@@ -173,12 +175,15 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         limited.putAll(retrieved.limitations());
         List<Branch> branches = new ArrayList<>();
         for (Planned p : confirmed.requirements()) {
-            if (p.mode() == Mode.LIMITED || limited.containsKey(p.id())) continue;
+            // A member-scope source is no branch: its companies go with the requirement it serves.
+            if (p.mode() == Mode.LIMITED || limited.containsKey(p.id()) || p.origin() == ChatPlan.Origin.SCOPE) continue;
             List<String> avoid = p.parent() == null ? List.of()
                     : labels(retrieved.results().getOrDefault(p.parent(), List.of()));
-            branches.add(new Branch(p.id(), p.label(), p.types(), p.mode() == Mode.GENERAL,
-                    retrieved.results().getOrDefault(p.id(), List.of()), retrieved.noneFound().contains(p.id()),
-                    p.parent(), avoid));
+            List<ChatToolResult> results = new ArrayList<>();
+            if (p.onScope()) results.addAll(retrieved.results().getOrDefault(p.dependsOn().requirementId(), List.of()));
+            results.addAll(retrieved.results().getOrDefault(p.id(), List.of()));
+            branches.add(new Branch(p.id(), p.label(), p.types(), p.mode() == Mode.GENERAL, results,
+                    retrieved.noneFound().contains(p.id()), p.parent(), avoid));
         }
         route.set("limited", json(limited));
         if (branches.isEmpty()) {
@@ -258,6 +263,12 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                     : retrieved.noneFound().contains(id) ? NOTHING_FOUND : EVIDENCE_INSUFFICIENT;
             limitations.add(ChatResults.insufficient(cause, byId.get(id).label()));
         }
+        for (String id : retrieved.cut()) {
+            // Answered on only the first of the member's companies: say so beside the answer.
+            if (explicit(decision, id) && kept.stream().anyMatch(s -> s.requirementIds().contains(id))) {
+                limitations.add(ChatResults.scopeCut(byId.get(id).label()));
+            }
+        }
 
         Set<String> answered = new HashSet<>();
         kept.forEach(s -> answered.addAll(s.requirementIds()));
@@ -268,7 +279,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         var targets = passed.graphTargets().stream().filter(g -> reachable.contains(g.id())).toList();
         ChatResult result = ChatResults.answered(run, kept, keptCitations, targets,
                 items(retrieved, answered, "company"), items(retrieved, answered, "issue"), limitations,
-                overrode(run, confirmed, answered), clock.instant());
+                overrode(run, confirmed, answered), writtenPeriod(run, confirmed, answered), clock.instant());
         route.put("outcome", "answered");
         return new ChatEngineOutcome.Completed(result, route);
     }
@@ -306,6 +317,19 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                     .forEach(i -> items.putIfAbsent(i.id(), new ChatAppliedItem(i.id(), i.label()))));
         });
         return List.copyOf(items.values());
+    }
+
+    /** The period an answered comparison read from the question's own words, or null when none did. */
+    private static ChatAppliedPeriod writtenPeriod(ChatRun run, ChatPlan.Run plan, Set<String> answered) {
+        for (Planned p : plan.requirements()) {
+            if (!answered.contains(p.id()) || !p.capabilities().contains(ChatCapability.GRAPH_VERSION_DIFF)) continue;
+            var period = ChatRetrieval.period(run, p).filter(found -> found.expression() != null);
+            if (period.isPresent()) {
+                return new ChatAppliedPeriod(period.get().start().toString(), period.get().end().toString(), "question",
+                        period.get().expression());
+            }
+        }
+        return null;
     }
 
     /** The question replaced the selection when one of these requirements read targets the member had not selected. */

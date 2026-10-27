@@ -37,14 +37,14 @@
 
 ## 화면·목표 API
 
-[D-AUT-02](screen-D-AUT-02.md) · [D-AUT-01](screen-D-AUT-01.md) · [M-GRP-01](screen-M-GRP-01.md) · [D-MY-01](screen-D-MY-01.md) · [D-GRP-T](screen-D-GRP-T.md) · [D-GRP-T2](screen-D-GRP-T2.md) · [D-GRP-T3](screen-D-GRP-T3.md) · [D-GRP-T4](screen-D-GRP-T4.md) · [D-GRP-T5](screen-D-GRP-T5.md) · [D-ONB-01](screen-D-ONB-01.md) · [D-ONB-02](screen-D-ONB-02.md) · [D-WAT-01](screen-D-WAT-01.md) · [D-WAT-01b](screen-D-WAT-01b.md) · [D-GRP-03](screen-D-GRP-03.md) · [D-STK-01](screen-D-STK-01.md) · [M-STK-01](screen-M-STK-01.md) · [D-AI-01](screen-D-AI-01.md) · [M-AI-01](screen-M-AI-01.md) · [D-AI-02b](screen-D-AI-02b.md) · [D-AI-01b](screen-D-AI-01b.md) · [D-AI-02](screen-D-AI-02.md) · [A-ADM-05c](screen-A-ADM-05c.md) · [A-ADM-01](screen-A-ADM-01.md) · [A-ADM-03](screen-A-ADM-03.md) · [A-ADM-04](screen-A-ADM-04.md) · [D-GRP-01](screen-D-GRP-01.md) · [D-BRF-01](screen-D-BRF-01.md) · [D-COM-02](screen-D-COM-02.md) · [A-ADM-05](screen-A-ADM-05.md)
+[D-AUT-02](screen-D-AUT-02.md) · [D-AUT-01](screen-D-AUT-01.md) · [M-GRP-01](screen-M-GRP-01.md) · [D-MY-01](screen-D-MY-01.md) · [D-GRP-T](screen-D-GRP-T.md) · [D-GRP-T2](screen-D-GRP-T2.md) · [D-GRP-T3](screen-D-GRP-T3.md) · [D-GRP-T4](screen-D-GRP-T4.md) · [D-GRP-T5](screen-D-GRP-T5.md) · [D-ONB-01](screen-D-ONB-01.md) · [D-ONB-02](screen-D-ONB-02.md) · [D-WAT-01](screen-D-WAT-01.md) · [D-WAT-01b](screen-D-WAT-01b.md) · [D-GRP-03](screen-D-GRP-03.md) · [D-STK-01](screen-D-STK-01.md) · [M-STK-01](screen-M-STK-01.md) · [D-AI-02](screen-D-AI-02.md) · [D-AI-01](screen-D-AI-01.md) · [M-AI-01](screen-M-AI-01.md) · [D-AI-02b](screen-D-AI-02b.md) · [D-AI-01b](screen-D-AI-01b.md) · [A-ADM-05c](screen-A-ADM-05c.md) · [A-ADM-01](screen-A-ADM-01.md) · [A-ADM-03](screen-A-ADM-03.md) · [A-ADM-04](screen-A-ADM-04.md) · [D-GRP-01](screen-D-GRP-01.md) · [D-BRF-01](screen-D-BRF-01.md) · [D-COM-02](screen-D-COM-02.md) · [A-ADM-05](screen-A-ADM-05.md)
 
 | 도메인 | 연결 작업 수 | 작업 목록 |
 | --- | --- | --- |
 | auth | 5 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | me | 2 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | portfolio | 2 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
-| chat | 7 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
+| chat | 9 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | admin | 14 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | telemetry | 1 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | feedback | 1 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |

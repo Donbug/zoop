@@ -70,8 +70,10 @@
 | TEAM_DECISION_REQUIRED | warning | getBriefing | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |  |
 | TEAM_DECISION_REQUIRED | warning | listBriefingRounds | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |  |
 | TEAM_DECISION_REQUIRED | warning | getBriefingGraphBasis | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |  |
+| TEAM_DECISION_REQUIRED | warning | listConversations | 와이어프레임에 대화 목록 화면이 없다. 웹은 D-AI-02 드로어 안의 '대화 기록' 보기로 임시 구현했으며 화면 설계 확정이 필요하다. |  |
 | TEAM_DECISION_REQUIRED | warning | createConversation | 대화·작업·멱등성 키의 실제 보존 기간과 운영 담당자를 출시 전에 등록해야 한다. 대화 소유권·활성 작업 하나·최초 요청 고정은 확정 계약이다. |  |
 | TEAM_DECISION_REQUIRED | warning | getConversation | 대화·작업의 실제 보존 기간과 마스킹·철회 전파 운영값을 출시 전에 등록해야 한다. |  |
+| TEAM_DECISION_REQUIRED | warning | deleteConversation | 개별 대화 삭제를 고지하는 개인정보 처리방침·이용약관 개정본(docs/legal/drafts) 승인과 시행 전까지 zoop.chat.delete-enabled를 켜지 않는다. |  |
 | TEAM_DECISION_REQUIRED | warning | getCurrentConversation | 최신 대화 복원의 보존 기간과 계정 삭제·로그아웃 뒤 cache 폐기 운영값을 출시 전에 등록해야 한다. |  |
 | TEAM_DECISION_REQUIRED | warning | submitQuestion | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다. / Jev 0.70/0.35, 도구 호출 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.9를 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다. |  |
 | TEAM_DECISION_REQUIRED | warning | getQuestionJob | 작업 결과·실패·도구 호출 영수증의 실제 보존 기간을 출시 전에 등록해야 한다. 조회는 새 모델 실행을 만들지 않는 확정 계약이다. |  |
@@ -252,7 +254,7 @@
 | BFF_PATH_DIFFERENCE | difference | getGraph | 목표 /api/v1/graph ↔ BFF /api/graph |  |
 | BFF_FIELD_DIFFERENCE | difference | getGraph | 목표만 161 · BFF만 27 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompanyRelation | 목표 /api/v1/graph/edges/{id} ↔ BFF /api/graph/edges/{id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getCompanyRelation | 목표만 135 · BFF만 43 · 형식/필수/권한 변경 6 |  |
+| BFF_FIELD_DIFFERENCE | difference | getCompanyRelation | 목표만 182 · BFF만 43 · 형식/필수/권한 변경 6 |  |
 | BFF_PATH_DIFFERENCE | difference | searchCompanies | 목표 /api/v1/companies ↔ BFF /api/companies |  |
 | BFF_FIELD_DIFFERENCE | difference | searchCompanies | 목표만 108 · BFF만 50 · 형식/필수/권한 변경 4 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompany | 목표 /api/v1/companies/{id} ↔ BFF /api/companies/{id} |  |
@@ -279,10 +281,12 @@
 | TARGET_ONLY_API | difference | getBriefingItemDetail | GET /api/v1/briefings/{roundId}/items/{eventId}: 직접 대응 BFF 없음 |  |
 | BFF_PATH_DIFFERENCE | difference | getBriefingGraphBasis | 목표 /api/v1/briefings/{id}/graph ↔ BFF /api/briefings/{id}/graph |  |
 | BFF_FIELD_DIFFERENCE | difference | getBriefingGraphBasis | 목표만 106 · BFF만 30 · 형식/필수/권한 변경 7 |  |
+| TARGET_ONLY_API | difference | listConversations | GET /api/v1/chat/sessions: 직접 대응 BFF 없음 |  |
 | BFF_PATH_DIFFERENCE | difference | createConversation | 목표 /api/v1/chat/sessions/{id} ↔ BFF /api/chat/sessions/{id} |  |
 | BFF_FIELD_DIFFERENCE | difference | createConversation | 목표만 161 · BFF만 12 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | getConversation | 목표 /api/v1/chat/sessions/{id} ↔ BFF /api/chat/sessions/{id} |  |
 | BFF_FIELD_DIFFERENCE | difference | getConversation | 목표만 175 · BFF만 32 · 형식/필수/권한 변경 23 |  |
+| TARGET_ONLY_API | difference | deleteConversation | DELETE /api/v1/chat/sessions/{id}: 직접 대응 BFF 없음 |  |
 | BFF_PATH_DIFFERENCE | difference | getCurrentConversation | 목표 /api/v1/chat/sessions/current ↔ BFF /api/chat/sessions/current |  |
 | BFF_FIELD_DIFFERENCE | difference | getCurrentConversation | 목표만 175 · BFF만 32 · 형식/필수/권한 변경 23 |  |
 | BFF_PATH_DIFFERENCE | difference | submitQuestion | 목표 /api/v1/chat/sessions/{id}/jobs ↔ BFF /api/chat/sessions/{id}/jobs |  |

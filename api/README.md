@@ -19,28 +19,27 @@ Java 21과 Gradle 버전은 프로젝트에 고정했습니다. `JAVA_HOME`을 �
 cp api/.env.example api/.env
 # api/.env에 필수 ZOOP_AUTH_CSRF_KEYS와 사용할 ZOOP_AUTH_ALLOWED_ORIGINS를 설정합니다.
 # 필요하면 포트·DB 이름·계정 값도 수정합니다.
-set -a
-. ./api/.env
-set +a
 
 docker compose --env-file api/.env -f api/compose.local.yaml up -d --wait
-SPRING_PROFILES_ACTIVE=local ./api/gradlew -p api bootRun
+cd api
+SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
 ```
-```sh
+```powershell
 # 윈도우용
 Copy-Item api/.env.example api/.env
-# api/.env의 필수 값 확인 후 아래 환경변수에도 설정합니다.
-$env:ZOOP_AUTH_CSRF_KEYS = "local-v1=<생성한 키>"
-$env:ZOOP_AUTH_ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:8080"
+# api/.env에 필수 값과 사용할 Origin을 설정합니다.
 $env:SPRING_PROFILES_ACTIVE = "local"
 
 docker compose --env-file api/.env -f api/compose.local.yaml up -d --wait
-.\api\gradlew.bat -p api bootRun
+Set-Location api
+.\gradlew.bat bootRun
 ```
 
-application-local.yml 파일을 설정하세요.
+필요한 로컬 프로필 설정은 `application-local.yml`에서 확인하세요.
 
-Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경변수를 내보낸 후 실행하거나 IDE Run Configuration에 아래 변수를 직접 등록하세요. Compose의 `--env-file`은 DB 컨테이너 설정에만 적용됩니다.
+`application.yml`의 `spring.config.import`가 실행 작업 디렉터리의 `.env`를 Spring 설정으로 읽습니다. 위 명령처럼 `api` 디렉터리에서 실행하면 `api/.env`가 적용되며, 셸에서 파일을 미리 내보낼 필요가 없습니다. IDE로 실행할 때도 작업 디렉터리를 `api`로 지정하세요. 실제 OS 환경변수가 있으면 `.env` 값보다 우선합니다.
+
+이 import는 `System.getenv()` 값을 설정하지 않으므로, 자식 프로세스에 환경변수를 전달해야 하는 별도 작업에서는 셸에서 내보내야 합니다. Compose의 `--env-file`은 DB 컨테이너 설정에만 적용됩니다.
 
 | 변수 | 용도 |
 |---|---|
@@ -66,7 +65,7 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 | `ZOOP_GRAPH_AUTO_ACTIVATION_ENABLED` `ZOOP_GRAPH_AUTO_ACTIVATION_*` | 선택, 기본 `false`. 켜면 **웹 애플리케이션**이 운영자 수입이 등록한 비활성 snapshot 버전 중 가장 최근 하나를 관리자 활성화(`activateGraphVersion`)와 **같은 사전 검사**(권리·근거·공개 제외·snapshot 읽기)를 거쳐 system 주체로 활성화합니다(FS059, 활성화 이력 `actor_kind=system`). 현재 공개 버전보다 앞선(`sequence`가 작은) 수입은 활성화하지 않고, 시작 시각에서 `LOOKBACK`(기본 `PT30M`, 한 회차)만큼 되돌아본 뒤에 수입된 버전만 대상입니다. 확인 주기 `INTERVAL`(기본 `PT15S`), 검사 거절 뒤 재시도 `RETRY_AFTER`(기본 `PT5M`), 소스 장애·그 밖의 실패 뒤 재시도 `UNAVAILABLE_RETRY_AFTER`(기본 `PT1M`). 전용 스레드에서 돌고, 수입·제외 명령 같은 비웹 실행에서는 동작하지 않습니다. 바꾸려면 재시작합니다. 관리자가 수동으로 활성화(되돌리기 포함)하면 그보다 먼저 수입돼 기다리던 버전은 자동으로 활성화하지 않고, **그 뒤에 수입된** 버전이 검사를 통과하면 그 버전으로 바뀝니다. |
 | `ZOOP_GRAPH_HANDOFF_IMPORT_*` `ZOOP_HANDOFF_*` `ZOOP_RELATION_STATE_DIR` `ZOOP_EXTRACTION_STATE_DIR` | 선택. operator 전용 비웹 그래프 handoff 스테이징 import(기본 비활성, 설정 없이도 기동). 위 `ZOOP_INGESTION_*`·`ZOOP_ARTIFACT_ROOT`도 필요하고 문서 import·분석, `fixture` 소스와 한 프로세스에서 함께 켤 수 없습니다. 이름·규칙은 [그래프 handoff 스테이징 import](#그래프-handoff-스테이징-import) |
 
-`DB_PORT`나 `DB_NAME`을 바꾸면 `DB_URL`도 일치하게 수정하세요. `.env.example`의 비밀번호는 로컬 전용 예시이며 운영용이 아닙니다. 실제 `.env`는 Git에서 제외됩니다. 이미 초기화된 DB 볼륨의 계정·비밀번호는 환경변수만 바꿔도 변경되지 않습니다.
+`DB_PORT`나 `DB_NAME`을 바꾸면 `DB_URL`도 일치하게 수정하세요. `.env.example`의 비밀번호는 로컬 전용 예시이며 운영용이 아닙니다. 실제 `.env`는 Git에서 제외됩니다. 이미 초기화된 DB 볼륨의 계정·비밀번호는 설정값만 바꿔도 변경되지 않습니다.
 
 ### 프로세스 생존 확인
 
@@ -108,20 +107,18 @@ curl -s 'http://127.0.0.1:<출력된 포트>/api/v1/graph?asOf=2026-10-05T00:00:
 
 ### 로컬 HTTP 브라우저 테스트
 
-`application-local.yml`은 로컬 프로필에서만 `http://localhost:3000` 프론트의 `/api/**` CORS 요청을 허용하고 세션 쿠키의 `Secure` 속성을 끕니다. 인증 Origin 검증에는 프론트와 API에서 직접 여는 Swagger UI의 Origin(`http://localhost:8080`)을 모두 허용합니다. 백엔드 포트를 바꾸면 API Origin도 같은 포트로 지정하세요. 일반 프로필의 HTTPS Origin 검증과 보안 쿠키 설정은 그대로 적용됩니다.
+`application-local.yml`은 로컬 프로필에서만 `http://localhost:5173` 프론트의 `/api/**` CORS 요청을 허용하고 세션 쿠키의 `Secure` 속성을 끕니다. 인증 Origin 검증에는 프론트와 API에서 직접 여는 Swagger UI의 Origin(`http://localhost:8080`)을 모두 허용합니다. 백엔드 포트를 바꾸면 API Origin도 같은 포트로 지정하세요. 일반 프로필의 HTTPS Origin 검증과 보안 쿠키 설정은 그대로 적용됩니다.
 
-`api/.env.example`의 `ZOOP_AUTH_ALLOWED_ORIGINS`는 빈 값이므로, `.env`를 불러온 **뒤** 로컬 테스트 값을 지정해야 합니다. 다음 명령은 저장소 루트에서 실행합니다.
+`api/.env.example`의 `ZOOP_AUTH_ALLOWED_ORIGINS`는 빈 값이므로, `api/.env`에 로컬 테스트 값을 넣거나 아래처럼 실행 시 환경변수로 지정해야 합니다. 다음 명령은 저장소 루트에서 시작합니다.
 
 ```sh
-set -a
-. ./api/.env
-set +a
 export SPRING_PROFILES_ACTIVE=local
 export ZOOP_SWAGGER_ENABLED=true
 export ZOOP_AUTH_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:8080
 export ZOOP_API_CORS_ALLOWED_ORIGINS=http://localhost:5173
 docker compose --env-file api/.env -f api/compose.local.yaml up -d --wait
-./api/gradlew -p api bootRun
+cd api
+./gradlew bootRun
 ```
 
 Swagger UI는 `http://localhost:8080/swagger-ui.html`에서 API와 같은 Origin으로 열리므로 CORS 허용 목록에 API 주소를 추가할 필요가 없습니다. 프론트에서 직접 호출할 때는 프론트 담당자가 API 주소를 `http://localhost:8080`으로 지정하고 쿠키 요청에 credentials를 포함해야 합니다. 다른 출처나 `/api/**` 바깥 경로가 필요하면 공통 설정인 `common/config/ApiCorsConfiguration.java`와 `zoop.api.cors.allowed-origins`를 검토하세요.
@@ -301,7 +298,7 @@ bundle `-7` 스테이징 뒤, 공개 제외 저장소가 연결된 기본 설정
 
 `src/main/resources/company/demo-companies.json`은 팀이 확정한 24개 기업 목록입니다. `prototype/` 파일이나 DB를 실행 중에 읽지 않습니다. 종목 코드가 없는 OpenAI·Anthropic은 `ORG:OPENAI`, `ORG:ANTHROPIC` ID를 사용하며 `ticker`, `exchange_code`, `market`은 비워 둡니다. `brand_source`는 색상·로고 출처가 확인된 경우에만 넣고, 단순 홈페이지 주소는 `null`로 둡니다. 향후 GraphDB에서도 같은 회사 ID를 써야 합니다.
 
-DB 환경변수(`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`)를 설정하고 API를 시작하면 Flyway migration `V20261014163000__seed_confirmed_companies.sql`이 **최초 한 번** 24개 기업을 적재하고, `V20261015090000__add_company_brand_source.sql`이 내부 출처 컬럼을 추가합니다. 그 다음 앱 시작 시 번들 JSON을 읽어 같은 기업 ID의 값을 갱신합니다. 이후 JSON을 바꿔 다시 시작해도 ID 기준으로 변경된 행만 갱신하며 중복 삽입하지 않습니다. 다른 기업 및 이를 참조하는 분석 기록은 삭제하지 않습니다. PostgreSQL 컨테이너만 시작하면 Flyway와 JSON 적재가 실행되지 않으므로 API도 시작해야 합니다. Spring Boot는 `.env` 파일을 자동으로 읽지 않습니다.
+`DB_URL`·`DB_USERNAME`·`DB_PASSWORD`를 `api/.env` 또는 OS 환경변수로 설정하고 API를 시작하면 Flyway migration `V20261014163000__seed_confirmed_companies.sql`이 **최초 한 번** 24개 기업을 적재하고, `V20261015090000__add_company_brand_source.sql`이 내부 출처 컬럼을 추가합니다. 그 다음 앱 시작 시 번들 JSON을 읽어 같은 기업 ID의 값을 갱신합니다. 이후 JSON을 바꿔 다시 시작해도 ID 기준으로 변경된 행만 갱신하며 중복 삽입하지 않습니다. 다른 기업 및 이를 참조하는 분석 기록은 삭제하지 않습니다. PostgreSQL 컨테이너만 시작하면 Flyway와 JSON 적재가 실행되지 않으므로 API도 시작해야 합니다. `api/.env`를 사용한다면 `api` 디렉터리에서 앱을 실행하세요.
 
 카탈로그 JSON을 수정해 로컬 DB에 다시 반영할 때에만 `api` 디렉터리에서 명시적 적재 명령을 사용합니다.
 

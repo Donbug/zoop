@@ -160,8 +160,10 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | [getBriefingRecap](#getbriefingrecap) | GET | /api/v1/briefings/{id}/recap | 공개 | P1 |
 | [getBriefingItemDetail](#getbriefingitemdetail) | GET | /api/v1/briefings/{roundId}/items/{eventId} | 공개 | P1 |
 | [getBriefingGraphBasis](#getbriefinggraphbasis) | GET | /api/v1/briefings/{id}/graph | 공개 | P1 |
+| [listConversations](#listconversations) | GET | /api/v1/chat/sessions | 회원(본인) | P2 |
 | [createConversation](#createconversation) | PUT | /api/v1/chat/sessions/{id} | 회원(본인) | P1 |
 | [getConversation](#getconversation) | GET | /api/v1/chat/sessions/{id} | 회원(본인) | P1 |
+| [deleteConversation](#deleteconversation) | DELETE | /api/v1/chat/sessions/{id} | 회원(본인) | P2 |
 | [getCurrentConversation](#getcurrentconversation) | GET | /api/v1/chat/sessions/current | 회원(본인) | P1 |
 | [submitQuestion](#submitquestion) | POST | /api/v1/chat/sessions/{id}/jobs | 회원(본인) | P1 |
 | [getQuestionJob](#getquestionjob) | GET | /api/v1/chat/jobs/{job_id} | 회원(본인) | P1 |
@@ -1086,7 +1088,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getEvent · 사건 상세와 근거 참조 조회
 
-사건 상세와 근거 참조 조회. round·graphVersion·asOf로 공개 버전 하나를 고정하고(그래프 조회와 같은 규칙) 그 버전에서 현재 제외를 적용한 뒤 보이는 사건만 반환하며, 보이지 않으면 RESOURCE_NOT_FOUND/404다. relations·companies·articles·follows·evidenceIds와 사건 머리 필드는 스냅샷에서 읽는다. asOf는 그래프와 같이 사건의 기사가 하나라도 asOf 이후에 공개됐으면 사건 전체를 가리며(404), 일부 기사만 남긴 상세는 만들지 않는다. articles는 이 사건의 보이는 근거가 가리키는 정확한 (기사 ID, 기사 버전)만 담고 같은 기사의 다른 버전은 넣지 않으며, 최신 공개순이다(FS021의 관련도 우선 정렬은 관련도 원천이 없어 미구현). relations[].edgeId는 그래프 표시 간선 ID와 같다. follows는 FOLLOWS 관계(뒤 사건→앞 사건)에서 이 버전에 보이는 사건만 담는다. 수입한 버전은 그 버전의 import receipt(AI 인계 묶음)에서 mentions(원본 S2 언급, verification none)·fieldDecisions(운영자 필드 판정의 필드·결정·사유 코드만, 판정 대상 값은 싣지 않음, candidateId는 null)·sourceSupport(인계 값을 그대로 복사)를 읽고, receipt를 읽을 수 없거나, 그 사건을 담지 않거나, 인계 묶음 스키마가 현재(zoop-graph-handoff-bundle-5)가 아니면(이전 묶음은 언급·필드 판정이 없으므로 빈 목록으로 대신하지 않음) SOURCE_UNAVAILABLE/503이다. 수입한 버전은 근거마다 getEvidence와 같은 현재 공개 게이트(기사 접근 상태·현재 source grant·registry)를 지금 다시 적용해, 언급은 그 근거가 모두 보일 때만 참가자와 함께 내보내고(일부라도 가려지면 언급 전체를 뺌), 관계는 근거가 모두 보일 때만, 기사는 보이는 근거가 가리킬 때만 남긴다. 머리 필드는 운영자가 고른 대표 언급(fieldProvenance.selection=operator-representative)의 값이거나, 대표가 없으면(unanimous) 모든 언급이 같은 값이므로, 대표 언급 또는 모든 언급이 온전히 보이지 않으면 사건 전체를 RESOURCE_NOT_FOUND/404로 닫는다. follows와 FOLLOWS 관계의 상대 사건도 같은 머리 검사를 통과해야 하며, 통과하지 못하면 관계와 참조 모두에서 뺀다. 운영자가 보류·거절(HOLD·REJECT)한 언급의 eventTime(이때 timePrecision=unknown)·period는 null이며 어떤 필드로도 내보내지 않는다. 현재 권한·제외로 기사 일부가 빠지면 sourceSupport는 articleCount를 보이는 기사 수로 하고 가려진 기사에 의존하는 knownLineageCount·independentSourceCount는 null, 목록은 보이는 기사만 남긴다. 합성 fixture 버전은 receipt가 없어 mentions·fieldDecisions가 빈 배열이고 sourceSupport는 모든 기사의 출처가 알려지지 않은 것으로 표시한다(개수는 0이 아니라 null). articles[].publisher는 고정된 기사 버전의 저장된 article_versions 값이며 없으면 null, relationType은 그 기사의 보이는 언급이 모두 background면 PROVIDES_BACKGROUND, 아니면 REPORTS, 언급 정보가 없으면 null이다(앱 결정). role이 있는 companies·relations·참가자는 roleUnconfirmed=true다(인계가 확인된 역할을 생산하지 않음). summary는 아직 사건 요약 생산자가 없어 Unavailable이고 metadata.partial=true·failures에 summary를 남기며, approval은 null이다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+사건 상세와 근거 참조 조회. round·graphVersion·asOf로 공개 버전 하나를 고정하고(그래프 조회와 같은 규칙) 그 버전에서 현재 제외를 적용한 뒤 보이는 사건만 반환하며, 보이지 않으면 RESOURCE_NOT_FOUND/404다. relations·companies·articles·follows·evidenceIds와 사건 머리 필드는 스냅샷에서 읽는다. asOf는 그래프와 같이 사건의 기사가 하나라도 asOf 이후에 공개됐으면 사건 전체를 가리며(404), 일부 기사만 남긴 상세는 만들지 않는다. articles는 이 사건의 보이는 근거가 가리키는 정확한 (기사 ID, 기사 버전)만 담고 같은 기사의 다른 버전은 넣지 않으며, 최신 공개순이다(FS021의 관련도 우선 정렬은 관련도 원천이 없어 미구현). relations[].edgeId는 그래프 표시 간선 ID와 같다. follows는 FOLLOWS 관계(뒤 사건→앞 사건)에서 이 버전에 보이는 사건만 담는다. 수입한 버전은 그 버전의 import receipt(AI 인계 묶음)에서 mentions(원본 S2 언급, verification none)·fieldDecisions(운영자 필드 판정의 필드·결정·사유 코드만, 판정 대상 값은 싣지 않음, candidateId는 null)·sourceSupport(인계 값을 그대로 복사)를 읽고, receipt를 읽을 수 없거나, 그 사건을 담지 않거나, 인계 묶음 스키마가 현재(zoop-graph-handoff-bundle-5)가 아니면(이전 묶음은 언급·필드 판정이 없으므로 빈 목록으로 대신하지 않음) SOURCE_UNAVAILABLE/503이다. receipt 미등록·고정 바이트 손상·형식 오류는 재시도로 복구되지 않아 error.retryable=false다. receipt 저장소의 일시 읽기 장애는 error.retryable=true다. 수입한 버전은 근거마다 getEvidence와 같은 현재 공개 게이트(기사 접근 상태·현재 source grant·registry)를 지금 다시 적용해, 언급은 그 근거가 모두 보일 때만 참가자와 함께 내보내고(일부라도 가려지면 언급 전체를 뺌), 관계는 근거가 모두 보일 때만, 기사는 보이는 근거가 가리킬 때만 남긴다. 머리 필드는 운영자가 고른 대표 언급(fieldProvenance.selection=operator-representative)의 값이거나, 대표가 없으면(unanimous) 모든 언급이 같은 값이므로, 대표 언급 또는 모든 언급이 온전히 보이지 않으면 사건 전체를 RESOURCE_NOT_FOUND/404로 닫는다. follows와 FOLLOWS 관계의 상대 사건도 같은 머리 검사를 통과해야 하며, 통과하지 못하면 관계와 참조 모두에서 뺀다. 운영자가 보류·거절(HOLD·REJECT)한 언급의 eventTime(이때 timePrecision=unknown)·period는 null이며 어떤 필드로도 내보내지 않는다. 현재 권한·제외로 기사 일부가 빠지면 sourceSupport는 articleCount를 보이는 기사 수로 하고 가려진 기사에 의존하는 knownLineageCount·independentSourceCount는 null, 목록은 보이는 기사만 남긴다. 합성 fixture 버전은 receipt가 없어 mentions·fieldDecisions가 빈 배열이고 sourceSupport는 모든 기사의 출처가 알려지지 않은 것으로 표시한다(개수는 0이 아니라 null). articles[].publisher는 고정된 기사 버전의 저장된 article_versions 값이며 없으면 null, relationType은 그 기사의 보이는 언급이 모두 background면 PROVIDES_BACKGROUND, 아니면 REPORTS, 언급 정보가 없으면 null이다(앱 결정). role이 있는 companies·relations·참가자는 roleUnconfirmed=true다(인계가 확인된 역할을 생산하지 않음). summary는 아직 사건 요약 생산자가 없어 Unavailable이고 metadata.partial=true·failures에 summary를 남기며, approval은 null이다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1281,6 +1283,34 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | id | path | 필수 | string |  |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
+<a id="listconversations"></a>
+
+## listConversations · 대화 목록
+
+질문이 하나 이상 있는 본인 대화를 최근 질문 순(updatedAt, id 내림차순)으로 회수한다. 제목은 첫 질문(100자 초과 시 잘라 '…')이다. '새 대화'로 만들고 질문하지 않은 대화는 나오지 않는다. 모델을 호출하지 않는다. 기본 20개, 최대 50개. nextCursor는 회원과 limit에 묶이며 다른 limit으로 쓰면 INVALID_CURSOR다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/chat/sessions` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [ChatConversationList](#schema-chatconversationlist), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, INVALID_CURSOR, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED |
+| FS/NFS | [FS050](../../system/out/feature-FS050.md) · [FS051](../../system/out/feature-FS051.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| 화면 | [D-AI-02](../../system/out/screen-D-AI-02.md) |
+| WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.8, 6.9.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 직접 대응 BFF 작업 없음. 본인 대화 목록은 정식 API에서 구현한다. |
+| 팀 확인 필요 | 와이어프레임에 대화 목록 화면이 없다. 웹은 D-AI-02 드로어 안의 '대화 기록' 보기로 임시 구현했으며 화면 설계 확정이 필요하다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
+| limit | query | 선택 | integer | 페이지 크기. 기본 20, 최대 50. |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+
 <a id="createconversation"></a>
 
 ## createConversation · 새 대화 생성
@@ -1335,6 +1365,34 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string | Conversation id made by the client |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+
+<a id="deleteconversation"></a>
+
+## deleteConversation · 대화 삭제
+
+본인 대화와 그 질문 작업·도구 호출을 즉시 삭제한다(삭제 표시·보관 기간 없음). 모델 실행 원장(ai_executions)의 비용 메타데이터는 작업 연결 없이 남는다. 대기·실행 중인 질문이 있으면 JOB_IN_PROGRESS로 거부하므로 먼저 취소한다. 승인된 개인정보 처리방침·이용약관(2026-10-13.1)은 개별 채팅 삭제를 제공하지 않는다고 고지하므로, 개정본이 시행될 때까지 서버 설정 zoop.chat.delete-enabled=false이며 이때는 RESOURCE_NOT_FOUND다. 클라이언트는 listConversations의 deleteEnabled로 노출 여부를 정한다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `DELETE /api/v1/chat/sessions/{id}` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | 없음 |
+| 응답 | 204: 본문 없음, 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, JOB_IN_PROGRESS, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
+| FS/NFS | [FS050](../../system/out/feature-FS050.md) · [FS051](../../system/out/feature-FS051.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| 화면 | [D-AI-02](../../system/out/screen-D-AI-02.md) |
+| WBS | 6.1.2, 6.11.1, 6.9.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 직접 대응 BFF 작업 없음. 대화 즉시 삭제는 정식 API에서 구현한다. |
+| 팀 확인 필요 | 개별 대화 삭제를 고지하는 개인정보 처리방침·이용약관 개정본(docs/legal/drafts) 승인과 시행 전까지 zoop.chat.delete-enabled를 켜지 않는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| id | path | 필수 | string | Conversation id made by the client |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
 
 <a id="getcurrentconversation"></a>
 
@@ -3801,6 +3859,32 @@ What the member had selected when asking: graph targets, optional evidence refer
 | session | 필수 | [ChatSessionResponse](#schema-chatsessionresponse) |  |
 | jobs | 필수 | [ChatJob](#schema-chatjob)[] |  |
 
+<a id="schema-chatconversationlist"></a>
+
+### ChatConversationList
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| items | 필수 | [ChatConversationSummary](#schema-chatconversationsummary)[] |  |
+| nextCursor | 필수 | string / null | 다음 페이지 커서. 마지막 페이지면 null |
+| deleteEnabled | 필수 | boolean | deleteConversation이 열려 있는지. 거짓이면 클라이언트는 삭제를 보여 주지 않는다 |
+
+<a id="schema-chatconversationsummary"></a>
+
+### ChatConversationSummary
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| title | 필수 | string | 첫 질문. 100자를 넘으면 99자와 '…' |
+| createdAt | 필수 | string (date-time) |  |
+| updatedAt | 필수 | string (date-time) | 마지막으로 질문한 시각 |
+| jobs | 필수 | integer | 질문 작업 수(확인 질문의 답 포함) |
+
 <a id="schema-chatcurrentresponse"></a>
 
 ### ChatCurrentResponse
@@ -4487,6 +4571,62 @@ allow는 HOLD 대상의 운영자 최종 승인(approved)이며 재검증이나 
 | quote | 필수 | string |  |
 | quoteVerified | 필수 | boolean / null |  |
 
+<a id="schema-structuraldetails"></a>
+
+### StructuralDetails
+
+FS023 공급 관계 상세. 새 서버는 항상 반환하지만 구서버와 혼재 배포될 수 있어 기존 consumer 호환이 필요한 동안 OpenAPI 및 웹 타입에서 선택 필드로 유지한다. 혼재 배포 지원 종료 시 필수 여부를 다시 결정한다. available일 때만 완전한 paths를 제공하며 일부 경로를 잘라 공개하지 않는다. unavailable은 관계 없음이 아니다. 비공개 pathCompanies는 공개하지 않는다. legacy_data·not_recorded는 기록 부재이므로 metadata.partial/failures에 넣지 않는다. details_not_available은 확인 가능한 상세를 제공하지 못한 상태로 metadata.partial과 STRUCTURAL_DETAIL_UNAVAILABLE을 제공한다. 조회 중 일시 장애는 기본 관계 상세를 유지하고 metadata.failures에 SOURCE_UNAVAILABLE, retryable=true로 기록한다. receipt 구조 손상은 로그를 남기고 details_not_available 및 retryable=false로 기록한다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {available, unavailable, not_applicable} |  |
+| reason | 필수 | string, null {legacy_data, not_recorded, details_not_available, None} |  |
+| paths | 필수 | [StructuralRelationPath](#schema-structuralrelationpath)[] |  |
+
+<a id="schema-structuralrelationpath"></a>
+
+### StructuralRelationPath
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| relationId | 필수 | string | 표시 간선 뒤 원본 공개 relation ID. 경로를 합치지 않고 relationId 순으로 반환한다. |
+| companies | 필수 | [StructuralCompany](#schema-structuralcompany)[] | 운영자가 매핑한 P→…→C 순서이며 공급 방향이 아니다. 모두 현재 공개된 기업이다. |
+| links | 필수 | [StructuralSupplyLink](#schema-structuralsupplylink)[] | basis 순서. 인과·가격 방향·독립 원천 증명을 뜻하지 않는다. |
+
+<a id="schema-structuralcompany"></a>
+
+### StructuralCompany
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| label | 필수 | string |  |
+
+<a id="schema-structuralsupplylink"></a>
+
+### StructuralSupplyLink
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| basisId | 필수 | string | receipt relationKey, 기존 basis.edgeId에 대응. |
+| relationType | 필수 | string {SUPPLIES} |  |
+| supplierCompanyId | 필수 | string |  |
+| customerCompanyId | 필수 | string |  |
+| businessScope | 필수 | string, null | S3 원문 텍스트. null은 미상이며 전체 사업이 아니다. |
+| productScope | 필수 | string, null | S3 원문 텍스트. 제품 엔티티 ID가 아니다. |
+| validFrom | 필수 | string, null | 효력 시작일 YYYY-MM-DD. null은 미상. |
+| validUntil | 필수 | string, null | 마지막 유효일 YYYY-MM-DD, 당일 포함. null은 영구 유효가 아니다. |
+| validity | 필수 | string {scheduled, active, ended, unknown} | metadata.asOf의 Asia/Seoul 날짜 기준, BasisOut.validity와 동일. |
+| verifiedAt | 필수 | string (date-time) | 관계를 eligible하게 만든 판정 시각. 기사 발행 시각과 구분한다. |
+| countries | 필수 | string[] |  |
+| evidenceIds | 필수 | string[] (uniqueItems) | 이 basis에 속하며 현재 읽을 수 있는 근거. EdgeDetail.evidenceIds에 합치지 않는다. |
+
 <a id="schema-edgedetail"></a>
 
 ### EdgeDetail
@@ -4495,6 +4635,7 @@ allow는 HOLD 대상의 운영자 최종 승인(approved)이며 재검증이나 
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| structuralDetails | 선택 | [StructuralDetails](#schema-structuraldetails) |  |
 | id | 필수 | string |  |
 | relationType | 필수 | string {INVOLVES, STRUCTURALLY_RELATED_TO, FOLLOWS, SHARES_ISSUE} |  |
 | derived | 필수 | boolean |  |

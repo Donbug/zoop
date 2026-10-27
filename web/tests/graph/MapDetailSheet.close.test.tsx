@@ -83,6 +83,7 @@ it.each([
       <ImpactPathPanel
         companyId={company.id}
         issueId={issue.id}
+        context={context}
         graph={graph}
         impact={impact}
         loading={false}
@@ -208,6 +209,7 @@ it.each(['loading', 'error'] as const)(
           <ImpactPathPanel
             companyId={company.id}
             issueId={issue.id}
+            context={context}
             graph={graph}
             impact={null}
             loading={loading}

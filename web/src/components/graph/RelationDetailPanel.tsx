@@ -3,7 +3,11 @@ import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import CompanyLogo from '@/components/common/CompanyLogo';
 import { useRelationData } from '@/hooks/useRelationData';
 import type { EventContext } from '@/types/map/event';
-import type { RelationDetail } from '@/types/map/relation';
+import type {
+  RelationDetail,
+  StructuralSupplyLink,
+} from '@/types/map/relation';
+import StructuralRelationSection from './StructuralRelationSection';
 import {
   formatEventTime,
   formatPublishedAt,
@@ -22,6 +26,7 @@ interface Props {
     action: 'evidence' | 'ai',
     relation: RelationDetail,
     issueId?: string,
+    supplyLink?: StructuralSupplyLink,
   ) => void;
 }
 
@@ -46,6 +51,9 @@ export default function RelationDetailPanel({
     heading.current?.focus();
   }, [id]);
   const shared = data?.relationType === 'SHARES_ISSUE';
+  const structuralFailure = data?.metadata.failures.find(
+    (failure) => failure.section === 'structuralDetails',
+  );
   const count = new Set(data?.evidenceIds).size;
   const verifiedAt = data?.basis
     .map((basis) => basis.verifiedAt)
@@ -119,7 +127,11 @@ export default function RelationDetailPanel({
             <section className={ui.section} aria-label="관계 정보">
               <p>{data.explanation}</p>
               <dl className="mt-3 grid grid-cols-[64px_1fr] gap-x-2 gap-y-2">
-                <dt className={ui.muted}>방향</dt>
+                <dt className={ui.muted}>
+                  {data.relationType === 'STRUCTURALLY_RELATED_TO'
+                    ? '구조 간선 방향'
+                    : '방향'}
+                </dt>
                 <dd>
                   {data.directed
                     ? `${data.source.label} → ${data.target.label}`
@@ -166,6 +178,16 @@ export default function RelationDetailPanel({
                 )}
               </dl>
             </section>
+            {data.relationType === 'STRUCTURALLY_RELATED_TO' && (
+              <StructuralRelationSection
+                details={data.structuralDetails}
+                failure={structuralFailure}
+                onRetry={() => setRetry((value) => value + 1)}
+                onEvidence={(link) =>
+                  onAction('evidence', data, undefined, link)
+                }
+              />
+            )}
             <div className={ui.actions}>
               <button
                 disabled={!count}
