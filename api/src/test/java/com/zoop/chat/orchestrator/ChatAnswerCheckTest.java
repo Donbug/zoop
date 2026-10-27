@@ -78,6 +78,29 @@ class ChatAnswerCheckTest {
     }
 
     @Test
+    void aSectionSharedWithAStatedConceptStillChecksTheSplitConceptsNamesAndFailsInsteadOfDropping() {
+        var parent = branch("r1", List.of("ev-r1"));
+        var split = new Branch("r1-c", "요구 r1 — 개념 설명", Set.of(ChatQueryType.Q02), true, List.of(), false, "r1",
+                List.of("SK하이닉스"));
+        var stated = new Branch("r2", "메모리 개념", Set.of(ChatQueryType.Q02), true, List.of(), false);
+        var named = new ChatGeneratedAnswer(List.of(new Section("general_knowledge",
+                "HBM과 DRAM은 메모리입니다. SK하이닉스는 HBM을 주로 엔비디아에 공급합니다.", List.of("r1-c", "r2"), List.of())),
+                List.of("r1"), List.of());
+        assertEquals("general_names", ChatAnswerCheck.check(List.of(parent, split, stated), named).failedCheck(),
+                "the member's own r2 is never dropped silently with the server's addition");
+
+        var factual = new ChatGeneratedAnswer(List.of(new Section("general_knowledge", "HBM 수요는 2026년에 컸습니다.",
+                List.of("r1-c", "r2"), List.of())), List.of("r1"), List.of());
+        assertEquals("general_section", ChatAnswerCheck.check(List.of(parent, split, stated), factual).failedCheck());
+
+        var plain = new ChatGeneratedAnswer(List.of(new Section("general_knowledge", "HBM과 DRAM은 메모리 반도체입니다.",
+                List.of("r1-c", "r2"), List.of())), List.of("r1"), List.of());
+        var passed = ChatAnswerCheck.check(List.of(parent, split, stated), plain).passed();
+        assertEquals(List.of(), passed.dropped());
+        assertEquals(List.of("r1"), passed.insufficient());
+    }
+
+    @Test
     void zoopDocumentTextAndPublicEvidenceNeverShareASection() {
         // Q01 + Q03 in one requirement: a policy read and a company read.
         var policy = new ChatToolResult("chat-tool/v1", "tc-1", "zoopPolicy.read", "zoop-docs/policy.privacy@v1",

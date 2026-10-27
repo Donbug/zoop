@@ -57,6 +57,29 @@ class ChatPlannerTest {
     }
 
     @Test
+    void aConceptLabelStaysWithinTheAnswerStagesLabelLimitInCodePointsAndItsParentKeepsItsOwn() {
+        int suffix = ChatPlan.Planned.CONCEPT_LABEL.codePointCount(0, ChatPlan.Planned.CONCEPT_LABEL.length());
+        assertEquals(8, suffix);
+        for (int length : List.of(3992, 3993, 4000)) {
+            var parent = planned("가".repeat(length));
+            String label = parent.concept().label();
+            assertEquals(Math.min(length + suffix, 4000), label.codePointCount(0, label.length()), "length " + length);
+            assertTrue(label.endsWith(ChatPlan.Planned.CONCEPT_LABEL));
+            assertEquals(length, parent.label().length(), "the parent's label is never cut");
+        }
+        // Supplementary characters count once each and are never split into a lone surrogate.
+        String wide = "𝐀".repeat(4000);
+        String label = planned(wide).concept().label();
+        assertEquals(4000, label.codePointCount(0, label.length()));
+        assertEquals("𝐀".repeat(3992) + ChatPlan.Planned.CONCEPT_LABEL, label);
+    }
+
+    private static ChatPlan.Planned planned(String label) {
+        return new ChatPlan.Planned("r1", label, Set.of(ChatQueryType.Q02, ChatQueryType.Q03), Mode.TOOLS, null, List.of(),
+                List.of(), ChatPlan.TargetSource.QUESTION, null, null, 1);
+    }
+
+    @Test
     void aLookupThatAlsoAsksForAConceptRunsAsBeforeWithTheConceptBesideIt() {
         var plan = run(planner.plan(run(0, "v1"), decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9),
                 Map.of("company.read", 0.9), List.of("KRX:000660"))), BOUND));
