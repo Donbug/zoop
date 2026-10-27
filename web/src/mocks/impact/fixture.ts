@@ -18,6 +18,8 @@ export function createMockImpact(
   return {
     companyId,
     issueId,
+    pathStatus:
+      scenario === 'empty' ? 'no_direct_relation' : 'direct_available',
     steps:
       scenario === 'empty'
         ? []

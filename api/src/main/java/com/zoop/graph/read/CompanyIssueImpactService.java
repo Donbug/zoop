@@ -44,6 +44,10 @@ public class CompanyIssueImpactService {
                 .filter(edge -> edge.source().equals(issueId) && edge.target().equals(companyId))
                 .sorted(java.util.Comparator.comparing(DisplayGraph.Edge::id))
                 .findFirst().orElse(null);
+        boolean structuralRelation = direct == null && graph.edges.values().stream()
+                .anyMatch(edge -> !edge.derived() && "STRUCTURALLY_RELATED_TO".equals(edge.relationType())
+                        && (edge.source().equals(issueId) && edge.target().equals(companyId)
+                                || edge.source().equals(companyId) && edge.target().equals(issueId)));
         Instant evidenceAsOf = pinned.selected().asOfRequested() ? pinned.selected().asOf() : null;
         List<String> visibleEvidenceIds = direct == null ? List.of() : direct.evidenceIds().stream()
                 .filter(id -> evidence.shownNow(id, round, pinned.selected().version().id(), evidenceAsOf, requestId))
@@ -59,7 +63,9 @@ public class CompanyIssueImpactService {
                 : List.of();
         Metadata metadata = new Metadata(pinned.selected().source(), pinned.selected().asOf(),
                 pinned.selected().version().id(), requestId, evidenceWithheld, failures);
-        return new ImpactPath(companyId, issueId, steps, metadata);
+        String pathStatus = direct != null ? "direct_available"
+                : structuralRelation ? "structural_path_details_unavailable" : "no_direct_relation";
+        return new ImpactPath(companyId, issueId, pathStatus, steps, metadata);
     }
 
     private static boolean blank(String value) {

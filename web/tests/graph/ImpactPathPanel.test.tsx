@@ -20,6 +20,7 @@ const metadata: Impact['metadata'] = {
 const connectedImpact: Impact = {
   companyId,
   issueId,
+  pathStatus: 'direct_available',
   steps: [
     {
       id: companyId,
@@ -77,14 +78,22 @@ describe('D-GRP-06 · impact path states', () => {
 
   it('distinguishes a successful empty path from a direct confirmed connection', () => {
     renderPanel({
-      impact: { ...connectedImpact, steps: [] },
+      impact: {
+        ...connectedImpact,
+        pathStatus: 'no_direct_relation',
+        steps: [],
+      },
     });
 
     const panel = within(
       screen.getByRole('complementary', { name: /영향 경로/ }),
     );
     expect(panel.getByText(/직접 연결 미확인/)).toBeTruthy();
-    expect(panel.getByText('확인된 영향 경로가 없습니다.')).toBeTruthy();
+    expect(
+      panel.getByText(
+        '선택한 그래프에서 기업과 이슈 사이의 직접 연결을 확인하지 못했습니다.',
+      ),
+    ).toBeTruthy();
     expect(panel.queryByRole('alert')).toBeNull();
   });
 

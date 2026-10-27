@@ -4,7 +4,7 @@ import com.zoop.common.response.Metadata;
 import java.util.List;
 
 /** OpenAPI {@code ImpactPath}: only relationships visible in the pinned public snapshot are represented. */
-public record ImpactPath(String companyId, String issueId, List<Step> steps, Metadata metadata) {
+public record ImpactPath(String companyId, String issueId, String pathStatus, List<Step> steps, Metadata metadata) {
     public ImpactPath {
         steps = List.copyOf(steps);
     }

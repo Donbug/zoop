@@ -35,11 +35,10 @@ export async function getCompanyIssueImpact(
       skipAuth: true,
     },
   );
-  if (context.round) {
-    if (impact.companyId !== companyId || impact.issueId !== issueId)
-      throw new Error('요청한 영향 경로와 응답이 일치하지 않습니다.');
+  if (impact.companyId !== companyId || impact.issueId !== issueId)
+    throw new Error('요청한 영향 경로와 응답이 일치하지 않습니다.');
+  if (context.round || context.graphVersion || context.asOf)
     assertSnapshot(impact.metadata, context);
-  }
   return impact;
 }
 

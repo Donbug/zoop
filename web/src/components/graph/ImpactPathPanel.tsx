@@ -99,9 +99,15 @@ export default function ImpactPathPanel({
             ? '연결 확인 중'
             : error
               ? '연결 확인 불가'
-              : impact?.steps.length
-                ? '직접 연결 확인'
-                : '직접 연결 미확인'}{' '}
+              : impact?.pathStatus === 'structural_path_details_unavailable'
+                ? '구조 경로 상세 미제공'
+                : impact?.pathStatus === 'direct_available'
+                  ? '직접 연결 확인'
+                  : impact?.pathStatus === 'no_direct_relation'
+                    ? '직접 연결 미확인'
+                    : impact?.steps.length
+                      ? '연결 확인'
+                      : '직접 연결 미확인'}{' '}
           · 지도 기준 {new Date(graph.metadata.asOf).toLocaleString('ko-KR')}
         </p>
       </header>
@@ -195,7 +201,11 @@ export default function ImpactPathPanel({
                   })}
                 </ol>
               ) : (
-                <p className={ui.muted}>확인된 영향 경로가 없습니다.</p>
+                <p className={ui.muted}>
+                  {impact.pathStatus === 'structural_path_details_unavailable'
+                    ? '구조 관계는 공개 그래프에서 확인됐지만, 현재 전체 경로와 단계별 근거는 제공되지 않습니다.'
+                    : '선택한 그래프에서 기업과 이슈 사이의 직접 연결을 확인하지 못했습니다.'}
+                </p>
               )}
             </section>
             <section

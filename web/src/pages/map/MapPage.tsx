@@ -449,23 +449,15 @@ function MapWorkspace({
     });
     if (id) track({ type: 'graph_node_select', targetId: id, viewId });
   };
-  const eventContext = tutorialOpen
-    ? {
-        graphVersion: data?.metadata.graphVersion ?? undefined,
-        asOf: data?.metadata.asOf ?? undefined,
-      }
-    : {
-        round,
-        graphVersion:
-          params.get('graphVersion') ??
-          data?.metadata.graphVersion ??
-          undefined,
-        asOf: params.get('asOf') ?? data?.metadata.asOf ?? undefined,
-      };
+  const eventContext = {
+    round: tutorialOpen ? undefined : round,
+    graphVersion: data?.metadata.graphVersion ?? undefined,
+    asOf: data?.metadata.asOf ?? undefined,
+  };
   const impact = useImpactPath(
-    round && !data ? null : impactCompanyId,
-    round && !data ? null : impactIssueId,
-    round || tutorialOpen ? eventContext : undefined,
+    data && !loading && !error ? impactCompanyId : null,
+    data && !loading && !error ? impactIssueId : null,
+    eventContext,
     tutorialOpen &&
       target?.company.id === impactCompanyId &&
       target?.issue.id === impactIssueId

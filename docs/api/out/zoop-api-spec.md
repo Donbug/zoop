@@ -2679,7 +2679,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 ## getCompanyIssueImpact · 기업 맥락 이슈 영향 경로 조회
 
-고정된 공개 그래프에서 보이는 기업과 이슈 사이의 직접 INVOLVES 관계만 반환한다. 관계가 없으면 200과 빈 steps를 반환한다. 각 근거 ID에는 getEvidence와 같은 현재 공개 권리 검사를 적용한다. 권리 때문에 근거가 빠지면 metadata.partial=true와 evidence 실패 항목을 반환하고, 권한 원천을 확인할 수 없으면 SOURCE_UNAVAILABLE/503이다. 구조 관계는 전체 receipt 경로의 공개 적격성과 basis별 근거를 검증할 수 있을 때만 이후 확장할 수 있으며, 현재 이 operation은 추정·탐색 경로를 만들지 않는다. 기업·이슈가 선택 버전에 없거나 공개 필터 뒤에 보이지 않으면 404다. round·graphVersion·asOf는 getGraph와 같은 공개 버전 선택 규칙을 따른다.
+고정된 공개 그래프에서 보이는 기업과 이슈 사이의 직접 INVOLVES 관계만 경로로 반환한다. pathStatus=direct_available이면 직접 경로가 있다. STRUCTURALLY_RELATED_TO만 보이면 200과 빈 steps, pathStatus=structural_path_details_unavailable을 반환해 실제 관계 부재와 구분한다. 둘 다 없으면 빈 steps와 pathStatus=no_direct_relation을 반환한다. 각 근거 ID에는 getEvidence와 같은 현재 공개 권리 검사를 적용한다. 권리 때문에 근거가 빠지면 metadata.partial=true와 evidence 실패 항목을 반환하고, 권한 원천을 확인할 수 없으면 SOURCE_UNAVAILABLE/503이다. 구조 상세 경로는 receipt 전체 경로의 공개 적격성과 basis별 근거를 검증할 수 있을 때만 반환할 수 있으며, 추정·탐색 경로를 만들지 않는다. 기업·이슈가 선택 버전에 없거나 공개 필터 뒤에 보이지 않으면 404다. round·graphVersion·asOf는 getGraph와 같은 공개 버전 선택 규칙을 따른다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -7124,6 +7124,7 @@ S1 실제 문서 요약. exact citation+별도 semantic supported 영수증을 �
 | --- | --- | --- | --- |
 | companyId | 필수 | string |  |
 | issueId | 필수 | string |  |
+| pathStatus | 필수 | string {direct_available, structural_path_details_unavailable, no_direct_relation} | 직접 INVOLVES 경로 제공 여부와 구조 경로 상세의 미제공 상태를 구분한다. |
 | steps | 필수 | object[] |  |
 | steps[].id | 필수 | string |  |
 | steps[].kind | 필수 | string {company, issue, industry, product} |  |
