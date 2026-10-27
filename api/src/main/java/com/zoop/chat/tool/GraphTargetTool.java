@@ -6,6 +6,7 @@ import com.zoop.document.evidence.service.EvidenceService.Readability;
 import com.zoop.graph.read.GraphContextLookup;
 import com.zoop.graph.read.PublicGraphReader;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +37,11 @@ abstract class GraphTargetTool implements ChatTool {
     /** The visible target of this tool's kind, or empty. */
     abstract Optional<GraphContextLookup.Target> find(GraphContextLookup lookup, String id);
 
+    /** What one requested id reads, in order: its own target by default; a tool may read several for one id. */
+    List<GraphContextLookup.Target> targets(GraphContextLookup lookup, String id) {
+        return find(lookup, id).map(List::of).orElse(List.of());
+    }
+
     /** Evidence passed on for a found target ahead of its graph evidence; none by default. */
     List<String> ownEvidence(GraphContextLookup.Target target) {
         return List.of();
@@ -64,12 +70,16 @@ abstract class GraphTargetTool implements ChatTool {
         Set<String> checked = new LinkedHashSet<>();
         boolean truncated = false;
         List<ChatToolItem> items = new ArrayList<>();
+        Set<String> found = new HashSet<>();
+        List<GraphContextLookup.Target> targets = new ArrayList<>();
         for (String id : request.targets()) {
-            var target = find(lookup, id);
-            if (target.isEmpty()) continue;
+            // Two requested ids may read the same target (an issue and a company it involves): it is reported once.
+            targets(lookup, id).stream().filter(t -> found.add(t.id())).forEach(targets::add);
+        }
+        for (var target : targets) {
             List<String> evidence = new ArrayList<>();
-            List<String> candidates = new ArrayList<>(ownEvidence(target.get()));
-            candidates.addAll(target.get().evidenceIds());
+            List<String> candidates = new ArrayList<>(ownEvidence(target));
+            candidates.addAll(target.evidenceIds());
             for (String evidenceId : candidates) {
                 // The runner interrupts a read that ran out of time: stop instead of reading on.
                 if (Thread.currentThread().isInterrupted()) throw new ChatToolUnavailable("read interrupted");
@@ -85,8 +95,7 @@ abstract class GraphTargetTool implements ChatTool {
                 }
             }
             if (evidence.isEmpty() && !keptWithoutEvidence()) continue;
-            items.add(new ChatToolItem(target.get().id(), target.get().kind(), target.get().label(),
-                    target.get().companyIds(), evidence));
+            items.add(new ChatToolItem(target.id(), target.kind(), target.label(), target.companyIds(), evidence));
         }
         return new ChatToolOutput(version, items, List.copyOf(passed), truncated, false);
     }

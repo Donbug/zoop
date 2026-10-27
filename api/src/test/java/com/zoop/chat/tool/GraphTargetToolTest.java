@@ -112,12 +112,25 @@ class GraphTargetToolTest {
 
     @Test
     void issueReadReturnsItsCompaniesAndEvidence() {
-        var out = issue().read(SCOPE, new ChatToolRequest("issue.read", List.of(HBM_SUPPLY, HYNIX), 20));
+        var out = issue().read(SCOPE, new ChatToolRequest("issue.read", List.of(HBM_SUPPLY), 20));
         assertEquals(1, out.items().size());
         var issue = out.items().getFirst();
         assertEquals("issue", issue.kind());
         assertEquals(Set.of(NVDA, HYNIX), Set.copyOf(issue.companyIds()));
         assertEquals(Set.of(SUPPLY_NVDA, SUPPLY_HYNIX), Set.copyOf(issue.evidenceIds()));
+    }
+
+    @Test
+    void issueReadOfACompanyReadsItsIssuesNewestFirstAndEachIssueOnce() {
+        var out = issue().read(SCOPE, new ChatToolRequest("issue.read", List.of(HYNIX), 20));
+        assertEquals(List.of("iss-fixture-hbm-equip", HBM_SUPPLY), out.items().stream().map(i -> i.id()).toList(),
+                "involved in one, structurally related to the other; newest event first");
+        assertTrue(out.items().stream().allMatch(i -> "issue".equals(i.kind())));
+
+        var both = issue().read(SCOPE, new ChatToolRequest("issue.read", List.of(HBM_SUPPLY, HYNIX), 20));
+        assertEquals(List.of(HBM_SUPPLY, "iss-fixture-hbm-equip"), both.items().stream().map(i -> i.id()).toList(),
+                "an issue asked for and read again through its company is reported once, where it was first asked");
+        assertTrue(issue().read(SCOPE, new ChatToolRequest("issue.read", List.of("KRX:999999"), 20)).items().isEmpty());
     }
 
     @Test
