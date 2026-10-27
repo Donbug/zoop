@@ -265,8 +265,9 @@ Luna가 배경으로 쓸 내용이 없다고 판단하면 배경 하위 요구�
 
 `insufficient_evidence` 결과의 `applied.companies·issues`에 이번 실행의 조회가 돌려준 기업·사건을 넣는다(답한 요구가 없으므로 모든 요구의 조회 결과). `questionOverrodeContext`도 같은 기준으로 계산한다. `answered`에서는 지금처럼 답한 요구의 조회 결과만 넣는다. OpenAPI `ChatApplied` 설명에 이 뜻을 적었다.
 
-- 근거 부족 결과는 인용이 없어 기존 응답 가드의 근거 재확인에 걸리지 않는다. 그래서 저장 결과를 돌려줄 때마다(작업·대화 조회, 최신 대화 복원 등) `ChatResponseGuard`가 `applied`의 기업·사건도 다시 확인한다. 고정한 `graphVersion`·asOf에 현재 공개 제외를 적용한 공개 그래프에서 지금 보이지 않는 대상은 응답에서 뺀다. 그래프를 읽지 못해 확인할 수 없으면 모두 뺀다(`ChatTargetAccess`, `GraphTargetAccess`). `answered` 결과에도 같은 규칙을 쓴다. 저장된 결과는 바꾸지 않는다.
+- 근거 부족 결과는 인용이 없어 기존 응답 가드의 근거 재확인에 걸리지 않는다. 그래서 저장 결과를 돌려줄 때마다(작업·대화 조회, 최신 대화 복원 등) `ChatResponseGuard`가 `applied`의 기업·사건도 다시 확인한다. 고정한 `graphVersion`·asOf에 현재 공개 제외를 적용한 공개 그래프에서 지금 보이지 않는 대상은 응답에서 뺀다. 그래프를 읽지 못해 확인할 수 없으면 모두 뺀다(`ChatTargetAccess`, `GraphTargetAccess`). `answered` 결과에도 같은 규칙을 쓰고, 지도 이동 대상(`graphTargets`)도 같은 확인 결과로 거른다. 저장된 결과는 바꾸지 않는다.
   - 예: 두 기업 사이 경로 조회(`graph.path.read`)가 중간 사건을 돌려주고 답이 근거 부족으로 끝났다. 그 뒤 그 사건이 공개 제외되면, 대화를 복원해도 그 사건 이름은 다시 나오지 않는다.
+  - 예: 사건이 실행 뒤 제외됐지만, 그 근거를 다른 공개 관계도 인용해 지금도 읽을 수 있다. 인용 검사는 통과하므로 답변은 그대로지만, 제외된 사건은 `graphTargets`에서 빠져 지도 이동 대상으로 나오지 않는다.
 
 ### 12.5 limitation 문장
 
