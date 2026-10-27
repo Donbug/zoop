@@ -146,8 +146,31 @@ class ChatResponseGuardTest {
         assertEquals(1, targetChecks.size(), "each target is checked once per conversation");
     }
 
+    @Test
+    void aMapTargetExcludedSinceTheRunIsLeftOutWhileItsSharedEvidenceKeepsTheAnswer() {
+        var result = answered("ev-shared");
+        var mapped = new ChatResult(result.outcome(), result.messageId(), result.answer(), result.sections(),
+                result.answerBasis(), result.reason(), result.sources(), result.citations(),
+                List.of(new GraphTarget("KRX:000660", "company"), new GraphTarget("iss-excluded", "issue")), result.applied(),
+                result.choices(), result.action(), result.limitations(), result.metadata());
+        var job = job(List.of(), mapped);
+
+        // The issue was excluded, but the evidence is still readable through a public relation that cites it too.
+        var shown = guard(Set.of("ev-shared"), Optional.of(Set.of("KRX:000660"))).job(job, "req-1").result();
+        assertEquals("근거 본문", shown.answer(), "the citation still reads, so the answer stays");
+        assertEquals(result.citations(), shown.citations());
+        assertEquals(List.of(new GraphTarget("KRX:000660", "company")), shown.graphTargets(),
+                "the excluded issue is no longer a place the map moves to");
+        assertEquals(2, job.result().graphTargets().size(), "what is stored never changes");
+
+        var unchecked = guard(Set.of("ev-shared"), Optional.empty()).job(job, "req-2").result();
+        assertTrue(unchecked.graphTargets().isEmpty(), "visibility that cannot be checked shows no map target");
+        assertEquals("근거 본문", unchecked.answer());
+    }
+
+    /** Every applied or map target is visible. */
     private ChatResponseGuard guard(Set<String> readable) {
-        return guard(readable, Optional.of(Set.of()));
+        return guard(readable, null);
     }
 
     private ChatResponseGuard guard(Set<String> readable, Optional<Set<String>> visible) {
@@ -156,6 +179,7 @@ class ChatResponseGuardTest {
             return readable.contains(id);
         }, (ids, version, asOf, requestId) -> {
             targetChecks.add(String.join(",", ids.stream().sorted().toList()) + "@" + version + "@" + asOf);
+            if (visible == null) return Optional.of(ids);
             return visible.map(v -> Set.copyOf(ids.stream().filter(v::contains).toList()));
         });
     }
