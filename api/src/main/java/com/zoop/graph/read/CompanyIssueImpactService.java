@@ -11,6 +11,8 @@ import com.zoop.graph.read.dto.CompanyIssueImpactResponse.BusinessLink;
 import com.zoop.graph.read.dto.CompanyIssueImpactResponse.BusinessPath;
 import com.zoop.graph.read.dto.CompanyIssueImpactResponse.Impact;
 import com.zoop.graph.read.dto.CompanyIssueImpactResponse.Step;
+import com.zoop.graph.snapshot.PublicGraphSnapshot.Basis;
+import com.zoop.graph.snapshot.PublicGraphSnapshot.Relation;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.nio.charset.StandardCharsets;
@@ -19,6 +21,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -87,6 +90,7 @@ public class CompanyIssueImpactService {
 
     private Impact readImpact(PublicGraphReader.Pinned pinned, DisplayGraph.Edge edge, String issueId, String companyId,
             String round, String graphVersion, Instant requestedAsOf, String requestId) {
+        if (!receiptBacked(pinned)) return new Impact("unavailable", "not_recorded", List.of());
         Obj bundle = evidence.graphImportBundle(pinned.selected().version().id(), requestId);
         if (!bundle.has("impacts")) return new Impact("unavailable", "not_recorded", List.of());
 
@@ -95,14 +99,14 @@ public class CompanyIssueImpactService {
             row.exactly(IMPACT_ROW_KEYS);
             rowsByRelation.computeIfAbsent(row.string("edgeId"), ignored -> new java.util.ArrayList<>()).add(row);
         }
-        List<Obj> receiptRelations = bundle.objects("relations");
+        Map<String, Obj> receiptRelations = index(bundle.objects("relations"), "id");
         List<ImpactCandidate> verified = new java.util.ArrayList<>();
+        boolean evidenceUnavailable = false;
         String evidenceGraphVersion = round == null ? pinned.selected().version().id() : graphVersion;
 
         for (String relationId : edge.relationIds()) {
-            List<Obj> matches = receiptRelations.stream().filter(relation -> relation.string("id").equals(relationId)).toList();
-            if (matches.size() != 1) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
-            Obj relation = matches.get(0);
+            Obj relation = receiptRelations.get(relationId);
+            if (relation == null) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
             if (!"INVOLVES".equals(relation.string("type")) || !issueId.equals(relation.string("source"))
                     || !companyId.equals(relation.string("target"))) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
 
@@ -145,7 +149,8 @@ public class CompanyIssueImpactService {
                 }
                 if (cited.stream().anyMatch(id -> !evidence.shownNow(id, round, evidenceGraphVersion,
                         requestedAsOf, requestId))) {
-                    return new Impact("unavailable", "evidence_unavailable", List.of());
+                    evidenceUnavailable = true;
+                    continue;
                 }
                 String impactId = impactId(pinned.selected().version().id(), relationId, sourceKey);
                 verified.add(new ImpactCandidate(relationId, sourceKey,
@@ -154,6 +159,7 @@ public class CompanyIssueImpactService {
             }
             if (!seenSourceRefs.containsAll(sourceRefs)) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         }
+        if (evidenceUnavailable) return new Impact("unavailable", "evidence_unavailable", List.of());
         if (verified.isEmpty()) {
             return new Impact("unavailable", "not_verified", List.of());
         }
@@ -191,35 +197,63 @@ public class CompanyIssueImpactService {
 
     private BusinessPath readBusinessPath(PublicGraphReader.Pinned pinned, DisplayGraph.Edge edge, String issueId,
             String round, String graphVersion, Instant requestedAsOf, String requestId) {
+        if (!receiptBacked(pinned)) return new BusinessPath("unavailable", "not_recorded", List.of(), List.of());
         Obj bundle = evidence.graphImportBundle(pinned.selected().version().id(), requestId);
-        List<Obj> receiptRelations = bundle.objects("relations");
+        String schema = bundle.string("schemaVersion");
+        if (LEGACY_BUNDLE_SCHEMAS.contains(schema)) {
+            return new BusinessPath("unavailable", "legacy_data", List.of(), List.of());
+        }
+        if (!SUPPORTED_BUNDLE_SCHEMAS.contains(schema)) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        Map<String, Obj> receiptRelations = index(bundle.objects("relations"), "id");
         List<PathCandidate> candidates = new java.util.ArrayList<>();
         String unavailableReason = "not_recorded";
         boolean sawUnmapped = false;
         boolean sawPrivateOrUnlinked = false;
         boolean sawUnreadableEvidence = false;
+        boolean sawIncomplete = false;
         DisplayGraph graph = pinned.graph();
+        Map<String, Relation> snapshotRelations = snapshotRelationIndex(graph);
+        Map<String, String> articleKeyByEvidence = new HashMap<>();
+        Map<String, Boolean> evidenceVisibility = new HashMap<>();
+        graph.snapshot.evidence().forEach(item -> articleKeyByEvidence.put(item.evidenceId(),
+                item.articleId() + "@" + item.articleVersion()));
 
         for (String relationId : edge.relationIds()) {
-            List<Obj> matches = receiptRelations.stream().filter(relation -> relation.string("id").equals(relationId)).toList();
-            if (matches.size() != 1) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
-            Obj relation = matches.get(0);
+            Obj relation = receiptRelations.get(relationId);
+            if (relation == null) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
             if (!"STRUCTURALLY_RELATED_TO".equals(relation.string("type"))
                     || !issueId.equals(relation.string("source")) || !edge.target().equals(relation.string("target"))) {
                 throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
             }
-            if (!relation.has("structuralPath") || relation.isNull("structuralPath")) continue;
+            if (!relation.has("structuralPath") || relation.isNull("structuralPath")) {
+                sawIncomplete = true;
+                continue;
+            }
+            Relation visibleRelation = snapshotRelations.get(relationId);
+            if (visibleRelation == null) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+            List<Obj> bases = relation.objects("basis");
+            Map<String, Obj> basesById = index(bases, "relationKey");
+            if (bases.size() != visibleRelation.basis().size()
+                    || visibleRelation.basis().stream().anyMatch(item -> !basesById.containsKey(item.basisId()))) {
+                sawIncomplete = true;
+                continue;
+            }
             Obj path = relation.object("structuralPath");
             String status = path.string("status");
             if ("unavailable".equals(status)) {
+                path.exactly(Set.of("status", "reason"));
+                if (!"intermediate_company_unmapped".equals(path.string("reason"))) {
+                    throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+                }
                 if ("intermediate_company_unmapped".equals(path.string("reason"))) sawUnmapped = true;
+                sawIncomplete = true;
                 continue;
             }
             if (!"complete".equals(status)) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+            path.exactly(Set.of("status", "companyIds", "links"));
 
             List<String> companyIds = path.strings("companyIds");
             List<Obj> rawLinks = path.objects("links");
-            List<Obj> bases = relation.objects("basis");
             if (companyIds.size() < 2 || companyIds.size() > 3 || rawLinks.size() != companyIds.size() - 1
                     || bases.size() != rawLinks.size() || !companyIds.get(companyIds.size() - 1).equals(edge.target())
                     || new HashSet<>(companyIds).size() != companyIds.size()) {
@@ -227,6 +261,7 @@ public class CompanyIssueImpactService {
             }
             if (companyIds.stream().anyMatch(id -> !graph.companies.containsKey(id))) {
                 sawPrivateOrUnlinked = true;
+                sawIncomplete = true;
                 continue;
             }
             String firstCompanyId = companyIds.get(0);
@@ -236,6 +271,12 @@ public class CompanyIssueImpactService {
                     .findFirst().orElse(null);
             if (start == null) {
                 sawPrivateOrUnlinked = true;
+                sawIncomplete = true;
+                continue;
+            }
+            if (start.evidenceIds().isEmpty()) {
+                sawPrivateOrUnlinked = true;
+                sawIncomplete = true;
                 continue;
             }
             Set<String> allEvidence = new TreeSet<>(edge.evidenceIds());
@@ -243,6 +284,7 @@ public class CompanyIssueImpactService {
             List<BusinessLink> links = new java.util.ArrayList<>();
             for (int index = 0; index < rawLinks.size(); index++) {
                 Obj rawLink = rawLinks.get(index);
+                rawLink.exactly(Set.of("supplierCompanyId", "customerCompanyId"));
                 Obj basis = bases.get(index);
                 String supplier = rawLink.string("supplierCompanyId");
                 String customer = rawLink.string("customerCompanyId");
@@ -251,20 +293,26 @@ public class CompanyIssueImpactService {
                 }
                 List<String> evidenceIds = basis.strings("evidenceIds");
                 if (evidenceIds.isEmpty()) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+                Basis visibleBasis = visibleRelation.basis().stream()
+                        .filter(item -> item.basisId().equals(basis.string("relationKey"))).findFirst()
+                        .orElseThrow(() -> new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
+                validateBasis(basis, visibleBasis, evidenceIds, articleKeyByEvidence);
                 allEvidence.addAll(evidenceIds);
                 String reason = businessReason(basis);
                 links.add(new BusinessLink(supplier, customer, reason, evidenceIds));
             }
             String evidenceGraphVersion = round == null ? pinned.selected().version().id() : graphVersion;
-            if (allEvidence.stream().anyMatch(id -> !evidence.shownNow(id, round, evidenceGraphVersion,
-                    requestedAsOf, requestId))) {
+            if (allEvidence.stream().anyMatch(id -> !evidenceVisibility.computeIfAbsent(id,
+                    key -> evidence.shownNow(key, round, evidenceGraphVersion, requestedAsOf, requestId)))) {
                 sawUnreadableEvidence = true;
+                sawIncomplete = true;
                 continue;
             }
             String firstEvidenceId = allEvidence.isEmpty() ? "" : allEvidence.iterator().next();
             candidates.add(new PathCandidate(companyIds, links, relationId, firstEvidenceId));
         }
 
+        if (sawIncomplete) candidates.clear();
         if (!candidates.isEmpty()) {
             PathCandidate selected = candidates.stream().min(Comparator
                     .comparingInt((PathCandidate candidate) -> candidate.links().size())
@@ -275,6 +323,7 @@ public class CompanyIssueImpactService {
         if (sawUnreadableEvidence) unavailableReason = "evidence_unavailable";
         else if (sawPrivateOrUnlinked) unavailableReason = "not_public";
         else if (sawUnmapped) unavailableReason = "intermediate_company_unmapped";
+        else if (sawIncomplete) unavailableReason = "incomplete";
         return new BusinessPath("unavailable", unavailableReason, List.of(), List.of());
     }
 
@@ -282,13 +331,74 @@ public class CompanyIssueImpactService {
         return (supplier.equals(from) && customer.equals(to)) || (supplier.equals(to) && customer.equals(from));
     }
 
-    private static String businessReason(Obj basis) {
+    static String businessReason(Obj basis) {
         String relationType = basis.string("relationType");
+        if (!"SUPPLIES".equals(relationType)) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         String businessScope = basis.stringOrNull("businessScope");
         String productScope = basis.stringOrNull("productScope");
         List<String> scopes = java.util.stream.Stream.of(businessScope, productScope).filter(value -> value != null && !value.isBlank())
                 .toList();
-        return scopes.isEmpty() ? relationType : relationType + " · " + String.join(" · ", scopes);
+        return scopes.isEmpty() ? "공급" : "공급 · " + String.join(" · ", scopes);
+    }
+
+    private static final Set<String> SUPPORTED_BUNDLE_SCHEMAS = Set.of("zoop-graph-handoff-bundle-5",
+            "zoop-graph-handoff-bundle-6", "zoop-graph-handoff-bundle-7");
+    private static final Set<String> LEGACY_BUNDLE_SCHEMAS = Set.of("zoop-graph-handoff-bundle-1",
+            "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3", "zoop-graph-handoff-bundle-4");
+
+    private static boolean receiptBacked(PublicGraphReader.Pinned pinned) {
+        return "snapshot".equals(pinned.selected().version().kind()) && !pinned.selected().reconstructed();
+    }
+
+    private static Map<String, Obj> index(List<Obj> rows, String key) {
+        Map<String, Obj> result = new HashMap<>();
+        for (Obj row : rows) {
+            if (result.putIfAbsent(row.string(key), row) != null) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        }
+        return result;
+    }
+
+    private static Map<String, Relation> snapshotRelationIndex(DisplayGraph graph) {
+        Map<String, Relation> result = new HashMap<>();
+        for (Relation relation : graph.snapshot.relations()) {
+            if (result.putIfAbsent(relation.relationId(), relation) != null) {
+                throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+            }
+        }
+        return result;
+    }
+
+    private static void validateBasis(Obj basis, Basis visible, List<String> evidenceIds,
+            Map<String, String> articleKeyByEvidence) {
+        if (!"SUPPLIES".equals(basis.string("relationType"))
+                || !visible.relationType().equals(basis.string("relationType"))
+                || !parseOffsetInstant(visible.verifiedAt()).equals(parseOffsetInstant(basis.string("verifiedAt")))
+                || !java.util.Objects.equals(visible.validFrom(), basis.stringOrNull("validFrom"))
+                || !java.util.Objects.equals(visible.validUntil(), basis.stringOrNull("validUntil"))
+                || !visible.countries().equals(basis.strings("countries"))) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        }
+        Set<String> receiptArticles = new HashSet<>();
+        for (Obj article : basis.objects("sourceArticles")) {
+            receiptArticles.add(article.string("articleId") + "@" + article.string("articleVersion"));
+        }
+        Set<String> snapshotArticles = visible.articles().stream()
+                .map(article -> article.articleId() + "@" + article.articleVersion())
+                .collect(java.util.stream.Collectors.toSet());
+        Set<String> citedArticles = new HashSet<>();
+        for (String evidenceId : evidenceIds) {
+            String articleKey = articleKeyByEvidence.get(evidenceId);
+            if (articleKey == null) throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+            citedArticles.add(articleKey);
+        }
+        if (!receiptArticles.equals(snapshotArticles) || !citedArticles.equals(receiptArticles)) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        }
+    }
+
+    private static String parseOffsetInstant(String value) {
+        try { return java.time.OffsetDateTime.parse(value).toInstant().toString(); }
+        catch (DateTimeParseException exception) { throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception); }
     }
 
     private record PathCandidate(List<String> companyIds, List<BusinessLink> links, String relationId,
