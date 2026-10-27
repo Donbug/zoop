@@ -1,3 +1,4 @@
+import { useAdminRefresh } from '@/hooks/useAdminRefresh';
 import { useCallback } from 'react';
 import { getAiUsage } from '@/apis/admin/briefings';
 import {
@@ -104,6 +105,7 @@ export default function AiUsageOverview() {
   const viewLabel = VIEWS.find((option) => option.value === view)?.label;
   const load = useCallback(() => getAiUsage(window), [window]);
   const usage = useAsyncData(load);
+  useAdminRefresh(usage.reload, 10000);
   const data = usage.data;
   const allowed = VIEW_FEATURES[view];
   const features = data
@@ -136,6 +138,11 @@ export default function AiUsageOverview() {
           />
         }
       />
+      {usage.refreshError && (
+        <p role="status" className="text-[11px] text-zoop-muted">
+          새로 고치지 못했어요. 이전 결과를 표시해요.
+        </p>
+      )}
       <Tabs
         label="AI 사용량 보기"
         value={view}

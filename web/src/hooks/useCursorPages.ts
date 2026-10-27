@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '@/apis/auth/ApiService';
+import type { Reload, ReloadOptions } from './useAsyncData';
 
 type Page = { items: unknown[]; nextCursor: string | null };
 
@@ -10,6 +11,7 @@ type State<P> = {
   error: Error | null;
   loadingMore: boolean;
   moreError: Error | null;
+  refreshError?: Error;
 };
 
 function toError(error: unknown) {
@@ -24,47 +26,87 @@ function toError(error: unknown) {
 export function useCursorPages<P extends Page>(
   load: (cursor?: string) => Promise<P>,
 ) {
-  const [attempt, setAttempt] = useState(0);
+  const [request, setRequest] = useState<{
+    attempt: number;
+    quiet: boolean;
+    count: number;
+    countFor?: typeof load;
+    accept?: () => boolean;
+  }>({ attempt: 0, quiet: false, count: 1 });
+  const { attempt, quiet, accept } = request;
+  const pageCount = request.countFor === load ? request.count : 1;
   const [state, setState] = useState<State<P> | null>(null);
+  const busy = useRef(false);
 
   useEffect(() => {
     let active = true;
-    load().then(
-      (page) => {
+    busy.current = true;
+    async function readPages() {
+      const pages = [await load()];
+      while (active && pages.length < pageCount && pages.at(-1)?.nextCursor) {
+        pages.push(await load(pages.at(-1)!.nextCursor!));
+      }
+      return pages;
+    }
+    void readPages().then(
+      (pages) => {
+        if (active) busy.current = false;
         if (active)
-          setState({
-            load,
-            attempt,
-            pages: [page],
-            error: null,
-            loadingMore: false,
-            moreError: null,
-          });
+          setState((previous) =>
+            quiet && accept?.() === false && previous?.load === load
+              ? { ...previous, attempt }
+              : {
+                  load,
+                  attempt,
+                  pages,
+                  error: null,
+                  loadingMore: false,
+                  moreError: null,
+                },
+          );
       },
       (error: unknown) => {
+        if (active) busy.current = false;
         if (active)
-          setState({
-            load,
-            attempt,
-            pages: [],
-            error: toError(error),
-            loadingMore: false,
-            moreError: null,
-          });
+          setState((previous) =>
+            quiet && previous?.load === load && previous.pages.length > 0
+              ? {
+                  ...previous,
+                  attempt,
+                  loadingMore: false,
+                  refreshError: toError(error),
+                }
+              : {
+                  load,
+                  attempt,
+                  pages: [],
+                  error: toError(error),
+                  loadingMore: false,
+                  moreError: null,
+                },
+          );
       },
     );
     return () => {
       active = false;
     };
-  }, [load, attempt]);
+  }, [load, attempt, quiet, pageCount, accept]);
 
   const settled =
-    state && state.load === load && state.attempt === attempt ? state : null;
+    state && state.load === load && (state.attempt === attempt || quiet)
+      ? state
+      : null;
   const pages = settled?.pages ?? [];
   const nextCursor = pages.at(-1)?.nextCursor ?? null;
 
   const loadMore = useCallback(() => {
-    if (!settled || !nextCursor || settled.loadingMore) return;
+    if (
+      !settled ||
+      !nextCursor ||
+      settled.loadingMore ||
+      settled.attempt !== attempt
+    )
+      return;
     // 조건이 바뀐 뒤 도착한 이전 조건의 다음 쪽은 버린다.
     const same = (previous: State<P> | null): previous is State<P> =>
       previous !== null &&
@@ -86,8 +128,10 @@ export function useCursorPages<P extends Page>(
       (error: unknown) => {
         // 커서가 만료됐으면(INVALID_CURSOR) 같은 커서로 다시 보내지 않고 첫 쪽부터 다시 읽는다.
         if (error instanceof ApiError && error.code === 'INVALID_CURSOR') {
-          setAttempt((value) =>
-            value === settled.attempt ? value + 1 : value,
+          setRequest((value) =>
+            value.attempt === settled.attempt
+              ? { attempt: value.attempt + 1, quiet: false, count: 1 }
+              : value,
           );
           return;
         }
@@ -98,9 +142,27 @@ export function useCursorPages<P extends Page>(
         );
       },
     );
-  }, [settled, nextCursor, load]);
+  }, [settled, nextCursor, load, attempt]);
 
-  const reload = useCallback(() => setAttempt((value) => value + 1), []);
+  const reload: Reload = useCallback(
+    (options?: ReloadOptions) => {
+      if (
+        options?.quiet &&
+        (busy.current ||
+          settled?.loadingMore ||
+          (settled && settled.attempt !== attempt))
+      )
+        return;
+      setRequest((value) => ({
+        attempt: value.attempt + 1,
+        quiet: options?.quiet === true,
+        count: options?.quiet ? Math.max(1, settled?.pages.length ?? 1) : 1,
+        countFor: load,
+        accept: options?.accept,
+      }));
+    },
+    [settled, attempt, load],
+  );
 
   return {
     status: !settled ? 'loading' : settled.error ? 'error' : 'success',
@@ -112,5 +174,6 @@ export function useCursorPages<P extends Page>(
     moreError: settled?.moreError ?? null,
     loadMore,
     reload,
+    ...(settled?.refreshError ? { refreshError: settled.refreshError } : {}),
   } as const;
 }
