@@ -139,6 +139,14 @@ zoop:
       connect-timeout: ${ZOOP_AI_PLAN_ADMISSION_CLIENT_CONNECT_TIMEOUT:3s}
       request-timeout: ${ZOOP_AI_PLAN_ADMISSION_CLIENT_REQUEST_TIMEOUT:30s}
       max-response-bytes: ${ZOOP_AI_PLAN_ADMISSION_CLIENT_MAX_RESPONSE_BYTES:16000000}
+    handoff-exposure-client:
+      # Identity-only exposure query (scope handoff.exposure) for the operator exclusion command. A proposal, never an exclusion.
+      enabled: ${ZOOP_AI_HANDOFF_EXPOSURE_CLIENT_ENABLED:false}
+      base-url: ${ZOOP_AI_HANDOFF_EXPOSURE_CLIENT_BASE_URL:}
+      token: ${ZOOP_AI_HANDOFF_EXPOSURE_CLIENT_TOKEN:}
+      connect-timeout: ${ZOOP_AI_HANDOFF_EXPOSURE_CLIENT_CONNECT_TIMEOUT:3s}
+      request-timeout: ${ZOOP_AI_HANDOFF_EXPOSURE_CLIENT_REQUEST_TIMEOUT:60s}
+      max-response-bytes: ${ZOOP_AI_HANDOFF_EXPOSURE_CLIENT_MAX_RESPONSE_BYTES:7340032}
     chat-client:
       # Chatbot model stages through ai/service (POST /internal/v1/chat-stages/{stage}). Disabled by default. Enabled, it
       # registers the chat engine, so zoop.chat.questions-enabled may be turned on. mode: replay (AI-side fixtures, no network)
