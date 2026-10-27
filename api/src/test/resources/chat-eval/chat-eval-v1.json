@@ -518,10 +518,26 @@
         "router": {"r1": {"types": {"Q03": 0.9}, "capabilities": {"company.read": 0.9}}}
       },
       "expect": {
-        "stages": [],
+        "stages": ["router"],
         "tools": [],
         "outcome": "failed",
         "failure": {"kind": "transient", "reason": null, "rerunnable": true}
+      }
+    },
+    {
+      "id": "failure-graph-unreadable-concept",
+      "group": "failure",
+      "question": "HBM이 뭐야?",
+      "graphVersion": "fixture-unknown",
+      "script": {
+        "router": {"r1": {"types": {"Q02": 0.95}, "capabilities": {}}},
+        "answer": {"sections": [{"basis": "general_knowledge", "text": "HBM은 메모리 칩을 수직으로 쌓아 대역폭을 높인 메모리입니다.", "requirementIds": ["r1"], "evidenceIds": []}]}
+      },
+      "expect": {
+        "stages": ["router", "answer", "verify"],
+        "tools": [],
+        "outcome": "answered",
+        "answerBasis": "general_knowledge"
       }
     },
     {

@@ -24,6 +24,7 @@ import com.zoop.chat.orchestrator.ChatCitationSource;
 import com.zoop.chat.orchestrator.ChatGeneratedAnswer;
 import com.zoop.chat.orchestrator.ChatModels;
 import com.zoop.chat.orchestrator.ChatModels.Failure.Fate;
+import com.zoop.chat.orchestrator.ChatPlanner;
 import com.zoop.chat.orchestrator.ChatQueryType;
 import com.zoop.chat.orchestrator.ChatRouteDecision;
 import com.zoop.chat.orchestrator.ChatSemanticVerdicts;
@@ -41,9 +42,11 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * The three orchestrator model ports over the AI service's chat stages ({@code zoop-ai-chat-1}). The server decides what is
  * sent: the router gets the question chain, the requirements split by {@link ChatRequirementSplitter} and the descriptions of
- * the bound capabilities; company and issue names are resolved here ({@link CompanyNameResolver}, {@link IssueNameResolver}
- * over the run's pinned graph), never by the model, and a name that fits several becomes a clarification without any model
- * call. The generator and verifier get quotes built from the evidence records, each with the
+ * the bound capabilities; company and issue names are resolved here, never by the model. Company names
+ * ({@link CompanyNameResolver}) are resolved before the router, so a name that fits several companies becomes a clarification
+ * without any model call. Issue names ({@link IssueNameResolver}, over the run's pinned graph) are resolved after it and only
+ * when a requirement may look something up, so a concept question never reads the graph; a shared issue name is then a
+ * clarification after the router call. The generator and verifier get quotes built from the evidence records, each with the
  * {@code sourceId} the AI side's chat grant registry checks. No member id, account data or article text is sent.
  *
  * <p>Failures map to {@link ChatModels.Failure}: a stage whose request may have reached the provider is {@link Fate#UNKNOWN}
@@ -115,33 +118,10 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             // More than the planner accepts: it asks the member to narrow the question; the router is not asked.
             return new ChatRouteDecision(pieces.stream().map(p -> requirement(p, Map.of(), Map.of(), List.of(), 0)).toList(), null);
         }
-        Map<String, List<String>> targets = new LinkedHashMap<>();
-        List<String> fromReplies = new ArrayList<>();
-        // A pinned graph that cannot be read is the reads' outage too: it ends the run as such, not as a model failure.
-        IssueNameResolver.Names issueNames = issues.at(run.graphVersionId(), run.context().asOf());
-        try {
-            for (String reply : replies) {
-                for (var mention : named(reply, issueNames)) {
-                    resolved(mention, picked).ifPresent(id -> {
-                        if (!fromReplies.contains(id)) fromReplies.add(id);
-                    });
-                }
-            }
-            // A name typed in a reply counts as a pick for a shared name of the question.
-            picked.addAll(fromReplies);
-            for (var piece : pieces) {
-                List<String> ids = new ArrayList<>();
-                for (var mention : named(piece.text(), issueNames)) {
-                    Optional<String> id = resolved(mention, picked);
-                    if (id.isEmpty()) return new ChatRouteDecision(List.of(), new ChatRouteDecision.Ambiguity(mention.kind(),
-                            mention.candidates()));
-                    if (!ids.contains(id.get())) ids.add(id.get());
-                }
-                targets.put(piece.id(), ids.isEmpty() ? List.copyOf(fromReplies) : List.copyOf(ids));
-            }
-        } catch (RuntimeException unreadable) {
-            throw new ChatModels.Failure(Fate.NOT_SENT, "company or issue names could not be resolved");
-        }
+        // Companies are resolved before the router, so a shared company name asks without any model call.
+        Resolved companies = resolve(pieces, replies, picked, IssueNameResolver.NONE);
+        if (companies.ambiguity() != null) return new ChatRouteDecision(List.of(), companies.ambiguity());
+        Map<String, List<String>> targets = companies.targets();
 
         ObjectNode input = StrictJson.newObject();
         input.set("turns", turns(run));
@@ -156,7 +136,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             }
         }
         JsonNode answer = call(run, ROUTER, "router", input);
-        return decode(() -> {
+        ChatRouteDecision decision = decode(() -> {
             Map<String, JsonNode> routed = new HashMap<>();
             for (JsonNode r : array(answer, "requirements")) {
                 if (routed.put(text(r, "requirementId"), r) != null) throw new IllegalArgumentException("duplicate");
@@ -177,6 +157,63 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             }
             return new ChatRouteDecision(decided, null);
         });
+
+        // Issues are resolved only for a question that may look something up: a concept question never reads the pinned
+        // graph, so it is answered while the graph cannot be read. A graph that cannot be read here is the reads' outage
+        // too, and ends the run as such, not as a model failure.
+        if (decision.requirements().stream().noneMatch(ChatModelStages::mayLookUp)) return decision;
+        Resolved named = resolve(pieces, replies, picked, issues.at(run.graphVersionId(), run.context().asOf()));
+        if (named.ambiguity() != null) return new ChatRouteDecision(List.of(), named.ambiguity());
+        return new ChatRouteDecision(decision.requirements().stream().map(r -> new ChatRouteDecision.Requirement(r.id(),
+                r.label(), r.explicit(), r.types(), r.capabilities(), named.targets().get(r.id()), r.prohibitedAdvice(),
+                r.dependsOn())).toList(), null);
+    }
+
+    /**
+     * Whether the planner may give a requirement a lookup: a type other than a concept (Q02) at its lowest band. It is the
+     * band at which a concept question naming a company or an issue also becomes a question about it.
+     */
+    private static boolean mayLookUp(ChatRouteDecision.Requirement requirement) {
+        return requirement.types().entrySet().stream()
+                .anyMatch(t -> t.getKey() != ChatQueryType.Q02 && t.getValue() >= ChatPlanner.REVIEW);
+    }
+
+    /** Targets by requirement, or the shared name to ask about. */
+    private record Resolved(Map<String, List<String>> targets, ChatRouteDecision.Ambiguity ambiguity) { }
+
+    /**
+     * The companies, and the issues {@code issueNames} knows, that each requirement names, in order; a requirement that names
+     * none takes what the replies named. A name typed in a reply counts as a pick for a shared name of the question.
+     */
+    private Resolved resolve(List<ChatRequirementSplitter.Piece> pieces, List<String> replies, Set<String> chosen,
+            IssueNameResolver.Names issueNames) {
+        Set<String> picked = new HashSet<>(chosen);
+        Map<String, List<String>> targets = new LinkedHashMap<>();
+        List<String> fromReplies = new ArrayList<>();
+        try {
+            for (String reply : replies) {
+                for (var mention : named(reply, issueNames)) {
+                    resolved(mention, picked).ifPresent(id -> {
+                        if (!fromReplies.contains(id)) fromReplies.add(id);
+                    });
+                }
+            }
+            picked.addAll(fromReplies);
+            for (var piece : pieces) {
+                List<String> ids = new ArrayList<>();
+                for (var mention : named(piece.text(), issueNames)) {
+                    Optional<String> id = resolved(mention, picked);
+                    if (id.isEmpty()) {
+                        return new Resolved(null, new ChatRouteDecision.Ambiguity(mention.kind(), mention.candidates()));
+                    }
+                    if (!ids.contains(id.get())) ids.add(id.get());
+                }
+                targets.put(piece.id(), ids.isEmpty() ? List.copyOf(fromReplies) : List.copyOf(ids));
+            }
+        } catch (RuntimeException unreadable) {
+            throw new ChatModels.Failure(Fate.NOT_SENT, "company or issue names could not be resolved");
+        }
+        return new Resolved(targets, null);
     }
 
     /** The root's requirements, replaced in order by a free-text reply's own while they are more than the planner accepts. */

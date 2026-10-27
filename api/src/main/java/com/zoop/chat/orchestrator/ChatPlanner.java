@@ -47,7 +47,7 @@ import java.util.Set;
  */
 public class ChatPlanner {
     static final double TAKE = 0.70;
-    static final double REVIEW = 0.35;
+    public static final double REVIEW = 0.35;
     static final double ADVICE = 0.10;
     static final int MAX_REQUIREMENTS = 6;
     static final int MAX_STAGES = 3;

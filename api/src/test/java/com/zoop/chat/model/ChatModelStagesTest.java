@@ -61,6 +61,8 @@ class ChatModelStagesTest {
 
     private final List<ChatStageCall> calls = new ArrayList<>();
     private List<IssueNameResolver.Entry> issueCatalog = List.of();
+    private boolean issueOutage;
+    private int issueReads;
     private final List<String> recorded = new ArrayList<>();
     private Function<ChatStageCall, ChatStageReply> answer = call -> { throw new AssertionError("no call expected"); };
 
@@ -89,6 +91,8 @@ class ChatModelStagesTest {
     }, new IssueNameResolver(null) {
         @Override
         public Names at(String graphVersion, Instant asOf) {
+            issueReads++;
+            if (issueOutage) throw new com.zoop.chat.tool.ChatToolUnavailable("graph down");
             return text -> match(text, issueCatalog);
         }
     }, (evidenceId, graphVersion, asOf, traceId) -> evidenceId.equals(EV_A)
@@ -180,7 +184,7 @@ class ChatModelStagesTest {
         calls.clear();
         issueCatalog = List.of(supply, again);
         ChatRouteDecision shared = stages.route(run(root("HBM 공급 계약 사건 알려줘")), Set.of("issue.read"));
-        assertTrue(calls.isEmpty());
+        assertEquals(1, calls.size(), "issues are resolved after the router, so a shared issue name asks after it");
         assertEquals("other", shared.ambiguity().kind(), "the public choice kinds have none for issues");
         assertEquals(List.of("차세대 HBM 공급 계약 (2026-09-22)", "HBM 추가 공급 계약 (2026-10-02)"),
                 shared.ambiguity().options().stream().map(ChatRouteDecision.Option::label).toList());
@@ -190,6 +194,26 @@ class ChatModelStagesTest {
                 Set.of("issue.read"));
         assertNull(picked.ambiguity());
         assertEquals(List.of("iss-supply-2"), picked.requirements().getFirst().targets());
+    }
+
+    @Test
+    void aConceptQuestionNeverReadsTheGraphSoItIsRoutedWhileTheGraphIsDown() {
+        issueCatalog = List.of(new IssueNameResolver.Entry("iss-supply", "차세대 HBM 공급 계약", "HBM", "공급 계약", null));
+        issueOutage = true;
+        answer = call -> succeeded(call, """
+                {"requirements":[{"requirementId":"r1","types":{"Q02":0.9,"Q03":0.2},"capabilities":{},
+                  "prohibitedAdvice":0.0}]}""");
+        ChatRouteDecision concept = stages.route(run(root("HBM 공급 계약이 뭐야")), Set.of("issue.read"));
+        assertEquals(List.of(), concept.requirements().getFirst().targets(), "a concept names no issue");
+        assertEquals(0, issueReads);
+
+        answer = call -> succeeded(call, """
+                {"requirements":[{"requirementId":"r1","types":{"Q02":0.6,"Q03":0.4},"capabilities":{},
+                  "prohibitedAdvice":0.0}]}""");
+        assertThrows(com.zoop.chat.tool.ChatToolUnavailable.class,
+                () -> stages.route(run(root("HBM 공급 계약이 뭐야")), Set.of("issue.read")),
+                "a question that may look the issue up needs the graph, and its outage is the reads' outage");
+        assertEquals(1, issueReads);
     }
 
     @Test
