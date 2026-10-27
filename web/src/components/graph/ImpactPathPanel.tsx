@@ -31,8 +31,8 @@ const impactLabel = (label: Impact['impact']['results'][number]['label']) =>
   ({
     positive: '긍정',
     negative: '부정',
-    mixed: '혼합',
-    undetermined: '판정 불확정',
+    mixed: '혼재',
+    undetermined: '판단 보류',
   })[label];
 
 const impactUnavailable = (

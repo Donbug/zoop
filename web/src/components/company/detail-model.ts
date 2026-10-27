@@ -128,6 +128,11 @@ export function impactEdges(
     !impact.steps.some(
       (step) => step.id === impact.issueId && step.kind === 'issue',
     ) ||
+    impact.steps.some(
+      (step) =>
+        (step.id === impact.companyId || step.id === impact.issueId) &&
+        step.evidenceIds.length === 0,
+    ) ||
     impact.metadata.partial ||
     graph.metadata.partial ||
     impact.metadata.graphVersion !== graph.metadata.graphVersion ||

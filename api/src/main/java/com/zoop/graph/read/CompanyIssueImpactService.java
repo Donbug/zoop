@@ -108,7 +108,10 @@ public class CompanyIssueImpactService {
 
             Set<String> sourceRefs = new HashSet<>();
             for (Obj sourceRef : relation.objects("sourceRefs")) {
-                sourceRef.exactly(Set.of("jobId", "id"));
+                sourceRef.exactly(Set.of("kind", "jobId", "id"));
+                if (!"s3-relation".equals(sourceRef.string("kind"))) {
+                    throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+                }
                 sourceRefs.add(sourceRef.string("jobId") + "\n" + sourceRef.string("id"));
             }
             Set<String> seenSourceRefs = new HashSet<>();
