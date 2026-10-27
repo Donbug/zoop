@@ -121,6 +121,16 @@ final class ChatResults {
         return new ChatLimitation(kind, label.length() > 200 ? label.substring(0, 200) : label, message);
     }
 
+    /**
+     * A Q07 requirement answered on only the first of the member's companies (holdings first, then the watchlist): a
+     * {@code results_truncated} note beside the answer, never a reason to leave it unanswered.
+     */
+    static ChatLimitation scopeCut(String label) {
+        var limitation = limitation("results_truncated", label);
+        return new ChatLimitation(limitation.kind(), limitation.label(), "내 종목이 많아 앞의 "
+                + com.zoop.chat.tool.ChatToolRequest.MAX_TARGETS + "개(보유 종목 먼저, 그다음 관심 목록 순)만 확인했어요.");
+    }
+
     /** A clarification or guidance result: no sections, citations or limitations. */
     static ChatResult withoutAnswer(ChatRun run, String outcome, String reasonCode, List<ChatChoice> choices, Instant now) {
         return new ChatResult(outcome, PENDING_MESSAGE, "", List.of(), "none", reason(reasonCode), List.of(), List.of(),

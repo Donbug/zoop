@@ -38,9 +38,17 @@ import java.util.Set;
  * </ul>
  */
 final class ChatRetrieval {
-    /** What retrieval produced: results per requirement, the limitations it decided, or a stop or failed call. */
+    /**
+     * What retrieval produced: results per requirement, the limitations it decided, or a stop or failed call. {@code cut}
+     * holds the requirements that read on only part of the member's companies (Q07: more than a stage fans out to).
+     */
     record Outcome(Map<String, List<ChatToolResult>> results, Map<String, String> limitations, Set<String> noneFound,
-            ChatPlan.Stop stop, ChatToolResult failed) { }
+            ChatPlan.Stop stop, ChatToolResult failed, Set<String> cut) {
+        Outcome(Map<String, List<ChatToolResult>> results, Map<String, String> limitations, Set<String> noneFound,
+                ChatPlan.Stop stop, ChatToolResult failed) {
+            this(results, limitations, noneFound, stop, failed, Set.of());
+        }
+    }
 
     private final ChatToolRunner runner;
 
@@ -52,6 +60,7 @@ final class ChatRetrieval {
         Map<String, List<ChatToolResult>> results = new LinkedHashMap<>();
         Map<String, String> limitations = new LinkedHashMap<>();
         Set<String> noneFound = new LinkedHashSet<>();
+        Set<String> cut = new LinkedHashSet<>();
         for (int stage = 1; stage <= plan.stages(); stage++) {
             List<ChatToolRequest> calls = new ArrayList<>();
             Map<String, Integer> callIndex = new HashMap<>();
@@ -66,6 +75,14 @@ final class ChatRetrieval {
                         continue;
                     }
                     Found found = found(results.getOrDefault(source, List.of()));
+                    if (p.onScope()) {
+                        // The member's own companies: having none is the answer, and reading only some of them is noted.
+                        if (found.companies().isEmpty() && !found.truncated()) {
+                            noneFound.add(p.id());
+                            continue;
+                        }
+                        if (found.truncated()) cut.add(p.id());
+                    }
                     var decision = checkpoint(p.dependsOn(), found.companies().size());
                     if (decision == Checkpoint.EXCESS) {
                         return new Outcome(results, limitations, noneFound,
@@ -116,7 +133,7 @@ final class ChatRetrieval {
                 noneFound.add(p.id());
             }
         }
-        return new Outcome(results, limitations, noneFound, null, null);
+        return new Outcome(results, limitations, noneFound, null, null, cut);
     }
 
     /**

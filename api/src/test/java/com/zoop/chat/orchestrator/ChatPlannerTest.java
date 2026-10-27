@@ -211,6 +211,37 @@ class ChatPlannerTest {
     }
 
     @Test
+    void myStocksAreReadFirstFromTheMembersOwnScopeAndTheRestReadsOnThem() {
+        Set<String> bound = Set.of("company.read", "issue.read", "portfolio.scope.read");
+        var plan = run(planner.plan(run(0, "v1"), decision(
+                req("mine", Map.of(ChatQueryType.Q07, 0.9, ChatQueryType.Q03, 0.8), Map.of("issue.read", 0.8))), bound));
+        assertEquals(List.of("mine-s", "mine"), ids(plan));
+        var scope = plan.requirements().get(0);
+        assertEquals(ChatPlan.Origin.SCOPE, scope.origin());
+        assertEquals(List.of(ChatCapability.PORTFOLIO_SCOPE_READ), scope.capabilities());
+        assertEquals(List.of(ChatCapability.MEMBER_SELF), scope.targets());
+        assertEquals(1, scope.stage());
+        var mine = plan.requirements().get(1);
+        assertEquals(List.of(ChatCapability.COMPANY_READ, ChatCapability.ISSUE_READ), mine.capabilities(),
+                "a company fact on the member's companies reads them");
+        assertEquals(new ChatRouteDecision.Dependency("mine-s", "atLeast", 1), mine.dependsOn());
+        assertEquals(2, mine.stage());
+
+        var listOnly = run(planner.plan(run(0, "v1"), decision(req("list", Map.of(ChatQueryType.Q07, 0.9), Map.of())),
+                bound));
+        assertEquals(List.of("list"), ids(listOnly), "listing my stocks is the scope read itself");
+        assertEquals(List.of(ChatCapability.PORTFOLIO_SCOPE_READ), listOnly.requirements().getFirst().capabilities());
+
+        var named = run(planner.plan(run(0, "v1"), decision(req("named", Map.of(ChatQueryType.Q07, 0.9,
+                ChatQueryType.Q03, 0.8), Map.of("company.read", 0.9), List.of("KRX:005930"))), bound));
+        assertEquals(List.of("named"), ids(named), "a named company is read as named");
+        assertEquals(List.of("KRX:005930"), named.requirements().getFirst().targets());
+
+        assertStop("guidance", "out_of_scope", planner.plan(run(0, "v1"), decision(req("unbound",
+                Map.of(ChatQueryType.Q07, 0.9), Map.of())), Set.of("company.read")));
+    }
+
+    @Test
     void aConceptQuestionNamingACompanyIsAlsoACompanyQuestion() {
         var plan = run(planner.plan(run(0, "v1"), decision(req("r", Map.of(ChatQueryType.Q02, 0.72,
                 ChatQueryType.Q03, 0.54), Map.of(), List.of("KRX:005930"))), BOUND));

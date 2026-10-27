@@ -64,13 +64,20 @@ public enum ChatCapability {
 
     /** What a capability that can read the whole public graph reads when its requirement names nothing. */
     public static final String WHOLE_GRAPH = "graph:public";
+    /** The only target of a member-scope read: the run's own member, which the server injects. */
+    public static final String MEMBER_SELF = "member:self";
 
     /**
      * The targets the capability reads when the requirement names none and nothing is selected: the whole public graph for
-     * {@code graph.version.diff} ("what changed on the map"); none for any other capability, which then needs a target.
+     * {@code graph.version.diff} ("what changed on the map"), the run's own member for {@code portfolio.scope.read}; none
+     * for any other capability, which then needs a target.
      */
     public List<String> untargeted() {
-        return this == GRAPH_VERSION_DIFF ? List.of(WHOLE_GRAPH) : List.of();
+        return switch (this) {
+            case GRAPH_VERSION_DIFF -> List.of(WHOLE_GRAPH);
+            case PORTFOLIO_SCOPE_READ -> List.of(MEMBER_SELF);
+            default -> List.of();
+        };
     }
 
     public static Optional<ChatCapability> of(String id) {
