@@ -3944,7 +3944,7 @@ paths:
             - "BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다."
         teamQuestions:
           - "대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다."
-          - "Jev 0.70/0.35, MCP 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.8을 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다."
+          - "Jev 0.70/0.35, 도구 호출 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.9를 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다."
   "/api/v1/chat/jobs/{job_id}":
     get:
       tags:
@@ -5611,8 +5611,8 @@ paths:
     post:
       tags:
         - "admin-jobs"
-      summary: "수집·재검증·투영 작업 접수"
-      description: "수집·재검증·투영 작업 접수.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      summary: "계획 분석 작업 접수"
+      description: "analyze_plan은 계획 참조를 PostgreSQL에 등록하고 처리 대기열에 넣는다. 접수 경로는 AI를 호출하지 않으며 202는 로컬 영속 접수만 뜻한다. 같은 멱등성 키는 당시 응답을 그대로 재생하고, 다른 키로 같은 계획을 접수하면 원래 root 작업과 deduplicated=true를 반환한다. ingest/revalidate/project의 기존 요청 형태는 유지하지만 실행기가 없어 SOURCE_UNAVAILABLE/503, retryable=false로 거절하고 어떤 행도 만들지 않는다. analyze_plan 비활성 상태도 같다. 새 요청은 UTF-8 JSON 64 KiB 이하이며 중복 키·후행 JSON·알 수 없는 속성·형변환을 거절한다."
       operationId: "createAnalysisJob"
       requestBody:
         required: true
@@ -5628,6 +5628,10 @@ paths:
               schema:
                 "$ref": "#/components/schemas/JobCreated"
           headers:
+            Location:
+              description: "접수되거나 중복으로 확인된 원래 작업의 상세 경로"
+              schema:
+                type: "string"
             X-Request-ID:
               description: "실제 사용한 전송별 요청 ID"
               schema:
@@ -5785,7 +5789,7 @@ paths:
       tags:
         - "admin-jobs"
       summary: "허용된 분석 작업 재시도"
-      description: "허용된 분석 작업 재시도. RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 작업(같은 종류·라벨·입력)으로 대기열에 넣고 202를 돌려준다. 허용되지 않으면 REVISION_CONFLICT/409이고 아무것도 만들지 않는다. AI 요청을 직접 다시 보내지 않으며, 새 모델 실행이 필요하면 작업 실행 시 새 AI jobId를 쓴다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 앱 작업(같은 종류·라벨·입력)으로 대기열에 넣고 202를 반환한다. 거절은 REVISION_CONFLICT/409이며 아무것도 만들지 않는다. analyze_plan은 기존 계획과 고정 S2/S3 ID를 이어서 처리하며 완료된 단위를 다시 실행하지 않는다. 다른 미래 실행기에서 새 모델 실행이 필요할 때 새 AI jobId를 쓰는 조건은 유지한다. 실행기가 없는 기존 종류와 비활성 analyze_plan은 worker_unavailable이다. 같은 키는 현재 기능 상태와 무관하게 저장된 응답을 재생한다."
       operationId: "retryAnalysisJob"
       parameters:
         -
@@ -8587,6 +8591,108 @@ components:
         - "source"
         - "recentErrors"
         - "note"
+    AiUsageDay:
+      properties:
+        date:
+          type: "string"
+          format: "date"
+          description: "KST 날짜 YYYY-MM-DD"
+        features:
+          items:
+            "$ref": "#/components/schemas/AiUsageDayFeature"
+          type: "array"
+      type: "object"
+      required:
+        - "date"
+        - "features"
+      description: "하루(KST) 동안의 기능별 모델 사용량(getAiUsage.daily). 집계 window 경계 이상 asOf 이하의 ai_executions를 started_at 기준으로 고른 뒤, started_at을 KST 날짜로 변환해 귀속한다. 자정을 넘어 끝나거나 나중에 영수증이 확인된 실행도 시작일에 남는다. running·unknown 실행은 호출 수 모집단에 포함하되 아직 모르는 토큰·비용은 0이 아니라 null이다."
+    AiUsageDayFeature:
+      properties:
+        feature:
+          type: "string"
+          description: "ai_executions.feature (chatbot, briefing, briefing-outlook, news-analysis, document-sentiment). 귀속 규칙은 getAiUsage 설명과 같다."
+        modelCalls:
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
+          description: "execution_mode=live인 실제 외부 모델 시도 수. replay·save_only는 넣지 않는다. 모르면 null"
+        inputTokens:
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
+        outputTokens:
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
+        actualCost:
+          anyOf:
+            -
+              type: "number"
+            -
+              type: "null"
+          description: "실제 청구액. 모르면 0이 아니라 null. 통화는 AiUsageResponse.cost.currency"
+        estimatedCost:
+          anyOf:
+            -
+              type: "number"
+            -
+              type: "null"
+          description: "추정액. 모르면 0이 아니라 null"
+      type: "object"
+      required:
+        - "feature"
+        - "modelCalls"
+        - "inputTokens"
+        - "outputTokens"
+        - "actualCost"
+        - "estimatedCost"
+    AiUsageMembers:
+      properties:
+        totalMembers:
+          type: "integer"
+          description: "집계 기간 끝 기준 가입 회원 수(탈퇴 제외)"
+        aiMembers:
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
+          description: "기간 안에 회원 단위로 셀 수 있는 AI 기능을 한 번이라도 쓴 회원 수(중복 제거). 측정하지 않으면 null"
+        chatbotMembers:
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
+          description: "기간 안에 챗봇 질문을 한 회원 수(chat_sessions.member_id 중복 제거). 측정하지 않으면 null"
+        briefingMembers:
+          anyOf:
+            -
+              type: "integer"
+            -
+              type: "null"
+          description: "기간 안에 브리핑을 읽은 회원 수. 회원별 읽음 기록이 없으면 null"
+        note:
+          anyOf:
+            -
+              type: "string"
+            -
+              type: "null"
+          description: "집계 기준 설명(예: 게스트 제외)"
+      type: "object"
+      required:
+        - "totalMembers"
+        - "aiMembers"
+        - "chatbotMembers"
+        - "briefingMembers"
+        - "note"
+      description: "AI 사용 회원 수(getAiUsage.members). 화면은 각 값을 totalMembers로 나눠 비율을 보여 준다."
     AiUsageResponse:
       properties:
         asOf:
@@ -8609,6 +8715,22 @@ components:
           type: "array"
         cost:
           "$ref": "#/components/schemas/FeatureCost"
+        daily:
+          anyOf:
+            -
+              items:
+                "$ref": "#/components/schemas/AiUsageDay"
+              type: "array"
+            -
+              type: "null"
+          description: "제안(2026-10-24, A-ADM-04b 날짜별 그래프): 집계 기간의 KST 날짜별·기능별 모델 사용량. ai_executions.started_at이 요청 window 경계 이상 asOf 이하인 실행을 started_at의 KST 날짜에 귀속한다. 24h·7d·30d의 첫날과 마지막 날은 window 경계에 따라 일부 시간만 포함할 수 있다. 오래된 날짜부터 정렬하고, 사용 기록이 없는 날도 빠뜨리지 않는다. 서버가 아직 집계하지 않으면 필드를 생략하거나 null이다."
+        members:
+          anyOf:
+            -
+              "$ref": "#/components/schemas/AiUsageMembers"
+            -
+              type: "null"
+          description: "제안(2026-10-24, A-ADM-04b 사용 회원 비율): 집계 기간에 AI 기능을 쓴 회원 수. 서버가 아직 집계하지 않으면 필드를 생략하거나 null이다."
       type: "object"
       required:
         - "asOf"
@@ -10107,7 +10229,7 @@ components:
           type: "array"
           maxItems: 20
           uniqueItems: true
-          description: "이 구간의 사실 주장이 연결된 근거. 모두 result.citations의 evidenceId여야 하며 general_knowledge 구간은 빈 배열이다. zoop_documented 구간은 sourceKind=zoop_doc, evidence_grounded 구간은 sourceKind=article 인용만 가리킨다."
+          description: "이 구간의 사실 주장이 연결된 근거. 모두 result.citations의 evidenceId여야 하며 general_knowledge 구간은 빈 배열이다. zoop_documented 구간은 sourceKind=zoop_doc, evidence_grounded 구간은 sourceKind=article 또는 company_profile 인용만 가리킨다."
       type: "object"
       required:
         - "basis"
@@ -10319,7 +10441,7 @@ components:
               type: "string"
             -
               type: "null"
-          description: "기계 판독용 원인 코드. transient: deadline_guard(시작 전 잔여 기한 부족), provider_error(송신 전 연결 실패·처리 거부가 명시된 오류·형식 불일치 응답), tool_timeout(읽기 전용 MCP 조회 상한 초과), response_unknown(모델 송신 후 응답 불명, retry=null). budget_exceeded: context_too_large, output_limit. UI 문구와 관리자 집계의 기준이다."
+          description: "기계 판독용 원인 코드. transient: deadline_guard(시작 전 잔여 기한 부족), provider_error(송신 전 연결 실패·처리 거부가 명시된 오류·형식 불일치 응답), tool_timeout(읽기 전용 도구 조회 상한 초과), response_unknown(모델 송신 후 응답 불명, retry=null). budget_exceeded: context_too_large, output_limit. UI 문구와 관리자 집계의 기준이다."
         message:
           type: "string"
         retry:
@@ -10643,10 +10765,11 @@ components:
           enum:
             - "article"
             - "zoop_doc"
-          description: "article: 뉴스·공시 원문(articleId·articleVersion 필수, docId·docVersion null). zoop_doc: 승인된 ZOOP 도움말·화면 명세·정책 문서(docId·docVersion 필수, articleId·articleVersion·publisher·publishedAt·url은 null, articleTitle에는 문서 제목). zoop_documented 구간은 zoop_doc 인용만, evidence_grounded 구간은 article 인용만 쓴다."
+            - "company_profile"
+          description: "article: 뉴스·공시 원문(articleId·articleVersion 필수, docId·docVersion null). zoop_doc: 승인된 ZOOP 도움말·화면 명세·정책 문서(docId·docVersion 필수, articleId·articleVersion·publisher·publishedAt·url은 null, articleTitle에는 문서 제목). company_profile: 줍이 검수한 기업 카탈로그 프로필(사업 개요·법인명·대표·설립일·업종·홈페이지) 전문(docId는 기업 ID, articleId·articleVersion·docVersion·publishedAt은 null, start=0·end는 quote의 code point 길이, articleTitle은 '<기업명> 기업 개요', publisher는 '줍 기업 카탈로그', url은 기업 홈페이지 또는 null). 카탈로그가 인용한 문장을 바꾸면 그 인용은 더 이상 읽을 수 없다. zoop_documented 구간은 zoop_doc 인용만, evidence_grounded 구간은 article·company_profile 인용만 쓴다."
         evidenceId:
           type: "string"
-          description: "인용 식별자. article이면 evidence ID, zoop_doc이면 서버가 문서 ID·버전·구간으로 만든 결정적 ID다. sections[].evidenceIds가 이 값을 가리킨다."
+          description: "인용 식별자. article이면 evidence ID, company_profile이면 기업 ID와 인용 문장으로 만든 결정적 ID(ev- 형식), zoop_doc이면 서버가 문서 ID·버전·구간으로 만든 결정적 ID다. sections[].evidenceIds가 이 값을 가리킨다."
         quote:
           type: "string"
         articleId:
@@ -13517,6 +13640,41 @@ components:
         - "relations"
         - "articles"
     JobCreate:
+      oneOf:
+        - "$ref": "#/components/schemas/AnalyzePlanJobCreate"
+        - "$ref": "#/components/schemas/LegacyJobCreate"
+      discriminator:
+        propertyName: "kind"
+        mapping:
+          analyze_plan: "#/components/schemas/AnalyzePlanJobCreate"
+          ingest: "#/components/schemas/LegacyJobCreate"
+          revalidate: "#/components/schemas/LegacyJobCreate"
+          project: "#/components/schemas/LegacyJobCreate"
+    AnalyzePlanJobCreate:
+      type: "object"
+      additionalProperties: false
+      properties:
+        kind:
+          type: "string"
+          const: "analyze_plan"
+        reason:
+          type: "string"
+          minLength: 1
+          maxLength: 500
+          description: "앞뒤 공백을 제거한 감사 사유에 기존 AuditReasonPolicy를 적용한다."
+        plan:
+          type: "object"
+          additionalProperties: false
+          properties:
+            planId:
+              type: "string"
+              pattern: "^s2plan-[0-9a-f]{64}$"
+            planDigest:
+              type: "string"
+              pattern: "^[0-9a-f]{64}$"
+          required: ["planId", "planDigest"]
+      required: ["kind", "reason", "plan"]
+    LegacyJobCreate:
       type: "object"
       properties:
         kind:
@@ -13641,15 +13799,82 @@ components:
         - "jobId"
         - "reason"
     JobOut:
+      oneOf:
+        - "$ref": "#/components/schemas/LegacyJobOut"
+        - "$ref": "#/components/schemas/AnalyzePlanJobOut"
+      discriminator:
+        propertyName: "kind"
+    LegacyJobOut:
+      allOf:
+        - "$ref": "#/components/schemas/JobCommonOut"
+        - type: "object"
+          properties:
+            kind:
+              enum: ["ingest", "revalidate", "project"]
+          not:
+            required: ["planRun"]
+    AnalyzePlanJobOut:
+      allOf:
+        - "$ref": "#/components/schemas/JobCommonOut"
+        - type: "object"
+          properties:
+            kind:
+              const: "analyze_plan"
+            planRun:
+              "$ref": "#/components/schemas/PlanRunOut"
+            ingest:
+              type: "null"
+            report:
+              type: "null"
+            flush:
+              type: "null"
+            ledgerBefore:
+              type: "null"
+            ledgerAfter:
+              type: "null"
+          required: ["planRun"]
+    PlanRunOut:
+      type: "object"
+      additionalProperties: false
+      description: "내용 없는 AI 처리 인계 관측이다. 수집·검수 원천 동기화·HOLD 승인·그래프 수입·공개 활성화나 지속적인 읽기 권한을 뜻하지 않는다. 종결 작업의 요약은 불변이다."
+      properties:
+        planId:
+          type: "string"
+          pattern: "^s2plan-[0-9a-f]{64}$"
+        planDigest:
+          type: "string"
+          pattern: "^[0-9a-f]{64}$"
+        admissionId:
+          type: ["string", "null"]
+        manifestDigest:
+          type: ["string", "null"]
+          pattern: "^[0-9a-f]{64}$"
+        sourceId:
+          type: ["string", "null"]
+        roundId:
+          type: ["string", "null"]
+        phase:
+          enum: ["awaiting_admission", "admitting", "extracting", "relating", "cancelling", "ready", "failed", "cancelled"]
+        totalUnits:
+          type: ["integer", "null"]
+          minimum: 0
+        readyUnits:
+          type: "integer"
+          minimum: 0
+        activeUnit:
+          type: ["integer", "null"]
+          minimum: 1
+        completion:
+          const: "ai_processing_handoff"
+        publicChanged:
+          const: false
+      required: ["planId", "planDigest", "admissionId", "manifestDigest", "sourceId", "roundId", "phase", "totalUnits", "readyUnits", "activeUnit", "completion", "publicChanged"]
+    JobCommonOut:
       properties:
         id:
           type: "string"
         kind:
           type: "string"
-          enum:
-            - "ingest"
-            - "revalidate"
-            - "project"
         label:
           type: "string"
         status:
@@ -15247,7 +15472,9 @@ components:
             - "other_running"
             - "dataset_missing"
             - "outcome_unknown"
-          description: "재시도 판정. in_progress(대기·실행 중), succeeded(이미 성공), duplicate_running(이 작업의 재시도가 대기·실행 중), newer_attempt(더 새 재시도가 있어 가장 최근 시도만 재시도 가능), superseded(같은 종류·같은 입력의 더 나중 작업이 성공), outcome_unknown(외부 실행 결과를 확인할 수 없음: 응답 유실로 실행·과금 여부를 모르므로 자동 재시도하지 않음), dataset_missing(작업의 실행 계획이나 입력 연결이 없거나 철회됨, 일시적 조회 장애는 해당하지 않음), allowed. other_running은 대기열 정책상 다른 작업 실행만으로 재시도를 거절하지 않으므로 반환하지 않는다. blockedBy는 막고 있는 작업 ID다."
+            - "worker_unavailable"
+            - "plan_not_reusable"
+          description: "기존 in_progress/succeeded/duplicate_running/newer_attempt/superseded/outcome_unknown 판정 순서를 유지한다. dataset_missing은 등록된 계획·서비스 결속이 없거나 사용할 수 없는 경우이며 일시적 조회 장애가 아니다. plan_not_reusable은 영구 비활성 접수·불변 식별자 충돌·재시작할 수 없는 취소 AI 단계다. worker_unavailable은 연결된 실행기가 없는 종류나 비활성 analyze_plan이다. 다른 실행 작업은 새 작업을 대기시킬 뿐 other_running을 반환하지 않는다."
         reason:
           type: "string"
         blockedBy:

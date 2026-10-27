@@ -8,8 +8,8 @@ Run with the installed pipeline Python from the repository root:
 Requires the existing API boot jar, JDK 21+, installed pipeline and cached project
 PostgreSQL image. Never builds, installs, pulls, borrows a DB or calls a provider.
 Creates only an owned Docker bridge, tmpfs DB, loopback JVMs and temporary
-synthetic ledgers. Default refusal and explicitly opted-in development activation
-run in separate JVMs. SQL seeds synthetic auth and catalog ONLY, never activation.
+synthetic ledgers. Default activation checks the app-owned exclusion store and
+current rights. SQL seeds synthetic auth and catalog ONLY, never activation.
 The auth fixture does not prove password login, OAuth or operator provisioning.
 """
 from __future__ import annotations
@@ -198,31 +198,24 @@ def scenario(args, db, scratch, evidence, layouts):
         return expect(web, label, activation_path, status, error, payload=body,
                       headers={**headers, "Idempotency-Key": key})
 
-    with Web(smoke.jar, env) as web:
-        headers = admin_headers(web)
-        unchanged = publication_state(db)
-        activate(web, headers, "default-exclusion-store-refusal", "default-refusal", payload, 503, "SOURCE_UNAVAILABLE")
-        check(publication_state(db) == unchanged, "default refusal changed publication state/revision")
-        evidence["defaultRefusalUnchanged"] = True
-        expect(web, "staged-public-graph-refused", f"/api/v1/graph?graphVersion={vid}", 409, "VERSION_UNAVAILABLE")
-    check(Web.instances[-1].process.poll() is not None, "default JVM still running before opted-in process")
-
     registry = layout.registry_path.read_bytes()
     issue = "issue:supply-2026q3"
     eid = hs.evidence_id(world, "a", hs.EVT_A)
     event_path = "/api/v1/events/" + urllib.parse.quote(issue, safe="") + "?" + urllib.parse.urlencode({"graphVersion": vid})
     evidence_path = f"/api/v1/evidence/{eid}?graphVersion={vid}"
-    with Web(smoke.jar, {**env, "ZOOP_GRAPH_ACTIVATION_ALLOW_WITHOUT_EXCLUSION_STORE": "true"}) as web:
+    with Web(smoke.jar, env) as web:
         headers = admin_headers(web)
         unchanged = publication_state(db)
-        # Rights are re-read even under the fixture-only bypass, before publication.
+        # The app's real exclusion store is present; default activation still rechecks current rights.
         smoke.set_registry(lambda grant: grant.update({"enabled": False}))
         try:
-            activate(web, headers, "opt-in-current-rights-refusal", "rights-refusal", payload, 409, "REVISION_CONFLICT")
-            check(publication_state(db) == unchanged, "rights refusal changed publication state/revision")
+            activate(web, headers, "default-current-rights-refusal", "rights-refusal", payload, 409, "REVISION_CONFLICT")
+            check(publication_state(db) == unchanged, "default rights refusal changed publication state/revision")
+            evidence["defaultRefusalUnchanged"] = True
+            expect(web, "staged-public-graph-refused", f"/api/v1/graph?graphVersion={vid}", 409, "VERSION_UNAVAILABLE")
         finally:
             layout.registry_path.write_bytes(registry)
-        activated = activate(web, headers, "opt-in-admin-http-activation", "activate-success", payload, 200)
+        activated = activate(web, headers, "default-admin-http-activation", "activate-success", payload, 200)
         check(activated == {"activeVersionId": vid, "previousActiveVersionId": before["active"], "idempotent": False},
               "activation response differs from contract")
         after = publication_state(db)
@@ -287,8 +280,8 @@ def scenario(args, db, scratch, evidence, layouts):
                     "category": "production-contract",
                     "seam": "GET /api/v1/events/{id} for imported bundle7",
                     "observed": "503 SOURCE_UNAVAILABLE",
-                    "source": "api/src/main/java/com/zoop/graph/read/EventDetailService.java:56-57,132-135",
-                    "sourceFinding": "currentBundle accepts only bundle-5; this scenario imports bundle-7",
+                    "source": "api/src/main/java/com/zoop/graph/read/EventDetailService.java",
+                    "requiredContract": "supportedBundle must accept exact bundle-5, bundle-6 and bundle-7 receipts",
                     "remaining": "event same-version read and event current-rights revocation/restoration",
                 }]
             raise
@@ -333,8 +326,8 @@ def main():
     owned = "zoop-activation-smoke-" + secrets.token_hex(8)
     network_created = container_created = False
     evidence = {"status": "failed", "steps": [], "providerCalls": 0, "modelCalls": 0,
-                "exclusionStoreAuthoritative": False, "developmentOptInOnly": True,
-                "notProven": ["production publication readiness", "authoritative exclusion store", "real-source rights",
+                "exclusionStoreAuthoritative": True, "developmentOptInOnly": False,
+                "notProven": ["production publication readiness", "exclusion command mutations", "real-source rights",
                               "password login/OAuth/operator provisioning", "external AI/model path"],
                 "cleanup": {"container": False, "network": False, "processes": False, "temporaryState": False}}
     def stop(signum, frame):

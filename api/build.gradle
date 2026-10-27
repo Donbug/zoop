@@ -31,8 +31,16 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+// Cached Spring test contexts share one disposable database; each pool must stay bounded.
+tasks.withType(Test).configureEach {
+	systemProperty 'spring.datasource.hikari.maximum-pool-size', '4'
+	systemProperty 'spring.datasource.hikari.minimum-idle', '0'
+}
+
 // Default `test`: foundation tests and the AI client tests against in-process stub servers. No Python, no network.
 tasks.named('test') {
+	// The proof regression launches the actual test-owned CLI in a separate JVM (System.exit must not stop the test worker).
+	systemProperty 'zoop.ai.proof.classpath', sourceSets.test.runtimeClasspath.asPath
 	useJUnitPlatform {
 		excludeTags 'ai-contract'
 		excludeTags 'ai-pipeline-contract'
@@ -166,4 +174,22 @@ tasks.register('aiChatContractTest', Test) {
 		events 'passed', 'failed'
 		exceptionFormat 'full'
 	}
+}
+
+// Test-owned synthetic consumer. No Spring app queue, policy control, publication or provider calls.
+tasks.register('preparePlanAdmissionProof') {
+	group = 'verification'
+	description = 'Compiles the synthetic admission proof client and writes its direct JVM classpath.'
+	dependsOn tasks.named('testClasses')
+	doLast {
+		layout.buildDirectory.file('plan-admission-proof-classpath.txt').get().asFile.text = sourceSets.test.runtimeClasspath.asPath
+	}
+}
+
+tasks.register('planAdmissionProof', JavaExec) {
+	group = 'verification'
+	description = 'Runs the test-owned synthetic exact-plan consumer: config.json reference.json evidence-directory.'
+	dependsOn tasks.named('testClasses')
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = 'com.zoop.ai.PlanAdmissionProof'
 }

@@ -156,7 +156,7 @@ class ChatContextFreezerTest {
     private ChatContextFreezer freezer(boolean versions, DisclosureExclusions exclusions) {
         var selector = new GraphVersionSelector(repository(versions), Clock.fixed(NOW, ZoneOffset.UTC));
         var reader = new PublicGraphReader(selector,
-                new FixtureGraphSnapshotStore(ChatContextFreezerTest.class.getClassLoader()), () -> exclusions);
+                new FixtureGraphSnapshotStore(ChatContextFreezerTest.class.getClassLoader()), pinned -> exclusions);
         return new ChatContextFreezer(reader, selector, (id, version, asOf, requestId) -> {
             accessChecks.add(id + "@" + version + "@" + asOf);
             return !unreadable.contains(id);

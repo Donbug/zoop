@@ -51,6 +51,14 @@ zoop:
     session:
       idle-timeout: ${ZOOP_ADMIN_IDLE_TIMEOUT:30m}
       absolute-timeout: ${ZOOP_ADMIN_ABSOLUTE_TIMEOUT:8h}
+    review:
+      reconcile:
+        # Settles review decisions whose AI answer was lost, from the AI ledger, in the web application on its own thread. Runs
+        # only while the AI relation client is configured (zoop.ai.relation-client.enabled=true); on by default then.
+        enabled: ${ZOOP_ADMIN_REVIEW_RECONCILE_ENABLED:true}
+        interval: ${ZOOP_ADMIN_REVIEW_RECONCILE_INTERVAL:PT1M}
+        min-age: ${ZOOP_ADMIN_REVIEW_RECONCILE_MIN_AGE:PT2M}
+        batch: ${ZOOP_ADMIN_REVIEW_RECONCILE_BATCH:50}
   graph:
     snapshot:
       # Public graph snapshot source: none (default; reads fail closed), fixture (local/dev synthetic data only) or artifact
@@ -58,9 +66,20 @@ zoop:
       source: ${ZOOP_GRAPH_SNAPSHOT_SOURCE:none}
       artifact-root: ${ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT:}
     activation:
-      # Imported (non-fixture) versions are not activated while no public exclusion store exists (FS081), because "nothing
-      # excluded" cannot be checked. An operator who accepts that may set this to true; synthetic fixtures are not affected.
+      # The public exclusion store (FS081, disclosure_exclusion_*) now always exists, so activation checks the version's current
+      # exclusions and this switch has no effect. It only matters for a DisclosureExclusionReader without a store (tests).
       allow-without-exclusion-store: ${ZOOP_GRAPH_ACTIVATION_ALLOW_WITHOUT_EXCLUSION_STORE:false}
+    auto-activation:
+      # FS059: the web application makes the newest version an operator import staged public once it passes the same checks as an
+      # admin activation (system actor in the activation history). Off by default; a restart changes it. Versions imported from
+      # lookback (one round) before start count, so a restart or deploy does not drop the current round. A refused version is
+      # retried after retry-after, an unavailable source or another failure after unavailable-retry-after. It runs on its own
+      # thread, never the shared scheduling thread.
+      enabled: ${ZOOP_GRAPH_AUTO_ACTIVATION_ENABLED:false}
+      interval: ${ZOOP_GRAPH_AUTO_ACTIVATION_INTERVAL:PT15S}
+      lookback: ${ZOOP_GRAPH_AUTO_ACTIVATION_LOOKBACK:PT30M}
+      retry-after: ${ZOOP_GRAPH_AUTO_ACTIVATION_RETRY_AFTER:PT5M}
+      unavailable-retry-after: ${ZOOP_GRAPH_AUTO_ACTIVATION_UNAVAILABLE_RETRY_AFTER:PT1M}
   chat:
     # Accepting new questions and retries needs a ChatEngine, registered by zoop.ai.chat-client.enabled=true. Off by default:
     # submit and retry answer 503 MODEL_UNAVAILABLE instead of leaving a job queued forever, and startup refuses intake on
@@ -70,6 +89,22 @@ zoop:
       # Claims queued jobs and recovers expired leases in the web application; runs nothing while no ChatEngine exists.
       enabled: ${ZOOP_CHAT_EXECUTOR_ENABLED:true}
       workers: ${ZOOP_CHAT_EXECUTOR_WORKERS:2}
+  analysis:
+    analyze-plan:
+      # Executes fixed admitted S2/S3 units only; completion does not collect or publish data.
+      # Enabling requires all three HTTP clients, a common base URL and the expected AI principal.
+      enabled: ${ZOOP_ANALYSIS_ANALYZE_PLAN_ENABLED:false}
+      expected-principal: ${ZOOP_ANALYSIS_ANALYZE_PLAN_EXPECTED_PRINCIPAL:}
+      poll-interval: ${ZOOP_ANALYSIS_ANALYZE_PLAN_POLL_INTERVAL:2s}
+      attempt-deadline: ${ZOOP_ANALYSIS_ANALYZE_PLAN_ATTEMPT_DEADLINE:30m}
+      lease: ${ZOOP_ANALYSIS_ANALYZE_PLAN_LEASE:150s}
+      max-consecutive-failures: ${ZOOP_ANALYSIS_ANALYZE_PLAN_MAX_CONSECUTIVE_FAILURES:5}
+      max-recovery-dispatches: ${ZOOP_ANALYSIS_ANALYZE_PLAN_MAX_RECOVERY_DISPATCHES:3}
+      max-reclaims: ${ZOOP_ANALYSIS_ANALYZE_PLAN_MAX_RECLAIMS:16}
+    review-sync:
+      # Runs only with analyze-plan: re-reads observed units' S2/S3 results into the admin review targets.
+      interval: ${ZOOP_ANALYSIS_REVIEW_SYNC_INTERVAL:60s}
+      batch: ${ZOOP_ANALYSIS_REVIEW_SYNC_BATCH:20}
   ai:
     client:
       # Internal S1 AI transport client. Disabled by default; the application starts without any AI setting.
@@ -96,6 +131,14 @@ zoop:
       connect-timeout: ${ZOOP_AI_RELATION_CLIENT_CONNECT_TIMEOUT:3s}
       request-timeout: ${ZOOP_AI_RELATION_CLIENT_REQUEST_TIMEOUT:30s}
       max-response-bytes: ${ZOOP_AI_RELATION_CLIENT_MAX_RESPONSE_BYTES:8388608}
+    plan-admission-client:
+      # Exact-plan admission transport only. Active admission is not source rights, execution readiness or spending authority.
+      enabled: ${ZOOP_AI_PLAN_ADMISSION_CLIENT_ENABLED:false}
+      base-url: ${ZOOP_AI_PLAN_ADMISSION_CLIENT_BASE_URL:}
+      token: ${ZOOP_AI_PLAN_ADMISSION_CLIENT_TOKEN:}
+      connect-timeout: ${ZOOP_AI_PLAN_ADMISSION_CLIENT_CONNECT_TIMEOUT:3s}
+      request-timeout: ${ZOOP_AI_PLAN_ADMISSION_CLIENT_REQUEST_TIMEOUT:30s}
+      max-response-bytes: ${ZOOP_AI_PLAN_ADMISSION_CLIENT_MAX_RESPONSE_BYTES:16000000}
     chat-client:
       # Chatbot model stages through ai/service (POST /internal/v1/chat-stages/{stage}). Disabled by default. Enabled, it
       # registers the chat engine, so zoop.chat.questions-enabled may be turned on. mode: replay (AI-side fixtures, no network)
@@ -153,6 +196,14 @@ zoop:
     canonical: ${ZOOP_HANDOFF_CANONICAL:}
     decisions: ${ZOOP_HANDOFF_DECISIONS:}
     bindings: ${ZOOP_HANDOFF_BINDINGS:}
+    artifact-root: ${ZOOP_ARTIFACT_ROOT:}
+  disclosure-exclusion:
+    # Operator-only, non-web write of the public exclusion store (FS081, see api/README.md): `exclude` from an AI exposure report
+    # (zoop-ai-handoff-exposure output, embedded in the request) or an explicit `lift`. Disabled by default. Enabled, it refuses a
+    # web context and any path that is not normalized and absolute. The artifact root is only read (import receipts).
+    enabled: ${ZOOP_DISCLOSURE_EXCLUSION_ENABLED:false}
+    request: ${ZOOP_DISCLOSURE_EXCLUSION_REQUEST:}
+    result: ${ZOOP_DISCLOSURE_EXCLUSION_RESULT:}
     artifact-root: ${ZOOP_ARTIFACT_ROOT:}
   document-read:
     # Public GET /api/v1/evidence/{id} (see api/docs/DOCUMENT_ANALYSIS.md, api/docs/GRAPH_READ_HANDOFF.md). All settings are optional,

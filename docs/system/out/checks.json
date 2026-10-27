@@ -487,7 +487,7 @@
       "code": "TEAM_DECISION_REQUIRED",
       "target": "submitQuestion",
       "severity": "warning",
-      "message": "대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다. / Jev 0.70/0.35, MCP 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.8을 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다.",
+      "message": "대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다. / Jev 0.70/0.35, 도구 호출 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.9를 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다.",
       "source": ""
     },
     {
@@ -2076,7 +2076,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAdminDashboard",
       "severity": "difference",
-      "message": "목표만 698 · BFF만 633 · 형식/필수/권한 변경 7",
+      "message": "목표만 1082 · BFF만 633 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -2230,7 +2230,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "listAnalysisJobs",
       "severity": "difference",
-      "message": "목표만 120 · BFF만 93 · 형식/필수/권한 변경 21",
+      "message": "목표만 804 · BFF만 393 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -2244,7 +2244,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "createAnalysisJob",
       "severity": "difference",
-      "message": "목표만 167 · BFF만 39 · 형식/필수/권한 변경 16",
+      "message": "목표만 526 · BFF만 194 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -2258,7 +2258,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAnalysisJob",
       "severity": "difference",
-      "message": "목표만 114 · BFF만 39 · 형식/필수/권한 변경 14",
+      "message": "목표만 456 · BFF만 189 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -2272,7 +2272,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "retryAnalysisJob",
       "severity": "difference",
-      "message": "목표만 162 · BFF만 36 · 형식/필수/권한 변경 16",
+      "message": "목표만 504 · BFF만 186 · 형식/필수/권한 변경 9",
       "source": ""
     },
     {
@@ -2286,7 +2286,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "cancelAnalysisJob",
       "severity": "difference",
-      "message": "목표만 162 · BFF만 30 · 형식/필수/권한 변경 16",
+      "message": "목표만 504 · BFF만 180 · 형식/필수/권한 변경 9",
       "source": ""
     },
     {
@@ -2300,7 +2300,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAiUsage",
       "severity": "difference",
-      "message": "목표만 114 · BFF만 21 · 형식/필수/권한 변경 10",
+      "message": "목표만 157 · BFF만 21 · 형식/필수/권한 변경 10",
       "source": ""
     },
     {

@@ -7,20 +7,59 @@ Spring 백엔드에서 내부 AI 서비스의 그래프 버전 읽기(`graph.rea
 
 > **구현과 공개 운영을 구분합니다.** 현재 생산자 계약은 bundle `zoop-graph-handoff-bundle-7`, 운영자 판정 파일 `zoop-public-decisions-3`이며, 앱 공개 스냅샷은 형식 3입니다. 비활성 스테이징 수입, 일반 graph 근거·structural basis-only·impact-only 근거 읽기, 읽기 전용 exposure CLI·내부 HTTP가 구현되어 있습니다. 요약·영향 행은 비공개 import receipt에 보존되며, 요약의 공개 `getEvent` 소비는 백엔드 소유의 후속 범위입니다. 이 구현은 전체 철회나 AWS 배포 완료를 뜻하지 않습니다. 아래 날짜별 절은 각 변경 당시의 계약·검증 이력이며 현재 생산자 버전을 대신하지 않습니다.
 - **AI 읽기와 앱 공개 상태는 별개입니다.** 내부 서비스(`127.0.0.1`, 앞단 TLS 프록시는 미배포)에는 활성 버전 포인터가 없습니다. graph 버전 응답의 `publication`은 항상 `not-published`입니다. `delivery.state=current`는 “이번 요청에서 검증됨”이지 “앱이 보여 주는 활성 버전”이 아닙니다. exposure는 별도 `handoff.exposure` scope를 요구하고 기본 비활성화이며, 원문 없이 영향 ID만 반환합니다. 앱의 현재 제외 목록·revision·공개 활성화를 변경하지 않습니다([HTTP 소비 계약](#내부-http-소비-계약)).
-- **Spring 구현 기준.** 공개 `GET /api/v1/graph`, 기업·관계·시점 조회, `graph_versions`·`graph_activations`, 버전 선택기와 `PublicGraphReader`가 있습니다. `AdminGraphVersionController`·서비스와 활성화 사전 검사가 구현되어 있지만, 공개 제외 저장소는 아직 없습니다. 기본 활성화 게이트는 안전 조건이 충족되지 않으면 차단하며, 명시적인 로컬·운영자 플래그는 운영 준비 완료를 뜻하지 않습니다. 스냅샷 source는 기본 `none`, local/dev용 `fixture`, 수입된 불변 파일을 검증해 읽는 `artifact`로 구분합니다. Spring은 Neo4j에 직접 접속하지 않고 Neo4j 자격을 받지 않습니다.
+- **Spring 구현 기준.** 공개 `GET /api/v1/graph`, 기업·관계·시점 조회, `graph_versions`·`graph_activations`, 버전 선택기와 `PublicGraphReader`가 있습니다. `AdminGraphVersionController`·서비스와 활성화 사전 검사, 버전별 공개 제외 저장소와 운영자 제외 명령(2026-10-24, [api README](../README.md#공개-제외-명령-fs081))이 구현되어 있습니다. 기본 활성화 게이트는 안전 조건이 충족되지 않으면 차단하며, 명시적인 로컬·운영자 플래그는 운영 준비 완료를 뜻하지 않습니다. 스냅샷 source는 기본 `none`, local/dev용 `fixture`, 수입된 불변 파일을 검증해 읽는 `artifact`로 구분합니다. Spring은 Neo4j에 직접 접속하지 않고 Neo4j 자격을 받지 않습니다.
 - **운영자 스테이징 수입.** `com.zoop.graph.importer`는 설치된 handoff·ingestion CLI의 현재 결과와 앱 DB·본문을 대조해 근거 및 비활성 버전을 등록하며, 활성 포인터를 변경하지 않습니다. 스냅샷 형식 3은 읽기용 투영이고 원본 manifest·bundle 전체는 영수증에 보존됩니다. 앱 mention ID는 문서·버전·원천 ID로 결정해 문서 간 같은 로컬 ID를 구분합니다. 원래 언급 값은 `verification: none`이고, 운영자의 `eventTime`·`period` verdict(`fieldVerdicts`)는 앱 verifier가 독립 재계산해 보류·거절된 머리 값을 snapshot에서 `null`로 만듭니다(영수증에는 원본과 verdict가 그대로 남음). `quote_verified`도 인용 무결성이지 의미 검증·공개 승인 자체가 아닙니다([필드 verdict 계약](#2026-10-21-bundle--4의-운영자-필드-verdict--eventtimeperiod의-보류거절)). `structuralPath`·`pathCompanies`·basis 범위 텍스트·`impacts[]`·`issues[].summary`는 snapshot의 공개 필드가 아닙니다. 근거 읽기는 [graph 본문 근거 계약](#2026-10-20-getevidence의-graph-본문-근거-경로)과 아래 `-5`·`-6` 절을, 수입 명령과 설정은 [API 실행 안내](../README.md#그래프-handoff-스테이징-import)를 따릅니다.
 - 운영자가 AI 버전을 만들고 서버 allowlist에 올립니다. 이 AI 읽기 서비스는 버전을 **만들거나 찾거나 나열하지 못합니다**(목록 라우트 없음). 앱의 operator 스테이징 명령은 전달받은 handoff를 별도의 비활성 앱 버전으로 등록합니다.
 - 실제 로컬 HTTP 서버 → 설치된 graph CLI → 격리된 Neo4j 5.26 경로의 smoke를 통과했습니다(2026-10-15 로컬 실행 기록이며 현재 `main`의 재검증이 아닙니다). 1~3홉·권한 분리·digest 불일치·원천 권한 철회·canonical 변경·그래프 변조·원장 잠금·시간 초과를 확인했습니다. 원천 원장 변경과 모델 호출은 없었습니다. 이 서비스 구현은 이후 PR #213에서 `main`에 병합됐지만, 배포·실제 데이터 운영은 하지 않았습니다.
 
 ### 관리자 활성화 HTTP의 합성 검증 경계
 
-`api/scripts/graph_handoff_activation_smoke.py`는 기존 SQL 활성화 harness와 별도로 실행합니다([실행 명령과 전제](../README.md#관리자-http-활성화의-별도-합성-smoke)). 설치된 CLI의 합성 bundle `-7`을 Spring으로 비활성 수입한 뒤, 첫 JVM에서 기본 활성화가 503 `SOURCE_UNAVAILABLE`로 거절되고 포인터·review revision·이력·감사·멱등 기록이 바뀌지 않는지 확인합니다. 별도의 시험 JVM에서만 기존 개발용 opt-in 플래그를 켜 실제 관리자 HTTP 활성화와 현재 권리 검사, 멱등·stale 조건, 같은 공개 버전의 graph·event·evidence HTTP를 검사합니다.
+`api/scripts/graph_handoff_activation_smoke.py`는 기존 SQL 활성화 harness와 별도로 실행합니다([실행 명령과 전제](../README.md#관리자-http-활성화의-별도-합성-smoke)). 설치된 CLI의 합성 bundle `-7`을 Spring으로 비활성 수입한 뒤, 공개 제외 저장소가 연결된 기본 설정에서 현재 권리 철회로 활성화가 409 `REVISION_CONFLICT`로 거절되고 포인터·review revision·이력·감사·멱등 기록이 바뀌지 않는지 확인합니다. 권리를 복구한 뒤 같은 JVM에서 개발용 우회 플래그 없이 실제 관리자 HTTP 활성화, 멱등·stale 조건, 같은 공개 버전의 graph·event·evidence HTTP와 현재 권리 철회·복구를 검사합니다. 공개 제외 저장소의 읽기 실패에 따른 503 `SOURCE_UNAVAILABLE` 계약은 Java 시험의 범위입니다.
 
-합성 관리자 세션은 소유한 임시 DB에만 준비하며 실제 세션 조회·CSRF·Origin 검사를 통과합니다. 비밀번호 로그인·OAuth·운영 계정 발급, 권위 있는 공개 제외 저장소나 운영 공개 준비는 증명하지 않습니다. 모델 호출은 없으며, SQL로 활성 포인터를 움직여 HTTP 성공으로 간주하지 않습니다. 기존 `graph_handoff_import_smoke.py`의 `harnessActivations`는 계속 **SQL 시험 활성화**를 뜻하고, 새 명령의 `adminHttpActivations`·`httpPointerChanges` 및 fixture seed 이력과 구분합니다.
+합성 관리자 세션은 소유한 임시 DB에만 준비하며 실제 세션 조회·CSRF·Origin 검사를 통과합니다. 비밀번호 로그인·OAuth·운영 계정 발급, 제외 명령의 변경·해제나 운영 공개 준비는 증명하지 않습니다. 모델 호출은 없으며, SQL로 활성 포인터를 움직여 HTTP 성공으로 간주하지 않습니다. 기존 `graph_handoff_import_smoke.py`의 `harnessActivations`는 계속 **SQL 시험 활성화**를 뜻하고, 새 명령의 `adminHttpActivations`·`httpPointerChanges` 및 fixture seed 이력과 구분합니다.
 
-최초 smoke에서는 bundle `-7`의 사건 상세가 503 `SOURCE_UNAVAILABLE`로 거절됐습니다. 이후 `EventDetailService`가 소비 필드의 의미가 같은 정확한 bundle `-5`·`-6`·`-7` receipt를 읽도록 수정했고, 새 수입은 계속 `-7`만 허용합니다. 수정 후 새 jar의 실제 HTTP 28단계에서 활성화·graph·event·evidence 조회와 현재 권리 철회/복원을 확인했습니다. 미지원 과거·미래 버전과 접두어 유사값은 거절하며, 요약의 미제공 상태는 바꾸지 않았습니다. 이 로컬 검증은 운영 배포나 수령자의 실행 확인을 뜻하지 않습니다.
+최초 smoke에서는 bundle `-7`의 사건 상세가 503 `SOURCE_UNAVAILABLE`로 거절됐습니다. 이후 `EventDetailService`가 소비 필드의 의미가 같은 정확한 bundle `-5`·`-6`·`-7` receipt를 읽도록 수정했고, 새 수입은 계속 `-7`만 허용합니다. 당시 수정 후 새 jar의 실제 HTTP 28단계에서 활성화·graph·event·evidence 조회와 현재 권리 철회/복원을 확인했으며, 공개 제외 저장소 통합 후 기본 설정 경로의 재검증과는 별개입니다. 미지원 과거·미래 버전과 접두어 유사값은 거절하며, 요약의 미제공 상태는 바꾸지 않았습니다. 이 로컬 검증은 운영 배포나 수령자의 실행 확인을 뜻하지 않습니다.
 
 
+## 수집·분석 실행과 공개 스케줄의 책임
+
+**계획 생성·접수·실행·공개를 구분합니다.** `plan-round`는 완료된 수집 회차의 정확한 계획을 파일로 만듭니다. 수동 모드에서는 사람이 검토한 계획을 서비스 정지 상태에서 설치하고, 별도 온라인 모드에서는 사람이 사전 등록한 정책 안에서 실행 중인 서비스가 계획을 접수합니다. 문서의 **운영자는 사람인 운영 책임자**이며 LLM이나 AI 에이전트를 뜻하지 않습니다. 실행·원천 사용·비용 허가, HOLD 후보의 최종 의미 검수, 앱 공개 활성화는 서로 대체할 수 없습니다.
+
+공개 전환은 기존 앱 소유 경계를 유지합니다. 계획 접수·Spring 전송 클라이언트에 더해, 앱의 불변 계획 등록과 별도 `analyze_plan` 큐 worker도 `feat/55-analyze-plan-jobs`에서 구현·로컬 검증됐습니다. 이 큐는 `ingest`와 구분해 고정된 S2/S3 작업을 진행하고 내용 없는 처리 인계(`ai_processing_handoff`)를 기록하며, 수집 baseline·검수·그래프·공개 활성화를 변경하지 않습니다. 통합·수령자 실행 확인·운영 수용은 별도이며, 정기 호출에서 결과 수입·공통 버전 공개까지 잇는 연결은 미구현입니다. 설정·재시도·취소·실행 검증 명령은 [관리자 계획 분석 큐](AI_INTEGRATION.md#관리자-계획-분석-큐)를 따릅니다.
+
+| 담당 경계 | 맡는 일 | 맡지 않는 일 |
+|---|---|---|
+| 사람 운영자 | 정확한 계획과 실행 범위 검토, 원천 권리·모델·예산 설정 승인, HOLD의 최종 검수 | AI 결과만으로 새 실행 권한이 생겼다고 간주하지 않음 |
+| AI 파이프라인·내부 서비스 | 수집 회차와 계획 제공, 현재 허가·입력 검사, S2/S3 실행·상태, 고정된 인계 결과 제공 | 앱의 활성 버전 포인터 변경, 앱 호출자가 보낸 registry 설치 지시 수용 |
+| 앱 스케줄러·백엔드 | 준비된 계획의 진행 관리, 인계 결과 수입, 공개 조건 확인과 공통 버전 활성화 | AI 서버 파일 직접 덮어쓰기, HOLD 자동 승인, 실패를 새 공개 결과로 대체 |
+
+**수입 뒤 자동 활성화(앱).** 수입은 지금처럼 운영자 비웹 명령으로 하고, 웹 애플리케이션의 공개 스케줄러(`GraphAutoActivationScheduler`, `ZOOP_GRAPH_AUTO_ACTIVATION_ENABLED`, 기본 꺼짐)가 새로 수입된 가장 최근 비활성 버전을 관리자 활성화와 같은 사전 검사를 거쳐 공통 공개 버전으로 전환합니다. 더 오래된 수입이 현재 버전을 덮지 않고, 검사에 실패하거나 새 대상이 없으면 기존 버전을 유지합니다. 이 스케줄러는 AI CLI(tick·plan-round·freeze)를 실행하지 않으며, 새 계획·인계 ID의 자동 전달과 decisions 생성은 이 범위가 아닙니다([api README](../README.md) 환경 변수 표).
+
+온라인 접수는 `planId`·`planDigest`만 받고 서버의 고정 계획을 검증해 S2 승인·단위별 단 하나의 S3 ID·manifest·quota를 함께 기록합니다. 앱의 `PlanAdmissionClient`는 접수·조회만 제공하고 정책 변경이나 권한 파일 쓰기를 제공하지 않습니다([설정·소비 규칙](AI_INTEGRATION.md#계획-접수-클라이언트)). 실제 Java→서비스→S2/S3 합성 검증은 서비스 재시작 없이 두 회차를 처리했습니다. 운영 정책·live 예산·배포 설정은 이 검증으로 등록되지 않습니다.
+
+```mermaid
+sequenceDiagram
+    participant O as 사람 운영자
+    participant A as 앱 클라이언트
+    participant S as AI 서비스
+    participant V as 계획 검증 CLI
+    participant D as 권한 SQLite
+    O->>S: 정책 변경 · If-Match · 작업 키
+    S->>D: 정책 revision · 이전 권한 종료
+    A->>S: planId · planDigest로 접수
+    S->>V: 정확한 계획 · 현재 원천 읽기 검증
+    V-->>S: 고정된 검증 결과
+    S->>D: S2/S3 권한 · manifest · quota 원자적 기록
+    S-->>A: 불변 실행 참조 · 현재 정책 권한 상태
+    A->>S: 같은 참조로 S2/S3 명시적 제출
+    S-->>A: 작업 상태 · 현재 허용되는 결과
+```
+
+정책은 카탈로그·snapshot·prompt·fixture/runtime을 정확히 고정합니다. 이 내용이 달라지면 사람의 정책 개정이 필요하며, 정책 변경·비활성화·관측된 만료로 종료된 기존 admission은 옛 정책을 다시 넣어도 되살아나지 않습니다. plan/unit 상한은 누적 작업 수 제한이지 금액 예산이 아닙니다. 이미 시작된 child를 정책 만료 시각에 취소하거나 이미 전달한 내용을 회수한다는 보장도 없으며, 후속 실행·전달에서는 현재 권한을 다시 검사합니다. 세부 계약은 [서비스 안내](../../ai/service/README.md#온라인-plan-admission선택-기본-꺼짐)를 따릅니다.
+
+**30분은 회차 간격이지 분석 허용 시간이나 달성한 SLA가 아닙니다.** [비기능 명세](../../docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv)의 목표는 KST 05분/35분 예정 회차를 각각 10분/40분까지 메인 그래프와 기업 상세의 새 조회에서 같은 공개 버전으로 확인하는 것입니다. 처리량·환경별 실측은 별도로 필요하며, 늦은 시작으로 기한을 늘리거나 미검증 결과를 공개하지 않습니다.
+
+새 공개 대상이 없거나 분석·권리·제외·조회 준비 검사가 실패하면 기존 유효 버전을 유지합니다. 정상 0건, HOLD/REJECT, 실패와 관측 누락을 구분하고, 늦게 끝난 이전 회차가 최신 활성 버전을 되돌리지 않도록 합니다. 기존 버전 유지도 현재 공개 제외를 우회하는 이유가 되지 않습니다. 현재 단발 실행이나 합성 smoke만으로 정기 발행 완료를 선언하지 않습니다.
 
 ## 호출
 
@@ -207,7 +246,7 @@ run init        # 멱등 재확인(원장·Neo4j 불변)
 |---|---|---|
 | 생산 | 설치 명령 `zoop-ai-handoff {freeze,inspect,recover,export}`가 둘 이상의 S3 job을 고정해 불변 bundle 생성 | operator 비웹 스테이징 import가 앱 `graph_versions`에 **비활성 등록**합니다([api README](../README.md#그래프-handoff-스테이징-import)). 앱 활성화 관리 API·사전 검사는 별도 구현이며 수입이 활성화를 수행하지 않습니다. |
 | 상태 | `publication=not-published`, `readiness={app:"import-pending", evidenceRegistration:"not-registered", publicActivation:"none", graphDb:"none"}` | `GraphDbStatus`/`Neo4jStatus`/`GraphDbVersionState` 대응 생산자 없음(**만들어 채우지 마세요**) |
-| 근거 | 앱 호환 evidence id를 **제안**하고 좌표·`quoteSha256`·locator를 제공 | 스테이징 import가 앱 텍스트 기준 인용 해시 검증과 `evidence` 행 등록을 수행합니다(인용 무결성만, 의미 검증 아님). `getEvidence`의 graph·basis-only·impact-only 읽기는 구현되어 있으며, 앱 공개 제외 저장소는 아직 없습니다. |
+| 근거 | 앱 호환 evidence id를 **제안**하고 좌표·`quoteSha256`·locator를 제공 | 스테이징 import가 앱 텍스트 기준 인용 해시 검증과 `evidence` 행 등록을 수행합니다(인용 무결성만, 의미 검증 아님). `getEvidence`의 graph·basis-only·impact-only 읽기와 버전별 공개 제외(이슈·관계·근거)가 구현되어 있습니다. |
 | 시각 | `publishedAt`/`observedAt`/`eventTime`/`verifiedAt`을 따로 보존 | `asOf` 정책(버전 선택 vs 고정 버전 안 disclosure 필터) |
 
 ## 소유 경계
@@ -521,7 +560,7 @@ bundle 스키마만 `zoop-graph-handoff-bundle-3` → `-4`로 한 번에 바꿨�
 
 **source registry 파일 경계.** 운영자만 `ZOOP_DOCUMENT_READ_INGESTION_SOURCES`의 파일과 상위 디렉터리를 바꿀 수 있어야 하고, 웹 프로세스에는 파일 읽기 권한만 부여합니다. 운영자는 쓰기 가능한 전용 디렉터리에서 완성된 일반 파일을 만든 뒤 같은 디렉터리의 `sources.json`으로 원자적으로 교체합니다. 기존 파일을 FIFO·장치로 바꾸거나 symlink를 끼워 넣지 않습니다. reader는 매 요청에 경로의 symlink·파일 종류·크기를 확인하고, POSIX 파일 속성이 있으면 그룹/기타 쓰기 권한도 거절합니다. 지원하는 파일시스템에서는 디렉터리 핸들에 상대적인 `NOFOLLOW_LINKS` 순회를 사용하지만, 현재 macOS JDK는 이를 제공하지 않아 일반 경로 검사 후 다시 엽니다. Java의 이 파일 읽기에는 원자적인 비차단 열기·열린 파일 종류 확인이 없어, 파일이나 상위 디렉터리를 동시에 교체할 수 있는 권한 있는 로컬 공격자까지 막는다고 주장하지 않습니다. POSIX 속성을 제공하지 않는 환경이나 공유 임시 디렉터리 아래에 놓는 경우에도 운영자가 상위 경로의 소유권과 교체 권한을 통제해야 합니다(스티키 디렉터리는 그 아래 운영자 소유 항목을 다른 사용자가 교체할 수 없어야 함). reader는 권한을 수정하지 않고, 읽기·검증 실패는 파일 내용이나 경로를 응답에 담지 않고 503으로 처리합니다.
 
-**한계.** source registry의 scope만 제거하는 철회는 이미 노출된 근거를 막지 못합니다(scope pin이 handoff에 없음): grant를 disable하거나 revision을 바꾸거나 operation을 빼야 합니다. 공개 제외 overlay는 아직 `NONE`(FS081)이고 공개 활성화 기능이 없어 운영 환경에서는 어떤 버전도 읽히지 않습니다. 요청마다 registry·snapshot·receipt를 읽고 캐시하지 않습니다.
+**한계.** source registry의 scope만 제거하는 철회는 이미 노출된 근거를 막지 못합니다(scope pin이 handoff에 없음): grant를 disable하거나 revision을 바꾸거나 operation을 빼야 합니다. 공개 제외 overlay와 관리자 활성화는 이후 구현됐으며 현재 계약은 [지금 상태](#지금-상태-사실)와 [공개 제외 명령](../README.md#공개-제외-명령-fs081)을 따릅니다. 요청마다 registry·snapshot·receipt를 읽고 캐시하지 않습니다.
 
 **검증.** `EvidenceServiceTest`·`GraphEvidenceServiceTest`·`GraphEvidenceSnapshotReaderTest`·`SourceRegistryTest`·`DocumentReadPropertiesTest`(단위), `make api-graph-handoff-import-smoke`(실제 jar·PostgreSQL·HTTP; 기본으로 evidence 읽기 단계 포함, `--no-with-evidence-read`로 끔). 이 smoke는 **시험 harness 전용** psql 활성화 2건(`harnessActivations: 2`: evidence 읽기 단계 1건, bundle `-4` verdict 세계의 공개 그래프 읽기 1건; import의 `importActivationsWritten: 0`과 별개, production 게시 아님)을 격리 DB에서 수행합니다. 앞의 한 건 뒤에는 공유 행·나중 receipt, 권한 변경별 CLI parity(`read`/`store`/`quote-display` 제거, disabled, rights, 빈 evidence, 만료, revision·grant id 변경, `model-send` 대조), 과거 `asOf`+현재 권한, registry 변조·삭제 503, receipt 변조·비공개 article 404, 읽기 전용(표·artifact 트리 불변)을 확인합니다.
 
@@ -566,7 +605,7 @@ bundle 스키마만 `-4` → `-5`로 한 번에 바꿨습니다(manifest·runtim
 
 **이미 import된 이전 receipt.** 서비스는 receipt의 `bundle.schemaVersion`이 아니라 형태만 봅니다. 따라서 `-4` 등 이전 스키마로 import된 receipt도 `relations[].basis[]`가 `relationKey`·`evidenceIds`를 갖추고 relation의 `id`·`type`·`source`·`target`이 snapshot과 같으면 **지금의 모든 게이트(현재 source registry 권한, 행·본문·span·텍스트 해시, article 가용성, 선택 버전의 등록된 해시·크기)를 그대로 적용한 채** basis-only span을 서비스합니다(`-4` receipt에는 `structuralPath`·`pathCompanies`·basis scope가 없지만 이 읽기는 그것들을 읽지 않습니다). 그 형태가 없는 receipt만 basis-only span에서 404로 fail closed합니다. 한 relation에 basis가 둘 이상이고 asOf가 그중 일부만 검증한 시점이면, 아직 검증되지 않은 basis의 근거는 같은 기사를 가리키는 앞선 basis가 보인다는 이유로 서비스되지 않습니다(후보 basis의 receipt `evidenceIds`에 정확히 그 id가 있어야 함).
 
-**알려진 한계·검증 상태.** 공개 제외 overlay(FS081)는 저장소가 없어 빌드된 jar에서는 relation·issue·evidence 제외를 HTTP로 구동할 수 없습니다. 이 세 제외는 실제 `PublicGraphReader`+`EvidenceService`를 묶은 Java 시험(`GraphEvidenceServiceTest`, `GraphEvidenceSnapshotReaderTest`)이 가변 overlay로 확인합니다. 시험: `HandoffBundleVerifierTest`(알려진·비공개·미매핑 중간, 1홉 unavailable·고아·카운트·scope 크기·비구조 경로 거부, 생산자의 `export-path-*`·`bundle-path-01..22` fixture), `GraphHandoffImporterTest`·`GraphHandoffImportPostgresIntegrationTest`(catalogue ∪ 검증·롤백·snapshot 배제·receipt 문구), `GraphEvidenceServiceTest`(basis 소속·권한·tamper), `make api-graph-handoff-import-smoke`(실제 jar·PostgreSQL·HTTP, 구조 경로 세계를 마지막에 import하고 시험 harness 활성화 1건을 **거꾸로 날짜 지정**해 basis 검증 이전의 asOf를 구동하며 `harnessActivations`는 4가 됩니다). 실행 결과는 Main이 통합 검증에서 확인합니다.
+**알려진 한계·검증 상태.** 이 import smoke는 공개 제외 저장소의 변경을 구동하지 않습니다. relation·issue·evidence 제외는 실제 `PublicGraphReader`+`EvidenceService`를 묶은 Java 시험(`GraphEvidenceServiceTest`, `GraphEvidenceSnapshotReaderTest`)이 가변 overlay로 확인합니다. 현재 앱 저장소와 운영자 명령은 [공개 제외 명령](../README.md#공개-제외-명령-fs081)을 따릅니다. 시험: `HandoffBundleVerifierTest`(알려진·비공개·미매핑 중간, 1홉 unavailable·고아·카운트·scope 크기·비구조 경로 거부, 생산자의 `export-path-*`·`bundle-path-01..22` fixture), `GraphHandoffImporterTest`·`GraphHandoffImportPostgresIntegrationTest`(catalogue ∪ 검증·롤백·snapshot 배제·receipt 문구), `GraphEvidenceServiceTest`(basis 소속·권한·tamper), `make api-graph-handoff-import-smoke`(실제 jar·PostgreSQL·HTTP, 구조 경로 세계를 마지막에 import하고 시험 harness 활성화 1건을 **거꾸로 날짜 지정**해 basis 검증 이전의 asOf를 구동하며 `harnessActivations`는 4가 됩니다). 실행 결과는 Main이 통합 검증에서 확인합니다.
 
 ## 2026-10-21: bundle `-6` — 영향 행(`impacts[]`)과 impact-only 근거 읽기
 
@@ -624,12 +663,14 @@ AI는 변경된 문서·source·grant 또는 S3 관계 후보를 **명시한 han
 
 1. 결과의 `handoffId`, `manifestDigest`, `bundleDigest`, `contentDigest`를 앱이 보관한 import receipt에 대조합니다. AI가 앱의 `graphVersion`이나 최신 활성 버전을 대신 고르지 않습니다.
 2. `issues`, `relations`, `evidenceIds`는 **제외 검토 대상**이지 적용 완료 기록이 아닙니다. 앱은 자체 결정·revision·저장을 거쳐야 하며, 결과를 읽는 것만으로 활성화 안전 조건이 충족되지는 않습니다.
-3. 이슈·간선 ID는 정정 후 새 handoff에서도 재사용될 수 있습니다. 현재 `DisclosureExclusions`는 전역 집합이므로 여러 결과를 그대로 합쳐 적용하면 정정된 버전까지 숨길 수 있습니다. 버전별 제외 여부와 정정·복구 정책은 앱 저장소 구현에서 결정해야 합니다.
+3. 이슈·간선 ID는 정정 후 새 handoff에서도 재사용될 수 있습니다. 여러 결과를 전역 집합으로 합치면 정정된 버전까지 숨길 수 있으므로, 앱 저장소는 제외를 버전별로 보관하고 `DisclosureExclusionReader.current(versionId)`로 해당 버전의 overlay를 읽습니다.
 4. 오류·빈 결과·이전보다 작은 결과로 기존 제외를 해제하지 않습니다. 선택하지 않은 handoff와 이전 schema의 영향이 없다는 뜻도 아닙니다.
 5. 원천 변경은 모델이 본 전체 S2/S3 입력을 따라 보수적으로 관계를 포함합니다. 관계 후보의 의미상 철회는 원문 철회가 아니므로 기사·근거 목록은 비어 있습니다. 이 두 원인을 구분해야 합니다.
 6. `articles`는 별도 기사 목록의 검토에도 쓸 수 있는 식별자입니다. 기존 `GraphSnapshotFilter`에 제외 목록을 넣는 것만으로 기업 문서 목록·S1·브리핑·채팅·캐시·Neo4j까지 처리된 것으로 보지 않습니다.
 
-CLI는 현재 bundle `-7`만 처리하며 하나라도 해석할 수 없는 선택이 있으면 전체를 거절합니다. 실제 권한 판단과 원문 공개는 기존 읽기 게이트를 계속 사용합니다. 이 기능은 공개 제외의 생산자 측 선행 계약이며 **FS081 전체 완료나 앱 exclusion store 구현 완료가 아닙니다.**
+**앱 소비 구현(2026-10-24).** 운영자 명령 `com.zoop.graph.exclusion`이 이 보고서를 받아 위 조건을 지킵니다: ① handoff마다 앱이 수입한 버전의 receipt와 handoffId·세 digest를 대조하고, ② 제안은 운영자 명령으로만 저장하며, ③ 제외는 그 버전에만 적용하고, ④ 보고서로는 해제하지 않고 사유를 적은 `lift`로만 해제하며, ⑤ `relation-retraction`이 기사·근거를 제안하면 거절하고, ⑥ 기사 대상은 기록만 하고 그래프 조회는 이슈·관계·근거에 적용합니다. 실행 방법은 [api README](../README.md#공개-제외-명령-fs081)입니다.
+
+CLI는 현재 bundle `-7`만 처리하며 하나라도 해석할 수 없는 선택이 있으면 전체를 거절합니다. 실제 권한 판단과 원문 공개는 기존 읽기 게이트를 계속 사용합니다. 이 기능은 공개 제외의 생산자 측 선행 계약이며, **CLI의 성공만으로 앱의 제외 적용이나 FS081 전체 완료를 뜻하지 않습니다.** 앱 저장소 구현은 위 운영자 명령 절을 따릅니다.
 
 ### 내부 HTTP 소비 계약
 

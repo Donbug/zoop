@@ -26,8 +26,9 @@ import org.springframework.stereotype.Component;
  * <li>A selected evidence item that is no longer readable keeps its id and kind but not its title.</li>
  * <li>A result citing any evidence that is not readable now (withdrawn, private, rights changed, excluded from the pinned
  * graph, or not verifiable) returns no answer text, sections, sources, citations or graph targets; {@code answer} carries
- * a fixed notice and {@code answerBasis} is {@code none}. Approved ZOOP documents ({@code zoop_doc}) have no document
- * registry yet, so they cannot be verified and are withheld the same way.</li>
+ * a fixed notice and {@code answerBasis} is {@code none}. An approved ZOOP document ({@code zoop_doc}) is checked the same
+ * way: it stays readable while the version it quoted is still in effect now, whatever the stored asOf ({@link ChatZoopDocs}).
+ * A citation of any other kind cannot be verified and is withheld.</li>
  * </ul>
  *
  * <p>It runs outside the chat transaction because the evidence read has its own.
@@ -37,6 +38,7 @@ public class ChatResponseGuard {
     public static final String WITHHELD_ANSWER = "이 답변이 인용한 자료를 지금은 보여드릴 수 없어요. 자료가 비공개로 바뀌었거나 "
             + "접근 권한을 확인하지 못했어요. 필요하면 새 질문으로 다시 물어봐 주세요.";
     public static final String WITHHELD_EVIDENCE_LABEL = "표시할 수 없는 근거";
+    private static final Set<String> CHECKABLE = Set.of("article", "company_profile", "zoop_doc");
 
     private final ChatEvidenceAccess access;
 
@@ -89,7 +91,9 @@ public class ChatResponseGuard {
         Set<String> articles = new LinkedHashSet<>();
         Set<String> documents = new LinkedHashSet<>();
         for (Citation citation : nullSafe(result.citations())) {
-            ("article".equals(citation.sourceKind()) ? articles : documents).add(citation.evidenceId());
+            // A catalog profile or ZOOP document quote is checked like an article: readable while its source still holds it.
+            boolean checkable = CHECKABLE.contains(citation.sourceKind());
+            (checkable ? articles : documents).add(citation.evidenceId());
         }
         if (!documents.isEmpty()) return false;
         Set<String> cited = new LinkedHashSet<>(articles);

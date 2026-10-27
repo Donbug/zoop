@@ -68,12 +68,24 @@ class ChatResponseGuardTest {
     }
 
     @Test
-    void anUnverifiableZoopDocumentCitationIsWithheld() {
-        var result = new ChatResult("answered", "msg-1", "ZOOP 안내 본문",
+    void aZoopDocumentCitationIsShownWhileItsVersionIsInEffectAndWithheldOnceReplaced() {
+        var job = job(List.of(), documented("zoop_doc"));
+        assertSame(job, guard(Set.of("doc-1")).job(job, "r"));
+        assertEquals(ChatResponseGuard.WITHHELD_ANSWER, guard(Set.of()).job(job, "r").result().answer());
+    }
+
+    @Test
+    void aCitationOfAnUnknownKindIsWithheldEvenWhenItsIdReads() {
+        assertEquals(ChatResponseGuard.WITHHELD_ANSWER,
+                guard(Set.of("doc-1")).job(job(List.of(), documented("help_page")), "r").result().answer());
+    }
+
+    private static ChatResult documented(String sourceKind) {
+        return new ChatResult("answered", "msg-1", "ZOOP 안내 본문",
                 List.of(new ChatAnswerSection("zoop_documented", "ZOOP 안내 본문", List.of("doc-1"))), "zoop_documented",
-                null, List.of(), List.of(new Citation("zoop_doc", "doc-1", "구간", null, null, "help-1", "v1", 0, 2, "도움말",
-                        null, null, null)), List.of(), applied(), List.of(), null, List.of(), metadata());
-        assertEquals(ChatResponseGuard.WITHHELD_ANSWER, guard(Set.of("doc-1")).job(job(List.of(), result), "r").result().answer());
+                null, List.of(), List.of(new Citation(sourceKind, "doc-1", "구간", null, null, "policy.privacy", "v1", 0, 2,
+                        "개인정보 처리방침 · 1. 처리 목적과 항목", null, null, null)), List.of(), applied(), List.of(), null,
+                List.of(), metadata());
     }
 
     @Test

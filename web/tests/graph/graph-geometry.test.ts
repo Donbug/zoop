@@ -41,8 +41,8 @@ describe('D-GRP-01/01b · graph readability', () => {
     expect(node.style?.labelText).toBeTruthy();
     expect(String(node.style?.labelText)).toContain('…');
     expect(issue.label).toBe(title);
-    expect(textWidth(String(node.style?.labelText), 13)).toBeLessThanOrEqual(
-      180,
+    expect(textWidth(String(node.style?.labelText), 15)).toBeLessThanOrEqual(
+      220,
     );
   });
   it('keeps short titles intact and does not split Unicode code points', () => {

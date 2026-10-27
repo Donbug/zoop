@@ -61,7 +61,7 @@ class EventDetailServiceTest {
     }
 
     private EventDetailService fixtures() {
-        return new EventDetailService(GraphReadFixtures.reader(NOW, () -> DisclosureExclusions.NONE), receipts, registry);
+        return new EventDetailService(GraphReadFixtures.reader(NOW, pinned -> DisclosureExclusions.NONE), receipts, registry);
     }
 
     // ---- synthetic fixture version: snapshot facts only --------------------------------------------------------------
@@ -148,7 +148,7 @@ class EventDetailServiceTest {
     @Test
     void anExcludedEventIsNotFound() {
         var service = new EventDetailService(GraphReadFixtures.reader(NOW,
-                () -> new DisclosureExclusions(1, java.util.Set.of(EUV), java.util.Set.of(), java.util.Set.of())),
+                pinned -> new DisclosureExclusions(1, java.util.Set.of(EUV), java.util.Set.of(), java.util.Set.of())),
                 receipts, registry);
         assertEquals(ErrorCode.RESOURCE_NOT_FOUND,
                 assertThrows(CustomException.class, () -> service.get(EUV, null, null, null, "r")).getErrorCode());
@@ -496,7 +496,7 @@ class EventDetailServiceTest {
             public boolean everActivated(String id) { return record.id().equals(id); }
         };
         PublicGraphReader reader = new PublicGraphReader(new GraphVersionSelector(versions, Clock.fixed(NOW, ZoneOffset.UTC)),
-                version -> snapshot, () -> exclusions);
+                version -> snapshot, pinned -> exclusions);
         return new EventDetailService(reader, receipts, registry);
     }
 

@@ -500,7 +500,7 @@ class GraphHandoffImporterTest {
         when(versions.everActivated(versionId)).thenReturn(true);
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         PublicGraphReader reader = new PublicGraphReader(new GraphVersionSelector(versions, clock),
-                new ArtifactGraphSnapshotStore(store, registry, null), () -> DisclosureExclusions.NONE);
+                new ArtifactGraphSnapshotStore(store, registry, null), ignoredVersion -> DisclosureExclusions.NONE);
         EvidenceReadRepository evidence = mock(EvidenceReadRepository.class);
         for (EvidenceRow row : graph.evidenceRows().values()) {
             when(evidence.findEvidence(row.id())).thenReturn(Optional.of(new EvidenceView(row.id(), row.articleId(),

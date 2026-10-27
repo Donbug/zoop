@@ -48,7 +48,7 @@ two-relation path through a mapped but unpublished middle company (a private `pa
 text; the receipts keep the complete bundle, the `structural_path_closed_over_involves_basis_and_catalog` check and the operator-mapped-chain note. With the evidence-read phase a FOURTH
 TEST-HARNESS activation (BACK-DATED to just after the last activation, so an asOf can fall before the structural basis was verified) serves the private-middle version: the spans only a
 structural basis cites are 200 without eventIds from the selected version's receipt, 404 before the basis was verified or the article published, under a revoked grant, a private article,
-tampered receipt bytes or another version, and no public body names the private company. Disclosure exclusions have no store in the built application, so they are proven by the Java tests.
+tampered receipt bytes or another version, and no public body names the private company. This smoke does not mutate the app's disclosure exclusion store; exclusion behavior is proven by the Java tests.
 A sixth, producer-authored IMPACT world (`graph_handoff_smoke.impact_export`, replay, SYNTHETIC, handoff `handoff-impacts-1`, built after the path worlds) is imported last: the receipt retains
 the closed `impacts[]` (one row per INVOLVES source relation: a verified positive with an impact-only quote, a verifier-rejected, a verified negative of the other S3 job, a verified undetermined,
 a no-evidence and a precheck-rejected row; hand-written in `hs.expected_impacts`), while the snapshot, the import result and every public body carry no proposal, effect, label, candidate id or
@@ -56,8 +56,8 @@ verifier digest. With the evidence-read phase a FIFTH TEST-HARNESS activation se
 selected version's receipt although the one candidate structural basis does not cite it, 404 before the version existed / the article was published, for another version, under a revoked grant, a
 private article or tampered receipt bytes. The article's publication boundary is proven with the IMPACT version itself selected on both sides: at the very end the script adds TEST-ONLY historical
 activation rows (reason `smoke history:`, reported as `historicalActivations`, never an import or harness activation) at the fixture's own publication instant, so asOf half a second before is 404 although
-graphVersion pins the impact version (a wrong pin would be 422) and half a second after is 200 with that version in metadata. An excluded edge/evidence and a malformed receipt basis need a mutable
-exclusion store / re-registered receipt, so the Java tests (real pinned reader, real service) prove those and this script does not claim them over HTTP.
+graphVersion pins the impact version (a wrong pin would be 422) and half a second after is 200 with that version in metadata. Excluded edge/evidence and malformed receipt basis cases are proven
+by the Java tests (real pinned reader, real service); this script does not mutate the exclusion store or re-register receipts to claim those cases over HTTP.
 The impact phase also inserts ONE explicitly SYNTHETIC published ORIGINAL briefing round using the existing briefing PostgreSQL fixture's payload,
 source-binding and current-grant conventions (not the replay/reconstruction path). It pins only the supply issue to the real imported impact version at a
 cutoff before all structural basis verification and before that version's actual harness activation. Real round-scoped HTTP reads must retain the impact-only
@@ -932,8 +932,8 @@ def path_read_phase(paths: dict, db, layout, previous: str) -> dict:
     between that activation and the moment the S3 relations became eligible selects this version while its structural bases are not yet verified.
 
     A BASIS-ONLY span (SUP, and the second link's sentence) is cited by no issue and no relation, only by a structural basis: it is served (200, no eventIds) only when the
-    selected version's receipt proves exactly that relation's basis cites it, and every current rights / row / article / receipt gate still applies. Disclosure exclusions have
-    no store in the built application (nothing to drive over HTTP); the relation / issue / evidence exclusions are proven by the Java tests with the real pinned reader."""
+    selected version's receipt proves exactly that relation's basis cites it, and every current rights / row / article / receipt gate still applies. This smoke does not mutate
+    the app's disclosure exclusion store; the relation / issue / evidence exclusions are proven by the Java tests with the real pinned reader."""
     import urllib.parse
     from datetime import timezone
     smoke, world, layout6, vid = paths["smoke"], paths["world"], paths["layout"], paths["vids"]["private"]

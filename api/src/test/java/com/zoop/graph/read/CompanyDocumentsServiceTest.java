@@ -84,7 +84,7 @@ class CompanyDocumentsServiceTest {
         when(analyses.read(any(), any(), anyString(), anyString())).thenReturn(noAnalysis);
         when(analyses.read(any(), any(), anyString(), anyString(), eq(true))).thenReturn(noAnalysis);
         when(analyses.read(any(), any(), anyString(), anyString(), eq(false))).thenReturn(noAnalysis);
-        service = new CompanyDocumentsService(GraphReadFixtures.reader(NOW, () -> DisclosureExclusions.NONE), jdbc,
+        service = new CompanyDocumentsService(GraphReadFixtures.reader(NOW, pinned -> DisclosureExclusions.NONE), jdbc,
                 registry, evidence, analyses, JsonMapper.builder().build());
     }
 
@@ -213,7 +213,7 @@ class CompanyDocumentsServiceTest {
         String asOf = NOW.toString();
         var documents = service.list(COMPANY, null, null, null, null, "fixture-2026-10-08", asOf,
                 null, null, "req-1");
-        var timeline = new EventListService(GraphReadFixtures.reader(NOW, () -> DisclosureExclusions.NONE), jdbc,
+        var timeline = new EventListService(GraphReadFixtures.reader(NOW, pinned -> DisclosureExclusions.NONE), jdbc,
                 JsonMapper.builder().build()).list(COMPANY, 1, null, null, null, null,
                         "fixture-2026-10-08", asOf);
         Set<String> timelineIds = timeline.items().stream().map(item -> item.id()).collect(Collectors.toSet());
@@ -326,7 +326,7 @@ class CompanyDocumentsServiceTest {
                 java.util.Map.of(GraphReadFixtures.HBM_SUPPLY, List.of(COMPANY), GraphReadFixtures.HBM_EQUIP, List.of(HANMI)));
         var reader = new PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
                 java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC), (id, request) -> basis),
-                new com.zoop.graph.snapshot.FixtureGraphSnapshotStore(getClass().getClassLoader()), () -> DisclosureExclusions.NONE);
+                new com.zoop.graph.snapshot.FixtureGraphSnapshotStore(getClass().getClassLoader()), pinned -> DisclosureExclusions.NONE);
         service = new CompanyDocumentsService(reader, jdbc, registry, evidence, analyses, JsonMapper.builder().build());
         var first = service.list(COMPANY, null, null, null, "round", null, null, null, 1, "req-1");
         assertNotNull(first.nextCursor());

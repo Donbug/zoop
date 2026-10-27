@@ -73,7 +73,7 @@
 | TEAM_DECISION_REQUIRED | warning | createConversation | 대화·작업·멱등성 키의 실제 보존 기간과 운영 담당자를 출시 전에 등록해야 한다. 대화 소유권·활성 작업 하나·최초 요청 고정은 확정 계약이다. |  |
 | TEAM_DECISION_REQUIRED | warning | getConversation | 대화·작업의 실제 보존 기간과 마스킹·철회 전파 운영값을 출시 전에 등록해야 한다. |  |
 | TEAM_DECISION_REQUIRED | warning | getCurrentConversation | 최신 대화 복원의 보존 기간과 계정 삭제·로그아웃 뒤 cache 폐기 운영값을 출시 전에 등록해야 한다. |  |
-| TEAM_DECISION_REQUIRED | warning | submitQuestion | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다. / Jev 0.70/0.35, MCP 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.8을 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다. |  |
+| TEAM_DECISION_REQUIRED | warning | submitQuestion | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다. / Jev 0.70/0.35, 도구 호출 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.9를 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다. |  |
 | TEAM_DECISION_REQUIRED | warning | getQuestionJob | 작업 결과·실패·도구 호출 영수증의 실제 보존 기간을 출시 전에 등록해야 한다. 조회는 새 모델 실행을 만들지 않는 확정 계약이다. |  |
 | TEAM_DECISION_REQUIRED | warning | retryQuestionJob | 실패 kind별 retry는 ChatFailure.retry가 권위이며 출력 검증 실패 자동 재생성은 금지한다. 운영 재시도 횟수 경보값만 출시 전에 등록한다. |  |
 | TEAM_DECISION_REQUIRED | warning | cancelQuestionJob | 취소 뒤 늦은 worker 완료와 신규 도구 호출 차단은 확정 계약이다. provider 결과·과금이 불명확한 호출의 운영 조정 담당자를 출시 전에 등록한다. |  |
@@ -300,7 +300,7 @@
 | BFF_PATH_DIFFERENCE | difference | logOutAdmin | 목표 /api/v1/admin/auth/logout ↔ BFF /api/admin/auth/logout |  |
 | BFF_FIELD_DIFFERENCE | difference | logOutAdmin | 목표만 162 · BFF만 0 · 형식/필수/권한 변경 1 |  |
 | BFF_PATH_DIFFERENCE | difference | getAdminDashboard | 목표 /api/v1/admin/dashboard ↔ BFF /api/admin/dashboard |  |
-| BFF_FIELD_DIFFERENCE | difference | getAdminDashboard | 목표만 698 · BFF만 633 · 형식/필수/권한 변경 7 |  |
+| BFF_FIELD_DIFFERENCE | difference | getAdminDashboard | 목표만 1082 · BFF만 633 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | listAuditRecords | 목표 /api/v1/admin/audit-log ↔ BFF /api/admin/audit-log |  |
 | BFF_FIELD_DIFFERENCE | difference | listAuditRecords | 목표만 119 · BFF만 31 · 형식/필수/권한 변경 8 |  |
 | BFF_PATH_DIFFERENCE | difference | getPipelineOverview | 목표 /api/v1/admin/pipeline/overview ↔ BFF /api/admin/pipeline/overview |  |
@@ -322,17 +322,17 @@
 | BFF_PATH_DIFFERENCE | difference | activateGraphVersion | 목표 /api/v1/admin/graph/versions/{version_id}/activate ↔ BFF /api/admin/graph/versions/{version_id}/activate |  |
 | BFF_FIELD_DIFFERENCE | difference | activateGraphVersion | 목표만 165 · BFF만 12 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | listAnalysisJobs | 목표 /api/v1/admin/jobs ↔ BFF /api/admin/jobs |  |
-| BFF_FIELD_DIFFERENCE | difference | listAnalysisJobs | 목표만 120 · BFF만 93 · 형식/필수/권한 변경 21 |  |
+| BFF_FIELD_DIFFERENCE | difference | listAnalysisJobs | 목표만 804 · BFF만 393 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | createAnalysisJob | 목표 /api/v1/admin/jobs ↔ BFF /api/admin/jobs |  |
-| BFF_FIELD_DIFFERENCE | difference | createAnalysisJob | 목표만 167 · BFF만 39 · 형식/필수/권한 변경 16 |  |
+| BFF_FIELD_DIFFERENCE | difference | createAnalysisJob | 목표만 526 · BFF만 194 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | getAnalysisJob | 목표 /api/v1/admin/jobs/{job_id} ↔ BFF /api/admin/jobs/{job_id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getAnalysisJob | 목표만 114 · BFF만 39 · 형식/필수/권한 변경 14 |  |
+| BFF_FIELD_DIFFERENCE | difference | getAnalysisJob | 목표만 456 · BFF만 189 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | retryAnalysisJob | 목표 /api/v1/admin/jobs/{job_id}/retry ↔ BFF /api/admin/jobs/{job_id}/retry |  |
-| BFF_FIELD_DIFFERENCE | difference | retryAnalysisJob | 목표만 162 · BFF만 36 · 형식/필수/권한 변경 16 |  |
+| BFF_FIELD_DIFFERENCE | difference | retryAnalysisJob | 목표만 504 · BFF만 186 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | cancelAnalysisJob | 목표 /api/v1/admin/jobs/{job_id}/cancel ↔ BFF /api/admin/jobs/{job_id}/cancel |  |
-| BFF_FIELD_DIFFERENCE | difference | cancelAnalysisJob | 목표만 162 · BFF만 30 · 형식/필수/권한 변경 16 |  |
+| BFF_FIELD_DIFFERENCE | difference | cancelAnalysisJob | 목표만 504 · BFF만 180 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | getAiUsage | 목표 /api/v1/admin/ai-usage ↔ BFF /api/admin/ai-usage |  |
-| BFF_FIELD_DIFFERENCE | difference | getAiUsage | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 10 |  |
+| BFF_FIELD_DIFFERENCE | difference | getAiUsage | 목표만 157 · BFF만 21 · 형식/필수/권한 변경 10 |  |
 | BFF_PATH_DIFFERENCE | difference | listAdminBriefingRounds | 목표 /api/v1/admin/briefings ↔ BFF /api/admin/briefings |  |
 | BFF_FIELD_DIFFERENCE | difference | listAdminBriefingRounds | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 12 |  |
 | BFF_PATH_DIFFERENCE | difference | getAdminBriefingRound | 목표 /api/v1/admin/briefings/{round_id} ↔ BFF /api/admin/briefings/{round_id} |  |

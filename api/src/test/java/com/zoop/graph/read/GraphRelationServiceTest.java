@@ -23,7 +23,7 @@ class GraphRelationServiceTest {
     private DisclosureExclusions exclusions = DisclosureExclusions.NONE;
     private final org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate jdbc =
             org.mockito.Mockito.mock(org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate.class);
-    private final GraphRelationService service = new GraphRelationService(GraphReadFixtures.reader(NOW, () -> exclusions), jdbc);
+    private final GraphRelationService service = new GraphRelationService(GraphReadFixtures.reader(NOW, pinned -> exclusions), jdbc);
 
     private static final String STRUCTURAL = DisplayGraph.edgeId("STRUCTURALLY_RELATED_TO", HBM_EQUIP, HYNIX);
     private static final String SHARED = DisplayGraph.edgeId("SHARES_ISSUE", HYNIX, NVDA);
@@ -62,7 +62,7 @@ class GraphRelationServiceTest {
                 java.util.Map.of(HBM_SUPPLY, List.of(HYNIX, NVDA)));
         var selector = new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
                 java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC), (id, request) -> basis);
-        return new GraphRelationService(new PublicGraphReader(selector, ignored -> snapshot, () -> DisclosureExclusions.NONE), jdbc);
+        return new GraphRelationService(new PublicGraphReader(selector, ignored -> snapshot, pinned -> DisclosureExclusions.NONE), jdbc);
     }
 
     @Test

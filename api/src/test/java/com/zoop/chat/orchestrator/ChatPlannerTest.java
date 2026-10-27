@@ -84,11 +84,45 @@ class ChatPlannerTest {
     }
 
     @Test
+    void namedCompaniesGetTheServerDefaultReadsWhateverTheCapabilityProbabilities() {
+        Set<String> bound = Set.of("company.read", "issue.read", "evidence.resolve", "graph.path.read");
+        var plan = run(planner.plan(run(0, "v1"), decision(
+                req("about", Map.of(ChatQueryType.Q03, 0.6), Map.of("issue.read", 0.1), List.of("KRX:005930")),
+                req("relation", Map.of(ChatQueryType.Q04, 0.99), Map.of("graph.path.read", 0.3),
+                        List.of("KRX:005930", "NASDAQ:ASML")),
+                req("issue", Map.of(ChatQueryType.Q03, 0.9), Map.of("issue.read", 0.9), List.of("iss-1"))), bound));
+        assertEquals(List.of(ChatCapability.COMPANY_READ), plan.requirements().get(0).capabilities(),
+                "a company question reads the company even when no capability reached the review band");
+        assertEquals(List.of(ChatCapability.GRAPH_PATH_READ), plan.requirements().get(1).capabilities());
+        assertEquals(List.of(ChatCapability.ISSUE_READ), plan.requirements().get(2).capabilities(),
+                "an issue target gets no company read");
+
+        var unbound = run(planner.plan(run(0, "v1"), decision(req("about", Map.of(ChatQueryType.Q03, 0.9),
+                Map.of("issue.read", 0.9), List.of("KRX:005930"))), Set.of("issue.read")));
+        assertEquals(List.of(ChatCapability.ISSUE_READ), unbound.requirements().getFirst().capabilities(),
+                "a default runs only when bound");
+    }
+
+    @Test
+    void aConceptQuestionNamingACompanyIsAlsoACompanyQuestion() {
+        var plan = run(planner.plan(run(0, "v1"), decision(req("r", Map.of(ChatQueryType.Q02, 0.72,
+                ChatQueryType.Q03, 0.54), Map.of(), List.of("KRX:005930"))), BOUND));
+        var r = plan.requirements().getFirst();
+        assertEquals(ChatPlan.Mode.TOOLS, r.mode());
+        assertEquals(List.of(ChatCapability.COMPANY_READ), r.capabilities());
+
+        var concept = run(planner.plan(run(0, "v1"), decision(req("r", Map.of(ChatQueryType.Q02, 0.9,
+                ChatQueryType.Q03, 0.2), Map.of(), List.of("KRX:005930"))), BOUND));
+        assertEquals(ChatPlan.Mode.GENERAL, concept.requirements().getFirst().mode(),
+                "below the review band it stays a concept");
+    }
+
+    @Test
     void gatesLimitWhatTheModelCannotDecide() {
         var plan = run(planner.plan(run(0, "v1"), decision(
                 req("advice", Map.of(ChatQueryType.Q02, 0.9), Map.of()).withAdvice(0.2),
                 req("path", Map.of(ChatQueryType.Q04, 0.9), Map.of("graph.path.read", 0.95), List.of("KRX:000660")),
-                req("free", Map.of(ChatQueryType.Q03, 0.9), Map.of("graph.delete", 0.99), List.of("KRX:000660")),
+                req("free", Map.of(ChatQueryType.Q03, 0.9), Map.of("graph.delete", 0.99), List.of("iss-1")),
                 req("concept", Map.of(ChatQueryType.Q02, 0.9), Map.of())), BOUND));
         assertEquals(Arrays.asList("investment_advice", "out_of_scope", "out_of_scope", null),
                 plan.requirements().stream().map(ChatPlan.Planned::limitation).toList(),
@@ -200,6 +234,34 @@ class ChatPlannerTest {
             var failure = assertThrows(ChatModels.Failure.class, () -> planner.plan(run(0, "v1"), bad, BOUND));
             assertEquals(ChatModels.Failure.Fate.NOT_SENT, failure.fate());
         }
+    }
+
+    @Test
+    void aPolicyQuestionReadsTheFixedPoliciesWithoutATargetOrAGraph() {
+        Set<String> bound = Set.of("company.read", "zoopPolicy.read");
+        var plan = run(planner.plan(run(0, null, List.of("iss-selected")), decision(req("r1",
+                Map.of(ChatQueryType.Q01, 0.9), Map.of("zoopPolicy.read", 0.8, "company.read", 0.9))), bound));
+        var r1 = plan.requirements().getFirst();
+        assertEquals(Mode.TOOLS, r1.mode());
+        assertEquals(List.of(ChatCapability.ZOOP_POLICY_READ), r1.capabilities(), "Q01 does not allow company.read");
+        assertEquals(ChatPlan.TargetSource.SERVER, r1.targetSource(), "the selection is not what a policy read reads");
+        assertTrue(r1.targets().isEmpty());
+        assertEquals(1, ChatPlanner.worstCaseCalls(plan), "both policies go in one call");
+
+        var withCompany = run(planner.plan(run(0, null), decision(req("r1", Map.of(ChatQueryType.Q01, 0.9),
+                Map.of("zoopPolicy.read", 0.8), List.of("KRX:000660"))), bound)).requirements().getFirst();
+        assertEquals(ChatPlan.TargetSource.SERVER, withCompany.targetSource(), "a named company is not a policy");
+    }
+
+    @Test
+    void aPolicyReadAlongsideAGraphLookupStillNeedsTheGraph() {
+        Set<String> bound = Set.of("company.read", "zoopPolicy.read");
+        assertStop("guidance", "graph_unavailable", planner.plan(run(0, null), decision(
+                req("r1", Map.of(ChatQueryType.Q01, 0.9), Map.of("zoopPolicy.read", 0.8)),
+                req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of("KRX:000660"))), bound));
+        // An unbound Q01 tool never runs.
+        assertStop("guidance", "out_of_scope", planner.plan(run(0, null), decision(req("r1",
+                Map.of(ChatQueryType.Q01, 0.9), Map.of("help.search", 0.9))), bound));
     }
 
     // ---- fixtures -------------------------------------------------------------------------------------------------------

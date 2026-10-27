@@ -27,6 +27,8 @@ import com.zoop.chat.orchestrator.ChatModels.Failure.Fate;
 import com.zoop.chat.orchestrator.ChatQueryType;
 import com.zoop.chat.orchestrator.ChatRouteDecision;
 import com.zoop.chat.orchestrator.ChatSemanticVerdicts;
+import com.zoop.chat.service.ChatCompanyProfiles;
+import com.zoop.chat.service.ChatZoopDocs;
 import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolPath;
@@ -60,8 +62,11 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     static final int MAX_LABEL = 300;
     static final int MAX_PATHS = 20;
     private static final Pattern EVIDENCE = Pattern.compile("ev-[0-9a-f]{64}");
-    /** Item kinds whose label is catalog or graph data (company names, issue titles, relation pairs), not source text. */
-    static final Set<String> SENT_ITEM_KINDS = Set.of("company", "issue", "edge");
+    /**
+     * Item kinds whose label is catalog or graph data (company names, issue titles, relation pairs) or a ZOOP document title,
+     * not source text.
+     */
+    static final Set<String> SENT_ITEM_KINDS = Set.of("company", "issue", "edge", "zoop_doc");
 
     /** The S2-1 source id of an article: the {@code articles.provider} the chat grant registry is keyed by. */
     @FunctionalInterface
@@ -255,11 +260,21 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     }
 
     private Optional<ObjectNode> quote(Citation citation) {
-        if (!"article".equals(citation.sourceKind()) || citation.articleId() == null || citation.quote() == null
-                || citation.quote().isEmpty() || citation.quote().length() > MAX_QUOTE) {
+        if (citation.quote() == null || citation.quote().isEmpty() || citation.quote().length() > MAX_QUOTE) {
             return Optional.empty();
         }
-        return sources.sourceOf(citation.articleId()).map(source -> {
+        Optional<String> sourceId;
+        if ("company_profile".equals(citation.sourceKind())) {
+            // ZOOP's own catalog text: its grant is the catalog's, not an article provider's.
+            sourceId = Optional.of(ChatCompanyProfiles.SOURCE_ID);
+        } else if ("zoop_doc".equals(citation.sourceKind())) {
+            sourceId = Optional.of(ChatZoopDocs.SOURCE_ID);
+        } else if ("article".equals(citation.sourceKind()) && citation.articleId() != null) {
+            sourceId = sources.sourceOf(citation.articleId());
+        } else {
+            return Optional.empty();
+        }
+        return sourceId.map(source -> {
             ObjectNode quote = StrictJson.newObject().put("evidenceId", citation.evidenceId()).put("sourceId", source)
                     .put("quote", citation.quote());
             if (citation.articleTitle() != null && citation.articleTitle().length() <= 500) {

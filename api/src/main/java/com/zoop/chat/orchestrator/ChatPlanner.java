@@ -33,7 +33,8 @@ import java.util.Set;
  * ({@link ChatQueryType}) and runs only when bound in the registry.</li>
  * <li>Targets named in the question take precedence over the selected context; a lookup with neither is ambiguous. When
  * the context is used and the member narrowed it to chosen evidence, the requirement (and what depends on it) may read and
- * cite only that evidence.</li>
+ * cite only that evidence. A ZOOP document capability (Q01) always reads its fixed documents, so a requirement that reads
+ * only those needs no target and no frozen graph.</li>
  * <li>General knowledge answers a pure Q02 requirement only. A requirement that also asks for a current fact needs a lookup
  * or is {@code out_of_scope}; it never falls back to a general answer.</li>
  * <li>Before any call: more than 6 explicit requirements, an ambiguity, more than 3 dependent stages or more than 12 calls in
@@ -70,7 +71,8 @@ public class ChatPlanner {
             if (p == null) return clarify(run, "ambiguous_target", List.of());
             planned.put(p.id(), p);
         }
-        if (planned.values().stream().anyMatch(p -> p.mode() == Mode.TOOLS) && run.graphVersionId() == null) {
+        if (planned.values().stream().anyMatch(p -> p.mode() == Mode.TOOLS
+                && p.capabilities().stream().anyMatch(ChatCapability::readsGraph)) && run.graphVersionId() == null) {
             return new ChatPlan.Stop("guidance", "graph_unavailable", List.of());
         }
         if (planned.values().stream().allMatch(p -> p.mode() == Mode.LIMITED)) {
@@ -94,7 +96,9 @@ public class ChatPlanner {
             if (p.mode() != Mode.TOOLS) continue;
             int targets = p.dependsOn() == null ? p.targets().size()
                     : "atLeast".equals(p.dependsOn().cardinality()) ? ChatToolRequest.MAX_TARGETS : p.dependsOn().count();
-            for (ChatCapability capability : p.capabilities()) calls += chunks(capability, targets);
+            for (ChatCapability capability : p.capabilities()) {
+                calls += chunks(capability, capability.documents().isEmpty() ? targets : capability.documents().size());
+            }
         }
         return calls;
     }
@@ -130,6 +134,11 @@ public class ChatPlanner {
 
         if (r.prohibitedAdvice() > ADVICE) return base.limited("investment_advice");
         if (all.isEmpty()) return base.limited("out_of_scope");
+        // A question that names a company asks about that company, not only a concept, once Q03 reaches the review band.
+        if (all.equals(Set.of(ChatQueryType.Q02)) && r.targets().stream().anyMatch(ChatPlanner::companyId)
+                && r.types().getOrDefault(ChatQueryType.Q03, 0.0) >= REVIEW) {
+            all.add(ChatQueryType.Q03);
+        }
         // Only a pure concept question is answered from general knowledge; Q02 never stands in for a current fact.
         if (all.equals(Set.of(ChatQueryType.Q02))) {
             return new Planned(r.id(), r.label(), all, Mode.GENERAL, null, List.of(), List.of(), null, null, null, 1);
@@ -146,9 +155,25 @@ public class ChatPlanner {
             best(allowed).filter(e -> e.getValue() >= REVIEW)
                     .ifPresent(e -> capabilities.add(ChatCapability.of(e.getKey()).orElseThrow()));
         }
+        // Server defaults for companies the question names (never for a dependent stage), whatever the capability
+        // probabilities: a company fact reads the company, and a relation between two or more of them reads the path.
+        // Each still has to be allowed by the type and bound.
+        Set<ChatCapability> defaults = EnumSet.noneOf(ChatCapability.class);
+        long companies = r.dependsOn() == null ? r.targets().stream().filter(ChatPlanner::companyId).count() : 0;
+        if (companies > 0 && all.contains(ChatQueryType.Q03)) defaults.add(ChatCapability.COMPANY_READ);
+        if (companies >= 2 && all.contains(ChatQueryType.Q04)) defaults.add(ChatCapability.GRAPH_PATH_READ);
+        for (ChatCapability c : defaults) {
+            if (permitted.contains(c) && bound.contains(c.id()) && !capabilities.contains(c)) capabilities.add(c);
+        }
+        capabilities.sort(Comparator.comparing(ChatCapability::id));
         // A fact requirement without a lookup it may make is out of scope, even when it also asks about a concept.
         if (capabilities.isEmpty()) return base.limited("out_of_scope");
 
+        // ZOOP documents are read whatever the question names, so a requirement that reads only them needs no target.
+        if (r.dependsOn() == null && capabilities.stream().noneMatch(c -> c.documents().isEmpty())) {
+            return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities, List.of(), TargetSource.SERVER, null,
+                    null, 1);
+        }
         if (r.dependsOn() != null) {
             if (source == null || source.mode() != Mode.TOOLS) return base.limited("precondition_unmet");
             return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities, List.of(), TargetSource.DEPENDENCY,
@@ -165,6 +190,11 @@ public class ChatPlanner {
         List<String> scope = selection.evidenceIds().isEmpty() ? null : selection.evidencePool();
         return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities, targets, TargetSource.CONTEXT, scope,
                 null, 1);
+    }
+
+    /** A catalog company id ({@code KRX:005930}, {@code ORG:OPENAI}); issue and evidence ids have no exchange prefix. */
+    static boolean companyId(String id) {
+        return id.indexOf(':') > 0;
     }
 
     /** The best type when only an explicit requirement may use the review band. */

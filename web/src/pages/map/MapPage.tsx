@@ -845,10 +845,10 @@ function MapWorkspace({
                 onClick={() => setNotice(notice === 'info' ? '' : 'info')}
                 aria-label="지도 데이터 안내"
               >
-                <GraphIcon name="info" size={15} />
+                <GraphIcon name="info" size={19} />
               </button>
               <button onClick={onStartTutorial} aria-label="튜토리얼 다시 보기">
-                <GraphIcon name="help" size={15} />
+                <GraphIcon name="help" size={19} />
               </button>
             </div>
           </div>
@@ -1331,7 +1331,10 @@ function MapWorkspace({
               </div>
             )}
           </div>
-          <AiChatDrawer onViewOnMap={viewAnswerTarget} />
+          <AiChatDrawer
+            onViewOnMap={viewAnswerTarget}
+            returnFocusTo={mapRegion}
+          />
           <EvidenceDrawer
             onTutorialSkip={
               tutorialOpen && tutorialStep && tutorialStep < 5
