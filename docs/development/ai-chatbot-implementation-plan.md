@@ -2,7 +2,7 @@
 
 최초 기준일: 2026년 10월 21일 / 구현 상태 갱신: 2026년 10월 25일
 
-기준 정책: `ZOOP-AIG-001 v0.9`
+기준 정책: `ZOOP-AIG-001 v0.10` / 목표 설계 갱신: 2026-10-27 (날짜별 구현 기록과 구분)
 
 화면 추적: `D-AI-01`, `D-AI-01b`, `D-AI-02`, `D-AI-02b`
 
@@ -17,6 +17,21 @@
 - [현재 AI 내부 HTTP 계약](../api/internal-ai-openapi.yaml)
 
 ## 1. 현재 진행 상태
+
+### 2026-10-27 추가 개발 범위 (구현 예정)
+
+기존 상태 표는 해당 시점의 구현 증거다. 다음은 문서 개정으로 완료된 것이 아니며 아래 순서로 개발한다.
+
+1. **요구·계획 계약**: Q02/Q03/Q04 multi-label 조합, 새 질문별 재분류, 문맥 승계·명시 조건 우선, 최소 충분 도구와 의존 stage를 fixture로 고정한다. Q01 검색 차단·Q02~Q08 선택적 검색 capability를 추가한다. 독립 Luna coverage-verifier는 기존 남은 과제로 구현한다.
+2. **MCP POC**: 기존 공개 읽기 어댑터를 MCP 서버에 노출하고 서버 측 클라이언트·고정 바인딩·인증·위임 문맥·스키마 검사를 구현한다. 직접 어댑터와 MCP의 결과·권한·버전 동등성을 시험한다.
+3. **보조 웹 검색**: 사전 계획·의존 조회·최대 1회 보충 라운드, 검색 중복 제거, 실제 공급자 호출 수·기한 집계, Q07 검색어 최소화를 구현한다. 실패는 기존 ChatFailure로 보존한다.
+4. **출처·저장 계약**: `web_reported`·`web_result`, 검색 snapshot·검색 시각·requirementId 매핑을 DTO·저장·검사·guard에 추가한다. JSON 저장으로 충분한지 검토하고 필요 시에만 migration을 작성한다. 공급자 미선정 상태에서 보유 기간을 임의 확정하지 않는다.
+5. **화면 동작**: 별도 `uiActions[]` 계약을 구현하고 실제 조회된 기업·관계·경로·근거·브리핑 ID만 연결한다. 클릭 시 권한·버전을 확인하고 자동 이동·재열람 재실행을 막는다. UI 수정 전 wireframe README·manifest·대상 이미지 및 web 지침을 읽는다.
+6. **계약 동기화·출시**: 구현 원본 변경 후 OpenAPI·생성 클라이언트·화면·replay/통합 평가를 갱신한다. 합성 fixture 검증 후 공급자 약관·개인정보·grant·비용·지연을 확인해 활성화한다. 공개 job 수명주기와 기존 예산은 유지한다.
+
+상세 매핑은 [MCP·화면 동작 계약](../design/ai-chatbot-mcp-actions.md), 새 수용 사례는 [평가 세트](ai-chatbot-eval-set.md)의 다음 버전 항목을 따른다.
+
+### 기존 구현 상태
 
 | 영역 | 현재 확인된 상태 | 구현 판단 |
 | --- | --- | --- |
@@ -126,7 +141,7 @@ Q07 내 종목의 잠정 결정(2026-10-27, 사용자 승인, 평가 세트로 �
 
 | 순서 | 유형 | 최초 구현 도구 | 현재 기반·추가 작업 |
 | ---: | --- | --- | --- |
-| 1 | Q02 일반 개념 | 도구 없음 | Luna 제한 답변을 `general_knowledge` 구간으로 저장, 서버 고정 안내·근거 없음·정책 검사, Jev `prohibitedAdvice` 판정 |
+| 1 | Q02 일반 개념 | 안정적 일반 설명은 도구 없음, 목표 보조 검색은 별도 | Luna 제한 답변을 `general_knowledge` 구간으로 저장, 서버 고정 안내·근거 없음·정책 검사, Jev `prohibitedAdvice` 판정 |
 | 2 | Q01 서비스 안내 | `help.search`, `screenSpec.read`, `zoopPolicy.read` | 승인된 제품 문서 registry와 버전·철회 상태가 필요. 인용은 `Citation.sourceKind=zoop_doc`(docId·docVersion·code point 구간)으로 만들고 결정적 인용 ID를 발급 |
 | 3 | Q03 기업·사건 | `company.read`, `document.search`, `issue.read`, `evidence.resolve` | `company.read`·`issue.read`·`evidence.resolve` 구현. `document.search`와 검색형 기간 조건은 미구현 |
 | 4 | Q04 관계·경로 | `graph.path.read` | `PublicGraphReader` 위 최대 3-hop·노드/간선 50개·현재 evidence 재검사를 구현. Neo4j·AI 내부 그래프 API는 호출하지 않음 |
@@ -135,7 +150,7 @@ Q07 내 종목의 잠정 결정(2026-10-27, 사용자 승인, 평가 세트로 �
 | 7 | Q07 내 종목 | `portfolio.scope.read` + Q03/Q04 | 구현(2026-10-27): 서버가 주입한 작업 회원의 보유(모의 계좌)·관심 종목(`PersonalCompanies`)을 1단계로 읽고 나머지 조회를 그 종목에 2단계로 실행. 질문이 기업을 지목하면 그 기업을 그대로 읽고 본인 범위 여부는 아직 확인하지 않음 |
 | 8 | Q08 선정 근거 | `selectionRule.read` + evidence | 실제 적용 rule revision·입력 요인 조회 구현 필요 |
 
-웹 검색 대체 경로(`web.search`)는 위 순서와 별개로, 내부 도구로 답할 수 없는 Q03 요구에만 보충 라운드로 부르는 검색 API 직접 어댑터로 설계했다(MCP 미사용). 공급자·비용·개인정보 처리방침 개정이 결정되기 전에는 구현하지 않는다. [웹 검색 대체 경로 설계](../design/ai-chatbot-web-search.md)
+웹 검색(`web.search`)은 Q01을 제외한 Q02~Q08의 선택적 보조 도구다. 최초 계획과 기존 1회 보충 라운드에 배치할 수 있으며 내부 0건 조건에만 제한하지 않는다. 기존 어댑터를 재사용하는 MCP 서버 POC를 구현하며 공급자 확정 전에는 합성 fixture로 검증한다. 실제 호출은 비용·저장 권리·개인정보 절차·grant 확정 후 활성화한다. [보조 웹 검색 설계](../design/ai-chatbot-web-search.md), [MCP·화면 동작 계약](../design/ai-chatbot-mcp-actions.md).
 
 근거가 일부만 있는 질문의 처리는 [부분 답변 분기와 근거 부족 안내 설계](../design/ai-chatbot-partial-answer.md)에 있다(2026-10-26 구현). 1부는 개념과 사실이 섞인 요구에서 서버가 개념 하위 요구 `<id>-c`를 나눠 개념은 답한다(`ChatPlanner.withConcepts`, 기능 플래그 없음). Q03 근거 0개일 때 일반 배경을 붙이는 2부는 동문서답 위험으로 채택하지 않았다. 대신 근거 부족 결과의 `reason`을 원인별 서버 문장과 다음에 해 볼 일로 나누고, `applied`에 실제로 확인한 대상을 담는다(`ChatResults.InsufficientCause`).
 
@@ -160,7 +175,7 @@ Q01 `zoopPolicy.read`(`ZoopPolicyReadTool`, 문서 원천 `ChatZoopDocs`)를 같
   - 등록을 읽지 못하면 빈 결과가 아니라 `tool_unavailable`이다.
 - 인용 필드: 공개 계약대로 `zoop_doc` 인용의 `articleId`·`articleVersion`·`publisher`·`publishedAt`·`url`은 null이고 `articleTitle`이 문서 제목·절 제목이다.
 - 대상: 질문·선택 대상이 아니라 서버가 고정한 두 문서를 한 번에 읽는다(라우터는 문서를 지목하지 않는다). 회원이 좁힌 근거 선택 범위는 같은 요구의 그래프 도구에만 적용하고 고정 정책 문서 읽기에는 적용하지 않는다. 그래프를 읽지 않으므로 문서만 읽는 요구는 고정 그래프가 없어도 실행된다. 그래프 도구와 함께면 기존처럼 `graph_unavailable`이다.
-- 결정론 검사 `document_section`: `zoop_documented` 구간은 문서 도구가 전달한 근거만, `evidence_grounded` 구간은 그 밖의 근거만 인용한다. 인용 단계에서 구간 basis와 `sourceKind`가 어긋나면 `validation_failed`다.
+- 결정론 검사 `document_section`: `zoop_documented` 구간은 문서 도구가 전달한 근거만, `evidence_grounded` 구간은 그 밖의 근거만 인용한다. 인용 단계에서 구간 basis와 `sourceKind`가 어긋나면 `validation_failed`다. 웹 확장 시 `web_result`는 `web_reported`에만 연결하며 기존 ‘그 밖의 근거’ 조건으로 내부 근거 구간에 유입되지 않게 검사도 변경한다.
 - 모델 단계: 인용문은 grant 원천 `zoop-docs`로 보낸다. 운영자 챗봇 grant 파일에 이 원천의 `model-send` grant가 없으면 보내지 않고 실패한다. Luna 프롬프트(`zoop-chat-answer-2026-10-25-1`)가 `zoop_documented` 구간을 알고, Jev 검증은 일반 개념이 아닌 모든 구간에 지지 판정을 한다.
 - 시험: 단위(`ChatZoopDocsTest`·`ZoopPolicyReadToolTest`·계획·검사·엔진·모델 단계), 실제 migration을 읽는 PostgreSQL 시험(`ChatZoopDocsPostgresTest`, 두 약관 19개 절). 실제 데이터 기반이지만 모델 호출 없는 검증이다.
 
@@ -243,7 +258,7 @@ Q01 `zoopPolicy.read`(`ZoopPolicyReadTool`, 문서 원천 `ChatZoopDocs`)를 같
 | 체크포인트 | `exactly(2)`에 0개(잘림 없음 → 없음 답변, 잘림 → 근거 부족, 도구 오류 → 개수 평가 없이 failed)·1개·2개·3개 이상, 조합 6개 초과 시 자유 입력, 초과 시 다음 단계·생성 호출 0회, 선택 후 새 job이 같은 asOf로 같은 결과 재현, fan-out 상한 초과 |
 | 데이터 | graphVersion 고정, 문서 철회, citation offset, 브리핑 회차, 기간 경계 |
 | 그래프 | 챗봇 경로가 같은 graphVersion의 `/api/v1/graph` 결과와 일치, 공개 제외 결정 반영 후 철회 간선 미노출, 공개 활성화 이력이 없는 버전·사용 불가 버전 거부, 이전 공개 버전은 현재 공개 제외 결정을 적용해 조회(Q05), 기업 간 hop 1·2·3과 4 거부, 노드·간선 50개 절단 시 `truncated`, graphTargets가 지도에서 열림, Neo4j·AI 내부 그래프 API 호출 0회 |
-| 결과 | answerBasis를 sections에서 계산(단일·mixed·none), `zoop_documented` 구간의 `zoop_doc` 인용과 `evidence_grounded` 구간의 `article` 인용 교차 사용 거부, 이어 붙인 answer 12,000자 초과 거부, Q02 단독은 general_knowledge 구간 하나와 빈 sources·citations, Q02+Q03은 mixed와 구간별 인용, 일반 개념 구간의 근거 연결·최신 사실 거부, 고정 안내 중복 없음, clarification 새 job, no PARTIAL |
+| 결과 | answerBasis를 sections에서 계산(단일·mixed·none), `zoop_documented` 구간의 `zoop_doc` 인용과 `evidence_grounded` 구간의 `article` 인용 교차 사용 거부, 이어 붙인 answer 12,000자 초과 거부, 검색 없는 Q02 단독은 general_knowledge 구간 하나와 빈 sources·citations, Q02+Q03은 mixed와 구간별 인용, 일반 개념 구간의 근거 연결·최신 사실 거부, 고정 안내 중복 없음, clarification 새 job, no PARTIAL |
 | 제한 | 투자 판단 혼합 질문의 `investment_advice`, 체크포인트 미달 `precondition_unmet`, 문서 20개 잘림 `results_truncated`, 한 요구만 근거 부족, 요구 누락·중복 소속·본문의 제한 요구 답변 시 `validation_failed`, 모델이 근거 없이 제안한 제한 거부, 도구 timeout이 limitation이 아닌 failed, answered 외 outcome의 빈 배열 |
 | 확인 답 | 선택지 답·자유 입력 답, 없는 choiceId·clarification 아닌 원 작업·다른 대화 원 작업 422/404, resolves+context 422, 원 고정 문맥 복사, 원 작업 불변, 같은 확인 질문 재답변, 깊이 2 작업의 모호·체크포인트 초과는 `guidance`와 다음 단계·생성 호출 0회, 깊이 2에서 모호함이 해소되면 `answered`·도구 장애는 `failed`(guidance로 바꾸지 않음), 확인 답의 답이 루트 질문과 사슬의 답을 순서대로 합쳐 재실행 |
 | 의미 검증 | 1층 실패 시 Jev 0회, 일반 개념 구간은 Choice 없이 `prohibitedAdvice`만 판정하고 예이면 전체 실패, 전부 supported 통과, contradicted·prohibitedAdvice 예 전체 실패, 한 요구 hold 시 그 구간·통합 구간 제외와 limitation 및 answer·answerBasis·citations 재계산, 모든 요구 hold 시 insufficient_evidence, 응답 형식 오류 시 영수증 저장 후 transient |

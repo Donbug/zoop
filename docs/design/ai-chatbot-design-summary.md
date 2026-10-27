@@ -2,7 +2,7 @@
 
 문서 상태: 팀 공유용 목표 설계 요약 · 2026-10-25 구현 현황 반영
 
-문서 버전: 1.5 / 기준 정책: ZOOP-AIG-001 v0.9
+문서 버전: 1.6 / 기준 정책: ZOOP-AIG-001 v0.10 / 설계 갱신: 2026-10-27
 
 최초 기준일: 2026년 10월 21일 / 구현 상태 갱신: 2026년 10월 25일
 
@@ -21,6 +21,9 @@ ZOOP 챗봇은 하나의 LLM이 질문 해석, 데이터 검색, 답변 생성�
 핵심 결정은 다음과 같다.
 
 - 질문은 Q01~Q08 중 하나만 선택하지 않고 여러 유형에 동시에 해당할 수 있다.
+- Q02·Q03·Q04를 내부 분류로 유지하면서 필요한 도구를 한 턴에 조합하고 한 답변으로 제공한다. 세 유형의 모든 도구를 의무 호출하지 않는다.
+- 세션의 분류를 고정하지 않고 새 질문/job마다 재분류한다. 이전 대상·기간은 문맥 후보이며 새 질문의 명시 조건이 우선한다.
+- 웹 검색은 Q01을 제외한 Q02~Q08에 선택적 보조 도구로 허용한다. 내부 0건 조건에만 제한하지 않고, 내부 원천이 결정하는 사실을 대체하지 않는다.
 - 유형이나 도구를 고정 세 개로 제한하지 않는다.
 - 선택된 유형에 연결된 모든 도구를 호출하지 않고, 명시적 요구를 충족하는 최소 충분 도구만 호출한다.
 - Jev와 검증 LLM은 도구를 직접 호출하거나 실행 권한을 갖지 않는다.
@@ -64,12 +67,14 @@ flowchart LR
 | 요구 분해기 | 원문을 명시적 하위 요구와 대상·기간으로 구조화 | DB 조회, 권한 추측 |
 | Jev 라우터 | Q01~Q08 해당 여부와 승인된 논리 기능 후보를 typed 확률로 판정 | 자유 문자열 도구 생성, 도구 직접 호출, 최종 답변 생성 |
 | Luna `coverage-verifier` | 원문 요구가 후보 계획에 모두 포함됐는지 구조화된 스키마로 검토 | 실행 권한 부여, allowlist 확장, 최종 답변 생성 |
-| ZOOP 서버 | 최종 계획 확정, 권한·스키마·예산 검사, 논리 기능을 앱 내부 읽기 어댑터에 매핑 | 모델의 권한·도구 제안을 그대로 신뢰 |
-| 읽기 도구 계층(앱 내부 어댑터) | 승인된 공개·개인 범위에서 읽기 전용 조회 수행 | 데이터 수정·삭제, 검수 승인, 주문·결제 |
+| ZOOP 서버 | 최종 계획 확정, 권한·스키마·예산 검사, 논리 기능을 현재 내부 어댑터·목표 MCP 바인딩에 매핑 | 모델의 권한·도구 제안을 그대로 신뢰 |
+| 읽기 도구 계층(내부 어댑터·목표 MCP) | 승인된 공개·개인 범위에서 읽기 전용 조회 수행 | 데이터 수정·삭제, 검수 승인, 주문·결제 |
 | Luna | 허용된 일반 지식과 BranchContext로 하위 답변을 만들고 통합 | 누락 데이터를 추측, 존재하지 않는 출처 생성 |
 | 출력 검증기 | 요구 커버리지, 인용, 수치, 버전, 권한, 투자 판단 범위, 응답 스키마 검사 | 실패 답변의 자동 재생성 |
 
 ## 4. Q01~Q08 질의 유형
+
+아래 표는 주 처리 원천이다. Q02~Q08에는 필요 시 `web.search`를 추가할 수 있지만 내부 그래프·버전 차이·발행 회차·개인 범위·선정 기록의 권위를 대신하지 않는다. Q01에는 검색을 연결하지 않는다.
 
 Q 유형은 배타적인 단일 enum이 아니라 실행 능력 태그다. 한 질문에 여러 유형이 동시에 선택될 수 있다.
 
@@ -97,7 +102,7 @@ Q02는 최신 기업 상태, 가격, 공시, 시장 전망을 일반 지식으�
 7. 호출 수, 전체 시간, 비용, 문서 수와 그래프 경로 길이는 서버 예산으로 제한한다.
 8. 예산을 초과하면 요구를 조용히 버리지 않고 도구 호출 전에 범위 선택을 요청한다. 조회 결과를 봐야 범위를 정할 수 있으면 선언된 체크포인트에서 답변 생성 전에 요청한다.
 
-문서에 표시한 `help.search`, `document.search`, `graph.path.read` 등의 이름은 목표 논리 도구 ID다. 레지스트리에 등록된 앱 내부 읽기 어댑터만 실행한다. 서비스는 MCP를 쓰지 않는다(2026-10-25 결정). 외부 웹 검색은 내부 도구로 답할 수 없을 때만 쓰는 검색 API 직접 어댑터로 설계 중이다([웹 검색 대체 경로 설계](ai-chatbot-web-search.md), 미구현).
+문서의 `help.search`, `document.search`, `graph.path.read` 등은 목표 논리 도구 ID다. 현재는 등록된 내부 읽기 어댑터를 실행한다. 2026-10-27 목표는 이 어댑터를 재사용하는 읽기 전용 MCP 서버 POC이며, 2026-10-25의 MCP 미사용 결정을 대체한다. 서버가 승인한 바인딩만 실행하고 모델은 실행 권한을 갖지 않는다. [복합 질의·MCP·화면 동작 계약](ai-chatbot-mcp-actions.md)과 [보조 웹 검색 설계](ai-chatbot-web-search.md)를 따른다. MCP 연결·웹 검색·새 UI action 계약은 구현 예정이다.
 
 **그래프 조회 원천.** `graph.path.read`·`graph.version.diff`는 공개 그래프 API와 같은 앱 읽기 경로 `PublicGraphReader`(버전 고정 → 불변 스냅샷 → asOf 필터 → 현재 공개 제외 결정 적용)만 사용한다. Neo4j는 AI 파이프라인의 관계 투영·검증 저장소이고 AI 내부 그래프 읽기 API는 비공개·미게시 버전을 다루므로, 챗봇은 둘 다 호출하지 않는다. 그래서 답변의 `graphVersion`·경로·철회 상태가 사용자가 지도에서 보는 그래프와 같다. hop은 화면 `depth`와 같은 기업 간 관계 hop이며(스냅샷 내부의 기업–이슈 간선 수가 아님) 최대 3이다. 과거 graphVersion·asOf는 공개 그래프 API와 같이 공개 활성화 이력이 있는 버전만 허용하고, 그 버전에도 현재 공개 제외 결정을 적용한다(Q05 기간 비교).
 
@@ -121,6 +126,7 @@ Jev는 자유 문장 대신 정해진 질문에 typed 판정을 돌려주는 모
 | `zoop-graph-read` | `graph.path.read`, `graph.version.diff` |
 | `zoop-briefing-read` | `briefing.read`, `briefing.evidence` |
 | `zoop-member-scope-read` | `portfolio.scope.read` |
+| `zoop-web-read` (추가 예정) | `web.search` — Q02~Q08 선택적 보조 검색, Q01 제외 |
 
 공통 요청에는 `requestId`, `jobId`, `capabilityId`, `targets`, `period`, `asOf`, 선택적 `graphVersion`, `limit`을 넣는다. 회원 ID와 본인 종목 범위는 모델 출력이나 사용자 문장에서 받지 않고 인증된 서버 문맥으로 주입한다. 공통 결과에는 `schemaVersion`, `toolCallId`, `capabilityId`, `dataVersion`, `items`, `evidenceIds`, `truncated`, `nextAllowed`, 실제 오류 상태를 넣는다. 각 도구의 세부 스키마는 별도로 버전 고정한다.
 
@@ -237,7 +243,7 @@ Jev는 자유 문장 대신 정해진 질문에 typed 판정을 돌려주는 모
 
 외부 API 장애를 `insufficient_evidence`나 “관련 뉴스 없음”으로 바꾸지 않는다. 검증 실패도 성공 outcome으로 바꾸지 않으며 자동 재생성하지 않는다.
 
-`answered` 본문은 근거 수준별 구간 `ChatResult.sections`(`basis`, `text`, `evidenceIds`)로 구성하고, 서버가 구간 text를 순서대로 이어 `answer`(전체 12,000자 이하)를 만든다. 구간 `basis`는 일반 LLM 개념 설명 `general_knowledge`, 승인된 ZOOP 문서 `zoop_documented`, 공개 근거 기반 사실 `evidence_grounded` 중 하나다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다.
+`answered` 본문은 근거 수준별 구간 `ChatResult.sections`(`basis`, `text`, `evidenceIds`)로 구성하고, 서버가 구간 text를 순서대로 이어 `answer`(전체 12,000자 이하)를 만든다. 현재 계약의 구간 `basis`는 일반 LLM 개념 설명 `general_knowledge`, 승인된 ZOOP 문서 `zoop_documented`, 공개 근거 기반 사실 `evidence_grounded` 중 하나다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다. 목표 웹 근거 `web_reported`는 DTO·검증기·화면을 함께 확장한 뒤 추가한다.
 
 공개 `ChatResult.answerBasis`는 서버가 구간에서 계산한다. basis가 한 종류면 그 값, 두 종류 이상이면 `mixed`, 구간이 없는 확인·안내·근거 부족은 `none`이다. UI는 결과 배지에 `answerBasis`를, 구간 배지와 인용 연결에 `sections`를 사용하며 자체 추측하지 않는다.
 
@@ -311,7 +317,7 @@ Q02 일반 개념은 권위 자료가 없으므로 두 번째 모델의 동의�
 | 공개 수명주기 | 회원 전용 세션·질문 job API, PostgreSQL 저장, 멱등성, 단일 활성 job, 취소·재시도·lease fence | recovery artifact와 실제 `save_only` 복구 없음 |
 | 모델 단계 | `chat-router` Jev, `chat-answer` Luna, `chat-verification` Jev의 별도 계약·원장·grant·영수증 | 임계값 미보정, 실제 호출·배포 승인 아님 |
 | 계획 | Q01~Q08·capability registry, 서버 allowlist·예산·체크포인트, 질문이 지목한 기업의 기본 조회 | 별도 Luna `coverage-verifier`와 보완 라운드 없음. 개념과 사실이 섞인 요구 하나는 서버가 개념 하위 요구를 나눠 근거가 없어도 개념은 답함([부분 답변 설계](ai-chatbot-partial-answer.md) 1부). Q03 근거 0개일 때 일반 배경을 붙이는 2부는 동문서답 위험으로 미채택 |
-| 도구 | 앱 내부 읽기 어댑터 `company.read`(기업 카탈로그 개요를 `company_profile` 인용으로 포함), `issue.read`, `evidence.resolve`, `graph.path.read`, `graph.version.diff`(Q05 이전 공개 지도와의 변화), `portfolio.scope.read`(Q07 본인 보유·관심 종목, 서버 주입 회원), `zoopPolicy.read`(승인 약관·개인정보 처리방침, `zoop_doc` 인용) | Q01의 `help.search`·`screenSpec.read`(승인 문서 없음), Q05의 `period.compare`, Q06·Q08와 `document.search` 미연결. 외부 웹 검색은 [설계 초안](ai-chatbot-web-search.md)만 있음 |
+| 도구 | 앱 내부 읽기 어댑터 `company.read`(기업 카탈로그 개요를 `company_profile` 인용으로 포함), `issue.read`, `evidence.resolve`, `graph.path.read`, `graph.version.diff`(Q05 이전 공개 지도와의 변화), `portfolio.scope.read`(Q07 본인 보유·관심 종목, 서버 주입 회원), `zoopPolicy.read`(승인 약관·개인정보 처리방침, `zoop_doc` 인용) | Q01의 `help.search`·`screenSpec.read`(승인 문서 없음), Q05의 `period.compare`, Q06·Q08와 `document.search` 미연결. 외부 웹 검색은 [합의된 목표 설계](ai-chatbot-web-search.md)만 있음 |
 | 생성·검증 | `BranchContext`, typed 생성, 서버 citation, 결정론적 검사, section 단위 Jev support·투자 판단 | claim 단위 `unsupportedCausality`, 일부 수치·그래프 의미 검사, 24k/2k token guard 없음 |
 | 권한 | 고정 graphVersion/asOf, 현재 evidence 접근 재검사, 응답 시 철회 재검사 | `zoop_doc`은 `term_versions`의 승인 약관만 연결(도움말·화면 명세 미연결), 회원 종목 도구 미연결 |
 | 웹 | D-AI-01~02b가 공개 Chat API로 대화 생성·복원, 질문 접수·polling·취소·재시도, 답변·인용(`article`·`zoop_doc`·`company_profile`)·확인 질문·실패를 렌더링 | 타입은 손으로 쓴 `web/src/types/ai`이며 OpenAPI 생성 seam 없음. 실제 백엔드·모델과의 종단 시험 없음 |
@@ -330,7 +336,7 @@ Q02 일반 개념은 권위 자료가 없으므로 두 번째 모델의 동의�
 - Q01~Q08은 단일 분류가 아니라 multi-label 실행 능력 태그로 사용한다.
 - Jev는 `0.70/0.35` 임계값을 적용하되 사용자가 명시한 요구는 확률로 제거하지 않는다.
 - 커버리지 검증은 Luna의 별도 stage로 두고 생성 stage와 프롬프트·스키마·권한·영수증을 분리한다.
-- 읽기 도구는 다섯 읽기 전용 레지스트리 그룹으로 관리하며 서버만 실행 권한을 가진다.
+- 기존 다섯 읽기 전용 레지스트리 그룹에 목표 `zoop-web-read`를 추가하며 서버만 실행 권한을 가진다.
 - 유형 수를 세 개로 자르지 않고, 5.1절의 실행 상한 안에서 필요한 최소 충분 도구를 호출한다.
 - MVP에는 `PARTIAL`을 추가하지 않는다. 서로 다른 스냅샷이나 독립 실패를 구조적으로 표시해야 하면 먼저 범위를 확인한다.
 - 의존 실행은 단계와 서버 평가 체크포인트로 선언하고, `clarification`은 답변 생성 전(계획 시점 또는 체크포인트)까지만 허용한다.

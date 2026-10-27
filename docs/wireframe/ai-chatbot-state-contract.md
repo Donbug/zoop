@@ -4,11 +4,22 @@
 
 기준 API: [`docs/api/openapi.yaml`](../api/openapi.yaml)의 `createConversation`, `getConversation`, `getCurrentConversation`, `submitQuestion`, `getQuestionJob`, `retryQuestionJob`, `cancelQuestionJob`, `listConversations`, `deleteConversation`
 
-상세 처리 정책: [`ZOOP AI 거버넌스 정책 v0.9`](../ZOOP_AI_거버넌스_정책.md), [`AI 챗봇 설계 요약`](../design/ai-chatbot-design-summary.md)
+상세 처리 정책: [`ZOOP AI 거버넌스 정책 v0.10`](../ZOOP_AI_거버넌스_정책.md), [`AI 챗봇 설계 요약`](../design/ai-chatbot-design-summary.md)
 
 이 문서는 네 정적 와이어프레임이 증명하지 않는 로딩·오류·빈 상태·권한·복구 동작을 구현 계약으로 보완한다. 새 시각 디자인을 임의로 만들기보다 같은 드로어 안의 상태 변형으로 먼저 구현한다. 별도 화면 ID가 필요한 수준으로 구조가 바뀌면 manifest와 Figma 화면을 함께 갱신한다.
 
 ## 1. 공통 원칙
+
+### 2026-10-27 추가 목표 계약 (구현 예정)
+
+- 새 질문은 기존 대화에서도 재분류한다. 세션 고정 Q 유형을 강제하지 않는다. Q02/Q03/Q04 복합 요구는 한 답변으로 제공하며 별도 질문으로 강제하지 않는다.
+- Q01은 웹 검색을 사용하지 않는다. Q02~Q08은 필요한 경우만 검색하며 ‘웹 검색 결과 · ZOOP 미검증’과 검색 시점·서버 검증 링크를 표시한다. 일반 지식·내부 evidence와 구분한다.
+- 목표 `web_reported`·`web_result`·`uiActions[]`는 현재 API 지원 필드가 아니다. DTO·OpenAPI·클라이언트·검사·저장·guard 확장과 함께 UI를 구현한다. 현재 `action=set_watchlist`를 임의 동작 실행기로 바꾸지 않는다.
+- 기업 상세·간선/경로 포커스·근거·브리핑 동작은 서버가 실제 조회 결과로 만든 typed 버튼으로 제공한다. 클릭 시 실행하고 자동 이동하지 않으며 polling·복구·재열람으로 재실행하지 않는다.
+- 클릭 시 권한·철회·버전 불일치를 확인한다. 열 수 없으면 안내하고 다른 간선으로 치환하지 않는다. 웹 보도만으로 내부 지도 간선 버튼을 만들지 않는다.
+- 화면 ID·대상 계약은 [MCP·화면 동작 계약](../design/ai-chatbot-mcp-actions.md)을 따른다. 이번 개정은 Figma·화면 구현 수정이 아니다. 구현 시 개별 와이어프레임을 확인한다.
+
+### 기존 공통 동작
 
 - 챗봇은 회원 전용이다. 비회원은 질문 본문·선택 대상을 서버에 전송하지 않고 로그인 안내를 표시한다.
 - 질문 접수 시 화면 선택 문맥을 `contextIds`, `evidenceIds`, `period`, `asOf`, `graphVersion`으로 전송한다. 질문에 명시된 대상·기간이 화면 문맥보다 우선한다.
