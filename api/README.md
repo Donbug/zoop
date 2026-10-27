@@ -258,8 +258,9 @@ console.log(response.status); // 활성 회원 세션이 정상 폐기되면 204
 
 **재실행.** 결과(`applied`·`unchanged`)에 이른 명령은 변경과 같은 트랜잭션에 `requestId`·요청 SHA-256·결과를 기록합니다. 같은 `requestId`로 다른 요청을 보내면 `request_conflict`이고, 새 결정에는 새 `requestId`를 씁니다.
 
-- **아무것도 쓰지 않은 실패:** `request_invalid`, `report_invalid`, `versions_invalid`(물을 버전이 없거나 20개 초과), `exposure_unavailable`(클라이언트 꺼짐·전송 실패·5xx), `exposure_refused`(AI의 확정 거절), `version_unknown`, `receipt_unavailable`, `receipt_mismatch`, `request_conflict`, `revision_stale`, `database_unavailable`(커밋 전 문장 실패, 롤백됨). 기록도 남지 않으므로, 원인을 고친 뒤 같은 `requestId`로 다시 실행할 수 있습니다.
+- **아무것도 쓰지 않은 실패:** `request_invalid`, `report_invalid`, `versions_invalid`(물을 버전이 없거나 20개 초과), `exposure_unavailable`(클라이언트 꺼짐·전송 실패·5xx 응답), `exposure_refused`(AI의 4xx 확정 거절), `version_unknown`, `receipt_unavailable`, `receipt_mismatch`, `request_conflict`, `revision_stale`, `database_unavailable`(커밋 전 문장 실패, 롤백됨). 기록도 남지 않으므로, 원인을 고친 뒤 같은 `requestId`로 다시 실행할 수 있습니다.
 - **결과를 알 수 없는 경우:** `outcome_unknown`(커밋 여부 불명), `result_unavailable`, `internal_error`, 그리고 결과 파일이 없거나 비었거나 일부만 있거나 읽을 수 없는 경우. 결과 파일은 DB 커밋이 **끝난 뒤** 쓰므로, `result_unavailable`이나 불완전한 결과 파일은 변경이 이미 커밋됐을 수 있습니다. 이 경우에는 롤백이나 무기록을 가정하지 말고, **같은 `requestId`·같은 본문의 요청 파일**을 새 결과 경로로 다시 실행합니다. 이미 커밋됐으면 기록한 결과를 `replayed: true`로 돌려주고 아무것도 바꾸지 않으며, 커밋되지 않았으면 처음 실행처럼 처리합니다.
+- **`exclude-query` 기본 선택의 예외:** `graphVersionIds`가 비어 있으면 실행할 때 고른 버전 목록이 요청 hash에 묶입니다. 첫 실행 뒤 새 버전이 수입되어 목록이 바뀌면, 같은 파일을 다시 실행해도 `replayed: true`가 아니라 `request_conflict`가 됩니다(대상이 20개를 넘으면 기록 조회 전에 `versions_invalid`). 이 경우의 거절은 "이번 실행이 쓴 것이 없다"는 뜻일 뿐, 그 `requestId`가 예전에 커밋되지 않았다는 뜻이 아닙니다. 다시 적용하기 전에 `disclosure_exclusion_requests`에서 그 `requestId`의 기록(결과·revision)을 먼저 확인하고, 기록이 없을 때만 새 `requestId`로 실행합니다.
 
 변경 하나는 공통 publication lock 아래 한 트랜잭션이며 `revision`은 MAX+1입니다. 공개 조회와 활성화 사전 검사는 잠금 없이 그 버전의 현재 제외를 한 문장으로 읽어 이슈·관계·근거에 적용하며, 저장소를 읽지 못하면 빈 제외로 대신하지 않고 503 `SOURCE_UNAVAILABLE`입니다. 기사 대상은 기록만 하며, 기업 문서 목록·S1·브리핑·채팅·캐시·Neo4j의 제외 반영은 이 범위가 아닙니다.
 

@@ -152,8 +152,10 @@ public final class DisclosureExclusionService {
                 throw new ExclusionException(ExclusionFailure.VERSIONS_INVALID);
             }
             receipts.put(versionId, receipt);
+            // One more than a query can select is already refused: stop before reading any further receipt.
+            if (receipts.size() > HandoffExposureClient.MAX_HANDOFFS) throw new ExclusionException(ExclusionFailure.VERSIONS_INVALID);
         }
-        if (receipts.isEmpty() || receipts.size() > HandoffExposureClient.MAX_HANDOFFS) {
+        if (receipts.isEmpty()) {
             throw new ExclusionException(ExclusionFailure.VERSIONS_INVALID);
         }
         List<String> handoffIds = new ArrayList<>();
@@ -182,7 +184,9 @@ public final class DisclosureExclusionService {
             answer = exposure.exposure(handoffIds, request.changed());
         } catch (AiServiceRejectionException refused) {
             log.warn("disclosure exclusion exposure refused: {} {}", refused.httpStatus(), refused.code());
-            throw new ExclusionException(ExclusionFailure.EXPOSURE_REFUSED);
+            // A 5xx envelope (runtime_busy, runtime_unavailable, service_configuration_invalid) is the service, not a refusal.
+            throw new ExclusionException(refused.httpStatus() >= 500 ? ExclusionFailure.EXPOSURE_UNAVAILABLE
+                    : ExclusionFailure.EXPOSURE_REFUSED);
         } catch (AiClientException unavailable) {
             log.warn("disclosure exclusion exposure unavailable: {}", unavailable.getClass().getSimpleName());
             throw new ExclusionException(ExclusionFailure.EXPOSURE_UNAVAILABLE);
@@ -191,8 +195,9 @@ public final class DisclosureExclusionService {
             throw new ExclusionException(ExclusionFailure.REQUEST_INVALID);
         }
         Report report = ExclusionRequestParser.report(answer);
-        // The answer is about exactly what was asked: this change (and so its cause) and these handoffs, in this order.
-        if (!report.handoffs().stream().map(Handoff::handoffId).toList().equals(handoffIds)
+        // The answer is about exactly what was asked: this change (and so its cause) and these handoffs, which the producer
+        // returns sorted by id (zoop-handoff-exposure-1 scope.handoffIds and handoffs), whatever order they were asked in.
+        if (!report.handoffs().stream().map(Handoff::handoffId).toList().equals(handoffIds.stream().sorted().toList())
                 || !Canonical.digest(answer.get("changed")).equals(Canonical.digest(request.changed()))) {
             throw new ExclusionException(ExclusionFailure.REPORT_INVALID);
         }

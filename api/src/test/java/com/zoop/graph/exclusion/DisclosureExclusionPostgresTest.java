@@ -236,6 +236,15 @@ class DisclosureExclusionPostgresTest {
                 Optional.empty(), Optional.empty(), Optional.empty());
         assertEquals(ExclusionFailure.EXPOSURE_REFUSED,
                 failure(querying(fake), ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange(), v1)));
+        fake.failure = new HandoffServiceErrorException(AiOperation.EXPOSURE, "req-1", 409, "handoff_pin_mismatch", false,
+                Optional.empty(), Optional.empty(), Optional.empty());
+        assertEquals(ExclusionFailure.EXPOSURE_REFUSED,
+                failure(querying(fake), ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange(), v1)));
+        fake.failure = new HandoffServiceErrorException(AiOperation.EXPOSURE, "req-1", 503, "runtime_busy", true,
+                Optional.empty(), Optional.empty(), Optional.empty());
+        assertEquals(ExclusionFailure.EXPOSURE_UNAVAILABLE,
+                failure(querying(fake), ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange(), v1)),
+                "a 5xx envelope is the service being unavailable, not a refusal");
         fake.failure = new AiTransportException(AiOperation.EXPOSURE, "req-1", AiTransportException.Failure.TIMEOUT,
                 OptionalInt.empty(), "HttpTimeoutException");
         assertEquals(ExclusionFailure.EXPOSURE_UNAVAILABLE,
@@ -270,6 +279,60 @@ class DisclosureExclusionPostgresTest {
         assertEquals(ExclusionFailure.VERSIONS_INVALID, failure(querying(fake), ExposureReports.query(ExposureReports.requestId(),
                 ExposureReports.sourceChange(), DisclosureExclusionService.versionId(HANDOFF_OLD))));
         assertEquals(1, fake.asked.size());
+    }
+
+    /** The real producer's answer: one handoff per id, sorted by id whatever order they were asked in. */
+    private static JsonNode sortedAnswer(List<String> ids, String excludedIn, String issueId) {
+        return ExposureReports.report(ids.stream().sorted()
+                .map(id -> ExposureReports.handoff(id, id.equals(excludedIn) ? List.of(issueId) : List.of(), List.of(), false))
+                .toArray(ObjectNode[]::new));
+    }
+
+    @Test
+    void theProducersSortedAnswerMatchesVersionsAskedInAnotherOrder() throws Exception {
+        FakeExposure fake = new FakeExposure();
+        fake.answer = ids -> sortedAnswer(ids, HANDOFF_1, "issue-sorted");
+        // Named in reverse id order: asked that way, answered sorted.
+        ExclusionResult named = querying(fake).run(parser.parse(
+                ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange(), v2, v1)));
+        assertTrue(named.succeeded(), () -> String.valueOf(named.failure()));
+        assertEquals(List.of(HANDOFF_2, HANDOFF_1), fake.asked.getFirst());
+        assertEquals(Set.of("issue-sorted"), reader.current(v1).issueIds());
+
+        // Imported after the others but first by id: the default (import) order is not the answer's order either.
+        String early = "exclusion-test-handoff-0";
+        stageVersion(early);
+        try {
+            ExclusionResult byDefault = querying(fake).run(parser.parse(
+                    ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange())));
+            assertTrue(byDefault.succeeded(), () -> String.valueOf(byDefault.failure()));
+            assertEquals(List.of(HANDOFF_1, HANDOFF_2, early), fake.asked.get(1), "asked in import order");
+        } finally {
+            dropVersion(early);
+        }
+    }
+
+    @Test
+    void oneVersionMoreThanAQueryCanSelectStopsBeforeReadingAnyFurtherReceipt() throws Exception {
+        List<String> extra = new ArrayList<>();
+        for (int i = 1; i <= 20; i++) extra.add("exclusion-test-cap-" + String.format("%02d", i));
+        try {
+            for (String handoffId : extra) stageVersion(handoffId);
+            // The 22nd default target's receipt is gone: reading it would be receipt_unavailable, so stopping at the 21st shows.
+            jdbc.update("DELETE FROM artifacts WHERE id = ?", "artifact-receipt-" + DisclosureExclusionService.versionId(extra.getLast()));
+            FakeExposure fake = new FakeExposure();
+            assertEquals(ExclusionFailure.VERSIONS_INVALID,
+                    failure(querying(fake), ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange())));
+            assertEquals(List.of(), fake.asked);
+        } finally {
+            for (String handoffId : extra) dropVersion(handoffId);
+        }
+    }
+
+    private void dropVersion(String handoffId) {
+        String versionId = DisclosureExclusionService.versionId(handoffId);
+        jdbc.update("DELETE FROM graph_versions WHERE id = ?", versionId);
+        jdbc.update("DELETE FROM artifacts WHERE id IN (?, ?)", "artifact-exclusion-test-" + versionId, "artifact-receipt-" + versionId);
     }
 
     @Test
