@@ -220,7 +220,7 @@ Luna가 배경으로 쓸 내용이 없다고 판단하면 배경 하위 요구�
 
 ## 11. 범위 밖(별도 작업)
 
-- 사건(issue)을 지목한 질문의 `issue.read` 기본 조회. 기업 지목 때의 `company.read` 기본 조회(`ChatPlanner.java:158-167`)와 같은 규칙으로 따로 낸다.
+- 사건(issue)을 지목한 질문의 `issue.read` 기본 조회. 기업 지목 때의 `company.read` 기본 조회(`ChatPlanner.java:158-167`)와 같은 규칙으로 따로 낸다. → 2026-10-27 별도 작업으로 구현([구현 계획](../development/ai-chatbot-implementation-plan.md) 사건 지목 결정 (5)·(6)).
 - 분리된 Luna `coverage-verifier`와 보충 라운드. 웹 검색 설계가 보충 라운드를 쓰고, 이 설계는 보충 라운드 없이 동작한다.
 
 ## 12. 근거 부족 안내 개선 (구현됨)
