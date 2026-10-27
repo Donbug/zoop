@@ -80,8 +80,13 @@ final class ReviewTargetReader {
      * @throws Malformed when either document is not an object with its array ({@code eventCandidates}, {@code relations})
      */
     static Projection read(String s2Json, String s3Json) {
-        Events events = events(StrictJson.parseObject(s2Json));
-        JsonNode items = StrictJson.parseObject(s3Json).array("relations");
+        return read(StrictJson.parseObject(s2Json), StrictJson.parseObject(s3Json));
+    }
+
+    /** {@link #read(String, String)} over documents already parsed (the candidate detail's own reads). */
+    static Projection read(Obj s2, Obj s3) {
+        Events events = events(s2);
+        JsonNode items = s3.array("relations");
         Map<String, List<Relation>> grouped = new LinkedHashMap<>();
         List<Relation> alone = new ArrayList<>();
         int unknown = 0;
