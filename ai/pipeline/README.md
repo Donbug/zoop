@@ -161,16 +161,31 @@ zoop-ai-ingest run --state-dir STATE --sources registry.json --fixture-manifest 
 ```
 
 - **권한은 registry가 가진다.** source는 `adapter: "collected-http"`, `rights: "known"`+증거, `allowedOperations`에 `read`·`store`, 정확한 `allowedHosts`가 필요합니다. URL이 공개돼 있거나 robots.txt가 허용한다는 사실은 license가 아닙니다. registry는 시작 시, 각 실제 GET 직전(robots.txt·리다이렉트 포함), 응답 수신 뒤 원문/receipt 저장 전, 최종 확정 직전과 저장된 결과의 재전달 직전에 다시 읽습니다. 최종 rename 뒤 반환 전에도 재확인하고, 그 사이 권한이 바뀌면 소유한 디렉터리임을 확인해 비공개 임시 위치로 되돌려 제거합니다. grant의 철회·변경은 URL별 실패로 낮추지 않고 수집 전체를 중단합니다. 저장된 수집도 현재 권한이 없으면 본문 없이 `source_unauthorized` 또는 `registry_changed`만 반환합니다. 마지막 확인과 실제 반환 사이의 권한 변경을 원자적으로 막는 계약은 아닙니다.
-- **policy 파일**(읽기 전용, 모든 값 필수, 기본값 없음): `userAgent`(운영자가 정한 식별 문자열, 브라우저 흉내 금지), `timeoutSeconds`·`maxTotalSeconds`·`maxRedirects`·`maxRequests`(robots 포함)·`maxResponseBytes`·`maxTotalBytes`·`minIntervalSeconds`·`allowedMediaTypes`(`text/html`,`application/pdf`) 그리고 시험 전용 `syntheticLoopback`(기본 false).
+- **policy 파일**(읽기 전용): `userAgent`(운영자가 정한 식별 문자열, 브라우저 흉내 금지), `timeoutSeconds`·`maxTotalSeconds`·`maxRedirects`·`maxRequests`(robots 포함)·`maxResponseBytes`·`maxTotalBytes`·`minIntervalSeconds`·`allowedMediaTypes`(`text/html`,`application/pdf`)는 필수입니다. 시험 전용 `syntheticLoopback`은 기본 false이고, 선택 항목 `contactUrl`은 아래 연락처 규칙을 따릅니다.
 - **요청**: `{"schemaVersion":"zoop-collection-1","collectionId","sourceId","scopeId","targets":[{"candidateId","url","title","documentKind":"news"|"disclosure","supplierDocumentId"?,"publishedAt"?,"modifiedAt"?,"sourceRevision"?,"publisher"?}]}`. 설명 메타데이터(제목·시각·종류·발행 매체)는 **요청에 선언된 값만** 쓰며 페이지에서 긁어 오지 않습니다. `publishedAt`은 날짜(`YYYY-MM-DD`)면 `day` 정밀도로 남고 자정으로 바뀌지 않으며, 오프셋이 있는 시각만 `instant`, 오프셋 없는 시각은 `unresolved`(시간대를 가정하지 않음), 없으면 `unknown`입니다. 원문 표기·정밀도·근거는 `collection.published`에, `Item.publishedAt`에는 `instant`만 들어갑니다. `publisher`(선택)는 운영자가 선언한 발행 매체 이름이며 `null`·생략이 모두 미지정으로 같은 요청 digest를 만들고 지정하면 요청 identity가 달라집니다(같은 `collectionId`로 바꾸면 `collection_input_conflict`). 값 규칙과 identity 영향은 아래 ‘운영자 선언 발행 매체’ 문단을 따릅니다.
 - **네트워크 방어(요청·robots·리다이렉트 hop마다 반복)**: URL 정규화(자격 증명·제어문자·모호한 인코딩·기본이 아닌 포트 거부), 정확한 호스트 목록, HTTPS만(루프백 http는 `syntheticLoopback`이 켜졌고 호스트가 `localhost`/`127.0.0.1`일 때만), robots.txt 선확인(최장 일치 RFC 9309, 404만 허용·그 외 오류는 거부), DNS 결과의 모든 주소가 전역 라우팅 가능해야 하며(IPv4-mapped/NAT64 포함) **검증한 그 주소로 직접 연결하면서** Host 헤더와 TLS SNI·인증서 이름은 요청 호스트를 유지합니다(DNS rebinding 방지, 요청마다 새 해석·새 연결). 프록시 환경변수는 무시(`trust_env=False`), TLS 검증은 끄지 않고, 쿠키·인증·Referer는 보내지 않으며, 압축 응답 거부, 401/403/429는 그 호스트를 실행 동안 차단, 자동 재시도 없음, 요청 수·바이트·시간·콘텐츠 타입 제한. 시스템 DNS 조회는 제한 시간에 중단·회수되는 별도 자식 프로세스에서 실행하고 비동기 HTTP 연결·TLS·헤더·본문 전체는 절대 deadline에서 취소합니다(조금씩 전송되는 헤더/본문도 제한). 동기 CLI/API이므로 같은 스레드에 이미 실행 중인 asyncio event loop가 있는 호출은 지원하지 않으며 `collector_async_context_unsupported`로 거부합니다. 오류는 URL·헤더 없는 안정적인 코드뿐입니다.
-- **robots 그룹 선택**: `userAgent`의 제품 토큰과 대소문자 구분 없이 일치하는 그룹들을 합치고, 일치하는 그룹이 없을 때만 `*` 그룹들을 적용합니다. `Allow`·`Disallow` 경로와 `Crawl-delay` 값은 선택한 그룹에서만 검증하므로 다른 봇 전용 그룹의 잘못된 값은 수집을 막지 않습니다. 다만 잘못된 헤더·그룹 밖 규칙·잘못된 UTF-8 등 파일 구조 오류와 적용 그룹의 잘못된 값은 여전히 `robots_malformed`로 본문 요청 전에 거부합니다. 절대 URL 규칙을 경로로 바꾸지 않습니다. 선택한 규칙은 경로·쿼리에 최장 일치를 적용하고 같은 길이에서는 `Allow`가 우선하며, 지연은 선택한 그룹들의 최댓값을 따릅니다. 유효한 금지 규칙은 `robots_denied`로 본문 요청을 막습니다.
+- **robots 그룹 선택**: `userAgent`의 제품 토큰과 대소문자 구분 없이 일치하는 그룹들을 합치고, 일치하는 그룹이 없을 때만 `*` 그룹들을 적용합니다. 기존에 지원하던 `User-agent: 제품/버전` 형식도 그대로 지원합니다. `Allow`·`Disallow` 경로와 `Crawl-delay` 값은 선택한 그룹에서만 검증하므로 다른 봇 전용 그룹의 잘못된 값은 수집을 막지 않습니다. 콜론이 있는 `User-agent`의 전체 값이 지원하지 않는 형식일 때는 선두 identity를 기존 agent 이름 문법으로 읽어 적용 가능성만 검사합니다. 그 전체 이름이 실제 제품 토큰 또는 `*`와 대소문자 구분 없이 같으면, 적용될 수 있는 제한을 버리고 wildcard 허용으로 넘어가지 않도록 `robots_malformed`로 거부합니다. 이는 [RFC 9309 §2.3.1.5](https://www.rfc-editor.org/rfc/rfc9309.html#section-2.3.1.5)가 특정한 해석을 의무화해서가 아니라 이 수집기가 추가로 채택한 보수적 거부 정책입니다. 다른 이름의 비표준 헤더는 일치하지 않는 별도 그룹의 경계로 처리하며, 그 규칙을 앞뒤의 유효한 그룹으로 넘기지 않습니다. 잘못된 값을 정규화해 적용 그룹으로 선택하거나 이름 안의 임의 부분 문자열로 발행자의 의도를 추정하지 않습니다. 콜론이 없는 행·그룹 밖 규칙·잘못된 UTF-8 등 파일 구조 오류와 적용 그룹의 잘못된 값도 여전히 `robots_malformed`로 본문 요청 전에 거부합니다. 절대 URL 규칙을 경로로 바꾸지 않습니다. 선택한 규칙은 경로·쿼리에 최장 일치를 적용하고 같은 길이에서는 `Allow`가 우선하며, 지연은 선택한 그룹들의 최댓값을 따릅니다. 유효한 금지 규칙은 `robots_denied`로 본문 요청을 막습니다.
 - **산출물과 출처 구분**: `<source.inputRoot>/collections/<collectionId>/`에 `bodies/<sha256>.bin`(내용 주소), `receipts/<sha256>.json`(최종 URL·리다이렉트·HTTP 상태·콘텐츠 타입·ETag/Last-Modified/Date·robots 상태·본문 sha256·실제 수집 시각(UTC)·grant id/revision·`network`), `page-0.json`, `manifest.json`, `collection.json`. 모든 item은 `collection.provenance = "collected_http"`(획득 경로를 뜻함)이며 `collection.network`는 `external` 또는 `synthetic_loopback`(정책의 `syntheticLoopback`으로 로컬 시험 서버에서 받은 바이트, 외부 문서가 아님)입니다. receipt는 manifest/item이 hash로 고정합니다. `adapter: "collected-http"` source는 이 기록이 없는 item을 거부(`discovery_item_invalid`)하고, `authored-files` source는 이 기록이 있는 item을 거부해 **authored fixture를 actual로 바꿔 부를 수 없습니다.** ingestion은 receipt가 이 source·scope·candidate·현재 grant revision·실제 bytes와 일치하는지 검사합니다(`collection_receipt_invalid`). receipt는 서명되지 않은 운영자 로컬 파일이므로 입력 디렉터리를 쥔 사람은 위조할 수 있습니다. 이는 일관성 증거이지 네트워크 증명이 아닙니다.
 - **불변·멱등**: `collectionId`는 불변입니다. 같은 id와 같은 입력(요청·source 설정·grant·policy)은 저장된 결과를 다시 보여 줄 뿐 재요청하지 않고(`replayed: true`), 다른 입력이면 `collection_input_conflict`입니다. 부분/실패 수집도 그대로 재현되며 숨은 재시도는 없습니다(다시 하려면 새 id).
 - **부분·빈 결과·오류 구분**: 모든 URL 성공 `complete`, 일부 성공 `partial`(manifest page `partial`), 전부 실패 `failed`(manifest page `failed`, 빈 items). 요청 자체의 거부(`target_invalid`, 인증·어댑터·네임스페이스 오류)는 `error`이며 어느 쪽도 "성공한 0건"이 아닙니다. ingestion은 partial/failed page를 `incomplete`로 둡니다.
 - **디렉터리 안전**: `inputRoot`와 `collections/`는 심볼릭 링크를 따르지 않고(디렉터리 fd, `O_NOFOLLOW`) 열며, `.lock`으로 배타 잠금하고, 낯선 파일(예: 외부 SQLite)이나 같은 id의 낯선 디렉터리는 채택하지 않고(`collection_namespace_conflict`) 앱/S1/PoC 상태 루트와 겹치면 거부합니다. 기존 `collection.json`도 descriptor-relative `O_NONBLOCK|O_NOFOLLOW`로 열고 regular file/크기 한도를 확인한 뒤 제한된 길이만 읽습니다(FIFO 등은 즉시 거부·미수정). 자신이 만든 `.tmp-<id>-…`에만 쓰고 한 번의 rename으로 공개하며, 실패 시 자신이 만든 이름만 지웁니다(이전 프로세스가 남긴 임시 디렉터리는 채택도 삭제도 하지 않음).
 - **지원/미지원**: 지원은 명시된 `text/html`·`application/pdf` URL의 단발 수집뿐입니다(`text/plain` 등은 없음). 검색·RSS·DART/OpenDART 같은 API·인증·스케줄링·주기 갱신·시간 창 coverage 주장은 구현하지 않았으며 수집은 `coverageThrough`를 비웁니다. 실제 사이트에 대한 수집은 이 변경에서 실행하지 않았습니다.
 - **HTTPS 인증서 검증**은 끌 수 없고, 연결 IP가 아니라 원래 요청 호스트를 Host·SNI·인증서 이름으로 사용합니다. 공개 회귀 시험의 HTTP 루프백만으로 TLS의 신뢰 체인과 이름 검증까지 증명할 수 없으므로, TLS 변경 시 별도 신뢰된 로컬 테스트 CA/잘못된 이름/신뢰되지 않은 CA 검증이 필요합니다.
+
+### 수집기 연락처 설정
+
+`--policy`로 읽는 정책에 선택 항목 `contactUrl`을 지정하면 기존 `userAgent` 뒤에 ` (+<contactUrl>)`만 붙입니다. 별도 User-Agent 재정의 CLI 옵션은 없습니다. 연락처를 지정할 때 `userAgent`는 기존 제품 이름과 버전을 유지한 `제품/버전` 형식이어야 하며, 브라우저 문자열이나 다른 주석을 함께 넣을 수 없습니다. 최종 헤더는 최대 200자의 ASCII입니다. URL은 공개 HTTPS 도메인을 사용해야 하고, 자격 증명·공백·제어문자·비ASCII 문자·괄호·HTML 구분자·역슬래시를 허용하지 않습니다. URL의 공개 접근 가능 여부와 내용의 진실성은 운영자가 별도로 확인해야 하며 수집기가 연락처 페이지를 가져오지는 않습니다.
+
+robots.txt와 모든 리다이렉트 요청에 같은 최종 식별 문자열을 보내고 receipt의 기존 `userAgent`에 그대로 남깁니다. 연락처를 지정한 새 수집은 전부 실패해 receipt가 없어도 `collection.json`과 CLI 결과의 `userAgent`에 이를 기록합니다. `contactUrl`을 생략하거나 null로 두면 그 필드만 직렬화에서 빠지므로 기존 정책과 중첩된 corpus 설정의 canonical bytes, 요청 digest 계산 방식과 receipt 형식은 바뀌지 않습니다. 다른 nullable 필드는 그대로 유지합니다. 같은 `collectionId`의 연락처를 추가·변경하면 `collection_input_conflict`이며, 기존 수집을 다시 읽을 때 새 식별 필드를 만들어 넣거나 이전 실패를 재시도하지 않습니다.
+
+[ONS의 봇 안내](https://developer.ons.gov.uk/bots/)는 운영 주체·목적·연락 방법을 설명하는 공개 URL을 권장합니다. 이 저장소의 아래 `Collector contact` 절을 공개 브랜치나 커밋에서 읽을 수 있게 게시한 뒤, 그 절을 가리키는 고정 URL을 사용할 수 있습니다. 이 문서를 로컬에서 수정한 것만으로 공개된 연락처가 되지는 않습니다. 개인 이름·사용자명·개인 이메일·가상의 회사 이메일을 헤더에 넣지 않습니다. 식별 연락처는 수집 권한을 대신하지 않으며, 실제 수집에는 별도로 확인한 이용 조건·권리 근거와 운영자 grant·예산·실행 승인이 필요합니다.
+
+### Collector contact
+
+**Owner:** the Zoop project. **Purpose:** bounded, operator-approved research into company-related public documents for the Zoop project, subject to source permissions, robots rules and request budgets. The collector does not log in or bypass access controls.
+
+**Contact:** [Zoop project GitHub Issues](https://github.com/Donbug/zoop/issues). Site owners can report collector access concerns through this project channel. Please do not post credentials or other private information. This channel does not promise a response time or continuous monitoring.
+
 
 ### 정책브리핑의 날짜·채널별 유한 수집 (`korea_corpus_cli`)
 
@@ -305,7 +320,7 @@ ai/pipeline/.venv/bin/python ai/pipeline/scripts/collection_smoke.py --output-di
 
 서버는 종료됐으므로 남은 URL·포트는 재실행용이 아니라 형식 참고용이다. 이 파일들은 합성 문서이며 근거 자료나 실제 수집물이 아니다. 아래 B의 JSON은 같은 스키마의 실제 모드 버전이다.
 
-**B. 실제 모드: 사용자가 권리를 확인한 URL만.** 아래 `news.example.com`, `evidence`, `userAgent`, `targets`는 반드시 자기 값으로 바꾼다. `evidence`에는 이 URL들의 수집·저장·인용 표시를 허락한다는 **실제 근거**(계약·약관·서면 허락)를 적는다. 공개 URL이라는 사실이나 robots 허용은 근거가 아니다. 근거 없이 임의의 사이트를 넣지 않는다. 한 번에 최대 50건이며 모든 값이 필수라 기본값이 없다.
+**B. 실제 모드: 사용자가 권리를 확인한 URL만.** 아래 `news.example.com`, `evidence`, `userAgent`, `targets`는 반드시 자기 값으로 바꾼다. `evidence`에는 이 URL들의 수집·저장·인용 표시를 허락한다는 **실제 근거**(계약·약관·서면 허락)를 적는다. 공개 URL이라는 사실이나 robots 허용은 근거가 아니다. 근거 없이 임의의 사이트를 넣지 않는다. 한 번에 최대 50건이며 필수 정책 값에는 기본값이 없다. 연락처를 요구하는 사이트에는 위 연락처 설정에 따라 실제로 공개된 페이지의 `contactUrl`도 지정한다.
 
 ```sh
 BIN="$PWD/ai/pipeline/.venv/bin"
@@ -323,7 +338,7 @@ cat > "$WORK/sources.json" <<EOF
 EOF
 
 cat > "$WORK/policy.json" <<'EOF'
-{"schemaVersion":"zoop-collection-policy-1","userAgent":"ZoopCollector/1.0 (+mailto:operator@example.com)","timeoutSeconds":20,
+{"schemaVersion":"zoop-collection-policy-1","userAgent":"ZoopCollector/1.0","timeoutSeconds":20,
  "maxTotalSeconds":300,"maxRedirects":3,"maxRequests":20,"maxResponseBytes":5000000,"maxTotalBytes":50000000,"minIntervalSeconds":1,
  "allowedMediaTypes":["text/html","application/pdf"],"syntheticLoopback":false}
 EOF
@@ -390,6 +405,10 @@ done
 
 
 `zoop_ai_pipeline.ingestion_cli`의 `run/resume/inspect`는 BFF의 admin `ingest-run`과 **다른 내부 실행 경계**다. 네이티브 URL/HTML/PDF 준비(`ingestion_url`·`ingestion_parsers`·`ingestion_pdf`, lxml·pypdf, 같은 공개 의존성)만 쓰며 private PoC를 import하지 않고 네트워크·모델·PoC 원장·앱/S1 DB에는 연결하지 않는다(네트워크는 위 `zoop-ai-collect`만 연다). 이전 pinned-PoC parser 프로필(`pocCommit`)로 만든 round는 새 프로필(`parser: zoop-native-parsers-1`)과 달라 `resume`이 `parser_profile_changed`로 거부하며, 그 round의 저장된 version과 export는 그대로 읽힌다(재해석하지 않음). 새 프로필의 version은 같은 raw bytes여도 새 preparation key/version id를 가진다. 명시한 전용 `--state-dir`의 private `ingestion.sqlite3`에 원래 response/raw BLOB, source-local 문서 ID, raw/text version, HTML node/PDF page span과 연속 checkpoint를 저장한다. 현재 operator `--sources`는 매번 완전한 snapshot으로 읽고, fixture manifest는 hash-pinned 파일 입력일 뿐 권한을 발급하지 않는다. 수집한 관찰의 `export`는 `observation`에 `provenance: "collected_http"`와 `collection`(실제 수집 시각, 최종 URL, HTTP 상태, 본문 sha256, 문서 종류, `network`, 선언된 게시 시각의 원문·정밀도)을 **추가로** 돌려주며 license를 주장하지 않는다. authored 관찰의 export는 이전과 같은 닫힌 키 집합 그대로다(Java `IngestionExportParser`가 두 형태의 정확한 키 집합을 고정하며, 같은 집합을 `tests/test_collection.py`가 고정한다). run/inspect 결과의 최상위 `provenance`는 두 경우 모두 있다.
+
+**파서 실행 환경의 신원 확인.** 지원 환경은 frozen lock에 고정된 의존성을 사용한다. 새 round를 만들거나 미완료 후보를 준비할 때 `importlib.metadata.version()`으로 얻은 `lxml`·`pypdf` 버전이 없거나(`PackageNotFoundError`·`null`), 문자열이 아니거나, 비어 있거나 공백뿐이거나, 200자를 넘으면 `input_or_configuration_invalid`로 거부한다. 새 `run`은 이 오류를 JSON으로 반환하고 종료 코드 2로 끝나며 round나 준비된 version을 등록하지 않는다. 기존 미완료 round의 `resume`은 같은 코드를 `failure.code`에 기록하고 `incomplete`로 남는다. 이미 저장한 raw bytes는 보존하지만 새 준비 결과나 영구 parse hold는 만들지 않는다. 정상 버전 문자열은 그대로 사용하므로 기존 canonical bytes와 문서 신원은 바뀌지 않는다.
+
+이 오류가 나면 frozen lock에 맞는 실행 환경과 설치된 distribution metadata를 복구한 뒤 준비 작업을 다시 실행한다. 모듈의 `__version__`, 추정값, 문자열 변환으로 빈 신원을 대신하지 않는다. 현재 실행 환경의 metadata가 손상돼도 유효하게 저장된 과거 version의 `inspect`·읽기 전용 `export`는 현재 권한 검사에 따라 계속 사용할 수 있다. 이미 기록된 원본·receipt·export는 고치거나 덮어쓰지 않으며, 잘못 기록된 버전 정보도 소급해서 채우지 않는다.
 
 저장소 루트에서 다음 명령으로 합성 HTML/PDF와 실제 subprocess CLI를 재현한다. driver는 fresh 임시 입력/상태를 만들고 검사 후 모두 제거한다.
 
