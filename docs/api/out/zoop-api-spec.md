@@ -7083,12 +7083,12 @@ pathStatus=none은 기업·이슈가 모두 공개됐지만 공개 연결이 없
 
 ### ImpactBusinessPath
 
-구조 연결의 운영자 매핑 사업 관계 사슬이다. 공급 방향은 관계 사실이며 이슈 영향·인과·가격 방향이 아니다. complete는 공개 시작 INVOLVES, 모든 basis와 현재 읽을 수 있는 단계별 근거, 공개 중간 기업이 모두 확인된 경우에만 허용한다.
+구조 연결의 운영자 매핑 사업 관계 사슬이다. 공급 방향은 관계 사실이며 이슈 영향·인과·가격 방향이 아니다. fixture·재구성 버전은 영수증을 읽지 않고 not_recorded를 반환한다. complete는 공개 시작 INVOLVES, 선택 시점에 보이는 모든 basis의 영수증·snapshot 일치, 현재 읽을 수 있는 단계별 근거, 공개 중간 기업이 모두 확인된 경우에만 허용한다. 후보 관계 중 하나라도 완전하게 공개할 수 없으면 사슬 전체를 unavailable로 둔다. 지원 bundle은 5~7이며 1~4는 legacy_data, 미지원·손상 영수증은 503이다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | status | 필수 | string {complete, unavailable} |  |
-| reason | 필수 | string, null {not_recorded, intermediate_company_unmapped, not_public, evidence_unavailable, incomplete, None} | complete에서는 null이다. 비공개 지원 참조의 ID나 내부 원장 내용은 제공하지 않는다. |
+| reason | 필수 | string, null {not_recorded, legacy_data, intermediate_company_unmapped, not_public, evidence_unavailable, incomplete, None} | complete에서는 null이다. 비공개 지원 참조의 ID나 내부 원장 내용은 제공하지 않는다. |
 | companyIds | 필수 | string[] | complete에서만 이슈에 직접 참여한 공개 기업부터 선택 기업까지 2~3개 ID. unavailable에서는 빈 배열. |
 | links | 필수 | [ImpactBusinessLink](#schema-impactbusinesslink)[] | complete에서만 companyIds의 인접 쌍별 공급자·고객 관계와 공개 근거. unavailable에서는 빈 배열. |
 
@@ -7109,7 +7109,7 @@ pathStatus=none은 기업·이슈가 모두 공개됐지만 공개 연결이 없
 
 ### CompanyIssueImpactAssessment
 
-영수증 누락·손상·선택 버전 불일치는 503이다. 공개 경로가 없으면 no_public_path, structural에 이슈별 판정 생산 계약이 없으면 issue_impact_not_produced, direct의 구버전 영수증에 impacts[]가 없으면 not_recorded, 검증 행은 있지만 공개 가능한 판정이 없으면 not_verified다. 검증 행 중 하나라도 필수 근거를 현재 열 수 없으면 다른 행도 내보내지 않고 evidence_unavailable이다.
+snapshot 버전의 영수증 손상·선택 버전 불일치는 503이다. fixture·재구성 버전은 영수증이 없는 정상 자료 상태이므로 영향 판정은 not_recorded, 구조 상세는 not_recorded다. 공개 경로가 없으면 no_public_path, structural에 이슈별 판정 생산 계약이 없으면 issue_impact_not_produced, direct의 구버전 영수증에 impacts[]가 없으면 not_recorded, 검증 행은 있지만 공개 가능한 판정이 없으면 not_verified다. 검증 행 중 하나라도 필수 근거를 현재 열 수 없으면 다른 행도 내보내지 않고 evidence_unavailable이다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
