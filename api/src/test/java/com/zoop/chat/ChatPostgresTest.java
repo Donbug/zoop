@@ -381,6 +381,34 @@ class ChatPostgresTest {
 
     @Test
     @Transactional
+    void aReceiptBackedChatExecutionNeitherBlocksTheDeletionNorBecomesMutable() {
+        String memberId = insertMember();
+        String session = insertSession(memberId, Instant.now());
+        String job = insertJob(session, 1, "cancelled", null, 0);
+        String receipt = insertReceipt();
+        String execution = insertExecution(job, receipt);
+
+        // Still occurrence history: no other change, and no unlinking from a job that exists.
+        assertConstraint(() -> jdbc.update("UPDATE ai_executions SET chat_job_id = NULL WHERE id = ?", execution));
+        assertConstraint(() -> jdbc.update("UPDATE ai_executions SET input_tokens = 1 WHERE id = ?", execution));
+
+        assertTrue(repository.deleteSession(session), "the deletion's own unlinking is the one change it takes");
+        assertNull(jdbc.queryForObject("SELECT chat_job_id FROM ai_executions WHERE id = ?", String.class, execution));
+        assertEquals(receipt, jdbc.queryForObject("SELECT receipt_artifact_id FROM ai_executions WHERE id = ?",
+                String.class, execution));
+        assertConstraint(() -> jdbc.update("UPDATE ai_executions SET input_tokens = 1 WHERE id = ?", execution));
+
+        // A withdrawal with such a row is not blocked either.
+        String other = insertSession(memberId, Instant.now());
+        String kept = insertExecution(insertJob(other, 1, "cancelled", null, 0), insertReceipt());
+        jdbc.update("DELETE FROM members WHERE id = ?", memberId);
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM chat_sessions WHERE member_id = ?", Integer.class,
+                memberId));
+        assertNull(jdbc.queryForObject("SELECT chat_job_id FROM ai_executions WHERE id = ?", String.class, kept));
+    }
+
+    @Test
+    @Transactional
     void theListHoldsConversationsWithQuestionsLatestFirstAndContinuesAfterAPosition() {
         String memberId = insertMember();
         Instant base = Instant.parse("2026-10-27T00:00:00Z");
@@ -410,10 +438,25 @@ class ChatPostgresTest {
     }
 
     private String insertExecution(String job) {
+        return insertExecution(job, null);
+    }
+
+    private String insertExecution(String job, String receipt) {
         String id = "aix-" + suffix();
         jdbc.update("""
-                INSERT INTO ai_executions (id, feature, execution_mode, status, chat_job_id, stage, started_at, finished_at)
-                VALUES (?, 'chatbot', 'live', 'succeeded', ?, 'chat-router', now(), now())""", id, job);
+                INSERT INTO ai_executions (id, feature, execution_mode, status, chat_job_id, stage, receipt_artifact_id,
+                                           started_at, finished_at)
+                VALUES (?, 'chatbot', 'live', 'succeeded', ?, 'chat-router', ?, now(), now())""", id, job, receipt);
+        return id;
+    }
+
+    /** An AI call receipt artifact row; the file itself is not needed for the database rules. */
+    private String insertReceipt() {
+        String id = "art-receipt-" + suffix();
+        jdbc.update("""
+                INSERT INTO artifacts (id, kind, storage_uri, sha256, bytes, media_type, created_at)
+                VALUES (?, 'ai_call_receipt', ?, repeat('b', 64), 10, 'application/json', now())""",
+                id, "artifact-root:receipts/" + id + ".json");
         return id;
     }
 

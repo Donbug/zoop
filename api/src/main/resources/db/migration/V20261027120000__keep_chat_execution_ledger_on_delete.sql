@@ -14,3 +14,21 @@ ALTER TABLE ai_executions ADD CONSTRAINT fk_ai_executions_chat_job FOREIGN KEY (
 ALTER TABLE ai_executions DROP CONSTRAINT ck_ai_executions_owner;
 ALTER TABLE ai_executions ADD CONSTRAINT ck_ai_executions_owner CHECK (
     num_nonnulls(chat_job_id, briefing_attempt_id, analysis_job_id, document_analysis_id) >= 1 OR feature = 'chatbot');
+
+-- ON DELETE SET NULL updates the execution row, and a receipt-backed row refused every update
+-- (V20261014130000, tr_ai_executions_receipt_immutable), so a single such chatbot row would still block the deletion. The
+-- one change it now takes is losing a chat job that no longer exists, with nothing else changed: the deletion's own
+-- unlinking. Unlinking a job that still exists, or any other change, is refused as before.
+CREATE OR REPLACE FUNCTION ai_executions_reject_receipt_update() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF OLD.receipt_artifact_id IS NOT NULL THEN
+        IF OLD.feature = 'chatbot' AND OLD.chat_job_id IS NOT NULL AND NEW.chat_job_id IS NULL
+            AND to_jsonb(NEW) - 'chat_job_id' = to_jsonb(OLD) - 'chat_job_id'
+            AND NOT EXISTS (SELECT 1 FROM chat_jobs j WHERE j.id = OLD.chat_job_id) THEN
+            RETURN NEW;
+        END IF;
+        RAISE EXCEPTION 'a receipt-backed AI execution is immutable' USING ERRCODE = 'restrict_violation';
+    END IF;
+    RETURN NEW;
+END
+$$;
