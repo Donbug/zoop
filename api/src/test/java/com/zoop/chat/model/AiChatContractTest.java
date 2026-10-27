@@ -98,6 +98,11 @@ class AiChatContractTest {
             public List<Mention> mentions(String text) {
                 return match(text, CATALOG);
             }
+        }, new IssueNameResolver(null) {
+            @Override
+            public Names at(String graphVersion, java.time.Instant asOf) {
+                return NONE;
+            }
         }, (evidenceId, graphVersion, asOf, traceId) -> Optional.ofNullable(Map.of(
                 EVIDENCE, citation(EVIDENCE, "art-synthetic"),
                 UNGRANTED_EVIDENCE, citation(UNGRANTED_EVIDENCE, "art-ungranted")).get(evidenceId)),

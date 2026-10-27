@@ -252,7 +252,7 @@ class OrchestratedChatEngineTest {
         var found = assertInstanceOf(ChatEngineOutcome.Completed.class,
                 engine().answer(run(), new Control(Duration.ofSeconds(60))));
         assertEquals("insufficient_evidence", found.result().outcome());
-        assertEquals(ChatResults.insufficientReason(run(), ChatResults.InsufficientCause.EVIDENCE_INSUFFICIENT),
+        assertEquals(ChatResults.insufficientReason(run(), ChatResults.InsufficientCause.EVIDENCE_INSUFFICIENT, false),
                 found.result().reason());
         assertTrue(found.result().reason().startsWith("관련 항목은 찾았지만"), found.result().reason());
         assertEquals(List.of("SK하이닉스"), found.result().applied().companies().stream().map(c -> c.label()).toList(),
@@ -272,6 +272,16 @@ class OrchestratedChatEngineTest {
         ChatResult selection = completed(engine().answer(narrowed, new Control(Duration.ofSeconds(60))));
         assertEquals("insufficient_evidence", selection.outcome());
         assertTrue(selection.reason().endsWith("선택을 해제하고 다시 물으면 더 넓게 찾아볼 수 있어요."), selection.reason());
+
+        // The same selection, but the question names another company: that read was not narrowed, so neither is the hint.
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(), List.of(),
+                List.of(), false, false));
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
+                List.of(NVDA)));
+        ChatResult elsewhere = completed(engine().answer(narrowed, new Control(Duration.ofSeconds(60))));
+        assertEquals("insufficient_evidence", elsewhere.outcome());
+        assertFalse(elsewhere.reason().contains("선택한 근거 안에서만"), elsewhere.reason());
+        assertTrue(elsewhere.reason().endsWith("지도에서 대상을 고른 뒤 다시 물어봐 주세요."), elsewhere.reason());
     }
 
     @Test

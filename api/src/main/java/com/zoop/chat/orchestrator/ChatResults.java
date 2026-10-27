@@ -79,9 +79,13 @@ final class ChatResults {
     private ChatResults() {
     }
 
-    /** The reason of an insufficient-evidence result: what happened, then what to try. */
-    static String insufficientReason(ChatRun run, InsufficientCause cause) {
-        String hint = !run.selection().evidenceIds().isEmpty() ? "narrowed"
+    /**
+     * The reason of an insufficient-evidence result: what happened, then what to try. {@code narrowed} is whether every read
+     * that ran was bound to the selected evidence, not whether evidence was selected: a question naming another company
+     * reads beyond the selection, so clearing it would change nothing.
+     */
+    static String insufficientReason(ChatRun run, InsufficientCause cause, boolean narrowed) {
+        String hint = narrowed ? "narrowed"
                 : cause == InsufficientCause.RESULTS_TRUNCATED ? "truncated"
                 : run.context().period() != null ? "period" : "other";
         return CAUSES.get(cause.code()) + " " + HINTS.get(hint);
@@ -98,10 +102,10 @@ final class ChatResults {
      * An insufficient-evidence result: no sections, citations or limitations, but the reason says why and
      * {@code applied} shows the companies and issues the reads looked at.
      */
-    static ChatResult insufficient(ChatRun run, InsufficientCause cause, List<ChatAppliedItem> companies,
+    static ChatResult insufficient(ChatRun run, InsufficientCause cause, boolean narrowed, List<ChatAppliedItem> companies,
             List<ChatAppliedItem> issues, boolean questionOverrodeContext, Instant now) {
         return new ChatResult("insufficient_evidence", PENDING_MESSAGE, "", List.of(), "none",
-                insufficientReason(run, cause), List.of(), List.of(), List.of(),
+                insufficientReason(run, cause, narrowed), List.of(), List.of(), List.of(),
                 applied(run, companies, issues, questionOverrodeContext, now), List.of(), null, List.of(), metadata(run, now));
     }
 

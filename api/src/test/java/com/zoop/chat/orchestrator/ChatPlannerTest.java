@@ -57,6 +57,29 @@ class ChatPlannerTest {
     }
 
     @Test
+    void aConceptLabelStaysWithinTheAnswerStagesLabelLimitInCodePointsAndItsParentKeepsItsOwn() {
+        int suffix = ChatPlan.Planned.CONCEPT_LABEL.codePointCount(0, ChatPlan.Planned.CONCEPT_LABEL.length());
+        assertEquals(8, suffix);
+        for (int length : List.of(3992, 3993, 4000)) {
+            var parent = planned("가".repeat(length));
+            String label = parent.concept().label();
+            assertEquals(Math.min(length + suffix, 4000), label.codePointCount(0, label.length()), "length " + length);
+            assertTrue(label.endsWith(ChatPlan.Planned.CONCEPT_LABEL));
+            assertEquals(length, parent.label().length(), "the parent's label is never cut");
+        }
+        // Supplementary characters count once each and are never split into a lone surrogate.
+        String wide = "𝐀".repeat(4000);
+        String label = planned(wide).concept().label();
+        assertEquals(4000, label.codePointCount(0, label.length()));
+        assertEquals("𝐀".repeat(3992) + ChatPlan.Planned.CONCEPT_LABEL, label);
+    }
+
+    private static ChatPlan.Planned planned(String label) {
+        return new ChatPlan.Planned("r1", label, Set.of(ChatQueryType.Q02, ChatQueryType.Q03), Mode.TOOLS, null, List.of(),
+                List.of(), ChatPlan.TargetSource.QUESTION, null, null, 1);
+    }
+
+    @Test
     void aLookupThatAlsoAsksForAConceptRunsAsBeforeWithTheConceptBesideIt() {
         var plan = run(planner.plan(run(0, "v1"), decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9),
                 Map.of("company.read", 0.9), List.of("KRX:000660"))), BOUND));
@@ -153,6 +176,17 @@ class ChatPlannerTest {
         assertEquals(List.of(ChatCapability.ISSUE_READ), plan.requirements().get(2).capabilities(),
                 "an issue target gets no company read");
 
+        var issue = run(planner.plan(run(0, "v1"), decision(
+                req("named", Map.of(ChatQueryType.Q03, 0.6), Map.of(), List.of("iss-1")),
+                req("both", Map.of(ChatQueryType.Q03, 0.9), Map.of(), List.of("KRX:005930", "iss-1")),
+                req("concept", Map.of(ChatQueryType.Q02, 0.8, ChatQueryType.Q03, 0.4), Map.of(), List.of("iss-1"))), bound));
+        assertEquals(List.of(ChatCapability.ISSUE_READ), issue.requirements().get(0).capabilities(),
+                "a named issue reads the issue even when no capability reached the review band");
+        assertEquals(List.of(ChatCapability.COMPANY_READ, ChatCapability.ISSUE_READ),
+                issue.requirements().get(1).capabilities());
+        assertEquals(ChatPlan.Mode.TOOLS, issue.requirements().get(2).mode(),
+                "a concept question naming an issue is also an issue question");
+
         var unbound = run(planner.plan(run(0, "v1"), decision(req("about", Map.of(ChatQueryType.Q03, 0.9),
                 Map.of("issue.read", 0.9), List.of("KRX:005930"))), Set.of("issue.read")));
         assertEquals(List.of(ChatCapability.ISSUE_READ), unbound.requirements().getFirst().capabilities(),
@@ -180,7 +214,8 @@ class ChatPlannerTest {
         var plan = run(planner.plan(run(0, "v1"), decision(
                 req("advice", Map.of(ChatQueryType.Q02, 0.9), Map.of()).withAdvice(0.2),
                 req("path", Map.of(ChatQueryType.Q04, 0.9), Map.of("graph.path.read", 0.95), List.of("KRX:000660")),
-                req("free", Map.of(ChatQueryType.Q03, 0.9), Map.of("graph.delete", 0.99), List.of("iss-1")),
+                // Q08 has no server default for a named issue, so only the unknown capability is left.
+                req("free", Map.of(ChatQueryType.Q08, 0.9), Map.of("graph.delete", 0.99), List.of("iss-1")),
                 req("concept", Map.of(ChatQueryType.Q02, 0.9), Map.of())), BOUND));
         assertEquals(Arrays.asList("investment_advice", "out_of_scope", "out_of_scope", null),
                 plan.requirements().stream().map(ChatPlan.Planned::limitation).toList(),

@@ -321,7 +321,7 @@ Q02 일반 개념은 권위 자료가 없으므로 두 번째 모델의 동의�
 - Luna `coverage-verifier`의 분리 계약을 구현하거나 승인된 대체 coverage 절차를 확정
 - claim 단위 의미 검증과 `unsupportedCausality`, Luna 입력 24,000·출력 2,000 token guard
 - 미연결 Q 유형별 데이터 소유 도구
-- 복합 질문·권한·근거 부족·공격 입력을 포함한 고정 평가 세트와 임계값 보정
+- 복합 질문·권한·근거 부족·공격 입력을 포함한 고정 평가 세트와 임계값 보정(대본 실행용 세트 v1은 있음: [고정 평가 세트](../development/ai-chatbot-eval-set.md))
 - PostgreSQL evidence 수입과 handoff → 앱 공개 스냅샷 활성화 → 챗봇 그래프 조회 → 철회 반영의 종단 시험
 - 실제 배포 환경, live 호출 비용·권한 승인과 단계적 기능 플래그 활성화
 

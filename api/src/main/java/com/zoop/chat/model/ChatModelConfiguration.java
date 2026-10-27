@@ -9,6 +9,7 @@ import com.zoop.chat.orchestrator.ChatCitationSource;
 import com.zoop.chat.orchestrator.OrchestratedChatEngine;
 import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolRunner;
+import com.zoop.graph.read.PublicGraphReader;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -33,12 +34,12 @@ public class ChatModelConfiguration {
 
     @Bean
     ChatModelStages chatModelStages(HttpChatStageClient client, AiChatClientProperties properties,
-            NamedParameterJdbcTemplate jdbc, ChatCitationSource citations, Clock clock) {
+            NamedParameterJdbcTemplate jdbc, PublicGraphReader graphs, ChatCitationSource citations, Clock clock) {
         ChatModelStages.ArticleSources sources = articleId -> Optional.ofNullable(jdbc.query(
                 "SELECT provider FROM articles WHERE id = :id", new MapSqlParameterSource("id", articleId),
                 rs -> rs.next() ? rs.getString(1) : null));
-        return new ChatModelStages(client, properties.validatedMode(), new CompanyNameResolver(jdbc), citations, sources,
-                new ChatModelRecorder(jdbc, clock));
+        return new ChatModelStages(client, properties.validatedMode(), new CompanyNameResolver(jdbc),
+                new IssueNameResolver(graphs), citations, sources, new ChatModelRecorder(jdbc, clock));
     }
 
     @Bean

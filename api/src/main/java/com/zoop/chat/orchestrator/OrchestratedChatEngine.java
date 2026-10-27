@@ -282,8 +282,19 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         route.put("outcome", "insufficient_evidence").put("reason", cause.code());
         Set<String> all = new HashSet<>();
         plan.requirements().forEach(p -> all.add(p.id()));
-        return new ChatEngineOutcome.Completed(ChatResults.insufficient(run, cause, items(retrieved, all, "company"),
-                items(retrieved, all, "issue"), overrode(run, plan, all), clock.instant()), route);
+        return new ChatEngineOutcome.Completed(ChatResults.insufficient(run, cause, narrowed(plan, retrieved),
+                items(retrieved, all, "company"), items(retrieved, all, "issue"), overrode(run, plan, all), clock.instant()),
+                route);
+    }
+
+    /**
+     * Whether every read that ran was bound to the selected evidence: some requirement read, and each one that did had an
+     * evidence scope. A mix of narrowed and wide reads is not narrowed.
+     */
+    static boolean narrowed(ChatPlan.Run plan, ChatRetrieval.Outcome retrieved) {
+        List<Planned> read = plan.requirements().stream()
+                .filter(p -> p.mode() == Mode.TOOLS && retrieved.results().containsKey(p.id())).toList();
+        return !read.isEmpty() && read.stream().allMatch(p -> p.evidenceScope() != null);
     }
 
     /** The items of one kind the reads of these requirements returned, once each, in read order. */

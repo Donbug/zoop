@@ -26,10 +26,12 @@ import java.util.regex.Pattern;
  * <li>{@code general_section}: a {@code general_knowledge} section cites nothing, answers pure Q02 requirements only and
  * states no current fact: no amount, percentage, price, year or calendar date (design summary 8.2: Q02 is never a way around
  * a lookup).</li>
- * <li>{@code general_names}: a general section answering only requirements the server split off ({@link ChatPlan.Origin})
- * does not name the companies or issues their parents' reads returned. Such a section that breaks this or
- * {@code general_section} is dropped and its requirements count as unanswered: it is the server's addition, not what the
- * member asked, so it does not fail the answer.</li>
+ * <li>{@code general_names}: a general section answering any requirement the server split off ({@link ChatPlan.Origin})
+ * does not name the companies or issues that requirement's parent read returned, whatever else the section answers. A
+ * section answering only split-off requirements that breaks this or {@code general_section} is dropped and its
+ * requirements count as unanswered: it is the server's addition, not what the member asked, so it does not fail the
+ * answer. One that also answers a router requirement fails like any other section, so that requirement is never lost
+ * silently.</li>
  * <li>{@code evidence_section}: an {@code evidence_grounded} section cites only evidence its own requirements' tool results
  * passed on, and cites some unless all its requirements found nothing. ZOOP document reads do not count here.</li>
  * <li>{@code document_section}: a {@code zoop_documented} section does the same with what its requirements' ZOOP document
@@ -104,11 +106,13 @@ final class ChatAnswerCheck {
             if ("general_knowledge".equals(section.basis())) {
                 boolean broken = !section.evidenceIds().isEmpty() || owners.stream().anyMatch(b -> !b.general())
                         || CURRENT_FACT.matcher(section.text()).find();
-                if (owners.stream().allMatch(b -> b.parent() != null) && (broken || names(section.text(), owners))) {
+                boolean named = names(section.text(), owners);
+                if (owners.stream().allMatch(b -> b.parent() != null) && (broken || named)) {
                     dropped.addAll(section.requirementIds());
                     continue;
                 }
                 if (broken) return Result.fail("general_section");
+                if (named) return Result.fail("general_names");
                 String text = section.text().strip();
                 sections.add(new ChatGeneratedAnswer.Section(section.basis(),
                         text.startsWith(GENERAL_NOTICE) ? text : GENERAL_NOTICE + " " + text, section.requirementIds(),
