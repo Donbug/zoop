@@ -95,12 +95,15 @@ docker build \
 | 변수 | 용도 |
 |---|---|
 | `AWS_REGION` | AWS 리전 |
-| `AWS_ROLE_ARN` | GitHub OIDC 배포 역할 |
+| `AWS_IMAGE_STAGE_ROLE_ARN` | `stage-image` 실행 시 사용하는 API ECR 전용 GitHub OIDC 역할 |
+| `AWS_DEPLOY_ROLE_ARN` | `deploy` 실행 시 사용하는 ECR·ECS 배포용 GitHub OIDC 역할 |
 | `API_ECR_REPOSITORY` | API ECR Repository 이름 |
 | `API_ECS_CLUSTER` | ECS Cluster 이름 |
 | `API_ECS_SERVICE` | API ECS Service 이름 |
 | `API_ECS_TASK_DEFINITION` | API Task Definition 이름 |
 | `API_ECS_CONTAINER_NAME` | Task Definition 내부 API Container 이름 |
+
+`stage-image`는 API ECR Repository에만 접근 가능한 최소 권한 역할을 사용한다. `deploy`는 이미지 준비와 ECS Task Definition 및 Service 갱신에 필요한 별도 배포 역할을 사용한다. 두 operation이 하나의 IAM 역할을 공유하지 않는다.
 
 실제 Secret 값은 저장소 코드나 문서에 기록하지 않는다.
 
