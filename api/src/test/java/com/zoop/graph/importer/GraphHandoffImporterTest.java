@@ -570,12 +570,11 @@ class GraphHandoffImporterTest {
 
 
 
-    @Test
-    void aCurrentImportReceiptServesEventMetadataOverTheConsumerRouteWithoutExposingItsSummary() throws Exception {
-        Built summarized = HandoffFixtures.withSummary(built, HandoffFixtures::availableSummary);
-        handoff.envelope = summarized.envelopeBytes();
-        assertTrue(importer.run(summarized.request()).succeeded());
-        String versionId = summarized.versionId();
+    /** The public read side over one imported version, as activated: real snapshot store, receipts and source registry. */
+    private record ReadSide(PublicGraphReader reader, EvidenceService receipts, GraphVersionSelector selector, Path sources,
+            String sourceRegistry) { }
+
+    private ReadSide readSide(String versionId) throws Exception {
         ArtifactRow snapshot = registry.findArtifact("artifact-" + versionId).orElseThrow();
         GraphVersionRecord version = new GraphVersionRecord(versionId, 3, "snapshot", snapshot.id(),
                 snapshot.storageUri(), snapshot.sha256(), true);
@@ -584,7 +583,9 @@ class GraphHandoffImporterTest {
         when(versions.find(versionId)).thenReturn(Optional.of(version));
         when(versions.everActivated(versionId)).thenReturn(true);
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        PublicGraphReader reader = new PublicGraphReader(new GraphVersionSelector(versions, clock),
+        when(versions.active()).thenReturn(Optional.of(version));
+        GraphVersionSelector selector = new GraphVersionSelector(versions, clock);
+        PublicGraphReader reader = new PublicGraphReader(selector,
                 new ArtifactGraphSnapshotStore(store, registry, null), ignoredVersion -> DisclosureExclusions.NONE);
         EvidenceReadRepository evidence = mock(EvidenceReadRepository.class);
         for (EvidenceRow row : graph.evidenceRows().values()) {
@@ -605,6 +606,46 @@ class GraphHandoffImporterTest {
         Files.writeString(sources, sourceRegistry);
         EvidenceService receipts = new EvidenceService(evidence, registry, null, new DocumentReadSources(sources),
                 new GraphEvidenceSnapshotReader(reader), new EvidenceArtifactReader(store), clock, transaction);
+        return new ReadSide(reader, receipts, selector, sources, sourceRegistry);
+    }
+
+    @Test
+    void aCurrentBundle7ImportIsPublishedForTheCandidateLists() throws Exception {
+        // #349 review: the candidate publication state reads the importer's own bundle-7 receipt through the same head gate.
+        handoff.envelope = built.envelopeBytes();
+        assertTrue(importer.run(built.request()).succeeded());
+        String versionId = built.versionId();
+        ReadSide side = readSide(versionId);
+        var published = new com.zoop.admin.review.PublishedCandidates(side.reader(), side.receipts(), side.selector(),
+                ignoredVersion -> DisclosureExclusions.NONE, Clock.fixed(NOW, ZoneOffset.UTC));
+
+        var shown = published.current("req-published").orElseThrow(() -> new AssertionError("publication state unknown"));
+
+        assertEquals(versionId, shown.versionId());
+        assertFalse(shown.events().isEmpty(), "the imported issue's S2 event candidate is published");
+        assertTrue(shown.excludedEvents().isEmpty());
+        assertFalse(shown.relations().isEmpty(), "the imported relation's S3 candidate is published");
+
+        // Rights withdrawn now: the same receipt's items are hidden, never unknown.
+        Files.writeString(side.sources(), side.sourceRegistry().replace("\"enabled\":true", "\"enabled\":false"));
+        var withdrawn = new com.zoop.admin.review.PublishedCandidates(side.reader(), side.receipts(), side.selector(),
+                ignoredVersion -> DisclosureExclusions.NONE, Clock.fixed(NOW, ZoneOffset.UTC)).current("req-withdrawn")
+                .orElseThrow();
+        assertTrue(withdrawn.events().isEmpty());
+        assertEquals(shown.events(), withdrawn.excludedEvents());
+    }
+
+    @Test
+    void aCurrentImportReceiptServesEventMetadataOverTheConsumerRouteWithoutExposingItsSummary() throws Exception {
+        Built summarized = HandoffFixtures.withSummary(built, HandoffFixtures::availableSummary);
+        handoff.envelope = summarized.envelopeBytes();
+        assertTrue(importer.run(summarized.request()).succeeded());
+        String versionId = summarized.versionId();
+        ReadSide side = readSide(versionId);
+        PublicGraphReader reader = side.reader();
+        EvidenceService receipts = side.receipts();
+        Path sources = side.sources();
+        String sourceRegistry = side.sourceRegistry();
         var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
                 new EventController(null, new EventDetailService(reader, receipts, registry)))
                 .setControllerAdvice(new com.zoop.common.exception.GlobalExceptionHandler())

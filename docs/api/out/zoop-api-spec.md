@@ -3516,9 +3516,9 @@ The immutable published original of a round (what users saw before any correctio
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| companyId | 필수 | string / null |  |
+| companyId | 필수 | string / null | 앱 기업 ID. AI 원천 기업 ID는 앱 카탈로그 ID가 아니므로 대응이 확인되기 전에는 null. |
 | name | 필수 | string |  |
-| role | 필수 | string |  |
+| role | 필수 | string / null | S2 참여 기업의 역할. 관계 끝점에만 있는 기업은 null. |
 
 <a id="schema-candidatecounts"></a>
 
@@ -3543,15 +3543,15 @@ Current candidate review targets: total = active + inactive (inactive = no relat
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| title | 필수 | string |  |
+| title | 필수 | string / null | S2 사건 후보의 제목. 사건이 없는 관계 후보(기업-기업 관계 등)는 null. |
 | candidateId | 필수 | string |  |
 | sourceVersion | 필수 | string | 이 상세 응답의 후보 AI 원천 버전. 결정 요청의 expectedSourceVersion으로 보낸다. |
-| sourceRevision | 필수 | string | 이 상세 응답의 후보 AI 원천 revision. 결정 요청의 expectedSourceRevision으로 보낸다. |
-| issueId | 필수 | string |  |
+| sourceRevision | 필수 | string / null | 후보 단위 AI 원천 revision은 없어 항상 null이다. 결정 요청의 expectedSourceRevision에는 relations[].sourceRevision을 보낸다(결정은 관계 단위). |
+| issueId | 필수 | string / null | 이 사건 후보가 합쳐질 기존 공개 이슈 ID. S2 disposition.targetEventId(AI 사건 ID)를 활성 공개 버전의 수입 영수증(issues[].sourceEvents의 snapshot-event)으로 찾은 값이다. 새 사건 후보, 사건이 없는 관계 후보, 활성 버전에 그 사건이 없거나 여러 이슈에 걸린 경우, 활성 버전·영수증을 읽을 수 없는 경우는 null. |
 | status | 필수 | string {ALLOW, HOLD, REJECT} |  |
 | active | 필수 | boolean |  |
-| policyVersion | 필수 | string |  |
-| action | 필수 | string |  |
+| policyVersion | 필수 | string / null | AI 원천에 대응 값이 없어 현재 항상 null. |
+| action | 필수 | string / null | S2 사건 후보의 동작. 사건이 없는 관계 후보는 null. |
 | target | 필수 | string / null |  |
 | eventTime | 필수 | string / null |  |
 | companies | 필수 | [CandidateCompany](#schema-candidatecompany)[] |  |
@@ -3561,14 +3561,14 @@ Current candidate review targets: total = active + inactive (inactive = no relat
 | onUserGraph | 필수 | boolean |  |
 | decision | 필수 | [ReviewDecisionOut](#schema-reviewdecisionout) / null |  |
 | rule | 필수 | [CandidateRule](#schema-candidaterule) / null |  |
-| mention | 필수 | [CandidateMention](#schema-candidatemention) |  |
+| mention | 필수 | [CandidateMention](#schema-candidatemention) / null | S2 사건 후보의 원래 언급. 사건이 없는 관계 후보는 null. |
 | articles | 필수 | [CandidateArticle](#schema-candidatearticle)[] |  |
 | evidence | 필수 | [CandidateEvidence](#schema-candidateevidence)[] |  |
 | relations | 필수 | [CandidateRelation](#schema-candidaterelation)[] |  |
 | verification | 필수 | [VerificationOut](#schema-verificationout) |  |
 | invalidationReason | 필수 | string / null |  |
 | history | 필수 | [ReviewDecisionOut](#schema-reviewdecisionout)[] |  |
-| graphDb | 필수 | string {reflected, pending, not_stored, unknown} |  |
+| graphDb | 필수 | string {reflected, pending, not_stored, unknown, excluded} | 현재 공개 그래프 버전 기준 상태(사용자가 지금 읽을 수 있는지). reflected: 활성 버전에서 이 후보의 관계나 사건을 사용자가 읽을 수 있음(공개 제외와 근거 읽기 검사—기사 접근·원천 grant—를 모두 통과), excluded: 활성 버전에 공개됐지만 지금은 공개 제외나 근거 읽기 검사로 숨겨짐, pending: 운영자가 최종 승인(approvalBasis=operator-final-approval)한 관계가 아직 공개 버전에 없음(다음 인계·수입 대기), not_stored: 그 밖(자동 검증만 통과하고 인계되지 않은 관계 포함), unknown: 활성 버전·수입 영수증을 읽을 수 없거나 근거 읽기 검사를 지금 확인할 수 없음. 별도 그래프 DB 투영이 아니라 공개 snapshot 기준이다. 목록의 onUserGraph는 reflected일 때만 true다. 판정은 (활성 버전, 공개 제외 revision)이 같으면 최대 60초 동안 재사용되고, 만료 뒤 한 요청이 다시 계산하는 동안 다른 요청은 만료된 판정을 받는다. 그래서 같은 버전 안에서 기사 접근이나 원천 grant가 바뀐 결과는 최대 60초에 재계산 시간을 더한 만큼 늦게 반영될 수 있다(버전 활성화나 공개 제외 변경은 바로 반영). |
 
 <a id="schema-candidateevidence"></a>
 
@@ -3582,7 +3582,7 @@ Current candidate review targets: total = active + inactive (inactive = no relat
 | articleVersion | 필수 | string |  |
 | start | 필수 | integer |  |
 | end | 필수 | integer |  |
-| quote | 필수 | string |  |
+| quote | 필수 | string / null | 원문 인용. 앱 기사 저장소에서 접근 권한이 철회된 기사의 인용은 인용 버전이 앱에 수입됐는지와 관계없이 null. AI 생성자가 인용 검증 실패로 quote를 null로 준 경우도 null(복원·빈 문자열 대체 없음). |
 | articleTitle | 필수 | string / null |  |
 | url | 필수 | string / null |  |
 
@@ -3597,7 +3597,7 @@ Current candidate review targets: total = active + inactive (inactive = no relat
 | items | 필수 | [CandidateRow](#schema-candidaterow)[] |  |
 | nextCursor | 필수 | string / null |  |
 | counts | 필수 | object |  |
-| asOf | 필수 | string (date-time) |  |
+| asOf | 필수 | string (date-time) | 응답을 만든 시각. 각 행의 onUserGraph 판정은 이 시각 기준 최대 60초에 재계산 시간을 더한 만큼 전에 확인한 결과일 수 있다(graphDb 설명 참조). |
 
 <a id="schema-candidatemention"></a>
 
@@ -3647,13 +3647,13 @@ Current candidate review targets: total = active + inactive (inactive = no relat
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| title | 필수 | string |  |
+| title | 필수 | string / null | S2 사건 후보의 제목. 사건이 없는 관계 후보(기업-기업 관계 등)는 null. |
 | candidateId | 필수 | string |  |
-| issueId | 필수 | string |  |
+| issueId | 필수 | string / null | 이 사건 후보가 합쳐질 기존 공개 이슈 ID. S2 disposition.targetEventId(AI 사건 ID)를 활성 공개 버전의 수입 영수증(issues[].sourceEvents의 snapshot-event)으로 찾은 값이다. 새 사건 후보, 사건이 없는 관계 후보, 활성 버전에 그 사건이 없거나 여러 이슈에 걸린 경우, 활성 버전·영수증을 읽을 수 없는 경우는 null. |
 | status | 필수 | string {ALLOW, HOLD, REJECT} |  |
 | active | 필수 | boolean |  |
-| policyVersion | 필수 | string |  |
-| action | 필수 | string |  |
+| policyVersion | 필수 | string / null | AI 원천에 대응 값이 없어 현재 항상 null. |
+| action | 필수 | string / null | S2 사건 후보의 동작. 사건이 없는 관계 후보는 null. |
 | target | 필수 | string / null |  |
 | eventTime | 필수 | string / null |  |
 | companies | 필수 | [CandidateCompany](#schema-candidatecompany)[] |  |
@@ -3670,7 +3670,7 @@ Current candidate review targets: total = active + inactive (inactive = no relat
 
 How an application publication rule affects a candidate. Hide-only: see ``ReviewRuleOut``. The candidate's
 ``rule`` is null when no rule's condition covers it and when it can never be published (an AI REJECT, or an inactive
-candidate replaced by a newer job), since a rule has nothing to hide there.
+candidate replaced by a newer job), since a rule has nothing to hide there. The app does not evaluate the rules on candidates yet (2026-10-26): until it does, ``rule`` is always null and ``rule=true`` in the list finds nothing.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
