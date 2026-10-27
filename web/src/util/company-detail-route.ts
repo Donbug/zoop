@@ -9,9 +9,19 @@ export function companyDetailRouteFromMap(
   if (returnTo?.split('?')[0] === path) return returnTo;
 
   const detail = new URLSearchParams();
-  for (const key of ['period', 'tab', 'asOf', 'graphVersion'] as const) {
+  for (const key of [
+    'period',
+    'tab',
+    'asOf',
+    'graphVersion',
+    'depth',
+  ] as const) {
     const value = map.get(key);
-    if (value && (key !== 'graphVersion' || map.get('asOf')))
+    if (
+      value &&
+      (key !== 'graphVersion' || map.get('asOf')) &&
+      (key !== 'depth' || value === '1' || value === '2')
+    )
       detail.set(key, value);
   }
   return detail.size ? `${path}?${detail}` : path;
