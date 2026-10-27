@@ -161,9 +161,61 @@ export type Documents = {
   nextCursor: string | null;
   metadata: Meta;
 };
+// D-GRP-06 / D-GRP-05 · FS022 API consuming FS079 offline results.
+export type ImpactBusinessPath = {
+  status: 'complete' | 'unavailable';
+  reason:
+    | 'not_recorded'
+    | 'intermediate_company_unmapped'
+    | 'not_public'
+    | 'evidence_unavailable'
+    | 'incomplete'
+    | null;
+  companyIds: string[];
+  links: {
+    supplierCompanyId: string;
+    customerCompanyId: string;
+    reason: string;
+    evidenceIds: string[];
+  }[];
+};
+
+export type ImpactResult = {
+  impactId: string;
+  status: 'verified';
+  label: 'positive' | 'negative' | 'mixed' | 'undetermined';
+  evidenceIds: string[];
+  effects: {
+    positive: string[];
+    negative: string[];
+    neutral: string[];
+    uncertain: string[];
+  };
+};
+
 export type Impact = {
   companyId: string;
   issueId: string;
-  steps: { id: string; kind: string; reason: string; evidenceIds: string[] }[];
+  pathStatus: 'available' | 'none';
+  pathType: 'direct' | 'structural' | null;
+  edgeId: string | null;
+  steps: {
+    id: string;
+    kind: 'issue' | 'company';
+    reason: string;
+    evidenceIds: string[];
+  }[];
+  businessPath: ImpactBusinessPath | null;
+  impact: {
+    status: 'available' | 'unavailable';
+    reason:
+      | 'no_public_path'
+      | 'not_recorded'
+      | 'not_verified'
+      | 'evidence_unavailable'
+      | 'issue_impact_not_produced'
+      | null;
+    results: ImpactResult[];
+  };
   metadata: Meta;
 };

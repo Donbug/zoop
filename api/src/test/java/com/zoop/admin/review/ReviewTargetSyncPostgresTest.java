@@ -9,6 +9,7 @@ import static com.zoop.admin.review.ReviewTargetReaderTest.relation;
 import static com.zoop.admin.review.ReviewTargetReaderTest.s2;
 import static com.zoop.admin.review.ReviewTargetReaderTest.s3;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -142,6 +143,20 @@ class ReviewTargetSyncPostgresTest {
         assertEquals(relationId, jdbc.queryForObject("SELECT id FROM review_targets WHERE source_job_id = ? AND external_id = ? "
                 + "AND target_type = 'relation'", String.class, s3Job, rel('2')), "same row, identity untouched");
         assertEquals(5, count());
+    }
+
+    @Test
+    void aRowSyncedBeforeTheApprovalColumnGetsItFromTheSameRevision() {
+        sync.sync(upstream, recorded, result("hold", "2"));
+        // As the migration leaves a row synced before it: no approval value yet.
+        jdbc.update("UPDATE review_targets SET operator_approved = NULL WHERE source_job_id = ?", s3Job);
+
+        sync.sync(upstream, recorded, result("hold", "2"));
+        assertEquals(Boolean.FALSE, jdbc.queryForObject("SELECT operator_approved FROM review_targets WHERE source_job_id = ? "
+                + "AND target_type = 'relation' AND external_id = ?", Boolean.class, s3Job, rel('2')), "filled, same revision");
+        assertNull(jdbc.queryForObject("SELECT operator_approved FROM review_targets WHERE source_job_id = ? "
+                + "AND target_type = 'candidate' AND external_id = ?", Boolean.class, s3Job, EVENT_A), "a candidate row has none");
+        assertEquals("HOLD", status("relation", rel('2')), "the status still moves only with a newer revision");
     }
 
     @Test
