@@ -112,7 +112,21 @@ describe('ImpactPathPanel structural relation details', () => {
         impact={{
           companyId: company.id,
           issueId: issue.id,
+          pathStatus: 'available',
+          pathType: 'structural',
+          edgeId: structuralEdge.id,
           steps: [],
+          businessPath: {
+            status: 'unavailable',
+            reason: 'not_recorded',
+            companyIds: [],
+            links: [],
+          },
+          impact: {
+            status: 'unavailable',
+            reason: 'issue_impact_not_produced',
+            results: [],
+          },
           metadata: {
             source: 'fixture',
             asOf: graph.metadata.asOf,
