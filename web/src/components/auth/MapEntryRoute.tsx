@@ -13,5 +13,7 @@ export default function MapEntryRoute() {
     );
   if (auth.status !== 'ready' || (!auth.isAuthenticated && !auth.isGuest))
     return <Navigate to="/login" replace state={{ from: location }} />;
+  if (auth.isAuthenticated && auth.onboardingCompleted === false)
+    return <Navigate to="/onboarding" replace />;
   return <Outlet />;
 }

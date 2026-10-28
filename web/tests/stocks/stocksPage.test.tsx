@@ -86,6 +86,7 @@ const rowOf = async (name: string) =>
   (await within(await list()).findByText(name)).closest('li') as HTMLElement;
 
 beforeEach(() => {
+  sessionStorage.removeItem('zoop.stocks.personal-filter');
   useAuthStore.getState().setSession(anonymous);
 });
 
@@ -289,6 +290,24 @@ describe('D-STK-01 관심 종목 (FS027)', () => {
         .getByRole('button', { name: 'NVIDIA 관심 종목' })
         .getAttribute('aria-pressed'),
     ).toBe('true');
+  });
+
+  test('내 종목 필터와 개수를 유지하고 관심 해제 시 검색창에 초점을 옮긴다', async () => {
+    useAuthStore.getState().setSession(member());
+    const server = createFakeServer();
+    myMember(server, { connected: true, watchlistIds: [NVIDIA.id] });
+    quotes(server);
+    const { user, location } = openStocks('/stocks?scope=mine');
+    await screen.findByRole('button', { name: '관심 1' });
+    await user.click(screen.getByRole('button', { name: '관심 1' }));
+    expect(location()).toContain('personal=watch');
+    expect(sessionStorage.getItem('zoop.stocks.personal-filter')).toBe('watch');
+    expect(screen.getByText('NVIDIA')).toBeTruthy();
+    expect(screen.queryByText('삼성전자')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'NVIDIA 관심 종목' }));
+    expect(document.activeElement).toBe(
+      screen.getByLabelText('기업명·영문명·티커 검색'),
+    );
   });
 
   test('내 종목의 기업 정보 조회가 실패하면 빈 목록 대신 오류와 재시도를 제공한다', async () => {

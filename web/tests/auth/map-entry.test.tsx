@@ -30,10 +30,20 @@ function open(entry = '/?mode=all&select=node%3AKRX%3A005930') {
           <Route index element={<p>시장 지도</p>} />
         </Route>
         <Route path="/login" element={<LoginTarget />} />
+        <Route path="/onboarding" element={<p>초기 설정</p>} />
       </Routes>
     </MemoryRouter>,
   );
 }
+it('redirects an incomplete member to onboarding', () => {
+  vi.mocked(useAuth).mockReturnValue({
+    ...useAuth(),
+    isAuthenticated: true,
+    onboardingCompleted: false,
+  });
+  open('/');
+  expect(screen.getByText('초기 설정')).toBeTruthy();
+});
 it.each(['member', 'guest'])(
   'keeps a confirmed %s session on the map at the service root',
   (kind) => {

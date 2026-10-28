@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { logout } from '@/apis/auth/auth';
+import { ApiError, call } from '@/apis/auth/ApiService';
 import GraphIcon from '@/components/graph/GraphIcon';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -15,13 +16,13 @@ export default function AccountMenu() {
       <Link
         to="/login"
         className="relationship-user min-h-11 min-w-11 justify-center"
-        aria-label="로그인"
+        aria-label={auth.isGuest ? '비회원 체험 중 · 로그인' : '로그인'}
         title="로그인"
       >
         <span>
           <GraphIcon name="user" />
         </span>
-        로그인
+        {auth.isGuest ? '비회원 체험 중 · 로그인' : '로그인'}
       </Link>
     );
   return (
@@ -41,6 +42,7 @@ function MemberAccountMenu({
   revision: number;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const action = useRef<HTMLButtonElement>(null);
@@ -48,7 +50,10 @@ function MemberAccountMenu({
   const locked = useRef(false);
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
+  const [linking, setLinking] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const socialResult = new URLSearchParams(location.search).get('social');
   const menuId = useId();
   const tooltipId = useId();
   useEffect(() => {
@@ -91,6 +96,44 @@ function MemberAccountMenu({
       if (active.current) setPending(false);
     }
   }
+  async function linkSocial(provider: 'google' | 'kakao') {
+    if (locked.current || useAuthStore.getState().sessionRevision !== revision)
+      return;
+    locked.current = true;
+    setPending(true);
+    setLinking(true);
+    setLinkError(null);
+    try {
+      const result = await call<{ authorizationUrl: string }>(
+        `/api/v1/auth/social/${provider}/link/authorize`,
+        'POST',
+        { returnTo: '/' },
+      );
+      if (useAuthStore.getState().sessionRevision !== revision) return;
+      const url = new URL(result.authorizationUrl);
+      const host =
+        provider === 'google' ? 'accounts.google.com' : 'kauth.kakao.com';
+      if (url.protocol !== 'https:' || url.hostname !== host)
+        throw new Error('Invalid authorization URL');
+      window.location.assign(url.href);
+    } catch (error) {
+      if (
+        active.current &&
+        useAuthStore.getState().sessionRevision === revision
+      )
+        setLinkError(
+          error instanceof ApiError && error.status === 409
+            ? '계정을 연결하지 못했어요. 연결된 계정을 확인해 주세요.'
+            : '계정 연결을 시작하지 못했어요. 다시 시도해 주세요.',
+        );
+    } finally {
+      locked.current = false;
+      if (active.current) {
+        setPending(false);
+        setLinking(false);
+      }
+    }
+  }
   return (
     <div
       ref={root}
@@ -102,6 +145,30 @@ function MemberAccountMenu({
         if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
       }}
       onKeyDown={(event) => {
+        if (
+          open &&
+          event.target !== trigger.current &&
+          ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)
+        ) {
+          const items = [
+            ...(root.current?.querySelectorAll<HTMLButtonElement>(
+              '[role="menuitem"]:not(:disabled)',
+            ) ?? []),
+          ];
+          const index = items.indexOf(
+            document.activeElement as HTMLButtonElement,
+          );
+          const target =
+            event.key === 'Home'
+              ? 0
+              : event.key === 'End'
+                ? items.length - 1
+                : event.key === 'ArrowDown'
+                  ? (index + 1) % items.length
+                  : (index - 1 + items.length) % items.length;
+          event.preventDefault();
+          items[target]?.focus();
+        }
         if (event.key === 'Escape' && open) {
           event.preventDefault();
           event.stopPropagation();
@@ -158,6 +225,20 @@ function MemberAccountMenu({
             </p>
           </div>
           <div id={menuId} role="menu" aria-label="계정 메뉴" className="p-1">
+            {(['google', 'kakao'] as const).map((provider) => (
+              <button
+                key={provider}
+                type="button"
+                role="menuitem"
+                disabled={pending}
+                className="flex min-h-11 w-full items-center rounded-panel px-3 text-left text-xs hover:bg-panel-soft focus-visible:outline-2 disabled:opacity-60"
+                onClick={() => void linkSocial(provider)}
+              >
+                {provider === 'google'
+                  ? 'Google 계정 연결'
+                  : '카카오 계정 연결'}
+              </button>
+            ))}
             <button
               ref={action}
               type="button"
@@ -166,17 +247,8 @@ function MemberAccountMenu({
               aria-busy={pending}
               className="flex min-h-11 w-full cursor-pointer items-center rounded-panel px-3 text-left text-xs hover:bg-panel-soft focus-visible:bg-panel-soft focus-visible:outline-2 focus-visible:outline-panel-ink disabled:cursor-progress disabled:opacity-60"
               onClick={() => void signOut()}
-              onKeyDown={(event) => {
-                if (
-                  ['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)
-                ) {
-                  event.preventDefault();
-                  event.currentTarget.focus();
-                }
-                if (event.key === 'Tab') setOpen(false);
-              }}
             >
-              {pending
+              {pending && !linking
                 ? '로그아웃하고 있어요'
                 : failed
                   ? '로그아웃 다시 시도'
@@ -192,7 +264,30 @@ function MemberAccountMenu({
               주세요.
             </p>
           )}
+          {linkError && (
+            <p role="alert" className="px-4 pb-3 text-xs text-zoop-alert">
+              {linkError}
+            </p>
+          )}
         </div>
+      )}
+      {socialResult === 'linked' && (
+        <p
+          role="status"
+          className="absolute right-0 w-64 bg-zoop-paper p-2 text-xs"
+        >
+          소셜 계정을 연결했어요.
+        </p>
+      )}
+      {(socialResult === 'failed' || socialResult === 'cancelled') && (
+        <p
+          role="status"
+          className="absolute right-0 w-64 bg-zoop-paper p-2 text-xs"
+        >
+          {socialResult === 'cancelled'
+            ? '계정 연결을 취소했어요.'
+            : '계정을 연결하지 못했어요. 다시 시도해 주세요.'}
+        </p>
       )}
     </div>
   );

@@ -40,6 +40,14 @@ function matches(row: CompanyBrief, query: string) {
   );
 }
 
+function rememberedPersonalFilter() {
+  try {
+    return sessionStorage.getItem('zoop.stocks.personal-filter');
+  } catch {
+    return null;
+  }
+}
+
 // D-STK-01 종목 (FS037·FS027)
 // - 상단 메뉴 [종목]: 들어오면 전체 종목을 이름순으로 보여 주고, 기업명·영문명·티커로 명시적 검색한다.
 // - 검색어(q)와 범위(scope)는 주소에 남겨 상세에서 돌아와도 그대로 보인다.
@@ -50,6 +58,14 @@ export default function StocksPage() {
   const [params, setParams] = useSearchParams();
   const query = params.get('q') ?? '';
   const scope: StockScope = params.get('scope') === 'mine' ? 'mine' : 'all';
+  const requestedPersonal =
+    params.get('personal') ?? rememberedPersonalFilter();
+  const personal =
+    requestedPersonal === 'held'
+      ? 'held'
+      : requestedPersonal === 'watch'
+        ? 'watch'
+        : 'all';
   const { checking, isAuthenticated } = useAuth();
 
   // 주소의 검색어가 바뀌면(뒤로 가기 포함) 입력칸도 맞춘다.
@@ -190,6 +206,17 @@ export default function StocksPage() {
       setLoginNeeded(true);
       return;
     }
+    if (
+      scope === 'mine' &&
+      watchedIds.has(row.id) &&
+      (personal === 'watch' || !heldIds.has(row.id))
+    ) {
+      const active = document.activeElement;
+      const next = active
+        ?.closest('li')
+        ?.nextElementSibling?.querySelector<HTMLElement>('a');
+      (next ?? document.getElementById('stock-search'))?.focus();
+    }
     // 내 종목에 바로 보이도록 행 정보를 남겨 둔다.
     if (!briefs[row.id])
       setBriefs((previous) => ({ ...previous, [row.id]: row }));
@@ -209,6 +236,7 @@ export default function StocksPage() {
     const nextParams = new URLSearchParams();
     if (next) nextParams.set('q', next);
     if (scope === 'mine') nextParams.set('scope', 'mine');
+    if (personal !== 'all') nextParams.set('personal', personal);
     setParams(nextParams);
   };
 
@@ -216,6 +244,7 @@ export default function StocksPage() {
     const nextParams = new URLSearchParams();
     if (query) nextParams.set('q', query);
     if (next === 'mine') nextParams.set('scope', 'mine');
+    if (personal !== 'all') nextParams.set('personal', personal);
     setParams(nextParams, { replace: true });
   };
 
@@ -227,7 +256,16 @@ export default function StocksPage() {
     (!isAuthenticated ||
       (settings.status === 'success' && portfolio.status === 'success'));
 
-  const rows = scope === 'mine' ? mineRows : allRows.map(toBrief);
+  const rows =
+    scope === 'mine'
+      ? mineRows.filter(
+          (row) =>
+            personal === 'all' ||
+            (personal === 'held'
+              ? heldIds.has(row.id)
+              : watchedIds.has(row.id)),
+        )
+      : allRows.map(toBrief);
   const listLoading =
     scope === 'mine'
       ? isAuthenticated &&
@@ -273,6 +311,58 @@ export default function StocksPage() {
           </button>
         ))}
       </div>
+
+      {scope === 'mine' &&
+        isAuthenticated &&
+        !memberDataFailed &&
+        !mineFailed &&
+        !listLoading && (
+          <div
+            role="group"
+            aria-label="내 종목 필터"
+            className="mt-3 flex gap-2"
+          >
+            {(
+              [
+                ['all', '전체'],
+                ['held', '보유'],
+                ['watch', '관심'],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={personal === value}
+                className="rounded-panel border border-zoop-line px-3 py-2 text-xs aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper"
+                onClick={() => {
+                  const next = new URLSearchParams(params);
+                  try {
+                    sessionStorage.setItem(
+                      'zoop.stocks.personal-filter',
+                      value,
+                    );
+                  } catch {
+                    // The URL still keeps the selection when storage is unavailable.
+                  }
+                  if (value === 'all') next.delete('personal');
+                  else next.set('personal', value);
+                  setParams(next, { replace: true });
+                }}
+              >
+                {label}{' '}
+                {
+                  mineRows.filter(
+                    (row) =>
+                      value === 'all' ||
+                      (value === 'held'
+                        ? heldIds.has(row.id)
+                        : watchedIds.has(row.id)),
+                  ).length
+                }
+              </button>
+            ))}
+          </div>
+        )}
 
       {loginNeeded && !isAuthenticated && (
         <p
@@ -327,9 +417,13 @@ export default function StocksPage() {
       ) : rows.length === 0 ? (
         <p className="mt-5 rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-wash p-[18px] text-[11px] leading-relaxed text-zoop-muted">
           {scope === 'mine'
-            ? query
-              ? `'${query}'에 맞는 보유·관심 종목이 없어요.`
-              : '보유·관심 종목이 없어요. 시장 전체에서 ☆로 관심 종목을 추가해 보세요.'
+            ? personal === 'held'
+              ? '표시할 보유 종목이 없어요.'
+              : personal === 'watch'
+                ? '표시할 관심 종목이 없어요.'
+                : query
+                  ? `'${query}'에 맞는 보유·관심 종목이 없어요.`
+                  : '보유·관심 종목이 없어요. 시장 전체에서 ☆로 관심 종목을 추가해 보세요.'
             : query
               ? `'${query}' 검색 결과가 없어요.`
               : '표시할 종목이 없어요.'}

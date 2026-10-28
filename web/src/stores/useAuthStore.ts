@@ -10,6 +10,7 @@ function resetPrivateState() {
   useAiChatStore.getState().reset();
   try {
     sessionStorage.removeItem('zoop.graph.personal-filter');
+    sessionStorage.removeItem('zoop.stocks.personal-filter');
     sessionStorage.removeItem('oauth_state');
   } catch {
     /* cookie sessions work without browser storage */
