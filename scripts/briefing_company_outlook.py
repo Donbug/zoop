@@ -96,6 +96,7 @@ def verification_schema(frozen):
 def assess(client,frozen,initial_repair=None):
     attempts=[]
     for attempt in range(2):
+        if getattr(client, 'usage', None) is not None: client.usage.retry(attempt)
         data={'frozen':frozen,'repair':attempts[-1] if attempts else initial_repair};schema=generation_schema(frozen)
         digest=client.request_digest('company_outlook_generation',data,'generation.md','unused',8000,schema)
         draft=client.call('company_outlook_generation',data,'generation.md','unused',8000,schema)
