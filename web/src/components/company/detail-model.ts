@@ -120,8 +120,7 @@ export function impactEdges(
 ): string[] {
   if (
     !impact ||
-    impact.pathStatus !== 'available' ||
-    !impact.edgeId ||
+    impact.pathStatus !== 'direct_available' ||
     !impact.steps.some(
       (step) => step.id === impact.companyId && step.kind === 'company',
     ) ||
@@ -139,21 +138,16 @@ export function impactEdges(
     Date.parse(impact.metadata.asOf) !== Date.parse(graph.metadata.asOf)
   )
     return [];
-  const edge = graph.edges.find((candidate) => candidate.id === impact.edgeId);
-  const expectedRelation =
-    impact.pathType === 'direct'
-      ? 'INVOLVES'
-      : impact.pathType === 'structural'
-        ? 'STRUCTURALLY_RELATED_TO'
-        : null;
-  return edge &&
-    !edge.derived &&
-    edge.evidenceIds.length > 0 &&
-    edge.relationType === expectedRelation &&
-    edge.source === impact.issueId &&
-    edge.target === impact.companyId
-    ? [edge.id]
-    : [];
+  const evidenceIds = new Set(impact.steps.flatMap((step) => step.evidenceIds));
+  const edge = graph.edges.find(
+    (candidate) =>
+      !candidate.derived &&
+      candidate.relationType === 'INVOLVES' &&
+      candidate.source === impact.issueId &&
+      candidate.target === impact.companyId &&
+      [...evidenceIds].every((id) => candidate.evidenceIds.includes(id)),
+  );
+  return edge ? [edge.id] : [];
 }
 export const safeHref = (value: string | null) =>
   value && /^https?:\/\//i.test(value) ? value : undefined;
