@@ -16,6 +16,9 @@ export type CompanyOutlook = {
   reading?: {
     status: 'PASS' | 'WITHHELD';
     resultVersion: string;
+    schemaVersion?: 'zoop-company-reading-v2';
+    fact?: CompanyStatement;
+    background?: CompanyStatement;
     brief?: CompanyStatement;
     watch?: CompanyStatement;
     change?: CompanyStatement;

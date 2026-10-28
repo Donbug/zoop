@@ -17,8 +17,20 @@ final class BriefingCompanySchemas {
         if ("verification".equals(phase)) {
             fields.set("supported", StrictJson.newObject().put("type", "boolean"));
             fields.set("reason", text(700));
+            if ("company_reading_".equals(prefix) && (frozen.has("schemaVersion") && "zoop-company-reading-v2".equals(frozen.string("schemaVersion")))) {
+                ObjectNode quality = StrictJson.newObject();
+                for (String key : List.of("specificity", "newInformation", "continuity", "nonRepetition"))
+                    quality.set(key, StrictJson.newObject().put("type", "boolean"));
+                fields.set("quality", object(quality));
+            }
         } else if ("company_reading_".equals(prefix)) {
-            fields.set("brief", statement(evidence, 70)); fields.set("watch", statement(evidence, 50)); fields.set("change", statement(evidence, 60));
+            if ((frozen.has("schemaVersion") && "zoop-company-reading-v2".equals(frozen.string("schemaVersion")))) {
+                fields.set("brief", statement(evidence, 140)); fields.set("fact", statement(evidence, 160));
+                fields.set("watch", statement(evidence, 180)); fields.set("background", statement(evidence, 240));
+                fields.set("change", statement(evidence, 180));
+            } else {
+                fields.set("brief", statement(evidence, 70)); fields.set("watch", statement(evidence, 50)); fields.set("change", statement(evidence, 60));
+            }
         } else {
             ObjectNode s = statement(evidence, 420);
             fields.set("assessment", choice(List.of("positive", "negative", "mixed", "watch")));

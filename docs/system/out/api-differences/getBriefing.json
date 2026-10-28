@@ -389,6 +389,22 @@
     "response:200:application/json.companyOutlooks.companies[].reading": {
       "type": "object"
     },
+    "response:200:application/json.companyOutlooks.companies[].reading.background": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.background.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.background.evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].reading.background.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.background.text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.background.text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].reading.background:required": false,
     "response:200:application/json.companyOutlooks.companies[].reading.brief": {
       "type": "object"
     },
@@ -421,10 +437,33 @@
     },
     "response:200:application/json.companyOutlooks.companies[].reading.change.text:required": true,
     "response:200:application/json.companyOutlooks.companies[].reading.change:required": false,
+    "response:200:application/json.companyOutlooks.companies[].reading.fact": {
+      "type": "object"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.fact.evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.fact.evidenceIds:required": true,
+    "response:200:application/json.companyOutlooks.companies[].reading.fact.evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.fact.text": {
+      "type": "string"
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.fact.text:required": true,
+    "response:200:application/json.companyOutlooks.companies[].reading.fact:required": false,
     "response:200:application/json.companyOutlooks.companies[].reading.resultVersion": {
       "type": "string"
     },
     "response:200:application/json.companyOutlooks.companies[].reading.resultVersion:required": true,
+    "response:200:application/json.companyOutlooks.companies[].reading.schemaVersion": {
+      "type": "string",
+      "enum": [
+        "zoop-company-reading-v2"
+      ]
+    },
+    "response:200:application/json.companyOutlooks.companies[].reading.schemaVersion:required": false,
     "response:200:application/json.companyOutlooks.companies[].reading.status": {
       "type": "string",
       "enum": [

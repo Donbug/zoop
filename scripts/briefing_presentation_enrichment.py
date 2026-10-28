@@ -64,7 +64,7 @@ def run(args):
     base.private_dir(output)
     base.write_once(output / "base-presentation-bundle.json", raw)
     # Recovery validation retains its own base, editorial review and immutable calls.
-    for name in ("base-bundle-v2.json", "grouped-issues.json", "editorial-review-holds.json"):
+    for name in ("base-bundle-v2.json", "grouped-issues.json", "editorial-review-holds.json", "publication-companies.json"):
         if (baseline / name).exists():
             base.write_once(output / name, base.regular(baseline / name))
     base.private_dir(output / "calls")
@@ -75,7 +75,13 @@ def run(args):
         for path in sorted((cached / "market" / folder).glob("*")):
             if path.is_file():
                 base.write_once(output / "market" / folder / path.name, base.regular(path))
-    receipts, calls = market.fetch_receipts(output, offline_only)
+    urls=None
+    if bundle.get('roundSeries'):
+        from datetime import date,timedelta
+        series=bundle['roundSeries']['rounds']
+        urls=market.provider_urls((date.fromisoformat(series[0]['date'])-timedelta(days=10)).isoformat(),
+                                  (date.fromisoformat(series[-1]['date'])+timedelta(days=1)).isoformat())
+    receipts, calls = market.fetch_receipts(output, offline_only, urls)
     if calls:
         raise base.ReplayError("presentation_must_not_fetch")
     original = {r["roundId"]: r for r in bundle["rounds"]}

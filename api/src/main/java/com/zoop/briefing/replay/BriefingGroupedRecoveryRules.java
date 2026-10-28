@@ -52,7 +52,7 @@ final class BriefingGroupedRecoveryRules {
         for (String name : names) require(Canonical.sha256(resource(name)).equals(prompts.string(name)), "prompt_digest");
         Map<String, StrictJson.Obj> rounds = new LinkedHashMap<>();
         for (StrictJson.Obj round : layer.objects("rounds")) require(rounds.putIfAbsent(round.string("roundId"), round) == null, "duplicate_round");
-        require(rounds.size() == 14, "fourteen_rounds");
+        roundCoverage(bundle, rounds.keySet());
         Map<String, JsonNode> receipts = new LinkedHashMap<>(); Map<String, Recording> recordings = new LinkedHashMap<>();
         for (StrictJson.Obj receipt : layer.objects("receipts")) {
             String digest = receipt.string("requestDigest");
@@ -72,6 +72,14 @@ final class BriefingGroupedRecoveryRules {
             }
         }
         return new Layer(bytes, editorial, layer, rounds, receipts, recordings);
+    }
+
+    static void roundCoverage(StrictJson.Obj bundle, Set<String> recovered) {
+        Set<String> expected = new HashSet<>();
+        for (StrictJson.Obj round : bundle.objects("rounds"))
+            require(expected.add(round.string("roundId")), "duplicate_base_round");
+        int count = bundle.has("roundSeries") ? bundle.object("roundSeries").objects("rounds").size() : 14;
+        require(count >= 1 && count <= 14 && expected.size() == count && recovered.equals(expected), "round_coverage");
     }
 
     static void validate(Layer layer, StrictJson.Obj bundle, Path output) {

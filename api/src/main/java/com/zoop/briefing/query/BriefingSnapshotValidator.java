@@ -109,11 +109,16 @@ final class BriefingSnapshotValidator {
             choice(field(company, "comparison"), "status", Set.of("updated", "compared", "unavailable"));
             if (company.has("reading")) {
                 JsonNode reading = object(field(company, "reading")); text(reading, "resultVersion");
+                String schema = reading.has("schemaVersion") ? text(reading, "schemaVersion") : "zoop-company-reading-v1";
+                check(Set.of("zoop-company-reading-v1", "zoop-company-reading-v2").contains(schema));
+                boolean v2 = "zoop-company-reading-v2".equals(schema);
                 if ("PASS".equals(choice(reading, "status", Set.of("PASS", "WITHHELD")))) {
-                    for (String field : java.util.List.of("brief", "watch", "change")) {
+                    for (String field : v2 ? java.util.List.of("brief", "fact", "watch", "background", "change") : java.util.List.of("brief", "watch", "change")) {
                         companyStatement(field(reading, field), ownSources);
                         String value = text(field(reading, field), "text");
-                        check(value.codePointCount(0, value.length()) <= switch (field) { case "brief" -> 70; case "watch" -> 50; default -> 60; });
+                        int limit = v2 ? switch (field) { case "brief" -> 140; case "fact" -> 160; case "background" -> 240; default -> 180; }
+                                : switch (field) { case "brief" -> 70; case "watch" -> 50; default -> 60; };
+                        check(value.codePointCount(0, value.length()) <= limit);
                     }
                 }
             }
