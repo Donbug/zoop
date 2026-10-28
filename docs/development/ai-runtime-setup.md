@@ -165,7 +165,7 @@ ai/worker/.venv/bin/python ai/worker/scripts/native_jev_smoke.py
 | `chat-router` | 네이티브 Jev `/systemone`, `ZOOP_AI_CHAT_JEV_MODEL=jev-1.14.0` | 요구별 Q01~Q08·연결 기능·투자 판단 Noul | 4초 |
 | `chat-answer` | OpenAI 호환 `chat/completions`, `ZOOP_AI_CHAT_ANSWER_MODEL`은 정확히 `gpt-6-luna`, `_REASONING_EFFORT`는 `high`(생략 시 `high`, 다른 값 거절) | 엄격 JSON 구간별 답변 | 25초 |
 | `chat-verification` | 네이티브 Jev `/systemone` | 근거 구간 지지 Choice, 모든 구간 투자 판단 Noul | 6초 |
-| `chat-agent` | OpenAI 호환 `responses`, `ZOOP_AI_CHAT_AGENT_MODEL`은 정확히 `gpt-6-luna`, `_REASONING_EFFORT`는 `medium`(생략 시 `medium`, 다른 값 거절), `store=true` | ZOOP MCP 도구(`require_approval=always`) 한 단계: 승인 요청에서 멈추거나 `chat-answer`와 같은 schema의 최종 답변. 승인은 앱이 결정하고 다음 단계(`continuation`)로 전달 | 30초 |
+| `chat-agent` | OpenAI 호환 `responses`, `ZOOP_AI_CHAT_AGENT_MODEL`은 정확히 `gpt-6-luna`, `_REASONING_EFFORT`는 `medium`(생략 시 `medium`, 다른 값 거절), `store=true`, MCP 서버 URL은 운영자 설정 `ZOOP_AI_CHAT_MCP_SERVER_URL`만(HTTPS·기본 포트·userinfo/query/fragment 없음, 요청으로 지정 불가, 없으면 live 송신 안 함), grant는 MCP 도구의 `authorization`으로 매 단계 전송 | ZOOP MCP 도구(`require_approval=always`) 한 단계: 승인 요청에서 멈추거나 `chat-answer`와 같은 schema의 최종 답변. 승인은 앱이 결정하고 다음 단계(`continuation`)로 전달 | 30초 |
 
 - **게이트·예산**: `ZOOP_AI_CHAT_LIVE_ENABLED=1`과 양수 `ZOOP_AI_CHAT_MAX_CALLS`가 모두 있어야 live 송신. 상한은 세 stage가 공유하며 `chat.sqlite3`의 live 송신 건수로 센다. 없으면 `chat_live_disabled`로 아무것도 보내지 않는다. key는 생성 `ZOOP_AI_API_KEY`, Jev `TYPESAFE_API_KEY`이며 각 key는 자기 endpoint에만 간다.
 - **원장 우선·멱등·응답 불명**: `invocationId`(작업·시도·stage)당 한 번만 보낸다.
