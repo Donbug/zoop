@@ -1,6 +1,8 @@
 # ZOOP AI 챗봇 부분 답변 분기와 근거 부족 안내 설계
 
-2026-10-27 참조 갱신: 이 문서의 기준 코드·미채택 대안은 당시 기록이다. 현재 검색 목표는 [Q02~Q08 보조 웹 검색](ai-chatbot-web-search.md)이며 Q03 내부 0건에만 제한하지 않는다. 사전 계획 또는 기존 1회 보충 라운드에 배치하고 실행 장애는 근거 부족이 아닌 ChatFailure로 처리한다. 미채택 일반 지식 대체안을 다시 채택한 것은 아니다.
+2026-10-28 목표 계약: 이 문서의 main `3eba73af` 분석과 미채택 대안은 당시 기록으로 보존한다. 최신 목표는 [Luna MCP 실행 계약](ai-chatbot-mcp-actions.md)의 `answerStatus=complete|partial|guidance`와 `notices[]`다. 보조 웹 검색의 timeout·unavailable·0건만으로 전체 job을 실패시키지 않으며, 검증된 답을 유지하고 웹 장애 notice와 실제 미충족 요구 limitation을 구분한다. 인증·권한·grant·스키마·출력 검증 실패는 이 예외에 포함하지 않는다.
+
+이 문서에서 “PARTIAL 미지원”, “도구 실패는 전체 failed”, “독립 coverage-verifier”라고 적힌 부분은 현행 코드 또는 과거 설계 설명이며 v0.11 목표로 사용하지 않는다. 구현 전까지 공개 API에 새 필드를 먼저 추가하지 않는다.
 
 문서 상태: 1부 구현됨 · 2부(일반 지식 대체 경로) 검토 후 미채택 · 근거 부족 안내 개선(12장) 구현됨 — 2026-10-26, 브랜치 `feat/chat-partial-answer-fallback`
 
@@ -222,10 +224,10 @@ Luna가 배경으로 쓸 내용이 없다고 판단하면 배경 하위 요구�
 | P4 | 하위 요구 구간 검사 실패 시 구간만 뺄지(3.1) | 권장대로 구현: 구간만 뺌. 투자 권유와 Jev `prohibitedAdvice=yes`는 실행 전체 실패 유지 |
 | P5 | 2부 적용 유형 | 해당 없음(2부 미채택) |
 
-## 11. 범위 밖(별도 작업)
+## 11. 당시 범위 밖(현재 v0.11에서 재설계)
 
 - 사건(issue)을 지목한 질문의 `issue.read` 기본 조회. 기업 지목 때의 `company.read` 기본 조회(`ChatPlanner.java:158-167`)와 같은 규칙으로 따로 낸다. → 2026-10-27 별도 작업으로 구현([구현 계획](../development/ai-chatbot-implementation-plan.md) 사건 지목 결정 (5)·(6)).
-- 분리된 Luna `coverage-verifier`와 보충 라운드. 보조 웹 검색은 사전 계획 또는 보충 라운드를 쓰고, 이 설계는 보충 라운드 없이 동작한다.
+- 분리된 Luna `coverage-verifier`는 채택하지 않는다. Luna Responses 실행 중 요구 추적과 서버 결정론 커버리지 검사로 대체한다.
 
 ## 12. 근거 부족 안내 개선 (구현됨)
 
