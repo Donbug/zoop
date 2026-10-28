@@ -83,13 +83,13 @@ MCP 호출도 `chat_tool_calls`에 기존 호출과 같은 상태(예약 → 실
 
 ## 4. agent 경로 (단계 3)
 
-`zoop.chat.mcp.agent-enabled=true`(`ZOOP_CHAT_AGENT_ENABLED`)이고 `/mcp`, 챗봇 모델 단계(`zoop.ai.chat-client.enabled`)가 모두 있을 때만 `ChatMcpAgent`가 등록된다. 하나라도 없으면 기동을 거절한다. 공급자가 이 엔드포인트에 닿는 HTTPS 주소는 Java가 보내지 않고 AI runtime 운영자 설정 `ZOOP_AI_CHAT_MCP_SERVER_URL`로만 정한다(요청으로 지정 불가: grant가 다른 호스트로 가지 않게).
+`zoop.chat.mcp.agent-enabled=true`(`ZOOP_CHAT_AGENT_ENABLED`)이고 `/mcp`, 챗봇 모델 단계(`zoop.ai.chat-client.enabled`)가 모두 있을 때만 `ChatMcpAgent`가 등록된다. 하나라도 없으면 기동을 거절한다(`/mcp`가 꺼진 채 agent만 켜도 `ChatAgentFlagCheck`가 거절해 direct 경로로 조용히 떨어지지 않는다). 공급자가 이 엔드포인트에 닿는 HTTPS 주소는 Java가 보내지 않고 AI runtime 운영자 설정 `ZOOP_AI_CHAT_MCP_SERVER_URL`로만 정한다(요청으로 지정 불가: grant가 다른 호스트로 가지 않게).
 
 **어느 run이 타는가.** 라우터·계획은 그대로다. 계획의 읽기가 모두 **독립 1단계 읽기**이고 그 기능이 모두 MCP로 노출될 때만 agent 경로다. Q07 본인 범위(server-only `portfolio.scope.read` 선행), 의존 단계·체크포인트가 있는 계획, 읽기가 없는 계획(일반 개념·제한만)은 기존 direct 경로(서버가 읽고 Luna는 쓰기만)다.
 
 **흐름.**
 1. Java가 run의 grant 토큰을 발급하고 `chat-agent` 1단계를 부른다. 요구마다 planner가 해석한 대상 ID(`targets`)를 넘기고, 허용 도구는 계획의 기능만이다.
-2. 단계가 `approval_required`로 멈추면 Java가 요청마다 결정한다. **run의 허용 도구이고 `ChatMcpTools.approve`가 예약에 성공한 호출만 승인**하고 나머지는 거부한다. 결정을 continuation(`previous_response_id`)으로 보내면 공급자가 승인된 호출만 `/mcp`로 실행한다.
+2. 단계가 `approval_required`로 멈추면 Java가 요청마다 결정한다. **run의 허용 도구이고, `targets`의 모든 ID가 도달 가능하며, `ChatMcpTools.approve`가 예약에 성공한 호출만 승인**하고 나머지는 거부한다. 도달 가능한 ID는 첫 라운드엔 요구의 해석된 `targets`, 다음 라운드부터는 거기에 이전에 승인·실행된 결과의 항목·기업·경로 양끝·단계·근거 ID를 더한 서버 소유 목록이다. `targets`가 없는 호출(고정 문서, 버전 비교 전체 그래프)은 인자 검사만 거친다. 프롬프트의 "ID를 추측하지 않는다"와 공급자의 `allowed_tools`는 서버 검사를 대신하지 않는다. 결정을 continuation(`previous_response_id`)으로 보내면 공급자가 승인된 호출만 `/mcp`로 실행한다.
 3. 승인 라운드는 최대 3회. 다음 단계 하나만 할 시간이 남거나 라운드를 다 쓰면 남은 요청을 모두 거부해 그 단계가 답을 쓰게 한다. 그 뒤에도 묻는 run은 실패한 모델 단계다.
 4. 최종 답은 **실행된 호출의 결과로** 검사한다. `/mcp`는 성공 호출의 결과 봉투를 모델에 보낸 것과 같은 JSON으로 `chat_tool_calls.result`(jsonb, 256 KiB 이하, migration `V20261028140000`)에 남기고, Java는 그 결과로 branch를 만들어 기존 결정론 검사·인용·Jev 검증·결과 생성을 그대로 거친다. 어느 인스턴스가 `/mcp` 호출을 받았든 같은 PostgreSQL에서 읽는다. 결과는 run의 요구들이 공유한다(승인 요청에 요구 ID가 아직 없다).
 
@@ -113,8 +113,8 @@ MCP 호출도 `chat_tool_calls`에 기존 호출과 같은 상태(예약 → 실
 - `ChatMcpGrantsTest`: 발급·검증, 변조·잘림·다른 키, deadline 만료, 키 회전, subject scope(회원별 차이, 평문 회원 ID 없음), `portfolio.scope.read` 거부, 키 설정 오류(값 비노출).
 - `ChatMcpEndpointTest`: 실제 SDK servlet transport·server와 메모리 job 저장소로 401/403/413/429(헤더 공백 변형도 같은 창), `initialize`, grant별 `tools/list`, 승인된 호출 1회 실행과 원장 기록(`via=mcp`), 미승인·다른 target·다른 limit·재사용 거부, 다른 attempt·다른 subject·종료된 run 무조회, 승인 시 호출 상한, `result_too_large`의 원장 실패 기록.
 - `ChatExecutorPostgresTest`(PostgreSQL): `attach`와 fence, 예약 호출 조회(`findReservedToolCall`)의 기능·digest·attempt 일치와 시작 뒤 소멸, `chat_tool_calls.result` 보관(성공만)과 크기·상태 제약.
-- `ChatMcpConfigurationTest`: 기본 꺼짐이면 bean·경로 없음, 켜고 키가 없으면 기동 거절, 키가 있으면 `/mcp` 등록, agent 경로의 모델 단계 요구.
-- `ChatMcpAgentTest`: 실제 MCP 도구 위의 승인 루프. 승인된 호출만 실행되고 결과가 원장에서 돌아옴, 예약 불가·허용 밖 도구 거부, 3라운드 뒤 마무리 거부와 끝없이 묻는 run의 실패, 시간 부족 시 마무리, 종료된 run에서 중단, grant의 도구·만료.
+- `ChatMcpConfigurationTest`: 기본 꺼짐이면 bean·경로 없음, 켜고 키가 없으면 기동 거절, 키가 있으면 `/mcp` 등록, agent 경로의 모델 단계 요구, `/mcp` 없이 agent만 켜면 기동 거절.
+- `ChatMcpAgentTest`: 실제 MCP 도구 위의 승인 루프. 승인된 호출만 실행되고 결과가 원장에서 돌아옴, 예약 불가·허용 밖 도구 거부, 해석되지도 승인 결과에 나오지도 않은 target·섞인 target·잘못된 모양 거부와 승인 결과로 도달한 target 승인, 3라운드 뒤 마무리 거부와 끝없이 묻는 run의 실패, 시간 부족 시 마무리, 종료된 run에서 중단, grant의 도구·만료.
 - `ChatAgentPathEngineTest`(orchestrator): agent 경로를 타는 계획과 direct에 남는 계획(의존 단계·일반 개념·노출 안 된 도구), 실행 결과에 없는 근거 인용의 `validation_failed`, 단계 시간 부족의 `deadline_guard`.
 
 모두 합성 job·합성 도구·scripted 모델이며 모델·네트워크·실제 데이터를 쓰지 않는다. 실제 OpenAI 런타임과의 상호 운용은 승인된 소량 live 시험에서 확인한다.
