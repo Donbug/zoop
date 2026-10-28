@@ -255,8 +255,8 @@
     **Agent steps.** Every MCP tool call of a `chat-agent` run is held for the application (`require_approval=always`), and the runtime never approves anything. A step
     ends `approval_required` (the held calls, no answer) or `completed` (the final answer). The application decides each request, reserves the calls it approves on its
     own ledger and resumes the stored response (`continuation.previousResponseId`, so the provider stores responses) with its decisions in a NEW step with its own
-    invocation id. The input carries the application's job-scoped MCP grant token; the runtime sends it only to the provider and keeps it out of every identity
-    and stored answer.
+    invocation id. The input carries the application's job-scoped MCP grant token; the runtime sends it only to the provider, as the MCP tool's `authorization`,
+    and keeps it out of every identity and stored answer. The MCP server URL is never part of a request: it is the operator's `ZOOP_AI_CHAT_MCP_SERVER_URL`.
 
     **Once per invocation.** `invocationId` (equal to `Idempotency-Key`) names one stage of one attempt. The runtime sends it at most once: the same id and input
     return the stored outcome, another input under the same id is the stage failure `invocation_conflict`, and a request whose outcome is unknown stays `unknown`.
@@ -7937,7 +7937,6 @@
                         "label": "SK하이닉스 최근 사건"
                         "general": false
                     "mcp":
-                      "serverUrl": "https://api.zoop.example/mcp"
                       "authorization": "zmcp1.k1.synthetic-grant-token.synthetic-mac"
                       "allowedTools":
                         - "company_read"

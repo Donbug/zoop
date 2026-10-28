@@ -202,9 +202,9 @@ class AgentRequirement(Wire):
 
 
 class McpConnection(Wire):
-    """The ZOOP MCP server the provider's runtime calls for this run: its HTTPS URL, the job-scoped grant token the server
-    issued (the bearer of every MCP request; this runtime never stores or logs it) and the tools the run may use."""
-    server_url: str = Field(pattern=r"^https://\S{1,2040}$")
+    """The run's access to the ZOOP MCP server: the job-scoped grant token the application issued (sent as the MCP tool's
+    `authorization` on every request; this runtime never stores or logs it) and the tools the run may use. The server's URL is
+    no part of a request: it is the operator's `ZOOP_AI_CHAT_MCP_SERVER_URL`, so no caller can send the grant elsewhere."""
     authorization: str = Field(min_length=16, max_length=4096, pattern=r"^[A-Za-z0-9._-]+$")
     allowed_tools: list[str] = Field(min_length=1, max_length=MAX_AGENT_TOOLS)
 

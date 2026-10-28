@@ -4,9 +4,9 @@ One step is one Responses request (ZOOP-AIG-001 v0.11 6.3, MCP actions contract 
 
 - the first step sends the turns and requirements; a continuation resumes the stored response (`previous_response_id`, so
   `store=true`) with the application's approval decisions as `mcp_approval_response` items;
-- the ZOOP MCP server is the only tool, with the application's grant token as its bearer, the application's `allowed_tools` and
-  `require_approval=always`: the provider holds every tool call until the application decides, and this runtime only relays
-  those decisions;
+- the ZOOP MCP server is the only tool: the operator's server URL (never one a request names), the application's grant token
+  as the tool's `authorization` on every step, the application's `allowed_tools` and `require_approval=always`: the provider
+  holds every tool call until the application decides, and this runtime only relays those decisions;
 - a step ends at approval requests (no answer) or with one final structured answer (the same `ChatAnswer` schema as
   `chat-answer`); anything else is a definite failure. The application checks every cited evidence id against the tool calls it
   approved and ran, so this runtime checks only the shape, the requirement ids and the citation budget.
@@ -20,6 +20,7 @@ import copy
 import json
 import re
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import ValidationError
 
@@ -58,20 +59,39 @@ def schema() -> dict[str, Any]:
     return ChatAnswer.model_json_schema(by_alias=True)
 
 
-def _tool(payload: AgentInput) -> dict[str, Any]:
-    return {"type": "mcp", "server_label": SERVER_LABEL, "server_url": payload.mcp.server_url,
-            "headers": {"Authorization": "Bearer " + payload.mcp.authorization},
+def server_url(value: str) -> str:
+    """The operator's ZOOP MCP server URL (`ZOOP_AI_CHAT_MCP_SERVER_URL`) in canonical form, or ValueError: an HTTPS URL on the
+    default port with a host and a path, and no user info, query or fragment. Only this URL ever receives a run's grant."""
+    text = value.strip()
+    if not text or len(text) > 2048 or any(ch.isspace() for ch in text):
+        raise ValueError("mcp_server_url_invalid")
+    parts = urlsplit(text)
+    try:
+        port = parts.port
+    except ValueError:
+        raise ValueError("mcp_server_url_invalid") from None
+    if (parts.scheme.lower() != "https" or not parts.hostname or parts.username is not None or parts.password is not None
+            or "@" in parts.netloc or port not in (None, 443) or parts.query or parts.fragment or "?" in text or "#" in text
+            or not parts.path.startswith("/")):
+        raise ValueError("mcp_server_url_invalid")
+    return urlunsplit(("https", parts.hostname.lower(), parts.path, "", ""))
+
+
+def _tool(payload: AgentInput, url: str) -> dict[str, Any]:
+    # The grant goes in the MCP tool's own `authorization` (the raw token, no scheme prefix). The provider does not keep it in
+    # the stored response, so every step, continuations included, sends it again.
+    return {"type": "mcp", "server_label": SERVER_LABEL, "server_url": url, "authorization": payload.mcp.authorization,
             "allowed_tools": list(payload.mcp.allowed_tools), "require_approval": "always"}
 
 
-def build_request(payload: AgentInput, model: str, reasoning_effort: str | None) -> dict[str, Any]:
-    """The exact Responses body of one step. Instructions, tools and the answer format are sent on every step: a continuation
-    does not inherit them from the stored response."""
+def build_request(payload: AgentInput, model: str, reasoning_effort: str | None, url: str) -> dict[str, Any]:
+    """The exact Responses body of one step to the server at `url` (the canonical operator URL). Instructions, tools with their
+    authorization and the answer format are sent on every step: a continuation does not inherit them."""
     request: dict[str, Any] = {
         "model": model,
         "store": True,
         "instructions": PROMPT,
-        "tools": [_tool(payload)],
+        "tools": [_tool(payload, url)],
         "text": {"format": {"type": "json_schema", "name": "chat_answer", "strict": True, "schema": schema()}},
     }
     if reasoning_effort is not None:

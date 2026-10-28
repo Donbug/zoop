@@ -60,13 +60,18 @@ class ChatStageConfig:
     reasoning_effort: str | None
     prompt_version: str
     mode: str
+    # A live agent step's ZOOP MCP server: the operator's canonical URL (`ZOOP_AI_CHAT_MCP_SERVER_URL`); None otherwise.
+    mcp_server_url: str | None = None
 
     def recipient(self) -> str:
         return self.provider if self.mode == "replay" else f"{self.provider}:{self.provider_revision}"
 
     def wire(self) -> dict[str, Any]:
-        return {"provider": self.provider, "providerRevision": self.provider_revision, "model": self.model,
+        wire = {"provider": self.provider, "providerRevision": self.provider_revision, "model": self.model,
                 "reasoningEffort": self.reasoning_effort, "promptVersion": self.prompt_version}
+        if self.mcp_server_url is not None:
+            wire["mcpServerUrl"] = self.mcp_server_url
+        return wire
 
 
 def _prompt_version(stage: str) -> str:
@@ -91,7 +96,17 @@ def stage_config(stage: str, mode: str, env: dict[str, str] | None = None) -> Ch
         effort = env.get(effort_key, "").strip() or module.REASONING_EFFORT
         if effort != module.REASONING_EFFORT:
             raise ProviderError("reasoning_effort_unsupported")
-        return ChatStageConfig(LUNA, digest({"endpoint": base}), model, effort, _prompt_version(stage), mode)
+        server = None
+        if stage == "chat-agent":
+            # The only host a run's grant may reach: set by the operator, never taken from a request.
+            configured = env.get("ZOOP_AI_CHAT_MCP_SERVER_URL", "").strip()
+            if not configured:
+                raise ProviderError("mcp_server_url_required")
+            try:
+                server = chat_agent.server_url(configured)
+            except ValueError:
+                raise ProviderError("mcp_server_url_invalid") from None
+        return ChatStageConfig(LUNA, digest({"endpoint": base}), model, effort, _prompt_version(stage), mode, server)
     base = env.get("TYPESAFE_BASE_URL", "").strip() or NATIVE_DEFAULT_BASE_URL
     validate_base_url(base)
     if "/systemone" in base:
@@ -266,7 +281,9 @@ def provider_body(request: StageRequest, config: ChatStageConfig) -> tuple[str, 
     if request.stage == "chat-answer":
         return "chat/completions", chat_luna.build_request(parsed, config.model, config.reasoning_effort)
     if request.stage == "chat-agent":
-        return "responses", chat_agent.build_request(parsed, config.model, config.reasoning_effort)
+        if config.mcp_server_url is None:
+            raise ProviderError("mcp_server_url_required")
+        return "responses", chat_agent.build_request(parsed, config.model, config.reasoning_effort, config.mcp_server_url)
     if request.stage == "chat-router":
         return "systemone", chat_jev.build_router_request(parsed, config.model)
     return "systemone", chat_jev.build_verification_request(parsed, config.model)

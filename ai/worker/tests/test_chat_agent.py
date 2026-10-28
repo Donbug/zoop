@@ -17,16 +17,16 @@ from zoop_ai.provider import ProviderError
 
 EV1 = "ev-" + "1" * 64
 TOKEN = "zmcp1.k1.eyJqb2IiOiJqb2ItMSJ9.c2lnbmF0dXJlLXN5bnRoZXRpYw"
+URL = "https://api.zoop.example/mcp"
 LIVE = {"ZOOP_AI_CHAT_LIVE_ENABLED": "1", "ZOOP_AI_CHAT_MAX_CALLS": "5", "ZOOP_AI_API_KEY": "luna-key-synthetic",
-        "ZOOP_AI_CHAT_AGENT_MODEL": "gpt-6-luna"}
+        "ZOOP_AI_CHAT_AGENT_MODEL": "gpt-6-luna", "ZOOP_AI_CHAT_MCP_SERVER_URL": URL}
 
 
 def agent_input(**change: Any) -> dict[str, Any]:
     payload = {"turns": [{"text": "SK하이닉스와 삼성전자의 관계와 HBM이 뭔지 알려줘"}],
                "requirements": [{"requirementId": "r1", "label": "SK하이닉스와 삼성전자의 관계", "general": False},
                                 {"requirementId": "r2", "label": "HBM — 개념 설명", "general": True}],
-               "mcp": {"serverUrl": "https://api.zoop.example/mcp", "authorization": TOKEN,
-                       "allowedTools": ["company_read", "graph_path_read"]},
+               "mcp": {"authorization": TOKEN, "allowedTools": ["company_read", "graph_path_read"]},
                "maxCitations": 20}
     payload.update(change)
     return payload
@@ -52,8 +52,8 @@ def approval_response(*requests: tuple[str, str, dict[str, Any]], echo_token: bo
            "usage": {"input_tokens": 900, "output_tokens": 60, "input_tokens_details": {"cached_tokens": 0},
                      "output_tokens_details": {"reasoning_tokens": 40}}}
     if echo_token:
-        raw["tools"] = [{"type": "mcp", "server_label": "zoop", "server_url": "https://api.zoop.example/mcp",
-                         "headers": {"Authorization": "Bearer " + TOKEN}, "require_approval": "always"}]
+        raw["tools"] = [{"type": "mcp", "server_label": "zoop", "server_url": URL, "authorization": TOKEN,
+                         "require_approval": "always"}]
     return raw
 
 
@@ -98,11 +98,11 @@ def run(req: StageRequest, tmp: Path, endpoint: Endpoint | None = None, env: dic
 # ---- request -----------------------------------------------------------------------------------------------------------------
 
 def test_the_first_step_sends_the_question_with_the_zoop_mcp_tool_held_for_approval():
-    body = chat_agent.build_request(AgentInput.model_validate(agent_input()), "gpt-6-luna", "medium")
+    body = chat_agent.build_request(AgentInput.model_validate(agent_input()), "gpt-6-luna", "medium", URL)
     assert body["model"] == "gpt-6-luna" and body["store"] is True and body["reasoning"] == {"effort": "medium"}
     assert body["instructions"] == chat_agent.PROMPT and "previous_response_id" not in body
-    assert body["tools"] == [{"type": "mcp", "server_label": "zoop", "server_url": "https://api.zoop.example/mcp",
-                              "headers": {"Authorization": "Bearer " + TOKEN},
+    # The official remote MCP authentication: the raw grant in the tool's own `authorization`, no headers, no scheme prefix.
+    assert body["tools"] == [{"type": "mcp", "server_label": "zoop", "server_url": URL, "authorization": TOKEN,
                               "allowed_tools": ["company_read", "graph_path_read"], "require_approval": "always"}]
     assert body["text"]["format"]["type"] == "json_schema" and body["text"]["format"]["strict"] is True
     question = json.loads(body["input"][0]["content"])
@@ -113,20 +113,22 @@ def test_the_first_step_sends_the_question_with_the_zoop_mcp_tool_held_for_appro
 
 def test_a_continuation_resumes_the_stored_response_with_only_the_applications_decisions():
     payload = AgentInput.model_validate(agent_input(continuation=continuation(("mcpr_1", True), ("mcpr_2", False))))
-    body = chat_agent.build_request(payload, "gpt-6-luna", "medium")
+    body = chat_agent.build_request(payload, "gpt-6-luna", "medium", URL)
     assert body["previous_response_id"] == "resp_1" and body["store"] is True
     assert body["input"] == [{"type": "mcp_approval_response", "approval_request_id": "mcpr_1", "approve": True},
                              {"type": "mcp_approval_response", "approval_request_id": "mcpr_2", "approve": False}]
-    # Instructions, tools and format are sent again: a continuation does not inherit them.
+    # Instructions, tools with their authorization and format are sent again: a continuation does not inherit them.
     assert body["tools"][0]["require_approval"] == "always" and body["instructions"] == chat_agent.PROMPT
+    assert body["tools"][0]["authorization"] == TOKEN and body["tools"][0]["server_url"] == URL
 
 
 @pytest.mark.parametrize("change", [
-    {"mcp": {"serverUrl": "http://api.zoop.example/mcp", "authorization": TOKEN, "allowedTools": ["company_read"]}},
-    {"mcp": {"serverUrl": "https://api.zoop.example/mcp", "authorization": "short", "allowedTools": ["company_read"]}},
-    {"mcp": {"serverUrl": "https://api.zoop.example/mcp", "authorization": TOKEN, "allowedTools": []}},
-    {"mcp": {"serverUrl": "https://api.zoop.example/mcp", "authorization": TOKEN, "allowedTools": ["company.read"]}},
-    {"mcp": {"serverUrl": "https://api.zoop.example/mcp", "authorization": TOKEN, "allowedTools": ["a", "a"]}},
+    # A caller never names the server: the URL is the operator's setting.
+    {"mcp": {"serverUrl": "https://attacker.example/mcp", "authorization": TOKEN, "allowedTools": ["company_read"]}},
+    {"mcp": {"authorization": "short", "allowedTools": ["company_read"]}},
+    {"mcp": {"authorization": TOKEN, "allowedTools": []}},
+    {"mcp": {"authorization": TOKEN, "allowedTools": ["company.read"]}},
+    {"mcp": {"authorization": TOKEN, "allowedTools": ["a", "a"]}},
     {"continuation": {"previousResponseId": "resp_1", "decisions": []}},
     {"continuation": continuation(("mcpr_1", True), ("mcpr_1", False))},
     {"requirements": [{"requirementId": "r1", "label": "a", "general": False},
@@ -162,7 +164,7 @@ def test_a_step_that_stops_at_approval_requests_relays_them_and_never_stores_the
         {"approvalRequestId": "mcpr_2", "toolName": "graph_path_read", "arguments": {"targets": ["KRX:000660", "KRX:005930"]}}]
     path, body, authorization = endpoint.calls[0]
     assert path.endswith("/responses") and authorization == "Bearer luna-key-synthetic"
-    assert body["tools"][0]["headers"] == {"Authorization": "Bearer " + TOKEN}
+    assert body["tools"][0]["authorization"] == TOKEN and body["tools"][0]["server_url"] == URL
     assert result.receipt.model == "gpt-6-luna-2026-09-01" and result.receipt.usage.reasoning_tokens == 40
     assert result.receipt.usage.input_tokens == 900 and result.receipt.usage.cached_tokens == 0
 
@@ -276,6 +278,37 @@ def test_an_authored_replay_step_matches_its_input_whatever_the_token(tmp_path):
 def test_redaction_keeps_everything_but_echoed_credentials():
     raw = approval_response(("mcpr_1", "company_read", {}))
     kept = chat_agent.redact(raw)
-    assert kept["tools"][0]["headers"] == chat_agent.REDACTED and kept["output"] == raw["output"]
-    assert raw["tools"][0]["headers"] == {"Authorization": "Bearer " + TOKEN}, "the original is not changed"
+    assert kept["tools"][0]["authorization"] == chat_agent.REDACTED and kept["output"] == raw["output"]
+    assert raw["tools"][0]["authorization"] == TOKEN, "the original is not changed"
     assert chat_agent.redact({"choices": []}) == {"choices": []}
+
+
+@pytest.mark.parametrize("url", [
+    "http://api.zoop.example/mcp", "https://user:pw@api.zoop.example/mcp", "https://api.zoop.example@attacker.example/mcp",
+    "https://api.zoop.example/mcp?next=https://attacker.example", "https://api.zoop.example/mcp#x",
+    "https://api.zoop.example:8443/mcp", "https://api.zoop.example", "https:///mcp", "https://api.zoop.example/m cp", "",
+])
+def test_only_a_plain_https_operator_url_is_a_server_url(url):
+    with pytest.raises(ValueError):
+        chat_agent.server_url(url)
+
+
+def test_the_server_url_is_canonical():
+    assert chat_agent.server_url(" HTTPS://API.Zoop.Example:443/mcp ") == "https://api.zoop.example/mcp"
+
+
+@pytest.mark.parametrize("env, code", [
+    ({k: v for k, v in LIVE.items() if k != "ZOOP_AI_CHAT_MCP_SERVER_URL"}, "mcp_server_url_required"),
+    ({**LIVE, "ZOOP_AI_CHAT_MCP_SERVER_URL": "https://attacker.example/mcp?x=1"}, "mcp_server_url_invalid"),
+])
+def test_a_live_step_without_a_valid_operator_url_sends_nothing(tmp_path, env, code):
+    endpoint = Endpoint()
+    result = run(request(agent_input()), tmp_path, endpoint, env)
+    assert result.failure.code == code and not result.failure.sent and not endpoint.calls
+
+
+def test_the_operator_url_is_part_of_the_live_configuration():
+    config = stage_config("chat-agent", "live", LIVE)
+    assert config.mcp_server_url == URL and config.wire()["mcpServerUrl"] == URL
+    assert "mcpServerUrl" not in stage_config("chat-answer", "live", {**LIVE, "ZOOP_AI_CHAT_ANSWER_MODEL": "gpt-6-luna"}).wire()
+    assert stage_config("chat-agent", "replay").mcp_server_url is None
