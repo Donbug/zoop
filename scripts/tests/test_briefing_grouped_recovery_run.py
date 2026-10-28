@@ -138,5 +138,22 @@ class RecoveryProcessBudgetTest(unittest.TestCase):
                         if child.pid and child.is_alive():child.terminate();child.join()
 
 
+class EditorialPreflightTest(unittest.TestCase):
+    def test_hold_requires_the_same_authorization_and_fixed_evidence_before_calls(self):
+        hold={'roundId':'r','issueId':'i','code':'PRIOR','reason':'검토한 과거 발표','evidenceIds':['source']}
+        self.assertEqual([hold],run.validate_review({'userInboxRef':'inbox/user','holds':[hold]},'inbox/user'))
+        for review in ({'userInboxRef':'another','holds':[hold]},
+                       {'userInboxRef':'inbox/user','holds':[{**hold,'evidenceIds':[]}]},
+                       {'userInboxRef':'inbox/user','holds':[hold,hold]}):
+            with self.assertRaises(run.sim.ReplayError):run.validate_review(review,'inbox/user')
+
+    def test_resume_keeps_exact_legacy_draft_without_applying_recovery_writer_contract(self):
+        old={'draftOrigin':'base','draft':{'claims':[{'text':'원래 검증된 11억 달러 문장'}]},'draftSourceRequestDigest':'recorded'}
+        fresh=run.clone(old)
+        with patch.object(run.recovery,'validate_item',side_effect=AssertionError('Not a new recovery draft')):
+            run.validate_resume_draft(old,fresh)
+        fresh['draft']['claims'][0]['text']='임의로 바꾼 문장'
+        with self.assertRaisesRegex(run.sim.ReplayError,'base_draft_changed'):run.validate_resume_draft(old,fresh)
+
 if __name__ == "__main__":
     unittest.main()

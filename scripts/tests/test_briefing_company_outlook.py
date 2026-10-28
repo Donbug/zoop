@@ -22,6 +22,12 @@ class CompanyOutlookTest(unittest.TestCase):
     def test_evening_never_uses_yesterdays_or_another_company_judgment(self):
         h=[{'status':'PASS','date':'2026-10-07','edition':'evening','draft':{'companies':[{'companyId':'A'}]}}]
         self.assertEqual('unavailable',c.previous_for('A','2026-10-08','evening',h)['status'])
+    def test_v3_morning_does_not_call_an_older_morning_the_previous_evening(self):
+        row={'status':'PASS','date':'2026-10-22','edition':'morning','roundId':'r','cutoff':'2026-10-22T09:20:00+09:00','resultVersion':'old-am','draft':{'companies':[{'companyId':'A'}]}}
+        self.assertEqual('unavailable',c.previous_for('A','2026-10-23','morning',[row],strict=True)['status'])
+        row['edition']='evening';row['resultVersion']='exact-pm'
+        self.assertEqual('exact-pm',c.previous_for('A','2026-10-23','morning',[row],strict=True)['resultVersion'])
+
     def test_exact_previous_version_required(self):
         f=self.frozen();f['targets'][0]['previous']={'status':'available','resultVersion':'new'};d=self.draft();d['companies'][0]['comparison'].update(status='updated',previousResultVersion='old')
         with self.assertRaisesRegex(ValueError,'previous_version'): c.validate(d,f)
@@ -42,5 +48,16 @@ class CompanyOutlookTest(unittest.TestCase):
         c.validate(self.draft(),self.frozen())
         d=self.draft();d['companies'][0]['conditions']=[]
         with self.assertRaises(c.base.ReplayError): c.validate(d,self.frozen())
+
+    def test_v4_selected_only_presentation_cannot_invent_background_sources(self):
+        source={'documentId':'d','evidenceId':'a','bodySha256':'a'*64,'quote':'A가 계약 이행을 계획한다.',
+                'publishedAt':'2026-10-22T17:00:00+09:00'}
+        row={'roundId':'r','date':'2026-10-22','edition':'evening','marketEnrichment':{'cutoff':'2026-10-22T17:30:00+09:00'}}
+        effective={'resultSha256':'b'*64,'selected':[{'issueId':'i','companyLinks':[{'companyId':'A','name':'A'}],'sources':[source]}],
+                   'result':{'items':[{'issueId':'i','claims':[{'text':'계약 이행 계획','evidenceIds':['a']}]}]}}
+        frozen=c.freeze(row,effective,{'d':{'title':'원문','url':'https://example.com/source'}},[],version='company-outlook-v4')
+        self.assertEqual(['a'],frozen['targets'][0]['sourceIds']);self.assertEqual({'a'},set(frozen['sources']))
+        self.assertEqual('unavailable',frozen['targets'][0]['previous']['status'])
+        self.assertEqual('edition-bound-v2',frozen['comparisonContract'])
 
 if __name__=='__main__': unittest.main()

@@ -45,4 +45,20 @@ class EditorialTests(unittest.TestCase):
         _,c=self.candidate('MATERIAL_UPDATE');v=selection([c]);v['selected'][0]['novelty']='MATERIAL_UPDATE';v['selected'][0]['deltaEvidenceIds']=c['newEvidenceIds']
         with self.assertRaisesRegex(G.ReplayError,'editorial_delta_missing'):G.freeze_grouped_selection(v,[c],'a'*64)
 
+    def test_reviewed_issuer_retrieval_is_opt_in_and_preserves_cutoff(self):
+        a,c=self.candidate()
+        spec={'window':{'from':'2026-10-07T09:20:00+09:00','to':'2026-10-07T17:30:00+09:00','openStart':False}}
+        cid=next(iter(G._catalog(c)[1]))
+        reports=[{'reportId':'copy-'+str(i),'companyIds':[cid],'availableBefore':'2026-10-06T00:00:00+09:00',
+                  'title':c['title'],'quote':' '.join(e['quote'] for e in G._catalog(c)[0].values())} for i in range(4)]
+        issuer={'reportId':'issuer','companyIds':[cid],'availableBefore':'2026-10-06T00:00:00+09:00',
+                'title':'Earlier release','quote':'Earlier factual background','sourceRole':'issuer_release','reviewStatus':'reviewed'}
+        future={**issuer,'reportId':'future-issuer','availableBefore':'2026-10-07T10:00:00+09:00'}
+        history={'reports':[*reports,issuer,future]}
+        self.assertNotIn('issuer',guard.review_inputs(a,spec,history)['issues'][0]['priorReportIds'])
+        history['retrievalPolicy']='reviewed-issuer-first-v1'
+        related=guard.review_inputs(a,spec,history)['issues'][0]['priorReportIds']
+        self.assertIn('issuer',related);self.assertNotIn('future-issuer',related)
+        self.assertEqual(4,len(related))
+
 if __name__=='__main__':unittest.main()

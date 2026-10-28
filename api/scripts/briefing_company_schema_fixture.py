@@ -15,3 +15,9 @@ for prefix in ('company_outlook_','company_reading_'):
           r.company.generation_schema(frozen) if prefix=='company_outlook_' else r.schema(frozen))
   value={'type':'json_schema','name':prefix+phase,'strict':True,'schema':schema}
   (output/(prefix+phase+'.json')).write_bytes(r.base.canonical(value))
+
+frozen['schemaVersion'] = r.SCHEMA_V2
+(output/'frozen-v2.json').write_bytes(r.base.canonical(frozen))
+for phase in ('generation','verification'):
+ schema = r.schema(frozen) if phase == 'generation' else r.verification_schema(frozen)
+ (output/('company_reading_v2_'+phase+'.json')).write_bytes(r.base.canonical({'type':'json_schema','name':'company_reading_'+phase,'strict':True,'schema':schema}))

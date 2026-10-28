@@ -14,6 +14,7 @@ class BriefingReview303Test {
         assertEquals(14,BriefingCompanyOutlookRules.rows(StrictJson.Obj.of(layer),14).size());
         assertThrows(IllegalArgumentException.class,()->BriefingCompanyOutlookRules.rows(StrictJson.Obj.of(layer)));
         layer.put("schemaVersion",BriefingCompanyReadingRules.SCHEMA);
+        for(var row:rounds)((ObjectNode)row).putObject("frozen").put("schemaVersion",BriefingCompanyReadingRules.SCHEMA);
         assertEquals(14,BriefingCompanyReadingRules.rows(StrictJson.Obj.of(layer),14).size());
         assertThrows(IllegalArgumentException.class,()->BriefingCompanyReadingRules.rows(StrictJson.Obj.of(layer)));
         rounds.addObject().put("roundId","round-15").put("cutoff",Instant.EPOCH.plusSeconds(16).toString());
