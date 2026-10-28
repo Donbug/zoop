@@ -13,6 +13,7 @@ import com.zoop.chat.dto.ChatFailure;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.repository.ChatJobRow;
 import com.zoop.chat.repository.ChatToolCallEnd;
+import com.zoop.chat.tool.ChatToolRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
@@ -259,7 +260,7 @@ class ChatJobExecutorTest {
     }
 
     private static ChatToolCallReservation reservation(String capability) {
-        return new ChatToolCallReservation("chat-tools/v1", "zoop-core-read", capability, "app:" + capability,
+        return new ChatToolCallReservation(ChatToolRegistry.VERSION, "zoop-core-read", capability, "app:" + capability,
                 "chat-tool/v1", "0".repeat(64), "{}");
     }
 

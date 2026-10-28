@@ -31,12 +31,12 @@
 
 ## 화면·목표 API
 
-[D-COM-02](screen-D-COM-02.md) · [M-COM-01](screen-M-COM-01.md) · [D-SEN-01](screen-D-SEN-01.md) · [D-BRF-01](screen-D-BRF-01.md) · [D-BRF-02](screen-D-BRF-02.md) · [M-BRF-01](screen-M-BRF-01.md) · [D-SEN-02](screen-D-SEN-02.md) · [D-AI-01](screen-D-AI-01.md) · [M-AI-01](screen-M-AI-01.md) · [D-AI-02b](screen-D-AI-02b.md) · [D-AI-01b](screen-D-AI-01b.md) · [D-AI-02](screen-D-AI-02.md) · [D-COM-01](screen-D-COM-01.md) · [D-GRP-06](screen-D-GRP-06.md) · [D-GRP-05](screen-D-GRP-05.md) · [D-COM-01b](screen-D-COM-01b.md) · [D-COM-04](screen-D-COM-04.md) · [D-COM-05](screen-D-COM-05.md) · [D-COM-06](screen-D-COM-06.md)
+[D-COM-02](screen-D-COM-02.md) · [M-COM-01](screen-M-COM-01.md) · [D-SEN-01](screen-D-SEN-01.md) · [D-BRF-01](screen-D-BRF-01.md) · [D-BRF-02](screen-D-BRF-02.md) · [M-BRF-01](screen-M-BRF-01.md) · [D-SEN-02](screen-D-SEN-02.md) · [D-AI-02](screen-D-AI-02.md) · [D-AI-01](screen-D-AI-01.md) · [M-AI-01](screen-M-AI-01.md) · [D-AI-02b](screen-D-AI-02b.md) · [D-AI-01b](screen-D-AI-01b.md) · [D-COM-01](screen-D-COM-01.md) · [D-GRP-06](screen-D-GRP-06.md) · [D-GRP-05](screen-D-GRP-05.md) · [D-COM-01b](screen-D-COM-01b.md) · [D-COM-04](screen-D-COM-04.md) · [D-COM-05](screen-D-COM-05.md) · [D-COM-06](screen-D-COM-06.md)
 
 | 도메인 | 연결 작업 수 | 작업 목록 |
 | --- | --- | --- |
 | companies | 4 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | briefings | 3 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
-| chat | 7 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
+| chat | 9 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 
 작업별 FS/NFS 역링크와 전체 연결은 API 명세서 및 xlsx 추적표에 보존한다.

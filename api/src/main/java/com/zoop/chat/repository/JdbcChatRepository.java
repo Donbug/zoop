@@ -71,6 +71,32 @@ public class JdbcChatRepository implements ChatRepository {
     }
 
     @Override
+    public List<ChatSessionSummaryRow> sessions(String memberId, Instant afterUpdatedAt, String afterId, int limit) {
+        var parameters = new MapSqlParameterSource("memberId", memberId).addValue("limit", limit);
+        String after = "";
+        if (afterUpdatedAt != null) {
+            after = " AND (s.updated_at, s.id) < (:afterAt, :afterId)";
+            parameters.addValue("afterAt", Timestamp.from(afterUpdatedAt)).addValue("afterId", afterId);
+        }
+        return jdbc.query("""
+                SELECT s.id, s.created_at, s.updated_at, f.question, c.jobs
+                  FROM chat_sessions s
+                  JOIN LATERAL (SELECT j.question FROM chat_jobs j WHERE j.session_id = s.id ORDER BY j.seq LIMIT 1) f
+                       ON true
+                  JOIN LATERAL (SELECT count(*)::integer AS jobs FROM chat_jobs j WHERE j.session_id = s.id) c ON true
+                 WHERE s.member_id = :memberId%s
+                 ORDER BY s.updated_at DESC, s.id DESC
+                 LIMIT :limit
+                """.formatted(after), parameters, (rs, index) -> new ChatSessionSummaryRow(rs.getString("id"), instant(rs, "created_at"),
+                instant(rs, "updated_at"), rs.getString("question"), rs.getInt("jobs")));
+    }
+
+    @Override
+    public boolean deleteSession(String sessionId) {
+        return jdbc.update("DELETE FROM chat_sessions WHERE id = :id", new MapSqlParameterSource("id", sessionId)) == 1;
+    }
+
+    @Override
     public int countJobs(String sessionId) {
         Integer count = jdbc.queryForObject("SELECT count(*) FROM chat_jobs WHERE session_id = :id",
                 new MapSqlParameterSource("id", sessionId), Integer.class);

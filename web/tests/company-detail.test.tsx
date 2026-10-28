@@ -127,7 +127,7 @@ const graph: GraphResponse = {
       relationType: 'INVOLVES',
       role: null,
       summary: '합성 관계',
-      assertionStatus: 'confirmed',
+      assertionStatus: 'occurred',
       derived: false,
       via: [],
       evidenceIds: ['ev-a'],
@@ -230,10 +230,37 @@ beforeEach(() => {
     json({
       ...events[0],
       id: r.params.id,
+      period: null,
+      companies: [
+        {
+          id,
+          name: '합성 기업',
+          role: null,
+          roleUnconfirmed: true,
+          relationType: 'INVOLVES',
+        },
+      ],
       articles: [],
       relations: [],
       evidenceIds: ['ev-a'],
-      metadata: { ...metadata, asOf: r.query.get('asOf') ?? time },
+      summary: { status: 'unavailable', reason: 'fixture summary unavailable' },
+      mentions: [],
+      sourceSupport: {
+        articleCount: 0,
+        knownLineageCount: null,
+        unknownLineageArticles: [],
+        independentSourceCount: null,
+        duplicateGroups: [],
+      },
+      fieldDecisions: [],
+      follows: { previous: [], next: [] },
+      approval: null,
+      metadata: {
+        ...metadata,
+        requestId: 'synthetic',
+        failures: [],
+        asOf: r.query.get('asOf') ?? time,
+      },
     }),
   );
   server.on('GET', '/api/v1/companies/:id/graph', (r) =>
@@ -246,6 +273,9 @@ beforeEach(() => {
     json({
       companyId: id,
       issueId: r.params.issueId,
+      pathStatus: 'available',
+      pathType: 'direct',
+      edgeId: 'edge-a',
       steps: [
         {
           id: 'issue-a',
@@ -255,6 +285,8 @@ beforeEach(() => {
         },
         { id, kind: 'company', reason: '연결 기업', evidenceIds: ['ev-a'] },
       ],
+      businessPath: null,
+      impact: { status: 'unavailable', reason: 'not_recorded', results: [] },
       metadata: { ...metadata, asOf: r.query.get('asOf') ?? time },
     }),
   );
@@ -578,6 +610,27 @@ test('event map link opens the event-time map; round trip restores period, time,
     `/companies/${encodeURIComponent(id)}${query}`,
   );
 });
+test('FS044 · D-COM-06 / M-COM-02: unavailable event-time graph keeps return route without futile impact retry', async () => {
+  server.on('GET', '/api/v1/companies/:id/issues/:issueId/impact', () =>
+    apiError(409, 'VERSION_UNAVAILABLE'),
+  );
+  const query = `${pinned}&period=1m&tab=events&event=issue-a&bucket=2026-10-05`;
+  open(query);
+  await screen.findByRole('heading', { name: '합성 사건 A' });
+  await userEvent.click(
+    screen.getByRole('link', { name: '이 사건 시점의 관계를 지도에서 보기' }),
+  );
+  await screen.findByText(/사건 시점의 그래프 버전을 사용할 수 없어요/);
+  expect(
+    screen.queryByRole('button', { name: '영향 경로 다시 조회' }),
+  ).toBeNull();
+  await userEvent.click(
+    screen.getByRole('link', { name: '기업 상세로 돌아가기' }),
+  );
+  expect(screen.getByTestId('address').textContent).toBe(
+    `/companies/${encodeURIComponent(id)}${query}`,
+  );
+});
 test('documents and company profile preserve absence and refuse unsafe external links', async () => {
   server.on('GET', '/api/v1/companies/:id/documents', () =>
     json({
@@ -676,6 +729,9 @@ test('buckets follow exact five-minute/hour/day/week resolutions and never inven
   const impact: Impact = {
     companyId: id,
     issueId: 'issue-a',
+    pathStatus: 'available',
+    pathType: 'direct',
+    edgeId: 'edge-a',
     steps: [
       {
         id: 'issue-a',
@@ -685,9 +741,24 @@ test('buckets follow exact five-minute/hour/day/week resolutions and never inven
       },
       { id, kind: 'company', reason: 'confirmed', evidenceIds: ['ev-a'] },
     ],
+    businessPath: null,
+    impact: { status: 'unavailable', reason: 'not_recorded', results: [] },
     metadata,
   };
   expect(impactEdges(graph, impact)).toEqual(['edge-a']);
+  expect(
+    impactEdges(
+      {
+        ...graph,
+        edges: graph.edges.map((edge) => ({
+          ...edge,
+          relationType: 'STRUCTURALLY_RELATED_TO',
+          assertionStatus: null,
+        })),
+      },
+      { ...impact, pathType: 'structural' },
+    ),
+  ).toEqual(['edge-a']);
   expect(
     impactEdges(graph, {
       ...impact,
@@ -869,10 +940,13 @@ test('D-COM-04 version, missing and outage failures are told apart; only outages
   expect(within(region()).queryByRole('img')).toBeNull();
 });
 
-test('unconfirmed business assertions are excluded from actual impact paths', () => {
+test('FS044 edges without published evidence are excluded from actual impact paths', () => {
   const impact: Impact = {
     companyId: id,
     issueId: 'issue-a',
+    pathStatus: 'available',
+    pathType: 'direct',
+    edgeId: 'edge-a',
     steps: [
       {
         id: 'issue-a',
@@ -882,6 +956,8 @@ test('unconfirmed business assertions are excluded from actual impact paths', ()
       },
       { id, kind: 'company', reason: '합성 근거', evidenceIds: ['ev-a'] },
     ],
+    businessPath: null,
+    impact: { status: 'unavailable', reason: 'not_recorded', results: [] },
     metadata,
   };
   expect(
@@ -890,7 +966,7 @@ test('unconfirmed business assertions are excluded from actual impact paths', ()
         ...graph,
         edges: graph.edges.map((edge) => ({
           ...edge,
-          assertionStatus: 'unconfirmed',
+          evidenceIds: [],
         })),
       },
       impact,

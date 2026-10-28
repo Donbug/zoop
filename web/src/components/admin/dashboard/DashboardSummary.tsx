@@ -1,3 +1,4 @@
+import { useAdminRefresh } from '@/hooks/useAdminRefresh';
 import { getAdminDashboard } from '@/apis/admin/dashboard';
 import {
   Empty,
@@ -255,10 +256,26 @@ function Usage({ data }: { data: Dashboard }) {
 // - 상태: 조회 중 · 자료 없음(영역별) · 조회 실패(다시 시도) · 권한 없음. 관리자 세션 만료(401)는 AdminProtectedRoute가 로그인으로 보낸다.
 export default function DashboardSummary() {
   const dashboard = useAsyncData(getAdminDashboard);
+  useAdminRefresh(dashboard.reload, 10000);
   const data = dashboard.data;
   return (
     <div className="flex flex-col gap-6 py-8 text-zoop-ink">
       <PageHeader title="대시보드" />
+      {data && (
+        <p className="text-xs text-zoop-muted">
+          갱신{' '}
+          {new Date(data.generatedAt).toLocaleTimeString('ko-KR', {
+            timeZone: 'Asia/Seoul',
+            hour12: false,
+          })}{' '}
+          · 10초마다 자동 갱신
+        </p>
+      )}
+      {dashboard.refreshError && (
+        <p role="status" className="text-xs text-zoop-muted">
+          새로 고치지 못했어요. 이전 결과를 표시해요.
+        </p>
+      )}
 
       {dashboard.status === 'loading' && (
         <Loading>대시보드를 불러오고 있어요</Loading>

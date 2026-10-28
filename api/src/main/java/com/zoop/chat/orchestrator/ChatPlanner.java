@@ -9,6 +9,7 @@ import com.zoop.chat.orchestrator.ChatPlan.TargetSource;
 import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatToolRequest;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -36,7 +37,9 @@ import java.util.Set;
  * cite only that evidence. A ZOOP document capability (Q01) always reads its fixed documents, so a requirement that reads
  * only those needs no target and no frozen graph.</li>
  * <li>General knowledge answers a pure Q02 requirement only. A requirement that also asks for a current fact needs a lookup
- * or is {@code out_of_scope}; it never falls back to a general answer.</li>
+ * or is {@code out_of_scope}; it never falls back to a general answer. Its Q02 part is split off as a concept requirement
+ * of the server's own ({@link ChatPlan.Origin#CONCEPT}, id {@code <id>-c}), answered from general knowledge whatever the
+ * fact part finds (partial-answer design, part 1).</li>
  * <li>Before any call: more than 6 explicit requirements, an ambiguity, more than 3 dependent stages or more than 12 calls in
  * the worst case the checkpoints allow end as {@code clarification}. At clarification depth 2 every such stop is
  * {@code guidance} instead (ZOOP-AIG-001 6.3.4).</li>
@@ -44,11 +47,14 @@ import java.util.Set;
  */
 public class ChatPlanner {
     static final double TAKE = 0.70;
-    static final double REVIEW = 0.35;
+    public static final double REVIEW = 0.35;
     static final double ADVICE = 0.10;
     static final int MAX_REQUIREMENTS = 6;
     static final int MAX_STAGES = 3;
     static final int MAX_CHOICES = 6;
+    /** Branches the answer stage takes at most, and the longest requirement id it accepts (zoop-ai-chat-1). */
+    static final int MAX_BRANCHES = 6;
+    static final int MAX_ID = 32;
 
     public ChatPlan plan(ChatRun run, ChatRouteDecision decision, Set<String> bound) {
         validate(decision);
@@ -69,21 +75,49 @@ public class ChatPlanner {
         for (var requirement : kept) {
             Planned p = serve(run, requirement, bound, planned);
             if (p == null) return clarify(run, "ambiguous_target", List.of());
+            if (p.onScope()) {
+                Planned scope = p.scope();
+                planned.put(scope.id(), scope);
+            }
             planned.put(p.id(), p);
         }
         if (planned.values().stream().anyMatch(p -> p.mode() == Mode.TOOLS
                 && p.capabilities().stream().anyMatch(ChatCapability::readsGraph)) && run.graphVersionId() == null) {
             return new ChatPlan.Stop("guidance", "graph_unavailable", List.of());
         }
-        if (planned.values().stream().allMatch(p -> p.mode() == Mode.LIMITED)) {
+        List<Planned> requirements = withConcepts(decision, planned.values());
+        if (requirements.stream().allMatch(p -> p.mode() == Mode.LIMITED)) {
             boolean advice = planned.values().stream().anyMatch(p -> "investment_advice".equals(p.limitation()));
             return new ChatPlan.Stop("guidance", advice ? "investment_advice" : "out_of_scope", List.of());
         }
-        var plan = new ChatPlan.Run(List.copyOf(planned.values()));
+        var plan = new ChatPlan.Run(requirements);
         if (plan.stages() > MAX_STAGES || worstCaseCalls(plan) > ChatRunControl.MAX_TOOL_CALLS) {
             return clarify(run, "plan_over_budget", List.of());
         }
         return plan;
+    }
+
+    /**
+     * The plan with the Q02 part of each router requirement that also asks for something else split off right after it as a
+     * general requirement of its own, so the concept is answered even when the rest finds no evidence or cannot be looked
+     * up. Not for an investment decision, and only while the answer stage has room for one more branch.
+     */
+    private static List<Planned> withConcepts(ChatRouteDecision decision, Collection<Planned> planned) {
+        Set<String> ids = new HashSet<>();
+        decision.requirements().forEach(r -> ids.add(r.id()));
+        long room = MAX_BRANCHES - planned.stream()
+                .filter(p -> p.mode() != Mode.LIMITED && p.origin() != ChatPlan.Origin.SCOPE).count();
+        List<Planned> requirements = new ArrayList<>();
+        for (Planned p : planned) {
+            requirements.add(p);
+            String id = p.id() + Planned.CONCEPT_ID;
+            if (room > 0 && p.mode() != Mode.GENERAL && p.types().contains(ChatQueryType.Q02)
+                    && !"investment_advice".equals(p.limitation()) && id.length() <= MAX_ID && ids.add(id)) {
+                requirements.add(p.concept());
+                room--;
+            }
+        }
+        return List.copyOf(requirements);
     }
 
     /**
@@ -134,8 +168,8 @@ public class ChatPlanner {
 
         if (r.prohibitedAdvice() > ADVICE) return base.limited("investment_advice");
         if (all.isEmpty()) return base.limited("out_of_scope");
-        // A question that names a company asks about that company, not only a concept, once Q03 reaches the review band.
-        if (all.equals(Set.of(ChatQueryType.Q02)) && r.targets().stream().anyMatch(ChatPlanner::companyId)
+        // A question that names a company or an issue asks about it, not only a concept, once Q03 reaches the review band.
+        if (all.equals(Set.of(ChatQueryType.Q02)) && !r.targets().isEmpty()
                 && r.types().getOrDefault(ChatQueryType.Q03, 0.0) >= REVIEW) {
             all.add(ChatQueryType.Q03);
         }
@@ -155,12 +189,20 @@ public class ChatPlanner {
             best(allowed).filter(e -> e.getValue() >= REVIEW)
                     .ifPresent(e -> capabilities.add(ChatCapability.of(e.getKey()).orElseThrow()));
         }
-        // Server defaults for companies the question names (never for a dependent stage), whatever the capability
-        // probabilities: a company fact reads the company, and a relation between two or more of them reads the path.
-        // Each still has to be allowed by the type and bound.
+        // Server defaults for companies and issues the question names (never for a dependent stage), whatever the capability
+        // probabilities: a company fact reads the company, an issue fact reads the issue, and a relation between two or
+        // more companies reads the path. Each still has to be allowed by the type and bound.
         Set<ChatCapability> defaults = EnumSet.noneOf(ChatCapability.class);
         long companies = r.dependsOn() == null ? r.targets().stream().filter(ChatPlanner::companyId).count() : 0;
+        long issues = r.dependsOn() == null ? r.targets().size() - companies : 0;
         if (companies > 0 && all.contains(ChatQueryType.Q03)) defaults.add(ChatCapability.COMPANY_READ);
+        if (issues > 0 && all.contains(ChatQueryType.Q03)) defaults.add(ChatCapability.ISSUE_READ);
+        // A period comparison compares the public graph, with or without a named target.
+        if (r.dependsOn() == null && all.contains(ChatQueryType.Q05)) defaults.add(ChatCapability.GRAPH_VERSION_DIFF);
+        // "My stocks" that names no company reads the member's own companies first, and a company fact reads them.
+        boolean mine = r.dependsOn() == null && r.targets().isEmpty() && all.contains(ChatQueryType.Q07);
+        if (mine) defaults.add(ChatCapability.PORTFOLIO_SCOPE_READ);
+        if (mine && all.contains(ChatQueryType.Q03)) defaults.add(ChatCapability.COMPANY_READ);
         if (companies >= 2 && all.contains(ChatQueryType.Q04)) defaults.add(ChatCapability.GRAPH_PATH_READ);
         for (ChatCapability c : defaults) {
             if (permitted.contains(c) && bound.contains(c.id()) && !capabilities.contains(c)) capabilities.add(c);
@@ -168,6 +210,19 @@ public class ChatPlanner {
         capabilities.sort(Comparator.comparing(ChatCapability::id));
         // A fact requirement without a lookup it may make is out of scope, even when it also asks about a concept.
         if (capabilities.isEmpty()) return base.limited("out_of_scope");
+
+        // Q07: the member's companies come from their own scope, read by the server for the authenticated member. The rest
+        // of the requirement reads on them in the next stage (at least one, at most the fan-out the scope read passes on).
+        if (mine && capabilities.contains(ChatCapability.PORTFOLIO_SCOPE_READ)) {
+            List<ChatCapability> rest = capabilities.stream().filter(c -> c != ChatCapability.PORTFOLIO_SCOPE_READ).toList();
+            if (rest.isEmpty()) {
+                return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities,
+                        ChatCapability.PORTFOLIO_SCOPE_READ.untargeted(), TargetSource.SERVER, null, null, 1);
+            }
+            var scope = new ChatRouteDecision.Dependency(r.id() + Planned.SCOPE_ID, "atLeast", 1);
+            return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, rest, List.of(), TargetSource.DEPENDENCY, null,
+                    scope, 2);
+        }
 
         // ZOOP documents are read whatever the question names, so a requirement that reads only them needs no target.
         if (r.dependsOn() == null && capabilities.stream().noneMatch(c -> c.documents().isEmpty())) {
@@ -186,7 +241,14 @@ public class ChatPlanner {
         // The selected context: its targets, or the selected evidence alone, narrowed to the evidence the member chose.
         var selection = run.selection();
         List<String> targets = !selection.contextIds().isEmpty() ? selection.contextIds() : selection.evidenceIds();
-        if (targets.isEmpty()) return null;
+        if (targets.isEmpty()) {
+            // Reads that can cover the whole public graph ("what changed on the map") need no target.
+            if (capabilities.stream().allMatch(c -> !c.untargeted().isEmpty())) {
+                return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities,
+                        capabilities.getFirst().untargeted(), TargetSource.SERVER, null, null, 1);
+            }
+            return null;
+        }
         List<String> scope = selection.evidenceIds().isEmpty() ? null : selection.evidencePool();
         return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities, targets, TargetSource.CONTEXT, scope,
                 null, 1);

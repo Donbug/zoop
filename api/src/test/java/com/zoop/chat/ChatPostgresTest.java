@@ -16,6 +16,7 @@ import com.zoop.auth.config.MemberCsrfInterceptor;
 import com.zoop.auth.service.AuthOriginPolicy;
 import com.zoop.auth.service.MemberSessionService;
 import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
+import com.zoop.auth.service.MemberSettingsService;
 import com.zoop.auth.service.SessionCookie;
 import com.zoop.chat.controller.ChatController;
 import com.zoop.chat.dto.ChatAnswerSection;
@@ -25,12 +26,17 @@ import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.dto.Citation;
 import com.zoop.chat.dto.GraphTarget;
 import com.zoop.chat.executor.ChatEngine;
+import com.zoop.chat.repository.ChatRepository;
+import com.zoop.chat.repository.ChatSessionSummaryRow;
+import com.zoop.chat.service.ChatMemberScope;
 import com.zoop.chat.service.ChatResponseGuard;
 import com.zoop.chat.service.ChatService;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.exception.GlobalExceptionHandler;
+import com.zoop.common.json.StrictJson;
 import com.zoop.common.request.RequestIdFilter;
+import com.zoop.portfolio.service.PortfolioService;
 import com.zoop.common.response.Metadata;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Tag;
@@ -49,6 +55,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -71,6 +78,10 @@ class ChatPostgresTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired MemberSessionService sessions;
     @Autowired ChatService service;
+    @Autowired ChatRepository repository;
+    @Autowired ChatMemberScope scope;
+    @Autowired MemberSettingsService settings;
+    @Autowired PortfolioService portfolio;
     @Autowired ChatController controller;
     @Autowired ObjectMapper mapper;
 
@@ -265,6 +276,20 @@ class ChatPostgresTest {
         mvc.perform(post("/api/v1/chat/jobs/{id}/cancel", jobId).cookie(cookie).header("Origin", ORIGIN)
                         .header("X-CSRF-Token", issued.response().csrfToken()).header("Idempotency-Key", "cancel-1"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("cancelled"));
+
+        mvc.perform(get("/api/v1/chat/sessions")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/chat/sessions").cookie(cookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(session))
+                .andExpect(jsonPath("$.items[0].title").value("HBM이 뭐야?"))
+                .andExpect(jsonPath("$.nextCursor").isEmpty())
+                .andExpect(jsonPath("$.deleteEnabled").value(false));
+        mvc.perform(delete("/api/v1/chat/sessions/{id}", session).cookie(cookie)).andExpect(status().isForbidden());
+        mvc.perform(delete("/api/v1/chat/sessions/{id}", session).cookie(cookie).header("Origin", ORIGIN)
+                        .header("X-CSRF-Token", issued.response().csrfToken()))
+                .andExpect(status().isNotFound());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM chat_sessions WHERE id = ?", Integer.class, session),
+                "deletion stays off until the policy revision is in force");
     }
 
     @Test
@@ -331,6 +356,135 @@ class ChatPostgresTest {
         } finally {
             jdbc.update("DELETE FROM members WHERE id = ?", memberId);
         }
+    }
+
+    @Test
+    @Transactional
+    void myStocksAreTheHoldingsThenTheWatchlistTheMemberSavedWithCatalogNames() {
+        String memberId = insertMember();
+        var member = new MemberPrincipal(memberId, "chat-scope");
+        assertEquals(List.of(), scope.of(memberId), "nothing saved yet");
+
+        settings.update(member, StrictJson.parseObject("""
+                {"version":1,"investor":false,"mode":"watchlist","watchlistIds":["NASDAQ:NVDA","KRX:005930"],"completed":true}
+                """.getBytes(java.nio.charset.StandardCharsets.UTF_8)).node(), "chat-scope-watch");
+        portfolio.connect(member, "demo-balanced", "chat-scope-connect", "chat-scope-connected");
+
+        var companies = scope.of(memberId);
+        assertEquals(List.of("KRX:005930", "KRX:000660", "NASDAQ:NVDA"),
+                companies.stream().map(ChatMemberScope.Company::id).toList(), "holdings in account order, then the watchlist");
+        assertEquals(List.of("보유·관심", "보유", "관심"), companies.stream().map(ChatMemberScope.Company::relation).toList());
+        assertEquals("삼성전자", companies.getFirst().name());
+        assertEquals(List.of(), scope.of(insertMember()), "another member's are not read");
+    }
+
+    @Test
+    @Transactional
+    void deletingAConversationOrItsMemberKeepsTheChatExecutionLedgerWithoutTheJob() {
+        String memberId = insertMember();
+        String session = insertSession(memberId, Instant.now());
+        String job = insertJob(session, 1, "cancelled", null, 0);
+        String execution = insertExecution(job);
+
+        assertTrue(repository.deleteSession(session));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM chat_jobs WHERE id = ?", Integer.class, job));
+        assertNull(jdbc.queryForObject("SELECT chat_job_id FROM ai_executions WHERE id = ?", String.class, execution),
+                "the execution stays for the cost ledger, without the deleted job");
+        assertFalse(repository.deleteSession(session));
+
+        // A withdrawal deletes the member with every conversation, which a model call no longer blocks.
+        String other = insertSession(memberId, Instant.now());
+        String kept = insertExecution(insertJob(other, 1, "cancelled", null, 0));
+        jdbc.update("DELETE FROM members WHERE id = ?", memberId);
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM chat_sessions WHERE member_id = ?", Integer.class,
+                memberId));
+        assertNull(jdbc.queryForObject("SELECT chat_job_id FROM ai_executions WHERE id = ?", String.class, kept));
+
+        // Executions of the other features still need their owner.
+        assertConstraint(() -> jdbc.update("""
+                INSERT INTO ai_executions (id, feature, execution_mode, status, started_at)
+                VALUES (?, 'briefing', 'live', 'running', now())""", "aix-" + suffix()));
+    }
+
+    @Test
+    @Transactional
+    void aReceiptBackedChatExecutionNeitherBlocksTheDeletionNorBecomesMutable() {
+        String memberId = insertMember();
+        String session = insertSession(memberId, Instant.now());
+        String job = insertJob(session, 1, "cancelled", null, 0);
+        String receipt = insertReceipt();
+        String execution = insertExecution(job, receipt);
+
+        // Still occurrence history: no other change, and no unlinking from a job that exists.
+        assertConstraint(() -> jdbc.update("UPDATE ai_executions SET chat_job_id = NULL WHERE id = ?", execution));
+        assertConstraint(() -> jdbc.update("UPDATE ai_executions SET input_tokens = 1 WHERE id = ?", execution));
+
+        assertTrue(repository.deleteSession(session), "the deletion's own unlinking is the one change it takes");
+        assertNull(jdbc.queryForObject("SELECT chat_job_id FROM ai_executions WHERE id = ?", String.class, execution));
+        assertEquals(receipt, jdbc.queryForObject("SELECT receipt_artifact_id FROM ai_executions WHERE id = ?",
+                String.class, execution));
+        assertConstraint(() -> jdbc.update("UPDATE ai_executions SET input_tokens = 1 WHERE id = ?", execution));
+
+        // A withdrawal with such a row is not blocked either.
+        String other = insertSession(memberId, Instant.now());
+        String kept = insertExecution(insertJob(other, 1, "cancelled", null, 0), insertReceipt());
+        jdbc.update("DELETE FROM members WHERE id = ?", memberId);
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM chat_sessions WHERE member_id = ?", Integer.class,
+                memberId));
+        assertNull(jdbc.queryForObject("SELECT chat_job_id FROM ai_executions WHERE id = ?", String.class, kept));
+    }
+
+    @Test
+    @Transactional
+    void theListHoldsConversationsWithQuestionsLatestFirstAndContinuesAfterAPosition() {
+        String memberId = insertMember();
+        Instant base = Instant.parse("2026-10-27T00:00:00Z");
+        String older = insertSession(memberId, base);
+        insertJob(older, 1, "cancelled", null, 0);
+        String newer = insertSession(memberId, base.plusSeconds(60));
+        insertJob(newer, 1, "cancelled", null, 0);
+        insertJob(newer, 2, "cancelled", null, 0);
+        insertSession(memberId, base.plusSeconds(120));
+        insertSession(insertMember(), base.plusSeconds(180));
+
+        var all = repository.sessions(memberId, null, null, 10);
+        assertEquals(List.of(newer, older), all.stream().map(ChatSessionSummaryRow::id).toList(),
+                "an empty conversation and another member's are not listed");
+        assertEquals(2, all.getFirst().jobs());
+        assertEquals("q", all.getFirst().firstQuestion());
+        assertEquals(List.of(older), repository.sessions(memberId, all.getFirst().updatedAt(), newer, 10).stream()
+                .map(ChatSessionSummaryRow::id).toList());
+        assertEquals(1, repository.sessions(memberId, null, null, 1).size());
+    }
+
+    private String insertSession(String memberId, Instant at) {
+        String session = "conv-" + suffix();
+        jdbc.update("INSERT INTO chat_sessions (id, member_id, created_at, updated_at) VALUES (?, ?, ?, ?)", session,
+                memberId, Timestamp.from(at), Timestamp.from(at));
+        return session;
+    }
+
+    private String insertExecution(String job) {
+        return insertExecution(job, null);
+    }
+
+    private String insertExecution(String job, String receipt) {
+        String id = "aix-" + suffix();
+        jdbc.update("""
+                INSERT INTO ai_executions (id, feature, execution_mode, status, chat_job_id, stage, receipt_artifact_id,
+                                           started_at, finished_at)
+                VALUES (?, 'chatbot', 'live', 'succeeded', ?, 'chat-router', ?, now(), now())""", id, job, receipt);
+        return id;
+    }
+
+    /** An AI call receipt artifact row; the file itself is not needed for the database rules. */
+    private String insertReceipt() {
+        String id = "art-receipt-" + suffix();
+        jdbc.update("""
+                INSERT INTO artifacts (id, kind, storage_uri, sha256, bytes, media_type, created_at)
+                VALUES (?, 'ai_call_receipt', ?, repeat('b', 64), 10, 'application/json', now())""",
+                id, "artifact-root:receipts/" + id + ".json");
+        return id;
     }
 
     private String insertJob(String session, int seq, String status, String resolves, int depth) {

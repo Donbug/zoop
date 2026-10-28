@@ -32,14 +32,93 @@ class ChatPlannerTest {
     }
 
     @Test
-    void aConceptMixedWithACurrentFactNeverFallsBackToGeneralKnowledge() {
+    void aConceptMixedWithACurrentFactNeverFallsBackToGeneralKnowledgeButItsConceptIsSplitOff() {
         var plan = run(planner.plan(run(0, "v1"), decision(
                 req("mixed", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9), Map.of()),
                 req("concept", Map.of(ChatQueryType.Q02, 0.9), Map.of())), BOUND));
+        assertEquals(List.of("mixed", "mixed-c", "concept"), ids(plan));
         assertEquals(Mode.LIMITED, plan.requirements().get(0).mode());
         assertEquals("out_of_scope", plan.requirements().get(0).limitation(),
                 "Q03 needs a lookup; the Q02 part does not make it a general answer");
-        assertEquals(Mode.GENERAL, plan.requirements().get(1).mode());
+        var split = plan.requirements().get(1);
+        assertEquals(Mode.GENERAL, split.mode());
+        assertEquals(ChatPlan.Origin.CONCEPT, split.origin());
+        assertEquals("mixed", split.parent());
+        assertEquals("요구 mixed — 개념 설명", split.label());
+        assertEquals(Set.of(ChatQueryType.Q02), split.types());
+        assertTrue(split.capabilities().isEmpty() && split.targets().isEmpty());
+        assertEquals(Mode.GENERAL, plan.requirements().get(2).mode());
+        assertEquals(ChatPlan.Origin.ROUTER, plan.requirements().get(2).origin(), "a pure concept is not split");
+
+        var alone = planner.plan(run(0, "v1"), decision(
+                req("mixed", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9), Map.of())), BOUND);
+        assertEquals(List.of("mixed", "mixed-c"), ids(run(alone)),
+                "a fact part out of scope no longer turns the whole question into guidance");
+    }
+
+    @Test
+    void aConceptLabelStaysWithinTheAnswerStagesLabelLimitInCodePointsAndItsParentKeepsItsOwn() {
+        int suffix = ChatPlan.Planned.CONCEPT_LABEL.codePointCount(0, ChatPlan.Planned.CONCEPT_LABEL.length());
+        assertEquals(8, suffix);
+        for (int length : List.of(3992, 3993, 4000)) {
+            var parent = planned("가".repeat(length));
+            String label = parent.concept().label();
+            assertEquals(Math.min(length + suffix, 4000), label.codePointCount(0, label.length()), "length " + length);
+            assertTrue(label.endsWith(ChatPlan.Planned.CONCEPT_LABEL));
+            assertEquals(length, parent.label().length(), "the parent's label is never cut");
+        }
+        // Supplementary characters count once each and are never split into a lone surrogate.
+        String wide = "𝐀".repeat(4000);
+        String label = planned(wide).concept().label();
+        assertEquals(4000, label.codePointCount(0, label.length()));
+        assertEquals("𝐀".repeat(3992) + ChatPlan.Planned.CONCEPT_LABEL, label);
+    }
+
+    private static ChatPlan.Planned planned(String label) {
+        return new ChatPlan.Planned("r1", label, Set.of(ChatQueryType.Q02, ChatQueryType.Q03), Mode.TOOLS, null, List.of(),
+                List.of(), ChatPlan.TargetSource.QUESTION, null, null, 1);
+    }
+
+    @Test
+    void aLookupThatAlsoAsksForAConceptRunsAsBeforeWithTheConceptBesideIt() {
+        var plan = run(planner.plan(run(0, "v1"), decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9), List.of("KRX:000660"))), BOUND));
+        assertEquals(List.of("r1", "r1-c"), ids(plan));
+        var lookup = plan.requirements().getFirst();
+        assertEquals(Mode.TOOLS, lookup.mode());
+        assertEquals(List.of(ChatCapability.COMPANY_READ), lookup.capabilities());
+        assertEquals(ChatPlan.Origin.ROUTER, lookup.origin());
+        assertNull(lookup.parent());
+        assertEquals(1, ChatPlanner.worstCaseCalls(plan), "the concept makes no call");
+    }
+
+    @Test
+    void noConceptIsSplitOffAnInvestmentDecisionOrWhenTheAnswerStageHasNoRoom() {
+        var advice = planner.plan(run(0, "v1"), decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9), List.of("KRX:000660")).withAdvice(0.5)), BOUND);
+        assertEquals(new ChatPlan.Stop("guidance", "investment_advice", List.of()), advice);
+
+        List<Req> six = new java.util.ArrayList<>();
+        six.add(req("r0", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
+                List.of("KRX:000660")));
+        for (int i = 1; i < 6; i++) six.add(req("r" + i, Map.of(ChatQueryType.Q02, 0.9), Map.of()));
+        var full = run(planner.plan(run(0, "v1"), decision(six.toArray(Req[]::new)), BOUND));
+        assertEquals(6, full.requirements().size(), "the answer stage takes six branches at most");
+
+        var five = run(planner.plan(run(0, "v1"), decision(six.subList(0, 5).toArray(Req[]::new)), BOUND));
+        assertEquals(List.of("r0", "r0-c", "r1", "r2", "r3", "r4"), ids(five));
+
+        String longId = "r".repeat(31);
+        var tooLong = run(planner.plan(run(0, "v1"), decision(req(longId, Map.of(ChatQueryType.Q02, 0.9,
+                ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of("KRX:000660"))), BOUND));
+        assertEquals(List.of(longId), ids(tooLong), "the split id would pass the 32 characters a requirement id may have");
+
+        var taken = run(planner.plan(run(0, "v1"), decision(
+                req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
+                        List.of("KRX:000660")),
+                req("r1-c", Map.of(ChatQueryType.Q02, 0.9), Map.of())), BOUND));
+        assertEquals(List.of("r1", "r1-c"), ids(taken));
+        assertEquals(ChatPlan.Origin.ROUTER, taken.requirements().get(1).origin(), "a router id is never shadowed");
     }
 
     @Test
@@ -97,10 +176,69 @@ class ChatPlannerTest {
         assertEquals(List.of(ChatCapability.ISSUE_READ), plan.requirements().get(2).capabilities(),
                 "an issue target gets no company read");
 
+        var issue = run(planner.plan(run(0, "v1"), decision(
+                req("named", Map.of(ChatQueryType.Q03, 0.6), Map.of(), List.of("iss-1")),
+                req("both", Map.of(ChatQueryType.Q03, 0.9), Map.of(), List.of("KRX:005930", "iss-1")),
+                req("concept", Map.of(ChatQueryType.Q02, 0.8, ChatQueryType.Q03, 0.4), Map.of(), List.of("iss-1"))), bound));
+        assertEquals(List.of(ChatCapability.ISSUE_READ), issue.requirements().get(0).capabilities(),
+                "a named issue reads the issue even when no capability reached the review band");
+        assertEquals(List.of(ChatCapability.COMPANY_READ, ChatCapability.ISSUE_READ),
+                issue.requirements().get(1).capabilities());
+        assertEquals(ChatPlan.Mode.TOOLS, issue.requirements().get(2).mode(),
+                "a concept question naming an issue is also an issue question");
+
         var unbound = run(planner.plan(run(0, "v1"), decision(req("about", Map.of(ChatQueryType.Q03, 0.9),
                 Map.of("issue.read", 0.9), List.of("KRX:005930"))), Set.of("issue.read")));
         assertEquals(List.of(ChatCapability.ISSUE_READ), unbound.requirements().getFirst().capabilities(),
                 "a default runs only when bound");
+    }
+
+    @Test
+    void aPeriodComparisonReadsTheMapDiffForTheNamedTargetsOrTheWholeMap() {
+        Set<String> bound = Set.of("company.read", "graph.version.diff");
+        var plan = run(planner.plan(run(0, "v1"), decision(
+                req("whole", Map.of(ChatQueryType.Q05, 0.9), Map.of()),
+                req("named", Map.of(ChatQueryType.Q05, 0.8), Map.of("graph.version.diff", 0.2), List.of("KRX:005930"))),
+                bound));
+        var whole = plan.requirements().get(0);
+        assertEquals(List.of(ChatCapability.GRAPH_VERSION_DIFF), whole.capabilities(),
+                "the comparison is read whatever the capability probabilities");
+        assertEquals(List.of(ChatCapability.WHOLE_GRAPH), whole.targets());
+        assertEquals(List.of("KRX:005930"), plan.requirements().get(1).targets());
+
+        assertStop("guidance", "out_of_scope", planner.plan(run(0, "v1"), decision(req("whole",
+                Map.of(ChatQueryType.Q05, 0.9), Map.of())), Set.of("company.read")));
+    }
+
+    @Test
+    void myStocksAreReadFirstFromTheMembersOwnScopeAndTheRestReadsOnThem() {
+        Set<String> bound = Set.of("company.read", "issue.read", "portfolio.scope.read");
+        var plan = run(planner.plan(run(0, "v1"), decision(
+                req("mine", Map.of(ChatQueryType.Q07, 0.9, ChatQueryType.Q03, 0.8), Map.of("issue.read", 0.8))), bound));
+        assertEquals(List.of("mine-s", "mine"), ids(plan));
+        var scope = plan.requirements().get(0);
+        assertEquals(ChatPlan.Origin.SCOPE, scope.origin());
+        assertEquals(List.of(ChatCapability.PORTFOLIO_SCOPE_READ), scope.capabilities());
+        assertEquals(List.of(ChatCapability.MEMBER_SELF), scope.targets());
+        assertEquals(1, scope.stage());
+        var mine = plan.requirements().get(1);
+        assertEquals(List.of(ChatCapability.COMPANY_READ, ChatCapability.ISSUE_READ), mine.capabilities(),
+                "a company fact on the member's companies reads them");
+        assertEquals(new ChatRouteDecision.Dependency("mine-s", "atLeast", 1), mine.dependsOn());
+        assertEquals(2, mine.stage());
+
+        var listOnly = run(planner.plan(run(0, "v1"), decision(req("list", Map.of(ChatQueryType.Q07, 0.9), Map.of())),
+                bound));
+        assertEquals(List.of("list"), ids(listOnly), "listing my stocks is the scope read itself");
+        assertEquals(List.of(ChatCapability.PORTFOLIO_SCOPE_READ), listOnly.requirements().getFirst().capabilities());
+
+        var named = run(planner.plan(run(0, "v1"), decision(req("named", Map.of(ChatQueryType.Q07, 0.9,
+                ChatQueryType.Q03, 0.8), Map.of("company.read", 0.9), List.of("KRX:005930"))), bound));
+        assertEquals(List.of("named"), ids(named), "a named company is read as named");
+        assertEquals(List.of("KRX:005930"), named.requirements().getFirst().targets());
+
+        assertStop("guidance", "out_of_scope", planner.plan(run(0, "v1"), decision(req("unbound",
+                Map.of(ChatQueryType.Q07, 0.9), Map.of())), Set.of("company.read")));
     }
 
     @Test
@@ -110,11 +248,13 @@ class ChatPlannerTest {
         var r = plan.requirements().getFirst();
         assertEquals(ChatPlan.Mode.TOOLS, r.mode());
         assertEquals(List.of(ChatCapability.COMPANY_READ), r.capabilities());
+        assertEquals(List.of("r", "r-c"), ids(plan), "the concept it asked about is still answered");
 
         var concept = run(planner.plan(run(0, "v1"), decision(req("r", Map.of(ChatQueryType.Q02, 0.9,
                 ChatQueryType.Q03, 0.2), Map.of(), List.of("KRX:005930"))), BOUND));
         assertEquals(ChatPlan.Mode.GENERAL, concept.requirements().getFirst().mode(),
                 "below the review band it stays a concept");
+        assertEquals(List.of("r"), ids(concept));
     }
 
     @Test
@@ -122,7 +262,8 @@ class ChatPlannerTest {
         var plan = run(planner.plan(run(0, "v1"), decision(
                 req("advice", Map.of(ChatQueryType.Q02, 0.9), Map.of()).withAdvice(0.2),
                 req("path", Map.of(ChatQueryType.Q04, 0.9), Map.of("graph.path.read", 0.95), List.of("KRX:000660")),
-                req("free", Map.of(ChatQueryType.Q03, 0.9), Map.of("graph.delete", 0.99), List.of("iss-1")),
+                // Q08 has no server default for a named issue, so only the unknown capability is left.
+                req("free", Map.of(ChatQueryType.Q08, 0.9), Map.of("graph.delete", 0.99), List.of("iss-1")),
                 req("concept", Map.of(ChatQueryType.Q02, 0.9), Map.of())), BOUND));
         assertEquals(Arrays.asList("investment_advice", "out_of_scope", "out_of_scope", null),
                 plan.requirements().stream().map(ChatPlan.Planned::limitation).toList(),
@@ -278,6 +419,10 @@ class ChatPlannerTest {
 
     static Req req(String id, Map<ChatQueryType, Double> types, Map<String, Double> capabilities) {
         return req(id, types, capabilities, List.of());
+    }
+
+    static List<String> ids(ChatPlan.Run plan) {
+        return plan.requirements().stream().map(ChatPlan.Planned::id).toList();
     }
 
     static Req req(String id, Map<ChatQueryType, Double> types, Map<String, Double> capabilities, List<String> targets) {

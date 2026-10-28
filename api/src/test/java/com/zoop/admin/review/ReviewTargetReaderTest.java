@@ -27,8 +27,12 @@ class ReviewTargetReaderTest {
                 .map(company -> "{\"companyId\":\"" + company + "\",\"name\":\"n\",\"role\":\"subject\"}")
                 .collect(Collectors.joining(",", "[", "]"));
         return """
-                {"eventCandidateId":"%s","state":"%s","disposition":{"status":"%s"},
-                 "mention":{"title":"t","participants":%s}}""".formatted(id, state, disposition, participants);
+                {"eventCandidateId":"%s","state":"%s","disposition":{"status":"%s","targetEventId":null},
+                 "mention":{"mentionId":"m-1","title":"t","action":"a","target":null,"eventTime":"2026-10-20",
+                  "period":null,"assertionStatus":"announced","background":false,"countries":[],"keywords":[],
+                  "participants":%s},
+                 "citations":[{"documentId":"doc-%s","documentVersion":"%s","start":0,"end":3,"quote":"q"}]}"""
+                .formatted(id, state, disposition, participants, "1".repeat(64), "2".repeat(64));
     }
 
     static String s2(String... events) {
@@ -42,7 +46,9 @@ class ReviewTargetReaderTest {
     static String relation(String id, String type, String subject, String object, String status, String revision) {
         return """
                 {"relationCandidateId":"%s","sourceRevision":"%s","type":"%s","subject":%s,"object":%s,
-                 "eligibility":{"status":"%s"}}""".formatted(id, revision, type, subject, object, status);
+                 "eligibility":{"status":"%s","reasons":[{"code":"claim_%s"}]},
+                 "citations":[{"documentId":"doc-%s","documentVersion":"%s","start":0,"end":2,"quote":"r"}]}"""
+                .formatted(id, revision, type, subject, object, status, status, "1".repeat(64), "2".repeat(64));
     }
 
     static String s3(String... relations) {
@@ -68,10 +74,27 @@ class ReviewTargetReaderTest {
         assertEquals(List.of("NV", "SK", "SS"), candidate.companyIds(), "participants and relation companies");
         assertEquals(List.of("PARTICIPATES_IN"), candidate.relationTypes());
         assertEquals("3", candidate.sourceRevision(), "the sum of its relations' revisions");
-        assertEquals(new Row("relation", rel('2'), EVENT_A, "HOLD", List.of("SS"), List.of("PARTICIPATES_IN"), "2"),
-                rows.get("relation:" + rel('2')));
+        Row hold = rows.get("relation:" + rel('2'));
+        assertEquals(List.of(EVENT_A, "HOLD", List.of("SS"), List.of("PARTICIPATES_IN"), "2"),
+                List.of(hold.candidateId(), hold.status(), hold.companyIds(), hold.relationTypes(), hold.sourceRevision()));
         assertEquals("ALLOW", rows.get("relation:" + rel('1')).status());
         assertEquals(0, projection.unknownEvents());
+    }
+
+    @Test
+    void theListDisplayComesFromTheEventCandidateAndItsRelations() {
+        Map<String, Row> rows = byKey(ReviewTargetReader.read(
+                s2(event(EVENT_A, "candidate", "new-event-candidate", "SK")),
+                s3(relation(rel('1'), "PARTICIPATES_IN", endpoint("company", "SK"), endpoint("event", EVENT_A), "hold", "1"),
+                        relation(rel('2'), "PARTICIPATES_IN", endpoint("company", "SS"), endpoint("event", EVENT_A), "reject", "1"))));
+
+        ReviewTargetReader.Display candidate = rows.get("candidate:" + EVENT_A).display();
+        assertEquals(new ReviewTargetReader.Display(null, "t", "a", null, "2026-10-20", 1,
+                List.of(new ReviewTargetReader.Company("SK", "n", "subject"), new ReviewTargetReader.Company("SS", "SS", null)),
+                List.of("claim_hold", "claim_reject")), candidate, "the mention's own citations count, every relation's reasons");
+        ReviewTargetReader.Display relation = rows.get("relation:" + rel('2')).display();
+        assertEquals(new ReviewTargetReader.Display(null, null, null, null, null, 1,
+                List.of(new ReviewTargetReader.Company("SS", "SS", null)), List.of("claim_reject")), relation);
     }
 
     @Test
@@ -79,8 +102,11 @@ class ReviewTargetReaderTest {
         Map<String, Row> rows = byKey(ReviewTargetReader.read(s2(),
                 s3(relation(rel('1'), "SUPPLIES", endpoint("company", "A"), endpoint("company", "B"), "hold", "4"))));
 
-        assertEquals(new Row("candidate", rel('1'), rel('1'), "HOLD", List.of("A", "B"), List.of("SUPPLIES"), "4"),
-                rows.get("candidate:" + rel('1')));
+        Row alone = rows.get("candidate:" + rel('1'));
+        assertEquals(List.of(rel('1'), "HOLD", List.of("A", "B"), List.of("SUPPLIES"), "4"),
+                List.of(alone.candidateId(), alone.status(), alone.companyIds(), alone.relationTypes(), alone.sourceRevision()));
+        assertEquals(null, alone.display().title(), "no event: no title, action or event time");
+        assertEquals(1, alone.display().evidenceCount(), "the relation's own citations");
         assertEquals(rel('1'), rows.get("relation:" + rel('1')).candidateId());
     }
 
@@ -102,6 +128,19 @@ class ReviewTargetReaderTest {
 
         assertEquals(1, projection.unknownEvents());
         assertEquals(List.of("A"), byKey(projection).get("candidate:" + rel('1')).companyIds());
+    }
+
+    @Test
+    void onlyAnOperatorsFinalApprovalMarksARelationApproved() {
+        String automatic = relation(rel('1'), "SUPPLIES", endpoint("company", "A"), endpoint("company", "B"), "eligible", "1")
+                .replace("\"reasons\":", "\"approvalBasis\":{\"kind\":\"automatic-verifier\"},\"reasons\":");
+        String operator = relation(rel('2'), "SUPPLIES", endpoint("company", "A"), endpoint("company", "C"), "eligible", "3")
+                .replace("\"reasons\":", "\"approvalBasis\":{\"kind\":\"operator-final-approval\"},\"reasons\":");
+        Map<String, Row> rows = byKey(ReviewTargetReader.read(s2(), s3(automatic, operator)));
+
+        assertEquals(false, rows.get("relation:" + rel('1')).operatorApproved());
+        assertEquals(true, rows.get("relation:" + rel('2')).operatorApproved());
+        assertEquals(null, rows.get("candidate:" + rel('2')).operatorApproved(), "a candidate row carries no approval");
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.zoop.chat.orchestrator;
 
 import com.zoop.chat.dto.ChatChoice;
+import com.zoop.chat.dto.ChatJobRequest;
 import com.zoop.chat.tool.ChatCapability;
 import java.util.List;
 import java.util.Set;
@@ -38,14 +39,33 @@ public sealed interface ChatPlan {
     enum TargetSource { QUESTION, CONTEXT, DEPENDENCY, SERVER }
 
     /**
+     * Who asked for a requirement. {@code ROUTER}: the route decision. {@code CONCEPT}: the server split the Q02 part off a
+     * router requirement that also asks for a fact (partial-answer design, part 1). The member never stated it as such, so
+     * leaving it unanswered is no limitation. {@code SCOPE}: the server reads the member's own companies first for a Q07
+     * requirement that names none, which then reads the rest on them; it is no branch of its own, its reads go with the
+     * requirement it serves.
+     */
+    enum Origin { ROUTER, CONCEPT, SCOPE }
+
+    /**
      * One planned requirement. TOOLS requirements read {@code capabilities} on {@code targets}, or, when
      * {@code dependsOn} is set, on the companies its source finds; {@code stage} is 1 plus its source's stage. A LIMITED one
      * carries its {@code limitation} kind. {@code evidenceScope} is the evidence the member narrowed the selection to
-     * (null when not narrowed): the requirement may read and cite nothing else.
+     * (null when not narrowed): the requirement may read and cite nothing else. {@code parent} is the router requirement a
+     * server requirement was split from (null for a router one).
      */
     record Planned(String id, String label, Set<ChatQueryType> types, Mode mode, String limitation,
             List<ChatCapability> capabilities, List<String> targets, TargetSource targetSource, List<String> evidenceScope,
-            ChatRouteDecision.Dependency dependsOn, int stage) {
+            ChatRouteDecision.Dependency dependsOn, int stage, Origin origin, String parent) {
+        /** Id and label suffixes of a concept requirement. */
+        static final String CONCEPT_ID = "-c";
+        static final String CONCEPT_LABEL = " — 개념 설명";
+        /** Id and label suffixes of a member-scope source. */
+        static final String SCOPE_ID = "-s";
+        static final String SCOPE_LABEL = " — 내 종목";
+        /** The longest label the answer stage takes, in code points (zoop-ai-chat-1 {@code Branch.label}). */
+        static final int MAX_LABEL = ChatJobRequest.MAX_QUESTION;
+
         public Planned {
             types = Set.copyOf(types);
             capabilities = List.copyOf(capabilities);
@@ -53,8 +73,44 @@ public sealed interface ChatPlan {
             evidenceScope = evidenceScope == null ? null : List.copyOf(evidenceScope);
         }
 
+        /** A router requirement. */
+        Planned(String id, String label, Set<ChatQueryType> types, Mode mode, String limitation,
+                List<ChatCapability> capabilities, List<String> targets, TargetSource targetSource,
+                List<String> evidenceScope, ChatRouteDecision.Dependency dependsOn, int stage) {
+            this(id, label, types, mode, limitation, capabilities, targets, targetSource, evidenceScope, dependsOn, stage,
+                    Origin.ROUTER, null);
+        }
+
         Planned limited(String kind) {
-            return new Planned(id, label, types, Mode.LIMITED, kind, List.of(), List.of(), null, null, dependsOn, stage);
+            return new Planned(id, label, types, Mode.LIMITED, kind, List.of(), List.of(), null, null, dependsOn, stage,
+                    origin, parent);
+        }
+
+        /** The member-scope source this requirement depends on: a stage-1 read of the member's own companies. */
+        Planned scope() {
+            int room = MAX_LABEL - SCOPE_LABEL.codePointCount(0, SCOPE_LABEL.length());
+            String base = label.codePointCount(0, label.length()) <= room ? label
+                    : label.substring(0, label.offsetByCodePoints(0, room));
+            return new Planned(id + SCOPE_ID, base + SCOPE_LABEL, Set.of(ChatQueryType.Q07), Mode.TOOLS, null,
+                    List.of(ChatCapability.PORTFOLIO_SCOPE_READ), ChatCapability.PORTFOLIO_SCOPE_READ.untargeted(),
+                    TargetSource.SERVER, null, null, 1, Origin.SCOPE, id);
+        }
+
+        /** Whether this requirement reads on the companies of its member-scope source. */
+        boolean onScope() {
+            return dependsOn != null && dependsOn.requirementId().equals(id + SCOPE_ID);
+        }
+
+        /**
+         * The Q02 part of this requirement as a general requirement of its own. Only the derived label is cut, by code
+         * points, so that with its suffix it stays within {@link #MAX_LABEL}; the parent keeps its own.
+         */
+        Planned concept() {
+            int room = MAX_LABEL - CONCEPT_LABEL.codePointCount(0, CONCEPT_LABEL.length());
+            String base = label.codePointCount(0, label.length()) <= room ? label
+                    : label.substring(0, label.offsetByCodePoints(0, room));
+            return new Planned(id + CONCEPT_ID, base + CONCEPT_LABEL, Set.of(ChatQueryType.Q02), Mode.GENERAL, null,
+                    List.of(), List.of(), null, null, null, 1, Origin.CONCEPT, id);
         }
     }
 }

@@ -22,7 +22,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("run",))
     parser.add_argument("--sources", required=True, type=Path, help="source registry (zoop-ingestion-s2-1) naming a `collected-http` source")
-    parser.add_argument("--policy", required=True, type=Path, help="read-only operator policy: user agent and every fetch budget")
+    parser.add_argument("--policy", required=True, type=Path, help="read-only policy: product userAgent, optional HTTPS contactUrl, and every fetch budget")
     args = parser.parse_args()
     try:
         raw = sys.stdin.buffer.read(MAX_INPUT + 1)

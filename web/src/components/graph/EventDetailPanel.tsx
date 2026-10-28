@@ -16,6 +16,7 @@ import {
 export type EventAction = 'evidence' | 'focus' | 'ai';
 interface Props {
   id: string;
+  companyDetailHref?: (id: string) => string;
   context: EventContext;
   geography: GraphNode['geography'];
   /** 지도에 있는 기업 노드의 로고 */
@@ -27,6 +28,7 @@ interface Props {
 // D-GRP-02 · Figma 619:6269 · WBS 6.6.22.
 export default function EventDetailPanel({
   id,
+  companyDetailHref,
   context,
   geography,
   logoOf,
@@ -76,7 +78,10 @@ export default function EventDetailPanel({
             />
             <div>
               <a
-                href={`/companies/${encodeURIComponent(company.id)}`}
+                href={
+                  companyDetailHref?.(company.id) ??
+                  `/companies/${encodeURIComponent(company.id)}`
+                }
                 className="text-zoop-ink underline underline-offset-4 focus-visible:outline-2"
               >
                 <strong>{company.name}</strong>

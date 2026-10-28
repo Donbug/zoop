@@ -1,3 +1,4 @@
+import { useAdminRefresh } from '@/hooks/useAdminRefresh';
 import { useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { getInsightsSummary, listCompanyInsights } from '@/apis/admin/insights';
@@ -63,6 +64,7 @@ function MetricTable({
 export function StatsSummaryPanel({ window }: { window: StatsWindow }) {
   const load = useCallback(() => getInsightsSummary(window), [window]);
   const summary = useAsyncData(load);
+  useAdminRefresh(summary.reload, 10000);
   if (summary.status === 'loading')
     return <Loading>이용 통계를 불러오고 있어요</Loading>;
   if (summary.status === 'error')
@@ -82,6 +84,11 @@ export function StatsSummaryPanel({ window }: { window: StatsWindow }) {
 
   return (
     <>
+      {summary.refreshError && (
+        <p role="status" className="text-[11px] text-zoop-muted">
+          새로 고치지 못했어요. 이전 결과를 표시해요.
+        </p>
+      )}
       <Note>
         집계 시각 {formatKst(data.asOf)} · 비율은 분모가 {data.minSample}{' '}
         미만이면 숨기고 건수만 보여 줘요.
@@ -202,6 +209,7 @@ export function CompanyRankingPanel({ window }: { window: StatsWindow }) {
     [window],
   );
   const ranking = useCursorPages(load);
+  useAdminRefresh(ranking.reload, 10000);
   if (ranking.status === 'loading')
     return <Loading>종목 순위를 불러오고 있어요</Loading>;
   if (ranking.status === 'error' && ranking.error)
@@ -218,6 +226,11 @@ export function CompanyRankingPanel({ window }: { window: StatsWindow }) {
 
   return (
     <>
+      {ranking.refreshError && (
+        <p role="status" className="text-[11px] text-zoop-muted">
+          새로 고치지 못했어요. 이전 결과를 표시해요.
+        </p>
+      )}
       <Note>
         기업 {count(first.totalCompanies)}개 중 활동이 있는 기업 · 집계 시각{' '}
         {formatKst(first.asOf)} · {first.holdingsNote}

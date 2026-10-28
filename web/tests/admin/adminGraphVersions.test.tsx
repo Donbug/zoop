@@ -1,4 +1,4 @@
-import { act, screen, within } from '@testing-library/react';
+import { fireEvent, act, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test } from 'vitest';
 import AdminProtectedRoute from '@/components/admin/common/AdminProtectedRoute';
 import AdminPipelinePage from '@/pages/admin/pipeline/AdminPipelinePage';
@@ -177,7 +177,17 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     await user.click(await screen.findByRole('button', { name: 'v1로 전환' }));
     const form = screen.getByRole('form', { name: '그래프 버전 전환' });
     await user.click(within(form).getByRole('button', { name: 'v1로 전환' }));
-    expect(within(form).getByText('사유를 입력해 주세요.')).toBeTruthy();
+    expect(
+      within(form).getByText('사유를 1~500자로 입력해 주세요.'),
+    ).toBeTruthy();
+    const limitedReason = within(form).getByLabelText(
+      '전환 사유(감사 로그에 남아요)',
+    ) as HTMLTextAreaElement;
+    expect(limitedReason.maxLength).toBe(500);
+    fireEvent.change(limitedReason, { target: { value: 'x'.repeat(501) } });
+    fireEvent.submit(form);
+    expect(within(form).getByText('사유 501/500자')).toBeTruthy();
+    fireEvent.change(limitedReason, { target: { value: '' } });
     expect(server.calls('POST', ACTIVATE)).toHaveLength(0);
 
     await user.type(
