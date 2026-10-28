@@ -15,6 +15,7 @@ import BriefingItemDetails from './BriefingItemDetails';
 import BriefingContinuity from './BriefingContinuity';
 import BriefingRecap from './BriefingRecap';
 import BriefingS3Impacts from './BriefingS3Impacts';
+import ImpactCue from '@/components/common/ImpactCue';
 import {
   BODY,
   EMPTY,
@@ -50,8 +51,10 @@ function CompanyInIssue({
       <h5 className="flex flex-wrap items-center gap-2 text-sm font-bold">
         {company.name}
         {view.assessment && (
-          <span className="rounded border border-zoop-line px-2 py-1 text-xs">
-            사업 영향 · {labels[view.assessment]}
+          <span className="text-xs">
+            <ImpactCue tone={view.assessment} badge>
+              사업 영향 · {labels[view.assessment]}
+            </ImpactCue>
           </span>
         )}
       </h5>
@@ -64,16 +67,20 @@ function CompanyInIssue({
               : '이 이슈의 사업 영향은 아직 판단하기 어렵습니다.')}
         </p>
       </section>
-      <div className="grid gap-4 rounded-lg bg-zoop-wash p-4 sm:grid-cols-2">
-        <section>
-          <h6 className="text-sm font-bold">긍정 가능성</h6>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <section className="rounded-lg border border-zoop-positive/20 bg-zoop-positive/5 p-4">
+          <h6 className="text-sm font-bold">
+            <ImpactCue tone="positive">긍정 가능성</ImpactCue>
+          </h6>
           <p className={`${BODY} mt-2`}>
             {view.positive?.text ??
               '이 이슈에 연결된 긍정 근거가 아직 없습니다.'}
           </p>
         </section>
-        <section>
-          <h6 className="text-sm font-bold">위험·불확실성</h6>
+        <section className="rounded-lg border border-zoop-alert/20 bg-zoop-alert/5 p-4">
+          <h6 className="text-sm font-bold">
+            <ImpactCue tone="negative">위험·불확실성</ImpactCue>
+          </h6>
           <p className={`${BODY} mt-2`}>
             {view.negative?.text ??
               '구체적인 위험 조건을 추가 확인해야 합니다.'}
@@ -82,7 +89,11 @@ function CompanyInIssue({
       </div>
       {view.fact && (
         <section>
-          <h6 className="text-sm font-bold">확인된 새 정보</h6>
+          <h6 className="text-sm font-bold">
+            <ImpactCue tone="positive" icon="check">
+              확인된 새 정보
+            </ImpactCue>
+          </h6>
           <p className={`${BODY} mt-2`}>{view.fact.text}</p>
         </section>
       )}
@@ -275,7 +286,9 @@ function IssueFollowUp({
       </section>
       <section>
         <h4 className="text-sm font-bold">
-          {evening ? '다음 거래일 확인할 사건' : '오늘 확인할 사건'}
+          <ImpactCue tone="neutral" icon="calendar">
+            {evening ? '다음 거래일 확인할 사건' : '오늘 확인할 사건'}
+          </ImpactCue>
         </h4>
         {watching.length ? (
           <ul className="mt-2 space-y-3">
