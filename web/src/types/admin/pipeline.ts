@@ -195,6 +195,8 @@ export type CandidateFilters = {
   decision?: CandidateDecisionFilter;
   active?: boolean;
   published?: boolean;
+  /** true면 자동 검수 규칙 대상 후보만 */
+  rule?: boolean;
   q?: string;
 };
 

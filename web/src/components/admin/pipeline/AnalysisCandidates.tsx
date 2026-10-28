@@ -6,13 +6,11 @@ import {
   Loading,
   MoreButton,
   Note,
-  Section,
   Segmented,
   Table,
 } from '@/components/admin/common/AdminUi';
 import {
   SEARCH_INPUT,
-  SELECT,
   TD,
   TH,
   count,
@@ -22,11 +20,7 @@ import { useCursorPages } from '@/hooks/useCursorPages';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { useAdminSessionStore } from '@/stores/useAdminSessionStore';
-import type {
-  CandidateDecisionFilter,
-  CandidateFilters,
-  CandidateStatus,
-} from '@/types/admin/pipeline';
+import type { CandidateFilters, CandidateStatus } from '@/types/admin/pipeline';
 import {
   candidateStatusLabel,
   decisionLabel,
@@ -36,17 +30,54 @@ type StatusFilter = CandidateStatus | 'all';
 
 const parseStatus = (value: string | null): StatusFilter =>
   value === 'all' || value === 'ALLOW' || value === 'REJECT' ? value : 'HOLD';
-const parseDecision = (value: string | null) =>
-  value === 'none' || value === 'allow' || value === 'reject'
-    ? (value as CandidateDecisionFilter)
-    : undefined;
-const parseBoolean = (value: string | null) =>
-  value === 'true' ? true : value === 'false' ? false : undefined;
+
+const SCOPE_OPTIONS: { value: 'all' | 'rule'; label: string }[] = [
+  { value: 'all', label: '모든 후보' },
+  { value: 'rule', label: '규칙 대상만' },
+];
+
+function StatusIcon({ status }: { status: CandidateStatus }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      className="size-3.5 shrink-0"
+    >
+      <circle cx="8" cy="8" r="6" />
+      {status === 'ALLOW' && <path d="m5.5 8.2 1.7 1.7 3.3-3.6" />}
+      {status === 'HOLD' && <path d="m6 6 4 4m0-4-4 4" />}
+      {status === 'REJECT' && <path d="m4 12 8-8" />}
+    </svg>
+  );
+}
+
+function HiddenIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+      className="size-3.5 shrink-0"
+    >
+      <path d="M2 8s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4Z" />
+      <circle cx="8" cy="8" r="1.8" />
+      <path d="m3 13 10-10" />
+    </svg>
+  );
+}
 
 // A-ADM-03 후보 탭 (FS067-01·FS067-02, listAnalysisCandidates·getAnalysisCandidate)
 // - 프로토타입 admin/pipeline/candidates.tsx를 옮겼다. 필터·검색어·고른 후보(?candidate=)는 주소에 남는다.
 // - 판정 기본값은 프로토타입처럼 보류(HOLD)다. 조건이 바뀌면 첫 쪽부터 다시 읽는다(커서는 같은 조건에서만 유효).
-// - 앱이 아직 규칙을 후보에 평가하지 않아(rule=null, rule=true는 항상 빈 목록) 규칙 대상 필터는 두지 않는다.
+// - 와이어프레임대로 [판정] [모든 후보 | 규칙 대상만] 필터와 검색만 둔다. 규칙 대상(?rule=true)은 listAnalysisCandidates의 rule 조건이다.
+//   앱이 아직 규칙을 후보에 평가하지 않아(rule=null) 지금은 규칙 대상만 고르면 빈 목록이 온다.
 // - 허용·거부 결정은 상세에서 관계마다 한다(decideAnalysisCandidate).
 // - 목록의 onUserGraph=false는 공개하지 않은 후보와 공개 여부를 확인하지 못한 후보를 함께 뜻해서, 단정하지 않고 상세에서 구분한다.
 // 표시 버전이 바뀌면(graphRevision) 공개 표시 상태가 달라지므로 목록·상세를 다시 읽는다. 필터·고른 후보는 주소에 남아 그대로다.
@@ -63,9 +94,7 @@ function CandidatesSession() {
   const { params, updateQuery } = useRouteQuery();
   const selectedId = params.get('candidate');
   const status = parseStatus(params.get('status'));
-  const decision = parseDecision(params.get('decision'));
-  const published = parseBoolean(params.get('published'));
-  const active = parseBoolean(params.get('active'));
+  const ruleOnly = params.get('rule') === 'true';
   const urlQ = params.get('q') ?? '';
   const [text, setText] = useState(urlQ);
   // 뒤로·앞으로 가기로 주소의 검색어가 바뀌면 입력칸도 맞춘다.
@@ -79,14 +108,12 @@ function CandidatesSession() {
     (cursor?: string) => {
       const filters: CandidateFilters = {
         status: status === 'all' ? undefined : status,
-        decision,
-        published,
-        active,
+        rule: ruleOnly || undefined,
         q: q || undefined,
       };
       return listAnalysisCandidates(filters, cursor);
     },
-    [status, decision, published, active, q],
+    [status, ruleOnly, q],
   );
   const candidates = useCursorPages(load);
   const first = candidates.pages[0];
@@ -113,7 +140,7 @@ function CandidatesSession() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,460px)]">
-      <Section title="후보">
+      <section aria-label="후보" className="flex min-w-0 flex-col gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <Segmented
             label="판정 상태"
@@ -126,76 +153,33 @@ function CandidatesSession() {
               )
             }
           />
-          <input
-            type="search"
-            aria-label="후보 검색"
-            placeholder="제목·기업·대상으로 찾기"
-            maxLength={200}
-            value={text}
-            onChange={(event) => {
-              setText(event.target.value);
+          <Segmented
+            label="규칙 대상"
+            value={ruleOnly ? 'rule' : 'all'}
+            options={SCOPE_OPTIONS}
+            onChange={(value) =>
               updateQuery(
-                { q: event.target.value.trim() || null },
+                { rule: value === 'rule' ? 'true' : null },
                 { replace: true },
-              );
-            }}
-            className={SEARCH_INPUT}
+              )
+            }
           />
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <label className="flex flex-col gap-1 text-[11px] text-zoop-muted">
-            검수 결정
-            <select
-              className={SELECT}
-              value={decision ?? ''}
-              onChange={(event) =>
-                updateQuery(
-                  { decision: event.target.value || null },
-                  { replace: true },
-                )
-              }
-            >
-              <option value="">전체</option>
-              <option value="none">결정 없음</option>
-              <option value="allow">허용</option>
-              <option value="reject">거부</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-[11px] text-zoop-muted">
-            사용자 그래프
-            <select
-              className={SELECT}
-              value={published === undefined ? '' : String(published)}
-              onChange={(event) =>
-                updateQuery(
-                  { published: event.target.value || null },
-                  { replace: true },
-                )
-              }
-            >
-              <option value="">전체</option>
-              <option value="true">표시 중</option>
-              <option value="false">표시 안 됨·확인 못 함</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-[11px] text-zoop-muted">
-            후보 상태
-            <select
-              className={SELECT}
-              value={active === undefined ? '' : String(active)}
-              onChange={(event) =>
-                updateQuery(
-                  { active: event.target.value || null },
-                  { replace: true },
-                )
-              }
-            >
-              <option value="">전체</option>
-              <option value="true">활성</option>
-              <option value="false">비활성</option>
-            </select>
-          </label>
-        </div>
+        <input
+          type="search"
+          aria-label="후보 검색"
+          placeholder="제목·기업·대상으로 찾기"
+          maxLength={200}
+          value={text}
+          onChange={(event) => {
+            setText(event.target.value);
+            updateQuery(
+              { q: event.target.value.trim() || null },
+              { replace: true },
+            );
+          }}
+          className={SEARCH_INPUT}
+        />
         {candidates.refreshError && (
           <p role="status" className="text-[11px] text-zoop-muted">
             새로 고치지 못했어요. 이전 결과를 표시해요.
@@ -251,7 +235,10 @@ function CandidatesSession() {
                       }
                     >
                       <td className={`${TD} whitespace-nowrap font-semibold`}>
-                        {candidateStatusLabel[row.status]}
+                        <span className="inline-flex items-center gap-1">
+                          <StatusIcon status={row.status} />
+                          {candidateStatusLabel[row.status]}
+                        </span>
                       </td>
                       <td className={`${TD} max-w-[28rem]`}>
                         <button
@@ -276,8 +263,15 @@ function CandidatesSession() {
                       <td className={`${TD} text-right tabular-nums`}>
                         {count(row.evidenceCount)}
                       </td>
-                      <td className={TD}>
-                        {row.onUserGraph ? '표시 중' : '표시 안 됨·확인 못 함'}
+                      <td className={`${TD} whitespace-nowrap text-zoop-muted`}>
+                        {row.onUserGraph ? (
+                          '표시 중'
+                        ) : (
+                          <span className="inline-flex items-center gap-1">
+                            <HiddenIcon />
+                            표시 안 됨·확인 못 함
+                          </span>
+                        )}
                       </td>
                       <td className={TD}>
                         {row.decision
@@ -298,7 +292,7 @@ function CandidatesSession() {
             )}
           </>
         )}
-      </Section>
+      </section>
 
       <aside
         aria-label="후보 상세"
@@ -312,10 +306,12 @@ function CandidatesSession() {
             onDecided={() => candidates.reload({ quiet: true })}
           />
         ) : (
-          <Empty>
-            후보를 골라 주세요. 목록에서 후보를 고르면 원문 인용과 판정 근거를
-            보여 줘요.
-          </Empty>
+          <div className="flex flex-col gap-2 pt-2">
+            <h2 className="text-sm font-bold">후보를 골라 주세요</h2>
+            <p className="text-[11px] text-zoop-muted">
+              왼쪽 목록에서 후보를 고르면 원문 인용과 판정 근거를 보여 줘요.
+            </p>
+          </div>
         )}
       </aside>
     </div>

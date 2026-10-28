@@ -30,6 +30,7 @@ export function listAnalysisCandidates(
   if (filters.active !== undefined) query.set('active', String(filters.active));
   if (filters.published !== undefined)
     query.set('published', String(filters.published));
+  if (filters.rule !== undefined) query.set('rule', String(filters.rule));
   if (filters.q) query.set('q', filters.q);
   if (cursor) query.set('cursor', cursor);
   const suffix = query.size ? `?${query}` : '';

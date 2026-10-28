@@ -43,6 +43,7 @@ export default function PipelineReview() {
         label="그래프 관제 보기"
         value={tab}
         options={TABS}
+        variant="line"
         onChange={(next) =>
           updateQuery({ tab: next === 'candidates' ? null : next })
         }

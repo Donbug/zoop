@@ -1,10 +1,4 @@
-import {
-  act,
-  fireEvent,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test } from 'vitest';
 import AdminProtectedRoute from '@/components/admin/common/AdminProtectedRoute';
 import PipelineReview from '@/components/admin/pipeline/PipelineReview';
@@ -232,26 +226,22 @@ describe('A-ADM-03 후보 탭 · 67', () => {
     await screen.findAllByRole('button', { name: '삼성전자, 미국 공장 증설' });
     expect(listCalls()[1].query.get('cursor')).toBe('signed-cursor');
 
-    fireEvent.change(screen.getByRole('combobox', { name: '검수 결정' }), {
-      target: { value: 'none' },
-    });
-    fireEvent.change(screen.getByRole('combobox', { name: '사용자 그래프' }), {
-      target: { value: 'false' },
-    });
-    fireEvent.change(screen.getByRole('combobox', { name: '후보 상태' }), {
-      target: { value: 'true' },
-    });
+    await user.click(screen.getByRole('button', { name: '규칙 대상만' }));
     await user.click(screen.getByRole('button', { name: /^통과/ }));
     expect(location()).toBe(
-      '/admin/pipeline?tab=candidates&decision=none&published=false&active=true&status=ALLOW',
+      '/admin/pipeline?tab=candidates&rule=true&status=ALLOW',
     );
     await screen.findByRole('table', { name: '후보 목록' });
     const last = listCalls().at(-1)!;
     expect(last.query.get('status')).toBe('ALLOW');
-    expect(last.query.get('decision')).toBe('none');
-    expect(last.query.get('published')).toBe('false');
-    expect(last.query.get('active')).toBe('true');
+    expect(last.query.get('rule')).toBe('true');
     expect(last.query.has('cursor')).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: '모든 후보' }));
+    expect(location()).toBe('/admin/pipeline?tab=candidates&status=ALLOW');
+    await waitFor(() =>
+      expect(listCalls().at(-1)!.query.has('rule')).toBe(false),
+    );
   });
 
   test('검색어는 바로 주소에 남기고 잠시 뒤 요청한다', async () => {
@@ -479,7 +469,7 @@ describe('A-ADM-03 후보 공개 표시 · #379 리뷰', () => {
       });
     });
     const { user, location } = open(
-      '/admin/pipeline?tab=versions&published=false&candidate=cand-1',
+      '/admin/pipeline?tab=versions&rule=true&candidate=cand-1',
     );
     await screen.findByRole('table', { name: '그래프 버전 목록' });
     await waitFor(() => expect(server.calls('GET', CANDIDATE)).toHaveLength(1));
@@ -496,9 +486,9 @@ describe('A-ADM-03 후보 공개 표시 · #379 리뷰', () => {
 
     await waitFor(() => expect(server.calls('GET', CANDIDATE)).toHaveLength(2));
     expect(listCalls().length).toBeGreaterThan(lists);
-    expect(listCalls().at(-1)?.query.get('published')).toBe('false');
+    expect(listCalls().at(-1)?.query.get('rule')).toBe('true');
     expect(location()).toBe(
-      '/admin/pipeline?tab=versions&published=false&candidate=cand-1',
+      '/admin/pipeline?tab=versions&rule=true&candidate=cand-1',
     );
   });
 

@@ -180,18 +180,41 @@ export function Segmented<T extends string>({
   );
 }
 
-/** 화면 안 탭. 선택한 탭은 aria-selected이고 아래 선으로 표시한다. */
+/** 화면 안 탭. 선택한 탭은 aria-selected다. line은 A-ADM-03처럼 폭을 나눠 쓰고 아래 선으로 표시한다. */
 export function Tabs<T extends string>({
   label,
   value,
   options,
   onChange,
+  variant = 'pill',
 }: {
   label: string;
   value: T;
   options: { value: T; label: string }[];
   onChange: (value: T) => void;
+  variant?: 'pill' | 'line';
 }) {
+  if (variant === 'line')
+    return (
+      <div
+        role="tablist"
+        aria-label={label}
+        className="flex w-full overflow-x-auto border-b-[0.667px] border-zoop-line"
+      >
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            role="tab"
+            aria-selected={option.value === value}
+            onClick={() => onChange(option.value)}
+            className={`-mb-px min-h-11 flex-1 shrink-0 border-b-2 border-transparent px-4 text-sm text-zoop-muted transition-colors hover:text-zoop-ink aria-selected:border-zoop-ink aria-selected:font-bold aria-selected:text-zoop-ink ${FOCUS_RING}`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    );
   return (
     <div
       role="tablist"
