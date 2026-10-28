@@ -273,9 +273,7 @@ beforeEach(() => {
     json({
       companyId: id,
       issueId: r.params.issueId,
-      pathStatus: 'available',
-      pathType: 'direct',
-      edgeId: 'edge-a',
+      pathStatus: 'direct_available',
       steps: [
         {
           id: 'issue-a',
@@ -285,8 +283,6 @@ beforeEach(() => {
         },
         { id, kind: 'company', reason: '연결 기업', evidenceIds: ['ev-a'] },
       ],
-      businessPath: null,
-      impact: { status: 'unavailable', reason: 'not_recorded', results: [] },
       metadata: { ...metadata, asOf: r.query.get('asOf') ?? time },
     }),
   );
@@ -729,9 +725,7 @@ test('buckets follow exact five-minute/hour/day/week resolutions and never inven
   const impact: Impact = {
     companyId: id,
     issueId: 'issue-a',
-    pathStatus: 'available',
-    pathType: 'direct',
-    edgeId: 'edge-a',
+    pathStatus: 'direct_available',
     steps: [
       {
         id: 'issue-a',
@@ -741,8 +735,6 @@ test('buckets follow exact five-minute/hour/day/week resolutions and never inven
       },
       { id, kind: 'company', reason: 'confirmed', evidenceIds: ['ev-a'] },
     ],
-    businessPath: null,
-    impact: { status: 'unavailable', reason: 'not_recorded', results: [] },
     metadata,
   };
   expect(impactEdges(graph, impact)).toEqual(['edge-a']);
@@ -756,9 +748,9 @@ test('buckets follow exact five-minute/hour/day/week resolutions and never inven
           assertionStatus: null,
         })),
       },
-      { ...impact, pathType: 'structural' },
+      { ...impact, pathStatus: 'structural_path_details_unavailable' },
     ),
-  ).toEqual(['edge-a']);
+  ).toEqual([]);
   expect(
     impactEdges(graph, {
       ...impact,
@@ -944,9 +936,7 @@ test('FS044 edges without published evidence are excluded from actual impact pat
   const impact: Impact = {
     companyId: id,
     issueId: 'issue-a',
-    pathStatus: 'available',
-    pathType: 'direct',
-    edgeId: 'edge-a',
+    pathStatus: 'direct_available',
     steps: [
       {
         id: 'issue-a',
@@ -956,8 +946,6 @@ test('FS044 edges without published evidence are excluded from actual impact pat
       },
       { id, kind: 'company', reason: '합성 근거', evidenceIds: ['ev-a'] },
     ],
-    businessPath: null,
-    impact: { status: 'unavailable', reason: 'not_recorded', results: [] },
     metadata,
   };
   expect(

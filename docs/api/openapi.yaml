@@ -8164,7 +8164,7 @@ paths:
     get:
       operationId: "getCompanyIssueImpact"
       summary: "기업 맥락 이슈 영향 경로 조회"
-      description: "D-GRP-06·D-GRP-05 / FS022. FS079 오프라인 검증 결과를 소비하지만 FS079 자체에 공개 HTTP 작업을 새로 배정하지 않는다. 선택한 공개 버전·asOf·현재 공개 제외를 함께 적용한다. 보이는 INVOLVES가 있으면 direct, 그렇지 않고 보이는 STRUCTURALLY_RELATED_TO가 있으면 structural이다. 다른 이슈를 경유하거나 SHARES_ISSUE를 경로로 쓰지 않는다. 구조 연결만으로 이슈의 긍정·부정 영향을 주장하지 않는다."
+      description: "고정된 공개 그래프에서 보이는 기업과 이슈 사이의 직접 INVOLVES 관계만 경로로 반환한다. pathStatus=direct_available이면 직접 경로가 있다. STRUCTURALLY_RELATED_TO만 보이면 200과 빈 steps, pathStatus=structural_path_details_unavailable을 반환해 실제 관계 부재와 구분한다. 둘 다 없으면 빈 steps와 pathStatus=no_direct_relation을 반환한다. 각 근거 ID에는 getEvidence와 같은 현재 공개 권리 검사를 적용한다. 권리 때문에 근거가 빠지면 metadata.partial=true와 evidence 실패 항목을 반환하고, 권한 원천을 확인할 수 없으면 SOURCE_UNAVAILABLE/503이다. 구조 상세 경로는 receipt 전체 경로의 공개 적격성과 basis별 근거를 검증할 수 있을 때만 반환할 수 있으며, 추정·탐색 경로를 만들지 않는다. 기업·이슈가 선택 버전에 없거나 공개 필터 뒤에 보이지 않으면 404다. round·graphVersion·asOf는 getGraph와 같은 공개 버전 선택 규칙을 따른다."
       parameters:
         -
           name: "id"
@@ -8181,8 +8181,8 @@ paths:
         -
           name: "round"
           in: "query"
+          description: "이 브리핑 회차의 공개 그래프를 고정한다. graphVersion과 함께 쓰면 해당 회차와 일치해야 한다."
           required: false
-          description: "브리핑 회차가 고정한 그래프를 읽는다. graphVersion/asOf를 함께 지정하면 저장된 회차의 버전·자료 시점과 정확히 일치해야 하며 최신 그래프로 대체하지 않는다."
           schema:
             type: "string"
         -
@@ -8194,7 +8194,7 @@ paths:
       security: []
       responses:
         "200":
-          description: "공개된 기업과 이슈 사이에 연결이 없으면 pathStatus=none이다. 연결이 있어도 사업 사슬 또는 검증된 영향 결과를 제공할 수 없으면 각 상태를 unavailable로 구분한다."
+          description: "정상 응답"
           headers:
             X-Request-ID:
               description: "실제 사용한 전송별 요청 ID"
@@ -8204,74 +8204,6 @@ paths:
             "application/json":
               schema:
                 "$ref": "#/components/schemas/ImpactPath"
-              examples:
-                directVerified:
-                  summary: "직접 연결과 검증된 기업별 영향"
-                  value:
-                    companyId: "KRX:000000"
-                    issueId: "issue-example"
-                    pathStatus: "available"
-                    pathType: "direct"
-                    edgeId: "edge-1111111111111111"
-                    steps:
-                      - {id: "issue-example", kind: "issue", reason: "기사에 직접 관련된 사건", evidenceIds: ["ev-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]}
-                      - {id: "KRX:000000", kind: "company", reason: "사건에 직접 관련된 기업", evidenceIds: ["ev-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]}
-                    businessPath: null
-                    impact:
-                      status: "available"
-                      reason: null
-                      results:
-                        - impactId: "impact-example-1"
-                          status: "verified"
-                          label: "positive"
-                          evidenceIds: ["ev-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
-                          effects: {positive: ["ev-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"], negative: [], neutral: [], uncertain: []}
-                    metadata: {source: "synthetic-example", asOf: "2026-10-20T00:00:00Z", graphVersion: "gv-3333333333333333333333333333333333333333333333333333333333333333", requestId: "request-example", partial: false, failures: []}
-                structuralUnavailable:
-                  summary: "구조 연결은 공개됐으나 상세 사슬과 이슈별 영향은 미제공"
-                  value:
-                    companyId: "KRX:000001"
-                    issueId: "issue-example"
-                    pathStatus: "available"
-                    pathType: "structural"
-                    edgeId: "edge-2222222222222222"
-                    steps:
-                      - {id: "issue-example", kind: "issue", reason: "사건", evidenceIds: ["ev-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]}
-                      - {id: "KRX:000001", kind: "company", reason: "공개 사업 관계로 이어진 기업", evidenceIds: ["ev-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]}
-                    businessPath: {status: "unavailable", reason: "not_public", companyIds: [], links: []}
-                    impact: {status: "unavailable", reason: "issue_impact_not_produced", results: []}
-                    metadata: {source: "synthetic-example", asOf: "2026-10-20T00:00:00Z", graphVersion: "gv-3333333333333333333333333333333333333333333333333333333333333333", requestId: "request-example", partial: false, failures: []}
-                structuralComplete:
-                  summary: "공개 시작 기업과 단계별 근거가 확인된 사업 관계 사슬"
-                  value:
-                    companyId: "KRX:000001"
-                    issueId: "issue-example"
-                    pathStatus: "available"
-                    pathType: "structural"
-                    edgeId: "edge-2222222222222222"
-                    steps:
-                      - {id: "issue-example", kind: "issue", reason: "사건", evidenceIds: ["ev-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]}
-                      - {id: "KRX:000001", kind: "company", reason: "공개 사업 관계로 이어진 기업", evidenceIds: ["ev-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]}
-                    businessPath:
-                      status: "complete"
-                      reason: null
-                      companyIds: ["KRX:000000", "KRX:000001"]
-                      links:
-                        - {supplierCompanyId: "KRX:000000", customerCompanyId: "KRX:000001", reason: "확인된 공급 관계", evidenceIds: ["ev-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]}
-                    impact: {status: "unavailable", reason: "issue_impact_not_produced", results: []}
-                    metadata: {source: "synthetic-example", asOf: "2026-10-20T00:00:00Z", graphVersion: "gv-3333333333333333333333333333333333333333333333333333333333333333", requestId: "request-example", partial: false, failures: []}
-                noPublicPath:
-                  summary: "공개된 두 대상 사이에 연결 없음"
-                  value:
-                    companyId: "KRX:000001"
-                    issueId: "issue-example"
-                    pathStatus: "none"
-                    pathType: null
-                    edgeId: null
-                    steps: []
-                    businessPath: null
-                    impact: {status: "unavailable", reason: "no_public_path", results: []}
-                    metadata: {source: "synthetic-example", asOf: "2026-10-20T00:00:00Z", graphVersion: "gv-3333333333333333333333333333333333333333333333333333333333333333", requestId: "request-example", partial: false, failures: []}
         "409":
           "$ref": "#/components/responses/Error409"
         "503":
@@ -8312,7 +8244,6 @@ paths:
         errorCodes:
           - "INVALID_REQUEST"
           - "VERSION_UNAVAILABLE"
-          - "RESOURCE_NOT_FOUND"
           - "SOURCE_UNAVAILABLE"
         prototype:
           method: null
@@ -17884,16 +17815,14 @@ components:
           type: "string"
         pathStatus:
           type: "string"
-          enum: ["available", "none"]
-        pathType:
-          type: ["string", "null"]
-          enum: ["direct", "structural", null]
-        edgeId:
-          type: ["string", "null"]
-          description: "선택 버전의 필터된 공개 그래프에서 고른 표시 간선 ID. 경로가 없으면 null."
+          description: "직접 INVOLVES 경로 제공 여부와 구조 경로 상세의 미제공 상태를 구분한다."
+          enum:
+            - "direct_available"
+            - "structural_path_details_unavailable"
+            - "no_direct_relation"
         steps:
           type: "array"
-          description: "available이면 공개 이슈, 선택 기업 순서의 두 노드다. none이면 빈 배열이다. 중간 사업 관계 기업은 이 목록에 넣지 않는다."
+          description: "직접 경로의 순서는 [issue, company]다."
           items:
             type: "object"
             properties:
@@ -17904,6 +17833,8 @@ components:
                 enum:
                   - "company"
                   - "issue"
+                  - "industry"
+                  - "product"
               reason:
                 type: "string"
               evidenceIds:
@@ -17915,26 +17846,15 @@ components:
               - "kind"
               - "reason"
               - "evidenceIds"
-        businessPath:
-          description: "structural에서만 객체다. 시작 기업의 공개 INVOLVES와 모든 단계·근거·중간 기업의 공개 조건을 통과해야 complete다. direct/none은 null."
-          oneOf:
-            - "$ref": "#/components/schemas/ImpactBusinessPath"
-            - type: "null"
-        impact:
-          "$ref": "#/components/schemas/CompanyIssueImpactAssessment"
         metadata:
           "$ref": "#/components/schemas/Metadata"
       required:
         - "companyId"
         - "issueId"
         - "pathStatus"
-        - "pathType"
-        - "edgeId"
         - "steps"
-        - "businessPath"
-        - "impact"
         - "metadata"
-      description: "pathStatus=none은 기업·이슈가 모두 공개됐지만 공개 연결이 없는 200 결과다. 대상이 없거나 공개되지 않으면 404다. direct가 structural보다 우선한다. structural의 완전한 공개 사슬 후보가 여러 개면 단계 수, 원천 관계 ID, 근거 ID 오름차순으로 하나만 선택한다. available 경로의 steps는 정확히 [issue, company]이고 none에서는 비어 있다. 현재 판정 없이 산업·제품 단계나 긍정·부정 영향을 만들지 않는다."
+      description: "기업 패널에서 여는 공개 영향 경로다. 현재 steps는 선택된 공개 스냅샷의 직접 INVOLVES 연결만 담으며 연결이 없으면 빈 배열이다. 근거 ID는 getEvidence의 현재 권리 검사를 통과한 항목만 포함한다. 관계가 보이더라도 구조 경로의 receipt 검증이 완료되지 않은 경우 추정 단계를 만들지 않는다."
     ImpactBusinessPath:
       type: "object"
       properties:
