@@ -296,16 +296,37 @@ export default function CandidateDetailPanel({
               ))}
             </tbody>
           </Table>
-          {target && targetRelation && (
-            <CandidateDecisionForm
-              key={`${target.relationId}:${target.decision}`}
-              candidateId={c.candidateId}
-              relation={targetRelation}
-              decision={target.decision}
-              onCancel={() => setTarget(null)}
-              onDone={done}
-            />
-          )}
+          {/* 다시 읽은 뒤 그 관계를 더는 결정할 수 없으면(다른 관리자가 결정·재분석에서 빠짐) 폼 대신 알린다. */}
+          {target &&
+            !(
+              targetRelation &&
+              (target.decision === 'allow' ? canAllow : canReject)(
+                targetRelation,
+              )
+            ) && (
+              <p role="status" className="text-xs text-zoop-alert">
+                그 사이 이 관계가 결정됐거나 목록에서 빠져 더는 결정할 수
+                없어요. 새로 읽은 상태를 확인해 주세요.
+              </p>
+            )}
+          {target &&
+            targetRelation &&
+            (target.decision === 'allow' ? canAllow : canReject)(
+              targetRelation,
+            ) && (
+              <CandidateDecisionForm
+                key={`${target.relationId}:${target.decision}`}
+                candidateId={c.candidateId}
+                relation={targetRelation}
+                decision={target.decision}
+                onCancel={() => setTarget(null)}
+                onDone={done}
+                onConflict={() => {
+                  detail.reload({ quiet: true });
+                  onDecided?.();
+                }}
+              />
+            )}
         </Section>
       )}
 

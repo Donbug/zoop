@@ -16,9 +16,12 @@ import type {
   CandidateRelation,
 } from '@/types/admin/pipeline';
 
+const isConflict = (error: unknown) =>
+  error instanceof ApiError && error.code === 'REVISION_CONFLICT';
+
 function decisionError(error: Error) {
-  if (error instanceof ApiError && error.code === 'REVISION_CONFLICT')
-    return '그 사이 관계 상태나 AI 원천이 바뀌었어요. 상세를 새로 읽고 다시 확인해 주세요.';
+  if (isConflict(error))
+    return '그 사이 관계 상태나 AI 원천이 바뀌어 상세를 새로 읽었어요. 바뀐 내용을 확인하고 다시 보내 주세요.';
   if (error instanceof ApiError && error.code === 'VALIDATION_FAILED')
     return '원문 인용이나 원천 권리 검사를 통과하지 못해 승인할 수 없어요.';
   return adminActionErrorMessage(error);
@@ -33,12 +36,15 @@ export default function CandidateDecisionForm({
   decision,
   onCancel,
   onDone,
+  onConflict,
 }: {
   candidateId: string;
   relation: CandidateRelation;
   decision: 'allow' | 'reject';
   onCancel: () => void;
   onDone: (result: CandidateDecisionResponse) => void;
+  /** 409 REVISION_CONFLICT(다른 관리자의 결정·비활성 관계)면 상세를 다시 읽는다. 입력한 사유는 남긴다. */
+  onConflict?: () => void;
 }) {
   const allow = decision === 'allow';
   const title = allow ? '관계 승인' : '관계 거부';
@@ -79,6 +85,7 @@ export default function CandidateDecisionForm({
       if (owner !== useAdminSessionStore.getState().revision) return;
       setError(caught instanceof Error ? caught : new Error(String(caught)));
       setPending(false);
+      if (isConflict(caught)) onConflict?.();
     }
   }
 
