@@ -355,7 +355,8 @@ public class AnalysisCandidateService {
             }
         }
         List<ReviewDecisionOut> own = decisions.getOrDefault(r.id(), List.of());
-        return new CandidateRelation(r.relationCandidateId(), r.sourceVersion(), r.sourceRevision(), item.string("type"),
+        return new CandidateRelation(r.relationCandidateId(), r.sourceVersion(), r.sourceRevision(), r.revision(),
+                item.string("type"),
                 subject.string("ref"), object.string("ref"), role,
                 mention == null ? null : mention.stringOrNull("assertionStatus"), item.objects("citations").size(),
                 shown.map(s -> s.relation(r.s3JobId(), r.relationCandidateId())).orElse(false),
