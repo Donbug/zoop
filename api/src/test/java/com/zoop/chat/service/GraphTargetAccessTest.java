@@ -28,6 +28,7 @@ class GraphTargetAccessTest {
     private static final String HYNIX = "KRX:000660";
     private static final String HBM_SUPPLY = "iss-fixture-hbm-supply";
 
+    private static final Instant EARLY = Instant.parse("2026-09-01T00:00:00Z");
     private DisclosureExclusions exclusions = DisclosureExclusions.NONE;
 
     @Test
@@ -39,6 +40,15 @@ class GraphTargetAccessTest {
         exclusions = new DisclosureExclusions(1, Set.of(HBM_SUPPLY), Set.of(), Set.of());
         assertEquals(Optional.of(Set.of(HYNIX)), access.visible(Set.of(HYNIX, HBM_SUPPLY), ACTIVE, null, "req-2"),
                 "an issue excluded after the run is no longer visible at the run's own version");
+    }
+
+    @Test
+    void aRunFrozenWithoutAnAsOfKeepsItsPinUnfilteredAndOneFrozenAtATimeIsFilteredThere() {
+        var access = new GraphTargetAccess(reader(repository()));
+        assertEquals(Optional.of(Set.of(HYNIX, HBM_SUPPLY)), access.visible(Set.of(HYNIX, HBM_SUPPLY), ACTIVE, null, "r"),
+                "never re-read as a version-only address, which would filter at its first publication");
+        assertEquals(Optional.of(Set.of(HYNIX)), access.visible(Set.of(HYNIX, HBM_SUPPLY), ACTIVE, EARLY, "r"),
+                "the issue was reported after the frozen time");
     }
 
     @Test
@@ -67,7 +77,8 @@ class GraphTargetAccessTest {
             public Optional<GraphVersionRecord> active() { return Optional.ofNullable(known.get(ACTIVE)); }
             public Optional<String> activeVersionIdAt(Instant asOf) { return Optional.of(ACTIVE); }
             public boolean everActivated(String id) { return known.containsKey(id); }
-            public Optional<Instant> firstActivatedAt(String id) { return everActivated(id) ? Optional.of(Instant.parse("2026-10-01T00:00:00Z")) : Optional.empty(); }
+            // First published before any fixture issue was reported: a version-only read of it would show none (#88).
+            public Optional<Instant> firstActivatedAt(String id) { return everActivated(id) ? Optional.of(EARLY) : Optional.empty(); }
         };
     }
 

@@ -74,10 +74,11 @@ public class EventListService {
                 || !Objects.equals(after.asOf(), asOf))) {
             throw new CustomException(ErrorCode.INVALID_CURSOR);
         }
-        // A later page without an asOf keeps the first page's pinned read (its time and whether it was filtered at it); it is
-        // never re-read as a version-only address, which would filter a list the first page did not.
-        PublicGraphReader.Pinned pinned = after != null && requestedAsOf == null
-                ? reader.readPinned(after.versionId(), Instant.parse(after.pinnedAt()), Boolean.TRUE.equals(after.filtered()))
+        // A later page keeps the first page's pinned read (its version, its time and whether it was filtered at it): never
+        // re-read as a version-only address, and never re-selected at the asOf, where a version activated since would win.
+        PublicGraphReader.Pinned pinned = after != null
+                ? reader.readPinned(after.versionId(), Instant.parse(after.pinnedAt()),
+                        requestedAsOf != null || Boolean.TRUE.equals(after.filtered()))
                 : reader.read(null, graphVersion, requestedAsOf);
         DisplayGraph graph = pinned.graph();
 

@@ -68,7 +68,9 @@ public class GraphVersionDiffTool implements ChatTool {
         String earlier;
         List<GraphChanges.Change> changes;
         try {
-            var pinned = reader.read(null, scope.graphVersionId(), scope.asOf());
+            // The run's frozen pin, kept as it is (#88); the earlier map is read the same way, so both sides share one filter.
+            boolean filtered = scope.asOf() != null;
+            var pinned = reader.readPinned(scope.graphVersionId(), scope.asOf(), filtered);
             version = pinned.selected().version().id();
             Instant at = scope.asOf() != null ? scope.asOf() : clock.instant();
             if (request.since() != null && request.since().isAfter(at)) {
@@ -82,7 +84,7 @@ public class GraphVersionDiffTool implements ChatTool {
             if (earlier.equals(version)) {
                 return new ChatToolOutput(earlier + ".." + version, List.of(), List.of(), false, false);
             }
-            changes = GraphChanges.between(reader.read(null, earlier, null).graph(), pinned.graph());
+            changes = GraphChanges.between(reader.readPinned(earlier, scope.asOf(), filtered).graph(), pinned.graph());
         } catch (CustomException | DataAccessException | TransactionException unavailable) {
             throw new ChatToolUnavailable("graph versions around " + scope.graphVersionId() + " cannot be read", unavailable);
         }

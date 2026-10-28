@@ -161,6 +161,49 @@ class EventListServiceTest {
     }
 
     @Test
+    void aLaterPageWithAnAsOfKeepsTheFirstPagesVersionWhenAnotherIsActivatedForThatTimeBetweenPages() {
+        // The version public at the asOf, as the selector sees it: 10-01 for the first page, 10-08 after an activation.
+        String[] activeAt = {"fixture-2026-10-01"};
+        var fixtures = GraphReadFixtures.repository();
+        var versions = new com.zoop.graph.version.GraphVersionRepository() {
+            public java.util.Optional<com.zoop.graph.version.GraphVersionRecord> find(String id) { return fixtures.find(id); }
+            public java.util.Optional<com.zoop.graph.version.GraphVersionRecord> active() { return fixtures.active(); }
+            public java.util.Optional<String> activeVersionIdAt(Instant asOf) { return java.util.Optional.of(activeAt[0]); }
+            public boolean everActivated(String id) { return fixtures.everActivated(id); }
+            public java.util.Optional<Instant> firstActivatedAt(String id) { return fixtures.firstActivatedAt(id); }
+        };
+        var reader = new PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(versions,
+                java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)),
+                new com.zoop.graph.snapshot.FixtureGraphSnapshotStore(getClass().getClassLoader()), pinned -> DisclosureExclusions.NONE);
+        var paged = new EventListService(reader, mock(NamedParameterJdbcTemplate.class), JsonMapper.builder().build());
+        String asOf = "2026-10-05T00:00:00Z";
+
+        List<String> expected = new java.util.ArrayList<>();
+        String next = null;
+        do {
+            var page = paged.list(null, null, null, null, next, 1, null, asOf);
+            expected.addAll(ids(page.items()));
+            expected.addAll(ids(page.unknownTimeItems()));
+            next = page.nextCursor();
+        } while (next != null);
+
+        var first = paged.list(null, null, null, null, null, 1, null, asOf);
+        assertNotNull(first.nextCursor());
+        activeAt[0] = "fixture-2026-10-08";
+        List<String> pages = new java.util.ArrayList<>(ids(first.items()));
+        pages.addAll(ids(first.unknownTimeItems()));
+        next = first.nextCursor();
+        while (next != null) {
+            var page = paged.list(null, null, null, null, next, 1, null, asOf);
+            assertEquals("fixture-2026-10-01", page.metadata().graphVersion(), "the cursor's version, not the newly active one");
+            pages.addAll(ids(page.items()));
+            pages.addAll(ids(page.unknownTimeItems()));
+            next = page.nextCursor();
+        }
+        assertEquals(expected, pages, "no event skipped or repeated across the activation");
+    }
+
+    @Test
     void aLaterPageKeepsTheFirstPagesReadAndIsNeverReReadAsAVersionAlone() throws Exception {
         // One article of the active version has no publication time: a read as of the version's first activation drops what
         // only it supports, the default (unfiltered) read keeps it.
