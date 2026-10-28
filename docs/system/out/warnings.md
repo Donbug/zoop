@@ -338,7 +338,7 @@
 | BFF_PATH_DIFFERENCE | difference | cancelAnalysisJob | 목표 /api/v1/admin/jobs/{job_id}/cancel ↔ BFF /api/admin/jobs/{job_id}/cancel |  |
 | BFF_FIELD_DIFFERENCE | difference | cancelAnalysisJob | 목표만 504 · BFF만 180 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | getAiUsage | 목표 /api/v1/admin/ai-usage ↔ BFF /api/admin/ai-usage |  |
-| BFF_FIELD_DIFFERENCE | difference | getAiUsage | 목표만 172 · BFF만 35 · 형식/필수/권한 변경 10 |  |
+| BFF_FIELD_DIFFERENCE | difference | getAiUsage | 목표만 214 · BFF만 50 · 형식/필수/권한 변경 8 |  |
 | BFF_PATH_DIFFERENCE | difference | listAdminBriefingRounds | 목표 /api/v1/admin/briefings ↔ BFF /api/admin/briefings |  |
 | BFF_FIELD_DIFFERENCE | difference | listAdminBriefingRounds | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 12 |  |
 | BFF_PATH_DIFFERENCE | difference | getAdminBriefingRound | 목표 /api/v1/admin/briefings/{round_id} ↔ BFF /api/admin/briefings/{round_id} |  |

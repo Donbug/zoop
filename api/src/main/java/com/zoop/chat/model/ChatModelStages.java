@@ -380,7 +380,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         ChatStageCall request = new ChatStageCall(invocation, stage, mode, input);
         String execution;
         try {
-            execution = recorder.start(run.jobId(), stage, mode);
+            execution = recorder.start(run.jobId(), run.attemptNo(), stage, mode);
         } catch (RuntimeException unrecorded) {
             throw new ChatModels.Failure(Fate.NOT_SENT, "the model call could not be recorded");
         }
@@ -389,16 +389,18 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             reply = client.invoke(request);
         } catch (AiClientException error) {
             Fate fate = fate(error);
-            finish(execution, fate == Fate.UNKNOWN ? "unknown" : "failed", null, code(error));
+            finish(execution, fate == Fate.UNKNOWN ? "unknown" : "failed",
+                    fate == Fate.UNKNOWN ? "unknown" : "not_sent", null, code(error));
             throw new ChatModels.Failure(fate, "chat stage " + stage + " failed: " + code(error));
         }
         if (!reply.succeeded()) {
             ChatStageReply.Failure failure = reply.failure();
             Fate fate = failure.unknown() ? Fate.UNKNOWN : failure.sent() ? Fate.NOT_SENT : Fate.REFUSED;
-            finish(execution, failure.unknown() ? "unknown" : "failed", reply.receipt(), failure.code());
+            String sendState = failure.unknown() ? "unknown" : failure.sent() ? "sent" : "not_sent";
+            finish(execution, failure.unknown() ? "unknown" : "failed", sendState, reply.receipt(), failure.code());
             throw new ChatModels.Failure(fate, "chat stage " + stage + " failed: " + failure.code());
         }
-        finish(execution, "succeeded", reply.receipt(), null);
+        finish(execution, "succeeded", "sent", reply.receipt(), null);
         return reply.answer();
     }
 
@@ -423,13 +425,13 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         return "client_error";
     }
 
-    private void finish(String execution, String status, ChatStageReply.Receipt receipt, String code) {
+    private void finish(String execution, String status, String sendState, ChatStageReply.Receipt receipt, String code) {
         // A stage the engine cut off is interrupted, before or during this write, and an interrupted thread cannot use its
         // database connection. The outcome is written on a thread of its own, which the cancellation never reaches, and this
         // thread waits for it; an interrupt that arrives meanwhile is kept for after.
         Thread writer = Thread.ofVirtual().name("chat-model-ledger").start(() -> {
             try {
-                recorder.finish(execution, status, receipt, code);
+                recorder.finish(execution, status, sendState, receipt, code);
             } catch (RuntimeException unrecorded) {
                 // The stage outcome stands; the running row stays as evidence that the call was made.
             }

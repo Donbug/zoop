@@ -68,14 +68,14 @@ class ChatModelStagesTest {
 
     private final ChatModelStages stages = stages(new ChatModelRecorder(null, Clock.systemUTC()) {
         @Override
-        public String start(String jobId, String stage, String mode) {
-            recorded.add("start " + jobId + " " + stage + " " + mode);
+        public String start(String jobId, int attemptNo, String stage, String mode) {
+            recorded.add("start " + jobId + " " + attemptNo + " " + stage + " " + mode);
             return "aix-1";
         }
 
         @Override
-        public void finish(String id, String status, ChatStageReply.Receipt receipt, String errorCode) {
-            recorded.add("finish " + status + " " + (receipt == null ? "-" : receipt.model()) + " " + errorCode);
+        public void finish(String id, String status, String sendState, ChatStageReply.Receipt receipt, String errorCode) {
+            recorded.add("finish " + status + " " + sendState + " " + (receipt == null ? "-" : receipt.model()) + " " + errorCode);
         }
     });
 
@@ -149,7 +149,7 @@ class ChatModelStagesTest {
         assertEquals(Map.of("company.read", 0.9), r2.capabilities());
         assertEquals(List.of(SAMSUNG.id()), r2.targets());
         assertTrue(r2.explicit());
-        assertEquals(List.of("start chat-job-0001 chat-router replay", "finish succeeded jev null"), recorded);
+        assertEquals(List.of("start chat-job-0001 1 chat-router replay", "finish succeeded sent jev null"), recorded);
     }
 
     @Test
@@ -392,12 +392,12 @@ class ChatModelStagesTest {
         var writerInterrupted = new AtomicBoolean();
         var stages = stages(new ChatModelRecorder(null, Clock.systemUTC()) {
             @Override
-            public String start(String jobId, String stage, String mode) {
+            public String start(String jobId, int attemptNo, String stage, String mode) {
                 return "aix-1";
             }
 
             @Override
-            public void finish(String id, String status, ChatStageReply.Receipt receipt, String errorCode) {
+            public void finish(String id, String status, String sendState, ChatStageReply.Receipt receipt, String errorCode) {
                 writing.countDown();
                 try {
                     // The engine's cancellation lands here, in the middle of the write.

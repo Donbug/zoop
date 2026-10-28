@@ -3518,25 +3518,27 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| availability | 필수 | string {complete, partial, unavailable} | 기능별 집계 완전성. unavailable은 해당 기능 행을 유지하며 측정값은 null로 둔다. |
+| unavailableMetrics | 필수 | string[] | 이 기능에서 미측정인 필드의 기계 판독 키. |
 | feature | 필수 | string {chatbot, news-analysis, briefing, document-sentiment, briefing-outlook} | 내부 document-summary/semantic-verification은 news-analysis, 문서 기업 판정은 document-sentiment, 전망 판정은 briefing-outlook. 브리핑의 다른 생성 단계만 briefing에 집계한다. |
 | label | 필수 | string |  |
 | engine | 필수 | string |  |
 | modelBacked | 필수 | boolean |  |
-| requests | 필수 | integer | 기능별 접수 단위. chatbot=chat_jobs, news-analysis=summary document_analyses, document-sentiment=sentiment document_analyses, briefing=briefing_attempts, briefing-outlook=해당 시도의 outlook 단계. 멱등 재전송은 제외하며 기능 간 합산은 전체 요청 수가 아니다. |
-| succeeded | 필수 | integer | 해당 기능 requests 모집단에서 성공으로 종결한 수. 권리 보류와 진행 중 요청을 임의로 포함하지 않는다. |
-| failed | 필수 | integer | 해당 기능 requests 모집단에서 실패로 종결한 수. 권리 보류와 결과 불명확 호출을 모델 실패로 단정하지 않는다. |
+| requests | 필수 | integer / null | 기능별 접수 단위. chatbot=chat_jobs, news-analysis=summary document_analyses, document-sentiment=sentiment document_analyses, briefing=briefing_attempts, briefing-outlook=해당 시도의 outlook 단계. 멱등 재전송은 제외하며 기능 간 합산은 전체 요청 수가 아니다. |
+| succeeded | 필수 | integer / null | 해당 기능 requests 모집단에서 성공으로 종결한 수. 권리 보류와 진행 중 요청을 임의로 포함하지 않는다. |
+| failed | 필수 | integer / null | 해당 기능 requests 모집단에서 실패로 종결한 수. 권리 보류와 결과 불명확 호출을 모델 실패로 단정하지 않는다. |
 | latencyMs | 필수 | [LatencyOut](#schema-latencyout) / null |  |
 | usage | 필수 | [FeatureUsage](#schema-featureusage) |  |
 | cost | 필수 | [FeatureCost](#schema-featurecost) |  |
 | source | 필수 | string {measured, job-runner, ledger-db, document} |  |
-| recentErrors | 필수 | [RecentError](#schema-recenterror)[] |  |
+| recentErrors | 필수 | [RecentError](#schema-recenterror)[] / null | 오류 없음은 [], 원천 미가용/부분 실패는 null이다. |
 | note | 필수 | string |  |
 
 <a id="schema-aiusageday"></a>
 
 ### AiUsageDay
 
-하루(KST) 동안의 기능별 모델 사용량(getAiUsage.daily). 집계 window 경계 이상 asOf 이하의 ai_executions를 started_at 기준으로 고른 뒤, started_at을 KST 날짜로 변환해 귀속한다. 자정을 넘어 끝나거나 나중에 영수증이 확인된 실행도 시작일에 남는다. running·unknown 실행은 호출 수 모집단에 포함하되 아직 모르는 토큰·비용은 0이 아니라 null이다.
+하루(KST) 동안의 기능별 모델 사용량(getAiUsage.daily). 매 날짜에 5개 기능 행을 유지한다. 집계 window 경계 이상 asOf 이하의 ai_executions를 started_at 기준으로 고른 뒤, started_at을 KST 날짜로 변환해 귀속한다. 자정을 넘어 끝나거나 나중에 영수증이 확인된 실행도 시작일에 남는다. running·unknown 실행은 호출 수 모집단에 포함하되 아직 모르는 토큰·비용은 0이 아니라 null이다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -3551,6 +3553,8 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| availability | 필수 | string {complete, partial, unavailable} |  |
+| unavailableMetrics | 필수 | string[] |  |
 | feature | 필수 | string | ai_executions.feature (chatbot, briefing, briefing-outlook, news-analysis, document-sentiment). 귀속 규칙은 getAiUsage 설명과 같다. |
 | modelCalls | 필수 | integer / null | execution_mode=live인 실제 외부 모델 시도 수. replay·save_only는 넣지 않는다. 모르면 null |
 | inputTokens | 필수 | integer / null |  |
@@ -3566,7 +3570,9 @@ AI 사용 회원 수(getAiUsage.members). 화면은 각 값을 totalMembers로 �
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| totalMembers | 필수 | integer | 집계 기간 끝 기준 가입 회원 수(탈퇴 제외) |
+| availability | 필수 | string {complete, partial, unavailable} |  |
+| unavailableMetrics | 필수 | string[] |  |
+| totalMembers | 필수 | integer / null | 집계 기간 끝 기준 가입 회원 수(탈퇴 제외) |
 | aiMembers | 필수 | integer / null | 기간 안에 회원 단위로 셀 수 있는 AI 기능을 한 번이라도 쓴 회원 수(중복 제거). 측정하지 않으면 null |
 | chatbotMembers | 필수 | integer / null | 기간 안에 챗봇 질문을 한 회원 수(chat_sessions.member_id 중복 제거). 측정하지 않으면 null |
 | briefingMembers | 필수 | integer / null | 기간 안에 브리핑을 읽은 회원 수. 회원별 읽음 기록이 없으면 null |
@@ -3580,9 +3586,11 @@ AI 사용 회원 수(getAiUsage.members). 화면은 각 값을 totalMembers로 �
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| availability | 필수 | string {complete, partial} | 응답 전체의 집계 완전성. 일부 원천을 읽지 못해도 가능한 기능 행은 반환한다. |
+| unavailableMetrics | 필수 | string[] | 응답 전반에서 집계하지 못한 경로를 나타내는 키. |
 | asOf | 필수 | string (date-time) |  |
 | window | 필수 | string {24h, 7d, 30d, all} |  |
-| features | 필수 | [AiFeature](#schema-aifeature)[] |  |
+| features | 필수 | [AiFeature](#schema-aifeature)[] | 항상 5개 기능(chatbot, news-analysis, briefing, document-sentiment, briefing-outlook)을 기능별 가용성과 함께 반환한다. |
 | pastRuns | 필수 | [PastRun](#schema-pastrun)[] |  |
 | cost | 필수 | [FeatureCost](#schema-featurecost) |  |
 | daily | 선택 | [AiUsageDay](#schema-aiusageday)[] / null | 제안(2026-10-24, A-ADM-04b 날짜별 그래프): 집계 기간의 KST 날짜별·기능별 모델 사용량. ai_executions.started_at이 요청 window 경계 이상 asOf 이하인 실행을 started_at의 KST 날짜에 귀속한다. 24h·7d·30d의 첫날과 마지막 날은 window 경계에 따라 일부 시간만 포함할 수 있다. 오래된 날짜부터 정렬하고, 사용 기록이 없는 날도 빠뜨리지 않는다. 서버가 아직 집계하지 않으면 필드를 생략하거나 null이다. |
@@ -5606,8 +5614,8 @@ details에는 승인된 검증 정보만 제공한다. 스택·원문·개인정
 | modelCalls | 필수 | integer / null | 실제 외부 모델 전송이 확인된 live 시도 수. 미영수증·결과 불명확 시도로 전체 수를 확정할 수 없으면 null. replay/save_only 제외. |
 | inputTokens | 필수 | integer / null | 확인된 입력 토큰 합계. 일부 시도에서 미보고되어 합계를 확정할 수 없으면 null. |
 | outputTokens | 필수 | integer / null | 확인된 출력 토큰 합계. 일부 시도에서 미보고되어 합계를 확정할 수 없으면 null. |
-| replayCalls | 필수 | integer | 저장된 판정 재사용 횟수. 모델 호출 횟수와 구분한다. |
-| retries | 필수 | integer | 최초 실행 뒤 새 앱/도메인 시도 또는 추가 모델 호출을 동반한 재시도 수. 같은 키 재전송·poll·모델 재호출 없는 recover·save_only는 제외하고 한 재시도 단위는 한 번만 센다. |
+| replayCalls | 필수 | integer / null | 저장된 판정 재사용 횟수. 모델 호출 횟수와 구분한다. |
+| retries | 필수 | integer / null | 최초 실행 뒤 새 앱/도메인 시도 또는 추가 모델 호출을 동반한 재시도 수. 같은 키 재전송·poll·모델 재호출 없는 recover·save_only는 제외하고 한 재시도 단위는 한 번만 센다. |
 
 <a id="schema-feedbackday"></a>
 

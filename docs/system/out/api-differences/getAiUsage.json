@@ -7,6 +7,14 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "response:200:application/json.availability": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partial"
+      ]
+    },
+    "response:200:application/json.availability:required": true,
     "response:200:application/json.daily:required": false,
     "response:200:application/json.daily<anyOf:0>": {
       "type": "array"
@@ -33,6 +41,15 @@
     "response:200:application/json.daily<anyOf:0>[].features[].actualCost<anyOf:1>": {
       "type": "null"
     },
+    "response:200:application/json.daily<anyOf:0>[].features[].availability": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partial",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.daily<anyOf:0>[].features[].availability:required": true,
     "response:200:application/json.daily<anyOf:0>[].features[].estimatedCost:required": true,
     "response:200:application/json.daily<anyOf:0>[].features[].estimatedCost<anyOf:0>": {
       "type": "number"
@@ -65,7 +82,89 @@
     "response:200:application/json.daily<anyOf:0>[].features[].outputTokens<anyOf:1>": {
       "type": "null"
     },
+    "response:200:application/json.daily<anyOf:0>[].features[].unavailableMetrics": {
+      "type": "array"
+    },
+    "response:200:application/json.daily<anyOf:0>[].features[].unavailableMetrics:required": true,
+    "response:200:application/json.daily<anyOf:0>[].features[].unavailableMetrics[]": {
+      "type": "string"
+    },
     "response:200:application/json.daily<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.features[].availability": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partial",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.features[].availability:required": true,
+    "response:200:application/json.features[].failed<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.features[].failed<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.features[].recentErrors<anyOf:0>": {
+      "type": "array"
+    },
+    "response:200:application/json.features[].recentErrors<anyOf:0>[]": {
+      "type": "object"
+    },
+    "response:200:application/json.features[].recentErrors<anyOf:0>[].at": {
+      "type": "string"
+    },
+    "response:200:application/json.features[].recentErrors<anyOf:0>[].at:required": true,
+    "response:200:application/json.features[].recentErrors<anyOf:0>[].code:required": true,
+    "response:200:application/json.features[].recentErrors<anyOf:0>[].code<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.features[].recentErrors<anyOf:0>[].code<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.features[].recentErrors<anyOf:0>[].message:required": true,
+    "response:200:application/json.features[].recentErrors<anyOf:0>[].message<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.features[].recentErrors<anyOf:0>[].message<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.features[].recentErrors<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.features[].requests<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.features[].requests<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.features[].succeeded<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.features[].succeeded<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.features[].unavailableMetrics": {
+      "type": "array"
+    },
+    "response:200:application/json.features[].unavailableMetrics:required": true,
+    "response:200:application/json.features[].unavailableMetrics[]": {
+      "type": "string"
+    },
+    "response:200:application/json.features[].usage.replayCalls<anyOf:0>": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.features[].usage.replayCalls<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.features[].usage.retries<anyOf:0>": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.features[].usage.retries<anyOf:1>": {
       "type": "null"
     },
     "response:200:application/json.members:required": false,
@@ -79,6 +178,15 @@
     "response:200:application/json.members<anyOf:0>.aiMembers<anyOf:1>": {
       "type": "null"
     },
+    "response:200:application/json.members<anyOf:0>.availability": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partial",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.members<anyOf:0>.availability:required": true,
     "response:200:application/json.members<anyOf:0>.briefingMembers:required": true,
     "response:200:application/json.members<anyOf:0>.briefingMembers<anyOf:0>": {
       "type": "integer"
@@ -100,10 +208,20 @@
     "response:200:application/json.members<anyOf:0>.note<anyOf:1>": {
       "type": "null"
     },
-    "response:200:application/json.members<anyOf:0>.totalMembers": {
+    "response:200:application/json.members<anyOf:0>.totalMembers:required": true,
+    "response:200:application/json.members<anyOf:0>.totalMembers<anyOf:0>": {
       "type": "integer"
     },
-    "response:200:application/json.members<anyOf:0>.totalMembers:required": true,
+    "response:200:application/json.members<anyOf:0>.totalMembers<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.members<anyOf:0>.unavailableMetrics": {
+      "type": "array"
+    },
+    "response:200:application/json.members<anyOf:0>.unavailableMetrics:required": true,
+    "response:200:application/json.members<anyOf:0>.unavailableMetrics[]": {
+      "type": "string"
+    },
     "response:200:application/json.members<anyOf:1>": {
       "type": "null"
     },
@@ -139,6 +257,13 @@
     "response:200:application/json.pastRuns[].usage<anyOf:0>.replayCalls:required": true,
     "response:200:application/json.pastRuns[].usage<anyOf:1>": {
       "type": "null"
+    },
+    "response:200:application/json.unavailableMetrics": {
+      "type": "array"
+    },
+    "response:200:application/json.unavailableMetrics:required": true,
+    "response:200:application/json.unavailableMetrics[]": {
+      "type": "string"
     },
     "response:200:header:X-Request-ID": {
       "type": "string"
@@ -414,6 +539,45 @@
     }
   },
   "bffOnly": {
+    "response:200:application/json.features[].failed": {
+      "type": "integer"
+    },
+    "response:200:application/json.features[].recentErrors": {
+      "type": "array"
+    },
+    "response:200:application/json.features[].recentErrors[]": {
+      "type": "object"
+    },
+    "response:200:application/json.features[].recentErrors[].at": {
+      "type": "string"
+    },
+    "response:200:application/json.features[].recentErrors[].at:required": true,
+    "response:200:application/json.features[].recentErrors[].code:required": true,
+    "response:200:application/json.features[].recentErrors[].code<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.features[].recentErrors[].code<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.features[].recentErrors[].message:required": true,
+    "response:200:application/json.features[].recentErrors[].message<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.features[].recentErrors[].message<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.features[].requests": {
+      "type": "integer"
+    },
+    "response:200:application/json.features[].succeeded": {
+      "type": "integer"
+    },
+    "response:200:application/json.features[].usage.replayCalls": {
+      "type": "integer"
+    },
+    "response:200:application/json.features[].usage.retries": {
+      "type": "integer"
+    },
     "response:200:application/json.pastRuns[].usage": {
       "type": "object"
     },
@@ -530,24 +694,6 @@
           "document-summary",
           "semantic-verification"
         ]
-      }
-    },
-    "response:200:application/json.features[].usage.replayCalls": {
-      "target": {
-        "type": "integer",
-        "minimum": 0
-      },
-      "bff": {
-        "type": "integer"
-      }
-    },
-    "response:200:application/json.features[].usage.retries": {
-      "target": {
-        "type": "integer",
-        "minimum": 0
-      },
-      "bff": {
-        "type": "integer"
       }
     },
     "response:401:application/json.error.code": {

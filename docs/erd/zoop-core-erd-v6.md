@@ -571,13 +571,16 @@ job checkpoint `zoop-app-analyze-plan-checkpoint-1`은 phase, activeOrdinal, ter
 
 ### 32. ai_executions — AI 호출·재사용·복구 관측
 
+FS068/getAiUsage 집계 원천, null 규칙, 합성 기대값은 [관리자 AI 사용량 집계 기준](../../api/docs/AI_USAGE_AGGREGATION.md)을 참고한다.
+
 ```text
 id text PK; feature text; execution_mode text; status text
 chat_job_id text? FK chat_jobs; briefing_attempt_id text? FK briefing_attempts
 analysis_job_id text? FK analysis_jobs; document_analysis_id text? FK document_analyses
 ai_job_id text?; ai_attempt_id text?; stage text?; receipt_artifact_id text? FK artifacts
 grant_id text?; grant_revision text?; grant_checked_at timestamptz?; grant_scope jsonb?
-attempt_no integer?; provider text?; model text?; prompt_version text?; reasoning_effort text?
+attempt_no integer?; provider_send_state text?; provider_revision text?; receipt_execution_mode text?
+provider_sent_at timestamptz?; provider_received_at timestamptz?; provider text?; model text?; prompt_version text?; reasoning_effort text?
 input_tokens bigint?; output_tokens bigint?; estimated_cost numeric?; actual_cost numeric?; currency text?
 error_code text?; error_message text?; started_at timestamptz; finished_at timestamptz?
 transmission_confirmed boolean?; retry_unit_id text?; cost_basis jsonb?
@@ -587,6 +590,8 @@ UNIQUE(ai_job_id, ai_attempt_id) WHERE ai_job_id IS NOT NULL AND ai_attempt_id I
 feature별 시간·오류·비용 집계가 필요하므로 개별 행을 유지한다. 네 소유/문맥 FK 중 적어도 하나가 NOT NULL이어야 한다. chat_job_id·briefing_attempt_id·analysis_job_id 세 실행 소유 FK는 최대 하나만 허용하고 document_analysis_id는 독립 또는 실행 소유 FK와 함께 허용한다. 문서 분석과 analysis_job이 함께 있으면 document_analyses.analysis_job_id와 일치해야 한다. 다른 실행 소유와 문서 분석을 함께 기록하면 고정 입력에 해당 분석 ID가 실제 포함됐는지 저장 경로에서 검사한다. 이것은 실행 한 건의 추가 문맥이며 중복 실행 행을 만들지 않는다.
 
 컬럼 CHECK는 `num_nonnulls(chat_job_id, briefing_attempt_id, analysis_job_id, document_analysis_id)>=1` 및 `num_nonnulls(chat_job_id, briefing_attempt_id, analysis_job_id)<=1`이다. 교차 행 관계는 저장 트랜잭션/트리거로 검증한다. chat/analysis 작업에 연결된 attempt_no는 그 소유 작업의 실제 시도 번호이고, briefing_attempt_id는 자체로 시도를 식별한다. 문서 분석만 연결된 실행은 attempt_no=NULL을 허용한다. 집계는 실행 id를 기준으로 한 번만 센다.
+
+chatbot 실행은 `chat_job_id`와 실제 `chat_jobs.attempts[].n`에 해당하는 `attempt_no`를 함께 저장한다. `provider_send_state`는 `sent`/`not_sent`/`unknown`으로 요청 전송 여부를 보존하며, 과거 행은 NULL(미확인)이다. 이 값과 `status`는 서로 다른 축이다. 챗봇 attempt 재시도 수는 작업 단위 `chat_jobs.attempts`를 기준으로 세며 개별 모델 단계 연결에는 이 쌍을 쓴다.
 
 execution_mode는 live/replay/save_only로 통일한다. replay는 저장 산출물 재사용이고 save_only는 검증 결과 저장 복구로 모델 실호출 수에 넣지 않는다. 문서 provenance의 replay/live와 같은 용어를 쓰되 save_only를 해당 공개 enum에 추가하지 않는다. 미제공 비용은 NULL. 인덱스: `(feature, started_at)`, `(status, started_at)`.
 

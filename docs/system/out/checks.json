@@ -2342,7 +2342,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAiUsage",
       "severity": "difference",
-      "message": "목표만 172 · BFF만 35 · 형식/필수/권한 변경 10",
+      "message": "목표만 214 · BFF만 50 · 형식/필수/권한 변경 8",
       "source": ""
     },
     {
