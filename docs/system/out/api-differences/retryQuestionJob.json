@@ -104,7 +104,8 @@
       "type": "string",
       "enum": [
         "article",
-        "zoop_doc"
+        "zoop_doc",
+        "company_profile"
       ]
     },
     "response:200:application/json.result<anyOf:0>.citations[].sourceKind:required": true,
@@ -122,6 +123,7 @@
         "investment_advice",
         "precondition_unmet",
         "results_truncated",
+        "not_in_member_scope",
         "evidence_insufficient",
         "out_of_scope"
       ]
@@ -304,7 +306,8 @@
       "type": "string",
       "enum": [
         "article",
-        "zoop_doc"
+        "zoop_doc",
+        "company_profile"
       ]
     },
     "response:202:application/json.result<anyOf:0>.citations[].sourceKind:required": true,
@@ -322,6 +325,7 @@
         "investment_advice",
         "precondition_unmet",
         "results_truncated",
+        "not_in_member_scope",
         "evidence_insufficient",
         "out_of_scope"
       ]

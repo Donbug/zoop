@@ -57,9 +57,10 @@ def call_pin_problem(view: ExtractionView, pins: Pins) -> str | None:
 
 class ExtractionDispatcher:
     def __init__(self, ledger: ExtractionLedger, process: ExtractionProcess, gate: RelationGate, log: Callable[[dict[str, Any]], None],
-                 authorize: Callable[[str, Pins, str], str | None]):
+                 authorize: Callable[[str, Pins, str], str | None], *, online_authority=None):
         """`authorize(owner, pins, job id)` returns None when the approval and fixtures are still the reserved ones, otherwise a stable refusal code."""
         self._ledger, self._process, self._gate, self._log, self._authorize = ledger, process, gate, log, authorize
+        self._online_authority = online_authority
         self._wake, self._stop = threading.Event(), threading.Event()
         self._unrecorded: tuple[Claim, Update] | None = None  # a finished dispatch whose ledger write has not yet succeeded
         self._thread = threading.Thread(target=self._loop, name="zoop-ai-extraction-dispatcher", daemon=True)
@@ -140,7 +141,9 @@ class ExtractionDispatcher:
             if claim.pins.live_binding is not None and not self._process.live_available:
                 self._log({"event": "extraction_dispatch", "jobId": claim.job_id, "outcome": "live_unavailable"})
                 return Update("idle", "runtime_error", "live_unavailable")
-            refusal = self._authorize(claim.owner, claim.pins, claim.job_id)
+            refusal = (self._online_authority.refuse_s2(claim) if self._online_authority is not None
+                       else "authority_origin_mismatch" if claim.authority_ref is not None
+                       else self._authorize(claim.owner, claim.pins, claim.job_id))
             if refusal is not None:
                 self._log({"event": "extraction_dispatch", "jobId": claim.job_id, "outcome": refusal})
                 return Update("idle", "runtime_error", refusal)

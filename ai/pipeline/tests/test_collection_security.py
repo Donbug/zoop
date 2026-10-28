@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import errno
 import os
 import socket
+import struct
 import subprocess
 import sys
 import threading
@@ -210,6 +212,8 @@ class DrippingServer:
 
     def serve(self, connection):
         try:
+            path = None
+            drip_phase = False
             connection.settimeout(2)
             request = b""
             while b"\r\n\r\n" not in request and len(request) < 65536:
@@ -224,6 +228,7 @@ class DrippingServer:
                 return
             connection.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 10\r\nConnection: close\r\nX-Slow: "
                                + (b"ok\r\n\r\n" if self.complete_headers else b""))
+            drip_phase = True
             deadline = time.monotonic() + self.seconds
             while time.monotonic() < deadline and not self.stop.wait(self.interval):
                 connection.sendall(b"a")
@@ -237,7 +242,13 @@ class DrippingServer:
             if not self.complete_headers:
                 connection.sendall(b"\r\n\r\n")
             connection.sendall(b"hello")
-        except (OSError, IndexError):
+        except OSError as exc:
+            # A reset or broken pipe during the target drip is closure too; robots and failed handshakes prove nothing.
+            if drip_phase and path != "/robots.txt" and (
+                isinstance(exc, (ConnectionResetError, BrokenPipeError)) or exc.errno in (errno.ECONNRESET, errno.EPIPE)
+            ):
+                self.peer_closed.set()
+        except IndexError:
             pass
         finally:
             connection.close()
@@ -268,6 +279,18 @@ def test_slowly_dripped_response_headers_cannot_outlive_the_absolute_deadline(ki
     assert elapsed < 4.5, f"the collector kept reading dripped headers for {elapsed:.1f}s despite a 1s/2s budget"
     assert dripping.peer_closed.wait(1.5), "the timed-out request left a live socket behind"
     assert collections(kit) == [".lock", "slow-headers"], "a timed-out request left a temporary collection behind"
+
+
+def test_dripping_target_counts_tcp_reset_after_response_begins_as_peer_closure():
+    server = DrippingServer(seconds=1, interval=0.02)
+    try:
+        with socket.create_connection(("127.0.0.1", server.port), timeout=2) as client:
+            client.sendall(b"GET /slow HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+            assert client.recv(4096), "the target response must begin before the client resets it"
+            client.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+        assert server.peer_closed.wait(1.5), "a TCP reset during the target drip was not observed as peer closure"
+    finally:
+        server.close()
 
 
 def test_slowly_dripped_body_is_cancelled_and_no_partial_body_is_published(kit):

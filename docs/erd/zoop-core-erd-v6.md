@@ -6,7 +6,7 @@
 
 ## 1. 결정 요약
 
-**PostgreSQL 36개 테이블.** 함께 저장하고 읽는 결과는 JSON으로 통합하고 독립 조회·집계·무결성에 필요한 관계는 테이블로 유지한다. v0.7 챗봇 오케스트레이션의 실제 MCP 호출은 독립 관측·예산 집계를 위해 `chat_tool_calls`로 분리한다.
+**PostgreSQL 42개 테이블.** 함께 저장하고 읽는 결과는 JSON으로 통합하고 독립 조회·집계·무결성에 필요한 관계는 테이블로 유지한다. v0.7 챗봇 오케스트레이션의 실제 도구 호출은 독립 관측·예산 집계를 위해 `chat_tool_calls`로 분리하고, 고정 계획의 여러 앱 시도가 공유하는 실행 참조는 `analysis_plans`·`analysis_plan_units`로 정규화한다.
 
 기존 설계는 회원과 1:1인 비밀번호·설정, 분석 결과 내부의 주장·인용, 발행본 내부 항목·판정, 응답과 함께 읽는 채팅 인용까지 분리했다. API가 독립 수정·검색을 요구하지 않는 구성 요소에도 별도 테이블을 배정한 것이 개수 증가의 큰 원인이다. 재시도·정정·감사 등 명세가 실제로 요구하는 기능도 개수에 영향을 준다.
 
@@ -25,11 +25,11 @@
 | 문서·근거·분석 | 5 | 분석 내부 주장·인용·긍부정을 한 결과에 저장 |
 | 브리핑 | 3 | 회차에 발행 원문 보관, 정정·중단은 한 이력 테이블 |
 | 채팅 | 3 | 작업에 결과·인용·라우팅 요약을 포함하고 실제 도구 호출은 독립 기록 |
-| 그래프·검수·공개 규칙 | 6 | 실제 조회 이력 유지, 버전 상태·활성 포인터 통합 |
-| 평가·작업·통계·감사 | 6 | 독립 집계·조회가 필요한 기록 유지 |
-| **합계** | **36** | Neo4j 노드·관계 및 파일 저장소는 이 개수에 포함하지 않음 |
+| 그래프·검수·공개 규칙·공개 제외 | 10 | 실제 조회 이력 유지, 버전 상태·활성 포인터 통합, 버전별 적용 규칙, 버전별 공개 제외 이력·명령 기록 |
+| 평가·작업·통계·감사 | 8 | 독립 집계·조회가 필요한 기록, 계획 등록·단위별 실행 원장 유지 |
+| **합계** | **42** | Neo4j 노드·관계 및 파일 저장소는 이 개수에 포함하지 않음 |
 
-36개는 이 설계안의 선택이지 API가 강제하는 최소 개수가 아니다. 개발 일정과 인력 배분은 이 ERD의 범위에서 제외한다.
+42개는 이 설계안의 선택이지 API가 강제하는 최소 개수가 아니다. 개발 일정과 인력 배분은 이 ERD의 범위에서 제외한다.
 
 ## 2. 저장소와 공통 규칙
 
@@ -46,8 +46,8 @@ PostgreSQL은 회원·카탈로그·문서·결과·이력을 저장한다. Neo4
 
 ### 앱 작업·AI 작업·입력 버전 연결 규칙
 
-- 공개 관리자 API의 `jobId`는 `analysis_jobs.id`다. 내부 AI 서비스의 `jobId`는 별도 식별자이며 한 앱 작업에 여러 AI 작업을 허용한다. `analysis_jobs.input`은 최초 명령·검수 원천 버전을 고정하고, `checkpoint.aiUnits[]`는 하위 단위별 `{unitKey, aiJobId, submitArtifactId, runtimeInputDigest?}`를 저장한다. `unitKey`는 작업 안에서 유일하다. `document_analyses.ai_job_id`는 해당 문서·단계 요청의 내부 AI 작업을, `briefing_attempts.stages`는 단계별 AI 작업 ID를 가리킨다. 모두 submit 전에 ID와 불변 요청 본문 artifact를 커밋한다.
-- 내부 submit은 저장된 `aiJobId`를 `body.jobId`와 `Idempotency-Key`에 동일하게 쓴다. 전송 결과가 불명확하면 같은 ID·본문을 재전송하고 poll·recover·저장만 복구에도 새 ID를 만들지 않는다. 명시적 재분석은 새 `document_analyses` 행·`request_no`를, 관리자 재시도는 `retry_of`가 있는 새 `analysis_jobs` 행을 만든다. 새 모델 실행이 필요할 때 새 AI `jobId`를 발급하며 이전 결과·호출 이력을 덮어쓰지 않는다.
+- 공개 관리자 API의 `jobId`는 `analysis_jobs.id`다. 내부 AI 서비스의 `jobId`는 별도 식별자이며 한 앱 작업에 여러 AI 작업을 허용한다. 기존 작업의 `checkpoint.aiUnits[]` 계약과 이력은 유지한다. 새 `analyze_plan`의 정본은 `analysis_plan_units`이며, 계획의 검증된 순서·고정 S2/S3 명령·단계 관측을 앱 재시도 사이에서 공유한다. 매 poll마다 전체 manifest나 단위 배열을 복사하지 않는다. `document_analyses.ai_job_id`·`briefing_attempts.stages`는 각 소비 기능의 계약을 따른다.
+- 내부 submit은 저장된 AI ID를 `body.jobId`와 `Idempotency-Key`에 동일하게 쓴다. poll·recover·응답 유실 조정에도 새 ID를 만들지 않는다. 관리자 retry는 새 `analysis_jobs` 행이지만 `analyze_plan`은 같은 계획의 고정 S2/S3 ID를 이어서 처리한다. 새 모델 실행은 별도로 준비한 새 계획이며 앱이 nonce나 ID를 만들어 대신하지 않는다.
 - AI 서비스 호출 영수증의 `jobId`/`attemptId`는 `ai_executions.ai_job_id`/`ai_attempt_id`에 그대로 저장한다. 영수증 본문은 `receipt_artifact_id`의 불변 파일에 저장한다. 같은 `(ai_job_id, ai_attempt_id)`를 다시 수집하면 기존 실행 행을 반환해 호출·토큰·비용을 중복 집계하지 않는다. 작업 수준 `inputDigest`와 개별 호출의 `inputDigest`는 다른 값일 수 있으므로 각각 해당 원본과 대조한다. 이 식별자 관계는 `ai_executions.id`의 문자열 형식에 의존하지 않는다.
 - 문서 입력 `article_version`, 분석의 `result_version`, 검수 원천의 `source_version`/`source_revision`, 관리자 결정 `revision`은 서로 독립적이다. 문서 분석은 문서 버전·단계·회사 맥락·`request_no`별로 고정하고, 새 분석은 새 `request_no`와 성공 시 새 `result_version`을 갖는다. 그래프와 브리핑은 사용한 분석 ID·결과 버전·검수 revision을 생성 시점에 고정한다.
 - 검수 대상별 `review_targets.current_revision` 및 전역 `review_decisions.global_revision`은 앱의 결정 revision이다. AI 후보의 `review_targets.source_revision`은 원천 revision이다. 앱 결정 때만 앱 revision을 증가시키고, AI 원천 변경만으로 앱 revision을 증가시키지 않는다. 결정 당시의 원천 버전·revision은 같은 트랜잭션의 `audit_logs.detail`에 `reviewDecisionId`와 함께 고정하고, 해당 감사 행은 결정 이력이 남아 있는 동안 보존한다. 원천 버전·revision이 현재 값과 다른 과거 결정은 새 원천의 승인 근거로 쓰지 않는다. 그래프·브리핑의 `review_revision`은 발행 시점 앱 전역 revision이며 AI 원천 revision이 아니다.
@@ -402,7 +402,14 @@ UNIQUE(active) WHERE active=true
 
 활성화는 공통 DB advisory lock 안에서 기존 active=false, 대상 active=true, graph_activations INSERT, 감사 기록을 한 트랜잭션으로 수행한다. 읽는 쪽은 요청 시작에 버전 하나를 고정한다. 투영 성공과 검증 통과 전에는 활성화하지 않는다. 버전 없는 최신 그래프로 fallback하지 않는다.
 
-review_revision은 버전 생성 트랜잭션의 공통 publication_state 잠금 아래 읽은 `COALESCE(MAX(review_decisions.global_revision),0)`를 snapshot과 함께 고정한다. 외부 snapshot 생성은 잠금 밖에서 수행하되 커밋 시 입력 revision과 현재 revision의 일치를 검사한다. 이후 새 결정이 생겨도 고정값을 수정하지 않는다. rule_revision은 publication_rule_changes.log_revision의 별도 카운터다.
+review_revision(`COALESCE(MAX(review_decisions.global_revision),0)`)과 rule_revision(`COALESCE(MAX(publication_rule_changes.log_revision),0)`)은 인계 묶음 수입 트랜잭션이 켜진 규칙과 함께 **한 SQL 문장**으로 읽어 snapshot과 함께 고정한다. 수입은 정기 회차(30분)마다 돌므로 공통 publication_state 잠금을 잡지 않는다. 두 카운터는 그 잠금 아래 MAX+1로 할당되고 잠금이 커밋까지 유지되므로, 한 문장은 각각의 커밋된 앞부분을 보고 그때의 규칙 상태와 어긋나지 않는다. 읽은 뒤 커밋된 결정·규칙 전환은 다음 회차 버전에 반영한다. 이후 새 결정이 생겨도 고정값을 수정하지 않는다. 규칙 이전에 수입된 버전은 rule_revision NULL이며 규칙을 적용하지 않았다.
+
+```text
+graph_version_rules: graph_version_id text FK graph_versions ON DELETE CASCADE; rule_id text FK publication_rules
+PRIMARY KEY(graph_version_id, rule_id)
+```
+
+graph_version_rules는 그 버전 snapshot을 거른 규칙(수입 시점에 켜져 있던 규칙)이다. 같은 고정값으로 다시 수입하면 지금 켜진 규칙이 아니라 이 규칙으로 다시 계산해 비교한다. 행은 버전과 함께 쓰고 UPDATE를 거절한다. `published*`는 receipt와 이 규칙으로 언제든 같은 판정 함수로 다시 계산할 수 있어 따로 저장하지 않는다.
 
 activated_at 컬럼은 제거한다. GraphVersionOut.activatedAt은 graph_activations에서 이 버전의 pointer_changed=true인 마지막 시각으로 계산한다. active 컬럼은 현재 포인터의 권위값이며 그 변경·동일 변경 이력·감사는 공통 잠금 아래 하나의 트랜잭션에서만 기록한다. 일반 UPDATE 권한으로 active를 수정하지 못하게 한다. 이력을 현재 active와 경쟁하는 별도 쓰기 경로로 사용하지 않는다.
 
@@ -421,16 +428,22 @@ actor_kind=admin이면 admin_id 필수 및 당시 관리자 이메일을 저장�
 ### 26. review_targets — 검수 대상 등록부·목록 투영
 
 ```text
-id text PK; target_type text; external_id text; source_version text
+id text PK; target_type text; source_job_id text; external_id text; source_version text
 candidate_id text; current_revision bigint; status text; active boolean; is_current boolean
 company_ids text[]; relation_types text[]; source_revision text; source_updated_at timestamptz?
 verification_artifact_id text? FK artifacts; updated_at timestamptz
-UNIQUE(target_type, external_id, source_version)
-UNIQUE(candidate_id) WHERE target_type='candidate' AND is_current=true
-UNIQUE(candidate_id, external_id) WHERE target_type='relation' AND is_current=true
+issue_id text?; title text?; action text?; target text?; event_time text?; evidence_count integer?
+companies jsonb?; reasons text[]?; operator_approved boolean?
+UNIQUE(target_type, source_job_id, external_id, source_version)
+UNIQUE(source_job_id, candidate_id) WHERE target_type='candidate' AND is_current=true
+UNIQUE(source_job_id, candidate_id, external_id) WHERE target_type='relation' AND is_current=true
 ```
 
+`source_job_id`는 후보를 만든 내부 S3 job이다(AI 담당 합의 2026-10-22). AI 후보 ID는 그 job과 고정 입력 안에서만 안정하므로 앱의 대상 키는 job ID와 후보 ID를 함께 쓰고, 결정은 그 job의 review 경로로 보낸다. 서로 다른 job의 같은 후보 ID는 서로를 대체하지 않는다. 그래서 동기화의 is_current 전환은 같은 `(source_job_id, candidate_id)`(relation은 `external_id`까지) 안에서만 일어나고, 다른 job의 행은 건드리지 않는다. 대상 행의 신원(`id`, `target_type`, `source_job_id`, `external_id`, `source_version`, `candidate_id`)은 DB trigger로 변경을 막고, `current_revision`은 결정과 함께 1씩만 증가한다.
+
 detail JSON 복제를 제거한다. 근거·관계·검증 상세는 source_version/source_revision으로 고정한 분석 후보 원천에서 조회하고 RDB 결정 이력을 조합한다. RDB의 status/active/company_ids/relation_types는 목록 필터용 투영이며 권위 원천이 아니다. 원천 revision이 달라지면 동기화 후 반환하거나 명시적으로 실패 처리하며 오래된 투영과 새 상세를 섞지 않는다. 목록 커서도 source revision에 결합하고 원천이 그 snapshot을 지원하지 않으면 커서를 무효화한다.
+
+**목록 표시용 투영 (2026-10-26, #132).** 후보 목록이 행마다 AI 원천을 부르지 않고 SQL로 검색·페이지를 나누도록, 후보 행에 짧은 표시값 `issue_id`·`title`·`action`·`target`·`event_time`·`evidence_count`·`companies`(`[{sourceId, name, role}]`, AI 원천 기업 ID)·`reasons`(AI 판정 사유 코드)를 둔다. 동기화가 analyze-plan unit의 hash로 고정한 S2 결과와 S3 결과에서 함께 쓰며, 이것도 투영이고 권위 원천이 아니다. relation 행의 `operator_approved`는 AI eligibility의 `approvalBasis.kind=operator-final-approval` 투영이며, 후보 상세 `graphDb=pending`(운영자 승인 뒤 다음 인계·수입 대기)과 자동 통과를 구분하는 데만 쓴다. 인용문·관계 상세·검증 결과 같은 긴 내용은 복제하지 않는다. 사건이 없는 관계 후보와 relation 행은 `issue_id`·`title`·`action`·`target`·`event_time`이 NULL이다. 목록 커서는 원천 revision 대신 행의 `updated_at`(동기화 시각)과 `id`에 결합한다. 페이지를 넘기는 동안 동기화로 갱신된 행은 첫 페이지 쪽으로 옮겨 가며 이후 페이지에는 나오지 않는다.
 
 candidateId의 현재 후보 행은 부분 UNIQUE로 한 개만 허용한다. 과거 버전 행은 이력 FK를 위해 유지하며 is_current 전환과 관련 relation 등록을 한 트랜잭션으로 처리한다. API 결정은 현재 후보와 원천 revision을 다시 확인한다. 원천 ID 존재를 SQL FK로 위장하지 않는다. company_ids/relation_types에는 필요한 배열 GIN 인덱스를 둔다.
 
@@ -446,8 +459,12 @@ admin_id text? FK admins; admin_email_snapshot text; verification_artifact_id te
 decided_at timestamptz; revision bigint; global_revision bigint UNIQUE; origin text; job_id text? FK analysis_jobs
 UNIQUE(target_id, revision)
 CHECK(revision >= 1 AND global_revision >= 1)
-CHECK(origin <> 'admin' OR admin_id IS NOT NULL)
+CHECK(origin <> 'admin' OR (admin_id IS NOT NULL AND admin_email_snapshot IS NOT NULL))
 ```
+
+결정 이력은 추가만 허용한다(UPDATE·DELETE는 DB trigger가 거절).
+
+AI 원천에 결정을 보내기 전에 앱은 별도의 짧은 트랜잭션으로 멱등 키(processing)와 결정 의도 `review_decision_intents`를 먼저 저장한다. 의도는 AI operation id(관리자·method·path·멱등 키 전체 범위에서 만든 값), 대상 행, 요청(결정·사유·기대값 3개), 관리자 email snapshot을 고정하고, 상태는 pending에서 applied(정산한 결정 행), refused(원천이 아무것도 기록하지 않은 확정 거절), blocked(계약 불일치, operation 조회로만 정산)로만 바뀐다. AI가 결정을 적용했다면 응답 유실·앱 중단·DB 실패가 있어도 의도만으로 결정·감사·멱등 응답을 정산한다. 이때 현재 투영이 여전히 HOLD인지나 같은 행이 current인지는 묻지 않는다(권위는 AI 원천). 확정 거절만 의도를 닫고 같은 키가 그 오류를 재생한다. 일시 불가·미확인 응답은 의도를 열어 두어 같은 키가 같은 요청을 다시 보내고, 정산 작업은 `GET …/reviews/{operationId}`로 기록된 operation을 정산하며 원천이 모르는 operation은 관리자를 대신해 보내지 않는다. 의도 행은 삭제하지 않는다.
 
 candidate와 relation 결정을 모두 보존한다. revision은 결정 대상별 값이며 current_revision은 최초 0이다. relationId가 없으면 candidate 대상, 있으면 해당 후보에 속하는 relation 대상을 해석하고 expectedRevision을 그 대상의 current_revision과 비교한다. 공개 응답의 decision/history에 대상별 revision을 제공해 클라이언트가 같은 대상의 값을 보내도록 한다. 공통 publication_state advisory lock→대상 행 잠금 순으로 획득하고 `current_revision=expectedRevision` 조건부 UPDATE로 +1한 값과 동일 revision의 결정을 INSERT한다. UPDATE 0건 또는 UNIQUE(target_id,revision) 충돌은 REVISION_CONFLICT/409다. origin=admin이면 admin_id 필수, verification_artifact_id는 실제 자동 검증 결과가 있을 때만 채운다. decision=allow는 2026-10-21 사용자 정책에 따라 현재 HOLD인 대상에 대한 운영자 최종 승인이며(DecisionResponse.decision=approved) 재검증 접수가 아니다. 결정·감사·멱등성 완료 기록만 저장하고 analysis_jobs(kind=revalidate) 행이나 모델·검증 호출을 만들지 않는다. DecisionResponse는 publicChanged=false를 반환하며 jobId는 없다(승인은 그래프 투영·활성화가 아니다). 스키마·endpoint·정확한 인용·현재 원천 권리 검사는 사람이 덮어쓸 수 없고, 이전 자동 판정과 claim 분포는 AI 원천에서 불변으로 남는다. `job_id`는 이전 계약이 allow로 접수한 재검증 job의 이력 링크로 nullable을 유지한다. 신규 approved와 reject는 항상 NULL이다. 이전 allow 행과 그 재검증 job은 삭제·이관하지 않으며 신규 승인으로 재해석하지 않는다. 현재 승인 여부는 최신 원천 revision에 대해 AI 원천이 반환하는 approvalBasis(kind=operator-final-approval)로만 판단하고 review_decisions 행만으로 추정하지 않는다. 다른 관리자 작업이 running이어도 결정 접수에는 영향이 없으며 결정 API에 JOB_IN_PROGRESS를 추가하지 않는다. 동일 멱등성 요청은 기존 결정 응답을 재생한다.
 
@@ -466,7 +483,7 @@ id text PK; title text; summary text; definition jsonb
 default_enabled boolean; enabled boolean; revision bigint; updated_at timestamptz
 ```
 
-rule ID의 버전을 유지한다. eligible/publishedCandidates/publishedEvents는 고정 그래프/후보에서 계산한다. 규칙 정의는 불변 버전으로 관리하고 enabled 상태만 수정한다.
+rule ID의 버전을 유지한다. 규칙은 앱 공개 정책으로, 이미 공개 적격인 내용을 공개에서 빼는 방향으로만 작동하며 HOLD를 공개하거나 AI 판정 입력을 바꾸지 않는다(AI 담당 2026-10-22). eligible은 활성 버전이 참조하는 원천 job 범위에서 현재 규칙에 해당하는 HOLD 수(정보용 현재 대기 건수, 공개 수 아님)로, review_targets·원천 revision에서 조회할 때 계산하며 그 투영이 없으면 null이다. publishedCandidates/publishedEvents는 활성 그래프 버전에서 규칙 적용 후 공개 상태로 남은 수로, 버전을 만들 때 세어 버전과 함께 고정한다(규칙 변경은 다음 버전부터 반영, 고정 값이 없으면 null). 버전 고정 당시 통계와 현재 대기 건수를 구분한다. 규칙 정의는 불변 버전으로 관리하고 enabled 상태만 수정한다.
 
 ### 29. publication_rule_changes — 규칙 변경 이력
 
@@ -491,19 +508,20 @@ feature별 CHECK: chatbot_answer는 chat_job_id만, briefing_round는 round_id�
 
 target_id 원문을 그대로 보존한다. value=none은 취소 상태로 유지하고 집계 제외. 동일 value/reason 요청은 updated_at을 바꾸지 않는다. version 불일치는 409. 브리핑 targetVersion은 현재 활성 그래프가 아닌 해당 회차의 graph_version_id와 비교한다. **briefing_issue의 회차 식별 문맥은 현재 요청 스키마만으로 명확하지 않다. 아래 미결 계약을 먼저 해결해야 한다.**
 
-### 31. analysis_jobs — 수집·재검증·투영 작업
+### 31. analysis_jobs — 수집·재검증·투영·계획 분석 작업
 
 ```text
 id text PK; kind text; scope text; label text; status text; reason text; requested_by text
 requested_at timestamptz; started_at timestamptz?; finished_at timestamptz?
 retry_of text? FK analysis_jobs; command_key text UNIQUE; input jsonb; checkpoint jsonb?
+plan_id text? FK analysis_plans
 target_version_id text? FK graph_versions; cancel_requested boolean; recovered boolean
 report jsonb?; ingest jsonb?; flush jsonb?; error jsonb?; ledger_before jsonb?; ledger_after jsonb?
 attempts jsonb; owner_token text?; lease_until timestamptz?; next_attempt_at timestamptz?
 UNIQUE(scope) WHERE scope='admin' AND status='running'
 ```
 
-kind=ingest/revalidate/project, scope=admin/internal_projection, status=queued/running/succeeded/failed/cancelled. scope=internal_projection이면 kind=project인 CHECK를 둔다. 클라이언트가 scope를 지정할 수 없으며 자동 투영만 internal_projection, 관리자 createAnalysisJob이 접수하는 job은 admin이다. 이전 계약에서 결정 API가 접수한 revalidate job도 admin 이력으로 남기며 현재 결정 API는 job을 만들지 않는다. `analysis_job_attempts`는 내부 실행 배열로 통합한다. JobOut의 retryOf/report/checkpoint 의미를 유지한다. 관리자의 재시도는 API 의미에 맞는 새 job과 retry_of를 생성하고, 내부 worker 회수만 attempts에 기록한다.
+kind=ingest/revalidate/project/analyze_plan, scope=admin/internal_projection, status=queued/running/succeeded/failed/cancelled. 기존 행은 변경하지 않는다. internal_projection이면 여전히 kind=project다. plan_id는 analyze_plan일 때만 필수이며 scope=admin을 요구한다. 새 종류의 input은 `{schemaVersion:"zoop-app-analyze-plan-1",planId,planDigest}`와 정확히 일치하고 최초 등록 참조와 대조한다. 최초 명령·plan_id는 불변이다. 새 종류의 report/ingest/flush/ledgerBefore/ledgerAfter/target_version_id는 NULL이며 기존 종류의 응답에는 planRun을 추가하지 않는다.
 
 자동 graph project 작업은 원인 변경과 같은 RDB 트랜잭션에서 queued로 생성하는 outbox 역할을 한다. JobList.items/active, JobLock, RetryState.other_running, Dashboard.jobs, Overview.jobs의 running/queued/failed24h 모두 scope=admin만 대상으로 한다. failed24h는 해당 scope의 failed 행 중 finished_at이 응답 기준 시각 직전 24시간에 속한 수다. 관리자의 job 단건 조회/재시도/취소에서 internal_projection은 RESOURCE_NOT_FOUND로 처리하고 내부 worker만 회수한다. 내부 작업 상태는 pipeline.graphDb.pendingJobs 등 그래프 운영 상태에 반영한다. ai_executions 비용은 scope와 무관하게 실제 실행을 집계하므로 누락하지 않는다.
 
@@ -512,6 +530,39 @@ kind=ingest/revalidate/project, scope=admin/internal_projection, status=queued/r
 worker는 짧은 실행권 획득 트랜잭션에서 관리자 실행 advisory lock을 잡고 running이 없을 때 실행 가능한 queued를 requested_at, id 순서로 선택한다. 아직 next_attempt_at이 되지 않은 행과 취소된 행은 제외한다. 선택한 행을 잠근 뒤 queued 상태를 재확인하고 running 전이·새 owner_token·lease_until·시도 기록을 함께 커밋한 다음 외부 작업을 실행한다. 부분 UNIQUE 경합은 worker의 실행권 획득 실패로 처리해 롤백 후 대기시키며, 이미 완료한 접수에 오류를 전파하지 않는다. 종료 시 토큰 조건으로 상태를 확정하고 다음 대기 작업을 실행한다. 임대 만료 회수는 기존 실행을 안전하게 종결/회수하고 오래된 worker의 쓰기를 차단한 뒤 같은 단일 running 제약 아래 수행한다.
 
 JobList.items는 대기·실행·종료 작업을 모두 포함한다. JobList.active는 scope=admin이면서 running인 작업 하나 또는 NULL이다. JobLock은 같은 running 행이 있을 때만 locked=true와 해당 jobId를 반환하며, queued만 있으면 locked=false, jobId=null이다. 이 잠금은 실행권 상태를 뜻하며 새 작업 접수를 막지 않는다. Dashboard.jobs/Overview.jobs는 queued를 대기 행 수, running을 0 또는 1로 집계한다. 재시도는 기존 실패 종류·superseded·중복 재시도 검증을 유지하되 다른 작업의 running만으로 접수를 거절하지 않고 허용된 재시도 작업을 queued로 저장한다. RetryState.other_running은 기존 enum에 남기되 이 대기열 정책에서는 다른 실행이 있다는 이유만으로 반환하지 않는다.
+
+`analyze_plan`만 실제 create와 실행기에 연결된다. 기존 ingest/revalidate/project 요청 형태는 그대로지만 새 create는 실행기 미연결로 503 SOURCE_UNAVAILABLE(retryable=false), retry는 worker_unavailable로 거절하며 inert 행을 만들지 않는다. 멱등성 완료 응답은 현재 기능 활성화 여부보다 먼저 확인하여 당시 응답을 재생한다. 서로 다른 키로 같은 참조를 접수하면 최초 root 작업을 반환한다. retry는 같은 plan_id를 가진 새 앱 시도이며 이전 종결 요약을 바꾸지 않는다.
+
+계획 분석의 잠금 순서는 관리자 실행 advisory lock → 앱 job → plan → unit이다. create 중복 판정은 별도의 계획별 advisory lock과 잠금 없는 root 조회를 사용해 plan → job 역순 잠금을 만들지 않는다. 모든 worker 쓰기는 같은 owner_token·running·실제 미만료 lease·취소 상태로 fence한다. 행/plan/unit 잠금 대기 뒤 현재 시간을 새로 읽으며 PostgreSQL now()의 트랜잭션 시작 시각을 승인 근거로 쓰지 않는다. HTTP 동안 DB transaction이나 행 잠금을 유지하지 않는다. internal_projection과 발행 잠금 영역은 변경하지 않는다.
+
+#### 31A. analysis_plans — 불변 계획 등록과 접수
+
+```text
+plan_id text PK; plan_digest text; service_binding text; expected_principal text
+registered_at timestamptz; registered_by text; admission_intent_at timestamptz?
+admission_id text? UNIQUE; accepted_at timestamptz?; policy_revision bigint?; policy_digest text?
+receipt_sha256 text?; manifest_digest text?; manifest jsonb?
+last_authority_state text?; last_authority_reason text?; authority_observed_at timestamptz?; last_admission_code text?
+```
+
+참조·서비스 endpoint/주체 결속·최초 등록 메타데이터는 불변이다. 같은 plan_id를 다른 digest나 service binding으로 재결속하지 않는다. 접수 identity/pin/완전한 manifest는 처음에 모두 NULL이며 검증된 접수 후 한 번에 기록하고 이후 변경·삭제하지 않는다. 현재 authority 관측만 갱신한다. active 관측은 원천 권리·모델 비용·공개 권한을 부여하지 않는다. NULL authority는 미관측이며 inactive와 구별한다.
+
+#### 31B. analysis_plan_units — 정규화된 S2/S3 실행 원장
+
+```text
+plan_id text FK analysis_plans; ordinal integer >= 1; unit_key text
+s2_job_id text UNIQUE; s2_approved_request_digest text; s2_input_digest text
+s3_job_id text UNIQUE; s2_submit jsonb; s3_submit jsonb; s3_input_digest text?
+s2_checkpoint jsonb; s3_checkpoint jsonb
+PRIMARY KEY(plan_id,ordinal); UNIQUE(plan_id,unit_key); CHECK(unit_key=s2_job_id)
+```
+
+검증된 manifest 순서의 모든 단위와 접수 tuple을 한 transaction으로 저장한다. 지연 제약 trigger는 누락·추가·불일치 단위를 거절하므로 prefix를 실행할 수 없다. ordinal·ID·digest·정확한 참조 전용 submit은 불변이며 삭제하지 않는다. S3 runtime input digest는 처음 유효한 상태에서 한 번 고정한다.
+
+단계 checkpoint `zoop-app-analyze-plan-stage-1`은 state, intentAt, acceptedObservedAt, 완전한 typed 내용 없는 lastStatus, resultObservedAt, 정확한 UTF-8 결과 문자열의 SHA-256, 내용 없는 receipts, 실패 분류/코드와 유한 실패·recover 횟수를 저장한다. 원문·후보 payload는 저장하지 않는다. READY 상태만으로 완료하지 않으며 결과 envelope 자체의 identity와 AVAILABLE을 관측해야 result_observed가 된다. 완료 관측·최초 accepted 시각은 불변이다.
+
+job checkpoint `zoop-app-analyze-plan-checkpoint-1`은 phase, activeOrdinal, terminalSummary, lastFailureCategory만 포함한다. 종결 시 PlanRunOut 전체를 고정하여 후속 retry·검수 활동이 과거 결과를 바꾸지 못한다. succeeded는 모든 단위 쌍의 처리 인계이며 수집 baseline·review_targets·ai_executions·그래프·공개 활성화를 변경하지 않는다. 후속 소비자는 새로 결과를 조회하고 현재 권리를 검증해야 한다.
+
 
 관리자 접수/재시도 잠금과 내부 투영 스케줄러 잠금은 별개다. 실제 Neo4j 쓰기는 scope와 무관하게 대상 버전별 공유 잠금으로 직렬화해 관리자 project와 내부 project 충돌을 방지한다. 최종 활성화는 기존 공통 활성화 잠금을 유지한다. Neo4j 반영은 command_key로 중복 실행을 견디고 실제 투영 성공 후 완료한다. 버전 간 자료를 동시에 수정하는 투영 구현이면 쓰기 잠금 범위를 그래프 전체로 넓힌다.
 
@@ -594,13 +645,27 @@ UNIQUE(chat_job_id, attempt_no, tool_call_id)
 UNIQUE(chat_job_id, attempt_no, call_index)
 ```
 
-읽기 전용 MCP 또는 같은 논리 계약의 서버 내부 어댑터 호출을 한 행씩 기록한다. `call_index`는 계획의 안정된 순서이며 실제 병렬 완료 순서를 뜻하지 않는다. `registry_group`, `capability_id`, `tool_id`, `schema_version`은 호출 시점 레지스트리의 값을 고정한다. 모델이 만든 자유 문자열 도구명은 저장·실행하지 않는다. `request_meta`는 대상 ID·기간·asOf·graphVersion·limit처럼 허용된 구조만 포함하고 회원 ID·질문 원문·인증 토큰·개인 포트폴리오 전문을 넣지 않는다. 전체 요청·응답을 보존해야 할 때만 접근 통제와 보존 정책을 충족한 불변 artifact를 연결한다.
+읽기 전용 도구(서버 내부 어댑터) 호출을 한 행씩 기록한다. `call_index`는 계획의 안정된 순서이며 실제 병렬 완료 순서를 뜻하지 않는다. `registry_group`, `capability_id`, `tool_id`, `schema_version`은 호출 시점 레지스트리의 값을 고정한다. 모델이 만든 자유 문자열 도구명은 저장·실행하지 않는다. `request_meta`는 대상 ID·기간·asOf·graphVersion·limit처럼 허용된 구조만 포함하고 회원 ID·질문 원문·인증 토큰·개인 포트폴리오 전문을 넣지 않는다. 전체 요청·응답을 보존해야 할 때만 접근 통제와 보존 정책을 충족한 불변 artifact를 연결한다.
 
 상태는 `reserved`, `running`, `succeeded`, `failed`, `cancelled`, `unknown`이다. 계획 확정 시 호출 예산을 `reserved`로 먼저 기록하고 소유 토큰을 확인한 실행만 전이한다. timeout 등으로 외부 완료 여부를 모르면 `unknown`을 실패나 호출 0회로 바꾸지 않는다. 같은 논리 조회를 재사용한 경우 새 성공 호출을 만들지 않고 원 호출 ID를 `route_summary`에 참조한다. 추가 조회 라운드는 `plan_revision`을 증가시키며 최대 횟수는 정책 버전과 함께 검증한다.
 
 `tool_call_id`는 시도 안의 계획 순서로 `tc-<call_index>`를 쓴다. 앱 내부 읽기 어댑터(`tool_id` `app:<capabilityId>`)는 같은 프로세스의 읽기 전용 조회이므로 개별 3초·단계 10초 상한을 넘긴 호출은 결과를 버리고 `failed`(`error_code=tool_timeout`)로 닫는다. 단계 상한 안에 시작하지 못한 호출은 `reserved`로 남고, 시작 기록이 단계 상한 뒤에 끝난 호출은 실행하지 않는다. 상한을 넘긴 읽기는 중단 신호를 받으며, 실제로 끝날 때까지 앱 전체 동시 읽기 한도(16)를 계속 차지한다. 예약·시작·종료 기록은 작업 실행 기한 안에서만 잠금·DB를 기다리고(`statement_timeout`), 기록하지 못하면 결과를 쓰지 않고 실행을 멈춰 lease 회수로 끝낸다. 작업이 완료·실패·취소·lease 만료 회수로 끝나면 그 작업의 `reserved` 호출은 `cancelled`, `running` 호출은 `unknown`으로 함께 닫는다. `error_code`는 `tool_timeout`, `tool_unavailable`(고정 그래프 없음, 버전·스냅샷·근거 상태 확인 불가), `tool_failed`(어댑터 오류·결과 형식 위반)이며, 실패한 호출을 빈 결과나 “없음”으로 바꾸지 않는다.
 
 `evidence_ids`는 성공 응답에서 답변 후보에 전달한 근거 ID이며 저장 시 현재 공개 문서 버전과 일치하는지 검사한다. 응답의 `data_version`, `truncated`, `next_allowed`와 artifact가 있으면 그 내용이 일치해야 한다. 기본 인덱스는 `(chat_job_id, attempt_no, call_index)`, `(tool_id, started_at)`, `(status, started_at)`이다. 요청당 호출 수·지연·오류·중복 제거율은 이 테이블에서 집계하고 모델 호출·토큰·비용은 `ai_executions`에서 별도로 집계한다.
+
+### 37–39. disclosure_exclusion_changes, disclosure_exclusion_targets, disclosure_exclusion_requests — 공개 제외(FS081)
+
+```text
+disclosure_exclusion_changes: revision bigint PK; action text(exclude|lift); cause text(source-change|relation-retraction|operator)
+  report_sha256 text?(exclude만); reason text; operator text; changed_at timestamptz
+disclosure_exclusion_targets: revision FK; graph_version_id FK graph_versions ON DELETE CASCADE
+  target_kind text(issue|relation|evidence|article); target_id text; article_version text(article만, 아니면 '')
+  PRIMARY KEY(revision, graph_version_id, target_kind, target_id, article_version)
+disclosure_exclusion_requests: request_id text PK; request_sha256 text; action text(exclude|lift)
+  revision bigint(명령이 남긴 제외 revision); result jsonb(결과 문서); recorded_at timestamptz
+```
+
+공개된 버전의 내용을 **그 버전에서만** 공개 조회에서 뺀다(권리 철회, 관계 오연결). 생산자가 정정한 새 인계 묶음에서 같은 이슈·간선 ID를 다시 쓸 수 있어서 전역 집합으로 두지 않는다. snapshot은 바꾸지 않고, 읽을 때 현재 제외를 overlay로 적용한다. 변경 하나는 운영자 명령 하나(AI 영향 조회 보고서의 `exclude`, 또는 사유를 적은 `lift`)이며, 대상의 현재 상태는 그 대상의 마지막 변경이다. 빈 보고서나 이전보다 작은 보고서로는 해제하지 않는다. `revision`은 앱 전체 제외 카운터(`DisclosureExclusions.revision`)로, 공통 publication_state 잠금 아래 MAX+1로 할당하고 커밋까지 잠금을 유지한다. 읽는 쪽(공개 조회·활성화 사전 검사)은 잠금 없이 한 문장으로 읽는다. 결과(`applied`·`unchanged`)에 이른 명령은 같은 트랜잭션에서 `disclosure_exclusion_requests`에 명령 ID·요청 hash·결과를 남긴다. 같은 ID의 재실행(결과 유실·커밋 결과 불명)은 저장한 결과만 돌려주고 아무것도 바꾸지 않으며, 같은 ID의 다른 요청은 거절한다. 해제(`lift`)는 운영자가 본 제외 revision(`expectedRevision`)을 함께 보내고, 그 뒤에 바뀐 대상이 있으면 거절한다. 세 테이블은 UPDATE·DELETE를 거절하며, 대상 행만 버전 삭제와 함께 지워진다. 기사(`article`) 대상은 그래프 밖 소비자(기업 문서 목록·S1·브리핑·채팅·캐시·Neo4j)를 위해 기록만 하고, 그래프 조회는 이슈·관계·근거를 적용한다.
 
 ## 4. 핵심 관계도
 
@@ -642,6 +707,8 @@ erDiagram
     graph_versions ||--o{ graph_activations : activates
     review_targets ||--o{ review_decisions : decisions
     analysis_jobs o|--o{ review_decisions : legacy_revalidation
+    analysis_plans o|--o{ analysis_jobs : fixed_plan_attempts
+    analysis_plans ||--o{ analysis_plan_units : immutable_units
     publication_rules ||--o{ publication_rule_changes : changes
 ```
 
@@ -669,7 +736,7 @@ erDiagram
 | feedback | feedback | 유효 평가·취소·집계 유지 |
 | chat_sessions | chat_sessions | 대화 소유권 유지 |
 | chat_jobs, chat_attempts, chat_results, chat_citations | chat_jobs + chat_tool_calls | 질문·결과·계획 요약은 작업에 통합하고 실제 읽기 도구 호출은 독립 관측 |
-| graph_versions, graph_version_db_state, graph_active_version | graph_versions | 3→1, 활성 버전 유일성 유지 |
+| graph_versions, graph_version_db_state, graph_active_version | graph_versions + graph_version_rules | 3→1, 활성 버전 유일성 유지. 버전별 적용 규칙은 규칙 FK가 필요해 하위 테이블 |
 | graph_activations | graph_activations | 버전 활성화 이력 유지 |
 | review_targets, review_decisions | 동일 2개 | 대상과 결정 이력 유지 |
 | publication_rules, publication_rule_changes | 동일 2개 | 규칙 API의 history 유지 |
@@ -690,6 +757,9 @@ erDiagram
 | chat_jobs.frozen_context/result | ChatFrozenContext / ChatResult 전체 | 최초 문맥과 completed 결과 불변 |
 | chat_jobs.route_summary | ChatRouteSummary v1: 요구·Q 유형·기능·커버리지·계획·예산·검증 요약 | 실행 중 소유 토큰으로 단계별 갱신, completed 뒤 불변 |
 | chat_jobs.attempts, analysis_jobs.attempts | 내부 시도 이력 | 완료 원소 불변, 활성 원소만 토큰 검사 후 종료 |
+| analysis_plans.manifest | 검증된 완전한 참조 전용 manifest | 접수 identity/pin/모든 단위와 함께 write-once |
+| analysis_plan_units.s2_checkpoint/s3_checkpoint | 내용 없는 typed 상태·의도·결과 해시·receipt·실패 분류 | 현재 job owner/lease fence, 완료 관측 불변 |
+| analysis_jobs.checkpoint (analyze_plan) | phase·activeOrdinal·terminalSummary·lastFailureCategory | 종결 요약과 상태/시각 불변 |
 | chat_tool_calls.request_meta | 허용된 대상·기간·버전·limit만 포함한 호출 메타데이터 | 예약 후 허용 필드만 기록, 원문·비밀·개인 전문 금지 |
 | review_targets 목록 투영 | 상세 JSON 없음, 원천 상세를 version/revision으로 조회 | 필터용 컬럼만 revision 단위 동기화 |
 | graph_versions.graph_db_state | GraphDbVersionState 및 투영 상태 | 투영 worker가 상태 갱신 |
@@ -722,10 +792,10 @@ API DTO를 그대로 노출하는 DB 엔티티로 만들지는 않는다. 저장
 | `getAdminSession`, `logInAdmin`, `logOutAdmin` | admins, admin_sessions, 코드 권한 매핑 | 별도 쿠키와 유휴/절대 만료 |
 | `getAdminDashboard`, `getPipelineOverview` | 회원·후보·작업·브리핑·그래프·AI·감사 원천의 집계, Neo4j 상태 | 별도 dashboard 테이블 없음. 외부 상태 조회 실패를 실제로 표현 |
 | `listAuditRecords` | audit_logs | 필터·커서로 조회 |
-| `listAnalysisCandidates`, `getAnalysisCandidate`, `decideAnalysisCandidate` | review_targets, 분석 후보 원천, review_decisions, audit_logs (이전 계약 이력 조회 시 analysis_jobs) | revision·원천 CAS, allow는 HOLD 최종 승인이며 job·모델 호출 없음 |
+| `listAnalysisCandidates`, `getAnalysisCandidate`, `decideAnalysisCandidate` | review_targets, 분석 후보 원천, review_decisions, review_decision_intents, audit_logs (이전 계약 이력 조회 시 analysis_jobs) | revision·원천 CAS, allow는 HOLD 최종 승인이며 job·모델 호출 없음 |
 | `listPublicationRules`, `setPublicationRule` | publication_rules, publication_rule_changes, review_targets, graph_versions | 현재 상태·history·집계와 변경 직렬화 |
 | `listGraphVersions`, `publishGraphVersion`, `activateGraphVersion` | graph_versions, graph_activations, artifacts, analysis_jobs, audit_logs | 검증된 snapshot·투영 성공·활성화 이력 |
-| `listAnalysisJobs`, `createAnalysisJob`, `getAnalysisJob`, `retryAnalysisJob`, `cancelAnalysisJob` | analysis_jobs, audit_logs, idempotency_records | scope=admin의 ingest/revalidate/project, retryOf·checkpoint·취소 |
+| `listAnalysisJobs`, `createAnalysisJob`, `getAnalysisJob`, `retryAnalysisJob`, `cancelAnalysisJob` | analysis_jobs, analysis_plans, analysis_plan_units, audit_logs, idempotency_records | analyze_plan의 고정 계획 처리·내용 없는 인계; 기존 종류 이력·취소 유지 |
 | `getAiUsage` | ai_executions, document_analyses, analysis_jobs, briefing_attempts, chat_jobs | 기능별 접수 단위와 실제 호출·재사용·복구 구분, 기간별 비용·오류·pastRuns |
 | `listAdminBriefingRounds`, `getAdminBriefingRound`, `reprocessBriefingRound` | briefing_rounds, briefing_attempts, briefing_changes, audit_logs | 미발행만 재처리, stages·attemptsLog 보존 |
 | `appendBriefingCorrection`, `setBriefingSuspension` | briefing_changes, briefing_rounds, audit_logs, idempotency_records | 원문 불변, 이력 추가와 상태 변경 원자 처리 |
@@ -790,7 +860,7 @@ API DTO를 그대로 노출하는 DB 엔티티로 만들지는 않는다. 저장
 | review_targets.target_type / status | candidate, relation / ALLOW, HOLD, REJECT; status는 원천의 목록 투영값 |
 | review_decisions.decision / origin | allow, reject / admin, snapshot-migration |
 | feedback.feature / value | chatbot_answer, briefing_round, briefing_issue / up, down, none |
-| analysis_jobs.kind / scope / status | ingest, revalidate, project / admin, internal_projection / queued, running, succeeded, failed, cancelled |
+| analysis_jobs.kind / scope / status | ingest, revalidate, project, analyze_plan / admin, internal_projection / queued, running, succeeded, failed, cancelled |
 | analysis_jobs.attempts | 내부 status=running,succeeded,failed,cancelled; 시도 번호 유일, 단일 활성 원소, 완료 원소 불변 |
 | ai_executions.feature | chatbot, news-analysis, briefing, document-sentiment, briefing-outlook |
 | ai_executions.execution_mode / status | live, replay, save_only / running, succeeded, failed, cancelled, unknown. unknown은 제공자 결과·과금 미확정이며 API 집계에서 0/failed로 단정하지 않음 |

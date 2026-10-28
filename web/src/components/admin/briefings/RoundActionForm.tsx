@@ -24,9 +24,9 @@ const COPY: Record<
   reprocess: {
     title: '브리핑 재처리',
     reason: '재처리 사유',
-    submit: '재처리 요청',
+    submit: '재처리 요청(무료)',
     done: '재처리를 요청했어요.',
-    hint: '지연·실패한 미발행 회차만 다시 처리해요. 새 회차를 만들거나 발행본을 덮어쓰지 않아요.',
+    hint: '무료(모델을 다시 부르지 않아요). 지연·실패한 미발행 회차만 다시 처리해요. 새 회차를 만들거나 발행본을 덮어쓰지 않아요.',
   },
   correct: {
     title: '정정 등록',
@@ -98,7 +98,11 @@ export default function RoundActionForm({
     if (pending) return;
     const trimmedReason = reason.trim();
     const trimmedBody = body.trim();
-    if (!trimmedReason || (action === 'correct' && !trimmedBody)) {
+    if (
+      !trimmedReason ||
+      trimmedReason.length > 500 ||
+      (action === 'correct' && (!trimmedBody || trimmedBody.length > 2000))
+    ) {
       setMissing(true);
       return;
     }
@@ -139,10 +143,11 @@ export default function RoundActionForm({
 
   return (
     <form
+      data-admin-editing="true"
       noValidate
       aria-label={copy.title}
       onSubmit={(event) => void submit(event)}
-      className="flex flex-col gap-3 rounded-[3px] border-[0.667px] border-zoop-ink bg-zoop-paper p-4"
+      className="flex flex-col gap-3 rounded-2xl bg-zoop-soft p-5"
     >
       <div className="flex flex-col gap-0.5">
         <p className="text-sm font-bold">{copy.title}</p>
@@ -180,6 +185,7 @@ export default function RoundActionForm({
               <textarea
                 id={id}
                 value={body}
+                maxLength={2000}
                 disabled={pending}
                 aria-invalid={missing && !body.trim()}
                 onChange={(event) => setBody(event.target.value)}
@@ -194,6 +200,7 @@ export default function RoundActionForm({
           <textarea
             id={id}
             value={reason}
+            maxLength={500}
             disabled={pending}
             aria-invalid={missing && !reason.trim()}
             onChange={(event) => setReason(event.target.value)}
@@ -201,6 +208,10 @@ export default function RoundActionForm({
           />
         )}
       </Field>
+      <p className="text-[11px] text-zoop-muted">
+        사유 {reason.length}/500자
+        {action === 'correct' && ` · 정정 ${body.length}/2000자`}
+      </p>
       {missing && (
         <p role="alert" className="text-[11px] text-zoop-alert">
           {action === 'correct'

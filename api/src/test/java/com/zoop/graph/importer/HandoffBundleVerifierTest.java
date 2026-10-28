@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 import com.zoop.common.json.Canonical;
@@ -151,7 +153,7 @@ class HandoffBundleVerifierTest {
             byte[] export = resource(name);
             HandoffBundle verified = new HandoffExportParser().parse(export, pinning(export)).bundle();
             JsonNode bundle = HandoffFixtures.parse(export).get("bundle");
-            assertEquals("zoop-graph-handoff-bundle-6", bundle.get("schemaVersion").stringValue(), name);
+            assertEquals("zoop-graph-handoff-bundle-7", bundle.get("schemaVersion").stringValue(), name);
             assertEquals(headlines.get(name).size(), bundle.get("issues").size(), name);
             for (JsonNode issue : bundle.get("issues")) {
                 String id = issue.get("id").stringValue();
@@ -272,10 +274,35 @@ class HandoffBundleVerifierTest {
 
     private static final HandoffFixtures.Built BUILT = HandoffFixtures.build();
 
+    /**
+     * What the producer's zero-call table leaves on an issue whose test edit added a HOLD/REJECT verdict to the default
+     * {@code not-requested} summary: exactly {@code unavailable/temporal-review-pending}. Applied by the helpers that expect ONE other rule
+     * to decide, so a verdict edit is never refused for a summary it did not intend to forge; a test about the summary itself edits the
+     * summary AFTER this (or verifies the bundle directly).
+     */
+    private static void settleSummary(ObjectNode bundle) {
+        for (JsonNode issue : bundle.get("issues")) {
+            JsonNode verdicts = issue.get("fieldVerdicts");
+            JsonNode summary = issue.get("summary");
+            if (verdicts == null || !verdicts.isArray() || summary == null || !summary.isObject() || !summary.path("code").isString()
+                    || !HandoffIssueSummary.NOT_REQUESTED.equals(summary.path("code").stringValue())) {
+                continue;
+            }
+            for (JsonNode verdict : verdicts) {
+                JsonNode decision = verdict.path("decision");
+                if (decision.isString() && (decision.stringValue().equals("HOLD") || decision.stringValue().equals("REJECT"))) {
+                    ((ObjectNode) issue).set("summary", HandoffFixtures.unavailable(HandoffIssueSummary.TEMPORAL_PENDING));
+                    break;
+                }
+            }
+        }
+    }
+
     /** A copy of the valid bundle with {@code change} applied and the content digest recomputed. */
     private static JsonNode mutated(Consumer<ObjectNode> change) {
         ObjectNode copy = BUILT.bundle().deepCopy();
         change.accept(copy);
+        settleSummary(copy);
         ((ObjectNode) copy.get("digests")).put("content", HandoffBundleVerifier.contentDigest(copy));
         return copy;
     }
@@ -306,7 +333,6 @@ class HandoffBundleVerifierTest {
         assertRefused("the schema version before field verdicts", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-3"));
         assertRefused("the schema version before structural paths", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-4"));
         assertRefused("the schema version before impacts", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-5"));
-        assertRefused("a later schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-7"));
         assertRefused("wrong policy version", b -> ((ObjectNode) b.get("policy")).put("version", "zoop-public-projection-policy-2"));
         assertRefused("live without a provider recording", b -> setMode(b, "live", "authored-test"));
         assertRefused("a provider recording of a replay", b -> setMode(b, "replay", "provider"));
@@ -384,6 +410,7 @@ class HandoffBundleVerifierTest {
     private static JsonNode mutatedFrom(HandoffFixtures.Built built, Consumer<ObjectNode> change) {
         ObjectNode copy = built.bundle().deepCopy();
         change.accept(copy);
+        settleSummary(copy);
         ((ObjectNode) copy.get("digests")).put("content", HandoffBundleVerifier.contentDigest(copy));
         return copy;
     }
@@ -1168,6 +1195,7 @@ class HandoffBundleVerifierTest {
     }
 
     private static JsonNode verifiedAfter(ObjectNode bundle) {
+        settleSummary(bundle);
         ((ObjectNode) bundle.get("digests")).put("content", HandoffBundleVerifier.contentDigest(bundle));
         HandoffBundleVerifier.verify(bundle);
         return bundle;
@@ -1451,6 +1479,7 @@ class HandoffBundleVerifierTest {
     /** A bundle that is already as the forger wrote it: only its content digest is recomputed, so the verdict rules alone can refuse it. */
     private static void assertRefusedOn(String rule, ObjectNode base) {
         ObjectNode copy = base.deepCopy();
+        settleSummary(copy);
         ((ObjectNode) copy.get("digests")).put("content", HandoffBundleVerifier.contentDigest(copy));
         assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(copy), rule);
     }
@@ -2355,8 +2384,8 @@ class HandoffBundleVerifierTest {
             ((ObjectNode) earlier.get("digests")).put("content", Canonical.digest(withoutImpactsSubset(earlier)));
             HandoffBundleVerifier.verify(earlier);
         }, "the bundle-5 shape: no impacts, the five-collection digest");
-        assertRefusedFrom(BUILT, "a later schema", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-7"));
-        // A bundle-6 whose provenance says live cannot carry the replay-only technical code.
+        assertRefusedFrom(BUILT, "a later schema", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-8"));
+        // A bundle-7 whose provenance says live cannot carry the replay-only technical code.
         assertRefusedFrom(LIVE, "a replay-only code in a live bundle",
                 b -> candidateRow(impactRow(b, 0), "technical-reject", "verifier_reply_invalid", true, true));
     }
@@ -2383,7 +2412,7 @@ class HandoffBundleVerifierTest {
             byte[] export = resource(name);
             HandoffBundle verified = new HandoffExportParser().parse(export, pinning(export)).bundle();
             JsonNode bundle = HandoffFixtures.parse(export).get("bundle");
-            assertEquals("zoop-graph-handoff-bundle-6", bundle.get("schemaVersion").stringValue(), name);
+            assertEquals("zoop-graph-handoff-bundle-7", bundle.get("schemaVersion").stringValue(), name);
             assertEquals(expected.get(name), bundle.get("impacts"), name);
             assertEquals(expected.get(name).size(), bundle.get("counts").get("impacts").intValue(), name);
             assertEquals("s3-independent-verifier-quote-effect", bundle.get("policy").get("impacts").stringValue(), name);
@@ -2548,5 +2577,454 @@ class HandoffBundleVerifierTest {
     void aVerifiedRowMayListFortyEffectsInTotalAcrossSidesAndFortyOneIsRefused() {
         assertAcceptedFrom(IMPACT, "40 valid effects spread over four sides", b -> withEffectTotal(b, 40));
         assertRefusedFrom(IMPACT, "41 otherwise valid effects spread over four sides (no side exceeds its share)", b -> withEffectTotal(b, 41));
+    }
+
+    // ---------------------------------------------------------------------------------------------- issue summary (bundle -7) ----
+
+    private static final HandoffFixtures.Built SUMMARIZED = HandoffFixtures.withSummary(BUILT, HandoffFixtures::availableSummary);
+    private static final HandoffFixtures.Built LIVE_SUMMARIZED = HandoffFixtures.withSummary(LIVE, HandoffFixtures::availableSummary);
+
+    private static ObjectNode summaryOf(ObjectNode bundle) {
+        return (ObjectNode) issueOf(bundle).get("summary");
+    }
+
+    /** The base handoff's bundle with {@code change} applied and ONLY its content digest recomputed: the summary rules alone can refuse it. */
+    private static void assertSummaryBundle(HandoffFixtures.Built base, boolean accepted, String rule, Consumer<ObjectNode> change) {
+        ObjectNode copy = base.bundle().deepCopy();
+        change.accept(copy);
+        ((ObjectNode) copy.get("digests")).put("content", HandoffBundleVerifier.contentDigest(copy));
+        if (accepted) {
+            HandoffBundleVerifier.verify(copy);
+        } else {
+            assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(copy), rule);
+        }
+    }
+
+    /** The summary was forged AS IT STANDS: no digest, text or id of it is repaired, so any of them can refuse it. */
+    private static void assertForgedSummary(String rule, Consumer<ObjectNode> forge) {
+        assertSummaryBundle(SUMMARIZED, false, rule, b -> forge.accept(summaryOf(b)));
+    }
+
+    /**
+     * One rule of the closed shape broken by a forger who is careful: the text, the evidence union, the result version and the result
+     * digest are recomputed from the edited claims, so that ONLY the targeted rule can refuse it.
+     */
+    private static void assertRuleRefused(String rule, Consumer<ObjectNode> edit) {
+        assertSummaryBundle(SUMMARIZED, false, rule, b -> {
+            ObjectNode summary = summaryOf(b);
+            edit.accept(summary);
+            reseal(summary);
+        });
+    }
+
+    private static void assertRuleAccepted(HandoffFixtures.Built base, String rule, Consumer<ObjectNode> edit) {
+        assertSummaryBundle(base, true, rule, b -> {
+            ObjectNode summary = summaryOf(b);
+            edit.accept(summary);
+            reseal(summary);
+        });
+    }
+
+    /** Recomputes {@code text}, {@code evidenceIds}, {@code resultVersion} and {@code source.resultDigest} of an edited available summary. */
+    private static void reseal(ObjectNode summary) {
+        ArrayNode claims = (ArrayNode) summary.get("claims");
+        List<String> texts = new ArrayList<>();
+        java.util.TreeSet<String> union = new java.util.TreeSet<>();
+        for (JsonNode claim : claims) {
+            texts.add(claim.get("text").stringValue());
+            claim.get("evidenceIds").values().forEach(id -> union.add(id.stringValue()));
+        }
+        summary.put("text", String.join("\n", texts));
+        ArrayNode ids = summary.putArray("evidenceIds");
+        union.forEach(ids::add);
+        ObjectNode source = (ObjectNode) summary.get("source");
+        String basisDigest = source.get("basisDigest").stringValue();
+        ObjectNode version = StrictJson.newObject();
+        version.put("basisDigest", basisDigest);
+        version.set("claims", claims);
+        summary.put("resultVersion", "isr-" + Canonical.digest(version));
+        ObjectNode body = summary.deepCopy();
+        body.remove("source");
+        ObjectNode preimage = StrictJson.newObject();
+        preimage.put("jobId", source.get("jobId").stringValue());
+        preimage.put("inputDigest", source.get("inputDigest").stringValue());
+        preimage.put("basisDigest", basisDigest);
+        preimage.set("result", body);
+        source.put("resultDigest", Canonical.digest(preimage));
+    }
+
+    private static ObjectNode claimOf(ObjectNode summary, int index) {
+        return (ObjectNode) summary.get("claims").get(index);
+    }
+
+    @Test
+    void theSharedSummaryTimeVectorsDecideEveryGeneratedAtOfAnAvailableSummaryThroughTheWholeVerifier() throws Exception {
+        // The summary is resealed after the edit, so ONLY the generatedAt grammar can refuse the bundle; the vectors are the producer's (hand-written, shared).
+        JsonNode vectors = HandoffFixtures.parse(resource("summary-time-vectors.json"));
+        for (JsonNode value : vectors.get("accept").values()) {
+            String time = value.stringValue();
+            assertRuleAccepted(SUMMARIZED, time, s -> s.put("generatedAt", time));
+            assertRuleAccepted(LIVE_SUMMARIZED, time, s -> s.put("generatedAt", time));
+        }
+        for (JsonNode item : vectors.get("reject").values()) {
+            JsonNode value = item.get("value");
+            assertRuleRefused(item.get("why").stringValue(), s -> s.set("generatedAt", value));
+        }
+    }
+
+    @Test
+    void theDefaultAndTheTemporalWorldCarryTheirDeterministicSummaryAndNoOtherValueIsAcceptedForThem() {
+        assertEquals(HandoffIssueSummary.NOT_REQUESTED, summaryOf(BUILT.bundle().deepCopy()).get("code").stringValue());
+        HandoffBundleVerifier.verify(BUILT.bundle());
+        HandoffFixtures.Built held = HandoffFixtures.build(HandoffFixtures.Spec.standard().withVerdicts());
+        assertEquals(HandoffIssueSummary.TEMPORAL_PENDING, summaryOf(held.bundle().deepCopy()).get("code").stringValue());
+        assertTrue(summaryOf(held.bundle().deepCopy()).get("source").isNull());
+        HandoffBundleVerifier.verify(held.bundle());
+
+        // A HOLD/REJECT verdict anywhere on the issue leaves EXACTLY temporal-review-pending: not-requested, an input-too-large claim,
+        // a job-coded unavailable and an available summary are all refused for it, and so is a pending code with a job source.
+        assertSummaryBundle(held, false, "not-requested on a held issue",
+                b -> summaryOf(b).put("code", HandoffIssueSummary.NOT_REQUESTED));
+        assertSummaryBundle(held, false, "input-too-large on a held issue",
+                b -> summaryOf(b).put("code", HandoffIssueSummary.INPUT_TOO_LARGE));
+        assertSummaryBundle(held, false, "a job-coded unavailable on a held issue",
+                b -> issueOf(b).set("summary", HandoffFixtures.withheldSummary(b, "verifier-hold")));
+        assertSummaryBundle(held, false, "an available summary on a held issue", b -> issueOf(b).set("summary", HandoffFixtures.availableSummary(b)));
+        // ...and the converse: a pending code on an issue nobody held, or an input-too-large one that is small.
+        assertSummaryBundle(BUILT, false, "temporal-review-pending without any HOLD/REJECT",
+                b -> summaryOf(b).put("code", HandoffIssueSummary.TEMPORAL_PENDING));
+        assertSummaryBundle(BUILT, false, "input-too-large for one quote", b -> summaryOf(b).put("code", HandoffIssueSummary.INPUT_TOO_LARGE));
+        assertSummaryBundle(BUILT, false, "a deterministic code that carries a job source",
+                b -> summaryOf(b).set("source", HandoffFixtures.withheldSummary(b, "verifier-hold").get("source")));
+        assertSummaryBundle(BUILT, false, "an unknown code", b -> summaryOf(b).put("code", "temporal-guard"));
+    }
+
+    @Test
+    void aHeldIssueIsPendingEvenWhenTheHeldVerdictIsOnANonRepresentativeMention() {
+        // The rule looks at every verdict of the issue, not at the selection basis that decides the headline: a REJECT on the second mention
+        // withholds no headline value but still leaves the summary pending.
+        ObjectNode other = BUILT.bundle().deepCopy();
+        addSecondDocument(other);
+        verdictsOf(other).add(verdictOn(other, 1, "eventTime", "REJECT", "contradicted", eventEvidence(other, 1)));
+        issueOf(other).set("summary", HandoffFixtures.unavailable(HandoffIssueSummary.TEMPORAL_PENDING));
+        ((ObjectNode) other.get("digests")).put("content", HandoffBundleVerifier.contentDigest(other));
+        HandoffBundleVerifier.verify(other);
+        issueOf(other).set("summary", HandoffFixtures.unavailable(HandoffIssueSummary.NOT_REQUESTED));
+        ((ObjectNode) other.get("digests")).put("content", HandoffBundleVerifier.contentDigest(other));
+        assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(other));
+    }
+
+    @Test
+    void anAvailableSummaryOfEveryExecutionModeIsAcceptedAndMustMatchTheBundlesMode() {
+        HandoffBundleVerifier.verify(SUMMARIZED.bundle());
+        HandoffBundleVerifier.verify(LIVE_SUMMARIZED.bundle());
+        assertEquals("authored-replay", summaryOf(SUMMARIZED.bundle().deepCopy()).get("producer").get("kind").stringValue());
+        assertEquals("provider", summaryOf(LIVE_SUMMARIZED.bundle().deepCopy()).get("producer").get("kind").stringValue());
+        assertEquals("independent-verifier", summaryOf(LIVE_SUMMARIZED.bundle().deepCopy()).get("verifier").get("kind").stringValue());
+
+        // A replayed (authored) summary never sits in a live bundle, and a provider one never in a replay bundle, even when every digest agrees.
+        ObjectNode replayed = summaryOf(SUMMARIZED.bundle().deepCopy());
+        assertSummaryBundle(LIVE, false, "an authored replay summary in a live bundle", b -> issueOf(b).set("summary", replayed));
+        ObjectNode provider = summaryOf(LIVE_SUMMARIZED.bundle().deepCopy());
+        assertSummaryBundle(BUILT, false, "a provider summary in a replay bundle", b -> issueOf(b).set("summary", provider));
+        assertRuleRefused("a replay producer that names a model", s -> ((ObjectNode) s.get("producer")).put("model", "gpt-6-luna"));
+        assertRuleRefused("a replay producer with a reasoning effort", s -> ((ObjectNode) s.get("producer")).put("reasoningEffort", "high"));
+        assertRuleRefused("a replay verifier that names a model", s -> ((ObjectNode) s.get("verifier")).put("model", "jev-1.14.0"));
+        assertRuleRefused("a replay verifier posing as independent", s -> ((ObjectNode) s.get("verifier")).put("kind", "independent-verifier"));
+        assertRuleRefused("a replay producer posing as a provider", s -> ((ObjectNode) s.get("producer")).put("kind", "provider"));
+        assertRuleAccepted(LIVE_SUMMARIZED, "a live summary keeps its models", s -> { });
+        assertSummaryBundle(LIVE_SUMMARIZED, false, "a live producer without a model", b -> {
+            ObjectNode summary = summaryOf(b);
+            ((ObjectNode) summary.get("producer")).putNull("model");
+            reseal(summary);
+        });
+        assertSummaryBundle(LIVE_SUMMARIZED, false, "a live producer without a reasoning effort", b -> {
+            ObjectNode summary = summaryOf(b);
+            ((ObjectNode) summary.get("producer")).putNull("reasoningEffort");
+            reseal(summary);
+        });
+        assertSummaryBundle(LIVE_SUMMARIZED, false, "a live verifier without a model", b -> {
+            ObjectNode summary = summaryOf(b);
+            ((ObjectNode) summary.get("verifier")).putNull("model");
+            reseal(summary);
+        });
+    }
+
+    @Test
+    void everyFieldOfAnAvailableSummaryIsRecomputedAndAnyTamperingIsRefused() {
+        // Tampered text, ids, basis and digests, each left as the forger wrote it.
+        assertForgedSummary("a text that is not the claims joined by a newline", s -> s.put("text", "다른 문장이다."));
+        assertForgedSummary("a claim text edited behind the text", s -> claimOf(s, 0).put("text", "합성기업이 계약을 취소했다."));
+        assertForgedSummary("a forged result version", s -> s.put("resultVersion", "isr-" + "0".repeat(64)));
+        assertForgedSummary("a forged result digest", s -> ((ObjectNode) s.get("source")).put("resultDigest", "0".repeat(64)));
+        assertForgedSummary("a forged basis digest", s -> ((ObjectNode) s.get("source")).put("basisDigest", "0".repeat(64)));
+        assertForgedSummary("a forged job id", s -> ((ObjectNode) s.get("source")).put("jobId", "summary-job-2"));
+        assertForgedSummary("a forged input digest", s -> ((ObjectNode) s.get("source")).put("inputDigest", "0".repeat(64)));
+        assertForgedSummary("an evidence union that is not the claims' union", s -> s.putArray("evidenceIds"));
+        assertForgedSummary("a claim id edited", s -> claimOf(s, 0).put("claimId", "c2"));
+        assertForgedSummary("a producer identity edited behind the result digest", s -> ((ObjectNode) s.get("producer")).put("promptVersion", "other"));
+        assertForgedSummary("a generation time edited behind the result digest", s -> s.put("generatedAt", "2026-10-23T01:02:03+00:00"));
+
+        // The basis: the summary rests on exactly the quotes (and their `report`/`background` context) the bundle's mentions state.
+        assertSummaryBundle(SUMMARIZED, false, "a mention turned into a background one under an unchanged summary",
+                b -> mention(b, 0).put("background", true));
+        assertSummaryBundle(SUMMARIZED, false, "a different article text under an unchanged summary",
+                b -> articleNode(b, 0).put("textSha256", "d".repeat(64)));
+        assertSummaryBundle(SUMMARIZED, false, "a different quote hash under an unchanged summary", b -> {
+            String quote = summaryOf(b).get("evidenceIds").get(0).stringValue();
+            for (JsonNode record : b.get("evidence")) {
+                if (record.get("id").stringValue().equals(quote)) {
+                    ((ObjectNode) record).put("quoteSha256", "e".repeat(64));
+                }
+            }
+        });
+    }
+
+    @Test
+    void everyClosedRuleOfAnAvailableSummaryIsEnforcedOneAtATime() {
+        assertRuleAccepted(SUMMARIZED, "the resealed control", s -> { });
+        assertRuleRefused("an unknown key", s -> s.put("note", "x"));
+        assertRuleRefused("a missing language", s -> s.remove("language"));
+        assertRuleRefused("a language other than ko", s -> s.put("language", "en"));
+        assertRuleRefused("a claim without any Hangul syllable", s -> claimOf(s, 0).put("text", "Synthetic Co announced."));
+        assertRuleRefused("a claim with a newline", s -> claimOf(s, 0).put("text", "합성기업이\n계약을 발표했다."));
+        assertRuleRefused("a claim with a carriage return", s -> claimOf(s, 0).put("text", "합성기업이\r계약을 발표했다."));
+        assertRuleRefused("an empty claim", s -> claimOf(s, 0).put("text", ""));
+        assertRuleAccepted(SUMMARIZED, "a claim of 280 code points", s -> claimOf(s, 0).put("text", "가".repeat(280)));
+        assertRuleRefused("a claim of 281 code points", s -> claimOf(s, 0).put("text", "가".repeat(281)));
+        // Code points, not UTF-16 units: 280 code points of two UTF-16 units each occupy 559 units.
+        assertRuleAccepted(SUMMARIZED, "280 code points of two UTF-16 units each",
+                s -> claimOf(s, 0).put("text", "가" + "\uD83D\uDE00".repeat(279)));
+        assertRuleRefused("281 code points of two UTF-16 units each", s -> claimOf(s, 0).put("text", "가" + "\uD83D\uDE00".repeat(280)));
+        assertRuleRefused("a claim id that is not c1", s -> claimOf(s, 0).put("claimId", "c2"));
+        assertRuleRefused("an unknown claim key", s -> claimOf(s, 0).put("note", "x"));
+        assertRuleRefused("no claims", s -> s.putArray("claims"));
+        assertRuleRefused("a claim without evidence", s -> claimOf(s, 0).putArray("evidenceIds"));
+        assertRuleRefused("a claim citing evidence outside the basis quotes (the issue's geography evidence)", s -> {
+            String quote = claimOf(s, 0).get("evidenceIds").get(0).stringValue();
+            String geography = SUMMARIZED.bundle().get("issues").get(0).get("geography").get("evidenceIds").get(0).stringValue();
+            assertTrue(!geography.equals(quote));
+            List<String> ids = new ArrayList<>(List.of(quote, geography));
+            Collections.sort(ids);
+            ArrayNode cited = claimOf(s, 0).putArray("evidenceIds");
+            ids.forEach(cited::add);
+        });
+        assertRuleRefused("a claim citing an unknown evidence id", s -> {
+            claimOf(s, 0).putArray("evidenceIds").add(UNKNOWN_EVIDENCE);
+        });
+        assertRuleRefused("a duplicated evidence id in a claim", s -> {
+            String quote = claimOf(s, 0).get("evidenceIds").get(0).stringValue();
+            ((ArrayNode) claimOf(s, 0).get("evidenceIds")).add(quote);
+        });
+        assertRuleRefused("a generation time without an offset", s -> s.put("generatedAt", "2026-10-22T01:02:03"));
+        assertRuleRefused("a generation time that is not a time", s -> s.put("generatedAt", "yesterday"));
+        assertRuleRefused("a prompt version that is empty", s -> ((ObjectNode) s.get("producer")).put("promptVersion", ""));
+        assertRuleRefused("a schema digest that is not a hash", s -> ((ObjectNode) s.get("producer")).put("schemaDigest", "xyz"));
+        assertRuleRefused("a runtime identity that is not a hash", s -> ((ObjectNode) s.get("producer")).put("runtimeIdentity", "A".repeat(64)));
+        assertRuleRefused("a verifier adapter that is not a hash", s -> ((ObjectNode) s.get("verifier")).put("adapterIdentity", "g".repeat(64)));
+        assertRuleRefused("a verifier request digest that is not a hash", s -> ((ObjectNode) s.get("verifier")).put("requestDigest", ""));
+        assertRuleRefused("an unknown producer key", s -> ((ObjectNode) s.get("producer")).put("temperature", "0"));
+        assertRuleRefused("a missing verifier key", s -> ((ObjectNode) s.get("verifier")).remove("requestDigest"));
+        assertRuleRefused("an unknown source key", s -> ((ObjectNode) s.get("source")).put("note", "x"));
+        assertRuleRefused("a source job id that is not an id", s -> ((ObjectNode) s.get("source")).put("jobId", "a b"));
+        assertForgedSummary("a missing source", s -> s.putNull("source"));
+        assertRuleRefused("a status other than available/unavailable", s -> s.put("status", "ready"));
+        // Six claims (each valid, each citing the one quote) is one more than the closed maximum of five.
+        assertRuleAccepted(SUMMARIZED, "five claims", s -> {
+            ArrayNode claims = (ArrayNode) s.get("claims");
+            for (int index = 2; index <= 5; index++) {
+                claims.add(claimOf(s, 0).deepCopy());
+                claimOf(s, index - 1).put("claimId", "c" + index);
+            }
+        });
+        assertRuleRefused("six claims", s -> {
+            ArrayNode claims = (ArrayNode) s.get("claims");
+            for (int index = 2; index <= 6; index++) {
+                claims.add(claimOf(s, 0).deepCopy());
+                claimOf(s, index - 1).put("claimId", "c" + index);
+            }
+        });
+    }
+
+    /** A syntactically valid evidence id that no bundle holds. */
+    private static final String UNKNOWN_EVIDENCE = "ev-" + "0".repeat(64);
+
+    @Test
+    void aJobCodedUnavailableSummaryNamesItsPinnedResultAndIsRecomputed() {
+        for (String code : List.of("producer-invalid", "verifier-hold", "verifier-reject")) {
+            HandoffFixtures.Built coded = HandoffFixtures.withSummary(BUILT, b -> HandoffFixtures.withheldSummary(b, code));
+            HandoffBundleVerifier.verify(coded.bundle());
+            assertForgedFrom(coded, code + ": a source basis that is not this issue's", s -> ((ObjectNode) s.get("source")).put("basisDigest", "0".repeat(64)));
+            assertForgedFrom(coded, code + ": a forged result digest", s -> ((ObjectNode) s.get("source")).put("resultDigest", "0".repeat(64)));
+            assertForgedFrom(coded, code + ": no source", s -> s.putNull("source"));
+            assertForgedFrom(coded, code + ": an unknown key", s -> s.put("note", "x"));
+            // The result digest covers the code: relabelling one withheld outcome as another (hold -> reject, ...) is refused.
+            assertForgedFrom(coded, code + ": relabelled", s -> s.put("code", code.equals("verifier-hold") ? "verifier-reject" : "verifier-hold"));
+        }
+    }
+
+    private static void assertForgedFrom(HandoffFixtures.Built base, String rule, Consumer<ObjectNode> forge) {
+        assertSummaryBundle(base, false, rule, b -> forge.accept(summaryOf(b)));
+    }
+
+    @Test
+    void aMissingMalformedOrUnknownSummaryKeyIsRefusedAndNothingIsDefaulted() {
+        assertSummaryBundle(BUILT, false, "an issue without a summary", b -> issueOf(b).remove("summary"));
+        assertSummaryBundle(BUILT, false, "a null summary", b -> issueOf(b).putNull("summary"));
+        assertSummaryBundle(BUILT, false, "a summary that is not an object", b -> issueOf(b).put("summary", "not-requested"));
+        assertSummaryBundle(BUILT, false, "a summary without a status", b -> summaryOf(b).remove("status"));
+        assertSummaryBundle(BUILT, false, "an unavailable summary without a code", b -> summaryOf(b).remove("code"));
+        assertSummaryBundle(BUILT, false, "an unavailable summary without its source key", b -> summaryOf(b).remove("source"));
+        assertSummaryBundle(BUILT, false, "an unknown key on a deterministic summary", b -> summaryOf(b).put("text", "x"));
+        assertSummaryBundle(BUILT, false, "a missing policy key", b -> ((ObjectNode) b.get("policy")).remove("issueSummary"));
+        assertSummaryBundle(BUILT, false, "another summary policy", b -> ((ObjectNode) b.get("policy")).put("issueSummary", "zoop-issue-summary-policy-2"));
+    }
+
+    @Test
+    void theQuoteCapIsExactlySixtyAndTheBasisIsTheUnionOfMentionEvidenceOnly() {
+        // 61 quotes decide input-too-large, 60 do not: the table is decided by the basis the verifier itself builds.
+        ObjectNode basis = StrictJson.newObject();
+        ArrayNode quotes = basis.putArray("quotes");
+        for (int index = 0; index < HandoffIssueSummary.MAX_QUOTES; index++) {
+            quotes.addObject().put("evidenceId", "ev-" + String.format("%064x", index));
+        }
+        StrictJson.Obj issue = StrictJson.Obj.of(issueOf(BUILT.bundle().deepCopy()));
+        assertNull(HandoffIssueSummary.deterministicCode(issue, basis));
+        quotes.addObject().put("evidenceId", "ev-" + String.format("%064x", HandoffIssueSummary.MAX_QUOTES));
+        assertEquals(HandoffIssueSummary.INPUT_TOO_LARGE, HandoffIssueSummary.deterministicCode(issue, basis));
+
+        // The basis of the standard issue is its title and the ONE mention quote: the geography and structural spans are not in it.
+        ObjectNode bundle = SUMMARIZED.bundle().deepCopy();
+        assertEquals(1, summaryOf(bundle).get("evidenceIds").size());
+        StrictJson.Obj raw = StrictJson.Obj.of(issueOf(bundle));
+        Map<String, HandoffBundle.Evidence> evidence = new HashMap<>();
+        HandoffBundle verified = HandoffBundleVerifier.verify(bundle);
+        verified.evidence().forEach(e -> evidence.put(e.id(), e));
+        Map<String, HandoffBundle.Article> articles = new HashMap<>();
+        verified.articles().forEach(a -> articles.put(HandoffBundleVerifier.articleKey(a.articleId(), a.articleVersion()), a));
+        ObjectNode computed = HandoffIssueSummary.basis(raw, evidence, articles);
+        assertEquals(1, computed.get("quotes").size());
+        assertEquals(HandoffFixtures.summaryBasis(bundle), computed, "the verifier's basis equals the hand-built one");
+        assertEquals(summaryOf(bundle).get("source").get("basisDigest").stringValue(), Canonical.digest(computed));
+    }
+
+    @Test
+    void theBundleSixShapeAndAForgedSevenLabelOnItAreRefused() {
+        assertRefusedFrom(BUILT, "the earlier schema string on a seven shape", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-6"));
+        assertThrows(StrictJson.Malformed.class, () -> {
+            ObjectNode earlier = BUILT.bundle().deepCopy();
+            earlier.put("schemaVersion", "zoop-graph-handoff-bundle-6");
+            issueOf(earlier).remove("summary");
+            ((ObjectNode) earlier.get("policy")).remove("issueSummary");
+            ((ObjectNode) earlier.get("digests")).put("content", HandoffBundleVerifier.contentDigest(earlier));
+            HandoffBundleVerifier.verify(earlier);
+        }, "the bundle-6 shape: no summary, no summary policy");
+        assertThrows(StrictJson.Malformed.class, () -> {
+            ObjectNode forged = BUILT.bundle().deepCopy();
+            issueOf(forged).remove("summary");
+            ((ObjectNode) forged.get("policy")).remove("issueSummary");
+            ((ObjectNode) forged.get("digests")).put("content", HandoffBundleVerifier.contentDigest(forged));
+            HandoffBundleVerifier.verify(forged);
+        }, "the bundle-6 shape carrying the bundle-7 label");
+    }
+
+    @Test
+    void theProducersRealSummaryExportsCarryTheHandWrittenSummariesAndEachNegativeBundleIsRefusedWithItsContentDigestRecomputed() throws Exception {
+        // expected-summaries.json is written by hand in graph_handoff_smoke.py (never derived from the planner): per export file, per public
+        // issue id, the status, code, whether a job result is pinned and, for an available summary, its text, claims, evidence union and kinds.
+        JsonNode expected = HandoffFixtures.parse(resource("expected-summaries.json"));
+        int accepted = 0;
+        int refused = 0;
+        int available = 0;
+        int jobCoded = 0;
+        for (String name : expected.propertyNames()) {
+            JsonNode want = expected.get(name);
+            byte[] export = resource(name);
+            if (want.has("breaks")) {
+                JsonNode bundle = HandoffFixtures.parse(export).get("bundle");
+                assertEquals(HandoffBundleVerifier.contentDigest(bundle), bundle.get("digests").get("content").stringValue(), name);
+                assertEquals(GraphHandoffFailure.BUNDLE_INVALID, failureOf(export), name + ": " + want.get("breaks").stringValue());
+                refused++;
+                continue;
+            }
+            new HandoffExportParser().parse(export, pinning(export));
+            JsonNode bundle = HandoffFixtures.parse(export).get("bundle");
+            assertEquals("zoop-graph-handoff-bundle-7", bundle.get("schemaVersion").stringValue(), name);
+            assertEquals("zoop-issue-summary-policy-1", bundle.get("policy").get("issueSummary").stringValue(), name);
+            assertEquals(want.size(), bundle.get("issues").size(), name);
+            for (JsonNode issue : bundle.get("issues")) {
+                String id = issue.get("id").stringValue();
+                JsonNode expectation = want.get(id);
+                JsonNode summary = issue.get("summary");
+                String at = name + " " + id;
+                assertEquals(expectation.get("status").stringValue(), summary.get("status").stringValue(), at);
+                assertEquals(expectation.get("pinned").booleanValue(), !summary.get("source").isNull(), at);
+                if (expectation.get("status").stringValue().equals("unavailable")) {
+                    assertEquals(expectation.get("code").stringValue(), summary.get("code").stringValue(), at);
+                    if (expectation.get("pinned").booleanValue()) {
+                        jobCoded++;
+                    }
+                    continue;
+                }
+                available++;
+                for (String field : List.of("text", "claims", "evidenceIds", "language")) {
+                    assertEquals(expectation.get(field), summary.get(field), at + " " + field);
+                }
+                assertEquals(expectation.get("producerKind").stringValue(), summary.get("producer").get("kind").stringValue(), at);
+                assertEquals(expectation.get("verifierKind").stringValue(), summary.get("verifier").get("kind").stringValue(), at);
+            }
+            accepted++;
+        }
+        assertTrue(accepted >= 10 && refused >= 12, "exports " + accepted + ", negative bundles " + refused);
+        assertEquals(1, available, "exactly one real export carries an available summary");
+        assertEquals(1, jobCoded, "exactly one real export carries a job-coded unavailable summary");
+    }
+
+    @Test
+    void anUncitedQuoteOfTheRealSummaryExportIsPartOfItsBasisSoEditingItRefusesTheBundleWithItsContentDigestRecomputed() throws Exception {
+        // The producer's real export (export-summary.json): the available summary has ONE claim, but its issue has a second mention (another article under another source)
+        // that no claim cites. The summary rests on that quote too, so changing only that mention or its article must refuse the bundle.
+        ObjectNode bundle = (ObjectNode) HandoffFixtures.parse(resource("export-summary.json")).get("bundle");
+        HandoffBundleVerifier.verify(bundle);
+        int issueIndex = -1;
+        for (int i = 0; i < bundle.get("issues").size(); i++) {
+            if ("available".equals(bundle.get("issues").get(i).get("summary").get("status").stringValue())) {
+                issueIndex = i;
+            }
+        }
+        assertTrue(issueIndex >= 0, "the real export carries an available summary");
+        JsonNode issue = bundle.get("issues").get(issueIndex);
+        java.util.Set<String> cited = new java.util.HashSet<>();
+        issue.get("summary").get("evidenceIds").values().forEach(id -> cited.add(id.stringValue()));
+        int uncitedIndex = -1;
+        for (int m = 0; m < issue.get("mentions").size(); m++) {
+            boolean touched = false;
+            for (JsonNode id : issue.get("mentions").get(m).get("evidenceIds")) {
+                touched |= cited.contains(id.stringValue());
+            }
+            if (!touched) {
+                uncitedIndex = m;
+            }
+        }
+        assertTrue(uncitedIndex >= 0, "the real export has a mention no claim cites");
+        assertEquals(1, issue.get("summary").get("claims").size(), "the real summary has one claim");
+
+        ObjectNode background = bundle.deepCopy();
+        ((ObjectNode) background.get("issues").get(issueIndex).get("mentions").get(uncitedIndex)).put("background", true);
+        ((ObjectNode) background.get("digests")).put("content", HandoffBundleVerifier.contentDigest(background));
+        assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(background), "the uncited mention turned into a background one");
+
+        JsonNode uncitedMention = issue.get("mentions").get(uncitedIndex);
+        ObjectNode hashed = bundle.deepCopy();
+        boolean edited = false;
+        for (JsonNode article : hashed.get("articles")) {
+            if (article.get("articleId").equals(uncitedMention.get("articleId")) && article.get("articleVersion").equals(uncitedMention.get("articleVersion"))) {
+                ((ObjectNode) article).put("textSha256", "7".repeat(64));
+                edited = true;
+            }
+        }
+        assertTrue(edited, "the uncited article is in the bundle");
+        ((ObjectNode) hashed.get("digests")).put("content", HandoffBundleVerifier.contentDigest(hashed));
+        assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(hashed), "the uncited article's text hash edited");
     }
 }

@@ -125,4 +125,52 @@ public class JdbcAdminAuditRepository implements AdminAuditRepository {
                 .addValue("createdJobId", createdJobId).addValue("reason", reason).addValue("requestId", requestId)
                 .addValue("occurredAt", Timestamp.from(occurredAt)));
     }
+
+    @Override
+    public void recordReviewDecision(String adminId, String email, String targetId, long reviewDecisionId, String decision,
+            String sourceVersion, String sourceRevision, long revision, long globalRevision, String reason, String requestId,
+            Instant occurredAt) {
+        jdbc.update("""
+                INSERT INTO audit_logs
+                  (actor_kind, admin_id, actor_id, actor_email_snapshot, action,
+                   target_type, target_id, outcome, purpose, reason, request_id, detail, occurred_at)
+                VALUES ('admin', :adminId, :adminId, :email, 'review.decision',
+                        'review_target', :targetId, 'succeeded', 'review', :reason,
+                        :requestId, jsonb_build_object(
+                            'reviewDecisionId', CAST(:reviewDecisionId AS bigint),
+                            'decision', CAST(:decision AS text),
+                            'sourceVersion', CAST(:sourceVersion AS text),
+                            'sourceRevision', CAST(:sourceRevision AS text),
+                            'revision', CAST(:revision AS bigint),
+                            'globalRevision', CAST(:globalRevision AS bigint)), :occurredAt)
+                """, new MapSqlParameterSource("adminId", adminId)
+                .addValue("email", email).addValue("targetId", targetId).addValue("reviewDecisionId", reviewDecisionId)
+                .addValue("decision", decision).addValue("sourceVersion", sourceVersion)
+                .addValue("sourceRevision", sourceRevision).addValue("revision", revision)
+                .addValue("globalRevision", globalRevision).addValue("reason", reason).addValue("requestId", requestId)
+                .addValue("occurredAt", Timestamp.from(occurredAt)));
+    }
+
+    @Override
+    public void recordPublicationRuleSwitch(String adminId, String email, String ruleId, long changeId,
+            boolean beforeEnabled, boolean afterEnabled, long revision, long logRevision, String reason, String requestId,
+            Instant occurredAt) {
+        jdbc.update("""
+                INSERT INTO audit_logs
+                  (actor_kind, admin_id, actor_id, actor_email_snapshot, action,
+                   target_type, target_id, outcome, purpose, reason, request_id, detail, occurred_at)
+                VALUES ('admin', :adminId, :adminId, :email, 'publication.rule.switch',
+                        'publication_rule', :ruleId, 'succeeded', 'graph_publication', :reason,
+                        :requestId, jsonb_build_object(
+                            'changeId', CAST(:changeId AS bigint),
+                            'beforeEnabled', CAST(:beforeEnabled AS boolean),
+                            'afterEnabled', CAST(:afterEnabled AS boolean),
+                            'revision', CAST(:revision AS bigint),
+                            'logRevision', CAST(:logRevision AS bigint)), :occurredAt)
+                """, new MapSqlParameterSource("adminId", adminId)
+                .addValue("email", email).addValue("ruleId", ruleId).addValue("changeId", changeId)
+                .addValue("beforeEnabled", beforeEnabled).addValue("afterEnabled", afterEnabled)
+                .addValue("revision", revision).addValue("logRevision", logRevision).addValue("reason", reason)
+                .addValue("requestId", requestId).addValue("occurredAt", Timestamp.from(occurredAt)));
+    }
 }

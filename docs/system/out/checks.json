@@ -464,6 +464,13 @@
     },
     {
       "code": "TEAM_DECISION_REQUIRED",
+      "target": "listConversations",
+      "severity": "warning",
+      "message": "와이어프레임에 대화 목록 화면이 없다. 웹은 D-AI-02 드로어 안의 '대화 기록' 보기로 임시 구현했으며 화면 설계 확정이 필요하다.",
+      "source": ""
+    },
+    {
+      "code": "TEAM_DECISION_REQUIRED",
       "target": "createConversation",
       "severity": "warning",
       "message": "대화·작업·멱등성 키의 실제 보존 기간과 운영 담당자를 출시 전에 등록해야 한다. 대화 소유권·활성 작업 하나·최초 요청 고정은 확정 계약이다.",
@@ -478,6 +485,13 @@
     },
     {
       "code": "TEAM_DECISION_REQUIRED",
+      "target": "deleteConversation",
+      "severity": "warning",
+      "message": "개별 대화 삭제를 고지하는 개인정보 처리방침·이용약관 개정본(docs/legal/drafts) 승인과 시행 전까지 zoop.chat.delete-enabled를 켜지 않는다.",
+      "source": ""
+    },
+    {
+      "code": "TEAM_DECISION_REQUIRED",
       "target": "getCurrentConversation",
       "severity": "warning",
       "message": "최신 대화 복원의 보존 기간과 계정 삭제·로그아웃 뒤 cache 폐기 운영값을 출시 전에 등록해야 한다.",
@@ -487,7 +501,7 @@
       "code": "TEAM_DECISION_REQUIRED",
       "target": "submitQuestion",
       "severity": "warning",
-      "message": "대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다. / Jev 0.70/0.35, MCP 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.8을 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다.",
+      "message": "대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다. / Jev 0.70/0.35, 도구 호출 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.9를 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다.",
       "source": ""
     },
     {
@@ -1670,7 +1684,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getVirtualAccountProfile",
       "severity": "difference",
-      "message": "목표만 132 · BFF만 32 · 형식/필수/권한 변경 8",
+      "message": "목표만 177 · BFF만 32 · 형식/필수/권한 변경 8",
       "source": ""
     },
     {
@@ -1740,7 +1754,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getCompanyRelation",
       "severity": "difference",
-      "message": "목표만 135 · BFF만 43 · 형식/필수/권한 변경 6",
+      "message": "목표만 182 · BFF만 43 · 형식/필수/권한 변경 6",
       "source": ""
     },
     {
@@ -1880,7 +1894,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getBriefing",
       "severity": "difference",
-      "message": "목표만 743 · BFF만 60 · 형식/필수/권한 변경 21",
+      "message": "목표만 1094 · BFF만 60 · 형식/필수/권한 변경 21",
       "source": ""
     },
     {
@@ -1926,6 +1940,13 @@
       "source": ""
     },
     {
+      "code": "TARGET_ONLY_API",
+      "target": "listConversations",
+      "severity": "difference",
+      "message": "GET /api/v1/chat/sessions: 직접 대응 BFF 없음",
+      "source": ""
+    },
+    {
       "code": "BFF_PATH_DIFFERENCE",
       "target": "createConversation",
       "severity": "difference",
@@ -1951,6 +1972,13 @@
       "target": "getConversation",
       "severity": "difference",
       "message": "목표만 175 · BFF만 32 · 형식/필수/권한 변경 23",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "deleteConversation",
+      "severity": "difference",
+      "message": "DELETE /api/v1/chat/sessions/{id}: 직접 대응 BFF 없음",
       "source": ""
     },
     {
@@ -2076,7 +2104,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAdminDashboard",
       "severity": "difference",
-      "message": "목표만 695 · BFF만 633 · 형식/필수/권한 변경 7",
+      "message": "목표만 1082 · BFF만 633 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -2104,7 +2132,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getPipelineOverview",
       "severity": "difference",
-      "message": "목표만 116 · BFF만 22 · 형식/필수/권한 변경 12",
+      "message": "목표만 131 · BFF만 36 · 형식/필수/권한 변경 12",
       "source": ""
     },
     {
@@ -2118,7 +2146,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "listAnalysisCandidates",
       "severity": "difference",
-      "message": "목표만 115 · BFF만 23 · 형식/필수/권한 변경 10",
+      "message": "목표만 128 · BFF만 37 · 형식/필수/권한 변경 11",
       "source": ""
     },
     {
@@ -2132,7 +2160,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAnalysisCandidate",
       "severity": "difference",
-      "message": "목표만 123 · BFF만 30 · 형식/필수/권한 변경 11",
+      "message": "목표만 180 · BFF만 82 · 형식/필수/권한 변경 13",
       "source": ""
     },
     {
@@ -2146,7 +2174,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "decideAnalysisCandidate",
       "severity": "difference",
-      "message": "목표만 174 · BFF만 38 · 형식/필수/권한 변경 11",
+      "message": "목표만 175 · BFF만 40 · 형식/필수/권한 변경 11",
       "source": ""
     },
     {
@@ -2160,7 +2188,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "listPublicationRules",
       "severity": "difference",
-      "message": "목표만 120 · BFF만 21 · 형식/필수/권한 변경 9",
+      "message": "목표만 126 · BFF만 24 · 형식/필수/권한 변경 9",
       "source": ""
     },
     {
@@ -2174,7 +2202,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "setPublicationRule",
       "severity": "difference",
-      "message": "목표만 160 · BFF만 12 · 형식/필수/권한 변경 11",
+      "message": "목표만 149 · BFF만 24 · 형식/필수/권한 변경 10",
       "source": ""
     },
     {
@@ -2230,7 +2258,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "listAnalysisJobs",
       "severity": "difference",
-      "message": "목표만 120 · BFF만 93 · 형식/필수/권한 변경 21",
+      "message": "목표만 804 · BFF만 393 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -2244,7 +2272,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "createAnalysisJob",
       "severity": "difference",
-      "message": "목표만 167 · BFF만 39 · 형식/필수/권한 변경 16",
+      "message": "목표만 526 · BFF만 194 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -2258,7 +2286,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAnalysisJob",
       "severity": "difference",
-      "message": "목표만 114 · BFF만 39 · 형식/필수/권한 변경 14",
+      "message": "목표만 456 · BFF만 189 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -2272,7 +2300,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "retryAnalysisJob",
       "severity": "difference",
-      "message": "목표만 162 · BFF만 36 · 형식/필수/권한 변경 16",
+      "message": "목표만 504 · BFF만 186 · 형식/필수/권한 변경 9",
       "source": ""
     },
     {
@@ -2286,7 +2314,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "cancelAnalysisJob",
       "severity": "difference",
-      "message": "목표만 162 · BFF만 30 · 형식/필수/권한 변경 16",
+      "message": "목표만 504 · BFF만 180 · 형식/필수/권한 변경 9",
       "source": ""
     },
     {
@@ -2300,7 +2328,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAiUsage",
       "severity": "difference",
-      "message": "목표만 114 · BFF만 21 · 형식/필수/권한 변경 10",
+      "message": "목표만 172 · BFF만 35 · 형식/필수/권한 변경 10",
       "source": ""
     },
     {
@@ -2650,7 +2678,7 @@
     "RESERVED_REQUIREMENT_UNMAPPED": 1,
     "INDEX_DETAIL_RANGE_STALE": 17,
     "INDEX_REQUIREMENT_META_MISMATCH": 4,
-    "TEAM_DECISION_REQUIRED": 37,
+    "TEAM_DECISION_REQUIRED": 39,
     "REQUIREMENT_TITLE_REVIEW": 42,
     "REQUIREMENT_BINDING_BY_MEANING": 12,
     "CONTRACT_UNDECIDED": 1,
@@ -2661,28 +2689,28 @@
     "BFF_CACHED_OBSERVATION": 1,
     "BFF_PATH_DIFFERENCE": 81,
     "BFF_FIELD_DIFFERENCE": 81,
-    "TARGET_ONLY_API": 7,
+    "TARGET_ONLY_API": 9,
     "PROTOTYPE_ONLY_API": 3
   },
   "severityCounts": {
-    "warning": 205,
-    "difference": 172
+    "warning": 207,
+    "difference": 174
   },
   "xlsxReadback": {
     "status": "passed",
     "sheetDataRows": {
-      "추적표": 660,
-      "화면→기능→API": 1437,
+      "추적표": 680,
+      "화면→기능→API": 1457,
       "기능→WBS→구현 상태": 500,
-      "API 목록": 88,
+      "API 목록": 90,
       "오류 코드": 28,
-      "경고": 377,
+      "경고": 381,
       "원문 WBS": 173,
       "원문 제안·유효 기준": 8,
       "범위 예외·상세 권한": 34,
       "수용 기준": 121
     },
-    "cells": 48298
+    "cells": 48988
   },
   "acceptanceCoverage": {
     "status": "passed",
@@ -2727,15 +2755,15 @@
       "BE": 82,
       "FE": 33
     },
-    "targetOperations": 88
+    "targetOperations": 90
   },
   "sheetDataRows": {
-    "추적표": 660,
-    "화면→기능→API": 1437,
+    "추적표": 680,
+    "화면→기능→API": 1457,
     "기능→WBS→구현 상태": 500,
-    "API 목록": 88,
+    "API 목록": 90,
     "오류 코드": 28,
-    "경고": 377,
+    "경고": 381,
     "원문 WBS": 173,
     "원문 제안·유효 기준": 8,
     "범위 예외·상세 권한": 34,

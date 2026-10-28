@@ -1,0 +1,240 @@
+{
+  "schemaVersion": "zoop-archive-recheck-v1",
+  "status": "PASS",
+  "policySha256": "2d07730549d34b56334be608c986c52592f4194570b1b2cf74162030355cf740",
+  "scannerSha256": "09b15bba8dbcd13f872254a5815406a5d9143b231f7b2ea2b521cf27725d44d1",
+  "readerSha256": "cd31eac30c0bbd5f4bc44076126063e77f9a650ffacb3180931a674b51df5479",
+  "publisherRedactorSha256": "e3da5bab1beb6d21ff2e2c26160b2f36bbc742ab7b538bbda361790e1d506f50",
+  "distributionSha256": "e5a5b0b94b56be1653c9695c48dcfb528608b1e29aecf188610f3c982a5d2890",
+  "distributionFiles": [
+    {
+      "path": "manifest.json",
+      "sha256": "400be8c560283f5ae3e80a0aa88c65142f642d30feb4935fef9a20e8a9efd155"
+    },
+    {
+      "path": "files.jsonl.gz",
+      "sha256": "66ff8009c14abbb61fe4908a462ab7c6e8065a672253fcedd865d4e3e7a52e15",
+      "bytes": 9214000
+    },
+    {
+      "path": "excluded.jsonl",
+      "sha256": "3534ab3357231d4182da7bda44b98fab82d9d65bbb39996710af33b68c2dcc28",
+      "bytes": 68287
+    },
+    {
+      "path": "redactions.jsonl",
+      "sha256": "7224aaf9c096b259b8280fc763c902871e5d7726a22e61fe92dc9b8430b24b1d",
+      "bytes": 442374
+    },
+    {
+      "path": "objects-001.tar.gz",
+      "sha256": "a10f68ea953827a84ed22c5f98a45ede64dbff6844ebd509ff6d1c6d6a6d5c03",
+      "bytes": 18503956
+    },
+    {
+      "path": "objects-002.tar.gz",
+      "sha256": "4bc080cf619628867c944e55c8b7786b25cddaa39c8df52f9a921737dca9f60d",
+      "bytes": 18541414
+    },
+    {
+      "path": "objects-003.tar.gz",
+      "sha256": "814132d9df24bc419c438506419b86414492d21c8f5c02148b3fd71c182d7f13",
+      "bytes": 17784708
+    },
+    {
+      "path": "objects-004.tar.gz",
+      "sha256": "b7161f95c5e975535287b79b3a9ee40a544d89d210e9fcd614d1e4c514b7e06d",
+      "bytes": 18567010
+    },
+    {
+      "path": "objects-005.tar.gz",
+      "sha256": "baa55f7c6e7a6218d2f01f3cc1f44a558f0116a732d9c99dd1c057576e2fc6b1",
+      "bytes": 18004490
+    },
+    {
+      "path": "objects-006.tar.gz",
+      "sha256": "a4f8a04f2c2ec975f01bd081a55c213e138350a5a21b1e5a7e83ff38cde7def5",
+      "bytes": 19324722
+    },
+    {
+      "path": "objects-007.tar.gz",
+      "sha256": "140e830e56865681e7fa0509a3086a2b42bb9dee858d2664e8a0a06b8b2cec8b",
+      "bytes": 17801721
+    },
+    {
+      "path": "objects-008.tar.gz",
+      "sha256": "81464542de11cde922b57a4744eb49e961f8c0fd45d921fb807a0b69356d62a3",
+      "bytes": 4223248
+    },
+    {
+      "path": "objects-009.tar.gz",
+      "sha256": "2c4cb5b94be46df580602552cbd225fbd188819cf70cff5c497471f051030acb",
+      "bytes": 18045046
+    },
+    {
+      "path": "objects-010.tar.gz",
+      "sha256": "6168979733a7ba3a03fcb5c945249fce2a2a8842857d19519b2c94e14aa6aa8e",
+      "bytes": 16939001
+    },
+    {
+      "path": "objects-011.tar.gz",
+      "sha256": "44e9e12d16ef024948e55b052a233db7f72c03dbdd0da46f91ca100d19141ce7",
+      "bytes": 17984210
+    },
+    {
+      "path": "objects-012.tar.gz",
+      "sha256": "8f2f33f9fcf1970b2fbac58b7a3624c606fca9167470a4c4e608cbe776939635",
+      "bytes": 17741214
+    },
+    {
+      "path": "objects-013.tar.gz",
+      "sha256": "e93adc7702cddac8b14b53e95627412a5713f68835def56ffdc6c65bfa8a9721",
+      "bytes": 17635797
+    },
+    {
+      "path": "objects-014.tar.gz",
+      "sha256": "cf0871a63a838103adb1fc1d6cbe64cd2c00a623d80f5efd00de29261756e100",
+      "bytes": 16896382
+    },
+    {
+      "path": "objects-015.tar.gz",
+      "sha256": "324721e22ae07370aa43ed271a1a8c6f84b56b3190308ea664aca388fb578aa2",
+      "bytes": 16493767
+    },
+    {
+      "path": "objects-016.tar.gz",
+      "sha256": "8e7768e299e46b15d13f759a3a4ea3e9b58576a54db17affd7e9404bdaa40d89",
+      "bytes": 21240739
+    },
+    {
+      "path": "objects-017.tar.gz",
+      "sha256": "a8248a1519fd944b2328b3ca2a56209e1d0cc71a5c3f8e6ed4a128bc1c8263a4",
+      "bytes": 18169444
+    },
+    {
+      "path": "objects-018.tar.gz",
+      "sha256": "8d72bdc540e8e781f1dce8e6971a27603f9a5fa11e00b6e45dbf8c28a670b0fc",
+      "bytes": 18843887
+    },
+    {
+      "path": "objects-019.tar.gz",
+      "sha256": "ab8b773ef70772205d404a0c5f710629402e4096bfeee5ab8960629f56d81e54",
+      "bytes": 17801165
+    },
+    {
+      "path": "objects-020.tar.gz",
+      "sha256": "03f154c7330c47f44906c1e60cc64f11d4b3c081858e8579ee9176066a91c364",
+      "bytes": 19515951
+    },
+    {
+      "path": "objects-021.tar.gz",
+      "sha256": "fcb3feb02682b4ec6f3e987d4b12d170f746d18be86d7a32a245133ee02866ff",
+      "bytes": 15686935
+    },
+    {
+      "path": "objects-022.tar.gz",
+      "sha256": "5417fe419d9ec1ffa41aaaebabd9e6a6aa9d47a7fab4b1de2984867589a94178",
+      "bytes": 18352315
+    },
+    {
+      "path": "objects-023.tar.gz",
+      "sha256": "c886158a2d2b4f8976b7ce1745ecd88cd29847ac7a25821c9d756a7663e6efe1",
+      "bytes": 1889047
+    }
+  ],
+  "objectsInspected": 24121,
+  "logicalFiles": 132244,
+  "zipObjectsInspected": 1000,
+  "zipMembersInspected": 1000,
+  "gzipObjectsInspected": 0,
+  "postgresRowsByTable": {
+    "ai_executions": 0,
+    "article_versions": 9667,
+    "articles": 9667,
+    "artifacts": 76801,
+    "briefing_changes": 5,
+    "briefing_rounds": 311,
+    "companies": 1477,
+    "company_catalog_revision": 33,
+    "document_analyses": 0,
+    "evidence": 15653,
+    "graph_activations": 19,
+    "graph_versions": 19
+  },
+  "administrativeValues": {
+    "reserved_fixture_email": 5,
+    "system": 19
+  },
+  "findings": [],
+  "newAiCalls": 0,
+  "newProviderCalls": 0,
+  "reviewedMetadataFields": [
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/0/token",
+      "matches": 1
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/1/token",
+      "matches": 1
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/10/token",
+      "matches": 1
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/11/token",
+      "matches": 1
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/2/token",
+      "matches": 1
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/3/token",
+      "matches": 1
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/4/token",
+      "matches": 1
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/5/token",
+      "matches": 1
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/6/token",
+      "matches": 1
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/7/token",
+      "matches": 1
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/8/token",
+      "matches": 1
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/9/token",
+      "matches": 1
+    }
+  ],
+  "limits": [
+    "PASS covers only these public signature/field rules, fixed top-level PostgreSQL columns and administrative value policy; not all possible secrets or personal data.",
+    "Historical private known-value comparisons are not publicly reproducible and are not claimed by this recheck.",
+    "Empty ai_executions/document_analyses exports admit no rows under this fixed-snapshot policy.",
+    "Nested JSON is checked for credential fields, not given a universal personal-data clearance. Public article bylines/contact details may remain.",
+    "SQL and preserved scripts are scanned as data and never executed. SQL execution safety and source redistribution rights are not certified."
+  ]
+}

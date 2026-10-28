@@ -9,6 +9,7 @@ import {
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import GraphCanvas from '@/components/graph/GraphCanvas';
+import { GraphAppearanceContext } from '@/components/graph/graph-appearance';
 import { createMockGraph } from '@/mocks/graph/response';
 import type { GraphData } from '@antv/g6';
 import {
@@ -44,8 +45,8 @@ const canvas = vi.hoisted(() => ({
 vi.mock('@antv/g6', () => ({
   Graph: class {
     destroyed = false;
-    constructor() {
-      canvas.created();
+    constructor(options?: unknown) {
+      canvas.created(options);
     }
     on(name: string, handler: (event: { target: { id: string } }) => void) {
       canvas.handlers.set(name, handler);
@@ -102,6 +103,146 @@ beforeEach(() => {
   );
 });
 describe('D-GRP-02 · canvas selection bridge', () => {
+  it('keeps the renderer when a parent supplies equivalent appearance values', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const page = (selectedId?: string) => (
+      <GraphAppearanceContext
+        value={{ variant: 'improved', theme: 'light', preview: true }}
+      >
+        <GraphCanvas data={data} selectedId={selectedId} />
+      </GraphAppearanceContext>
+    );
+    const view = render(page());
+    await waitFor(() => expect(canvas.created).toHaveBeenCalledTimes(1));
+    view.rerender(page('KRX:005930'));
+    await waitFor(() =>
+      expect(
+        canvas.setData.mock.lastCall?.[0].nodes.some(
+          (n: { id: string }) => n.id === 'KRX:005930',
+        ),
+      ).toBe(true),
+    );
+    expect(canvas.created).toHaveBeenCalledTimes(1);
+    expect(canvas.destroyed).not.toHaveBeenCalled();
+  });
+
+  it('D-GRP-01 does not move nodes by dragging; only the map camera moves', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.created).toHaveBeenCalled());
+    const behaviors = canvas.created.mock.lastCall![0].behaviors as (
+      string | { type?: string }
+    )[];
+    expect(
+      behaviors.some(
+        (b) =>
+          b === 'drag-element' ||
+          (typeof b === 'object' && b.type === 'drag-element'),
+      ),
+    ).toBe(false);
+    expect(canvas.handlers.has('node:dragend')).toBe(false);
+  });
+
+  it('D-GRP-01 double click fits the visible neighborhood and the tutorial blocks double click', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const view = render(<GraphCanvas data={data} />);
+    const host = screen.getByRole('img');
+    Object.defineProperty(host, 'clientWidth', {
+      configurable: true,
+      value: 1200,
+    });
+    Object.defineProperty(host, 'clientHeight', {
+      configurable: true,
+      value: 700,
+    });
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    canvas.zoomTo.mockClear();
+    await act(async () =>
+      canvas.handlers.get('node:dblclick')!({ target: { id: 'KRX:005930' } }),
+    );
+    await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalled());
+    expect(canvas.zoomTo.mock.lastCall![0]).toBeLessThanOrEqual(1.8);
+    canvas.zoomTo.mockClear();
+    fireEvent.keyDown(screen.getByRole('button', { name: '기업: 삼성전자' }), {
+      key: 'Enter',
+      shiftKey: true,
+    });
+    await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalled());
+    view.rerender(
+      <GraphCanvas data={data} tutorialLocked tutorialTargetId="KRX:005930" />,
+    );
+    await act(async () => {});
+    canvas.zoomTo.mockClear();
+    await act(async () => {
+      canvas.handlers.get('node:dblclick')!({ target: { id: 'KRX:005930' } });
+    });
+    expect(canvas.zoomTo).not.toHaveBeenCalled();
+  });
+
+  it('D-GRP-01 Shift+Enter on a folded event expands it first and fits its neighborhood after that draw', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const onSelect = vi.fn();
+    const view = render(<GraphCanvas data={data} onSelect={onSelect} />);
+    const host = screen.getByRole('img');
+    Object.defineProperty(host, 'clientWidth', {
+      configurable: true,
+      value: 1200,
+    });
+    Object.defineProperty(host, 'clientHeight', {
+      configurable: true,
+      value: 700,
+    });
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    const drawnIds = () =>
+      (
+        canvas.setData.mock.lastCall![0] as { nodes: { id: string }[] }
+      ).nodes.map((node) => node.id);
+    expect(drawnIds()).not.toContain('mock-issue-20');
+    canvas.zoomTo.mockClear();
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: '사건: 삼성전자 개별 공시 (예시)' }),
+      { key: 'Enter', shiftKey: true },
+    );
+    await waitFor(() => expect(onSelect).toHaveBeenCalledWith('mock-issue-20'));
+    expect(canvas.zoomTo).not.toHaveBeenCalled();
+    view.rerender(
+      <GraphCanvas
+        data={data}
+        onSelect={onSelect}
+        selectedId="mock-issue-20"
+      />,
+    );
+    await waitFor(() => expect(drawnIds()).toContain('mock-issue-20'));
+    await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalled());
+    expect(canvas.zoomTo.mock.lastCall![0]).toBeLessThanOrEqual(1.8);
+  });
+
+  it('M-GRP-01 folds path details into a compact bar and reopens the sheet without losing the path', async () => {
+    vi.stubGlobal('matchMedia', () => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    useAuthStore.setState({ status: 'ready', session: null, member: null });
+    useGraphUiStore.getState().reset();
+    vi.spyOn(graphApi, 'getGraph').mockResolvedValue(
+      createMockGraph({ mode: 'all', personalFilter: 'all' }),
+    );
+    const router = createMemoryRouter([{ path: '/', element: <MapPage /> }], {
+      initialEntries: ['/?mode=all&path=KRX:005930,NASDAQ:NVDA'],
+    });
+    render(<RouterProvider router={router} />);
+    await screen.findByRole('dialog', { name: '지도 상세' });
+    await userEvent.click(screen.getByRole('button', { name: '지도로 접기' }));
+    expect(screen.queryByRole('dialog', { name: '지도 상세' })).toBeNull();
+    const bar = screen.getByRole('group', { name: '지도 경로' });
+    expect(bar.textContent).toContain('삼성전자 ⇆ NVIDIA');
+    expect(router.state.location.search).toContain('path=');
+    await userEvent.click(
+      within(bar).getByRole('button', { name: '경로 단계 보기' }),
+    );
+    expect(screen.getByRole('dialog', { name: '지도 상세' })).toBeTruthy();
+  });
   it('모바일의 기존 상세/경로를 닫고 실제 캔버스에서 재시작·이동·확대·기업 선택을 수행한다', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({
       matches: query.includes('max-width: 767px'),
@@ -206,14 +347,21 @@ describe('D-GRP-02 · canvas selection bridge', () => {
         const direct = rendered.edges?.find(
           (edge) => !edge.style?.lineDash && !edge.style?.endArrow,
         );
-        expect(direct?.style?.lineWidth).toBe(1.5);
+        expect(direct?.style?.lineWidth).toBe(1.1);
         expect(direct?.style?.stroke).toBe(
-          theme === 'dark' ? '#c4c9d1' : '#606a76',
+          theme === 'dark' ? '#a5a9b1' : '#71757c',
         );
         const label = rendered.nodes?.find(
           (node) => node.id === 'NASDAQ:NVDA',
         )?.style;
         expect(Number(label?.labelFontSize)).toBeGreaterThan(17.2);
+        const aiFeature = screen.getByRole('button', { name: 'AI 기능' });
+        expect(aiFeature.querySelector('img')?.getAttribute('src')).toBe(
+          '/graph-assets/ai.svg',
+        );
+        expect(
+          screen.getByRole('button', { name: 'AI 채팅' }).querySelector('img'),
+        ).toBeNull();
         const filters = screen.getByRole('group', { name: '그래프 표시 필터' });
         expect(filters.closest('.relationship-toolbar')).toBeTruthy();
         expect(screen.queryByLabelText('그래프 범례')).toBeNull();
@@ -675,7 +823,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
         url: '/?mode=all',
         view: {
           hidden: [],
-          camera: { zoom: 1, position: [0, 0], size: [0, 0] },
+          camera: { zoom: 1, position: [0, 0], size: [0, 0], layout: 2 },
         },
       }),
     );
@@ -808,7 +956,12 @@ describe('D-GRP-02 · canvas selection bridge', () => {
         url: '/?mode=all',
         view: {
           hidden: [],
-          camera: { zoom: 1.8, position: [40, 60], size: [1600, 900] },
+          camera: {
+            zoom: 1.8,
+            position: [40, 60],
+            size: [1600, 900],
+            layout: 2,
+          },
         },
       }),
     );
@@ -826,7 +979,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       url: '/?mode=all',
       view: {
         hidden: [],
-        camera: { zoom: 1.8, position: [40, 60], size: [0, 0] },
+        camera: { zoom: 1.8, position: [40, 60], size: [0, 0], layout: 2 },
       },
     });
     sessionStorage.setItem('zoop.graph.view:member-a:all', saved);
@@ -841,7 +994,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     expect(
       JSON.parse(sessionStorage.getItem('zoop.graph.view:member-a:all')!).view
         .camera,
-    ).toEqual({ zoom: 1.8, position: [40, 60], size: [0, 0] });
+    ).toEqual({ zoom: 1.8, position: [40, 60], size: [0, 0], layout: 2 });
   });
 
   it('enables the desktop minimap only above sixty visible nodes', async () => {
@@ -1082,6 +1235,17 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     ).toBe(true);
   });
 
+  it('D-GRP-01 shows each zoom control name on hover and lets the tutorial camera step use fit', () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} />);
+    const zoom = screen.getByLabelText('지도 확대 조절');
+    for (const name of ['확대', '축소', '전체 그래프 맞춤']) {
+      const button = within(zoom).getByRole('button', { name });
+      expect(button.textContent).toContain(name);
+      expect(button.getAttribute('data-tutorial-action')).toBe('zoom');
+    }
+  });
+
   it('D-GRP-01 shows the flow order toggle in the always-visible zoom controls', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const onFlowChange = vi.fn();
@@ -1231,5 +1395,55 @@ describe('D-GRP-02 · canvas selection bridge', () => {
         (edge) => ids.has(edge.source) && ids.has(edge.target),
       ),
     ).toBe(true);
+  });
+
+  it('D-GRP-01 노드 위에서 끌어도 지도를 옮기고, 끈 뒤 손을 뗄 때의 클릭으로 노드를 고르지 않는다', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const onSelect = vi.fn();
+    render(<GraphCanvas data={data} onSelect={onSelect} />);
+    await waitFor(() => expect(canvas.handlers.has('node:click')).toBe(true));
+    const options = canvas.created.mock.lastCall?.[0] as {
+      behaviors: unknown[];
+      node: {
+        state: Record<string, Record<string, unknown>>;
+      };
+    };
+    expect(options.behaviors[0]).toEqual({ type: 'drag-canvas', enable: true });
+    const surface = screen.getByRole('img', { name: /관계 지도:/ });
+
+    fireEvent.pointerDown(surface, { button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(surface, { clientX: 140, clientY: 125 });
+    fireEvent.pointerUp(window, { clientX: 140, clientY: 125 });
+    act(() =>
+      canvas.handlers.get('node:click')!({ target: { id: data.nodes[0].id } }),
+    );
+    act(() => canvas.handlers.get('canvas:click')!({ target: { id: '' } }));
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.pointerDown(surface, { button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerUp(window, { clientX: 101, clientY: 100 });
+    act(() =>
+      canvas.handlers.get('node:click')!({ target: { id: data.nodes[0].id } }),
+    );
+    expect(onSelect).toHaveBeenCalledWith(data.nodes[0].id);
+  });
+
+  it('D-GRP-03 선택 상태가 G6 기본 12px로 이름표를 줄이지 않는다', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.created).toHaveBeenCalled());
+    const { state } = (
+      canvas.created.mock.lastCall?.[0] as {
+        node: {
+          state: Record<string, Record<string, (datum: unknown) => unknown>>;
+        };
+      }
+    ).node;
+    const datum = {
+      id: 'n',
+      style: { labelFontSize: 26, labelFontWeight: 800 },
+    };
+    expect(state.selected.labelFontSize(datum)).toBe(26);
+    expect(state.selected.labelFontWeight(datum)).toBe(800);
   });
 });

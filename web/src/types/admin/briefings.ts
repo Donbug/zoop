@@ -125,6 +125,7 @@ export type PastRun = {
   rejected: number | null;
   pending: number | null;
   errorCount: number | null;
+  /** 앱에 사용량 기록이 없는 실행(analyze_plan 등)은 null: 0이 아니라 미측정이다. */
   usage: {
     calls: number;
     replayCalls: number;
@@ -132,7 +133,38 @@ export type PastRun = {
     outputTokens: number;
     elapsedSeconds: number;
     estimatedCost: number | null;
-  };
+  } | null;
+};
+
+/**
+ * 하루(KST) 동안 한 기능이 쓴 모델 사용량. 계약 제안(#134 요청) 필드이며, 모르는 값은 0이 아니라 null이다.
+ * 비용은 실제 청구액과 추정액을 따로 둔다.
+ */
+export type AiUsageDayFeature = {
+  feature: string;
+  modelCalls: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  actualCost: number | null;
+  estimatedCost: number | null;
+};
+
+export type AiUsageDay = {
+  /** KST 날짜 YYYY-MM-DD */
+  date: string;
+  features: AiUsageDayFeature[];
+};
+
+/**
+ * 집계 기간에 AI를 쓴 회원 수(계약 제안). totalMembers는 기간 끝 기준 가입 회원(탈퇴 제외)이다.
+ * 기능별 회원 수는 측정하지 않으면 null이다.
+ */
+export type AiUsageMembers = {
+  totalMembers: number;
+  aiMembers: number | null;
+  chatbotMembers: number | null;
+  briefingMembers: number | null;
+  note: string | null;
 };
 
 export type AiUsage = {
@@ -141,4 +173,8 @@ export type AiUsage = {
   features: AiFeatureUsage[];
   pastRuns: PastRun[];
   cost: FeatureCost;
+  /** 날짜별·기능별 사용량(계약 제안). 서버가 아직 주지 않으면 없다. */
+  daily?: AiUsageDay[] | null;
+  /** AI 사용 회원 수(계약 제안). 서버가 아직 주지 않으면 없다. */
+  members?: AiUsageMembers | null;
 };

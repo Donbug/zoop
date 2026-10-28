@@ -437,6 +437,54 @@ export function useChatConversation(memberId: string) {
     }
   }, [adopt, canSwitch, current, mark]);
 
+  /**
+   * D-AI-02 대화 기록에서 지난 대화를 연다. 새 대화와 같은 조건에서만 바꾸고, 읽는 동안에는 전송·재시도·취소를 막는다.
+   * 성공하면 이전 대화의 늦은 응답을 모두 버리고, 실패하면 지금 대화를 그대로 둔다. 저장 상태만 읽고 모델을 부르지 않는다.
+   */
+  const open = useCallback(
+    async (id: string) => {
+      if (id === session.current) return true;
+      if (!canSwitch) return false;
+      const stamp = mark();
+      setNotice(null);
+      setSwitching(true);
+      try {
+        const conversation = await getConversation(id);
+        if (!current(stamp)) return false;
+        epoch.current += 1;
+        apply(conversation);
+        setPollError(null);
+        setLoad({ kind: 'ready' });
+        return true;
+      } catch (error) {
+        if (!current(stamp)) return false;
+        setNotice(noticeFor(error, '대화를 열지 못했어요.'));
+        return false;
+      } finally {
+        if (stamp.generation === generation.current) setSwitching(false);
+      }
+    },
+    [apply, canSwitch, current, mark],
+  );
+
+  /**
+   * 서버에서 삭제한 대화를 잊는다. 지금 대화였다면 빈 상태로 바꾸고(다음 질문이 새 대화를 만든다) 그 대화의 늦은 응답과
+   * 미확정 질문을 버린다.
+   */
+  const forget = useCallback(
+    (id: string) => {
+      if (session.current !== id) return;
+      epoch.current += 1;
+      adopt(null);
+      setJobs([]);
+      setPending(null);
+      setPollError(null);
+      setNotice(null);
+      setLoad({ kind: 'ready' });
+    },
+    [adopt],
+  );
+
   /** "다시 확인": 저장 상태만 다시 읽는다. 모델을 다시 부르지 않는다. */
   const recheck = useCallback(() => {
     if (load.kind === 'error') return restore(sessionId);
@@ -465,6 +513,8 @@ export function useChatConversation(memberId: string) {
     retry: (job: ChatJob) => act(job, 'retry'),
     cancel: (job: ChatJob) => act(job, 'cancel'),
     startNew,
+    open,
+    forget,
     recheck,
     dismissNotice: () => setNotice(null),
   };

@@ -19,8 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class JdbcGraphVersionRepository implements GraphVersionRepository {
-    /** Shared publication lock (ERD v6 section 24): pointer changes and their history are serialized. */
-    static final long PUBLICATION_LOCK = 0x7a6f6f7067726170L;
+    /**
+     * Shared publication lock (ERD v6 section 24): pointer changes and their history are serialized, and review decisions
+     * (global revision) take the same lock.
+     */
+    public static final long PUBLICATION_LOCK = 0x7a6f6f7067726170L;
     private static final String SELECT = """
             SELECT v.id, v.sequence, v.kind, v.snapshot_artifact_id, a.storage_uri, a.sha256, v.active
             FROM graph_versions v JOIN artifacts a ON a.id = v.snapshot_artifact_id
@@ -59,6 +62,16 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (SELECT 1 FROM graph_activations WHERE version_id = :id AND pointer_changed)
                 """, new MapSqlParameterSource("id", versionId), Boolean.class));
+    }
+
+    @Override
+    public Optional<String> previousVersionId(String versionId, Instant at) {
+        return first(jdbc.queryForList("""
+                SELECT previous_version_id FROM graph_activations
+                WHERE version_id = :id AND pointer_changed AND activated_at <= :at AND previous_version_id IS NOT NULL
+                  AND previous_version_id <> version_id
+                ORDER BY activated_at DESC, id DESC LIMIT 1
+                """, new MapSqlParameterSource("id", versionId).addValue("at", Timestamp.from(at)), String.class));
     }
 
     /** True when any non-fixture (imported) version exists; fixture seeding must never move such a pointer. */
@@ -153,6 +166,51 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
         if (!Objects.equals(expectedActiveVersionId, active().map(GraphVersionRecord::id).orElse(null))) {
             throw new CustomException(ErrorCode.REVISION_CONFLICT);
         }
+        return activateChecked(versionId, adminId, adminEmail, reason, publishable);
+    }
+
+    /**
+     * The newest imported version that was imported at or after {@code since}, was never the public pointer and comes after the
+     * active version (FS059: an older import never replaces a newer public version). Imports are ordered by {@code sequence},
+     * the import order. When the last pointer change was an administrator's, only versions imported after it count: an admin
+     * rollback is never undone by an import that was already waiting, only by the next one.
+     */
+    public Optional<GraphVersionRecord> autoActivationCandidate(Instant since) {
+        return first(jdbc.query(SELECT + """
+                WHERE v.kind = 'snapshot' AND v.created_at >= :since
+                  AND NOT EXISTS (SELECT 1 FROM graph_activations g WHERE g.version_id = v.id AND g.pointer_changed)
+                  AND v.sequence > COALESCE((SELECT c.sequence FROM graph_versions c WHERE c.active), 0)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM (SELECT actor_kind, activated_at FROM graph_activations WHERE pointer_changed
+                                     ORDER BY activated_at DESC, id DESC LIMIT 1) last
+                      WHERE last.actor_kind = 'admin' AND v.created_at <= last.activated_at)
+                ORDER BY v.sequence DESC LIMIT 1
+                """, new MapSqlParameterSource("since", Timestamp.from(since)), JdbcGraphVersionRepository::row));
+    }
+
+    /**
+     * The automatic activation after an import: {@link #activateByAdmin}'s order (lock, checks, activation time, last check,
+     * pointer, {@code published_at}) for the system actor, but only while {@code versionId} is still
+     * {@link #autoActivationCandidate the candidate} and the pointer is still {@code expectedActiveVersionId}. Otherwise another
+     * activation or a newer import won and nothing changes (empty).
+     */
+    @Transactional
+    public Optional<Activation> activateBySystem(String versionId, String expectedActiveVersionId, Instant since,
+            String reason, Supplier<Consumer<Instant>> publishable) {
+        jdbc.getJdbcTemplate().execute("SELECT pg_advisory_xact_lock(" + PUBLICATION_LOCK + ")");
+        if (!Objects.equals(expectedActiveVersionId, active().map(GraphVersionRecord::id).orElse(null))
+                || !autoActivationCandidate(since).map(GraphVersionRecord::id).filter(versionId::equals).isPresent()) {
+            return Optional.empty();
+        }
+        return Optional.of(activateChecked(versionId, null, "system", reason, publishable));
+    }
+
+    /**
+     * The shared tail of both activations, under the publication lock the caller holds: the slow checks, then the activation time,
+     * then the last check at that time, the pointer, the history and the first {@code published_at}, all at that one time.
+     */
+    private Activation activateChecked(String versionId, String adminId, String adminEmail, String reason,
+            Supplier<Consumer<Instant>> publishable) {
         Consumer<Instant> atActivation = publishable.get();
         Instant at = clock.instant();
         atActivation.accept(at);

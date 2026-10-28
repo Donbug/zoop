@@ -31,6 +31,10 @@
       "minLength": 1
     },
     "request:application/json.expectedSourceVersion:required": true,
+    "request:application/json.relationId": {
+      "type": "string",
+      "minLength": 1
+    },
     "response:200:application/json.candidateId": {
       "type": "string"
     },
@@ -442,6 +446,13 @@
     }
   },
   "bffOnly": {
+    "request:application/json.relationId<anyOf:0>": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "request:application/json.relationId<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.decision.adminEmail": {
       "type": "string"
     },
@@ -564,14 +575,9 @@
         "maxLength": 500
       }
     },
-    "request:application/json.relationId<anyOf:0>": {
-      "target": {
-        "type": "string"
-      },
-      "bff": {
-        "type": "string",
-        "maxLength": 200
-      }
+    "request:application/json.relationId:required": {
+      "target": true,
+      "bff": false
     },
     "response:200:application/json.decision": {
       "target": {

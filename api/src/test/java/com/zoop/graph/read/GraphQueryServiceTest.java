@@ -51,7 +51,7 @@ class GraphQueryServiceTest {
             return ids.stream().filter(id -> id.startsWith("NASDAQ:") || id.startsWith("KRX:") || id.startsWith("NYSE:"))
                     .map(id -> new Company(id, "catalog " + id, null, null)).toList();
         });
-        service = new GraphQueryService(GraphReadFixtures.reader(NOW, () -> exclusions), jdbc);
+        service = new GraphQueryService(GraphReadFixtures.reader(NOW, pinned -> exclusions), jdbc);
     }
 
     @Test
@@ -248,7 +248,7 @@ class GraphQueryServiceTest {
             }
             public Optional<String> activeVersionIdAt(Instant asOf) { return Optional.empty(); }
             public boolean everActivated(String id) { return false; }
-        }, Clock.fixed(NOW, ZoneOffset.UTC)), new FixtureGraphSnapshotStore(getClass().getClassLoader()), () -> exclusions), jdbc);
+        }, Clock.fixed(NOW, ZoneOffset.UTC)), new FixtureGraphSnapshotStore(getClass().getClassLoader()), pinned -> exclusions), jdbc);
         assertThrows(GraphSnapshotUnavailableException.class, () -> broken.getGraph(null, null, null, null, null, null, null, null, "r"));
     }
 

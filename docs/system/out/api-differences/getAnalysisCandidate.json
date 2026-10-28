@@ -7,12 +7,136 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "response:200:application/json.action<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.action<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.articles[].title": {
       "type": [
         "string",
         "null"
       ]
     },
+    "response:200:application/json.companies[].role<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.companies[].role<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.evidence[].quote<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.evidence[].quote<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.issueId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.issueId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.mention<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.mention<anyOf:0>.action": {
+      "type": "string"
+    },
+    "response:200:application/json.mention<anyOf:0>.action:required": true,
+    "response:200:application/json.mention<anyOf:0>.assertionStatus:required": true,
+    "response:200:application/json.mention<anyOf:0>.assertionStatus<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.mention<anyOf:0>.assertionStatus<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.mention<anyOf:0>.background": {
+      "type": "boolean"
+    },
+    "response:200:application/json.mention<anyOf:0>.background:required": true,
+    "response:200:application/json.mention<anyOf:0>.countries": {
+      "type": "array"
+    },
+    "response:200:application/json.mention<anyOf:0>.countries:required": true,
+    "response:200:application/json.mention<anyOf:0>.countries[]": {
+      "type": "string"
+    },
+    "response:200:application/json.mention<anyOf:0>.eventTime:required": true,
+    "response:200:application/json.mention<anyOf:0>.eventTime<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.mention<anyOf:0>.eventTime<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.mention<anyOf:0>.keywords": {
+      "type": "array"
+    },
+    "response:200:application/json.mention<anyOf:0>.keywords:required": true,
+    "response:200:application/json.mention<anyOf:0>.keywords[]": {
+      "type": "string"
+    },
+    "response:200:application/json.mention<anyOf:0>.mentionId": {
+      "type": "string"
+    },
+    "response:200:application/json.mention<anyOf:0>.mentionId:required": true,
+    "response:200:application/json.mention<anyOf:0>.participants": {
+      "type": "array"
+    },
+    "response:200:application/json.mention<anyOf:0>.participants:required": true,
+    "response:200:application/json.mention<anyOf:0>.participants[]": {
+      "type": "object"
+    },
+    "response:200:application/json.mention<anyOf:0>.participants[].companyId:required": true,
+    "response:200:application/json.mention<anyOf:0>.participants[].companyId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.mention<anyOf:0>.participants[].companyId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.mention<anyOf:0>.participants[].name": {
+      "type": "string"
+    },
+    "response:200:application/json.mention<anyOf:0>.participants[].name:required": true,
+    "response:200:application/json.mention<anyOf:0>.participants[].role:required": true,
+    "response:200:application/json.mention<anyOf:0>.participants[].role<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.mention<anyOf:0>.participants[].role<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.mention<anyOf:0>.period:required": true,
+    "response:200:application/json.mention<anyOf:0>.period<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.mention<anyOf:0>.period<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.mention<anyOf:0>.target:required": true,
+    "response:200:application/json.mention<anyOf:0>.target<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.mention<anyOf:0>.target<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.mention<anyOf:0>.title": {
+      "type": "string"
+    },
+    "response:200:application/json.mention<anyOf:0>.title:required": true,
+    "response:200:application/json.mention<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.policyVersion<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.policyVersion<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.relations[].revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.relations[].revision:required": true,
     "response:200:application/json.relations[].sourceRevision": {
       "type": "string"
     },
@@ -21,14 +145,30 @@
       "type": "string"
     },
     "response:200:application/json.relations[].sourceVersion:required": true,
-    "response:200:application/json.sourceRevision": {
+    "response:200:application/json.rule<anyOf:0>.hiddenRelations": {
+      "type": "array"
+    },
+    "response:200:application/json.rule<anyOf:0>.hiddenRelations:required": true,
+    "response:200:application/json.rule<anyOf:0>.hiddenRelations[]": {
       "type": "string"
     },
     "response:200:application/json.sourceRevision:required": true,
+    "response:200:application/json.sourceRevision<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.sourceRevision<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.sourceVersion": {
       "type": "string"
     },
     "response:200:application/json.sourceVersion:required": true,
+    "response:200:application/json.title<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.title<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -303,6 +443,9 @@
     }
   },
   "bffOnly": {
+    "response:200:application/json.action": {
+      "type": "string"
+    },
     "response:200:application/json.articles[].synthetic": {
       "type": "boolean"
     },
@@ -312,6 +455,125 @@
     },
     "response:200:application/json.articles[].title<anyOf:1>": {
       "type": "null"
+    },
+    "response:200:application/json.companies[].role": {
+      "type": "string"
+    },
+    "response:200:application/json.evidence[].quote": {
+      "type": "string"
+    },
+    "response:200:application/json.issueId": {
+      "type": "string"
+    },
+    "response:200:application/json.mention": {
+      "type": "object"
+    },
+    "response:200:application/json.mention.action": {
+      "type": "string"
+    },
+    "response:200:application/json.mention.action:required": true,
+    "response:200:application/json.mention.assertionStatus:required": true,
+    "response:200:application/json.mention.assertionStatus<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.mention.assertionStatus<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.mention.background": {
+      "type": "boolean"
+    },
+    "response:200:application/json.mention.background:required": true,
+    "response:200:application/json.mention.countries": {
+      "type": "array"
+    },
+    "response:200:application/json.mention.countries:required": true,
+    "response:200:application/json.mention.countries[]": {
+      "type": "string"
+    },
+    "response:200:application/json.mention.eventTime:required": true,
+    "response:200:application/json.mention.eventTime<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.mention.eventTime<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.mention.keywords": {
+      "type": "array"
+    },
+    "response:200:application/json.mention.keywords:required": true,
+    "response:200:application/json.mention.keywords[]": {
+      "type": "string"
+    },
+    "response:200:application/json.mention.mentionId": {
+      "type": "string"
+    },
+    "response:200:application/json.mention.mentionId:required": true,
+    "response:200:application/json.mention.participants": {
+      "type": "array"
+    },
+    "response:200:application/json.mention.participants:required": true,
+    "response:200:application/json.mention.participants[]": {
+      "type": "object"
+    },
+    "response:200:application/json.mention.participants[].companyId:required": true,
+    "response:200:application/json.mention.participants[].companyId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.mention.participants[].companyId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.mention.participants[].name": {
+      "type": "string"
+    },
+    "response:200:application/json.mention.participants[].name:required": true,
+    "response:200:application/json.mention.participants[].role": {
+      "type": "string"
+    },
+    "response:200:application/json.mention.participants[].role:required": true,
+    "response:200:application/json.mention.period:required": true,
+    "response:200:application/json.mention.period<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.mention.period<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.mention.target:required": true,
+    "response:200:application/json.mention.target<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.mention.target<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.mention.title": {
+      "type": "string"
+    },
+    "response:200:application/json.mention.title:required": true,
+    "response:200:application/json.policyVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.rule<anyOf:0>.droppedRelations": {
+      "type": "array"
+    },
+    "response:200:application/json.rule<anyOf:0>.droppedRelations:required": true,
+    "response:200:application/json.rule<anyOf:0>.droppedRelations[]": {
+      "type": "string"
+    },
+    "response:200:application/json.rule<anyOf:0>.withheldParticipants": {
+      "type": "array"
+    },
+    "response:200:application/json.rule<anyOf:0>.withheldParticipants:required": true,
+    "response:200:application/json.rule<anyOf:0>.withheldParticipants[]": {
+      "type": "integer"
+    },
+    "response:200:application/json.rule<anyOf:0>.withheldRelations": {
+      "type": "array"
+    },
+    "response:200:application/json.rule<anyOf:0>.withheldRelations:required": true,
+    "response:200:application/json.rule<anyOf:0>.withheldRelations[]": {
+      "type": "string"
+    },
+    "response:200:application/json.title": {
+      "type": "string"
     },
     "response:200:application/json.verification.observations[].confidence:required": true,
     "response:200:application/json.verification.observations[].confidence<anyOf:0>": {
@@ -406,6 +668,27 @@
         "type": "string"
       }
     },
+    "response:200:application/json.graphDb": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "reflected",
+          "pending",
+          "not_stored",
+          "unknown",
+          "excluded"
+        ]
+      },
+      "bff": {
+        "type": "string",
+        "enum": [
+          "reflected",
+          "pending",
+          "not_stored",
+          "unknown"
+        ]
+      }
+    },
     "response:200:application/json.history[].decidedAt": {
       "target": {
         "type": "string",
@@ -422,6 +705,23 @@
       },
       "bff": {
         "type": "string"
+      }
+    },
+    "response:200:application/json.rule<anyOf:0>.notAppliedReason<anyOf:0>": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "admin_decision",
+          "rule_disabled"
+        ]
+      },
+      "bff": {
+        "type": "string",
+        "enum": [
+          "admin_decision",
+          "rule_disabled",
+          "not_published"
+        ]
       }
     },
     "response:401:application/json.error.code": {

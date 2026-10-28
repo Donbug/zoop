@@ -15,4 +15,13 @@ public interface GraphVersionRepository {
 
     /** True when the version was ever the active pointer; only such versions are publicly readable. */
     boolean everActivated(String versionId);
+
+    /**
+     * The version that was public just before {@code versionId} last became the active pointer at or before {@code at}
+     * (Q05 "the previous map"); empty when it was the first, or never became the pointer by then. A store without
+     * activation history has none.
+     */
+    default Optional<String> previousVersionId(String versionId, Instant at) {
+        return Optional.empty();
+    }
 }

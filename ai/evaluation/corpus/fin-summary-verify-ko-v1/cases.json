@@ -1,0 +1,599 @@
+{
+  "schema": "zoop-summary-verify-cases-1",
+  "corpusId": "fin-summary-verify-ko-v1",
+  "revision": "2026-10-22.1",
+  "split": "dev",
+  "stage": "verify-issue-summary",
+  "provenance": {
+    "fictional": true,
+    "language": "ko",
+    "split": "dev",
+    "note": "AI 보조로 작성한 가상 금융 사례입니다. 실제 기업·기사·개인정보가 없으며 개발용 입력일 뿐 모델 품질 검증 자료가 아닙니다."
+  },
+  "cases": [
+    {
+      "caseId": "NS01",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 누리톱의 2026년 2분기 매출은 120억 원, 영업이익은 8억 원이다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "누리톱의 2026년 2분기 매출은 120억 원이다.",
+            "quoteIds": [
+              "q1"
+            ]
+          },
+          {
+            "claimId": "c2",
+            "text": "누리톱의 같은 분기 영업이익은 8억 원이다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS02",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 도담결은 이번 이사회에서 배당을 실시하지 않기로 결정했다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "도담결은 이번 이사회에서 배당을 하지 않기로 했다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS03",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 마루핀의 3분기 운송비는 배송 경로 단축으로 전 분기보다 2억 원 줄었다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "배송 경로 단축으로 마루핀의 3분기 운송비가 전 분기보다 2억 원 감소했다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS04",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 새론빔의 주가는 2026년 6월 2일 종가 4,000원에서 6월 3일 종가 4,200원으로 올랐다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "새론빔의 종가는 2026년 6월 2일 4,000원에서 다음 날 4,200원으로 상승했다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS05",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "background",
+            "text": "가상기업 여울칩은 2023년에 첫 연구소를 열었다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "여울칩은 2023년에 첫 연구소를 개설한 이력이 있다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS06",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "background",
+            "text": "가상기업 바림축은 2022년에 시험 생산을 시작했다."
+          },
+          {
+            "quoteId": "q2",
+            "context": "report",
+            "text": "바림축의 2026년 1분기 생산량은 600대이다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "바림축은 2022년에 시험 생산을 시작했다.",
+            "quoteIds": [
+              "q1"
+            ]
+          },
+          {
+            "claimId": "c2",
+            "text": "바림축의 2026년 1분기 생산량은 600대이다.",
+            "quoteIds": [
+              "q2"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS07",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 소담륜의 2026년 상반기 매출은 70억 원이다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "소담륜은 2026년 상반기 배당을 실시했다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS08",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 온새틀의 2026년 2분기 매출은 90억 원이다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "온새틀의 2026년 2분기 매출은 90억 원이고 영업이익은 7억 원이다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS09",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 다온펄의 2026년 말 현금성 자산은 30억 원이다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "다온펄의 2026년 말 현금성 자산은 30억 원이다.",
+            "quoteIds": [
+              "q1"
+            ]
+          },
+          {
+            "claimId": "c2",
+            "text": "다온펄의 2026년 말 차입금은 10억 원이다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS10",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 고운팁은 2026년 4월에 전시장을 열었다."
+          },
+          {
+            "quoteId": "q2",
+            "context": "report",
+            "text": "고운팁의 전시장 면적은 300제곱미터이다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "고운팁의 전시장 면적은 300제곱미터이다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS11",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 아람듀의 2026년 3분기 매출은 50억 원이다."
+          },
+          {
+            "quoteId": "q2",
+            "context": "report",
+            "text": "아람듀의 2026년 3분기 영업이익은 4억 원이다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "아람듀의 2026년 3분기 매출은 50억 원이며 영업이익은 4억 원이다.",
+            "quoteIds": [
+              "q1",
+              "q2"
+            ]
+          },
+          {
+            "claimId": "c2",
+            "text": "아람듀의 2026년 3분기 영업이익은 4억 원이다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS12",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 미르솜은 2026년 5월 이사회에서 공장 매각안을 승인하지 않았다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "미르솜은 2026년 5월 이사회에서 공장 매각안을 승인했다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS13",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "이번 물류 계약의 수주 기업은 가상기업 라온깃이며, 가상기업 해솔칸은 수주 기업이 아니다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "이번 물류 계약을 수주한 기업은 해솔칸이다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS14",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 별하륨의 신규 창고 개장일은 2026년 7월 8일로 확정됐다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "별하륨의 신규 창고 개장일은 2026년 7월 18일로 확정됐다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS15",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 초롬셀의 이번 설비 투자액은 5억 원이다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "초롬셀의 이번 설비 투자액은 5만 원이다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS16",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 보늬텍의 2026년 1분기 출하량은 240대이다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "보늬텍의 2026년 1분기 출하량은 420대이다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS17",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 이든복의 2026년 2분기 광고비는 전 분기보다 늘었다."
+          },
+          {
+            "quoteId": "q2",
+            "context": "report",
+            "text": "이든복의 2026년 2분기 매출은 전 분기보다 증가했다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "이든복은 광고비를 늘린 덕분에 2026년 2분기 매출이 전 분기보다 증가했다.",
+            "quoteIds": [
+              "q1",
+              "q2"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS18",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 하람큐는 2026년 8월에 부품 공급 계약을 체결했다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "하람큐의 2026년 8월 부품 공급 계약 체결로 거래처의 생산 중단이 해소됐다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS19",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 누벨링의 주식을 지금 매수하는 것이 좋다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "누벨링의 주식을 지금 매수하는 것이 좋다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS20",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 푸름쐐의 주가는 2026년 9월 1일 6,000원에 마감했다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "푸름쐐의 주가는 2026년 10월 말에 9,000원에 도달할 것이다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS21",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "background",
+            "text": "가상기업 모들샘의 첫 해외 지점은 2024년 3월에 개설됐다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "모들샘은 이번 달인 2026년 10월에 첫 해외 지점을 새로 개설했다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS22",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "background",
+            "text": "가상기업 아솔맵의 2023년 12월 시험 설비 점검은 완료됐다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "아솔맵은 이번 달인 2026년 10월에 별도 회차의 시험 설비 점검을 새로 완료했다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS23",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "background",
+            "text": "가상기업 도래숲은 2024년 5월에 제품 설명회를 개최했다."
+          },
+          {
+            "quoteId": "q2",
+            "context": "report",
+            "text": "도래숲은 이번 달인 2026년 10월에 별도의 제품 설명회를 개최했다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "도래숲은 이번 달인 2026년 10월에 별도의 제품 설명회를 개최했다.",
+            "quoteIds": [
+              "q1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "NS24",
+      "payload": {
+        "quotes": [
+          {
+            "quoteId": "q1",
+            "context": "report",
+            "text": "가상기업 해든묶의 2026년 2분기 국내 매출은 40억 원이며, 해외 매출은 20억 원이다."
+          },
+          {
+            "quoteId": "q2",
+            "context": "report",
+            "text": "해든묶의 2026년 2분기 연구비는 3억 원이다."
+          },
+          {
+            "quoteId": "q3",
+            "context": "report",
+            "text": "해든묶의 2026년 2분기 총매출은 60억 원이다."
+          }
+        ],
+        "claims": [
+          {
+            "claimId": "c1",
+            "text": "해든묶의 2026년 2분기 총매출은 40억 원이다.",
+            "quoteIds": [
+              "q1",
+              "q3"
+            ]
+          },
+          {
+            "claimId": "c2",
+            "text": "해든묶의 2026년 2분기 연구비는 3억 원이다.",
+            "quoteIds": [
+              "q1"
+            ]
+          },
+          {
+            "claimId": "c3",
+            "text": "해든묶의 2026년 2분기 연구비는 3억 원이다.",
+            "quoteIds": [
+              "q2"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

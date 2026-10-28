@@ -13,9 +13,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import com.zoop.chat.service.ChatCompanyProfiles;
 import com.zoop.chat.service.ChatEvidenceAccess;
 import com.zoop.document.evidence.service.EvidenceService.Readability;
 import com.zoop.graph.read.DisclosureExclusions;
+import com.zoop.graph.read.GraphContextLookup;
 import com.zoop.graph.read.PublicGraphReader;
 import com.zoop.graph.snapshot.FixtureGraphSnapshotStore;
 import com.zoop.graph.version.GraphVersionRecord;
@@ -43,6 +45,7 @@ class GraphTargetToolTest {
     private final Set<String> denied = new HashSet<>();
     private final Set<String> unchecked = new HashSet<>();
     private final List<String> checks = new ArrayList<>();
+    private final Map<String, ChatCompanyProfiles.Quote> profiles = new java.util.HashMap<>();
     private DisclosureExclusions exclusions = DisclosureExclusions.NONE;
 
     @Test
@@ -59,13 +62,110 @@ class GraphTargetToolTest {
     }
 
     @Test
+    void companyReadPassesTheCatalogProfileAheadOfRelationEvidence() {
+        String profile = "ev-" + "a".repeat(64);
+        profiles.put(HYNIX, new ChatCompanyProfiles.Quote(profile, HYNIX, "SK하이닉스", "SK하이닉스 사업 개요: 메모리", null,
+                null));
+        var out = company().read(SCOPE, new ChatToolRequest("company.read", List.of(HYNIX), 20));
+        assertEquals(profile, out.items().getFirst().evidenceIds().getFirst());
+        assertEquals(Set.of(profile, SUPPLY_HYNIX, EQUIP_HYNIX), Set.copyOf(out.evidenceIds()));
+
+        denied.add(profile);
+        var refused = company().read(SCOPE, new ChatToolRequest("company.read", List.of(HYNIX), 20));
+        assertFalse(refused.evidenceIds().contains(profile), "a profile is passed on only through the evidence access");
+    }
+
+    @Test
+    void aProfileIsReadableOnlyWhileItsCompanyIsVisibleAndItsTextUnchangedSinceTheAsOf() {
+        Instant updated = Instant.parse("2026-10-05T00:00:00Z");
+        var hynix = new ChatCompanyProfiles.Quote("ev-" + "a".repeat(64), HYNIX, "SK하이닉스", "SK하이닉스 사업 개요: 메모리",
+                null, updated);
+        var catalog = profiles();
+        assertEquals(Readability.READABLE, catalog.readability(hynix, ACTIVE, null, "job-1"));
+        assertEquals(Readability.READABLE, catalog.readability(hynix, ACTIVE, Instant.parse("2026-10-09T00:00:00Z"), "job-1"));
+        assertEquals(Readability.DENIED, catalog.readability(hynix, ACTIVE, Instant.parse("2026-10-04T00:00:00Z"), "job-1"),
+                "the catalog changed after that asOf: its current text is not what it said then");
+        assertEquals(Readability.DENIED, catalog.readability(hynix, null, null, "job-1"));
+
+        var unlisted = new ChatCompanyProfiles.Quote("ev-" + "b".repeat(64), "KRX:999999", "없는 기업", "없는 기업 사업 개요: -",
+                null, updated);
+        assertEquals(Readability.DENIED, catalog.readability(unlisted, ACTIVE, null, "job-1"),
+                "a catalog text alone never makes a company public");
+
+        var outage = new ChatCompanyProfiles(null, null, failingReader(new DataAccessResourceFailureException("down")));
+        assertEquals(Readability.UNAVAILABLE, outage.readability(hynix, ACTIVE, null, "job-1"));
+        assertEquals(Readability.UNAVAILABLE, profiles().readability(hynix, "fixture-unknown", null, "job-1"));
+    }
+
+    @Test
+    void aCatalogOutageWhileCheckingAnIdIsUnavailableNotAFault() {
+        for (RuntimeException failure : List.of(new DataAccessResourceFailureException("companies unreachable"),
+                new CannotCreateTransactionException("no connection"))) {
+            var catalog = new ChatCompanyProfiles(null, null, reader()) {
+                @Override
+                public Optional<Quote> byId(String evidenceId) {
+                    throw failure;
+                }
+            };
+            assertEquals(Optional.of(Readability.UNAVAILABLE), catalog.check("ev-" + "a".repeat(64), ACTIVE, null, "job-1"));
+        }
+    }
+
+    @Test
     void issueReadReturnsItsCompaniesAndEvidence() {
-        var out = issue().read(SCOPE, new ChatToolRequest("issue.read", List.of(HBM_SUPPLY, HYNIX), 20));
+        var out = issue().read(SCOPE, new ChatToolRequest("issue.read", List.of(HBM_SUPPLY), 20));
         assertEquals(1, out.items().size());
         var issue = out.items().getFirst();
         assertEquals("issue", issue.kind());
         assertEquals(Set.of(NVDA, HYNIX), Set.copyOf(issue.companyIds()));
         assertEquals(Set.of(SUPPLY_NVDA, SUPPLY_HYNIX), Set.copyOf(issue.evidenceIds()));
+    }
+
+    @Test
+    void issueReadOfACompanyReadsItsIssuesNewestFirstAndEachIssueOnce() {
+        var out = issue().read(SCOPE, new ChatToolRequest("issue.read", List.of(HYNIX), 20));
+        assertEquals(List.of("iss-fixture-hbm-equip", HBM_SUPPLY), out.items().stream().map(i -> i.id()).toList(),
+                "involved in one, structurally related to the other; newest event first");
+        assertTrue(out.items().stream().allMatch(i -> "issue".equals(i.kind())));
+
+        var both = issue().read(SCOPE, new ChatToolRequest("issue.read", List.of(HBM_SUPPLY, HYNIX), 20));
+        assertEquals(List.of(HBM_SUPPLY, "iss-fixture-hbm-equip"), both.items().stream().map(i -> i.id()).toList(),
+                "an issue asked for and read again through its company is reported once, where it was first asked");
+        assertTrue(issue().read(SCOPE, new ChatToolRequest("issue.read", List.of("KRX:999999"), 20)).items().isEmpty());
+    }
+
+    @Test
+    void aCompanyWithManyIssuesReturnsAtMostTheItemCapAndSaysTheRestWasCut() {
+        var many = expanding(GraphTargetTool.MAX_ITEMS + 10).read(SCOPE,
+                new ChatToolRequest("issue.read", List.of(HYNIX), 20));
+        assertEquals(GraphTargetTool.MAX_ITEMS, many.items().size());
+        assertEquals("iss-many-0", many.items().getFirst().id(), "the newest are kept, in order");
+        assertTrue(many.truncated(), "the issues left out are never taken for none");
+
+        var exact = expanding(GraphTargetTool.MAX_ITEMS).read(SCOPE, new ChatToolRequest("issue.read", List.of(HYNIX), 20));
+        assertEquals(GraphTargetTool.MAX_ITEMS, exact.items().size());
+        assertFalse(exact.truncated(), "exactly the cap leaves nothing out");
+    }
+
+    /** A target read whose one requested id expands to {@code count} issues, as a company with that many issues does. */
+    private GraphTargetTool expanding(int count) {
+        return new GraphTargetTool(reader(), access()) {
+            @Override
+            public ChatCapability capability() {
+                return ChatCapability.ISSUE_READ;
+            }
+
+            @Override
+            Optional<GraphContextLookup.Target> find(GraphContextLookup lookup, String id) {
+                return Optional.empty();
+            }
+
+            @Override
+            List<GraphContextLookup.Target> targets(GraphContextLookup lookup, String id) {
+                return java.util.stream.IntStream.range(0, count).mapToObj(i -> new GraphContextLookup.Target(
+                        "iss-many-" + i, "issue", "사건 " + i, List.of(id), List.of())).toList();
+            }
+        };
     }
 
     @Test
@@ -120,10 +220,10 @@ class GraphTargetToolTest {
         var request = new ChatToolRequest("company.read", List.of(HYNIX), 20);
         for (RuntimeException failure : List.of(new DataAccessResourceFailureException("graph_versions unreachable"),
                 new CannotCreateTransactionException("no connection"))) {
-            var tool = new CompanyReadTool(failingReader(failure), access());
+            var tool = new CompanyReadTool(failingReader(failure), access(), profiles());
             assertThrows(ChatToolUnavailable.class, () -> tool.read(SCOPE, request));
         }
-        var bug = new CompanyReadTool(failingReader(new IllegalStateException("bug")), access());
+        var bug = new CompanyReadTool(failingReader(new IllegalStateException("bug")), access(), profiles());
         assertThrows(IllegalStateException.class, () -> bug.read(SCOPE, request));
     }
 
@@ -148,7 +248,16 @@ class GraphTargetToolTest {
     }
 
     private CompanyReadTool company() {
-        return new CompanyReadTool(reader(), access());
+        return new CompanyReadTool(reader(), access(), profiles());
+    }
+
+    private ChatCompanyProfiles profiles() {
+        return new ChatCompanyProfiles(null, null, reader()) {
+            @Override
+            public Optional<Quote> forCompany(String companyId) {
+                return Optional.ofNullable(profiles.get(companyId));
+            }
+        };
     }
 
     private IssueReadTool issue() {
@@ -162,7 +271,7 @@ class GraphTargetToolTest {
     private PublicGraphReader reader() {
         var selector = new GraphVersionSelector(repository(), Clock.fixed(NOW, ZoneOffset.UTC));
         return new PublicGraphReader(selector, new FixtureGraphSnapshotStore(GraphTargetToolTest.class.getClassLoader()),
-                () -> exclusions);
+                pinned -> exclusions);
     }
 
     private PublicGraphReader failingReader(RuntimeException failure) {
@@ -173,7 +282,7 @@ class GraphTargetToolTest {
             public boolean everActivated(String id) { throw failure; }
         };
         return new PublicGraphReader(new GraphVersionSelector(failing, Clock.fixed(NOW, ZoneOffset.UTC)),
-                new FixtureGraphSnapshotStore(GraphTargetToolTest.class.getClassLoader()), () -> exclusions);
+                new FixtureGraphSnapshotStore(GraphTargetToolTest.class.getClassLoader()), pinned -> exclusions);
     }
 
     private ChatEvidenceAccess access() {

@@ -160,8 +160,10 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | [getBriefingRecap](#getbriefingrecap) | GET | /api/v1/briefings/{id}/recap | 공개 | P1 |
 | [getBriefingItemDetail](#getbriefingitemdetail) | GET | /api/v1/briefings/{roundId}/items/{eventId} | 공개 | P1 |
 | [getBriefingGraphBasis](#getbriefinggraphbasis) | GET | /api/v1/briefings/{id}/graph | 공개 | P1 |
+| [listConversations](#listconversations) | GET | /api/v1/chat/sessions | 회원(본인) | P2 |
 | [createConversation](#createconversation) | PUT | /api/v1/chat/sessions/{id} | 회원(본인) | P1 |
 | [getConversation](#getconversation) | GET | /api/v1/chat/sessions/{id} | 회원(본인) | P1 |
+| [deleteConversation](#deleteconversation) | DELETE | /api/v1/chat/sessions/{id} | 회원(본인) | P2 |
 | [getCurrentConversation](#getcurrentconversation) | GET | /api/v1/chat/sessions/current | 회원(본인) | P1 |
 | [submitQuestion](#submitquestion) | POST | /api/v1/chat/sessions/{id}/jobs | 회원(본인) | P1 |
 | [getQuestionJob](#getquestionjob) | GET | /api/v1/chat/jobs/{job_id} | 회원(본인) | P1 |
@@ -696,7 +698,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getVirtualAccountProfile · 가상 계좌 프로필 조회
 
-서비스 시연용 고정 Mock 프로필을 조회한다. 실제 증권계좌·자격 증명 연동이 아니며 프로필의 예수금·보유종목 값은 변경하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+서비스 시연용 고정 Mock 프로필을 연결 없이 읽기 전용으로 미리 본다. 현재 시세로 평가 금액과 비중을 계산하며, 조회는 회원 계좌 연결 상태를 변경하지 않는다. 실제 증권계좌·자격 증명 연동이 아니며 프로필 값도 변경하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1086,7 +1088,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getEvent · 사건 상세와 근거 참조 조회
 
-사건 상세와 근거 참조 조회. round·graphVersion·asOf로 공개 버전 하나를 고정하고(그래프 조회와 같은 규칙) 그 버전에서 현재 제외를 적용한 뒤 보이는 사건만 반환하며, 보이지 않으면 RESOURCE_NOT_FOUND/404다. relations·companies·articles·follows·evidenceIds와 사건 머리 필드는 스냅샷에서 읽는다. asOf는 그래프와 같이 사건의 기사가 하나라도 asOf 이후에 공개됐으면 사건 전체를 가리며(404), 일부 기사만 남긴 상세는 만들지 않는다. articles는 이 사건의 보이는 근거가 가리키는 정확한 (기사 ID, 기사 버전)만 담고 같은 기사의 다른 버전은 넣지 않으며, 최신 공개순이다(FS021의 관련도 우선 정렬은 관련도 원천이 없어 미구현). relations[].edgeId는 그래프 표시 간선 ID와 같다. follows는 FOLLOWS 관계(뒤 사건→앞 사건)에서 이 버전에 보이는 사건만 담는다. 수입한 버전은 그 버전의 import receipt(AI 인계 묶음)에서 mentions(원본 S2 언급, verification none)·fieldDecisions(운영자 필드 판정의 필드·결정·사유 코드만, 판정 대상 값은 싣지 않음, candidateId는 null)·sourceSupport(인계 값을 그대로 복사)를 읽고, receipt를 읽을 수 없거나, 그 사건을 담지 않거나, 인계 묶음 스키마가 현재(zoop-graph-handoff-bundle-5)가 아니면(이전 묶음은 언급·필드 판정이 없으므로 빈 목록으로 대신하지 않음) SOURCE_UNAVAILABLE/503이다. 수입한 버전은 근거마다 getEvidence와 같은 현재 공개 게이트(기사 접근 상태·현재 source grant·registry)를 지금 다시 적용해, 언급은 그 근거가 모두 보일 때만 참가자와 함께 내보내고(일부라도 가려지면 언급 전체를 뺌), 관계는 근거가 모두 보일 때만, 기사는 보이는 근거가 가리킬 때만 남긴다. 머리 필드는 운영자가 고른 대표 언급(fieldProvenance.selection=operator-representative)의 값이거나, 대표가 없으면(unanimous) 모든 언급이 같은 값이므로, 대표 언급 또는 모든 언급이 온전히 보이지 않으면 사건 전체를 RESOURCE_NOT_FOUND/404로 닫는다. follows와 FOLLOWS 관계의 상대 사건도 같은 머리 검사를 통과해야 하며, 통과하지 못하면 관계와 참조 모두에서 뺀다. 운영자가 보류·거절(HOLD·REJECT)한 언급의 eventTime(이때 timePrecision=unknown)·period는 null이며 어떤 필드로도 내보내지 않는다. 현재 권한·제외로 기사 일부가 빠지면 sourceSupport는 articleCount를 보이는 기사 수로 하고 가려진 기사에 의존하는 knownLineageCount·independentSourceCount는 null, 목록은 보이는 기사만 남긴다. 합성 fixture 버전은 receipt가 없어 mentions·fieldDecisions가 빈 배열이고 sourceSupport는 모든 기사의 출처가 알려지지 않은 것으로 표시한다(개수는 0이 아니라 null). articles[].publisher는 고정된 기사 버전의 저장된 article_versions 값이며 없으면 null, relationType은 그 기사의 보이는 언급이 모두 background면 PROVIDES_BACKGROUND, 아니면 REPORTS, 언급 정보가 없으면 null이다(앱 결정). role이 있는 companies·relations·참가자는 roleUnconfirmed=true다(인계가 확인된 역할을 생산하지 않음). summary는 아직 사건 요약 생산자가 없어 Unavailable이고 metadata.partial=true·failures에 summary를 남기며, approval은 null이다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+사건 상세와 근거 참조 조회. round·graphVersion·asOf로 공개 버전 하나를 고정하고(그래프 조회와 같은 규칙) 그 버전에서 현재 제외를 적용한 뒤 보이는 사건만 반환하며, 보이지 않으면 RESOURCE_NOT_FOUND/404다. relations·companies·articles·follows·evidenceIds와 사건 머리 필드는 스냅샷에서 읽는다. asOf는 그래프와 같이 사건의 기사가 하나라도 asOf 이후에 공개됐으면 사건 전체를 가리며(404), 일부 기사만 남긴 상세는 만들지 않는다. articles는 이 사건의 보이는 근거가 가리키는 정확한 (기사 ID, 기사 버전)만 담고 같은 기사의 다른 버전은 넣지 않으며, 최신 공개순이다(FS021의 관련도 우선 정렬은 관련도 원천이 없어 미구현). relations[].edgeId는 그래프 표시 간선 ID와 같다. follows는 FOLLOWS 관계(뒤 사건→앞 사건)에서 이 버전에 보이는 사건만 담는다. 수입한 버전은 그 버전의 import receipt(AI 인계 묶음)에서 mentions(원본 S2 언급, verification none)·fieldDecisions(운영자 필드 판정의 필드·결정·사유 코드만, 판정 대상 값은 싣지 않음, candidateId는 null)·sourceSupport(인계 값을 그대로 복사)를 읽고, receipt를 읽을 수 없거나, 그 사건을 담지 않거나, 인계 묶음 스키마가 현재(zoop-graph-handoff-bundle-5)가 아니면(이전 묶음은 언급·필드 판정이 없으므로 빈 목록으로 대신하지 않음) SOURCE_UNAVAILABLE/503이다. receipt 미등록·고정 바이트 손상·형식 오류는 재시도로 복구되지 않아 error.retryable=false다. receipt 저장소의 일시 읽기 장애는 error.retryable=true다. 수입한 버전은 근거마다 getEvidence와 같은 현재 공개 게이트(기사 접근 상태·현재 source grant·registry)를 지금 다시 적용해, 언급은 그 근거가 모두 보일 때만 참가자와 함께 내보내고(일부라도 가려지면 언급 전체를 뺌), 관계는 근거가 모두 보일 때만, 기사는 보이는 근거가 가리킬 때만 남긴다. 머리 필드는 운영자가 고른 대표 언급(fieldProvenance.selection=operator-representative)의 값이거나, 대표가 없으면(unanimous) 모든 언급이 같은 값이므로, 대표 언급 또는 모든 언급이 온전히 보이지 않으면 사건 전체를 RESOURCE_NOT_FOUND/404로 닫는다. follows와 FOLLOWS 관계의 상대 사건도 같은 머리 검사를 통과해야 하며, 통과하지 못하면 관계와 참조 모두에서 뺀다. 운영자가 보류·거절(HOLD·REJECT)한 언급의 eventTime(이때 timePrecision=unknown)·period는 null이며 어떤 필드로도 내보내지 않는다. 현재 권한·제외로 기사 일부가 빠지면 sourceSupport는 articleCount를 보이는 기사 수로 하고 가려진 기사에 의존하는 knownLineageCount·independentSourceCount는 null, 목록은 보이는 기사만 남긴다. 합성 fixture 버전은 receipt가 없어 mentions·fieldDecisions가 빈 배열이고 sourceSupport는 모든 기사의 출처가 알려지지 않은 것으로 표시한다(개수는 0이 아니라 null). articles[].publisher는 고정된 기사 버전의 저장된 article_versions 값이며 없으면 null, relationType은 그 기사의 보이는 언급이 모두 background면 PROVIDES_BACKGROUND, 아니면 REPORTS, 언급 정보가 없으면 null이다(앱 결정). role이 있는 companies·relations·참가자는 roleUnconfirmed=true다(인계가 확인된 역할을 생산하지 않음). summary는 아직 사건 요약 생산자가 없어 Unavailable이고 metadata.partial=true·failures에 summary를 남기며, approval은 null이다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1281,6 +1283,34 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | id | path | 필수 | string |  |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
+<a id="listconversations"></a>
+
+## listConversations · 대화 목록
+
+질문이 하나 이상 있는 본인 대화를 최근 질문 순(updatedAt, id 내림차순)으로 회수한다. 제목은 첫 질문(100자 초과 시 잘라 '…')이다. '새 대화'로 만들고 질문하지 않은 대화는 나오지 않는다. 모델을 호출하지 않는다. 기본 20개, 최대 50개. nextCursor는 회원과 limit에 묶이며 다른 limit으로 쓰면 INVALID_CURSOR다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/chat/sessions` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [ChatConversationList](#schema-chatconversationlist), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, INVALID_CURSOR, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED |
+| FS/NFS | [FS050](../../system/out/feature-FS050.md) · [FS051](../../system/out/feature-FS051.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| 화면 | [D-AI-02](../../system/out/screen-D-AI-02.md) |
+| WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.8, 6.9.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 직접 대응 BFF 작업 없음. 본인 대화 목록은 정식 API에서 구현한다. |
+| 팀 확인 필요 | 와이어프레임에 대화 목록 화면이 없다. 웹은 D-AI-02 드로어 안의 '대화 기록' 보기로 임시 구현했으며 화면 설계 확정이 필요하다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
+| limit | query | 선택 | integer | 페이지 크기. 기본 20, 최대 50. |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+
 <a id="createconversation"></a>
 
 ## createConversation · 새 대화 생성
@@ -1336,6 +1366,34 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | id | path | 필수 | string | Conversation id made by the client |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
+<a id="deleteconversation"></a>
+
+## deleteConversation · 대화 삭제
+
+본인 대화와 그 질문 작업·도구 호출을 즉시 삭제한다(삭제 표시·보관 기간 없음). 모델 실행 원장(ai_executions)의 비용 메타데이터는 작업 연결 없이 남는다. 대기·실행 중인 질문이 있으면 JOB_IN_PROGRESS로 거부하므로 먼저 취소한다. 승인된 개인정보 처리방침·이용약관(2026-10-13.1)은 개별 채팅 삭제를 제공하지 않는다고 고지하므로, 개정본이 시행될 때까지 서버 설정 zoop.chat.delete-enabled=false이며 이때는 RESOURCE_NOT_FOUND다. 클라이언트는 listConversations의 deleteEnabled로 노출 여부를 정한다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `DELETE /api/v1/chat/sessions/{id}` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | 없음 |
+| 응답 | 204: 본문 없음, 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, JOB_IN_PROGRESS, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
+| FS/NFS | [FS050](../../system/out/feature-FS050.md) · [FS051](../../system/out/feature-FS051.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| 화면 | [D-AI-02](../../system/out/screen-D-AI-02.md) |
+| WBS | 6.1.2, 6.11.1, 6.9.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 직접 대응 BFF 작업 없음. 대화 즉시 삭제는 정식 API에서 구현한다. |
+| 팀 확인 필요 | 개별 대화 삭제를 고지하는 개인정보 처리방침·이용약관 개정본(docs/legal/drafts) 승인과 시행 전까지 zoop.chat.delete-enabled를 켜지 않는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| id | path | 필수 | string | Conversation id made by the client |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
+
 <a id="getcurrentconversation"></a>
 
 ## getCurrentConversation · 최신 대화 복원
@@ -1380,7 +1438,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.6.10, 6.9.1, 6.9.2, 6.9.3, 6.9.4, 6.9.5, 6.9.6, 6.9.10, 6.9.11, 6.9.12, 6.9.13, 6.9.14, 6.5.7 |
 | 프로토타입 대응 | /api/chat/sessions/{id}/jobs |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다., Jev 0.70/0.35, MCP 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.8을 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다. |
+| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다., Jev 0.70/0.35, 도구 호출 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.9를 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다. |
 
 ### 요청 필드
 
@@ -1397,7 +1455,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getQuestionJob · 질문 작업 상태·저장 결과 회수
 
-질문 작업 상태·저장 결과 회수. 결과를 돌려줄 때마다(작업·대화 조회, 최신 대화 복원, 멱등 재전송, 취소·재시도 응답) 현재 근거 접근 권한을 공개 근거 조회(getEvidence)와 같은 기준으로 다시 확인한다. 저장된 결과는 바꾸지 않으며, 인용 근거가 철회·비공개·권리 변경·공개 제외로 지금 읽을 수 없거나 확인할 수 없으면 응답에서 answer를 고정 안내 문장으로 바꾸고 sections·sources·citations·graphTargets를 비우며 answerBasis=none으로 보낸다. 지금 읽을 수 없는 선택 근거(context.items의 evidence)는 id·kind만 남기고 label을 '표시할 수 없는 근거'로 보낸다. 모델을 호출하지 않는다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+질문 작업 상태·저장 결과 회수. 결과를 돌려줄 때마다(작업·대화 조회, 최신 대화 복원, 멱등 재전송, 취소·재시도 응답) 현재 근거 접근 권한을 공개 근거 조회(getEvidence)와 같은 기준으로 다시 확인한다. 저장된 결과는 바꾸지 않으며, 인용 근거가 철회·비공개·권리 변경·공개 제외로 지금 읽을 수 없거나 확인할 수 없으면 응답에서 answer를 고정 안내 문장으로 바꾸고 sections·sources·citations·graphTargets를 비우며 answerBasis=none으로 보낸다. 지금 읽을 수 없는 선택 근거(context.items의 evidence)는 id·kind만 남기고 label을 '표시할 수 없는 근거'로 보낸다. result.applied의 companies·issues와 result.graphTargets는 결과 종류와 관계없이 고정한 graphVersion·asOf에 현재 공개 제외를 적용한 공개 그래프에서 지금 보이는 기업·사건만 남기고, 확인할 수 없으면 모두 뺀다. 제외된 사건의 근거가 다른 공개 대상의 인용으로 계속 읽혀 답변이 유지돼도 그 사건은 graphTargets에서 빠진다. 모델을 호출하지 않는다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1660,7 +1718,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
 | WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.7, 6.10.16 |
 | 프로토타입 대응 | /api/admin/pipeline/candidates |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다., ``rule``(CandidateRule)은 숨김 방향이다. 프로토타입 R1의 withheldParticipants/withheldRelations/droppedRelations와 notAppliedReason=not_published는 없고 hiddenRelations를 둔다. applied=true는 결정 전 HOLD를 포함해 공개되면 숨겨진다는 뜻이다(규칙은 HOLD를 공개하지 않음, AI 5-A)., notAppliedReason=admin_decision은 관리자가 거절한 후보만 뜻한다(HOLD 여부와 무관, 프로토타입은 허용·거절 모든 결정). 허용한 HOLD는 applied=true이고, AI REJECT 후보와 비활성 후보(active=false)는 rule=null이다. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
 
 ### 요청 필드
@@ -1694,7 +1752,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
 | WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.7, 6.10.16 |
 | 프로토타입 대응 | /api/admin/pipeline/candidates/{candidate_id} |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., ``rule``(CandidateRule)은 숨김 방향이다. 프로토타입 R1의 withheldParticipants/withheldRelations/droppedRelations와 notAppliedReason=not_published는 없고 hiddenRelations를 둔다. applied=true는 결정 전 HOLD를 포함해 공개되면 숨겨진다는 뜻이다(규칙은 HOLD를 공개하지 않음, AI 5-A)., notAppliedReason=admin_decision은 관리자가 거절한 후보만 뜻한다(HOLD 여부와 무관, 프로토타입은 허용·거절 모든 결정). 허용한 HOLD는 applied=true이고, AI REJECT 후보와 비활성 후보(active=false)는 rule=null이다. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
 
 ### 요청 필드
@@ -1708,7 +1766,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## decideAnalysisCandidate · 후보 거부 또는 운영자 최종 승인
 
-관리자는 후보 상세에서 확인한 대상별 revision과 AI 원천 sourceVersion/sourceRevision을 expectedRevision/expectedSourceVersion/expectedSourceRevision으로 보낸다. relationId가 있으면 세 기대값은 해당 relation의 값이다. 서버는 대상·현재 AI 원천을 다시 확인하고 하나라도 다르면 REVISION_CONFLICT/409로 거절하며 결정·감사를 성공으로 기록하지 않는다. allow는 현재 HOLD인 대상에 대한 운영자의 최종 승인이다(2026-10-21 사용자 정책, DecisionResponse.decision=approved). 재검증·모델 호출·작업 접수가 아니며 jobId를 만들지 않는다. 대상이 HOLD가 아니거나 응답 없는 모델 호출이 남아 있는 등 현재 상태와 맞지 않으면 REVISION_CONFLICT/409다. 결정성 검사(스키마·endpoint·정확한 인용 좌표·현재 원천 권리)는 사람이 덮어쓸 수 없으며 통과하지 못하거나 원천이 철회됐으면 VALIDATION_FAILED/422다. 기존 자동 검증 판정과 claim 분포는 이력으로 그대로 남고 수동 승인이 자동 검증을 통과한 것으로 표시되지 않는다. reject는 대상을 제외한다. 이미 ALLOW인 대상의 승인과 확정된 reject의 번복은 이 계약 범위 밖이다. 승인은 공개·그래프 활성화가 아니므로 publicChanged는 항상 false이며 투영과 활성화는 별도 기록이다. 승인 근거(approvalBasis)는 내부 감사 메타데이터이며 이 응답에 넣지 않는다. 이전 계약의 allow(재검증 접수, revalidation_requested, jobId)는 이력으로만 보존하며 승인으로 소급하지 않는다.
+관리자는 후보 상세에서 결정할 관계(relationId, 필수)와 그 관계의 revision·AI 원천 sourceVersion/sourceRevision을 relationId/expectedRevision/expectedSourceVersion/expectedSourceRevision으로 보낸다. AI 원천은 관계 단위로만 결정하므로 후보 전체를 한 번에 결정하는 요청은 없다. 최신 AI 결과에서 빠진 비활성 관계(active=false)는 현재 상태와 맞지 않아 REVISION_CONFLICT/409다. 서버는 대상·현재 AI 원천을 다시 확인하고 하나라도 다르면 REVISION_CONFLICT/409로 거절하며 결정·감사를 성공으로 기록하지 않는다. allow는 현재 HOLD인 대상에 대한 운영자의 최종 승인이다(2026-10-21 사용자 정책, DecisionResponse.decision=approved). 재검증·모델 호출·작업 접수가 아니며 jobId를 만들지 않는다. 대상이 HOLD가 아니거나 응답 없는 모델 호출이 남아 있는 등 현재 상태와 맞지 않으면 REVISION_CONFLICT/409다. 결정성 검사(스키마·endpoint·정확한 인용 좌표·현재 원천 권리)는 사람이 덮어쓸 수 없으며 통과하지 못하거나 원천이 철회됐으면 VALIDATION_FAILED/422다. 기존 자동 검증 판정과 claim 분포는 이력으로 그대로 남고 수동 승인이 자동 검증을 통과한 것으로 표시되지 않는다. reject는 대상을 제외한다. 이미 ALLOW인 대상의 승인과 확정된 reject의 번복은 이 계약 범위 밖이다. 승인은 공개·그래프 활성화가 아니므로 publicChanged는 항상 false이며 투영과 활성화는 별도 기록이다. 승인 근거(approvalBasis)는 내부 감사 메타데이터이며 이 응답에 넣지 않는다. 이전 계약의 allow(재검증 접수, revalidation_requested, jobId)는 이력으로만 보존하며 승인으로 소급하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1754,7 +1812,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
 | WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.5 |
 | 프로토타입 대응 | /api/admin/pipeline/rules |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다., publishedCandidates/publishedEvents는 활성 그래프 버전을 만들 때 세어 버전과 함께 고정한다(규칙 변경은 다음 버전부터 반영). 프로토타입은 조회할 때마다 overlay로 다시 계산한다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
 
 ### 요청 필드
@@ -1769,20 +1827,20 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## setPublicationRule · 검증 규칙 목표 상태 설정
 
-검증 규칙 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+검증 규칙 목표 상태 설정. 규칙은 앱 공개 정책이며 이미 공개 적격인 내용을 공개에서 빼는 방향으로만 작동한다. 규칙을 켜도 HOLD는 공개되지 않고 AI 판정 입력도 바뀌지 않는다. 이미 같은 상태면 아무것도 기록하지 않고 idempotent=true를 돌려준다. 변경은 공통 공개 잠금 아래 규칙 revision과 전역 rule log revision을 올리고 이력·감사를 같은 트랜잭션에 남긴다. reviewRevision은 응답 시점의 COALESCE(MAX(review_decisions.global_revision),0)이다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `PUT /api/v1/admin/pipeline/rules/{rule_id}` |
 | 권한·우선순위 | 관리자(작업별 권한) · P1 |
 | 요청 본문 | [RuleSwitchRequest](#schema-ruleswitchrequest) |
-| 응답 | 200: [RuleSwitchResponse](#schema-ruleswitchresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
+| 응답 | 200: [RuleSwitchResponse](#schema-ruleswitchresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, RATE_LIMITED |
 | FS/NFS | [FS059](../../system/out/feature-FS059.md) · [FS067-02](../../system/out/feature-FS067-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS012](../../system/out/feature-NFS012.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
 | WBS | 6.1.2, 6.11.1, 6.10.7, 6.10.16, 6.5.5 |
 | 프로토타입 대응 | /api/admin/pipeline/rules/{rule_id} |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., publishedCandidates/publishedEvents는 활성 그래프 버전을 만들 때 세어 버전과 함께 고정한다(규칙 변경은 다음 버전부터 반영). 프로토타입은 조회할 때마다 overlay로 다시 계산한다. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
 
 ### 요청 필드
@@ -1915,9 +1973,9 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 <a id="createanalysisjob"></a>
 
-## createAnalysisJob · 수집·재검증·투영 작업 접수
+## createAnalysisJob · 계획 분석 작업 접수
 
-수집·재검증·투영 작업 접수.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+analyze_plan은 계획 참조를 PostgreSQL에 등록하고 처리 대기열에 넣는다. 접수 경로는 AI를 호출하지 않으며 202는 로컬 영속 접수만 뜻한다. 같은 멱등성 키는 당시 응답을 그대로 재생하고, 다른 키로 같은 계획을 접수하면 원래 root 작업과 deduplicated=true를 반환한다. ingest/revalidate/project의 기존 요청 형태는 유지하지만 실행기가 없어 SOURCE_UNAVAILABLE/503, retryable=false로 거절하고 어떤 행도 만들지 않는다. analyze_plan 비활성 상태도 같다. 새 요청은 UTF-8 JSON 64 KiB 이하이며 중복 키·후행 JSON·알 수 없는 속성·형변환을 거절한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1974,7 +2032,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## retryAnalysisJob · 허용된 분석 작업 재시도
 
-허용된 분석 작업 재시도. RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 작업(같은 종류·라벨·입력)으로 대기열에 넣고 202를 돌려준다. 허용되지 않으면 REVISION_CONFLICT/409이고 아무것도 만들지 않는다. AI 요청을 직접 다시 보내지 않으며, 새 모델 실행이 필요하면 작업 실행 시 새 AI jobId를 쓴다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 앱 작업(같은 종류·라벨·입력)으로 대기열에 넣고 202를 반환한다. 거절은 REVISION_CONFLICT/409이며 아무것도 만들지 않는다. analyze_plan은 기존 계획과 고정 S2/S3 ID를 이어서 처리하며 완료된 단위를 다시 실행하지 않는다. 다른 미래 실행기에서 새 모델 실행이 필요할 때 새 AI jobId를 쓰는 조건은 유지한다. 실행기가 없는 기존 종류와 비활성 analyze_plan은 worker_unavailable이다. 같은 키는 현재 기능 상태와 무관하게 저장된 응답을 재생한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2679,7 +2737,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 ## getCompanyIssueImpact · 기업 맥락 이슈 영향 경로 조회
 
-기업 패널에서 여는 영향 경로다. 데이터에 없는 산업·제품 단계나 관계 유형을 만들지 않는다.
+고정된 공개 그래프에서 보이는 기업과 이슈 사이의 직접 INVOLVES 관계만 경로로 반환한다. pathStatus=direct_available이면 직접 경로가 있다. STRUCTURALLY_RELATED_TO만 보이면 200과 빈 steps, pathStatus=structural_path_details_unavailable을 반환해 실제 관계 부재와 구분한다. 둘 다 없으면 빈 steps와 pathStatus=no_direct_relation을 반환한다. 각 근거 ID에는 getEvidence와 같은 현재 공개 권리 검사를 적용한다. 권리 때문에 근거가 빠지면 metadata.partial=true와 evidence 실패 항목을 반환하고, 권한 원천을 확인할 수 없으면 SOURCE_UNAVAILABLE/503이다. 구조 상세 경로는 receipt 전체 경로의 공개 적격성과 basis별 근거를 검증할 수 있을 때만 반환할 수 있으며, 추정·탐색 경로를 만들지 않는다. 기업·이슈가 선택 버전에 없거나 공개 필터 뒤에 보이지 않으면 404다. round·graphVersion·asOf는 getGraph와 같은 공개 버전 선택 규칙을 따른다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2701,6 +2759,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string |  |
 | issueId | path | 필수 | string |  |
+| round | query | 선택 | string | 이 브리핑 회차의 공개 그래프를 고정한다. graphVersion과 함께 쓰면 해당 회차와 일치해야 한다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
@@ -3005,6 +3064,46 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | recentErrors | 필수 | [RecentError](#schema-recenterror)[] |  |
 | note | 필수 | string |  |
 
+<a id="schema-aiusageday"></a>
+
+### AiUsageDay
+
+하루(KST) 동안의 기능별 모델 사용량(getAiUsage.daily). 집계 window 경계 이상 asOf 이하의 ai_executions를 started_at 기준으로 고른 뒤, started_at을 KST 날짜로 변환해 귀속한다. 자정을 넘어 끝나거나 나중에 영수증이 확인된 실행도 시작일에 남는다. running·unknown 실행은 호출 수 모집단에 포함하되 아직 모르는 토큰·비용은 0이 아니라 null이다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| date | 필수 | string (date) | KST 날짜 YYYY-MM-DD |
+| features | 필수 | [AiUsageDayFeature](#schema-aiusagedayfeature)[] |  |
+
+<a id="schema-aiusagedayfeature"></a>
+
+### AiUsageDayFeature
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| feature | 필수 | string | ai_executions.feature (chatbot, briefing, briefing-outlook, news-analysis, document-sentiment). 귀속 규칙은 getAiUsage 설명과 같다. |
+| modelCalls | 필수 | integer / null | execution_mode=live인 실제 외부 모델 시도 수. replay·save_only는 넣지 않는다. 모르면 null |
+| inputTokens | 필수 | integer / null |  |
+| outputTokens | 필수 | integer / null |  |
+| actualCost | 필수 | number / null | 실제 청구액. 모르면 0이 아니라 null. 통화는 AiUsageResponse.cost.currency |
+| estimatedCost | 필수 | number / null | 추정액. 모르면 0이 아니라 null |
+
+<a id="schema-aiusagemembers"></a>
+
+### AiUsageMembers
+
+AI 사용 회원 수(getAiUsage.members). 화면은 각 값을 totalMembers로 나눠 비율을 보여 준다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| totalMembers | 필수 | integer | 집계 기간 끝 기준 가입 회원 수(탈퇴 제외) |
+| aiMembers | 필수 | integer / null | 기간 안에 회원 단위로 셀 수 있는 AI 기능을 한 번이라도 쓴 회원 수(중복 제거). 측정하지 않으면 null |
+| chatbotMembers | 필수 | integer / null | 기간 안에 챗봇 질문을 한 회원 수(chat_sessions.member_id 중복 제거). 측정하지 않으면 null |
+| briefingMembers | 필수 | integer / null | 기간 안에 브리핑을 읽은 회원 수. 회원별 읽음 기록이 없으면 null |
+| note | 필수 | string / null | 집계 기준 설명(예: 게스트 제외) |
+
 <a id="schema-aiusageresponse"></a>
 
 ### AiUsageResponse
@@ -3018,6 +3117,8 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | features | 필수 | [AiFeature](#schema-aifeature)[] |  |
 | pastRuns | 필수 | [PastRun](#schema-pastrun)[] |  |
 | cost | 필수 | [FeatureCost](#schema-featurecost) |  |
+| daily | 선택 | [AiUsageDay](#schema-aiusageday)[] / null | 제안(2026-10-24, A-ADM-04b 날짜별 그래프): 집계 기간의 KST 날짜별·기능별 모델 사용량. ai_executions.started_at이 요청 window 경계 이상 asOf 이하인 실행을 started_at의 KST 날짜에 귀속한다. 24h·7d·30d의 첫날과 마지막 날은 window 경계에 따라 일부 시간만 포함할 수 있다. 오래된 날짜부터 정렬하고, 사용 기록이 없는 날도 빠뜨리지 않는다. 서버가 아직 집계하지 않으면 필드를 생략하거나 null이다. |
+| members | 선택 | [AiUsageMembers](#schema-aiusagemembers) / null | 제안(2026-10-24, A-ADM-04b 사용 회원 비율): 집계 기간에 AI 기능을 쓴 회원 수. 서버가 아직 집계하지 않으면 필드를 생략하거나 null이다. |
 
 <a id="schema-approvalout"></a>
 
@@ -3366,6 +3467,57 @@ The immutable published original of a round (what users saw before any correctio
 | message | 필수 | string |  |
 | previous | 필수 | [BriefingResponse](#schema-briefingresponse) / null | 고정 참조의 과거 발행 원문. 이번 회차의 새 평가·새 전망이 아니다. available일 때만 제공하며 기존 데이터·시장 지표의 시점도 과거 그대로다. |
 
+<a id="schema-briefingcontinuity"></a>
+
+### BriefingContinuity
+
+선택적 조용한 회차 정책. 참고 소식·이전 발행본 복기·수집 부족을 구분하며 기존 발행 내용을 바꾸지 않는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 필수 | string {importance-continuity-v1, importance-continuity-v2} |  |
+| roundId | 필수 | string |  |
+| cutoff | 필수 | string (date-time) |  |
+| mode | 필수 | string {core, reference, recap, coverage_limited, validation_failed} |  |
+| importanceFloor | 필수 | integer {1, 2} / null |  |
+| message | 필수 | string |  |
+| coverage | 필수 | object |  |
+| coverage.status | 필수 | string {registered_scope, limited, insufficient} |  |
+| coverage.confirmedDocuments | 필수 | integer |  |
+| coverage.message | 필수 | string |  |
+| references | 필수 | object[] |  |
+| references[].issueId | 필수 | string |  |
+| references[].title | 필수 | string |  |
+| references[].importance | 필수 | integer {1} |  |
+| references[].label | 필수 | string |  |
+| references[].companies | 필수 | object[] |  |
+| references[].companies[].id | 필수 | string |  |
+| references[].companies[].name | 필수 | string |  |
+| references[].sources | 필수 | object[] |  |
+| references[].sources[].evidenceId | 필수 | string |  |
+| references[].sources[].documentId | 필수 | string |  |
+| references[].sources[].documentVersion | 필수 | string |  |
+| references[].sources[].quote | 필수 | string |  |
+| references[].sources[].url | 필수 | string / null |  |
+| references[].sources[].dateContext | 필수 | object |  |
+| references[].sources[].dateContext.publishedAt | 필수 | string (date-time) |  |
+| recap | 필수 | object |  |
+| recap.status | 필수 | string {available, unavailable} |  |
+| recap.previousRoundId | 필수 | string / null |  |
+| recap.date | 선택 | string (date) |  |
+| recap.edition | 선택 | string {morning, evening} |  |
+| recap.dataAsOf | 필수 | string (date-time) / null |  |
+| recap.message | 필수 | string |  |
+| recap.items | 필수 | [BriefingItem](#schema-briefingitem)[] |  |
+| watchConditions | 필수 | object[] |  |
+| watchConditions[].text | 필수 | string |  |
+| watchConditions[].kind | 필수 | string {verification_check, previous_condition} |  |
+| watchConditions[].companyName | 선택 | string |  |
+| watchConditions[].previousRoundId | 선택 | string |  |
+| forecast | 필수 | object |  |
+| forecast.status | 필수 | string {unavailable, not_updated} |  |
+| forecast.message | 필수 | string |  |
+
 <a id="schema-briefingresponse"></a>
 
 ### BriefingResponse
@@ -3385,6 +3537,7 @@ The immutable published original of a round (what users saw before any correctio
 | dataAsOf | 필수 | string (date-time) / null |  |
 | graphVersion | 필수 | string / null |  |
 | items | 필수 | [BriefingItem](#schema-briefingitem)[] |  |
+| continuity | 선택 | [BriefingContinuity](#schema-briefingcontinuity) / null | 선택적 참고 소식·복기·수집 범위. 기존 발행본에는 생략될 수 있다. |
 | companyOutlooks | 선택 | [CompanyOutlooks](#schema-companyoutlooks) | 선정 기업별 사업 전망·조건·근거와 동일 기업의 이전 판단 비교. 과거 발행본에는 없을 수 있습니다. 시장 요약·지표와 별도이며 주가 예측이 아닙니다. |
 | marketSummary | 필수 | [AnalysisSummary](#schema-analysissummary) / [Unavailable](#schema-unavailable) |  |
 | marketVariables | 필수 | [MarketVariables](#schema-marketvariables) / [Unavailable](#schema-unavailable) | KOSPI, KOSDAQ and USD/KRW stored with the published round; unavailable (with the reason) when the round has none |
@@ -3479,15 +3632,15 @@ The immutable published original of a round (what users saw before any correctio
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| companyId | 필수 | string / null |  |
+| companyId | 필수 | string / null | 앱 기업 ID. AI 원천 기업 ID는 앱 카탈로그 ID가 아니므로 대응이 확인되기 전에는 null. |
 | name | 필수 | string |  |
-| role | 필수 | string |  |
+| role | 필수 | string / null | S2 참여 기업의 역할. 관계 끝점에만 있는 기업은 null. |
 
 <a id="schema-candidatecounts"></a>
 
 ### CandidateCounts
 
-
+Current candidate review targets: total = active + inactive (inactive = no relation of it is in the latest AI result). allow/hold/reject count active candidates only.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -3506,15 +3659,15 @@ The immutable published original of a round (what users saw before any correctio
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| title | 필수 | string |  |
+| title | 필수 | string / null | S2 사건 후보의 제목. 사건이 없는 관계 후보(기업-기업 관계 등)는 null. |
 | candidateId | 필수 | string |  |
 | sourceVersion | 필수 | string | 이 상세 응답의 후보 AI 원천 버전. 결정 요청의 expectedSourceVersion으로 보낸다. |
-| sourceRevision | 필수 | string | 이 상세 응답의 후보 AI 원천 revision. 결정 요청의 expectedSourceRevision으로 보낸다. |
-| issueId | 필수 | string |  |
+| sourceRevision | 필수 | string / null | 후보 단위 AI 원천 revision은 없어 항상 null이다. 결정 요청의 expectedSourceRevision에는 relations[].sourceRevision을 보낸다(결정은 관계 단위). |
+| issueId | 필수 | string / null | 이 사건 후보가 합쳐질 기존 공개 이슈 ID. S2 disposition.targetEventId(AI 사건 ID)를 활성 공개 버전의 수입 영수증(issues[].sourceEvents의 snapshot-event)으로 찾은 값이다. 새 사건 후보, 사건이 없는 관계 후보, 활성 버전에 그 사건이 없거나 여러 이슈에 걸린 경우, 활성 버전·영수증을 읽을 수 없는 경우는 null. |
 | status | 필수 | string {ALLOW, HOLD, REJECT} |  |
 | active | 필수 | boolean |  |
-| policyVersion | 필수 | string |  |
-| action | 필수 | string |  |
+| policyVersion | 필수 | string / null | AI 원천에 대응 값이 없어 현재 항상 null. |
+| action | 필수 | string / null | S2 사건 후보의 동작. 사건이 없는 관계 후보는 null. |
 | target | 필수 | string / null |  |
 | eventTime | 필수 | string / null |  |
 | companies | 필수 | [CandidateCompany](#schema-candidatecompany)[] |  |
@@ -3524,14 +3677,14 @@ The immutable published original of a round (what users saw before any correctio
 | onUserGraph | 필수 | boolean |  |
 | decision | 필수 | [ReviewDecisionOut](#schema-reviewdecisionout) / null |  |
 | rule | 필수 | [CandidateRule](#schema-candidaterule) / null |  |
-| mention | 필수 | [CandidateMention](#schema-candidatemention) |  |
+| mention | 필수 | [CandidateMention](#schema-candidatemention) / null | S2 사건 후보의 원래 언급. 사건이 없는 관계 후보는 null. |
 | articles | 필수 | [CandidateArticle](#schema-candidatearticle)[] |  |
 | evidence | 필수 | [CandidateEvidence](#schema-candidateevidence)[] |  |
 | relations | 필수 | [CandidateRelation](#schema-candidaterelation)[] |  |
 | verification | 필수 | [VerificationOut](#schema-verificationout) |  |
 | invalidationReason | 필수 | string / null |  |
 | history | 필수 | [ReviewDecisionOut](#schema-reviewdecisionout)[] |  |
-| graphDb | 필수 | string {reflected, pending, not_stored, unknown} |  |
+| graphDb | 필수 | string {reflected, pending, not_stored, unknown, excluded} | 현재 공개 그래프 버전 기준 상태(사용자가 지금 읽을 수 있는지). reflected: 활성 버전에서 이 후보의 관계나 사건을 사용자가 읽을 수 있음(공개 제외와 근거 읽기 검사—기사 접근·원천 grant—를 모두 통과), excluded: 활성 버전에 공개됐지만 지금은 공개 제외나 근거 읽기 검사로 숨겨짐, pending: 운영자가 최종 승인(approvalBasis=operator-final-approval)한 관계가 아직 공개 버전에 없음(다음 인계·수입 대기), not_stored: 그 밖(자동 검증만 통과하고 인계되지 않은 관계 포함), unknown: 활성 버전·수입 영수증을 읽을 수 없거나 근거 읽기 검사를 지금 확인할 수 없음. 별도 그래프 DB 투영이 아니라 공개 snapshot 기준이다. 목록의 onUserGraph는 reflected일 때만 true다. 판정은 (활성 버전, 공개 제외 revision)이 같으면 최대 60초 동안 재사용되고, 만료 뒤 한 요청이 다시 계산하는 동안 다른 요청은 만료된 판정을 받는다. 그래서 같은 버전 안에서 기사 접근이나 원천 grant가 바뀐 결과는 최대 60초에 재계산 시간을 더한 만큼 늦게 반영될 수 있다(버전 활성화나 공개 제외 변경은 바로 반영). |
 
 <a id="schema-candidateevidence"></a>
 
@@ -3545,7 +3698,7 @@ The immutable published original of a round (what users saw before any correctio
 | articleVersion | 필수 | string |  |
 | start | 필수 | integer |  |
 | end | 필수 | integer |  |
-| quote | 필수 | string |  |
+| quote | 필수 | string / null | 원문 인용. 앱 기사 저장소에서 접근 권한이 철회된 기사의 인용은 인용 버전이 앱에 수입됐는지와 관계없이 null. AI 생성자가 인용 검증 실패로 quote를 null로 준 경우도 null(복원·빈 문자열 대체 없음). |
 | articleTitle | 필수 | string / null |  |
 | url | 필수 | string / null |  |
 
@@ -3560,7 +3713,7 @@ The immutable published original of a round (what users saw before any correctio
 | items | 필수 | [CandidateRow](#schema-candidaterow)[] |  |
 | nextCursor | 필수 | string / null |  |
 | counts | 필수 | object |  |
-| asOf | 필수 | string (date-time) |  |
+| asOf | 필수 | string (date-time) | 응답을 만든 시각. 각 행의 onUserGraph 판정은 이 시각 기준 최대 60초에 재계산 시간을 더한 만큼 전에 확인한 결과일 수 있다(graphDb 설명 참조). |
 
 <a id="schema-candidatemention"></a>
 
@@ -3593,6 +3746,7 @@ The immutable published original of a round (what users saw before any correctio
 | relationId | 필수 | string |  |
 | sourceVersion | 필수 | string | 이 relation AI 원천 버전. relation 결정 요청에 사용한다. |
 | sourceRevision | 필수 | string | 이 relation AI 원천 revision. relation 결정 요청에 사용한다. |
+| revision | 필수 | integer | 이 관계 검수 대상의 현재 revision. decideAnalysisCandidate의 expectedRevision으로 sourceVersion·sourceRevision과 함께 보낸다. |
 | relationType | 필수 | string |  |
 | source | 필수 | string |  |
 | target | 필수 | string |  |
@@ -3610,13 +3764,13 @@ The immutable published original of a round (what users saw before any correctio
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| title | 필수 | string |  |
+| title | 필수 | string / null | S2 사건 후보의 제목. 사건이 없는 관계 후보(기업-기업 관계 등)는 null. |
 | candidateId | 필수 | string |  |
-| issueId | 필수 | string |  |
+| issueId | 필수 | string / null | 이 사건 후보가 합쳐질 기존 공개 이슈 ID. S2 disposition.targetEventId(AI 사건 ID)를 활성 공개 버전의 수입 영수증(issues[].sourceEvents의 snapshot-event)으로 찾은 값이다. 새 사건 후보, 사건이 없는 관계 후보, 활성 버전에 그 사건이 없거나 여러 이슈에 걸린 경우, 활성 버전·영수증을 읽을 수 없는 경우는 null. |
 | status | 필수 | string {ALLOW, HOLD, REJECT} |  |
 | active | 필수 | boolean |  |
-| policyVersion | 필수 | string |  |
-| action | 필수 | string |  |
+| policyVersion | 필수 | string / null | AI 원천에 대응 값이 없어 현재 항상 null. |
+| action | 필수 | string / null | S2 사건 후보의 동작. 사건이 없는 관계 후보는 null. |
 | target | 필수 | string / null |  |
 | eventTime | 필수 | string / null |  |
 | companies | 필수 | [CandidateCompany](#schema-candidatecompany)[] |  |
@@ -3631,16 +3785,16 @@ The immutable published original of a round (what users saw before any correctio
 
 ### CandidateRule
 
-A candidate a publication rule covers: whether it is on the user graph through the rule, and what it leaves out.
+How an application publication rule affects a candidate. Hide-only: see ``ReviewRuleOut``. The candidate's
+``rule`` is null when no rule's condition covers it and when it can never be published (an AI REJECT, or an inactive
+candidate replaced by a newer job), since a rule has nothing to hide there. The app does not evaluate the rules on candidates yet (2026-10-26): until it does, ``rule`` is always null and ``rule=true`` in the list finds nothing.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| ruleId | 필수 | string |  |
-| applied | 필수 | boolean |  |
-| notAppliedReason | 필수 | string {admin_decision, rule_disabled, not_published} / null |  |
-| withheldParticipants | 필수 | integer[] | Indexes into the candidate's mention participants whose role is left out |
-| withheldRelations | 필수 | string[] | Relation ids whose role is left out |
-| droppedRelations | 필수 | string[] | Relation ids the rule does not publish at all (a FOLLOWS whose follow-side event did not occur yet) |
+| ruleId | 필수 | string | The publication rule whose condition covers this candidate (``<ruleId>@<version>``). |
+| applied | 필수 | boolean | True when the rule is enabled and its condition matches, whatever the candidate's publication state: its<br>``hiddenRelations`` are kept off the public graph once it is published (AI pass, or an administrator allow followed by a<br>new import). For a HOLD nobody has decided yet it tells the administrator that allowing it will not make those<br>relations public. It never means the rule published anything: a rule never publishes a HOLD and never turns a HOLD<br>into an approval (AI owner 2026-10-22, 5-A). |
+| notAppliedReason | 필수 | string {admin_decision, rule_disabled} / null | Why the rule hides nothing here: rule_disabled (switched off), admin_decision (an administrator rejected<br>the candidate, HOLD or not, so it is never published; an allowed HOLD is applied). Null when applied. |
+| hiddenRelations | 필수 | string[] | Relation ids of the candidate the rule keeps off the public graph once it is published. Empty when not<br>applied. |
 
 <a id="schema-chataction"></a>
 
@@ -3663,13 +3817,13 @@ answered 본문의 근거 수준별 구간.
 | --- | --- | --- | --- |
 | basis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded} | 이 구간의 근거 수준. general_knowledge 구간은 서버가 고정 안내 문장 '일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.'로 시작하고 최신 사실·수치·전망·투자 판단을 담지 않는다. |
 | text | 필수 | string |  |
-| evidenceIds | 필수 | string[] (uniqueItems) | 이 구간의 사실 주장이 연결된 근거. 모두 result.citations의 evidenceId여야 하며 general_knowledge 구간은 빈 배열이다. zoop_documented 구간은 sourceKind=zoop_doc, evidence_grounded 구간은 sourceKind=article 인용만 가리킨다. |
+| evidenceIds | 필수 | string[] (uniqueItems) | 이 구간의 사실 주장이 연결된 근거. 모두 result.citations의 evidenceId여야 하며 general_knowledge 구간은 빈 배열이다. zoop_documented 구간은 sourceKind=zoop_doc, evidence_grounded 구간은 sourceKind=article 또는 company_profile 인용만 가리킨다. |
 
 <a id="schema-chatapplied"></a>
 
 ### ChatApplied
 
-What the answer was actually built on.
+What the answer was actually built on. For insufficient_evidence, nothing was answered, so companies and issues are what this run's reads looked at.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -3764,6 +3918,32 @@ What the member had selected when asking: graph targets, optional evidence refer
 | session | 필수 | [ChatSessionResponse](#schema-chatsessionresponse) |  |
 | jobs | 필수 | [ChatJob](#schema-chatjob)[] |  |
 
+<a id="schema-chatconversationlist"></a>
+
+### ChatConversationList
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| items | 필수 | [ChatConversationSummary](#schema-chatconversationsummary)[] |  |
+| nextCursor | 필수 | string / null | 다음 페이지 커서. 마지막 페이지면 null |
+| deleteEnabled | 필수 | boolean | deleteConversation이 열려 있는지. 거짓이면 클라이언트는 삭제를 보여 주지 않는다 |
+
+<a id="schema-chatconversationsummary"></a>
+
+### ChatConversationSummary
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| title | 필수 | string | 첫 질문. 100자를 넘으면 99자와 '…' |
+| createdAt | 필수 | string (date-time) |  |
+| updatedAt | 필수 | string (date-time) | 마지막으로 질문한 시각 |
+| jobs | 필수 | integer | 질문 작업 수(확인 질문의 답 포함) |
+
 <a id="schema-chatcurrentresponse"></a>
 
 ### ChatCurrentResponse
@@ -3783,7 +3963,7 @@ What the member had selected when asking: graph targets, optional evidence refer
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | kind | 필수 | string {validation_failed, save_failed, result_lost, transient, budget_exceeded, permission_denied, internal} | transient: 같은 고정 문맥으로 다시 실행하면 달라질 수 있는 시간 초과·공급자 오류. 재실행 가능 여부는 retry로 판단하며, 모델 응답 불명(response_unknown)은 중복 호출·과금을 막기 위해 retry=null이다. budget_exceeded: 같은 입력이면 반드시 다시 넘는 크기 한도(rerun 불가, 범위를 좁힌 새 질문 안내). |
-| reason | 필수 | string / null | 기계 판독용 원인 코드. transient: deadline_guard(시작 전 잔여 기한 부족), provider_error(송신 전 연결 실패·처리 거부가 명시된 오류·형식 불일치 응답), tool_timeout(읽기 전용 MCP 조회 상한 초과), response_unknown(모델 송신 후 응답 불명, retry=null). budget_exceeded: context_too_large, output_limit. UI 문구와 관리자 집계의 기준이다. |
+| reason | 필수 | string / null | 기계 판독용 원인 코드. transient: deadline_guard(시작 전 잔여 기한 부족), provider_error(송신 전 연결 실패·처리 거부가 명시된 오류·형식 불일치 응답), tool_timeout(읽기 전용 도구 조회 상한 초과), response_unknown(모델 송신 후 응답 불명, retry=null). budget_exceeded: context_too_large, output_limit. UI 문구와 관리자 집계의 기준이다. |
 | message | 필수 | string |  |
 | retry | 필수 | string {rerun, save_only} / null | What 'retry' would do: rerun the same job with its frozen context, or only save the kept verified result. null = not allowed. rerun은 작업당 실행 3회(runs ≤ 3)까지이며 이후에는 null이다. reason=response_unknown이면 처음부터 null이다. |
 
@@ -3847,7 +4027,7 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| kind | 필수 | string {investment_advice, precondition_unmet, results_truncated, evidence_insufficient, out_of_scope} | investment_advice: 투자 판단 요청이라 제공하지 않음. precondition_unmet: 앞 단계 결과가 체크포인트 조건에 못 미쳐 의존 요구를 수행할 수 없음. results_truncated: 조회 상한에 걸려 일부 자료만 확인함. evidence_insufficient: 조회는 성공했으나 이 요구의 공개 근거가 부족함. out_of_scope: 지원하지 않는 하위 요구. 서버가 gate·체크포인트·도구 결과로 정하며 모델 자기평가로 정하지 않는다. |
+| kind | 필수 | string {investment_advice, precondition_unmet, results_truncated, not_in_member_scope, evidence_insufficient, out_of_scope} | investment_advice: 투자 판단 요청이라 제공하지 않음. precondition_unmet: 앞 단계 결과가 체크포인트 조건에 못 미쳐 의존 요구를 수행할 수 없음. results_truncated: 조회 상한에 걸려 일부 자료만 확인함. not_in_member_scope: 내 종목 질문이 지목한 기업이 회원의 보유·관심 종목이 아님(묻는 대상이면 조회하지 않고, 관계의 기준점이면 조회하되 알림). evidence_insufficient: 조회는 성공했으나 이 요구의 공개 근거가 부족함. out_of_scope: 지원하지 않는 하위 요구. 서버가 gate·체크포인트·도구 결과로 정하며 모델 자기평가로 정하지 않는다. |
 | label | 필수 | string | 해당 요구를 회원 질문의 표현으로 나타낸 문구 |
 | message | 필수 | string | kind별 서버 템플릿으로 만든 안내 문장 |
 
@@ -3905,8 +4085,8 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| sourceKind | 필수 | string {article, zoop_doc} | article: 뉴스·공시 원문(articleId·articleVersion 필수, docId·docVersion null). zoop_doc: 승인된 ZOOP 도움말·화면 명세·정책 문서(docId·docVersion 필수, articleId·articleVersion·publisher·publishedAt·url은 null, articleTitle에는 문서 제목). zoop_documented 구간은 zoop_doc 인용만, evidence_grounded 구간은 article 인용만 쓴다. |
-| evidenceId | 필수 | string | 인용 식별자. article이면 evidence ID, zoop_doc이면 서버가 문서 ID·버전·구간으로 만든 결정적 ID다. sections[].evidenceIds가 이 값을 가리킨다. |
+| sourceKind | 필수 | string {article, zoop_doc, company_profile} | article: 뉴스·공시 원문(articleId·articleVersion 필수, docId·docVersion null). zoop_doc: 승인된 ZOOP 도움말·화면 명세·정책 문서(docId·docVersion 필수, articleId·articleVersion·publisher·publishedAt·url은 null, articleTitle에는 문서 제목). company_profile: 줍이 검수한 기업 카탈로그 프로필(사업 개요·법인명·대표·설립일·업종·홈페이지) 전문(docId는 기업 ID, articleId·articleVersion·docVersion·publishedAt은 null, start=0·end는 quote의 code point 길이, articleTitle은 '<기업명> 기업 개요', publisher는 '줍 기업 카탈로그', url은 기업 홈페이지 또는 null). 카탈로그가 인용한 문장을 바꾸면 그 인용은 더 이상 읽을 수 없다. zoop_documented 구간은 zoop_doc 인용만, evidence_grounded 구간은 article·company_profile 인용만 쓴다. |
+| evidenceId | 필수 | string | 인용 식별자. article이면 evidence ID, company_profile이면 기업 ID와 인용 문장으로 만든 결정적 ID(ev- 형식), zoop_doc이면 서버가 문서 ID·버전·구간으로 만든 결정적 ID다. sections[].evidenceIds가 이 값을 가리킨다. |
 | quote | 필수 | string |  |
 | articleId | 필수 | string, null |  |
 | articleVersion | 필수 | string, null |  |
@@ -4379,10 +4559,10 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | --- | --- | --- | --- |
 | decision | 필수 | string {allow, reject} |  |
 | reason | 필수 | string |  |
-| relationId | 선택 | string / null |  |
-| expectedRevision | 필수 | integer | 상세 응답에서 확인한 결정 대상(candidate 또는 relation)의 앱 검수 revision. |
-| expectedSourceVersion | 필수 | string | 상세 응답에서 확인한 결정 대상의 AI 원천 버전. 현재 값과 다르면 REVISION_CONFLICT/409. |
-| expectedSourceRevision | 필수 | string | 상세 응답에서 확인한 결정 대상의 AI 원천 revision. 현재 값과 다르면 REVISION_CONFLICT/409. |
+| relationId | 필수 | string | 결정할 관계(후보 상세의 relation id). AI 원천은 관계 단위로만 결정하므로 필수이며, 후보 전체를 한 번에 결정하는 요청은 없다. |
+| expectedRevision | 필수 | integer | 상세 응답에서 확인한 그 관계의 앱 검수 revision. |
+| expectedSourceVersion | 필수 | string | 상세 응답에서 확인한 그 관계의 AI 원천 버전. 현재 값과 다르면 REVISION_CONFLICT/409. |
+| expectedSourceRevision | 필수 | string | 상세 응답에서 확인한 그 관계의 AI 원천 revision. 현재 값과 다르면 REVISION_CONFLICT/409. |
 
 <a id="schema-decisionresponse"></a>
 
@@ -4450,6 +4630,62 @@ allow는 HOLD 대상의 운영자 최종 승인(approved)이며 재검증이나 
 | quote | 필수 | string |  |
 | quoteVerified | 필수 | boolean / null |  |
 
+<a id="schema-structuraldetails"></a>
+
+### StructuralDetails
+
+FS023 공급 관계 상세. 새 서버는 항상 반환하지만 구서버와 혼재 배포될 수 있어 기존 consumer 호환이 필요한 동안 OpenAPI 및 웹 타입에서 선택 필드로 유지한다. 혼재 배포 지원 종료 시 필수 여부를 다시 결정한다. available일 때만 완전한 paths를 제공하며 일부 경로를 잘라 공개하지 않는다. unavailable은 관계 없음이 아니다. 비공개 pathCompanies는 공개하지 않는다. legacy_data·not_recorded는 기록 부재이므로 metadata.partial/failures에 넣지 않는다. details_not_available은 확인 가능한 상세를 제공하지 못한 상태로 metadata.partial과 STRUCTURAL_DETAIL_UNAVAILABLE을 제공한다. 조회 중 일시 장애는 기본 관계 상세를 유지하고 metadata.failures에 SOURCE_UNAVAILABLE, retryable=true로 기록한다. receipt 구조 손상은 로그를 남기고 details_not_available 및 retryable=false로 기록한다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {available, unavailable, not_applicable} |  |
+| reason | 필수 | string, null {legacy_data, not_recorded, details_not_available, None} |  |
+| paths | 필수 | [StructuralRelationPath](#schema-structuralrelationpath)[] |  |
+
+<a id="schema-structuralrelationpath"></a>
+
+### StructuralRelationPath
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| relationId | 필수 | string | 표시 간선 뒤 원본 공개 relation ID. 경로를 합치지 않고 relationId 순으로 반환한다. |
+| companies | 필수 | [StructuralCompany](#schema-structuralcompany)[] | 운영자가 매핑한 P→…→C 순서이며 공급 방향이 아니다. 모두 현재 공개된 기업이다. |
+| links | 필수 | [StructuralSupplyLink](#schema-structuralsupplylink)[] | basis 순서. 인과·가격 방향·독립 원천 증명을 뜻하지 않는다. |
+
+<a id="schema-structuralcompany"></a>
+
+### StructuralCompany
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| label | 필수 | string |  |
+
+<a id="schema-structuralsupplylink"></a>
+
+### StructuralSupplyLink
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| basisId | 필수 | string | receipt relationKey, 기존 basis.edgeId에 대응. |
+| relationType | 필수 | string {SUPPLIES} |  |
+| supplierCompanyId | 필수 | string |  |
+| customerCompanyId | 필수 | string |  |
+| businessScope | 필수 | string, null | S3 원문 텍스트. null은 미상이며 전체 사업이 아니다. |
+| productScope | 필수 | string, null | S3 원문 텍스트. 제품 엔티티 ID가 아니다. |
+| validFrom | 필수 | string, null | 효력 시작일 YYYY-MM-DD. null은 미상. |
+| validUntil | 필수 | string, null | 마지막 유효일 YYYY-MM-DD, 당일 포함. null은 영구 유효가 아니다. |
+| validity | 필수 | string {scheduled, active, ended, unknown} | metadata.asOf의 Asia/Seoul 날짜 기준, BasisOut.validity와 동일. |
+| verifiedAt | 필수 | string (date-time) | 관계를 eligible하게 만든 판정 시각. 기사 발행 시각과 구분한다. |
+| countries | 필수 | string[] |  |
+| evidenceIds | 필수 | string[] (uniqueItems) | 이 basis에 속하며 현재 읽을 수 있는 근거. EdgeDetail.evidenceIds에 합치지 않는다. |
+
 <a id="schema-edgedetail"></a>
 
 ### EdgeDetail
@@ -4458,6 +4694,7 @@ allow는 HOLD 대상의 운영자 최종 승인(approved)이며 재검증이나 
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| structuralDetails | 선택 | [StructuralDetails](#schema-structuraldetails) |  |
 | id | 필수 | string |  |
 | relationType | 필수 | string {INVOLVES, STRUCTURALLY_RELATED_TO, FOLLOWS, SHARES_ISSUE} |  |
 | derived | 필수 | boolean |  |
@@ -4833,7 +5070,7 @@ same request again never toggles anything.
 
 ### GraphDbStatus
 
-
+getPipelineOverview: the graph state recorded with the active version, never a current reading. The app never updates it and the importer records none, so an imported version is unavailable (also without an active version). The graph database itself is the AI side's: pendingJobs, neo4j, oldestPendingAt and lastCompletedAt are null there.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5146,6 +5383,28 @@ and the baseline stays where it was.
 
 
 
+[AnalyzePlanJobCreate](#schema-analyzeplanjobcreate) / [LegacyJobCreate](#schema-legacyjobcreate)
+
+<a id="schema-analyzeplanjobcreate"></a>
+
+### AnalyzePlanJobCreate
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| kind | 필수 | string |  |
+| reason | 필수 | string | 앞뒤 공백을 제거한 감사 사유에 기존 AuditReasonPolicy를 적용한다. |
+| plan | 필수 | object |  |
+| plan.planId | 필수 | string |  |
+| plan.planDigest | 필수 | string |  |
+
+<a id="schema-legacyjobcreate"></a>
+
+### LegacyJobCreate
+
+
+
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | kind | 필수 | string {ingest, revalidate, project} |  |
@@ -5222,10 +5481,55 @@ and the baseline stays where it was.
 
 
 
+[LegacyJobOut](#schema-legacyjobout) / [AnalyzePlanJobOut](#schema-analyzeplanjobout)
+
+<a id="schema-legacyjobout"></a>
+
+### LegacyJobOut
+
+
+
+[JobCommonOut](#schema-jobcommonout) / object
+
+<a id="schema-analyzeplanjobout"></a>
+
+### AnalyzePlanJobOut
+
+
+
+[JobCommonOut](#schema-jobcommonout) / object
+
+<a id="schema-planrunout"></a>
+
+### PlanRunOut
+
+내용 없는 AI 처리 인계 관측이다. 수집·검수 원천 동기화·HOLD 승인·그래프 수입·공개 활성화나 지속적인 읽기 권한을 뜻하지 않는다. 종결 작업의 요약은 불변이다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| planId | 필수 | string |  |
+| planDigest | 필수 | string |  |
+| admissionId | 필수 | string, null |  |
+| manifestDigest | 필수 | string, null |  |
+| sourceId | 필수 | string, null |  |
+| roundId | 필수 | string, null |  |
+| phase | 필수 | object {awaiting_admission, admitting, extracting, relating, cancelling, ready, failed, cancelled} |  |
+| totalUnits | 필수 | integer, null |  |
+| readyUnits | 필수 | integer |  |
+| activeUnit | 필수 | integer, null |  |
+| completion | 필수 | object |  |
+| publicChanged | 필수 | object |  |
+
+<a id="schema-jobcommonout"></a>
+
+### JobCommonOut
+
+
+
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | id | 필수 | string |  |
-| kind | 필수 | string {ingest, revalidate, project} |  |
+| kind | 필수 | string |  |
 | label | 필수 | string |  |
 | status | 필수 | string {queued, running, succeeded, failed, cancelled} |  |
 | reason | 필수 | string |  |
@@ -5285,7 +5589,7 @@ and the baseline stays where it was.
 
 ### LedgerRef
 
-
+getPipelineOverview: database is the app database (zoop-app) read at checkedAt (= asOf). The AI side's ledger is not read here.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5566,7 +5870,7 @@ The three market indicators stored with a published round; never changed after p
 
 ### MockProfileResponse
 
-FS062: one project mock profile with its account id, cash and holdings (no real brokerage account).
+FS062: one project mock profile with its account id, cash, valued holdings and weights. Read-only; it does not create a member connection or access a real brokerage account.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5575,7 +5879,8 @@ FS062: one project mock profile with its account id, cash and holdings (no real 
 | accountId | 필수 | string |  |
 | cash | 필수 | [MockCash](#schema-mockcash) / null | null when the mock does not provide cash; 0 is a real 0 |
 | asOf | 필수 | string (date-time) / null | As-of time of the mock values when the mock gives one |
-| holdings | 필수 | [MockHoldingOut](#schema-mockholdingout)[] |  |
+| holdings | 필수 | [HoldingOut](#schema-holdingout)[] |  |
+| valuation | 필수 | [PortfolioValuation](#schema-portfoliovaluation) |  |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-neo4jstatus"></a>
@@ -5643,7 +5948,7 @@ FS062: one project mock profile with its account id, cash and holdings (no real 
 
 ### OverviewJobs
 
-Analysis jobs next to the ledger state: what is in progress and what failed (details: jobs tab).
+Analysis jobs next to the ledger state: what is in progress and what failed (details: jobs tab). ingest is the same baseline as listAnalysisJobs.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5682,7 +5987,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 
 ### PastRun
 
-
+getPipelineOverview: runId is the analysis job id. An analyze_plan job counts its units (processed) and its review targets by status so far (null until it has targets; pending and errorCount null); other jobs answer from their run report, null without one. usage is null where the app holds no usage (analyze_plan usage stays with the AI service), never a guessed 0.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5696,13 +6001,13 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 | rejected | 필수 | integer / null |  |
 | pending | 필수 | integer / null |  |
 | errorCount | 필수 | integer / null |  |
-| usage | 필수 | [UsageOut](#schema-usageout) |  |
+| usage | 필수 | [UsageOut](#schema-usageout) / null |  |
 
 <a id="schema-policyinfo"></a>
 
 ### PolicyInfo
 
-
+getPipelineOverview: version is the active graph version's policy version (null without one). decisionPolicy and validationModel belong to the AI side and are always null; the app never verifies on the web, so webVerification is always false.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5804,7 +6109,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 
 ### PublicationState
 
-
+ledgerMatchesActive: the most recently imported version is the active version (false while a newer import waits or was refused). issuesOnlyInLedger and issuesOnlyInActive are not compared yet and are always empty.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5944,7 +6249,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | allowed | 필수 | boolean |  |
-| code | 필수 | string {allowed, succeeded, in_progress, superseded, newer_attempt, duplicate_running, other_running, dataset_missing, outcome_unknown} | 재시도 판정. in_progress(대기·실행 중), succeeded(이미 성공), duplicate_running(이 작업의 재시도가 대기·실행 중), newer_attempt(더 새 재시도가 있어 가장 최근 시도만 재시도 가능), superseded(같은 종류·같은 입력의 더 나중 작업이 성공), outcome_unknown(외부 실행 결과를 확인할 수 없음: 응답 유실로 실행·과금 여부를 모르므로 자동 재시도하지 않음), dataset_missing(작업의 실행 계획이나 입력 연결이 없거나 철회됨, 일시적 조회 장애는 해당하지 않음), allowed. other_running은 대기열 정책상 다른 작업 실행만으로 재시도를 거절하지 않으므로 반환하지 않는다. blockedBy는 막고 있는 작업 ID다. |
+| code | 필수 | string {allowed, succeeded, in_progress, superseded, newer_attempt, duplicate_running, other_running, dataset_missing, outcome_unknown, worker_unavailable, plan_not_reusable} | 기존 in_progress/succeeded/duplicate_running/newer_attempt/superseded/outcome_unknown 판정 순서를 유지한다. dataset_missing은 등록된 계획·서비스 결속이 없거나 사용할 수 없는 경우이며 일시적 조회 장애가 아니다. plan_not_reusable은 영구 비활성 접수·불변 식별자 충돌·재시작할 수 없는 취소 AI 단계다. worker_unavailable은 연결된 실행기가 없는 종류나 비활성 analyze_plan이다. 다른 실행 작업은 새 작업을 대기시킬 뿐 other_running을 반환하지 않는다. |
 | reason | 필수 | string |  |
 | blockedBy | 필수 | string / null |  |
 
@@ -5952,7 +6257,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 
 ### ReviewCounts
 
-
+decisions, allowed and rejected count administrators' decisions only (origin admin); a migrated decision is not a review. revision is the app-wide global decision revision.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5961,8 +6266,8 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 | allowed | 필수 | integer |  |
 | rejected | 필수 | integer |  |
 | holdPendingReview | 필수 | integer |  |
-| ruleCandidates | 필수 | integer | Candidates on the user graph through a publication rule right now |
-| ruleEvents | 필수 | integer | Events on the user graph that exist only because of a publication rule |
+| ruleCandidates | 필수 | integer | Candidates on the user graph through a publication rule right now. A rule never publishes a HOLD (AI answer 5-A), so this is 0. |
+| ruleEvents | 필수 | integer | Events on the user graph that exist only because of a publication rule. 0, as for ruleCandidates. |
 
 <a id="schema-reviewdecisionout"></a>
 
@@ -5986,7 +6291,12 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 
 ### ReviewRuleOut
 
-A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@2``.
+An application publication rule; the id carries its version (``<ruleId>@<version>``). A rule can only keep
+already eligible content off the public graph. It never publishes a HOLD, never turns a HOLD into an approval and never
+changes an AI judgement input: content is published only by an AI pass inside a handoff or by an administrator allow
+followed by a new handoff, import and activation. ``changedAt``/``changedBy``/``reason`` are the latest change, null
+only while the rule has never been changed (a rule switched back to its default keeps its latest change).
+``history`` is every change, newest first.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5998,9 +6308,9 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 | changedAt | 필수 | string (date-time) / null |  |
 | changedBy | 필수 | string / null |  |
 | reason | 필수 | string / null |  |
-| eligible | 필수 | integer | HOLD candidates of the active version the rule covers (ignoring the switch and admin decisions) |
-| publishedCandidates | 필수 | integer |  |
-| publishedEvents | 필수 | integer |  |
+| eligible | 필수 | integer / null | Information only, not a publication count: HOLD review targets in the source jobs the active version references that the rule currently covers (counted from review_targets and AI source revisions, ignoring the switch and admin decisions). The current pending count, not the statistics frozen with a version. Null while that source projection does not exist yet. |
+| publishedCandidates | 필수 | integer / null | Candidates in the rule's scope that are still public after the rule is applied in the active graph version (not candidates the rule published: a rule never publishes). Counted when that version is built and frozen with it (the statistics at freeze time, AI owner 5-A), so a switch changes it only from the next version. Null while the active version has no frozen count. |
+| publishedEvents | 필수 | integer / null | Events in the rule's scope that are still public after the rule is applied in the active graph version (not events the rule published). Frozen with that version like ``publishedCandidates``. Null while the active version has no frozen count. |
 | history | 필수 | [RuleChangeOut](#schema-rulechangeout)[] |  |
 
 <a id="schema-rounddetail"></a>
@@ -6140,7 +6450,7 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | enabled | 필수 | boolean |  |
-| reason | 필수 | string |  |
+| reason | 필수 | string | Stored with surrounding whitespace stripped; 1 to 500 characters after stripping (longer is 422<br>INVALID_REQUEST). |
 
 <a id="schema-ruleswitchresponse"></a>
 
@@ -6951,18 +7261,84 @@ S1 실제 문서 요약. exact citation+별도 semantic supported 영수증을 �
 
 ### ImpactPath
 
-기업 패널에서 여는 영향 경로다. 데이터에 없는 산업·제품 단계나 관계 유형을 만들지 않는다.
+기업 패널에서 여는 공개 영향 경로다. 현재 steps는 선택된 공개 스냅샷의 직접 INVOLVES 연결만 담으며 연결이 없으면 빈 배열이다. 근거 ID는 getEvidence의 현재 권리 검사를 통과한 항목만 포함한다. 관계가 보이더라도 구조 경로의 receipt 검증이 완료되지 않은 경우 추정 단계를 만들지 않는다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | companyId | 필수 | string |  |
 | issueId | 필수 | string |  |
-| steps | 필수 | object[] |  |
+| pathStatus | 필수 | string {direct_available, structural_path_details_unavailable, no_direct_relation} | 직접 INVOLVES 경로 제공 여부와 구조 경로 상세의 미제공 상태를 구분한다. |
+| steps | 필수 | object[] | 직접 경로의 순서는 [issue, company]다. |
 | steps[].id | 필수 | string |  |
 | steps[].kind | 필수 | string {company, issue, industry, product} |  |
 | steps[].reason | 필수 | string |  |
 | steps[].evidenceIds | 필수 | string[] |  |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
+
+<a id="schema-impactbusinesspath"></a>
+
+### ImpactBusinessPath
+
+구조 연결의 운영자 매핑 사업 관계 사슬이다. 공급 방향은 관계 사실이며 이슈 영향·인과·가격 방향이 아니다. fixture·재구성 버전은 영수증을 읽지 않고 not_recorded를 반환한다. complete는 공개 시작 INVOLVES, 선택 시점에 보이는 모든 basis의 영수증·snapshot 일치, 현재 읽을 수 있는 단계별 근거, 공개 중간 기업이 모두 확인된 경우에만 허용한다. 후보 관계 중 하나라도 완전하게 공개할 수 없으면 사슬 전체를 unavailable로 둔다. 지원 bundle은 5~7이며 1~4는 legacy_data, 미지원·손상 영수증은 503이다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {complete, unavailable} |  |
+| reason | 필수 | string, null {not_recorded, legacy_data, intermediate_company_unmapped, not_public, evidence_unavailable, incomplete, None} | complete에서는 null이다. 비공개 지원 참조의 ID나 내부 원장 내용은 제공하지 않는다. |
+| companyIds | 필수 | string[] | complete에서만 이슈에 직접 참여한 공개 기업부터 선택 기업까지 2~3개 ID. unavailable에서는 빈 배열. |
+| links | 필수 | [ImpactBusinessLink](#schema-impactbusinesslink)[] | complete에서만 companyIds의 인접 쌍별 공급자·고객 관계와 공개 근거. unavailable에서는 빈 배열. |
+
+<a id="schema-impactbusinesslink"></a>
+
+### ImpactBusinessLink
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| supplierCompanyId | 필수 | string |  |
+| customerCompanyId | 필수 | string |  |
+| reason | 필수 | string | 검증된 사업 관계 유형·범위에서 표시할 설명. 원천에 없는 인과 해석을 만들지 않는다. |
+| evidenceIds | 필수 | string[] |  |
+
+<a id="schema-companyissueimpactassessment"></a>
+
+### CompanyIssueImpactAssessment
+
+snapshot 버전의 영수증 손상·선택 버전 불일치는 503이다. fixture·재구성 버전은 영수증이 없는 정상 자료 상태이므로 영향 판정은 not_recorded, 구조 상세는 not_recorded다. 공개 경로가 없으면 no_public_path, structural에 이슈별 판정 생산 계약이 없으면 issue_impact_not_produced, direct의 구버전 영수증에 impacts[]가 없으면 not_recorded, 검증 행은 있지만 공개 가능한 판정이 없으면 not_verified다. 검증 행 중 하나라도 필수 근거를 현재 열 수 없으면 다른 행도 내보내지 않고 evidence_unavailable이다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {available, unavailable} |  |
+| reason | 필수 | string, null {no_public_path, not_recorded, not_verified, evidence_unavailable, issue_impact_not_produced, None} | available에서는 null이다. none 경로는 no_public_path, 구조적 이슈 영향 생산 전은 issue_impact_not_produced, impacts[]가 없는 구버전은 not_recorded다. 선택 버전 영수증 손상·불일치는 503으로 처리한다. |
+| results | 필수 | [CompanyIssueImpactResult](#schema-companyissueimpactresult)[] | available일 때 하나 이상, unavailable일 때 빈 배열. 공개 간선의 원천 판정별로 유지하고 합산하지 않는다. 검증 행 하나라도 필수 근거를 열 수 없으면 전체를 evidence_unavailable로 둔다. |
+
+<a id="schema-companyissueimpactresult"></a>
+
+### CompanyIssueImpactResult
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| impactId | 필수 | string | 원천 판정을 구별하는 공개용 불투명 ID. 같은 그래프 버전 안에서 안정적이고 유일하며 내부 원천 참조를 드러내지 않는다. |
+| status | 필수 | string {verified} |  |
+| label | 필수 | string {positive, negative, mixed, undetermined} | 선택 이슈의 선택 기업에 대한 검증 결과. 구조 관계 자체의 영향 판정을 복사하지 않는다. 주가·확률 예측이 아니다. |
+| evidenceIds | 필수 | string[] | effects 네 목록의 중복 없는 합집합. 모두 현재 getEvidence에서 읽을 수 있어야 한다. |
+| effects | 필수 | [CompanyIssueImpactEffects](#schema-companyissueimpacteffects) |  |
+
+<a id="schema-companyissueimpacteffects"></a>
+
+### CompanyIssueImpactEffects
+
+검증기가 각 인용에 지정한 효과별 근거. 서로 겹치지 않고 합집합은 result.evidenceIds와 같다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| positive | 필수 | string[] |  |
+| negative | 필수 | string[] |  |
+| neutral | 필수 | string[] |  |
+| uncertain | 필수 | string[] |  |
 
 <a id="schema-errorcode"></a>
 

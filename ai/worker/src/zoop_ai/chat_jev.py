@@ -119,7 +119,8 @@ def build_verification_request(payload: VerificationInput, model: str) -> dict[s
                 for s in payload.sections]
     questions: dict[str, Any] = {}
     for index, section in enumerate(payload.sections):
-        if section.basis == "evidence_grounded":
+        # Every section that rests on quotes (public evidence or a ZOOP document) is checked against them.
+        if section.basis != "general_knowledge":
             questions[f"s{index}-support"] = {"type": "choice",
                                               "instructions": {"task": VERIFY_TASK,
                                                                "question": SUPPORT_QUESTION.format(index=index)},
@@ -135,7 +136,7 @@ def interpret_verification(raw: Any, payload: VerificationInput, model: str) -> 
     verdicts = []
     for index, section in enumerate(payload.sections):
         support = None
-        if section.basis == "evidence_grounded":
+        if section.basis != "general_knowledge":
             choice, probabilities, confidence = native_jev._choice(answers[f"s{index}-support"])
             accepted = (choice != "insufficient" and probabilities[choice] >= native_jev.CHOICE_PROBABILITY
                         and confidence >= native_jev.CHOICE_CONFIDENCE)

@@ -1,5 +1,17 @@
+import { useAdminRefresh } from '@/hooks/useAdminRefresh';
 import { useCallback } from 'react';
 import { getAiUsage } from '@/apis/admin/briefings';
+import {
+  DailyCostChart,
+  DailyTokenChart,
+  FeatureShare,
+  MemberRate,
+} from '@/components/admin/ai/AiUsageCharts';
+import {
+  VIEW_FEATURES,
+  totalsByDay,
+  type AiUsageView,
+} from '@/components/admin/ai/aiUsageModel';
 import {
   Empty,
   ErrorBox,
@@ -9,6 +21,7 @@ import {
   Section,
   Segmented,
   Table,
+  Tabs,
 } from '@/components/admin/common/AdminUi';
 import { TD, TH, count } from '@/components/admin/common/adminStyles';
 import { aiSourceLabel, policyGroupLabel } from '@/constants/adminLabels';
@@ -23,6 +36,18 @@ const WINDOWS: { value: AiUsageWindow; label: string }[] = [
   { value: '30d', label: '30일' },
   { value: 'all', label: '전체' },
 ];
+
+const VIEWS: { value: AiUsageView; label: string }[] = [
+  { value: 'all', label: '전체' },
+  { value: 'briefing', label: '브리핑' },
+  { value: 'chatbot', label: 'AI 챗봇' },
+];
+
+const parseView = (value: string | null): AiUsageView =>
+  value === 'briefing' || value === 'chatbot' ? value : 'all';
+
+/** 날짜별·회원 수 계약 제안 필드를 서버가 아직 주지 않을 때 */
+const NOT_PROVIDED = 'AI 사용량 API가 아직 이 값을 주지 않아요.';
 
 const parseWindow = (value: string | null): AiUsageWindow =>
   WINDOWS.some((option) => option.value === value)
@@ -71,14 +96,26 @@ const NUM_HEAD = `${TH} text-right whitespace-nowrap`;
 // A-ADM-04b AI 사용량·오류 (FS068, getAiUsage)
 // - 기능별 접수 요청과 실제 모델 호출·재사용·재시도를 구분한다. 기능 간 합계를 전체 요청 수로 쓰지 않는다.
 // - 비용은 실제·추정을 구분하고, 자료가 없는 값은 0으로 바꾸지 않는다.
+// - [전체 | 브리핑 | AI 챗봇] 보기(?view=)로 회원 사용 비율·날짜별 토큰·비용을 나눠 본다(강사 피드백 2026-10-24).
+//   날짜별(daily)·회원 수(members)는 계약 제안 필드라, 서버가 주지 않으면 '아직 제공하지 않음'으로 둔다.
 export default function AiUsageOverview() {
   const { params, updateQuery } = useRouteQuery();
   const window = parseWindow(params.get('window'));
+  const view = parseView(params.get('view'));
+  const viewLabel = VIEWS.find((option) => option.value === view)?.label;
   const load = useCallback(() => getAiUsage(window), [window]);
   const usage = useAsyncData(load);
+  useAdminRefresh(usage.reload, 10000);
   const data = usage.data;
+  const allowed = VIEW_FEATURES[view];
+  const features = data
+    ? data.features.filter(
+        (feature) => !allowed || allowed.includes(feature.feature),
+      )
+    : [];
+  const days = data?.daily ? totalsByDay(data.daily, view) : null;
   const errors = data
-    ? data.features.flatMap((feature) =>
+    ? features.flatMap((feature) =>
         feature.recentErrors.map((error) => ({ ...error, feature })),
       )
     : [];
@@ -101,6 +138,19 @@ export default function AiUsageOverview() {
           />
         }
       />
+      {usage.refreshError && (
+        <p role="status" className="text-[11px] text-zoop-muted">
+          새로 고치지 못했어요. 이전 결과를 표시해요.
+        </p>
+      )}
+      <Tabs
+        label="AI 사용량 보기"
+        value={view}
+        options={VIEWS}
+        onChange={(next) =>
+          updateQuery({ view: next === 'all' ? null : next }, { replace: true })
+        }
+      />
       {usage.status === 'loading' && (
         <Loading>AI 사용량을 불러오고 있어요</Loading>
       )}
@@ -121,8 +171,43 @@ export default function AiUsageOverview() {
             · 범위{' '}
             {WINDOWS.find((option) => option.value === data.window)?.label}
           </Note>
+          <Section
+            title={`${view === 'all' ? 'AI' : viewLabel} 사용 회원 비율`}
+          >
+            {data.members ? (
+              <MemberRate members={data.members} view={view} />
+            ) : (
+              <Empty>{NOT_PROVIDED}</Empty>
+            )}
+          </Section>
+          <Section title={`${viewLabel} 날짜별 토큰 사용량`}>
+            {days ? (
+              <DailyTokenChart
+                title={`${viewLabel} 날짜별 토큰 사용량`}
+                days={days}
+              />
+            ) : (
+              <Empty>{NOT_PROVIDED}</Empty>
+            )}
+          </Section>
+          <Section title={`${viewLabel} 날짜별 AI 비용`}>
+            {days ? (
+              <DailyCostChart
+                title={`${viewLabel} 날짜별 AI 비용`}
+                days={days}
+                currency={data.cost.currency}
+              />
+            ) : (
+              <Empty>{NOT_PROVIDED}</Empty>
+            )}
+          </Section>
+          {view === 'all' && (
+            <Section title="기능별 토큰 비중">
+              <FeatureShare features={data.features} />
+            </Section>
+          )}
           <Section title="기능별 사용량">
-            {data.features.length === 0 ? (
+            {features.length === 0 ? (
               <Empty>집계할 AI 기능이 없어요.</Empty>
             ) : (
               <Table caption="AI 기능별 사용량">
@@ -145,7 +230,7 @@ export default function AiUsageOverview() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.features.map((feature) => (
+                  {features.map((feature) => (
                     <tr key={feature.feature}>
                       <td className={`${TD} whitespace-nowrap font-semibold`}>
                         {feature.label}
@@ -184,12 +269,12 @@ export default function AiUsageOverview() {
                 </tbody>
               </Table>
             )}
-            {data.features.some((feature) => feature.note) && (
+            {features.some((feature) => feature.note) && (
               <ul
                 aria-label="집계 참고"
                 className="flex flex-col gap-1 text-[11px] leading-relaxed text-zoop-muted"
               >
-                {data.features
+                {features
                   .filter((feature) => feature.note)
                   .map((feature) => (
                     <li key={feature.feature}>
@@ -235,7 +320,7 @@ export default function AiUsageOverview() {
             )}
           </Section>
 
-          {data.pastRuns.length > 0 && (
+          {view === 'all' && data.pastRuns.length > 0 && (
             <Section title="뉴스 분석 실행 기록">
               <Table caption="뉴스 분석 실행 기록">
                 <thead>
@@ -265,10 +350,15 @@ export default function AiUsageOverview() {
                       <td className={NUM}>{known(run.held)}</td>
                       <td className={NUM}>{known(run.rejected)}</td>
                       <td className={NUM}>{known(run.errorCount)}</td>
-                      <td className={NUM}>{count(run.usage.calls)}</td>
-                      <td className={NUM}>{count(run.usage.inputTokens)}</td>
+                      {/* 미측정 사용량(null)은 0이 아니라 –로 둔다. */}
+                      <td className={NUM}>{known(run.usage?.calls ?? null)}</td>
                       <td className={NUM}>
-                        {duration(run.usage.elapsedSeconds * 1000)}
+                        {known(run.usage?.inputTokens ?? null)}
+                      </td>
+                      <td className={NUM}>
+                        {duration(
+                          run.usage ? run.usage.elapsedSeconds * 1000 : null,
+                        )}
                       </td>
                       <td className={`${TD} text-zoop-muted`}>
                         {aiSourceLabel[run.source] ?? run.source}

@@ -19,10 +19,11 @@ from typing import Any
 
 import pytest
 
-from handoff_support import (HANDOFF, OTHER_HANDOFF, PRINCIPAL, SOURCE_DATA, HandoffWorkspace, bundle_url, envelope, error_output, export_entry, full_bundle,
-                             manifest_of, mutated, status_url, structural, withheld_output)
+from handoff_support import (HANDOFF, HIDDEN_EVIDENCE, OTHER_HANDOFF, PRINCIPAL, SOURCE_DATA, SUMMARY_KEYS, HandoffWorkspace, assemble, basis_of, bundle_url, envelope,
+                             error_output, export_entry, full_bundle, issue_summary, json_keys, live_bundle, manifest_of, mutated, reseal, resummarize, seal, status_url,
+                             structural, with_quotes, with_side_evidence, withheld_output)
 from support import canonical, document_replay
-from zoop_ai_service.handoff_doc import digest, example_bundle, pins
+from zoop_ai_service.handoff_doc import digest, example_bundle, pins, summary_of
 
 BASE_KEYS = {"PATH", "LANG", "PYTHONDONTWRITEBYTECODE", "PYTHONUNBUFFERED", "PYTHONNOUSERSITE", "PYTHONUTF8"}
 OS_ADDED = {"__CF_USER_TEXT_ENCODING", "LC_CTYPE"}   # the operating system or the interpreter may add these to any child
@@ -510,7 +511,7 @@ WRONG_MENTION = [_set((*MENTION, "verification"), "verified"), _set((*MENTION, "
                  _set((*MENTION, "participants", 0, "sourceCompanyId"), 5),
                  _set(("schemaVersion",), "zoop-graph-handoff-bundle-1"), _set(("schemaVersion",), "zoop-graph-handoff-bundle-2"),
                  _set(("schemaVersion",), "zoop-graph-handoff-bundle-3"), _set(("schemaVersion",), "zoop-graph-handoff-bundle-4"),
-                 _set(("schemaVersion",), "zoop-graph-handoff-bundle-5")]
+                 _set(("schemaVersion",), "zoop-graph-handoff-bundle-5"), _set(("schemaVersion",), "zoop-graph-handoff-bundle-6")]
 VERDICTS = ("issues", 0, "fieldVerdicts")
 VERDICT = (*VERDICTS, 0)
 UNKNOWN_VERDICT = [_set((*VERDICT, "extra"), 1), _set((*VERDICT, "note"), "review prose"), _set((*VERDICT, "evidence"), []), _set((*VERDICT, "notes"), "x"),
@@ -626,17 +627,25 @@ def test_a_supplier_customer_direction_is_relayed_as_the_producer_states_it_and_
 
 
 def test_a_current_answer_in_an_earlier_bundle_schema_is_refused_and_a_legacy_handoff_is_withheld_without_any_old_content(tmp_path, start):
-    """The service knows only `zoop-graph-handoff-bundle-6`: a bundle-1 shaped export (no mentions), a bundle-2 shaped export (mentions, no `fieldProvenance`), a
-    bundle-3 shaped export (provenance, no `fieldVerdicts`/`withheld`), a bundle-4 shaped export (no `pathCompanies`/`structuralPath`/basis scopes) or a bundle-5 shaped
-    export (no `impacts`) is never relayed, and the producer's own withheld answer for a handoff frozen under any of them reaches the caller as a 200 with that reason
-    and nothing of the old receipt."""
+    """The service knows only `zoop-graph-handoff-bundle-7`: a bundle-1 shaped export (no mentions), a bundle-2 shaped export (mentions, no `fieldProvenance`), a
+    bundle-3 shaped export (provenance, no `fieldVerdicts`/`withheld`), a bundle-4 shaped export (no `pathCompanies`/`structuralPath`/basis scopes), a bundle-5 shaped
+    export (no `impacts`) or a bundle-6 shaped export (no issue `summary`, no `policy.issueSummary`) is never relayed, and the producer's own withheld answer for a handoff
+    frozen under any of them reaches the caller as a 200 with that reason and nothing of the old receipt."""
     ws = workspace(tmp_path)
     service = start(workspace=ws)
 
+    def historical(schema: str) -> dict[str, Any]:
+        """The current example as an earlier build froze it: no summary and no summary policy, under `schema`."""
+        b = copy.deepcopy(example_bundle())
+        b["schemaVersion"] = schema
+        del b["policy"]["issueSummary"]
+        for issue in b["issues"]:
+            del issue["summary"]
+        return b
+
     def four() -> dict[str, Any]:
         """A genuine bundle-4 shape: no pathCompanies/structuralPath/scopes, sealed over the HISTORICAL five content lists (never the current-schema seal)."""
-        b = copy.deepcopy(example_bundle())
-        b["schemaVersion"] = "zoop-graph-handoff-bundle-4"
+        b = historical("zoop-graph-handoff-bundle-4")
         del b["pathCompanies"], b["counts"]["pathCompanies"]
         for relation in b["relations"]:
             del relation["structuralPath"]
@@ -646,11 +655,17 @@ def test_a_current_answer_in_an_earlier_bundle_schema_is_refused_and_a_legacy_ha
 
     def five() -> dict[str, Any]:
         """A genuine bundle-5 shape: no impacts/counts.impacts/policy.impacts, sealed over the HISTORICAL six content lists."""
-        b = copy.deepcopy(example_bundle())
-        b["schemaVersion"] = "zoop-graph-handoff-bundle-5"
+        b = historical("zoop-graph-handoff-bundle-5")
         del b["impacts"], b["counts"]["impacts"], b["policy"]["impacts"]
         b["manifestDigest"] = digest(manifest_of(b))
         b["digests"]["content"] = digest({key: b[key] for key in ("companies", "pathCompanies", "issues", "relations", "evidence", "articles")})
+        return b
+
+    def six() -> dict[str, Any]:
+        """A genuine bundle-6 shape: no issue summary and no `policy.issueSummary`, sealed over the same seven content lists."""
+        b = historical("zoop-graph-handoff-bundle-6")
+        b["manifestDigest"] = digest(manifest_of(b))
+        b["digests"]["content"] = digest({key: b[key] for key in ("companies", "pathCompanies", "issues", "relations", "impacts", "evidence", "articles")})
         return b
 
     earlier = (mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-1"), [(issue.pop("mentions"), issue.pop("fieldProvenance"), issue.pop("fieldVerdicts"))
@@ -658,7 +673,7 @@ def test_a_current_answer_in_an_earlier_bundle_schema_is_refused_and_a_legacy_ha
                mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-2"), [(issue.pop("fieldProvenance"), issue.pop("fieldVerdicts")) for issue in b["issues"]])),
                mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-3"), [(issue.pop("fieldVerdicts"), issue["fieldProvenance"].pop("withheld"))
                                                                                        for issue in b["issues"]])),
-               four(), five())
+               four(), five(), six())
     for legacy in earlier:
         serve(ws, legacy)
         for url in (bundle_url(), status_url()):
@@ -871,7 +886,9 @@ def test_the_same_edge_with_two_source_relations_keeps_two_separate_rows_never_a
 # ---- withheld, refused and unreadable answers ----------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("code", ["source_unauthorized", "canonical_mapping_changed", "decisions_changed", "bindings_changed", "review_revision_changed",
-                                  "upstream_changed", "source_pin_missing", "handoff_content_changed", "handoff_contract_changed"])
+                                  "upstream_changed", "source_pin_missing", "handoff_content_changed", "handoff_contract_changed",
+                                  "issue_summary_pin_mismatch", "issue_summary_basis_changed", "issue_summary_issue_not_public",
+                                  "issue_summary_temporal_review_pending", "issue_summary_input_too_large"])
 def test_a_withheld_answer_is_a_200_with_identity_and_a_reason_and_nothing_else(tmp_path, start, code):
     ws = workspace(tmp_path)
     ws.script({"mode": "result", "output": withheld_output(code=code), "exit": 2})
@@ -1053,3 +1070,109 @@ def test_the_handoff_group_does_not_change_the_other_families(tmp_path, start):
     graph = service.request("GET", "/internal/v1/graph-versions/graph-main-1", as_="grapher")
     assert graph.status_code == 409 and graph.json()["schemaVersion"] == "zoop-ai-internal-graph-1"
     assert ws.calls() == []
+
+
+# ---- bundle 7: the issue summary ---------------------------------------------------------------------------------------------------
+
+SUMMARY_OUTCOMES = ("available", "not-requested", "temporal-review-pending", "verifier-hold", "producer-invalid", "verifier-reject")
+SUMMARY_SENTENCE = "합성기업이 2026년 9월 30일 공급 계약을 발표했다."      # the authored claim of the example summary: source-derived text, delivered on the bundle route only
+
+
+@pytest.mark.parametrize("outcome", SUMMARY_OUTCOMES)
+def test_every_summary_outcome_is_relayed_exactly_and_the_relay_neither_asks_for_nor_writes_a_summary(tmp_path, start, outcome):
+    ws = workspace(tmp_path)
+    bundle = serve(ws, example_bundle(outcome))
+    service = start(workspace=ws)
+    before = operator_state(ws)
+    response = get(service, bundle_url())
+    wire = response.json()
+    assert response.status_code == 200 and wire["delivery"]["state"] == "current" and wire["bundle"] == bundle and sha(wire["bundle"]) == wire["verification"]["bundleDigest"]
+    assert wire["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-7" and wire["bundle"]["policy"]["issueSummary"] == "zoop-issue-summary-policy-1"
+    delivered = wire["bundle"]["issues"][0]["summary"]
+    assert delivered == bundle["issues"][0]["summary"] and (SUMMARY_SENTENCE in json.dumps(wire, ensure_ascii=False)) == (outcome == "available")
+    assert (delivered["status"], delivered.get("code")) == (("available", None) if outcome == "available" else ("unavailable", outcome))
+    status = get(service, status_url())
+    assert status.status_code == 200 and not json_keys(status.json()) & SUMMARY_KEYS and SUMMARY_SENTENCE not in json.dumps(status.json(), ensure_ascii=False)
+    assert operator_state(ws) == before                                                           # the relay writes no ledger and no file
+
+
+def test_a_rich_live_summary_over_several_quotes_is_relayed_with_its_provider_identities(tmp_path, start):
+    ws = workspace(tmp_path)
+    bundle = serve(ws, resummarize(with_quotes(live_bundle(), 4)))
+    wire = get(start(workspace=ws), bundle_url()).json()
+    delivered = wire["bundle"]["issues"][0]["summary"]
+    assert wire["bundle"] == bundle and wire["verification"]["provenance"]["executionMode"] == "live"
+    assert (delivered["producer"]["kind"], delivered["verifier"]["kind"]) == ("provider", "independent-verifier") and delivered["producer"]["model"]
+    assert len(delivered["claims"]) == 3 and len(delivered["evidenceIds"]) == 5 and delivered["claims"][2]["evidenceIds"] == delivered["evidenceIds"]
+    assert len(wire["bundle"]["issues"][0]["evidenceIds"]) == 5 and delivered["source"]["basisDigest"] == sha(basis_of(bundle))
+
+
+def _edited_claim(bundle: dict[str, Any]) -> None:
+    claims = issue_summary(bundle)["claims"]
+    claims[0]["text"] = "합성기업이 계약을 취소했다."
+    issue_summary(bundle)["text"] = "\n".join(c["text"] for c in claims)
+
+
+def _live_without_resummary(bundle: dict[str, Any]) -> None:
+    bundle["provenance"].update(executionMode="live", recordingKind="provider")
+    bundle["sources"][0]["provenance"].update(executionMode="live", recordingKind="provider")
+
+
+TAMPERED_SUMMARY = {
+    "tampered-claim": _edited_claim,
+    "tampered-text": lambda b: issue_summary(b).update(text="다른 본문이다."),
+    "tampered-version": lambda b: issue_summary(b).update(resultVersion="isr-" + "0" * 64),
+    "tampered-source": lambda b: issue_summary(b)["source"].update(resultDigest="0" * 64),
+    "hidden-evidence-id": lambda b: issue_summary(b).update(assemble(b, [SUMMARY_SENTENCE], [[HIDDEN_EVIDENCE]])),
+    "side-evidence-id": lambda b: issue_summary(b).update(assemble(b, [SUMMARY_SENTENCE], [[with_side_evidence(b, "geography")]])),
+    "wrong-basis-title": lambda b: b["issues"][0].update(title="합성 공급 계약 (정정)"),
+    "wrong-basis-quote": lambda b: b["evidence"][0].update(quoteSha256="f" * 64),
+    "wrong-basis-extra-quote": lambda b: with_quotes(b, 1),
+    "wrong-provenance-provider-kind-in-replay": lambda b: (issue_summary(b)["producer"].update(kind="provider"), reseal(b)),
+    "wrong-provenance-model-in-replay": lambda b: (issue_summary(b)["producer"].update(model="model-x"), reseal(b)),
+    "wrong-provenance-replay-summary-in-live-bundle": _live_without_resummary,
+    "held-issue-with-text": lambda b: b["issues"][0]["fieldVerdicts"][0].update(decision="HOLD", reasonCode="ambiguous"),
+    "deterministic-code-without-its-condition": lambda b: b["issues"][0].update(summary=summary_of(b, "temporal-review-pending")),
+    "dropped-summary": lambda b: b["issues"][0].pop("summary"),
+    "dropped-policy": lambda b: b["policy"].pop("issueSummary"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(TAMPERED_SUMMARY))
+def test_a_summary_that_does_not_follow_the_decision_table_is_refused_even_when_every_outer_digest_and_pin_matches(tmp_path, start, name):
+    """`mutated` recomputes the manifest and content digests and `serve` lists the pins of THIS bundle, so the producer's receipt, the operator's pins and the bytes all agree:
+    only the closed model's recomputation of the summary can refuse it. Tampered content, hidden evidence ids, a wrong basis and a wrong provenance all end as a 500
+    `runtime_contract_mismatch` with no bundle, no summary text and no digest on either route."""
+    ws = workspace(tmp_path)
+    bundle = serve(ws, mutated(TAMPERED_SUMMARY[name]))
+    service = start(workspace=ws)
+    for url in (bundle_url(), status_url()):
+        response = get(service, url)
+        assert response.status_code == 500 and error_of(response)["code"] == "runtime_contract_mismatch" and error_of(response)["retryable"] is False, (name, url)
+        assert "bundle" not in response.json() and SUMMARY_SENTENCE not in json.dumps(response.json(), ensure_ascii=False) and "KRX:005930" not in response.text
+        assert pins(bundle)["bundleDigest"] not in response.text
+
+
+def test_the_same_edits_with_a_re_pinned_summary_are_delivered_so_the_basis_is_what_binds_it(tmp_path, start):
+    """The negative of the table above: change what the summary rests on and re-derive the summary for it, and the bundle is an ordinary current delivery."""
+    ws = workspace(tmp_path)
+    bundle = serve(ws, resummarize(mutated(lambda b: b["issues"][0].update(title="합성 공급 계약 (정정)"))))
+    wire = get(start(workspace=ws), bundle_url()).json()
+    assert wire["delivery"]["state"] == "current" and wire["bundle"] == bundle and wire["bundle"]["issues"][0]["title"] == "합성 공급 계약 (정정)"
+
+
+def test_a_bundle_6_shaped_export_without_summary_or_policy_is_never_relayed_as_current(tmp_path, start):
+    """A genuine bundle-6 shape (no issue summary, no `policy.issueSummary`, content digest over the same seven lists) is neither upgraded nor relayed: the service knows
+    `-7` only, and an old summary-less bundle is never `not-requested`."""
+    ws = workspace(tmp_path)
+    old = copy.deepcopy(example_bundle())
+    old["schemaVersion"] = "zoop-graph-handoff-bundle-6"
+    del old["policy"]["issueSummary"]
+    del old["issues"][0]["summary"]
+    seal(old)
+    serve(ws, old)
+    service = start(workspace=ws)
+    for url in (bundle_url(), status_url()):
+        response = get(service, url)
+        assert response.status_code == 500 and error_of(response)["code"] == "runtime_contract_mismatch" and "bundle" not in response.json()
+        assert not json_keys(response.json()) & SUMMARY_KEYS and "zoop-graph-handoff-bundle-6" not in response.text and pins(old)["bundleDigest"] not in response.text

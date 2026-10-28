@@ -4,7 +4,9 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import com.zoop.common.json.StrictJson;
+import com.zoop.graph.importer.GraphHandoffResult.RuleFacts;
 import com.zoop.graph.importer.GraphHandoffResult.StoredFileFact;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -72,6 +74,30 @@ final class GraphHandoffResultWriter {
         ObjectNode evidence = root.putObject("evidenceRows");
         evidence.put("registered", staged.evidenceRegistered());
         evidence.put("existing", staged.evidenceExisting());
+        RuleFacts facts = staged.rules();
+        ObjectNode rules = root.putObject("publicationRules");
+        if (facts.ruleRevision() == null) {
+            rules.putNull("ruleRevision");
+        } else {
+            rules.put("ruleRevision", facts.ruleRevision());
+        }
+        rules.put("reviewRevision", facts.reviewRevision());
+        ArrayNode applied = rules.putArray("applied");
+        facts.applied().forEach(applied::add);
+        ObjectNode stored = rules.putObject("stored");
+        stored.put("issues", facts.storedIssues());
+        stored.put("relations", facts.storedRelations());
+        stored.put("articles", facts.storedArticles());
+        stored.put("evidence", facts.storedEvidence());
+        ObjectNode hidden = rules.putObject("hidden");
+        hidden.put("issues", facts.hiddenIssues());
+        hidden.put("relations", facts.hiddenRelations());
+        ObjectNode byRule = rules.putObject("byRule");
+        facts.byRule().forEach((id, hits) -> {
+            ObjectNode node = byRule.putObject(id);
+            node.put("issues", hits.issues());
+            node.put("relations", hits.relations());
+        });
         file(root.putObject("snapshot"), staged.snapshot());
         file(root.putObject("receipt"), staged.receipt());
         return StrictJson.write(root);

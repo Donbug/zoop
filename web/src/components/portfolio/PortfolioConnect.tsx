@@ -1,14 +1,20 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import ErrorNotice from '@/components/common/ErrorNotice';
 import OnboardingStep from '@/components/onboarding/OnboardingStep';
 import {
   connectPortfolio,
   createIdempotencyKey,
   getMockPortfolios,
+  getMockPortfolioPreview,
   getPortfolio,
 } from '@/apis/portfolio/portfolio';
 import { useAsyncData } from '@/hooks/useAsyncData';
-import { formatQuantity, formatWeight } from '@/util/format';
+import {
+  formatKst,
+  formatMoney,
+  formatQuantity,
+  formatWeight,
+} from '@/util/format';
 import type {
   PortfolioConnection,
   PortfolioConnectProps,
@@ -101,6 +107,12 @@ export default function PortfolioConnect({
     (chosenId && items.some((item) => item.id === chosenId)
       ? chosenId
       : items[0]?.id) ?? null;
+  const loadPreview = useCallback(
+    () =>
+      selectedId ? getMockPortfolioPreview(selectedId) : Promise.resolve(null),
+    [selectedId],
+  );
+  const preview = useAsyncData(loadPreview);
   const lookupsReady =
     options.status === 'success' && portfolio.status === 'success';
   const isConnected = Boolean(connected) || Boolean(portfolio.data?.connected);
@@ -259,7 +271,7 @@ export default function PortfolioConnect({
           className="flex items-center gap-2 font-semibold text-gray-950"
         >
           <BankIcon className="size-5 shrink-0" />
-          연결할 가상 계좌
+          가상 계좌 선택
         </h2>
         {(options.status === 'loading' || portfolio.status === 'loading') && (
           <p role="status" className="text-sm text-gray-500">
@@ -315,6 +327,113 @@ export default function PortfolioConnect({
           </ul>
         )}
       </section>
+      {fromOnboarding && selectedId && (
+        <section
+          aria-labelledby="portfolio-preview-heading"
+          className="rounded-xl border border-gray-200 bg-white p-5"
+        >
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <h2
+                id="portfolio-preview-heading"
+                className="font-semibold text-gray-950"
+              >
+                {items.find((item) => item.id === selectedId)?.label}
+              </h2>
+            </div>
+          </div>
+          {preview.status === 'loading' && (
+            <p role="status" className="text-sm text-gray-500">
+              종목과 비중을 불러오고 있어요
+            </p>
+          )}
+          {preview.status === 'error' && (
+            <ErrorNotice
+              title="계좌 미리보기를 불러오지 못했어요"
+              message="계좌 연결은 하지 않았어요. 다시 시도해 주세요."
+              onRetry={preview.reload}
+            />
+          )}
+          {preview.status === 'success' && preview.data && (
+            <>
+              <dl className="mb-3 grid grid-cols-2 gap-2 rounded-lg bg-gray-50 p-3 text-sm">
+                <div>
+                  <dt className="text-xs text-gray-500">계좌 종류</dt>
+                  <dd className="mt-1 font-medium text-gray-900">
+                    모의 주식 계좌
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">예수금</dt>
+                  <dd className="mt-1 font-medium text-gray-900">
+                    {preview.data.cash
+                      ? formatMoney(
+                          preview.data.cash.amount,
+                          preview.data.cash.currency,
+                        )
+                      : '미제공'}
+                  </dd>
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-xs text-gray-500">평가 기준</dt>
+                  <dd className="mt-1 text-gray-700">
+                    {preview.data.valuation.currency
+                      ? `${preview.data.valuation.currency} · `
+                      : ''}
+                    {formatKst(preview.data.valuation.calculatedAt)}
+                  </dd>
+                </div>
+              </dl>
+              {preview.data.holdings.length === 0 ? (
+                <p className="text-sm text-gray-500">보유 종목이 없어요.</p>
+              ) : (
+                <ul
+                  aria-label="미리보기 보유 종목"
+                  className="divide-y divide-gray-100"
+                >
+                  {preview.data.holdings.map((holding) => (
+                    <li
+                      key={holding.companyId}
+                      className="flex items-center justify-between gap-3 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-gray-950">
+                          {holding.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {[holding.ticker, formatQuantity(holding.quantity)]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right text-sm">
+                        <p className="font-medium text-gray-900">
+                          {holding.marketValue !== null &&
+                          holding.quote.status === 'available'
+                            ? formatMoney(
+                                holding.marketValue,
+                                holding.quote.currency,
+                              )
+                            : '평가 금액 미제공'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatWeight(holding.weight)}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {preview.data.valuation.weightUnavailableReason && (
+                <p className="mt-2 text-xs text-gray-500">
+                  비중을 계산할 수 없어요:{' '}
+                  {preview.data.valuation.weightUnavailableReason}
+                </p>
+              )}
+            </>
+          )}
+        </section>
+      )}
     </OnboardingStep>
   );
 }

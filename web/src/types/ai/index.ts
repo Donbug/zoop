@@ -63,7 +63,8 @@ export type ChatAnswerSection = {
 };
 
 export type ChatCitation = {
-  sourceKind: 'article' | 'zoop_doc';
+  /** company_profile: ZOOP's reviewed company catalog text; docId is the company id. */
+  sourceKind: 'article' | 'zoop_doc' | 'company_profile';
   evidenceId: string;
   quote: string;
   articleId: string | null;
@@ -108,6 +109,7 @@ export type ChatLimitationKind =
   | 'investment_advice'
   | 'precondition_unmet'
   | 'results_truncated'
+  | 'not_in_member_scope'
   | 'evidence_insufficient'
   | 'out_of_scope';
 
@@ -173,3 +175,19 @@ export type ChatSession = { id: string; createdAt: string; jobs: number };
 export type ChatConversation = { session: ChatSession; jobs: ChatJob[] };
 
 export type ChatCurrentResponse = { conversation: ChatConversation | null };
+
+/** listConversations 한 항목. title은 첫 질문(100자 초과 시 잘림), updatedAt은 마지막으로 질문한 시각. */
+export type ChatConversationSummary = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  jobs: number;
+};
+
+/** deleteEnabled가 거짓이면 서버가 삭제를 열지 않았다(처리방침·약관 개정 전): 삭제를 보여 주지 않는다. */
+export type ChatConversationList = {
+  items: ChatConversationSummary[];
+  nextCursor: string | null;
+  deleteEnabled: boolean;
+};

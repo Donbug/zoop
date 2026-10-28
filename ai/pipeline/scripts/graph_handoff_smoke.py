@@ -7,10 +7,13 @@
 
 Two S2 jobs (two events, one frozen snapshot event with two documents) and two S3 jobs are authored replay: no model, no provider, no original PoC state,
 no network (every CLI subprocess runs under a socket audit hook). Expectations are written by hand from the authored world, never derived from the
-planner under test. `--write-fixture DIR` additionally writes the valid export envelope (bundle `-6`, no operator verdict, default `not-proposed` impact rows), the real export of a `rich` impact world, the real exports of a hand-reviewed SYNTHETIC world
+planner under test. `--write-fixture DIR` additionally writes the valid export envelope (bundle `-7`, no operator verdict, default `not-proposed` impact rows, `not-requested` summaries), the real export of a `rich` impact world, the real exports of a hand-reviewed SYNTHETIC world
 (`export-field-verdicts.json`, handoff `handoff-verdicts-1`, also importable through `verdict_export`) and of a time-withheld one (`export-field-verdicts-time.json`), the
 hand-written expected original mentions (`expected-mentions.json`), field provenance (`expected-field-provenance.json`), verdicts (`expected-field-verdicts.json`) and public
 headline values (`expected-headline-values.json`), the real withheld envelope of a handoff frozen under an earlier bundle schema and negative fixtures the backend import can be tested with.
+The issue-summary world (`export-summary.json`: an available summary and a deterministic `temporal-review-pending`; `export-summary-withheld.json`: a `verifier-hold` job result and `not-requested`; the hand-written
+`expected-summaries.json` of every export and one rule broken per `bundle-summary-NN.json`) pins REAL authored-replay `zoop-ai-issue-summary` job results in the decisions and freezes them with
+`--issue-summary-state-dir`; the export never opens that ledger and no model or provider is called.
 Without `--write-package` fresh owned state is always removed; the source ledgers must be byte-identical after every command.
 
 `--write-package DIR` builds the same authored world (synthetic company ids SYNTH:000001/SYNTH:000002) directly in the NEW directory DIR, freezes ONE handoff
@@ -41,6 +44,9 @@ from scripts.extraction_smoke import page  # noqa: E402
 from scripts.relation_smoke import RelKit, SUP, INV, co, converge, ev, find, impact_item, impact_verifier_reply, proposal, tree, world_cite  # noqa: E402
 from zoop_ai_pipeline.graph_projection import review_state  # noqa: E402
 from zoop_ai_pipeline.handoff_contracts import POLICY, app_evidence_id, content_digest  # noqa: E402
+from zoop_ai_pipeline.issue_summary import producer_payload, verifier_payload  # noqa: E402
+from zoop_ai_pipeline.issue_summary_contracts import summary_basis  # noqa: E402
+from zoop_ai_pipeline.issue_summary_prompts import claims_from  # noqa: E402
 from zoop_ai_pipeline.ingestion_contracts import canonical, digest  # noqa: E402
 
 CUSTOM = {"PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1"}
@@ -99,9 +105,40 @@ ORIGINS = {"a": ORIGIN_SHARED, "a2": ORIGIN_SHARED}                             
 
 # ---------------------------------------------------------------- the authored world (also used by the unit tests) -----------------
 
+UNCITED_SOURCE = "synthetic-source-uncited"          # the source (and grant) document a2 is ingested under in the issue-summary worlds
+
+
+def uncited_source_entry(base: dict) -> dict:
+    """A second registry source: a copy of the world's only source under its OWN source id and its OWN grant, so one grant can be revoked while the other stays."""
+    return {**base, "sourceId": UNCITED_SOURCE, "grant": {**base["grant"], "grantId": "operator-grant-uncited", "sourceId": UNCITED_SOURCE}}
+
+
+def ingest_in_source(kit, name: str, document: dict, source_id: str) -> dict:
+    """`Kit.ingest` for ONE document under another source id (its checkpoint starts at revision 0): the exact observation ref."""
+    item = kit.item("c0", document["supplier"], f"https://example.invalid/{name}/0", ref="d0", publisher=document.get("publisher"))
+    item["publishedAt"] = document.get("published", "2026-10-08T00:00:00+00:00")
+    manifest = kit.manifest(name, [[item]], bodies={"d0": document["html"]})
+    payload = json.loads(manifest.read_bytes())
+    payload["sourceId"] = source_id
+    manifest.write_bytes(json_bytes(payload))
+    request = {**kit.request(manifest, f"round-{name}", 0), "sourceId": source_id}
+    result = kit.cli("run", request, state="ingestion", manifest=manifest)
+    assert result["state"] == "complete" and result["counts"]["textReady"] == 1, result
+    ref = result["documentRefs"][0]
+    return {"roundId": request["roundId"], "sourceId": source_id, "page": ref["page"], "ordinal": ref["ordinal"], "documentId": ref["documentId"],
+            "rawVersion": ref["rawVersion"], "documentVersion": ref["documentVersion"]}
+
+
+def set_grant(world, source_id: str, enabled: bool) -> None:
+    """Revoke or restore the grant of ONE source of the world's registry (the other sources are untouched)."""
+    registry = json.loads(world.kit.registry_path.read_text())
+    next(source for source in registry["sources"] if source["sourceId"] == source_id)["grant"]["enabled"] = enabled
+    world.kit.registry_path.write_bytes(json_bytes(registry))
+
+
 def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a2_countries: tuple = ("KR",), dated: bool = False,
                 valid_from: str | None = "2026-01-01", valid_until: str | None = "2026-12-31", event_time: str | None = "2026-09-30",
-                a2_event_time=SAME, snapshot_differs: bool = False, approve: bool = False, chain: bool = False, impact: str | None = None) -> SimpleNamespace:
+                a2_event_time=SAME, snapshot_differs: bool = False, approve: bool = False, chain: bool = False, impact: str | None = None, uncited_source: bool = False) -> SimpleNamespace:
     """The authored world. Variants (each is a REAL ingestion + S2 + S3 world, used by the integrity regressions):
     collide: the two documents of snapshot event-a use the SAME local mention id (S2 scopes member identity by documentVersion + mentionId, so this is legal);
     a2_differs: the second member's title differs (a metadata conflict unless the operator picks a representative); a2_countries: its country field;
@@ -117,12 +154,21 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
     impact: `verified` (rel-a's participation: a verified POSITIVE impact over its own sentence plus an uncited sentence of document a; rel-b's participation in `event-a`: a verified
     NEGATIVE one on the SAME supply edge; the factory participation: `no-evidence`, plus an off-target company that is never exported) or `rejected` (the verifier contradicts the
     target of rel-a's impact, finds rel-b's `event-a` target insufficient, and the factory impact cites a document outside the relation); default none: every impact stage is complete
-    with no candidate (`not-proposed`)."""
+    with no candidate (`not-proposed`).
+    uncited_source: document a2 is ingested under its OWN source id and grant (`UNCITED_SOURCE`), so revoking that grant alone removes one article of the supply issue's summary basis."""
     kit = RelKit(root)
     valid_text = validity_sentence(valid_from, valid_until) if dated else None
-    d1, d2, d3 = kit.ingest("docs", [{"supplier": "supplier-a", "html": page(SUP, INV, EVT_A, GEO_A, *((CHAIN,) if chain else ())), "publisher": PUBLISHERS["a"]},
-                                     {"supplier": "supplier-a2", "html": page(EVT_A2)},
-                                     {"supplier": "supplier-b", "html": page(QB, GEO_B, QB3, *((valid_text,) if valid_text else ())), "published": None}])
+    docs = [{"supplier": "supplier-a", "html": page(SUP, INV, EVT_A, GEO_A, *((CHAIN,) if chain else ())), "publisher": PUBLISHERS["a"]},
+            {"supplier": "supplier-a2", "html": page(EVT_A2)},
+            {"supplier": "supplier-b", "html": page(QB, GEO_B, QB3, *((valid_text,) if valid_text else ())), "published": None}]
+    if uncited_source:
+        kit.registry["sources"].append(uncited_source_entry(kit.registry["sources"][0]))
+        kit.save_registry()
+        # a and b are the SAME article versions the standard world registers (the app keeps one row per documentId+version, URL included): b keeps the URL it has there (`docs/2`).
+        d1, d3 = kit.ingest("docs", [docs[0], {**docs[2], "url": "https://example.invalid/docs/2"}])
+        d2 = ingest_in_source(kit, "docs-a2", docs[1], UNCITED_SOURCE)
+    else:
+        d1, d2, d3 = kit.ingest("docs", docs)
     refs = {"a": d1, "a2": d2, "b": d3}
     art = {name: kit.article(ref) for name, ref in refs.items()}
     m_a = {**kit.mention(art["a"], "m-a", [kit.evidence(art["a"], EVT_A)], event_time=event_time), "countries": ["KR"], "participants": [ISSUER, SUPPLIER, UNKNOWN]}
@@ -242,16 +288,17 @@ def origins_doc(world, declared: dict) -> list:
             "decisionRef": f"origin-2026-10-21:{name}", "decisionVersion": "o1"} for name, origin in sorted(declared.items())]
 
 
-def decisions_doc(world, *, verdicts: dict | None = None, published_time=UNSET, origins=UNSET) -> dict:
+def decisions_doc(world, *, verdicts: dict | None = None, published_time=UNSET, origins=UNSET, summaries: dict | None = None) -> dict:
     """The operator's public decisions. `verdicts` maps a canonical issue id to its per-field verdict entries (`field_verdict`); an issue without an entry has none.
     `published_time` is the supply issue's public event time the structural attestation was reviewed against (None: a time verdict withheld it). `origins` maps a document
-    name to its declared origin id (default `ORIGINS`: a and a2 share one origin, b declares none)."""
-    verdicts = verdicts or {}
+    name to its declared origin id (default `ORIGINS`: a and a2 share one origin, b declares none). `summaries` maps a canonical issue id to the operator's PIN of one produced issue-summary
+    result (`{jobId, inputDigest, resultDigest}`); an issue without one has `summary: null`."""
+    verdicts, summaries = verdicts or {}, summaries or {}
     job = "rel-b" if getattr(world, "dated", False) else "rel-a"        # the dated world's structural basis is the SUPPLIES relation whose validity lives in document b
     r = find(world.jobs[job], "SUPPLIES", "SYNTH-3", "SYNTH-1")
     comparison = next(c for c in next(x for x in world.s2["b"]["eventCandidates"] if x["eventCandidateId"] == world.evc["b"])["comparisons"]
                       if c["targetEventId"] == "event-a")
-    return {"schemaVersion": "zoop-public-decisions-2", "policyVersion": POLICY,
+    return {"schemaVersion": "zoop-public-decisions-3", "policyVersion": POLICY,
             "companies": [{"canonicalId": "co:synth-1", "publicId": "KRX:005930", "label": "합성기업", "decisionRef": "catalog-2026-10-16:1"},
                           {"canonicalId": "co:synth-3", "publicId": "KRX:000660", "label": "합성부품", "decisionRef": "catalog-2026-10-16:3"}],
             "issues": [{"canonicalId": "issue:supply", "publicId": "issue:supply-2026q3", "decisionRef": "issue-2026-10-16:supply",
@@ -260,14 +307,15 @@ def decisions_doc(world, *, verdicts: dict | None = None, published_time=UNSET, 
                         "representative": {"upstream": upstream(world, "a"), "kind": "event-candidate", "ref": world.evc["a"], "mentionId": "m-a",
                                            "documentId": world.refs["a"]["documentId"], "documentVersion": world.refs["a"]["documentVersion"],
                                            "observation": {k: world.refs["a"][k] for k in ("roundId", "sourceId", "page", "ordinal", "documentId", "rawVersion", "documentVersion")}},
-                        "fieldVerdicts": verdicts.get("issue:supply", [])},
+                        "fieldVerdicts": verdicts.get("issue:supply", []), "summary": summaries.get("issue:supply")},
                        {"canonicalId": "issue:factory", "publicId": "issue:factory-2026q4", "decisionRef": "issue-2026-10-16:factory",
                         "geography": {"classification": "international", "countries": ["US"], "evidence": [span(world, "b", GEO_B)],
                                       "decisionRef": "geo-2026-10-16:factory", "decisionVersion": "g1"}, "representative": None,
-                        "fieldVerdicts": verdicts.get("issue:factory", [])},
+                        "fieldVerdicts": verdicts.get("issue:factory", []), "summary": summaries.get("issue:factory")},
                        {"canonicalId": "issue:overseas", "publicId": "issue:overseas-2026q4", "decisionRef": "issue-2026-10-16:overseas",
                         "geography": {"classification": "domestic", "countries": ["KR"], "evidence": [span(world, "b", QB3)],
-                                      "decisionRef": "geo-2026-10-16:overseas", "decisionVersion": "g1"}, "representative": None, "fieldVerdicts": []}],
+                                      "decisionRef": "geo-2026-10-16:overseas", "decisionVersion": "g1"}, "representative": None, "fieldVerdicts": [],
+                        "summary": summaries.get("issue:overseas")}],
             "structural": [{"issue": "issue:supply", "company": "co:synth-3", "basis": [{"jobId": job, "relationCandidateId": r["relationCandidateId"]}],
                             "applicability": {"status": "operator-asserted", "reviewer": REVIEWER, "decisionRef": "applic-2026-10-16:1", "decisionVersion": "v1",
                                               "bindingDigest": structural_binding(world, job=job, published_time=published_time)}}],
@@ -405,11 +453,11 @@ def observation_docs(world) -> dict:
     return {"canonical": {"schemaVersion": "zoop-graph-canonical-1", "entries": [
                 {"upstream": up, "kind": "company", "ref": "SYNTH-1", "canonicalId": "co:synth-1", "decisionRef": "canon-2026-10-16:company"},
                 {"upstream": up, "kind": "event", "ref": "event-y", "canonicalId": "issue:y", "decisionRef": "canon-2026-10-16:event"}]},
-            "decisions": {"schemaVersion": "zoop-public-decisions-2", "policyVersion": POLICY,
+            "decisions": {"schemaVersion": "zoop-public-decisions-3", "policyVersion": POLICY,
                           "companies": [{"canonicalId": "co:synth-1", "publicId": "KRX:005930", "label": "합성기업", "decisionRef": "catalog-2026-10-16:1"}],
                           "issues": [{"canonicalId": "issue:y", "publicId": "issue:y-2026q3", "decisionRef": "issue-2026-10-16:y",
                                       "geography": {"classification": "domestic", "countries": ["KR"], "evidence": [span(world, "y1", GEO_Y)],
-                                                    "decisionRef": "geo-2026-10-16:y", "decisionVersion": "g1"}, "representative": None, "fieldVerdicts": []}],
+                                                    "decisionRef": "geo-2026-10-16:y", "decisionVersion": "g1"}, "representative": None, "fieldVerdicts": [], "summary": None}],
                           "structural": [], "follows": [], "origins": []},
             "bindings": {"schemaVersion": "zoop-app-document-bindings-1", "bindings": [
                 {"documentId": ref["documentId"], "documentVersion": ref["documentVersion"], "articleId": ref["documentId"], "articleVersion": ref["documentVersion"],
@@ -782,8 +830,9 @@ class Operator:
         self.state = self.root / "handoff"
         self.outputs: list[str] = []
 
-    def cli(self, command: str, request: dict, *, expected: int = 0, hook: str | None = None, state: Path | None = None, absent: bool = False):
-        """`absent`: every source ledger, grant registry and operator file path names something that does not exist (a command that touches any of them fails)."""
+    def cli(self, command: str, request: dict, *, expected: int = 0, hook: str | None = None, state: Path | None = None, absent: bool = False, summaries: Path | None = None):
+        """`absent`: every source ledger, grant registry and operator file path names something that does not exist (a command that touches any of them fails). `summaries`: the issue-summary
+        ledger given as `--issue-summary-state-dir` (a freeze whose decisions pin a produced summary result needs it; no other command may be given it)."""
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()), "LANG": "en_US.UTF-8", **ownership_env(), **CUSTOM}
         program = GUARD + (HOOKS[hook] if hook else "") + "runpy.run_module('zoop_ai_pipeline.handoff_cli', run_name='__main__')\n"
         argv = [sys.executable, "-c", program, command, "--state-dir", str(state or self.state)]
@@ -792,6 +841,8 @@ class Operator:
             argv += ["--relation-state-dir", str(base / "relation"), "--extraction-state-dir", str(base / "extraction"),
                      "--ingestion-state-dir", str(base / "ingestion"), "--sources", str(base / "sources.json" if absent else self.world.kit.registry_path),
                      "--canonical", str(base / "canonical.json"), "--decisions", str(base / "decisions.json"), "--bindings", str(base / "bindings.json")]
+        if summaries is not None:
+            argv += ["--issue-summary-state-dir", str(summaries)]
         child = subprocess.run(argv, input=json_bytes(request), stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=PIPELINE, timeout=300)
         text = child.stdout.decode()
         self.outputs.append(text)
@@ -931,7 +982,7 @@ def check_chain_export(world, bundle: dict, middle: str) -> None:
     """The chain world's export equals the hand-written expectation: published companies, private path companies, every edge's ordered path with directed links,
     the S3 scopes copied exactly, the unchanged edge id formula and the participants the bundle does not publish."""
     want = expected_chain(middle)
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-6"
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7"
     assert [c["id"] for c in bundle["companies"]] == want["companies"] and bundle["pathCompanies"] == want["pathCompanies"], (middle, bundle["pathCompanies"])
     assert not {c["id"] for c in bundle["pathCompanies"]} & ({c["id"] for c in bundle["companies"]} | {i["id"] for i in bundle["issues"]})
     assert bundle["counts"]["companies"] == len(want["companies"]) and bundle["counts"]["pathCompanies"] == len(want["pathCompanies"]), bundle["counts"]
@@ -1035,18 +1086,27 @@ BUNDLE_2 = "zoop-graph-handoff-bundle-2"           # before field provenance: `m
 BUNDLE_3 = "zoop-graph-handoff-bundle-3"           # before field verdicts: `fieldProvenance` without `withheld`, no issue `fieldVerdicts`
 BUNDLE_4 = "zoop-graph-handoff-bundle-4"           # before structural paths: no `pathCompanies`, `structuralPath` or basis scopes
 BUNDLE_5 = "zoop-graph-handoff-bundle-5"           # before impacts: no `impacts`, `counts.impacts` or `policy.impacts`
+BUNDLE_6 = "zoop-graph-handoff-bundle-6"           # before issue summaries: no issue `summary`, no `policy.issueSummary`
 LEGACY_AT = "2026-10-15T00:00:00+00:00"
 LEGACY_CODE = "handoff_contract_changed"
 
 
 def legacy_bundle(bundle: dict, manifest: dict, schema: str) -> dict:
-    """The bundle an earlier build froze for this manifest: today's export under that build's schema string, without what that build did not yet write. `-5` has no top-level
-    `impacts`, `counts.impacts` or `policy.impacts` (and its content digest does not cover them); `-4` has no top-level
+    """The bundle an earlier build froze for this manifest: today's export under that build's schema string, without what that build did not yet write. `-6` has no issue `summary`
+    and no `policy.issueSummary` (its content digest already covered the seven collections); `-5` also has no top-level `impacts`, `counts.impacts` or `policy.impacts` (and its content
+    digest does not cover them); `-4` has no top-level
     `pathCompanies`, no relation `structuralPath`, no basis `businessScope`/`productScope` and no `counts.pathCompanies`; `-3` also has no issue `fieldVerdicts` and no
     `fieldProvenance.withheld`; `-2` has no `fieldProvenance` either; `-1` has none of them nor the issues' `mentions`. The content digest is recomputed over the earlier
     collections (its formula never included `pathCompanies`)."""
-    assert schema in (BUNDLE_1, BUNDLE_2, BUNDLE_3, BUNDLE_4, BUNDLE_5), schema
+    assert schema in (BUNDLE_1, BUNDLE_2, BUNDLE_3, BUNDLE_4, BUNDLE_5, BUNDLE_6), schema
     old = json.loads(json.dumps(bundle))
+    for issue in old["issues"]:
+        del issue["summary"]                                                        # `-7` added the closed per-issue summary and its policy literal
+    del old["policy"]["issueSummary"]
+    if schema == BUNDLE_6:
+        old.update(schemaVersion=schema, handoffId=manifest["handoffId"], manifestDigest=digest(manifest))
+        old["digests"]["content"] = content_digest(old)
+        return old
     del old["impacts"], old["counts"]["impacts"], old["policy"]["impacts"]          # `-6` added the receipt-only impact rows, their count and policy literal
     if schema == BUNDLE_5:
         old.update(schemaVersion=schema, handoffId=manifest["handoffId"], manifestDigest=digest(manifest))
@@ -1155,8 +1215,9 @@ def legacy_history(world, exported: dict) -> tuple[str, dict]:
                                                          ("legacy-ready-3", BUNDLE_3, "ready", "written"), ("legacy-reserved-3", BUNDLE_3, "reserved", "missing"),
                                                          ("legacy-ready-4", BUNDLE_4, "ready", "written"), ("legacy-reserved-4", BUNDLE_4, "reserved", "missing"),
                                                          ("legacy-failed-4", BUNDLE_4, "failed", "garbage"), ("legacy-ready-5", BUNDLE_5, "ready", "written"),
-                                                         ("legacy-reserved-5", BUNDLE_5, "reserved", "missing"))}
-    assert {row["receipt"]["bundleSchema"] for row in planted.values()} == {BUNDLE_1, BUNDLE_2, BUNDLE_3, BUNDLE_4, BUNDLE_5}
+                                                         ("legacy-reserved-5", BUNDLE_5, "reserved", "missing"), ("legacy-ready-6", BUNDLE_6, "ready", "written"),
+                                                         ("legacy-reserved-6", BUNDLE_6, "reserved", "missing"))}
+    assert {row["receipt"]["bundleSchema"] for row in planted.values()} == {BUNDLE_1, BUNDLE_2, BUNDLE_3, BUNDLE_4, BUNDLE_5, BUNDLE_6}
     os.chmod(state, 0o755)
     for path in (state / "bundles", *(state / "bundles").iterdir(), state / "handoff.sqlite3", state / "handoff.lock"):
         os.chmod(path, 0o755 if path.is_dir() else 0o644)
@@ -1180,7 +1241,7 @@ def legacy_history(world, exported: dict) -> tuple[str, dict]:
     for name, row in planted.items():
         seen = operator.cli("inspect", operator.sel(name), expected=2, state=state)
         assert seen["receipt"] == row["receipt"] and seen["attempts"] == row["attempts"] and seen["state"] == row["state"], seen
-    return ("earlier-schema history (`-3` ready/reserved rows, `-2` ready/reserved/failed rows and a `-1` ready row): inspect shows the stored receipt and attempts (next null, withheld handoff_contract_changed), "
+    return ("earlier-schema history (`-6`, `-5`, `-4` and `-3` ready/reserved rows, `-2` ready/reserved/failed rows and a `-1` ready row): inspect shows the stored receipt and attempts (next null, withheld handoff_contract_changed), "
             "export is withheld, recover and a same-id freeze are refused, all from the ledger alone with no source/operator file/artifact read; bytes, modes and mtimes unchanged; "
             "a new handoff id still freezes and exports"), withheld
 
@@ -1231,10 +1292,16 @@ def invalid_review_files(operator: Operator, world) -> str:
     old["schemaVersion"] = "zoop-public-decisions-1"
     for issue in old["issues"]:
         del issue["fieldVerdicts"]
-    for name, doc in (("missing-list", missing), ("earlier-schema", old)):
+    before_summaries = reviewed(world)                       # the earlier decisions schema (-2): the same file without the per-issue `summary` pin
+    before_summaries["schemaVersion"] = "zoop-public-decisions-2"
+    for issue in before_summaries["issues"]:
+        del issue["summary"]
+    no_pin_key = reviewed(world)
+    del no_pin_key["issues"][0]["summary"]
+    for name, doc in (("missing-list", missing), ("earlier-schema", old), ("decisions-2", before_summaries), ("missing-summary-pin", no_pin_key)):
         write_operator(world, decisions=doc)
         assert operator.cli("freeze", manifest_doc(world, f"invalid-{name}", file_hashes(world.root)), expected=2)["error"]["code"] == "decisions_invalid", name
-    return "malformed review files are refused whole (decisions_invalid, nothing frozen): duplicate (mention, field), ALLOW without a span, HOLD/unstated with a span, REJECT/stated, HOLD/ambiguous without a span, free-text note, null value, unjudgeable field, 21 spans, lowercase decision, missing verdict list, earlier decisions schema"
+    return "malformed review files are refused whole (decisions_invalid, nothing frozen): duplicate (mention, field), ALLOW without a span, HOLD/unstated with a span, REJECT/stated, HOLD/ambiguous without a span, free-text note, null value, unjudgeable field, 21 spans, lowercase decision, missing verdict list, earlier decisions schemas (-1 and -2), missing summary pin key"
 
 
 def unbindable_reviews(operator: Operator, world) -> str:
@@ -1287,7 +1354,7 @@ def verdict_export(root: Path, public_ids: dict | None = None) -> tuple[SimpleNa
     out = freeze_export(Operator(world), world, VERDICT_HANDOFF, decisions)
     bundle = out["bundle"]
     ids = {name: evidence_id(world, name, quote) for name, quote in (("a", PERIOD_A), ("a2", PERIOD_A2), ("b", PERIOD_B))}
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-6" and bundle["handoffId"] == VERDICT_HANDOFF
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["handoffId"] == VERDICT_HANDOFF
     assert {i["id"]: i["fieldVerdicts"] for i in bundle["issues"]} == expected_verdicts(world, cases)
     assert {i["id"]: i["fieldProvenance"] for i in bundle["issues"]} == expected_field_provenance(world, VERDICT_WITHHELD)
     assert {i["id"]: i["mentions"] for i in bundle["issues"]} == expected_mentions(world, public_ids), "an original mention value was changed by a verdict"
@@ -1320,7 +1387,7 @@ def approved_export(root: Path, public_ids: dict | None = None) -> tuple[SimpleN
         company["publicId"] = (public_ids or {}).get(company["publicId"], company["publicId"])
     out = freeze_export(Operator(world), world, APPROVED_HANDOFF, decisions)
     bundle = out["bundle"]
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-6" and bundle["handoffId"] == APPROVED_HANDOFF
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["handoffId"] == APPROVED_HANDOFF
     check_export(world, out, public_ids)
     kinds = sorted(u["approvalBasis"]["kind"] for s in bundle["sources"] for u in s["reviewUsed"])
     assert kinds == ["automatic-verifier", "automatic-verifier", "operator-final-approval", "operator-final-approval"], kinds
@@ -1343,7 +1410,7 @@ def impact_export(root: Path, public_ids: dict | None = None) -> tuple[SimpleNam
         company["publicId"] = (public_ids or {}).get(company["publicId"], company["publicId"])
     out = freeze_export(Operator(world), world, IMPACT_HANDOFF, decisions)
     bundle = out["bundle"]
-    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-6" and bundle["handoffId"] == IMPACT_HANDOFF
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["handoffId"] == IMPACT_HANDOFF
     check_export(world, out, public_ids)
     assert sorted(((r["status"], r["code"]) for r in bundle["impacts"]), key=repr) == sorted(RICH_STATUSES, key=repr), [(r["status"], r["code"]) for r in bundle["impacts"]]
     assert len({r["edgeId"] for r in bundle["impacts"] if r["issueId"] == "issue:supply-2026q3"}) == 1 and sum(r["issueId"] == "issue:supply-2026q3" for r in bundle["impacts"]) == 4
@@ -1586,6 +1653,297 @@ def field_verdicts(root: Path) -> tuple[list, SimpleNamespace]:
 
 
 
+# ---------------------------------------------------------------- issue summaries (bundle -7) ------------------------------------
+
+SUMMARY_HANDOFF = "handoff-summary-1"
+SUMMARY_WITHHELD_HANDOFF = "handoff-summary-withheld-1"
+SUPPLY, FACTORY = "issue:supply-2026q3", "issue:factory-2026q4"
+# The authored summary of the supply issue: ONE hand-written Korean claim that cites only the quote of document a. The issue's second mention (document a2, another article under its own
+# source and grant) is NOT cited, yet the summary rests on it too: the model saw both quotes, so the basis, the pin and the rights all cover the uncited article. SYNTHETIC: nothing here
+# is a real model's output, and no claim repeats a source sentence.
+SUMMARY_CLAIMS = (("합성기업이 공급 계약을 발표했다.", "a", EVT_A),)
+UNCITED = ("a2", EVT_A2)                          # the document and quote of the supply issue's mention that no claim cites
+PENDING = {"status": "unavailable", "code": "temporal-review-pending", "pinned": False}
+NOT_REQUESTED = {"status": "unavailable", "code": "not-requested", "pinned": False}
+
+
+def summary_cli(world, command: str, request: dict, *, fixture: Path | None = None, expected: int = 0, state: Path | None = None):
+    """The installed `zoop-ai-issue-summary` in a child process under the same network guard as the handoff CLI: authored replay only, no key and no model."""
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()), "LANG": "en_US.UTF-8", **ownership_env(), **CUSTOM}
+    program = GUARD + "runpy.run_module('zoop_ai_pipeline.issue_summary_cli', run_name='__main__')\n"
+    argv = [sys.executable, "-c", program, command, "--state-dir", str(state or world.root / "summary")]
+    if command in {"submit", "run", "resume", "inspect", "export"}:               # the commands that consult sources and rights; `cancel` and `live-binding` take none
+        root = world.root
+        argv += ["--relation-state-dir", str(root / "relation"), "--extraction-state-dir", str(root / "extraction"), "--ingestion-state-dir", str(root / "ingestion"),
+                 "--sources", str(world.kit.registry_path), "--canonical", str(root / "canonical.json"), "--decisions", str(root / "decisions.json"),
+                 "--bindings", str(root / "bindings.json")]
+    if fixture is not None:
+        argv += ["--fixture", str(fixture)]
+    child = subprocess.run(argv, input=json_bytes(request), stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=PIPELINE, timeout=300)
+    text = child.stdout.decode()
+    assert child.returncode == expected, (command, child.returncode, text[:2000], child.stderr.decode()[-2000:])
+    assert not child.stderr, child.stderr.decode()[-2000:]
+    return json.loads(text)
+
+
+def summary_fixture(world, bundle: dict, issue_id: str, claims: tuple, decisions: list) -> dict:
+    """The authored replay fixture of one summary job: the model reply (the hand-written `claims`, each citing the positional label of its quote) and the independent verifier's
+    answer (one hand-written decision per claim, no advice, no unsupported causality, no background-as-current), each keyed by the digest of the exact native stage payload.
+    The basis is the pure `summary_basis` of the UNPINNED export; the quoted texts are sliced from the authored documents by the bundle's own evidence offsets."""
+    issue = next(i for i in bundle["issues"] if i["id"] == issue_id)
+    evidence = {e["id"]: e for e in bundle["evidence"]}
+    articles = {(a["articleId"], a["articleVersion"]): a for a in bundle["articles"]}
+    basis = summary_basis(issue, evidence, articles)
+    name_of = {ref["documentId"]: name for name, ref in world.refs.items()}          # the authored bindings give an article the id of its document
+    texts = {q["evidenceId"]: world.art[name_of[q["articleId"]]].body[q["start"]:q["end"]] for q in basis["quotes"]}
+    payload = producer_payload(basis, texts)
+    labels = {q["evidenceId"]: f"q{n}" for n, q in enumerate(basis["quotes"], 1)}
+    reply = {"claims": [{"text": text, "quoteIds": [labels[evidence_id(world, name, quote)]]} for text, name, quote in claims]}
+    produced = claims_from(reply, payload)
+    verdict = {"claims": [{"claimId": c["claimId"], "decision": d, "reason": "authored"} for c, d in zip(produced, decisions)],
+               "prohibitedAdvice": "absent", "unsupportedCausality": "absent", "backgroundAsCurrent": "absent"}
+    return {"format": "zoop-issue-summary-fixture-1", "synthetic": True, "recordingKind": "authored-test",
+            "records": [{"stage": "issue-summary", "requestDigest": digest(payload), "response": reply},
+                        {"stage": "verify-issue-summary", "requestDigest": digest(verifier_payload(payload, produced)), "response": verdict}]}
+
+
+def expected_available(world) -> dict:
+    """Hand-written part of the supply issue's available summary that no digest, time or job id decides."""
+    claims = [{"claimId": f"c{n}", "text": text, "evidenceIds": [evidence_id(world, name, quote)]} for n, (text, name, quote) in enumerate(SUMMARY_CLAIMS, 1)]
+    return {"status": "available", "pinned": True, "text": "\n".join(text for text, _, _ in SUMMARY_CLAIMS), "claims": claims,
+            "evidenceIds": sorted(c["evidenceIds"][0] for c in claims), "language": "ko", "producerKind": "authored-replay", "verifierKind": "authored-replay"}
+
+
+def check_summary_part(summary: dict, want: dict) -> None:
+    """One issue's exported `summary` equals the hand-written expectation (see `expected_summaries`): status/code, pinned or not, and for an available one the text, claims,
+    evidence union, language and the two kinds."""
+    assert summary["status"] == want["status"], (summary, want)
+    assert (summary["source"] is not None) == want["pinned"], (summary, want)
+    if want["status"] == "unavailable":
+        assert set(summary) == {"status", "code", "source"} and summary["code"] == want["code"], (summary, want)
+        return
+    for key in ("text", "claims", "evidenceIds", "language"):
+        assert summary[key] == want[key], (key, summary[key], want[key])
+    assert summary["producer"]["kind"] == want["producerKind"] and summary["verifier"]["kind"] == want["verifierKind"], summary
+    assert summary["producer"]["model"] is None and summary["verifier"]["model"] is None, "an authored replay names no model"
+
+
+def summary_world(root: Path, handoff_id: str, outcome: str, public_ids: dict | None = None) -> tuple[SimpleNamespace, dict]:
+    """The real export (`handoff_id`) of an ISSUE-SUMMARY world through the installed CLIs, checked against hand-written expectations. `outcome` `available`: the supply issue is summarised
+    by an authored replay job (ONE claim, supported, citing the first article only; the second article of the issue is uncited but part of the basis) whose immutable result the decisions pin, and
+    the factory issue carries a HOLD period verdict (deterministic `temporal-review-pending`, no job); `verifier-hold`: the verifier finds the claim insufficient, so the pinned result is a job-coded unavailable, and the
+    factory issue has no verdict and no pin (`not-requested`). Flow: freeze+export an UNPINNED handoff (its bundle is the basis of the job input) -> `submit` (queued, no call) ->
+    `run` (exactly two replay calls, no provider call) -> `run` again (no further call) -> `export` the pin fields -> decisions-3 pin them -> `freeze --issue-summary-state-dir` ->
+    `export` (no summary ledger or flag: it works with the ledger moved away). The summary ledger is never written by freeze or export. A SYNTHETIC test world."""
+    assert outcome in ("available", "verifier-hold"), outcome
+    held = outcome == "available"
+    world = build_world(root, uncited_source=True)          # document a2 (the uncited article) lives under its own source and grant
+    verdicts = {"issue:factory": [field_verdict(world, "b", "m-b", "period", "2026Q4", "HOLD", "ambiguous", [PERIOD_B])]} if held else None
+
+    def decisions(summaries: dict | None = None, extra: dict | None = None) -> dict:
+        doc = decisions_doc(world, verdicts={**(verdicts or {}), **(extra or {})}, summaries=summaries)
+        for company in doc["companies"]:
+            company["publicId"] = (public_ids or {}).get(company["publicId"], company["publicId"])
+        return doc
+
+    operator = Operator(world)
+    first = freeze_export(operator, world, f"{handoff_id}-input", decisions())
+    assert {i["id"]: i["summary"] for i in first["bundle"]["issues"]} == {
+        SUPPLY: {"status": "unavailable", "code": "not-requested", "source": None},
+        FACTORY: {"status": "unavailable", "code": "temporal-review-pending" if held else "not-requested", "source": None}}, "an unpinned handoff states the zero-call table"
+    assert first["bundle"]["policy"]["issueSummary"] == "zoop-issue-summary-policy-1"
+
+    fixture = world.root / f"summary-{outcome}-fixture.json"
+    fixture.write_bytes(json_bytes(summary_fixture(world, first["bundle"], SUPPLY, SUMMARY_CLAIMS, ["supported" if held else "insufficient"])))
+    job = f"summary-job-{outcome}"
+    request = {"schemaVersion": "zoop-issue-summary-1", "jobId": job, "issueId": SUPPLY, "mode": "replay", "manifest": first["manifest"]}
+    queued = summary_cli(world, "submit", request)
+    assert queued["state"] == "queued" and queued["usage"]["replayCalls"] == 0 and queued["usage"]["providerCalls"] == 0 and queued["usage"]["modelCalls"] == 0, queued
+    ran = summary_cli(world, "run", request, fixture=fixture)
+    assert ran["state"] == "ready" and ran["result"]["outcome"] == ("available" if held else "verifier-hold"), ran
+    assert ran["usage"]["replayCalls"] == 2 and ran["usage"]["providerCalls"] == 0 and ran["usage"]["modelCalls"] == 0, ran["usage"]
+    assert summary_cli(world, "run", request, fixture=fixture)["usage"] == ran["usage"], "a second run made another call"
+    pinned = summary_cli(world, "export", {"schemaVersion": "zoop-issue-summary-1", "jobId": job})
+    pin = {key: pinned[key] for key in ("jobId", "inputDigest", "resultDigest")}
+    # The job's own delivery follows the CURRENT rights like the S2/S3 results: a revoked grant withholds the stored result (identity and usage only: no pin fields, outcome or text); restored, the same
+    # result is shown again. The CITED article's source and, separately, the UNCITED article's source: the model saw both, so either grant alone withholds it.
+    selector = {"schemaVersion": "zoop-issue-summary-1", "jobId": job}
+    for source_id in ("synthetic-source", UNCITED_SOURCE):
+        set_grant(world, source_id, False)
+        hidden = summary_cli(world, "export", selector, expected=2)
+        assert hidden["delivery"]["status"] == "withheld" and not {"summary", "outcome", "resultDigest", "provenance"} & set(hidden), (source_id, hidden)
+        assert all(text not in json.dumps(hidden, ensure_ascii=False) for text, _, _ in SUMMARY_CLAIMS), "a withheld summary export carried text"
+        set_grant(world, source_id, True)
+        assert summary_cli(world, "export", selector) == pinned, f"restoring the grant of {source_id} did not restore the same result"
+
+    pinned_decisions = decisions({"issue:supply": pin})
+    write_operator(world, decisions=pinned_decisions)
+    ledger = world.root / "summary"
+    ledger_before = ledger_snapshot(ledger)
+    frozen = operator.cli("freeze", manifest_doc(world, handoff_id, file_hashes(world.root)), summaries=ledger)
+    assert frozen["state"] == "ready" and frozen["usage"] == {"providerCalls": 0, "modelCalls": 0}, frozen
+    out = operator.cli("export", operator.sel(handoff_id))
+    assert out["delivery"]["status"] == "current" and out["usage"] == {"providerCalls": 0, "modelCalls": 0}, out["delivery"]
+    assert ledger_snapshot(ledger) == ledger_before, "freeze or export wrote the issue-summary ledger"
+    # Pinning rewrote the decisions file the job's own manifest pinned: the job's public export is withheld now, while the handoff freeze proved the sources and rights with ITS manifest.
+    moved_on = summary_cli(world, "export", selector, expected=2)
+    assert moved_on["delivery"]["status"] == "withheld" and "summary" not in moved_on and "resultDigest" not in moved_on, moved_on
+    bundle = out["bundle"]
+    by_id = {i["id"]: i for i in bundle["issues"]}
+    want = expected_summaries_of(world, outcome)
+    for issue_id, expectation in want.items():
+        check_summary_part(by_id[issue_id]["summary"], expectation)
+    summary = by_id[SUPPLY]["summary"]
+    assert summary == pinned["summary"], "the bundle did not carry the job's exact result"
+    assert (summary["source"]["jobId"], summary["source"]["inputDigest"], summary["source"]["resultDigest"]) == (pin["jobId"], pin["inputDigest"], pin["resultDigest"])
+    basis = summary_basis(next(i for i in first["bundle"]["issues"] if i["id"] == SUPPLY), {e["id"]: e for e in first["bundle"]["evidence"]},
+                          {(a["articleId"], a["articleVersion"]): a for a in first["bundle"]["articles"]})
+    uncited = evidence_id(world, *UNCITED)
+    assert summary["source"]["basisDigest"] == digest(basis) and len(basis["quotes"]) == 2, "the summary rests on both mention quotes of the supply issue"
+    assert uncited in {q["evidenceId"] for q in basis["quotes"]} and uncited not in summary.get("evidenceIds", []), "the uncited quote must be part of the basis although no claim cites it"
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["handoffId"] == handoff_id
+    assert canonical(bundle).encode() == (operator.state / "bundles" / f"{frozen['receipt']['bundleDigest']}.json").read_bytes(), "export is not the frozen artifact"
+    dumped = json.dumps(out, ensure_ascii=False)
+    assert all(text not in dumped for text in PRIVATE), "source text leaked"
+
+    # Export needs neither the summary ledger nor a new flag: the same bundle with the ledger moved away, and the flag is refused for export.
+    moved = world.root / "summary-moved"
+    ledger.rename(moved)
+    assert operator.cli("export", operator.sel(handoff_id))["bundle"] == bundle, "export depends on the summary ledger"
+    assert operator.cli("export", operator.sel(handoff_id), expected=2, summaries=moved)["error"]["code"] == "input_or_configuration_invalid"
+    moved.rename(ledger)
+
+    # Current rights: a revoked grant withholds the handoff with no summary text; restored, it is current again. The UNCITED article's own grant counts as much as the cited one's.
+    for source_id in ("synthetic-source", UNCITED_SOURCE):
+        set_grant(world, source_id, False)
+        gone = operator.cli("export", operator.sel(handoff_id), expected=2)
+        assert gone["delivery"]["status"] == "withheld" and "bundle" not in gone and all(text not in json.dumps(gone, ensure_ascii=False) for text, _, _ in SUMMARY_CLAIMS), (source_id, gone)
+        set_grant(world, source_id, True)
+        assert operator.cli("export", operator.sel(handoff_id))["bundle"] == bundle, f"restoring the grant of {source_id} did not restore the same export"
+    world.summary = SimpleNamespace(pin=pin, job=job, pinned_decisions=pinned_decisions, decisions=decisions, ledger=ledger, first=first, operator=operator,
+                                    uncited=SimpleNamespace(name=UNCITED[0], source=UNCITED_SOURCE, document_id=world.refs[UNCITED[0]]["documentId"], evidence_id=uncited))
+    return world, out
+
+
+def expected_summaries_of(world, outcome: str) -> dict:
+    """Hand-written summaries of the two public issues of a summary world."""
+    if outcome == "available":
+        return {SUPPLY: expected_available(world), FACTORY: PENDING}
+    return {SUPPLY: {"status": "unavailable", "code": "verifier-hold", "pinned": True}, FACTORY: NOT_REQUESTED}
+
+
+def summary_refusals(world, out: dict) -> str:
+    """A pin the handoff cannot honor refuses the WHOLE freeze with a stable code and writes nothing (the refused id does not exist afterwards), through the installed CLI over the
+    `available` summary world: a pin without the ledger flag, the flag without a pin, a wrong result or input digest, an unknown job, a pinned issue that is now held, a pinned issue that is not
+    public, and a pin whose basis the current sources no longer give because the UNCITED article (document a2, which no claim cites) is bound differently: another article id, another article
+    version, or a text hash that does not match its source (the issue is not published). The operator files are restored after each case, so the frozen handoff is still current at the end."""
+    ctx = world.summary
+    operator, root, ledger = ctx.operator, world.root, ctx.ledger
+    handoff_id = out["handoffId"]
+    frozen_bytes = {name: (root / f"{name}.json").read_bytes() for name in ("canonical", "decisions", "bindings")}
+    state_before = ledger_snapshot(ledger)
+
+    def refuse(name: str, code: str, decisions: dict, *, bindings: dict | None = None, flag: bool = True) -> None:
+        write_operator(world, decisions=decisions, bindings=bindings)
+        refused = operator.cli("freeze", manifest_doc(world, name, file_hashes(root)), expected=2, summaries=ledger if flag else None)
+        assert refused["error"]["code"] == code, (name, refused)
+        assert operator.cli("inspect", operator.sel(name), expected=2)["error"]["code"] == "handoff_not_found", f"{name}: a refused freeze left a handoff row"
+
+    pin = ctx.pin
+    refuse("pin-without-ledger", "issue_summary_state_missing", ctx.pinned_decisions, flag=False)
+    refuse("ledger-without-pin", "issue_summary_state_unused", ctx.decisions())
+    refuse("pin-wrong-result", "issue_summary_pin_mismatch", ctx.decisions({"issue:supply": {**pin, "resultDigest": "0" * 64}}))
+    refuse("pin-wrong-input", "issue_summary_pin_mismatch", ctx.decisions({"issue:supply": {**pin, "inputDigest": "0" * 64}}))
+    refuse("pin-unknown-job", "issue_summary_not_found", ctx.decisions({"issue:supply": {**pin, "jobId": "no-such-summary-job"}}))
+    held = {"issue:supply": [field_verdict(world, "a", "m-a", "period", "2026Q3", "HOLD", "ambiguous", [PERIOD_A])]}
+    refuse("pin-on-held-issue", "issue_summary_temporal_review_pending", ctx.decisions({"issue:supply": pin}, extra=held))
+    refuse("pin-on-unpublished-issue", "issue_summary_issue_not_public", ctx.decisions({"issue:supply": pin, "issue:overseas": pin}))
+    uncited_document = ctx.uncited.document_id
+    moved = bindings_doc(world)
+    next(b for b in moved["bindings"] if b["documentId"] == uncited_document)["articleId"] = "doc-" + "5" * 64
+    refuse("pin-after-uncited-article-id-change", "issue_summary_basis_changed", ctx.pinned_decisions, bindings=moved)
+    versioned = bindings_doc(world)
+    next(b for b in versioned["bindings"] if b["documentId"] == uncited_document)["articleVersion"] = "6" * 64
+    refuse("pin-after-uncited-article-version-change", "issue_summary_basis_changed", ctx.pinned_decisions, bindings=versioned)
+    unhashed = bindings_doc(world)
+    next(b for b in unhashed["bindings"] if b["documentId"] == uncited_document)["textSha256"] = "7" * 64
+    refuse("pin-after-uncited-binding-hash-change", "issue_summary_issue_not_public", ctx.pinned_decisions, bindings=unhashed)
+    for name, raw in frozen_bytes.items():
+        (root / f"{name}.json").write_bytes(raw)
+    assert ledger_snapshot(ledger) == state_before, "a refused freeze wrote the issue-summary ledger"
+    assert operator.cli("export", operator.sel(handoff_id))["bundle"] == out["bundle"], "a refused freeze changed the frozen handoff"
+    artifact = operator.state / "bundles" / f"{operator.cli('inspect', operator.sel(handoff_id))['receipt']['bundleDigest']}.json"
+    original = artifact.read_bytes()
+    os.chmod(artifact, 0o600)
+    artifact.write_bytes(original.replace(SUMMARY_CLAIMS[0][0].encode(), "합성기업이 공급 계약을 취소했다.".encode(), 1))
+    assert operator.cli("export", operator.sel(handoff_id), expected=2)["error"]["code"] == "handoff_artifact_invalid", "an edited summary text in the artifact was exported"
+    artifact.write_bytes(original)
+    assert operator.cli("export", operator.sel(handoff_id))["bundle"] == out["bundle"]
+    return ("issue summaries: freeze refuses a pin without the ledger flag (issue_summary_state_missing), the flag without a pin (issue_summary_state_unused), a wrong result or input digest "
+            "(issue_summary_pin_mismatch), an unknown job (issue_summary_not_found), a pinned held issue (issue_summary_temporal_review_pending), a pinned unpublished issue "
+            "(issue_summary_issue_not_public), and a basis the sources no longer give because the UNCITED article is bound to another article id or version (issue_summary_basis_changed) or "
+            "by a wrong text hash (the issue is not published), each with no handoff row and an untouched summary ledger; an edited summary text in the artifact is refused on export "
+            "(handoff_artifact_invalid)")
+
+
+def expected_summaries(summary_world_: SimpleNamespace, withheld_world: SimpleNamespace, path_exports: dict) -> dict:
+    """Hand-written summary of every public issue of every export file: not-requested unless an operator HOLD/REJECT verdict (`verdict_cases` / `time_cases`) leaves
+    `temporal-review-pending`; the two summary worlds pin a job. Keyed by export file name, then public issue id."""
+    plain = {SUPPLY: NOT_REQUESTED, FACTORY: NOT_REQUESTED}
+    return {"export-valid.json": plain, "export-collision.json": plain, "export-approved.json": plain, "export-impacts.json": plain, "export-impacts-unicode.json": plain,
+            **{f"export-path-{middle}.json": plain for middle in path_exports},
+            "export-field-verdicts.json": {SUPPLY: PENDING, FACTORY: PENDING},
+            "export-field-verdicts-time.json": {SUPPLY: PENDING, FACTORY: NOT_REQUESTED},
+            "export-summary.json": expected_summaries_of(summary_world_, "available"), "export-summary-withheld.json": expected_summaries_of(withheld_world, "verifier-hold")}
+
+
+def summary_mutations() -> dict:
+    """name -> (the one change to the `export-summary.json` bundle, the validator location that must refuse it). The caller recomputes the content digest, so ONLY the summary rule can
+    refuse the bundle: the supply issue carries the available summary, the factory issue (a HOLD period verdict) `temporal-review-pending`."""
+    def issue(b, issue_id):
+        return next(i for i in b["issues"] if i["id"] == issue_id)
+
+    def geography_evidence(b):
+        return issue(b, SUPPLY)["geography"]["evidenceIds"][0]
+
+    def foreign_claim(b):
+        issue(b, SUPPLY)["summary"]["claims"][0]["evidenceIds"] = [geography_evidence(b)]
+
+    def uncited_mention(b):
+        """The supply mention whose quote no claim cites: it is in the summary's basis only."""
+        supply = issue(b, SUPPLY)
+        cited = set(supply["summary"]["evidenceIds"])
+        return next(m for m in supply["mentions"] if not cited & set(m["evidenceIds"]))
+
+    def uncited_article_hash(b):
+        mention = uncited_mention(b)
+        next(a for a in b["articles"] if (a["articleId"], a["articleVersion"]) == (mention["articleId"], mention["articleVersion"]))["textSha256"] = "7" * 64
+
+    def forge(key, value):
+        return lambda b: issue(b, SUPPLY)["summary"].__setitem__(key, value)
+
+    return {
+        "a summary text that is not the claims joined": (forge("text", "다른 문장이다."), "issue.summary.text"),
+        "a claim edited behind the summary text": (lambda b: issue(b, SUPPLY)["summary"]["claims"][0].__setitem__("text", "합성기업이 공급 계약을 취소했다."), "issue.summary.text"),
+        "a claim citing evidence outside the issue's mention quotes": (foreign_claim, "issue.summary.claims.evidenceIds"),
+        "a basis digest of another basis": (lambda b: issue(b, SUPPLY)["summary"]["source"].__setitem__("basisDigest", "0" * 64), "issue.summary.source.basisDigest"),
+        "a forged result digest": (lambda b: issue(b, SUPPLY)["summary"]["source"].__setitem__("resultDigest", "0" * 64), "issue.summary.source.resultDigest"),
+        "a forged result version": (forge("resultVersion", "isr-" + "0" * 64), "issue.summary.resultVersion"),
+        "a replay summary relabelled as a provider's": (lambda b: issue(b, SUPPLY)["summary"]["producer"].__setitem__("kind", "provider"), "issue.summary.producer.kind"),
+        "a summary language other than ko": (forge("language", "en"), "issue.summary.language"),
+        "an available summary on the issue whose time field is held": (lambda b: issue(b, FACTORY).__setitem__("summary", json.loads(json.dumps(issue(b, SUPPLY)["summary"]))),
+                                                                      "issue.summary.status"),
+        "not-requested on the issue whose time field is held": (lambda b: issue(b, FACTORY).__setitem__("summary", {"status": "unavailable", "code": "not-requested", "source": None}),
+                                                               "issue.summary.code"),
+        "temporal-review-pending on an issue nobody held": (lambda b: issue(b, SUPPLY).__setitem__("summary", {"status": "unavailable", "code": "temporal-review-pending", "source": None}),
+                                                           "issue.summary.code"),
+        "an issue without its summary key": (lambda b: issue(b, SUPPLY).pop("summary"), "issue"),
+        "another summary policy": (lambda b: b["policy"].__setitem__("issueSummary", "zoop-issue-summary-policy-2"), "policy.issueSummary"),
+        "the uncited mention turned into a background one under an unchanged summary": (lambda b: uncited_mention(b).__setitem__("background", True), "issue.summary.resultVersion"),
+        "the uncited article's text hash edited under an unchanged summary": (uncited_article_hash, "issue.summary.resultVersion"),
+    }
+
+
 def smoke(root: Path, fixture: Path | None) -> dict:
     world = build_world(root)
     write_operator(world)
@@ -1683,17 +2041,28 @@ def smoke(root: Path, fixture: Path | None) -> dict:
                   "verified-but-undetermined) and `no-evidence`/precheck-rejected rows on the factory edge, labels exist only on verified rows, the invented off-target company is never exported")
     legacy_check, legacy_withheld = legacy_history(world, exported)
     checks.append(legacy_check)
+    summary_ns, summary_out = summary_world(root.parent / "summary", SUMMARY_HANDOFF, "available")
+    checks.append("issue summaries: a REAL authored-replay `zoop-ai-issue-summary` job (submit = queued with no call, run = exactly two replay calls and no provider call, a second run = no further call) "
+                  "whose immutable result the decisions-3 pin carries into bundle -7 through `freeze --issue-summary-state-dir`: the supply issue's available summary (ONE claim citing the first article; the "
+                  "second article, under its own source and grant, is uncited but in the basis) equals the hand-written text, claims, evidence and kinds and is the job's exact object; the factory issue's HOLD "
+                  "verdict leaves `temporal-review-pending` with no job; export is the frozen artifact, needs no summary ledger or flag (works with the ledger moved away), freeze and export leave the "
+                  "ledger byte-identical and call no model; revoking EITHER source's grant (the cited or the uncited article's) withholds the summary job's export and the whole handoff with no summary text, "
+                  "and restoring it gives the same output")
+    checks.append(summary_refusals(summary_ns, summary_out))
+    withheld_ns, withheld_out = summary_world(root.parent / "summary-withheld", SUMMARY_WITHHELD_HANDOFF, "verifier-hold")
+    checks.append("a job the independent verifier held (`verifier-hold`) is pinned as a job-coded unavailable summary with its source pin and no text; an issue with no verdict and no pin is `not-requested`")
 
     if fixture is not None:
         write_fixture(fixture, world, exported, withheld, legacy_withheld, collision_world, collision, verdict_fixtures, path_exports, path_world, impact_world, impact_out,
-                      approved_world, approved)
+                      approved_world, approved, summary_ns, summary_out, withheld_ns, withheld_out)
         checks.append(f"fixtures written to {fixture}")
     return {"status": "passed", "providerCalls": 0, "modelCalls": 0, "checks": checks}
 
 
 def write_fixture(directory: Path, world, valid: dict, withheld: dict, legacy_withheld: dict, collision_world, collision: dict, verdict_fixtures: SimpleNamespace,
-                  path_exports: dict, path_world, impact_world, impact_out: dict, approved_world, approved: dict) -> None:
-    """The valid export envelope (bundle `-6`, no operator verdict: `fieldVerdicts` empty; default `not-proposed` impact rows), the real export of the legal local-mentionId collision world, the real export of the hand-reviewed
+                  path_exports: dict, path_world, impact_world, impact_out: dict, approved_world, approved: dict, summary_ns: SimpleNamespace, summary_out: dict,
+                  withheld_ns: SimpleNamespace, withheld_out: dict) -> None:
+    """The valid export envelope (bundle `-7`, no operator verdict: `fieldVerdicts` empty; default `not-proposed` impact rows; every summary `not-requested`), the real export of the legal local-mentionId collision world, the real export of the hand-reviewed
     verdict world (`export-field-verdicts.json`) and of the time-withheld world (`export-field-verdicts-time.json`), the hand-written expected original mentions, field provenance and
     verdicts of them, negative bundles (each MUST be refused by an importer; the verdict and structural-path ones keep a recomputed content digest so only their own rule can refuse them),
     the real exports of the structural-path world (`export-path-known|private|unmapped.json`, `expected-structural-paths.json`, one rule broken per `bundle-path-NN.json`)
@@ -1825,6 +2194,19 @@ def write_fixture(directory: Path, world, valid: dict, withheld: dict, legacy_wi
                                     "export-impacts-unicode.json": unicode_impact_rows(expected_impacts(impact_world)),
                                     **{f"export-path-{middle}.json": expected_impacts(path_world) for middle in path_exports},
                                     **{f"bundle-impact-{number:02d}.json": {"breaks": name, "validatorLocation": at} for number, (name, (_, at, _)) in enumerate(mutations.items(), 1)}})
+    # Issue summaries: the real exports of the two summary worlds, the hand-written summary of every public issue of every export above and one rule broken per `bundle-summary-NN.json`
+    # (content digest recomputed, so only the summary rule can refuse it).
+    write("export-summary.json", summary_out)
+    write("export-summary-withheld.json", withheld_out)
+    summary_changes = summary_mutations()
+    for number, (name, (change, at)) in enumerate(summary_changes.items(), 1):
+        copy = json.loads(json.dumps(summary_out["bundle"]))
+        change(copy)
+        copy["digests"]["content"] = content_digest(copy)
+        write(f"bundle-summary-{number:02d}.json", {**summary_out, "bundle": copy})
+    write("expected-summaries.json", {**expected_summaries(summary_ns, withheld_ns, path_exports),
+                                      **{f"bundle-summary-{number:02d}.json": {"breaks": name, "validatorLocation": at}
+                                         for number, (name, (_, at)) in enumerate(summary_changes.items(), 1)}})
 
 
 # ---------------------------------------------------------------- retained operator package ----------------------------------------

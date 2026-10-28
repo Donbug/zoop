@@ -18,11 +18,11 @@ import pytest
 from pydantic import ValidationError
 
 from handoff_support import (HANDOFF, HANDOFF_VARS, OTHER_HANDOFF, PRINCIPAL, SOURCE_DATA, HandoffWorkspace, envelope, error_output, export_entry, full_bundle,
-                             manifest_of, mutated, seal, withheld_output)
+                             live_bundle, manifest_of, mutated, seal, withheld_output)
 from support import canonical
 from zoop_ai_service import handoff_access
 from zoop_ai_service.config import ConfigError, load
-from zoop_ai_service.handoff_doc import examples, example_bundle, pins
+from zoop_ai_service.handoff_doc import examples, example_bundle, pins, summary_of
 from zoop_ai_service.handoff_reads import HandoffError, HandoffReads
 from zoop_ai_service.handoff_runtime import interpret
 from zoop_ai_service.handoff_wire import (MAX_COMPANIES, Bundle, Export, HdBundle, HdErrorEnvelope, HdStatus)
@@ -434,6 +434,7 @@ def test_verdict_shapes_are_accepted_and_relayed_exactly_without_semantic_judgem
     assert Bundle.model_validate(bundle).wire() == bundle
     for empty in (example_bundle(), full_bundle()):
         empty["issues"][0]["fieldVerdicts"] = []
+        empty["issues"][0]["summary"] = summary_of(empty, "not-requested")    # no HOLD/REJECT is left: the issue is no longer `temporal-review-pending`
         assert Bundle.model_validate(empty).wire() == empty
 
 
@@ -459,7 +460,7 @@ def test_the_envelope_projection_drops_what_the_application_may_not_read_and_kee
     lambda out: out["delivery"].update(checkedAt="yesterday"), lambda out: out["receipt"].update(bundleDigest="short"),
     lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-1"), lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-2"),
     lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-3"), lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-4"),
-    lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-5"),
+    lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-5"), lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-6"),
     lambda out: out["receipt"].update(bundleBytes=0), lambda out: out["receipt"].update(bundleSchema="other"), lambda out: out.update(bundle=[]),
     lambda out: out.update(manifest=[]),
 ])
@@ -548,7 +549,8 @@ def test_a_handoff_frozen_under_the_earlier_bundle_schema_is_withheld_with_its_r
         assert wire["delivery"] == {"state": "withheld", "reason": "handoff_contract_changed", "checkedAt": None}
         assert wire["verification"] is None and wire.get("bundle") is None and wire.get("manifest") is None
         text = json.dumps(wire)
-        for old in ("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3", "zoop-graph-handoff-bundle-4", "zoop-graph-handoff-bundle-5", "bundleSchema", "receipt", pins(example_bundle())["bundleDigest"]):
+        for old in ("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3", "zoop-graph-handoff-bundle-4", "zoop-graph-handoff-bundle-5",
+                    "zoop-graph-handoff-bundle-6", "bundleSchema", "receipt", "summary", pins(example_bundle())["bundleDigest"]):
             assert old not in text
 
 
@@ -662,7 +664,7 @@ def test_every_authored_handoff_example_validates_through_the_wire_models_and_wi
         if name == "withheld":
             assert wire["bundle"] is None and wire["verification"] is None and wire["manifest"] is None
         else:
-            assert canonical(wire["bundle"]) == canonical(example_bundle())
+            assert canonical(wire["bundle"]) == canonical(example_bundle("temporal-review-pending" if name == "currentSummaryHeld" else "available"))
             assert hashlib.sha256(canonical(wire["bundle"]).encode()).hexdigest() == wire["verification"]["bundleDigest"]
             assert hashlib.sha256(canonical(wire["manifest"]).encode()).hexdigest() == wire["verification"]["manifestDigest"] == wire["bundle"]["manifestDigest"]
     for example in sample["errors"].values():
@@ -677,9 +679,7 @@ ORIGIN = {"originId": "origin-1", "reviewer": "reviewer-1", "decisionRef": "orig
 
 def test_the_provenance_pairs_the_approval_basis_and_the_source_support_are_closed_and_exact():
     bundle = example_bundle()
-    live = copy.deepcopy(bundle)
-    live["provenance"].update(executionMode="live", recordingKind="provider")
-    live["sources"][0]["provenance"].update(executionMode="live", recordingKind="provider")
+    live = live_bundle()      # a LIVE export carries provider and independent-verifier summary identities (a replay summary can never sit in a live bundle)
     assert Bundle.model_validate(live).wire() == live
     manual = copy.deepcopy(bundle)
     manual["sources"][0]["reviewUsed"][0]["approvalBasis"] = {"kind": "operator-final-approval", "revision": 1, "reviewer": "ops-1",

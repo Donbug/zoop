@@ -6,7 +6,8 @@ versions, purposes, receipts and failure states apart from S1):
 - `chat-router`: native Jev, typed Noul probabilities per requirement for the Q01-Q08 tags, the bound capabilities and
   prohibited advice.
 - `chat-answer`: Luna `answer-generator`, a strict JSON answer by sections over the branch context.
-- `chat-verification`: native Jev, per section a support Choice (evidence sections only) and a prohibited-advice Noul.
+- `chat-verification`: native Jev, per section a support Choice (sections with quotes only: evidence and ZOOP document
+  sections) and a prohibited-advice Noul.
 
 The application never sends member ids, emails, account data or full article texts. Quoted spans carry their `sourceId` so the
 operator chat grant registry decides whether they may be sent to a recipient.
@@ -23,13 +24,16 @@ from .contracts import Wire
 CHAT_SCHEMA_VERSION = "zoop-ai-chat-1"
 ChatStage = Literal["chat-router", "chat-answer", "chat-verification"]
 QueryType = Literal["Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08"]
-Basis = Literal["general_knowledge", "evidence_grounded"]
+# `zoop_documented` rests on ZOOP's own approved documents (policies), `evidence_grounded` on public evidence.
+Basis = Literal["general_knowledge", "zoop_documented", "evidence_grounded"]
 
 MAX_REQUIREMENTS = 6
 MAX_SECTIONS = 12
 MAX_CITATIONS = 20
 MAX_QUESTION = 4000
 MAX_TEXT = 12000
+MAX_PATHS = 20
+MAX_PATH_STEPS = 6
 
 
 class ChatGrant(Wire):
@@ -114,6 +118,32 @@ class BranchItem(Wire):
     label: str = Field(min_length=1, max_length=300)
 
 
+class PathStep(Wire):
+    """One stored graph edge of a found path, in path order: its stored direction, relation type, display role and the
+    evidence (quoted in the same branch) that supports this edge."""
+    edge_id: str = Field(min_length=1)
+    source_id: str = Field(min_length=1)
+    target_id: str = Field(min_length=1)
+    relation: str = Field(min_length=1, max_length=100)
+    role: str | None = Field(default=None, max_length=300)
+    evidence_ids: list[str] = Field(max_length=MAX_CITATIONS)
+
+
+class PathResult(Wire):
+    """One pair of a path read. `found` has its steps; `none` was proven unconnected within the hop limit; `cut` reached
+    the limit, so a longer connection may exist and it must never be reported as none."""
+    from_id: str = Field(min_length=1)
+    to_id: str = Field(min_length=1)
+    status: Literal["found", "none", "cut"]
+    steps: list[PathStep] = Field(max_length=MAX_PATH_STEPS)
+
+    @model_validator(mode="after")
+    def steps_match_status(self):
+        if (self.status == "found") == (not self.steps):
+            raise ValueError("a found path has steps, a none or cut pair has none")
+        return self
+
+
 class Branch(Wire):
     requirement_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")
     label: str = Field(min_length=1, max_length=MAX_QUESTION)
@@ -121,6 +151,16 @@ class Branch(Wire):
     none_found: bool
     items: list[BranchItem] = Field(max_length=50)
     evidence: list[Quote] = Field(max_length=MAX_CITATIONS)
+    paths: list[PathResult] = Field(default_factory=list, max_length=MAX_PATHS)
+
+    @model_validator(mode="after")
+    def step_evidence_quoted(self):
+        quoted = {q.evidence_id for q in self.evidence}
+        for path in self.paths:
+            for step in path.steps:
+                if not set(step.evidence_ids) <= quoted:
+                    raise ValueError("a path step names evidence that is not quoted in its branch")
+        return self
 
 
 class AnswerInput(Wire):

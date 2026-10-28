@@ -1,0 +1,725 @@
+{
+  "schema": "zoop-summary-verify-loopback-script-1",
+  "kind": "authored_control_not_a_model",
+  "variant": "deviations",
+  "corpusId": "fin-summary-verify-ko-v1",
+  "inputsSha256": "c57e0f8cb4c1caac5713b89b311a64f451cad6fd205c218a98bcc6167c1c2dd8",
+  "note": "Authored responses for harness checks, never model measurements or calibration.",
+  "entries": [
+    {
+      "caseId": "NS01",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "supported",
+          "p": 0.85,
+          "confidence": 0.98
+        },
+        {
+          "choice": "supported",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS02",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "supported",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "present",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS03",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "supported",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": null
+    },
+    {
+      "caseId": "NS04",
+      "scenario": "model_mismatch",
+      "claims": [
+        {
+          "choice": "supported",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS05",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "supported",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS06",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "supported",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        {
+          "choice": "supported",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS07",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "supported",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS08",
+      "scenario": "non_json",
+      "usage": null
+    },
+    {
+      "caseId": "NS09",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "supported",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        {
+          "choice": "insufficient",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS10",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "insufficient",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS11",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "supported",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        {
+          "choice": "insufficient",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS12",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "contradicted",
+          "p": 0.85,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS13",
+      "scenario": "usage_implausible",
+      "claims": [
+        {
+          "choice": "contradicted",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 100000000,
+        "outputTokens": 1
+      }
+    },
+    {
+      "caseId": "NS14",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "contradicted",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS15",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "contradicted",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS16",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "contradicted",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS17",
+      "scenario": "silent",
+      "usage": null
+    },
+    {
+      "caseId": "NS18",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "insufficient",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "present",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS19",
+      "scenario": "http_error",
+      "usage": null,
+      "status": 500
+    },
+    {
+      "caseId": "NS20",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "insufficient",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "present",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS21",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "contradicted",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "present",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS22",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "insufficient",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "present",
+          "p": 0.7,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS23",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "insufficient",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "present",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    },
+    {
+      "caseId": "NS24",
+      "scenario": "answers",
+      "claims": [
+        {
+          "choice": "contradicted",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        {
+          "choice": "insufficient",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        {
+          "choice": "supported",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      ],
+      "checks": {
+        "advice": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "causality": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        },
+        "framing": {
+          "choice": "absent",
+          "p": 0.98,
+          "confidence": 0.98
+        }
+      },
+      "usage": {
+        "inputTokens": 120,
+        "outputTokens": 12
+      }
+    }
+  ]
+}

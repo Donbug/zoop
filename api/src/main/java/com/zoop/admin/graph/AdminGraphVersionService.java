@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -29,6 +30,7 @@ import com.zoop.graph.snapshot.GraphSnapshotStore;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.version.GraphVersionRecord;
 import com.zoop.graph.version.JdbcGraphVersionRepository;
+import com.zoop.graph.version.JdbcGraphVersionRepository.Activation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,6 +54,7 @@ public class AdminGraphVersionService {
     private static final String CURSOR_PREFIX = "gv1:";
     private static final String IMPORTED = "snapshot";
     private static final String FIXTURE_SOURCE = "fixture";
+    static final String AUTO_REASON = "auto-activation after import";
 
     private final JdbcAdminGraphVersionRepository repository;
     private final JdbcGraphVersionRepository versions;
@@ -166,6 +169,29 @@ public class AdminGraphVersionService {
         }
     }
 
+    /** The version {@link #activateImported} would try now, if any. */
+    public Optional<GraphVersionRecord> importedCandidate(Instant since) {
+        return versions.autoActivationCandidate(since);
+    }
+
+    /**
+     * The automatic activation after an import (FS059, scheduler {@link GraphAutoActivationScheduler}): {@code candidate} gets the
+     * same snapshot read and current-eligibility checks as an admin activation and becomes public for the system actor. Empty when
+     * another activation or a newer import won meanwhile. A refusal is the same {@link CustomException} the admin path answers
+     * (a database failure too: {@code SOURCE_UNAVAILABLE}), and the pointer stays.
+     */
+    @Transactional
+    public Optional<Activation> activateImported(GraphVersionRecord candidate, Instant since, String requestId) {
+        try {
+            String expected = versions.active().map(GraphVersionRecord::id).orElse(null);
+            PublicGraphSnapshot snapshot = snapshots.load(candidate);
+            return versions.activateBySystem(candidate.id(), expected, since, AUTO_REASON,
+                    () -> publishableNow(candidate, snapshot, requestId));
+        } catch (DataAccessException exception) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception);
+        }
+    }
+
     /**
      * A synthetic fixture is publishable only where the snapshot source itself is the local/dev fixture source: an artifact
      * deployment can still read old fixture rows, and "[합성]" data must never become its public graph. The source is fixed
@@ -193,7 +219,7 @@ public class AdminGraphVersionService {
                     version.id(), requestId);
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
         }
-        PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot, null, exclusions.current());
+        PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot, null, exclusions.current(version.id()));
         Instant at = clock.instant();
         Map<String, GraphEvidence> found = new LinkedHashMap<>();
         Set<String> articles = new TreeSet<>();

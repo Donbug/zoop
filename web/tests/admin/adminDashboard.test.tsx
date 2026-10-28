@@ -56,6 +56,21 @@ function overview(): InsightsOverview {
         unavailableReason: null,
       },
       {
+        key: 'onboarding',
+        group: 'usage',
+        label: '온보딩 완료율',
+        kind: 'ratio',
+        unit: '명',
+        definition: '',
+        count: null,
+        numerator: 3,
+        denominator: 3,
+        rate: 1,
+        sampleHidden: false,
+        availability: 'available',
+        unavailableReason: null,
+      },
+      {
         key: 'briefingRate',
         group: 'interest',
         label: '브리핑 조회율',
@@ -206,7 +221,33 @@ beforeEach(() => {
 
 describe('A-ADM-01 운영 대시보드 (FS072)', () => {
   test('요약 지표 5개와 각 영역을 와이어프레임대로 보여 준다', async () => {
-    server.on('GET', DASHBOARD, () => json(dashboard()));
+    server.on('GET', DASHBOARD, () =>
+      json(
+        dashboard({
+          jobs: {
+            running: 0,
+            queued: 0,
+            failed24h: 0,
+            recent: [
+              {
+                id: 'job-plan',
+                kind: 'analyze_plan',
+                label: 'analyze_plan',
+                status: 'succeeded',
+                requestedAt: '2026-10-06T03:00:00Z',
+              },
+              {
+                id: 'job-ingest',
+                kind: 'ingest',
+                label: 'ingest',
+                status: 'succeeded',
+                requestedAt: '2026-10-06T02:00:00Z',
+              },
+            ],
+          },
+        }),
+      ),
+    );
     openDashboard();
 
     expect(await screen.findByText('260건')).toBeTruthy();
@@ -218,8 +259,14 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
     expect(screen.getByText('반영됨')).toBeTruthy();
     expect(screen.getByText('대기 작업 0건')).toBeTruthy();
     expect(screen.getByText('실행 0 · 대기 0')).toBeTruthy();
+    // A-ADM-03's distinct kind remains distinct in the existing dashboard consumer.
+    expect(screen.getByText('분석계획')).toBeTruthy();
+    expect(screen.getByText('신규 기사 처리')).toBeTruthy();
+    expect(screen.queryByText('analyze_plan')).toBeNull();
     expect(screen.getByText('성공 28 · 실패 0')).toBeTruthy();
-    expect(screen.getByText('갱신 2026-10-06 12:43 KST')).toBeTruthy();
+    expect(screen.queryByText('갱신 2026-10-06 12:43 KST')).toBeNull();
+    expect(screen.queryByRole('button', { name: '새로 고침' })).toBeNull();
+    expect(screen.queryByText('온보딩 완료율')).toBeNull();
 
     const briefings = screen.getByRole('table', { name: '브리핑 회차 목록' });
     expect(within(briefings).getByText('2026-10-06 출근')).toBeTruthy();
@@ -314,7 +361,7 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
     await screen.findByText('260건');
     expect(
       screen.getByRole('link', { name: '작업 관제 →' }).getAttribute('href'),
-    ).toBe('/admin/pipeline');
+    ).toBe('/admin/pipeline?tab=jobs');
     expect(
       screen.getByRole('link', { name: 'AI 운영 →' }).getAttribute('href'),
     ).toBe('/admin/ai');
@@ -447,15 +494,5 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
     expect(await screen.findByText('관리자 로그인 화면')).toBeTruthy();
     expect(location()).toBe('/admin/login');
     expect(useAdminSessionStore.getState().admin).toBeNull();
-  });
-
-  test('새로 고침은 대시보드를 다시 조회한다', async () => {
-    server.on('GET', DASHBOARD, () => json(dashboard()));
-    const { user } = openDashboard();
-
-    await screen.findByText('260건');
-    await user.click(screen.getByRole('button', { name: '새로 고침' }));
-    await screen.findByText('260건');
-    expect(server.calls('GET', DASHBOARD)).toHaveLength(2);
   });
 });
