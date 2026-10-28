@@ -59,8 +59,7 @@ def previous_issue_company(company, issue_id, date_value, edition, cutoff, histo
     provide continuity; similar company names/titles do not create aliases.
     """
     boundary = context.legacy._aware(cutoff)
-    eligible = [r for r in history if r.get('status') == 'PASS'
-        and context.legacy._aware(r['cutoff']) < boundary
+    eligible = [r for r in history if context.legacy._aware(r['cutoff']) < boundary
         and ((edition == 'evening' and r['date'] == date_value and r['edition'] == 'morning')
              or (edition == 'morning' and r['date'] < date_value and r['edition'] == 'evening'))]
     if not eligible:
@@ -69,6 +68,8 @@ def previous_issue_company(company, issue_id, date_value, edition, cutoff, histo
     eligible = [r for r in eligible if context.legacy._aware(r['cutoff']) == latest]
     matches = []
     for row in eligible:
+        if row.get('status') != 'PASS':
+            continue
         targets = row.get('frozen', {}).get('targets', [])
         target = next((t for t in targets if t['companyId'] == company and t.get('issueIds') == [issue_id]), None)
         judgment = next((c for c in row['draft']['companies'] if c['companyId'] == company), None)
@@ -80,6 +81,31 @@ def previous_issue_company(company, issue_id, date_value, edition, cutoff, histo
     return {'status': 'available', 'issueId': issue_id, 'companyId': company,
         'roundId': row['roundId'], 'date': row['date'], 'edition': row['edition'],
         'cutoff': row['cutoff'], 'resultVersion': row['resultVersion'], 'judgment': copy.deepcopy(judgment)}
+
+
+def source_overlap(source, other, metadata):
+    """Aliases cannot smuggle another event's passage into background context.
+
+    Different versions/documents are distinct. Within a body, compare exact
+    quote spans when the body is available; otherwise only provably disjoint
+    passages are retained. Do not treat a new evidence ID as new information.
+    """
+    if (source['documentId'], source['bodySha256']) != (other['documentId'], other['bodySha256']):
+        return False
+    a, b = source['quote'], other['quote']
+    if a in b or b in a:
+        return True
+    body = metadata.get(source['documentId'], {}).get('fullBody', '')
+    if body and base.digest(body.encode()) == source['bodySha256'] and a in body and b in body:
+        def spans(quote):
+            start = body.find(quote)
+            while start >= 0:
+                yield start, start + len(quote)
+                start = body.find(quote, start + 1)
+        return any(x < v and u < y for x, y in spans(a) for u, v in spans(b))
+    # No authenticated offsets/body: keep neither an uncertain partial alias
+    # nor an expanded context from the other selected event.
+    return True
 
 
 def freeze_issue_inputs(row, effective, metadata, history, version=VERSION):
@@ -112,8 +138,11 @@ def freeze(row,effective,metadata,history,version=VERSION,issue_id=None):
             for d in docs[:8]: own.extend(d['sources'])
             if issue_id is not None:
                 target['issueEvidenceIds'] = [s['evidenceId'] for s in issue['sources']]
-                foreign = {s['evidenceId'] for other_id, other in selected.items() if other_id != issue_id for s in other['sources']} - set(target['issueEvidenceIds'])
-                own = [s for s in own if s['evidenceId'] not in foreign]
+                foreign_sources = [s for other_id, other in selected.items() if other_id != issue_id for s in other['sources']]
+                foreign = {s['evidenceId'] for s in foreign_sources} - set(target['issueEvidenceIds'])
+                own = [s for s in own if s['evidenceId'] not in foreign and
+                       (s['evidenceId'] in target['issueEvidenceIds'] or not any(
+                           source_overlap(s, other, metadata) for other in foreign_sources))]
             for s in own:
                 doc=metadata[s['documentId']]
                 published=(s.get('publishedAt') or s.get('publicationClock',{}).get('publishedAt')

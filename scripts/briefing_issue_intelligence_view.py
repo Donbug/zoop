@@ -58,7 +58,19 @@ def reuse_candidate_assessments(frozen, row, calls):
 def project(baseline, frozen, row, calls):
     m.check_seal(frozen)
     # A verified prose receipt does not prove a separately edited selection reason.
-    reuse_candidate_assessments(frozen, row, calls)
+    assessed, verified, _ = reuse_candidate_assessments(frozen, row, calls)
+    m.validate_assessments(assessed, frozen)
+    selection = row['selection']
+    m.require(selection['inputSha256'] == frozen['inputSha256'] and
+              selection['policyVersion'] == frozen['policyVersion'], 'view_selection_binding')
+    selected_by_id = {s['issueId']: s for s in selection['selected']}
+    m.require(len(selected_by_id) == len(selection['selected']) <= 3 and
+              len({p['issueId'] for p in row['passed']}) == len(row['passed']), 'view_selection_coverage')
+    for selected in selection['selected']:
+        iid = selected['issueId']
+        m.require(selected['assessment'] == assessed['assessments'][iid] and
+                  verified['checks'][iid]['supported'] and
+                  selected['candidate'] in frozen['candidates'], 'view_selected_assessment_binding')
     m.require(b.digest(b.canonical(baseline)) == frozen['baselineResponseSha256'] and
               row['round']['roundId'] == baseline['id'] and row['round']['cutoff'] == frozen['cutoff'], 'view_baseline_binding')
     response = copy.deepcopy(baseline)
@@ -66,9 +78,19 @@ def project(baseline, frozen, row, calls):
     for passed in row['passed']:
         proof = prove_issue(passed, calls)
         f, draft = passed['frozen'], passed['draft']
-        selected = next(s for s in row['selection']['selected'] if s['issueId'] == f['issueId'])
+        m.require(f['issueId'] in selected_by_id, 'view_selected_issue_missing')
+        selected = selected_by_id[f['issueId']]
         candidate = selected['candidate']
         m.require(any(c == candidate for c in frozen['candidates']), 'view_candidate_binding')
+        expected = m.analysis_inputs(frozen, {'selected': [selected]}, [])[0]
+        # Previous judgments are authenticated by the analysis receipts above.
+        # All current round/candidate/selection fields must match independently.
+        for target in expected['targets']:
+            bound = next((t for t in f['targets'] if t['companyId'] == target['companyId']), None)
+            m.require(bound is not None, 'view_target_binding')
+            target['previous'] = copy.deepcopy(bound['previous'])
+        m.require(m.seal(expected) == f and f in row['analysisInputs'], 'view_analysis_input_binding')
+        assessment = assessed['assessments'][f['issueId']]
         sources = {sid: {**copy.deepcopy(s), 'title': baseline.get('editionReview', {}).get('sources', {}).get(sid, {}).get('title') or '원문 자료'}
                    for sid, s in f['sources'].items()}
         companies = []
@@ -84,7 +106,7 @@ def project(baseline, frozen, row, calls):
             'evidenceIds': sorted({e for c in draft['companies'] for e in c['newInformation']['evidenceIds']}),
             'generatedAt': row['generatedAt'], 'resultVersion': passed['resultVersion']}
         item = {'eventId': f['issueId'], 'rank': len(items) + 1, 'title': draft['headline']['text'],
-            'reason': selected['assessment']['whyImportant']['text'] + ' ' + selected['assessment']['whyNow']['text'],
+            'reason': assessment['whyImportant']['text'] + ' ' + assessment['whyNow']['text'],
             'companies': linked, 'evidenceIds': refs, 'evidenceCount': len(refs), 'summary': summary,
             'eventTime': None, 'timePrecision': 'unknown', 'reportedAt': min(s['publishedAt'] for s in sources.values())}
         items.append(item)
@@ -103,9 +125,12 @@ def project(baseline, frozen, row, calls):
             'evidence': evidence, 'limitations': ['회차 마감 이전 원발행 시각 기준의 과거 자료 재분석입니다.'],
             'metadata': copy.deepcopy(response['metadata'])}
     value = {'schemaVersion': m.VERSION, 'policyVersion': m.POLICY, 'model': b.MODEL,
+        'baselineResponseSha256': frozen['baselineResponseSha256'],
         'verificationMode': 'separate_model_request', **row['round'], 'generatedAt': row['generatedAt'], 'issues': issues}
     value['resultVersion'] = m.VERSION + '-view-' + b.digest(b.canonical(value))
     response['items'], response['issueIntelligence'] = items, value
+    response['preservedPublication'] = {'sha256': frozen['baselineResponseSha256'],
+                                        'response': copy.deepcopy(baseline)}
     response['generatedAt'] = row['generatedAt']
     response['graphVersion'] = None  # the new selection has no published graph snapshot
     response['metadata']['graphVersion'] = None

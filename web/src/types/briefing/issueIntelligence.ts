@@ -10,6 +10,7 @@ export type IssueIntelligence = {
   date: string;
   edition: 'morning' | 'evening';
   cutoff: string;
+  baselineResponseSha256?: string;
   resultVersion: string;
   generatedAt: string;
   issues: {

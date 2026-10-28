@@ -1,6 +1,12 @@
+import * as briefingApi from '@/apis/briefing/briefing';
+import {
+  readingGroups,
+  validIssueReading,
+  groupCompanies,
+} from '@/util/briefingIssueReading';
 import { render, screen, within, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import type { BriefingResponse } from '@/types/briefing';
 import { briefingIssueViews } from '@/util/briefingIssueView';
@@ -156,7 +162,10 @@ function fixture(): BriefingResponse {
     marketVariables: { status: 'unavailable', reason: '합성 시장 자료 없음' },
   } as unknown as BriefingResponse;
 }
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 describe('D-BRF-01/02 issue-centered reading', () => {
   it('keeps three distinct issues from the same company and never copies its judgment to unrelated issues', () => {
     const r = fixture(),
@@ -256,13 +265,13 @@ describe('D-BRF-01/02 issue-centered reading', () => {
     const headings = screen.getAllByRole('heading').map((x) => x.textContent);
     expect(headings).toEqual(['주요 시장 지표', '핵심 이슈']);
     expect(screen.queryByText('첫 사건 확인')).toBeNull();
-    expect(screen.queryByText('오늘 확인할 사건')).toBeNull();
+    expect(screen.queryByText('다음 확인사항')).toBeNull();
     expect(screen.queryByText('첫 사건의 사업상 의미')).toBeNull();
     const first = screen.getByText('서로 다른 사건 1').closest('summary')!;
     await user.click(first);
     expect(screen.getByText('첫 사건의 사업상 의미')).toBeTruthy();
     expect(
-      within(first.parentElement!).getByText('오늘 확인할 사건'),
+      within(first.parentElement!).getByText('다음 확인사항'),
     ).toBeTruthy();
     expect(
       within(first.parentElement!).getAllByText('첫 사건 확인').length,
@@ -480,5 +489,193 @@ describe('D-BRF-01/02 new issue/company AI revision', () => {
         v.companies.every((c) => !c.outlook && !c.assessment),
       ),
     ).toBe(true);
+  });
+  function reviewed() {
+    const value = fresh();
+    value.issueReading = {
+      schemaVersion: 'issue-reading-review-v1',
+      roundId: value.id,
+      baseResultVersion: value.issueIntelligence!.resultVersion,
+      cutoff: value.dataAsOf!,
+      groups: [
+        {
+          id: 'reviewed-event',
+          title: '같은 결정과 조건부 후속 절차',
+          issueIds: ['issue-1', 'issue-2'],
+          reason:
+            '원문 검토에서 동일 결정에 따른 조건부 집행 절차임을 확인했다.',
+          support: value.issueIntelligence!.issues.slice(0, 2).flatMap((i) =>
+            Object.values(i.sources).map((source) => ({
+              issueId: i.issueId,
+              ...source,
+            })),
+          ),
+        },
+      ],
+      issues: value.issueIntelligence!.issues.map((i) => ({
+        issueId: i.issueId,
+        whyImportant: s(
+          i.headline.evidenceIds[0],
+          '자본정책에 관한 중요한 변화다.',
+        ),
+        whyNow: s(
+          i.headline.evidenceIds[0],
+          '이번 회차에 이사회 승인이 새로 확인됐다.',
+        ),
+        priceUsedForRanking: false,
+        connections: i.companies.map((c) => ({
+          companyId: c.companyId,
+          position: 'primary' as const,
+          basis: s(c.sourceIds[0], '이 결정을 내린 직접 당사자다.'),
+        })),
+      })),
+    };
+    return value;
+  }
+  it('groups only explicitly reviewed components and preserves independent same-company events', () => {
+    const value = reviewed(),
+      original = structuredClone(value),
+      views = briefingIssueViews(value);
+    expect(
+      readingGroups({ ...value, issueReading: undefined }, views),
+    ).toHaveLength(3);
+    const groups = readingGroups(value, views);
+    expect(groups).toHaveLength(2);
+    expect(groups[0].members.map((v) => v.item.eventId)).toEqual([
+      'issue-1',
+      'issue-2',
+    ]);
+    expect(groups[1].members[0].item.eventId).toBe('issue-3');
+    expect(readingGroups(value, views, false)).toHaveLength(3);
+    expect(groupCompanies(groups[0])[0].view.refs).toHaveLength(2);
+    expect(value).toEqual(original);
+  });
+  it('rejects stale or changed grouping evidence and does not merge a partial personal view', () => {
+    const value = reviewed(),
+      views = briefingIssueViews(value);
+    expect(readingGroups(value, views.slice(1))).toHaveLength(2);
+    value.issueReading!.groups[0].support[0].quote = '검토 당시와 다른 원문';
+    expect(validIssueReading(value)).toBeNull();
+    expect(readingGroups(value, views)).toHaveLength(3);
+    value.issueReading = reviewed().issueReading;
+    value.issueReading!.baseResultVersion = 'another-version';
+    expect(validIssueReading(value)).toBeNull();
+  });
+  it('shows the selection rationale before expansion and keeps original IDs/actions inside the reviewed group', async () => {
+    const user = userEvent.setup(),
+      value = reviewed();
+    render(
+      <MemoryRouter>
+        <IssueCentricBriefing
+          result={value}
+          renderExtra={(i) => <button>{i.eventId} 원래 평가</button>}
+        />
+      </MemoryRouter>,
+    );
+    const title = screen.getByText('같은 결정과 조건부 후속 절차');
+    expect(title.closest('summary')!.textContent).toContain('선정 이유');
+    expect(title.closest('summary')!.textContent).toContain('자본정책');
+    expect(
+      screen.queryByRole('button', { name: 'issue-1 원래 평가' }),
+    ).toBeNull();
+    await user.click(title);
+    expect(screen.getAllByText('다음 확인사항').length).toBeGreaterThan(0);
+    expect(screen.queryByText('오늘 확인할 사건')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'issue-1 원래 평가' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'issue-2 원래 평가' }),
+    ).toBeTruthy();
+    expect(
+      screen.getAllByText('비교 가능한 이전 판단 없음').length,
+    ).toBeGreaterThan(0);
+  });
+  it('removes exact repeated common facts without deleting the stored paragraphs', async () => {
+    const user = userEvent.setup(),
+      value = reviewed();
+    value.issueReading!.groups = [];
+    const fact =
+      value.issueIntelligence!.issues[0].companies[0].newInformation.text;
+    value.items[0].summary = {
+      text: fact + '\n' + fact,
+      evidenceIds: ['e1'],
+      generatedAt: value.issueIntelligence!.generatedAt,
+      resultVersion: value.issueIntelligence!.resultVersion,
+    };
+    const original = structuredClone(value.items[0]);
+    render(
+      <MemoryRouter>
+        <IssueCentricBriefing result={value} />
+      </MemoryRouter>,
+    );
+    await user.click(screen.getByText(value.items[0].title));
+    const heading = screen
+      .getByText('공통으로 확인된 사실')
+      .closest('section')!;
+    expect(within(heading).getAllByText(fact)).toHaveLength(1);
+    expect(screen.queryByText('이 기업에 추가로 확인된 사실')).toBeNull();
+    expect(value.items[0]).toEqual(original);
+  });
+});
+
+describe('PR394 review boundaries for saved publications', () => {
+  it('shows issue conditions even if the company watch refers only to a different issue', async () => {
+    const r = fixture();
+    r.editionReview!.companies[0].watch = [s('e1', '첫 사건만 확인')];
+    const view = briefingIssueViews(r)[1];
+    expect(view.companies[0].impact).toBeUndefined();
+    expect(view.companies[0].nextChecks.map((c) => c.text)).toContain(
+      '두 번째 사건 확인',
+    );
+    render(
+      <MemoryRouter>
+        <IssueCentricBriefing result={r} />
+      </MemoryRouter>,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByText('서로 다른 사건 2'));
+    expect(screen.getByText('자세한 사업 분석·전망')).toBeTruthy();
+    expect(screen.getAllByText('두 번째 사건 확인').length).toBeGreaterThan(0);
+  });
+  it('keeps the current issues visible on previous GET failure and supports local retry', async () => {
+    const r = fixture();
+    r.editionReview!.previousReview = {
+      roundId: 'prior',
+      date: '2026-10-21',
+      edition: 'evening',
+      cutoff: '2026-10-21T08:30:00Z',
+      resultVersion: 'prior-version',
+      draft: { companies: [] },
+    };
+    const get = vi
+      .spyOn(briefingApi, 'getBriefing')
+      .mockRejectedValueOnce(new Error('503'))
+      .mockResolvedValueOnce({
+        ...fixture(),
+        id: 'prior',
+        date: '2026-10-21',
+        edition: 'evening',
+      });
+    render(
+      <MemoryRouter>
+        <IssueCentricBriefing result={r} />
+      </MemoryRouter>,
+    );
+    const user = userEvent.setup();
+    await screen.findByRole('button', { name: '이전 회차 다시 확인' });
+    await user.click(screen.getByText('서로 다른 사건 1'));
+    expect(screen.queryByText('비교 가능한 이전 판단 없음')).toBeNull();
+    expect(
+      screen.getByText('이전 회차 조회 실패로 판단 비교를 확인하지 못했어요.'),
+    ).toBeTruthy();
+    await user.click(
+      screen.getByRole('button', { name: '이전 회차 다시 확인' }),
+    );
+    await screen.findByText('비교 가능한 이전 판단 없음');
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(
+      screen.queryByRole('button', { name: '이전 회차 다시 확인' }),
+    ).toBeNull();
   });
 });
