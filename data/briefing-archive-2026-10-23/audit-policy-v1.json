@@ -1,0 +1,486 @@
+{
+  "schemaVersion": "zoop-archive-recheck-v1",
+  "archiveManifestSha256": "400be8c560283f5ae3e80a0aa88c65142f642d30feb4935fef9a20e8a9efd155",
+  "redactionMarkers": [
+    "[REDACTED_CREDENTIAL]"
+  ],
+  "textRules": [
+    {
+      "id": "private-key",
+      "pattern": "-----BEGIN (?:[A-Z ]*PRIVATE KEY)-----"
+    },
+    {
+      "id": "openai-key",
+      "pattern": "\\b(?:sk-(?:proj-|svcacct-)[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{32,})\\b"
+    },
+    {
+      "id": "github-or-aws-key",
+      "pattern": "\\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[A-Z0-9]{16})\\b"
+    },
+    {
+      "id": "jwt",
+      "pattern": "\\beyJ[A-Za-z0-9_-]+\\.eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\b"
+    },
+    {
+      "id": "bearer",
+      "pattern": "(?i)\\bBearer[ \\t]+[A-Za-z0-9_.~+/-]{12,}=*"
+    },
+    {
+      "id": "credential-assignment",
+      "pattern": "(?ix)(?:^|[?&]|[\"'\\s])(?:crtfc_key|api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|password|passwd|authorization|csrf[_-]?keys?)[\"']?\\s*[:=]\\s*[\"']?(?P<value>[^\\s\"'&<>;,}]{8,})"
+    }
+  ],
+  "credentialFieldPattern": "^(?:.*[_-])?(?:api[_-]?key|password|passwd|client[_-]?secret|access[_-]?token|refresh[_-]?token|id[_-]?token|authorization|proxy[_-]?authorization|cookie|set[_-]?cookie|csrf[_-]?(?:key|keys|secret)|private[_-]?key|secret[_-]?key|client[_-]?key|bearer|token)$",
+  "maximumExpandedBytesPerObject": 536870912,
+  "maximumArchiveDepth": 3,
+  "postgresColumns": {
+    "article_versions": [
+      "article_id",
+      "collected_at",
+      "publication_precision",
+      "published_at",
+      "published_date",
+      "publisher",
+      "raw_artifact_id",
+      "text_artifact_id",
+      "title",
+      "url",
+      "version"
+    ],
+    "articles": [
+      "access_status",
+      "created_at",
+      "current_version",
+      "id",
+      "kind",
+      "lineage_key",
+      "provider",
+      "provider_key"
+    ],
+    "artifacts": [
+      "bytes",
+      "created_at",
+      "id",
+      "kind",
+      "media_type",
+      "sha256",
+      "storage_uri"
+    ],
+    "briefing_changes": [
+      "admin_email_snapshot",
+      "admin_id",
+      "corrected",
+      "created_at",
+      "event_id",
+      "id",
+      "kind",
+      "original",
+      "reason",
+      "round_id",
+      "seq",
+      "suspended"
+    ],
+    "briefing_rounds": [
+      "attempt_no",
+      "comparison_snapshot",
+      "created_at",
+      "edition",
+      "failure_reason",
+      "generated_at",
+      "generation_token",
+      "graph_version_id",
+      "id",
+      "lease_until",
+      "morning_round_id",
+      "open_start",
+      "payload_sha256",
+      "public_snapshot",
+      "published_at",
+      "published_payload",
+      "review_revision",
+      "revision",
+      "round_date",
+      "rule_revision",
+      "scheduled_at",
+      "schema_version",
+      "stages",
+      "status",
+      "window_from",
+      "window_to"
+    ],
+    "companies": [
+      "aliases",
+      "brand_color",
+      "brand_source",
+      "created_at",
+      "exchange_code",
+      "id",
+      "logo_url",
+      "market",
+      "name",
+      "name_key",
+      "profile",
+      "search_text",
+      "ticker",
+      "updated_at"
+    ],
+    "company_catalog_revision": [
+      "revision",
+      "singleton"
+    ],
+    "evidence": [
+      "article_id",
+      "article_version",
+      "created_at",
+      "end_offset",
+      "id",
+      "input_kind",
+      "offset_unit",
+      "quote",
+      "quote_verified",
+      "raw_locator_ids",
+      "start_offset",
+      "summary_analysis_id",
+      "text_artifact_id",
+      "verification_artifact_id",
+      "verified_at"
+    ],
+    "graph_activations": [
+      "action",
+      "activated_at",
+      "actor_kind",
+      "admin_email_snapshot",
+      "admin_id",
+      "id",
+      "pointer_changed",
+      "previous_version_id",
+      "reason",
+      "version_id"
+    ],
+    "graph_versions": [
+      "active",
+      "article_count",
+      "candidate_count",
+      "created_at",
+      "created_by",
+      "graph_db_state",
+      "id",
+      "issue_count",
+      "kind",
+      "policy_version",
+      "published_at",
+      "reason",
+      "relation_count",
+      "review_revision",
+      "rule_revision",
+      "sequence",
+      "snapshot_artifact_id",
+      "source_label"
+    ],
+    "ai_executions": [],
+    "document_analyses": []
+  },
+  "syntheticEmailPattern": "[^@\\s]+@(?:[^@\\s]+\\.(?:test|invalid|example)|example\\.(?:com|org|net))",
+  "historicalRedactor": {
+    "algorithmSourceSha256": "d08ff6f0a6a813d7572d903bc2d6082efbd007ec5244cc27907c10746cdbfe78",
+    "rules": "Matching credential properties replaced recursively; literal private known-value list plus these text signature families; marker=[REDACTED_CREDENTIAL]. ZIP/gzip recursively checked, maximum depth 3 and expanded ZIP size 512MiB. Structured JSON/JSONL rewritten only when needed.",
+    "privateKnownValueListPublished": false,
+    "historicalPrivateListReproducedByThisCheck": false
+  },
+  "limits": [
+    "PASS covers only these public signature/field rules, fixed top-level PostgreSQL columns and administrative value policy; not all possible secrets or personal data.",
+    "Historical private known-value comparisons are not publicly reproducible and are not claimed by this recheck.",
+    "Empty ai_executions/document_analyses exports admit no rows under this fixed-snapshot policy.",
+    "Nested JSON is checked for credential fields, not given a universal personal-data clearance. Public article bylines/contact details may remain.",
+    "SQL and preserved scripts are scanned as data and never executed. SQL execution safety and source redistribution rights are not certified."
+  ],
+  "reviewedFieldExceptions": [
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/0/token",
+      "requiredSiblingKeys": [
+        "rank",
+        "type",
+        "score",
+        "token",
+        "typeID",
+        "subtype",
+        "entityID"
+      ],
+      "reason": "Article NLP entity label alongside entityID/type/rank/score; not an authentication token.",
+      "requiredValueTypes": {
+        "rank": "str",
+        "type": "str",
+        "score": "float",
+        "token": "str",
+        "typeID": "str",
+        "subtype": "str",
+        "entityID": "int"
+      }
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/1/token",
+      "requiredSiblingKeys": [
+        "rank",
+        "type",
+        "score",
+        "token",
+        "typeID",
+        "subtype",
+        "entityID"
+      ],
+      "reason": "Article NLP entity label alongside entityID/type/rank/score; not an authentication token.",
+      "requiredValueTypes": {
+        "rank": "str",
+        "type": "str",
+        "score": "float",
+        "token": "str",
+        "typeID": "str",
+        "subtype": "str",
+        "entityID": "int"
+      }
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/2/token",
+      "requiredSiblingKeys": [
+        "rank",
+        "type",
+        "score",
+        "token",
+        "typeID",
+        "subtype",
+        "entityID"
+      ],
+      "reason": "Article NLP entity label alongside entityID/type/rank/score; not an authentication token.",
+      "requiredValueTypes": {
+        "rank": "str",
+        "type": "str",
+        "score": "float",
+        "token": "str",
+        "typeID": "str",
+        "subtype": "str",
+        "entityID": "int"
+      }
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/3/token",
+      "requiredSiblingKeys": [
+        "rank",
+        "type",
+        "score",
+        "token",
+        "typeID",
+        "subtype",
+        "entityID"
+      ],
+      "reason": "Article NLP entity label alongside entityID/type/rank/score; not an authentication token.",
+      "requiredValueTypes": {
+        "rank": "str",
+        "type": "str",
+        "score": "float",
+        "token": "str",
+        "typeID": "str",
+        "subtype": "str",
+        "entityID": "int"
+      }
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/4/token",
+      "requiredSiblingKeys": [
+        "rank",
+        "type",
+        "score",
+        "token",
+        "typeID",
+        "subtype",
+        "entityID"
+      ],
+      "reason": "Article NLP entity label alongside entityID/type/rank/score; not an authentication token.",
+      "requiredValueTypes": {
+        "rank": "str",
+        "type": "str",
+        "score": "float",
+        "token": "str",
+        "typeID": "str",
+        "subtype": "str",
+        "entityID": "int"
+      }
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/5/token",
+      "requiredSiblingKeys": [
+        "rank",
+        "type",
+        "score",
+        "token",
+        "typeID",
+        "subtype",
+        "entityID"
+      ],
+      "reason": "Article NLP entity label alongside entityID/type/rank/score; not an authentication token.",
+      "requiredValueTypes": {
+        "rank": "str",
+        "type": "str",
+        "score": "float",
+        "token": "str",
+        "typeID": "str",
+        "subtype": "str",
+        "entityID": "int"
+      }
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/6/token",
+      "requiredSiblingKeys": [
+        "rank",
+        "type",
+        "score",
+        "token",
+        "typeID",
+        "subtype",
+        "entityID"
+      ],
+      "reason": "Article NLP entity label alongside entityID/type/rank/score; not an authentication token.",
+      "requiredValueTypes": {
+        "rank": "str",
+        "type": "str",
+        "score": "float",
+        "token": "str",
+        "typeID": "str",
+        "subtype": "str",
+        "entityID": "int"
+      }
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/7/token",
+      "requiredSiblingKeys": [
+        "rank",
+        "type",
+        "score",
+        "token",
+        "typeID",
+        "subtype",
+        "entityID"
+      ],
+      "reason": "Article NLP entity label alongside entityID/type/rank/score; not an authentication token.",
+      "requiredValueTypes": {
+        "rank": "str",
+        "type": "str",
+        "score": "float",
+        "token": "str",
+        "typeID": "str",
+        "subtype": "str",
+        "entityID": "int"
+      }
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/8/token",
+      "requiredSiblingKeys": [
+        "rank",
+        "type",
+        "score",
+        "token",
+        "typeID",
+        "subtype",
+        "entityID"
+      ],
+      "reason": "Article NLP entity label alongside entityID/type/rank/score; not an authentication token.",
+      "requiredValueTypes": {
+        "rank": "str",
+        "type": "str",
+        "score": "float",
+        "token": "str",
+        "typeID": "str",
+        "subtype": "str",
+        "entityID": "int"
+      }
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/9/token",
+      "requiredSiblingKeys": [
+        "rank",
+        "type",
+        "score",
+        "token",
+        "typeID",
+        "subtype",
+        "entityID"
+      ],
+      "reason": "Article NLP entity label alongside entityID/type/rank/score; not an authentication token.",
+      "requiredValueTypes": {
+        "rank": "str",
+        "type": "str",
+        "score": "float",
+        "token": "str",
+        "typeID": "str",
+        "subtype": "str",
+        "entityID": "int"
+      }
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/10/token",
+      "requiredSiblingKeys": [
+        "rank",
+        "type",
+        "score",
+        "token",
+        "typeID",
+        "subtype",
+        "entityID"
+      ],
+      "reason": "Article NLP entity label alongside entityID/type/rank/score; not an authentication token.",
+      "requiredValueTypes": {
+        "rank": "str",
+        "type": "str",
+        "score": "float",
+        "token": "str",
+        "typeID": "str",
+        "subtype": "str",
+        "entityID": "int"
+      }
+    },
+    {
+      "objectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+      "pointer": "/page/klangoo/entities/11/token",
+      "requiredSiblingKeys": [
+        "rank",
+        "type",
+        "score",
+        "token",
+        "typeID",
+        "subtype",
+        "entityID"
+      ],
+      "reason": "Article NLP entity label alongside entityID/type/rank/score; not an authentication token.",
+      "requiredValueTypes": {
+        "rank": "str",
+        "type": "str",
+        "score": "float",
+        "token": "str",
+        "typeID": "str",
+        "subtype": "str",
+        "entityID": "int"
+      }
+    }
+  ],
+  "publisherConfigRedaction": {
+    "revision": "review-fix-157",
+    "previousManifestSha256": "cc6ac6f3caafd03114f1a441642a54583867c82ef30c187ca84bab0d34d9fff9",
+    "replacedObjectSha256": "03dda6aef183b9937b85cbadc729132f454d2d030f09e2054e94499c4871014c",
+    "replacementObjectSha256": "145ce2580ad012773bf2396a49f175ca5aa8dd0f9b4d2dc5eb6f2c6d38ad114d",
+    "logicalFilesUpdated": 16,
+    "rule": "publisher-browser-analytics-key",
+    "pointer": "/analytics/tags/permutive/workspace_api_key",
+    "redactorSha256": "e3da5bab1beb6d21ff2e2c26160b2f36bbc742ab7b538bbda361790e1d506f50",
+    "reason": "Conservative removal of a captured third-party browser analytics key; no claim about key permissions or project credential exposure."
+  }
+}
