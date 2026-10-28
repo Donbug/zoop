@@ -120,6 +120,21 @@ class CompanySearchServiceTest {
         assertTrue(service.search("query", pinned.nextCursor(), null, null, null).asOfRequested());
     }
 
+    @Test
+    void countsFilteredAtAVersionsFirstActivationKeepLaterPagesFiltered() {
+        when(repository.search("query", null, 2L)).thenReturn(List.of(row("a"), row("b")));
+        var first = service.search("query", null, 1, "graph-7", null);
+        assertFalse(first.asOfRequested(), "a version alone is no requested asOf");
+        Instant firstActivation = Instant.parse("2026-10-08T00:00:00Z");
+
+        var pinned = service.pinGraphSnapshot(first, "graph-7", firstActivation, true);
+
+        assertTrue(pinned.asOfRequested());
+        var next = service.search("query", pinned.nextCursor(), null, null, null);
+        assertEquals(firstActivation, next.asOf());
+        assertTrue(next.asOfRequested(), "the counts were filtered at it, so later pages are too");
+    }
+
     private static void assertInvalidCursor(org.junit.jupiter.api.function.Executable executable) {
         assertInvalidCursor(executable, "cursor");
     }

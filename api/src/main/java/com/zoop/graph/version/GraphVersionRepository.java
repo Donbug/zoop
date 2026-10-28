@@ -17,6 +17,12 @@ public interface GraphVersionRepository {
     boolean everActivated(String versionId);
 
     /**
+     * When the version first became the active pointer (its earliest pointer change): the time a read of that version alone is
+     * pinned to (#88). Empty when it never was the pointer, so it is not publicly readable by id.
+     */
+    Optional<Instant> firstActivatedAt(String versionId);
+
+    /**
      * The version that was public just before {@code versionId} last became the active pointer at or before {@code at}
      * (Q05 "the previous map"); empty when it was the first, or never became the pointer by then. A store without
      * activation history has none.

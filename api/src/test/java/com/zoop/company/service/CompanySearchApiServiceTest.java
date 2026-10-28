@@ -38,7 +38,7 @@ class CompanySearchApiServiceTest {
         when(searchService.search("zoop", null, 10, null, null)).thenReturn(page);
         when(issueCountQuery.countIssues(List.of("company-1"), null, null, false))
                 .thenReturn(new CompanyIssueCountSnapshot("graph-12", asOf, Map.of("company-1", 3L)));
-        when(searchService.pinGraphSnapshot(page, "graph-12", asOf)).thenReturn(pinned);
+        when(searchService.pinGraphSnapshot(page, "graph-12", asOf, false)).thenReturn(pinned);
 
         var response = service.search("zoop", null, 10, null, null, "request-1");
 
@@ -66,6 +66,6 @@ class CompanySearchApiServiceTest {
                 () -> service.search(null, null, null, null, null, "request-1"));
 
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE, exception.getErrorCode());
-        verify(searchService, never()).pinGraphSnapshot(any(), any(), any());
+        verify(searchService, never()).pinGraphSnapshot(any(), any(), any(), anyBoolean());
     }
 }

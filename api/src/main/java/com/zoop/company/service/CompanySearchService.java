@@ -76,13 +76,19 @@ public class CompanySearchService {
     }
 
     public CompanySearchPage pinGraphSnapshot(CompanySearchPage page, String graphVersion, Instant asOf) {
+        return pinGraphSnapshot(page, graphVersion, asOf, page.asOfRequested());
+    }
+
+    /** filtered: the counts were filtered at asOf (a version-only first page reads as of its first activation, #88). */
+    public CompanySearchPage pinGraphSnapshot(CompanySearchPage page, String graphVersion, Instant asOf, boolean filtered) {
+        boolean asOfRequested = page.asOfRequested() || filtered;
         String nextCursor = page.nextCursor();
         if (nextCursor != null) {
             Position position = readPosition(nextCursor);
             nextCursor = encode(new Position(position.query(), graphVersion, asOf, position.limit(),
-                    position.rank(), position.name(), position.id(), position.catalogRevision(), page.asOfRequested()));
+                    position.rank(), position.name(), position.id(), position.catalogRevision(), asOfRequested));
         }
-        return new CompanySearchPage(page.items(), nextCursor, graphVersion, asOf, page.asOfRequested());
+        return new CompanySearchPage(page.items(), nextCursor, graphVersion, asOf, asOfRequested);
     }
 
     private String encode(Position position) {

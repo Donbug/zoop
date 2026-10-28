@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 
 /** Issue names in a question (decision of 2026-10-27): a whole title, or both target and action; shared words ask. */
 class IssueNameResolverTest {
+    private static final Instant EARLY = Instant.parse("2026-09-01T00:00:00Z");
     private static final Entry SUPPLY = new Entry("iss-supply", "차세대 GPU용 HBM 공급 계약", "HBM", "공급 계약", "2026-09-22");
     private static final Entry EQUIP = new Entry("iss-equip", "HBM 생산 장비 증설 발표", "HBM 장비", "증설", "2026-09-25");
     private static final Entry SUPPLY_AGAIN = new Entry("iss-supply-2", "HBM 추가 공급 계약 체결", "HBM", "공급 계약", "2026-10-02");
@@ -71,6 +72,9 @@ class IssueNameResolverTest {
         assertEquals(List.of("iss-fixture-hbm-supply"),
                 mentions.stream().map(m -> m.issues().getFirst().id()).toList());
         assertThrows(ChatToolUnavailable.class, () -> resolver.at("fixture-unknown", null));
+        // A run frozen without an asOf keeps its pin unfiltered; one frozen at a time is filtered there.
+        assertTrue(resolver.at("fixture-2026-10-08", EARLY).mentions("HBM 공급 계약 사건 알려줘").isEmpty(),
+                "filtered at the frozen time, before the issue was reported");
     }
 
     private static PublicGraphReader reader() {
@@ -88,6 +92,8 @@ class IssueNameResolverTest {
             public Optional<GraphVersionRecord> active() { return Optional.of(record); }
             public Optional<String> activeVersionIdAt(Instant asOf) { return Optional.of(id); }
             public boolean everActivated(String v) { return id.equals(v); }
+            // First published before any fixture issue was reported: a version-only read of it would show none (#88).
+            public Optional<Instant> firstActivatedAt(String v) { return everActivated(v) ? Optional.of(EARLY) : Optional.empty(); }
         };
         Clock clock = Clock.fixed(Instant.parse("2026-10-21T03:00:00Z"), ZoneOffset.UTC);
         return new PublicGraphReader(new GraphVersionSelector(versions, clock),

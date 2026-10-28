@@ -645,6 +645,7 @@ class ChatEvalSetTest {
                     return Optional.of(asOf.isBefore(Instant.parse("2026-10-08T00:00:00Z")) ? EARLIER : GRAPH);
                 }
                 public boolean everActivated(String id) { return known.containsKey(id); }
+                public Optional<Instant> firstActivatedAt(String id) { return EARLIER.equals(id) ? Optional.of(Instant.parse("2026-10-01T00:00:00Z")) : GRAPH.equals(id) ? Optional.of(Instant.parse("2026-10-08T00:00:00Z")) : Optional.empty(); }
                 public Optional<String> previousVersionId(String id, Instant at) {
                     return GRAPH.equals(id) ? Optional.of(EARLIER) : Optional.empty();
                 }

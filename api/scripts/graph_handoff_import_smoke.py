@@ -621,8 +621,24 @@ def verdict_read_phase(smoke, db, layout, layout4, world, vid4: str, previous: s
               "the verdict harness activation did not apply")
         harness_fingerprint = smoke.table_fingerprint()
 
-        # the real graph output: the pinned version and the default (active) read both hide the rejected time -------------------
-        for path in (f"/api/v1/graph?graphVersion={vid4}", "/api/v1/graph"):
+        # the version alone (#88) is read as of its first activation, rounded up to the millisecond, exactly as that asOf with the version:
+        # the factory issue rests only on an article without a publication instant, which cannot be shown as published by then ----------
+        code, pinned = get_json(web, f"/api/v1/graph?graphVersion={vid4}")
+        graph_reads += 1
+        first = at.replace(microsecond=at.microsecond // 1000 * 1000)
+        first = first if first == at else first + timedelta(milliseconds=1)
+        check(code == 200 and pinned["metadata"]["graphVersion"] == vid4
+              and datetime.fromisoformat(pinned["metadata"]["asOf"].replace("Z", "+00:00")) == first,
+              f"the version alone is not pinned to its first activation {first.isoformat()}: {code} {str(pinned)[:300]}")
+        code, again = get_json(web, f"/api/v1/graph?graphVersion={vid4}&asOf={urllib.parse.quote(pinned['metadata']['asOf'])}")
+        graph_reads += 1
+        check(code == 200 and {k: v for k, v in again.items() if k != "metadata"} == {k: v for k, v in pinned.items() if k != "metadata"},
+              f"the returned asOf sent back with the version does not open the same graph: {code} {str(again)[:300]}")
+        pinned_issues = {n["id"]: n for n in pinned["nodes"] if n["kind"] == "issue"}
+        check(set(pinned_issues) == {supply} and (pinned_issues[supply]["eventTime"], pinned_issues[supply]["timePrecision"]) == (None, "unknown"),
+              f"the pinned version: issue nodes {[(n['id'], n['eventTime'], n['timePrecision']) for n in pinned_issues.values()]}")
+        # the default (active) read has no asOf: both issues, the rejected time hidden ---------------------------------------------
+        for path in ("/api/v1/graph",):
             code, graph = get_json(web, path)
             graph_reads += 1
             check(code == 200 and graph["metadata"]["graphVersion"] == vid4, f"{path}: {code} {str(graph)[:300]}")
@@ -802,7 +818,9 @@ def approved_read_phase(approved: dict, db, layout, previous: str) -> dict:
         check(db.scalar("SELECT id FROM graph_versions WHERE active") == vid and db.scalar("SELECT count(*) FROM graph_activations") == 5,
               "the approved harness activation did not apply")
         harness_fingerprint = smoke.table_fingerprint()
-        code, graph = get_json(web, f"/api/v1/graph?graphVersion={vid}")
+        # The default read of the now active version: a read of the version alone is as of its first activation (#88), which hides an
+        # issue resting only on an article without a publication instant; what this world proves is its content, not that cut.
+        code, graph = get_json(web, "/api/v1/graph")
         check(code == 200 and graph["metadata"]["graphVersion"] == vid, f"the approved graph read: {code} {str(graph)[:300]}")
         issue_ids = {n["id"] for n in graph["nodes"] if n["kind"] == "issue"}
         check(issue_ids == set(hs.expected_support(world)), f"the approved graph's issues are not the hand-written ones: {sorted(issue_ids)}")
@@ -1068,7 +1086,8 @@ def path_read_phase(paths: dict, db, layout, previous: str) -> dict:
              "each restored byte-for-byte and served again")
 
         # no public node or path data in any public body ----------------------------------------------------------------------------
-        code, text = web.get(f"/api/v1/graph?graphVersion={vid}")
+        # The default read of the now active version (a read of the version alone is as of its back-dated first activation, #88).
+        code, text = web.get("/api/v1/graph")
         bodies.append(text)
         graph_reads += 1
         graph = json.loads(text) if code == 200 else {}
@@ -1448,8 +1467,10 @@ def impact_read_phase(impact: dict, db, layout, previous: str) -> dict:
         direct = served(web, direct_id, "the round's ordinary direct evidence", **round_params)
         check(direct["eventIds"] == ["issue:supply-2026q3"], f"the round's direct event membership changed: {direct}")
         basis_id, outside_id = hs.evidence_id(world, "a", hs.SUP), hs.evidence_id(world, "b", hs.QB)
-        served(web, basis_id, "the basis span is proven in the unfiltered impact version", graphVersion=vid)
-        served(web, outside_id, "the other issue's span exists in the unfiltered impact version", graphVersion=vid)
+        # Unfiltered: the default read of the active impact version (a read of the version alone is as of its first activation, #88).
+        for eid, why in ((basis_id, "the basis span is proven in the unfiltered impact version"),
+                         (outside_id, "the other issue's span exists in the unfiltered impact version")):
+            check(served(web, eid, why)["metadata"]["graphVersion"] == vid, f"{why}: not the active impact version")
         withheld(web, basis_id, "same-article candidate is not proof before structural verification", **round_params)
         withheld(web, outside_id, "the factory evidence is outside the supply-only round", **round_params)
         for change in ({"graphVersion": previous}, {"asOf": (round_fixture["cutoff"] + timedelta(seconds=1)).isoformat()}):

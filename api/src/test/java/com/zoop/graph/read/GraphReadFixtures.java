@@ -56,7 +56,28 @@ final class GraphReadFixtures {
                 return Optional.of(asOf.isBefore(Instant.parse("2026-10-08T00:00:00Z")) ? "fixture-2026-10-01" : "fixture-2026-10-08");
             }
             public boolean everActivated(String id) { return versions.containsKey(id); }
+            public Optional<Instant> firstActivatedAt(String id) {
+                // The fixture activation history: each fixture became active on its own date.
+                return versions.containsKey(id) ? Optional.of(Instant.parse(id.substring("fixture-".length()) + "T00:00:00Z"))
+                        : Optional.empty();
+            }
         };
+    }
+
+    /** The active fixture with its first article's publication time unknown: a read as of its first activation drops it. */
+    static com.zoop.graph.snapshot.PublicGraphSnapshot withAnUndatedArticle() {
+        var base = snapshot("fixture-2026-10-08");
+        var articles = base.articles().stream().map(a -> a == base.articles().getFirst()
+                ? new PublicGraphSnapshot.Article(a.articleId(), a.version(), a.title(), a.url(), null) : a).toList();
+        return new PublicGraphSnapshot(base.snapshotFormat(), base.versionId(), base.sourceBundleId(), base.companies(),
+                base.issues(), base.relations(), articles, base.evidence());
+    }
+
+    /** A reader over {@link #withAnUndatedArticle} for every version, at a fixed request time. */
+    static PublicGraphReader undatedReader(Instant now) {
+        var snapshot = withAnUndatedArticle();
+        return new PublicGraphReader(new GraphVersionSelector(repository(), Clock.fixed(now, ZoneOffset.UTC)),
+                version -> snapshot, pinned -> DisclosureExclusions.NONE);
     }
 
     static PublicGraphReader reader(Instant now, DisclosureExclusionReader exclusions) {

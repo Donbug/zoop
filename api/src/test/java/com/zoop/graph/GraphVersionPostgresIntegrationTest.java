@@ -30,6 +30,16 @@ import com.zoop.graph.version.JdbcGraphVersionRepository.NewGraphVersion;
 import com.zoop.portfolio.service.PortfolioService;
 import java.sql.Timestamp;
 import java.time.Duration;
+import static org.mockito.Mockito.mock;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.jayway.jsonpath.JsonPath;
+import com.zoop.auth.service.MemberSessionService;
+import com.zoop.common.exception.GlobalExceptionHandler;
+import com.zoop.common.request.RequestIdFilter;
+import com.zoop.graph.read.GraphController;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -139,6 +149,22 @@ class GraphVersionPostgresIntegrationTest {
     }
 
     @Test
+    void aVersionAloneOverHttpReturnsTheTimeThatOpensItAgain() throws Exception {
+        // The version before the active one, read through the real selector, store and DB; sessions are not needed for mode=all.
+        var mvc = MockMvcBuilders.standaloneSetup(new GraphController(context.getBean(GraphQueryService.class),
+                        mock(MemberSessionService.class), mock(PersonalCompanies.class)))
+                .setControllerAdvice(new GlobalExceptionHandler()).addFilters(new RequestIdFilter()).build();
+        String body = mvc.perform(get("/api/v1/graph").param("mode", "all").param("graphVersion", "fixture-2026-10-01"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String asOf = JsonPath.read(body, "$.metadata.asOf");
+        assertEquals(Instant.parse("2026-10-01T00:00:00Z"), Instant.parse(asOf), "its first publication, not the request time");
+
+        // Sent back as a browser would keep it (millisecond ISO time) with the version: the same version opens.
+        mvc.perform(get("/api/v1/graph").param("mode", "all").param("graphVersion", "fixture-2026-10-01").param("asOf", asOf))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.metadata.graphVersion").value("fixture-2026-10-01"));
+    }
+
+    @Test
     void thePreviousVersionIsTheOnePublicBeforeTheLastActivationUpToTheGivenTime() {
         Instant later = Instant.parse("2026-10-20T00:00:00Z");
         assertEquals(java.util.Optional.of("fixture-2026-10-01"), repository.previousVersionId("fixture-2026-10-08", later));
@@ -163,6 +189,12 @@ class GraphVersionPostgresIntegrationTest {
                 "SELECT pointer_changed FROM graph_activations WHERE reason = 'no-op'", Boolean.class));
         assertEquals("fixture-2026-10-01", selector.select(null, null, Instant.parse("2026-10-12T00:00:00Z")).version().id());
         assertEquals("fixture-2026-10-08", selector.select(null, null, Instant.parse("2026-10-10T12:00:00Z")).version().id());
+        // A version alone is read as of its first publication, which a rollback does not move (#88).
+        assertEquals(Optional.of(Instant.parse("2026-10-01T00:00:00Z")), repository.firstActivatedAt("fixture-2026-10-01"));
+        var alone = selector.select(null, "fixture-2026-10-01", null);
+        assertEquals(Instant.parse("2026-10-01T00:00:00Z"), alone.asOf());
+        assertEquals("fixture-2026-10-01", selector.select(null, "fixture-2026-10-01", alone.asOf()).version().id());
+        assertEquals(Optional.empty(), repository.firstActivatedAt("never-registered"));
     }
 
     @Test

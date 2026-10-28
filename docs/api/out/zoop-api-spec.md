@@ -56,7 +56,7 @@ POST 가입·로그인·소셜 가입 완료·명시적 소셜 연결 시작과 
 
 ### publicationVersions
 
-그래프·사건·관계·근거 조회는 선택 graphVersion 또는 asOf를 받는다. 생략하면 한 요청 시작 시 활성 공개 버전을 고정하고 응답 metadata.graphVersion/asOf에 반환한다. 둘을 함께 지정하면 일치해야 한다. asOf는 그 시점 이전 공개 버전을 선택하며 이후 공개 자료는 사용하지 않는다. round는 발행 회차가 고정한 버전과 회차 마감 시각을 함께 뜻한다. round와 graphVersion/asOf를 함께 지정하면 저장된 회차 기준과 정확히 같아야 한다. 회차의 저장 버전은 데이터 마감 이후 발행될 수 있으므로 activeVersionAt(asOf)로 다시 선택하지 않는다. 고정 버전 부재는 VERSION_UNAVAILABLE이며 최신 자료로 대체하지 않는다. 과거 로컬 회차의 별도 재구성본은 graphOrigin=reconstructed로 구분하고 원본 발행 버전·문안을 변경하지 않으며, 재구성 ID는 round 문맥 없이 직접 조회할 수 없다. 브리핑은 그래프 버전·자료·시장 지표·긍부정을 발행 시 고정한다. 정정은 원문 밖에 덧붙인다.
+그래프·사건·관계·근거 조회는 선택 graphVersion 또는 asOf를 받는다. 생략하면 한 요청 시작 시 활성 공개 버전을 고정하고 응답 metadata.graphVersion/asOf에 반환한다. 둘을 함께 지정하면 일치해야 한다. asOf는 그 시점 이전 공개 버전을 선택하며 이후 공개 자료는 사용하지 않는다. graphVersion만 지정하면 그 버전이 처음 공개(활성화)된 시각을 asOf로 삼아 asOf와 그 버전을 함께 지정한 조회와 똑같이 처리하고, 그 시각을 metadata.asOf에 반환한다(밀리초 단위로 올림하며, 되돌리기로 다시 활성화돼도 바뀌지 않는다). 반환된 asOf와 graphVersion을 함께 보내면 같은 결과를 연다. 예외로 같은 밀리초 안에 다른 버전이 이어 활성화되어 그 시각이 이 버전을 선택하지 못하면 요청 시각을 metadata.asOf로 반환하고 시점 필터 없이 처리하며, 이때 그 asOf를 함께 보낸 조회는 422가 될 수 있다. 커서 다음 페이지·질문 고정 맥락 등 서버가 이미 고정한 조회를 다시 읽을 때는 이 규칙으로 다시 해석하지 않고 첫 조회의 기준 시각과 필터 적용 여부를 유지한다. round는 발행 회차가 고정한 버전과 회차 마감 시각을 함께 뜻한다. round와 graphVersion/asOf를 함께 지정하면 저장된 회차 기준과 정확히 같아야 한다. 회차의 저장 버전은 데이터 마감 이후 발행될 수 있으므로 activeVersionAt(asOf)로 다시 선택하지 않는다. 고정 버전 부재는 VERSION_UNAVAILABLE이며 최신 자료로 대체하지 않는다. 과거 로컬 회차의 별도 재구성본은 graphOrigin=reconstructed로 구분하고 원본 발행 버전·문안을 변경하지 않으며, 재구성 ID는 round 문맥 없이 직접 조회할 수 없다. 브리핑은 그래프 버전·자료·시장 지표·긍부정을 발행 시 고정한다. 정정은 원문 밖에 덧붙인다.
 
 ### partialFailures
 
@@ -836,7 +836,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | depth | query | 선택 | integer / null | Hops from the focus; omit for the whole connected component. |
 | round | query | 선택 | string / null | Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/v1/briefings/{id}/graph. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
-| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
+| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. 단독으로 지정하면 그 버전이 처음 공개된 시각 기준으로 조회하고 그 시각을 metadata.asOf로 돌려준다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 | personalFilter | query | 선택 | string {all, holdings, watchlist} | 개인화 모드의 기준 기업 범위. 전체 모드에서는 적용하지 않는다. |
 
@@ -867,7 +867,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | id | path | 필수 | string |  |
 | round | query | 선택 | string / null | Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/v1/briefings/{id}/graph. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
-| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
+| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. 단독으로 지정하면 그 버전이 처음 공개된 시각 기준으로 조회하고 그 시각을 metadata.asOf로 돌려준다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 
 <a id="searchcompanies"></a>
@@ -898,7 +898,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
 | limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
-| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
+| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. 단독으로 지정하면 그 버전이 처음 공개된 시각 기준으로 조회하고 그 시각을 metadata.asOf로 돌려준다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 
 <a id="getcompany"></a>
@@ -928,7 +928,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | id | path | 필수 | string |  |
 | round | query | 선택 | string / null | Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/v1/briefings/{id}/graph. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
-| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
+| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. 단독으로 지정하면 그 버전이 처음 공개된 시각 기준으로 조회하고 그 시각을 metadata.asOf로 돌려준다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 
 <a id="getcompanyquote"></a>
@@ -984,7 +984,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string |  |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
-| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
+| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. 단독으로 지정하면 그 버전이 처음 공개된 시각 기준으로 조회하고 그 시각을 metadata.asOf로 돌려준다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 
 <a id="getcompanyprices"></a>
@@ -1045,7 +1045,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
 | limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
-| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
+| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. 단독으로 지정하면 그 버전이 처음 공개된 시각 기준으로 조회하고 그 시각을 metadata.asOf로 돌려준다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 | kind | query | 선택 | string {news, disclosure} |  |
 | round | query | 선택 | string | 브리핑 회차 ID. 회차가 고정한 버전·마감 시각과 선정 이슈 범위의 문서만 반환한다. cursor도 회차·버전·시각에 결속하며 다른 회차로 재사용하면 INVALID_CURSOR다. 현재 접근 권한·정확 인용을 재확인하고 최신 문서나 새 분석으로 대체하지 않는다. 재구성 자료는 metadata.source=briefing_reconstructed_graph로 구분한다. |
@@ -1083,7 +1083,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
 | limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
-| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
+| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. 단독으로 지정하면 그 버전이 처음 공개된 시각 기준으로 조회하고 그 시각을 metadata.asOf로 돌려준다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 
 <a id="getevent"></a>
@@ -1113,7 +1113,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | id | path | 필수 | string |  |
 | round | query | 선택 | string / null | Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/v1/briefings/{id}/graph. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
-| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
+| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. 단독으로 지정하면 그 버전이 처음 공개된 시각 기준으로 조회하고 그 시각을 metadata.asOf로 돌려준다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 
 <a id="getevidence"></a>
@@ -1143,7 +1143,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | id | path | 필수 | string |  |
 | round | query | 선택 | string / null | Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/v1/briefings/{id}/graph. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
-| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
+| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. 단독으로 지정하면 그 버전이 처음 공개된 시각 기준으로 조회하고 그 시각을 metadata.asOf로 돌려준다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 | companyId | query | 선택 | string | 기업 맥락을 지정하면 승인 연결을 검증하고 해당 기업 판정만 반환한다. 생략하면 sentiment=null이다. |
 
@@ -2821,7 +2821,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | issueId | path | 필수 | string |  |
 | round | query | 선택 | string | 이 브리핑 회차의 공개 그래프를 고정한다. graphVersion과 함께 쓰면 해당 회차와 일치해야 한다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
-| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
+| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. 단독으로 지정하면 그 버전이 처음 공개된 시각 기준으로 조회하고 그 시각을 metadata.asOf로 돌려준다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 
 <a id="getpersonalizedbriefing"></a>
@@ -2880,7 +2880,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | id | path | 필수 | string |  |
 | asOf | query | 필수 | string (date-time) | 사건 선택에 따라 조회할 정확한 기준 시각. RFC 3339 오프셋이 필수다. |
 | depth | query | 선택 | integer {1, 2} | 명세의 시점별 그래프 범위 1-hop 또는 2-hop. 운영상의 임의 페이지 상한과 구분한다. |
-| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
+| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. 단독으로 지정하면 그 버전이 처음 공개된 시각 기준으로 조회하고 그 시각을 metadata.asOf로 돌려준다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
 ## 공통 스키마
