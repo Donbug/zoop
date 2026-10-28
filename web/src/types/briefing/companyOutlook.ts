@@ -23,6 +23,14 @@ export type CompanyOutlook = {
     watch?: CompanyStatement;
     change?: CompanyStatement;
   };
+  card?: {
+    schemaVersion: 'zoop-company-card-v1';
+    status: 'PASS' | 'WITHHELD';
+    resultVersion: string;
+    topic?: CompanyStatement;
+    title?: CompanyStatement;
+    description?: CompanyStatement;
+  };
   price?: CompanyPrice;
   previous?: {
     status: 'available' | 'unavailable';

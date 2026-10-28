@@ -7,9 +7,19 @@ import FeedbackButtons from '@/components/common/FeedbackButtons';
 import { usePersonalBriefing } from '@/hooks/usePersonalBriefing';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import type { FeedbackValue } from '@/types/feedback';
-import type { BriefingEdition, BriefingResponse } from '@/types/briefing';
+import type {
+  BriefingEdition,
+  BriefingItem,
+  BriefingResponse,
+} from '@/types/briefing';
 import { briefingTime } from '@/util/briefingTime';
 import CompanyOutlooks from './CompanyOutlooks';
+import JudgmentUpdate from './JudgmentUpdate';
+import EditionReview from './EditionReview';
+import IssueCentricBriefing from './IssueCentricBriefing';
+import { BriefingS3Disclosure } from './BriefingS3Impacts';
+import { validEditionReview } from '@/util/editionReview';
+import { validJudgment } from '@/util/judgmentUpdate';
 import BriefingReadingSection from './BriefingReadingSection';
 import MarketIndicators from './MarketIndicators';
 import MarketSummary from './MarketSummary';
@@ -20,6 +30,7 @@ import BriefingComparison from './BriefingComparison';
 import PersonalBasisNotice from './PersonalBasisNotice';
 import { hasOnlyKnownLimitations } from './briefingLimitations';
 import {
+  BODY,
   CARD,
   EMPTY,
   NOTE,
@@ -224,9 +235,90 @@ export default function PublishedBriefing({
     </div>
   );
 
+  const issueExtra = (item: BriefingItem) =>
+    result && (
+      <div className="mt-1 flex flex-col gap-2">
+        {!compact && <BriefingS3Disclosure round={result} item={item} />}
+        <Link
+          to={`/?round=${encodeURIComponent(result.id)}&select=${encodeURIComponent(`node:${item.eventId}`)}`}
+          className={`self-start text-[11px] font-semibold underline underline-offset-4 ${FOCUS_RING}`}
+        >
+          이 회차 관계 그래프에서 보기
+        </Link>
+        {result.graphVersion && (
+          <FeedbackButtons
+            key={`${feedbackKey}:${item.eventId}`}
+            feature="briefing_issue"
+            targetId={`${result.id}/${item.eventId}`}
+            targetVersion={result.graphVersion}
+            subject={`핵심 이슈 ${item.rank}`}
+            saved={saved('briefing_issue', `${result.id}/${item.eventId}`)}
+          />
+        )}
+      </div>
+    );
+
+  const feedbackReadError = myFeedback?.key === feedbackKey &&
+    myFeedback?.error && (
+      <p role="alert" className={EMPTY}>
+        내 평가를 불러오지 못해 평가 버튼을 잠시 사용할 수 없어요.{' '}
+        <button
+          type="button"
+          className={FOCUS_RING}
+          onClick={() => setFeedbackAttempt((value) => value + 1)}
+        >
+          내 평가 다시 확인
+        </button>
+      </p>
+    );
+  const roundFeedback = result && (
+    <section className={SECTION} aria-label="이 브리핑 평가">
+      <h3 className={SECTION_TITLE}>이 브리핑은 어땠나요?</h3>
+      {result.graphVersion ? (
+        <FeedbackButtons
+          key={`${feedbackKey}:round`}
+          feature="briefing_round"
+          targetId={result.id}
+          targetVersion={result.graphVersion}
+          subject="이 브리핑 회차"
+          saved={saved('briefing_round', result.id)}
+        />
+      ) : (
+        <p className={NOTE}>
+          이 회차는 결과 버전이 없어 평가를 남길 수 없어요.
+        </p>
+      )}
+    </section>
+  );
+
   const currentContext = result && (
     <>
-      <CompanyOutlooks result={result} compact={compact} />
+      <EditionReview result={result} compact={compact} />
+      {validEditionReview(result) ? (
+        <BriefingReadingSection compact title="이전 분석·기업 시세·근거 보존본">
+          <JudgmentUpdate result={result} compact={compact} />
+          <CompanyOutlooks result={result} compact={false} />
+        </BriefingReadingSection>
+      ) : (
+        <>
+          <JudgmentUpdate result={result} compact={compact} />
+          {validJudgment(result) ? (
+            <BriefingReadingSection
+              compact
+              title="기존 생성 전문·시세·근거 보존본"
+            >
+              <p className={NOTE}>
+                아래는 비교 분석 추가 전 생성한 문안입니다. 좁은 인용에 따른
+                과거의 ‘일정 미확인’ 표현은 위의 원문 전체 기반 판단을
+                확인하세요.
+              </p>
+              <CompanyOutlooks result={result} compact={false} />
+            </BriefingReadingSection>
+          ) : (
+            <CompanyOutlooks result={result} compact={compact} />
+          )}
+        </>
+      )}
       {compact && (
         <MarketIndicators variables={result.marketVariables} compact />
       )}
@@ -298,10 +390,42 @@ export default function PublishedBriefing({
               {result.notice.reason && ` · ${result.notice.reason}`}
             </p>
           )}
-          {result.continuity && result.continuity.mode !== 'core' && (
-            <BriefingContinuity value={result.continuity} compact={compact} />
+          {!compact &&
+            result.continuity &&
+            result.continuity.mode !== 'core' && (
+              <BriefingContinuity value={result.continuity} compact={compact} />
+            )}
+          {result.status === 'published' && compact && (
+            <>
+              {personal && (
+                <PersonalBasisNotice
+                  member={Boolean(memberId)}
+                  checking={checking}
+                  state={personalView.state}
+                  dataAsOf={result.dataAsOf}
+                  onRetry={personalView.reload}
+                />
+              )}
+              {!knownLimits && partialInfo}
+              {feedbackReadError}
+              <IssueCentricBriefing
+                result={result}
+                items={(personalBriefing ?? result).items}
+                renderExtra={issueExtra}
+              />
+              {result.corrections.length > 0 && (
+                <section className={SECTION}>
+                  <h3 className={SECTION_TITLE}>정정 이력</h3>
+                  {result.corrections.map((c) => (
+                    <p key={c.id} className={BODY}>
+                      {c.corrected} · {c.reason}
+                    </p>
+                  ))}
+                </section>
+              )}
+            </>
           )}
-          {result.status === 'published' && (
+          {result.status === 'published' && !compact && (
             <BriefingReadingSection
               compact={
                 compact &&
@@ -329,47 +453,14 @@ export default function PublishedBriefing({
                   onRetry={personalView.reload}
                 />
               )}
-              {myFeedback?.key === feedbackKey && myFeedback?.error && (
-                <p role="alert" className={EMPTY}>
-                  내 평가를 불러오지 못해 평가 버튼을 잠시 사용할 수 없어요.{' '}
-                  <button
-                    type="button"
-                    className={FOCUS_RING}
-                    onClick={() => setFeedbackAttempt((value) => value + 1)}
-                  >
-                    내 평가 다시 확인
-                  </button>
-                </p>
-              )}
+              {feedbackReadError}
               <BriefingIssueList
                 compact={compact}
                 items={(personalBriefing ?? result).items}
                 roundId={result.id}
                 graphVersion={result.graphVersion}
                 graphHref={`/?round=${encodeURIComponent(result.id)}`}
-                renderExtra={(item) => (
-                  <div className="mt-1 flex flex-col gap-2">
-                    <Link
-                      to={`/?round=${encodeURIComponent(result.id)}&select=${encodeURIComponent(`node:${item.eventId}`)}`}
-                      className={`self-start text-[11px] font-semibold underline underline-offset-4 ${FOCUS_RING}`}
-                    >
-                      이 회차 관계 그래프에서 보기
-                    </Link>
-                    {result.graphVersion && (
-                      <FeedbackButtons
-                        key={`${feedbackKey}:${item.eventId}`}
-                        feature="briefing_issue"
-                        targetId={`${result.id}/${item.eventId}`}
-                        targetVersion={result.graphVersion}
-                        subject={`핵심 이슈 ${item.rank}`}
-                        saved={saved(
-                          'briefing_issue',
-                          `${result.id}/${item.eventId}`,
-                        )}
-                      />
-                    )}
-                  </div>
-                )}
+                renderExtra={issueExtra}
               />
               <BriefingReadingSection
                 compact={compact}
@@ -415,23 +506,12 @@ export default function PublishedBriefing({
                   </ol>
                 </section>
               )}
-              <section className={SECTION} aria-label="이 브리핑 평가">
-                <h3 className={SECTION_TITLE}>이 브리핑은 어땠나요?</h3>
-                {result.graphVersion ? (
-                  <FeedbackButtons
-                    key={`${feedbackKey}:round`}
-                    feature="briefing_round"
-                    targetId={result.id}
-                    targetVersion={result.graphVersion}
-                    subject="이 브리핑 회차"
-                    saved={saved('briefing_round', result.id)}
-                  />
-                ) : (
-                  <p className={NOTE}>
-                    이 회차는 결과 버전이 없어 평가를 남길 수 없어요.
-                  </p>
-                )}
-              </section>
+              {roundFeedback}
+            </BriefingReadingSection>
+          )}
+          {compact && result.status === 'published' && (
+            <BriefingReadingSection compact title="이 브리핑 평가">
+              {roundFeedback}
             </BriefingReadingSection>
           )}
           {compact && (

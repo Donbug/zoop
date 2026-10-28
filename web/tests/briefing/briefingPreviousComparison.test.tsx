@@ -107,12 +107,12 @@ describe('D-BRF-01 이전 퇴근 브리핑 대비', () => {
       true,
     );
     expect(
-      await screen.findByRole('heading', { name: '기업별 전망 미제공' }),
+      await screen.findByRole('heading', { name: '핵심 이슈' }),
     ).toBeTruthy();
     expect(screen.queryByRole('heading', { name: '오늘의 전망' })).toBeNull();
     expect(
-      screen.getByText('시장 지수 설명은 별도 시장 요약입니다.'),
-    ).toBeTruthy();
+      screen.queryByText('시장 지수 설명은 별도 시장 요약입니다.'),
+    ).toBeNull();
   });
 
   it('이전 성공 발행본이 출근이면 출근 제목과 실제 날짜로 연결한다', async () => {

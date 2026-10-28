@@ -16,12 +16,15 @@ VERSION = 'company-reading-v1'
 SCHEMA = 'zoop-company-reading-v1'
 V2 = 'company-reading-v2'
 SCHEMA_V2 = 'zoop-company-reading-v2'
+CARD = 'company-card-v1'
+SCHEMA_CARD = 'zoop-company-card-v1'
+CARD_QUALITY = ('concise', 'distinctRoles', 'qualifiersPreserved', 'noUnsupportedClaim')
 QUALITY = ('specificity', 'newInformation', 'continuity', 'nonRepetition')
 
 
 def freeze(row, version=VERSION):
-    company.require(version in (VERSION, V2), 'reading_version')
-    return {'schemaVersion': SCHEMA_V2 if version == V2 else SCHEMA, 'roundId': row['roundId'], 'edition': row['edition'], 'cutoff': row['cutoff'],
+    company.require(version in (VERSION, V2, CARD), 'reading_version')
+    return {'schemaVersion': SCHEMA_CARD if version == CARD else SCHEMA_V2 if version == V2 else SCHEMA, 'roundId': row['roundId'], 'edition': row['edition'], 'cutoff': row['cutoff'],
             'companyResultVersion': row['resultVersion'], 'draft': row['draft'], 'targets': row['frozen']['targets'],
             'sources': row['frozen']['sources']}
 
@@ -32,7 +35,8 @@ def schema(frozen):
         value['properties']['text']['maxLength'] = length
         return value
     v2 = frozen.get('schemaVersion', SCHEMA) == SCHEMA_V2
-    fields = {'brief': s(140), 'fact': s(160), 'watch': s(180), 'background': s(240), 'change': s(180)} if v2 else {'brief': s(70), 'watch': s(50), 'change': s(60)}
+    card = frozen.get('schemaVersion') == SCHEMA_CARD
+    fields = {'topic': s(12), 'title': s(32), 'description': s(64)} if card else {'brief': s(140), 'fact': s(160), 'watch': s(180), 'background': s(240), 'change': s(180)} if v2 else {'brief': s(70), 'watch': s(50), 'change': s(60)}
     item = company.obj({'companyId': {'type': 'string', 'enum': [t['companyId'] for t in frozen['targets']]},
                         **fields})
     count = len(frozen['targets'])
@@ -43,12 +47,13 @@ def validate(draft, frozen):
     base.validate_schema(draft, schema(frozen))
     expected = {t['companyId']: t for t in frozen['targets']}
     company.require({c['companyId'] for c in draft['companies']} == set(expected), 'reading_coverage')
-    if frozen.get('schemaVersion', SCHEMA) == SCHEMA_V2:
-        for key in ('brief', 'watch'):
+    card = frozen.get('schemaVersion') == SCHEMA_CARD
+    if frozen.get('schemaVersion', SCHEMA) == SCHEMA_V2 or card:
+        for key in (('title',) if card else ('brief', 'watch')):
             normalized = [c[key]['text'].translate(str.maketrans('', '', ' \t\r\n')) for c in draft['companies']]
             company.require(len(set(normalized)) == len(normalized), 'reading_repeated_' + key)
     for c in draft['companies']:
-        for key in (('brief', 'fact', 'watch', 'background', 'change') if frozen.get('schemaVersion', SCHEMA) == SCHEMA_V2 else ('brief', 'watch', 'change')):
+        for key in (('topic', 'title', 'description') if card else ('brief', 'fact', 'watch', 'background', 'change') if frozen.get('schemaVersion', SCHEMA) == SCHEMA_V2 else ('brief', 'watch', 'change')):
             s = c[key]
             company.require(set(s['evidenceIds']) <= set(expected[c['companyId']]['sourceIds']), 'reading_foreign_source')
             company.require(len(s['evidenceIds']) == len(set(s['evidenceIds'])), 'reading_duplicate_source')
@@ -56,34 +61,42 @@ def validate(draft, frozen):
 
 def verification_schema(frozen):
     value = company.verification_schema(frozen)
-    if frozen.get('schemaVersion', SCHEMA) == SCHEMA_V2:
+    card = frozen.get('schemaVersion') == SCHEMA_CARD
+    if frozen.get('schemaVersion', SCHEMA) == SCHEMA_V2 or card:
         item = value['properties']['checks']['items']
-        item['properties']['quality'] = company.obj({k: {'type': 'boolean'} for k in QUALITY})
+        item['properties']['quality'] = company.obj({k: {'type': 'boolean'} for k in (CARD_QUALITY if card else QUALITY)})
         item['required'].append('quality')
     return value
 
 
-def assess(client, frozen):
-    attempts = []
+def assess(client, frozen, initial_attempts=None, card_prompt_version=CARD):
+    attempts = list(initial_attempts or [])
+    card = frozen.get('schemaVersion') == SCHEMA_CARD
+    company.require(not card or len(attempts) <= 4, 'card_attempt_limit')
+    prefix = 'company_card_' if card else 'company_reading_'
+    limit = 2000 if card else 5000
     for _ in range(2):
-        data = {'frozen': frozen, 'repair': attempts[-1] if attempts else None}
+        repair = attempts[-1] if attempts else None
+        if card and repair is not None:
+            repair = {'previousAttempt': repair, 'guidance': '제목은 자연스러운 짧은 사건 명사구로 다시 작성하세요. 날짜·금액을 모두 담으려 자르거나 조사를 남기지 마세요. 부차적인 효력 날짜는 제목에서 통째로 생략할 수 있습니다. 날짜를 유지한다면 예정·목표 상태를 반드시 포함하세요. 주제와 설명도 각각 검증하세요.'}
+        data = {'frozen': frozen, 'repair': repair}
         gs = schema(frozen)
-        gd = client.request_digest('company_reading_generation', data, 'generation.md', 'unused', 5000, gs)
-        draft = client.call('company_reading_generation', data, 'generation.md', 'unused', 5000, gs)
+        gd = client.request_digest(prefix + 'generation', data, 'generation.md', 'unused', limit, gs)
+        draft = client.call(prefix + 'generation', data, 'generation.md', 'unused', limit, gs)
         try:
             validate(draft, frozen)
         except (ValueError, base.ReplayError) as error:
-            attempts.append({'draft': draft, 'generationRequestDigest': gd, 'error': str(error)})
+            attempts.append({'draft': draft, 'generationRequestDigest': gd, 'error': str(error), **({'promptVersion': card_prompt_version} if card else {})})
             continue
         vs = verification_schema(frozen)
         data = {'frozen': frozen, 'draft': draft}
-        vd = client.request_digest('company_reading_verification', data, 'verification.md', 'unused', 5000, vs)
-        verified = client.call('company_reading_verification', data, 'verification.md', 'unused', 5000, vs)
+        vd = client.request_digest(prefix + 'verification', data, 'verification.md', 'unused', limit, vs)
+        verified = client.call(prefix + 'verification', data, 'verification.md', 'unused', limit, vs)
         base.validate_schema(verified, vs)
         ids = [c['companyId'] for c in verified['checks']]
         company.require(len(ids) == len(set(ids)) and set(ids) == {t['companyId'] for t in frozen['targets']}, 'reading_verification_coverage')
-        attempts.append({'draft': draft, 'generationRequestDigest': gd, 'verificationRequestDigest': vd, 'verification': verified})
-        if all(c['supported'] and (frozen.get('schemaVersion', SCHEMA) != SCHEMA_V2 or all(c['quality'].values())) for c in verified['checks']):
+        attempts.append({'draft': draft, 'generationRequestDigest': gd, 'verificationRequestDigest': vd, 'verification': verified, **({'promptVersion': card_prompt_version} if card else {})})
+        if all(c['supported'] and (frozen.get('schemaVersion', SCHEMA) not in (SCHEMA_V2, SCHEMA_CARD) or all(c['quality'].values())) for c in verified['checks']):
             return {'status': 'PASS', 'draft': draft, 'attempts': attempts,
                     'generationRequestDigest': gd, 'verificationRequestDigest': vd}
     return {'status': 'WITHHELD', 'draft': None, 'attempts': attempts}
@@ -163,7 +176,7 @@ def run(args, transport=None):
         if not series:
             layer['maximumPaidCallsIncludingPrior'] = args.max_calls
             layer['runId'] = args.run_id
-        layer['seriesCompanyReading' if series else 'companyReadingLayer'] = {'schemaVersion': SCHEMA_V2 if version == V2 else SCHEMA, 'authorizationRef': args.authorization_ref,
+        layer['seriesCompanyReading' if series else 'companyReadingLayer'] = {'schemaVersion': SCHEMA_CARD if version == CARD else SCHEMA_V2 if version == V2 else SCHEMA, 'authorizationRef': args.authorization_ref,
                                         'rounds': completed, 'receipts': receipts}
         base.write_once(output / 'bundle-v2.json', base.canonical(bundle))
         proof = {**plan, 'status': 'COMPLETE', 'pass': sum(r['status'] == 'PASS' for r in completed),

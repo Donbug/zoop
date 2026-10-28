@@ -40,4 +40,6 @@
 | 작업 | 메서드·목표 경로 | WBS | 권한 |
 | --- | --- | --- | --- |
 | [getBriefing](../../api/out/zoop-api-spec.md#getbriefing) | GET /api/v1/briefings | 6.1.2, 6.11.1, 6.8.1, 6.8.2, 6.8.3, 6.8.4, 6.8.6, 6.8.8, 6.8.11, 6.8.12, 6.8.13, 6.5.3 | 공개 |
+| [getBriefingItemImpacts](../../api/out/zoop-api-spec.md#getbriefingitemimpacts) | GET /api/v1/briefings/{roundId}/items/{eventId}/impacts | 6.1.2, 6.11.1 | 공개 |
+| [getBriefingItemImpactReviews](../../api/out/zoop-api-spec.md#getbriefingitemimpactreviews) | GET /api/v1/briefings/{roundId}/items/{eventId}/impact-reviews | 6.1.2, 6.11.1 | 공개 |
 | [getBriefingItemDetail](../../api/out/zoop-api-spec.md#getbriefingitemdetail) | GET /api/v1/briefings/{roundId}/items/{eventId} | 6.1.2, 6.11.1, 6.8.3, 6.8.6, 6.8.8, 6.8.11, 6.8.12, 6.8.13, 6.5.3 | 공개 |
