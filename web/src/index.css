@@ -26,6 +26,19 @@
   --color-panel-control: #e2e2e2;
   --color-panel-soft: #f8f8f8;
   --radius-panel: 8px;
+
+  /* 서비스 화면 전환. motion-safe:animate-service-enter로만 쓴다. */
+  --animate-service-enter: service-enter 180ms ease-out;
+  @keyframes service-enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 /* 다크 테마도 로그인 화면과 같은 중성 회색 팔레트를 쓴다.

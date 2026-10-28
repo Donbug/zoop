@@ -518,7 +518,7 @@ describe('Issue35 · FS006 D-AUT-01/D-ONB-01', () => {
     expect(
       screen.queryByRole('heading', { name: '이메일로 로그인' }),
     ).toBeNull();
-    current = member();
+    current = member(true);
     server.on('GET', '/api/v1/auth/session', () => json(current));
     await userEvent.click(
       screen.getByRole('button', { name: '세션 다시 확인' }),
@@ -526,7 +526,7 @@ describe('Issue35 · FS006 D-AUT-01/D-ONB-01', () => {
     expect((await screen.findByTestId('destination')).textContent).toBe('/my');
   });
   it('cookie authentication reaches protected content with no bearer token', async () => {
-    current = member();
+    current = member(true);
     open('/my');
     expect((await screen.findByTestId('destination')).textContent).toBe('/my');
     expect(useAuthStore.getState().session?.kind).toBe('member');

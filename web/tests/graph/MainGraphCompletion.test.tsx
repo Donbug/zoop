@@ -370,6 +370,26 @@ it('과거 회차 저장본 부재는 재시도 오류와 구분하고 현재 �
 });
 
 describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
+  it.each(['linked', 'cancelled', 'failed'])(
+    '#381 튜토리얼로 주소를 정리해도 소셜 계정 연결 결과(%s)는 남기고 그 밖의 값은 지운다',
+    async (result) => {
+      const router = setup(
+        `/?social=${result}&code=abc&state=xyz&select=node:KRX:005930&tour=1`,
+      );
+      await screen.findByRole('heading', { name: '지도 움직이기' });
+      const params = new URLSearchParams(router.state.location.search);
+      expect(params.get('social')).toBe(result);
+      expect(params.get('mode')).toBe('all');
+      expect(params.get('tour')).toBe('1');
+      expect([...params.keys()].sort()).toEqual(['mode', 'social', 'tour']);
+    },
+  );
+  it('#381 알 수 없는 social 값은 튜토리얼 주소에 남기지 않는다', async () => {
+    const router = setup('/?social=other&tour=1');
+    await screen.findByRole('heading', { name: '지도 움직이기' });
+    const params = new URLSearchParams(router.state.location.search);
+    expect([...params.keys()].sort()).toEqual(['mode', 'tour']);
+  });
   it('이미 열린 5단계에서 다시 보기해도 경로와 상세를 정리하고 처음부터 시작한다', async () => {
     const router = setup('/?mode=all&tour=1');
     await screen.findByRole('heading', { name: '지도 움직이기' });
