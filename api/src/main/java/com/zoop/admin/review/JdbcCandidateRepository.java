@@ -33,23 +33,22 @@ public class JdbcCandidateRepository {
             """;
 
     /**
-     * Whether the current candidate row {@code alias} is the newest analysis of its event: false when another S3 job has a current
-     * candidate row for the same AI event ({@code issue_id}, the S2 {@code targetEventId}) whose S3 result was observed later. A
-     * re-analysis (a new plan, so a new S2 and S3 job) keeps the older job's rows, which stay decidable and keep their history;
-     * the list and the overview show the newest only. Rows without an event id (a new event, a company-to-company relation) have
-     * nothing to match across jobs and are always shown. Ties and rows with no plan unit fall back to the S3 job id.
+     * Whether the current candidate row {@code alias} is the newest analysis of its input: false when another S3 job has a current
+     * candidate row for the same AI event ({@code issue_id}, the S2 {@code targetEventId}) from the same S2 input (the plan units'
+     * {@code s2_input_digest}, which pins the document, the snapshot, the catalogue and the run) and its S3 result was observed
+     * strictly later. The event id alone is not enough: other documents and other snapshots can name the same id, and their
+     * candidates stay listed. Rows without a plan unit, without an event id or observed at the same instant are never hidden. The
+     * older job's rows stay decidable and keep their history; only the list and the overview leave them out.
      */
     public static String newestAnalysis(String alias) {
         return """
                 NOT EXISTS (SELECT 1 FROM review_targets n
-                              LEFT JOIN analysis_plan_units nu ON nu.s3_job_id = n.source_job_id
-                              LEFT JOIN analysis_plan_units au ON au.s3_job_id = %1$s.source_job_id
+                              JOIN analysis_plan_units nu ON nu.s3_job_id = n.source_job_id
+                              JOIN analysis_plan_units au ON au.s3_job_id = %1$s.source_job_id
                              WHERE n.target_type = 'candidate' AND n.is_current AND n.issue_id = %1$s.issue_id
-                               AND n.source_job_id <> %1$s.source_job_id
-                               AND (COALESCE(CAST(nu.s3_checkpoint->>'resultObservedAt' AS timestamptz), '-infinity'),
-                                    n.source_job_id)
-                                 > (COALESCE(CAST(au.s3_checkpoint->>'resultObservedAt' AS timestamptz), '-infinity'),
-                                    %1$s.source_job_id))""".formatted(alias);
+                               AND n.source_job_id <> %1$s.source_job_id AND nu.s2_input_digest = au.s2_input_digest
+                               AND CAST(nu.s3_checkpoint->>'resultObservedAt' AS timestamptz)
+                                 > CAST(au.s3_checkpoint->>'resultObservedAt' AS timestamptz))""".formatted(alias);
     }
 
     private final NamedParameterJdbcTemplate jdbc;
