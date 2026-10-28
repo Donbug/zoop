@@ -49,7 +49,7 @@ export default function EventDetailPanel({
       name === 'evidence'
         ? '이 사건에 연결된 근거 문서를 열었습니다.'
         : name === 'ai'
-          ? '이 사건을 질문 대상으로 연결했습니다. AI 대화는 준비 중입니다.'
+          ? '이 사건을 질문 대상으로 연결했습니다.'
           : '이 사건을 지도 중심으로 선택했습니다.',
     );
   }
