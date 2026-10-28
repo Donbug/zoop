@@ -47,6 +47,8 @@ class CompanyDocumentsServiceTest {
     private NamedParameterJdbcTemplate jdbc;
     private DocumentRegistryRepository registry;
     private CompanyDocumentAnalysisReader analyses;
+    /** The graph side of a pinned evidence re-read: the real snapshot reader, over the same graph the page reads. */
+    private GraphEvidenceSnapshotReader evidenceGraph;
 
     @BeforeEach
     void setUp() {
@@ -68,6 +70,10 @@ class CompanyDocumentsServiceTest {
         var snapshotEvidence = GraphReadFixtures.snapshot("fixture-2026-10-08").evidence();
         when(evidence.read(anyString(), any(), any(), any(), any(), any())).thenAnswer(call -> {
             String evidenceId = call.getArgument(0);
+            // Outside a round, the public endpoint's own selector decides, as the real service would.
+            if (call.getArgument(1) == null && evidenceGraph.read(call.getArgument(2),
+                    call.getArgument(3) == null ? null : Instant.parse(call.<String>getArgument(3)), evidenceId).span() == null)
+                throw new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE);
             var span = snapshotEvidence.stream().filter(item -> item.evidenceId().equals(evidenceId)).findFirst().orElseThrow();
             String selectedVersion = call.getArgument(2);
             String requestedAsOf = call.getArgument(3);
@@ -75,6 +81,17 @@ class CompanyDocumentsServiceTest {
                     selectedVersion, "req-1", false, List.of());
             return new EvidenceResponse(evidenceId, "quote", span.start(), span.end(), span.articleId(),
                     span.articleVersion(), null, true, List.of(), metadata, null, span.articleVersion(), null, null, null, null);
+        });
+        // A pinned re-read sees what the real reader's readPinned sees: an id outside that snapshot is withheld.
+        evidenceGraph = new GraphEvidenceSnapshotReader(GraphReadFixtures.reader(NOW, pinned -> DisclosureExclusions.NONE));
+        when(evidence.readPinned(anyString(), anyString(), any(), any(), any())).thenAnswer(call -> {
+            String evidenceId = call.getArgument(0);
+            var found = evidenceGraph.readPinned(call.getArgument(1), call.getArgument(2), evidenceId);
+            if (found.span() == null) throw new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE);
+            return new EvidenceResponse(evidenceId, "quote", found.span().start(), found.span().end(),
+                    found.span().articleId(), found.span().articleVersion(), null, true, List.of(),
+                    new Metadata("public_graph_snapshot", found.asOf(), found.graphVersion(), "req-1", false, List.of()),
+                    null, found.span().articleVersion(), null, null, null, null);
         });
         analyses = mock(CompanyDocumentAnalysisReader.class);
         var noAnalysis = new CompanyDocumentAnalysisReader.Visible(null, null,
@@ -134,9 +151,14 @@ class CompanyDocumentsServiceTest {
     void aLaterPageKeepsTheFirstPagesReadAndIsNeverReReadAsAVersionAlone() throws Exception {
         var paged = new CompanyDocumentsService(GraphReadFixtures.undatedReader(NOW), jdbc, registry, evidence, analyses,
                 JsonMapper.builder().build());
+        // Evidence is re-read through the real snapshot reader's pinned path over the same undated graph.
+        evidenceGraph = new GraphEvidenceSnapshotReader(GraphReadFixtures.undatedReader(NOW));
         List<String> unfiltered = documents(paged, null, null, null);
         List<String> filtered = documents(paged, "fixture-2026-10-08", null, null);
         org.junit.jupiter.api.Assertions.assertFalse(filtered.containsAll(unfiltered), "the fixture must make the two reads differ");
+        String undated = GraphReadFixtures.withAnUndatedArticle().articles().getFirst().articleId();
+        assertTrue(unfiltered.contains(undated), "the default read keeps the undated document after its evidence re-read");
+        org.junit.jupiter.api.Assertions.assertFalse(filtered.contains(undated), "a version alone is filtered");
 
         assertEquals(unfiltered, documents(paged, null, null, 1), "default first page: later pages stay unfiltered");
         assertEquals(filtered, documents(paged, "fixture-2026-10-08", null, 1), "version-only first page: later pages filtered");
@@ -208,7 +230,9 @@ class CompanyDocumentsServiceTest {
         when(visible.eventIds()).thenReturn(List.of(GraphReadFixtures.HBM_SUPPLY));
         when(visible.quote()).thenReturn("검증된 인용");
         when(visible.quoteVerified()).thenReturn(true);
-        doReturn(visible).when(evidence).read(eq(span.evidenceId()), any(), any(), any(), any(), any());
+        when(visible.metadata()).thenReturn(new Metadata("public_graph_snapshot", NOW,
+                "fixture-2026-10-08", "req-1", false, List.of()));
+        doReturn(visible).when(evidence).readPinned(eq(span.evidenceId()), any(), any(), any(), any());
         var document = list("2026-09-22", "2026-09-22", null, null).items().get(0);
         assertEquals(List.of(span.evidenceId()), document.quotes().stream()
                 .map(CompanyDocumentsService.Quote::evidenceId).toList());
@@ -225,14 +249,15 @@ class CompanyDocumentsServiceTest {
         when(visible.eventIds()).thenReturn(List.of(GraphReadFixtures.HBM_SUPPLY));
         when(visible.metadata()).thenReturn(new Metadata("public_graph_snapshot", NOW,
                 "fixture-2026-10-08", "req-1", false, List.of()));
-        doReturn(visible).when(evidence).read(eq(span.evidenceId()), any(), any(), any(), any(), any());
+        doReturn(visible).when(evidence).readPinned(eq(span.evidenceId()), any(), any(), any(), any());
         var matching = service.list(COMPANY, null, null, null, null, "fixture-2026-10-08", NOW.toString(),
                 null, null, "req-1");
         assertEquals(List.of(span.evidenceId()), matching.items().stream()
                 .filter(item -> item.id().equals("art-hbm-supply")).findFirst().orElseThrow().quotes().stream()
                 .map(CompanyDocumentsService.Quote::evidenceId).toList());
-        when(visible.metadata()).thenReturn(new Metadata("public_graph_snapshot", NOW.plusSeconds(1),
-                "fixture-2026-10-08", "req-1", false, List.of()));
+        // An answer from another version than the page pinned is never quoted.
+        when(visible.metadata()).thenReturn(new Metadata("public_graph_snapshot", NOW,
+                "fixture-2026-10-01", "req-1", false, List.of()));
         var mismatched = service.list(COMPANY, null, null, null, null, "fixture-2026-10-08", NOW.toString(),
                 null, null, "req-1");
         assertEquals(List.of(), mismatched.items().stream()
@@ -289,8 +314,9 @@ class CompanyDocumentsServiceTest {
                 "publisher-v2", "https://example.invalid/v2", Instant.parse("2026-09-24T01:00:00Z"), null,
                 "datetime", null, null, NOW)));
         EvidenceResponse visibleV2 = new EvidenceResponse(newEvidenceId, "새 인용", 0, 40, articleId, "v2", null,
-                true, List.of(newIssueId), null, null, "v2", null, null, null, null);
-        doReturn(visibleV2).when(evidence).read(eq(newEvidenceId), any(), any(), any(), any(), any());
+                true, List.of(newIssueId), new Metadata("public_graph_snapshot", NOW, "fixture-2026-10-08", "req-1", false,
+                List.of()), null, "v2", null, null, null, null);
+        doReturn(visibleV2).when(evidence).readPinned(eq(newEvidenceId), any(), any(), any(), any());
         service = new CompanyDocumentsService(reader, jdbc, registry, evidence, analyses, JsonMapper.builder().build());
 
         var result = list(null, null, null, null);
@@ -306,11 +332,11 @@ class CompanyDocumentsServiceTest {
         var spans = GraphReadFixtures.snapshot("fixture-2026-10-08").evidence().stream()
                 .filter(span -> span.articleId().equals("art-hbm-supply")).toList();
         spans.forEach(span -> doThrow(new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE))
-                .when(evidence).read(eq(span.evidenceId()), any(), any(), any(), any(), any()));
+                .when(evidence).readPinned(eq(span.evidenceId()), any(), any(), any(), any()));
         assertTrue(list(null, null, null, null).items().stream().noneMatch(item -> item.id().equals("art-hbm-supply")));
 
         doThrow(new CustomException(ErrorCode.SOURCE_UNAVAILABLE)).when(evidence)
-                .read(eq(spans.get(0).evidenceId()), any(), any(), any(), any(), any());
+                .readPinned(eq(spans.get(0).evidenceId()), any(), any(), any(), any());
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
                 () -> list(null, null, null, null)).getErrorCode());
     }

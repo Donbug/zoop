@@ -154,6 +154,24 @@ public class EvidenceService {
     }
 
     /**
+     * {@link #read} for a caller that already pinned {@code graphVersion} (a company documents page): the version is kept as
+     * pinned, never re-selected from the public selector, and {@code filteredAt} is set only when that read was filtered by a
+     * requested time, so an unfiltered page keeps its undated documents. Current source grants are still checked now.
+     */
+    public EvidenceResponse readPinned(String id, String graphVersion, Instant filteredAt, String companyId, String requestId) {
+        if (id == null || !EVIDENCE_ID.matcher(id).matches()) {
+            throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
+        Instant now = clock.instant();
+        try {
+            return transaction.execute(status -> dispatch(id, graphVersion, filteredAt, companyId, requestId, now, true));
+        } catch (DataAccessException | TransactionException error) {
+            log.warn("Evidence read failed in the database (cause={}, requestId={})", error.getClass().getSimpleName(), requestId);
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, error);
+        }
+    }
+
+    /**
      * The registry is chosen by what is STORED, never by a request parameter: a row whose verification artifact is a graph
      * import {@code verification_receipt} is a graph body citation; every other row is an S1 summary citation. S1 citations
      * have no pinned form: a graph version or as-of is refused before the S1 registry is read.

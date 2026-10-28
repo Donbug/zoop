@@ -175,12 +175,15 @@ public class CompanyDocumentsService {
             boolean sourceAuthorized = false;
             for (String evidenceId : candidate.evidenceIds()) {
                 try {
-                    EvidenceResponse visible = evidence.read(evidenceId, round, pinned.selected().version().id(),
-                            round == null ? asOf : pinned.selected().asOf().toString(),
-                            companyId, requestId);
-                    boolean sameSnapshot = (asOf == null && round == null) || visible.metadata() != null
+                    // Outside a round the page's own pin is kept: the version as pinned, filtered only when the first page was.
+                    EvidenceResponse visible = round == null
+                            ? evidence.readPinned(evidenceId, pinned.selected().version().id(),
+                                    pinned.selected().asOfRequested() ? pinned.selected().asOf() : null, companyId, requestId)
+                            : evidence.read(evidenceId, round, pinned.selected().version().id(),
+                                    pinned.selected().asOf().toString(), companyId, requestId);
+                    boolean sameSnapshot = visible.metadata() != null
                             && pinned.selected().version().id().equals(visible.metadata().graphVersion())
-                            && pinned.selected().asOf().equals(visible.metadata().asOf());
+                            && (round == null || pinned.selected().asOf().equals(visible.metadata().asOf()));
                     boolean sameDocument = sameSnapshot && candidate.snapshot().articleId().equals(visible.articleId())
                             && candidate.snapshot().version().equals(visible.articleVersion());
                     if (sameDocument) {
