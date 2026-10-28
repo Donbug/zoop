@@ -43,7 +43,9 @@ public final class AnalysisCandidates {
             String articleTitle, String url) {
     }
 
-    public record CandidateRelation(String relationId, String sourceVersion, String sourceRevision, String relationType,
+    /** {@code revision} is the relation target's: with {@code sourceVersion}/{@code sourceRevision}, a decision's expected values. */
+    public record CandidateRelation(String relationId, String sourceVersion, String sourceRevision, long revision,
+            String relationType,
             String source, String target, String role, String assertionStatus, int evidenceCount, boolean onUserGraph,
             ReviewDecisionOut decision) {
     }

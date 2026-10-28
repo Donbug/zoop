@@ -64,7 +64,7 @@ flowchart LR
 | 1 저장·job 수명주기 | 부분 구현 | recovery artifact와 실제 `save_only` 복구 |
 | 2 오케스트레이터 | 부분 구현 | 경로별 동적 deadline, 보충 라운드와 coverage 재확인 |
 | 3 router·coverage | 부분 구현 | Jev router는 구현, Luna coverage-verifier는 미구현 |
-| 4 읽기 도구 | 부분 구현 | Q03 일부와 Q04 경로 구현, Q01·Q05~Q08 미연결 |
+| 4 읽기 도구 | 부분 구현 | Q03 일부, Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`) 구현, Q01 일부·Q06·Q08 미연결 |
 | 5 생성·출력 검증 | 부분 구현 | 구간 단위 생성·검증은 구현, claim 단위 검증·token guard 미구현 |
 | 6 웹 | 구현 | OpenAPI 타입 생성 seam, 실제 백엔드와의 종단 확인 |
 | 7 평가·출시 | 부분 구현 | 고정 평가 세트 v1(대본 실행)만 있음. 실제 모델·데이터 평가와 임계값 보정, 보안·종단·배포 증명 |
@@ -116,6 +116,10 @@ flowchart LR
 
 사건 지목의 잠정 결정(2026-10-27, 사용자 승인, 평가 세트로 보정 전): (5) 질문에 적힌 사건은 앱이 작업이 고정한 공개 그래프의 사건으로만 해석한다(`IssueNameResolver`). 공백과 라틴 대소문자를 무시하고 사건 제목 전체가 들어 있거나, 그 사건의 `target`과 `action`이 둘 다 들어 있으면 그 사건이다. 같은 말(같은 제목, 또는 같은 target·action)에 맞는 사건이 여럿이면 `clarification`(선택지 종류 `other`, 표시명은 제목과 사건 시점)이고, 제목이 적힌 사건은 target·action이 같은 다른 사건을 부르지 않는다. 질문 대상은 기업 다음에 사건 순이다. 기업 이름은 라우터 전에, 사건 이름은 라우터 뒤에 어떤 요구가 그래프를 읽는 바인딩된 능력을 허용하는 유형을 검토 구간(0.35) 이상으로 가질 때만 해석한다. Q02는 능력이 없고 Q01은 ZOOP 문서만 읽으므로 해당하지 않는다. 그래서 순수 개념 질문과 정책 문서만 읽는 Q01 질문은 활성 버전이 고정돼 있어도 고정 그래프를 읽지 않고 그래프 장애 중에도 답하며, 같은 말에 맞는 사건의 확인 질문은 라우터 호출 뒤에 나온다. 사건 해석에서 고정 그래프를 읽을 수 없으면 조회 장애(transient)로 끝난다. 이름 지목된 사건은 Q03일 때 `issue.read` 기본 조회를 받는다(기업의 `company.read` 기본 조회와 같은 규칙). (6) `issue.read`에 기업 ID를 주면 그 기업이 관여하거나 구조적으로 연결된 공개 사건을 최신순으로 돌려준다. 대상 읽기 한 번은 항목을 50개(생성 단계가 branch 하나에 받는 수)까지 돌려주고, 넘치면 `truncated=true`라 남은 사건을 "없음"으로 보지 않는다(`GraphTargetTool.MAX_ITEMS`). 도구 출력의 의미가 바뀌었으므로 레지스트리는 `chat-tools/v2`다.
 
+Q05 기간 비교의 잠정 결정(2026-10-27, 사용자 승인, 평가 세트로 보정 전): (7) 비교 기준은 질문에 적힌 기간이다. 정해진 한국어 표현(오늘·어제·그제, 이번 주·지난주, 이번 달·지난달, N일·N주·N달 전, 최근 N일·N주, `YYYY-MM-DD`, `M월 D일`)만 서버가 KST로 결정론적으로 해석하고(`ChatPeriods`), 여러 표현은 가장 이른 시작부터 가장 늦은 끝까지 한 기간으로 묶는다. 기간 시작 시각(KST 자정)에 공개돼 있던 지도와 작업이 고정한 지도를 비교한다. 질문에 기간이 없으면 회원이 고른 기간, 그것도 없으면 고정 지도 직전에 공개됐던 지도와 비교한다. 해석한 기간은 결과의 `applied.period`(`basis=question`, `expression`)로 보인다. (8) `graph.version.diff`는 대상(기업·사건)을 지목하면 그와 관련된 변화만, 아니면 지도 전체 변화를 최대 40건 돌려주고, 추가된 항목만 지금 고정 지도의 근거를 싣는다. 비교할 이전 공개 지도가 없으면 "변화 없음"이 아니라 잘린 조회(`truncated`)다. 레지스트리는 `chat-tools/v3`다.
+
+Q07 내 종목의 잠정 결정(2026-10-27, 사용자 승인, 평가 세트로 보정 전): (9) 범위는 연결된 모의 계좌의 보유 종목(계좌 표시 순) 다음 관심 종목(관심 목록 순)이며, 지도 "내 종목" 보기와 같은 원천(`PersonalCompanies`)이다. 회원은 작업의 인증 회원으로 서버가 조회 범위(`ChatToolScope.memberId`)에 넣고, `portfolio.scope.read`는 `member:self` 외의 대상을 받지 않는다. (10) 기업을 지목하지 않은 Q07 요구는 계획기가 서버 요구 `<id>-s`(`Origin.SCOPE`, 1단계 `portfolio.scope.read`)를 앞에 두고 원 요구를 `atLeast(1)` 의존 단계로 바꾼다. 범위 요구는 따로 답하지 않고 그 결과가 원 요구의 답변 입력에 함께 들어간다. 종목이 없으면 "없음"을 답하고(근거 없이 허용), 5개를 넘으면 앞 5개만 조회하고 `results_truncated` 안내를 답변 옆에 붙인다. 회원 본인 범위만 읽은 구간은 공개 근거가 없으므로 인용 없이 허용한다. 레지스트리는 `chat-tools/v4`다.
+
 ### 단계 4 — 도구 레지스트리와 읽기 어댑터
 
 레지스트리를 한 번에 모두 구현하지 말고 아래 수직 순서로 연동한다.
@@ -126,9 +130,9 @@ flowchart LR
 | 2 | Q01 서비스 안내 | `help.search`, `screenSpec.read`, `zoopPolicy.read` | 승인된 제품 문서 registry와 버전·철회 상태가 필요. 인용은 `Citation.sourceKind=zoop_doc`(docId·docVersion·code point 구간)으로 만들고 결정적 인용 ID를 발급 |
 | 3 | Q03 기업·사건 | `company.read`, `document.search`, `issue.read`, `evidence.resolve` | `company.read`·`issue.read`·`evidence.resolve` 구현. `document.search`와 검색형 기간 조건은 미구현 |
 | 4 | Q04 관계·경로 | `graph.path.read` | `PublicGraphReader` 위 최대 3-hop·노드/간선 50개·현재 evidence 재검사를 구현. Neo4j·AI 내부 그래프 API는 호출하지 않음 |
-| 5 | Q05 기간 비교 | `period.compare`, `graph.version.diff` | 두 `graph_versions` 스냅샷을 `PublicGraphReader`로 각각 읽어 서버가 diff 계산. 버전 diff 계약·어댑터 추가 필요 |
+| 5 | Q05 기간 비교 | `period.compare`, `graph.version.diff` | `graph.version.diff` 구현(2026-10-27): 고정 버전과 이전 공개 버전을 `PublicGraphReader`로 각각 읽어 서버가 추가·삭제된 기업·사건·관계를 계산. `period.compare`(문서 수 등 기간 비교)는 미구현 |
 | 6 | Q06 브리핑 | `briefing.read`, `briefing.evidence` | briefing migration·발행 조회·회차 고정 구현 필요 |
-| 7 | Q07 내 종목 | `portfolio.scope.read` + Q03/Q04 | watchlist·portfolio 기반 존재. 인증 서버 문맥 주입과 범위 전파 필요 |
+| 7 | Q07 내 종목 | `portfolio.scope.read` + Q03/Q04 | 구현(2026-10-27): 서버가 주입한 작업 회원의 보유(모의 계좌)·관심 종목(`PersonalCompanies`)을 1단계로 읽고 나머지 조회를 그 종목에 2단계로 실행. 질문이 기업을 지목하면 그 기업을 그대로 읽고 본인 범위 여부는 아직 확인하지 않음 |
 | 8 | Q08 선정 근거 | `selectionRule.read` + evidence | 실제 적용 rule revision·입력 요인 조회 구현 필요 |
 
 웹 검색 대체 경로(`web.search`)는 위 순서와 별개로, 내부 도구로 답할 수 없는 Q03 요구에만 보충 라운드로 부르는 검색 API 직접 어댑터로 설계했다(MCP 미사용). 공급자·비용·개인정보 처리방침 개정이 결정되기 전에는 구현하지 않는다. [웹 검색 대체 경로 설계](../design/ai-chatbot-web-search.md)
@@ -137,7 +141,7 @@ flowchart LR
 
 모든 어댑터는 공통 요청·결과 봉투를 사용하고 `dataVersion`, `evidenceIds`, `truncated`, `nextAllowed`, 실제 오류를 반환한다. 회원 ID는 모델이나 사용자 입력에서 받지 않고 Java 인증 문맥에서 주입한다.
 
-첫 도구 계층은 레지스트리 `chat-tools/v1`(2026-10-27부터 `chat-tools/v2`, 결정 (6))에 `company.read`·`issue.read`·`evidence.resolve`를 앱 공개 그래프 읽기 경로(`PublicGraphReader`) 위의 내부 어댑터로 등록한다. 그래프 버전·asOf는 계획이 아니라 작업의 고정 문맥에서 주입하고, 근거 ID는 공개 근거 조회가 지금 읽을 수 있는 것만 상한(20개) 안에서 전달한다. 상한 때문에 읽지 않은 근거가 있으면 `truncated=true`이며, 근거 상태를 확인할 수 없으면 빈 결과가 아니라 호출 실패(`tool_unavailable`)다. 단계 실행기는 등록되지 않은 기능이 하나라도 있으면 아무것도 예약하지 않고, 시도당 12회·동시 4개·개별 3초·단계 10초(실행 기한 이내)를 강제한다.
+첫 도구 계층은 레지스트리 `chat-tools/v1`(2026-10-27부터 `chat-tools/v2`·`v3`·`v4`, 결정 (6)·(8)·(10))에 `company.read`·`issue.read`·`evidence.resolve`를 앱 공개 그래프 읽기 경로(`PublicGraphReader`) 위의 내부 어댑터로 등록한다. 그래프 버전·asOf는 계획이 아니라 작업의 고정 문맥에서 주입하고, 근거 ID는 공개 근거 조회가 지금 읽을 수 있는 것만 상한(20개) 안에서 전달한다. 상한 때문에 읽지 않은 근거가 있으면 `truncated=true`이며, 근거 상태를 확인할 수 없으면 빈 결과가 아니라 호출 실패(`tool_unavailable`)다. 단계 실행기는 등록되지 않은 기능이 하나라도 있으면 아무것도 예약하지 않고, 시도당 12회·동시 4개·개별 3초·단계 10초(실행 기한 이내)를 강제한다.
 
 Q04 `graph.path.read`(`GraphPathTool`, 경로 탐색 `GraphPathLookup`)를 같은 레지스트리에 추가했다(2026-10-23).
 - 첫 대상에서 나머지 각 대상까지의 최단 경로를 같은 고정 버전·asOf·공개 제외의 표시 그래프에서 찾는다.

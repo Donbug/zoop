@@ -11,11 +11,11 @@ public final class ReviewDecision {
     private ReviewDecision() {
     }
 
-    /** The three expected values are the decided target's (the relation's when {@code relationId} is set). */
+    /** The three expected values are the decided relation's; {@code relationId} is required (the AI source decides relations). */
     public record Request(
             @NotNull @Pattern(regexp = "allow|reject") String decision,
             @NotBlank @Size(max = 500) String reason,
-            @Size(max = 200) String relationId,
+            @NotBlank @Size(max = 200) String relationId,
             @NotNull @PositiveOrZero Long expectedRevision,
             @NotBlank @Size(max = 200) String expectedSourceVersion,
             @NotBlank @Pattern(regexp = "[0-9]{1,18}") String expectedSourceRevision) {

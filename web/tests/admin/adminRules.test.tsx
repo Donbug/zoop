@@ -225,7 +225,9 @@ describe('A-ADM-03 자동 검수 규칙 · 66', () => {
       await user.type(screen.getByLabelText('전환 사유'), '사유 유지');
       await user.click(screen.getByRole('button', { name: '규칙 켜기 확인' }));
       expect((await screen.findByRole('alert')).textContent).toContain(
-        status === 409 ? '규칙 상태가 달라졌어요' : '사유와 규칙 정보를 확인',
+        status === 409
+          ? '규칙 상태가 달라졌어요'
+          : '사유를 확인해 주세요. 1~500자 한 줄로 쓰고, 이메일(@)·웹 주소(http)·비밀번호나 인증 관련 단어·토큰처럼 보이는 긴 문자열은 넣지 마세요.',
       );
       expect(
         (screen.getByLabelText('전환 사유') as HTMLTextAreaElement).value,
@@ -290,4 +292,32 @@ test('A-ADM-03 규칙 목록 401은 관리자 로그인으로 이동해요', asy
   server.on('GET', PATH, () => apiError(401, 'AUTH_REQUIRED'));
   open();
   expect(await screen.findByText('관리자 로그인')).toBeTruthy();
+});
+
+test('A-ADM-03 사유 조건을 미리 안내하고 줄바꿈 사유는 서버로 보내 422 결과를 안내해요', async () => {
+  server.on('PUT', SWITCH, () => apiError(422, 'INVALID_REQUEST'));
+  const { user } = open();
+  await user.click(
+    await screen.findByRole('button', { name: '단일 출처 숨기기 규칙 켜기' }),
+  );
+  const form = screen.getByRole('form', { name: '단일 출처 숨기기 전환 사유' });
+  const input = within(form).getByLabelText('전환 사유');
+  expect(
+    within(form).getByText(
+      '1~500자 한 줄로 써 주세요. 이메일·웹 주소·비밀번호/인증 관련 단어·토큰처럼 긴 문자열은 넣지 마세요.',
+    ),
+  ).toBeTruthy();
+  await user.type(input, '검토{Enter}완료');
+  await user.click(
+    within(form).getByRole('button', { name: '규칙 켜기 확인' }),
+  );
+  expect((await within(form).findByRole('alert')).textContent).toBe(
+    '사유를 확인해 주세요. 1~500자 한 줄로 쓰고, 이메일(@)·웹 주소(http)·비밀번호나 인증 관련 단어·토큰처럼 보이는 긴 문자열은 넣지 마세요.',
+  );
+  expect(server.calls('PUT', SWITCH)).toHaveLength(1);
+  expect(server.calls('PUT', SWITCH)[0].body).toEqual({
+    enabled: true,
+    reason: '검토\n완료',
+  });
+  expect((input as HTMLTextAreaElement).value).toBe('검토\n완료');
 });

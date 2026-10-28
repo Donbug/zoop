@@ -25,7 +25,7 @@ import tools.jackson.databind.node.ObjectNode;
 public class JdbcReviewRepository {
     private static final String TARGET = """
             SELECT id, target_type, source_job_id, external_id, source_version, candidate_id, current_revision, status,
-                   source_revision, is_current
+                   source_revision, is_current, active
             FROM review_targets
             """;
 
@@ -36,7 +36,7 @@ public class JdbcReviewRepository {
     }
 
     public record Target(String id, String type, String sourceJobId, String externalId, String sourceVersion,
-            String candidateId, long revision, String status, String sourceRevision, boolean current) {
+            String candidateId, long revision, String status, String sourceRevision, boolean current, boolean active) {
     }
 
     /** One decision command as fixed before the AI call; {@code status} pending|applied|refused|blocked. */
@@ -375,6 +375,6 @@ public class JdbcReviewRepository {
         return new Target(rs.getString("id"), rs.getString("target_type"), rs.getString("source_job_id"),
                 rs.getString("external_id"), rs.getString("source_version"), rs.getString("candidate_id"),
                 rs.getLong("current_revision"), rs.getString("status"), rs.getString("source_revision"),
-                rs.getBoolean("is_current"));
+                rs.getBoolean("is_current"), rs.getBoolean("active"));
     }
 }

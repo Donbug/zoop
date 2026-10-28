@@ -142,7 +142,6 @@ export function impactEdges(
   const edge = graph.edges.find(
     (candidate) =>
       !candidate.derived &&
-      candidate.assertionStatus === 'confirmed' &&
       candidate.relationType === 'INVOLVES' &&
       candidate.source === impact.issueId &&
       candidate.target === impact.companyId &&
