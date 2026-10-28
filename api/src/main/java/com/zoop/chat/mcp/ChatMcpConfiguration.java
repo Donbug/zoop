@@ -1,6 +1,9 @@
 package com.zoop.chat.mcp;
 
 import com.zoop.chat.executor.ChatJobExecutor;
+import com.zoop.chat.orchestrator.ChatModels;
+import com.zoop.chat.repository.ChatExecutionRepository;
+import org.springframework.beans.factory.ObjectProvider;
 import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolRunner;
 import io.modelcontextprotocol.common.McpTransportContext;
@@ -46,6 +49,22 @@ public class ChatMcpConfiguration {
     @Bean
     ChatMcpTools chatMcpTools(ChatToolRegistry registry, ChatToolRunner runner, ChatJobExecutor executor) {
         return new ChatMcpTools(registry, runner, executor, PROTOCOL_JSON);
+    }
+
+    /**
+     * The agent path, only with {@code zoop.chat.mcp.agent-enabled=true}: runs take it when their plan fits, through the chat
+     * model stages ({@code zoop.ai.chat-client.enabled=true}); enabled without them, startup fails naming the setting. The URL
+     * the provider calls this endpoint at is the AI runtime operator's ({@code ZOOP_AI_CHAT_MCP_SERVER_URL}), never sent from here.
+     */
+    @Bean
+    @ConditionalOnProperty(name = "zoop.chat.mcp.agent-enabled", havingValue = "true")
+    ChatMcpAgent chatMcpAgent(ObjectProvider<ChatModels.Agent> agent, ChatMcpTools tools, ChatMcpGrants grants,
+            ChatExecutionRepository runs) {
+        ChatModels.Agent stages = agent.getIfAvailable();
+        if (stages == null) {
+            throw new IllegalStateException("zoop.chat.mcp.agent-enabled needs the chat model stages (zoop.ai.chat-client.enabled)");
+        }
+        return new ChatMcpAgent(stages, tools, grants, runs, PROTOCOL_JSON);
     }
 
     @Bean(destroyMethod = "")

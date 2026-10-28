@@ -156,8 +156,8 @@ public final class ChatMcpTools {
         if (approved.isEmpty()) return refused(NOT_APPROVED);
         ChatToolResult result;
         try {
-            result = runner.runReserved(run, attached.get().control(), List.of(approved.get()), List.of(call),
-                    this::tooLarge).getFirst();
+            result = runner.runReserved(run, attached.get().control(), List.of(approved.get()), List.of(call), delivery)
+                    .getFirst();
         } catch (ChatRunSuperseded lost) {
             // Either the run ended, or a concurrent identical request started this reservation first.
             return refused(executor.attach(run.jobId(), run.attemptNo()).isPresent() ? NOT_APPROVED : RUN_NOT_ACTIVE);
@@ -168,12 +168,24 @@ public final class ChatMcpTools {
                 .addTextContent(mapper.writeValueAsString(structured)).isError(!result.succeeded()).build();
     }
 
-    /** {@link #RESULT_TOO_LARGE} for an output whose result would exceed {@link #MAX_RESULT_BYTES}; checked before it is recorded. */
-    private String tooLarge(ChatToolOutput output) {
-        // The envelope adds a few short fields (ids, versions, flags) to the output's own serialization.
-        int bytes = mapper.writeValueAsBytes(output).length + ENVELOPE_BYTES;
-        return bytes > MAX_RESULT_BYTES ? RESULT_TOO_LARGE : null;
-    }
+    /**
+     * What a usable MCP read does before it is recorded: an output over {@link #MAX_RESULT_BYTES} is refused as
+     * {@link #RESULT_TOO_LARGE}; otherwise the success keeps exactly the envelope the model receives, so the server checks
+     * the final answer against it.
+     */
+    private final ChatToolRunner.Delivery delivery = new ChatToolRunner.Delivery() {
+        @Override
+        public String refuse(ChatToolOutput output) {
+            // The envelope adds a few short fields (ids, versions, flags) to the output's own serialization.
+            int bytes = mapper.writeValueAsBytes(output).length + ENVELOPE_BYTES;
+            return bytes > MAX_RESULT_BYTES ? RESULT_TOO_LARGE : null;
+        }
+
+        @Override
+        public String keep(ChatToolResult result) {
+            return mapper.writeValueAsString(structured(result));
+        }
+    };
 
     /**
      * The call a model's arguments make: {@code targets} (1 to 5 distinct ids) and an optional {@code limit} (1 to 20), and

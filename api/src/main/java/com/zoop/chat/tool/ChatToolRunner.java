@@ -21,7 +21,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -106,7 +105,23 @@ public class ChatToolRunner implements AutoCloseable {
         // Every reservation is built (every capability bound) before anything is reserved.
         List<ChatToolCallReservation> reservations = calls.stream().map(call -> reservation(run, call, via)).toList();
         List<String> ids = control.reserveToolCalls(planRevision, reservations);
-        return runReserved(run, control, ids, calls, output -> null);
+        return runReserved(run, control, ids, calls, Delivery.NONE);
+    }
+
+    /**
+     * What the caller of {@link #runReserved} does with a usable read before it is recorded: refuse it with a failure code
+     * (recorded {@code failed}, no result reported), or keep its result envelope (JSON) on the ledger with the success.
+     */
+    public interface Delivery {
+        Delivery NONE = new Delivery() { };
+
+        default String refuse(ChatToolOutput output) {
+            return null;
+        }
+
+        default String keep(ChatToolResult result) {
+            return null;
+        }
     }
 
     /**
@@ -121,11 +136,10 @@ public class ChatToolRunner implements AutoCloseable {
 
     /**
      * Runs calls that are already reserved ({@code ids}, in the same order as {@code calls}) under the same limits and
-     * records as {@link #runStage}. {@code refuse} may turn an adapter output that passed the runner's checks into a failure
-     * code; such a call is recorded {@code failed} with that code and reports no result.
+     * records as {@link #runStage}, with {@code delivery} deciding on each usable read before it is recorded.
      */
     public List<ChatToolResult> runReserved(ChatRun run, ChatRunControl control, List<String> ids,
-            List<ChatToolRequest> calls, Function<ChatToolOutput, String> refuse) {
+            List<ChatToolRequest> calls, Delivery delivery) {
         if (ids.size() != calls.size()) throw new IllegalArgumentException("one reserved id per call");
         List<ChatToolRegistry.Binding> bindings = calls.stream().map(this::binding).toList();
         ChatToolScope scope = scope(run);
@@ -157,7 +171,7 @@ public class ChatToolRunner implements AutoCloseable {
                 slots.release();
                 inFlight.release();
                 started.add(CompletableFuture.supplyAsync(
-                        () -> finish(control, id, call, null, new TimeoutException(), superseded, refuse), records));
+                        () -> finish(control, id, call, null, new TimeoutException(), superseded, delivery), records));
                 continue;
             }
             // The task always runs (never cancelled before it starts), so its slots are always given back; a timeout
@@ -182,7 +196,7 @@ public class ChatToolRunner implements AutoCloseable {
                 if (error instanceof TimeoutException && thread != null) thread.interrupt();
             });
             started.add(read.handleAsync((output, error) -> finish(control, id, call, output, error, superseded,
-                    refuse), records));
+                    delivery), records));
         }
         awaitRecords(started, stageEnd, superseded);
         if (superseded.get()) throw new ChatRunSuperseded();
@@ -239,11 +253,11 @@ public class ChatToolRunner implements AutoCloseable {
     }
 
     private ChatToolResult finish(ChatRunControl control, String id, ChatToolRequest call, ChatToolOutput output,
-            Throwable error, AtomicBoolean superseded, Function<ChatToolOutput, String> refuse) {
+            Throwable error, AtomicBoolean superseded, Delivery delivery) {
         ChatToolResult result;
         ChatToolCallEnd end;
         String problem = error == null ? invalid(call, output) : null;
-        String refused = error == null && problem == null ? refuse.apply(output) : null;
+        String refused = error == null && problem == null ? delivery.refuse(output) : null;
         if (refused != null) {
             // A usable read the caller cannot pass on (an MCP result over its size limit): recorded as that failure, so
             // the ledger never shows evidence as delivered that was not.
@@ -252,7 +266,7 @@ public class ChatToolRunner implements AutoCloseable {
         } else if (error == null && problem == null) {
             result = ChatToolResult.succeeded(id, call.capabilityId(), output);
             end = new ChatToolCallEnd("succeeded", null, output.dataVersion(), output.evidenceIds(), output.truncated(),
-                    output.nextAllowed());
+                    output.nextAllowed(), delivery.keep(result));
         } else {
             Throwable cause = error instanceof CompletionException wrapped && wrapped.getCause() != null
                     ? wrapped.getCause() : error;

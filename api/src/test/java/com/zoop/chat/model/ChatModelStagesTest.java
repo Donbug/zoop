@@ -127,6 +127,42 @@ class ChatModelStagesTest {
     }
 
     @Test
+    void anAgentStepSendsTheGrantAndToolsButNoServerUrlAndReadsBothOutcomes() {
+        var requirement = new com.zoop.chat.orchestrator.ChatModels.AgentRequirement("r1", "SK하이닉스 최근 사건", false,
+                List.of("KRX:000660"));
+        answer = call -> succeeded(call, """
+                {"responseId":"resp_1","status":"approval_required","mcpCalls":[],"answer":null,
+                 "approvalRequests":[{"approvalRequestId":"mcpr_1","toolName":"company_read","arguments":{"targets":["KRX:000660"],"limit":null}}]}""");
+        var held = stages.step(run(root("SK하이닉스 최근 사건")), 1, new com.zoop.chat.orchestrator.ChatModels.AgentInput(
+                List.of(requirement), "zmcp1.k1.payload.mac-synthetic", List.of("company_read"), 20, null, List.of()));
+        assertFalse(held.completed());
+        assertEquals("company_read", held.approvals().getFirst().toolName());
+        assertTrue(held.approvals().getFirst().arguments().containsKey("limit"), "an explicit null is kept for the server check");
+
+        var first = calls.getFirst();
+        assertEquals("chat-agent", first.stage());
+        assertEquals(JOB + ".1.agent-1", first.invocationId());
+        var mcp = first.input().path("mcp");
+        assertEquals("zmcp1.k1.payload.mac-synthetic", mcp.path("authorization").asString());
+        assertFalse(mcp.has("serverUrl"), "the MCP server URL is the AI runtime operator's, never sent from here");
+        assertEquals("KRX:000660", first.input().path("requirements").get(0).path("targets").get(0).asString());
+        assertFalse(first.input().has("continuation"));
+
+        answer = call -> succeeded(call, """
+                {"responseId":"resp_2","status":"completed","approvalRequests":[],"mcpCalls":[{"toolName":"company_read","failed":false}],
+                 "answer":{"sections":[{"basis":"evidence_grounded","text":"공급 계약","requirementIds":["r1"],"evidenceIds":["%s"]}],
+                           "insufficientRequirementIds":[],"graphTargetIds":["KRX:000660"]}}""".formatted(EV_A));
+        var done = stages.step(run(root("SK하이닉스 최근 사건")), 2, new com.zoop.chat.orchestrator.ChatModels.AgentInput(
+                List.of(requirement), "zmcp1.k1.payload.mac-synthetic", List.of("company_read"), 20, "resp_1",
+                List.of(new com.zoop.chat.orchestrator.ChatModels.Decision("mcpr_1", true))));
+        assertTrue(done.completed());
+        assertEquals(List.of(EV_A), done.answer().sections().getFirst().evidenceIds());
+        var continuation = calls.get(1).input().path("continuation");
+        assertEquals("resp_1", continuation.path("previousResponseId").asString());
+        assertTrue(continuation.path("decisions").get(0).path("approve").asBoolean());
+    }
+
+    @Test
     void theRouterGetsTheSplitRequirementsAndBoundCapabilitiesAndNamesAreResolvedByTheServer() {
         answer = call -> succeeded(call, """
                 {"requirements":[

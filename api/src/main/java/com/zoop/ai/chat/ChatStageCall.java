@@ -11,7 +11,7 @@ import tools.jackson.databind.JsonNode;
  * the stage input of the {@code zoop-ai-chat-1} contract, which the AI service validates completely.
  */
 public record ChatStageCall(String invocationId, String stage, String mode, JsonNode input) {
-    public static final Set<String> STAGES = Set.of("chat-router", "chat-answer", "chat-verification");
+    public static final Set<String> STAGES = Set.of("chat-router", "chat-answer", "chat-verification", "chat-agent");
     private static final Pattern INVOCATION = Pattern.compile("[A-Za-z0-9_.:-]{8,96}");
 
     public ChatStageCall {

@@ -95,15 +95,37 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     private final Clock clock;
     private final StageLimits limits;
     private final ExecutorService models = Executors.newVirtualThreadPerTaskExecutor();
+    /** The agent path when registered (MCP endpoint on, agent enabled); null keeps every run on the direct path. */
+    private final ChatAgentPath agent;
+    /**
+     * One agent step: the AI service's {@code chat-agent} deadline (30 s + 3 s) and the service headroom. Each step is its own
+     * model call and its own guard; together they stay inside the run deadline or the run ends as {@code deadline_guard}.
+     */
+    static final Duration AGENT_STEP = Duration.ofSeconds(33).plus(StageLimits.SERVICE_HEADROOM);
+    /** The least an agent step is given: the time to write the answer (MCP actions contract 3.2). */
+    static final Duration MIN_AGENT_STEP = Duration.ofSeconds(10);
 
     public OrchestratedChatEngine(ChatModels.Router router, ChatModels.Generator generator, ChatModels.Verifier verifier,
             ChatToolRegistry registry, ChatToolRunner runner, ChatCitationSource citations, Clock clock) {
-        this(router, generator, verifier, registry, runner, citations, clock, StageLimits.POLICY);
+        this(router, generator, verifier, registry, runner, citations, clock, StageLimits.POLICY, null);
+    }
+
+    public OrchestratedChatEngine(ChatModels.Router router, ChatModels.Generator generator, ChatModels.Verifier verifier,
+            ChatToolRegistry registry, ChatToolRunner runner, ChatCitationSource citations, Clock clock,
+            ChatAgentPath agent) {
+        this(router, generator, verifier, registry, runner, citations, clock, StageLimits.POLICY, agent);
     }
 
     OrchestratedChatEngine(ChatModels.Router router, ChatModels.Generator generator, ChatModels.Verifier verifier,
             ChatToolRegistry registry, ChatToolRunner runner, ChatCitationSource citations, Clock clock,
             StageLimits limits) {
+        this(router, generator, verifier, registry, runner, citations, clock, limits, null);
+    }
+
+    OrchestratedChatEngine(ChatModels.Router router, ChatModels.Generator generator, ChatModels.Verifier verifier,
+            ChatToolRegistry registry, ChatToolRunner runner, ChatCitationSource citations, Clock clock,
+            StageLimits limits, ChatAgentPath agent) {
+        this.agent = agent;
         this.limits = limits;
         this.router = router;
         this.generator = generator;
@@ -160,7 +182,39 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         record(route, confirmed);
 
         var retrieved = new ChatRetrieval.Outcome(Map.of(), Map.of(), Set.of(), null, null);
-        if (confirmed.requirements().stream().anyMatch(p -> p.mode() == Mode.TOOLS)) {
+        ChatGeneratedAnswer agentAnswer = null;
+        List<ChatCapability> agentTools = agentTools(confirmed);
+        if (agentTools != null) {
+            // The agent path: Luna chooses and chains the allowed reads, the server decides each one, and the answer is
+            // checked below against exactly the results of the calls that ran (shared by the requirements they serve).
+            control.phase("retrieving");
+            Duration after = limits.verify().plus(limits.server());
+            guard(control, MIN_AGENT_STEP.plus(after));
+            ChatAgentPath.Outcome ran = agent.run(run, control, agentRequirements(confirmed), agentTools,
+                    ChatAnswerCheck.MAX_CITATIONS, new ChatAgentPath.Steps() {
+                        @Override
+                        public ChatModels.AgentStep run(Supplier<ChatModels.AgentStep> step) {
+                            // Each step waits at most what is left before verification and saving, and never less than
+                            // the time an answer needs; the effective Luna budget is the remaining time, not a fixed 35 s.
+                            Duration left = control.remaining().minus(after);
+                            Duration limit = left.compareTo(AGENT_STEP) < 0 ? left : AGENT_STEP;
+                            if (limit.compareTo(MIN_AGENT_STEP) < 0) throw new DeadlineGuard();
+                            return model(control, limit, after, step);
+                        }
+
+                        @Override
+                        public boolean closing() {
+                            return control.remaining().minus(after).compareTo(MIN_AGENT_STEP.multipliedBy(2)) < 0;
+                        }
+                    });
+            Map<String, List<ChatToolResult>> results = new LinkedHashMap<>();
+            confirmed.requirements().stream().filter(p -> p.mode() == Mode.TOOLS)
+                    .forEach(p -> results.put(p.id(), ran.results()));
+            retrieved = new ChatRetrieval.Outcome(results, Map.of(), Set.of(), null, null);
+            agentAnswer = ran.answer();
+            route.put("path", "agent").put("agentSteps", ran.steps()).put("approvedCalls", ran.approved())
+                    .put("deniedCalls", ran.denied());
+        } else if (confirmed.requirements().stream().anyMatch(p -> p.mode() == Mode.TOOLS)) {
             control.phase("retrieving");
             guard(control, limits.tools().plus(limits.generate()).plus(limits.verify()).plus(limits.server()));
             retrieved = retrieval.run(run, control, confirmed);
@@ -198,10 +252,15 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                     confirmed, retrieved);
         }
 
-        control.phase("writing");
-        var context = new ChatBranchContext(run.turns(), run.context(), branches, ChatAnswerCheck.MAX_CITATIONS);
-        ChatGeneratedAnswer generated = model(control, limits.generate(), limits.verify().plus(limits.server()),
-                () -> generator.generate(run, context));
+        ChatGeneratedAnswer generated;
+        if (agentAnswer != null) {
+            generated = agentAnswer;
+        } else {
+            control.phase("writing");
+            var context = new ChatBranchContext(run.turns(), run.context(), branches, ChatAnswerCheck.MAX_CITATIONS);
+            generated = model(control, limits.generate(), limits.verify().plus(limits.server()),
+                    () -> generator.generate(run, context));
+        }
         var checked = ChatAnswerCheck.check(branches, generated);
         route.put("deterministicCheck", checked.failedCheck() == null ? "passed" : checked.failedCheck());
         if (checked.failedCheck() != null) return validationFailed();
@@ -402,6 +461,35 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     @Override
     public void close() {
         models.shutdownNow();
+    }
+
+    /**
+     * The tools of the agent path for this plan, or null for the direct path. The agent takes a plan whose reads are all
+     * independent first-stage reads the MCP endpoint exposes: no member-scope read or dependent stage (Q07 and checkpointed
+     * plans stay direct, the member scope being a server-only precondition) and at least one read at all (a plan of general
+     * and limited requirements needs no tools).
+     */
+    List<ChatCapability> agentTools(ChatPlan.Run plan) {
+        if (agent == null) return null;
+        Set<ChatCapability> exposed = agent.tools();
+        Set<ChatCapability> tools = new LinkedHashSet<>();
+        for (Planned p : plan.requirements()) {
+            if (p.mode() != Mode.TOOLS) continue;
+            if (p.origin() == ChatPlan.Origin.SCOPE || p.dependsOn() != null || p.stage() != 1
+                    || !exposed.containsAll(p.capabilities())) {
+                return null;
+            }
+            tools.addAll(p.capabilities());
+        }
+        return tools.isEmpty() ? null : List.copyOf(tools);
+    }
+
+    /** The answerable requirements of the plan as the agent sees them: reads with their resolved targets, general parts. */
+    private static List<ChatModels.AgentRequirement> agentRequirements(ChatPlan.Run plan) {
+        return plan.requirements().stream().filter(p -> p.mode() == Mode.TOOLS || p.mode() == Mode.GENERAL)
+                .map(p -> new ChatModels.AgentRequirement(p.id(), p.label(), p.mode() == Mode.GENERAL,
+                        p.mode() == Mode.TOOLS ? p.targets().stream().limit(10).toList() : List.of()))
+                .toList();
     }
 
     private static void guard(ChatRunControl control, Duration needed) {

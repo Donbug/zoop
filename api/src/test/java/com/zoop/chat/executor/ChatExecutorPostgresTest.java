@@ -226,6 +226,33 @@ class ChatExecutorPostgresTest {
     }
 
     @Test
+    void anMcpCallKeepsTheResultItReturnedWithItsSuccessOnly() {
+        String jobId = submit("MCP 결과 보관");
+        executor.claimNext().orElseThrow();
+        var control = executor.attach(jobId, 1).orElseThrow().control();
+        assertEquals(List.of("tc-0", "tc-1"), control.reserveToolCalls(1,
+                List.of(reservation("company.read"), reservation("issue.read"))));
+        String kept = "{\"schemaVersion\":\"chat-tool/v1\",\"items\":[{\"id\":\"KRX:000660\"}],\"evidenceIds\":[]}";
+        control.toolCallStarted("tc-0");
+        control.toolCallFinished("tc-0", new ChatToolCallEnd("succeeded", null, "v1", List.of(), false, false, kept));
+        control.toolCallStarted("tc-1");
+        control.toolCallFinished("tc-1", ChatToolCallEnd.failed("tool_timeout"));
+
+        var results = runs.keptToolResults(jobId, 1);
+        assertEquals(1, results.size(), "a failed call keeps nothing");
+        assertEquals("tc-0", results.getFirst().toolCallId());
+        assertEquals("company.read", results.getFirst().capabilityId());
+        assertEquals("KRX:000660", mapper.readTree(results.getFirst().result()).path("items").get(0).path("id").asString());
+        assertTrue(runs.keptToolResults(jobId, 2).isEmpty());
+        // The database refuses a result over its limit or on a call that did not succeed.
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> jdbc.update(
+                "UPDATE chat_tool_calls SET result = '{\"a\":1}'::jsonb WHERE chat_job_id = ? AND tool_call_id = 'tc-1'", jobId));
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> jdbc.update(
+                "UPDATE chat_tool_calls SET result = jsonb_build_object('pad', repeat('x', 262144)) WHERE chat_job_id = ? "
+                        + "AND tool_call_id = 'tc-0'", jobId));
+    }
+
+    @Test
     void anExpiredLeaseIsRecoveredTheLateRunIsDiscardedAndARerunStartsANewAttempt() {
         String jobId = submit("오래 걸린 질문");
         var claim = executor.claimNext().orElseThrow();

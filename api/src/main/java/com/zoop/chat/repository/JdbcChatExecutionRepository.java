@@ -187,13 +187,24 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
                 connection.createArrayOf("text", end.evidenceIds().toArray()));
         return jdbc.update("UPDATE chat_tool_calls c SET status = :status, error_code = :error, data_version = :dataVersion,"
                 + " evidence_ids = :evidenceIds, truncated = :truncated, next_allowed = :nextAllowed,"
-                + " finished_at = GREATEST(:at, c.started_at)"
+                + " result = CAST(:result AS jsonb), finished_at = GREATEST(:at, c.started_at)"
                 + " WHERE c.chat_job_id = :id AND c.attempt_no = :attempt AND c.tool_call_id = :toolCallId"
                 + " AND c.status = 'running' AND " + TOOL_CALL_OWNED, params(jobId, ownerToken, at)
                 .addValue("attempt", attemptNo).addValue("toolCallId", toolCallId).addValue("status", end.status())
                 .addValue("error", end.errorCode()).addValue("dataVersion", end.dataVersion())
                 .addValue("evidenceIds", evidenceIds).addValue("truncated", end.truncated())
-                .addValue("nextAllowed", end.nextAllowed())) == 1;
+                .addValue("nextAllowed", end.nextAllowed()).addValue("result", end.result())) == 1;
+    }
+
+    @Override
+    public List<ChatKeptToolResult> keptToolResults(String jobId, int attemptNo) {
+        return jdbc.query("""
+                SELECT tool_call_id, capability_id, result::text AS result FROM chat_tool_calls
+                 WHERE chat_job_id = :id AND attempt_no = :attempt AND status = 'succeeded' AND result IS NOT NULL
+                 ORDER BY call_index
+                """, new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo),
+                (rs, index) -> new ChatKeptToolResult(rs.getString("tool_call_id"), rs.getString("capability_id"),
+                        rs.getString("result")));
     }
 
     private boolean closeToolCalls(String jobId, Instant at) {

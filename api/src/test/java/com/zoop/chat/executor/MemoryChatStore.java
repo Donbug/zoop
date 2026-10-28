@@ -221,6 +221,16 @@ public final class MemoryChatStore implements ChatRepository, ChatExecutionRepos
         return true;
     }
 
+    @Override
+    public synchronized List<com.zoop.chat.repository.ChatKeptToolResult> keptToolResults(String jobId, int attemptNo) {
+        return toolCalls.stream().filter(c -> c.row.jobId().equals(jobId) && c.row.attemptNo() == attemptNo
+                        && "succeeded".equals(c.status) && c.end != null && c.end.result() != null)
+                .sorted(Comparator.comparingInt(c -> c.row.callIndex()))
+                .map(c -> new com.zoop.chat.repository.ChatKeptToolResult(c.row.toolCallId(), c.row.capabilityId(),
+                        c.end.result()))
+                .toList();
+    }
+
     private ToolCall toolCall(String jobId, int attemptNo, String toolCallId) {
         return toolCalls.stream().filter(c -> c.row.jobId().equals(jobId) && c.row.attemptNo() == attemptNo
                 && c.row.toolCallId().equals(toolCallId)).findFirst().orElseThrow();
