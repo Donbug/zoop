@@ -6,7 +6,7 @@
 
 작성일: 2026년 10월 13일
 
-개정일: 2026년 10월 25일
+개정일: 2026년 10월 27일
 
 적용 대상: ZOOP 금융 이슈·기업 관계 탐색 서비스
 
@@ -197,7 +197,7 @@ Q02는 최신 금융 상황을 일반 지식으로 답하기 위한 우회 경�
 
 위 상황은 기존 계약을 설명하는 분류이며 새 enum을 정의하지 않는다. 투자 판단 요청은 제한 이유와 지원 범위를 안내하고, 분리 가능한 허용 요구를 완결된 형태로 답할 수 있으면 `answered`로 저장하되 제한된 요구와 이유를 `limitations`에 기록한다. 이는 실행 도중 일부가 누락·실패한 `PARTIAL`을 뜻하지 않는다. 허용된 필수 요구를 예산·모호성·도구 부재 때문에 수행하지 못하면 완료 답변으로 가장하지 않고 답변 생성 전(계획 시점 또는 6.3.4절의 선언된 체크포인트) `clarification` 또는 실제 상태에 맞는 `guidance`를 사용한다. 복합 질문의 부분 실행 결과를 표현하는 별도 `PARTIAL` outcome은 현재 계약에 없다. 하위 결과·버전 등을 구조화하여 제공하려면 공개 계약을 먼저 확장하고 검증한다. 근거 부족과 장애를 구분하고, 외부 API 실패를 ‘관련 뉴스 없음’으로 표현하지 않는다.
 
-`answered` 결과에서 답하지 않은 요구는 공개 `ChatResult.limitations`의 항목(`kind`, `label`, `message`)으로 기록한다. `kind`는 `investment_advice`(투자 판단), `precondition_unmet`(6.3.4절 체크포인트 미달), `results_truncated`(조회 상한 도달), `evidence_insufficient`(조회는 성공했으나 해당 요구의 근거 부족), `out_of_scope`(지원하지 않는 하위 요구) 중 하나다.
+`answered` 결과에서 답하지 않은 요구는 공개 `ChatResult.limitations`의 항목(`kind`, `label`, `message`)으로 기록한다. `kind`는 `investment_advice`(투자 판단), `precondition_unmet`(6.3.4절 체크포인트 미달), `results_truncated`(조회 상한 도달), `not_in_member_scope`(내 종목 질문이 지목한 기업이 회원의 보유·관심 종목이 아님), `evidence_insufficient`(조회는 성공했으나 해당 요구의 근거 부족), `out_of_scope`(지원하지 않는 하위 요구) 중 하나다.
 
 - 제한 여부는 서버가 결정한다. 투자 판단 gate, 체크포인트 판정, 도구 결과의 `truncated`, 해당 요구의 유효 citation 부재가 근거이며 모델이 스스로 요구를 제한으로 돌릴 수 없다. `message`는 `kind`별 서버 템플릿으로 만든다.
 - 출력 검증은 모든 필수 요구가 본문에서 근거와 함께 답한 요구와 `limitations` 항목 중 정확히 하나에 속하는지 검사하고, 어느 쪽에도 없거나 본문이 제한된 요구를 답한 것처럼 쓰면 `validation_failed`로 종료한다.

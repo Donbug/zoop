@@ -193,6 +193,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                         limited.containsValue("investment_advice") ? "investment_advice" : "out_of_scope", List.of()));
             }
             return insufficient(run, route, limited.containsValue("results_truncated") ? RESULTS_TRUNCATED
+                    : limited.containsValue("not_in_member_scope") ? NOT_IN_MEMBER_SCOPE
                     : limited.containsValue("precondition_unmet") ? PRECONDITION_UNMET : EVIDENCE_INSUFFICIENT,
                     confirmed, retrieved);
         }
@@ -243,6 +244,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             // The most specific cause the server knows: a limit it hit, then a verdict, then a lookup that found nothing.
             List<String> unanswered = insufficient.stream().filter(id -> byId.get(id).parent() == null).toList();
             InsufficientCause cause = limited.containsValue("results_truncated") ? RESULTS_TRUNCATED
+                    : limited.containsValue("not_in_member_scope") ? NOT_IN_MEMBER_SCOPE
                     : unanswered.stream().anyMatch(held::contains) ? EVIDENCE_HELD
                     : !unanswered.isEmpty() && retrieved.noneFound().containsAll(unanswered) ? NOTHING_FOUND
                     : limited.containsValue("precondition_unmet") ? PRECONDITION_UNMET : EVIDENCE_INSUFFICIENT;
@@ -269,6 +271,12 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 limitations.add(ChatResults.scopeCut(byId.get(id).label()));
             }
         }
+        retrieved.outside().forEach((id, how) -> {
+            // Answered on the member's companies, though the question also named one that is not: say so beside it.
+            if (explicit(decision, id) && kept.stream().anyMatch(s -> s.requirementIds().contains(id))) {
+                limitations.add(ChatResults.outsideScope(how, byId.get(id).label()));
+            }
+        });
 
         Set<String> answered = new HashSet<>();
         kept.forEach(s -> answered.addAll(s.requirementIds()));

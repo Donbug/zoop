@@ -225,6 +225,7 @@ Jev는 자유 문장 대신 정해진 질문에 typed 판정을 돌려주는 모
 | `investment_advice` | 투자 판단 요청 | 투자 판단 gate |
 | `precondition_unmet` | 체크포인트 미달로 의존 요구 수행 불가 | 체크포인트 판정 |
 | `results_truncated` | 조회 상한에 걸려 일부 자료만 확인 | 도구 결과 `truncated` |
+| `not_in_member_scope` | 내 종목(Q07) 질문이 지목한 기업이 회원의 보유·관심 종목이 아님 | 서버의 회원 범위 조회(`portfolio.scope.read`) |
 | `evidence_insufficient` | 조회는 성공했지만 이 요구의 근거 부족 | 해당 요구의 유효 citation 부재, 또는 Jev 의미 검증 hold로 제외된 요구 |
 | `out_of_scope` | 지원하지 않는 하위 요구 | 서버 지원 범위 |
 

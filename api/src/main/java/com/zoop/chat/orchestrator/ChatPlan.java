@@ -42,8 +42,9 @@ public sealed interface ChatPlan {
      * Who asked for a requirement. {@code ROUTER}: the route decision. {@code CONCEPT}: the server split the Q02 part off a
      * router requirement that also asks for a fact (partial-answer design, part 1). The member never stated it as such, so
      * leaving it unanswered is no limitation. {@code SCOPE}: the server reads the member's own companies first for a Q07
-     * requirement that names none, which then reads the rest on them; it is no branch of its own, its reads go with the
-     * requirement it serves.
+     * requirement, which then reads the rest on them: all of them when it names no company or names one as a reference point
+     * (a relation), else only those of the named companies that are the member's. It is no branch of its own, its reads go
+     * with the requirement it serves.
      */
     enum Origin { ROUTER, CONCEPT, SCOPE }
 
@@ -86,14 +87,18 @@ public sealed interface ChatPlan {
                     origin, parent);
         }
 
-        /** The member-scope source this requirement depends on: a stage-1 read of the member's own companies. */
-        Planned scope() {
+        /**
+         * The member-scope source this requirement depends on: a stage-1 read of the member's own companies, or of those of
+         * {@code named} (the companies the question names as what "my stocks" is about) that are the member's.
+         */
+        Planned scope(List<String> named) {
             int room = MAX_LABEL - SCOPE_LABEL.codePointCount(0, SCOPE_LABEL.length());
             String base = label.codePointCount(0, label.length()) <= room ? label
                     : label.substring(0, label.offsetByCodePoints(0, room));
             return new Planned(id + SCOPE_ID, base + SCOPE_LABEL, Set.of(ChatQueryType.Q07), Mode.TOOLS, null,
-                    List.of(ChatCapability.PORTFOLIO_SCOPE_READ), ChatCapability.PORTFOLIO_SCOPE_READ.untargeted(),
-                    TargetSource.SERVER, null, null, 1, Origin.SCOPE, id);
+                    List.of(ChatCapability.PORTFOLIO_SCOPE_READ),
+                    named.isEmpty() ? ChatCapability.PORTFOLIO_SCOPE_READ.untargeted() : named,
+                    named.isEmpty() ? TargetSource.SERVER : TargetSource.QUESTION, null, null, 1, Origin.SCOPE, id);
         }
 
         /** Whether this requirement reads on the companies of its member-scope source. */

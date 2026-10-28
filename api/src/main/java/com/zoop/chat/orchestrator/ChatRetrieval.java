@@ -35,20 +35,30 @@ import java.util.Set;
  * stops with a clarification built from what was actually found; fewer makes the dependent requirement
  * {@code precondition_unmet}; none at all, when the source was not cut by a limit, lets the source answer that nothing was
  * found; none from a cut source is not "none" and the source becomes {@code results_truncated}.</li>
+ * <li>Q07 on companies the question names: those that are not the member's are not read. None of them being the member's
+ * makes the requirement {@code not_in_member_scope}; only some being theirs is noted beside the answer ({@code outside}).
+ * A company named as a reference point is read with the member's companies, first, and noted when it is not one of them.</li>
  * </ul>
  */
 final class ChatRetrieval {
     /**
      * What retrieval produced: results per requirement, the limitations it decided, or a stop or failed call. {@code cut}
      * holds the requirements that read on only part of the member's companies (Q07: more than a stage fans out to).
+     * {@code outside} holds the Q07 requirements that name a company that is not the member's, by how it was named.
      */
     record Outcome(Map<String, List<ChatToolResult>> results, Map<String, String> limitations, Set<String> noneFound,
-            ChatPlan.Stop stop, ChatToolResult failed, Set<String> cut) {
+            ChatPlan.Stop stop, ChatToolResult failed, Set<String> cut, Map<String, Outside> outside) {
         Outcome(Map<String, List<ChatToolResult>> results, Map<String, String> limitations, Set<String> noneFound,
                 ChatPlan.Stop stop, ChatToolResult failed) {
-            this(results, limitations, noneFound, stop, failed, Set.of());
+            this(results, limitations, noneFound, stop, failed, Set.of(), Map.of());
         }
     }
+
+    /**
+     * How a Q07 requirement named a company that is not the member's: as what it asks about ({@code NAMED}, not read), or as
+     * the point the member's companies are related to ({@code ANCHOR}, read all the same).
+     */
+    enum Outside { NAMED, ANCHOR }
 
     private final ChatToolRunner runner;
 
@@ -61,6 +71,9 @@ final class ChatRetrieval {
         Map<String, String> limitations = new LinkedHashMap<>();
         Set<String> noneFound = new LinkedHashSet<>();
         Set<String> cut = new LinkedHashSet<>();
+        Map<String, Outside> outside = new LinkedHashMap<>();
+        Map<String, Planned> byId = new HashMap<>();
+        plan.requirements().forEach(p -> byId.put(p.id(), p));
         for (int stage = 1; stage <= plan.stages(); stage++) {
             List<ChatToolRequest> calls = new ArrayList<>();
             Map<String, Integer> callIndex = new HashMap<>();
@@ -75,7 +88,22 @@ final class ChatRetrieval {
                         continue;
                     }
                     Found found = found(results.getOrDefault(source, List.of()));
+                    List<String> anchors = p.targets().stream().filter(ChatPlanner::companyId).toList();
                     if (p.onScope()) {
+                        // The scope source reads the companies the question names, or the member's companies.
+                        Planned scope = byId.get(source);
+                        List<String> named = scope.targetSource() == ChatPlan.TargetSource.QUESTION ? scope.targets()
+                                : List.of();
+                        List<String> asked = named.isEmpty() ? anchors : named;
+                        if (!found.truncated() && !found.companies().isEmpty()
+                                && !found.companies().keySet().containsAll(asked)) {
+                            outside.put(p.id(), named.isEmpty() ? Outside.ANCHOR : Outside.NAMED);
+                        }
+                        // None of the companies it is about is the member's: nothing of theirs to read.
+                        if (!named.isEmpty() && found.companies().isEmpty()) {
+                            limitations.put(p.id(), "not_in_member_scope");
+                            continue;
+                        }
                         // The member's own companies: having none is the answer, and reading only some of them is noted.
                         if (found.companies().isEmpty() && !found.truncated()) {
                             noneFound.add(p.id());
@@ -96,7 +124,16 @@ final class ChatRetrieval {
                         limitations.put(p.id(), "precondition_unmet");
                         continue;
                     }
-                    targets = List.copyOf(found.companies().keySet());
+                    if (p.onScope()) {
+                        // A reference point first (a path reads from its first target), then the member's companies, then
+                        // a named issue.
+                        Set<String> read = new LinkedHashSet<>(anchors);
+                        read.addAll(found.companies().keySet());
+                        read.addAll(p.targets());
+                        targets = List.copyOf(read);
+                    } else {
+                        targets = List.copyOf(found.companies().keySet());
+                    }
                 }
                 for (ChatCapability capability : p.capabilities()) {
                     // The member's narrowed evidence selection bounds the reads of the requirement's own targets, never
@@ -133,7 +170,7 @@ final class ChatRetrieval {
                 noneFound.add(p.id());
             }
         }
-        return new Outcome(results, limitations, noneFound, null, null, cut);
+        return new Outcome(results, limitations, noneFound, null, null, cut, outside);
     }
 
     /**
