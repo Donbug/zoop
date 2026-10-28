@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 type Token = 'ink' | 'muted' | 'faint' | 'line' | 'paper' | 'soft' | 'up';
 export type ColorTheme = 'light' | 'dark';
@@ -81,24 +81,27 @@ export function toggleTheme(): { theme: ColorTheme; stored: boolean } {
 }
 
 /**
- * 화면 모드를 바꾸고 주소의 ?theme=을 라우터(useSearchParams)로 맞춘다.
+ * 화면 모드를 바꾸고 주소의 ?theme=을 라우터로 맞춘다.
  * 저장했으면 ?theme=을 지워 저장한 값이 다음 새로 고침에 쓰이게 하고, 저장소가 없으면 주소에 남긴다.
  * 라우터를 거쳐야 이후 주소 갱신(useRouteQuery)이 예전 ?theme=을 되살리지 않는다.
  */
 export function useThemeToggle() {
-  const [params, setParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   return () => {
     const { theme, stored } = toggleTheme();
     const wanted = stored ? null : theme;
-    if (params.get('theme') === wanted) return;
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (wanted) next.set('theme', wanted);
-        else next.delete('theme');
-        return next;
+    const next = new URLSearchParams(location.search);
+    if (next.get('theme') === wanted) return;
+    if (wanted) next.set('theme', wanted);
+    else next.delete('theme');
+    navigate(
+      {
+        pathname: location.pathname,
+        search: next.size ? `?${next}` : '',
+        hash: location.hash,
       },
-      { replace: true, preventScrollReset: true },
+      { replace: true, preventScrollReset: true, state: location.state },
     );
   };
 }

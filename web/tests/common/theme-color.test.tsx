@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import {
   applyInitialTheme,
   themeColor,
@@ -89,6 +91,41 @@ function ThemeProbe() {
     </>
   );
 }
+
+it.each([false, true])(
+  'D-AUT-01 · 82: preserves login return state and hash when updating theme (storage blocked=%s)',
+  async (blocked) => {
+    document.documentElement.dataset.theme = 'light';
+    if (blocked)
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new DOMException('blocked');
+      });
+    const state = { from: { pathname: '/my', search: '?tab=holdings' } };
+    const router = createMemoryRouter(
+      [{ path: '/login', element: <ThemeProbe /> }],
+      {
+        initialEntries: [
+          {
+            pathname: '/login',
+            search: blocked ? '?tab=sign-in' : '?tab=sign-in&theme=light',
+            hash: '#email',
+            state,
+          },
+        ],
+      },
+    );
+    render(<RouterProvider router={router} />);
+    await userEvent.click(screen.getByRole('button', { name: '전환' }));
+    expect(router.state.location.state).toEqual(state);
+    expect(router.state.location.hash).toBe('#email');
+    expect(new URLSearchParams(router.state.location.search).get('tab')).toBe(
+      'sign-in',
+    );
+    expect(new URLSearchParams(router.state.location.search).get('theme')).toBe(
+      blocked ? 'dark' : null,
+    );
+  },
+);
 
 it('82번 drops ?theme through the router so later query updates do not restore it', async () => {
   document.documentElement.dataset.theme = 'light';

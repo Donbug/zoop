@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test } from 'vitest';
 import StocksPage from '@/pages/stocks/StocksPage';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -8,10 +8,12 @@ import {
   NVIDIA,
   SAMSUNG,
   SAMSUNG_SDI,
+  settingsBody,
 } from '../support/fixtures';
 import {
   apiError,
   createFakeServer,
+  deferred,
   json,
   type FakeServer,
 } from '../support/fakeServer';
@@ -82,6 +84,113 @@ function openStocks(path = '/stocks') {
 }
 
 const list = () => screen.findByRole('list', { name: '종목 목록' });
+
+test('D-STK-01: personal filter resets after switching member while preserving search and scope', async () => {
+  useAuthStore.getState().setSession(member());
+  const server = createFakeServer();
+  myMember(server, { connected: true, watchlistIds: [NVIDIA.id] });
+  quotes(server);
+  const { user, location } = openStocks('/stocks?scope=mine&q=NVIDIA');
+  await user.click(await screen.findByRole('button', { name: '관심 1' }));
+  const next = member();
+  if (next.user) next.user.id = 'mem-2';
+  myMember(server, { connected: false, watchlistIds: [] });
+  act(() => useAuthStore.getState().setSession(next));
+  expect(sessionStorage.getItem('zoop.stocks.personal-filter')).toBeNull();
+  expect(screen.queryByRole('list', { name: '종목 목록' })).toBeNull();
+  expect(
+    (await screen.findByRole('button', { name: '전체 0' })).getAttribute(
+      'aria-pressed',
+    ),
+  ).toBe('true');
+  expect(
+    new URL(location(), 'http://localhost').searchParams.has('personal'),
+  ).toBe(false);
+  expect(new URL(location(), 'http://localhost').searchParams.get('q')).toBe(
+    'NVIDIA',
+  );
+  expect(
+    new URL(location(), 'http://localhost').searchParams.get('scope'),
+  ).toBe('mine');
+});
+
+test('D-STK-01: restoring or rechecking the same member keeps the requested personal filter', async () => {
+  useAuthStore.getState().setSession(member());
+  const server = createFakeServer();
+  myMember(server, { connected: true, watchlistIds: [NVIDIA.id] });
+  quotes(server);
+  const { location } = openStocks('/stocks?scope=mine&personal=watch');
+  await screen.findByRole('button', { name: '관심 1' });
+  act(() => useAuthStore.getState().setStatus('checking'));
+  act(() => useAuthStore.getState().setSession(member()));
+  await waitFor(() =>
+    expect(
+      screen
+        .getByRole('button', { name: '관심 1' })
+        .getAttribute('aria-pressed'),
+    ).toBe('true'),
+  );
+  expect(location()).toContain('personal=watch');
+});
+
+test('D-STK-01: signing out resets the URL filter before the next member signs in', async () => {
+  useAuthStore.getState().setSession(member());
+  const server = createFakeServer();
+  myMember(server, { connected: true, watchlistIds: [NVIDIA.id] });
+  quotes(server);
+  const { user, location } = openStocks('/stocks?scope=mine');
+  await user.click(await screen.findByRole('button', { name: '관심 1' }));
+  act(() => useAuthStore.getState().clearSession());
+  expect(
+    new URL(location(), 'http://localhost').searchParams.has('personal'),
+  ).toBe(false);
+  act(() => useAuthStore.getState().setSession(member()));
+  await waitFor(() =>
+    expect(
+      screen
+        .getByRole('button', { name: /^전체 / })
+        .getAttribute('aria-pressed'),
+    ).toBe('true'),
+  );
+});
+
+test.each(['success', 'failure'])(
+  'D-STK-01: late prior-member watch %s cannot restore rows or errors for the next member',
+  async (result) => {
+    useAuthStore.getState().setSession(member());
+    const server = createFakeServer();
+    myMember(server, { connected: true, watchlistIds: [NVIDIA.id] });
+    quotes(server);
+    const pending = deferred<Response>();
+    server.on('PUT', WATCH, () => pending.promise);
+    const { user } = openStocks('/stocks?scope=mine');
+    await user.click(await screen.findByRole('button', { name: '관심 1' }));
+    await user.click(
+      within(await rowOf('NVIDIA')).getByRole('button', {
+        name: 'NVIDIA 관심 종목',
+      }),
+    );
+    myMember(server, { connected: false, watchlistIds: [] });
+    const next = member();
+    if (next.user) next.user.id = 'mem-next';
+    act(() => useAuthStore.getState().setSession(next));
+    await screen.findByRole('button', { name: '전체 0' });
+    await act(async () =>
+      pending.resolve(
+        result === 'success'
+          ? json(settingsBody({ watchlistIds: [SAMSUNG.id] }))
+          : apiError(503, 'SOURCE_UNAVAILABLE'),
+      ),
+    );
+    expect(
+      screen
+        .getByRole('button', { name: '전체 0' })
+        .getAttribute('aria-pressed'),
+    ).toBe('true');
+    expect(screen.queryByRole('list', { name: '종목 목록' })).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  },
+);
 const rowOf = async (name: string) =>
   (await within(await list()).findByText(name)).closest('li') as HTMLElement;
 

@@ -56,6 +56,38 @@ function rememberedPersonalFilter() {
 export default function StocksPage() {
   const location = useLocation();
   const [params, setParams] = useSearchParams();
+  const { isAuthenticated, member, status } = useAuth();
+  const confirmedMember = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    // D-STK-01: only an actual member change resets the URL-owned filter.
+    // Initial session restoration and a recheck of the same member keep it.
+    if (status !== 'ready') return;
+    const current = isAuthenticated ? (member?.id ?? null) : null;
+    const previous = confirmedMember.current;
+    confirmedMember.current = current;
+    if (
+      previous === undefined ||
+      previous === current ||
+      !params.has('personal')
+    )
+      return;
+    setParams(
+      (value) => {
+        const next = new URLSearchParams(value);
+        next.delete('personal');
+        return next;
+      },
+      { replace: true, preventScrollReset: true, state: location.state },
+    );
+  }, [status, isAuthenticated, member?.id, params, setParams, location.state]);
+  // A member change must also discard old list/cache/pending-write state.
+  // A checking session retains member.id, so same-member rechecks do not remount.
+  return <StocksSession key={member?.id ?? 'nonmember'} />;
+}
+
+function StocksSession() {
+  const location = useLocation();
+  const [params, setParams] = useSearchParams();
   const query = params.get('q') ?? '';
   const scope: StockScope = params.get('scope') === 'mine' ? 'mine' : 'all';
   const requestedPersonal =
