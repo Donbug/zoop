@@ -4,7 +4,7 @@ import { adminMenus } from '@/constants/navigation';
 import { logoutAdmin } from '@/apis/admin/auth';
 import { useAdminSessionStore } from '@/stores/useAdminSessionStore';
 import { BUTTON, FOCUS_RING } from './adminStyles';
-import { toggleTheme } from '@/util/theme-color';
+import { useThemeToggle } from '@/util/theme-color';
 
 function SidebarChevron({ direction }: { direction: 'left' | 'right' }) {
   return (
@@ -23,6 +23,7 @@ function SidebarChevron({ direction }: { direction: 'left' | 'right' }) {
 // A-ADM-01·02·02b·03·04·04b·05·05b 공통 관리자 내비게이션.
 export default function AdminLayout() {
   const navigate = useNavigate();
+  const toggleTheme = useThemeToggle();
   const admin = useAdminSessionStore((state) => state.admin);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 

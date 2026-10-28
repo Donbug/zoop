@@ -5,7 +5,10 @@ import {
   themeColor,
   toggleTheme,
   useColorTheme,
+  useThemeToggle,
 } from '@/util/theme-color';
+import { useRouteQuery } from '@/hooks/useRouteQuery';
+import { renderRoutes } from '../support/renderRoutes';
 
 // Dark theme: the first paint follows ?theme= or the saved choice; the canvas reads token values.
 beforeEach(() => {
@@ -48,13 +51,8 @@ it('reads the current token value for canvas colors and falls back to light', ()
   expect(themeColor('ink')).toBe('#ffffff');
 });
 
-it('82번 toggles without reloading, keeps typed input and router state, and drops ?theme', () => {
+it('82번 toggles without reloading and keeps typed input', () => {
   document.documentElement.dataset.theme = 'light';
-  window.history.replaceState(
-    { idx: 3, key: 'k' },
-    '',
-    '/admin?tab=x&theme=light',
-  );
   const seen: string[] = [];
   function Probe() {
     const theme = useColorTheme();
@@ -67,27 +65,63 @@ it('82번 toggles without reloading, keeps typed input and router state, and dro
   }) as HTMLInputElement;
   fireEvent.change(input, { target: { value: '입력 중인 사유' } });
 
-  act(() => toggleTheme());
+  act(() => {
+    toggleTheme();
+  });
 
   expect(document.documentElement.dataset.theme).toBe('dark');
   expect(seen.at(-1)).toBe('dark');
   expect(input.value).toBe('입력 중인 사유');
   expect(localStorage.getItem('zoop.theme')).toBe('dark');
-  expect(window.location.search).toBe('?tab=x');
-  expect(window.history.state).toEqual({ idx: 3, key: 'k' });
 });
 
-it('82번 keeps the choice in the URL when browser storage is unavailable', () => {
+function ThemeProbe() {
+  const toggle = useThemeToggle();
+  const { updateQuery } = useRouteQuery();
+  return (
+    <>
+      <button type="button" onClick={toggle}>
+        전환
+      </button>
+      <button type="button" onClick={() => updateQuery({ node: 'n1' })}>
+        노드
+      </button>
+    </>
+  );
+}
+
+it('82번 drops ?theme through the router so later query updates do not restore it', async () => {
+  document.documentElement.dataset.theme = 'light';
+  const { user, location } = renderRoutes(
+    [{ path: '/', element: <ThemeProbe /> }],
+    '/?tab=x&theme=light',
+  );
+
+  await user.click(screen.getByRole('button', { name: '전환' }));
+  expect(location()).toBe('/?tab=x');
+  await user.click(screen.getByRole('button', { name: '노드' }));
+
+  expect(location()).toBe('/?tab=x&node=n1');
+  expect(document.documentElement.dataset.theme).toBe('dark');
+  expect(localStorage.getItem('zoop.theme')).toBe('dark');
+});
+
+it('82번 keeps the choice in the URL when browser storage is unavailable', async () => {
   document.documentElement.dataset.theme = 'light';
   const unavailable = vi
     .spyOn(Storage.prototype, 'setItem')
     .mockImplementation(() => {
       throw new DOMException('blocked');
     });
+  const { user, location } = renderRoutes(
+    [{ path: '/', element: <ThemeProbe /> }],
+    '/',
+  );
 
-  toggleTheme();
+  await user.click(screen.getByRole('button', { name: '전환' }));
+  await user.click(screen.getByRole('button', { name: '노드' }));
 
   expect(document.documentElement.dataset.theme).toBe('dark');
-  expect(new URLSearchParams(window.location.search).get('theme')).toBe('dark');
+  expect(location()).toBe('/?theme=dark&node=n1');
   unavailable.mockRestore();
 });

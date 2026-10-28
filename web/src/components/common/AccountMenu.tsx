@@ -6,6 +6,7 @@ import GraphIcon from '@/components/graph/GraphIcon';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { Member } from '@/types/auth';
+import { readSocialLinkResult, socialLinkMessage } from './socialLinkResult';
 
 // D-GRP-01 / D-MY-01 common header · account menu (user decision 2026-10-17).
 export default function AccountMenu() {
@@ -53,7 +54,7 @@ function MemberAccountMenu({
   const [linking, setLinking] = useState(false);
   const [failed, setFailed] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
-  const socialResult = new URLSearchParams(location.search).get('social');
+  const socialResult = readSocialLinkResult(location.search);
   const menuId = useId();
   const tooltipId = useId();
   useEffect(() => {
@@ -271,22 +272,12 @@ function MemberAccountMenu({
           )}
         </div>
       )}
-      {socialResult === 'linked' && (
+      {socialResult && (
         <p
           role="status"
           className="absolute right-0 w-64 bg-zoop-paper p-2 text-xs"
         >
-          소셜 계정을 연결했어요.
-        </p>
-      )}
-      {(socialResult === 'failed' || socialResult === 'cancelled') && (
-        <p
-          role="status"
-          className="absolute right-0 w-64 bg-zoop-paper p-2 text-xs"
-        >
-          {socialResult === 'cancelled'
-            ? '계정 연결을 취소했어요.'
-            : '계정을 연결하지 못했어요. 다시 시도해 주세요.'}
+          {socialLinkMessage[socialResult]}
         </p>
       )}
     </div>

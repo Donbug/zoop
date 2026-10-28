@@ -8,7 +8,10 @@ import type { AdminSession } from '@/types/admin';
 import { toggleTheme } from '@/util/theme-color';
 import { renderRoutes } from '../support/renderRoutes';
 
-vi.mock('@/util/theme-color', () => ({ toggleTheme: vi.fn() }));
+vi.mock('@/util/theme-color', () => {
+  const toggleTheme = vi.fn();
+  return { toggleTheme, useThemeToggle: () => toggleTheme };
+});
 const session: AdminSession = {
   authenticated: true,
   expired: false,

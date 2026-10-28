@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import MapEntryRoute from '@/components/auth/MapEntryRoute';
 import { useAuth } from '@/hooks/useAuth';
+import OnboardingLayout from '@/components/onboarding/OnboardingLayout';
 
 vi.mock('@/hooks/useAuth');
 beforeEach(() => {
@@ -101,4 +102,50 @@ it('uses the login recovery screen on a failed session check', async () => {
   open();
   expect(await screen.findByText(/로그인 시작/)).toBeTruthy();
   expect(screen.queryByText('시장 지도')).toBeNull();
+});
+it.each([
+  ['linked', '소셜 계정을 연결했어요.'],
+  ['cancelled', '계정 연결을 취소했어요.'],
+  ['failed', '계정을 연결하지 못했어요. 다시 시도해 주세요.'],
+])(
+  '#381 keeps a social-link result (%s) when an incomplete member is sent to onboarding',
+  (result, message) => {
+    vi.mocked(useAuth).mockReturnValue({
+      ...useAuth(),
+      isAuthenticated: true,
+      onboardingCompleted: false,
+    });
+    render(
+      <MemoryRouter initialEntries={[`/?social=${result}`]}>
+        <Routes>
+          <Route path="/" element={<MapEntryRoute />} />
+          <Route path="/onboarding" element={<OnboardingLayout />}>
+            <Route index element={<p>초기 설정</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('초기 설정')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe(message);
+  },
+);
+it('#381 forwards only a known social-link result to onboarding', () => {
+  vi.mocked(useAuth).mockReturnValue({
+    ...useAuth(),
+    isAuthenticated: true,
+    onboardingCompleted: false,
+  });
+  function Where() {
+    const location = useLocation();
+    return <p>온보딩 {location.search || '(없음)'}</p>;
+  }
+  render(
+    <MemoryRouter initialEntries={['/?social=other&code=abc']}>
+      <Routes>
+        <Route path="/" element={<MapEntryRoute />} />
+        <Route path="/onboarding" element={<Where />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  expect(screen.getByText('온보딩 (없음)')).toBeTruthy();
 });

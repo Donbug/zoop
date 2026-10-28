@@ -71,12 +71,9 @@ import type {
 import '@/components/graph/relationship-map.css';
 import { useColorTheme } from '@/util/theme-color';
 
+// Same-session preference only. useAuthStore clears it when the member changes
+// and keeps it when the same member's session is restored after a reload.
 const FILTER_KEY = 'zoop.graph.personal-filter';
-// Same-session preference only; cleared on sign-in/out.
-useAuthStore.subscribe((next, previous) => {
-  if (Boolean(next.member) !== Boolean(previous.member))
-    sessionStorage.removeItem(FILTER_KEY);
-});
 function readFilter(value: string | null): PersonalScope {
   return value === 'holdings' || value === 'watchlist' ? value : 'all';
 }

@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { toggleTheme } from '@/util/theme-color';
+import { useThemeToggle } from '@/util/theme-color';
 import GraphIcon from '@/components/graph/GraphIcon';
 import { useAiChatStore } from '@/stores/useAiChatStore';
 import AccountMenu from './AccountMenu';
@@ -19,6 +19,7 @@ export default function ServiceHeader({
   navLabel?: string;
 }) {
   const navigate = useNavigate();
+  const toggleTheme = useThemeToggle();
   const { pathname } = useLocation();
   /** D-AI-01: the AI drawer lives on the map. Elsewhere, go to the map first; the selected target is kept as it is. */
   function openAiChat() {

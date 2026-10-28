@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 type Token = 'ink' | 'muted' | 'faint' | 'line' | 'paper' | 'soft' | 'up';
 export type ColorTheme = 'light' | 'dark';
@@ -62,23 +63,42 @@ export function useColorTheme() {
   );
 }
 
-/** 화면 모드 전환. 새로 불러오지 않아 입력 중인 내용과 화면 상태가 남는다(82번). */
-export function toggleTheme() {
+/**
+ * 화면 모드 전환. 새로 불러오지 않아 입력 중인 내용과 화면 상태가 남는다(82번).
+ * 주소의 ?theme=은 건드리지 않는다. 라우터 안에서는 useThemeToggle로 주소까지 맞춘다.
+ */
+export function toggleTheme(): { theme: ColorTheme; stored: boolean } {
   const next = currentTheme() === 'dark' ? 'light' : 'dark';
-  const url = new URL(window.location.href);
-  const hadQuery = url.searchParams.has('theme');
-  url.searchParams.delete('theme');
   let stored = true;
   try {
     localStorage.setItem(KEY, next);
   } catch {
     stored = false;
-    // 저장소가 없으면 새로 고침 뒤에도 선택이 남도록 URL에 남긴다.
-    url.searchParams.set('theme', next);
   }
-  // 라우터 상태(history.state)는 그대로 두고 주소의 ?theme=만 맞춘다.
-  if (hadQuery || !stored)
-    window.history.replaceState(window.history.state, '', url.toString());
   document.documentElement.dataset.theme = next;
   for (const listener of listeners) listener();
+  return { theme: next, stored };
+}
+
+/**
+ * 화면 모드를 바꾸고 주소의 ?theme=을 라우터(useSearchParams)로 맞춘다.
+ * 저장했으면 ?theme=을 지워 저장한 값이 다음 새로 고침에 쓰이게 하고, 저장소가 없으면 주소에 남긴다.
+ * 라우터를 거쳐야 이후 주소 갱신(useRouteQuery)이 예전 ?theme=을 되살리지 않는다.
+ */
+export function useThemeToggle() {
+  const [params, setParams] = useSearchParams();
+  return () => {
+    const { theme, stored } = toggleTheme();
+    const wanted = stored ? null : theme;
+    if (params.get('theme') === wanted) return;
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (wanted) next.set('theme', wanted);
+        else next.delete('theme');
+        return next;
+      },
+      { replace: true, preventScrollReset: true },
+    );
+  };
 }
