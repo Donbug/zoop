@@ -78,7 +78,13 @@ export type MarketIndicator = {
   baseline: { value: number; date: string; at: string | null } | null;
   change: number | null;
   changeRate: number | null;
-  source: { name: string; official: boolean; delayNote: string | null } | null;
+  source: {
+    name: string;
+    official: boolean;
+    delayNote: string | null;
+    /** getBriefing QuoteSourceOut.url; older saved responses may omit it. */
+    url?: string | null;
+  } | null;
   reason: string | null;
 };
 /** 퇴근 회차의 같은 날 출근 회차 대비 핵심 이슈 변화(SinceMorningItem) */
@@ -194,7 +200,12 @@ export type BriefingResponse = {
   companyOutlooks?: import('./companyOutlook').CompanyOutlooks;
   marketSummary: BriefingMarketSummary;
   marketVariables:
-    | { status: 'available'; indicators: MarketIndicator[] }
+    | {
+        status: 'available';
+        /** Stored collection time only; never infer it from the observation time. */
+        collectedAt?: string | null;
+        indicators: MarketIndicator[];
+      }
     | { status: 'unavailable'; reason: string };
   /** 퇴근 회차만 값이 있다. 출근 회차는 null */
   sinceMorning: SinceMorning | null;

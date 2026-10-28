@@ -63,4 +63,20 @@ describe('FS065 사용 이벤트 계측', () => {
 
     expect(server.calls('POST', TELEMETRY)).toHaveLength(0);
   });
+
+  test('D-BRF-01·02 discards queued activity when the session changes', async () => {
+    useAuthStore.getState().setSession(guest);
+    track({ type: 'briefing_view', targetId: 'old-round', viewId: 'old-view' });
+    useAuthStore.getState().setSession({ ...guest, csrfToken: 'new-csrf' });
+    flushTelemetry();
+    expect(server.calls('POST', TELEMETRY)).toHaveLength(0);
+    track({ type: 'briefing_view', targetId: 'new-round', viewId: 'new-view' });
+    flushTelemetry();
+    await expect.poll(() => server.calls('POST', TELEMETRY).length).toBe(1);
+    expect(server.calls('POST', TELEMETRY)[0].body).toEqual({
+      events: [
+        { type: 'briefing_view', targetId: 'new-round', viewId: 'new-view' },
+      ],
+    });
+  });
 });

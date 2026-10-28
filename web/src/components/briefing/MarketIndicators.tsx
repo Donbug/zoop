@@ -1,5 +1,7 @@
 import type { BriefingResponse, MarketIndicator } from '@/types/briefing';
 import { briefingTime } from '@/util/briefingTime';
+import PanelDisclosure from '@/components/graph/PanelDisclosure';
+import { safeArticleUrl } from '@/components/graph/event-format';
 import {
   EMPTY,
   FOCUS_RING,
@@ -18,6 +20,63 @@ const statuses = {
 const number = (value: number) =>
   value.toLocaleString('ko-KR', { maximumFractionDigits: 2 });
 const signed = (value: number) => `${value > 0 ? '+' : ''}${number(value)}`;
+
+// D-BRF-01·02: prototype features/briefing-market.tsx market information disclosure.
+function MarketInfo({
+  variables,
+}: {
+  variables: Extract<
+    BriefingResponse['marketVariables'],
+    { status: 'available' }
+  >;
+}) {
+  const source = variables.indicators.find((item) => item.source)?.source;
+  return (
+    <PanelDisclosure
+      label="시장 지표 안내"
+      trigger={
+        <span
+          className="inline-flex min-h-11 min-w-11 items-center justify-center"
+          aria-hidden="true"
+        >
+          ⓘ
+        </span>
+      }
+    >
+      <p className={NOTE}>
+        이 회차를 만들 때 받은 값이고, 발행한 뒤에는 바뀌지 않아요.
+      </p>
+      {source && (
+        <p className={NOTE}>
+          출처 {source.name}
+          {!source.official && ' · 비공식'}
+          {source.delayNote && ` · ${source.delayNote}`}
+        </p>
+      )}
+      <p className={NOTE}>
+        값을 받은 시각 {briefingTime(variables.collectedAt ?? null)}
+      </p>
+      <ul>
+        {variables.indicators.map((item) => {
+          const href = safeArticleUrl(item.source?.url ?? null);
+          return href ? (
+            <li key={item.id}>
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${labels[item.id]} 출처 열기 (새 창)`}
+                className={`inline-flex min-h-11 items-center text-xs underline underline-offset-4 ${FOCUS_RING}`}
+              >
+                {labels[item.id]} 출처 ↗
+              </a>
+            </li>
+          ) : null;
+        })}
+      </ul>
+    </PanelDisclosure>
+  );
+}
 
 /** 일별 값은 관측 날짜를 쓴다. 환율의 일별 고시값은 시장 종가와 구분한다. */
 function observed(item: MarketIndicator) {
@@ -83,9 +142,14 @@ export default function MarketIndicators({
 }) {
   return (
     <section className={SECTION} aria-labelledby="market-indicators-title">
-      <h3 id="market-indicators-title" className={SECTION_TITLE}>
-        주요 시장 지표
-      </h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 id="market-indicators-title" className={SECTION_TITLE}>
+          주요 시장 지표
+        </h3>
+        {variables?.status === 'available' && (
+          <MarketInfo variables={variables} />
+        )}
+      </div>
       {variables?.status === 'unavailable' && (
         <p className={`${EMPTY} mb-3`}>{variables.reason}</p>
       )}
