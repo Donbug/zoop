@@ -3372,6 +3372,78 @@ paths:
           operationId: null
           differences: ["Spring 공개 조회의 읽기 전용 복기 뷰이며 직접 대응 BFF 없음."]
         teamQuestions: []
+  "/api/v1/briefings/{roundId}/items/{eventId}/impacts":
+    get:
+      tags: ["briefings"]
+      summary: "회차 이슈의 기업별 S3 영향 평가와 검증 인용"
+      description: "발행 당시 고정 그래프 receipt를 현재 원문·권한으로 검증하여 읽는다. 별개 S3 평가를 합산하지 않으며 producer proposal은 제공하지 않는다. 신규 모델 호출·DB 쓰기 없음. 원래 그래프 없는 과거 회차는 unavailable이며 재구성/최신 그래프로 대체하지 않는다."
+      operationId: "getBriefingItemImpacts"
+      x-zoop:
+        fsIds: [FS030, FS033]
+        nfsIds: [NFS001, NFS004, NFS005, NFS006]
+        screenIds: [D-BRF-01, D-BRF-02, M-BRF-01]
+        wbsIds: [6.1.2, 6.11.1]
+        priority: P1
+        authority: 공개
+        errorCodes: [INVALID_REQUEST, RESOURCE_NOT_FOUND, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE, INTERNAL_ERROR]
+        prototype:
+          method: GET
+          path: null
+          operationId: null
+          differences: ["기존 BFF 대응 없이 고정 그래프 S3 receipt를 Spring API로 읽는다."]
+        teamQuestions: []
+      security: []
+      parameters:
+        - {name: "roundId", in: "path", required: true, schema: {type: "string", minLength: 1, maxLength: 256}}
+        - {name: "eventId", in: "path", required: true, schema: {type: "string", minLength: 1, maxLength: 256}}
+        - {name: "graphVersion", in: "query", required: false, description: "발행 회차의 고정 버전과 일치해야 한다.", schema: {type: "string"}}
+        - "$ref": "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: "기업별 저장 평가 또는 명시적인 미저장 상태"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/BriefingImpacts"}
+        "404": {"$ref": "#/components/responses/Error404"}
+        "409": {"$ref": "#/components/responses/Error409"}
+        "422": {"$ref": "#/components/responses/Error422"}
+        "503": {"$ref": "#/components/responses/Error503"}
+  "/api/v1/briefings/{roundId}/items/{eventId}/impact-reviews":
+    get:
+      tags: ["briefings"]
+      summary: "기존 브리핑의 인용·주변 문맥으로 수행한 S3 사후 재평가"
+      description: "원래 발행본을 변경하지 않는 별도 사후 평가다. 고정 manifest·생성/독립 검증 receipt·원본 발행 해시·현재 근거 권한을 확인한다. reviewContext의 생성 시각과 범위를 표시한다. 조회 중 AI 호출·기록 변경은 없다. 명시적으로 설정한 실행 결과가 없으면 unavailable이다."
+      operationId: "getBriefingItemImpactReviews"
+      x-zoop:
+        fsIds: [FS030, FS033]
+        nfsIds: [NFS001, NFS004, NFS005, NFS006]
+        screenIds: [D-BRF-01, D-BRF-02, M-BRF-01]
+        wbsIds: [6.1.2, 6.11.1]
+        priority: P1
+        authority: 공개
+        errorCodes: [INVALID_REQUEST, RESOURCE_NOT_FOUND, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE, INTERNAL_ERROR]
+        prototype:
+          method: GET
+          path: null
+          operationId: null
+          differences: ["기존 BFF 직접 대응 없음. Spring에서 불변 사후 평가 기록을 현재 원문 권한으로 읽는다."]
+        teamQuestions: []
+      security: []
+      parameters:
+        - {name: "roundId", in: "path", required: true, schema: {type: "string", minLength: 1, maxLength: 256}}
+        - {name: "eventId", in: "path", required: true, schema: {type: "string", minLength: 1, maxLength: 256}}
+        - {name: "graphVersion", in: "query", required: false, description: "발행 회차의 고정 버전과 일치해야 한다.", schema: {type: "string"}}
+        - "$ref": "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: "기업별 저장 평가 또는 명시적인 미저장 상태"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/BriefingImpacts"}
+        "404": {"$ref": "#/components/responses/Error404"}
+        "409": {"$ref": "#/components/responses/Error409"}
+        "422": {"$ref": "#/components/responses/Error422"}
+        "503": {"$ref": "#/components/responses/Error503"}
   "/api/v1/briefings/{roundId}/items/{eventId}":
     get:
       tags: ["briefings"]
@@ -8425,6 +8497,862 @@ components:
           type: array
           minItems: 1
           items: {type: string}
+    EditionStatement:
+      type: object
+      required:
+      - text
+      - evidenceIds
+      properties:
+        text:
+          type: string
+          minLength: 1
+        evidenceIds:
+          type: array
+          minItems: 0
+          maxItems: 6
+          items:
+            type: string
+      description: 시장 해석·자료 부족 안내는 기사 근거 ID가 없을 수 있으며 검증된 시장 스냅샷과 결속합니다. 기업 사실의 근거 ID는 별도로 필수 검사합니다.
+    AiPriceOutlooks:
+      type: object
+      required: [schemaVersion, model, promptVersion, verificationMode, status, roundId, date, edition, cutoff, resultVersion, generatedAt, inputSha256, reviewVersion, priceContextVersion, companies]
+      properties:
+        schemaVersion: {type: string, const: zoop-ai-price-outlooks-v1}
+        model: {type: string, const: gpt-6-luna}
+        promptVersion: {type: string, const: company-outlook-v5}
+        verificationMode: {type: string, const: independent_model}
+        status: {type: string, enum: [PASS, WITHHELD]}
+        roundId: {type: string}
+        date: {type: string, format: date}
+        edition: {type: string, enum: [morning, evening]}
+        cutoff: {type: string, format: date-time}
+        resultVersion: {type: string}
+        generatedAt: {type: string, format: date-time}
+        inputSha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+        reviewVersion: {type: string}
+        priceContextVersion: {type: string}
+        generationRequestDigest: {type: string, pattern: '^[a-f0-9]{64}$'}
+        verificationRequestDigest: {type: string, pattern: '^[a-f0-9]{64}$'}
+        projectionSha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+        historyNote: {type: string}
+        supersedesResultVersion: {type: string}
+        companies:
+          type: array
+          maxItems: 24
+          items: {$ref: '#/components/schemas/AiPriceCompany'}
+    AiPriceCompany:
+      type: object
+      required: [companyId, companyName, role, assessment, impact, outlook, conditions, risks, comparison, previous]
+      properties:
+        companyId: {type: string}
+        companyName: {type: string}
+        role: {type: string, enum: [selected, tracked]}
+        assessment: {type: string, enum: [positive, negative, mixed, watch]}
+        impact: {$ref: '#/components/schemas/CompanyStatement'}
+        outlook: {$ref: '#/components/schemas/CompanyStatement'}
+        conditions:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items: {$ref: '#/components/schemas/CompanyStatement'}
+        risks:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items: {$ref: '#/components/schemas/CompanyStatement'}
+        comparison:
+          allOf:
+            - {$ref: '#/components/schemas/CompanyStatement'}
+            - type: object
+              required: [status, previousResultVersion]
+              properties:
+                status: {type: string, enum: [updated, compared, unavailable]}
+                previousResultVersion: {type: [string, 'null']}
+        previous:
+          type: object
+          required: [status]
+          properties:
+            status: {type: string, enum: [available, unavailable]}
+            kind: {type: string, enum: [verified_ai_price_outlook, preserved_editorial_review]}
+            roundId: {type: string}
+            resultVersion: {type: string}
+            judgment: {type: object}
+    BriefingPriceContext:
+      type: object
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          type: string
+          const: zoop-company-price-context-v1
+        status:
+          type: string
+          const: derived
+        roundId:
+          type: string
+        date:
+          type: string
+          format: date
+        edition:
+          type: string
+          enum:
+          - morning
+          - evening
+        cutoff:
+          type: string
+          format: date-time
+        reviewVersion:
+          type: string
+        resultVersion:
+          type: string
+          pattern: ^price-context-v1-[0-9a-f]{64}$
+        generatedAt:
+          type: string
+          format: date-time
+        authorship:
+          type: string
+          const: deterministic_price_observation
+        scopeNote:
+          type: string
+        companies:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompanyPriceObservation'
+          maxItems: 12
+        outlookIntegrationVersion:
+          const: zoop-company-price-outlook-v1
+        marketReference:
+          $ref: '#/components/schemas/PriceMarketReference'
+      required:
+      - schemaVersion
+      - status
+      - roundId
+      - date
+      - edition
+      - cutoff
+      - reviewVersion
+      - resultVersion
+      - generatedAt
+      - authorship
+      - scopeNote
+      - companies
+      description: 회차 마감 이전 토스 일봉/완료 분봉과 실제 기사 시각으로 계산한 별도 관측. 규칙 기반 문장이고 모델 검증·기사 인과·사업
+        조건 확인·예측 적중을 뜻하지 않는다. 기존 분석/시세를 보존하며 과거 재생은 사후 수집 한계를 표시한다. 선택적 outlookIntegrationVersion이
+        있으면 사업 근거 원문·가격 관측·다음 조건을 묶은 전망 및 관측일/비교일이 고정된 시장 참고 지표를 제공한다. 가격으로 사업 판단을 바꾸거나
+        인과/적중/초과성과를 주장하지 않는다.
+    CompanyPriceObservation:
+      type: object
+      additionalProperties: false
+      properties:
+        companyId:
+          type: string
+        companyName:
+          type: string
+        currency:
+          type: string
+          enum:
+          - KRW
+          - USD
+        provider:
+          type: string
+          const: toss
+        cutoff:
+          type: string
+          format: date-time
+        responseSha256s:
+          type: array
+          items:
+            type: string
+            pattern: ^[0-9a-f]{64}$
+          minItems: 2
+          maxItems: 2
+        status:
+          type: string
+          enum:
+          - available
+          - unavailable
+        reason:
+          type: string
+        sessionDate:
+          type: string
+          format: date
+        exchangeTimezone:
+          type: string
+        completeSession:
+          type: boolean
+        barCount:
+          type: integer
+          minimum: 1
+        latest:
+          $ref: '#/components/schemas/PriceContextPoint'
+        day:
+          $ref: '#/components/schemas/PriceContextDay'
+        summary:
+          type: string
+        flow:
+          type: string
+        news:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriceContextNews'
+        sinceMorning:
+          $ref: '#/components/schemas/PriceContextMorning'
+        interpretation:
+          type: string
+        limitation:
+          type: string
+        outlook:
+          $ref: '#/components/schemas/PriceAwareOutlook'
+      required:
+      - companyId
+      - companyName
+      - currency
+      - provider
+      - cutoff
+      - responseSha256s
+      - status
+      oneOf:
+      - properties:
+          status:
+            const: unavailable
+        required:
+        - reason
+      - properties:
+          status:
+            const: available
+        required:
+        - sessionDate
+        - exchangeTimezone
+        - completeSession
+        - barCount
+        - latest
+        - day
+        - summary
+        - flow
+        - news
+        - sinceMorning
+        - interpretation
+        - limitation
+    PriceAwareOutlook:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - authorship
+      - stance
+      - businessJudgment
+      - priceObservation
+      - nextCheck
+      - takeaway
+      - text
+      - marketNote
+      - evidenceIds
+      properties:
+        schemaVersion:
+          const: zoop-company-price-outlook-v1
+        authorship:
+          const: source_bound_composition
+        stance:
+          type: string
+        businessJudgment:
+          $ref: '#/components/schemas/CompanyStatement'
+        priceObservation:
+          type: string
+        nextCheck:
+          type: string
+        takeaway:
+          type: string
+        text:
+          type: string
+        marketNote:
+          type: string
+        evidenceIds:
+          type: array
+          items:
+            type: string
+    PriceMarketReference:
+      type: object
+      additionalProperties: false
+      required:
+      - status
+      - snapshotSha256
+      - indicators
+      - note
+      properties:
+        status:
+          enum:
+          - available
+          - unavailable
+        snapshotSha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        indicators:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriceMarketIndicator'
+        note:
+          type: string
+    PriceMarketIndicator:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - label
+      - value
+      - unit
+      - valueKind
+      - observedDate
+      - observedAt
+      - status
+      - source
+      - baselineDate
+      - changeRatePercent
+      - text
+      properties:
+        id:
+          enum:
+          - kospi
+          - kosdaq
+          - usdkrw
+        label:
+          type: string
+        value:
+          type: number
+        unit:
+          type: string
+        valueKind:
+          type: string
+        observedDate:
+          type: string
+          format: date
+        observedAt:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        status:
+          enum:
+          - ok
+          - delayed
+        source:
+          type: object
+          additionalProperties: true
+        baselineDate:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+        changeRatePercent:
+          anyOf:
+          - type: string
+            pattern: ^-?\d+(?:\.\d+)?$
+          - type: 'null'
+        text:
+          type: string
+    PriceContextPoint:
+      type: object
+      additionalProperties: false
+      properties:
+        value:
+          type: string
+          pattern: ^-?\d+(?:\.\d+)?$
+        observedAt:
+          type: string
+          format: date-time
+        kind:
+          type: string
+          enum:
+          - daily_close
+          - five_minute_close
+      required:
+      - value
+      - observedAt
+      - kind
+    PriceContextDay:
+      type: object
+      additionalProperties: false
+      properties:
+        baselineDate:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+        baselineClose:
+          anyOf:
+          - type: string
+            pattern: ^-?\d+(?:\.\d+)?$
+          - type: 'null'
+        changeRatePercent:
+          anyOf:
+          - type: string
+            pattern: ^-?\d+(?:\.\d+)?$
+          - type: 'null'
+        kind:
+          type: string
+          enum:
+          - provider_daily_bar
+          - completed_five_minute_bars
+        open:
+          type: string
+          pattern: ^-?\d+(?:\.\d+)?$
+        high:
+          type: string
+          pattern: ^-?\d+(?:\.\d+)?$
+        low:
+          type: string
+          pattern: ^-?\d+(?:\.\d+)?$
+        closeOrLast:
+          type: string
+          pattern: ^-?\d+(?:\.\d+)?$
+        volume:
+          anyOf:
+          - type: string
+            pattern: ^-?\d+(?:\.\d+)?$
+          - type: 'null'
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+      required:
+      - baselineDate
+      - baselineClose
+      - changeRatePercent
+      - kind
+      - open
+      - high
+      - low
+      - closeOrLast
+      - volume
+      - from
+      - to
+    PriceContextNews:
+      type: object
+      additionalProperties: false
+      properties:
+        evidenceId:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        timing:
+          type: string
+          enum:
+          - before_session
+          - during_session
+          - after_session
+        status:
+          type: string
+          enum:
+          - observed
+          - no_post_news_trade
+          - event_window_unavailable
+        postNewsBars:
+          type: integer
+          minimum: 0
+        before:
+          anyOf:
+          - $ref: '#/components/schemas/PriceContextPoint'
+          - type: 'null'
+        changeRatePercent:
+          anyOf:
+          - type: string
+            pattern: ^-?\d+(?:\.\d+)?$
+          - type: 'null'
+        observation:
+          type: string
+      required:
+      - evidenceId
+      - publishedAt
+      - timing
+      - status
+      - postNewsBars
+      - before
+      - changeRatePercent
+      - observation
+    PriceContextMorning:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum:
+          - available
+          - unavailable
+          - no_new_session
+          - revised_observation
+        observation:
+          type: string
+        before:
+          $ref: '#/components/schemas/PriceContextPoint'
+        changeRatePercent:
+          type: string
+          pattern: ^-?\d+(?:\.\d+)?$
+      required:
+      - status
+      - observation
+    EditionReview:
+      type: object
+      required:
+      - schemaVersion
+      - status
+      - verificationMode
+      - reviewer
+      - reviewedAt
+      - resultVersion
+      - roundId
+      - date
+      - edition
+      - cutoff
+      - analysisVersion
+      - scopeNote
+      - previousReview
+      - sources
+      - marketVariables
+      - capabilities
+      - headline
+      - summary
+      - marketInterpretation
+      - comparison
+      - nextSession
+      - companies
+      description: 출근 오늘 집중·퇴근 장 평가/아침 기업 점검/다음 거래일 시나리오의 원문 대조 편집 검토 스냅샷. 독립 모델 검증 결과와 구분하며 기존 전문·시세·근거를 보존합니다.
+      properties:
+        schemaVersion:
+          type: string
+          enum:
+          - zoop-edition-review-v1
+        status:
+          type: string
+          enum:
+          - REVIEWED
+        verificationMode:
+          type: string
+          enum:
+          - editorial_source_review
+        reviewer:
+          type: string
+        resultVersion:
+          type: string
+        roundId:
+          type: string
+        analysisVersion:
+          type: string
+        scopeNote:
+          type: string
+        headline:
+          type: string
+        date:
+          type: string
+          format: date
+        edition:
+          type: string
+          enum:
+          - morning
+          - evening
+        cutoff:
+          type: string
+          format: date-time
+        reviewedAt:
+          type: string
+          format: date-time
+        previousReview:
+          type:
+          - object
+          - 'null'
+          description: 실제 직전 편집본의 버전·회차·마감과 원 판단/확인 조건. 없으면 비교 불가를 표시합니다.
+          additionalProperties: true
+        sources:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/EditionSource'
+        marketVariables:
+          oneOf:
+            - $ref: '#/components/schemas/MarketVariables'
+            - $ref: '#/components/schemas/Unavailable'
+        capabilities:
+          type: object
+          required:
+          - intraday
+          - sectors
+          - flows
+          - calendar
+          properties:
+            intraday:
+              type: string
+              enum:
+              - unavailable
+            sectors:
+              type: string
+              enum:
+              - unavailable
+            flows:
+              type: string
+              enum:
+              - unavailable
+            calendar:
+              type: string
+              enum:
+              - unverified
+        summary:
+          $ref: '#/components/schemas/EditionStatement'
+        marketInterpretation:
+          $ref: '#/components/schemas/EditionStatement'
+        comparison:
+          $ref: '#/components/schemas/EditionStatement'
+        nextSession:
+          $ref: '#/components/schemas/EditionStatement'
+        companies:
+          type: array
+          maxItems: 12
+          items:
+            $ref: '#/components/schemas/EditionCompanyReview'
+    EditionCompanyReview:
+      type: object
+      required:
+      - companyId
+      - companyName
+      - role
+      - sourceIds
+      - previous
+      - price
+      - stance
+      - title
+      - takeaway
+      - newInformation
+      - judgment
+      - watch
+      - positive
+      - negative
+      - checks
+      properties:
+        companyId:
+          type: string
+        companyName:
+          type: string
+        role:
+          type: string
+          enum:
+          - selected
+          - tracked
+        sourceIds:
+          type: array
+          items:
+            type: string
+        previous:
+          type:
+          - object
+          - 'null'
+          additionalProperties: true
+        price:
+          $ref: '#/components/schemas/CompanyPrice'
+        stance:
+          type: string
+          enum:
+          - priority_watch
+          - watch
+          - cautious_watch
+          - deferred
+        title:
+          $ref: '#/components/schemas/CompanyStatement'
+        takeaway:
+          $ref: '#/components/schemas/CompanyStatement'
+        newInformation:
+          $ref: '#/components/schemas/CompanyStatement'
+        judgment:
+          $ref: '#/components/schemas/CompanyStatement'
+        positive:
+          $ref: '#/components/schemas/CompanyStatement'
+        negative:
+          $ref: '#/components/schemas/CompanyStatement'
+        watch:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/CompanyStatement'
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/EditionConditionCheck'
+    EditionConditionCheck:
+      type: object
+      required:
+      - condition
+      - status
+      - observation
+      properties:
+        condition:
+          type: string
+        status:
+          type: string
+          enum:
+          - confirmed
+          - contradicted
+          - not_observed
+        observation:
+          $ref: '#/components/schemas/EditionStatement'
+      description: 직전 확인 조건을 누락·변조하지 않습니다. 확인/반증에는 해당 기업의 비교 마감 이후 근거가 필요하며 가격 등락은 조건 확인을 대체하지 않습니다.
+    EditionSource:
+      type: object
+      required:
+      - evidenceId
+      - documentId
+      - documentVersion
+      - bodySha256
+      - quote
+      - publishedAt
+      - title
+      - url
+      - fullBody
+      properties:
+        evidenceId:
+          type: string
+        documentId:
+          type: string
+        documentVersion:
+          type: string
+        bodySha256:
+          type: string
+        quote:
+          type: string
+        title:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        url:
+          type: string
+          format: uri
+        fullBody:
+          type: string
+          maxLength: 100000
+    JudgmentUpdate:
+      type: object
+      description: 직전 검증된 회사 판단·회차 마감 이전 보존 원문 전체로 만든 별도 산업 판단 갱신. 같은 기업 비교와 산업 맥락 연결을 구분하고, 이전 기업은 watch로 표시. 과거 원문 수집 시각의 한계와
+        편집 검토 범위를 보존합니다.
+      required:
+      - schemaVersion
+      - status
+      - roundId
+      - edition
+      - cutoff
+      - previousRoundId
+      - previousCutoff
+      - companyResultVersion
+      - previousResultVersion
+      - resultVersion
+      - generatedAt
+      - scopeNote
+      properties:
+        schemaVersion:
+          type: string
+          enum:
+          - zoop-judgment-update-v1
+        status:
+          type: string
+          enum:
+          - PASS
+          - WITHHELD
+        roundId: &id001
+          type: string
+        edition: *id001
+        previousRoundId: *id001
+        companyResultVersion: *id001
+        previousResultVersion: *id001
+        resultVersion: *id001
+        scopeNote: *id001
+        reason: *id001
+        cutoff:
+          type: string
+          format: date-time
+        previousCutoff:
+          type: string
+          format: date-time
+        generatedAt:
+          type: string
+          format: date-time
+        conclusion: &id002
+          $ref: '#/components/schemas/CompanyStatement'
+        industryChange: *id002
+        limits: *id002
+        companies:
+          type: array
+          items:
+            $ref: '#/components/schemas/JudgmentCompany'
+        sources:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/JudgmentSource'
+        editorialReview:
+          type: object
+          description: 선택적 원문 대조 편집 이력. reviewer/reviewedAt/frozenSha256/changes를 보존하며 modelVerificationAppliesTo=pre_edit_draft는
+            자동 검증이 편집 전 초안에만 적용됐음을 뜻합니다. 편집 뒤 자동검증으로 표현하지 않습니다.
+          additionalProperties: true
+    JudgmentCompany:
+      type: object
+      required:
+      - companyId
+      - companyName
+      - role
+      - decision
+      - sourceIds
+      - previousJudgment
+      - previousResultVersion
+      - newEvidence
+      - reason
+      - strengthenIf
+      - weakenIf
+      - topic
+      - title
+      - description
+      properties:
+        companyId: *id001
+        companyName: *id001
+        role:
+          type: string
+          enum:
+          - selected
+          - watch
+        decision:
+          type: string
+          enum:
+          - initial
+          - maintained
+          - strengthened
+          - weakened
+          - unassessable
+        sourceIds:
+          type: array
+          items: *id001
+        previousJudgment:
+          type: [object, 'null']
+          additionalProperties: true
+        previousResultVersion:
+          type: [string, 'null']
+        newEvidence: *id002
+        reason: *id002
+        strengthenIf: *id002
+        weakenIf: *id002
+        topic: *id002
+        title: *id002
+        description: *id002
+    JudgmentSource:
+      type: object
+      required: [evidenceId, documentId, documentVersion, bodySha256, quote, publishedAt, title, url, fullBody]
+      properties:
+        evidenceId: {type: string}
+        documentId: {type: string}
+        documentVersion: {type: string}
+        bodySha256: {type: string}
+        quote: {type: string}
+        publishedAt: {type: string, format: date-time}
+        title: {type: string}
+        url: {type: string, format: uri}
+        fullBody:
+          type: string
+          maxLength: 24000
+          description: 생성·검증에 실제 사용한 SHA 고정 보존 원문 전체. 당시 수집 본문 동일성을 주장하지 않습니다.
     CompanyOutlooks:
       type: object
       required: [schemaVersion, roundId, edition, cutoff, status, resultVersion, generatedAt, scopeNote, companies]
@@ -8488,6 +9416,8 @@ components:
             judgment: {type: object}
         reading:
           "$ref": "#/components/schemas/CompanyShortReading"
+        card:
+          "$ref": "#/components/schemas/CompanyBriefingCard"
         price:
           "$ref": "#/components/schemas/CompanyPrice"
         observedMovement:
@@ -8511,6 +9441,17 @@ components:
               url: {type: string, format: uri}
               publishedAt: {type: string, format: date-time}
 
+    CompanyBriefingCard:
+      type: object
+      description: 전문·짧은 읽기·시세를 보존하면서 별도 생성·독립 검증한 한눈 카드. PASS일 때만 주제·제목·보조 설명을 표시합니다.
+      required: [schemaVersion, status, resultVersion]
+      properties:
+        schemaVersion: {type: string, const: zoop-company-card-v1}
+        status: {type: string, enum: [PASS, WITHHELD]}
+        resultVersion: {type: string}
+        topic: {"$ref": "#/components/schemas/CompanyStatement", description: 12자 이내 주제 태그.}
+        title: {"$ref": "#/components/schemas/CompanyStatement", description: 32자 이내 사건 제목. 계획·추정 한정어를 유지.}
+        description: {"$ref": "#/components/schemas/CompanyStatement", description: 64자 이내 상보적인 확인 조건·불확실성.}
     CompanyShortReading:
       type: object
       description: 전문을 보존하면서 별도 생성·검증한 짧은 읽기. v2는 판단·새 사실·다음 확인·배경·이전 판단 비교를 구분합니다.
@@ -9386,6 +10327,215 @@ components:
         - "summary"
         - "reportedAt"
         - "documentSentiments"
+    BriefingImpacts:
+      type: "object"
+      required: ["roundId", "eventId", "graphVersion", "dataAsOf", "status", "reason", "companies", "metadata"]
+      properties:
+        roundId: {type: "string"}
+        eventId: {type: "string"}
+        graphVersion: {type: ["string", "null"]}
+        dataAsOf: {type: "string", format: "date-time"}
+        status: {type: "string", enum: ["available", "unavailable"]}
+        reason: {type: ["string", "null"]}
+        companies:
+          type: "array"
+          items: {"$ref": "#/components/schemas/CompanyImpact"}
+        metadata: {"$ref": "#/components/schemas/Metadata"}
+        reviewContext:
+          description: "사후 재평가 경로에만 존재한다. 원래 발행 당시 S3 평가를 의미하지 않는다."
+          anyOf:
+            - {"$ref": "#/components/schemas/BriefingImpactReviewContext"}
+            - {type: "null"}
+    BriefingImpactReviewContext:
+      type: "object"
+      required: ["mode", "assessedAt", "inputScope", "generationModel", "verifierModel", "resultVersion"]
+      properties:
+        mode: {type: "string", const: "historical_reassessment"}
+        assessedAt: {type: "string", format: "date-time"}
+        inputScope: {type: "string", const: "preserved_quote_context"}
+        generationModel: {type: "string", const: "gpt-6-luna"}
+        verifierModel: {type: "string", const: "jev-1.14.0"}
+        resultVersion: {type: "string", pattern: "^[a-f0-9]{64}$"}
+        citationPolicy: {type: ["string", "null"], enum: ["complete-source-paragraph-1", null]}
+    CompanyImpact:
+      type: "object"
+      required: ["companyId", "companyName", "status", "reason", "assessments"]
+      properties:
+        companyId: {type: "string"}
+        companyName: {type: "string"}
+        status: {type: "string", enum: ["available", "unavailable"]}
+        reason: {type: ["string", "null"]}
+        assessments:
+          type: "array"
+          items: {"$ref": "#/components/schemas/Assessment"}
+    Assessment:
+      type: "object"
+      description: "별개 원장 행을 유지한다. verified만 label/evidence를 제공한다. facts는 방향 판단과 분리된 정확 원문이며 유보/평가 미제시에도 제공할 수 있다. 평가 부재와 실제 undetermined를 구분한다. proposal/사설 경로/작업 ID/검증 digest는 제공하지 않는다."
+      required: ["id", "relationId", "status", "label", "provenance", "evidence"]
+      properties:
+        id: {type: "string"}
+        relationId: {type: "string"}
+        status: {type: "string", enum: ["verified", "not-applicable", "not-proposed", "no-evidence", "technical-reject", "verifier-reject", "withheld"]}
+        label: {type: ["string", "null"], enum: ["positive", "negative", "mixed", "undetermined", null]}
+        provenance: {"$ref": "#/components/schemas/Provenance"}
+        evidence:
+          type: "array"
+          items: {"$ref": "#/components/schemas/EffectEvidence"}
+        facts:
+          type: "array"
+          description: "사실 확인용 원문 문맥. 검증된 긍부정 효과와 구분하며 effect/label을 포함하지 않는다."
+          items: {"$ref": "#/components/schemas/FactEvidence"}
+        evidencePlan:
+          description: "기존 원문 보강 및 추가 수집 계획. 새 AI 평가나 기존 라벨 변경을 의미하지 않는다."
+          anyOf:
+            - {"$ref": "#/components/schemas/ImpactEvidencePlan"}
+            - {type: "null"}
+        supplementalReview:
+          description: "추가 공식 근거로 나중에 독립 검증한 별도 결과. 기존 label/evidence와 발행본은 보존하며 GET에서 모델을 호출하지 않는다."
+          anyOf:
+            - {"$ref": "#/components/schemas/SupplementalImpactReview"}
+            - {type: "null"}
+    SupplementalImpactReview:
+      type: "object"
+      required: ["mode", "assessedAt", "previousLabel", "label", "targetVerdict", "verifierModel", "summary", "limitations", "confirmedFacts", "evidence", "resultVersion", "historicalVersionVerified"]
+      properties:
+        mode: {type: "string", const: "supplemental_historical_simulation"}
+        assessedAt: {type: "string", format: "date-time"}
+        previousLabel: {type: "string", enum: ["positive", "negative", "mixed", "undetermined"]}
+        label: {type: "string", enum: ["positive", "negative", "mixed", "undetermined"]}
+        targetVerdict: {type: "string", enum: ["supported", "insufficient"]}
+        verifierModel: {type: "string", const: "jev-1.14.0"}
+        summary: {type: "string", description: "검증 결과와 원문에 근거해 편집한 한국어 설명. 모델이 작성한 이유라고 주장하지 않음."}
+        limitations: {type: "string"}
+        confirmedFacts:
+          type: "array"
+          minItems: 1
+          maxItems: 8
+          items:
+            type: "object"
+            required: ["text", "evidenceIds"]
+            properties:
+              text: {type: "string"}
+              evidenceIds:
+                type: "array"
+                minItems: 1
+                uniqueItems: true
+                items: {type: "string"}
+        evidence:
+          type: "array"
+          minItems: 1
+          maxItems: 16
+          items: {"$ref": "#/components/schemas/EffectEvidence"}
+        resultVersion: {type: "string", pattern: "^[a-f0-9]{64}$"}
+        historicalVersionVerified: {type: "boolean", const: false}
+    FactEvidence:
+      type: "object"
+      required: ["id", "quote", "articleId", "articleVersion", "title", "url", "publishedAt", "start", "end"]
+      properties:
+        id: {type: "string"}
+        quote: {type: "string"}
+        articleId: {type: "string"}
+        articleVersion: {type: "string"}
+        title: {type: "string"}
+        url: {type: "string"}
+        publishedAt: {type: "string", format: "date-time"}
+        start: {type: "integer", minimum: 0}
+        end: {type: "integer", minimum: 1}
+    ImpactEvidencePlan:
+      type: "object"
+      required: ["status", "preparedAt", "reason", "existingEvidence", "collectionNeeds"]
+      properties:
+        status: {type: "string", const: "prepared_not_evaluated"}
+        preparedAt: {type: "string", format: "date-time"}
+        reason: {type: "string"}
+        existingEvidence:
+          type: "array"
+          items: {"$ref": "#/components/schemas/SupportingFact"}
+        collectionNeeds:
+          type: "array"
+          items: {"$ref": "#/components/schemas/CollectionNeed"}
+        research:
+          description: "사후 확인한 공식 참고자료. 발행 당시 근거/AI 영향 판정과 분리하며 GET은 AI를 실행하지 않음."
+          anyOf:
+            - {"$ref": "#/components/schemas/ResearchSupplement"}
+            - {type: "null"}
+    ResearchSupplement:
+      type: "object"
+      required: ["status", "linkedAt", "sources", "timeCheck"]
+      properties:
+        status: {type: "string", const: "editorial_sources_not_ai_evaluated"}
+        linkedAt: {type: "string", format: "date-time"}
+        sources:
+          type: "array"
+          maxItems: 4
+          items: {"$ref": "#/components/schemas/LinkedSource"}
+        timeCheck:
+          anyOf:
+            - {"$ref": "#/components/schemas/PublicationTimeCheck"}
+            - {type: "null"}
+    LinkedSource:
+      type: "object"
+      required: ["id", "companyId", "title", "url", "publishedAt", "timeBasis", "summary", "limitations", "excerpt", "transport", "textSha256", "historicalVersionVerified"]
+      properties:
+        id: {type: "string"}
+        companyId: {type: "string"}
+        title: {type: "string"}
+        url: {type: "string", format: "uri"}
+        publishedAt: {type: "string", format: "date-time"}
+        timeBasis: {type: "string", enum: ["issuer_html_jsonld", "SEC_index_accepted_America_New_York"]}
+        summary: {type: "string", description: "출처를 확인해 작성한 편집 요약. 독립 AI 효과 검증 결과가 아님."}
+        limitations: {type: "string"}
+        excerpt: {type: "string"}
+        transport: {type: "string", enum: ["direct_http", "web_tool_extract"]}
+        textSha256: {type: "string", pattern: "^[a-f0-9]{64}$", description: "확인한 로컬 본문/웹 추출 텍스트 SHA. 원본 HTML SHA와 구분."}
+        historicalVersionVerified: {type: "boolean", const: false}
+    PublicationTimeCheck:
+      type: "object"
+      required: ["status", "summary", "limitation", "storedPublishedAt", "distributionPublishedAt", "storedUrl", "distributionUrl"]
+      properties:
+        status: {type: "string", const: "publisher_time_disagreement"}
+        summary: {type: "string"}
+        limitation: {type: "string"}
+        storedPublishedAt: {type: "string", format: "date-time"}
+        distributionPublishedAt: {type: "string", format: "date-time"}
+        storedUrl: {type: "string", format: "uri"}
+        distributionUrl: {type: "string", format: "uri"}
+    SupportingFact:
+      type: "object"
+      required: ["scope", "note", "source"]
+      properties:
+        scope: {type: "string", enum: ["direct", "issuer_explanation", "conditional_risk", "background"]}
+        note: {type: "string"}
+        source: {"$ref": "#/components/schemas/FactEvidence"}
+    CollectionNeed:
+      type: "object"
+      required: ["kind", "what", "why", "preferredSource"]
+      properties:
+        kind: {type: "string", enum: ["before_cutoff_gap", "future_followup"]}
+        what: {type: "string"}
+        why: {type: "string"}
+        preferredSource: {type: "string"}
+    Provenance:
+      type: "object"
+      required: ["sourceKind", "executionMode", "recordingKind"]
+      properties:
+        sourceKind: {type: "string", enum: ["collected", "synthetic"]}
+        executionMode: {type: "string", enum: ["live", "replay"]}
+        recordingKind: {type: "string", enum: ["provider", "authored-test"]}
+    EffectEvidence:
+      type: "object"
+      required: ["id", "effect", "quote", "articleId", "articleVersion", "title", "url", "publishedAt", "start", "end"]
+      properties:
+        id: {type: "string"}
+        effect: {type: "string", enum: ["positive", "negative", "neutral", "uncertain"]}
+        quote: {type: "string"}
+        articleId: {type: "string"}
+        articleVersion: {type: "string"}
+        title: {type: ["string", "null"]}
+        url: {type: ["string", "null"]}
+        publishedAt: {type: ["string", "null"], format: "date-time"}
+        start: {type: "integer", minimum: 0}
+        end: {type: "integer", minimum: 1}
     BriefingItemDetail:
       type: "object"
       required: ["roundId", "eventId", "title", "summary", "selectionReason", "claims", "companies", "evidence", "limitations", "metadata"]
@@ -9820,6 +10970,17 @@ components:
           anyOf:
             - "$ref": "#/components/schemas/BriefingContinuity"
             - type: "null"
+        aiPriceOutlooks:
+          "$ref": "#/components/schemas/AiPriceOutlooks"
+          description: "v5 실제 가격·원문 입력으로 새로 생성·독립 모델 검증한 기업 전망. 보류 시 새 문안을 표시하지 않고 기존 기록을 유지합니다."
+        companyPriceContext:
+          "$ref": "#/components/schemas/BriefingPriceContext"
+        editionReview:
+          "$ref": "#/components/schemas/EditionReview"
+          description: "출근 집중/퇴근 장·아침 기업 점검·다음 거래일 시나리오의 선택적 편집 검토본."
+        judgmentUpdate:
+          "$ref": "#/components/schemas/JudgmentUpdate"
+          description: "선택적 비교 판단. 핵심 선정과 별도로 이전 기업의 미해결 조건을 추적하며, 없으면 기존 응답 유지."
         companyOutlooks:
           "$ref": "#/components/schemas/CompanyOutlooks"
           description: "선정 기업별 사업 전망·조건·근거와 동일 기업의 이전 판단 비교. 과거 발행본에는 없을 수 있습니다. 시장 요약·지표와 별도이며 주가 예측이 아닙니다."

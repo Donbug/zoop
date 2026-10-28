@@ -243,7 +243,9 @@ it.each([false, true])(
     const recapHeading = await screen.findByRole('heading', {
       name: /이전 브리핑 복기/,
     });
-    for (const name of ['기업별 전망 미제공', '시장 요약', '주요 시장 지표']) {
+    for (const name of compact
+      ? ['주요 시장 지표']
+      : ['기업별 전망 미제공', '시장 요약', '주요 시장 지표']) {
       const current = screen.getByRole('heading', { name, hidden: true });
       expect(
         current.compareDocumentPosition(recapHeading) &
