@@ -97,6 +97,7 @@ public class CompanyDocumentsService {
                 ? reader.readPinned(after.graphVersion(), Instant.parse(after.pinnedAt()), Boolean.TRUE.equals(after.filtered()))
                 : reader.read(round, after == null ? graphVersion : after.graphVersion(), requestedAsOf);
         DisplayGraph graph = pinned.graph();
+        Set<DisclosureExclusions.ArticleTarget> excludedArticles = pinned.exclusions().articleTargets();
         Map<DocumentKey, PublicGraphSnapshot.Article> snapshotArticles = new HashMap<>();
         Map<String, List<PublicGraphSnapshot.Article>> articlesById = new HashMap<>();
         for (var article : graph.snapshot.articles()) {
@@ -139,6 +140,7 @@ public class CompanyDocumentsService {
         List<Candidate> candidates = new ArrayList<>();
         for (var entry : events.entrySet()) {
             PublicGraphSnapshot.Article snapshot = snapshotArticles.get(entry.getKey());
+            if (excludedArticles.contains(new DisclosureExclusions.ArticleTarget(snapshot.articleId(), snapshot.version()))) continue;
             ArticleRow article = registry.findArticle(entry.getKey().articleId()).orElse(null);
             if (article == null || !"available".equals(article.accessStatus())) continue;
             if (kind != null && !kind.equals(article.kind())) continue;

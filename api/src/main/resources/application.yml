@@ -91,6 +91,12 @@ zoop:
       # Claims queued jobs and recovers expired leases in the web application; runs nothing while no ChatEngine exists.
       enabled: ${ZOOP_CHAT_EXECUTOR_ENABLED:true}
       workers: ${ZOOP_CHAT_EXECUTOR_WORKERS:2}
+    mcp:
+      # POST /mcp: the chatbot's read tools for a running job, over MCP Streamable HTTP (api/docs/chat-mcp.md). Off by
+      # default, and the path does not exist then. Enabled, it needs ZOOP_CHAT_MCP_ACTIVE_KEY_ID and ZOOP_CHAT_MCP_KEYS (the
+      # job-scoped grant tokens' signing keys, not the model API key). Turning it on outside local tests waits for the
+      # model-send grant check on returned results.
+      enabled: ${ZOOP_CHAT_MCP_ENABLED:false}
   analysis:
     analyze-plan:
       # Executes fixed admitted S2/S3 units only; completion does not collect or publish data.

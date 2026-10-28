@@ -190,6 +190,19 @@ class CompanyDocumentsServiceTest {
     }
 
     @Test
+    void articleExclusionHidesOnlyTheExactVersionFromItsPinnedGraph() {
+        var exclusions = new DisclosureExclusions(4, Set.of(), Set.of(), Set.of(),
+                Set.of(new DisclosureExclusions.ArticleTarget("art-hbm-supply", "v1")));
+        service = new CompanyDocumentsService(GraphReadFixtures.reader(NOW, ignored -> exclusions), jdbc,
+                registry, evidence, analyses, JsonMapper.builder().build());
+
+        var result = list(null, null, null, null);
+
+        assertTrue(result.items().stream().noneMatch(item -> item.id().equals("art-hbm-supply")));
+        assertTrue(result.items().stream().anyMatch(item -> item.id().equals("art-hbm-equip")));
+    }
+
+    @Test
     void boundedRangeExcludesUnknownPublicationTime() {
         var source = GraphReadFixtures.snapshot("fixture-2026-10-08");
         var changedArticles = source.articles().stream().map(article -> article.articleId().equals("art-hbm-supply")
@@ -325,6 +338,15 @@ class CompanyDocumentsServiceTest {
         assertEquals("새 제목", document.title());
         assertEquals(List.of(newIssueId), document.events().stream().map(CompanyDocumentsService.EventRef::eventId).toList());
         assertEquals(List.of(newEvidenceId), document.quotes().stream().map(CompanyDocumentsService.Quote::evidenceId).toList());
+
+        when(reader.read(any(), any(), any())).thenReturn(new PublicGraphReader.Pinned(
+                new SelectedGraphVersion(GraphReadFixtures.record("fixture-2026-10-08", true), NOW, false),
+                DisplayGraph.of(snapshot), new DisclosureExclusions(3, Set.of(), Set.of(), Set.of(),
+                        Set.of(new DisclosureExclusions.ArticleTarget(articleId, "v2")))));
+        var withNewestVersionExcluded = list(null, null, null, null).items().stream()
+                .filter(item -> item.id().equals(articleId)).findFirst().orElseThrow();
+        assertEquals("v1", withNewestVersionExcluded.documentVersion(),
+                "only the exact excluded article version is hidden; the other eligible version remains selectable");
     }
 
     @Test

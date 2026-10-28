@@ -10,6 +10,7 @@ import HoldingsSidebar from '@/components/graph/HoldingsSidebar';
 import { companyLogo } from '@/util/company-logo';
 import { Link } from 'react-router-dom';
 import ServiceHeader from '@/components/common/ServiceHeader';
+import SkipLink from '@/components/common/SkipLink';
 import GraphCanvas from '@/components/graph/GraphCanvas';
 import GraphIcon from '@/components/graph/GraphIcon';
 import GraphTutorial from '@/components/graph/GraphTutorial';
@@ -73,13 +74,12 @@ import type {
   PersonalScope,
 } from '@/types/map';
 import '@/components/graph/relationship-map.css';
+import { useColorTheme } from '@/util/theme-color';
+import { readSocialLinkResult } from '@/components/common/socialLinkResult';
 
+// Same-session preference only. useAuthStore clears it when the member changes
+// and keeps it when the same member's session is restored after a reload.
 const FILTER_KEY = 'zoop.graph.personal-filter';
-// Same-session preference only; cleared on sign-in/out.
-useAuthStore.subscribe((next, previous) => {
-  if (Boolean(next.member) !== Boolean(previous.member))
-    sessionStorage.removeItem(FILTER_KEY);
-});
 function readFilter(value: string | null): PersonalScope {
   return value === 'holdings' || value === 'watchlist' ? value : 'all';
 }
@@ -102,12 +102,23 @@ export default function MapPage() {
       useGraphUiStore.getState().closeEvidence();
       useGraphUiStore.getState().setTutorialStep(1);
       useAiChatStore.getState().close();
-      if (params.toString() !== 'mode=all&tour=1')
+      // 소셜 계정 연결에서 돌아온 결과(?social=)는 알려진 값만 남겨 튜토리얼 중·뒤에도 계정 메뉴가 알린다.
+      const social = readSocialLinkResult(`?${params}`);
+      const tourQuery: Record<string, string> = {
+        mode: 'all',
+        tour: '1',
+        ...(social ? { social } : {}),
+      };
+      const normalized =
+        [...params.keys()].length === Object.keys(tourQuery).length &&
+        Object.entries(tourQuery).every(
+          ([key, value]) => params.getAll(key).join() === value,
+        );
+      if (!normalized)
         updateQuery(
           {
             ...Object.fromEntries([...params.keys()].map((key) => [key, null])),
-            mode: 'all',
-            tour: '1',
+            ...tourQuery,
           },
           { replace: true },
         );
@@ -120,8 +131,7 @@ export default function MapPage() {
     };
   }, [entryKey, readyEntry, tour, params, updateQuery]);
   const inherited = useContext(GraphAppearanceContext);
-  const theme =
-    document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+  const theme = useColorTheme();
   const appearance = useMemo<GraphAppearance>(
     () => inherited ?? { variant: 'improved', theme },
     [inherited, theme],
@@ -782,6 +792,7 @@ function MapWorkspace({
       data-tutorial-ai-focus={tutorialOpen && tutorialStep === 5}
       className={`${mapAppearanceStyles(appearance)} relationship-map min-w-0! [&_.relationship-toolbar]:overflow-x-auto [&_.relationship-toolbar]:max-w-full max-md:min-h-0! max-md:[&_.relationship-header]:h-auto! max-md:[&_.relationship-header]:flex-wrap! max-md:[&_.relationship-header]:gap-2! max-md:[&_.relationship-header]:px-2! max-md:[&_.relationship-header]:py-2! max-md:[&_.relationship-header_nav]:order-last max-md:[&_.relationship-header_nav]:w-full max-md:[&_.relationship-header_nav]:h-10! max-md:[&_.relationship-header_nav]:flex! max-md:[&_.relationship-header_nav]:overflow-y-hidden! max-md:[&_.relationship-header_nav>*]:shrink-0 max-md:[&_.relationship-header_nav]:overflow-x-auto max-md:[&_.relationship-toolbar]:max-w-full max-md:[&_.relationship-toolbar]:overflow-x-auto [&_.relationship-canvas]:min-h-0! max-md:[&_.relationship-body]:min-h-0! max-md:[&_.relationship-body]:px-1!`}
     >
+      <SkipLink />
       <ServiceHeader />
       {tutorialOpen && (
         <p className="border-b border-zoop-line bg-zoop-soft px-4 py-2 text-xs max-md:hidden">
@@ -810,7 +821,11 @@ function MapWorkspace({
         </p>
       )}
       {round && <BriefingSnapshotBanner roundId={round} />}
-      <main className="relationship-main">
+      <main
+        id="service-main"
+        tabIndex={-1}
+        className="relationship-main motion-safe:animate-service-enter"
+      >
         <section
           ref={mapRegion}
           tabIndex={-1}

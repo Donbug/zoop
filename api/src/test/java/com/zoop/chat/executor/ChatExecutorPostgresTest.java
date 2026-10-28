@@ -194,6 +194,38 @@ class ChatExecutorPostgresTest {
     }
 
     @Test
+    void aRunningAttemptCanBeAttachedFromOutsideItsThreadUnderTheSameFences() {
+        String jobId = submit("MCP로 붙을 질문");
+        var claim = executor.claimNext().orElseThrow();
+
+        var attached = executor.attach(jobId, 1).orElseThrow();
+        assertEquals(jobId, attached.run().jobId());
+        assertEquals(1, attached.run().attemptNo());
+        // The stored deadline is the claim's, rounded to the database's microseconds.
+        assertTrue(Duration.between(claim.deadline(), attached.run().deadline()).abs().toMillis() < 1);
+        assertTrue(attached.control().owned());
+        assertEquals(List.of("tc-0"), attached.control().reserveToolCalls(1, List.of(reservation("company.read"))));
+        // An approved (reserved) call is found by its exact capability and digest, and only while still reserved.
+        String digest = "0".repeat(64);
+        assertEquals(Optional.of("tc-0"), executor.reservedToolCall(jobId, 1, "company.read", digest));
+        assertTrue(executor.reservedToolCall(jobId, 1, "issue.read", digest).isEmpty());
+        assertTrue(executor.reservedToolCall(jobId, 1, "company.read", "1".repeat(64)).isEmpty());
+        assertTrue(executor.reservedToolCall(jobId, 2, "company.read", digest).isEmpty());
+        assertTrue(executor.attach(jobId, 2).isEmpty(), "another attempt");
+        assertTrue(executor.attach("job-missing", 1).isEmpty());
+
+        assertEquals(List.of("tc-1"), attached.control().reserveToolCalls(1, List.of(reservation("issue.read"))));
+        attached.control().toolCallStarted("tc-1");
+        assertTrue(executor.reservedToolCall(jobId, 1, "issue.read", digest).isEmpty(), "a started call is spent");
+
+        service.cancel(member, jobId, "cancel-" + suffix());
+        assertTrue(executor.attach(jobId, 1).isEmpty());
+        assertThrows(ChatRunSuperseded.class, () -> attached.control().toolCallStarted("tc-0"));
+        assertEquals("cancelled", jdbc.queryForObject(
+                "SELECT status FROM chat_tool_calls WHERE chat_job_id = ? AND tool_call_id = 'tc-0'", String.class, jobId));
+    }
+
+    @Test
     void anExpiredLeaseIsRecoveredTheLateRunIsDiscardedAndARerunStartsANewAttempt() {
         String jobId = submit("오래 걸린 질문");
         var claim = executor.claimNext().orElseThrow();

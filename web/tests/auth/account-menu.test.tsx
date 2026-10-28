@@ -46,7 +46,7 @@ function open() {
   );
   return userEvent.setup();
 }
-it('opens an account summary with just logout without navigating to stocks', async () => {
+it('opens an account summary with account linking and logout without navigating', async () => {
   const user = open();
   const trigger = screen.getByRole('button', { name: '계정 메뉴 열기' });
   expect(trigger.getAttribute('aria-expanded')).toBe('false');
@@ -60,7 +60,7 @@ it('opens an account summary with just logout without navigating to stocks', asy
   expect(screen.getByText('menu-member@example.test')).toBeTruthy();
   const menu = screen.getByRole('menu', { name: '계정 메뉴' });
   expect(trigger.getAttribute('aria-controls')).toBe(menu.id);
-  expect(within(menu).getAllByRole('menuitem')).toHaveLength(1);
+  expect(within(menu).getAllByRole('menuitem')).toHaveLength(3);
   expect(document.activeElement).toBe(
     within(menu).getByRole('menuitem', { name: '로그아웃' }),
   );
@@ -74,7 +74,9 @@ it('supports Enter, Space, arrow keys, Escape focus return and Tab dismissal', a
   const trigger = screen.getByRole('button', { name: '계정 메뉴 열기' });
   expect(document.activeElement).toBe(trigger);
   await user.keyboard('{Enter}{ArrowDown}{Home}{End}');
-  expect(document.activeElement).toBe(screen.getByRole('menuitem'));
+  expect(document.activeElement).toBe(
+    screen.getByRole('menuitem', { name: '로그아웃' }),
+  );
   await user.keyboard('{Escape}');
   expect(document.activeElement).toBe(trigger);
   expect(screen.queryByRole('menu')).toBeNull();
@@ -161,9 +163,10 @@ it.each(['success', 'failure'])(
     await user.click(screen.getByRole('button', { name: '계정 메뉴 열기' }));
     expect(screen.getByText('next-member@example.test')).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
-    expect((screen.getByRole('menuitem') as HTMLButtonElement).disabled).toBe(
-      false,
-    );
+    expect(
+      (screen.getByRole('menuitem', { name: '로그아웃' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
   },
 );
 it('shows login instead of account details for nonmembers', () => {
@@ -174,4 +177,22 @@ it('shows login instead of account details for nonmembers', () => {
   ).toBe('/login');
   expect(screen.queryByRole('button', { name: '계정 메뉴 열기' })).toBeNull();
   expect(screen.queryByText('menu-member@example.test')).toBeNull();
+});
+it('starts explicit linking with the member CSRF token and reports a conflict', async () => {
+  server.on('POST', '/api/v1/auth/social/google/link/authorize', () =>
+    apiError(409, 'CONFLICT'),
+  );
+  const user = open();
+  await user.click(screen.getByRole('button', { name: '계정 메뉴 열기' }));
+  await user.click(screen.getByRole('menuitem', { name: 'Google 계정 연결' }));
+  expect((await screen.findByRole('alert')).textContent).toContain(
+    '연결된 계정을 확인',
+  );
+  const request = server.calls(
+    'POST',
+    '/api/v1/auth/social/google/link/authorize',
+  )[0];
+  expect(request.body).toEqual({ returnTo: '/' });
+  expect(request.headers.get('X-CSRF-Token')).toBe('synthetic-menu-csrf');
+  expect(useAuthStore.getState().member?.id).toBe('menu-member');
 });
