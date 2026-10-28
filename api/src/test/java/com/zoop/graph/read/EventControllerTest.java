@@ -24,7 +24,7 @@ class EventControllerTest {
     private final MockMvc mvc;
 
     EventControllerTest() {
-        PublicGraphReader reader = GraphReadFixtures.reader(Instant.parse("2026-10-16T12:00:00Z"), () -> DisclosureExclusions.NONE);
+        PublicGraphReader reader = GraphReadFixtures.reader(Instant.parse("2026-10-16T12:00:00Z"), pinned -> DisclosureExclusions.NONE);
         DocumentRegistryRepository registry = mock(DocumentRegistryRepository.class);
         when(registry.findVersion(anyString(), anyString())).thenReturn(Optional.empty());
         mvc = MockMvcBuilders.standaloneSetup(new EventController(

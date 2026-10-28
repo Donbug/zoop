@@ -3,8 +3,16 @@ import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import CompanyLogo from '@/components/common/CompanyLogo';
 import { useRelationData } from '@/hooks/useRelationData';
 import type { EventContext } from '@/types/map/event';
-import type { RelationDetail } from '@/types/map/relation';
-import { formatEventTime, formatPublishedAt } from './event-format';
+import type {
+  RelationDetail,
+  StructuralSupplyLink,
+} from '@/types/map/relation';
+import StructuralRelationSection from './StructuralRelationSection';
+import {
+  formatEventTime,
+  formatPublishedAt,
+  safeArticleUrl,
+} from './event-format';
 import GraphIcon from './GraphIcon';
 
 interface Props {
@@ -18,6 +26,7 @@ interface Props {
     action: 'evidence' | 'ai',
     relation: RelationDetail,
     issueId?: string,
+    supplyLink?: StructuralSupplyLink,
   ) => void;
 }
 
@@ -42,6 +51,9 @@ export default function RelationDetailPanel({
     heading.current?.focus();
   }, [id]);
   const shared = data?.relationType === 'SHARES_ISSUE';
+  const structuralFailure = data?.metadata.failures.find(
+    (failure) => failure.section === 'structuralDetails',
+  );
   const count = new Set(data?.evidenceIds).size;
   const verifiedAt = data?.basis
     .map((basis) => basis.verifiedAt)
@@ -115,7 +127,11 @@ export default function RelationDetailPanel({
             <section className={ui.section} aria-label="관계 정보">
               <p>{data.explanation}</p>
               <dl className="mt-3 grid grid-cols-[64px_1fr] gap-x-2 gap-y-2">
-                <dt className={ui.muted}>방향</dt>
+                <dt className={ui.muted}>
+                  {data.relationType === 'STRUCTURALLY_RELATED_TO'
+                    ? '구조 간선 방향'
+                    : '방향'}
+                </dt>
                 <dd>
                   {data.directed
                     ? `${data.source.label} → ${data.target.label}`
@@ -131,8 +147,47 @@ export default function RelationDetailPanel({
                 </dd>
                 <dt className={ui.muted}>검증 상태</dt>
                 <dd>{data.verification.note ?? data.verification.status}</dd>
+                {(data.roles.length > 0 || data.role) && (
+                  <>
+                    <dt className={ui.muted}>역할</dt>
+                    <dd>
+                      {data.roles.length ? data.roles.join(', ') : data.role}
+                    </dd>
+                  </>
+                )}
+                {!data.derived && (
+                  <>
+                    <dt className={ui.muted}>보도 표현</dt>
+                    <dd>
+                      {(
+                        {
+                          occurred: '발생',
+                          announced: '보도 언급',
+                          planned: '계획',
+                          forecast: '전망',
+                        } as Record<string, string>
+                      )[data.assertionStatus ?? ''] ?? '확인 필요'}
+                    </dd>
+                    <dt className={ui.muted}>인용 검증</dt>
+                    <dd>
+                      {data.verification.status === 'ALLOW'
+                        ? '통과'
+                        : '해당 없음'}
+                    </dd>
+                  </>
+                )}
               </dl>
             </section>
+            {data.relationType === 'STRUCTURALLY_RELATED_TO' && (
+              <StructuralRelationSection
+                details={data.structuralDetails}
+                failure={structuralFailure}
+                onRetry={() => setRetry((value) => value + 1)}
+                onEvidence={(link) =>
+                  onAction('evidence', data, undefined, link)
+                }
+              />
+            )}
             <div className={ui.actions}>
               <button
                 disabled={!count}
@@ -225,6 +280,41 @@ export default function RelationDetailPanel({
                 </p>
               )}
             </section>
+            {/* D-GRP-04 · gap 30: basis links are supplied by getCompanyRelation. */}
+            {data.basis.length > 0 && (
+              <section className={ui.section} aria-label="관계 기준 문서">
+                <h3>관계 기준 문서</h3>
+                {data.basis.length ? (
+                  <ul className={ui.list}>
+                    {data.basis.map((basis) => {
+                      const href = safeArticleUrl(basis.sourceUrl);
+                      return (
+                        <li key={basis.edgeId}>
+                          {href ? (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-zoop-ink underline underline-offset-4 focus-visible:outline-2"
+                            >
+                              기준 문서 열기{' '}
+                              <span className="sr-only">(새 창에서 열림)</span>
+                            </a>
+                          ) : (
+                            <p>기준 문서 링크 없음</p>
+                          )}
+                          <p className={ui.muted}>
+                            검증{' '}
+                            {formatPublishedAt(basis.verifiedAt) ??
+                              '확인 시점 미제공'}
+                          </p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+              </section>
+            )}
             <footer className={ui.footer}>
               <p>{data.metadata.source}</p>
               <p>조회 기준 · {formatPublishedAt(data.metadata.asOf)}</p>

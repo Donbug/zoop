@@ -1,9 +1,13 @@
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import CompanyLogo from '@/components/common/CompanyLogo';
 import GraphIcon from '@/components/graph/GraphIcon';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useRelationData } from '@/hooks/useRelationData';
 import type { Impact } from '@/types/company/detail';
+import type { EventContext } from '@/types/map/event';
 import type { GraphResponse } from '@/types/map/graph';
+import type { StructuralSupplyLink } from '@/types/map/relation';
+import StructuralRelationSection from './StructuralRelationSection';
 
 type Props = {
   tutorialEvidence?: boolean;
@@ -11,10 +15,14 @@ type Props = {
   tutorialSaving?: boolean;
   companyId: string;
   issueId: string;
+  context: EventContext;
   graph: GraphResponse;
   impact: Impact | null;
   loading: boolean;
   error: string | null;
+  errorCode?: string | null;
+  errorStatus?: number | null;
+  retryable?: boolean;
   onRetry: () => void;
   onClose: () => void;
   onViewIssue: () => void;
@@ -31,10 +39,12 @@ export default function ImpactPathPanel({
   tutorialAi = false,
   tutorialSaving = false,
   issueId,
+  context,
   graph,
   impact,
   loading,
   error,
+  retryable = true,
   onRetry,
   onClose,
   onViewIssue,
@@ -46,6 +56,13 @@ export default function ImpactPathPanel({
     heading.current?.focus();
   }, [companyId, issueId]);
   const company = graph.nodes.find((node) => node.id === companyId);
+  const structuralEdge = graph.edges.find(
+    (edge) =>
+      !edge.derived &&
+      edge.relationType === 'STRUCTURALLY_RELATED_TO' &&
+      [edge.source, edge.target].includes(companyId) &&
+      [edge.source, edge.target].includes(issueId),
+  );
   const evidenceIds = unique(
     impact?.steps.flatMap((step) => step.evidenceIds) ?? [],
   );
@@ -95,18 +112,28 @@ export default function ImpactPathPanel({
           {company?.label ?? companyId} · 영향 경로
         </h2>
         <p className={ui.muted}>
-          {graph.edges.some(
-            (edge) =>
-              edge.relationType === 'INVOLVES' &&
-              [edge.source, edge.target].includes(companyId) &&
-              [edge.source, edge.target].includes(issueId),
-          )
-            ? '직접 관련'
-            : '구조적 관련'}{' '}
+          {loading
+            ? '연결 확인 중'
+            : error
+              ? '연결 확인 불가'
+              : impact?.pathStatus === 'structural_path_details_unavailable'
+                ? '구조 관계 확인'
+                : impact?.pathStatus === 'direct_available'
+                  ? '직접 연결 확인'
+                  : impact?.pathStatus === 'no_direct_relation'
+                    ? '직접 연결 미확인'
+                    : impact?.steps.length
+                      ? '연결 확인'
+                      : '직접 연결 미확인'}{' '}
           · 지도 기준 {new Date(graph.metadata.asOf).toLocaleString('ko-KR')}
         </p>
       </header>
       <div className={ui.scroll} aria-busy={loading}>
+        {impact?.metadata.partial && (
+          <p className="px-4 py-2 text-[11px] text-zoop-alert" role="status">
+            현재 공개 권한을 확인할 수 있는 근거만 표시합니다.
+          </p>
+        )}
         {loading && (
           <div className={ui.state} role="status">
             <span className="block h-14 rounded-panel bg-panel-line motion-safe:animate-pulse" />
@@ -118,9 +145,15 @@ export default function ImpactPathPanel({
             <strong>영향 경로를 불러오지 못했습니다.</strong>
             <p>{error}</p>
             <p>지도와 기업 선택은 그대로 유지됩니다.</p>
-            <button data-tutorial-action="retry" onClick={onRetry}>
-              다시 시도
-            </button>
+            {retryable ? (
+              <button data-tutorial-action="retry" onClick={onRetry}>
+                다시 시도
+              </button>
+            ) : (
+              <p>
+                선택한 그래프 버전을 확인한 뒤 기업과 이슈를 다시 선택해 주세요.
+              </p>
+            )}
           </div>
         )}
         {impact && (
@@ -191,9 +224,21 @@ export default function ImpactPathPanel({
                   })}
                 </ol>
               ) : (
-                <p className={ui.muted}>확인된 영향 경로가 없습니다.</p>
+                <p className={ui.muted}>
+                  {impact.pathStatus === 'structural_path_details_unavailable'
+                    ? '구조 관계가 공개 그래프에서 확인됐습니다. 경로 상세와 단계별 근거는 아래 사업 관계 상세에서 확인합니다.'
+                    : '선택한 그래프에서 기업과 이슈 사이의 직접 연결을 확인하지 못했습니다.'}
+                </p>
               )}
             </section>
+            {structuralEdge && (
+              <StructuralImpactDetails
+                key={`${structuralEdge.id}:${JSON.stringify(context)}`}
+                edgeId={structuralEdge.id}
+                context={context}
+                onEvidence={(link) => onEvidence(unique(link.evidenceIds))}
+              />
+            )}
             <section
               className={ui.section}
               aria-labelledby="impact-company-title"
@@ -215,8 +260,7 @@ export default function ImpactPathPanel({
                           {connected?.label}
                         </strong>
                         <p className={ui.muted}>
-                          {edge.summary || '직접 관련'} · 근거{' '}
-                          {edge.evidenceIds.length}건
+                          {edge.summary || '공개 그래프 연결'}
                         </p>
                       </div>
                     </li>
@@ -250,5 +294,57 @@ export default function ImpactPathPanel({
         )}
       </div>
     </aside>
+  );
+}
+
+function StructuralImpactDetails({
+  edgeId,
+  context,
+  onEvidence,
+}: {
+  edgeId: string;
+  context: EventContext;
+  onEvidence: (link: StructuralSupplyLink) => void;
+}) {
+  const [retry, setRetry] = useState(0);
+  const { data, loading, error, retryable } = useRelationData(
+    edgeId,
+    context,
+    retry,
+  );
+  const failure = data?.metadata.failures.find(
+    (item) => item.section === 'structuralDetails',
+  );
+  if (loading && !data)
+    return (
+      <section className={ui.section} aria-label="사업 관계 상세" role="status">
+        사업 관계 상세를 불러오는 중입니다.
+      </section>
+    );
+  if (error && !data)
+    return (
+      <section className={ui.section} aria-label="사업 관계 상세" role="alert">
+        <p>사업 관계 상세를 불러오지 못했습니다.</p>
+        <p>{error}</p>
+        {retryable ? (
+          <button onClick={() => setRetry((value) => value + 1)}>
+            다시 시도
+          </button>
+        ) : (
+          <p className={ui.muted}>
+            선택한 그래프 버전에서 사업 관계 상세를 찾지 못했습니다. 기업과
+            이슈를 다시 선택해 주세요.
+          </p>
+        )}
+      </section>
+    );
+  if (!data) return null;
+  return (
+    <StructuralRelationSection
+      details={data.structuralDetails}
+      failure={failure}
+      onRetry={() => setRetry((value) => value + 1)}
+      onEvidence={onEvidence}
+    />
   );
 }

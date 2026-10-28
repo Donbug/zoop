@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test } from 'vitest';
 import AdminProtectedRoute from '@/components/admin/common/AdminProtectedRoute';
 import AdminBriefingsPage from '@/pages/admin/briefings/AdminBriefingsPage';
@@ -303,12 +303,19 @@ describe('A-ADM-04 브리핑 운영 (FS070·FS071)', () => {
 
     await user.click(within(panel).getByRole('button', { name: '재처리' }));
     const form = within(panel).getByRole('form', { name: '브리핑 재처리' });
-    await user.click(within(form).getByRole('button', { name: '재처리 요청' }));
+    expect(
+      within(form).getByText(/무료\(모델을 다시 부르지 않아요\)/),
+    ).toBeTruthy();
+    await user.click(
+      within(form).getByRole('button', { name: '재처리 요청(무료)' }),
+    );
     expect(within(form).getByText('사유를 입력해 주세요.')).toBeTruthy();
     expect(server.calls('POST', REPROCESS)).toHaveLength(0);
 
     await user.type(within(form).getByLabelText('재처리 사유'), '원장 복구됨');
-    await user.click(within(form).getByRole('button', { name: '재처리 요청' }));
+    await user.click(
+      within(form).getByRole('button', { name: '재처리 요청(무료)' }),
+    );
 
     expect(await within(panel).findByText('재처리를 요청했어요.')).toBeTruthy();
     expect(server.calls('POST', REPROCESS)[0].body).toEqual({
@@ -332,7 +339,9 @@ describe('A-ADM-04 브리핑 운영 (FS070·FS071)', () => {
     const form = within(panel).getByRole('form', { name: '브리핑 재처리' });
     await user.type(within(form).getByLabelText('재처리 사유'), reason);
     const submit = () =>
-      user.click(within(form).getByRole('button', { name: '재처리 요청' }));
+      user.click(
+        within(form).getByRole('button', { name: '재처리 요청(무료)' }),
+      );
     await submit();
     return { user, panel, form, submit };
   }
@@ -416,6 +425,22 @@ describe('A-ADM-04 브리핑 운영 (FS070·FS071)', () => {
       await within(panel).findByRole('button', { name: '정정 등록' }),
     );
     const form = within(panel).getByRole('form', { name: '정정 등록' });
+    const correction = within(form).getByLabelText(
+      '정정 내용',
+    ) as HTMLTextAreaElement;
+    const reasonInput = within(form).getByLabelText(
+      '정정 사유',
+    ) as HTMLTextAreaElement;
+    expect(correction.maxLength).toBe(2000);
+    expect(reasonInput.maxLength).toBe(500);
+    fireEvent.change(correction, { target: { value: 'x'.repeat(2001) } });
+    fireEvent.change(reasonInput, { target: { value: '사유' } });
+    fireEvent.submit(form);
+    expect(
+      within(form).getByText('사유 2/500자 · 정정 2001/2000자'),
+    ).toBeTruthy();
+    fireEvent.change(correction, { target: { value: '' } });
+    fireEvent.change(reasonInput, { target: { value: '' } });
 
     await user.selectOptions(
       within(form).getByLabelText('정정할 항목'),
@@ -547,6 +572,66 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
     expect(server.calls('GET', AI_USAGE)[0].query.get('window')).toBe('7d');
   });
 
+  test('뉴스 분석 실행 기록에서 미측정 사용량은 0이 아니라 –로, 측정된 실행은 값 그대로 보여 준다', async () => {
+    server.on('GET', AI_USAGE, () =>
+      json({
+        ...aiUsage,
+        pastRuns: [
+          {
+            runId: 'job-plan',
+            label: '계획 분석',
+            policyGroup: 'admin-job',
+            source: 'job-runner',
+            processed: 3,
+            approved: null,
+            held: null,
+            rejected: null,
+            pending: null,
+            errorCount: null,
+            usage: null,
+          },
+          {
+            runId: 'job-run',
+            label: '기사 분석',
+            policyGroup: 'admin-job',
+            source: 'job-runner',
+            processed: 4,
+            approved: 2,
+            held: 1,
+            rejected: 1,
+            pending: 0,
+            errorCount: 0,
+            usage: {
+              calls: 3,
+              replayCalls: 3,
+              inputTokens: 1500,
+              outputTokens: 5,
+              elapsedSeconds: 1.5,
+              estimatedCost: null,
+            },
+          },
+        ],
+      }),
+    );
+    open('/admin/ai');
+
+    const table = await screen.findByRole('table', {
+      name: '뉴스 분석 실행 기록',
+    });
+    const rows = within(table).getAllByRole('row');
+    const unmeasured = within(rows[1]);
+    expect(unmeasured.getByText('계획 분석')).toBeTruthy();
+    expect(unmeasured.getByText('3')).toBeTruthy();
+    // 승인·보류·거부·오류 4칸 + 모델 호출·입력 토큰·걸린 시간 3칸이 모두 미측정
+    expect(unmeasured.getAllByText('–')).toHaveLength(7);
+    expect(unmeasured.queryByText('0')).toBeNull();
+
+    const measured = within(rows[2]);
+    expect(measured.getByText('기사 분석')).toBeTruthy();
+    expect(measured.getByText('1,500')).toBeTruthy();
+    expect(measured.getByText('1.5초')).toBeTruthy();
+  });
+
   test('기간을 바꾸면 다시 조회하고, 최근 오류를 기능과 함께 보여 준다', async () => {
     server.on('GET', AI_USAGE, (request) =>
       json({
@@ -578,5 +663,219 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
     const errors = await screen.findByRole('table', { name: 'AI 최근 오류' });
     expect(within(errors).getByText('MODEL_TIMEOUT')).toBeTruthy();
     expect(within(errors).getByText('응답 시간 초과')).toBeTruthy();
+  });
+
+  test('날짜별·회원 수 자료가 아직 없으면 그래프 대신 아직 제공하지 않는다고 알린다', async () => {
+    server.on('GET', AI_USAGE, () => json(aiUsage));
+    open('/admin/ai');
+    await screen.findByRole('table', { name: 'AI 기능별 사용량' });
+    expect(
+      screen.getAllByText('AI 사용량 API가 아직 이 값을 주지 않아요.'),
+    ).toHaveLength(3);
+    expect(screen.queryByRole('group', { name: /날짜별/ })).toBeNull();
+  });
+
+  test('전체·브리핑·AI 챗봇 보기로 회원 사용 비율과 날짜별 토큰·비용을 나눠 보여 준다', async () => {
+    server.on('GET', AI_USAGE, () =>
+      json({
+        ...aiUsage,
+        cost: { ...aiUsage.cost, currency: 'USD' },
+        features: [
+          feature({
+            usage: {
+              modelCalls: 10,
+              inputTokens: 3000,
+              outputTokens: 1000,
+              replayCalls: 0,
+              retries: 0,
+            },
+          }),
+          feature({
+            feature: 'briefing',
+            label: '출퇴근 브리핑',
+            usage: {
+              modelCalls: 2,
+              inputTokens: 900,
+              outputTokens: 100,
+              replayCalls: 0,
+              retries: 0,
+            },
+          }),
+        ],
+        members: {
+          totalMembers: 200,
+          aiMembers: 50,
+          chatbotMembers: 30,
+          briefingMembers: null,
+          note: null,
+        },
+        daily: [
+          {
+            date: '2026-10-24',
+            features: [
+              {
+                feature: 'chatbot',
+                modelCalls: 6,
+                inputTokens: 2000,
+                outputTokens: 600,
+                actualCost: null,
+                estimatedCost: 0.03,
+              },
+              {
+                feature: 'briefing',
+                modelCalls: 1,
+                inputTokens: 500,
+                outputTokens: 50,
+                actualCost: 0.01,
+                estimatedCost: 0.012,
+              },
+            ],
+          },
+          {
+            date: '2026-10-23',
+            features: [
+              {
+                feature: 'chatbot',
+                modelCalls: 4,
+                inputTokens: 1000,
+                outputTokens: 400,
+                actualCost: null,
+                estimatedCost: 0.02,
+              },
+              {
+                feature: 'briefing',
+                modelCalls: null,
+                inputTokens: null,
+                outputTokens: null,
+                actualCost: null,
+                estimatedCost: null,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const { user, location } = open('/admin/ai');
+
+    expect(await screen.findByText('25%')).toBeTruthy();
+    expect(screen.getByText('50명 / 전체 200명')).toBeTruthy();
+    expect(
+      screen.getByRole('meter', { name: 'AI 기능을 쓴 회원 비율' }),
+    ).toBeTruthy();
+    const tokens = screen.getByRole('group', {
+      name: '전체 날짜별 토큰 사용량 (←→로 날짜 이동)',
+    });
+    // 날짜는 오래된 것부터 그린다.
+    const bars = within(tokens).getAllByRole('img');
+    expect(bars[0].getAttribute('aria-label')).toBe(
+      '10월 23일 입력 자료 없음, 출력 자료 없음, 모델 호출 자료 없음',
+    );
+    expect(bars[1].getAttribute('aria-label')).toBe(
+      '10월 24일 입력 2,500, 출력 650, 모델 호출 7',
+    );
+    expect(
+      screen.getByRole('list', { name: '기능별 토큰 비중' }).textContent,
+    ).toContain('80%');
+
+    // 키보드: 그래프는 Tab 한 칸(마지막 날)이고, ←로 앞 날짜로 옮기면 값 읽기 줄도 바뀐다.
+    expect(bars.map((bar) => bar.getAttribute('tabindex'))).toEqual([
+      '-1',
+      '0',
+    ]);
+    bars[1].focus();
+    await user.keyboard('{ArrowLeft}');
+    expect(document.activeElement).toBe(bars[0]);
+    expect(bars[0].getAttribute('tabindex')).toBe('0');
+    expect(bars[1].getAttribute('tabindex')).toBe('-1');
+    expect(tokens.parentElement?.parentElement?.textContent).toContain(
+      '10월 23일 입력 자료 없음 · 출력 자료 없음 · 모델 호출 자료 없음',
+    );
+    await user.keyboard('{End}');
+    expect(document.activeElement).toBe(bars[1]);
+
+    // 실제 청구액이 있는 기능(브리핑)과 추정만 있는 기능(챗봇)을 함께 더한다.
+    const allCost = screen.getByRole('group', {
+      name: '전체 날짜별 AI 비용 (←→로 날짜 이동)',
+    });
+    expect(
+      within(allCost).getAllByRole('img')[1].getAttribute('aria-label'),
+    ).toBe('10월 24일 실제+추정 0.04 USD');
+
+    await user.click(screen.getByRole('tab', { name: '브리핑' }));
+    expect(location()).toBe('/admin/ai?view=briefing');
+    expect(screen.getByText('측정 안 함 / 전체 200명')).toBeTruthy();
+    const briefing = screen.getByRole('group', {
+      name: '브리핑 날짜별 토큰 사용량 (←→로 날짜 이동)',
+    });
+    const briefingBars = within(briefing).getAllByRole('img');
+    expect(briefingBars[0].getAttribute('aria-label')).toBe(
+      '10월 23일 입력 자료 없음, 출력 자료 없음, 모델 호출 자료 없음',
+    );
+    const cost = screen.getByRole('group', {
+      name: '브리핑 날짜별 AI 비용 (←→로 날짜 이동)',
+    });
+    expect(within(cost).getAllByRole('img')[1].getAttribute('aria-label')).toBe(
+      '10월 24일 실제 0.01 USD',
+    );
+    expect(screen.getByText(/실제 청구 비용이에요/)).toBeTruthy();
+    const table = screen.getByRole('table', { name: 'AI 기능별 사용량' });
+    expect(within(table).getByText('출퇴근 브리핑')).toBeTruthy();
+    expect(within(table).queryByText('AI 챗봇')).toBeNull();
+    expect(screen.queryByRole('list', { name: '기능별 토큰 비중' })).toBeNull();
+
+    await user.click(screen.getByRole('tab', { name: 'AI 챗봇' }));
+    expect(screen.getByText('15%')).toBeTruthy();
+    const chatCost = screen.getByRole('group', {
+      name: 'AI 챗봇 날짜별 AI 비용 (←→로 날짜 이동)',
+    });
+    expect(
+      within(chatCost).getAllByRole('img')[0].getAttribute('aria-label'),
+    ).toBe('10월 23일 추정 0.02 USD');
+    expect(
+      screen.getByText(/추정 비용이에요. 실제 청구액과 다를 수 있어요/),
+    ).toBeTruthy();
+  });
+
+  test('일부 기능의 토큰을 모르면 부분합으로 기능 비중을 만들지 않는다', async () => {
+    server.on('GET', AI_USAGE, () =>
+      json({
+        ...aiUsage,
+        features: [
+          feature({
+            usage: {
+              modelCalls: 2,
+              inputTokens: 900,
+              outputTokens: 100,
+              replayCalls: 0,
+              retries: 0,
+            },
+          }),
+          feature({
+            feature: 'news-analysis',
+            label: '뉴스 분석',
+            usage: {
+              modelCalls: null,
+              inputTokens: null,
+              outputTokens: null,
+              replayCalls: 0,
+              retries: 0,
+            },
+          }),
+        ],
+      }),
+    );
+    open('/admin/ai');
+
+    const share = await screen.findByRole('list', {
+      name: '기능별 토큰 비중',
+    });
+    expect(
+      screen.getByText(
+        '일부 기능의 토큰 자료가 없어 전체 토큰과 기능별 비중을 계산하지 않아요.',
+      ),
+    ).toBeTruthy();
+    expect(share.textContent).toContain('1천');
+    expect(share.textContent).toContain('자료 없음');
+    expect(share.textContent).not.toContain('%');
   });
 });

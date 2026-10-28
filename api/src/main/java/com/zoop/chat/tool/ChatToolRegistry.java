@@ -11,13 +11,13 @@ import org.springframework.stereotype.Component;
 /**
  * Maps a logical capability to the one read adapter that implements it, with the values {@code chat_tool_calls} fixes per
  * call: registry version, registry group, tool id and schema version. Only a bound capability is ever executed; an unknown
- * id or a capability without an adapter has no binding. Adapters are in-process reads behind the same logical contract an
- * MCP tool would serve.
+ * id or a capability without an adapter has no binding. Adapters are in-process reads of the application; the service uses
+ * no MCP server or client (ZOOP-AIG-001 v0.9), and an outside source such as web search is a direct adapter here too.
  */
 @Component
 public class ChatToolRegistry {
     /** Changes whenever a binding or a tool's input or output meaning changes. */
-    public static final String VERSION = "chat-tools/v1";
+    public static final String VERSION = "chat-tools/v4";
     /** The common request and result envelope. */
     public static final String SCHEMA_VERSION = "chat-tool/v1";
 

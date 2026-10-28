@@ -1,4 +1,4 @@
-# ai/service — 내부 HTTP transport (S1 분석, S2 추출, S3 관계 job, 읽기 전용 그래프·handoff)
+# ai/service — 내부 HTTP transport (S1 분석, S2 추출, S3 관계 job, 챗봇 모델 단계, 읽기 전용 그래프·handoff)
 
 앱 백엔드가 S1 분석(`document-summary`, `document-sentiment`, `semantic-verification`, `briefing-outlook`, 계약 `zoop-ai-s1-1`)을 제출·조회·취소·복구하는 **내부 전용 HTTP 서비스**입니다. 같은 프로세스가 별도 리소스 가족으로 S2 이벤트·토픽 후보 job(`/internal/v1/extraction-jobs`, 기본 꺼짐)과 S3 관계·영향 후보 job(`/internal/v1/relation-jobs`, 기본 꺼짐)도 노출합니다. FastAPI/uvicorn이며 **설치된 `zoop-ai`(S2는 `zoop-ai-extract`, S3는 `zoop-ai-relation`) CLI만** 호출합니다. `zoop_ai`·`zoop_ai_pipeline`·BFF를 import하지 않고 worker의 `worker.sqlite3`와 pipeline의 `extraction.sqlite3`·`relation.sqlite3`·`ingestion.sqlite3`를 열지 않습니다. 런타임 원장이 작업 상태의 유일한 출처이고 이 서비스는 소유자·멱등·고정된 승인 신원·dispatch 상태만 별도 `service.sqlite3`(S1), `extraction-jobs.sqlite3`(S2), `relation-jobs.sqlite3`(S3)에 둡니다.
 
@@ -8,7 +8,7 @@
 
 ```bash
 make service-install           # uv sync --project ai/service --frozen --group dev (공개 의존성만, 토큰 없음)
-make service-test              # 실제 uvicorn + 설치된 zoop-ai + authored replay
+make service-test              # 실제 uvicorn + 설치된 zoop-ai + authored replay (4-worker 병렬, 느린 테스트 30개 시간 출력)
 make service-smoke             # 실제 프로세스 smoke (replay 4종 + recover + loopback cancel/restart)
 make service-openapi-check     # docs/api/internal-ai-openapi.{json,yaml} 생성 drift
 make service-pipeline-test     # S2 extraction + S3 relation job: 실제 uvicorn + 설치된 zoop-ai-extract·zoop-ai-relation + 새 운영자 세계 (make pipeline-install 필요, 없으면 실패)
@@ -48,6 +48,44 @@ ai/service/.venv/bin/python -m zoop_ai_service.main   # 또는 zoop-ai-service (
 | live 통과 | `ZOOP_AI_LIVE_ENABLED=1`과 양수 `ZOOP_AI_GLOBAL_MAX_CALLS`가 **모두 있을 때만** live가 열리고, 그렇지 않으면 `ZOOP_AI_LIVE_ENABLED/GLOBAL_MAX_CALLS/PROVIDER/BASE_URL/API_KEY`와 네이티브 검증용 `ZOOP_AI_VERIFY_PROVIDER`·`TYPESAFE_API_KEY/BASE_URL/VALIDATION_MODEL`은 child에 전달되지 않는다(Jev key는 live가 열린 S1 child에만 가고 S2/S3/그래프 child에는 가지 않는다). stage별 `ZOOP_AI_{DOCUMENT_SUMMARY,DOCUMENT_SENTIMENT,VERIFY,BRIEFING_OUTLOOK}_{MODEL,REASONING_EFFORT}`는 입력 digest에 영향을 주므로 항상 통과한다. |
 
 잘못된 설정은 종료 코드 78과 `{"error":"service_config_invalid","field":"<VAR>","reason":"<code>"}`만 출력합니다(값 출력 없음). child 환경은 `PATH=/usr/bin:/bin`, `LANG=C.UTF-8`, `PYTHON*` 몇 개와 위 통과 값뿐입니다. 요청이 경로·명령·환경·provider URL·모델·fixture·grant registry를 고를 수는 없습니다.
+
+### 온라인 plan admission(선택, 기본 꺼짐)
+
+`ZOOP_AI_SERVICE_PLAN_ADMISSION=1`과 운영자 소유 절대 디렉터리 `ZOOP_AI_SERVICE_PLAN_ROOT`를 함께 설정하면, 실행 중인 서비스가 이미 생성된 정확한 S2 plan을 받아 S2 승인과 단위별 S3 ID를 한 트랜잭션으로 등록합니다. S2·S3 실행 설정 그룹이 모두 필요하지만 온라인 모드에서는 `ZOOP_AI_SERVICE_EXTRACTION_APPROVALS`와 `ZOOP_AI_SERVICE_RELATION_UPSTREAMS`를 읽거나 요구하지 않습니다. 두 설정이 없으면 기존 수동 파일 모드를 유지하며, 일부만 설정하면 시작을 거부합니다.
+
+권한의 유일한 저장소는 서비스 상태 디렉터리의 `plan-authority.sqlite3`(스키마 `zoop-ai-plan-authority-1`)입니다. 현재 정책과 불변 정책 이력, 운영자 CAS 작업 영수증, 누적 사용량, admission manifest, 짝을 이룬 S2·S3 권한을 함께 보관합니다. 새 저장소의 정책 revision은 0이고 정책은 없습니다. 정책 파일 자동 로드나 기본 허용 정책은 없으며, 앱의 admission 요청은 정책을 설치하지 못합니다.
+
+| 경로 | scope | 동작 |
+|---|---|---|
+| `POST /internal/v1/plan-admissions` | `plan.admit` | `planId`·`planDigest`만 받습니다. `Idempotency-Key=planId`가 필수이며 최초 등록은 201, 정확한 재요청은 200입니다. |
+| `GET /internal/v1/plan-admissions/{planId}?planDigest=…` | `plan.read` | 저장된 불변 manifest와 현재 admission-policy 권한 상태를 반환합니다. 목록·검색은 없습니다. |
+| `GET /internal/v1/plan-admission-policy` | `plan.policy` | 현재 revision·정책 digest·정책·상태·누적 사용량과 정확한 ETag를 반환합니다. |
+| `PUT /internal/v1/plan-admission-policy` | `plan.policy` | 별도 운영자가 닫힌 정책 문서, 작업 `Idempotency-Key`, 정확한 `If-Match`로 정책을 변경합니다. 앱 실행 principal에는 이 scope를 함께 부여할 수 없습니다. |
+
+정책은 principal, 모든 입력·snapshot 문서의 source ID, synthetic/actual 구분, 만료 시각, prompt·catalogue·snapshot·topic과 replay fixture 또는 공개 live runtime 신원을 정확히 제한합니다. `maxPlans`·`maxUnits`는 모든 revision에 걸친 누적 admission 수와 S2 단위 수입니다. 취소·실패·만료·정책 변경은 사용량을 환불하지 않습니다. **이 수량 제한은 provider 호출 수나 금액 예산이 아닙니다.** 기존 source rights, live gate와 송신 시점의 독립적인 dollar/call cap이 그대로 필요합니다.
+
+정책 PUT의 같은 운영자·키·문서 digest·If-Match 재요청은 이후 정책이 바뀌었어도 원래 영수증을 반환합니다. 같은 키로 문서나 If-Match를 바꾸면 409 `idempotency_conflict`, 새로운 작업의 오래된 If-Match는 412 `policy_conflict`입니다. 같은 문서를 새 작업으로 다시 제출해도 revision·만료·사용량은 갱신하지 않습니다. 실제 정책 변경은 이전 admission을 모두 영구 비활성화합니다. 만료를 한 번 관측하면 해당 revision과 admission은 시계를 되돌리거나 예전 정책 바이트를 복원해도 살아나지 않습니다.
+
+운영자 정책 작업의 신원과 과거 영수증은 키를 퇴출하거나 재사용하지 않고 계속 보존합니다. Admission 수량 제한 때문에 정책 비활성화나 교체를 막지 않으며, 개별 요청 크기 제한과 admission 저장량 제한은 별도로 유지합니다.
+
+Admission은 `<plan-root>/<planId>`의 네 plan 파일만 읽고 receipt를 내부에서 고정한 뒤, 수동 installer와 공유하는 제한된 실제 `zoop-ai-extract verify-plan` subprocess로 전체 내용을 재구성·검증합니다. 자격 증명·송신 cap은 verifier에 전달하지 않습니다. 검증은 쓰기 트랜잭션 밖에서 수행하며, commit 직전에 정책 revision·만료·설정/디렉터리 신원·plan/registry/fixture pin·충돌·quota를 다시 확인합니다. 검증 중 정책이 바뀌면 409 `policy_changed`로 거부하며, 다른 revision으로 자동 재평가하지 않습니다. Admission과 조회는 실행을 enqueue하거나 dispatch하지 않습니다.
+
+반환 manifest의 각 S2 단위에는 정확히 하나의 결정적 S3 ID가 들어갑니다. S3는 그 ID·provenance·upstream·runtime만 허용하며, 같은 admission origin으로 서비스가 수락한 S2 row가 먼저 있어야 합니다. 운영자가 pipeline에 따로 만든 S2 job은 채택하지 않습니다. S2·S3 예약과 dispatch claim은 불변 `authority_ref`를 보관하며, 제출 후 gate 대기 직후·replay를 포함한 모든 dispatch·명시적 recover·내용 전달·S3 검수 시 현재 권한을 다시 확인합니다. 내용 없는 상태·안전한 취소·과거 작업 영수증 조회는 권한을 갱신하지 않습니다. 이미 실행 중인 child를 정책 만료 순간에 회수하거나 이미 전달한 내용을 취소하는 기능은 아닙니다.
+
+서비스는 process lock을 먼저 잡고, 모든 서비스 원장 복구·중단 처리보다 앞서 모드와 저장소를 확인합니다. 사용 중인 수동 profile을 온라인으로 전환하거나 온라인 flag를 제거해 수동 권한으로 바꾸면 `authority_mode_mismatch`로 시작을 거부합니다. **별도의 서비스 상태 profile을 사용해야 합니다.** 온라인 marker가 있는데 authority DB나 필수 control DB가 사라졌거나 손상되면 닫힌 상태로 거부하며 quota·이력을 재생성하지 않습니다. 온라인 상태에서 offline installer를 실행할 수도 없습니다. S2 서비스 원장은 `zoop-ai-extraction-jobs-ledger-3`, S3는 `zoop-ai-relation-jobs-ledger-4`로 전진하며, 기존 수동 row의 origin은 null로 남고 온라인 origin으로 재해석하지 않습니다.
+
+온라인 profile의 최초 lock 파일은 새 profile에서만 생성합니다. 이후 시작에서는 기존 `service.lock`이 반드시 있어야 하며, authority binding에 원래 lock의 device/inode를 고정합니다. 파일이 사라졌거나 다른 inode로 바뀌면 새 lock으로 대체하거나 원장을 복구하지 않고 시작을 거부합니다.
+
+최초 온라인 시작은 네 DB와 최종 marker를 `.authority-prepare-*` 비공개 디렉터리에 완성한 뒤, WAL을 checkpoint하고 DELETE journal 모드로 봉인합니다. 모든 정책·작업·dispatch·검수 이력이 비어 있고 누적 수량이 0인지 확인한 후, 파일의 바이트·device/inode·크기와 원래 디렉터리·lock·설정 binding을 불변 manifest에 고정합니다. 준비 디렉터리를 `authority-initialization`으로 덮어쓰기 없이 원자적으로 게시한 시점부터 자동 재시작 복구가 가능합니다. 복구는 고정된 네 DB inode를 기존 서비스 경로로 옮기고, 준비된 `authority-mode.json` inode를 **마지막에** 옮깁니다. 이 marker(`zoop-ai-authority-mode-2`)가 게시되기 전에는 일반 원장 생성자·작업 복구·dispatch·HTTP 처리를 시작하지 않습니다.
+
+중단된 초기화는 각 고정 파일이 준비 경로와 최종 경로 중 정확히 한 곳에 남아 있고, 아직 사용되지 않은 봉인 상태일 때만 이어 갑니다. 파일 누락·교체·중복·hardlink·journal sidecar·binding 변경·사용 이력은 자동 채택하거나 정리하지 않고 거부합니다. **`authority-initialization` 게시 전의 중단으로 `.authority-prepare-*`만 남았다면 자동 복구 대상이 아닙니다.** 운영자가 상태를 확인해야 하며, 서비스는 잔여 디렉터리를 삭제하거나 새 DB로 덮어쓰지 않습니다. 파일시스템의 전원 장애로 소유권 증거가 모호해진 경우에도 복구를 보장하지 않고 닫힌 상태로 거부합니다.
+
+완료된 v2 profile은 manifest와 원래 marker·DB inode를 계속 보존해야 합니다. 이후 정상 사용으로 바뀐 DB 바이트나 이력을 초기화 당시 해시·빈 상태와 다시 비교하지는 않습니다. 기존 v1 marker와 네 DB가 모두 있는 profile은 기존 검증을 유지하지만, v1 marker만 있는 불완전한 상태는 새 초기화로 해석하지 않습니다. 초기화 대기 상태에서도 수동 시작과 offline installer는 허용하지 않습니다. 이 복구는 정책 설치·grant 부활·quota 환불이나 사용한 원장의 재생성 기능이 아닙니다.
+
+오류는 안정적인 코드만 반환합니다. 정책·quota·ID 거부는 자동 재시도 대상으로 표시하지 않으며, 검증의 실질적 거부(`plan_verification_failed`)와 verifier 전송 불능(`plan_verifier_unavailable`)을 구분합니다. 실제 정책·source grant·예산 설치, 유료 호출, 공개 JobCreate/queue/scheduler, HOLD 승인·게시·활성화는 이 기능의 범위가 아닙니다.
+
+Verifier가 종료 코드 2와 닫힌 `zoop-extraction-s2-2` 오류 envelope를 함께 반환할 때만 409 `plan_verification_failed`로 분류합니다. 비정상 종료·signal·비JSON/빈/불일치 응답·출력 초과·deadline은 503 `plan_verifier_unavailable`이며, raw child 출력 없이 재시도 가능한 전송 불능으로 구분합니다. 출력 크기·deadline·kill/reap 한도는 그대로 유지하고 자동 재시도는 하지 않습니다.
+
 
 ### 운영자 토큰 절차(수동, 에이전트가 실행하지 않음)
 
@@ -144,6 +182,38 @@ live S2/S3 job은 **서버 운영자가 고정한 것만** 돌아갑니다. 호�
 
 **서버 사전 승인(`ZOOP_AI_SERVICE_EXTRACTION_APPROVALS`).** 호출자는 pipeline의 S2 `Submit`을 보내지 못합니다. 운영자 파일(`{"schemaVersion":"zoop-ai-extraction-approvals-1","approvals":[{"principal","jobId","approvedRequestDigest","request","producerReplayDigest","topicReplayDigest"}]}`, live 항목은 `producerReplayDigest`·`topicReplayDigest` 대신 `liveRuntimeIdentity`, 알 수 없는 키·중복 `(principal, jobId)`·모르는 principal 거부)이 principal+jobId+digest를 **정확한 S2 `Submit` 본문**(스냅샷·카탈로그·incoming 관측·토픽 요청)과, replay 항목이면 그것이 실행될 fixture 바이트의 SHA-256에, live 항목이면 그 요청이 비용을 쓸 수 있는 런타임 binding 신원에 대응시킵니다. 서비스는 읽을 때마다 `request`의 정규 JSON digest가 `approvedRequestDigest`와 같은지, `request.jobId`가 항목의 `jobId`와 같은지, provenance 쌍이 `(replay, authored-test)`(fixture digest 필수) 또는 `(live, provider)`(fixture 없음, `liveRuntimeIdentity` 필수)인지, `topic` 요청과 `topicReplayDigest`가 정확히 짝인지(replay에서 `topic`이 있으면 선택 fixture가 설정돼 있어야 함)를 검증하고, 하나라도 어긋나면 시작을 거부하거나 닫힙니다. 목록에 없으면 존재 여부와 관계없이 같은 403 `request_not_approved`를 ledger·child 이전에 돌려줍니다. live 항목은 live 그룹이 없으면 409 `live_unavailable`입니다. **승인은 pipeline이 허용하는 것을 좁힐 뿐입니다.** pipeline은 내용을 다루는 모든 명령에서 운영자 source registry를 다시 읽으므로 승인이 있어도 registry가 막으면 읽히지 않습니다. 파일은 사용할 때마다 다시 읽고 읽을 수 없으면 닫힙니다(503 `service_configuration_invalid`).
 
+**회차 계획 파일(`zoop-ai-extract plan-round`).** pipeline의 [오프라인 계획 명령](../pipeline/README.md#이벤트same주제-후보-s2-2-authored-replay-또는-live-provider)은 완료 회차에서 `approvals.json`, `relation-upstreams.json`, `manifest.json`, `receipt.json`을 만듭니다. 계획 생성은 설치·유료 호출·예산 설정과 별개입니다. 앱용 manifest에는 계획 ID·digest·단위별 S2 제출 필드만 있으며, 승인 항목의 분석 입력·스냅샷·카탈로그·비밀·원문은 없습니다. 계획 작업은 `s2p-` ID를 사용하며 기존 CLI 작업을 HTTP 작업으로 재사용하지 않습니다. 검토한 계획은 아래 운영자 전용 명령으로 설치합니다. 앱의 계획 등록과 `JobCreate.planId` 처리는 BE에 제안한 후속 작업이며 아직 구현되지 않았습니다.
+
+**검토한 계획을 오프라인으로 설치합니다.** 먼저 서비스를 중지하고 서비스와 같은 운영자 환경을 사용합니다. 서비스 상태 디렉터리는 미리 존재하는 현재 사용자 소유의 `0700` 디렉터리여야 합니다. S2·S3 설정 그룹, 알려진 principal, 기존 두 registry가 필요합니다. 처음에는 기존 형식의 빈 `approvals`·`upstreams` 배열을 운영자가 준비합니다. registry와 fixture·명령 파일은 서비스·앱·worker·ingestion·extraction·relation 상태 루트 밖에 두고, symlink와 겹치는 경로는 사용하지 않습니다. 한 destination 쌍을 다른 서비스 상태 디렉터리나 관리되지 않는 reader/writer와 공유하면 안 됩니다.
+
+```bash
+# 서비스 가상환경의 python을 사용합니다. inspect/status는 설치 파일이나 상태 디렉터리를 만들지 않습니다.
+ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli inspect --plan-dir /absolute/reviewed-plan
+# 출력의 currentDigest, reviewDigest와 정확한 변경 내용을 사람이 검토한 뒤에만 실행합니다.
+ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli install \
+  --plan-dir /absolute/reviewed-plan \
+  --expected-current-digest CURRENT_DIGEST --expected-review-digest REVIEW_DIGEST
+ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli status \
+  --installation-id plan-install-REVIEW_DIGEST
+# status의 transactionDigest를 확인한 뒤, 중단된 설치만 명시적으로 복구합니다.
+ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli recover \
+  --installation-id plan-install-REVIEW_DIGEST --expected-transaction-digest TRANSACTION_DIGEST
+```
+
+`inspect`는 bounded·duplicate-free JSON, receipt의 정확한 파일 hash/길이, manifest digest, 기존 서비스 로더의 principal·요청 digest·fixture/runtime pin을 검사합니다. 설치된 `zoop-ai-extract verify-plan`을 읽기 전용으로 호출해 전체 `Submit` 스키마와 현재 회차로 계획을 재생성하고, incoming·snapshot 문서의 현재 source-read/export 권한과 source binding도 확인합니다. plan 파일·현재 registry 바이트·설정·source registry/binding·병합 결과를 모두 `reviewDigest`에 묶습니다. digest는 검토 대상의 무결성 식별자이지 사람의 승인 증명이나 인증 토큰이 아닙니다. 설치 권한은 보호된 운영자 실행 환경과 파일 권한에 있습니다.
+
+검토 대상에는 서비스 상태 디렉터리와 각 target의 부모 디렉터리의 device/inode도 포함됩니다. 같은 경로에 같은 바이트를 복사했어도 디렉터리 자체가 교체되면 기존 검토·journal로 설치하거나 복구하지 않습니다. 설치·복구는 확인한 디렉터리 FD를 유지하고 파일 생성·교체·journal 게시를 그 FD에 상대적으로 수행합니다. 디렉터리의 mtime·크기나 target 파일의 교체 전 inode는 고정하지 않으므로, 무관한 형제 파일 작업이나 정상적인 원자 교체 때문에 검토가 무효가 되지는 않습니다.
+
+`install`은 서비스와 같은 `ProcessLock`을 잡고 현재 바이트와 검토 digest를 다시 검사합니다. `(principal, jobId)` 승인과 `(principal, jobId, inputDigest)` upstream은 동일하면 유지하고 새 항목만 추가합니다. 같은 키의 다른 내용은 전체 거부하며, 다른 principal·이전 회차·standalone S3 항목을 제거하지 않습니다. 병합 뒤에도 기존 크기 제한과 replay fixture pin을 만족해야 합니다. fixture 회전이나 기존 승인 정리는 이 명령의 기능이 아닙니다.
+
+설치 journal은 `$ZOOP_AI_SERVICE_STATE_DIR/plan-install/`의 `binding.json`, `pending.json`, `transactions/<installationId>/`에 저장합니다. transaction에는 보호된 before/after 이미지·`intent.json`·최종 `receipt.json`이 남습니다. 파일과 디렉터리를 fsync하고 **두 target 중 하나라도 바꾸기 전에** pending marker를 영속합니다. 두 파일 교체 자체는 물리적으로 원자적이지 않습니다. 서비스는 lock 직후, 어떤 원장 생성·중단 작업 복구·dispatch보다 먼저 미해결·손상 journal을 검사해 `plan_install_unresolved`로 시작을 거부합니다. 이 보장은 동일한 상태 소유자의 lock과 시작 차단에 의존합니다.
+
+미완료 transaction의 `recover`는 각 target이 기록된 before 또는 after 바이트일 때만 before 쌍으로 돌리고 `aborted` receipt를 남깁니다. committed receipt와 남은 pending marker가 있으면 정확한 after 쌍을 확인한 뒤 marker만 정리합니다. 수동 철회나 다른 세 번째 바이트, 손상 journal, 바뀐 destination은 덮어쓰지 않습니다. `status`·`recover`는 전체 `config.load()`를 호출하지 않으며 source registry·fixture·원문·provider key·budget이 없어도 저장된 transaction의 경로와 이미지로 판단합니다.
+
+정상 설치와 재호출의 출력은 `schemaVersion`, `installationId`, `transactionDigest`, `outcome`, `appliedNow`, `installationCurrent`입니다. 최초 commit만 `appliedNow:true`이며, committed·aborted ID를 재사용해 새 승인을 만들 수 없습니다. 이후 계획이 추가되어도 기존 receipt 재호출은 registry를 다시 쓰지 않습니다. 따로 철회된 항목이 있으면 과거 receipt metadata와 `appliedNow:false`, `installationCurrent:false`, `error.code:installation_not_current`를 함께 반환하고 exit 78로 끝납니다. 이 상태의 `installationCurrent`는 **기록된 정확한 항목이 현재 registry에 남아 있는지**만 뜻하며 현재 원천 권한이나 실행 가능성을 보증하지 않습니다. 일반 성공은 exit 0, 거부는 exit 78, 잘못된 CLI 인자는 argparse의 exit 2입니다. 주요 거부 코드는 `stale_current`, `stale_review`, `service_state_busy`, `plan_conflict`, `fixture_changed`, `installation_pending`, `journal_target_drift`, `journal_binding_changed`입니다.
+
+설치는 source 권한·model-send 권한·예산·HOLD allow·앱 공개 권한을 만들지 않고, job을 submit/resume/cancel하거나 서비스를 시작하지도 않습니다. snapshot mention grounding과 실제 freeze 가능성은 submit에서, 현재 source/model-send 권한은 실제 사용과 dispatch에서 다시 검사합니다. 검증과 파일 게시 사이의 권한 변경은 하나의 transaction이 아니므로 이 재검사를 유지해야 합니다. 이 운영자 도구는 상시 자동 승인 정책이나 05/35 수집·10/40 확인 보장의 구현이 아닙니다. 단위 transaction 검사는 `tests/test_plan_install.py`, 실제 CLI·HTTP 흐름과 중단 복구는 `scripts/plan_install_service_smoke.py`에서 다룹니다.
+
 **소유권·고정된 신원.** job은 제출한 principal의 것이고 다른 principal의 job·예약만 된 job·없는 job은 모두 같은 404, 같은 jobId를 다른 principal이 제출하면 409 `job_id_unavailable`입니다. pipeline의 `submit`은 이미 있는 id에 대해 저장된 job을 그대로 보고하므로 첫 시도는 먼저 `inspect`로 그 id가 pipeline 원장에 없음을 확인하고, 있으면 예약을 풀고 409(운영자가 만든 job을 채택해 읽는 일을 막음)입니다. **예약은 `submit` 전에 영속합니다**: 소유자·호출자 본문 digest와 함께 그 순간 승인이 고정한 값, 즉 승인된 요청 digest, producer fixture digest, (있으면) 토픽 fixture digest, 그리고 pipeline이 보고해야 하는 `inputDigest`(`digest({request, replayFixtureHash})`를 **서비스가 승인 바이트로 계산**, pipeline이 말한 값을 받아 적지 않음)를 원장에 씁니다. 고정 열은 불변입니다(DB trigger). 정확히 같은 본문의 재전송은 고정된 값을 그대로 쓰고(200), 같은 jobId에 다른 digest는 409 `idempotency_conflict`, 승인 항목이나 fixture 파일이 그사이 바뀌었으면 409 `approval_changed`·`fixture_changed`(또는 withheld)로 같은 job id를 새 바이트에 다시 묶지 않습니다. 고쳐 쓰려면 새 jobId를 승인해야 합니다.
 
 **접수와 dispatch.** 인증→헤더→본문(엄격한 3개 필드)→(소유자·본문 digest 조회)→승인 조회→fixture digest 확인→**`reserved` 기록**→(첫 시도면 채택 검사)→`zoop-ai-extract submit`(replay fixture 이름, 등록만: 호출·후보 0)→**pipeline이 보고한 `inputDigest`가 서비스가 계산한 값과 같고 provenance·상태(`queued`·호출 없음)가 승인과 같은지 확인**→**`accepted`+초기 dispatch 1개를 한 transaction으로 기록**→202. `submit`이 결과를 못 주면 같은 gate 안에서 `inspect`로 등록 여부를 확인하고(등록돼 있으면 이어 가고, 없음이 증명되면 예약을 풀고, 판단할 수 없으면 예약을 유지), **어떤 경우에도 `submit`을 다시 보내지 않습니다.** 크래시가 등록 뒤·서비스 확인 전에 났다면 소유자의 같은 재시도가 같은 신원으로 이를 완료합니다. S2와 S3의 모든 child는 **단 하나의 gate** 뒤에서 한 번에 하나만 실행합니다(pipeline 원장 락은 기다리지 않고, S3는 S2가 쓰는 바로 그 원장을 읽는다).
@@ -186,7 +256,7 @@ live S2/S3 job은 **서버 운영자가 고정한 것만** 돌아갑니다. 호�
 | 라우트 | scope | 응답 |
 |---|---|---|
 | `GET /internal/v1/graph-handoffs/{handoffId}` | `handoff.read` | 200 `HdStatus`: 신원·`state`·`delivery`와, current일 때만 `verification`(manifest·bundle·content digest, 바이트 수, bundle 자신의 개수, source job 수, provenance 선언). 노드·source id·제목·본문 없음 |
-| `GET /internal/v1/graph-handoffs/{handoffId}/bundle` | `handoff.read` | 200 `HdBundle`: 위와 같은 형제 필드 + current이고 두 pin이 맞을 때만 `manifest`(freeze 때 원장에 동결된 manifest 본문, 닫힌 모델 `HandoffManifest`)와 `bundle`(`zoop-graph-handoff-bundle-6` 전체. 각 issue의 `mentions[]`는 닫힌 `BMention`/`BParticipant` 모델, `fieldProvenance`는 닫힌 `BFieldProvenance`/`BSameValueMentions`/`BMentionRef` 모델, `fieldVerdicts[]`는 닫힌 `BFieldVerdict` 모델, 최상위 비공개 `pathCompanies[]`와 relation의 `structuralPath`·basis의 `businessScope`/`productScope`는 아래 `-5` 문단, 최상위 비공개 `impacts[]`는 `-6` 문단의 닫힌 모델입니다). 백엔드는 이 한 응답으로 `sha256(canonical(manifest))`=`manifestDigest`와 `sha256(canonical(bundle))`=`bundleDigest`를 모두 재계산합니다. 서비스는 manifest 누락·미지 필드(500 `runtime_contract_mismatch`)와 digest·handoffId·선언·정책 버전·파일 해시·source 핀 불일치(500 `runtime_binding_mismatch`)를 거절하며 status·withheld에는 manifest가 없습니다 |
+| `GET /internal/v1/graph-handoffs/{handoffId}/bundle` | `handoff.read` | 200 `HdBundle`: 위와 같은 형제 필드 + current이고 두 pin이 맞을 때만 `manifest`(freeze 때 원장에 동결된 manifest 본문, 닫힌 모델 `HandoffManifest`)와 `bundle`(`zoop-graph-handoff-bundle-7` 전체. 각 issue의 `mentions[]`는 닫힌 `BMention`/`BParticipant` 모델, `fieldProvenance`는 닫힌 `BFieldProvenance`/`BSameValueMentions`/`BMentionRef` 모델, `fieldVerdicts[]`는 닫힌 `BFieldVerdict` 모델, 최상위 비공개 `pathCompanies[]`와 relation의 `structuralPath`·basis의 `businessScope`/`productScope`는 아래 `-5` 문단, 최상위 비공개 `impacts[]`는 `-6` 문단, 각 issue의 `summary`와 `policy.issueSummary`는 `-7` 문단의 닫힌 모델입니다). 백엔드는 이 한 응답으로 `sha256(canonical(manifest))`=`manifestDigest`와 `sha256(canonical(bundle))`=`bundleDigest`를 모두 재계산합니다. 서비스는 manifest 누락·미지 필드(500 `runtime_contract_mismatch`)와 digest·handoffId·선언·정책 버전·파일 해시·source 핀 불일치(500 `runtime_binding_mismatch`)를 거절하며 status·withheld에는 manifest가 없습니다 |
 
 쿼리 파라미터는 **하나도 허용하지 않습니다**(422). 목록·생성·복구 route는 없습니다.
 
@@ -194,9 +264,9 @@ live S2/S3 job은 **서버 운영자가 고정한 것만** 돌아갑니다. 호�
 
 **handoff allowlist(`ZOOP_AI_SERVICE_HANDOFF_EXPORTS`).** handoff id는 라벨일 뿐이므로 운영자가 principal별로 정확한 `{handoffId, manifestDigest, bundleDigest}`(둘 다 필수 sha256 pin: manifest 해시와 canonical bundle 바이트 해시)를 `{"schemaVersion":"zoop-ai-handoff-exports-1","handoffs":[…]}`로 적습니다. 알 수 없는 키·pin 누락·중복 `(principal, handoffId)`·모르는 principal은 시작을 거부합니다. 목록에 없으면(없는 id·다른 principal의 것 포함) 같은 403 `handoff_not_allowed`를 child 전에 돌려줍니다. 파일은 요청마다 다시 읽고 slot·gate 대기 뒤 child 시작 전, child 응답 직후 답의 어떤 부분이든 쓰기 전, 내용 조립 직전에 다시 읽어 바뀌었으면 403입니다.
 
-**전달 규칙.** 내용은 아래가 **모두** 성립할 때만 나갑니다. (1) 생산자가 `ready`·`delivery.status=current`를 말하고(운영자 파일 3개의 매니페스트 pin, S3 권한·S2 upstream pin·grant, 사용한 검수 revision, 재구성한 content digest를 매 export마다 다시 검증), (2) 받은 bundle의 canonical 바이트 sha256이 생산자 receipt와 **운영자 `bundleDigest` pin** 둘 다와 같고 manifest digest가 `manifestDigest` pin과 같으며, (3) bundle이 모든 중첩 수준에서 **닫힌 모델**(`handoff_wire.Bundle`)을 통과하고 모델이 다시 내보낸 canonical 바이트가 해시한 바이트와 정확히 같을 때. 아니면 **200 + `delivery.state=withheld`**와 사유(`source_unauthorized`·`upstream_changed`·`canonical_mapping_changed`·`decisions_changed`·`bindings_changed`·`review_revision_changed`·`handoff_content_changed`·`handoff_not_ready`·`handoff_pin_mismatch`·`handoff_contract_changed` …)만 있고 `verification`·`bundle`은 null입니다(개수·source id도 없음). 생산자 receipt와 받은 바이트가 서로 어긋나면 500 `runtime_binding_mismatch`, 닫힌 모델이 거부하면(모르는 중첩 필드, 타입·범위 위반 — **digest와 pin을 새 내용에 맞춰 갱신했어도**) 500 `runtime_contract_mismatch`입니다. 둘 다 재시도해도 바뀌지 않으므로 retryable이 아닙니다. 검사들은 서로 다른 시각의 읽기라 그 사이의 철회는 잡지 못하고 이미 나간 내용은 회수되지 않습니다.
+**전달 규칙.** 내용은 아래가 **모두** 성립할 때만 나갑니다. (1) 생산자가 `ready`·`delivery.status=current`를 말하고(운영자 파일 3개의 매니페스트 pin, S3 권한·S2 upstream pin·grant, 사용한 검수 revision, 재구성한 content digest를 매 export마다 다시 검증), (2) 받은 bundle의 canonical 바이트 sha256이 생산자 receipt와 **운영자 `bundleDigest` pin** 둘 다와 같고 manifest digest가 `manifestDigest` pin과 같으며, (3) bundle이 모든 중첩 수준에서 **닫힌 모델**(`handoff_wire.Bundle`)을 통과하고 모델이 다시 내보낸 canonical 바이트가 해시한 바이트와 정확히 같을 때. 아니면 **200 + `delivery.state=withheld`**와 사유(`source_unauthorized`·`upstream_changed`·`canonical_mapping_changed`·`decisions_changed`·`bindings_changed`·`review_revision_changed`·`handoff_content_changed`·`handoff_not_ready`·`handoff_pin_mismatch`·`handoff_contract_changed`, 요약 pin·basis가 바뀐 `issue_summary_pin_mismatch`·`issue_summary_basis_changed`·`issue_summary_issue_not_public`·`issue_summary_temporal_review_pending`·`issue_summary_input_too_large` …)만 있고 `verification`·`bundle`은 null입니다(개수·source id도 없음). 생산자 receipt와 받은 바이트가 서로 어긋나면 500 `runtime_binding_mismatch`, 닫힌 모델이 거부하면(모르는 중첩 필드, 타입·범위 위반, basis·digest·검증 규칙을 따르지 않는 summary — **digest와 pin을 새 내용에 맞춰 갱신했어도**) 500 `runtime_contract_mismatch`입니다. 둘 다 재시도해도 바뀌지 않으므로 retryable이 아닙니다. 검사들은 서로 다른 시각의 읽기라 그 사이의 철회는 잡지 못하고 이미 나간 내용은 회수되지 않습니다.
 
-**bundle 스키마 `-6`와 이전 handoff.** 서비스의 닫힌 `Bundle` 모델과 receipt 투영(`RtReceipt.bundle_schema`)은 `zoop-graph-handoff-bundle-6`만 받습니다. `zoop-graph-handoff-bundle-1`~`-5`로 freeze된 handoff는 생산자가 내용 없이 `handoff_contract_changed`로 withheld하며, 서비스는 그 사유 코드만 200 withheld로 그대로 전달하고 옛 receipt·bundle 내용은 어떤 것도 싣지 않습니다(운영자가 새 handoff id를 freeze합니다). `-1`~`-5` 모양의 current 응답(`-4`는 `pathCompanies`·`structuralPath`·basis scope가 없는 모양, `-5`는 `impacts`·`counts.impacts`·`policy.impacts`가 없고 content digest가 여섯 목록 위에 있는 모양)은 닫힌 모델이 아니라 receipt 투영에서 500 `runtime_contract_mismatch`로 거절되며 어떤 별칭·변환·보정도 없습니다. issue의 `mentions[]`는 S2 원본 mention 값(문서·버전·S2 local id로 식별, `verification`은 항상 `none`, 참가자의 `role`은 S2 텍스트 그대로)이며 병합된 issue 필드에서 만들어지지 않고 verdict가 있어도 바뀌지 않습니다. 서비스는 이 값들의 의미(partition·시간 정밀도·회사 매핑)를 다시 판단하지 않고 구조만 고정합니다.
+**bundle 스키마 `-7`와 이전 handoff.** 서비스의 닫힌 `Bundle` 모델과 receipt 투영(`RtReceipt.bundle_schema`)은 `zoop-graph-handoff-bundle-7`만 받습니다. `zoop-graph-handoff-bundle-1`~`-6`으로 freeze된 handoff는 생산자가 내용 없이 `handoff_contract_changed`로 withheld하며, 서비스는 그 사유 코드만 200 withheld로 그대로 전달하고 옛 receipt·bundle 내용은 어떤 것도 싣지 않습니다(운영자가 새 handoff id를 freeze합니다). `-1`~`-6` 모양의 current 응답(`-4`는 `pathCompanies`·`structuralPath`·basis scope가 없는 모양, `-5`는 `impacts`·`counts.impacts`·`policy.impacts`가 없고 content digest가 여섯 목록 위에 있는 모양, `-6`은 issue `summary`와 `policy.issueSummary`가 없는 모양)은 닫힌 모델이 아니라 receipt 투영에서 500 `runtime_contract_mismatch`로 거절되며 어떤 별칭·변환·보정도 없습니다. issue의 `mentions[]`는 S2 원본 mention 값(문서·버전·S2 local id로 식별, `verification`은 항상 `none`, 참가자의 `role`은 S2 텍스트 그대로)이며 병합된 issue 필드에서 만들어지지 않고 verdict가 있어도 바뀌지 않습니다. 서비스는 이 값들의 의미(partition·시간 정밀도·회사 매핑)를 다시 판단하지 않고 구조만 고정합니다.
 
 **비공개 `pathCompanies`와 `structuralPath`(`-5`).** 최상위 `pathCompanies[]`는 `companies[]`와 같은 닫힌 `{id, canonicalId, label, decisionRef}` 모양이며 id 정렬·유일·최대 20000개이고 `companies`·issue id와 겹치지 않습니다. 완전한 경로의 "매핑된 중간 회사 중 공개 `companies`가 아닌 것" 집합과 정확히 같아야 하며(고아·누락 모두 거절) `counts.pathCompanies`는 그 길이입니다. 공개 노드가 아니라 백엔드가 카탈로그와 경로를 닫기 위한 비공개 지원 참조입니다. 모든 relation은 `structuralPath`(INVOLVES·FOLLOWS는 명시적 `null`)를 가지며, `STRUCTURALLY_RELATED_TO`는 `{status:"complete", companyIds:[P,C]|[P,M,C], links:[{supplierCompanyId, customerCompanyId}]}`(basis마다 링크 하나, 링크 양 끝은 인접 `companyIds`와 같은 쌍, 모두 서로 다름, P는 같은 issue의 INVOLVES 참가자·C는 relation target이자 비참가자) 또는 basis가 2개일 때만 가능한 `{status:"unavailable", reason:"intermediate_company_unmapped"}`입니다. 각 basis는 S3 값을 그대로 복사한 `businessScope`·`productScope`(null 가능, 500 코드포인트 이하 텍스트이며 엔티티 id가 아님)를 가집니다. 이는 운영자가 매핑한 basis 연결일 뿐 인과·가격 방향이나 독립 출처 증명이 아니며, 서비스는 이 구조·연결·닫힘·개수만 검사합니다.
 
@@ -206,11 +276,54 @@ live S2/S3 job은 **서버 운영자가 고정한 것만** 돌아갑니다. 호�
 
 **비공개 `impacts`(`-6`).** 최상위 `impacts[]`는 방출된 모든 `INVOLVES` edge의 `sourceRefs`(s3-relation) 하나당 정확히 한 행이며 `(edgeId, sourceRelation.jobId, sourceRelation.relationCandidateId)` 순으로 정렬됩니다. 같은 edge의 서로 다른 source relation은 합치지 않고 따로 남습니다. 행은 닫힌 13개 키(`edgeId`·`issueId`·`companyId`·`sourceRelation`·`impactCandidateId`·`status`·`code`·`label`·`targetVerdict`·`effects`·`verifier`·`verifierRequestDigest`·`proposal`)입니다. `status`는 `not-applicable`(운영자 최종 승인 source: 후보 없음)·`not-proposed`·`no-evidence`·`technical-reject`·`verifier-reject`·`verified`·`withheld`이고 `code`는 technical-reject(`producer_reply_invalid`·`impact_precheck_rejected`·`verifier_reply_invalid`)와 withheld(`impact_evidence_outside_relation_documents`·`impact_quote_ambiguous`)에만 있습니다. `effects`(`positive`·`negative`·`neutral`·`uncertain`: 정렬·유일·서로소·합쳐 1~40개의 app `ev-` id, 모두 번들 evidence이며 edge가 인용한 article version, 한 행 안에서 `source.sourceEvidenceId`는 서로 다름)와 `label`(`uncertain` 또는 target `insufficient`면 `undetermined`, 양쪽이면 `mixed`, 한쪽이면 그쪽, 중립뿐이면 `undetermined`)은 `verified`에만 있습니다. `proposal`은 검증되지 않은 비공개 제안(`verification:"none"`, reason 1~2000·limitations ≤1000 **Unicode code point**)이며 검증된 근거가 아닙니다. label은 한 source relation의 quote 근거가 회사에 미친 효과이지 이벤트의 공개 집계 label도, 인과·가격 확률도 아닙니다. 서비스의 닫힌 모델은 행 단위 상태표와 보이는 전역 닫힘(coverage·정렬·endpoint·source 승인 종류·evidence id·article version·`counts.impacts`·`policy.impacts`·label)을 모두 강제하고, 의미 판단은 생산자와 Java importer가 맡습니다. `-5` 이하 handoff에는 `impacts`가 없으며 그 부재는 "제안 없음"이 아니라 "사용 불가"입니다. content digest는 `companies`·`pathCompanies`·`issues`·`relations`·`impacts`·`evidence`·`articles` 일곱 목록의 canonical sha256입니다.
 
-**bundle 바이트.** `bundle`은 생산자의 산출물 그대로이며 서비스가 추가·삭제·기본값 보정·정규화하는 것은 없습니다(`exclude_unset`로 입력 키만 되돌리고, 되돌린 canonical 문자열이 받은 것과 다르면 거부). `verification.bundleDigest`는 canonical JSON(키 정렬, `,`·`:` 구분자, 비ASCII 비이스케이프)의 UTF-8 바이트 sha256입니다. 숫자는 음이 아닌 정수뿐이고 키는 ASCII뿐이라 어떤 언어의 JSON 파서 + 같은 직렬화도 같은 digest를 냅니다(`pipeline_tests`와 smoke가 JavaScript로 다시 계산해 확인). 서비스 필드(`appImport`·`delivery`·`verification`·`observedAt`)는 `bundle` 밖의 형제입니다. 제목·URL·label·관측·grant 같은 source 유래 값은 데이터이며 권한의 근거가 아닙니다: 전달 여부는 현재 `delivery.state`와 운영자 pin만이 정합니다. 닫힌 모델은 키 집합·타입·패턴·크기 한도(구조)를 고정하고, 참조 닫힘·id 공식·개수·권한 같은 의미 규칙은 생산자가 쓰기 전과 매 export마다 검증하며 서비스는 반복하지 않습니다.
+**issue `summary`(`-7`).** 각 issue는 닫힌 `summary`를 필수로 가집니다(키가 없거나 `null`이면 거절합니다: 옛 모양이나 떨어진 summary는 현재로 읽히지 않습니다). `policy.issueSummary`는 `zoop-issue-summary-policy-1`입니다. 값은 `available`(1~5개 `claims[{claimId c1..cn, text(한 줄, 1~280 code point, 한글 음절 1자 이상), evidenceIds(1~5개, 정렬·유일)}]`, 그 문장을 줄바꿈으로 이은 `text`, claim 근거의 정렬된 합집합 `evidenceIds`, 닫힌 문법 `YYYY-MM-DDTHH:MM:SS[.1~9자리](Z|+HH:MM|-HH:MM)`의 `generatedAt`(ASCII 숫자·대문자 `T`/`Z`, offset 필수·18:00 이하, 실제 달력 날짜·연 0001~9999, 윤초와 compact·공백·주차·ordinal 형 거절. 생산자·앱 verifier와 같은 규칙이며 Python `fromisoformat`이 아니고 이 필드에만 적용), `isr-`+digest({basisDigest, claims})인 `resultVersion`, `language:"ko"`, `source{jobId, inputDigest, resultDigest, basisDigest}`, `producer`·`verifier` 신원) 또는 `unavailable`+`code`입니다. `not-requested`·`temporal-review-pending`·`input-too-large`는 뒤에 job이 없어 `source:null`이고 `producer-invalid`·`verifier-hold`·`verifier-reject`는 실패한 job의 고정된 결과를 `source`로 가리킵니다. 서비스는 생산자의 `issue_summary_contracts`를 이식해 bundle 안의 값만으로 **다시 계산**합니다. (1) 입력 basis는 issue `title`과 모든 `mentions[].evidenceIds`의 합집합(evidence id 순, 각 인용은 article version·offset·`quoteSha256`에 고정, 그 인용을 단 mention이 **모두** background일 때만 `context:"background"`)이며 geography 전용·verdict 전용 근거는 들어가지 않습니다. 그 digest가 `source.basisDigest`와 같아야 합니다. (2) 이슈에 HOLD/REJECT 필드 verdict가 하나라도 있으면(어느 mention이든) 정확히 `unavailable/temporal-review-pending`이어야 하고 `available`을 포함한 다른 값은 bundle 전체를 거절합니다. 해당 조건이 없는데 deterministic 코드가 오는 것도 거절이고 입력 인용이 60개를 넘으면 `input-too-large`입니다. (3) claim 근거는 basis 인용의 부분집합이어야 하고 `resultVersion`과 `source.resultDigest`는 다시 계산한 값과 같아야 합니다. (4) replay bundle의 producer·verifier는 둘 다 `authored-replay`(모델명·reasoning effort 없음, 독립 모델의 판정이 아님)이고 live bundle만 `provider`+`independent-verifier`(모델명·effort 필수)입니다. 위반은 pin·digest를 새 내용에 맞춰 갱신했어도 500 `runtime_contract_mismatch`입니다. 이 값은 verifier가 인용에 대조한 문장이지 사실·투자 조언·인과·가격 확률이 아닙니다. `-6` 이하 handoff에는 summary가 없고 그 부재는 `not-requested`가 아니라 "사용 불가"입니다. 읽기 전용 중계는 summary job을 실행하지도 summary 원장을 열지도 않으며(고정 argv는 `export`뿐) export는 freeze된 불변 artifact의 summary를 쓰고 모델·provider를 부르지 않습니다.
+
+**앱 suppression gate(필수, 구현은 백엔드 소유).** summary의 입력은 claim이 인용한 근거만이 아니라 **basis의 모든 evidence id와 그 article version 전부**입니다. 앱이 asOf 시점·현재 source 권리·읽을 수 있는 article version으로 summary를 보일지 정할 때는 (1) receipt의 issue에서 **필터 전** `mentions[].evidenceIds`의 합집합(= basis 인용 전체)을 구하고 (2) 그 전부가 가시 evidence이며 그 모든 article version이 현재 읽을 수 있을 때만 `AnalysisSummary`를 내고 (3) 하나라도 가려졌으면 요약 전체를 숨깁니다(일부 claim만 남기지 않습니다). snapshot에 보이는 mention만 남긴 집합이나 생산자가 고른 인용만으로 검사하면 가려진 입력이 빠진 채 통과하므로 허용되지 않습니다. `temporal-review-pending`·`input-too-large`·job 쪽 `unavailable`은 요약 문장을 내지 않습니다. 이 서비스는 게이트를 구현하지 않고 계약만 고정하며, 앱 import와 공개 `getEvent` 매핑은 BE 소유입니다.
+
+**bundle 바이트.** `bundle`은 생산자의 산출물 그대로이며 서비스가 추가·삭제·기본값 보정·정규화하는 것은 없습니다(`exclude_unset`로 입력 키만 되돌리고, 되돌린 canonical 문자열이 받은 것과 다르면 거부). `verification.bundleDigest`는 canonical JSON(키 정렬, `,`·`:` 구분자, 비ASCII 비이스케이프)의 UTF-8 바이트 sha256입니다. 숫자는 음이 아닌 정수뿐이고 키는 ASCII뿐이라 어떤 언어의 JSON 파서 + 같은 직렬화도 같은 digest를 냅니다(`pipeline_tests`와 smoke가 JavaScript로 다시 계산해 확인). 서비스 필드(`appImport`·`delivery`·`verification`·`observedAt`)는 `bundle` 밖의 형제입니다. 제목·URL·label·관측·grant 같은 source 유래 값은 데이터이며 권한의 근거가 아닙니다: 전달 여부는 현재 `delivery.state`와 운영자 pin만이 정합니다. 닫힌 모델은 키 집합·타입·패턴·크기 한도(구조)를 고정하고, 참조 닫힘·id 공식·개수·권한 같은 의미 규칙은 생산자가 쓰기 전과 매 export마다 검증하며 서비스는 반복하지 않습니다(예외는 둘: `impacts` 행 상태표와 닫힘, 그리고 바로 위 issue `summary`의 의사결정표).
 
 **한도와 오류.** 생산자의 bundle 상한은 canonical 6 MiB이고 서비스는 child stdout을 16 MiB까지 읽습니다(넘으면 잘라 보내지 않고 503 `runtime_unavailable`). child는 요청당 하나이고 자동 재시도는 없으며 동시 child는 2개(초과 시 503 `service_busy`), deadline 45초입니다. writer가 원장을 잡은 상태(`handoff_busy`·`relation_busy`·`extraction_busy`·`ingestion_busy`)는 503 `runtime_busy`, 손상·변경된 artifact·운영자 파일·소유 설정·복구 필요(`handoff_recovery_required`)는 503 `service_configuration_invalid`, 목록에 있으나 원장에 없는 id는 404 `handoff_not_found`입니다. 모든 503은 `Retry-After`를 갖고 빈 bundle로 답하지 않습니다.
 
-**시험.** `tests/test_handoff_unit.py`(설정 닫힘·allowlist 엄격성·exit·canonical 줄 해석·닫힌 모델을 모든 노드에서 변조·`fieldProvenance`/`withheld`/`fieldVerdicts` 모양 거절과 의미 비판단·결정/사유/span 조합·전달 규칙·예시), `tests/test_handoff_http.py`(실제 uvicorn + 시험 소유 stand-in 명령: 고정 argv·최소 환경·pin·중첩 모르는 필드와 verdict 자유 서술 note·원문 span 키 거절·`fieldProvenance`/verdict 모양 변조·`-1`~`-5` 모양 거절·`impacts` 행 상태표·coverage·정렬·label·effects·source 승인 위조·길이(Unicode code point)·count/policy/digest를 digest를 다시 봉인한 채 변조·같은 edge의 상반 행 보존·바이트 동일 중계·JS digest·withheld·busy·deadline·동시성·로그), `pipeline_tests/test_handoff_real_cli.py`(실제 `zoop-ai-handoff`와 S3 job 두 개 세계: CLI export와 바이트 동일, 생산자 검증기 통과, issue별 `fieldProvenance`의 동치·닫힘과 verdict의 모양·결속·withheld 재계산을 독립적으로 재확인, 생산자 세계의 손으로 쓴 `impacts` 기대와 일치, status에 impact 내용 없음, 권한 철회·운영자 파일 변경 withheld→복원)는 기본 `service-test`/`service-pipeline-test`에 들어갑니다. 서비스 시험·smoke는 판정을 만들거나 선택에서 유추하지 않으며 실제 verdict 입력은 생산자 fixture가 제공하고, 없으면 빈 `fieldVerdicts`·빈 `withheld`만 확인합니다. 종단 smoke는 `make service-handoff-smoke`(`scripts/handoff_service_smoke.py`, Neo4j 불필요, pipeline 설치가 없으면 skip이 아니라 **실패**)입니다. 생성된 [내부 OpenAPI](../../docs/api/internal-ai-openapi.yaml)가 계약이며 백엔드 사용 주의는 [인수 문서](../../api/docs/GRAPH_READ_HANDOFF.md)에 있습니다.
+**시험.** `tests/test_handoff_unit.py`(설정 닫힘·allowlist 엄격성·exit·canonical 줄 해석·닫힌 모델을 모든 노드에서 변조·`fieldProvenance`/`withheld`/`fieldVerdicts` 모양 거절과 의미 비판단·결정/사유/span 조합·전달 규칙·예시), `tests/test_handoff_summary_unit.py`(issue `summary`: 손으로 쓴 basis·digest 기대, 여섯 결과 전부와 live 신원, 55가지 내용 변조·hidden id(geography/verdict 전용 근거 포함)·잘못된 basis·잘못된 provenance 거절, 같은 변경을 다시 pin하면 받아들여짐, 60/61 인용 경계, HOLD/REJECT 우선순위, claim 길이·한글 경계, 그리고 `generatedAt` 문법: 생산자·앱 verifier와 **같은 공유 vector 파일** `api/src/test/resources/graph-handoff/summary-time-vectors.json`의 accept·reject 전부와 Python 라이브러리 파서가 받는데 문법이 거절하는 형태), `tests/test_handoff_http.py`(실제 uvicorn + 시험 소유 stand-in 명령: 고정 argv·최소 환경·pin·중첩 모르는 필드와 verdict 자유 서술 note·원문 span 키 거절·`fieldProvenance`/verdict 모양 변조·`-1`~`-6` 모양 거절·`impacts` 행 상태표·coverage·정렬·label·effects·source 승인 위조·길이(Unicode code point)·count/policy/digest를 digest를 다시 봉인한 채 변조·같은 edge의 상반 행 보존·summary 결과별 바이트 동일 중계와 status에 summary 없음과 운영자 상태 무변경·digest·pin을 다시 맞춘 summary 변조(내용·hidden id·basis·provenance)의 500 거절·JS digest·withheld·busy·deadline·동시성·로그), `pipeline_tests/test_handoff_real_cli.py`(실제 `zoop-ai-handoff`와 S3 job 두 개 세계: CLI export와 바이트 동일, 생산자 검증기 통과, issue별 `fieldProvenance`의 동치·닫힘과 verdict의 모양·결속·withheld 재계산을 독립적으로 재확인, 생산자 세계의 손으로 쓴 `impacts`·`summary` 기대와 일치, status에 impact 내용 없음, 권한 철회·운영자 파일 변경 withheld→복원, 그리고 **서비스 모델과 설치된 생산자 `validate_bundle`이 summary 156개 fixture·변조(시간 문법 포함)에 같은 판정을 내는지의 차분 시험**)는 기본 `service-test`/`service-pipeline-test`에 들어갑니다. 서비스 시험·smoke는 판정을 만들거나 선택에서 유추하지 않으며 실제 verdict 입력은 생산자 fixture가 제공하고, 없으면 빈 `fieldVerdicts`·빈 `withheld`만 확인합니다. 종단 smoke는 `make service-handoff-smoke`(`scripts/handoff_service_smoke.py`, Neo4j 불필요, pipeline 설치가 없으면 skip이 아니라 **실패**)입니다. 생성된 [내부 OpenAPI](../../docs/api/internal-ai-openapi.yaml)가 계약이며 백엔드 사용 주의는 [인수 문서](../../api/docs/GRAPH_READ_HANDOFF.md)에 있습니다.
+
+## Handoff 영향 ID 조회 (`POST /internal/v1/graph-handoffs/exposure`)
+
+`queryGraphHandoffExposure`는 일반 export를 먼저 호출하지 않고 설치된 `zoop-ai-handoff-exposure`를 한 번 실행합니다. 별도 scope `handoff.exposure`가 필요하며 `handoff.read`와 어느 방향으로도 권한을 포함하지 않습니다. 현재 source 권리가 철회되어 bundle 전달이 withheld인 뒤에도 고정 기록의 영향 ID를 조회할 수 있지만, handoff allowlist의 허용이 철회되면 조회도 거절합니다.
+
+**독립 설정.** 다음 다섯 변수는 전부 없으면 비활성화이고, 일부만 있거나 값이 잘못되면 시작을 거절합니다. 기존 서비스 기본 설정과 소유 경계용 `ZOOP_STATE_DIR`는 그대로 필요합니다. 실제 환경 파일은 자동으로 수정하지 않습니다.
+
+| 변수 | 값 |
+|---|---|
+| `ZOOP_AI_SERVICE_HANDOFF_EXPOSURE_COMMAND` | 설치된 `zoop-ai-handoff-exposure` 실행 파일의 절대 경로 |
+| `ZOOP_AI_HANDOFF_EXPOSURE_STATE_DIR` | 기존 handoff 원장 루트 |
+| `ZOOP_AI_HANDOFF_EXPOSURE_EXTRACTION_STATE_DIR` | 기존 S2 원장 루트 |
+| `ZOOP_AI_HANDOFF_EXPOSURE_INGESTION_STATE_DIR` | 기존 ingestion 원장 루트 |
+| `ZOOP_AI_SERVICE_HANDOFF_EXPOSURE_EXPORTS` | 기존 `zoop-ai-handoff-exports-1` 형식의 principal별 manifest/bundle pin allowlist |
+
+세 루트는 서로 및 앱·서비스·S1 상태와 겹칠 수 없고 symlink를 허용하지 않습니다. 함께 설정된 S2/S3·graph·일반 handoff 그룹과 원천 루트가 같아야 하며, 일반 handoff가 있으면 handoff 루트와 allowlist 파일도 같아야 합니다. exposure만 켤 때는 source registry·canonical·decisions·bindings·S3 원장·모델/graph 자격 증명이 필요하지 않으며 다른 그룹도 켜지지 않습니다.
+
+챗봇을 함께 켜면 `ZOOP_AI_CHAT_STATE_DIR`도 이 세 원장 루트와 같거나 그 상위·하위 경로일 수 없습니다(`chat_roots_overlap`). 일반 handoff가 꺼져 있어도 이 검사는 적용됩니다. 챗봇이나 S2/S3의 live 설정·키가 있어도 exposure child에는 전달되지 않습니다.
+
+**입출력.** 요청은 기존 닫힌 `zoop-handoff-exposure-1` 계약입니다. `handoffIds`는 중복 없는 명시적 ID 1~20개이고, `changed`는 문서·source·grant 또는 `(jobId, relationCandidateId)` 쌍의 `s3-relation`입니다. 문서의 `documentVersion`·`rawVersion`, grant의 `revision`은 필수 nullable 필드입니다. null은 그 신원의 모든 고정 버전/리비전을 뜻하며 handoff 선택의 wildcard는 아닙니다. 인증·scope 확인 뒤 JSON/UTF-8, 중복 키·비유한 숫자·알 수 없는 필드를 검사하고 선언/스트리밍 본문 모두 65,536바이트로 제한합니다. query parameter·job 등록·idempotency 요구·캐시·자동 재시도·부분 성공은 없습니다.
+
+성공은 `200 {"schemaVersion":"zoop-ai-internal-handoff-1","report":…}`입니다. report는 생산자 출력 그대로이며 닫힌 중첩 모델로 키·타입·신원·선택 전체·정렬/중복·개수·고정 한계 문구·모델/공급자 호출 0을 검증합니다. 정규화가 생기거나 canonical JSON 한 줄이 아니거나 newline 포함 6 MiB를 넘으면 전달하지 않습니다. 서비스는 영향 전파를 다시 계산하지 않으며, **report의 manifest/bundle pin과 allowlist를 비교할 뿐 받지 않은 bundle 바이트의 해시를 계산했다고 주장하지 않습니다.** 기사·이슈·관계·근거 식별자 외에 제목·label·URL·본문·인용문·자유 진단을 추가할 수 없습니다.
+
+**실행과 철회.** 전체 선택을 한 allowlist snapshot으로 허가한 뒤 두 reader slot 및 같은 프로세스 S2/S3 writer의 `RelationGate`를 사용합니다(gate 대기 10초, child deadline 45초). 대기 뒤·child 종료 뒤 오류 해석 전·응답 직전에 전체 선택의 같은 항목을 다시 확인합니다. 중간 철회는 성공과 오류를 모두 숨깁니다. 이들은 별도 시점의 읽기이며 최종 확인 직후 철회를 원자적으로 막는 보장은 아닙니다. source 계열은 ingestion/extraction 경로를 넘기고 S3 관계 철회는 handoff 경로만 넘깁니다. child는 자격 증명 없는 환경·익명 stdin·서버 소유 cwd·폐기되는 stderr를 사용합니다. 공통 runner의 16 MiB stdout 파일 크기 확인은 종료 후 검사이지 실시간 디스크 quota가 아닙니다.
+
+| 상황 | HTTP / code |
+|---|---|
+| 미인증 / scope 없음 / 선택 중 미허용·변경 항목 | 401 `authentication_required` / 403 `scope_denied` / 403 `handoff_not_allowed` |
+| 비활성 / 선택 중 누락·history·손상·미준비 / pin 불일치 | 409 `execution_unavailable` / `handoff_selection_unmappable` / `handoff_pin_mismatch` |
+| 잘못된 요청 / 모르는 신원 / 미사용 관계 / 생산자 보고서 상한 | 422 `invalid_request` / `changed_identity_unknown` / `changed_relation_unused` / `exposure_report_limit` |
+| 본문 상한 / media type | 413 `request_too_large` / 415 `unsupported_media_type` |
+| slot·gate·원장 경합 / 실행 불가·timeout / 운영자 설정·원장 오류 | 503 `service_busy`·`runtime_busy` / `runtime_unavailable` / `service_configuration_invalid` |
+| 잘못된 report / 요청 결속 불일치 / 알 수 없는 생산자 오류 | 500 `runtime_contract_mismatch` / `runtime_binding_mismatch` / `internal_error` |
+
+오류는 기존 `HdErrorEnvelope`만 쓰며 영향 ID·부분 report·CLI detail을 싣지 않습니다. 기록은 있으나 선택된 handoff에 연결되지 않은 신원은 완전한 빈 report가 될 수 있지만 모르는 신원은 오류입니다. 앱은 네 receipt 신원을 대조하고 버전별 제외·정정·복구·revision·활성화를 별도로 처리합니다. 빈 결과나 더 작은 결과가 기존 제외를 해제하지 않습니다.
+
+공통 runner가 child 시작 뒤 출력 상한 초과나 I/O 오류를 보고해도 읽기 전용 exposure는 503 `runtime_unavailable`로 응답하며 자동 재시도하지 않습니다. 호출자가 다시 조회할 수 있다는 뜻이지 이전 요청을 서비스가 재실행한다는 뜻은 아닙니다. 같은 상황에서 챗봇은 모델 요청을 보냈을 수 있으므로 502 `stage_outcome_unknown`으로 응답하고 재송신을 허용하지 않습니다.
+
+**검증 명령(별도 실행).** `ai/service/.venv/bin/python -m pytest ai/service/tests`와 `ai/service/.venv/bin/python -m pytest ai/service/pipeline_tests`는 서로 다른 프로세스로 실행합니다. 새 실제 HTTP/CLI smoke는 `ai/service/.venv/bin/python ai/service/scripts/handoff_exposure_service_smoke.py`입니다. 설치된 CLI, 실제 loopback HTTP, 기존 synthetic replay world와 손으로 작성된 영향 기대값을 사용하며 source 철회 뒤 조회·일반 export withheld·기록된 빈 결과와 모르는 신원·선택 전체 실패·원장 경합·원장/앱 무변경을 검사합니다. 이는 실기사 품질·모델 성능·배포 검증이 아닙니다.
 
 ## 챗봇 모델 단계 (`/internal/v1/chat-stages/{stage}`)
 
@@ -223,6 +336,8 @@ live S2/S3 job은 **서버 운영자가 고정한 것만** 돌아갑니다. 호�
 | `ZOOP_AI_SERVICE_CHAT_GRANTS` | 운영자 챗봇 grant registry(`schemaVersion: zoop-ai-chat-1`). S1 registry와 별도 |
 | `ZOOP_AI_SERVICE_CHAT_REPLAY` | 선택. authored replay fixture. 없으면 `mode=replay`는 409 `execution_unavailable` |
 | 챗봇 live | `ZOOP_AI_CHAT_LIVE_ENABLED=1`과 양수 `ZOOP_AI_CHAT_MAX_CALLS`가 모두 있을 때만 이 둘과 `ZOOP_AI_API_KEY`·`TYPESAFE_API_KEY`가 **챗봇 child에만** 전달된다. 모델·endpoint 이름(`ZOOP_AI_CHAT_ANSWER_MODEL`·`_REASONING_EFFORT`, `ZOOP_AI_CHAT_JEV_MODEL`, `ZOOP_AI_BASE_URL`, `TYPESAFE_BASE_URL`)은 항상 전달된다. S1·파이프라인 게이트는 이 child를 열지 않는다 |
+
+- 챗봇 원장은 함께 설정된 S2/S3·graph·handoff·exposure의 모든 원장 루트와도 분리한다(`chat_roots_overlap`). S2/S3와 exposure는 같은 `RelationGate`로 직렬화하지만, 별도 원장을 쓰는 챗봇은 이 gate를 공유하지 않는다.
 
 - 본문은 `StageRequest`(`schemaVersion`, `invocationId`, `stage`, `mode`, `input`)이고 `Idempotency-Key`는 `invocationId`와 같아야 하며 경로의 stage와 본문 stage가 같아야 한다. child는 `<principal>:<invocationId>`를 받으므로 principal끼리 원장 행을 공유하지 않는다.
 - **200**은 stage 결과다. `status=failed`도 200이며 `failure.sent`·`failure.unknown`이 송신 여부와 결과 불명을 말한다. **502/504 `stage_outcome_unknown`**은 child가 보냈을 수 있다는 뜻이므로 그 invocation을 다시 보내지 않는다. **503**(`runtime_unavailable`, `service_busy`, `service_configuration_invalid`)은 보내지 않았다는 뜻이다. `runtime_unavailable`은 child가 **시작조차 못 한** 경우에만 쓰고, 시작한 뒤의 출력 상한 초과나 출력 읽기 오류는 502 `stage_outcome_unknown`이다.
@@ -244,7 +359,9 @@ live S2/S3 job은 **서버 운영자가 고정한 것만** 돌아갑니다. 호�
 
 ## 검증
 
-`tests/`는 실제 uvicorn 프로세스(127.0.0.1)와 실제 설치된 `zoop-ai`를 쓰고 CLI를 흉내 내지 않습니다. 자격 증명은 시험마다 메모리에서 만든 합성 값이며 저장소에는 토큰도 digest도 없습니다. 모델은 호출하지 않습니다. 오직 live 경로 시험이 `127.0.0.1`의 loopback provider(표준 라이브러리 HTTP 서버, 요청 수만 센다)를 쓰고 외부 네트워크는 쓰지 않습니다. 프로세스 충돌 시험은 `tests/launcher.py`가 실제 컴포넌트를 감싸 정해진 경계에서 서비스를 SIGKILL하며 프로덕션 코드에는 그런 hook이 없습니다.
+`tests/`는 실제 uvicorn 프로세스(127.0.0.1)에서 HTTP 경계를 검사하며, 목적에 따라 설치된 `zoop-ai` 또는 시험 소유의 CLI 대역을 사용합니다. 대역 시험은 잘못된 출력·시간 초과·권한 변경 등 전송 경계만 증명하며, 실제 pipeline 실행은 `pipeline_tests/`와 각 설치 CLI smoke로 별도 확인합니다. 자격 증명은 시험마다 메모리에서 만든 합성 값이며 저장소에는 토큰도 digest도 없습니다. 모델은 호출하지 않습니다. live 경로 시험은 `127.0.0.1`의 loopback provider를 사용하고 외부 네트워크는 쓰지 않습니다. 프로세스 충돌 시험은 `tests/launcher.py`가 실제 컴포넌트를 감싸 정해진 경계에서 서비스를 SIGKILL하며 프로덕션 코드에는 그런 hook이 없습니다.
+
+CI의 `ai-service` 작업은 4-worker 병렬 전체 시험(느린 테스트 30개 시간 출력)·loopback smoke·내부 OpenAPI drift 검사를 모두 유지하며 전체 실행 제한은 25분이다. 이는 개별 HTTP 요청이나 CLI child의 timeout을 늘리는 설정이 아니다.
 
 | 파일 | 증명 |
 |---|---|

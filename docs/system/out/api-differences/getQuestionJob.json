@@ -95,7 +95,8 @@
       "type": "string",
       "enum": [
         "article",
-        "zoop_doc"
+        "zoop_doc",
+        "company_profile"
       ]
     },
     "response:200:application/json.result<anyOf:0>.citations[].sourceKind:required": true,

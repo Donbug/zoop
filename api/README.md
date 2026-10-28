@@ -19,28 +19,27 @@ Java 21과 Gradle 버전은 프로젝트에 고정했습니다. `JAVA_HOME`을 �
 cp api/.env.example api/.env
 # api/.env에 필수 ZOOP_AUTH_CSRF_KEYS와 사용할 ZOOP_AUTH_ALLOWED_ORIGINS를 설정합니다.
 # 필요하면 포트·DB 이름·계정 값도 수정합니다.
-set -a
-. ./api/.env
-set +a
 
 docker compose --env-file api/.env -f api/compose.local.yaml up -d --wait
-SPRING_PROFILES_ACTIVE=local ./api/gradlew -p api bootRun
+cd api
+SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
 ```
-```sh
+```powershell
 # 윈도우용
 Copy-Item api/.env.example api/.env
-# api/.env의 필수 값 확인 후 아래 환경변수에도 설정합니다.
-$env:ZOOP_AUTH_CSRF_KEYS = "local-v1=<생성한 키>"
-$env:ZOOP_AUTH_ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:8080"
+# api/.env에 필수 값과 사용할 Origin을 설정합니다.
 $env:SPRING_PROFILES_ACTIVE = "local"
 
 docker compose --env-file api/.env -f api/compose.local.yaml up -d --wait
-.\api\gradlew.bat -p api bootRun
+Set-Location api
+.\gradlew.bat bootRun
 ```
 
-application-local.yml 파일을 설정하세요.
+필요한 로컬 프로필 설정은 `application-local.yml`에서 확인하세요.
 
-Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경변수를 내보낸 후 실행하거나 IDE Run Configuration에 아래 변수를 직접 등록하세요. Compose의 `--env-file`은 DB 컨테이너 설정에만 적용됩니다.
+`application.yml`의 `spring.config.import`가 실행 작업 디렉터리의 `.env`를 Spring 설정으로 읽습니다. 위 명령처럼 `api` 디렉터리에서 실행하면 `api/.env`가 적용되며, 셸에서 파일을 미리 내보낼 필요가 없습니다. IDE로 실행할 때도 작업 디렉터리를 `api`로 지정하세요. 실제 OS 환경변수가 있으면 `.env` 값보다 우선합니다.
+
+이 import는 `System.getenv()` 값을 설정하지 않으므로, 자식 프로세스에 환경변수를 전달해야 하는 별도 작업에서는 셸에서 내보내야 합니다. Compose의 `--env-file`은 DB 컨테이너 설정에만 적용됩니다.
 
 | 변수 | 용도 |
 |---|---|
@@ -56,15 +55,33 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 | `ZOOP_API_CORS_ALLOWED_ORIGINS` | `/api/**` 전체에 적용할 브라우저 CORS 허용 Origin 목록(쉼표 구분). 비어 있으면 CORS 매핑을 등록하지 않음 |
 | `ZOOP_AUTH_TRUSTED_PROXIES` | `X-Forwarded-For`를 제공할 수 있는 프록시의 숫자 IP 목록(쉼표 구분). 빈 값은 전달 헤더 무시 |
 | `ZOOP_CHAT_QUESTIONS_ENABLED` | 선택. AI 챗봇 질문·재시도 접수(기본 `false`). 꺼져 있으면 `submitQuestion`·`retryQuestionJob`이 503 `MODEL_UNAVAILABLE`을 반환해 실행되지 않을 작업을 만들지 않습니다. 대화 생성·조회·복원과 작업 조회·취소는 플래그와 무관하게 동작하며 모델을 호출하지 않습니다. 켜려면 `ChatEngine`(오케스트레이터)이 등록돼 있어야 하며(`ZOOP_AI_CHAT_CLIENT_ENABLED=true`가 등록) 없으면 기동을 거절합니다. `ZOOP_CHAT_EXECUTOR_ENABLED`(기본 `true`)·`ZOOP_CHAT_EXECUTOR_WORKERS`(기본 2)는 대기 작업을 집어 실행하고 만료된 lease를 회수하는 실행기이며, 엔진이 없으면 아무 작업도 집지 않습니다 |
-| `ZOOP_AI_CLIENT_*` `ZOOP_AI_EXTRACTION_CLIENT_*` `ZOOP_AI_RELATION_CLIENT_*` `ZOOP_AI_CHAT_CLIENT_*` | 선택. 내부 AI transport 클라이언트(S1/S2/S3/챗봇 가족별, 기본 비활성, 설정 없이도 기동). 이름·규칙은 [AI 연동](docs/AI_INTEGRATION.md#설정), [S2·S3 절](docs/AI_INTEGRATION.md#s2-추출s3-관계-클라이언트), [챗봇 절](docs/AI_INTEGRATION.md#챗봇-모델-단계-클라이언트) |
+| `ZOOP_AI_CLIENT_*` `ZOOP_AI_EXTRACTION_CLIENT_*` `ZOOP_AI_RELATION_CLIENT_*` `ZOOP_AI_CHAT_CLIENT_*` `ZOOP_AI_PLAN_ADMISSION_CLIENT_*` | 선택. 내부 AI transport 클라이언트는 가족별로 독립이며 기본 비활성입니다. 설정은 [AI 연동](docs/AI_INTEGRATION.md#설정), [S2·S3](docs/AI_INTEGRATION.md#s2-추출s3-관계-클라이언트), [챗봇](docs/AI_INTEGRATION.md#챗봇-모델-단계-클라이언트), [계획 접수](docs/AI_INTEGRATION.md#계획-접수-클라이언트)를 따릅니다. |
+| `ZOOP_ADMIN_REVIEW_RECONCILE_ENABLED` `ZOOP_ADMIN_REVIEW_RECONCILE_*` | 선택, 기본 `true`이지만 **AI 관계 클라이언트(`ZOOP_AI_RELATION_CLIENT_ENABLED=true`)가 있을 때만** 동작합니다. 관리자 HOLD 검수 결정의 AI 응답을 잃었을 때(미확인·blocked) 웹 애플리케이션이 전용 스레드에서 AI 원장을 조회해 정리합니다(`ReviewDecisionService.reconcile`). 미확인 결정은 같은 operation으로 다시 보내며, 원천은 두 번 기록하지 않습니다. 주기 `INTERVAL`(기본 `PT1M`), 만든 지 `MIN_AGE`(기본 `PT2M`)가 지난 의도부터, 한 번에 `BATCH`(기본 50)건. 열린 의도가 남으면 수가 바뀔 때와 1시간마다 경고합니다. `false`로 끌 수 있고, 비웹 실행에서는 동작하지 않습니다. |
 | `ZOOP_DOCUMENT_IMPORT_*` `ZOOP_INGESTION_*` `ZOOP_ARTIFACT_ROOT` | 선택. operator 전용 비웹 문서 import(기본 비활성, 설정 없이도 기동). 이름·규칙은 [문서 import](docs/DOCUMENT_IMPORT.md#실행) |
 | `ZOOP_DOCUMENT_ANALYSIS_*` | 선택. operator 전용 비웹 문서 분석(기본 비활성, 설정 없이도 기동). S1 AI 클라이언트(`ZOOP_AI_CLIENT_*`)와 위 `ZOOP_INGESTION_*`·`ZOOP_ARTIFACT_ROOT`도 필요하고 문서 import와 한 프로세스에서 함께 켤 수 없습니다. 이름·규칙은 [문서 분석](docs/DOCUMENT_ANALYSIS.md#실행) |
 | `ZOOP_DOCUMENT_READ_GRANTS` `ZOOP_DOCUMENT_READ_INGESTION_SOURCES` `ZOOP_DOCUMENT_READ_ARTIFACT_ROOT` | 선택. 공개 `GET /api/v1/evidence/{id}`(운영 플래그와 독립, 읽기 전용). `GRANTS`는 operator의 flat S1 grant registry 파일로 S1 요약 근거에만 쓰이고 요청마다 읽으며 미설정이면 그 읽기는 503입니다. `INGESTION_SOURCES`는 graph 본문 근거용 S2-1 source registry(`zoop-ingestion-s2-1`)로 **handoff import의 `ZOOP_INGESTION_SOURCES`와 같은 파일**을 operator가 지정하며, 요청마다 읽고 기본값·S1 fallback이 없어 미설정이면 graph 근거 읽기는 503입니다. `ARTIFACT_ROOT`는 캐시로 돌려준 요약의 exact receipt, 그리고 graph 근거의 선택된 버전 import receipt 한 건을 읽을 때만 필요합니다(미설정이면 그 경우만 503). 값이 있는데 정규화된 절대 경로가 아니거나 없으면 기동 실패. 이 권한 선택은 백엔드 소유자(정세빈) 확인 전까지 배포하지 않습니다. 규칙은 [문서 분석 § 근거 읽기](docs/DOCUMENT_ANALYSIS.md#근거-읽기-getevidence-부분-구현)와 [graph 본문 근거 경로](docs/GRAPH_READ_HANDOFF.md#2026-10-20-getevidence의-graph-본문-근거-경로-로컬-작업-트리-미게시) |
 | `ZOOP_GRAPH_SNAPSHOT_SOURCE` `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT` | 선택. 공개 그래프 스냅샷을 어디서 읽을지 정합니다. 기본 `none`: 등록된 버전이 있어도 스냅샷 읽기는 503 `SOURCE_UNAVAILABLE`이고, 버전이 없으면 409 `VERSION_UNAVAILABLE`입니다(빈 그래프로 대체하지 않음). `fixture`: **local/dev 전용**이며, 기동 시 `src/main/resources/graph-fixtures/`의 합성 스냅샷 2개를 `graph_versions`에 등록·활성화합니다(제목 `[합성]`, 실제 뉴스 아님). 이미 가져온(non-fixture) 버전이 있는 DB에서는 기동을 거절합니다. `artifact`: `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT`(정규화된 절대 경로)의 스냅샷 파일을 레지스트리 hash·크기로 검증해 읽기 전용으로 읽고, 이미 등록된 fixture 버전(classpath 위치)은 기존 fixture 읽기 경로가 그대로 읽어 기존 읽기가 달라지지 않습니다(아래 [그래프 handoff 스테이징 import](#그래프-handoff-스테이징-import)). 어떤 버전을 공개로 보여 줄지는 여전히 선택기와 활성 포인터가 정하며 `artifact`가 등록·활성화하지 않습니다. 규칙은 [그래프 조회 계약 결정](../docs/api/graph-read-contract-proposal.md) §0 |
-| `ZOOP_GRAPH_ACTIVATION_ALLOW_WITHOUT_EXCLUSION_STORE` | 선택, 기본 `false`. 공개 제외 저장소(FS081)가 아직 없어서, 관리자 활성화(`activateGraphVersion`)는 수입한(non-fixture) 버전을 기본으로 503 `SOURCE_UNAVAILABLE`로 거절합니다. "제외할 항목이 없음"을 확인할 수 없기 때문입니다. 운영자가 이 한계를 알고 `true`로 켜면 허용합니다. 이때도 활성화 직전의 권리·근거 검사(기사 접근 상태, 선택 버전 receipt의 grant, 현재 S2-1 원천 registry)는 그대로 적용됩니다. 합성 fixture 버전에는 영향이 없습니다. 대신 fixture 버전은 `ZOOP_GRAPH_SNAPSHOT_SOURCE=fixture`일 때만 활성화할 수 있고, `artifact`·`none`에서는 422로 거절합니다(운영 DB에 남은 `[합성]` 행이 공개 그래프가 되지 않도록). |
+| `ZOOP_GRAPH_ACTIVATION_ALLOW_WITHOUT_EXCLUSION_STORE` | 선택, 기본 `false`. **이제 효과가 없습니다.** 공개 제외 저장소(FS081, 아래 "공개 제외 명령")가 생겨서 관리자 활성화(`activateGraphVersion`)는 항상 그 버전의 현재 제외를 적용해 사전 검사합니다. 저장소가 없는 reader(시험용)에서만, 수입한(non-fixture) 버전을 기본으로 503 `SOURCE_UNAVAILABLE`로 거절하고 `true`면 허용합니다. 이때도 활성화 직전의 권리·근거 검사(기사 접근 상태, 선택 버전 receipt의 grant, 현재 S2-1 원천 registry)는 그대로 적용됩니다. 합성 fixture 버전에는 영향이 없습니다. 대신 fixture 버전은 `ZOOP_GRAPH_SNAPSHOT_SOURCE=fixture`일 때만 활성화할 수 있고, `artifact`·`none`에서는 422로 거절합니다(운영 DB에 남은 `[합성]` 행이 공개 그래프가 되지 않도록). |
+| `ZOOP_GRAPH_AUTO_ACTIVATION_ENABLED` `ZOOP_GRAPH_AUTO_ACTIVATION_*` | 선택, 기본 `false`. 켜면 **웹 애플리케이션**이 운영자 수입이 등록한 비활성 snapshot 버전 중 가장 최근 하나를 관리자 활성화(`activateGraphVersion`)와 **같은 사전 검사**(권리·근거·공개 제외·snapshot 읽기)를 거쳐 system 주체로 활성화합니다(FS059, 활성화 이력 `actor_kind=system`). 현재 공개 버전보다 앞선(`sequence`가 작은) 수입은 활성화하지 않고, 시작 시각에서 `LOOKBACK`(기본 `PT30M`, 한 회차)만큼 되돌아본 뒤에 수입된 버전만 대상입니다. 확인 주기 `INTERVAL`(기본 `PT15S`), 검사 거절 뒤 재시도 `RETRY_AFTER`(기본 `PT5M`), 소스 장애·그 밖의 실패 뒤 재시도 `UNAVAILABLE_RETRY_AFTER`(기본 `PT1M`). 전용 스레드에서 돌고, 수입·제외 명령 같은 비웹 실행에서는 동작하지 않습니다. 바꾸려면 재시작합니다. 관리자가 수동으로 활성화(되돌리기 포함)하면 그보다 먼저 수입돼 기다리던 버전은 자동으로 활성화하지 않고, **그 뒤에 수입된** 버전이 검사를 통과하면 그 버전으로 바뀝니다. |
 | `ZOOP_GRAPH_HANDOFF_IMPORT_*` `ZOOP_HANDOFF_*` `ZOOP_RELATION_STATE_DIR` `ZOOP_EXTRACTION_STATE_DIR` | 선택. operator 전용 비웹 그래프 handoff 스테이징 import(기본 비활성, 설정 없이도 기동). 위 `ZOOP_INGESTION_*`·`ZOOP_ARTIFACT_ROOT`도 필요하고 문서 import·분석, `fixture` 소스와 한 프로세스에서 함께 켤 수 없습니다. 이름·규칙은 [그래프 handoff 스테이징 import](#그래프-handoff-스테이징-import) |
 
-`DB_PORT`나 `DB_NAME`을 바꾸면 `DB_URL`도 일치하게 수정하세요. `.env.example`의 비밀번호는 로컬 전용 예시이며 운영용이 아닙니다. 실제 `.env`는 Git에서 제외됩니다. 이미 초기화된 DB 볼륨의 계정·비밀번호는 환경변수만 바꿔도 변경되지 않습니다.
+`DB_PORT`나 `DB_NAME`을 바꾸면 `DB_URL`도 일치하게 수정하세요. `.env.example`의 비밀번호는 로컬 전용 예시이며 운영용이 아닙니다. 실제 `.env`는 Git에서 제외됩니다. 이미 초기화된 DB 볼륨의 계정·비밀번호는 설정값만 바꿔도 변경되지 않습니다.
+
+### 프로세스 생존 확인
+
+인증 없이 `GET /health`를 호출하면 HTTP 200과 `{"status":"UP"}`만 반환합니다. 쿠키·Authorization·CSRF 토큰은 필요하지 않으며, 응답 본문에 비밀 값이나 내부 오류·연결 정보를 포함하지 않습니다.
+
+```sh
+curl --fail-with-body -i http://localhost:8080/health
+```
+
+이 엔드포인트는 요청을 처리하는 프로세스의 생존(liveness)만 확인합니다. DB·AI·외부 서비스에 요청하거나 준비 상태(readiness)를 집계하지 않으므로, **정상 기동 후 DB 연결이 끊겨도 프로세스가 HTTP 요청을 처리하는 동안에는 200을 반환합니다.** 다른 API의 정상 동작이나 시작 작업의 완료를 보장하지 않습니다.
+
+이는 **DB 없이 전체 애플리케이션이 기동한다는 뜻이 아닙니다.** 일반 기동에는 `DB_URL`·`DB_USERNAME`·`DB_PASSWORD`, 접근 가능한 PostgreSQL, Flyway 마이그레이션·JPA 스키마 검증, 시작 시 기업 카탈로그 import가 필요합니다. 필수 CSRF 서명 키 설정도 그대로 필요합니다. AI 클라이언트는 기본 비활성입니다. DB 자동 설정을 제외하거나 별도 프로필로 웹 서버만 띄우는 우회 경로는 제공하지 않습니다.
+
+메서드 처리는 기존 Spring MVC 설정을 유지합니다. `HEAD /health`는 200과 빈 본문, `OPTIONS /health`는 200과 `Allow: GET, HEAD, OPTIONS`를 반환합니다. `POST`·`PUT`·`PATCH`·`DELETE`는 405이며, 오류 본문은 기존 공통 오류 처리의 `INVALID_REQUEST` 형식입니다.
+
+컨트롤러 테스트는 HTTP 응답 계약을 검증하며 전체 애플리케이션이나 컨테이너 기동의 증거는 아닙니다. 실제 이미지의 8080 포트와 기동 후 DB 중단 시나리오는 [API Dev 배포 절차의 로컬 컨테이너 검증](../docs/development/api-dev-deployment.md#51-로컬-컨테이너-생존-확인)을 따릅니다.
 
 ### 그래프 읽기 로컬 빠른 시작 (합성 fixture, 일회용)
 
@@ -90,20 +107,18 @@ curl -s 'http://127.0.0.1:<출력된 포트>/api/v1/graph?asOf=2026-10-05T00:00:
 
 ### 로컬 HTTP 브라우저 테스트
 
-`application-local.yml`은 로컬 프로필에서만 `http://localhost:3000` 프론트의 `/api/**` CORS 요청을 허용하고 세션 쿠키의 `Secure` 속성을 끕니다. 인증 Origin 검증에는 프론트와 API에서 직접 여는 Swagger UI의 Origin(`http://localhost:8080`)을 모두 허용합니다. 백엔드 포트를 바꾸면 API Origin도 같은 포트로 지정하세요. 일반 프로필의 HTTPS Origin 검증과 보안 쿠키 설정은 그대로 적용됩니다.
+`application-local.yml`은 로컬 프로필에서만 `http://localhost:5173` 프론트의 `/api/**` CORS 요청을 허용하고 세션 쿠키의 `Secure` 속성을 끕니다. 인증 Origin 검증에는 프론트와 API에서 직접 여는 Swagger UI의 Origin(`http://localhost:8080`)을 모두 허용합니다. 백엔드 포트를 바꾸면 API Origin도 같은 포트로 지정하세요. 일반 프로필의 HTTPS Origin 검증과 보안 쿠키 설정은 그대로 적용됩니다.
 
-`api/.env.example`의 `ZOOP_AUTH_ALLOWED_ORIGINS`는 빈 값이므로, `.env`를 불러온 **뒤** 로컬 테스트 값을 지정해야 합니다. 다음 명령은 저장소 루트에서 실행합니다.
+`api/.env.example`의 `ZOOP_AUTH_ALLOWED_ORIGINS`는 빈 값이므로, `api/.env`에 로컬 테스트 값을 넣거나 아래처럼 실행 시 환경변수로 지정해야 합니다. 다음 명령은 저장소 루트에서 시작합니다.
 
 ```sh
-set -a
-. ./api/.env
-set +a
 export SPRING_PROFILES_ACTIVE=local
 export ZOOP_SWAGGER_ENABLED=true
 export ZOOP_AUTH_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:8080
 export ZOOP_API_CORS_ALLOWED_ORIGINS=http://localhost:5173
 docker compose --env-file api/.env -f api/compose.local.yaml up -d --wait
-./api/gradlew -p api bootRun
+cd api
+./gradlew bootRun
 ```
 
 Swagger UI는 `http://localhost:8080/swagger-ui.html`에서 API와 같은 Origin으로 열리므로 CORS 허용 목록에 API 주소를 추가할 필요가 없습니다. 프론트에서 직접 호출할 때는 프론트 담당자가 API 주소를 `http://localhost:8080`으로 지정하고 쿠키 요청에 credentials를 포함해야 합니다. 다른 출처나 `/api/**` 바깥 경로가 필요하면 공통 설정인 `common/config/ApiCorsConfiguration.java`와 `zoop.api.cors.allowed-origins`를 검토하세요.
@@ -245,7 +260,7 @@ Swagger `/v3/api-docs`의 위 5개 operation과 목표 정본 [`docs/api/openapi
 
 ## AI 분석 transport
 
-`com.zoop.ai`는 `ai/service`의 internal operation을 호출하는 전송 클라이언트입니다. S1 분석 5개(submit/status/result/cancel/recover)에 더해 S2 추출 job(`ExtractionClient`, 서버 사전 승인 digest 참조) 5개와 S3 관계 job(`RelationClient`, 허용된 upstream과 AI 원천 version·revision을 거는 검수 `review`/`operation` 포함) 7개를 별도 가족으로 호출하며, 가족마다 설정은 독립이고 기본 비활성입니다. S2/S3 submit은 호출자가 `ExecutionMode`(replay/live)를 명시해야 하고 live는 요청일 뿐이며 서버 운영자의 승인·핀·gate가 권한입니다. 사람의 `allow`는 최종 승인(HTTP 200, 재검증·`recoverOperation` 없음)입니다. 서비스 principal로 호출하며 앱 저장·사용자 격리·결과 import·공개 endpoint·공개 인증은 포함하지 않습니다. 설정, 의미(202≠완료, withheld, 결과 불명 복구), 요청 ID, 검증 범위와 인계 사항은 [AI 연동](docs/AI_INTEGRATION.md)에 있습니다.
+`zoop.ai.plan-admission-client`·S2/S3 전송 클라이언트와 별도로 `zoop.analysis.analyze-plan`은 관리자 계획 분석 큐를 제공합니다. 모두 기본 비활성이며 클라이언트나 큐 설정만으로 원천 사용·모델 비용·HOLD 승인·공개 권한이 생기지 않습니다. `POST /api/v1/admin/jobs`의 analyze_plan만 실제 계획 등록·PostgreSQL 단위 원장·worker에 연결됩니다. 성공은 고정 S2/S3 결과의 내용 없는 처리 인계(publicChanged=false)이며 수집·검수 동기화·발행을 하지 않습니다. 기존 ingest/revalidate/project 요청 형태와 이력은 유지하지만 새 접수와 retry는 실행기 미연결로 거절합니다. 설정 환경 변수, 재시작·취소·continuation 의미, 실제 합성 `make api-analyze-plan-smoke ANALYZE_PLAN_SMOKE_OUTPUT=/external/fresh-dir` 명령은 [AI 연동의 관리자 계획 분석 큐](docs/AI_INTEGRATION.md#관리자-계획-분석-큐)를 참고하세요.
 
 ## 문서 등록 import
 
@@ -259,7 +274,7 @@ Swagger `/v3/api-docs`의 위 5개 operation과 목표 정본 [`docs/api/openapi
 
 ## 그래프 handoff 스테이징 import
 
-`com.zoop.graph.importer`는 AI `zoop-ai-handoff`가 동결한 handoff 하나를 **비활성** 그래프 버전으로 올리는 **operator 전용 비웹 실행**입니다(`--spring.main.web-application-type=none`, `ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED=true`). HTTP 경로가 없고 평소 기동은 달라지지 않으며, 문서 import·분석(같은 artifact 잠금)이나 활성화하는 `fixture` 소스와 한 프로세스에서 켜면 기동이 거절됩니다. 실행은 `graph_activations`를 쓰지 않고 `graph_versions.active`와 article의 `current_version`을 바꾸지 않으므로 공개 API는 이 버전을 읽을 수 없습니다(명시 `graphVersion`은 409 `VERSION_UNAVAILABLE`, 기본·asOf 읽기는 기존 활성 포인터 그대로). **활성화 경로는 아직 없습니다**(결과의 `nextActivation=unsupported`).
+`com.zoop.graph.importer`는 AI `zoop-ai-handoff`가 동결한 handoff 하나를 **비활성** 그래프 버전으로 올리는 **operator 전용 비웹 실행**입니다(`--spring.main.web-application-type=none`, `ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED=true`). import 자체에는 HTTP 경로가 없고 평소 기동은 달라지지 않으며, 문서 import·분석(같은 artifact 잠금)이나 활성화하는 `fixture` 소스와 한 프로세스에서 켜면 기동이 거절됩니다. 실행은 `graph_activations`를 쓰지 않고 `graph_versions.active`와 article의 `current_version`을 바꾸지 않으므로 아직 활성화하지 않은 버전을 공개 API로 읽을 수 없습니다(명시 `graphVersion`은 409 `VERSION_UNAVAILABLE`, 기본·asOf 읽기는 기존 활성 포인터 그대로). 별도의 관리자 `POST /api/v1/admin/graph/versions/{versionId}/activate`는 현재 권리·버전별 공개 제외·읽기 준비를 검사한 뒤 활성화하며, 공개 제외 저장소를 읽을 수 없으면 503 `SOURCE_UNAVAILABLE`로 거절합니다. import 결과의 `nextActivation=unsupported`는 import의 기존 스테이징 계약이며 관리자 경로의 부재를 뜻하지 않습니다.
 
 요청(`zoop-graph-handoff-import-1`, 닫힌 스키마)은 `handoffId`, 운영자가 고정한 `expectedManifestDigest`·`expectedBundleDigest`(둘 다 필수), `operator`입니다(`created_by=operator:<operator>`, AI 검수 revision이 아닙니다). 실행은 ① 설치된 `zoop-ai-handoff export`의 **현재** 결과(저장 파일이 아님)를 받아 canonical hash 두 개를 직접 다시 계산해 핀과 대조하고, 생산자 `validate_bundle`의 Java 이식으로 bundle 전체(닫힌 스키마·참조 폐쇄·`ev-`/`edge-` 공식·개수·content digest)와 manifest 일치를 검증하며, ② bundle이 기록한 **모든 관측**마다 `zoop-ai-ingest export --require-store`를 새로 실행해(같은 registry·같은 S2-1 원장, `store` 권리 포함) 권리·grant·관측 시각·제목·URL·게시 시각을 대조하고, ③ 한 transaction에서 앱 쪽(article version의 제목·URL·게시 시각 정밀도, 앱 텍스트와 export 텍스트의 byte 일치, 회사 ID·이름)을 검증해 불변 스냅샷·receipt 파일, `artifacts`(`graph_snapshot`·`verification_receipt`), `evidence`, `graph_versions`(inactive, `review_revision` 0, `published_at` 없음)를 등록하고 **commit 직전에 ①②를 다시 실행**합니다(권리가 바뀌면 rollback). id는 `gv-`+SHA-256(handoffId)로 결정되며 같은 핀의 재실행은 `unchanged`, 같은 id의 다른 핀은 `version_conflict`입니다.
 
@@ -269,13 +284,50 @@ Swagger `/v3/api-docs`의 위 5개 operation과 목표 정본 [`docs/api/openapi
 
 동시성·재시도 규칙: import의 transaction은 첫 문장으로 회사 카탈로그 테이블 잠금(`LOCK TABLE companies IN SHARE MODE`)을 잡고 commit까지 유지하므로, 한 번 읽은 회사 이름과 "이슈 ID가 카탈로그 회사 ID가 아님" 확인이 commit 시점에도 참입니다. 카탈로그 import도 같은 순서(테이블 잠금 다음 행 잠금)로 잡아 서로를 기다리며 교착하지 않고, 이 대기에는 자체 시간 제한이 없어 상대 transaction이 끝나거나 DB 오류(`database_unavailable`)로 끝납니다. import는 transaction 안에서 사용하는 article 행을 `FOR UPDATE`로 잠그고(`access_status`가 `private`·`deleted`이면 거절) commit 직전 재검사 뒤 같은 잠금 아래에서 상태를 다시 확인하므로, 동시에 들어온 공개 철회는 import의 commit을 기다린 뒤에 적용됩니다. 이미 있는 증거 행은 내용(article·version·텍스트 artifact·인용·구간·locator)과 의미(`input_kind=body`, `offset_unit=unicode_code_point`, 요약 연결 없음, `quote_verified=TRUE`이고 검증 artifact가 graph `verification_receipt`)가 모두 같을 때만 재사용하며 그 밖의 같은 id는 `evidence_collision`입니다(행을 UPDATE로 고치지 않음; 앞선 handoff의 receipt를 검증 artifact로 가진 행은 정상 재사용). 스냅샷의 회사 노드는 bundle이 말하는 `companyId`·`label`만 담고 `brandColor`·`logoUrl`은 선택 외형이므로 카탈로그에서 복사하지도 만들어 내지도 않습니다. 스냅샷 바이트는 검증된 bundle만으로 정해지므로 commit 결과가 불명확했던 시도 뒤의 같은 핀 재시도는 남은 파일을 그대로 채택합니다.
 
+공개 규칙([규칙 문서](../docs/development/issue-133-publication-rules.md) 2-1): 카탈로그 잠금 바로 다음에 켜진 규칙과 `rule_revision`·`review_revision`을 **한 SQL 문장**으로 읽고, 판정 함수(`PublicationRuleEvaluator`)로 거른 snapshot을 저장합니다. 버전 행에는 두 revision과 거른 뒤의 이슈·관계·기사 수를, `graph_version_rules`에는 적용한 규칙을 남깁니다. receipt와 `evidence` 행은 bundle 전체를 그대로 둡니다. 수입은 정기 회차마다 돌므로 publication lock을 잡지 않으며, 읽은 뒤 커밋된 규칙 전환은 다음 회차 버전에 반영됩니다. 같은 핀을 다시 수입하면 지금 켜진 규칙이 아니라 그 버전의 적용 규칙으로 다시 계산해 `unchanged`를 판단합니다. 켜진 규칙(또는 버전의 적용 규칙)의 정의를 읽을 수 없으면 `rule_definition_invalid`로 아무것도 쓰지 않고 실패합니다. migration이 등록한 `single-source@1`·`speculative-issue@1`은 둘 다 꺼진 상태입니다. 결과 파일의 `counts`는 지금처럼 bundle의 수이고, `publicationRules`가 규칙이 한 일을 따로 알립니다: `ruleRevision`·`reviewRevision`, 적용한 규칙(`applied`), 저장된 snapshot의 수(`stored`), 연결 정리까지 포함해 숨긴 이슈·관계 수(`hidden`), 규칙마다 그 조건에 직접 걸린 수(`byRule`)입니다. id와 내용은 넣지 않습니다. `unchanged`이면 그 버전을 처음 수입할 때의 값이고(지금 켜진 규칙이 아님), 규칙 이전에 수입된 버전은 `ruleRevision`이 `null`입니다.
+
 설정은 `application.yml`의 `zoop.graph-handoff-import.*`(요청·결과 파일, `zoop-ai-handoff`·`zoop-ai-ingest` 실행 파일, handoff·relation·extraction·S2-1 상태 디렉터리, **하나의** source registry, 동결에 쓴 canonical·decisions·bindings 파일, artifact root)이며 값이 틀리면 설정 이름만 알리고 기동을 거절합니다. 하위 CLI에는 DB 자격이 전달되지 않습니다. 결과 파일(`0600`, 이미 있으면 덮어쓰지 않음)에는 경로·본문·비밀이 없고 실패 시 프로세스는 0이 아닌 코드로 끝납니다. 스테이징된 스냅샷을 읽으려면 `ZOOP_GRAPH_SNAPSHOT_SOURCE=artifact`와 `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT`(같은 root)를 씁니다. 실제 CLI·PostgreSQL smoke는 `api/scripts/graph_handoff_import_smoke.py`(파이프라인 venv의 Python으로 실행, 사용법은 파일 머리말)이고 PostgreSQL 통합 시험은 `companyIntegrationTest`에 포함됩니다.
+
+### 관리자 HTTP 활성화의 별도 합성 smoke
+
+기존 `graph_handoff_import_smoke.py`의 SQL harness 활성화와 검사들은 그대로 유지합니다. 관리자 HTTP 경로는 다음 **별도 명령**으로 확인합니다. 설치된 pipeline, 기존 API boot jar, JDK 21 이상, OrbStack과 프로젝트의 캐시된 `postgres:16.13-alpine` 이미지가 필요하며, 이 명령은 빌드·설치·이미지 pull을 하지 않습니다.
+
+```sh
+ai/pipeline/.venv/bin/python -m unittest discover -s api/scripts -p test_graph_handoff_activation_smoke.py
+ai/pipeline/.venv/bin/python api/scripts/graph_handoff_activation_smoke.py \
+  --result /tmp/zoop-graph-activation-result.json
+```
+
+결과 경로는 매번 새 파일을 지정합니다. 명령은 자체 Docker bridge·tmpfs PostgreSQL·loopback JVM과 합성 CLI 원장만 만들고 종료 시 자신의 자원만 정리합니다. PostgreSQL 포트는 `127.0.0.1`에만 엽니다. DB 설정·provider 자격·Spring 설정은 상속하지 않으며 AI 클라이언트는 모두 끕니다. 실제 계정이나 로그인 대신 시험 DB의 합성 관리자·세션을 사용하고, 실제 세션 조회로 받은 CSRF 토큰과 관리자 쿠키·Origin으로 요청합니다. 비밀번호 로그인·OAuth·운영자 계정 발급은 이 시험의 증명 범위가 아닙니다.
+
+bundle `-7` 스테이징 뒤, 공개 제외 저장소가 연결된 기본 설정의 JVM에서 현재 권리 철회에 따른 활성화 거절(409)과 활성 포인터·review revision·활성화 이력·감사·멱등 기록의 불변을 확인합니다. 권리를 복구한 뒤 같은 JVM에서 개발용 우회 플래그 없이 실제 관리자 HTTP 활성화, 같은 키 재전송·다른 본문 충돌·오래된 활성 포인터·새 키로 이미 활성인 버전 요청을 검사하고, 같은 버전의 공개 graph·event·정확한 evidence span 및 현재 권리 철회·복구를 확인합니다. 공개 제외 저장소를 읽지 못할 때의 fail-closed 계약은 Java 시험에서 별도로 확인합니다. SQL은 카탈로그·인증 fixture만 준비하며, 양성 HTTP 활성화를 대신하지 않습니다. 기존 fixture seeder의 활성화도 별도로 집계합니다.
+
+마지막 JSON과 `--result`에는 단계별 상태 코드, `importActivationWrites: 0`, `sqlHarnessActivations: 0`, 실제 HTTP 포인터 변경 수, 현재 권리, `modelCalls: 0`, 소스 HEAD·jar hash와 소유 자원 정리 결과를 기록합니다. 실패는 0이 아닌 종료 코드와 실패 JSON으로 남습니다. 이 시험은 앱의 공개 제외 reader가 연결된 기본 설정을 사용하지만 제외 명령의 변경·해제, 실제 기사 권리, 운영 공개 준비 또는 외부 모델 실행을 증명하지 않습니다. `.env`와 운영 기본값은 바꾸지 않습니다.
+
+**bundle 계약 수정 이력:** 최초 실행에서는 `EventDetailService`가 bundle `-5`만 읽어 `-7` 사건 상세가 503 `SOURCE_UNAVAILABLE`로 차단됐습니다. 이후 읽기 소비자가 정확한 `-5`·`-6`·`-7` receipt를 지원하도록 수정했고, 새 수입은 계속 `-7`만 허용합니다. 당시 수정 후 새 jar의 실제 HTTP 28단계가 통과했으며, 공개 제외 저장소 통합 후 위 기본 설정 경로의 재검증과는 별개입니다. 스크립트는 미지원 계약을 성공으로 처리하거나 bundle 버전을 낮추지 않으며, 향후 같은 불일치가 생기면 `blocked`·종료 코드 1로 기록합니다. 로컬 실행 증거와 운영·수령자 확인은 구분합니다.
+
+
+## 공개 제외 명령 (FS081)
+
+`com.zoop.graph.exclusion`은 공개 제외 저장소(`disclosure_exclusion_changes`·`disclosure_exclusion_targets`·`disclosure_exclusion_requests`, ERD 37–39절)에 쓰는 **operator 전용 비웹 실행**입니다(`--spring.main.web-application-type=none`, `ZOOP_DISCLOSURE_EXCLUSION_ENABLED=true`, `ZOOP_DISCLOSURE_EXCLUSION_REQUEST`·`ZOOP_DISCLOSURE_EXCLUSION_RESULT`, receipt를 읽을 `ZOOP_ARTIFACT_ROOT`). HTTP 경로가 없고, artifact 저장소는 읽기만 해서(`readVerified`, 잠금 없음) 정기 수입과 같은 시간에도 실행할 수 있습니다. 결과 파일(`0600`, 이미 있으면 덮어쓰지 않음)에는 결과·`replayed`·revision·버전별 개수만 남고 대상 ID는 남지 않습니다.
+
+요청(`zoop-disclosure-exclusion-1`, 닫힌 스키마)은 둘 중 하나이며, 둘 다 명령 ID `requestId`(`[A-Za-z0-9._:-]{1,200}`)를 가집니다.
+
+- **`exclude`**: `requestId`, `operator`, `reason`, 그리고 `zoop-ai-handoff-exposure`가 출력한 보고서(`zoop-handoff-exposure-1`, 내부 계약 `ExposureReport`)를 `report`에 그대로 넣습니다. 보고서는 닫힌 스키마의 키·타입·null 허용·enum·고정 문장·배열 상한까지 모두 검사하고, 선택한 handoff마다 앱이 수입한 버전(`gv-` + handoffId의 SHA-256)이 있어야 하며 그 버전 receipt의 `handoffId`·manifest·bundle·content digest가 보고서와 같아야 합니다(하나라도 다르면 전체 거절, 아무것도 쓰지 않음). 보고서가 제안한 이슈·관계·근거·기사를 **그 버전에서만** 제외합니다. 이미 제외된 대상은 그대로 두므로 같은 보고서를 다시 넣어도 바뀌는 것이 없습니다(`unchanged`). 관계 오연결(`relation-retraction`)은 기사·근거를 제안할 수 없습니다.
+- **`lift`**: `requestId`, `operator`, `reason`, `graphVersionId`, `expectedRevision`, `targets[{kind, id[, articleVersion]}]`. 제외를 끝내는 유일한 방법입니다. 빈 보고서나 이전보다 작은 보고서로는 해제하지 않습니다. `expectedRevision`은 운영자가 해제를 결정할 때 본 제외 revision이며, 대상 중 하나라도 그 뒤에 바뀌었거나 저장소가 아직 그 revision에 이르지 않았으면 `revision_stale`로 거절합니다.
+
+**재실행.** 결과(`applied`·`unchanged`)에 이른 명령은 변경과 같은 트랜잭션에 `requestId`·요청 SHA-256·결과를 기록합니다. 같은 `requestId`로 다른 요청을 보내면 `request_conflict`이고, 새 결정에는 새 `requestId`를 씁니다.
+
+- **아무것도 쓰지 않은 실패:** `request_invalid`, `report_invalid`, `version_unknown`, `receipt_unavailable`, `receipt_mismatch`, `request_conflict`, `revision_stale`, `database_unavailable`(커밋 전 문장 실패, 롤백됨). 기록도 남지 않으므로, 원인을 고친 뒤 같은 `requestId`로 다시 실행할 수 있습니다.
+- **결과를 알 수 없는 경우:** `outcome_unknown`(커밋 여부 불명), `result_unavailable`, `internal_error`, 그리고 결과 파일이 없거나 비었거나 일부만 있거나 읽을 수 없는 경우. 결과 파일은 DB 커밋이 **끝난 뒤** 쓰므로, `result_unavailable`이나 불완전한 결과 파일은 변경이 이미 커밋됐을 수 있습니다. 이 경우에는 롤백이나 무기록을 가정하지 말고, **같은 `requestId`·같은 본문의 요청 파일**을 새 결과 경로로 다시 실행합니다. 이미 커밋됐으면 기록한 결과를 `replayed: true`로 돌려주고 아무것도 바꾸지 않으며, 커밋되지 않았으면 처음 실행처럼 처리합니다.
+
+변경 하나는 공통 publication lock 아래 한 트랜잭션이며 `revision`은 MAX+1입니다. 공개 조회와 활성화 사전 검사는 잠금 없이 그 버전의 현재 제외를 한 문장으로 읽어 이슈·관계·근거에 적용하며, 저장소를 읽지 못하면 빈 제외로 대신하지 않고 503 `SOURCE_UNAVAILABLE`입니다. 기사 대상은 기록만 하며, 기업 문서 목록·S1·브리핑·채팅·캐시·Neo4j의 제외 반영은 이 범위가 아닙니다.
 
 ## 기본 기업 카탈로그 적재
 
 `src/main/resources/company/demo-companies.json`은 팀이 확정한 24개 기업 목록입니다. `prototype/` 파일이나 DB를 실행 중에 읽지 않습니다. 종목 코드가 없는 OpenAI·Anthropic은 `ORG:OPENAI`, `ORG:ANTHROPIC` ID를 사용하며 `ticker`, `exchange_code`, `market`은 비워 둡니다. `brand_source`는 색상·로고 출처가 확인된 경우에만 넣고, 단순 홈페이지 주소는 `null`로 둡니다. 향후 GraphDB에서도 같은 회사 ID를 써야 합니다.
 
-DB 환경변수(`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`)를 설정하고 API를 시작하면 Flyway migration `V20261014163000__seed_confirmed_companies.sql`이 **최초 한 번** 24개 기업을 적재하고, `V20261015090000__add_company_brand_source.sql`이 내부 출처 컬럼을 추가합니다. 그 다음 앱 시작 시 번들 JSON을 읽어 같은 기업 ID의 값을 갱신합니다. 이후 JSON을 바꿔 다시 시작해도 ID 기준으로 변경된 행만 갱신하며 중복 삽입하지 않습니다. 다른 기업 및 이를 참조하는 분석 기록은 삭제하지 않습니다. PostgreSQL 컨테이너만 시작하면 Flyway와 JSON 적재가 실행되지 않으므로 API도 시작해야 합니다. Spring Boot는 `.env` 파일을 자동으로 읽지 않습니다.
+`DB_URL`·`DB_USERNAME`·`DB_PASSWORD`를 `api/.env` 또는 OS 환경변수로 설정하고 API를 시작하면 Flyway migration `V20261014163000__seed_confirmed_companies.sql`이 **최초 한 번** 24개 기업을 적재하고, `V20261015090000__add_company_brand_source.sql`이 내부 출처 컬럼을 추가합니다. 그 다음 앱 시작 시 번들 JSON을 읽어 같은 기업 ID의 값을 갱신합니다. 이후 JSON을 바꿔 다시 시작해도 ID 기준으로 변경된 행만 갱신하며 중복 삽입하지 않습니다. 다른 기업 및 이를 참조하는 분석 기록은 삭제하지 않습니다. PostgreSQL 컨테이너만 시작하면 Flyway와 JSON 적재가 실행되지 않으므로 API도 시작해야 합니다. `api/.env`를 사용한다면 `api` 디렉터리에서 앱을 실행하세요.
 
 카탈로그 JSON을 수정해 로컬 DB에 다시 반영할 때에만 `api` 디렉터리에서 명시적 적재 명령을 사용합니다.
 
@@ -283,7 +335,7 @@ DB 환경변수(`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`)를 설정하고 API를 �
 .\gradlew.bat bootRun --args="--spring.profiles.active=catalog-import --spring.main.web-application-type=none --zoop.catalog.import-file=src/main/resources/company/demo-companies.json"
 ```
 
-이 수동 명령은 입력 전체를 검증한 뒤 확정 목록을 `companies`에 삽입하거나 같은 ID의 이름·종목 코드·거래소·별칭·브랜드 색상·로고 경로·내부 출처(`brand_source`)를 갱신합니다. `brand_source`의 `null`은 기존 출처를 비우며, 생략하면 기존 값을 보존합니다. 다른 기업은 삭제하지 않습니다. 항목에 `market`(상장사만)이나 `profile`(`legalName`·`representative`·`foundedDate`·`websiteUrl`·`sector`만 허용, `foundedDate`는 `YYYY-MM-DD`, `websiteUrl`은 `https://`)이 있으면 그 값으로 바꾸고, 키를 생략하면 기존 값을 보존합니다. `profile` 안의 `null`은 저장하지 않아 API에서 `null`로 나옵니다. `"profile": null`은 프로필 전체를 비웁니다(`market`·`brand_source`의 `null`과 같음). 값은 공식 자료(KIND 기업개요, SEC 연차보고서, 각 사 공식 사이트)로 확인된 것만 넣고 추정하지 않습니다. 해외 기업 설립일(15곳 중 13곳)의 출처와 창립·법인 설립 기준은 [설립일 근거](docs/company-founded-date-sources.md)에 기록했습니다. OpenAI·Anthropic의 `market`은 항상 NULL입니다. 재실행 시 동일한 행은 쓰지 않아 `company_catalog_revision`도 바뀌지 않습니다. 완료 로그의 `total`, `changed`, `unchanged`로 결과를 확인하세요. 기존 Flyway migration은 수정하지 않습니다. 일부 SVG는 프론트엔드가 같은 이름으로 `web/public/graph-assets`에 추가할 예정입니다.
+이 수동 명령은 입력 전체를 검증한 뒤 확정 목록을 `companies`에 삽입하거나 같은 ID의 이름·종목 코드·거래소·별칭·브랜드 색상·로고 경로·내부 출처(`brand_source`)를 갱신합니다. `brand_source`의 `null`은 기존 출처를 비우며, 생략하면 기존 값을 보존합니다. 다른 기업은 삭제하지 않습니다. 항목에 `market`(상장사만)이나 `profile`(`legalName`·`representative`·`foundedDate`·`websiteUrl`·`sector`·`businessSummary`만 허용, `foundedDate`는 `YYYY-MM-DD`, `websiteUrl`은 `https://`, `businessSummary`는 600자 이하이며 챗봇이 기업 개요 인용으로 쓴다)이 있으면 그 값으로 바꾸고, 키를 생략하면 기존 값을 보존합니다. `profile` 안의 `null`은 저장하지 않아 API에서 `null`로 나옵니다. `"profile": null`은 프로필 전체를 비웁니다(`market`·`brand_source`의 `null`과 같음). 값은 공식 자료(KIND 기업개요, SEC 연차보고서, 각 사 공식 사이트)로 확인된 것만 넣고 추정하지 않습니다. 해외 기업 설립일(15곳 중 13곳)의 출처와 창립·법인 설립 기준은 [설립일 근거](docs/company-founded-date-sources.md)에 기록했습니다. OpenAI·Anthropic의 `market`은 항상 NULL입니다. 재실행 시 동일한 행은 쓰지 않아 `company_catalog_revision`도 바뀌지 않습니다. 완료 로그의 `total`, `changed`, `unchanged`로 결과를 확인하세요. 기존 Flyway migration은 수정하지 않습니다. 일부 SVG는 프론트엔드가 같은 이름으로 `web/public/graph-assets`에 추가할 예정입니다.
 
 ```sql
 SELECT count(*) FROM companies;

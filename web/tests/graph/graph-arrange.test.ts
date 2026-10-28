@@ -6,6 +6,7 @@ import {
   focusRings,
 } from '@/components/graph/graph-arrange';
 import { toG6Data } from '@/components/graph/graph-model';
+import { styleGraph } from '@/components/graph/graph-appearance';
 import type { GraphResponse } from '@/types/map/graph';
 
 // D-GRP-07b 포커스 모드·D-GRP-01 [흐름 순으로 정렬]의 배치. 합성 mock 그래프.
@@ -132,4 +133,61 @@ test('흐름 순 정렬: 사건과 이어지지 않은 기업은 연결된 노�
     expect(Number(n.style?.x)).toBeGreaterThan(rightmostConnected),
   );
   expect(new Set(loose.map((n) => n.style?.x)).size).toBeGreaterThan(1);
+});
+
+test('flow order keeps styled (enlarged) company nodes and their labels apart in each column', () => {
+  // Review #321: 5 events each tied to the same 6 companies at height 600. The improved
+  // appearance enlarges companies by 15%, so the fixed 88 row gap alone would overlap them.
+  const base = graph();
+  const companies = base.nodes.filter((n) => n.kind === 'company').slice(0, 6);
+  const issues = base.nodes.filter((n) => n.kind === 'issue').slice(0, 5);
+  const template = base.edges.find((e) => e.relationType === 'INVOLVES')!;
+  const data: GraphResponse = {
+    ...base,
+    nodes: [...companies, ...issues],
+    edges: issues.flatMap((issue) =>
+      companies.map((company) => ({
+        ...template,
+        id: `${issue.id}->${company.id}`,
+        source: issue.id,
+        target: company.id,
+        relationType: 'INVOLVES' as const,
+        derived: false,
+        via: [],
+      })),
+    ),
+  };
+  const width = 1245;
+  const height = 600;
+  const styled = styleGraph(toG6Data(data, width, height), {
+    variant: 'improved',
+    theme: 'light',
+  });
+  const arranged = arrangeFlow(styled, data, width, height);
+  const columns = new Map<number, typeof arranged>();
+  for (const node of arranged)
+    columns.set(Number(node.style?.x), [
+      ...(columns.get(Number(node.style?.x)) ?? []),
+      node,
+    ]);
+  const companyColumn = [...columns.values()].find((column) =>
+    column.some((node) => node.id === companies[0].id),
+  )!;
+  expect(companyColumn).toHaveLength(6);
+  const radius = (node: (typeof arranged)[number]) =>
+    Number(node.style?.size) / 2;
+  const sorted = [...companyColumn].sort(
+    (a, b) => Number(a.style?.y) - Number(b.style?.y),
+  );
+  // The styled diameter is larger than the old 88 minimum gap.
+  expect(2 * radius(sorted[0])).toBeGreaterThan(88);
+  for (let i = 1; i < sorted.length; i += 1) {
+    const upper = sorted[i - 1];
+    const label =
+      Number(upper.style?.labelFontSize ?? 0) * 1.4 +
+      Math.abs(Number(upper.style?.labelOffsetY ?? 0));
+    expect(
+      Number(sorted[i].style?.y) - Number(upper.style?.y),
+    ).toBeGreaterThanOrEqual(radius(upper) + label + radius(sorted[i]));
+  }
 });

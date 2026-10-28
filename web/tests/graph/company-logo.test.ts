@@ -42,7 +42,7 @@ it('D-GRP-01 renders logos even when the API supplies null', () => {
   expect(samsung?.style?.iconRadius).toBe(
     Number(samsung?.style?.iconWidth) / 2,
   );
-  expect(samsung?.style?.labelFontSize).toBe(17.2);
+  expect(samsung?.style?.labelFontSize).toBe(19);
   expect(
     result.nodes?.find((node) => node.id === 'KRX:006400')?.style?.iconSrc,
   ).toBe('/graph-assets/samsung.svg');
@@ -94,7 +94,9 @@ it.each([
         );
         expect(node?.style?.iconSrc).toBeUndefined();
         expect(node?.style?.iconText).toBe('새');
-        expect(node?.style?.fill).toBe(paper);
+        expect(node?.style?.fill).toBe(
+          variant === 'improved' && theme === 'dark' ? '#262626' : paper,
+        );
         expect(node?.style?.iconFill).toBe(ink);
         expect(node?.style?.fill).not.toBe(node?.style?.iconFill);
       }

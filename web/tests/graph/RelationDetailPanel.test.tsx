@@ -85,6 +85,90 @@ describe('D-GRP-04 · relation rail states', () => {
     );
     expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
   });
+  it('keeps the base relation on a partial 200 and retries structural details in the same context', async () => {
+    const partial = createMockRelation(edge.id);
+    const structuralUnavailable: RelationDetail = {
+      ...partial,
+      relationType: 'STRUCTURALLY_RELATED_TO',
+      source: { ...partial.source, kind: 'issue' },
+      target: { ...partial.target, kind: 'company' },
+      structuralDetails: {
+        status: 'unavailable',
+        reason: 'details_not_available',
+        paths: [],
+      },
+      metadata: {
+        ...partial.metadata,
+        partial: true,
+        failures: [
+          {
+            section: 'structuralDetails',
+            code: 'SOURCE_UNAVAILABLE',
+            message: '구조 상세 원천을 일시적으로 읽지 못했습니다.',
+            retryable: true,
+            asOf: partial.metadata.asOf,
+          },
+        ],
+      },
+    };
+    const available: RelationDetail = {
+      ...structuralUnavailable,
+      structuralDetails: {
+        status: 'available',
+        reason: null,
+        paths: [
+          {
+            relationId: 'supply-path',
+            companies: [
+              { id: partial.source.id, label: partial.source.label },
+              { id: partial.target.id, label: partial.target.label },
+            ],
+            links: [
+              {
+                basisId: 'supply-basis',
+                relationType: 'SUPPLIES',
+                supplierCompanyId: partial.target.id,
+                customerCompanyId: partial.source.id,
+                businessScope: null,
+                productScope: null,
+                validFrom: null,
+                validUntil: null,
+                validity: 'active',
+                verifiedAt: partial.metadata.asOf,
+                countries: [],
+                evidenceIds: ['supply-evidence'],
+              },
+            ],
+          },
+        ],
+      },
+      metadata: {
+        ...structuralUnavailable.metadata,
+        partial: false,
+        failures: [],
+      },
+    };
+    const context = { graphVersion: 'graph-1', asOf: '2026-10-20T00:00:00Z' };
+    mocked
+      .mockResolvedValueOnce(structuralUnavailable)
+      .mockResolvedValueOnce(available);
+    render(
+      <RelationDetailPanel {...props} id="structural-edge" context={context} />,
+    );
+
+    expect(await screen.findByText('구조적 관련')).toBeTruthy();
+    expect(
+      screen.getByText('구조 상세 원천을 일시적으로 읽지 못했습니다.'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('현재 표시할 수 있는 사업 관계 상세 정보가 없습니다.'),
+    ).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(
+      await screen.findByRole('button', { name: '공급 관계 근거 1건 보기' }),
+    ).toBeTruthy();
+    expect(mocked).toHaveBeenNthCalledWith(2, 'structural-edge', context);
+  });
   it.each(['empty', 'no-evidence'] as const)(
     'shows %s without fabricating actionable evidence',
     async (scenario) => {

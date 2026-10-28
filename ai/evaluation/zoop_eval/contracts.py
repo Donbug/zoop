@@ -19,6 +19,63 @@ SCHEMA_VERIFY_GOLD = "zoop-verify-gold-1"
 SCHEMA_VERIFY_RUN = "zoop-verify-run-1"
 SCHEMA_VERIFY_SCORE = "zoop-verify-score-1"
 SCHEMA_VERIFY_LOOPBACK = "zoop-verify-loopback-script-1"
+SCHEMA_SUMMARY_VERIFY_CASES = "zoop-summary-verify-cases-1"
+SCHEMA_SUMMARY_VERIFY_GOLD = "zoop-summary-verify-gold-1"
+SCHEMA_SUMMARY_VERIFY_RUN = "zoop-summary-verify-run-1"
+SCHEMA_SUMMARY_VERIFY_SCORE = "zoop-summary-verify-score-1"
+SCHEMA_SUMMARY_VERIFY_LOOPBACK = "zoop-summary-verify-loopback-script-1"
+
+# External development materials are conversion artifacts, never scorer run families.
+SCHEMA_MATERIAL_INPUTS = "zoop-eval-material-inputs-1"
+SCHEMA_MATERIAL_GOLD = "zoop-eval-material-gold-1"
+SCHEMA_MATERIAL_VALIDATION = "zoop-eval-material-validation-1"
+MATERIAL_ARTIFACT_FIELDS = {
+    SCHEMA_MATERIAL_INPUTS: ("schema", "ok", "materialsId", "dataset", "status", "validationScope",
+                            "provenance", "limits", "normalization", "contexts", "cases", "choices"),
+    SCHEMA_MATERIAL_GOLD: ("schema", "ok", "materialsId", "dataset", "status", "validationScope",
+                          "provenance", "limits", "inputsSha256", "annotationStatus", "cases"),
+    SCHEMA_MATERIAL_VALIDATION: ("schema", "ok", "materialsId", "status", "validationScope",
+                                "provenance", "limits", "counts", "inputsSha256"),
+}
+MATERIAL_OBJECT_FIELDS = {
+    "provenance": ("manifestSha256", "collectedAt", "purpose", "collectionExecution",
+                   "collectionLimitations", "sources", "verifiedFiles"),
+    "normalization": ("split", "selection", "method", "modifications"),
+    "context": ("tableUid", "table", "paragraphs"),
+    "paragraph": ("uid", "order", "text"),
+    "entity": ("text", "type", "span"),
+    "span": ("start", "end", "unit", "endExclusive"),
+}
+MATERIAL_CASE_FIELDS = {
+    (SCHEMA_MATERIAL_INPUTS, "klue-re"): ("guid", "sentence", "source", "subjectEntity", "objectEntity"),
+    (SCHEMA_MATERIAL_INPUTS, "tatqa"): ("uid", "order", "question", "contextId"),
+    (SCHEMA_MATERIAL_GOLD, "klue-re"): ("guid", "labelId", "label"),
+    (SCHEMA_MATERIAL_GOLD, "tatqa"): ("uid", "contextId", "answer", "answer_type", "answer_from",
+                                    "scale", "derivation", "req_comparison", "rel_paragraphs", "paragraphIds"),
+}
+
+# Retrieval diagnostics have their own closed family; never graph/QA answer runs.
+SCHEMA_MATERIAL_RETRIEVAL_RUN = "zoop-eval-material-retrieval-run-1"
+SCHEMA_MATERIAL_RETRIEVAL_SCORE = "zoop-eval-material-retrieval-score-1"
+MATERIAL_RETRIEVAL_RUN_FIELDS = (
+    "schema", "ok", "materialsId", "dataset", "status", "finalized", "inputsSha256",
+    "provenance", "normalization", "limits", "algorithm", "config", "measurement",
+    "queryIds", "candidatePools", "records",
+)
+MATERIAL_RETRIEVAL_RECORD_FIELDS = ("queryId", "contextId", "status", "ranking", "elapsedNs", "error")
+
+# Public KLUE RE ClassLabel order, not learned from the selected gold rows.
+# https://github.com/KLUE-benchmark/KLUE/wiki/KLUE-RE-dataset-description
+# https://huggingface.co/datasets/klue/klue (configuration re, label feature)
+KLUE_RE_LABELS = (
+    "no_relation", "org:dissolved", "org:founded", "org:place_of_headquarters",
+    "org:alternate_names", "org:member_of", "org:members", "org:political/religious_affiliation",
+    "org:product", "org:founded_by", "org:top_members/employees", "org:number_of_employees/members",
+    "per:date_of_birth", "per:date_of_death", "per:place_of_birth", "per:place_of_death",
+    "per:place_of_residence", "per:origin", "per:employee_of", "per:schools_attended",
+    "per:alternate_names", "per:parents", "per:children", "per:siblings", "per:spouse",
+    "per:other_family", "per:colleagues", "per:product", "per:religion", "per:title",
+)
 
 SPLITS = ("dev", "test")
 TASK_KINDS = ("graph", "qa")
@@ -65,9 +122,10 @@ def _no_constants(name: str):
     reject("json_non_finite", f"non-finite JSON constant {name}")
 
 
-def parse_json(raw: bytes | str, where: str) -> Any:
+def parse_json(raw: bytes | str, where: str, *, parse_float=float) -> Any:
     try:
-        return json.loads(raw, object_pairs_hook=_no_duplicate_keys, parse_constant=_no_constants)
+        return json.loads(raw, object_pairs_hook=_no_duplicate_keys, parse_constant=_no_constants,
+                          parse_float=parse_float)
     except json.JSONDecodeError as exc:
         reject("json_invalid", f"{where}: {exc}")
 

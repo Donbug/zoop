@@ -199,6 +199,21 @@ def java_command(explicit):
     return command
 
 
+def frontend_environment(env, api):
+    # An explicit empty value overrides Vite's .env files as well as inherited shell values.
+    return {**env, 'ZOOP_DEV_API_TARGET': api, 'VITE_API_BASE_URL': '',
+            'ZOOP_DEV_HTTPS_CERT': '', 'ZOOP_DEV_HTTPS_KEY': ''}
+
+
+def cleanup_owned_container(docker, name, ownership):
+    try:
+        actual = docker('inspect', '--format', '{{index .Config.Labels "' + LABEL + '.owner"}}', name)
+    except (DemoError, subprocess.SubprocessError):
+        return  # The create may have failed before a container existed.
+    if actual == ownership:
+        docker('rm', '-f', '-v', name)
+
+
 def run(args):
     index, files = validate(Path(args.data).resolve())
     if args.check:
@@ -226,7 +241,7 @@ def run(args):
     name = 'zoop-briefing-team-' + secrets.token_hex(5)
     password, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
     children = []
-    created = False
+    ownership = secrets.token_hex(16)
     with tempfile.TemporaryDirectory(prefix='zoop-briefing-team-') as directory:
         work = Path(directory).resolve()
         try:
@@ -239,11 +254,10 @@ def run(args):
                         parent.mkdir(mode=0o700, exist_ok=True)
                     target.write_bytes(raw)
                     target.chmod(0o600)
-            docker('run', '-d', '--pull', 'never', '--name', name, '--label', LABEL + '=1',
+            docker('run', '-d', '--pull', 'never', '--name', name, '--label', LABEL + '=1', '--label', LABEL + '.owner=' + ownership,
                    '--tmpfs', '/var/lib/postgresql/data', '-e', 'POSTGRES_DB=' + DATABASE,
                    '-e', 'POSTGRES_USER=' + USER, '-e', 'POSTGRES_PASSWORD', '-p', '127.0.0.1::5432', args.image,
                    env={**env, 'POSTGRES_PASSWORD': password})
-            created = True
             mapped = docker('port', name, '5432/tcp')
             db_port = next(line.rsplit(':', 1)[1] for line in mapped.splitlines() if line.startswith('127.0.0.1:'))
             for _ in range(100):
@@ -291,7 +305,7 @@ def run(args):
                       'apiUrl': api, 'briefingUrl': web + '/briefing?date=2026-10-22&edition=evening&reading=compact'}
             if not args.api_only:
                 with (work / 'web.log').open('w') as log:
-                    webenv = {**env, 'ZOOP_DEV_API_TARGET': api, 'ZOOP_DEV_HTTPS_CERT': '', 'ZOOP_DEV_HTTPS_KEY': ''}
+                    webenv = frontend_environment(env, api)
                     frontend = subprocess.Popen([node, str(vite), '--host', '127.0.0.1', '--port', str(web_port), '--strictPort'],
                                                 cwd=ROOT / 'web', env=webenv, stdout=log, stderr=subprocess.STDOUT)
                 children.append(frontend)
@@ -331,8 +345,7 @@ def run(args):
                     except subprocess.TimeoutExpired:
                         child.kill()
                         child.wait(timeout=5)
-            if created:
-                docker('rm', '-f', '-v', name)
+            cleanup_owned_container(docker, name, ownership)
 
 
 def parser():

@@ -8,8 +8,9 @@ from __future__ import annotations
 import re
 from datetime import date, datetime
 from typing import Literal
+from urllib.parse import urlsplit
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_serializer, model_validator
 
 from .ingestion_contracts import MAX_RAW, Declared, Published, Wire
 
@@ -25,6 +26,7 @@ _LOCAL = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?$")
 class Policy(Wire):
     schema_version: Literal["zoop-collection-policy-1"]
     user_agent: str = Field(min_length=1, max_length=200)
+    contact_url: str | None = Field(default=None, min_length=1, max_length=1000)
     timeout_seconds: int = Field(ge=1, le=300)
     max_total_seconds: int = Field(ge=1, le=3600)
     max_redirects: int = Field(ge=0, le=5)
@@ -43,10 +45,42 @@ class Policy(Wire):
             raise ValueError("user agent must be printable ASCII")
         return value
 
+    @field_validator("contact_url")
+    @classmethod
+    def contact_page(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        if any(not 0x21 <= ord(c) <= 0x7E or c in "()<>\\\"" for c in value):
+            raise ValueError("contact URL must be ASCII and safe inside a user-agent comment")
+        parsed = urlsplit(value)
+        if (parsed.scheme != "https" or parsed.username is not None or parsed.password is not None
+                or parsed.port not in (None, 443) or not parsed.hostname
+                or not re.fullmatch(r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}", parsed.hostname)
+                or parsed.hostname.lower().endswith((".localhost", ".local", ".internal", ".test", ".invalid", ".example", ".onion"))):
+            raise ValueError("contact URL must name a public HTTPS page without credentials")
+        return value
+
+    @model_serializer(mode="wrap")
+    def _without_unspecified_contact(self, handler):
+        # Also applies when nested in a corpus config; no older nullable policy/request fields are changed.
+        dumped = handler(self)
+        if self.contact_url is None:
+            dumped.pop("contactUrl" if "contactUrl" in dumped else "contact_url", None)
+        return dumped
+
+    @property
+    def effective_user_agent(self) -> str:
+        return self.user_agent if self.contact_url is None else f"{self.user_agent} (+{self.contact_url})"
+
     @model_validator(mode="after")
     def ordered(self):
         if self.max_response_bytes > self.max_total_bytes or self.timeout_seconds > self.max_total_seconds:
             raise ValueError("per-item limits exceed the run limits")
+        if self.contact_url is not None:
+            if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*/[A-Za-z0-9][A-Za-z0-9_.-]*", self.user_agent):
+                raise ValueError("contact requires the existing bare product/version, not a browser or another comment")
+            if len(self.effective_user_agent) > 200:
+                raise ValueError("effective user agent exceeds 200 ASCII characters")
         return self
 
 

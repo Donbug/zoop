@@ -16,7 +16,8 @@ public class JdbcAnalysisJobRepository {
     private static final String COLUMNS = """
             id, kind, scope, label, status, reason, requested_by, requested_at, started_at, finished_at, retry_of,
             command_key, input::text AS input, cancel_requested, recovered, report::text AS report, ingest::text AS ingest,
-            flush::text AS flush, error::text AS error, ledger_before::text AS ledger_before, ledger_after::text AS ledger_after
+            flush::text AS flush, error::text AS error, ledger_before::text AS ledger_before, ledger_after::text AS ledger_after,
+            plan_id, checkpoint::text AS checkpoint
             """;
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -28,7 +29,7 @@ public class JdbcAnalysisJobRepository {
     public record JobRow(String id, String kind, String scope, String label, String status, String reason, String requestedBy,
             Instant requestedAt, Instant startedAt, Instant finishedAt, String retryOf, String commandKey, String input,
             boolean cancelRequested, boolean recovered, String report, String ingest, String flush, String error,
-            String ledgerBefore, String ledgerAfter) {
+            String ledgerBefore, String ledgerAfter, String planId, String checkpoint) {
     }
 
     public record IdempotencyRow(String id, String requestHash, String status, Integer responseStatus, String responseBody) {
@@ -57,6 +58,51 @@ public class JdbcAnalysisJobRepository {
     public Optional<JobRow> running() {
         return jdbc.query("SELECT " + COLUMNS + " FROM analysis_jobs WHERE scope = 'admin' AND status = 'running'",
                 JdbcAnalysisJobRepository::row).stream().findFirst();
+    }
+
+    public record DashboardCounts(long running, long queued, long failed24h) { }
+
+    public DashboardCounts dashboardCountsAt(Instant asOf) {
+        return jdbc.queryForObject("""
+                SELECT count(*) FILTER (WHERE status = 'running') AS running,
+                       count(*) FILTER (WHERE status = 'queued') AS queued,
+                       count(*) FILTER (WHERE status = 'failed'
+                           AND finished_at >= :start AND finished_at < :asOf) AS failed24h
+                FROM analysis_jobs
+                WHERE scope = 'admin' AND requested_at <= :asOf
+                """, new MapSqlParameterSource("asOf", Timestamp.from(asOf))
+                .addValue("start", Timestamp.from(asOf.minusSeconds(86_400))),
+                (rs, rowNum) -> new DashboardCounts(rs.getLong("running"), rs.getLong("queued"),
+                        rs.getLong("failed24h")));
+    }
+
+    public List<JobRow> dashboardRecentAt(Instant asOf, int limit) {
+        return jdbc.query("SELECT " + COLUMNS + """
+                 FROM analysis_jobs
+                WHERE scope = 'admin' AND requested_at <= :asOf
+                ORDER BY requested_at DESC, id DESC
+                LIMIT :limit
+                """, new MapSqlParameterSource("asOf", Timestamp.from(asOf)).addValue("limit", limit),
+                JdbcAnalysisJobRepository::row);
+    }
+
+    public Optional<JobRow> dashboardRunningAt(Instant asOf) {
+        return jdbc.query("SELECT " + COLUMNS + """
+                 FROM analysis_jobs
+                WHERE scope = 'admin' AND status = 'running' AND requested_at <= :asOf
+                """, new MapSqlParameterSource("asOf", Timestamp.from(asOf)),
+                JdbcAnalysisJobRepository::row).stream().findFirst();
+    }
+
+    /** The newest administrator job that failed by {@code asOf}. */
+    public Optional<JobRow> latestFailedAt(Instant asOf) {
+        return jdbc.query("SELECT " + COLUMNS + """
+                 FROM analysis_jobs
+                WHERE scope = 'admin' AND status = 'failed' AND finished_at <= :asOf
+                ORDER BY finished_at DESC, id DESC
+                LIMIT 1
+                """, new MapSqlParameterSource("asOf", Timestamp.from(asOf)), JdbcAnalysisJobRepository::row)
+                .stream().findFirst();
     }
 
     /** The newest administrator ingest that finished normally: the next run's baseline. */
@@ -96,16 +142,23 @@ public class JdbcAnalysisJobRepository {
     }
 
     public void insertQueued(String id, String kind, String label, String reason, String requestedBy, Instant requestedAt,
-            String retryOf, String commandKey, String input) {
+            String retryOf, String commandKey, String input, String planId) {
         jdbc.update("""
                 INSERT INTO analysis_jobs
-                  (id, kind, scope, label, status, reason, requested_by, requested_at, retry_of, command_key, input)
+                  (id, kind, scope, label, status, reason, requested_by, requested_at, retry_of, command_key, input, plan_id,
+                   checkpoint)
                 VALUES (:id, :kind, 'admin', :label, 'queued', :reason, :requestedBy, :requestedAt, :retryOf, :commandKey,
-                        CAST(:input AS jsonb))
+                        CAST(:input AS jsonb), :planId, CASE WHEN :kind = 'analyze_plan' THEN
+                        '{"schemaVersion":"zoop-app-analyze-plan-checkpoint-1","phase":"awaiting_admission","activeOrdinal":null,"terminalSummary":null,"lastFailureCategory":null}'::jsonb ELSE NULL END)
                 """, new MapSqlParameterSource("id", id).addValue("kind", kind).addValue("label", label)
                 .addValue("reason", reason).addValue("requestedBy", requestedBy)
                 .addValue("requestedAt", Timestamp.from(requestedAt)).addValue("retryOf", retryOf)
-                .addValue("commandKey", commandKey).addValue("input", input));
+                .addValue("commandKey", commandKey).addValue("input", input).addValue("planId", planId));
+    }
+
+    public Optional<JobRow> rootForCommand(String commandKey) {
+        return jdbc.query("SELECT " + COLUMNS + " FROM analysis_jobs WHERE scope = 'admin' AND command_key = :key",
+                new MapSqlParameterSource("key", commandKey), JdbcAnalysisJobRepository::row).stream().findFirst();
     }
 
     /** A queued job never ran: it ends cancelled at once. */
@@ -172,7 +225,7 @@ public class JdbcAnalysisJobRepository {
                 instant(rs, "started_at"), instant(rs, "finished_at"), rs.getString("retry_of"), rs.getString("command_key"),
                 rs.getString("input"), rs.getBoolean("cancel_requested"), rs.getBoolean("recovered"), rs.getString("report"),
                 rs.getString("ingest"), rs.getString("flush"), rs.getString("error"), rs.getString("ledger_before"),
-                rs.getString("ledger_after"));
+                rs.getString("ledger_after"), rs.getString("plan_id"), rs.getString("checkpoint"));
     }
 
     private static Instant instant(ResultSet rs, String column) throws SQLException {

@@ -5,8 +5,10 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -21,7 +23,8 @@ import org.springframework.stereotype.Repository;
  * The JDBC statements of {@link GraphHandoffRepository}. Evidence is WRITTEN by the document analysis repository, so a graph
  * evidence row is exactly the row shape and the verification convention of the existing evidence table; it is READ by a statement
  * of its own that returns every column deciding sameness (the analysis read leaves out the kind, the unit, the summary link and
- * the verification flag). The version insert never touches {@code active}, {@code graph_activations} or {@code published_at}.
+ * the verification flag). The version insert never touches {@code active}, {@code graph_activations} or {@code published_at}, and
+ * nothing here takes the publication lock.
  */
 @Repository
 public class JdbcGraphHandoffRepository implements GraphHandoffRepository {
@@ -38,16 +41,34 @@ public class JdbcGraphHandoffRepository implements GraphHandoffRepository {
             WHERE e.id = :id
             """;
     private static final String FIND_VERSION = """
-            SELECT id, kind, active, snapshot_artifact_id, created_by
+            SELECT id, kind, active, snapshot_artifact_id, created_by, rule_revision, review_revision
             FROM graph_versions
             WHERE id = :id
             """;
     private static final String INSERT_VERSION = """
             INSERT INTO graph_versions (id, sequence, kind, created_at, created_by, reason, source_label, policy_version,
-                issue_count, relation_count, article_count, snapshot_artifact_id, review_revision, active)
+                issue_count, relation_count, article_count, snapshot_artifact_id, review_revision, rule_revision, active)
             VALUES (:id, (SELECT COALESCE(MAX(sequence), 0) + 1 FROM graph_versions), 'snapshot', :createdAt, :createdBy,
-                :reason, :sourceLabel, :policyVersion, :issues, :relations, :articles, :artifactId, 0, false)
+                :reason, :sourceLabel, :policyVersion, :issues, :relations, :articles, :artifactId, :reviewRevision,
+                :ruleRevision, false)
             """;
+    // ONE statement (see GraphHandoffRepository#publicationState): the two counters and the enabled rules come from the same
+    // snapshot. The cross join keeps a row when no rule is enabled (id and definition NULL).
+    private static final String PUBLICATION_STATE = """
+            SELECT s.rule_revision, s.review_revision, r.id, r.definition::text AS definition
+            FROM (SELECT (SELECT COALESCE(MAX(log_revision), 0) FROM publication_rule_changes) AS rule_revision,
+                         (SELECT COALESCE(MAX(global_revision), 0) FROM review_decisions) AS review_revision) s
+            LEFT JOIN publication_rules r ON r.enabled
+            ORDER BY r.id
+            """;
+    private static final String VERSION_RULES = """
+            SELECT r.id, r.definition::text AS definition
+            FROM graph_version_rules v JOIN publication_rules r ON r.id = v.rule_id
+            WHERE v.graph_version_id = :id
+            ORDER BY r.id
+            """;
+    private static final String INSERT_VERSION_RULE =
+            "INSERT INTO graph_version_rules (graph_version_id, rule_id) VALUES (:id, :ruleId)";
 
     private final NamedParameterJdbcTemplate jdbc;
     private final DocumentAnalysisRepository analysis;
@@ -103,7 +124,29 @@ public class JdbcGraphHandoffRepository implements GraphHandoffRepository {
     public Optional<StagedVersion> findVersion(String id) {
         return jdbc.query(FIND_VERSION, new MapSqlParameterSource("id", id), (result, index) -> new StagedVersion(
                 result.getString("id"), result.getString("kind"), result.getBoolean("active"),
-                result.getString("snapshot_artifact_id"), result.getString("created_by"))).stream().findFirst();
+                result.getString("snapshot_artifact_id"), result.getString("created_by"),
+                result.getObject("rule_revision", Long.class), result.getLong("review_revision"))).stream().findFirst();
+    }
+
+    @Override
+    public PublicationState publicationState() {
+        long[] revisions = new long[2];
+        List<RuleRow> rules = new ArrayList<>();
+        jdbc.query(PUBLICATION_STATE, result -> {
+            revisions[0] = result.getLong("rule_revision");
+            revisions[1] = result.getLong("review_revision");
+            String id = result.getString("id");
+            if (id != null) {
+                rules.add(new RuleRow(id, result.getString("definition")));
+            }
+        });
+        return new PublicationState(revisions[0], revisions[1], rules);
+    }
+
+    @Override
+    public List<RuleRow> versionRules(String versionId) {
+        return jdbc.query(VERSION_RULES, new MapSqlParameterSource("id", versionId),
+                (result, index) -> new RuleRow(result.getString("id"), result.getString("definition")));
     }
 
     @Override
@@ -118,7 +161,12 @@ public class JdbcGraphHandoffRepository implements GraphHandoffRepository {
                 .addValue("issues", version.issueCount())
                 .addValue("relations", version.relationCount())
                 .addValue("articles", version.articleCount())
-                .addValue("artifactId", version.snapshotArtifactId()));
+                .addValue("artifactId", version.snapshotArtifactId())
+                .addValue("reviewRevision", version.reviewRevision())
+                .addValue("ruleRevision", version.ruleRevision()));
+        for (String ruleId : version.ruleIds()) {
+            jdbc.update(INSERT_VERSION_RULE, new MapSqlParameterSource("id", version.id()).addValue("ruleId", ruleId));
+        }
     }
 
     private static Instant instant(ResultSet result, String column) throws SQLException {

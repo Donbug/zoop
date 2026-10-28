@@ -1,3 +1,4 @@
+import { useAdminRefresh } from '@/hooks/useAdminRefresh';
 import { getInsightsOverview } from '@/apis/admin/insights';
 import {
   ErrorBox,
@@ -16,6 +17,7 @@ import { useAsyncData } from '@/hooks/useAsyncData';
 // A-ADM-01 이용·선호도(7일) (FS072, getInsightsOverview). 대시보드 조회와 따로 실패·재시도한다.
 export default function InsightsOverviewSection() {
   const overview = useAsyncData(getInsightsOverview);
+  useAdminRefresh(overview.reload, 10000);
   const data = overview.data;
 
   return (
@@ -27,6 +29,11 @@ export default function InsightsOverviewSection() {
         { to: '/admin/members', label: '회원 관리' },
       ]}
     >
+      {overview.refreshError && (
+        <p role="status" className="text-[11px] text-zoop-muted">
+          새로 고치지 못했어요. 이전 결과를 표시해요.
+        </p>
+      )}
       {overview.status === 'loading' && (
         <Loading>이용 통계를 불러오고 있어요</Loading>
       )}
@@ -39,18 +46,20 @@ export default function InsightsOverviewSection() {
       )}
       {data && (
         <dl className="grid grid-cols-2 gap-x-6 gap-y-5 py-2 md:grid-cols-3 lg:grid-cols-6">
-          {data.metrics.map((metric) => (
-            <Metric
-              key={metric.key}
-              label={metric.label}
-              value={<MetricValue metric={metric} />}
-              detail={
-                metric.kind === 'ratio' ? (
-                  <MetricBasis metric={metric} minSample={data.minSample} />
-                ) : undefined
-              }
-            />
-          ))}
+          {data.metrics
+            .filter((metric) => metric.key !== 'onboarding')
+            .map((metric) => (
+              <Metric
+                key={metric.key}
+                label={metric.label}
+                value={<MetricValue metric={metric} />}
+                detail={
+                  metric.kind === 'ratio' ? (
+                    <MetricBasis metric={metric} minSample={data.minSample} />
+                  ) : undefined
+                }
+              />
+            ))}
           <Metric
             label="AI 좋아요 비율"
             value={

@@ -15,6 +15,7 @@ import fcntl
 import hashlib
 import os
 import sqlite3
+import stat
 import threading
 import time
 from dataclasses import dataclass
@@ -127,23 +128,62 @@ class Update:
 class ProcessLock:
     """Exclusive non-blocking flock held for the process lifetime. The kernel drops it when the process dies, however it dies."""
 
-    def __init__(self, directory: Path):
-        self._fd = os.open(directory / "service.lock", os.O_RDWR | os.O_CREAT, 0o600)
+    def __init__(self, directory: Path, *, directory_fd: int | None = None, create: bool = True):
+        self._directory, self._directory_fd = directory, directory_fd
+        try:
+            path = directory / "service.lock" if directory_fd is None else "service.lock"
+            self._fd = os.open(path, os.O_RDWR | (os.O_CREAT if create else 0) | getattr(os, "O_NOFOLLOW", 0), 0o600, dir_fd=directory_fd)
+        except OSError:
+            raise ConfigError("ZOOP_AI_SERVICE_STATE_DIR", "service_lock_unusable") from None
+        info = os.fstat(self._fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1:
+            os.close(self._fd)
+            raise ConfigError("ZOOP_AI_SERVICE_STATE_DIR", "service_lock_unusable")
         try:
             fcntl.flock(self._fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
             os.close(self._fd)
             raise ConfigError("ZOOP_AI_SERVICE_STATE_DIR", "service_state_busy") from None
         os.set_inheritable(self._fd, False)
+        self.identity = (info.st_dev, info.st_ino)
+        try:
+            self.validate()
+        except BaseException:
+            self.close()
+            raise
+
+    def validate(self) -> None:
+        """The named lock must remain the inode whose exclusive flock this object holds."""
+        try:
+            path = self._directory / "service.lock" if self._directory_fd is None else "service.lock"
+            current = os.stat(path, dir_fd=self._directory_fd, follow_symlinks=False)
+            held = os.fstat(self._fd)
+            if (current.st_dev, current.st_ino) != self.identity or (held.st_dev, held.st_ino) != self.identity \
+                    or not stat.S_ISREG(current.st_mode) or current.st_nlink != 1:
+                raise OSError("lock identity changed")
+        except OSError:
+            raise ConfigError("ZOOP_AI_SERVICE_STATE_DIR", "service_lock_unusable") from None
+
+    def close(self) -> None:
+        if self._fd is not None:
+            os.close(self._fd)
+            self._fd = None
+
+    def __enter__(self) -> ProcessLock:
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.close()
 
 
 class ServiceLedger:
-    def __init__(self, directory: Path, worker_state_dir: Path, clock=time.time):
+    def __init__(self, directory: Path, worker_state_dir: Path, clock=time.time, *, existing_only=False):
         self._clock = clock
         self._guard = threading.RLock()
         path = directory / "service.sqlite3"
         try:
-            self._db = sqlite3.connect(path, timeout=30, isolation_level=None, check_same_thread=False)
+            self._db = sqlite3.connect(path.as_uri() + "?mode=rw" if existing_only else path,
+                                       uri=existing_only, timeout=30, isolation_level=None, check_same_thread=False)
             os.chmod(path, 0o600)
             self._db.row_factory = sqlite3.Row
             self._db.execute("PRAGMA journal_mode=WAL")

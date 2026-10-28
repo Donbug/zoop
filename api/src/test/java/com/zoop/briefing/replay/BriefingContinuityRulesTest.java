@@ -61,6 +61,18 @@ class BriefingContinuityRulesTest {
         assertTrue(references(issue("one","MATERIAL_UPDATE"),1).isEmpty());
         var i=issue("one","MATERIAL_UPDATE");i.withObject("freshnessReview").withArray("deltaEvidenceIds").add("one-e");assertEquals(1,references(i,1).size());
     }
+    @Test void materialUpdateCannotRepackageAnAlreadyPublishedQuoteWithAnotherEvidenceId() {
+        var i=issue("repeat","MATERIAL_UPDATE"); i.withObject("freshnessReview").withArray("deltaEvidenceIds").add("repeat-e");
+        var request=StrictJson.newObject();request.putArray("issues").add(i);
+        var answer=StrictJson.newObject();answer.putObject("assessments").putObject("repeat").put("importance",1)
+                .put("priority",60).put("status","HOLD").put("scope","COMPANY").put("reason","합성 갱신");
+        var history=StrictJson.newArray();var old=history.addObject().put("issueId","repeat");
+        old.putArray("sources").addObject().put("evidenceId","another-article")
+                .put("quote",i.path("newMentions").get(0).path("evidence").get(0).path("quote").asString());
+        assertTrue(BriefingContinuityRules.references(round(),StrictJson.Obj.of(request),StrictJson.Obj.of(answer),history,support(request)).isEmpty());
+        ((ObjectNode)old.path("sources").get(0)).put("quote","[합성] 이전에는 없었던 별도 사실");
+        assertEquals(1,BriefingContinuityRules.references(round(),StrictJson.Obj.of(request),StrictJson.Obj.of(answer),history,support(request)).size());
+    }
     @Test void collectionUncertaintyAndUnavailablePreviousRemainExplicit() {
         var info=BriefingContinuityRules.initial(round());assertEquals("limited",info.path("coverage").path("status").asString());
         assertEquals("unavailable",info.path("recap").path("status").asString());assertEquals(0,info.path("recap").path("items").size());

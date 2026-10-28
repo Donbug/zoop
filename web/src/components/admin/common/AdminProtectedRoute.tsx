@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { loadAdminSession } from '@/apis/admin/auth';
 import { useAdminSessionStore } from '@/stores/useAdminSessionStore';
+import { BUTTON } from './adminStyles';
 import type { AdminLoginLocationState } from '@/types/admin';
 
 /** 다음 만료 시각(유휴·최대 중 이른 쪽)까지 남은 밀리초 */
@@ -59,7 +60,7 @@ export default function AdminProtectedRoute() {
         <button
           type="button"
           onClick={() => void loadAdminSession()}
-          className="h-8 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3 text-xs font-semibold text-zoop-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
+          className={BUTTON}
         >
           다시 시도
         </button>
@@ -75,5 +76,5 @@ export default function AdminProtectedRoute() {
     return <Navigate to="/admin/login" replace state={state} />;
   }
 
-  return <Outlet />;
+  return <Outlet key={admin.id} />;
 }

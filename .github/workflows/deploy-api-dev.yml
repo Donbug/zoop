@@ -45,24 +45,36 @@ jobs:
         shell: bash
         env:
           DEPLOY_OPERATION: ${{ inputs.operation }}
-          AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+          IMAGE_STAGE_ROLE_ARN: ${{ vars.AWS_IMAGE_STAGE_ROLE_ARN }}
+          DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
         run: |
           set -euo pipefail
 
           required_variables=(
             AWS_REGION
             ECR_REPOSITORY
-            AWS_ROLE_ARN
           )
 
-          if [ "$DEPLOY_OPERATION" = "deploy" ]; then
-            required_variables+=(
-              ECS_CLUSTER
-              ECS_SERVICE
-              ECS_TASK_DEFINITION
-              ECS_CONTAINER_NAME
-            )
-          fi
+          case "$DEPLOY_OPERATION" in
+            stage-image)
+              required_variables+=(
+                IMAGE_STAGE_ROLE_ARN
+              )
+              ;;
+            deploy)
+              required_variables+=(
+                DEPLOY_ROLE_ARN
+                ECS_CLUSTER
+                ECS_SERVICE
+                ECS_TASK_DEFINITION
+                ECS_CONTAINER_NAME
+              )
+              ;;
+            *)
+              echo "::error::Unsupported deployment operation: $DEPLOY_OPERATION"
+              exit 1
+              ;;
+          esac
 
           for variable_name in "${required_variables[@]}"; do
             if [ -z "${!variable_name:-}" ]; then
@@ -71,12 +83,21 @@ jobs:
             fi
           done
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials for image staging
+        if: ${{ inputs.operation == 'stage-image' }}
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_IMAGE_STAGE_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-          role-session-name: zoop-api-dev-${{ github.run_id }}
+          role-session-name: zoop-api-stage-${{ github.run_id }}
+
+      - name: Configure AWS credentials for ECS deployment
+        if: ${{ inputs.operation == 'deploy' }}
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: zoop-api-deploy-${{ github.run_id }}
 
       - name: Require an active ECS service for deployment
         if: ${{ inputs.operation == 'deploy' }}

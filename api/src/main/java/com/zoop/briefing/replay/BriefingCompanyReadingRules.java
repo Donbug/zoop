@@ -13,9 +13,12 @@ final class BriefingCompanyReadingRules {
     static final String SCHEMA = "zoop-company-reading-v1";
     private BriefingCompanyReadingRules() { }
     static Map<String, StrictJson.Obj> rows(StrictJson.Obj layer) {
+        return rows(layer, 4);
+    }
+    static Map<String, StrictJson.Obj> rows(StrictJson.Obj layer, int maximum) {
         require(SCHEMA.equals(layer.string("schemaVersion")) && !layer.string("authorizationRef").isBlank(), "layer");
         Map<String, StrictJson.Obj> out = new LinkedHashMap<>();
-        require(!layer.objects("rounds").isEmpty() && layer.objects("rounds").size() <= 4, "round_count");
+        require(!layer.objects("rounds").isEmpty() && layer.objects("rounds").size() <= maximum, "round_count");
         for (StrictJson.Obj row : layer.objects("rounds")) require(out.putIfAbsent(row.string("roundId"), row) == null, "duplicate_round");
         return out;
     }

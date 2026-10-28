@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  fitFootprint,
+  fitZoom,
   freeViewport,
   intersects,
   nodeRect,
@@ -39,8 +41,8 @@ describe('D-GRP-01/01b · graph readability', () => {
     expect(node.style?.labelText).toBeTruthy();
     expect(String(node.style?.labelText)).toContain('…');
     expect(issue.label).toBe(title);
-    expect(textWidth(String(node.style?.labelText), 13)).toBeLessThanOrEqual(
-      180,
+    expect(textWidth(String(node.style?.labelText), 15)).toBeLessThanOrEqual(
+      220,
     );
   });
   it('keeps short titles intact and does not split Unicode code points', () => {
@@ -90,5 +92,47 @@ describe('D-GRP-01/01b · graph readability', () => {
     expect(safe.y + safe.height).toBeLessThanOrEqual(388);
     expect(safe.width).toBe(350);
     expect(intersects(safe, sheet)).toBe(false);
+  });
+});
+
+describe('D-GRP-01 fit bounds', () => {
+  const longTitle = '가'.repeat(40);
+  const node = (x: number, labelFontSize: number) =>
+    ({
+      id: String(x),
+      style: {
+        x,
+        y: 0,
+        size: 30,
+        labelText: longTitle,
+        labelFontSize,
+        labelWordWrapWidth: (170 * labelFontSize) / 13,
+      },
+    }) as NodeData;
+  const safe = { width: 300, height: 400 };
+
+  it('does not depend on the zoom-scaled label size, so repeating a fit gives the same zoom', () => {
+    const atNormal = fitZoom(
+      [node(0, 13), node(120, 13)].map(fitFootprint),
+      safe,
+      1.8,
+    );
+    const afterZoomOut = fitZoom(
+      [node(0, 26), node(120, 26)].map(fitFootprint),
+      safe,
+      1.8,
+    );
+    expect(afterZoomOut.zoom).toBe(atNormal.zoom);
+    expect(atNormal.center).toEqual([60, 0]);
+  });
+
+  it('wraps a long title at the display width instead of measuring it on one line', () => {
+    const footprint = fitFootprint(node(0, 13));
+    expect(footprint.labelWidth).toBeLessThanOrEqual(170 + 24);
+    expect(footprint.labelHeight).toBeGreaterThan(13 * 1.5 * 2);
+    // 한 줄 폭(520px)으로 재면 300px 안에서 아주 작게 줄던 경우: 이제 두 노드가 들어가는 배율을 고른다.
+    expect(
+      fitZoom([node(0, 13), node(120, 13)].map(fitFootprint), safe, 1.8).zoom,
+    ).toBeGreaterThan(0.5);
   });
 });

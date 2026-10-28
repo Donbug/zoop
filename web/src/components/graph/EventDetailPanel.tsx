@@ -5,6 +5,8 @@ import { useEventData } from '@/hooks/useEventData';
 import type { EventContext, EventDetail } from '@/types/map/event';
 import type { GraphNode } from '@/types/map/graph';
 import GraphIcon from './GraphIcon';
+import EventLinkedDetails from './EventLinkedDetails';
+import ApprovalNote from './ApprovalNote';
 import {
   formatEventTime,
   formatPublishedAt,
@@ -14,6 +16,7 @@ import {
 export type EventAction = 'evidence' | 'focus' | 'ai';
 interface Props {
   id: string;
+  companyDetailHref?: (id: string) => string;
   context: EventContext;
   geography: GraphNode['geography'];
   /** 지도에 있는 기업 노드의 로고 */
@@ -25,6 +28,7 @@ interface Props {
 // D-GRP-02 · Figma 619:6269 · WBS 6.6.22.
 export default function EventDetailPanel({
   id,
+  companyDetailHref,
   context,
   geography,
   logoOf,
@@ -73,7 +77,15 @@ export default function EventDetailPanel({
               className={ui.avatar}
             />
             <div>
-              <strong>{company.name}</strong>
+              <a
+                href={
+                  companyDetailHref?.(company.id) ??
+                  `/companies/${encodeURIComponent(company.id)}`
+                }
+                className="text-zoop-ink underline underline-offset-4 focus-visible:outline-2"
+              >
+                <strong>{company.name}</strong>
+              </a>
               <p>
                 {company.roleUnconfirmed
                   ? '역할 미확인'
@@ -154,6 +166,7 @@ export default function EventDetailPanel({
         )}
         {data && (
           <>
+            {!failed('approval') && <ApprovalNote approval={data.approval} />}
             <div
               className={`${ui.actions} [&>button:last-child]:col-span-2 [&>button:last-child]:bg-panel-ink [&>button:last-child]:text-white`}
             >
@@ -253,6 +266,12 @@ export default function EventDetailPanel({
                 관련 문서{' '}
                 {failed('articles') ? '조회 실패' : `${data.articles.length}건`}
               </h3>
+              {!failed('sourceSupport') &&
+                data.sourceSupport.independentSourceCount !== null && (
+                  <p className="text-zoop-muted">
+                    독립 출처 {data.sourceSupport.independentSourceCount}곳
+                  </p>
+                )}
               {failed('articles') ? (
                 <p className={ui.muted}>관련 문서를 불러오지 못했습니다.</p>
               ) : data.articles.length ? (
@@ -308,6 +327,7 @@ export default function EventDetailPanel({
                 기업별 영향 해석은 제공되지 않았습니다.
               </p>
             </section>
+            <EventLinkedDetails event={data} />
             <footer className={ui.footer}>
               <p>{data.metadata.source}</p>
               <p>

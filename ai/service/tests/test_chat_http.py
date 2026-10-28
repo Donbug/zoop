@@ -218,3 +218,77 @@ def test_an_abnormal_child_is_an_unknown_outcome_never_a_not_sent_one(tmp_path, 
     key = body()["invocationId"]
     unknown = service.request("POST", URL, as_="chatter", body=body(), headers={"Idempotency-Key": key})
     assert unknown.status_code == 502 and unknown.json()["error"]["code"] == "stage_outcome_unknown"
+
+
+@pytest.mark.parametrize("root_name", ["ZOOP_AI_HANDOFF_EXPOSURE_STATE_DIR", "ZOOP_AI_HANDOFF_EXPOSURE_EXTRACTION_STATE_DIR",
+                                      "ZOOP_AI_HANDOFF_EXPOSURE_INGESTION_STATE_DIR"])
+@pytest.mark.parametrize("placement", ["same", "child", "parent"])
+def test_chat_cannot_overlap_exposure_roots_without_an_ordinary_handoff(tmp_path, root_name, placement):
+    from exposure_support import exposure_env, workspace
+
+    ws = workspace(tmp_path / "ws")
+    stub = ChatStub(tmp_path / "chat")
+    operator_root = tmp_path / "operator" / "ledger"
+    operator_root.mkdir(parents=True, mode=0o700)
+    chat_root = {"same": operator_root, "child": operator_root / "chat", "parent": operator_root.parent}[placement]
+    env = ws.env(**{**exposure_env(ws, only=True), **stub.env(), root_name: str(operator_root),
+                   "ZOOP_AI_CHAT_STATE_DIR": str(chat_root)})
+    before = sorted(operator_root.rglob("*"))
+    with pytest.raises(ConfigError) as caught:
+        load(env)
+    assert (caught.value.field, caught.value.reason) == ("ZOOP_AI_CHAT_STATE_DIR", "chat_roots_overlap")
+    assert sorted(operator_root.rglob("*")) == before and not stub.state.exists()
+
+
+def test_chat_and_pipeline_live_settings_never_reach_the_exposure_child(tmp_path, start):
+    from exposure_support import URL as exposure_url, exposure_env, query, report, workspace
+    from test_handoff_http import BASE_KEYS, OS_ADDED, operator_state
+
+    ws = workspace(tmp_path / "ws", with_relation=True)
+    stub = ChatStub(tmp_path / "chat")
+    settings = {"ZOOP_AI_CHAT_LIVE_ENABLED": "1", "ZOOP_AI_CHAT_MAX_CALLS": "2",
+                "ZOOP_AI_API_KEY": "synthetic-chat-key", "TYPESAFE_API_KEY": "synthetic-jev-key",
+                "ZOOP_AI_CHAT_ANSWER_MODEL": "gpt-6-luna", "ZOOP_AI_CHAT_JEV_MODEL": "jev-1.14.0",
+                "ZOOP_AI_SERVICE_PIPELINE_LIVE": "1", "ZOOP_AI_PIPELINE_LIVE_ENABLED": "1",
+                "ZOOP_AI_PIPELINE_LIVE_MODEL": "gpt-6-luna", "ZOOP_AI_PIPELINE_LIVE_REASONING_EFFORT": "high",
+                "TYPESAFE_VALIDATION_MODEL": "jev-1.14.0", "ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR": str(tmp_path / "budget"),
+                "ZOOP_AI_PIPELINE_LIVE_MAX_USD": "1", "ZOOP_AI_PIPELINE_LIVE_MAX_CALLS": "2"}
+    service = start(workspace=ws, env={**exposure_env(ws, only=True), **stub.env(**settings)})
+    before = operator_state(ws)
+    assert service.request("POST", exposure_url, as_="chatter", body=query()).status_code == 403
+    key = body()["invocationId"]
+    assert service.request("POST", URL, as_="viewer", body=body(), headers={"Idempotency-Key": key}).status_code == 403
+    assert ws.calls() == stub.calls() == []
+    exposed = service.request("POST", exposure_url, body=query())
+    assert exposed.status_code == 200 and exposed.json()["report"] == report()
+    answer = service.request("POST", URL, as_="chatter", body=body(), headers={"Idempotency-Key": key})
+    assert answer.status_code == 200 and answer.json()["invocationId"] == key
+    exposure_call, = ws.calls()
+    chat_call, = stub.calls()
+    assert set(exposure_call["env"]) <= BASE_KEYS | OS_ADDED | {"ZOOP_STATE_DIR", "ZOOP_AI_WORKER_STATE_DIR"}
+    for name in ("ZOOP_AI_API_KEY", "TYPESAFE_API_KEY", "ZOOP_AI_CHAT_LIVE_ENABLED"):
+        assert chat_call["env"][name] == settings[name]
+    assert "ZOOP_AI_PIPELINE_LIVE_ENABLED" not in chat_call["env"]
+    assert operator_state(ws) == before
+
+
+def test_shared_runner_overflow_keeps_exposure_retryable_but_chat_unknown(tmp_path, start):
+    from exposure_support import URL as exposure_url, exposure_env, query, report, workspace
+    from zoop_ai_service.runtime import MAX_STDOUT
+
+    ws = workspace(tmp_path / "ws")
+    stub = ChatStub(tmp_path / "chat")
+    service = start(workspace=ws, env={**exposure_env(ws, only=True), **stub.env()})
+    ws.script({"mode": "raw", "raw": "x" * (MAX_STDOUT + 1), "exit": 0})
+    stub.answer("x" * (MAX_STDOUT + 1))
+    exposed = service.request("POST", exposure_url, body=query())
+    assert exposed.status_code == 503 and exposed.json()["error"]["code"] == "runtime_unavailable"
+    assert exposed.json()["error"]["retryable"] is True and exposed.headers["retry-after"] == "2"
+    key = body()["invocationId"]
+    unknown = service.request("POST", URL, as_="chatter", body=body(), headers={"Idempotency-Key": key})
+    assert unknown.status_code == 502 and unknown.json()["error"]["code"] == "stage_outcome_unknown"
+    assert unknown.json()["error"]["retryable"] is False and "retry-after" not in unknown.headers
+    assert len(ws.calls()) == len(stub.calls()) == 1
+    ws.script({"output": report()})
+    assert service.request("POST", exposure_url, body=query()).status_code == 200
+    assert len(ws.calls()) == 2 and len(stub.calls()) == 1

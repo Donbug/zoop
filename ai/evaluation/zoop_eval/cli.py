@@ -18,6 +18,12 @@ from .scoring import score_run
 from .verification import (
     DEFAULT_VERIFY_CORPUS, describe, load_verify_corpus, parse_verify_run, render_verify_score, score_verify_run, write_verify_controls,
 )
+from .summary_verification import (
+    DEFAULT_SUMMARY_CORPUS, describe_summary, load_summary_corpus, parse_summary_run,
+    render_summary_score, score_summary_run, write_summary_controls,
+)
+from .materials import DEFAULT_MATERIALS, DATASETS, canonical as material_json, convert_materials
+from .material_retrieval import retrieve_materials, score_material_retrieval
 
 
 def _emit(document: dict[str, Any], fmt: str, renderer, out: Path | None) -> None:
@@ -54,8 +60,15 @@ def _validate(args) -> dict[str, Any]:
     }
 
 
+class _MaterialArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise Rejected("materials_arguments", "invalid material command arguments")
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="zoop_eval", description="Deterministic offline scoring of recorded outputs against authored gold. Makes no model, network or database calls.")
+    argv = list(sys.argv[1:] if argv is None else argv)
+    parser_type = _MaterialArgumentParser if argv and argv[0].startswith("materials-") else argparse.ArgumentParser
+    parser = parser_type(prog="zoop_eval", description="Deterministic offline scoring of recorded outputs against authored gold. Makes no model, network or database calls.")
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("validate", "controls", "score", "compare"):
         p = sub.add_parser(name)
@@ -78,9 +91,52 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--format", choices=("json", "text"), default="json")
             p.add_argument("--out", type=Path, help="also write the JSON document here")
             p.add_argument("run", help="run file (zoop-verify-run-1)")
-    args = parser.parse_args(argv)
+    for name in ("summary-verify-validate", "summary-verify-controls", "summary-verify-score"):
+        p = sub.add_parser(name)
+        p.add_argument("--corpus", type=Path, default=DEFAULT_SUMMARY_CORPUS,
+                       help="native issue-summary corpus directory (cases.json, gold.json)")
+        if name == "summary-verify-controls":
+            p.add_argument("--out-dir", type=Path, required=True)
+        if name == "summary-verify-score":
+            p.add_argument("--format", choices=("json", "text"), default="json")
+            p.add_argument("--out", type=Path)
+            p.add_argument("run", help="captured zoop-summary-verify-run-1 file")
+    for name in ("materials-validate", "materials-inputs", "materials-gold"):
+        p = sub.add_parser(name, help="read-only development material conversion, not scoring")
+        p.add_argument("--materials", type=Path, default=DEFAULT_MATERIALS)
+        if name != "materials-validate":
+            p.add_argument("--dataset", choices=DATASETS, required=True)
+    for name in ("materials-retrieve", "materials-retrieval-score"):
+        p = sub.add_parser(name, help="paired-context paragraph retrieval diagnostics, not answer scoring")
+        p.add_argument("--materials", type=Path, default=DEFAULT_MATERIALS)
+        if name == "materials-retrieve":
+            p.add_argument("--top-k", type=int, default=5)
+        else:
+            p.add_argument("run", type=Path, help="finalized zoop-eval-material-retrieval-run-1 JSON")
     try:
-        if args.command == "verify-validate":
+        args = parser.parse_args(argv)
+        if args.command == "materials-retrieve":
+            print(material_json(retrieve_materials(args.materials, args.top_k)))
+        elif args.command == "materials-retrieval-score":
+            print(material_json(score_material_retrieval(args.run, args.materials)))
+        elif args.command.startswith("materials-"):
+            document = convert_materials(args.command, args.materials, getattr(args, "dataset", None))
+            print(material_json(document))
+        elif args.command == "summary-verify-validate":
+            print(json.dumps(describe_summary(load_summary_corpus(args.corpus)), indent=1, ensure_ascii=False))
+        elif args.command == "summary-verify-controls":
+            paths = write_summary_controls(load_summary_corpus(args.corpus), args.out_dir)
+            print(json.dumps({"ok": True, "written": list(paths.values()),
+                              "note": "authored provider scripts only; capture native receipts with the pipeline loopback runner"}, indent=1))
+        elif args.command == "summary-verify-score":
+            corpus = load_summary_corpus(args.corpus)
+            try:
+                raw = Path(args.run).read_bytes()
+            except OSError as exc:
+                raise Rejected("file_unreadable", str(exc)) from None
+            _emit(score_summary_run(corpus, parse_summary_run(raw, corpus["inputs"])),
+                  args.format, render_summary_score, args.out)
+        elif args.command == "verify-validate":
             print(json.dumps(describe(load_verify_corpus(args.corpus)), indent=1, ensure_ascii=False))
         elif args.command == "verify-controls":
             written = write_verify_controls(load_verify_corpus(args.corpus), args.out_dir)

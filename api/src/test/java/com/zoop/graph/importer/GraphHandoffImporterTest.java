@@ -8,11 +8,13 @@ import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import java.util.Optional;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.common.json.Canonical;
 import com.zoop.document.analysis.repository.EvidenceRow;
@@ -20,7 +22,14 @@ import com.zoop.document.importer.IngestionExportParser;
 import com.zoop.document.importer.Observation;
 import com.zoop.document.repository.ArtifactRow;
 import com.zoop.document.service.InMemoryDocumentRegistry;
+import com.zoop.graph.importer.GraphHandoffRepository.PublicationState;
+import com.zoop.graph.importer.GraphHandoffRepository.RuleRow;
 import com.zoop.graph.importer.GraphHandoffResult.Outcome;
+import com.zoop.document.evidence.repository.EvidenceReadRepository;
+import com.zoop.document.evidence.repository.EvidenceView;
+import com.zoop.document.evidence.service.DocumentReadSources;
+import com.zoop.document.evidence.service.EvidenceArtifactReader;
+import com.zoop.document.evidence.service.EvidenceService;
 import com.zoop.graph.importer.GraphHandoffResult.Staged;
 import com.zoop.graph.importer.HandoffFixtures.Built;
 import com.zoop.graph.importer.HandoffFixtures.FakeHandoff;
@@ -28,6 +37,15 @@ import com.zoop.graph.importer.HandoffFixtures.FakeIngestion;
 import com.zoop.graph.importer.HandoffFixtures.Shape;
 import com.zoop.graph.importer.HandoffFixtures.Spec;
 import com.zoop.graph.snapshot.GraphSnapshotCodec;
+import com.zoop.graph.read.DisclosureExclusions;
+import com.zoop.graph.read.EventController;
+import com.zoop.graph.read.EventDetailService;
+import com.zoop.graph.read.GraphEvidenceSnapshotReader;
+import com.zoop.graph.read.PublicGraphReader;
+import com.zoop.graph.snapshot.ArtifactGraphSnapshotStore;
+import com.zoop.graph.version.GraphVersionRecord;
+import com.zoop.graph.version.GraphVersionRepository;
+import com.zoop.graph.version.GraphVersionSelector;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,6 +75,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * The whole import with the real strict parsers, the real artifact file store and the real importer; only the two installed
@@ -112,9 +135,22 @@ class GraphHandoffImporterTest {
         importer = newImporter();
     }
 
+    /** {@link #setUp()} again within one test: a new store, registry and database, as if nothing had been imported. */
+    private void freshSetUp() throws IOException {
+        try (Stream<Path> files = Files.walk(root)) {
+            files.sorted(Comparator.reverseOrder()).forEach(path -> path.toFile().delete());
+        }
+        setUp();
+    }
+
     private GraphHandoffImporter newImporter() {
         return new GraphHandoffImporter(handoff, ingestion, new IngestionExportParser(), store, registry, graph, transaction,
                 Clock.fixed(NOW, ZoneOffset.UTC));
+    }
+
+    /** The {@code publicationRules} object of the written result file. */
+    private static JsonNode rules(GraphHandoffResult result) {
+        return HandoffFixtures.parse(GraphHandoffResultWriter.toBytes(result)).get("publicationRules");
     }
 
     private static GraphHandoffException failure(GraphHandoffResult result) {
@@ -124,6 +160,12 @@ class GraphHandoffImporterTest {
 
     private Path snapshotFile(String versionId) {
         return root.resolve("graph_snapshot").resolve(versionId + ".json");
+    }
+
+    /** The snapshot file the version registered, found through the registry as the public read finds it (the name carries the rules). */
+    private Path storedSnapshotFile(String versionId) {
+        String uri = registry.findArtifact("artifact-" + versionId).orElseThrow().storageUri();
+        return root.resolve(uri.substring(uri.indexOf(':') + 1));
     }
 
     private Path receiptFile(String versionId) {
@@ -256,13 +298,135 @@ class GraphHandoffImporterTest {
         assertEquals(3, written.get("evidenceRows").get("registered").intValue());
     }
 
+    // ------------------------------------------------------------------------------------------------ publication rules ----
+
+    /** Hides the fixture's INVOLVES (one article) and keeps its structural relation, so the issue stays. */
+    private static final RuleRow INVOLVES_SINGLE = new RuleRow("involves-single@1",
+            "{\"kind\": \"single_source\", \"minSources\": 2, \"relationTypes\": [\"INVOLVES\"]}");
+    /** Enabled, readable, and matches nothing in the fixture (its issue is announced). */
+    private static final RuleRow CANCELLED_ONLY = new RuleRow("cancelled-only@1",
+            "{\"kind\": \"assertion_status\", \"hide\": [\"cancelled\"]}");
+
+    @Test
+    void theVersionFixesBothRevisionsAndARuleThatMatchesNothingLeavesTheWritersBytes() throws Exception {
+        GraphHandoffResult plainResult = importer.run(built.request());
+        assertTrue(plainResult.succeeded());
+        assertEquals(HandoffFixtures.parse("""
+                {"ruleRevision":0,"reviewRevision":0,"applied":[],"stored":{"issues":1,"relations":2,"articles":1,"evidence":3},
+                 "hidden":{"issues":0,"relations":0},"byRule":{}}
+                """.getBytes(StandardCharsets.UTF_8)), rules(plainResult), "no rule: what is stored is the bundle");
+        byte[] unfiltered = Files.readAllBytes(storedSnapshotFile(built.versionId()));
+        var plain = graph.inserted().get(0);
+        assertEquals(0, plain.ruleRevision());
+        assertEquals(0, plain.reviewRevision());
+        assertEquals(List.of(), plain.ruleIds());
+        assertEquals(List.of(), graph.versionRules(built.versionId()));
+
+        freshSetUp();
+        graph.publication = new PublicationState(7, 4, List.of(CANCELLED_ONLY));
+        GraphHandoffResult matchedNothing = importer.run(built.request());
+        assertTrue(matchedNothing.succeeded());
+        assertEquals(HandoffFixtures.parse("""
+                {"ruleRevision":7,"reviewRevision":4,"applied":["cancelled-only@1"],
+                 "stored":{"issues":1,"relations":2,"articles":1,"evidence":3},"hidden":{"issues":0,"relations":0},
+                 "byRule":{"cancelled-only@1":{"issues":0,"relations":0}}}
+                """.getBytes(StandardCharsets.UTF_8)), rules(matchedNothing));
+
+        var inserted = graph.inserted().get(0);
+        assertEquals(7, inserted.ruleRevision());
+        assertEquals(4, inserted.reviewRevision());
+        assertEquals(List.of("cancelled-only@1"), inserted.ruleIds(), "an enabled rule is recorded whether or not it hid anything");
+        assertEquals(List.of(CANCELLED_ONLY), graph.versionRules(built.versionId()));
+        assertEquals(List.of(1L, 2L, 1L), List.of(inserted.issueCount(), inserted.relationCount(), inserted.articleCount()));
+        assertEquals(sha256(unfiltered), sha256(Files.readAllBytes(storedSnapshotFile(built.versionId()))),
+                "the same bytes as with no rule at all");
+    }
+
+    @Test
+    void anEnabledRuleFiltersTheStoredSnapshotWhileTheReceiptAndTheEvidenceRowsKeepTheWholeBundle() throws Exception {
+        graph.publication = new PublicationState(3, 0, List.of(INVOLVES_SINGLE));
+
+        GraphHandoffResult result = importer.run(built.request());
+
+        assertTrue(result.succeeded());
+        String versionId = built.versionId();
+        PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(Files.readAllBytes(storedSnapshotFile(versionId)), versionId);
+        assertEquals(List.of("STRUCTURALLY_RELATED_TO"), snapshot.relations().stream().map(r -> r.relationType()).toList());
+        assertEquals(List.of(ISSUE), snapshot.issues().stream().map(i -> i.issueId()).toList(),
+                "the issue keeps its structural company relation");
+        assertEquals(2, snapshot.companies().size(), "companies are the catalogue and always stay");
+        var inserted = graph.inserted().get(0);
+        assertEquals(List.of(1L, 1L, 1L), List.of(inserted.issueCount(), inserted.relationCount(), inserted.articleCount()),
+                "the version counts what the stored snapshot holds");
+        assertEquals(List.of("involves-single@1"), inserted.ruleIds());
+        assertEquals(3, inserted.ruleRevision());
+        // The result file says what the rules did; its counts stay the bundle's.
+        JsonNode written = HandoffFixtures.parse(GraphHandoffResultWriter.toBytes(result));
+        assertEquals(2, written.get("counts").get("relations").intValue());
+        JsonNode rules = rules(result);
+        assertEquals(3, rules.get("ruleRevision").intValue());
+        assertEquals("[\"involves-single@1\"]", rules.get("applied").toString());
+        assertEquals(1, rules.get("stored").get("relations").intValue());
+        assertEquals(1, rules.get("stored").get("issues").intValue());
+        assertEquals(snapshot.evidence().size(), rules.get("stored").get("evidence").intValue());
+        assertEquals(1, rules.get("hidden").get("relations").intValue());
+        assertEquals(0, rules.get("hidden").get("issues").intValue());
+        assertEquals(1, rules.get("byRule").get("involves-single@1").get("relations").intValue());
+
+        // The receipt is the complete bundle and every span is registered: a rule changes the public projection only.
+        assertEquals(built.bundle(), HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId))).get("bundle"));
+        assertEquals(3, graph.evidenceRows().size());
+        assertEquals(3, HandoffFixtures.parse(GraphHandoffResultWriter.toBytes(result)).get("evidenceRows").get("registered")
+                .intValue());
+    }
+
+    @Test
+    void aRepeatedImportFiltersWithTheRulesItsVersionWasStagedWithWhateverWasSwitchedSince() throws Exception {
+        for (List<RuleRow> first : List.of(List.of(INVOLVES_SINGLE), List.<RuleRow>of())) {
+            freshSetUp();
+            graph.publication = new PublicationState(3, 0, first);
+            GraphHandoffResult staged = importer.run(built.request());
+            assertTrue(staged.succeeded());
+            byte[] stored = Files.readAllBytes(storedSnapshotFile(built.versionId()));
+
+            // The switch flips the rule; the staged version is not this import's to change, only the next version's.
+            graph.publication = new PublicationState(4, 0, first.isEmpty() ? List.of(INVOLVES_SINGLE) : List.of());
+            GraphHandoffResult again = importer.run(built.request());
+
+            assertTrue(again.succeeded(), first.toString());
+            assertEquals(Outcome.UNCHANGED, again.staged().outcome(), first.toString());
+            assertEquals(rules(staged), rules(again), "the version's own rules and revisions, never the switched ones");
+            assertEquals(1, graph.inserted().size());
+            assertEquals(sha256(stored), sha256(Files.readAllBytes(storedSnapshotFile(built.versionId()))));
+        }
+    }
+
+    @Test
+    void anEnabledRuleThisAppCannotReadFailsTheImportBeforeAnythingIsWritten() throws Exception {
+        InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+        InMemoryDocumentRegistry.State registryBefore = registry.state();
+        long filesBefore = fileCount();
+        for (RuleRow unreadable : List.of(
+                new RuleRow("regex@1", "{\"kind\": \"regex\", \"pattern\": \".*\"}"),
+                new RuleRow("too-small@1", "{\"kind\": \"single_source\", \"minSources\": 1, \"relationTypes\": [\"INVOLVES\"]}"),
+                new RuleRow("not-a-rule-id", CANCELLED_ONLY.definition()))) {
+            graph.publication = new PublicationState(1, 0, List.of(CANCELLED_ONLY, unreadable));
+
+            GraphHandoffException failure = failure(importer.run(built.request()));
+
+            assertEquals(GraphHandoffFailure.RULE_DEFINITION_INVALID, failure.failure(), unreadable.id());
+            assertEquals(0, graph.writes(), unreadable.id());
+            assertNothingWritten(graphBefore, registryBefore, filesBefore);
+        }
+    }
+
     @Test
     void theReceiptKeepsTheOriginalMentionsRawWhileTheSnapshotStaysFormat3WithoutMentionValues() throws Exception {
         assertTrue(importer.run(built.request()).succeeded());
         String versionId = built.versionId();
 
         JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId)));
-        assertEquals("zoop-graph-handoff-bundle-6", receipt.get("bundle").get("schemaVersion").stringValue());
+        assertEquals("zoop-graph-handoff-bundle-7", receipt.get("bundle").get("schemaVersion").stringValue());
         // The hand-written expectation of the issue's field provenance: the one unanimous mention states every value, and the
         // receipt says so without claiming any value was verified (selection, not fact verification).
         JsonNode provenance = receipt.get("bundle").get("issues").get(0).get("fieldProvenance");
@@ -319,6 +483,280 @@ class GraphHandoffImporterTest {
         assertEquals(0, provenance.get("withheld").size());
         assertEquals("2026-09-30", snapshot.issues().get(0).eventTime());
         assertEquals("2026Q3", snapshot.issues().get(0).period());
+    }
+
+    @Test
+    void importedSupplyScopeReachesRelationHttpOnlyWhileItsBasisIsReadable() throws Exception {
+        assertTrue(importer.run(built.request()).succeeded());
+        String versionId = built.versionId();
+        ArtifactRow stored = registry.findArtifact("artifact-" + versionId).orElseThrow();
+        var version = new com.zoop.graph.version.GraphVersionRecord(versionId, 3, "snapshot", stored.id(),
+                stored.storageUri(), stored.sha256(), true);
+        var versions = org.mockito.Mockito.mock(com.zoop.graph.version.GraphVersionRepository.class);
+        org.mockito.Mockito.when(versions.find(versionId)).thenReturn(java.util.Optional.of(version));
+        org.mockito.Mockito.when(versions.everActivated(versionId)).thenReturn(true);
+        Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+        var publicReader = new com.zoop.graph.read.PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(versions, clock),
+                new com.zoop.graph.snapshot.ArtifactGraphSnapshotStore(store, registry, null),
+                ignoredVersion -> com.zoop.graph.read.DisclosureExclusions.NONE);
+        var evidenceRows = org.mockito.Mockito.mock(com.zoop.document.evidence.repository.EvidenceReadRepository.class);
+        for (EvidenceRow row : graph.evidenceRows().values()) {
+            org.mockito.Mockito.when(evidenceRows.findEvidence(row.id())).thenReturn(java.util.Optional.of(
+                    new com.zoop.document.evidence.repository.EvidenceView(row.id(), row.articleId(), row.articleVersion(),
+                            row.textArtifactId(), row.quote(), row.startOffset(), row.endOffset(), "body", true, row.verificationArtifactId())));
+        }
+        Path sourceFile = temp.toRealPath().resolve("relation-read-sources.json");
+        String sources = """
+                {"schemaVersion":"zoop-ingestion-s2-1","revision":"relation-read-1","sources":[{
+                  "sourceId":"synthetic-source","adapter":"authored-files","inputRoot":"/synthetic",
+                  "allowedHosts":["example.invalid"],"scopes":[{"scopeId":"body","selection":"authored fixture",
+                    "initialCursor":null,"articleXPath":null,"timestampLimitations":["authored fixture"]}],
+                  "grant":{"grantId":"operator-grant","revision":"rights-1","sourceId":"synthetic-source",
+                    "enabled":true,"rights":"known","allowedOperations":["read","store","quote-display"],
+                    "recipients":[],"purposes":[],"evidence":["authored synthetic fixture"],"expiresAt":null}}]}
+                """;
+        Files.writeString(sourceFile, sources);
+        var evidenceService = new com.zoop.document.evidence.service.EvidenceService(evidenceRows, registry, null,
+                new com.zoop.document.evidence.service.DocumentReadSources(sourceFile),
+                new com.zoop.graph.read.GraphEvidenceSnapshotReader(publicReader),
+                new com.zoop.document.evidence.service.EvidenceArtifactReader(store), clock, transaction);
+        var pinned = publicReader.read(null, versionId, null);
+        // Resolve the display ID using its stable public formula, not the producer's full source relation ID.
+        String edgeId = "edge-" + sha256(("STRUCTURALLY_RELATED_TO|" + ISSUE + "|" + COMPANY_B).getBytes(StandardCharsets.UTF_8)).substring(0, 16);
+        var service = new com.zoop.graph.read.GraphRelationService(publicReader,
+                org.mockito.Mockito.mock(org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate.class),
+                new com.zoop.graph.read.GraphStructuralDetailReader(evidenceService));
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
+                new com.zoop.graph.read.GraphRelationController(service))
+                .setControllerAdvice(new com.zoop.common.exception.GlobalExceptionHandler())
+                .addFilters(new com.zoop.common.request.RequestIdFilter()).build();
+        var request = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/graph/edges/" + edgeId)
+                .param("graphVersion", versionId);
+        var response = mvc.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.status").value("available"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.metadata.partial").value(false))
+                .andReturn();
+        JsonNode body = HandoffFixtures.parse(response.getResponse().getContentAsByteArray());
+        JsonNode sourceRelation = built.bundle().get("relations").values().stream()
+                .filter(r -> r.get("type").stringValue().equals("STRUCTURALLY_RELATED_TO")).findFirst().orElseThrow();
+        JsonNode link = body.get("structuralDetails").get("paths").get(0).get("links").get(0);
+        assertEquals(sourceRelation.get("basis").get(0).get("businessScope"), link.get("businessScope"));
+        assertEquals(sourceRelation.get("structuralPath").get("links").get(0).get("supplierCompanyId"), link.get("supplierCompanyId"));
+        assertEquals(sourceRelation.get("basis").get(0).get("evidenceIds"), link.get("evidenceIds"));
+        // A source grant is checked now, not only when the bundle was imported.
+        Files.writeString(sourceFile, sources.replace("\"enabled\":true", "\"enabled\":false"));
+        mvc.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.status").value("unavailable"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.paths").isEmpty())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.metadata.partial").value(true));
+        Files.writeString(sourceFile, sources);
+        mvc.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.status").value("available"));
+        Files.writeString(receiptFile(versionId), "{}");
+        mvc.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.relationType")
+                        .value("STRUCTURALLY_RELATED_TO"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.status")
+                        .value("unavailable"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.structuralDetails.reason")
+                        .value("details_not_available"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.metadata.partial")
+                        .value(true))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.metadata.failures[0].code")
+                        .value("STRUCTURAL_DETAIL_UNAVAILABLE"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.metadata.failures[0].retryable")
+                        .value(false));
+    }
+
+
+
+    /** The public read side over one imported version, as activated: real snapshot store, receipts and source registry. */
+    private record ReadSide(PublicGraphReader reader, EvidenceService receipts, GraphVersionSelector selector, Path sources,
+            String sourceRegistry) { }
+
+    private ReadSide readSide(String versionId) throws Exception {
+        ArtifactRow snapshot = registry.findArtifact("artifact-" + versionId).orElseThrow();
+        GraphVersionRecord version = new GraphVersionRecord(versionId, 3, "snapshot", snapshot.id(),
+                snapshot.storageUri(), snapshot.sha256(), true);
+        // Only the read-side version port models an activated version; the importer never activates anything.
+        GraphVersionRepository versions = mock(GraphVersionRepository.class);
+        when(versions.find(versionId)).thenReturn(Optional.of(version));
+        when(versions.everActivated(versionId)).thenReturn(true);
+        Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+        when(versions.active()).thenReturn(Optional.of(version));
+        GraphVersionSelector selector = new GraphVersionSelector(versions, clock);
+        PublicGraphReader reader = new PublicGraphReader(selector,
+                new ArtifactGraphSnapshotStore(store, registry, null), ignoredVersion -> DisclosureExclusions.NONE);
+        EvidenceReadRepository evidence = mock(EvidenceReadRepository.class);
+        for (EvidenceRow row : graph.evidenceRows().values()) {
+            when(evidence.findEvidence(row.id())).thenReturn(Optional.of(new EvidenceView(row.id(), row.articleId(),
+                    row.articleVersion(), row.textArtifactId(), row.quote(), row.startOffset(), row.endOffset(),
+                    "body", true, row.verificationArtifactId())));
+        }
+        Path sources = temp.toRealPath().resolve("event-read-sources.json");
+        String sourceRegistry = """
+                {"schemaVersion":"zoop-ingestion-s2-1","revision":"event-read-1","sources":[{
+                  "sourceId":"synthetic-source","adapter":"authored-files","inputRoot":"/synthetic",
+                  "allowedHosts":["example.invalid"],"scopes":[{"scopeId":"body","selection":"authored fixture",
+                    "initialCursor":null,"articleXPath":null,"timestampLimitations":["authored fixture"]}],
+                  "grant":{"grantId":"operator-grant","revision":"rights-1","sourceId":"synthetic-source",
+                    "enabled":true,"rights":"known","allowedOperations":["read","store","quote-display"],
+                    "recipients":[],"purposes":[],"evidence":["authored synthetic fixture"],"expiresAt":null}}]}
+                """;
+        Files.writeString(sources, sourceRegistry);
+        EvidenceService receipts = new EvidenceService(evidence, registry, null, new DocumentReadSources(sources),
+                new GraphEvidenceSnapshotReader(reader), new EvidenceArtifactReader(store), clock, transaction);
+        return new ReadSide(reader, receipts, selector, sources, sourceRegistry);
+    }
+
+    @Test
+    void aCurrentBundle7ImportIsPublishedForTheCandidateLists() throws Exception {
+        // #349 review: the candidate publication state reads the importer's own bundle-7 receipt through the same head gate.
+        handoff.envelope = built.envelopeBytes();
+        assertTrue(importer.run(built.request()).succeeded());
+        String versionId = built.versionId();
+        ReadSide side = readSide(versionId);
+        var published = new com.zoop.admin.review.PublishedCandidates(side.reader(), side.receipts(), side.selector(),
+                ignoredVersion -> DisclosureExclusions.NONE, Clock.fixed(NOW, ZoneOffset.UTC));
+
+        var shown = published.current("req-published").orElseThrow(() -> new AssertionError("publication state unknown"));
+
+        assertEquals(versionId, shown.versionId());
+        assertFalse(shown.events().isEmpty(), "the imported issue's S2 event candidate is published");
+        assertTrue(shown.excludedEvents().isEmpty());
+        assertFalse(shown.relations().isEmpty(), "the imported relation's S3 candidate is published");
+
+        // Rights withdrawn now: the same receipt's items are hidden, never unknown.
+        Files.writeString(side.sources(), side.sourceRegistry().replace("\"enabled\":true", "\"enabled\":false"));
+        var withdrawn = new com.zoop.admin.review.PublishedCandidates(side.reader(), side.receipts(), side.selector(),
+                ignoredVersion -> DisclosureExclusions.NONE, Clock.fixed(NOW, ZoneOffset.UTC)).current("req-withdrawn")
+                .orElseThrow();
+        assertTrue(withdrawn.events().isEmpty());
+        assertEquals(shown.events(), withdrawn.excludedEvents());
+    }
+
+    @Test
+    void aCurrentImportReceiptServesEventMetadataOverTheConsumerRouteWithoutExposingItsSummary() throws Exception {
+        Built summarized = HandoffFixtures.withSummary(built, HandoffFixtures::availableSummary);
+        handoff.envelope = summarized.envelopeBytes();
+        assertTrue(importer.run(summarized.request()).succeeded());
+        String versionId = summarized.versionId();
+        ReadSide side = readSide(versionId);
+        PublicGraphReader reader = side.reader();
+        EvidenceService receipts = side.receipts();
+        Path sources = side.sources();
+        String sourceRegistry = side.sourceRegistry();
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
+                new EventController(null, new EventDetailService(reader, receipts, registry)))
+                .setControllerAdvice(new com.zoop.common.exception.GlobalExceptionHandler())
+                .addFilters(new com.zoop.common.request.RequestIdFilter()).build();
+
+        mvc.perform(get("/api/v1/events/" + ISSUE).param("graphVersion", versionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ISSUE))
+                .andExpect(jsonPath("$.mentions[0].title").value("합성 공급 계약"))
+                .andExpect(jsonPath("$.mentions[0].eventTime").value("2026-09-30"))
+                .andExpect(jsonPath("$.sourceSupport.articleCount").value(1))
+                .andExpect(jsonPath("$.metadata.graphVersion").value(versionId))
+                .andExpect(jsonPath("$.metadata.source").value("public_graph_snapshot"))
+                .andExpect(jsonPath("$.metadata.partial").value(true))
+                .andExpect(jsonPath("$.metadata.failures[0].code").value("SUMMARY_NOT_PRODUCED"))
+                .andExpect(jsonPath("$.summary.status").value("unavailable"))
+                .andExpect(jsonPath("$.summary.text").doesNotExist())
+                .andExpect(jsonPath("$.approval").isEmpty());
+
+        // The same supported receipt still cannot bypass current source rights or its registry-pinned bytes.
+        Files.writeString(sources, sourceRegistry.replace("\"enabled\":true", "\"enabled\":false"));
+        mvc.perform(get("/api/v1/events/" + ISSUE).param("graphVersion", versionId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+        Files.writeString(sources, sourceRegistry);
+        Files.writeString(receiptFile(versionId), "{}");
+        mvc.perform(get("/api/v1/events/" + ISSUE).param("graphVersion", versionId))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error.code").value("SOURCE_UNAVAILABLE"));
+    }
+
+
+
+    @Test
+    void anAvailableSummaryIsRetainedExactlyInTheReceiptAndNeverReachesTheSnapshotOrTheResult() throws Exception {
+        Built summarized = HandoffFixtures.withSummary(built, HandoffFixtures::availableSummary);
+        handoff.envelope = summarized.envelopeBytes();
+
+        GraphHandoffResult result = importer.run(summarized.request());
+
+        assertTrue(result.succeeded(), () -> String.valueOf(result.failure() == null ? null : result.failure().failure()));
+        String versionId = summarized.versionId();
+        // The receipt keeps the producer's exact object: every claim, id, digest, identity and the job pin.
+        JsonNode retained = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId))).get("bundle").get("issues").get(0).get("summary");
+        assertEquals(summarized.bundle().get("issues").get(0).get("summary"), retained);
+        assertEquals("available", retained.get("status").stringValue());
+        assertEquals(HandoffFixtures.SUMMARY_CLAIM, retained.get("text").stringValue());
+        assertEquals(HandoffFixtures.SUMMARY_JOB, retained.get("source").get("jobId").stringValue());
+        // It is a receipt-only record, not a public snapshot projection: nothing of it is in the snapshot or in the written result.
+        byte[] snapshotBytes = Files.readAllBytes(snapshotFile(versionId));
+        assertEquals(PublicGraphSnapshot.FORMAT, GraphSnapshotCodec.read(snapshotBytes, versionId).snapshotFormat());
+        String snapshotText = new String(snapshotBytes, StandardCharsets.UTF_8);
+        String resultText = new String(GraphHandoffResultWriter.toBytes(result), StandardCharsets.UTF_8);
+        for (String summaryOnly : List.of(HandoffFixtures.SUMMARY_CLAIM, "resultVersion", "isr-", HandoffFixtures.SUMMARY_JOB, "authored-replay",
+                "claims", "basisDigest", "issueSummary")) {
+            assertFalse(snapshotText.contains(summaryOnly), "snapshot: " + summaryOnly);
+            assertFalse(resultText.contains(summaryOnly), "result: " + summaryOnly);
+        }
+
+        // The same pins again: a no-op with the same retained summary.
+        assertEquals(Outcome.UNCHANGED, importer.run(summarized.request()).staged().outcome());
+    }
+
+    @Test
+    void aTemporalPendingOrJobCodedSummaryIsRetainedAsStatedAndANotRequestedOneNeverBecomesAnAvailableOne() throws Exception {
+        Built held = HandoffFixtures.build(Spec.standard().withVerdicts());
+        handoff.envelope = held.envelopeBytes();
+
+        assertTrue(importer.run(held.request()).succeeded());
+        JsonNode retained = HandoffFixtures.parse(Files.readAllBytes(receiptFile(held.versionId()))).get("bundle").get("issues").get(0).get("summary");
+        assertEquals("temporal-review-pending", retained.get("code").stringValue());
+        assertTrue(retained.get("source").isNull());
+        assertFalse(Files.readString(receiptFile(held.versionId())).contains(HandoffFixtures.SUMMARY_CLAIM));
+    }
+
+    @Test
+    void aTamperedSummaryIsRefusedBeforeAnythingIsWrittenWhateverItsDigestsSay() throws Exception {
+        InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+        InMemoryDocumentRegistry.State registryBefore = registry.state();
+        long filesBefore = fileCount();
+        Built summarized = HandoffFixtures.withSummary(built, HandoffFixtures::availableSummary);
+        Built held = HandoffFixtures.build(Spec.standard().withVerdicts());
+        record Forgery(String rule, Built forged) {
+        }
+        List<Forgery> forgeries = List.of(
+                new Forgery("a claim text edited behind the digests", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary").get("claims").get(0)).put("text", "합성기업이 계약을 취소했다."))),
+                new Forgery("a summary text that is not the claims", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary")).put("text", "다른 문장이다."))),
+                new Forgery("an evidence id outside the issue's mention quotes", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary").get("claims").get(0)).putArray("evidenceIds")
+                                .add("ev-" + "0".repeat(64)))),
+                new Forgery("a basis digest of another basis", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary").get("source")).put("basisDigest", "0".repeat(64)))),
+                new Forgery("an available summary on an issue whose time field is held", HandoffFixtures.repinned(held,
+                        b -> ((ObjectNode) b.get("issues").get(0)).set("summary", HandoffFixtures.availableSummary(b)))),
+                new Forgery("not-requested on an issue whose time field is held", HandoffFixtures.repinned(held,
+                        b -> ((ObjectNode) b.get("issues").get(0)).set("summary", HandoffFixtures.unavailable("not-requested")))),
+                new Forgery("temporal-review-pending on an issue nobody held", HandoffFixtures.repinned(built,
+                        b -> ((ObjectNode) b.get("issues").get(0)).set("summary", HandoffFixtures.unavailable("temporal-review-pending")))),
+                new Forgery("a replay summary relabelled as a provider's", HandoffFixtures.repinned(summarized,
+                        b -> ((ObjectNode) b.get("issues").get(0).get("summary").get("producer")).put("kind", "provider"))));
+        for (Forgery forgery : forgeries) {
+            handoff.envelope = forgery.forged().envelopeBytes();
+
+            GraphHandoffException failure = failure(importer.run(forgery.forged().request()));
+
+            assertEquals(GraphHandoffFailure.BUNDLE_INVALID, failure.failure(), forgery.rule());
+            assertEquals(0, graph.writes(), forgery.rule());
+            assertNothingWritten(graphBefore, registryBefore, filesBefore);
+        }
     }
 
     @Test
@@ -470,7 +908,7 @@ class GraphHandoffImporterTest {
     @Test
     void anExportOfAnEarlierBundleSchemaIsAnInvalidBundleAndNothingIsWritten() throws Exception {
         for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3",
-                "zoop-graph-handoff-bundle-5")) {
+                "zoop-graph-handoff-bundle-5", "zoop-graph-handoff-bundle-6")) {
             InMemoryGraphHandoffRepository.State graphBefore = graph.state();
             InMemoryDocumentRegistry.State registryBefore = registry.state();
             long filesBefore = fileCount();
@@ -479,8 +917,11 @@ class GraphHandoffImporterTest {
             bundle.put("schemaVersion", schema);
             ObjectNode issue = (ObjectNode) bundle.get("issues").get(0);
             // What each earlier build wrote: -3 has provenance without `withheld` and no verdicts, -2 no provenance, -1 no mentions;
-            // -5 has today's issues, so only its schema string (this build writes impacts, it never did) marks it as earlier.
-            if (!schema.endsWith("-5")) {
+            // -5 has today's issues, so only its schema string marks it as earlier; -6 lacks the issue summary and its policy key.
+            if (schema.endsWith("-6")) {
+                issue.remove("summary");
+                ((ObjectNode) bundle.get("policy")).remove("issueSummary");
+            } else if (!schema.endsWith("-5")) {
                 issue.remove("fieldVerdicts");
                 if (schema.endsWith("-3")) {
                     ((ObjectNode) issue.get("fieldProvenance")).remove("withheld");
@@ -892,6 +1333,38 @@ class GraphHandoffImporterTest {
         assertEquals("existing", next.staged().snapshot().file());
         assertEquals("existing", next.staged().receipt().file());
         assertEquals(1, graph.state().versions().size());
+    }
+
+    @Test
+    void aRetryAfterAnUnknownCommitAndARuleSwitchStagesUnderTheNewRulesWithoutAFileConflict() throws Exception {
+        // PR #326 review: the lost attempt left the file of its rules; the switch changes the bytes the retry writes.
+        graph.publication = new PublicationState(3, 0, List.of(INVOLVES_SINGLE));
+        transaction.failCommitOnce = true;
+        assertEquals(GraphHandoffFailure.DATABASE_UNAVAILABLE, failure(importer.run(built.request())).failure());
+        Path lostFile = root.resolve("graph_snapshot")
+                .resolve(GraphHandoffImporter.snapshotFileName(built.versionId(), List.of("involves-single@1")));
+        assertTrue(Files.exists(lostFile), "the unknown outcome keeps the file");
+
+        graph.publication = new PublicationState(4, 0, List.of());
+        GraphHandoffResult retry = importer.run(built.request());
+
+        assertTrue(retry.succeeded(), () -> String.valueOf(retry.failure() == null ? null : retry.failure().failure()));
+        assertEquals(Outcome.STAGED, retry.staged().outcome());
+        assertEquals("created", retry.staged().snapshot().file(), "its own file, not the orphan of the other rule set");
+        assertEquals(List.of(), graph.inserted().get(0).ruleIds());
+        assertEquals(4, graph.inserted().get(0).ruleRevision());
+        assertEquals(2, GraphSnapshotCodec.read(Files.readAllBytes(snapshotFile(built.versionId())), built.versionId())
+                .relations().size(), "the snapshot of the rules read by the retry");
+        assertTrue(Files.exists(lostFile), "the orphan is left alone, never registered");
+
+        // Under the same rules a lost attempt's file is adopted, as without rules.
+        freshSetUp();
+        graph.publication = new PublicationState(3, 0, List.of(INVOLVES_SINGLE));
+        transaction.failCommitOnce = true;
+        importer.run(built.request());
+        GraphHandoffResult same = importer.run(built.request());
+        assertTrue(same.succeeded());
+        assertEquals("existing", same.staged().snapshot().file());
     }
 
     @Test

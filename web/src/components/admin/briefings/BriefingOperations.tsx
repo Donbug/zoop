@@ -1,3 +1,4 @@
+import { useAdminRefresh } from '@/hooks/useAdminRefresh';
 import { useCallback, useState } from 'react';
 import {
   getAdminBriefingRound,
@@ -89,12 +90,12 @@ function RoundDetailView({
         <dd className={`${DD} tabular-nums`}>{count(round.attempts)}회</dd>
       </dl>
       {round.failureReason && (
-        <p className="rounded-[3px] border-[0.667px] border-zoop-alert px-3 py-2 text-xs">
+        <p className="rounded-2xl bg-zoop-soft px-4 py-3 text-xs text-zoop-alert">
           실패 사유: {round.failureReason}
         </p>
       )}
       {round.suspension && (
-        <p className="rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-wash px-3 py-2 text-xs">
+        <p className="rounded-2xl bg-zoop-soft px-4 py-3 text-xs">
           제공 중단: {round.suspension.reason}{' '}
           <span className="text-[11px] text-zoop-muted">
             ({formatKst(round.suspension.at)} · {round.suspension.adminEmail})
@@ -270,9 +271,20 @@ function RoundPanel({
   const [action, setAction] = useState<RoundAction | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const round = detail.data;
+  useAdminRefresh(
+    detail.reload,
+    !action && round && ['generating', 'verifying'].includes(round.status)
+      ? 5000
+      : false,
+  );
 
   return (
     <article aria-label="회차 상세" className="flex min-w-0 flex-col gap-4">
+      {detail.refreshError && (
+        <p role="status" className="text-[11px] text-zoop-muted">
+          새로 고치지 못했어요. 이전 결과를 표시해요.
+        </p>
+      )}
       <div className="flex items-start gap-2">
         <h2 className="flex-1 text-sm font-bold tabular-nums">
           {round
@@ -336,6 +348,14 @@ export default function BriefingOperations() {
   const { params, updateQuery } = useRouteQuery();
   const selectedId = params.get('round');
   const rounds = useCursorPages(listAdminBriefingRounds);
+  useAdminRefresh(
+    rounds.reload,
+    rounds.items.some((round) =>
+      ['generating', 'verifying'].includes(round.status),
+    )
+      ? 5000
+      : false,
+  );
   const schedule = rounds.pages[0]?.schedule;
 
   return (
@@ -351,6 +371,11 @@ export default function BriefingOperations() {
           )
         }
       />
+      {rounds.refreshError && (
+        <p role="status" className="text-[11px] text-zoop-muted">
+          새로 고치지 못했어요. 이전 결과를 표시해요.
+        </p>
+      )}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,440px)]">
         <div className="flex min-w-0 flex-col gap-3 self-start">
           {rounds.status === 'loading' && (
@@ -393,7 +418,7 @@ export default function BriefingOperations() {
                           onClick={() =>
                             updateQuery({ round: round.id }, { replace: true })
                           }
-                          className={`whitespace-nowrap text-left font-semibold tabular-nums hover:underline ${FOCUS_RING}`}
+                          className={`whitespace-nowrap rounded-full px-3 py-2 text-left font-semibold tabular-nums hover:bg-zoop-soft aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper ${FOCUS_RING}`}
                         >
                           {round.date} {editionLabel[round.edition]}
                         </button>

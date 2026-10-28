@@ -23,7 +23,7 @@ class GraphRelationServiceTest {
     private DisclosureExclusions exclusions = DisclosureExclusions.NONE;
     private final org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate jdbc =
             org.mockito.Mockito.mock(org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate.class);
-    private final GraphRelationService service = new GraphRelationService(GraphReadFixtures.reader(NOW, () -> exclusions), jdbc);
+    private final GraphRelationService service = new GraphRelationService(GraphReadFixtures.reader(NOW, pinned -> exclusions), jdbc, new GraphStructuralDetailReader(org.mockito.Mockito.mock(com.zoop.document.evidence.service.EvidenceService.class)));
 
     private static final String STRUCTURAL = DisplayGraph.edgeId("STRUCTURALLY_RELATED_TO", HBM_EQUIP, HYNIX);
     private static final String SHARED = DisplayGraph.edgeId("SHARES_ISSUE", HYNIX, NVDA);
@@ -62,7 +62,7 @@ class GraphRelationServiceTest {
                 java.util.Map.of(HBM_SUPPLY, List.of(HYNIX, NVDA)));
         var selector = new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
                 java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC), (id, request) -> basis);
-        return new GraphRelationService(new PublicGraphReader(selector, ignored -> snapshot, () -> DisclosureExclusions.NONE), jdbc);
+        return new GraphRelationService(new PublicGraphReader(selector, ignored -> snapshot, pinned -> DisclosureExclusions.NONE), jdbc, new GraphStructuralDetailReader(org.mockito.Mockito.mock(com.zoop.document.evidence.service.EvidenceService.class)));
     }
 
     @Test
@@ -99,8 +99,44 @@ class GraphRelationServiceTest {
         assertEquals("active", edge.basis().get(0).validity());
         assertEquals("active", edge.validity());
         assertEquals(GraphRelationService.EXPLANATIONS.get("STRUCTURALLY_RELATED_TO"), edge.explanation());
+        assertEquals("unavailable", edge.structuralDetails().status());
+        assertEquals("not_recorded", edge.structuralDetails().reason());
+        assertFalse(edge.metadata().partial());
+        assertTrue(edge.metadata().failures().isEmpty());
         assertTrue(edge.via().isEmpty());
         assertEquals("fixture-2026-10-08", edge.metadata().graphVersion());
+    }
+
+    @Test
+    void transientStructuralDetailFailurePreservesBaseRelationAndMarksRetryablePartialResponse() {
+        assertStructuralDetailFailure(true, "SOURCE_UNAVAILABLE");
+    }
+
+    @Test
+    void permanentStructuralDetailFailurePreservesBaseRelationAndMarksNonRetryablePartialResponse() {
+        assertStructuralDetailFailure(false, "STRUCTURAL_DETAIL_UNAVAILABLE");
+    }
+
+    private void assertStructuralDetailFailure(boolean retryable, String failureCode) {
+        var details = org.mockito.Mockito.mock(GraphStructuralDetailReader.class);
+        org.mockito.Mockito.when(details.read(org.mockito.ArgumentMatchers.any(PublicGraphReader.Pinned.class),
+                org.mockito.ArgumentMatchers.any(DisplayGraph.Edge.class), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq("r")))
+                .thenThrow(new CustomException(ErrorCode.SOURCE_UNAVAILABLE, retryable));
+        var subject = new GraphRelationService(GraphReadFixtures.reader(NOW, ignored -> DisclosureExclusions.NONE), jdbc, details);
+
+        var edge = subject.getRelation(STRUCTURAL, null, null, null, "r");
+
+        assertEquals("STRUCTURALLY_RELATED_TO", edge.relationType());
+        assertEquals("ALLOW", edge.verification().status());
+        assertEquals("SUPPLIES", edge.basis().get(0).relationType());
+        assertEquals("unavailable", edge.structuralDetails().status());
+        assertEquals("details_not_available", edge.structuralDetails().reason());
+        assertTrue(edge.metadata().partial());
+        assertEquals(1, edge.metadata().failures().size());
+        assertEquals("structuralDetails", edge.metadata().failures().get(0).section());
+        assertEquals(failureCode, edge.metadata().failures().get(0).code());
+        assertEquals(retryable, edge.metadata().failures().get(0).retryable());
     }
 
     @Test

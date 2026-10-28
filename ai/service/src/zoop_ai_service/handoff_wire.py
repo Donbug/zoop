@@ -1,4 +1,4 @@
-"""Wire models of the read-only handoff family (`zoop-ai-internal-handoff-1`) and the CLOSED model of the `zoop-graph-handoff-bundle-6` bundle.
+"""Wire models of the read-only handoff family (`zoop-ai-internal-handoff-1`) and the CLOSED model of the `zoop-graph-handoff-bundle-7` bundle.
 
 Three kinds of model live here:
   * `Hd*` models (extra forbidden) are what this service emits as status and what the generated OpenAPI documents;
@@ -16,11 +16,16 @@ The models are the structural contract the application can rely on (exact key se
 export, and the service never repeats or second-guesses them. Everything in the bundle that came from a source (titles, URLs, labels, observation
 metadata) is data, never authority: no field of it grants, extends or proves a right, and the service gates delivery only on the producer's current
 verdict and the operator's pins.
-The one exception is the `impacts` list: its row state table and every closure the closed models can see (one row per emitted INVOLVES source relation, endpoints,
-source approval kind, effect evidence ids and article versions, counts, policy, deterministic label) are enforced here as well, so a forged row never leaves.
+Two exceptions: the `impacts` list (its row state table and every closure the closed models can see: one row per emitted INVOLVES source relation, endpoints, source
+approval kind, effect evidence ids and article versions, counts, policy, deterministic label) and the issue `summary` (bundle `-7`: the whole decision table of the
+producer's `issue_summary_contracts` is recomputed from the bundle, see `check_issue_summary`) are enforced here as well, so a forged row or summary never leaves.
 """
 from __future__ import annotations
 
+import hashlib
+import json
+import re
+from datetime import datetime
 from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
@@ -31,7 +36,7 @@ from .wire import ErrorBody, Reviewer, Safe
 
 SCHEMA = "zoop-ai-internal-handoff-1"
 RUNTIME_SCHEMA = "zoop-ai-handoff-1"
-BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-6"
+BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-7"
 POLICY = "zoop-public-projection-policy-1"
 HANDOFF_ID_PATTERN = r"^[A-Za-z0-9._:-]{1,200}$"
 HASH_PATTERN = r"^[a-f0-9]{64}$"
@@ -44,6 +49,13 @@ STAMP_PATTERN = r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]
 # Limits mirror the producer's (`handoff_contracts.py`); free text is bounded far above anything a source field holds and far below the 6 MiB bundle cap.
 MAX_SOURCES, MAX_COMPANIES, MAX_ISSUES, MAX_RELATIONS, MAX_EVIDENCE, MAX_ARTICLES, MAX_EXCLUSIONS = 20, 20_000, 2_000, 10_000, 20_000, 1_000, 20_000
 MAX_TEXT = 20_000
+# Issue summary limits and vocabulary mirror the producer's `issue_summary_contracts`. The input quote cap is part of the policy identity: changing it changes the policy string.
+SUMMARY_POLICY = "zoop-issue-summary-policy-1"
+MAX_QUOTES, MAX_CLAIMS, MAX_CLAIM_QUOTES, MAX_CLAIM_TEXT = 60, 5, 5, 280      # MAX_CLAIM_TEXT counts Unicode code points
+SUMMARY_DETERMINISTIC = ("not-requested", "temporal-review-pending", "input-too-large")      # no job exists behind them: `source` is null
+SUMMARY_HELD_DECISIONS = ("HOLD", "REJECT")
+# (executionMode, recordingKind) -> (producer kind, verifier kind): a replay summary is an authored answer, never an independent model's, and never sits in a live bundle.
+SUMMARY_KINDS = {("replay", "authored-test"): ("authored-replay", "authored-replay"), ("live", "provider"): ("provider", "independent-verifier")}
 RETRYABLE = frozenset({"runtime_unavailable", "runtime_busy", "service_busy", "service_configuration_invalid"})
 
 STATES = ("reserved", "ready", "failed")
@@ -104,6 +116,7 @@ class BPolicy(Bx):
     sequence: Literal["s2-comparison-with-operator-decision"]
     source_support: Literal["origin-or-exact-text-union"]
     impacts: Literal["s3-independent-verifier-quote-effect"]
+    issue_summary: Literal["zoop-issue-summary-policy-1"]
 
 
 class BJob(Bx):
@@ -338,6 +351,223 @@ class BFieldProvenance(Bx):
     withheld: Annotated[list[Literal["eventTime", "period"]], Field(max_length=2)]
 
 
+# ---- the issue summary (`issues[].summary`, bundle `-7`) --------------------------------------------------------------------
+
+EvidenceId = Annotated[str, StringConstraints(pattern=EVIDENCE_ID_PATTERN)]
+
+
+class BSummarySource(Bx):
+    """The immutable summary job result this value came from: the job, its input digest, the digest of its result and the basis digest of the issue input it was
+    written for. A deterministic `unavailable` value has no job and therefore no source (`null`)."""
+    job_id: Id
+    input_digest: Hash
+    result_digest: Hash
+    basis_digest: Hash
+
+
+class BSummaryClaim(Bx):
+    """One sentence of an available summary with the quote evidence ids it rests on (1..5, sorted, unique, all inside the issue's own input basis)."""
+    claim_id: Annotated[str, StringConstraints(pattern=r"^c[1-5]$")]
+    text: Annotated[str, StringConstraints(min_length=1, max_length=MAX_CLAIM_TEXT)]
+    evidence_ids: Annotated[list[EvidenceId], Field(min_length=1, max_length=MAX_CLAIM_QUOTES)]
+
+    @model_validator(mode="after")
+    def one_korean_line_over_sorted_unique_quotes(self) -> BSummaryClaim:
+        if "\n" in self.text or "\r" in self.text or not _hangul(self.text):
+            raise ValueError("a claim is one line of text with at least one Hangul syllable")
+        if self.evidence_ids != sorted(set(self.evidence_ids)):
+            raise ValueError("a claim's evidenceIds are sorted and unique")
+        return self
+
+
+class BSummaryProducer(Bx):
+    """Who wrote the claims. `kind` pairs with the bundle's execution mode: `authored-replay` (an authored answer, no model, `model` and `reasoningEffort` null) in a
+    replay bundle, `provider` (a named model and reasoning effort) in a live one."""
+    kind: Literal["authored-replay", "provider"]
+    model: Name | None
+    reasoning_effort: Annotated[str, StringConstraints(min_length=1, max_length=50)] | None
+    prompt_version: Name
+    schema_digest: Hash
+    runtime_identity: Hash
+
+
+class BSummaryVerifier(Bx):
+    """Who checked the claims against the quotes. `authored-replay` in a replay bundle (never an independent model's verdict), `independent-verifier` in a live one."""
+    kind: Literal["authored-replay", "independent-verifier"]
+    model: Name | None
+    adapter_identity: Hash
+    request_digest: Hash
+
+
+class BSummaryAvailable(Bx):
+    """A verified multi-article summary of ONE issue: 1..5 claims, each cited to quote evidence of the issue's own mentions. Its closure with the issue (basis digest,
+    result version, result digest, evidence ids inside the basis, execution-mode kinds) is `check_issue_summary`; what this model fixes is the shape and everything a
+    value says about itself (claim ids `c1..cn`, `text` = claims joined by a newline, `evidenceIds` = the sorted union of the claims', a strict offset-aware `generatedAt`)."""
+    status: Literal["available"]
+    text: Annotated[str, StringConstraints(min_length=1, max_length=MAX_CLAIMS * (MAX_CLAIM_TEXT + 1) - 1)]
+    claims: Annotated[list[BSummaryClaim], Field(min_length=1, max_length=MAX_CLAIMS)]
+    evidence_ids: Annotated[list[EvidenceId], Field(min_length=1, max_length=MAX_CLAIMS * MAX_CLAIM_QUOTES)]
+    generated_at: Stamp
+    result_version: Annotated[str, StringConstraints(pattern=r"^isr-[a-f0-9]{64}$")]
+    language: Literal["ko"]
+    source: BSummarySource
+    producer: BSummaryProducer
+    verifier: BSummaryVerifier
+
+    @model_validator(mode="after")
+    def text_evidence_and_time_say_what_the_claims_say(self) -> BSummaryAvailable:
+        if [c.claim_id for c in self.claims] != [f"c{n}" for n in range(1, len(self.claims) + 1)]:
+            raise ValueError("claim ids are c1..cn in order")
+        if self.text != "\n".join(c.text for c in self.claims):
+            raise ValueError("text is the claims joined by a newline")
+        if self.evidence_ids != sorted({i for c in self.claims for i in c.evidence_ids}):
+            raise ValueError("evidenceIds is the sorted union of the claims' evidenceIds")
+        if not summary_time_valid(self.generated_at):
+            raise ValueError("generatedAt is a strict offset-aware time: YYYY-MM-DDTHH:MM:SS[.f{1,9}](Z|+HH:MM|-HH:MM)")
+        return self
+
+
+class BSummaryUnavailable(Bx):
+    """No summary text exists. A deterministic `code` (`not-requested`, `temporal-review-pending`, `input-too-large`) has no job behind it (`source` null); a job
+    `code` (`producer-invalid`, `verifier-hold`, `verifier-reject`) names the pinned result of the job that failed. It is never an empty available summary."""
+    status: Literal["unavailable"]
+    code: Literal["not-requested", "temporal-review-pending", "input-too-large", "producer-invalid", "verifier-hold", "verifier-reject"]
+    source: BSummarySource | None
+
+    @model_validator(mode="after")
+    def a_job_code_names_its_job_and_a_deterministic_one_has_none(self) -> BSummaryUnavailable:
+        if (self.source is None) != (self.code in SUMMARY_DETERMINISTIC):
+            raise ValueError("source is null exactly for a deterministic code")
+        return self
+
+
+Summary = Annotated[Union[BSummaryAvailable, BSummaryUnavailable], Field(discriminator="status")]
+
+
+def _hangul(text: str) -> bool:
+    return any("\uac00" <= ch <= "\ud7a3" for ch in text)
+
+
+# The shared summary-time grammar (producer `issue_summary_contracts`, app `HandoffTime`, these rules: `api/src/test/resources/graph-handoff/summary-time-vectors.json` is read by all
+# three). ASCII only, uppercase `T` and `Z`, seconds required, an optional fraction of 1..9 digits, a MANDATORY offset (`Z` or `+HH:MM` / `-HH:MM`, hour:minute with a colon, at most
+# 18:00 in either direction), a real calendar date and clock time in years 1..9999. No basic (compact) form, no space or lowercase separator, no week or ordinal date, no leap
+# second. It is deliberately NOT `datetime.fromisoformat`, which also takes forms another language refuses.
+_SUMMARY_TIME = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.[0-9]{1,9})?(Z|[+-]([0-9]{2}):([0-9]{2}))", re.ASCII)
+
+
+def summary_time_valid(value: Any) -> bool:
+    found = _SUMMARY_TIME.fullmatch(value) if isinstance(value, str) else None
+    if found is None:
+        return False
+    year, month, day, hour, minute, second = (int(found.group(n)) for n in range(1, 7))
+    try:
+        datetime(year, month, day, hour, minute, second)         # years 1..9999, a real calendar day, hour 0..23, minute and second 0..59
+    except ValueError:
+        return False
+    if found.group(7) != "Z":
+        offset_hours, offset_minutes = int(found.group(8)), int(found.group(9))
+        return offset_minutes <= 59 and offset_hours * 60 + offset_minutes <= 18 * 60
+    return True
+
+
+def _digest(value: Any) -> str:
+    return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+# The pure rules below take plain bundle dictionaries, exactly as the producer's `issue_summary_contracts` does, so the bundle model, the authored examples and the
+# tests derive every digest from ONE definition. `issue` needs only `id`, `title`, `mentions[].evidenceIds/background` and `fieldVerdicts[].decision`; `evidence` maps an
+# evidence id to a record with `articleId`, `articleVersion`, `start`, `end`, `quoteSha256`; `articles` maps (articleId, articleVersion) to a record with `documentId`,
+# `documentVersion`, `textSha256`.
+
+def temporal_review_pending(issue: dict[str, Any]) -> bool:
+    """Any operator field verdict of the issue (on ANY mention, representative or not) that is HOLD or REJECT. Only `eventTime` and `period` are judged."""
+    return any(v["decision"] in SUMMARY_HELD_DECISIONS for v in issue["fieldVerdicts"])
+
+
+def summary_basis(issue: dict[str, Any], evidence: dict[str, dict[str, Any]], articles: dict[tuple[str, str], dict[str, Any]]) -> dict[str, Any]:
+    """The exact model input of one issue (the producer's `summary_basis`): its title and the union of `mentions[].evidenceIds` sorted by evidence id, each quote pinned
+    to its article version and quote hash. A quote is `background` only when EVERY mention citing it is a background mention. Geography-only and verdict-only evidence is
+    never part of it. A KeyError means the bundle does not hold an evidence row or article the basis names."""
+    background: dict[str, bool] = {}
+    for mention in issue["mentions"]:
+        for ident in mention["evidenceIds"]:
+            background[ident] = background.get(ident, True) and mention["background"] is True
+    quotes, used = [], {}
+    for ident in sorted(background):
+        record = evidence[ident]
+        key = (record["articleId"], record["articleVersion"])
+        article = articles[key]
+        used[key] = {"articleId": key[0], "articleVersion": key[1], "documentId": article["documentId"], "documentVersion": article["documentVersion"],
+                     "textSha256": article["textSha256"]}
+        quotes.append({"evidenceId": ident, "articleId": key[0], "articleVersion": key[1], "start": record["start"], "end": record["end"],
+                       "quoteSha256": record["quoteSha256"], "context": "background" if background[ident] else "report"})
+    return {"policy": SUMMARY_POLICY, "issueId": issue["id"], "title": issue["title"], "quotes": quotes, "articles": [used[key] for key in sorted(used)]}
+
+
+def basis_digest(basis: dict[str, Any]) -> str:
+    return _digest(basis)
+
+
+def deterministic_code(issue: dict[str, Any], basis: dict[str, Any]) -> str | None:
+    """The zero-call rule table, in order: a held or rejected time field, then an oversized input. None means a job may exist for this issue."""
+    if temporal_review_pending(issue):
+        return "temporal-review-pending"
+    if len(basis["quotes"]) > MAX_QUOTES:
+        return "input-too-large"
+    return None
+
+
+def result_version(basis_digest_: str, claims: list[dict[str, Any]]) -> str:
+    """Content identity of an available summary: the basis it was written for and its claims. Never a time, a job id or a runtime."""
+    return "isr-" + _digest({"basisDigest": basis_digest_, "claims": claims})
+
+
+def result_digest(job_id: str, input_digest: str, basis_digest_: str, body: dict[str, Any]) -> str:
+    """The digest a decisions pin and the bundle `source` carry: the job identity and basis around the result `body` (the summary without `source`)."""
+    return _digest({"jobId": job_id, "inputDigest": input_digest, "basisDigest": basis_digest_, "result": body})
+
+
+def check_issue_summary(issue: BIssue, evidence: dict[str, dict[str, Any]], articles: dict[tuple[str, str], dict[str, Any]], execution: tuple[str, str]) -> None:
+    """The producer's `check_summary` over one issue of the bundle, recomputed from the bundle itself. A deterministic code is accepted only while its own condition
+    holds (a held issue carries no other value, `available` included, and `not-requested` only while no deterministic rule applies); a job-coded or `available` value
+    only while no deterministic rule applies and only for the exact basis it was produced for (basis digest, result digest, result version, claim evidence inside the
+    issue's own input quotes, producer and verifier kinds of the bundle's execution mode). `execution` is the bundle's (executionMode, recordingKind). Raises ValueError."""
+    view = {"id": issue.id, "title": issue.title, "mentions": [{"evidenceIds": m.evidence_ids, "background": m.background} for m in issue.mentions],
+            "fieldVerdicts": [{"decision": v.decision} for v in issue.field_verdicts]}
+    try:
+        basis = summary_basis(view, evidence, articles)
+    except KeyError:
+        raise ValueError("an issue's summary basis names evidence or an article the bundle does not hold") from None
+    expected, digest, summary = deterministic_code(view, basis), basis_digest(basis), issue.summary
+    if isinstance(summary, BSummaryUnavailable):
+        if summary.code in SUMMARY_DETERMINISTIC:
+            if summary.code != (expected or "not-requested"):
+                raise ValueError("a deterministic summary code applies exactly while its own condition holds")
+            return
+        source = summary.source
+        if expected is not None or source is None or source.basis_digest != digest or source.result_digest != result_digest(
+                source.job_id, source.input_digest, digest, {"status": "unavailable", "code": summary.code}):
+            raise ValueError("a job-coded unavailable summary needs the issue's basis, no deterministic code and its own result digest")
+        return
+    if expected is not None:
+        raise ValueError("an issue with a deterministic summary code carries no available summary")
+    kinds = SUMMARY_KINDS.get(execution)
+    if kinds is None or (summary.producer.kind, summary.verifier.kind) != kinds:
+        raise ValueError("the summary's producer and verifier kinds pair with the bundle's execution mode")
+    live = execution[0] == "live"
+    if (summary.producer.model is not None) != live or (summary.producer.reasoning_effort is not None) != live or (summary.verifier.model is not None) != live:
+        raise ValueError("a model and reasoning effort are named exactly in a live bundle")
+    allowed = {q["evidenceId"] for q in basis["quotes"]}
+    if any(i not in allowed for claim in summary.claims for i in claim.evidence_ids):
+        raise ValueError("a claim cites only the issue's own input quotes")
+    if summary.result_version != result_version(digest, [claim.wire() for claim in summary.claims]):
+        raise ValueError("resultVersion is the digest of the basis and the claims")
+    body = {k: v for k, v in summary.wire().items() if k != "source"}
+    source = summary.source
+    if source.basis_digest != digest or source.result_digest != result_digest(source.job_id, source.input_digest, digest, body):
+        raise ValueError("the summary's source pins the issue's basis and the result it carries")
+
+
 class BIssue(Bx):
     id: Id
     canonical_id: Id
@@ -357,6 +587,7 @@ class BIssue(Bx):
     field_provenance: BFieldProvenance
     field_verdicts: Annotated[list[BFieldVerdict], Field(max_length=2000)]
     source_support: BSourceSupport
+    summary: Summary
 
 
 class BSourceRef(Bx):
@@ -698,7 +929,7 @@ class BDigests(Bx):
 
 class Bundle(Bx):
     """The producer's artifact. Key names, order-free content and every value are the producer's; this class only says which shapes are acceptable."""
-    schema_version: Literal["zoop-graph-handoff-bundle-6"]
+    schema_version: Literal["zoop-graph-handoff-bundle-7"]
     handoff_id: Id
     manifest_digest: Hash
     provenance: BProvenance
@@ -742,6 +973,20 @@ class Bundle(Bx):
         if self.counts.companies != len(main) or self.counts.path_companies != len(private):
             raise ValueError("counts.companies and counts.pathCompanies must equal the list lengths")
         self.impacts_close_over_the_involves_sources()
+        return self
+
+    @model_validator(mode="after")
+    def issue_summaries_follow_the_decision_table(self) -> Bundle:
+        """Every `issues[].summary` is recomputed from the bundle ITSELF (basis digest, deterministic temporal/input-size code, claim and result identity, execution-mode
+        provenance), never trusted: see `check_issue_summary`. A bundle whose summary is missing, dropped or of another shape never reaches this point (the key is
+        required and the models are closed)."""
+        evidence = {e.id: {"articleId": e.article_id, "articleVersion": e.article_version, "start": e.start, "end": e.end, "quoteSha256": e.quote_sha256}
+                    for e in self.evidence}
+        articles = {(a.article_id, a.article_version): {"documentId": a.document_id, "documentVersion": a.document_version, "textSha256": a.text_sha256}
+                    for a in self.articles}
+        execution = (self.provenance.execution_mode, self.provenance.recording_kind)
+        for issue in self.issues:
+            check_issue_summary(issue, evidence, articles, execution)
         return self
 
     def impacts_close_over_the_involves_sources(self) -> None:
@@ -874,7 +1119,7 @@ class RtUsage(Projection):
 class RtReceipt(Projection):
     handoff_id: str
     manifest_digest: str = Field(pattern=HASH_PATTERN)
-    bundle_schema: Literal["zoop-graph-handoff-bundle-6"]
+    bundle_schema: Literal["zoop-graph-handoff-bundle-7"]
     bundle_digest: str = Field(pattern=HASH_PATTERN)
     content_digest: str = Field(pattern=HASH_PATTERN)
     bundle_bytes: int = Field(ge=1)

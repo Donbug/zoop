@@ -120,11 +120,17 @@ export function impactEdges(
 ): string[] {
   if (
     !impact ||
+    impact.pathStatus !== 'direct_available' ||
     !impact.steps.some(
       (step) => step.id === impact.companyId && step.kind === 'company',
     ) ||
     !impact.steps.some(
       (step) => step.id === impact.issueId && step.kind === 'issue',
+    ) ||
+    impact.steps.some(
+      (step) =>
+        (step.id === impact.companyId || step.id === impact.issueId) &&
+        step.evidenceIds.length === 0,
     ) ||
     impact.metadata.partial ||
     graph.metadata.partial ||
@@ -132,26 +138,16 @@ export function impactEdges(
     Date.parse(impact.metadata.asOf) !== Date.parse(graph.metadata.asOf)
   )
     return [];
-  const edges: string[] = [];
-  for (let i = 1; i < impact.steps.length; i++) {
-    const a = impact.steps[i - 1].id,
-      b = impact.steps[i].id;
-    for (const e of graph.edges)
-      if (
-        !e.derived &&
-        e.assertionStatus === 'confirmed' &&
-        e.evidenceIds.some(
-          (evidence) =>
-            impact.steps[i - 1].evidenceIds.includes(evidence) ||
-            impact.steps[i].evidenceIds.includes(evidence),
-        ) &&
-        e.relationType !== 'SHARES_ISSUE' &&
-        ((e.source === a && e.target === b) ||
-          (e.source === b && e.target === a))
-      )
-        edges.push(e.id);
-  }
-  return [...new Set(edges)];
+  const evidenceIds = new Set(impact.steps.flatMap((step) => step.evidenceIds));
+  const edge = graph.edges.find(
+    (candidate) =>
+      !candidate.derived &&
+      candidate.relationType === 'INVOLVES' &&
+      candidate.source === impact.issueId &&
+      candidate.target === impact.companyId &&
+      [...evidenceIds].every((id) => candidate.evidenceIds.includes(id)),
+  );
+  return edge ? [edge.id] : [];
 }
 export const safeHref = (value: string | null) =>
   value && /^https?:\/\//i.test(value) ? value : undefined;

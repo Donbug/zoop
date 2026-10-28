@@ -35,8 +35,25 @@ final class ChatResults {
                     + "보내 주세요."),
             Map.entry("out_of_scope", "이 질문은 지금 답할 수 있는 범위 밖이에요. 기업과 사건의 연결이나 근거 자료에 대해 물어봐 주세요."),
             Map.entry("investment_advice", "특정 종목의 매수·매도 판단은 제공하지 않아요. 기업과 사건의 연결이나 근거 자료에 대해 물어봐 주세요."),
-            Map.entry("graph_unavailable", "공개된 지도 데이터가 아직 없어 근거를 조회할 수 없어요. 일반 개념 질문은 지금도 할 수 있어요."),
-            Map.entry("evidence_insufficient", "조회한 범위에서 답에 쓸 공개 근거가 부족해요. 대상이나 기간을 바꿔 다시 물어봐 주세요."));
+            Map.entry("graph_unavailable", "공개된 지도 데이터가 아직 없어 근거를 조회할 수 없어요. 일반 개념 질문은 지금도 할 수 있어요."));
+
+    /**
+     * Why an insufficient-evidence result answered nothing, by cause code ({@link InsufficientCause}): the first sentence of
+     * its reason. A {@link #HINTS} sentence follows it.
+     */
+    private static final Map<String, String> CAUSES = Map.of(
+            "results_truncated", "조회 상한 때문에 일부 자료만 확인해 답을 단정할 수 없었어요.",
+            "evidence_held", "근거는 찾았지만 답변 내용이 근거와 맞는지 충분히 확인하지 못해 보여 드리지 않았어요.",
+            "nothing_found", "조회한 범위에서 관련된 공개 자료를 찾지 못했어요.",
+            "precondition_unmet", "앞 단계에서 찾은 대상이 질문의 조건에 맞지 않아 이어서 확인하지 못했어요.",
+            "evidence_insufficient", "관련 항목은 찾았지만 답에 쓸 수 있는 공개 근거가 부족했어요.");
+
+    /** What the member can try next, chosen from the run's own scope, not from what a model said. */
+    private static final Map<String, String> HINTS = Map.of(
+            "narrowed", "선택한 근거 안에서만 확인했어요. 선택을 해제하고 다시 물으면 더 넓게 찾아볼 수 있어요.",
+            "truncated", "대상이나 기간을 좁혀 다시 물어봐 주세요.",
+            "period", "기간을 넓히거나 다른 기업·사건을 지목해 다시 물어봐 주세요.",
+            "other", "다른 기업이나 사건을 지목하거나, 지도에서 대상을 고른 뒤 다시 물어봐 주세요.");
 
     private static final Map<String, String> LIMITATIONS = Map.of(
             "investment_advice", "매수·매도 같은 투자 판단은 제공하지 않아요.",
@@ -45,7 +62,51 @@ final class ChatResults {
             "evidence_insufficient", "이 부분은 답에 쓸 공개 근거가 부족했어요.",
             "out_of_scope", "이 부분은 지금 답할 수 있는 범위 밖이에요.");
 
+    /** {@code evidence_insufficient} messages that say why, when the server knows it; otherwise the kind's own. */
+    private static final Map<String, String> INSUFFICIENT = Map.of(
+            "evidence_held", "이 부분은 답변 내용이 근거와 맞는지 충분히 확인하지 못해 뺐어요.",
+            "nothing_found", "이 부분은 조회한 범위에서 관련 자료를 찾지 못했어요.");
+
+    /** Why nothing or a part could not be answered, as the server decided it. */
+    enum InsufficientCause {
+        RESULTS_TRUNCATED, EVIDENCE_HELD, NOTHING_FOUND, PRECONDITION_UNMET, EVIDENCE_INSUFFICIENT;
+
+        String code() {
+            return name().toLowerCase();
+        }
+    }
+
     private ChatResults() {
+    }
+
+    /**
+     * The reason of an insufficient-evidence result: what happened, then what to try. {@code narrowed} is whether every read
+     * that ran was bound to the selected evidence, not whether evidence was selected: a question naming another company
+     * reads beyond the selection, so clearing it would change nothing.
+     */
+    static String insufficientReason(ChatRun run, InsufficientCause cause, boolean narrowed) {
+        String hint = narrowed ? "narrowed"
+                : cause == InsufficientCause.RESULTS_TRUNCATED ? "truncated"
+                : run.context().period() != null ? "period" : "other";
+        return CAUSES.get(cause.code()) + " " + HINTS.get(hint);
+    }
+
+    /** An {@code evidence_insufficient} limitation whose message says why when it is known. */
+    static ChatLimitation insufficient(InsufficientCause cause, String label) {
+        var limitation = limitation("evidence_insufficient", label);
+        String message = INSUFFICIENT.get(cause.code());
+        return message == null ? limitation : new ChatLimitation(limitation.kind(), limitation.label(), message);
+    }
+
+    /**
+     * An insufficient-evidence result: no sections, citations or limitations, but the reason says why and
+     * {@code applied} shows the companies and issues the reads looked at.
+     */
+    static ChatResult insufficient(ChatRun run, InsufficientCause cause, boolean narrowed, List<ChatAppliedItem> companies,
+            List<ChatAppliedItem> issues, boolean questionOverrodeContext, Instant now) {
+        return new ChatResult("insufficient_evidence", PENDING_MESSAGE, "", List.of(), "none",
+                insufficientReason(run, cause, narrowed), List.of(), List.of(), List.of(),
+                applied(run, companies, issues, questionOverrodeContext, null, now), List.of(), null, List.of(), metadata(run, now));
     }
 
     static String reason(String code) {
@@ -60,23 +121,35 @@ final class ChatResults {
         return new ChatLimitation(kind, label.length() > 200 ? label.substring(0, 200) : label, message);
     }
 
-    /** A clarification, guidance or insufficient-evidence result: no sections, citations or limitations. */
+    /**
+     * A Q07 requirement answered on only the first of the member's companies (holdings first, then the watchlist): a
+     * {@code results_truncated} note beside the answer, never a reason to leave it unanswered.
+     */
+    static ChatLimitation scopeCut(String label) {
+        var limitation = limitation("results_truncated", label);
+        return new ChatLimitation(limitation.kind(), limitation.label(), "내 종목이 많아 앞의 "
+                + com.zoop.chat.tool.ChatToolRequest.MAX_TARGETS + "개(보유 종목 먼저, 그다음 관심 목록 순)만 확인했어요.");
+    }
+
+    /** A clarification or guidance result: no sections, citations or limitations. */
     static ChatResult withoutAnswer(ChatRun run, String outcome, String reasonCode, List<ChatChoice> choices, Instant now) {
         return new ChatResult(outcome, PENDING_MESSAGE, "", List.of(), "none", reason(reasonCode), List.of(), List.of(),
-                List.of(), applied(run, List.of(), List.of(), false, now), List.copyOf(choices), null, List.of(),
+                List.of(), applied(run, List.of(), List.of(), false, null, now), List.copyOf(choices), null, List.of(),
                 metadata(run, now));
     }
 
     static ChatResult answered(ChatRun run, List<ChatGeneratedAnswer.Section> sections, List<Citation> citations,
             List<GraphTarget> targets, List<ChatAppliedItem> companies, List<ChatAppliedItem> issues,
-            List<ChatLimitation> limitations, boolean questionOverrodeContext, Instant now) {
+            List<ChatLimitation> limitations, boolean questionOverrodeContext, ChatAppliedPeriod writtenPeriod, Instant now) {
         List<ChatAnswerSection> publicSections = sections.stream()
                 .map(s -> new ChatAnswerSection(s.basis(), s.text(), s.evidenceIds())).toList();
         Set<String> sources = new LinkedHashSet<>();
-        citations.forEach(c -> sources.add(c.articleId()));
+        // Sources are articles; a catalog profile quote has none.
+        citations.stream().filter(c -> c.articleId() != null).forEach(c -> sources.add(c.articleId()));
         return new ChatResult("answered", PENDING_MESSAGE, ChatAnswerCheck.joined(sections), publicSections,
                 answerBasis(sections), null, List.copyOf(sources), List.copyOf(citations), List.copyOf(targets),
-                applied(run, companies, issues, questionOverrodeContext, now), List.of(), null, List.copyOf(limitations),
+                applied(run, companies, issues, questionOverrodeContext, writtenPeriod, now), List.of(), null,
+                List.copyOf(limitations),
                 metadata(run, now));
     }
 
@@ -87,10 +160,11 @@ final class ChatResults {
         return bases.isEmpty() ? "none" : bases.size() == 1 ? bases.iterator().next() : "mixed";
     }
 
+    /** The period applied: the one the question wrote, when a read used it, else the one the member selected. */
     private static ChatApplied applied(ChatRun run, List<ChatAppliedItem> companies, List<ChatAppliedItem> issues,
-            boolean questionOverrodeContext, Instant now) {
+            boolean questionOverrodeContext, ChatAppliedPeriod writtenPeriod, Instant now) {
         var context = run.context();
-        ChatAppliedPeriod period = context.period() == null ? null
+        ChatAppliedPeriod period = writtenPeriod != null ? writtenPeriod : context.period() == null ? null
                 : new ChatAppliedPeriod(context.period().start(), context.period().end(), "context", null);
         return new ChatApplied(List.copyOf(companies), List.copyOf(issues), period, run.graphVersionId(),
                 context.asOf() != null ? context.asOf() : now, questionOverrodeContext);

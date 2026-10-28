@@ -71,7 +71,7 @@ class Credentials:
         extraction = ["extraction.submit", "extraction.read", "extraction.cancel", "extraction.recover"]
         self.scopes = {
             "alpha": ["analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover", *relation, *extraction, "graph.read", "handoff.read",
-                      "chat.invoke"],
+                      "handoff.exposure", "chat.invoke"],
             "beta": ["analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover", *relation, *extraction, "graph.read", "handoff.read",
                      "chat.invoke"],
             "reader": ["analysis.read"],
@@ -189,7 +189,7 @@ def combined_replay() -> dict[str, Any]:
 
 
 class ServiceProcess:
-    """A real `python -m zoop_ai_service.main` (or the test launcher) on 127.0.0.1 with its stdout/stderr captured to files."""
+    """The real production entry (or fault launcher) with an owned loopback listener and captured stdout/stderr."""
 
     def __init__(self, workspace: Workspace, *, env: dict[str, str] | None = None, launcher: bool = False,
                  launcher_env: dict[str, str] | None = None):
@@ -197,7 +197,7 @@ class ServiceProcess:
         self._env = env if env is not None else workspace.env()
         if launcher_env:
             self._env = {**self._env, **launcher_env}
-        self._argv = [sys.executable, str(LAUNCHER)] if launcher else [sys.executable, "-m", "zoop_ai_service.main"]
+        self._argv = [sys.executable, str(LAUNCHER), *([] if launcher else ["--production-entrypoint"])]
         self.process: subprocess.Popen | None = None
         self.client = httpx.Client(base_url=f"http://127.0.0.1:{workspace.port}", timeout=60)
         self._runs = 0
@@ -207,11 +207,30 @@ class ServiceProcess:
         return self.workspace.root / f"service-{self._runs}.out"
 
     def start(self, *, wait: bool = True) -> ServiceProcess:
-        self._runs += 1
-        self.process = subprocess.Popen(self._argv, env=self._env, stdin=subprocess.DEVNULL, cwd=self.workspace.root,
-                                        stdout=self.log_path.open("wb"), stderr=(self.workspace.root / f"service-{self._runs}.err").open("wb"))
-        if wait:
-            self.wait_ready()
+        try:
+            self._runs += 1
+            # A released free_port() result can belong to another fixture by startup; its listener can even satisfy readiness.
+            # Reserve without listening, then transfer the sole remaining descriptor to this child. Never retain a parent
+            # listener across a crash: clients must observe the real process's disconnect, and restarts get a fresh transport.
+            with socket.socket() as listener:
+                listener.bind(("127.0.0.1", 0))
+                self.workspace.port = listener.getsockname()[1]
+                # Keep caller-owned client settings (notably the online admission harness's trust_env=False).
+                self.client.base_url = f"http://127.0.0.1:{self.workspace.port}"
+                env = {**self._env, "ZOOP_AI_SERVICE_PORT": str(self.workspace.port),
+                       "ZOOP_TEST_LISTENER_FD": str(listener.fileno())}
+                # Admission fault fixtures supply their own Python script; keep its hooks under the same socket adapter.
+                argv = self._argv
+                if argv[1] != str(LAUNCHER):
+                    argv = [argv[0], str(LAUNCHER), "--script", *argv[1:]]
+                with self.log_path.open("wb") as stdout, (self.workspace.root / f"service-{self._runs}.err").open("wb") as stderr:
+                    self.process = subprocess.Popen(argv, env=env, pass_fds=(listener.fileno(),), stdin=subprocess.DEVNULL,
+                                                    cwd=self.workspace.root, stdout=stdout, stderr=stderr)
+            if wait:
+                self.wait_ready()
+        except BaseException:
+            self.close()
+            raise
         return self
 
     def wait_ready(self) -> None:

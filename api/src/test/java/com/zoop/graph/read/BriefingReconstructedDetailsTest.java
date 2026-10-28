@@ -29,11 +29,11 @@ class BriefingReconstructedDetailsTest {
         var basis = new BriefingGraphLookup.Basis("round", source.versionId(), NOW, Map.of(HBM_SUPPLY, List.of(HYNIX, NVDA)),
                 new BriefingGraphLookup.Reconstruction(version, NOW));
         return new PublicGraphReader(new GraphVersionSelector(repository(), Clock.fixed(NOW, ZoneOffset.UTC),
-                (id, request) -> basis), ignored -> snapshot, () -> DisclosureExclusions.NONE);
+                (id, request) -> basis), ignored -> snapshot, pinned -> DisclosureExclusions.NONE);
     }
     @Test void relationCompanyAndEventKeepReconstructedSourceAndUnknownRole() {
         var reader = reader();
-        var detail = new GraphRelationService(reader, mock(NamedParameterJdbcTemplate.class)).getRelation(
+        var detail = new GraphRelationService(reader, mock(NamedParameterJdbcTemplate.class), new GraphStructuralDetailReader(org.mockito.Mockito.mock(com.zoop.document.evidence.service.EvidenceService.class))).getRelation(
                 DisplayGraph.edgeId("INVOLVES", HBM_SUPPLY, HYNIX), "round", null, null, "r");
         assertEquals("briefing_reconstructed_graph", detail.metadata().source());
         assertEquals("not_applicable", detail.verification().status());

@@ -33,6 +33,12 @@ class BriefingSeriesPriceRulesTest {
     }
     private void version(ObjectNode row) { row.remove("resultVersion");row.put("resultVersion","company-prices-v1-"+Canonical.digest(row)); }
     private Map<String,StrictJson.Obj> originals(){return Map.of("authored-round",StrictJson.Obj.of(company()));}
+    @Test void allWithheldHasNoPriceTargetsAndCannotHideAPassingRound() {
+        var b=bundle();((ObjectNode)b.path("marketEnrichment").path("seriesCompanyPrices")).putArray("rounds");
+        var held=company().put("status","WITHHELD");
+        assertThat(BriefingSeriesPriceRules.rows(StrictJson.Obj.of(b),"local:authored",Map.of("authored-round",StrictJson.Obj.of(held)),output)).isEmpty();
+        assertThatThrownBy(()->BriefingSeriesPriceRules.rows(StrictJson.Obj.of(b),"local:authored",originals(),output)).hasMessageContaining("round_coverage");
+    }
     @Test void priceLayerBindsOriginalBundleOutlookAndCompleteCompanySet() {
         var b=bundle();assertThat(BriefingSeriesPriceRules.rows(StrictJson.Obj.of(b),"local:authored",originals(),output)).hasSize(1);
         ((ObjectNode)b.path("marketEnrichment")).put("original","changed");

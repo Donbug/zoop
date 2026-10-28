@@ -54,7 +54,7 @@ final class BriefingSeriesPriceRules {
             }
         }
         Set<String> expectedRounds = new HashSet<>(); companies.forEach((id,c) -> { if ("PASS".equals(c.string("status"))) expectedRounds.add(id); });
-        require(!rows.isEmpty() && rows.size() <= 14 && rows.keySet().equals(expectedRounds), "round_coverage");
+        require(rows.size() <= 14 && rows.keySet().equals(expectedRounds), "round_coverage");
         return rows;
     }
 

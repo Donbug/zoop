@@ -77,16 +77,23 @@ class InsightsPostgresTest {
         var body = mapper.readValue("""
                 {"events":[
                   {"type":"screen_view","screen":"main","viewId":"%s"},
-                  {"type":"graph_node_select","targetId":"NASDAQ:NVDA","viewId":"%s"}
+                  {"type":"graph_node_select","targetId":"NASDAQ:NVDA","viewId":"%s"},
+                  {"type":"graph_edge_select","targetId":"edge-1234abcd","viewId":"%s"}
                 ]}
-                """.formatted(view, view), TelemetryBatchRequest.class);
+                """.formatted(view, view, view), TelemetryBatchRequest.class);
         telemetry.record(principal, "summary-" + UUID.randomUUID(), body, "summary-request");
 
         var summary = insights.summary("7d", "summary-request");
         var nodeCtr = summary.metrics().stream().filter(metric -> metric.key().equals("nodeCtr")).findFirst().orElseThrow();
+        var edgeCtr = summary.metrics().stream().filter(metric -> metric.key().equals("edgeCtr")).findFirst().orElseThrow();
         assertEquals(1L, nodeCtr.numerator());
         assertEquals(1L, nodeCtr.denominator());
+        assertEquals(1L, edgeCtr.numerator());
+        assertEquals(1L, edgeCtr.denominator());
         assertTrue(nodeCtr.sampleHidden());
+        assertEquals(1L, summary.trend().stream().filter(day -> day.date().equals(
+                summary.asOf().atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate()))
+                .findFirst().orElseThrow().edgeSelections());
         var overview = insights.overview("overview-request");
         assertEquals("unavailable", overview.feedback().availability());
         assertEquals("not_integrated", overview.feedback().unavailableReason());

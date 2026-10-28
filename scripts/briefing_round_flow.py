@@ -135,6 +135,33 @@ def alive(pid):
         return False
 
 
+def process_identity(pid):
+    # PID liveness alone also matches a recycled PID. Pin OS start time and command.
+    done = subprocess.run(['ps', '-p', str(pid), '-o', 'lstart=', '-o', 'command='],
+                          capture_output=True, text=True, check=False)
+    if done.returncode or not done.stdout.strip():
+        raise base.ReplayError('flow_process_identity_unavailable')
+    return base.digest(done.stdout.strip().encode())
+
+
+def response_identity(url):
+    value = get(url)
+    if isinstance(value, dict) and isinstance(value.get('metadata'), dict):
+        value['metadata'].pop('requestId', None)
+    return base.digest(base.canonical(value))
+
+
+def owned_process(record, url):
+    if not alive(record['pid']):
+        return False
+    if (record.get('url') != url or not record.get('processIdentity')
+            or process_identity(record['pid']) != record['processIdentity']):
+        raise base.ReplayError('flow_process_ownership_changed')
+    if record.get('responseIdentity') != response_identity(url):
+        raise base.ReplayError('flow_process_response_changed')
+    return True
+
+
 def process(work, name, command, url, env):
     folder = work / 'processes' / name
     base.private_dir(folder)
@@ -143,7 +170,7 @@ def process(work, name, command, url, env):
         previous = base.strict_load(base.regular(old[-1]))
         if alive(previous['pid']):
             # Existing owned process may still be recovering; never kill or duplicate it.
-            get(url)
+            owned_process(previous, url)
             return previous
     port = int(url.split(':', 2)[2].split('/')[0])
     local.free_port(port)
@@ -151,13 +178,13 @@ def process(work, name, command, url, env):
         os.chmod(log.name, 0o600)
         child = subprocess.Popen([str(x) for x in command], cwd=ROOT if name == 'api' else ROOT / 'web',
                                  env=env, stdout=log, stderr=subprocess.STDOUT)
-    result = {'pid': child.pid, 'url': url, 'startedAt': base.now()}
-    base.write_once(folder / f'{len(old) + 1:04d}.json', base.canonical(result))
+    result = {'pid': child.pid, 'url': url, 'startedAt': base.now(), 'processIdentity': process_identity(child.pid)}
     for _ in range(90):
         if child.poll() is not None:
             raise base.ReplayError('flow_' + name + '_start_failed')
         try:
-            get(url)
+            result['responseIdentity'] = response_identity(url)
+            base.write_once(folder / f'{len(old) + 1:04d}.json', base.canonical(result))
             return result
         except Exception:
             time.sleep(.3)
@@ -272,7 +299,7 @@ def execute(args, work, baseline, transport):
     health = api + '/api/v1/briefings/' + first + '/graph'
     ledger.step('api', lambda: process(work, 'api', [java, '-jar', frozen, *common, '--server.address=127.0.0.1',
         '--server.port=' + str(args.api_port), '--zoop.briefing.replay.read-enabled=true'], health, env),
-        lambda r: alive(r['pid']) and get(health).get('status') == 'available')
+        lambda r: owned_process(r, health) and get(health).get('status') == 'available')
     checked_http = {}
     def verify_http():
         if 'result' in checked_http:
@@ -298,11 +325,11 @@ def execute(args, work, baseline, transport):
             if not args.node_modules:
                 raise base.ReplayError('node_modules_path_required')
             modules.symlink_to(Path(args.node_modules).resolve(), target_is_directory=True)
-        webenv = dict(env); webenv['ZOOP_DEV_API_TARGET'] = api
+        webenv = dict(env); webenv.update(ZOOP_DEV_API_TARGET=api, VITE_API_BASE_URL='')
         # Vite root returns HTML. Its manifest is a static JSON readiness endpoint.
         weburl = 'http://127.0.0.1:' + str(args.web_port) + '/package.json'
         ledger.step('frontend', lambda: process(work, 'frontend', [modules / '.bin/vite', '--host','127.0.0.1','--port',str(args.web_port),'--strictPort'], weburl, webenv),
-                    lambda r: alive(r['pid']) and get(weburl).get('name') == 'zoop-web')
+                    lambda r: owned_process(r, weburl) and get(weburl).get('name') == 'zoop-web')
     result = {'status':'COMPLETE','executedStages':ledger.executed,'reusedStages':ledger.reused,'newPaidCalls':0,
         'rounds':http['rounds'],'bundle':price['bundle'],'apiUrl':api,
         'briefingUrl':'http://127.0.0.1:' + str(args.web_port) + '/briefing?reading=compact' if args.serve else None}

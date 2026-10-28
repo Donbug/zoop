@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useAdminRefresh } from '@/hooks/useAdminRefresh';
 import { getAdminDashboard } from '@/apis/admin/dashboard';
 import {
   Empty,
@@ -9,7 +9,7 @@ import {
   Section,
   Table,
 } from '@/components/admin/common/AdminUi';
-import { BUTTON, TD, TH, count } from '@/components/admin/common/adminStyles';
+import { TD, TH, count } from '@/components/admin/common/adminStyles';
 import {
   editionLabel,
   graphDbStatusLabel,
@@ -148,7 +148,7 @@ function Jobs({ data }: { data: Dashboard }) {
   return (
     <Section
       title="최근 작업"
-      link={[{ to: '/admin/pipeline', label: '작업 관제' }]}
+      link={[{ to: '/admin/pipeline?tab=jobs', label: '작업 관제' }]}
     >
       {!jobs ? (
         <Empty>작업 원장을 읽지 못했어요.</Empty>
@@ -256,35 +256,26 @@ function Usage({ data }: { data: Dashboard }) {
 // - 상태: 조회 중 · 자료 없음(영역별) · 조회 실패(다시 시도) · 권한 없음. 관리자 세션 만료(401)는 AdminProtectedRoute가 로그인으로 보낸다.
 export default function DashboardSummary() {
   const dashboard = useAsyncData(getAdminDashboard);
+  useAdminRefresh(dashboard.reload, 10000);
   const data = dashboard.data;
-  // 새로 고침하면 이용·선호도 영역도 다시 읽는다.
-  const [refresh, setRefresh] = useState(0);
-
   return (
     <div className="flex flex-col gap-6 py-8 text-zoop-ink">
-      <PageHeader
-        title="대시보드"
-        actions={
-          <>
-            {data && (
-              <p className="font-inter text-[11px] text-zoop-muted tabular-nums">
-                갱신 {formatKst(data.generatedAt)}
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                dashboard.reload();
-                setRefresh((value) => value + 1);
-              }}
-              disabled={dashboard.status === 'loading'}
-              className={BUTTON}
-            >
-              새로 고침
-            </button>
-          </>
-        }
-      />
+      <PageHeader title="대시보드" />
+      {data && (
+        <p className="text-xs text-zoop-muted">
+          갱신{' '}
+          {new Date(data.generatedAt).toLocaleTimeString('ko-KR', {
+            timeZone: 'Asia/Seoul',
+            hour12: false,
+          })}{' '}
+          · 10초마다 자동 갱신
+        </p>
+      )}
+      {dashboard.refreshError && (
+        <p role="status" className="text-xs text-zoop-muted">
+          새로 고치지 못했어요. 이전 결과를 표시해요.
+        </p>
+      )}
 
       {dashboard.status === 'loading' && (
         <Loading>대시보드를 불러오고 있어요</Loading>
@@ -303,7 +294,7 @@ export default function DashboardSummary() {
           {data.ledger.status === 'unavailable' && (
             <p
               role="status"
-              className="rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-wash px-3 py-2 text-[11px] text-zoop-muted"
+              className="rounded-2xl bg-zoop-soft px-4 py-3 text-[11px] text-zoop-muted"
             >
               원장에 연결하지 못해 검수 현황을 표시하지 못했어요.
               {data.ledger.error && ` (${data.ledger.error.message})`}
@@ -318,7 +309,7 @@ export default function DashboardSummary() {
             <AiFeatures data={data} />
             <Usage data={data} />
           </div>
-          <InsightsOverviewSection key={refresh} />
+          <InsightsOverviewSection />
         </>
       )}
     </div>
