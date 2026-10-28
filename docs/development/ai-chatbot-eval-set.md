@@ -1,6 +1,6 @@
 # ZOOP AI 챗봇 고정 평가 세트
 
-기준일: 2026년 10월 27일 / 세트 버전: `chat-eval-v1`
+기준일: 2026년 10월 28일 / 실행 세트 버전: `chat-eval-v1` / 다음 목표: `chat-eval-v2`
 
 관련 문서:
 
@@ -98,7 +98,7 @@ export JAVA_HOME=<JDK 21>
 
 ## 5. v1 사례와 드러난 공백
 
-41개 사례: Q01 2, Q02 2, Q03 8, Q04 2, Q05 3, Q06 1, Q07 4, Q08 1, 복합 6, 투자 판단 4, 공격 3, 확인 질문 1, 장애 4. 2026-10-27 기준 모두 통과한다(대본 실행).
+45개 사례: Q01 2, Q02 2, Q03 8, Q04 2, Q05 3, Q06 1, Q07 8, Q08 1, 복합 6, 투자 판단 4, 공격 3, 확인 질문 1, 장애 4. 2026-10-27 기준 모두 통과한다(대본 실행).
 
 세트를 만들며 확인한 현재 공백(`gap` 표시 사례):
 
@@ -109,12 +109,57 @@ export JAVA_HOME=<JDK 21>
 
 v1에서 찾은 공백 중 사건 이름 미해석과 기업 대상 `issue.read`의 빈 결과는 2026-10-27에 고쳤다(구현 계획 사건 지목 결정 (5)·(6)). `q03-issue-named`, `q03-issue-and-company-named`, `q03-company-issues-by-name`이 그 동작을 고정하고, `failure-graph-unreadable-concept`는 그래프를 읽을 수 없어도 순수 개념 질문은 답하는지(사건 이름을 필요할 때만 해석하는지) 확인한다. 같은 말에 맞는 사건이 여럿인 확인 질문은 fixture에 그런 사건이 없어 `IssueNameResolverTest`·`ChatModelStagesTest`가 다룬다.
 
+Q07에서 질문이 기업을 지목하는 경우(구현 계획 결정 (11))는 `q07-named-in-scope`, `q07-named-partly-outside`, `q07-named-outside`, `q07-anchor-outside`가 고정한다.
+
 세트에 넣지 못한 것:
 
 - **체크포인트·의존 단계**: 라우터 wire(`zoop-ai-chat-1`)에 의존 관계 필드가 없어 `ChatModelStages`는 항상 `dependsOn: null`을 만든다. 질문에서 `exactly(2)` 같은 체크포인트를 만들 경로가 없으므로, 그 흐름은 `OrchestratedChatEngineTest`의 결정 대본으로만 확인된다. 라우터 계약에 의존 관계가 들어오면 이 세트에 사례를 추가한다.
 - **확인 질문의 답(깊이 1·2)**, **선택 근거로 좁힌 질문(`evidencePool`)**, **시간 한도(`deadline_guard`)**: 실행기가 단일 턴·고정 시간만 다룬다. 필요하면 사례 형식에 `turns`와 남은 시간을 더한다.
 
 ## 6. 다음 단계
+
+### 2026-10-28 v0.11 수용 사례 (chat-eval-v2 추가 예정)
+
+현재 `chat-eval-v1` 실행 증거와 구분한다. 아래는 구현 후 고정 fixture·기대 호출·결과를 추가할 항목이며 이번 개정으로 테스트가 추가되거나 통과한 것은 아니다.
+
+| 사례 | 기대 결과 |
+| --- | --- |
+| Q02 단독 안정적 개념 | 웹 보조 최대 1회, 성공 시 web_reported; 0건·장애면 제한된 일반 지식과 notice, 불필요한 Q03/Q04 없음 |
+| Q02+Q03+Q04 복합 요구 | 필요한 조회 조합·중복 제거, 명시 요구 누락 없음, 최종 생성 1회 |
+| 네 유형 이상 필수 요구 | top-3로 자르지 않음, 예산 초과 시 clarification |
+| Q01 단독 / Q01+Q03 | Q01 검색·웹 근거 차용 없음, 복합 질문의 Q03에만 필요 검색 |
+| Q02~Q08 각각 검색 필요/불필요 쌍 | 필요한 경우만 검색, 내부 0건이 아니어도 외부 보완 가능 |
+| 웹에만 있고 내부 그래프에 없는 관계 | 외부 보도와 내부 경로 구분, 간선·포커스 대상 생성 금지 |
+| Q05/Q06/Q08 외부 정보 불일치 | 실제 차이·발행 회차·기록된 선정 이유를 웹으로 덮지 않음 |
+| Q07 보조 검색 | 본인 범위 먼저 확인, 원문·식별자·수량·전체 포트폴리오 전송 없음 |
+| 다음 턴 Q04→Q02 / 그 회사·최신 | 재분류, 검증된 문맥 승계, 명시 조건 우선·모호성 확인 |
+| polling·재열람 | 새 분류·검색·모델 호출·UI 동작 실행 없음 |
+| Q03~Q08 내부 근거 충분/부족 쌍 | 충분하면 웹 0회, 부족·최신성·출처 요청이면 마지막 라운드에서만 웹 |
+| 검색 0건 / timeout / unavailable | 전체 답변 유지, web_unavailable notice와 실제 미충족 limitation 분리 |
+| 배치 검색·재시도·기한 초과 | 총 8·내부 6·웹 2, job 45초, Luna 잔여 기한·마지막 10초 작성 예약 준수 |
+| 동일 logical call 동시·순차 중복 | single-flight 1회, 성공 0건 포함 요청 cache hit, 권한·grant 재검사 |
+| cache key의 scope·version·asOf 차이 | 서로 합치지 않음, job 종료 뒤 재사용 없음 |
+| MCP/direct 동일 fixture | 같은 Tool Service의 결과·권한·버전·evidence 정규화 동등 |
+| Responses 시작 전 preflight 실패·circuit open | MCP 미노출, 처음부터 direct adapter·BranchContext 경로, 같은 예산·grant |
+| Responses 실행 중 MCP transport 실패 | direct 결과 끼워 넣기 0회, 성공 결과 유지·notice/limitation, 다음 job circuit 반영 |
+| 인증·권한·grant·스키마 거부 | direct 우회 0회, 거부 원인 유지 |
+| MCP 결과 수신 여부 불명 | 자동·수동 중복 호출 0회, response_unknown/reconciliation |
+| 최근 5회 중 연결 3회 실패 | 30초 circuit open, half-open probe 1회; 인증·DB 오류는 집계 제외 |
+| mcp_approval_request 1·3라운드 | ai/service 독자 승인 0회, Java의 예산·요구·scope·grant 결정만 continuation에 사용 |
+| approval 거부 | 위조 MCP/function 결과·direct 대체 메시지 0회, 다른 정상 근거 또는 limitation/guidance |
+| Q07 portfolio scope | portfolio.scope.read MCP catalog 미등록, 전체 목록·수량·보유 표시 모델 전송 0건, 일치 공개 결과 최대 5개 |
+| /mcp 외부 경계 | 64 KiB request·256 KiB call result·1 MiB job·분당 30·동시 4 위반 거부 |
+| 도구 1·4·8회 latency | server-only client, 합성 Responses replay, 승인된 소량 live를 분리 기록; terminal DB commit까지 45초 |
+| 인용 위조·snippet 미지지·프롬프트 주입 | 출처·요구 매핑 및 의미 검사, 외부 지시 무시 |
+| MCP 미등록 도구·위조 subject·스키마 변경 | 차단, allowlist 자동 확장 없음 |
+| Luna allowed_tools·연속 호출 | 허용 도구만 선택, 새 정보 이득 없는 반복 거부, 명시 요구별 서버 coverage |
+| 부분 결과 | answerStatus complete/partial/guidance, notices와 limitations 중복 없음 |
+| UI 대상 철회·버전 변경·외부 보도 ID 위조 | 클릭 시 재검사·안내, 임의 경로 실행 없음 |
+| snapshot 만료·grant 부재 | 재현 불가 구간 가림·모델 전송 차단, 거짓 최신성 표시 없음 |
+
+상세 기준: [보조 웹 검색](../design/ai-chatbot-web-search.md), [Luna MCP 실행·화면 동작](../design/ai-chatbot-mcp-actions.md).
+
+### 평가 운영 작업
 
 1. 사례 추가: 새 도구·유형을 연결하는 PR은 그 유형의 사례를 같은 변경에서 추가하거나 `gap` 사례의 기대값을 고친다.
 2. 실제 모델 실행: 같은 세트에서 `script`를 무시하고 AI 서비스의 live 단계를 부르는 모드를 둔다. 그때 비교 대상은 `expect` 중 모델과 무관한 서버 결정과 outcome 분포다. 유료 호출이므로 실행마다 사용자 승인과 호출 상한이 필요하다.

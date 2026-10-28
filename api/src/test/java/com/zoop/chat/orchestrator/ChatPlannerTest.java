@@ -233,12 +233,52 @@ class ChatPlannerTest {
         assertEquals(List.of(ChatCapability.PORTFOLIO_SCOPE_READ), listOnly.requirements().getFirst().capabilities());
 
         var named = run(planner.plan(run(0, "v1"), decision(req("named", Map.of(ChatQueryType.Q07, 0.9,
-                ChatQueryType.Q03, 0.8), Map.of("company.read", 0.9), List.of("KRX:005930"))), bound));
-        assertEquals(List.of("named"), ids(named), "a named company is read as named");
-        assertEquals(List.of("KRX:005930"), named.requirements().getFirst().targets());
+                ChatQueryType.Q03, 0.8), Map.of("company.read", 0.9), List.of("KRX:005930", "NASDAQ:NVDA"))), bound));
+        assertEquals(List.of("named-s", "named"), ids(named), "a named company is checked against the member's first");
+        assertEquals(List.of("KRX:005930", "NASDAQ:NVDA"), named.requirements().get(0).targets());
+        assertEquals(ChatPlan.TargetSource.QUESTION, named.requirements().get(0).targetSource());
+        assertEquals(List.of(), named.requirements().get(1).targets(), "it reads only those that are the member's");
+        assertEquals(List.of(ChatCapability.COMPANY_READ), named.requirements().get(1).capabilities());
+
+        var isMine = run(planner.plan(run(0, "v1"), decision(req("is", Map.of(ChatQueryType.Q07, 0.9), Map.of(),
+                List.of("KRX:005930"))), bound));
+        assertEquals(List.of("is"), ids(isMine), "\"is it mine\" is the scope read of the named company itself");
+        assertEquals(List.of("KRX:005930"), isMine.requirements().getFirst().targets());
 
         assertStop("guidance", "out_of_scope", planner.plan(run(0, "v1"), decision(req("unbound",
                 Map.of(ChatQueryType.Q07, 0.9), Map.of())), Set.of("company.read")));
+    }
+
+    @Test
+    void aCompanyNamedInARelationIsTheReferencePointReadWithTheMembersCompanies() {
+        Set<String> bound = Set.of("company.read", "issue.read", "graph.path.read", "portfolio.scope.read");
+        var plan = run(planner.plan(run(0, "v1"), decision(req("linked", Map.of(ChatQueryType.Q07, 0.9,
+                ChatQueryType.Q04, 0.8), Map.of(), List.of("KRX:005930"))), bound));
+        assertEquals(List.of("linked-s", "linked"), ids(plan));
+        assertEquals(List.of(ChatCapability.MEMBER_SELF), plan.requirements().get(0).targets(), "all of the member's");
+        var linked = plan.requirements().get(1);
+        assertEquals(List.of("KRX:005930"), linked.targets(), "the reference point is read too");
+        assertEquals(List.of(ChatCapability.GRAPH_PATH_READ), linked.capabilities(),
+                "a relation to one named company reads paths to the member's companies");
+        assertEquals(2, linked.stage());
+    }
+
+    @Test
+    void aNamedIssueOrADependentStageNeverSendsTargetsToTheMemberScopeRead() {
+        Set<String> bound = Set.of("company.read", "issue.read", "portfolio.scope.read");
+        var issue = run(planner.plan(run(0, "v1"), decision(req("hbm", Map.of(ChatQueryType.Q07, 0.9,
+                ChatQueryType.Q03, 0.8), Map.of("portfolio.scope.read", 0.9, "issue.read", 0.8), List.of("iss-hbm"))), bound));
+        assertEquals(List.of(ChatCapability.MEMBER_SELF), issue.requirements().get(0).targets());
+        assertEquals(List.of("iss-hbm"), issue.requirements().get(1).targets(), "the issue is read with the member's companies");
+
+        var dependent = run(planner.plan(run(0, "v1"), decision(
+                req("first", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of("KRX:005930")),
+                req("then", Map.of(ChatQueryType.Q07, 0.9, ChatQueryType.Q03, 0.8),
+                        Map.of("portfolio.scope.read", 0.9, "issue.read", 0.8))
+                        .dependingOn(new Dependency("first", "atLeast", 1))), bound));
+        var then = dependent.requirements().stream().filter(p -> p.id().equals("then")).findFirst().orElseThrow();
+        assertFalse(then.capabilities().contains(ChatCapability.PORTFOLIO_SCOPE_READ),
+                "a dependent stage reads on what its source found, never the member's scope");
     }
 
     @Test

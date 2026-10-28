@@ -76,7 +76,7 @@ public class ChatPlanner {
             Planned p = serve(run, requirement, bound, planned);
             if (p == null) return clarify(run, "ambiguous_target", List.of());
             if (p.onScope()) {
-                Planned scope = p.scope();
+                Planned scope = p.scope(named(requirement, p));
                 planned.put(scope.id(), scope);
             }
             planned.put(p.id(), p);
@@ -129,7 +129,8 @@ public class ChatPlanner {
         for (Planned p : plan.requirements()) {
             if (p.mode() != Mode.TOOLS) continue;
             int targets = p.dependsOn() == null ? p.targets().size()
-                    : "atLeast".equals(p.dependsOn().cardinality()) ? ChatToolRequest.MAX_TARGETS : p.dependsOn().count();
+                    : ("atLeast".equals(p.dependsOn().cardinality()) ? ChatToolRequest.MAX_TARGETS : p.dependsOn().count())
+                            + (p.onScope() ? p.targets().size() : 0);
             for (ChatCapability capability : p.capabilities()) {
                 calls += chunks(capability, capability.documents().isEmpty() ? targets : capability.documents().size());
             }
@@ -199,28 +200,37 @@ public class ChatPlanner {
         if (issues > 0 && all.contains(ChatQueryType.Q03)) defaults.add(ChatCapability.ISSUE_READ);
         // A period comparison compares the public graph, with or without a named target.
         if (r.dependsOn() == null && all.contains(ChatQueryType.Q05)) defaults.add(ChatCapability.GRAPH_VERSION_DIFF);
-        // "My stocks" that names no company reads the member's own companies first, and a company fact reads them.
-        boolean mine = r.dependsOn() == null && r.targets().isEmpty() && all.contains(ChatQueryType.Q07);
+        // "My stocks" reads the member's own companies first, and a company fact reads them. A company the question names is
+        // what "my stocks" is about ("my Samsung"), read only when it is the member's, unless the question asks for a
+        // relation: then it is the point the member's companies are related to ("mine linked to Samsung") and is read too.
+        boolean mine = r.dependsOn() == null && all.contains(ChatQueryType.Q07);
+        boolean anchored = mine && companies > 0 && all.contains(ChatQueryType.Q04);
         if (mine) defaults.add(ChatCapability.PORTFOLIO_SCOPE_READ);
         if (mine && all.contains(ChatQueryType.Q03)) defaults.add(ChatCapability.COMPANY_READ);
-        if (companies >= 2 && all.contains(ChatQueryType.Q04)) defaults.add(ChatCapability.GRAPH_PATH_READ);
+        if ((companies >= 2 || anchored) && all.contains(ChatQueryType.Q04)) defaults.add(ChatCapability.GRAPH_PATH_READ);
         for (ChatCapability c : defaults) {
             if (permitted.contains(c) && bound.contains(c.id()) && !capabilities.contains(c)) capabilities.add(c);
         }
+        // Only a requirement of its own reads the member's scope: a dependent stage reads on what its source found.
+        if (!mine) capabilities.remove(ChatCapability.PORTFOLIO_SCOPE_READ);
         capabilities.sort(Comparator.comparing(ChatCapability::id));
         // A fact requirement without a lookup it may make is out of scope, even when it also asks about a concept.
         if (capabilities.isEmpty()) return base.limited("out_of_scope");
 
         // Q07: the member's companies come from their own scope, read by the server for the authenticated member. The rest
         // of the requirement reads on them in the next stage (at least one, at most the fan-out the scope read passes on).
+        // A reference point and a named issue stay the requirement's own targets, read with the member's companies.
         if (mine && capabilities.contains(ChatCapability.PORTFOLIO_SCOPE_READ)) {
+            List<String> named = anchored ? List.of() : r.targets().stream().filter(ChatPlanner::companyId).toList();
             List<ChatCapability> rest = capabilities.stream().filter(c -> c != ChatCapability.PORTFOLIO_SCOPE_READ).toList();
             if (rest.isEmpty()) {
                 return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities,
-                        ChatCapability.PORTFOLIO_SCOPE_READ.untargeted(), TargetSource.SERVER, null, null, 1);
+                        named.isEmpty() ? ChatCapability.PORTFOLIO_SCOPE_READ.untargeted() : named,
+                        named.isEmpty() ? TargetSource.SERVER : TargetSource.QUESTION, null, null, 1);
             }
             var scope = new ChatRouteDecision.Dependency(r.id() + Planned.SCOPE_ID, "atLeast", 1);
-            return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, rest, List.of(), TargetSource.DEPENDENCY, null,
+            List<String> own = r.targets().stream().filter(t -> !named.contains(t)).toList();
+            return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, rest, own, TargetSource.DEPENDENCY, null,
                     scope, 2);
         }
 
@@ -252,6 +262,14 @@ public class ChatPlanner {
         List<String> scope = selection.evidenceIds().isEmpty() ? null : selection.evidencePool();
         return new Planned(r.id(), r.label(), all, Mode.TOOLS, null, capabilities, targets, TargetSource.CONTEXT, scope,
                 null, 1);
+    }
+
+    /**
+     * The companies a Q07 requirement's scope source checks: those the question names that the planned requirement no longer
+     * reads itself (none when it reads the member's companies on a reference point, or names no company).
+     */
+    private static List<String> named(ChatRouteDecision.Requirement r, Planned p) {
+        return r.targets().stream().filter(t -> companyId(t) && !p.targets().contains(t)).toList();
     }
 
     /** A catalog company id ({@code KRX:005930}, {@code ORG:OPENAI}); issue and evidence ids have no exchange prefix. */
