@@ -1,0 +1,312 @@
+import { useCallback, useState } from 'react';
+import { listAnalysisCandidates } from '@/apis/admin/pipeline';
+import {
+  Empty,
+  ErrorBox,
+  Loading,
+  MoreButton,
+  Note,
+  Section,
+  Segmented,
+  Table,
+} from '@/components/admin/common/AdminUi';
+import {
+  SEARCH_INPUT,
+  SELECT,
+  TD,
+  TH,
+  count,
+} from '@/components/admin/common/adminStyles';
+import CandidateDetailPanel from '@/components/admin/pipeline/CandidateDetailPanel';
+import { useCursorPages } from '@/hooks/useCursorPages';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useRouteQuery } from '@/hooks/useRouteQuery';
+import { useAdminSessionStore } from '@/stores/useAdminSessionStore';
+import type {
+  CandidateDecisionFilter,
+  CandidateFilters,
+  CandidateStatus,
+} from '@/types/admin/pipeline';
+import {
+  candidateStatusLabel,
+  decisionLabel,
+} from '@/components/admin/pipeline/candidateLabels';
+
+type StatusFilter = CandidateStatus | 'all';
+
+const parseStatus = (value: string | null): StatusFilter =>
+  value === 'all' || value === 'ALLOW' || value === 'REJECT' ? value : 'HOLD';
+const parseDecision = (value: string | null) =>
+  value === 'none' || value === 'allow' || value === 'reject'
+    ? (value as CandidateDecisionFilter)
+    : undefined;
+const parseBoolean = (value: string | null) =>
+  value === 'true' ? true : value === 'false' ? false : undefined;
+
+// A-ADM-03 후보 탭 (FS067-01·FS067-02, listAnalysisCandidates·getAnalysisCandidate)
+// - 프로토타입 admin/pipeline/candidates.tsx를 옮겼다. 필터·검색어·고른 후보(?candidate=)는 주소에 남는다.
+// - 판정 기본값은 프로토타입처럼 보류(HOLD)다. 조건이 바뀌면 첫 쪽부터 다시 읽는다(커서는 같은 조건에서만 유효).
+// - 앱이 아직 규칙을 후보에 평가하지 않아(rule=null, rule=true는 항상 빈 목록) 규칙 대상 필터는 두지 않는다.
+// - 허용·거부 결정은 decideAnalysisCandidate가 main에 생기면(#357) 연결한다.
+export default function AnalysisCandidates() {
+  const revision = useAdminSessionStore((state) => state.revision);
+  return <CandidatesSession key={revision} />;
+}
+
+function CandidatesSession() {
+  const { params, updateQuery } = useRouteQuery();
+  const selectedId = params.get('candidate');
+  const status = parseStatus(params.get('status'));
+  const decision = parseDecision(params.get('decision'));
+  const published = parseBoolean(params.get('published'));
+  const active = parseBoolean(params.get('active'));
+  const urlQ = params.get('q') ?? '';
+  const [text, setText] = useState(urlQ);
+  // 뒤로·앞으로 가기로 주소의 검색어가 바뀌면 입력칸도 맞춘다.
+  const [seenQ, setSeenQ] = useState(urlQ);
+  if (urlQ !== seenQ) {
+    setSeenQ(urlQ);
+    if (urlQ !== text.trim()) setText(urlQ);
+  }
+  const q = useDebouncedValue(text.trim(), 300);
+  const load = useCallback(
+    (cursor?: string) => {
+      const filters: CandidateFilters = {
+        status: status === 'all' ? undefined : status,
+        decision,
+        published,
+        active,
+        q: q || undefined,
+      };
+      return listAnalysisCandidates(filters, cursor);
+    },
+    [status, decision, published, active, q],
+  );
+  const candidates = useCursorPages(load);
+  const first = candidates.pages[0];
+  const counts = first?.counts;
+  const statusOptions: { value: StatusFilter; label: string }[] = [
+    {
+      value: 'HOLD',
+      label:
+        `보류 ${counts?.HOLD === undefined ? '' : count(counts.HOLD)}`.trim(),
+    },
+    {
+      value: 'ALLOW',
+      label:
+        `통과 ${counts?.ALLOW === undefined ? '' : count(counts.ALLOW)}`.trim(),
+    },
+    {
+      value: 'REJECT',
+      label:
+        `폐기 ${counts?.REJECT === undefined ? '' : count(counts.REJECT)}`.trim(),
+    },
+    { value: 'all', label: '전체' },
+  ];
+  const select = (id: string | null) => updateQuery({ candidate: id });
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,460px)]">
+      <Section title="후보">
+        <div className="flex flex-wrap items-center gap-3">
+          <Segmented
+            label="판정 상태"
+            value={status}
+            options={statusOptions}
+            onChange={(value) =>
+              updateQuery(
+                { status: value === 'HOLD' ? null : value },
+                { replace: true },
+              )
+            }
+          />
+          <input
+            type="search"
+            aria-label="후보 검색"
+            placeholder="제목·기업·대상으로 찾기"
+            maxLength={200}
+            value={text}
+            onChange={(event) => {
+              setText(event.target.value);
+              updateQuery(
+                { q: event.target.value.trim() || null },
+                { replace: true },
+              );
+            }}
+            className={SEARCH_INPUT}
+          />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <label className="flex flex-col gap-1 text-[11px] text-zoop-muted">
+            검수 결정
+            <select
+              className={SELECT}
+              value={decision ?? ''}
+              onChange={(event) =>
+                updateQuery(
+                  { decision: event.target.value || null },
+                  { replace: true },
+                )
+              }
+            >
+              <option value="">전체</option>
+              <option value="none">결정 없음</option>
+              <option value="allow">허용</option>
+              <option value="reject">거부</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-[11px] text-zoop-muted">
+            사용자 그래프
+            <select
+              className={SELECT}
+              value={published === undefined ? '' : String(published)}
+              onChange={(event) =>
+                updateQuery(
+                  { published: event.target.value || null },
+                  { replace: true },
+                )
+              }
+            >
+              <option value="">전체</option>
+              <option value="true">표시 중</option>
+              <option value="false">표시 안 함</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-[11px] text-zoop-muted">
+            후보 상태
+            <select
+              className={SELECT}
+              value={active === undefined ? '' : String(active)}
+              onChange={(event) =>
+                updateQuery(
+                  { active: event.target.value || null },
+                  { replace: true },
+                )
+              }
+            >
+              <option value="">전체</option>
+              <option value="true">활성</option>
+              <option value="false">비활성</option>
+            </select>
+          </label>
+        </div>
+        {candidates.refreshError && (
+          <p role="status" className="text-[11px] text-zoop-muted">
+            새로 고치지 못했어요. 이전 결과를 표시해요.
+          </p>
+        )}
+        {candidates.status === 'loading' && (
+          <Loading>후보를 불러오고 있어요</Loading>
+        )}
+        {candidates.status === 'error' && candidates.error && (
+          <ErrorBox
+            title="후보 목록을 불러오지 못했어요"
+            error={candidates.error}
+            onRetry={candidates.reload}
+          />
+        )}
+        {candidates.status === 'success' && (
+          <>
+            {counts && (
+              <Note>
+                활성 후보 기준 · 비활성 {count(counts.inactive ?? null)}건
+              </Note>
+            )}
+            {candidates.items.length === 0 ? (
+              <Empty>
+                {q
+                  ? '검색어에 맞는 후보가 없어요. 다른 검색어로 찾아 보세요.'
+                  : '이 조건의 후보가 없어요.'}
+              </Empty>
+            ) : (
+              <Table caption="후보 목록">
+                <thead>
+                  <tr>
+                    <th className={TH}>판정</th>
+                    <th className={TH}>이슈</th>
+                    <th className={TH}>관련 기업</th>
+                    <th className={`${TH} text-right`}>근거</th>
+                    <th className={TH}>사용자 그래프</th>
+                    <th className={TH}>검수</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {candidates.items.map((row) => (
+                    <tr
+                      key={row.candidateId}
+                      className={
+                        row.candidateId === selectedId
+                          ? 'bg-zoop-wash'
+                          : undefined
+                      }
+                    >
+                      <td className={`${TD} whitespace-nowrap font-semibold`}>
+                        {candidateStatusLabel[row.status]}
+                      </td>
+                      <td className={`${TD} max-w-[28rem]`}>
+                        <button
+                          type="button"
+                          aria-pressed={row.candidateId === selectedId}
+                          onClick={() => select(row.candidateId)}
+                          className="line-clamp-2 min-h-8 text-left font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
+                        >
+                          {row.title ?? '사건 없는 관계 후보'}
+                        </button>
+                        {!row.active && (
+                          <span className="mt-1 inline-block rounded-[3px] border-[0.667px] border-zoop-line px-1.5 py-0.5 text-[10px] text-zoop-muted">
+                            비활성
+                          </span>
+                        )}
+                      </td>
+                      <td className={`${TD} max-w-48 truncate text-zoop-muted`}>
+                        {row.companies
+                          .map((company) => company.name)
+                          .join(', ') || '–'}
+                      </td>
+                      <td className={`${TD} text-right tabular-nums`}>
+                        {count(row.evidenceCount)}
+                      </td>
+                      <td className={TD}>
+                        {row.onUserGraph ? '표시 중' : '표시 안 함'}
+                      </td>
+                      <td className={TD}>
+                        {row.decision
+                          ? decisionLabel[row.decision.decision]
+                          : '–'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
+            {candidates.hasMore && (
+              <MoreButton
+                loading={candidates.loadingMore}
+                error={candidates.moreError}
+                onClick={candidates.loadMore}
+              />
+            )}
+          </>
+        )}
+      </Section>
+
+      <aside
+        aria-label="후보 상세"
+        className="min-w-0 border-t-[0.667px] border-zoop-line pt-6 lg:border-t-0 lg:border-l-[0.667px] lg:pt-0 lg:pl-6"
+      >
+        {selectedId ? (
+          <CandidateDetailPanel
+            key={selectedId}
+            id={selectedId}
+            onClose={() => select(null)}
+          />
+        ) : (
+          <Empty>
+            후보를 골라 주세요. 목록에서 후보를 고르면 원문 인용과 판정 근거를
+            보여 줘요.
+          </Empty>
+        )}
+      </aside>
+    </div>
+  );
+}

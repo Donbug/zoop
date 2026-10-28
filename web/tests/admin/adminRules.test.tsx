@@ -13,6 +13,7 @@ import {
   type FakeServer,
 } from '../support/fakeServer';
 import { renderRoutes } from '../support/renderRoutes';
+import { onOverview } from '../support/adminPipeline';
 
 const PATH = '/api/v1/admin/pipeline/rules';
 const SWITCH = `${PATH}/:ruleId`;
@@ -63,6 +64,7 @@ function open(path = '/admin/pipeline?tab=rules') {
 beforeEach(() => {
   useAdminSessionStore.getState().setSession(session);
   server = createFakeServer();
+  onOverview(server);
   server.on('GET', '/api/v1/admin/graph/versions', () =>
     json({
       items: [],
