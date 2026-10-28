@@ -98,9 +98,9 @@ zoop:
       # model-send grant check on returned results.
       enabled: ${ZOOP_CHAT_MCP_ENABLED:false}
       # The agent path (Luna chooses the reads through this endpoint, the server approves each call). Off by default; needs
-      # the endpoint above, the chat model stages and the HTTPS URL the model provider reaches this endpoint at.
+      # the endpoint above and the chat model stages. The URL the model provider reaches this endpoint at is set on the AI
+      # runtime (ZOOP_AI_CHAT_MCP_SERVER_URL), the only server a run's grant is ever sent to.
       agent-enabled: ${ZOOP_CHAT_AGENT_ENABLED:false}
-      public-url: ${ZOOP_CHAT_MCP_PUBLIC_URL:}
   analysis:
     analyze-plan:
       # Executes fixed admitted S2/S3 units only; completion does not collect or publish data.

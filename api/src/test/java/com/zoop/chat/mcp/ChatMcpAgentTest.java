@@ -121,7 +121,7 @@ class ChatMcpAgentTest {
     }
 
     private ChatAgentPath.Outcome run(ChatAgentPath.Steps steps) {
-        var agent = new ChatMcpAgent(luna, tools, grants, store, mapper, "https://api.zoop.example/mcp");
+        var agent = new ChatMcpAgent(luna, tools, grants, store, mapper);
         var attached = executor.attach(JOB, 1).orElseThrow();
         return agent.run(attached.run(), attached.control(), REQUIREMENTS, List.of(ChatCapability.COMPANY_READ), 20, steps);
     }
@@ -160,7 +160,6 @@ class ChatMcpAgentTest {
 
         var first = luna.inputs.getFirst();
         assertEquals(List.of("company_read"), first.allowedTools(), "only the allowed tools");
-        assertEquals("https://api.zoop.example/mcp", first.serverUrl());
         var second = luna.inputs.get(1);
         assertEquals("resp_mcpr_1", second.previousResponseId());
         assertEquals(List.of(new ChatModels.Decision("mcpr_1", true)), second.decisions());

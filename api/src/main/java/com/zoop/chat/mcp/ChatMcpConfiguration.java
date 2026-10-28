@@ -53,18 +53,18 @@ public class ChatMcpConfiguration {
 
     /**
      * The agent path, only with {@code zoop.chat.mcp.agent-enabled=true}: runs take it when their plan fits, through the chat
-     * model stages ({@code zoop.ai.chat-client.enabled=true}) and the public HTTPS URL the provider calls this endpoint at.
-     * Enabled without either, startup fails naming the setting.
+     * model stages ({@code zoop.ai.chat-client.enabled=true}); enabled without them, startup fails naming the setting. The URL
+     * the provider calls this endpoint at is the AI runtime operator's ({@code ZOOP_AI_CHAT_MCP_SERVER_URL}), never sent from here.
      */
     @Bean
     @ConditionalOnProperty(name = "zoop.chat.mcp.agent-enabled", havingValue = "true")
     ChatMcpAgent chatMcpAgent(ObjectProvider<ChatModels.Agent> agent, ChatMcpTools tools, ChatMcpGrants grants,
-            ChatExecutionRepository runs, @Value("${zoop.chat.mcp.public-url:}") String publicUrl) {
+            ChatExecutionRepository runs) {
         ChatModels.Agent stages = agent.getIfAvailable();
         if (stages == null) {
             throw new IllegalStateException("zoop.chat.mcp.agent-enabled needs the chat model stages (zoop.ai.chat-client.enabled)");
         }
-        return new ChatMcpAgent(stages, tools, grants, runs, PROTOCOL_JSON, publicUrl);
+        return new ChatMcpAgent(stages, tools, grants, runs, PROTOCOL_JSON);
     }
 
     @Bean(destroyMethod = "")

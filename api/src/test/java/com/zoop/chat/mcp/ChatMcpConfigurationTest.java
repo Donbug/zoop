@@ -68,17 +68,12 @@ class ChatMcpConfigurationTest {
             "ZOOP_CHAT_MCP_KEYS=k1=" + ChatMcpGrantsTest.KEY_A, "zoop.chat.mcp.agent-enabled=true"};
 
     @Test
-    void theAgentPathNeedsTheModelStagesAndAnHttpsPublicUrl() {
+    void theAgentPathNeedsTheModelStages() {
         var withRepository = runner.withBean(ChatExecutionRepository.class, MemoryChatStore::new);
-        withRepository.withPropertyValues(ENABLED).withPropertyValues("zoop.chat.mcp.public-url=https://api.zoop.example/mcp")
-                .run(context -> assertThat(context.getStartupFailure()).rootCause()
-                        .hasMessageContaining("zoop.ai.chat-client.enabled"));
+        withRepository.withPropertyValues(ENABLED).run(context -> assertThat(context.getStartupFailure()).rootCause()
+                .hasMessageContaining("zoop.ai.chat-client.enabled"));
         ChatModels.Agent stages = (run, step, input) -> { throw new UnsupportedOperationException(); };
-        var withStages = withRepository.withBean(ChatModels.Agent.class, () -> stages);
-        withStages.withPropertyValues(ENABLED).withPropertyValues("zoop.chat.mcp.public-url=http://api.zoop.example/mcp")
-                .run(context -> assertThat(context.getStartupFailure()).rootCause()
-                        .hasMessageContaining("ZOOP_CHAT_MCP_PUBLIC_URL"));
-        withStages.withPropertyValues(ENABLED).withPropertyValues("zoop.chat.mcp.public-url=https://api.zoop.example/mcp")
+        withRepository.withBean(ChatModels.Agent.class, () -> stages).withPropertyValues(ENABLED)
                 .run(context -> assertThat(context).hasSingleBean(ChatMcpAgent.class));
     }
 }

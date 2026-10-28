@@ -47,19 +47,14 @@ public final class ChatMcpAgent implements ChatAgentPath {
     private final ChatMcpGrants grants;
     private final ChatExecutionRepository runs;
     private final ObjectMapper mapper;
-    private final String serverUrl;
 
     public ChatMcpAgent(ChatModels.Agent agent, ChatMcpTools tools, ChatMcpGrants grants, ChatExecutionRepository runs,
-            ObjectMapper mapper, String serverUrl) {
-        if (serverUrl == null || !serverUrl.startsWith("https://")) {
-            throw new IllegalArgumentException("the chat MCP public URL is an https URL (ZOOP_CHAT_MCP_PUBLIC_URL)");
-        }
+            ObjectMapper mapper) {
         this.agent = agent;
         this.tools = tools;
         this.grants = grants;
         this.runs = runs;
         this.mapper = mapper;
-        this.serverUrl = serverUrl;
     }
 
     @Override
@@ -78,7 +73,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
         int approved = 0;
         int denied = 0;
         for (int step = 1, rounds = 0; ; step++) {
-            var input = new ChatModels.AgentInput(requirements, serverUrl, token, names, maxCitations, previous, decisions);
+            var input = new ChatModels.AgentInput(requirements, token, names, maxCitations, previous, decisions);
             int number = step;
             ChatModels.AgentStep outcome = steps.run(() -> agent.step(run, number, input));
             if (outcome.completed()) return new Outcome(outcome.answer(), kept(run), step, approved, denied);

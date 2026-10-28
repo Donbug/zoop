@@ -394,7 +394,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             ArrayNode targets = wire.putArray("targets");
             requirement.targets().forEach(targets::add);
         }
-        ObjectNode mcp = input.putObject("mcp").put("serverUrl", agent.serverUrl()).put("authorization", agent.grantToken());
+        ObjectNode mcp = input.putObject("mcp").put("authorization", agent.grantToken());
         ArrayNode tools = mcp.putArray("allowedTools");
         agent.allowedTools().forEach(tools::add);
         input.put("maxCitations", Math.min(MAX_QUOTES, agent.maxCitations()));
