@@ -7,6 +7,17 @@ base = grouped.base
 POLICY = 'recorded-supported-event-exact-quote-v1'
 
 
+def participants_bound(mention, raw):
+    projection = mention.get('companyProjection')
+    if projection is not None:
+        return all(a['rawParticipant'] in raw['participants'] for a in projection['audit'])
+    # Legacy archives have no projection audit. Bind every public company and role
+    # directly to the participants the grounding model actually received.
+    return all(any(c['companyId'] == p.get('company_id') and c['name'] == p.get('name')
+                   and c.get('role') == p.get('role') for p in raw['participants'])
+               for c in mention['companies'])
+
+
 def load(archive, output):
     originals = {m['mentionId']: m for i in archive['issues'] for m in i['mentions']}
     documents = {d['documentId']: d for d in archive['documents']}
@@ -41,7 +52,7 @@ def load(archive, output):
             grouped.require(m['grounding'] == verdict and raw['background'] is False
                             and all(m[left] == raw[right] for left, right in [('articleId', 'article_id'), ('pocArticleVersion', 'article_version'), ('title', 'title'), ('action', 'action'), ('assertionStatus', 'assertion_status')]), 'semantic_event_binding')
             grouped.require(all(any(all(e[f] == old[f] for f in ('quote', 'start', 'end')) for old in raw['evidence']) for e in m['evidence']), 'semantic_quote_binding')
-            grouped.require(all(a['rawParticipant'] in raw['participants'] for a in m.get('companyProjection', {}).get('audit', [])), 'semantic_participant_binding')
+            grouped.require(participants_bound(m, raw), 'semantic_participant_binding')
             grouped.require(key_id not in result, 'semantic_duplicate_mention')
             result[key_id] = {'mention': m, 'requestDigest': key}
     return result
@@ -54,6 +65,9 @@ def matches(current, proof):
     if m.get('grounding', {}).get('verdict') != 'SUPPORTED' or any(m[f] != current[f] for f in ('articleId', 'articleVersion', 'bodySha256')):
         return False
     accepted = {e['evidenceId']: e for e in m['evidence']}
+    original_companies = {(c['companyId'], c['name'], c.get('role')) for c in m['companies']}
+    if {(c['companyId'], c['name'], c.get('role')) for c in current['companies']} != original_companies:
+        return False
     return bool(current['evidence']) and all(e.get('quote', '').strip() and e['evidenceId'] in accepted
         and all(e[f] == accepted[e['evidenceId']][f] for f in ('quote', 'start', 'end')) for e in current['evidence'])
 

@@ -217,14 +217,14 @@ public final class BriefingReplayImporter {
         StrictJson.Obj seriesCompanies = explicitSeries && bundle.has("marketEnrichment") && bundle.object("marketEnrichment").has("seriesCompanyOutlooks")
                 ? bundle.object("marketEnrichment").object("seriesCompanyOutlooks") : null;
         if (seriesCompanies != null) require(settings.userInboxRef().equals(seriesCompanies.string("authorizationRef")), "series_company_authorization");
-        Map<String, StrictJson.Obj> seriesCompanyRows = seriesCompanies == null ? Map.of() : BriefingCompanyOutlookRules.rows(seriesCompanies);
+        Map<String, StrictJson.Obj> seriesCompanyRows = seriesCompanies == null ? Map.of() : BriefingCompanyOutlookRules.rows(seriesCompanies, 14);
         Map<String, StrictJson.Obj> seriesPriceRows = explicitSeries && bundle.has("marketEnrichment")
                 ? BriefingSeriesPriceRules.rows(bundle, settings.userInboxRef(), seriesCompanyRows, settings.bundle().getParent()) : Map.of();
         Map<String, JsonNode> seriesCompanyReceipts = seriesCompanies == null ? Map.of() : simulationReceiptLedger(seriesCompanies.objects("receipts"));
         StrictJson.Obj seriesReading = explicitSeries && bundle.has("marketEnrichment") && bundle.object("marketEnrichment").has("seriesCompanyReading")
                 ? bundle.object("marketEnrichment").object("seriesCompanyReading") : null;
         if (seriesReading != null) require(settings.userInboxRef().equals(seriesReading.string("authorizationRef")), "series_reading_authorization");
-        Map<String, StrictJson.Obj> seriesReadingRows = seriesReading == null ? Map.of() : BriefingCompanyReadingRules.rows(seriesReading);
+        Map<String, StrictJson.Obj> seriesReadingRows = seriesReading == null ? Map.of() : BriefingCompanyReadingRules.rows(seriesReading, 14);
         Map<String, JsonNode> seriesReadingReceipts = seriesReading == null ? Map.of() : simulationReceiptLedger(seriesReading.objects("receipts"));
         require(seriesCompanyRows.keySet().containsAll(seriesReadingRows.keySet()), "series_reading_company_rounds");
         Set<String> seriesReadingOwned = new HashSet<>();

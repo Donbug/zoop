@@ -16,6 +16,8 @@ class PairwiseTest(unittest.TestCase):
   f={'targets':[{'companyId':x,'issueIds':['same-story']} for x in ('A','B','C')]}
   self.assertEqual(e.representative_cases(f),[])
   f['targets'][0]['issueIds'].append('second-story');f['targets'][2]['issueIds']=['third-story']
+  self.assertEqual(e.representative_cases(f),[])
+  f['targets'][0]['issueIds']=['second-story']
   cases=e.representative_cases(f);self.assertEqual(len({c['issueId'] for c in cases}),3)
  def test_same_input_hash_ignores_only_output_contract_version(self):
   row={'frozen':{'schemaVersion':'v1','sources':{'a':'actual quote'},'previous':'exact-version'}}

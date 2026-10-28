@@ -23,9 +23,10 @@ def run(args, transport=None):
     if args.authorization_ref != company_layer['authorizationRef'] or 'seriesCompanyPrices' in layer:
         raise ValueError('prices_authorization_or_existing_layer')
     rows = [r for r in company_layer['rounds'] if r['status'] == 'PASS']
-    if not rows or len(rows) > 14:
+    if not company_layer['rounds'] or len(company_layer['rounds']) > 14:
         raise ValueError('prices_company_rounds')
-    cutoffs = [prices.market.aware(r['cutoff']) for r in rows]
+    # All-WITHHELD is a valid completed generation run with no price targets.
+    cutoffs = [prices.market.aware(r['cutoff']) for r in (rows or company_layer['rounds'])]
     start = min(cutoffs).astimezone(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=7)
     end = max(cutoffs).astimezone(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
     bounds = prices.period(int(start.timestamp()), int(end.timestamp()))
@@ -38,6 +39,8 @@ def run(args, transport=None):
         if proof['identity'] != identity or proof['bundleSha256'] != base.digest(base.regular(output / 'bundle-v2.json')):
             raise ValueError('prices_completed_changed')
         completed = base.strict_load(base.regular(output / 'bundle-v2.json'))['marketEnrichment']['seriesCompanyPrices']
+        if {key:completed.get(key) for key in identity} != identity:
+            raise ValueError('prices_completed_identity_changed')
         for row in completed['rounds']:
             for cid, archived in row['prices'].items():
                 if prices.snapshot(cid, row['cutoff'], archived['sources'], output) != archived:
@@ -58,7 +61,7 @@ def run(args, transport=None):
                 if not target.exists():
                     os.link(file, target)
         ids = sorted({t['companyId'] for r in rows for t in r['frozen']['targets']})
-        receipts = prices.collect(ids, output, transport or prices.market.transport, start=bounds[0], end=bounds[1])
+        receipts = prices.collect(ids, output, transport or prices.market.transport, start=bounds[0], end=bounds[1]) if ids else {}
         completed = []
         for original_row in rows:
             row = {'roundId': original_row['roundId'], 'cutoff': original_row['cutoff'],

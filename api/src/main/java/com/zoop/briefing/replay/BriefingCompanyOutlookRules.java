@@ -22,9 +22,12 @@ final class BriefingCompanyOutlookRules {
     private BriefingCompanyOutlookRules() { }
 
     static Map<String, StrictJson.Obj> rows(StrictJson.Obj layer) {
+        return rows(layer, 4);
+    }
+    static Map<String, StrictJson.Obj> rows(StrictJson.Obj layer, int maximum) {
         require(SCHEMA.equals(layer.string("schemaVersion")) && !layer.string("authorizationRef").isBlank(), "layer");
         Map<String, StrictJson.Obj> out = new LinkedHashMap<>(); Instant last = Instant.MIN;
-        require(!layer.objects("rounds").isEmpty() && layer.objects("rounds").size() <= 4, "round_count");
+        require(!layer.objects("rounds").isEmpty() && layer.objects("rounds").size() <= maximum, "round_count");
         for (StrictJson.Obj row : layer.objects("rounds")) {
             Instant cutoff = Instant.parse(row.string("cutoff")); require(cutoff.isAfter(last), "chronology"); last = cutoff;
             require(out.putIfAbsent(row.string("roundId"), row) == null, "duplicate_round");

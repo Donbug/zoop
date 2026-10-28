@@ -13,6 +13,7 @@ class BriefingCoreEvidenceRulesTest {
         var m = c.putArray("newMentions").addObject().put("mentionId", "authored-mention").put("articleId", "authored-doc")
                 .put("articleVersion", "v1").put("bodySha256", "b".repeat(64));
         m.putArray("evidence").addObject().put("evidenceId", "authored-evidence").put("quote", quote).put("start", 0).put("end", quote.length());
+        m.putArray("companies");
         return c;
     }
     Map<String, BriefingReferenceSupport.Proof> support(ObjectNode c) {
