@@ -112,6 +112,30 @@ final class ExposureReports {
         return StrictJson.write(request);
     }
 
+    /** The source change every synthetic report answers. */
+    static ObjectNode sourceChange() {
+        ObjectNode changed = StrictJson.newObject();
+        changed.put("kind", "source");
+        changed.put("sourceId", "synthetic-source");
+        return changed;
+    }
+
+    /** An {@code exclude-query} for this change in these versions (none: the default versions). */
+    static byte[] query(String requestId, ObjectNode changed, String... versionIds) {
+        ObjectNode request = StrictJson.newObject();
+        request.put("schemaVersion", "zoop-disclosure-exclusion-1");
+        request.put("requestId", requestId);
+        request.put("action", "exclude-query");
+        request.put("operator", "operator-a");
+        request.put("reason", "권리 철회에 따른 공개 제외");
+        request.set("changed", changed);
+        ArrayNode versions = request.putArray("graphVersionIds");
+        for (String versionId : versionIds) {
+            versions.add(versionId);
+        }
+        return StrictJson.write(request);
+    }
+
     /** A lift decided on exclusion revision {@code expectedRevision}. */
     static byte[] lift(String versionId, long expectedRevision, String... issueIds) {
         ObjectNode request = StrictJson.newObject();
