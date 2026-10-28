@@ -21,6 +21,9 @@ export type MapMode = 'all' | 'personal';
 
 export type PersonalScope = 'all' | 'holdings' | 'watchlist';
 
+/** 지도 화면에서 마지막으로 저장한 관심 종목 목록. seq가 바뀌면 사이드바·기업 상세가 이 목록으로 맞춘다. */
+export type WatchSync = { ids: string[]; seq: number };
+
 export type GraphTutorialStep = 1 | 2 | 3 | 4 | 5;
 
 export type GraphUiState = {

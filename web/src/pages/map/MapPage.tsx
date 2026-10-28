@@ -72,6 +72,7 @@ import type {
   GraphTutorialStep,
   MapMode,
   PersonalScope,
+  WatchSync,
 } from '@/types/map';
 import '@/components/graph/relationship-map.css';
 import { useColorTheme } from '@/util/theme-color';
@@ -222,6 +223,7 @@ function MapWorkspace({
     query.addEventListener?.('change', changed);
     return () => query.removeEventListener?.('change', changed);
   }, []);
+  const [watchSync, setWatchSync] = useState<WatchSync | null>(null);
   const [missingCompany, setMissingCompany] = useState<{
     id: string;
     owner: string;
@@ -833,6 +835,19 @@ function MapWorkspace({
       );
     }
   }
+  // FS027: 사이드바·기업 상세 어느 쪽에서 관심을 저장해도 두 화면을 같은 목록으로 맞추고,
+  // 개인화 지도는 저장 뒤 목록으로 다시 조회한다. 저장 전에 받아 둔 개인화 응답은 쓰지 않는다.
+  function watchSaved(watchlistIds: string[]) {
+    setWatchSync((sync) => ({ ids: watchlistIds, seq: (sync?.seq ?? 0) + 1 }));
+    prefetch.current = null;
+    // 개인화 전환 조회가 진행 중이면 그 응답을 버리고 저장 뒤 목록으로 다시 전환한다.
+    if (switching === 'personal') {
+      void changeMode('personal');
+      return;
+    }
+    if (appliedMode === 'personal' || requestedMode === 'personal')
+      setRetry((value) => value + 1);
+  }
   function changeFilter(scope: PersonalScope) {
     sessionStorage.setItem(FILTER_KEY, scope);
     updateQuery({
@@ -1008,10 +1023,8 @@ function MapWorkspace({
                   key={memoryOwner}
                   member={Boolean(token)}
                   graph={!loading && !error ? data : null}
-                  onWatchChanged={() => {
-                    if (appliedMode === 'personal')
-                      setRetry((value) => value + 1);
-                  }}
+                  watchSync={watchSync}
+                  onWatchChanged={watchSaved}
                   logoOf={(id) =>
                     companyLogo(
                       id,
@@ -1033,6 +1046,9 @@ function MapWorkspace({
                       selectNode(id);
                       return;
                     }
+                    // 상세를 닫으면 고른 사이드바 행으로 포커스를 돌려준다.
+                    if (document.activeElement instanceof HTMLElement)
+                      opener.current = document.activeElement;
                     updateQuery({
                       select: `node:${id}`,
                       id: null,
@@ -1298,6 +1314,8 @@ function MapWorkspace({
                   fallback={companyNode}
                   relatedCompanies={relatedCompanies}
                   token={token}
+                  watchSync={watchSync}
+                  onWatchSaved={watchSaved}
                   onClose={() => selectNode(null)}
                   tutorialIssueId={
                     tutorialOpen && tutorialStep === 3

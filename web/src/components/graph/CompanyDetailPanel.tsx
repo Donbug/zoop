@@ -7,6 +7,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { setWatchlistCompany } from '@/apis/graph/companies';
 import { useCompanyData } from '@/hooks/useCompanyData';
 import type { GraphNode } from '@/types/map/graph';
+import type { WatchSync } from '@/types/map';
 import IssueDocumentSentiments from './IssueDocumentSentiments';
 
 type RelatedCompany = { id: string; name: string; sharedIssueCount: number };
@@ -17,6 +18,9 @@ type Props = {
   fallback: GraphNode;
   relatedCompanies: RelatedCompany[];
   token: string | null;
+  /** 지도 화면에서 마지막으로 저장한 관심 목록(사이드바에서 저장한 것 포함). */
+  watchSync?: WatchSync | null;
+  onWatchSaved?: (watchlistIds: string[]) => void;
   onClose: () => void;
   onSelectIssue: (id: string) => void;
   tutorialIssueId?: string;
@@ -96,6 +100,13 @@ export default function CompanyDetailPanel(props: Props) {
   const [watchOverride, setWatchOverride] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [watchError, setWatchError] = useState('');
+  // 사이드바에서 이 기업의 관심을 바꾸면 ★도 같은 목록으로 맞춘다. 저장 중에는 내 저장 결과를 기다린다.
+  const [appliedSync, setAppliedSync] = useState(props.watchSync?.seq ?? 0);
+  if (props.watchSync && props.watchSync.seq !== appliedSync) {
+    setAppliedSync(props.watchSync.seq);
+    if (!saving)
+      setWatchOverride(props.watchSync.ids.includes(props.companyId));
+  }
   const company = data?.company;
   const watch = watchOverride ?? Boolean(company?.watch);
 
@@ -109,6 +120,7 @@ export default function CompanyDetailPanel(props: Props) {
     try {
       const settings = await setWatchlistCompany(props.companyId, desired);
       setWatchOverride(settings.watchlistIds.includes(props.companyId));
+      props.onWatchSaved?.(settings.watchlistIds);
     } catch {
       setWatchOverride(previous);
       setWatchError('관심기업 저장에 실패했습니다. 다시 시도해 주세요.');

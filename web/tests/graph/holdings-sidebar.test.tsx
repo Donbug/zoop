@@ -63,6 +63,37 @@ it('lists watched companies and saves a star only after the API confirms it', as
   expect(
     await within(watch).findByText(/고른 관심 종목이 없어요/),
   ).toBeTruthy();
+  expect(onWatchChanged).toHaveBeenCalledWith([]);
+});
+
+// #388 리뷰: 기업 상세에서 저장한 관심 목록도 사이드바의 별·목록·빈 안내에 반영한다.
+it('applies a watchlist saved elsewhere on the map', async () => {
+  myMember(server, { connected: true, watchlistIds: [NVIDIA.id] });
+  const sidebar = (watchSync: { ids: string[]; seq: number } | null) => (
+    <MemoryRouter>
+      <HoldingsSidebar
+        member
+        logoOf={() => null}
+        onPick={vi.fn()}
+        onClose={vi.fn()}
+        watchSync={watchSync}
+      />
+    </MemoryRouter>
+  );
+  const { rerender } = render(sidebar(null));
+  const watch = await screen.findByRole('region', { name: '관심 종목' });
+  await within(watch).findByRole('button', { name: 'NVIDIA 관심 종목' });
+
+  rerender(sidebar({ ids: [], seq: 1 }));
+  expect(
+    await within(watch).findByText(/고른 관심 종목이 없어요/),
+  ).toBeTruthy();
+
+  rerender(sidebar({ ids: [SAMSUNG.id], seq: 2 }));
+  const star = await within(watch).findByRole('button', {
+    name: `${SAMSUNG.name} 관심 종목`,
+  });
+  expect(star.getAttribute('aria-pressed')).toBe('true');
 });
 
 it('keeps the saved star and reports a failed write', async () => {

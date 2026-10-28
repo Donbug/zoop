@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import type { GraphResponse } from '@/types/map/graph';
 import type { CompanyBrief } from '@/types/company';
+import type { WatchSync } from '@/types/map';
 
 function complete(value: unknown) {
   if (!value || typeof value !== 'object') return false;
@@ -38,7 +39,9 @@ type Props = {
   graph?: GraphResponse | null;
   onPick: (companyId: string) => void;
   onClose: () => void;
-  onWatchChanged?: () => void;
+  /** 지도 화면에서 마지막으로 저장한 관심 목록(기업 상세에서 저장한 것 포함). */
+  watchSync?: WatchSync | null;
+  onWatchChanged?: (watchlistIds: string[]) => void;
 };
 
 // D-GRP-01/01b: member holdings and watchlist, with explicit confirmed writes.
@@ -48,6 +51,7 @@ export default function HoldingsSidebar({
   graph,
   onPick,
   onClose,
+  watchSync,
   onWatchChanged,
 }: Props) {
   const location = useLocation();
@@ -77,6 +81,7 @@ export default function HoldingsSidebar({
           logoOf={logoOf}
           graph={graph}
           onPick={onPick}
+          watchSync={watchSync}
           onWatchChanged={onWatchChanged}
         />
       ) : (
@@ -99,10 +104,20 @@ function HoldingsList({
   logoOf,
   graph,
   onPick,
+  watchSync,
   onWatchChanged,
 }: Omit<Props, 'member' | 'onClose'>) {
   const portfolio = useAsyncData(loadPortfolio);
   const settings = useAsyncData(loadSettings);
+  // 다른 곳(기업 상세)에서 저장한 관심 목록을 받으면 별·목록·빈 안내를 그 목록으로 맞춘다.
+  // 처음 열 때의 값은 이미 조회 결과에 들어 있으므로 그 뒤에 바뀐 것만 반영한다.
+  const [appliedSync, setAppliedSync] = useState(watchSync?.seq ?? 0);
+  if (watchSync && watchSync.seq !== appliedSync) {
+    setAppliedSync(watchSync.seq);
+    if (settings.status === 'success')
+      settings.setData({ ...settings.data, watchlistIds: watchSync.ids });
+    else settings.reload();
+  }
   const watchKey = settings.data?.watchlistIds.join('\u001f') ?? '';
   const loadWatch = useCallback(async () => {
     const ids = watchKey ? watchKey.split('\u001f') : [];
@@ -183,7 +198,7 @@ function HoldingsList({
       )
         focusAfter.current = Math.max(removedIndex, 0);
       settings.setData(result);
-      onWatchChanged?.();
+      onWatchChanged?.(result.watchlistIds);
     } catch {
       if (
         active.current &&
