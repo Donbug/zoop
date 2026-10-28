@@ -3,7 +3,13 @@ import PriceChart from './PriceChart';
 import { formatKst, formatMoney } from '@/util/format';
 import BoltIcon from './BoltIcon';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useNavigationType,
+  useParams,
+} from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useCompanyResource, type Resource } from '@/hooks/useCompanyResource';
@@ -199,6 +205,7 @@ export default function CompanyWorkspace() {
   const { id = '' } = useParams();
   const { params, updateQuery } = useRouteQuery();
   const location = useLocation();
+  const navigationType = useNavigationType();
   const navigate = useNavigate();
   const auth = useAuth();
   const revision = useAuthStore((s) => s.sessionRevision);
@@ -213,7 +220,21 @@ export default function CompanyWorkspace() {
   const requestedGraphAsOf = params.get('graphAsOf');
   const invalid = !!asOf && !exactTime(asOf);
   // 그래프 밖을 눌러 끝낸 시점은 주소에서 지워지기 전에도 바로 현재 시점 그래프로 보인다.
-  const [closedGraphAsOf, setClosedGraphAsOf] = useState<string | null>(null);
+  const [closedGraphTime, setClosedGraphTime] = useState<{
+    asOf: string;
+    entryKey: string;
+  } | null>(null);
+  const closedGraphAsOf = closedGraphTime?.asOf ?? null;
+  // D-COM-06: the close is complete once the URL drops that time. Clear it
+  // before rendering so Back/Forward can restore the same timestamp later.
+  if (
+    closedGraphTime &&
+    (requestedGraphAsOf !== closedGraphTime.asOf ||
+      (navigationType === 'POP' && location.key !== closedGraphTime.entryKey))
+  )
+    setClosedGraphTime(null);
+  else if (closedGraphTime && location.key !== closedGraphTime.entryKey)
+    setClosedGraphTime({ ...closedGraphTime, entryKey: location.key });
   const graphAsOf =
     requestedGraphAsOf &&
     requestedGraphAsOf !== closedGraphAsOf &&
@@ -259,6 +280,7 @@ export default function CompanyWorkspace() {
   const graphTimeOpen = graphAsOf;
   useEffect(() => {
     if (!graphTimeOpen) return;
+    const timeToClose = graphTimeOpen;
     const clickedAt = paramsKey;
     function outside(event: MouseEvent) {
       const target = event.target;
@@ -268,7 +290,7 @@ export default function CompanyWorkspace() {
         target.closest('[data-graph-time-trigger]')
       )
         return;
-      setClosedGraphAsOf(graphTimeOpen);
+      setClosedGraphTime({ asOf: timeToClose, entryKey: location.key });
       window.clearTimeout(closeTimer.current);
       closeTimer.current = window.setTimeout(
         () => clearIfUnchanged(clickedAt),
@@ -277,7 +299,7 @@ export default function CompanyWorkspace() {
     }
     document.addEventListener('click', outside, true);
     return () => document.removeEventListener('click', outside, true);
-  }, [graphTimeOpen, paramsKey]);
+  }, [graphTimeOpen, paramsKey, location.key]);
   // 버전 단독 주소는 그 버전의 차트를 열 수 없다고 안내하므로 가격 조회도 시작하지 않는다.
   const prices = useCompanyResource<Prices>(
     invalid || versionOnly
@@ -453,7 +475,7 @@ export default function CompanyWorkspace() {
     return time && time !== asOf ? time : null;
   };
   function showEventGraph(item: Events['items'][number], time: string) {
-    setClosedGraphAsOf(null);
+    setClosedGraphTime(null);
     updateQuery({
       graphAsOf: time,
       event: item.id,
