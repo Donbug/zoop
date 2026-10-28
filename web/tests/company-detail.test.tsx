@@ -322,6 +322,73 @@ function open(query = '') {
 }
 const pinned = `?asOf=${encodeURIComponent(time)}&graphVersion=v1`;
 
+test('D-COM-06: catalog company switch clears the prior company event graph time', async () => {
+  server.on('GET', '/api/v1/companies', () =>
+    json({
+      items: [{ id: 'KRX:OTHER', name: '리뷰 다른 기업', ticker: 'OTHER' }],
+      nextCursor: null,
+    }),
+  );
+  open(`${pinned}&graphAsOf=${encodeURIComponent(old)}`);
+  const catalog = screen.getByRole('complementary', { name: '기업 선택' });
+  await userEvent.type(
+    within(catalog).getByRole('textbox', { name: '기업명·종목 코드' }),
+    'OTHER',
+  );
+  await userEvent.click(within(catalog).getByRole('button', { name: '검색' }));
+  await userEvent.click(
+    await within(catalog).findByRole('link', { name: /리뷰 다른 기업/ }),
+  );
+  const address = screen.getByTestId('address').textContent ?? '';
+  expect(address).toContain('/companies/KRX%3AOTHER');
+  expect(
+    new URL(address, 'http://localhost').searchParams.has('graphAsOf'),
+  ).toBe(false);
+  expect(new URL(address, 'http://localhost').searchParams.get('asOf')).toBe(
+    time,
+  );
+  expect(
+    new URL(address, 'http://localhost').searchParams.get('graphVersion'),
+  ).toBe('v1');
+});
+
+test.each([
+  { eventTime: time, timePrecision: 'datetime' },
+  { eventTime: null, timePrecision: 'unknown' },
+  { eventTime: '2026-10', timePrecision: 'month' },
+  { eventTime: '2026-10-06', timePrecision: 'day' },
+])(
+  'D-COM-06: selected issue map link overrides an older graph time (%j)',
+  async (eventTime) => {
+    server.on('GET', '/api/v1/events/:id', (r) =>
+      json({
+        ...events[0],
+        id: r.params.id,
+        ...eventTime,
+        articles: [],
+        relations: [],
+        evidenceIds: [],
+        metadata,
+      }),
+    );
+    open(`${pinned}&graphAsOf=${encodeURIComponent(old)}&event=issue-a`);
+    await screen.findByRole('heading', { name: '합성 사건 A' });
+    const link = screen.getByRole('link', {
+      name: '이 사건 시점의 관계를 지도에서 보기',
+    });
+    const href = new URL(link.getAttribute('href')!, 'http://localhost');
+    expect(href.searchParams.get('asOf')).toBe(time);
+    expect(href.searchParams.get('graphVersion')).toBe('v1');
+    const graphLink = screen.getByRole('link', { name: '지도에서 보기' });
+    const graphHref = new URL(
+      graphLink.getAttribute('href')!,
+      'http://localhost',
+    );
+    expect(graphHref.searchParams.get('asOf')).toBe(old);
+    expect(graphHref.searchParams.has('graphVersion')).toBe(false);
+  },
+);
+
 function VersionOnlyNavigation() {
   const navigate = useNavigate();
   return (

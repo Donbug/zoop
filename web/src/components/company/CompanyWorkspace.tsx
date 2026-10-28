@@ -369,10 +369,13 @@ export default function CompanyWorkspace() {
   // 시각이 없으면 현재 기준 시점을 쓰고, 일 정밀도는 그날 한국 시간 끝까지로 본다.
   const eventMapQuery = new URLSearchParams(mapQuery);
   const eventAsOf = eventReferenceTime(event.data, asOf);
-  if (eventAsOf && eventAsOf !== asOf) {
+  if (eventAsOf) {
     eventMapQuery.set('asOf', eventAsOf);
-    // 다른 시점이면 그 시점의 공개 버전을 서버가 고르게 한다.
+    // D-COM-06: 사건 링크는 오른쪽 그래프의 임시 시점을 물려받지 않는다.
+    // 본문과 같은 시점이면 원래 공개 버전을 복원하고, 다르면 서버가 고른다.
     eventMapQuery.delete('graphVersion');
+    if (version && Date.parse(eventAsOf) === Date.parse(asOf ?? ''))
+      eventMapQuery.set('graphVersion', version);
   }
   const highlighted = graph.data ? impactEdges(graph.data, impact.data) : [];
   function selectEvent(item: Events['items'][number], targetTab?: string) {
