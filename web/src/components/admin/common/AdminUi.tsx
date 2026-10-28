@@ -190,7 +190,7 @@ export function Tabs<T extends string>({
 }: {
   label: string;
   value: T;
-  options: { value: T; label: string }[];
+  options: { value: T; label: string; icon?: ReactNode }[];
   onChange: (value: T) => void;
   variant?: 'pill' | 'line';
 }) {
@@ -208,8 +208,9 @@ export function Tabs<T extends string>({
             role="tab"
             aria-selected={option.value === value}
             onClick={() => onChange(option.value)}
-            className={`-mb-px min-h-11 flex-1 shrink-0 border-b-2 border-transparent px-4 text-sm text-zoop-muted transition-colors hover:text-zoop-ink aria-selected:border-zoop-ink aria-selected:font-bold aria-selected:text-zoop-ink ${FOCUS_RING}`}
+            className={`-mb-px inline-flex min-h-11 flex-1 shrink-0 items-center justify-center gap-1.5 border-b-2 border-transparent px-4 text-sm text-zoop-muted transition-colors hover:text-zoop-ink aria-selected:border-zoop-ink aria-selected:font-bold aria-selected:text-zoop-ink ${FOCUS_RING}`}
           >
+            {option.icon}
             {option.label}
           </button>
         ))}

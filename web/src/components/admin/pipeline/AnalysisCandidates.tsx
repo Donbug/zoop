@@ -235,7 +235,9 @@ function CandidatesSession() {
                       }
                     >
                       <td className={`${TD} whitespace-nowrap font-semibold`}>
-                        <span className="inline-flex items-center gap-1">
+                        <span
+                          className={`inline-flex items-center gap-1 ${row.status === 'HOLD' ? 'text-zoop-hold' : ''}`}
+                        >
                           <StatusIcon status={row.status} />
                           {candidateStatusLabel[row.status]}
                         </span>
