@@ -93,12 +93,21 @@ public class ChatToolRunner implements AutoCloseable {
     /** Runs the stage's calls and returns one result per call, in plan order. */
     public List<ChatToolResult> runStage(ChatRun run, ChatRunControl control, int planRevision,
             List<ChatToolRequest> calls) {
+        return runStage(run, control, planRevision, calls, null);
+    }
+
+    /**
+     * Runs the stage's calls like {@link #runStage(ChatRun, ChatRunControl, int, List)}; {@code via}, when not null, names
+     * the transport the calls came through (the chat MCP endpoint: {@code mcp}) and is kept in each call's request record.
+     */
+    public List<ChatToolResult> runStage(ChatRun run, ChatRunControl control, int planRevision,
+            List<ChatToolRequest> calls, String via) {
         List<ChatToolRegistry.Binding> bindings = calls.stream().map(call -> registry.bind(call.capabilityId())
                 .orElseThrow(() -> new IllegalArgumentException("unbound chat capability: " + call.capabilityId())))
                 .toList();
         ChatToolScope scope = new ChatToolScope(run.jobId(), run.graphVersionId(), run.context().asOf(), run.memberId());
         List<ChatToolCallReservation> reservations = new ArrayList<>();
-        for (int i = 0; i < calls.size(); i++) reservations.add(reservation(bindings.get(i), scope, calls.get(i)));
+        for (int i = 0; i < calls.size(); i++) reservations.add(reservation(bindings.get(i), scope, calls.get(i), via));
         List<String> ids = control.reserveToolCalls(planRevision, reservations);
 
         long stageEnd = System.nanoTime() + Math.min(stageLimit.toNanos(), Math.max(0, control.remaining().toNanos()));
@@ -248,8 +257,9 @@ public class ChatToolRunner implements AutoCloseable {
 
     /** The allowed request structure {@code chat_tool_calls} keeps, and its digest. */
     private static ChatToolCallReservation reservation(ChatToolRegistry.Binding binding, ChatToolScope scope,
-            ChatToolRequest call) {
+            ChatToolRequest call, String via) {
         ObjectNode meta = StrictJson.newObject();
+        if (via != null) meta.put("via", via);
         var targets = meta.putArray("targets");
         call.targets().forEach(targets::add);
         meta.put("limit", call.limit());

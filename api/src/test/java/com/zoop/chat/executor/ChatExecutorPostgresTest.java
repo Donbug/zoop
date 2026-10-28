@@ -187,6 +187,28 @@ class ChatExecutorPostgresTest {
     }
 
     @Test
+    void aRunningAttemptCanBeAttachedFromOutsideItsThreadUnderTheSameFences() {
+        String jobId = submit("MCP로 붙을 질문");
+        var claim = executor.claimNext().orElseThrow();
+
+        var attached = executor.attach(jobId, 1).orElseThrow();
+        assertEquals(jobId, attached.run().jobId());
+        assertEquals(1, attached.run().attemptNo());
+        // The stored deadline is the claim's, rounded to the database's microseconds.
+        assertTrue(Duration.between(claim.deadline(), attached.run().deadline()).abs().toMillis() < 1);
+        assertTrue(attached.control().owned());
+        assertEquals(List.of("tc-0"), attached.control().reserveToolCalls(1, List.of(reservation("company.read"))));
+        assertTrue(executor.attach(jobId, 2).isEmpty(), "another attempt");
+        assertTrue(executor.attach("job-missing", 1).isEmpty());
+
+        service.cancel(member, jobId, "cancel-" + suffix());
+        assertTrue(executor.attach(jobId, 1).isEmpty());
+        assertThrows(ChatRunSuperseded.class, () -> attached.control().toolCallStarted("tc-0"));
+        assertEquals("cancelled", jdbc.queryForObject(
+                "SELECT status FROM chat_tool_calls WHERE chat_job_id = ? AND tool_call_id = 'tc-0'", String.class, jobId));
+    }
+
+    @Test
     void anExpiredLeaseIsRecoveredTheLateRunIsDiscardedAndARerunStartsANewAttempt() {
         String jobId = submit("오래 걸린 질문");
         var claim = executor.claimNext().orElseThrow();

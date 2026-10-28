@@ -60,6 +60,17 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
     }
 
     @Override
+    public Optional<ChatRunningJob> findRunning(String jobId, Instant at) {
+        String select = JdbcChatRepository.JOB_SELECT.replaceFirst("SELECT ",
+                "SELECT j.owner_token AS run_owner_token, j.deadline_at AS run_deadline_at, ");
+        return jdbc.query(select + " WHERE j.id = :id AND j.status = 'running' AND j.lease_until > :at",
+                new MapSqlParameterSource().addValue("id", jobId).addValue("at", Timestamp.from(at)),
+                (rs, index) -> new ChatRunningJob(JdbcChatRepository.JOB.mapRow(rs, index),
+                        rs.getString("run_owner_token"), rs.getTimestamp("run_deadline_at").toInstant()))
+                .stream().findFirst();
+    }
+
+    @Override
     public boolean phase(String jobId, String ownerToken, String phase, Instant at) {
         return jdbc.update("UPDATE chat_jobs SET phase = :phase, updated_at = :at WHERE id = :id AND " + OWNED,
                 params(jobId, ownerToken, at).addValue("phase", phase)) == 1;

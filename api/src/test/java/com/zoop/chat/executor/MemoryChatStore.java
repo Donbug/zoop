@@ -11,6 +11,7 @@ import java.util.Optional;
 import com.zoop.chat.repository.ChatExecutionRepository;
 import com.zoop.chat.repository.ChatJobRow;
 import com.zoop.chat.repository.ChatRepository;
+import com.zoop.chat.repository.ChatRunningJob;
 import com.zoop.chat.repository.ChatSessionRow;
 import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.repository.NewChatJob;
@@ -20,15 +21,15 @@ import com.zoop.chat.repository.NewChatToolCall;
  * In-memory job store with the executor's fences: a run's writes apply only while the job is running under its owner token
  * and an unexpired lease. Only the reads the executor needs are implemented.
  */
-final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
+public final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
     final Map<String, Job> jobs = new LinkedHashMap<>();
     final List<ToolCall> toolCalls = new ArrayList<>();
 
     /** A {@code chat_tool_calls} row: the reservation, its status and how it ended. */
-    static final class ToolCall {
-        final NewChatToolCall row;
-        String status = "reserved";
-        ChatToolCallEnd end;
+    public static final class ToolCall {
+        public final NewChatToolCall row;
+        public String status = "reserved";
+        public ChatToolCallEnd end;
 
         ToolCall(NewChatToolCall row) {
             this.row = row;
@@ -52,7 +53,7 @@ final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
         }
     }
 
-    void add(ChatJobRow row) {
+    public void add(ChatJobRow row) {
         jobs.put(row.id(), new Job(row));
     }
 
@@ -61,7 +62,7 @@ final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
     }
 
     /** What a member's cancel does to the row. */
-    void cancel(String id, Instant at) {
+    public void cancel(String id, Instant at) {
         Job job = jobs.get(id);
         job.row = with(job.row, "cancelled", null, job.row.runs(), job.row.attempts(), at, at);
         job.ownerToken = null;
@@ -69,7 +70,7 @@ final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
         closeToolCalls(id);
     }
 
-    synchronized List<ToolCall> toolCalls(String jobId) {
+    public synchronized List<ToolCall> toolCalls(String jobId) {
         return toolCalls.stream().filter(c -> c.row.jobId().equals(jobId)).toList();
     }
 
@@ -100,6 +101,13 @@ final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
     public Optional<ChatJobRow> lockOwned(String jobId, String ownerToken, Instant at) {
         Job job = jobs.get(jobId);
         return owned(job, ownerToken, at) ? Optional.of(job.row) : Optional.empty();
+    }
+
+    @Override
+    public Optional<ChatRunningJob> findRunning(String jobId, Instant at) {
+        Job job = jobs.get(jobId);
+        if (job == null || job.ownerToken == null || !owned(job, job.ownerToken, at)) return Optional.empty();
+        return Optional.of(new ChatRunningJob(job.row, job.ownerToken, job.deadline));
     }
 
     @Override

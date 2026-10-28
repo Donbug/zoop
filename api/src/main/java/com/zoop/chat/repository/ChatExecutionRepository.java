@@ -22,6 +22,13 @@ public interface ChatExecutionRepository {
     /** The job locked while this owner still holds an unexpired lease on it. */
     Optional<ChatJobRow> lockOwned(String jobId, String ownerToken, Instant at);
 
+    /**
+     * The job while it is running under an unexpired lease, with its owner token and deadline; not locked. A caller that
+     * acts for the run (the MCP endpoint) still writes only through the fenced writes, so a run that ends meanwhile changes
+     * nothing.
+     */
+    Optional<ChatRunningJob> findRunning(String jobId, Instant at);
+
     boolean phase(String jobId, String ownerToken, String phase, Instant at);
 
     /** Records that the run is about to call a model (after {@link #lockOwned} in the same transaction). */
