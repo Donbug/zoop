@@ -1,0 +1,21 @@
+# Gradle and Java build output
+/\.gradle/
+/build/
+/bin/
+/out/
+
+# Runtime logs
+/logs/
+*.log
+
+# Local environment secrets; keep the checked-in example
+/.env
+/.env.*
+!/.env.example
+
+# IDE metadata
+/.idea/
+/*.iml
+/.classpath
+/.project
+/.settings/

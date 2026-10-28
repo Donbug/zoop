@@ -184,12 +184,12 @@ class ChatEvalSetTest {
         }, "replay", world.names, world.issues, world.citations, articleId -> Optional.of("fixture-news"), new ChatModelRecorder(null,
                 Clock.systemUTC()) {
             @Override
-            public String start(String jobId, String stage, String mode) {
+            public String start(String jobId, int attemptNo, String stage, String mode) {
                 return "aix-eval";
             }
 
             @Override
-            public void finish(String execution, String status, ChatStageReply.Receipt receipt, String code) {
+            public void finish(String execution, String status, String sendState, ChatStageReply.Receipt receipt, String code) {
             }
         });
         ChatModels.Router router = (r, bound) -> {
