@@ -12,6 +12,8 @@ from pathlib import Path
 
 from briefing_usage import CommandPipe, UsageSession, digest, recorded, write_once
 
+OUTLOOK_PROMPT_VERSIONS = frozenset('company-outlook-v'+str(n) for n in range(1,6))
+
 
 def helper(name):
     spec = importlib.util.spec_from_file_location('_usage_'+name, Path(__file__).with_name(name+'.py'))
@@ -45,6 +47,15 @@ def run(job_path, output, command=None, *, execute=False, transport=None, key_fi
     purpose = 'outlook' if job['operation'].endswith('outlook') else 'generation'
     if type(job['maxCalls']) is not int or not 0 <= job['maxCalls'] <= 16:
         raise ValueError('usage_job_call_limit')
+    prompt_binding = None
+    if job['operation'] == 'outlook':
+        producer = helper('briefing_company_outlook')
+        version = data.get('promptVersion', producer.VERSION)
+        if not isinstance(version, str) or version not in OUTLOOK_PROMPT_VERSIONS:
+            raise ValueError('usage_outlook_prompt_version')
+        prompts = producer.PROMPTS.with_name(version)
+        prompt_binding = {'promptVersion': version, 'promptArtifacts': {
+            name: digest((prompts/name).read_bytes()) for name in ('generation.md','verification.md')}}
     plan = {'schemaVersion':'briefing-recorded-producer-v1','roundId':job['round']['id'],
             'purpose':purpose,'inputSha256':job['inputSha256'],'jobSha256':digest(raw),'newModelCalls':0}
     if not execute:
@@ -54,7 +65,15 @@ def run(job_path, output, command=None, *, execute=False, transport=None, key_fi
     output.mkdir(mode=0o700,parents=True,exist_ok=True)
     if output.is_symlink() or output.stat().st_mode & 0o077:
         raise ValueError('usage_private_output_required')
+    binding_path = output/'outlook-prompts.json'
+    if prompt_binding is not None and not binding_path.exists() and (output/'identity.json').exists() \
+            and version != 'company-outlook-v1':
+        # Older non-v1 runs used v1 files despite their input version. Preserve
+        # those records, but never reuse them as a verified run of the new version.
+        raise ValueError('usage_legacy_outlook_prompt_binding_missing')
     write_once(output/'identity.json',plan)
+    if prompt_binding is not None:
+        write_once(binding_path, prompt_binding)
     result_path=output/'result.json'
     if result_path.exists():
         _, saved=load(result_path)
@@ -89,12 +108,12 @@ def run(job_path, output, command=None, *, execute=False, transport=None, key_fi
         if transport is None and key_file is None:
             raise ValueError('usage_live_transport_required')
         if job['operation']=='outlook':
-            producer=helper('briefing_company_outlook'); base=producer.base
+            base=producer.base
             if data.get('roundId') != job['round']['id'] or data.get('date') != job['round']['date'] \
                     or data.get('edition') != job['round']['edition'] or data.get('cutoff') != job['round']['windowTo']:
                 raise ValueError('usage_outlook_round_identity')
             client=producer.context.legacy.MarketSummaryClient(output,transport or base.authenticated_transport(Path(key_file)),
-                job['maxCalls'],prompt_root=producer.PROMPTS)
+                job['maxCalls'],prompt_root=prompts)
             generate=lambda:producer.assess(client,data)
         else:
             producer=helper('briefing_round_simulation');base=producer.base

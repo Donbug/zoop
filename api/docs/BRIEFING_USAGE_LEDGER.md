@@ -42,6 +42,10 @@ job 파일의 모든 필드는 다음과 같으며 추가 필드는 거부한다
 
 `generation` 입력은 `{selected, context, maxRepairs}`다. `context`는 기존 `briefing_round_simulation`의 고정 문맥 `{context, contextSha256, ...}`이며 회차 날짜·edition·window와 digest를 검사한다. `maxRepairs`는 0 또는 1이다. `outlook` 입력은 기존 `briefing_company_outlook.assess`의 고정 문맥이고 roundId/date/edition/cutoff가 job과 같아야 한다. maxCalls는 0~16이며 기존 write-ahead 호출 예산도 적용한다. 기사 수집·이슈 선정·권리 허가는 이 원장이 새로 부여하지 않는다. 기존 검증·공개 경계를 거친 입력만 전달한다.
 
+`outlook`의 고정 입력 `promptVersion`에 따라 `company-outlook-v1`~`v5`의 생성·검증 파일을 함께 선택한다. 필드가 없는 기존 입력만 v1로 처리하며, NULL·미지원 버전·경로 문자열은 접수·모델 전송 전에 거절한다. 새 실행은 `outlook-prompts.json`에 버전과 두 파일의 SHA-256을 고정하고 완료 결과 재사용 전에도 대조한다. 프롬프트 내용이나 입력 버전이 바뀌면 같은 output에서 이어 실행하지 않는다.
+
+기존 v1 완료 기록은 보존·재사용한다. 수정 전에는 v4/v5 입력도 v1 파일을 사용했으므로, 기존 비-v1 output에 프롬프트 결속 파일이 없으면 `usage_legacy_outlook_prompt_binding_missing`으로 중단한다. 그 기록을 삭제하거나 새 버전의 결과로 소급 표시하지 않는다. 올바른 버전으로 다시 생성하려면 별도 승인 후 새 requestKey와 output을 사용한다.
+
 ```sh
 # 계획 확인: DB/모델 호출 없음
 python3 scripts/briefing_usage_run.py --job /private/job/job.json --output /private/job/output

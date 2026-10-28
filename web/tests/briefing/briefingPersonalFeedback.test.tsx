@@ -76,7 +76,13 @@ function signInMember(id = 'mem-1') {
   });
 }
 
-function setup(url = '/briefing', latest: BriefingResponse = briefing()) {
+function setup(
+  url = '/briefing?reading=full',
+  latest: BriefingResponse = briefing(),
+) {
+  // Legacy full-view feedback/personalization checks retain their original surface.
+  if (!new URL(url, 'http://localhost').searchParams.has('reading'))
+    url += (url.includes('?') ? '&' : '?') + 'reading=full';
   const server = createFakeServer();
   server.on('GET', '/api/v1/briefings', () => json(latest));
   server.on('GET', '/api/v1/briefings/rounds', () =>
@@ -706,7 +712,7 @@ it('restores the cookie session on a direct briefing-page visit before loading m
     json({ items: [], nextCursor: null }),
   );
   render(
-    <MemoryRouter initialEntries={['/briefing']}>
+    <MemoryRouter initialEntries={['/briefing?reading=full']}>
       <BriefingPage />
     </MemoryRouter>,
   );

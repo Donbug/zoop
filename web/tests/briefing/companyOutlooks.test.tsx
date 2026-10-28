@@ -1,9 +1,22 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import CompanyOutlooks from '@/components/briefing/CompanyOutlooks';
 import type { BriefingResponse } from '@/types/briefing';
 import type { CompanyOutlooks as Layer } from '@/types/briefing/companyOutlook';
 
+const summaryText = (name: string) =>
+  screen.getByLabelText(`${name} 한눈 요약`).querySelector('summary p')!
+    .textContent;
+
+const cardText = {
+  schemaVersion: 'zoop-company-card-v1' as const,
+  status: 'PASS' as const,
+  resultVersion: 'card-verified',
+  topic: { text: '공급 계획', evidenceIds: ['e'] },
+  title: { text: '공급 확대 계획', evidenceIds: ['e'] },
+  description: { text: '실제 공급·매출 기여는 미확인', evidenceIds: ['e'] },
+};
 const statement = {
   text: '공급이 이행되는 경우 사업 기회를 검토합니다.',
   evidenceIds: ['e'],
@@ -143,12 +156,10 @@ describe('D-BRF-01·02 company outlook', () => {
         compact
       />,
     );
-    expect(screen.getByLabelText('합성 기업 짧은 읽기').textContent).toContain(
-      '사업 기회는 있으나',
-    );
-    const detail = screen
-      .getByText('자세히 · 기업 전망 전문과 근거')
-      .closest('details')!;
+    expect(summaryText('합성 기업')).toContain('검증된 한눈 카드가 없습니다');
+    const detail = screen.getByLabelText(
+      '합성 기업 한눈 요약',
+    ) as HTMLDetailsElement;
     expect(detail.open).toBe(false);
     expect(detail.textContent).toContain(statement.text);
     rerender(<CompanyOutlooks result={result} compact={false} />);
@@ -159,10 +170,9 @@ describe('D-BRF-01·02 company outlook', () => {
   });
   it('does not replace an unavailable short reading with the full paragraph', () => {
     render(<CompanyOutlooks result={result} compact />);
-    expect(screen.getByText(/검증된 짧은 요약이 없습니다/)).toBeTruthy();
+    expect(screen.getByText(/검증된 한눈 카드가 없습니다/)).toBeTruthy();
     expect(
-      screen.getByText('자세히 · 기업 전망 전문과 근거').closest('details')!
-        .open,
+      (screen.getByLabelText('합성 기업 한눈 요약') as HTMLDetailsElement).open,
     ).toBe(false);
   });
   it('shows a same-day morning price comparison and guards the round cutoff', () => {
@@ -295,5 +305,237 @@ describe('D-BRF-01·02 company outlook', () => {
     );
     expect(screen.getByText('근거 검증 보류')).toBeTruthy();
     expect(screen.queryByRole('article')).toBeNull();
+  });
+});
+
+const specific = {
+  ...layer.companies[0],
+  reading: {
+    schemaVersion: 'zoop-company-reading-v2' as const,
+    status: 'PASS' as const,
+    resultVersion: 'reading-v2-test',
+    brief: {
+      text: '증설은 장비 공급능력 확대의 조건부 근거입니다.',
+      evidenceIds: ['e'],
+    },
+    fact: {
+      text: '합성 기업이 새 생산라인 증설 계획을 발표했습니다.',
+      evidenceIds: ['e'],
+    },
+    watch: {
+      text: '실제 가동이 확인되면 공급 확대 판단을 강화합니다.',
+      evidenceIds: ['e'],
+    },
+    background: {
+      text: '기존 생산능력 수치는 제공되지 않았습니다.',
+      evidenceIds: ['e'],
+    },
+    change: {
+      text: '비교할 같은 기업의 이전 판단이 없습니다.',
+      evidenceIds: ['e'],
+    },
+  },
+};
+describe('D-BRF-01/02 specific company reading v2', () => {
+  it('shows judgment, new fact and next condition before collapsed background and evidence', () => {
+    render(
+      <CompanyOutlooks
+        result={{
+          ...result,
+          companyOutlooks: { ...layer, companies: [specific] },
+        }}
+        compact
+      />,
+    );
+    const card = screen.getByLabelText('합성 기업 판단과 새 사실');
+    const text = card.textContent!;
+    expect(text.indexOf('한 줄 판단')).toBeLessThan(text.indexOf('새 사실'));
+    expect(text.indexOf('새 사실')).toBeLessThan(
+      text.indexOf('다음 확인 조건'),
+    );
+    expect(
+      screen.getByText('배경·이전 판단과의 연결·문장 근거').closest('details')!
+        .open,
+    ).toBe(false);
+    expect(screen.getAllByText(specific.reading.background.text).length).toBe(
+      1,
+    );
+    expect(
+      (screen.getByLabelText('합성 기업 한눈 요약') as HTMLDetailsElement).open,
+    ).toBe(false);
+  });
+  it.each(['WITHHELD', 'missing_fact', 'foreign_evidence'])(
+    'does not expose unverified v2 text for %s',
+    (state) => {
+      const company = structuredClone(specific);
+      if (state === 'WITHHELD')
+        (company.reading as { status: string }).status = state;
+      if (state === 'missing_fact') company.reading.fact.text = '';
+      if (state === 'foreign_evidence')
+        company.reading.fact.evidenceIds = ['another-company'];
+      render(
+        <CompanyOutlooks
+          result={{
+            ...result,
+            companyOutlooks: { ...layer, companies: [company] },
+          }}
+          compact
+        />,
+      );
+      expect(screen.queryByLabelText('합성 기업 판단과 새 사실')).toBeNull();
+      expect(
+        screen.getByText(/검증된 새 문안을 표시할 수 없습니다/),
+      ).toBeTruthy();
+      expect(screen.getByText('자세히 · 기업 전망 전문과 근거')).toBeTruthy();
+    },
+  );
+});
+
+describe('D-BRF-01/02 at-a-glance reading', () => {
+  it.each(['WITHHELD', 'wrong-version', 'too-long', 'missing-description'])(
+    'rejects invalid card %s while keeping the full analysis',
+    (kind) => {
+      const card = { ...cardText };
+      if (kind === 'WITHHELD') card.status = 'WITHHELD' as 'PASS';
+      if (kind === 'wrong-version')
+        card.schemaVersion = 'unknown' as typeof card.schemaVersion;
+      if (kind === 'too-long')
+        card.title = { text: '계획'.repeat(20), evidenceIds: ['e'] };
+      if (kind === 'missing-description')
+        card.description = undefined as unknown as typeof card.description;
+      render(
+        <CompanyOutlooks
+          result={{
+            ...result,
+            companyOutlooks: {
+              ...layer,
+              companies: [{ ...layer.companies[0], card }],
+            },
+          }}
+          compact
+        />,
+      );
+      expect(summaryText('합성 기업')).toContain('검증된 한눈 카드가 없습니다');
+      expect(
+        screen.getAllByText(statement.text, { selector: 'p' }).length,
+      ).toBeGreaterThan(0);
+    },
+  );
+
+  it('lets readers scan every company before opening prices and the original analysis', async () => {
+    const user = userEvent.setup();
+    const companies = ['기업 가', '기업 나', '기업 다'].map((name, index) => ({
+      ...layer.companies[0],
+      companyId: `KRX:TEST${index}`,
+      companyName: name,
+      card: {
+        ...cardText,
+        title: { text: `${name} 공급 확대 계획`, evidenceIds: ['e'] },
+      },
+      reading: {
+        status: 'PASS' as const,
+        resultVersion: `reading-${index}`,
+        brief: {
+          text: `${name}의 공급 확대는 예정이며, 실제 실적 기여는 확인되지 않았습니다.`,
+          evidenceIds: ['e'],
+        },
+      },
+    }));
+    const many = {
+      ...result,
+      companyOutlooks: { ...layer, companies },
+      items: companies.map((company) => ({
+        eventId: 'i',
+        companies: [{ id: company.companyId, name: company.companyName }],
+      })),
+    } as BriefingResponse;
+    const original = JSON.stringify(many);
+    const { rerender } = render(<CompanyOutlooks result={many} compact />);
+    expect(
+      screen.getByRole('heading', { name: '핵심 기업 한눈에' }),
+    ).toBeTruthy();
+    for (const company of companies) {
+      const card = screen.getByLabelText(
+        `${company.companyName} 한눈 요약`,
+      ) as HTMLDetailsElement;
+      expect(card.open).toBe(false);
+      expect(summaryText(company.companyName)).toBe(company.card.title.text);
+      expect(card.querySelector('summary')!.textContent).not.toContain(
+        company.reading.brief.text,
+      );
+    }
+    const first = screen.getByLabelText(
+      '기업 가 한눈 요약',
+    ) as HTMLDetailsElement;
+    await user.click(within(first).getByRole('heading', { name: '기업 가' }));
+    expect(first.open).toBe(true);
+    expect(
+      (screen.getByLabelText('기업 나 한눈 요약') as HTMLDetailsElement).open,
+    ).toBe(false);
+    expect(
+      within(first)
+        .getByText('자세히 · 기업 전망 전문과 근거')
+        .closest('details')!.open,
+    ).toBe(true);
+    expect(first.textContent).toContain('규모와 시기 확인이 필요합니다.');
+    expect(first.textContent).toContain('수익성은 확인되지 않았습니다.');
+    expect(
+      within(first)
+        .getAllByRole('link', { hidden: true })[0]
+        .getAttribute('href'),
+    ).toBe('https://example.com/source');
+    rerender(<CompanyOutlooks result={many} compact={false} />);
+    expect(screen.queryByLabelText('기업 가 한눈 요약')).toBeNull();
+    expect(
+      screen
+        .getAllByText('자세히 · 기업 전망 전문과 근거')
+        .every((node) => node.closest('details')!.open),
+    ).toBe(true);
+    expect(JSON.stringify(many)).toBe(original);
+  });
+
+  it('keeps full qualifiers and refuses a short sentence with foreign evidence', () => {
+    const text = '약 20개 기업 도입 검토 계획';
+    const company = {
+      ...layer.companies[0],
+      card: { ...cardText, title: { text, evidenceIds: ['e'] } },
+      reading: {
+        status: 'PASS' as const,
+        resultVersion: 'r',
+        brief: { text, evidenceIds: ['e'] },
+      },
+    };
+    const { rerender } = render(
+      <CompanyOutlooks
+        result={{
+          ...result,
+          companyOutlooks: { ...layer, companies: [company] },
+        }}
+        compact
+      />,
+    );
+    expect(summaryText('합성 기업')).toBe(text);
+    rerender(
+      <CompanyOutlooks
+        result={{
+          ...result,
+          companyOutlooks: {
+            ...layer,
+            companies: [
+              {
+                ...company,
+                card: {
+                  ...cardText,
+                  title: { text, evidenceIds: ['foreign'] },
+                },
+              },
+            ],
+          },
+        }}
+        compact
+      />,
+    );
+    expect(summaryText('합성 기업')).not.toContain(text);
+    expect(summaryText('합성 기업')).toContain('검증된 한눈 카드가 없습니다');
   });
 });

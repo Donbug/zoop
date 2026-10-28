@@ -75,6 +75,19 @@ final class BriefingSnapshotValidator {
         JsonNode snapshot = object(row.publicSnapshot());
         summary(field(snapshot, "marketSummary"), evidence);
         marketAnalysis(field(snapshot, "marketSummary"), row);
+        if (snapshot.has("editionReview")) {
+            Set<String> selectedCompanies = new HashSet<>();
+            for (JsonNode item : p.path("items")) for (JsonNode company : item.path("companies")) selectedCompanies.add(company.path("id").stringValue());
+            com.zoop.briefing.replay.BriefingEditionReviewRules.validateProjection(snapshot.get("editionReview"), row.id(), row.edition(), row.windowTo(), p.path("marketVariables"), snapshot.path("companyOutlooks").path("resultVersion").stringValue(), selectedCompanies);
+        }
+        if (snapshot.has("judgmentUpdate")) com.zoop.briefing.replay.BriefingJudgmentUpdateRules.validateProjection(snapshot.get("judgmentUpdate"), row.id(), row.edition(), row.windowTo());
+        if (snapshot.has("aiPriceOutlooks")) com.zoop.briefing.replay.BriefingAiPriceOutlookRules.validateProjection(
+                com.zoop.common.json.StrictJson.Obj.of(snapshot.get("aiPriceOutlooks")),
+                com.zoop.common.json.StrictJson.Obj.of(snapshot.get("editionReview")),
+                com.zoop.common.json.StrictJson.Obj.of(snapshot.get("companyPriceContext")));
+        if (snapshot.has("companyPriceContext")) com.zoop.briefing.replay.BriefingPriceContextRules.validateProjection(
+                com.zoop.common.json.StrictJson.Obj.of(snapshot.get("companyPriceContext")),
+                com.zoop.common.json.StrictJson.Obj.of(snapshot.get("editionReview")));
         if (snapshot.has("companyOutlooks")) companyOutlooks(snapshot.get("companyOutlooks"), row, evidence);
         JsonNode market = field(p, "marketVariables");
         if (!market.isNull()) market(market, row.windowTo());
@@ -109,13 +122,30 @@ final class BriefingSnapshotValidator {
             choice(field(company, "comparison"), "status", Set.of("updated", "compared", "unavailable"));
             if (company.has("reading")) {
                 JsonNode reading = object(field(company, "reading")); text(reading, "resultVersion");
+                String schema = reading.has("schemaVersion") ? text(reading, "schemaVersion") : "zoop-company-reading-v1";
+                check(Set.of("zoop-company-reading-v1", "zoop-company-reading-v2").contains(schema));
+                boolean v2 = "zoop-company-reading-v2".equals(schema);
                 if ("PASS".equals(choice(reading, "status", Set.of("PASS", "WITHHELD")))) {
-                    for (String field : java.util.List.of("brief", "watch", "change")) {
+                    for (String field : v2 ? java.util.List.of("brief", "fact", "watch", "background", "change") : java.util.List.of("brief", "watch", "change")) {
                         companyStatement(field(reading, field), ownSources);
                         String value = text(field(reading, field), "text");
-                        check(value.codePointCount(0, value.length()) <= switch (field) { case "brief" -> 70; case "watch" -> 50; default -> 60; });
+                        int limit = v2 ? switch (field) { case "brief" -> 140; case "fact" -> 160; case "background" -> 240; default -> 180; }
+                                : switch (field) { case "brief" -> 70; case "watch" -> 50; default -> 60; };
+                        check(value.codePointCount(0, value.length()) <= limit);
                     }
                 }
+            }
+            if (company.has("card")) {
+                JsonNode card = object(field(company, "card"));
+                same(text(card, "schemaVersion"), "zoop-company-card-v1"); text(card, "resultVersion");
+                if ("PASS".equals(choice(card, "status", Set.of("PASS", "WITHHELD")))) {
+                    for (String key : java.util.List.of("topic", "title", "description")) {
+                        companyStatement(field(card, key), ownSources);
+                        String value = text(field(card, key), "text");
+                        int limit = switch (key) { case "topic" -> 12; case "title" -> 32; default -> 64; };
+                        check(value.codePointCount(0, value.length()) <= limit);
+                    }
+                } else check(!card.has("topic") && !card.has("title") && !card.has("description"));
             }
             if (company.has("price")) companyPrice(object(field(company, "price")), text(company, "companyId"), row.windowTo());
         }

@@ -274,10 +274,12 @@
 | BFF_PATH_DIFFERENCE | difference | getEvidence | 목표 /api/v1/evidence/{id} ↔ BFF /api/evidence/{id} |  |
 | BFF_FIELD_DIFFERENCE | difference | getEvidence | 목표만 125 · BFF만 55 · 형식/필수/권한 변경 16 |  |
 | BFF_PATH_DIFFERENCE | difference | getBriefing | 목표 /api/v1/briefings ↔ BFF /api/briefings |  |
-| BFF_FIELD_DIFFERENCE | difference | getBriefing | 목표만 1078 · BFF만 60 · 형식/필수/권한 변경 21 |  |
+| BFF_FIELD_DIFFERENCE | difference | getBriefing | 목표만 1857 · BFF만 60 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | listBriefingRounds | 목표 /api/v1/briefings/rounds ↔ BFF /api/briefings/rounds |  |
 | BFF_FIELD_DIFFERENCE | difference | listBriefingRounds | 목표만 84 · BFF만 39 · 형식/필수/권한 변경 6 |  |
 | TARGET_ONLY_API | difference | getBriefingRecap | GET /api/v1/briefings/{id}/recap: 직접 대응 BFF 없음 |  |
+| TARGET_ONLY_API | difference | getBriefingItemImpacts | GET /api/v1/briefings/{roundId}/items/{eventId}/impacts: 직접 대응 BFF 없음 |  |
+| TARGET_ONLY_API | difference | getBriefingItemImpactReviews | GET /api/v1/briefings/{roundId}/items/{eventId}/impact-reviews: 직접 대응 BFF 없음 |  |
 | TARGET_ONLY_API | difference | getBriefingItemDetail | GET /api/v1/briefings/{roundId}/items/{eventId}: 직접 대응 BFF 없음 |  |
 | BFF_PATH_DIFFERENCE | difference | getBriefingGraphBasis | 목표 /api/v1/briefings/{id}/graph ↔ BFF /api/briefings/{id}/graph |  |
 | BFF_FIELD_DIFFERENCE | difference | getBriefingGraphBasis | 목표만 106 · BFF만 30 · 형식/필수/권한 변경 7 |  |

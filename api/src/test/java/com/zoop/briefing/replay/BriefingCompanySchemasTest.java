@@ -38,6 +38,18 @@ class BriefingCompanySchemasTest {
             assertThatThrownBy(() -> recorded(prefix, "verification", loose)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("response_schema");
         }
     }
+    @Test void v2RequiresAllFiveRolesAndIndependentQualityFlags() throws Exception {
+        var v2 = StrictJson.parseObject(Files.readAllBytes(root.resolve("frozen-v2.json")));
+        for (String phase : List.of("generation", "verification")) {
+            var actual = StrictJson.parseObject(Files.readAllBytes(root.resolve("company_reading_v2_" + phase + ".json")));
+            assertThat(BriefingCompanySchemas.format("company_reading_", phase, v2)).isEqualTo(actual.node());
+        }
+        assertThat(BriefingCompanySchemas.format("company_reading_", "generation", v2)
+                .at("/schema/properties/companies/items/required").toString()).contains("fact", "background", "brief", "watch", "change");
+        assertThat(BriefingCompanySchemas.format("company_reading_", "verification", v2)
+                .at("/schema/properties/checks/items/properties/quality/required").toString())
+                .contains("specificity", "newInformation", "continuity", "nonRepetition");
+    }
     private void recorded(String prefix, String phase, ObjectNode format) throws Exception {
         String version = prefix.equals("company_outlook_") ? "company-outlook-v1" : "company-reading-v1";
         String instructions;
