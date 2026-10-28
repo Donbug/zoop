@@ -15,6 +15,7 @@ import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.repository.ChatExecutionRepository;
 import com.zoop.chat.repository.ChatJobRow;
 import com.zoop.chat.repository.ChatRepository;
+import com.zoop.chat.repository.ChatRunningJob;
 import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.repository.NewChatToolCall;
 import com.zoop.chat.service.FrozenSelection;
@@ -137,6 +138,36 @@ public class ChatJobExecutor {
         if (!store(claim, outcome)) {
             log.info("chat run of job {} no longer owns it; its outcome was discarded", claim.job().id());
         }
+    }
+
+    /** A run reached from outside its own thread: its frozen request and its fenced control. */
+    public record Attached(ChatRun run, ChatRunControl control) { }
+
+    /**
+     * The run of a job that is running {@code attemptNo} now under an unexpired lease, for a tool request that arrives
+     * outside the run's thread (the chat MCP endpoint). Empty once the job ended, was cancelled, its lease ran out or a newer
+     * attempt runs. The control writes through the same owner-token fences as the run's own, so a run that ends meanwhile
+     * refuses every write with {@link ChatRunSuperseded}.
+     */
+    public Optional<Attached> attach(String jobId, int attemptNo) {
+        Optional<ChatRunningJob> running = runs.findRunning(jobId, clock.instant());
+        if (running.isEmpty()) return Optional.empty();
+        ChatJobRow job = running.get().job();
+        Optional<ObjectNode> attempt = current(attempts(job.attempts()), "running")
+                .filter(a -> a.path("n").asInt() == attemptNo
+                        && running.get().ownerToken().equals(a.path("ownerToken").asString(null)));
+        if (attempt.isEmpty()) return Optional.empty();
+        Claim claim = new Claim(job, running.get().ownerToken(), attemptNo, attempt.get().path("mode").asString(),
+                running.get().deadline());
+        return Optional.of(new Attached(run(claim), new Control(claim)));
+    }
+
+    /**
+     * The attempt's call still reserved for exactly this capability and input digest: a call the server approved and
+     * reserved ahead (an approved MCP call) that has not started yet.
+     */
+    public Optional<String> reservedToolCall(String jobId, int attemptNo, String capabilityId, String inputDigest) {
+        return runs.findReservedToolCall(jobId, attemptNo, capabilityId, inputDigest);
     }
 
     /** Ends running jobs whose lease ran out; returns how many it ended. */

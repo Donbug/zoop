@@ -154,6 +154,8 @@ flowchart LR
 
 Q07의 `portfolio.scope.read`는 Java server-only precondition으로 실행하며 MCP catalog에 등록하지 않는다. 전체 보유 목록·수량·보유 표시는 OpenAI에 보내지 않고 scope 안에서 일치한 공개 결과만 최대 5개로 최소화한다. 초기 MCP 도구 연결은 `company.read`, `issue.read`, `evidence.resolve`, 공개 그래프 경로/버전 차이, 브리핑 순으로 수직 구현한다. direct와 MCP fixture 동등성 시험을 각 도구에 붙인다.
 
+현재 상태(2026-10-28, MCP 서버 단독 1단계): Java `POST /mcp`를 공식 MCP Java SDK 2.1.0의 stateless servlet transport로 구현했다(`com.zoop.chat.mcp`, 기능 플래그 `ZOOP_CHAT_MCP_ENABLED` 기본 꺼짐). job·attempt·graphVersion·asOf·subject scope·도구·deadline에 결속한 HMAC grant 토큰, 서버 승인 = `chat_tool_calls` 예약(정확한 요청 digest)과 일치하는 호출만 1회 실행, `Origin` 거부, request 64 KiB, result 256 KiB/호출, 토큰당 분당 30요청(인스턴스별)을 적용한다. 도구는 `portfolio.scope.read`를 뺀 레지스트리 바인딩이며 기존 `ChatToolRunner`·`chat_tool_calls`(`request_meta.via=mcp`)로 실행돼 direct 경로와 같은 읽기를 쓴다. 모델은 `targets`·`limit`만 정하고 버전·asOf·근거 선택 범위·비교 기간은 서버가 주입한다. 아직 없는 것: 3번 model-send grant 검사, job당 1 MiB·8/6/2·동시 4회(job 단위)·요청 캐시, 4번 preflight·circuit, ai/service Responses 연결. 그래서 로컬 합성 시험 밖에서는 켜지 않는다([챗봇 MCP 엔드포인트](../../api/docs/chat-mcp.md)).
+
 ### 단계 5 — 답변 생성·부분 결과·검증
 
 1. Luna Responses 출력은 requirement별 section·claim·citation·limitation·uiAction 후보를 typed schema로 반환한다.
