@@ -1,6 +1,8 @@
 package com.zoop.admin.review;
 
+import com.zoop.common.json.StrictJson;
 import com.zoop.graph.version.JdbcGraphVersionRepository;
+import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -12,6 +14,8 @@ import java.util.UUID;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * {@code review_targets} (the filter projection of the AI source), the append-only {@code review_decisions} and the
@@ -75,27 +79,77 @@ public class JdbcReviewRepository {
      * Registers a target of an S3 job, or refreshes its projection when this reading is newer. The key is the source identity
      * ({@code target_type}, job, external id, source version), so the identity columns are never touched. A reading only replaces
      * the stored one when its AI source revision is greater: an older reading that arrives late, or one taken before a decision
-     * this app settled, never moves the status back.
+     * this app settled, never moves the status back. The display values (the S2 content the unit pinned by hash, so the same for
+     * every reading of one job) are also written when only they differ, so a row synced before they existed gets them.
      *
      * @return true when a row was inserted or refreshed
      */
     public boolean upsertTarget(String sourceJobId, String sourceVersion, ReviewTargetReader.Row row, Instant at) {
+        ReviewTargetReader.Display display = row.display();
         return jdbc.update("""
                 INSERT INTO review_targets (id, target_type, source_job_id, external_id, source_version, candidate_id, status,
-                                            company_ids, relation_types, source_revision, updated_at)
-                VALUES (:id, :type, :job, :external, :version, :candidate, :status, CAST(:companies AS text[]),
-                        CAST(:types AS text[]), :revision, :at)
+                                            company_ids, relation_types, source_revision, updated_at, issue_id, title, action,
+                                            target, event_time, evidence_count, companies, reasons, operator_approved)
+                VALUES (:id, :type, :job, :external, :version, :candidate, :status, CAST(:companyIds AS text[]),
+                        CAST(:types AS text[]), :revision, :at, :issue, :title, :action, :target, :eventTime, :evidence,
+                        CAST(:named AS jsonb), CAST(:reasons AS text[]), :approved)
                 ON CONFLICT (target_type, source_job_id, external_id, source_version) DO UPDATE
-                   SET status = EXCLUDED.status, company_ids = EXCLUDED.company_ids,
-                       relation_types = EXCLUDED.relation_types, source_revision = EXCLUDED.source_revision,
-                       updated_at = EXCLUDED.updated_at
-                 WHERE CAST(EXCLUDED.source_revision AS numeric) > CAST(review_targets.source_revision AS numeric)
+                   SET status = CASE WHEN """ + NEWER + """
+                                     THEN EXCLUDED.status ELSE review_targets.status END,
+                       company_ids = CASE WHEN """ + NEWER + """
+                                          THEN EXCLUDED.company_ids ELSE review_targets.company_ids END,
+                       relation_types = CASE WHEN """ + NEWER + """
+                                             THEN EXCLUDED.relation_types ELSE review_targets.relation_types END,
+                       source_revision = CASE WHEN """ + NEWER + """
+                                              THEN EXCLUDED.source_revision ELSE review_targets.source_revision END,
+                       reasons = CASE WHEN """ + NEWER + """
+                                       OR review_targets.reasons IS NULL THEN EXCLUDED.reasons ELSE review_targets.reasons END,
+                       operator_approved = CASE WHEN """ + NEWER + """
+                                                      OR """ + FILL_APPROVAL + """
+                                                 THEN EXCLUDED.operator_approved ELSE review_targets.operator_approved END,
+                       issue_id = EXCLUDED.issue_id, title = EXCLUDED.title, action = EXCLUDED.action, target = EXCLUDED.target,
+                       event_time = EXCLUDED.event_time, evidence_count = EXCLUDED.evidence_count,
+                       companies = EXCLUDED.companies, updated_at = EXCLUDED.updated_at
+                 WHERE """ + NEWER + """
+                    OR (review_targets.issue_id, review_targets.title, review_targets.action, review_targets.target, review_targets.event_time,
+                        review_targets.evidence_count, review_targets.companies)
+                       IS DISTINCT FROM (EXCLUDED.issue_id, EXCLUDED.title, EXCLUDED.action, EXCLUDED.target, EXCLUDED.event_time,
+                        EXCLUDED.evidence_count, EXCLUDED.companies)
+                    OR review_targets.reasons IS NULL
+                    OR """ + FILL_APPROVAL + """
                 """, new MapSqlParameterSource("id", "rt-" + UUID.randomUUID()).addValue("type", row.type())
                 .addValue("job", sourceJobId).addValue("external", row.externalId()).addValue("version", sourceVersion)
                 .addValue("candidate", row.candidateId()).addValue("status", row.status())
-                .addValue("companies", row.companyIds().toArray(String[]::new))
+                .addValue("companyIds", row.companyIds().toArray(String[]::new))
                 .addValue("types", row.relationTypes().toArray(String[]::new))
-                .addValue("revision", row.sourceRevision()).addValue("at", Timestamp.from(at))) == 1;
+                .addValue("revision", row.sourceRevision()).addValue("at", Timestamp.from(at))
+                .addValue("issue", display.issueId()).addValue("title", display.title())
+                .addValue("action", display.action()).addValue("target", display.target()).addValue("eventTime", display.eventTime())
+                .addValue("evidence", display.evidenceCount()).addValue("named", companiesJson(display.companies()))
+                .addValue("reasons", display.reasons().toArray(String[]::new))
+                .addValue("approved", row.operatorApproved())) == 1;
+    }
+
+    /** The incoming reading is a later AI source revision than the stored one. */
+    private static final String NEWER =
+            " CAST(EXCLUDED.source_revision AS numeric) > CAST(review_targets.source_revision AS numeric) ";
+
+    /**
+     * A row synced before {@code operator_approved} existed gets it from a reading of the same AI revision; an older reading
+     * never overwrites it.
+     */
+    private static final String FILL_APPROVAL = " (review_targets.operator_approved IS NULL AND EXCLUDED.operator_approved IS NOT NULL"
+            + " AND CAST(EXCLUDED.source_revision AS numeric) = CAST(review_targets.source_revision AS numeric)) ";
+
+    private static String companiesJson(List<ReviewTargetReader.Company> companies) {
+        ArrayNode array = StrictJson.newArray();
+        for (ReviewTargetReader.Company company : companies) {
+            ObjectNode node = array.addObject();
+            node.put("sourceId", company.sourceId());
+            node.put("name", company.name());
+            node.put("role", company.role());
+        }
+        return new String(StrictJson.write(array), StandardCharsets.UTF_8);
     }
 
     /**
@@ -163,6 +217,12 @@ public class JdbcReviewRepository {
                 ORDER BY u.s3_checkpoint->>'resultObservedAt', u.plan_id, u.ordinal LIMIT :limit
                 """, new MapSqlParameterSource("limit", limit).addValue("skip", skipJobIds.toArray(String[]::new)),
                 JdbcReviewRepository::syncUnit);
+    }
+
+    /** The observed unit that ran this S3 job, if any. */
+    public Optional<SyncUnit> unitOf(String s3JobId) {
+        return jdbc.query(SYNC_UNIT + " AND u.s3_job_id = :job", new MapSqlParameterSource("job", s3JobId),
+                JdbcReviewRepository::syncUnit).stream().findFirst();
     }
 
     /** Observed units after ({@code planId}, {@code ordinal}) in key order: one page of the round-robin refresh. */

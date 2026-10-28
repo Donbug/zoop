@@ -53,9 +53,9 @@ public class CompanyIssueImpactService {
                 .filter(id -> evidence.shownNow(id, round, pinned.selected().version().id(), evidenceAsOf, requestId))
                 .toList();
         List<ImpactPath.Step> steps = direct == null ? List.of() : List.of(
+                new ImpactPath.Step(issueId, "issue", "기사에 기업과 사건의 연결이 기록되어 있습니다.", visibleEvidenceIds),
                 new ImpactPath.Step(companyId, "company", direct.role() == null ? direct.summary() : direct.role(),
-                        visibleEvidenceIds),
-                new ImpactPath.Step(issueId, "issue", "기사에 기업과 사건의 연결이 기록되어 있습니다.", visibleEvidenceIds));
+                        visibleEvidenceIds));
         boolean evidenceWithheld = direct != null && visibleEvidenceIds.size() != direct.evidenceIds().size();
         List<SectionFailure> failures = evidenceWithheld
                 ? List.of(new SectionFailure("evidence", "EVIDENCE_UNAVAILABLE",

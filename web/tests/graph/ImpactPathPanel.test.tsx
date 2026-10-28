@@ -112,6 +112,7 @@ describe('ImpactPathPanel structural relation details', () => {
         impact={{
           companyId: company.id,
           issueId: issue.id,
+          pathStatus: 'structural_path_details_unavailable',
           steps: [],
           metadata: {
             source: 'fixture',
@@ -192,5 +193,51 @@ describe('ImpactPathPanel structural relation details', () => {
         1,
       ),
     );
+  });
+
+  it('does not retry a non-retryable structural relation failure', () => {
+    vi.mocked(useRelationData).mockReturnValue({
+      key: 'structural',
+      data: null,
+      error: '선택한 그래프에서 관계 상세를 찾지 못했습니다.',
+      retryable: false,
+      loading: false,
+    });
+    render(
+      <ImpactPathPanel
+        companyId={company.id}
+        issueId={issue.id}
+        context={context}
+        graph={selectedGraph}
+        impact={{
+          companyId: company.id,
+          issueId: issue.id,
+          pathStatus: 'structural_path_details_unavailable',
+          steps: [],
+          metadata: {
+            source: 'fixture',
+            asOf: graph.metadata.asOf,
+            graphVersion: graph.metadata.graphVersion,
+          },
+        }}
+        loading={false}
+        error={null}
+        onRetry={vi.fn()}
+        onClose={vi.fn()}
+        onViewIssue={vi.fn()}
+        onEvidence={vi.fn()}
+        onAskAi={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText('선택한 그래프에서 관계 상세를 찾지 못했습니다.'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        /선택한 그래프 버전에서 사업 관계 상세를 찾지 못했습니다/,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
   });
 });

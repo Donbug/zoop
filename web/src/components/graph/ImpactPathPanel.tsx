@@ -20,6 +20,9 @@ type Props = {
   impact: Impact | null;
   loading: boolean;
   error: string | null;
+  errorCode?: string | null;
+  errorStatus?: number | null;
+  retryable?: boolean;
   onRetry: () => void;
   onClose: () => void;
   onViewIssue: () => void;
@@ -41,6 +44,7 @@ export default function ImpactPathPanel({
   impact,
   loading,
   error,
+  retryable = true,
   onRetry,
   onClose,
   onViewIssue,
@@ -141,9 +145,15 @@ export default function ImpactPathPanel({
             <strong>영향 경로를 불러오지 못했습니다.</strong>
             <p>{error}</p>
             <p>지도와 기업 선택은 그대로 유지됩니다.</p>
-            <button data-tutorial-action="retry" onClick={onRetry}>
-              다시 시도
-            </button>
+            {retryable ? (
+              <button data-tutorial-action="retry" onClick={onRetry}>
+                다시 시도
+              </button>
+            ) : (
+              <p>
+                선택한 그래프 버전을 확인한 뒤 기업과 이슈를 다시 선택해 주세요.
+              </p>
+            )}
           </div>
         )}
         {impact && (
@@ -297,7 +307,11 @@ function StructuralImpactDetails({
   onEvidence: (link: StructuralSupplyLink) => void;
 }) {
   const [retry, setRetry] = useState(0);
-  const { data, loading, error } = useRelationData(edgeId, context, retry);
+  const { data, loading, error, retryable } = useRelationData(
+    edgeId,
+    context,
+    retry,
+  );
   const failure = data?.metadata.failures.find(
     (item) => item.section === 'structuralDetails',
   );
@@ -312,9 +326,16 @@ function StructuralImpactDetails({
       <section className={ui.section} aria-label="사업 관계 상세" role="alert">
         <p>사업 관계 상세를 불러오지 못했습니다.</p>
         <p>{error}</p>
-        <button onClick={() => setRetry((value) => value + 1)}>
-          다시 시도
-        </button>
+        {retryable ? (
+          <button onClick={() => setRetry((value) => value + 1)}>
+            다시 시도
+          </button>
+        ) : (
+          <p className={ui.muted}>
+            선택한 그래프 버전에서 사업 관계 상세를 찾지 못했습니다. 기업과
+            이슈를 다시 선택해 주세요.
+          </p>
+        )}
       </section>
     );
   if (!data) return null;

@@ -25,15 +25,15 @@ export function createMockImpact(
         ? []
         : [
             {
-              id: companyId,
-              kind: 'company',
-              reason: '선택한 기업',
-              evidenceIds: relation.evidenceIds,
-            },
-            {
               id: issueId,
               kind: 'issue',
               reason: relation.summary || '직접 관련',
+              evidenceIds: relation.evidenceIds,
+            },
+            {
+              id: companyId,
+              kind: 'company',
+              reason: '선택한 기업',
               evidenceIds: relation.evidenceIds,
             },
           ],

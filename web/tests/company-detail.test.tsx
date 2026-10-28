@@ -230,10 +230,37 @@ beforeEach(() => {
     json({
       ...events[0],
       id: r.params.id,
+      period: null,
+      companies: [
+        {
+          id,
+          name: '합성 기업',
+          role: null,
+          roleUnconfirmed: true,
+          relationType: 'INVOLVES',
+        },
+      ],
       articles: [],
       relations: [],
       evidenceIds: ['ev-a'],
-      metadata: { ...metadata, asOf: r.query.get('asOf') ?? time },
+      summary: { status: 'unavailable', reason: 'fixture summary unavailable' },
+      mentions: [],
+      sourceSupport: {
+        articleCount: 0,
+        knownLineageCount: null,
+        unknownLineageArticles: [],
+        independentSourceCount: null,
+        duplicateGroups: [],
+      },
+      fieldDecisions: [],
+      follows: { previous: [], next: [] },
+      approval: null,
+      metadata: {
+        ...metadata,
+        requestId: 'synthetic',
+        failures: [],
+        asOf: r.query.get('asOf') ?? time,
+      },
     }),
   );
   server.on('GET', '/api/v1/companies/:id/graph', (r) =>
@@ -246,6 +273,7 @@ beforeEach(() => {
     json({
       companyId: id,
       issueId: r.params.issueId,
+      pathStatus: 'direct_available',
       steps: [
         {
           id: 'issue-a',
@@ -676,6 +704,7 @@ test('buckets follow exact five-minute/hour/day/week resolutions and never inven
   const impact: Impact = {
     companyId: id,
     issueId: 'issue-a',
+    pathStatus: 'direct_available',
     steps: [
       {
         id: 'issue-a',
@@ -873,6 +902,7 @@ test('unconfirmed business assertions are excluded from actual impact paths', ()
   const impact: Impact = {
     companyId: id,
     issueId: 'issue-a',
+    pathStatus: 'direct_available',
     steps: [
       {
         id: 'issue-a',

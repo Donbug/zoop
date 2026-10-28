@@ -35,8 +35,8 @@ class CompanyIssueImpactServiceTest {
 
         var result = service.getImpact(HYNIX, HBM_SUPPLY, null, null, null, "req-1");
 
-        assertEquals(List.of(HYNIX, HBM_SUPPLY), result.steps().stream().map(s -> s.id()).toList());
-        assertEquals(List.of("company", "issue"), result.steps().stream().map(s -> s.kind()).toList());
+        assertEquals(List.of(HBM_SUPPLY, HYNIX), result.steps().stream().map(s -> s.id()).toList());
+        assertEquals(List.of("issue", "company"), result.steps().stream().map(s -> s.kind()).toList());
         assertEquals(relation.evidenceIds(), result.steps().get(0).evidenceIds());
         assertEquals("fixture-2026-10-08", result.metadata().graphVersion());
         assertFalse(result.metadata().partial());

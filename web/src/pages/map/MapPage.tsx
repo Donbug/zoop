@@ -1184,6 +1184,9 @@ function MapWorkspace({
                   impact={impact.data}
                   loading={impact.loading}
                   error={impact.error}
+                  errorCode={impact.errorCode}
+                  errorStatus={impact.errorStatus}
+                  retryable={impact.retryable}
                   onRetry={impact.retry}
                   onClose={() => {
                     if (tutorialOpen && tutorialStep === 4) setTutorialStep(3);

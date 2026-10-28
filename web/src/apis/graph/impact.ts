@@ -65,14 +65,15 @@ export async function getTutorialImpact(
   return {
     companyId,
     issueId,
+    pathStatus: 'direct_available',
     steps: [
+      { id: issueId, kind: 'issue', reason: relation.summary, evidenceIds },
       {
         id: companyId,
         kind: 'company',
         reason: relation.role ?? relation.summary,
         evidenceIds,
       },
-      { id: issueId, kind: 'issue', reason: relation.summary, evidenceIds },
     ],
     metadata: relation.metadata,
   };

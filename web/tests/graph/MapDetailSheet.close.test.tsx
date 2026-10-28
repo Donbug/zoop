@@ -16,6 +16,7 @@ import { useEventData } from '@/hooks/useEventData';
 import { useRelationData } from '@/hooks/useRelationData';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { createMockGraph } from '@/mocks/graph/response';
+import type { Impact } from '@/types/company/detail';
 
 vi.mock('@/hooks/useCompanyData');
 vi.mock('@/hooks/useEventData');
@@ -29,6 +30,49 @@ const context = {
   graphVersion: graph.metadata.graphVersion ?? undefined,
   asOf: graph.metadata.asOf,
 };
+
+it('D-GRP-06 marks a confirmed direct connection', () => {
+  vi.mocked(useEventData).mockReturnValue({
+    key: 'fixture',
+    loading: false,
+    error: null,
+    data: null,
+  });
+  const impact: Impact = {
+    companyId: company.id,
+    issueId: issue.id,
+    pathStatus: 'direct_available',
+    steps: [
+      { id: issue.id, kind: 'issue', reason: '확인', evidenceIds: ['ev-a'] },
+      {
+        id: company.id,
+        kind: 'company',
+        reason: '확인',
+        evidenceIds: ['ev-a'],
+      },
+    ],
+    metadata: graph.metadata,
+  };
+  render(
+    <MemoryRouter>
+      <ImpactPathPanel
+        companyId={company.id}
+        issueId={issue.id}
+        context={context}
+        graph={graph}
+        impact={impact}
+        loading={false}
+        error={null}
+        onClose={vi.fn()}
+        onRetry={vi.fn()}
+        onViewIssue={vi.fn()}
+        onEvidence={vi.fn()}
+        onAskAi={vi.fn()}
+      />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText(/직접 연결 확인/)).toBeTruthy();
+});
 
 // M-GRP-01: render real panel headers in the mobile portal, including failure/loading.
 it.each(['loading', 'error'] as const)(
