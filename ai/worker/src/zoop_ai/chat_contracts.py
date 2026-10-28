@@ -8,12 +8,17 @@ versions, purposes, receipts and failure states apart from S1):
 - `chat-answer`: Luna `answer-generator`, a strict JSON answer by sections over the branch context.
 - `chat-verification`: native Jev, per section a support Choice (sections with quotes only: evidence and ZOOP document
   sections) and a prohibited-advice Noul.
+- `chat-agent`: one step of a Luna Responses run that calls the ZOOP MCP tools (ZOOP-AIG-001 v0.11 6.3, MCP actions contract
+  3.4). Every tool call is held for the application's approval (`require_approval=always`): a step ends either at approval
+  requests or with the final answer, and the application resumes the stored response with its decisions. This runtime never
+  approves anything on its own.
 
 The application never sends member ids, emails, account data or full article texts. Quoted spans carry their `sourceId` so the
 operator chat grant registry decides whether they may be sent to a recipient.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any, Literal
 
@@ -22,7 +27,7 @@ from pydantic import Field, model_validator
 from .contracts import Wire
 
 CHAT_SCHEMA_VERSION = "zoop-ai-chat-1"
-ChatStage = Literal["chat-router", "chat-answer", "chat-verification"]
+ChatStage = Literal["chat-router", "chat-answer", "chat-verification", "chat-agent"]
 QueryType = Literal["Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08"]
 # `zoop_documented` rests on ZOOP's own approved documents (policies), `evidence_grounded` on public evidence.
 Basis = Literal["general_knowledge", "zoop_documented", "evidence_grounded"]
@@ -182,6 +187,101 @@ class ChatAnswer(Wire):
     graph_target_ids: list[str] = Field(max_length=50)
 
 
+MAX_AGENT_TOOLS = 13
+MAX_APPROVALS = 8
+MAX_MCP_CALLS = 16
+TOOL_NAME = r"^[A-Za-z0-9_]{1,64}$"
+PROVIDER_ID = r"^[A-Za-z0-9_-]{1,128}$"
+
+
+class AgentRequirement(Wire):
+    """One requirement the agent run answers. `general` marks a stable concept part that may be explained without evidence."""
+    requirement_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")
+    label: str = Field(min_length=1, max_length=MAX_QUESTION)
+    general: bool
+
+
+class McpConnection(Wire):
+    """The ZOOP MCP server the provider's runtime calls for this run: its HTTPS URL, the job-scoped grant token the server
+    issued (the bearer of every MCP request; this runtime never stores or logs it) and the tools the run may use."""
+    server_url: str = Field(pattern=r"^https://\S{1,2040}$")
+    authorization: str = Field(min_length=16, max_length=4096, pattern=r"^[A-Za-z0-9._-]+$")
+    allowed_tools: list[str] = Field(min_length=1, max_length=MAX_AGENT_TOOLS)
+
+    @model_validator(mode="after")
+    def tool_names(self):
+        if any(not re.fullmatch(TOOL_NAME, name) for name in self.allowed_tools):
+            raise ValueError("an allowed tool is an MCP tool name")
+        if len(set(self.allowed_tools)) != len(self.allowed_tools):
+            raise ValueError("allowed tools must be distinct")
+        return self
+
+
+class ApprovalDecision(Wire):
+    """The application's decision on one approval request. This runtime only relays it; it never approves on its own."""
+    approval_request_id: str = Field(pattern=PROVIDER_ID)
+    approve: bool
+
+
+class Continuation(Wire):
+    """Resumes the stored provider response `previous_response_id` with the application's decisions on its approval requests."""
+    previous_response_id: str = Field(pattern=PROVIDER_ID)
+    decisions: list[ApprovalDecision] = Field(min_length=1, max_length=MAX_APPROVALS)
+
+    @model_validator(mode="after")
+    def distinct(self):
+        if len({d.approval_request_id for d in self.decisions}) != len(self.decisions):
+            raise ValueError("one decision per approval request")
+        return self
+
+
+class AgentInput(Wire):
+    """One step of a Luna Responses run with the ZOOP MCP tools: the first step (no `continuation`) or a continuation with the
+    application's approval decisions. The application sends no evidence here: the tools return it."""
+    turns: list[Turn] = Field(min_length=1, max_length=3)
+    requirements: list[AgentRequirement] = Field(min_length=1, max_length=MAX_REQUIREMENTS)
+    mcp: McpConnection
+    max_citations: int = Field(ge=0, le=MAX_CITATIONS)
+    continuation: Continuation | None = None
+
+    @model_validator(mode="after")
+    def distinct(self):
+        if len({r.requirement_id for r in self.requirements}) != len(self.requirements):
+            raise ValueError("requirement ids must be distinct")
+        return self
+
+
+class ApprovalRequest(Wire):
+    """A tool call the model proposes and the provider holds until the application decides (`require_approval=always`)."""
+    approval_request_id: str = Field(pattern=PROVIDER_ID)
+    tool_name: str = Field(pattern=TOOL_NAME)
+    arguments: dict[str, Any]
+
+
+class McpCallSummary(Wire):
+    """An MCP call the provider made in this step (after an approval): its tool and whether the server answered an error."""
+    tool_name: str = Field(pattern=TOOL_NAME)
+    failed: bool
+
+
+class AgentAnswer(Wire):
+    """The outcome of one agent step. `approval_required`: the run stopped at the listed approval requests, no answer;
+    `completed`: the final answer, no requests. `response_id` is the stored provider response a continuation resumes."""
+    response_id: str = Field(pattern=PROVIDER_ID)
+    status: Literal["approval_required", "completed"]
+    approval_requests: list[ApprovalRequest] = Field(max_length=MAX_APPROVALS)
+    mcp_calls: list[McpCallSummary] = Field(max_length=MAX_MCP_CALLS)
+    answer: ChatAnswer | None
+
+    @model_validator(mode="after")
+    def outcome(self):
+        if (self.status == "approval_required") != bool(self.approval_requests):
+            raise ValueError("approval requests exactly when approval is required")
+        if (self.status == "completed") != (self.answer is not None):
+            raise ValueError("an answer exactly when completed")
+        return self
+
+
 class VerifySection(Wire):
     basis: Basis
     text: str = Field(min_length=1, max_length=MAX_TEXT)
@@ -213,7 +313,7 @@ class VerificationAnswer(Wire):
 
 
 INPUTS: dict[str, type[Wire]] = {"chat-router": RouterInput, "chat-answer": AnswerInput,
-                                 "chat-verification": VerificationInput}
+                                 "chat-verification": VerificationInput, "chat-agent": AgentInput}
 
 
 class StageRequest(Wire):
