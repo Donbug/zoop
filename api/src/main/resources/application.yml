@@ -97,6 +97,10 @@ zoop:
       # job-scoped grant tokens' signing keys, not the model API key). Turning it on outside local tests waits for the
       # model-send grant check on returned results.
       enabled: ${ZOOP_CHAT_MCP_ENABLED:false}
+      # The agent path (Luna chooses the reads through this endpoint, the server approves each call). Off by default; needs
+      # the endpoint above, the chat model stages and the HTTPS URL the model provider reaches this endpoint at.
+      agent-enabled: ${ZOOP_CHAT_AGENT_ENABLED:false}
+      public-url: ${ZOOP_CHAT_MCP_PUBLIC_URL:}
   analysis:
     analyze-plan:
       # Executes fixed admitted S2/S3 units only; completion does not collect or publish data.

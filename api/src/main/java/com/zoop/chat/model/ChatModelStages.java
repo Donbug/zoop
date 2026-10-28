@@ -55,10 +55,14 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code <jobId>.<attempt>.<stage>}, so a rerun of the job is a new invocation and a repeat of the same one is never sent
  * twice.
  */
-public class ChatModelStages implements ChatModels.Router, ChatModels.Generator, ChatModels.Verifier {
+public class ChatModelStages implements ChatModels.Router, ChatModels.Generator, ChatModels.Verifier, ChatModels.Agent {
     static final String ROUTER = "chat-router";
     static final String ANSWER = "chat-answer";
     static final String VERIFICATION = "chat-verification";
+    static final String AGENT = "chat-agent";
+    private static final tools.jackson.databind.ObjectMapper ARGUMENTS = tools.jackson.databind.json.JsonMapper.builder().build();
+    private static final tools.jackson.core.type.TypeReference<Map<String, Object>> ARGUMENT_MAP =
+            new tools.jackson.core.type.TypeReference<>() { };
     static final int MAX_REQUIREMENTS = 6;
     static final int MAX_ITEMS = 50;
     static final int MAX_QUOTES = 20;
@@ -371,6 +375,62 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             }
             return new ChatSemanticVerdicts(verdicts);
         });
+    }
+
+    // ---------------------------------------------------------------- agent
+
+    /**
+     * One {@code chat-agent} step: the requirements with their resolved targets, the MCP connection and, for a continuation,
+     * the stored response with the server's decisions. Each step is its own invocation ({@code <job>.<attempt>.agent-<n>}).
+     */
+    @Override
+    public ChatModels.AgentStep step(ChatRun run, int step, ChatModels.AgentInput agent) {
+        ObjectNode input = StrictJson.newObject();
+        input.set("turns", turns(run));
+        ArrayNode requirements = input.putArray("requirements");
+        for (ChatModels.AgentRequirement requirement : agent.requirements()) {
+            ObjectNode wire = requirements.addObject().put("requirementId", requirement.id())
+                    .put("label", requirement.label()).put("general", requirement.general());
+            ArrayNode targets = wire.putArray("targets");
+            requirement.targets().forEach(targets::add);
+        }
+        ObjectNode mcp = input.putObject("mcp").put("serverUrl", agent.serverUrl()).put("authorization", agent.grantToken());
+        ArrayNode tools = mcp.putArray("allowedTools");
+        agent.allowedTools().forEach(tools::add);
+        input.put("maxCitations", Math.min(MAX_QUOTES, agent.maxCitations()));
+        if (agent.previousResponseId() != null) {
+            ObjectNode continuation = input.putObject("continuation").put("previousResponseId", agent.previousResponseId());
+            ArrayNode decisions = continuation.putArray("decisions");
+            agent.decisions().forEach(d -> decisions.addObject().put("approvalRequestId", d.approvalRequestId())
+                    .put("approve", d.approve()));
+        }
+        JsonNode answer = call(run, AGENT, "agent-" + step, input);
+        return decode(() -> {
+            List<ChatModels.ApprovalRequest> approvals = new ArrayList<>();
+            for (JsonNode request : array(answer, "approvalRequests")) {
+                JsonNode arguments = request.get("arguments");
+                if (arguments == null || !arguments.isObject()) throw new IllegalArgumentException("arguments");
+                approvals.add(new ChatModels.ApprovalRequest(text(request, "approvalRequestId"), text(request, "toolName"),
+                        ARGUMENTS.convertValue(arguments, ARGUMENT_MAP)));
+            }
+            JsonNode written = answer.get("answer");
+            ChatGeneratedAnswer generated = null;
+            if ("completed".equals(text(answer, "status"))) {
+                if (written == null || !written.isObject()) throw new IllegalArgumentException("answer");
+                generated = generated(written);
+            }
+            return new ChatModels.AgentStep(text(answer, "responseId"), approvals, generated);
+        });
+    }
+
+    private static ChatGeneratedAnswer generated(JsonNode answer) {
+        List<ChatGeneratedAnswer.Section> sections = new ArrayList<>();
+        for (JsonNode s : array(answer, "sections")) {
+            sections.add(new ChatGeneratedAnswer.Section(text(s, "basis"), text(s, "text"), strings(s, "requirementIds"),
+                    strings(s, "evidenceIds")));
+        }
+        return new ChatGeneratedAnswer(sections, strings(answer, "insufficientRequirementIds"),
+                strings(answer, "graphTargetIds"));
     }
 
     // ---------------------------------------------------------------- one stage

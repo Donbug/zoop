@@ -6,6 +6,8 @@ import com.zoop.chat.executor.ChatEngine;
 import com.zoop.chat.executor.ChatJobExecutor;
 import com.zoop.chat.executor.MemoryChatStore;
 import com.zoop.chat.executor.NoChatTransactions;
+import com.zoop.chat.orchestrator.ChatModels;
+import com.zoop.chat.repository.ChatExecutionRepository;
 import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolRunner;
 import java.time.Clock;
@@ -58,6 +60,25 @@ class ChatMcpConfigurationTest {
                     assertThat(context).hasSingleBean(ChatMcpGrants.class);
                     ServletRegistrationBean<?> servlet = context.getBean(ServletRegistrationBean.class);
                     assertThat(servlet.getUrlMappings()).containsExactly(ChatMcpConfiguration.PATH);
+                    assertThat(context).doesNotHaveBean(ChatMcpAgent.class);
                 });
+    }
+
+    private static final String[] ENABLED = {"zoop.chat.mcp.enabled=true", "ZOOP_CHAT_MCP_ACTIVE_KEY_ID=k1",
+            "ZOOP_CHAT_MCP_KEYS=k1=" + ChatMcpGrantsTest.KEY_A, "zoop.chat.mcp.agent-enabled=true"};
+
+    @Test
+    void theAgentPathNeedsTheModelStagesAndAnHttpsPublicUrl() {
+        var withRepository = runner.withBean(ChatExecutionRepository.class, MemoryChatStore::new);
+        withRepository.withPropertyValues(ENABLED).withPropertyValues("zoop.chat.mcp.public-url=https://api.zoop.example/mcp")
+                .run(context -> assertThat(context.getStartupFailure()).rootCause()
+                        .hasMessageContaining("zoop.ai.chat-client.enabled"));
+        ChatModels.Agent stages = (run, step, input) -> { throw new UnsupportedOperationException(); };
+        var withStages = withRepository.withBean(ChatModels.Agent.class, () -> stages);
+        withStages.withPropertyValues(ENABLED).withPropertyValues("zoop.chat.mcp.public-url=http://api.zoop.example/mcp")
+                .run(context -> assertThat(context.getStartupFailure()).rootCause()
+                        .hasMessageContaining("ZOOP_CHAT_MCP_PUBLIC_URL"));
+        withStages.withPropertyValues(ENABLED).withPropertyValues("zoop.chat.mcp.public-url=https://api.zoop.example/mcp")
+                .run(context -> assertThat(context).hasSingleBean(ChatMcpAgent.class));
     }
 }
