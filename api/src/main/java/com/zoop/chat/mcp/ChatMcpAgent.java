@@ -15,6 +15,7 @@ import com.zoop.chat.tool.ChatToolResult;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
@@ -25,9 +26,11 @@ import tools.jackson.databind.ObjectMapper;
  * steps, and every tool call Luna proposes is decided here and only here.
  *
  * <ul>
- * <li>A proposed call is approved exactly when it names one of the run's allowed tools and {@link ChatMcpTools#approve}
- * reserves it (valid arguments, within the attempt's call limit); otherwise it is denied. Nothing is approved without being reserved, and a denied call
- * never runs.</li>
+ * <li>A proposed call is approved exactly when it names one of the run's allowed tools, every target it names is reachable
+ * and {@link ChatMcpTools#approve} reserves it (valid arguments, within the attempt's call limit); otherwise it is denied.
+ * Reachable are the ids the server resolved for the requirements and, from the next round on, the ids the calls it
+ * approved returned (items, their companies, path endpoints and steps, evidence). Nothing is approved without being
+ * reserved, and a denied call never runs.</li>
  * <li>At most {@link #MAX_ROUNDS} rounds of approvals (the dependency rounds of ZOOP-AIG-001 6.3.3). The step after the last
  * round denies whatever is still asked, so Luna answers from what it has; a run that still asks after that is a failed
  * model step, never an endless loop.</li>
@@ -68,6 +71,9 @@ public final class ChatMcpAgent implements ChatAgentPath {
         String token = grants.issue(run, allowed);
         List<String> names = allowed.stream().map(ChatMcpTools::name).toList();
         var attached = new ChatJobExecutor.Attached(run, control);
+        // The ids a call may target: what the server resolved for the requirements, then what approved calls returned.
+        Set<String> reachable = new LinkedHashSet<>();
+        requirements.forEach(r -> reachable.addAll(r.targets()));
         String previous = null;
         List<ChatModels.Decision> decisions = List.of();
         int approved = 0;
@@ -84,11 +90,13 @@ public final class ChatMcpAgent implements ChatAgentPath {
             // Past the last round, or with time for only one more step, nothing more runs: the next step writes the answer.
             boolean closing = rounds > MAX_ROUNDS || steps.closing();
             if (closing) rounds = MAX_ROUNDS + 1;
+            if (!closing) kept(run).forEach(result -> reachable.addAll(reached(result)));
             List<ChatModels.Decision> next = new ArrayList<>();
             for (ChatModels.ApprovalRequest request : outcome.approvals()) {
                 boolean approve = false;
-                // Only the run's own tools: the provider's allowed_tools is no server-side check.
-                if (!closing && names.contains(request.toolName())) {
+                // Only the run's own tools on ids the server resolved or a call it approved returned: neither the
+                // provider's allowed_tools nor the prompt's "never guess an id" is a server-side check.
+                if (!closing && names.contains(request.toolName()) && targetsReachable(request.arguments(), reachable)) {
                     ChatMcpTools.Approval approval = tools.approve(attached, request.toolName(), request.arguments());
                     if (ChatMcpTools.RUN_NOT_ACTIVE.equals(approval.refused())) throw new ChatRunSuperseded();
                     approve = approval.approved();
@@ -100,6 +108,37 @@ public final class ChatMcpAgent implements ChatAgentPath {
             previous = outcome.responseId();
             decisions = next;
         }
+    }
+
+    /**
+     * Whether every target of a proposed call is reachable. A call without {@code targets} reads what the server fixes for
+     * it (the fixed ZOOP documents, or the whole public graph of a version diff) and is left to the argument check; any other
+     * shape is refused there too.
+     */
+    static boolean targetsReachable(Map<String, Object> arguments, Set<String> reachable) {
+        if (!arguments.containsKey("targets")) return true;
+        if (!(arguments.get("targets") instanceof List<?> targets)) return false;
+        return targets.stream().allMatch(target -> target instanceof String id && reachable.contains(id));
+    }
+
+    /** The ids a result made known: its items and their companies, path endpoints and steps, and its evidence. */
+    static Set<String> reached(ChatToolResult result) {
+        Set<String> ids = new LinkedHashSet<>(result.evidenceIds());
+        for (ChatToolItem item : result.items()) {
+            ids.add(item.id());
+            ids.addAll(item.companyIds());
+            ids.addAll(item.evidenceIds());
+        }
+        for (ChatToolPath path : result.paths()) {
+            ids.add(path.fromId());
+            ids.add(path.toId());
+            for (ChatToolPath.Step step : path.steps()) {
+                ids.add(step.sourceId());
+                ids.add(step.targetId());
+                ids.addAll(step.evidenceIds());
+            }
+        }
+        return ids;
     }
 
     /** The results the attempt's MCP calls returned to the model, as kept on the ledger. */

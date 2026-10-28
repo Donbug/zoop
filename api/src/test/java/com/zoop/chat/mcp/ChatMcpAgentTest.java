@@ -184,12 +184,53 @@ class ChatMcpAgentTest {
 
     @Test
     void afterThreeRoundsWhatIsStillAskedIsDeniedAndAnEndlessAgentFails() {
-        luna.script.add(n -> held("mcpr_" + n, "company_read", Map.of("targets", List.of("KRX:00000" + n))));
+        // Reachable targets only, so each round really reserves: the resolved company, varied by its result limit.
+        luna.script.add(n -> held("mcpr_" + n, "company_read", Map.of("targets", List.of("KRX:000660"), "limit", n)));
         assertThrows(ChatModels.Failure.class, () -> run(steps(false)));
         assertEquals(5, luna.inputs.size(), "four held steps answered, the fifth still asks");
         assertEquals(3, store.toolCalls(JOB).size(), "three approval rounds reserved");
         assertEquals(List.of(new ChatModels.Decision("mcpr_4", false)), luna.inputs.get(4).decisions(),
                 "the closing round denies");
+    }
+
+    @Test
+    void aTargetTheServerNeverResolvedAndNoApprovedCallReturnedIsDenied() {
+        // Round 1: an id nobody resolved is denied; the resolved company is approved.
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(
+                new ChatModels.ApprovalRequest("mcpr_guess", "company_read", Map.of("targets", List.of("KRX:999999"))),
+                new ChatModels.ApprovalRequest("mcpr_known", "company_read", Map.of("targets", List.of("KRX:000660")))),
+                null));
+        // Round 2: a company the approved call returned is now reachable; one mixed with a guess is not.
+        luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(
+                new ChatModels.ApprovalRequest("mcpr_related", "company_read", Map.of("targets", List.of("KRX:005930"))),
+                new ChatModels.ApprovalRequest("mcpr_mixed", "company_read",
+                        Map.of("targets", List.of("KRX:005930", "KRX:999999"))),
+                new ChatModels.ApprovalRequest("mcpr_shape", "company_read", Map.of("targets", "KRX:005930"))),
+                null));
+        luna.script.add(n -> done());
+
+        var outcome = run(steps(false));
+
+        assertEquals(List.of(new ChatModels.Decision("mcpr_guess", false), new ChatModels.Decision("mcpr_known", true)),
+                luna.inputs.get(1).decisions());
+        assertEquals(List.of(new ChatModels.Decision("mcpr_related", true), new ChatModels.Decision("mcpr_mixed", false),
+                new ChatModels.Decision("mcpr_shape", false)), luna.inputs.get(2).decisions());
+        assertEquals(2, outcome.approved());
+        assertEquals(3, outcome.denied());
+        assertEquals(List.of("KRX:000660", "KRX:005930"),
+                outcome.results().stream().map(result -> result.items().getFirst().id()).toList(),
+                "only the reachable targets were read");
+        assertEquals(2, luna.made.size());
+    }
+
+    @Test
+    void aCallWithoutTargetsIsJudgedByTheArgumentCheckAlone() {
+        assertTrue(ChatMcpAgent.targetsReachable(Map.of("limit", 5), java.util.Set.of()));
+        assertTrue(ChatMcpAgent.targetsReachable(Map.of("targets", List.of("a")), java.util.Set.of("a")));
+        var explicitNull = new java.util.HashMap<String, Object>();
+        explicitNull.put("targets", null);
+        assertFalse(ChatMcpAgent.targetsReachable(explicitNull, java.util.Set.of("a")));
+        assertFalse(ChatMcpAgent.targetsReachable(Map.of("targets", List.of(1)), java.util.Set.of("1")));
     }
 
     @Test
@@ -234,8 +275,9 @@ class ChatMcpAgentTest {
             @Override
             public ChatToolOutput read(ChatToolScope scope, ChatToolRequest request) {
                 String id = request.targets().getFirst();
+                // Each company relates to Samsung Electronics, which a later round may then read.
                 return new ChatToolOutput(scope.graphVersionId(),
-                        List.of(new ChatToolItem(id, "company", "SK하이닉스", List.of(id), List.of("ev-1"))),
+                        List.of(new ChatToolItem(id, "company", "SK하이닉스", List.of(id, "KRX:005930"), List.of("ev-1"))),
                         List.of("ev-1"), false, false);
             }
         };
