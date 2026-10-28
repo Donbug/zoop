@@ -2,7 +2,7 @@ import CompanyInfoTab from './CompanyInfoTab';
 import PriceChart from './PriceChart';
 import { formatKst, formatMoney } from '@/util/format';
 import BoltIcon from './BoltIcon';
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -39,7 +39,7 @@ import {
 } from './detail-model';
 
 const workspaceClasses =
-  'company-workspace grid grid-cols-[200px_minmax(0,1fr)_280px] gap-3 m-0 overflow-visible text-zoop-ink max-[1000px]:grid-cols-[150px_minmax(0,1fr)_240px] max-md:flex max-md:flex-col [&_section]:border-b [&_section]:border-zoop-line [&_section]:py-4 [&_h1]:text-[26px] [&_h1]:font-bold [&_h1]:tracking-[-0.035em] [&_h2]:mb-3 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:tracking-[-0.025em] [&_h3]:font-semibold [&_p]:text-xs [&_p]:text-zoop-muted [&_p]:leading-[1.7] [&_button]:cursor-pointer [&_button]:rounded-full [&_button]:border [&_button]:border-zoop-line [&_button]:bg-white [&_button]:min-h-[36px] [&_button]:px-4 [&_button]:py-2 [&_button]:text-xs! [&_button[aria-pressed=true]]:bg-zoop-ink [&_button[aria-pressed=true]]:text-white [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-default [&_a]:cursor-pointer [&_a]:px-[9px] [&_a]:py-1.5 [&_a]:text-xs [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-zoop-ink [&_nav]:my-3 [&_nav]:flex [&_nav]:flex-wrap [&_nav]:gap-1.5 [&_article]:border-b [&_article]:border-zoop-line [&_article]:py-3 [&_table]:w-full [&_table]:text-xs [&_table]:wrap-anywhere [&_[role=alert]]:text-zoop-alert [&_details]:my-3 [&_input]:max-w-full [&_input]:rounded-xl [&_input]:border [&_input]:border-zoop-line [&_input]:bg-white [&_input]:px-3 [&_input]:py-2 [&_input]:min-h-[38px] [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-2 [&_summary:focus-visible]:outline-zoop-ink max-md:[&_table]:block max-md:[&_table]:overflow-auto max-md:[&_section]:min-w-0 max-md:[&_section]:wrap-anywhere';
+  'company-workspace grid grid-cols-[200px_minmax(0,1fr)_280px] gap-3 m-0 overflow-visible text-zoop-ink max-[1000px]:grid-cols-[160px_minmax(0,1fr)] max-md:flex max-md:flex-col [&_section]:border-b [&_section]:border-zoop-line [&_section]:py-4 [&_h1]:text-[26px] [&_h1]:font-bold [&_h1]:tracking-[-0.035em] [&_h2]:mb-3 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:tracking-[-0.025em] [&_h3]:font-semibold [&_p]:text-xs [&_p]:text-zoop-muted [&_p]:leading-[1.7] [&_button]:cursor-pointer [&_button]:rounded-full [&_button]:border [&_button]:border-zoop-line [&_button]:bg-white [&_button]:min-h-[36px] [&_button]:px-4 [&_button]:py-2 [&_button]:text-xs! [&_button[aria-pressed=true]]:bg-zoop-ink [&_button[aria-pressed=true]]:text-white [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-default [&_a]:cursor-pointer [&_a]:px-[9px] [&_a]:py-1.5 [&_a]:text-xs [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-zoop-ink [&_nav]:my-3 [&_nav]:flex [&_nav]:flex-wrap [&_nav]:gap-1.5 [&_article]:border-b [&_article]:border-zoop-line [&_article]:py-3 [&_table]:w-full [&_table]:text-xs [&_table]:wrap-anywhere [&_[role=alert]]:text-zoop-alert [&_details]:my-3 [&_input]:max-w-full [&_input]:rounded-xl [&_input]:border [&_input]:border-zoop-line [&_input]:bg-white [&_input]:px-3 [&_input]:py-2 [&_input]:min-h-[38px] [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-2 [&_summary:focus-visible]:outline-zoop-ink max-md:[&_table]:block max-md:[&_table]:overflow-auto max-md:[&_section]:min-w-0 max-md:[&_section]:wrap-anywhere';
 
 function Status<T>({
   resource,
@@ -209,13 +209,20 @@ export default function CompanyWorkspace() {
     version = params.get('graphVersion'),
     eventId = params.get('event');
   // D-COM-06: 타임라인 사건의 [이 당시 관계그래프 보기]로 고른 시각. 오른쪽 관계 그래프에만 쓰고
-  // 차트·타임라인의 기준 시점(asOf)은 그대로 둔다. 정확한 시각이 아니면 무시한다.
+  // 차트·타임라인의 기준 시점(asOf)은 그대로 둔다. 정확한 시각이 아니거나 기준 시점보다 이르지 않으면 무시한다.
   const requestedGraphAsOf = params.get('graphAsOf');
+  const invalid = !!asOf && !exactTime(asOf);
+  // 그래프 밖을 눌러 끝낸 시점은 주소에서 지워지기 전에도 바로 현재 시점 그래프로 보인다.
+  const [closedGraphAsOf, setClosedGraphAsOf] = useState<string | null>(null);
   const graphAsOf =
-    requestedGraphAsOf && exactTime(requestedGraphAsOf)
+    requestedGraphAsOf &&
+    requestedGraphAsOf !== closedGraphAsOf &&
+    exactTime(requestedGraphAsOf) &&
+    asOf &&
+    !invalid &&
+    Date.parse(requestedGraphAsOf) < Date.parse(asOf)
       ? requestedGraphAsOf
       : null;
-  const invalid = !!asOf && !exactTime(asOf);
   const snapshot = { asOf, graphVersion: version };
   // 사건 시점 그래프는 그 시점의 공개 버전을 서버가 고르게 한다(버전을 보내지 않는다).
   const graphSnapshot = graphAsOf
@@ -229,6 +236,48 @@ export default function CompanyWorkspace() {
     owner,
   );
   const quote = useCompanyResource<Quote>(companyUrl(id, '/quote'));
+  // D-COM-06: 사건 시점 그래프는 그래프를 쓰는 동안만 유지한다. 그래프 영역 밖(다른 사건·탭·빈 곳 등)을
+  // 누르면 현재 기준 시점 그래프로 돌아간다. 키보드로 누른 것도 click으로 들어온다.
+  // 누른 곳의 동작(다른 사건 고르기 등)도 주소를 바꾸므로, 주소의 graphAsOf는 그 변경이 반영된 뒤에 지운다.
+  // 먼저 지우면 아직 반영되지 않은 그 변경을 예전 주소로 덮어쓴다.
+  const graphPanel = useRef<HTMLElement>(null);
+  const paramsKey = params.toString();
+  const clearClosedGraphTime = useEffectEvent(() => {
+    if (closedGraphAsOf && params.get('graphAsOf') === closedGraphAsOf)
+      updateQuery({ graphAsOf: null }, { replace: true });
+  });
+  useEffect(() => {
+    clearClosedGraphTime();
+  }, [paramsKey]);
+  const clearIfUnchanged = useEffectEvent((clickedAt: string) => {
+    // 누른 곳이 주소를 바꾸지 않았으면(빈 곳 등) 여기서 지운다.
+    if (params.toString() === clickedAt) clearClosedGraphTime();
+  });
+  // 지운 뒤 그래프 시점이 풀려 듣기를 해제해도 예약한 정리는 남아야 해서 타이머는 화면을 떠날 때만 취소한다.
+  const closeTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(closeTimer.current), []);
+  const graphTimeOpen = graphAsOf;
+  useEffect(() => {
+    if (!graphTimeOpen) return;
+    const clickedAt = paramsKey;
+    function outside(event: MouseEvent) {
+      const target = event.target;
+      if (
+        !(target instanceof Element) ||
+        graphPanel.current?.contains(target) ||
+        target.closest('[data-graph-time-trigger]')
+      )
+        return;
+      setClosedGraphAsOf(graphTimeOpen);
+      window.clearTimeout(closeTimer.current);
+      closeTimer.current = window.setTimeout(
+        () => clearIfUnchanged(clickedAt),
+        300,
+      );
+    }
+    document.addEventListener('click', outside, true);
+    return () => document.removeEventListener('click', outside, true);
+  }, [graphTimeOpen, paramsKey]);
   // 버전 단독 주소는 그 버전의 차트를 열 수 없다고 안내하므로 가격 조회도 시작하지 않는다.
   const prices = useCompanyResource<Prices>(
     invalid || versionOnly
@@ -295,12 +344,20 @@ export default function CompanyWorkspace() {
       ? `/api/v1/events/${encodeURIComponent(eventId)}?${new URLSearchParams(Object.entries(snapshot).filter((entry): entry is [string, string] => entry[1] !== null))}`
       : null,
   );
+  // 영향 경로는 그래프 시점이 지금 고른 사건의 시각일 때만 그 시각으로 조회한다.
+  // 다른 사건을 고르는 순간(그래프 시점이 풀리기 전)에도 그 사건을 남의 시각으로 조회하지 않는다.
+  const selectedEvent =
+    events.data?.items.find((item) => item.id === eventId) ?? event.data;
+  const impactSnapshot =
+    graphAsOf && eventReferenceTime(selectedEvent, asOf) === graphAsOf
+      ? graphSnapshot
+      : snapshot;
   const impact = useCompanyResource<Impact>(
     ready && eventId
       ? companyUrl(
           id,
           `/issues/${encodeURIComponent(eventId)}/impact`,
-          graphSnapshot,
+          impactSnapshot,
         )
       : null,
   );
@@ -396,6 +453,7 @@ export default function CompanyWorkspace() {
     return time && time !== asOf ? time : null;
   };
   function showEventGraph(item: Events['items'][number], time: string) {
+    setClosedGraphAsOf(null);
     updateQuery({
       graphAsOf: time,
       event: item.id,
@@ -403,6 +461,9 @@ export default function CompanyWorkspace() {
       document: null,
       evidence: null,
     });
+    // 좁은 화면에서는 관계 그래프가 본문 아래에 있으므로 바뀐 그래프로 옮겨 보여 준다.
+    if (window.matchMedia?.('(max-width: 1000px)').matches)
+      graphPanel.current?.scrollIntoView({ block: 'start' });
   }
   if (invalid)
     return (
@@ -413,6 +474,7 @@ export default function CompanyWorkspace() {
             updateQuery({
               asOf: null,
               graphVersion: null,
+              graphAsOf: null,
               event: null,
               bucket: null,
             })
@@ -798,6 +860,7 @@ export default function CompanyWorkspace() {
                                     graphAsOf === itemGraphTime &&
                                     eventId === item.id
                                   }
+                                  data-graph-time-trigger
                                   aria-label={`${item.title} · 이 당시 관계그래프 보기`}
                                   onClick={() =>
                                     showEventGraph(item, itemGraphTime)
@@ -922,9 +985,11 @@ export default function CompanyWorkspace() {
           )}
         </section>
       </main>
-      {/* D-COM-04: 와이어프레임처럼 오른쪽 열에 두고, 스크롤해도 화면 안에 남는다(모바일 폭에서는 아래로 쌓는다). */}
+      {/* D-COM-04: 넓은 화면은 와이어프레임처럼 오른쪽 열에 두고 스크롤해도 화면 안에 남는다.
+          1000px 이하에서는 본문 아래로 옮겨 넓게 본다. */}
       <aside
-        className="min-w-0 self-start rounded-2xl bg-white p-4 shadow-sm md:sticky md:top-4 md:max-h-[calc(100vh-2rem)] md:overflow-y-auto [&_li]:text-xs [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full [&_svg]:bg-zoop-line max-md:w-full"
+        ref={graphPanel}
+        className="min-w-0 self-start rounded-2xl bg-white p-4 shadow-sm min-[1001px]:sticky min-[1001px]:top-4 min-[1001px]:max-h-[calc(100vh-2rem)] min-[1001px]:overflow-y-auto max-[1000px]:col-start-2 [&_li]:text-xs [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full [&_svg]:bg-zoop-line max-md:w-full"
         aria-label="시점 기반 관계 그래프"
         data-screen-id="D-COM-04"
       >

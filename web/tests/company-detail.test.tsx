@@ -1698,3 +1698,76 @@ test('D-COM-06: an event time without a public version still offers the way back
     await screen.findByRole('img', { name: '기준 시점 기업 관계 그래프' }),
   ).toBeTruthy();
 });
+
+test('D-COM-06: the event-time graph stays while the graph is used and returns to the current time on a click elsewhere', async () => {
+  // 사건 B는 A보다 늦다. A 시점 그래프에서 B를 고르면 B를 A 시각으로 조회하면 안 된다.
+  server.on('GET', '/api/v1/events', (r) =>
+    json({
+      items: [events[0], { ...events[1], eventTime: '2026-10-05T12:00:00Z' }],
+      unknownTimeItems: [],
+      nextCursor: null,
+      metadata: {
+        ...metadata,
+        asOf: r.query.get('asOf') ?? time,
+        total: 2,
+        excludedUnknownTime: 0,
+      },
+    }),
+  );
+  open(pinned);
+  const user = userEvent.setup();
+  const address = () => screen.getByTestId('address').textContent ?? '';
+  await user.click(
+    await screen.findByRole('button', {
+      name: '합성 사건 A · 이 당시 관계그래프 보기',
+    }),
+  );
+  expect(address()).toContain(`graphAsOf=${encodeURIComponent(old)}`);
+
+  // 그래프 안의 조작(깊이 바꾸기)은 사건 시점을 유지한다.
+  const panel = screen.getByRole('complementary', {
+    name: '시점 기반 관계 그래프',
+  });
+  await user.click(within(panel).getByRole('button', { name: '2단계' }));
+  await waitFor(() => expect(address()).toContain('depth=2'));
+  expect(address()).toContain(`graphAsOf=${encodeURIComponent(old)}`);
+
+  // 그래프 밖에서 다른 사건을 고르면 그 사건은 고르고 그래프는 현재 기준 시점으로 돌아간다.
+  await user.click(screen.getByRole('button', { name: '합성 사건 B' }));
+  await waitFor(() => expect(address()).not.toContain('graphAsOf'));
+  expect(address()).toContain('event=issue-b');
+  await waitFor(() => {
+    const impact = server
+      .calls('GET', '/api/v1/companies/:id/issues/:issueId/impact')
+      .filter((call) => call.params.issueId === 'issue-b');
+    expect(impact.length).toBeGreaterThan(0);
+    expect(impact.every((call) => call.query.get('asOf') === time)).toBe(true);
+  });
+  await waitFor(() => {
+    const last = server.calls('GET', '/api/v1/companies/:id/graph').at(-1)!;
+    expect(last.query.get('asOf')).toBe(time);
+    expect(last.query.get('graphVersion')).toBe('v1');
+  });
+});
+
+test('D-COM-06: a graph time that is not earlier than the reference time is ignored', async () => {
+  open(`${pinned}&graphAsOf=${encodeURIComponent('2026-10-07T00:00:00Z')}`);
+  await screen.findByRole('img', { name: '기준 시점 기업 관계 그래프' });
+  expect(
+    server
+      .calls('GET', '/api/v1/companies/:id/graph')
+      .every((call) => call.query.get('asOf') === time),
+  ).toBe(true);
+  expect(
+    screen.queryByRole('button', { name: '현재 시점 관계 그래프로 돌아가기' }),
+  ).toBeNull();
+});
+
+test('D-COM-06: recovering from an invalid reference time also clears the graph time', async () => {
+  open(`?asOf=bad&graphAsOf=${encodeURIComponent(old)}`);
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole('button', { name: '최신 제공 시점으로 조회' }),
+  );
+  expect(screen.getByTestId('address').textContent).not.toContain('graphAsOf');
+});
