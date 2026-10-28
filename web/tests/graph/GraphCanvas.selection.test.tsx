@@ -21,7 +21,7 @@ import MapPage from '@/pages/map/MapPage';
 import * as graphApi from '@/apis/graph/graph';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
-import { toggleTheme } from '@/util/theme-color';
+import { toggleTheme, useColorTheme } from '@/util/theme-color';
 
 const canvas = vi.hoisted(() => ({
   created: vi.fn(),
@@ -40,6 +40,8 @@ const canvas = vi.hoisted(() => ({
   getZoom: vi.fn(() => 1),
   getPosition: vi.fn(() => [0, 0]),
   setSize: vi.fn(),
+  setNode: vi.fn(),
+  setEdge: vi.fn(),
   resizeCallbacks: [] as (() => void)[],
   handlers: new Map<string, (event: { target: { id: string } }) => void>(),
 }));
@@ -69,6 +71,8 @@ vi.mock('@antv/g6', () => ({
       return canvas.setData.mock.lastCall?.[0]?.nodes ?? [];
     }
     setSize = canvas.setSize;
+    setNode = canvas.setNode;
+    setEdge = canvas.setEdge;
     setData = canvas.setData;
     draw = canvas.draw;
     setElementState = canvas.setElementState;
@@ -127,18 +131,47 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     expect(canvas.destroyed).not.toHaveBeenCalled();
   });
 
-  it('D-GRP-01 82번 화면 모드를 바꾸면 새로 고침 없이 지도를 다시 그려 토큰 색을 다시 읽는다', async () => {
+  it('D-GRP-01 82번 화면 모드를 바꾸면 그래프·카메라는 그대로 두고 색만 다시 읽어 그린다', async () => {
     document.documentElement.dataset.theme = 'light';
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
-    render(<GraphCanvas data={data} />);
+    // 지도 화면처럼 화면 모드를 그래프 모양(GraphAppearanceContext)으로도 내려준다.
+    function Themed() {
+      const theme = useColorTheme();
+      return (
+        <GraphAppearanceContext value={{ variant: 'improved', theme }}>
+          <GraphCanvas data={data} />
+        </GraphAppearanceContext>
+      );
+    }
+    render(<Themed />);
     await waitFor(() => expect(canvas.created).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    const draws = canvas.setData.mock.calls.length;
+    canvas.zoomTo.mockClear();
+    canvas.translateTo.mockClear();
+    canvas.fitView.mockClear();
 
-    act(() => toggleTheme());
+    document.documentElement.style.setProperty('--color-zoop-ink', '#fafafa');
+    act(() => {
+      toggleTheme();
+    });
 
-    await waitFor(() => expect(canvas.created).toHaveBeenCalledTimes(2));
-    expect(canvas.destroyed).toHaveBeenCalledTimes(1);
-    expect(document.documentElement.dataset.theme).toBe('dark');
-    act(() => toggleTheme());
+    await waitFor(() =>
+      expect(canvas.setData.mock.calls.length).toBeGreaterThan(draws),
+    );
+    expect(canvas.created).toHaveBeenCalledTimes(1);
+    expect(canvas.destroyed).not.toHaveBeenCalled();
+    expect(canvas.setNode.mock.lastCall?.[0].state.hovered.haloStroke).toBe(
+      '#fafafa',
+    );
+    expect(canvas.setEdge).toHaveBeenCalled();
+    expect(canvas.zoomTo).not.toHaveBeenCalled();
+    expect(canvas.translateTo).not.toHaveBeenCalled();
+    expect(canvas.fitView).not.toHaveBeenCalled();
+    document.documentElement.style.removeProperty('--color-zoop-ink');
+    act(() => {
+      toggleTheme();
+    });
   });
 
   it('D-GRP-01 does not move nodes by dragging; only the map camera moves', async () => {
