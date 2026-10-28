@@ -1,9 +1,11 @@
 # ZOOP AI 챗봇 설계 요약
 
 문서 버전: 1.7 / 기준 정책: ZOOP-AIG-001 v0.11 / 설계 갱신: 2026-10-28
-상태: 사용자 설계 승인 · 구현 예정 · 팀 검토 및 출시 검증 별도
+상태: 2026-10-28 팀 결정 · 구현 예정 · 출시 검증 별도
 
-상세: [거버넌스](../ZOOP_AI_거버넌스_정책.md), [Luna MCP 실행·캐시·fallback 계약](ai-chatbot-mcp-actions.md), [웹 검색](ai-chatbot-web-search.md), [개발 계획](../development/ai-chatbot-implementation-plan.md), [평가](../development/ai-chatbot-eval-set.md), [화면 상태](../wireframe/ai-chatbot-state-contract.md).
+이번 팀 결정은 2026-10-25의 MCP 미사용 결정을 대체한다. 기존 Java direct adapter는 Responses 시작 전 MCP 장애가 확인된 job의 시작 경로와 비교 기준으로 유지한다.
+
+상세: [거버넌스](../ZOOP_AI_거버넌스_정책.md), [Luna MCP 실행·캐시·direct 시작 계약](ai-chatbot-mcp-actions.md), [웹 검색](ai-chatbot-web-search.md), [개발 계획](../development/ai-chatbot-implementation-plan.md), [평가](../development/ai-chatbot-eval-set.md), [화면 상태](../wireframe/ai-chatbot-state-contract.md).
 [기존 FigJam](https://www.figma.com/board/n9faVm9OiLCKwD8OgnFQfX)은 이전 설계일 수 있으며 이번 문서 개정의 동기화 증거로 사용하지 않는다.
 
 ## 1. 핵심 요약
@@ -41,11 +43,13 @@ Jev가 Q01~Q08 유형과 기능 후보를 분류하면 서버가 허용 도구·
 | Luna | 허용된 도구·인자·순서 선택, 중간 결과에 따른 보충, 최종 답변 후보 |
 | OpenAI Responses | MCP 도구 목록과 호출 전송, 승인 요청/결과 반환 |
 | Java MCP endpoint | 인증 경계의 HTTPS Streamable HTTP /mcp, 호출 gate·캐시·공통 Tool Service |
-| Direct adapter | MCP 연결 장애의 같은 정책/조회 로직 fallback |
-| ai/service·worker | 모델 진입 HTTP와 Responses 실행·승인 continuation·영수증 |
+| Direct adapter | preflight 실패·circuit open이면 Responses 시작 전 선택하는 대체 시작 경로 |
+| ai/service·worker | Responses 시작·중지·continuation. approval 요청을 Java에 반환하고 Java 결정만 전달 |
 | 출력 검증기 | 요구/인용/버전 등 코드 검사 + 독립 Jev 의미 검증 |
 
 앱→AI 모델 실행은 ai/service HTTP를 유지한다. OpenAI→Java /mcp callback은 새 목표 경계이며 구현 PR에서 CLAUDE.md·네트워크·인증·계약을 함께 갱신한다. 비공개 Neo4j나 AI 저장소를 앱 챗봇이 직접 읽지 않는다. 모델 API 키와 MCP 위임 토큰은 분리한다.
+
+`require_approval=always`의 승인자는 Java 작업 실행기다. ai/service는 `mcp_approval_request`를 Java에 반환하고, Java가 예산·요구·scope·grant·기한을 판단한 뒤 continuation을 다시 호출한다. 실행 중 MCP 오류 결과를 direct 결과로 끼워 넣지 않는다.
 
 ## 4. Q01~Q08 질의 유형
 
@@ -72,11 +76,11 @@ Jev가 Q01~Q08 유형과 기능 후보를 분류하면 서버가 허용 도구·
 
 | 항목 | 초기 상한 |
 | --- | --- |
-| 도구 시도 | 총 8회, 내부 최대 6회·웹 최대 2회, cache hit·실패·fallback 포함 |
+| 도구 시도 | 총 8회, 내부 최대 6회·웹 최대 2회, cache hit·실패·direct 조회 포함 |
 | 동시 / 의존 | 최대 4개 / 총 3라운드, 추가 4번째 보충 없음 |
 | 대상 / 자료 | fan-out·batch 최대 5개, 문서 20개, 그래프 3-hop·노드/간선 각 50개 |
 | 개별 timeout | DB 3초·그래프 경로 5초·웹 7초, 잔여 기한으로 축소 |
-| Luna / job | MCP·continuation·fallback·생성 합산 35초 / running부터 저장까지 45초 |
+| Luna / job | MCP·Java 승인 continuation·생성 합산 35초 / running부터 terminal-state DB commit 완료까지 45초 |
 | 단계 예약 | router 4초·후검증 6초·서버 3초 |
 | Luna 토큰 | 누적 입력 24,000·최종 답변 2,000, reasoning 비용은 별도 포함 예약 |
 | 요구 / 확인 | 명시 요구 6개 / 확인 사슬 최대 2회 |
@@ -84,13 +88,15 @@ Jev가 Q01~Q08 유형과 기능 후보를 분류하면 서버가 허용 도구·
 
 실효 Luna 시간은 min(35초, job 잔여 − 후검증 6초 − 서버 3초)다. router가 4초를 쓰면 32초다. 최종 작성용 10초를 남기고 새 도구를 중단한다. 제한으로 중단한 자료를 전체 조회라고 표시하지 않는다. 최악 경로가 예산을 넘으면 범위를 확인하며 실행 중에는 확인된 결과/안내로 종료한다.
 
+초기 Responses reasoning effort는 `medium`이다. 구현 전에 도구 1·4·8회와 승인 continuation의 합성 replay 및 승인된 소량 live 지연 spike를 수행한다. `high`는 품질 이득과 45초 준수를 함께 증명한 뒤 적용한다.
+
 캐시 키에는 job·실행 세대·도구/스키마/정책 revision·정규화 인자·회원 scope·버전·asOf를 포함한다. 동일 요청의 실제 조회는 1회이고 동시 요청은 single-flight로 합친다. 성공·정상 0건만 캐시하며 실패는 실패 원장으로 별도 관리한다. hit에도 권한·철회·model-send grant를 확인하고 원 결과와 toolCallId를 그대로 연결한다. 상세는 [MCP 계약 3.3절](ai-chatbot-mcp-actions.md#33-요청-단위-캐시와-중복-억제).
 
 ### 5.2 의존 실행과 체크포인트
 
 서버가 개수 조건 exactly/atLeast/atMost를 요구에서 정한다. 초과이면 실제 대상의 choices로 clarification, 미달이면 가능한 요구만 답하고 precondition_unmet, 정상 0건이면 조회 범위 내 찾지 못함, truncated이면 확인 한계를 표시한다. 오류를 0건으로 평가하지 않는다.
 
-Q07은 개인 범위를 먼저 조회한다. 웹이 필요한 기업이 2개를 넘으면 임의 두 기업을 고르지 않고 범위를 확인한다. 같은 질문 사슬 최대 2회 이후에도 선택이 안 되면 guidance로 종료한다. resolves는 부모의 고정 문맥을 승계한다.
+Q07의 `portfolio.scope.read`는 Java server-only precondition이며 MCP에 노출하지 않는다. 전체 보유 목록·수량·보유 표시는 모델로 보내지 않고, scope 안에서 실제로 일치한 공개 사건·관계 결과만 최대 5개로 최소화한다. 웹이 필요한 기업이 2개를 넘으면 임의 두 기업을 고르지 않고 범위를 확인한다. 같은 질문 사슬 최대 2회 이후에도 선택이 안 되면 guidance로 종료한다.
 
 ## 6. 복합 질문 예시
 
@@ -154,8 +160,8 @@ general_knowledge에는 서버 고정 안내 ‘일반 개념 설명입니다. �
 | 영역 | 현재 코드 | 추가 구현 |
 | --- | --- | --- |
 | 공개 job | 회원 전용 저장·polling·멱등성·취소·lease·재시도 | answerStatus/notices·장애 limitation, 저장 복구 |
-| 모델 | chat-router Jev·chat-answer Luna·chat-verification Jev, Luna는 chat/completions·high·도구 없음 | Luna Responses MCP·승인 continuation·사용량·deadline |
-| 도구 | company.read, issue.read, evidence.resolve, graph.path.read, graph.version.diff, portfolio.scope.read, zoopPolicy.read | MCP 외피·공통 gate·cache·fallback, 미연결 Q01 일부/Q06/Q08·document.search·period.compare·batch |
+| 모델 | chat-router Jev·chat-answer Luna·chat-verification Jev, Luna는 chat/completions·high·도구 없음 | Luna Responses MCP·Java 승인 continuation·medium·사용량·deadline |
+| 도구 | company.read, issue.read, evidence.resolve, graph.path.read, graph.version.diff, portfolio.scope.read, zoopPolicy.read | portfolio.scope.read는 server-only, 나머지 MCP 외피·공통 gate·cache·direct 시작 경로 |
 | 근거·검증 | BranchContext·서버 citation·결정론 검사·section Jev | 웹 출처·claim 인과 검증·token guard·grant 선반환 검사 |
 | 화면 | D-AI-01~02b API 연결·결과/인용/확인/실패 | 새 목표 필드·부분 안내·UI 동작, 와이어프레임 근거와 종단 시험 |
 
@@ -163,11 +169,11 @@ general_knowledge에는 서버 고정 안내 ‘일반 개념 설명입니다. �
 
 ## 11. 개발·출시 판단
 
-1. Responses 및 MCP의 typed 계약·승인/취소/unknown 흐름을 합성 fixture로 고정한다.
-2. 읽기 도구의 공통 gate·요청 cache/single-flight·budget·direct fallback을 구현한다.
-3. Q02 기본 웹, Q03~Q08 최후 검색, 비치명적 웹 오류·snapshot·grant를 구현한다.
-4. DTO/OpenAPI/저장/웹/guard와 화면 추적을 함께 갱신한다.
-5. 같은 질문 세트에서 기존 서버 계획, Luna function calling, Luna MCP의 요구 충족·근거 지지·중복/불필요 호출·p95·비용을 비교한다.
-6. 공급자·보유 기간·비용 상한·권한·live gate·팀 검토를 완료하고 단계적으로 활성화한다.
+1. MCP 서버 단독 클라이언트 시험과 합성 Responses replay로 typed 계약·승인/취소/unknown을 고정한다.
+2. 도구 1·4·8회·승인 라운드의 승인된 소량 live latency spike로 45초 가능성을 측정한다.
+3. 읽기 도구의 공통 gate·요청 cache/single-flight·budget·preflight direct 시작 경로를 구현한다.
+4. Q02 기본 웹, Q03~Q08 최후 검색, 비치명적 웹 오류·snapshot·grant를 구현한다.
+5. DTO/OpenAPI/저장/웹/guard와 화면 추적을 함께 갱신한다.
+6. 같은 질문 세트에서 기존 서버 계획과 Luna MCP의 요구 충족·근거 지지·p95·비용을 비교하고 단계적으로 활성화한다.
 
 MCP 자체가 정확도 향상을 보장하지 않는다. 중간 결과 기반 추가 조회의 이점과 비용·지연을 분리해 평가한다.

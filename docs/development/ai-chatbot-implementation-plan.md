@@ -22,12 +22,14 @@
 
 이 절은 아래의 2026-10-27 목표와 충돌할 때 우선한다. 현재 코드는 Java 직접 어댑터와 Luna Chat Completions를 사용하므로, 다음 항목은 구현 완료 표시가 아니다.
 
+2026-10-28 팀 결정이며 2026-10-25의 MCP 미사용 결정을 대체한다.
+
 1. **실행 구조**: Jev Q01~Q08 multi-label → 서버 allowed_tools·scope·예산 → Luna Responses 원격 MCP 선택·연속 호출 → 서버 결정론 검사 → Jev 의미 검증으로 변경한다. 별도 Luna coverage-verifier는 구현하지 않는다.
-2. **MCP 경계**: Java 앱의 HTTPS Streamable HTTP `/mcp`가 기존 Tool Service를 재사용한다. OpenAI 런타임이 MCP 클라이언트이며 ai/service는 Responses 요청·승인 continuation을 관리한다. 네트워크·인증·위임·`CLAUDE.md` 경계를 함께 갱신한다.
+2. **MCP 경계와 승인**: Java 앱의 HTTPS Streamable HTTP `/mcp`가 기존 Tool Service를 재사용한다. `require_approval=always`로 두고 ai/service가 approval request를 Java에 반환하면 Java가 예산·요구·scope·grant를 판단한 뒤 ai/service continuation을 다시 호출한다. ai/service는 독자 승인하지 않는다.
 3. **웹 정책**: Q01 금지, Q02 기본 보조, Q03~Q08 내부 근거 뒤 마지막 수단이다. timeout·unavailable·0건은 전체 답변을 실패시키지 않고 `notices`와 실제 미충족 요구 limitation으로 구분한다.
 4. **예산**: 총 8회·내부 6회·웹 2회, 동시 4개, 총 3라운드, fan-out 5, DB 3초·그래프 5초·웹 7초, Luna 35초·job 45초, 입력 24k·답변 2k를 서버가 원자적으로 예약·차감한다.
 5. **중복 억제**: job/generation·논리 도구·정책/스키마 revision·정규화 인자·subject scope·version·asOf를 키로 요청 캐시와 single-flight를 둔다. 성공 0건도 저장하고 cache hit에서 권한·grant·철회를 다시 확인한다.
-6. **fallback**: MCP transport/unavailable만 같은 Tool Service의 Java 직접 어댑터로 논리 호출당 1회 fallback한다. 인증·권한·grant·스키마 거부와 결과 수신 여부 불명은 우회·재호출하지 않는다. 5회 중 3회 연결 실패면 30초 circuit open 후 probe 1회를 허용한다.
+6. **direct 시작 경로**: Responses 시작 전 preflight 실패·circuit open이면 MCP를 노출하지 않고 처음부터 Java direct adapter로 조회한다. 실행 중 MCP 오류는 direct 결과로 바꿔 끼우지 않는다. 인증·권한·grant·스키마 거부와 결과 수신 여부 불명도 우회·재호출하지 않는다.
 7. **결과 계약**: 기존 status/outcome에 새 상태를 추가하지 않고 목표 `answerStatus=complete|partial|guidance`, `notices[]`를 DTO·저장·OpenAPI·웹·guard와 동시에 구현한다.
 8. **턴 문맥**: 새 질문마다 재분류하고 이전 완료 2턴의 검증된 대상 ID·기간만 후보로 승계한다. 이전 답변 본문은 모델에 넘기지 않는다.
 
@@ -113,8 +115,8 @@ flowchart LR
 ### 단계 2 — 오케스트레이터·예산·캐시
 
 1. job의 frozen context와 서버 allowed_tools를 만들고 모든 호출 전에 권한·scope·버전·grant·예산을 검사한다.
-2. 8/6/2 호출 상한, 총 3라운드, 동시 4개, fan-out 5와 개별 timeout을 원자 예약한다. failed·fallback·cache hit도 논리 시도로 원장에 남긴다.
-3. job 45초 안에서 라우터와 최종 검증·저장을 예약하고 Luna에 `min(35초, remaining-9초)`를 준다. 마지막 10초에는 새 도구를 시작하지 않는다.
+2. 8/6/2 호출 상한, 총 3라운드, 동시 4개, fan-out 5와 개별 timeout을 원자 예약한다. failed·direct 시작 경로·cache hit도 논리 시도로 원장에 남긴다.
+3. running 전이부터 최종 검증 결과와 영수증의 terminal-state DB commit 완료까지 45초 안에서 예약하고 Luna에 `min(35초, remaining-9초)`를 준다. 마지막 10초에는 새 도구를 시작하지 않는다.
 4. 요청 캐시·single-flight와 중복 판단을 구현한다. 후속 호출은 대상·기간·페이지·근거 종류 등 정보 이득이 있을 때만 허용한다.
 5. 명시 요구마다 answered/limited/clarify 상태를 추적하고 서버 커버리지 검사로 누락·중복을 막는다.
 6. checkpoint·clarification·취소·lease·늦은 완료 거부는 현행 수명주기와 결합한다.
@@ -125,21 +127,22 @@ flowchart LR
 
 1. Jev router는 요구별 Q 유형·확률·명시 여부를 typed schema로 반환한다. 명시 요구는 확률만으로 제거하지 않는다.
 2. 서버가 승인 capability를 실제 MCP 도구로 매핑하고 `allowed_tools`를 만든다. Q01에는 web.search를 노출하지 않는다.
-3. ai/service의 Luna 호출을 Chat Completions에서 Responses로 옮기고 원격 MCP URL, 짧은 서비스 토큰, allowed_tools, approval continuation, deadline·usage 수집을 구현한다.
-4. Luna는 도구 결과를 보고 후속 도구를 선택하고 최종 구조화 답변을 만든다. 독립 Luna coverage-verifier 호출은 두지 않는다.
-5. route·MCP call·continuation·generation·semantic-verification을 서로 다른 stage/receipt로 기록한다.
-6. 이전 2턴 문맥은 서버가 검증된 대상 ID·기간만 정규화해 전달한다.
+3. ai/service의 Luna 호출을 Chat Completions에서 Responses(`reasoning.effort=medium`)로 옮기고 원격 MCP URL, 짧은 서비스 토큰, allowed_tools, deadline·usage 수집을 구현한다.
+4. ai/service가 `mcp_approval_request`를 받으면 response/request ID와 typed 호출 정보를 Java에 반환한다. Java가 승인 원장을 기록하고 같은 job에서 ai/service continuation endpoint를 다시 호출하며, ai/service는 Java 결정만 `mcp_approval_response`로 전달한다.
+5. Luna는 승인된 도구 결과를 보고 후속 도구를 선택하고 최종 구조화 답변을 만든다. 독립 Luna coverage-verifier 호출은 두지 않는다.
+6. route·approval request/decision·MCP call·continuation·generation·semantic-verification을 서로 다른 stage/receipt로 기록한다.
+7. 이전 2턴 문맥은 서버가 검증된 대상 ID·기간만 정규화해 전달한다.
 
 ### 단계 4 — Tool Service, MCP 서버, 웹
 
 1. 기존 공개 읽기 어댑터를 단일 Tool Service 뒤에 둔다. 직접 경로와 MCP 경로가 동일한 schema·scope·snapshot·결과 정규화를 사용하게 한다.
-2. Java 앱에 인증된 HTTPS Streamable HTTP `/mcp`를 추가한다. Python은 앱 DB를 직접 읽지 않는다.
+2. Java 앱에 인증된 HTTPS Streamable HTTP `/mcp`를 추가한다. request 64 KiB, 정규화 result 256 KiB/호출·1 MiB/job, token당 분당 30요청, job당 8회·동시 4회, 절대 deadline을 적용한다. 고정 출발지 범위가 계약으로 제공되기 전 IP allowlist를 유일한 인증으로 쓰지 않는다. Python은 앱 DB를 직접 읽지 않는다.
 3. MCP 결과를 OpenAI에 반환하기 전 source/model-send grant를 확인한다. cache hit도 다시 확인한다.
-4. transport/unavailable에만 직접 어댑터 fallback을 1회 허용하고 circuit breaker를 적용한다. 권한·grant·스키마 거부는 fallback 금지다.
+4. Responses 시작 전 health preflight 실패·circuit open이면 direct 경로를 선택한다. 실행 중 MCP 오류는 direct 결과로 대체하지 않고 다음 job을 위한 circuit 통계만 갱신한다. 권한·grant·스키마 거부는 direct 우회 금지다.
 5. Q02는 웹을 기본 보조로, Q03~Q08은 내부 근거가 부족한 마지막 단계로 둔다. Q01은 등록 자체를 거부한다.
 6. 검색 0건·timeout·unavailable을 분리하며 웹 실패로 job을 실패시키지 않는다. 공급자·권리·보관·개인정보·일일 상한은 활성화 전에 고정한다.
 
-초기 도구 연결은 `company.read`, `issue.read`, `evidence.resolve`, 공개 그래프 경로/버전 차이, 브리핑, 본인 scope 순으로 수직 구현한다. 직접 어댑터와 MCP fixture 동등성 시험을 각 도구에 붙인다.
+Q07의 `portfolio.scope.read`는 Java server-only precondition으로 실행하며 MCP catalog에 등록하지 않는다. 전체 보유 목록·수량·보유 표시는 OpenAI에 보내지 않고 scope 안에서 일치한 공개 결과만 최대 5개로 최소화한다. 초기 MCP 도구 연결은 `company.read`, `issue.read`, `evidence.resolve`, 공개 그래프 경로/버전 차이, 브리핑 순으로 수직 구현한다. direct와 MCP fixture 동등성 시험을 각 도구에 붙인다.
 
 ### 단계 5 — 답변 생성·부분 결과·검증
 
@@ -159,10 +162,12 @@ flowchart LR
 
 ### 단계 7 — 평가·관측·점진 출시
 
-1. 단일 Q 유형보다 복합·모호·공격·장애 질문을 먼저 고정 평가에 포함한다.
-2. `chat_tool_calls`로 호출 수·중복·지연·오류·추가 라운드를, `ai_executions`로 모델 호출·토큰·비용을 분리 집계한다.
-3. Q01 문서 경로 → Q02 웹 보조 → Q03 사실 → Q04/Q07 → Q05/Q06/Q08 순으로 feature flag를 연다. 준비되지 않은 유형을 일반 LLM으로 우회하지 않는다. Q02 단독 답변도 Jev `prohibitedAdvice` 판정을 쓰므로 Q02를 포함한 모든 유형은 Jev 의미 검증 연결과 임계값 보정이 선행 조건이다. Q02에 필요한 것은 Noul 하나뿐이라 가장 먼저 보정할 수 있다.
-4. 고정 평가와 보안 시험을 통과한 registry/model/prompt/policy 조합만 활성화한다.
+1. 일반 MCP 클라이언트로 `/mcp` 인증·스키마·크기·rate limit·grant를 서버 단독 시험한다.
+2. 실제 모델 키 없이 합성 Responses replay로 approval request/response·continuation·오류·unknown 모양을 시험한다.
+3. 명시 승인을 받은 소량 live tunnel에서 합성 데이터만 사용해 도구 1·4·8회와 approval 1·3라운드의 p50/p95·토큰·비용을 측정한다. CI는 앞의 두 계층만 필수로 실행한다.
+4. `chat_tool_calls`와 `ai_executions`로 호출·승인·지연·오류·토큰·비용을 분리 집계한다.
+5. Q01 문서 경로 → Q02 웹 보조 → Q03 사실 → Q04/Q07 → Q05/Q06/Q08 순으로 feature flag를 연다.
+6. 고정 평가와 보안 시험을 통과한 registry/model/prompt/policy 조합만 활성화한다.
 
 현재 상태: 모델·도구 호출 원장과 다수의 단위·PostgreSQL 시험은 있다. 고정 평가 세트 `chat-eval-v1`(34문항: Q01~Q08·복합·투자 판단·공격·확인 질문·장애)은 질문 문장부터 실제 요구 분해·이름 해석·계획·읽기 도구·검사를 거치고 모델 세 단계만 대본으로 바꿔 기본 `test`에서 돈다([고정 평가 세트](ai-chatbot-eval-set.md)). 흐름 회귀만 확인하며, 실제 모델·데이터로 잰 챗봇 한국어 금융 평가 보정과 실제 배포·종단 출시 증명은 없다. live gate와 질문 접수 플래그는 기본 비활성이다.
 
@@ -186,12 +191,13 @@ flowchart LR
 
 ## 5. 다음 PR 범위
 
-1. StageLimits 8/6/2·45초, 요청 캐시·single-flight, 서버 requirement coverage
-2. Java Tool Service 추출, 원격 MCP endpoint·서비스 인증·grant, 직접 fallback·circuit breaker
-3. ai/service Luna Responses 전환, allowed_tools·approval continuation·usage/deadline
-4. answerStatus/notices·부분 결과·재열람 guard의 DTO·migration·OpenAPI·웹 동시 변경
-5. Q01~Q08 수직 도구, 웹 공급자·권리·개인정보·일일 한도
-6. 고정 fixture·live eval·부하·장애 시험과 기능 플래그 단계 활성화
+1. latency spike: MCP 서버 단독 시험, 합성 Responses replay, 승인된 소량 live 도구 1·4·8회 측정
+2. StageLimits 8/6/2·45초, 요청 캐시·single-flight, 서버 requirement coverage
+3. Java Tool Service 추출, 원격 MCP endpoint·서비스 인증·크기/rate limit·grant, preflight direct 시작·circuit breaker
+4. ai/service Luna Responses 전환, allowed_tools·Java 승인 continuation·usage/deadline
+5. answerStatus/notices·부분 결과·재열람 guard의 DTO·migration·OpenAPI·웹 동시 변경
+6. Q01~Q08 수직 도구, 웹 공급자·권리·개인정보·일일 한도
+7. 고정 fixture·live eval·부하·장애 시험과 기능 플래그 단계 활성화
 
 각 PR은 현재 저장·멱등·권한·호출 원장을 유지한다. MCP 서버와 Responses 연결만 먼저 합쳐 공개 계약을 앞서 내보내지 않는다.
 
@@ -205,7 +211,7 @@ flowchart LR
 | 멱등성 | 같은 키·본문 재전송, 같은 키·다른 본문 충돌, 처리 중 재전송 |
 | 동시성 | 대화당 활성 job 하나, 취소와 늦은 완료 경합, lease 만료 회수 |
 | 라우팅 | 8유형 단일·복합, 명시 요구 보존, 4개 이상 유형, 낮은 확률 필수 요구 |
-| 계획 | 미등록 도구, 중복 제거, 의존·병렬 순서, 8회(내부 6·웹 2)·4동시·총 3라운드·fan-out 5 한도, 요청 cache·single-flight |
+| 계획 | 미등록 도구, approval을 Java만 결정, 중복 제거, 의존·병렬 순서, 8회(내부 6·웹 2)·4동시·총 3라운드·fan-out 5 한도, 요청 cache·single-flight |
 | 체크포인트 | `exactly(2)`에 0개(잘림 없음 → 없음 답변, 잘림 → 근거 부족, 도구 오류 → 개수 평가 없이 failed)·1개·2개·3개 이상, 조합 6개 초과 시 자유 입력, 초과 시 다음 단계·생성 호출 0회, 선택 후 새 job이 같은 asOf로 같은 결과 재현, fan-out 상한 초과 |
 | 데이터 | graphVersion 고정, 문서 철회, citation offset, 브리핑 회차, 기간 경계 |
 | 그래프 | 챗봇 경로가 같은 graphVersion의 `/api/v1/graph` 결과와 일치, 공개 제외 결정 반영 후 철회 간선 미노출, 공개 활성화 이력이 없는 버전·사용 불가 버전 거부, 이전 공개 버전은 현재 공개 제외 결정을 적용해 조회(Q05), 기업 간 hop 1·2·3과 4 거부, 노드·간선 50개 절단 시 `truncated`, graphTargets가 지도에서 열림, Neo4j·AI 내부 그래프 API 호출 0회 |
@@ -213,7 +219,7 @@ flowchart LR
 | 제한 | 투자 판단 혼합 질문의 `investment_advice`, 체크포인트 미달 `precondition_unmet`, 문서 20개 잘림 `results_truncated`, 한 요구만 근거 부족, 요구 누락·중복 소속·본문의 제한 요구 답변 시 `validation_failed`, 모델이 근거 없이 제안한 제한 거부, 내부 필수 도구 timeout은 failure, 보조 웹 timeout은 notice와 필요 시 limitation, answered 외 outcome 계약 |
 | 확인 답 | 선택지 답·자유 입력 답, 없는 choiceId·clarification 아닌 원 작업·다른 대화 원 작업 422/404, resolves+context 422, 원 고정 문맥 복사, 원 작업 불변, 같은 확인 질문 재답변, 깊이 2 작업의 모호·체크포인트 초과는 `guidance`와 다음 단계·생성 호출 0회, 깊이 2에서 모호함이 해소되면 `answered`·도구 장애는 `failed`(guidance로 바꾸지 않음), 확인 답의 답이 루트 질문과 사슬의 답을 순서대로 합쳐 재실행 |
 | 의미 검증 | 1층 실패 시 Jev 0회, 일반 개념 구간은 Choice 없이 `prohibitedAdvice`만 판정하고 예이면 전체 실패, 전부 supported 통과, contradicted·prohibitedAdvice 예 전체 실패, 한 요구 hold 시 그 구간·통합 구간 제외와 limitation 및 answer·answerBasis·citations 재계산, 모든 요구 hold 시 insufficient_evidence, 응답 형식 오류 시 영수증 저장 후 transient |
-| 장애 | Jev/Luna/도구 timeout, unknown 호출, 저장 실패, result_lost, save_only |
-| 기한·한도 | job 45초, Luna min(35초, remaining-9초), 마지막 10초 신규 도구 금지, DB 3초·그래프 5초·웹 7초, 8/6/2 원자 예약, cache hit·fallback·실패 시도 집계, response_unknown 재호출 0회, 입력 24k·출력 2k, 실행 3회 뒤 retry null, lease 만료 뒤 늦은 완료 거부 |
+| 장애 | preflight direct 시작, 실행 중 MCP 오류 direct 대체 0회, auth/grant/schema 우회 0회, Jev/Luna timeout, unknown, 저장 실패 |
+| 기한·한도 | terminal-state DB commit까지 job 45초, Luna min(35초, remaining-9초), 마지막 10초 신규 도구 금지, DB 3초·그래프 5초·웹 7초, 8/6/2 원자 예약, cache hit·direct 조회·실패 시도 집계, response_unknown 재호출 0회, 입력 24k·출력 2k, 실행 3회 뒤 retry null, lease 만료 뒤 늦은 완료 거부 |
 | UI | 새로고침 복구, 조회 오류 재확인, late response 폐기, 접근성·모바일 |
 | 관측 | 모델·도구 호출 중복 집계 없음, 미보고 비용 NULL, 요청 ID 연계 |

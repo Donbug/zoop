@@ -204,11 +204,12 @@ Q02는 최신 금융 상황을 일반 지식으로 답하기 위한 우회 경�
 3. 새 질문마다 명시 요구를 구조화한다. 이전 완료 턴은 최대 2턴의 검증된 대상 ID·기간만 문맥 후보로 사용하며 이전 답변 본문은 넘기지 않는다. 새 질문의 명시 조건이 우선한다.
 4. TypeSafe Jev가 Q01~Q08을 multi-label로 판정한다. 유형별 확률 `p>=0.70`은 후보, `0.35<=p<0.70`은 검토 후보로 두되 명시 요구는 확률만으로 제거하지 않는다.
 5. 서버가 승인된 논리 기능·MCP 도구·대상 scope·권한·호출 예산으로 `allowed_tools`를 만든다. Q01에는 웹 검색을 허용하지 않는다.
-6. ai/service가 Luna Responses API에 정제 입력과 ZOOP 원격 MCP 연결을 제공한다. Luna는 허용 목록 안에서 필요한 도구와 인자를 선택하고 결과를 보고 다음 도구를 호출한다. 실제 MCP 클라이언트는 OpenAI 런타임이며 Luna는 호출을 제안한다.
-7. Java 애플리케이션의 MCP 엔드포인트는 기존 읽기 Tool Service를 재사용한다. 호출마다 typed schema, subject/scope, 공개 상태, 고정 버전, source/model-send grant, 중복·예산·기한을 다시 검사한다. Python ai/service가 애플리케이션 DB를 직접 읽지 않는다.
-8. Luna 실행 중 요구 추적과 서버의 결정론적 커버리지 검사를 사용한다. 별도 Luna coverage-verifier 2회 호출은 두지 않는다. 남은 요구가 있고 정보 이득이 예상되며 예산이 남을 때만 후속 조회한다.
-9. Luna가 구간·claim·근거 ID를 포함한 답변 후보를 만든다. 서버가 스키마·인용·근거 접근성·요구 커버리지·금지 조언·수치·인과를 검사한 뒤 별도 Jev semantic-verification을 수행한다.
-10. 검증된 결과만 저장하고 공개한다. polling·재열람은 분류·도구·모델·UI action을 다시 실행하지 않는다.
+6. ai/service가 Luna Responses API(`reasoning.effort=medium`, `require_approval=always`)에 정제 입력과 ZOOP 원격 MCP 연결을 제공한다. Luna는 허용 목록 안에서 도구를 제안하고 OpenAI 런타임이 `mcp_approval_request`를 반환한다.
+7. ai/service는 approval request와 response/request ID를 Java에 반환한다. Java 작업 실행기가 requirementIds·scope·grant·예산·기한을 승인/거부하고 ai/service continuation을 다시 호출한다. ai/service는 Java 결정만 `mcp_approval_response`로 전달하며 독자 승인하지 않는다.
+8. Java MCP endpoint는 기존 Tool Service를 재사용하고 결과 반환 전에 typed schema, 공개 상태, 고정 버전, model-send grant와 크기를 검사한다. Python ai/service가 애플리케이션 DB를 직접 읽지 않는다.
+9. Luna 실행 중 요구 추적과 서버의 결정론적 커버리지 검사를 사용한다. 별도 Luna coverage-verifier 2회 호출은 두지 않는다. 남은 요구가 있고 정보 이득이 예상되며 예산이 남을 때만 후속 조회한다.
+10. Luna가 구간·claim·근거 ID를 포함한 답변 후보를 만든다. 서버가 스키마·인용·근거 접근성·요구 커버리지·금지 조언·수치·인과를 검사한 뒤 별도 Jev semantic-verification을 수행한다.
+11. 검증된 결과만 저장하고 공개한다. polling·재열람은 분류·도구·모델·UI action을 다시 실행하지 않는다.
 
 Q02·Q03·Q04는 하나의 고정 분기로 합치지 않는다. 한 질문의 명시 요구에 따라 필요한 유형과 도구를 조합하되 관련 없는 도구는 호출하지 않는다. Q05~Q08도 같은 원칙을 적용한다.
 
@@ -222,16 +223,16 @@ Q02·Q03·Q04는 하나의 고정 분기로 합치지 않는다. 한 질문의 �
 | Q04 관계·경로 | 앱 공개 그래프 스냅샷·간선 근거 | 이미 존재하는 간선의 외부 배경만. 웹만으로 내부 간선 생성 금지 |
 | Q05 기간 비교 | 고정 버전 차이 계산 | 차이 원인 단정 금지, 필요한 외부 배경만 |
 | Q06 브리핑 | 발행 회차·해당 스냅샷 | 발행 내용을 덮지 않는 보조 설명만 |
-| Q07 내 종목 | 본인 scope 확인 후 공개 자료 | 식별자·수량·전체 포트폴리오 전송 금지 |
+| Q07 내 종목 | Java server-only `portfolio.scope.read` 후 scope 안의 공개 사건·관계 | 전체 보유 목록·수량·보유 표시 전송 금지, 일치 결과 최대 5개 |
 | Q08 근거·선정 이유 | 기록된 근거·규칙·점수 요인 | 기록된 선정 이유를 외부 기사로 대체 금지 |
 
 범용 금융·산업 용어 사전은 구축하지 않는다. Q02 검색 결과가 없으면 Luna의 안정적 일반 개념 설명을 사용할 수 있지만 현재 기업 상태·가격·점유율·전망·최신 사건·투자 판단은 일반 지식으로 답하지 않는다. ZOOP 고유 정책은 승인 문서가 없으면 모델이 만들지 않는다.
 
 #### 6.3.2 현재 구현과 목표 경계
 
-현재 코드는 Java 서버가 `chat-tools/v1` 도구 계획과 직접 어댑터 호출을 수행하고, ai/service의 Luna `chat-answer`는 Chat Completions에서 도구 없이 `BranchContext`를 받아 생성한다. 등록 도구에는 `zoop-doc-read`, `zoop-public-read`, `zoop-public-graph-read`, `zoop-user-read`, `zoop-briefing-read`와 `graph.version.diff`, `portfolio.scope.read`가 포함된다. Responses 원격 MCP, 승인 continuation, 요청 캐시, answerStatus/notices는 아직 구현되지 않았다.
+현재 코드는 Java 서버가 `chat-tools/v1` 도구 계획과 직접 어댑터 호출을 수행하고, ai/service의 Luna `chat-answer`는 Chat Completions에서 도구 없이 `BranchContext`를 받아 생성한다. 등록된 현재 direct 도구에는 `zoop-doc-read`, `zoop-public-read`, `zoop-public-graph-read`, `zoop-user-read`, `zoop-briefing-read`와 `graph.version.diff`, `portfolio.scope.read`가 포함된다. 목표에서는 `portfolio.scope.read`를 MCP에 노출하지 않고 Java server-only precondition으로 유지한다. Responses 원격 MCP, 승인 continuation, 요청 캐시, answerStatus/notices는 아직 구현되지 않았다.
 
-목표 MCP 서버는 애플리케이션 JVM의 별도 HTTPS `/mcp` 경계(Streamable HTTP)로 두고 동일 Tool Service를 사용한다. 이는 기존 “앱 BE↔AI는 ai/service HTTP로만” 경계에 OpenAI 런타임→앱 MCP 인바운드를 추가하는 설계 변경이다. 구현 PR은 `CLAUDE.md`, 네트워크 allowlist, 서비스 인증, 위임 문맥, OpenAPI가 아닌 내부 MCP 계약을 함께 갱신해야 한다. 운영 기본 경로를 바꾸기 전 직접 어댑터와 MCP의 권한·버전·결과 동등성을 검증한다.
+목표 MCP 서버는 애플리케이션 JVM의 별도 HTTPS `/mcp` 경계(Streamable HTTP)로 두고 동일 Tool Service를 사용한다. request body 64 KiB, 정규화 결과 256 KiB/호출·1 MiB/job, token당 분당 30요청, job당 8회·동시 4회, 절대 deadline을 초기값으로 둔다. 고정 출발지 범위가 계약으로 제공되기 전에는 IP allowlist를 유일한 인증으로 사용하지 않는다. 이는 기존 “앱 BE↔AI는 ai/service HTTP로만” 경계에 OpenAI 런타임→앱 MCP 인바운드를 추가하는 설계 변경이다. 구현 PR은 `CLAUDE.md`, 네트워크 allowlist, 서비스 인증, 위임 문맥, OpenAPI가 아닌 내부 MCP 계약을 함께 갱신해야 한다. 운영 기본 경로를 바꾸기 전 직접 어댑터와 MCP의 권한·버전·결과 동등성을 검증한다.
 
 #### 6.3.3 호출·시간·비용 상한
 
@@ -242,26 +243,26 @@ Q02·Q03·Q04는 하나의 고정 분기로 합치지 않는다. 한 질문의 �
 | 의존 라운드 | 최초 포함 총 3라운드 |
 | fan-out·batch | 한 단계 최대 5개 |
 | 개별 timeout | DB 3초, 그래프 5초, 웹 7초 |
-| Luna 실행 | MCP·continuation·fallback·최종 생성 합산 최대 35초 |
-| 전체 job | running부터 저장 직전까지 45초 |
+| Luna 실행 | MCP·Java 승인 continuation·최종 생성 합산 최대 35초 |
+| 전체 job | running 전이부터 결과·영수증의 terminal-state DB commit 완료까지 45초 |
 | 입력·출력 | 누적 입력 24k token, 최종 답변 2k token |
 | 확인 질문 사슬 | 최대 2회 |
 | 동일 job 재실행 | 최대 3회, save_only 제외 |
 | 웹 일일 초기 상한 | 회원 20회, 프로젝트 500회(KST); 공급자·비용 결정 뒤 조정 |
 
-라우터 4초, 최종 검증·서버 처리 9초를 예약한다. 따라서 Luna에 주는 실제 기한은 `min(35초, job 남은 시간-9초)`이며 라우터가 4초를 썼다면 최대 32초다. Luna 기한 안에서 마지막 10초는 새 도구 호출 없이 답안 작성에 예약한다. reasoning token은 24k 입력과 별도로 공급자 비용·사용량에 기록한다.
+라우터 4초, 최종 검증·DB commit을 포함한 서버 처리 9초를 예약한다. 따라서 Luna에 주는 실제 기한은 `min(35초, job 남은 시간-9초)`이며 라우터가 4초를 썼다면 최대 32초다. Luna 기한 안에서 마지막 10초는 새 도구 호출 없이 답안 작성에 예약한다. 초기 reasoning effort는 medium이다. reasoning token은 24k 입력과 별도로 공급자 비용·사용량에 기록한다. 구현 전에 도구 1·4·8회와 승인 1·3라운드의 replay·승인된 소량 live latency spike로 45초 가능성을 측정하며, high는 품질 이득과 시간 준수를 증명한 뒤 정책 revision으로 올린다.
 
-호출 시도, 실패, 직접 어댑터 fallback은 모두 상한에 포함한다. 요청 단위 캐시 hit는 공급자 호출을 줄이되 논리 시도로 기록한다. Q07에서 5개 기업 모두 웹 조회가 필요하지만 웹 예산이 2회라면 임의 두 기업을 고르지 않고 범위를 묻는다.
+호출 시도, 실패, 사전 direct 시작 경로의 조회는 모두 상한에 포함한다. 요청 단위 캐시 hit는 공급자 호출을 줄이되 논리 시도로 기록한다. Q07에서 5개 기업 모두 웹 조회가 필요하지만 웹 예산이 2회라면 임의 두 기업을 고르지 않고 범위를 묻는다.
 
-#### 6.3.4 요청 단위 캐시·중복·fallback
+#### 6.3.4 요청 단위 캐시·중복·direct 시작 경로
 
 같은 job·generation 안에 요청 단위 캐시와 single-flight를 둔다. 키에는 논리 도구, 스키마/정책 revision, 정규화 인자, subject scope, graph/data version, asOf를 포함한다. 성공 0건도 캐시한다. job·회원 사이 공유 캐시는 두지 않으며 완료 시 폐기한다. cache hit에서도 현재 권한·grant·철회 상태를 다시 검사한다.
 
 같은 도구의 중복 호출은 동일한 논리 목적·키로 진행 중이거나 이미 확정된 조회를 다시 보내는 경우다. 비용·지연·공급자 quota·서로 다른 시점 결과를 막기 위해 single-flight로 합치고, 후속 호출은 새 대상·기간·페이지·근거 종류 등 실질적 정보 이득을 증명할 때만 허용한다.
 
-MCP 연결·transport·서버 unavailable이면 동일 Tool Service의 Java 직접 어댑터를 논리 호출당 최대 1회 사용한다. fallback도 같은 권한·scope·버전·캐시·ledger·deadline을 사용한다. 인증·권한·grant·스키마 거부는 fallback으로 우회하지 않는다. 모델이 MCP 결과를 받았는지 알 수 없는 `response_unknown`은 중복 호출하지 않고 reconciliation 대상으로 남긴다.
+Responses 시작 전 health preflight 실패 또는 circuit open이면 MCP를 노출하지 않고 Java direct adapter로 필요한 조회를 먼저 실행해 검증된 BranchContext를 Luna에 제공한다. Responses 실행 중 MCP 오류는 direct 결과로 바꿔 끼우지 않으며 확보한 결과·notice·limitation으로 종료하고 circuit 통계는 다음 job에 반영한다. 인증·권한·grant·스키마 거부와 `response_unknown`은 direct로 우회하지 않는다.
 
-MCP endpoint의 최근 연결 5회 중 3회 실패 시 30초 circuit open, 이후 health probe 1회로 half-open한다. 업무 DB 오류와 인증 거부는 endpoint circuit 통계에서 제외한다.
+MCP endpoint의 최근 연결 5회 중 3회 실패 시 30초 circuit open, 이후 health probe 1회로 half-open한다. direct 자료는 MCP receipt가 아니라 direct tool receipt와 evidence ID로 연결하며 같은 실행 중 일반 메시지나 function output으로 대체하는 방식은 spike 전까지 채택하지 않는다. 업무 DB 오류와 인증 거부는 endpoint circuit 통계에서 제외한다.
 
 #### 6.3.5 보조 웹 검색과 실패
 
@@ -450,7 +451,7 @@ Q01~Q08의 회원 자격을 공통으로 확인하고, Q07은 세션에서 확�
 
 평가에는 모호한 기업, 지시어, 상대 날짜, 한영 혼용, 복합 질의, 자료가 없는 경우, 정정·철회 문서, 서로 충돌하는 기사, 잘못된 그래프 경로, 로그아웃 후 응답, 외부 API 장애와 공격 입력을 포함한다. 대형 기업과 소형 기업, 자료가 많은 기업과 적은 기업을 나누어 확인한다. 자료량 차이를 기업의 중요성이나 투자 가치 차이로 해석하는지 점검한다.
 
-전체 정확도와 함께 유형별 정밀도·재현율, multi-label micro·macro F1, 명시 요구 커버리지, 필수 도구 누락률, 불필요·중복 호출률, cache·single-flight 적중률, MCP→직접 어댑터 fallback률, 웹 보완 이득과 실패 시 답변 보존율, p50·p95·비용을 확인한다. Luna의 도구 선택과 서버 allowed_tools·scope·예산 준수, 서버 커버리지 검사와 Jev 의미 검증의 오승인·오차단을 나누어 기록한다. 성능 지표에는 데이터·모델·프롬프트·도구 레지스트리·정책 revision을 함께 남긴다.
+전체 정확도와 함께 유형별 정밀도·재현율, multi-label micro·macro F1, 명시 요구 커버리지, 필수 도구 누락률, 불필요·중복 호출률, cache·single-flight 적중률, preflight direct 시작률, 웹 보완 이득과 실패 시 답변 보존율, p50·p95·비용을 확인한다. Luna의 도구 선택과 서버 allowed_tools·scope·예산 준수, 서버 커버리지 검사와 Jev 의미 검증의 오승인·오차단을 나누어 기록한다. 성능 지표에는 데이터·모델·프롬프트·도구 레지스트리·정책 revision을 함께 남긴다.
 
 ### 11.2 초기 출시 기준
 
@@ -509,7 +510,7 @@ Q02는 범용 용어 사전과 일반 개념 RAG를 출시 조건으로 두지 �
 
 ## 12 모델과 정책 변경 관리
 
-모델, Jev 질문·임계값, 논리 기능 레지스트리, Luna Responses·MCP 도구 설명·allowed_tools·스키마, 서버 커버리지 규칙, 직접 어댑터 fallback, Luna의 시스템·유형별 프롬프트, 임베딩 모델, 검색 설정, 관계 스키마, 출력 검증 기준과 이슈 선정 규칙을 버전으로 관리한다. 모델 교체 시 같은 이름의 API라는 이유만으로 결과가 동일하다고 가정하지 않는다. 임베딩 변경 시 색인 재생성과 검색 품질도 검증한다.
+모델, Jev 질문·임계값, 논리 기능 레지스트리, Luna Responses·MCP 도구 설명·allowed_tools·스키마, 서버 커버리지 규칙, preflight direct 시작 경로, Luna의 시스템·유형별 프롬프트, 임베딩 모델, 검색 설정, 관계 스키마, 출력 검증 기준과 이슈 선정 규칙을 버전으로 관리한다. 모델 교체 시 같은 이름의 API라는 이유만으로 결과가 동일하다고 가정하지 않는다. 임베딩 변경 시 색인 재생성과 검색 품질도 검증한다.
 
 변경 요청에는 목적, 영향 유형, 데이터 범위, 평가 결과, 알려진 실패, 승인자, 배포·롤백 방법을 기록한다. 개인정보 범위 확대, 새 외부 제공자, 도구 권한 확대, 투자 판단 범위 변경은 책임자와 해당 데이터·보안 담당자의 검토를 요구한다.
 
@@ -517,13 +518,13 @@ Q02는 범용 용어 사전과 일반 개념 RAG를 출시 조건으로 두지 �
 
 ## 13 운영 감시와 감사 기록
 
-챗봇 작업 단위로 요청 추적 ID와 작업 ID, 접수 시각, 가명 회원 식별자, requirementId와 명시적 요구, 내부 Q 유형·확률, 논리 기능 후보, Luna MCP 선택·서버 커버리지 결과, 선택·추가·cache/single-flight·중복 제거·fallback 사유, 도구 레지스트리 버전과 실제 도구·상태, 예약·사용한 호출 수·시간·비용·조회량, 작업 status와 outcome, 정책·모델·프롬프트·데이터 버전, 근거 ID와 검증 실패 코드를 기록한다. 비회원의 거절된 접근은 질문 작업으로 생성하지 않고 필요한 접근 보안 기록으로 구분한다. 상세 내부 추론이나 불필요한 원문은 감사 필수 항목으로 두지 않는다.
+챗봇 작업 단위로 요청 추적 ID와 작업 ID, 접수 시각, 가명 회원 식별자, requirementId와 명시적 요구, 내부 Q 유형·확률, 논리 기능 후보, Luna MCP 선택·서버 커버리지 결과, 선택·추가·cache/single-flight·중복 제거·direct 시작 사유, 도구 레지스트리 버전과 실제 도구·상태, 예약·사용한 호출 수·시간·비용·조회량, 작업 status와 outcome, 정책·모델·프롬프트·데이터 버전, 근거 ID와 검증 실패 코드를 기록한다. 비회원의 거절된 접근은 질문 작업으로 생성하지 않고 필요한 접근 보안 기록으로 구분한다. 상세 내부 추론이나 불필요한 원문은 감사 필수 항목으로 두지 않는다.
 
 실제 모델 호출인 live, 저장된 응답을 사용하는 replay, 저장 복구인 save_only를 구분하여 집계한다. save_only를 새로운 모델 호출로 세지 않는다. 제공자가 보고하지 않은 토큰·비용은 null이며 0으로 바꾸지 않는다. 내부 worker의 호출 전 예산 예약과 호출 영수증은 재시작 이후에도 유지하고, 송신 여부가 불명인 호출의 예약을 임의 해제하지 않는다.
 
 배치 단위로 출처, 수집 범위, 중복 수, 후보 수, 통과·보류·실패 수, 검수 결과, 공개 전환과 롤백 기록을 남긴다. 브리핑은 회차, 선정 규칙 버전, 근거 목록과 정정 이력을 연결한다. 실제 모델의 비결정성 때문에 완전히 같은 문장을 재생성할 수 있다고 보장하지 않되, 어떤 자료와 설정으로 결과가 만들어졌는지는 추적 가능하게 한다.
 
-운영 대시보드는 유형별 요청량, 분류 변경, 명시적 요구 커버리지, 필수 기능·도구 누락률, 불필요·중복 도구 호출률, cache·single-flight·fallback률, 서버 커버리지와 Jev 검증의 오승인·오차단, 실행 예산 초과, 확인 질문 비율, 근거 부족률, 출력 검증 실패율, 보류 적체, 출처 지연, 응답 시간과 비용을 감시한다. 기준선 대비 악화와 보안·공개 경계 위반을 구분하여 알린다. 수치 경보 임계값은 부하·시연 시험으로 정하고, 중대 권한 위반이나 비밀값 노출은 단일 사건도 즉시 대응한다.
+운영 대시보드는 유형별 요청량, 분류 변경, 명시적 요구 커버리지, 필수 기능·도구 누락률, 불필요·중복 도구 호출률, cache·single-flight·direct 시작률, 서버 커버리지와 Jev 검증의 오승인·오차단, 실행 예산 초과, 확인 질문 비율, 근거 부족률, 출력 검증 실패율, 보류 적체, 출처 지연, 응답 시간과 비용을 감시한다. 기준선 대비 악화와 보안·공개 경계 위반을 구분하여 알린다. 수치 경보 임계값은 부하·시연 시험으로 정하고, 중대 권한 위반이나 비밀값 노출은 단일 사건도 즉시 대응한다.
 
 API와 개인화 결과를 공용 캐시에 저장하지 않는다. 캐시가 필요한 내부 기능은 사용자 범위, 정책·데이터 버전, 기간·회차를 키에 반영하고 로그아웃·철회·버전 변경에 따른 무효화를 검증한다. CloudWatch 등 운영 시스템의 로그 접근도 역할별로 제한한다.
 
@@ -550,7 +551,7 @@ API와 개인화 결과를 공용 캐시에 저장하지 않는다. 캐시가 �
 
 MVP에는 Q01부터 Q08까지의 multi-label 분류 계약과 미지원 유형 처리, 권한 검증, 공개 데이터 필터, 읽기 전용 도구, 근거 표시, 출력 검증, 버전 고정, 보류·재검증·공개 전환, 최소 감사 로그, 오류 신고와 중단·롤백을 포함한다. 유형별 실제 데이터나 도구가 준비되지 않았다면 해당 유형은 미지원 또는 이용 불가로 명확히 표시한다. Q02는 범용 용어 사전 없이 6.1절의 제한된 일반 LLM 경로와 표시·평가 기준을 적용하며 이를 근거 검증 완료 기능으로 소개하지 않는다. ZOOP 고유 개념에는 승인된 도움말·정책·화면 명세만 사용하고 일반 LLM이 내부 규칙을 만들지 못하게 한다.
 
-Jev 라우터와 Java 직접 읽기 도구, Luna 생성·Jev 의미 검증은 일부 구현됐지만 목표 MVP와 출시 조건은 아직 충족하지 않는다. 남은 조건은 TypeSafe 전송 승인, Responses 원격 MCP와 승인 continuation, 요청 캐시·single-flight, 직접 어댑터 fallback·circuit breaker, answerStatus/notices 계약, 8/6/2·45초 guard, 미연결 도구, 종단 평가다. 준비되지 않은 경로는 기능 플래그로 닫고 현재 Chat Completions 경로를 MCP 구현 완료로 표시하지 않는다.
+Jev 라우터와 Java 직접 읽기 도구, Luna 생성·Jev 의미 검증은 일부 구현됐지만 목표 MVP와 출시 조건은 아직 충족하지 않는다. 남은 조건은 TypeSafe 전송 승인, Responses 원격 MCP와 승인 continuation, 요청 캐시·single-flight, preflight direct 시작·circuit breaker, answerStatus/notices 계약, 8/6/2·45초 guard, 미연결 도구, 종단 평가다. 준비되지 않은 경로는 기능 플래그로 닫고 현재 Chat Completions 경로를 MCP 구현 완료로 표시하지 않는다.
 
 UI 고지에는 AI 생성·보조 결과라는 사실, 사건 답변의 기준 시점, 근거 확인 방법과 투자 판단 범위를 포함한다. 고지 문구만으로 검증·권한 통제를 대체하지 않는다. 모든 답변에 긴 경고문을 반복하기보다는 최초 안내와 해당 답변의 한계를 읽기 쉽게 표시한다.
 
@@ -573,18 +574,18 @@ UI 고지에는 AI 생성·보조 결과라는 사실, 사건 답변의 기준 �
 | D01 | 역할별 실명과 최종 승인자    | 3장의 역할을 실제 팀원에게 배정하고 최종 승인자를 기록한다.                                                     | 출시 확인 필요 | 프로젝트 책임자         |
 | D02 | 내부 질의 유형과 도구 매핑   | Q01~Q08 multi-label, 서버 allowed_tools 안에서 Luna가 필요한 MCP를 선택한다. Q01 웹 금지, Q02 기본 보조, Q03~Q08 마지막 수단을 적용한다. | 결정 | AI·백엔드 담당자 |
 | D03 | 분류 임계값과 기간 변경 관리 | 명시 요구 고정, Jev `0.70/0.35`, Luna 실행 중 요구 추적과 서버 커버리지 검사. 독립 Luna coverage-verifier는 사용하지 않는다. | 결정 | AI·품질 담당자 |
-| D04 | 모델과 외부 전송 조건        | Jev router와 semantic-verification을 분리하고 Luna Responses가 MCP 선택·생성을 담당한다. source/model-send grant와 제공자 처리는 출시 시 고정한다. | 설계 결정·출시 확인 필요 | AI·보안 담당자 |
+| D04 | 모델과 외부 전송 조건        | Jev router/verification을 분리하고 Luna Responses는 MCP를 제안한다. Java가 모든 approval을 결정하고 ai/service는 continuation만 수행한다. source/model-send grant는 출시 시 고정한다. | 설계 결정·출시 확인 필요 | AI·보안 담당자 |
 | D05 | 출처와 이용 조건             | 원문 보관·재배포·LLM 전송 범위를 출처별로 등록한다.                                                             | 출시 확인 필요 | 데이터 담당자           |
 | D06 | 보관과 삭제                  | 데이터 종류별 기간과 외부 제공자·백업 처리 절차를 승인한다.                                                     | 출시 확인 필요 | 보안·운영 담당자        |
 | D07 | 검수와 공개 책임             | allow/reject·재검증 큐를 유지하고 표본 검수 주기·비율 및 별도 수정 후보 생성 경로를 확정한다.                   | 출시 확인 필요 | 데이터·검수 담당자      |
 | D08 | 브리핑 운영 시간             | 개발은 승인 시간 내에서 시연하고 정기 운영 시간은 별도 승인한다.                                                | 출시 확인 필요 | 운영·프로젝트 책임자    |
 | D09 | 지표의 지연 기준             | 환율·지수별 출처, 관측·비교 시각과 지연 임계값을 데이터 계약에 등록한다.                                        | 출시 확인 필요 | 데이터 담당자           |
 | D10 | 출시 평가 수치               | 11.2절 기준을 출시 차단선으로 적용하고 실제 평가 결과를 기록한다.                                               | 결정·실측 필요 | 품질·프로젝트 책임자    |
-| D11 | 요청·비용 상한 | 총 8회·내부 6회·웹 2회, 동시 4회, 총 3라운드, fan-out 5, DB 3초·그래프 5초·웹 7초, Luna 35초·job 45초, 24k/2k를 적용한다. | 결정 | 백엔드·운영 담당자 |
+| D11 | 요청·비용 상한 | 총 8회·내부 6회·웹 2회, 동시 4회, 총 3라운드, fan-out 5, DB 3초·그래프 5초·웹 7초, Luna 35초·terminal commit까지 job 45초, 24k/2k를 적용한다. | 결정 | 백엔드·운영 담당자 |
 | D12 | 사고 대응과 알림             | 연락 경로, 중단 권한, 사용자 안내와 재개 책임자를 실제 운영표에 지정한다.                                       | 출시 확인 필요 | 운영·프로젝트 책임자    |
 | D13 | Q02 개념 답변 경로           | 범용 용어 사전 없이 Luna 일반 개념 답변을 허용하고 `general_knowledge` 구간 단위로 서버 고정 안내 문구·근거 없음·최신 사실 금지와 ZOOP 문서 분기 규칙을 적용한다. 필요 시 별도 웹 근거 구간을 추가하며 6.3.5절을 따른다. | 결정 | AI·품질·프로젝트 책임자 |
 | D14 | 챗봇 근거·그래프 종단 연동   | S2·S3 결과의 PostgreSQL evidence 수입과 handoff → 앱 공개 스냅샷 활성화 → 챗봇 조회 → 철회 반영 종단 시험을 통과해야 한다. | 출시 확인 필요 | AI·백엔드·데이터 담당자 |
-| D15 | 챗봇 라우터 출시 승인        | router 계약·동적 도구 계획·읽기 전용 권한·Luna stage·검증 영수증의 실제 구현과 고정 평가 통과를 확인한다.        | 출시 확인 필요 | AI·백엔드·보안 담당자   |
+| D15 | 챗봇 라우터 출시 승인        | MCP 서버 단독 시험·합성 Responses replay·승인된 소량 live latency spike, Java approval·Luna stage·검증 영수증의 실제 구현을 확인한다.        | 출시 확인 필요 | AI·백엔드·보안 담당자   |
 
 결정 기록 형식은 `결정 ID / 결정 내용 / 근거 / 담당자 / 승인자 / 결정일 / 적용 버전`으로 통일한다. `결정` 항목도 구현·시험 완료를 뜻하지 않는다. 출시 확인 조건이 충족되지 않은 기능은 비활성 상태로 두고, 전체 프로젝트를 멈추는 대신 영향을 받는 기능과 데이터 범위를 명확히 제한한다.
 
@@ -592,7 +593,7 @@ UI 고지에는 AI 생성·보조 결과라는 사실, 사건 답변의 기준 �
 
 ### 17.1 프로젝트 자료
 
-- 2026년 10월 28일 v0.11 제품 결정: Jev multi-label 뒤 서버가 allowed_tools·scope·예산을 고정하고 Luna Responses가 ZOOP 원격 MCP 도구를 선택·연속 호출한다. 총 8회(내부 6·웹 2)·job 45초, 요청 단위 cache·single-flight, MCP 장애 시 동일 Tool Service의 Java 직접 어댑터 fallback, 웹 실패 비차단, answerStatus/notices 목표 계약을 채택한다. 인증·권한·grant·스키마 거부는 fallback으로 우회하지 않는다.
+- 2026년 10월 28일 v0.11 팀 결정: 2026-10-25 MCP 미사용 결정을 대체한다. Jev multi-label 뒤 서버가 allowed_tools·scope·예산을 고정하고 Luna Responses가 ZOOP 원격 MCP 도구를 제안하며 Java가 approval을 결정한다. 총 8회(내부 6·웹 2)·job 45초, 요청 단위 cache·single-flight, Responses 시작 전 MCP 장애·circuit open 시 direct 시작 경로, 웹 실패 비차단, answerStatus/notices 목표 계약을 채택한다. 실행 중 MCP 오류와 인증·권한·grant·스키마 거부는 direct로 우회하지 않는다.
 - 2026년 10월 27일 v0.10 제품 결정: Q02/Q03/Q04는 multi-label을 유지해 한 턴의 필요한 도구와 답변을 통합한다. 새 질문마다 재분류하고 Q01을 제외한 Q02~Q08에 선택적 보조 웹 검색을 허용한다. 기존 어댑터를 재사용하는 MCP 서버 POC와 typed UI 동작을 목표로 추가한다. 아래 v0.9의 MCP 미사용·검색 API 직접 연결 결정은 당시 구현 기록이며 새 목표로 대체한다. 실제 외부 검색 활성화는 공급자·권리·개인정보·grant·실측 조건 충족 후다.
 
 - ZOOP 클라우드 사용계획서 TA 반영본 2026년 10월 13일. 서비스 목적, EC2·RDS·Neo4j·S3 역할, 자동 검증과 보류 검수, 재검증, 공개 버전 전환, 개발 운영 시간의 기준으로 사용했다.
@@ -625,4 +626,4 @@ v0.9의 MCP 미사용 결정은 v0.10의 POC 목표로, v0.10의 서버 중심 P
 | 0.8  | 2026년 10월 20일 | 단계형 계획과 체크포인트(개수 조건·0/1/초과 처리), 답변 생성 전 `clarification` 허용 범위, 의존 단계·fan-out·보충 라운드 예산 구분, 요구별 `limitations` 공개 계약과 커버리지 검증, 근거 수준별 답변 `sections`와 구간 단위 Q02 규칙·`answerBasis` 계산, 챗봇 Jev 의미 검증의 순서·대상·판정·장애 처리, 단계별 시간 상한·경로별 기한·실패 분류·재실행 상한·진행 단계, 챗봇 그래프 조회를 앱 공개 스냅샷으로 고정, 파일명에서 버전 표기 제거(`ZOOP_AI_거버넌스_정책_v0.1.md` → `ZOOP_AI_거버넌스_정책.md`), 최종 검토 반영(남은 필수 단계 기준 기한 검사·커버리지 6초, ZOOP 문서 인용 형식, 요구 6개 상한, 일반 개념 구간 `prohibitedAdvice` 판정, `save_only` 재실행 횟수 제외, 확인 질문 사슬 최대 2회) | 팀 검토 및 승인 필요 |
 | 0.9  | 2026년 10월 25일 | 서비스 MCP 미사용 결정(도구는 앱 내부 읽기 어댑터, 웹 검색은 검색 API 직접 어댑터), ‘MCP’ 표현을 ‘도구’로 정정(상한·의미 변경 없음), 6.3.2 현재 구현 경계를 main 코드 기준으로 갱신하고 15.1 라우터·도구 상태를 그에 맞춤 | 팀 검토 및 승인 필요 |
 | 0.10 | 2026년 10월 27일 | Q02~Q08 보조 웹 검색·Q01 제외, 턴별 재분류·복합 도구 조합, MCP 서버 POC·typed UI 동작 목표, 출처/개인정보/실패/예산 및 구현 경계 명시 | 제품 방향 합의·팀 승인 미확인 |
-| 0.11 | 2026년 10월 28일 | Luna Responses 원격 MCP 도구 선택, 8/6/2·45초 상한, 요청 cache·single-flight, Java fallback·circuit breaker, 웹 비차단 실패, answerStatus/notices 목표 계약 확정 | 사용자 방향 승인·팀/출시 검증 필요 |
+| 0.11 | 2026년 10월 28일 | Luna Responses 원격 MCP, Java approval continuation, preflight direct 시작, Q07 server-only scope, 8/6/2·terminal commit까지 45초, cache·웹 비차단·answerStatus/notices 확정 | 팀 결정·출시 검증 필요 |

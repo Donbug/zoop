@@ -137,10 +137,17 @@ v1에서 찾은 공백 중 사건 이름 미해석과 기업 대상 `issue.read`
 | 배치 검색·재시도·기한 초과 | 총 8·내부 6·웹 2, job 45초, Luna 잔여 기한·마지막 10초 작성 예약 준수 |
 | 동일 logical call 동시·순차 중복 | single-flight 1회, 성공 0건 포함 요청 cache hit, 권한·grant 재검사 |
 | cache key의 scope·version·asOf 차이 | 서로 합치지 않음, job 종료 뒤 재사용 없음 |
-| MCP transport 장애 | 같은 Tool Service 직접 어댑터 1회 fallback, 결과·권한·버전 동등 |
-| 인증·권한·grant·스키마 거부 | 직접 fallback 0회, 거부 원인 유지 |
+| MCP/direct 동일 fixture | 같은 Tool Service의 결과·권한·버전·evidence 정규화 동등 |
+| Responses 시작 전 preflight 실패·circuit open | MCP 미노출, 처음부터 direct adapter·BranchContext 경로, 같은 예산·grant |
+| Responses 실행 중 MCP transport 실패 | direct 결과 끼워 넣기 0회, 성공 결과 유지·notice/limitation, 다음 job circuit 반영 |
+| 인증·권한·grant·스키마 거부 | direct 우회 0회, 거부 원인 유지 |
 | MCP 결과 수신 여부 불명 | 자동·수동 중복 호출 0회, response_unknown/reconciliation |
 | 최근 5회 중 연결 3회 실패 | 30초 circuit open, half-open probe 1회; 인증·DB 오류는 집계 제외 |
+| mcp_approval_request 1·3라운드 | ai/service 독자 승인 0회, Java의 예산·요구·scope·grant 결정만 continuation에 사용 |
+| approval 거부 | 위조 MCP/function 결과·direct 대체 메시지 0회, 다른 정상 근거 또는 limitation/guidance |
+| Q07 portfolio scope | portfolio.scope.read MCP catalog 미등록, 전체 목록·수량·보유 표시 모델 전송 0건, 일치 공개 결과 최대 5개 |
+| /mcp 외부 경계 | 64 KiB request·256 KiB call result·1 MiB job·분당 30·동시 4 위반 거부 |
+| 도구 1·4·8회 latency | server-only client, 합성 Responses replay, 승인된 소량 live를 분리 기록; terminal DB commit까지 45초 |
 | 인용 위조·snippet 미지지·프롬프트 주입 | 출처·요구 매핑 및 의미 검사, 외부 지시 무시 |
 | MCP 미등록 도구·위조 subject·스키마 변경 | 차단, allowlist 자동 확장 없음 |
 | Luna allowed_tools·연속 호출 | 허용 도구만 선택, 새 정보 이득 없는 반복 거부, 명시 요구별 서버 coverage |

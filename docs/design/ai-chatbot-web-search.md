@@ -1,6 +1,6 @@
 # ZOOP AI 챗봇 보조 웹 검색 설계
 
-문서 상태: 2026-10-28 사용자 승인 · 구현 예정 · 공급자/출시 확인 별도
+문서 상태: 2026-10-28 팀 결정 · 구현 예정 · 공급자/출시 확인 별도
 
 기준 정책: [ZOOP-AIG-001 v0.11](../ZOOP_AI_거버넌스_정책.md) / [설계 요약](ai-chatbot-design-summary.md) / [Luna MCP 실행 계약](ai-chatbot-mcp-actions.md)
 
