@@ -129,7 +129,7 @@ notices는 답변을 막지 않은 장애/처리 정보, limitations는 미충�
 
 서버는 허용 도구·스키마·대상·scope·고정 버전·기한·호출 수를 검사한다. MCP 결과를 OpenAI에 반환하기 전에 source grant와 모델 전송 범위를 검사한다. Luna의 자체 coverage 판단은 추가 조회 신호이며 최종 정답 판정이 아니다.
 
-연결 장애 시 direct adapter는 같은 결과/권한/cache/원장을 사용한다. 실패한 조회만 최대 1회 전환하고 전체 예산을 초기화하지 않는다. 권한·인증·grant·schema 거부는 전환하지 않는다. 결과 불명 모델 호출은 재전송하지 않는다. 최근 MCP 연결 5회 중 3회 실패하면 30초 차단 후 probe 1회로 복구 여부를 판단한다.
+direct adapter는 Responses 시작 전 preflight 실패·circuit open일 때만 시작 경로로 선택하며 같은 결과/권한/cache/원장/예산을 사용한다. 실행 중 MCP 오류는 direct 결과로 바꿔 끼우지 않고 성공한 결과와 notice/limitation으로 종료한다. 권한·인증·grant·schema 거부는 direct로 우회하지 않는다. 결과 불명 모델 호출은 재전송하지 않는다. 최근 MCP 연결 5회 중 3회 실패하면 30초 차단 후 probe 1회로 복구 여부를 판단한다.
 
 ### 8.2 생성 후 출력 검증
 

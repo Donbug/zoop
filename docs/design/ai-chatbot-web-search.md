@@ -106,6 +106,6 @@ web_reported basis와 Citation.sourceKind=web_result를 추가한다. 서버가 
 | 개인정보 방침·동의 | 실제 공급자 처리 조건을 반영해 검토·개정 여부 확정 |
 | source grant | OpenAI·Jev 수신자/목적별 model-send 등록 필요 |
 | schema·화면 | web_reported/web_result·answerStatus/notices·limitation·guard 동시 구현 필요 |
-| 실제 품질·시간 | 기존 서버 계획 / Luna function calling / Luna MCP를 같은 세트로 비교 |
+| 실제 품질·시간 | 기존 서버 계획 / Luna MCP를 같은 세트로 비교 |
 
-개발 순서는 합성 MCP fixture → 호출/캐시/실패 gate → 출처·저장·화면 계약 → 개인정보/공급자 확정 → 승인된 소량 실측이다. 기능 플래그 기본 꺼짐을 유지한다. 이 개정은 테스트 실행·실제 모델 호출·출시 승인을 뜻하지 않는다.
+개발 순서는 [개발 계획](../development/ai-chatbot-implementation-plan.md)의 latency spike(MCP 서버 단독 시험·합성 Responses replay·승인된 소량 live 측정) → 합성 MCP fixture → 호출/캐시/실패 gate → 출처·저장·화면 계약 → 개인정보/공급자 확정 → 웹 검색 포함 승인된 소량 실측이다. 기능 플래그 기본 꺼짐을 유지한다. 이 개정은 테스트 실행·실제 모델 호출·출시 승인을 뜻하지 않는다.
