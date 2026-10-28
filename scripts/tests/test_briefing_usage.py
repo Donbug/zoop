@@ -65,6 +65,13 @@ class UsageTest(unittest.TestCase):
         with self.assertRaises(base.ReplayError):
             with recorded(client,self.session(pipe)):client.call('briefing_generation',{},'unused','unused')
         self.assertFalse(calls);self.assertEqual('failed',pipe.events[-1]['outcome'])
+    def test_preparation_error_keeps_its_failure_stage_without_a_model_reservation(self):
+        pipe=Pipe()
+        with self.assertRaises(ValueError):
+            with self.session(pipe):raise ValueError('authored preparation error')
+        self.assertEqual('failed',pipe.events[-1]['outcome'])
+        self.assertEqual('prepare',pipe.events[-1]['failureStage'])
+        self.assertFalse(any(e['op']=='model_start' for e in pipe.events))
     def test_failed_db_finish_retains_raw_provider_response_and_content_free_recovery_receipt(self):
         pipe=Pipe('model_finish');client=Client(self.output,lambda _:response())
         with self.assertRaises(base.ReplayError):

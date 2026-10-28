@@ -81,7 +81,7 @@ class UsageSession:
         self.estimate, self.interval = estimate, heartbeat_seconds
         self.owner = None
         self.unit = None
-        self.stage = None
+        self.stage = 'prepare'
         self.failed = None
         self.stop = threading.Event()
         self.thread = None

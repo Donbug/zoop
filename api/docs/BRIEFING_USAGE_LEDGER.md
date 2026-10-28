@@ -68,6 +68,8 @@ python3 scripts/briefing_usage_run.py --job /private/job/job.json --output /priv
 
 claim은 회차 행 잠금·새 owner_token·증가 attempt_no·임대 및 시도 INSERT를 한 트랜잭션으로 처리한다. partial UNIQUE가 회차당 활성 시도를 하나로 제한한다. provider 전송 중 DB 잠금은 유지하지 않는다. 임대 회수는 기존 시도를 failed/lease_expired로 끝내고 미완료 AI 행을 unknown으로 남긴 후 새 시도를 만든다. 만료된 작업자는 heartbeat/새 호출/발행을 못 하지만 자기 영수증을 같은 AI 행에 늦게 반영할 수 있다. 종료 시도의 신원·단계 이력은 변경하지 않는다.
 
+모델 호출 전 준비 중 오류는 `failureStage=prepare`로 남긴다. 모델 전송 예약이 없으면 AI 호출 행을 만들지 않는다.
+
 ## 모델 관측과 복구
 
 전송 직전 `model_start`를 독립 커밋하고 실제 응답/오류 후 `model_finish`를 독립 커밋한다. job ID는 `briefing-direct:<attemptId>`, AI attempt ID는 기존 제공자 요청 바이트의 SHA-256이다. 직접 호출의 앱 소유 ID이며 AI 서비스의 ID나 제공자 응답 ID가 아니다. DB의 UNIQUE(job,attempt)와 결정적 실행 ID로 중복 영수증을 막는다. 이미 시작된 호출을 발견하면 무조건 재전송하지 않고 운영자 조정 대상으로 중단한다.
