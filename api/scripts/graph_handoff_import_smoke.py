@@ -27,7 +27,7 @@ not cleaned):
 
 (the Make target runs this script with --jar/--handoff-cli/--ingest-cli; the direct python invocation with those flags and
 --psql-container/--db-user/--db-name still works.) The staged snapshot is the app's current format 3 (PR #217) and carries no original mention value:
-the retained receipt keeps the complete `zoop-graph-handoff-bundle-6` bundle, whose `issues[].mentions[]` the script compares with hand-written S2 values, whose
+the retained receipt keeps the complete `zoop-graph-handoff-bundle-7` bundle, whose `issues[].mentions[]` the script compares with hand-written S2 values, whose
 `issues[].fieldProvenance` (which mentions state each selected headline value, whether the operator's representative or unanimity selected it, and which of
 `eventTime`/`period` an operator verdict withheld; never a verification) it compares with hand-written selection facts and whose `issues[].fieldVerdicts` it compares
 with hand-written operator verdicts.
@@ -48,7 +48,7 @@ two-relation path through a mapped but unpublished middle company (a private `pa
 text; the receipts keep the complete bundle, the `structural_path_closed_over_involves_basis_and_catalog` check and the operator-mapped-chain note. With the evidence-read phase a FOURTH
 TEST-HARNESS activation (BACK-DATED to just after the last activation, so an asOf can fall before the structural basis was verified) serves the private-middle version: the spans only a
 structural basis cites are 200 without eventIds from the selected version's receipt, 404 before the basis was verified or the article published, under a revoked grant, a private article,
-tampered receipt bytes or another version, and no public body names the private company. Disclosure exclusions have no store in the built application, so they are proven by the Java tests.
+tampered receipt bytes or another version, and no public body names the private company. This smoke does not mutate the app's disclosure exclusion store; exclusion behavior is proven by the Java tests.
 A sixth, producer-authored IMPACT world (`graph_handoff_smoke.impact_export`, replay, SYNTHETIC, handoff `handoff-impacts-1`, built after the path worlds) is imported last: the receipt retains
 the closed `impacts[]` (one row per INVOLVES source relation: a verified positive with an impact-only quote, a verifier-rejected, a verified negative of the other S3 job, a verified undetermined,
 a no-evidence and a precheck-rejected row; hand-written in `hs.expected_impacts`), while the snapshot, the import result and every public body carry no proposal, effect, label, candidate id or
@@ -56,20 +56,25 @@ verifier digest. With the evidence-read phase a FIFTH TEST-HARNESS activation se
 selected version's receipt although the one candidate structural basis does not cite it, 404 before the version existed / the article was published, for another version, under a revoked grant, a
 private article or tampered receipt bytes. The article's publication boundary is proven with the IMPACT version itself selected on both sides: at the very end the script adds TEST-ONLY historical
 activation rows (reason `smoke history:`, reported as `historicalActivations`, never an import or harness activation) at the fixture's own publication instant, so asOf half a second before is 404 although
-graphVersion pins the impact version (a wrong pin would be 422) and half a second after is 200 with that version in metadata. An excluded edge/evidence and a malformed receipt basis need a mutable
-exclusion store / re-registered receipt, so the Java tests (real pinned reader, real service) prove those and this script does not claim them over HTTP.
+graphVersion pins the impact version (a wrong pin would be 422) and half a second after is 200 with that version in metadata. Excluded edge/evidence and malformed receipt basis cases are proven
+by the Java tests (real pinned reader, real service); this script does not mutate the exclusion store or re-register receipts to claim those cases over HTTP.
 The impact phase also inserts ONE explicitly SYNTHETIC published ORIGINAL briefing round using the existing briefing PostgreSQL fixture's payload,
 source-binding and current-grant conventions (not the replay/reconstruction path). It pins only the supply issue to the real imported impact version at a
 cutoff before all structural basis verification and before that version's actual harness activation. Real round-scoped HTTP reads must retain the impact-only
 span with null S1 summary and empty eventIds, refuse wrong pins/cutoffs, withhold the not-yet-verified basis span and the other issue's evidence, and enforce
 both current ingestion rights and current briefing-source rights. Fixture publication SQL is counted separately as syntheticBriefingRounds, never as
 production publication or admin activation proof. No receipt, graph snapshot or AI ledger is synthesized for this round.
+A seventh, producer-authored ISSUE-SUMMARY world (`graph_handoff_smoke.summary_world`, replay, SYNTHETIC, handoff `handoff-summary-1`: a REAL authored-replay `zoop-ai-issue-summary` job pinned by
+the decisions, frozen with `--issue-summary-state-dir`) is imported last, without any activation: four FORGED summaries (a text that is not the claims, a claim citing evidence outside the issue's mention
+quotes, a basis digest of another basis, `not-requested` on an issue whose time field is held) are first offered by a stand-in exporter whose bundle digests are self-consistent, and the app refuses
+each by its own recomputation (`bundle_invalid`, nothing written); the genuine export then stages, the receipt retains the producer's exact summaries (the available one and the deterministic
+`temporal-review-pending`), and the snapshot, the import result and the database carry none of their text.
 
 On success the last stdout line is {"status": "passed", "steps": N, "providerCalls": 0, "modelCalls": 0, ...}; any failed
 
 An evidence-read phase runs by default (turn it off with --no-with-evidence-read): after the collision import it starts the web jar on loopback
 (artifact source, ZOOP_DOCUMENT_READ_INGESTION_SOURCES = the same registry file, S1 grants unset), makes ONE explicit TEST-HARNESS psql activation of the
-second staged version (the import itself never activates; production has no activation route) and reads GET /api/v1/evidence/{id} for the graph body
+second staged version (the import itself never activates; admin HTTP is separately exercised by graph_handoff_activation_smoke.py) and reads GET /api/v1/evidence/{id} for the graph body
 evidence, with CLI parity for the source registry and failure cases; the verdict world then gets its own one TEST-HARNESS activation and public graph reads. The final line
 reports importActivationsWritten: 0 and harnessActivations: 2 separately, plus evidenceReads and verdictGraphReads.
 """
@@ -80,6 +85,7 @@ import atexit
 import hashlib
 import json
 import os
+import shlex
 import shutil
 import socket
 import stat
@@ -100,7 +106,20 @@ sys.path[:0] = [str(PIPELINE), str(API_SCRIPTS)]
 import document_import_smoke as base  # noqa: E402  (database, jar and step helpers)
 from scripts import graph_handoff_smoke as hs  # noqa: E402  (the authored AI world and its operator documents)
 
-check, step = base.check, base.step
+check = base.check
+_last_step_at = time.monotonic()
+_last_step_label = "setup"
+
+
+def step(label: str) -> str:
+    global _last_step_at, _last_step_label
+    now = time.monotonic()
+    print(f"[timing] {_last_step_label}: {now - _last_step_at:.1f}s", file=sys.stderr, flush=True)
+    _last_step_at = now
+    _last_step_label = label
+    return base.step(label)
+
+
 PUBLIC_IDS = {"KRX:005930": "SYNTH:000001", "KRX:000660": "SYNTH:000002"}   # the catalog's seeded ids are never reused
 SCHEMA = "zoop-graph-handoff-import-1"
 COMPANIES = (("SYNTH:000001", "합성기업"), ("SYNTH:000002", "합성부품"))
@@ -209,30 +228,32 @@ class Smoke:
         self.runs = 0
 
     # ---------------------------------------------------------------------------------------------------- jar runs ----
-    def graph_env(self, request: Path, result: Path) -> dict:
+    def graph_env(self, request: Path, result: Path, cli: Path | None = None) -> dict:
         root = self.world.root
         return {**self.jar.base_env(), "ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED": "true",
                 "ZOOP_GRAPH_HANDOFF_IMPORT_REQUEST": str(request), "ZOOP_GRAPH_HANDOFF_IMPORT_RESULT": str(result),
-                "ZOOP_HANDOFF_CLI": str(self.args.handoff_cli), "ZOOP_HANDOFF_STATE_DIR": str(root / "handoff"),
+                "ZOOP_HANDOFF_CLI": str(cli or self.args.handoff_cli), "ZOOP_HANDOFF_STATE_DIR": str(root / "handoff"),
                 "ZOOP_RELATION_STATE_DIR": str(root / "relation"), "ZOOP_EXTRACTION_STATE_DIR": str(root / "extraction"),
                 "ZOOP_INGESTION_CLI": str(self.args.ingest_cli), "ZOOP_INGESTION_STATE_DIR": str(root / "ingestion"),
                 "ZOOP_INGESTION_SOURCES": str(self.layout.registry_path), "ZOOP_HANDOFF_CANONICAL": str(root / "canonical.json"),
                 "ZOOP_HANDOFF_DECISIONS": str(root / "decisions.json"), "ZOOP_HANDOFF_BINDINGS": str(root / "bindings.json"),
                 "ZOOP_ARTIFACT_ROOT": str(self.layout.artifacts), **hs.ownership_env()}
 
-    def graph_import(self, label: str, request: dict | bytes) -> tuple[int, dict | None, str]:
-        """One operator run of the graph handoff import; returns (exit status, parsed result file, process output)."""
+    def graph_import(self, label: str, request: dict | bytes, *, cli: Path | None = None) -> tuple[int, dict | None, str]:
+        """One operator run of the graph handoff import; returns (exit status, parsed result file, process output). `cli`: a stand-in for the installed handoff command."""
         self.runs += 1
         stem = f"{self.runs:02d}-{label}"
         request_path = self.layout.requests / f"{stem}-request.json"
         result_path = self.layout.requests / f"{stem}-result.json"
         request_path.write_bytes(request if isinstance(request, bytes) else json.dumps(request).encode("utf-8"))
+        started_at = time.monotonic()
         try:
-            done = subprocess.run(self.jar.argv("--spring.main.web-application-type=none"), env=self.graph_env(request_path, result_path),
+            done = subprocess.run(self.jar.argv("--spring.main.web-application-type=none"), env=self.graph_env(request_path, result_path, cli),
                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=420)
         except subprocess.TimeoutExpired as expired:
             base.OUTPUT.append((expired.stdout or b"").decode("utf-8", "replace"))
             raise AssertionError(f"{label}: the import JVM did not exit within 420s (result file exists: {result_path.exists()})")
+        print(f"[timing] graph import {label}: {time.monotonic() - started_at:.1f}s", file=sys.stderr, flush=True)
         output = done.stdout.decode("utf-8", "replace")
         base.OUTPUT.append(output)
         parsed = None
@@ -302,6 +323,7 @@ class Smoke:
 class WebRun:
     def __init__(self, jar, extra_env: dict, ready: str | None = None):
         self.ready = ready
+        self.started_at = time.monotonic()
         with socket.socket() as probe:
             probe.bind(("127.0.0.1", 0))
             self.port = probe.getsockname()[1]
@@ -322,6 +344,7 @@ class WebRun:
         while time.monotonic() < deadline and self.process.poll() is None and not any(marker in l for l in self.lines):
             time.sleep(0.5)
         check(any(marker in l for l in self.lines), "the web application did not become ready:\n" + "".join(self.lines)[-1500:])
+        print(f"[timing] graph smoke web startup: {time.monotonic() - self.started_at:.1f}s", file=sys.stderr, flush=True)
         return self
 
     def __exit__(self, *exc):
@@ -344,7 +367,7 @@ class WebRun:
 def evidence_read_phase(smoke, db, layout, world, vid2: str, never_activated: tuple, active_before: str) -> dict:
     """Public GET /api/v1/evidence/{id} over real HTTP for the graph body evidence of the second staged handoff.
 
-    The import never activates, and no production activation exists, so a staged version is unreadable by design. This phase therefore adds
+    The import never activates, so a staged version is unreadable by design. This SQL-only phase therefore adds
     ONE explicit TEST-HARNESS activation of `vid2` by psql, mirroring JdbcGraphVersionRepository.activateSystem (same advisory lock, pointer move
     and a `system` history row), in the smoke's own throwaway database. It is reported separately (`harnessActivations`) and is not an import
     result. The evidence rows of `vid2` are shared with the first import, whose receipt they still point at: reading proves the SELECTED version's
@@ -562,7 +585,7 @@ def evidence_read_phase(smoke, db, layout, world, vid2: str, never_activated: tu
 def verdict_read_phase(smoke, db, layout, layout4, world, vid4: str, previous: str, ev4) -> dict:
     """Public graph reads over real HTTP of the VERDICT world's staged version: the rejected/held `eventTime` and `period` are hidden in the real graph output.
 
-    The import never activates, and no production activation exists, so this phase adds ONE explicit TEST-HARNESS activation of `vid4` by psql (the same
+    The import never activates, so this SQL-only phase adds ONE explicit TEST-HARNESS activation of `vid4` by psql (the same
     statement shape as `evidence_read_phase`, moving the pointer from `previous`) in the smoke's own throwaway database. It is reported separately
     (`harnessActivations`) and is not an import result. The web application reads the retained receipt of `vid4` with the verdict world's OWN source registry
     (`layout4`). Everything expected is written out by hand from the authored (SYNTHETIC) review: the supply representative's event time is REJECTed (no time,
@@ -684,7 +707,7 @@ def approved_world_phase(args, db, layout, scratch: Path) -> dict:
           and result["provenance"]["recordingKind"] == "authored-test" and result["provenance"]["approvalBases"] == kinds
           and result["provenance"]["structuralRelationOrigin"] == "manual-operator-review", f"provenance: {result['provenance']}")
     receipt = json.loads((layout.artifacts / "verification_receipt" / f"{vid}.json").read_text("utf-8"))
-    check(receipt["bundle"] == bundle and receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-6", "the approved receipt does not retain the producer's bundle")
+    check(receipt["bundle"] == bundle and receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-7", "the approved receipt does not retain the producer's bundle")
     check(receipt["appVerification"]["approvalBasis"] == "audit-metadata-not-a-verifier-verdict", "the receipt overclaims what an approval basis is")
     used = {(source["relation"]["jobId"], use["relationCandidateId"]): use for source in bundle["sources"] for use in source["reviewUsed"]}
     check(set(used) == set(approvals), f"the used reviews differ from the hand-written approvals: {sorted(used)} vs {sorted(approvals)}")
@@ -842,7 +865,7 @@ def path_world_phase(args, db, layout, scratch: Path) -> dict:
         decision_docs[middle] = decisions
         exports[middle] = hs.freeze_export(operator, world, f"path-{middle}-1", decisions)
         want, bundle = hs.expected_chain(middle, PATH_IDS), exports[middle]["bundle"]
-        check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-6", f"{middle}: the producer's bundle is not schema 6")
+        check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7", f"{middle}: the producer's bundle is not schema 7")
         check([c["id"] for c in bundle["companies"]] == want["companies"] and bundle["pathCompanies"] == want["pathCompanies"],
               f"{middle}: companies {[c['id'] for c in bundle['companies']]} / path companies {bundle['pathCompanies']} are not the hand-written ones")
         paths = {r["target"]: r["structuralPath"] for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO"}
@@ -909,8 +932,8 @@ def path_read_phase(paths: dict, db, layout, previous: str) -> dict:
     between that activation and the moment the S3 relations became eligible selects this version while its structural bases are not yet verified.
 
     A BASIS-ONLY span (SUP, and the second link's sentence) is cited by no issue and no relation, only by a structural basis: it is served (200, no eventIds) only when the
-    selected version's receipt proves exactly that relation's basis cites it, and every current rights / row / article / receipt gate still applies. Disclosure exclusions have
-    no store in the built application (nothing to drive over HTTP); the relation / issue / evidence exclusions are proven by the Java tests with the real pinned reader."""
+    selected version's receipt proves exactly that relation's basis cites it, and every current rights / row / article / receipt gate still applies. This smoke does not mutate
+    the app's disclosure exclusion store; the relation / issue / evidence exclusions are proven by the Java tests with the real pinned reader."""
     import urllib.parse
     from datetime import timezone
     smoke, world, layout6, vid = paths["smoke"], paths["world"], paths["layout"], paths["vids"]["private"]
@@ -1109,7 +1132,7 @@ def impact_world_phase(args, db, layout, scratch: Path) -> dict:
     manifest_digest, bundle_digest = hs.digest(env["manifest"]), sha256(hs.canonical(env["bundle"]).encode("utf-8"))
     bundle = env["bundle"]
     rows = hs.expected_impacts(world, PUBLIC_IDS)
-    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-6" and bundle["impacts"] == rows and len(rows) == 6 == bundle["counts"]["impacts"]
+    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["impacts"] == rows and len(rows) == 6 == bundle["counts"]["impacts"]
           and bundle["policy"]["impacts"] == "s3-independent-verifier-quote-effect", "the producer's impacts are not the hand-written rows")
     check(sorted([(r["status"], r["code"]) for r in rows], key=repr) == sorted(hs.RICH_STATUSES, key=repr), f"the authored world does not hold every status: {rows}")
     inv = hs.evidence_id(world, "a", hs.INV)
@@ -1156,6 +1179,110 @@ def impact_world_phase(args, db, layout, scratch: Path) -> dict:
          "no-evidence, precheck-rejected) retained in the receipt; the snapshot, import result and database carry no proposal, effect, label, candidate id or verifier digest; the "
          "impact-only quote is a registered verified body span; a retry is a no-op with identical bytes")
     return {"world": world, "layout": layout7, "smoke": smoke7, "vid": vid, "bundle": bundle, "rows": rows, "inv": inv, "private": private}
+
+
+# Words that belong to the retained receipt only: a staged snapshot, an import result or a database row must never carry them.
+SUMMARY_WORDS = ("resultVersion", "isr-", "basisDigest", "issueSummary", "authored-replay", "temporal-review-pending", "claims", "summary-job")
+FORGED_SUMMARIES = ("a summary text that is not the claims joined", "a claim citing evidence outside the issue's mention quotes", "a basis digest of another basis",
+                    "not-requested on the issue whose time field is held")
+
+
+def forged_export(env: dict, change) -> tuple[bytes, str, str]:
+    """A SELF-CONSISTENT forged export envelope: `change` edits a copy of the genuine bundle, then the content digest, the receipt's pins and the byte count are recomputed the way a forger who
+    controls the whole export would. Returns (the bytes the stand-in exporter prints, the manifest digest, the forged bundle digest): only the app's own recomputation can refuse it."""
+    forged = json.loads(json.dumps(env))
+    change(forged["bundle"])
+    forged["bundle"]["digests"]["content"] = hs.content_digest(forged["bundle"])
+    raw = hs.canonical(forged["bundle"]).encode("utf-8")
+    forged["receipt"].update(bundleDigest=sha256(raw), contentDigest=forged["bundle"]["digests"]["content"], bundleBytes=len(raw))
+    return (hs.canonical(forged) + "\n").encode("utf-8"), hs.digest(forged["manifest"]), sha256(raw)
+
+
+def forging_cli(directory: Path, name: str, envelope: bytes) -> Path:
+    """An executable that stands in for `zoop-ai-handoff export`: it drains stdin and prints the given envelope. The producer would have refused to write such a bundle; the app must refuse it
+    by its own recomputation."""
+    payload = directory / f"{name}.envelope"
+    payload.write_bytes(envelope)
+    script = directory / f"{name}.sh"
+    script.write_text("#!/bin/sh\ncat > /dev/null\ncat " + shlex.quote(str(payload)) + "\n", encoding="utf-8")
+    os.chmod(script, 0o700)
+    return script
+
+
+def summary_world_phase(args, db, layout, scratch: Path) -> dict:
+    """The producer's ISSUE-SUMMARY world (SYNTHETIC, authored replay: the producer and the verifier are fixture answers, never an independent inference): a REAL `zoop-ai-issue-summary` replay
+    job (two calls) whose immutable result the decisions pin, frozen by the installed `zoop-ai-handoff --issue-summary-state-dir` and imported over real processes, WITHOUT any activation.
+    The supply issue's available summary and the factory issue's deterministic `temporal-review-pending` (a HOLD period verdict) equal the hand-written expectation of
+    `hs.expected_summaries_of`. Four self-consistent FORGED exports are offered first by a stand-in exporter; the app refuses each (`bundle_invalid`) with nothing written. The genuine
+    import stages; the receipt retains the producer's exact summaries; the snapshot (format 3), the import result and the database rows carry no summary text, id or digest."""
+    world, env = hs.summary_world(scratch / "summary", hs.SUMMARY_HANDOFF, "available", PUBLIC_IDS)
+    layout8 = Layout(world, args.ingest_cli)
+    layout8.artifacts = layout.artifacts
+    smoke8 = Smoke(args, db, layout8)
+    status, result, _ = smoke8.jar.run("documents-summary", [base.item(ref) for ref in world.refs.values()], artifact_root=layout.artifacts)
+    check(status == 0 and result and result["status"] == "succeeded", f"the summary world's document import failed: {result}")
+    ledgers_before = {name: fingerprint(path) for name, path in layout8.ledgers.items()}
+    hid, vid = hs.SUMMARY_HANDOFF, version_id(hs.SUMMARY_HANDOFF)
+    manifest_digest, bundle_digest = hs.digest(env["manifest"]), sha256(hs.canonical(env["bundle"]).encode("utf-8"))
+    bundle = env["bundle"]
+    want = hs.expected_summaries_of(world, "available")
+    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-7" and bundle["policy"]["issueSummary"] == "zoop-issue-summary-policy-1", "the producer's summary bundle is not -7")
+    for issue in bundle["issues"]:
+        hs.check_summary_part(issue["summary"], want[issue["id"]])
+    available = next(i for i in bundle["issues"] if i["id"] == hs.SUPPLY)["summary"]
+    before = smoke8.table_fingerprint()
+
+    # forged exports: refused by the app's own recomputation, nothing written -----------------------------------------------------------
+    changes = hs.summary_mutations()
+    cli_dir = Path(tempfile.mkdtemp(prefix="zoop-forged-exporter-", dir=layout.work)).resolve()
+    for name in FORGED_SUMMARIES:
+        raw, forged_manifest, forged_bundle = forged_export(env, changes[name][0])
+        script = forging_cli(cli_dir, f"forged-{FORGED_SUMMARIES.index(name)}", raw)
+        status, result, output = smoke8.graph_import(f"summary-forged-{FORGED_SUMMARIES.index(name)}", smoke8.request(hid, forged_manifest, forged_bundle), cli=script)
+        check(status != 0 and result and result["status"] == "failed" and result["failure"]["code"] == "bundle_invalid", f"{name}: the app did not refuse a forged summary: {result} {output[-500:]}")
+        check(smoke8.table_fingerprint() == before and not (layout.artifacts / "graph_snapshot" / f"{vid}.json").exists()
+              and not (layout.artifacts / "verification_receipt" / f"{vid}.json").exists(), f"{name}: a refused summary import left rows or files behind")
+    step(f"{len(FORGED_SUMMARIES)} self-consistent forged summaries (edited text, a claim outside the mention quotes, another basis digest, not-requested on a held issue) are refused by the app's "
+         "own recomputation (bundle_invalid) with no row, snapshot or receipt written")
+
+    # the genuine import --------------------------------------------------------------------------------------------------------------
+    status, result, output = smoke8.graph_import("summary", smoke8.request(hid, manifest_digest, bundle_digest))
+    check(status == 0 and result and result["status"] == "succeeded" and result["outcome"] == "staged" and result["graphVersionId"] == vid and result["active"] is False
+          and result["activation"] == "not-activated" and result["publicRead"] == "unavailable", f"the summary handoff was not staged: {result} {output[-800:]}")
+    counts = bundle["counts"]
+    check(result["counts"] == {"companies": counts["companies"], "issues": counts["issues"], "relations": sum(counts["relations"].values()), "articles": counts["articles"],
+                               "evidence": counts["evidence"]}, f"the summary import result: {result['counts']}")
+    check(db.scalar("SELECT count(*) FROM graph_versions WHERE active") == 1 and smoke8.table_fingerprint()["activations"] == before["activations"],
+          "the summary import moved the pointer or wrote an activation")
+    leaked = [word for word in (*SUMMARY_WORDS, *(c["text"] for c in available["claims"])) if word in json.dumps(result, ensure_ascii=False)]
+    check(not leaked, f"summary content reached the import result: {leaked}")
+
+    # the receipt retains the producer's exact summaries ------------------------------------------------------------------------------
+    receipt = json.loads((layout.artifacts / "verification_receipt" / f"{vid}.json").read_text("utf-8"))
+    check(receipt["bundle"] == bundle and receipt["manifest"] == env["manifest"], "the receipt does not retain the producer's summary bundle")
+    retained = {i["id"]: i["summary"] for i in receipt["bundle"]["issues"]}
+    check(retained == {i["id"]: i["summary"] for i in bundle["issues"]}, "the receipt does not retain the producer's exact summaries")
+    for issue_id, expectation in want.items():
+        hs.check_summary_part(retained[issue_id], expectation)
+    check(retained[hs.SUPPLY]["text"] == "\n".join(text for text, _, _ in hs.SUMMARY_CLAIMS) and retained[hs.FACTORY] == {"status": "unavailable", "code": "temporal-review-pending", "source": None},
+          "the retained summaries are not the hand-written ones")
+
+    # a receipt-only record: not in the snapshot -------------------------------------------------------------------------------------
+    snapshot_file = layout.artifacts / "graph_snapshot" / f"{vid}.json"
+    snapshot_bytes = snapshot_file.read_bytes()
+    snapshot = json.loads(snapshot_bytes.decode("utf-8"))
+    snapshot_text = snapshot_bytes.decode("utf-8")
+    check(snapshot["snapshotFormat"] == 3 and set(snapshot) == {"snapshotFormat", "versionId", "sourceBundleId", "companies", "issues", "relations", "articles", "evidence"},
+          "the summary snapshot is not format 3")
+    leaked = [word for word in (*SUMMARY_WORDS, *(c["text"] for c in available["claims"]), available["source"]["jobId"], available["source"]["resultDigest"])
+              if word in snapshot_text]
+    check(not leaked, f"issue-summary content reached the public snapshot: {leaked}")
+    status, again, _ = smoke8.graph_import("summary-again", smoke8.request(hid, manifest_digest, bundle_digest))
+    check(status == 0 and again and again["outcome"] == "unchanged" and snapshot_file.read_bytes() == snapshot_bytes, f"retrying the summary import changed the staged bytes: {again}")
+    check({name: fingerprint(path) for name, path in layout8.ledgers.items()} == ledgers_before, "the summary world's ledgers changed")
+    step("an issue-summary world (SYNTHETIC replay job pinned by decisions-3): the available summary and the deterministic temporal-review-pending equal the hand-written ones and are retained "
+         "EXACTLY in the receipt; the snapshot, the import result and the database carry none of their text, ids or digests; no activation; a retry is a no-op with identical bytes")
+    return {"world": world, "layout": layout8, "smoke": smoke8, "vid": vid, "bundle": bundle}
 
 
 def impact_round_fixture(impact: dict, db) -> dict:
@@ -1565,8 +1692,11 @@ def main() -> int:
     check(row["kind"] == "snapshot" and row["active"] is False and row["review_revision"] == 0 and row["unpublished"] is True
           and row["created_by"] == "operator:smoke-operator" and row["policy_version"] == "zoop-public-projection-policy-1"
           and row["source_label"] == f"graph-handoff:{hid}" and (row["issue_count"], row["relation_count"], row["article_count"]) == (2, 4, 3)
-          and row["snapshot_artifact_id"] == f"artifact-{vid}" and row["rule_revision"] is None and row["candidate_count"] is None,
+          and row["snapshot_artifact_id"] == f"artifact-{vid}" and row["rule_revision"] == 0 and row["candidate_count"] is None,
           f"version row: {row}")
+    # Publication rules (#133): the seeded rules are off, so the version fixed rule_revision 0 and was filtered with no rule.
+    check(db.scalar(f"SELECT count(*) FROM graph_version_rules WHERE graph_version_id = '{vid}'") == 0,
+          "a version staged with every rule off records no applied rule")
     check(db.scalar("SELECT id FROM graph_versions WHERE active") == active_before, "the active pointer moved")
     check(db.scalar("SELECT count(*) FROM graph_versions WHERE active") == 1, "not exactly one active version")
     check(db.scalar("SELECT coalesce(md5(string_agg(a::text, '|' ORDER BY a.id)), '') FROM graph_activations a") == history_before,
@@ -1653,7 +1783,7 @@ def main() -> int:
     check(receipt_issues["issue:factory-2026q4"]["mentions"] == expected_mentions(
         world, ("b", "m-b", hs.QB, "합성 공장 착공", "공장 착공 알림", "2026-11-15", "2026Q4", DOC_B)),
           f"factory mentions: {receipt_issues['issue:factory-2026q4']['mentions']}")
-    check(receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-6", "the retained bundle is not schema 6")
+    check(receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-7", "the retained bundle is not schema 7")
     # The selection facts the receipt retains, hand-written from the authored world: the supply issue's operator-chosen representative (document a) states every
     # headline value, while a2 states the same value in every field but its title; the factory issue's only mention is unanimous. Which mentions state the issue's
     # value is a selection fact, never a verification (`verification` stays `none`).
@@ -1855,7 +1985,7 @@ def main() -> int:
           "a rejected or held value, or a verdict, reached the public snapshot")
     receipt4 = json.loads(receipt_file4.read_text("utf-8"))
     check(receipt4["bundle"] == verdict_env["bundle"] and receipt4["manifest"] == verdict_env["manifest"], "the verdict receipt does not retain the original")
-    check(receipt4["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-6" and receipt4["bundle"]["handoffId"] == hid4, "the verdict receipt is not bundle -6")
+    check(receipt4["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-7" and receipt4["bundle"]["handoffId"] == hid4, "the verdict receipt is not bundle -7")
     receipt_issues4 = {i["id"]: i for i in receipt4["bundle"]["issues"]}
     # The ORIGINAL mentions are untouched by every verdict: the withheld supply time and the held factory period are still stated by their mentions.
     check(receipt_issues4[supply_id]["mentions"] == expected_mentions(
@@ -1907,6 +2037,8 @@ def main() -> int:
     impact = impact_world_phase(args, db, layout, scratch)
     if args.with_evidence_read:
         impact_read = impact_read_phase(impact, db, layout, paths["vids"]["private"])
+    # The summary world imports last and activates nothing: its forged exports and receipt retention need no pointer.
+    summary = summary_world_phase(args, db, layout, scratch)
 
     # ledgers, logs --------------------------------------------------------------------------------------------------------
     check({name: fingerprint(path) for name, path in layout.ledgers.items()} == ledgers_before,
@@ -1919,8 +2051,8 @@ def main() -> int:
         check(text not in joined, "source or review text reached a process output")
     step("every ledger is byte/mode/mtime identical; no path, secret or source text in any output")
 
-    print(json.dumps({"status": "passed", "steps": len(base.STEPS), "providerCalls": 0, "modelCalls": 0, "handoffs": 6 + len(PATH_MIDDLES),
-                      "evidenceRows": db.scalar("SELECT count(*) FROM evidence"), "stagedVersions": 6 + len(PATH_MIDDLES), "importActivationsWritten": 0,
+    print(json.dumps({"status": "passed", "steps": len(base.STEPS), "providerCalls": 0, "modelCalls": 0, "handoffs": 7 + len(PATH_MIDDLES),
+                      "evidenceRows": db.scalar("SELECT count(*) FROM evidence"), "stagedVersions": 7 + len(PATH_MIDDLES), "importActivationsWritten": 0,
                       "harnessActivations": harness["harnessActivations"] + verdict_read["harnessActivations"] + approved_read["harnessActivations"]
                       + path_read["harnessActivations"] + impact_read["harnessActivations"],
                       "evidenceReads": harness["evidenceReads"] + verdict_read["evidenceReads"] + approved_read["evidenceReads"] + path_read["evidenceReads"]
@@ -1934,7 +2066,7 @@ def main() -> int:
                       "roundBeforeStructuralVerification": impact_read.get("roundBeforeStructuralVerification", False),
                       "roundBeforeActualActivation": impact_read.get("roundBeforeActualActivation", False),
                       "roundReadOnly": impact_read.get("roundReadOnly", False),
-                      "importRuns": smoke.runs + smoke2.runs + smoke4.runs + approved["smoke"].runs + paths["smoke"].runs + impact["smoke"].runs,
+                      "importRuns": smoke.runs + smoke2.runs + smoke4.runs + approved["smoke"].runs + paths["smoke"].runs + impact["smoke"].runs + summary["smoke"].runs,
                       "ledgerReadOnly": True}))
     return 0
 

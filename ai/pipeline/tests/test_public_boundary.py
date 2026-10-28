@@ -30,6 +30,7 @@ CLIS = {
     "dependency_cli": ["--ingestion-state-dir", "/nonexistent/i", "--extraction-state-dir", "/nonexistent/e"],
     "graph_projection_cli": ["inspect", "--state-dir", "/nonexistent/s"],
     "handoff_cli": ["inspect", "--state-dir", "/nonexistent/s"],
+    "handoff_exposure_cli": ["--state-dir", "/nonexistent/s"],
 }
 
 

@@ -19,10 +19,12 @@ zoop-ai-relation = "zoop_ai_pipeline.relation_cli:main"
 zoop-ai-dependents = "zoop_ai_pipeline.dependency_cli:main"
 zoop-ai-graph = "zoop_ai_pipeline.graph_projection_cli:main"
 zoop-ai-handoff = "zoop_ai_pipeline.handoff_cli:main"
+zoop-ai-handoff-exposure = "zoop_ai_pipeline.handoff_exposure_cli:main"
+zoop-ai-issue-summary = "zoop_ai_pipeline.issue_summary_cli:main"
 
 [dependency-groups]
 # The S1 worker is only a test dependency: citation parity checks compare against its public exact() rule.
-dev = ["pytest==9.1.1", "zoop-ai-worker"]
+dev = ["pytest==9.1.1", "pytest-xdist==3.8.0", "zoop-ai-worker"]
 
 [tool.uv]
 package = true

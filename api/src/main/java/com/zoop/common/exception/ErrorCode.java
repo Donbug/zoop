@@ -11,6 +11,7 @@ public enum ErrorCode {
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "요청이 허용되지 않습니다.", false),
     EMAIL_TAKEN(HttpStatus.CONFLICT, "이미 등록된 이메일입니다.", false),
     SOCIAL_LINK_REQUIRED(HttpStatus.CONFLICT, "기존 계정으로 로그인한 후 소셜 계정을 연결해 주세요.", false),
+    VALIDATION_FAILED(HttpStatus.UNPROCESSABLE_CONTENT, "자동 검증 또는 필수 근거 검증을 통과하지 못했습니다.", false),
     REVISION_CONFLICT(HttpStatus.CONFLICT, "설정이 변경되었습니다. 최신 상태를 확인해 주세요.", false),
     IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, "같은 요청 키에 다른 내용이 사용되었습니다.", false),
     JOB_IN_PROGRESS(HttpStatus.CONFLICT, "이 대화에서 아직 처리 중인 질문이 있습니다.", false),

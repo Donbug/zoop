@@ -11,6 +11,7 @@ import java.util.Optional;
 import com.zoop.chat.repository.ChatJobRow;
 import com.zoop.chat.repository.ChatRepository;
 import com.zoop.chat.repository.ChatSessionRow;
+import com.zoop.chat.repository.ChatSessionSummaryRow;
 import com.zoop.chat.repository.NewChatJob;
 
 /** In-memory {@link ChatRepository} with the table's uniqueness rules: job id, and one queued/running job per conversation. */
@@ -45,6 +46,24 @@ final class MemoryChatRepository implements ChatRepository {
     public Optional<ChatSessionRow> latestSession(String memberId) {
         return sessions.values().stream().filter(s -> s.memberId().equals(memberId))
                 .max(Comparator.comparing(ChatSessionRow::updatedAt).thenComparing(ChatSessionRow::id));
+    }
+
+    @Override
+    public List<ChatSessionSummaryRow> sessions(String memberId, Instant afterUpdatedAt, String afterId, int limit) {
+        Comparator<ChatSessionRow> latest = Comparator.comparing(ChatSessionRow::updatedAt).thenComparing(ChatSessionRow::id);
+        return sessions.values().stream().filter(s -> s.memberId().equals(memberId) && !jobs(s.id()).isEmpty())
+                .filter(s -> afterUpdatedAt == null
+                        || latest.compare(s, new ChatSessionRow(afterId, memberId, afterUpdatedAt, afterUpdatedAt)) < 0)
+                .sorted(latest.reversed()).limit(limit)
+                .map(s -> new ChatSessionSummaryRow(s.id(), s.createdAt(), s.updatedAt(), jobs(s.id()).getFirst().question(),
+                        jobs(s.id()).size()))
+                .toList();
+    }
+
+    @Override
+    public boolean deleteSession(String sessionId) {
+        jobs.values().removeIf(j -> j.sessionId().equals(sessionId));
+        return sessions.remove(sessionId) != null;
     }
 
     @Override

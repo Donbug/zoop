@@ -7,14 +7,20 @@ examples. Every example is built through the real wire models, so an example tha
 """
 from __future__ import annotations
 
+import hashlib
+import json
+
 from typing import Any
 
 from . import chat_doc, extraction_doc, graph_doc, handoff_doc
+from .handoff_exposure_wire import ExposureQuery
 from .relation_ledger import OperationRow
 from .relation_review import operation_status
 from .relation_wire import (SCHEMA as RELATION_SCHEMA, RelationErrorEnvelope, RelationJobContent, RelationJobStatus, RelationOperationStatus,
                             RelationResultEnvelope, RelationReview, RelationSubmit, next_action as relation_next)
 from .wire import SCHEMA, ErrorBody, ErrorEnvelope, JobStatus, ResultEnvelope, next_action
+from .plan_wire import (PLAN_ID_PATTERN, PlanAdmissionEnvelope, PlanErrorEnvelope, PlanPolicyDisabled,
+                        PlanPolicyEnabled, PlanPolicyState, PlanPolicyUpdate, PlanReference)
 
 CONTRACT = "ai-contract.schema.json"
 STAMP = "2026-10-12T03:00:00Z"
@@ -390,6 +396,107 @@ def _document_relation(spec: dict[str, Any], sample: dict[str, dict[str, Any]]) 
     _attach(lookup, "409", {"example": sample["errors"]["409.executionUnavailable"]})
 
 
+def plan_examples() -> dict[str, Any]:
+    """Synthetic, model-validated references and receipts; never a source grant."""
+    def digest(value: Any) -> str:
+        return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+                                         allow_nan=False).encode("utf-8")).hexdigest()
+
+    reference = PlanReference(schema_version="zoop-ai-plan-admission-1", plan_id="s2plan-" + DIGEST, plan_digest=DIGEST).wire()
+    provenance = {"sourceKind": "synthetic", "executionMode": "replay", "recordingKind": "authored-test"}
+    upstream = {"jobId": "synthetic-plan-unit-1", "inputDigest": DIGEST}
+    relation_id = "s3p-" + digest({"format": "zoop-plan-admission-relation-job-1", "planId": reference["planId"],
+                                  "planDigest": DIGEST, "upstream": upstream})
+    manifest = {"schemaVersion": "zoop-ai-plan-manifest-1", "planId": reference["planId"], "planDigest": DIGEST,
+                "receiptSha256": DIGEST, "principal": "synthetic-app",
+                "round": {"sourceId": "synthetic-source", "roundId": "synthetic-round-1", "ingestionInputDigest": DIGEST},
+                "provenance": provenance, "units": [{
+                    "unitKey": upstream["jobId"],
+                    "extractionSubmit": {"schemaVersion": "zoop-extraction-s2-2", "jobId": upstream["jobId"], "approvedRequestDigest": DIGEST},
+                    "extractionInputDigest": DIGEST,
+                    "relationSubmit": {"schemaVersion": "zoop-relation-s3", "jobId": relation_id,
+                                       "provenance": provenance, "upstream": upstream}}]}
+    manifest["manifestDigest"] = digest(manifest)
+    admitted = PlanAdmissionEnvelope.model_validate({
+        "schemaVersion": "zoop-ai-plan-admission-1",
+        "admissionId": "pa-" + digest({"format": "zoop-plan-admission-identity-1", "principal": "synthetic-app",
+                                      "planId": reference["planId"], "planDigest": DIGEST}),
+        "acceptedAt": STAMP, "policyRevision": 1, "policyDigest": DIGEST,
+        "manifest": manifest, "authority": {"state": "active", "reason": None}}).wire()
+    disabled = PlanPolicyDisabled(schema_version="zoop-ai-plan-policy-1", enabled=False).wire()
+    unconfigured = PlanPolicyState(revision=0, policy_digest=None, policy=None, status="unconfigured",
+                                   usage={"plans": 0, "units": 0}).wire()
+    update = PlanPolicyUpdate(operation_id="synthetic-policy-disable-1", revision=1,
+                              policy_digest=digest(disabled), changed=True).wire()
+    return {"reference": reference, "admitted": admitted, "disabled": disabled, "unconfigured": unconfigured, "update": update}
+
+
+def _document_plans(spec: dict[str, Any]) -> None:
+    schemas = spec["components"]["schemas"]
+    for model in (PlanReference, PlanPolicyDisabled, PlanPolicyEnabled):
+        schema = model.model_json_schema(by_alias=True, ref_template="#/components/schemas/{model}")
+        for name, definition in schema.pop("$defs", {}).items():
+            schemas.setdefault(name, definition)
+        schemas[model.__name__] = schema
+    sample = plan_examples()
+    paths = spec["paths"]
+    admit = paths["/internal/v1/plan-admissions"]["post"]
+    admit["requestBody"] = {"required": True, "content": {"application/json": {
+        "schema": {"$ref": "#/components/schemas/PlanReference"},
+        "examples": {"exactReference": {"summary": "Synthetic exact reference; Idempotency-Key equals planId", "value": sample["reference"]}}}}}
+    admit["description"] = (
+        "Scope plan.admit. Resolve only the configured plan root and completely verify the installed plan. "
+        "Admission atomically persists paired S2/S3 references and cumulative quota, but never submits or dispatches either job. "
+        "201 is a first commit; 200 is the original immutable receipt, including inactive history, without regeneration or quota debit. "
+        "An admission is not present source-rights proof, readiness, spending permission, publication or activation. "
+        "Manual and online authorities are exclusive; absent online configuration returns execution_unavailable after authentication. "
+        "Requests are bounded at 2,000,000 bytes. Complete replies are bounded at 16,000,000 bytes; units are never truncated. "
+        "Revisions, counters and limits are signed 64-bit nonnegative integers (positive for a revision or policy limit).")
+    lookup = paths["/internal/v1/plan-admissions/{planId}"]["get"]
+    lookup["description"] = "Scope plan.read. Exactly one planDigest query is required; no listing/search. Unknown and other-principal records answer alike. The manifest is persisted immutable history; only current admission-policy authority changes. No dispatch."
+    for operation in (admit, lookup):
+        for code in ("200", "201"):
+            if code in operation["responses"]:
+                _attach(operation, code, {"admitted": {"summary": "Immutable synthetic admission and current policy authority", "value": sample["admitted"]}})
+                operation["responses"][code]["headers"] = {
+                    "Location": {"description": "Exact query URL including planDigest.", "schema": {"type": "string"}}}
+    policy_get = paths["/internal/v1/plan-admission-policy"]["get"]
+    policy_put = paths["/internal/v1/plan-admission-policy"]["put"]
+    policy_get["description"] = "Scope plan.policy, never assigned to the application admission/execution principal. Current policy status and cumulative usage; initial revision zero has no policy. ETag is quoted plan-policy-<revision>-<digest or none>."
+    policy_get["responses"]["200"]["headers"] = {
+        "ETag": {"description": 'Exact quoted current policy identity; initially \"plan-policy-0-none\".', "schema": {"type": "string"}}}
+    _attach(policy_get, "200", {"unconfigured": {"summary": "Default: no policy", "value": sample["unconfigured"]}})
+    policy_put["requestBody"] = {"required": True, "content": {"application/json": {
+        "schema": {"oneOf": [{"$ref": "#/components/schemas/PlanPolicyDisabled"}, {"$ref": "#/components/schemas/PlanPolicyEnabled"}]},
+        "examples": {"disabled": {"summary": "Synthetic disable operation, not an operating grant", "value": sample["disabled"]}}}}}
+    policy_put["description"] = (
+        "Scope plan.policy. Raw closed policy document; exact If-Match and stable operation Idempotency-Key are required. "
+        "Exact operator/key/body/If-Match retries return their historical receipt, even after another update. "
+        "Changed body or If-Match with the same key conflicts (409); a new stale CAS conflicts (412). "
+        "Identical current bytes do not renew revision/expiry or reset usage. A changed policy terminally retires all prior admissions. "
+        "A replay receipt is not current state: GET current policy rather than treating it as the latest revision. "
+        "Policy changes never refund usage and never authorize source/model spending. Application clients have no policy-write method.")
+    _attach(policy_put, "200", {"disabled": {"summary": "Historical operation receipt, not current policy", "value": sample["update"]}})
+    # A historical PUT receipt must never acquire a later current-state ETag.
+    for path in ("/internal/v1/plan-admissions", "/internal/v1/plan-admissions/{planId}", "/internal/v1/plan-admission-policy"):
+        for operation in paths[path].values():
+            for parameter in operation.get("parameters", []):
+                if parameter["name"] == "Idempotency-Key":
+                    parameter.update(required=True, schema={"type": "string", "pattern": PLAN_ID_PATTERN if operation is admit else r"^[A-Za-z0-9_.-]{1,120}$"},
+                                     description="Must equal body.planId." if operation is admit else "Stable operator-scoped operation id; retry identical body and If-Match.")
+                elif parameter["name"] == "If-Match":
+                    parameter.update(required=True, schema={"type": "string"}, description='Exact quoted policy ETag from GET; initially \"plan-policy-0-none\".')
+                elif parameter["name"] == "planDigest":
+                    parameter.update(required=True, schema={"type": "string", "pattern": r"^[0-9a-f]{64}$"})
+            for code, response in operation["responses"].items():
+                if int(code) >= 400:
+                    error_code = {401: "authentication_required", 403: "scope_denied", 404: "admission_not_found", 409: "admission_disabled",
+                                  412: "policy_conflict", 413: "request_too_large", 415: "unsupported_media_type",
+                                  422: "invalid_request", 500: "internal_error", 503: "authority_unavailable"}[int(code)]
+                    value = PlanErrorEnvelope(error=ErrorBody(code=error_code, retryable=int(code) == 503, request_id="req-plan-0001")).wire()
+                    response["content"]["application/json"]["examples"] = {"error": {"summary": error_code, "value": value}}
+
+
 def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     """The full document. `submit_example` is a worker-fixture Submit body (repository-authored synthetic text)."""
     spec = app.openapi()
@@ -403,7 +510,9 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
                     {"name": "extraction-jobs", "description": "S2 event/topic candidate jobs over an operator-approved request, through the installed zoop-ai-extract pipeline (replay, or live for an operator-pinned approval)."},
                     {"name": "graph-versions", "description": "Read-only, nonpublic S3 graph version status and company focus over operator-listed versions, through the installed zoop-ai-graph pipeline (no write, no model)."},
                     {"name": "graph-handoffs", "description": "Read-only, nonpublic AI handoff status and whole-bundle delivery over operator-pinned handoffs, through the installed zoop-ai-handoff export command (no write, no model, no network)."},
-                    {"name": "chat-stages", "description": "One chatbot model stage (router, answer or verification) per request, synchronously, through the installed zoop-ai-chat runtime (replay, or live behind the chat gate)."}]
+                    {"name": "chat-stages", "description": "One chatbot model stage (router, answer or verification) per request, synchronously, through the installed zoop-ai-chat runtime (replay, or live behind the chat gate)."},
+                    {"name": "plan-admissions", "description": "Bounded exact plan admission and immutable reference reads; no dispatch."},
+                    {"name": "plan-admission-policy", "description": "Separate operator-only policy CAS control; never application authority."}]
     components = spec["components"]
     components["securitySchemes"] = {"bearerAuth": {"type": "http", "scheme": "bearer",
                                                     "description": "Operator-issued token; the service holds only its SHA-256 digest. Roles are the route scopes."}}
@@ -418,7 +527,9 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
               "submitExtractionJob": "extraction.submit", "getExtractionJobStatus": "extraction.read", "getExtractionJobResult": "extraction.read",
               "cancelExtractionJob": "extraction.cancel", "recoverExtractionJob": "extraction.recover",
               "getGraphVersionStatus": "graph.read", "getGraphVersionFocus": "graph.read",
-              "getGraphHandoffStatus": "handoff.read", "getGraphHandoffBundle": "handoff.read", "invokeChatStage": "chat.invoke"}
+              "getGraphHandoffStatus": "handoff.read", "getGraphHandoffBundle": "handoff.read", "queryGraphHandoffExposure": "handoff.exposure",
+              "invokeChatStage": "chat.invoke", "admitPlan": "plan.admit", "getPlanAdmission": "plan.read",
+              "getPlanAdmissionPolicy": "plan.policy", "setPlanAdmissionPolicy": "plan.policy"}
     for path in spec["paths"].values():
         for operation in path.values():
             operation["security"] = [{"bearerAuth": [scopes[operation["operationId"]]]}]
@@ -434,7 +545,7 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
                     parameter.update(description="Optional correlation id, echoed on every response and never used as an idempotency key.",
                                      schema={"type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$"})
             for code in ("401", "403", "404", "422", "503"):
-                if code in operation["responses"] and not any(name in operation["operationId"] for name in ("Relation", "Extraction", "Graph")):
+                if code in operation["responses"] and not any(name in operation["operationId"] for name in ("Relation", "Extraction", "Graph", "Plan")):
                     _attach(operation, code, {"example": {"summary": sample["errors"][code]["summary"], "value": sample["errors"][code]["value"]}})
     base = spec["paths"]["/internal/v1/analysis-jobs"]["post"]
     base["requestBody"] = {"required": True, "content": {"application/json": {
@@ -472,5 +583,22 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     extraction_doc.document(spec)
     graph_doc.document(spec)
     handoff_doc.document(spec)
+    request = ExposureQuery.model_json_schema(by_alias=True, ref_template="#/components/schemas/{model}")
+    for name, definition in request.pop("$defs", {}).items():
+        components["schemas"].setdefault(name, definition)
+    components["schemas"]["ExposureQuery"] = request
+    exposure = spec["paths"]["/internal/v1/graph-handoffs/exposure"]["post"]
+    exposure["requestBody"] = {"required": True, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ExposureQuery"}}}}
+    exposure["description"] = (
+        "Requires handoff.exposure, independent of handoff.read. One explicit selection of 1–20 unique handoff IDs; request at most 65,536 UTF-8 bytes. "
+        "No query parameters, idempotency requirement, job, cache, retry or partial result. Invokes zoop-ai-handoff-exposure directly, never ordinary export. "
+        "Source rights are not evaluated: frozen identity reads remain possible after source revocation, but every allowlist entry must remain unchanged. "
+        "A complete allowlist snapshot is checked before the child, after any gate wait, after the child before errors are interpreted, and before response. "
+        "These are separate observations, not atomic revocation. Closed canonical report limit: 6 MiB including newline; model/provider calls are zero. "
+        "The CLI validates frozen artifacts; the service compares reported manifest/bundle pins to the allowlist, not hashes of bundle bytes it did not receive. "
+        "The app must reconcile handoffId, manifestDigest, bundleDigest and contentDigest with its receipt. This endpoint changes no exclusion, revision or "
+        "activation state; errors and empty/smaller reports never clear exclusions.")
+    exposure["responses"]["200"]["description"] = "Complete unchanged identity-only report in the handoff envelope; not current delivery authority or import readiness."
     chat_doc.document(spec)
+    _document_plans(spec)
     return spec

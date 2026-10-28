@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import copy
+import io
 import json
 import os
 import sqlite3
+import sys
+from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 
 import pytest
@@ -42,6 +45,106 @@ def resume(kit, rid="round-1"):
     store = Store(kit.root / "state")
     try:
         return Ingestor(store, Authority(kit.registry_path)).resume(rid, "synthetic-source")
+    finally:
+        store.close()
+
+
+def _unknown_parser_version(monkeypatch, library, failure):
+    lookup = parsers.version
+
+    def damaged_metadata(name):
+        if name != library:
+            return lookup(name)
+        if failure == "missing":
+            raise PackageNotFoundError(name)
+        return None if failure == "null" else ""
+
+    monkeypatch.setattr(parsers, "version", damaged_metadata)
+
+
+@pytest.mark.parametrize("library", ["lxml", "pypdf"])
+@pytest.mark.parametrize("failure", ["null", "empty", "missing"])
+def test_unknown_parser_identity_refuses_cli_run_before_preparation(kit, monkeypatch, capsys, library, failure):
+    from zoop_ai_pipeline.ingestion_cli import main
+
+    manifest = kit.manifest("unknown-parser", [[kit.item()]])
+    _unknown_parser_version(monkeypatch, library, failure)
+    monkeypatch.setattr(sys, "argv", ["zoop-ingestion", "run", "--state-dir", str(kit.root / "state"),
+                                    "--sources", str(kit.registry_path), "--fixture-manifest", str(manifest)])
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(json_bytes(kit.request(manifest)))))
+    assert main() == 2
+    captured = capsys.readouterr()
+    assert json.loads(captured.out) == {"schemaVersion": "zoop-ingestion-s2-1", "error": {"code": "input_or_configuration_invalid"}}
+    assert captured.err == ""
+    store = Store(kit.root / "state", existing=True)
+    try:
+        for table in ("rounds", "raw_versions", "preparations", "versions", "candidates"):
+            assert store.one(f"SELECT COUNT(*) n FROM {table}")["n"] == 0
+        request = Export.model_validate(kit.selector(page=0, ordinal=0, documentId="not-created",
+                                                    rawVersion="not-created", documentVersion="not-created"))
+        with pytest.raises(IngestionFailure, match="^round_not_found$"):
+            Ingestor(store, Authority(kit.registry_path)).export(request)
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize("library", ["lxml", "pypdf"])
+@pytest.mark.parametrize("failure", ["null", "empty", "missing"])
+def test_unknown_parser_identity_stops_incomplete_resume_without_durable_hold(kit, monkeypatch, library, failure):
+    manifest = kit.manifest("recover-parser", [[kit.item()]])
+    payload = json.loads(manifest.read_bytes())
+    body = kit.inputs / payload["documents"]["html"]["file"]
+    body.unlink()
+    first = execute(kit, manifest)
+    assert first["state"] == "incomplete" and first["counts"]["textReady"] == 0
+    body.write_bytes(HTML)
+    with monkeypatch.context() as damaged:
+        _unknown_parser_version(damaged, library, failure)
+        stopped = resume(kit)
+    assert stopped["state"] == "incomplete"
+    assert stopped["failure"] == {"code": "input_or_configuration_invalid"}
+    assert stopped["checkpoint"]["revision"] == 0
+    assert stopped["counts"]["textReady"] == stopped["counts"]["held"] == 0
+    ref = stopped["documentRefs"][0]
+    assert ref["rawVersion"] is not None and ref["documentVersion"] is None
+    store = Store(kit.root / "state", existing=True)
+    try:
+        for table in ("preparations", "versions"):
+            assert store.one(f"SELECT COUNT(*) n FROM {table}")["n"] == 0
+        request = Export.model_validate(kit.selector(page=0, ordinal=0, documentId=ref["documentId"],
+                                                    rawVersion=ref["rawVersion"], documentVersion="not-prepared"))
+        with pytest.raises(IngestionFailure, match="^observation_not_found$"):
+            Ingestor(store, Authority(kit.registry_path)).export(request)
+    finally:
+        store.close()
+    recovered = resume(kit)
+    assert recovered["state"] == "complete" and recovered["counts"]["textReady"] == 1
+    assert recovered["counts"]["newRawVersions"] == recovered["counts"]["newTextVersions"] == 1
+
+
+@pytest.mark.parametrize("library", ["lxml", "pypdf"])
+@pytest.mark.parametrize("failure", ["null", "empty", "missing"])
+def test_healthy_parser_identity_and_history_remain_exact_when_runtime_metadata_breaks(kit, monkeypatch, library, failure):
+    from zoop_ai_pipeline.corpus_review import NativeDocument
+
+    assert parsers.profile() == {"parser": "zoop-native-parsers-1", "lxml": "6.1.3", "pypdf": "6.19.0",
+        "mappingVersion": "unicode-copy-segments-1", "htmlDecoding": "utf-8-strict", "htmlScope": "native-article-scope-1",
+        "pdfExtraction": "page-text-bounded-1", "articleXPath": None}
+    result = execute(kit, kit.manifest("healthy-parser", [[kit.item()]]))
+    ref = result["documentRefs"][0]
+    assert ref["documentVersion"] == "4b685906fc3a1402c605da54a7ab7fc9e2e49f7af6021dbc06eab3287a551fe9"
+    before = inspect(kit, ref)
+    store = Store(kit.root / "state", existing=True)
+    try:
+        runner = Ingestor(store, Authority(kit.registry_path))
+        selector = Export.model_validate(kit.selector(**{k: ref[k] for k in ("page", "ordinal", "documentId", "rawVersion", "documentVersion")}))
+        exported = runner.export(selector)
+        NativeDocument.model_validate(exported)
+        _unknown_parser_version(monkeypatch, library, failure)
+        assert runner.export(selector) == exported
+        inspected = runner.inspect(Inspect.model_validate(kit.selector(documentId=ref["documentId"], documentVersion=ref["documentVersion"])))
+        assert inspected == before
+        assert runner.resume("round-1", "synthetic-source") == result
     finally:
         store.close()
 

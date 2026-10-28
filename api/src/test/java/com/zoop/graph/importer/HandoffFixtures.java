@@ -216,6 +216,7 @@ final class HandoffFixtures {
         policy.put("sequence", "s2-comparison-with-operator-decision");
         policy.put("sourceSupport", HandoffBundleVerifier.SOURCE_SUPPORT_POLICY);
         policy.put("impacts", HandoffBundleVerifier.IMPACTS_POLICY);
+        policy.put("issueSummary", HandoffIssueSummary.POLICY);
 
         ObjectNode pin = StrictJson.newObject();
         pin.putObject("relation").put("jobId", relationJob).put("inputDigest", "f".repeat(64));
@@ -364,6 +365,8 @@ final class HandoffFixtures {
             verdicts.add(verdict("period", "2026Q3", "HOLD", "ambiguous", basisId));
         }
         issue.set("sourceSupport", sourceSupport(spec.origin()));
+        // A HOLD/REJECT verdict anywhere leaves exactly temporal-review-pending; otherwise no job was pinned: not-requested.
+        issue.set("summary", unavailable(spec.verdicts() ? HandoffIssueSummary.TEMPORAL_PENDING : HandoffIssueSummary.NOT_REQUESTED));
         ObjectNode sameValue = provenanceOfIssue.putObject("sameValueMentions");
         for (String field : List.of("title", "action", "target", "eventTime", "period", "assertionStatus")) {
             ObjectNode reference = sameValue.putArray(field).addObject();
@@ -739,6 +742,140 @@ final class HandoffFixtures {
         }
         node.putArray("duplicateGroups");
         return node;
+    }
+
+    // ---------------------------------------------------------------------------------------------- issue summary ------------------------
+
+    static final String SUMMARY_JOB = "summary-job-1";
+    /** The one claim of the standard issue's available summary: a Hangul sentence that restates its one mention quote. */
+    static final String SUMMARY_CLAIM = "합성기업이 계약을 발표했다.";
+
+    /** An {@code unavailable} summary with {@code source: null}: {@code not-requested}, {@code temporal-review-pending} or {@code input-too-large}. */
+    static ObjectNode unavailable(String code) {
+        ObjectNode node = StrictJson.newObject();
+        node.put("status", "unavailable");
+        node.put("code", code);
+        node.putNull("source");
+        return node;
+    }
+
+    /**
+     * The summary basis of the standard issue, built by hand from the bundle's own fields (not through the verifier's code): its
+     * title, its ONE mention quote ({@code report}: the mention is not a background one) and that quote's article version.
+     */
+    static ObjectNode summaryBasis(ObjectNode bundle) {
+        JsonNode issue = bundle.get("issues").get(0);
+        JsonNode mention = issue.get("mentions").get(0);
+        String quoteId = mention.get("evidenceIds").get(0).stringValue();
+        JsonNode record = null;
+        for (JsonNode candidate : bundle.get("evidence")) {
+            if (candidate.get("id").stringValue().equals(quoteId)) {
+                record = candidate;
+            }
+        }
+        JsonNode article = bundle.get("articles").get(0);
+        ObjectNode basis = StrictJson.newObject();
+        basis.put("policy", HandoffIssueSummary.POLICY);
+        basis.put("issueId", issue.get("id").stringValue());
+        basis.put("title", issue.get("title").stringValue());
+        ObjectNode quote = basis.putArray("quotes").addObject();
+        quote.put("evidenceId", quoteId);
+        quote.put("articleId", record.get("articleId").stringValue());
+        quote.put("articleVersion", record.get("articleVersion").stringValue());
+        quote.put("start", record.get("start").intValue());
+        quote.put("end", record.get("end").intValue());
+        quote.put("quoteSha256", record.get("quoteSha256").stringValue());
+        quote.put("context", mention.get("background").booleanValue() ? "background" : "report");
+        ObjectNode used = basis.putArray("articles").addObject();
+        used.put("articleId", article.get("articleId").stringValue());
+        used.put("articleVersion", article.get("articleVersion").stringValue());
+        used.put("documentId", article.get("documentId").stringValue());
+        used.put("documentVersion", article.get("documentVersion").stringValue());
+        used.put("textSha256", article.get("textSha256").stringValue());
+        return basis;
+    }
+
+    /** The {@code source} pin of a job result: its identity, the basis it was written for and the digest of {@code body} around them. */
+    private static ObjectNode summarySource(ObjectNode body, String basisDigest) {
+        ObjectNode preimage = StrictJson.newObject();
+        preimage.put("jobId", SUMMARY_JOB);
+        preimage.put("inputDigest", "9".repeat(64));
+        preimage.put("basisDigest", basisDigest);
+        preimage.set("result", body);
+        ObjectNode source = StrictJson.newObject();
+        source.put("jobId", SUMMARY_JOB);
+        source.put("inputDigest", "9".repeat(64));
+        source.put("resultDigest", Canonical.digest(preimage));
+        source.put("basisDigest", basisDigest);
+        return source;
+    }
+
+    /**
+     * The AVAILABLE summary of the standard issue's one quote with every digest recomputed the way the producer does (basis digest,
+     * {@code isr-} result version, result digest). The producer and verifier kinds pair with the bundle's execution mode: authored
+     * replay with no model, or a provider with an independent verifier and named models.
+     */
+    static ObjectNode availableSummary(ObjectNode bundle) {
+        boolean live = bundle.get("provenance").get("executionMode").stringValue().equals("live");
+        ObjectNode basis = summaryBasis(bundle);
+        String basisDigest = Canonical.digest(basis);
+        String quoteId = basis.get("quotes").get(0).get("evidenceId").stringValue();
+        ArrayNode claims = StrictJson.newArray();
+        ObjectNode claim = claims.addObject();
+        claim.put("claimId", "c1");
+        claim.put("text", SUMMARY_CLAIM);
+        claim.putArray("evidenceIds").add(quoteId);
+        ObjectNode body = StrictJson.newObject();
+        body.put("status", "available");
+        body.put("text", SUMMARY_CLAIM);
+        body.set("claims", claims.deepCopy());
+        body.putArray("evidenceIds").add(quoteId);
+        body.put("generatedAt", "2026-10-22T01:02:03+00:00");
+        ObjectNode version = StrictJson.newObject();
+        version.put("basisDigest", basisDigest);
+        version.set("claims", claims);
+        body.put("resultVersion", "isr-" + Canonical.digest(version));
+        body.put("language", "ko");
+        ObjectNode producer = body.putObject("producer");
+        producer.put("kind", live ? "provider" : "authored-replay");
+        if (live) {
+            producer.put("model", "gpt-6-luna");
+            producer.put("reasoningEffort", "high");
+        } else {
+            producer.putNull("model");
+            producer.putNull("reasoningEffort");
+        }
+        producer.put("promptVersion", "zoop-issue-summary-prompt-1");
+        producer.put("schemaDigest", "7".repeat(64));
+        producer.put("runtimeIdentity", "8".repeat(64));
+        ObjectNode verifier = body.putObject("verifier");
+        verifier.put("kind", live ? "independent-verifier" : "authored-replay");
+        if (live) {
+            verifier.put("model", "jev-1.14.0");
+        } else {
+            verifier.putNull("model");
+        }
+        verifier.put("adapterIdentity", "a".repeat(64));
+        verifier.put("requestDigest", "b".repeat(64));
+        ObjectNode summary = body.deepCopy();
+        summary.set("source", summarySource(body, basisDigest));
+        return summary;
+    }
+
+    /** A job-coded {@code unavailable} summary ({@code producer-invalid}, {@code verifier-hold} or {@code verifier-reject}) of the standard issue. */
+    static ObjectNode withheldSummary(ObjectNode bundle, String code) {
+        String basisDigest = Canonical.digest(summaryBasis(bundle));
+        ObjectNode body = StrictJson.newObject();
+        body.put("status", "unavailable");
+        body.put("code", code);
+        ObjectNode summary = body.deepCopy();
+        summary.set("source", summarySource(body, basisDigest));
+        return summary;
+    }
+
+    /** The same handoff whose one issue carries the summary {@code make} builds from the built bundle (content digest and bundle pins recomputed). */
+    static Built withSummary(Built built, Function<ObjectNode, ObjectNode> make) {
+        return repinned(built, bundle -> ((ObjectNode) bundle.get("issues").get(0)).set("summary", make.apply(bundle)));
     }
 
     private static List<String> sorted(String... ids) {

@@ -20,6 +20,8 @@ import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.json.Canonical;
 import com.zoop.common.json.StrictJson;
+import com.zoop.admin.jobs.AnalyzePlanState.ServiceBinding;
+import org.springframework.beans.factory.ObjectProvider;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -30,15 +32,11 @@ import java.util.UUID;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * The administrator's view of analysis jobs (#132) and the two actions on an existing one (#133): cancel and retry. Neither
- * calls the AI service: a cancel marks the row (a running job is stopped by the worker that owns it) and a retry only queues a
- * new job with {@code retry_of}, which the worker submits later. Submitting a new job ({@code createAnalysisJob}) is not
- * offered until that worker exists, so no accepted job can wait forever.
- */
+/** Administrator mutations are DB-only. The durable worker reconciles the committed fixed AI identities afterwards. */
 @Service
 public class AnalysisJobService {
     static final String RETRY_RULE = "실패하거나 취소된 작업만, 그 작업의 가장 최근 시도에서 재시도할 수 있습니다. 재시도는 새 작업으로 대기열에 들어가며 "
@@ -46,6 +44,7 @@ public class AnalysisJobService {
     private static final Set<String> STATUSES = Set.of("queued", "running", "succeeded", "failed", "cancelled");
     private static final int DEFAULT_LIMIT = 50;
     private static final int MAX_LIMIT = 100;
+    private static final int DASHBOARD_RECENT_LIMIT = 5;
 
     private final JdbcAnalysisJobRepository repository;
     private final AdminAuditRepository audit;
@@ -53,13 +52,20 @@ public class AnalysisJobService {
     private final CsrfKeyRing keys;
     private final Clock clock;
 
+    private final JdbcAnalyzePlanRepository plans;
+    private final ObjectProvider<AnalyzePlanWorker> workers;
+    private final ObjectProvider<ServiceBinding> bindings;
     public AnalysisJobService(JdbcAnalysisJobRepository repository, AdminAuditRepository audit, ObjectMapper mapper,
-            CsrfKeyRing keys, Clock clock) {
+            CsrfKeyRing keys, Clock clock, JdbcAnalyzePlanRepository plans, ObjectProvider<AnalyzePlanWorker> workers,
+            ObjectProvider<ServiceBinding> bindings) {
         this.repository = repository;
         this.audit = audit;
         this.mapper = mapper;
         this.keys = keys;
         this.clock = clock;
+        this.plans = plans;
+        this.workers = workers;
+        this.bindings = bindings;
     }
 
     @Transactional(readOnly = true)
@@ -94,11 +100,84 @@ public class AnalysisJobService {
         }
     }
 
+    public record JobOverview(long running, long queued, long failed24h, JobOut active, List<JobOut> recent) { }
+
+    /** One DB snapshot for dashboard counts, rows, retry judgement and the same public JobOut mapping as list/detail. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public JobOverview dashboardAt(Instant asOf) {
+        var counts = repository.dashboardCountsAt(asOf);
+        List<JobRow> recent = repository.dashboardRecentAt(asOf, DASHBOARD_RECENT_LIMIT);
+        JobRow running = repository.dashboardRunningAt(asOf).orElse(null);
+        List<JobRow> judged = new ArrayList<>(recent);
+        if (running != null) judged.add(running);
+        List<JobRow> context = repository.retryContext(judged);
+        return new JobOverview(counts.running(), counts.queued(), counts.failed24h(),
+                running == null ? null : out(running, context), recent.stream().map(j -> out(j, context)).toList());
+    }
+
+    /** The pipeline overview's job part: counts, the newest failure, the ingest baseline and the newest jobs. */
+    public record PipelineJobs(long running, long queued, long failed24h, JobOut lastFailure, IngestBaseline ingest,
+            List<JobOut> recent) { }
+
+    /** One DB snapshot, the same public JobOut mapping as list/detail (joins the caller's read transaction). */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public PipelineJobs pipelineAt(Instant asOf, int recentLimit) {
+        var counts = repository.dashboardCountsAt(asOf);
+        List<JobRow> recent = repository.dashboardRecentAt(asOf, recentLimit);
+        JobRow failed = repository.latestFailedAt(asOf).orElse(null);
+        List<JobRow> judged = new ArrayList<>(recent);
+        if (failed != null) judged.add(failed);
+        List<JobRow> context = repository.retryContext(judged);
+        return new PipelineJobs(counts.running(), counts.queued(), counts.failed24h(),
+                failed == null ? null : out(failed, context), baseline(), recent.stream().map(j -> out(j, context)).toList());
+    }
+
     @Transactional(readOnly = true)
     public JobOut get(String id) {
         try {
             JobRow job = repository.adminJob(id).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
             return out(job, repository.retryContext(List.of(job)));
+        } catch (DataAccessException exception) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception);
+        }
+    }
+
+    /** Durable local acceptance, never an AI call. Replay is historical even after capability is disabled. */
+    @Transactional
+    public JobCreated create(AnalyzePlanCommand command, String idempotencyKey, AdminPrincipal admin, String requestId) {
+        String reason = AnalyzePlanRequestParser.checkedReason(command.reason());
+        ObjectNode body = StrictJson.newObject();
+        body.put("kind", "analyze_plan");
+        body.put("reason", reason);
+        body.set("plan", mapper.valueToTree(command.plan()));
+        validateKey(idempotencyKey);
+        String path = "/api/v1/admin/jobs";
+        String hash = Canonical.digest(body);
+        try {
+            var previous = repository.findIdempotencyForUpdate(admin.adminId(), path, idempotencyKey);
+            if (previous.isPresent()) return replay(previous.get(), hash, JobCreated.class);
+            if (workers.getIfAvailable() == null || bindings.getIfAvailable() == null) {
+                throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, false);
+            }
+            String proposedId = "job-" + UUID.randomUUID();
+            return idempotent(admin, path, idempotencyKey, proposedId, hash, 202, JobCreated.class, () -> {
+                ServiceBinding binding = bindings.getObject();
+                plans.registrationLock(command.plan().planId());
+                Instant at = clock.instant();
+                plans.register(command.plan(), binding, admin.adminId(), at);
+                String key = "analyze-plan:" + binding.digest() + ":" + command.plan().planId();
+                var existing = repository.rootForCommand(key);
+                if (existing.isPresent()) return new JobCreated(out(existing.get(), repository.retryContext(List.of(existing.get()))), true);
+                ObjectNode input = StrictJson.newObject();
+                input.put("schemaVersion", "zoop-app-analyze-plan-1");
+                input.put("planId", command.plan().planId());
+                input.put("planDigest", command.plan().planDigest());
+                repository.insertQueued(proposedId, "analyze_plan", "계획 분석", reason, admin.adminId(), at, null, key,
+                        mapper.writeValueAsString(input), command.plan().planId());
+                audit.recordAnalysisJobAction(admin.adminId(), admin.email(), "analysis.job.create", proposedId, null,
+                        "queued", proposedId, reason, requestId, at);
+                return new JobCreated(get(proposedId), false);
+            });
         } catch (DataAccessException exception) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception);
         }
@@ -117,7 +196,10 @@ public class AnalysisJobService {
             JobRow job = repository.lockAdmin(id).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
             Instant now = clock.instant();
             switch (job.status()) {
-                case "queued" -> repository.cancelQueued(id, now);
+                case "queued" -> {
+                    if ("analyze_plan".equals(job.kind())) plans.cancelQueued(id, now);
+                    else repository.cancelQueued(id, now);
+                }
                 case "running" -> {
                     if (job.cancelRequested()) return get(id); // already asked: nothing changes, nothing to audit
                     repository.requestCancel(id);
@@ -143,11 +225,11 @@ public class AnalysisJobService {
         return idempotent(admin, path, idempotencyKey, id, requestHash("retry", id, reason), 202, JobCreated.class, () -> {
             // The source row lock serialises two retries of the same job; the judge then sees the first one.
             JobRow job = repository.lockAdmin(id).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
-            if (!RetryJudge.judge(job, errorCode(job), repository.retryContext(List.of(job))).allowed()) throw new CustomException(ErrorCode.REVISION_CONFLICT);
+            if (!retryState(job, errorCode(job), repository.retryContext(List.of(job))).allowed()) throw new CustomException(ErrorCode.REVISION_CONFLICT);
             Instant now = clock.instant();
             String newId = "job-" + UUID.randomUUID();
             repository.insertQueued(newId, job.kind(), job.label(), reason, admin.adminId(), now, id, "retry:" + id,
-                    job.input());
+                    job.input(), job.planId());
             audit.recordAnalysisJobAction(admin.adminId(), admin.email(), "analysis.job.retry", id, job.status(),
                     job.status(), newId, reason, requestId, now);
             return new JobCreated(get(newId), false);
@@ -167,19 +249,29 @@ public class AnalysisJobService {
                     requestHash, clock.instant());
             IdempotencyRow record = repository.findIdempotencyForUpdate(admin.adminId(), path, key)
                     .orElseThrow(() -> new IllegalStateException("Claimed idempotency record is missing"));
+            if (!claimed) return replay(record, requestHash, type);
             if (!record.requestHash().equals(requestHash)) throw new CustomException(ErrorCode.IDEMPOTENCY_CONFLICT);
-            if (!claimed) {
-                if (!"completed".equals(record.status()) || record.responseBody() == null) {
-                    throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, true);
-                }
-                return mapper.readValue(record.responseBody(), type);
-            }
             T result = action.run();
             repository.completeIdempotency(record.id(), status, mapper.writeValueAsString(result));
             return result;
         } catch (DataAccessException exception) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception);
         }
+    }
+
+    private <T> T replay(IdempotencyRow record, String hash, Class<T> type) {
+        if (!record.requestHash().equals(hash)) throw new CustomException(ErrorCode.IDEMPOTENCY_CONFLICT);
+        if (!"completed".equals(record.status()) || record.responseBody() == null) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, true);
+        }
+        return mapper.readValue(record.responseBody(), type);
+    }
+
+    private AnalysisJobResponse.RetryState retryState(JobRow job, String error, List<JobRow> context) {
+        boolean available = "analyze_plan".equals(job.kind()) && workers.getIfAvailable() != null;
+        String barrier = "analyze_plan".equals(job.kind())
+                ? job.planId() == null ? "dataset_missing" : plans.retryBarrier(job.planId()) : null;
+        return RetryJudge.judge(job, error, context, available, barrier);
     }
 
     /** {@code context} holds at least the job's retries and later successes on its input (see {@code retryContext}). */
@@ -189,9 +281,10 @@ public class AnalysisJobService {
                 : Duration.between(j.startedAt(), j.finishedAt()).toMillis() / 1000.0;
         return new JobOut(j.id(), j.kind(), j.label(), j.status(), j.reason(), j.requestedBy(), iso(j.requestedAt()),
                 iso(j.startedAt()), iso(j.finishedAt()), duration, j.retryOf(), j.cancelRequested(), j.recovered(),
-                RetryJudge.judge(j, error == null ? null : error.code(), context), read(j.ingest(), IngestOutcome.class),
+                retryState(j, error == null ? null : error.code(), context), read(j.ingest(), IngestOutcome.class),
                 read(j.report(), RunReport.class), read(j.flush(), FlushResult.class), error,
-                read(j.ledgerBefore(), LedgerCounts.class), read(j.ledgerAfter(), LedgerCounts.class));
+                read(j.ledgerBefore(), LedgerCounts.class), read(j.ledgerAfter(), LedgerCounts.class),
+                "analyze_plan".equals(j.kind()) ? plans.summary(j.id(), null) : null);
     }
 
     /**

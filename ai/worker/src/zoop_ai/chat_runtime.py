@@ -269,8 +269,13 @@ class LiveSender:
                 self.env.get("TYPESAFE_API_KEY", ""))
 
     def preflight(self, request: StageRequest, config: ChatStageConfig) -> None:
-        if not self._endpoint(config)[1]:
+        key = self._endpoint(config)[1]
+        if not key:
             raise ProviderError("provider_key_required")
+        # A key with whitespace or control characters (e.g. a trailing space in an env file) cannot travel in a header: the HTTP
+        # client refuses it locally, which would look like an unknown fate. Refuse it here, before anything is reserved.
+        if any(ord(char) < 33 or ord(char) > 126 for char in key):
+            raise ProviderError("provider_key_invalid")
 
     def send(self, request: StageRequest, config: ChatStageConfig) -> Any:
         base, key = self._endpoint(config)

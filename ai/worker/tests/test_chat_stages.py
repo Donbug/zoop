@@ -145,6 +145,17 @@ def test_verification_policy_holds_whatever_is_uncertain():
     assert verdicts(choice("supported"), 0.5)[0]["prohibitedAdvice"] == "hold"
 
 
+def test_a_zoop_document_section_is_checked_against_its_quotes_like_evidence():
+    payload = VerificationInput.model_validate({
+        "sections": [{"basis": "zoop_documented", "text": "탈퇴하면 대화 기록이 지워집니다.", "evidenceIds": [EV2]}],
+        "citations": [{"evidenceId": EV2, "sourceId": "zoop-docs", "quote": "## 2. 보유 기간\n\n탈퇴하면 지웁니다."}]})
+    body = chat_jev.build_verification_request(payload, chat_jev.MODEL)
+    assert set(body["questions"]) == {"s0-support", "s0-advice"}
+    raw = {"model": chat_jev.MODEL, "answers": {"s0-support": choice("insufficient"), "s0-advice": noul(0.02)}}
+    assert [v.wire() for v in chat_jev.interpret_verification(raw, payload, chat_jev.MODEL).sections] == [
+        {"support": "hold", "prohibitedAdvice": "no"}]
+
+
 def test_stage_identities_are_separate_from_s1_and_from_each_other():
     versions = {chat_jev.prompt_version("chat-router"), chat_jev.prompt_version("chat-verification"),
                 chat_luna.prompt_version()}
@@ -162,6 +173,15 @@ def test_nothing_is_sent_without_the_live_gate_or_a_key(tmp_path):
     assert endpoint.calls == []
     # Refusals before sending leave nothing behind: the same invocation can run once allowed.
     assert run(request("chat-router", router_input()), tmp_path, endpoint).status == "succeeded"
+
+
+def test_a_key_that_cannot_travel_in_a_header_is_refused_before_anything_is_reserved(tmp_path):
+    endpoint = Endpoint(jev_all())
+    for bad in ("jev-key-synthetic ", " jev-key-synthetic", "jev-key	synthetic"):
+        refused = run(request("chat-router", router_input()), tmp_path, endpoint, env={**LIVE, "TYPESAFE_API_KEY": bad})
+        assert refused.failure.code == "provider_key_invalid" and not refused.failure.sent and not refused.failure.unknown
+    assert endpoint.calls == []
+    assert run(request("chat-router", router_input()), tmp_path, endpoint).status == "succeeded", "nothing was reserved"
 
 
 def test_the_router_goes_to_jev_with_the_jev_key_and_records_a_receipt(tmp_path):
@@ -411,3 +431,41 @@ def test_cli_prints_the_result_and_exits_by_outcome(tmp_path, monkeypatch, capsy
     monkeypatch.setattr("sys.stdin", io.StringIO('{"schemaVersion":"zoop-ai-chat-1"}'))
     assert chat_cli.main(["invoke", "--state-dir", str(state)]) == 64
     assert json.loads(capsys.readouterr().out) == {"error": "request_invalid"}
+
+
+def path_branch(*paths: dict[str, Any]) -> dict[str, Any]:
+    payload = answer_input()
+    payload["branches"][0]["paths"] = list(paths)
+    return payload
+
+
+def step(edge: str, evidence: list[str]) -> dict[str, Any]:
+    return {"edgeId": edge, "sourceId": "iss-hbm", "targetId": "KRX:000660", "relation": "INVOLVES", "role": None,
+            "evidenceIds": evidence}
+
+
+def test_path_pairs_keep_their_status_and_steps_name_only_quoted_evidence():
+    found = {"fromId": "KRX:000660", "toId": "NASDAQ:NVDA", "status": "found", "steps": [step("e-1", [EV1])]}
+    cut = {"fromId": "KRX:000660", "toId": "NASDAQ:AMD", "status": "cut", "steps": []}
+    none = {**cut, "status": "none"}
+    with_cut = request("chat-answer", path_branch(found, cut)).parsed().wire()
+    with_none = request("chat-answer", path_branch(found, none)).parsed().wire()
+    assert with_cut["branches"][0]["paths"][1]["status"] == "cut"
+    assert with_cut != with_none, "a pair cut by the limit never reads like a pair proven unconnected"
+    assert request("chat-answer", answer_input()).parsed().wire()["branches"][0]["paths"] == []
+
+    for bad in ({**found, "steps": []}, {**cut, "steps": [step("e-1", [EV1])]},
+                {**found, "steps": [step("e-1", ["ev-" + "9" * 64])]}):
+        with pytest.raises(ValueError):
+            request("chat-answer", path_branch(bad)).parsed()
+
+
+def test_the_answer_prompt_explains_paths_and_its_version_moved():
+    assert "status=cut" in chat_luna.PROMPT and "evidenceIds" in chat_luna.PROMPT
+    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-10-26-1-")
+
+
+def test_the_answer_prompt_and_schema_know_zoop_document_sections():
+    assert "zoop_documented" in chat_luna.PROMPT and "zoop-docs" in chat_luna.PROMPT
+    basis = json.dumps(chat_luna.schema(), ensure_ascii=False)
+    assert "zoop_documented" in basis

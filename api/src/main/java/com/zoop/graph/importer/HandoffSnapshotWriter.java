@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 
 import com.zoop.common.json.Canonical;
 import com.zoop.common.json.StrictJson;
@@ -20,6 +21,7 @@ import com.zoop.graph.importer.HandoffBundle.Issue;
 import com.zoop.graph.importer.HandoffBundle.Relation;
 import com.zoop.graph.importer.HandoffExportParser.VerifiedHandoff;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -47,7 +49,7 @@ import tools.jackson.databind.node.ObjectNode;
  * always gives the same ids. The representative event resolves to its article version the same way, and is written as
  * {@code null} when that mention is not among the written ones, never as a mention the snapshot lacks. A document identity that
  * matches more than one bundle article is genuinely ambiguous and refused ({@link GraphHandoffFailure#MENTION_ARTICLE_AMBIGUOUS});
- * the verifier of {@code zoop-graph-handoff-bundle-6} already requires exactly one article per mention document version, and every
+ * the verifier of {@code zoop-graph-handoff-bundle-7} already requires exactly one article per mention document version, and every
  * original mention cites evidence of its own article, so under that schema the references cover every mention of an issue. The
  * snapshot does not carry the mention values (title, action, time, assertion status, background, participants): they are the
  * producer's S2 candidate or snapshot values ({@code verification: "none"}) and stay only in the receipt, which keeps the whole
@@ -67,7 +69,12 @@ import tools.jackson.databind.node.ObjectNode;
  * to {@code -5} the top-level {@code impacts} is absent from the receipt: a reader must treat impacts as unavailable, never as
  * {@code not-proposed} or {@code not-applicable}. From {@code -6} on, {@code impacts} (one row per S3 relation behind an INVOLVES
  * edge: the producer's unverified proposal, the verifier-mapped quote effects and the recomputed label) live ONLY in the receipt;
- * the snapshot carries no impact, proposal, effect, label or verifier digest.
+ * the snapshot carries no impact, proposal, effect, label or verifier digest. For {@code zoop-graph-handoff-bundle-1} to {@code -6}
+ * the issue's {@code summary} is absent from the receipt: a reader must treat it as unavailable (never produced), never as
+ * {@code not-requested}. From {@code -7} on, every issue carries a closed {@code summary} (see {@link HandoffIssueSummary}) that lives
+ * ONLY in the receipt as the exact producer object, never in the snapshot or the public graph read: it is not a snapshot projection.
+ * Whoever serves it must apply the current-rights and asOf gate to the issue's whole summary basis (every quote of
+ * {@code mentions[].evidenceIds}), not only to the claims' cited evidence.
  *
  * <p>{@code validUntil} is the last valid day (inclusive) and {@code null} is unknown, never "forever": days are written verbatim
  * or not at all ({@link HandoffTime#dayOrNull}); no midnight and no extra day is ever added.
@@ -230,6 +237,46 @@ final class HandoffSnapshotWriter {
             node.put("end", item.end());
         }
         return Canonical.bytes(root);
+    }
+
+    /**
+     * The snapshot written by {@link #snapshot} with only the issues, relations, article versions and evidence {@code visible} (a
+     * subset of it, from {@code PublicationRuleEvaluator.apply}) still holds, each kept element byte-for-byte as written and in its
+     * order. Every other key is copied unchanged, so a snapshot no rule filtered is the same bytes.
+     */
+    static byte[] keepOnly(byte[] snapshot, PublicGraphSnapshot visible) {
+        Set<String> issues = new HashSet<>();
+        visible.issues().forEach(issue -> issues.add(issue.issueId()));
+        Set<String> relations = new HashSet<>();
+        visible.relations().forEach(relation -> relations.add(relation.relationId()));
+        Set<String> articles = new HashSet<>();
+        visible.articles().forEach(article -> articles.add(article.articleId() + "\n" + article.version()));
+        Set<String> evidence = new HashSet<>();
+        visible.evidence().forEach(item -> evidence.add(item.evidenceId()));
+
+        Obj source = StrictJson.parseObject(snapshot);
+        ObjectNode root = StrictJson.newObject();
+        for (String key : source.node().propertyNames()) {
+            root.set(key, switch (key) {
+                case "issues" -> kept(source.array(key), node -> issues.contains(Obj.of(node).string("issueId")));
+                case "relations" -> kept(source.array(key), node -> relations.contains(Obj.of(node).string("relationId")));
+                case "articles" -> kept(source.array(key), node -> articles.contains(
+                        Obj.of(node).string("articleId") + "\n" + Obj.of(node).string("version")));
+                case "evidence" -> kept(source.array(key), node -> evidence.contains(Obj.of(node).string("evidenceId")));
+                default -> source.raw(key);
+            });
+        }
+        return Canonical.bytes(root);
+    }
+
+    private static ArrayNode kept(JsonNode array, Predicate<JsonNode> keep) {
+        ArrayNode out = StrictJson.newArray();
+        for (JsonNode node : array) {
+            if (keep.test(node)) {
+                out.add(node);
+            }
+        }
+        return out;
     }
 
     /** The written mentions of one issue (app mention id to its article version, ascending) and the representative's app id, if written. */

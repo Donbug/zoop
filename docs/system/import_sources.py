@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT = ROOT / "docs/system/catalog.yaml"
 SPEC_ID = re.compile(r"(?:NFS|FS)[0-9?]+(?:-[0-9?]+)?")
 VALID_ID = re.compile(r"(?:NFS|FS)\d{3}(?:-\d{2})?")
+TEXT_FINGERPRINT_SUFFIXES = {".csv", ".json", ".md"}
 
 
 def relative(path: Path) -> str:
@@ -23,6 +24,14 @@ def relative(path: Path) -> str:
         return path.resolve().relative_to(ROOT).as_posix()
     except ValueError:
         return path.resolve().as_posix()
+
+
+def fingerprint_bytes(path: Path) -> bytes:
+    """Hash text sources independently of the checkout's newline convention."""
+    content = path.read_bytes()
+    if path.suffix.lower() in TEXT_FINGERPRINT_SUFFIXES:
+        return content.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return content
 
 
 def csv_rows(path: Path) -> list[list[str]]:
@@ -242,7 +251,7 @@ def main() -> None:
     catalog = {"schemaVersion": 1, "sources": {"specDir": relative(args.spec_dir), "wbsDir": relative(args.wbs_dir),
                "requirementsDir": relative(args.requirements_dir), "screens": relative(args.screens), "gap": relative(args.gap),
                "historicalSpecFiles": [relative(p) for p in args.historical_spec_files]},
-               "fingerprints": {relative(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs},
+               "fingerprints": {relative(p): hashlib.sha256(fingerprint_bytes(p)).hexdigest() for p in inputs},
                "specs": specs, "requirements": requirements, "wbs": tasks, "wbsSources": wbs_sources,
                "screens": [{**s, "source": {"path": relative(args.screens), "row": s["page"], "rowUnit": "slide-page"}}
                            for s in screens], "implementation": import_implementation(args.gap), "warnings": warnings}

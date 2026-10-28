@@ -63,6 +63,11 @@ def load(path: Path, principals: Collection[str]) -> Access:
             raw = handle.read(MAX_BYTES + 1)
     except OSError:
         raise AccessError("upstream_allowlist_unreadable") from None
+    return parse(raw, principals)
+
+
+def parse(raw: bytes, principals: Collection[str]) -> Access:
+    """Validate bounded registry bytes without opening or creating a file."""
     if len(raw) > MAX_BYTES:
         raise AccessError("upstream_allowlist_too_large")
     try:

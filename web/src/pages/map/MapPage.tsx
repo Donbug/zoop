@@ -20,7 +20,10 @@ import { companyPath } from '@/components/graph/company-path';
 import ImpactPathPanel from '@/components/graph/ImpactPathPanel';
 import CompanyDetailPanel from '@/components/graph/CompanyDetailPanel';
 import RelationDetailPanel from '@/components/graph/RelationDetailPanel';
-import type { RelationDetail } from '@/types/map/relation';
+import type {
+  RelationDetail,
+  StructuralSupplyLink,
+} from '@/types/map/relation';
 import EventDetailPanel, {
   type EventAction,
 } from '@/components/graph/EventDetailPanel';
@@ -50,6 +53,7 @@ import { useImpactPath } from '@/hooks/useImpactPath';
 import { companyUrl } from '@/apis/company/company';
 import { setTutorialCompleted } from '@/apis/graph/tutorial';
 import { impactEdges, exactTime } from '@/components/company/detail-model';
+import { companyDetailRouteFromMap } from '@/util/company-detail-route';
 import type { Impact } from '@/types/company/detail';
 import { useAuth } from '@/hooks/useAuth';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
@@ -170,6 +174,7 @@ function MapWorkspace({
   const [retry, setRetry] = useState(0);
   const [notice, setNotice] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsedPath, setCollapsedPath] = useState<string | null>(null);
   const [filterHost, setFilterHost] = useState<HTMLDivElement | null>(null);
   const [centerRequest, setCenterRequest] = useState<{
     id: string;
@@ -297,6 +302,8 @@ function MapWorkspace({
   const pathParts = params.get('path')?.split(',') ?? [];
   const pathFrom = pathParts[0] || null;
   const pathTo = pathParts.length === 2 ? pathParts[1] || null : null;
+  const pathIsCollapsed =
+    !tutorialOpen && Boolean(pathFrom) && collapsedPath === params.get('path');
   const displayedPath =
     data && !loading && !error && pathFrom && pathTo
       ? companyPath(data, pathFrom, pathTo)
@@ -443,23 +450,15 @@ function MapWorkspace({
     });
     if (id) track({ type: 'graph_node_select', targetId: id, viewId });
   };
-  const eventContext = tutorialOpen
-    ? {
-        graphVersion: data?.metadata.graphVersion ?? undefined,
-        asOf: data?.metadata.asOf ?? undefined,
-      }
-    : {
-        round,
-        graphVersion:
-          params.get('graphVersion') ??
-          data?.metadata.graphVersion ??
-          undefined,
-        asOf: params.get('asOf') ?? data?.metadata.asOf ?? undefined,
-      };
+  const eventContext = {
+    round: tutorialOpen ? undefined : round,
+    graphVersion: data?.metadata.graphVersion ?? undefined,
+    asOf: data?.metadata.asOf ?? undefined,
+  };
   const impact = useImpactPath(
-    round && !data ? null : impactCompanyId,
-    round && !data ? null : impactIssueId,
-    round || tutorialOpen ? eventContext : undefined,
+    data && !loading && !error ? impactCompanyId : null,
+    data && !loading && !error ? impactIssueId : null,
+    eventContext,
     tutorialOpen &&
       target?.company.id === impactCompanyId &&
       target?.issue.id === impactIssueId
@@ -473,6 +472,7 @@ function MapWorkspace({
     )
       opener.current = document.activeElement;
     updateQuery({ select: `edge:${id}`, id: null, impact: null, path: null });
+    track({ type: 'graph_edge_select', targetId: id, viewId });
   }
   useEffect(() => {
     if (
@@ -503,6 +503,7 @@ function MapWorkspace({
     action: 'evidence' | 'ai',
     relation: RelationDetail,
     issueId?: string,
+    supplyLink?: StructuralSupplyLink,
   ) {
     const issue = relation.via.find((item) => item.id === issueId);
     const target: GraphTarget = {
@@ -510,14 +511,17 @@ function MapWorkspace({
       id: issue?.id ?? relation.id,
       label:
         issue?.title ?? `${relation.source.label} – ${relation.target.label}`,
-      evidenceIds: issue?.evidenceIds ?? relation.evidenceIds,
-      verifiedAt: issue
-        ? null
-        : (relation.basis
-            .map((basis) => basis.verifiedAt)
-            .filter((value): value is string => Boolean(value))
-            .sort()
-            .at(-1) ?? null),
+      evidenceIds:
+        supplyLink?.evidenceIds ?? issue?.evidenceIds ?? relation.evidenceIds,
+      verifiedAt: supplyLink
+        ? supplyLink.verifiedAt
+        : issue
+          ? null
+          : (relation.basis
+              .map((basis) => basis.verifiedAt)
+              .filter((value): value is string => Boolean(value))
+              .sort()
+              .at(-1) ?? null),
       mapContext: {
         ...eventContext,
         graphVersion: relation.metadata.graphVersion ?? undefined,
@@ -728,8 +732,15 @@ function MapWorkspace({
       )}
       {historicalImpact.error && (
         <p role="alert">
-          영향 경로 조회 실패. 관계를 임의 강조하지 않았어요.
-          <button onClick={historicalImpact.retry}>영향 경로 다시 조회</button>
+          {historicalImpact.errorCode === 'VERSION_UNAVAILABLE'
+            ? '사건 시점의 그래프 버전을 사용할 수 없어요. 관계를 임의 강조하지 않았어요.'
+            : '영향 경로 조회 실패. 관계를 임의 강조하지 않았어요.'}
+          {historicalImpact.errorRetryable !== false &&
+            historicalImpact.errorCode !== 'VERSION_UNAVAILABLE' && (
+              <button onClick={historicalImpact.retry}>
+                영향 경로 다시 조회
+              </button>
+            )}
         </p>
       )}
       {round && <BriefingSnapshotBanner roundId={round} />}
@@ -769,21 +780,22 @@ function MapWorkspace({
               onClick={() => setSidebarOpen((open) => !open)}
               title="내가 보유 중인 종목 보기"
             >
-              <GraphIcon name="sidebar" />내 종목
+              <GraphIcon name="sidebar" inheritColor />
+              보유 종목
             </button>
             <div className="relationship-mode" aria-label="그래프 모드">
               <button
                 aria-pressed={appliedMode === 'all'}
                 onClick={() => void changeMode('all')}
               >
-                <GraphIcon name="globe" />
+                <GraphIcon name="globe" inheritColor />
                 시장 전체
               </button>
               <button
                 aria-pressed={appliedMode === 'personal'}
                 onClick={() => void changeMode('personal')}
               >
-                <GraphIcon name="personal" />내 종목
+                <GraphIcon name="personal" inheritColor />내 종목
               </button>
             </div>
             <span className="relationship-divider" />
@@ -840,15 +852,15 @@ function MapWorkspace({
                 onClick={() => setNotice(notice === 'info' ? '' : 'info')}
                 aria-label="지도 데이터 안내"
               >
-                <GraphIcon name="info" size={15} />
+                <GraphIcon name="info" size={19} />
               </button>
               <button onClick={onStartTutorial} aria-label="튜토리얼 다시 보기">
-                <GraphIcon name="help" size={15} />
+                <GraphIcon name="help" size={19} />
               </button>
             </div>
           </div>
           <div
-            className={`relationship-body${selectedPanel ? ' has-company-panel max-md:pb-[48dvh]!' : ''}${tutorialOpen || sidebarOpen ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
+            className={`relationship-body${selectedPanel ? ` has-company-panel ${pathIsCollapsed ? '' : 'max-md:pb-[48dvh]!'}` : ''}${tutorialOpen || sidebarOpen ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
             aria-busy={loading}
           >
             {sidebarOpen && (
@@ -893,7 +905,9 @@ function MapWorkspace({
                     ? `${memoryOwner}:tutorial`
                     : round
                       ? `${memoryOwner}:round:${round}`
-                      : memoryOwner
+                      : historical
+                        ? `${memoryOwner}:asOf:${asOf}`
+                        : memoryOwner
                 }
                 tutorialPhase={
                   tutorialOpen && tutorialStep === 1
@@ -961,6 +975,37 @@ function MapWorkspace({
                 </p>
               </div>
             )}
+            {pathFrom && pathIsCollapsed && (
+              <div
+                role="group"
+                aria-label="지도 경로"
+                data-screen-id="D-GRP-07"
+                className="absolute top-2 right-2 left-2 z-20 flex flex-wrap items-center gap-1 rounded-lg border border-zoop-line bg-zoop-paper p-2 text-[13px] text-zoop-ink md:hidden"
+              >
+                <strong className="min-w-0 flex-1 truncate">
+                  {data?.nodes.find((n) => n.id === pathFrom)?.label ??
+                    '첫 기업'}{' '}
+                  ⇆{' '}
+                  {data?.nodes.find((n) => n.id === pathTo)?.label ??
+                    '기업 선택'}
+                  {displayedPath
+                    ? ` · ${displayedPath.edgeIds.length}단계`
+                    : ''}
+                </strong>
+                <button
+                  className="min-h-11 rounded border border-zoop-line px-2"
+                  onClick={() => setCollapsedPath(null)}
+                >
+                  경로 단계 보기
+                </button>
+                <button
+                  className="min-h-11 rounded border border-zoop-line px-2"
+                  onClick={() => updateQuery({ path: null })}
+                >
+                  경로 나가기
+                </button>
+              </div>
+            )}
             {focusNode?.kind === 'company' && !pathFrom && (
               <GraphFocusControls
                 label={focusNode.label}
@@ -999,7 +1044,7 @@ function MapWorkspace({
                 tutorialOpen && tutorialStep && tutorialStep < 5,
               )}
               open={Boolean(selectedPanel)}
-              suspended={evidenceOpen}
+              suspended={evidenceOpen || pathIsCollapsed}
               tutorial={
                 tutorialOpen &&
                 tutorialStep && (
@@ -1045,6 +1090,9 @@ function MapWorkspace({
                 <CompanyDetailPanel
                   key={companyNode.id}
                   companyId={companyNode.id}
+                  companyDetailHref={(id) =>
+                    companyDetailRouteFromMap(id, params.toString())
+                  }
                   context={round || tutorialOpen ? eventContext : undefined}
                   fallback={companyNode}
                   relatedCompanies={relatedCompanies}
@@ -1095,6 +1143,14 @@ function MapWorkspace({
                   tutorialSaving={tutorialSaving}
                 />
               )}
+              {pathFrom && !tutorialOpen && (
+                <button
+                  className="min-h-11 w-full border-b border-zoop-line bg-zoop-paper px-4 text-left text-[13px] text-zoop-ink md:hidden"
+                  onClick={() => setCollapsedPath(params.get('path'))}
+                >
+                  지도로 접기
+                </button>
+              )}
               {pathFrom && (
                 <CompanyPathPanel
                   graph={data}
@@ -1134,10 +1190,14 @@ function MapWorkspace({
                 <ImpactPathPanel
                   companyId={impactCompanyId}
                   issueId={impactIssueId}
+                  context={eventContext}
                   graph={data}
                   impact={impact.data}
                   loading={impact.loading}
                   error={impact.error}
+                  errorCode={impact.errorCode}
+                  errorStatus={impact.errorStatus}
+                  retryable={impact.retryable}
                   onRetry={impact.retry}
                   onClose={() => {
                     if (tutorialOpen && tutorialStep === 4) setTutorialStep(3);
@@ -1178,6 +1238,9 @@ function MapWorkspace({
                   <EventDetailPanel
                     key={eventId}
                     id={eventId}
+                    companyDetailHref={(id) =>
+                      companyDetailRouteFromMap(id, params.toString())
+                    }
                     context={eventContext}
                     geography={selectedNode?.geography ?? null}
                     logoOf={logoOf}
@@ -1285,7 +1348,10 @@ function MapWorkspace({
               </div>
             )}
           </div>
-          <AiChatDrawer onViewOnMap={viewAnswerTarget} />
+          <AiChatDrawer
+            onViewOnMap={viewAnswerTarget}
+            returnFocusTo={mapRegion}
+          />
           <EvidenceDrawer
             onTutorialSkip={
               tutorialOpen && tutorialStep && tutorialStep < 5
@@ -1295,6 +1361,10 @@ function MapWorkspace({
                   }
                 : undefined
             }
+            onClosed={() => {
+              // 근거를 불러오지 못한 경우에도 창을 확인하고 닫으면 다음 단계로 이어 간다.
+              if (tutorialOpen && tutorialStep === 4) setTutorialStep(5);
+            }}
             onReady={(id) => {
               if (
                 tutorialOpen &&

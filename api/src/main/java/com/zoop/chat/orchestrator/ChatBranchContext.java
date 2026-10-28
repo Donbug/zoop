@@ -21,12 +21,21 @@ public record ChatBranchContext(List<ChatRun.Turn> turns, ChatFrozenContext cont
     /**
      * One requirement. {@code general} is a Q02 concept answered without tools. {@code noneFound} is a lookup that
      * succeeded and found nothing within its scope, without being cut by a limit: the generator may say so.
+     * {@code parent} is set for a requirement the server split off a router requirement ({@link ChatPlan.Origin}), and
+     * {@code avoidNames} are the company and issue labels its parent's reads returned, which its text must not name.
      */
     public record Branch(String requirementId, String label, Set<ChatQueryType> types, boolean general,
-            List<ChatToolResult> results, boolean noneFound) {
+            List<ChatToolResult> results, boolean noneFound, String parent, List<String> avoidNames) {
         public Branch {
             types = Set.copyOf(types);
             results = List.copyOf(results);
+            avoidNames = List.copyOf(avoidNames);
+        }
+
+        /** A router requirement's branch. */
+        public Branch(String requirementId, String label, Set<ChatQueryType> types, boolean general,
+                List<ChatToolResult> results, boolean noneFound) {
+            this(requirementId, label, types, general, results, noneFound, null, List.of());
         }
     }
 }

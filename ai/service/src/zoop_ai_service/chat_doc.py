@@ -49,6 +49,11 @@ def examples() -> dict[str, Any]:
 
 def document(spec: dict[str, Any]) -> None:
     sample = examples()
+    schemas = spec["components"]["schemas"]
+    request = ChatStageRequest.model_json_schema(by_alias=True, ref_template="#/components/schemas/{model}")
+    for name, definition in request.pop("$defs", {}).items():
+        schemas.setdefault(name, definition)
+    schemas["ChatStageRequest"] = request
     operation = spec["paths"]["/internal/v1/chat-stages/{stage}"]["post"]
     operation["requestBody"] = {"required": True, "content": {"application/json": {
         "schema": {"$ref": "#/components/schemas/ChatStageRequest"},

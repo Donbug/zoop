@@ -26,6 +26,9 @@ final class InMemoryGraphHandoffRepository implements GraphHandoffRepository {
     private Map<String, StoredEvidence> evidence = new LinkedHashMap<>();
     private Map<String, StagedVersion> versions = new LinkedHashMap<>();
     private List<NewStagedVersion> inserted = new ArrayList<>();
+    private Map<String, List<RuleRow>> versionRules = new LinkedHashMap<>();
+    /** What {@link #publicationState()} answers: no rule enabled at revision 0 unless a test sets it. */
+    PublicationState publication = new PublicationState(0, 0, List.of());
     private int writes;
     /** Whether the catalog lock was taken in the current transaction: a catalog read without it is a defect of the importer. */
     private boolean catalogLocked;
@@ -37,11 +40,13 @@ final class InMemoryGraphHandoffRepository implements GraphHandoffRepository {
         this.activations = activations;
     }
 
-    record State(Map<String, StoredEvidence> evidence, Map<String, StagedVersion> versions, List<NewStagedVersion> inserted) {
+    record State(Map<String, StoredEvidence> evidence, Map<String, StagedVersion> versions, List<NewStagedVersion> inserted,
+            Map<String, List<RuleRow>> versionRules) {
     }
 
     State state() {
-        return new State(new LinkedHashMap<>(evidence), new LinkedHashMap<>(versions), new ArrayList<>(inserted));
+        return new State(new LinkedHashMap<>(evidence), new LinkedHashMap<>(versions), new ArrayList<>(inserted),
+                new LinkedHashMap<>(versionRules));
     }
 
     /** The evidence rows as the document analysis repository reads them (content and verification columns only). */
@@ -60,6 +65,7 @@ final class InMemoryGraphHandoffRepository implements GraphHandoffRepository {
             evidence = new LinkedHashMap<>(before.evidence());
             versions = new LinkedHashMap<>(before.versions());
             inserted = new ArrayList<>(before.inserted());
+            versionRules = new LinkedHashMap<>(before.versionRules());
             throw failure;
         } finally {
             catalogLocked = false;
@@ -132,13 +138,32 @@ final class InMemoryGraphHandoffRepository implements GraphHandoffRepository {
     }
 
     @Override
+    public PublicationState publicationState() {
+        return publication;
+    }
+
+    @Override
+    public List<RuleRow> versionRules(String versionId) {
+        return versionRules.getOrDefault(versionId, List.of());
+    }
+
+    @Override
     public void insertStagedVersion(NewStagedVersion version) {
         writes++;
         if (versions.containsKey(version.id())) {
             throw new DataIntegrityViolationException("graph_versions primary key");
         }
         versions.put(version.id(), new StagedVersion(version.id(), "snapshot", false, version.snapshotArtifactId(),
-                version.createdBy()));
+                version.createdBy(), version.ruleRevision(), version.reviewRevision()));
         inserted.add(version);
+        // Like the foreign key: a recorded rule is one of the stored rules (here, one the publication state returned).
+        List<RuleRow> rules = new ArrayList<>();
+        for (String ruleId : version.ruleIds()) {
+            rules.add(publication.enabledRules().stream().filter(rule -> rule.id().equals(ruleId)).findFirst()
+                    .orElseThrow(() -> new DataIntegrityViolationException("graph_version_rules rule")));
+        }
+        if (!rules.isEmpty()) {
+            versionRules.put(version.id(), List.copyOf(rules));
+        }
     }
 }

@@ -102,6 +102,8 @@ Render one GraphLegend group in the top toolbar using the GraphCanvas portal slo
 
 Company logos use `CompanyLogo`, `logoScale` and `logoBackground` from the shared logo utility. Background marks with checked safe margins fill the circle; other symbols fit the inscribed square (68% diameter) and use object-contain. Preserve brand colors and the Micron/Amazon backgrounds across themes. See [graph UI improvements](GRAPH_UI_IMPROVEMENTS.md) for asset provenance, verification and scope.
 
+D-GRP-01/01b uses `graph-readability` for screen-size text, LOD and measured label culling. Nodes are not draggable; dragging moves the map camera only. Mobile tools reuse zoop tokens and 44px targets. See [canvas enhancements](GRAPH_CANVAS_ENHANCEMENTS.md) for behavior and validation limits.
+
 ## Briefing at-a-glance reading (D-BRF-01/02)
 
 `CompanyOutlooks` uses a native, keyboard-accessible disclosure per selected company in `reading=compact`. Show separately generated, independently verified `company.card` fields: topic (12 Unicode characters), event title (32), and complementary qualification (64). Do not clip text or use the longer `reading.brief` as a fallback. Do not hardcode particular companies, a positive interpretation, or exactly three companies: one issue may involve several companies.

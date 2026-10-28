@@ -164,6 +164,10 @@ export type Documents = {
 export type Impact = {
   companyId: string;
   issueId: string;
+  pathStatus?:
+    | 'direct_available'
+    | 'structural_path_details_unavailable'
+    | 'no_direct_relation';
   steps: { id: string; kind: string; reason: string; evidenceIds: string[] }[];
   metadata: Meta;
 };

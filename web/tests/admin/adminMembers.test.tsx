@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test } from 'vitest';
 import AdminProtectedRoute from '@/components/admin/common/AdminProtectedRoute';
 import AdminMembersPage from '@/pages/admin/members/AdminMembersPage';
@@ -173,7 +173,12 @@ describe('A-ADM-05 회원·접근 관리 (FS069)', () => {
     await user.click(within(table).getByRole('link', { name: 'M-EBF98301' }));
     expect(location()).toBe('/admin/members/M-EBF98301');
     expect(await screen.findByText('41회')).toBeTruthy();
-    expect(screen.getByText('종목 이름은 보이지 않아요')).toBeTruthy();
+    expect(screen.queryByText('1분 단위로 기록돼요')).toBeNull();
+    expect(screen.queryByText('노드·간선')).toBeNull();
+    expect(screen.queryByText('좋아요 / 싫어요')).toBeNull();
+    expect(screen.queryByText('종목 이름은 보이지 않아요')).toBeNull();
+    expect(screen.queryByText('가상 계좌 연결됨')).toBeNull();
+    expect(screen.queryByText('가상 계좌 없음')).toBeNull();
     expect(screen.getByText('차단하거나 해제한 기록이 없어요.')).toBeTruthy();
   });
 
@@ -227,7 +232,17 @@ describe('A-ADM-05 회원·접근 관리 (FS069)', () => {
       within(form).getByText(/열려 있는 모든 세션이 지금 끝나고/),
     ).toBeTruthy();
     await user.click(within(form).getByRole('button', { name: '차단하기' }));
-    expect(within(form).getByText('사유를 입력해 주세요.')).toBeTruthy();
+    expect(
+      within(form).getByText('사유를 1~500자로 입력해 주세요.'),
+    ).toBeTruthy();
+    const limitedReason = within(form).getByLabelText(
+      '차단 사유(감사 로그에 남아요)',
+    ) as HTMLTextAreaElement;
+    expect(limitedReason.maxLength).toBe(500);
+    fireEvent.change(limitedReason, { target: { value: 'x'.repeat(501) } });
+    fireEvent.submit(form);
+    expect(within(form).getByText('사유 501/500자')).toBeTruthy();
+    fireEvent.change(limitedReason, { target: { value: '' } });
     expect(server.calls('POST', BLOCK)).toHaveLength(0);
 
     await user.type(

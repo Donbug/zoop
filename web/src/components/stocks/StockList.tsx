@@ -43,9 +43,12 @@ export default function StockList({
               className="size-8 rounded-full bg-zoop-ink text-xs font-bold text-zoop-paper"
             />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-bold text-zoop-ink">
+              <Link
+                to={`/companies/${encoded}`}
+                className="block truncate text-[13px] font-bold text-zoop-ink hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
+              >
                 {row.name}
-              </p>
+              </Link>
               <p className="mt-[3px] font-inter text-[11px] text-zoop-muted">
                 {[
                   row.ticker,

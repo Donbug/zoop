@@ -29,9 +29,9 @@ rows are exactly the ones a `-2` ledger held: an `allow` then meant "ask for an 
 They stay readable as history, are never dispatched, resent or reinterpreted as approvals (`review_contract_changed`), and no code writes their
 revalidation columns any more.
 
-Schema: `zoop-ai-relation-jobs-ledger-3`. A `-1` ledger gains the operations table; a `-2` ledger has its operations table rebuilt in place inside one
-transaction (SQLite cannot alter a CHECK) with every row copied and marked `legacy-revalidation`; nothing is dropped or reset, and a later or foreign
-schema is refused.
+Schema: `zoop-ai-relation-jobs-ledger-4`. Supported `-1` through `-3` ledgers migrate forward, retaining legacy operation history. The `-2` operations
+table is rebuilt transactionally with every row copied and marked `legacy-revalidation`. Existing manual rows keep a null authority_ref; online
+rows pin an immutable admission origin. Nothing is reset or rebound, and future or foreign schemas are refused.
 """
 from __future__ import annotations
 
@@ -46,8 +46,8 @@ from pathlib import Path
 from .config import ConfigError
 from .ledger import stamp
 
-LEDGER_SCHEMA = "zoop-ai-relation-jobs-ledger-3"
-MIGRATES_FROM = ("zoop-ai-relation-jobs-ledger-1", "zoop-ai-relation-jobs-ledger-2")
+LEDGER_SCHEMA = "zoop-ai-relation-jobs-ledger-4"
+MIGRATES_FROM = ("zoop-ai-relation-jobs-ledger-1", "zoop-ai-relation-jobs-ledger-2", "zoop-ai-relation-jobs-ledger-3")
 LEGACY = "legacy-revalidation"
 FINAL = "final-approval"
 FILE = "relation-jobs.sqlite3"
@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS relation_jobs (
  reserved_at TEXT NOT NULL,
  accepted_at TEXT,
  live_binding TEXT,
+ authority_ref TEXT,
  execution_mode TEXT NOT NULL DEFAULT 'replay' CHECK (execution_mode IN ('replay','live') AND ((execution_mode='live') = (live_binding IS NOT NULL))),
  CHECK ((state='reserved' AND input_digest IS NULL AND accepted_at IS NULL)
      OR (state='accepted' AND input_digest IS NOT NULL AND accepted_at IS NOT NULL)));
@@ -142,7 +143,7 @@ ACTIVE = "(SELECT COUNT(*) FROM relation_dispatch WHERE state IN ('pending','in_
 
 # Columns added after the first schema. A fresh ledger creates them in DDL above; an older one gains them in place (ALTER ADD COLUMN: nothing is
 # rewritten and every old row reads as a replay job whose dispatch was not an explicit recovery).
-ADDED_COLUMNS = (("relation_jobs", "live_binding", "TEXT"),
+ADDED_COLUMNS = (("relation_jobs", "authority_ref", "TEXT"), ("relation_jobs", "live_binding", "TEXT"),
                  ("relation_jobs", "execution_mode",
                   "TEXT NOT NULL DEFAULT 'replay' CHECK (execution_mode IN ('replay','live') AND ((execution_mode='live') = (live_binding IS NOT NULL)))"),
                  ("relation_dispatch", "explicit", "INTEGER NOT NULL DEFAULT 0 CHECK (explicit IN (0,1))"))
@@ -150,6 +151,7 @@ JOBS_IMMUTABLE = """CREATE TRIGGER relation_jobs_immutable BEFORE UPDATE ON rela
  WHEN NOT (OLD.job_id=NEW.job_id AND OLD.owner=NEW.owner AND OLD.request_digest=NEW.request_digest
        AND OLD.upstream_job_id=NEW.upstream_job_id AND OLD.upstream_input_digest=NEW.upstream_input_digest
        AND OLD.execution_mode=NEW.execution_mode AND OLD.live_binding IS NEW.live_binding
+       AND OLD.authority_ref IS NEW.authority_ref
        AND OLD.reserved_at=NEW.reserved_at AND OLD.state='reserved'
        AND ((NEW.state='reserved' AND NEW.submit_attempts=OLD.submit_attempts+1)
          OR (NEW.state='accepted' AND NEW.submit_attempts=OLD.submit_attempts)))
@@ -169,6 +171,7 @@ class RelationRow:
     accepted_at: str | None
     execution_mode: str = "replay"
     live_binding: str | None = None   # the runtime identity the operator's allowlist pinned for this live job; None for a replay job
+    authority_ref: str | None = None
 
 
 @dataclass(frozen=True)
@@ -228,6 +231,7 @@ class Claim:
     upstream_job_id: str | None = None
     upstream_input_digest: str | None = None
     live_binding: str | None = None
+    authority_ref: str | None = None
 
 
 @dataclass(frozen=True)
@@ -241,12 +245,13 @@ class Update:
 
 
 class RelationLedger:
-    def __init__(self, directory: Path, relation_state_dir: Path, clock=time.time):
+    def __init__(self, directory: Path, relation_state_dir: Path, clock=time.time, *, existing_only=False):
         self._clock = clock
         self._guard = threading.RLock()
         path = directory / FILE
         try:
-            self._db = sqlite3.connect(path, timeout=30, isolation_level=None, check_same_thread=False)
+            self._db = sqlite3.connect(path.as_uri() + "?mode=rw" if existing_only else path,
+                                       uri=existing_only, timeout=30, isolation_level=None, check_same_thread=False)
             os.chmod(path, 0o600)
             self._db.row_factory = sqlite3.Row
             self._db.execute("PRAGMA journal_mode=WAL")
@@ -315,16 +320,16 @@ class RelationLedger:
             row = self._db.execute("SELECT * FROM relation_jobs WHERE job_id=?", (job_id,)).fetchone()
         return None if row is None else RelationRow(row["job_id"], row["owner"], row["request_digest"], row["upstream_job_id"],
                                                     row["upstream_input_digest"], row["state"], row["submit_attempts"],
-                                                    row["input_digest"], row["accepted_at"], row["execution_mode"], row["live_binding"])
+                                                    row["input_digest"], row["accepted_at"], row["execution_mode"], row["live_binding"], row["authority_ref"])
 
     def reserve(self, job_id: str, owner: str, request_digest: str, upstream_job_id: str, upstream_input_digest: str,
-                live_binding: str | None = None) -> RelationRow:
+                live_binding: str | None = None, authority_ref: str | None = None) -> RelationRow:
         """`live_binding` is the runtime identity the operator's allowlist pinned for a live job (None: a replay job). Immutable from here on."""
         with self._tx() as db:
             db.execute("INSERT OR IGNORE INTO relation_jobs(job_id,owner,request_digest,upstream_job_id,upstream_input_digest,state,reserved_at,"
-                       "live_binding,execution_mode) VALUES (?,?,?,?,?,'reserved',?,?,?)",
+                       "live_binding,execution_mode,authority_ref) VALUES (?,?,?,?,?,'reserved',?,?,?,?)",
                        (job_id, owner, request_digest, upstream_job_id, upstream_input_digest, stamp(self._clock()), live_binding,
-                        "live" if live_binding is not None else "replay"))
+                        "live" if live_binding is not None else "replay", authority_ref))
         row = self.job(job_id)
         assert row is not None
         return row
@@ -377,7 +382,7 @@ class RelationLedger:
         now = self._clock()
         with self._tx() as db:
             job = db.execute("SELECT d.job_id, d.busy_count, d.explicit, j.input_digest, j.execution_mode, j.owner, j.upstream_job_id, "
-                             "j.upstream_input_digest, j.live_binding FROM relation_dispatch d "
+                             "j.upstream_input_digest, j.live_binding, j.authority_ref FROM relation_dispatch d "
                              "JOIN relation_jobs j ON j.job_id=d.job_id "
                              "WHERE d.state='pending' AND (d.not_before IS NULL OR d.not_before<=?) ORDER BY d.seq LIMIT 1", (now,)).fetchone()
             if job is None:
@@ -385,7 +390,7 @@ class RelationLedger:
             db.execute("UPDATE relation_dispatch SET state='in_flight', dispatch_count=dispatch_count+1, not_before=NULL, updated_at=? WHERE job_id=?",
                        (stamp(now), job["job_id"]))
             return Claim(job["job_id"], job["input_digest"], job["busy_count"], job["execution_mode"] == "live", bool(job["explicit"]),
-                         job["owner"], job["upstream_job_id"], job["upstream_input_digest"], job["live_binding"])
+                         job["owner"], job["upstream_job_id"], job["upstream_input_digest"], job["live_binding"], job["authority_ref"])
 
     def finish(self, job_id: str, update: Update) -> bool:
         now = self._clock()

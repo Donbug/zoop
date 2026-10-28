@@ -43,8 +43,8 @@ export default function MemberStatusForm({
     event.preventDefault();
     if (pending) return;
     const trimmed = reason.trim();
-    setMissing(!trimmed);
-    if (!trimmed) return;
+    setMissing(!trimmed || trimmed.length > 500);
+    if (!trimmed || trimmed.length > 500) return;
     setError(null);
     setPending(true);
     const revision = member.statusRevision;
@@ -71,10 +71,11 @@ export default function MemberStatusForm({
 
   return (
     <form
+      data-admin-editing="true"
       noValidate
       aria-label={title}
       onSubmit={(event) => void submit(event)}
-      className="flex flex-col gap-3 rounded-[3px] border-[0.667px] border-zoop-ink bg-zoop-paper p-4"
+      className="flex flex-col gap-3 rounded-2xl bg-zoop-soft p-5"
     >
       <p className="text-sm font-bold">{title}</p>
       <p className="text-[11px] leading-relaxed text-zoop-muted">
@@ -91,15 +92,17 @@ export default function MemberStatusForm({
         <textarea
           id={reasonId}
           value={reason}
+          maxLength={500}
           disabled={pending}
           aria-invalid={missing}
           onChange={(event) => setReason(event.target.value)}
           className={TEXTAREA}
         />
       </div>
+      <p className="text-[11px] text-zoop-muted">사유 {reason.length}/500자</p>
       {missing && (
         <p role="alert" className="text-[11px] text-zoop-alert">
-          사유를 입력해 주세요.
+          사유를 1~500자로 입력해 주세요.
         </p>
       )}
       {error && (

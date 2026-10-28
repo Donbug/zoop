@@ -22,6 +22,7 @@ import com.zoop.chat.repository.ChatExecutionRepository;
 import com.zoop.chat.repository.ChatRepository;
 import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.service.ChatService;
+import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolRequest;
 import com.zoop.chat.tool.ChatToolRunner;
 import org.junit.jupiter.api.AfterEach;
@@ -261,7 +262,7 @@ class ChatExecutorPostgresTest {
         var first = rows.getFirst();
         assertEquals("tc-0", first.get("tool_call_id"));
         assertEquals(1, first.get("attempt_no"));
-        assertEquals("chat-tools/v1", first.get("registry_version"));
+        assertEquals(ChatToolRegistry.VERSION, first.get("registry_version"));
         assertEquals("zoop-core-read", first.get("registry_group"));
         assertEquals("app:company.read", first.get("tool_id"));
         assertEquals("20", first.get("meta_limit"));
@@ -298,19 +299,21 @@ class ChatExecutorPostgresTest {
             var results = tools.runStage(run, control, 1,
                     List.of(new ChatToolRequest("company.read", List.of("KRX:000660"), 20)));
             assertEquals(ChatToolRunner.UNAVAILABLE, results.getFirst().error());
-            assertThrows(IllegalArgumentException.class, () -> tools.runStage(run, control, 1,
-                    List.of(new ChatToolRequest("graph.path.read", List.of("KRX:000660"), 20))));
+            var path = tools.runStage(run, control, 1,
+                    List.of(new ChatToolRequest("graph.path.read", List.of("KRX:000660", "NASDAQ:NVDA"), 20)));
+            assertEquals(ChatToolRunner.UNAVAILABLE, path.getFirst().error());
             return new ChatEngineOutcome.Failed("transient", "provider_error", true);
         });
         String jobId = submit("그래프 없이 도구 호출");
         assertTrue(executor.runOnce());
 
-        assertEquals(List.of("failed:tool_unavailable"), jdbc.queryForList(
-                "SELECT status || ':' || error_code FROM chat_tool_calls WHERE chat_job_id = ?", String.class, jobId));
+        assertEquals(List.of("company.read failed:tool_unavailable", "graph.path.read failed:tool_unavailable"),
+                jdbc.queryForList("SELECT capability_id || ' ' || status || ':' || error_code FROM chat_tool_calls "
+                        + "WHERE chat_job_id = ? ORDER BY call_index", String.class, jobId));
     }
 
     private static ChatToolCallReservation reservation(String capability) {
-        return new ChatToolCallReservation("chat-tools/v1", "zoop-core-read", capability, "app:" + capability,
+        return new ChatToolCallReservation(ChatToolRegistry.VERSION, "zoop-core-read", capability, "app:" + capability,
                 "chat-tool/v1", "0".repeat(64), "{\"limit\":20}");
     }
 

@@ -59,11 +59,12 @@ def policy(outcome: Outcome, view: object | None, *, busy_count: int, busy_codes
 
 class RelationDispatcher:
     def __init__(self, ledger: RelationLedger, process: RelationProcess, gate: RelationGate, log: Callable[[dict[str, Any]], None],
-                 authorize: Callable[[str, str, str, str], str | None] | None = None):
+                 authorize: Callable[[str, str, str, str], str | None] | None = None, *, online_authority=None):
         """`authorize(owner, upstream job id, upstream input digest, pinned runtime identity)` returns None when the owner may still run this LIVE
         job, otherwise a stable refusal code. It is asked before every live child (never for a replay job, whose authority was checked at submit)."""
         self._ledger, self._process, self._gate, self._log = ledger, process, gate, log
         self._authorize = authorize
+        self._online_authority = online_authority
         self._wake, self._stop = threading.Event(), threading.Event()
         self._unrecorded: tuple[Claim, Update] | None = None  # a finished dispatch whose ledger write has not yet succeeded
         self._thread = threading.Thread(target=self._loop, name="zoop-ai-relation-dispatcher", daemon=True)
@@ -131,6 +132,10 @@ class RelationDispatcher:
         if view.job_id != claim.job_id or view.input_digest != claim.input_digest:
             self._log({"event": "relation_dispatch", "jobId": claim.job_id, "outcome": "binding_mismatch"})
             return outcome, view, Update("idle", "runtime_error", "runtime_binding_mismatch")
+        if self._online_authority is not None:
+            problem = self._online_authority.refuse_s3_result(claim, outcome.result)
+            if problem is not None:
+                return outcome, view, Update("idle", "runtime_error", problem)
         return outcome, view, None
 
     def _supervise(self, claim: Claim) -> Update | None:
@@ -142,13 +147,24 @@ class RelationDispatcher:
                 # no model environment) is built, and the row ends idle so the operator can recover it once live is configured again.
                 self._log({"event": "relation_dispatch", "jobId": claim.job_id, "outcome": "live_unavailable"})
                 return Update("idle", "runtime_error", "live_unavailable")
-            if claim.live:
+            if self._online_authority is not None or claim.authority_ref is not None:
+                refusal = (self._online_authority.refuse_s3(claim) if self._online_authority is not None else "authority_origin_mismatch")
+                if refusal is not None:
+                    return Update("idle", "runtime_error", refusal)
+            if claim.live and self._online_authority is None:
                 assert claim.owner is not None and claim.upstream_job_id is not None and claim.upstream_input_digest is not None
                 refusal = ("live_binding_unpinned" if claim.live_binding is None or self._authorize is None else
                            self._authorize(claim.owner, claim.upstream_job_id, claim.upstream_input_digest, claim.live_binding))
                 if refusal is not None:
                     self._log({"event": "relation_dispatch", "jobId": claim.job_id, "outcome": refusal})
                     return Update("idle", "runtime_error", refusal)
+            if self._online_authority is not None:
+                probe = self._process.inspect(claim.job_id)
+                if probe.kind != "result":
+                    return Update("idle", "runtime_error", "runtime_unavailable")
+                problem = self._online_authority.refuse_s3_result(claim, probe.result)
+                if problem is not None:
+                    return Update("idle", "runtime_error", problem)
             outcome = self._process.resume(claim.job_id, self._stop, live=claim.live, initial_only=not claim.explicit)
         finally:
             self._gate.release()

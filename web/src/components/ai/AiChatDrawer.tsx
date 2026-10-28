@@ -1,6 +1,13 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import ChatHistoryList from '@/components/ai/ChatHistoryList';
 import ChatJobCard, { type AnswerMapTarget } from '@/components/ai/ChatJobCard';
 import { PHASE_LABEL } from '@/components/ai/chat-phases';
 import {
@@ -17,7 +24,7 @@ import { useAiChatStore } from '@/stores/useAiChatStore';
 import type { ChatJob } from '@/types/ai';
 import type { GraphTarget } from '@/types/map';
 
-// D-AI-01 질문·대상 연결, D-AI-01b 확인 질문, D-AI-02 작업 복구·대화 회수, D-AI-02b 대화 조회 오류.
+// D-AI-01 질문·대상 연결, D-AI-01b 확인 질문, D-AI-02 작업 복구·대화 회수(대화 기록 포함), D-AI-02b 대화 조회 오류.
 // 상태 계약: docs/wireframe/ai-chatbot-state-contract.md
 
 const TARGET_KIND: Record<GraphTarget['kind'], string> = {
@@ -30,16 +37,18 @@ const TARGET_KIND: Record<GraphTarget['kind'], string> = {
 type Props = {
   /** 답변이 가리키는 대상을 답변의 그래프 버전 기준으로 지도에 연다. 열 수 없으면 false. */
   onViewOnMap?: (target: AnswerMapTarget) => boolean;
+  /** 닫을 때 연 요소가 더는 없으면(다른 화면 헤더에서 열고 지도로 이동한 경우) 포커스를 돌려줄 지도 영역. */
+  returnFocusTo?: RefObject<HTMLElement | null>;
 };
 
-export default function AiChatDrawer({ onViewOnMap }: Props) {
+export default function AiChatDrawer({ onViewOnMap, returnFocusTo }: Props) {
   const isOpen = useAiChatStore((state) => state.isOpen);
   const close = useAiChatStore((state) => state.close);
   const { checking, isAuthenticated, member } = useAuth();
   const location = useLocation();
   if (!isOpen) return null;
   return (
-    <DrawerShell onClose={close}>
+    <DrawerShell onClose={close} returnFocusTo={returnFocusTo}>
       {checking ? (
         <p className={ui.state} role="status">
           로그인 상태를 확인하고 있어요.
@@ -68,9 +77,11 @@ export default function AiChatDrawer({ onViewOnMap }: Props) {
 
 function DrawerShell({
   onClose,
+  returnFocusTo,
   children,
 }: {
   onClose: () => void;
+  returnFocusTo?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }) {
   const dialog = useRef<HTMLElement>(null);
@@ -81,11 +92,16 @@ function DrawerShell({
     opener.current = document.activeElement as HTMLElement | null;
     const frame = requestAnimationFrame(() => heading.current?.focus());
     const returnTo = opener;
+    const fallback = returnFocusTo;
     return () => {
       cancelAnimationFrame(frame);
-      if (returnTo.current?.isConnected) returnTo.current.focus();
+      const target = returnTo.current;
+      // The opener may be gone: a header on another screen opened the drawer and unmounted on the way to the map.
+      if (target && target !== document.body && target.isConnected)
+        target.focus();
+      else fallback?.current?.focus();
     };
-  }, []);
+  }, [returnFocusTo]);
 
   return (
     <div className="absolute inset-0 z-20 flex justify-end">
@@ -163,6 +179,7 @@ function ChatPanel({
   const chat = useChatConversation(memberId);
   const [linked, setLinked] = useState(true);
   const [replyTo, setReplyTo] = useState<ChatJob | null>(null);
+  const [view, setView] = useState<'chat' | 'history'>('chat');
   const input = useRef<HTMLTextAreaElement>(null);
 
   const useTarget = linked && target !== null;
@@ -201,7 +218,18 @@ function ChatPanel({
   }
 
   async function startNew() {
-    if (await chat.startNew()) setReplyTo(null);
+    if (await chat.startNew()) {
+      setReplyTo(null);
+      setView('chat');
+    }
+  }
+
+  async function open(id: string) {
+    const changed = id !== chat.sessionId;
+    // 열지 못하면 질문 창으로 돌아가 오류 안내를 보여 준다. 대화는 그대로다.
+    const opened = await chat.open(id);
+    if (opened && changed) setReplyTo(null);
+    setView('chat');
   }
 
   const byId = new Map(chat.jobs.map((job) => [job.id, job]));
@@ -218,190 +246,217 @@ function ChatPanel({
         <p className={ui.muted}>
           질문 대상: {useTarget ? targetLabel : '없음'}
         </p>
-        <button
-          type="button"
-          className={ui.button}
-          disabled={!chat.canSwitch}
-          onClick={() => void startNew()}
-        >
-          새 대화
-        </button>
-      </div>
-      <div className={ui.scroll}>
-        <section className={ui.section} aria-labelledby="ai-chat-target">
-          <h3 id="ai-chat-target">질문에 연결할 대상</h3>
-          {target ? (
-            <label className="flex items-start gap-2">
-              <input
-                type="checkbox"
-                checked={linked}
-                onChange={(event) => setLinked(event.target.checked)}
-                className="mt-0.5"
-              />
-              <span>
-                <span className={ui.itemTitle}>{targetLabel}</span>
-                <span className={`${ui.muted} block`}>
-                  {TARGET_KIND[target.kind]}
-                  {target.evidenceIds?.length
-                    ? ` · 근거 ${target.evidenceIds.length}건`
-                    : ''}
-                  {target.mapContext?.graphVersion
-                    ? ` · 그래프 ${target.mapContext.graphVersion}`
-                    : ''}
-                </span>
-              </span>
-            </label>
-          ) : (
-            <p className={ui.muted}>
-              지도에서 기업이나 사건을 고르면 질문에 연결할 수 있어요.
-            </p>
-          )}
-        </section>
-
-        <div aria-live="polite" className="sr-only">
-          {announced ? statusText(announced) : ''}
-        </div>
-
-        {chat.load.kind === 'loading' && (
-          <p className={ui.state} role="status">
-            이전 대화를 불러오고 있어요.
-          </p>
-        )}
-        {chat.load.kind === 'error' && (
-          <LoadError
-            error={chat.load.error}
-            onRecheck={() => void chat.recheck()}
-            onNew={() => void startNew()}
-          />
-        )}
-        {chat.load.kind === 'ready' && chat.jobs.length === 0 && (
-          <p className={ui.state}>
-            궁금한 점을 입력해 보세요. 일반 개념은 바로 물을 수 있고, “그
-            기업”처럼 대상을 가리키는 질문은 어떤 대상인지 되물을 수 있어요.
-          </p>
-        )}
-        {chat.jobs.map((job) => (
-          <ChatJobCard
-            key={job.id}
-            job={job}
-            answers={
-              job.resolves ? (byId.get(job.resolves.jobId) ?? null) : null
-            }
-            busy={locked || chat.acting}
-            onChoose={(clarification, choice) =>
-              void chat.reply(clarification, choice)
-            }
-            onAnswerFreely={(clarification) => {
-              setReplyTo(clarification);
-              input.current?.focus();
-            }}
-            onRetry={(job) => void chat.retry(job)}
-            onCancel={(job) => void chat.cancel(job)}
-            onViewOnMap={onViewOnMap}
-          />
-        ))}
-        {chat.pollError && (
-          <div className={ui.state} role="alert">
-            <p className="mt-0!">
-              질문 상태를 확인하지 못했어요. 질문은 서버에서 계속 처리되고 있을
-              수 있어요.
-            </p>
-            <button type="button" onClick={() => void chat.recheck()}>
-              다시 확인
-            </button>
-          </div>
-        )}
-        {chat.pending && (
-          <PendingBox
-            pending={chat.pending}
-            busy={chat.sending}
-            onResend={() => void resend()}
-            onDiscard={() => void chat.discard()}
-          />
-        )}
-        {chat.notice && (
-          <NoticeBox notice={chat.notice} onDismiss={chat.dismissNotice} />
-        )}
-      </div>
-
-      <form
-        className="shrink-0 border-t border-panel-line px-4 py-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void submit();
-        }}
-      >
-        {replyTo && (
-          <p
-            className={`${ui.muted} mb-2 flex items-center justify-between gap-2`}
-          >
-            <span className="wrap-anywhere">
-              확인 질문 “{replyTo.question}”에 답하는 중
-            </span>
-            <button
-              type="button"
-              className="underline"
-              onClick={() => setReplyTo(null)}
-            >
-              답하지 않기
-            </button>
-          </p>
-        )}
-        <div className="flex items-end gap-2">
-          <label className="sr-only" htmlFor="ai-chat-input">
-            질문
-          </label>
-          <textarea
-            id="ai-chat-input"
-            ref={input}
-            rows={2}
-            className="min-h-10 flex-1 resize-none rounded-panel border border-panel-line px-3 py-2 text-[12px] leading-[18px] focus-visible:outline-2 focus-visible:outline-panel-ink"
-            placeholder="질문을 입력해 주세요"
-            value={draft}
-            aria-describedby="ai-chat-hint"
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (
-                event.key === 'Enter' &&
-                !event.shiftKey &&
-                !event.nativeEvent.isComposing
-              ) {
-                event.preventDefault();
-                void submit();
-              }
-            }}
-          />
+        <div className="flex shrink-0 gap-2">
           <button
-            type="submit"
+            type="button"
             className={ui.button}
-            disabled={!sendable}
-            aria-busy={chat.sending}
+            aria-pressed={view === 'history'}
+            onClick={() => setView(view === 'history' ? 'chat' : 'history')}
           >
-            {chat.sending ? '보내는 중' : '보내기'}
+            대화 기록
+          </button>
+          <button
+            type="button"
+            className={ui.button}
+            disabled={!chat.canSwitch}
+            onClick={() => void startNew()}
+          >
+            새 대화
           </button>
         </div>
-        <div id="ai-chat-hint" className={`${ui.muted} mt-1`}>
-          {chat.active && (
-            <p className="m-0">
-              이 대화의 질문을 처리하는 동안에는 새 질문을 보낼 수 없어요.
-            </p>
-          )}
-          {!useTarget && !replyTo && (
-            <p className="m-0">
-              연결한 대상이 없어요. 질문에 기업 이름을 적거나 위에서 대상을 골라
-              주세요.
-            </p>
-          )}
-          {length > MAX_QUESTION - 500 && (
-            <p
-              className={length > MAX_QUESTION ? 'm-0 text-zoop-alert' : 'm-0'}
-            >
-              {length}/{MAX_QUESTION}자
-            </p>
-          )}
-          <p className="m-0">AI가 생성한 답변이며 투자 권유가 아니에요.</p>
-        </div>
-      </form>
+      </div>
+      {view === 'history' ? (
+        <ChatHistoryList
+          currentId={chat.sessionId}
+          canOpen={chat.canSwitch}
+          onOpen={(id) => void open(id)}
+          onDeleted={(id) => {
+            if (id === chat.sessionId) setReplyTo(null);
+            chat.forget(id);
+          }}
+          onBack={() => setView('chat')}
+        />
+      ) : (
+        <>
+          <div className={ui.scroll}>
+            <section className={ui.section} aria-labelledby="ai-chat-target">
+              <h3 id="ai-chat-target">질문에 연결할 대상</h3>
+              {target ? (
+                <label className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={linked}
+                    onChange={(event) => setLinked(event.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className={ui.itemTitle}>{targetLabel}</span>
+                    <span className={`${ui.muted} block`}>
+                      {TARGET_KIND[target.kind]}
+                      {target.evidenceIds?.length
+                        ? ` · 근거 ${target.evidenceIds.length}건`
+                        : ''}
+                      {target.mapContext?.graphVersion
+                        ? ` · 그래프 ${target.mapContext.graphVersion}`
+                        : ''}
+                    </span>
+                  </span>
+                </label>
+              ) : (
+                <p className={ui.muted}>
+                  지도에서 기업이나 사건을 고르면 질문에 연결할 수 있어요.
+                </p>
+              )}
+            </section>
+
+            <div aria-live="polite" className="sr-only">
+              {announced ? statusText(announced) : ''}
+            </div>
+
+            {chat.load.kind === 'loading' && (
+              <p className={ui.state} role="status">
+                이전 대화를 불러오고 있어요.
+              </p>
+            )}
+            {chat.load.kind === 'error' && (
+              <LoadError
+                error={chat.load.error}
+                onRecheck={() => void chat.recheck()}
+                onNew={() => void startNew()}
+              />
+            )}
+            {chat.load.kind === 'ready' && chat.jobs.length === 0 && (
+              <p className={ui.state}>
+                궁금한 점을 입력해 보세요. 일반 개념은 바로 물을 수 있고, “그
+                기업”처럼 대상을 가리키는 질문은 어떤 대상인지 되물을 수 있어요.
+              </p>
+            )}
+            {chat.jobs.map((job) => (
+              <ChatJobCard
+                key={job.id}
+                job={job}
+                answers={
+                  job.resolves ? (byId.get(job.resolves.jobId) ?? null) : null
+                }
+                busy={locked || chat.acting}
+                onChoose={(clarification, choice) =>
+                  void chat.reply(clarification, choice)
+                }
+                onAnswerFreely={(clarification) => {
+                  setReplyTo(clarification);
+                  input.current?.focus();
+                }}
+                onRetry={(job) => void chat.retry(job)}
+                onCancel={(job) => void chat.cancel(job)}
+                onViewOnMap={onViewOnMap}
+              />
+            ))}
+            {chat.pollError && (
+              <div className={ui.state} role="alert">
+                <p className="mt-0!">
+                  질문 상태를 확인하지 못했어요. 질문은 서버에서 계속 처리되고
+                  있을 수 있어요.
+                </p>
+                <button type="button" onClick={() => void chat.recheck()}>
+                  다시 확인
+                </button>
+              </div>
+            )}
+            {chat.pending && (
+              <PendingBox
+                pending={chat.pending}
+                busy={chat.sending}
+                onResend={() => void resend()}
+                onDiscard={() => void chat.discard()}
+              />
+            )}
+            {chat.notice && (
+              <NoticeBox notice={chat.notice} onDismiss={chat.dismissNotice} />
+            )}
+          </div>
+
+          <form
+            className="shrink-0 border-t border-panel-line px-4 py-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submit();
+            }}
+          >
+            {replyTo && (
+              <p
+                className={`${ui.muted} mb-2 flex items-center justify-between gap-2`}
+              >
+                <span className="wrap-anywhere">
+                  확인 질문 “{replyTo.question}”에 답하는 중
+                </span>
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={() => setReplyTo(null)}
+                >
+                  답하지 않기
+                </button>
+              </p>
+            )}
+            <div className="flex items-end gap-2">
+              <label className="sr-only" htmlFor="ai-chat-input">
+                질문
+              </label>
+              <textarea
+                id="ai-chat-input"
+                ref={input}
+                rows={2}
+                className="min-h-10 flex-1 resize-none rounded-panel border border-panel-line px-3 py-2 text-[12px] leading-[18px] focus-visible:outline-2 focus-visible:outline-panel-ink"
+                placeholder="질문을 입력해 주세요"
+                value={draft}
+                aria-describedby="ai-chat-hint"
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (
+                    event.key === 'Enter' &&
+                    !event.shiftKey &&
+                    !event.nativeEvent.isComposing
+                  ) {
+                    event.preventDefault();
+                    void submit();
+                  }
+                }}
+              />
+              <button
+                type="submit"
+                className={ui.button}
+                disabled={!sendable}
+                aria-busy={chat.sending}
+              >
+                {chat.sending ? '보내는 중' : '보내기'}
+              </button>
+            </div>
+            <div id="ai-chat-hint" className={`${ui.muted} mt-1`}>
+              {chat.active && (
+                <p className="m-0">
+                  이 대화의 질문을 처리하는 동안에는 새 질문을 보낼 수 없어요.
+                </p>
+              )}
+              {!useTarget && !replyTo && (
+                <p className="m-0">
+                  연결한 대상이 없어요. 질문에 기업 이름을 적거나 위에서 대상을
+                  골라 주세요.
+                </p>
+              )}
+              {length > MAX_QUESTION - 500 && (
+                <p
+                  className={
+                    length > MAX_QUESTION ? 'm-0 text-zoop-alert' : 'm-0'
+                  }
+                >
+                  {length}/{MAX_QUESTION}자
+                </p>
+              )}
+              <p className="m-0">AI가 생성한 답변이며 투자 권유가 아니에요.</p>
+            </div>
+          </form>
+        </>
+      )}
     </>
   );
 }

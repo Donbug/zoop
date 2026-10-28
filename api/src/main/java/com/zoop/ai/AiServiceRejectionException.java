@@ -19,7 +19,8 @@ import java.util.Optional;
  * new job id or operation id. The client never retries; {@code retryable()} is only the service's advice.
  */
 public abstract sealed class AiServiceRejectionException extends AiClientException
-        permits AiServiceErrorException, ExtractionServiceErrorException, RelationServiceErrorException {
+        permits AiServiceErrorException, ExtractionServiceErrorException, RelationServiceErrorException, PlanAdmissionServiceErrorException,
+                HandoffServiceErrorException {
     private final int httpStatus;
     private final String code;
     private final boolean retryable;
