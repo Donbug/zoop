@@ -1,346 +1,181 @@
 # ZOOP AI 챗봇 설계 요약
 
-문서 상태: 팀 공유용 목표 설계 요약 · 2026-10-25 구현 현황 반영
+문서 버전: 1.7 / 기준 정책: ZOOP-AIG-001 v0.11 / 설계 갱신: 2026-10-28
+상태: 2026-10-28 팀 결정 · 구현 예정 · 출시 검증 별도
 
-문서 버전: 1.5 / 기준 정책: ZOOP-AIG-001 v0.9
+이번 팀 결정은 2026-10-25의 MCP 미사용 결정을 대체한다. 기존 Java direct adapter는 Responses 시작 전 MCP 장애가 확인된 job의 시작 경로와 비교 기준으로 유지한다.
 
-최초 기준일: 2026년 10월 21일 / 구현 상태 갱신: 2026년 10월 25일
-
-상세 정책: [ZOOP AI 거버넌스 정책](../ZOOP_AI_거버넌스_정책.md)
-
-개발 계획: [AI 챗봇 구현 준비·개발 계획](../development/ai-chatbot-implementation-plan.md)
-
-화면 상태: [D-AI-01~02b 구현 계약](../wireframe/ai-chatbot-state-contract.md)
-
-시각 자료: [ZOOP AI 챗봇 전체 아키텍처 FigJam](https://www.figma.com/board/n9faVm9OiLCKwD8OgnFQfX)
+상세: [거버넌스](../ZOOP_AI_거버넌스_정책.md), [Luna MCP 실행·캐시·direct 시작 계약](ai-chatbot-mcp-actions.md), [웹 검색](ai-chatbot-web-search.md), [개발 계획](../development/ai-chatbot-implementation-plan.md), [평가](../development/ai-chatbot-eval-set.md), [화면 상태](../wireframe/ai-chatbot-state-contract.md).
+[기존 FigJam](https://www.figma.com/board/n9faVm9OiLCKwD8OgnFQfX)은 이전 설계일 수 있으며 이번 문서 개정의 동기화 증거로 사용하지 않는다.
 
 ## 1. 핵심 요약
 
-ZOOP 챗봇은 하나의 LLM이 질문 해석, 데이터 검색, 답변 생성을 모두 자율적으로 수행하는 구조가 아니다. 질문을 구조화하고 Jev가 필요한 유형과 논리 기능 후보를 typed 판정하며, 실제 도구 선택과 실행 권한은 서버가 가진다. 조회 결과는 Luna의 `answer-generator` stage가 답변으로 만들고, 결정론적 검사와 Jev 의미 검증을 통과한 결과만 저장·전달한다. 목표 설계의 분리된 Luna `coverage-verifier` stage는 아직 구현되지 않았으며, 현재 서버는 0.70/0.35 임계값과 allowlist로 계획을 확정한다.
+Jev가 Q01~Q08 유형과 기능 후보를 분류하면 서버가 허용 도구·대상·권한·예산을 고정한다. Luna는 Responses API에서 ZOOP MCP 도구를 선택하고 결과에 따라 추가 조회한 후 최종 답변 후보를 만든다. 서버의 결정론 검사와 별도 Jev 의미 검증을 통과한 내용만 사용자에게 제공한다.
 
-핵심 결정은 다음과 같다.
-
-- 질문은 Q01~Q08 중 하나만 선택하지 않고 여러 유형에 동시에 해당할 수 있다.
-- 유형이나 도구를 고정 세 개로 제한하지 않는다.
-- 선택된 유형에 연결된 모든 도구를 호출하지 않고, 명시적 요구를 충족하는 최소 충분 도구만 호출한다.
-- Jev와 검증 LLM은 도구를 직접 호출하거나 실행 권한을 갖지 않는다.
-- 서버가 allowlist, 권한, 입력 스키마, 공개 상태와 실행 예산을 검사한 뒤 도구 호출을 승인한다.
-- 범용 금융·산업 용어 사전은 구축하지 않는다. 일반 개념은 제한된 Luna 답변으로 처리하고, ZOOP 고유 개념만 승인된 정책·도움말 문서를 조회한다.
-- 챗봇 개별 답변에는 사람의 사전 검수를 요구하지 않는다. 공개 데이터 생성·검수와 챗봇 자동 검증을 구분한다.
+- 한 질문에 여러 유형이 해당할 수 있다. Q02·Q03·Q04를 필요한 도구로 조합하고 유형 수를 top-3로 제한하지 않는다.
+- 범용 용어 사전은 없다. Q02는 웹 보조 근거를 기본 시도하고 실패하면 제한된 일반 지식 설명을 제공한다.
+- Q01은 웹 검색 금지. Q03~Q08은 내부 조회를 먼저 하고 부족한 요구에만 마지막 웹 검색을 사용한다.
+- 웹 장애만으로 전체 답변을 실패시키지 않는다. 정상 근거 답변·부분 답변·확인 불가 안내를 제공한다.
+- 요청 단위 cache/single-flight로 동일 조회를 재사용한다. 권한/철회는 cache hit에서도 재검사한다.
+- MCP 연결 장애에는 공통 Tool Service의 Java direct adapter로 최대 1회 전환한다. 인증/권한/grant/스키마 거부를 우회하지 않는다.
+- 개별 답변은 자동 검증한다. 공개 데이터 생성·관리자 검수와 구분한다.
 
 ## 2. 목표 처리 흐름
 
-```mermaid
-flowchart LR
-    question[회원 질문] --> auth[인증·대화 소유권 확인]
-    auth --> freeze[대상·기간·asOf·graphVersion 고정]
-    freeze --> decompose[명시적 요구를 requirementId로 분해]
-    decompose --> jev[Jev Q01~Q08 및 논리 기능 typed 판정]
-    jev --> coverage[Luna coverage-verifier 요구 커버리지 검증]
-    coverage --> decision{계획이 명확하고 예산 내인가?}
-    decision -->|아니오| clarify[clarification 또는 guidance]
-    decision -->|예| gate[서버 allowlist·권한·스키마 검사]
-    gate --> tools[stage별 읽기 전용 도구 실행]
-    tools --> checkpoint{체크포인트 조건}
-    checkpoint -->|초과| clarify
-    checkpoint -->|다음 stage| tools
-    checkpoint -->|충족·미달·0개| context[구조화된 BranchContext]
-    context --> luna[Luna 구간별 답변 생성]
-    luna --> det[1층 결정론적 검사]
-    det -->|실패| failed[validation_failed]
-    det -->|통과| sem[2층 Jev 의미 검증]
-    sem -->|contradicted·금지 조언| failed
-    sem -->|hold 요구 제외·통과| save[ChatResult 저장 후 전달]
-```
+1. 회원·소유권·멱등성 검사, 대상·기간·asOf·graphVersion 고정.
+2. 명시 요구를 requirementId로 나누고 모호한 대상은 clarification.
+3. Jev의 multi-label 판정을 서버 필수/선택 capability 및 허용 도구로 변환.
+4. ai/service가 Luna Responses API에 정제 입력·MCP 연결·허용 도구를 전달.
+5. Luna가 필요한 도구와 인자를 선택. OpenAI 런타임이 MCP 요청을 전달.
+6. Java MCP gate가 실행/모델 전송 권한·버전·중복·예산을 검사하고 공통 읽기 서비스를 실행.
+7. Luna가 중간 결과를 받아 미해결 요구만 추가 조회. 서버 체크포인트·최대 3라운드·웹 gate 적용.
+8. 최종 구조화 답변 후보 1개를 생성하고 결정론 검사 → 별도 Jev 의미 검증 → 저장·전달.
+9. 자료·검색·모델 장애에는 원인을 보존하면서 검증된 내용 또는 고정 안내로 종료.
 
-기한 검사는 각 모델 단계 시작 전에 수행하며, 이후 남은 필수 단계의 상한 합보다 기한이 부족하면 호출하지 않고 `transient`(`deadline_guard`)로 끝낸다(5.1절).
-
-독립적인 도구 조회는 병렬 실행하고, 앞 단계 결과가 다음 단계 입력일 때만 순차 실행한다. 순차 실행은 계획에 단계(stage)로 선언하고, 결과 개수에 따라 진행이 달라지면 서버가 평가하는 체크포인트를 붙인다(5.2절). 1차 조회 결과가 부족하면 승인된 예산 안에서만 보충 라운드를 실행한다.
+기존 독립 Luna coverage-verifier 최대 2회 목표는 실행 중 요구 추적과 서버 커버리지 검사로 대체한다. 이를 독립 사실 검증으로 취급하지 않으며 최종 Jev 검증은 유지한다.
 
 ## 3. 구성요소별 책임
 
-| 구성요소 | 담당 역할 | 하지 않는 일 |
-| --- | --- | --- |
-| 요구 분해기 | 원문을 명시적 하위 요구와 대상·기간으로 구조화 | DB 조회, 권한 추측 |
-| Jev 라우터 | Q01~Q08 해당 여부와 승인된 논리 기능 후보를 typed 확률로 판정 | 자유 문자열 도구 생성, 도구 직접 호출, 최종 답변 생성 |
-| Luna `coverage-verifier` | 원문 요구가 후보 계획에 모두 포함됐는지 구조화된 스키마로 검토 | 실행 권한 부여, allowlist 확장, 최종 답변 생성 |
-| ZOOP 서버 | 최종 계획 확정, 권한·스키마·예산 검사, 논리 기능을 앱 내부 읽기 어댑터에 매핑 | 모델의 권한·도구 제안을 그대로 신뢰 |
-| 읽기 도구 계층(앱 내부 어댑터) | 승인된 공개·개인 범위에서 읽기 전용 조회 수행 | 데이터 수정·삭제, 검수 승인, 주문·결제 |
-| Luna | 허용된 일반 지식과 BranchContext로 하위 답변을 만들고 통합 | 누락 데이터를 추측, 존재하지 않는 출처 생성 |
-| 출력 검증기 | 요구 커버리지, 인용, 수치, 버전, 권한, 투자 판단 범위, 응답 스키마 검사 | 실패 답변의 자동 재생성 |
+| 구성요소 | 역할 |
+| --- | --- |
+| Jev router | 유형·capability 확률, 자유 도구명·실행 권한 생성 없음 |
+| 서버 정책/작업 실행기 | 명시 요구, 허용 목록·대상·예산·체크포인트, 내구 원장, 결과/권한 검사 |
+| Luna | 허용된 도구·인자·순서 선택, 중간 결과에 따른 보충, 최종 답변 후보 |
+| OpenAI Responses | MCP 도구 목록과 호출 전송, 승인 요청/결과 반환 |
+| Java MCP endpoint | 인증 경계의 HTTPS Streamable HTTP /mcp, 호출 gate·캐시·공통 Tool Service |
+| Direct adapter | preflight 실패·circuit open이면 Responses 시작 전 선택하는 대체 시작 경로 |
+| ai/service·worker | Responses 시작·중지·continuation. approval 요청을 Java에 반환하고 Java 결정만 전달 |
+| 출력 검증기 | 요구/인용/버전 등 코드 검사 + 독립 Jev 의미 검증 |
+
+앱→AI 모델 실행은 ai/service HTTP를 유지한다. OpenAI→Java /mcp callback은 새 목표 경계이며 구현 PR에서 CLAUDE.md·네트워크·인증·계약을 함께 갱신한다. 비공개 Neo4j나 AI 저장소를 앱 챗봇이 직접 읽지 않는다. 모델 API 키와 MCP 위임 토큰은 분리한다.
+
+`require_approval=always`의 승인자는 Java 작업 실행기다. ai/service는 `mcp_approval_request`를 Java에 반환하고, Java가 예산·요구·scope·grant·기한을 판단한 뒤 continuation을 다시 호출한다. 실행 중 MCP 오류 결과를 direct 결과로 끼워 넣지 않는다.
 
 ## 4. Q01~Q08 질의 유형
 
-Q 유형은 배타적인 단일 enum이 아니라 실행 능력 태그다. 한 질문에 여러 유형이 동시에 선택될 수 있다.
-
-| 유형 | 목적 | 주요 데이터·처리 |
+| 유형 | 목적 | 주 원천 / 웹 규칙 |
 | --- | --- | --- |
-| Q01 서비스 안내 | 화면·기능·사용 방법 설명 | 승인된 도움말, 화면 명세, ZOOP 정책 문서 |
-| Q02 금융·산업 개념 | HBM 같은 일반 개념 설명 | 범용 용어 사전 없이 제한된 Luna 답변. ZOOP 고유 개념만 내부 정책 조회 |
-| Q03 기업·사건 사실 | 기업 관련 뉴스·공시·사건 조회 | PostgreSQL 기업·문서·사건·근거, 필요한 외부 데이터 어댑터 |
-| Q04 관계·경로 | 기업 간 직접·간접 관계 탐색 | 앱 공개 그래프 스냅샷의 고정 버전, 간선별 PostgreSQL 근거와 원문 |
-| Q05 기간 비교 | 기간·버전 간 관계 변화 비교 | 그래프 버전, 활성화 이력, 서버 차이 계산 |
-| Q06 브리핑 | 발행된 출근·퇴근 브리핑 설명 | 브리핑 회차, dataAsOf, 포함 이슈와 근거 |
-| Q07 내 종목 | 본인 보유·관심 종목 범위의 관련 정보 | 본인 종목 범위를 먼저 확인한 뒤 Q03·Q04 등 공개 조회 |
-| Q08 선정 근거 | 이슈·관계·브리핑 선정 이유 설명 | 실제 적용된 규칙 revision, 입력 요인, 공개 근거 |
+| Q01 | 서비스 안내 | 승인 도움말·화면·정책, 웹 금지 |
+| Q02 | 금융·산업 개념 | 웹 보조 근거 기본 시도, 실패 시 Luna 일반 개념 |
+| Q03 | 기업·사건 사실 | 기업·문서·이슈·근거, 부족 시 마지막 웹 |
+| Q04 | 관계·경로 | PublicGraphReader의 공개 스냅샷과 간선 근거, 웹은 외부 배경만 |
+| Q05 | 기간·버전 비교 | 공개 버전·활성 이력·서버 차이 계산, 웹은 배경만 |
+| Q06 | 브리핑 | 발행 회차·dataAsOf·포함 이슈·근거, 웹으로 회차를 재작성하지 않음 |
+| Q07 | 내 종목 | 서버에서 본인 범위 확인 후 공개 조회, 외부에는 개별 공개 기업 정보만 |
+| Q08 | 선정 근거 | 실제 규칙 revision·선정 기록, 웹으로 이유를 추정하지 않음 |
 
-Q02는 최신 기업 상태, 가격, 공시, 시장 전망을 일반 지식으로 답하는 우회 경로가 아니다. 최신 사실이 포함되면 Q03~Q08의 근거 조회 경로를 함께 사용한다.
+원문 요청은 해당 유형의 evidence.resolve 등으로 해결하며 Q06으로 재분류하지 않는다. Q02는 최신 사실·가격·전망 답변의 우회 경로가 아니다. 웹에만 있는 관계는 내부 지도 간선이나 포커스 대상이 아니다.
 
-## 5. 동적 도구 선택 원칙
+## 5. 동적 도구 선택
 
-1. 사용자가 명시한 하위 요구는 필수 요구로 고정한다.
-2. Jev가 Q 유형과 버전이 고정된 논리 기능 목록을 판정한다.
-3. Luna `coverage-verifier`가 누락 요구와 불필요 기능을 검토한다.
-4. 서버가 최소 충분 도구 집합을 확정한다.
-5. 동일 목적의 중복 조회와 답변에 쓰이지 않을 조회는 제거한다.
-6. 권한·개인정보·투자 판단 gate는 모델 선택과 무관하게 항상 실행한다.
-7. 호출 수, 전체 시간, 비용, 문서 수와 그래프 경로 길이는 서버 예산으로 제한한다.
-8. 예산을 초과하면 요구를 조용히 버리지 않고 도구 호출 전에 범위 선택을 요청한다. 조회 결과를 봐야 범위를 정할 수 있으면 선언된 체크포인트에서 답변 생성 전에 요청한다.
+명시적 요구는 확률로 버리지 않는다. Jev p≥0.70은 후보, 0.35≤p<0.70은 검토 후보로 Luna가 선택할 수 있게 하며 낮은 확률이어도 명시 요구에 필요한 등록 도구는 포함한다. 확률은 권한이나 정답률 보장이 아니다. 관련 없는 도구를 모두 노출하지 않는다.
 
-문서에 표시한 `help.search`, `document.search`, `graph.path.read` 등의 이름은 목표 논리 도구 ID다. 레지스트리에 등록된 앱 내부 읽기 어댑터만 실행한다. 서비스는 MCP를 쓰지 않는다(2026-10-25 결정). 외부 웹 검색은 내부 도구로 답할 수 없을 때만 쓰는 검색 API 직접 어댑터로 설계 중이다([웹 검색 대체 경로 설계](ai-chatbot-web-search.md), 미구현).
+필수 capability는 실제 결과로 충족해야 한다. 같은 근거가 이미 다른 도구 결과에 있으면 불필요한 중복 호출을 강제하지 않는다. 의미적 충분성은 인용 개수나 evidenceSufficient boolean으로 단정하지 않는다. 모델은 requirementId와 미해결 항목을 제시하고 서버는 실제 결과·예산·권한을 검사한다.
 
-**그래프 조회 원천.** `graph.path.read`·`graph.version.diff`는 공개 그래프 API와 같은 앱 읽기 경로 `PublicGraphReader`(버전 고정 → 불변 스냅샷 → asOf 필터 → 현재 공개 제외 결정 적용)만 사용한다. Neo4j는 AI 파이프라인의 관계 투영·검증 저장소이고 AI 내부 그래프 읽기 API는 비공개·미게시 버전을 다루므로, 챗봇은 둘 다 호출하지 않는다. 그래서 답변의 `graphVersion`·경로·철회 상태가 사용자가 지도에서 보는 그래프와 같다. hop은 화면 `depth`와 같은 기업 간 관계 hop이며(스냅샷 내부의 기업–이슈 간선 수가 아님) 최대 3이다. 과거 graphVersion·asOf는 공개 그래프 API와 같이 공개 활성화 이력이 있는 버전만 허용하고, 그 버전에도 현재 공개 제외 결정을 적용한다(Q05 기간 비교).
-
-### 5.1 확정된 초기 선택값
-
-**Jev 선택 기준**
-
-Jev는 자유 문장 대신 정해진 질문에 typed 판정을 돌려주는 모델이다. 판정 형식은 두 가지다. **Choice**는 여러 선택지 중 하나를 고르는 질문으로 선택지별 확률 분포와 confidence를 준다(예: 의미 검증의 `supported / contradicted / insufficient`). **Noul**은 예/아니오 하나를 묻는 독립 질문으로 “예”일 확률 `p` 하나를 준다(예: “이 질문이 Q04에 해당하는가?”, “이 문장이 투자 권유인가?”). 라우터는 Q 유형과 논리 기능마다 Noul 질문을 하나씩 두므로 한 질문이 여러 유형에 동시에 해당할 수 있다. 아래 `p`는 그 Noul 확률이다.
-
-- 사용자가 명시한 요구는 `required=true`로 고정하며 Jev 확률로 제거하지 않는다.
-- Noul 확률 `p >= 0.70`은 자동 후보, `0.35 <= p < 0.70`은 커버리지 검토 후보로 사용한다.
-- `p < 0.35`는 기본 제외하되, 명시적 요구이거나 커버리지 누락으로 확인되면 allowlist 안에서 포함할 수 있다.
-- 커버리지 검증은 최초 1회와 계획 보완 후 재확인 1회까지, 최종 답변 생성은 1회만 허용한다.
-
-**도구 레지스트리**
-
-| 그룹 | 논리 도구 |
-| --- | --- |
-| `zoop-help-read` | `help.search`, `screenSpec.read`, `zoopPolicy.read` |
-| `zoop-core-read` | `company.read`, `document.search`, `issue.read`, `evidence.resolve`, `period.compare`, `selectionRule.read` |
-| `zoop-graph-read` | `graph.path.read`, `graph.version.diff` |
-| `zoop-briefing-read` | `briefing.read`, `briefing.evidence` |
-| `zoop-member-scope-read` | `portfolio.scope.read` |
-
-공통 요청에는 `requestId`, `jobId`, `capabilityId`, `targets`, `period`, `asOf`, 선택적 `graphVersion`, `limit`을 넣는다. 회원 ID와 본인 종목 범위는 모델 출력이나 사용자 문장에서 받지 않고 인증된 서버 문맥으로 주입한다. 공통 결과에는 `schemaVersion`, `toolCallId`, `capabilityId`, `dataVersion`, `items`, `evidenceIds`, `truncated`, `nextAllowed`, 실제 오류 상태를 넣는다. 각 도구의 세부 스키마는 별도로 버전 고정한다.
-
-**요청당 실행 상한**
+### 5.1 실행 상한과 요청 캐시
 
 | 항목 | 초기 상한 |
 | --- | --- |
-| 도구 호출·동시 실행 | 최대 12회·동시 4회 |
-| 의존 단계·fan-out | 계획당 최대 3단계, 단계별 앞 단계 결과 대상 최대 5개 |
-| 보충 라운드 | 계획된 단계 뒤 최대 1라운드 |
-| 시간 | 단계별 잠정 상한(Jev 라우터 4초, Luna 커버리지 회당 6초, 도구 단계 10초·개별 3초, Luna 생성 25초, Jev 의미 검증 6초, 서버 처리 3초). ChatJob 기한은 계획한 단계 상한의 합이며 최대 60초 |
-| 조회량 | 문서 최대 20개, 그래프 최대 3-hop·노드 50개·간선 50개 |
-| Luna context·답변 | 입력 24,000 토큰·출력 2,000 토큰 |
-| 모델 호출 | 라우터 Jev 1회, 커버리지 Luna 최대 2회, 생성 Luna 1회, 의미 검증 Jev 1회 |
-| 명시적 요구 | 질문당 최대 6개. 넘으면 도구 호출 전 `clarification`(`limitations` 8개·`sections` 12개·claim 20개 상한의 기준) |
-| 확인 질문 사슬 | 루트 질문부터 최대 2회. 깊이 2 확인 답 작업도 정상 처리하며, 추가 확인이 필요할 때만 `clarification` 대신 `guidance` |
+| 도구 시도 | 총 8회, 내부 최대 6회·웹 최대 2회, cache hit·실패·direct 조회 포함 |
+| 동시 / 의존 | 최대 4개 / 총 3라운드, 추가 4번째 보충 없음 |
+| 대상 / 자료 | fan-out·batch 최대 5개, 문서 20개, 그래프 3-hop·노드/간선 각 50개 |
+| 개별 timeout | DB 3초·그래프 경로 5초·웹 7초, 잔여 기한으로 축소 |
+| Luna / job | MCP·Java 승인 continuation·생성 합산 35초 / running부터 terminal-state DB commit 완료까지 45초 |
+| 단계 예약 | router 4초·후검증 6초·서버 3초 |
+| Luna 토큰 | 누적 입력 24,000·최종 답변 2,000, reasoning 비용은 별도 포함 예약 |
+| 요구 / 확인 | 명시 요구 6개 / 확인 사슬 최대 2회 |
+| 웹 일 상한 | 회원 20회·프로젝트 500회, KST 기준, 확인 사슬·재실행 누적 |
 
-단계는 계획에 미리 선언한 의존 실행이고, 보충 라운드는 결과가 부족할 때 계획에 없던 조회다. 둘 다 도구 호출 12회에 포함하며 예산은 체크포인트 조건이 허용하는 최악의 경우로 계산한다. 계획 단계에서 상한을 넘으면 도구를 일부만 조용히 호출하지 않고 범위를 좁히는 `clarification`을 반환한다. 실행 도중 timeout이나 공급자 장애가 발생하면 불완전한 자료를 완전한 답변처럼 제공하지 않고 실제 실패 상태로 종료한다.
+실효 Luna 시간은 min(35초, job 잔여 − 후검증 6초 − 서버 3초)다. router가 4초를 쓰면 32초다. 최종 작성용 10초를 남기고 새 도구를 중단한다. 제한으로 중단한 자료를 전체 조회라고 표시하지 않는다. 최악 경로가 예산을 넘으면 범위를 확인하며 실행 중에는 확인된 결과/안내로 종료한다.
 
-**실행 기한.** 60초는 평균 소요 시간이 아니라 포기 차단선이다. 기한은 `running` 시작부터 검증된 결과 저장까지이며, 계획 확정 때 실제로 실행할 단계의 상한만 더해 정한다.
+초기 Responses reasoning effort는 `medium`이다. 구현 전에 도구 1·4·8회와 승인 continuation의 합성 replay 및 승인된 소량 live 지연 spike를 수행한다. `high`는 품질 이득과 45초 준수를 함께 증명한 뒤 적용한다.
 
-| 경로 | 실행 단계 | 기한 |
-| --- | --- | --- |
-| Q02 단독 | 라우터 4 + 커버리지 6 + 생성 25 + 의미 검증 6 + 서버 3 | 44초 |
-| 단순 근거 조회 | 위 + 도구 10 | 54초 |
-| 복합(커버리지 재확인) | 라우터 4 + 커버리지 6×2 + 도구 10 + 생성 25 + 의미 검증 6 + 서버 3 | 60초 |
+캐시 키에는 job·실행 세대·도구/스키마/정책 revision·정규화 인자·회원 scope·버전·asOf를 포함한다. 동일 요청의 실제 조회는 1회이고 동시 요청은 single-flight로 합친다. 성공·정상 0건만 캐시하며 실패는 실패 원장으로 별도 관리한다. hit에도 권한·철회·model-send grant를 확인하고 원 결과와 toolCallId를 그대로 연결한다. 상세는 [MCP 계약 3.3절](ai-chatbot-mcp-actions.md#33-요청-단위-캐시와-중복-억제).
 
-- 모든 경로의 단계 상한 합은 60초를 넘지 않게 정한다.
-- 각 모델 단계를 시작하기 전에 남은 기한이 **그 단계와 이후 남은 필수 단계 상한의 합**보다 적으면 호출하지 않고 종료한다. 다음 단계 하나만 보면 생성 비용을 쓴 뒤 의미 검증 직전에 기한이 끝날 수 있다. 커버리지 재확인도 이 조건을 만족할 때만 실행한다.
-- 시간 상한은 실측 근거 없는 잠정값이다. 출시 전 단계별 p95를 측정해 상한을 p95의 1.5배로 다시 정하고, Luna 커버리지 reasoning effort 하향을 함께 검토한다.
-- 진행 중에는 공개 `ChatJob.phase`(`planning` → `retrieving` → `writing` → `verifying`)로 현재 단계를 보여 준다. 검증 전 본문은 노출하지 않는다.
+### 5.2 의존 실행과 체크포인트
 
-**한도 초과 분류.** 같은 고정 문맥으로 다시 실행했을 때 결과가 달라질 수 있는지로 나눈다.
+서버가 개수 조건 exactly/atLeast/atMost를 요구에서 정한다. 초과이면 실제 대상의 choices로 clarification, 미달이면 가능한 요구만 답하고 precondition_unmet, 정상 0건이면 조회 범위 내 찾지 못함, truncated이면 확인 한계를 표시한다. 오류를 0건으로 평가하지 않는다.
 
-| 상황 | 처리 | 재시도 |
-| --- | --- | --- |
-| 계획 시점 예산·체크포인트 fan-out 초과 | `clarification` | 해당 없음 |
-| 보충 라운드가 호출 상한 때문에 불가 | `results_truncated`·`evidence_insufficient` limitation | 해당 없음 |
-| 모델 송신 전 실패(잔여 기한 부족, 연결 실패·처리 거부가 명시된 공급자 오류, 형식·모델 불일치 응답) | `transient`(`deadline_guard`, `provider_error`) | `rerun` |
-| 도구 단계·개별 상한 초과 | `transient`(`tool_timeout`) | `rerun` |
-| 모델 송신 후 상한 초과·연결 끊김으로 응답 불명 | `transient`(`response_unknown`), 호출 `unknown`·`reconcile_only` | 없음(중복 호출·과금 방지, 운영자 정산) |
-| 압축 후에도 입력 24k 초과, 출력 2k 상한 도달로 미완성 | `budget_exceeded`(`context_too_large`, `output_limit`) | 없음, 범위를 좁힌 새 질문 안내 |
+Q07의 `portfolio.scope.read`는 Java server-only precondition이며 MCP에 노출하지 않는다. 전체 보유 목록·수량·보유 표시는 모델로 보내지 않고, scope 안에서 실제로 일치한 공개 사건·관계 결과만 최대 5개로 최소화한다. 웹이 필요한 기업이 2개를 넘으면 임의 두 기업을 고르지 않고 범위를 확인한다. 같은 질문 사슬 최대 2회 이후에도 선택이 안 되면 guidance로 종료한다.
 
-`rerun`은 작업당 실행 3회까지이며 이후 `retry=null`이다. 모델을 호출하지 않는 `save_only`는 이 횟수에 포함하지 않는다. 공급자가 이미 처리·과금했을 수 있는 응답 불명 모델 호출은 다시 실행하지 않는다. 도구는 읽기 전용 내부 조회라 timeout 뒤 재실행해도 외부 상태·과금이 바뀌지 않는다.
+## 6. 복합 질문 예시
 
-### 5.2 단계와 체크포인트
+‘A와 B의 관계·관련 사건·HBM 개념’을 물으면 Luna가 공개 경로와 사건을 조회하고 필요한 원문을 보충한다. HBM에는 Q02 웹 보조 근거를 사용할 수 있다. 내부 사실 요구가 남으면 마지막 웹 검색을 사용하며 총 2회 안에서 공유한다. 웹이 실패해도 확보한 경로·사건과 제한된 개념 설명을 제공하고 외부 미확인 부분을 알린다.
 
-조회 결과로 대상이 정해지는 질문은 회원이 호출 전에 답할 수 없다. 서버는 계획 확정 때 `stages[]`와 `checkpoint`(평가 대상 단계, `exactly(n)`·`atLeast(n)`·`atMost(n)` 개수 조건, 0개·미달·초과 처리)를 typed 값으로 선언한다. 조건은 요구 분해 결과(‘두 회사’ → `exactly(2)`)에서 정하며 모델이 실행 중에 판단하지 않는다.
+‘HBM 설명과 지금 살 주식’은 개념만 답하고 investment_advice limitation으로 제한한다. 웹 snippet의 매수 의견·목표주가도 답변에 인용하지 않는다.
 
-| 체크포인트 결과 | 처리 | outcome |
-| --- | --- | --- |
-| 조건 충족 | 다음 단계 진행 | 이후 결과에 따름 |
-| 초과 | 다음 단계 미호출, 실제 조회된 대상으로 선택지 구성(조합 6개 이하, `kind=scope`), 넘으면 자유 입력 | `clarification` |
-| 미달(1개 이상) | 조회된 대상은 답하고 의존 요구는 `precondition_unmet` limitation으로 기록 | `answered` |
-| 0개, `truncated=false`·오류 없음 | 해당 대상 없음을 조회 범위·기준 시각과 함께 답변 | `answered` |
-| 0개, `truncated=true`·오류 없음 | “없음”으로 표현하지 않음 | `insufficient_evidence` |
-| 도구 timeout·장애·권한 오류 | 개수 조건을 평가하지 않음 | `failed` |
+## 7. 결과와 장애 응답
 
-`clarification`은 답변 생성 전, 즉 계획 시점이나 선언된 체크포인트에서만 반환한다. 체크포인트에서 멈추면 Luna 생성은 호출하지 않는다. 회원의 선택은 `resolves`를 담은 새 작업이 되고 원 작업의 asOf·graphVersion을 복사하므로 같은 조회 결과 위에서 이어진다. 체크포인트 판정과 중단 단계는 `route_summary`에, 이미 실행한 호출은 `chat_tool_calls`에 남긴다.
+현재 ChatJob은 queued/running/completed/failed/cancelled, ChatResult.outcome은 answered/clarification/guidance/insufficient_evidence다. 이번 목표는 새 job 상태 PARTIAL이 아니라 별도 **answerStatus=complete|partial|guidance**, **notices[]** 및 장애 limitation 확장이다. 아직 DTO/OpenAPI/웹에 구현되지 않았다.
 
-## 6. 복합 질문 처리 예시
-
-질문:
-
-> 내 종목 중 오늘 뉴스가 있는 회사를 찾고, 두 회사 관계와 최근 변화도 설명해줘.
-
-예상 분기:
-
-1. stage 1: Q07로 본인 종목 범위를 확인한다.
-2. stage 2: Q03으로 해당 범위의 오늘 뉴스·사건을 조회한다. 결과에 `exactly(2)` 체크포인트를 둔다.
-3. 정확히 두 회사면 stage 3에서 Q04 관계 경로와 Q05 기간 변화를 병렬 조회한다.
-4. 셋 이상이면 Q04·Q05를 호출하지 않고 실제 조회된 회사 조합으로 `clarification`한다. 하나면 그 회사의 뉴스를 답하고 관계 요구는 `precondition_unmet` limitation으로 기록한다. 0개이며 결과가 잘리지 않았으면 해당 종목이 없음을 근거와 함께 답한다.
-5. Luna가 요구별 결과를 결합하고 각 주장에 근거와 기준 시점을 표시한다.
-
-질문:
-
-> HBM을 설명하고 지금 어떤 주식을 사야 하는지도 알려줘.
-
-처리:
-
-- Q02 일반 개념 설명은 제공할 수 있다.
-- 특정 매수·매도 결론은 제공하지 않는다.
-- 허용된 설명이 완결되면 `answered`로 저장하고, 매수 판단 요구는 `limitations`에 `investment_advice` 항목으로 기록한다.
-- 이는 실행 도중 일부가 실패한 `PARTIAL` 결과를 뜻하지 않는다.
-
-## 7. 결과 상태와 사용자 응답
-
-현재 공개 계약에는 별도 `PARTIAL` outcome이 없다.
-
-| outcome 또는 상태 | 사용 조건 |
+| 상황 | 목표 표시 |
 | --- | --- |
-| `answered` | 허용된 필수 요구를 완결되게 답했고 자동 검증을 통과한 경우 |
-| `clarification` | 기업·기간·회차가 모호하거나 최소 충분 계획이 실행 예산을 초과해 범위 선택이 필요한 경우. 계획 시점 또는 체크포인트 초과(답변 생성 전)에만 반환 |
-| `guidance` | 지원 범위 밖 요청, 필요한 ZOOP 내부 문서 부재, 금지된 투자 판단만 요청한 경우 |
-| `insufficient_evidence` | 조회는 성공했지만 공개 근거가 부족한 경우. `reason`은 서버가 원인(조회 상한·검증 보류·찾은 것 없음·선행 조건·근거 부족)과 다음에 해 볼 일을 두 문장으로 쓰고, `applied`에는 이번 조회가 확인한 기업·사건을 담는다([부분 답변 설계](ai-chatbot-partial-answer.md) 12장) |
-| `failed` + `ChatFailure` | 기술 장애, 권한 오류 또는 출력 검증 실패 등 작업 실패 |
+| 모든 요구를 검증된 내용으로 답함 | answered + complete |
+| 일부만 답함 | answered + partial, 미충족 요구별 limitation |
+| 웹 보완만 실패, 내부로 모두 답함 | answered + complete, web_unavailable notice |
+| Q02 웹 실패 | 일반 개념 설명 + web_unavailable, 명시 출처 요구가 남으면 partial |
+| 아무것도 답할 수 없음 | guidance 또는 조회 성공 후 insufficient_evidence, 확인 범위·다음 행동 |
+| 대상/기간 모호·fan-out 초과 | clarification, answerStatus=guidance |
+| 모델 unknown·검증 실패·권한 위반 | 실제 failed/권한 오류 유지, 기존 failure 기반 고정 안내 |
+| 취소·저장/전달 장애 | 상태를 완료로 가장하지 않고 해당 안내 |
 
-`answered`에서 답하지 않은 요구는 `ChatResult.limitations`의 항목(`kind`, `label`, `message`)으로 기록한다.
+‘항상 답변’은 서비스가 응답 가능한 한 내용을 답하거나 확인 불가 이유를 안내하는 원칙이다. 없는 사실 생성, 검증 생략, DB/HTTP 전체 장애에서도 전달 보장을 의미하지 않는다.
 
-| kind | 사용 조건 | 결정 근거 |
-| --- | --- | --- |
-| `investment_advice` | 투자 판단 요청 | 투자 판단 gate |
-| `precondition_unmet` | 체크포인트 미달로 의존 요구 수행 불가 | 체크포인트 판정 |
-| `results_truncated` | 조회 상한에 걸려 일부 자료만 확인 | 도구 결과 `truncated` |
-| `not_in_member_scope` | 내 종목(Q07) 질문이 지목한 기업이 회원의 보유·관심 종목이 아님 | 서버의 회원 범위 조회(`portfolio.scope.read`) |
-| `evidence_insufficient` | 조회는 성공했지만 이 요구의 근거 부족 | 해당 요구의 유효 citation 부재, 또는 Jev 의미 검증 hold로 제외된 요구 |
-| `out_of_scope` | 지원하지 않는 하위 요구 | 서버 지원 범위 |
+notices는 답변을 막지 않은 장애/처리 정보, limitations는 미충족 요구다. 이 둘을 분리해 답한 요구와 limitation을 정확히 하나에 대응시키는 기존 규칙을 유지한다. 웹 오류를 evidence_insufficient나 ‘관련 뉴스 없음’으로 숨기지 않는다.
 
-- 제한 여부와 `message`는 서버가 정한다. 모델이 요구를 스스로 제한으로 돌려 빠져나갈 수 없다.
-- 모든 필수 요구는 본문에서 근거와 함께 답했거나 limitation 항목 중 정확히 하나에 속해야 한다.
-- 도구 장애·timeout·권한 오류는 limitation이 아니라 `failed`다. 그래서 `limitations`는 `PARTIAL`이 아니다.
-- `limitations`는 `answered`에서만 비어 있지 않을 수 있다. 답한 요구가 없으면 `guidance` 또는 `insufficient_evidence`이고 전체 이유는 `reason`에 둔다.
+현재 공개 limitation kind는 `investment_advice`, `precondition_unmet`, `results_truncated`, `not_in_member_scope`(내 종목(Q07) 질문이 지목한 기업이 회원의 보유·관심 종목이 아님, 서버 `portfolio.scope.read` 판정), `evidence_insufficient`, `out_of_scope`다. 장애 원인 kind 확장은 목표 계약이다.
 
-`clarification`에 대한 회원의 답은 새 ChatJob이며 `resolves`에 원 작업 ID와 선택한 `ChatChoice.id`(자유 입력이면 null)를 담는다. 서버는 선택지가 원 결과에 실제로 있는지 검사하고, 원 질문·원 고정 문맥과 선택을 합쳐 요구 분해부터 다시 실행한다. 클라이언트는 선택지 ID를 해석하지 않으며 원 작업은 바뀌지 않는다. 확인 질문 사슬은 최대 2회다(루트 깊이 0, 확인 답은 원 작업 + 1). 깊이 2 작업에서 다시 모호·초과가 생기면 `clarification` 대신 대상·기간을 구체적으로 적은 새 질문을 안내하는 `guidance`로 끝내고, 다음 단계와 답변 생성을 호출하지 않는다. 확인 답 작업은 루트 질문과 사슬의 답을 순서대로 합쳐 실행하며, 같은 확인 질문에 다시 답하는 분기는 제한하지 않는다.
+## 8. 검증과 복구
 
-외부 API 장애를 `insufficient_evidence`나 “관련 뉴스 없음”으로 바꾸지 않는다. 검증 실패도 성공 outcome으로 바꾸지 않으며 자동 재생성하지 않는다.
+### 8.1 호출 전·실행 중 검사
 
-`answered` 본문은 근거 수준별 구간 `ChatResult.sections`(`basis`, `text`, `evidenceIds`)로 구성하고, 서버가 구간 text를 순서대로 이어 `answer`(전체 12,000자 이하)를 만든다. 구간 `basis`는 일반 LLM 개념 설명 `general_knowledge`, 승인된 ZOOP 문서 `zoop_documented`, 공개 근거 기반 사실 `evidence_grounded` 중 하나다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다.
+서버는 허용 도구·스키마·대상·scope·고정 버전·기한·호출 수를 검사한다. MCP 결과를 OpenAI에 반환하기 전에 source grant와 모델 전송 범위를 검사한다. Luna의 자체 coverage 판단은 추가 조회 신호이며 최종 정답 판정이 아니다.
 
-공개 `ChatResult.answerBasis`는 서버가 구간에서 계산한다. basis가 한 종류면 그 값, 두 종류 이상이면 `mixed`, 구간이 없는 확인·안내·근거 부족은 `none`이다. UI는 결과 배지에 `answerBasis`를, 구간 배지와 인용 연결에 `sections`를 사용하며 자체 추측하지 않는다.
+direct adapter는 Responses 시작 전 preflight 실패·circuit open일 때만 시작 경로로 선택하며 같은 결과/권한/cache/원장/예산을 사용한다. 실행 중 MCP 오류는 direct 결과로 바꿔 끼우지 않고 성공한 결과와 notice/limitation으로 종료한다. 권한·인증·grant·schema 거부는 direct로 우회하지 않는다. 결과 불명 모델 호출은 재전송하지 않는다. 최근 MCP 연결 5회 중 3회 실패하면 30초 차단 후 probe 1회로 복구 여부를 판단한다.
 
-예: “HBM이 뭐고 SK하이닉스 최근 HBM 뉴스는?” → `general_knowledge` 구간(고정 안내 + HBM 설명, 근거 없음)과 `evidence_grounded` 구간(뉴스 사실, `evidenceIds` 연결) → `answerBasis=mixed`.
+### 8.2 생성 후 출력 검증
 
-## 8. 두 단계 검증
-
-### 8.1 도구 호출 전 계획 검증
-
-아래는 목표 계약이다. 현재 구현은 requirement ID, Q type·capability allowlist, 등록 여부, 호출·단계 예산과 의존 순서를 서버가 검사하지만 별도 Luna `coverage-verifier` 호출과 보완 뒤 재확인은 수행하지 않는다.
-
-- 모든 `requirementId`가 후보 계획에 포함됐는지 검사한다.
-- 커버리지 검증 LLM은 `coveredRequirements`, `missingRequirements`, `unnecessaryCapabilities`, `requiresClarification`을 반환한다.
-- 서버가 allowlist와 예산 안에서 계획을 보완하거나 축소한다.
-- 등록되지 않은 기능·도구·인자와 typed 스키마를 벗어난 값은 실행하지 않는다.
-
-### 8.2 Luna 생성 후 출력 검증
-
-출력 검증은 두 층이며 순서가 고정이다. 1층 결정론적 검사에 실패하면 2층 Jev를 호출하지 않고 `validation_failed`로 끝낸다.
-
-**1층 — 결정론적 검사 (코드 규칙, 모델 없음)**
-
-| 검사 | 확인 방법 |
+| 검사 | 기준 |
 | --- | --- |
-| 스키마 | Luna 출력이 typed JSON 스키마(enum·길이·필수 필드)에 맞는지 |
-| 요구 커버리지 | 각 필수 요구가 본문 구간과 `limitations` 항목 중 정확히 하나에 속하는지, 각 limitation이 서버 결정 근거와 일치하는지, 본문이 제한된 요구를 답한 것처럼 쓰지 않았는지 |
-| 인용 실재 | `evidenceId`가 이번 job의 도구 결과에 실제로 있었는지 |
-| 인용 원문 일치 | `quote`가 고정 문서 버전의 `[start,end)` 원문과 정확히 같은지, 철회·비공개가 아닌지 |
-| 구간 규칙 | 일반 개념 구간에 근거가 없는지, 근거 구간의 인용이 자기 구간 `evidenceIds` 안에 있는지, 모든 `evidenceIds`가 `citations`에 있는지, `zoop_documented` 구간은 `sourceKind=zoop_doc`·`evidence_grounded` 구간은 `sourceKind=article` 인용만 쓰는지, 이어 붙인 `answer`가 12,000자 이하인지 |
-| 수치·날짜 | 주장의 숫자·날짜·통화·기간이 인용 원문 또는 도구의 구조화 데이터와 같은지 |
-| 그래프 | 관계 endpoint·유형·방향·hop 수와 간선별 근거가 `graph.path.read` 결과와 같은지, `graphTargets`가 같은 `graphVersion`의 지도(`/api/v1/graph`의 companyId·depth)에서 열리는지 |
-| 버전·범위 | graphVersion·dataAsOf·브리핑 회차가 고정 문맥과 같은지, Q07 종목이 본인 범위 안인지, 개인정보가 없는지 |
-| 서버 개념 구간 | 서버가 떼어 낸 개념 하위 요구(`<id>-c`)의 일반 구간이 원래 요구의 도구 결과가 돌려준 기업·사건 이름을 쓰지 않는지. 이 구간이 일반 구간 규칙이나 이 검사에 걸리면 실행 전체가 아니라 그 구간만 뺀다([부분 답변 설계](ai-chatbot-partial-answer.md) 3.1) |
-| 투자 표현 | 매수·매도 권유 표현을 어휘·패턴 규칙으로 1차 검사(2층 Jev `prohibitedAdvice`가 모든 구간에 2차 적용) |
+| 스키마·요구 커버리지 | typed JSON, 명시 요구별 답변 또는 실제 사유 limitation, notice 별도 |
+| 인용 실재·원문 | 이번 job의 실제 sourceId/evidenceId·고정 버전·인용 구간 일치 |
+| basis | 일반 개념/ZOOP 문서/내부 근거/web_reported 구분, 인용 종류 일치 |
+| 수치·그래프 | 원문·구조화 데이터 일치, 실제 endpoint·방향·hop·공개 버전 |
+| 권한·범위 | 현재 공개/철회·Q07 본인 범위·개인정보·grant |
+| 표현 | 투자 권유·목표주가·가격/수익 예측 금지, 웹 인용도 예외 없음 |
 
-**2층 — Jev 의미 검증 (1층 통과 시에만, 최대 1회)**
+결정론 검사 통과 후 별도 Jev를 최대 1회 호출한다. 근거 주장마다 supported/contradicted/insufficient 및 prohibitedAdvice·unsupportedCausality를 확인한다. 일반 지식 구간은 사실 검증으로 표시하지 않고 prohibitedAdvice를 확인한다. 모든 정상 일반 개념 답변에도 이 정책 검사를 적용한다.
 
-1층은 인용이 진짜이고 원문이 정확하다는 것까지 보장하지만, 원문이 주장을 실제로 뒷받침하는지는 판단하지 못한다(예: 주장 “공급한다” ↔ 원문 “공급을 협의 중”).
+contradicted·금지 조언 또는 결정론적 검증 실패는 해당 정책에 따라 본문 차단, validation_failed 원장과 고정 안내다. hold는 해당 요구와 의존 통합 구간을 제외하고 limitation을 만든다. 남은 답이 없으면 insufficient_evidence다. 자동 재생성하지 않는다. 기존 개념 하위 요구의 결정론적 제외 예외는 [부분 답변 기록 3.1절](ai-chatbot-partial-answer.md#31-하위-요구-구간의-추가-검사)을 유지한다.
 
-- 대상: `evidence_grounded`·`zoop_documented` 구간의 claim과 인용 원문(최대 20개)과 `general_knowledge` 구간 전체를 한 번의 호출로 보낸다. `answered`이면 일반 개념만 답한 경우에도 호출한다.
-- 판정: 근거 구간 claim마다 `supported / contradicted / insufficient`와 Noul(`prohibitedAdvice`, `unsupportedCausality`). `general_knowledge` 구간은 권위 자료가 없으므로 사실 판정(Choice) 없이 Noul `prohibitedAdvice`만 판정하며, 이 결과를 사실 검증 통과로 기록하지 않는다. 우회적인 투자 권유가 일반 설명에 섞이는 것을 어휘 규칙만으로는 막기 어렵기 때문이다.
+general_knowledge에는 서버 고정 안내 ‘일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.’를 붙이고 evidenceIds는 비운다. web_reported는 ‘웹 검색 결과 · ZOOP 미검증’으로 표시하고 실제 출처만 연결한다. answerBasis는 서버가 구간에서 계산한다.
 
-| 판정 | 처리 | 결과 |
+## 9. 보안·UI·문맥
+
+- 모델이 생성한 SQL·Cypher·임의 URL·스크립트를 실행하지 않는다. 도구는 읽기 전용이다.
+- UI 제안은 유효 조회 ID에서 서버가 만들고 사용자 클릭 시 실행한다. graphTargets와 uiActions는 같은 도메인 결과에서 파생하며 충돌 시 동작을 차단한다.
+- 재열람·polling은 검색·모델 호출·화면 동작을 재실행하지 않는다. 검증 전 본문은 숨긴다.
+- 이전 일반 턴 문맥 승계는 별도 신규 기능이다. 직전 완료 2턴의 검증된 ID·기간만 사용하고 현재 권한을 재검사한다. 본문은 승계하지 않는다.
+
+## 10. 현재 구현과 목표의 경계
+
+| 영역 | 현재 코드 | 추가 구현 |
 | --- | --- | --- |
-| 모두 `supported`, Noul 아니오 | 통과 | 저장 |
-| `contradicted` 하나 이상 또는 Noul 예 | 답변 전체 차단 | `failed`·`validation_failed`, retry 없음 |
-| `insufficient` 또는 Noul 불확실(hold) | 그 claim이 속한 요구의 구간을 서버가 제외하고 `evidence_insufficient` limitation 기록 | 남은 요구가 있으면 `answered`, 없으면 `insufficient_evidence` |
+| 공개 job | 회원 전용 저장·polling·멱등성·취소·lease·재시도 | answerStatus/notices·장애 limitation, 저장 복구 |
+| 모델 | chat-router Jev·chat-answer Luna·chat-verification Jev, Luna는 chat/completions·high·도구 없음 | Luna Responses MCP·Java 승인 continuation·medium·사용량·deadline |
+| 도구 | company.read, issue.read, evidence.resolve, graph.path.read, graph.version.diff, portfolio.scope.read, zoopPolicy.read | portfolio.scope.read는 server-only, 나머지 MCP 외피·공통 gate·cache·direct 시작 경로 |
+| 근거·검증 | BranchContext·서버 citation·결정론 검사·section Jev | 웹 출처·claim 인과 검증·token guard·grant 선반환 검사 |
+| 화면 | D-AI-01~02b API 연결·결과/인용/확인/실패 | 새 목표 필드·부분 안내·UI 동작, 와이어프레임 근거와 종단 시험 |
 
-- hold 제외는 재생성이 아닌 결정론적 처리다. 이를 위해 각 구간은 내부적으로 하나의 요구에만 속하고, 여러 요구를 잇는 통합 문장은 별도 구간으로 두어 관련 요구 중 하나라도 제외되면 함께 제외한다.
-- Jev 모델 불일치·응답 형식 오류는 원문 응답을 영수증으로 먼저 저장하고 재시도 없이 `failed`(`transient`, `provider_error`, retry=`rerun`)로 닫는다. 송신 후 timeout으로 응답을 모르면 `response_unknown`(retry 없음)이고 호출은 운영자 정산 대상이다. 검증을 건너뛰는 경로는 없다.
-- 질문 집합·정책 버전·영수증은 S1 의미 검증과 분리한다. 임계값은 S1 잠정값(Choice ≥ 0.90 그리고 confidence ≥ 0.80, Noul ≥ 0.90 / ≤ 0.10)으로 시작하며, 미보정 값이므로 출시 승인 전에 챗봇 평가 세트로 보정한다.
+문서 개정으로 런타임·OpenAPI·DB·Figma를 변경하거나 실제 모델을 실행한 것은 아니다. 날짜별 구현 증거는 [개발 계획](../development/ai-chatbot-implementation-plan.md)에 보존한다.
 
-Q02 일반 개념은 권위 자료가 없으므로 두 번째 모델의 동의만으로 사실 검증을 통과했다고 표시하지 않는다. 일반 개념 범위, 최신 사실·수치 포함 여부, 투자 판단, 내부 모순과 명백한 오류를 검사한 뒤 일반 개념 설명으로만 제공한다. 이 검사는 `general_knowledge` 구간 단위로 하며, 근거 구간의 사실 주장은 그 구간의 `evidenceIds`에서만 인용하는지, 모든 `evidenceIds`가 `citations`에 있는지, 서버가 계산한 `answerBasis`가 구간 basis와 일치하는지 함께 확인한다.
+## 11. 개발·출시 판단
 
-## 9. 보안·권한 원칙
+1. MCP 서버 단독 클라이언트 시험과 합성 Responses replay로 typed 계약·승인/취소/unknown을 고정한다.
+2. 도구 1·4·8회·승인 라운드의 승인된 소량 live latency spike로 45초 가능성을 측정한다.
+3. 읽기 도구의 공통 gate·요청 cache/single-flight·budget·preflight direct 시작 경로를 구현한다.
+4. Q02 기본 웹, Q03~Q08 최후 검색, 비치명적 웹 오류·snapshot·grant를 구현한다.
+5. DTO/OpenAPI/저장/웹/guard와 화면 추적을 함께 갱신한다.
+6. 같은 질문 세트에서 기존 서버 계획과 Luna MCP의 요구 충족·근거 지지·p95·비용을 비교하고 단계적으로 활성화한다.
 
-- 모든 챗봇 질문은 회원 전용이며 접수 전에 세션과 대화 소유권을 확인한다.
-- Q07은 서버가 확인한 본인의 보유·관심 종목만 사용한다.
-- 수집 문서와 사용자 질문의 명령문은 데이터로 취급하고 시스템 지시로 실행하지 않는다.
-- 모델이 생성한 SQL·Cypher·URL·도구명을 운영 환경에서 직접 실행하지 않는다.
-- 챗봇 도구는 읽기 전용이며 데이터 공개·승인·수정·삭제·권한 변경·주문·결제를 허용하지 않는다.
-- 검증 전 생성 본문은 사용자에게 사실 답변으로 스트리밍하지 않는다.
-- 완료 결과를 전달할 때도 현재 회원·소유권·근거 접근 권한을 다시 확인한다.
-
-## 10. 현재 구현과 목표 설계의 경계
-
-2026-10-25 main 코드 기준 구현 경계는 다음과 같다.
-
-| 영역 | 현재 구현 | 목표와의 차이 |
-| --- | --- | --- |
-| 공개 수명주기 | 회원 전용 세션·질문 job API, PostgreSQL 저장, 멱등성, 단일 활성 job, 취소·재시도·lease fence | recovery artifact와 실제 `save_only` 복구 없음 |
-| 모델 단계 | `chat-router` Jev, `chat-answer` Luna, `chat-verification` Jev의 별도 계약·원장·grant·영수증 | 임계값 미보정, 실제 호출·배포 승인 아님 |
-| 계획 | Q01~Q08·capability registry, 서버 allowlist·예산·체크포인트, 질문이 지목한 기업의 기본 조회 | 별도 Luna `coverage-verifier`와 보완 라운드 없음. 개념과 사실이 섞인 요구 하나는 서버가 개념 하위 요구를 나눠 근거가 없어도 개념은 답함([부분 답변 설계](ai-chatbot-partial-answer.md) 1부). Q03 근거 0개일 때 일반 배경을 붙이는 2부는 동문서답 위험으로 미채택 |
-| 도구 | 앱 내부 읽기 어댑터 `company.read`(기업 카탈로그 개요를 `company_profile` 인용으로 포함), `issue.read`, `evidence.resolve`, `graph.path.read`, `graph.version.diff`(Q05 이전 공개 지도와의 변화), `portfolio.scope.read`(Q07 본인 보유·관심 종목, 서버 주입 회원), `zoopPolicy.read`(승인 약관·개인정보 처리방침, `zoop_doc` 인용) | Q01의 `help.search`·`screenSpec.read`(승인 문서 없음), Q05의 `period.compare`, Q06·Q08와 `document.search` 미연결. 외부 웹 검색은 [설계 초안](ai-chatbot-web-search.md)만 있음 |
-| 생성·검증 | `BranchContext`, typed 생성, 서버 citation, 결정론적 검사, section 단위 Jev support·투자 판단 | claim 단위 `unsupportedCausality`, 일부 수치·그래프 의미 검사, 24k/2k token guard 없음 |
-| 권한 | 고정 graphVersion/asOf, 현재 evidence 접근 재검사, 응답 시 철회 재검사 | `zoop_doc`은 `term_versions`의 승인 약관만 연결(도움말·화면 명세 미연결), 회원 종목 도구 미연결 |
-| 웹 | D-AI-01~02b가 공개 Chat API로 대화 생성·복원, 질문 접수·polling·취소·재시도, 답변·인용(`article`·`zoop_doc`·`company_profile`)·확인 질문·실패를 렌더링 | 타입은 손으로 쓴 `web/src/types/ai`이며 OpenAPI 생성 seam 없음. 실제 백엔드·모델과의 종단 시험 없음 |
-
-따라서 구현 코드를 “단지 목표 설계”로 취급해서도 안 되고, 코드 존재를 출시 완료로 해석해서도 안 된다. 출시 전에 최소한 다음 항목이 필요하다.
-
-- Luna `coverage-verifier`의 분리 계약을 구현하거나 승인된 대체 coverage 절차를 확정
-- claim 단위 의미 검증과 `unsupportedCausality`, Luna 입력 24,000·출력 2,000 token guard
-- 미연결 Q 유형별 데이터 소유 도구
-- 복합 질문·권한·근거 부족·공격 입력을 포함한 고정 평가 세트와 임계값 보정(대본 실행용 세트 v1은 있음: [고정 평가 세트](../development/ai-chatbot-eval-set.md))
-- PostgreSQL evidence 수입과 handoff → 앱 공개 스냅샷 활성화 → 챗봇 그래프 조회 → 철회 반영의 종단 시험
-- 실제 배포 환경, live 호출 비용·권한 승인과 단계적 기능 플래그 활성화
-
-## 11. 확정된 초기 구현 결정
-
-- Q01~Q08은 단일 분류가 아니라 multi-label 실행 능력 태그로 사용한다.
-- Jev는 `0.70/0.35` 임계값을 적용하되 사용자가 명시한 요구는 확률로 제거하지 않는다.
-- 커버리지 검증은 Luna의 별도 stage로 두고 생성 stage와 프롬프트·스키마·권한·영수증을 분리한다.
-- 읽기 도구는 다섯 읽기 전용 레지스트리 그룹으로 관리하며 서버만 실행 권한을 가진다.
-- 유형 수를 세 개로 자르지 않고, 5.1절의 실행 상한 안에서 필요한 최소 충분 도구를 호출한다.
-- MVP에는 `PARTIAL`을 추가하지 않는다. 서로 다른 스냅샷이나 독립 실패를 구조적으로 표시해야 하면 먼저 범위를 확인한다.
-- 의존 실행은 단계와 서버 평가 체크포인트로 선언하고, `clarification`은 답변 생성 전(계획 시점 또는 체크포인트)까지만 허용한다.
-- ChatJob 기한은 계획 경로별 단계 상한의 합(최대 60초)이며 실측 p95로 보정한다. 시간 초과는 `transient`(rerun 3회까지. 단, 모델 송신 후 응답 불명은 `response_unknown`이며 retry 없음), 같은 입력에서 반복되는 크기 초과는 `budget_exceeded`(rerun 없음)다.
-- Q02 일반 개념은 `general_knowledge` 구간에만 담는다. 구간 첫 문장 `일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.`는 서버가 붙이고, 구간 `evidenceIds`는 빈 배열이며 최신 사실·전망·개인 투자 판단을 포함하지 않는다. 일반 개념만 답한 결과는 `sources`·`citations`도 빈 배열이다. 근거 구간과 함께 있으면 `answerBasis=mixed`다. 이 구간은 Jev `prohibitedAdvice` 판정만 받는다.
-- ZOOP 도움말·정책 인용은 `Citation.sourceKind=zoop_doc`(docId·docVersion·구간)으로 뉴스·공시 인용과 같은 형식을 쓴다.
-- 한 질문의 명시적 요구는 최대 6개이며 넘으면 계획 시점 `clarification`이다.
-- 확인 질문 사슬은 루트 질문부터 최대 2회다. 깊이 2 확인 답 작업도 정상 처리하며, 추가 확인이 필요할 때만 `clarification` 대신 `guidance`로 끝난다.
-
-남은 일은 미구현 경계의 완성과 출시 증명이다. 도구별 세부 스키마·소유 서비스, 배포 모델의 정확한 버전과 외부 전송 승인, 담당자 실명, 보관 기간, 비용 경보액, 평가 보정과 종단 연동 시험 결과는 출시 전에 등록해야 한다.
-
-이 문서의 현재 구현 표는 코드 기준 스냅샷이며 출시 완료 선언이 아니다. 세부 예외, 데이터 공개·철회, 감사·장애 대응 기준은 AI 거버넌스 정책을 따른다.
+MCP 자체가 정확도 향상을 보장하지 않는다. 중간 결과 기반 추가 조회의 이점과 비용·지연을 분리해 평가한다.
