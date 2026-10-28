@@ -32,6 +32,26 @@ public class JdbcCandidateRepository {
               LEFT JOIN analysis_plan_units u ON u.s3_job_id = t.source_job_id
             """;
 
+    /**
+     * Whether the current candidate row {@code alias} is the newest analysis of its event: false when another S3 job has a current
+     * candidate row for the same AI event ({@code issue_id}, the S2 {@code targetEventId}) whose S3 result was observed later. A
+     * re-analysis (a new plan, so a new S2 and S3 job) keeps the older job's rows, which stay decidable and keep their history;
+     * the list and the overview show the newest only. Rows without an event id (a new event, a company-to-company relation) have
+     * nothing to match across jobs and are always shown. Ties and rows with no plan unit fall back to the S3 job id.
+     */
+    public static String newestAnalysis(String alias) {
+        return """
+                NOT EXISTS (SELECT 1 FROM review_targets n
+                              LEFT JOIN analysis_plan_units nu ON nu.s3_job_id = n.source_job_id
+                              LEFT JOIN analysis_plan_units au ON au.s3_job_id = %1$s.source_job_id
+                             WHERE n.target_type = 'candidate' AND n.is_current AND n.issue_id = %1$s.issue_id
+                               AND n.source_job_id <> %1$s.source_job_id
+                               AND (COALESCE(CAST(nu.s3_checkpoint->>'resultObservedAt' AS timestamptz), '-infinity'),
+                                    n.source_job_id)
+                                 > (COALESCE(CAST(au.s3_checkpoint->>'resultObservedAt' AS timestamptz), '-infinity'),
+                                    %1$s.source_job_id))""".formatted(alias);
+    }
+
     private final NamedParameterJdbcTemplate jdbc;
 
     public JdbcCandidateRepository(NamedParameterJdbcTemplate jdbc) {
@@ -60,7 +80,8 @@ public class JdbcCandidateRepository {
     }
 
     public List<Candidate> page(Filter filter, Instant afterAt, String afterId, int limit) {
-        StringBuilder sql = new StringBuilder(CANDIDATE).append(" WHERE t.target_type = 'candidate' AND t.is_current");
+        StringBuilder sql = new StringBuilder(CANDIDATE).append(" WHERE t.target_type = 'candidate' AND t.is_current AND ")
+                .append(newestAnalysis("t"));
         MapSqlParameterSource params = new MapSqlParameterSource("limit", limit);
         if (filter.status() != null) {
             sql.append(" AND t.status = :status");
@@ -166,13 +187,13 @@ public class JdbcCandidateRepository {
         return byTarget;
     }
 
-    /** Current candidates per status (active ones) and the inactive ones under {@code inactive}. */
+    /** Current candidates per status (active ones) and the inactive ones under {@code inactive}, newest analysis only. */
     public Map<String, Integer> counts() {
         Map<String, Integer> counts = new LinkedHashMap<>(Map.of("ALLOW", 0, "HOLD", 0, "REJECT", 0, "inactive", 0));
         jdbc.query("""
                 SELECT CASE WHEN active THEN status ELSE 'inactive' END AS bucket, count(*) AS n
-                  FROM review_targets WHERE target_type = 'candidate' AND is_current GROUP BY 1
-                """, rs -> {
+                  FROM review_targets t WHERE target_type = 'candidate' AND is_current AND %s GROUP BY 1
+                """.formatted(newestAnalysis("t")), rs -> {
                     counts.put(rs.getString("bucket"), rs.getInt("n"));
                 });
         return counts;

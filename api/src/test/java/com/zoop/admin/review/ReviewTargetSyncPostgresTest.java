@@ -27,6 +27,7 @@ import com.zoop.common.json.StrictJson.Malformed;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +54,8 @@ class ReviewTargetSyncPostgresTest {
     @Autowired JdbcReviewRepository reviews;
     @Autowired PlatformTransactionManager transactions;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.zoop.admin.pipeline.JdbcPipelineOverviewReader overview;
+    @Autowired JdbcCandidateRepository candidates;
 
     private final ExtractionClient extraction = mock(ExtractionClient.class);
     private ReviewTargetSync sync;
@@ -202,6 +205,68 @@ class ReviewTargetSyncPostgresTest {
 
         assertTrue(active("relation", rel('2')), "it may still be there: only a complete reading deactivates");
         assertEquals("HOLD", status("candidate", EVENT_A));
+    }
+
+    /** The same four relations read again by another S3 job: a re-analysis of the same S2 content under a new plan. */
+    private UntrustedRelationPayload reanalysed(String job) {
+        return new UntrustedRelationPayload(job, "4".repeat(64), s3(
+                relation(rel('1'), "PARTICIPATES_IN", endpoint("company", "SK"), endpoint("event", EVENT_A), "eligible", "1"),
+                relation(rel('2'), "PARTICIPATES_IN", endpoint("company", "SS"), endpoint("event", EVENT_A), "hold", "2"),
+                relation(rel('3'), "PARTICIPATES_IN", endpoint("company", "SK"), endpoint("event", EVENT_HELD), "hold", "1"),
+                relation(rel('4'), "SUPPLIES", endpoint("company", "A"), endpoint("company", "B"), "hold", "1")), List.of());
+    }
+
+    /** The S3 jobs whose current candidate row for this external id the candidate list shows (any status). */
+    private List<String> listed(String external, String... jobs) {
+        return candidates.page(new JdbcCandidateRepository.Filter(null, null, null, null, null, List.of(), List.of()),
+                null, null, 1000).stream()
+                .filter(c -> c.candidateId().equals(external) && List.of(jobs).contains(c.s3JobId()))
+                .map(JdbcCandidateRepository.Candidate::s3JobId).sorted().toList();
+    }
+
+    /**
+     * C2 (#132): a re-analysis gets new S3 jobs and the projection keys rows by job, so the older job's rows stay current. When
+     * both analyses name the same AI event, the list, the counts and the overview show the newest analysis only; the older
+     * job's HOLD stays decidable.
+     */
+    @Test
+    void aReanalysedEventIsListedAndCountedOnceUnderTheNewestAnalysis() {
+        s2Json = s2Json.replace("\"targetEventId\":null", "\"targetEventId\":\"event-a-snapshot\"");
+        recorded = Canonical.sha256(s2Json);
+        upstreamResult(Optional.of(new UntrustedExtractionPayload(upstream.jobId(), S2_DIGEST, s2Json)));
+        sync.sync(upstream, recorded, result("hold", "2"));
+        String olderJob = s3Job;
+        Map<String, Integer> countsBefore = candidates.counts();
+        long holdBefore = overview.decisions().holdPending();
+        long activeBefore = overview.candidates().active();
+
+        // No plan unit owns these jobs, so the newest is told by job id: the newer one sorts after the older.
+        String newerJob = olderJob + "-z";
+        sync.sync(upstream, recorded, reanalysed(newerJob));
+
+        assertEquals(List.of(newerJob), listed(EVENT_A, olderJob, newerJob), "the event is listed once, newest analysis");
+        assertEquals(List.of(olderJob, newerJob), listed(rel('4'), olderJob, newerJob),
+                "a company-to-company candidate has no event to match across jobs: both stay");
+        assertEquals(countsBefore.get("HOLD") + 1, candidates.counts().get("HOLD"), "only the standalone one is new");
+        assertEquals(activeBefore + 1, overview.candidates().active());
+        assertEquals(holdBefore + 1, overview.decisions().holdPending(),
+                "the event's HOLD moved to the newer job; only the standalone HOLD waits twice");
+
+        var older = reviews.currentCandidate(candidateTargetId(EVENT_A)).orElseThrow();
+        assertEquals("HOLD", reviews.currentRelation(older, rel('2')).orElseThrow().status(),
+                "the older job's HOLD can still be decided");
+    }
+
+    @Test
+    void aReanalysedNewEventWithoutAnEventIdIsListedOncePerJob() {
+        sync.sync(upstream, recorded, result("hold", "2"));
+        String olderJob = s3Job;
+        String newerJob = olderJob + "-z";
+
+        sync.sync(upstream, recorded, reanalysed(newerJob));
+
+        assertEquals(List.of(olderJob, newerJob), listed(EVENT_A, olderJob, newerJob),
+                "nothing tells the two analyses are of one event");
     }
 
     private boolean active(String type, String external) {
