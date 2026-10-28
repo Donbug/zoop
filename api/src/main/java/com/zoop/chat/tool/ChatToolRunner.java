@@ -109,11 +109,16 @@ public class ChatToolRunner implements AutoCloseable {
     }
 
     /**
-     * What the caller of {@link #runReserved} does with a usable read before it is recorded: refuse it with a failure code
-     * (recorded {@code failed}, no result reported), or keep its result envelope (JSON) on the ledger with the success.
+     * What the caller of {@link #runReserved} does with a usable read before it is recorded: narrow it to what may be passed
+     * on (the result and the ledger then show only that), refuse it with a failure code (recorded {@code failed}, no result
+     * reported), or keep its result envelope (JSON) on the ledger with the success.
      */
     public interface Delivery {
         Delivery NONE = new Delivery() { };
+
+        default ChatToolOutput pass(ChatToolOutput output) {
+            return output;
+        }
 
         default String refuse(ChatToolOutput output) {
             return null;
@@ -257,16 +262,17 @@ public class ChatToolRunner implements AutoCloseable {
         ChatToolResult result;
         ChatToolCallEnd end;
         String problem = error == null ? invalid(call, output) : null;
-        String refused = error == null && problem == null ? delivery.refuse(output) : null;
+        ChatToolOutput passed = error == null && problem == null ? delivery.pass(output) : output;
+        String refused = error == null && problem == null ? delivery.refuse(passed) : null;
         if (refused != null) {
-            // A usable read the caller cannot pass on (an MCP result over its size limit): recorded as that failure, so
-            // the ledger never shows evidence as delivered that was not.
+            // A usable read the caller cannot pass on (an MCP result over its size limit, or one its send grants cannot be
+            // checked for): recorded as that failure, so the ledger never shows evidence as delivered that was not.
             result = ChatToolResult.failed(id, call.capabilityId(), refused);
             end = ChatToolCallEnd.failed(refused);
         } else if (error == null && problem == null) {
-            result = ChatToolResult.succeeded(id, call.capabilityId(), output);
-            end = new ChatToolCallEnd("succeeded", null, output.dataVersion(), output.evidenceIds(), output.truncated(),
-                    output.nextAllowed(), delivery.keep(result));
+            result = ChatToolResult.succeeded(id, call.capabilityId(), passed);
+            end = new ChatToolCallEnd("succeeded", null, passed.dataVersion(), passed.evidenceIds(), passed.truncated(),
+                    passed.nextAllowed(), delivery.keep(result));
         } else {
             Throwable cause = error instanceof CompletionException wrapped && wrapped.getCause() != null
                     ? wrapped.getCause() : error;

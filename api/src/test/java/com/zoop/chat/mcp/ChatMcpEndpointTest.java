@@ -21,6 +21,7 @@ import com.zoop.chat.tool.ChatToolScope;
 import io.modelcontextprotocol.server.McpStatelessSyncServer;
 import io.modelcontextprotocol.server.transport.HttpServletStatelessServerTransport;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -31,6 +32,7 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -48,6 +50,9 @@ class ChatMcpEndpointTest {
     private static final String CONTEXT = "{\"items\":[],\"evidenceCount\":0,\"period\":null,"
             + "\"asOf\":\"2026-10-27T00:00:00Z\",\"graphVersion\":\"gv-1\"}";
     private static final String SELECTION = "{\"contextIds\":[],\"evidenceIds\":[],\"evidencePool\":[]}";
+
+    @TempDir
+    Path dir;
 
     private final JsonMapper mapper = JsonMapper.builder().build();
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
@@ -75,7 +80,7 @@ class ChatMcpEndpointTest {
         grants = ChatMcpGrantsTest.grants("k1", "k1=" + ChatMcpGrantsTest.KEY_A, NOW);
         filter = new ChatMcpAccessFilter(grants, clock);
         transport = ChatMcpConfiguration.transport(mapper);
-        tools = new ChatMcpTools(registry, runner, executor, mapper);
+        tools = new ChatMcpTools(registry, runner, executor, ChatSendGrantsTest.gate(dir), mapper);
         server = ChatMcpConfiguration.server(transport, tools, mapper);
         running(JOB, 1);
     }
@@ -226,6 +231,42 @@ class ChatMcpEndpointTest {
         for (int i = 0; i < 12; i++) assertTrue(approve("company_read", "{\"targets\":[\"co-" + i + "\"]}").approved());
         assertEquals("tool_budget_exhausted", approve("company_read", "{\"targets\":[\"co-99\"]}").refused());
         assertEquals(12, store.toolCalls(JOB).size());
+    }
+
+    @Test
+    void evidenceWhoseSourceMayNotBeSentIsLeftOutOfTheResultAndTheLedger() throws Exception {
+        // The synthetic news source loses its grant: the company stays, its evidence does not.
+        ChatSendGrantsTest.write(dir.resolve("chat-grants.json"), com.zoop.chat.service.ChatCompanyProfiles.SOURCE_ID);
+        approve("company_read", "{\"targets\":[\"co-1\"]}");
+        JsonNode result = rpc(token(ChatCapability.COMPANY_READ), call("company_read", "{\"targets\":[\"co-1\"]}"))
+                .path("result");
+        assertFalse(result.path("isError").asBoolean(true), result.toString());
+        JsonNode read = result.path("structuredContent");
+        assertEquals("co-1", read.path("items").get(0).path("id").asString());
+        assertTrue(read.path("items").get(0).path("evidenceIds").isEmpty());
+        assertTrue(read.path("evidenceIds").isEmpty());
+        assertEquals("source_grant_denied", read.path("withheld").path("reason").asString());
+        assertEquals(0, read.path("withheld").path("items").asInt());
+        assertEquals(1, read.path("withheld").path("evidenceIds").asInt());
+        assertFalse(result.toString().contains("ev-1"), "a withheld id is not sent either");
+
+        var recorded = store.toolCalls(JOB).getFirst();
+        assertEquals("succeeded", recorded.status);
+        assertTrue(recorded.end.evidenceIds().isEmpty(), "the ledger shows only what was delivered");
+        assertEquals(read.toString(), mapper.readTree(recorded.end.result()).toString());
+    }
+
+    @Test
+    void aResultWhoseSendGrantsCannotBeCheckedIsRefusedNotReturnedUnchecked() throws Exception {
+        java.nio.file.Files.delete(dir.resolve("chat-grants.json"));
+        approve("company_read", "{\"targets\":[\"co-1\"]}");
+        assertEquals("send_grants_unavailable", error(rpc(token(ChatCapability.COMPANY_READ),
+                call("company_read", "{\"targets\":[\"co-1\"]}"))));
+        var recorded = store.toolCalls(JOB).getFirst();
+        assertEquals("failed", recorded.status);
+        assertEquals("send_grants_unavailable", recorded.end.errorCode());
+        assertTrue(recorded.end.evidenceIds().isEmpty());
+        assertEquals(1, companyReads.size(), "the read ran; only its delivery was refused");
     }
 
     @Test

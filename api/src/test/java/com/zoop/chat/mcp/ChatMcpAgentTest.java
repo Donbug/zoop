@@ -24,6 +24,7 @@ import com.zoop.chat.tool.ChatToolRunner;
 import com.zoop.chat.tool.ChatToolScope;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.spec.McpSchema;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -36,6 +37,7 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -54,6 +56,9 @@ class ChatMcpAgentTest {
     private static final ChatGeneratedAnswer ANSWER = new ChatGeneratedAnswer(List.of(new ChatGeneratedAnswer.Section(
             "evidence_grounded", "SK하이닉스는 HBM을 공급한다.", List.of("r1"), List.of("ev-1"))), List.of(), List.of());
 
+    @TempDir
+    Path dir;
+
     private final JsonMapper mapper = JsonMapper.builder().build();
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     private MemoryChatStore store;
@@ -71,7 +76,7 @@ class ChatMcpAgentTest {
         executor = new ChatJobExecutor(store, store,
                 new StaticListableBeanFactory(Map.of()).getBeanProvider(ChatEngine.class), mapper, clock,
                 new NoChatTransactions());
-        tools = new ChatMcpTools(registry, runner, executor, mapper);
+        tools = new ChatMcpTools(registry, runner, executor, ChatSendGrantsTest.gate(dir), mapper);
         grants = ChatMcpGrantsTest.grants("k1", "k1=" + ChatMcpGrantsTest.KEY_A, NOW);
         luna = new Luna();
         String attempts = "[{\"n\":1,\"mode\":\"run\",\"requestKey\":\"" + JOB + "\",\"status\":\"running\","

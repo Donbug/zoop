@@ -46,9 +46,28 @@ public class ChatMcpConfiguration {
         return new ChatMcpGrants(activeKeyId, keys, clock);
     }
 
+    /**
+     * The send grants every result is checked against before it leaves ({@link ChatSendGrants}): the operator's chat grant
+     * registry, the same file the AI runtime reads, and the agent stage's recipient. Missing, or a registry that cannot be
+     * read at startup, fails startup naming the setting; later the file is read again for every result.
+     */
     @Bean
-    ChatMcpTools chatMcpTools(ChatToolRegistry registry, ChatToolRunner runner, ChatJobExecutor executor) {
-        return new ChatMcpTools(registry, runner, executor, PROTOCOL_JSON);
+    ChatSendGrants chatSendGrants(@Value("${ZOOP_CHAT_MCP_SEND_GRANTS:}") String registry,
+            @Value("${ZOOP_CHAT_MCP_SEND_RECIPIENT:}") String recipient, Clock clock) {
+        var grants = new ChatSendGrants(registry, recipient, clock);
+        try {
+            grants.sendable();
+        } catch (ChatSendGrants.Unavailable unreadable) {
+            throw new IllegalStateException("The chat grant registry (ZOOP_CHAT_MCP_SEND_GRANTS) cannot be read as "
+                    + ChatSendGrants.SCHEMA);
+        }
+        return grants;
+    }
+
+    @Bean
+    ChatMcpTools chatMcpTools(ChatToolRegistry registry, ChatToolRunner runner, ChatJobExecutor executor,
+            ChatSendGrants grants, ChatMcpSources sources) {
+        return new ChatMcpTools(registry, runner, executor, new ChatMcpSendGate(grants, sources), PROTOCOL_JSON);
     }
 
     /**
