@@ -666,9 +666,21 @@ AI는 변경된 문서·source·grant 또는 S3 관계 후보를 **명시한 han
 3. 이슈·간선 ID는 정정 후 새 handoff에서도 재사용될 수 있습니다. 여러 결과를 전역 집합으로 합치면 정정된 버전까지 숨길 수 있으므로, 앱 저장소는 제외를 버전별로 보관하고 `DisclosureExclusionReader.current(versionId)`로 해당 버전의 overlay를 읽습니다.
 4. 오류·빈 결과·이전보다 작은 결과로 기존 제외를 해제하지 않습니다. 선택하지 않은 handoff와 이전 schema의 영향이 없다는 뜻도 아닙니다.
 5. 원천 변경은 모델이 본 전체 S2/S3 입력을 따라 보수적으로 관계를 포함합니다. 관계 후보의 의미상 철회는 원문 철회가 아니므로 기사·근거 목록은 비어 있습니다. 이 두 원인을 구분해야 합니다.
-6. `articles`는 별도 기사 목록의 검토에도 쓸 수 있는 식별자입니다. 기존 `GraphSnapshotFilter`에 제외 목록을 넣는 것만으로 기업 문서 목록·S1·브리핑·채팅·캐시·Neo4j까지 처리된 것으로 보지 않습니다.
+6. `articles`는 기사 ID와 기사 버전을 함께 식별합니다. 앱은 이를 공개 제외 저장소에 해당 그래프 버전의 대상으로 기록합니다. 공개 그래프·근거·챗봇은 현재 이슈·관계·근거 overlay를 적용하고, 기업 문서 목록은 `PublicGraphReader`가 한 번 읽은 같은 버전 overlay의 정확한 `(articleId, articleVersion)`도 목록 후보에서 제외합니다. 그러므로 최신 기사 버전을 제외해도 다른 버전이 공개 가능하면 그 버전이 목록에 선택될 수 있습니다. **결정된 정책:** S1 분석은 그래프 제외 때문에 막히지 않고 기존 분석 결과도 숨기지 않습니다. S1은 기사 접근 상태와 S1 grant를 계속 확인합니다. 이미 발행된 브리핑의 본문·상세는 발행 저장본으로 유지하고, 나중의 그래프 제외로 바꾸지 않습니다. 브리핑의 그래프 basis를 다시 조회할 때는 `PublicGraphReader`의 현재 제외 상태를 적용하고, 필수 대상이 제외되면 basis를 사용할 수 없는 상태로 반환합니다. 캐시·Neo4j는 앱 백엔드에 구현된 제외 소비자가 아닙니다.
 
-**앱 소비 구현(2026-10-24).** 운영자 명령 `com.zoop.graph.exclusion`이 이 보고서를 받아 위 조건을 지킵니다: ① handoff마다 앱이 수입한 버전의 receipt와 handoffId·세 digest를 대조하고, ② 제안은 운영자 명령으로만 저장하며, ③ 제외는 그 버전에만 적용하고, ④ 보고서로는 해제하지 않고 사유를 적은 `lift`로만 해제하며, ⑤ `relation-retraction`이 기사·근거를 제안하면 거절하고, ⑥ 기사 대상은 기록만 하고 그래프 조회는 이슈·관계·근거에 적용합니다. 실행 방법은 [api README](../README.md#공개-제외-명령-fs081)입니다.
+**앱 소비 구현(2026-10-28).** 운영자 명령 `com.zoop.graph.exclusion`이 이 보고서를 받아 위 조건을 지킵니다: ① handoff마다 앱이 수입한 버전의 receipt와 handoffId·세 digest를 대조하고, ② 제안은 운영자 명령으로만 저장하며, ③ 제외는 그 버전에만 적용하고, ④ 보고서로는 해제하지 않고 사유를 적은 `lift`로만 해제하며, ⑤ `relation-retraction`이 기사·근거를 제안하면 거절합니다. 공개 그래프·근거·챗봇은 이슈·관계·근거 제외를 적용하고, 기업 문서 목록은 정확한 기사 ID·버전 제외도 적용합니다. 결정된 정책에 따라 S1과 발행 브리핑 본문·상세는 그래프 제외를 따로 적용하지 않으며, 브리핑 graph basis 조회는 공개 그래프 overlay를 따릅니다. 캐시·Neo4j는 현재 앱 백엔드의 소비 범위가 아닙니다. 실행 방법은 [api README](../README.md#공개-제외-명령-fs081)입니다.
+
+### 실패 단계와 재실행 경계 (FS067-03 · FS081)
+
+| 작업 | 실패 후 보존·재실행 방식 | 근거 시험·코드 |
+|---|---|---|
+| Handoff 비활성 수입 | 수입은 검증 뒤 단일 DB 트랜잭션으로 snapshot·receipt·evidence·비활성 version을 기록합니다. 알려진 rollback이면 이번 실행이 만든 파일을 정리합니다. DB commit 결과가 불명하면 파일을 보존하고, **같은 handoff pin으로 재실행**해 등록된 행·파일의 bytes를 대조하고 이어받습니다. 이미 동일한 pin으로 staging됐고 등록 파일도 온전하면 `unchanged`; 수입은 활성 포인터를 바꾸지 않습니다. | `GraphHandoffImporterTest.repeatingATwoHopImportIsUnchangedAndKeepsTheSameBytes`; `GraphHandoffImporter` write/unknown-outcome 처리 |
+| 그래프 활성화 | 현재 권리·근거·제외 사전 검사를 통과하고 활성 포인터·이력·감사·멱등 기록이 한 트랜잭션으로 커밋됩니다. 검사 실패나 감사 쓰기 실패는 포인터·이력·멱등 기록을 남기지 않으므로 원인을 고친 뒤 다시 요청할 수 있습니다. 성공한 요청의 같은 멱등 키·본문은 기존 결과를 재생합니다. | `GraphVersionPostgresIntegrationTest.importedVersionPassesTheExclusionStoreGateAndIsStillCheckedBeforeThePointerMoves`; `aFailedAuditWriteRollsBackThePointerTheHistoryAndTheIdempotencyRecord` |
+| 공개 제외 명령 | 검증 단계에서 난 실패는 제외 revision을 쓰지 않아 원인을 바로잡고 같은 `requestId`로 재실행할 수 있습니다. commit 여부가 불명확하거나 결과 파일을 쓰지 못한 경우는 미적용으로 단정하지 말고 **같은 `requestId`·같은 요청 본문**을 새 결과 경로로 재실행합니다. 이미 commit됐으면 결과를 `replayed`로 반환하며 변경하지 않습니다. `exclude-query`가 기록된 요청이면 exposure를 다시 조회하지 않습니다. | `DisclosureExclusionPostgresTest.aQueryAsksTheHandoffsOfTheNamedVersionsAndExcludesWhatTheAnswerProposesOnce`; same-command replay 시험; [명령 오류·재실행 규칙](../README.md#공개-제외-명령-fs081) |
+| 분석 작업 재시도 (FS067-03) | `retryAnalysisJob`은 재시도 허용 판정을 먼저 하고, 허용된 경우 원 작업과 같은 종류·입력·plan을 가리키는 새 queued job(`retry_of`)을 만듭니다. 원 작업 이력은 유지되고 같은 멱등 키·본문은 생성된 재시도 응답을 재생합니다. 후속 성공이 같은 입력을 이미 처리했거나 retry 판단이 거절하면 새 작업을 만들지 않습니다. analyze-plan은 기존 plan/checkpoint를 이어받을 수 있으며 모든 실패가 무조건 재시도 가능한 것은 아닙니다. | `AnalysisJobPostgresTest.aLaterSuccessOnTheSameInputSupersedesAFailedJobInDetailAndRetry`; `AnalyzePlanPersistencePostgresTest.queuedCancelFreezesSummaryAndRetryContinuesOneRegisteredExecution`; `AnalysisJobService.retry` |
+| S1 문서 분석 단계 복구 | 별도 operator 명령의 `advance`는 먼저 AI job 상태를 읽고 기존 job ID로 진행합니다. `/recover`는 요청에 `recover:true`가 있을 때만 호출하며, 호출 전 현재 기사 접근 상태와 grant를 다시 확인합니다. 새 분석 job을 만들어 기존 결과를 덮지 않습니다. | `DocumentAnalyzerAdvanceTest.theServicesNextActionDecidesAndRecoverNeedsTheOperatorsOptIn`; `assertNotRecovered` 권리 철회 시험; [문서 분석 재개 계약](DOCUMENT_ANALYSIS.md#실행) |
+
+이 표는 서로 다른 복구 모델을 구분합니다. 특히 관리자 분석 재시도는 새 `analysis_jobs` 행을 만들지만 같은 plan/checkpoint를 재사용할 수 있고, S1 문서 분석은 기존 job의 상태를 읽은 뒤 명시적으로 recover합니다. 실패 단계를 보여주는 A-ADM-03 UI는 이 작업에서 추가하지 않습니다.
 
 CLI는 현재 bundle `-7`만 처리하며 하나라도 해석할 수 없는 선택이 있으면 전체를 거절합니다. 실제 권한 판단과 원문 공개는 기존 읽기 게이트를 계속 사용합니다. 이 기능은 공개 제외의 생산자 측 선행 계약이며, **CLI의 성공만으로 앱의 제외 적용이나 FS081 전체 완료를 뜻하지 않습니다.** 앱 저장소 구현은 위 운영자 명령 절을 따릅니다.
 

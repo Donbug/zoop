@@ -37,8 +37,9 @@ final class ExclusionResultWriter {
         root.put("snapshots", "unchanged");
         root.put("activation", "unchanged");
         root.put("graphRead", "issues-relations-evidence");
-        root.put("notApplied", "articles are recorded for company documents, S1, briefings, chat, caches and Neo4j, which this "
-                + "slice does not filter");
+        root.put("notApplied", "article exclusions filter company document lists by exact article version; S1 analysis and "
+                + "published briefing body/details do not use graph exclusions; briefing graph basis, public graph, evidence and "
+                + "chat apply their graph read rules; caches and Neo4j are outside this backend");
         ArrayNode versions = root.putArray("versions");
         for (VersionChange version : result.versions()) {
             ObjectNode node = versions.addObject();
