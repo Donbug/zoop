@@ -5,6 +5,7 @@ import com.zoop.chat.executor.ChatRun;
 import com.zoop.chat.executor.ChatRunSuperseded;
 import com.zoop.chat.orchestrator.ChatPeriods;
 import com.zoop.chat.tool.ChatCapability;
+import com.zoop.chat.tool.ChatToolOutput;
 import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolRequest;
 import com.zoop.chat.tool.ChatToolResult;
@@ -12,7 +13,6 @@ import com.zoop.chat.tool.ChatToolRunner;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -28,7 +28,8 @@ import tools.jackson.databind.ObjectMapper;
  * The chat read tools as MCP tools: every capability bound in {@link ChatToolRegistry} except the member scope read, which
  * the server runs itself before a model is involved (Q07). A call is executed for the job attempt its grant names, through
  * the same {@link ChatToolRunner} and {@code chat_tool_calls} ledger as the server's own plans, so the same per-attempt call
- * limit, timeouts and adapter checks apply.
+ * limit, timeouts and adapter checks apply. A grant only opens the door: a call runs only when it is exactly a call the
+ * server approved ahead ({@link #approve}), once.
  *
  * <p>A model chooses only the targets and a result limit. Everything else comes from the job: the pinned graph version and
  * asOf, the evidence the member narrowed the selection to, the compared period of a graph diff and the fixed ZOOP documents
@@ -43,7 +44,11 @@ public final class ChatMcpTools {
     /** Largest serialized result a call returns; a larger one is refused instead of being cut. */
     static final int MAX_RESULT_BYTES = 256 * 1024;
 
+    /** Room for the result envelope's own fields beyond the adapter output. */
+    private static final int ENVELOPE_BYTES = 1024;
+
     static final String NOT_GRANTED = "tool_not_granted";
+    static final String NOT_APPROVED = "call_not_approved";
     static final String RUN_NOT_ACTIVE = "run_not_active";
     static final String GRANT_MISMATCH = "grant_mismatch";
     static final String INVALID_ARGUMENTS = "invalid_arguments";
@@ -90,6 +95,42 @@ public final class ChatMcpTools {
                 && capability(tool.name()).filter(grant::allows).isPresent();
     }
 
+    /** The outcome of an approval: the reserved call's id, or the code it was refused with. */
+    public record Approval(String toolCallId, String refused) {
+        public boolean approved() {
+            return toolCallId != null;
+        }
+    }
+
+    /**
+     * Approves one exact call for the attached run (the server's decision on a model's {@code mcp_approval_request}): the
+     * named MCP tool with these arguments, completed by what the server injects. Approving reserves the call in
+     * {@code chat_tool_calls}, so it counts against the attempt's call limit at once; {@code /mcp} then runs only a call
+     * that matches a reservation, and each reservation only once. A reservation never called is closed as
+     * {@code cancelled} with the job.
+     */
+    public Approval approve(ChatJobExecutor.Attached attached, String toolName, Map<String, Object> arguments) {
+        Optional<ChatCapability> capability = capability(toolName).filter(exposed()::contains);
+        if (capability.isEmpty()) return new Approval(null, NOT_GRANTED);
+        ChatRun run = attached.run();
+        ChatToolRequest call;
+        try {
+            call = request(run, capability.get(), arguments);
+        } catch (IllegalArgumentException invalid) {
+            return new Approval(null, INVALID_ARGUMENTS);
+        }
+        var reservation = runner.reservation(run, call, VIA);
+        try {
+            return new Approval(attached.control().reserveToolCalls(PLAN_REVISION, List.of(reservation)).getFirst(),
+                    null);
+        } catch (ChatRunSuperseded ended) {
+            return new Approval(null, RUN_NOT_ACTIVE);
+        } catch (IllegalArgumentException overLimit) {
+            // The attempt already reserved every call it may make.
+            return new Approval(null, BUDGET_EXHAUSTED);
+        }
+    }
+
     McpSchema.CallToolResult call(McpTransportContext context, McpSchema.CallToolRequest request) {
         if (!(context.get(GRANT) instanceof ChatMcpGrant grant)) return refused(NOT_GRANTED);
         Optional<ChatCapability> capability = capability(request.name()).filter(exposed()::contains);
@@ -98,7 +139,8 @@ public final class ChatMcpTools {
         if (attached.isEmpty()) return refused(RUN_NOT_ACTIVE);
         ChatRun run = attached.get().run();
         if (!Objects.equals(run.graphVersionId(), grant.graphVersionId())
-                || !Objects.equals(run.context().asOf(), grant.asOf())) {
+                || !Objects.equals(run.context().asOf(), grant.asOf())
+                || !grant.scope().equals(ChatMcpGrants.scope(run))) {
             return refused(GRANT_MISMATCH);
         }
         ChatToolRequest call;
@@ -107,20 +149,30 @@ public final class ChatMcpTools {
         } catch (IllegalArgumentException invalid) {
             return refused(INVALID_ARGUMENTS);
         }
+        // Only the exact call the server approved runs: same tool, same canonical request (targets, limit and everything
+        // injected), reserved for this attempt and not started yet.
+        String digest = runner.reservation(run, call, VIA).inputDigest();
+        Optional<String> approved = executor.reservedToolCall(run.jobId(), run.attemptNo(), call.capabilityId(), digest);
+        if (approved.isEmpty()) return refused(NOT_APPROVED);
         ChatToolResult result;
         try {
-            result = runner.runStage(run, attached.get().control(), PLAN_REVISION, List.of(call), VIA).getFirst();
-        } catch (ChatRunSuperseded ended) {
-            return refused(RUN_NOT_ACTIVE);
-        } catch (IllegalArgumentException overLimit) {
-            // The attempt already reserved every call it may make.
-            return refused(BUDGET_EXHAUSTED);
+            result = runner.runReserved(run, attached.get().control(), List.of(approved.get()), List.of(call),
+                    this::tooLarge).getFirst();
+        } catch (ChatRunSuperseded lost) {
+            // Either the run ended, or a concurrent identical request started this reservation first.
+            return refused(executor.attach(run.jobId(), run.attemptNo()).isPresent() ? NOT_APPROVED : RUN_NOT_ACTIVE);
         }
+        if (RESULT_TOO_LARGE.equals(result.error())) return refused(RESULT_TOO_LARGE);
         Map<String, Object> structured = structured(result);
-        String text = mapper.writeValueAsString(structured);
-        if (text.getBytes(StandardCharsets.UTF_8).length > MAX_RESULT_BYTES) return refused(RESULT_TOO_LARGE);
-        return McpSchema.CallToolResult.builder().structuredContent(structured).addTextContent(text)
-                .isError(!result.succeeded()).build();
+        return McpSchema.CallToolResult.builder().structuredContent(structured)
+                .addTextContent(mapper.writeValueAsString(structured)).isError(!result.succeeded()).build();
+    }
+
+    /** {@link #RESULT_TOO_LARGE} for an output whose result would exceed {@link #MAX_RESULT_BYTES}; checked before it is recorded. */
+    private String tooLarge(ChatToolOutput output) {
+        // The envelope adds a few short fields (ids, versions, flags) to the output's own serialization.
+        int bytes = mapper.writeValueAsBytes(output).length + ENVELOPE_BYTES;
+        return bytes > MAX_RESULT_BYTES ? RESULT_TOO_LARGE : null;
     }
 
     /**

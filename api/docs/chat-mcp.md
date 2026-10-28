@@ -26,12 +26,14 @@ MCP 메시지를 읽기 전에 순서대로 검사한다.
 
 ### grant 토큰 (`ChatMcpGrants`)
 
-`zmcp1.<keyId>.<payload>.<mac>`. payload는 정규화 JSON `{job, attempt, tools, graphVersion, asOf, exp}`이고 mac은 전용 purpose의 HMAC-SHA256이다(둘 다 base64url).
+`zmcp1.<keyId>.<payload>.<mac>`. payload는 정규화 JSON `{job, attempt, tools, graphVersion, asOf, scope, exp}`이고 mac은 전용 purpose의 HMAC-SHA256이다(둘 다 base64url).
 
-- 서버만 발급한다. `exp`는 run deadline이며 job·attempt·graphVersion·asOf에 결속된다. 회원 ID는 담지 않는다.
+- 서버만 발급한다. `exp`는 run deadline이며 job·attempt·graphVersion·asOf에 결속된다.
+- `scope`는 subject 범위 digest(회원 + 서버가 주입하는 근거 선택 범위·선택 기간)다. 회원 ID를 평문으로 담지 않으며, 호출 시 run에서 다시 계산한 값과 다르면 `grant_mismatch`다.
+- grant는 문을 여는 것까지다. 실제 호출은 아래 "호출 승인"에서 서버가 승인한 정확한 호출과 일치해야 실행된다.
 - `portfolio.scope.read`는 발급 단계에서 거부한다(Q07 본인 범위는 Java가 먼저 고정, 모델 비노출).
 - 키: `ZOOP_CHAT_MCP_ACTIVE_KEY_ID`, `ZOOP_CHAT_MCP_KEYS`(`id=base64url`, 32바이트 이상, 쉼표 구분). 활성 키가 서명하고 나열된 키는 모두 검증하므로 회전할 수 있다. 토큰이 외부(모델 공급자)로 나가므로 CSRF 키와 분리한다. 모델 API 키와도 별개다.
-- 토큰·키는 로그에 쓰지 않는다. rate window는 토큰 digest로 센다.
+- 토큰·키는 로그에 쓰지 않는다. rate window는 검증에 쓴 토큰 문자열의 digest로 세므로 `Authorization` 헤더의 공백 변형도 같은 창을 쓴다.
 
 호출마다 토큰의 job·attempt가 **지금 실행 중인 attempt**인지 DB에서 다시 확인한다(`ChatJobExecutor.attach`). 원장 쓰기는 run과 같은 owner-token·lease fence를 쓰므로 취소·만료·새 attempt 뒤의 호출은 아무것도 기록하지 않는다. owner token은 서버 밖으로 나가지 않는다.
 
@@ -49,6 +51,15 @@ MCP 메시지를 읽기 전에 순서대로 검사한다.
 
 서버 주입: graphVersion·asOf(job 고정), 회원이 좁힌 근거 선택 범위(`evidenceIds`가 있으면 `evidencePool`), `graph.version.diff`의 비교 시작 시각(job의 선택 기간), 고정 ZOOP 문서.
 
+### 호출 승인 (승인 = 원장 예약)
+
+`require_approval=always`에서 Java가 모델의 `mcp_approval_request`를 승인할 때 `ChatMcpTools.approve(attached, 도구, 인자)`를 부른다. 승인은 그 정확한 호출(도구 + 정규화 요청: targets·limit·서버 주입값)을 `chat_tool_calls`에 `reserved`로 예약하고 `input_digest`로 식별한다.
+
+- `/mcp`의 `tools/call`은 같은 attempt에 같은 기능·같은 digest로 **아직 시작되지 않은 예약**이 있을 때만 실행하며, 예약을 `running`으로 바꾸는 fenced 전이로 한 번만 소비한다. 없으면 `call_not_approved`이고 아무것도 읽지 않는다. 승인받지 않은 target, 다른 limit, 이미 쓴 승인은 모두 여기서 막힌다.
+- 승인 시점에 예약되므로 attempt 호출 상한(현재 12회)을 원자적으로 차감한다. 상한 초과 승인은 `tool_budget_exhausted`다.
+- 승인됐지만 호출되지 않은 예약은 job이 끝날 때 기존 규칙대로 `cancelled`로 닫힌다.
+- 이번 PR에는 `approve`를 부르는 실행 경로(ai/service의 approval request 전달)가 아직 없다. 계약과 강제 지점만 먼저 고정했다.
+
 ### 결과와 오류
 
 성공은 `structuredContent`와 같은 JSON의 text content로 `chat-tool/v1` 봉투(`toolCallId`, `dataVersion`, `items`, `evidenceIds`, `truncated`, `nextAllowed`, 경로 읽기의 `paths`)를 돌려준다. 실패는 빈 성공이 아니라 `isError=true`와 코드다.
@@ -57,17 +68,18 @@ MCP 메시지를 읽기 전에 순서대로 검사한다.
 | --- | --- |
 | `tool_not_granted` | grant에 없는 도구 |
 | `run_not_active` | job이 끝났거나 취소·만료·다른 attempt |
-| `grant_mismatch` | grant의 graphVersion·asOf가 job과 다름 |
+| `grant_mismatch` | grant의 graphVersion·asOf·subject scope가 job과 다름 |
 | `invalid_arguments` | 인자 규칙 위반(아무것도 읽지 않음, 원장 기록 없음) |
-| `tool_budget_exhausted` | attempt의 호출 상한(현재 12회) 도달 |
-| `result_too_large` | 직렬화 결과 256 KiB 초과 |
+| `call_not_approved` | 서버가 승인(예약)한 호출과 정확히 일치하지 않거나 이미 사용됨 |
+| `tool_budget_exhausted` | (승인 시) attempt의 호출 상한(현재 12회) 도달 |
+| `result_too_large` | 직렬화 결과 256 KiB 초과. 원장 기록 **전에** 검사해 `failed`/`result_too_large`로 남기며 근거·dataVersion은 기록하지 않음 |
 | `tool_timeout` `tool_unavailable` `tool_failed` | 기존 runner 실패 코드(원장에 `failed`) |
 
 등록되지 않은 이름(`portfolio_scope_read`, 점 포함 ID)은 SDK가 JSON-RPC `-32602 Unknown tool`로 답한다.
 
 ### 원장
 
-MCP 호출도 `chat_tool_calls`에 기존 호출과 같은 방식으로 예약·시작·종료된다. `plan_revision`은 1이고 `request_meta.via = "mcp"`로 경로를 구분한다. 스키마 변경(migration)은 없다.
+MCP 호출도 `chat_tool_calls`에 기존 호출과 같은 상태(예약 → 실행 → 종료)로 남는다. 예약은 승인 때, 실행·종료는 `/mcp` 호출 때다. `plan_revision`은 1이고 `request_meta.via = "mcp"`로 경로를 구분한다. 스키마 변경(migration)은 없다.
 
 ## 4. 켜기 전에 남은 조건
 
@@ -84,8 +96,9 @@ MCP 호출도 `chat_tool_calls`에 기존 호출과 같은 방식으로 예약·
 ./api/gradlew -p api test --tests 'com.zoop.chat.mcp.*'
 ```
 
-- `ChatMcpGrantsTest`: 발급·검증, 변조·잘림·다른 키, deadline 만료, 키 회전, `portfolio.scope.read` 거부, 키 설정 오류(값 비노출).
-- `ChatMcpEndpointTest`: 실제 SDK servlet transport·server와 메모리 job 저장소로 401/403/413/429, `initialize`, grant별 `tools/list`, 성공 호출의 runner·원장 기록(`via=mcp`), 거부 인자·미허용 도구·종료된 run의 무조회, attempt 호출 상한.
+- `ChatMcpGrantsTest`: 발급·검증, 변조·잘림·다른 키, deadline 만료, 키 회전, subject scope(회원별 차이, 평문 회원 ID 없음), `portfolio.scope.read` 거부, 키 설정 오류(값 비노출).
+- `ChatMcpEndpointTest`: 실제 SDK servlet transport·server와 메모리 job 저장소로 401/403/413/429(헤더 공백 변형도 같은 창), `initialize`, grant별 `tools/list`, 승인된 호출 1회 실행과 원장 기록(`via=mcp`), 미승인·다른 target·다른 limit·재사용 거부, 다른 attempt·다른 subject·종료된 run 무조회, 승인 시 호출 상한, `result_too_large`의 원장 실패 기록.
+- `ChatExecutorPostgresTest`(PostgreSQL): `attach`와 fence, 예약 호출 조회(`findReservedToolCall`)의 기능·digest·attempt 일치와 시작 뒤 소멸.
 - `ChatMcpConfigurationTest`: 기본 꺼짐이면 bean·경로 없음, 켜고 키가 없으면 기동 거절, 키가 있으면 `/mcp` 등록.
 
 모두 합성 job·합성 도구이며 모델·네트워크·실제 데이터를 쓰지 않는다. 실제 OpenAI 런타임과의 상호 운용은 단계 3의 합성 replay와 승인된 소량 live 시험에서 확인한다.

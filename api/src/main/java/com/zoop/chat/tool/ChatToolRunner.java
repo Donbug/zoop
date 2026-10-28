@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -102,13 +103,32 @@ public class ChatToolRunner implements AutoCloseable {
      */
     public List<ChatToolResult> runStage(ChatRun run, ChatRunControl control, int planRevision,
             List<ChatToolRequest> calls, String via) {
-        List<ChatToolRegistry.Binding> bindings = calls.stream().map(call -> registry.bind(call.capabilityId())
-                .orElseThrow(() -> new IllegalArgumentException("unbound chat capability: " + call.capabilityId())))
-                .toList();
-        ChatToolScope scope = new ChatToolScope(run.jobId(), run.graphVersionId(), run.context().asOf(), run.memberId());
-        List<ChatToolCallReservation> reservations = new ArrayList<>();
-        for (int i = 0; i < calls.size(); i++) reservations.add(reservation(bindings.get(i), scope, calls.get(i), via));
+        // Every reservation is built (every capability bound) before anything is reserved.
+        List<ChatToolCallReservation> reservations = calls.stream().map(call -> reservation(run, call, via)).toList();
         List<String> ids = control.reserveToolCalls(planRevision, reservations);
+        return runReserved(run, control, ids, calls, output -> null);
+    }
+
+    /**
+     * The {@code chat_tool_calls} reservation of one call of {@code run}: its kept request structure and the digest of
+     * capability and request, which identifies the exact call. {@code via} as in
+     * {@link #runStage(ChatRun, ChatRunControl, int, List, String)}. Throws {@link IllegalArgumentException} for an unbound
+     * capability.
+     */
+    public ChatToolCallReservation reservation(ChatRun run, ChatToolRequest call, String via) {
+        return reservation(binding(call), scope(run), call, via);
+    }
+
+    /**
+     * Runs calls that are already reserved ({@code ids}, in the same order as {@code calls}) under the same limits and
+     * records as {@link #runStage}. {@code refuse} may turn an adapter output that passed the runner's checks into a failure
+     * code; such a call is recorded {@code failed} with that code and reports no result.
+     */
+    public List<ChatToolResult> runReserved(ChatRun run, ChatRunControl control, List<String> ids,
+            List<ChatToolRequest> calls, Function<ChatToolOutput, String> refuse) {
+        if (ids.size() != calls.size()) throw new IllegalArgumentException("one reserved id per call");
+        List<ChatToolRegistry.Binding> bindings = calls.stream().map(this::binding).toList();
+        ChatToolScope scope = scope(run);
 
         long stageEnd = System.nanoTime() + Math.min(stageLimit.toNanos(), Math.max(0, control.remaining().toNanos()));
         Semaphore slots = new Semaphore(MAX_CONCURRENT);
@@ -137,7 +157,7 @@ public class ChatToolRunner implements AutoCloseable {
                 slots.release();
                 inFlight.release();
                 started.add(CompletableFuture.supplyAsync(
-                        () -> finish(control, id, call, null, new TimeoutException(), superseded), records));
+                        () -> finish(control, id, call, null, new TimeoutException(), superseded, refuse), records));
                 continue;
             }
             // The task always runs (never cancelled before it starts), so its slots are always given back; a timeout
@@ -161,8 +181,8 @@ public class ChatToolRunner implements AutoCloseable {
                 Thread thread = reader.get();
                 if (error instanceof TimeoutException && thread != null) thread.interrupt();
             });
-            started.add(read.handleAsync((output, error) -> finish(control, id, call, output, error, superseded),
-                    records));
+            started.add(read.handleAsync((output, error) -> finish(control, id, call, output, error, superseded,
+                    refuse), records));
         }
         awaitRecords(started, stageEnd, superseded);
         if (superseded.get()) throw new ChatRunSuperseded();
@@ -179,6 +199,15 @@ public class ChatToolRunner implements AutoCloseable {
     public void close() {
         pool.shutdownNow();
         records.shutdownNow();
+    }
+
+    private ChatToolRegistry.Binding binding(ChatToolRequest call) {
+        return registry.bind(call.capabilityId())
+                .orElseThrow(() -> new IllegalArgumentException("unbound chat capability: " + call.capabilityId()));
+    }
+
+    private static ChatToolScope scope(ChatRun run) {
+        return new ChatToolScope(run.jobId(), run.graphVersionId(), run.context().asOf(), run.memberId());
     }
 
     /** Waits for every started call to be recorded, at most {@code recordGrace} past the stage end. */
@@ -210,11 +239,17 @@ public class ChatToolRunner implements AutoCloseable {
     }
 
     private ChatToolResult finish(ChatRunControl control, String id, ChatToolRequest call, ChatToolOutput output,
-            Throwable error, AtomicBoolean superseded) {
+            Throwable error, AtomicBoolean superseded, Function<ChatToolOutput, String> refuse) {
         ChatToolResult result;
         ChatToolCallEnd end;
         String problem = error == null ? invalid(call, output) : null;
-        if (error == null && problem == null) {
+        String refused = error == null && problem == null ? refuse.apply(output) : null;
+        if (refused != null) {
+            // A usable read the caller cannot pass on (an MCP result over its size limit): recorded as that failure, so
+            // the ledger never shows evidence as delivered that was not.
+            result = ChatToolResult.failed(id, call.capabilityId(), refused);
+            end = ChatToolCallEnd.failed(refused);
+        } else if (error == null && problem == null) {
             result = ChatToolResult.succeeded(id, call.capabilityId(), output);
             end = new ChatToolCallEnd("succeeded", null, output.dataVersion(), output.evidenceIds(), output.truncated(),
                     output.nextAllowed());

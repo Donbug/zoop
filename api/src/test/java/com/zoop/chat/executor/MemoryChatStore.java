@@ -194,6 +194,15 @@ public final class MemoryChatStore implements ChatRepository, ChatExecutionRepos
     }
 
     @Override
+    public synchronized Optional<String> findReservedToolCall(String jobId, int attemptNo, String capabilityId,
+            String inputDigest) {
+        return toolCalls.stream().filter(c -> c.row.jobId().equals(jobId) && c.row.attemptNo() == attemptNo
+                        && c.row.capabilityId().equals(capabilityId) && c.row.inputDigest().equals(inputDigest)
+                        && "reserved".equals(c.status))
+                .min(java.util.Comparator.comparingInt(c -> c.row.callIndex())).map(c -> c.row.toolCallId());
+    }
+
+    @Override
     public synchronized boolean startToolCall(String jobId, String ownerToken, int attemptNo, String toolCallId,
             Instant at) {
         var call = toolCall(jobId, attemptNo, toolCallId);

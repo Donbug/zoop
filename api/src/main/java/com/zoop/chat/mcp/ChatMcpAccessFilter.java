@@ -58,14 +58,16 @@ public final class ChatMcpAccessFilter implements Filter {
             return;
         }
         String authorization = request.getHeader("Authorization");
-        Optional<ChatMcpGrant> grant = authorization != null && authorization.startsWith(BEARER)
-                ? grants.verify(authorization.substring(BEARER.length()).trim()) : Optional.empty();
+        String token = authorization != null && authorization.startsWith(BEARER)
+                ? authorization.substring(BEARER.length()).trim() : null;
+        Optional<ChatMcpGrant> grant = grants.verify(token);
         if (grant.isEmpty()) {
             response.setHeader("WWW-Authenticate", "Bearer");
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
             return;
         }
-        if (!admit(Canonical.sha256(authorization), grant.get().expiresAt())) {
+        // Keyed on the verified token itself, so spacing variants of one header share one window.
+        if (!admit(Canonical.sha256(token), grant.get().expiresAt())) {
             response.setHeader("Retry-After", Long.toString(WINDOW.toSeconds()));
             response.sendError(429);
             return;

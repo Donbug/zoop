@@ -36,7 +36,7 @@ public final class ChatMcpGrants {
     private static final String KEY_ID = "[A-Za-z0-9_-]{1,64}";
     private static final int MAX_TOKEN_LENGTH = 4096;
     private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
-    private static final Set<String> FIELDS = Set.of("job", "attempt", "tools", "graphVersion", "asOf", "exp");
+    private static final Set<String> FIELDS = Set.of("job", "attempt", "tools", "graphVersion", "asOf", "scope", "exp");
 
     private final String activeKeyId;
     private final Map<String, byte[]> keys;
@@ -70,7 +70,7 @@ public final class ChatMcpGrants {
      */
     public String issue(ChatRun run, Collection<ChatCapability> tools) {
         ChatMcpGrant grant = new ChatMcpGrant(run.jobId(), run.attemptNo(), List.copyOf(tools), run.graphVersionId(),
-                run.context().asOf(), run.deadline());
+                run.context().asOf(), scope(run), run.deadline());
         var payload = StrictJson.newObject();
         payload.put("job", grant.jobId());
         payload.put("attempt", grant.attemptNo());
@@ -78,6 +78,7 @@ public final class ChatMcpGrants {
         grant.tools().forEach(tool -> ids.add(tool.id()));
         payload.put("graphVersion", grant.graphVersionId());
         payload.put("asOf", grant.asOf() == null ? null : grant.asOf().toString());
+        payload.put("scope", grant.scope());
         payload.put("exp", grant.expiresAt().toString());
         String signed = PREFIX + "." + activeKeyId + "." + ENCODER.encodeToString(Canonical.bytes(payload));
         return signed + "." + ENCODER.encodeToString(mac(keys.get(activeKeyId), signed));
@@ -108,13 +109,29 @@ public final class ChatMcpGrants {
             }
             String asOf = fields.stringOrNull("asOf");
             grant = new ChatMcpGrant(fields.string("job"), fields.count("attempt"), tools,
-                    fields.stringOrNull("graphVersion"), asOf == null ? null : Instant.parse(asOf),
+                    fields.stringOrNull("graphVersion"), asOf == null ? null : Instant.parse(asOf), fields.string("scope"),
                     Instant.parse(fields.string("exp")));
         } catch (StrictJson.Malformed | IllegalArgumentException | DateTimeParseException malformed) {
             // Signed by us but unreadable: a key reused elsewhere or a format from another version. Never a grant.
             return Optional.empty();
         }
         return clock.instant().isBefore(grant.expiresAt()) ? Optional.of(grant) : Optional.empty();
+    }
+
+    /**
+     * The subject scope a grant is bound to: a digest of the job's member and of what the server injects into its calls
+     * (the narrowed evidence selection and the selected period). It names no member in the clear, and a grant whose scope
+     * differs from the run's is refused.
+     */
+    public static String scope(ChatRun run) {
+        var scope = StrictJson.newObject();
+        scope.put("member", run.memberId());
+        var selection = run.selection();
+        var evidence = scope.putArray("evidence");
+        if (!selection.evidenceIds().isEmpty()) selection.evidencePool().forEach(evidence::add);
+        var period = run.context().period();
+        scope.put("period", period == null ? null : period.start() + "/" + period.end());
+        return Canonical.digest(scope);
     }
 
     private static byte[] mac(byte[] key, String signed) {

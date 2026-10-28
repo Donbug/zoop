@@ -162,6 +162,14 @@ public class ChatJobExecutor {
         return Optional.of(new Attached(run(claim), new Control(claim)));
     }
 
+    /**
+     * The attempt's call still reserved for exactly this capability and input digest: a call the server approved and
+     * reserved ahead (an approved MCP call) that has not started yet.
+     */
+    public Optional<String> reservedToolCall(String jobId, int attemptNo, String capabilityId, String inputDigest) {
+        return runs.findReservedToolCall(jobId, attemptNo, capabilityId, inputDigest);
+    }
+
     /** Ends running jobs whose lease ran out; returns how many it ended. */
     public int recoverExpired() {
         int ended = 0;

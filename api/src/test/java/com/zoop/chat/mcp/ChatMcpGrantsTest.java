@@ -35,7 +35,19 @@ class ChatMcpGrantsTest {
         assertEquals("gv-1", grant.graphVersionId());
         assertEquals(Instant.parse("2026-10-27T00:00:00Z"), grant.asOf());
         assertEquals(NOW.plusSeconds(45), grant.expiresAt());
+        assertEquals(ChatMcpGrants.scope(run("job-00001", 2)), grant.scope());
         assertTrue(token.startsWith("zmcp1.k1."));
+    }
+
+    @Test
+    void theSubjectScopeDiffersByMemberAndNamesNoMember() {
+        String a = ChatMcpGrants.scope(run("job-00001", 1, "member-a"));
+        assertFalse(a.equals(ChatMcpGrants.scope(run("job-00001", 1, "member-b"))));
+        assertEquals(a, ChatMcpGrants.scope(run("job-00002", 3, "member-a")));
+        String token = grants("k1", "k1=" + KEY_A, NOW).issue(run("job-00001", 1, "member-a"),
+                List.of(ChatCapability.COMPANY_READ));
+        String payload = new String(Base64.getUrlDecoder().decode(token.split("\\.")[2]), StandardCharsets.UTF_8);
+        assertFalse(payload.contains("member-a"), payload);
     }
 
     @Test
@@ -97,8 +109,12 @@ class ChatMcpGrantsTest {
     }
 
     static ChatRun run(String jobId, int attemptNo) {
+        return run(jobId, attemptNo, "member-a");
+    }
+
+    static ChatRun run(String jobId, int attemptNo, String memberId) {
         var context = new ChatFrozenContext(List.of(), 0, null, Instant.parse("2026-10-27T00:00:00Z"), "gv-1");
-        return new ChatRun(jobId, "conv-0001", "member-a", attemptNo, "run",
+        return new ChatRun(jobId, "conv-0001", memberId, attemptNo, "run",
                 List.of(new ChatRun.Turn(jobId, "질문", null, null)), context, FrozenSelection.NONE, "gv-1", 0, NOW,
                 NOW.plusSeconds(45));
     }

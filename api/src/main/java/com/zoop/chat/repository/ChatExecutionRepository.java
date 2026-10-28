@@ -59,6 +59,13 @@ public interface ChatExecutionRepository {
     /** Stores reserved tool calls (after {@link #lockOwned} in the same transaction). */
     void reserveToolCalls(List<NewChatToolCall> calls, Instant at);
 
+    /**
+     * The oldest call of the attempt that is still {@code reserved} for exactly this capability and input digest; empty when
+     * there is none (never reserved, already started or closed). Not locked: starting it is the fenced
+     * {@link #startToolCall}, which only one caller wins.
+     */
+    Optional<String> findReservedToolCall(String jobId, int attemptNo, String capabilityId, String inputDigest);
+
     /** reserved → running, fenced like every run write; false when the run no longer owns the job. */
     boolean startToolCall(String jobId, String ownerToken, int attemptNo, String toolCallId, Instant at);
 

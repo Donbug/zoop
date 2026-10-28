@@ -161,6 +161,18 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
     }
 
     @Override
+    public Optional<String> findReservedToolCall(String jobId, int attemptNo, String capabilityId, String inputDigest) {
+        return jdbc.queryForList("""
+                SELECT tool_call_id FROM chat_tool_calls
+                 WHERE chat_job_id = :id AND attempt_no = :attempt AND capability_id = :capability
+                   AND input_digest = :digest AND status = 'reserved'
+                 ORDER BY call_index LIMIT 1
+                """, new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo)
+                .addValue("capability", capabilityId).addValue("digest", inputDigest), String.class)
+                .stream().findFirst();
+    }
+
+    @Override
     public boolean startToolCall(String jobId, String ownerToken, int attemptNo, String toolCallId, Instant at) {
         return jdbc.update("UPDATE chat_tool_calls c SET status = 'running', started_at = :at"
                 + " WHERE c.chat_job_id = :id AND c.attempt_no = :attempt AND c.tool_call_id = :toolCallId"
