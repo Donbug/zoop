@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -176,38 +176,22 @@ describe('D-GRP-02 · prototype event panel completion via /api/v1', () => {
     },
   );
 
-  it.each(['admin-review', 'review-rule'] as const)(
-    '26: ports %s approval text and dismisses with focus return',
-    async (source) => {
-      const server = createFakeServer();
-      const event = structuredClone(baseEvent);
-      event.approval = {
-        source,
-        label: '합성 승인 표시',
-        ruleId: 'test-rule',
-        scope: 'test',
-      };
-      server.on('GET', '/api/v1/events/:id', () => json(event));
-      render(<EventDetailPanel {...eventProps} />);
-      await screen.findByText('합성 승인 표시');
-      const trigger = screen.getByLabelText(
-        source === 'admin-review'
-          ? '관리자가 원문 근거를 직접 확인하고 게시했어요'
-          : '역할 표현을 확인하지 못해 비우고 게시했어요',
-      );
-      const disclosure = trigger.closest('details')!;
-      trigger.focus();
-      await userEvent.keyboard('{Enter}');
-      expect(disclosure.open).toBe(true);
-      await userEvent.keyboard('{Escape}');
-      expect(disclosure.open).toBe(false);
-      expect(document.activeElement).toBe(trigger);
-      expect(eventProps.onClose).not.toHaveBeenCalled();
-      await userEvent.click(trigger);
-      fireEvent.pointerDown(document.body);
-      expect(disclosure.open).toBe(false);
-    },
-  );
+  it('26: approval source stays off the user panel (FE handoff 3-1)', async () => {
+    const server = createFakeServer();
+    const event = structuredClone(baseEvent);
+    event.approval = {
+      source: 'admin-review',
+      label: '합성 승인 표시',
+      scope: 'test',
+    };
+    server.on('GET', '/api/v1/events/:id', () => json(event));
+    render(<EventDetailPanel {...eventProps} />);
+    await screen.findByRole('heading', { name: baseEvent.title });
+    expect(screen.queryByText('합성 승인 표시')).toBeNull();
+    expect(
+      screen.queryByLabelText('관리자가 원문 근거를 직접 확인하고 게시했어요'),
+    ).toBeNull();
+  });
 
   it('26/27/28: suppresses missing and failed sections, retries without stale content', async () => {
     const server = createFakeServer();
