@@ -38,6 +38,8 @@ import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { arrangeFlow, arrangeFocus } from './graph-arrange';
 import { applyGraphReading } from './graph-readability';
 import GraphMobileTools from './GraphMobileTools';
+import MapEmptyState from './MapEmptyState';
+import type { PersonalScope } from '@/types/map';
 import {
   fitFootprint,
   fitZoom,
@@ -73,6 +75,8 @@ export default function GraphCanvas({
   tutorialCameraEnabled = false,
   tutorialShowNeighborhood = false,
   onTutorialAction,
+  onPersonalFilter,
+  onMarket,
 }: {
   data: GraphResponse;
   filterHost?: HTMLElement | null;
@@ -83,6 +87,8 @@ export default function GraphCanvas({
   tutorialCameraEnabled?: boolean;
   tutorialShowNeighborhood?: boolean;
   onTutorialAction?: (action: 'pan' | 'zoom') => void;
+  onPersonalFilter?: (scope: PersonalScope) => void;
+  onMarket?: () => void;
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
   focusId?: string | null;
@@ -1545,23 +1551,11 @@ export default function GraphCanvas({
           {selectedNode.watch ? ' · 관심' : ''}
         </p>
       )}
-      {data.nodes.length === 0 && (
-        <div className="relationship-message" role="status">
-          {personal
-            ? data.metadata.personalFilter === 'holdings'
-              ? '보유종목이 없습니다.'
-              : data.metadata.personalFilter === 'watchlist'
-                ? '관심종목이 없습니다.'
-                : '보유종목 또는 관심종목이 없습니다.'
-            : '현재 표시할 수 있는 관계 데이터가 없습니다.'}
-          {personal && <a href="/my">관심종목 설정</a>}
-        </div>
-      )}
-      {data.nodes.length > 0 && data.edges.length === 0 && (
-        <p className="relationship-empty-relations" role="status">
-          현재 확인된 관련 관계가 없습니다.
-        </p>
-      )}
+      <MapEmptyState
+        graph={data}
+        onPersonalFilter={onPersonalFilter}
+        onMarket={onMarket}
+      />
       {renderError && (
         <div className="relationship-message" role="alert">
           그래프를 표시하지 못했습니다.
