@@ -20,8 +20,7 @@ const isConflict = (error: unknown) =>
   error instanceof ApiError && error.code === 'REVISION_CONFLICT';
 
 function decisionError(error: Error) {
-  if (isConflict(error))
-    return '그 사이 관계 상태나 AI 원천이 바뀌어 상세를 새로 읽었어요. 바뀐 내용을 확인하고 다시 보내 주세요.';
+  if (isConflict(error)) return '그 사이 관계 상태나 AI 원천이 바뀌었어요.';
   if (error instanceof ApiError && error.code === 'VALIDATION_FAILED')
     return '원문 인용이나 원천 권리 검사를 통과하지 못해 승인할 수 없어요.';
   return adminActionErrorMessage(error);
@@ -34,6 +33,8 @@ export default function CandidateDecisionForm({
   candidateId,
   relation,
   decision,
+  refresh = 'idle',
+  onRetryRefresh,
   onCancel,
   onDone,
   onConflict,
@@ -41,6 +42,9 @@ export default function CandidateDecisionForm({
   candidateId: string;
   relation: CandidateRelation;
   decision: 'allow' | 'reject';
+  /** 409 뒤 상세 다시 읽기 상태. 새 상세가 오기 전·실패하면 예전 revision으로 보내지 않는다. */
+  refresh?: 'idle' | 'reloading' | 'failed';
+  onRetryRefresh?: () => void;
   onCancel: () => void;
   onDone: (result: CandidateDecisionResponse) => void;
   /** 409 REVISION_CONFLICT(다른 관리자의 결정·비활성 관계)면 상세를 다시 읽는다. 입력한 사유는 남긴다. */
@@ -57,9 +61,10 @@ export default function CandidateDecisionForm({
   // 세션이 바뀐 뒤 이전 관리자의 결정 결과를 새 관리자 화면에 반영하지 않는다.
   const owner = useAdminSessionStore.getState().revision;
 
+  const conflicted = error !== null && isConflict(error);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending) return;
+    if (pending || refresh !== 'idle') return;
     const trimmed = reason.trim();
     setInvalid(!trimmed || trimmed.length > 500);
     if (!trimmed || trimmed.length > 500) return;
@@ -134,6 +139,27 @@ export default function CandidateDecisionForm({
           {title}에 실패했어요. {decisionError(error)}
         </p>
       )}
+      {conflicted && refresh === 'reloading' && (
+        <p role="status" className="text-xs text-zoop-muted">
+          상세를 새로 읽고 있어요. 입력한 사유는 그대로 남아요.
+        </p>
+      )}
+      {conflicted && refresh === 'failed' && (
+        <p
+          role="alert"
+          className="flex flex-wrap items-center gap-2 text-xs text-zoop-alert"
+        >
+          상세를 새로 읽지 못했어요. 예전 상태로는 보낼 수 없어요.
+          <button type="button" className={BUTTON} onClick={onRetryRefresh}>
+            다시 읽기
+          </button>
+        </p>
+      )}
+      {conflicted && refresh === 'idle' && (
+        <p role="status" className="text-xs text-zoop-muted">
+          상세를 새로 읽었어요. 바뀐 내용을 확인하고 다시 보내 주세요.
+        </p>
+      )}
       <div className="flex justify-end gap-2">
         <button
           type="button"
@@ -143,7 +169,11 @@ export default function CandidateDecisionForm({
         >
           취소
         </button>
-        <button type="submit" className={PRIMARY_BUTTON} disabled={pending}>
+        <button
+          type="submit"
+          className={PRIMARY_BUTTON}
+          disabled={pending || refresh !== 'idle'}
+        >
           {pending ? '보내고 있어요' : allow ? '승인하기' : '거부하기'}
         </button>
       </div>
