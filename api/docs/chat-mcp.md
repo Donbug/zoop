@@ -2,7 +2,7 @@
 
 기준: [Luna MCP 실행 계약](../../docs/design/ai-chatbot-mcp-actions.md) 3장, [개발 계획](../../docs/development/ai-chatbot-implementation-plan.md) 단계 4 · 화면 추적 `D-AI-02`
 
-상태: MCP 서버(1단계)와 agent 경로(단계 3: Luna Responses `chat-agent` + Java 승인 루프) 구현. 두 기능 플래그 모두 기본 꺼짐. live 호출은 아직 하지 않았다(합성 replay·fake로만 시험).
+상태: MCP 서버(1단계), agent 경로(단계 3: Luna Responses `chat-agent` + Java 승인 루프), 결과의 모델 전송 grant 검사 구현. 두 기능 플래그 모두 기본 꺼짐. live 호출은 아직 하지 않았다(합성 replay·fake로만 시험).
 
 ## 1. 무엇을 하는가
 
@@ -73,9 +73,20 @@ MCP 메시지를 읽기 전에 순서대로 검사한다.
 | `call_not_approved` | 서버가 승인(예약)한 호출과 정확히 일치하지 않거나 이미 사용됨 |
 | `tool_budget_exhausted` | (승인 시) attempt의 호출 상한(현재 12회) 도달 |
 | `result_too_large` | 직렬화 결과 256 KiB 초과. 원장 기록 **전에** 검사해 `failed`/`result_too_large`로 남기며 근거·dataVersion은 기록하지 않음 |
+| `send_grants_unavailable` | 아래 모델 전송 gate가 판단할 수 없음(grant 레지스트리를 읽지 못함·형식 위반, 근거 출처를 읽지 못함). 읽기는 실행됐지만 결과를 보내지 않고 `failed`로 남김 |
 | `tool_timeout` `tool_unavailable` `tool_failed` | 기존 runner 실패 코드(원장에 `failed`) |
 
 등록되지 않은 이름(`portfolio_scope_read`, 점 포함 ID)은 SDK가 JSON-RPC `-32602 Unknown tool`로 답한다.
+
+### 모델 전송 gate (`ChatMcpSendGate`, `ChatSendGrants`)
+
+hosted MCP 결과는 ai/service의 전송 gate를 거치지 않고 이 엔드포인트에서 OpenAI로 바로 간다. 그래서 `/mcp`는 성공 결과를 원장에 기록하고 돌려주기 **전에** 출처마다 모델 전송 grant를 확인하고, 허용되지 않은 부분은 결과에서 뺀다.
+
+- **grant 원본**: AI runtime이 `--grants`로 읽는 운영자 챗봇 grant 레지스트리(`zoop-ai-chat-1`) **같은 파일**을 `ZOOP_CHAT_MCP_SEND_GRANTS`(절대·정규화 경로)로 읽는다. 결과마다 다시 읽으므로 철회는 다음 결과부터 적용된다. 형식은 worker의 `ChatGrantRegistry`와 같이 엄격하게 본다(필드 누락·추가·중복 키, 모르는 rights·operation·목적, offset 없는 만료는 레지스트리 전체 거부).
+- **규칙**: worker의 `chat-agent` 단계 규칙과 같다. 같은 source의 grant가 `enabled`, `rights=known`, `model-send`, 목적에 `chat-agent`, 수신자에 `ZOOP_CHAT_MCP_SEND_RECIPIENT`(AI runtime이 `chat-agent` 단계에 쓰는 수신자, live `openai-compatible:<revision>`)가 있고 만료 전이어야 한다. `chat-agent` 목적은 그 단계의 Responses 저장(`store=true`)·continuation 재개를 포함하는 목적으로 등록한다.
+- **출처 대응**: 기업 항목(이름) = `zoop-company-catalog`, 사건 제목·관계·경로 단계 = `zoop-graph`(새 source ID), ZOOP 문서 제목 = `zoop-docs`, 근거(근거 항목의 label은 기사 제목) = direct 경로의 인용과 같은 규칙. 근거는 run의 고정 버전·asOf로 인용 읽기를 해서 기업 개요면 카탈로그, ZOOP 문서 구간이면 `zoop-docs`, 기사면 `articles.provider`(`CitedMcpSources`)이며 지금 인용할 수 없는 근거는 출처가 없어 보내지 않는다. 그 밖의 항목 종류도 보내지 않는다.
+- **뺀 부분**: 허용되지 않은 항목·경로는 **통째로**, 근거 ID는 결과와 항목·경로 단계의 목록에서 모두 뺀다. 맨 ID도 보내지 않는다. 결과에는 `withheld: {reason: "source_grant_denied", items, evidenceIds, paths}`로 개수만 남는다(아무것도 빼지 않았으면 없음). 원장의 `evidence_ids`와 `chat_tool_calls.result`도 보낸 것만 담으므로, 최종 답 검사와 다음 라운드의 도달 가능한 ID에도 뺀 것은 들어가지 않는다.
+- **판단 불가**: 레지스트리를 읽지 못하거나 근거 출처를 읽지 못하면 빈 허용이 아니라 호출 거부(`send_grants_unavailable`)다. 설정이 없거나 기동 때 레지스트리를 읽지 못하면 `/mcp`를 켠 기동 자체가 실패한다.
 
 ### 원장
 
@@ -99,7 +110,7 @@ MCP 호출도 `chat_tool_calls`에 기존 호출과 같은 상태(예약 → 실
 
 아래가 끝나기 전에는 로컬 합성 시험 밖에서 `ZOOP_CHAT_MCP_ENABLED`·`ZOOP_CHAT_AGENT_ENABLED`를 켜지 않는다.
 
-1. **model-send grant 검사.** hosted MCP 결과는 ai/service의 전송 gate를 거치지 않고 OpenAI로 간다. 결과 반환 전에 source/model-send grant(OpenAI Luna 수신자, `store=true` 목적 포함)를 검사해야 한다. 현재 챗봇 grant는 ai/service 쪽에만 있다.
+1. ~~**model-send grant 검사.**~~ 구현(3장 "모델 전송 gate"). 켜기 전에 운영자가 레지스트리에 `chat-agent` 목적·agent 수신자 grant와 `zoop-graph` source를 등록하고, OpenAI 보유 조건을 거버넌스 10장에 기록해야 한다.
 2. **예산 8/6/2·동시 4개(job 단위)·요청 캐시·job당 결과 1 MiB**(단계 2). 현재는 기존 attempt당 12회와 runner의 호출 3초·단계 10초, 승인 3라운드만 적용된다. rate limit은 인스턴스별이다. job 기한도 아직 기존 60초다.
 3. **승인 요청의 요구 매핑**: 지금은 결과를 run의 요구들이 공유한다. 요구별 인용 결속이 필요하면 승인 요청에 requirementIds를 받도록 계약을 넓힌다.
 4. **네트워크·운영**: HTTPS 인바운드 노출 범위, 공급자 출발지 제한 여부(IP allowlist만으로 인증하지 않음), 승인된 소량 live latency spike(실제 Responses·MCP 응답 형태 확인 포함).
@@ -111,9 +122,12 @@ MCP 호출도 `chat_tool_calls`에 기존 호출과 같은 상태(예약 → 실
 ```
 
 - `ChatMcpGrantsTest`: 발급·검증, 변조·잘림·다른 키, deadline 만료, 키 회전, subject scope(회원별 차이, 평문 회원 ID 없음), `portfolio.scope.read` 거부, 키 설정 오류(값 비노출).
-- `ChatMcpEndpointTest`: 실제 SDK servlet transport·server와 메모리 job 저장소로 401/403/413/429(헤더 공백 변형도 같은 창), `initialize`, grant별 `tools/list`, 승인된 호출 1회 실행과 원장 기록(`via=mcp`), 미승인·다른 target·다른 limit·재사용 거부, 다른 attempt·다른 subject·종료된 run 무조회, 승인 시 호출 상한, `result_too_large`의 원장 실패 기록.
+- `ChatMcpEndpointTest`: 실제 SDK servlet transport·server와 메모리 job 저장소로 401/403/413/429(헤더 공백 변형도 같은 창), `initialize`, grant별 `tools/list`, 승인된 호출 1회 실행과 원장 기록(`via=mcp`), 미승인·다른 target·다른 limit·재사용 거부, 다른 attempt·다른 subject·종료된 run 무조회, 승인 시 호출 상한, `result_too_large`의 원장 실패 기록, grant 없는 출처의 근거를 결과·원장에서 빼고 `withheld`로 표시, 레지스트리를 읽지 못하면 `send_grants_unavailable`.
+- `ChatSendGrantsTest`: `chat-agent` 규칙(비활성·rights·`model-send` 없음·목적·수신자·만료 거부), 매번 다시 읽어 철회 즉시 적용, 없음·형식 위반·추가 필드·중복 키·크기 초과 레지스트리는 전부 거부, 설정 검증.
+- `ChatMcpSendGateTest`: 출처별 항목·경로·근거 ID 제외와 개수, 그래프 grant 없으면 사건·관계·경로 제외, 모르는 항목 종류 제외, 레지스트리 판단 불가.
+- `CitedMcpSourcesTest`: 인용 종류별 출처(기사 공급자·카탈로그·ZOOP 문서), 인용할 수 없는 근거는 출처 없음, DB 오류는 판단 불가.
 - `ChatExecutorPostgresTest`(PostgreSQL): `attach`와 fence, 예약 호출 조회(`findReservedToolCall`)의 기능·digest·attempt 일치와 시작 뒤 소멸, `chat_tool_calls.result` 보관(성공만)과 크기·상태 제약.
-- `ChatMcpConfigurationTest`: 기본 꺼짐이면 bean·경로 없음, 켜고 키가 없으면 기동 거절, 키가 있으면 `/mcp` 등록, agent 경로의 모델 단계 요구, `/mcp` 없이 agent만 켜면 기동 거절.
+- `ChatMcpConfigurationTest`: 기본 꺼짐이면 bean·경로 없음, 켜고 키나 읽을 수 있는 grant 레지스트리가 없으면 기동 거절(경로 비노출), 둘 다 있으면 `/mcp` 등록, agent 경로의 모델 단계 요구, `/mcp` 없이 agent만 켜면 기동 거절.
 - `ChatMcpAgentTest`: 실제 MCP 도구 위의 승인 루프. 승인된 호출만 실행되고 결과가 원장에서 돌아옴, 예약 불가·허용 밖 도구 거부, 해석되지도 승인 결과에 나오지도 않은 target·섞인 target·잘못된 모양 거부와 승인 결과로 도달한 target 승인, 3라운드 뒤 마무리 거부와 끝없이 묻는 run의 실패, 시간 부족 시 마무리, 종료된 run에서 중단, grant의 도구·만료.
 - `ChatAgentPathEngineTest`(orchestrator): agent 경로를 타는 계획과 direct에 남는 계획(의존 단계·일반 개념·노출 안 된 도구), 실행 결과에 없는 근거 인용의 `validation_failed`, 단계 시간 부족의 `deadline_guard`.
 
