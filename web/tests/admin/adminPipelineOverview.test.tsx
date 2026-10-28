@@ -12,7 +12,7 @@ import {
   type FakeServer,
 } from '../support/fakeServer';
 import { renderRoutes } from '../support/renderRoutes';
-import { OVERVIEW, overview } from '../support/adminPipeline';
+import { OVERVIEW, overview, onOverview } from '../support/adminPipeline';
 
 // A-ADM-03 이슈 관제 개요 (FS058·FS059·FS063·FS067-01). 합성 계약 픽스처만 쓴다.
 const session: AdminSession = {
@@ -50,6 +50,8 @@ const metric = (label: string) =>
 beforeEach(() => {
   useAdminSessionStore.getState().setSession(session);
   server = createFakeServer();
+  // 탭 위 자동 검수 규칙과 기본 후보 탭은 빈 응답. 개요는 테스트마다 따로 등록한다.
+  onOverview(server);
   server.on('GET', '/api/v1/admin/graph/versions', () =>
     json({
       items: [],

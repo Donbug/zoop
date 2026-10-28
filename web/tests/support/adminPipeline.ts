@@ -77,9 +77,25 @@ export const overview = (
   ...patch,
 });
 
-/** 이슈 관제 화면을 여는 테스트가 개요 요청을 처리하도록 등록한다. */
+export const RULES = '/api/v1/admin/pipeline/rules';
+
+/**
+ * 이슈 관제 화면을 여는 테스트가 늘 보이는 영역의 요청을 처리하도록 등록한다.
+ * 개요·자동 검수 규칙(탭 위)과 기본 탭인 후보 목록이다. 규칙·후보는 빈 응답이며, 테스트가 나중에 등록하면 덮인다.
+ */
 export function onOverview(server: FakeServer, body = overview()) {
   server.on('GET', OVERVIEW, () => json(body));
+  server.on('GET', RULES, () =>
+    json({ items: [], asOf: '2026-10-28T01:00:00Z', nextCursor: null }),
+  );
+  server.on('GET', CANDIDATES, () =>
+    json({
+      items: [],
+      nextCursor: null,
+      counts: {},
+      asOf: '2026-10-28T01:00:00Z',
+    }),
+  );
 }
 
 export const candidate = (

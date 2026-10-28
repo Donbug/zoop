@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { getAnalysisCandidate } from '@/apis/admin/pipeline';
 import {
   Empty,
@@ -9,6 +9,7 @@ import {
   Table,
 } from '@/components/admin/common/AdminUi';
 import { BUTTON, LINK, TD, TH } from '@/components/admin/common/adminStyles';
+import CandidateDecisionForm from '@/components/admin/pipeline/CandidateDecisionForm';
 import {
   candidateGraphLabel,
   candidateStatusLabel,
@@ -16,7 +17,11 @@ import {
   relationLabel,
 } from '@/components/admin/pipeline/candidateLabels';
 import { useAsyncData } from '@/hooks/useAsyncData';
-import type { CandidateDetail } from '@/types/admin/pipeline';
+import type {
+  CandidateDecisionResponse,
+  CandidateDetail,
+  CandidateRelation,
+} from '@/types/admin/pipeline';
 import { formatKst } from '@/util/format';
 
 const reasonTitle = (detail: CandidateDetail) =>
@@ -28,16 +33,25 @@ const reasonTitle = (detail: CandidateDetail) =>
 
 // A-ADM-03 후보 상세 (FS067-02, getAnalysisCandidate)
 // - 프로토타입 candidates.tsx의 CandidateDetail을 옮겼다. 원문 인용은 앱이 검증한 구간만 보이고, 검증에 실패하면 quote가 null이다.
-// - 허용·거부 결정 폼은 결정 API(#357)가 생기면 이 자리에 붙인다.
+// - 결정은 관계마다 승인·거부한다(decideAnalysisCandidate). 승인은 HOLD 후보의 아직 결정하지 않은 관계만,
+//   거부는 폐기 판정이 아닌 후보의 아직 결정하지 않은 관계만 할 수 있다. 확정된 결정의 번복은 계약 범위 밖이다.
 export default function CandidateDetailPanel({
   id,
   onClose,
+  onDecided,
 }: {
   id: string;
   onClose: () => void;
+  /** 결정이 끝나면 목록의 판정·검수 열을 다시 읽게 한다. */
+  onDecided?: () => void;
 }) {
   const load = useCallback(() => getAnalysisCandidate(id), [id]);
   const detail = useAsyncData(load);
+  const [target, setTarget] = useState<{
+    relationId: string;
+    decision: 'allow' | 'reject';
+  } | null>(null);
+  const [message, setMessage] = useState('');
 
   if (detail.status === 'loading')
     return <Loading>후보 상세를 불러오고 있어요</Loading>;
@@ -51,6 +65,29 @@ export default function CandidateDetailPanel({
     );
 
   const c = detail.data;
+  const canAllow = (relation: CandidateRelation) =>
+    c.active &&
+    c.status === 'HOLD' &&
+    relation.decision === null &&
+    relation.evidenceCount > 0;
+  const canReject = (relation: CandidateRelation) =>
+    c.active && c.status !== 'REJECT' && relation.decision === null;
+  const decidable = c.relations.some(
+    (relation) => canAllow(relation) || canReject(relation),
+  );
+  const targetRelation = target
+    ? c.relations.find((relation) => relation.relationId === target.relationId)
+    : undefined;
+  function done(result: CandidateDecisionResponse) {
+    setMessage(
+      result.decision === 'approved'
+        ? '관계를 승인했어요. 다음 그래프 버전을 만들 때 반영돼요.'
+        : '관계를 거부했어요.',
+    );
+    setTarget(null);
+    detail.reload();
+    onDecided?.();
+  }
   const articles = new Map(
     c.articles.map((article) => [article.articleId, article]),
   );
@@ -113,10 +150,22 @@ export default function CandidateDetailPanel({
       )}
       {c.invalidationReason && <Note>비활성 사유: {c.invalidationReason}</Note>}
 
-      <Note>
-        허용·거부 결정은 준비 중이에요. 결정 API가 연결되면 이 자리에서
-        결정해요.
-      </Note>
+      {message && (
+        <p role="status" className="text-xs font-semibold">
+          {message}
+        </p>
+      )}
+      {!c.active ? (
+        <Note>비활성 후보는 결정할 수 없어요.</Note>
+      ) : c.status === 'REJECT' ? (
+        <Note>폐기 판정 후보는 결정할 수 없어요.</Note>
+      ) : c.relations.length === 0 ? (
+        <Note>결정할 관계가 없어요.</Note>
+      ) : (
+        decidable && (
+          <Note>아래 연결 관계에서 관계마다 승인하거나 거부해요.</Note>
+        )
+      )}
 
       <Section title="원문 인용">
         {c.evidence.length === 0 ? (
@@ -179,6 +228,7 @@ export default function CandidateDetailPanel({
                 <th className={TH}>대상</th>
                 <th className={`${TH} text-right`}>근거</th>
                 <th className={TH}>사용자 그래프</th>
+                <th className={TH}>검수</th>
               </tr>
             </thead>
             <tbody>
@@ -196,10 +246,58 @@ export default function CandidateDetailPanel({
                   <td className={TD}>
                     {relation.onUserGraph ? '표시 중' : '표시 안 함'}
                   </td>
+                  <td className={TD}>
+                    {relation.decision ? (
+                      decisionLabel[relation.decision.decision]
+                    ) : (
+                      <span className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          className={BUTTON}
+                          disabled={!canAllow(relation) || target !== null}
+                          aria-label={`${relation.source} → ${relation.target} 관계 승인`}
+                          onClick={() => {
+                            setMessage('');
+                            setTarget({
+                              relationId: relation.relationId,
+                              decision: 'allow',
+                            });
+                          }}
+                        >
+                          승인
+                        </button>
+                        <button
+                          type="button"
+                          className={BUTTON}
+                          disabled={!canReject(relation) || target !== null}
+                          aria-label={`${relation.source} → ${relation.target} 관계 거부`}
+                          onClick={() => {
+                            setMessage('');
+                            setTarget({
+                              relationId: relation.relationId,
+                              decision: 'reject',
+                            });
+                          }}
+                        >
+                          거부
+                        </button>
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </Table>
+          {target && targetRelation && (
+            <CandidateDecisionForm
+              key={`${target.relationId}:${target.decision}`}
+              candidateId={c.candidateId}
+              relation={targetRelation}
+              decision={target.decision}
+              onCancel={() => setTarget(null)}
+              onDone={done}
+            />
+          )}
         </Section>
       )}
 

@@ -299,6 +299,7 @@ function CandidatesSession() {
             key={selectedId}
             id={selectedId}
             onClose={() => select(null)}
+            onDecided={() => candidates.reload({ quiet: true })}
           />
         ) : (
           <Empty>

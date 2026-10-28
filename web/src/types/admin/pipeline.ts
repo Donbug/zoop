@@ -197,3 +197,21 @@ export type CandidateFilters = {
   published?: boolean;
   q?: string;
 };
+
+/** DecisionRequest. 결정은 관계 단위이고, 상세에서 본 그 관계의 revision·AI 원천을 함께 보낸다. */
+export type CandidateDecisionRequest = {
+  decision: 'allow' | 'reject';
+  reason: string;
+  relationId: string;
+  expectedRevision: number;
+  expectedSourceVersion: string;
+  expectedSourceRevision: string;
+};
+
+/** DecisionResponse. 승인은 공개가 아니라서 publicChanged는 항상 false다. */
+export type CandidateDecisionResponse = {
+  candidateId: string;
+  decision: 'approved' | 'rejected';
+  revision: number;
+  publicChanged: false;
+};

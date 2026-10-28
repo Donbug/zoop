@@ -107,7 +107,7 @@ function headersOf(pathEnd: string) {
     .map(([, init]) => new Headers(init?.headers));
 }
 
-function open(path = '/admin/pipeline') {
+function open(path = '/admin/pipeline?tab=versions') {
   return renderRoutes(
     [
       {
@@ -279,7 +279,7 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeTruthy();
 
     await user.click(screen.getByRole('tab', { name: '후보' }));
-    expect(location()).toBe('/admin/pipeline?tab=candidates');
+    expect(location()).toBe('/admin/pipeline');
     expect(
       await screen.findByText('후보 목록을 불러오지 못했어요'),
     ).toBeTruthy();

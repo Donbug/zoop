@@ -125,7 +125,7 @@ describe('A-ADM-03 후보 탭 · 67', () => {
     expect(screen.getByText(/비활성 2건/)).toBeTruthy();
   });
 
-  test('후보를 고르면 원문 인용·연결 관계·검증 판정을 보여 주고 주소에 남긴다. 결정 버튼은 아직 없다', async () => {
+  test('후보를 고르면 원문 인용·연결 관계·검증 판정과 관계별 결정 버튼을 보여 주고 주소에 남긴다', async () => {
     const { user, location } = open();
 
     await user.click(
@@ -151,10 +151,20 @@ describe('A-ADM-03 후보 탭 · 67', () => {
         .getByRole('link', { name: '원문 기사 ↗' })
         .getAttribute('rel'),
     ).toBe('noopener noreferrer');
-    expect(aside.textContent).toContain('허용·거부 결정은 준비 중이에요');
     expect(
-      within(aside).queryByRole('button', { name: /허용|거부/ }),
-    ).toBeNull();
+      (
+        within(aside).getByRole('button', {
+          name: '삼성전자 → 미국 공장 증설 관계 승인',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
+    expect(
+      (
+        within(aside).getByRole('button', {
+          name: '삼성전자 → 미국 공장 증설 관계 거부',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
 
     await user.click(
       within(aside).getByRole('button', { name: '후보 상세 닫기' }),
@@ -289,4 +299,138 @@ describe('A-ADM-03 후보 탭 · 67', () => {
     expect(screen.queryByRole('table', { name: '후보 목록' })).toBeNull();
     expect(screen.getByText('후보를 불러오고 있어요')).toBeTruthy();
   });
+});
+
+describe('A-ADM-03 후보 결정 · 67 (decideAnalysisCandidate)', () => {
+  const DECISION = `${CANDIDATE}/decision`;
+  const approve = '삼성전자 → 미국 공장 증설 관계 승인';
+  const reject = '삼성전자 → 미국 공장 증설 관계 거부';
+
+  async function openDetail() {
+    const view = open('/admin/pipeline?candidate=cand-1');
+    const aside = screen.getByRole('complementary', { name: '후보 상세' });
+    await within(aside).findByRole('button', { name: approve });
+    return { ...view, aside };
+  }
+
+  test('사유를 받아 상세에서 본 관계 revision·AI 원천과 함께 승인을 보내고, 상세와 목록을 다시 읽는다', async () => {
+    server.on('POST', DECISION, () =>
+      json({
+        candidateId: 'cand-1',
+        decision: 'approved',
+        revision: 2,
+        publicChanged: false,
+      }),
+    );
+    const { user, aside } = await openDetail();
+    const listBefore = listCalls().length;
+
+    await user.click(within(aside).getByRole('button', { name: approve }));
+    const form = within(aside).getByRole('form', { name: '관계 승인' });
+    expect(form.textContent).toContain('승인해도 바로 공개되지 않고');
+    await user.click(within(form).getByRole('button', { name: '승인하기' }));
+    expect(within(form).getByRole('alert').textContent).toContain(
+      '사유를 1~500자로 입력해 주세요.',
+    );
+    expect(server.calls('POST', DECISION)).toHaveLength(0);
+
+    server.on('GET', CANDIDATE, ({ params }) =>
+      json(
+        candidateDetail(params.candidateId, {
+          relations: [
+            {
+              ...candidateDetail().relations[0],
+              revision: 2,
+              decision: {
+                id: 9,
+                targetType: 'relation',
+                targetId: 'rel-1',
+                decision: 'allow',
+                reason: '공시 확인',
+                adminEmail: 'admin@zoop.test',
+                decidedAt: '2026-10-28T02:00:00Z',
+                revision: 2,
+                origin: 'admin',
+              },
+            },
+          ],
+        }),
+      ),
+    );
+    await user.type(within(form).getByLabelText('승인 사유'), ' 공시 확인 ');
+    await user.click(within(form).getByRole('button', { name: '승인하기' }));
+
+    const [call] = server.calls('POST', DECISION);
+    expect(call.params.candidateId).toBe('cand-1');
+    expect(call.body).toEqual({
+      decision: 'allow',
+      reason: '공시 확인',
+      relationId: 'rel-1',
+      expectedRevision: 1,
+      expectedSourceVersion: 'src-v3',
+      expectedSourceRevision: 'r1',
+    });
+    expect(call.headers.get('Idempotency-Key')).toBeTruthy();
+    expect(call.headers.get('X-CSRF-Token')).toBe('test-admin-csrf');
+    expect(
+      await within(aside).findByText(
+        '관계를 승인했어요. 다음 그래프 버전을 만들 때 반영돼요.',
+      ),
+    ).toBeTruthy();
+    await waitFor(() =>
+      expect(
+        within(aside).getByRole('table', { name: '연결 관계' }).textContent,
+      ).toContain('허용'),
+    );
+    expect(within(aside).queryByRole('button', { name: approve })).toBeNull();
+    expect(listCalls().length).toBeGreaterThan(listBefore);
+  });
+
+  test('그 사이 관계가 바뀌었으면(409) 사유를 남긴 채 상세를 새로 읽으라고 알린다', async () => {
+    server.on('POST', DECISION, () => apiError(409, 'REVISION_CONFLICT'));
+    const { user, aside } = await openDetail();
+
+    await user.click(within(aside).getByRole('button', { name: reject }));
+    const form = within(aside).getByRole('form', { name: '관계 거부' });
+    await user.type(within(form).getByLabelText('거부 사유'), '오보');
+    await user.click(within(form).getByRole('button', { name: '거부하기' }));
+
+    expect((await within(form).findByRole('alert')).textContent).toContain(
+      '상세를 새로 읽고 다시 확인해 주세요.',
+    );
+    expect(
+      (within(form).getByLabelText('거부 사유') as HTMLTextAreaElement).value,
+    ).toBe('오보');
+    expect(server.calls('POST', DECISION)[0].body).toMatchObject({
+      decision: 'reject',
+      relationId: 'rel-1',
+    });
+  });
+
+  test.each([
+    ['ALLOW', true, false, null],
+    ['REJECT', true, true, '폐기 판정 후보는 결정할 수 없어요.'],
+    ['HOLD', false, true, '비활성 후보는 결정할 수 없어요.'],
+  ] as const)(
+    '%s 판정(active=%s)이면 승인할 수 없고, 거부 불가=%s',
+    async (status, active, rejectDisabled, note) => {
+      server.on('GET', CANDIDATE, ({ params }) =>
+        json(candidateDetail(params.candidateId, { status, active })),
+      );
+      open('/admin/pipeline?candidate=cand-1');
+      const aside = screen.getByRole('complementary', { name: '후보 상세' });
+      const allowButton = (await within(aside).findByRole('button', {
+        name: approve,
+      })) as HTMLButtonElement;
+      expect(allowButton.disabled).toBe(true);
+      expect(
+        (
+          within(aside).getByRole('button', {
+            name: reject,
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(rejectDisabled);
+      if (note) expect(aside.textContent).toContain(note);
+    },
+  );
 });

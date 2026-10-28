@@ -49,7 +49,7 @@ const rule = (id = 'single-source@1', enabled = false): PublicationRule => ({
   history: [],
 });
 let server: FakeServer;
-function open(path = '/admin/pipeline?tab=rules') {
+function open(path = '/admin/pipeline') {
   return renderRoutes(
     [
       {
@@ -173,7 +173,7 @@ describe('A-ADM-03 자동 검수 규칙 · 66', () => {
     expect(request.headers.get('X-CSRF-Token')).toBe('test-admin-csrf');
     expect(request.headers.has('Idempotency-Key')).toBe(false);
   });
-  test('요청 중 다른 규칙과 재제출 잠금·탭 숨김 뒤 결과 유지·idempotent 안내', async () => {
+  test('요청 중 다른 규칙과 재제출 잠금·탭을 옮겨도 규칙은 탭 위에 남아 결과 유지·idempotent 안내', async () => {
     const pending = deferred<Response>();
     server.on('PUT', SWITCH, () => pending.promise);
     const { user, location } = open();
@@ -191,8 +191,8 @@ describe('A-ADM-03 자동 검수 규칙 · 66', () => {
     ).toBe(true);
     fireEvent.submit(screen.getByRole('form'));
     expect(server.calls('PUT', SWITCH)).toHaveLength(1);
-    await user.click(screen.getByRole('tab', { name: '후보' }));
-    expect(location()).toContain('tab=candidates');
+    await user.click(screen.getByRole('tab', { name: '작업' }));
+    expect(location()).toContain('tab=jobs');
     await act(async () =>
       pending.resolve(
         json({
@@ -202,7 +202,6 @@ describe('A-ADM-03 자동 검수 규칙 · 66', () => {
         }),
       ),
     );
-    await user.click(screen.getByRole('tab', { name: '규칙' }));
     expect(
       await screen.findByText(
         '이미 같은 상태예요. 다음 그래프 버전부터 반영돼요.',
