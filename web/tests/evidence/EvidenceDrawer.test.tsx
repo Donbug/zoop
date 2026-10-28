@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -26,13 +27,27 @@ const target = {
   },
 };
 
-function Harness({ onViewOnMap = vi.fn() }) {
+function Harness({
+  onViewOnMap = vi.fn(),
+  result = 'edges',
+}: {
+  onViewOnMap?: (selection: unknown) => void;
+  result?: 'edges' | 'event' | 'none';
+}) {
+  // 지도 쪽 결과를 흉내 낸다: 고른 근거가 있으면 result, 없으면 null.
+  const [mapResult, setMapResult] = useState<typeof result | null>(null);
   return (
     <>
       <button onClick={() => useGraphUiStore.getState().openEvidence(target)}>
         근거 열기
       </button>
-      <EvidenceDrawer onViewOnMap={onViewOnMap} />
+      <EvidenceDrawer
+        mapResult={mapResult}
+        onViewOnMap={(selection) => {
+          onViewOnMap(selection);
+          setMapResult(selection ? result : null);
+        }}
+      />
     </>
   );
 }
@@ -82,6 +97,31 @@ describe('D-GRP-05 · evidence drawer states and interactions', () => {
     expect(opener.inert).not.toBe(true);
     expect(document.activeElement).toBe(opener);
   });
+  it('D-GRP-05 15번 강조 중에는 지도를 어둡게 덮지 않고, 지도에 없으면 알리고 눌린 상태로 두지 않는다', async () => {
+    mocked.mockImplementation(async (id) => createMockEvidence(id));
+    const view = render(<Harness result="none" />);
+    await userEvent.click(screen.getByRole('button', { name: '근거 열기' }));
+    await screen.findByRole('dialog', { name: '근거 문서' });
+    const [first] = screen.getAllByRole('button', { name: '◇ 지도에서 보기' });
+    await userEvent.click(first);
+    expect(screen.getByRole('status').textContent).toContain(
+      '이 근거와 연결된 선이나 사건이 지금 지도에 없어요.',
+    );
+    expect(first.getAttribute('aria-pressed')).toBe('false');
+    expect(view.container.querySelector('[class~="bg-black/35"]')).toBeTruthy();
+    view.unmount();
+    useGraphUiStore.getState().closeEvidence();
+
+    render(<Harness result="edges" />);
+    await userEvent.click(screen.getByRole('button', { name: '근거 열기' }));
+    await screen.findByRole('dialog', { name: '근거 문서' });
+    await userEvent.click(
+      screen.getAllByRole('button', { name: '◇ 지도에서 보기' })[0],
+    );
+    expect(document.querySelector('[class~="bg-black/35"]')).toBeNull();
+    expect(screen.queryByText(/지금 지도에 없어요/)).toBeNull();
+  });
+
   it('shows source, publication time, captured quotes and link availability', async () => {
     mocked.mockImplementation(async (id) => createMockEvidence(id));
     const onViewOnMap = vi.fn();
@@ -106,8 +146,14 @@ describe('D-GRP-05 · evidence drawer states and interactions', () => {
       name: '◇ 지도에서 보기',
     });
     await userEvent.click(mapButtons[0]);
-    expect(onViewOnMap).toHaveBeenCalledWith('mock-issue-1');
+    expect(onViewOnMap).toHaveBeenCalledWith({
+      evidenceId: 'mock-evidence-1',
+      eventIds: ['mock-issue-1'],
+    });
     expect(mapButtons[0].getAttribute('aria-pressed')).toBe('true');
+    await userEvent.click(mapButtons[0]);
+    expect(onViewOnMap).toHaveBeenLastCalledWith(null);
+    expect(mapButtons[0].getAttribute('aria-pressed')).toBe('false');
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(

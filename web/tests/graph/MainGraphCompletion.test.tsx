@@ -14,6 +14,7 @@ import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import { useAiChatStore } from '@/stores/useAiChatStore';
 import { focusNeighborhood } from '@/components/graph/graph-model';
 import { createMockGraph } from '@/mocks/graph/response';
+import { createMockEvidence } from '@/mocks/evidence/fixture';
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { GraphResponse } from '@/types/map/graph';
 
@@ -30,6 +31,8 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
     onSelect,
     onTutorialAction,
     tutorialTargetId,
+    highlightedEdgeIds,
+    isolateSelection,
   }: {
     tutorialTargetId?: string;
     onTutorialAction?: (action: 'pan' | 'zoom') => void;
@@ -39,6 +42,8 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
     focusHops: 1 | 2;
     memoryOwner: string;
     onSelect: (id: string) => void;
+    highlightedEdgeIds: string[];
+    isolateSelection?: boolean;
   }) => (
     <div
       data-testid="graph-canvas"
@@ -46,6 +51,8 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
       data-focus={focusId ?? ''}
       data-hops={focusHops}
       data-view-owner={memoryOwner}
+      data-highlighted={highlightedEdgeIds.join(',')}
+      data-isolate={isolateSelection ? 'yes' : 'no'}
     >
       {onTutorialAction && (
         <>
@@ -156,6 +163,121 @@ it('D-GRP-07 restores a pair from URL, lets the user repick and closes without c
   expect(new URLSearchParams(router.state.location.search).get('mode')).toBe(
     'all',
   );
+});
+
+it('D-GRP-07 selects a path company and leaves path and focus mode', async () => {
+  anonymous();
+  vi.mocked(getGraph).mockResolvedValue(
+    createMockGraph({ mode: 'all', personalFilter: 'all' }),
+  );
+  const router = setup(
+    '/?mode=all&path=KRX%3A005930%2CNASDAQ%3ANVDA&focus=mock-issue-1&hops=2',
+  );
+  const panel = await screen.findByRole('complementary', {
+    name: '두 기업 사이 경로',
+  });
+  await userEvent.click(
+    await within(panel).findByRole('button', { name: '삼성전자' }),
+  );
+  const params = new URLSearchParams(router.state.location.search);
+  expect(params.get('select')).toBe('node:KRX:005930');
+  expect(params.has('path')).toBe(false);
+  expect(params.has('focus')).toBe(false);
+});
+
+it('D-GRP-05 highlights only edges supported by the selected evidence and clears on close', async () => {
+  anonymous();
+  const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  vi.mocked(getGraph).mockResolvedValue(graph);
+  vi.spyOn(evidenceApi, 'getEvidence').mockImplementation(async (id) =>
+    createMockEvidence(id),
+  );
+  setup();
+  await screen.findByTestId('graph-canvas');
+  act(() =>
+    useGraphUiStore.getState().openEvidence({
+      kind: 'issue',
+      id: 'mock-issue-1',
+      label: '사건',
+      evidenceIds: ['mock-evidence-1'],
+      mapContext: {
+        graphVersion: graph.metadata.graphVersion ?? undefined,
+        asOf: graph.metadata.asOf,
+        url: '/',
+      },
+    }),
+  );
+  await userEvent.click(
+    await screen.findByRole('button', { name: '◇ 지도에서 보기' }),
+  );
+  const expected = graph.edges
+    .filter((edge) => edge.evidenceIds.includes('mock-evidence-1'))
+    .map((edge) => edge.id);
+  expect(expected.length).toBeGreaterThan(0);
+  expect(
+    screen.getByTestId('graph-canvas').getAttribute('data-highlighted'),
+  ).toBe(expected.join(','));
+  await userEvent.click(screen.getByRole('button', { name: '근거 창 닫기' }));
+  expect(
+    screen.getByTestId('graph-canvas').getAttribute('data-highlighted'),
+  ).toBe('');
+  vi.restoreAllMocks();
+});
+
+it('D-GRP-05 isolates the related event when no edge has that evidence', async () => {
+  anonymous();
+  const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  graph.edges = graph.edges.map((edge) => ({ ...edge, evidenceIds: [] }));
+  vi.mocked(getGraph).mockResolvedValue(graph);
+  vi.spyOn(evidenceApi, 'getEvidence').mockImplementation(async (id) =>
+    createMockEvidence(id),
+  );
+  setup();
+  await screen.findByTestId('graph-canvas');
+  act(() =>
+    useGraphUiStore.getState().openEvidence({
+      kind: 'issue',
+      id: 'mock-issue-1',
+      label: '사건',
+      evidenceIds: ['mock-evidence-1'],
+      mapContext: {
+        graphVersion: graph.metadata.graphVersion ?? undefined,
+        asOf: graph.metadata.asOf,
+        url: '/',
+      },
+    }),
+  );
+  await userEvent.click(
+    await screen.findByRole('button', { name: '◇ 지도에서 보기' }),
+  );
+  expect(
+    screen.getByTestId('graph-canvas').getAttribute('data-highlighted'),
+  ).toBe('');
+  expect(screen.getByTestId('graph-canvas').getAttribute('data-isolate')).toBe(
+    'yes',
+  );
+  vi.restoreAllMocks();
+});
+
+it('D-GRP-01 shows help and event focus controls', async () => {
+  anonymous();
+  vi.mocked(getGraph).mockResolvedValue(
+    createMockGraph({ mode: 'all', personalFilter: 'all' }),
+  );
+  const router = setup('/?mode=all&focus=mock-issue-1&hops=1');
+  expect(await screen.findByRole('group', { name: /중심 보기/ })).toBeTruthy();
+  await userEvent.click(
+    screen.getByRole('radio', { name: '2단계: 이웃의 이웃까지' }),
+  );
+  expect(new URLSearchParams(router.state.location.search).get('hops')).toBe(
+    '2',
+  );
+  await userEvent.click(screen.getByRole('button', { name: '조작 도움말' }));
+  expect(
+    screen.getByRole('region', { name: '지도 조작 도움말' }).textContent,
+  ).toContain('Shift+Enter');
+  await userEvent.keyboard('{Escape}');
+  expect(screen.queryByRole('region', { name: '지도 조작 도움말' })).toBeNull();
 });
 
 it('D-BRF-04 회차 지도를 최신 main 지도에 연결하고 현재 지도로 복귀한다', async () => {
@@ -915,4 +1037,36 @@ it('D-GRP-01/01b restores mode selection, consumes prefetched data once, and ret
   expect(new URLSearchParams(router.state.location.search).get('select')).toBe(
     'node:NASDAQ:NVDA',
   );
+});
+
+it('D-GRP-05 15번 근거 강조는 보고 있던 중심 보기(1·2단계)를 풀지 않는다', async () => {
+  anonymous();
+  const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  vi.mocked(getGraph).mockResolvedValue(graph);
+  vi.spyOn(evidenceApi, 'getEvidence').mockImplementation(async (id) =>
+    createMockEvidence(id),
+  );
+  setup('/?mode=all&focus=mock-issue-1&hops=2');
+  await screen.findByTestId('graph-canvas');
+  act(() =>
+    useGraphUiStore.getState().openEvidence({
+      kind: 'issue',
+      id: 'mock-issue-1',
+      label: '사건',
+      evidenceIds: ['mock-evidence-1'],
+      mapContext: {
+        graphVersion: graph.metadata.graphVersion ?? undefined,
+        asOf: graph.metadata.asOf,
+        url: '/',
+      },
+    }),
+  );
+  await userEvent.click(
+    await screen.findByRole('button', { name: '◇ 지도에서 보기' }),
+  );
+  const canvas = screen.getByTestId('graph-canvas');
+  expect(canvas.getAttribute('data-highlighted')).not.toBe('');
+  expect(canvas.getAttribute('data-focus')).toBe('mock-issue-1');
+  expect(canvas.getAttribute('data-hops')).toBe('2');
+  vi.restoreAllMocks();
 });

@@ -58,6 +58,8 @@ export default function GraphCanvas({
   onFlowChange,
   highlightedEdgeIds = noHighlightedEdges,
   selectedEdgeId = null,
+  isolateSelection = false,
+  evidenceMode = false,
   onSelectEdge,
   connectionPath = false,
   memoryOwner = 'public',
@@ -93,6 +95,10 @@ export default function GraphCanvas({
   onFlowChange?: (flow: boolean) => void;
   highlightedEdgeIds?: string[];
   selectedEdgeId?: string | null;
+  /** 근거에 연결선이 없을 때 사건만 강조한다. */
+  isolateSelection?: boolean;
+  /** 근거 강조가 활성화되면 이전 hover가 무관한 연결을 강조하지 않는다. */
+  evidenceMode?: boolean;
   onSelectEdge?: (id: string) => void;
   connectionPath?: boolean;
   memoryOwner?: string;
@@ -192,8 +198,8 @@ export default function GraphCanvas({
           }
         await applyGraphReading(graph, base, data, {
           zoom: graph.getZoom(),
-          anchor: hovered.current ?? selected,
-          edge: hoveredEdge.current ?? selectedEdgeId,
+          anchor: evidenceMode ? selected : (hovered.current ?? selected),
+          edge: evidenceMode ? null : (hoveredEdge.current ?? selectedEdgeId),
           focus: focusId,
           path,
         });
@@ -301,7 +307,7 @@ export default function GraphCanvas({
       );
       // 마우스를 올린 노드가 우선이고, 없으면 클릭해 선택한 노드의 연결을 계속 강조한다.
       const anchor =
-        hovered.current ??
+        (evidenceMode ? null : hovered.current) ??
         (selected && nodeKinds.has(selected) ? selected : null);
       const active =
         anchor &&
@@ -311,7 +317,7 @@ export default function GraphCanvas({
           : null;
       const relatedNodes = new Set(active ? [active] : []);
       const relatedEdges = new Set<string>();
-      if (active) {
+      if (active && !isolateSelection) {
         for (const edge of rendered.edges ?? []) {
           const source = String(edge.source);
           const target = String(edge.target);
@@ -676,6 +682,8 @@ export default function GraphCanvas({
             .filter((edge) => highlightedEdgeIds.includes(edge.id))
             .flatMap((edge) => [edge.source, edge.target]),
         );
+        // 근거에 연결선이 없어 사건만 강조할 때도 범례로 숨긴 사건을 드러낸다(15번).
+        if (isolateSelection && selected) pathNodes.add(selected);
         // 배치가 바뀌면(포커스 진입·해제, 흐름 순 켜기·끄기) 이전 위치를 유지하지 않고 새 배치 전체를 화면에 맞춘다.
         if (arrangement !== lastArrangement.current) {
           lastArrangement.current = arrangement;
@@ -868,6 +876,8 @@ export default function GraphCanvas({
     tutorialCameraEnabled,
     tutorialShowNeighborhood,
     selectedEdgeId,
+    isolateSelection,
+    evidenceMode,
     focusId,
     focusHops,
     focusLayout,

@@ -15,6 +15,8 @@ import GraphIcon from '@/components/graph/GraphIcon';
 import GraphTutorial from '@/components/graph/GraphTutorial';
 import { tutorialTarget } from '@/components/graph/tutorial/tutorial-target';
 import GraphFocusControls from '@/components/graph/GraphFocusControls';
+import GraphHelp from '@/components/graph/GraphHelp';
+import CompanyLogo from '@/components/common/CompanyLogo';
 import CompanyPathPanel from '@/components/graph/CompanyPathPanel';
 import { companyPath } from '@/components/graph/company-path';
 import ImpactPathPanel from '@/components/graph/ImpactPathPanel';
@@ -157,9 +159,13 @@ function MapWorkspace({
   const modeSequence = useRef(0);
   const [switching, setSwitching] = useState<MapMode | null>(null);
   const [transitionNotice, setTransitionNotice] = useState('');
-  const evidenceOpen = useGraphUiStore((state) =>
-    Boolean(state.evidenceTarget),
-  );
+  const evidenceTarget = useGraphUiStore((state) => state.evidenceTarget);
+  const evidenceOpen = Boolean(evidenceTarget);
+  const [evidenceSelection, setEvidenceSelection] = useState<{
+    target: GraphTarget;
+    evidenceId: string;
+    eventIds: string[];
+  } | null>(null);
   const isolatedOpen = params.get('select') === 'bundle:isolated';
   const paramsKey = params.toString();
   useEffect(() => {
@@ -307,6 +313,30 @@ function MapWorkspace({
   const displayedPath =
     data && !loading && !error && pathFrom && pathTo
       ? companyPath(data, pathFrom, pathTo)
+      : null;
+  const activeEvidence =
+    evidenceSelection?.target === evidenceTarget &&
+    data &&
+    (!evidenceTarget?.mapContext?.graphVersion ||
+      evidenceTarget.mapContext.graphVersion === data.metadata.graphVersion) &&
+    (!evidenceTarget?.mapContext?.asOf ||
+      Date.parse(evidenceTarget.mapContext.asOf) ===
+        Date.parse(data.metadata.asOf))
+      ? evidenceSelection
+      : null;
+  const evidenceEdges =
+    activeEvidence && data
+      ? data.edges
+          .filter((edge) =>
+            edge.evidenceIds.includes(activeEvidence.evidenceId),
+          )
+          .map((edge) => edge.id)
+      : [];
+  const evidenceFallback =
+    activeEvidence && !evidenceEdges.length
+      ? (activeEvidence.eventIds.find((id) =>
+          data?.nodes.some((node) => node.id === id),
+        ) ?? null)
       : null;
   const edgeId = rawSelection?.startsWith('edge:')
     ? rawSelection.slice(5) || null
@@ -848,6 +878,7 @@ function MapWorkspace({
               </>
             )}
             <div className="relationship-toolbar-help">
+              <GraphHelp disabled={tutorialOpen} />
               <button
                 onClick={() => setNotice(notice === 'info' ? '' : 'info')}
                 aria-label="지도 데이터 안내"
@@ -938,15 +969,21 @@ function MapWorkspace({
                   });
                 }}
                 selectedId={
-                  pathFrom ?? selectedId ?? detailEventId ?? companyId
+                  activeEvidence
+                    ? evidenceFallback
+                    : (pathFrom ?? selectedId ?? detailEventId ?? companyId)
                 }
-                connectionPath={Boolean(pathFrom)}
+                connectionPath={Boolean(pathFrom) && !activeEvidence}
                 highlightedEdgeIds={
-                  pathFrom
-                    ? (displayedPath?.edgeIds ?? [])
-                    : impactEdges(data, impact.data ?? historicalImpact.data)
+                  activeEvidence
+                    ? evidenceEdges
+                    : pathFrom
+                      ? (displayedPath?.edgeIds ?? [])
+                      : impactEdges(data, impact.data ?? historicalImpact.data)
                 }
-                selectedEdgeId={edgeId}
+                selectedEdgeId={activeEvidence ? null : edgeId}
+                isolateSelection={Boolean(activeEvidence && evidenceFallback)}
+                evidenceMode={Boolean(activeEvidence)}
                 onSelectEdge={selectEdge}
                 onSelect={selectNode}
                 focusId={
@@ -975,13 +1012,23 @@ function MapWorkspace({
                 </p>
               </div>
             )}
-            {pathFrom && pathIsCollapsed && (
+            {pathFrom && (pathIsCollapsed || Boolean(displayedPath)) && (
               <div
                 role="group"
                 aria-label="지도 경로"
                 data-screen-id="D-GRP-07"
-                className="absolute top-2 right-2 left-2 z-20 flex flex-wrap items-center gap-1 rounded-lg border border-zoop-line bg-zoop-paper p-2 text-[13px] text-zoop-ink md:hidden"
+                className={`absolute top-2 left-2 z-20 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-1 rounded-lg border border-zoop-line bg-zoop-paper p-2 text-[13px] text-zoop-ink ${pathIsCollapsed ? '' : 'max-md:hidden'}`}
               >
+                {data?.nodes
+                  .filter((n) => n.id === pathFrom)
+                  .map((n) => (
+                    <CompanyLogo
+                      key={n.id}
+                      name={n.label}
+                      logoUrl={n.logoUrl}
+                      className="size-6 rounded-full bg-zoop-ink text-xs text-zoop-paper"
+                    />
+                  ))}
                 <strong className="min-w-0 flex-1 truncate">
                   {data?.nodes.find((n) => n.id === pathFrom)?.label ??
                     '첫 기업'}{' '}
@@ -992,9 +1039,28 @@ function MapWorkspace({
                     ? ` · ${displayedPath.edgeIds.length}단계`
                     : ''}
                 </strong>
+                {data?.nodes
+                  .filter((n) => n.id === pathTo)
+                  .map((n) => (
+                    <CompanyLogo
+                      key={n.id}
+                      name={n.label}
+                      logoUrl={n.logoUrl}
+                      className="size-6 rounded-full bg-zoop-ink text-xs text-zoop-paper"
+                    />
+                  ))}
                 <button
                   className="min-h-11 rounded border border-zoop-line px-2"
-                  onClick={() => setCollapsedPath(null)}
+                  onClick={() => {
+                    setCollapsedPath(null);
+                    requestAnimationFrame(() =>
+                      document
+                        .querySelector<HTMLElement>(
+                          'aside[aria-label="두 기업 사이 경로"] h2',
+                        )
+                        ?.focus(),
+                    );
+                  }}
                 >
                   경로 단계 보기
                 </button>
@@ -1006,7 +1072,7 @@ function MapWorkspace({
                 </button>
               </div>
             )}
-            {focusNode?.kind === 'company' && !pathFrom && (
+            {focusNode && !pathFrom && (
               <GraphFocusControls
                 label={focusNode.label}
                 hops={focusHops}
@@ -1167,6 +1233,14 @@ function MapWorkspace({
                       select: null,
                     })
                   }
+                  onSelectCompany={(id) =>
+                    updateQuery({
+                      path: null,
+                      focus: null,
+                      hops: null,
+                      select: `node:${id}`,
+                    })
+                  }
                   onEvidence={(id) => {
                     const node = data?.nodes.find((n) => n.id === id);
                     const evidenceIds = [
@@ -1319,13 +1393,6 @@ function MapWorkspace({
                     가상 데이터입니다.
                   </p>
                 )}
-                {notice === 'help' && (
-                  <p>
-                    빈 영역 드래그로 이동 · 휠 또는 +/−로 확대 · 맞춤 버튼으로
-                    전체 보기 · 기업 또는 사건 선택으로 상세 확인 · Tab으로 노드
-                    및 연결선 이동 · Enter로 선택 · Escape로 상세 닫기.
-                  </p>
-                )}
                 {data?.metadata.partial && (
                   <p>
                     일부 데이터를 조회하지 못했습니다.{' '}
@@ -1353,6 +1420,7 @@ function MapWorkspace({
             returnFocusTo={mapRegion}
           />
           <EvidenceDrawer
+            key={evidenceTarget?.id ?? 'closed'}
             onTutorialSkip={
               tutorialOpen && tutorialStep && tutorialStep < 5
                 ? () => {
@@ -1374,8 +1442,21 @@ function MapWorkspace({
               )
                 setTutorialStep(5);
             }}
-            onViewOnMap={(id) =>
-              updateQuery({ focus: id, hops: '1', path: null })
+            mapResult={
+              activeEvidence
+                ? evidenceEdges.length
+                  ? 'edges'
+                  : evidenceFallback
+                    ? 'event'
+                    : 'none'
+                : null
+            }
+            onViewOnMap={(selection) =>
+              setEvidenceSelection(
+                selection && evidenceTarget
+                  ? { target: evidenceTarget, ...selection }
+                  : null,
+              )
             }
           />
         </section>
