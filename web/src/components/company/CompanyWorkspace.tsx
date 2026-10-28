@@ -39,7 +39,7 @@ import {
 } from './detail-model';
 
 const workspaceClasses =
-  'company-workspace grid grid-cols-[200px_minmax(0,1fr)_280px] gap-3 m-0 overflow-visible text-zoop-ink max-[1000px]:grid-cols-[160px_minmax(0,1fr)] max-md:flex max-md:flex-col [&_section]:border-b [&_section]:border-zoop-line [&_section]:py-4 [&_h1]:text-[26px] [&_h1]:font-bold [&_h1]:tracking-[-0.035em] [&_h2]:mb-3 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:tracking-[-0.025em] [&_h3]:font-semibold [&_p]:text-xs [&_p]:text-zoop-muted [&_p]:leading-[1.7] [&_button]:cursor-pointer [&_button]:rounded-full [&_button]:border [&_button]:border-zoop-line [&_button]:bg-white [&_button]:min-h-[36px] [&_button]:px-4 [&_button]:py-2 [&_button]:text-xs! [&_button[aria-pressed=true]]:bg-zoop-ink [&_button[aria-pressed=true]]:text-white [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-default [&_a]:cursor-pointer [&_a]:px-[9px] [&_a]:py-1.5 [&_a]:text-xs [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-zoop-ink [&_nav]:my-3 [&_nav]:flex [&_nav]:flex-wrap [&_nav]:gap-1.5 [&_article]:border-b [&_article]:border-zoop-line [&_article]:py-3 [&_table]:w-full [&_table]:text-xs [&_table]:wrap-anywhere [&_[role=alert]]:text-zoop-alert [&_details]:my-3 [&_input]:max-w-full [&_input]:rounded-xl [&_input]:border [&_input]:border-zoop-line [&_input]:bg-white [&_input]:px-3 [&_input]:py-2 [&_input]:min-h-[38px] [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-2 [&_summary:focus-visible]:outline-zoop-ink max-md:[&_table]:block max-md:[&_table]:overflow-auto max-md:[&_section]:min-w-0 max-md:[&_section]:wrap-anywhere';
+  'company-workspace grid grid-cols-[200px_minmax(0,1fr)_280px] gap-3 m-0 overflow-visible text-zoop-ink max-[1000px]:grid-cols-[150px_minmax(0,1fr)_240px] max-md:flex max-md:flex-col [&_section]:border-b [&_section]:border-zoop-line [&_section]:py-4 [&_h1]:text-[26px] [&_h1]:font-bold [&_h1]:tracking-[-0.035em] [&_h2]:mb-3 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:tracking-[-0.025em] [&_h3]:font-semibold [&_p]:text-xs [&_p]:text-zoop-muted [&_p]:leading-[1.7] [&_button]:cursor-pointer [&_button]:rounded-full [&_button]:border [&_button]:border-zoop-line [&_button]:bg-white [&_button]:min-h-[36px] [&_button]:px-4 [&_button]:py-2 [&_button]:text-xs! [&_button[aria-pressed=true]]:bg-zoop-ink [&_button[aria-pressed=true]]:text-white [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-default [&_a]:cursor-pointer [&_a]:px-[9px] [&_a]:py-1.5 [&_a]:text-xs [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-zoop-ink [&_nav]:my-3 [&_nav]:flex [&_nav]:flex-wrap [&_nav]:gap-1.5 [&_article]:border-b [&_article]:border-zoop-line [&_article]:py-3 [&_table]:w-full [&_table]:text-xs [&_table]:wrap-anywhere [&_[role=alert]]:text-zoop-alert [&_details]:my-3 [&_input]:max-w-full [&_input]:rounded-xl [&_input]:border [&_input]:border-zoop-line [&_input]:bg-white [&_input]:px-3 [&_input]:py-2 [&_input]:min-h-[38px] [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-2 [&_summary:focus-visible]:outline-zoop-ink max-md:[&_table]:block max-md:[&_table]:overflow-auto max-md:[&_section]:min-w-0 max-md:[&_section]:wrap-anywhere';
 
 function Status<T>({
   resource,
@@ -145,6 +145,40 @@ const BUCKET_PAGE = 10;
 const bucketElementId = (key: string) =>
   `bucket-${key.replace(/[^\w-]/g, '_')}`;
 
+function ClockIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      className="size-3.5 shrink-0"
+    >
+      <circle cx="8" cy="8" r="6" />
+      <path d="M8 4.8V8l2.2 1.4" />
+    </svg>
+  );
+}
+/** 관계 그래프 영역은 svg를 그래프 크기로 늘리므로 아이콘의 크기·배경을 되돌린다. */
+function HomeIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-3.5! w-3.5! shrink-0 bg-transparent!"
+    >
+      <path d="M2.5 7.5 8 3l5.5 4.5M4 6.5V13h3V9.5h2V13h3V6.5" />
+    </svg>
+  );
+}
+
 /** 사건 시점 지도의 기준 시각. 현재 기준 시점보다 늦을 수 없다. */
 function eventReferenceTime(
   event: { eventTime: string | null; timePrecision: string } | null | undefined,
@@ -174,8 +208,19 @@ export default function CompanyWorkspace() {
   const asOf = params.get('asOf'),
     version = params.get('graphVersion'),
     eventId = params.get('event');
+  // D-COM-06: 타임라인 사건의 [이 당시 관계그래프 보기]로 고른 시각. 오른쪽 관계 그래프에만 쓰고
+  // 차트·타임라인의 기준 시점(asOf)은 그대로 둔다. 정확한 시각이 아니면 무시한다.
+  const requestedGraphAsOf = params.get('graphAsOf');
+  const graphAsOf =
+    requestedGraphAsOf && exactTime(requestedGraphAsOf)
+      ? requestedGraphAsOf
+      : null;
   const invalid = !!asOf && !exactTime(asOf);
   const snapshot = { asOf, graphVersion: version };
+  // 사건 시점 그래프는 그 시점의 공개 버전을 서버가 고르게 한다(버전을 보내지 않는다).
+  const graphSnapshot = graphAsOf
+    ? { asOf: graphAsOf, graphVersion: null }
+    : snapshot;
   const ready = !!asOf && !invalid;
   const versionOnly = versionOnlyAddress(asOf, version);
   const range = ready ? timeRange(asOf!, period) : {};
@@ -243,7 +288,7 @@ export default function CompanyWorkspace() {
     true,
   );
   const graph = useCompanyResource<GraphResponse>(
-    ready ? companyUrl(id, '/graph', { ...snapshot, depth }) : null,
+    ready ? companyUrl(id, '/graph', { ...graphSnapshot, depth }) : null,
   );
   const event = useCompanyResource<EventDetail>(
     ready && eventId
@@ -255,7 +300,7 @@ export default function CompanyWorkspace() {
       ? companyUrl(
           id,
           `/issues/${encodeURIComponent(eventId)}/impact`,
-          snapshot,
+          graphSnapshot,
         )
       : null,
   );
@@ -316,8 +361,9 @@ export default function CompanyWorkspace() {
     depth: String(depth),
     returnTo: `${location.pathname}${location.search}`,
   });
-  if (asOf) mapQuery.set('asOf', asOf);
-  if (version) mapQuery.set('graphVersion', version);
+  if (graphAsOf) mapQuery.set('asOf', graphAsOf);
+  else if (asOf) mapQuery.set('asOf', asOf);
+  if (version && !graphAsOf) mapQuery.set('graphVersion', version);
   if (eventId) mapQuery.set('event', eventId);
   // 사건의 관계는 그 사건 시각 기준 지도로 연다. 기업 상세의 기준 시점은 그대로 둔다.
   // 시각이 없으면 현재 기준 시점을 쓰고, 일 정밀도는 그날 한국 시간 끝까지로 본다.
@@ -338,7 +384,21 @@ export default function CompanyWorkspace() {
       ...(targetTab
         ? { tab: targetTab, docScope: 'event', document: null, evidence: null }
         : {}),
-      // 사건을 골라도 기준 시점은 바꾸지 않는다(D-COM-06 시점 이동 없음).
+      // 사건을 골라도 기준 시점은 바꾸지 않는다. 그래프 시점은 [이 당시 관계그래프 보기]로만 옮긴다.
+    });
+  }
+  /** D-COM-06: 사건 시각의 관계 그래프. 월·연 정밀도나 시각 미상, 현재 기준 시점과 같거나 늦은 사건은 옮기지 않는다. */
+  const eventGraphTime = (item: Events['items'][number]) => {
+    const time = eventReferenceTime(item, asOf);
+    return time && time !== asOf ? time : null;
+  };
+  function showEventGraph(item: Events['items'][number], time: string) {
+    updateQuery({
+      graphAsOf: time,
+      event: item.id,
+      bucket: bucketKey(item, period),
+      document: null,
+      evidence: null,
     });
   }
   if (invalid)
@@ -544,6 +604,7 @@ export default function CompanyWorkspace() {
                 updateQuery({
                   asOf: null,
                   graphVersion: null,
+                  graphAsOf: null,
                   event: null,
                   bucket: null,
                   document: null,
@@ -699,34 +760,53 @@ export default function CompanyWorkspace() {
                           <BoltIcon />
                           사건 {items.length}건
                         </button>
-                        {items.map((item) => (
-                          <article
-                            key={item.id}
-                            className="flex flex-col gap-1 border-0! py-0!"
-                          >
-                            <p className="text-[11px] text-zoop-muted">
-                              문서 {item.articleCount}건 ·{' '}
-                              {relationLabel(item.relationTypes) ||
-                                '직접 관계 미확인'}
-                            </p>
-                            <button
-                              aria-pressed={eventId === item.id}
-                              onClick={() => selectEvent(item)}
-                              className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-left text-sm! font-semibold text-zoop-ink underline-offset-4 hover:underline aria-pressed:underline"
+                        {items.map((item) => {
+                          const itemGraphTime = eventGraphTime(item);
+                          return (
+                            <article
+                              key={item.id}
+                              className="flex flex-col gap-1 border-0! py-0! xl:grid xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start xl:gap-x-3 xl:[&>*]:col-start-1"
                             >
-                              {item.title}
-                            </button>
-                            <p className="text-[11px] text-zoop-muted tabular-nums">
-                              {item.eventTime ?? '시점 미상'}
-                            </p>
-                            <button
-                              onClick={() => selectEvent(item, 'documents')}
-                              className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-[11px]! text-zoop-muted underline underline-offset-4"
-                            >
-                              근거 문서 {item.articleCount}건 보기
-                            </button>
-                          </article>
-                        ))}
+                              <p className="text-[11px] text-zoop-muted">
+                                문서 {item.articleCount}건 ·{' '}
+                                {relationLabel(item.relationTypes) ||
+                                  '직접 관계 미확인'}
+                              </p>
+                              <button
+                                aria-pressed={eventId === item.id}
+                                onClick={() => selectEvent(item)}
+                                className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-left text-sm! font-semibold text-zoop-ink underline-offset-4 hover:underline aria-pressed:underline"
+                              >
+                                {item.title}
+                              </button>
+                              <p className="text-[11px] text-zoop-muted tabular-nums">
+                                {item.eventTime ?? '시점 미상'}
+                              </p>
+                              <button
+                                onClick={() => selectEvent(item, 'documents')}
+                                className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-[11px]! text-zoop-muted underline underline-offset-4"
+                              >
+                                근거 문서 {item.articleCount}건 보기
+                              </button>
+                              {itemGraphTime && (
+                                <button
+                                  type="button"
+                                  aria-pressed={
+                                    graphAsOf === itemGraphTime &&
+                                    eventId === item.id
+                                  }
+                                  aria-label={`${item.title} · 이 당시 관계그래프 보기`}
+                                  onClick={() =>
+                                    showEventGraph(item, itemGraphTime)
+                                  }
+                                  className="mt-1 inline-flex items-center gap-1.5 self-start whitespace-nowrap xl:col-start-2! xl:row-span-4 xl:row-start-1 xl:mt-0 xl:self-center"
+                                >
+                                  <ClockIcon />이 당시 관계그래프 보기
+                                </button>
+                              )}
+                            </article>
+                          );
+                        })}
                       </div>
                     </li>
                   ))}
@@ -839,8 +919,9 @@ export default function CompanyWorkspace() {
           )}
         </section>
       </main>
+      {/* D-COM-04: 와이어프레임처럼 오른쪽 열에 두고, 스크롤해도 화면 안에 남는다(모바일 폭에서는 아래로 쌓는다). */}
       <aside
-        className="min-w-0 rounded-2xl bg-white p-4 shadow-sm [&_li]:text-xs [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full [&_svg]:bg-zoop-line max-[1000px]:col-start-2 max-md:w-full"
+        className="min-w-0 self-start rounded-2xl bg-white p-4 shadow-sm md:sticky md:top-4 md:max-h-[calc(100vh-2rem)] md:overflow-y-auto [&_li]:text-xs [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full [&_svg]:bg-zoop-line max-md:w-full"
         aria-label="시점 기반 관계 그래프"
         data-screen-id="D-COM-04"
       >
@@ -862,6 +943,12 @@ export default function CompanyWorkspace() {
             </button>
           ))}
         </nav>
+        {graphAsOf && (
+          <p role="status" className="mt-2">
+            사건 시점 {formatKst(graphAsOf)} 기준 관계예요. 차트·타임라인은 기존
+            기준 시점 그대로예요.
+          </p>
+        )}
         <Status resource={graph} label="관계 그래프" />
         {!ready && !versionOnly && (
           <p role="status">관계 그래프의 기준 시점을 확인하고 있어요.</p>
@@ -878,7 +965,7 @@ export default function CompanyWorkspace() {
               <p key={`${failure.section}:${i}`}>{failure.message}</p>
             ))}
             <CompanyGraphPreview
-              key={`${id}:${asOf}:${version}:${depth}`}
+              key={`${id}:${asOf}:${version}:${graphAsOf}:${depth}`}
               selectedId={eventId ?? id}
               data={graph.data}
               highlighted={highlighted}
@@ -902,11 +989,27 @@ export default function CompanyWorkspace() {
                   next.delete('document');
                   next.delete('evidence');
                   next.delete('docScope');
+                  next.delete('graphAsOf');
                   navigate(`/companies/${encodeURIComponent(node)}?${next}`);
                 }
               }}
             />
           </>
+        )}
+        {/* 사건 시점 그래프를 열 수 없어도(공개 버전 없음 등) 돌아갈 수 있게 그래프 상태와 상관없이 둔다. */}
+        {graphAsOf && (
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              aria-label="현재 시점 관계 그래프로 돌아가기"
+              title="현재 시점으로"
+              className={`${ui.button} inline-flex items-center gap-1`}
+              onClick={() => updateQuery({ graphAsOf: null })}
+            >
+              <HomeIcon />
+              현재
+            </button>
+          </div>
         )}
         {eventId && (
           <>

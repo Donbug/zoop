@@ -430,7 +430,7 @@ test('same bucket exposes count then individual cards; selecting an issue keeps 
   await user.click(screen.getByRole('button', { name: '합성 사건 A' }));
   await screen.findByRole('heading', { name: '합성 사건 A' });
   expect(screen.getByTestId('address').textContent).toContain('event=issue-a');
-  // D-COM-06 시점 이동 없음: 사건을 골라도 기준 시점은 그대로다.
+  // 사건을 골라도 기준 시점은 그대로다. 그래프 시점은 [이 당시 관계그래프 보기]로만 옮긴다.
   expect(screen.getByTestId('address').textContent).toContain(
     `asOf=${encodeURIComponent(time)}`,
   );
@@ -1519,3 +1519,115 @@ test.each(['success', 'failure'] as const)(
     expect(screen.queryByText(/그래프 버전\(v-past\)만 있어/)).toBeNull();
   },
 );
+
+test('D-COM-06: [이 당시 관계그래프 보기] moves only the graph to the event time and [현재] returns', async () => {
+  open(pinned);
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole('button', {
+      name: '합성 사건 A · 이 당시 관계그래프 보기',
+    }),
+  );
+  const address = () => screen.getByTestId('address').textContent ?? '';
+  expect(address()).toContain(`graphAsOf=${encodeURIComponent(old)}`);
+  expect(address()).toContain(`asOf=${encodeURIComponent(time)}`);
+  expect(address()).toContain('event=issue-a');
+  await waitFor(() => {
+    const last = server.calls('GET', '/api/v1/companies/:id/graph').at(-1)!;
+    expect(last.query.get('asOf')).toBe(old);
+    // 그 시점의 공개 버전은 서버가 고른다.
+    expect(last.query.has('graphVersion')).toBe(false);
+  });
+  expect(
+    server
+      .calls('GET', '/api/v1/events')
+      .every((call) => call.query.get('asOf') === time),
+  ).toBe(true);
+  expect(screen.getByText(/사건 시점 .* 기준 관계예요/)).toBeTruthy();
+
+  await user.click(
+    await screen.findByRole('button', {
+      name: '현재 시점 관계 그래프로 돌아가기',
+    }),
+  );
+  expect(address()).not.toContain('graphAsOf');
+  await waitFor(() => {
+    const last = server.calls('GET', '/api/v1/companies/:id/graph').at(-1)!;
+    expect(last.query.get('asOf')).toBe(time);
+    expect(last.query.get('graphVersion')).toBe('v1');
+  });
+  expect(
+    screen.queryByRole('button', { name: '현재 시점 관계 그래프로 돌아가기' }),
+  ).toBeNull();
+});
+
+test('D-COM-06: day events use the KST day end; month, unknown and later events offer no graph time', async () => {
+  server.on('GET', '/api/v1/events', () =>
+    json({
+      items: [
+        { ...events[0], timePrecision: 'day', eventTime: '2026-10-04' },
+        {
+          ...events[1],
+          id: 'issue-month',
+          title: '월 사건',
+          timePrecision: 'month',
+          eventTime: '2026-09',
+        },
+        {
+          ...events[1],
+          id: 'issue-later',
+          title: '나중 사건',
+          eventTime: '2026-10-07T03:00:00Z',
+        },
+      ],
+      unknownTimeItems: [],
+      nextCursor: null,
+      metadata: { ...metadata, total: 3, excludedUnknownTime: 0 },
+    }),
+  );
+  open(pinned);
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole('button', {
+      name: '합성 사건 A · 이 당시 관계그래프 보기',
+    }),
+  );
+  expect(screen.getByTestId('address').textContent).toContain(
+    `graphAsOf=${encodeURIComponent('2026-10-04T23:59:59+09:00')}`,
+  );
+  expect(
+    screen.queryByRole('button', { name: '월 사건 · 이 당시 관계그래프 보기' }),
+  ).toBeNull();
+  expect(
+    screen.queryByRole('button', {
+      name: '나중 사건 · 이 당시 관계그래프 보기',
+    }),
+  ).toBeNull();
+});
+
+test('D-COM-06: [최신 시점] also clears the event-time graph', async () => {
+  open(`${pinned}&graphAsOf=${encodeURIComponent(old)}`);
+  const user = userEvent.setup();
+  await screen.findByRole('button', {
+    name: '현재 시점 관계 그래프로 돌아가기',
+  });
+  await user.click(screen.getByRole('button', { name: '최신 시점' }));
+  expect(screen.getByTestId('address').textContent).not.toContain('graphAsOf');
+});
+
+test('D-COM-06: an event time without a public version still offers the way back', async () => {
+  server.on('GET', '/api/v1/companies/:id/graph', (r) =>
+    r.query.get('asOf') === old
+      ? apiError(409, 'VERSION_UNAVAILABLE')
+      : json({ ...graph, metadata: { ...graph.metadata, asOf: time } }),
+  );
+  open(`${pinned}&graphAsOf=${encodeURIComponent(old)}`);
+  const user = userEvent.setup();
+  await screen.findByText(/관계 그래프 조회 실패/);
+  await user.click(
+    screen.getByRole('button', { name: '현재 시점 관계 그래프로 돌아가기' }),
+  );
+  expect(
+    await screen.findByRole('img', { name: '기준 시점 기업 관계 그래프' }),
+  ).toBeTruthy();
+});
