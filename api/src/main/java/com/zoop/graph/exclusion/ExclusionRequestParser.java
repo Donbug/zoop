@@ -12,16 +12,20 @@ import com.zoop.common.json.StrictJson.Obj;
 import com.zoop.graph.exclusion.ExclusionRequest.Exclude;
 import com.zoop.graph.exclusion.ExclusionRequest.Handoff;
 import com.zoop.graph.exclusion.ExclusionRequest.Lift;
+import com.zoop.graph.exclusion.ExclusionRequest.Query;
 import com.zoop.graph.exclusion.ExclusionRequest.Report;
 import com.zoop.graph.exclusion.ExclusionRequest.Target;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Reads the request file ({@code zoop-disclosure-exclusion-1}, closed). An {@code exclude} embeds the exposure report exactly as
  * {@code zoop-ai-handoff-exposure} printed it; the report is checked against the closed {@code ExposureReport} schema of
  * {@code docs/api/internal-ai-openapi.yaml} ({@code zoop-handoff-exposure-1}), so a report of another version or a hand-edited one
  * with an unknown key, a value of the wrong type, a reason or text outside its enum or const, or a list over its cap is refused
- * whole. Nothing is read from the AI side here: the report is the operator's input. {@code requestId} names the command (a re-run
- * of the same request returns the recorded result); a {@code lift} also names the {@code expectedRevision} it was decided on.
+ * whole. Nothing is read from the AI side here: the report is the operator's input. An {@code exclude-query} names the change and
+ * the versions instead, and the command reads the report from the AI service ({@link #report(JsonNode)} checks it the same way).
+ * {@code requestId} names the command (a re-run of the same request returns the recorded result); a {@code lift} also names the
+ * {@code expectedRevision} it was decided on.
  */
 public final class ExclusionRequestParser {
     public static final String SCHEMA_VERSION = "zoop-disclosure-exclusion-1";
@@ -29,13 +33,16 @@ public final class ExclusionRequestParser {
     /** The producer caps a report at 6 MiB; the request adds a few fields around it. */
     public static final int MAX_BYTES = 7 * 1024 * 1024;
 
-    private static final Pattern ID = Pattern.compile("[A-Za-z0-9._:-]{1,200}");
+    /** A producer id, a handoff id included (the exposure contract's {@code handoffIds} pattern). */
+    static final Pattern ID = Pattern.compile("[A-Za-z0-9._:-]{1,200}");
     private static final Pattern DIGEST = Pattern.compile("[a-f0-9]{64}");
     private static final Pattern EVIDENCE = Pattern.compile("ev-[a-f0-9]{64}");
     private static final Pattern ARTICLE = Pattern.compile("doc-[a-f0-9]{64}");
     private static final Pattern OPERATOR = Pattern.compile("[A-Za-z0-9._@-]{1,100}");
     private static final Pattern RELATION_CANDIDATE = Pattern.compile("rc-[a-f0-9]{64}");
     private static final int MAX_LIFT_TARGETS = 20_000;
+    /** One exposure query selects at most 20 handoffs, one per version. */
+    static final int MAX_QUERY_VERSIONS = 20;
     static final String CONSISTENCY = "shared locks on every opened ledger were held from the first read until this output";
     static final String EFFECT = "none: identity-only proposal for the selected handoffs; nothing was excluded, revised, overlaid, "
             + "activated or written, and an empty or smaller result never clears or narrows any existing exclusion";
@@ -65,6 +72,20 @@ public final class ExclusionRequestParser {
                 return new Lift(requestId, Canonical.digest(root.node()), operator, reason, id(root.string("graphVersionId")),
                         root.count("expectedRevision"), targets);
             }
+            if ("exclude-query".equals(action)) {
+                root.exactly(Set.of("schemaVersion", "requestId", "action", "operator", "reason", "changed", "graphVersionIds"));
+                Obj changed = root.object("changed");
+                String cause = "s3-relation".equals(changed.string("kind")) ? "relation-retraction" : "source-change";
+                changed(changed, cause);
+                List<String> versions = new ArrayList<>();
+                for (String versionId : root.strings("graphVersionIds")) {
+                    versions.add(id(versionId));
+                }
+                if (versions.size() > MAX_QUERY_VERSIONS || new LinkedHashSet<>(versions).size() != versions.size()) {
+                    throw new StrictJson.Malformed();
+                }
+                return new Query(requestId, Canonical.digest(root.node()), operator, reason, changed.node(), cause, versions);
+            }
             if (!"exclude".equals(action)) throw new StrictJson.Malformed();
             root.exactly(Set.of("schemaVersion", "requestId", "action", "operator", "reason", "report"));
         } catch (StrictJson.Malformed | IllegalArgumentException invalid) {
@@ -73,6 +94,15 @@ public final class ExclusionRequestParser {
         try {
             return new Exclude(root.string("requestId"), Canonical.digest(root.node()), root.string("operator"),
                     reason(root.string("reason")), report(root.object("report")));
+        } catch (StrictJson.Malformed | IllegalArgumentException invalid) {
+            throw new ExclusionException(ExclusionFailure.REPORT_INVALID);
+        }
+    }
+
+    /** An exposure report read from the AI service, checked exactly as an embedded one; {@code report_invalid} otherwise. */
+    static Report report(JsonNode report) {
+        try {
+            return report(StrictJson.Obj.of(report));
         } catch (StrictJson.Malformed | IllegalArgumentException invalid) {
             throw new ExclusionException(ExclusionFailure.REPORT_INVALID);
         }

@@ -2,6 +2,8 @@ package com.zoop.graph.exclusion;
 
 import java.util.List;
 
+import tools.jackson.databind.JsonNode;
+
 /**
  * One run of the exclusion command: an {@code exclude} from an AI exposure report, or an explicit {@code lift}. {@code requestId}
  * names the command and {@code requestSha256} is the SHA-256 of the canonical request: a re-run of a recorded command returns its
@@ -19,6 +21,18 @@ public sealed interface ExclusionRequest {
     /** Excludes what the report proposes, per handoff, in the graph version imported from that handoff. */
     record Exclude(String requestId, String requestSha256, String operator, String reason, Report report)
             implements ExclusionRequest {
+    }
+
+    /**
+     * Asks the AI service which public ids {@code changed} touches in these versions ({@code queryGraphHandoffExposure}) and then
+     * excludes them exactly as an {@link Exclude} of that report would. {@code graphVersionIds} empty: the active version and the
+     * imported versions that may become active after it. {@code changed} is the contract's change object, already validated.
+     */
+    record Query(String requestId, String requestSha256, String operator, String reason, JsonNode changed, String cause,
+            List<String> graphVersionIds) implements ExclusionRequest {
+        public Query {
+            graphVersionIds = List.copyOf(graphVersionIds);
+        }
     }
 
     /**

@@ -53,6 +53,22 @@ class PortfolioScopeReadToolTest {
     }
 
     @Test
+    void namedCompaniesAreThoseOfThemThatAreTheMembersCheckedAgainstAllOfThem() {
+        companies = new ArrayList<>();
+        for (int i = 0; i < 7; i++) companies.add(new ChatMemberScope.Company("KRX:00000" + i, "기업 " + i, i < 2, i >= 2));
+        var out = tool.read(new ChatToolScope("job-1", "gv-1", null, "member-a"),
+                new ChatToolRequest("portfolio.scope.read", List.of("KRX:000006", "KRX:999999", "KRX:000001"), 20));
+        assertEquals(List.of("member-a"), asked);
+        assertEquals(List.of("KRX:000001", "KRX:000006"), out.items().stream().map(ChatToolItem::id).toList(),
+                "in the member's order, past the first five, and a company that is not theirs is left out");
+        assertFalse(out.truncated(), "every named company was checked");
+        assertThrows(IllegalArgumentException.class, () -> tool.read(new ChatToolScope("job-1", "gv-1", null, "member-a"),
+                new ChatToolRequest("portfolio.scope.read", List.of(ChatCapability.MEMBER_SELF, "KRX:000001"), 20)));
+        assertThrows(IllegalArgumentException.class, () -> tool.read(new ChatToolScope("job-1", "gv-1", null, "member-a"),
+                new ChatToolRequest("portfolio.scope.read", List.of("member:b"), 20)));
+    }
+
+    @Test
     void onlyTheInjectedMemberIsReadAndAnOutageIsNeverAnEmptyList() {
         assertThrows(IllegalArgumentException.class, () -> tool.read(new ChatToolScope("job-1", "gv-1", null), self()));
         assertThrows(IllegalArgumentException.class, () -> tool.read(new ChatToolScope("job-1", "gv-1", null, "member-a"),

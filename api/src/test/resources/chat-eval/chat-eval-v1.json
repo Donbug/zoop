@@ -387,6 +387,75 @@
       }
     },
     {
+      "id": "q07-named-in-scope",
+      "group": "Q07",
+      "question": "내 종목인 삼성전자 최근 사건 알려줘",
+      "memberScope": [{"id": "KRX:005930", "name": "삼성전자", "held": true}],
+      "script": {
+        "router": {"r1": {"types": {"Q07": 0.9, "Q03": 0.8}, "capabilities": {"issue.read": 0.8}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "보유한 삼성전자는 EUV 수출 규제 사건에 연결돼 있습니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch"]}]}
+      },
+      "expect": {
+        "targets": {"r1": ["KRX:005930"]},
+        "tools": ["company.read", "issue.read", "portfolio.scope.read"],
+        "planned": ["r1-s:tools", "r1:tools"],
+        "outcome": "answered",
+        "appliedCompanies": ["KRX:005930"],
+        "limitations": []
+      }
+    },
+    {
+      "id": "q07-named-partly-outside",
+      "group": "Q07",
+      "question": "내 종목인 삼성전자랑 NVIDIA 최근 사건 알려줘",
+      "memberScope": [{"id": "KRX:005930", "name": "삼성전자", "held": true}],
+      "script": {
+        "router": {"r1": {"types": {"Q07": 0.9, "Q03": 0.8}, "capabilities": {"issue.read": 0.8}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "보유한 삼성전자는 EUV 수출 규제 사건에 연결돼 있습니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch"]}]}
+      },
+      "expect": {
+        "planned": ["r1-s:tools", "r1:tools"],
+        "outcome": "answered",
+        "appliedCompanies": ["KRX:005930"],
+        "limitations": [{"kind": "not_in_member_scope", "cause": "named_outside"}]
+      }
+    },
+    {
+      "id": "q07-named-outside",
+      "group": "Q07",
+      "question": "내 종목인 NVIDIA 최근 사건 알려줘",
+      "memberScope": [{"id": "KRX:005930", "name": "삼성전자", "held": true}],
+      "script": {
+        "router": {"r1": {"types": {"Q07": 0.9, "Q03": 0.8}, "capabilities": {"issue.read": 0.8}}}
+      },
+      "expect": {
+        "stages": ["router"],
+        "tools": ["portfolio.scope.read"],
+        "outcome": "insufficient_evidence",
+        "reason": "not_in_member_scope"
+      }
+    },
+    {
+      "id": "q07-anchor-outside",
+      "group": "Q07",
+      "question": "내 종목 중에 NVIDIA와 연결된 게 있어?",
+      "memberScope": [
+        {"id": "KRX:000660", "name": "SK하이닉스", "held": true},
+        {"id": "KRX:005930", "name": "삼성전자", "watched": true}
+      ],
+      "script": {
+        "router": {"r1": {"types": {"Q07": 0.9, "Q04": 0.8}, "capabilities": {}}},
+        "answer": {"sections": [{"basis": "evidence_grounded", "text": "보유한 SK하이닉스가 NVIDIA와 차세대 GPU용 HBM 공급 계약 사건으로 연결돼 있습니다.", "requirementIds": ["r1"], "evidenceIds": ["$branch"]}]}
+      },
+      "expect": {
+        "tools": ["graph.path.read", "portfolio.scope.read"],
+        "planned": ["r1-s:tools", "r1:tools"],
+        "outcome": "answered",
+        "appliedCompanies": ["NASDAQ:NVDA", "KRX:000660"],
+        "limitations": [{"kind": "not_in_member_scope", "cause": "anchor_outside"}]
+      }
+    },
+    {
       "id": "q08-selection-rule",
       "group": "Q08",
       "question": "이 사건은 왜 지도에 올라왔어?",

@@ -17,6 +17,12 @@ public enum ExclusionFailure {
     REQUEST_CONFLICT("request_conflict"),
     /** A lift target changed after the lift's {@code expectedRevision}, or that revision is ahead of the store. */
     REVISION_STALE("revision_stale"),
+    /** An {@code exclude-query} found no version to ask about, or more than one query can select. Nothing was asked or written. */
+    VERSIONS_INVALID("versions_invalid"),
+    /** The exposure client is not configured, or the AI service could not answer (transport, 5xx). Nothing was written. */
+    EXPOSURE_UNAVAILABLE("exposure_unavailable"),
+    /** The AI service refused the query with a definite error (e.g. handoff_not_allowed, handoff_pin_mismatch). Nothing written. */
+    EXPOSURE_REFUSED("exposure_refused"),
     /** Known rollback: nothing was written. */
     DATABASE_UNAVAILABLE("database_unavailable"),
     /** The commit may or may not have happened: re-run the same request (same requestId) to read its recorded result. */

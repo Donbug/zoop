@@ -4024,7 +4024,7 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| kind | 필수 | string {investment_advice, precondition_unmet, results_truncated, evidence_insufficient, out_of_scope} | investment_advice: 투자 판단 요청이라 제공하지 않음. precondition_unmet: 앞 단계 결과가 체크포인트 조건에 못 미쳐 의존 요구를 수행할 수 없음. results_truncated: 조회 상한에 걸려 일부 자료만 확인함. evidence_insufficient: 조회는 성공했으나 이 요구의 공개 근거가 부족함. out_of_scope: 지원하지 않는 하위 요구. 서버가 gate·체크포인트·도구 결과로 정하며 모델 자기평가로 정하지 않는다. |
+| kind | 필수 | string {investment_advice, precondition_unmet, results_truncated, not_in_member_scope, evidence_insufficient, out_of_scope} | investment_advice: 투자 판단 요청이라 제공하지 않음. precondition_unmet: 앞 단계 결과가 체크포인트 조건에 못 미쳐 의존 요구를 수행할 수 없음. results_truncated: 조회 상한에 걸려 일부 자료만 확인함. not_in_member_scope: 내 종목 질문이 지목한 기업이 회원의 보유·관심 종목이 아님(묻는 대상이면 조회하지 않고, 관계의 기준점이면 조회하되 알림). evidence_insufficient: 조회는 성공했으나 이 요구의 공개 근거가 부족함. out_of_scope: 지원하지 않는 하위 요구. 서버가 gate·체크포인트·도구 결과로 정하며 모델 자기평가로 정하지 않는다. |
 | label | 필수 | string | 해당 요구를 회원 질문의 표현으로 나타낸 문구 |
 | message | 필수 | string | kind별 서버 템플릿으로 만든 안내 문장 |
 
