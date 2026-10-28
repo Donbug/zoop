@@ -112,7 +112,7 @@ public class AiUsageService {
                        count(*) FILTER (WHERE status='completed' AND stages->>'outcome'='available') AS succeeded,
                        count(*) FILTER (WHERE status='failed' OR stages->>'outcome'='failed') AS failed,
                        (SELECT count(*) FROM briefing_rounds r
-                         WHERE r.published_at IS NOT NULL AND r.published_at<=:asOf AND (:from IS NULL OR r.published_at>=:from)
+                         WHERE r.published_at IS NOT NULL AND r.published_at<=:asOf AND (CAST(:from AS timestamptz) IS NULL OR r.published_at>=:from)
                            AND NOT EXISTS (SELECT 1 FROM briefing_attempts old WHERE old.round_id=r.id AND old.purpose='generation'))
                            AS unrecorded_publications,
                        avg(extract(epoch FROM (finished_at-started_at))*1000)
@@ -122,13 +122,13 @@ public class AiUsageService {
                        max(extract(epoch FROM (finished_at-started_at))*1000)
                            FILTER (WHERE finished_at IS NOT NULL AND finished_at>=started_at) AS latency_max
                   FROM briefing_attempts
-                 WHERE purpose='generation' AND started_at<=:asOf AND (:from IS NULL OR started_at>=:from)
+                 WHERE purpose='generation' AND started_at<=:asOf AND (CAST(:from AS timestamptz) IS NULL OR started_at>=:from)
                 """ : """
                 SELECT count(*) AS requests,
                        count(*) FILTER (WHERE stages->'outlook'->>'outcome'='available') AS succeeded,
                        count(*) FILTER (WHERE stages->'outlook'->>'outcome'='failed') AS failed,
                        (SELECT count(*) FROM briefing_rounds r
-                         WHERE r.published_at IS NOT NULL AND r.published_at<=:asOf AND (:from IS NULL OR r.published_at>=:from)
+                         WHERE r.published_at IS NOT NULL AND r.published_at<=:asOf AND (CAST(:from AS timestamptz) IS NULL OR r.published_at>=:from)
                            AND NOT EXISTS (SELECT 1 FROM briefing_attempts old WHERE old.round_id=r.id AND old.purpose='generation'))
                            AS unrecorded_publications,
                        avg(extract(epoch FROM (finished_at-(stages->'outlook'->>'requestedAt')::timestamptz))*1000)
@@ -142,9 +142,9 @@ public class AiUsageService {
                            FILTER (WHERE finished_at IS NOT NULL AND stages->'outlook'->>'requestedAt' IS NOT NULL
                                AND finished_at >= (stages->'outlook'->>'requestedAt')::timestamptz) AS latency_max
                   FROM briefing_attempts
-                 WHERE stages ? 'outlook' AND stages->'outlook'->>'requestedAt' IS NOT NULL
+                 WHERE jsonb_exists(stages, 'outlook') AND stages->'outlook'->>'requestedAt' IS NOT NULL
                    AND (stages->'outlook'->>'requestedAt')::timestamptz<=:asOf
-                   AND (:from IS NULL OR (stages->'outlook'->>'requestedAt')::timestamptz>=:from)
+                   AND (CAST(:from AS timestamptz) IS NULL OR (stages->'outlook'->>'requestedAt')::timestamptz>=:from)
                 """;
         Map<String, Object> requests = jdbc.queryForMap(requestSql, params);
         Map<String, Object> executions = jdbc.queryForMap("""
@@ -164,7 +164,7 @@ public class AiUsageService {
                        min(currency) FILTER (WHERE actual_cost IS NOT NULL OR estimated_cost IS NOT NULL) AS currency
                   FROM ai_executions
                  WHERE feature=:feature AND briefing_attempt_id IS NOT NULL
-                   AND started_at<=:asOf AND (:from IS NULL OR started_at>=:from)
+                   AND started_at<=:asOf AND (CAST(:from AS timestamptz) IS NULL OR started_at>=:from)
                 """, params);
         long uncertain = number(executions, "uncertain_calls"), sent = number(executions, "sent_calls");
         boolean usageComplete = uncertain == 0 && number(executions, "missing_input") == 0 && number(executions, "missing_output") == 0;
@@ -193,13 +193,13 @@ public class AiUsageService {
         List<RecentError> errors = jdbc.query("""
                 SELECT occurred_at, code FROM (
                     SELECT finished_at AS occurred_at, failure_reason AS code FROM briefing_attempts
-                     WHERE (purpose=:purpose OR (:purpose='outlook' AND purpose='generation' AND stages ? 'outlook'))
+                     WHERE (purpose=:purpose OR (:purpose='outlook' AND purpose='generation' AND jsonb_exists(stages, 'outlook')))
                        AND status='failed' AND finished_at<=:asOf
-                       AND (:from IS NULL OR started_at>=:from)
+                       AND (CAST(:from AS timestamptz) IS NULL OR started_at>=:from)
                     UNION ALL
                     SELECT finished_at AS occurred_at, error_code AS code FROM ai_executions
                      WHERE feature=:feature AND briefing_attempt_id IS NOT NULL AND status IN ('failed','unknown')
-                       AND started_at<=:asOf AND (:from IS NULL OR started_at>=:from)
+                       AND started_at<=:asOf AND (CAST(:from AS timestamptz) IS NULL OR started_at>=:from)
                 ) errors WHERE occurred_at IS NOT NULL ORDER BY occurred_at DESC LIMIT 10
                 """, params.addValue("purpose", ledgerFeature.equals("briefing") ? "generation" : "outlook"),
                 (rs, row) -> new RecentError(rs.getTimestamp("occurred_at").toInstant(), rs.getString("code"), null));
@@ -223,7 +223,7 @@ public class AiUsageService {
                        count(*) FILTER (WHERE status = 'completed') AS succeeded,
                        count(*) FILTER (WHERE status = 'failed') AS failed,
                        (SELECT count(*) FROM chat_jobs j2 CROSS JOIN LATERAL jsonb_array_elements(j2.attempts) a
-                         WHERE j2.created_at <= :asOf AND (:from IS NULL OR j2.created_at >= :from)
+                         WHERE j2.created_at <= :asOf AND (CAST(:from AS timestamptz) IS NULL OR j2.created_at >= :from)
                            AND COALESCE((a ->> 'n')::integer, 1) > 1
                            AND COALESCE((a ->> 'modelCalled')::boolean, false)) AS retries,
                        avg(extract(epoch FROM (finished_at - created_at)) * 1000)
@@ -233,7 +233,7 @@ public class AiUsageService {
                        max(extract(epoch FROM (finished_at - created_at)) * 1000)
                            FILTER (WHERE status IN ('completed', 'failed')) AS latency_max
                   FROM chat_jobs
-                 WHERE created_at <= :asOf AND (:from IS NULL OR created_at >= :from)
+                 WHERE created_at <= :asOf AND (CAST(:from AS timestamptz) IS NULL OR created_at >= :from)
                 """, params);
         Map<String, Object> executions = jdbc.queryForMap("""
                 SELECT count(*) FILTER (WHERE execution_mode = 'live'
@@ -260,7 +260,7 @@ public class AiUsageService {
                        count(DISTINCT currency) FILTER (WHERE actual_cost IS NOT NULL OR estimated_cost IS NOT NULL) AS currencies,
                        min(currency) FILTER (WHERE actual_cost IS NOT NULL OR estimated_cost IS NOT NULL) AS currency
                   FROM ai_executions
-                 WHERE feature = 'chatbot' AND started_at <= :asOf AND (:from IS NULL OR started_at >= :from)
+                 WHERE feature = 'chatbot' AND started_at <= :asOf AND (CAST(:from AS timestamptz) IS NULL OR started_at >= :from)
                 """, params);
         long uncertain = number(executions, "uncertain_calls"), sent = number(executions, "sent_calls");
         boolean usageComplete = uncertain == 0 && number(executions, "missing_input") == 0 && number(executions, "missing_output") == 0;
@@ -285,7 +285,7 @@ public class AiUsageService {
                 actual != null || estimate != null ? "확인된 금액만 포함합니다." : UNAVAILABLE_COST);
         List<RecentError> errors = jdbc.query("""
                 SELECT finished_at, failure ->> 'code' AS code FROM chat_jobs
-                 WHERE status = 'failed' AND created_at <= :asOf AND (:from IS NULL OR created_at >= :from)
+                 WHERE status = 'failed' AND created_at <= :asOf AND (CAST(:from AS timestamptz) IS NULL OR created_at >= :from)
                  ORDER BY finished_at DESC LIMIT 10
                 """, params, (rs, row) -> new RecentError(rs.getTimestamp("finished_at").toInstant(), rs.getString("code"), null));
         return new Feature(missing.isEmpty() ? "complete" : "partial", List.copyOf(missing), "chatbot", "AI 챗봇",
@@ -311,7 +311,7 @@ public class AiUsageService {
                            FILTER (WHERE status IN ('available', 'failed') AND updated_at >= created_at) AS latency_max
                   FROM document_analyses
                  WHERE stage = :stage AND status <> 'not_requested'
-                   AND created_at <= :asOf AND (:from IS NULL OR created_at >= :from)
+                   AND created_at <= :asOf AND (CAST(:from AS timestamptz) IS NULL OR created_at >= :from)
                 """, params);
         Map<String, Object> executions = jdbc.queryForMap("""
                 SELECT count(*) FILTER (WHERE execution_mode = 'live'
@@ -343,7 +343,7 @@ public class AiUsageService {
                        count(DISTINCT currency) FILTER (WHERE actual_cost IS NOT NULL OR estimated_cost IS NOT NULL) AS currencies,
                        min(currency) FILTER (WHERE actual_cost IS NOT NULL OR estimated_cost IS NOT NULL) AS currency
                   FROM ai_executions
-                 WHERE feature = :feature AND started_at <= :asOf AND (:from IS NULL OR started_at >= :from)
+                 WHERE feature = :feature AND started_at <= :asOf AND (CAST(:from AS timestamptz) IS NULL OR started_at >= :from)
                 """, params);
 
         long uncertain = number(executions, "uncertain_calls");
@@ -380,7 +380,7 @@ public class AiUsageService {
         List<RecentError> errors = jdbc.query("""
                 SELECT updated_at, reason FROM document_analyses
                  WHERE stage = :stage AND status = 'failed' AND created_at <= :asOf
-                   AND (:from IS NULL OR created_at >= :from)
+                   AND (CAST(:from AS timestamptz) IS NULL OR created_at >= :from)
                  ORDER BY updated_at DESC LIMIT 10
                 """, params, (rs, row) -> new RecentError(rs.getTimestamp("updated_at").toInstant(), rs.getString("reason"), null));
         boolean complete = missing.isEmpty();

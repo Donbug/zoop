@@ -66,6 +66,10 @@ class AiUsagePostgresTest {
                 .andExpect(jsonPath("$.features[1].usage.modelCalls").doesNotExist())
                 .andExpect(jsonPath("$.features[1].usage.inputTokens").doesNotExist())
                 .andExpect(jsonPath("$.features[1].recentErrors[0].code").value("provider_timeout"));
+        mvc.perform(get("/api/v1/admin/ai-usage").param("window", "all").cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.features[1].requests").isNumber())
+                .andExpect(jsonPath("$.features[2].source").value("ledger-db"));
         mvc.perform(get("/api/v1/admin/ai-usage").param("window", "90d").cookie(admin))
                 .andExpect(status().isUnprocessableContent());
     }
@@ -74,19 +78,31 @@ class AiUsagePostgresTest {
     void aggregatesBriefingGenerationAndOutlookSeparately() throws Exception {
         Cookie admin = login();
         seedBriefingUsage();
+        boolean hasUnrecordedPublications = jdbc.queryForObject("""
+                SELECT EXISTS (SELECT 1 FROM briefing_rounds r
+                    WHERE r.published_at BETWEEN now() - interval '24 hours' AND now()
+                      AND NOT EXISTS (SELECT 1 FROM briefing_attempts a
+                          WHERE a.round_id=r.id AND a.purpose='generation'))
+                """, Boolean.class);
 
-        mvc.perform(get("/api/v1/admin/ai-usage").param("window", "24h").cookie(admin))
+        var result = mvc.perform(get("/api/v1/admin/ai-usage").param("window", "24h").cookie(admin))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.features[2].feature").value("briefing"))
-                .andExpect(jsonPath("$.features[2].requests").value(1))
-                .andExpect(jsonPath("$.features[2].succeeded").value(1))
                 .andExpect(jsonPath("$.features[2].usage.modelCalls").value(2))
                 .andExpect(jsonPath("$.features[2].usage.retries").value(1))
                 .andExpect(jsonPath("$.features[2].usage.inputTokens").value(30))
                 .andExpect(jsonPath("$.features[4].feature").value("briefing-outlook"))
-                .andExpect(jsonPath("$.features[4].requests").value(1))
                 .andExpect(jsonPath("$.features[4].usage.modelCalls").value(1))
                 .andExpect(jsonPath("$.features[4].usage.inputTokens").value(11));
+        if (hasUnrecordedPublications) {
+            result.andExpect(jsonPath("$.features[2].requests").doesNotExist())
+                    .andExpect(jsonPath("$.features[2].unavailableMetrics").isArray())
+                    .andExpect(jsonPath("$.features[4].requests").doesNotExist());
+        } else {
+            result.andExpect(jsonPath("$.features[2].requests").value(1))
+                    .andExpect(jsonPath("$.features[2].succeeded").value(1))
+                    .andExpect(jsonPath("$.features[4].requests").value(1));
+        }
     }
 
     private Cookie login() throws Exception {
@@ -126,10 +142,10 @@ class AiUsagePostgresTest {
                 VALUES(?,?,?,'summary',2,'failed','provider_timeout','test-grant','r1',?,?,?,?)
                 """, analysis, article, version, Timestamp.from(now), aiJob, Timestamp.from(now), Timestamp.from(now));
         jdbc.update("""
-                INSERT INTO ai_executions(id,feature,execution_mode,status,document_analysis_id,ai_job_id,stage,
+                INSERT INTO ai_executions(id,feature,execution_mode,status,document_analysis_id,stage,
                     provider_send_state,started_at,finished_at,error_code)
-                VALUES(?, 'news-analysis','live','unknown',?,?, 'document-summary','unknown',?,?, 'provider_timeout')
-                """, "execution-ai-" + suffix, analysis, aiJob, Timestamp.from(now), Timestamp.from(now));
+                VALUES(?, 'news-analysis','live','unknown',?, 'document-summary','unknown',?,?, 'provider_timeout')
+                """, "execution-ai-" + suffix, analysis, Timestamp.from(now), Timestamp.from(now));
     }
 
     private void seedBriefingUsage() {
