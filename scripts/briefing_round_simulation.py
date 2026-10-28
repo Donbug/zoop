@@ -367,6 +367,7 @@ def generate_round(client, selected, edition, context, max_repairs):
     last_draft, last_validation, attempts = None, None, []
     generation_key, verification_key = None, None
     for attempt in range(max_repairs + 1):
+        if getattr(client, 'usage', None) is not None: client.usage.retry(attempt)
         data = {**context, "selected": selected, "edition": edition, "repairAttempt": attempt,
                 "priorDraft": last_draft, "priorValidation": last_validation}
         generation_schema = keyed_schema("generation", "items", [row["issueId"] for row in selected], "issueId",

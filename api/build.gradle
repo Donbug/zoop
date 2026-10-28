@@ -33,6 +33,7 @@ dependencies {
 
 // Cached Spring test contexts share one disposable database; each pool must stay bounded.
 tasks.withType(Test).configureEach {
+	systemProperty 'zoop.briefing.usage.classpath', sourceSets.test.runtimeClasspath.asPath
 	systemProperty 'spring.datasource.hikari.maximum-pool-size', '4'
 	systemProperty 'spring.datasource.hikari.minimum-idle', '0'
 }
