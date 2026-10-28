@@ -47,6 +47,15 @@ import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.node.ObjectNode;
+import com.zoop.ai.AiOperation;
+import com.zoop.ai.AiTransportException;
+import com.zoop.ai.HandoffServiceErrorException;
+import com.zoop.ai.handoff.HandoffExposureClient;
+import java.util.ArrayList;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.function.Function;
+import tools.jackson.databind.JsonNode;
 
 /**
  * The exclusion store, its read and the operator command against the disposable company test database: real migration, constraints,
@@ -56,6 +65,8 @@ import tools.jackson.databind.node.ObjectNode;
 class DisclosureExclusionPostgresTest {
     private static final String HANDOFF_1 = "exclusion-test-handoff-1";
     private static final String HANDOFF_2 = "exclusion-test-handoff-2";
+    /** Imported from an older bundle schema: the exposure query cannot map it. */
+    private static final String HANDOFF_OLD = "exclusion-test-handoff-old";
     private static ConfigurableApplicationContext context;
     private static JdbcTemplate jdbc;
     private static DocumentRegistryRepository registry;
@@ -95,7 +106,7 @@ class DisclosureExclusionPostgresTest {
     /** Versions go with their exclusion targets (cascade); the change log is history and stays. */
     private static void clean() {
         jdbc.update("DELETE FROM graph_versions WHERE source_label = 'exclusion-test'");
-        for (String handoffId : List.of(HANDOFF_1, HANDOFF_2)) {
+        for (String handoffId : List.of(HANDOFF_1, HANDOFF_2, HANDOFF_OLD)) {
             String versionId = DisclosureExclusionService.versionId(handoffId);
             jdbc.update("DELETE FROM artifacts WHERE id IN (?, ?)", "artifact-exclusion-test-" + versionId,
                     "artifact-receipt-" + versionId);
@@ -119,8 +130,13 @@ class DisclosureExclusionPostgresTest {
 
     /** An imported version as the importer leaves it: the version row and its registered, verified receipt file. */
     private void stageVersion(String handoffId) throws Exception {
+        stageVersion(handoffId, DisclosureExclusionService.BUNDLE_SCHEMA);
+    }
+
+    private void stageVersion(String handoffId, String bundleSchema) throws Exception {
         String versionId = DisclosureExclusionService.versionId(handoffId);
         ObjectNode receipt = StrictJson.newObject();
+        receipt.putObject("bundle").put("schemaVersion", bundleSchema);
         receipt.put("schemaVersion", "zoop-graph-handoff-import-receipt-1");
         receipt.put("handoffId", handoffId);
         receipt.put("manifestDigest", ExposureReports.DIGEST_M);
@@ -151,6 +167,216 @@ class DisclosureExclusionPostgresTest {
 
     private long revision() {
         return jdbc.queryForObject("SELECT COALESCE(MAX(revision), 0) FROM disclosure_exclusion_changes", Long.class);
+    }
+
+    /** Stands in for the AI exposure query: records what it was asked, then answers or fails. */
+    private static final class FakeExposure implements HandoffExposureClient {
+        final List<List<String>> asked = new ArrayList<>();
+        Function<List<String>, JsonNode> answer = ids -> {
+            throw new AssertionError("not asked");
+        };
+        RuntimeException failure;
+
+        @Override
+        public JsonNode exposure(List<String> handoffIds, JsonNode changed) {
+            asked.add(List.copyOf(handoffIds));
+            if (failure != null) throw failure;
+            return answer.apply(handoffIds);
+        }
+    }
+
+    private DisclosureExclusionService querying(HandoffExposureClient exposure) {
+        return new DisclosureExclusionService(new JdbcDisclosureExclusionRepository(context.getBean(NamedParameterJdbcTemplate.class)),
+                registry, store, new TransactionTemplate(context.getBean(PlatformTransactionManager.class)), exposure);
+    }
+
+    private ExclusionFailure failure(DisclosureExclusionService with, byte[] request) {
+        ExclusionResult result = with.run(parser.parse(request));
+        assertFalse(result.succeeded());
+        return result.failure().failure();
+    }
+
+    @Test
+    void aQueryAsksTheHandoffsOfTheNamedVersionsAndExcludesWhatTheAnswerProposesOnce() {
+        FakeExposure fake = new FakeExposure();
+        fake.answer = ids -> ExposureReports.report(ExposureReports.handoff(HANDOFF_1, List.of("issue-q"), List.of(), false),
+                ExposureReports.handoff(HANDOFF_2, List.of(), List.of(), false));
+        byte[] request = ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange(), v1, v2);
+
+        ExclusionResult result = querying(fake).run(parser.parse(request));
+
+        assertTrue(result.succeeded(), () -> String.valueOf(result.failure()));
+        assertEquals(ExclusionResult.APPLIED, result.outcome());
+        assertEquals(List.of(List.of(HANDOFF_1, HANDOFF_2)), fake.asked, "the handoff ids the receipts name, in that order");
+        assertEquals(Set.of("issue-q"), reader.current(v1).issueIds());
+        assertEquals(Set.of(), reader.current(v2).issueIds());
+
+        ExclusionResult again = querying(fake).run(parser.parse(request));
+        assertTrue(again.replay(), "the recorded result");
+        assertEquals(1, fake.asked.size(), "a recorded request asks nothing again");
+    }
+
+    @Test
+    void anAnswerAboutSomethingElseARefusalOrNoClientWritesNothing() {
+        long before = revision();
+        FakeExposure fake = new FakeExposure();
+        fake.answer = ids -> ExposureReports.report(ExposureReports.handoff(HANDOFF_2, List.of("issue-x"), List.of(), false));
+        assertEquals(ExclusionFailure.REPORT_INVALID,
+                failure(querying(fake), ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange(), v1)),
+                "an answer for other handoffs than asked");
+
+        fake.answer = ids -> ExposureReports.report(ExposureReports.handoff(HANDOFF_1, List.of("issue-x"), List.of(), false));
+        ObjectNode otherChange = ExposureReports.sourceChange();
+        otherChange.put("sourceId", "another-source");
+        assertEquals(ExclusionFailure.REPORT_INVALID,
+                failure(querying(fake), ExposureReports.query(ExposureReports.requestId(), otherChange, v1)),
+                "an answer for another change than asked");
+
+        fake.failure = new HandoffServiceErrorException(AiOperation.EXPOSURE, "req-1", 403, "handoff_not_allowed", false,
+                Optional.empty(), Optional.empty(), Optional.empty());
+        assertEquals(ExclusionFailure.EXPOSURE_REFUSED,
+                failure(querying(fake), ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange(), v1)));
+        fake.failure = new HandoffServiceErrorException(AiOperation.EXPOSURE, "req-1", 409, "handoff_pin_mismatch", false,
+                Optional.empty(), Optional.empty(), Optional.empty());
+        assertEquals(ExclusionFailure.EXPOSURE_REFUSED,
+                failure(querying(fake), ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange(), v1)));
+        fake.failure = new HandoffServiceErrorException(AiOperation.EXPOSURE, "req-1", 503, "runtime_busy", true,
+                Optional.empty(), Optional.empty(), Optional.empty());
+        assertEquals(ExclusionFailure.EXPOSURE_UNAVAILABLE,
+                failure(querying(fake), ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange(), v1)),
+                "a 5xx envelope is the service being unavailable, not a refusal");
+        fake.failure = new AiTransportException(AiOperation.EXPOSURE, "req-1", AiTransportException.Failure.TIMEOUT,
+                OptionalInt.empty(), "HttpTimeoutException");
+        assertEquals(ExclusionFailure.EXPOSURE_UNAVAILABLE,
+                failure(querying(fake), ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange(), v1)));
+        assertEquals(ExclusionFailure.EXPOSURE_UNAVAILABLE,
+                failure(querying(null), ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange(), v1)));
+        assertEquals(ExclusionFailure.VERSION_UNKNOWN, failure(querying(new FakeExposure()),
+                ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange(), "gv-not-imported")));
+        assertEquals(before, revision(), "no failed query wrote a change");
+    }
+
+    @Test
+    void byDefaultTheImportedVersionsThatMayStillBecomePublicAreAskedAndAnOlderBundleIsLeftOut() throws Exception {
+        stageVersion(HANDOFF_OLD, "zoop-graph-handoff-bundle-5");
+        List<String> targets = new JdbcDisclosureExclusionRepository(context.getBean(NamedParameterJdbcTemplate.class))
+                .exposureTargets();
+        assertTrue(targets.containsAll(List.of(v1, v2)), "imported after the active version and not active");
+        assertTrue(targets.indexOf(v1) < targets.indexOf(v2), "in import order");
+
+        FakeExposure fake = new FakeExposure();
+        fake.answer = ids -> ExposureReports.report(ids.stream()
+                .map(id -> ExposureReports.handoff(id, HANDOFF_1.equals(id) ? List.of("issue-d") : List.of(), List.of(), false))
+                .toArray(ObjectNode[]::new));
+        ExclusionResult result = querying(fake).run(parser.parse(
+                ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange())));
+
+        assertTrue(result.succeeded(), () -> String.valueOf(result.failure()));
+        assertTrue(fake.asked.getFirst().containsAll(List.of(HANDOFF_1, HANDOFF_2)));
+        assertFalse(fake.asked.getFirst().contains(HANDOFF_OLD), "the AI cannot map an older bundle: never asked by default");
+        assertEquals(Set.of("issue-d"), reader.current(v1).issueIds());
+        // Named explicitly, it is refused before anything is asked.
+        assertEquals(ExclusionFailure.VERSIONS_INVALID, failure(querying(fake), ExposureReports.query(ExposureReports.requestId(),
+                ExposureReports.sourceChange(), DisclosureExclusionService.versionId(HANDOFF_OLD))));
+        assertEquals(1, fake.asked.size());
+    }
+
+    /** The real producer's answer: one handoff per id, sorted by id whatever order they were asked in. */
+    private static JsonNode sortedAnswer(List<String> ids, String excludedIn, String issueId) {
+        return ExposureReports.report(ids.stream().sorted()
+                .map(id -> ExposureReports.handoff(id, id.equals(excludedIn) ? List.of(issueId) : List.of(), List.of(), false))
+                .toArray(ObjectNode[]::new));
+    }
+
+    @Test
+    void theProducersSortedAnswerMatchesVersionsAskedInAnotherOrder() throws Exception {
+        FakeExposure fake = new FakeExposure();
+        fake.answer = ids -> sortedAnswer(ids, HANDOFF_1, "issue-sorted");
+        // Named in reverse id order: asked that way, answered sorted.
+        ExclusionResult named = querying(fake).run(parser.parse(
+                ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange(), v2, v1)));
+        assertTrue(named.succeeded(), () -> String.valueOf(named.failure()));
+        assertEquals(List.of(HANDOFF_2, HANDOFF_1), fake.asked.getFirst());
+        assertEquals(Set.of("issue-sorted"), reader.current(v1).issueIds());
+
+        // Imported after the others but first by id: the default (import) order is not the answer's order either.
+        String early = "exclusion-test-handoff-0";
+        stageVersion(early);
+        try {
+            ExclusionResult byDefault = querying(fake).run(parser.parse(
+                    ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange())));
+            assertTrue(byDefault.succeeded(), () -> String.valueOf(byDefault.failure()));
+            assertEquals(List.of(HANDOFF_1, HANDOFF_2, early), fake.asked.get(1), "asked in import order");
+        } finally {
+            dropVersion(early);
+        }
+    }
+
+    @Test
+    void oneVersionMoreThanAQueryCanSelectStopsBeforeReadingAnyFurtherReceipt() throws Exception {
+        List<String> extra = new ArrayList<>();
+        for (int i = 1; i <= 20; i++) extra.add("exclusion-test-cap-" + String.format("%02d", i));
+        try {
+            for (String handoffId : extra) stageVersion(handoffId);
+            // The 22nd default target's receipt is gone: reading it would be receipt_unavailable, so stopping at the 21st shows.
+            jdbc.update("DELETE FROM artifacts WHERE id = ?", "artifact-receipt-" + DisclosureExclusionService.versionId(extra.getLast()));
+            FakeExposure fake = new FakeExposure();
+            assertEquals(ExclusionFailure.VERSIONS_INVALID,
+                    failure(querying(fake), ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange())));
+            assertEquals(List.of(), fake.asked);
+        } finally {
+            for (String handoffId : extra) dropVersion(handoffId);
+        }
+    }
+
+    private void dropVersion(String handoffId) {
+        String versionId = DisclosureExclusionService.versionId(handoffId);
+        jdbc.update("DELETE FROM graph_versions WHERE id = ?", versionId);
+        jdbc.update("DELETE FROM artifacts WHERE id IN (?, ?)", "artifact-exclusion-test-" + versionId, "artifact-receipt-" + versionId);
+    }
+
+    @Test
+    void theSameRequestOverAnotherSetOfVersionsIsAnotherCommand() throws Exception {
+        FakeExposure fake = new FakeExposure();
+        fake.answer = ids -> ExposureReports.report(ids.stream()
+                .map(id -> ExposureReports.handoff(id, List.of(), List.of(), false)).toArray(ObjectNode[]::new));
+        byte[] request = ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange());
+        assertTrue(querying(fake).run(parser.parse(request)).succeeded());
+        assertTrue(querying(fake).run(parser.parse(request)).replay(), "same versions: the recorded result");
+
+        stageVersion("exclusion-test-handoff-3");
+        try {
+            assertEquals(ExclusionFailure.REQUEST_CONFLICT, failure(querying(fake), request),
+                    "a version imported meanwhile: the recorded command covered other versions");
+            assertEquals(1, fake.asked.size(), "neither re-run asked again");
+        } finally {
+            String extra = DisclosureExclusionService.versionId("exclusion-test-handoff-3");
+            jdbc.update("DELETE FROM graph_versions WHERE id = ?", extra);
+            jdbc.update("DELETE FROM artifacts WHERE id IN (?, ?)", "artifact-exclusion-test-" + extra, "artifact-receipt-" + extra);
+        }
+    }
+
+    @Test
+    void theOperatorCommandWiresTheExposureClientAndWritesTheResultFile() throws Exception {
+        FakeExposure fake = new FakeExposure();
+        fake.answer = ids -> ExposureReports.report(ids.stream()
+                .map(id -> ExposureReports.handoff(id, HANDOFF_1.equals(id) ? List.of("issue-r") : List.of(), List.of(), false))
+                .toArray(ObjectNode[]::new));
+        Path requestFile = temp.resolve("request.json");
+        Path resultFile = temp.resolve("result.json");
+        Files.write(requestFile, ExposureReports.query(ExposureReports.requestId(), ExposureReports.sourceChange(), v1));
+        var properties = new DisclosureExclusionConfiguration.Properties(true, requestFile.toString(), resultFile.toString(),
+                temp.toRealPath().resolve("artifacts").toString());
+        var exposure = new org.springframework.beans.factory.support.StaticListableBeanFactory(java.util.Map.of("exposure", fake))
+                .getBeanProvider(HandoffExposureClient.class);
+
+        new DisclosureExclusionConfiguration().disclosureExclusionRunner(properties, context,
+                context.getBean(NamedParameterJdbcTemplate.class), registry,
+                new TransactionTemplate(context.getBean(PlatformTransactionManager.class)), exposure).run(null);
+
+        assertEquals("applied", StrictJson.parseObject(Files.readAllBytes(resultFile)).string("outcome"));
+        assertEquals(List.of(List.of(HANDOFF_1)), fake.asked);
+        assertEquals(Set.of("issue-r"), reader.current(v1).issueIds());
     }
 
     @Test

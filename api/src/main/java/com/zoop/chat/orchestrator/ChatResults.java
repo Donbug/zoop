@@ -46,6 +46,7 @@ final class ChatResults {
             "evidence_held", "근거는 찾았지만 답변 내용이 근거와 맞는지 충분히 확인하지 못해 보여 드리지 않았어요.",
             "nothing_found", "조회한 범위에서 관련된 공개 자료를 찾지 못했어요.",
             "precondition_unmet", "앞 단계에서 찾은 대상이 질문의 조건에 맞지 않아 이어서 확인하지 못했어요.",
+            "not_in_member_scope", "질문한 기업이 보유·관심 종목에 없어 내 종목으로 확인하지 않았어요.",
             "evidence_insufficient", "관련 항목은 찾았지만 답에 쓸 수 있는 공개 근거가 부족했어요.");
 
     /** What the member can try next, chosen from the run's own scope, not from what a model said. */
@@ -53,12 +54,14 @@ final class ChatResults {
             "narrowed", "선택한 근거 안에서만 확인했어요. 선택을 해제하고 다시 물으면 더 넓게 찾아볼 수 있어요.",
             "truncated", "대상이나 기간을 좁혀 다시 물어봐 주세요.",
             "period", "기간을 넓히거나 다른 기업·사건을 지목해 다시 물어봐 주세요.",
+            "member_scope", "보유·관심 종목에 있는 기업을 물어보거나, '내 종목' 없이 그 기업을 다시 물어봐 주세요.",
             "other", "다른 기업이나 사건을 지목하거나, 지도에서 대상을 고른 뒤 다시 물어봐 주세요.");
 
     private static final Map<String, String> LIMITATIONS = Map.of(
             "investment_advice", "매수·매도 같은 투자 판단은 제공하지 않아요.",
             "precondition_unmet", "앞 단계에서 찾은 대상이 조건에 맞지 않아 이 부분은 답하지 못했어요.",
             "results_truncated", "조회 상한 때문에 일부 자료만 확인해 이 부분은 단정하지 않았어요.",
+            "not_in_member_scope", "질문한 기업이 보유·관심 종목에 없어 이 부분은 확인하지 않았어요.",
             "evidence_insufficient", "이 부분은 답에 쓸 공개 근거가 부족했어요.",
             "out_of_scope", "이 부분은 지금 답할 수 있는 범위 밖이에요.");
 
@@ -69,7 +72,7 @@ final class ChatResults {
 
     /** Why nothing or a part could not be answered, as the server decided it. */
     enum InsufficientCause {
-        RESULTS_TRUNCATED, EVIDENCE_HELD, NOTHING_FOUND, PRECONDITION_UNMET, EVIDENCE_INSUFFICIENT;
+        RESULTS_TRUNCATED, NOT_IN_MEMBER_SCOPE, EVIDENCE_HELD, NOTHING_FOUND, PRECONDITION_UNMET, EVIDENCE_INSUFFICIENT;
 
         String code() {
             return name().toLowerCase();
@@ -85,7 +88,8 @@ final class ChatResults {
      * reads beyond the selection, so clearing it would change nothing.
      */
     static String insufficientReason(ChatRun run, InsufficientCause cause, boolean narrowed) {
-        String hint = narrowed ? "narrowed"
+        String hint = cause == InsufficientCause.NOT_IN_MEMBER_SCOPE ? "member_scope"
+                : narrowed ? "narrowed"
                 : cause == InsufficientCause.RESULTS_TRUNCATED ? "truncated"
                 : run.context().period() != null ? "period" : "other";
         return CAUSES.get(cause.code()) + " " + HINTS.get(hint);
@@ -129,6 +133,19 @@ final class ChatResults {
         var limitation = limitation("results_truncated", label);
         return new ChatLimitation(limitation.kind(), limitation.label(), "내 종목이 많아 앞의 "
                 + com.zoop.chat.tool.ChatToolRequest.MAX_TARGETS + "개(보유 종목 먼저, 그다음 관심 목록 순)만 확인했어요.");
+    }
+
+    /**
+     * A Q07 requirement answered on the member's companies, though the question named a company that is not one of them
+     * (holdings or watchlist): a {@code not_in_member_scope} note beside the answer. A company it asks about was not read; a
+     * reference point was read all the same.
+     */
+    static ChatLimitation outsideScope(ChatRetrieval.Outside how, String label) {
+        var limitation = limitation("not_in_member_scope", label);
+        String message = how == ChatRetrieval.Outside.NAMED
+                ? "질문한 기업 중 보유·관심 종목이 아닌 기업은 내 종목으로 확인하지 않았어요."
+                : "기준으로 지목한 기업은 보유·관심 종목이 아니에요.";
+        return new ChatLimitation(limitation.kind(), limitation.label(), message);
     }
 
     /** A clarification or guidance result: no sections, citations or limitations. */

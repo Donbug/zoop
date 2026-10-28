@@ -123,6 +123,8 @@ Q07의 `portfolio.scope.read`는 Java server-only precondition이며 MCP에 노�
 
 notices는 답변을 막지 않은 장애/처리 정보, limitations는 미충족 요구다. 이 둘을 분리해 답한 요구와 limitation을 정확히 하나에 대응시키는 기존 규칙을 유지한다. 웹 오류를 evidence_insufficient나 ‘관련 뉴스 없음’으로 숨기지 않는다.
 
+현재 공개 limitation kind는 `investment_advice`, `precondition_unmet`, `results_truncated`, `not_in_member_scope`(내 종목(Q07) 질문이 지목한 기업이 회원의 보유·관심 종목이 아님, 서버 `portfolio.scope.read` 판정), `evidence_insufficient`, `out_of_scope`다. 장애 원인 kind 확장은 목표 계약이다.
+
 ## 8. 검증과 복구
 
 ### 8.1 호출 전·실행 중 검사

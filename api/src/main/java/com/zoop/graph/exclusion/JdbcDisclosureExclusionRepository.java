@@ -3,6 +3,7 @@ package com.zoop.graph.exclusion;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -31,6 +32,19 @@ public class JdbcDisclosureExclusionRepository {
 
     public JdbcDisclosureExclusionRepository(NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
+    }
+
+    /**
+     * The versions an {@code exclude-query} asks about by default: the active imported version and every imported version after it
+     * (by sequence) that is not active, which an activation may still make public. A rolled-back newer version is among them.
+     */
+    public List<String> exposureTargets() {
+        return jdbc.queryForList("""
+                SELECT id FROM graph_versions
+                 WHERE kind = 'snapshot'
+                   AND (active OR sequence > COALESCE((SELECT sequence FROM graph_versions WHERE active), 0))
+                 ORDER BY sequence
+                """, new MapSqlParameterSource(), String.class);
     }
 
     /** The shared publication lock: exclusion changes, rule switches, review decisions and activation never interleave. */

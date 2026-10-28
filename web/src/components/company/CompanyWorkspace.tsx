@@ -913,8 +913,22 @@ export default function CompanyWorkspace() {
             <Status resource={impact} label="영향 경로" />
             {impact.data && (
               <>
-                <h3>공개 자료에 확인된 영향 경로</h3>
-                {!impact.data.steps.length && <p>확인된 영향 경로가 없어요.</p>}
+                <h3>
+                  {impact.data.pathStatus ===
+                  'structural_path_details_unavailable'
+                    ? '구조 경로 상세'
+                    : impact.data.steps.length
+                      ? '공개 자료에 확인된 영향 경로'
+                      : '직접 연결 확인'}
+                </h3>
+                {!impact.data.steps.length && (
+                  <p>
+                    {impact.data.pathStatus ===
+                    'structural_path_details_unavailable'
+                      ? '구조 관계는 공개 그래프에서 확인됐지만, 전체 경로 상세는 제공되지 않아요.'
+                      : '이 기준 시점의 공개 그래프에서 기업과 사건의 직접 연결을 확인하지 못했어요.'}
+                  </p>
+                )}
                 <ol>
                   {impact.data.steps.map((step, i) => (
                     <li key={`${step.id}:${i}`}>

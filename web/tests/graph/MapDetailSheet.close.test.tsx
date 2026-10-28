@@ -31,11 +31,7 @@ const context = {
   asOf: graph.metadata.asOf,
 };
 
-// D-GRP-06 label terminology follows the OpenAPI user decision.
-it.each([
-  ['mixed', '혼재'],
-  ['undetermined', '판단 보류'],
-] as const)('D-GRP-06 renders %s as %s', (label, expected) => {
+it('D-GRP-06 marks a confirmed direct connection', () => {
   vi.mocked(useEventData).mockReturnValue({
     key: 'fixture',
     loading: false,
@@ -45,9 +41,7 @@ it.each([
   const impact: Impact = {
     companyId: company.id,
     issueId: issue.id,
-    pathStatus: 'available',
-    pathType: 'direct',
-    edgeId: graph.edges[0].id,
+    pathStatus: 'direct_available',
     steps: [
       { id: issue.id, kind: 'issue', reason: '확인', evidenceIds: ['ev-a'] },
       {
@@ -57,25 +51,6 @@ it.each([
         evidenceIds: ['ev-a'],
       },
     ],
-    businessPath: null,
-    impact: {
-      status: 'available',
-      reason: null,
-      results: [
-        {
-          impactId: label,
-          status: 'verified',
-          label,
-          evidenceIds: ['ev-a'],
-          effects: {
-            positive: [],
-            negative: [],
-            neutral: [],
-            uncertain: ['ev-a'],
-          },
-        },
-      ],
-    },
     metadata: graph.metadata,
   };
   render(
@@ -83,6 +58,7 @@ it.each([
       <ImpactPathPanel
         companyId={company.id}
         issueId={issue.id}
+        context={context}
         graph={graph}
         impact={impact}
         loading={false}
@@ -95,7 +71,7 @@ it.each([
       />
     </MemoryRouter>,
   );
-  expect(screen.getByText(`영향 판정 · ${expected}`)).toBeTruthy();
+  expect(screen.getByText(/직접 연결 확인/)).toBeTruthy();
 });
 
 // M-GRP-01: render real panel headers in the mobile portal, including failure/loading.
@@ -208,6 +184,7 @@ it.each(['loading', 'error'] as const)(
           <ImpactPathPanel
             companyId={company.id}
             issueId={issue.id}
+            context={context}
             graph={graph}
             impact={null}
             loading={loading}

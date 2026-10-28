@@ -98,7 +98,7 @@ export JAVA_HOME=<JDK 21>
 
 ## 5. v1 사례와 드러난 공백
 
-41개 사례: Q01 2, Q02 2, Q03 8, Q04 2, Q05 3, Q06 1, Q07 4, Q08 1, 복합 6, 투자 판단 4, 공격 3, 확인 질문 1, 장애 4. 2026-10-27 기준 모두 통과한다(대본 실행).
+45개 사례: Q01 2, Q02 2, Q03 8, Q04 2, Q05 3, Q06 1, Q07 8, Q08 1, 복합 6, 투자 판단 4, 공격 3, 확인 질문 1, 장애 4. 2026-10-27 기준 모두 통과한다(대본 실행).
 
 세트를 만들며 확인한 현재 공백(`gap` 표시 사례):
 
@@ -108,6 +108,8 @@ export JAVA_HOME=<JDK 21>
 | `q01-help-unbound`, `q06`, `q08` | 도구 미연결·미구현으로 `out_of_scope` 안내다. |
 
 v1에서 찾은 공백 중 사건 이름 미해석과 기업 대상 `issue.read`의 빈 결과는 2026-10-27에 고쳤다(구현 계획 사건 지목 결정 (5)·(6)). `q03-issue-named`, `q03-issue-and-company-named`, `q03-company-issues-by-name`이 그 동작을 고정하고, `failure-graph-unreadable-concept`는 그래프를 읽을 수 없어도 순수 개념 질문은 답하는지(사건 이름을 필요할 때만 해석하는지) 확인한다. 같은 말에 맞는 사건이 여럿인 확인 질문은 fixture에 그런 사건이 없어 `IssueNameResolverTest`·`ChatModelStagesTest`가 다룬다.
+
+Q07에서 질문이 기업을 지목하는 경우(구현 계획 결정 (11))는 `q07-named-in-scope`, `q07-named-partly-outside`, `q07-named-outside`, `q07-anchor-outside`가 고정한다.
 
 세트에 넣지 못한 것:
 

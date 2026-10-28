@@ -259,6 +259,7 @@ class AnalyzePlanWorkerTest {
         assertNull(detail.evidence().get(1).quote(), "the producer withheld it: kept null, the detail still answers");
         assertEquals(1, detail.relations().size(), "only the relation that names this event");
         assertEquals("2", detail.relations().getFirst().sourceRevision(), "the value a decision sends as expected");
+        assertEquals(0, detail.relations().getFirst().revision(), "the target revision a decision sends as expectedRevision");
         assertEquals("subject", detail.relations().getFirst().role(), "the S2 participant's role of the company endpoint");
         assertEquals("hold", detail.verification().verdicts().getFirst().decision());
         assertEquals("unknown", detail.graphDb(), "no readable active version: unknown, never not_stored");

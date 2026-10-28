@@ -16,6 +16,33 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.node.ObjectNode;
 
 class ExclusionRequestParserTest {
+    @Test
+    void aQueryNamesTheChangeAndTheVersionsAndIsRefusedWhenEitherIsOutsideTheContract() {
+        var query = (ExclusionRequest.Query) new ExclusionRequestParser().parse(
+                ExposureReports.query("q-1", ExposureReports.sourceChange(), "gv-a", "gv-b"));
+        assertEquals("source-change", query.cause());
+        assertEquals(java.util.List.of("gv-a", "gv-b"), query.graphVersionIds());
+        assertEquals("synthetic-source", query.changed().get("sourceId").stringValue());
+
+        var relation = tools.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+        relation.put("kind", "s3-relation");
+        relation.put("jobId", "s3-job");
+        relation.put("relationCandidateId", "rc-" + "a".repeat(64));
+        assertEquals("relation-retraction",
+                ((ExclusionRequest.Query) new ExclusionRequestParser().parse(ExposureReports.query("q-2", relation))).cause());
+
+        var unknown = ExposureReports.sourceChange();
+        unknown.put("extra", 1);
+        for (byte[] invalid : java.util.List.of(ExposureReports.query("q-3", unknown),
+                ExposureReports.query("q-4", ExposureReports.sourceChange(), "gv-a", "gv-a"),
+                ExposureReports.query("q-5", ExposureReports.sourceChange(),
+                        java.util.stream.IntStream.rangeClosed(1, 21).mapToObj(i -> "gv-" + i).toArray(String[]::new)))) {
+            var failure = org.junit.jupiter.api.Assertions.assertThrows(ExclusionException.class,
+                    () -> new ExclusionRequestParser().parse(invalid));
+            assertEquals(ExclusionFailure.REQUEST_INVALID, failure.failure());
+        }
+    }
+
     private final ExclusionRequestParser parser = new ExclusionRequestParser();
 
     @Test

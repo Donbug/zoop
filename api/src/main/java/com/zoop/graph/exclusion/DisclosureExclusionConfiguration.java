@@ -3,9 +3,11 @@ package com.zoop.graph.exclusion;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 
+import com.zoop.ai.handoff.HandoffExposureClient;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.artifact.storage.ArtifactStoreException;
 import com.zoop.document.repository.DocumentRegistryRepository;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -39,7 +41,8 @@ public class DisclosureExclusionConfiguration {
 
     @Bean
     DisclosureExclusionRunner disclosureExclusionRunner(Properties properties, ApplicationContext context,
-            NamedParameterJdbcTemplate jdbc, DocumentRegistryRepository registry, TransactionOperations transaction) {
+            NamedParameterJdbcTemplate jdbc, DocumentRegistryRepository registry, TransactionOperations transaction,
+            ObjectProvider<HandoffExposureClient> exposure) {
         if (context instanceof WebApplicationContext) {
             throw new IllegalStateException("zoop.disclosure-exclusion.enabled requires spring.main.web-application-type=none");
         }
@@ -51,7 +54,7 @@ public class DisclosureExclusionConfiguration {
         }
         return new DisclosureExclusionRunner(path("request", properties.request()), path("result", properties.result()),
                 new ExclusionRequestParser(), new DisclosureExclusionService(new JdbcDisclosureExclusionRepository(jdbc), registry,
-                        store, transaction));
+                        store, transaction, exposure.getIfAvailable()));
     }
 
     private static Path path(String name, String value) {

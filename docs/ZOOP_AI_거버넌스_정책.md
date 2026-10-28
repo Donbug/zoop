@@ -193,7 +193,7 @@ Q02는 최신 금융 상황을 일반 지식으로 답하기 위한 우회 경�
 | 보조 웹 검색 실패로 일부 외부 요구를 확인하지 못함 | 확보한 답변 유지, 해당 요구 limitation과 `web_unavailable` notice, `partial` |
 | 권한·스키마·grant 거부, 출력 검증 실패, 저장 실패 | 기존 `failed`와 `ChatFailure`; 안전한 고정 안내 외 미검증 본문 미표시 |
 
-`limitations`는 답하지 못한 요구를 나타내며 `investment_advice / precondition_unmet / results_truncated / evidence_insufficient / out_of_scope`를 사용한다. `notices`는 답변 요구와 일대일 대응하지 않는 비차단 실행 상태다. 장애를 근거 부족으로 숨기지 않고 같은 실패를 limitation과 notice에 중복 기록하지 않는다. 모델은 스스로 요구를 삭제하거나 limitation을 만들 권한이 없다. 서버 커버리지 검사는 모든 명시 요구가 답변·limitation·clarification 중 정확히 하나에 연결되는지 확인한다.
+`limitations`는 답하지 못한 요구를 나타내며 `investment_advice / precondition_unmet / results_truncated / not_in_member_scope / evidence_insufficient / out_of_scope`를 사용한다(`not_in_member_scope`는 내 종목 질문이 지목한 기업이 회원의 보유·관심 종목이 아님을 서버 `portfolio.scope.read`로 판정한 경우). `notices`는 답변 요구와 일대일 대응하지 않는 비차단 실행 상태다. 장애를 근거 부족으로 숨기지 않고 같은 실패를 limitation과 notice에 중복 기록하지 않는다. 모델은 스스로 요구를 삭제하거나 limitation을 만들 권한이 없다. 서버 커버리지 검사는 모든 명시 요구가 답변·limitation·clarification 중 정확히 하나에 연결되는지 확인한다.
 
 웹 검색 실패만으로 전체 job을 실패시키지 않는다. 다만 인증·권한·스키마·모델 전송 grant·결정론적 출력 검증 실패는 보조 도구 장애가 아니므로 기존 차단 정책을 유지한다. 답변을 항상 저장 가능한 상태로 끝낸다는 원칙은 사실을 만들어 내라는 뜻이 아니며, 근거가 없으면 검증된 부분 답변 또는 고정 guidance를 제공한다.
 

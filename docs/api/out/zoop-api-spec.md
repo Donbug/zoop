@@ -1088,7 +1088,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getEvent · 사건 상세와 근거 참조 조회
 
-사건 상세와 근거 참조 조회. round·graphVersion·asOf로 공개 버전 하나를 고정하고(그래프 조회와 같은 규칙) 그 버전에서 현재 제외를 적용한 뒤 보이는 사건만 반환하며, 보이지 않으면 RESOURCE_NOT_FOUND/404다. relations·companies·articles·follows·evidenceIds와 사건 머리 필드는 스냅샷에서 읽는다. asOf는 그래프와 같이 사건의 기사가 하나라도 asOf 이후에 공개됐으면 사건 전체를 가리며(404), 일부 기사만 남긴 상세는 만들지 않는다. articles는 이 사건의 보이는 근거가 가리키는 정확한 (기사 ID, 기사 버전)만 담고 같은 기사의 다른 버전은 넣지 않으며, 최신 공개순이다(FS021의 관련도 우선 정렬은 관련도 원천이 없어 미구현). relations[].edgeId는 그래프 표시 간선 ID와 같다. follows는 FOLLOWS 관계(뒤 사건→앞 사건)에서 이 버전에 보이는 사건만 담는다. 수입한 버전은 그 버전의 import receipt(AI 인계 묶음)에서 mentions(원본 S2 언급, verification none)·fieldDecisions(운영자 필드 판정의 필드·결정·사유 코드만, 판정 대상 값은 싣지 않음, candidateId는 null)·sourceSupport(인계 값을 그대로 복사)를 읽고, receipt를 읽을 수 없거나, 그 사건을 담지 않거나, 인계 묶음 스키마가 현재(zoop-graph-handoff-bundle-5)가 아니면(이전 묶음은 언급·필드 판정이 없으므로 빈 목록으로 대신하지 않음) SOURCE_UNAVAILABLE/503이다. 수입한 버전은 근거마다 getEvidence와 같은 현재 공개 게이트(기사 접근 상태·현재 source grant·registry)를 지금 다시 적용해, 언급은 그 근거가 모두 보일 때만 참가자와 함께 내보내고(일부라도 가려지면 언급 전체를 뺌), 관계는 근거가 모두 보일 때만, 기사는 보이는 근거가 가리킬 때만 남긴다. 머리 필드는 운영자가 고른 대표 언급(fieldProvenance.selection=operator-representative)의 값이거나, 대표가 없으면(unanimous) 모든 언급이 같은 값이므로, 대표 언급 또는 모든 언급이 온전히 보이지 않으면 사건 전체를 RESOURCE_NOT_FOUND/404로 닫는다. follows와 FOLLOWS 관계의 상대 사건도 같은 머리 검사를 통과해야 하며, 통과하지 못하면 관계와 참조 모두에서 뺀다. 운영자가 보류·거절(HOLD·REJECT)한 언급의 eventTime(이때 timePrecision=unknown)·period는 null이며 어떤 필드로도 내보내지 않는다. 현재 권한·제외로 기사 일부가 빠지면 sourceSupport는 articleCount를 보이는 기사 수로 하고 가려진 기사에 의존하는 knownLineageCount·independentSourceCount는 null, 목록은 보이는 기사만 남긴다. 합성 fixture 버전은 receipt가 없어 mentions·fieldDecisions가 빈 배열이고 sourceSupport는 모든 기사의 출처가 알려지지 않은 것으로 표시한다(개수는 0이 아니라 null). articles[].publisher는 고정된 기사 버전의 저장된 article_versions 값이며 없으면 null, relationType은 그 기사의 보이는 언급이 모두 background면 PROVIDES_BACKGROUND, 아니면 REPORTS, 언급 정보가 없으면 null이다(앱 결정). role이 있는 companies·relations·참가자는 roleUnconfirmed=true다(인계가 확인된 역할을 생산하지 않음). summary는 아직 사건 요약 생산자가 없어 Unavailable이고 metadata.partial=true·failures에 summary를 남기며, approval은 null이다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+사건 상세와 근거 참조 조회. round·graphVersion·asOf로 공개 버전 하나를 고정하고(그래프 조회와 같은 규칙) 그 버전에서 현재 제외를 적용한 뒤 보이는 사건만 반환하며, 보이지 않으면 RESOURCE_NOT_FOUND/404다. relations·companies·articles·follows·evidenceIds와 사건 머리 필드는 스냅샷에서 읽는다. asOf는 그래프와 같이 사건의 기사가 하나라도 asOf 이후에 공개됐으면 사건 전체를 가리며(404), 일부 기사만 남긴 상세는 만들지 않는다. articles는 이 사건의 보이는 근거가 가리키는 정확한 (기사 ID, 기사 버전)만 담고 같은 기사의 다른 버전은 넣지 않으며, 최신 공개순이다(FS021의 관련도 우선 정렬은 관련도 원천이 없어 미구현). relations[].edgeId는 그래프 표시 간선 ID와 같다. follows는 FOLLOWS 관계(뒤 사건→앞 사건)에서 이 버전에 보이는 사건만 담는다. 수입한 버전은 그 버전의 import receipt(AI 인계 묶음)에서 mentions(원본 S2 언급, verification none)·fieldDecisions(운영자 필드 판정의 필드·결정·사유 코드만, 판정 대상 값은 싣지 않음, candidateId는 null)·sourceSupport(인계 값을 그대로 복사)를 읽고, receipt를 읽을 수 없거나, 그 사건을 담지 않거나, 인계 묶음 스키마가 현재(zoop-graph-handoff-bundle-5)가 아니면(이전 묶음은 언급·필드 판정이 없으므로 빈 목록으로 대신하지 않음) SOURCE_UNAVAILABLE/503이다. receipt 미등록·고정 바이트 손상·형식 오류는 재시도로 복구되지 않아 error.retryable=false다. receipt 저장소의 일시 읽기 장애는 error.retryable=true다. 수입한 버전은 근거마다 getEvidence와 같은 현재 공개 게이트(기사 접근 상태·현재 source grant·registry)를 지금 다시 적용해, 언급은 그 근거가 모두 보일 때만 참가자와 함께 내보내고(일부라도 가려지면 언급 전체를 뺌), 관계는 근거가 모두 보일 때만, 기사는 보이는 근거가 가리킬 때만 남긴다. 머리 필드는 운영자가 고른 대표 언급(fieldProvenance.selection=operator-representative)의 값이거나, 대표가 없으면(unanimous) 모든 언급이 같은 값이므로, 대표 언급 또는 모든 언급이 온전히 보이지 않으면 사건 전체를 RESOURCE_NOT_FOUND/404로 닫는다. follows와 FOLLOWS 관계의 상대 사건도 같은 머리 검사를 통과해야 하며, 통과하지 못하면 관계와 참조 모두에서 뺀다. 운영자가 보류·거절(HOLD·REJECT)한 언급의 eventTime(이때 timePrecision=unknown)·period는 null이며 어떤 필드로도 내보내지 않는다. 현재 권한·제외로 기사 일부가 빠지면 sourceSupport는 articleCount를 보이는 기사 수로 하고 가려진 기사에 의존하는 knownLineageCount·independentSourceCount는 null, 목록은 보이는 기사만 남긴다. 합성 fixture 버전은 receipt가 없어 mentions·fieldDecisions가 빈 배열이고 sourceSupport는 모든 기사의 출처가 알려지지 않은 것으로 표시한다(개수는 0이 아니라 null). articles[].publisher는 고정된 기사 버전의 저장된 article_versions 값이며 없으면 null, relationType은 그 기사의 보이는 언급이 모두 background면 PROVIDES_BACKGROUND, 아니면 REPORTS, 언급 정보가 없으면 null이다(앱 결정). role이 있는 companies·relations·참가자는 roleUnconfirmed=true다(인계가 확인된 역할을 생산하지 않음). summary는 아직 사건 요약 생산자가 없어 Unavailable이고 metadata.partial=true·failures에 summary를 남기며, approval은 null이다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1766,7 +1766,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## decideAnalysisCandidate · 후보 거부 또는 운영자 최종 승인
 
-관리자는 후보 상세에서 확인한 대상별 revision과 AI 원천 sourceVersion/sourceRevision을 expectedRevision/expectedSourceVersion/expectedSourceRevision으로 보낸다. relationId가 있으면 세 기대값은 해당 relation의 값이다. 서버는 대상·현재 AI 원천을 다시 확인하고 하나라도 다르면 REVISION_CONFLICT/409로 거절하며 결정·감사를 성공으로 기록하지 않는다. allow는 현재 HOLD인 대상에 대한 운영자의 최종 승인이다(2026-10-21 사용자 정책, DecisionResponse.decision=approved). 재검증·모델 호출·작업 접수가 아니며 jobId를 만들지 않는다. 대상이 HOLD가 아니거나 응답 없는 모델 호출이 남아 있는 등 현재 상태와 맞지 않으면 REVISION_CONFLICT/409다. 결정성 검사(스키마·endpoint·정확한 인용 좌표·현재 원천 권리)는 사람이 덮어쓸 수 없으며 통과하지 못하거나 원천이 철회됐으면 VALIDATION_FAILED/422다. 기존 자동 검증 판정과 claim 분포는 이력으로 그대로 남고 수동 승인이 자동 검증을 통과한 것으로 표시되지 않는다. reject는 대상을 제외한다. 이미 ALLOW인 대상의 승인과 확정된 reject의 번복은 이 계약 범위 밖이다. 승인은 공개·그래프 활성화가 아니므로 publicChanged는 항상 false이며 투영과 활성화는 별도 기록이다. 승인 근거(approvalBasis)는 내부 감사 메타데이터이며 이 응답에 넣지 않는다. 이전 계약의 allow(재검증 접수, revalidation_requested, jobId)는 이력으로만 보존하며 승인으로 소급하지 않는다.
+관리자는 후보 상세에서 결정할 관계(relationId, 필수)와 그 관계의 revision·AI 원천 sourceVersion/sourceRevision을 relationId/expectedRevision/expectedSourceVersion/expectedSourceRevision으로 보낸다. AI 원천은 관계 단위로만 결정하므로 후보 전체를 한 번에 결정하는 요청은 없다. 최신 AI 결과에서 빠진 비활성 관계(active=false)는 현재 상태와 맞지 않아 REVISION_CONFLICT/409다. 서버는 대상·현재 AI 원천을 다시 확인하고 하나라도 다르면 REVISION_CONFLICT/409로 거절하며 결정·감사를 성공으로 기록하지 않는다. allow는 현재 HOLD인 대상에 대한 운영자의 최종 승인이다(2026-10-21 사용자 정책, DecisionResponse.decision=approved). 재검증·모델 호출·작업 접수가 아니며 jobId를 만들지 않는다. 대상이 HOLD가 아니거나 응답 없는 모델 호출이 남아 있는 등 현재 상태와 맞지 않으면 REVISION_CONFLICT/409다. 결정성 검사(스키마·endpoint·정확한 인용 좌표·현재 원천 권리)는 사람이 덮어쓸 수 없으며 통과하지 못하거나 원천이 철회됐으면 VALIDATION_FAILED/422다. 기존 자동 검증 판정과 claim 분포는 이력으로 그대로 남고 수동 승인이 자동 검증을 통과한 것으로 표시되지 않는다. reject는 대상을 제외한다. 이미 ALLOW인 대상의 승인과 확정된 reject의 번복은 이 계약 범위 밖이다. 승인은 공개·그래프 활성화가 아니므로 publicChanged는 항상 false이며 투영과 활성화는 별도 기록이다. 승인 근거(approvalBasis)는 내부 감사 메타데이터이며 이 응답에 넣지 않는다. 이전 계약의 allow(재검증 접수, revalidation_requested, jobId)는 이력으로만 보존하며 승인으로 소급하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2737,7 +2737,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 ## getCompanyIssueImpact · 기업 맥락 이슈 영향 경로 조회
 
-D-GRP-06·D-GRP-05 / FS022. FS079 오프라인 검증 결과를 소비하지만 FS079 자체에 공개 HTTP 작업을 새로 배정하지 않는다. 선택한 공개 버전·asOf·현재 공개 제외를 함께 적용한다. 보이는 INVOLVES가 있으면 direct, 그렇지 않고 보이는 STRUCTURALLY_RELATED_TO가 있으면 structural이다. 다른 이슈를 경유하거나 SHARES_ISSUE를 경로로 쓰지 않는다. 구조 연결만으로 이슈의 긍정·부정 영향을 주장하지 않는다.
+고정된 공개 그래프에서 보이는 기업과 이슈 사이의 직접 INVOLVES 관계만 경로로 반환한다. pathStatus=direct_available이면 직접 경로가 있다. STRUCTURALLY_RELATED_TO만 보이면 200과 빈 steps, pathStatus=structural_path_details_unavailable을 반환해 실제 관계 부재와 구분한다. 둘 다 없으면 빈 steps와 pathStatus=no_direct_relation을 반환한다. 각 근거 ID에는 getEvidence와 같은 현재 공개 권리 검사를 적용한다. 권리 때문에 근거가 빠지면 metadata.partial=true와 evidence 실패 항목을 반환하고, 권한 원천을 확인할 수 없으면 SOURCE_UNAVAILABLE/503이다. 구조 상세 경로는 receipt 전체 경로의 공개 적격성과 basis별 근거를 검증할 수 있을 때만 반환할 수 있으며, 추정·탐색 경로를 만들지 않는다. 기업·이슈가 선택 버전에 없거나 공개 필터 뒤에 보이지 않으면 404다. round·graphVersion·asOf는 getGraph와 같은 공개 버전 선택 규칙을 따른다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2745,7 +2745,7 @@ D-GRP-06·D-GRP-05 / FS022. FS079 오프라인 검증 결과를 소비하지만 
 | 권한·우선순위 | 공개 · P1 |
 | 요청 본문 | 없음 |
 | 응답 | 200: [ImpactPath](#schema-impactpath), 409: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE |
+| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
 | FS/NFS | [FS022](../../system/out/feature-FS022.md) · [FS024](../../system/out/feature-FS024.md) · [FS055](../../system/out/feature-FS055.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-GRP-06](../../system/out/screen-D-GRP-06.md) · [D-GRP-05](../../system/out/screen-D-GRP-05.md) |
 | WBS | 6.1.2, 6.11.1, 6.6.6, 6.6.7, 6.6.9, 6.6.22, 6.6.24, 6.6.25, 6.6.26, 6.5.1 |
@@ -2759,7 +2759,7 @@ D-GRP-06·D-GRP-05 / FS022. FS079 오프라인 검증 결과를 소비하지만 
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string |  |
 | issueId | path | 필수 | string |  |
-| round | query | 선택 | string | 브리핑 회차가 고정한 그래프를 읽는다. graphVersion/asOf를 함께 지정하면 저장된 회차의 버전·자료 시점과 정확히 일치해야 하며 최신 그래프로 대체하지 않는다. |
+| round | query | 선택 | string | 이 브리핑 회차의 공개 그래프를 고정한다. graphVersion과 함께 쓰면 해당 회차와 일치해야 한다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
@@ -3688,6 +3688,7 @@ Current candidate review targets: total = active + inactive (inactive = no relat
 | relationId | 필수 | string |  |
 | sourceVersion | 필수 | string | 이 relation AI 원천 버전. relation 결정 요청에 사용한다. |
 | sourceRevision | 필수 | string | 이 relation AI 원천 revision. relation 결정 요청에 사용한다. |
+| revision | 필수 | integer | 이 관계 검수 대상의 현재 revision. decideAnalysisCandidate의 expectedRevision으로 sourceVersion·sourceRevision과 함께 보낸다. |
 | relationType | 필수 | string |  |
 | source | 필수 | string |  |
 | target | 필수 | string |  |
@@ -3968,7 +3969,7 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| kind | 필수 | string {investment_advice, precondition_unmet, results_truncated, evidence_insufficient, out_of_scope} | investment_advice: 투자 판단 요청이라 제공하지 않음. precondition_unmet: 앞 단계 결과가 체크포인트 조건에 못 미쳐 의존 요구를 수행할 수 없음. results_truncated: 조회 상한에 걸려 일부 자료만 확인함. evidence_insufficient: 조회는 성공했으나 이 요구의 공개 근거가 부족함. out_of_scope: 지원하지 않는 하위 요구. 서버가 gate·체크포인트·도구 결과로 정하며 모델 자기평가로 정하지 않는다. |
+| kind | 필수 | string {investment_advice, precondition_unmet, results_truncated, not_in_member_scope, evidence_insufficient, out_of_scope} | investment_advice: 투자 판단 요청이라 제공하지 않음. precondition_unmet: 앞 단계 결과가 체크포인트 조건에 못 미쳐 의존 요구를 수행할 수 없음. results_truncated: 조회 상한에 걸려 일부 자료만 확인함. not_in_member_scope: 내 종목 질문이 지목한 기업이 회원의 보유·관심 종목이 아님(묻는 대상이면 조회하지 않고, 관계의 기준점이면 조회하되 알림). evidence_insufficient: 조회는 성공했으나 이 요구의 공개 근거가 부족함. out_of_scope: 지원하지 않는 하위 요구. 서버가 gate·체크포인트·도구 결과로 정하며 모델 자기평가로 정하지 않는다. |
 | label | 필수 | string | 해당 요구를 회원 질문의 표현으로 나타낸 문구 |
 | message | 필수 | string | kind별 서버 템플릿으로 만든 안내 문장 |
 
@@ -4500,10 +4501,10 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | --- | --- | --- | --- |
 | decision | 필수 | string {allow, reject} |  |
 | reason | 필수 | string |  |
-| relationId | 선택 | string / null |  |
-| expectedRevision | 필수 | integer | 상세 응답에서 확인한 결정 대상(candidate 또는 relation)의 앱 검수 revision. |
-| expectedSourceVersion | 필수 | string | 상세 응답에서 확인한 결정 대상의 AI 원천 버전. 현재 값과 다르면 REVISION_CONFLICT/409. |
-| expectedSourceRevision | 필수 | string | 상세 응답에서 확인한 결정 대상의 AI 원천 revision. 현재 값과 다르면 REVISION_CONFLICT/409. |
+| relationId | 필수 | string | 결정할 관계(후보 상세의 relation id). AI 원천은 관계 단위로만 결정하므로 필수이며, 후보 전체를 한 번에 결정하는 요청은 없다. |
+| expectedRevision | 필수 | integer | 상세 응답에서 확인한 그 관계의 앱 검수 revision. |
+| expectedSourceVersion | 필수 | string | 상세 응답에서 확인한 그 관계의 AI 원천 버전. 현재 값과 다르면 REVISION_CONFLICT/409. |
+| expectedSourceRevision | 필수 | string | 상세 응답에서 확인한 그 관계의 AI 원천 revision. 현재 값과 다르면 REVISION_CONFLICT/409. |
 
 <a id="schema-decisionresponse"></a>
 
@@ -4571,6 +4572,62 @@ allow는 HOLD 대상의 운영자 최종 승인(approved)이며 재검증이나 
 | quote | 필수 | string |  |
 | quoteVerified | 필수 | boolean / null |  |
 
+<a id="schema-structuraldetails"></a>
+
+### StructuralDetails
+
+FS023 공급 관계 상세. 새 서버는 항상 반환하지만 구서버와 혼재 배포될 수 있어 기존 consumer 호환이 필요한 동안 OpenAPI 및 웹 타입에서 선택 필드로 유지한다. 혼재 배포 지원 종료 시 필수 여부를 다시 결정한다. available일 때만 완전한 paths를 제공하며 일부 경로를 잘라 공개하지 않는다. unavailable은 관계 없음이 아니다. 비공개 pathCompanies는 공개하지 않는다. legacy_data·not_recorded는 기록 부재이므로 metadata.partial/failures에 넣지 않는다. details_not_available은 확인 가능한 상세를 제공하지 못한 상태로 metadata.partial과 STRUCTURAL_DETAIL_UNAVAILABLE을 제공한다. 조회 중 일시 장애는 기본 관계 상세를 유지하고 metadata.failures에 SOURCE_UNAVAILABLE, retryable=true로 기록한다. receipt 구조 손상은 로그를 남기고 details_not_available 및 retryable=false로 기록한다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {available, unavailable, not_applicable} |  |
+| reason | 필수 | string, null {legacy_data, not_recorded, details_not_available, None} |  |
+| paths | 필수 | [StructuralRelationPath](#schema-structuralrelationpath)[] |  |
+
+<a id="schema-structuralrelationpath"></a>
+
+### StructuralRelationPath
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| relationId | 필수 | string | 표시 간선 뒤 원본 공개 relation ID. 경로를 합치지 않고 relationId 순으로 반환한다. |
+| companies | 필수 | [StructuralCompany](#schema-structuralcompany)[] | 운영자가 매핑한 P→…→C 순서이며 공급 방향이 아니다. 모두 현재 공개된 기업이다. |
+| links | 필수 | [StructuralSupplyLink](#schema-structuralsupplylink)[] | basis 순서. 인과·가격 방향·독립 원천 증명을 뜻하지 않는다. |
+
+<a id="schema-structuralcompany"></a>
+
+### StructuralCompany
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| label | 필수 | string |  |
+
+<a id="schema-structuralsupplylink"></a>
+
+### StructuralSupplyLink
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| basisId | 필수 | string | receipt relationKey, 기존 basis.edgeId에 대응. |
+| relationType | 필수 | string {SUPPLIES} |  |
+| supplierCompanyId | 필수 | string |  |
+| customerCompanyId | 필수 | string |  |
+| businessScope | 필수 | string, null | S3 원문 텍스트. null은 미상이며 전체 사업이 아니다. |
+| productScope | 필수 | string, null | S3 원문 텍스트. 제품 엔티티 ID가 아니다. |
+| validFrom | 필수 | string, null | 효력 시작일 YYYY-MM-DD. null은 미상. |
+| validUntil | 필수 | string, null | 마지막 유효일 YYYY-MM-DD, 당일 포함. null은 영구 유효가 아니다. |
+| validity | 필수 | string {scheduled, active, ended, unknown} | metadata.asOf의 Asia/Seoul 날짜 기준, BasisOut.validity와 동일. |
+| verifiedAt | 필수 | string (date-time) | 관계를 eligible하게 만든 판정 시각. 기사 발행 시각과 구분한다. |
+| countries | 필수 | string[] |  |
+| evidenceIds | 필수 | string[] (uniqueItems) | 이 basis에 속하며 현재 읽을 수 있는 근거. EdgeDetail.evidenceIds에 합치지 않는다. |
+
 <a id="schema-edgedetail"></a>
 
 ### EdgeDetail
@@ -4579,6 +4636,7 @@ allow는 HOLD 대상의 운영자 최종 승인(approved)이며 재검증이나 
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| structuralDetails | 선택 | [StructuralDetails](#schema-structuraldetails) |  |
 | id | 필수 | string |  |
 | relationType | 필수 | string {INVOLVES, STRUCTURALLY_RELATED_TO, FOLLOWS, SHARES_ISSUE} |  |
 | derived | 필수 | boolean |  |
@@ -7145,22 +7203,18 @@ S1 실제 문서 요약. exact citation+별도 semantic supported 영수증을 �
 
 ### ImpactPath
 
-pathStatus=none은 기업·이슈가 모두 공개됐지만 공개 연결이 없는 200 결과다. 대상이 없거나 공개되지 않으면 404다. direct가 structural보다 우선한다. structural의 완전한 공개 사슬 후보가 여러 개면 단계 수, 원천 관계 ID, 근거 ID 오름차순으로 하나만 선택한다. available 경로의 steps는 정확히 [issue, company]이고 none에서는 비어 있다. 현재 판정 없이 산업·제품 단계나 긍정·부정 영향을 만들지 않는다.
+기업 패널에서 여는 공개 영향 경로다. 현재 steps는 선택된 공개 스냅샷의 직접 INVOLVES 연결만 담으며 연결이 없으면 빈 배열이다. 근거 ID는 getEvidence의 현재 권리 검사를 통과한 항목만 포함한다. 관계가 보이더라도 구조 경로의 receipt 검증이 완료되지 않은 경우 추정 단계를 만들지 않는다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | companyId | 필수 | string |  |
 | issueId | 필수 | string |  |
-| pathStatus | 필수 | string {available, none} |  |
-| pathType | 필수 | string, null {direct, structural, None} |  |
-| edgeId | 필수 | string, null | 선택 버전의 필터된 공개 그래프에서 고른 표시 간선 ID. 경로가 없으면 null. |
-| steps | 필수 | object[] | available이면 공개 이슈, 선택 기업 순서의 두 노드다. none이면 빈 배열이다. 중간 사업 관계 기업은 이 목록에 넣지 않는다. |
+| pathStatus | 필수 | string {direct_available, structural_path_details_unavailable, no_direct_relation} | 직접 INVOLVES 경로 제공 여부와 구조 경로 상세의 미제공 상태를 구분한다. |
+| steps | 필수 | object[] | 직접 경로의 순서는 [issue, company]다. |
 | steps[].id | 필수 | string |  |
-| steps[].kind | 필수 | string {company, issue} |  |
+| steps[].kind | 필수 | string {company, issue, industry, product} |  |
 | steps[].reason | 필수 | string |  |
 | steps[].evidenceIds | 필수 | string[] |  |
-| businessPath | 필수 | [ImpactBusinessPath](#schema-impactbusinesspath) / null | structural에서만 객체다. 시작 기업의 공개 INVOLVES와 모든 단계·근거·중간 기업의 공개 조건을 통과해야 complete다. direct/none은 null. |
-| impact | 필수 | [CompanyIssueImpactAssessment](#schema-companyissueimpactassessment) |  |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-impactbusinesspath"></a>

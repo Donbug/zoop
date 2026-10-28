@@ -24,7 +24,7 @@ const graph: GraphResponse = {
       relationType: 'INVOLVES',
       role: null,
       summary: '합성 직접 관계',
-      assertionStatus: 'confirmed',
+      assertionStatus: 'occurred',
       derived: false,
       via: [],
       evidenceIds: ['fixture-evidence'],
@@ -104,6 +104,12 @@ test('derived edges are never styled as a confirmed highlighted path', () => {
     .querySelector('line')!;
   expect(line.getAttribute('class')).not.toContain('b75b00');
   expect(line.getAttribute('stroke-dasharray')).toBe('4 4');
+});
+test('D-COM-04 highlights a published impact edge whose assertion status is occurred', () => {
+  render(<CompanyGraphPreview data={graph} highlighted={['fixture-edge']} />);
+  expect(
+    screen.getByRole('img').querySelector('line')!.getAttribute('class'),
+  ).toContain('b75b00');
 });
 test.each(['focus', 'depth', 'version', 'time', 'missing-depth'] as const)(
   'a mismatched %s snapshot is rejected',
@@ -192,12 +198,12 @@ test('equivalent KST timestamp is accepted and historical map uses the same guar
   await expect(getGraph(request)).rejects.toThrow('시점');
 });
 
-test('an unconfirmed edge is not highlighted as a verified impact path', () => {
+test('D-COM-04 an edge without published evidence is not highlighted as an impact path', () => {
   render(
     <CompanyGraphPreview
       data={{
         ...graph,
-        edges: [{ ...graph.edges[0], assertionStatus: 'unconfirmed' }],
+        edges: [{ ...graph.edges[0], evidenceIds: [] }],
       }}
       highlighted={['fixture-edge']}
     />,

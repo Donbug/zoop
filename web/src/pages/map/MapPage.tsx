@@ -20,7 +20,10 @@ import { companyPath } from '@/components/graph/company-path';
 import ImpactPathPanel from '@/components/graph/ImpactPathPanel';
 import CompanyDetailPanel from '@/components/graph/CompanyDetailPanel';
 import RelationDetailPanel from '@/components/graph/RelationDetailPanel';
-import type { RelationDetail } from '@/types/map/relation';
+import type {
+  RelationDetail,
+  StructuralSupplyLink,
+} from '@/types/map/relation';
 import EventDetailPanel, {
   type EventAction,
 } from '@/components/graph/EventDetailPanel';
@@ -50,6 +53,7 @@ import { useImpactPath } from '@/hooks/useImpactPath';
 import { companyUrl } from '@/apis/company/company';
 import { setTutorialCompleted } from '@/apis/graph/tutorial';
 import { impactEdges, exactTime } from '@/components/company/detail-model';
+import { companyDetailRouteFromMap } from '@/util/company-detail-route';
 import type { Impact } from '@/types/company/detail';
 import { useAuth } from '@/hooks/useAuth';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
@@ -446,23 +450,15 @@ function MapWorkspace({
     });
     if (id) track({ type: 'graph_node_select', targetId: id, viewId });
   };
-  const eventContext = tutorialOpen
-    ? {
-        graphVersion: data?.metadata.graphVersion ?? undefined,
-        asOf: data?.metadata.asOf ?? undefined,
-      }
-    : {
-        round,
-        graphVersion:
-          params.get('graphVersion') ??
-          data?.metadata.graphVersion ??
-          undefined,
-        asOf: params.get('asOf') ?? data?.metadata.asOf ?? undefined,
-      };
+  const eventContext = {
+    round: tutorialOpen ? undefined : round,
+    graphVersion: data?.metadata.graphVersion ?? undefined,
+    asOf: data?.metadata.asOf ?? undefined,
+  };
   const impact = useImpactPath(
-    round && !data ? null : impactCompanyId,
-    round && !data ? null : impactIssueId,
-    round || tutorialOpen ? eventContext : undefined,
+    data && !loading && !error ? impactCompanyId : null,
+    data && !loading && !error ? impactIssueId : null,
+    eventContext,
     tutorialOpen &&
       target?.company.id === impactCompanyId &&
       target?.issue.id === impactIssueId
@@ -507,6 +503,7 @@ function MapWorkspace({
     action: 'evidence' | 'ai',
     relation: RelationDetail,
     issueId?: string,
+    supplyLink?: StructuralSupplyLink,
   ) {
     const issue = relation.via.find((item) => item.id === issueId);
     const target: GraphTarget = {
@@ -514,14 +511,17 @@ function MapWorkspace({
       id: issue?.id ?? relation.id,
       label:
         issue?.title ?? `${relation.source.label} – ${relation.target.label}`,
-      evidenceIds: issue?.evidenceIds ?? relation.evidenceIds,
-      verifiedAt: issue
-        ? null
-        : (relation.basis
-            .map((basis) => basis.verifiedAt)
-            .filter((value): value is string => Boolean(value))
-            .sort()
-            .at(-1) ?? null),
+      evidenceIds:
+        supplyLink?.evidenceIds ?? issue?.evidenceIds ?? relation.evidenceIds,
+      verifiedAt: supplyLink
+        ? supplyLink.verifiedAt
+        : issue
+          ? null
+          : (relation.basis
+              .map((basis) => basis.verifiedAt)
+              .filter((value): value is string => Boolean(value))
+              .sort()
+              .at(-1) ?? null),
       mapContext: {
         ...eventContext,
         graphVersion: relation.metadata.graphVersion ?? undefined,
@@ -732,8 +732,15 @@ function MapWorkspace({
       )}
       {historicalImpact.error && (
         <p role="alert">
-          영향 경로 조회 실패. 관계를 임의 강조하지 않았어요.
-          <button onClick={historicalImpact.retry}>영향 경로 다시 조회</button>
+          {historicalImpact.errorCode === 'VERSION_UNAVAILABLE'
+            ? '사건 시점의 그래프 버전을 사용할 수 없어요. 관계를 임의 강조하지 않았어요.'
+            : '영향 경로 조회 실패. 관계를 임의 강조하지 않았어요.'}
+          {historicalImpact.errorRetryable !== false &&
+            historicalImpact.errorCode !== 'VERSION_UNAVAILABLE' && (
+              <button onClick={historicalImpact.retry}>
+                영향 경로 다시 조회
+              </button>
+            )}
         </p>
       )}
       {round && <BriefingSnapshotBanner roundId={round} />}
@@ -1083,6 +1090,9 @@ function MapWorkspace({
                 <CompanyDetailPanel
                   key={companyNode.id}
                   companyId={companyNode.id}
+                  companyDetailHref={(id) =>
+                    companyDetailRouteFromMap(id, params.toString())
+                  }
                   context={round || tutorialOpen ? eventContext : undefined}
                   fallback={companyNode}
                   relatedCompanies={relatedCompanies}
@@ -1180,6 +1190,7 @@ function MapWorkspace({
                 <ImpactPathPanel
                   companyId={impactCompanyId}
                   issueId={impactIssueId}
+                  context={eventContext}
                   graph={data}
                   impact={impact.data}
                   loading={impact.loading}
@@ -1227,6 +1238,9 @@ function MapWorkspace({
                   <EventDetailPanel
                     key={eventId}
                     id={eventId}
+                    companyDetailHref={(id) =>
+                      companyDetailRouteFromMap(id, params.toString())
+                    }
                     context={eventContext}
                     geography={selectedNode?.geography ?? null}
                     logoOf={logoOf}

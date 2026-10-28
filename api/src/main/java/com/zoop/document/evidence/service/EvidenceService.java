@@ -394,7 +394,8 @@ public class EvidenceService {
         } catch (Denied | GraphReceiptGrants.Malformed unusable) {
             log.warn("Graph receipt cannot describe the version (graphVersion={}, reason={}, requestId={})", versionId,
                     unusable.getMessage(), requestId);
-            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+            // The receipt is pinned immutable input: its absence or invalid shape will not heal by retrying this read.
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, false);
         }
     }
 

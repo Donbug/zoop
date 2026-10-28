@@ -102,9 +102,10 @@ class ChatEvalSetTest {
             "deterministicCheck", "answerBasis", "citationKinds", "limitations", "planned", "droppedGeneral",
             "heldRequirements", "appliedCompanies", "appliedIssues", "appliedPeriod", "graphTargets", "questionOverrodeContext",
             "choices");
-    /** What an {@code evidence_insufficient} limitation's message says for each cause the server names. */
+    /** What a limitation's message says for each cause the server names. */
     static final Map<String, String> CAUSE_WORDING = Map.of("evidence_held", "확인하지 못해 뺐어요", "nothing_found",
-            "찾지 못했어요", "scope_cut", "만 확인했어요");
+            "찾지 못했어요", "scope_cut", "만 확인했어요", "named_outside", "아닌 기업은 내 종목으로 확인하지 않았어요",
+            "anchor_outside", "기준으로 지목한 기업은");
     private static final Map<String, String> STAGE_NAMES = Map.of(ChatModelStages.ROUTER, "router", ChatModelStages.ANSWER,
             "answer", ChatModelStages.VERIFICATION, "verify");
     private static final ChatStageReply.Receipt RECEIPT = new ChatStageReply.Receipt("replay", "chat-eval", "scripted",
