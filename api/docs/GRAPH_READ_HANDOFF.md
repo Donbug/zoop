@@ -695,3 +695,20 @@ CLI는 현재 bundle `-7`만 처리하며 하나라도 해석할 수 없는 선�
 전체 allowlist는 child 전·gate 대기 후·child 결과/오류 해석 전·응답 직전에 다시 읽습니다. 어느 선택 항목이든 사라지거나 pin이 바뀌면 403 `handoff_not_allowed`로 전체를 거절합니다. 최종 확인 직후의 철회까지 원자적으로 막는 보장은 아닙니다. 미인증은 401, scope 부족은 403, 비활성은 409 `execution_unavailable`, 선택 중 누락/history/손상은 409 `handoff_selection_unmappable`, pin 불일치는 409 `handoff_pin_mismatch`입니다. 모르는 변경 신원·미사용 관계·생산자 출력 한도는 각각 422 `changed_identity_unknown`·`changed_relation_unused`·`exposure_report_limit`이며, 기록되었지만 선택에 연결되지 않은 신원만 완전한 빈 report가 될 수 있습니다. 경합·실행 불가·운영자 설정 오류는 503, 잘못된 출력/요청 결속은 500입니다. 모든 실패는 기존 `HdErrorEnvelope`만 반환하고 report·부분 영향 ID·CLI detail을 포함하지 않습니다.
 
 실제 loopback HTTP/설치 CLI 회귀와 smoke는 synthetic authored replay 자료를 사용합니다(`ai/service/scripts/handoff_exposure_service_smoke.py`). 실기사 품질이나 운영 배포를 증명하지 않으며, 앱의 버전별 제외 적용과 정정·복구 정책은 여전히 앱 소유입니다.
+
+## 2026-10-28: 버전의 구성 행과 묶음 projection (#55 정기 회차, 앱 PR-1 · `V20261028170000`)
+
+**무엇.** 정기 회차에서는 여러 회차의 묶음(handoff)을 한 공개 버전으로 조립해야 한다(AI 회신 4번: "묶음 하나가 앱의 전체 그래프 버전이므로 회차 증분만 활성화하면 기존 그래프가 줄어든다"). 그 첫 단계로 수입기가 버전마다 두 가지를 더 남긴다. 공개 읽기·활성화·제외는 바뀌지 않는다.
+
+| 남기는 것 | 어디에 | 내용 |
+|---|---|---|
+| 구성 행 | `graph_version_sources(graph_version_id, ordinal, handoff_id, receipt_artifact_id, bundle_snapshot_artifact_id)` | 버전이 어느 묶음으로 이루어졌는지(ordinal 순). 지금은 버전마다 행 하나(ordinal 0, 자기 handoff). PK `(version, ordinal)`, UNIQUE `(version, handoff)`, 버전과 함께만 삭제(CASCADE: 버전 행이 이미 사라진 뒤의 삭제만 trigger가 통과), UPDATE·직접 DELETE는 거절 |
+| 묶음 projection | 켜진 규칙이 아무것도 숨기지 않았으면 snapshot artifact 자체(`artifact-<gv>`, kind `graph_snapshot`). 숨겼을 때만 별도 artifact `artifact-bundle-<gv>`(kind `graph_bundle_snapshot`), 파일 `graph_bundle/<gv>.json` | 검증된 묶음의 형식 3 snapshot을 **공개 규칙을 적용하기 전**에 쓴 바이트(`versionId = gv-sha(handoffId)`, `sourceBundleId = handoffId`). 규칙과 무관하므로 별도 파일의 이름도 규칙과 무관하고, 같은 묶음이면 같은 바이트다. 같은 바이트를 두 번 저장하지 않으려고 숨긴 것이 없을 때는 snapshot을 그대로 가리킨다 |
+
+**왜 projection을 따로 두는가.** 버전의 snapshot(`artifact-<gv>`)은 그날 켜진 규칙으로 거른 결과라 원본이 아니다. 조립은 구성 묶음의 projection을 합친 뒤 **그날의 규칙**으로 다시 거르므로, 나중에 끈 규칙이 이전 묶음의 내용을 되살리고, 날짜 규칙(오래된 이슈 숨기기)이 들어와도 원본에서 다시 거를 수 있다. receipt를 다시 파싱·재검증하지 않으므로 묶음 스키마 버전과도 무관하다.
+
+**backfill.** migration은 그때까지 수입된 `kind='snapshot'`·`source_label='graph-handoff:<id>'` 버전마다 행 하나를 채우되 projection은 `NULL`로 둔다(그 전에는 남기지 않았다). 이런 버전은 자신을 설명할 수는 있지만 조립의 base가 될 수 없으며, 조립 수입은 그 묶음을 결과 파일에 `dropped`로 적고 거른 snapshot을 합치지 않는다. 합성 fixture 버전은 행이 없다.
+
+**재수입(`unchanged`)의 추가 검사.** 구성이 정확히 그 묶음 하나(ordinal 0, 같은 handoffId·receipt)인지, projection이 있으면 그 바이트(snapshot 자체이든 별도 artifact이든)가 이 핀이 만드는 바이트와 같은지. projection이 없는 backfill 버전은 `bundleSnapshot: null`로 답한다. 결과 파일에는 `bundleSnapshot{artifactId, sha256, bytes, file}`과 `composition{sources[], newSource}`가 추가됐다. `newSource`는 `staged`일 때만 값이 있고 `unchanged`면 `null`이다(아무것도 새로 구성하지 않았으므로). PR-3의 조립 소비자는 `bundle_snapshot_artifact_id`가 가리키는 artifact의 kind가 `graph_snapshot`·`graph_bundle_snapshot` 둘 중 무엇이든 형식 3 snapshot으로 읽는다.
+
+**다음 단계(별도 PR).** receipt 해석을 "버전 → 묶음 목록"으로(PR-2), 공개 제외를 묶음 단위로(PR-4), 조립 수입과 `compose` 설정(PR-3). 그 전까지 구성은 언제나 묶음 하나다.
