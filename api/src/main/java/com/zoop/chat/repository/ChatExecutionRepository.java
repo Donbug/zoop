@@ -69,6 +69,9 @@ public interface ChatExecutionRepository {
     /** reserved → running, fenced like every run write; false when the run no longer owns the job. */
     boolean startToolCall(String jobId, String ownerToken, int attemptNo, String toolCallId, Instant at);
 
+    /** The attempt's succeeded calls that kept their result (MCP calls), in call order. */
+    List<ChatKeptToolResult> keptToolResults(String jobId, int attemptNo);
+
     /** running → succeeded|failed, fenced like every run write; false when the run no longer owns the job. */
     boolean finishToolCall(String jobId, String ownerToken, int attemptNo, String toolCallId, ChatToolCallEnd end,
             Instant at);
