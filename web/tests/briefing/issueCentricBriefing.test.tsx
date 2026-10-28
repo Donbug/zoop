@@ -264,11 +264,11 @@ describe('D-BRF-01/02 issue-centered reading', () => {
     expect(
       within(first.parentElement!).getByText('오늘 확인할 사건'),
     ).toBeTruthy();
-    expect(within(first.parentElement!).getByText('첫 사건 확인')).toBeTruthy();
+    expect(
+      within(first.parentElement!).getAllByText('첫 사건 확인').length,
+    ).toBeGreaterThan(0);
     expect(screen.queryByText('첫 사건의 조건부 전망')).toBeTruthy();
-    expect(screen.getAllByText('기존 기업 사업 판단 · 긍정 요인')).toHaveLength(
-      1,
-    );
+    expect(screen.getAllByText('사업 영향 · 긍정 요인')).toHaveLength(1);
     const second = screen.getByText('서로 다른 사건 2').closest('summary')!;
     await user.click(second);
     expect(
@@ -276,11 +276,93 @@ describe('D-BRF-01/02 issue-centered reading', () => {
     ).toBeNull();
     expect(
       within(second.parentElement!).getByText(
-        '이 이슈에 연결된 기존 v5 기업 전망이 없습니다.',
+        '이 이슈의 사업 영향은 아직 판단하기 어렵습니다.',
       ),
     ).toBeTruthy();
     await user.click(first);
     expect(screen.queryByText('첫 사건의 사업상 의미')).toBeNull();
     expect(screen.queryByText('첫 사건 확인')).toBeNull();
+  });
+});
+
+describe('issue/company previous-judgment binding', () => {
+  function pair() {
+    const current = fixture(),
+      prior = fixture();
+    prior.id = 'prior';
+    prior.date = '2026-10-21';
+    prior.edition = 'evening';
+    prior.dataAsOf = '2026-10-21T08:30:00Z';
+    for (const source of Object.values(prior.editionReview!.sources))
+      source.publishedAt = '2026-10-21T07:00:00Z';
+    Object.assign(prior.editionReview!, {
+      roundId: prior.id,
+      date: prior.date,
+      edition: prior.edition,
+      cutoff: prior.dataAsOf,
+      resultVersion: 'prior-review',
+    });
+    prior.editionReview!.companies[0].price.cutoff = prior.dataAsOf;
+    prior.aiPriceOutlooks = undefined;
+    current.editionReview!.previousReview = {
+      roundId: prior.id,
+      date: prior.date,
+      edition: prior.edition,
+      cutoff: prior.dataAsOf,
+      resultVersion: 'prior-review',
+      draft: { companies: prior.editionReview!.companies },
+    };
+    current.editionReview!.companies[0].previous = structuredClone(
+      prior.editionReview!.companies[0],
+    );
+    current.editionReview!.companies[0].checks =
+      prior.editionReview!.companies[0].watch.map((w) => ({
+        condition: w.text,
+        status: 'not_observed' as const,
+        observation: s(),
+      }));
+    const c = current.aiPriceOutlooks!.companies[0];
+    c.previous = {
+      status: 'available',
+      kind: 'preserved_editorial_review',
+      roundId: prior.id,
+      resultVersion: 'prior-review',
+      judgment: { judgment: prior.editionReview!.companies[0].judgment },
+    };
+    c.comparison = {
+      ...s('e1', '같은 사건의 새 근거로 판단 갱신'),
+      status: 'updated',
+      previousResultVersion: 'prior-review',
+    };
+    return { current, prior };
+  }
+  it('requires the historical publication, same event and same company', () => {
+    const { current, prior } = pair();
+    expect(
+      briefingIssueViews(current)[0].companies[0].comparison,
+    ).toBeUndefined();
+    expect(
+      briefingIssueViews(current, current.items, prior)[0].companies[0]
+        .comparison?.text,
+    ).toBe('같은 사건의 새 근거로 판단 갱신');
+    prior.items[0].eventId = 'another-event';
+    expect(
+      briefingIssueViews(current, current.items, prior)[0].companies[0]
+        .comparison,
+    ).toBeUndefined();
+  });
+  it('rejects a changed historical revision and future response', () => {
+    const { current, prior } = pair();
+    prior.editionReview!.resultVersion = 'revised';
+    expect(
+      briefingIssueViews(current, current.items, prior)[0].companies[0]
+        .previous,
+    ).toBeUndefined();
+    prior.editionReview!.resultVersion = 'prior-review';
+    prior.dataAsOf = '2026-10-23T08:30:00Z';
+    expect(
+      briefingIssueViews(current, current.items, prior)[0].companies[0]
+        .previous,
+    ).toBeUndefined();
   });
 });

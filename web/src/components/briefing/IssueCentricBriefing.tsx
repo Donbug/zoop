@@ -1,5 +1,7 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { getBriefing } from '@/apis/briefing/briefing';
+import { validEditionReview } from '@/util/editionReview';
 import type { BriefingItem, BriefingResponse } from '@/types/briefing';
 import {
   briefingIssueViews,
@@ -49,19 +51,40 @@ function CompanyInIssue({
         {company.name}
         {view.assessment && (
           <span className="rounded border border-zoop-line px-2 py-1 text-xs">
-            기존 기업 사업 판단 · {labels[view.assessment]}
+            사업 영향 · {labels[view.assessment]}
           </span>
         )}
       </h5>
-      {view.impact ? (
-        <>
-          <p className={BODY}>{view.impact.text}</p>
-          <p className={NOTE}>
-            이 이슈와 인용된 배경을 함께 본 기업의 사업상 판단입니다.
+      <section aria-label="한 줄 결론">
+        <h6 className="text-sm font-bold">한 줄 결론</h6>
+        <p className={`${BODY} mt-2`}>
+          {view.conclusion?.text ??
+            (view.impact && view.impact.text.length <= 160
+              ? view.impact.text
+              : '이 이슈의 사업 영향은 아직 판단하기 어렵습니다.')}
+        </p>
+      </section>
+      <div className="grid gap-4 rounded-lg bg-zoop-wash p-4 sm:grid-cols-2">
+        <section>
+          <h6 className="text-sm font-bold">긍정 가능성</h6>
+          <p className={`${BODY} mt-2`}>
+            {view.positive?.text ??
+              '이 이슈에 연결된 긍정 근거가 아직 없습니다.'}
           </p>
-        </>
-      ) : (
-        <p className={NOTE}>이 이슈에 연결된 기존 v5 기업 전망이 없습니다.</p>
+        </section>
+        <section>
+          <h6 className="text-sm font-bold">위험·불확실성</h6>
+          <p className={`${BODY} mt-2`}>
+            {view.negative?.text ??
+              '구체적인 위험 조건을 추가 확인해야 합니다.'}
+          </p>
+        </section>
+      </div>
+      {view.fact && (
+        <section>
+          <h6 className="text-sm font-bold">확인된 새 정보</h6>
+          <p className={`${BODY} mt-2`}>{view.fact.text}</p>
+        </section>
       )}
       {price?.status === 'available' && (
         <div className="rounded border border-zoop-line bg-zoop-wash p-3">
@@ -107,26 +130,53 @@ function CompanyInIssue({
             '이 회차에 연결된 검증 가능한 기업 시세가 없습니다.'}
         </p>
       )}
-      {view.outlook && (
-        <div>
-          <h6 className="text-sm font-semibold">현재 전망과 확인 조건</h6>
-          <p className={`${BODY} mt-2`}>{view.outlook.text}</p>
-        </div>
-      )}
-      {view.risks.length > 0 && (
+      {(view.impact || view.outlook || view.risks.length > 0) && (
         <details>
           <summary
-            className={`min-h-11 cursor-pointer content-center text-xs ${FOCUS_RING}`}
+            className={`min-h-11 cursor-pointer content-center text-sm font-semibold ${FOCUS_RING}`}
           >
-            판단이 약해질 조건
+            자세한 사업 분석·전망
           </summary>
-          <ul className="list-disc space-y-2 pl-4">
-            {view.risks.map((s, i) => (
-              <li key={i} className={BODY}>
-                {s.text}
-              </li>
-            ))}
-          </ul>
+          <div className="mt-3 space-y-4">
+            {view.impact && (
+              <section>
+                <h6 className="text-sm font-bold">사업상 의미</h6>
+                <p className={`${BODY} mt-2`}>{view.impact.text}</p>
+              </section>
+            )}
+            {view.outlook && (
+              <section>
+                <h6 className="text-sm font-bold">현재 전망과 확인 조건</h6>
+                <p className={`${BODY} mt-2`}>{view.outlook.text}</p>
+              </section>
+            )}
+            {view.conditions.length > 0 && (
+              <section>
+                <h6 className="text-sm font-bold">상세 확인 조건</h6>
+                <ul className="mt-2 list-disc space-y-2 pl-4">
+                  {view.conditions.map((c, i) => (
+                    <li className={BODY} key={i}>
+                      {c.text}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {view.risks.length > 0 && (
+              <section>
+                <h6 className="text-sm font-bold">
+                  판단을 바꿀 위험·반대 조건
+                </h6>
+                <ul className="mt-2 list-disc space-y-2 pl-4">
+                  {view.risks.map((c, i) => (
+                    <li className={BODY} key={i}>
+                      {c.text}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
         </details>
       )}
       {view.refs.length > 0 && (
@@ -178,10 +228,23 @@ function IssueFollowUp({
   const changed = view.companies.filter(
     (c) => c.comparison && c.comparison.status !== 'unavailable',
   );
-  const watching = view.companies.filter((c) => c.conditions.length > 0);
+  const watching = view.companies.filter((c) => c.nextChecks.length > 0);
   return (
     <>
       <section>
+        {view.companies
+          .filter((c) => c.previous)
+          .map((c) => (
+            <div
+              key={c.company.id}
+              className="mb-3 rounded border border-zoop-line p-3"
+            >
+              <p className="text-xs font-semibold">
+                {c.company.name} · 같은 이슈의 이전 판단
+              </p>
+              <p className={`${BODY} mt-1`}>{c.previous!.judgment.text}</p>
+            </div>
+          ))}
         <h4 className="text-sm font-bold">
           {evening ? '아침 판단에서 달라진 점' : '전날 판단에서 달라진 점'}
         </h4>
@@ -220,7 +283,7 @@ function IssueFollowUp({
               <li key={c.company.id}>
                 <p className="text-xs font-semibold">{c.company.name}</p>
                 <ul className="mt-1 list-disc space-y-2 pl-4">
-                  {c.conditions.map((condition, i) => (
+                  {c.nextChecks.map((condition, i) => (
                     <li className={BODY} key={i}>
                       {condition.text}
                     </li>
@@ -255,14 +318,16 @@ function IssueCard({
       <details
         id={issueAnchor(item)}
         onToggle={(e) => setOpen(e.currentTarget.open)}
-        className="scroll-mt-4 rounded-lg border border-zoop-line bg-zoop-paper"
+        className="scroll-mt-4 overflow-hidden rounded-2xl border border-zoop-line bg-zoop-paper"
       >
-        <summary className={`cursor-pointer list-none p-4 ${FOCUS_RING}`}>
+        <summary
+          className={`cursor-pointer list-none p-5 sm:p-6 ${FOCUS_RING}`}
+        >
           <span className="flex justify-between gap-3 text-xs text-zoop-muted">
             <span>핵심 이슈 {item.rank}</span>
             <span aria-hidden>{open ? '접기 −' : '자세히 +'}</span>
           </span>
-          <strong className="mt-2 block text-base leading-snug">
+          <strong className="mt-3 block text-lg font-bold leading-snug">
             {item.title}
           </strong>
           <span className="mt-3 block text-xs text-zoop-muted">
@@ -273,7 +338,7 @@ function IssueCard({
           </span>
         </summary>
         {open && (
-          <div className="space-y-5 border-t border-zoop-line p-4">
+          <div className="space-y-6 border-t border-zoop-line p-5 sm:p-6">
             <section>
               <h4 className="text-sm font-bold">무슨 일이 있었나요?</h4>
               <p className={`${BODY} mt-2`}>
@@ -282,12 +347,6 @@ function IssueCard({
                   : item.summary.reason}
               </p>
             </section>
-            <BriefingS3Impacts
-              key={`${result.id}:${item.eventId}:${result.graphVersion}`}
-              round={result}
-              item={item}
-            />
-            <IssueFollowUp view={view} result={result} />
             {view.companies.map((c) => (
               <CompanyInIssue
                 key={c.company.id}
@@ -295,6 +354,19 @@ function IssueCard({
                 evening={result.edition === 'evening'}
               />
             ))}
+            <IssueFollowUp view={view} result={result} />
+            <details>
+              <summary
+                className={`min-h-11 cursor-pointer content-center text-sm font-semibold ${FOCUS_RING}`}
+              >
+                기업별 독립 검증·추가 근거
+              </summary>
+              <BriefingS3Impacts
+                key={`${result.id}:${item.eventId}:${result.graphVersion}`}
+                round={result}
+                item={item}
+              />
+            </details>
             <BriefingItemDetails
               roundId={result.id}
               graphVersion={result.graphVersion}
@@ -327,7 +399,30 @@ export default function IssueCentricBriefing({
   items?: BriefingItem[];
   renderExtra?: (item: BriefingItem) => ReactNode;
 }) {
-  const views = briefingIssueViews(result, items);
+  const [previous, setPrevious] = useState<BriefingResponse>();
+  const prior = validEditionReview(result)?.previousReview;
+  const priorDate = prior?.date,
+    priorEdition = prior?.edition,
+    priorId = prior?.roundId;
+  useEffect(() => {
+    let active = true;
+    if (priorDate && priorEdition)
+      getBriefing(priorDate, priorEdition)
+        .then((value) => {
+          if (active && value.id === priorId) setPrevious(value);
+        })
+        .catch(() => {
+          /* Unavailable history never blocks the current publication. */
+        });
+    return () => {
+      active = false;
+    };
+  }, [priorDate, priorEdition, priorId]);
+  const views = briefingIssueViews(
+    result,
+    items,
+    previous?.id === priorId ? previous : undefined,
+  );
   return (
     <div data-presentation="issue-centered">
       <MarketIndicators

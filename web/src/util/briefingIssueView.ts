@@ -3,6 +3,7 @@ import type { CompanyStatement } from '@/types/briefing/companyOutlook';
 import { validAiPriceOutlooks } from './aiPriceOutlook';
 import { validEditionReview } from './editionReview';
 import { validPriceContext } from './briefingPriceContext';
+import { issuePrevious } from './briefingIssueComparison';
 
 /** A company is never the selection key. Each statement must actually cite this issue.
  * A company-wide judgment citing another selected issue cannot be cloned across cards.
@@ -11,6 +12,7 @@ import { validPriceContext } from './briefingPriceContext';
 export function briefingIssueViews(
   result: BriefingResponse,
   items = result.items,
+  previous?: BriefingResponse,
 ) {
   const review = validEditionReview(result);
   const prices = validPriceContext(result);
@@ -64,19 +66,52 @@ export function briefingIssueViews(
           const outlook = anchored(generated?.outlook)
             ? generated!.outlook
             : undefined;
-          const comparison = anchored(generated?.comparison)
-            ? generated!.comparison
-            : undefined;
+          const before = issuePrevious(result, previous, item, company.id);
+          const comparisonBound =
+            before &&
+            generated?.previous.roundId === before.roundId &&
+            generated.previous.resultVersion === before.resultVersion &&
+            generated.previous.kind === before.kind &&
+            JSON.stringify(
+              generated.previous.judgment?.outlook ??
+                generated.previous.judgment?.judgment,
+            ) === JSON.stringify(before.judgment);
+          const comparison =
+            comparisonBound && anchored(generated?.comparison)
+              ? generated!.comparison
+              : undefined;
           const conditions =
             generated?.conditions.filter(anchored) ??
             original?.watch.filter(anchored) ??
             [];
           const risks = generated?.risks.filter(anchored) ?? [];
+          const conclusion = anchored(original?.takeaway)
+            ? original.takeaway
+            : undefined;
+          const nextChecks = original?.watch.filter(anchored) ?? conditions;
+          const positive = anchored(original?.positive)
+            ? original.positive
+            : undefined;
+          const negative = anchored(original?.negative)
+            ? original.negative
+            : undefined;
+          const fact = anchored(original?.newInformation)
+            ? original.newInformation
+            : undefined;
           const refs = [
             ...new Set(
-              [impact, outlook, comparison, ...conditions, ...risks].flatMap(
-                (s) => s?.evidenceIds ?? [],
-              ),
+              [
+                impact,
+                outlook,
+                comparison,
+                conclusion,
+                ...nextChecks,
+                positive,
+                negative,
+                fact,
+                ...conditions,
+                ...risks,
+              ].flatMap((s) => s?.evidenceIds ?? []),
             ),
           ].flatMap((id) =>
             review?.sources[id] ? [{ id, ...review.sources[id] }] : [],
@@ -89,6 +124,12 @@ export function briefingIssueViews(
             impact,
             outlook,
             comparison,
+            previous: before,
+            conclusion,
+            nextChecks,
+            positive,
+            negative,
+            fact,
             conditions,
             risks,
             refs,

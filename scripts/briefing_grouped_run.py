@@ -60,6 +60,9 @@ def run(args, transport=None):
     if publication_ids is not None:
         run_identity["publicationCompanyIds"] = publication_ids
         run_identity["publicationCatalogSha256"] = base.digest(catalog_raw)
+    policy = getattr(args, "issue_selection_policy", None)
+    if policy == "legacy": policy = None
+    if policy: run_identity["issueSelectionPolicy"] = policy
     run_identity["selectionEvidencePolicy"] = semantic.POLICY
     support = semantic.load(archive, archive_path.parent)
     if archive.get("editorialReview"): run_identity["selectionEligibilityPolicy"] = "explicit-eligibility-v1"
@@ -100,6 +103,7 @@ def run(args, transport=None):
                   "groupArchiveSha256":archive_sha,
                   "baseline":{"from":series["rounds"][0]["window"]["from"] if series else local_spec["window"]["from"] if local_spec else sim.BASELINE,
                     "meaning":"explicit_series_baseline" if series else "local_validation_window_start" if local_spec else "simulation_baseline_not_service_first_round"}}
+        if policy: identity["issueSelectionPolicy"] = policy
         identity["selectionEvidencePolicy"] = semantic.POLICY
         if archive.get("editorialReview"): identity["selectionEligibilityPolicy"] = "explicit-eligibility-v1"
         if series: identity["roundSeries"] = series
@@ -129,7 +133,7 @@ def run(args, transport=None):
         else:
             data=grouped.grouped_selection_data(candidates,context,published_history)
             selection_digest=client.request_digest(grouped.SELECTION_STAGE,data,"selection.md","selection.schema.json",max_output=grouped.selection_output_cap(candidates),
-                                                   schema_override=grouped.selection_schema(candidates, publication_ids))
+                                                   schema_override=grouped.selection_schema(candidates, publication_ids, policy))
             record["groupedSelectionRequestDigest"]=selection_digest
             try:
                 outcome=grouped.attempt_grouped_selection(client,candidates,context,identity_sha,published_history)
@@ -197,6 +201,7 @@ def run(args, transport=None):
 def parser():
     p=argparse.ArgumentParser(description=__doc__)
     for name in ["archive","sources","clocks","output","user-inbox-ref"]:p.add_argument("--"+name,required=True)
+    p.add_argument("--issue-selection-policy", choices=["legacy", grouped.issue_policy.VERSION], default=None)
     p.add_argument("--round-series");p.add_argument("--publication-catalog");p.add_argument("--round-spec");p.add_argument("--key-file");p.add_argument("--execute-authorized",action="store_true")
     p.add_argument("--hold-unresolved-requests",action="store_true",
         help="Withhold unchanged requests already pending without a completion at startup; never resend them.")
