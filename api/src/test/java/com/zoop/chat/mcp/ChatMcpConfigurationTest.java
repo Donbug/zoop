@@ -23,7 +23,7 @@ import tools.jackson.databind.json.JsonMapper;
 /** The chat MCP endpoint exists only when enabled, and enabled it refuses to start without its grant keys. */
 class ChatMcpConfigurationTest {
     private final WebApplicationContextRunner runner = new WebApplicationContextRunner()
-            .withUserConfiguration(ChatMcpConfiguration.class)
+            .withUserConfiguration(ChatMcpConfiguration.class, ChatAgentFlagCheck.class)
             .withBean(Clock.class, () -> Clock.fixed(ChatMcpGrantsTest.NOW, ZoneOffset.UTC))
             .withBean(ChatToolRegistry.class, () -> new ChatToolRegistry(List.of()))
             .withBean(ChatToolRunner.class, () -> new ChatToolRunner(new ChatToolRegistry(List.of())))
@@ -75,5 +75,11 @@ class ChatMcpConfigurationTest {
         ChatModels.Agent stages = (run, step, input) -> { throw new UnsupportedOperationException(); };
         withRepository.withBean(ChatModels.Agent.class, () -> stages).withPropertyValues(ENABLED)
                 .run(context -> assertThat(context).hasSingleBean(ChatMcpAgent.class));
+    }
+
+    @Test
+    void theAgentFlagWithoutTheMcpEndpointRefusesToStart() {
+        runner.withPropertyValues("zoop.chat.mcp.agent-enabled=true").run(context -> assertThat(context.getStartupFailure())
+                .rootCause().hasMessageContaining("ZOOP_CHAT_MCP_ENABLED"));
     }
 }
