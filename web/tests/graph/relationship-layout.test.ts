@@ -88,3 +88,51 @@ test('D-GRP-01/01b: emphasis preserves layout and coordinates remain finite', ()
   expect(data).toEqual(before);
   expect(relationshipPositions({ ...data, nodes: [], edges: [] }).size).toBe(0);
 });
+
+test('D-GRP-01: sparse links get more room than a densely connected neighborhood', () => {
+  const fixture = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const companies = fixture.nodes
+    .filter((node) => node.kind === 'company')
+    .slice(0, 5);
+  const issues = fixture.nodes
+    .filter((node) => node.kind === 'issue')
+    .slice(0, 3);
+  const denseEdges = issues.flatMap((issue, i) =>
+    companies.slice(0, 3).map((company, j) => ({
+      ...fixture.edges[0],
+      id: `dense-${i}-${j}`,
+      source: issue.id,
+      target: company.id,
+      relationType: 'INVOLVES' as const,
+    })),
+  );
+  const sparseEdge = {
+    ...denseEdges[0],
+    id: 'sparse',
+    target: companies[3].id,
+  };
+  const graph = {
+    ...fixture,
+    nodes: [...companies, ...issues],
+    edges: [...denseEdges, sparseEdge],
+  };
+  const points = relationshipPositions(graph);
+  const length = (edge: typeof sparseEdge) =>
+    distance(points.get(edge.source)!, points.get(edge.target)!);
+  const denseMean =
+    denseEdges.reduce((sum, edge) => sum + length(edge), 0) / denseEdges.length;
+  const isolatedNearest = Math.min(
+    ...graph.nodes
+      .filter((node) => node.id !== companies[4].id)
+      .map((node) =>
+        distance(points.get(node.id)!, points.get(companies[4].id)!),
+      ),
+  );
+  // 이 합성 그래프에서 변경 전에 측정한 밀집 구간 평균 거리예요. 요청한 30% 이상 확대를 확인해요.
+  const previousDenseMean = 191.91688130435122;
+  expect(denseMean).toBeGreaterThanOrEqual(previousDenseMean * 1.3);
+  expect(length(sparseEdge)).toBeGreaterThan(denseMean * 1.5);
+  // 좌표 연산의 부동소수점 오차만 허용하고 실제 배치 거리는 바꾸지 않아요.
+  expect(isolatedNearest).toBeGreaterThanOrEqual(180 - 1e-9);
+  expect(isolatedNearest).toBeLessThanOrEqual(360);
+});

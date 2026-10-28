@@ -72,6 +72,16 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
                 .filter(Objects::nonNull).map(Timestamp::toInstant).findFirst();
     }
 
+    @Override
+    public Optional<String> previousVersionId(String versionId, Instant at) {
+        return first(jdbc.queryForList("""
+                SELECT previous_version_id FROM graph_activations
+                WHERE version_id = :id AND pointer_changed AND activated_at <= :at AND previous_version_id IS NOT NULL
+                  AND previous_version_id <> version_id
+                ORDER BY activated_at DESC, id DESC LIMIT 1
+                """, new MapSqlParameterSource("id", versionId).addValue("at", Timestamp.from(at)), String.class));
+    }
+
     /** True when any non-fixture (imported) version exists; fixture seeding must never move such a pointer. */
     public boolean hasNonFixtureVersions() {
         return Boolean.TRUE.equals(jdbc.queryForObject(

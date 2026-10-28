@@ -16,6 +16,7 @@ import { useEventData } from '@/hooks/useEventData';
 import { useRelationData } from '@/hooks/useRelationData';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { createMockGraph } from '@/mocks/graph/response';
+import type { Impact } from '@/types/company/detail';
 
 vi.mock('@/hooks/useCompanyData');
 vi.mock('@/hooks/useEventData');
@@ -29,6 +30,74 @@ const context = {
   graphVersion: graph.metadata.graphVersion ?? undefined,
   asOf: graph.metadata.asOf,
 };
+
+// D-GRP-06 label terminology follows the OpenAPI user decision.
+it.each([
+  ['mixed', '혼재'],
+  ['undetermined', '판단 보류'],
+] as const)('D-GRP-06 renders %s as %s', (label, expected) => {
+  vi.mocked(useEventData).mockReturnValue({
+    key: 'fixture',
+    loading: false,
+    error: null,
+    data: null,
+  });
+  const impact: Impact = {
+    companyId: company.id,
+    issueId: issue.id,
+    pathStatus: 'available',
+    pathType: 'direct',
+    edgeId: graph.edges[0].id,
+    steps: [
+      { id: issue.id, kind: 'issue', reason: '확인', evidenceIds: ['ev-a'] },
+      {
+        id: company.id,
+        kind: 'company',
+        reason: '확인',
+        evidenceIds: ['ev-a'],
+      },
+    ],
+    businessPath: null,
+    impact: {
+      status: 'available',
+      reason: null,
+      results: [
+        {
+          impactId: label,
+          status: 'verified',
+          label,
+          evidenceIds: ['ev-a'],
+          effects: {
+            positive: [],
+            negative: [],
+            neutral: [],
+            uncertain: ['ev-a'],
+          },
+        },
+      ],
+    },
+    metadata: graph.metadata,
+  };
+  render(
+    <MemoryRouter>
+      <ImpactPathPanel
+        companyId={company.id}
+        issueId={issue.id}
+        context={context}
+        graph={graph}
+        impact={impact}
+        loading={false}
+        error={null}
+        onClose={vi.fn()}
+        onRetry={vi.fn()}
+        onViewIssue={vi.fn()}
+        onEvidence={vi.fn()}
+        onAskAi={vi.fn()}
+      />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText(`영향 판정 · ${expected}`)).toBeTruthy();
+});
 
 // M-GRP-01: render real panel headers in the mobile portal, including failure/loading.
 it.each(['loading', 'error'] as const)(
@@ -140,6 +209,7 @@ it.each(['loading', 'error'] as const)(
           <ImpactPathPanel
             companyId={company.id}
             issueId={issue.id}
+            context={context}
             graph={graph}
             impact={null}
             loading={loading}

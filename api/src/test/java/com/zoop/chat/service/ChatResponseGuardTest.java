@@ -3,10 +3,12 @@ package com.zoop.chat.service;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import com.zoop.chat.dto.ChatAnswerSection;
 import com.zoop.chat.dto.ChatApplied;
+import com.zoop.chat.dto.ChatAppliedItem;
 import com.zoop.chat.dto.ChatContextItem;
 import com.zoop.chat.dto.ChatConversation;
 import com.zoop.chat.dto.ChatCurrentResponse;
@@ -27,6 +29,7 @@ class ChatResponseGuardTest {
     private static final Instant AS_OF = Instant.parse("2026-10-20T00:00:00Z");
 
     private final List<String> checks = new ArrayList<>();
+    private final List<String> targetChecks = new ArrayList<>();
 
     @Test
     void readableEvidenceIsReturnedUnchangedAtThePinnedVersion() {
@@ -104,11 +107,89 @@ class ChatResponseGuardTest {
         assertNull(guard.current(new ChatCurrentResponse(null), "req-3").conversation());
     }
 
+    @Test
+    void anAppliedTargetHiddenSinceTheRunIsLeftOutOfAnInsufficientResultWithoutChangingTheStoredOne() {
+        var job = job(List.of(), insufficient());
+        var shown = guard(Set.of(), Optional.of(Set.of("KRX:000660"))).job(job, "req-1").result();
+        assertEquals(List.of(new ChatAppliedItem("KRX:000660", "SK하이닉스")), shown.applied().companies());
+        assertEquals(List.of(), shown.applied().issues(), "an issue excluded since the run is not named again");
+        assertEquals(job.result().reason(), shown.reason());
+        assertEquals(2,job.result().applied().companies().size() + job.result().applied().issues().size(),
+                "what is stored never changes");
+        assertEquals(List.of("KRX:000660,iss-1@gv-1@" + AS_OF), targetChecks);
+
+        var unchecked = guard(Set.of(), Optional.empty()).job(job, "req-2").result();
+        assertTrue(unchecked.applied().companies().isEmpty() && unchecked.applied().issues().isEmpty(),
+                "visibility that cannot be checked shows nothing");
+
+        var visible = guard(Set.of(), Optional.of(Set.of("KRX:000660", "iss-1")));
+        assertSame(job, visible.job(job, "req-3"));
+    }
+
+    @Test
+    void anAnsweredResultKeepsOnlyVisibleAppliedTargetsAndAConversationChecksEachOnce() {
+        var result = answered("ev-1");
+        var withTargets = new ChatResult(result.outcome(), result.messageId(), result.answer(), result.sections(),
+                result.answerBasis(), result.reason(), result.sources(), result.citations(), result.graphTargets(),
+                new ChatApplied(List.of(new ChatAppliedItem("KRX:000660", "SK하이닉스")),
+                        List.of(new ChatAppliedItem("iss-1", "HBM 공급 확대")), null, "gv-1", AT, false),
+                result.choices(), result.action(), result.limitations(), result.metadata());
+        var guard = guard(Set.of("ev-1"), Optional.of(Set.of("KRX:000660")));
+        var conversation = new ChatConversation(new ChatSessionResponse("conv-0001", AT, 2),
+                List.of(job(List.of(), withTargets), job(List.of(), withTargets)));
+        var shown = guard.conversation(conversation, "req-1");
+        for (var job : shown.jobs()) {
+            assertEquals("근거 본문", job.result().answer(), "readable citations keep the answer");
+            assertEquals(List.of("KRX:000660"), job.result().applied().companies().stream().map(ChatAppliedItem::id).toList());
+            assertTrue(job.result().applied().issues().isEmpty());
+        }
+        assertEquals(1, targetChecks.size(), "each target is checked once per conversation");
+    }
+
+    @Test
+    void aMapTargetExcludedSinceTheRunIsLeftOutWhileItsSharedEvidenceKeepsTheAnswer() {
+        var result = answered("ev-shared");
+        var mapped = new ChatResult(result.outcome(), result.messageId(), result.answer(), result.sections(),
+                result.answerBasis(), result.reason(), result.sources(), result.citations(),
+                List.of(new GraphTarget("KRX:000660", "company"), new GraphTarget("iss-excluded", "issue")), result.applied(),
+                result.choices(), result.action(), result.limitations(), result.metadata());
+        var job = job(List.of(), mapped);
+
+        // The issue was excluded, but the evidence is still readable through a public relation that cites it too.
+        var shown = guard(Set.of("ev-shared"), Optional.of(Set.of("KRX:000660"))).job(job, "req-1").result();
+        assertEquals("근거 본문", shown.answer(), "the citation still reads, so the answer stays");
+        assertEquals(result.citations(), shown.citations());
+        assertEquals(List.of(new GraphTarget("KRX:000660", "company")), shown.graphTargets(),
+                "the excluded issue is no longer a place the map moves to");
+        assertEquals(2, job.result().graphTargets().size(), "what is stored never changes");
+
+        var unchecked = guard(Set.of("ev-shared"), Optional.empty()).job(job, "req-2").result();
+        assertTrue(unchecked.graphTargets().isEmpty(), "visibility that cannot be checked shows no map target");
+        assertEquals("근거 본문", unchecked.answer());
+    }
+
+    /** Every applied or map target is visible. */
     private ChatResponseGuard guard(Set<String> readable) {
+        return guard(readable, null);
+    }
+
+    private ChatResponseGuard guard(Set<String> readable, Optional<Set<String>> visible) {
         return new ChatResponseGuard((id, version, asOf, requestId) -> {
             checks.add(id + "@" + version + "@" + asOf);
             return readable.contains(id);
+        }, (ids, version, asOf, requestId) -> {
+            targetChecks.add(String.join(",", ids.stream().sorted().toList()) + "@" + version + "@" + asOf);
+            if (visible == null) return Optional.of(ids);
+            return visible.map(v -> Set.copyOf(ids.stream().filter(v::contains).toList()));
         });
+    }
+
+    private static ChatResult insufficient() {
+        return new ChatResult("insufficient_evidence", "msg-job-00001", "", List.of(), "none",
+                "관련 항목은 찾았지만 답에 쓸 수 있는 공개 근거가 부족했어요.", List.of(), List.of(), List.of(),
+                new ChatApplied(List.of(new ChatAppliedItem("KRX:000660", "SK하이닉스")),
+                        List.of(new ChatAppliedItem("iss-1", "HBM 공급 확대")), null, "gv-1", AT, false),
+                List.of(), null, List.of(), metadata());
     }
 
     private static ChatJob job(List<ChatContextItem> items, ChatResult result) {

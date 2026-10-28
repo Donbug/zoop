@@ -165,6 +165,22 @@ class GraphVersionPostgresIntegrationTest {
     }
 
     @Test
+    void thePreviousVersionIsTheOnePublicBeforeTheLastActivationUpToTheGivenTime() {
+        Instant later = Instant.parse("2026-10-20T00:00:00Z");
+        assertEquals(java.util.Optional.of("fixture-2026-10-01"), repository.previousVersionId("fixture-2026-10-08", later));
+        assertTrue(repository.previousVersionId("fixture-2026-10-01", later).isEmpty(), "the first public version");
+        assertTrue(repository.previousVersionId("fixture-2026-10-08", Instant.parse("2026-10-05T00:00:00Z")).isEmpty(),
+                "not public yet then");
+
+        // A rollback makes 10-01 public again after 10-08; a no-op reactivation does not move the pointer.
+        repository.activateSystem("fixture-2026-10-08", "no-op", Instant.parse("2026-10-10T00:00:00Z"));
+        repository.activateSystem("fixture-2026-10-01", "rollback", Instant.parse("2026-10-11T00:00:00Z"));
+        assertEquals(java.util.Optional.of("fixture-2026-10-08"), repository.previousVersionId("fixture-2026-10-01", later));
+        assertTrue(repository.previousVersionId("fixture-2026-10-01", Instant.parse("2026-10-10T12:00:00Z")).isEmpty(),
+                "before the rollback it was only ever the first version");
+    }
+
+    @Test
     void reactivatingKeepsOnePointerAndRecordsWhetherItMoved() {
         repository.activateSystem("fixture-2026-10-08", "no-op", Instant.parse("2026-10-10T00:00:00Z"));
         repository.activateSystem("fixture-2026-10-01", "rollback", Instant.parse("2026-10-11T00:00:00Z"));

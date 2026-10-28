@@ -10,7 +10,8 @@ export function compactRelationshipGroups(
   groups: string[][],
 ) {
   if (groups.length < 2) return;
-  const gap = 200;
+  // 최종 1.5배 확대를 적용하면 묶음 사이 여백은 180이 돼요.
+  const gap = 120;
   const boxes = groups
     .map((ids) => {
       const members = ids.map((id) => points.get(id)!);
@@ -153,7 +154,13 @@ export function relationshipPositions(data: GraphResponse): Map<string, Point> {
       const dx = b.x - a.x,
         dy = b.y - a.y;
       const distance = Math.max(1, Math.hypot(dx, dy));
-      const strength = (distance ** 2 / 210) * edge.weight;
+      // D-GRP-01: 연결이 적은 끝 노드는 촘촘한 관계 묶음보다 느슨하게 붙여요.
+      const degree = Math.min(
+        neighbors.get(edge.source)!.size,
+        neighbors.get(edge.target)!.size,
+      );
+      const spacing = degree <= 1 ? 1.75 : degree === 2 ? 1.3 : 1;
+      const strength = (distance ** 2 / (210 * spacing ** 3)) * edge.weight;
       const fx = (dx / distance) * strength,
         fy = (dy / distance) * strength;
       forces.get(edge.source)!.x += fx;
@@ -215,7 +222,7 @@ export function relationshipPositions(data: GraphResponse): Map<string, Point> {
     leaves.set(parentId ?? '', index + 1);
     const angle = index * 2.399963229728653;
     const radius = parent
-      ? 180 + Math.floor(index / 6) * 90
+      ? 270 + Math.floor(index / 6) * 135
       : 400 + index * 100;
     points.set(node.id, {
       x: (parent?.x ?? 0) + Math.cos(angle) * radius,
@@ -241,6 +248,11 @@ export function relationshipPositions(data: GraphResponse): Map<string, Point> {
     groups.push(group);
   }
   compactRelationshipGroups(points, groups);
+  // D-GRP-01/01b: 배율을 줄여 상쇄하지 않고, 같은 배율에서 기본 간격을 50% 넓혀요.
+  for (const point of points.values()) {
+    point.x *= 1.5;
+    point.y *= 1.5;
+  }
   cache.set(data, points);
   return points;
 }

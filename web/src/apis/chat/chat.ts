@@ -2,13 +2,14 @@ import { call } from '@/apis/auth/ApiService';
 import { createIdempotencyKey } from '@/apis/portfolio/portfolio';
 import type {
   ChatConversation,
+  ChatConversationList,
   ChatCurrentResponse,
   ChatJob,
   ChatJobRequest,
   ChatSession,
 } from '@/types/ai';
 
-// D-AI-01/01b/02/02b. docs/api/openapi.yaml createConversation … cancelQuestionJob.
+// D-AI-01/01b/02/02b. docs/api/openapi.yaml createConversation … cancelQuestionJob, listConversations, deleteConversation.
 // GET 회수는 저장된 상태만 읽고 모델을 다시 부르지 않는다.
 
 /** 대화·질문 작업 ID: 계약의 `[A-Za-z0-9_-]{8,64}`. */
@@ -63,6 +64,17 @@ export async function getCurrentConversation() {
   );
   if (current.conversation) ensureConversationId(current.conversation);
   return current;
+}
+
+/** D-AI-02 대화 기록: 질문이 있는 본인 대화를 최근 질문 순으로. 커서는 같은 limit으로만 쓴다. */
+export async function listConversations(cursor?: string) {
+  const query = cursor ? `?cursor=${enc(cursor)}` : '';
+  return call<ChatConversationList>(`/api/v1/chat/sessions${query}`, 'GET');
+}
+
+/** 대화와 질문 작업을 즉시 삭제한다. 처리 중인 질문이 있으면 서버가 JOB_IN_PROGRESS로 거부한다. */
+export async function deleteConversation(id: string) {
+  await call<void>(`/api/v1/chat/sessions/${enc(id)}`, 'DELETE');
 }
 
 /** 같은 jobId(=Idempotency-Key)로 다시 보내면 서버는 같은 작업을 돌려준다. */

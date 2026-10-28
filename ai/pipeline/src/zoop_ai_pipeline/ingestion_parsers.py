@@ -11,7 +11,7 @@ import os
 import re
 import subprocess
 import sys
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 
 from .ingestion_contracts import MAX_RAW, MAX_TEXT, IngestionFailure
 from .ingestion_url import canonical_url
@@ -31,7 +31,13 @@ _RESTRICTED_MARKER = re.compile(r"(?:^|[\s_-])(?:paywall|login-required|subscrip
 
 
 def profile(article_xpath: str | None = None) -> dict:
-    return {"parser": PARSER, "lxml": version("lxml"), "pypdf": version("pypdf"), "mappingVersion": MAPPING,
+    try:
+        lxml_version, pypdf_version = version("lxml"), version("pypdf")
+    except PackageNotFoundError as exc:
+        raise IngestionFailure("input_or_configuration_invalid") from exc
+    if any(not isinstance(value, str) or not value.strip() or len(value) > 200 for value in (lxml_version, pypdf_version)):
+        raise IngestionFailure("input_or_configuration_invalid")
+    return {"parser": PARSER, "lxml": lxml_version, "pypdf": pypdf_version, "mappingVersion": MAPPING,
             "htmlDecoding": "utf-8-strict", "htmlScope": HTML_SCOPE, "pdfExtraction": PDF_EXTRACTION, "articleXPath": article_xpath}
 
 

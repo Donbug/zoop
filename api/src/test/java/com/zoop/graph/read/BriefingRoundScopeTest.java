@@ -46,7 +46,7 @@ class BriefingRoundScopeTest {
         assertEquals(Set.of(HBM_SUPPLY), graph.issues.keySet());
         assertEquals(List.of(HBM_SUPPLY), graph.edges.get(edgeId).via());
         assertFalse(graph.edges.get(edgeId).summary().contains("2"));
-        var relations = new GraphRelationService(reader, mock(NamedParameterJdbcTemplate.class));
+        var relations = new GraphRelationService(reader, mock(NamedParameterJdbcTemplate.class), new GraphStructuralDetailReader(org.mockito.Mockito.mock(com.zoop.document.evidence.service.EvidenceService.class)));
         var detail = relations.getRelation(edgeId, "round", null, null, "r");
         assertEquals(List.of(HBM_SUPPLY), detail.via().stream().map(v -> v.id()).toList());
         var company = new GraphCompanySnapshotReader(reader).read(new CompanyGraphReadRequest(HYNIX, "round", null, null)).orElseThrow();

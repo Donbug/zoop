@@ -26,8 +26,15 @@ import java.util.regex.Pattern;
  * <li>{@code general_section}: a {@code general_knowledge} section cites nothing, answers pure Q02 requirements only and
  * states no current fact: no amount, percentage, price, year or calendar date (design summary 8.2: Q02 is never a way around
  * a lookup).</li>
+ * <li>{@code general_names}: a general section answering any requirement the server split off ({@link ChatPlan.Origin})
+ * does not name the companies or issues that requirement's parent read returned, whatever else the section answers. A
+ * section answering only split-off requirements that breaks this or {@code general_section} is dropped and its
+ * requirements count as unanswered: it is the server's addition, not what the member asked, so it does not fail the
+ * answer. One that also answers a router requirement fails like any other section, so that requirement is never lost
+ * silently.</li>
  * <li>{@code evidence_section}: an {@code evidence_grounded} section cites only evidence its own requirements' tool results
- * passed on, and cites some unless all its requirements found nothing. ZOOP document reads do not count here.</li>
+ * passed on, and cites some unless all its requirements found nothing or read only the member's own companies (Q07, which
+ * have no public evidence). ZOOP document reads do not count here.</li>
  * <li>{@code document_section}: a {@code zoop_documented} section does the same with what its requirements' ZOOP document
  * reads (Q01) passed on, and nothing else: approved ZOOP text and public evidence never share a section.</li>
  * <li>{@code citation_budget}: all sections together cite at most 20 distinct evidence ids ({@code ChatResult.citations}).</li>
@@ -52,8 +59,12 @@ final class ChatAnswerCheck {
     private static final Pattern ADVICE = Pattern.compile(
             "(매수|매도|사|팔|담으)(하)?(세요|십시오|는 것을 추천|기를 권)|추천 종목|목표\\s*주가|지금이 (매수|매도) (적기|타이밍)");
 
-    /** The checked answer: sections with the notice in place, the declared insufficient requirements and map targets. */
-    record Passed(List<ChatGeneratedAnswer.Section> sections, List<String> insufficient, List<GraphTarget> graphTargets) { }
+    /**
+     * The checked answer: sections with the notice in place, the declared insufficient requirements (with those of dropped
+     * sections no kept section answers), map targets and the requirements of the general sections dropped.
+     */
+    record Passed(List<ChatGeneratedAnswer.Section> sections, List<String> insufficient, List<GraphTarget> graphTargets,
+            List<String> dropped) { }
 
     /** The first failing check id, or the passed answer. */
     record Result(Passed passed, String failedCheck) {
@@ -90,13 +101,19 @@ final class ChatAnswerCheck {
         }
 
         List<ChatGeneratedAnswer.Section> sections = new ArrayList<>();
+        Set<String> dropped = new LinkedHashSet<>();
         for (var section : answer.sections()) {
             List<Branch> owners = section.requirementIds().stream().map(byId::get).toList();
             if ("general_knowledge".equals(section.basis())) {
-                if (!section.evidenceIds().isEmpty() || owners.stream().anyMatch(b -> !b.general())
-                        || CURRENT_FACT.matcher(section.text()).find()) {
-                    return Result.fail("general_section");
+                boolean broken = !section.evidenceIds().isEmpty() || owners.stream().anyMatch(b -> !b.general())
+                        || CURRENT_FACT.matcher(section.text()).find();
+                boolean named = names(section.text(), owners);
+                if (owners.stream().allMatch(b -> b.parent() != null) && (broken || named)) {
+                    dropped.addAll(section.requirementIds());
+                    continue;
                 }
+                if (broken) return Result.fail("general_section");
+                if (named) return Result.fail("general_names");
                 String text = section.text().strip();
                 sections.add(new ChatGeneratedAnswer.Section(section.basis(),
                         text.startsWith(GENERAL_NOTICE) ? text : GENERAL_NOTICE + " " + text, section.requirementIds(),
@@ -107,7 +124,8 @@ final class ChatAnswerCheck {
                 owners.forEach(b -> b.results().forEach(r -> {
                     if (documentRead(r) == documented) passedOn.addAll(r.evidenceIds());
                 }));
-                boolean nothingFound = owners.stream().allMatch(Branch::noneFound);
+                // Nothing found, or only the member's own companies read: neither has public evidence to cite.
+                boolean nothingFound = owners.stream().allMatch(b -> b.noneFound() || memberOnly(b));
                 if (owners.stream().anyMatch(Branch::general) || !passedOn.containsAll(section.evidenceIds())
                         || (section.evidenceIds().isEmpty() && !nothingFound)) {
                     return Result.fail(documented ? "document_section" : "evidence_section");
@@ -115,6 +133,10 @@ final class ChatAnswerCheck {
                 sections.add(section);
             }
         }
+
+        Set<String> kept = new HashSet<>();
+        sections.forEach(s -> kept.addAll(s.requirementIds()));
+        dropped.stream().filter(id -> !kept.contains(id)).forEach(insufficient::add);
 
         Set<String> cited = new HashSet<>();
         sections.forEach(s -> cited.addAll(s.evidenceIds()));
@@ -136,8 +158,25 @@ final class ChatAnswerCheck {
         }
 
         if (joined(sections).length() > MAX_ANSWER) return Result.fail("length");
-        if (sections.stream().anyMatch(s -> ADVICE.matcher(s.text()).find())) return Result.fail("investment_wording");
-        return new Result(new Passed(List.copyOf(sections), List.copyOf(insufficient), List.copyOf(targets)), null);
+        // A dropped section is checked too: advice wording fails the answer wherever it is.
+        if (answer.sections().stream().anyMatch(s -> ADVICE.matcher(s.text()).find())) {
+            return Result.fail("investment_wording");
+        }
+        return new Result(new Passed(List.copyOf(sections), List.copyOf(insufficient), List.copyOf(targets),
+                List.copyOf(dropped)), null);
+    }
+
+    /** Whether the text names a label the owners must avoid, spacing aside. */
+    private static boolean names(String text, List<Branch> owners) {
+        String flat = text.replaceAll("\\s+", "");
+        return owners.stream().flatMap(b -> b.avoidNames().stream()).map(n -> n.replaceAll("\\s+", ""))
+                .anyMatch(n -> !n.isEmpty() && flat.contains(n));
+    }
+
+    /** A requirement that read only the member's own scope ({@code portfolio.scope.read}), which carries no evidence. */
+    static boolean memberOnly(Branch branch) {
+        return !branch.results().isEmpty() && branch.results().stream().allMatch(r -> ChatCapability.of(r.capabilityId())
+                .map(c -> c == ChatCapability.PORTFOLIO_SCOPE_READ).orElse(false));
     }
 
     /** A read of ZOOP's own documents: a capability that reads no graph. */

@@ -119,7 +119,7 @@ export default function CompanyGraphPreview({
               className={
                 highlighted.includes(edge.id) &&
                 !edge.derived &&
-                edge.assertionStatus === 'confirmed'
+                edge.evidenceIds.length > 0
                   ? 'stroke-[#b75b00] stroke-[4px]'
                   : 'stroke-zoop-faint stroke-1'
               }

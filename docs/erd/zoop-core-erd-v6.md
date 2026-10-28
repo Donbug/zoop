@@ -432,6 +432,8 @@ id text PK; target_type text; source_job_id text; external_id text; source_versi
 candidate_id text; current_revision bigint; status text; active boolean; is_current boolean
 company_ids text[]; relation_types text[]; source_revision text; source_updated_at timestamptz?
 verification_artifact_id text? FK artifacts; updated_at timestamptz
+issue_id text?; title text?; action text?; target text?; event_time text?; evidence_count integer?
+companies jsonb?; reasons text[]?; operator_approved boolean?
 UNIQUE(target_type, source_job_id, external_id, source_version)
 UNIQUE(source_job_id, candidate_id) WHERE target_type='candidate' AND is_current=true
 UNIQUE(source_job_id, candidate_id, external_id) WHERE target_type='relation' AND is_current=true
@@ -440,6 +442,8 @@ UNIQUE(source_job_id, candidate_id, external_id) WHERE target_type='relation' AN
 `source_job_id`는 후보를 만든 내부 S3 job이다(AI 담당 합의 2026-10-22). AI 후보 ID는 그 job과 고정 입력 안에서만 안정하므로 앱의 대상 키는 job ID와 후보 ID를 함께 쓰고, 결정은 그 job의 review 경로로 보낸다. 서로 다른 job의 같은 후보 ID는 서로를 대체하지 않는다. 그래서 동기화의 is_current 전환은 같은 `(source_job_id, candidate_id)`(relation은 `external_id`까지) 안에서만 일어나고, 다른 job의 행은 건드리지 않는다. 대상 행의 신원(`id`, `target_type`, `source_job_id`, `external_id`, `source_version`, `candidate_id`)은 DB trigger로 변경을 막고, `current_revision`은 결정과 함께 1씩만 증가한다.
 
 detail JSON 복제를 제거한다. 근거·관계·검증 상세는 source_version/source_revision으로 고정한 분석 후보 원천에서 조회하고 RDB 결정 이력을 조합한다. RDB의 status/active/company_ids/relation_types는 목록 필터용 투영이며 권위 원천이 아니다. 원천 revision이 달라지면 동기화 후 반환하거나 명시적으로 실패 처리하며 오래된 투영과 새 상세를 섞지 않는다. 목록 커서도 source revision에 결합하고 원천이 그 snapshot을 지원하지 않으면 커서를 무효화한다.
+
+**목록 표시용 투영 (2026-10-26, #132).** 후보 목록이 행마다 AI 원천을 부르지 않고 SQL로 검색·페이지를 나누도록, 후보 행에 짧은 표시값 `issue_id`·`title`·`action`·`target`·`event_time`·`evidence_count`·`companies`(`[{sourceId, name, role}]`, AI 원천 기업 ID)·`reasons`(AI 판정 사유 코드)를 둔다. 동기화가 analyze-plan unit의 hash로 고정한 S2 결과와 S3 결과에서 함께 쓰며, 이것도 투영이고 권위 원천이 아니다. relation 행의 `operator_approved`는 AI eligibility의 `approvalBasis.kind=operator-final-approval` 투영이며, 후보 상세 `graphDb=pending`(운영자 승인 뒤 다음 인계·수입 대기)과 자동 통과를 구분하는 데만 쓴다. 인용문·관계 상세·검증 결과 같은 긴 내용은 복제하지 않는다. 사건이 없는 관계 후보와 relation 행은 `issue_id`·`title`·`action`·`target`·`event_time`이 NULL이다. 목록 커서는 원천 revision 대신 행의 `updated_at`(동기화 시각)과 `id`에 결합한다. 페이지를 넘기는 동안 동기화로 갱신된 행은 첫 페이지 쪽으로 옮겨 가며 이후 페이지에는 나오지 않는다.
 
 candidateId의 현재 후보 행은 부분 UNIQUE로 한 개만 허용한다. 과거 버전 행은 이력 FK를 위해 유지하며 is_current 전환과 관련 relation 등록을 한 트랜잭션으로 처리한다. API 결정은 현재 후보와 원천 revision을 다시 확인한다. 원천 ID 존재를 SQL FK로 위장하지 않는다. company_ids/relation_types에는 필요한 배열 GIN 인덱스를 둔다.
 

@@ -10,12 +10,15 @@ import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolRequest;
 import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.chat.tool.ChatToolRunner;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -35,9 +38,17 @@ import java.util.Set;
  * </ul>
  */
 final class ChatRetrieval {
-    /** What retrieval produced: results per requirement, the limitations it decided, or a stop or failed call. */
+    /**
+     * What retrieval produced: results per requirement, the limitations it decided, or a stop or failed call. {@code cut}
+     * holds the requirements that read on only part of the member's companies (Q07: more than a stage fans out to).
+     */
     record Outcome(Map<String, List<ChatToolResult>> results, Map<String, String> limitations, Set<String> noneFound,
-            ChatPlan.Stop stop, ChatToolResult failed) { }
+            ChatPlan.Stop stop, ChatToolResult failed, Set<String> cut) {
+        Outcome(Map<String, List<ChatToolResult>> results, Map<String, String> limitations, Set<String> noneFound,
+                ChatPlan.Stop stop, ChatToolResult failed) {
+            this(results, limitations, noneFound, stop, failed, Set.of());
+        }
+    }
 
     private final ChatToolRunner runner;
 
@@ -49,6 +60,7 @@ final class ChatRetrieval {
         Map<String, List<ChatToolResult>> results = new LinkedHashMap<>();
         Map<String, String> limitations = new LinkedHashMap<>();
         Set<String> noneFound = new LinkedHashSet<>();
+        Set<String> cut = new LinkedHashSet<>();
         for (int stage = 1; stage <= plan.stages(); stage++) {
             List<ChatToolRequest> calls = new ArrayList<>();
             Map<String, Integer> callIndex = new HashMap<>();
@@ -63,6 +75,14 @@ final class ChatRetrieval {
                         continue;
                     }
                     Found found = found(results.getOrDefault(source, List.of()));
+                    if (p.onScope()) {
+                        // The member's own companies: having none is the answer, and reading only some of them is noted.
+                        if (found.companies().isEmpty() && !found.truncated()) {
+                            noneFound.add(p.id());
+                            continue;
+                        }
+                        if (found.truncated()) cut.add(p.id());
+                    }
                     var decision = checkpoint(p.dependsOn(), found.companies().size());
                     if (decision == Checkpoint.EXCESS) {
                         return new Outcome(results, limitations, noneFound,
@@ -84,14 +104,15 @@ final class ChatRetrieval {
                     boolean fixed = !capability.documents().isEmpty();
                     var read = fixed ? capability.documents() : targets;
                     List<String> scope = fixed ? null : p.evidenceScope();
+                    Instant since = capability == ChatCapability.GRAPH_VERSION_DIFF ? since(run, p).orElse(null) : null;
                     for (List<String> chunk : batches(capability, read)) {
                         String key = capability.id() + "\u0000" + String.join("\u0000", chunk) + "\u0001"
-                                + (scope == null ? "*" : String.join("\u0000", scope));
+                                + (scope == null ? "*" : String.join("\u0000", scope)) + "\u0001" + since;
                         Integer index = callIndex.get(key);
                         if (index == null) {
                             index = calls.size();
                             callIndex.put(key, index);
-                            calls.add(new ChatToolRequest(capability.id(), chunk, ChatToolRequest.MAX_LIMIT, scope));
+                            calls.add(new ChatToolRequest(capability.id(), chunk, ChatToolRequest.MAX_LIMIT, scope, since));
                         }
                         owned.computeIfAbsent(p.id(), k -> new ArrayList<>()).add(index);
                     }
@@ -112,7 +133,22 @@ final class ChatRetrieval {
                 noneFound.add(p.id());
             }
         }
-        return new Outcome(results, limitations, noneFound, null, null);
+        return new Outcome(results, limitations, noneFound, null, null, cut);
+    }
+
+    /**
+     * The period a comparison compares with: the one the requirement's own words write ({@link ChatPeriods}), else the one
+     * the member selected with the question; empty for "the previous public graph".
+     */
+    static Optional<ChatPeriods.Period> period(ChatRun run, Planned p) {
+        var written = ChatPeriods.parse(p.label(), run.askedAt());
+        if (written.isPresent() || run.context().period() == null) return written;
+        var selected = run.context().period();
+        return Optional.of(new ChatPeriods.Period(LocalDate.parse(selected.start()), LocalDate.parse(selected.end()), null));
+    }
+
+    private static Optional<Instant> since(ChatRun run, Planned p) {
+        return period(run, p).map(ChatPeriods.Period::startInstant);
     }
 
     /** The target lists of one capability's calls; {@link ChatPlanner#chunks} counts them. */

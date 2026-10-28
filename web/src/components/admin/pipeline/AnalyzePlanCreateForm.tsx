@@ -147,6 +147,7 @@ export default function AnalyzePlanCreateForm({
 
   return (
     <form
+      data-admin-editing={pending || Object.values(fields).some(Boolean)}
       noValidate
       aria-label="분석계획 접수"
       onSubmit={(event) => void submit(event)}
