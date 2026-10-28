@@ -188,6 +188,20 @@ jobs:
             --file api/Dockerfile \
             --tag "zoop-api:ci-${GITHUB_SHA}" \
             api
+  ai-container:
+    name: ai-container
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Build AI container without AWS credentials
+        run: |
+          docker build \
+            --file ai/Dockerfile \
+            --tag "zoop-ai:ci-${GITHUB_SHA}" \
+            ai
 
   api-tests:
     name: api-tests
