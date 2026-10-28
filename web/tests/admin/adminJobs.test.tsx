@@ -19,6 +19,7 @@ import {
   type FakeServer,
 } from '../support/fakeServer';
 import { renderRoutes } from '../support/renderRoutes';
+import { onOverview } from '../support/adminPipeline';
 
 // A-ADM-03 작업 탭 (FS058·FS067-01·FS067-03, listAnalysisJobs·getAnalysisJob·retryAnalysisJob·cancelAnalysisJob). 합성 fixture.
 
@@ -217,6 +218,7 @@ beforeEach(() => {
   });
   server = createFakeServer();
   server.on('GET', SESSION, () => json(signedIn));
+  onOverview(server);
 });
 
 describe('A-ADM-03 작업 탭 (FS058·FS067)', () => {
