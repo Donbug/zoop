@@ -23,7 +23,8 @@ LIVE = {"ZOOP_AI_CHAT_LIVE_ENABLED": "1", "ZOOP_AI_CHAT_MAX_CALLS": "5", "ZOOP_A
 
 def agent_input(**change: Any) -> dict[str, Any]:
     payload = {"turns": [{"text": "SK하이닉스와 삼성전자의 관계와 HBM이 뭔지 알려줘"}],
-               "requirements": [{"requirementId": "r1", "label": "SK하이닉스와 삼성전자의 관계", "general": False},
+               "requirements": [{"requirementId": "r1", "label": "SK하이닉스와 삼성전자의 관계", "general": False,
+                                 "targets": ["KRX:000660", "KRX:005930"]},
                                 {"requirementId": "r2", "label": "HBM — 개념 설명", "general": True}],
                "mcp": {"serverUrl": "https://api.zoop.example/mcp", "authorization": TOKEN,
                        "allowedTools": ["company_read", "graph_path_read"]},
@@ -108,6 +109,7 @@ def test_the_first_step_sends_the_question_with_the_zoop_mcp_tool_held_for_appro
     question = json.loads(body["input"][0]["content"])
     assert body["input"][0]["role"] == "user"
     assert [r["requirementId"] for r in question["requirements"]] == ["r1", "r2"] and question["maxCitations"] == 20
+    assert question["requirements"][0]["targets"] == ["KRX:000660", "KRX:005930"] and question["requirements"][1]["targets"] == []
     assert TOKEN not in body["input"][0]["content"]
 
 
@@ -131,6 +133,7 @@ def test_a_continuation_resumes_the_stored_response_with_only_the_applications_d
     {"continuation": continuation(("mcpr_1", True), ("mcpr_1", False))},
     {"requirements": [{"requirementId": "r1", "label": "a", "general": False},
                       {"requirementId": "r1", "label": "b", "general": False}]},
+    {"requirements": [{"requirementId": "r1", "label": "a", "general": False, "targets": ["KRX 000660"]}]},
 ])
 def test_an_invalid_step_input_is_refused(change):
     with pytest.raises(ValueError):

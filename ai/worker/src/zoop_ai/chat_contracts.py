@@ -195,10 +195,18 @@ PROVIDER_ID = r"^[A-Za-z0-9_-]{1,128}$"
 
 
 class AgentRequirement(Wire):
-    """One requirement the agent run answers. `general` marks a stable concept part that may be explained without evidence."""
+    """One requirement the agent run answers. `general` marks a stable concept part that may be explained without evidence.
+    `targets` are the ids the server already resolved for it (companies, issues); the model reads them, it never guesses ids."""
     requirement_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")
     label: str = Field(min_length=1, max_length=MAX_QUESTION)
     general: bool
+    targets: list[str] = Field(default_factory=list, max_length=10)
+
+    @model_validator(mode="after")
+    def target_ids(self):
+        if any(not re.fullmatch(r"[A-Za-z0-9:._-]{1,128}", target) for target in self.targets):
+            raise ValueError("a target is an id")
+        return self
 
 
 class McpConnection(Wire):
