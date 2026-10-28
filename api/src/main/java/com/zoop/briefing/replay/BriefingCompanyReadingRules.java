@@ -13,9 +13,12 @@ final class BriefingCompanyReadingRules {
     static final String SCHEMA = "zoop-company-reading-v1";
     private BriefingCompanyReadingRules() { }
     static Map<String, StrictJson.Obj> rows(StrictJson.Obj layer) {
+        return rows(layer, 4);
+    }
+    static Map<String, StrictJson.Obj> rows(StrictJson.Obj layer, int maximum) {
         require(SCHEMA.equals(layer.string("schemaVersion")) && !layer.string("authorizationRef").isBlank(), "layer");
         Map<String, StrictJson.Obj> out = new LinkedHashMap<>();
-        require(!layer.objects("rounds").isEmpty() && layer.objects("rounds").size() <= 4, "round_count");
+        require(!layer.objects("rounds").isEmpty() && layer.objects("rounds").size() <= maximum, "round_count");
         for (StrictJson.Obj row : layer.objects("rounds")) require(out.putIfAbsent(row.string("roundId"), row) == null, "duplicate_round");
         return out;
     }
@@ -34,7 +37,8 @@ final class BriefingCompanyReadingRules {
         ObjectNode version = (ObjectNode) row.node().deepCopy(); version.remove("resultVersion");
         require(("reading-v1-" + Canonical.digest(version)).equals(row.string("resultVersion")), "version");
         Set<String> ids = new HashSet<>(); frozen.objects("targets").forEach(t -> ids.add(t.string("companyId")));
-        require(ids.equals(Set.copyOf(row.object("prices").node().propertyNames())), "price_company_coverage");
+        if (row.has("prices")) require(ids.equals(Set.copyOf(row.object("prices").node().propertyNames())), "price_company_coverage");
+        else require("not_connected".equals(row.string("pricePolicy")), "price_policy");
         List<StrictJson.Obj> attempts = row.objects("attempts"); require(!attempts.isEmpty() && attempts.size() <= 2, "attempt_count");
         Instant generated = Instant.parse(row.string("generatedAt"));
         for (StrictJson.Obj attempt : attempts) {
@@ -81,7 +85,7 @@ final class BriefingCompanyReadingRules {
             ObjectNode c = (ObjectNode) node; String id = c.path("companyId").stringValue();
             ObjectNode reading = c.putObject("reading").put("status", row.string("status")).put("resultVersion", row.string("resultVersion"));
             if (passed) for (String field : List.of("brief", "watch", "change")) reading.set(field, shortTexts.get(id).raw(field).deepCopy());
-            c.set("price", BriefingCompanyPriceRules.apply(row.object("prices").object(id), id, Instant.parse(row.string("cutoff")), output));
+            if (row.has("prices")) c.set("price", BriefingCompanyPriceRules.apply(row.object("prices").object(id), id, Instant.parse(row.string("cutoff")), output));
         }
         projection.put("readingVersion", row.string("resultVersion"));
     }

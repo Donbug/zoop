@@ -38,7 +38,7 @@ public final class BriefingReplayReadPolicy {
             StrictJson.Obj saved = StrictJson.parseObject(Files.readAllBytes(manifest));
             StrictJson.Obj marker = StrictJson.Obj.of(row.publicSnapshot()).object("replay");
             String scope = saved.string("scope");
-            if (!List.of("development_replay", "publication_clock_simulation").contains(scope)
+            if (!List.of("development_replay", "publication_clock_simulation", LocalBriefingCollectionRules.MODE).contains(scope)
                     || !scope.equals(marker.string("scope"))) return false;
             for (String field : List.of("runId", "sourceFileSha256", "bundleSha256", "userInboxRef")) {
                 if (!saved.string(field).equals(marker.string(field))) return false;
@@ -46,6 +46,9 @@ public final class BriefingReplayReadPolicy {
             if ("publication_clock_simulation".equals(scope)
                     && (!saved.string("clockFileSha256").equals(marker.string("clockFileSha256"))
                         || !marker.bool("retrospectiveBodies") || marker.bool("operationalCollectionGate"))) return false;
+            if (LocalBriefingCollectionRules.MODE.equals(scope)
+                    && (marker.bool("retrospectiveBodies") || marker.bool("operationalCollectionGate")
+                        || !marker.object("localCollection").bool("collectedBeforeCutoff"))) return false;
             if (!saved.string("grantsSha256").equals(Canonical.sha256(Files.readAllBytes(grants)))) return false;
             for (StrictJson.Obj round : saved.objects("rounds")) {
                 if (!round.string("id").equals(row.id())) continue;

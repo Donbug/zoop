@@ -1894,7 +1894,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getBriefing",
       "severity": "difference",
-      "message": "목표만 721 · BFF만 60 · 형식/필수/권한 변경 21",
+      "message": "목표만 1078 · BFF만 60 · 형식/필수/권한 변경 21",
       "source": ""
     },
     {

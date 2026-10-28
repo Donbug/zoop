@@ -50,7 +50,7 @@ def create(directory, unknown=False, selection_mode="normal"):
             receipt = {"stage": stage, "model": module.base.MODEL, "requestDigest": digest,
                 "responseId": None, "status": "unknown", "usageKnown": False, "inputTokens": None,
                 "outputTokens": None, "actualCost": None, "actualCostKnown": False}
-            archive["receipts"] = [receipt]
+            archive["receipts"].append(receipt)
             archive["held"] = [{"articleId": document["documentId"], "requestDigest": digest,
                 "stage": stage, "usageKnown": False, "reason": "operator_held_unresolved_paid_request"}]
             fixture.archive_path.write_bytes(module.base.canonical(archive))

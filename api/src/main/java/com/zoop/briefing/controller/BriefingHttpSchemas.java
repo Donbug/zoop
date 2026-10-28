@@ -29,7 +29,27 @@ public final class BriefingHttpSchemas {
                     description = "직전 발행 회차와 사건 ID 기준 포함 여부 비교입니다. 전망 정확도 평가는 제공하지 않습니다.") JsonNode previousComparison,
             @Schema(nullable = true, allowableValues = {"no_issues_in_window"}) String emptyReason,
             List<BriefingCorrection> corrections, @Schema(nullable = true) BriefingNotice notice,
-            BriefingReferences references, BriefingMetadata metadata, @Schema(nullable = true) BriefingOutlook outlook) { }
+            BriefingReferences references, BriefingMetadata metadata, @Schema(nullable = true) BriefingOutlook outlook,
+            @Schema(nullable = true, description = "선택적 조용한 회차 정책. 핵심·참고·복기·수집부족을 구분하며 원 발행 문안을 바꾸지 않습니다.") BriefingContinuity continuity) { }
+
+
+    @Schema(name = "BriefingContinuity")
+    public record BriefingContinuity(String schemaVersion, String roundId, Instant cutoff,
+            @Schema(allowableValues = {"core", "reference", "recap", "coverage_limited", "validation_failed"}) String mode,
+            @Schema(nullable = true, allowableValues = {"1", "2"}) Integer importanceFloor, String message,
+            ContinuityCoverage coverage, List<ContinuityReference> references, ContinuityRecap recap,
+            List<ContinuityCondition> watchConditions, ContinuityForecast forecast) { }
+    public record ContinuityCoverage(@Schema(allowableValues = {"registered_scope", "limited", "insufficient"}) String status,
+            int confirmedDocuments, String message) { }
+    public record ContinuityReference(String issueId, String title, int importance, String label,
+            List<ContinuityCompany> companies, List<tools.jackson.databind.JsonNode> sources) { }
+    public record ContinuityCompany(String id, String name) { }
+    public record ContinuityRecap(String status, @Schema(nullable = true) String previousRoundId,
+            @Schema(nullable = true) Instant dataAsOf, @Schema(nullable = true) LocalDate date,
+            @Schema(nullable = true) String edition, String message, List<BriefingItem> items) { }
+    public record ContinuityCondition(String text, String kind, @Schema(nullable = true) String companyName,
+            @Schema(nullable = true) String previousRoundId) { }
+    public record ContinuityForecast(String status, String message) { }
 
     @Schema(name = "BriefingRecap", requiredProperties = {"roundId", "graphVersion", "dataAsOf", "status", "reason", "message", "previous"})
     public record BriefingRecap(String roundId, @Schema(nullable = true) String graphVersion,
@@ -41,7 +61,8 @@ public final class BriefingHttpSchemas {
     @Schema(name = "CompanyOutlooks", requiredProperties = {"schemaVersion", "roundId", "edition", "cutoff", "status", "resultVersion", "generatedAt", "scopeNote", "companies"})
     public record CompanyOutlooks(String schemaVersion, String roundId, String edition, Instant cutoff,
             @Schema(allowableValues = {"PASS", "WITHHELD"}) String status, String resultVersion, Instant generatedAt,
-            String scopeNote, List<CompanyOutlook> companies, String reason) { }
+            String scopeNote, List<CompanyOutlook> companies, String reason,
+            @Schema(description = "기존 기업 전망·짧은 읽기를 재생성하지 않고 연결한 회차 시세 보완본의 버전. 과거 발행본에서는 생략.") String priceVersion) { }
 
     @Schema(name = "CompanyStatement", requiredProperties = {"text", "evidenceIds"})
     public record CompanyStatement(String text, List<String> evidenceIds) { }
@@ -67,7 +88,9 @@ public final class BriefingHttpSchemas {
     public record CompanyPricePoint(String value, Instant observedAt, LocalDate sessionDate,
             @Schema(allowableValues = {"five_minute_close", "daily_close"}) String kind) { }
     @Schema(name = "CompanyPriceSource", requiredProperties = {"companyId", "interval", "url", "httpStatus", "sha256", "bytes", "collectedAt"})
-    public record CompanyPriceSource(String companyId, String interval, String url, int httpStatus, String sha256, long bytes, Instant collectedAt) { }
+    public record CompanyPriceSource(String companyId, String interval, String url, int httpStatus, String sha256, long bytes, Instant collectedAt,
+            @Schema(description = "새 회차 시세 수집의 요청 시작 UTC Unix 초. 구 기록에서는 생략.") Long period1,
+            @Schema(description = "요청 종료 UTC Unix 초(미포함). 가격 관측은 별도로 회차 마감 이하만 허용.") Long period2) { }
     @Schema(name = "CompanyPrice", requiredProperties = {"companyId", "cutoff", "currency", "exchangeTimezone", "source", "official", "note", "sources", "status", "reason", "latest", "baseline", "comparisonStatus", "change", "changeRate"},
             description = "회차 마감 전 완료된 정규장 관측값입니다. 출근은 전일 종가 대비, 퇴근은 같은 날 09:20 기준 대비이며 전망 적중률이 아닙니다.")
     public record CompanyPrice(String companyId, Instant cutoff, String currency, String exchangeTimezone, String source,

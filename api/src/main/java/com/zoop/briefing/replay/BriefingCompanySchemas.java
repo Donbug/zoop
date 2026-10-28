@@ -26,7 +26,12 @@ final class BriefingCompanySchemas {
             fields.set("conditions", array(s, 1, 3)); fields.set("risks", array(s, 1, 3));
             ObjectNode comparison = s.deepCopy();
             ObjectNode props = (ObjectNode) comparison.path("properties");
-            props.set("status", choice(List.of("updated", "compared", "unavailable")));
+            List<String> statuses = List.of("updated", "compared", "unavailable");
+            if (frozen.has("comparisonContract")) {
+                if (!"edition-bound-v2".equals(frozen.string("comparisonContract"))) throw new IllegalArgumentException("Company comparison contract");
+                statuses = "morning".equals(frozen.string("edition")) ? List.of("updated", "unavailable") : List.of("compared", "unavailable");
+            }
+            props.set("status", choice(statuses));
             ObjectNode nullable = StrictJson.newObject(); nullable.putArray("type").add("string").add("null");
             props.set("previousResultVersion", nullable); fields.set("comparison", object(props));
         }

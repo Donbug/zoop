@@ -12,6 +12,10 @@ class CompanyOutlookTest(unittest.TestCase):
         stmt={'text':'확인할 조건','evidenceIds':['a']}
         return {'companies':[{'companyId':'A','assessment':'watch','impact':stmt,'outlook':stmt,'conditions':[stmt],'risks':[stmt],
             'comparison':{**stmt,'status':'unavailable','previousResultVersion':None}}]}
+    def test_edition_bound_comparison_schema_rejects_morning_status_in_evening(self):
+        f=self.frozen();f['edition']='evening';f['comparisonContract']='edition-bound-v2'
+        d=self.draft();d['companies'][0]['comparison']['status']='updated'
+        with self.assertRaises(c.base.ReplayError):c.base.validate_schema(d,c.generation_schema(f))
     def test_foreign_company_evidence_rejected(self):
         f=self.frozen();f['sources']['b']={};d=copy.deepcopy(self.draft());d['companies'][0]['outlook']['evidenceIds']=['b']
         with self.assertRaisesRegex(ValueError,'foreign_company_evidence'): c.validate(d,f)

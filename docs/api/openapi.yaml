@@ -8436,6 +8436,9 @@ components:
         status: {type: string, enum: [PASS, WITHHELD]}
         resultVersion: {type: string}
         generatedAt: {type: string, format: date-time}
+        priceVersion:
+          type: string
+          description: 기존 기업 전망·짧은 읽기를 재생성하지 않고 연결한 회차 시세 보완본의 버전. 과거 발행본에서는 생략할 수 있습니다.
         scopeNote: {type: string}
         reason: {type: string}
         companies:
@@ -8537,6 +8540,14 @@ components:
         sha256: {type: string}
         bytes: {type: integer}
         collectedAt: {type: string, format: date-time}
+        period1:
+          type: integer
+          format: int64
+          description: 명시적인 수집 시작 UTC Unix 초. 구 고정 기간 기록에는 없을 수 있습니다.
+        period2:
+          type: integer
+          format: int64
+          description: 수집 종료 UTC Unix 초(미포함). 미래 응답 행은 이 구간과 회차 마감으로 별도 차단합니다.
     CompanyPrice:
       type: object
       description: 회차 마감 전 완료된 정규장 이력. 출근은 전일 종가, 퇴근은 같은 날 09:20 관측값 대비. 당시 수집본이나 전망 적중률을 뜻하지 않습니다.
@@ -9655,6 +9666,92 @@ components:
           anyOf:
             - "$ref": "#/components/schemas/BriefingResponse"
             - type: "null"
+    BriefingContinuity:
+      type: object
+      description: "선택적 조용한 회차 정책. 참고 소식·이전 발행본 복기·수집 부족을 구분하며 기존 발행 내용을 바꾸지 않는다."
+      required: [schemaVersion, roundId, cutoff, mode, importanceFloor, message, coverage, references, recap, watchConditions, forecast]
+      properties:
+        schemaVersion: {type: string, enum: [importance-continuity-v1, importance-continuity-v2]}
+        roundId: {type: string}
+        cutoff: {type: string, format: date-time}
+        mode: {type: string, enum: [core, reference, recap, coverage_limited, validation_failed]}
+        importanceFloor:
+          anyOf: [{type: integer, enum: [1, 2]}, {type: "null"}]
+        message: {type: string}
+        coverage:
+          type: object
+          required: [status, confirmedDocuments, message]
+          properties:
+            status: {type: string, enum: [registered_scope, limited, insufficient]}
+            confirmedDocuments: {type: integer, minimum: 0}
+            message: {type: string}
+        references:
+          type: array
+          maxItems: 3
+          items:
+            type: object
+            required: [issueId, title, importance, label, companies, sources]
+            properties:
+              issueId: {type: string}
+              title: {type: string}
+              importance: {type: integer, enum: [1]}
+              label: {type: string}
+              companies:
+                type: array
+                items:
+                  type: object
+                  required: [id, name]
+                  properties:
+                    id: {type: string}
+                    name: {type: string}
+              sources:
+                type: array
+                items:
+                  type: object
+                  required: [evidenceId, documentId, documentVersion, quote, url, dateContext]
+                  properties:
+                    evidenceId: {type: string}
+                    documentId: {type: string}
+                    documentVersion: {type: string}
+                    quote: {type: string}
+                    url:
+                      anyOf: [{type: string}, {type: "null"}]
+                    dateContext:
+                      type: object
+                      required: [publishedAt]
+                      properties:
+                        publishedAt: {type: string, format: date-time}
+        recap:
+          type: object
+          required: [status, previousRoundId, dataAsOf, message, items]
+          properties:
+            status: {type: string, enum: [available, unavailable]}
+            previousRoundId:
+              anyOf: [{type: string}, {type: "null"}]
+            date: {type: string, format: date}
+            edition: {type: string, enum: [morning, evening]}
+            dataAsOf:
+              anyOf: [{type: string, format: date-time}, {type: "null"}]
+            message: {type: string}
+            items:
+              type: array
+              items: {$ref: "#/components/schemas/BriefingItem"}
+        watchConditions:
+          type: array
+          items:
+            type: object
+            required: [text, kind]
+            properties:
+              text: {type: string}
+              kind: {type: string, enum: [verification_check, previous_condition]}
+              companyName: {type: string}
+              previousRoundId: {type: string}
+        forecast:
+          type: object
+          required: [status, message]
+          properties:
+            status: {type: string, enum: [unavailable, not_updated]}
+            message: {type: string}
     BriefingResponse:
       properties:
         id:
@@ -9715,6 +9812,11 @@ components:
           items:
             "$ref": "#/components/schemas/BriefingItem"
           type: "array"
+        continuity:
+          description: "선택적 참고 소식·복기·수집 범위. 기존 발행본에는 생략될 수 있다."
+          anyOf:
+            - "$ref": "#/components/schemas/BriefingContinuity"
+            - type: "null"
         companyOutlooks:
           "$ref": "#/components/schemas/CompanyOutlooks"
           description: "선정 기업별 사업 전망·조건·근거와 동일 기업의 이전 판단 비교. 과거 발행본에는 없을 수 있습니다. 시장 요약·지표와 별도이며 주가 예측이 아닙니다."
