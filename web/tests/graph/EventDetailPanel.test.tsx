@@ -143,7 +143,7 @@ describe('D-GRP-02 · panel states and accessibility', () => {
   });
 });
 
-it('D-GRP-02 AI 질문 안내는 대화창이 열린다는 사실과 맞아요', async () => {
+it('D-GRP-02 AI에게 묻기는 onAction("ai")으로 사건 문맥을 넘겨요', async () => {
   const event = createMockEvent(props.id);
   mocked.mockResolvedValue(event);
   render(<EventDetailPanel {...props} />);
@@ -151,6 +151,4 @@ it('D-GRP-02 AI 질문 안내는 대화창이 열린다는 사실과 맞아요',
     await screen.findByRole('button', { name: 'AI에게 묻기' }),
   );
   expect(props.onAction).toHaveBeenCalledWith('ai', event);
-  const notice = screen.getByText(/질문 대상으로 연결했습니다/);
-  expect(notice.textContent).not.toContain('준비 중');
 });

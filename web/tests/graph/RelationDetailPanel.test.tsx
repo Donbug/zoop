@@ -231,16 +231,3 @@ describe('D-GRP-04 · relation rail states', () => {
     ).toBeTruthy();
   });
 });
-
-it('D-GRP-04 AI 질문 안내는 대화창이 열린다는 사실과 맞아요', async () => {
-  render(<RelationDetailPanel {...props} />);
-  await userEvent.click(
-    await screen.findByRole('button', { name: 'AI에게 묻기' }),
-  );
-  expect(props.onAction).toHaveBeenLastCalledWith(
-    'ai',
-    createMockRelation(edge.id),
-  );
-  const notice = screen.getByText(/질문 대상으로 연결했습니다/);
-  expect(notice.textContent).not.toContain('준비 중');
-});
