@@ -70,6 +70,7 @@ import type {
 } from '@/types/map';
 import '@/components/graph/relationship-map.css';
 import { useColorTheme } from '@/util/theme-color';
+import { readSocialLinkResult } from '@/components/common/socialLinkResult';
 
 // Same-session preference only. useAuthStore clears it when the member changes
 // and keeps it when the same member's session is restored after a reload.
@@ -96,12 +97,23 @@ export default function MapPage() {
       useGraphUiStore.getState().closeEvidence();
       useGraphUiStore.getState().setTutorialStep(1);
       useAiChatStore.getState().close();
-      if (params.toString() !== 'mode=all&tour=1')
+      // 소셜 계정 연결에서 돌아온 결과(?social=)는 알려진 값만 남겨 튜토리얼 중·뒤에도 계정 메뉴가 알린다.
+      const social = readSocialLinkResult(`?${params}`);
+      const tourQuery: Record<string, string> = {
+        mode: 'all',
+        tour: '1',
+        ...(social ? { social } : {}),
+      };
+      const normalized =
+        [...params.keys()].length === Object.keys(tourQuery).length &&
+        Object.entries(tourQuery).every(
+          ([key, value]) => params.getAll(key).join() === value,
+        );
+      if (!normalized)
         updateQuery(
           {
             ...Object.fromEntries([...params.keys()].map((key) => [key, null])),
-            mode: 'all',
-            tour: '1',
+            ...tourQuery,
           },
           { replace: true },
         );
