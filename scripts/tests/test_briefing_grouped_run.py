@@ -92,6 +92,7 @@ class GroupedRunTest(unittest.TestCase):
         archive = fixtures.archive(*groups)
         archive["documents"] = [{k: v for k, v in doc.items() if k != "clockTime"} for doc in archive["documents"]]
         archive.update(sourceFileSha256=source["sourceFileSha256"], clockFileSha256=source["clockFileSha256"])
+        fixtures.record_grounding(archive, self.root)
         self.archive_path.write_bytes(base.canonical(archive))
         return archive
 

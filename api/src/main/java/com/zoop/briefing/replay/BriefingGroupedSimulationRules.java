@@ -64,6 +64,7 @@ final class BriefingGroupedSimulationRules {
             recording(receipt, output, false);
             if ("unknown".equals(receipt.string("status"))) unknownCalls.add(unknown(receipt, archive, usedDocuments, output));
         }
+        BriefingEditorialRules.archive(archive, output);
         return new Archive(bytes, archive, issues, sources, clocks, List.copyOf(unknownCalls));
     }
 
@@ -153,6 +154,16 @@ final class BriefingGroupedSimulationRules {
 
     static void round(StrictJson.Obj bundle, StrictJson.Obj round, Archive archive,
             Map<String, JsonNode> receipts, Path output, ArrayNode history) {
+        boolean semantic = round.object("identity").has("selectionEvidencePolicy");
+        round(bundle, round, archive, receipts, output, history, semantic,
+                semantic ? BriefingReferenceSupport.load(archive, output) : Map.of());
+    }
+
+    static void round(StrictJson.Obj bundle, StrictJson.Obj round, Archive archive,
+            Map<String, JsonNode> receipts, Path output, ArrayNode history, boolean semantic,
+            Map<String, BriefingReferenceSupport.Proof> support) {
+        if (round.object("identity").has("selectionEvidencePolicy")) require(semantic
+                && BriefingCoreEvidenceRules.POLICY.equals(round.object("identity").string("selectionEvidencePolicy")), "semantic_evidence_policy");
         require(bundle.string("groupArchiveSha256").equals(round.object("identity").string("groupArchiveSha256")), "identity_archive");
         Set<String> stages = Set.of(SELECTION_STAGE, "round_simulation_" + round.string("edition") + "_generation",
                 "round_simulation_" + round.string("edition") + "_verification");
@@ -184,8 +195,16 @@ final class BriefingGroupedSimulationRules {
         for (StrictJson.Obj candidate : request.objects("issues")) {
             String id = candidate.string("issueId"); require(candidates.putIfAbsent(id, candidate) == null && expected.containsKey(id), "candidate_identity");
             snapshot(candidate, expected.get(id), round, archive);
+            if (round.object("identity").has("selectionEvidencePolicy")) BriefingCoreEvidenceRules.frozen(candidate, support);
+            else require(!candidate.has("evidencePolicy") && !candidate.has("semanticSupport"), "undeclared_evidence_policy");
         }
         require(candidates.keySet().equals(expected.keySet()), "candidate_population");
+        if (round.object("identity").has("selectionEligibilityPolicy")) require("explicit-eligibility-v1".equals(round.object("identity").string("selectionEligibilityPolicy"))
+                && request.has("selectionEligibility"), "selection_eligibility_policy");
+        if (request.has("selectionEligibility")) {
+            StrictJson.Obj providerRequest = StrictJson.parseObject(read(output.resolve("calls/"+key+".request.json")));
+            eligibilityManifest(request, providerRequest, candidates.keySet());
+        }
         selectionCorrection(round, receipts, receipt, selected, output);
         boolean published = Set.of("SELECTED", "EMPTY_CONFIRMED").contains(round.string("selectionStatus"));
         // Invalid completed model answers are retained as audit for held rounds; they do not authorize publication.
@@ -193,15 +212,23 @@ final class BriefingGroupedSimulationRules {
         StrictJson.Obj answer = selected.answer();
         answer.object("assessments").exactly(candidates.keySet());
         require(answer.objects("selected").size() <= 3, "selection_limit");
-        Set<String> chosen = new HashSet<>();
+        Set<String> chosen = new HashSet<>(); ArrayNode rejectedDuplicates = StrictJson.newArray(); int choiceIndex = -1;
         for (StrictJson.Obj choice : answer.objects("selected")) {
-            String id = choice.string("issueId"); require(candidates.containsKey(id) && chosen.add(id), "selected_identity");
+            choiceIndex++;
+            String id = choice.string("issueId"); require(candidates.containsKey(id), "selected_identity");
+            if (!chosen.add(id)) {
+                require(candidates.get(id).has("freshnessReview"), "duplicate_selected_identity");
+                rejectedDuplicates.add(StrictJson.newObject().put("index", choiceIndex).put("issueId", id)
+                        .put("reason", "duplicate_selected_issue").put("choiceSha256", Canonical.digest(choice.node())));
+                continue;
+            }
             StrictJson.Obj assessment = answer.object("assessments").object(id);
             require("SELECTABLE".equals(assessment.string("status")) && assessment.count("importance") >= 2, "selected_importance");
             if (assessment.count("importance") == 3) require(Set.of("BROAD_MARKET", "COMMON_POLICY").contains(assessment.string("scope"))
                     && !assessment.string("transmission").isBlank() && (!"BROAD_MARKET".equals(assessment.string("scope"))
                     || Set.copyOf(assessment.strings("affectedSectors")).size() >= 2), "broad_impact_proof");
         }
+        require(round.has("groupedRejectedSelections") ? rejectedDuplicates.equals(round.array("groupedRejectedSelections")) : rejectedDuplicates.isEmpty(), "selection_rejection_audit");
         Set<String> actual = new HashSet<>();
         for (StrictJson.Obj item : round.objects("selected")) {
             String id = item.string("issueId"); StrictJson.Obj candidate = candidates.get(id);
@@ -248,6 +275,18 @@ final class BriefingGroupedSimulationRules {
                 Set<String> expectedLinks = new HashSet<>(companyEvidence.get(companyId)); expectedLinks.retainAll(evidenceIds);
                 require(!expectedLinks.isEmpty() && expectedLinks.equals(Set.copyOf(company.strings("evidenceIds"))), "selected_company_citations");
                 companyIds.add(companyId); companyNames.add(company.string("name"));
+            }
+            if (semantic) require(BriefingCoreEvidenceRules.eligible(candidate, support), "selected_semantic_support_missing");
+            if (candidate.has("freshnessReview")) {
+                StrictJson.Obj review = candidate.object("freshnessReview");
+                // Only replay an explicitly legacy contract with its historical threshold.
+                if (!semantic) require(item.objects("sources").stream().mapToInt(e -> e.string("quote").codePointCount(0, e.string("quote").length())).sum() >= 80, "selected_evidence_too_thin");
+                require(!Set.of("REPEAT", "UNCERTAIN").contains(review.string("decision")), "editorial_repeat_selected");
+                if ("MATERIAL_UPDATE".equals(review.string("decision")))
+                    require("MATERIAL_UPDATE".equals(choice.string("novelty")) && choice.strings("deltaEvidenceIds").stream().anyMatch(review.strings("deltaEvidenceIds")::contains), "editorial_delta_missing");
+                Set<String> linked = new HashSet<>();
+                companyEvidence.forEach((cid, refs) -> { if (refs.stream().anyMatch(evidenceIds::contains)) linked.add(cid); });
+                require(linked.equals(Set.copyOf(companyIds)), "selected_company_omission");
             }
             require(companyIds.equals(choice.strings("companyIds")) && companyNames.equals(item.strings("companyNames")), "selected_company_membership");
         }
@@ -313,6 +352,14 @@ final class BriefingGroupedSimulationRules {
         require(stage.equals(receipt.string("stage")), "phase_stage"); return recording(receipt, output, true);
     }
 
+    static void eligibilityManifest(StrictJson.Obj input, StrictJson.Obj providerRequest, Set<String> candidates) {
+        JsonNode items = providerRequest.object("text").object("format").object("schema").object("properties").object("selected").raw("items");
+        List<String> allowed = new ArrayList<>();
+        for (JsonNode variant : items.path("anyOf")) allowed.add(variant.path("properties").path("issueId").path("enum").get(0).stringValue());
+        require(new HashSet<>(allowed).size() == allowed.size() && candidates.containsAll(allowed)
+                && allowed.equals(input.object("selectionEligibility").strings("allowedIssueIds")), "selection_eligibility_manifest");
+    }
+
     private static void context(StrictJson.Obj input, StrictJson.Obj round) {
         require(round.string("identitySha256").equals(input.string("contextSha256"))
                 && round.object("identity").node().equals(input.object("context").node()), "request_context_binding");
@@ -325,7 +372,7 @@ final class BriefingGroupedSimulationRules {
     private static void snapshot(StrictJson.Obj candidate, StrictJson.Obj issue, StrictJson.Obj round, Archive archive) {
         require(candidate.object("window").node().equals(round.object("window").node())
                 && archive.root().string("sourceFileSha256").equals(candidate.string("sourceFileSha256"))
-                && candidate.bool("historicalSimulation") && !candidate.bool("operationalCollectionGate")
+                && candidate.bool("historicalSimulation") == !round.has("localCollection") && !candidate.bool("operationalCollectionGate")
                 && !candidate.bool("historicalBodyUnchangedProven"), "snapshot_scope");
         ObjectNode identity = (ObjectNode) candidate.node().deepCopy(); identity.remove("asOfSnapshotSha256");
         require(Canonical.digest(identity).equals(candidate.string("asOfSnapshotSha256")), "snapshot_digest");
@@ -369,6 +416,8 @@ final class BriefingGroupedSimulationRules {
                 .comparing((StrictJson.Obj m) -> Instant.parse(m.string("publishedAt")))
                 .thenComparing(m -> m.string("mentionId"))).orElseThrow();
         require(earliest.string("title").equals(candidate.string("title")), "snapshot_title_asof");
+        ObjectNode freshness = BriefingEditorialRules.decision(archive.root(), round.object("window"), issue.string("issueId"));
+        require(freshness == null ? !candidate.has("freshnessReview") : freshness.equals(candidate.object("freshnessReview").node()), "snapshot_editorial_review");
         Map<String, StrictJson.Obj> newEvidence = evidence(candidate, "newMentions"), background = evidence(candidate, "backgroundMentions");
         Set<String> allEvidence = new HashSet<>(newEvidence.keySet()); allEvidence.addAll(background.keySet());
         require(Set.copyOf(candidate.strings("newEvidenceIds")).equals(newEvidence.keySet())
@@ -422,7 +471,7 @@ final class BriefingGroupedSimulationRules {
         return new Recording(input, null);
     }
 
-    private static Recording recording(StrictJson.Obj receipt, Path output, boolean completed) {
+    static Recording recording(StrictJson.Obj receipt, Path output, boolean completed) {
         String digest = receipt.string("requestDigest"); require(digest.matches("[0-9a-f]{64}"), "receipt_digest");
         byte[] requestBytes = read(output.resolve("calls").resolve(digest + ".request.json"));
         require(digest.equals(Canonical.sha256(requestBytes)), "request_digest"); StrictJson.Obj request = StrictJson.parseObject(requestBytes);
@@ -443,9 +492,12 @@ final class BriefingGroupedSimulationRules {
         require(text.size() == 1, "response_text");
         StrictJson.Obj input = StrictJson.parseObject(request.string("input"));
         String stage = receipt.string("stage");
-        String prompt = SELECTION_STAGE.equals(stage) ? "grouped-selection.md"
-                : stage.endsWith("_verification") ? "grouped-verification.md" : "grouped-generation-" + input.string("edition") + ".md";
-        require(Canonical.sha256(request.string("instructions")).equals(input.object("context").object("promptArtifacts").string(prompt)), "request_prompt_binding");
+        if (!Set.of("editorial_freshness", "issue_grounding").contains(stage)) {
+            String prompt = SELECTION_STAGE.equals(stage) ? "grouped-selection.md"
+                    : stage.endsWith("_verification") ? "grouped-verification.md" : "grouped-generation-" + input.string("edition") + ".md";
+            require(Canonical.sha256(request.string("instructions")).equals(input.object("context").object("promptArtifacts").string(prompt)), "request_prompt_binding");
+        } // Editorial freshness and native grounding have their own checks in BriefingEditorialRules / BriefingReferenceSupport.
+
         return new Recording(input, StrictJson.parseObject(text.getFirst()));
     }
 

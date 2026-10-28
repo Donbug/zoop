@@ -2853,6 +2853,7 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | status | 필수 | string {PASS, WITHHELD} |  |
 | resultVersion | 필수 | string |  |
 | generatedAt | 필수 | string (date-time) |  |
+| priceVersion | 선택 | string | 기존 기업 전망·짧은 읽기를 재생성하지 않고 연결한 회차 시세 보완본의 버전. 과거 발행본에서는 생략할 수 있습니다. |
 | scopeNote | 필수 | string |  |
 | reason | 선택 | string |  |
 | companies | 필수 | [CompanyOutlook](#schema-companyoutlook)[] |  |
@@ -2941,6 +2942,8 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | sha256 | 필수 | string |  |
 | bytes | 필수 | integer |  |
 | collectedAt | 필수 | string (date-time) |  |
+| period1 | 선택 | integer (int64) | 명시적인 수집 시작 UTC Unix 초. 구 고정 기간 기록에는 없을 수 있습니다. |
+| period2 | 선택 | integer (int64) | 수집 종료 UTC Unix 초(미포함). 미래 응답 행은 이 구간과 회차 마감으로 별도 차단합니다. |
 
 <a id="schema-companyprice"></a>
 
@@ -3461,6 +3464,57 @@ The immutable published original of a round (what users saw before any correctio
 | message | 필수 | string |  |
 | previous | 필수 | [BriefingResponse](#schema-briefingresponse) / null | 고정 참조의 과거 발행 원문. 이번 회차의 새 평가·새 전망이 아니다. available일 때만 제공하며 기존 데이터·시장 지표의 시점도 과거 그대로다. |
 
+<a id="schema-briefingcontinuity"></a>
+
+### BriefingContinuity
+
+선택적 조용한 회차 정책. 참고 소식·이전 발행본 복기·수집 부족을 구분하며 기존 발행 내용을 바꾸지 않는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 필수 | string {importance-continuity-v1, importance-continuity-v2} |  |
+| roundId | 필수 | string |  |
+| cutoff | 필수 | string (date-time) |  |
+| mode | 필수 | string {core, reference, recap, coverage_limited, validation_failed} |  |
+| importanceFloor | 필수 | integer {1, 2} / null |  |
+| message | 필수 | string |  |
+| coverage | 필수 | object |  |
+| coverage.status | 필수 | string {registered_scope, limited, insufficient} |  |
+| coverage.confirmedDocuments | 필수 | integer |  |
+| coverage.message | 필수 | string |  |
+| references | 필수 | object[] |  |
+| references[].issueId | 필수 | string |  |
+| references[].title | 필수 | string |  |
+| references[].importance | 필수 | integer {1} |  |
+| references[].label | 필수 | string |  |
+| references[].companies | 필수 | object[] |  |
+| references[].companies[].id | 필수 | string |  |
+| references[].companies[].name | 필수 | string |  |
+| references[].sources | 필수 | object[] |  |
+| references[].sources[].evidenceId | 필수 | string |  |
+| references[].sources[].documentId | 필수 | string |  |
+| references[].sources[].documentVersion | 필수 | string |  |
+| references[].sources[].quote | 필수 | string |  |
+| references[].sources[].url | 필수 | string / null |  |
+| references[].sources[].dateContext | 필수 | object |  |
+| references[].sources[].dateContext.publishedAt | 필수 | string (date-time) |  |
+| recap | 필수 | object |  |
+| recap.status | 필수 | string {available, unavailable} |  |
+| recap.previousRoundId | 필수 | string / null |  |
+| recap.date | 선택 | string (date) |  |
+| recap.edition | 선택 | string {morning, evening} |  |
+| recap.dataAsOf | 필수 | string (date-time) / null |  |
+| recap.message | 필수 | string |  |
+| recap.items | 필수 | [BriefingItem](#schema-briefingitem)[] |  |
+| watchConditions | 필수 | object[] |  |
+| watchConditions[].text | 필수 | string |  |
+| watchConditions[].kind | 필수 | string {verification_check, previous_condition} |  |
+| watchConditions[].companyName | 선택 | string |  |
+| watchConditions[].previousRoundId | 선택 | string |  |
+| forecast | 필수 | object |  |
+| forecast.status | 필수 | string {unavailable, not_updated} |  |
+| forecast.message | 필수 | string |  |
+
 <a id="schema-briefingresponse"></a>
 
 ### BriefingResponse
@@ -3480,6 +3534,7 @@ The immutable published original of a round (what users saw before any correctio
 | dataAsOf | 필수 | string (date-time) / null |  |
 | graphVersion | 필수 | string / null |  |
 | items | 필수 | [BriefingItem](#schema-briefingitem)[] |  |
+| continuity | 선택 | [BriefingContinuity](#schema-briefingcontinuity) / null | 선택적 참고 소식·복기·수집 범위. 기존 발행본에는 생략될 수 있다. |
 | companyOutlooks | 선택 | [CompanyOutlooks](#schema-companyoutlooks) | 선정 기업별 사업 전망·조건·근거와 동일 기업의 이전 판단 비교. 과거 발행본에는 없을 수 있습니다. 시장 요약·지표와 별도이며 주가 예측이 아닙니다. |
 | marketSummary | 필수 | [AnalysisSummary](#schema-analysissummary) / [Unavailable](#schema-unavailable) |  |
 | marketVariables | 필수 | [MarketVariables](#schema-marketvariables) / [Unavailable](#schema-unavailable) | KOSPI, KOSDAQ and USD/KRW stored with the published round; unavailable (with the reason) when the round has none |

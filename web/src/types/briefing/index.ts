@@ -127,6 +127,52 @@ export type PreviousBriefingComparison =
       items: PreviousBriefingComparisonItem[];
     }
   | { status: 'unavailable'; reason: string };
+export type BriefingContinuity = {
+  schemaVersion: 'importance-continuity-v1' | 'importance-continuity-v2';
+  roundId: string;
+  cutoff: string;
+  mode:
+    'core' | 'reference' | 'recap' | 'coverage_limited' | 'validation_failed';
+  importanceFloor: 2 | 1 | null;
+  message: string;
+  coverage: {
+    status: 'registered_scope' | 'limited' | 'insufficient';
+    confirmedDocuments: number;
+    message: string;
+  };
+  references: {
+    issueId: string;
+    title: string;
+    importance: 1;
+    label: string;
+    companies: { id: string; name: string }[];
+    sources: {
+      evidenceId: string;
+      documentId: string;
+      documentVersion: string;
+      quote: string;
+      url: string | null;
+      dateContext: { publishedAt: string };
+    }[];
+  }[];
+  recap: {
+    status: 'available' | 'unavailable';
+    previousRoundId: string | null;
+    date?: string;
+    edition?: BriefingEdition;
+    dataAsOf: string | null;
+    message: string;
+    items: BriefingItem[];
+  };
+  watchConditions: {
+    text: string;
+    kind: 'verification_check' | 'previous_condition';
+    companyName?: string;
+    previousRoundId?: string;
+  }[];
+  forecast: { status: 'unavailable' | 'not_updated'; message: string };
+};
+
 /** Consumer fields of getBriefing; publication snapshots are never recalculated. */
 export type BriefingResponse = {
   id: string;
@@ -139,6 +185,7 @@ export type BriefingResponse = {
   dataAsOf: string | null;
   graphVersion: string | null;
   items: BriefingItem[];
+  continuity?: BriefingContinuity;
   companyOutlooks?: import('./companyOutlook').CompanyOutlooks;
   marketSummary: BriefingMarketSummary;
   marketVariables:

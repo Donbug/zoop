@@ -1,0 +1,128 @@
+{
+  "schemaVersion": "zoop-briefing-team-demo-v1",
+  "capturedAt": "2026-10-23",
+  "productionAuthorized": false,
+  "sourceCommit": "d1e76bf851140918af1e2ee670c4f341255c8d69",
+  "originalManifestSha256": "ccaa1d30969c3db350f255c5ad99a619c8fbbce16933aed6a65e9c0b8552e98c",
+  "newAiCalls": 0,
+  "newPriceCalls": 0,
+  "scope": "recorded_read_projection",
+  "tables": {
+    "articles": 65,
+    "article_versions": 65,
+    "evidence": 135,
+    "briefing_rounds": 3,
+    "artifacts": 268
+  },
+  "files": [
+    {
+      "path": "tables/articles.json",
+      "sha256": "1ed28c1e022ea8312c190e7d65273589621059eb76edd540c49bab16f4d5138f",
+      "bytes": 21610
+    },
+    {
+      "path": "tables/article_versions.json",
+      "sha256": "ebd57574793ba88897f3a5e0524cdaf2b2ce76c95b10741bd201fb6ed05ede47",
+      "bytes": 46397
+    },
+    {
+      "path": "tables/evidence.json",
+      "sha256": "ef466c1e77f0c45b547728a5d93e9d2fdcb6b9720d21b4caf63533636249b1a6",
+      "bytes": 190340
+    },
+    {
+      "path": "tables/briefing_rounds.json",
+      "sha256": "c4ae41d9be84dcb78c8a0b0b6a7c9d005899d14244930dcd22602216597bcf91",
+      "bytes": 529907
+    },
+    {
+      "path": "artifacts/briefing_graphs/brf-reconstructed-7da91664d1d1b001ea61a33441992325c4e344a87bef2bdf221865bdca3370ec.json",
+      "sha256": "b02d57cb87853f306c1ea9bae4e3db166c024982cacbf0f1c5470f07e8ce0c5e",
+      "bytes": 316
+    },
+    {
+      "path": "artifacts/briefing_graphs/brf-reconstructed-b73c270b2c8b0b87b0bf93749ba5afe4231671afda3f1ec75bad4e462768e0c7.json",
+      "sha256": "5ddc884dd773ab69dc2f39a7e328fcb440dadb57a6c7ccf6db930f453d552c26",
+      "bytes": 5794
+    },
+    {
+      "path": "artifacts/briefing_graphs/brf-reconstructed-ea11ef0f28e91180a9694488962a8d1ff7c717401f340ad5025afd1c7f07bae9.json",
+      "sha256": "7fc929ec2a878d21ba40338879dee744005486a62b283e4a89a10304a04d2102",
+      "bytes": 3903
+    },
+    {
+      "path": "tables/artifacts.json",
+      "sha256": "2f6bf3ea7231b2a5645383f8747f4c048f33d850985a5081f241810e62dc0f25",
+      "bytes": 97892
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "ccaa1d30969c3db350f255c5ad99a619c8fbbce16933aed6a65e9c0b8552e98c",
+      "bytes": 152370
+    },
+    {
+      "path": "grants.json",
+      "sha256": "190a238d6f886d675a90779251aa48f674c12ebae261193eb738df0ef494877c",
+      "bytes": 33982
+    }
+  ],
+  "expected": [
+    {
+      "date": "2026-10-21",
+      "edition": "evening",
+      "roundId": "sim-2026-10-21-evening-cd52092e7432",
+      "coreItems": 0,
+      "companies": 0,
+      "path": "/api/v1/briefings?date=2026-10-21&edition=evening",
+      "responseSha256": "b3afa11d77f91c8f419d0c735a24aeac785122a5959ca74a312cdad79193878f",
+      "relatedResponses": {
+        "/api/v1/briefings/sim-2026-10-21-evening-cd52092e7432/graph": "eadcb0c443d1dd3bb11eed5fc8f57339bff9e70bf60a6e2f6b2e3ea59b9e9a71"
+      }
+    },
+    {
+      "date": "2026-10-22",
+      "edition": "morning",
+      "roundId": "sim-2026-10-22-morning-3b46d3009683",
+      "coreItems": 2,
+      "companies": 2,
+      "path": "/api/v1/briefings?date=2026-10-22&edition=morning",
+      "responseSha256": "4afce2fb89bffbc4415e3961eac1e4c516237281f6335ffde0111561f0314f12",
+      "relatedResponses": {
+        "/api/v1/briefings/sim-2026-10-22-morning-3b46d3009683/items/issue-8c4e887220df42d097277050": "9051109eacfa6a055c851514d887b400b4df4a20c20c369fe8ed493d41fbff2e",
+        "/api/v1/briefings/sim-2026-10-22-morning-3b46d3009683/items/issue-f30dc03d6f7bf1a08a117214": "570ccd2a09c8e8e457600acc5d0460a2121c242019fec2e0f213d275873d74fa",
+        "/api/v1/briefings/sim-2026-10-22-morning-3b46d3009683/graph": "4a670df645d582179e82b8f676de882d382d5c20f35bc036d05a59c2070d96c1"
+      }
+    },
+    {
+      "date": "2026-10-22",
+      "edition": "evening",
+      "roundId": "sim-2026-10-22-evening-45d79994a5a5",
+      "coreItems": 3,
+      "companies": 3,
+      "path": "/api/v1/briefings?date=2026-10-22&edition=evening",
+      "responseSha256": "7b7e5ef377efdd9e25f5c6732a8156c895c82fc24a67f44bf6b4f4822e18a84f",
+      "relatedResponses": {
+        "/api/v1/briefings/sim-2026-10-22-evening-45d79994a5a5/items/issue-e106c8afb0b7ce33a68c3af2": "4f70b5daa4f97767d2bf9e8934bb71c8ce9745a513a9cbbdc931eceae4b8a222",
+        "/api/v1/briefings/sim-2026-10-22-evening-45d79994a5a5/items/issue-98ffb895151dacc20d6264e4": "d4913aca9d70910e843635e33c8bc9c20a2eb96b21a3f4b6468b4f6ea81005b8",
+        "/api/v1/briefings/sim-2026-10-22-evening-45d79994a5a5/items/issue-88781965d31585459912f6c2": "cd848dd55ff9497ef0bfa907a04f76c0aefc536e84fe114a9744a0190089fb13",
+        "/api/v1/briefings/sim-2026-10-22-evening-45d79994a5a5/graph": "d43fb5c9d2dab227d5d674e3b82db599f1e8e07af6b45c150d1d14b1d41e4dc0"
+      }
+    }
+  ],
+  "omitted": [
+    "accounts",
+    "sessions",
+    "telemetry",
+    "secrets",
+    "full_source_files",
+    "raw_model_requests_and_responses",
+    "provider_credentials"
+  ],
+  "notes": [
+    "Unmodified stored publication payloads and public snapshots; retrospective simulation, not production publication.",
+    "Artifact metadata retains original source hashes and offsets. Only reconstructed graph files are included.",
+    "Briefing details contain recorded quotations, surrounding excerpts and original URLs. Full document/evidence file reads are outside this view-only package.",
+    "Original manifest is preserved for replay read checks; its complete generation artifact archive is not distributed."
+  ],
+  "responseDigest": "canonical_json_excluding_only_metadata_requestId"
+}

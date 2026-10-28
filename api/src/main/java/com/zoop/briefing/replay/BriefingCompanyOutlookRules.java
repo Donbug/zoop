@@ -22,9 +22,12 @@ final class BriefingCompanyOutlookRules {
     private BriefingCompanyOutlookRules() { }
 
     static Map<String, StrictJson.Obj> rows(StrictJson.Obj layer) {
+        return rows(layer, 4);
+    }
+    static Map<String, StrictJson.Obj> rows(StrictJson.Obj layer, int maximum) {
         require(SCHEMA.equals(layer.string("schemaVersion")) && !layer.string("authorizationRef").isBlank(), "layer");
         Map<String, StrictJson.Obj> out = new LinkedHashMap<>(); Instant last = Instant.MIN;
-        require(!layer.objects("rounds").isEmpty() && layer.objects("rounds").size() <= 4, "round_count");
+        require(!layer.objects("rounds").isEmpty() && layer.objects("rounds").size() <= maximum, "round_count");
         for (StrictJson.Obj row : layer.objects("rounds")) {
             Instant cutoff = Instant.parse(row.string("cutoff")); require(cutoff.isAfter(last), "chronology"); last = cutoff;
             require(out.putIfAbsent(row.string("roundId"), row) == null, "duplicate_round");
@@ -36,7 +39,7 @@ final class BriefingCompanyOutlookRules {
             Map<String, BriefingPresentationRules.Evidence> evidence, List<StrictJson.Obj> history,
             Map<String, JsonNode> receipts, Path output, Set<String> owned) {
         StrictJson.Obj frozen = row.object("frozen");
-        require(SCHEMA.equals(frozen.string("schemaVersion")) && VERSION.equals(frozen.string("promptVersion")), "schema");
+        require(SCHEMA.equals(frozen.string("schemaVersion")) && Set.of(VERSION, "company-outlook-v2").contains(frozen.string("promptVersion")), "schema");
         for (String field : List.of("roundId", "date", "edition", "cutoff")) {
             String value = switch (field) { case "roundId" -> payload.path("id").stringValue();
                 case "cutoff" -> market.string("cutoff"); default -> payload.path(field).stringValue(); };
@@ -158,7 +161,7 @@ final class BriefingCompanyOutlookRules {
     }
 
     private static StrictJson.Obj call(String digest, String phase, StrictJson.Obj frozen, Map<String, JsonNode> receipts, Path output, Set<String> owned) {
-        return recordedCall(digest, phase, frozen, receipts, output, owned, "company_outlook_", VERSION);
+        return recordedCall(digest, phase, frozen, receipts, output, owned, "company_outlook_", frozen.string("promptVersion"));
     }
 
     static StrictJson.Obj recordedCall(String digest, String phase, StrictJson.Obj frozen, Map<String, JsonNode> receipts,

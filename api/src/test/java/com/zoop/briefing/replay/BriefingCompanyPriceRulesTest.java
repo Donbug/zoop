@@ -66,4 +66,19 @@ class BriefingCompanyPriceRulesTest {
                     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("missing_projection");
         }
     }
+    @Test void laterExplicitRangeDoesNotUseOctoberFixtureRangeOrFutureBars() throws Exception {
+        long from = epoch("2026-10-14T00:00:00Z"), to = epoch("2026-10-23T00:00:00Z");
+        var rawRefs = List.of(archive("5m", new long[]{epoch("2026-10-22T00:15:00Z"), epoch("2026-10-22T00:20:00Z"), epoch("2026-10-23T00:15:00Z")},
+                new int[]{100,999,888}), archive("1d", new long[]{epoch("2026-10-21T00:00:00Z"),epoch("2026-10-22T00:00:00Z")},new int[]{90,110}));
+        var refs = rawRefs.stream().map(ref -> {
+            var node = (tools.jackson.databind.node.ObjectNode) ref.node().deepCopy();
+            node.put("period1",from).put("period2",to).put("url",ref.string("url").replace("1790812800",Long.toString(from)).replace("1791504000",Long.toString(to)));
+            return StrictJson.Obj.of(node);
+        }).toList();
+        var morning = BriefingCompanyPriceRules.points("KRX:005930",Instant.parse("2026-10-22T00:20:00Z"),refs,output);
+        assertThat(morning).hasSize(2); assertThat(morning.getLast().value()).isEqualByComparingTo("100");
+        var changed = (tools.jackson.databind.node.ObjectNode) refs.getFirst().node().deepCopy(); changed.put("period2",to+86400);
+        assertThatThrownBy(() -> BriefingCompanyPriceRules.points("KRX:005930",Instant.parse("2026-10-22T00:20:00Z"),List.of(StrictJson.Obj.of(changed),refs.getLast()),output))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("source_url");
+    }
 }

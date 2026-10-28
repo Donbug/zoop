@@ -39,9 +39,13 @@ def number(value):
         raise base.ReplayError("market_number_invalid")
 
 
-def provider_urls():
-    start = int(datetime(2026, 9, 23, tzinfo=KST).timestamp())
-    end = int(datetime(2026, 10, 9, tzinfo=KST).timestamp())
+def provider_urls(start_date=None, end_date=None):
+    start_day = date.fromisoformat(start_date) if start_date else date(2026,9,23)
+    end_day = date.fromisoformat(end_date) if end_date else date(2026,10,9)
+    if not start_day < end_day or (end_day-start_day).days > 62:
+        raise base.ReplayError("market_fetch_date_range")
+    start = int(datetime.combine(start_day,time.min,KST).timestamp())
+    end = int(datetime.combine(end_day,time.min,KST).timestamp())
     return {"kospi": f"https://query1.finance.yahoo.com/v8/finance/chart/%5EKS11?period1={start}&period2={end}&interval=1d",
             "kosdaq": f"https://query1.finance.yahoo.com/v8/finance/chart/%5EKQ11?period1={start}&period2={end}&interval=1d",
             "usdkrw": "https://api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices?pageSize=40&page=1"}
@@ -57,12 +61,12 @@ def transport(url):
         return error.code, error.read(1_000_001)
 
 
-def fetch_receipts(output, send=transport):
+def fetch_receipts(output, send=transport, urls=None):
     raw_dir, providers = output / "market/raw", output / "market/providers"
     base.private_dir(raw_dir)
     base.private_dir(providers)
     receipts, new_calls = {}, 0
-    for indicator, url in provider_urls().items():
+    for indicator, url in (urls or provider_urls()).items():
         path = providers / (indicator + ".json")
         if path.exists():
             saved = base.strict_load(base.regular(path))

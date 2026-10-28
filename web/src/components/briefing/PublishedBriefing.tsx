@@ -15,6 +15,7 @@ import MarketIndicators from './MarketIndicators';
 import MarketSummary from './MarketSummary';
 import BriefingIssueList from './BriefingIssueList';
 import BriefingRecap from './BriefingRecap';
+import BriefingContinuity from './BriefingContinuity';
 import BriefingComparison from './BriefingComparison';
 import PersonalBasisNotice from './PersonalBasisNotice';
 import { hasOnlyKnownLimitations } from './briefingLimitations';
@@ -270,7 +271,15 @@ export default function PublishedBriefing({
               <h2 className="text-lg font-bold tracking-[-0.025em]">
                 {result.edition === 'morning' ? '출근' : '퇴근'} 브리핑
               </h2>
-              <span className={STATUS_PILL}>{statuses[result.status]}</span>
+              <span className={STATUS_PILL}>
+                {result.continuity?.mode === 'reference'
+                  ? '참고 브리핑'
+                  : result.continuity?.mode === 'recap'
+                    ? result.continuity.recap.status === 'available'
+                      ? '복기 브리핑'
+                      : '확인 브리핑'
+                    : statuses[result.status]}
+              </span>
             </div>
             {compact && (
               <p className={`${NOTE} mt-2`}>
@@ -289,12 +298,22 @@ export default function PublishedBriefing({
               {result.notice.reason && ` · ${result.notice.reason}`}
             </p>
           )}
+          {result.continuity && result.continuity.mode !== 'core' && (
+            <BriefingContinuity value={result.continuity} compact={compact} />
+          )}
           {result.status === 'published' && (
-            <>
+            <BriefingReadingSection
+              compact={
+                compact &&
+                Boolean(result.continuity && result.continuity.mode !== 'core')
+              }
+              title="시장·지표와 전체 저장 상태 보기"
+            >
               {(!compact || !knownLimits) && partialInfo}
               {currentContext}
               {result.items.length === 0 &&
-                result.emptyReason === 'no_issues_in_window' && (
+                result.emptyReason === 'no_issues_in_window' &&
+                !result.continuity && (
                   <BriefingRecap
                     key={`${result.id}:${result.graphVersion}:${result.dataAsOf}`}
                     round={result}
@@ -413,7 +432,7 @@ export default function PublishedBriefing({
                   </p>
                 )}
               </section>
-            </>
+            </BriefingReadingSection>
           )}
           {compact && (
             <BriefingReadingSection compact title="발행 정보와 자료 확인 범위">
