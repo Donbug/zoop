@@ -16,6 +16,7 @@ import {
   type FakeServer,
 } from '../support/fakeServer';
 import { renderRoutes } from '../support/renderRoutes';
+import { CANDIDATES, onOverview } from '../support/adminPipeline';
 
 // A-ADM-03 그래프 버전 탭 (FS059, listGraphVersions·activateGraphVersion). 합성 fixture.
 
@@ -106,7 +107,7 @@ function headersOf(pathEnd: string) {
     .map(([, init]) => new Headers(init?.headers));
 }
 
-function open(path = '/admin/pipeline') {
+function open(path = '/admin/pipeline?tab=versions') {
   return renderRoutes(
     [
       {
@@ -130,6 +131,7 @@ beforeEach(() => {
   });
   server = createFakeServer();
   server.on('GET', SESSION, () => json(signedIn));
+  onOverview(server);
 });
 
 describe('A-ADM-03 그래프 버전 (FS059)', () => {
@@ -263,8 +265,9 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     expect(server.calls('GET', VERSIONS)).toHaveLength(1);
   });
 
-  test('목록을 불러오지 못하면 다시 시도할 수 있고, 후보 탭은 준비 중으로 보인다', async () => {
+  test('목록을 불러오지 못하면 다시 시도할 수 있고, 다른 탭도 각자 오류를 보여 준다', async () => {
     server.on('GET', VERSIONS, () => apiError(503, 'SOURCE_UNAVAILABLE'));
+    server.on('GET', CANDIDATES, () => apiError(503, 'SOURCE_UNAVAILABLE'));
     server.on('GET', '/api/v1/admin/jobs', () =>
       apiError(503, 'SOURCE_UNAVAILABLE'),
     );
@@ -276,8 +279,10 @@ describe('A-ADM-03 그래프 버전 (FS059)', () => {
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeTruthy();
 
     await user.click(screen.getByRole('tab', { name: '후보' }));
-    expect(location()).toBe('/admin/pipeline?tab=candidates');
-    expect(screen.getByText(/후보 검수는 아직 준비 중이에요/)).toBeTruthy();
+    expect(location()).toBe('/admin/pipeline');
+    expect(
+      await screen.findByText('후보 목록을 불러오지 못했어요'),
+    ).toBeTruthy();
     await user.click(screen.getByRole('tab', { name: '작업' }));
     expect(location()).toBe('/admin/pipeline?tab=jobs');
     expect(

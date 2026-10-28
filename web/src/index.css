@@ -13,6 +13,8 @@
   --color-zoop-up: #d23c3c;
   --color-zoop-down: #2f6fd8;
   --color-zoop-alert: #b42318;
+  /* A-ADM-03 보류(HOLD) 판정 */
+  --color-zoop-hold: #c2410c;
   --color-zoop-map: #dfdfdc;
   --font-inter: 'Inter Variable', 'Pretendard Variable', sans-serif;
 
@@ -41,6 +43,7 @@
   --color-zoop-up: #ffb4ad;
   --color-zoop-down: #a9c5ff;
   --color-zoop-alert: #ffb4ad;
+  --color-zoop-hold: #fdba74;
   --color-panel-ink: #ffffff;
   --color-panel-secondary: #d4d4d4;
   --color-panel-muted: #a3a3a3;

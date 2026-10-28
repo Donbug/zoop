@@ -34,7 +34,12 @@ const activationLabel: Record<GraphVersionActivation['action'], string> = {
 // A-ADM-03 그래프 버전 탭 (FS059, listGraphVersions·activateGraphVersion)
 // - 지금 사용자에게 보이는 버전, 버전 목록(최신 먼저), 전환 이력을 보여 준다.
 // - 이미 있는 버전으로만 바꾼다. 원장에서 새 버전 게시(publishGraphVersion)는 API가 아직 없다.
-export default function GraphVersions() {
+export default function GraphVersions({
+  onActivated,
+}: {
+  /** 표시 버전이 바뀌면 후보의 공개 표시 상태도 다시 읽게 알린다. */
+  onActivated?: () => void;
+} = {}) {
   const versions = useCursorPages(listGraphVersions);
   const [target, setTarget] = useState<GraphVersion | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -113,6 +118,7 @@ export default function GraphVersions() {
                   : `${result.activeVersionId}로 바꿨어요.`,
               );
               versions.reload();
+              if (!result.idempotent) onActivated?.();
             }}
           />
         )}

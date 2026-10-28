@@ -199,9 +199,7 @@ export default function RelationDetailPanel({
               <button
                 onClick={() => {
                   onAction('ai', data);
-                  setNotice(
-                    '이 연결선을 질문 대상으로 연결했습니다. AI 대화는 준비 중입니다.',
-                  );
+                  setNotice('이 연결선을 질문 대상으로 연결했습니다.');
                 }}
               >
                 <GraphIcon name="ai" size={14} />

@@ -171,6 +171,7 @@ class ResponsesClient:
         self.new_calls = set()
         self.reused_calls = set()
         self.authorized_truncations = set(authorized_truncations)
+        self.usage = None  # Optional, explicit producer scope; ordinary replay/legacy tools remain offline.
 
     def call(self, stage, data, prompt_name, schema_name, max_output=8000, schema_override=None):
         try:
@@ -242,6 +243,8 @@ class ResponsesClient:
                 if digest(raw) != receipt.get("responseSha256"):
                     raise ReplayError("cached_response_digest_mismatch")
                 self.reused_calls.add(key)
+                if self.usage is not None:
+                    self.usage.replay(stage, key)
                 result = output_of(strict_load(raw))
                 validate_schema(result, schema)
                 return result
@@ -256,7 +259,7 @@ class ResponsesClient:
             self.new_calls.add(key)
         # A transport exception intentionally leaves the reservation unresolved. Never automatically resend it.
         try:
-            status, raw = self.transport(encoded)
+            status, raw = self.transport(encoded) if self.usage is None else self.usage.invoke(stage, encoded, self.transport)
         except Exception as error:
             raise ReplayError("transport_unknown_usage_no_automatic_retry") from error
         write_once(body_path, raw)

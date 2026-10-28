@@ -22,6 +22,15 @@ base = company.base
 
 
 class Review303Test(unittest.TestCase):
+    def test_source_digest_must_match_baseline_before_any_model_client_is_created(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);source=fixtures.fixture(root);sources=root/'sources.jsonl';sources.write_bytes(b'{}\n')
+            bundle=json.loads((source/'bundle-v2.json').read_bytes());bundle['sourceFileSha256']='b'*64
+            (source/'bundle-v2.json').write_bytes(base.canonical(bundle))
+            args=company.parser().parse_args(['--baseline',str(source),'--output',str(root/'output'),
+                '--sources',str(sources),'--authorization-ref','local:authored','--execute'])
+            with patch.object(base,'authenticated_transport',side_effect=AssertionError('client created')):
+                with self.assertRaisesRegex(base.ReplayError,'source_baseline_mismatch'):company.generate(args)
     def test_legacy_company_or_role_cannot_borrow_grounding(self):
         raw = {'participants': [{'company_id':'TEST:A','name':'기업A','role':'buyer'}]}
         mention = {'companies':[{'companyId':'TEST:A','name':'기업A','role':'buyer'}]}

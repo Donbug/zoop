@@ -142,3 +142,13 @@ describe('D-GRP-02 · panel states and accessibility', () => {
     );
   });
 });
+
+it('D-GRP-02 AI에게 묻기는 onAction("ai")으로 사건 문맥을 넘겨요', async () => {
+  const event = createMockEvent(props.id);
+  mocked.mockResolvedValue(event);
+  render(<EventDetailPanel {...props} />);
+  await userEvent.click(
+    await screen.findByRole('button', { name: 'AI에게 묻기' }),
+  );
+  expect(props.onAction).toHaveBeenCalledWith('ai', event);
+});

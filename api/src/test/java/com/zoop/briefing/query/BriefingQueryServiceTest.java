@@ -426,6 +426,96 @@ class BriefingQueryServiceTest {
         assertEquals("available",row.publicSnapshot().at("/continuity/recap/status").asString());
     }
 
+    private BriefingRound companyReading(String schema) {
+        var row = published();
+        var layer = ((ObjectNode) row.publicSnapshot()).putObject("companyOutlooks")
+                .put("schemaVersion", "zoop-company-outlooks-v1").put("roundId", row.id()).put("edition", row.edition())
+                .put("cutoff", row.windowTo().toString()).put("generatedAt", row.generatedAt().toString())
+                .put("resultVersion", "company-result").put("scopeNote", "확인된 자료 범위").put("status", "PASS");
+        var company = layer.putArray("companies").addObject().put("companyId", "company-original")
+                .put("companyName", "원본 기업").put("assessment", "watch");
+        company.putArray("sources").addObject().put("evidenceId", "e-original").put("quote", "저장 인용")
+                .put("documentId", "doc").put("documentVersion", "version").put("bodySha256", "sha")
+                .put("title", "원본").put("url", "https://example.com/source").put("publishedAt", MORNING.toString());
+        for (String field : List.of("impact", "outlook", "comparison")) {
+            var statement = company.putObject(field).put("text", "원본 기업 판단");
+            statement.putArray("evidenceIds").add("e-original");
+            if (field.equals("comparison")) statement.put("status", "unavailable");
+        }
+        for (String field : List.of("facts", "conditions", "risks"))
+            company.putArray(field).addObject().put("text", "원본 기업 근거").putArray("evidenceIds").add("e-original");
+        var reading = company.putObject("reading").put("status", "PASS").put("resultVersion", "reading-result");
+        if (schema != null) reading.put("schemaVersion", schema);
+        for (String field : List.of("brief", "fact", "watch", "background", "change"))
+            reading.putObject(field).put("text", "판단 문장").putArray("evidenceIds").add("e-original");
+        when(repository.find(DATE, "morning")).thenReturn(Optional.of(row));
+        return row;
+    }
+
+    @Test void publicReadPreservesV2StatementsBeyondLegacyLimitsWithoutRewritingTheSnapshot() {
+        var row = companyReading("zoop-company-reading-v2");
+        var reading = (ObjectNode) row.publicSnapshot().at("/companyOutlooks/companies/0/reading");
+        for (var entry : java.util.Map.of("brief", 140, "fact", 160, "watch", 180, "background", 240, "change", 180).entrySet())
+            ((ObjectNode) reading.get(entry.getKey())).put("text", "가".repeat(entry.getValue()));
+        var before = row.publicSnapshot().deepCopy();
+        assertEquals(reading, service.get(DATE, "morning", "request").at("/companyOutlooks/companies/0/reading"));
+        assertEquals(before, row.publicSnapshot());
+        ((ObjectNode) reading.get("fact")).put("text", "가".repeat(161));
+        assertUnavailable(() -> service.get(DATE, "morning", "request"));
+    }
+
+    @Test void v2PublicReadRejectsMissingFactsForeignEvidenceAndUnknownVersions() {
+        var row = companyReading("zoop-company-reading-v2");
+        var reading = (ObjectNode) row.publicSnapshot().at("/companyOutlooks/companies/0/reading");
+        var fact = reading.remove("fact");
+        assertUnavailable(() -> service.get(DATE, "morning", "request"));
+        reading.set("fact", fact);
+        ((ObjectNode) fact).putArray("evidenceIds").add("unbound-source");
+        assertUnavailable(() -> service.get(DATE, "morning", "request"));
+        ((ObjectNode) fact).putArray("evidenceIds").add("e-original");
+        reading.put("schemaVersion", "zoop-company-reading-v99");
+        assertUnavailable(() -> service.get(DATE, "morning", "request"));
+    }
+
+    @Test void legacyReadingWithoutSchemaRetainsItsOriginalLengthLimit() {
+        var row = companyReading(null);
+        var reading = (ObjectNode) row.publicSnapshot().at("/companyOutlooks/companies/0/reading");
+        reading.remove("fact"); reading.remove("background");
+        assertEquals("PASS", service.get(DATE, "morning", "request").at("/companyOutlooks/companies/0/reading/status").asString());
+        ((ObjectNode) reading.get("brief")).put("text", "가".repeat(71));
+        assertUnavailable(() -> service.get(DATE, "morning", "request"));
+    }
+
+    @Test void publicReadKeepsOptionalCardAndOriginalReadingSeparate() {
+        var row = companyReading("zoop-company-reading-v2");
+        var company = (ObjectNode) row.publicSnapshot().at("/companyOutlooks/companies/0");
+        var original = company.get("reading").deepCopy();
+        var card = company.putObject("card").put("schemaVersion", "zoop-company-card-v1")
+                .put("status", "PASS").put("resultVersion", "card-original");
+        for (String key : List.of("topic", "title", "description"))
+            card.putObject(key).put("text", "도입 계획").putArray("evidenceIds").add("e-original");
+        assertEquals(card, service.get(DATE, "morning", "request").at("/companyOutlooks/companies/0/card"));
+        assertEquals(original, company.get("reading"));
+        ((ObjectNode) card.get("title")).put("text", "가".repeat(33));
+        assertUnavailable(() -> service.get(DATE, "morning", "request"));
+    }
+    @Test void publicReadRejectsForeignCardEvidenceMissingRolesAndWithheldDrafts() {
+        var row = companyReading("zoop-company-reading-v2");
+        var company = (ObjectNode) row.publicSnapshot().at("/companyOutlooks/companies/0");
+        var card = company.putObject("card").put("schemaVersion", "zoop-company-card-v1")
+                .put("status", "PASS").put("resultVersion", "card-original");
+        for (String key : List.of("topic", "title", "description"))
+            card.putObject(key).put("text", "도입 계획").putArray("evidenceIds").add("e-original");
+        var description = card.remove("description"); assertUnavailable(() -> service.get(DATE, "morning", "request"));
+        card.set("description", description);
+        ((ObjectNode) card.get("topic")).putArray("evidenceIds").add("foreign");
+        assertUnavailable(() -> service.get(DATE, "morning", "request"));
+        ((ObjectNode) card.get("topic")).putArray("evidenceIds").add("e-original");
+        card.put("status", "WITHHELD"); assertUnavailable(() -> service.get(DATE, "morning", "request"));
+        card.remove("topic"); card.remove("title"); card.remove("description");
+        assertEquals("WITHHELD", service.get(DATE, "morning", "request").at("/companyOutlooks/companies/0/card/status").asString());
+    }
+
     private void assertUnavailable(Runnable action) {
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class, action::run).getErrorCode());
     }

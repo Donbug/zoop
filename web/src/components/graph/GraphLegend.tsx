@@ -1,6 +1,7 @@
 import GraphIcon from './GraphIcon';
 import type { GraphResponse } from '@/types/map/graph';
 import type { LegendKey } from './graph-view';
+import { edgeSwatchClass } from './edge-swatch';
 
 // D-GRP-01/01b: a single horizontal legend controls graph visibility.
 const entries: [LegendKey, string, string][] = [
@@ -74,10 +75,7 @@ export default function GraphLegend({
             {kind ? (
               <GraphIcon name={key} size={12} />
             ) : (
-              <b
-                aria-hidden="true"
-                className={`legend-line ${key === 'FOLLOWS' ? 'follows' : key === 'SHARES_ISSUE' ? 'dashed' : key === 'STRUCTURALLY_RELATED_TO' ? 'opacity-50' : ''}`}
-              />
+              <b aria-hidden="true" className={edgeSwatchClass(key)} />
             )}
             {label} <span>{count}</span>
           </button>

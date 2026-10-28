@@ -1,4 +1,3 @@
-import { useSyncExternalStore } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import PublishedBriefing from '@/components/briefing/PublishedBriefing';
 import BriefingRoundPicker from '@/components/briefing/BriefingRoundPicker';
@@ -10,16 +9,6 @@ import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 
 const EDITION_BUTTON = `min-w-[76px] whitespace-nowrap rounded-[2px] text-xs font-semibold text-zoop-muted aria-pressed:bg-zoop-paper aria-pressed:text-zoop-ink aria-pressed:shadow-[0_0_0_0.5px_#1a1a1a14] max-sm:flex-1 ${FOCUS_RING}`;
 
-const narrowScreen = '(max-width: 639px)';
-const subscribeScreen = (notify: () => void) => {
-  if (!window.matchMedia) return () => {};
-  const media = window.matchMedia(narrowScreen);
-  media.addEventListener('change', notify);
-  return () => media.removeEventListener('change', notify);
-};
-const isNarrowScreen = () => window.matchMedia?.(narrowScreen).matches ?? false;
-const desktopScreen = () => false;
-
 // D-BRF-01 출근 · D-BRF-02 퇴근 브리핑 (/briefing). 날짜·회차는 주소(?date=&edition=)에 남는다.
 export default function BriefingPage() {
   const { params, updateQuery } = useRouteQuery();
@@ -28,13 +17,8 @@ export default function BriefingPage() {
   const revision = useAuthStore((s) => s.sessionRevision);
   const edition: BriefingEdition =
     params.get('edition') === 'evening' ? 'evening' : 'morning';
-  const narrow = useSyncExternalStore(
-    subscribeScreen,
-    isNarrowScreen,
-    desktopScreen,
-  );
   const reading = params.get('reading');
-  const compact = reading === 'compact' || (reading !== 'full' && narrow);
+  const compact = reading !== 'full';
   const date = params.get('date') ?? '';
   // FS036: 공통 / 내 종목 기준. 주소(?view=personal)에 남는다.
   const personal = params.get('view') === 'personal';
@@ -65,26 +49,11 @@ export default function BriefingPage() {
       >
         <BriefingRoundPicker
           date={date}
-          onChange={(next) => updateQuery({ date: next || null })}
+          edition={edition}
+          onChange={(next, nextEdition) =>
+            updateQuery({ date: next || null, edition: nextEdition })
+          }
         />
-        <div className="flex h-[38px] rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-soft p-[3px] max-sm:w-full">
-          <button
-            type="button"
-            aria-pressed={edition === 'morning'}
-            onClick={() => updateQuery({ edition: 'morning' })}
-            className={EDITION_BUTTON}
-          >
-            ☼ 출근
-          </button>
-          <button
-            type="button"
-            aria-pressed={edition === 'evening'}
-            onClick={() => updateQuery({ edition: 'evening' })}
-            className={EDITION_BUTTON}
-          >
-            ◔ 퇴근
-          </button>
-        </div>
       </div>
 
       <div
@@ -116,7 +85,7 @@ export default function BriefingPage() {
         aria-label="브리핑 읽기 방식"
       >
         <span className="mr-auto text-[11px] text-zoop-muted">
-          {compact ? '핵심부터 가볍게' : '전체 분석과 근거'}
+          {compact ? '핵심 이슈 중심' : '전체 분석과 근거'}
         </span>
         <button
           type="button"

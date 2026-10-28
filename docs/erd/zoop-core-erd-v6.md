@@ -318,6 +318,7 @@ BriefingResponse.status 매핑: scheduled/missing→not_ready, generating/verify
 
 ```text
 id text PK; round_id text FK briefing_rounds; attempt_no integer
+request_key text UNIQUE; purpose text; lease_until timestamptz
 trigger text; admin_id text? FK admins; admin_email_snapshot text?
 owner_token text UNIQUE; status text; stages jsonb; input_artifact_id text? FK artifacts
 failure_reason text?; started_at timestamptz; finished_at timestamptz?
@@ -328,6 +329,8 @@ UNIQUE(round_id) WHERE status IN ('queued', 'running', 'verifying')
 RoundDetail.attemptsLog와 실행 이력·AI 사용량 연결에 사용한다. 브리핑은 API가 시도 목록을 직접 반환하고 worker가 단계 상태를 기록하므로 별도 유지한다. 한 회차 실행권과 토큰을 짧은 트랜잭션에서 획득하며 모델 호출 중 잠금을 유지하지 않는다. 만료 worker는 현재 owner_token 검사로 발행을 차단한다.
 
 실행권 획득 시 `briefing_rounds.generation_token = briefing_attempts.owner_token`으로 동일한 새 난수 토큰을 기록한다. generating/verifying 회차에는 해당 토큰·회차의 활성 시도가 정확히 하나 있어야 한다. 회차 잠금 아래 시도 INSERT와 회차 전이를 같은 트랜잭션으로 수행하며 교차 테이블 관계는 전용 저장 경로/지연 제약 트리거로 강제한다. heartbeat/단계 변경/발행은 토큰 일치와 미만료 임대를 검사한다. 만료 회수는 기존 시도를 failed로 끝내고 새 토큰·시도 번호를 부여한다. 종료 시 회차 토큰/임대만 NULL로 해제하고 시도 토큰은 이력으로 보존한다.
+
+FS068 producer 구현은 `request_key`로 동일 접수의 멱등성을 보장하고 `stages.inputSha256`으로 고정 입력을 결속한다. `purpose=generation`은 위 회차 토큰 규칙을 적용한다. `purpose=outlook`은 이미 발행된 회차에도 추가 접수할 수 있으며 자체 attempt 임대만 갱신하고 발행본·회차 상태는 바꾸지 않는다. 두 purpose를 합해 한 회차의 활성 시도는 최대 하나다. 종료 시도는 불변이며 재처리는 새 request_key·시도 번호로 접수한다. `completed`는 producer 처리 종료이고, 검증 보류는 `stages.outcome=withheld`, 실제 발행 여부는 `briefing_rounds.published_at`으로 구분한다. 상세: [producer 원장 계약](../../api/docs/BRIEFING_USAGE_LEDGER.md).
 
 ### 21. briefing_changes — 정정·중단·재개 이력
 
@@ -577,6 +580,7 @@ grant_id text?; grant_revision text?; grant_checked_at timestamptz?; grant_scope
 attempt_no integer?; provider text?; model text?; prompt_version text?; reasoning_effort text?
 input_tokens bigint?; output_tokens bigint?; estimated_cost numeric?; actual_cost numeric?; currency text?
 error_code text?; error_message text?; started_at timestamptz; finished_at timestamptz?
+transmission_confirmed boolean?; retry_unit_id text?; cost_basis jsonb?
 UNIQUE(ai_job_id, ai_attempt_id) WHERE ai_job_id IS NOT NULL AND ai_attempt_id IS NOT NULL
 ```
 
@@ -589,6 +593,8 @@ execution_mode는 live/replay/save_only로 통일한다. replay는 저장 산출
 AI 서비스 호출 영수증으로 만든 행은 `ai_job_id`/`ai_attempt_id`를 함께 채우고 `receipt_artifact_id`에 내용 없는 원본 영수증을 보존한다. 같은 AI 시도는 한 행만 허용한다. 실행 소유 FK가 문서 분석이면 `document_analyses.ai_job_id`와 일치시키고, 관리자·브리핑이면 각 checkpoint/stages의 AI 작업 ID와 일치시킨다. 앱의 replay/save_only 기록은 AI 시도 ID 없이 남길 수 있다. 영수증의 `stage`·모델 설정·호출 입력 digest는 artifact에서 검증하며 작업 수준 입력 digest와 같은 값으로 가정하지 않는다.
 
 `grant_id`/`grant_revision`/`grant_checked_at`과 `grant_scope`의 sourceId·requiredOperations·requiredPurposes·requiredRecipients는 이 시도 직전에 확인한 권리 스냅샷이다. 실행 시점의 허가를 입증하지만 현재 공개 권한을 부여하지 않는다. 현재 권리는 원천 grant registry에서 매번 재평가한다. `status=unknown`은 제공자 결과·과금 여부가 불명확한 시도로, failed나 비용 0으로 바꾸지 않고 operator_reconcile 대상으로 남긴다. `actual_cost`는 실제 확인된 청구 자료가 있을 때만, `estimated_cost`는 추정 가능한 경우에만 채우며 미보고 토큰·금액은 NULL로 보존한다.
+
+브리핑 producer는 `transmission_confirmed=true/false/NULL`로 전송 확인/미전송 확인/불명확을 구분한다. 같은 재시도에서 생성·검증 호출이 여러 번 발생해도 `retry_unit_id`를 DISTINCT로 한 번만 센다. replay/save_only는 AI 시도 ID·토큰·비용·retry_unit_id 없이 기록한다. 직접 제공자 호출의 ID는 `briefing-direct:<briefing_attempt_id>`/호출 요청 digest이며 AI 서비스 ID나 제공자 응답 ID로 가장하지 않는다. 알려진 입력/출력 토큰은 독립적으로 보존한다. 추정치를 기록할 때는 `currency`와 단가·가격 버전이 있는 `cost_basis`를 함께 남기며, 청구 자료 없는 actual_cost는 NULL이다. 서로 다른 호스트의 시계 차로 종료 시각이 시작보다 빠르면 원래 종료 시각은 영수증에 보존하고 행의 finished_at은 NULL로 두어 가짜 지연 시간을 만들지 않는다.
 
 **AI 사용량 산식:** `getAiUsage.features[].requests`는 `analysis_jobs` 전체 행 수가 아니다. chatbot은 접수된 `chat_jobs`, news-analysis는 `stage=summary`의 `document_analyses`, document-sentiment는 `stage=sentiment`의 `document_analyses`, briefing은 `briefing_attempts`, briefing-outlook은 각 시도의 outlook 단계 접수 건수를 센다. 멱등 재전송은 새 요청이 아니다. `succeeded`/`failed`는 같은 요청 모집단의 종결 결과이며 pending/withheld를 임의로 성공·모델 실패에 넣지 않는다. briefing과 briefing-outlook의 요청 수는 포함 관계가 있으므로 기능 간 합계로 전체 요청 수를 만들지 않는다.
 

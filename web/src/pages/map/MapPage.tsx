@@ -15,6 +15,8 @@ import GraphIcon from '@/components/graph/GraphIcon';
 import GraphTutorial from '@/components/graph/GraphTutorial';
 import { tutorialTarget } from '@/components/graph/tutorial/tutorial-target';
 import GraphFocusControls from '@/components/graph/GraphFocusControls';
+import GraphHelp from '@/components/graph/GraphHelp';
+import CompanyLogo from '@/components/common/CompanyLogo';
 import CompanyPathPanel from '@/components/graph/CompanyPathPanel';
 import { companyPath } from '@/components/graph/company-path';
 import ImpactPathPanel from '@/components/graph/ImpactPathPanel';
@@ -31,7 +33,10 @@ import AiChatDrawer from '@/components/ai/AiChatDrawer';
 import type { AnswerMapTarget } from '@/components/ai/ChatJobCard';
 import BriefingSnapshotBanner from '@/components/graph/BriefingSnapshotBanner';
 import EvidenceDrawer from '@/components/evidence/EvidenceDrawer';
-import { graphSummary } from '@/components/graph/graph-model';
+import {
+  focusNeighborhood,
+  graphSummary,
+} from '@/components/graph/graph-model';
 import {
   useGraphData,
   graphRequestKey,
@@ -157,9 +162,16 @@ function MapWorkspace({
   const modeSequence = useRef(0);
   const [switching, setSwitching] = useState<MapMode | null>(null);
   const [transitionNotice, setTransitionNotice] = useState('');
-  const evidenceOpen = useGraphUiStore((state) =>
-    Boolean(state.evidenceTarget),
-  );
+  const evidenceTarget = useGraphUiStore((state) => state.evidenceTarget);
+  const evidenceOpen = Boolean(evidenceTarget);
+  const [evidenceSelection, setEvidenceSelection] = useState<{
+    target: GraphTarget;
+    evidenceId: string;
+    eventIds: string[];
+  } | null>(null);
+  // 근거 창이 닫히면 지도에서 보기 선택도 버린다. 같은 대상을 다시 열어도 예전 강조가 살아나지 않는다.
+  if (!evidenceTarget && evidenceSelection) setEvidenceSelection(null);
+  const [centeredEvidence, setCenteredEvidence] = useState<string | null>(null);
   const isolatedOpen = params.get('select') === 'bundle:isolated';
   const paramsKey = params.toString();
   useEffect(() => {
@@ -308,6 +320,30 @@ function MapWorkspace({
     data && !loading && !error && pathFrom && pathTo
       ? companyPath(data, pathFrom, pathTo)
       : null;
+  const activeEvidence =
+    evidenceSelection?.target === evidenceTarget &&
+    data &&
+    (!evidenceTarget?.mapContext?.graphVersion ||
+      evidenceTarget.mapContext.graphVersion === data.metadata.graphVersion) &&
+    (!evidenceTarget?.mapContext?.asOf ||
+      Date.parse(evidenceTarget.mapContext.asOf) ===
+        Date.parse(data.metadata.asOf))
+      ? evidenceSelection
+      : null;
+  const evidenceEdges =
+    activeEvidence && data
+      ? data.edges
+          .filter((edge) =>
+            edge.evidenceIds.includes(activeEvidence.evidenceId),
+          )
+          .map((edge) => edge.id)
+      : [];
+  const evidenceFallback =
+    activeEvidence && !evidenceEdges.length
+      ? (activeEvidence.eventIds.find((id) =>
+          data?.nodes.some((node) => node.id === id),
+        ) ?? null)
+      : null;
   const edgeId = rawSelection?.startsWith('edge:')
     ? rawSelection.slice(5) || null
     : null;
@@ -339,6 +375,36 @@ function MapWorkspace({
   const flowOrder = params.get('arrange') === 'flow';
   const focusHops: 1 | 2 = params.get('hops') === '2' ? 2 : 1;
   const focusNode = data?.nodes.find((node) => node.id === focusId) ?? null;
+  // 15번: 근거 강조는 보고 있던 중심 보기를 유지하되, 강조할 선·사건이 중심 보기 밖이면
+  // 강조하는 동안만 전체 지도로 보인다. 주소의 focus는 그대로라 창을 닫으면 중심 보기로 돌아온다.
+  const evidenceEdgeNodes = data
+    ? data.edges
+        .filter((edge) => evidenceEdges.includes(edge.id))
+        .flatMap((edge) => [edge.source, edge.target])
+    : [];
+  const evidenceNodes = evidenceFallback
+    ? [evidenceFallback]
+    : evidenceEdgeNodes;
+  const focusShown =
+    data && !pathFrom && focusId
+      ? focusNeighborhood(data, focusId, focusHops)
+      : null;
+  const evidenceOutsideFocus = Boolean(
+    focusShown?.size && evidenceNodes.some((id) => !focusShown.has(id)),
+  );
+  // 강조한 선이 화면 밖에 있을 수 있어 첫 선으로 지도를 옮긴다(사건만 강조하면 선택이 옮긴다).
+  const evidenceCenter = evidenceEdgeNodes[0] ?? null;
+  const evidenceKey = activeEvidence
+    ? `${activeEvidence.evidenceId}:${evidenceOutsideFocus}`
+    : null;
+  if (evidenceKey !== centeredEvidence) {
+    setCenteredEvidence(evidenceKey);
+    if (evidenceKey && evidenceCenter)
+      setCenterRequest((old) => ({
+        id: evidenceCenter,
+        seq: (old?.seq ?? 0) + 1,
+      }));
+  }
   const logoOf = (companyId: string) =>
     data?.nodes.find((node) => node.id === companyId)?.logoUrl;
   useEffect(() => {
@@ -848,6 +914,7 @@ function MapWorkspace({
               </>
             )}
             <div className="relationship-toolbar-help">
+              <GraphHelp disabled={tutorialOpen} />
               <button
                 onClick={() => setNotice(notice === 'info' ? '' : 'info')}
                 aria-label="지도 데이터 안내"
@@ -938,25 +1005,33 @@ function MapWorkspace({
                   });
                 }}
                 selectedId={
-                  pathFrom ?? selectedId ?? detailEventId ?? companyId
+                  activeEvidence
+                    ? evidenceFallback
+                    : (pathFrom ?? selectedId ?? detailEventId ?? companyId)
                 }
-                connectionPath={Boolean(pathFrom)}
+                connectionPath={Boolean(pathFrom) && !activeEvidence}
                 highlightedEdgeIds={
-                  pathFrom
-                    ? (displayedPath?.edgeIds ?? [])
-                    : impactEdges(data, impact.data ?? historicalImpact.data)
+                  activeEvidence
+                    ? evidenceEdges
+                    : pathFrom
+                      ? (displayedPath?.edgeIds ?? [])
+                      : impactEdges(data, impact.data ?? historicalImpact.data)
                 }
-                selectedEdgeId={edgeId}
+                selectedEdgeId={activeEvidence ? null : edgeId}
+                isolateSelection={Boolean(activeEvidence && evidenceFallback)}
+                evidenceMode={Boolean(activeEvidence)}
                 onSelectEdge={selectEdge}
                 onSelect={selectNode}
                 focusId={
-                  pathFrom
+                  pathFrom || evidenceOutsideFocus
                     ? null
                     : (focusId ??
                       (historical ? (detailEventId ?? companyId) : null))
                 }
                 focusHops={focusHops}
-                focusLayout={!pathFrom && Boolean(focusId)}
+                focusLayout={
+                  !pathFrom && !evidenceOutsideFocus && Boolean(focusId)
+                }
                 flow={flowOrder}
                 onFlowChange={(next) =>
                   updateQuery({ arrange: next ? 'flow' : null })
@@ -975,13 +1050,23 @@ function MapWorkspace({
                 </p>
               </div>
             )}
-            {pathFrom && pathIsCollapsed && (
+            {pathFrom && (pathIsCollapsed || Boolean(displayedPath)) && (
               <div
                 role="group"
                 aria-label="지도 경로"
                 data-screen-id="D-GRP-07"
-                className="absolute top-2 right-2 left-2 z-20 flex flex-wrap items-center gap-1 rounded-lg border border-zoop-line bg-zoop-paper p-2 text-[13px] text-zoop-ink md:hidden"
+                className={`absolute top-2 left-2 z-20 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-1 rounded-lg border border-zoop-line bg-zoop-paper p-2 text-[13px] text-zoop-ink ${pathIsCollapsed ? '' : 'max-md:hidden'}`}
               >
+                {data?.nodes
+                  .filter((n) => n.id === pathFrom)
+                  .map((n) => (
+                    <CompanyLogo
+                      key={n.id}
+                      name={n.label}
+                      logoUrl={n.logoUrl}
+                      className="size-6 rounded-full bg-zoop-ink text-xs text-zoop-paper"
+                    />
+                  ))}
                 <strong className="min-w-0 flex-1 truncate">
                   {data?.nodes.find((n) => n.id === pathFrom)?.label ??
                     '첫 기업'}{' '}
@@ -992,9 +1077,28 @@ function MapWorkspace({
                     ? ` · ${displayedPath.edgeIds.length}단계`
                     : ''}
                 </strong>
+                {data?.nodes
+                  .filter((n) => n.id === pathTo)
+                  .map((n) => (
+                    <CompanyLogo
+                      key={n.id}
+                      name={n.label}
+                      logoUrl={n.logoUrl}
+                      className="size-6 rounded-full bg-zoop-ink text-xs text-zoop-paper"
+                    />
+                  ))}
                 <button
                   className="min-h-11 rounded border border-zoop-line px-2"
-                  onClick={() => setCollapsedPath(null)}
+                  onClick={() => {
+                    setCollapsedPath(null);
+                    requestAnimationFrame(() =>
+                      document
+                        .querySelector<HTMLElement>(
+                          'aside[aria-label="두 기업 사이 경로"] h2',
+                        )
+                        ?.focus(),
+                    );
+                  }}
                 >
                   경로 단계 보기
                 </button>
@@ -1006,7 +1110,7 @@ function MapWorkspace({
                 </button>
               </div>
             )}
-            {focusNode?.kind === 'company' && !pathFrom && (
+            {focusNode && !pathFrom && !evidenceOutsideFocus && (
               <GraphFocusControls
                 label={focusNode.label}
                 hops={focusHops}
@@ -1167,6 +1271,14 @@ function MapWorkspace({
                       select: null,
                     })
                   }
+                  onSelectCompany={(id) =>
+                    updateQuery({
+                      path: null,
+                      focus: null,
+                      hops: null,
+                      select: `node:${id}`,
+                    })
+                  }
                   onEvidence={(id) => {
                     const node = data?.nodes.find((n) => n.id === id);
                     const evidenceIds = [
@@ -1319,13 +1431,6 @@ function MapWorkspace({
                     가상 데이터입니다.
                   </p>
                 )}
-                {notice === 'help' && (
-                  <p>
-                    빈 영역 드래그로 이동 · 휠 또는 +/−로 확대 · 맞춤 버튼으로
-                    전체 보기 · 기업 또는 사건 선택으로 상세 확인 · Tab으로 노드
-                    및 연결선 이동 · Enter로 선택 · Escape로 상세 닫기.
-                  </p>
-                )}
                 {data?.metadata.partial && (
                   <p>
                     일부 데이터를 조회하지 못했습니다.{' '}
@@ -1353,6 +1458,7 @@ function MapWorkspace({
             returnFocusTo={mapRegion}
           />
           <EvidenceDrawer
+            key={evidenceTarget?.id ?? 'closed'}
             onTutorialSkip={
               tutorialOpen && tutorialStep && tutorialStep < 5
                 ? () => {
@@ -1374,8 +1480,21 @@ function MapWorkspace({
               )
                 setTutorialStep(5);
             }}
-            onViewOnMap={(id) =>
-              updateQuery({ focus: id, hops: '1', path: null })
+            mapResult={
+              activeEvidence
+                ? evidenceEdges.length
+                  ? 'edges'
+                  : evidenceFallback
+                    ? 'event'
+                    : 'none'
+                : null
+            }
+            onViewOnMap={(selection) =>
+              setEvidenceSelection(
+                selection && evidenceTarget
+                  ? { target: evidenceTarget, ...selection }
+                  : null,
+              )
             }
           />
         </section>

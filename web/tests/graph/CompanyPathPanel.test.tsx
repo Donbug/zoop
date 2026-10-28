@@ -52,3 +52,24 @@ it('D-GRP-07 distinguishes an absent path in partial or truncated data from no r
   ).toBeTruthy();
   expect(panel.getByText('일부 자료를 받지 못했습니다.')).toBeTruthy();
 });
+
+it('D-GRP-07 displays path context and selects a company from the path', async () => {
+  const select = vi.fn();
+  render(<CompanyPathPanel {...props} onSelectCompany={select} />);
+  expect(screen.getByRole('heading', { name: '2단계 연결' })).toBeTruthy();
+  expect(screen.getByLabelText('경로를 찾는 방법')).toBeTruthy();
+  await userEvent.click(screen.getByRole('button', { name: '삼성전자' }));
+  expect(select).toHaveBeenCalledWith('KRX:005930');
+});
+
+it('D-GRP-07 단계 연결선 견본은 지도·범례와 같은 모양이고 방향 화살표를 그리지 않는다', () => {
+  const { container } = render(<CompanyPathPanel {...props} />);
+  const swatches = [...container.querySelectorAll('ol .legend-line')];
+  expect(swatches.length).toBeGreaterThan(0);
+  const types = props.graph!.edges.map((edge) => edge.relationType);
+  for (const swatch of swatches) {
+    if (swatch.classList.contains('dashed'))
+      expect(types).toContain('SHARES_ISSUE');
+  }
+  expect(container.querySelector('ol svg path')).toBeNull();
+});

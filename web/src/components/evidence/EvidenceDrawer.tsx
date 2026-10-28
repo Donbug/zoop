@@ -14,7 +14,11 @@ interface Props {
   /** 사용자가 창을 닫았을 때. 튜토리얼은 근거를 불러오지 못해도 닫으면 다음 단계로 넘어간다. */
   onClosed?: () => void;
   onTutorialSkip?: () => void;
-  onViewOnMap?: (eventId: string) => void;
+  onViewOnMap?: (
+    selection: { evidenceId: string; eventIds: string[] } | null,
+  ) => void;
+  /** 지도에서 보기 결과. 연결선·사건 강조, 지도에 없음(none), 강조 안 함(null) */
+  mapResult?: 'edges' | 'event' | 'none' | null;
 }
 
 function publisherLabel(evidence: EvidenceResponse) {
@@ -35,10 +39,9 @@ function EvidenceCard({
 }: {
   evidence: EvidenceResponse;
   focused: boolean;
-  onViewOnMap?: (eventId: string) => void;
+  onViewOnMap?: () => void;
 }) {
   const href = safeArticleUrl(evidence.article?.url ?? null);
-  const eventId = evidence.eventIds[0];
   return (
     <article
       className={`${ui.section} px-5! py-4! [&_h3]:mt-2! [&_h3]:mb-0! [&_blockquote]:mt-2 [&_blockquote]:rounded-[3px] [&_blockquote]:bg-panel-soft [&_blockquote]:px-3 [&_blockquote]:py-2.5 [&_blockquote]:text-[12px] [&_blockquote]:leading-[19.5px] [&_blockquote]:wrap-anywhere`}
@@ -75,11 +78,11 @@ function EvidenceCard({
             ) : (
               <span className={ui.muted}>원문 링크가 제공되지 않았습니다.</span>
             )}
-            {eventId && onViewOnMap && (
+            {onViewOnMap && (
               <button
                 type="button"
                 aria-pressed={focused}
-                onClick={() => onViewOnMap(eventId)}
+                onClick={onViewOnMap}
               >
                 ◇ 지도에서 보기
               </button>
@@ -104,6 +107,7 @@ export default function EvidenceDrawer({
   onClosed,
   onViewOnMap,
   onTutorialSkip,
+  mapResult = null,
 }: Props) {
   const target = useGraphUiStore((state) => state.evidenceTarget);
   const close = useGraphUiStore((state) => state.closeEvidence);
@@ -160,16 +164,27 @@ export default function EvidenceDrawer({
   const checkedAt = target.verifiedAt ?? null;
   const retryable = failures.some((failure) => failure.retryable);
 
+  const highlighted =
+    focusedEvidenceId !== null &&
+    (mapResult === 'edges' || mapResult === 'event');
+
   function viewOnMap(evidence: EvidenceResponse) {
-    const eventId = evidence.eventIds[0];
-    if (!eventId || !onViewOnMap) return;
-    setFocusedEvidenceId(evidence.id);
-    onViewOnMap(eventId);
+    if (!onViewOnMap) return;
+    const next =
+      focusedEvidenceId === evidence.id && highlighted ? null : evidence.id;
+    setFocusedEvidenceId(next);
+    onViewOnMap(
+      next ? { evidenceId: next, eventIds: evidence.eventIds } : null,
+    );
   }
 
   return (
     <div className="absolute inset-0 z-20 flex justify-end">
-      <div className="absolute inset-0 bg-black/35" aria-hidden="true" />
+      {/* 15번: 지도에서 보기로 강조 중이면 지도를 어둡게 덮지 않아 창 옆에서 강조된 지도가 보인다. */}
+      <div
+        className={`absolute inset-0 ${highlighted ? '' : 'bg-black/35'}`}
+        aria-hidden="true"
+      />
       <aside
         ref={dialog}
         className={`relative ${ui.shell} ${ui.wideShell} border-l border-panel-line`}
@@ -309,11 +324,16 @@ export default function EvidenceDrawer({
 
           {!loading && items.length > 0 && (
             <div className="flex flex-col">
+              {focusedEvidenceId && !highlighted && (
+                <p role="status" className={`px-5 py-3 ${ui.muted}`}>
+                  이 근거와 연결된 선이나 사건이 지금 지도에 없어요.
+                </p>
+              )}
               {items.map((evidence) => (
                 <EvidenceCard
                   key={evidence.id}
                   evidence={evidence}
-                  focused={focusedEvidenceId === evidence.id}
+                  focused={highlighted && focusedEvidenceId === evidence.id}
                   onViewOnMap={
                     onViewOnMap ? () => viewOnMap(evidence) : undefined
                   }
