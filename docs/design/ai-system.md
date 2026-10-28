@@ -1,6 +1,6 @@
 # AI 실행과 문서 공개 계약
 
-챗봇 목표 설계 갱신(2026-10-27): Q02/Q03/Q04 multi-label 도구 조합·턴별 재분류, Q01을 제외한 Q02~Q08의 선택적 보조 웹 검색, 기존 어댑터를 재사용하는 MCP 서버 POC와 typed 화면 동작을 채택했다. 아래 S1~S7 구현 기록이나 비공개 그래프 공개 경계를 변경하지 않는다. 새 계약·구현 예정 범위는 [챗봇 설계 요약](ai-chatbot-design-summary.md), [MCP·화면 동작](ai-chatbot-mcp-actions.md), [보조 웹 검색](ai-chatbot-web-search.md)을 따른다.
+챗봇 목표 설계 갱신(2026-10-28): Jev Q01~Q08 multi-label 뒤 서버가 allowed_tools·scope·8/6/2·45초 예산을 고정하고, Luna Responses가 Java 앱의 원격 MCP 도구를 선택·연속 호출한다. 요청 단위 cache·single-flight, MCP transport 장애 시 동일 Tool Service의 직접 어댑터 fallback, Q01 웹 금지·Q02 기본 보조·Q03~Q08 마지막 수단, 웹 실패 비차단과 answerStatus/notices 목표 계약을 채택했다. 기존 “앱 BE↔AI는 ai/service HTTP만” 경계에는 OpenAI 런타임→앱 MCP 인바운드를 명시적으로 추가해야 하며, 구현 PR에서 서비스 인증·네트워크 allowlist·grant·`CLAUDE.md`를 함께 바꾼다. 아래 S1~S7 구현 기록이나 비공개 그래프 공개 경계를 변경하지 않는다. 새 계약·구현 예정 범위는 [챗봇 설계 요약](ai-chatbot-design-summary.md), [Luna MCP 실행·화면 동작](ai-chatbot-mcp-actions.md), [보조 웹 검색](ai-chatbot-web-search.md)을 따른다.
 
 ## 현재 구현 범위와 설계 논의 적용
 
