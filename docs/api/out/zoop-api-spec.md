@@ -2737,7 +2737,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 ## getCompanyIssueImpact · 기업 맥락 이슈 영향 경로 조회
 
-D-GRP-06·D-GRP-05 / FS022. FS079 오프라인 검증 결과를 소비하지만 FS079 자체에 공개 HTTP 작업을 새로 배정하지 않는다. 선택한 공개 버전·asOf·현재 공개 제외를 함께 적용한다. 보이는 INVOLVES가 있으면 direct, 그렇지 않고 보이는 STRUCTURALLY_RELATED_TO가 있으면 structural이다. 다른 이슈를 경유하거나 SHARES_ISSUE를 경로로 쓰지 않는다. 구조 연결만으로 이슈의 긍정·부정 영향을 주장하지 않는다.
+고정된 공개 그래프에서 보이는 기업과 이슈 사이의 직접 INVOLVES 관계만 경로로 반환한다. pathStatus=direct_available이면 직접 경로가 있다. STRUCTURALLY_RELATED_TO만 보이면 200과 빈 steps, pathStatus=structural_path_details_unavailable을 반환해 실제 관계 부재와 구분한다. 둘 다 없으면 빈 steps와 pathStatus=no_direct_relation을 반환한다. 각 근거 ID에는 getEvidence와 같은 현재 공개 권리 검사를 적용한다. 권리 때문에 근거가 빠지면 metadata.partial=true와 evidence 실패 항목을 반환하고, 권한 원천을 확인할 수 없으면 SOURCE_UNAVAILABLE/503이다. 구조 상세 경로는 receipt 전체 경로의 공개 적격성과 basis별 근거를 검증할 수 있을 때만 반환할 수 있으며, 추정·탐색 경로를 만들지 않는다. 기업·이슈가 선택 버전에 없거나 공개 필터 뒤에 보이지 않으면 404다. round·graphVersion·asOf는 getGraph와 같은 공개 버전 선택 규칙을 따른다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2745,7 +2745,7 @@ D-GRP-06·D-GRP-05 / FS022. FS079 오프라인 검증 결과를 소비하지만 
 | 권한·우선순위 | 공개 · P1 |
 | 요청 본문 | 없음 |
 | 응답 | 200: [ImpactPath](#schema-impactpath), 409: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE |
+| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
 | FS/NFS | [FS022](../../system/out/feature-FS022.md) · [FS024](../../system/out/feature-FS024.md) · [FS055](../../system/out/feature-FS055.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-GRP-06](../../system/out/screen-D-GRP-06.md) · [D-GRP-05](../../system/out/screen-D-GRP-05.md) |
 | WBS | 6.1.2, 6.11.1, 6.6.6, 6.6.7, 6.6.9, 6.6.22, 6.6.24, 6.6.25, 6.6.26, 6.5.1 |
@@ -2759,7 +2759,7 @@ D-GRP-06·D-GRP-05 / FS022. FS079 오프라인 검증 결과를 소비하지만 
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string |  |
 | issueId | path | 필수 | string |  |
-| round | query | 선택 | string | 브리핑 회차가 고정한 그래프를 읽는다. graphVersion/asOf를 함께 지정하면 저장된 회차의 버전·자료 시점과 정확히 일치해야 하며 최신 그래프로 대체하지 않는다. |
+| round | query | 선택 | string | 이 브리핑 회차의 공개 그래프를 고정한다. graphVersion과 함께 쓰면 해당 회차와 일치해야 한다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. 단독으로 지정하면 그 버전이 처음 공개된 시각 기준으로 조회하고 그 시각을 metadata.asOf로 돌려준다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
@@ -7203,22 +7203,18 @@ S1 실제 문서 요약. exact citation+별도 semantic supported 영수증을 �
 
 ### ImpactPath
 
-pathStatus=none은 기업·이슈가 모두 공개됐지만 공개 연결이 없는 200 결과다. 대상이 없거나 공개되지 않으면 404다. direct가 structural보다 우선한다. structural의 완전한 공개 사슬 후보가 여러 개면 단계 수, 원천 관계 ID, 근거 ID 오름차순으로 하나만 선택한다. available 경로의 steps는 정확히 [issue, company]이고 none에서는 비어 있다. 현재 판정 없이 산업·제품 단계나 긍정·부정 영향을 만들지 않는다.
+기업 패널에서 여는 공개 영향 경로다. 현재 steps는 선택된 공개 스냅샷의 직접 INVOLVES 연결만 담으며 연결이 없으면 빈 배열이다. 근거 ID는 getEvidence의 현재 권리 검사를 통과한 항목만 포함한다. 관계가 보이더라도 구조 경로의 receipt 검증이 완료되지 않은 경우 추정 단계를 만들지 않는다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | companyId | 필수 | string |  |
 | issueId | 필수 | string |  |
-| pathStatus | 필수 | string {available, none} |  |
-| pathType | 필수 | string, null {direct, structural, None} |  |
-| edgeId | 필수 | string, null | 선택 버전의 필터된 공개 그래프에서 고른 표시 간선 ID. 경로가 없으면 null. |
-| steps | 필수 | object[] | available이면 공개 이슈, 선택 기업 순서의 두 노드다. none이면 빈 배열이다. 중간 사업 관계 기업은 이 목록에 넣지 않는다. |
+| pathStatus | 필수 | string {direct_available, structural_path_details_unavailable, no_direct_relation} | 직접 INVOLVES 경로 제공 여부와 구조 경로 상세의 미제공 상태를 구분한다. |
+| steps | 필수 | object[] | 직접 경로의 순서는 [issue, company]다. |
 | steps[].id | 필수 | string |  |
-| steps[].kind | 필수 | string {company, issue} |  |
+| steps[].kind | 필수 | string {company, issue, industry, product} |  |
 | steps[].reason | 필수 | string |  |
 | steps[].evidenceIds | 필수 | string[] |  |
-| businessPath | 필수 | [ImpactBusinessPath](#schema-impactbusinesspath) / null | structural에서만 객체다. 시작 기업의 공개 INVOLVES와 모든 단계·근거·중간 기업의 공개 조건을 통과해야 complete다. direct/none은 null. |
-| impact | 필수 | [CompanyIssueImpactAssessment](#schema-companyissueimpactassessment) |  |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-impactbusinesspath"></a>

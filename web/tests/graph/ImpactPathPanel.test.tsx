@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ImpactPathPanel from '@/components/graph/ImpactPathPanel';
@@ -112,21 +112,8 @@ describe('ImpactPathPanel structural relation details', () => {
         impact={{
           companyId: company.id,
           issueId: issue.id,
-          pathStatus: 'available',
-          pathType: 'structural',
-          edgeId: structuralEdge.id,
+          pathStatus: 'structural_path_details_unavailable',
           steps: [],
-          businessPath: {
-            status: 'unavailable',
-            reason: 'not_recorded',
-            companyIds: [],
-            links: [],
-          },
-          impact: {
-            status: 'unavailable',
-            reason: 'issue_impact_not_produced',
-            results: [],
-          },
           metadata: {
             source: 'fixture',
             asOf: graph.metadata.asOf,
@@ -155,5 +142,102 @@ describe('ImpactPathPanel structural relation details', () => {
       context,
       1,
     );
+  });
+
+  it('offers a retry when the structural relation request fails before returning data', async () => {
+    vi.mocked(useRelationData).mockReturnValue({
+      key: 'structural',
+      data: null,
+      error: '관계 상세 조회에 실패했습니다.',
+      retryable: true,
+      loading: false,
+    });
+    render(
+      <ImpactPathPanel
+        companyId={company.id}
+        issueId={issue.id}
+        context={context}
+        graph={selectedGraph}
+        impact={{
+          companyId: company.id,
+          issueId: issue.id,
+          pathStatus: 'structural_path_details_unavailable',
+          steps: [],
+          metadata: {
+            source: 'fixture',
+            asOf: graph.metadata.asOf,
+            graphVersion: graph.metadata.graphVersion,
+          },
+        }}
+        loading={false}
+        error={null}
+        onRetry={vi.fn()}
+        onClose={vi.fn()}
+        onViewIssue={vi.fn()}
+        onEvidence={vi.fn()}
+        onAskAi={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        /경로 상세와 단계별 근거는 아래 사업 관계 상세에서 확인합니다/,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText('관계 상세 조회에 실패했습니다.')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    await waitFor(() =>
+      expect(useRelationData).toHaveBeenLastCalledWith(
+        structuralEdge.id,
+        context,
+        1,
+      ),
+    );
+  });
+
+  it('does not retry a non-retryable structural relation failure', () => {
+    vi.mocked(useRelationData).mockReturnValue({
+      key: 'structural',
+      data: null,
+      error: '선택한 그래프에서 관계 상세를 찾지 못했습니다.',
+      retryable: false,
+      loading: false,
+    });
+    render(
+      <ImpactPathPanel
+        companyId={company.id}
+        issueId={issue.id}
+        context={context}
+        graph={selectedGraph}
+        impact={{
+          companyId: company.id,
+          issueId: issue.id,
+          pathStatus: 'structural_path_details_unavailable',
+          steps: [],
+          metadata: {
+            source: 'fixture',
+            asOf: graph.metadata.asOf,
+            graphVersion: graph.metadata.graphVersion,
+          },
+        }}
+        loading={false}
+        error={null}
+        onRetry={vi.fn()}
+        onClose={vi.fn()}
+        onViewIssue={vi.fn()}
+        onEvidence={vi.fn()}
+        onAskAi={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText('선택한 그래프에서 관계 상세를 찾지 못했습니다.'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        /선택한 그래프 버전에서 사업 관계 상세를 찾지 못했습니다/,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
   });
 });
