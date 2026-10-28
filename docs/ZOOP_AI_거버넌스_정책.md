@@ -204,7 +204,7 @@ Q02는 최신 금융 상황을 일반 지식으로 답하기 위한 우회 경�
 3. 새 질문마다 명시 요구를 구조화한다. 이전 완료 턴은 최대 2턴의 검증된 대상 ID·기간만 문맥 후보로 사용하며 이전 답변 본문은 넘기지 않는다. 새 질문의 명시 조건이 우선한다.
 4. TypeSafe Jev가 Q01~Q08을 multi-label로 판정한다. 유형별 확률 `p>=0.70`은 후보, `0.35<=p<0.70`은 검토 후보로 두되 명시 요구는 확률만으로 제거하지 않는다.
 5. 서버가 승인된 논리 기능·MCP 도구·대상 scope·권한·호출 예산으로 `allowed_tools`를 만든다. Q01에는 웹 검색을 허용하지 않는다.
-6. ai/service가 Luna Responses API(`reasoning.effort=medium`, `require_approval=always`)에 정제 입력과 ZOOP 원격 MCP 연결을 제공한다. Luna는 허용 목록 안에서 도구를 제안하고 OpenAI 런타임이 `mcp_approval_request`를 반환한다.
+6. ai/service가 Luna Responses API(`reasoning.effort=medium`, `require_approval=always`, `store=true`)에 정제 입력과 ZOOP 원격 MCP 연결을 제공한다. Luna는 허용 목록 안에서 도구를 제안하고 OpenAI 런타임이 `mcp_approval_request`를 반환한다.
 7. ai/service는 approval request와 response/request ID를 Java에 반환한다. Java 작업 실행기가 requirementIds·scope·grant·예산·기한을 승인/거부하고 ai/service continuation을 다시 호출한다. ai/service는 Java 결정만 `mcp_approval_response`로 전달하며 독자 승인하지 않는다.
 8. Java MCP endpoint는 기존 Tool Service를 재사용하고 결과 반환 전에 typed schema, 공개 상태, 고정 버전, model-send grant와 크기를 검사한다. Python ai/service가 애플리케이션 DB를 직접 읽지 않는다.
 9. Luna 실행 중 요구 추적과 서버의 결정론적 커버리지 검사를 사용한다. 별도 Luna coverage-verifier 2회 호출은 두지 않는다. 남은 요구가 있고 정보 이득이 예상되며 예산이 남을 때만 후속 조회한다.
@@ -443,6 +443,8 @@ Q01~Q08의 회원 자격을 공통으로 확인하고, Q07은 세션에서 확�
 
 보관 기간은 계정·종목, 대화 이력, 원문·근거, 감사 로그, 백업별로 정한다. 삭제 요청이나 보관 기간 만료 시 원본 DB, 벡터 색인, 캐시, 조사 사본과 외부 제공자 경로까지 처리 대상을 추적한다. 백업은 정해진 만료 정책을 따르며 복구 시 삭제·철회 기록을 재적용한다. 클라우드 자원의 견적상 보관 기간을 개인정보 보관 동의나 서비스 정책으로 대신하지 않는다.
 
+챗봇 Luna Responses는 승인 continuation을 위해 `store=true`를 사용한다(2026-10-28 팀 결정). 이 경로로 OpenAI에 전송된 정제 입력·MCP 도구 결과·모델 출력은 OpenAI 쪽 보관 대상이다. 공식 문서와 계정 설정으로 확인한 보유 기간·삭제 조건·학습 이용 설정을 이 절과 OpenAI 수신자의 model-send grant(목적: Responses 저장·continuation 재개)에 기록하고, response ID를 영수증에 남겨 삭제·만료 추적 대상에 포함한다. 확인과 grant 등록 전에는 실제 회원 데이터로 이 경로를 활성화하지 않는다.
+
 ## 11 품질 평가와 출시 기준
 
 ### 11.1 평가 세트
@@ -574,7 +576,7 @@ UI 고지에는 AI 생성·보조 결과라는 사실, 사건 답변의 기준 �
 | D01 | 역할별 실명과 최종 승인자    | 3장의 역할을 실제 팀원에게 배정하고 최종 승인자를 기록한다.                                                     | 출시 확인 필요 | 프로젝트 책임자         |
 | D02 | 내부 질의 유형과 도구 매핑   | Q01~Q08 multi-label, 서버 allowed_tools 안에서 Luna가 필요한 MCP를 선택한다. Q01 웹 금지, Q02 기본 보조, Q03~Q08 마지막 수단을 적용한다. | 결정 | AI·백엔드 담당자 |
 | D03 | 분류 임계값과 기간 변경 관리 | 명시 요구 고정, Jev `0.70/0.35`, Luna 실행 중 요구 추적과 서버 커버리지 검사. 독립 Luna coverage-verifier는 사용하지 않는다. | 결정 | AI·품질 담당자 |
-| D04 | 모델과 외부 전송 조건        | Jev router/verification을 분리하고 Luna Responses는 MCP를 제안한다. Java가 모든 approval을 결정하고 ai/service는 continuation만 수행한다. source/model-send grant는 출시 시 고정한다. | 설계 결정·출시 확인 필요 | AI·보안 담당자 |
+| D04 | 모델과 외부 전송 조건        | Jev router/verification을 분리하고 Luna Responses는 MCP를 제안한다. Java가 모든 approval을 결정하고 ai/service는 continuation만 수행한다. Responses는 `store=true`이며 OpenAI 보유 조건과 저장 목적을 grant에 기록한다. source/model-send grant는 출시 시 고정한다. | 설계 결정·출시 확인 필요 | AI·보안 담당자 |
 | D05 | 출처와 이용 조건             | 원문 보관·재배포·LLM 전송 범위를 출처별로 등록한다.                                                             | 출시 확인 필요 | 데이터 담당자           |
 | D06 | 보관과 삭제                  | 데이터 종류별 기간과 외부 제공자·백업 처리 절차를 승인한다.                                                     | 출시 확인 필요 | 보안·운영 담당자        |
 | D07 | 검수와 공개 책임             | allow/reject·재검증 큐를 유지하고 표본 검수 주기·비율 및 별도 수정 후보 생성 경로를 확정한다.                   | 출시 확인 필요 | 데이터·검수 담당자      |
@@ -593,7 +595,7 @@ UI 고지에는 AI 생성·보조 결과라는 사실, 사건 답변의 기준 �
 
 ### 17.1 프로젝트 자료
 
-- 2026년 10월 28일 v0.11 팀 결정: 2026-10-25 MCP 미사용 결정을 대체한다. Jev multi-label 뒤 서버가 allowed_tools·scope·예산을 고정하고 Luna Responses가 ZOOP 원격 MCP 도구를 제안하며 Java가 approval을 결정한다. 총 8회(내부 6·웹 2)·job 45초, 요청 단위 cache·single-flight, Responses 시작 전 MCP 장애·circuit open 시 direct 시작 경로, 웹 실패 비차단, answerStatus/notices 목표 계약을 채택한다. 실행 중 MCP 오류와 인증·권한·grant·스키마 거부는 direct로 우회하지 않는다.
+- 2026년 10월 28일 v0.11 팀 결정: 2026-10-25 MCP 미사용 결정을 대체한다. Jev multi-label 뒤 서버가 allowed_tools·scope·예산을 고정하고 Luna Responses가 ZOOP 원격 MCP 도구를 제안하며 Java가 approval을 결정한다. 총 8회(내부 6·웹 2)·job 45초, 요청 단위 cache·single-flight, Responses 시작 전 MCP 장애·circuit open 시 direct 시작 경로, 웹 실패 비차단, answerStatus/notices 목표 계약을 채택한다. 실행 중 MCP 오류와 인증·권한·grant·스키마 거부는 direct로 우회하지 않는다. continuation은 `previous_response_id`와 `store=true`를 사용하고 OpenAI 보유 조건을 10장·grant에 기록한다.
 - 2026년 10월 27일 v0.10 제품 결정: Q02/Q03/Q04는 multi-label을 유지해 한 턴의 필요한 도구와 답변을 통합한다. 새 질문마다 재분류하고 Q01을 제외한 Q02~Q08에 선택적 보조 웹 검색을 허용한다. 기존 어댑터를 재사용하는 MCP 서버 POC와 typed UI 동작을 목표로 추가한다. 아래 v0.9의 MCP 미사용·검색 API 직접 연결 결정은 당시 구현 기록이며 새 목표로 대체한다. 실제 외부 검색 활성화는 공급자·권리·개인정보·grant·실측 조건 충족 후다.
 
 - ZOOP 클라우드 사용계획서 TA 반영본 2026년 10월 13일. 서비스 목적, EC2·RDS·Neo4j·S3 역할, 자동 검증과 보류 검수, 재검증, 공개 버전 전환, 개발 운영 시간의 기준으로 사용했다.

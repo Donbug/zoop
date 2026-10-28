@@ -127,7 +127,7 @@ flowchart LR
 
 1. Jev router는 요구별 Q 유형·확률·명시 여부를 typed schema로 반환한다. 명시 요구는 확률만으로 제거하지 않는다.
 2. 서버가 승인 capability를 실제 MCP 도구로 매핑하고 `allowed_tools`를 만든다. Q01에는 web.search를 노출하지 않는다.
-3. ai/service의 Luna 호출을 Chat Completions에서 Responses(`reasoning.effort=medium`)로 옮기고 원격 MCP URL, 짧은 서비스 토큰, allowed_tools, deadline·usage 수집을 구현한다.
+3. ai/service의 Luna 호출을 Chat Completions에서 Responses(`reasoning.effort=medium`, `store=true`, `previous_response_id` continuation)로 옮기고 response ID를 영수증에 기록하며 원격 MCP URL, 짧은 서비스 토큰, allowed_tools, deadline·usage 수집을 구현한다.
 4. ai/service가 `mcp_approval_request`를 받으면 response/request ID와 typed 호출 정보를 Java에 반환한다. Java가 승인 원장을 기록하고 같은 job에서 ai/service continuation endpoint를 다시 호출하며, ai/service는 Java 결정만 `mcp_approval_response`로 전달한다.
 5. Luna는 승인된 도구 결과를 보고 후속 도구를 선택하고 최종 구조화 답변을 만든다. 독립 Luna coverage-verifier 호출은 두지 않는다.
 6. route·approval request/decision·MCP call·continuation·generation·semantic-verification을 서로 다른 stage/receipt로 기록한다.

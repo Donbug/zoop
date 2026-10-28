@@ -116,7 +116,12 @@ MCP endpoint와 direct adapter는 같은 Tool Service·스키마·scope·버전�
 
 각 continuation은 Luna 35초·job 45초 안에 포함된다. Java→ai/service 호출이 여러 번 생기므로 승인 request/response ID, 동일 response chain, 예산 예약과 취소를 replay·소량 live 시험에서 검증한다.
 
-**미결정(구현 PR에서 확정):** `previous_response_id` 재개는 이전 응답이 공급자 쪽에 저장(`store=true`)돼 있어야 하므로 MCP 결과·대화 입력이 공급자 보관 대상이 된다. 구현 전에 공식 문서로 저장 조건을 재확인하고 (a) `store=true`를 허용해 공급자 보유 기간을 model-send grant·보유 정책에 기록하거나 (b) `store=false`로 이전 출력 항목(암호화된 reasoning 포함)을 매 continuation에 다시 전달하고 24k 입력 예산 영향을 측정하는 방식 중 하나를 정한다. 결정 전에는 live 실행을 열지 않는다.
+**공급자 저장 결정(2026-10-28 팀 결정):** continuation은 `previous_response_id`로 재개하고 Luna Responses 요청은 `store=true`로 보낸다. 따라서 정제 입력·MCP 도구 결과·모델 출력이 OpenAI 쪽 보관 대상이 된다. `store=false`와 이전 출력 재전송 방식은 사용하지 않는다.
+
+- OpenAI 보유 기간·삭제 조건·학습 이용 설정은 공식 문서와 실제 계정 설정으로 확인한 값만 거버넌스 10장과 grant에 기록한다. 확인 전에는 ‘저장하지 않음’·특정 기간을 안내하지 않는다.
+- OpenAI Luna 수신자의 model-send grant 목적에 ‘Responses 저장(`store=true`)·continuation 재개’를 포함한다. 이 범위가 없는 source는 MCP 결과 반환 전 gate에서 차단한다.
+- 모든 Responses response ID를 job·실행 세대와 함께 영수증에 남겨 대화 삭제·보유 만료 시 외부 제공자 경로를 추적한다. 공급자 측 삭제 수단과 처리 방식은 구현 PR에서 확인해 기록한다.
+- 위 기록과 grant 등록이 끝나기 전에는 실제 회원 데이터의 live 실행을 열지 않는다. 합성 데이터 latency spike는 별도 승인 범위에서 진행한다.
 
 #### direct 경로 선택
 
