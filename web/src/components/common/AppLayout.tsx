@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import BottomNav from './BottomNav';
 import ServiceHeader from './ServiceHeader';
+import SkipLink from './SkipLink';
 
 export default function AppLayout() {
   const { pathname } = useLocation();
@@ -9,16 +10,7 @@ export default function AppLayout() {
   const section = pathname.split('/')[1] ?? '';
   return (
     <div className="service-surface">
-      <a
-        href="#service-main"
-        onClick={(event) => {
-          event.preventDefault();
-          document.getElementById('service-main')?.focus();
-        }}
-        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-zoop-paper focus:p-3"
-      >
-        본문으로 건너뛰기
-      </a>
+      <SkipLink />
       <ServiceHeader navLabel="데스크톱 주 메뉴" />
 
       <main

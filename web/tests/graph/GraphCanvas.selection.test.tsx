@@ -21,6 +21,7 @@ import MapPage from '@/pages/map/MapPage';
 import * as graphApi from '@/apis/graph/graph';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
+import { toggleTheme } from '@/util/theme-color';
 
 const canvas = vi.hoisted(() => ({
   created: vi.fn(),
@@ -124,6 +125,20 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     );
     expect(canvas.created).toHaveBeenCalledTimes(1);
     expect(canvas.destroyed).not.toHaveBeenCalled();
+  });
+
+  it('D-GRP-01 82번 화면 모드를 바꾸면 새로 고침 없이 지도를 다시 그려 토큰 색을 다시 읽는다', async () => {
+    document.documentElement.dataset.theme = 'light';
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.created).toHaveBeenCalledTimes(1));
+
+    act(() => toggleTheme());
+
+    await waitFor(() => expect(canvas.created).toHaveBeenCalledTimes(2));
+    expect(canvas.destroyed).toHaveBeenCalledTimes(1);
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    act(() => toggleTheme());
   });
 
   it('D-GRP-01 does not move nodes by dragging; only the map camera moves', async () => {

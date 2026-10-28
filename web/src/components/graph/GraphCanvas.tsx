@@ -14,7 +14,7 @@ import {
 } from './graph-appearance';
 import { createPortal } from 'react-dom';
 import GraphLegend from './GraphLegend';
-import { themeColor } from '@/util/theme-color';
+import { themeColor, useColorTheme } from '@/util/theme-color';
 import {
   Graph,
   type GraphData,
@@ -109,6 +109,8 @@ export default function GraphCanvas({
     [variant, theme, preview],
   );
   const colors = appearanceColors(appearance);
+  // 화면 모드가 바뀌면 그래프를 다시 만들어 토큰 색(themeColor)을 다시 읽는다. 카메라는 저장된 값으로 돌아온다.
+  const colorTheme = useColorTheme();
   const tutorialAction = useEffectEvent((action: 'pan' | 'zoom') =>
     onTutorialAction?.(action),
   );
@@ -1240,7 +1242,7 @@ export default function GraphCanvas({
       graph?.destroy();
       instance.current = null;
     };
-  }, [data, retry, memoryOwner, appearance, colors.selected]);
+  }, [data, retry, memoryOwner, appearance, colors.selected, colorTheme]);
   async function control(action: 'in' | 'out' | 'fit') {
     const graph = instance.current;
     if (!graph || graph.destroyed) return;

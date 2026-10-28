@@ -10,6 +10,7 @@ import HoldingsSidebar from '@/components/graph/HoldingsSidebar';
 import { companyLogo } from '@/util/company-logo';
 import { Link } from 'react-router-dom';
 import ServiceHeader from '@/components/common/ServiceHeader';
+import SkipLink from '@/components/common/SkipLink';
 import GraphCanvas from '@/components/graph/GraphCanvas';
 import GraphIcon from '@/components/graph/GraphIcon';
 import GraphTutorial from '@/components/graph/GraphTutorial';
@@ -68,6 +69,7 @@ import type {
   PersonalScope,
 } from '@/types/map';
 import '@/components/graph/relationship-map.css';
+import { useColorTheme } from '@/util/theme-color';
 
 const FILTER_KEY = 'zoop.graph.personal-filter';
 // Same-session preference only; cleared on sign-in/out.
@@ -115,8 +117,7 @@ export default function MapPage() {
     };
   }, [entryKey, readyEntry, tour, params, updateQuery]);
   const inherited = useContext(GraphAppearanceContext);
-  const theme =
-    document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+  const theme = useColorTheme();
   const appearance = useMemo<GraphAppearance>(
     () => inherited ?? { variant: 'improved', theme },
     [inherited, theme],
@@ -716,6 +717,7 @@ function MapWorkspace({
       data-tutorial-ai-focus={tutorialOpen && tutorialStep === 5}
       className={`${mapAppearanceStyles(appearance)} relationship-map min-w-0! [&_.relationship-toolbar]:overflow-x-auto [&_.relationship-toolbar]:max-w-full max-md:min-h-0! max-md:[&_.relationship-header]:h-auto! max-md:[&_.relationship-header]:flex-wrap! max-md:[&_.relationship-header]:gap-2! max-md:[&_.relationship-header]:px-2! max-md:[&_.relationship-header]:py-2! max-md:[&_.relationship-header_nav]:order-last max-md:[&_.relationship-header_nav]:w-full max-md:[&_.relationship-header_nav]:h-10! max-md:[&_.relationship-header_nav]:flex! max-md:[&_.relationship-header_nav]:overflow-y-hidden! max-md:[&_.relationship-header_nav>*]:shrink-0 max-md:[&_.relationship-header_nav]:overflow-x-auto max-md:[&_.relationship-toolbar]:max-w-full max-md:[&_.relationship-toolbar]:overflow-x-auto [&_.relationship-canvas]:min-h-0! max-md:[&_.relationship-body]:min-h-0! max-md:[&_.relationship-body]:px-1!`}
     >
+      <SkipLink />
       <ServiceHeader />
       {tutorialOpen && (
         <p className="border-b border-zoop-line bg-zoop-soft px-4 py-2 text-xs max-md:hidden">
@@ -744,7 +746,11 @@ function MapWorkspace({
         </p>
       )}
       {round && <BriefingSnapshotBanner roundId={round} />}
-      <main className="relationship-main">
+      <main
+        id="service-main"
+        tabIndex={-1}
+        className="relationship-main motion-safe:animate-service-enter"
+      >
         <section
           ref={mapRegion}
           tabIndex={-1}

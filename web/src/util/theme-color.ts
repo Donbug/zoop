@@ -1,4 +1,7 @@
+import { useSyncExternalStore } from 'react';
+
 type Token = 'ink' | 'muted' | 'faint' | 'line' | 'paper' | 'soft' | 'up';
+export type ColorTheme = 'light' | 'dark';
 
 const LIGHT: Record<Token, string> = {
   ink: '#1a1a1a',
@@ -35,18 +38,47 @@ export function applyInitialTheme() {
   document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
 }
 
-/** 화면 모드 전환. 캔버스 색을 다시 읽도록 새로 불러온다. */
+const listeners = new Set<() => void>();
+
+/** 지금 화면 모드(:root[data-theme]) */
+export function currentTheme(): ColorTheme {
+  if (typeof document === 'undefined') return 'light';
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+}
+
+function subscribeTheme(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/** 화면 모드가 바뀌면 다시 그린다. 캔버스(G6)는 이 값이 바뀔 때 토큰 색을 다시 읽는다. */
+export function useColorTheme() {
+  return useSyncExternalStore<ColorTheme>(
+    subscribeTheme,
+    currentTheme,
+    () => 'light',
+  );
+}
+
+/** 화면 모드 전환. 새로 불러오지 않아 입력 중인 내용과 화면 상태가 남는다(82번). */
 export function toggleTheme() {
-  const next =
-    document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
   const url = new URL(window.location.href);
+  const hadQuery = url.searchParams.has('theme');
   url.searchParams.delete('theme');
+  let stored = true;
   try {
     localStorage.setItem(KEY, next);
   } catch {
-    // 캔버스를 다시 그리려고 새로 불러와도 선택이 사라지지 않게 URL에 남긴다.
+    stored = false;
+    // 저장소가 없으면 새로 고침 뒤에도 선택이 남도록 URL에 남긴다.
     url.searchParams.set('theme', next);
   }
+  // 라우터 상태(history.state)는 그대로 두고 주소의 ?theme=만 맞춘다.
+  if (hadQuery || !stored)
+    window.history.replaceState(window.history.state, '', url.toString());
   document.documentElement.dataset.theme = next;
-  window.location.replace(url.toString());
+  for (const listener of listeners) listener();
 }
