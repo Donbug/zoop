@@ -33,6 +33,7 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
     tutorialTargetId,
     highlightedEdgeIds,
     isolateSelection,
+    centerRequest,
   }: {
     tutorialTargetId?: string;
     onTutorialAction?: (action: 'pan' | 'zoom') => void;
@@ -44,6 +45,7 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
     onSelect: (id: string) => void;
     highlightedEdgeIds: string[];
     isolateSelection?: boolean;
+    centerRequest?: { id: string; seq: number } | null;
   }) => (
     <div
       data-testid="graph-canvas"
@@ -53,6 +55,7 @@ vi.mock('@/components/graph/GraphCanvas', () => ({
       data-view-owner={memoryOwner}
       data-highlighted={highlightedEdgeIds.join(',')}
       data-isolate={isolateSelection ? 'yes' : 'no'}
+      data-center={centerRequest?.id ?? ''}
     >
       {onTutorialAction && (
         <>
@@ -1068,5 +1071,90 @@ it('D-GRP-05 15번 근거 강조는 보고 있던 중심 보기(1·2단계)를 �
   expect(canvas.getAttribute('data-highlighted')).not.toBe('');
   expect(canvas.getAttribute('data-focus')).toBe('mock-issue-1');
   expect(canvas.getAttribute('data-hops')).toBe('2');
+  vi.restoreAllMocks();
+});
+
+it('D-GRP-05 15번 근거가 중심 보기 밖이면 강조하는 동안만 전체 지도로 보이고, 창을 닫으면 중심 보기로 돌아온다', async () => {
+  anonymous();
+  const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  const evidenceNodes = graph.edges
+    .filter((edge) => edge.evidenceIds.includes('mock-evidence-1'))
+    .flatMap((edge) => [edge.source, edge.target]);
+  const outside = graph.nodes.find((node) => {
+    const shown = focusNeighborhood(graph, node.id, 1);
+    return evidenceNodes.some((id) => !shown.has(id));
+  });
+  expect(outside).toBeTruthy();
+  vi.mocked(getGraph).mockResolvedValue(graph);
+  vi.spyOn(evidenceApi, 'getEvidence').mockImplementation(async (id) =>
+    createMockEvidence(id),
+  );
+  setup(`/?mode=all&focus=${encodeURIComponent(outside!.id)}&hops=1`);
+  await screen.findByTestId('graph-canvas');
+  act(() =>
+    useGraphUiStore.getState().openEvidence({
+      kind: 'issue',
+      id: 'mock-issue-1',
+      label: '사건',
+      evidenceIds: ['mock-evidence-1'],
+      mapContext: {
+        graphVersion: graph.metadata.graphVersion ?? undefined,
+        asOf: graph.metadata.asOf,
+        url: '/',
+      },
+    }),
+  );
+  await userEvent.click(
+    await screen.findByRole('button', { name: '◇ 지도에서 보기' }),
+  );
+  const canvas = screen.getByTestId('graph-canvas');
+  expect(canvas.getAttribute('data-highlighted')).not.toBe('');
+  expect(canvas.getAttribute('data-focus')).toBe('');
+  expect(canvas.getAttribute('data-center')).toBe(evidenceNodes[0]);
+  expect(screen.queryByText(/지도에 없어요/)).toBeNull();
+
+  await userEvent.click(screen.getByRole('button', { name: '근거 창 닫기' }));
+  expect(screen.getByTestId('graph-canvas').getAttribute('data-focus')).toBe(
+    outside!.id,
+  );
+  expect(
+    screen.getByTestId('graph-canvas').getAttribute('data-highlighted'),
+  ).toBe('');
+  vi.restoreAllMocks();
+});
+
+it('D-GRP-05 15번 근거 창을 닫았다 같은 대상으로 다시 열면 예전 강조가 살아나지 않는다', async () => {
+  anonymous();
+  const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+  vi.mocked(getGraph).mockResolvedValue(graph);
+  vi.spyOn(evidenceApi, 'getEvidence').mockImplementation(async (id) =>
+    createMockEvidence(id),
+  );
+  setup();
+  await screen.findByTestId('graph-canvas');
+  const target = {
+    kind: 'issue' as const,
+    id: 'mock-issue-1',
+    label: '사건',
+    evidenceIds: ['mock-evidence-1'],
+    mapContext: {
+      graphVersion: graph.metadata.graphVersion ?? undefined,
+      asOf: graph.metadata.asOf,
+      url: '/',
+    },
+  };
+  act(() => useGraphUiStore.getState().openEvidence(target));
+  await userEvent.click(
+    await screen.findByRole('button', { name: '◇ 지도에서 보기' }),
+  );
+  expect(
+    screen.getByTestId('graph-canvas').getAttribute('data-highlighted'),
+  ).not.toBe('');
+  act(() => useGraphUiStore.getState().closeEvidence());
+  act(() => useGraphUiStore.getState().openEvidence(target));
+  await screen.findByRole('button', { name: '◇ 지도에서 보기' });
+  expect(
+    screen.getByTestId('graph-canvas').getAttribute('data-highlighted'),
+  ).toBe('');
   vi.restoreAllMocks();
 });

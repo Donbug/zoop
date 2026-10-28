@@ -33,7 +33,10 @@ import AiChatDrawer from '@/components/ai/AiChatDrawer';
 import type { AnswerMapTarget } from '@/components/ai/ChatJobCard';
 import BriefingSnapshotBanner from '@/components/graph/BriefingSnapshotBanner';
 import EvidenceDrawer from '@/components/evidence/EvidenceDrawer';
-import { graphSummary } from '@/components/graph/graph-model';
+import {
+  focusNeighborhood,
+  graphSummary,
+} from '@/components/graph/graph-model';
 import {
   useGraphData,
   graphRequestKey,
@@ -166,6 +169,9 @@ function MapWorkspace({
     evidenceId: string;
     eventIds: string[];
   } | null>(null);
+  // 근거 창이 닫히면 지도에서 보기 선택도 버린다. 같은 대상을 다시 열어도 예전 강조가 살아나지 않는다.
+  if (!evidenceTarget && evidenceSelection) setEvidenceSelection(null);
+  const [centeredEvidence, setCenteredEvidence] = useState<string | null>(null);
   const isolatedOpen = params.get('select') === 'bundle:isolated';
   const paramsKey = params.toString();
   useEffect(() => {
@@ -369,6 +375,36 @@ function MapWorkspace({
   const flowOrder = params.get('arrange') === 'flow';
   const focusHops: 1 | 2 = params.get('hops') === '2' ? 2 : 1;
   const focusNode = data?.nodes.find((node) => node.id === focusId) ?? null;
+  // 15번: 근거 강조는 보고 있던 중심 보기를 유지하되, 강조할 선·사건이 중심 보기 밖이면
+  // 강조하는 동안만 전체 지도로 보인다. 주소의 focus는 그대로라 창을 닫으면 중심 보기로 돌아온다.
+  const evidenceEdgeNodes = data
+    ? data.edges
+        .filter((edge) => evidenceEdges.includes(edge.id))
+        .flatMap((edge) => [edge.source, edge.target])
+    : [];
+  const evidenceNodes = evidenceFallback
+    ? [evidenceFallback]
+    : evidenceEdgeNodes;
+  const focusShown =
+    data && !pathFrom && focusId
+      ? focusNeighborhood(data, focusId, focusHops)
+      : null;
+  const evidenceOutsideFocus = Boolean(
+    focusShown?.size && evidenceNodes.some((id) => !focusShown.has(id)),
+  );
+  // 강조한 선이 화면 밖에 있을 수 있어 첫 선으로 지도를 옮긴다(사건만 강조하면 선택이 옮긴다).
+  const evidenceCenter = evidenceEdgeNodes[0] ?? null;
+  const evidenceKey = activeEvidence
+    ? `${activeEvidence.evidenceId}:${evidenceOutsideFocus}`
+    : null;
+  if (evidenceKey !== centeredEvidence) {
+    setCenteredEvidence(evidenceKey);
+    if (evidenceKey && evidenceCenter)
+      setCenterRequest((old) => ({
+        id: evidenceCenter,
+        seq: (old?.seq ?? 0) + 1,
+      }));
+  }
   const logoOf = (companyId: string) =>
     data?.nodes.find((node) => node.id === companyId)?.logoUrl;
   useEffect(() => {
@@ -987,13 +1023,15 @@ function MapWorkspace({
                 onSelectEdge={selectEdge}
                 onSelect={selectNode}
                 focusId={
-                  pathFrom
+                  pathFrom || evidenceOutsideFocus
                     ? null
                     : (focusId ??
                       (historical ? (detailEventId ?? companyId) : null))
                 }
                 focusHops={focusHops}
-                focusLayout={!pathFrom && Boolean(focusId)}
+                focusLayout={
+                  !pathFrom && !evidenceOutsideFocus && Boolean(focusId)
+                }
                 flow={flowOrder}
                 onFlowChange={(next) =>
                   updateQuery({ arrange: next ? 'flow' : null })
@@ -1072,7 +1110,7 @@ function MapWorkspace({
                 </button>
               </div>
             )}
-            {focusNode && !pathFrom && (
+            {focusNode && !pathFrom && !evidenceOutsideFocus && (
               <GraphFocusControls
                 label={focusNode.label}
                 hops={focusHops}
