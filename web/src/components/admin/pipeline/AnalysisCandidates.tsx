@@ -47,10 +47,16 @@ const parseBoolean = (value: string | null) =>
 // - 프로토타입 admin/pipeline/candidates.tsx를 옮겼다. 필터·검색어·고른 후보(?candidate=)는 주소에 남는다.
 // - 판정 기본값은 프로토타입처럼 보류(HOLD)다. 조건이 바뀌면 첫 쪽부터 다시 읽는다(커서는 같은 조건에서만 유효).
 // - 앱이 아직 규칙을 후보에 평가하지 않아(rule=null, rule=true는 항상 빈 목록) 규칙 대상 필터는 두지 않는다.
-// - 허용·거부 결정은 decideAnalysisCandidate가 main에 생기면(#357) 연결한다.
-export default function AnalysisCandidates() {
+// - 허용·거부 결정은 상세에서 관계마다 한다(decideAnalysisCandidate).
+// - 목록의 onUserGraph=false는 공개하지 않은 후보와 공개 여부를 확인하지 못한 후보를 함께 뜻해서, 단정하지 않고 상세에서 구분한다.
+// 표시 버전이 바뀌면(graphRevision) 공개 표시 상태가 달라지므로 목록·상세를 다시 읽는다. 필터·고른 후보는 주소에 남아 그대로다.
+export default function AnalysisCandidates({
+  graphRevision = 0,
+}: {
+  graphRevision?: number;
+}) {
   const revision = useAdminSessionStore((state) => state.revision);
-  return <CandidatesSession key={revision} />;
+  return <CandidatesSession key={`${revision}:${graphRevision}`} />;
 }
 
 function CandidatesSession() {
@@ -169,7 +175,7 @@ function CandidatesSession() {
             >
               <option value="">전체</option>
               <option value="true">표시 중</option>
-              <option value="false">표시 안 함</option>
+              <option value="false">표시 안 됨·확인 못 함</option>
             </select>
           </label>
           <label className="flex flex-col gap-1 text-[11px] text-zoop-muted">
@@ -212,6 +218,10 @@ function CandidatesSession() {
                 활성 후보 기준 · 비활성 {count(counts.inactive ?? null)}건
               </Note>
             )}
+            <Note>
+              사용자 그래프 [표시 안 됨·확인 못 함]에는 공개 여부를 확인하지
+              못한 후보도 들어 있어요. 후보를 열면 구분해서 보여요.
+            </Note>
             {candidates.items.length === 0 ? (
               <Empty>
                 {q
@@ -267,7 +277,7 @@ function CandidatesSession() {
                         {count(row.evidenceCount)}
                       </td>
                       <td className={TD}>
-                        {row.onUserGraph ? '표시 중' : '표시 안 함'}
+                        {row.onUserGraph ? '표시 중' : '표시 안 됨·확인 못 함'}
                       </td>
                       <td className={TD}>
                         {row.decision

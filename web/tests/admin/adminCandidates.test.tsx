@@ -118,7 +118,7 @@ describe('A-ADM-03 후보 탭 · 67', () => {
     expect(within(status).getByRole('button', { name: '폐기 2' })).toBeTruthy();
     const rows = within(table).getAllByRole('row');
     expect(rows[1].textContent).toContain('삼성전자, 미국 공장 증설');
-    expect(rows[1].textContent).toContain('표시 안 함');
+    expect(rows[1].textContent).toContain('표시 안 됨·확인 못 함');
     expect(rows[2].textContent).toContain('사건 없는 관계 후보');
     expect(rows[2].textContent).toContain('비활성');
     expect(rows[2].textContent).toContain('거부');
@@ -433,4 +433,132 @@ describe('A-ADM-03 후보 결정 · 67 (decideAnalysisCandidate)', () => {
       if (note) expect(aside.textContent).toContain(note);
     },
   );
+});
+
+describe('A-ADM-03 후보 공개 표시 · #379 리뷰', () => {
+  test('그래프 버전을 바꾸면 필터·고른 후보를 그대로 두고 목록과 상세를 다시 읽는다', async () => {
+    const VERSIONS = '/api/v1/admin/graph/versions';
+    const ACTIVATE = `${VERSIONS}/:versionId/activate`;
+    const graphVersion = (id: string, active: boolean) => ({
+      id,
+      sequence: id === 'v2' ? 2 : 1,
+      kind: 'snapshot',
+      createdAt: '2026-10-21T03:00:00Z',
+      createdBy: 'importer',
+      reason: null,
+      sourceLabel: '합성',
+      policyVersion: null,
+      issueCount: 1,
+      relationCount: 1,
+      articleCount: 1,
+      candidateCount: 1,
+      sha256: 'a'.repeat(64),
+      bytes: 1,
+      active,
+      activatedAt: null,
+      graphDb: { status: 'reflected', pendingJobsAtCreation: 0, note: null },
+    });
+    let active = 'v2';
+    server.on('GET', VERSIONS, () =>
+      json({
+        activeVersionId: active,
+        items: [
+          graphVersion('v2', active === 'v2'),
+          graphVersion('v1', active === 'v1'),
+        ],
+        activations: [],
+        nextCursor: null,
+      }),
+    );
+    server.on('POST', ACTIVATE, () => {
+      active = 'v1';
+      return json({
+        activeVersionId: 'v1',
+        previousActiveVersionId: 'v2',
+        idempotent: false,
+      });
+    });
+    const { user, location } = open(
+      '/admin/pipeline?tab=versions&published=false&candidate=cand-1',
+    );
+    await screen.findByRole('table', { name: '그래프 버전 목록' });
+    await waitFor(() => expect(server.calls('GET', CANDIDATE)).toHaveLength(1));
+    const lists = listCalls().length;
+
+    await user.click(screen.getByRole('button', { name: 'v1로 전환' }));
+    const form = screen.getByRole('form', { name: '그래프 버전 전환' });
+    await user.type(
+      within(form).getByLabelText('전환 사유(감사 로그에 남아요)'),
+      '되돌림',
+    );
+    await user.click(within(form).getByRole('button', { name: 'v1로 전환' }));
+    await screen.findByText('v1로 바꿨어요.');
+
+    await waitFor(() => expect(server.calls('GET', CANDIDATE)).toHaveLength(2));
+    expect(listCalls().length).toBeGreaterThan(lists);
+    expect(listCalls().at(-1)?.query.get('published')).toBe('false');
+    expect(location()).toBe(
+      '/admin/pipeline?tab=versions&published=false&candidate=cand-1',
+    );
+  });
+
+  test('공개 여부를 확인하지 못한 후보는 비공개로 단정하지 않는다', async () => {
+    server.on('GET', CANDIDATE, ({ params }) =>
+      json(candidateDetail(params.candidateId, { graphDb: 'unknown' })),
+    );
+    open('/admin/pipeline?candidate=cand-1');
+
+    const table = await screen.findByRole('table', { name: '후보 목록' });
+    expect(within(table).getAllByRole('row')[1].textContent).toContain(
+      '표시 안 됨·확인 못 함',
+    );
+    expect(screen.getByText(/공개 여부를 확인하지 못한/)).toBeTruthy();
+    const aside = screen.getByRole('complementary', { name: '후보 상세' });
+    const relations = await within(aside).findByRole('table', {
+      name: '연결 관계',
+    });
+    expect(aside.textContent).not.toContain('표시 안 함');
+    expect(relations.textContent).toContain('확인할 수 없어요');
+  });
+
+  test('검수 이력에 결정 대상(후보·관계 id)과 판정 회차를 보이고, 관계 표에 관계 id를 보인다', async () => {
+    const decision = {
+      id: 3,
+      decision: 'reject' as const,
+      reason: '근거 부족',
+      adminEmail: 'admin@zoop.test',
+      decidedAt: '2026-10-27T05:00:00Z',
+      origin: 'admin',
+    };
+    server.on('GET', CANDIDATE, ({ params }) =>
+      json(
+        candidateDetail(params.candidateId, {
+          history: [
+            {
+              ...decision,
+              targetType: 'relation',
+              targetId: 'rel-1',
+              revision: 2,
+            },
+            {
+              ...decision,
+              id: 4,
+              targetType: 'candidate',
+              targetId: 'cand-1',
+              revision: 1,
+            },
+          ],
+        }),
+      ),
+    );
+    open('/admin/pipeline?candidate=cand-1');
+
+    const aside = screen.getByRole('complementary', { name: '후보 상세' });
+    const relations = await within(aside).findByRole('table', {
+      name: '연결 관계',
+    });
+    expect(relations.textContent).toContain('rel-1 · 회차 1');
+    expect(aside.textContent).toContain('관계 rel-1 · 판정 회차 2');
+    expect(aside.textContent).toContain('후보 cand-1 · 판정 회차 1');
+  });
 });

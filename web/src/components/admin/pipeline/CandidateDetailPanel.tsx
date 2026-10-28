@@ -65,6 +65,13 @@ export default function CandidateDetailPanel({
     );
 
   const c = detail.data;
+  // graphDb를 읽지 못하면(unknown) 앱은 onUserGraph=false를 주므로, 비공개로 단정하지 않는다.
+  const userGraphLabel = (onUserGraph: boolean) =>
+    onUserGraph
+      ? '표시 중'
+      : c.graphDb === 'unknown'
+        ? candidateGraphLabel.unknown
+        : '표시 안 함';
   const canAllow = (relation: CandidateRelation) =>
     c.active &&
     c.status === 'HOLD' &&
@@ -118,7 +125,7 @@ export default function CandidateDetailPanel({
           {!c.active && ' · 비활성'}
         </dd>
         <dt className="text-[11px] text-zoop-muted">사용자 그래프</dt>
-        <dd>{c.onUserGraph ? '표시 중' : '표시 안 함'}</dd>
+        <dd>{userGraphLabel(c.onUserGraph)}</dd>
         <dt className="text-[11px] text-zoop-muted">GraphDB 반영</dt>
         <dd>{candidateGraphLabel[c.graphDb]}</dd>
         <dt className="text-[11px] text-zoop-muted">사건 시각</dt>
@@ -236,6 +243,9 @@ export default function CandidateDetailPanel({
                 <tr key={relation.relationId}>
                   <td className={`${TD} whitespace-nowrap`}>
                     {relationLabel(relation.relationType)}
+                    <span className="block font-inter text-[10px] break-all text-zoop-muted">
+                      {relation.relationId} · 회차 {relation.revision}
+                    </span>
                   </td>
                   <td className={TD}>
                     {relation.source} → {relation.target}
@@ -243,9 +253,7 @@ export default function CandidateDetailPanel({
                   <td className={`${TD} text-right tabular-nums`}>
                     {relation.evidenceCount}
                   </td>
-                  <td className={TD}>
-                    {relation.onUserGraph ? '표시 중' : '표시 안 함'}
-                  </td>
+                  <td className={TD}>{userGraphLabel(relation.onUserGraph)}</td>
                   <td className={TD}>
                     {relation.decision ? (
                       decisionLabel[relation.decision.decision]
@@ -344,6 +352,14 @@ export default function CandidateDetailPanel({
               <li key={item.id} className="flex flex-col gap-0.5">
                 <span className="font-semibold">
                   {decisionLabel[item.decision]} · {item.adminEmail}
+                </span>
+                <span className="text-[11px] break-all text-zoop-muted">
+                  {item.targetType === 'relation'
+                    ? `관계 ${item.targetId}`
+                    : item.targetType === 'candidate'
+                      ? `후보 ${item.targetId}`
+                      : `${item.targetType} ${item.targetId}`}{' '}
+                  · 판정 회차 {item.revision}
                 </span>
                 <span className="text-[11px] text-zoop-muted">
                   {formatKst(item.decidedAt)}

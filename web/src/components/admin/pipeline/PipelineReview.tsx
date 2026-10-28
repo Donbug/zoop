@@ -29,6 +29,8 @@ export default function PipelineReview() {
   const [versionsOpened, setVersionsOpened] = useState(tab === 'versions');
   if (tab === 'versions' && !versionsOpened) setVersionsOpened(true);
   // 작업 탭은 처음 열 때 읽고, 그 뒤로는 숨기기만 해서 진행 중인 다시 실행·취소를 잃지 않게 한다.
+  // 그래프 버전을 바꾸면 후보 탭의 공개 표시 상태를 다시 읽는다.
+  const [graphRevision, setGraphRevision] = useState(0);
   const [jobsOpened, setJobsOpened] = useState(tab === 'jobs');
   if (tab === 'jobs' && !jobsOpened) setJobsOpened(true);
 
@@ -47,11 +49,13 @@ export default function PipelineReview() {
       />
       {/* 다른 탭으로 옮겨도 필터·더 보기 결과를 잃지 않도록 숨기기만 한다. */}
       <div hidden={tab !== 'candidates'}>
-        <AnalysisCandidates />
+        <AnalysisCandidates graphRevision={graphRevision} />
       </div>
       {versionsOpened && (
         <div hidden={tab !== 'versions'}>
-          <GraphVersions />
+          <GraphVersions
+            onActivated={() => setGraphRevision((value) => value + 1)}
+          />
         </div>
       )}
       {jobsOpened && (
