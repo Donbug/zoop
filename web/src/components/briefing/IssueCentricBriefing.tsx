@@ -9,6 +9,7 @@ import {
   type BriefingIssueView,
 } from '@/util/briefingIssueView';
 import { briefingTime } from '@/util/briefingTime';
+import { validIssueIntelligence } from '@/util/issueIntelligence';
 import { safeArticleUrl } from '@/components/graph/event-format';
 import MarketIndicators from './MarketIndicators';
 import BriefingItemDetails from './BriefingItemDetails';
@@ -273,7 +274,7 @@ function IssueFollowUp({
             이 이슈에 연결된 비교 가능한 이전 판단이 아직 없습니다.
           </p>
         )}
-        {result.aiPriceOutlooks?.historyNote && (
+        {!result.issueIntelligence && result.aiPriceOutlooks?.historyNote && (
           <details className="mt-2">
             <summary
               className={`min-h-11 cursor-pointer content-center text-xs ${FOCUS_RING}`}
@@ -413,7 +414,9 @@ export default function IssueCentricBriefing({
   renderExtra?: (item: BriefingItem) => ReactNode;
 }) {
   const [previous, setPrevious] = useState<BriefingResponse>();
-  const prior = validEditionReview(result)?.previousReview;
+  const prior = result.issueIntelligence
+    ? null
+    : validEditionReview(result)?.previousReview;
   const priorDate = prior?.date,
     priorEdition = prior?.edition,
     priorId = prior?.roundId;
@@ -445,6 +448,7 @@ export default function IssueCentricBriefing({
       />
       {result.items.length === 0 &&
         result.emptyReason === 'no_issues_in_window' &&
+        !result.issueIntelligence &&
         !result.continuity && (
           <BriefingRecap
             key={`${result.id}:${result.graphVersion}:${result.dataAsOf}`}
@@ -457,14 +461,21 @@ export default function IssueCentricBriefing({
         <BriefingContinuity value={result.continuity} compact />
       )}
       <section className={SECTION} aria-label="핵심 이슈 중심 브리핑">
+        {result.issueIntelligence && !validIssueIntelligence(result) && (
+          <p role="alert" className={EMPTY}>
+            새 분석의 회차·이슈·근거 연결을 확인하지 못했습니다.
+          </p>
+        )}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className={SECTION_TITLE}>핵심 이슈</h3>
-          <Link
-            to={`/?round=${encodeURIComponent(result.id)}`}
-            className={`text-xs underline ${FOCUS_RING}`}
-          >
-            이슈 관계 지도 ↗
-          </Link>
+          {!result.issueIntelligence && (
+            <Link
+              to={`/?round=${encodeURIComponent(result.id)}`}
+              className={`text-xs underline ${FOCUS_RING}`}
+            >
+              이슈 관계 지도 ↗
+            </Link>
+          )}
         </div>
         {views.length ? (
           <ol className="space-y-3">

@@ -366,3 +366,119 @@ describe('issue/company previous-judgment binding', () => {
     ).toBeUndefined();
   });
 });
+
+describe('D-BRF-01/02 new issue/company AI revision', () => {
+  function fresh() {
+    const value = fixture();
+    value.issueIntelligence = {
+      schemaVersion: 'issue-intelligence-v1',
+      policyVersion: 'issue-selection-policy-v2',
+      verificationMode: 'separate_model_request',
+      model: 'gpt-6-luna',
+      roundId: value.id,
+      date: value.date,
+      edition: value.edition,
+      cutoff: value.dataAsOf!,
+      resultVersion: 'new-revision',
+      generatedAt: '2026-10-28T00:00:00Z',
+      issues: value.items.map((i) => {
+        const id = i.evidenceIds[0];
+        const text = s(id, i.title + '의 새 판단');
+        return {
+          issueId: i.eventId,
+          status: 'PASS' as const,
+          resultVersion: 'new-' + i.eventId,
+          headline: s(id, i.title),
+          sources: {
+            [id]: {
+              evidenceId: id,
+              documentId: 'doc-' + id,
+              bodySha256: 'a'.repeat(64),
+              title: '합성 근거',
+              url: 'https://example.test/' + id,
+              publishedAt: '2026-10-21T23:00:00Z',
+              quote: '합성 원문',
+            },
+          },
+          companies: i.companies.map((c) => ({
+            companyId: c.id,
+            sourceIds: [id],
+            assessment: 'positive' as const,
+            takeaway: text,
+            positive: text,
+            negative: text,
+            newInformation: text,
+            impact: text,
+            outlook: text,
+            conditions: [text],
+            risks: [text],
+            comparison: {
+              ...text,
+              status: 'unavailable' as const,
+              previousResultVersion: null,
+            },
+            previous: {
+              status: 'unavailable' as const,
+              reason: 'same_issue_missing',
+            },
+          })),
+        };
+      }),
+    };
+    return value;
+  }
+  it('keeps three distinct judgments for the same company instead of borrowing its old copy', () => {
+    const value = fresh();
+    const views = briefingIssueViews(value);
+    expect(views.map((v) => v.companies[0].outlook?.text)).toEqual(
+      value.items.map((i) => i.title + '의 새 판단'),
+    );
+    expect(views.map((v) => v.companies[0].refs[0].id)).toEqual([
+      'e1',
+      'e2',
+      'e3',
+    ]);
+    expect(views[0].companies[0].price).toBeDefined();
+  });
+  it.each([
+    'future_source',
+    'foreign_evidence',
+    'wrong_round',
+    'wrong_issue_previous',
+    'unverified',
+  ])('rejects %s without falling back to old company copy', (kind) => {
+    const value = fresh();
+    const layer = value.issueIntelligence!;
+    const issue = layer.issues[0];
+    const c = issue.companies[0];
+    if (kind === 'future_source')
+      issue.sources.e1.publishedAt = '2026-11-01T00:00:00Z';
+    if (kind === 'foreign_evidence')
+      c.impact = { text: '다른 사건의 판단', evidenceIds: ['e2'] };
+    if (kind === 'wrong_round') layer.roundId = 'elsewhere';
+    if (kind === 'wrong_issue_previous') {
+      c.previous = {
+        status: 'available',
+        issueId: 'different',
+        companyId: c.companyId,
+        roundId: 'old',
+        date: '2026-10-21',
+        edition: 'evening',
+        cutoff: '2026-10-21T08:30:00Z',
+        resultVersion: 'old',
+        judgment: { outlook: s() },
+      };
+      c.comparison = {
+        ...c.comparison,
+        status: 'updated',
+        previousResultVersion: 'old',
+      };
+    }
+    if (kind === 'unverified') Object.assign(issue, { status: 'WITHHELD' });
+    expect(
+      briefingIssueViews(value).every((v) =>
+        v.companies.every((c) => !c.outlook && !c.assessment),
+      ),
+    ).toBe(true);
+  });
+});

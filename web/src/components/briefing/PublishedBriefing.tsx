@@ -239,12 +239,14 @@ export default function PublishedBriefing({
     result && (
       <div className="mt-1 flex flex-col gap-2">
         {!compact && <BriefingS3Disclosure round={result} item={item} />}
-        <Link
-          to={`/?round=${encodeURIComponent(result.id)}&select=${encodeURIComponent(`node:${item.eventId}`)}`}
-          className={`self-start text-[11px] font-semibold underline underline-offset-4 ${FOCUS_RING}`}
-        >
-          이 회차 관계 그래프에서 보기
-        </Link>
+        {!result.issueIntelligence && (
+          <Link
+            to={`/?round=${encodeURIComponent(result.id)}&select=${encodeURIComponent(`node:${item.eventId}`)}`}
+            className={`self-start text-[11px] font-semibold underline underline-offset-4 ${FOCUS_RING}`}
+          >
+            이 회차 관계 그래프에서 보기
+          </Link>
+        )}
         {result.graphVersion && (
           <FeedbackButtons
             key={`${feedbackKey}:${item.eventId}`}
@@ -434,9 +436,26 @@ export default function PublishedBriefing({
               title="시장·지표와 전체 저장 상태 보기"
             >
               {(!compact || !knownLimits) && partialInfo}
-              {currentContext}
+              {result.issueIntelligence ? (
+                <>
+                  <IssueCentricBriefing
+                    result={result}
+                    items={(personalBriefing ?? result).items}
+                    renderExtra={issueExtra}
+                  />
+                  <BriefingReadingSection
+                    compact
+                    title="이전 생성 전문·시장 요약·시세 보존본"
+                  >
+                    {currentContext}
+                  </BriefingReadingSection>
+                </>
+              ) : (
+                currentContext
+              )}
               {result.items.length === 0 &&
                 result.emptyReason === 'no_issues_in_window' &&
+                !result.issueIntelligence &&
                 !result.continuity && (
                   <BriefingRecap
                     key={`${result.id}:${result.graphVersion}:${result.dataAsOf}`}
@@ -454,14 +473,16 @@ export default function PublishedBriefing({
                 />
               )}
               {feedbackReadError}
-              <BriefingIssueList
-                compact={compact}
-                items={(personalBriefing ?? result).items}
-                roundId={result.id}
-                graphVersion={result.graphVersion}
-                graphHref={`/?round=${encodeURIComponent(result.id)}`}
-                renderExtra={issueExtra}
-              />
+              {!result.issueIntelligence && (
+                <BriefingIssueList
+                  compact={compact}
+                  items={(personalBriefing ?? result).items}
+                  roundId={result.id}
+                  graphVersion={result.graphVersion}
+                  graphHref={`/?round=${encodeURIComponent(result.id)}`}
+                  renderExtra={issueExtra}
+                />
+              )}
               <BriefingReadingSection
                 compact={compact}
                 title="이전 브리핑과 핵심 이슈 변화 보기"

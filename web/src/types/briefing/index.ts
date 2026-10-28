@@ -189,6 +189,7 @@ export type BriefingResponse = {
   editionReview?: import('./editionReview').EditionReview;
   companyPriceContext?: import('./priceContext').BriefingPriceContext;
   aiPriceOutlooks?: import('./aiPriceOutlook').AiPriceOutlooks;
+  issueIntelligence?: import('./issueIntelligence').IssueIntelligence;
   judgmentUpdate?: import('./judgmentUpdate').JudgmentUpdate;
   companyOutlooks?: import('./companyOutlook').CompanyOutlooks;
   marketSummary: BriefingMarketSummary;

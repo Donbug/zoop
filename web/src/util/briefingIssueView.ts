@@ -4,6 +4,7 @@ import { validAiPriceOutlooks } from './aiPriceOutlook';
 import { validEditionReview } from './editionReview';
 import { validPriceContext } from './briefingPriceContext';
 import { issuePrevious } from './briefingIssueComparison';
+import { validIssueIntelligence } from './issueIntelligence';
 
 /** A company is never the selection key. Each statement must actually cite this issue.
  * A company-wide judgment citing another selected issue cannot be cloned across cards.
@@ -17,6 +18,7 @@ export function briefingIssueViews(
   const review = validEditionReview(result);
   const prices = validPriceContext(result);
   const ai = validAiPriceOutlooks(result);
+  const intelligence = validIssueIntelligence(result);
   const owners = new Map<string, Set<string>>();
   for (const issue of result.items)
     for (const id of issue.evidenceIds) {
@@ -37,6 +39,64 @@ export function briefingIssueViews(
       return {
         item,
         companies: item.companies.map((company) => {
+          if (result.issueIntelligence) {
+            const issue = intelligence?.issues.find(
+              (i) => i.issueId === item.eventId,
+            );
+            const current = issue?.companies.find(
+              (c) => c.companyId === company.id,
+            );
+            const prior = current?.previous;
+            const price = prices?.companies.find(
+              (c) => c.companyId === company.id,
+            );
+            const sourceIds = current
+              ? [
+                  ...new Set(
+                    [
+                      current.takeaway,
+                      current.positive,
+                      current.negative,
+                      current.newInformation,
+                      current.impact,
+                      current.outlook,
+                      current.comparison,
+                      ...current.conditions,
+                      ...current.risks,
+                    ].flatMap((s) => s.evidenceIds),
+                  ),
+                ]
+              : [];
+            return {
+              company,
+              impact: current?.impact,
+              outlook: current?.outlook,
+              comparison: current?.comparison,
+              previous:
+                prior?.status === 'available'
+                  ? {
+                      judgment: prior.judgment.outlook,
+                      resultVersion: prior.resultVersion,
+                      roundId: prior.roundId,
+                      kind: 'verified_issue_company',
+                    }
+                  : undefined,
+              conclusion: current?.takeaway,
+              nextChecks: current?.conditions ?? [],
+              positive: current?.positive,
+              negative: current?.negative,
+              fact: current?.newInformation,
+              conditions: current?.conditions ?? [],
+              risks: current?.risks ?? [],
+              refs: sourceIds.map((id) => ({ id, ...issue!.sources[id] })),
+              assessment: current?.assessment,
+              price,
+              news:
+                price?.status === 'available'
+                  ? price.news.filter((n) => own.has(n.evidenceId))
+                  : [],
+            };
+          }
           const original = review?.companies.find(
             (c) => c.companyId === company.id,
           );
