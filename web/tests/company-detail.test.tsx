@@ -1,4 +1,11 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, test, vi } from 'vitest';
 import {
@@ -25,6 +32,7 @@ import {
 } from './support/fakeServer';
 import type { Event, Impact } from '@/types/company/detail';
 import type { GraphResponse } from '@/types/map/graph';
+import { renderRoutes } from './support/renderRoutes';
 vi.mock('@/components/graph/GraphCanvas', () => ({
   default: ({ highlightedEdgeIds = [] }: { highlightedEdgeIds: string[] }) => (
     <output data-testid="map-highlight">{highlightedEdgeIds.join(',')}</output>
@@ -322,6 +330,191 @@ function open(query = '') {
 }
 const pinned = `?asOf=${encodeURIComponent(time)}&graphVersion=v1`;
 
+function openHistory() {
+  return renderRoutes(
+    [
+      {
+        path: '/companies/:id',
+        element: (
+          <>
+            <Address />
+            <CompanyDetailPage />
+          </>
+        ),
+      },
+    ],
+    `/companies/${encodeURIComponent(id)}${pinned}`,
+  );
+}
+
+test('D-COM-06: Back and Forward restore event-time history after an outside selection', async () => {
+  const { router, user } = openHistory();
+  await user.click(
+    await screen.findByRole('button', {
+      name: '합성 사건 A · 이 당시 관계그래프 보기',
+    }),
+  );
+  const past = `${router.state.location.pathname}${router.state.location.search}`;
+  await user.click(screen.getByRole('button', { name: '합성 사건 B' }));
+  await waitFor(() =>
+    expect(screen.getByTestId('address').textContent).not.toContain(
+      'graphAsOf',
+    ),
+  );
+  const current = `${router.state.location.pathname}${router.state.location.search}`;
+  for (let i = 0; i < 2; i++) {
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    expect(
+      screen.getByRole('button', { name: '현재 시점 관계 그래프로 돌아가기' }),
+    ).toBeTruthy();
+    expect(screen.getByTestId('address').textContent).toBe(past);
+    await act(async () => {
+      await router.navigate(1);
+    });
+    expect(
+      screen.queryByRole('button', {
+        name: '현재 시점 관계 그래프로 돌아가기',
+      }),
+    ).toBeNull();
+    expect(screen.getByTestId('address').textContent).toBe(current);
+  }
+});
+
+test('D-COM-06: closing outside without navigation still allows reopening the same event time', async () => {
+  const { user } = openHistory();
+  for (let i = 0; i < 2; i++) {
+    await user.click(
+      await screen.findByRole('button', {
+        name: '합성 사건 A · 이 당시 관계그래프 보기',
+      }),
+    );
+    expect(
+      screen.getByRole('button', { name: '현재 시점 관계 그래프로 돌아가기' }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole('region', { name: '기업 개요' }));
+    await waitFor(() =>
+      expect(screen.getByTestId('address').textContent).not.toContain(
+        'graphAsOf',
+      ),
+    );
+    expect(
+      screen.queryByRole('button', {
+        name: '현재 시점 관계 그래프로 돌아가기',
+      }),
+    ).toBeNull();
+  }
+});
+
+test.each(['blank', 'selected'])(
+  'D-COM-06: Back before delayed cleanup restores an earlier entry at the same timestamp (%s)',
+  async (target) => {
+    const { router, user } = openHistory();
+    await user.click(
+      await screen.findByRole('button', {
+        name: '합성 사건 A · 이 당시 관계그래프 보기',
+      }),
+    );
+    const past = screen.getByTestId('address').textContent;
+    const panel = screen.getByRole('complementary', {
+      name: '시점 기반 관계 그래프',
+    });
+    if (target === 'blank')
+      await user.click(within(panel).getByRole('button', { name: '2단계' }));
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(
+        target === 'blank'
+          ? screen.getByRole('region', { name: '기업 개요' })
+          : screen.getByRole('button', { name: '합성 사건 A' }),
+      );
+      await act(async () => {
+        await router.navigate(-1);
+      });
+      expect(screen.getByTestId('address').textContent).toBe(past);
+      expect(
+        screen.getByRole('button', {
+          name: '현재 시점 관계 그래프로 돌아가기',
+        }),
+      ).toBeTruthy();
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(screen.getByTestId('address').textContent).toBe(past);
+    } finally {
+      vi.useRealTimers();
+    }
+  },
+);
+
+test('D-COM-06: catalog company switch clears the prior company event graph time', async () => {
+  server.on('GET', '/api/v1/companies', () =>
+    json({
+      items: [{ id: 'KRX:OTHER', name: '리뷰 다른 기업', ticker: 'OTHER' }],
+      nextCursor: null,
+    }),
+  );
+  open(`${pinned}&graphAsOf=${encodeURIComponent(old)}`);
+  const catalog = screen.getByRole('complementary', { name: '기업 선택' });
+  await userEvent.type(
+    within(catalog).getByRole('textbox', { name: '기업명·종목 코드' }),
+    'OTHER',
+  );
+  await userEvent.click(within(catalog).getByRole('button', { name: '검색' }));
+  await userEvent.click(
+    await within(catalog).findByRole('link', { name: /리뷰 다른 기업/ }),
+  );
+  const address = screen.getByTestId('address').textContent ?? '';
+  expect(address).toContain('/companies/KRX%3AOTHER');
+  expect(
+    new URL(address, 'http://localhost').searchParams.has('graphAsOf'),
+  ).toBe(false);
+  expect(new URL(address, 'http://localhost').searchParams.get('asOf')).toBe(
+    time,
+  );
+  expect(
+    new URL(address, 'http://localhost').searchParams.get('graphVersion'),
+  ).toBe('v1');
+});
+
+test.each([
+  { eventTime: time, timePrecision: 'datetime' },
+  { eventTime: null, timePrecision: 'unknown' },
+  { eventTime: '2026-10', timePrecision: 'month' },
+  { eventTime: '2026-10-06', timePrecision: 'day' },
+])(
+  'D-COM-06: selected issue map link overrides an older graph time (%j)',
+  async (eventTime) => {
+    server.on('GET', '/api/v1/events/:id', (r) =>
+      json({
+        ...events[0],
+        id: r.params.id,
+        ...eventTime,
+        articles: [],
+        relations: [],
+        evidenceIds: [],
+        metadata,
+      }),
+    );
+    open(`${pinned}&graphAsOf=${encodeURIComponent(old)}&event=issue-a`);
+    await screen.findByRole('heading', { name: '합성 사건 A' });
+    const link = screen.getByRole('link', {
+      name: '이 사건 시점의 관계를 지도에서 보기',
+    });
+    const href = new URL(link.getAttribute('href')!, 'http://localhost');
+    expect(href.searchParams.get('asOf')).toBe(time);
+    expect(href.searchParams.get('graphVersion')).toBe('v1');
+    const graphLink = screen.getByRole('link', { name: '지도에서 보기' });
+    const graphHref = new URL(
+      graphLink.getAttribute('href')!,
+      'http://localhost',
+    );
+    expect(graphHref.searchParams.get('asOf')).toBe(old);
+    expect(graphHref.searchParams.has('graphVersion')).toBe(false);
+  },
+);
+
 function VersionOnlyNavigation() {
   const navigate = useNavigate();
   return (
@@ -430,7 +623,7 @@ test('same bucket exposes count then individual cards; selecting an issue keeps 
   await user.click(screen.getByRole('button', { name: '합성 사건 A' }));
   await screen.findByRole('heading', { name: '합성 사건 A' });
   expect(screen.getByTestId('address').textContent).toContain('event=issue-a');
-  // D-COM-06 시점 이동 없음: 사건을 골라도 기준 시점은 그대로다.
+  // 사건을 골라도 기준 시점은 그대로다. 그래프 시점은 [이 당시 관계그래프 보기]로만 옮긴다.
   expect(screen.getByTestId('address').textContent).toContain(
     `asOf=${encodeURIComponent(time)}`,
   );
@@ -1519,3 +1712,188 @@ test.each(['success', 'failure'] as const)(
     expect(screen.queryByText(/그래프 버전\(v-past\)만 있어/)).toBeNull();
   },
 );
+
+test('D-COM-06: [이 당시 관계그래프 보기] moves only the graph to the event time and [현재] returns', async () => {
+  open(pinned);
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole('button', {
+      name: '합성 사건 A · 이 당시 관계그래프 보기',
+    }),
+  );
+  const address = () => screen.getByTestId('address').textContent ?? '';
+  expect(address()).toContain(`graphAsOf=${encodeURIComponent(old)}`);
+  expect(address()).toContain(`asOf=${encodeURIComponent(time)}`);
+  expect(address()).toContain('event=issue-a');
+  await waitFor(() => {
+    const last = server.calls('GET', '/api/v1/companies/:id/graph').at(-1)!;
+    expect(last.query.get('asOf')).toBe(old);
+    // 그 시점의 공개 버전은 서버가 고른다.
+    expect(last.query.has('graphVersion')).toBe(false);
+  });
+  expect(
+    server
+      .calls('GET', '/api/v1/events')
+      .every((call) => call.query.get('asOf') === time),
+  ).toBe(true);
+  expect(screen.getByText(/사건 시점 .* 기준 관계예요/)).toBeTruthy();
+
+  await user.click(
+    await screen.findByRole('button', {
+      name: '현재 시점 관계 그래프로 돌아가기',
+    }),
+  );
+  expect(address()).not.toContain('graphAsOf');
+  await waitFor(() => {
+    const last = server.calls('GET', '/api/v1/companies/:id/graph').at(-1)!;
+    expect(last.query.get('asOf')).toBe(time);
+    expect(last.query.get('graphVersion')).toBe('v1');
+  });
+  expect(
+    screen.queryByRole('button', { name: '현재 시점 관계 그래프로 돌아가기' }),
+  ).toBeNull();
+});
+
+test('D-COM-06: day events use the KST day end; month, unknown and later events offer no graph time', async () => {
+  server.on('GET', '/api/v1/events', () =>
+    json({
+      items: [
+        { ...events[0], timePrecision: 'day', eventTime: '2026-10-04' },
+        {
+          ...events[1],
+          id: 'issue-month',
+          title: '월 사건',
+          timePrecision: 'month',
+          eventTime: '2026-09',
+        },
+        {
+          ...events[1],
+          id: 'issue-later',
+          title: '나중 사건',
+          eventTime: '2026-10-07T03:00:00Z',
+        },
+      ],
+      unknownTimeItems: [],
+      nextCursor: null,
+      metadata: { ...metadata, total: 3, excludedUnknownTime: 0 },
+    }),
+  );
+  open(pinned);
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole('button', {
+      name: '합성 사건 A · 이 당시 관계그래프 보기',
+    }),
+  );
+  expect(screen.getByTestId('address').textContent).toContain(
+    `graphAsOf=${encodeURIComponent('2026-10-04T23:59:59+09:00')}`,
+  );
+  expect(
+    screen.queryByRole('button', { name: '월 사건 · 이 당시 관계그래프 보기' }),
+  ).toBeNull();
+  expect(
+    screen.queryByRole('button', {
+      name: '나중 사건 · 이 당시 관계그래프 보기',
+    }),
+  ).toBeNull();
+});
+
+test('D-COM-06: [최신 시점] also clears the event-time graph', async () => {
+  open(`${pinned}&graphAsOf=${encodeURIComponent(old)}`);
+  const user = userEvent.setup();
+  await screen.findByRole('button', {
+    name: '현재 시점 관계 그래프로 돌아가기',
+  });
+  await user.click(screen.getByRole('button', { name: '최신 시점' }));
+  expect(screen.getByTestId('address').textContent).not.toContain('graphAsOf');
+});
+
+test('D-COM-06: an event time without a public version still offers the way back', async () => {
+  server.on('GET', '/api/v1/companies/:id/graph', (r) =>
+    r.query.get('asOf') === old
+      ? apiError(409, 'VERSION_UNAVAILABLE')
+      : json({ ...graph, metadata: { ...graph.metadata, asOf: time } }),
+  );
+  open(`${pinned}&graphAsOf=${encodeURIComponent(old)}`);
+  const user = userEvent.setup();
+  await screen.findByText(/관계 그래프 조회 실패/);
+  await user.click(
+    screen.getByRole('button', { name: '현재 시점 관계 그래프로 돌아가기' }),
+  );
+  expect(
+    await screen.findByRole('img', { name: '기준 시점 기업 관계 그래프' }),
+  ).toBeTruthy();
+});
+
+test('D-COM-06: the event-time graph stays while the graph is used and returns to the current time on a click elsewhere', async () => {
+  // 사건 B는 A보다 늦다. A 시점 그래프에서 B를 고르면 B를 A 시각으로 조회하면 안 된다.
+  server.on('GET', '/api/v1/events', (r) =>
+    json({
+      items: [events[0], { ...events[1], eventTime: '2026-10-05T12:00:00Z' }],
+      unknownTimeItems: [],
+      nextCursor: null,
+      metadata: {
+        ...metadata,
+        asOf: r.query.get('asOf') ?? time,
+        total: 2,
+        excludedUnknownTime: 0,
+      },
+    }),
+  );
+  open(pinned);
+  const user = userEvent.setup();
+  const address = () => screen.getByTestId('address').textContent ?? '';
+  await user.click(
+    await screen.findByRole('button', {
+      name: '합성 사건 A · 이 당시 관계그래프 보기',
+    }),
+  );
+  expect(address()).toContain(`graphAsOf=${encodeURIComponent(old)}`);
+
+  // 그래프 안의 조작(깊이 바꾸기)은 사건 시점을 유지한다.
+  const panel = screen.getByRole('complementary', {
+    name: '시점 기반 관계 그래프',
+  });
+  await user.click(within(panel).getByRole('button', { name: '2단계' }));
+  await waitFor(() => expect(address()).toContain('depth=2'));
+  expect(address()).toContain(`graphAsOf=${encodeURIComponent(old)}`);
+
+  // 그래프 밖에서 다른 사건을 고르면 그 사건은 고르고 그래프는 현재 기준 시점으로 돌아간다.
+  await user.click(screen.getByRole('button', { name: '합성 사건 B' }));
+  await waitFor(() => expect(address()).not.toContain('graphAsOf'));
+  expect(address()).toContain('event=issue-b');
+  await waitFor(() => {
+    const impact = server
+      .calls('GET', '/api/v1/companies/:id/issues/:issueId/impact')
+      .filter((call) => call.params.issueId === 'issue-b');
+    expect(impact.length).toBeGreaterThan(0);
+    expect(impact.every((call) => call.query.get('asOf') === time)).toBe(true);
+  });
+  await waitFor(() => {
+    const last = server.calls('GET', '/api/v1/companies/:id/graph').at(-1)!;
+    expect(last.query.get('asOf')).toBe(time);
+    expect(last.query.get('graphVersion')).toBe('v1');
+  });
+});
+
+test('D-COM-06: a graph time that is not earlier than the reference time is ignored', async () => {
+  open(`${pinned}&graphAsOf=${encodeURIComponent('2026-10-07T00:00:00Z')}`);
+  await screen.findByRole('img', { name: '기준 시점 기업 관계 그래프' });
+  expect(
+    server
+      .calls('GET', '/api/v1/companies/:id/graph')
+      .every((call) => call.query.get('asOf') === time),
+  ).toBe(true);
+  expect(
+    screen.queryByRole('button', { name: '현재 시점 관계 그래프로 돌아가기' }),
+  ).toBeNull();
+});
+
+test('D-COM-06: recovering from an invalid reference time also clears the graph time', async () => {
+  open(`?asOf=bad&graphAsOf=${encodeURIComponent(old)}`);
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole('button', { name: '최신 제공 시점으로 조회' }),
+  );
+  expect(screen.getByTestId('address').textContent).not.toContain('graphAsOf');
+});

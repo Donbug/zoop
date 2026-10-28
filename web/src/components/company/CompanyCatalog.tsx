@@ -120,6 +120,7 @@ export default function CompanyCatalog({
       'document',
       'evidence',
       'docScope',
+      'graphAsOf',
       'returnTo',
     ])
       params.delete(key);
