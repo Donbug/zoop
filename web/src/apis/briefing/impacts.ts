@@ -242,7 +242,11 @@ export function validateBriefingImpacts(
                 !url.username &&
                 !url.password &&
                 !url.port &&
-                ['news.samsung.com', 'www.sec.gov'].includes(url.hostname);
+                [
+                  'news.samsung.com',
+                  'www.sec.gov',
+                  'www.globenewswire.com',
+                ].includes(url.hostname);
             } catch {
               /* Invalid sources fail closed below. */
             }

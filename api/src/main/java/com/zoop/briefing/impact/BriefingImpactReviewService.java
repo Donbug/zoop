@@ -85,6 +85,7 @@ public class BriefingImpactReviewService {
                     .put("id",text(company,"id")).put("name",text(company,"name"));
             check(actualCompanies.equals(basis.path("companies")));
             Set<String> proofStages=new HashSet<>();
+            List<BriefingNativeImpactPolicy.Proof> nativeProofs=new ArrayList<>();
             check(chosen.path("proofs").isArray() && chosen.path("proofs").size()<=4);
             for (JsonNode proof:chosen.path("proofs")) {
                 String relative=text(proof,"path");
@@ -97,6 +98,7 @@ public class BriefingImpactReviewService {
                 String stage=text(receipt,"stage");
                 check(Set.of("impact","verify-impact").contains(stage));
                 check(receipt.path("http").path("status").asInt()==200);
+                check(!receipt.path("http").path("truncated").asBoolean(true));
                 check(Canonical.sha256(text(receipt.path("http"),"bodyText"))
                         .equals(text(receipt.path("http"),"bodySha256")));
                 String model=stage.equals("impact")?"gpt-6-luna":"jev-1.14.0";
@@ -104,6 +106,8 @@ public class BriefingImpactReviewService {
                 String reported=text(receipt.path("model"),"reported");
                 check(reported.equals(model)||reported.startsWith(model+"-"));
                 proofStages.add(stage);
+                nativeProofs.add(new BriefingNativeImpactPolicy.Proof(receipt,
+                        BriefingNativeImpactPolicy.request(manifest.getParent(),proof,receipt)));
             }
             check(proofStages.contains("impact"));
             if (completeContext) {
@@ -122,6 +126,7 @@ public class BriefingImpactReviewService {
                 check(seen.add(company)); boolean member=false;
                 for (JsonNode c:actualCompanies) if (company.equals(c.path("id").asString()) && name.equals(c.path("name").asString())) member=true;
                 check(member && Set.of("verified","not-proposed","no-evidence","verifier-reject","technical-reject").contains(status));
+                BriefingNativeImpactPolicy.assessment(assessment,basis,text(selected,"title"),nativeProofs,completeContext);
                 List<EffectEvidence> quotes=new ArrayList<>();Set<String> quoteIds=new HashSet<>();
                 List<FactEvidence> facts=new ArrayList<>();Set<String> factIds=new HashSet<>();
                 if (completeContext) {

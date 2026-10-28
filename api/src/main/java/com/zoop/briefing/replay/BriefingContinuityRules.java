@@ -93,6 +93,12 @@ final class BriefingContinuityRules {
             if(!valid||companies.isEmpty()||sources.isEmpty())continue;
             if("MATERIAL_UPDATE".equals(decision) && (freshness.strings("deltaEvidenceIds").isEmpty()
                     || freshness.strings("deltaEvidenceIds").stream().noneMatch(sources::containsKey)))continue;
+            if(old.contains(issue.string("issueId")) && freshness.strings("deltaEvidenceIds").stream().noneMatch(id ->
+                    sources.containsKey(id) && java.util.stream.StreamSupport.stream(history.spliterator(),false)
+                        .filter(h -> issue.string("issueId").equals(h.path("issueId").asString()))
+                        .flatMap(h -> java.util.stream.StreamSupport.stream(h.path("sources").spliterator(),false))
+                        .noneMatch(e -> id.equals(e.path("evidenceId").asString())
+                            || sources.get(id).string("quote").equals(e.path("quote").asString()))))continue;
             var value=StrictJson.newObject().put("issueId",issue.string("issueId"))
                     .put("title",String.join("·",companies.values())+" 참고 소식")
                     .put("importance",1).put("priority",assessment.count("priority"))

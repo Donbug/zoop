@@ -7,11 +7,12 @@ performance or a factual ground-truth label. Original results remain immutable.
 import argparse
 import copy
 import os
-from itertools import combinations, product
+from itertools import combinations
 from pathlib import Path
 import briefing_company_reading as reading
 base = reading.base
 CRITERIA = reading.QUALITY
+SAMPLE_POLICY = 'single-issue-company-v1'
 
 
 def compare_input(row):
@@ -21,17 +22,19 @@ def compare_input(row):
 
 
 def representative_cases(frozen):
-    targets = sorted(frozen['targets'], key=lambda t: t['companyId'])
+    # Company-wide prose cannot be attributed to one of several issue IDs.
+    # Only unambiguous single-issue targets count towards the three-issue sample.
+    targets = sorted((t for t in frozen['targets'] if len(t['issueIds']) == 1), key=lambda t: t['companyId'])
     for chosen in combinations(targets, 3):
-        for issues in product(*(t['issueIds'] for t in chosen)):
-            if len(set(issues)) == 3:
-                return [{'companyId': t['companyId'], 'issueId': issue} for t, issue in zip(chosen, issues)]
+        if len({t['issueIds'][0] for t in chosen}) == 3:
+            return [{'companyId': t['companyId'], 'issueId': t['issueIds'][0]} for t in chosen]
     return []
 
 
 def representative_round_cases(rows):
     pool = [{**case, 'roundId': row['roundId']} for row in rows
             for target in sorted(row['frozen']['targets'], key=lambda t: t['companyId'])
+            if len(target['issueIds']) == 1
             for case in ({'companyId': target['companyId'], 'issueId': issue} for issue in target['issueIds'])]
     for chosen in combinations(pool, 3):
         if len({c['companyId'] for c in chosen}) == len({c['issueId'] for c in chosen}) == 3:
@@ -49,7 +52,8 @@ def run_multiround(args, source, output, bundle, parent, layer, raw, transport):
     for row in chosen:
         reading.company.require(compare_input(row) == {k:v for k,v in frozen[row['roundId']].items() if k != 'schemaVersion'}, 'evaluation_same_input')
     prompts = reading.company.context.PROMPTS.with_name('reading-pairwise-multiround-v1')
-    identity = {'contract': 'same-input-multi-round-v1', 'improvedBundleSha256': base.digest(raw), 'cases': cases,
+    identity = {'contract': 'same-input-multi-round-v1', 'samplePolicy': SAMPLE_POLICY,
+                'improvedBundleSha256': base.digest(raw), 'cases': cases,
                 'commonInputSha256ByRound': {r['roundId']: base.digest(base.canonical(compare_input(r))) for r in chosen},
                 'promptArtifacts': {p.name: base.digest(base.regular(p)) for p in prompts.iterdir() if p.is_file()},
                 'legacyPromptArtifacts': {p.name: base.digest(base.regular(p)) for p in reading.company.context.PROMPTS.with_name(reading.VERSION).iterdir() if p.is_file()},
@@ -79,7 +83,7 @@ def run_multiround(args, source, output, bundle, parent, layer, raw, transport):
     for improved_is_a in (False,True):
         a,b=(improved,legacy) if improved_is_a else (legacy,improved)
         data={'context':{'rounds':{r['roundId']:compare_input(r) for r in chosen}},
-              'companies':[{'companyId':c['companyId'],'roundId':c['roundId'],
+              'companies':[{'companyId':c['companyId'],'roundId':c['roundId'],'issueId':c['issueId'],
                   'A':a[c['roundId']][c['companyId']],'B':b[c['roundId']][c['companyId']]} for c in cases]}
         digest=judge.request_digest('company_reading_pairwise',data,'review.md','unused',6000,judge_schema(ids))
         answer=judge.call('company_reading_pairwise',data,'review.md','unused',6000,judge_schema(ids))
@@ -105,7 +109,7 @@ def validate_judgment(value, ids):
     reading.company.require(len({c['companyId'] for c in value['checks']}) == len(ids), 'evaluation_coverage')
 
 
-def run(args, transport=None):
+def _run(args, transport=None):
     source, output = Path(args.improved).resolve(), Path(args.output).resolve()
     reading.company.require(source != output and source not in output.parents and output not in source.parents, 'evaluation_separate_output')
     raw = base.regular(source / 'bundle-v2.json')
@@ -124,7 +128,7 @@ def run(args, transport=None):
     legacy_frozen = reading.freeze(full, reading.VERSION)
     reading.company.require(compare_input(improved) == {k: v for k, v in legacy_frozen.items() if k != 'schemaVersion'}, 'evaluation_same_input')
     prompts = reading.company.context.PROMPTS.with_name('reading-pairwise-v1')
-    identity = {'improvedBundleSha256': base.digest(raw), 'roundId': improved['roundId'],
+    identity = {'samplePolicy': SAMPLE_POLICY, 'improvedBundleSha256': base.digest(raw), 'roundId': improved['roundId'],
                 'commonInputSha256': base.digest(base.canonical(compare_input(improved))),
                 'promptArtifacts': {p.name: base.digest(base.regular(p)) for p in prompts.iterdir() if p.is_file()},
                 'legacyPromptArtifacts': {p.name: base.digest(base.regular(p)) for p in reading.company.context.PROMPTS.with_name(reading.VERSION).iterdir() if p.is_file()},
@@ -154,7 +158,9 @@ def run(args, transport=None):
     results = []
     for improved_is_a in (False, True):
         a, b = (new, old) if improved_is_a else (old, new)
-        data = {'context': compare_input(improved), 'companies': [{'companyId': cid, 'A': a[cid], 'B': b[cid]} for cid in selected]}
+        data = {'context': compare_input(improved), 'companies': [
+            {'companyId': case['companyId'], 'issueId': case['issueId'],
+             'A': a[case['companyId']], 'B': b[case['companyId']]} for case in cases]}
         digest = judge.request_digest('company_reading_pairwise', data, 'review.md', 'unused', 6000, judge_schema(selected))
         answer = judge.call('company_reading_pairwise', data, 'review.md', 'unused', 6000, judge_schema(selected))
         validate_judgment(answer, selected)
@@ -164,6 +170,22 @@ def run(args, transport=None):
              'limitation': 'Model comparison of three companies under identical frozen inputs; not human calibration or investment performance.'}
     base.write_once(output / 'comparison.json', base.canonical(proof))
     return proof
+
+
+def run(args, transport=None):
+    if not args.execute:
+        return _run(args, transport)
+    source, output = Path(args.improved).resolve(), Path(args.output).resolve()
+    reading.company.require(source != output and source not in output.parents and output not in source.parents,
+                            'evaluation_separate_output')
+    base.private_dir(output)
+    lock = output / '.reading-evaluation.lock'
+    fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    os.close(fd)
+    try:
+        return _run(args, transport)
+    finally:
+        lock.unlink(missing_ok=True)
 
 
 def parser():

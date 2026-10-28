@@ -164,7 +164,12 @@ def review(args,runtime,approval,case):
         output.append({'companyId':company['id'],'companyName':company['name'],'status':status,'label':label,
                        'targetVerdict':target,'evidence':effects})
     return {'basis':case['basis'],'inputDigest':case['inputDigest'],'assessedAt':now(),'assessments':output,
-            'proofs':[{'path':str(p.relative_to(args.output)),'sha256':sha(p.read_bytes()),'bytes':p.stat().st_size} for p in proofs]}
+            'proofs':[proof_reference(p,args.output) for p in proofs]}
+
+def proof_reference(receipt,root):
+    request=root/'requests'/receipt.name
+    return {'path':str(receipt.relative_to(root)),'sha256':sha(receipt.read_bytes()),'bytes':receipt.stat().st_size,
+            'request':{'path':str(request.relative_to(root)),'sha256':sha(request.read_bytes()),'bytes':request.stat().st_size}}
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)

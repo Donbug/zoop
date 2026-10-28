@@ -27,7 +27,7 @@ class BriefingImpactReviewServiceTest {
         String quote="A😀 company signs a contract.";
         int length=quote.codePointCount(0,quote.length());
         var payload=mapper.createObjectNode();
-        payload.putArray("items").addObject().put("eventId","issue").putArray("companies")
+        payload.putArray("items").addObject().put("eventId","issue").put("title","Issue").putArray("companies")
                 .addObject().put("id","company").put("name","Company");
         var round=new BriefingRound("round",LocalDate.parse("2026-10-22"),"evening",cutoff,null,cutoff,true,"published",
                 cutoff.plusSeconds(10),cutoff,null,payload,mapper.createObjectNode(),null);
@@ -63,6 +63,57 @@ class BriefingImpactReviewServiceTest {
                 .put("articleId","document").put("articleVersion","sha256-"+"b".repeat(64))
                 .put("title","Authored test").put("url","https://example.test/test").put("publishedAt","2026-10-22T07:00:00Z")
                 .put("start",100).put("end",100+length).put("sourceEvidenceId","original-evidence");
+        nativeProofs("positive");
+    }
+    void nativeProofs(String effect) throws Exception {
+        Files.createDirectories(directory.resolve("requests"));
+        var entry=(ObjectNode)root.path("reviews").get(0);var proofs=entry.putArray("proofs");
+        String quote=detail.path("evidence").get(0).path("quote").asString();
+        for(String stage:new String[]{"impact","verify-impact"}) {
+            boolean generation=stage.equals("impact");String model=generation?"gpt-6-luna":"jev-1.14.0";
+            var request=mapper.createObjectNode().put("stage",stage).put("bindingIdentity","f".repeat(64))
+                    .put("provider",generation?"openai-compatible":"typesafe-native");
+            var body=request.putObject("body").put("model",model);
+            var names=mapper.createArrayNode().add("Company");
+            var relation=BriefingNativeImpactPolicy.relation("company",names,"issue","Issue",!generation);
+            ObjectNode response=mapper.createObjectNode().put("model",model);
+            if(generation) {
+                request.put("schemaDigest",BriefingNativeImpactPolicy.POLICY.path("generationSchemaDigest").asString())
+                        .put("promptVersion",BriefingNativeImpactPolicy.POLICY.path("generationPromptVersion").asString()).putNull("expect");
+                body.putObject("response_format").putObject("json_schema").set("schema",BriefingNativeImpactPolicy.POLICY.path("generationSchema"));
+                var in=mapper.createObjectNode();in.set("relation",relation);
+                in.putArray("companies").add(relation.path("subject"));
+                in.putArray("relationQuotes").addObject().put("quoteId","original-evidence").put("text",quote);
+                in.putArray("documents").addObject().put("documentId","document").put("documentVersion","sha256-"+"b".repeat(64)).put("title","Authored test").put("text",quote);
+                var envelope=mapper.createObjectNode().put("stage","impact");envelope.set("input",in);
+                var messages=body.putArray("messages");messages.addObject().put("role","system").put("content",BriefingNativeImpactPolicy.POLICY.path("generationSystem").asString());
+                messages.addObject().put("role","user").put("content",envelope.toString());
+                var answer=mapper.createObjectNode().put("schemaVersion","zoop-impact-response-1").put("producerVersion","zoop-impact-producer-1");
+                var proposal=answer.putArray("impacts").addObject().put("impactedCompanyId","company");proposal.putArray("opposing");
+                proposal.putArray("supporting").addObject().put("documentId","document").put("documentVersion","b".repeat(64)).put("quote",quote);
+                response.putArray("choices").addObject().put("finish_reason","stop").putObject("message").put("content",answer.toString());
+            } else {
+                request.put("schemaDigest",BriefingNativeImpactPolicy.POLICY.path("adapterIdentity").asString());
+                request.putObject("expect").put("kind","verify-impact").putArray("quoteIds").add("quote");
+                var state=body.putObject("state");state.set("relation",relation);state.set("target",relation.path("subject"));
+                state.putArray("quotes").addObject().put("label","Q1").put("text",quote);
+                body.set("questions",BriefingNativeImpactPolicy.questions(1));
+                var answers=response.putObject("answers");choice(answers.putObject("target"),"supported",false);
+                choice(answers.putObject("quote-0"),effect,true);
+            }
+            request.put("requestDigest",Canonical.digest(body));
+            var receipt=mapper.createObjectNode().put("format","zoop-live-receipt-1").put("stage",stage)
+                    .put("bindingIdentity","f".repeat(64)).put("requestDigest",Canonical.digest(body));receipt.set("expect",request.path("expect"));
+            receipt.putObject("model").put("requested",model).put("reported",model);
+            receipt.putObject("http").put("status",200).put("truncated",false).put("bodyText",response.toString()).put("bodySha256",Canonical.sha256(response.toString()));
+            byte[] raw=mapper.writeValueAsBytes(receipt);Files.write(directory.resolve("receipts/"+stage+".json"),raw);
+            Files.write(directory.resolve("requests/"+stage+".json"),mapper.writeValueAsBytes(request));
+            proofs.addObject().put("path","receipts/"+stage+".json").put("sha256",Canonical.sha256(raw)).put("bytes",raw.length);
+        }
+    }
+    void choice(ObjectNode answer,String choice,boolean effect) {
+        answer.put("type","choice").put("choice",choice).put("confidence",.95);var probabilities=answer.putObject("probabilities");
+        for(String key:effect?new String[]{"positive","negative","neutral","uncertain"}:new String[]{"supported","contradicted","insufficient"})probabilities.put(key,choice.equals(key)?1.0:0.0);
     }
     BriefingImpactReviewService service() throws Exception {
         byte[] bytes=mapper.writeValueAsBytes(root);Path file=directory.resolve("manifest.json");Files.write(file,bytes);
@@ -99,8 +150,28 @@ class BriefingImpactReviewServiceTest {
         assessment.put("label","negative");var reader=service();
         assertThrows(CustomException.class,()->reader.get("round","issue",null,"request"));
     }
+    @Test void emptySuccessBodyAndAnotherCompanyRequestCannotBeUsedAsVerification() throws Exception {
+        Path file=directory.resolve("receipts/verify-impact.json");var receipt=(ObjectNode)mapper.readTree(Files.readAllBytes(file));
+        ((ObjectNode)receipt.path("http")).put("bodyText","{}").put("bodySha256",Canonical.sha256("{}"));
+        byte[] raw=mapper.writeValueAsBytes(receipt);Files.write(file,raw);
+        var proof=(ObjectNode)root.path("reviews").get(0).path("proofs").get(1);proof.put("sha256",Canonical.sha256(raw)).put("bytes",raw.length);
+        var first=service();assertThrows(CustomException.class,()->first.get("round","issue",null,"request"));
+        nativeProofs("positive");Path requestFile=directory.resolve("requests/verify-impact.json");
+        var request=(ObjectNode)mapper.readTree(Files.readAllBytes(requestFile));
+        ((ObjectNode)request.path("body").path("state").path("target")).putArray("names").add("Other Company");
+        request.put("requestDigest",Canonical.digest(request.path("body")));Files.write(requestFile,mapper.writeValueAsBytes(request));
+        receipt=(ObjectNode)mapper.readTree(Files.readAllBytes(file));receipt.set("requestDigest",request.path("requestDigest"));
+        raw=mapper.writeValueAsBytes(receipt);Files.write(file,raw);proof=(ObjectNode)root.path("reviews").get(0).path("proofs").get(1);
+        proof.put("sha256",Canonical.sha256(raw)).put("bytes",raw.length);
+        var second=service();assertThrows(CustomException.class,()->second.get("round","issue",null,"request"));
+    }
+    @Test void rehashedManifestEffectsMustStillMatchTheSavedNativeAnswer() throws Exception {
+        assessment.put("label","negative");((ObjectNode)assessment.path("evidence").get(0)).put("effect","negative");
+        var reader=service();assertThrows(CustomException.class,()->reader.get("round","issue",null,"request"));
+    }
     @Test void uncertainEffectsProduceUndeterminedAndMissingVerifierIsRefused() throws Exception {
         assessment.put("label","undetermined");((ObjectNode)assessment.path("evidence").get(0)).put("effect","uncertain");
+        nativeProofs("uncertain");
         assertEquals("undetermined",service().get("round","issue",null,"request").companies().getFirst().assessments().getFirst().label());
         ((tools.jackson.databind.node.ArrayNode)root.path("reviews").get(0).path("proofs")).remove(1);
         var reader=service();assertThrows(CustomException.class,()->reader.get("round","issue",null,"request"));
@@ -120,6 +191,7 @@ class BriefingImpactReviewServiceTest {
     @Test void undeterminedRetainsExactFactsSeparatelyFromQuoteEffects() throws Exception {
         withFactContext();assessment.put("label","undetermined");
         ((ObjectNode)assessment.path("evidence").get(0)).put("effect","uncertain");
+        nativeProofs("uncertain");
         var result=service().get("round","issue",null,"request");
         var a=result.companies().getFirst().assessments().getFirst();
         assertEquals("undetermined",a.label());assertEquals(1,a.facts().size());

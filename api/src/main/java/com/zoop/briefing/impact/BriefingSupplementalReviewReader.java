@@ -39,6 +39,7 @@ final class BriefingSupplementalReviewReader {
         check(digest.equals(text(request,"requestDigest"))&&digest.equals(text(receipt,"requestDigest"))
                 &&request.path("expect").equals(receipt.path("expect"))
                 &&text(request,"bindingIdentity").equals(text(receipt,"bindingIdentity")));
+        BriefingNativeImpactPolicy.verifyRequest(request);
         var candidate=input.path("candidate");var state=request.path("body").path("state");
         boolean named=false;
         for(var name:candidate.path("target").path("names"))
@@ -56,6 +57,7 @@ final class BriefingSupplementalReviewReader {
                 &&candidate.path("relationFacts").path("object").path("names").get(0).asString().equals(title)
                 &&state.path("target").path("names").equals(candidate.path("target").path("names")));
         check(state.path("relation").equals(nativeRelation(candidate.path("relationFacts"),mapper)));
+        check(BriefingNativeImpactPolicy.allowedNames(company,text(assessment,"companyName"),state.path("target").path("names")));
         var ids=receipt.path("expect").path("quoteIds");var quotes=candidate.path("quotes");
         check(ids.isArray()&&quotes.isArray()&&quotes.size()>0&&quotes.size()<=16&&ids.size()==quotes.size()
                 &&state.path("quotes").size()==quotes.size()
@@ -127,7 +129,7 @@ final class BriefingSupplementalReviewReader {
         return n;
     }
     /** Same provisional p>=.90/conf>=.80 policy as the native pipeline; uncertain never becomes neutral. */
-    private static String choice(JsonNode n,Set<String> options,boolean effect) {
+    static String choice(JsonNode n,Set<String> options,boolean effect) {
         check(text(n,"type").equals("choice"));String chosen=text(n,"choice");check(options.contains(chosen));
         var p=n.path("probabilities");check(p.isObject()&&p.size()==options.size());
         double sum=0,maximum=-1;for(String option:options) {

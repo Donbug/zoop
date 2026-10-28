@@ -20,10 +20,9 @@ const sides = {
 const states: Record<Exclude<S3Assessment['status'], 'verified'>, string> = {
   'not-applicable': '해당 관계는 영향 평가 대상이 아닙니다.',
   'not-proposed': '저장된 영향 평가가 없습니다.',
-  'no-evidence':
-    '평가 생성 단계에서 근거 인용을 제시하지 않아 독립 검증을 진행하지 않았습니다.',
+  'no-evidence': '영향을 판단할 인용 근거가 부족합니다.',
   'technical-reject': '평가 결과를 검증할 수 없습니다.',
-  'verifier-reject': '독립 검증을 통과하지 못했습니다.',
+  'verifier-reject': '근거 확인을 통과하지 못해 판단을 보류했습니다.',
   withheld: '현재 공개 조건을 충족하지 않아 평가를 표시하지 않습니다.',
 };
 
@@ -76,34 +75,25 @@ export default function BriefingS3Impacts({
       aria-label="이슈별 S3 기업 영향"
       className="space-y-3 border-t border-zoop-line pt-4"
     >
-      <h4 className="text-sm font-bold">이 이슈의 기업별 영향 · S3</h4>
+      <h4 className="text-sm font-bold">이 이슈의 기업별 영향</h4>
       {value?.reviewContext && (
-        <p
-          className={`${NOTE} rounded border border-zoop-line bg-zoop-wash p-3`}
-        >
-          사후 재평가 · {briefingTime(value.reviewContext.assessedAt)} 생성.
-          기존 브리핑에 저장된 인용·주변 문맥으로 나중에 평가한 결과이며 당시
-          발행본의 평가는 아닙니다. 생성 gpt-6-luna · 독립 검증 Jev.
-          {value.reviewContext.citationPolicy &&
-            ' 기존 생성 결과를 재사용하고 인용 문맥을 보완했습니다.'}
-        </p>
+        <span className="inline-flex rounded border border-zoop-line px-2 py-1 text-[11px] text-zoop-muted">
+          발행 후 추가 평가
+        </span>
       )}
       {error ? (
         <p role="status" className={NOTE}>
-          평가를 불러오지 못했습니다. 평가 미저장과는 다른 조회 오류입니다.{' '}
+          기업별 영향을 불러오지 못했습니다.{' '}
           <button className={`underline ${FOCUS_RING}`} onClick={retry}>
-            S3 평가 다시 시도
+            기업별 영향 다시 시도
           </button>
         </p>
       ) : !value ? (
         <p role="status" className={NOTE}>
-          저장된 S3 평가를 확인하고 있습니다.
+          기업별 영향을 불러오고 있습니다.
         </p>
       ) : value.companies.length === 0 ? (
-        <p className={NOTE}>
-          이 회차에는 연결된 S3 영향 평가가 저장돼 있지 않습니다. 기존 기업
-          전망과 시세는 아래에서 확인할 수 있습니다.
-        </p>
+        <p className={NOTE}>이 이슈에는 저장된 기업 영향 평가가 없습니다.</p>
       ) : (
         <>
           <p className={NOTE}>
@@ -118,9 +108,7 @@ export default function BriefingS3Impacts({
             >
               <h5 className="text-sm font-semibold">{c.companyName}</h5>
               {c.assessments.length === 0 && (
-                <p className={NOTE}>
-                  이 이슈와 기업에 연결된 S3 평가가 없습니다.
-                </p>
+                <p className={NOTE}>이 기업에 연결된 영향 평가가 없습니다.</p>
               )}
               {c.assessments.length > 1 && (
                 <p className={NOTE}>
@@ -196,8 +184,7 @@ export default function BriefingS3Impacts({
                         이전 {labels[a.supplementalReview.previousLabel]} →
                         재검증 {labels[a.supplementalReview.label]}
                         {' · '}
-                        {briefingTime(a.supplementalReview.assessedAt)} · Jev
-                        독립 검증
+                        {briefingTime(a.supplementalReview.assessedAt)}
                       </p>
                       <p className={BODY}>{a.supplementalReview.summary}</p>
                       <p className="text-xs font-semibold">확인된 사실</p>
@@ -245,11 +232,6 @@ export default function BriefingS3Impacts({
                           </div>
                         ))}
                       </details>
-                      <p className={NOTE}>
-                        사후 확보한 근거로 다시 검증한 결과입니다. 당시
-                        저장본과의 동일성은 미확인이며, 기존 발행 기록과 시세는
-                        보존합니다.
-                      </p>
                     </section>
                   )}
                   {(a.facts?.length ?? 0) > 0 && (
@@ -261,10 +243,6 @@ export default function BriefingS3Impacts({
                         원문에서 확인된 내용
                       </h6>
                       <p className={BODY}>{item.title}</p>
-                      <p className={NOTE}>
-                        기업명·행위·조건을 함께 보존한 원문입니다. 긍부정
-                        판단과는 구분합니다.
-                      </p>
                       {a.facts!.map((f) => (
                         <details key={f.id}>
                           <summary
@@ -484,6 +462,19 @@ export default function BriefingS3Impacts({
           ))}
         </>
       )}
+      {value?.reviewContext && (
+        <details className={NOTE}>
+          <summary
+            className={`min-h-11 cursor-pointer content-center underline ${FOCUS_RING}`}
+          >
+            평가 정보
+          </summary>
+          <p>
+            평가 시각 {briefingTime(value.reviewContext.assessedAt)} · 발행 후
+            추가로 평가한 결과입니다.
+          </p>
+        </details>
+      )}
     </section>
   );
 }
@@ -502,7 +493,7 @@ export function BriefingS3Disclosure({
       <summary
         className={`min-h-11 cursor-pointer content-center text-xs underline ${FOCUS_RING}`}
       >
-        S3 기업별 영향·근거 보기
+        기업별 영향·근거 보기
       </summary>
       {open && (
         <BriefingS3Impacts

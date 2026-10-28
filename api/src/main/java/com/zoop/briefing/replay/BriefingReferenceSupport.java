@@ -50,6 +50,9 @@ final class BriefingReferenceSupport {
                 // Canonical identity projection can rename a company, but cannot create a participant/role.
                 if(m.has("companyProjection")) for(var audit:m.object("companyProjection").objects("audit"))
                     require(raw.objects("participants").stream().anyMatch(p->p.node().equals(audit.object("rawParticipant").node())),"participant_binding");
+                if(!m.has("companyProjection")) for(var company:m.objects("companies"))
+                    require(raw.objects("participants").stream().anyMatch(p -> company.string("companyId").equals(p.stringOrNull("company_id"))
+                            && company.string("name").equals(p.string("name")) && company.string("role").equals(p.string("role"))),"legacy_participant_binding");
                 require(result.putIfAbsent(id,new Proof(m,receipt.string("requestDigest")))==null,"duplicate_supported_mention");
             }
         }
@@ -63,6 +66,10 @@ final class BriefingReferenceSupport {
                 || !m.string("articleId").equals(current.string("articleId")) || !m.string("articleVersion").equals(current.string("articleVersion"))
                 || !m.string("bodySha256").equals(current.string("bodySha256")))return false;
         Map<String,StrictJson.Obj> accepted=new HashMap<>();m.objects("evidence").forEach(e->accepted.put(e.string("evidenceId"),e));
+        if(current.objects("companies").size()!=m.objects("companies").size()
+                || current.objects("companies").stream().anyMatch(c -> m.objects("companies").stream().noneMatch(old ->
+                    c.string("companyId").equals(old.string("companyId")) && c.string("name").equals(old.string("name"))
+                    && java.util.Objects.equals(c.has("role")?c.stringOrNull("role"):null,old.has("role")?old.stringOrNull("role"):null)))) return false;
         if(current.objects("evidence").isEmpty())return false;
         for(var e:current.objects("evidence")) {
             var nativeQuote=accepted.get(e.string("evidenceId"));

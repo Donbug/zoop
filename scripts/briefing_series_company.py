@@ -21,7 +21,12 @@ def generate(args):
         proof_path=output/'completed.json'
         version=(base.strict_load(base.regular(proof_path))['identity'].get('promptVersion','company-outlook-v1')
                  if proof_path.exists() else 'company-outlook-v4')
-    identity={'baselineSha256':base.digest(raw),'authorizationRef':args.authorization_ref,'maximumCalls':args.max_calls}
+    source_bytes=base.regular(Path(args.sources))
+    if bundle.get('sourceFileSha256') and bundle['sourceFileSha256']!=base.digest(source_bytes):
+        raise base.ReplayError('series_company_source_baseline_mismatch')
+    comparison='edition-bound-v2' if getattr(args,'edition_bound_comparison',False) or version in ('company-outlook-v2','company-outlook-v3','company-outlook-v4') else None
+    identity={'baselineSha256':base.digest(raw),'sourceSha256':base.digest(source_bytes),'comparisonContract':comparison,
+              'authorizationRef':args.authorization_ref,'maximumCalls':args.max_calls}
     if version!='company-outlook-v1':identity['promptVersion']=version
     if not args.execute:
         return {'status':'OFFLINE','minimumNewCalls':2*len(bundle['marketEnrichment']['rounds']),'maximumTotalCalls':args.max_calls,'newPaidCalls':0}
@@ -31,19 +36,20 @@ def generate(args):
         if proof['identity']!=identity or base.digest(base.regular(output/'bundle-v2.json'))!=proof['bundleSha256']:
             raise base.ReplayError('series_company_reuse_mismatch')
         return {**proof,'newPaidCalls':0}
+    base.write_once(output/'series-execution.json',base.canonical(identity))
     if not args.key_file:raise base.ReplayError('series_company_key_required')
     for f in source.rglob('*'):
         if f.is_file() and f.name not in {'bundle-v2.json','bundle.binding.json','completed.json','plan.json'}:
             target=output/f.relative_to(source);base.private_dir(target.parent)
             if not target.exists():os.link(f,target)
-    metadata={d['documentId']:d for d in [base.strict_load(line) for line in base.regular(Path(args.sources)).decode().splitlines()]}
+    metadata={d['documentId']:d for d in [base.strict_load(line) for line in source_bytes.decode().splitlines()]}
     receipts=[];history=[];news={r['roundId']:r for r in bundle['rounds']}
     client=company.context.legacy.MarketSummaryClient(output,base.authenticated_transport(Path(args.key_file),timeout=600),args.max_calls,prompt_root=company.PROMPTS.with_name(version))
     for market in bundle['marketEnrichment']['rounds']:
         definition=news[market['roundId']]
         row={'roundId':market['roundId'],'date':market['date'],'edition':market['edition'],'marketEnrichment':market}
         frozen=company.freeze(row,definition,metadata,history,version)
-        if getattr(args,'edition_bound_comparison',False) or version in ('company-outlook-v2','company-outlook-v3','company-outlook-v4'):frozen['comparisonContract']='edition-bound-v2'
+        if comparison:frozen['comparisonContract']=comparison
         frozen['promptVersion']=version
         path=output/'company-rounds'/(row['roundId']+'.json');base.private_dir(path.parent)
         if path.exists():

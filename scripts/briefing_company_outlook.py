@@ -197,11 +197,13 @@ def _run(args,transport=None):
             target=output/file.relative_to(baseline);base.private_dir(target.parent)
             if not target.exists(): os.link(file,target)
     base.write_once(output/('company-plan-'+base.digest(base.canonical(plan))+'.json'),base.canonical(plan))
+    active_prompts=output/'company-prompts'/version
+    base.private_dir(active_prompts)
     for file in prompts.iterdir():
-        base.private_dir(output/'company-prompts');base.write_once(output/'company-prompts'/file.name,base.regular(file))
+        base.write_once(active_prompts/file.name,base.regular(file))
     def cache_only(_): raise base.ReplayError('company_cache_only_request_not_completed')
     send=transport or (base.authenticated_transport(Path(args.key_file),timeout=600) if new_rounds else cache_only)
-    client=context.legacy.MarketSummaryClient(output,send,args.max_calls,prompt_root=output/'company-prompts')
+    client=context.legacy.MarketSummaryClient(output,send,args.max_calls,prompt_root=active_prompts)
     completed=[];selected_ids={r['roundId'] for r in chosen}
     for row in timeline:
         frozen=(freeze(row,recovery[row['roundId']],metadata,completed) if version==VERSION

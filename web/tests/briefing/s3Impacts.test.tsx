@@ -155,9 +155,7 @@ describe('version-bound S3 issue impacts', () => {
     server.on('GET', route, () => json(v));
     render(<BriefingS3Impacts round={round} item={item} />);
     expect(
-      await screen.findByText(
-        /이 회차에는 연결된 S3 영향 평가가 저장돼 있지 않습니다/,
-      ),
+      await screen.findByText(/이 이슈에는 저장된 기업 영향 평가가 없습니다/),
     ).toBeTruthy();
     expect(screen.queryByText(/판단 유보/)).toBeNull();
   });
@@ -166,9 +164,11 @@ describe('version-bound S3 issue impacts', () => {
     server.on('GET', route, () => apiError(503, 'SOURCE_UNAVAILABLE'));
     const user = userEvent.setup();
     render(<BriefingS3Impacts round={round} item={item} />);
-    await screen.findByText(/평가 미저장과는 다른 조회 오류/);
+    await screen.findByText(/기업별 영향을 불러오지 못했습니다/);
     server.on('GET', route, () => json(fixture()));
-    await user.click(screen.getByRole('button', { name: 'S3 평가 다시 시도' }));
+    await user.click(
+      screen.getByRole('button', { name: '기업별 영향 다시 시도' }),
+    );
     expect(await screen.findByText('합성 positive 원문 인용')).toBeTruthy();
     expect(server.requests.every((r) => r.method === 'GET')).toBe(true);
   });
@@ -178,7 +178,7 @@ describe('version-bound S3 issue impacts', () => {
     const user = userEvent.setup();
     render(<BriefingS3Disclosure round={round} item={item} />);
     expect(server.requests).toHaveLength(0);
-    await user.click(screen.getByText('S3 기업별 영향·근거 보기'));
+    await user.click(screen.getByText('기업별 영향·근거 보기'));
     expect(await screen.findByText('합성 positive 원문 인용')).toBeTruthy();
     expect(server.requests).toHaveLength(1);
   });
@@ -191,7 +191,7 @@ describe('version-bound S3 issue impacts', () => {
     render(<BriefingS3Impacts round={round} item={item} />);
     expect(await screen.findByText('판단 유보 · 인용 근거 검증')).toBeTruthy();
     expect(screen.getByText(/평가는 수행했지만/)).toBeTruthy();
-    expect(screen.queryByText(/영향 평가가 저장돼 있지 않습니다/)).toBeNull();
+    expect(screen.queryByText(/저장된 기업 영향 평가가 없습니다/)).toBeNull();
   });
   it('discards a late reply from another issue', async () => {
     const server = createFakeServer(),
@@ -210,7 +210,7 @@ describe('version-bound S3 issue impacts', () => {
     await screen.findByText('합성 positive 원문 인용');
     old.resolve(json({ ...fixture(), companies: [] }));
     await waitFor(() =>
-      expect(screen.queryByText(/영향 평가가 저장돼 있지 않습니다/)).toBeNull(),
+      expect(screen.queryByText(/저장된 기업 영향 평가가 없습니다/)).toBeNull(),
     );
   });
   it('reads a later review without turning it into the original publication assessment', async () => {
@@ -244,7 +244,13 @@ describe('version-bound S3 issue impacts', () => {
       () => json(review),
     );
     render(<BriefingS3Impacts round={round} item={item} />);
-    expect(await screen.findByText(/사후 재평가/)).toBeTruthy();
+    expect(await screen.findByText(/발행 후 추가 평가/)).toBeTruthy();
+    expect(screen.getByText('평가 정보').closest('details')?.open).toBe(false);
+    expect(
+      screen.queryByText(
+        /생성 gpt-6-luna|독립 검증 Jev|기존 생성 결과를 재사용/,
+      ),
+    ).toBeNull();
     expect(screen.getByText('평가 1 · 긍정 · 인용 근거 검증')).toBeTruthy();
     expect(
       server.calls(
@@ -315,7 +321,7 @@ describe('D-BRF-01/02 confirmed facts are separate from impact direction', () =>
       screen.getByRole('link', { name: /원문 보기/ }).getAttribute('href'),
     ).toBe('https://example.test/fact');
     expect(
-      screen.getByText(/평가 생성 단계에서 근거 인용을 제시하지 않아/),
+      screen.getByText(/영향을 판단할 인용 근거가 부족합니다/),
     ).toBeTruthy();
     expect(screen.queryByText('긍정 · 인용 근거 검증')).toBeNull();
   });
@@ -488,6 +494,21 @@ describe('D-BRF-01/02 offline evidence preparation', () => {
     };
     return v;
   }
+  it('accepts the same reviewed GlobeNewswire source host as the server and rejects lookalikes', () => {
+    const value = withLinkedSources();
+    value.companies[0].assessments[0].evidencePlan!.research!.sources[0].url =
+      'https://www.globenewswire.com/news-release/fixture';
+    expect(() => validateBriefingImpacts(value, round, item)).not.toThrow();
+    for (const url of [
+      'https://www.globenewswire.com.evil.invalid/news',
+      'https://user@www.globenewswire.com/news',
+      'http://www.globenewswire.com/news',
+    ]) {
+      value.companies[0].assessments[0].evidencePlan!.research!.sources[0].url =
+        url;
+      expect(() => validateBriefingImpacts(value, round, item)).toThrow();
+    }
+  });
   it.each(['positive', 'undetermined'] as const)(
     'shows latest %s reasons and citations without overwriting original review',
     async (label) => {

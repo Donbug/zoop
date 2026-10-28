@@ -112,30 +112,70 @@ final class BriefingEditorialRules {
         // in the shared cache. These older calls are accounting only: selection
         // still reads exactly the active row's digest and decisions above.
         if (history.has("retrievalPolicy") && "reviewed-issuer-first-v1".equals(history.string("retrievalPolicy"))) {
-            for (var entry : receipts.entrySet()) if (!owned.contains(entry.getKey())) {
-                var call = BriefingGroupedSimulationRules.recording(entry.getValue(), output, true);
-                StrictJson.Obj current = layer.objects("rounds").stream()
-                        .filter(r -> r.object("window").node().equals(call.input().object("window").node()))
-                        .findFirst().orElseThrow(() -> new IllegalArgumentException("Editorial history window absent"));
-                historicalInput(call.input(), current.object("frozen"), reports);
-                Set<String> ids = new HashSet<>(); call.input().objects("issues").forEach(i -> ids.add(i.string("issueId")));
-                call.answer().exactly(ids);
-                for (StrictJson.Obj issue : call.input().objects("issues")) {
-                    var decision=call.answer().object(issue.string("issueId")); Set<String> evidence=new HashSet<>();
-                    issue.objects("newEvidence").forEach(e -> evidence.add(e.string("evidenceId")));
-                    require(Set.of("REPEAT","MATERIAL_UPDATE","DISTINCT_EVENT","UNCERTAIN").contains(decision.string("decision"))
-                            && !decision.string("reason").isBlank() && evidence.containsAll(decision.strings("deltaEvidenceIds"))
-                            && ("MATERIAL_UPDATE".equals(decision.string("decision")) == !decision.strings("deltaEvidenceIds").isEmpty()), "historical_decision");
-                }
-                try {
-                    var request=StrictJson.parseObject(Files.readAllBytes(output.resolve("calls/"+entry.getKey()+".request.json")));
-                    byte[] prompt=BriefingEditorialRules.class.getResourceAsStream("/briefing/prompts/"+layer.string("promptVersion")+"/review.md").readAllBytes();
-                    require(Canonical.sha256(prompt).equals(Canonical.sha256(request.string("instructions"))), "historical_prompt");
-                } catch (java.io.IOException error) { throw new IllegalArgumentException("Editorial history unavailable",error); }
-                owned.add(entry.getKey());
-            }
+            historicalAccounting(layer, reports, receipts, owned, output);
         }
         require(owned.equals(receipts.keySet()), "orphan_receipt");
+    }
+
+    static void historicalAccounting(StrictJson.Obj layer, Map<String, StrictJson.Obj> reports,
+            Map<String, StrictJson.Obj> receipts, Set<String> owned, Path output) {
+        Map<String, BriefingGroupedSimulationRules.Recording> calls = new LinkedHashMap<>();
+        Map<String, StrictJson.Obj> inputs = new LinkedHashMap<>();
+        for (var entry : receipts.entrySet()) if (!owned.contains(entry.getKey())) {
+            var call = BriefingGroupedSimulationRules.recording(entry.getValue(), output, true);
+            ObjectNode input = (ObjectNode) call.input().node().deepCopy(); input.remove("editorialCorrection");
+            StrictJson.Obj frozen = StrictJson.Obj.of(input);
+            StrictJson.Obj current = layer.objects("rounds").stream()
+                    .filter(r -> r.object("window").node().equals(frozen.object("window").node()))
+                    .findFirst().orElseThrow(() -> new IllegalArgumentException("Editorial history window absent"));
+            historicalInput(frozen, current.object("frozen"), reports);
+            try {
+                require(Set.of("editorial-freshness-v1", "editorial-freshness-v2", "editorial-freshness-v3")
+                        .contains(layer.string("promptVersion")), "prompt_version");
+                var request = StrictJson.parseObject(Files.readAllBytes(output.resolve("calls/"+entry.getKey()+".request.json")));
+                byte[] prompt = BriefingEditorialRules.class.getResourceAsStream("/briefing/prompts/"+layer.string("promptVersion")+"/review.md").readAllBytes();
+                require(Canonical.sha256(prompt).equals(Canonical.sha256(request.string("instructions"))), "historical_prompt");
+            } catch (java.io.IOException error) { throw new IllegalArgumentException("Editorial history unavailable", error); }
+            calls.put(entry.getKey(), call); inputs.put(entry.getKey(), frozen);
+        }
+        Set<String> failedOrigins = new HashSet<>();
+        for (var entry : calls.entrySet()) {
+            var call = entry.getValue(); if (!call.input().has("editorialCorrection")) continue;
+            var correction = call.input().object("editorialCorrection");
+            correction.exactly(Set.of("attempt", "failure", "originalRequestDigest", "originalResponseSha256", "previousReply", "instruction"));
+            String originalDigest = correction.string("originalRequestDigest");
+            var original = calls.get(originalDigest);
+            require(correction.count("attempt") == 1 && "editorial_delta_binding".equals(correction.string("failure"))
+                    && !correction.string("instruction").isBlank() && original != null
+                    && !original.input().has("editorialCorrection") && failedOrigins.add(originalDigest)
+                    && receipts.get(originalDigest).string("responseSha256").equals(correction.string("originalResponseSha256")), "historical_correction_origin");
+            require(original.input().node().equals(inputs.get(entry.getKey()).node())
+                    && original.answer().node().equals(correction.object("previousReply").node()), "historical_correction_inputs");
+            // Only the producer's known delta-binding failure may be retained.
+            // The failed reply is accounting evidence, never a selection decision.
+            require(!historicalAnswer(original.answer(), original.input()), "historical_correction_failure");
+            require(historicalAnswer(call.answer(), inputs.get(entry.getKey())), "historical_correction_answer");
+        }
+        for (var entry : calls.entrySet())
+            require(historicalAnswer(entry.getValue().answer(), inputs.get(entry.getKey()))
+                    || failedOrigins.contains(entry.getKey()), "historical_decision");
+        owned.addAll(calls.keySet());
+    }
+
+    static boolean historicalAnswer(StrictJson.Obj answer, StrictJson.Obj input) {
+        Set<String> ids = new HashSet<>(); input.objects("issues").forEach(i -> ids.add(i.string("issueId")));
+        answer.exactly(ids); boolean deltaBound = true;
+        for (var issue : input.objects("issues")) {
+            var decision = answer.object(issue.string("issueId"));
+            decision.exactly(Set.of("decision", "deltaEvidenceIds", "reason"));
+            Set<String> evidence = new HashSet<>(); issue.objects("newEvidence").forEach(e -> evidence.add(e.string("evidenceId")));
+            var delta = decision.strings("deltaEvidenceIds");
+            require(Set.of("REPEAT", "MATERIAL_UPDATE", "DISTINCT_EVENT", "UNCERTAIN").contains(decision.string("decision"))
+                    && !decision.string("reason").isBlank() && evidence.containsAll(delta)
+                    && new HashSet<>(delta).size() == delta.size(), "historical_decision");
+            deltaBound &= "MATERIAL_UPDATE".equals(decision.string("decision")) == !delta.isEmpty();
+        }
+        return deltaBound;
     }
 
     static void historicalInput(StrictJson.Obj old, StrictJson.Obj current, Map<String, StrictJson.Obj> reports) {

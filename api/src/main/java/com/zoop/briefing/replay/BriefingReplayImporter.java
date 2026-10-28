@@ -217,7 +217,7 @@ public final class BriefingReplayImporter {
         StrictJson.Obj seriesCompanies = explicitSeries && bundle.has("marketEnrichment") && bundle.object("marketEnrichment").has("seriesCompanyOutlooks")
                 ? bundle.object("marketEnrichment").object("seriesCompanyOutlooks") : null;
         if (seriesCompanies != null) require(settings.userInboxRef().equals(seriesCompanies.string("authorizationRef")), "series_company_authorization");
-        Map<String, StrictJson.Obj> seriesCompanyRows = seriesCompanies == null ? Map.of() : BriefingCompanyOutlookRules.rows(seriesCompanies);
+        Map<String, StrictJson.Obj> seriesCompanyRows = seriesCompanies == null ? Map.of() : BriefingCompanyOutlookRules.rows(seriesCompanies, 14);
         Map<String, StrictJson.Obj> seriesPriceRows = explicitSeries && bundle.has("marketEnrichment")
                 ? BriefingSeriesPriceRules.rows(bundle, settings.userInboxRef(), seriesCompanyRows, settings.bundle().getParent()) : Map.of();
         Map<String, JsonNode> seriesCompanyReceipts = seriesCompanies == null ? Map.of() : simulationReceiptLedger(seriesCompanies.objects("receipts"));
@@ -227,13 +227,13 @@ public final class BriefingReplayImporter {
             require(settings.userInboxRef().equals(seriesReading.string("authorizationRef")), "series_reading_authorization");
             require(Set.of(BriefingCompanyReadingRules.SCHEMA, BriefingCompanyReadingRules.SCHEMA_V2).contains(seriesReading.string("schemaVersion")), "series_reading_schema");
         }
-        Map<String, StrictJson.Obj> seriesReadingRows = seriesReading == null ? Map.of() : BriefingCompanyReadingRules.rows(seriesReading);
+        Map<String, StrictJson.Obj> seriesReadingRows = seriesReading == null ? Map.of() : BriefingCompanyReadingRules.rows(seriesReading, 14);
         Map<String, JsonNode> seriesReadingReceipts = seriesReading == null ? Map.of() : simulationReceiptLedger(seriesReading.objects("receipts"));
         require(seriesCompanyRows.keySet().containsAll(seriesReadingRows.keySet()), "series_reading_company_rounds");
         StrictJson.Obj seriesCards = explicitSeries && bundle.has("marketEnrichment") && bundle.object("marketEnrichment").has("seriesCompanyCards")
                 ? bundle.object("marketEnrichment").object("seriesCompanyCards") : null;
         if (seriesCards != null) require(settings.userInboxRef().equals(seriesCards.string("authorizationRef")), "series_card_authorization");
-        Map<String, StrictJson.Obj> seriesCardRows = seriesCards == null ? Map.of() : BriefingCompanyReadingRules.rows(seriesCards);
+        Map<String, StrictJson.Obj> seriesCardRows = seriesCards == null ? Map.of() : BriefingCompanyReadingRules.rows(seriesCards, 14);
         Map<String, JsonNode> seriesCardReceipts = seriesCards == null ? Map.of() : simulationReceiptLedger(seriesCards.objects("receipts"));
         require(seriesCompanyRows.keySet().containsAll(seriesCardRows.keySet()), "series_card_company_rounds");
         Set<String> seriesCardOwned = new HashSet<>();

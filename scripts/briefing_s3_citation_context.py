@@ -182,7 +182,7 @@ def main():
             # The new verifier is bound to the new context. Retain the original generator receipt only here;
             # all original verifier receipts remain immutable in the previous execution and copied archive.
             current['proofs']=[p for p in old['proofs'] if json.loads((args.previous/p['path']).read_text())['stage']=='impact']
-            current['proofs'].append({'path':str(proof.relative_to(args.output)),'sha256':base.sha(proof.read_bytes()),'bytes':proof.stat().st_size})
+            current['proofs'].append(live.proof_reference(proof,args.output))
             current['assessedAt']=base.now()
         base.once(path,current);reviews.append(current)
         print(json.dumps({'completed':len(reviews),'label':assessment['label'],'factParagraphs':len(facts)}),flush=True)

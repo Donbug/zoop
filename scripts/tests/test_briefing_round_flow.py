@@ -108,12 +108,13 @@ class RoundFlowTest(unittest.TestCase):
             root = Path(d); source = fixture(root); output = root / 'generated'
             base.private_dir(output)
             raw = base.regular(source / 'bundle-v2.json')
+            sources = root / 'sources.jsonl'; sources.write_bytes(b'{}\n')
             base.write_once(output / 'bundle-v2.json', raw)
             proof = {'status': 'COMPLETE', 'identity': {'baselineSha256': base.digest(raw),
-                     'authorizationRef': 'local:authored', 'maximumCalls': 80}, 'bundleSha256': base.digest(raw)}
+                     'authorizationRef': 'local:authored', 'maximumCalls': 80, 'sourceSha256': base.digest(sources.read_bytes()), 'comparisonContract': None}, 'bundleSha256': base.digest(raw)}
             base.write_once(output / 'completed.json', base.canonical(proof))
             args = company.parser().parse_args(['--baseline', str(source), '--output', str(output),
-                '--sources', str(root / 'not-needed.jsonl'), '--authorization-ref', 'local:authored', '--execute'])
+                '--sources', str(sources), '--authorization-ref', 'local:authored', '--execute'])
             with patch.object(flow.prices.prices.market, 'transport', price_fixtures.SeriesPricesTest().transport):
                 result = company.run(args)
             self.assertEqual('COMPLETE', result['priceStage'])

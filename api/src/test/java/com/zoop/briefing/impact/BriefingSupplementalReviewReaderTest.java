@@ -37,12 +37,13 @@ class BriefingSupplementalReviewReaderTest {
                 .put("articleVersion","sha256-"+Canonical.sha256(quote)).put("sourceEvidenceId","s")
                 .put("quote",quote).put("start",0).put("end",quote.codePointCount(0,quote.length()));
         for(String key:new String[]{"title","url","publishedAt"})fact.set(key,source.path(key));
-        request=m.createObjectNode().put("stage","verify-impact").put("provider","typesafe-native").put("bindingIdentity","policy");
+        request=m.createObjectNode().put("stage","verify-impact").put("provider","typesafe-native").put("bindingIdentity","policy")
+                .put("schemaDigest",BriefingNativeImpactPolicy.POLICY.path("adapterIdentity").asString());
         var body=request.putObject("body").put("model","jev-1.14.0");var state=body.putObject("state");
         var nativeRelation=relation.deepCopy();((ObjectNode)nativeRelation.path("subject")).remove("ref");((ObjectNode)nativeRelation.path("object")).remove("ref");
         state.set("relation",nativeRelation);var nativeTarget=target.deepCopy();nativeTarget.remove("ref");state.set("target",nativeTarget);
         state.putArray("quotes").addObject().put("label","Q1").put("text",quote);
-        var questions=body.putObject("questions");questions.putObject("target");questions.putObject("quote-0");
+        body.set("questions",BriefingNativeImpactPolicy.questions(1));
         request.putObject("expect").put("kind","verify-impact").putArray("quoteIds").add("q1");
         response=m.createObjectNode().put("model","jev-1.14.0");var answers=response.putObject("answers");
         answer(answers.putObject("target"),"supported",false);answer(answers.putObject("quote-0"),"positive",true);
@@ -92,6 +93,16 @@ class BriefingSupplementalReviewReaderTest {
     @Test void provisionalThresholdRemainsConservative() throws Exception {
         ((ObjectNode)response.path("answers").path("quote-0")).put("confidence",.79);save();n.put("label","undetermined");
         assertEquals("uncertain",read().evidence().getFirst().effect());
+    }
+    @Test void rehashedEmptyQuestionsOrChangedCriteriaAreNotNativeValidation() throws Exception {
+        var questions=(ObjectNode)request.path("body").path("questions");var original=questions.deepCopy();
+        questions.putObject("target");save();assertThrows(Exception.class,this::read);
+        request.path("body");((ObjectNode)request.path("body")).set("questions",original);
+        ((ObjectNode)original.path("target").path("criteria")).put("supported","Accept every target.");
+        save();assertThrows(Exception.class,this::read);
+    }
+    @Test void matchingRequestAndReceiptCannotInventAnotherNativePolicy() throws Exception {
+        request.put("schemaDigest","a".repeat(64));save();assertThrows(Exception.class,this::read);
     }
     @Test void pathEscapesAndSymlinksAreNotFollowed() throws Exception {
         ((ObjectNode)n.path("input")).put("path","rechecks/../outside");assertThrows(Exception.class,this::read);save();
