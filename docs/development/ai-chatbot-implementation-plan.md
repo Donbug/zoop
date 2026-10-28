@@ -143,6 +143,8 @@ flowchart LR
 6. route·approval request/decision·MCP call·continuation·generation·semantic-verification을 서로 다른 stage/receipt로 기록한다.
 7. 이전 2턴 문맥은 서버가 검증된 대상 ID·기간만 정규화해 전달한다.
 
+현재 상태(2026-10-28, AI 쪽): `zoop-ai-chat-1`에 새 단계 `chat-agent`를 추가했다(기존 `chat-answer`는 direct 시작 경로용으로 유지). 한 단계 = Luna Responses 요청 1회(`/responses`, `gpt-6-luna`·`medium`·`store=true`, ZOOP MCP 도구 하나·`require_approval=always`·`allowed_tools`, 답변 형식은 `chat-answer`와 같은 `ChatAnswer` strict schema)이며, 첫 단계는 turns·requirements를, 이어지는 단계는 `continuation.previousResponseId`와 Java의 승인 결정을 `mcp_approval_response`로만 전달한다. 결과는 `approval_required`(보류된 호출 목록, 답변 없음) 또는 `completed`(최종 답변과 그 단계의 MCP 호출 요약)다. AI runtime은 승인하지 않고, 다른 서버·허용 밖 도구·알 수 없는 출력 항목·`incomplete`는 확정 실패다. MCP grant 토큰은 공급자에만 전송하고 ledger 식별값·digest·저장 원응답에서 제외한다. 단계마다 Java가 새 invocation id를 쓰므로 기존 1회 전송·unknown 규칙이 단계별로 그대로 적용된다. 생성 OpenAPI(`docs/api/internal-ai-openapi.*`)를 갱신했다. Java 승인 루프·grant 발급·결과 검증 연결은 아직 없다(다음 PR). 실제 Responses·MCP 응답 형태는 합성 replay로만 확인했으며 승인된 소량 live spike에서 확인한다.
+
 ### 단계 4 — Tool Service, MCP 서버, 웹
 
 1. 기존 공개 읽기 어댑터를 단일 Tool Service 뒤에 둔다. 직접 경로와 MCP 경로가 동일한 schema·scope·snapshot·결과 정규화를 사용하게 한다.
