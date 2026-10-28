@@ -132,6 +132,11 @@
     "response:200:application/json.policyVersion<anyOf:1>": {
       "type": "null"
     },
+    "response:200:application/json.relations[].revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.relations[].revision:required": true,
     "response:200:application/json.relations[].sourceRevision": {
       "type": "string"
     },

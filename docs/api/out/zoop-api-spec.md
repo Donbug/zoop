@@ -1766,7 +1766,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## decideAnalysisCandidate · 후보 거부 또는 운영자 최종 승인
 
-관리자는 후보 상세에서 확인한 대상별 revision과 AI 원천 sourceVersion/sourceRevision을 expectedRevision/expectedSourceVersion/expectedSourceRevision으로 보낸다. relationId가 있으면 세 기대값은 해당 relation의 값이다. 서버는 대상·현재 AI 원천을 다시 확인하고 하나라도 다르면 REVISION_CONFLICT/409로 거절하며 결정·감사를 성공으로 기록하지 않는다. allow는 현재 HOLD인 대상에 대한 운영자의 최종 승인이다(2026-10-21 사용자 정책, DecisionResponse.decision=approved). 재검증·모델 호출·작업 접수가 아니며 jobId를 만들지 않는다. 대상이 HOLD가 아니거나 응답 없는 모델 호출이 남아 있는 등 현재 상태와 맞지 않으면 REVISION_CONFLICT/409다. 결정성 검사(스키마·endpoint·정확한 인용 좌표·현재 원천 권리)는 사람이 덮어쓸 수 없으며 통과하지 못하거나 원천이 철회됐으면 VALIDATION_FAILED/422다. 기존 자동 검증 판정과 claim 분포는 이력으로 그대로 남고 수동 승인이 자동 검증을 통과한 것으로 표시되지 않는다. reject는 대상을 제외한다. 이미 ALLOW인 대상의 승인과 확정된 reject의 번복은 이 계약 범위 밖이다. 승인은 공개·그래프 활성화가 아니므로 publicChanged는 항상 false이며 투영과 활성화는 별도 기록이다. 승인 근거(approvalBasis)는 내부 감사 메타데이터이며 이 응답에 넣지 않는다. 이전 계약의 allow(재검증 접수, revalidation_requested, jobId)는 이력으로만 보존하며 승인으로 소급하지 않는다.
+관리자는 후보 상세에서 결정할 관계(relationId, 필수)와 그 관계의 revision·AI 원천 sourceVersion/sourceRevision을 relationId/expectedRevision/expectedSourceVersion/expectedSourceRevision으로 보낸다. AI 원천은 관계 단위로만 결정하므로 후보 전체를 한 번에 결정하는 요청은 없다. 최신 AI 결과에서 빠진 비활성 관계(active=false)는 현재 상태와 맞지 않아 REVISION_CONFLICT/409다. 서버는 대상·현재 AI 원천을 다시 확인하고 하나라도 다르면 REVISION_CONFLICT/409로 거절하며 결정·감사를 성공으로 기록하지 않는다. allow는 현재 HOLD인 대상에 대한 운영자의 최종 승인이다(2026-10-21 사용자 정책, DecisionResponse.decision=approved). 재검증·모델 호출·작업 접수가 아니며 jobId를 만들지 않는다. 대상이 HOLD가 아니거나 응답 없는 모델 호출이 남아 있는 등 현재 상태와 맞지 않으면 REVISION_CONFLICT/409다. 결정성 검사(스키마·endpoint·정확한 인용 좌표·현재 원천 권리)는 사람이 덮어쓸 수 없으며 통과하지 못하거나 원천이 철회됐으면 VALIDATION_FAILED/422다. 기존 자동 검증 판정과 claim 분포는 이력으로 그대로 남고 수동 승인이 자동 검증을 통과한 것으로 표시되지 않는다. reject는 대상을 제외한다. 이미 ALLOW인 대상의 승인과 확정된 reject의 번복은 이 계약 범위 밖이다. 승인은 공개·그래프 활성화가 아니므로 publicChanged는 항상 false이며 투영과 활성화는 별도 기록이다. 승인 근거(approvalBasis)는 내부 감사 메타데이터이며 이 응답에 넣지 않는다. 이전 계약의 allow(재검증 접수, revalidation_requested, jobId)는 이력으로만 보존하며 승인으로 소급하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -3688,6 +3688,7 @@ Current candidate review targets: total = active + inactive (inactive = no relat
 | relationId | 필수 | string |  |
 | sourceVersion | 필수 | string | 이 relation AI 원천 버전. relation 결정 요청에 사용한다. |
 | sourceRevision | 필수 | string | 이 relation AI 원천 revision. relation 결정 요청에 사용한다. |
+| revision | 필수 | integer | 이 관계 검수 대상의 현재 revision. decideAnalysisCandidate의 expectedRevision으로 sourceVersion·sourceRevision과 함께 보낸다. |
 | relationType | 필수 | string |  |
 | source | 필수 | string |  |
 | target | 필수 | string |  |
@@ -4500,10 +4501,10 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | --- | --- | --- | --- |
 | decision | 필수 | string {allow, reject} |  |
 | reason | 필수 | string |  |
-| relationId | 선택 | string / null |  |
-| expectedRevision | 필수 | integer | 상세 응답에서 확인한 결정 대상(candidate 또는 relation)의 앱 검수 revision. |
-| expectedSourceVersion | 필수 | string | 상세 응답에서 확인한 결정 대상의 AI 원천 버전. 현재 값과 다르면 REVISION_CONFLICT/409. |
-| expectedSourceRevision | 필수 | string | 상세 응답에서 확인한 결정 대상의 AI 원천 revision. 현재 값과 다르면 REVISION_CONFLICT/409. |
+| relationId | 필수 | string | 결정할 관계(후보 상세의 relation id). AI 원천은 관계 단위로만 결정하므로 필수이며, 후보 전체를 한 번에 결정하는 요청은 없다. |
+| expectedRevision | 필수 | integer | 상세 응답에서 확인한 그 관계의 앱 검수 revision. |
+| expectedSourceVersion | 필수 | string | 상세 응답에서 확인한 그 관계의 AI 원천 버전. 현재 값과 다르면 REVISION_CONFLICT/409. |
+| expectedSourceRevision | 필수 | string | 상세 응답에서 확인한 그 관계의 AI 원천 revision. 현재 값과 다르면 REVISION_CONFLICT/409. |
 
 <a id="schema-decisionresponse"></a>
 
