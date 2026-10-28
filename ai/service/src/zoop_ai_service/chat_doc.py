@@ -9,8 +9,15 @@ from .chat_wire import ChatStageRequest, ChatStageResult
 DESCRIPTION = """\
 **Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-1`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
 stage synchronously through the installed `zoop-ai-chat invoke`: `chat-router` (native Jev, typed probabilities per requirement), `chat-answer` (Luna, a strict
-JSON answer by sections) or `chat-verification` (native Jev, per-section support and prohibited-advice verdicts). It is off unless its all-or-nothing server
-configuration group is set (otherwise 409 `execution_unavailable` after authentication). The application decides everything a stage only proposes.
+JSON answer by sections), `chat-verification` (native Jev, per-section support and prohibited-advice verdicts) or `chat-agent` (one step of a Luna Responses run
+that calls the ZOOP MCP tools). It is off unless its all-or-nothing server configuration group is set (otherwise 409 `execution_unavailable` after
+authentication). The application decides everything a stage only proposes.
+
+**Agent steps.** Every MCP tool call of a `chat-agent` run is held for the application (`require_approval=always`), and the runtime never approves anything. A step
+ends `approval_required` (the held calls, no answer) or `completed` (the final answer). The application decides each request, reserves the calls it approves on its
+own ledger and resumes the stored response (`continuation.previousResponseId`, so the provider stores responses) with its decisions in a NEW step with its own
+invocation id. The input carries the application's job-scoped MCP grant token; the runtime sends it only to the provider and keeps it out of every identity
+and stored answer.
 
 **Once per invocation.** `invocationId` (equal to `Idempotency-Key`) names one stage of one attempt. The runtime sends it at most once: the same id and input
 return the stored outcome, another input under the same id is the stage failure `invocation_conflict`, and a request whose outcome is unknown stays `unknown`.
@@ -19,8 +26,8 @@ The id is bound to the calling principal. A **200** carries the stage outcome: `
 request: never resend that invocation. A **503** means nothing was sent.
 
 **Live and rights.** Nothing reaches a provider unless the chat gate is open (`ZOOP_AI_CHAT_LIVE_ENABLED=1` and a positive `ZOOP_AI_CHAT_MAX_CALLS`, shared by
-the three stages and separate from the S1 and pipeline gates), and quoted spans are sent only under the operator chat grant registry (`model-send`, the stage
-as purpose and the exact recipient). Stage time limits: router 4 s, answer 25 s, verification 6 s.
+the chat stages and separate from the S1 and pipeline gates), and quoted spans are sent only under the operator chat grant registry (`model-send`, the stage
+as purpose and the exact recipient). Stage time limits: router 4 s, answer 25 s, verification 6 s, agent step 30 s.
 """
 
 EV = "ev-" + "1" * 64
@@ -44,7 +51,22 @@ def examples() -> dict[str, Any]:
     failed = ChatStageResult.model_validate({
         "schemaVersion": "zoop-ai-chat-1", "invocationId": "job-00000001:1:chat-answer", "stage": "chat-answer", "status": "failed",
         "answer": None, "failure": {"code": "source_grant_denied", "sent": False, "unknown": False}, "receipt": None})
-    return {"request": request.wire(), "succeeded": succeeded.wire(), "failed": failed.wire()}
+    agent = ChatStageRequest.model_validate({
+        "schemaVersion": "zoop-ai-chat-1", "invocationId": "job-00000001:1:chat-agent:2", "stage": "chat-agent", "mode": "replay",
+        "input": {"turns": [{"text": "SK하이닉스 최근 사건 알려줘"}],
+                  "requirements": [{"requirementId": "r1", "label": "SK하이닉스 최근 사건", "general": False}],
+                  "mcp": {"serverUrl": "https://api.zoop.example/mcp", "authorization": "zmcp1.k1.synthetic-grant-token.synthetic-mac",
+                          "allowedTools": ["company_read", "issue_read"]},
+                  "maxCitations": 20,
+                  "continuation": {"previousResponseId": "resp_synthetic_1",
+                                   "decisions": [{"approvalRequestId": "mcpr_synthetic_1", "approve": True}]}}})
+    held = ChatStageResult.model_validate({
+        "schemaVersion": "zoop-ai-chat-1", "invocationId": "job-00000001:1:chat-agent:1", "stage": "chat-agent", "status": "succeeded",
+        "answer": {"responseId": "resp_synthetic_1", "status": "approval_required", "answer": None, "mcpCalls": [],
+                   "approvalRequests": [{"approvalRequestId": "mcpr_synthetic_1", "toolName": "company_read",
+                                         "arguments": {"targets": ["KRX:000660"]}}]},
+        "failure": None, "receipt": {**receipt, "model": "authored-synthetic-chat-agent", "promptVersion": "zoop-chat-agent-0123456789abcdef"}})
+    return {"request": request.wire(), "succeeded": succeeded.wire(), "failed": failed.wire(), "agent": agent.wire(), "held": held.wire()}
 
 
 def document(spec: dict[str, Any]) -> None:
@@ -57,7 +79,10 @@ def document(spec: dict[str, Any]) -> None:
     operation = spec["paths"]["/internal/v1/chat-stages/{stage}"]["post"]
     operation["requestBody"] = {"required": True, "content": {"application/json": {
         "schema": {"$ref": "#/components/schemas/ChatStageRequest"},
-        "examples": {"router": {"summary": "chat-router replay request (synthetic question)", "value": sample["request"]}}}}}
+        "examples": {"router": {"summary": "chat-router replay request (synthetic question)", "value": sample["request"]},
+                     "agentContinuation": {"summary": "chat-agent continuation step with the application's decision (synthetic token)",
+                                           "value": sample["agent"]}}}}}
     operation["responses"]["200"]["content"]["application/json"]["examples"] = {
         "succeeded": {"summary": "Router probabilities", "value": sample["succeeded"]},
-        "notSent": {"summary": "A quote without a matching chat grant: nothing was sent", "value": sample["failed"]}}
+        "notSent": {"summary": "A quote without a matching chat grant: nothing was sent", "value": sample["failed"]},
+        "agentHeld": {"summary": "chat-agent step held at an approval request", "value": sample["held"]}}

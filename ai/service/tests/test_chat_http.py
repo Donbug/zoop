@@ -88,11 +88,14 @@ def test_the_group_is_all_or_nothing_and_the_keys_reach_only_an_open_chat_child(
     assert incomplete.value.reason == "chat_group_incomplete"
 
     keys = {"ZOOP_AI_API_KEY": "luna-key-synthetic-000000000000", "TYPESAFE_API_KEY": "jev-key-synthetic-0000000000000",
-            "ZOOP_AI_CHAT_ANSWER_MODEL": "gpt-6-luna", "ZOOP_AI_CHAT_JEV_MODEL": "jev-1.14.0"}
+            "ZOOP_AI_CHAT_ANSWER_MODEL": "gpt-6-luna", "ZOOP_AI_CHAT_JEV_MODEL": "jev-1.14.0",
+            "ZOOP_AI_CHAT_AGENT_MODEL": "gpt-6-luna", "ZOOP_AI_CHAT_AGENT_REASONING_EFFORT": "medium"}
     closed = load(ws.env(**stub.env(**keys))).chat
     assert closed is not None and not closed.live_available
     assert "ZOOP_AI_API_KEY" not in closed.child_env and "TYPESAFE_API_KEY" not in closed.child_env
     assert closed.child_env["ZOOP_AI_CHAT_ANSWER_MODEL"] == "gpt-6-luna"
+    assert closed.child_env["ZOOP_AI_CHAT_AGENT_MODEL"] == "gpt-6-luna"
+    assert closed.child_env["ZOOP_AI_CHAT_AGENT_REASONING_EFFORT"] == "medium"
 
     config = load(ws.env(**stub.env(**keys, ZOOP_AI_CHAT_LIVE_ENABLED="1", ZOOP_AI_CHAT_MAX_CALLS="3")))
     assert config.chat.live_available and config.chat.child_env["TYPESAFE_API_KEY"] == keys["TYPESAFE_API_KEY"]

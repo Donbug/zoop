@@ -248,8 +248,15 @@
 
     **Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-1`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
     stage synchronously through the installed `zoop-ai-chat invoke`: `chat-router` (native Jev, typed probabilities per requirement), `chat-answer` (Luna, a strict
-    JSON answer by sections) or `chat-verification` (native Jev, per-section support and prohibited-advice verdicts). It is off unless its all-or-nothing server
-    configuration group is set (otherwise 409 `execution_unavailable` after authentication). The application decides everything a stage only proposes.
+    JSON answer by sections), `chat-verification` (native Jev, per-section support and prohibited-advice verdicts) or `chat-agent` (one step of a Luna Responses run
+    that calls the ZOOP MCP tools). It is off unless its all-or-nothing server configuration group is set (otherwise 409 `execution_unavailable` after
+    authentication). The application decides everything a stage only proposes.
+
+    **Agent steps.** Every MCP tool call of a `chat-agent` run is held for the application (`require_approval=always`), and the runtime never approves anything. A step
+    ends `approval_required` (the held calls, no answer) or `completed` (the final answer). The application decides each request, reserves the calls it approves on its
+    own ledger and resumes the stored response (`continuation.previousResponseId`, so the provider stores responses) with its decisions in a NEW step with its own
+    invocation id. The input carries the application's job-scoped MCP grant token; the runtime sends it only to the provider and keeps it out of every identity
+    and stored answer.
 
     **Once per invocation.** `invocationId` (equal to `Idempotency-Key`) names one stage of one attempt. The runtime sends it at most once: the same id and input
     return the stored outcome, another input under the same id is the stage failure `invocation_conflict`, and a request whose outcome is unknown stays `unknown`.
@@ -258,8 +265,8 @@
     request: never resend that invocation. A **503** means nothing was sent.
 
     **Live and rights.** Nothing reaches a provider unless the chat gate is open (`ZOOP_AI_CHAT_LIVE_ENABLED=1` and a positive `ZOOP_AI_CHAT_MAX_CALLS`, shared by
-    the three stages and separate from the S1 and pipeline gates), and quoted spans are sent only under the operator chat grant registry (`model-send`, the stage
-    as purpose and the exact recipient). Stage time limits: router 4 s, answer 25 s, verification 6 s.
+    the chat stages and separate from the S1 and pipeline gates), and quoted spans are sent only under the operator chat grant registry (`model-send`, the stage
+    as purpose and the exact recipient). Stage time limits: router 4 s, answer 25 s, verification 6 s, agent step 30 s.
 "paths":
   "/internal/v1/analysis-jobs":
     "post":
@@ -7674,13 +7681,14 @@
           "required": true
           "schema":
             "type": "string"
-            "description": "chat-router, chat-answer or chat-verification."
+            "description": "chat-router, chat-answer, chat-verification or chat-agent."
             "enum":
               - "chat-router"
               - "chat-answer"
               - "chat-verification"
+              - "chat-agent"
             "title": "Stage"
-          "description": "chat-router, chat-answer or chat-verification."
+          "description": "chat-router, chat-answer, chat-verification or chat-agent."
         - "name": "Idempotency-Key"
           "in": "header"
           "required": true
@@ -7751,6 +7759,38 @@
                       "sent": false
                       "unknown": false
                     "receipt": null
+                "agentHeld":
+                  "summary": "chat-agent step held at an approval request"
+                  "value":
+                    "schemaVersion": "zoop-ai-chat-1"
+                    "invocationId": "job-00000001:1:chat-agent:1"
+                    "stage": "chat-agent"
+                    "status": "succeeded"
+                    "answer":
+                      "responseId": "resp_synthetic_1"
+                      "status": "approval_required"
+                      "approvalRequests":
+                        - "approvalRequestId": "mcpr_synthetic_1"
+                          "toolName": "company_read"
+                          "arguments":
+                            "targets":
+                              - "KRX:000660"
+                      "mcpCalls": []
+                      "answer": null
+                    "failure": null
+                    "receipt":
+                      "provider": "authored-replay"
+                      "providerRevision": "authored-replay-1"
+                      "model": "authored-synthetic-chat-agent"
+                      "promptVersion": "zoop-chat-agent-0123456789abcdef"
+                      "executionMode": "replay"
+                      "usage":
+                        "inputTokens": null
+                        "outputTokens": null
+                        "cachedTokens": null
+                        "reasoningTokens": null
+                      "sentAt": "2026-10-22T03:00:00+00:00"
+                      "receivedAt": "2026-10-22T03:00:01+00:00"
         "401":
           "description": "authentication_required: missing, malformed or unknown bearer token."
           "content":
@@ -7882,6 +7922,32 @@
                         "text": "HBM이 뭐야"
                         "explicit": true
                     "capabilities": []
+              "agentContinuation":
+                "summary": "chat-agent continuation step with the application's decision (synthetic token)"
+                "value":
+                  "schemaVersion": "zoop-ai-chat-1"
+                  "invocationId": "job-00000001:1:chat-agent:2"
+                  "stage": "chat-agent"
+                  "mode": "replay"
+                  "input":
+                    "turns":
+                      - "text": "SK하이닉스 최근 사건 알려줘"
+                    "requirements":
+                      - "requirementId": "r1"
+                        "label": "SK하이닉스 최근 사건"
+                        "general": false
+                    "mcp":
+                      "serverUrl": "https://api.zoop.example/mcp"
+                      "authorization": "zmcp1.k1.synthetic-grant-token.synthetic-mac"
+                      "allowedTools":
+                        - "company_read"
+                        - "issue_read"
+                    "maxCitations": 20
+                    "continuation":
+                      "previousResponseId": "resp_synthetic_1"
+                      "decisions":
+                        - "approvalRequestId": "mcpr_synthetic_1"
+                          "approve": true
   "/internal/v1/plan-admissions":
     "post":
       "tags":
@@ -8790,6 +8856,44 @@
       "description": "Scope plan.policy. Raw closed policy document; exact If-Match and stable operation Idempotency-Key are required. Exact operator/key/body/If-Match retries return their historical receipt, even after another update. Changed body or If-Match with the same key conflicts (409); a new stale CAS conflicts (412). Identical current bytes do not renew revision/expiry or reset usage. A changed policy terminally retires all prior admissions. A replay receipt is not current state: GET current policy rather than treating it as the latest revision. Policy changes never refund usage and never authorize source/model spending. Application clients have no policy-write method."
 "components":
   "schemas":
+    "AgentAnswer":
+      "properties":
+        "responseId":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          "title": "Responseid"
+        "status":
+          "type": "string"
+          "enum":
+            - "approval_required"
+            - "completed"
+          "title": "Status"
+        "approvalRequests":
+          "items":
+            "$ref": "#/components/schemas/ApprovalRequest"
+          "type": "array"
+          "title": "Approvalrequests"
+        "mcpCalls":
+          "items":
+            "$ref": "#/components/schemas/McpCallSummary"
+          "type": "array"
+          "title": "Mcpcalls"
+        "answer":
+          "anyOf":
+            - "$ref": "#/components/schemas/ChatAnswer"
+            - "type": "null"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "responseId"
+        - "status"
+        - "approvalRequests"
+        - "mcpCalls"
+        - "answer"
+      "title": "AgentAnswer"
+      "description": |-
+        One `chat-agent` step: `approval_required` with the held tool calls and no answer, or `completed` with the final answer. `responseId` is
+        the stored provider response the next step resumes with the application's decisions.
     "AnswerSection":
       "properties":
         "basis":
@@ -8820,6 +8924,28 @@
         - "requirementIds"
         - "evidenceIds"
       "title": "AnswerSection"
+    "ApprovalRequest":
+      "properties":
+        "approvalRequestId":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          "title": "Approvalrequestid"
+        "toolName":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9_]{1,64}$"
+          "title": "Toolname"
+        "arguments":
+          "additionalProperties": true
+          "type": "object"
+          "title": "Arguments"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "approvalRequestId"
+        - "toolName"
+        - "arguments"
+      "title": "ApprovalRequest"
+      "description": "A tool call the model proposed and the provider holds for the application's decision. The service relays it; it never decides."
     "BApprovalBasis":
       "properties":
         "kind":
@@ -11539,6 +11665,7 @@
             - "chat-router"
             - "chat-answer"
             - "chat-verification"
+            - "chat-agent"
           "title": "Stage"
         "status":
           "type": "string"
@@ -11551,9 +11678,10 @@
             - "$ref": "#/components/schemas/RouterAnswer"
             - "$ref": "#/components/schemas/ChatAnswer"
             - "$ref": "#/components/schemas/VerificationAnswer"
+            - "$ref": "#/components/schemas/AgentAnswer"
             - "type": "null"
           "title": "Answer"
-          "description": "The typed stage answer when succeeded: RouterAnswer (chat-router), ChatAnswer (chat-answer) or VerificationAnswer (chat-verification)."
+          "description": "The typed stage answer when succeeded: RouterAnswer (chat-router), ChatAnswer (chat-answer), VerificationAnswer (chat-verification) or AgentAnswer (chat-agent)."
         "failure":
           "anyOf":
             - "$ref": "#/components/schemas/ChatStageFailure"
@@ -13666,6 +13794,21 @@
         - "acceptedAt"
         - "observedAt"
       "title": "JobStatus"
+    "McpCallSummary":
+      "properties":
+        "toolName":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9_]{1,64}$"
+          "title": "Toolname"
+        "failed":
+          "type": "boolean"
+          "title": "Failed"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "toolName"
+        - "failed"
+      "title": "McpCallSummary"
     "PlanAdmissionEnvelope":
       "properties":
         "schemaVersion":
@@ -15444,6 +15587,7 @@
             - "chat-router"
             - "chat-answer"
             - "chat-verification"
+            - "chat-agent"
           "title": "Stage"
           "type": "string"
         "mode":
