@@ -72,6 +72,7 @@ import type {
   GraphTutorialStep,
   MapMode,
   PersonalScope,
+  WatchSync,
 } from '@/types/map';
 import '@/components/graph/relationship-map.css';
 import { useColorTheme } from '@/util/theme-color';
@@ -80,6 +81,16 @@ import { readSocialLinkResult } from '@/components/common/socialLinkResult';
 // Same-session preference only. useAuthStore clears it when the member changes
 // and keeps it when the same member's session is restored after a reload.
 const FILTER_KEY = 'zoop.graph.personal-filter';
+const SIDEBAR_KEY = 'zoop:sidebar-open';
+function readSidebarPreference(): boolean | null {
+  try {
+    const saved = localStorage.getItem(SIDEBAR_KEY);
+    if (saved === '1' || saved === '0') return saved === '1';
+  } catch {
+    // The viewport default still works when storage is unavailable.
+  }
+  return null;
+}
 function readFilter(value: string | null): PersonalScope {
   return value === 'holdings' || value === 'watchlist' ? value : 'all';
 }
@@ -195,7 +206,36 @@ function MapWorkspace({
   }, [paramsKey, memoryOwner]);
   const [retry, setRetry] = useState(0);
   const [notice, setNotice] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarPreference, setSidebarPreference] = useState(
+    readSidebarPreference,
+  );
+  const [wideViewport, setWideViewport] = useState(
+    () =>
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(min-width: 1600px)').matches,
+  );
+  const sidebarOpen = sidebarPreference ?? wideViewport;
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const query = window.matchMedia('(min-width: 1600px)');
+    const changed = (event: MediaQueryListEvent) =>
+      setWideViewport(event.matches);
+    query.addEventListener?.('change', changed);
+    return () => query.removeEventListener?.('change', changed);
+  }, []);
+  const [watchSync, setWatchSync] = useState<WatchSync | null>(null);
+  const [missingCompany, setMissingCompany] = useState<{
+    id: string;
+    owner: string;
+  } | null>(null);
+  function changeSidebar(open: boolean) {
+    setSidebarPreference(open);
+    try {
+      localStorage.setItem(SIDEBAR_KEY, open ? '1' : '0');
+    } catch {
+      /* Keep this visit's preference. */
+    }
+  }
   const [collapsedPath, setCollapsedPath] = useState<string | null>(null);
   const [filterHost, setFilterHost] = useState<HTMLDivElement | null>(null);
   const [centerRequest, setCenterRequest] = useState<{
@@ -704,7 +744,7 @@ function MapWorkspace({
     !checking &&
     !token &&
     (desiredMode === 'personal' || notice === 'login');
-  async function changeMode(mode: MapMode) {
+  async function changeMode(mode: MapMode, targetCompany?: string) {
     if (mode === 'personal' && !token) {
       setNotice('login');
       return;
@@ -741,11 +781,16 @@ function MapWorkspace({
       )
         return;
       const restored = restoreTargets(saved, nextGraph);
+      const targetFound =
+        targetCompany &&
+        nextGraph.nodes.some(
+          (node) => node.id === targetCompany && node.kind === 'company',
+        );
       prefetch.current = {
         key: graphRequestKey(request, token),
         data: nextGraph,
       };
-      setNotice('');
+      setNotice(targetCompany && !targetFound ? 'holding-missing-all' : '');
       setSwitching(null);
       setTransitionNotice(
         restored.dropped
@@ -756,6 +801,15 @@ function MapWorkspace({
         mode,
         scope: mode === 'personal' ? nextFilter : null,
         ...restored.changes,
+        ...(targetCompany
+          ? {
+              select: targetFound ? `node:${targetCompany}` : null,
+              focus: null,
+              hops: null,
+              path: null,
+              impact: null,
+            }
+          : {}),
         id: null,
         round: null,
         companyId: null,
@@ -764,6 +818,11 @@ function MapWorkspace({
         event: null,
         tour: null,
       });
+      if (targetFound)
+        setCenterRequest((request) => ({
+          id: targetCompany!,
+          seq: (request?.seq ?? 0) + 1,
+        }));
     } catch (failure) {
       if (
         sequence !== modeSequence.current ||
@@ -775,6 +834,19 @@ function MapWorkspace({
         `지도 전환 실패. 현재 지도와 선택을 유지합니다. ${failure instanceof Error ? failure.message : ''}`,
       );
     }
+  }
+  // FS027: 사이드바·기업 상세 어느 쪽에서 관심을 저장해도 두 화면을 같은 목록으로 맞추고,
+  // 개인화 지도는 저장 뒤 목록으로 다시 조회한다. 저장 전에 받아 둔 개인화 응답은 쓰지 않는다.
+  function watchSaved(watchlistIds: string[]) {
+    setWatchSync((sync) => ({ ids: watchlistIds, seq: (sync?.seq ?? 0) + 1 }));
+    prefetch.current = null;
+    // 개인화 전환 조회가 진행 중이면 그 응답을 버리고 저장 뒤 목록으로 다시 전환한다.
+    if (switching === 'personal') {
+      void changeMode('personal');
+      return;
+    }
+    if (appliedMode === 'personal' || requestedMode === 'personal')
+      setRetry((value) => value + 1);
   }
   function changeFilter(scope: PersonalScope) {
     sessionStorage.setItem(FILTER_KEY, scope);
@@ -858,11 +930,11 @@ function MapWorkspace({
               className="relationship-sidebar-toggle"
               aria-expanded={sidebarOpen}
               aria-controls="holdings-sidebar"
-              onClick={() => setSidebarOpen((open) => !open)}
-              title="내가 보유 중인 종목 보기"
+              onClick={() => changeSidebar(!sidebarOpen)}
+              title="보유·관심 종목 목록 보기"
+              aria-label="내 종목 목록"
             >
-              <GraphIcon name="sidebar" inheritColor />
-              보유 종목
+              <GraphIcon name="sidebar" inheritColor />내 종목
             </button>
             <div className="relationship-mode" aria-label="그래프 모드">
               <button
@@ -948,7 +1020,11 @@ function MapWorkspace({
             {sidebarOpen && (
               <div id="holdings-sidebar" className="flex min-h-0 max-sm:w-full">
                 <HoldingsSidebar
+                  key={memoryOwner}
                   member={Boolean(token)}
+                  graph={!loading && !error ? data : null}
+                  watchSync={watchSync}
+                  onWatchChanged={watchSaved}
                   logoOf={(id) =>
                     companyLogo(
                       id,
@@ -956,24 +1032,46 @@ function MapWorkspace({
                     )
                   }
                   onPick={(id) => {
+                    if (!data || loading || error) {
+                      setNotice('graph-not-ready');
+                      return;
+                    }
                     if (!data?.nodes.some((node) => node.id === id)) {
+                      setMissingCompany({ id, owner: memoryOwner });
                       setNotice('holding-missing');
                       return;
                     }
                     setNotice('');
-                    selectNode(id);
+                    if (tutorialOpen) {
+                      selectNode(id);
+                      return;
+                    }
+                    // 상세를 닫으면 고른 사이드바 행으로 포커스를 돌려준다.
+                    if (document.activeElement instanceof HTMLElement)
+                      opener.current = document.activeElement;
+                    updateQuery({
+                      select: `node:${id}`,
+                      id: null,
+                      focus: null,
+                      hops: null,
+                      path: null,
+                      impact: null,
+                    });
+                    track({ type: 'graph_node_select', targetId: id, viewId });
                     setCenterRequest((request) => ({
                       id,
                       seq: (request?.seq ?? 0) + 1,
                     }));
                   }}
-                  onClose={() => setSidebarOpen(false)}
+                  onClose={() => changeSidebar(false)}
                 />
               </div>
             )}
             {data ? (
               <GraphCanvas
                 data={data}
+                onPersonalFilter={changeFilter}
+                onMarket={() => void changeMode('all')}
                 filterHost={filterHost}
                 tutorialLocked={Boolean(
                   tutorialOpen && tutorialStep && tutorialStep < 5,
@@ -1216,6 +1314,8 @@ function MapWorkspace({
                   fallback={companyNode}
                   relatedCompanies={relatedCompanies}
                   token={token}
+                  watchSync={watchSync}
+                  onWatchSaved={watchSaved}
                   onClose={() => selectNode(null)}
                   tutorialIssueId={
                     tutorialOpen && tutorialStep === 3
@@ -1437,7 +1537,24 @@ function MapWorkspace({
                 {notice === 'holding-missing' && (
                   <p>
                     이 종목은 지금 지도에 없어요. 시장 전체 지도에서 찾아보세요.
+                    {appliedMode === 'personal' &&
+                      missingCompany?.owner === memoryOwner && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void changeMode('all', missingCompany.id)
+                          }
+                        >
+                          전체로 보기
+                        </button>
+                      )}
                   </p>
+                )}
+                {notice === 'holding-missing-all' && (
+                  <p>시장 전체 지도에서도 이 종목을 찾지 못했어요.</p>
+                )}
+                {notice === 'graph-not-ready' && (
+                  <p>지도를 확인한 뒤 종목을 다시 선택해 주세요.</p>
                 )}
                 {notice === 'info' && (
                   <p>

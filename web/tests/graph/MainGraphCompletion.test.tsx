@@ -17,6 +17,9 @@ import { createMockGraph } from '@/mocks/graph/response';
 import { createMockEvidence } from '@/mocks/evidence/fixture';
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { GraphResponse } from '@/types/map/graph';
+import { createFakeServer, json } from '../support/fakeServer';
+import { myMember } from '../support/myMember';
+import { connectedPortfolioBody, SAMSUNG_HOLDING } from '../support/fixtures';
 
 vi.mock('@/apis/graph/graph', () => ({ getGraph: vi.fn() }));
 vi.mock('@/apis/briefing/briefing', () => ({ getBriefingGraphBasis: vi.fn() }));
@@ -128,6 +131,268 @@ function setup(url = '/?mode=all') {
   render(<RouterProvider router={router} />);
   return router;
 }
+
+it('D-GRP-01 opens the sidebar on wide screens and remembers an explicit close', async () => {
+  anonymous();
+  localStorage.removeItem('zoop:sidebar-open');
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockReturnValue({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }),
+  );
+  vi.mocked(getGraph).mockResolvedValue(
+    createMockGraph({ mode: 'all', personalFilter: 'all' }),
+  );
+  const router = createMemoryRouter([{ path: '/', element: <MapPage /> }], {
+    initialEntries: ['/'],
+  });
+  const rendered = render(<RouterProvider router={router} />);
+  expect(
+    await screen.findByRole('complementary', { name: '내 종목' }),
+  ).toBeTruthy();
+  await userEvent.click(
+    screen.getByRole('button', { name: '내 종목 사이드바 닫기' }),
+  );
+  expect(localStorage.getItem('zoop:sidebar-open')).toBe('0');
+  rendered.unmount();
+  const second = createMemoryRouter([{ path: '/', element: <MapPage /> }], {
+    initialEntries: ['/'],
+  });
+  render(<RouterProvider router={second} />);
+  await screen.findByTestId('graph-canvas');
+  expect(screen.queryByRole('complementary', { name: '내 종목' })).toBeNull();
+  localStorage.removeItem('zoop:sidebar-open');
+  vi.unstubAllGlobals();
+});
+
+it('D-GRP-01b opens the excluded holding in the full graph only after a successful read', async () => {
+  member();
+  const session = useAuthStore.getState().session!;
+  useAuthStore.setState({
+    session: {
+      ...session,
+      setup: { completed: true, tutorialCompleted: true },
+    },
+  });
+  localStorage.setItem('zoop:sidebar-open', '1');
+  const server = createFakeServer();
+  myMember(server, { connected: true });
+  server.on('GET', '/api/v1/portfolio', () =>
+    json(
+      connectedPortfolioBody([{ ...SAMSUNG_HOLDING, companyId: 'KRX:005930' }]),
+    ),
+  );
+  vi.mocked(getGraph).mockImplementation(async (request) =>
+    createMockGraph(request),
+  );
+  const router = setup('/?mode=personal&scope=watchlist');
+  await userEvent.click(
+    await screen.findByRole('button', { name: '삼성전자, 지도에서 보기' }),
+  );
+  expect(screen.getByText(/이 종목은 지금 지도에 없어요/)).toBeTruthy();
+  await userEvent.click(screen.getByRole('button', { name: '전체로 보기' }));
+  await waitFor(() =>
+    expect(
+      new URLSearchParams(router.state.location.search).get('select'),
+    ).toBe('node:KRX:005930'),
+  );
+  expect(new URLSearchParams(router.state.location.search).get('mode')).toBe(
+    'all',
+  );
+  localStorage.removeItem('zoop:sidebar-open');
+});
+
+it('D-GRP-01b keeps the personal graph when full graph loading fails', async () => {
+  member();
+  const session = useAuthStore.getState().session!;
+  useAuthStore.setState({
+    session: {
+      ...session,
+      setup: { completed: true, tutorialCompleted: true },
+    },
+  });
+  localStorage.setItem('zoop:sidebar-open', '1');
+  const server = createFakeServer();
+  myMember(server, { connected: true });
+  server.on('GET', '/api/v1/portfolio', () =>
+    json(
+      connectedPortfolioBody([{ ...SAMSUNG_HOLDING, companyId: 'KRX:005930' }]),
+    ),
+  );
+  vi.mocked(getGraph).mockImplementation(async (request) => {
+    if (request.mode === 'all') throw new Error('source offline');
+    return createMockGraph(request);
+  });
+  const router = setup('/?mode=personal&scope=watchlist');
+  await userEvent.click(
+    await screen.findByRole('button', { name: '삼성전자, 지도에서 보기' }),
+  );
+  await userEvent.click(screen.getByRole('button', { name: '전체로 보기' }));
+  expect(await screen.findByText(/지도 전환 실패/)).toBeTruthy();
+  expect(new URLSearchParams(router.state.location.search).get('mode')).toBe(
+    'personal',
+  );
+  expect(new URLSearchParams(router.state.location.search).has('select')).toBe(
+    false,
+  );
+  localStorage.removeItem('zoop:sidebar-open');
+});
+
+it('D-GRP-01b does not reuse an excluded company after the member changes', async () => {
+  member();
+  const session = useAuthStore.getState().session!;
+  useAuthStore.setState({
+    session: {
+      ...session,
+      setup: { completed: true, tutorialCompleted: true },
+    },
+  });
+  localStorage.setItem('zoop:sidebar-open', '1');
+  const server = createFakeServer();
+  myMember(server, { connected: true });
+  server.on('GET', '/api/v1/portfolio', () =>
+    json(
+      connectedPortfolioBody([{ ...SAMSUNG_HOLDING, companyId: 'KRX:005930' }]),
+    ),
+  );
+  vi.mocked(getGraph).mockImplementation(async (request) =>
+    createMockGraph(request),
+  );
+  setup('/?mode=personal&scope=watchlist');
+  await userEvent.click(
+    await screen.findByRole('button', { name: '삼성전자, 지도에서 보기' }),
+  );
+  expect(screen.getByRole('button', { name: '전체로 보기' })).toBeTruthy();
+  act(() => {
+    const state = useAuthStore.getState();
+    const nextMember = {
+      id: 'different-member',
+      email: 'different@zoop.test',
+      displayName: '다른 회원',
+    };
+    useAuthStore.setState({
+      member: nextMember,
+      session: { ...state.session!, user: nextMember },
+      sessionRevision: state.sessionRevision + 1,
+    });
+  });
+  expect(screen.queryByRole('button', { name: '전체로 보기' })).toBeNull();
+  localStorage.removeItem('zoop:sidebar-open');
+});
+
+it('D-GRP-01 sidebar selection exits path and focus modes', async () => {
+  member();
+  const session = useAuthStore.getState().session!;
+  useAuthStore.setState({
+    session: {
+      ...session,
+      setup: { completed: true, tutorialCompleted: true },
+    },
+  });
+  localStorage.setItem('zoop:sidebar-open', '1');
+  const server = createFakeServer();
+  myMember(server, { connected: true });
+  server.on('GET', '/api/v1/portfolio', () =>
+    json(
+      connectedPortfolioBody([{ ...SAMSUNG_HOLDING, companyId: 'KRX:005930' }]),
+    ),
+  );
+  vi.mocked(getGraph).mockImplementation(async (request) =>
+    createMockGraph(request),
+  );
+  const router = setup(
+    '/?mode=all&path=KRX%3A005930%2CNASDAQ%3ANVDA&focus=mock-issue-1&hops=2',
+  );
+  await userEvent.click(
+    await screen.findByRole('button', { name: '삼성전자, 지도에서 보기' }),
+  );
+  await waitFor(() =>
+    expect(
+      new URLSearchParams(router.state.location.search).get('select'),
+    ).toBe('node:KRX:005930'),
+  );
+  expect(new URLSearchParams(router.state.location.search).has('path')).toBe(
+    false,
+  );
+  expect(new URLSearchParams(router.state.location.search).has('focus')).toBe(
+    false,
+  );
+  localStorage.removeItem('zoop:sidebar-open');
+});
+
+function sidebarMember() {
+  member();
+  const session = useAuthStore.getState().session!;
+  useAuthStore.setState({
+    session: {
+      ...session,
+      setup: { completed: true, tutorialCompleted: true },
+    },
+  });
+  localStorage.setItem('zoop:sidebar-open', '1');
+  const server = createFakeServer();
+  myMember(server, { connected: true });
+  server.on('GET', '/api/v1/portfolio', () =>
+    json(
+      connectedPortfolioBody([{ ...SAMSUNG_HOLDING, companyId: 'KRX:005930' }]),
+    ),
+  );
+}
+
+// #388 리뷰 1: 개인화 전환 조회가 끝나기 전에 관심을 저장하면, 저장 전 목록으로 받은 응답을 쓰지 않는다.
+it('FS027 restarts a pending personal switch after a watch is saved', async () => {
+  sidebarMember();
+  let releaseFirst!: () => void;
+  let personalCalls = 0;
+  vi.mocked(getGraph).mockImplementation(async (request) => {
+    if (request.mode === 'personal' && ++personalCalls === 1)
+      await new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+    return createMockGraph(request);
+  });
+  const router = setup('/?mode=all');
+  await screen.findByRole('button', { name: '삼성전자, 지도에서 보기' });
+  await userEvent.click(
+    within(screen.getByLabelText('그래프 모드')).getByRole('button', {
+      name: '내 종목',
+    }),
+  );
+  await waitFor(() => expect(personalCalls).toBe(1));
+  await userEvent.click(
+    screen.getByRole('button', { name: '삼성전자 관심 종목' }),
+  );
+  await waitFor(() => expect(personalCalls).toBe(2));
+  await act(async () => releaseFirst());
+  await waitFor(() =>
+    expect(new URLSearchParams(router.state.location.search).get('mode')).toBe(
+      'personal',
+    ),
+  );
+  expect(personalCalls).toBe(2);
+  localStorage.removeItem('zoop:sidebar-open');
+});
+
+// #388 리뷰 3: 사이드바에서 연 상세를 닫으면 고른 행으로 포커스가 돌아온다.
+it('D-GRP-01 returns focus to the sidebar row after closing its detail', async () => {
+  sidebarMember();
+  vi.mocked(getGraph).mockImplementation(async (request) =>
+    createMockGraph(request),
+  );
+  setup('/?mode=all');
+  const row = await screen.findByRole('button', {
+    name: '삼성전자, 지도에서 보기',
+  });
+  await userEvent.click(row);
+  await userEvent.click(
+    await screen.findByRole('button', { name: '기업 상세 닫기' }),
+  );
+  await waitFor(() => expect(document.activeElement).toBe(row));
+  localStorage.removeItem('zoop:sidebar-open');
+});
 
 it('D-GRP-07 restores a pair from URL, lets the user repick and closes without changing the graph mode', async () => {
   anonymous();

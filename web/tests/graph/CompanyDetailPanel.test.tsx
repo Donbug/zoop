@@ -217,6 +217,41 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
     ).toBe(false);
   });
 
+  // #388 리뷰: 사이드바와 기업 상세는 같은 관심 목록을 본다.
+  it('FS027 저장한 관심 목록을 지도 화면에 알리고, 사이드바에서 바꾼 목록을 ★에 반영한다', async () => {
+    vi.mocked(setWatchlistCompany).mockResolvedValue({
+      watchlistIds: [company.id],
+      version: 2,
+    } as never);
+    const onWatchSaved = vi.fn();
+    const panel = (watchSync: { ids: string[]; seq: number } | null) => (
+      <MemoryRouter>
+        <CompanyDetailPanel
+          companyId={company.id}
+          fallback={fallback}
+          relatedCompanies={[]}
+          token="member-token"
+          watchSync={watchSync}
+          onWatchSaved={onWatchSaved}
+          onClose={vi.fn()}
+          onSelectIssue={vi.fn()}
+          onFocus={vi.fn()}
+          onConnections={vi.fn()}
+          onAskAi={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+    const { rerender } = render(panel(null));
+    await userEvent.click(screen.getByRole('button', { name: '☆ 관심 추가' }));
+    await screen.findByRole('button', { name: '★ 관심 해제' });
+    expect(onWatchSaved).toHaveBeenCalledWith([company.id]);
+
+    rerender(panel({ ids: [], seq: 1 }));
+    expect(screen.getByRole('button', { name: '☆ 관심 추가' })).toBeTruthy();
+    rerender(panel({ ids: [company.id], seq: 2 }));
+    expect(screen.getByRole('button', { name: '★ 관심 해제' })).toBeTruthy();
+  });
+
   it('저장 실패 시 관심 상태를 되돌리고 재시도 경로를 제공한다', async () => {
     vi.mocked(setWatchlistCompany).mockRejectedValue(new Error('실패'));
     renderPanel('member-token');
