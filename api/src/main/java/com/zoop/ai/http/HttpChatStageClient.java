@@ -14,6 +14,7 @@ import com.zoop.ai.AiServiceErrorException;
 import com.zoop.ai.chat.ChatStageCall;
 import com.zoop.ai.chat.ChatStageClient;
 import com.zoop.ai.chat.ChatStageReply;
+import com.zoop.ai.chat.ChatMcpHealth;
 import com.zoop.ai.http.AiHttpTransport.Reply;
 import com.zoop.ai.http.WireJson.Malformed;
 import com.zoop.ai.http.WireJson.Obj;
@@ -29,6 +30,7 @@ import tools.jackson.databind.node.ObjectNode;
 public final class HttpChatStageClient implements ChatStageClient, AutoCloseable {
     static final String SCHEMA = "zoop-ai-chat-1";
     private static final String PATH = "/internal/v1/chat-stages/";
+    private static final String MCP_HEALTH_PATH = "/internal/v1/chat-mcp-health";
     private static final Pattern FAILURE_CODE = Pattern.compile("[a-z0-9_]{1,64}");
     private static final Pattern NAME = Pattern.compile("[\\x20-\\x7E]{1,200}");
 
@@ -48,6 +50,33 @@ public final class HttpChatStageClient implements ChatStageClient, AutoCloseable
                 WireJson.compact(body).getBytes(StandardCharsets.UTF_8), call.invocationId(),
                 HttpChatStageClient::rejection, 200);
         return AiHttpTransport.decode(reply, () -> decode(reply.body(), call));
+    }
+
+    /** The no-body, non-mutating MCP preflight. It never retries and never sends an idempotency key. */
+    public ChatMcpHealth probeMcp() {
+        Reply reply = transport.exchange(AiOperation.CHAT_MCP_HEALTH, "GET", transport.uri(MCP_HEALTH_PATH), null, null,
+                HttpChatStageClient::rejection, 200);
+        return AiHttpTransport.decode(reply, () -> decodeHealth(reply.body()));
+    }
+
+    static ChatMcpHealth decodeHealth(JsonNode node) {
+        Obj root = Obj.of(node, "body");
+        if (!SCHEMA.equals(root.string("schemaVersion", NAME))) throw new Malformed("identity");
+        String mcp = root.string("mcp", NAME);
+        String reason = root.optString("reason", NAME).orElse(null);
+        if ("reachable".equals(mcp)) {
+            if (reason != null) throw new Malformed("reason");
+            return new ChatMcpHealth(true, null);
+        }
+        if (!"unreachable".equals(mcp) || reason == null) throw new Malformed("mcp");
+        ChatMcpHealth.Reason decoded = switch (reason) {
+            case "mcp_timeout" -> ChatMcpHealth.Reason.TIMEOUT;
+            case "mcp_connect_failed" -> ChatMcpHealth.Reason.CONNECT_FAILED;
+            case "mcp_unavailable" -> ChatMcpHealth.Reason.UNAVAILABLE;
+            case "mcp_status_unexpected" -> ChatMcpHealth.Reason.STATUS_UNEXPECTED;
+            default -> throw new Malformed("reason");
+        };
+        return new ChatMcpHealth(false, decoded);
     }
 
     static ChatStageReply decode(JsonNode node, ChatStageCall call) {

@@ -117,6 +117,15 @@ def prepare_round(record, archive, calls, original_history):
     choices = sorted(selection_reply["selected"], key=lambda c: (
         -selection_reply["assessments"][c["issueId"]]["importance"],
         -selection_reply["assessments"][c["issueId"]]["priority"], c["issueId"]))
+    policy = record.get('identity', {}).get('issueSelectionPolicy')
+    policy_selected = None
+    if policy is not None:
+        # Reconstruct the same final top-three once, across all proposals.
+        # Per-choice legacy freezing loses policy order and deduplication scope.
+        policy_selected = {s['issueId']: s for s in grouped.freeze_grouped_selection(
+            selection_reply, candidates, record['identitySha256'], original_history, policy)}
+        choices_by_id = {c['issueId']: c for c in choices}
+        choices = [choices_by_id[iid] for iid in policy_selected]
     used_docs, used_ids = set(), set()
     for index, choice in enumerate(choices):
         entry = {"issueId": choice["issueId"], "originalRank": index + 1, "status": "NEEDS_DRAFT",
@@ -126,11 +135,12 @@ def prepare_round(record, archive, calls, original_history):
             "noveltyRequestDigest": None, "noveltyDecision": None, "errors": []}
         try:
             subset = clone(selection_reply); subset["selected"] = [choice]
-            frozen = grouped.freeze_grouped_selection(subset, candidates, record["identitySha256"], original_history)[0]
+            frozen = (policy_selected[choice["issueId"]] if policy_selected is not None else
+                      grouped.freeze_grouped_selection(subset, candidates, record["identitySha256"], original_history)[0])
             docs = {s["documentId"] for s in frozen["sources"]}
-            require(choice["issueId"] not in used_ids and not docs & used_docs, "recovery_duplicate_selection")
+            require(choice["issueId"] not in used_ids and (policy is not None or not docs & used_docs), "recovery_duplicate_selection")
             used_ids.add(choice["issueId"]); used_docs |= docs
-            entry["selection"] = frozen
+            entry["selection"] = normalized(frozen)
         except ERRORS as error:
             entry.update(status="INVALID_SELECTION", errors=[str(error)])
         items.append(entry)

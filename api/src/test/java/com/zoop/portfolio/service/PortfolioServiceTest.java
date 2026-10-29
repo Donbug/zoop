@@ -51,7 +51,7 @@ class PortfolioServiceTest {
 
         var preview = service.getProfile("demo-growth", "preview-1");
 
-        assertEquals(2, preview.holdings().size());
+        assertEquals(3, preview.holdings().size());
         assertEquals("available", preview.valuation().weightStatus());
         assertTrue(repository.connections.isEmpty());
     }
@@ -63,7 +63,7 @@ class PortfolioServiceTest {
         assertEquals(first.id(), retry.id());
         assertEquals(first.connectedAt(), retry.connectedAt());
         assertEquals("MOCK-KR-1001", first.accountId());
-        assertEquals(2, first.holdingsCount());
+        assertEquals(3, first.holdingsCount());
         assertEquals(1, repository.connections.size());
 
         var sameProfileNewKey = service.connect(MEMBER, "demo-growth", "connect-2", "req-3");
@@ -109,9 +109,9 @@ class PortfolioServiceTest {
 
         assertEquals("available", portfolio.valuation().weightStatus());
         assertEquals("USD", portfolio.valuation().currency());
-        assertEquals(0, new java.math.BigDecimal("2000").compareTo(portfolio.valuation().totalMarketValue()));
+        assertEquals(0, new java.math.BigDecimal("2400").compareTo(portfolio.valuation().totalMarketValue()));
         assertEquals(0, new java.math.BigDecimal("1200").compareTo(portfolio.holdings().get(0).marketValue()));
-        assertEquals(0, new java.math.BigDecimal("0.6").compareTo(portfolio.holdings().get(0).weight()));
+        assertEquals(0, new java.math.BigDecimal("0.5").compareTo(portfolio.holdings().get(0).weight()));
         assertInstanceOf(com.zoop.portfolio.dto.HoldingOut.Available.class,
                 portfolio.holdings().get(0).quote());
     }

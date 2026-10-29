@@ -69,6 +69,21 @@ function fixture() {
   } as unknown as BriefingResponse;
 }
 describe('D-BRF-01/02 judgment update', () => {
+  it('keeps original links without empty body disclosures in a finished-only projection', () => {
+    const r = fixture();
+    for (const source of Object.values(r.judgmentUpdate!.sources!))
+      delete source.fullBody;
+    render(<JudgmentUpdate result={r} compact={false} />);
+    expect(screen.queryByText('보존 원문 보기')).toBeNull();
+    expect(
+      screen.getAllByRole('link', { name: /원문 ↗/ }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(
+        '전체 본문은 포함되지 않았습니다. 원문 링크에서 확인해 주세요.',
+      ).length,
+    ).toBeGreaterThan(0);
+  });
   it('keeps the prior company in a distinct watch section and exposes actual prior judgment and conditions', async () => {
     const r = fixture();
     render(<JudgmentUpdate result={r} compact />);

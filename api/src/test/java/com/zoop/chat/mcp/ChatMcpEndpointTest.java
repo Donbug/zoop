@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zoop.chat.executor.ChatEngine;
 import com.zoop.chat.executor.ChatJobExecutor;
+import com.zoop.chat.executor.ChatRunControl;
 import com.zoop.chat.executor.MemoryChatStore;
 import com.zoop.chat.executor.NoChatTransactions;
 import com.zoop.chat.repository.ChatJobRow;
@@ -21,6 +22,7 @@ import com.zoop.chat.tool.ChatToolScope;
 import io.modelcontextprotocol.server.McpStatelessSyncServer;
 import io.modelcontextprotocol.server.transport.HttpServletStatelessServerTransport;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -31,6 +33,7 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -49,9 +52,14 @@ class ChatMcpEndpointTest {
             + "\"asOf\":\"2026-10-27T00:00:00Z\",\"graphVersion\":\"gv-1\"}";
     private static final String SELECTION = "{\"contextIds\":[],\"evidenceIds\":[],\"evidencePool\":[]}";
 
+    @TempDir
+    Path dir;
+
     private final JsonMapper mapper = JsonMapper.builder().build();
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     private final List<ChatToolRequest> companyReads = Collections.synchronizedList(new ArrayList<>());
+    /** When set, a company read waits for it: an identical request can arrive while the first is still reading. */
+    private static volatile java.util.concurrent.CountDownLatch companyGate;
     private MemoryChatStore store;
     private ChatToolRunner runner;
     private ChatJobExecutor executor;
@@ -65,7 +73,8 @@ class ChatMcpEndpointTest {
     void setUp() {
         store = new MemoryChatStore();
         var registry = new ChatToolRegistry(List.of(tool(ChatCapability.COMPANY_READ, companyReads, "삼성전자"),
-                tool(ChatCapability.GRAPH_PATH_READ, new ArrayList<>(), "경로"),
+                // Just under one result's 256 KiB: four of them fit the job's 1 MiB of kept results, five do not.
+                tool(ChatCapability.GRAPH_PATH_READ, new ArrayList<>(), "a".repeat(250_000)),
                 tool(ChatCapability.ISSUE_READ, new ArrayList<>(), "가".repeat(ChatMcpTools.MAX_RESULT_BYTES)),
                 tool(ChatCapability.PORTFOLIO_SCOPE_READ, new ArrayList<>(), "내 종목")));
         runner = new ChatToolRunner(registry);
@@ -75,7 +84,7 @@ class ChatMcpEndpointTest {
         grants = ChatMcpGrantsTest.grants("k1", "k1=" + ChatMcpGrantsTest.KEY_A, NOW);
         filter = new ChatMcpAccessFilter(grants, clock);
         transport = ChatMcpConfiguration.transport(mapper);
-        tools = new ChatMcpTools(registry, runner, executor, mapper);
+        tools = new ChatMcpTools(registry, runner, executor, ChatSendGrantsTest.gate(dir), mapper);
         server = ChatMcpConfiguration.server(transport, tools, mapper);
         running(JOB, 1);
     }
@@ -223,9 +232,164 @@ class ChatMcpEndpointTest {
 
     @Test
     void approvalsCountAgainstTheAttemptsCallLimit() {
-        for (int i = 0; i < 12; i++) assertTrue(approve("company_read", "{\"targets\":[\"co-" + i + "\"]}").approved());
+        // 6: the internal share of the job's 8 calls (MCP actions contract 3.2).
+        assertEquals(6, ChatRunControl.MAX_TOOL_CALLS);
+        for (int i = 0; i < ChatRunControl.MAX_TOOL_CALLS; i++) {
+            assertTrue(approve("company_read", "{\"targets\":[\"co-" + i + "\"]}").approved());
+        }
         assertEquals("tool_budget_exhausted", approve("company_read", "{\"targets\":[\"co-99\"]}").refused());
-        assertEquals(12, store.toolCalls(JOB).size());
+        assertEquals(ChatRunControl.MAX_TOOL_CALLS, store.toolCalls(JOB).size());
+    }
+
+    @Test
+    void evidenceWhoseSourceMayNotBeSentIsLeftOutOfTheResultAndTheLedger() throws Exception {
+        // The synthetic news source loses its grant: the company stays, its evidence does not.
+        ChatSendGrantsTest.write(dir.resolve("chat-grants.json"), com.zoop.chat.service.ChatCompanyProfiles.SOURCE_ID);
+        approve("company_read", "{\"targets\":[\"co-1\"]}");
+        JsonNode result = rpc(token(ChatCapability.COMPANY_READ), call("company_read", "{\"targets\":[\"co-1\"]}"))
+                .path("result");
+        assertFalse(result.path("isError").asBoolean(true), result.toString());
+        JsonNode read = result.path("structuredContent");
+        assertEquals("co-1", read.path("items").get(0).path("id").asString());
+        assertTrue(read.path("items").get(0).path("evidenceIds").isEmpty());
+        assertTrue(read.path("evidenceIds").isEmpty());
+        assertEquals("source_grant_denied", read.path("withheld").path("reason").asString());
+        assertEquals(0, read.path("withheld").path("items").asInt());
+        assertEquals(1, read.path("withheld").path("evidenceIds").asInt());
+        assertFalse(result.toString().contains("ev-1"), "a withheld id is not sent either");
+
+        var recorded = store.toolCalls(JOB).getFirst();
+        assertEquals("succeeded", recorded.status);
+        assertTrue(recorded.end.evidenceIds().isEmpty(), "the ledger shows only what was delivered");
+        assertEquals(read.toString(), mapper.readTree(recorded.end.result()).toString());
+    }
+
+    @Test
+    void aResultWhoseSendGrantsCannotBeCheckedIsRefusedNotReturnedUnchecked() throws Exception {
+        java.nio.file.Files.delete(dir.resolve("chat-grants.json"));
+        approve("company_read", "{\"targets\":[\"co-1\"]}");
+        assertEquals("send_grants_unavailable", error(rpc(token(ChatCapability.COMPANY_READ),
+                call("company_read", "{\"targets\":[\"co-1\"]}"))));
+        var recorded = store.toolCalls(JOB).getFirst();
+        assertEquals("failed", recorded.status);
+        assertEquals("send_grants_unavailable", recorded.end.errorCode());
+        assertTrue(recorded.end.evidenceIds().isEmpty());
+        assertEquals(1, companyReads.size(), "the read ran; only its delivery was refused");
+    }
+
+    @Test
+    void aRepeatOfACallReusesWhatTheFirstReadAndStillCountsAsACall() throws Exception {
+        String args = "{\"targets\":[\"co-1\"]}";
+        String first = approve("company_read", args).toolCallId();
+        String second = approve("company_read", args).toolCallId();
+        String token = token(ChatCapability.COMPANY_READ);
+        JsonNode read = rpc(token, call("company_read", args)).path("result").path("structuredContent");
+        assertTrue(read.path("cachedFrom").isMissingNode());
+
+        JsonNode reused = rpc(token, call("company_read", args)).path("result");
+        assertFalse(reused.path("isError").asBoolean(true), reused.toString());
+        JsonNode again = reused.path("structuredContent");
+        assertEquals(second, again.path("toolCallId").asString());
+        assertEquals(first, again.path("cachedFrom").asString(), "the same data, not a second lookup");
+        assertEquals(read.path("items").toString(), again.path("items").toString());
+        assertEquals(1, companyReads.size(), "read once");
+        var calls = store.toolCalls(JOB);
+        assertEquals(List.of("succeeded", "succeeded"), calls.stream().map(c -> c.status).toList(),
+                "the reuse is a call of its own on the ledger and in the budget");
+        assertEquals(again.toString(), mapper.readTree(calls.get(1).end.result()).toString());
+    }
+
+    @Test
+    void aReuseIsCheckedAgainstTheSendGrantsAsTheyAreNow() throws Exception {
+        String args = "{\"targets\":[\"co-1\"]}";
+        approve("company_read", args);
+        approve("company_read", args);
+        String token = token(ChatCapability.COMPANY_READ);
+        assertEquals("ev-1", rpc(token, call("company_read", args)).path("result").path("structuredContent")
+                .path("evidenceIds").get(0).asString());
+        // The news source loses its grant between the two: the reuse does not pass on what the first one could.
+        ChatSendGrantsTest.write(dir.resolve("chat-grants.json"), com.zoop.chat.service.ChatCompanyProfiles.SOURCE_ID);
+        JsonNode again = rpc(token, call("company_read", args)).path("result").path("structuredContent");
+        assertTrue(again.path("evidenceIds").isEmpty());
+        assertEquals(1, again.path("withheld").path("evidenceIds").asInt());
+        assertTrue(store.toolCalls(JOB).get(1).end.evidenceIds().isEmpty());
+        assertEquals(1, companyReads.size());
+    }
+
+    @Test
+    void identicalRequestsArrivingTogetherAreReadOnce() throws Exception {
+        String args = "{\"targets\":[\"co-1\"]}";
+        approve("company_read", args);
+        approve("company_read", args);
+        String token = token(ChatCapability.COMPANY_READ);
+        companyGate = new java.util.concurrent.CountDownLatch(1);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var a = pool.submit(() -> rpc(token, call("company_read", args)));
+            // The second arrives while the first is still reading.
+            while (companyReads.isEmpty()) Thread.onSpinWait();
+            var b = pool.submit(() -> rpc(token, call("company_read", args)));
+            Thread.sleep(200);
+            companyGate.countDown();
+            List<JsonNode> results = List.of(a.get(10, java.util.concurrent.TimeUnit.SECONDS).path("result"),
+                    b.get(10, java.util.concurrent.TimeUnit.SECONDS).path("result"));
+            assertTrue(results.stream().noneMatch(r -> r.path("isError").asBoolean(true)), results.toString());
+            assertEquals(1, results.stream().filter(r -> r.path("structuredContent").has("cachedFrom")).count());
+        } finally {
+            companyGate = null;
+            pool.shutdownNow();
+        }
+        assertEquals(1, companyReads.size(), "one read for both");
+    }
+
+    @Test
+    void identicalRequestsLetThroughAtTheSameMomentEachTakeTheirOwnApproval() throws Exception {
+        String token = token(ChatCapability.COMPANY_READ);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            // Three pairs, each pair released together before either has started its read.
+            for (int pair = 1; pair <= 3; pair++) {
+                String args = "{\"targets\":[\"co-" + pair + "\"]}";
+                approve("company_read", args);
+                approve("company_read", args);
+                var barrier = new java.util.concurrent.CyclicBarrier(2);
+                java.util.concurrent.Callable<JsonNode> request = () -> {
+                    barrier.await(5, java.util.concurrent.TimeUnit.SECONDS);
+                    return rpc(token, call("company_read", args)).path("result");
+                };
+                var a = pool.submit(request);
+                var b = pool.submit(request);
+                List<JsonNode> results = List.of(a.get(10, java.util.concurrent.TimeUnit.SECONDS),
+                        b.get(10, java.util.concurrent.TimeUnit.SECONDS));
+                assertTrue(results.stream().noneMatch(r -> r.path("isError").asBoolean(true)), results.toString());
+                assertEquals(2, results.stream().map(r -> r.path("structuredContent").path("toolCallId").asString())
+                        .distinct().count(), "each answered under its own approval");
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        assertEquals(3, companyReads.size(), "one read per pair");
+        assertTrue(store.toolCalls(JOB).stream().allMatch(c -> "succeeded".equals(c.status)),
+                "no approval left behind");
+    }
+
+    @Test
+    void resultsPastTheJobsOneMebibyteAreRecordedAsThatFailureNotDelivered() throws Exception {
+        String token = token(ChatCapability.GRAPH_PATH_READ);
+        for (int i = 2; i <= 5; i++) {
+            String args = "{\"targets\":[\"co-1\",\"co-" + i + "\"]}";
+            approve("graph_path_read", args);
+            JsonNode result = rpc(token, call("graph_path_read", args)).path("result");
+            assertFalse(result.path("isError").asBoolean(true), "result " + i);
+        }
+        String fifth = "{\"targets\":[\"co-1\",\"co-6\"]}";
+        approve("graph_path_read", fifth);
+        assertEquals(ChatRunControl.RESULTS_OVER_BUDGET, error(rpc(token, call("graph_path_read", fifth))));
+        var last = store.toolCalls(JOB).getLast();
+        assertEquals("failed", last.status);
+        assertEquals(ChatRunControl.RESULTS_OVER_BUDGET, last.end.errorCode());
+        assertNull(last.end.result());
+        assertTrue(store.keptResultBytes(JOB) <= ChatRunControl.MAX_KEPT_RESULT_BYTES);
     }
 
     @Test
@@ -339,6 +503,14 @@ class ChatMcpEndpointTest {
             @Override
             public ChatToolOutput read(ChatToolScope scope, ChatToolRequest request) {
                 seen.add(request);
+                var gate = capability == ChatCapability.COMPANY_READ ? companyGate : null;
+                if (gate != null) {
+                    try {
+                        gate.await(5, java.util.concurrent.TimeUnit.SECONDS);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
                 String id = request.targets().getFirst();
                 return new ChatToolOutput(scope.graphVersionId(),
                         List.of(new ChatToolItem(id, "company", label, List.of(id), List.of("ev-1"))),

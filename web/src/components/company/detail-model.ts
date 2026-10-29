@@ -1,6 +1,8 @@
 import type { ChartPeriod } from '@/types/company';
 import type { Event, Impact } from '@/types/company/detail';
 import type { GraphResponse } from '@/types/map/graph';
+import { exactTime } from '@/util/event-time';
+export { exactTime } from '@/util/event-time';
 export const periods: {
   value: ChartPeriod;
   label: string;
@@ -13,10 +15,6 @@ export const periods: {
   { value: '1m', label: '1개월', interval: '1d', bucket: '일' },
   { value: '1y', label: '1년', interval: '1wk', bucket: '주' },
 ];
-export const exactTime = (value: string | null | undefined) =>
-  !!value &&
-  /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
-  Number.isFinite(Date.parse(value));
 /**
  * 요청에 쓸 RFC 3339 시각(초 포함, UTC). 초 없는 시각(2026-10-20T00:00+09:00)은 기업·그래프 API가
  * 422로 거절하므로 기준 시점(asOf)으로 주소에 고정할 때 바꾼다.

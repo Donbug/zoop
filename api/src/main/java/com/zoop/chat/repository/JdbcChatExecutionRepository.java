@@ -77,6 +77,12 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
     }
 
     @Override
+    public boolean shortenDeadline(String jobId, String ownerToken, Instant deadline, Instant at) {
+        return jdbc.update("UPDATE chat_jobs SET deadline_at = LEAST(deadline_at, :deadline), updated_at = :at WHERE id = :id AND "
+                + OWNED, params(jobId, ownerToken, at).addValue("deadline", Timestamp.from(deadline))) == 1;
+    }
+
+    @Override
     public void recordModelCall(String jobId, int runs, String attempts, Instant at) {
         jdbc.update("UPDATE chat_jobs SET runs = :runs, attempts = CAST(:attempts AS jsonb), updated_at = :at WHERE id = :id",
                 new MapSqlParameterSource().addValue("id", jobId).addValue("runs", runs).addValue("attempts", attempts)
@@ -138,6 +144,15 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM chat_tool_calls WHERE chat_job_id = :id AND attempt_no = :attempt",
                 new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo), Integer.class);
+        return count == null ? 0 : count;
+    }
+
+    @Override
+    public int countJobToolCalls(String jobId, int attemptNo) {
+        Integer count = jdbc.queryForObject("""
+                SELECT count(*) FROM chat_tool_calls
+                 WHERE chat_job_id = :id AND (attempt_no = :attempt OR status <> 'cancelled')
+                """, new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo), Integer.class);
         return count == null ? 0 : count;
     }
 
@@ -205,6 +220,50 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
                 """, new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo),
                 (rs, index) -> new ChatKeptToolResult(rs.getString("tool_call_id"), rs.getString("capability_id"),
                         rs.getString("result")));
+    }
+
+    @Override
+    public Optional<ChatKeptToolResult> findKeptToolResult(String jobId, int attemptNo, String capabilityId,
+            String inputDigest) {
+        return jdbc.query("""
+                SELECT tool_call_id, capability_id, result::text AS result FROM chat_tool_calls
+                 WHERE chat_job_id = :id AND attempt_no = :attempt AND capability_id = :capability AND input_digest = :digest
+                   AND status = 'succeeded' AND result IS NOT NULL
+                 ORDER BY call_index LIMIT 1
+                """, new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo)
+                .addValue("capability", capabilityId).addValue("digest", inputDigest),
+                (rs, index) -> new ChatKeptToolResult(rs.getString("tool_call_id"), rs.getString("capability_id"),
+                        rs.getString("result"))).stream().findFirst();
+    }
+
+    @Override
+    public Optional<String> claimReservedToolCall(String jobId, String ownerToken, int attemptNo, String capabilityId,
+            String inputDigest, Instant at) {
+        return jdbc.queryForList("""
+                UPDATE chat_tool_calls c SET status = 'running', started_at = :at
+                 WHERE c.id = (SELECT r.id FROM chat_tool_calls r
+                                WHERE r.chat_job_id = :id AND r.attempt_no = :attempt AND r.capability_id = :capability
+                                  AND r.input_digest = :digest AND r.status = 'reserved'
+                                ORDER BY r.call_index LIMIT 1 FOR UPDATE SKIP LOCKED)
+                   AND c.status = 'reserved' AND
+                """ + " " + TOOL_CALL_OWNED + " RETURNING c.tool_call_id",
+                params(jobId, ownerToken, at).addValue("attempt", attemptNo).addValue("capability", capabilityId)
+                        .addValue("digest", inputDigest), String.class).stream().findFirst();
+    }
+
+    @Override
+    public long storedResultBytes(String result) {
+        Long bytes = jdbc.queryForObject("SELECT octet_length(CAST(:result AS jsonb)::text)",
+                new MapSqlParameterSource("result", result), Long.class);
+        return bytes == null ? 0 : bytes;
+    }
+
+    @Override
+    public long keptResultBytes(String jobId) {
+        Long bytes = jdbc.queryForObject(
+                "SELECT COALESCE(sum(octet_length(result::text)), 0) FROM chat_tool_calls WHERE chat_job_id = :id",
+                new MapSqlParameterSource("id", jobId), Long.class);
+        return bytes == null ? 0 : bytes;
     }
 
     private boolean closeToolCalls(String jobId, Instant at) {

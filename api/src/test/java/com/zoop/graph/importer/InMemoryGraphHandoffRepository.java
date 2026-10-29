@@ -13,10 +13,11 @@ import com.zoop.document.analysis.repository.EvidenceRow;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /**
- * Test double with the relational semantics the import relies on: the evidence primary key, the version primary key and the
- * pointer columns. Spring's rollback is not simulated by the double; {@link #transactionally} reproduces the transaction
- * boundary for the tests that need "an exception undoes everything the import wrote". The real SQL, constraints, row locks and
- * rollback are proven against PostgreSQL by {@code GraphHandoffImportPostgresIntegrationTest} and the operator smoke.
+ * Test double with the relational semantics the import relies on: the evidence primary key, the version primary key, the
+ * composition keys and the pointer columns. Spring's rollback is not simulated by the double; {@link #transactionally}
+ * reproduces the transaction boundary for the tests that need "an exception undoes everything the import wrote". The real SQL,
+ * constraints, row locks and rollback are proven against PostgreSQL by {@code GraphHandoffImportPostgresIntegrationTest} and the
+ * operator smoke.
  *
  * <p>{@code activeVersionId} and {@code activations} stand for the activation pointer and its history: the port has no statement
  * that can change them, so a test that seeds them and finds them unchanged proves the import never reached for them.
@@ -27,6 +28,7 @@ final class InMemoryGraphHandoffRepository implements GraphHandoffRepository {
     private Map<String, StagedVersion> versions = new LinkedHashMap<>();
     private List<NewStagedVersion> inserted = new ArrayList<>();
     private Map<String, List<RuleRow>> versionRules = new LinkedHashMap<>();
+    private Map<String, List<Source>> sources = new LinkedHashMap<>();
     /** What {@link #publicationState()} answers: no rule enabled at revision 0 unless a test sets it. */
     PublicationState publication = new PublicationState(0, 0, List.of());
     private int writes;
@@ -41,12 +43,12 @@ final class InMemoryGraphHandoffRepository implements GraphHandoffRepository {
     }
 
     record State(Map<String, StoredEvidence> evidence, Map<String, StagedVersion> versions, List<NewStagedVersion> inserted,
-            Map<String, List<RuleRow>> versionRules) {
+            Map<String, List<RuleRow>> versionRules, Map<String, List<Source>> sources) {
     }
 
     State state() {
         return new State(new LinkedHashMap<>(evidence), new LinkedHashMap<>(versions), new ArrayList<>(inserted),
-                new LinkedHashMap<>(versionRules));
+                new LinkedHashMap<>(versionRules), new LinkedHashMap<>(sources));
     }
 
     /** The evidence rows as the document analysis repository reads them (content and verification columns only). */
@@ -66,6 +68,7 @@ final class InMemoryGraphHandoffRepository implements GraphHandoffRepository {
             versions = new LinkedHashMap<>(before.versions());
             inserted = new ArrayList<>(before.inserted());
             versionRules = new LinkedHashMap<>(before.versionRules());
+            sources = new LinkedHashMap<>(before.sources());
             throw failure;
         } finally {
             catalogLocked = false;
@@ -92,6 +95,18 @@ final class InMemoryGraphHandoffRepository implements GraphHandoffRepository {
 
     void seedEvidence(StoredEvidence row) {
         evidence.put(row.row().id(), row);
+    }
+
+    /**
+     * What the composition migration leaves for a version staged before it: the one source row without a rule-free projection.
+     * Replaces the version's rows as the backfill would have written them.
+     */
+    void backfillWithoutBundleSnapshot(String versionId) {
+        List<Source> rows = new ArrayList<>();
+        for (Source source : sources.getOrDefault(versionId, List.of())) {
+            rows.add(new Source(source.ordinal(), source.handoffId(), source.receiptArtifactId(), null));
+        }
+        sources.put(versionId, List.copyOf(rows));
     }
 
     List<NewStagedVersion> inserted() {
@@ -165,5 +180,28 @@ final class InMemoryGraphHandoffRepository implements GraphHandoffRepository {
         if (!rules.isEmpty()) {
             versionRules.put(version.id(), List.copyOf(rules));
         }
+    }
+
+    @Override
+    public List<Source> sources(String versionId) {
+        return sources.getOrDefault(versionId, List.of());
+    }
+
+    @Override
+    public void insertSource(NewSource source) {
+        writes++;
+        // The foreign key, the primary key (version, ordinal) and the unique key (version, handoff).
+        if (!versions.containsKey(source.versionId())) {
+            throw new DataIntegrityViolationException("graph_version_sources version");
+        }
+        List<Source> rows = new ArrayList<>(sources.getOrDefault(source.versionId(), List.of()));
+        for (Source existing : rows) {
+            if (existing.ordinal() == source.ordinal() || existing.handoffId().equals(source.handoffId())) {
+                throw new DataIntegrityViolationException("graph_version_sources key");
+            }
+        }
+        rows.add(new Source(source.ordinal(), source.handoffId(), source.receiptArtifactId(), source.bundleSnapshotArtifactId()));
+        rows.sort((a, b) -> Integer.compare(a.ordinal(), b.ordinal()));
+        sources.put(source.versionId(), List.copyOf(rows));
     }
 }

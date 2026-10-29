@@ -9,7 +9,19 @@ import java.util.regex.Pattern;
  */
 public final class GraphHandoffException extends RuntimeException {
     /** The CLIs' own codes are lowercase snake_case (digits allowed, e.g. {@code s2_payload_invalid}); anything else is not echoed. */
+    /** The ingestion CLI's own codes (snake_case); anything else is not echoed. */
+    /** The ingestion CLI's own codes (snake_case); anything else is not echoed. */
+    /** The ingestion CLI's own codes (snake_case); anything else is not echoed. */
+    /** The ingestion CLI's own codes (snake_case); anything else is not echoed. */
     private static final Pattern CLI_CODE = Pattern.compile("[a-z0-9_]{1,64}");
+    /** A handoff refusal or withheld reason: the CLI's snake_case codes and ai/service's wider {@code Safe} alphabet. */
+    private static final Pattern HANDOFF_CODE = Pattern.compile("[A-Za-z0-9_.:-]{1,80}");
+    /** A handoff refusal or withheld reason: the CLI's snake_case codes and ai/service's wider {@code Safe} alphabet. */
+    private static final Pattern HANDOFF_CODE = Pattern.compile("[A-Za-z0-9_.:-]{1,80}");
+    /** A handoff refusal or withheld reason: the CLI's snake_case codes and ai/service's wider {@code Safe} alphabet. */
+    private static final Pattern HANDOFF_CODE = Pattern.compile("[A-Za-z0-9_.:-]{1,80}");
+    /** A handoff refusal or withheld reason: the CLI's snake_case codes and ai/service's wider {@code Safe} alphabet. */
+    private static final Pattern HANDOFF_CODE = Pattern.compile("[A-Za-z0-9_.:-]{1,80}");
 
     private final GraphHandoffFailure failure;
     private final String cliCode;
@@ -28,17 +40,17 @@ public final class GraphHandoffException extends RuntimeException {
 
     /** The handoff CLI refused with its structured error. */
     public static GraphHandoffException handoffRefused(String code) {
-        return new GraphHandoffException(GraphHandoffFailure.HANDOFF_REFUSED, safe(code), -1);
+        return new GraphHandoffException(GraphHandoffFailure.HANDOFF_REFUSED, safe(code, HANDOFF_CODE), -1);
     }
 
     /** The handoff CLI answered {@code delivery.status=withheld}. */
     public static GraphHandoffException handoffWithheld(String code) {
-        return new GraphHandoffException(GraphHandoffFailure.HANDOFF_WITHHELD, safe(code), -1);
+        return new GraphHandoffException(GraphHandoffFailure.HANDOFF_WITHHELD, safe(code, HANDOFF_CODE), -1);
     }
 
     /** The per-observation S2-1 export failed; {@code ingestionCode} is set only for the CLI's own refusal. */
     public static GraphHandoffException ingestion(GraphHandoffFailure failure, String ingestionCode, int observation) {
-        return new GraphHandoffException(failure, safe(ingestionCode), observation);
+        return new GraphHandoffException(failure, safe(ingestionCode, CLI_CODE), observation);
     }
 
     /** The same failure, attributed to the observation at this position (bundle order). */
@@ -60,7 +72,7 @@ public final class GraphHandoffException extends RuntimeException {
         return observation;
     }
 
-    private static String safe(String code) {
-        return code != null && CLI_CODE.matcher(code).matches() ? code : null;
+    private static String safe(String code, Pattern alphabet) {
+        return code != null && alphabet.matcher(code).matches() ? code : null;
     }
 }

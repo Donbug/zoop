@@ -1,7 +1,10 @@
 package com.zoop.admin.review;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zoop.admin.review.ReviewTargetReader.Projection;
 import com.zoop.admin.review.ReviewTargetReader.Row;
@@ -184,6 +187,20 @@ class ReviewTargetReaderTest {
     }
 
     @Test
+    void aReadingIsCompleteOnlyWhenEveryRelationIsReadAndHasAVerdict() {
+        String good = relation(rel('1'), "SUPPLIES", endpoint("company", "A"), endpoint("company", "B"), "hold", "1");
+        assertTrue(ReviewTargetReader.read(s2(), s3(good)).complete());
+
+        Projection waiting = ReviewTargetReader.read(s2(), s3(good,
+                relation(rel('2'), "SUPPLIES", endpoint("company", "A"), endpoint("company", "B"), "pending", "1")));
+        assertEquals(1, waiting.pending());
+        assertEquals(0, waiting.skipped());
+        assertFalse(waiting.complete(), "a relation with no verdict yet is not listed, so the rows are not the whole analysis");
+
+        assertFalse(ReviewTargetReader.read(s2(), s3(good, "42")).complete());
+    }
+
+    @Test
     void anUnreadableEventKeepsItsRelationsOut() {
         String broken = "{\"eventCandidateId\":\"" + EVENT_A + "\",\"state\":\"candidate\"}";
         Projection projection = ReviewTargetReader.read(s2(broken, event(EVENT_B, "candidate", "x", "A")),
@@ -236,5 +253,26 @@ class ReviewTargetReaderTest {
 
         assertEquals(List.of("B", "삼성전자"), rows.get("candidate:" + rel('1')).companyIds());
         assertEquals(List.of("SUPPLIES_V2"), rows.get("relation:" + rel('1')).relationTypes());
+    }
+    /** An event candidate as the service relays it, naming the job's analysed document. */
+    private static String naming(String event, String documentId, String version) {
+        return event.replaceFirst("\\{", "{\"document\":{\"documentId\":\"" + documentId + "\",\"documentVersion\":\"" + version
+                + "\"},");
+    }
+
+    @Test
+    void theAnalysedDocumentIsTheOneEveryEventCandidateNames() {
+        String a = naming(event(EVENT_A, "candidate", "new-event-candidate", "SK"), "문서-1", "6".repeat(64));
+        String rejected = naming(event(EVENT_HELD, "rejected", "held", "SK"), "문서-1", "6".repeat(64));
+        assertEquals(new ReviewTargetReader.Document("문서-1", "6".repeat(64)), ReviewTargetReader.read(s2(a, rejected), s3())
+                .document(), "rejected candidates name it too");
+
+        assertNull(ReviewTargetReader.read(s2(), s3()).document(), "a job that found nothing names no document");
+        assertNull(ReviewTargetReader.read(s2(a, naming(event(EVENT_HELD, "candidate", "held", "SK"), "문서-2", "6".repeat(64))),
+                s3()).document(), "two documents: not one analysis of one document");
+        assertNull(ReviewTargetReader.read(s2(naming(event(EVENT_A, "candidate", "held", "SK"), "문서-1", "6".repeat(63))), s3())
+                .document(), "a version that is no exact hash");
+        assertNull(ReviewTargetReader.read(s2(a, event(EVENT_HELD, "candidate", "held", "SK")), s3()).document(),
+                "a candidate without its document");
     }
 }

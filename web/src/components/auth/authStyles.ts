@@ -23,4 +23,4 @@ export const authAlert = 'text-xs leading-6 text-[#b42318]';
 
 export const authStatus = 'text-xs text-zoop-muted';
 
-export const authNote = 'text-[11px] leading-relaxed text-zoop-faint';
+export const authNote = 'text-[11px] leading-relaxed text-zoop-muted';

@@ -31,7 +31,7 @@ def generation_schema(frozen):
     ids=sorted(frozen['sources']);s=statement(ids)
     statuses = ['updated','compared','unavailable']
     if frozen.get('comparisonContract') is not None:
-        require(frozen['comparisonContract']=='edition-bound-v2','comparison_contract')
+        require(frozen['comparisonContract'] in ('edition-bound-v2','issue-company-v1'),'comparison_contract')
         statuses = ['updated','unavailable'] if frozen['edition']=='morning' else ['compared','unavailable']
     cmp=copy.deepcopy(s);cmp['properties'].update(status={'type':'string','enum':statuses},previousResultVersion={'type':['string','null']});cmp['required']=list(cmp['properties'])
     item=obj({'companyId':{'type':'string','enum':[t['companyId'] for t in frozen['targets']]},
@@ -40,7 +40,9 @@ def generation_schema(frozen):
     return obj({'companies':{'type':'array','items':item,'minItems':len(frozen['targets']),'maxItems':len(frozen['targets'])}})
 
 
-def previous_for(company,date_value,edition,history,strict=False):
+def previous_for(company,date_value,edition,history,strict=False,issue_id=None,cutoff=None):
+    if issue_id is not None:
+        return previous_issue_company(company, issue_id, date_value, edition, cutoff, history)
     for row in reversed(history):
         if row['status']!='PASS' or (edition=='evening' and (row['date']!=date_value or row['edition']!='morning')): continue
         if strict and edition == 'morning' and (row['edition'] != 'evening' or row['date'] != (date.fromisoformat(date_value)-timedelta(days=1)).isoformat()): continue
@@ -49,7 +51,72 @@ def previous_for(company,date_value,edition,history,strict=False):
     return {'status':'unavailable','reason':'same_day_morning_company_judgment_missing' if edition=='evening' else 'previous_company_judgment_missing'}
 
 
-def freeze(row,effective,metadata,history,version=VERSION):
+def previous_issue_company(company, issue_id, date_value, edition, cutoff, history):
+    """Resolve the corresponding publication first, then the event/company pair.
+
+    Never search backwards for a convenient old judgment when that pair is
+    missing from the immediately corresponding publication. Stable archive IDs
+    provide continuity; similar company names/titles do not create aliases.
+    """
+    boundary = context.legacy._aware(cutoff)
+    eligible = [r for r in history if context.legacy._aware(r['cutoff']) < boundary
+        and ((edition == 'evening' and r['date'] == date_value and r['edition'] == 'morning')
+             or (edition == 'morning' and r['date'] < date_value and r['edition'] == 'evening'))]
+    if not eligible:
+        return {'status': 'unavailable', 'reason': 'corresponding_round_missing'}
+    latest = max(context.legacy._aware(r['cutoff']) for r in eligible)
+    eligible = [r for r in eligible if context.legacy._aware(r['cutoff']) == latest]
+    matches = []
+    for row in eligible:
+        if row.get('status') != 'PASS':
+            continue
+        targets = row.get('frozen', {}).get('targets', [])
+        target = next((t for t in targets if t['companyId'] == company and t.get('issueIds') == [issue_id]), None)
+        judgment = next((c for c in row['draft']['companies'] if c['companyId'] == company), None)
+        if target and judgment:
+            matches.append((row, judgment))
+    if len(matches) != 1:
+        return {'status': 'unavailable', 'reason': 'same_issue_company_judgment_missing_or_ambiguous'}
+    row, judgment = matches[0]
+    return {'status': 'available', 'issueId': issue_id, 'companyId': company,
+        'roundId': row['roundId'], 'date': row['date'], 'edition': row['edition'],
+        'cutoff': row['cutoff'], 'resultVersion': row['resultVersion'], 'judgment': copy.deepcopy(judgment)}
+
+
+def source_overlap(source, other, metadata):
+    """Aliases cannot smuggle another event's passage into background context.
+
+    Different versions/documents are distinct. Within a body, compare exact
+    quote spans when the body is available; otherwise only provably disjoint
+    passages are retained. Do not treat a new evidence ID as new information.
+    """
+    if (source['documentId'], source['bodySha256']) != (other['documentId'], other['bodySha256']):
+        return False
+    a, b = source['quote'], other['quote']
+    if a in b or b in a:
+        return True
+    body = metadata.get(source['documentId'], {}).get('fullBody', '')
+    if body and base.digest(body.encode()) == source['bodySha256'] and a in body and b in body:
+        def spans(quote):
+            start = body.find(quote)
+            while start >= 0:
+                yield start, start + len(quote)
+                start = body.find(quote, start + 1)
+        return any(x < v and u < y for x, y in spans(a) for u, v in spans(b))
+    # No authenticated offsets/body: keep neither an uncertain partial alias
+    # nor an expanded context from the other selected event.
+    return True
+
+
+def freeze_issue_inputs(row, effective, metadata, history, version=VERSION):
+    """One generation input per issue; the same company can occur in many inputs.
+    Preparation is offline. No existing AI receipt is upgraded to a new verdict.
+    """
+    return [freeze(row, effective, metadata, history, version, issue_id=item['issueId'])
+            for item in effective['result']['items']]
+
+
+def freeze(row,effective,metadata,history,version=VERSION,issue_id=None):
     market=row['marketEnrichment']
     # Extractive presentation replays have verified selected evidence but no
     # generated broad-market context. Do not invent background documents.
@@ -57,17 +124,25 @@ def freeze(row,effective,metadata,history,version=VERSION):
     cutoff=context.legacy._aware(broad['window']['to'])
     selected={i['issueId']:i for i in effective['selected']};targets={};sources={}
     for item in effective['result']['items']:
+        if issue_id is not None and item['issueId'] != issue_id: continue
         issue=selected[item['issueId']]
         companies=[{'id':c['companyId'],'name':c['name']} for c in issue['companyLinks']]
         for company in companies:
             cid,name=company['id'],company['name']
             target=targets.setdefault(cid,{'companyId':cid,'companyName':name,'issueIds':[],'facts':[],'sourceIds':[],
-                'previous':previous_for(cid,row['date'],row['edition'],history,strict=version in ('company-outlook-v3','company-outlook-v4')),
+                'previous':previous_for(cid,row['date'],row['edition'],history,strict=version in ('company-outlook-v3','company-outlook-v4'), issue_id=issue_id, cutoff=broad['window']['to']),
                 'observedMovement':{'status':'unavailable','reason':'cutoff_bound_company_price_feed_missing'}})
             target['issueIds'].append(item['issueId']);target['facts'].extend({'text':c['text'],'evidenceIds':c['evidenceIds']} for c in item['claims'])
             own=list(issue['sources']);docs=[d for d in broad['documents'] if set(d['companyNames']) & ({name,'Alphabet'} if cid=='NASDAQ:GOOGL' else {name})]
             docs.sort(key=lambda d:(any(x in metadata[d['documentId']]['url'] for x in ('news.samsung','samsung.com','nvidia.com','investor','ir.','news.skhynix','tsmc.com','abc.xyz')),d['sources'][0]['publishedAt']),reverse=True)
             for d in docs[:8]: own.extend(d['sources'])
+            if issue_id is not None:
+                target['issueEvidenceIds'] = [s['evidenceId'] for s in issue['sources']]
+                foreign_sources = [s for other_id, other in selected.items() if other_id != issue_id for s in other['sources']]
+                foreign = {s['evidenceId'] for s in foreign_sources} - set(target['issueEvidenceIds'])
+                own = [s for s in own if s['evidenceId'] not in foreign and
+                       (s['evidenceId'] in target['issueEvidenceIds'] or not any(
+                           source_overlap(s, other, metadata) for other in foreign_sources))]
             for s in own:
                 doc=metadata[s['documentId']]
                 published=(s.get('publishedAt') or s.get('publicationClock',{}).get('publishedAt')
@@ -84,6 +159,9 @@ def freeze(row,effective,metadata,history,version=VERSION):
         'newsResultSha256':effective['resultSha256'],'targets':list(targets.values()),'sources':sources,'promptVersion':version,
         'scopeNote':'원발행 시각 기준 과거 시뮬레이션입니다. 기업 사업 영향의 조건부 해석이며 주가·목표가 예측이 아닙니다. 당시 수집·본문 동일성은 입증하지 않습니다.'}
     if version in ('company-outlook-v2','company-outlook-v3','company-outlook-v4'):frozen['comparisonContract']='edition-bound-v2'
+    if issue_id is not None:
+        frozen.update(issueId=issue_id, comparisonContract='issue-company-v1',
+            scopeRule='Interpret only this event and its cited company links. Previous company-wide judgments about other events are not comparable.')
     return frozen
 
 
@@ -94,7 +172,18 @@ def validate(draft,frozen):
         t=expected[c['companyId']]
         for s in [c['impact'],c['outlook'],*c['conditions'],*c['risks'],c['comparison']]:
             require(set(s['evidenceIds'])<=set(t['sourceIds']) and len(set(s['evidenceIds']))==len(s['evidenceIds']),'foreign_company_evidence')
-        prev=t['previous'];cmp=c['comparison'];require(cmp['previousResultVersion']==prev.get('resultVersion'),'previous_version')
+        prev=t['previous'];cmp=c['comparison'];
+        if frozen.get('comparisonContract') == 'issue-company-v1':
+            require(t['issueIds'] == [frozen['issueId']], 'issue_scope')
+            own = set(t['issueEvidenceIds'])
+            require(own and own <= set(t['sourceIds']), 'issue_evidence_scope')
+            require(all(set(s['evidenceIds']) & own for s in [c['impact'], c['outlook'], c['comparison'], *c['conditions'], *c['risks']]), 'issue_anchor_missing')
+            if prev['status'] == 'available':
+                require(prev.get('issueId') == frozen['issueId'] and prev.get('companyId') == c['companyId']
+                    and context.legacy._aware(prev['cutoff']) < context.legacy._aware(frozen['cutoff'])
+                    and (prev.get('date') == frozen['date'] and prev.get('edition') == 'morning' if frozen['edition'] == 'evening'
+                         else prev.get('date', '9999') < frozen['date'] and prev.get('edition') == 'evening'), 'previous_issue_scope')
+        require(cmp['previousResultVersion']==prev.get('resultVersion'),'previous_version')
         require(cmp['status']==('unavailable' if prev['status']=='unavailable' else 'updated' if frozen['edition']=='morning' else 'compared'),'comparison_status')
 
 

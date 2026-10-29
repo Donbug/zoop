@@ -129,6 +129,9 @@ export function usePersonalBriefing(round: BriefingResponse | null) {
       'evidenceIds',
       'evidenceCount',
       'companies',
+      // D-BRF-01·02: these judgments/counts also belong to the fixed publication.
+      'sourceSupport',
+      'documentSentiments',
     ] as const;
     if (
       fields.some((key) => !sameValue(briefing[key], round[key])) ||

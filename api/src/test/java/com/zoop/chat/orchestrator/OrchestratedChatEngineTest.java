@@ -684,6 +684,8 @@ class OrchestratedChatEngineTest {
         final List<ChatToolCallReservation> reserved = Collections.synchronizedList(new ArrayList<>());
         final Duration remaining;
         int modelCalls;
+        /** Calls earlier attempts of the job made. */
+        int spent;
 
         Control(Duration remaining) {
             this.remaining = remaining;
@@ -693,6 +695,11 @@ class OrchestratedChatEngineTest {
         @Override public void beforeModelCall() { modelCalls++; }
         @Override public Duration remaining() { return remaining; }
         @Override public boolean owned() { return true; }
+        @Override public int toolCallsLeft() { return MAX_TOOL_CALLS - reserved.size() - spent; }
+        @Override
+        public void shortenDeadline(java.time.Instant deadline) {
+            throw new UnsupportedOperationException("only the agent path shortens a deadline");
+        }
 
         @Override
         public List<String> reserveToolCalls(int planRevision, List<ChatToolCallReservation> calls) {
@@ -705,6 +712,11 @@ class OrchestratedChatEngineTest {
         }
 
         @Override public void toolCallStarted(String toolCallId) { }
+
+        @Override
+        public java.util.Optional<String> claimToolCall(String capabilityId, String inputDigest) {
+            throw new UnsupportedOperationException("only the MCP endpoint claims an approved call");
+        }
         @Override public void toolCallFinished(String toolCallId, ChatToolCallEnd end) { }
     }
 }

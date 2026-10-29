@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createIdempotencyKey } from '@/apis/portfolio/portfolio';
 import { recordInteractionEvents } from '@/apis/telemetry/telemetry';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -13,6 +13,7 @@ const ID_PATTERN = /^[A-Za-z0-9._:/-]{1,100}$/;
 
 let queue: TelemetryEvent[] = [];
 let timer: ReturnType<typeof setTimeout> | undefined;
+let queueRevision: number | null = null;
 
 function transmit(events: TelemetryEvent[]) {
   if (!useAuthStore.getState().session?.csrfToken) return;
@@ -22,6 +23,11 @@ function transmit(events: TelemetryEvent[]) {
 }
 
 export function flushTelemetry() {
+  // D-BRF-01·02 / FS065: queued activity must never be sent as another session.
+  if (queueRevision !== useAuthStore.getState().sessionRevision) {
+    resetTelemetry();
+    return;
+  }
   clearTimeout(timer);
   timer = undefined;
   while (queue.length > 0) transmit(queue.splice(0, MAX_BATCH));
@@ -29,6 +35,10 @@ export function flushTelemetry() {
 
 /** 이벤트를 큐에 넣는다. 서버가 거부할 모양(쓸 수 없는 id)은 보내지 않는다. */
 export function track(event: TelemetryEvent) {
+  const auth = useAuthStore.getState();
+  if (!auth.session?.csrfToken) return;
+  if (queueRevision !== auth.sessionRevision) resetTelemetry();
+  queueRevision = auth.sessionRevision;
   if ('targetId' in event && !ID_PATTERN.test(event.targetId)) return;
   queue.push(event);
   if (queue.length >= MAX_BATCH) flushTelemetry();
@@ -40,6 +50,7 @@ export function resetTelemetry() {
   clearTimeout(timer);
   timer = undefined;
   queue = [];
+  queueRevision = null;
 }
 
 if (typeof document !== 'undefined') {
@@ -55,8 +66,14 @@ function newViewId() {
 /** 화면이 열릴 때 노출 이벤트를 한 번 보내고, 이 노출의 viewId를 돌려준다. */
 export function useScreenView(screen: 'main' | 'briefing') {
   const [viewId] = useState(newViewId);
+  const revision = useAuthStore((s) => s.sessionRevision);
+  const last = useRef<string | null>(null);
   useEffect(() => {
+    const key = `${revision}:${screen}:${viewId}`;
+    if (!useAuthStore.getState().session?.csrfToken || last.current === key)
+      return;
+    last.current = key;
     track({ type: 'screen_view', screen, viewId });
-  }, [screen, viewId]);
+  }, [screen, viewId, revision]);
   return viewId;
 }

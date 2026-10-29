@@ -1,0 +1,181 @@
+{
+  "document": {
+    "documentId": "doc-5fec3c3e8b6a058b90b0fcf662404c726d3181548c935186766eae62f41adedf",
+    "documentVersion": "0cbf7911d023fbde6ba88c4aa8d04f0db9218d55204c4ba9e088d2b3f90bf745"
+  },
+  "plans": [
+    {
+      "enqueueId": "reanalysis-1",
+      "s2InputDigest": "cd939c0006f480f2bf7be5b935f94e1de3cc50f3465af6cf844f061f50dac1bf",
+      "s2JobId": "s2p-5d06bc54fd5ea872d8976e1b3d4e5b9a084952f59faaf62f0ce2e1b3edda0e2f",
+      "s2Result": {
+        "counts": {
+          "comparisons": 0,
+          "dispositions": {
+            "new-event-candidate": 1
+          },
+          "documents": 1,
+          "effectiveRelations": {
+            "CONFLICT": 0,
+            "DIFFERENT": 0,
+            "FOLLOWS": 0,
+            "HOLD": 0,
+            "SAME": 0
+          },
+          "eventCandidates": {
+            "candidate": 1,
+            "rejected": 0,
+            "total": 1
+          },
+          "snapshotEvents": 0,
+          "topicCandidates": 0
+        },
+        "eventCandidates": [
+          {
+            "approved": false,
+            "citations": [
+              {
+                "documentId": "doc-5fec3c3e8b6a058b90b0fcf662404c726d3181548c935186766eae62f41adedf",
+                "documentVersion": "0cbf7911d023fbde6ba88c4aa8d04f0db9218d55204c4ba9e088d2b3f90bf745",
+                "end": 34,
+                "evidenceId": "ev-9bddbe8dc800d53ef33e83f84c922c13",
+                "offsetUnit": "unicode_code_point",
+                "quote": "합성기업은 2026년 3분기 공급 계약을 발표했다😀 & 확인.",
+                "start": 0
+              }
+            ],
+            "comparisons": [],
+            "disposition": {
+              "comparedEvents": 0,
+              "follows": [],
+              "heldBy": [],
+              "reason": "no_same_in_frozen_snapshot",
+              "sameTargets": [],
+              "status": "new-event-candidate",
+              "targetEventId": null
+            },
+            "document": {
+              "documentId": "doc-5fec3c3e8b6a058b90b0fcf662404c726d3181548c935186766eae62f41adedf",
+              "documentVersion": "0cbf7911d023fbde6ba88c4aa8d04f0db9218d55204c4ba9e088d2b3f90bf745"
+            },
+            "eventCandidateId": "evc-9be622d50ec09dbcaaec421013e5627b6e0e962d9ef010013b19f44fc5f95a30",
+            "localMentionId": "m-1",
+            "mention": {
+              "action": "공급 계약 발표",
+              "assertionStatus": "announced",
+              "background": false,
+              "countries": [],
+              "eventTime": null,
+              "eventType": "supply_contract",
+              "keywords": [],
+              "mentionId": "m-1",
+              "participants": [
+                {
+                  "companyId": "SYNTH-1",
+                  "name": "합성기업",
+                  "role": "issuer"
+                }
+              ],
+              "period": "2026Q3",
+              "target": "공급 계약",
+              "title": "합성 공급 계약"
+            },
+            "mentionCandidateId": "mc-9c6bc8e3932d3499f6c57a1c7a34dcdbbdceca6814a0427c21462c0b1b30c611",
+            "reason": null,
+            "state": "candidate"
+          }
+        ],
+        "inputDigest": "cd939c0006f480f2bf7be5b935f94e1de3cc50f3465af6cf844f061f50dac1bf",
+        "jobId": "s2p-5d06bc54fd5ea872d8976e1b3d4e5b9a084952f59faaf62f0ce2e1b3edda0e2f",
+        "topicCandidates": []
+      }
+    },
+    {
+      "enqueueId": "reanalysis-2",
+      "s2InputDigest": "1d8c612908933bed124963395abdfede0d6290cdb3f85dffb86d53e26f5d7abb",
+      "s2JobId": "s2p-f1664073188f3f7040259f7351d3e25e2a812db269cf3cd9103d226e3e838b4c",
+      "s2Result": {
+        "counts": {
+          "comparisons": 0,
+          "dispositions": {
+            "new-event-candidate": 1
+          },
+          "documents": 1,
+          "effectiveRelations": {
+            "CONFLICT": 0,
+            "DIFFERENT": 0,
+            "FOLLOWS": 0,
+            "HOLD": 0,
+            "SAME": 0
+          },
+          "eventCandidates": {
+            "candidate": 1,
+            "rejected": 0,
+            "total": 1
+          },
+          "snapshotEvents": 0,
+          "topicCandidates": 0
+        },
+        "eventCandidates": [
+          {
+            "approved": false,
+            "citations": [
+              {
+                "documentId": "doc-5fec3c3e8b6a058b90b0fcf662404c726d3181548c935186766eae62f41adedf",
+                "documentVersion": "0cbf7911d023fbde6ba88c4aa8d04f0db9218d55204c4ba9e088d2b3f90bf745",
+                "end": 34,
+                "evidenceId": "ev-9bddbe8dc800d53ef33e83f84c922c13",
+                "offsetUnit": "unicode_code_point",
+                "quote": "합성기업은 2026년 3분기 공급 계약을 발표했다😀 & 확인.",
+                "start": 0
+              }
+            ],
+            "comparisons": [],
+            "disposition": {
+              "comparedEvents": 0,
+              "follows": [],
+              "heldBy": [],
+              "reason": "no_same_in_frozen_snapshot",
+              "sameTargets": [],
+              "status": "new-event-candidate",
+              "targetEventId": null
+            },
+            "document": {
+              "documentId": "doc-5fec3c3e8b6a058b90b0fcf662404c726d3181548c935186766eae62f41adedf",
+              "documentVersion": "0cbf7911d023fbde6ba88c4aa8d04f0db9218d55204c4ba9e088d2b3f90bf745"
+            },
+            "eventCandidateId": "evc-9be622d50ec09dbcaaec421013e5627b6e0e962d9ef010013b19f44fc5f95a30",
+            "localMentionId": "m-1",
+            "mention": {
+              "action": "공급 계약 발표",
+              "assertionStatus": "announced",
+              "background": false,
+              "countries": [],
+              "eventTime": null,
+              "eventType": "supply_contract",
+              "keywords": [],
+              "mentionId": "m-1",
+              "participants": [
+                {
+                  "companyId": "SYNTH-1",
+                  "name": "합성기업",
+                  "role": "issuer"
+                }
+              ],
+              "period": "2026Q3",
+              "target": "공급 계약",
+              "title": "합성 공급 계약"
+            },
+            "mentionCandidateId": "mc-9c6bc8e3932d3499f6c57a1c7a34dcdbbdceca6814a0427c21462c0b1b30c611",
+            "reason": null,
+            "state": "candidate"
+          }
+        ],
+        "inputDigest": "1d8c612908933bed124963395abdfede0d6290cdb3f85dffb86d53e26f5d7abb",
+        "jobId": "s2p-f1664073188f3f7040259f7351d3e25e2a812db269cf3cd9103d226e3e838b4c",
+        "topicCandidates": []
+      }
+    }
+  ],
+  "recordingKind": "authored-test"
+}

@@ -68,6 +68,9 @@ class HttpHandoffSourceTest {
         assertEquals(built.bundle().get("counts"), read.get("verification").get("counts"));
         assertFalse(read.has("bundle"));
         assertFalse(read.has("manifest"));
+        // The per-request stamps are not part of the receipt: the same pins must produce the same receipt bytes.
+        assertFalse(read.has("observedAt"));
+        assertFalse(read.get("delivery").has("checkedAt"));
     }
 
     @Test
@@ -102,6 +105,11 @@ class HttpHandoffSourceTest {
                 built.request());
         assertEquals(GraphHandoffFailure.HANDOFF_WITHHELD, withheld.failure());
         assertEquals("review_revision_changed", withheld.cliCode());
+        // A reason in the service's wider alphabet reaches the result as well (never dropped to null).
+        GraphHandoffException wide = failure(source(HandoffFixtures.withheld(built.spec().handoffId(), "Review.Changed:s3-revoked")),
+                built.request());
+        assertEquals(GraphHandoffFailure.HANDOFF_WITHHELD, wide.failure());
+        assertEquals("Review.Changed:s3-revoked", wide.cliCode());
     }
 
     @Test
@@ -143,6 +151,17 @@ class HttpHandoffSourceTest {
                 AiTransportException.Failure.CONNECT_FAILED, OptionalInt.empty(), null)), built.request());
         assertEquals(GraphHandoffFailure.HANDOFF_EXPORT_UNAVAILABLE, unreachable.failure());
         assertTrue(unreachable.cliCode() == null);
+
+        // An answer outside the contract is invalid, not a transient failure: a retry would not do better.
+        GraphHandoffException malformed = failure(failing(new AiTransportException(AiOperation.HANDOFF_READ, "r-5",
+                AiTransportException.Failure.RESPONSE_MALFORMED, OptionalInt.of(200), null)), built.request());
+        assertEquals(GraphHandoffFailure.HANDOFF_EXPORT_INVALID, malformed.failure());
+        GraphHandoffException tooLarge = failure(failing(new AiTransportException(AiOperation.HANDOFF_READ, "r-6",
+                AiTransportException.Failure.RESPONSE_TOO_LARGE, OptionalInt.of(200), null)), built.request());
+        assertEquals(GraphHandoffFailure.HANDOFF_EXPORT_INVALID, tooLarge.failure());
+        GraphHandoffException timedOut = failure(failing(new AiTransportException(AiOperation.HANDOFF_READ, "r-7",
+                AiTransportException.Failure.TIMEOUT, OptionalInt.empty(), null)), built.request());
+        assertEquals(GraphHandoffFailure.HANDOFF_EXPORT_UNAVAILABLE, timedOut.failure());
 
         // The status route maps the same way.
         HttpHandoffSource notAllowed = failing(new HandoffServiceErrorException(AiOperation.HANDOFF_READ, "r-4", 403,

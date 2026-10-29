@@ -94,8 +94,9 @@ zoop:
     mcp:
       # POST /mcp: the chatbot's read tools for a running job, over MCP Streamable HTTP (api/docs/chat-mcp.md). Off by
       # default, and the path does not exist then. Enabled, it needs ZOOP_CHAT_MCP_ACTIVE_KEY_ID and ZOOP_CHAT_MCP_KEYS (the
-      # job-scoped grant tokens' signing keys, not the model API key). Turning it on outside local tests waits for the
-      # model-send grant check on returned results.
+      # job-scoped grant tokens' signing keys, not the model API key) and ZOOP_CHAT_MCP_SEND_GRANTS / ZOOP_CHAT_MCP_SEND_RECIPIENT
+      # (the operator chat grant registry every result is checked against before it is sent, and the agent recipient).
+      # Turning it on outside local tests waits for the remaining conditions in api/docs/chat-mcp.md 5.
       enabled: ${ZOOP_CHAT_MCP_ENABLED:false}
       # The agent path (Luna chooses the reads through this endpoint, the server approves each call). Off by default; needs
       # the endpoint above and the chat model stages. The URL the model provider reaches this endpoint at is set on the AI

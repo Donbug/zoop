@@ -16,6 +16,7 @@ from support import Workspace
 from zoop_ai_service.config import ConfigError, load
 
 URL = "/internal/v1/chat-stages/chat-router"
+PROBE_URL = "/internal/v1/chat-mcp-health"
 STUB = '''#!__PYTHON__
 import json, os, sys
 ROOT = __ROOT__
@@ -158,6 +159,44 @@ def test_without_the_group_the_route_answers_409_after_authentication(start):
     assert service.request("POST", URL, as_="chatter", body=body(), headers={"Idempotency-Key": body()["invocationId"]}).status_code == 409
     assert service.request("POST", URL, as_=None, body=body()).status_code == 401
     assert service.request("POST", URL, as_="reader", body=body()).status_code == 403
+    assert service.request("GET", PROBE_URL, as_="chatter").status_code == 409
+    assert service.request("GET", PROBE_URL, as_=None).status_code == 401
+    assert service.request("GET", PROBE_URL, as_="reader").status_code == 403
+
+
+def test_the_content_free_probe_runs_with_fixed_argv_and_returns_reachability(tmp_path, start):
+    ws = Workspace(tmp_path / "ws")
+    stub = ChatStub(tmp_path / "chat")
+    service = start(workspace=ws, env=stub.env())
+
+    stub.answer({"schemaVersion": "zoop-ai-chat-1", "mcp": "reachable"})
+    reachable = service.request("GET", PROBE_URL, as_="chatter")
+    assert reachable.status_code == 200 and reachable.json() == {"schemaVersion": "zoop-ai-chat-1", "mcp": "reachable", "reason": None}
+    call = stub.calls()[0]
+    assert call["argv"] == ["probe-mcp"] and json.loads(call["stdin"]) == {}
+    assert "ZOOP_AI_API_KEY" not in call["env"] and "TYPESAFE_API_KEY" not in call["env"]
+
+    stub.answer({"schemaVersion": "zoop-ai-chat-1", "mcp": "unreachable", "reason": "mcp_timeout"}, exit_code=2)
+    unreachable = service.request("GET", PROBE_URL, as_="chatter")
+    assert unreachable.status_code == 200 and unreachable.json()["reason"] == "mcp_timeout"
+
+    unexpected = service.request("GET", PROBE_URL + "?extra=1", as_="chatter")
+    assert unexpected.status_code == 422 and len(stub.calls()) == 2
+
+
+def test_probe_configuration_and_abnormal_results_are_transport_errors(tmp_path, start):
+    ws = Workspace(tmp_path / "ws")
+    stub = ChatStub(tmp_path / "chat")
+    service = start(workspace=ws, env=stub.env())
+
+    stub.answer({"error": "mcp_server_url_invalid"}, exit_code=64)
+    configured = service.request("GET", PROBE_URL, as_="chatter")
+    assert configured.status_code == 503 and configured.json()["error"]["code"] == "service_configuration_invalid"
+    assert configured.json()["error"]["runtimeCode"] == "mcp_server_url_invalid"
+
+    stub.answer({"schemaVersion": "zoop-ai-chat-1", "mcp": "unreachable"}, exit_code=2)
+    invalid = service.request("GET", PROBE_URL, as_="chatter")
+    assert invalid.status_code == 502 and invalid.json()["error"]["code"] == "probe_failed"
 
 
 def test_a_stage_runs_once_with_fixed_argv_a_bound_id_and_the_chat_environment(tmp_path, start):

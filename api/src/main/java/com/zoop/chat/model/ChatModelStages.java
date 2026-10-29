@@ -397,6 +397,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         ObjectNode mcp = input.putObject("mcp").put("authorization", agent.grantToken());
         ArrayNode tools = mcp.putArray("allowedTools");
         agent.allowedTools().forEach(tools::add);
+        mcp.put("recipient", agent.recipient());
         input.put("maxCitations", Math.min(MAX_QUOTES, agent.maxCitations()));
         if (agent.previousResponseId() != null) {
             ObjectNode continuation = input.putObject("continuation").put("previousResponseId", agent.previousResponseId());
@@ -449,16 +450,17 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             reply = client.invoke(request);
         } catch (AiClientException error) {
             Fate fate = fate(error);
+            String failureCode = code(error);
             finish(execution, fate == Fate.UNKNOWN ? "unknown" : "failed",
-                    fate == Fate.UNKNOWN ? "unknown" : "not_sent", null, code(error));
-            throw new ChatModels.Failure(fate, "chat stage " + stage + " failed: " + code(error));
+                    fate == Fate.UNKNOWN ? "unknown" : "not_sent", null, failureCode);
+            throw new ChatModels.Failure(fate, failureCode, "chat stage " + stage + " failed: " + failureCode);
         }
         if (!reply.succeeded()) {
             ChatStageReply.Failure failure = reply.failure();
             Fate fate = failure.unknown() ? Fate.UNKNOWN : failure.sent() ? Fate.NOT_SENT : Fate.REFUSED;
             String sendState = failure.unknown() ? "unknown" : failure.sent() ? "sent" : "not_sent";
             finish(execution, failure.unknown() ? "unknown" : "failed", sendState, reply.receipt(), failure.code());
-            throw new ChatModels.Failure(fate, "chat stage " + stage + " failed: " + failure.code());
+            throw new ChatModels.Failure(fate, failure.code(), "chat stage " + stage + " failed: " + failure.code());
         }
         finish(execution, "succeeded", "sent", reply.receipt(), null);
         return reply.answer();

@@ -1,6 +1,3 @@
-@import 'pretendard/dist/web/variable/pretendardvariable.css';
-@import '@fontsource-variable/inter';
-
 /* D-GRP-01 visual baseline shared by D-AUT-01, D-WAT-01/01b and D-BRF-01/02. */
 :root {
   --zoop-ink: var(--color-zoop-ink);

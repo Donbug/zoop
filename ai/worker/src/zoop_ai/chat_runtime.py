@@ -16,6 +16,8 @@ Rules (ZOOP-AIG-001 6.3.2-6.3.3, design summary 5.1):
   snapshot) and is what the receipt records.
 - An agent step (`chat-agent`) is one Responses request, so the same ledger rules hold per step: the application gives every
   step its own invocation id. Its MCP grant token is excluded from every identity and redacted from the stored raw answer.
+  Its tool results reach the provider from the application's MCP server, which checks their send grants for the recipient
+  the step names; a step is sent only when that is this stage's own recipient (`mcp_recipient_mismatch` otherwise).
 - Order of one invocation: the ledger first (a known invocation answers from its record, whatever the gate or keys are now),
   then the gate, grants and sender for a new one, then one atomic claim with the live ceiling, the send, the raw answer stored,
   and only then usage and answer interpretation. Any interpretation failure keeps the raw answer as a definite failure.
@@ -168,6 +170,13 @@ def check_grants(request: StageRequest, recipient: str, registry: ChatGrantRegis
             for g in registry.grants)
         if not allowed:
             raise ProviderError("source_grant_denied")
+
+
+def check_recipient(request: StageRequest, recipient: str) -> None:
+    """An agent step goes only to the recipient the application checked its MCP results' send grants for."""
+    parsed = request.parsed()
+    if isinstance(parsed, AgentInput) and parsed.mcp.recipient != recipient:
+        raise ProviderError("mcp_recipient_mismatch")
 
 
 class ChatLedger:
@@ -324,6 +333,10 @@ class LiveSender:
             except httpx.TransportError:
                 raise ProviderError("provider_response_unknown", uncertain=True) from None
         if not 200 <= response.status_code < 300:
+            if response.status_code == 424 and request.stage == "chat-agent":
+                # The provider could not reach the ZOOP MCP server (it could not list its tools): the connection failure
+                # the application counts for its circuit. Shape per the provider documentation; confirmed in the live spike.
+                raise ProviderError(chat_agent.MCP_UNREACHABLE)
             raise ProviderError("provider_option_unsupported" if response.status_code == 400
                                 else f"provider_http_{response.status_code}")
         try:
@@ -480,6 +493,7 @@ def invoke(request: StageRequest, *, state_dir: Path, registry: ChatGrantRegistr
             ceiling = live_ceiling(env) if request.mode == "live" else None
             identity = request_identity(request, config)
             check_grants(request, config.recipient(), registry)
+            check_recipient(request, config.recipient())
             sender.preflight(request, config)
         except ProviderError as refused:
             return _failed(request, refused.code, sent=False, unknown=False, receipt=None)

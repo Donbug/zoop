@@ -28,7 +28,10 @@ export default function RouteError({
           다시 시도
         </button>
       )}
-      <Link className="mt-5 inline-block underline" to="/">
+      <Link
+        className="mt-5 inline-block underline max-md:min-h-10 max-md:content-center"
+        to="/"
+      >
         지도로 돌아가기
       </Link>
     </main>
