@@ -234,6 +234,28 @@ public class JdbcReviewRepository {
                 JdbcReviewRepository::syncUnit);
     }
 
+    /**
+     * Records the document the unit's S2 job analysed, once: a unit that already names it keeps it, and one naming another document
+     * is an error (the S2 result is fixed by its recorded hash, so the same job can never analyse two). No unit for this S3 job
+     * (a job the plan worker did not run) records nothing.
+     *
+     * @return true when the unit had no document yet and now has this one
+     */
+    public boolean recordDocument(String s3JobId, ReviewTargetReader.Document document) {
+        var params = new MapSqlParameterSource("job", s3JobId).addValue("id", document.documentId())
+                .addValue("version", document.documentVersion());
+        if (jdbc.update("""
+                UPDATE analysis_plan_units SET s2_document_id = :id, s2_document_version = :version
+                 WHERE s3_job_id = :job AND s2_document_id IS NULL
+                """, params) == 1) return true;
+        boolean other = Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (SELECT 1 FROM analysis_plan_units WHERE s3_job_id = :job
+                                 AND (s2_document_id, s2_document_version) <> (:id, :version))
+                """, params, Boolean.class));
+        if (other) throw new IllegalStateException("the unit already names another analysed document");
+        return false;
+    }
+
     private static SyncUnit syncUnit(ResultSet rs, int rowNumber) throws SQLException {
         return new SyncUnit(rs.getString("plan_id"), rs.getInt("ordinal"), rs.getString("s3_job_id"),
                 rs.getString("s3_input_digest"), rs.getString("s2_job_id"), rs.getString("s2_input_digest"),
