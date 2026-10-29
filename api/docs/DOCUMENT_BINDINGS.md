@@ -26,11 +26,12 @@ freeze는 S3 결과의 문서 `(documentId, documentVersion)`을 bindings로 앱
 | 환경 변수 | 용도 |
 |---|---|
 | `ZOOP_DOCUMENT_BINDINGS_ENABLED` | `true`일 때만 동작(기본 `false`). **웹 서버와 함께는 시작을 거부**하므로 `--spring.main.web-application-type=none`이 필수 |
-| `ZOOP_DOCUMENT_BINDINGS_OUTPUT` | 만들 bindings 파일. **없어야 하며** export가 끝난 뒤 배타적으로 만들어 통째로 씁니다(0600) |
+| `ZOOP_DOCUMENT_BINDINGS_OUTPUT` | 만들 bindings 파일. **없어야 하며** export가 끝난 뒤 같은 디렉터리의 임시 파일(`<이름>.<난수>.tmp`, 0600)에 통째로 쓰고 디스크에 내린 뒤 이 이름으로 옮깁니다(기존 파일은 바꾸지 않음) |
 | `ZOOP_DOCUMENT_BINDINGS_RESULT` | 결과 파일. **없어야 하며** 실행 시작 시 배타적으로 만들어집니다(0600). output과 달라야 합니다 |
 | `ZOOP_DOCUMENT_BINDINGS_SCOPE` | `available`(기본) 또는 `all`. 아래 [범위](#범위) |
 | `ZOOP_DOCUMENT_BINDINGS_SELECTION` | 선택. 묶을 문서 버전을 명시한 파일(존재하는 파일, 최대 4,000,000바이트). 아래 [선택 파일](#선택-파일-zoop-document-bindings-selection-1) |
 | `DB_URL` `DB_USERNAME` `DB_PASSWORD` | 기존 DB 연결 |
+| `ZOOP_AUTH_CSRF_ACTIVE_KEY_ID` `ZOOP_AUTH_CSRF_KEYS` | 기존 인증 설정. 비웹 기동도 CSRF key ring을 검증하므로 없으면 `Invalid CSRF key configuration`으로 기동 실패. 값·형식은 [api/README.md](../README.md)의 환경 변수 표 |
 
 모든 경로는 정규화된 절대 경로여야 하며, output과 result는 디렉터리의 symlink를 풀어도 서로 다른 파일이어야 합니다. 다른 운영자 명령(문서 import·분석, 그래프 수입, 공개 제외, 브리핑 replay)과 같은 프로세스에서 켜면 기동을 거절합니다. runner의 실행 순서가 정해져 있지 않고 먼저 실패한 runner가 JVM을 끝내므로, 종료 코드와 결과 파일이 이 실행의 것이려면 프로세스당 명령 하나여야 합니다. DB는 읽기만 하고 artifact store lock도 잡지 않습니다.
 
@@ -39,12 +40,13 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 ./api/gradlew -p api assemble
 env -i PATH=/usr/bin:/bin HOME="$HOME" \
   DB_URL=… DB_USERNAME=… DB_PASSWORD=… \
+  ZOOP_AUTH_CSRF_ACTIVE_KEY_ID=… ZOOP_AUTH_CSRF_KEYS=… \
   ZOOP_DOCUMENT_BINDINGS_ENABLED=true \
   ZOOP_DOCUMENT_BINDINGS_OUTPUT=/abs/round/bindings.json ZOOP_DOCUMENT_BINDINGS_RESULT=/abs/round/bindings-result.json \
   "$JAVA_HOME/bin/java" -jar api/build/libs/zoop-api-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none
 ```
 
-종료 코드는 export가 성공했을 때만 0입니다. 실패하면 결과 파일을 쓴 뒤 코드만 담은 예외로 끝나 JVM이 0이 아닌 값으로 종료하며, **output 파일은 만들지 않습니다.** output은 bindings가 모두 만들어진 뒤에야 배타적으로 만들어 통째로 쓰고, 쓰는 도중 실패하면 이 실행이 만든 파일을 지우므로 **output이 있으면 완전한 파일입니다.** 결과 파일이 비어 있으면 프로세스가 도중에 죽은 것이므로 새 경로로 다시 실행합니다. DB를 쓰지 않으므로 재실행은 언제나 안전합니다.
+종료 코드는 export가 성공했을 때만 0입니다. 실패하면 결과 파일을 쓴 뒤 코드만 담은 예외로 끝나 JVM이 0이 아닌 값으로 종료하며, **output 파일은 남기지 않습니다.** output은 bindings가 모두 만들어진 뒤 같은 디렉터리의 0600 임시 파일에 통째로 쓰고 디스크에 내린(force) 다음 한 번의 이름 바꾸기로 게시하므로, 읽는 쪽은 빈 파일이나 일부만 쓰인 파일을 보지 않습니다. 그 이름의 파일이 이미 있으면 바꾸지 않고 `output_unavailable`로 끝납니다. 쓰는 도중 실패하면 임시 파일을 지우고, output을 게시한 뒤 결과 파일을 쓰지 못하면(`result_unavailable`) 이 실행이 게시한 output을 지웁니다. 그래서 **output이 있으면 완전한 파일이고 결과 파일에 보고된 것이며, 종료 코드가 0이 아니면 output이 없습니다**(정리까지 실패한 경우만 예외이고 로그에 남습니다). 결과 파일이 비어 있으면 프로세스가 도중에 죽은 것이므로 새 경로로 다시 실행하고, output 옆에 남은 `<이름>.<난수>.tmp`는 지워도 됩니다. DB를 쓰지 않으므로 재실행은 언제나 안전합니다.
 
 ## 범위
 

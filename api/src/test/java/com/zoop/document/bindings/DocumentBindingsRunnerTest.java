@@ -1,12 +1,16 @@
 package com.zoop.document.bindings;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 import com.zoop.common.json.Canonical;
 import com.zoop.common.json.StrictJson;
@@ -54,6 +58,18 @@ class DocumentBindingsRunnerTest {
     private DocumentBindingsRunner runner(DocumentBindingsScope scope, boolean selected) {
         DocumentBindingsSettings settings = new DocumentBindingsSettings(output, result, selected ? selection : null, scope);
         return new DocumentBindingsRunner(settings, new BindingSelectionParser(), new DocumentBindingsExporter(repository));
+    }
+
+    /** The default run with the file writer replaced: the first write is the output, the second the result. */
+    private DocumentBindingsRunner runner(DocumentBindingsRunner.Writer writer) {
+        DocumentBindingsSettings settings = new DocumentBindingsSettings(output, result, null, DocumentBindingsScope.AVAILABLE);
+        return new DocumentBindingsRunner(settings, new BindingSelectionParser(), new DocumentBindingsExporter(repository), writer);
+    }
+
+    private List<String> files() throws IOException {
+        try (Stream<Path> entries = Files.list(base)) {
+            return entries.map(path -> path.getFileName().toString()).sorted().toList();
+        }
     }
 
     private Obj result() throws IOException {
@@ -173,6 +189,53 @@ class DocumentBindingsRunnerTest {
         assertEquals(DocumentBindingsFailure.RESULT_UNAVAILABLE, aborted.failure());
         assertEquals(firstOutput, Files.readString(output, StandardCharsets.UTF_8));
         assertEquals(firstResult, Files.readString(result, StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void theOutputIsNeverVisibleBeforeItIsWholeAndAnInterruptedWriteLeavesNothingBehind() throws Exception {
+        AtomicInteger writes = new AtomicInteger();
+        List<Boolean> outputSeenMidWrite = new java.util.ArrayList<>();
+        DocumentBindingsRunner.Writer interrupted = (channel, content) -> {
+            if (writes.incrementAndGet() > 1) {
+                DocumentBindingsRunner.WHOLE.write(channel, content);
+                return;
+            }
+            channel.write(ByteBuffer.wrap(content, 0, content.length / 2));
+            outputSeenMidWrite.add(Files.exists(output));
+            throw new IOException("no space left on device");
+        };
+
+        DocumentBindingsAbortedException aborted = assertThrows(DocumentBindingsAbortedException.class,
+                () -> runner(interrupted).run(null));
+
+        assertEquals(DocumentBindingsFailure.OUTPUT_UNAVAILABLE, aborted.failure());
+        assertEquals(List.of(false), outputSeenMidWrite, "half-written bytes are in a temporary file, not under the output's name");
+        assertFalse(Files.exists(output));
+        assertEquals(List.of("result.json"), files(), "the temporary file is removed");
+        assertEquals("output_unavailable", result().object("failure").string("code"));
+    }
+
+    @Test
+    void aResultThatCannotBeRecordedRemovesTheOutputThisRunPublished() throws Exception {
+        AtomicInteger writes = new AtomicInteger();
+        List<Boolean> outputPublishedBeforeResult = new java.util.ArrayList<>();
+        DocumentBindingsRunner.Writer resultFails = (channel, content) -> {
+            if (writes.incrementAndGet() == 1) {
+                DocumentBindingsRunner.WHOLE.write(channel, content);
+                return;
+            }
+            outputPublishedBeforeResult.add(Files.exists(output));
+            throw new IOException("I/O error");
+        };
+
+        DocumentBindingsAbortedException aborted = assertThrows(DocumentBindingsAbortedException.class,
+                () -> runner(resultFails).run(null));
+
+        assertEquals(DocumentBindingsFailure.RESULT_UNAVAILABLE, aborted.failure());
+        assertEquals(List.of(true), outputPublishedBeforeResult);
+        assertFalse(Files.exists(output), "a non-zero exit never leaves an output behind");
+        assertEquals(List.of("result.json"), files());
+        assertEquals(0, Files.size(result), "an empty result: outcome unknown, re-run with new paths");
     }
 
     @Test
