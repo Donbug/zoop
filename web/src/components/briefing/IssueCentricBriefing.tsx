@@ -534,9 +534,30 @@ function IssueCard({
                 </summary>
                 <div className="space-y-5">
                   {group.members.map((member) => (
-                    <section key={member.item.eventId}>
+                    <section
+                      key={member.item.eventId}
+                      aria-label={`${member.item.title} 원래 분석`}
+                    >
                       <h4 className="text-sm font-bold">{member.item.title}</h4>
                       <p className={`${NOTE} mt-2`}>{member.item.reason}</p>
+                      {member.companies.map((view) => {
+                        const connection = group.selections
+                          .find((s) => s.issueId === member.item.eventId)
+                          ?.connections.find(
+                            (c) => c.companyId === view.company.id,
+                          );
+                        return (
+                          <CompanyInIssue
+                            key={view.company.id}
+                            view={view}
+                            compact={false}
+                            commonFacts={facts}
+                            connection={connection?.basis.text ?? ''}
+                            position={connection?.position ?? 'unconfirmed'}
+                            evening={result.edition === 'evening'}
+                          />
+                        );
+                      })}
                       <IssueFollowUp
                         view={member}
                         result={result}

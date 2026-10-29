@@ -4,9 +4,21 @@ Grouping is an explicit editorial decision with exact source bindings. Equal
 companies/documents alone never imply the same event. No model/network calls.
 """
 import copy
+from briefing_issue_intelligence_view import project
 
 
-def annotate(response, recorded_round, groups=()):
+def annotate(response, recorded_round, groups=(), *, frozen, calls):
+    """Require the original frozen input and verified_calls() receipts, even on reuse.
+
+    Source ownership alone does not authenticate relation prose or price-ranking
+    flags. Rebuild the projection to bind both to the recorded model requests.
+    No model or network request is made here.
+    """
+    authenticated = project(response['preservedPublication']['response'], frozen,
+                            recorded_round, calls)['response']
+    for field in ('id', 'items', 'issueIntelligence', 'preservedPublication'):
+        if response[field] != authenticated[field]:
+            raise ValueError('reading_projection_changed:' + field)
     model = response['issueIntelligence']
     assert recorded_round['round']['roundId'] == response['id'], 'round_mismatch'
     assert model['roundId'] == response['id'], 'model_round_mismatch'

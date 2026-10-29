@@ -532,6 +532,44 @@ describe('D-BRF-01/02 new issue/company AI revision', () => {
     };
     return value;
   }
+  // D-BRF-01/02: grouped reading must retain each issue's original judgment.
+  it.each([
+    ['positive', 'negative', '긍정 요인', '부정 요인'],
+    ['mixed', 'watch', '긍정·부정 혼재', '판단 유보'],
+  ] as const)(
+    'preserves %s/%s judgments in the compact group member details',
+    async (first, second, firstLabel, secondLabel) => {
+      const value = reviewed();
+      const members = value.issueIntelligence!.issues.slice(0, 2);
+      members[0].companies[0].assessment = first;
+      members[1].companies[0].assessment = second;
+      const original = structuredClone(value);
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <IssueCentricBriefing result={value} />
+        </MemoryRouter>,
+      );
+      await user.click(screen.getByText('같은 결정과 조건부 후속 절차'));
+      await user.click(screen.getByText('세부 사건의 원래 분석·근거·평가'));
+      for (const [index, label] of [firstLabel, secondLabel].entries()) {
+        const member = within(
+          screen.getByRole('region', {
+            name: value.items[index].title + ' 원래 분석',
+          }),
+        );
+        expect(member.getByText('사업 영향 · ' + label)).toBeTruthy();
+        expect(
+          member.getAllByText(members[index].companies[0].takeaway.text).length,
+        ).toBeGreaterThan(0);
+        await user.click(member.getByText('자세한 사업 분석·전망'));
+        expect(
+          member.getAllByText(members[index].companies[0].outlook.text).length,
+        ).toBeGreaterThan(0);
+      }
+      expect(value).toEqual(original);
+    },
+  );
   it('groups only explicitly reviewed components and preserves independent same-company events', () => {
     const value = reviewed(),
       original = structuredClone(value),
