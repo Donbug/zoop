@@ -212,6 +212,25 @@ class ChatMcpAgentTest {
     }
 
     @Test
+    void aConceptMayMakeOneSearchFromTheFirstRound() {
+        useWeb();
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(search("w1", "HBM"), search("w2", "EUV 수출 규제")),
+                null));
+        luna.script.add(n -> done());
+        var circuit = new ChatMcpCircuitBreaker(() -> new com.zoop.ai.chat.ChatMcpHealth(true, null), clock);
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, mapper, circuit);
+        var attached = executor.attach(JOB, 1).orElseThrow();
+        var outcome = agent.run(attached.run(), attached.control(),
+                List.of(new ChatModels.AgentRequirement("r1", "HBM이 뭐야", true, List.of())),
+                List.of(ChatCapability.WEB_SEARCH), 20, steps(false));
+
+        assertEquals(List.of(new ChatModels.Decision("w1", true), new ChatModels.Decision("w2", false)),
+                luna.inputs.get(1).decisions(), "one search for the concept; nothing internal left more unmet");
+        assertEquals(1, outcome.results().size());
+        assertEquals(2, outcome.results().getFirst().webResults().size());
+    }
+
+    @Test
     void webFaultsTheAnswerWentOnWithoutAreNoticesNeverAFailure() {
         useWeb();
         luna.script.add(n -> held("c1", "company_read", Map.of("targets", List.of("KRX:000660"))));
