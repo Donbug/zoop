@@ -7,11 +7,12 @@
 | 있음 (2026-10-30) | 아직 없음 |
 | --- | --- |
 | `web.search` 도구(`ChatWebSearchTool`), 공급자 포트(`ChatWebSearchProvider`), 합성 공급자 | 실제 공급자(미선정), 공급자 키·약관·처리 국가 결정 |
-| 검색어 검사(`ChatWebQueryPolicy`) | 서버의 웹 단계 연결: Q02 기본 1회, Q03~Q08 미충족 요구에만 마지막 검색 |
+| 검색어 검사(`ChatWebQueryPolicy`) | Q02 기본 1회 검색(Q02만인 계획은 아직 direct 경로라 웹이 없음) |
+| agent 경로의 MCP 도구 노출과 Java 승인 gate(5장), `web-search:<공급자>` 전송 grant 검사, 웹 장애·예산 → notice | 요구별 미충족 판단(승인 요청에 요구 ID가 없어 run 단위로 판단) |
 | 호출당 7초, job당 웹 2회(내부 6회와 별도), 회원 하루 20회·프로젝트 하루 500회 원자 예약 | 답변 인용 계약(`web_reported` basis, `Citation.sourceKind=web_result`), AI 단계 계약, 화면 |
-| `web_*` notice 문구(`ChatResults`) | `web-search:<공급자>` model-send grant 검사, snapshot 저장·재열람 |
+| `web_*` notice 문구(`ChatResults`) | snapshot 저장·재열람, Jev 후검증 쪽 전송 grant |
 
-지금은 라우터·계획이 이 도구를 고르지 않고 MCP에도 노출되지 않는다(`ChatToolRegistry.bound()`에서 빠짐). 켜도 어떤 질문도 웹을 쓰지 않는다.
+라우터·서버 계획은 이 도구를 고르지 않는다(`ChatToolRegistry.bound()`에서 빠짐). 등록되면 MCP 도구로 노출되고, agent 경로에서만 Luna가 요청하고 서버가 승인한다(5장). **인용 계약이 없는 동안 웹 도구와 agent 경로를 함께 켜면 기동을 거절한다**: 웹에서 읽은 내용이 검사할 인용 없이 답에 섞일 수 있기 때문이다. 그래서 지금은 어떤 질문도 웹을 쓰지 않으며, 연결은 시험으로만 확인한다.
 
 ## 2. 켜는 방법 (로컬·시험 전용)
 
@@ -44,13 +45,26 @@ ZOOP_CHAT_WEB_ENABLED=true ZOOP_CHAT_WEB_PROVIDER=synthetic
 - 예약된 웹 호출은 성공·실패·timeout·미시작과 관계없이 일일 한도에서 센다.
 - 이 예외는 job 실패가 아니다. 서버 웹 단계가 연결되면 `web_budget_exhausted` notice로 바꾸고 내부 답변을 계속한다.
 
-## 5. 시험
+## 5. agent 경로의 승인 (`ChatMcpAgent`)
+
+1. **노출**: 사실 질문(Q03~Q08) 요구가 있는 agent 계획에만 허용 도구로 `web_search`를 더한다. Q01 서비스 안내와 Q02 개념만인 계획에는 넣지 않는다.
+2. **마지막 수단**: 웹 요청은 대상 ID가 아니라 검색어를 받으므로 도달 가능 ID 검사를 하지 않는다. 대신 앞 라운드에서 승인·실행된 내부 조회 중 0건이거나 상한에 잘린 결과가 있을 때만 승인한다. 그래서 첫 라운드의 웹 요청은 언제나 거부된다. 승인 요청에 요구 ID가 없어 이 판단은 run 단위다([chat-mcp.md](chat-mcp.md) 5장 4).
+3. **검색어·형식**: 인자는 `targets`(검색어 정확히 1개, 2~80자)와 `limit`(1~5)뿐이다. `ChatWebQueryPolicy`를 통과한 정규화 검색어로 예약하므로, 승인과 `/mcp` 실행의 digest가 같다. 회원에 관한 검색어는 `invalid_arguments`로 거부된다.
+4. **예산**: 승인 = 예약이며, job당 웹 2회와 회원·프로젝트의 그날 한도를 그때 차감한다. 모자라면 `web_budget_exhausted`로 거부하고 notice로 남긴다.
+5. **전송**: 결과의 웹 hit은 `web-search:<공급자>` grant가 `chat-agent` 수신자에 허용될 때만 모델에 보낸다. 아니면 hit과 그 항목을 통째로 빼고 `withheld.webResults`에 개수만 적는다.
+6. **notice**: 승인됐는데 결과가 남지 않은 검색은 `web_unavailable`, 0건은 `web_no_results`, 예산 거부는 `web_budget_exhausted`다. 답변을 막지 않으며 answered 결과의 `notices`에 붙는다(요구 표현 없음).
+
+## 6. 시험
 
 ```sh
 ./api/gradlew -p api test --tests 'com.zoop.chat.tool.ChatWebSearch*' --tests 'com.zoop.chat.executor.ChatJobExecutorTest'
 ```
 
-- `ChatWebSearchToolTest`: 검색어 허용·거절, 합성 결과의 형태, 0건·장애, 공급자에 닿지 않는 거절, 쓸 수 없는 결과 제거·자르기·중복 합치기, 예약 도메인 밖 fixture 거절, 레지스트리가 실행은 하되 계획·MCP에 내놓지 않음.
+- `ChatWebSearchToolTest`: 검색어 허용·거절, 합성 결과의 형태, 0건·장애, 공급자에 닿지 않는 거절, 쓸 수 없는 결과 제거·자르기·중복 합치기, 예약 도메인 밖 fixture 거절, 레지스트리가 실행은 하되 계획에 내놓지 않음.
 - `ChatWebSearchConfigurationTest`: 기본 꺼짐, 공급자 없이 켜면 기동 거절, 합성 공급자로 켜면 등록.
 - `ChatJobExecutorTest`: job당 웹 2회와 내부 6회 분리, 회원·프로젝트 일일 한도의 전부 아니면 전무.
 - `ChatExecutorPostgresTest`(PostgreSQL): 한도 행의 원자 증가, 회원 거절 시 프로젝트 몫 미차감, 회원 탈퇴 시 회원 행 삭제.
+- `ChatMcpAgentTest`: 실제 MCP 도구 위에서 첫 라운드 웹 거부, 내부 0건 뒤 승인, 회원에 관한 검색어 거부, 결과의 웹 hit이 원장에서 돌아옴, 0건·장애·job 예산 초과가 notice가 되고 답은 계속됨.
+- `ChatMcpSendGateTest`: 웹 hit은 그 공급자의 grant가 있을 때만 전송.
+- `ChatAgentPathEngineTest`: 사실 질문의 agent 실행에 웹 도구가 허용되고 웹 notice가 결과에 붙으며 complete를 유지.
+- `ChatMcpConfigurationTest`: 웹 도구와 agent 경로를 함께 켜면 기동 거절.
