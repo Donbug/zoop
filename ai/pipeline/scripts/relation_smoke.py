@@ -193,7 +193,7 @@ class RelKit(Kit):
             store.close()
 
 
-def build_world(root: Path, countries: tuple[str, ...] = ()) -> SimpleNamespace:
+def build_world(root: Path, countries: tuple[str, ...] = (), *, snapshot_countries: tuple[str, ...] = ()) -> SimpleNamespace:
     """Actual ingestion subprocess + actual S2 extraction (in-process) producing one READY upstream job with an event candidate,
     a snapshot event and a topic candidate. Nothing downstream may be written into it."""
     kit = RelKit(root)
@@ -202,6 +202,7 @@ def build_world(root: Path, countries: tuple[str, ...] = ()) -> SimpleNamespace:
     art = {"main": kit.article(main), "b": kit.article(other)}
     mention = {**kit.mention(art["main"], "m-main", [kit.evidence(art["main"], EVT)]), "countries": list(countries)}
     mention_b = kit.mention(art["b"], "m-b", [kit.evidence(art["b"], QB)], period="2026Q4", title="합성 공장 착공", action="공장 착공 알림")
+    mention_b["countries"] = list(snapshot_countries)
     snapshot = kit.event("event-1", [(other, mention_b)])
     replay = kit.replay("s2").extract(art["main"], [mention]).compare(mention, "event-1", [(other, art["b"], mention_b)], art["main"], "DIFFERENT", "다른 사건", []).write()
     request = kit.submit("s2-job", main, [snapshot], topic=True)

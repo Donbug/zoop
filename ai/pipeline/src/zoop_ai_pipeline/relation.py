@@ -19,12 +19,13 @@ from pathlib import Path
 
 from . import live_prompts
 from . import relation_rules as rules
+from . import country_context
 from .dependency_contracts import array, cites, invalid
-from .extraction import Extractor, Sources, cite_exact, upstream_digest
+from .extraction import Extractor, Sources, cite_exact, live_physical_calls, live_usage, upstream_digest
 from .extraction import Store as ExtractionStore
 from .extraction_contracts import ObservationRef, ProviderResponseUnknown
 from .ingestion_contracts import byte_hash, now, reserved_state_roots
-from .live_runtime import LiveFailure, LiveRuntime
+from .live_runtime import LiveFailure, LiveRuntime, physical_attempts
 from .relation_contracts import (BASIS_AUTOMATIC, BASIS_OPERATOR, CANDIDATE_VERSION, EFFECT_APPROVED, EFFECT_EXCLUDED, EFFECT_LEGACY_REVALIDATION,
     EFFECT_OF, IMPACT_CANDIDATE_VERSION, IMPACT_POLICY, IMPACT_PRODUCER, IMPACT_VERIFIER, LABEL_NOTE, LABELS, LEDGER_VERSION, MAX_DOCUMENTS, POLICY,
     PRODUCER, REQUEST, REVALIDATION_POLICY, SCHEMA, VERIFIER, VOCABULARY, CitationFailure, ExtractionFailure, Replay, ReplyInvalid, Review, Submit,
@@ -333,7 +334,7 @@ class Engine:
             topics.append({"ref": t["topicCandidateId"], "label": t["label"], "criteria": t["criteria"], "members": [{"kind": m["kind"], "ref": m["ref"]} for m in t["members"]]})
             view_topics[t["topicCandidateId"]] = {"names": [t["label"]], "docs": keys}
         companies = {c.company_id: [c.name, *c.aliases] for c in submit.catalogue.companies}
-        view = rules.View(companies, view_events, view_topics, {str(c) for c in countries}, self._cite_for(docs))
+        view = rules.View(companies, view_events, view_topics, country_context.resolve(countries), self._cite_for(docs))
         return Context(request, request.provenance.source_kind == "synthetic", result, docs, view,
                        sorted(events, key=lambda e: e["ref"]), sorted(topics, key=lambda t: t["ref"]), upstream_digest(result),
                        live=request.provenance.execution_mode == "live")
@@ -350,7 +351,8 @@ class Engine:
         """Replay-identical frozen identity. A live job adds `runtime` (the secret-free provider/prompt/budget-free runtime binding) at freeze only."""
         return {"schema": SCHEMA, "candidate": CANDIDATE_VERSION, "impactCandidate": IMPACT_CANDIDATE_VERSION,
                 "versions": {"producer": PRODUCER, "verifier": VERIFIER, "impactProducer": IMPACT_PRODUCER, "impactVerifier": IMPACT_VERIFIER,
-                             "policy": POLICY, "revalidationPolicy": REVALIDATION_POLICY, "impactPolicy": IMPACT_POLICY},
+                             "policy": POLICY, "revalidationPolicy": REVALIDATION_POLICY, "impactPolicy": IMPACT_POLICY,
+                             "countryContext": country_context.VERSION},
                 "upstream": {"jobId": ctx.request.upstream.job_id, "inputDigest": ctx.request.upstream.input_digest, "digest": ctx.digest},
                 "provenance": ctx.request.provenance.wire()}
 
@@ -399,14 +401,14 @@ class Engine:
     def _is_live(row) -> bool:
         return json.loads(row["request"])["provenance"]["executionMode"] == "live"
 
-    def _authorize_send(self, ctx: Context, runtime: LiveRuntime, stage: str, documents=None) -> None:
+    def _authorize_send(self, ctx: Context, runtime: LiveRuntime, stage: str, documents=None, *, recipient: str | None = None) -> None:
         """Current model-send authority for the whole SOURCE DEPENDENCY CLOSURE of this stage, under this stage's purpose and recipient.
 
         Quoted documents are not the only source-derived content that reaches the provider: endpoint names, event titles/participants, topic labels and
         the generated relation itself all derive from EVERY document the S2 job bound (the producer saw them all, and a name cannot be attributed to
         one document). So every downstream model stage (generation, verification, impact, impact verification) requires model-send for each
         bound source document, even though only `documents` have their raw text sent. This only widens the authority check; no extra text is sent."""
-        purpose, recipient = runtime.purpose(stage), runtime.recipient(stage)
+        purpose, recipient = runtime.purpose(stage), runtime.recipient(stage) if recipient is None else recipient
         for key in sorted(ctx.docs):
             self.sources.authorize_model_send(ctx.docs[key].ref, purpose, recipient)
 
@@ -522,9 +524,9 @@ class Engine:
             raise ExtractionFailure("job_cancelled_or_fenced")
 
     def _unknown_calls(self, job_id: str, rc: str | None = None) -> list:
-        """Started calls with no receipt whose transmission is UNKNOWN (never a definitively refused one). With `rc`, only those that could still
-        write that relation's verdict or impact."""
-        rows = self.store.all("SELECT ref FROM calls WHERE job_id=? AND state='started' AND response IS NULL AND attempt_id NOT IN "
+        """Started logical invocations with an UNKNOWN physical outcome, including a partial chain containing a known primary receipt.
+        A definitively refused invocation is excluded. With `rc`, only calls that could still write that relation's verdict or impact."""
+        rows = self.store.all("SELECT ref FROM calls WHERE job_id=? AND state='started' AND attempt_id NOT IN "
                               "(SELECT ref FROM stages WHERE job_id=? AND stage='refusal')", (job_id, job_id))
         if rc is None:
             return rows
@@ -626,8 +628,10 @@ class Engine:
         self.db.execute("INSERT OR IGNORE INTO stages VALUES(?,'refusal',?,?,?)", (job_id, attempt, canonical({"code": code}), now()))
 
     def _receive(self, attempt: str, raw) -> None:
-        self.db.execute("UPDATE calls SET state='received',response=?,response_digest=?,received_at=? WHERE attempt_id=? AND state='started'",
-            (canonical(raw), digest(raw), now(), attempt))
+        unknown = isinstance(raw, dict) and raw.get("format") == "zoop-live-chain-receipt-1" and any(
+            a["state"] == "unknown" for a in physical_attempts(raw))
+        self.db.execute("UPDATE calls SET state=?,response=?,response_digest=?,received_at=? WHERE attempt_id=? AND state='started' AND response IS NULL",
+            ("started" if unknown else "received", canonical(raw), digest(raw), now(), attempt))
 
     def _receipted(self, row, ctx: Context, fence: int, stage: str, ref: str, payload: dict, parse, *, fixtures: Fixtures | None = None,
                    role: str | None = None, documents=(), check=None):
@@ -650,7 +654,7 @@ class Engine:
         if call is None:
             if ctx.live:
                 attempt, receipt = self._send(row, ctx, fence, stage, ref, key, payload, documents)
-                result = self._answer(row, ctx, stage, attempt, receipt, parse, documents)
+                result = self._answer(row, ctx, stage, attempt, receipt, payload, parse, documents)
             else:
                 raw, fixture_hash = fixtures.find(role, stage, key, ctx.synthetic)
                 self._verify(ctx)
@@ -676,7 +680,7 @@ class Engine:
             if ctx.live:
                 if not isinstance(raw, dict) or raw.get("attemptId") != attempt:
                     raise ExtractionFailure("receipt_integrity_failed")
-                result = self._answer(row, ctx, stage, attempt, raw, parse, documents)
+                result = self._answer(row, ctx, stage, attempt, raw, payload, parse, documents)
             else:
                 try:
                     result = parse(raw)
@@ -695,11 +699,12 @@ class Engine:
         return result
 
     def _send(self, row, ctx: Context, fence: int, stage: str, ref: str, key: str, payload: dict, documents):
-        """Live transmission. Ordering: pure prepare -> current rights for every sent document -> durable reservation -> the runtime reserves
-        budget, calls `authorize` immediately before sending and sends once -> the raw receipt is persisted before anything parses it.
-        A transport failure leaves the reservation `started` (unknown, never resent); a refusal before sending is recorded as such."""
+        """Reserve one logical invocation; runtime journals each physical attempt before considering fallback.
+        Primary and fallback callbacks independently authorize the same source dependency closure for the exact recipient. A partial unknown
+        envelope is stored once with state started, never treated as a completed receipt or permission to resend."""
         job_id = row["job_id"]
         runtime = self._runtime(row, send=True)
+        fallback = runtime.fallback_recipient(stage)
         try:
             prepared = runtime.prepare(stage, payload)
         except LiveFailure as exc:
@@ -713,12 +718,21 @@ class Engine:
             self._verify(ctx)
             self._authorize_send(ctx, runtime, stage, documents)
 
+        def authorize_fallback() -> None:
+            self._guard(job_id, fence)
+            self._verify(ctx)
+            self._authorize_send(ctx, runtime, stage, documents, recipient=fallback)
+
         try:
-            receipt = runtime.send(prepared, attempt_id=attempt, authorize=authorize)
+            receipt = runtime.send(prepared, attempt_id=attempt, authorize=authorize,
+                                   **({"authorize_fallback": authorize_fallback} if fallback is not None else {}))
         except LiveFailure as exc:
+            if exc.receipt is not None:
+                self._receive(attempt, exc.receipt)
             if exc.uncertain:
                 raise ProviderResponseUnknown(exc.code) from exc
-            self._refuse(job_id, attempt, exc.code)
+            if exc.receipt is None:
+                self._refuse(job_id, attempt, exc.code)
             raise ExtractionFailure(exc.code) from exc
         except ExtractionFailure as exc:
             self._refuse(job_id, attempt, exc.code)
@@ -726,19 +740,35 @@ class Engine:
         self._receive(attempt, receipt)
         return attempt, receipt
 
-    def _answer(self, row, ctx: Context, stage: str, attempt: str, receipt: dict, parse, documents):
+    def _answer(self, row, ctx: Context, stage: str, attempt: str, receipt: dict, payload: dict, parse, documents):
         """Strict decode of a PERSISTED receipt into the native response and its pure parser. Any fault marks the receipt permanently.
 
         A producer model cannot count code points, so its citations may carry no offsets: `resolve_citations` fills them ONLY from a unique literal
         quote in the exact prepared text of a document that was sent (identity is never repaired); everything else still faces the exact check."""
         runtime = self._runtime(row, send=False)
+        frozen = json.loads(row["binding"])["runtime"]
+        if "fallback" in frozen.get("generation", {}):
+            if runtime.fallback_recipient(stage) is not None and receipt.get("format") != "zoop-live-chain-receipt-1":
+                raise ExtractionFailure("receipt_binding_mismatch")
+            expected = runtime.prepare(stage, payload)["requestDigest"]
+            if (receipt.get("attemptId"), receipt.get("stage"), receipt.get("bindingIdentity"), receipt.get("requestDigest")) != (
+                    attempt, stage, frozen["identity"], expected):
+                raise ExtractionFailure("receipt_binding_mismatch")
+            if receipt.get("format") == "zoop-live-chain-receipt-1" and receipt.get("logicalAttemptId") != attempt:
+                raise ExtractionFailure("receipt_binding_mismatch")
         try:
             raw = runtime.answer(stage, receipt)
             if stage in {"relation", "impact"}:
                 raw = live_prompts.resolve_citations(raw, {key: ctx.docs[key].export["document"]["text"] for key in documents})
         except LiveFailure as exc:
+            if exc.uncertain:
+                raise ProviderResponseUnknown(exc.code) from exc
             self._mark(attempt, exc.code)
             raise ReplyInvalid(exc.code) from exc
+        if receipt.get("format") == "zoop-live-chain-receipt-1":
+            for physical in physical_attempts(receipt):
+                if physical["state"] == "received":
+                    self._authorize_send(ctx, runtime, stage, documents, recipient=physical["receipt"]["recipient"])
         try:
             return parse(raw)
         except ReplyInvalid as exc:
@@ -891,6 +921,8 @@ class Engine:
         refused = {s["ref"]: json.loads(s["summary"])["code"] for s in stages if s["stage"] == "refusal"}
         received = sum(c["state"] == "received" for c in calls)
         unknown = sum(c["state"] == "started" and c["attempt_id"] not in refused for c in calls)
+        chain_live = live and "fallback" in binding.get("runtime", {}).get("generation", {})
+        physical_usage = live_usage(job_id, [{**dict(c), "state": "unsent" if c["attempt_id"] in refused else c["state"]} for c in calls]) if chain_live else None
         candidates = self.store.all("SELECT * FROM relation_candidates WHERE job_id=? ORDER BY relation_candidate_id", (job_id,))
         result = {"schemaVersion": SCHEMA, "jobId": job_id, "inputDigest": row["input_digest"], "state": row["state"], "phase": row["phase"],
             "resumeMode": row["resume_mode"], "failure": {"code": row["failure"], **({"detail": json.loads(row["detail"])} if row["detail"] else {})} if row["failure"] else None,
@@ -903,6 +935,10 @@ class Engine:
                       "providerCalls": received + unknown if live else 0, "modelCalls": received + unknown if live else 0, "creatorJobId": job_id},
             "calls": [{"stage": c["stage"], "state": "refused" if c["state"] == "started" and c["attempt_id"] in refused else c["state"], "requestDigest": c["request_digest"],
                        "fixtureHash": c["fixture_hash"], "responseDigest": c["response_digest"], "verdict": c["verdict"] or refused.get(c["attempt_id"])} for c in calls]}
+        if physical_usage is not None:
+            result["usage"] = {**physical_usage, "modelCalls": physical_usage["providerCalls"]}
+            for projected, call in zip(result["calls"], calls):
+                projected["physicalAttempts"] = live_physical_calls(call)
         if row["state"] == "cancelled":
             result["delivery"] = {"status": "withheld", "code": "job_cancelled"}
             return result

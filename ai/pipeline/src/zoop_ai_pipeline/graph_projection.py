@@ -35,10 +35,11 @@ from .graph_projection_contracts import (APPROVAL_KEYS, APPROVAL_KINDS, DEPTHS, 
     MAX_ATTEMPTS, MAX_EDGES, MAX_EVIDENCE, MAX_NODES, MAX_PLAN, MAX_REGISTRY, PLAN_VERSION, SCHEMA, STORE_SCHEMA, UNRESOLVED_SHOWN, CanonicalEntry,
     CanonicalRegistry, ExtractionFailure, Focus, Freeze, Init, Selector, Withheld, canonical, digest, entry_key, graph_digest, marker_props, normalized_props,
     plan_graph_digest, relation_id, stored_props)
-from .ingestion_contracts import Authority, IngestionFailure, copy_bounded, now, read_file, reserved_state_roots, timestamp
+from .ingestion_contracts import IngestionFailure, copy_bounded, now, read_file, reserved_state_roots, timestamp
 from .relation import Engine
 from .relation import Store as RelationStore
 from .relation_contracts import MAX_PATH
+from .private_processing import select_authority
 
 _SQL = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -456,8 +457,9 @@ class Paths:
     relation: Path
     extraction: Path
     ingestion: Path
-    sources: Path
+    sources: Path | None
     canonical: Path
+    private_processing: Path | None = None
 
 
 class Source:
@@ -475,7 +477,8 @@ class Source:
         self.store.close()
 
     def inspect(self, job_id: str) -> dict:
-        engine = Engine(self.store, Sources(self.paths.ingestion, Authority(self.paths.sources)), self.paths.extraction, self.paths.ingestion)
+        authority = select_authority(self.paths.sources, self.paths.private_processing)
+        engine = Engine(self.store, Sources(self.paths.ingestion, authority), self.paths.extraction, self.paths.ingestion)
         return engine.inspect(job_id)
 
 

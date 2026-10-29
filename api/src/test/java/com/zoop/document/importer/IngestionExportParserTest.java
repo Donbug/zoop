@@ -69,6 +69,25 @@ class IngestionExportParserTest {
     }
 
     @Test
+    void declaredNativeLanguageDoesNotChangeDocumentIdentityOrPublicMetadata() {
+        for (String language : List.of("ko", "en-US", "und", "x".repeat(35))) {
+            ObjectNode export = export(observation, MIXED_TEXT, MIXED_HASH);
+            observationOf(export).put("language", language);
+            VerifiedDocument document = parser.parse(ExportFixtures.bytes(export), observation);
+            assertEquals(observation, document.observation());
+            assertEquals(MIXED_TEXT, document.text());
+            assertEquals("authored", document.title());
+            assertNull(document.publisher());
+        }
+        for (String language : List.of("", "k", "x".repeat(36))) {
+            assertEquals(DocumentImportFailure.EXPORT_INVALID,
+                    failureOf(e -> observationOf(e).put("language", language)));
+        }
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).putNull("language")));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).put("language", 7)));
+    }
+
+    @Test
     void sourceHashIsPythonCanonicalJsonOfTheText() {
         // (text, sourceHash) pairs computed by Python json.dumps(ensure_ascii=False) + sha256.
         List<String[]> vectors = List.of(

@@ -5,12 +5,21 @@ import copy
 
 import pytest
 
-from tests.live_support import choice, endpoint, facts, quote, verify_impact_payload, verify_relation_payload
+from tests.live_support import choice, endpoint, environment, facts, quote, verify_impact_payload, verify_relation_payload
 from zoop_ai_pipeline import live_jev as jev
+from zoop_ai_pipeline import relation_rules as rules
+from zoop_ai_pipeline.live_runtime import LiveFailure, LiveRuntime
 from zoop_ai_pipeline.relation_contracts import ImpactVerifierResponse, VerifierResponse
 from zoop_ai_pipeline.relation_rules import decide_impact, decide_relation
 
 MODEL = "jev-1.14.0"
+
+# Historical prompt fixture, not a compatibility path. The comparison changes this one question only.
+OLD_SCOPE_QUESTION = (
+    "Read the quotes {labels} in `state.quotes` together as one passage. Do they describe the relationship as limited to "
+    "exactly `state.relation.businessScope` (business) and `state.relation.productScope` (product)? A null value asserts no "
+    "restriction and must not be contradicted."
+)
 
 
 def relation_body():
@@ -40,6 +49,98 @@ def test_the_relation_request_sends_only_quote_text_and_fixed_facts_and_one_type
     assert list(body["questions"]["claim-0"]["criteria"]) == ["supported", "contradicted", "insufficient"], "reversed is illegal for a subject"
     assert "Q1" in body["questions"]["claim-2"]["instructions"]["question"] and "Q2" not in body["questions"]["claim-2"]["instructions"]["question"], \
         "a claim names only its own allowed quotes (ev-b is the first quote of the payload, so Q1)"
+
+
+@pytest.mark.parametrize("business, product, text, verdicts, eligibility", [
+    pytest.param(None, "반도체", "가상공급은 가상고객에 반도체를 공급한다.", {}, "eligible", id="unknown-business"),
+    pytest.param("반도체 사업", None, "가상공급은 반도체 사업에서 가상고객에 제품을 공급한다.", {}, "eligible", id="unknown-product"),
+    pytest.param(None, None, "가상공급은 가상고객에 반도체를 공급한다.", {}, "eligible", id="both-unknown"),
+    pytest.param("의료 사업", "반도체", "가상공급은 가상고객에 반도체를 공급한다.",
+                 {"scope": "insufficient"}, "hold", id="one-of-two-facts-unsupported"),
+    pytest.param(None, "반도체만", "가상공급은 가상고객에 반도체를 공급한다.",
+                 {"scope": "insufficient"}, "hold", id="exclusivity-unsupported"),
+    pytest.param(None, "반도체만", "가상공급은 가상고객에 반도체만 공급한다.", {}, "eligible", id="exclusivity-stated"),
+    pytest.param(None, "자동차 부품", "가상공급은 가상고객에 반도체를 공급하며 자동차 부품은 공급하지 않는다.",
+                 {"scope": "contradicted"}, "reject", id="scope-contradicted"),
+    pytest.param(None, "반도체", "다른공급은 가상고객에 반도체를 공급한다.",
+                 {"subject": "contradicted"}, "reject", id="wrong-business-identity"),
+    pytest.param(None, None, "가상공급과 가상고객은 각각 반도체 사업을 운영한다.",
+                 {"type": "insufficient", "direction": "insufficient"}, "hold", id="same-business-is-not-supply"),
+])
+def test_scope_requests_preserve_facts_and_all_claims_still_gate_the_decision(business, product, text, verdicts, eligibility):
+    """Synthetic request/gate contract only: authored provider choices do not prove Jev's semantic accuracy."""
+    candidate = {**facts(), "businessScope": business, "productScope": product,
+                 "citations": [{"evidenceId": "ev-scope"}], "validity": {"from": None, "until": None, "citations": []}}
+    payload = verify_relation_payload()
+    payload["relation"] = {**facts(), "businessScope": business, "productScope": product}
+    payload["quotes"] = [quote("ev-scope", text)]
+    payload["claims"] = rules.claims(candidate)
+    before = copy.deepcopy(payload)
+    body, expect = jev.build_relation_request(payload, MODEL)
+    assert payload == before
+    assert body["state"]["relation"]["businessScope"] == business
+    assert body["state"]["relation"]["productScope"] == product
+    assert body["state"]["relation"]["subject"] == {"kind": "company", "names": ["가상공급"]}
+    assert body["state"]["relation"]["object"] == {"kind": "company", "names": ["가상고객"]}
+    assert body["state"]["quotes"] == [{"label": "Q1", "text": text}]
+    expected_ids = ["subject", "object", "type", "direction"]
+    if business is not None or product is not None:
+        expected_ids.append("scope")
+    assert [claim["claimId"] for claim in expect["claims"]] == expected_ids
+    assert all(claim["quoteIds"] == ["ev-scope"] for claim in expect["claims"])
+    winners = {f"claim-{i}": verdicts.get(claim_id, "supported") for i, claim_id in enumerate(expected_ids)}
+    response, audit = jev.interpret_relation(answers_for(body, winners), expect, MODEL)
+    assert decide_relation({"claims": payload["claims"]}, response)["eligibility"] == eligibility
+    assert [row["decision"] for row in audit] == [verdicts.get(claim_id, "supported") for claim_id in expected_ids]
+    assert all(row["quoteIds"] == (["ev-scope"] if row["verdict"] == "supported" else []) for row in response["claims"])
+    if "scope" in expected_ids:
+        # Keeping the scope claim in the request is not enough: a missing/uncertain answer must never auto-pass it.
+        missing = answers_for(body, winners)
+        missing["answers"].pop(f"claim-{expected_ids.index('scope')}")
+        with pytest.raises(ValueError, match="live_answers_invalid"):
+            jev.interpret_relation(missing, expect, MODEL)
+
+
+@pytest.mark.parametrize("p, confidence, expected", [(0.90, 0.80, "eligible"), (0.899, 0.95, "hold"), (0.97, 0.799, "hold")])
+def test_scope_correction_keeps_the_existing_probability_and_confidence_gates(p, confidence, expected):
+    body, expect = relation_body()
+    reply = answers_for(body)
+    reply["answers"]["claim-4"] = choice("supported", jev.CLAIM_OPTIONS, p, confidence)
+    response, audit = jev.interpret_relation(reply, expect, MODEL)
+    assert decide_relation({"claims": verify_relation_payload()["claims"]}, response)["eligibility"] == expected
+    assert audit[4]["choice"] == "supported"
+    assert audit[4]["probabilities"]["supported"] == p and audit[4]["confidence"] == confidence
+
+
+def test_scope_question_change_has_a_new_binding_without_changing_other_questions_or_reinterpreting_answers(monkeypatch, tmp_path):
+    environment(monkeypatch, tmp_path)
+    current = LiveRuntime.from_env()
+    payload = verify_relation_payload()
+    prepared = current.prepare("verify-relation", payload)
+    with monkeypatch.context() as prior:
+        prior.setitem(jev.CLAIM_TEMPLATES, "scope", OLD_SCOPE_QUESTION)
+        historical = LiveRuntime.from_env()
+        old_binding = historical.binding()
+        old_prepared = historical.prepare("verify-relation", payload)
+        old_reply = answers_for(old_prepared["body"], {"claim-4": "insufficient"})
+        old_decoded = jev.interpret_relation(old_reply, old_prepared["expect"], MODEL)
+    assert prepared["bindingIdentity"] != old_prepared["bindingIdentity"]
+    assert prepared["promptVersion"] != old_prepared["promptVersion"]
+    assert prepared["schemaDigest"] != old_prepared["schemaDigest"]
+    assert prepared["requestDigest"] != old_prepared["requestDigest"]
+    assert prepared["body"]["state"] == old_prepared["body"]["state"]
+    assert prepared["expect"] == old_prepared["expect"]
+    questions, old_questions = prepared["body"]["questions"], old_prepared["body"]["questions"]
+    assert {key for key in questions if questions[key] != old_questions[key]} == {"claim-4"}
+    assert questions["claim-4"]["criteria"] == old_questions["claim-4"]["criteria"]
+    assert current.binding()["verifier"]["policy"] == old_binding["verifier"]["policy"]
+    assert not current.accepts(old_binding)
+    with pytest.raises(LiveFailure, match="live_binding_mismatch"):
+        LiveRuntime.from_binding(old_binding)
+    # The pure decoder retains the historical insufficient verdict; this is not a fresh semantic judgment.
+    assert jev.interpret_relation(old_reply, old_prepared["expect"], MODEL) == old_decoded
+    assert decide_relation({"claims": payload["claims"]}, old_decoded[0])["eligibility"] == "hold"
+    assert list(tmp_path.iterdir()) == [], "preparing/comparing identities must not create a budget or state"
 
 
 def test_supported_claims_cite_exactly_their_allowed_quotes_and_the_result_satisfies_the_native_contract():
@@ -96,6 +197,7 @@ def test_indirect_relations_get_step_and_connection_questions():
 @pytest.mark.parametrize("mutate", [
     lambda p: p["claims"].append({"claimId": "invented", "quoteIds": ["ev-a"]}),
     lambda p: p["claims"].__setitem__(0, {"claimId": "subject", "quoteIds": ["ev-unknown"]}),
+    lambda p: p["claims"].__setitem__(4, {"claimId": "scope", "quoteIds": ["ev-unseen"]}),
     lambda p: p.__setitem__("claims", []),
     lambda p: p["quotes"].append(quote("ev-a")),
     lambda p: p["quotes"][0].__setitem__("text", ""),

@@ -13,12 +13,13 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
+from .country_context import VERSION as COUNTRY_CONTEXT
 from .extraction_contracts import ExtractionFailure, ObservationRef
 from .graph_projection_contracts import APPROVAL_KEYS, APPROVAL_KINDS
 from .ingestion_contracts import Wire, canonical, digest, timestamp
 from .issue_summary_contracts import POLICY as ISSUE_SUMMARY_POLICY
 from .issue_summary_contracts import check_summary, summary_basis
-from .relation_contracts import LABELS
+from .relation_contracts import LABELS, POLICY as RELATION_POLICY
 from .relation_rules import label_from
 from .source_support import KEYS as SOURCE_SUPPORT_KEYS
 from .source_support import source_support
@@ -751,7 +752,13 @@ def validate_bundle(bundle: dict) -> None:
         _text(u["inputDigest"], "source.upstream", HASH)
         _text(u["digest"], "source.upstream", HASH)
         _text(s["reviewDigest"], "source.reviewDigest", HASH)
-        versions = _keys(s["policies"], ("producer", "verifier", "impactProducer", "impactVerifier", "policy", "revalidationPolicy", "impactPolicy"), "source.policies")
+        policy_keys = ("producer", "verifier", "impactProducer", "impactVerifier", "policy", "revalidationPolicy", "impactPolicy")
+        _need(isinstance(s["policies"], dict) and s["policies"].get("policy") in ("zoop-relation-policy-1", RELATION_POLICY),
+              "source.policies")
+        current = s["policies"]["policy"] == RELATION_POLICY
+        versions = _keys(s["policies"], policy_keys + (("countryContext",) if current else ()), "source.policies")
+        if current:
+            _need(versions["countryContext"] == COUNTRY_CONTEXT, "source.policies.countryContext")
         for value in versions.values():
             _text(value, "source.policies")
             _need(bool(value), "source.policies")

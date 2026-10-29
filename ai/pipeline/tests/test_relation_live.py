@@ -6,11 +6,14 @@ adapter and budget ledger are the LiveTransport owner's tests; the real Luna/Jev
 """
 from __future__ import annotations
 
+import json
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
 
 from scripts.relation_smoke import GOOD, SUP, build_world, co, converge, find, impact_item, proposal, world_cite
+from tests.test_extraction_live import ChainPeer, chain_cli, chain_receipts, chain_world
 from zoop_ai_pipeline import relation
 from zoop_ai_pipeline.extraction_contracts import ExtractionFailure, Provenance
 from zoop_ai_pipeline.live_runtime import LiveFailure
@@ -65,6 +68,9 @@ def make_runtime(replies):
 
         def recipient(self, stage):
             return "fake:jev" if stage.startswith("verify") else "fake:gen"
+
+        def fallback_recipient(self, stage):
+            return None
 
         def prepare(self, stage, payload):
             return {"stage": stage, "digest": digest(payload)}
@@ -408,3 +414,115 @@ def test_the_real_gate_denies_a_stage_when_a_separately_granted_bound_source_lac
     w.kit.save_registry()
     done = w.kit.rel_job("resume", w.kit.rsel("lv"), runtime_factory=factory)
     assert done["state"] == "ready" and denied_stage in {s for s, _ in state.sends}
+
+
+def native_relation_request(upstream, job="native-s3"):
+    return {"schemaVersion": "zoop-relation-s3", "jobId": job, "provenance": upstream["provenance"],
+            "upstream": {"jobId": upstream["jobId"], "inputDigest": upstream["inputDigest"]}}
+
+
+@pytest.mark.parametrize("outcome", ["success", "denied", "unknown", "all-errors"])
+def test_native_relation_chain_cli_accounts_each_role_without_replaying_paid_upstream(tmp_path, monkeypatch, outcome):
+    w = chain_world(tmp_path, monkeypatch, fallback_grant=outcome != "denied")
+    with ChainPeer() as peer:
+        upstream = chain_cli(w, peer, "run", w.request("upstream", snapshot=False, topic=False))
+        assert upstream["state"] == "ready"
+        upstream_saved = chain_receipts(w)
+        before = w.budget.snapshot()
+        peer.behavior["openai", "relation"] = "invalid"
+        if outcome in {"unknown", "all-errors"}:
+            peer.behavior["deepseek", "relation"] = "unknown" if outcome == "unknown" else "invalid"
+        out = chain_cli(w, peer, "run", native_relation_request(upstream), family="relation")
+        assert out["state"] == {"success": "ready", "denied": "stopped", "unknown": "reconciling", "all-errors": "stopped"}[outcome]
+        assert sum(stage == "extract" for _, stage, _ in peer.requests) == 1
+        assert chain_receipts(w) == upstream_saved
+        rows = chain_receipts(w, "relation")
+        envelope = json.loads(next(r[3] for r in rows if r[0] == "relation"))
+        assert envelope["attemptId"] == envelope["logicalAttemptId"] == rows[0][1]
+        assert envelope["physicalAttempts"][0]["state"] == "received"
+        assert len(out["calls"][0]["physicalAttempts"]) == 2
+        usage = out["usage"]
+        if outcome == "success":
+            assert [(role, stage) for role, stage, _ in peer.requests] == [
+                ("openai", "extract"), ("openai", "relation"), ("deepseek", "relation"),
+                ("typesafe", "verify-relation"), ("openai", "impact")]
+            assert len(out["calls"]) == 3
+            assert usage["providerCalls"] == usage["modelCalls"] == usage["receivedCalls"] == 4
+            assert (usage["inputTokens"], usage["outputTokens"]) == (4600, 900)
+            assert out["counts"]["eligibility"]["eligible"] == 1
+            receipts = [json.loads(row[3]) for row in rows]
+            leaves = [p["receipt"] for r in receipts if "physicalAttempts" in r for p in r["physicalAttempts"]]
+            leaves += [r for r in receipts if "physicalAttempts" not in r]
+            assert {r["funding"]["accountRole"] for r in leaves} == {"shared-openai", "personal-deepseek", "personal-typesafe"}
+            for field in ("estimatedUsd", "chargedUsd"):
+                assert Decimal(usage[field]) == sum(Decimal(r["cost"][field]) for r in leaves)
+            after = w.budget.snapshot()
+            for bucket in ("shared", "personal"):
+                assert Decimal(after["buckets"][bucket]["chargedUsd"]) - Decimal(before["buckets"][bucket]["chargedUsd"]) == sum(
+                    Decimal(r["cost"]["chargedUsd"]) for r in leaves if r["funding"]["bucket"] == bucket)
+        else:
+            assert out["stages"]["relation"]["state"] == "pending" and out["relations"] == []
+            assert usage["providerCalls"] == (1 if outcome == "denied" else 2)
+            assert usage["receivedCalls"] == (2 if outcome == "all-errors" else 1)
+            assert usage["startedWithoutReceipt"] == (1 if outcome == "unknown" else 0)
+            if outcome == "unknown":
+                assert rows[0][2] == out["calls"][0]["state"] == "started"
+                assert out["resumeMode"] == "reconcile_only" and out["failure"]["code"] == "live_response_unknown"
+                assert usage["inputTokens"] is None and usage["chargedUsd"] is None
+                assert w.budget.snapshot()["states"]["reserved"] == 1
+            if outcome == "denied":
+                assert out["failure"]["code"] == "source_purpose_or_recipient_denied"
+                assert all(role != "deepseek" for role, _, _ in peer.requests)
+        count = len(peer.requests)
+        again = chain_cli(w, peer, "resume", {"schemaVersion": "zoop-relation-s3", "jobId": "native-s3"}, family="relation", live=False)
+        assert again["state"] == out["state"] and again["usage"] == usage
+        assert len(peer.requests) == count and chain_receipts(w, "relation") == rows and chain_receipts(w) == upstream_saved
+
+
+def test_native_relation_chain_cli_saved_winner_recovery_sends_no_generation_again(tmp_path, monkeypatch):
+    w = chain_world(tmp_path, monkeypatch)
+    hook = """
+from zoop_ai_pipeline.relation import Engine
+receive = Engine._receive
+def crash(self, attempt, raw):
+    receive(self, attempt, raw)
+    if raw['stage'] == 'relation':
+        os._exit(75)
+Engine._receive = crash
+"""
+    with ChainPeer() as peer:
+        upstream = chain_cli(w, peer, "run", w.request("upstream", snapshot=False, topic=False))
+        peer.behavior["openai", "relation"] = "invalid"
+        chain_cli(w, peer, "run", native_relation_request(upstream), family="relation", hook=hook, expected=75)
+        saved = chain_receipts(w, "relation")
+        assert len(saved) == 1
+        selector = {"schemaVersion": "zoop-relation-s3", "jobId": "native-s3"}
+        no_env = chain_cli(w, peer, "resume", selector, family="relation", live=False)
+        assert no_env["stages"]["relation"]["state"] == "complete" and len(no_env["relations"]) == 1
+        assert no_env["failure"]["code"] == "live_not_enabled"
+        assert chain_receipts(w, "relation") == saved
+        out = chain_cli(w, peer, "resume", selector, family="relation")
+        assert out["state"] == "ready"
+        assert [(role, stage) for role, stage, _ in peer.requests].count(("openai", "relation")) == 1
+        assert [(role, stage) for role, stage, _ in peer.requests].count(("deepseek", "relation")) == 1
+
+
+@pytest.mark.parametrize("field", ["attemptId", "logicalAttemptId", "stage", "requestDigest", "bindingIdentity"])
+def test_native_relation_chain_cli_rejects_wrong_outer_invocation(tmp_path, monkeypatch, field):
+    w = chain_world(tmp_path, monkeypatch)
+    hook = f"""
+from zoop_ai_pipeline.live_runtime import LiveRuntime
+send = LiveRuntime.send
+def wrong(self, *args, **kwargs):
+    result = send(self, *args, **kwargs)
+    if result.get('format') == 'zoop-live-chain-receipt-1':
+        result = {{**result, {field!r}: 'other'}}
+    return result
+LiveRuntime.send = wrong
+"""
+    with ChainPeer() as peer:
+        upstream = chain_cli(w, peer, "run", w.request("upstream", snapshot=False, topic=False))
+        out = chain_cli(w, peer, "run", native_relation_request(upstream), family="relation", hook=hook)
+        assert out["state"] == "stopped" and out["failure"]["code"] == "receipt_binding_mismatch"
+        assert out["stages"]["relation"]["state"] == "pending" and out["relations"] == []
+        assert len(peer.requests) == 2
