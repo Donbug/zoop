@@ -1,8 +1,10 @@
 package com.zoop.admin.review;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zoop.admin.review.ReviewTargetReader.Projection;
 import com.zoop.admin.review.ReviewTargetReader.Row;
@@ -182,6 +184,20 @@ class ReviewTargetReaderTest {
 
         assertEquals(4, projection.skipped());
         assertEquals(List.of(rel('1'), rel('1')), projection.rows().stream().map(Row::externalId).toList());
+    }
+
+    @Test
+    void aReadingIsCompleteOnlyWhenEveryRelationIsReadAndHasAVerdict() {
+        String good = relation(rel('1'), "SUPPLIES", endpoint("company", "A"), endpoint("company", "B"), "hold", "1");
+        assertTrue(ReviewTargetReader.read(s2(), s3(good)).complete());
+
+        Projection waiting = ReviewTargetReader.read(s2(), s3(good,
+                relation(rel('2'), "SUPPLIES", endpoint("company", "A"), endpoint("company", "B"), "pending", "1")));
+        assertEquals(1, waiting.pending());
+        assertEquals(0, waiting.skipped());
+        assertFalse(waiting.complete(), "a relation with no verdict yet is not listed, so the rows are not the whole analysis");
+
+        assertFalse(ReviewTargetReader.read(s2(), s3(good, "42")).complete());
     }
 
     @Test

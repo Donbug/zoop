@@ -35,6 +35,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -365,6 +367,41 @@ class ReviewTargetSyncPostgresTest {
         assertNull(jdbc.queryForObject("SELECT s2_document_id FROM analysis_plan_units WHERE s3_job_id = ?", String.class,
                 newerJob));
         assertEquals(List.of(olderJob), listed(event, EVENT_A, null), "the older analysis stays listed");
+    }
+
+    /**
+     * A newer analysis of the same document whose relations were not all read (one unreadable, or one with no verdict yet) lists
+     * less than the analysis it would replace: it records no document and hides nothing, so the older HOLD stays listed and
+     * counted. Once a reading of it is complete it records the document and replaces the older analysis.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"unknown", "pending"})
+    void anIncompleteReadingOfANewerAnalysisRecordsNoDocumentAndHidesNothing(String status) {
+        String event = linkTo("event-" + UUID.randomUUID());
+        String document = "document-" + UUID.randomUUID();
+        Instant earlier = Instant.parse("2026-10-28T00:00:00Z");
+        String olderJob = analyse("s3-older-" + UUID.randomUUID(), document, earlier);
+        long holdBefore = overview.decisions().holdPending();
+        Map<String, Integer> countsBefore = candidates.counts();
+
+        String newerJob = "s3-partial-" + UUID.randomUUID();
+        analyse(newerJob, document, earlier.plusSeconds(60), new UntrustedRelationPayload(newerJob, "4".repeat(64), s3(
+                relation(rel('2'), "PARTICIPATES_IN", endpoint("company", "SS"), endpoint("event", EVENT_A), status, "2")),
+                List.of()));
+
+        assertNull(jdbc.queryForObject("SELECT s2_document_id FROM analysis_plan_units WHERE s3_job_id = ?", String.class,
+                newerJob), status);
+        assertEquals(List.of(olderJob), listed(event, EVENT_A, "HOLD"), status + ": the older HOLD stays listed");
+        assertEquals(countsBefore.get("HOLD"), candidates.counts().get("HOLD"), status);
+        assertEquals(holdBefore, overview.decisions().holdPending(), status + ": and stays counted as waiting");
+
+        String s2Job = jdbc.queryForObject("SELECT s2_job_id FROM analysis_plan_units WHERE s3_job_id = ?", String.class,
+                newerJob);
+        String json = analysing(document);
+        sync.sync(new RelationUpstream(s2Job, inputOf(newerJob)), Canonical.sha256(json), reanalysed(newerJob));
+        assertEquals(document, jdbc.queryForObject("SELECT s2_document_id FROM analysis_plan_units WHERE s3_job_id = ?",
+                String.class, newerJob), status + ": a complete reading records it");
+        assertEquals(List.of(newerJob), listed(event, EVENT_A, "HOLD"), status);
     }
 
     /**

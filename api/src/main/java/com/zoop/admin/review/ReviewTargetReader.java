@@ -63,9 +63,14 @@ final class ReviewTargetReader {
     }
 
     /**
+     * @param pending  the relations left out because they have no verdict yet
      * @param document the document the S2 job analysed ({@link #analysed}); null when its result does not name it readably
      */
-    record Projection(List<Row> rows, int unknownEvents, int skipped, Document document) {
+    record Projection(List<Row> rows, int unknownEvents, int skipped, int pending, Document document) {
+        /** Every item was read and has a verdict: the rows are the whole analysis, so it may stand in for an older one. */
+        boolean complete() {
+            return skipped == 0 && pending == 0;
+        }
     }
 
     /**
@@ -105,6 +110,7 @@ final class ReviewTargetReader {
         List<Relation> alone = new ArrayList<>();
         int unknown = 0;
         int skipped = events.skipped();
+        int pending = 0;
         for (JsonNode item : items.values()) {
             Relation relation;
             try {
@@ -113,7 +119,10 @@ final class ReviewTargetReader {
                 skipped++;
                 continue;
             }
-            if (relation.status() == null) continue;
+            if (relation.status() == null) {
+                pending++;
+                continue;
+            }
             String owner = null;
             boolean blocked = false;
             boolean missing = false;
@@ -134,7 +143,7 @@ final class ReviewTargetReader {
         List<Row> rows = new ArrayList<>();
         grouped.forEach((event, relations) -> candidate(rows, event, events.byId().get(event), relations));
         for (Relation relation : alone) candidate(rows, relation.id(), null, List.of(relation));
-        return new Projection(rows, unknown, skipped, analysed(s2));
+        return new Projection(rows, unknown, skipped, pending, analysed(s2));
     }
 
     /**
