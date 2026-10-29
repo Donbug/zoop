@@ -12,6 +12,7 @@ import type {
   BriefingItemEvidence,
 } from '@/types/briefing';
 import { briefingTime } from '@/util/briefingTime';
+import { useBriefingIssueTracking } from './briefingTelemetryContext';
 import { hasOnlyKnownLimitations } from './briefingLimitations';
 import { BODY, EMPTY, FOCUS_RING, NOTE, STATUS_PILL } from './briefingStyles';
 
@@ -160,6 +161,7 @@ export default function BriefingItemDetails({
   const roundLabel = isRecap ? '이전 회차' : '이 회차';
   const issueLabel = isRecap ? '이전 핵심 이슈' : '핵심 이슈';
   const id = useId();
+  const recordOpen = useBriefingIssueTracking(roundId, item.eventId);
   const [detailOpen, setDetailOpen] = useState(false);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [state, setState] = useState<DetailState>({ status: 'idle' });
@@ -226,6 +228,7 @@ export default function BriefingItemDetails({
             aria-controls={`${id}-detail`}
             onClick={() => {
               setDetailOpen(!detailOpen);
+              if (!visible && !detailOpen) recordOpen();
               if (!detailOpen) load(!visible);
             }}
           >
@@ -241,6 +244,7 @@ export default function BriefingItemDetails({
           aria-controls={`${id}-evidence`}
           onClick={() => {
             setEvidenceOpen(!evidenceOpen);
+            if (!evidenceOnly && !visible && !evidenceOpen) recordOpen();
             if (!evidenceOpen) load(!visible);
           }}
         >

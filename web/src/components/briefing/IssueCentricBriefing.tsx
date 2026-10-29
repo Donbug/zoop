@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { useBriefingIssueTracking } from './briefingTelemetryContext';
 import { getBriefing } from '@/apis/briefing/briefing';
 import { validEditionReview } from '@/util/editionReview';
 import type { BriefingItem, BriefingResponse } from '@/types/briefing';
@@ -417,6 +418,7 @@ function IssueCard({
 }) {
   const [open, setOpen] = useState(false);
   const item = group.members[0].item;
+  const recordOpen = useBriefingIssueTracking(result.id, item.eventId);
   const displayedItem = { ...item, rank };
   const companies = groupCompanies(group);
   const facts = uniqueText(
@@ -450,7 +452,11 @@ function IssueCard({
             ? `briefing-group-${group.id}`
             : issueAnchor(item)
         }
-        onToggle={(e) => setOpen(e.currentTarget.open)}
+        onToggle={(e) => {
+          const next = e.currentTarget.open;
+          if (next && !open) recordOpen();
+          setOpen(next);
+        }}
         className="scroll-mt-4 overflow-hidden rounded-2xl border border-zoop-line bg-zoop-paper"
       >
         <summary
