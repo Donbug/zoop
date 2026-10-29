@@ -264,20 +264,18 @@ class ReviewTargetSyncPostgresTest {
     }
 
     /**
-     * The S2 result as the producer writes it for an analysis of {@code documentId}: its frozen binding names the incoming document
-     * by its observation. Every other part is this test's two events.
+     * The S2 result as the service relays it for an analysis of {@code documentId}: each event candidate names the job's analysed
+     * document. Every other part is this test's two events.
      */
     private String analysing(String documentId) {
-        return """
-                {"binding":{"incoming":"doc-key","documents":{"doc-key":{"observation":{"roundId":"round-1","sourceId":"src",
-                 "page":0,"ordinal":0,"documentId":"%s","rawVersion":"%s","documentVersion":"%s"}}}},""".formatted(documentId,
-                "5".repeat(64), "6".repeat(64)) + s2Json.substring(1);
+        return s2Json.replace("{\"eventCandidateId\"", "{\"document\":{\"documentId\":\"" + documentId
+                + "\",\"documentVersion\":\"" + "6".repeat(64) + "\"},\"eventCandidateId\"");
     }
 
     /**
      * One analysis of {@code documentId} under a new plan, as the producer runs it: a new S2 job id and an input digest that hashes
      * it, so no two analyses share either, and a new S3 job reading {@code relations}, observed at {@code observedAt}. A null
-     * document is a result whose binding names none.
+     * document is a result whose candidates name none.
      */
     private String analyse(String s3JobId, String documentId, Instant observedAt, UntrustedRelationPayload relations) {
         String s2Job = "s2-" + Canonical.sha256(s3JobId).substring(0, 40);
@@ -347,25 +345,31 @@ class ReviewTargetSyncPostgresTest {
                 "the older job's HOLD can still be decided, and its row and history stay");
     }
 
-    /** A newer analysis of the document that finds nothing to review still replaces the older one: there is no row to pair. */
+    /**
+     * A newer analysis that finds no event candidate names no document in the service's result (it relays no binding), so it
+     * cannot be told to be of the same document and replaces nothing.
+     */
     @Test
-    void aReanalysisThatFindsNoCandidateStillReplacesTheOlderOne() {
+    void aReanalysisThatFindsNoCandidateNamesNoDocumentAndReplacesNothing() {
         String event = linkTo("event-" + UUID.randomUUID());
         String document = "document-" + UUID.randomUUID();
         Instant earlier = Instant.parse("2026-10-28T00:00:00Z");
         String olderJob = analyse("s3-older-" + UUID.randomUUID(), document, earlier);
-        assertEquals(List.of(olderJob), listed(event, EVENT_A, null));
-
+        String kept = s2Json;
+        s2Json = s2();
         String newerJob = "s3-empty-" + UUID.randomUUID();
         analyse(newerJob, document, earlier.plusSeconds(60), new UntrustedRelationPayload(newerJob, "4".repeat(64), s3(),
                 List.of()));
+        s2Json = kept;
 
-        assertEquals(List.of(), listed(event, EVENT_A, null), "the newest analysis of the document has no candidate");
+        assertNull(jdbc.queryForObject("SELECT s2_document_id FROM analysis_plan_units WHERE s3_job_id = ?", String.class,
+                newerJob));
+        assertEquals(List.of(olderJob), listed(event, EVENT_A, null), "the older analysis stays listed");
     }
 
     /**
      * The review's counterexamples: another document reaching the same {@code targetEventId}, and analyses observed at the same
-     * instant, a result whose binding names no document and jobs no plan unit owns. None hides another.
+     * instant, a result whose candidates name no document and jobs no plan unit owns. None hides another.
      */
     @Test
     void anotherDocumentTheSameInstantNoDocumentOrNoPlanUnitNeverHides() {
@@ -383,16 +387,66 @@ class ReviewTargetSyncPostgresTest {
                 listed(event, EVENT_A, null), "no strictly later analysis of the same document, nothing hidden");
     }
 
+    /**
+     * The same regression over what the AI side really produces (api/scripts/export_reanalysis_fixtures.py): one round planned twice
+     * by the actual {@code plan_round} under two enqueue ids, each S2 job run by the actual pipeline and rendered by the service's
+     * {@code ExtractionJobContent}. Their job ids and input digests differ and their results carry no binding; the analysed document
+     * is the one their event candidates name.
+     */
+    @Test
+    void twoPlansOfOneRoundFromTheRealPlanBuilderAreOneAnalysisListedOnce() throws Exception {
+        String text;
+        try (var in = getClass().getResourceAsStream("/review/reanalysis-two-plans.json")) {
+            text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+        var fixture = com.zoop.common.json.StrictJson.parseObject(text);
+        var plans = fixture.objects("plans");
+        assertEquals(2, plans.size());
+        assertNotEquals(plans.get(0).string("s2JobId"), plans.get(1).string("s2JobId"));
+        assertNotEquals(plans.get(0).string("s2InputDigest"), plans.get(1).string("s2InputDigest"),
+                "the producer hashes the job id into the input digest");
+        var document = fixture.object("document");
+
+        Instant at = Instant.parse("2026-10-28T00:00:00Z");
+        List<String> jobs = new java.util.ArrayList<>();
+        for (int index = 0; index < plans.size(); index++) {
+            var plan = plans.get(index);
+            String s2Job = plan.string("s2JobId");
+            String input = plan.string("s2InputDigest");
+            String json = plan.raw("s2Result").toString();
+            assertFalse(json.contains("\"binding\""), "the service relays no binding");
+            String event = plan.object("s2Result").objects("eventCandidates").getFirst().string("eventCandidateId");
+            String s3Job = "s3-fixture-" + index + "-" + UUID.randomUUID();
+            planUnit(s3Job, s2Job, input, at.plusSeconds(60L * index));
+            ExtractionResult result = mock(ExtractionResult.class);
+            when(result.readyPayload()).thenReturn(Optional.of(new UntrustedExtractionPayload(s2Job, input, json)));
+            when(extraction.result(s2Job)).thenReturn(result);
+            sync.sync(new RelationUpstream(s2Job, input), Canonical.sha256(json), new UntrustedRelationPayload(s3Job,
+                    "4".repeat(64), s3(relation(rel('1'), "PARTICIPATES_IN", endpoint("company", "SK"), endpoint("event", event),
+                            "hold", "1")), List.of()));
+            jobs.add(s3Job);
+            assertEquals(List.of(document.string("documentId"), document.string("documentVersion")), jdbc.queryForList(
+                    "SELECT unnest(ARRAY[s2_document_id, s2_document_version]) FROM analysis_plan_units WHERE s3_job_id = ?",
+                    String.class, s3Job), "the document every candidate names");
+        }
+
+        assertEquals(List.of(jobs.get(1)), jdbc.queryForList("""
+                SELECT t.source_job_id FROM review_targets t
+                WHERE t.target_type = 'candidate' AND t.is_current AND t.source_job_id IN (?, ?) AND """
+                + " " + JdbcCandidateRepository.newestAnalysis("t"), String.class, jobs.get(0), jobs.get(1)),
+                "only the plan observed last is listed");
+    }
+
     /** The S2 result is fixed by its recorded hash: a unit is never moved to another document. */
     @Test
     void aUnitKeepsTheDocumentItWasFirstRecordedWith() {
         linkTo("event-" + UUID.randomUUID());
         String job = analyse("s3-" + UUID.randomUUID(), "document-a", Instant.parse("2026-10-28T00:00:00Z"));
-        assertFalse(reviews.recordDocument(job, new ReviewTargetReader.Document("document-a", "5".repeat(64), "6".repeat(64))),
+        assertFalse(reviews.recordDocument(job, new ReviewTargetReader.Document("document-a", "6".repeat(64))),
                 "the same document again changes nothing");
         // The repository's refusal reaches callers through Spring's repository exception translation.
         assertThrows(org.springframework.dao.InvalidDataAccessApiUsageException.class, () -> reviews.recordDocument(job,
-                new ReviewTargetReader.Document("document-b", "5".repeat(64), "6".repeat(64))));
+                new ReviewTargetReader.Document("document-b", "6".repeat(64))));
         assertEquals("document-a", jdbc.queryForObject("SELECT s2_document_id FROM analysis_plan_units WHERE s3_job_id = ?",
                 String.class, job));
     }

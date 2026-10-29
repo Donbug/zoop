@@ -34,18 +34,19 @@ public class JdbcCandidateRepository {
 
     /**
      * Whether the current candidate row {@code alias} belongs to the newest analysis of its document: false when the plan unit of
-     * another S3 job analysed the same document (the S2 observation's {@code documentId}, {@code rawVersion} and
-     * {@code documentVersion} the sync recorded) and its S3 result was observed strictly later. Then every candidate of the older
-     * job is left out, matched or not, so a re-analysis that names its candidates differently (a live model's mention ids) or finds
-     * none at all still replaces it, and two different documents never hide each other. A job whose unit names no document (synced
-     * before the column, or a result without one), without a plan unit or observed at the same instant is never hidden. The older
+     * another S3 job analysed the same document (the {@code documentId} and {@code documentVersion} the sync recorded from
+     * its S2 event candidates) and its S3 result was observed strictly later. Then every candidate of the older
+     * job is left out, matched or not, so a re-analysis that names its candidates differently (a live model's mention ids) still
+     * replaces it, and two different documents never hide each other. A job whose unit names no document (synced before the column,
+     * or a result with no candidate, which names none), without a plan unit or observed at the same instant is never hidden, and
+     * never hides another. The older
      * job's rows stay decidable and keep their history; only the list and the overview leave them out.
      */
     public static String newestAnalysis(String alias) {
         return """
                 NOT EXISTS (SELECT 1 FROM analysis_plan_units au
                               JOIN analysis_plan_units nu ON nu.s2_document_id = au.s2_document_id
-                                   AND nu.s2_raw_version = au.s2_raw_version AND nu.s2_document_version = au.s2_document_version
+                                   AND nu.s2_document_version = au.s2_document_version
                                    AND nu.s3_job_id <> au.s3_job_id
                              WHERE au.s3_job_id = %1$s.source_job_id
                                AND CAST(nu.s3_checkpoint->>'resultObservedAt' AS timestamptz)

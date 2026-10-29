@@ -238,27 +238,25 @@ class ReviewTargetReaderTest {
         assertEquals(List.of("B", "삼성전자"), rows.get("candidate:" + rel('1')).companyIds());
         assertEquals(List.of("SUPPLIES_V2"), rows.get("relation:" + rel('1')).relationTypes());
     }
-    private static String bound(String incoming, String observation) {
-        return """
-                {"binding":{"incoming":"%s","documents":{"member":{"observation":{"documentId":"member-doc","rawVersion":"%s",
-                 "documentVersion":"%s"}},"doc-key":{"observation":%s}}},"eventCandidates":[]}"""
-                .formatted(incoming, "7".repeat(64), "8".repeat(64), observation);
+    /** An event candidate as the service relays it, naming the job's analysed document. */
+    private static String naming(String event, String documentId, String version) {
+        return event.replaceFirst("\\{", "{\"document\":{\"documentId\":\"" + documentId + "\",\"documentVersion\":\"" + version
+                + "\"},");
     }
 
     @Test
-    void theAnalysedDocumentIsTheIncomingOneOfTheBindingAndNothingElse() {
-        String observation = """
-                {"roundId":"r","sourceId":"s","page":0,"ordinal":1,"documentId":"문서-1","rawVersion":"%s","documentVersion":"%s"}"""
-                .formatted("5".repeat(64), "6".repeat(64));
-        assertEquals(new ReviewTargetReader.Document("문서-1", "5".repeat(64), "6".repeat(64)),
-                ReviewTargetReader.read(bound("doc-key", observation), s3()).document(), "the incoming document, not a member");
-        assertEquals("member-doc", ReviewTargetReader.read(bound("member", observation), s3()).document().documentId());
+    void theAnalysedDocumentIsTheOneEveryEventCandidateNames() {
+        String a = naming(event(EVENT_A, "candidate", "new-event-candidate", "SK"), "문서-1", "6".repeat(64));
+        String rejected = naming(event(EVENT_HELD, "rejected", "held", "SK"), "문서-1", "6".repeat(64));
+        assertEquals(new ReviewTargetReader.Document("문서-1", "6".repeat(64)), ReviewTargetReader.read(s2(a, rejected), s3())
+                .document(), "rejected candidates name it too");
 
-        assertNull(ReviewTargetReader.read(s2(), s3()).document(), "no binding");
-        assertNull(ReviewTargetReader.read(bound("missing", observation), s3()).document(), "an incoming key with no document");
-        assertNull(ReviewTargetReader.read(bound("doc-key", observation.replace("5".repeat(64), "5".repeat(63))), s3())
-                .document(), "a raw version that is no exact hash");
-        assertNull(ReviewTargetReader.read(bound("doc-key", observation.replace("\"문서-1\"", "\"\"")), s3()).document(),
-                "an empty document id");
+        assertNull(ReviewTargetReader.read(s2(), s3()).document(), "a job that found nothing names no document");
+        assertNull(ReviewTargetReader.read(s2(a, naming(event(EVENT_HELD, "candidate", "held", "SK"), "문서-2", "6".repeat(64))),
+                s3()).document(), "two documents: not one analysis of one document");
+        assertNull(ReviewTargetReader.read(s2(naming(event(EVENT_A, "candidate", "held", "SK"), "문서-1", "6".repeat(63))), s3())
+                .document(), "a version that is no exact hash");
+        assertNull(ReviewTargetReader.read(s2(a, event(EVENT_HELD, "candidate", "held", "SK")), s3()).document(),
+                "a candidate without its document");
     }
 }

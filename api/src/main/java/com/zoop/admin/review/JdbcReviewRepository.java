@@ -243,14 +243,14 @@ public class JdbcReviewRepository {
      */
     public boolean recordDocument(String s3JobId, ReviewTargetReader.Document document) {
         var params = new MapSqlParameterSource("job", s3JobId).addValue("id", document.documentId())
-                .addValue("raw", document.rawVersion()).addValue("version", document.documentVersion());
+                .addValue("version", document.documentVersion());
         if (jdbc.update("""
-                UPDATE analysis_plan_units SET s2_document_id = :id, s2_raw_version = :raw, s2_document_version = :version
+                UPDATE analysis_plan_units SET s2_document_id = :id, s2_document_version = :version
                  WHERE s3_job_id = :job AND s2_document_id IS NULL
                 """, params) == 1) return true;
         boolean other = Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (SELECT 1 FROM analysis_plan_units WHERE s3_job_id = :job
-                                 AND (s2_document_id, s2_raw_version, s2_document_version) <> (:id, :raw, :version))
+                                 AND (s2_document_id, s2_document_version) <> (:id, :version))
                 """, params, Boolean.class));
         if (other) throw new IllegalStateException("the unit already names another analysed document");
         return false;

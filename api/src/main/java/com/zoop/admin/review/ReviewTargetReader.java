@@ -33,7 +33,7 @@ import tools.jackson.databind.JsonNode;
  */
 final class ReviewTargetReader {
     static final Pattern EVENT_CANDIDATE_ID = Pattern.compile("evc-[a-f0-9]{64}");
-    /** The S2 observation contract: a document id of 1 to 200 characters and its exact raw and document versions. */
+    /** The S2 document contract: a document id of 1 to 200 characters and its exact document version. */
     private static final Pattern DOCUMENT_ID = Pattern.compile(".{1,200}", Pattern.DOTALL);
     private static final Pattern VERSION = Pattern.compile("[a-f0-9]{64}");
     private static final Pattern SOURCE_REVISION = Pattern.compile("0|[1-9][0-9]{0,8}");
@@ -69,10 +69,11 @@ final class ReviewTargetReader {
     }
 
     /**
-     * The document an S2 job analysed, as its frozen binding names it ({@code binding.documents[binding.incoming].observation}):
-     * the identity two analyses of the same document share whatever plan, job or snapshot they ran under (#132).
+     * The document an S2 job analysed, as the service names it on each of its event candidates ({@code eventCandidates[].document},
+     * the job's incoming document): the identity two analyses of the same document share whatever plan, job or snapshot they ran
+     * under (#132). The service relays no raw version and no binding.
      */
-    record Document(String documentId, String rawVersion, String documentVersion) {
+    record Document(String documentId, String documentVersion) {
     }
 
     private record Event(boolean listed, Set<String> companies, String issueId, String title, String action, String target,
@@ -136,16 +137,25 @@ final class ReviewTargetReader {
         return new Projection(rows, unknown, skipped, analysed(s2));
     }
 
-    /** {@link Document} of the S2 result, or null when its binding does not name the analysed document in the contract's form. */
+    /**
+     * {@link Document} of the S2 result: the one document every event candidate names, rejected ones included. Null when there is
+     * no candidate (a job that found nothing names no document), when two candidates name different documents, or when one is not
+     * in the contract's form.
+     */
     static Document analysed(Obj s2) {
+        Document found = null;
         try {
-            Obj binding = s2.object("binding");
-            Obj observation = binding.object("documents").object(binding.string("incoming")).object("observation");
-            return new Document(matching(observation.string("documentId"), DOCUMENT_ID),
-                    matching(observation.string("rawVersion"), VERSION), matching(observation.string("documentVersion"), VERSION));
+            for (Obj item : s2.objects("eventCandidates")) {
+                Obj document = item.object("document");
+                Document named = new Document(matching(document.string("documentId"), DOCUMENT_ID),
+                        matching(document.string("documentVersion"), VERSION));
+                if (found != null && !found.equals(named)) return null;
+                found = named;
+            }
         } catch (Malformed unreadable) {
             return null;
         }
+        return found;
     }
 
     private static Events events(Obj s2) {
