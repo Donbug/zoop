@@ -17,8 +17,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -47,9 +45,6 @@ public final class ChatMcpAgent implements ChatAgentPath {
      * provider makes a round's approved calls before it answers the step, and the next round is decided only then.
      */
     static final int MAX_ROUND_CALLS = 4;
-    private static final TypeReference<List<ChatToolItem>> ITEMS = new TypeReference<>() { };
-    private static final TypeReference<List<ChatToolPath>> PATHS = new TypeReference<>() { };
-    private static final TypeReference<List<String>> STRINGS = new TypeReference<>() { };
 
     private final ChatModels.Agent agent;
     private final ChatMcpTools tools;
@@ -162,13 +157,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
     private List<ChatToolResult> kept(ChatRun run) {
         List<ChatToolResult> results = new ArrayList<>();
         for (ChatKeptToolResult kept : runs.keptToolResults(run.jobId(), run.attemptNo())) {
-            JsonNode node = mapper.readTree(kept.result());
-            results.add(new ChatToolResult(node.path("schemaVersion").asString(), kept.toolCallId(), kept.capabilityId(),
-                    node.path("dataVersion").asString(null), mapper.convertValue(node.path("items"), ITEMS),
-                    mapper.convertValue(node.path("evidenceIds"), STRINGS),
-                    node.path("truncated").isBoolean() ? node.path("truncated").asBoolean() : null,
-                    node.path("nextAllowed").isBoolean() ? node.path("nextAllowed").asBoolean() : null, null,
-                    node.has("paths") ? mapper.convertValue(node.path("paths"), PATHS) : List.of()));
+            results.add(ChatMcpTools.kept(mapper, kept));
         }
         return results;
     }

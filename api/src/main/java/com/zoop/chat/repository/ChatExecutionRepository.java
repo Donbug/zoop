@@ -84,6 +84,15 @@ public interface ChatExecutionRepository {
     /** The attempt's succeeded calls that kept their result (MCP calls), in call order. */
     List<ChatKeptToolResult> keptToolResults(String jobId, int attemptNo);
 
+    /**
+     * The attempt's first succeeded call of exactly this capability and input digest that kept its result: what an identical
+     * request of the same attempt reuses instead of reading again.
+     */
+    Optional<ChatKeptToolResult> findKeptToolResult(String jobId, int attemptNo, String capabilityId, String inputDigest);
+
+    /** Bytes of every result the job's calls kept, as stored, across its attempts (after {@link #lockOwned}). */
+    long keptResultBytes(String jobId);
+
     /** running → succeeded|failed, fenced like every run write; false when the run no longer owns the job. */
     boolean finishToolCall(String jobId, String ownerToken, int attemptNo, String toolCallId, ChatToolCallEnd end,
             Instant at);

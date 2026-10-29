@@ -49,8 +49,18 @@ public interface ChatRunControl {
     /** reserved → running, just before the call is made. */
     void toolCallStarted(String toolCallId);
 
-    /** running → succeeded|failed. */
+    /**
+     * running → succeeded|failed. A success that keeps a result is recorded only while every result the job kept stays within
+     * {@link #MAX_KEPT_RESULT_BYTES}; past it the call is recorded {@code failed} with {@link #RESULTS_OVER_BUDGET} and
+     * {@link ChatToolCallRefused} is thrown, so the result is never delivered.
+     */
     void toolCallFinished(String toolCallId, ChatToolCallEnd end);
+
+    /** All results one job's calls keep for a model (MCP results, as stored), across its attempts (MCP actions 3.2). */
+    int MAX_KEPT_RESULT_BYTES = 1024 * 1024;
+
+    /** The failure of a call whose result would take the job's kept results past {@link #MAX_KEPT_RESULT_BYTES}. */
+    String RESULTS_OVER_BUDGET = "job_results_too_large";
 
     /**
      * Tool calls one job may make across its attempts, supplementary rounds, failures and agent approvals included (MCP

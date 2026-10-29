@@ -222,6 +222,28 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
                         rs.getString("result")));
     }
 
+    @Override
+    public Optional<ChatKeptToolResult> findKeptToolResult(String jobId, int attemptNo, String capabilityId,
+            String inputDigest) {
+        return jdbc.query("""
+                SELECT tool_call_id, capability_id, result::text AS result FROM chat_tool_calls
+                 WHERE chat_job_id = :id AND attempt_no = :attempt AND capability_id = :capability AND input_digest = :digest
+                   AND status = 'succeeded' AND result IS NOT NULL
+                 ORDER BY call_index LIMIT 1
+                """, new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo)
+                .addValue("capability", capabilityId).addValue("digest", inputDigest),
+                (rs, index) -> new ChatKeptToolResult(rs.getString("tool_call_id"), rs.getString("capability_id"),
+                        rs.getString("result"))).stream().findFirst();
+    }
+
+    @Override
+    public long keptResultBytes(String jobId) {
+        Long bytes = jdbc.queryForObject(
+                "SELECT COALESCE(sum(octet_length(result::text)), 0) FROM chat_tool_calls WHERE chat_job_id = :id",
+                new MapSqlParameterSource("id", jobId), Long.class);
+        return bytes == null ? 0 : bytes;
+    }
+
     private boolean closeToolCalls(String jobId, Instant at) {
         jdbc.update(CLOSE_TOOL_CALLS, new MapSqlParameterSource().addValue("id", jobId).addValue("at", Timestamp.from(at)));
         return true;

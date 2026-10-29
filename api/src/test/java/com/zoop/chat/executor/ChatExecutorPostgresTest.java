@@ -398,6 +398,42 @@ class ChatExecutorPostgresTest {
     }
 
     @Test
+    void anIdenticalCallFindsTheKeptResultAndTheJobsKeptResultsStayWithinOneMebibyte() {
+        String jobId = submit("같은 조회와 결과 상한");
+        executor.claimNext().orElseThrow();
+        var control = executor.attach(jobId, 1).orElseThrow().control();
+        String digest = "0".repeat(64);
+        assertTrue(executor.keptToolResult(jobId, 1, "company.read", digest).isEmpty());
+        control.reserveToolCalls(1, List.of(reservation("company.read"), reservation("issue.read"),
+                reservation("issue.read"), reservation("issue.read"), reservation("issue.read"), reservation("issue.read")));
+        String small = "{\"items\":[],\"evidenceIds\":[]}";
+        control.toolCallStarted("tc-0");
+        control.toolCallFinished("tc-0", new ChatToolCallEnd("succeeded", null, "v1", List.of(), false, false, small));
+        var kept = executor.keptToolResult(jobId, 1, "company.read", digest).orElseThrow();
+        assertEquals("tc-0", kept.toolCallId(), "the first one that kept its result");
+        assertTrue(executor.keptToolResult(jobId, 1, "issue.read", digest).isEmpty());
+        assertTrue(executor.keptToolResult(jobId, 2, "company.read", digest).isEmpty(), "another attempt reads anew");
+
+        // Four results of 250 000 bytes (each under the column's 256 KiB) fit with the first; a fifth would pass 1 MiB and
+        // is recorded as that failure.
+        String big = "{\"pad\":\"" + "a".repeat(250_000) + "\"}";
+        for (String id : List.of("tc-1", "tc-2", "tc-3", "tc-4")) {
+            control.toolCallStarted(id);
+            control.toolCallFinished(id, new ChatToolCallEnd("succeeded", null, "v1", List.of(), false, false, big));
+        }
+        control.toolCallStarted("tc-5");
+        var refused = assertThrows(ChatToolCallRefused.class, () -> control.toolCallFinished("tc-5",
+                new ChatToolCallEnd("succeeded", null, "v1", List.of(), false, false, big)));
+        assertEquals(ChatRunControl.RESULTS_OVER_BUDGET, refused.code());
+        var row = jdbc.queryForMap("SELECT status, error_code, result FROM chat_tool_calls WHERE chat_job_id = ? "
+                + "AND tool_call_id = 'tc-5'", jobId);
+        assertEquals("failed", row.get("status"));
+        assertEquals(ChatRunControl.RESULTS_OVER_BUDGET, row.get("error_code"));
+        assertNull(row.get("result"));
+        assertTrue(runs.keptResultBytes(jobId) <= ChatRunControl.MAX_KEPT_RESULT_BYTES);
+    }
+
+    @Test
     void aCancelClosesTheRunsToolCallsAndFencesItsLaterWrites() {
         String jobId = submit("도구 호출 중 취소");
         var claim = executor.claimNext().orElseThrow();
