@@ -256,6 +256,29 @@ export default function CompanyWorkspace() {
     invalid ? null : companyUrl(id, '', snapshot),
     owner,
   );
+  // D-COM-04·06 (#358): 버전만 있는 주소는 서버가 그 버전이 처음 공개된 시각을 metadata.asOf로 준다.
+  // 그 버전으로 답했고 정확한 시각이면 주소의 asOf로 채운다(처음 열 때와 같은 방식). 채운 주소를 기억해
+  // "처음 공개된 시점으로 보는 중"을 알리고, 그 주소가 409·422면 예전처럼 열 수 없다고 안내한다.
+  const [versionPin, setVersionPin] = useState<{
+    version: string;
+    asOf: string;
+  } | null>(null);
+  const versionStart =
+    versionOnly &&
+    company.data?.metadata.graphVersion === version &&
+    exactTime(company.data.metadata.asOf)
+      ? requestTime(company.data.metadata.asOf)
+      : null;
+  if (
+    versionStart &&
+    (versionPin?.version !== version || versionPin.asOf !== versionStart)
+  )
+    setVersionPin({ version: version!, asOf: versionStart });
+  const pinnedFromVersion =
+    !!versionPin && versionPin.version === version && versionPin.asOf === asOf;
+  const versionStartFailed =
+    pinnedFromVersion &&
+    (company.errorStatus === 409 || company.errorStatus === 422);
   const quote = useCompanyResource<Quote>(companyUrl(id, '/quote'));
   // D-COM-06: 사건 시점 그래프는 그래프를 쓰는 동안만 유지한다. 그래프 영역 밖(다른 사건·탭·빈 곳 등)을
   // 누르면 현재 기준 시점 그래프로 돌아간다. 키보드로 누른 것도 click으로 들어온다.
@@ -310,7 +333,11 @@ export default function CompanyWorkspace() {
     // FS040: 처음 열 때의 기준 시점은 기업 응답의 공개 기준 시점과 그 버전이다. 가격 봉 시각은
     // 거래가 없는 날(주말·휴장)에 오래된 시점을 가리켜 이후 공개 자료를 빼거나 409를 만든다.
     // 공개 그래프 버전이 없으면(스냅샷 미게시) 고정하지 않는다. 고정하면 409가 된다.
-    // 주소에 graphVersion만 있는 과거 조회는 metadata.asOf가 요청 시각이라 덧붙이면 422가 된다.
+    // 주소에 graphVersion만 있으면 그 버전이 처음 공개된 시각(versionStart)을 asOf로 채운다.
+    if (versionStart) {
+      updateQuery({ asOf: versionStart, period }, { replace: true });
+      return;
+    }
     const latest = company.data?.metadata.asOf;
     const currentVersion = company.data?.metadata.graphVersion ?? null;
     if (
@@ -338,6 +365,7 @@ export default function CompanyWorkspace() {
     company.data?.metadata.asOf,
     company.data?.metadata.graphVersion,
     period,
+    versionStart,
   ]);
   const depth = params.get('depth') === '2' ? 2 : 1;
   const eventsQuery = new URLSearchParams({
@@ -514,14 +542,41 @@ export default function CompanyWorkspace() {
         portfolio={portfolio}
       />
       <main className="min-w-0 rounded-2xl bg-white p-6 shadow-sm max-md:p-4">
-        {versionOnly && (
+        {versionOnly && (company.loading || versionStart) && (
+          <p role="status" className="mb-4 text-[13px] text-zoop-muted">
+            그래프 버전({version})이 처음 공개된 시점을 확인하고 있어요.
+          </p>
+        )}
+        {versionOnly && !company.loading && !versionStart && (
           <p role="alert" className="mb-4 text-[13px] text-zoop-alert">
             이 주소에는 기준 시점 없이 그래프 버전({version})만 있어, 그 버전의
             차트·사건·관계 그래프를 열 수 없어요.{' '}
             <button
               type="button"
               className="font-semibold underline"
-              onClick={() => updateQuery({ graphVersion: null })}
+              // 최신 자료에서 남은 사건 시점(graphAsOf)이 다시 활성화되지 않게 함께 지운다.
+              onClick={() =>
+                updateQuery({ graphVersion: null, graphAsOf: null })
+              }
+            >
+              최신 자료로 보기
+            </button>
+          </p>
+        )}
+        {pinnedFromVersion && !versionStartFailed && (
+          <p role="status" className="mb-4 text-[13px] text-zoop-muted">
+            {`그래프 버전(${version})이 처음 공개된 시점(${formatKst(asOf!)})으로 보는 중이에요.`}
+          </p>
+        )}
+        {versionStartFailed && (
+          <p role="alert" className="mb-4 text-[13px] text-zoop-alert">
+            {`그래프 버전(${version})이 처음 공개된 시점으로 열지 못했어요. `}
+            <button
+              type="button"
+              className="font-semibold underline"
+              onClick={() =>
+                updateQuery({ asOf: null, graphVersion: null, graphAsOf: null })
+              }
             >
               최신 자료로 보기
             </button>
