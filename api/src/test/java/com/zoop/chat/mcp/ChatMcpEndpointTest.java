@@ -343,6 +343,37 @@ class ChatMcpEndpointTest {
     }
 
     @Test
+    void identicalRequestsLetThroughAtTheSameMomentEachTakeTheirOwnApproval() throws Exception {
+        String token = token(ChatCapability.COMPANY_READ);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            // Three pairs, each pair released together before either has started its read.
+            for (int pair = 1; pair <= 3; pair++) {
+                String args = "{\"targets\":[\"co-" + pair + "\"]}";
+                approve("company_read", args);
+                approve("company_read", args);
+                var barrier = new java.util.concurrent.CyclicBarrier(2);
+                java.util.concurrent.Callable<JsonNode> request = () -> {
+                    barrier.await(5, java.util.concurrent.TimeUnit.SECONDS);
+                    return rpc(token, call("company_read", args)).path("result");
+                };
+                var a = pool.submit(request);
+                var b = pool.submit(request);
+                List<JsonNode> results = List.of(a.get(10, java.util.concurrent.TimeUnit.SECONDS),
+                        b.get(10, java.util.concurrent.TimeUnit.SECONDS));
+                assertTrue(results.stream().noneMatch(r -> r.path("isError").asBoolean(true)), results.toString());
+                assertEquals(2, results.stream().map(r -> r.path("structuredContent").path("toolCallId").asString())
+                        .distinct().count(), "each answered under its own approval");
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        assertEquals(3, companyReads.size(), "one read per pair");
+        assertTrue(store.toolCalls(JOB).stream().allMatch(c -> "succeeded".equals(c.status)),
+                "no approval left behind");
+    }
+
+    @Test
     void resultsPastTheJobsOneMebibyteAreRecordedAsThatFailureNotDelivered() throws Exception {
         String token = token(ChatCapability.GRAPH_PATH_READ);
         for (int i = 2; i <= 5; i++) {

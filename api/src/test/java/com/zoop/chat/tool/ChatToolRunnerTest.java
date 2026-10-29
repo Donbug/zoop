@@ -410,6 +410,11 @@ class ChatToolRunnerTest {
         }
 
         @Override
+        public java.util.Optional<String> claimToolCall(String capabilityId, String inputDigest) {
+            throw new UnsupportedOperationException("only the MCP endpoint claims an approved call");
+        }
+
+        @Override
         public void toolCallStarted(String toolCallId) {
             if (started.size() >= supersededAfterStarts) throw new ChatRunSuperseded();
             pause(startDelay);

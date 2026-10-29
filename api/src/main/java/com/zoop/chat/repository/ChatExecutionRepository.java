@@ -78,6 +78,17 @@ public interface ChatExecutionRepository {
      */
     Optional<String> findReservedToolCall(String jobId, int attemptNo, String capabilityId, String inputDigest);
 
+    /**
+     * reserved → running for the attempt's first call still reserved for exactly this capability and input digest, picked and
+     * started in one statement (a call another request is picking is skipped), fenced like every run write; empty when none
+     * is left or the run no longer owns the job.
+     */
+    Optional<String> claimReservedToolCall(String jobId, String ownerToken, int attemptNo, String capabilityId,
+            String inputDigest, Instant at);
+
+    /** The size {@code result} has once stored, as {@code chat_tool_calls.result}'s JSON text. */
+    long storedResultBytes(String result);
+
     /** reserved → running, fenced like every run write; false when the run no longer owns the job. */
     boolean startToolCall(String jobId, String ownerToken, int attemptNo, String toolCallId, Instant at);
 

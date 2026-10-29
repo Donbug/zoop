@@ -58,8 +58,11 @@ public final class ChatMcpTools {
     /** The ledger's plan revision of MCP calls: a run that hands tools to a model has no server plan of its own. */
     static final int PLAN_REVISION = 1;
     static final String VIA = "mcp";
-    /** Largest serialized result a call returns; a larger one is refused instead of being cut. */
-    static final int MAX_RESULT_BYTES = 256 * 1024;
+    /**
+     * Largest result a call returns; a larger one is refused instead of being cut. Checked early on the serialized output,
+     * and again as stored when it is recorded ({@link ChatRunControl#toolCallFinished}).
+     */
+    static final int MAX_RESULT_BYTES = ChatRunControl.MAX_CALL_RESULT_BYTES;
 
     /** The longest wait for an identical request being read: a tool stage (10 s) and its record (2 s). */
     static final Duration SINGLE_FLIGHT_WAIT = Duration.ofSeconds(12);
@@ -76,7 +79,7 @@ public final class ChatMcpTools {
     static final String GRANT_MISMATCH = "grant_mismatch";
     static final String INVALID_ARGUMENTS = "invalid_arguments";
     static final String BUDGET_EXHAUSTED = "tool_budget_exhausted";
-    static final String RESULT_TOO_LARGE = "result_too_large";
+    static final String RESULT_TOO_LARGE = ChatRunControl.RESULT_TOO_LARGE;
     static final String SEND_GRANTS_UNAVAILABLE = "send_grants_unavailable";
     /** What a result says when part of it was withheld for want of a send grant. */
     static final String SOURCE_GRANT_DENIED = "source_grant_denied";
@@ -183,7 +186,15 @@ public final class ChatMcpTools {
         // Only the exact call the server approved runs: same tool, same canonical request (targets, limit and everything
         // injected), reserved for this attempt and not started yet.
         String digest = runner.reservation(run, call, VIA).inputDigest();
-        Optional<String> approved = executor.reservedToolCall(run.jobId(), run.attemptNo(), call.capabilityId(), digest);
+        var control = attached.get().control();
+        // The approval this request uses is picked and started in one step: requests arriving together each take their
+        // own, and none is left behind for one that took another's.
+        Optional<String> approved;
+        try {
+            approved = control.claimToolCall(call.capabilityId(), digest);
+        } catch (ChatRunSuperseded ended) {
+            return refused(RUN_NOT_ACTIVE);
+        }
         if (approved.isEmpty()) return refused(NOT_APPROVED);
         var delivery = new Delivery(run);
         ChatToolResult result;
@@ -193,22 +204,20 @@ public final class ChatMcpTools {
         CompletableFuture<Void> mine = new CompletableFuture<>();
         CompletableFuture<Void> earlier = flights.putIfAbsent(flight, mine);
         try {
-            if (earlier != null) awaitEarlier(earlier, attached.get().control().remaining());
+            if (earlier != null) awaitEarlier(earlier, control.remaining());
             Optional<ChatKeptToolResult> reused = executor.keptToolResult(run.jobId(), run.attemptNo(),
                     call.capabilityId(), digest);
             if (reused.isPresent()) {
                 ChatToolResult kept = kept(mapper, reused.get());
                 delivery.cachedFrom = kept.toolCallId();
-                result = runner.runCached(run, attached.get().control(), approved.get(), call, new ChatToolOutput(
+                result = runner.runCached(run, control, approved.get(), call, new ChatToolOutput(
                         kept.dataVersion(), kept.items(), kept.evidenceIds(), Boolean.TRUE.equals(kept.truncated()),
                         Boolean.TRUE.equals(kept.nextAllowed()), kept.paths()), delivery);
             } else {
-                result = runner.runReserved(run, attached.get().control(), List.of(approved.get()), List.of(call),
-                        delivery).getFirst();
+                result = runner.runClaimed(run, control, approved.get(), call, delivery);
             }
         } catch (ChatRunSuperseded lost) {
-            // Either the run ended, or a concurrent identical request started this reservation first.
-            return refused(executor.attach(run.jobId(), run.attemptNo()).isPresent() ? NOT_APPROVED : RUN_NOT_ACTIVE);
+            return refused(RUN_NOT_ACTIVE);
         } finally {
             if (earlier == null) {
                 flights.remove(flight, mine);
@@ -216,7 +225,11 @@ public final class ChatMcpTools {
             }
         }
         if (delivery.refusal != null && delivery.refusal.equals(result.error())) return refused(delivery.refusal);
-        if (ChatRunControl.RESULTS_OVER_BUDGET.equals(result.error())) return refused(ChatRunControl.RESULTS_OVER_BUDGET);
+        // Refused when recorded: over a result's or the job's limit as the column stores it.
+        if (ChatRunControl.RESULT_TOO_LARGE.equals(result.error())
+                || ChatRunControl.RESULTS_OVER_BUDGET.equals(result.error())) {
+            return refused(result.error());
+        }
         Map<String, Object> structured = structured(result, delivery.withheld, delivery.cachedFrom);
         return McpSchema.CallToolResult.builder().structuredContent(structured)
                 .addTextContent(mapper.writeValueAsString(structured)).isError(!result.succeeded()).build();

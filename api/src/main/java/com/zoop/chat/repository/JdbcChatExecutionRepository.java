@@ -237,6 +237,28 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
     }
 
     @Override
+    public Optional<String> claimReservedToolCall(String jobId, String ownerToken, int attemptNo, String capabilityId,
+            String inputDigest, Instant at) {
+        return jdbc.queryForList("""
+                UPDATE chat_tool_calls c SET status = 'running', started_at = :at
+                 WHERE c.id = (SELECT r.id FROM chat_tool_calls r
+                                WHERE r.chat_job_id = :id AND r.attempt_no = :attempt AND r.capability_id = :capability
+                                  AND r.input_digest = :digest AND r.status = 'reserved'
+                                ORDER BY r.call_index LIMIT 1 FOR UPDATE SKIP LOCKED)
+                   AND c.status = 'reserved' AND
+                """ + " " + TOOL_CALL_OWNED + " RETURNING c.tool_call_id",
+                params(jobId, ownerToken, at).addValue("attempt", attemptNo).addValue("capability", capabilityId)
+                        .addValue("digest", inputDigest), String.class).stream().findFirst();
+    }
+
+    @Override
+    public long storedResultBytes(String result) {
+        Long bytes = jdbc.queryForObject("SELECT octet_length(CAST(:result AS jsonb)::text)",
+                new MapSqlParameterSource("result", result), Long.class);
+        return bytes == null ? 0 : bytes;
+    }
+
+    @Override
     public long keptResultBytes(String jobId) {
         Long bytes = jdbc.queryForObject(
                 "SELECT COALESCE(sum(octet_length(result::text)), 0) FROM chat_tool_calls WHERE chat_job_id = :id",

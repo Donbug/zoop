@@ -4,6 +4,7 @@ import com.zoop.chat.repository.ChatToolCallEnd;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * What an engine may do to the job it runs. Every write is fenced by the run's owner token and unexpired lease: after a
@@ -50,11 +51,26 @@ public interface ChatRunControl {
     void toolCallStarted(String toolCallId);
 
     /**
-     * running → succeeded|failed. A success that keeps a result is recorded only while every result the job kept stays within
-     * {@link #MAX_KEPT_RESULT_BYTES}; past it the call is recorded {@code failed} with {@link #RESULTS_OVER_BUDGET} and
-     * {@link ChatToolCallRefused} is thrown, so the result is never delivered.
+     * reserved → running for this attempt's first call still reserved for exactly this capability and input digest, picked
+     * and started in one step, so requests arriving together each start a different one; empty when none is left (never
+     * reserved, or all already started).
+     */
+    Optional<String> claimToolCall(String capabilityId, String inputDigest);
+
+    /**
+     * running → succeeded|failed. A success that keeps a result is recorded only while it fits, measured as the database
+     * stores it (its JSON text after storing): within {@link #MAX_CALL_RESULT_BYTES} itself, and with every result the job
+     * kept within {@link #MAX_KEPT_RESULT_BYTES}. Otherwise the call is recorded {@code failed} with
+     * {@link #RESULT_TOO_LARGE} or {@link #RESULTS_OVER_BUDGET} and {@link ChatToolCallRefused} is thrown, so the result is
+     * never delivered.
      */
     void toolCallFinished(String toolCallId, ChatToolCallEnd end);
+
+    /** One kept result, as stored ({@code chat_tool_calls.result}'s own limit). */
+    int MAX_CALL_RESULT_BYTES = 256 * 1024;
+
+    /** The failure of a call whose kept result would be over {@link #MAX_CALL_RESULT_BYTES}. */
+    String RESULT_TOO_LARGE = "result_too_large";
 
     /** All results one job's calls keep for a model (MCP results, as stored), across its attempts (MCP actions 3.2). */
     int MAX_KEPT_RESULT_BYTES = 1024 * 1024;

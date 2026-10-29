@@ -1,6 +1,5 @@
 package com.zoop.chat.executor;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -311,6 +310,15 @@ public class ChatJobExecutor {
         }
 
         @Override
+        public Optional<String> claimToolCall(String capabilityId, String inputDigest) {
+            return recorded(() -> transaction.execute(status -> {
+                runs.limitWait(waitBudget());
+                return runs.claimReservedToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), capabilityId,
+                        inputDigest, clock.instant());
+            }));
+        }
+
+        @Override
         public int toolCallsLeft() {
             Integer made = recorded(() -> transaction.execute(status ->
                     runs.countJobToolCalls(claim.job().id(), claim.attemptNo())));
@@ -397,12 +405,16 @@ public class ChatJobExecutor {
                 runs.limitWait(waitBudget());
                 ChatToolCallEnd recording = end;
                 if (end.result() != null) {
-                    // The job row's lock orders the job's kept results, so their total is checked and written at once.
+                    // The job row's lock orders the job's kept results, so their total is checked and written at once,
+                    // every size measured the way the column stores it.
                     if (runs.lockOwned(claim.job().id(), claim.ownerToken(), clock.instant()).isEmpty()) return false;
-                    long kept = runs.keptResultBytes(claim.job().id());
-                    if (kept + end.result().getBytes(StandardCharsets.UTF_8).length > MAX_KEPT_RESULT_BYTES) {
-                        refused[0] = RESULTS_OVER_BUDGET;
-                        recording = ChatToolCallEnd.failed(RESULTS_OVER_BUDGET);
+                    long size = runs.storedResultBytes(end.result());
+                    String over = size > MAX_CALL_RESULT_BYTES ? RESULT_TOO_LARGE
+                            : runs.keptResultBytes(claim.job().id()) + size > MAX_KEPT_RESULT_BYTES ? RESULTS_OVER_BUDGET
+                            : null;
+                    if (over != null) {
+                        refused[0] = over;
+                        recording = ChatToolCallEnd.failed(over);
                     }
                 }
                 return runs.finishToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), toolCallId, recording,

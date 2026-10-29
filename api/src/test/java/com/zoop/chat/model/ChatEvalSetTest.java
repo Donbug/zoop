@@ -684,6 +684,11 @@ class ChatEvalSetTest {
         }
 
         @Override public void toolCallStarted(String toolCallId) { }
+
+        @Override
+        public java.util.Optional<String> claimToolCall(String capabilityId, String inputDigest) {
+            throw new UnsupportedOperationException("only the MCP endpoint claims an approved call");
+        }
         @Override public void toolCallFinished(String toolCallId, ChatToolCallEnd end) { }
     }
 
