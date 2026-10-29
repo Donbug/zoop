@@ -84,8 +84,10 @@ hosted MCP 결과는 ai/service의 전송 gate를 거치지 않고 이 엔드포
 
 - **grant 원본**: AI runtime이 `--grants`로 읽는 운영자 챗봇 grant 레지스트리(`zoop-ai-chat-1`) **같은 파일**을 `ZOOP_CHAT_MCP_SEND_GRANTS`(절대·정규화 경로)로 읽는다. 결과마다 다시 읽으므로 철회는 다음 결과부터 적용된다. 형식은 worker의 `ChatGrantRegistry`와 같이 엄격하게 본다(필드 누락·추가·중복 키, 모르는 rights·operation·목적, offset 없는 만료는 레지스트리 전체 거부).
 - **규칙**: worker의 `chat-agent` 단계 규칙과 같다. 같은 source의 grant가 `enabled`, `rights=known`, `model-send`, 목적에 `chat-agent`, 수신자에 `ZOOP_CHAT_MCP_SEND_RECIPIENT`(AI runtime이 `chat-agent` 단계에 쓰는 수신자, live `openai-compatible:<revision>`)가 있고 만료 전이어야 한다. `chat-agent` 목적은 그 단계의 Responses 저장(`store=true`)·continuation 재개를 포함하는 목적으로 등록한다.
-- **출처 대응**: 기업 항목(이름) = `zoop-company-catalog`, 사건 제목·관계·경로 단계 = `zoop-graph`(새 source ID), ZOOP 문서 제목 = `zoop-docs`, 근거(근거 항목의 label은 기사 제목) = direct 경로의 인용과 같은 규칙. 근거는 run의 고정 버전·asOf로 인용 읽기를 해서 기업 개요면 카탈로그, ZOOP 문서 구간이면 `zoop-docs`, 기사면 `articles.provider`(`CitedMcpSources`)이며 지금 인용할 수 없는 근거는 출처가 없어 보내지 않는다. 그 밖의 항목 종류도 보내지 않는다.
+- **수신자 결속**: Java가 검사한 수신자와 결과를 실제로 받는 수신자가 같아야 한다. Java는 agent 단계마다 `mcp.recipient`에 `ZOOP_CHAT_MCP_SEND_RECIPIENT`를 넣고, worker는 새 invocation을 보내기 전에 그 값이 그 단계의 실제 수신자(설정된 endpoint로 계산한 `openai-compatible:<revision>`, replay `authored-replay`)와 정확히 같은지 확인한다. 다르면 `mcp_recipient_mismatch`로 아무것도 보내지 않는다(Java에서는 거절된 모델 단계). 이 값은 공급자로 보내지 않는다.
+- **출처 대응**: 기업 항목(이름) = `zoop-company-catalog`, 사건 제목·경로 단계(ID·관계 유형·역할, 이름 없음) = `zoop-graph`(새 source ID), 관계(엣지) 항목은 label이 양 끝 이름(기업명 포함)과 관계로 이루어진 복합 label이라 `zoop-graph`와 `zoop-company-catalog`가 **모두** 있어야 함, ZOOP 문서 제목 = `zoop-docs`, 근거(근거 항목의 label은 기사 제목) = direct 경로의 인용과 같은 규칙. 근거는 run의 고정 버전·asOf로 인용 읽기를 해서 기업 개요면 카탈로그, ZOOP 문서 구간이면 `zoop-docs`, 기사면 `articles.provider`(`CitedMcpSources`)이며 지금 인용할 수 없는 근거는 출처가 없어 보내지 않는다. 그 밖의 항목 종류도 보내지 않는다.
 - **뺀 부분**: 허용되지 않은 항목·경로는 **통째로**, 근거 ID는 결과와 항목·경로 단계의 목록에서 모두 뺀다. 맨 ID도 보내지 않는다. 결과에는 `withheld: {reason: "source_grant_denied", items, evidenceIds, paths}`로 개수만 남는다(아무것도 빼지 않았으면 없음). 원장의 `evidence_ids`와 `chat_tool_calls.result`도 보낸 것만 담으므로, 최종 답 검사와 다음 라운드의 도달 가능한 ID에도 뺀 것은 들어가지 않는다.
+- **시간**: 검사(레지스트리·근거 출처 읽기)는 읽기와 같은 스레드에서 그 호출의 시간 한도(3초)와 runner 전체 슬롯 안에서 돈다. 느린 검사는 느린 읽기처럼 `tool_timeout`이 되고, 호출 기록 스레드를 붙잡지 않는다.
 - **판단 불가**: 레지스트리를 읽지 못하거나 근거 출처를 읽지 못하면 빈 허용이 아니라 호출 거부(`send_grants_unavailable`)다. 설정이 없거나 기동 때 레지스트리를 읽지 못하면 `/mcp`를 켠 기동 자체가 실패한다.
 
 ### 원장
@@ -124,10 +126,12 @@ MCP 호출도 `chat_tool_calls`에 기존 호출과 같은 상태(예약 → 실
 - `ChatMcpGrantsTest`: 발급·검증, 변조·잘림·다른 키, deadline 만료, 키 회전, subject scope(회원별 차이, 평문 회원 ID 없음), `portfolio.scope.read` 거부, 키 설정 오류(값 비노출).
 - `ChatMcpEndpointTest`: 실제 SDK servlet transport·server와 메모리 job 저장소로 401/403/413/429(헤더 공백 변형도 같은 창), `initialize`, grant별 `tools/list`, 승인된 호출 1회 실행과 원장 기록(`via=mcp`), 미승인·다른 target·다른 limit·재사용 거부, 다른 attempt·다른 subject·종료된 run 무조회, 승인 시 호출 상한, `result_too_large`의 원장 실패 기록, grant 없는 출처의 근거를 결과·원장에서 빼고 `withheld`로 표시, 레지스트리를 읽지 못하면 `send_grants_unavailable`.
 - `ChatSendGrantsTest`: `chat-agent` 규칙(비활성·rights·`model-send` 없음·목적·수신자·만료 거부), 매번 다시 읽어 철회 즉시 적용, 없음·형식 위반·추가 필드·중복 키·크기 초과 레지스트리는 전부 거부, 설정 검증.
-- `ChatMcpSendGateTest`: 출처별 항목·경로·근거 ID 제외와 개수, 그래프 grant 없으면 사건·관계·경로 제외, 모르는 항목 종류 제외, 레지스트리 판단 불가.
+- `ChatMcpSendGateTest`: 출처별 항목·경로·근거 ID 제외와 개수, 그래프 grant 없으면 사건·관계·경로 제외, 실제 `graph.version.diff`(합성 fixture)에서 카탈로그 grant가 없으면 기업과 함께 관계 label도 제외(기업명 우회 없음), 모르는 항목 종류 제외, 레지스트리 판단 불가.
 - `CitedMcpSourcesTest`: 인용 종류별 출처(기사 공급자·카탈로그·ZOOP 문서), 인용할 수 없는 근거는 출처 없음, DB 오류는 판단 불가.
 - `ChatExecutorPostgresTest`(PostgreSQL): `attach`와 fence, 예약 호출 조회(`findReservedToolCall`)의 기능·digest·attempt 일치와 시작 뒤 소멸, `chat_tool_calls.result` 보관(성공만)과 크기·상태 제약.
 - `ChatMcpConfigurationTest`: 기본 꺼짐이면 bean·경로 없음, 켜고 키나 읽을 수 있는 grant 레지스트리가 없으면 기동 거절(경로 비노출), 둘 다 있으면 `/mcp` 등록, agent 경로의 모델 단계 요구, `/mcp` 없이 agent만 켜면 기동 거절.
+- `ChatToolRunnerTest`(tool): 결과 검사가 멈추면 그 호출이 시간 한도로 끝나고 기록 스레드는 비어 다른 job의 direct 호출이 기록됨.
+- worker `test_chat_agent.py`: 단계의 `mcp.recipient`가 실제 수신자와 다르면(live 다른 endpoint·replay 이름, replay에 live 이름) `mcp_recipient_mismatch`로 보내지 않음, 수신자는 공급자 요청에 없음.
 - `ChatMcpAgentTest`: 실제 MCP 도구 위의 승인 루프. 승인된 호출만 실행되고 결과가 원장에서 돌아옴, 예약 불가·허용 밖 도구 거부, 해석되지도 승인 결과에 나오지도 않은 target·섞인 target·잘못된 모양 거부와 승인 결과로 도달한 target 승인, 3라운드 뒤 마무리 거부와 끝없이 묻는 run의 실패, 시간 부족 시 마무리, 종료된 run에서 중단, grant의 도구·만료.
 - `ChatAgentPathEngineTest`(orchestrator): agent 경로를 타는 계획과 direct에 남는 계획(의존 단계·일반 개념·노출 안 된 도구), 실행 결과에 없는 근거 인용의 `validation_failed`, 단계 시간 부족의 `deadline_guard`.
 
