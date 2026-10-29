@@ -1,3 +1,4 @@
+import { preservedPublication } from '@/util/preservedBriefing';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -272,4 +273,28 @@ describe('D-BRF-01/02 edition reviews', () => {
     expect(screen.getByText('오늘 어디에 집중할까요?')).toBeTruthy();
     expect(screen.getByText('오늘 확인할 사건·판단 변경 조건')).toBeTruthy();
   });
+});
+
+it('renders archived review with its original selected and tracked companies after reselection', () => {
+  const original = fixture();
+  const revised = structuredClone(original);
+  revised.items = [
+    {
+      ...revised.items[0],
+      companies: [{ ...revised.items[0].companies[0], id: 'DIFFERENT' }],
+    },
+  ];
+  revised.issueIntelligence = {
+    baselineResponseSha256: 'a'.repeat(64),
+  } as NonNullable<BriefingResponse['issueIntelligence']>;
+  revised.preservedPublication = { sha256: 'a'.repeat(64), response: original };
+  expect(validEditionReview(revised)).toBeNull();
+  const archive = preservedPublication(revised)!;
+  expect(archive.items).toEqual(original.items);
+  expect(validEditionReview(archive)).toEqual(original.editionReview);
+  render(<EditionReview result={archive} compact={false} />);
+  expect(screen.getByText('새 핵심 기업')).toBeTruthy();
+  expect(screen.getByText('아침 조건 추적')).toBeTruthy();
+  revised.preservedPublication.sha256 = 'b'.repeat(64);
+  expect(preservedPublication(revised)).toBeNull();
 });

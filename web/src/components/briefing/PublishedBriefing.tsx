@@ -1,9 +1,13 @@
+import BriefingPreservedContext from './BriefingPreservedContext';
+import { preservedPublication } from '@/util/preservedBriefing';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ApiError } from '@/apis/auth/ApiService';
 import { getBriefing } from '@/apis/briefing/briefing';
 import { getMyFeedback } from '@/apis/feedback/feedback';
 import FeedbackButtons from '@/components/common/FeedbackButtons';
+import BriefingPreviewFeedback from './BriefingPreviewFeedback';
+import { validIssueIntelligence } from '@/util/issueIntelligence';
 import { usePersonalBriefing } from '@/hooks/usePersonalBriefing';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import type { FeedbackValue } from '@/types/feedback';
@@ -13,16 +17,9 @@ import type {
   BriefingResponse,
 } from '@/types/briefing';
 import { briefingTime } from '@/util/briefingTime';
-import CompanyOutlooks from './CompanyOutlooks';
-import JudgmentUpdate from './JudgmentUpdate';
-import EditionReview from './EditionReview';
 import IssueCentricBriefing from './IssueCentricBriefing';
 import { BriefingS3Disclosure } from './BriefingS3Impacts';
-import { validEditionReview } from '@/util/editionReview';
-import { validJudgment } from '@/util/judgmentUpdate';
 import BriefingReadingSection from './BriefingReadingSection';
-import MarketIndicators from './MarketIndicators';
-import MarketSummary from './MarketSummary';
 import BriefingIssueList from './BriefingIssueList';
 import BriefingRecap from './BriefingRecap';
 import BriefingContinuity from './BriefingContinuity';
@@ -108,6 +105,10 @@ export default function PublishedBriefing({
   const memberId = useAuthStore(selectMemberId);
   const checking = useAuthStore((s) => s.status === 'checking');
   const published = result?.status === 'published' ? result : null;
+  const previewAnalysis =
+    import.meta.env.VITE_BRIEFING_PREVIEW_FEEDBACK === 'true' && result
+      ? validIssueIntelligence(result)
+      : null;
   const personalView = usePersonalBriefing(
     personal && memberId && published ? published : null,
   );
@@ -239,21 +240,34 @@ export default function PublishedBriefing({
     result && (
       <div className="mt-1 flex flex-col gap-2">
         {!compact && <BriefingS3Disclosure round={result} item={item} />}
-        <Link
-          to={`/?round=${encodeURIComponent(result.id)}&select=${encodeURIComponent(`node:${item.eventId}`)}`}
-          className={`self-start text-[11px] font-semibold underline underline-offset-4 ${FOCUS_RING}`}
-        >
-          이 회차 관계 그래프에서 보기
-        </Link>
-        {result.graphVersion && (
-          <FeedbackButtons
-            key={`${feedbackKey}:${item.eventId}`}
+        {!result.issueIntelligence && (
+          <Link
+            to={`/?round=${encodeURIComponent(result.id)}&select=${encodeURIComponent(`node:${item.eventId}`)}`}
+            className={`self-start text-[11px] font-semibold underline underline-offset-4 ${FOCUS_RING}`}
+          >
+            이 회차 관계 그래프에서 보기
+          </Link>
+        )}
+        {previewAnalysis ? (
+          <BriefingPreviewFeedback
+            key={`${previewAnalysis.resultVersion}:${item.eventId}`}
+            roundId={result.id}
+            resultVersion={previewAnalysis.resultVersion}
             feature="briefing_issue"
             targetId={`${result.id}/${item.eventId}`}
-            targetVersion={result.graphVersion}
             subject={`핵심 이슈 ${item.rank}`}
-            saved={saved('briefing_issue', `${result.id}/${item.eventId}`)}
           />
+        ) : (
+          result.graphVersion && (
+            <FeedbackButtons
+              key={`${feedbackKey}:${item.eventId}`}
+              feature="briefing_issue"
+              targetId={`${result.id}/${item.eventId}`}
+              targetVersion={result.graphVersion}
+              subject={`핵심 이슈 ${item.rank}`}
+              saved={saved('briefing_issue', `${result.id}/${item.eventId}`)}
+            />
+          )
         )}
       </div>
     );
@@ -274,7 +288,17 @@ export default function PublishedBriefing({
   const roundFeedback = result && (
     <section className={SECTION} aria-label="이 브리핑 평가">
       <h3 className={SECTION_TITLE}>이 브리핑은 어땠나요?</h3>
-      {result.graphVersion ? (
+      {previewAnalysis ? (
+        <BriefingPreviewFeedback
+          key={`${previewAnalysis.resultVersion}:round`}
+          roundId={result.id}
+          resultVersion={previewAnalysis.resultVersion}
+          feature="briefing_round"
+          targetId={result.id}
+          subject="이 브리핑 회차"
+          showNote
+        />
+      ) : result.graphVersion ? (
         <FeedbackButtons
           key={`${feedbackKey}:round`}
           feature="briefing_round"
@@ -292,53 +316,9 @@ export default function PublishedBriefing({
   );
 
   const currentContext = result && (
-    <>
-      <EditionReview result={result} compact={compact} />
-      {validEditionReview(result) ? (
-        <BriefingReadingSection compact title="이전 분석·기업 시세·근거 보존본">
-          <JudgmentUpdate result={result} compact={compact} />
-          <CompanyOutlooks result={result} compact={false} />
-        </BriefingReadingSection>
-      ) : (
-        <>
-          <JudgmentUpdate result={result} compact={compact} />
-          {validJudgment(result) ? (
-            <BriefingReadingSection
-              compact
-              title="기존 생성 전문·시세·근거 보존본"
-            >
-              <p className={NOTE}>
-                아래는 비교 분석 추가 전 생성한 문안입니다. 좁은 인용에 따른
-                과거의 ‘일정 미확인’ 표현은 위의 원문 전체 기반 판단을
-                확인하세요.
-              </p>
-              <CompanyOutlooks result={result} compact={false} />
-            </BriefingReadingSection>
-          ) : (
-            <CompanyOutlooks result={result} compact={compact} />
-          )}
-        </>
-      )}
-      {compact && (
-        <MarketIndicators variables={result.marketVariables} compact />
-      )}
-      <BriefingReadingSection
-        compact={compact}
-        title={
-          result.edition === 'morning'
-            ? '시장 요약·시장 전체 전망 읽기'
-            : '시장 요약·시장 흐름 비교 읽기'
-        }
-      >
-        <MarketSummary
-          summary={result.marketSummary}
-          edition={result.edition}
-          dataAsOf={result.dataAsOf}
-        />
-      </BriefingReadingSection>
-      {!compact && <MarketIndicators variables={result.marketVariables} />}
-    </>
+    <BriefingPreservedContext result={result} compact={compact} />
   );
+  const original = result && preservedPublication(result);
 
   return (
     <article
@@ -434,9 +414,36 @@ export default function PublishedBriefing({
               title="시장·지표와 전체 저장 상태 보기"
             >
               {(!compact || !knownLimits) && partialInfo}
-              {currentContext}
+              {result.issueIntelligence ? (
+                <>
+                  <IssueCentricBriefing
+                    compact={false}
+                    result={result}
+                    items={(personalBriefing ?? result).items}
+                    renderExtra={issueExtra}
+                  />
+                  <BriefingReadingSection
+                    compact
+                    title="이전 생성 전문·시장 요약·시세 보존본"
+                  >
+                    {original ? (
+                      <BriefingPreservedContext
+                        result={original}
+                        compact={false}
+                      />
+                    ) : (
+                      <p className={NOTE}>
+                        이전 발행본을 확인하지 못해 보존본을 표시하지 않습니다.
+                      </p>
+                    )}
+                  </BriefingReadingSection>
+                </>
+              ) : (
+                currentContext
+              )}
               {result.items.length === 0 &&
                 result.emptyReason === 'no_issues_in_window' &&
+                !result.issueIntelligence &&
                 !result.continuity && (
                   <BriefingRecap
                     key={`${result.id}:${result.graphVersion}:${result.dataAsOf}`}
@@ -454,14 +461,16 @@ export default function PublishedBriefing({
                 />
               )}
               {feedbackReadError}
-              <BriefingIssueList
-                compact={compact}
-                items={(personalBriefing ?? result).items}
-                roundId={result.id}
-                graphVersion={result.graphVersion}
-                graphHref={`/?round=${encodeURIComponent(result.id)}`}
-                renderExtra={issueExtra}
-              />
+              {!result.issueIntelligence && (
+                <BriefingIssueList
+                  compact={compact}
+                  items={(personalBriefing ?? result).items}
+                  roundId={result.id}
+                  graphVersion={result.graphVersion}
+                  graphHref={`/?round=${encodeURIComponent(result.id)}`}
+                  renderExtra={issueExtra}
+                />
+              )}
               <BriefingReadingSection
                 compact={compact}
                 title="이전 브리핑과 핵심 이슈 변화 보기"
@@ -509,11 +518,7 @@ export default function PublishedBriefing({
               {roundFeedback}
             </BriefingReadingSection>
           )}
-          {compact && result.status === 'published' && (
-            <BriefingReadingSection compact title="이 브리핑 평가">
-              {roundFeedback}
-            </BriefingReadingSection>
-          )}
+          {compact && result.status === 'published' && roundFeedback}
           {compact && (
             <BriefingReadingSection compact title="발행 정보와 자료 확인 범위">
               {publicationInfo}
