@@ -205,7 +205,8 @@
         "running",
         "done",
         "failed",
-        "skipped"
+        "skipped",
+        "unknown"
       ]
     },
     "response:200:application/json.briefings<anyOf:0>.latest[].stages.generate.status:required": true,
@@ -227,7 +228,8 @@
         "running",
         "done",
         "failed",
-        "skipped"
+        "skipped",
+        "unknown"
       ]
     },
     "response:200:application/json.briefings<anyOf:0>.latest[].stages.publish.status:required": true,
@@ -249,7 +251,8 @@
         "running",
         "done",
         "failed",
-        "skipped"
+        "skipped",
+        "unknown"
       ]
     },
     "response:200:application/json.briefings<anyOf:0>.latest[].stages.verify.status:required": true,

@@ -2181,7 +2181,7 @@ RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 앱 작업
 
 ## listAdminBriefingRounds · 브리핑 회차 운영 상태 목록
 
-브리핑 회차 운영 상태 목록.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+DB에 저장된 회차만 예정 시각·ID 내림차순으로 조회한다. 날짜는 KST 양끝 날짜 포함, 시각은 오프셋 필수·양끝 포함이며 from/to 형식은 같아야 한다. 커서는 관리자·필터·limit에 결속된다. 생성 시도 수/trigger는 generation 원장만 기준이며 과거 미기록은 0/null이다. 현재 재처리 API가 없어 reprocessable=false이다. 조회는 누락 회차 생성·수집·AI 호출·상태 변경을 하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2211,7 +2211,7 @@ RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 앱 작업
 
 ## getAdminBriefingRound · 브리핑 생성·검증·발행 상태 조회
 
-브리핑 생성·검증·발행 상태 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+관리자 인증 후 동일 DB 스냅샷에서 원문 해시를 확인해 발행 원문(제공 중단 회차 포함), 정정과 generation 처리 이력을 읽는다. 미기록 단계는 unknown, 미확인 시각은 null이며 공개 시각만으로 검증 성공을 추정하지 않는다. 조회는 상태를 변경하지 않는다. 운영 재처리·정정·중단/재개 쓰기 API는 별도 구현 범위이다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -7367,7 +7367,7 @@ Key issues of an evening round compared with the same day's published morning ro
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| status | 필수 | string {pending, running, done, failed, skipped} |  |
+| status | 필수 | string {pending, running, done, failed, skipped, unknown} | unknown은 단계 기록 없음이며 성공·실패·대기로 추정하지 않는다. |
 | at | 필수 | string / null |  |
 
 <a id="schema-stagesout"></a>

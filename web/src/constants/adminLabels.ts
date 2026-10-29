@@ -61,6 +61,7 @@ export const stageStatusLabel: Record<StageStatus, string> = {
   done: '완료',
   failed: '실패',
   skipped: '건너뜀',
+  unknown: '기록 없음',
 };
 
 export const aiSourceLabel: Record<string, string> = {

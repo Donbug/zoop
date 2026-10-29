@@ -217,13 +217,16 @@ function headersOf(pathEnd: string) {
     .map(([, init]) => new Headers(init?.headers));
 }
 
-function open(path: string) {
+function open(path: string, readOnly = false) {
   return renderRoutes(
     [
       {
         element: <AdminProtectedRoute />,
         children: [
-          { path: '/admin/briefings', element: <AdminBriefingsPage /> },
+          {
+            path: '/admin/briefings',
+            element: <AdminBriefingsPage readOnly={readOnly} />,
+          },
           { path: '/admin/ai', element: <AdminAiPage /> },
         ],
       },
@@ -1023,5 +1026,44 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
     expect(share.textContent).toContain('1천');
     expect(share.textContent).toContain('자료 없음');
     expect(share.textContent).not.toContain('%');
+  });
+});
+
+// The actual route defaults to the DB-backed read-only surface. Legacy form tests above
+// explicitly enable their isolated mock write API; no real mutation route is implied.
+describe('DB 연결 관리자 조회 화면', () => {
+  test('회차 상세는 읽되 연결되지 않은 쓰기는 요청하지 않는다', async () => {
+    server.on('GET', ROUND, () =>
+      json(
+        detail({
+          ...round(),
+          stages: {
+            generate: { status: 'done', at: null },
+            verify: { status: 'unknown', at: null },
+            publish: { status: 'done', at: null },
+          },
+        }),
+      ),
+    );
+    const { user } = open('/admin/briefings', true);
+    await user.click(
+      await screen.findByRole('button', { name: '2026-10-06 출근' }),
+    );
+    expect(await screen.findByText('검증 기록 없음')).toBeTruthy();
+    expect(screen.getByText(/회차 조회만 제공됩니다/)).toBeTruthy();
+    for (const label of ['재처리', '정정 등록', '제공 중단']) {
+      const button = screen.getByRole('button', {
+        name: label,
+      }) as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      await user.click(button);
+    }
+    expect(screen.queryByRole('textbox', { name: /사유/ })).toBeNull();
+    const calls = (
+      globalThis.fetch as unknown as {
+        mock: { calls: [unknown, RequestInit | undefined][] };
+      }
+    ).mock.calls;
+    expect(calls.some(([, init]) => init?.method === 'POST')).toBe(false);
   });
 });
