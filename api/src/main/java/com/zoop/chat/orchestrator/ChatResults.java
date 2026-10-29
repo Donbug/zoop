@@ -65,7 +65,8 @@ final class ChatResults {
             "results_truncated", "조회 상한 때문에 일부 자료만 확인해 이 부분은 단정하지 않았어요.",
             "not_in_member_scope", "질문한 기업이 보유·관심 종목에 없어 이 부분은 확인하지 않았어요.",
             "evidence_insufficient", "이 부분은 답에 쓸 공개 근거가 부족했어요.",
-            "out_of_scope", "이 부분은 지금 답할 수 있는 범위 밖이에요.");
+            "out_of_scope", "이 부분은 지금 답할 수 있는 범위 밖이에요.",
+            "tool_unavailable", "이 부분은 자료 조회가 일시적으로 되지 않아 답하지 못했어요. 잠시 뒤 다시 물어봐 주세요.");
 
     /**
      * Notice messages by code (MCP actions contract 3.5). Only {@code mcp_direct_start} is produced so far; the web and tool
