@@ -54,7 +54,11 @@ function detail(item: PreviousBriefingComparisonItem, sharesTitle: boolean) {
   return `${companies} · ${evidence}`;
 }
 
-type Props = { roundDate?: string } & (
+type Props = {
+  roundDate?: string;
+  /** 56: 이 회차 id. 주면 이슈 제목을 회차 지도로 잇고, 빠진 이슈는 비교 회차 지도로 보낸다. */
+  graphRoundId?: string;
+} & (
   | { basis?: 'morning'; since?: SinceMorning | null; previous?: never }
   | {
       basis: 'previous';
@@ -67,7 +71,7 @@ type Props = { roundDate?: string } & (
 // 신규/이어짐/빠짐은 비교 회차의 핵심 이슈 포함 여부이며 전망 적중이나 악재 해소가 아니다.
 export default function BriefingComparison(props: Props) {
   const id = useId();
-  const { roundDate } = props;
+  const { roundDate, graphRoundId } = props;
   const isPrevious = props.basis === 'previous';
   const comparison = isPrevious ? props.previous : props.since;
   const available = comparison?.status === 'available' ? comparison : null;
@@ -147,6 +151,16 @@ export default function BriefingComparison(props: Props) {
       ? available.previousDate
       : undefined
     : roundDate;
+  const comparedRoundId =
+    'previousRoundId' in available
+      ? available.previousRoundId
+      : available.morningRoundId;
+  const graphHref = (item: PreviousBriefingComparisonItem) => {
+    const round = item.change === 'dropped' ? comparedRoundId : graphRoundId;
+    return graphRoundId && round
+      ? `/?round=${encodeURIComponent(round)}&select=${encodeURIComponent(`node:${item.eventId}`)}`
+      : null;
+  };
   const referenceHref =
     referenceDate &&
     /^\d{4}-\d{2}-\d{2}$/.test(referenceDate) &&
@@ -203,13 +217,24 @@ export default function BriefingComparison(props: Props) {
                   >
                     {changeLabel[item.change]}
                   </span>
-                  <span
-                    className={`min-w-0 flex-1 text-[13px] font-semibold ${
-                      item.change === 'dropped' ? 'text-zoop-muted' : ''
-                    }`}
-                  >
-                    {item.title}
-                  </span>
+                  {graphHref(item) ? (
+                    <Link
+                      to={graphHref(item)!}
+                      className={`min-w-0 flex-1 text-[13px] font-semibold underline underline-offset-4 ${
+                        item.change === 'dropped' ? 'text-zoop-muted' : ''
+                      } ${FOCUS_RING}`}
+                    >
+                      {item.title}
+                    </Link>
+                  ) : (
+                    <span
+                      className={`min-w-0 flex-1 text-[13px] font-semibold ${
+                        item.change === 'dropped' ? 'text-zoop-muted' : ''
+                      }`}
+                    >
+                      {item.title}
+                    </span>
+                  )}
                 </p>
                 <p className={NOTE}>
                   {detail(item, (titleCount.get(item.title) ?? 0) > 1)}

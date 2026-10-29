@@ -1,8 +1,13 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import type { BriefingItem } from '@/types/briefing';
+import type { BriefingItem, BriefingResponse } from '@/types/briefing';
+import { issueAnchor } from '@/util/briefingIssueView';
 import BriefingReadingSection from './BriefingReadingSection';
 import BriefingItemDetails from './BriefingItemDetails';
+import {
+  BriefingDocumentSentiments,
+  IssueCorrections,
+} from './BriefingPublishedNotes';
 import {
   BODY,
   EMPTY,
@@ -20,7 +25,10 @@ export default function BriefingIssueList({
   roundId,
   graphVersion = null,
   renderExtra,
+  issueCorrections,
 }: {
+  /** 55: 화면에 있는 이슈에 붙는 정정(eventId별) */
+  issueCorrections?: Map<string, BriefingResponse['corrections']>;
   items?: BriefingItem[];
   compact?: boolean;
   /** D-BRF-04 이 회차 기준 지도 주소. 발행 회차에만 준다. */
@@ -57,7 +65,8 @@ export default function BriefingIssueList({
           {items.slice(0, 3).map((item) => (
             <li
               key={item.eventId}
-              className="flex flex-col gap-1.5 border-t-[0.667px] border-zoop-line pt-5 first:border-t-0 first:pt-0 [&+li]:mt-5"
+              id={issueAnchor(item)}
+              className="scroll-mt-4 flex flex-col gap-1.5 border-t-[0.667px] border-zoop-line pt-5 first:border-t-0 first:pt-0 [&+li]:mt-5"
             >
               <BriefingReadingSection
                 compact={compact}
@@ -84,9 +93,28 @@ export default function BriefingIssueList({
                 )}
                 <p className="text-[11px] text-zoop-muted">
                   {item.companies.length
-                    ? item.companies.map((company) => company.name).join(', ')
+                    ? item.companies.map((company, index) => (
+                        <span key={company.id || index}>
+                          {index > 0 && ', '}
+                          {company.id ? (
+                            <Link
+                              to={`/companies/${encodeURIComponent(company.id)}`}
+                              className={`underline underline-offset-4 ${FOCUS_RING}`}
+                            >
+                              {company.name}
+                            </Link>
+                          ) : (
+                            company.name
+                          )}
+                        </span>
+                      ))
                     : '확인된 기업 없음'}
                 </p>
+                <BriefingDocumentSentiments
+                  sentiments={item.documentSentiments}
+                  companies={item.companies}
+                  label={`핵심 이슈 ${item.rank} 문서 판정`}
+                />
                 <p className={BODY}>
                   {'text' in item.summary
                     ? item.summary.text
@@ -94,6 +122,8 @@ export default function BriefingIssueList({
                 </p>
                 <p className={NOTE}>
                   선정 이유: {item.reason} · 근거 {item.evidenceCount}건
+                  {item.sourceSupport &&
+                    ` · 보도 기사 ${item.sourceSupport.articleCount}건`}
                 </p>
                 {roundId && (
                   <BriefingItemDetails
@@ -104,6 +134,9 @@ export default function BriefingIssueList({
                   />
                 )}
                 {renderExtra?.(item)}
+                <IssueCorrections
+                  corrections={issueCorrections?.get(item.eventId) ?? []}
+                />
               </BriefingReadingSection>
             </li>
           ))}

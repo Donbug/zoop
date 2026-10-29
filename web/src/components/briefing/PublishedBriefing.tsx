@@ -25,9 +25,11 @@ import BriefingRecap from './BriefingRecap';
 import BriefingContinuity from './BriefingContinuity';
 import BriefingComparison from './BriefingComparison';
 import PersonalBasisNotice from './PersonalBasisNotice';
+import { BriefingCorrections, BriefingOutlook } from './BriefingPublishedNotes';
+import { BRIEFING_DISCLAIMER, splitCorrections } from './briefingCorrections';
+import { issueAnchor } from '@/util/briefingIssueView';
 import { hasOnlyKnownLimitations } from './briefingLimitations';
 import {
-  BODY,
   CARD,
   EMPTY,
   NOTE,
@@ -318,6 +320,17 @@ export default function PublishedBriefing({
     </section>
   );
 
+  // 화면은 순위 상위 3건만 그린다. 나머지 이슈의 정정은 회차 정정으로 남긴다.
+  const shownItems = result
+    ? [...(personalBriefing ?? result).items]
+        .sort((a, b) => a.rank - b.rank)
+        .slice(0, 3)
+    : [];
+  const corrections = splitCorrections(
+    result?.corrections ?? [],
+    shownItems.map((item) => item.eventId),
+  );
+
   const currentContext = result && (
     <BriefingPreservedContext result={result} compact={compact} />
   );
@@ -372,7 +385,20 @@ export default function PublishedBriefing({
               <p className={`${EMPTY} mt-4`} role="status">
                 {result.notice.message}
                 {result.notice.reason && ` · ${result.notice.reason}`}
+                {result.notice.at && ` · ${briefingTime(result.notice.at)}`}
               </p>
+            )}
+            {!compact && result.status === 'published' && (
+              <BriefingOutlook
+                outlook={result.outlook}
+                issues={(personalBriefing ?? result).items.map((item) => ({
+                  eventId: item.eventId,
+                  title: item.title,
+                  anchor: shownItems.includes(item)
+                    ? issueAnchor(item)
+                    : undefined,
+                }))}
+              />
             )}
             {!compact &&
               result.continuity &&
@@ -399,17 +425,9 @@ export default function PublishedBriefing({
                   result={result}
                   items={(personalBriefing ?? result).items}
                   renderExtra={issueExtra}
+                  issueCorrections={corrections.byIssue}
                 />
-                {result.corrections.length > 0 && (
-                  <section className={SECTION}>
-                    <h3 className={SECTION_TITLE}>정정 이력</h3>
-                    {result.corrections.map((c) => (
-                      <p key={c.id} className={BODY}>
-                        {c.corrected} · {c.reason}
-                      </p>
-                    ))}
-                  </section>
-                )}
+                <BriefingCorrections corrections={corrections.round} />
               </>
             )}
             {result.status === 'published' && !compact && (
@@ -430,6 +448,7 @@ export default function PublishedBriefing({
                       result={result}
                       items={(personalBriefing ?? result).items}
                       renderExtra={issueExtra}
+                      issueCorrections={corrections.byIssue}
                     />
                     <BriefingReadingSection
                       compact
@@ -479,6 +498,7 @@ export default function PublishedBriefing({
                     graphVersion={result.graphVersion}
                     graphHref={`/?round=${encodeURIComponent(result.id)}`}
                     renderExtra={issueExtra}
+                    issueCorrections={corrections.byIssue}
                   />
                 )}
                 <BriefingReadingSection
@@ -489,6 +509,9 @@ export default function PublishedBriefing({
                     <BriefingComparison
                       since={result.sinceMorning}
                       roundDate={result.date}
+                      graphRoundId={
+                        result.issueIntelligence ? undefined : result.id
+                      }
                     />
                   )}
                   {result.edition === 'morning' && (
@@ -496,35 +519,13 @@ export default function PublishedBriefing({
                       basis="previous"
                       previous={result.previousComparison ?? null}
                       roundDate={result.date}
+                      graphRoundId={
+                        result.issueIntelligence ? undefined : result.id
+                      }
                     />
                   )}
                 </BriefingReadingSection>
-                {result.corrections.length > 0 && (
-                  <section className={SECTION}>
-                    <h3 className={SECTION_TITLE}>정정 이력</h3>
-                    <ol className="flex flex-col gap-3">
-                      {result.corrections.map((correction) => (
-                        <li
-                          key={correction.id}
-                          className="flex flex-col gap-1 rounded-[3px] bg-zoop-wash p-3"
-                        >
-                          <p className={NOTE}>
-                            정정 시각 {briefingTime(correction.createdAt)}
-                          </p>
-                          {correction.original && (
-                            <p className="text-xs text-zoop-faint line-through">
-                              발행 원문: {correction.original}
-                            </p>
-                          )}
-                          <p className="text-xs">
-                            정정 내용: {correction.corrected}
-                          </p>
-                          <p className={NOTE}>사유: {correction.reason}</p>
-                        </li>
-                      ))}
-                    </ol>
-                  </section>
-                )}
+                <BriefingCorrections corrections={corrections.round} />
                 {roundFeedback}
               </BriefingReadingSection>
             )}
@@ -539,6 +540,9 @@ export default function PublishedBriefing({
               </BriefingReadingSection>
             )}
           </>
+        )}
+        {result?.status === 'published' && (
+          <p className={`${NOTE} mt-4`}>{BRIEFING_DISCLAIMER}</p>
         )}
         {canRetry && (
           <button className={PRIMARY_BUTTON} type="button" onClick={reload}>

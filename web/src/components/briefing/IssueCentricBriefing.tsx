@@ -3,7 +3,11 @@ import { Link } from 'react-router-dom';
 import { useBriefingIssueTracking } from './briefingTelemetryContext';
 import { getBriefing } from '@/apis/briefing/briefing';
 import { validEditionReview } from '@/util/editionReview';
-import type { BriefingItem, BriefingResponse } from '@/types/briefing';
+import type {
+  BriefingDocumentSentiment,
+  BriefingItem,
+  BriefingResponse,
+} from '@/types/briefing';
 import {
   briefingIssueViews,
   issueAnchor,
@@ -26,6 +30,10 @@ import BriefingRecap from './BriefingRecap';
 import BriefingS3Impacts from './BriefingS3Impacts';
 import ImpactCue from '@/components/common/ImpactCue';
 import {
+  BriefingDocumentSentiments,
+  IssueCorrections,
+} from './BriefingPublishedNotes';
+import {
   BODY,
   EMPTY,
   FOCUS_RING,
@@ -40,6 +48,10 @@ const labels = {
   mixed: '긍정·부정 혼재',
   watch: '판단 유보',
 };
+type Correction = BriefingResponse['corrections'][number];
+const articleCount = (item: BriefingItem) =>
+  item.sourceSupport ? ` · 보도 기사 ${item.sourceSupport.articleCount}건` : '';
+
 const signed = (s: string) => `${Number(s) > 0 ? '+' : ''}${s}%`;
 const amount = (s: string) =>
   Number(s).toLocaleString('ko-KR', { maximumFractionDigits: 4 });
@@ -81,7 +93,9 @@ function CompanyInIssue({
   commonFacts,
   connection,
   position,
+  sentiments,
 }: {
+  sentiments?: BriefingDocumentSentiment[];
   compact: boolean;
   commonFacts: string[];
   connection: string;
@@ -99,7 +113,16 @@ function CompanyInIssue({
       className="space-y-3 border-t border-zoop-line pt-4"
     >
       <h5 className="flex flex-wrap items-center gap-2 text-sm font-bold">
-        {company.name}
+        {company.id ? (
+          <Link
+            to={`/companies/${encodeURIComponent(company.id)}`}
+            className={`underline underline-offset-4 ${FOCUS_RING}`}
+          >
+            {company.name}
+          </Link>
+        ) : (
+          company.name
+        )}
         {view.assessment && (
           <span className="text-xs">
             <ImpactCue tone={view.assessment} badge>
@@ -124,6 +147,13 @@ function CompanyInIssue({
               : '연결 후보 · 영향 확정 전'}
         </p>
       )}
+      <BriefingDocumentSentiments
+        sentiments={sentiments?.filter(
+          (s) => s.sentiment.companyId === company.id,
+        )}
+        companies={[company]}
+        label={`${company.name} 문서 판정`}
+      />
       <section aria-label="한 줄 결론">
         <h6 className="text-sm font-bold">한 줄 결론</h6>
         <ReadingText
@@ -408,7 +438,9 @@ function IssueCard({
   comparisonState,
   result,
   renderExtra,
+  corrections,
 }: {
+  corrections: Correction[];
   group: ReturnType<typeof readingGroups>[number];
   rank: number;
   comparisonState: 'loading' | 'error' | 'ready';
@@ -444,8 +476,20 @@ function IssueCard({
   const evidenceCount = new Set(
     group.members.flatMap((v) => v.item.evidenceIds),
   ).size;
+  const sentiments = group.members.flatMap(
+    (m) => m.item.documentSentiments ?? [],
+  );
   return (
     <li>
+      {group.members.length > 1 &&
+        group.members.map((m) => (
+          // 회차 판단의 근거 이슈 앵커. 묶음 카드는 사건마다 같은 카드로 이어 준다.
+          <span
+            key={m.item.eventId}
+            id={issueAnchor(m.item)}
+            className="block scroll-mt-4"
+          />
+        ))}
       <details
         id={
           group.members.length > 1
@@ -478,6 +522,7 @@ function IssueCard({
               ? companies.map((c) => c.view.company.name).join(' · ')
               : '연결 기업 미확인'}{' '}
             · 관련 기업 {companies.length}곳 · 근거 {evidenceCount}건
+            {group.members.length === 1 && articleCount(item)}
           </span>
         </summary>
         {open && (
@@ -513,6 +558,7 @@ function IssueCard({
                 commonFacts={facts}
                 connection={connection}
                 position={position}
+                sentiments={sentiments}
                 evening={result.edition === 'evening'}
               />
             ))}
@@ -545,7 +591,10 @@ function IssueCard({
                       aria-label={`${member.item.title} 원래 분석`}
                     >
                       <h4 className="text-sm font-bold">{member.item.title}</h4>
-                      <p className={`${NOTE} mt-2`}>{member.item.reason}</p>
+                      <p className={`${NOTE} mt-2`}>
+                        {member.item.reason}
+                        {articleCount(member.item)}
+                      </p>
                       {member.companies.map((view) => {
                         const connection = group.selections
                           .find((s) => s.issueId === member.item.eventId)
@@ -560,6 +609,7 @@ function IssueCard({
                             commonFacts={facts}
                             connection={connection?.basis.text ?? ''}
                             position={connection?.position ?? 'unconfirmed'}
+                            sentiments={member.item.documentSentiments}
                             evening={result.edition === 'evening'}
                           />
                         );
@@ -648,6 +698,11 @@ function IssueCard({
           </div>
         )}
       </details>
+      {corrections.length > 0 && (
+        <div className="px-5 pb-5 sm:px-6">
+          <IssueCorrections corrections={corrections} />
+        </div>
+      )}
     </li>
   );
 }
@@ -658,9 +713,12 @@ export default function IssueCentricBriefing({
   items = result.items,
   renderExtra,
   compact = true,
+  issueCorrections,
 }: {
   result: BriefingResponse;
   items?: BriefingItem[];
+  /** 55: 화면에 있는 이슈에 붙는 정정(eventId별) */
+  issueCorrections?: Map<string, Correction[]>;
   compact?: boolean;
   renderExtra?: (item: BriefingItem) => ReactNode;
 }) {
@@ -784,6 +842,9 @@ export default function IssueCentricBriefing({
                 compact={compact}
                 result={result}
                 renderExtra={renderExtra}
+                corrections={group.members.flatMap(
+                  (m) => issueCorrections?.get(m.item.eventId) ?? [],
+                )}
               />
             ))}
           </ol>
