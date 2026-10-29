@@ -147,7 +147,7 @@ function DayBars({
                 y={y(max * ratio)}
                 textAnchor="end"
                 dominantBaseline="middle"
-                className="fill-zoop-muted text-[10px] tabular-nums"
+                className="fill-zoop-muted text-[11px] tabular-nums"
               >
                 {tick(max * ratio)}
               </text>
@@ -189,7 +189,7 @@ function DayBars({
                     x={PAD.left + slot * index + slot / 2}
                     y={H - 6}
                     textAnchor="middle"
-                    className="fill-zoop-muted text-[10px] tabular-nums"
+                    className="fill-zoop-muted text-[11px] tabular-nums"
                   >
                     {shortDate(date)}
                   </text>

@@ -134,7 +134,7 @@ export default function PriceChart({
           x="592"
           y={y(max) - 4}
           textAnchor="end"
-          className="fill-zoop-muted text-[10px]"
+          className="fill-zoop-muted text-[11px]"
         >
           {won.format(max)}
         </text>
@@ -142,7 +142,7 @@ export default function PriceChart({
           x="592"
           y={y(min) + 12}
           textAnchor="end"
-          className="fill-zoop-muted text-[10px]"
+          className="fill-zoop-muted text-[11px]"
         >
           {won.format(min)}
         </text>

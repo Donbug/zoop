@@ -182,7 +182,7 @@ export default function AdminLoginPage() {
             {pending ? '확인하고 있어요' : '관리자 로그인'}
           </button>
         </form>
-        <p className="text-center text-[10px] text-zoop-faint">
+        <p className="text-center text-[11px] text-zoop-faint">
           관리자 세션은 회원 세션과 분리돼요
           {idleMinutes ? ` · ${idleMinutes}분 동안 활동이 없으면 만료` : ''}
         </p>
