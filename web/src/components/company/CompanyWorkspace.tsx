@@ -563,7 +563,7 @@ export default function CompanyWorkspace() {
         currentCompany={company.data}
         portfolio={portfolio}
       />
-      <main className="min-w-0 rounded-2xl bg-white p-6 shadow-sm max-md:p-4">
+      <div className="min-w-0 rounded-2xl bg-white p-6 shadow-sm max-md:p-4">
         {versionOnly && (company.loading || versionStart) && (
           <p role="status" className="mb-4 text-[13px] text-zoop-muted">
             그래프 버전({version})이 처음 공개된 시점을 확인하고 있어요.
@@ -1107,7 +1107,7 @@ export default function CompanyWorkspace() {
             </>
           )}
         </section>
-      </main>
+      </div>
       {/* D-COM-04: 넓은 화면은 와이어프레임처럼 오른쪽 열에 두고 스크롤해도 화면 안에 남는다.
           1000px 이하에서는 본문 아래로 옮겨 넓게 본다. */}
       <aside

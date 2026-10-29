@@ -30,6 +30,11 @@ import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 
 ## Tokens and proportions
 
+For embedded Markdown such as D-AUT-02 terms, use `MarkdownContent` with
+`headingOffset={1}` so document headings start below the page h1. The offset
+changes heading semantics only, caps at h6, and preserves the existing visual
+classes. Omit the prop for standalone documents to keep their original levels.
+
 Tokens live in `src/index.css` under `@theme`. Use `font-panel`, `text-panel-ink`, `text-panel-muted`, `border-panel-line`, `border-panel-control`, `bg-panel-soft`, `rounded-panel` instead of repeating hex values. Error and warning text uses `text-zoop-alert`.
 
 | Element               | Baseline                                |

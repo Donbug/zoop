@@ -52,7 +52,14 @@ function tableCells(line: string): string[] {
 }
 
 /** Safe, deliberately small Markdown renderer for D-AUT-02 terms from the API. */
-export default function MarkdownContent({ source }: { source: string }) {
+export default function MarkdownContent({
+  source,
+  headingOffset = 0,
+}: {
+  source: string;
+  /** D-AUT-02 F3: embed a document below the page heading; visual styles stay unchanged. */
+  headingOffset?: 0 | 1 | 2 | 3 | 4 | 5;
+}) {
   const lines = source.replace(/\r\n?/g, '\n').split('\n');
   const blocks: ReactNode[] = [];
   let index = 0;
@@ -125,7 +132,8 @@ export default function MarkdownContent({ source }: { source: string }) {
     const heading = /^(#{1,6})\s+(.+)$/.exec(line);
     if (heading) {
       const level = heading[1].length;
-      const Tag = `h${level}` as 'h1';
+      const Tag = `h${Math.min(6, level + headingOffset)}` as
+        'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
       blocks.push(
         <Tag key={index} className="font-semibold text-gray-900">
           {inline(heading[2])}
