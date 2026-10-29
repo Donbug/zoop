@@ -554,7 +554,10 @@ export default function CompanyWorkspace() {
             <button
               type="button"
               className="font-semibold underline"
-              onClick={() => updateQuery({ graphVersion: null })}
+              // 최신 자료에서 남은 사건 시점(graphAsOf)이 다시 활성화되지 않게 함께 지운다.
+              onClick={() =>
+                updateQuery({ graphVersion: null, graphAsOf: null })
+              }
             >
               최신 자료로 보기
             </button>
@@ -571,7 +574,9 @@ export default function CompanyWorkspace() {
             <button
               type="button"
               className="font-semibold underline"
-              onClick={() => updateQuery({ asOf: null, graphVersion: null })}
+              onClick={() =>
+                updateQuery({ asOf: null, graphVersion: null, graphAsOf: null })
+              }
             >
               최신 자료로 보기
             </button>

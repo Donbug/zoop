@@ -1559,7 +1559,8 @@ test('a graphVersion-only address the API cannot pin to that version explains it
       },
     }),
   );
-  open('?graphVersion=v-past');
+  // 남아 있는 사건 시점(graphAsOf)은 복구 뒤 최신 본문보다 이르므로 지우지 않으면 다시 활성화된다.
+  open(`?graphVersion=v-past&graphAsOf=${encodeURIComponent(old)}`);
   const notice = await screen.findByText(/그래프 버전\(v-past\)만 있어/);
   expect(
     screen.queryByText('타임라인의 기준 시점을 확인하고 있어요.'),
@@ -1601,6 +1602,15 @@ test('a graphVersion-only address the API cannot pin to that version explains it
   ).toBeGreaterThan(0);
   expect(await screen.findByText(/별 종가/)).toBeTruthy();
   expect(screen.queryByText(/그래프 버전\(v-past\)만 있어/)).toBeNull();
+  expect(screen.getByTestId('address').textContent).not.toContain('graphAsOf');
+  await waitFor(() =>
+    expect(
+      server
+        .calls('GET', '/api/v1/companies/:id/graph')
+        .at(-1)
+        ?.query.get('asOf'),
+    ).toBe(time),
+  );
 });
 
 // D-COM-04·06 (#358): a version-only address opens at that version's first public time.
@@ -1633,7 +1643,7 @@ test('a graphVersion-only address fills asOf with the first public time of that 
       /그래프 버전\(v-past\)이 처음 공개된 시점\(.+\)으로 보는 중/,
     ),
   ).toBeTruthy();
-  expect(screen.queryByText(/그래프 버전(v-past)만 있어/)).toBeNull();
+  expect(screen.queryByText(/그래프 버전\(v-past\)만 있어/)).toBeNull();
   await waitFor(() =>
     expect(server.calls('GET', '/api/v1/events').length).toBeGreaterThan(0),
   );
@@ -1642,6 +1652,15 @@ test('a graphVersion-only address fills asOf with the first public time of that 
       .calls('GET', '/api/v1/events')
       .every((call) => call.query.get('graphVersion') === 'v-past'),
   ).toBe(true);
+  // 관계 그래프도 그 버전과 첫 공개 시각으로 조회한다.
+  await waitFor(() =>
+    expect(
+      server.calls('GET', '/api/v1/companies/:id/graph').length,
+    ).toBeGreaterThan(0),
+  );
+  const graphCall = server.calls('GET', '/api/v1/companies/:id/graph').at(-1)!;
+  expect(graphCall.query.get('graphVersion')).toBe('v-past');
+  expect(graphCall.query.get('asOf')).toBe(firstPublic);
 });
 
 test('a graphVersion-only address explains when its first public time cannot be opened', async () => {
@@ -1659,7 +1678,8 @@ test('a graphVersion-only address explains when its first public time cannot be 
           },
         }),
   );
-  open('?graphVersion=v-past');
+  // #401 리뷰: 첫 공개 시각 이후라 무시되던 사건 시점도 최신 자료로 돌아갈 때 함께 지운다.
+  open(`?graphVersion=v-past&graphAsOf=${encodeURIComponent(old)}`);
   const notice = await screen.findByText(
     /그래프 버전\(v-past\)이 처음 공개된 시점으로 열지 못했어요/,
   );
@@ -1675,6 +1695,15 @@ test('a graphVersion-only address explains when its first public time cannot be 
   );
   expect(screen.getByTestId('address').textContent).toContain(
     'graphVersion=v1',
+  );
+  expect(screen.getByTestId('address').textContent).not.toContain('graphAsOf');
+  await waitFor(() =>
+    expect(
+      server
+        .calls('GET', '/api/v1/companies/:id/graph')
+        .at(-1)
+        ?.query.get('asOf'),
+    ).toBe(time),
   );
 });
 
