@@ -168,6 +168,8 @@ class OrchestratedChatEngineTest {
         assertEquals("answered", result.outcome());
         assertEquals("mixed", result.answerBasis());
         assertTrue(result.limitations().isEmpty());
+        assertEquals("complete", result.answerStatus());
+        assertTrue(result.notices().isEmpty());
         assertEquals(List.of(readable.get(evidence(HYNIX))), result.citations());
 
         var concept = generated.getFirst().branches().get(1);
@@ -195,6 +197,7 @@ class OrchestratedChatEngineTest {
         assertEquals("general_knowledge", noEvidence.answerBasis());
         assertEquals(List.of("evidence_insufficient"), noEvidence.limitations().stream().map(l -> l.kind()).toList());
         assertEquals("요구 r1", noEvidence.limitations().getFirst().label());
+        assertEquals("partial", noEvidence.answerStatus(), "the fact part is unanswered");
 
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9), Map.of()));
         answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리 칩을 쌓은 메모리입니다.", "r1-c")), List.of(),
@@ -228,6 +231,7 @@ class OrchestratedChatEngineTest {
         verdicts = new ChatSemanticVerdicts(List.of());
         ChatResult nothingLeft = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
         assertEquals("insufficient_evidence", nothingLeft.outcome());
+        assertEquals("guidance", nothingLeft.answerStatus());
 
         answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리입니다. 지금 매수하세요.", "r1-c"),
                 grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r1"), evidence(HYNIX))), List.of(), List.of());
@@ -293,6 +297,7 @@ class OrchestratedChatEngineTest {
         ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
         assertEquals(List.of("investment_advice"), result.limitations().stream().map(l -> l.kind()).toList());
         assertEquals("요구 r2", result.limitations().getFirst().label());
+        assertEquals("partial", result.answerStatus());
         assertEquals(List.of("r1"), generated.getFirst().branches().stream().map(b -> b.requirementId()).toList());
 
         generated.clear();
