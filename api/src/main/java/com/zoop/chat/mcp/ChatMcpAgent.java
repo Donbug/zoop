@@ -53,6 +53,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
     private final String recipient;
     private final ChatExecutionRepository runs;
     private final ObjectMapper mapper;
+    /** The MCP preflight and circuit of live runs; null for replay runs, which reach no MCP endpoint. */
     private final ChatMcpCircuitBreaker circuit;
 
     public ChatMcpAgent(ChatModels.Agent agent, ChatMcpTools tools, ChatMcpGrants grants, String recipient,
@@ -68,7 +69,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
 
     @Override
     public boolean available() {
-        return circuit.allowAgent();
+        return circuit == null || circuit.allowAgent();
     }
 
     @Override
@@ -98,7 +99,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
                 outcome = steps.run(() -> agent.step(run, number, input));
             } catch (ChatModels.Failure failure) {
                 // This run remains failed. The observation affects only the path selected by later jobs.
-                circuit.agentFailed(failure.code());
+                if (circuit != null) circuit.agentFailed(failure.code());
                 throw failure;
             }
             if (outcome.completed()) return new Outcome(outcome.answer(), kept(run), step, approved, denied);

@@ -204,7 +204,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             // Preflight/circuit decisions happen before the first agent step. The direct path begins here; a failure after an
             // agent step has started is never replaced with direct results in this run.
             agentTools = null;
-            route.put("path", "direct").put("agentPreflight", "unavailable");
+            route.put("agentPreflight", "unavailable");
         }
         if (agentTools != null) {
             // The agent path: Luna chooses and chains the allowed reads, the server decides each one, and the answer is
@@ -243,6 +243,8 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             route.put("path", "agent").put("agentSteps", ran.steps()).put("approvedCalls", ran.approved())
                     .put("deniedCalls", ran.denied());
         } else if (confirmed.requirements().stream().anyMatch(p -> p.mode() == Mode.TOOLS)) {
+            // Every run that reads says which path read it; agentPreflight says when the agent was a candidate but not ready.
+            route.put("path", "direct");
             control.phase("retrieving");
             // A rerun reads within what is left of the job's calls, never a new budget.
             if (ChatPlanner.worstCaseCalls(confirmed) > control.toolCallsLeft()) throw new Stop(TOOL_BUDGET_SPENT);
