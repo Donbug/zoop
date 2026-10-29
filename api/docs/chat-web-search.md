@@ -52,7 +52,7 @@ ZOOP_CHAT_WEB_ENABLED=true ZOOP_CHAT_WEB_PROVIDER=synthetic
 3. **검색어·형식**: 인자는 `targets`(검색어 정확히 1개, 2~80자)와 `limit`(1~5)뿐이다. `ChatWebQueryPolicy`를 통과한 정규화 검색어로 예약하므로, 승인과 `/mcp` 실행의 digest가 같다. 회원에 관한 검색어는 `invalid_arguments`로 거부된다.
 4. **예산**: 승인 = 예약이며, job당 웹 2회와 회원·프로젝트의 그날 한도를 그때 차감한다. 모자라면 `web_budget_exhausted`로 거부하고 notice로 남긴다.
 5. **전송**: 결과의 웹 hit은 `web-search:<공급자>` grant가 `chat-agent` 수신자에 허용될 때만 모델에 보낸다. 아니면 hit과 그 항목을 통째로 빼고 `withheld.webResults`에 개수만 적는다.
-6. **notice**: 승인됐는데 결과가 남지 않은 검색은 `web_unavailable`, 0건은 `web_no_results`, 예산 거부는 `web_budget_exhausted`다. 답변을 막지 않으며 answered 결과의 `notices`에 붙는다(요구 표현 없음).
+6. **notice**: 승인됐는데 호출이 실패했거나 전송 grant 때문에 hit이 모두 빠진 검색은 `web_unavailable`, 공급자가 성공적으로 0건을 돌려준 검색은 `web_no_results`, 예산 거부는 `web_budget_exhausted`다. 답변을 막지 않으며 answered 결과의 `notices`에 붙는다(요구 표현 없음).
 
 ## 6. 시험
 
