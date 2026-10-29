@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zoop.chat.executor.ChatEngine;
 import com.zoop.chat.executor.ChatJobExecutor;
+import com.zoop.chat.executor.ChatRunControl;
 import com.zoop.chat.executor.MemoryChatStore;
 import com.zoop.chat.executor.NoChatTransactions;
 import com.zoop.chat.repository.ChatJobRow;
@@ -228,9 +229,13 @@ class ChatMcpEndpointTest {
 
     @Test
     void approvalsCountAgainstTheAttemptsCallLimit() {
-        for (int i = 0; i < 12; i++) assertTrue(approve("company_read", "{\"targets\":[\"co-" + i + "\"]}").approved());
+        // 6: the internal share of the job's 8 calls (MCP actions contract 3.2).
+        assertEquals(6, ChatRunControl.MAX_TOOL_CALLS);
+        for (int i = 0; i < ChatRunControl.MAX_TOOL_CALLS; i++) {
+            assertTrue(approve("company_read", "{\"targets\":[\"co-" + i + "\"]}").approved());
+        }
         assertEquals("tool_budget_exhausted", approve("company_read", "{\"targets\":[\"co-99\"]}").refused());
-        assertEquals(12, store.toolCalls(JOB).size());
+        assertEquals(ChatRunControl.MAX_TOOL_CALLS, store.toolCalls(JOB).size());
     }
 
     @Test

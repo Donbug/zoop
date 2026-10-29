@@ -37,6 +37,10 @@ public interface ChatRunControl {
     /** running → succeeded|failed. */
     void toolCallFinished(String toolCallId, ChatToolCallEnd end);
 
-    /** Tool calls one attempt may make, supplementary rounds included (ZOOP-AIG-001 6.3.3). */
-    int MAX_TOOL_CALLS = 12;
+    /**
+     * Tool calls one attempt may make, supplementary rounds, failures and agent approvals included (MCP actions contract 3.2:
+     * 8 per job, at most 6 internal and 2 web). Every bound read is internal until a web search tool exists, so the cap is
+     * the internal 6; the 2 web calls come with that tool, counted apart.
+     */
+    int MAX_TOOL_CALLS = 6;
 }
