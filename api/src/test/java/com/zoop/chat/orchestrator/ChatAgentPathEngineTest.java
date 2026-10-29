@@ -74,6 +74,8 @@ class ChatAgentPathEngineTest {
         final List<Boolean> closing = new ArrayList<>();
         ChatGeneratedAnswer answer;
         List<ChatToolResult> results = List.of();
+        boolean available = true;
+        ChatModels.Failure failure;
 
         Agent(Set<ChatCapability> exposed) {
             this.exposed = exposed;
@@ -85,10 +87,16 @@ class ChatAgentPathEngineTest {
         }
 
         @Override
+        public boolean available() {
+            return available;
+        }
+
+        @Override
         public Outcome run(ChatRun run, ChatRunControl control, List<ChatModels.AgentRequirement> given,
                 List<ChatCapability> tools, int maxCitations, Steps steps) {
             requirements.add(given);
             allowed.add(tools);
+            if (failure != null) throw failure;
             // One step through the engine's guard and limit, like the real path.
             closing.add(steps.closing());
             steps.run(() -> new ChatModels.AgentStep("resp_1", List.of(), answer));
@@ -160,6 +168,36 @@ class ChatAgentPathEngineTest {
         }
         assertTrue(agent.requirements.isEmpty(), "the agent took none of them");
         assertEquals(4, generated.size(), "each was answered by the direct generator");
+    }
+
+    @Test
+    void anUnavailablePreflightStartsDirectBeforeAnyAgentStep() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
+                List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ));
+        agent.available = false;
+        var control = new Control(Duration.ofSeconds(60));
+
+        engine(agent).answer(run(), control);
+
+        assertTrue(agent.requirements.isEmpty(), "no agent Responses step started");
+        assertEquals(1, generated.size(), "the existing direct retrieval/generation path handled the run");
+        assertEquals(1, control.reserved.size(), "the server-owned direct tool was used");
+    }
+
+    @Test
+    void anMcpFailureAfterTheAgentStartsIsNeverReplacedWithDirectResults() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
+                List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ));
+        agent.failure = new ChatModels.Failure(ChatModels.Failure.Fate.NOT_SENT, "mcp_unreachable", "MCP unavailable");
+        var control = new Control(Duration.ofSeconds(60));
+
+        assertEquals(new ChatEngineOutcome.Failed("transient", "provider_error", true),
+                engine(agent).answer(run(), control));
+        assertEquals(1, agent.requirements.size(), "the agent path had already started");
+        assertTrue(generated.isEmpty(), "the direct generator was not substituted");
+        assertTrue(control.reserved.isEmpty(), "the direct tool path was not substituted");
     }
 
     @Test

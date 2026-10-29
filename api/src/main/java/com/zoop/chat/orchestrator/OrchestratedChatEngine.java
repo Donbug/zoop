@@ -200,6 +200,12 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         var retrieved = new ChatRetrieval.Outcome(Map.of(), Map.of(), Set.of(), null, null);
         ChatGeneratedAnswer agentAnswer = null;
         List<ChatCapability> agentTools = agentTools(confirmed);
+        if (agentTools != null && !agent.available()) {
+            // Preflight/circuit decisions happen before the first agent step. The direct path begins here; a failure after an
+            // agent step has started is never replaced with direct results in this run.
+            agentTools = null;
+            route.put("path", "direct").put("agentPreflight", "unavailable");
+        }
         if (agentTools != null) {
             // The agent path: Luna chooses and chains the allowed reads, the server decides each one, and the answer is
             // checked below against exactly the results of the calls that ran (shared by the requirements they serve).

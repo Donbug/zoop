@@ -18,6 +18,7 @@ import com.zoop.ai.AiTransportException;
 import com.zoop.ai.AiTransportException.Failure;
 import com.zoop.ai.chat.ChatStageCall;
 import com.zoop.ai.chat.ChatStageReply;
+import com.zoop.ai.chat.ChatMcpHealth;
 import com.zoop.ai.http.StubAiServer.Reply;
 import com.zoop.common.json.StrictJson;
 import org.junit.jupiter.api.AfterEach;
@@ -78,6 +79,38 @@ class HttpChatStageClientTest {
         assertEquals("Bearer " + TOKEN, seen.header("Authorization"));
         assertEquals("{\"schemaVersion\":\"zoop-ai-chat-1\",\"invocationId\":\"" + INVOCATION + "\",\"stage\":\"chat-router\","
                 + "\"mode\":\"replay\",\"input\":{\"probe\":true}}", seen.body());
+    }
+
+    @Test
+    void getsTheContentFreeMcpHealthWithoutAnIdempotencyKey() {
+        server.respond(Reply.json(200, "{\"schemaVersion\":\"zoop-ai-chat-1\",\"mcp\":\"reachable\",\"reason\":null}"));
+
+        ChatMcpHealth health = client.probeMcp();
+
+        assertTrue(health.reachable());
+        assertNull(health.reason());
+        StubAiServer.Seen seen = server.requests.getFirst();
+        assertEquals("GET", seen.method());
+        assertEquals("/internal/v1/chat-mcp-health", seen.path());
+        assertNull(seen.header("Idempotency-Key"));
+        assertEquals("", seen.body());
+    }
+
+    @Test
+    void decodesOnlyTheClosedMcpHealthReasons() {
+        server.respond(Reply.json(200, "{\"schemaVersion\":\"zoop-ai-chat-1\",\"mcp\":\"unreachable\"," +
+                "\"reason\":\"mcp_timeout\"}"));
+        assertEquals(ChatMcpHealth.Reason.TIMEOUT, client.probeMcp().reason());
+
+        for (String body : new String[] {
+                "{\"schemaVersion\":\"zoop-ai-chat-1\",\"mcp\":\"reachable\",\"reason\":\"mcp_timeout\"}",
+                "{\"schemaVersion\":\"zoop-ai-chat-1\",\"mcp\":\"unreachable\",\"reason\":null}",
+                "{\"schemaVersion\":\"zoop-ai-chat-1\",\"mcp\":\"unreachable\",\"reason\":\"other\"}"}) {
+            server.respond(Reply.json(200, body));
+            AiTransportException malformed = assertThrows(AiTransportException.class, client::probeMcp);
+            assertEquals(Failure.RESPONSE_MALFORMED, malformed.failure());
+            assertFalse(malformed.requestMaybeProcessed(), "health is a read and never an unknown model outcome");
+        }
     }
 
     @Test

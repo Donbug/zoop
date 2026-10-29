@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .chat_wire import ChatStageRequest, ChatStageResult
+from .chat_wire import ChatMcpHealth, ChatStageRequest, ChatStageResult
 
 DESCRIPTION = """\
 **Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-1`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
@@ -30,6 +30,12 @@ request: never resend that invocation. A **503** means nothing was sent.
 **Live and rights.** Nothing reaches a provider unless the chat gate is open (`ZOOP_AI_CHAT_LIVE_ENABLED=1` and a positive `ZOOP_AI_CHAT_MAX_CALLS`, shared by
 the chat stages and separate from the S1 and pipeline gates), and quoted spans are sent only under the operator chat grant registry (`model-send`, the stage
 as purpose and the exact recipient). Stage time limits: router 4 s, answer 25 s, verification 6 s, agent step 30 s.
+
+**MCP preflight (`GET /internal/v1/chat-mcp-health`).** Under the same `chat.invoke` scope, the service runs `zoop-ai-chat probe-mcp` with no request body,
+grant, model call, ledger row or live-budget charge. The child sends a content-free JSON-RPC `ping` to the operator-configured MCP URL and treats only that
+endpoint's own `401` Bearer challenge as `reachable`. Timeout, connection failure and any other status are a 200 `unreachable` health answer with a closed
+reason. A missing or invalid operator URL is 503 configuration error; an unreadable child outcome is `probe_failed`. Callers use this before starting a
+Responses run; this route does not itself select a direct path or maintain the application's circuit breaker.
 """
 
 EV = "ev-" + "1" * 64
@@ -68,7 +74,10 @@ def examples() -> dict[str, Any]:
                    "approvalRequests": [{"approvalRequestId": "mcpr_synthetic_1", "toolName": "company_read",
                                          "arguments": {"targets": ["KRX:000660"]}}]},
         "failure": None, "receipt": {**receipt, "model": "authored-synthetic-chat-agent", "promptVersion": "zoop-chat-agent-0123456789abcdef"}})
-    return {"request": request.wire(), "succeeded": succeeded.wire(), "failed": failed.wire(), "agent": agent.wire(), "held": held.wire()}
+    reachable = ChatMcpHealth.model_validate({"schemaVersion": "zoop-ai-chat-1", "mcp": "reachable"})
+    unreachable = ChatMcpHealth.model_validate({"schemaVersion": "zoop-ai-chat-1", "mcp": "unreachable", "reason": "mcp_timeout"})
+    return {"request": request.wire(), "succeeded": succeeded.wire(), "failed": failed.wire(), "agent": agent.wire(), "held": held.wire(),
+            "reachable": reachable.wire(), "unreachable": unreachable.wire()}
 
 
 def document(spec: dict[str, Any]) -> None:
@@ -88,3 +97,7 @@ def document(spec: dict[str, Any]) -> None:
         "succeeded": {"summary": "Router probabilities", "value": sample["succeeded"]},
         "notSent": {"summary": "A quote without a matching chat grant: nothing was sent", "value": sample["failed"]},
         "agentHeld": {"summary": "chat-agent step held at an approval request", "value": sample["held"]}}
+    health = spec["paths"]["/internal/v1/chat-mcp-health"]["get"]
+    health["responses"]["200"]["content"]["application/json"]["examples"] = {
+        "reachable": {"summary": "The configured endpoint answered its Bearer challenge", "value": sample["reachable"]},
+        "unreachable": {"summary": "No answer before the content-free probe deadline", "value": sample["unreachable"]}}

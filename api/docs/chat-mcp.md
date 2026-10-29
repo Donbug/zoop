@@ -115,6 +115,10 @@ MCP 호출도 `chat_tool_calls`에 기존 호출과 같은 상태(예약 → 실
 
 **어느 run이 타는가.** 라우터·계획은 그대로다. 계획의 읽기가 모두 **독립 1단계 읽기**이고 그 기능이 모두 MCP로 노출될 때만 agent 경로다. Q07 본인 범위(server-only `portfolio.scope.read` 선행), 의존 단계·체크포인트가 있는 계획, 읽기가 없는 계획(일반 개념·제한만)은 기존 direct 경로(서버가 읽고 Luna는 쓰기만)다.
 
+**preflight·circuit.** agent에 맞는 계획은 첫 `chat-agent` 단계 전에 Java가 AI service의 `GET /internal/v1/chat-mcp-health`를 한 번 호출한다. `reachable`일 때만 agent를 시작하고, `unreachable` 또는 probe/service 오류면 그 run은 처음부터 기존 direct 조회·생성 경로를 쓴다. 최근 연결 관측 5회 중 timeout·connect 실패/실행 중 `mcp_unreachable`가 3회면 endpoint별 인스턴스 circuit을 30초 열며, 그동안 probe 없이 direct로 시작한다. 30초 뒤에는 동시 요청 중 하나만 half-open probe를 보내고 나머지는 direct로 시작한다. 성공하면 창을 비우고 닫고, 실패·probe 오류면 다시 30초 연다. 예상 밖 HTTP 상태(401/403 포함), 정책·grant·schema 거부, DB 오류, AI service probe 오류는 연결 실패 창에 넣지 않는다.
+
+agent 단계가 하나라도 시작된 뒤의 `mcp_unreachable`는 **같은 run에서 direct 결과로 대체하지 않는다**. 해당 run은 기존 모델 실패 규칙으로 끝나고 이 관측만 다음 run의 circuit 선택에 반영한다. 따라서 direct 선택은 Responses 시작 전 한 곳에서만 일어난다.
+
 **흐름.**
 1. Java가 run의 grant 토큰을 발급하고 `chat-agent` 1단계를 부른다. 요구마다 planner가 해석한 대상 ID(`targets`)를 넘기고, 허용 도구는 계획의 기능만이다.
 2. 단계가 `approval_required`로 멈추면 Java가 요청마다 결정한다. **run의 허용 도구이고, `targets`의 모든 ID가 도달 가능하며, `ChatMcpTools.approve`가 예약에 성공한 호출만 승인**하고 나머지는 거부한다. 도달 가능한 ID는 첫 라운드엔 요구의 해석된 `targets`, 다음 라운드부터는 거기에 이전에 승인·실행된 결과의 항목·기업·경로 양끝·단계·근거 ID를 더한 서버 소유 목록이다. `targets`가 없는 호출(고정 문서, 버전 비교 전체 그래프)은 인자 검사만 거친다. 프롬프트의 "ID를 추측하지 않는다"와 공급자의 `allowed_tools`는 서버 검사를 대신하지 않는다. 결정을 continuation(`previous_response_id`)으로 보내면 공급자가 승인된 호출만 `/mcp`로 실행한다.
@@ -131,8 +135,9 @@ MCP 호출도 `chat_tool_calls`에 기존 호출과 같은 상태(예약 → 실
 
 1. ~~**model-send grant 검사.**~~ 구현(3장 "모델 전송 gate"). 켜기 전에 운영자가 레지스트리에 `chat-agent` 목적·agent 수신자 grant와 `zoop-graph` source를 등록하고, OpenAI 보유 조건을 거버넌스 10장에 기록해야 한다.
 2. **예산**(단계 2): job 단위 호출 상한 6회(내부 몫, 웹 2회는 웹 검색 도구와 함께. rerun은 남은 호출만 쓰고, 계획에 모자라면 `budget_exceeded`로 재실행 불가), agent 라운드당 승인 4건(동시 4개), fan-out 5, agent run 45초(검증·저장까지)·Luna 35초는 구현했다. 요청 캐시·single-flight(인스턴스 안)·재사용 시 gate 재검사·job당 결과 1 MiB도 구현했다(3장). 남은 것: 그래프 경로 5초·웹 7초의 도구별 시간, direct 경로 45초(단계 한도 실측 후), 인스턴스를 넘는 single-flight(필요하면). rate limit은 인스턴스별이다.
-3. **승인 요청의 요구 매핑**: 지금은 결과를 run의 요구들이 공유한다. 요구별 인용 결속이 필요하면 승인 요청에 requirementIds를 받도록 계약을 넓힌다.
-4. **네트워크·운영**: HTTPS 인바운드 노출 범위, 공급자 출발지 제한 여부(IP allowlist만으로 인증하지 않음), 승인된 소량 live latency spike(실제 Responses·MCP 응답 형태 확인 포함).
+3. ~~**preflight·circuit breaker.**~~ 구현. AI runtime의 무과금 health probe와 Java의 5회/3실패·30초·단일 half-open probe, 시작 전 direct 선택, 실행 중 무대체를 적용했다.
+4. **승인 요청의 요구 매핑**: 지금은 결과를 run의 요구들이 공유한다. 요구별 인용 결속이 필요하면 승인 요청에 requirementIds를 받도록 계약을 넓힌다.
+5. **네트워크·운영**: HTTPS 인바운드 노출 범위, 공급자 출발지 제한 여부(IP allowlist만으로 인증하지 않음), 승인된 소량 live latency spike(실제 Responses·MCP 응답 형태 확인 포함).
 
 ## 6. 시험
 

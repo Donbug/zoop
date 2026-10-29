@@ -24,12 +24,16 @@ from pydantic import ValidationError
 from .config import ServiceConfig
 from .jobs import ApiError, Observation
 from .runtime import CODE, Deadlines, Outcome, WorkerProcess
-from .chat_wire import ANSWERS, CHAT_SCHEMA, INVOCATION_ID, ChatStageRequest, ChatStageResult
+from .chat_wire import ANSWERS, CHAT_SCHEMA, INVOCATION_ID, ChatMcpHealth, ChatStageRequest, ChatStageResult
 
 SLOTS = 4
 SLOT_WAIT = 1.0
 # The worker's own client timeout per stage plus process start and ledger writes.
 STAGE_DEADLINE = {"chat-router": 4.0 + 3.0, "chat-answer": 25.0 + 3.0, "chat-verification": 6.0 + 3.0, "chat-agent": 30.0 + 3.0}
+# The probe's own 3 s client timeout plus process start.
+PROBE_DEADLINE = 3.0 + 2.0
+# Exit-64 codes of the probe: the operator's MCP server URL setting.
+PROBE_CONFIG_CODES = frozenset({"mcp_server_url_required", "mcp_server_url_invalid"})
 # Exit-64 codes that are the caller's fault, and those that are the server's configuration.
 REQUEST_CODES = frozenset({"request_invalid"})
 CONFIG_CODES = frozenset({"state_dir_invalid", "grant_registry_invalid", "replay_fixture_invalid", "replay_fixture_required"})
@@ -48,6 +52,23 @@ def interpret(code: int, raw: bytes) -> Outcome:
             return Outcome("abnormal", exit_code=code)
         return Outcome("error", code=name, exit_code=64)
     if code not in (0, 2) or value.get("schemaVersion") != CHAT_SCHEMA or value.get("status") != ("succeeded" if code == 0 else "failed"):
+        return Outcome("abnormal", exit_code=code)
+    return Outcome("result", result=value, exit_code=code)
+
+
+def interpret_probe(code: int, raw: bytes) -> Outcome:
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return Outcome("abnormal", exit_code=code)
+    if not isinstance(value, dict):
+        return Outcome("abnormal", exit_code=code)
+    if code == 64:
+        name = value.get("error")
+        if set(value) != {"error"} or not isinstance(name, str) or not CODE.fullmatch(name):
+            return Outcome("abnormal", exit_code=code)
+        return Outcome("error", code=name, exit_code=64)
+    if code not in (0, 2) or value.get("schemaVersion") != CHAT_SCHEMA or value.get("mcp") != ("reachable" if code == 0 else "unreachable"):
         return Outcome("abnormal", exit_code=code)
     return Outcome("result", result=value, exit_code=code)
 
@@ -78,6 +99,9 @@ class ChatProcess:
         if chat.replay_path is not None:
             argv += ["--replay", str(chat.replay_path)]
         return self._runner.execute(argv, payload, deadline, interpret=interpret)
+
+    def probe(self, deadline: float) -> Outcome:
+        return self._runner.execute([str(self._chat.command), "probe-mcp"], {}, deadline, interpret=interpret_probe)
 
 
 class ChatStages:
@@ -119,3 +143,24 @@ class ChatStages:
             raise ApiError(503, "runtime_unavailable", retry_after=2)
         # A deadline, a signal or unreadable output: the child may have sent the request. Never resend it.
         raise ApiError(504 if outcome.kind == "timeout" else 502, "stage_outcome_unknown")
+
+    def probe_mcp(self, seen: Observation) -> ChatMcpHealth:
+        """The MCP server's reachability as the installed runtime probes it. It sends no grant, runs nothing and calls no model, so it shares
+        no ledger; a probe that cannot run, or whose child ends abnormally, is an error and never a health answer."""
+        if not self._slots.acquire(timeout=self._slot_wait):
+            raise ApiError(503, "service_busy", retry_after=1)
+        try:
+            outcome = self._process.probe(PROBE_DEADLINE)
+        finally:
+            self._slots.release()
+        seen.runtime.append({"command": "probe-mcp", "kind": outcome.kind, "exit": outcome.exit_code, "code": outcome.code})
+        if outcome.kind == "result":
+            try:
+                return ChatMcpHealth.model_validate(outcome.result)
+            except ValidationError:
+                raise ApiError(502, "probe_failed") from None
+        if outcome.kind == "error" and outcome.code in PROBE_CONFIG_CODES:
+            raise ApiError(503, "service_configuration_invalid", runtime_code=outcome.code, retry_after=5)
+        if outcome.kind == "unavailable" and not outcome.started:
+            raise ApiError(503, "runtime_unavailable", retry_after=2)
+        raise ApiError(504 if outcome.kind == "timeout" else 502, "probe_failed")

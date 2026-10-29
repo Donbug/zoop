@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from zoop_ai_service.chat_stages import STAGE_DEADLINE, ChatStages, interpret
+from zoop_ai_service.chat_stages import PROBE_DEADLINE, STAGE_DEADLINE, ChatStages, interpret, interpret_probe
 from zoop_ai_service.chat_wire import ChatStageRequest
 from zoop_ai_service.config import ChatConfig, ServiceConfig
 from zoop_ai_service.jobs import ApiError, Observation
@@ -49,9 +49,11 @@ def result(invocation: str, stage: str = "chat-router", status: str = "succeeded
 class Scripted:
     """Records what the stage service asked of the process and answers the scripted outcome."""
 
-    def __init__(self, outcome=None):
+    def __init__(self, outcome=None, *, probe_outcome=None):
         self.calls: list[tuple[dict[str, Any], float]] = []
+        self.probe_calls: list[float] = []
         self.outcome = outcome
+        self.probe_outcome = probe_outcome
         self.hold: threading.Event | None = None
 
     def invoke(self, payload: dict[str, Any], deadline: float) -> Outcome:
@@ -61,6 +63,10 @@ class Scripted:
         if callable(self.outcome):
             return self.outcome(payload)
         return self.outcome
+
+    def probe(self, deadline: float) -> Outcome:
+        self.probe_calls.append(deadline)
+        return self.probe_outcome
 
 
 # ---- interpretation ----------------------------------------------------------------------------------------------------
@@ -74,6 +80,18 @@ def test_exit_codes_map_to_outcomes_and_anything_unexpected_is_abnormal():
     for code, raw in [(2, ok), (0, failed), (1, ok), (64, b'{"error":"Bad Code"}'), (64, b'{"error":"x","more":1}'), (0, b"not json"),
                       (0, json.dumps({**result("p:x"), "schemaVersion": "zoop-ai-s1-1"}).encode()), (0, b"[]")]:
         assert interpret(code, raw).kind == "abnormal", (code, raw)
+
+
+def test_probe_exit_codes_map_only_the_closed_health_envelope():
+    reachable = b'{"schemaVersion":"zoop-ai-chat-1","mcp":"reachable"}'
+    unreachable = b'{"schemaVersion":"zoop-ai-chat-1","mcp":"unreachable","reason":"mcp_timeout"}'
+    assert interpret_probe(0, reachable).kind == "result"
+    assert interpret_probe(2, unreachable).kind == "result"
+    assert interpret_probe(64, b'{"error":"mcp_server_url_invalid"}') == Outcome(
+        "error", code="mcp_server_url_invalid", exit_code=64)
+    for code, raw in [(2, reachable), (0, unreachable), (1, reachable), (64, b'{"error":"Bad Code"}'),
+                      (0, b'{"schemaVersion":"other","mcp":"reachable"}'), (0, b"[]"), (0, b"not json")]:
+        assert interpret_probe(code, raw).kind == "abnormal", (code, raw)
 
 
 # ---- the stage service ---------------------------------------------------------------------------------------------------
@@ -165,6 +183,35 @@ def test_a_consistent_failed_result_with_a_receipt_passes_and_keeps_its_fate(tmp
     status, body = ChatStages(config(tmp_path), Scripted(answer)).invoke("app", "chat-router", request(), Observation())
     assert status == 200 and body.failure.unknown and body.receipt.execution_mode == "replay"
     assert body.invocation_id == "job-00000001:1:router"
+
+
+# ---- the MCP preflight ---------------------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("health", [
+    {"schemaVersion": "zoop-ai-chat-1", "mcp": "reachable"},
+    {"schemaVersion": "zoop-ai-chat-1", "mcp": "unreachable", "reason": "mcp_connect_failed"},
+])
+def test_a_probe_relays_a_closed_health_answer_without_a_stage_invocation(tmp_path, health):
+    process = Scripted(probe_outcome=Outcome("result", result=health, exit_code=0 if health["mcp"] == "reachable" else 2))
+    seen = Observation()
+    answer = ChatStages(config(tmp_path), process).probe_mcp(seen)
+    expected = {**health, "reason": health.get("reason")}
+    assert answer.wire() == expected and process.probe_calls == [PROBE_DEADLINE] and process.calls == []
+    assert seen.runtime == [{"command": "probe-mcp", "kind": "result", "exit": process.probe_outcome.exit_code, "code": None}]
+
+
+@pytest.mark.parametrize("outcome,status,code", [
+    (Outcome("result", result={"schemaVersion": "zoop-ai-chat-1", "mcp": "unreachable"}, exit_code=2), 502, "probe_failed"),
+    (Outcome("error", code="mcp_server_url_required", exit_code=64), 503, "service_configuration_invalid"),
+    (Outcome("timeout"), 504, "probe_failed"),
+    (Outcome("abnormal", exit_code=-9), 502, "probe_failed"),
+    (Outcome("unavailable"), 503, "runtime_unavailable"),
+    (Outcome("unavailable", started=True), 502, "probe_failed"),
+])
+def test_a_probe_failure_is_not_misreported_as_health(tmp_path, outcome, status, code):
+    with pytest.raises(ApiError) as caught:
+        ChatStages(config(tmp_path), Scripted(probe_outcome=outcome)).probe_mcp(Observation())
+    assert (caught.value.status, caught.value.code) == (status, code)
 
 
 HELD = {"responseId": "resp_1", "status": "approval_required", "answer": None, "mcpCalls": [],
