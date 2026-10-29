@@ -2148,3 +2148,44 @@ test('D-COM-01 F6 formats chart table and financial timestamps without changing 
   });
   expect(basis.getAttribute('datetime')).toBe(old);
 });
+
+test('D-COM-01 F6 shows unknown-time event report times in KST and keeps missing ones', async () => {
+  server.on('GET', '/api/v1/events', () =>
+    json({
+      items: [],
+      unknownTimeItems: [
+        {
+          ...events[0],
+          id: 'issue-u1',
+          title: '합성 시점 미상 A',
+          eventTime: null,
+          timePrecision: 'unknown',
+        },
+        {
+          ...events[1],
+          id: 'issue-u2',
+          title: '합성 시점 미상 B',
+          eventTime: null,
+          timePrecision: 'unknown',
+          reportedAt: null,
+        },
+      ],
+      nextCursor: null,
+      metadata: { ...metadata, total: 0, excludedUnknownTime: 2 },
+    }),
+  );
+  open(pinned);
+  const summary = await screen.findByText('시점 미상 사건 2건');
+  await userEvent.click(summary);
+  const unknown = within(summary.closest('details')!);
+  const reported = unknown.getByText('2026-10-05 12:00 KST', { exact: true });
+  expect(reported.tagName).toBe('TIME');
+  expect(reported.getAttribute('datetime')).toBe(old);
+  expect(reported.parentElement!.textContent).toContain(
+    '보도 시각 2026-10-05 12:00 KST (사건 시각 아님)',
+  );
+  expect(
+    unknown.getByRole('button', { name: '합성 시점 미상 B' }).parentElement!
+      .textContent,
+  ).toContain('보도 시각 미상 (사건 시각 아님)');
+});

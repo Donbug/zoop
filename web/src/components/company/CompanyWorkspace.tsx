@@ -1012,7 +1012,9 @@ export default function CompanyWorkspace() {
                         <button onClick={() => selectEvent(item)}>
                           {item.title}
                         </button>{' '}
-                        · 보도 시각 {item.reportedAt ?? '미상'} (사건 시각 아님)
+                        · 보도 시각{' '}
+                        <ReferenceTime value={item.reportedAt} missing="미상" />{' '}
+                        (사건 시각 아님)
                       </p>
                     ))}
                   </details>
