@@ -351,7 +351,7 @@ function RoundPanel({
 // - 회차별 데이터 기준 시점·생성/검증/발행 상태·실패 사유. 조회는 재처리나 발행을 하지 않는다.
 // - 선택한 회차는 주소(?round=)에 남는다. 관리 작업은 사유를 받고, 끝나면 목록과 상세를 다시 읽는다.
 export default function BriefingOperations({
-  readOnly = true,
+  readOnly = false,
 }: {
   readOnly?: boolean;
 }) {
@@ -381,9 +381,14 @@ export default function BriefingOperations({
           )
         }
       />
-      {readOnly && (
+      {readOnly ? (
         <Note>
           회차 조회만 제공됩니다. 재처리·정정·제공 중단 및 재개는 아직 지원하지
+          않습니다.
+        </Note>
+      ) : (
+        <Note>
+          정정·중단·재개는 변경 이력으로 저장됩니다. 재처리는 아직 지원하지
           않습니다.
         </Note>
       )}

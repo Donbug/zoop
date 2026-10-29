@@ -24,7 +24,7 @@ import tools.jackson.databind.node.ObjectNode;
 @Service
 @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
 public class AdminBriefingService {
-    static final String READ_ONLY_REASON = "현재 회차 조회만 지원합니다. 재처리 기능은 아직 연결되지 않았습니다.";
+    static final String READ_ONLY_REASON = "재처리 기능은 아직 연결되지 않았습니다.";
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private final JdbcAdminBriefingRepository repository;
     private final BriefingRoundRepository publications;
