@@ -16,10 +16,11 @@ import java.util.function.Predicate;
 /**
  * What of a tool's output may go to the agent model (api/docs/chat-mcp.md 5): each item, path and evidence id only when the
  * chat grant of its source allows sending it to the agent ({@link ChatSendGrants}); the rest is withheld whole, never sent as
- * a bare id, and only the counts say something was. Sources: a company's name is the company catalog's, an issue's title,
- * a relation and every path step are ZOOP's graph's ({@link #GRAPH_SOURCE_ID}), a ZOOP document title ZOOP's documents',
- * and evidence (an evidence item's label is its article's title) the source of its record ({@link ChatMcpSources}). An item
- * of any other kind is withheld.
+ * a bare id, and only the counts say something was. Sources: a company's name is the company catalog's, an issue's title
+ * and every path step (ids, relation type and role, no names) are ZOOP's graph's ({@link #GRAPH_SOURCE_ID}), a ZOOP document
+ * title ZOOP's documents', and evidence (an evidence item's label is its article's title) the source of its record
+ * ({@link ChatMcpSources}). A relation's label is composite, the names of both ends (companies among them) and the
+ * relation, so it needs every source it is made of: the graph's and the catalog's. An item of any other kind is withheld.
  */
 public final class ChatMcpSendGate {
     /** The chat grant registry's source id of ZOOP's public graph data: issue titles, relations and path steps. */
@@ -66,12 +67,15 @@ public final class ChatMcpSendGate {
             if (sendable.test(placed.get(id))) allowed.add(id);
         }
         boolean graph = sendable.test(GRAPH_SOURCE_ID);
+        boolean catalog = sendable.test(ChatCompanyProfiles.SOURCE_ID);
 
         List<ChatToolItem> items = new ArrayList<>();
         for (ChatToolItem item : output.items()) {
             boolean itemAllowed = switch (item.kind()) {
-                case "company" -> sendable.test(ChatCompanyProfiles.SOURCE_ID);
-                case "issue", "edge" -> graph;
+                case "company" -> catalog;
+                case "issue" -> graph;
+                // "<end> – <end>" (and the relation): company names travel inside it.
+                case "edge" -> graph && catalog;
                 case "zoop_doc" -> sendable.test(ChatZoopDocs.SOURCE_ID);
                 case "evidence" -> allowed.contains(item.id());
                 default -> false;

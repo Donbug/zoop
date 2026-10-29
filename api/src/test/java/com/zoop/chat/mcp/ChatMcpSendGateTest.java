@@ -7,16 +7,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zoop.chat.service.ChatCompanyProfiles;
 import com.zoop.chat.service.ChatZoopDocs;
+import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolOutput;
 import com.zoop.chat.tool.ChatToolPath;
+import com.zoop.chat.tool.ChatToolRequest;
+import com.zoop.chat.tool.ChatToolScope;
+import com.zoop.chat.tool.GraphVersionDiffTool;
+import com.zoop.graph.read.DisclosureExclusions;
+import com.zoop.graph.read.PublicGraphReader;
+import com.zoop.graph.snapshot.FixtureGraphSnapshotStore;
+import com.zoop.graph.version.GraphVersionRecord;
+import com.zoop.graph.version.GraphVersionRepository;
+import com.zoop.graph.version.GraphVersionSelector;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -106,5 +120,63 @@ class ChatMcpSendGateTest {
         var gate = new ChatMcpSendGate(new ChatSendGrants(dir.resolve("missing.json").toString(),
                 ChatSendGrantsTest.RECIPIENT, CLOCK), (run, ids) -> PLACED);
         assertThrows(ChatSendGrants.Unavailable.class, () -> gate.pass(null, output()));
+    }
+
+    @Test
+    void aRelationsLabelCarriesCompanyNamesSoWithoutTheCatalogsGrantItIsLeftOutToo() {
+        // The real version diff over the synthetic fixtures: 10-08 added AMD, the AI accelerator issue and its relations to
+        // AMD and TSMC, whose labels read "<issue> – AMD (...)".
+        var out = versionDiff().read(new ChatToolScope("job-1", "fixture-2026-10-08", null),
+                new ChatToolRequest("graph.version.diff", List.of(ChatCapability.WHOLE_GRAPH), 20, null, null));
+        assertTrue(out.items().stream().anyMatch(i -> "edge".equals(i.kind()) && i.label().contains("AMD")), out.toString());
+
+        var withoutCatalog = gate(ChatMcpSendGate.GRAPH_SOURCE_ID, "granted-news").pass(null, out);
+        assertEquals(List.of("issue"), withoutCatalog.output().items().stream().map(ChatToolItem::kind).distinct().toList());
+        assertTrue(withoutCatalog.output().items().stream().noneMatch(i -> i.label().contains("AMD")
+                || i.label().contains("TSMC")), "no company name leaves through a relation");
+        assertEquals(3, withoutCatalog.withheld().items(), "AMD and both relations");
+
+        var both = gate(ChatMcpSendGate.GRAPH_SOURCE_ID, ChatCompanyProfiles.SOURCE_ID).pass(null, out);
+        assertEquals(out.items().size(), both.output().items().size());
+    }
+
+    /** {@code graph.version.diff} over the two synthetic graph fixtures, 10-01 public before 10-08. */
+    private static GraphVersionDiffTool versionDiff() {
+        Instant now = Instant.parse("2026-10-21T03:00:00Z");
+        Map<String, GraphVersionRecord> known = Map.of("fixture-2026-10-01", record("fixture-2026-10-01", false),
+                "fixture-2026-10-08", record("fixture-2026-10-08", true));
+        GraphVersionRepository versions = new GraphVersionRepository() {
+            public Optional<GraphVersionRecord> find(String id) { return Optional.ofNullable(known.get(id)); }
+            public Optional<GraphVersionRecord> active() { return Optional.of(known.get("fixture-2026-10-08")); }
+            public Optional<String> activeVersionIdAt(Instant asOf) {
+                if (asOf.isBefore(Instant.parse("2026-10-01T00:00:00Z"))) return Optional.empty();
+                return Optional.of(asOf.isBefore(Instant.parse("2026-10-08T00:00:00Z")) ? "fixture-2026-10-01"
+                        : "fixture-2026-10-08");
+            }
+            public boolean everActivated(String id) { return known.containsKey(id); }
+            public Optional<Instant> firstActivatedAt(String id) {
+                return Optional.ofNullable(known.get(id)).map(r -> Instant.parse(r.id().equals("fixture-2026-10-01")
+                        ? "2026-10-01T00:00:00Z" : "2026-10-08T00:00:00Z"));
+            }
+            public Optional<String> previousVersionId(String id, Instant at) {
+                return "fixture-2026-10-08".equals(id) ? Optional.of("fixture-2026-10-01") : Optional.empty();
+            }
+        };
+        Clock clock = Clock.fixed(now, ZoneOffset.UTC);
+        var reader = new PublicGraphReader(new GraphVersionSelector(versions, clock),
+                new FixtureGraphSnapshotStore(ChatMcpSendGateTest.class.getClassLoader()),
+                pinned -> DisclosureExclusions.NONE);
+        return new GraphVersionDiffTool(reader, versions, (id, version, asOf, requestId) -> true, clock);
+    }
+
+    private static GraphVersionRecord record(String id, boolean active) {
+        byte[] bytes;
+        try (InputStream in = ChatMcpSendGateTest.class.getClassLoader().getResourceAsStream("graph-fixtures/" + id + ".json")) {
+            bytes = in.readAllBytes();
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+        return new GraphVersionRecord(id, 1, "fixture", "artifact-" + id,
+                FixtureGraphSnapshotStore.URI_PREFIX + id + ".json", FixtureGraphSnapshotStore.sha256(bytes), active);
     }
 }
