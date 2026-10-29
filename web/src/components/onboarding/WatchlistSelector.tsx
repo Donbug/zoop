@@ -215,7 +215,7 @@ export default function WatchlistSelector() {
     >
       <button
         type="button"
-        className={`self-start text-sm font-semibold ${focusRing} disabled:cursor-default disabled:opacity-50`}
+        className={`self-start text-sm font-semibold max-md:min-h-10 max-md:min-w-10 ${focusRing} disabled:cursor-default disabled:opacity-50`}
         disabled={busy}
         onClick={() => navigate(previous)}
       >
@@ -304,7 +304,7 @@ export default function WatchlistSelector() {
                 <span>{draft.watchlistNames[id] ?? id}</span>
                 <button
                   type="button"
-                  className={`min-h-6 min-w-6 rounded-full ${focusRing} disabled:cursor-default disabled:opacity-50`}
+                  className={`min-h-6 min-w-6 rounded-full max-md:min-h-10 max-md:min-w-10 ${focusRing} disabled:cursor-default disabled:opacity-50`}
                   disabled={busy || !ready}
                   aria-label={`${draft.watchlistNames[id] ?? id} 해제`}
                   onClick={() => draft.toggleWatchlist(id)}

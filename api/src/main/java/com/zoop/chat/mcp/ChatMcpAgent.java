@@ -17,8 +17,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -26,8 +24,9 @@ import tools.jackson.databind.ObjectMapper;
  * steps, and every tool call Luna proposes is decided here and only here.
  *
  * <ul>
- * <li>A proposed call is approved exactly when it names one of the run's allowed tools, every target it names is reachable
- * and {@link ChatMcpTools#approve} reserves it (valid arguments, within the attempt's call limit); otherwise it is denied.
+ * <li>A proposed call is approved exactly when it names one of the run's allowed tools, every target it names is reachable,
+ * fewer than {@link #MAX_ROUND_CALLS} calls were approved in its round and {@link ChatMcpTools#approve} reserves it (valid
+ * arguments, within the attempt's call limit); otherwise it is denied.
  * Reachable are the ids the server resolved for the requirements and, from the next round on, the ids the calls it
  * approved returned (items, their companies, path endpoints and steps, evidence). Nothing is approved without being
  * reserved, and a denied call never runs.</li>
@@ -41,23 +40,36 @@ import tools.jackson.databind.ObjectMapper;
  */
 public final class ChatMcpAgent implements ChatAgentPath {
     static final int MAX_ROUNDS = 3;
-    private static final TypeReference<List<ChatToolItem>> ITEMS = new TypeReference<>() { };
-    private static final TypeReference<List<ChatToolPath>> PATHS = new TypeReference<>() { };
-    private static final TypeReference<List<String>> STRINGS = new TypeReference<>() { };
+    /**
+     * Calls approved in one round, so at most this many of the job's calls run at once (MCP actions contract 3.2): the
+     * provider makes a round's approved calls before it answers the step, and the next round is decided only then.
+     */
+    static final int MAX_ROUND_CALLS = 4;
 
     private final ChatModels.Agent agent;
     private final ChatMcpTools tools;
     private final ChatMcpGrants grants;
+    /** The recipient the results' send grants are checked for ({@link ChatSendGrants#recipient}); each step names it. */
+    private final String recipient;
     private final ChatExecutionRepository runs;
     private final ObjectMapper mapper;
+    /** The MCP preflight and circuit of live runs; null for replay runs, which reach no MCP endpoint. */
+    private final ChatMcpCircuitBreaker circuit;
 
-    public ChatMcpAgent(ChatModels.Agent agent, ChatMcpTools tools, ChatMcpGrants grants, ChatExecutionRepository runs,
-            ObjectMapper mapper) {
+    public ChatMcpAgent(ChatModels.Agent agent, ChatMcpTools tools, ChatMcpGrants grants, String recipient,
+            ChatExecutionRepository runs, ObjectMapper mapper, ChatMcpCircuitBreaker circuit) {
         this.agent = agent;
         this.tools = tools;
         this.grants = grants;
+        this.recipient = recipient;
         this.runs = runs;
         this.mapper = mapper;
+        this.circuit = circuit;
+    }
+
+    @Override
+    public boolean available() {
+        return circuit == null || circuit.allowAgent();
     }
 
     @Override
@@ -79,9 +91,17 @@ public final class ChatMcpAgent implements ChatAgentPath {
         int approved = 0;
         int denied = 0;
         for (int step = 1, rounds = 0; ; step++) {
-            var input = new ChatModels.AgentInput(requirements, token, names, maxCitations, previous, decisions);
+            var input = new ChatModels.AgentInput(requirements, token, names, recipient, maxCitations, previous,
+                    decisions);
             int number = step;
-            ChatModels.AgentStep outcome = steps.run(() -> agent.step(run, number, input));
+            ChatModels.AgentStep outcome;
+            try {
+                outcome = steps.run(() -> agent.step(run, number, input));
+            } catch (ChatModels.Failure failure) {
+                // This run remains failed. The observation affects only the path selected by later jobs.
+                if (circuit != null) circuit.agentFailed(failure.code());
+                throw failure;
+            }
             if (outcome.completed()) return new Outcome(outcome.answer(), kept(run), step, approved, denied);
             if (rounds > MAX_ROUNDS) {
                 throw new ChatModels.Failure(ChatModels.Failure.Fate.NOT_SENT, "the agent kept asking after its last round");
@@ -92,18 +112,25 @@ public final class ChatMcpAgent implements ChatAgentPath {
             if (closing) rounds = MAX_ROUNDS + 1;
             if (!closing) kept(run).forEach(result -> reachable.addAll(reached(result)));
             List<ChatModels.Decision> next = new ArrayList<>();
+            int round = 0;
             for (ChatModels.ApprovalRequest request : outcome.approvals()) {
                 boolean approve = false;
                 // Only the run's own tools on ids the server resolved or a call it approved returned: neither the
-                // provider's allowed_tools nor the prompt's "never guess an id" is a server-side check.
-                if (!closing && names.contains(request.toolName()) && targetsReachable(request.arguments(), reachable)) {
+                // provider's allowed_tools nor the prompt's "never guess an id" is a server-side check. Past four in a
+                // round the rest are denied; Luna may ask for them again in the next round.
+                if (!closing && round < MAX_ROUND_CALLS && names.contains(request.toolName())
+                        && targetsReachable(request.arguments(), reachable)) {
                     ChatMcpTools.Approval approval = tools.approve(attached, request.toolName(), request.arguments());
                     if (ChatMcpTools.RUN_NOT_ACTIVE.equals(approval.refused())) throw new ChatRunSuperseded();
                     approve = approval.approved();
                 }
                 next.add(new ChatModels.Decision(request.id(), approve));
-                if (approve) approved++;
-                else denied++;
+                if (approve) {
+                    approved++;
+                    round++;
+                } else {
+                    denied++;
+                }
             }
             previous = outcome.responseId();
             decisions = next;
@@ -145,13 +172,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
     private List<ChatToolResult> kept(ChatRun run) {
         List<ChatToolResult> results = new ArrayList<>();
         for (ChatKeptToolResult kept : runs.keptToolResults(run.jobId(), run.attemptNo())) {
-            JsonNode node = mapper.readTree(kept.result());
-            results.add(new ChatToolResult(node.path("schemaVersion").asString(), kept.toolCallId(), kept.capabilityId(),
-                    node.path("dataVersion").asString(null), mapper.convertValue(node.path("items"), ITEMS),
-                    mapper.convertValue(node.path("evidenceIds"), STRINGS),
-                    node.path("truncated").isBoolean() ? node.path("truncated").asBoolean() : null,
-                    node.path("nextAllowed").isBoolean() ? node.path("nextAllowed").asBoolean() : null, null,
-                    node.has("paths") ? mapper.convertValue(node.path("paths"), PATHS) : List.of()));
+            results.add(ChatMcpTools.kept(mapper, kept));
         }
         return results;
     }

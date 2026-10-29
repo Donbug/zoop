@@ -14,6 +14,7 @@ import com.zoop.chat.dto.ChatFrozenContext;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.repository.ChatExecutionRepository;
 import com.zoop.chat.repository.ChatJobRow;
+import com.zoop.chat.repository.ChatKeptToolResult;
 import com.zoop.chat.repository.ChatRepository;
 import com.zoop.chat.repository.ChatRunningJob;
 import com.zoop.chat.repository.ChatToolCallEnd;
@@ -55,7 +56,8 @@ import tools.jackson.databind.node.ObjectNode;
  */
 @Component
 public class ChatJobExecutor {
-    static final Duration MAX_DEADLINE = Duration.ofSeconds(60);
+    /** The run deadline of every job; the agent path keeps to its own 45 s inside it (OrchestratedChatEngine.AGENT_JOB). */
+    public static final Duration MAX_DEADLINE = Duration.ofSeconds(60);
     static final Duration LEASE_GRACE = Duration.ofSeconds(15);
     static final String RESULT_SCHEMA_VERSION = "chat-result/v1";
     static final String ROUTE_SCHEMA_VERSION = "chat-route/v1";
@@ -121,21 +123,25 @@ public class ChatJobExecutor {
     public void execute(Claim claim) {
         ChatEngine engine = engines.getIfAvailable();
         ChatEngineOutcome outcome;
+        Instant deadline = claim.deadline();
         if (engine == null || "save_only".equals(claim.mode())) {
             // No recovery artifact store exists yet, so a kept verified result cannot be saved again.
             outcome = engine == null ? new ChatEngineOutcome.Failed("internal", null, false)
                     : new ChatEngineOutcome.Failed("result_lost", null, false);
         } else {
+            Control control = new Control(claim);
             try {
-                outcome = engine.answer(run(claim), new Control(claim));
+                outcome = engine.answer(run(claim), control);
             } catch (ChatRunSuperseded superseded) {
                 return;
             } catch (RuntimeException unexpected) {
                 log.warn("chat engine failed for job {}", claim.job().id(), unexpected);
                 outcome = new ChatEngineOutcome.Failed("internal", null, false);
             }
+            // The deadline the run kept to, brought forward when its path has a shorter one (the agent path's 45 s).
+            deadline = control.deadline;
         }
-        if (!store(claim, outcome)) {
+        if (!store(claim, deadline, outcome)) {
             log.info("chat run of job {} no longer owns it; its outcome was discarded", claim.job().id());
         }
     }
@@ -170,6 +176,14 @@ public class ChatJobExecutor {
         return runs.findReservedToolCall(jobId, attemptNo, capabilityId, inputDigest);
     }
 
+    /**
+     * The result an earlier call of the attempt with exactly this capability and input digest succeeded with and kept: what
+     * an identical request reuses (MCP actions contract 3.3).
+     */
+    public Optional<ChatKeptToolResult> keptToolResult(String jobId, int attemptNo, String capabilityId, String inputDigest) {
+        return runs.findKeptToolResult(jobId, attemptNo, capabilityId, inputDigest);
+    }
+
     /** Ends running jobs whose lease ran out; returns how many it ended. */
     public int recoverExpired() {
         int ended = 0;
@@ -193,7 +207,7 @@ public class ChatJobExecutor {
         return ended;
     }
 
-    private boolean store(Claim claim, ChatEngineOutcome outcome) {
+    private boolean store(Claim claim, Instant deadline, ChatEngineOutcome outcome) {
         ChatEngineOutcome checked = outcome instanceof ChatEngineOutcome.Completed completed
                 ? acceptable(claim, completed.result()) ? completed : new ChatEngineOutcome.Failed("internal", null, false)
                 : outcome;
@@ -203,7 +217,7 @@ public class ChatJobExecutor {
             if (locked.isEmpty()) return false;
             ArrayNode attempts = attempts(locked.get().attempts());
             ObjectNode attempt = attempt(attempts, claim.attemptNo());
-            ChatEngineOutcome ending = late(checked, attempt, now, claim.deadline());
+            ChatEngineOutcome ending = late(checked, attempt, now, deadline);
             if (ending instanceof ChatEngineOutcome.Completed completed) {
                 attempt.put("status", "succeeded").put("finishedAt", now.toString());
                 ChatResult result = withMessageId(completed.result(), messageId(claim.job().id()));
@@ -278,9 +292,37 @@ public class ChatJobExecutor {
     /** The fenced control an engine uses; every call checks that this run still owns the job. */
     private final class Control implements ChatRunControl {
         private final Claim claim;
+        /** The claim's deadline, or the earlier one the run brought it forward to. */
+        private volatile Instant deadline;
 
         Control(Claim claim) {
             this.claim = claim;
+            this.deadline = claim.deadline();
+        }
+
+        @Override
+        public void shortenDeadline(Instant at) {
+            if (!at.isBefore(deadline)) return;
+            Boolean shortened = recorded(() -> transaction.execute(status ->
+                    runs.shortenDeadline(claim.job().id(), claim.ownerToken(), at, clock.instant())));
+            if (!Boolean.TRUE.equals(shortened)) throw new ChatRunSuperseded();
+            deadline = at;
+        }
+
+        @Override
+        public Optional<String> claimToolCall(String capabilityId, String inputDigest) {
+            return recorded(() -> transaction.execute(status -> {
+                runs.limitWait(waitBudget());
+                return runs.claimReservedToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), capabilityId,
+                        inputDigest, clock.instant());
+            }));
+        }
+
+        @Override
+        public int toolCallsLeft() {
+            Integer made = recorded(() -> transaction.execute(status ->
+                    runs.countJobToolCalls(claim.job().id(), claim.attemptNo())));
+            return MAX_TOOL_CALLS - (made == null ? MAX_TOOL_CALLS : made);
         }
 
         @Override
@@ -309,7 +351,7 @@ public class ChatJobExecutor {
 
         @Override
         public Duration remaining() {
-            return Duration.between(clock.instant(), claim.deadline());
+            return Duration.between(clock.instant(), deadline);
         }
 
         @Override
@@ -326,8 +368,9 @@ public class ChatJobExecutor {
                 Instant now = clock.instant();
                 if (runs.lockOwned(claim.job().id(), claim.ownerToken(), now).isEmpty()) return null;
                 int first = runs.countToolCalls(claim.job().id(), claim.attemptNo());
-                if (first + calls.size() > MAX_TOOL_CALLS) {
-                    throw new IllegalArgumentException("tool plan exceeds " + MAX_TOOL_CALLS + " calls per attempt");
+                // The budget is the job's: a rerun counts what its earlier attempts made.
+                if (runs.countJobToolCalls(claim.job().id(), claim.attemptNo()) + calls.size() > MAX_TOOL_CALLS) {
+                    throw new IllegalArgumentException("tool plan exceeds " + MAX_TOOL_CALLS + " calls per job");
                 }
                 List<NewChatToolCall> rows = new ArrayList<>();
                 for (int i = 0; i < calls.size(); i++) {
@@ -357,12 +400,28 @@ public class ChatJobExecutor {
 
         @Override
         public void toolCallFinished(String toolCallId, ChatToolCallEnd end) {
+            String[] refused = new String[1];
             Boolean finished = recorded(() -> transaction.execute(status -> {
                 runs.limitWait(waitBudget());
-                return runs.finishToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), toolCallId, end,
+                ChatToolCallEnd recording = end;
+                if (end.result() != null) {
+                    // The job row's lock orders the job's kept results, so their total is checked and written at once,
+                    // every size measured the way the column stores it.
+                    if (runs.lockOwned(claim.job().id(), claim.ownerToken(), clock.instant()).isEmpty()) return false;
+                    long size = runs.storedResultBytes(end.result());
+                    String over = size > MAX_CALL_RESULT_BYTES ? RESULT_TOO_LARGE
+                            : runs.keptResultBytes(claim.job().id()) + size > MAX_KEPT_RESULT_BYTES ? RESULTS_OVER_BUDGET
+                            : null;
+                    if (over != null) {
+                        refused[0] = over;
+                        recording = ChatToolCallEnd.failed(over);
+                    }
+                }
+                return runs.finishToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), toolCallId, recording,
                         clock.instant());
             }));
             if (!Boolean.TRUE.equals(finished)) throw new ChatRunSuperseded();
+            if (refused[0] != null) throw new ChatToolCallRefused(refused[0]);
         }
 
         /**
@@ -370,7 +429,7 @@ public class ChatJobExecutor {
          * records nothing more and ends through lease recovery.
          */
         private Duration waitBudget() {
-            Duration left = Duration.between(clock.instant(), claim.deadline());
+            Duration left = Duration.between(clock.instant(), deadline);
             if (left.toMillis() < 1) throw new ChatRunSuperseded();
             return left;
         }

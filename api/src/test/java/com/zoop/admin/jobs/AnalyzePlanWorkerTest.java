@@ -4,6 +4,8 @@ import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.jayway.jsonpath.JsonPath;
 import com.zoop.admin.auth.provision.AdminProvisioningService;
@@ -13,6 +15,7 @@ import com.zoop.admin.review.AnalysisCandidateService;
 import com.zoop.admin.review.JdbcCandidateRepository;
 import com.zoop.admin.review.JdbcReviewRepository;
 import com.zoop.admin.review.PublishedCandidates;
+import com.zoop.admin.review.RelationReviewClient;
 import com.zoop.admin.review.ReviewTargetSync;
 import com.zoop.ai.*;
 import com.zoop.ai.extraction.*;
@@ -36,6 +39,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -50,8 +54,10 @@ import tools.jackson.databind.ObjectMapper;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -83,6 +89,8 @@ class AnalyzePlanWorkerTest {
     @Autowired PlatformTransactionManager transactions;
     @Autowired ObjectMapper mapper;
     @Autowired CsrfKeyRing keys;
+    /** Records every review it is sent (answers without refusing), so a decision settles at once. */
+    @MockitoBean RelationReviewClient reviewSource;
     private MockMvc mvc;
     private Cookie cookie;
     private String csrf;
@@ -270,6 +278,38 @@ class AnalyzePlanWorkerTest {
         when(published.current(any())).thenReturn(Optional.of(new PublishedCandidates.Shown("v", Set.of(), Set.of(),
                 Set.of(), Set.of())));
         assertEquals("not_stored", service.get(candidateId, "r-4").graphDb(), "a HOLD nobody approved is not pending");
+
+        // C4: an operator's allow over HTTP, then the AI reading that carries it, then the detail. The AI source here records
+        // every review (a mock that answers without refusing).
+        var held = service.get(candidateId, "r-6").relations().getFirst();
+        mvc.perform(post("/api/v1/admin/pipeline/candidates/" + candidateId + "/decision").cookie(cookie)
+                .header("Origin", ORIGIN).header("X-CSRF-Token", csrf).header("Idempotency-Key", "c4-" + tag)
+                .contentType("application/json").content("""
+                        {"decision":"allow","reason":"합성 최종 승인","relationId":"%s","expectedRevision":%d,
+                         "expectedSourceVersion":"%s","expectedSourceRevision":"%s"}"""
+                        .formatted(held.relationId(), held.revision(), held.sourceVersion(), held.sourceRevision())))
+                .andExpect(status().isOk());
+        verify(reviewSource).review(eq(script.s3.jobId()), eq(held.relationId()), eq(held.sourceVersion()),
+                eq(held.sourceRevision()), eq("allow"), anyString());
+        assertEquals("ALLOW", jdbc.queryForObject("SELECT status FROM review_targets WHERE source_job_id = ? "
+                + "AND target_type = 'relation' AND external_id = ?", String.class, script.s3.jobId(), held.relationId()));
+        assertEquals("not_stored", service.get(candidateId, "r-7").graphDb(),
+                "settled by the app, but the AI reading has not said it rests on an operator approval yet");
+
+        // The AI source now reports the relation eligible on that approval (a newer revision); the sync projects it.
+        // rc-1 is the first relation and the only one at revision 2.
+        String hold = "\"eligibility\":{\"status\":\"hold\",\"reasons\":[{\"code\":\"claim_insufficient\"}]}";
+        String approved = "\"eligibility\":{\"status\":\"eligible\",\"reasons\":[],\"approvalBasis\":{"
+                + "\"kind\":\"operator-final-approval\",\"revision\":3,\"reviewer\":\"operator\","
+                + "\"decidedAt\":\"2026-10-28T00:00:00Z\"}}";
+        script.relations = script.relations.replace("\"sourceRevision\":\"2\"", "\"sourceRevision\":\"3\"")
+                .replaceFirst(Pattern.quote(hold), Matcher.quoteReplacement(approved));
+        assertTrue(script.relations.contains("operator-final-approval"), "the fixture edit applied");
+        new ReviewTargetSync(reviews, s2, s3, transactions, clock, 500).runOnce();
+        assertEquals(Boolean.TRUE, jdbc.queryForObject("SELECT operator_approved FROM review_targets WHERE source_job_id = ? "
+                + "AND target_type = 'relation' AND external_id = ?", Boolean.class, script.s3.jobId(), held.relationId()));
+        assertEquals("pending", service.get(candidateId, "r-8").graphDb(),
+                "approved by an operator, not in the active version yet: waiting for the next handoff");
 
         String alone = candidateRepository.page(new JdbcCandidateRepository.Filter(null, null, null, null, "B-" + tag,
                 List.of(), List.of()), null, null, 10).getFirst().id();

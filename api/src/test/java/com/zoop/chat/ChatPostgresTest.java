@@ -371,9 +371,9 @@ class ChatPostgresTest {
         portfolio.connect(member, "demo-balanced", "chat-scope-connect", "chat-scope-connected");
 
         var companies = scope.of(memberId);
-        assertEquals(List.of("KRX:005930", "KRX:000660", "NASDAQ:NVDA"),
+        assertEquals(List.of("KRX:005930", "KRX:000660", "NYSE:TSM", "NASDAQ:NVDA"),
                 companies.stream().map(ChatMemberScope.Company::id).toList(), "holdings in account order, then the watchlist");
-        assertEquals(List.of("보유·관심", "보유", "관심"), companies.stream().map(ChatMemberScope.Company::relation).toList());
+        assertEquals(List.of("보유·관심", "보유", "보유", "관심"), companies.stream().map(ChatMemberScope.Company::relation).toList());
         assertEquals("삼성전자", companies.getFirst().name());
         assertEquals(List.of(), scope.of(insertMember()), "another member's are not read");
     }

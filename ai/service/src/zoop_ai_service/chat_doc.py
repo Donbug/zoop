@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .chat_wire import ChatStageRequest, ChatStageResult
+from .chat_wire import ChatMcpHealth, ChatStageRequest, ChatStageResult
 
 DESCRIPTION = """\
 **Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-1`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
@@ -18,6 +18,8 @@ ends `approval_required` (the held calls, no answer) or `completed` (the final a
 own ledger and resumes the stored response (`continuation.previousResponseId`, so the provider stores responses) with its decisions in a NEW step with its own
 invocation id. The input carries the application's job-scoped MCP grant token; the runtime sends it only to the provider, as the MCP tool's `authorization`,
 and keeps it out of every identity and stored answer. The MCP server URL is never part of a request: it is the operator's `ZOOP_AI_CHAT_MCP_SERVER_URL`.
+`mcp.recipient` names the recipient the application checked its MCP results' send grants for (those results reach the provider from the application, not
+through this runtime); a step is sent only when it is exactly the stage's own recipient, otherwise it fails `mcp_recipient_mismatch` with nothing sent.
 
 **Once per invocation.** `invocationId` (equal to `Idempotency-Key`) names one stage of one attempt. The runtime sends it at most once: the same id and input
 return the stored outcome, another input under the same id is the stage failure `invocation_conflict`, and a request whose outcome is unknown stays `unknown`.
@@ -28,6 +30,12 @@ request: never resend that invocation. A **503** means nothing was sent.
 **Live and rights.** Nothing reaches a provider unless the chat gate is open (`ZOOP_AI_CHAT_LIVE_ENABLED=1` and a positive `ZOOP_AI_CHAT_MAX_CALLS`, shared by
 the chat stages and separate from the S1 and pipeline gates), and quoted spans are sent only under the operator chat grant registry (`model-send`, the stage
 as purpose and the exact recipient). Stage time limits: router 4 s, answer 25 s, verification 6 s, agent step 30 s.
+
+**MCP preflight (`GET /internal/v1/chat-mcp-health`).** Under the same `chat.invoke` scope, the service runs `zoop-ai-chat probe-mcp` with no request body,
+grant, model call, ledger row or live-budget charge. The child sends a content-free JSON-RPC `ping` to the operator-configured MCP URL and treats only that
+endpoint's own `401` Bearer challenge as `reachable`. Timeout, connection failure and any other status are a 200 `unreachable` health answer with a closed
+reason. A missing or invalid operator URL is 503 configuration error; an unreadable child outcome is `probe_failed`. Callers use this before starting a
+Responses run; this route does not itself select a direct path or maintain the application's circuit breaker.
 """
 
 EV = "ev-" + "1" * 64
@@ -55,7 +63,8 @@ def examples() -> dict[str, Any]:
         "schemaVersion": "zoop-ai-chat-1", "invocationId": "job-00000001:1:chat-agent:2", "stage": "chat-agent", "mode": "replay",
         "input": {"turns": [{"text": "SK하이닉스 최근 사건 알려줘"}],
                   "requirements": [{"requirementId": "r1", "label": "SK하이닉스 최근 사건", "general": False}],
-                  "mcp": {"authorization": "zmcp1.k1.synthetic-grant-token.synthetic-mac", "allowedTools": ["company_read", "issue_read"]},
+                  "mcp": {"authorization": "zmcp1.k1.synthetic-grant-token.synthetic-mac", "allowedTools": ["company_read", "issue_read"],
+                          "recipient": "authored-replay"},
                   "maxCitations": 20,
                   "continuation": {"previousResponseId": "resp_synthetic_1",
                                    "decisions": [{"approvalRequestId": "mcpr_synthetic_1", "approve": True}]}}})
@@ -65,7 +74,10 @@ def examples() -> dict[str, Any]:
                    "approvalRequests": [{"approvalRequestId": "mcpr_synthetic_1", "toolName": "company_read",
                                          "arguments": {"targets": ["KRX:000660"]}}]},
         "failure": None, "receipt": {**receipt, "model": "authored-synthetic-chat-agent", "promptVersion": "zoop-chat-agent-0123456789abcdef"}})
-    return {"request": request.wire(), "succeeded": succeeded.wire(), "failed": failed.wire(), "agent": agent.wire(), "held": held.wire()}
+    reachable = ChatMcpHealth.model_validate({"schemaVersion": "zoop-ai-chat-1", "mcp": "reachable"})
+    unreachable = ChatMcpHealth.model_validate({"schemaVersion": "zoop-ai-chat-1", "mcp": "unreachable", "reason": "mcp_timeout"})
+    return {"request": request.wire(), "succeeded": succeeded.wire(), "failed": failed.wire(), "agent": agent.wire(), "held": held.wire(),
+            "reachable": reachable.wire(), "unreachable": unreachable.wire()}
 
 
 def document(spec: dict[str, Any]) -> None:
@@ -85,3 +97,7 @@ def document(spec: dict[str, Any]) -> None:
         "succeeded": {"summary": "Router probabilities", "value": sample["succeeded"]},
         "notSent": {"summary": "A quote without a matching chat grant: nothing was sent", "value": sample["failed"]},
         "agentHeld": {"summary": "chat-agent step held at an approval request", "value": sample["held"]}}
+    health = spec["paths"]["/internal/v1/chat-mcp-health"]["get"]
+    health["responses"]["200"]["content"]["application/json"]["examples"] = {
+        "reachable": {"summary": "The configured endpoint answered its Bearer challenge", "value": sample["reachable"]},
+        "unreachable": {"summary": "No answer before the content-free probe deadline", "value": sample["unreachable"]}}

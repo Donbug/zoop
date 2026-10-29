@@ -17,6 +17,14 @@ import java.util.function.Supplier;
  * (the server plans and reads, Luna only writes).
  */
 public interface ChatAgentPath {
+    /**
+     * Checks whether a new agent run may start. Production performs the MCP preflight and circuit decision here; false means
+     * the engine starts the direct path before any agent model request. Test and non-MCP paths are available by default.
+     */
+    default boolean available() {
+        return true;
+    }
+
     /** The capabilities the agent may be given (those exposed as MCP tools). */
     Set<ChatCapability> tools();
 

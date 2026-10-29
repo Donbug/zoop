@@ -289,17 +289,17 @@ export default function SignupForm({ social = false }: { social?: boolean }) {
                       }
                     />
                     {t.title}{' '}
-                    <span className="text-gray-500">
+                    <span className="text-zoop-muted">
                       {t.required ? '(필수)' : '(선택)'}
                     </span>
                   </label>
-                  <details className="ml-7 text-xs text-gray-500">
+                  <details className="ml-7 text-xs text-zoop-muted">
                     <summary className="cursor-pointer py-1">
                       {t.title} 본문 보기
                     </summary>
                     <div className="mt-1 max-h-[200px] overflow-auto bg-white p-3 text-gray-700">
                       {usable(t) ? (
-                        <MarkdownContent source={t.body!} />
+                        <MarkdownContent source={t.body!} headingOffset={1} />
                       ) : (
                         '약관 본문 준비 중'
                       )}

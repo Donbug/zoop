@@ -6,6 +6,13 @@ Use `SlimHeader` from `@/components/common/SlimHeader` for D-AUT-01/02, D-ONB-01
 
 Read before editing frontend UI. Baseline: D-GRP-03 company side panel, Figma 619:6729. Applies to D-GRP-02 event, D-GRP-04 relation, D-GRP-05 evidence. Wireframes remain the navigation reference; this guide unifies the visual primitives, not the data semantics.
 
+## Embedded Markdown (D-AUT-02)
+
+For embedded Markdown such as D-AUT-02 terms, use `MarkdownContent` with
+`headingOffset={1}` so document headings start below the page h1. The offset
+changes heading semantics only, caps at h6, and preserves the existing visual
+classes. Omit the prop for standalone documents to keep their original levels.
+
 ## Import and reuse
 
 ```tsx
@@ -153,3 +160,13 @@ D-BRF-01/02 source facts and directional assessment are separate in `BriefingS3I
 D-BRF-01/02 held assessments can expose a collapsed `evidencePlan` disclosure: existing source supplements, their scope and original links, then contemporaneous information gaps and future outcome checks. Label it as AI re-evaluation pending. Keep the verified label and actual effect citations above it. Do not turn a background article into the selected issue's cause or require future realised outcomes to exist at an earlier cutoff. Source/authority failure remains an error, not a fabricated empty plan. The compact main screen stays unchanged.
 
 D-BRF-01/02 completed `supplementalReview` results lead within the expanded issue/company S3 panel with the latest label, previous→latest transition, explanation, confirmed source facts and native effect citations. Label the old assessment as previous verification; keep its facts/quotes, all prices and full reading. Separate a verified-but-undetermined effect from missing data. Source links remain accessible for held results. The Korean explanation is editorial; the underlying quote effects are independently Jev-verified. Later-collected historical-source limitations remain visible, and opening a page must not trigger generation. Existing preparation/research disclosures are historical preparation records when a completed supplemental review is present.
+
+## Briefing impact colors (D-BRF-01/02)
+
+Use `ImpactCue` from `@/components/common/ImpactCue` for business-impact labels and evidence headings. Positive uses a green upward symbol, negative a red warning, mixed an amber balance, and watch/undetermined a neutral question mark. Always retain the textual label; icons are decorative and hidden from assistive technology. `badge` adds a tinted pill, and `icon="check"` / `icon="calendar"` marks confirmed facts / next events. Use `zoop-positive` / `zoop-mixed` tokens with their dark-theme overrides; existing `zoop-alert` / muted tokens cover other states. Body text and quotations keep their normal contrast. These business-impact colors never change the existing red/blue quote rise/fall convention or stored assessment values.
+
+## Reviewed issue grouping and selection rationale (D-BRF-01/02)
+
+`issueReading` is an optional, source-bound reading review, separate from verified model output. Only explicitly reviewed dependent event components may share a compact card; same company or document alone never triggers grouping. Bind round/result/cutoff and exact citations; invalid metadata restores original cards with a reliability warning. Full reading and the grouped card's archive preserve original events, evidence, assessments and feedback targets. Partial personal views cannot acquire hidden members through grouping.
+
+Show selection importance and what is new beneath each title. Place recorded direct event parties before related companies and show each connection's verified reason. Display common facts once in neutral colors. Compact positive/risk sections show a complete existing sentence with the remaining text expandable; do not invent a balanced pair. Use `다음 확인사항` for undated/longer-term conditions. Retain price baselines and causality limits. Both reading modes use a 1040px maximum desktop content width; retain the mobile layout padding and single issue column. Keep original response selection/versions in the preserved-publication subtree. Previous-round loading and error states must not be rendered as missing history. See `docs/development/briefing-issue-reading.md`.

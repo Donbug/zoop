@@ -16,6 +16,7 @@ import {
   useNavigate,
 } from 'react-router-dom';
 import CompanyDetailPage from '@/pages/company/CompanyDetailPage';
+import AppLayout from '@/components/common/AppLayout';
 import MapPage from '@/pages/map/MapPage';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
@@ -329,6 +330,33 @@ function open(query = '') {
   );
 }
 const pinned = `?asOf=${encodeURIComponent(time)}&graphVersion=v1`;
+
+test.each(['events', 'documents', 'info'])(
+  'D-COM-01 F4 keeps one main and the skip-link target on the %s tab',
+  async (tab) => {
+    const view = renderRoutes(
+      [
+        {
+          element: <AppLayout />,
+          children: [
+            { path: '/companies/:id', element: <CompanyDetailPage /> },
+          ],
+        },
+      ],
+      `/companies/${encodeURIComponent(id)}${pinned}&tab=${tab}`,
+    );
+    await screen.findByRole('heading', { name: '합성 기업', level: 1 });
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    const main = screen.getByRole('main');
+    expect(main.id).toBe('service-main');
+    await view.user.click(
+      screen.getByRole('link', { name: '본문으로 건너뛰기' }),
+    );
+    expect(document.activeElement).toBe(main);
+    expect(view.router.state.location.hash).toBe('');
+    expect(view.router.state.location.search).toContain(`tab=${tab}`);
+  },
+);
 
 function openHistory() {
   return renderRoutes(
@@ -727,6 +755,17 @@ test('connected member displays mock holding without replacing null values', asy
   expect(screen.getByText('계산 불가')).toBeTruthy();
   const region = screen.getByRole('region', { name: '가상 계좌 보유' });
   expect(within(region).getAllByText(/모의/).length).toBeGreaterThan(0);
+  // D-COM-01 / F6: private valuation timestamps retain the original machine values.
+  expect(
+    within(region)
+      .getByText('2026-10-05 12:00 KST', { exact: true })
+      .getAttribute('datetime'),
+  ).toBe(old);
+  expect(
+    within(region)
+      .getAllByText('2026-10-06 12:00 KST', { exact: true })
+      .every((element) => element.getAttribute('datetime') === time),
+  ).toBe(true);
   await act(async () => useAuthStore.getState().clearSession());
   expect(screen.queryByText('20주')).toBeNull();
 });
@@ -1904,6 +1943,56 @@ test('D-COM-06: day events use the KST day end; month, unknown and later events 
   ).toBeNull();
 });
 
+test.each(['2026-10-05T12:00:00+09:00', '2026-10-05T03:00:00.000Z'])(
+  'D-COM-06: a graph time written differently from the event time still drives the impact path (%s)',
+  async (graphTime) => {
+    open(`${pinned}&graphAsOf=${encodeURIComponent(graphTime)}&event=issue-a`);
+    await waitFor(() => {
+      const impact = server
+        .calls('GET', '/api/v1/companies/:id/issues/:issueId/impact')
+        .filter((call) => call.params.issueId === 'issue-a');
+      expect(impact.length).toBeGreaterThan(0);
+      expect(impact.at(-1)!.query.get('asOf')).toBe(graphTime);
+      expect(impact.at(-1)!.query.has('graphVersion')).toBe(false);
+    });
+    expect(
+      (
+        await screen.findByRole('button', {
+          name: '합성 사건 A · 이 당시 관계그래프 보기',
+        })
+      ).getAttribute('aria-pressed'),
+    ).toBe('true');
+  },
+);
+
+test('D-COM-06: an event at the reference time written with an offset offers no graph time', async () => {
+  server.on('GET', '/api/v1/events', () =>
+    json({
+      items: [
+        events[0],
+        {
+          ...events[1],
+          id: 'issue-same',
+          title: '같은 시각 사건',
+          eventTime: '2026-10-06T12:00:00+09:00',
+        },
+      ],
+      unknownTimeItems: [],
+      nextCursor: null,
+      metadata: { ...metadata, total: 2, excludedUnknownTime: 0 },
+    }),
+  );
+  open(pinned);
+  await screen.findByRole('button', {
+    name: '합성 사건 A · 이 당시 관계그래프 보기',
+  });
+  expect(
+    screen.queryByRole('button', {
+      name: '같은 시각 사건 · 이 당시 관계그래프 보기',
+    }),
+  ).toBeNull();
+});
+
 test('D-COM-06: [최신 시점] also clears the event-time graph', async () => {
   open(`${pinned}&graphAsOf=${encodeURIComponent(old)}`);
   const user = userEvent.setup();
@@ -2003,3 +2092,242 @@ test('D-COM-06: recovering from an invalid reference time also clears the graph 
   );
   expect(screen.getByTestId('address').textContent).not.toContain('graphAsOf');
 });
+
+// D-COM-01 / F6-F7: synthetic API responses verify display only; request selectors remain unchanged.
+function formattingQuote(
+  currency = 'KRW',
+  change: number | null = 2,
+  observedAt: string | null = time,
+  price: number | null = 120,
+) {
+  return {
+    status: 'available',
+    companyId: id,
+    source,
+    quote: {
+      price,
+      currency,
+      asOf: observedAt,
+      change,
+      changeRate: change === null ? null : 0.02,
+      volume: null,
+      dayLow: null,
+      dayHigh: null,
+      fiftyTwoWeekLow: null,
+      fiftyTwoWeekHigh: null,
+    },
+  };
+}
+
+test.each([
+  ['KRW', '120원', '▲ +2원 (+2.00%)'],
+  ['USD', '$120.00', '▲ +$2.00 (+2.00%)'],
+])(
+  'D-COM-01 F7 formats %s price and day change with currency',
+  async (currency, price, change) => {
+    server.on('GET', '/api/v1/companies/:id/quote', () =>
+      json(formattingQuote(currency)),
+    );
+    open(pinned);
+    const region = within(
+      await screen.findByRole('region', { name: '최신 시세' }),
+    );
+    expect(await region.findByText(price, { exact: true })).toBeTruthy();
+    expect(region.getByText(change, { exact: true })).toBeTruthy();
+  },
+);
+
+test('D-COM-01 F7 preserves missing quote amounts instead of fabricating zero', async () => {
+  server.on('GET', '/api/v1/companies/:id/quote', () =>
+    json(formattingQuote('KRW', null, null, null)),
+  );
+  open(pinned);
+  const region = within(
+    await screen.findByRole('region', { name: '최신 시세' }),
+  );
+  expect(
+    await region.findByText('미제공', { exact: true, selector: 'strong' }),
+  ).toBeTruthy();
+  expect(region.getByText('미제공 (미제공)', { exact: true })).toBeTruthy();
+  expect(region.queryByText('0원', { exact: true })).toBeNull();
+  expect(region.getByText(/공급자 관측 시각 미제공/)).toBeTruthy();
+});
+
+test('D-COM-01 F7 keeps zero as a real amount', async () => {
+  server.on('GET', '/api/v1/companies/:id/quote', () =>
+    json(formattingQuote('KRW', 0, time, 0)),
+  );
+  open(pinned);
+  const region = within(
+    await screen.findByRole('region', { name: '최신 시세' }),
+  );
+  expect(await region.findByText('0원', { exact: true })).toBeTruthy();
+  expect(region.getByText('0원 (+2.00%)', { exact: true })).toBeTruthy();
+});
+
+test('D-COM-01 F6 shows KST while preserving original metadata and observation times', async () => {
+  open(pinned);
+  const companyRegion = await screen.findByRole('region', {
+    name: '기업 개요',
+  });
+  const basis = await within(companyRegion).findByText('2026-10-06 12:00 KST', {
+    exact: true,
+  });
+  expect(basis.tagName).toBe('TIME');
+  expect(basis.getAttribute('datetime')).toBe(time);
+  const quoteRegion = screen.getByRole('region', { name: '최신 시세' });
+  const observed = await within(quoteRegion).findByText(
+    '2026-10-06 12:00 KST',
+    { exact: true },
+  );
+  expect(observed.getAttribute('datetime')).toBe(time);
+  expect(within(quoteRegion).getByText(/공급자 관측/).textContent).toContain(
+    '공급자 관측 2026-10-06 12:00 KST',
+  );
+  const last = server.calls('GET', '/api/v1/companies/:id').at(-1)!;
+  expect(last.query.get('asOf')).toBe(time);
+  expect(last.query.get('graphVersion')).toBe('v1');
+});
+
+test('D-COM-01 F6 preserves chart timestamps while B1 keeps unsupported financials hidden', async () => {
+  server.on('GET', '/api/v1/companies/:id/financials', () =>
+    json({
+      status: 'available',
+      items: [
+        {
+          name: '합성 지표',
+          period: '합성 기간',
+          value: 0,
+          unit: '원',
+          accountingBasis: null,
+          source: 'synthetic',
+          asOf: old,
+        },
+      ],
+      metadata,
+    }),
+  );
+  open(pinned);
+  await userEvent.click(await screen.findByText('표로 보기', { exact: true }));
+  const table = screen.getByRole('table');
+  const cell = await within(table).findByText('2026-10-05 12:00 KST', {
+    exact: true,
+  });
+  expect(cell.getAttribute('datetime')).toBe(old);
+  expect(server.calls('GET', '/api/v1/companies/:id/financials')).toHaveLength(
+    0,
+  );
+  expect(screen.queryByRole('region', { name: '핵심 재무' })).toBeNull();
+});
+
+test('D-COM-01 F6 shows unknown-time event report times in KST and keeps missing ones', async () => {
+  server.on('GET', '/api/v1/events', () =>
+    json({
+      items: [],
+      unknownTimeItems: [
+        {
+          ...events[0],
+          id: 'issue-u1',
+          title: '합성 시점 미상 A',
+          eventTime: null,
+          timePrecision: 'unknown',
+        },
+        {
+          ...events[1],
+          id: 'issue-u2',
+          title: '합성 시점 미상 B',
+          eventTime: null,
+          timePrecision: 'unknown',
+          reportedAt: null,
+        },
+      ],
+      nextCursor: null,
+      metadata: { ...metadata, total: 0, excludedUnknownTime: 2 },
+    }),
+  );
+  open(pinned);
+  const summary = await screen.findByText('시점 미상 사건 2건');
+  await userEvent.click(summary);
+  const unknown = within(summary.closest('details')!);
+  const reported = unknown.getByText('2026-10-05 12:00 KST', { exact: true });
+  expect(reported.tagName).toBe('TIME');
+  expect(reported.getAttribute('datetime')).toBe(old);
+  expect(reported.parentElement!.textContent).toContain(
+    '보도 시각 2026-10-05 12:00 KST (사건 시각 아님)',
+  );
+  expect(
+    unknown.getByRole('button', { name: '합성 시점 미상 B' }).parentElement!
+      .textContent,
+  ).toContain('보도 시각 미상 (사건 시각 아님)');
+});
+
+test('D-COM-01 B1 makes no unsupported financials request or financial section', async () => {
+  open(pinned);
+  await screen.findByRole('heading', { name: '합성 기업', level: 1 });
+  expect(server.calls('GET', '/api/v1/companies/:id/financials')).toHaveLength(
+    0,
+  );
+  expect(screen.queryByRole('region', { name: '핵심 재무' })).toBeNull();
+});
+
+test.each([
+  [2, 0.02, 'KRW', '▲ +2원 (+2.00%)', 'text-zoop-up'],
+  [-2, -0.02, 'KRW', '▼ -2원 (-2.00%)', 'text-zoop-down'],
+  [0, 0, 'KRW', '0원 (0.00%)', 'text-zoop-muted'],
+  [null, -0.02, 'KRW', '▼ 미제공 (-2.00%)', 'text-zoop-down'],
+  [2, null, 'KRW', '▲ +2원 (미제공)', 'text-zoop-up'],
+  [null, null, 'KRW', '미제공 (미제공)', 'text-zoop-muted'],
+  [0, 0.02, 'KRW', '0원 (+2.00%)', 'text-zoop-muted'],
+  [2, -0.02, 'KRW', '▲ +2원 (-2.00%)', 'text-zoop-up'],
+  [-2, -0.02, 'USD', '▼ -$2.00 (-2.00%)', 'text-zoop-down'],
+] as const)(
+  'D-COM-01 N-i shows change %s and rate %s in %s with the change direction and each value sign',
+  async (change, rate, currency, label, color) => {
+    const response = formattingQuote(currency, change);
+    response.quote.changeRate = rate;
+    server.on('GET', '/api/v1/companies/:id/quote', () => json(response));
+    open(pinned);
+    const region = within(
+      await screen.findByRole('region', { name: '최신 시세' }),
+    );
+    const indicator = await region.findByText(label, { exact: true });
+    expect(indicator.classList.contains(color)).toBe(true);
+    expect(indicator.classList.contains('text-[11px]')).toBe(false);
+    expect(indicator.classList.contains('mt-0.5')).toBe(false);
+  },
+);
+
+test.each([
+  ['datetime', '2026-10-05T03:00:00Z', '2026-10-05 12:00 KST'],
+  ['day', '2026-10-05', '2026-10-05'],
+  ['month', '2026-10', '2026-10'],
+  ['year', '2026', '2026'],
+  ['unknown', '2026-10-05', '시점 미상'],
+  ['unknown', null, '시점 미상'],
+  ['datetime', '2026-10-05T03:00:00', '시점 미상'],
+] as const)(
+  'D-COM-01 N-k displays %s event time %s without inventing precision',
+  async (precision, eventTime, label) => {
+    server.on('GET', '/api/v1/events', () =>
+      json({
+        items: [{ ...events[0], timePrecision: precision, eventTime }],
+        unknownTimeItems: [],
+        nextCursor: null,
+        metadata: { ...metadata, total: 1, excludedUnknownTime: 0 },
+      }),
+    );
+    open(pinned);
+    const title = await screen.findByRole('button', { name: '합성 사건 A' });
+    const row = within(title.closest('article')!);
+    const stamp = await row.findByText(label, {
+      exact: true,
+      selector: eventTime ? 'time' : 'p',
+    });
+    if (eventTime) expect(stamp.getAttribute('datetime')).toBe(eventTime);
+    else expect(title.closest('article')!.querySelector('time')).toBeNull();
+    expect(screen.getByTestId('address').textContent).toContain(pinned);
+    expect(screen.getByTestId('address').textContent).not.toContain(
+      'graphAsOf',
+    );
+  },
+);

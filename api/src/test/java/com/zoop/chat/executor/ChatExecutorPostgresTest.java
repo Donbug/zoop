@@ -340,6 +340,161 @@ class ChatExecutorPostgresTest {
     }
 
     @Test
+    void aRerunGetsWhatIsLeftOfTheJobsCallsNotANewBudget() {
+        engine.script((run, control) -> {
+            assertEquals(ChatRunControl.MAX_TOOL_CALLS, control.toolCallsLeft());
+            control.reserveToolCalls(1, Collections.nCopies(4, reservation("company.read")));
+            for (String id : List.of("tc-0", "tc-1", "tc-2")) {
+                control.toolCallStarted(id);
+                control.toolCallFinished(id, new ChatToolCallEnd("succeeded", null, "v1", List.of(), false, false));
+            }
+            return new ChatEngineOutcome.Failed("transient", "provider_error", true);
+        });
+        String jobId = submit("다시 처리할 질문");
+        assertTrue(executor.runOnce());
+        assertEquals("rerun", service.getJob(member, jobId).failure().retry());
+        assertEquals("queued", service.retry(member, jobId, "retry-" + suffix()).job().status());
+
+        engine.script((run, control) -> {
+            assertEquals(2, run.attemptNo());
+            // Three calls were made; the fourth reservation never ran (cancelled with the attempt) and does not count.
+            assertEquals(ChatRunControl.MAX_TOOL_CALLS - 3, control.toolCallsLeft());
+            assertThrows(IllegalArgumentException.class,
+                    () -> control.reserveToolCalls(1, Collections.nCopies(4, reservation("issue.read"))));
+            assertEquals(List.of("tc-0", "tc-1", "tc-2"),
+                    control.reserveToolCalls(1, Collections.nCopies(3, reservation("issue.read"))));
+            assertEquals(0, control.toolCallsLeft());
+            return ScriptedChatEngine.generalAnswer("남은 호출로 처리한 답");
+        });
+        assertTrue(executor.runOnce());
+        assertEquals("completed", service.getJob(member, jobId).status());
+        assertEquals(List.of("1:succeeded", "1:succeeded", "1:succeeded", "1:cancelled", "2:cancelled", "2:cancelled",
+                "2:cancelled"), jdbc.queryForList("SELECT attempt_no || ':' || status FROM chat_tool_calls "
+                + "WHERE chat_job_id = ? ORDER BY attempt_no, call_index", String.class, jobId));
+    }
+
+    @Test
+    void aShortenedDeadlineIsStoredReachesAttachedRequestsAndHoldsForTheFinalStore() {
+        engine.script((run, control) -> {
+            Instant shorter = run.deadline().minusSeconds(15);
+            control.shortenDeadline(shorter);
+            Instant stored = jdbc.queryForObject("SELECT deadline_at FROM chat_jobs WHERE id = ?", Timestamp.class,
+                    run.jobId()).toInstant();
+            assertTrue(Duration.between(shorter, stored).abs().toMillis() < 1);
+            control.shortenDeadline(run.deadline());
+            assertTrue(Duration.between(shorter, jdbc.queryForObject("SELECT deadline_at FROM chat_jobs WHERE id = ?",
+                    Timestamp.class, run.jobId()).toInstant()).abs().toMillis() < 1, "never moved later");
+            var attached = executor.attach(run.jobId(), 1).orElseThrow();
+            assertTrue(attached.control().remaining().compareTo(Duration.ofSeconds(45)) <= 0);
+            // Past the shortened deadline, though inside the claim's: the result is not stored as completed.
+            control.shortenDeadline(Instant.now().minusMillis(1));
+            return ScriptedChatEngine.generalAnswer("기한을 넘긴 답");
+        });
+        String jobId = submit("기한을 줄인 질문");
+        assertTrue(executor.runOnce());
+        var failed = service.getJob(member, jobId);
+        assertEquals("failed", failed.status());
+        assertEquals("deadline_guard", failed.failure().reason());
+    }
+
+    @Test
+    void anIdenticalCallFindsTheKeptResultAndTheJobsKeptResultsStayWithinOneMebibyte() {
+        String jobId = submit("같은 조회와 결과 상한");
+        executor.claimNext().orElseThrow();
+        var control = executor.attach(jobId, 1).orElseThrow().control();
+        String digest = "0".repeat(64);
+        assertTrue(executor.keptToolResult(jobId, 1, "company.read", digest).isEmpty());
+        control.reserveToolCalls(1, List.of(reservation("company.read"), reservation("issue.read"),
+                reservation("issue.read"), reservation("issue.read"), reservation("issue.read"), reservation("issue.read")));
+        String small = "{\"items\":[],\"evidenceIds\":[]}";
+        control.toolCallStarted("tc-0");
+        control.toolCallFinished("tc-0", new ChatToolCallEnd("succeeded", null, "v1", List.of(), false, false, small));
+        var kept = executor.keptToolResult(jobId, 1, "company.read", digest).orElseThrow();
+        assertEquals("tc-0", kept.toolCallId(), "the first one that kept its result");
+        assertTrue(executor.keptToolResult(jobId, 1, "issue.read", digest).isEmpty());
+        assertTrue(executor.keptToolResult(jobId, 2, "company.read", digest).isEmpty(), "another attempt reads anew");
+
+        // Sizes are what the column stores: jsonb text puts a space after every colon and comma. Four results fill the
+        // job to just under 1 MiB as stored; a last one that still fits as sent (compact) does not fit as stored.
+        String big = objects(14_562);
+        long stored = runs.storedResultBytes(big);
+        assertTrue(stored <= ChatRunControl.MAX_CALL_RESULT_BYTES);
+        for (String id : List.of("tc-1", "tc-2", "tc-3", "tc-4")) {
+            control.toolCallStarted(id);
+            control.toolCallFinished(id, new ChatToolCallEnd("succeeded", null, "v1", List.of(), false, false, big));
+        }
+        long left = ChatRunControl.MAX_KEPT_RESULT_BYTES - runs.keptResultBytes(jobId);
+        String last = "{\"a\":1,\"b\":2,\"c\":3,\"d\":4,\"e\":5}";
+        assertTrue(left >= 0 && last.length() <= left && runs.storedResultBytes(last) > left,
+                "fits as sent, not as stored: " + left);
+        control.toolCallStarted("tc-5");
+        var refused = assertThrows(ChatToolCallRefused.class, () -> control.toolCallFinished("tc-5",
+                new ChatToolCallEnd("succeeded", null, "v1", List.of(), false, false, last)));
+        assertEquals(ChatRunControl.RESULTS_OVER_BUDGET, refused.code());
+        var row = jdbc.queryForMap("SELECT status, error_code, result FROM chat_tool_calls WHERE chat_job_id = ? "
+                + "AND tool_call_id = 'tc-5'", jobId);
+        assertEquals("failed", row.get("status"));
+        assertEquals(ChatRunControl.RESULTS_OVER_BUDGET, row.get("error_code"));
+        assertNull(row.get("result"));
+        assertTrue(runs.keptResultBytes(jobId) <= ChatRunControl.MAX_KEPT_RESULT_BYTES);
+    }
+
+    @Test
+    void aResultUnderTheLimitAsSentButOverItAsStoredIsRefusedNotRejectedByTheColumn() {
+        String jobId = submit("저장 크기 기준 결과 상한");
+        executor.claimNext().orElseThrow();
+        var control = executor.attach(jobId, 1).orElseThrow().control();
+        control.reserveToolCalls(1, List.of(reservation("company.read")));
+        String result = objects(18_000);
+        assertTrue(result.length() <= ChatRunControl.MAX_CALL_RESULT_BYTES);
+        assertTrue(runs.storedResultBytes(result) > ChatRunControl.MAX_CALL_RESULT_BYTES);
+        control.toolCallStarted("tc-0");
+        // The column's own check would have failed the record and stopped the run; the record refuses it instead.
+        assertEquals(ChatRunControl.RESULT_TOO_LARGE, assertThrows(ChatToolCallRefused.class, () -> control
+                .toolCallFinished("tc-0", new ChatToolCallEnd("succeeded", null, "v1", List.of(), false, false, result)))
+                .code());
+        assertEquals("failed:" + ChatRunControl.RESULT_TOO_LARGE, jdbc.queryForObject("SELECT status || ':' || error_code "
+                + "FROM chat_tool_calls WHERE chat_job_id = ?", String.class, jobId));
+        assertTrue(control.owned(), "the run goes on");
+    }
+
+    /** {@code {"items":[{"a":1,"b":2},...]}} with {@code n} objects, written without spaces. */
+    private static String objects(int n) {
+        return "{\"items\":[" + String.join(",", Collections.nCopies(n, "{\"a\":1,\"b\":2}")) + "]}";
+    }
+
+    @Test
+    void requestsClaimingTogetherEachStartADifferentApprovedCall() throws Exception {
+        String jobId = submit("동시에 승인 호출 잡기");
+        executor.claimNext().orElseThrow();
+        var first = executor.attach(jobId, 1).orElseThrow().control();
+        var second = executor.attach(jobId, 1).orElseThrow().control();
+        String digest = "0".repeat(64);
+        first.reserveToolCalls(1, List.of(reservation("company.read"), reservation("company.read")));
+        var barrier = new java.util.concurrent.CyclicBarrier(2);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var a = pool.submit(() -> {
+                barrier.await(5, java.util.concurrent.TimeUnit.SECONDS);
+                return first.claimToolCall("company.read", digest);
+            });
+            var b = pool.submit(() -> {
+                barrier.await(5, java.util.concurrent.TimeUnit.SECONDS);
+                return second.claimToolCall("company.read", digest);
+            });
+            var claimed = java.util.Set.of(a.get(10, java.util.concurrent.TimeUnit.SECONDS).orElseThrow(),
+                    b.get(10, java.util.concurrent.TimeUnit.SECONDS).orElseThrow());
+            assertEquals(java.util.Set.of("tc-0", "tc-1"), claimed, "two requests, two different calls");
+        } finally {
+            pool.shutdownNow();
+        }
+        assertTrue(first.claimToolCall("company.read", digest).isEmpty(), "none is left");
+        assertTrue(first.claimToolCall("issue.read", digest).isEmpty());
+        assertEquals(List.of("running", "running"), jdbc.queryForList(
+                "SELECT status FROM chat_tool_calls WHERE chat_job_id = ? ORDER BY call_index", String.class, jobId));
+    }
+
+    @Test
     void aCancelClosesTheRunsToolCallsAndFencesItsLaterWrites() {
         String jobId = submit("도구 호출 중 취소");
         var claim = executor.claimNext().orElseThrow();

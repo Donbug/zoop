@@ -3,6 +3,7 @@ package com.zoop.chat.mcp;
 import com.zoop.chat.executor.ChatJobExecutor;
 import com.zoop.chat.orchestrator.ChatModels;
 import com.zoop.chat.repository.ChatExecutionRepository;
+import com.zoop.ai.http.HttpChatStageClient;
 import org.springframework.beans.factory.ObjectProvider;
 import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolRunner;
@@ -46,25 +47,49 @@ public class ChatMcpConfiguration {
         return new ChatMcpGrants(activeKeyId, keys, clock);
     }
 
+    /**
+     * The send grants every result is checked against before it leaves ({@link ChatSendGrants}): the operator's chat grant
+     * registry, the same file the AI runtime reads, and the agent stage's recipient. Missing, or a registry that cannot be
+     * read at startup, fails startup naming the setting; later the file is read again for every result.
+     */
     @Bean
-    ChatMcpTools chatMcpTools(ChatToolRegistry registry, ChatToolRunner runner, ChatJobExecutor executor) {
-        return new ChatMcpTools(registry, runner, executor, PROTOCOL_JSON);
+    ChatSendGrants chatSendGrants(@Value("${ZOOP_CHAT_MCP_SEND_GRANTS:}") String registry,
+            @Value("${ZOOP_CHAT_MCP_SEND_RECIPIENT:}") String recipient, Clock clock) {
+        var grants = new ChatSendGrants(registry, recipient, clock);
+        try {
+            grants.sendable();
+        } catch (ChatSendGrants.Unavailable unreadable) {
+            throw new IllegalStateException("The chat grant registry (ZOOP_CHAT_MCP_SEND_GRANTS) cannot be read as "
+                    + ChatSendGrants.SCHEMA);
+        }
+        return grants;
+    }
+
+    @Bean
+    ChatMcpTools chatMcpTools(ChatToolRegistry registry, ChatToolRunner runner, ChatJobExecutor executor,
+            ChatSendGrants grants, ChatMcpSources sources) {
+        return new ChatMcpTools(registry, runner, executor, new ChatMcpSendGate(grants, sources), PROTOCOL_JSON);
     }
 
     /**
      * The agent path, only with {@code zoop.chat.mcp.agent-enabled=true}: runs take it when their plan fits, through the chat
      * model stages ({@code zoop.ai.chat-client.enabled=true}); enabled without them, startup fails naming the setting. The URL
      * the provider calls this endpoint at is the AI runtime operator's ({@code ZOOP_AI_CHAT_MCP_SERVER_URL}), never sent from here.
+     * Live runs start only after the MCP preflight and circuit allow them ({@link ChatMcpCircuitBreaker}); replay runs reach no
+     * MCP endpoint (the AI runtime answers them from authored fixtures), so they have no preflight.
      */
     @Bean
     @ConditionalOnProperty(name = "zoop.chat.mcp.agent-enabled", havingValue = "true")
     ChatMcpAgent chatMcpAgent(ObjectProvider<ChatModels.Agent> agent, ChatMcpTools tools, ChatMcpGrants grants,
-            ChatExecutionRepository runs) {
+            ChatSendGrants sendGrants, ChatExecutionRepository runs, ObjectProvider<HttpChatStageClient> client, Clock clock,
+            @Value("${zoop.ai.chat-client.mode:replay}") String mode) {
         ChatModels.Agent stages = agent.getIfAvailable();
-        if (stages == null) {
+        HttpChatStageClient transport = client.getIfAvailable();
+        if (stages == null || transport == null) {
             throw new IllegalStateException("zoop.chat.mcp.agent-enabled needs the chat model stages (zoop.ai.chat-client.enabled)");
         }
-        return new ChatMcpAgent(stages, tools, grants, runs, PROTOCOL_JSON);
+        var circuit = "replay".equals(mode) ? null : new ChatMcpCircuitBreaker(transport::probeMcp, clock);
+        return new ChatMcpAgent(stages, tools, grants, sendGrants.recipient(), runs, PROTOCOL_JSON, circuit);
     }
 
     @Bean(destroyMethod = "")

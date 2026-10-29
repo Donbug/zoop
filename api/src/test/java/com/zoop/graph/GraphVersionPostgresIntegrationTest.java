@@ -295,7 +295,7 @@ class GraphVersionPostgresIntegrationTest {
 
             var connection = portfolio.connect(member, "demo-balanced", "graph-connect", "connected");
             var combined = graph.getGraph("personal", null, 1, null, null, null, null, personal.of(member), "combined");
-            assertEquals(List.of("KRX:005930", "KRX:000660", "NASDAQ:NVDA"), combined.metadata().focusCompanyIds());
+            assertEquals(List.of("KRX:005930", "KRX:000660", "NYSE:TSM", "NASDAQ:NVDA"), combined.metadata().focusCompanyIds());
             assertTrue(combined.nodes().stream().filter(node -> node.id().equals("KRX:005930"))
                     .allMatch(node -> node.holding() && node.watch()));
 
@@ -303,7 +303,7 @@ class GraphVersionPostgresIntegrationTest {
                     {"version":2,"watchlistIds":[]}
                     """.getBytes(java.nio.charset.StandardCharsets.UTF_8)).node(), "watch-clear");
             var held = graph.getGraph("personal", null, 1, null, null, null, null, personal.of(member), "held");
-            assertEquals(List.of("KRX:005930", "KRX:000660"), held.metadata().focusCompanyIds());
+            assertEquals(List.of("KRX:005930", "KRX:000660", "NYSE:TSM"), held.metadata().focusCompanyIds());
             assertTrue(held.nodes().stream().noneMatch(com.zoop.graph.read.dto.GraphResponse.Node::watch));
 
             portfolio.disconnect(member, connection.id());

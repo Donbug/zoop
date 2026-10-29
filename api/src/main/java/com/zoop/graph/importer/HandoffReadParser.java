@@ -27,8 +27,10 @@ import tools.jackson.databind.node.ObjectNode;
  * The review state check the CLI reports as {@code delivery.reviewDigestMatches} is part of what the producer verifies before
  * it answers {@code current} (its {@code used_review_revisions_unchanged} check), and the service never delivers content
  * otherwise; a change shows up as a withheld {@code review_revision_changed}. The receipt keeps the service's answer minus the
- * content under {@code producer.read}. {@link #current} applies steps 1 and 2 to a {@code getGraphHandoffStatus} answer, the
- * look right before the commit.
+ * content under {@code producer.read}, and minus the two per-request stamps ({@code observedAt}, {@code delivery.checkedAt}):
+ * the service stamps every answer anew, and the receipt must be a function of the verified pins so that the same pins imported
+ * again are {@code unchanged}, never a conflict. The stamps are logged by the source instead. {@link #current} applies steps 1
+ * and 2 to a {@code getGraphHandoffStatus} answer, the look right before the commit.
  */
 public final class HandoffReadParser {
     static final String TRANSPORT = "internal-http";
@@ -109,7 +111,10 @@ public final class HandoffReadParser {
                 bundleDigest, contentDigest);
     }
 
-    /** {@code producer.read}: the service's answer without its content, so the receipt says where the bundle came from. */
+    /**
+     * {@code producer.read}: the service's answer without its content and without its per-request stamps, so the receipt says
+     * where the bundle came from and stays byte-identical for the same pins.
+     */
     static ObjectNode producer(HandoffRead read, Verification verification) {
         ObjectNode answer = StrictJson.newObject();
         answer.put("schemaVersion", SCHEMA_VERSION);
@@ -118,7 +123,6 @@ public final class HandoffReadParser {
         answer.put("state", read.state());
         ObjectNode delivery = answer.putObject("delivery");
         delivery.put("state", read.delivery().state());
-        delivery.put("checkedAt", read.delivery().checkedAt().orElse(null));
         ObjectNode verified = answer.putObject("verification");
         verified.put("manifestDigest", verification.manifestDigest());
         verified.put("bundleDigest", verification.bundleDigest());
@@ -127,7 +131,6 @@ public final class HandoffReadParser {
         verified.set("counts", verification.counts());
         verified.put("sources", verification.sources());
         verified.set("provenance", verification.provenance());
-        answer.put("observedAt", read.observedAt());
         ObjectNode producer = StrictJson.newObject();
         producer.set("read", answer);
         return producer;

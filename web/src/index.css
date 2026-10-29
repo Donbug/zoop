@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+@import 'pretendard/dist/web/variable/pretendardvariable.css';
+@import '@fontsource-variable/inter';
 
 /* #169 서비스 셸과 D-GRP-02/03/04/05 상세 패널의 공용 토큰.
    화면별 값 대신 Tailwind 유틸리티(text-zoop-muted, font-panel 등)로 사용한다. */
@@ -13,6 +15,9 @@
   --color-zoop-up: #d23c3c;
   --color-zoop-down: #2f6fd8;
   --color-zoop-alert: #b42318;
+  /* 사업 영향 판정: 시세 상승(빨강)/하락(파랑)과 별도 의미. */
+  --color-zoop-positive: #15803d;
+  --color-zoop-mixed: #92400e;
   /* A-ADM-03 보류(HOLD) 판정 */
   --color-zoop-hold: #c2410c;
   --color-zoop-map: #dfdfdc;
@@ -27,12 +32,27 @@
   --color-panel-soft: #f8f8f8;
   --radius-panel: 8px;
 
-  /* 서비스 화면 전환. motion-safe:animate-service-enter로만 쓴다. */
-  --animate-service-enter: service-enter 180ms ease-out;
+  /* 움직임 토큰(프로토타입 tokens.css와 같은 값). 길이는 duration-150처럼 숫자 유틸리티로 쓰고,
+     곡선은 ease-standard·ease-enter·ease-exit·ease-enter-expressive 유틸리티로 쓴다.
+     지도 카메라는 같은 값을 components/graph/graph-motion.ts에서 쓴다. */
+  --motion-fast: 150ms;
+  --motion-exit: 200ms;
+  --motion-normal: 250ms;
+  --motion-slow: 300ms;
+  --motion-graph: 600ms;
+  --ease-standard: cubic-bezier(0.35, 0, 0.35, 1);
+  --ease-enter: cubic-bezier(0, 0, 0.15, 1);
+  --ease-exit: cubic-bezier(0.35, 0, 1, 1);
+  --ease-enter-expressive: cubic-bezier(0.03, 0.4, 0.1, 1);
+
+  /* 서비스 화면 전환. motion-safe:animate-service-enter로만 쓴다.
+     backwards: 시작 전 지연 동안에도 첫 장면(투명)으로 둬서 한 번 번쩍이지 않게 한다. */
+  --animate-service-enter: service-enter 250ms cubic-bezier(0, 0, 0.15, 1)
+    backwards;
   @keyframes service-enter {
     from {
       opacity: 0;
-      transform: translateY(6px);
+      transform: translateY(8px);
     }
     to {
       opacity: 1;
@@ -56,6 +76,8 @@
   --color-zoop-up: #ffb4ad;
   --color-zoop-down: #a9c5ff;
   --color-zoop-alert: #ffb4ad;
+  --color-zoop-positive: #86efac;
+  --color-zoop-mixed: #fcd34d;
   --color-zoop-hold: #fdba74;
   --color-panel-ink: #ffffff;
   --color-panel-secondary: #d4d4d4;
@@ -96,14 +118,7 @@
     margin: 0;
     background: var(--color-zoop-wash);
     color: var(--color-zoop-ink);
-    font-family:
-      Inter,
-      Pretendard,
-      system-ui,
-      -apple-system,
-      BlinkMacSystemFont,
-      'Segoe UI',
-      sans-serif;
+    font-family: var(--font-panel);
   }
 
   button,
@@ -118,5 +133,18 @@
   /* 검은 선 아이콘(graph-assets)은 다크에서 밝게 뒤집는다. 기업 로고는 뒤집지 않는다. */
   :root[data-theme='dark'] [data-icon] {
     filter: invert(0.92);
+  }
+
+  /* 동작 줄이기: 화면의 모든 전환·애니메이션과 부드러운 스크롤을 끈다(프로토타입 index.css와 같은 규칙).
+     motion-safe:를 빠뜨린 곳도 함께 멈춘다. 지도 카메라는 graph-motion.ts가 따로 끈다. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

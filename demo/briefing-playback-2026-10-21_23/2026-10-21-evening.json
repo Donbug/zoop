@@ -1,0 +1,1301 @@
+{
+  "details": {
+    "issue-690d52ce4daa8ad62b2fc549": {
+      "claims": [
+        {
+          "evidenceIds": [
+            "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+          ],
+          "text": "삼성SDS는 중앙부처 단일 조직 가운데 규모가 가장 큰 경찰청을 고객으로 확보했고, 경제·안보 분야 주요 부처들도 브리티웍스 도입을 결정했다.",
+          "type": "fact"
+        }
+      ],
+      "companies": [
+        {
+          "id": "KRX:018260",
+          "name": "삼성에스디에스",
+          "relationType": "INVOLVES",
+          "role": "서비스 공급자",
+          "roleUnconfirmed": false
+        }
+      ],
+      "eventId": "issue-690d52ce4daa8ad62b2fc549",
+      "evidence": [
+        {
+          "bodyContext": null,
+          "bodySha256": "769842409a5c7813e5f5688123a196c0ffdc115e8aeae70d5cdab3e3781e94fe",
+          "documentId": "news-45287b57d3e461d5e73c9c4994f3ab7acde744d6402f494cba9e79b3951901c8",
+          "documentVersion": "sha256-769842409a5c7813e5f5688123a196c0ffdc115e8aeae70d5cdab3e3781e94fe",
+          "evidenceId": "evidence-grouped-ec60cc2c10c734b4d659d1bd1679",
+          "id": "evidence-grouped-ec60cc2c10c734b4d659d1bd1679",
+          "publishedAt": "2026-10-21T07:51:08+00:00",
+          "publisher": "",
+          "quote": "최근 중앙부처 단일 조직 가운데 규모가 가장 큰 경찰청을 고객으로 확보했으며 경제·안보 분야 주요 부처들도 '브리티웍스' 도입을 결정했다.",
+          "quoteVerified": true,
+          "sourceKind": "news",
+          "title": "삼성SDS·네이버, 공무원 AI 플랫폼 경쟁 치열…공공 AX 주도권 누가 쥘까 - ZDNet korea",
+          "url": "https://zdnet.co.kr/view/?no=20261021164518"
+        }
+      ],
+      "limitations": [
+        "회차 마감 이전 원발행 시각 기준의 과거 자료 재분석입니다."
+      ],
+      "metadata": {
+        "asOf": "2026-10-21T08:30:00Z",
+        "failures": [
+          {
+            "asOf": null,
+            "code": "RETROSPECTIVE_BODY",
+            "message": "원 발행시각 기준의 과거 시뮬레이션이며 당시 수집·동일 본문 버전·전체 시장 모집단을 입증하지 않습니다.",
+            "retryable": false,
+            "section": "dataWindow"
+          },
+          {
+            "asOf": null,
+            "code": "SOURCE_UNAVAILABLE",
+            "message": "운영 권한·공개 그래프 승인이 없는 localhost 과거 시뮬레이션입니다.",
+            "retryable": false,
+            "section": "graphVersion"
+          },
+          {
+            "asOf": null,
+            "code": "RETROSPECTIVE_DAILY_SNAPSHOT",
+            "message": "회차 마감 이전 일별 지표를 나중에 조회한 과거 시뮬레이션입니다. 당시 장중 관측값·개별 뉴스의 주가 영향 인과관계를 입증하지 않습니다.",
+            "retryable": false,
+            "section": "marketVariables"
+          }
+        ],
+        "graphVersion": null,
+        "partial": true,
+        "schedule": {
+          "confirmed": true,
+          "evening": "17:30",
+          "morning": "09:20"
+        },
+        "selection": {
+          "basis": "market",
+          "reason": "기존 회차의 중요도 선정과 원문 근거를 유지하고, 문장별 검증·이전 발행 근거 비교를 통과한 항목을 제공합니다."
+        },
+        "source": "zoop-briefing-publication-clock-simulation"
+      },
+      "roundId": "sim-2026-10-21-evening-b717c348435d",
+      "selectionReason": "브리티웍스의 중앙부처 고객 확대는 삼성SDS의 기업용 업무 플랫폼 사업에 관한 구체적인 고객 확보 성과다. 보도는 중앙부처 단일 조직 가운데 규모가 가장 큰 경찰청과 경제·안보 분야 주요 부처의 도입 결정을 전한다. 10월 21일 보도에서 경찰청 고객 확보와 경제·안보 분야 주요 부처의 도입 결정이 확인됐다.",
+      "summary": {
+        "evidenceIds": [
+          "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+        ],
+        "generatedAt": "2026-10-28T07:16:23.959168+00:00",
+        "resultVersion": "issue-intelligence-v1-53c2bc3b3ef5906595d230bd4d7c7df7bebd97e274c53bcf61be39e507de5503",
+        "text": "삼성SDS는 중앙부처 단일 조직 가운데 규모가 가장 큰 경찰청을 고객으로 확보했고, 경제·안보 분야 주요 부처들도 브리티웍스 도입을 결정했다."
+      },
+      "title": "삼성SDS, 경찰청 확보·경제·안보 부처 브리티웍스 도입 결정"
+    },
+    "issue-f09b418cc91673d1608204f1": {
+      "claims": [
+        {
+          "evidenceIds": [
+            "evidence-grouped-752f455965deef2622a88c23d0cc"
+          ],
+          "text": "보도에 따르면 SK텔레콤은 SK하이퍼를 중심으로 2029년부터 2035년까지 전국 4~5개 거점에 총 5GW 규모의 AI 데이터센터를 구축할 계획이다.",
+          "type": "fact"
+        }
+      ],
+      "companies": [
+        {
+          "id": "KRX:017670",
+          "name": "SK텔레콤",
+          "relationType": "INVOLVES",
+          "role": "구축 계획 주체",
+          "roleUnconfirmed": false
+        }
+      ],
+      "eventId": "issue-f09b418cc91673d1608204f1",
+      "evidence": [
+        {
+          "bodyContext": null,
+          "bodySha256": "4e3285924cc2c24f63f197ab9273597f1828b861244e508b5490ec037fc4c8e9",
+          "documentId": "news-d78fb6883d943e4108eac8dff496a9ac71b713cd5d6192c8039ab0fc9eb4f40e",
+          "documentVersion": "sha256-4e3285924cc2c24f63f197ab9273597f1828b861244e508b5490ec037fc4c8e9",
+          "evidenceId": "evidence-grouped-752f455965deef2622a88c23d0cc",
+          "id": "evidence-grouped-752f455965deef2622a88c23d0cc",
+          "publishedAt": "2026-10-21T06:43:52+00:00",
+          "publisher": "",
+          "quote": "SK텔레콤은 SK하이퍼를 중심으로 2029년부터 2035년까지 전국 4~5개 거점에 총 5GW 규모의 AI 데이터센터를 구축할 계획이다.",
+          "quoteVerified": true,
+          "sourceKind": "news",
+          "title": "원문 자료",
+          "url": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=497327"
+        }
+      ],
+      "limitations": [
+        "회차 마감 이전 원발행 시각 기준의 과거 자료 재분석입니다."
+      ],
+      "metadata": {
+        "asOf": "2026-10-21T08:30:00Z",
+        "failures": [
+          {
+            "asOf": null,
+            "code": "RETROSPECTIVE_BODY",
+            "message": "원 발행시각 기준의 과거 시뮬레이션이며 당시 수집·동일 본문 버전·전체 시장 모집단을 입증하지 않습니다.",
+            "retryable": false,
+            "section": "dataWindow"
+          },
+          {
+            "asOf": null,
+            "code": "SOURCE_UNAVAILABLE",
+            "message": "운영 권한·공개 그래프 승인이 없는 localhost 과거 시뮬레이션입니다.",
+            "retryable": false,
+            "section": "graphVersion"
+          },
+          {
+            "asOf": null,
+            "code": "RETROSPECTIVE_DAILY_SNAPSHOT",
+            "message": "회차 마감 이전 일별 지표를 나중에 조회한 과거 시뮬레이션입니다. 당시 장중 관측값·개별 뉴스의 주가 영향 인과관계를 입증하지 않습니다.",
+            "retryable": false,
+            "section": "marketVariables"
+          }
+        ],
+        "graphVersion": null,
+        "partial": true,
+        "schedule": {
+          "confirmed": true,
+          "evening": "17:30",
+          "morning": "09:20"
+        },
+        "selection": {
+          "basis": "market",
+          "reason": "기존 회차의 중요도 선정과 원문 근거를 유지하고, 문장별 검증·이전 발행 근거 비교를 통과한 항목을 제공합니다."
+        },
+        "source": "zoop-briefing-publication-clock-simulation"
+      },
+      "roundId": "sim-2026-10-21-evening-b717c348435d",
+      "selectionReason": "전국 4~5개 거점에 총 5GW 규모의 AI 데이터센터를 구축하는 장기 계획은 SK텔레콤의 대규모 인프라 사업·투자 방향에 해당한다. 다만 보도는 증권사 전망을 통해 이 계획을 전한다. 10월 21일 보도에서 2029년부터 2035년까지 전국 4~5개 거점에 총 5GW 규모로 구축한다는 계획이 확인됐다.",
+      "summary": {
+        "evidenceIds": [
+          "evidence-grouped-752f455965deef2622a88c23d0cc"
+        ],
+        "generatedAt": "2026-10-28T07:16:23.959168+00:00",
+        "resultVersion": "issue-intelligence-v1-015378e7254cd944f4047aa334f7355a48e0d98b1d29439229dc1c17d1f35f77",
+        "text": "보도에 따르면 SK텔레콤은 SK하이퍼를 중심으로 2029년부터 2035년까지 전국 4~5개 거점에 총 5GW 규모의 AI 데이터센터를 구축할 계획이다."
+      },
+      "title": "SK텔레콤, 2029~2035년 5GW AI 데이터센터 구축 계획"
+    }
+  },
+  "response": {
+    "companyPriceContext": {
+      "authorship": "deterministic_price_observation",
+      "companies": [
+        {
+          "barCount": 78,
+          "companyId": "NASDAQ:NVDA",
+          "companyName": "NVIDIA",
+          "completeSession": true,
+          "currency": "USD",
+          "cutoff": "2026-10-21T08:30:00Z",
+          "day": {
+            "baselineClose": "217.09",
+            "baselineDate": "2026-10-19",
+            "changeRatePercent": "-0.29",
+            "closeOrLast": "216.47",
+            "from": "2026-10-20T13:30:00Z",
+            "high": "218.46",
+            "kind": "provider_daily_bar",
+            "low": "212.77",
+            "open": "215.98",
+            "to": "2026-10-20T20:00:00Z",
+            "volume": "79609078"
+          },
+          "exchangeTimezone": "America/New_York",
+          "flow": "장중 관측 고점 218.46·저점 212.77 USD. 종가는 고점 대비 -0.91%입니다.",
+          "interpretation": "현재 가격은 거래 맥락으로 활용합니다. 기사 후 관측 또는 공개 직전 비교 구간이 부족해, 기존 사업 판단을 주가만으로 강화·약화하지 않습니다.",
+          "latest": {
+            "kind": "daily_close",
+            "observedAt": "2026-10-20T20:00:00Z",
+            "value": "216.47"
+          },
+          "limitation": "기사와 가격의 시간상 전후 관측이며 인과관계·사업 조건 확인·예측 적중을 입증하지 않습니다.",
+          "news": [
+            {
+              "before": {
+                "kind": "daily_close",
+                "observedAt": "2026-10-20T20:00:00Z",
+                "value": "216.47"
+              },
+              "changeRatePercent": null,
+              "evidenceId": "evidence-grouped-28fc2570e12ff5493d4efddf701c",
+              "observation": "기사 공개 후 거래를 보여 주는 완료 봉이 없습니다. 이 회차 가격을 해당 기사 반응으로 평가하지 않습니다.",
+              "postNewsBars": 0,
+              "publishedAt": "2026-10-21T02:33:00Z",
+              "status": "no_post_news_trade",
+              "timing": "after_session"
+            }
+          ],
+          "outlook": {
+            "authorship": "source_bound_composition",
+            "businessJudgment": {
+              "evidenceIds": [
+                "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+              ],
+              "text": "11억 달러 용량 예약 선급금과 KYEC의 미국 테스트 시설 계획은 미래 공급 준비에 관한 정보입니다. 2027년4월 대량 생산 목표의 실행이 확인돼야 실제 테스트 용량 확보로 평가할 수 있습니다."
+            },
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+            ],
+            "marketNote": "국내 지수·원/달러는 시장 참고값이며 이 해외기업의 직접 비교지수나 같은 거래 구간의 가격 변화율이 아닙니다.",
+            "nextCheck": "기사 후 정규장 관측이 없어 이 가격을 새 소식의 반응으로 판단하지 않습니다. 다음 거래일에는 KYEC의 미국 시설·장비 마련과2027년4월 생산 목표의 진행을 확인합니다.",
+            "priceObservation": "2026-10-20 미국 정규장 종가 216.47 USD, 2026-10-19 제공 종가 대비 -0.29%입니다. 같은 날 출근의 해당 기업 가격 관측이 없어 아침 이후 비교를 유보합니다.",
+            "schemaVersion": "zoop-company-price-outlook-v1",
+            "stance": "priority_watch",
+            "takeaway": "예약 선급금과 실제 테스트 용량 확보를 구분합니다. 2026-10-20 종가 -0.29% (2026-10-19 대비).",
+            "text": "11억 달러 용량 예약 선급금과 KYEC의 미국 테스트 시설 계획은 미래 공급 준비에 관한 정보입니다. 2027년4월 대량 생산 목표의 실행이 확인돼야 실제 테스트 용량 확보로 평가할 수 있습니다. 가격 측면에서는 2026-10-20 미국 정규장 종가 216.47 USD, 2026-10-19 제공 종가 대비 -0.29%입니다. 같은 날 출근의 해당 기업 가격 관측이 없어 아침 이후 비교를 유보합니다. 기사 후 정규장 관측이 없어 이 가격을 새 소식의 반응으로 판단하지 않습니다. 다음 거래일에는 KYEC의 미국 시설·장비 마련과2027년4월 생산 목표의 진행을 확인합니다."
+          },
+          "provider": "toss",
+          "sessionDate": "2026-10-20",
+          "sinceMorning": {
+            "observation": "같은 날 출근의 해당 기업 가격 관측이 없어 아침 이후 비교를 유보합니다.",
+            "status": "unavailable"
+          },
+          "status": "available",
+          "summary": "2026-10-20 미국 정규장 종가 216.47 USD, 2026-10-19 제공 종가 대비 -0.29%입니다."
+        },
+        {
+          "barCount": 78,
+          "companyId": "KRX:018260",
+          "companyName": "삼성에스디에스",
+          "completeSession": true,
+          "currency": "KRW",
+          "cutoff": "2026-10-21T08:30:00Z",
+          "day": {
+            "baselineClose": "196100",
+            "baselineDate": "2026-10-20",
+            "changeRatePercent": "2.24",
+            "closeOrLast": "200500",
+            "from": "2026-10-21T00:00:00Z",
+            "high": "202500",
+            "kind": "provider_daily_bar",
+            "low": "196700",
+            "open": "199900",
+            "to": "2026-10-21T06:30:00Z",
+            "volume": "151480"
+          },
+          "exchangeTimezone": "Asia/Seoul",
+          "flow": "장중 관측 고점 202500·저점 196700 KRW. 종가는 고점 대비 -0.99%입니다.",
+          "interpretation": "현재 가격은 거래 맥락으로 활용합니다. 기사 후 관측 또는 공개 직전 비교 구간이 부족해, 기존 사업 판단을 주가만으로 강화·약화하지 않습니다.",
+          "latest": {
+            "kind": "daily_close",
+            "observedAt": "2026-10-21T06:30:00Z",
+            "value": "200500"
+          },
+          "limitation": "기사와 가격의 시간상 전후 관측이며 인과관계·사업 조건 확인·예측 적중을 입증하지 않습니다.",
+          "news": [
+            {
+              "before": {
+                "kind": "daily_close",
+                "observedAt": "2026-10-21T06:30:00Z",
+                "value": "200500"
+              },
+              "changeRatePercent": null,
+              "evidenceId": "evidence-grouped-ec60cc2c10c734b4d659d1bd1679",
+              "observation": "기사 공개 후 거래를 보여 주는 완료 봉이 없습니다. 이 회차 가격을 해당 기사 반응으로 평가하지 않습니다.",
+              "postNewsBars": 0,
+              "publishedAt": "2026-10-21T07:51:08Z",
+              "status": "no_post_news_trade",
+              "timing": "after_session"
+            }
+          ],
+          "outlook": {
+            "authorship": "source_bound_composition",
+            "businessJudgment": {
+              "evidenceIds": [
+                "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+              ],
+              "text": "공공 부문 고객 기반 확대는 기회지만 계약 금액과 실제 운영 범위가 확인돼야 사업 기여를 판단할 수 있습니다."
+            },
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "marketNote": "국내 지수는 아래 기간의 시장 참고값입니다. 종목과 관측 구간이 일치하지 않으면 상대 성과를 계산하지 않습니다.",
+            "nextCheck": "기사 후 정규장 관측이 없어 이 가격을 새 소식의 반응으로 판단하지 않습니다. 다음 거래일에는 주요 부처의 플랫폼 적용 범위·운영 개시가 확인되는지 살펴봅니다.",
+            "priceObservation": "2026-10-21 국내 정규장 종가 200500 KRW, 2026-10-20 제공 종가 대비 +2.24%입니다. 같은 날 출근의 해당 기업 가격 관측이 없어 아침 이후 비교를 유보합니다.",
+            "schemaVersion": "zoop-company-price-outlook-v1",
+            "stance": "watch",
+            "takeaway": "도입 결정이 실제 적용·운영으로 이어지는지 관찰합니다. 2026-10-21 종가 +2.24% (2026-10-20 대비).",
+            "text": "공공 부문 고객 기반 확대는 기회지만 계약 금액과 실제 운영 범위가 확인돼야 사업 기여를 판단할 수 있습니다. 가격 측면에서는 2026-10-21 국내 정규장 종가 200500 KRW, 2026-10-20 제공 종가 대비 +2.24%입니다. 같은 날 출근의 해당 기업 가격 관측이 없어 아침 이후 비교를 유보합니다. 기사 후 정규장 관측이 없어 이 가격을 새 소식의 반응으로 판단하지 않습니다. 다음 거래일에는 주요 부처의 플랫폼 적용 범위·운영 개시가 확인되는지 살펴봅니다."
+          },
+          "provider": "toss",
+          "sessionDate": "2026-10-21",
+          "sinceMorning": {
+            "observation": "같은 날 출근의 해당 기업 가격 관측이 없어 아침 이후 비교를 유보합니다.",
+            "status": "unavailable"
+          },
+          "status": "available",
+          "summary": "2026-10-21 국내 정규장 종가 200500 KRW, 2026-10-20 제공 종가 대비 +2.24%입니다."
+        }
+      ],
+      "cutoff": "2026-10-21T17:30:00+09:00",
+      "date": "2026-10-21",
+      "edition": "evening",
+      "generatedAt": "2026-10-24T05:24:10.475204+00:00",
+      "marketReference": {
+        "indicators": [
+          {
+            "baselineDate": "2026-10-19",
+            "changeRatePercent": "-3.73",
+            "id": "kospi",
+            "label": "KOSPI",
+            "observedAt": null,
+            "observedDate": "2026-10-20",
+            "source": {
+              "delayNote": "과거 일별 종가입니다. 출근 회차의 장중 값이나 당시 수집본을 입증하지 않습니다.",
+              "name": "Yahoo Finance 지수 일별 이력",
+              "official": false,
+              "provider": "yahoo",
+              "symbol": "^KS11",
+              "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5EKS11?period1=1791644400&period2=1792767600&interval=1d"
+            },
+            "status": "delayed",
+            "text": "KOSPI 2026-10-20 종가 5552.74 pt, 2026-10-19 종가 대비 -3.73% · 지연 자료",
+            "unit": "pt",
+            "value": 5552.74,
+            "valueKind": "close"
+          },
+          {
+            "baselineDate": "2026-10-19",
+            "changeRatePercent": "-3.33",
+            "id": "kosdaq",
+            "label": "KOSDAQ",
+            "observedAt": null,
+            "observedDate": "2026-10-20",
+            "source": {
+              "delayNote": "과거 일별 종가입니다. 출근 회차의 장중 값이나 당시 수집본을 입증하지 않습니다.",
+              "name": "Yahoo Finance 지수 일별 이력",
+              "official": false,
+              "provider": "yahoo",
+              "symbol": "^KQ11",
+              "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5EKQ11?period1=1791644400&period2=1792767600&interval=1d"
+            },
+            "status": "delayed",
+            "text": "KOSDAQ 2026-10-20 종가 781.97 pt, 2026-10-19 종가 대비 -3.33% · 지연 자료",
+            "unit": "pt",
+            "value": 781.97,
+            "valueKind": "close"
+          },
+          {
+            "baselineDate": "2026-10-19",
+            "changeRatePercent": "-0.49",
+            "id": "usdkrw",
+            "label": "원/달러",
+            "observedAt": null,
+            "observedDate": "2026-10-20",
+            "source": {
+              "delayNote": "날짜만 제공되는 일별 고시값으로 외환시장 종가·회차 시점 실시간 환율이 아닙니다.",
+              "name": "하나은행 고시 기준환율(네이버 일별 이력)",
+              "official": false,
+              "provider": "naver",
+              "symbol": "FX_USDKRW",
+              "url": "https://api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices?pageSize=40&page=1"
+            },
+            "status": "delayed",
+            "text": "원/달러 2026-10-20 일별 고시값 1327 원, 2026-10-19 일별 고시값 대비 -0.49% · 지연 자료",
+            "unit": "KRW",
+            "value": 1327.0,
+            "valueKind": "reference"
+          }
+        ],
+        "note": "각 지표의 관측일·비교일을 그대로 표시합니다. 거래 구간·통화·상장 시장이 다른 기업과 직접 비교하거나 뉴스 원인으로 사용하지 않습니다.",
+        "status": "available"
+      },
+      "outlookIntegrationVersion": "zoop-company-price-outlook-v1",
+      "resultVersion": "price-context-v1-0abacd6e1e87ce72afe1641488c6d23a37e2a4c027508c5ede97d821d414710d",
+      "reviewVersion": "edition-v1-1dba605438d36a91489bdd3c0f80d9dac14aefff663e02a1ad2a3f4b2d359600",
+      "roundId": "sim-2026-10-21-evening-b717c348435d",
+      "schemaVersion": "zoop-company-price-context-v1",
+      "scopeNote": "토스 API 보존 응답의 회차 마감 이전 관측으로 재구성했습니다. 사후 수집이며 당시 수집·예측 적중을 입증하지 않습니다.",
+      "status": "derived"
+    },
+    "corrections": [],
+    "dataAsOf": "2026-10-21T08:30:00Z",
+    "dataWindow": {
+      "end": "2026-10-21T08:30:00Z",
+      "openStart": false,
+      "start": "2026-10-21T00:20:00Z"
+    },
+    "date": "2026-10-21",
+    "edition": "evening",
+    "editionReview": {
+      "analysisVersion": "company-v1-234629b543b66e0476c9f72827f63e0d5a91f6adc4553775e8be7e401d5e2f74",
+      "capabilities": {
+        "calendar": "unverified",
+        "flows": "unavailable",
+        "intraday": "unavailable",
+        "sectors": "unavailable"
+      },
+      "companies": [
+        {
+          "checks": [],
+          "companyId": "NASDAQ:NVDA",
+          "companyName": "NVIDIA",
+          "judgment": {
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+            ],
+            "text": "11억 달러 용량 예약 선급금과 KYEC의 미국 테스트 시설 계획은 미래 공급 준비에 관한 정보입니다. 2027년4월 대량 생산 목표의 실행이 확인돼야 실제 테스트 용량 확보로 평가할 수 있습니다."
+          },
+          "negative": {
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+            ],
+            "text": "시설 준비나 생산 개시의 지연이 확인되면 공급 준비 전망을 낮춥니다."
+          },
+          "newInformation": {
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+            ],
+            "text": "11억 달러 용량 예약 선급금과 KYEC의 미국 테스트 시설 계획은 미래 공급 준비에 관한 정보입니다. 2027년4월 대량 생산 목표의 실행이 확인돼야 실제 테스트 용량 확보로 평가할 수 있습니다."
+          },
+          "positive": {
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+            ],
+            "text": "시설·장비 준비와 실제 생산 개시가 확인되면 테스트 용량 확보 가시성을 높여 봅니다."
+          },
+          "previous": null,
+          "price": {
+            "baseline": {
+              "kind": "daily_close",
+              "observedAt": "2026-10-20T20:00:00Z",
+              "sessionDate": "2026-10-20",
+              "value": "216.47"
+            },
+            "baselineKind": "morning_cutoff",
+            "change": null,
+            "changeRate": null,
+            "companyId": "NASDAQ:NVDA",
+            "comparisonStatus": "no_new_session",
+            "currency": "USD",
+            "cutoff": "2026-10-21T17:30:00+09:00",
+            "exchangeTimezone": "America/New_York",
+            "latest": {
+              "kind": "daily_close",
+              "observedAt": "2026-10-20T20:00:00Z",
+              "sessionDate": "2026-10-20",
+              "value": "216.47"
+            },
+            "note": "나중에 조회한 과거 정규장 이력입니다. 5분봉은 종료 후 사용하며 당시 수집·실시간 시세는 입증하지 않습니다.",
+            "official": false,
+            "reason": null,
+            "source": "Yahoo Finance",
+            "sources": [
+              {
+                "bytes": 51735,
+                "collectedAt": "2026-10-23T06:58:58.991903+00:00",
+                "companyId": "NASDAQ:NVDA",
+                "httpStatus": 200,
+                "interval": "5m",
+                "period1": 1791936000,
+                "period2": 1792800000,
+                "sha256": "9d5198448aec4656c530f53934a0c33b7d79d0cb8a8e980c48acd33a265e7f5b",
+                "url": "https://query1.finance.yahoo.com/v8/finance/chart/NVDA?period1=1791936000&period2=1792800000&interval=5m&includePrePost=false&events=splits%2Cdiv"
+              },
+              {
+                "bytes": 1987,
+                "collectedAt": "2026-10-23T06:58:59.279935+00:00",
+                "companyId": "NASDAQ:NVDA",
+                "httpStatus": 200,
+                "interval": "1d",
+                "period1": 1791936000,
+                "period2": 1792800000,
+                "sha256": "9f47439a63f3867e2ca34a9dae7e2984dd3902554a0d7f0bbc6399943d05528f",
+                "url": "https://query1.finance.yahoo.com/v8/finance/chart/NVDA?period1=1791936000&period2=1792800000&interval=1d&includePrePost=false&events=splits%2Cdiv"
+              }
+            ],
+            "status": "available"
+          },
+          "role": "selected",
+          "sourceIds": [
+            "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+          ],
+          "stance": "priority_watch",
+          "takeaway": {
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+            ],
+            "text": "예약 선급금과 실제 테스트 용량 확보를 구분합니다."
+          },
+          "title": {
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+            ],
+            "text": "테스트 용량 확보 계획"
+          },
+          "watch": [
+            {
+              "evidenceIds": [
+                "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+              ],
+              "text": "KYEC의 미국 시설·장비 마련과2027년4월 생산 목표의 진행을 확인합니다."
+            }
+          ]
+        },
+        {
+          "checks": [],
+          "companyId": "KRX:018260",
+          "companyName": "삼성에스디에스",
+          "judgment": {
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "text": "공공 부문 고객 기반 확대는 기회지만 계약 금액과 실제 운영 범위가 확인돼야 사업 기여를 판단할 수 있습니다."
+          },
+          "negative": {
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "text": "도입 취소나 적용 지연이 확인되면 실행 가능성을 낮춰 봅니다."
+          },
+          "newInformation": {
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "text": "공공 부문 고객 기반 확대는 기회지만 계약 금액과 실제 운영 범위가 확인돼야 사업 기여를 판단할 수 있습니다."
+          },
+          "positive": {
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "text": "실제 적용 범위와 이용 현황이 구체화되면 사업 가시성을 높여 평가합니다."
+          },
+          "previous": null,
+          "price": {
+            "baseline": {
+              "kind": "five_minute_close",
+              "observedAt": "2026-10-21T00:20:00Z",
+              "sessionDate": "2026-10-21",
+              "value": "201500.00"
+            },
+            "baselineKind": "morning_cutoff",
+            "change": "0.00",
+            "changeRate": "0.00",
+            "companyId": "KRX:018260",
+            "comparisonStatus": "available",
+            "currency": "KRW",
+            "cutoff": "2026-10-21T17:30:00+09:00",
+            "exchangeTimezone": "Asia/Seoul",
+            "latest": {
+              "kind": "daily_close",
+              "observedAt": "2026-10-21T06:30:00Z",
+              "sessionDate": "2026-10-21",
+              "value": "201500.00"
+            },
+            "note": "나중에 조회한 과거 정규장 이력입니다. 5분봉은 종료 후 사용하며 당시 수집·실시간 시세는 입증하지 않습니다.",
+            "official": false,
+            "reason": null,
+            "source": "Yahoo Finance",
+            "sources": [
+              {
+                "bytes": 31531,
+                "collectedAt": "2026-10-23T06:58:56.775833+00:00",
+                "companyId": "KRX:018260",
+                "httpStatus": 200,
+                "interval": "5m",
+                "period1": 1791936000,
+                "period2": 1792800000,
+                "sha256": "096e841d12ff305df09aba26a27d8e901dbe07a0a0251f406932710941287c9c",
+                "url": "https://query1.finance.yahoo.com/v8/finance/chart/018260.KS?period1=1791936000&period2=1792800000&interval=5m&includePrePost=false&events=splits%2Cdiv"
+              },
+              {
+                "bytes": 1703,
+                "collectedAt": "2026-10-23T06:58:57.069431+00:00",
+                "companyId": "KRX:018260",
+                "httpStatus": 200,
+                "interval": "1d",
+                "period1": 1791936000,
+                "period2": 1792800000,
+                "sha256": "0bba71bc4372c2d91d6929dcab0b38563aaa1de9915507f49ea3aaccc9ff44c8",
+                "url": "https://query1.finance.yahoo.com/v8/finance/chart/018260.KS?period1=1791936000&period2=1792800000&interval=1d&includePrePost=false&events=splits%2Cdiv"
+              }
+            ],
+            "status": "available"
+          },
+          "role": "selected",
+          "sourceIds": [
+            "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+          ],
+          "stance": "watch",
+          "takeaway": {
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "text": "도입 결정이 실제 적용·운영으로 이어지는지 관찰합니다."
+          },
+          "title": {
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "text": "공공 AI 도입 실행 확인"
+          },
+          "watch": [
+            {
+              "evidenceIds": [
+                "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+              ],
+              "text": "주요 부처의 플랫폼 적용 범위·운영 개시가 확인되는지 살펴봅니다."
+            }
+          ]
+        }
+      ],
+      "comparison": {
+        "evidenceIds": [
+          "evidence-grouped-28fc2570e12ff5493d4efddf701c",
+          "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+        ],
+        "text": "같은 날 출근 발행본이 없어 아침 판단의 적중·실패를 점검할 수 없습니다. 현재 선정된 기업의 사업 조건과 실제 가격 관측을 분리해 확인합니다."
+      },
+      "cutoff": "2026-10-21T17:30:00+09:00",
+      "date": "2026-10-21",
+      "edition": "evening",
+      "headline": "오늘 장 자료와 아침 발행본이 부족해 평가 범위를 구분합니다",
+      "marketInterpretation": {
+        "evidenceIds": [],
+        "text": "현재 지수는20일 값으로21일 장의 총평을 만들 수 없습니다. 장중 지수·업종·수급도 연결돼 있지 않아 오늘의 주도 업종이나 상승·하락 원인을 단정하지 않습니다."
+      },
+      "marketVariables": {
+        "collectedAt": "2026-10-23T06:04:40.515813+00:00",
+        "indicators": [
+          {
+            "baseline": {
+              "at": null,
+              "date": "2026-10-19",
+              "value": 5768.01
+            },
+            "change": -215.27,
+            "changeRate": -0.03732136386726098,
+            "id": "kospi",
+            "label": "KOSPI",
+            "observedAt": null,
+            "observedDate": "2026-10-20",
+            "reason": "회차 마감 전 가장 최근 확인된 거래일 종가입니다. 장중 시세는 제공하지 않습니다.",
+            "reasonCode": null,
+            "source": {
+              "delayNote": "과거 일별 종가입니다. 출근 회차의 장중 값이나 당시 수집본을 입증하지 않습니다.",
+              "name": "Yahoo Finance 지수 일별 이력",
+              "official": false,
+              "provider": "yahoo",
+              "symbol": "^KS11",
+              "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5EKS11?period1=1791644400&period2=1792767600&interval=1d"
+            },
+            "status": "delayed",
+            "unit": "pt",
+            "value": 5552.74,
+            "valueKind": "close"
+          },
+          {
+            "baseline": {
+              "at": null,
+              "date": "2026-10-19",
+              "value": 808.89
+            },
+            "change": -26.92,
+            "changeRate": -0.033280174065694966,
+            "id": "kosdaq",
+            "label": "KOSDAQ",
+            "observedAt": null,
+            "observedDate": "2026-10-20",
+            "reason": "회차 마감 전 가장 최근 확인된 거래일 종가입니다. 장중 시세는 제공하지 않습니다.",
+            "reasonCode": null,
+            "source": {
+              "delayNote": "과거 일별 종가입니다. 출근 회차의 장중 값이나 당시 수집본을 입증하지 않습니다.",
+              "name": "Yahoo Finance 지수 일별 이력",
+              "official": false,
+              "provider": "yahoo",
+              "symbol": "^KQ11",
+              "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5EKQ11?period1=1791644400&period2=1792767600&interval=1d"
+            },
+            "status": "delayed",
+            "unit": "pt",
+            "value": 781.97,
+            "valueKind": "close"
+          },
+          {
+            "baseline": {
+              "at": null,
+              "date": "2026-10-19",
+              "value": 1333.5
+            },
+            "change": -6.5,
+            "changeRate": -0.004874390701162355,
+            "id": "usdkrw",
+            "label": "원/달러",
+            "observedAt": null,
+            "observedDate": "2026-10-20",
+            "reason": "회차 마감 전에 확정 가능한 직전 날짜의 일별 고시환율입니다. 당일 고시 마감 시각은 확인되지 않았습니다.",
+            "reasonCode": null,
+            "source": {
+              "delayNote": "날짜만 제공되는 일별 고시값으로 외환시장 종가·회차 시점 실시간 환율이 아닙니다.",
+              "name": "하나은행 고시 기준환율(네이버 일별 이력)",
+              "official": false,
+              "provider": "naver",
+              "symbol": "FX_USDKRW",
+              "url": "https://api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices?pageSize=40&page=1"
+            },
+            "status": "delayed",
+            "unit": "KRW",
+            "value": 1327.0,
+            "valueKind": "reference"
+          }
+        ],
+        "rateCutoffAt": "2026-10-21T17:30:00+09:00",
+        "referenceAt": "2026-10-21T17:30:00+09:00",
+        "status": "available"
+      },
+      "nextSession": {
+        "evidenceIds": [
+          "evidence-grouped-28fc2570e12ff5493d4efddf701c",
+          "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+        ],
+        "text": "다음 거래일에는 NVIDIA 테스트 시설·생산 목표와 삼성SDS의 실제 도입·운영 범위가 구체화되는지 확인합니다. 새 근거가 없으면 기존 조건을 유지하고 수집 부족과 새로운 소식 부재를 구분합니다."
+      },
+      "previousReview": null,
+      "resultVersion": "edition-v1-1dba605438d36a91489bdd3c0f80d9dac14aefff663e02a1ad2a3f4b2d359600",
+      "reviewedAt": "2026-10-24T04:03:46.109066+00:00",
+      "reviewer": "codex",
+      "roundId": "sim-2026-10-21-evening-b717c348435d",
+      "schemaVersion": "zoop-edition-review-v1",
+      "scopeNote": "원발행 시각 기준 과거 시뮬레이션·원문 대조 편집본입니다. 나중에 조회한 보존 자료이며 당시 본문 동일성·주가 인과·예측 적중은 입증하지 않습니다.",
+      "sources": {
+        "evidence-grouped-28fc2570e12ff5493d4efddf701c": {
+          "bodySha256": "db79daf4cd541b5e9914723f609cdd54ba99f67dbba51b61bcce0e3044a015af",
+          "documentId": "news-33e8a073cb12402818f71498de563b421ae6e41030f788d4bfe6a9ab94d2a751",
+          "documentVersion": "sha256-db79daf4cd541b5e9914723f609cdd54ba99f67dbba51b61bcce0e3044a015af",
+          "evidenceId": "evidence-grouped-28fc2570e12ff5493d4efddf701c",
+          "publishedAt": "2026-10-21T02:33:00+00:00",
+          "quote": "NVIDIA’s $1.1 billion capacity reservation advance to KYEC will support new U.S. testing facilities and equipment, with high-volume production targeted for April 2027.",
+          "title": "NVIDIA and Supply Chain Partners Expand Capacity to Accelerate AI Infrastructure Buildout - 新浪香港",
+          "url": "https://portal.sina.com.hk/finance/finance-globenewswire/globenewswire/2026/10/21/1962159/nvidia-and-supply-chain-partners-expand-capacity-to-accelerate-ai-infrastructure-buildout/"
+        },
+        "evidence-grouped-ec60cc2c10c734b4d659d1bd1679": {
+          "bodySha256": "769842409a5c7813e5f5688123a196c0ffdc115e8aeae70d5cdab3e3781e94fe",
+          "documentId": "news-45287b57d3e461d5e73c9c4994f3ab7acde744d6402f494cba9e79b3951901c8",
+          "documentVersion": "sha256-769842409a5c7813e5f5688123a196c0ffdc115e8aeae70d5cdab3e3781e94fe",
+          "evidenceId": "evidence-grouped-ec60cc2c10c734b4d659d1bd1679",
+          "publishedAt": "2026-10-21T07:51:08+00:00",
+          "quote": "최근 중앙부처 단일 조직 가운데 규모가 가장 큰 경찰청을 고객으로 확보했으며 경제·안보 분야 주요 부처들도 '브리티웍스' 도입을 결정했다.",
+          "title": "삼성SDS·네이버, 공무원 AI 플랫폼 경쟁 치열…공공 AX 주도권 누가 쥘까 - ZDNet korea",
+          "url": "https://zdnet.co.kr/view/?no=20261021164518"
+        }
+      },
+      "status": "REVIEWED",
+      "summary": {
+        "evidenceIds": [
+          "evidence-grouped-28fc2570e12ff5493d4efddf701c",
+          "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+        ],
+        "text": "오늘21일 지수 종가와 출근 판단은 연결돼 있지 않습니다. 최근20일 지수와 개별 기업의 회차 기준 시세는 구분해 보여주며, NVIDIA 테스트 용량 계획·삼성SDS 공공 AI 도입의 실행 조건을 다음 관찰 과제로 남깁니다."
+      },
+      "verificationMode": "editorial_source_review"
+    },
+    "emptyReason": null,
+    "generatedAt": "2026-10-28T07:16:23.959168+00:00",
+    "graphVersion": null,
+    "id": "sim-2026-10-21-evening-b717c348435d",
+    "issueIntelligence": {
+      "cutoff": "2026-10-21T17:30:00+09:00",
+      "date": "2026-10-21",
+      "edition": "evening",
+      "generatedAt": "2026-10-28T07:16:23.959168+00:00",
+      "issues": [
+        {
+          "companies": [
+            {
+              "assessment": "positive",
+              "companyId": "KRX:017670",
+              "comparison": {
+                "evidenceIds": [
+                  "evidence-grouped-752f455965deef2622a88c23d0cc"
+                ],
+                "previousResultVersion": null,
+                "status": "unavailable",
+                "text": "이전 회차의 같은 이슈·기업 판단을 확인할 수 없어 변화 비교는 unavailable이다."
+              },
+              "conditions": [
+                {
+                  "evidenceIds": [
+                    "evidence-grouped-752f455965deef2622a88c23d0cc"
+                  ],
+                  "text": "2029~2035년 전국 4~5개 거점, 총 5GW 규모 구축 계획의 구체적인 실행과 각 거점의 건설·가동 여부를 확인해야 한다."
+                }
+              ],
+              "impact": {
+                "evidenceIds": [
+                  "evidence-grouped-752f455965deef2622a88c23d0cc"
+                ],
+                "text": "SK하이퍼를 중심으로 한 AI 데이터센터 구축 계획은 SK텔레콤의 대규모 인프라 사업 방향을 보여준다. 보도된 계획만으로 투자 규모나 매출·비용에 미치는 영향은 판단하기 어렵다."
+              },
+              "negative": {
+                "evidenceIds": [
+                  "evidence-grouped-752f455965deef2622a88c23d0cc"
+                ],
+                "text": "보도는 구축 계획을 전하지만 구체적인 사업 실행·투자 조건과 거점별 가동 일정은 제시하지 않았다."
+              },
+              "newInformation": {
+                "evidenceIds": [
+                  "evidence-grouped-752f455965deef2622a88c23d0cc"
+                ],
+                "text": "보도에 따르면 SK텔레콤은 SK하이퍼를 중심으로 2029년부터 2035년까지 전국 4~5개 거점에 총 5GW 규모의 AI 데이터센터를 구축할 계획이다."
+              },
+              "outlook": {
+                "evidenceIds": [
+                  "evidence-grouped-752f455965deef2622a88c23d0cc"
+                ],
+                "text": "사업 측면에서는 전국 4~5개 거점, 총 5GW 규모의 AI 데이터센터 구축 계획이 장기 인프라 사업 방향으로 확인됐다. 다만 이는 보도를 통해 전해진 계획이며, 구체적인 투자·실행 조건이나 매출 기여 규모는 확인되지 않았다. 가격 관측은 제공되지 않아 기사에 대한 주가 반응을 판단할 수 없다. 후속으로 사업 실행 계획과 거점별 건설·가동 진행을 확인해야 한다."
+              },
+              "positive": {
+                "evidenceIds": [
+                  "evidence-grouped-752f455965deef2622a88c23d0cc"
+                ],
+                "text": "SK하이퍼 중심의 AI 데이터센터 구축 계획이 확인돼 SK텔레콤의 장기 인프라 사업 방향이 구체화됐다."
+              },
+              "previous": {
+                "reason": "corresponding_round_missing",
+                "status": "unavailable"
+              },
+              "risks": [
+                {
+                  "evidenceIds": [
+                    "evidence-grouped-752f455965deef2622a88c23d0cc"
+                  ],
+                  "text": "2029~2035년 구축 계획의 실행과 거점별 건설·가동 여부, 구체적인 투자 조건은 아직 확인되지 않았다."
+                }
+              ],
+              "sourceIds": [
+                "evidence-grouped-752f455965deef2622a88c23d0cc"
+              ],
+              "takeaway": {
+                "evidenceIds": [
+                  "evidence-grouped-752f455965deef2622a88c23d0cc"
+                ],
+                "text": "SK텔레콤의 5GW AI 데이터센터 장기 구축 계획은 인프라 사업 방향에 긍정적이나, 실제 실행과 거점별 가동은 확인해야 한다."
+              }
+            }
+          ],
+          "headline": {
+            "evidenceIds": [
+              "evidence-grouped-752f455965deef2622a88c23d0cc"
+            ],
+            "text": "SK텔레콤, 2029~2035년 5GW AI 데이터센터 구축 계획"
+          },
+          "issueId": "issue-f09b418cc91673d1608204f1",
+          "resultVersion": "issue-intelligence-v1-015378e7254cd944f4047aa334f7355a48e0d98b1d29439229dc1c17d1f35f77",
+          "sources": {
+            "evidence-grouped-752f455965deef2622a88c23d0cc": {
+              "bodySha256": "4e3285924cc2c24f63f197ab9273597f1828b861244e508b5490ec037fc4c8e9",
+              "documentId": "news-d78fb6883d943e4108eac8dff496a9ac71b713cd5d6192c8039ab0fc9eb4f40e",
+              "evidenceId": "evidence-grouped-752f455965deef2622a88c23d0cc",
+              "publishedAt": "2026-10-21T06:43:52+00:00",
+              "quote": "SK텔레콤은 SK하이퍼를 중심으로 2029년부터 2035년까지 전국 4~5개 거점에 총 5GW 규모의 AI 데이터센터를 구축할 계획이다.",
+              "title": "원문 자료",
+              "url": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=497327"
+            }
+          },
+          "status": "PASS"
+        },
+        {
+          "companies": [
+            {
+              "assessment": "positive",
+              "companyId": "KRX:018260",
+              "comparison": {
+                "evidenceIds": [
+                  "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                ],
+                "previousResultVersion": null,
+                "status": "unavailable",
+                "text": "이전 퇴근의 같은 이슈·같은 기업 판단이 제공되지 않아 비교할 수 없다. 오늘은 경찰청 고객 확보와 경제·안보 분야 주요 부처의 브리티웍스 도입 결정이 확인됐다."
+              },
+              "conditions": [
+                {
+                  "evidenceIds": [
+                    "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                  ],
+                  "text": "각 부처의 실제 도입·운영이 진행되는지 확인이 필요하다. 보도에는 계약 조건, 도입 일정이나 매출 기여 규모가 제시되지 않았다."
+                }
+              ],
+              "impact": {
+                "evidenceIds": [
+                  "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                ],
+                "text": "브리티웍스의 공공부문 고객 확보라는 기업용 업무 플랫폼 사업 경로가 확인됐다. 다만 고객 확보와 도입 결정만으로 실제 매출 규모나 시점을 판단할 수는 없다."
+              },
+              "negative": {
+                "evidenceIds": [
+                  "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                ],
+                "text": "보도에서 계약 조건·도입 일정·매출 기여 규모는 확인되지 않아 사업 효과의 크기는 미확인이다."
+              },
+              "newInformation": {
+                "evidenceIds": [
+                  "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                ],
+                "text": "삼성SDS는 중앙부처 단일 조직 가운데 규모가 가장 큰 경찰청을 고객으로 확보했고, 경제·안보 분야 주요 부처들도 브리티웍스 도입을 결정했다."
+              },
+              "outlook": {
+                "evidenceIds": [
+                  "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                ],
+                "text": "경찰청 고객 확보와 경제·안보 분야 주요 부처의 도입 결정은 삼성SDS의 공공부문 업무 플랫폼 사업에 긍정적인 고객 확보 신호다. 실제 계약 조건과 도입·운영 진행, 매출 기여 규모는 보도에 제시되지 않아 사업 효과의 크기는 아직 판단하기 어렵다. 삼성SDS 주가는 10월 21일 직전 거래일 대비 2.24% 오른 200,500원에 마감했지만, 보도는 장 마감 뒤 나와 기사 이후 거래 반응은 관측되지 않았다. 후속 확인 조건은 각 부처의 실제 도입과 운영 여부다."
+              },
+              "positive": {
+                "evidenceIds": [
+                  "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                ],
+                "text": "경찰청 고객 확보와 경제·안보 분야 주요 부처의 도입 결정으로 브리티웍스의 공공부문 고객 기반 확대가 확인됐다."
+              },
+              "previous": {
+                "reason": "corresponding_round_missing",
+                "status": "unavailable"
+              },
+              "risks": [
+                {
+                  "evidenceIds": [
+                    "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                  ],
+                  "text": "도입 결정이 실제 운영으로 이어지는지, 계약 조건과 매출 기여 규모가 어떠한지는 보도에서 확인되지 않았다."
+                }
+              ],
+              "sourceIds": [
+                "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+              ],
+              "takeaway": {
+                "evidenceIds": [
+                  "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                ],
+                "text": "경찰청 고객 확보와 경제·안보 분야 주요 부처의 브리티웍스 도입 결정은 삼성SDS의 공공부문 업무 플랫폼 사업에 긍정적이나, 실제 운영과 매출 효과는 아직 확인되지 않았다."
+              }
+            }
+          ],
+          "headline": {
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "text": "삼성SDS, 경찰청 확보·경제·안보 부처 브리티웍스 도입 결정"
+          },
+          "issueId": "issue-690d52ce4daa8ad62b2fc549",
+          "resultVersion": "issue-intelligence-v1-53c2bc3b3ef5906595d230bd4d7c7df7bebd97e274c53bcf61be39e507de5503",
+          "sources": {
+            "evidence-grouped-ec60cc2c10c734b4d659d1bd1679": {
+              "bodySha256": "769842409a5c7813e5f5688123a196c0ffdc115e8aeae70d5cdab3e3781e94fe",
+              "documentId": "news-45287b57d3e461d5e73c9c4994f3ab7acde744d6402f494cba9e79b3951901c8",
+              "evidenceId": "evidence-grouped-ec60cc2c10c734b4d659d1bd1679",
+              "publishedAt": "2026-10-21T07:51:08+00:00",
+              "quote": "최근 중앙부처 단일 조직 가운데 규모가 가장 큰 경찰청을 고객으로 확보했으며 경제·안보 분야 주요 부처들도 '브리티웍스' 도입을 결정했다.",
+              "title": "삼성SDS·네이버, 공무원 AI 플랫폼 경쟁 치열…공공 AX 주도권 누가 쥘까 - ZDNet korea",
+              "url": "https://zdnet.co.kr/view/?no=20261021164518"
+            }
+          },
+          "status": "PASS"
+        }
+      ],
+      "model": "gpt-6-luna",
+      "policyVersion": "issue-selection-policy-v2",
+      "resultVersion": "issue-intelligence-v1-view-d38f7defc8105132d6b96cc9574baf9fc809ca64980ef25b36ee2883703bf5a4",
+      "roundId": "sim-2026-10-21-evening-b717c348435d",
+      "schemaVersion": "issue-intelligence-v1",
+      "verificationMode": "separate_model_request"
+    },
+    "issueReading": {
+      "baseResultVersion": "issue-intelligence-v1-view-d38f7defc8105132d6b96cc9574baf9fc809ca64980ef25b36ee2883703bf5a4",
+      "cutoff": "2026-10-21T17:30:00+09:00",
+      "groups": [],
+      "issues": [
+        {
+          "connections": [
+            {
+              "basis": {
+                "evidenceIds": [
+                  "evidence-grouped-752f455965deef2622a88c23d0cc"
+                ],
+                "text": "보도에 따르면 SK텔레콤은 SK하이퍼를 중심으로 AI 데이터센터 구축 계획을 추진한다."
+              },
+              "companyId": "KRX:017670",
+              "position": "related"
+            }
+          ],
+          "issueId": "issue-f09b418cc91673d1608204f1",
+          "priceUsedForRanking": false,
+          "whyImportant": {
+            "evidenceIds": [
+              "evidence-grouped-752f455965deef2622a88c23d0cc"
+            ],
+            "text": "전국 4~5개 거점에 총 5GW 규모의 AI 데이터센터를 구축하는 장기 계획은 SK텔레콤의 대규모 인프라 사업·투자 방향에 해당한다. 다만 보도는 증권사 전망을 통해 이 계획을 전한다."
+          },
+          "whyNow": {
+            "evidenceIds": [
+              "evidence-grouped-752f455965deef2622a88c23d0cc"
+            ],
+            "text": "10월 21일 보도에서 2029년부터 2035년까지 전국 4~5개 거점에 총 5GW 규모로 구축한다는 계획이 확인됐다."
+          }
+        },
+        {
+          "connections": [
+            {
+              "basis": {
+                "evidenceIds": [
+                  "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                ],
+                "text": "삼성SDS는 브리티웍스의 서비스 공급자로서 경찰청을 고객으로 확보했고 경제·안보 분야 주요 부처도 도입을 결정했다."
+              },
+              "companyId": "KRX:018260",
+              "position": "related"
+            }
+          ],
+          "issueId": "issue-690d52ce4daa8ad62b2fc549",
+          "priceUsedForRanking": false,
+          "whyImportant": {
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "text": "브리티웍스의 중앙부처 고객 확대는 삼성SDS의 기업용 업무 플랫폼 사업에 관한 구체적인 고객 확보 성과다. 보도는 중앙부처 단일 조직 가운데 규모가 가장 큰 경찰청과 경제·안보 분야 주요 부처의 도입 결정을 전한다."
+          },
+          "whyNow": {
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "text": "10월 21일 보도에서 경찰청 고객 확보와 경제·안보 분야 주요 부처의 도입 결정이 확인됐다."
+          }
+        }
+      ],
+      "roundId": "sim-2026-10-21-evening-b717c348435d",
+      "schemaVersion": "issue-reading-review-v1"
+    },
+    "items": [
+      {
+        "companies": [
+          {
+            "id": "KRX:017670",
+            "name": "SK텔레콤",
+            "relationType": "INVOLVES",
+            "role": "구축 계획 주체",
+            "roleUnconfirmed": false
+          }
+        ],
+        "eventId": "issue-f09b418cc91673d1608204f1",
+        "eventTime": null,
+        "evidenceCount": 1,
+        "evidenceIds": [
+          "evidence-grouped-752f455965deef2622a88c23d0cc"
+        ],
+        "rank": 1,
+        "reason": "전국 4~5개 거점에 총 5GW 규모의 AI 데이터센터를 구축하는 장기 계획은 SK텔레콤의 대규모 인프라 사업·투자 방향에 해당한다. 다만 보도는 증권사 전망을 통해 이 계획을 전한다. 10월 21일 보도에서 2029년부터 2035년까지 전국 4~5개 거점에 총 5GW 규모로 구축한다는 계획이 확인됐다.",
+        "reportedAt": "2026-10-21T06:43:52+00:00",
+        "summary": {
+          "evidenceIds": [
+            "evidence-grouped-752f455965deef2622a88c23d0cc"
+          ],
+          "generatedAt": "2026-10-28T07:16:23.959168+00:00",
+          "resultVersion": "issue-intelligence-v1-015378e7254cd944f4047aa334f7355a48e0d98b1d29439229dc1c17d1f35f77",
+          "text": "보도에 따르면 SK텔레콤은 SK하이퍼를 중심으로 2029년부터 2035년까지 전국 4~5개 거점에 총 5GW 규모의 AI 데이터센터를 구축할 계획이다."
+        },
+        "timePrecision": "unknown",
+        "title": "SK텔레콤, 2029~2035년 5GW AI 데이터센터 구축 계획"
+      },
+      {
+        "companies": [
+          {
+            "id": "KRX:018260",
+            "name": "삼성에스디에스",
+            "relationType": "INVOLVES",
+            "role": "서비스 공급자",
+            "roleUnconfirmed": false
+          }
+        ],
+        "eventId": "issue-690d52ce4daa8ad62b2fc549",
+        "eventTime": null,
+        "evidenceCount": 1,
+        "evidenceIds": [
+          "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+        ],
+        "rank": 2,
+        "reason": "브리티웍스의 중앙부처 고객 확대는 삼성SDS의 기업용 업무 플랫폼 사업에 관한 구체적인 고객 확보 성과다. 보도는 중앙부처 단일 조직 가운데 규모가 가장 큰 경찰청과 경제·안보 분야 주요 부처의 도입 결정을 전한다. 10월 21일 보도에서 경찰청 고객 확보와 경제·안보 분야 주요 부처의 도입 결정이 확인됐다.",
+        "reportedAt": "2026-10-21T07:51:08+00:00",
+        "summary": {
+          "evidenceIds": [
+            "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+          ],
+          "generatedAt": "2026-10-28T07:16:23.959168+00:00",
+          "resultVersion": "issue-intelligence-v1-53c2bc3b3ef5906595d230bd4d7c7df7bebd97e274c53bcf61be39e507de5503",
+          "text": "삼성SDS는 중앙부처 단일 조직 가운데 규모가 가장 큰 경찰청을 고객으로 확보했고, 경제·안보 분야 주요 부처들도 브리티웍스 도입을 결정했다."
+        },
+        "timePrecision": "unknown",
+        "title": "삼성SDS, 경찰청 확보·경제·안보 부처 브리티웍스 도입 결정"
+      }
+    ],
+    "marketSummary": {
+      "evidenceIds": [
+        "evidence-grouped-28fc2570e12ff5493d4efddf701c",
+        "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+      ],
+      "generatedAt": "2026-10-23T06:51:36.597264Z",
+      "resultVersion": "derived-v1-096294ad8817f505a42828678baaac1071db04a3f7d3701d01fa344670f80734",
+      "text": "보도에 따르면 NVIDIA의 11억 달러 용량 예약 선급금은 KYEC의 미국 신규 테스트 시설과 장비를 지원한다.\n보도는 대량 생산 목표 시점을 2027년 4월로 제시했다.\n보도는 경찰청이 브리티웍스 고객으로 확보됐다고 전했다.\n보도에 따르면 경제·안보 분야 주요 부처들도 브리티웍스 도입을 결정했다.\nKOSPI 2026-10-20 종가 5552.74pt.\nKOSDAQ 2026-10-20 종가 781.97pt.\n원/달러 환율 2026-10-20 은행고시 기준환율 1327원.\n검증된 핵심 이슈 문장과 회차 지표를 묶은 요약입니다. 전체 적격 기업·업종 분석과 새 전망 생성은 포함하지 않습니다."
+    },
+    "marketVariables": {
+      "collectedAt": "2026-10-23T06:04:40.515813+00:00",
+      "indicators": [
+        {
+          "baseline": {
+            "at": null,
+            "date": "2026-10-19",
+            "value": 5768.01
+          },
+          "change": -215.27,
+          "changeRate": -0.03732136386726098,
+          "id": "kospi",
+          "label": "KOSPI",
+          "observedAt": null,
+          "observedDate": "2026-10-20",
+          "reason": "회차 마감 전 가장 최근 확인된 거래일 종가입니다. 장중 시세는 제공하지 않습니다.",
+          "reasonCode": null,
+          "source": {
+            "delayNote": "과거 일별 종가입니다. 출근 회차의 장중 값이나 당시 수집본을 입증하지 않습니다.",
+            "name": "Yahoo Finance 지수 일별 이력",
+            "official": false,
+            "provider": "yahoo",
+            "symbol": "^KS11",
+            "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5EKS11?period1=1791644400&period2=1792767600&interval=1d"
+          },
+          "status": "delayed",
+          "unit": "pt",
+          "value": 5552.74,
+          "valueKind": "close"
+        },
+        {
+          "baseline": {
+            "at": null,
+            "date": "2026-10-19",
+            "value": 808.89
+          },
+          "change": -26.92,
+          "changeRate": -0.033280174065694966,
+          "id": "kosdaq",
+          "label": "KOSDAQ",
+          "observedAt": null,
+          "observedDate": "2026-10-20",
+          "reason": "회차 마감 전 가장 최근 확인된 거래일 종가입니다. 장중 시세는 제공하지 않습니다.",
+          "reasonCode": null,
+          "source": {
+            "delayNote": "과거 일별 종가입니다. 출근 회차의 장중 값이나 당시 수집본을 입증하지 않습니다.",
+            "name": "Yahoo Finance 지수 일별 이력",
+            "official": false,
+            "provider": "yahoo",
+            "symbol": "^KQ11",
+            "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5EKQ11?period1=1791644400&period2=1792767600&interval=1d"
+          },
+          "status": "delayed",
+          "unit": "pt",
+          "value": 781.97,
+          "valueKind": "close"
+        },
+        {
+          "baseline": {
+            "at": null,
+            "date": "2026-10-19",
+            "value": 1333.5
+          },
+          "change": -6.5,
+          "changeRate": -0.004874390701162355,
+          "id": "usdkrw",
+          "label": "원/달러",
+          "observedAt": null,
+          "observedDate": "2026-10-20",
+          "reason": "회차 마감 전에 확정 가능한 직전 날짜의 일별 고시환율입니다. 당일 고시 마감 시각은 확인되지 않았습니다.",
+          "reasonCode": null,
+          "source": {
+            "delayNote": "날짜만 제공되는 일별 고시값으로 외환시장 종가·회차 시점 실시간 환율이 아닙니다.",
+            "name": "하나은행 고시 기준환율(네이버 일별 이력)",
+            "official": false,
+            "provider": "naver",
+            "symbol": "FX_USDKRW",
+            "url": "https://api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices?pageSize=40&page=1"
+          },
+          "status": "delayed",
+          "unit": "KRW",
+          "value": 1327.0,
+          "valueKind": "reference"
+        }
+      ],
+      "rateCutoffAt": "2026-10-21T17:30:00+09:00",
+      "referenceAt": "2026-10-21T17:30:00+09:00",
+      "status": "available"
+    },
+    "metadata": {
+      "asOf": "2026-10-21T08:30:00Z",
+      "failures": [
+        {
+          "asOf": null,
+          "code": "RETROSPECTIVE_BODY",
+          "message": "원 발행시각 기준의 과거 시뮬레이션이며 당시 수집·동일 본문 버전·전체 시장 모집단을 입증하지 않습니다.",
+          "retryable": false,
+          "section": "dataWindow"
+        },
+        {
+          "asOf": null,
+          "code": "SOURCE_UNAVAILABLE",
+          "message": "운영 권한·공개 그래프 승인이 없는 localhost 과거 시뮬레이션입니다.",
+          "retryable": false,
+          "section": "graphVersion"
+        },
+        {
+          "asOf": null,
+          "code": "RETROSPECTIVE_DAILY_SNAPSHOT",
+          "message": "회차 마감 이전 일별 지표를 나중에 조회한 과거 시뮬레이션입니다. 당시 장중 관측값·개별 뉴스의 주가 영향 인과관계를 입증하지 않습니다.",
+          "retryable": false,
+          "section": "marketVariables"
+        }
+      ],
+      "graphVersion": null,
+      "partial": true,
+      "schedule": {
+        "confirmed": true,
+        "evening": "17:30",
+        "morning": "09:20"
+      },
+      "selection": {
+        "basis": "market",
+        "reason": "근거 검증 후 사건 중요도·새 정보를 평가한 별도 재분석입니다."
+      },
+      "source": "zoop-briefing-publication-clock-simulation"
+    },
+    "notice": {
+      "at": "2026-10-28T07:16:23.959168+00:00",
+      "kind": "analysis_revision",
+      "message": "이슈 중심 정책으로 새로 생성·검증한 비교본입니다.",
+      "reason": null
+    },
+    "outlook": null,
+    "previousComparison": {
+      "reason": "새 분석의 판단 비교는 이슈 상세에서 확인하세요.",
+      "status": "unavailable"
+    },
+    "publishedAt": "2026-10-24T07:02:26.028665Z",
+    "references": {
+      "companyIds": [
+        "KRX:017670",
+        "KRX:018260"
+      ],
+      "eventIds": [
+        "issue-f09b418cc91673d1608204f1",
+        "issue-690d52ce4daa8ad62b2fc549"
+      ],
+      "evidenceIds": [
+        "evidence-grouped-752f455965deef2622a88c23d0cc",
+        "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+      ]
+    },
+    "scheduledAt": "2026-10-21T08:30:00Z",
+    "sinceMorning": {
+      "reason": "새 분석의 판단 비교는 이슈 상세에서 확인하세요.",
+      "status": "unavailable"
+    },
+    "status": "published"
+  }
+}

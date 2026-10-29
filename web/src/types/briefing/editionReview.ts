@@ -51,7 +51,7 @@ export type EditionReview = {
       url: string;
       publishedAt: string;
       quote: string;
-      fullBody: string;
+      fullBody?: string;
     }
   >;
   marketVariables: BriefingResponse['marketVariables'];

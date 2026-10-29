@@ -24,6 +24,7 @@ import com.zoop.chat.tool.ChatToolRunner;
 import com.zoop.chat.tool.ChatToolScope;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.spec.McpSchema;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -36,6 +37,7 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -54,6 +56,9 @@ class ChatMcpAgentTest {
     private static final ChatGeneratedAnswer ANSWER = new ChatGeneratedAnswer(List.of(new ChatGeneratedAnswer.Section(
             "evidence_grounded", "SK하이닉스는 HBM을 공급한다.", List.of("r1"), List.of("ev-1"))), List.of(), List.of());
 
+    @TempDir
+    Path dir;
+
     private final JsonMapper mapper = JsonMapper.builder().build();
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     private MemoryChatStore store;
@@ -71,7 +76,7 @@ class ChatMcpAgentTest {
         executor = new ChatJobExecutor(store, store,
                 new StaticListableBeanFactory(Map.of()).getBeanProvider(ChatEngine.class), mapper, clock,
                 new NoChatTransactions());
-        tools = new ChatMcpTools(registry, runner, executor, mapper);
+        tools = new ChatMcpTools(registry, runner, executor, ChatSendGrantsTest.gate(dir), mapper);
         grants = ChatMcpGrantsTest.grants("k1", "k1=" + ChatMcpGrantsTest.KEY_A, NOW);
         luna = new Luna();
         String attempts = "[{\"n\":1,\"mode\":\"run\",\"requestKey\":\"" + JOB + "\",\"status\":\"running\","
@@ -121,7 +126,8 @@ class ChatMcpAgentTest {
     }
 
     private ChatAgentPath.Outcome run(ChatAgentPath.Steps steps) {
-        var agent = new ChatMcpAgent(luna, tools, grants, store, mapper);
+        var circuit = new ChatMcpCircuitBreaker(() -> new com.zoop.ai.chat.ChatMcpHealth(true, null), clock);
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, mapper, circuit);
         var attached = executor.attach(JOB, 1).orElseThrow();
         return agent.run(attached.run(), attached.control(), REQUIREMENTS, List.of(ChatCapability.COMPANY_READ), 20, steps);
     }
@@ -194,6 +200,24 @@ class ChatMcpAgentTest {
     }
 
     @Test
+    void atMostFourCallsAreApprovedInARoundSoAtMostFourRunAtOnce() {
+        // Five reachable calls asked at once (the resolved company at five result limits): the fifth waits a round.
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", java.util.stream.IntStream.rangeClosed(1, 5)
+                .mapToObj(i -> new ChatModels.ApprovalRequest("mcpr_" + i, "company_read",
+                        Map.of("targets", List.of("KRX:000660"), "limit", i)))
+                .toList(), null));
+        luna.script.add(n -> done());
+
+        var outcome = run(steps(false));
+
+        assertEquals(List.of(true, true, true, true, false),
+                luna.inputs.get(1).decisions().stream().map(ChatModels.Decision::approve).toList());
+        assertEquals(4, outcome.approved());
+        assertEquals(1, outcome.denied());
+        assertEquals(4, store.toolCalls(JOB).size(), "the denied one was never reserved");
+    }
+
+    @Test
     void aTargetTheServerNeverResolvedAndNoApprovedCallReturnedIsDenied() {
         // Round 1: an id nobody resolved is denied; the resolved company is approved.
         luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(
@@ -263,6 +287,8 @@ class ChatMcpAgentTest {
         assertEquals(List.of(ChatCapability.COMPANY_READ), grant.tools());
         assertEquals(NOW.plusSeconds(45), grant.expiresAt());
         assertEquals(JOB, grant.jobId());
+        assertEquals(ChatSendGrantsTest.RECIPIENT, luna.inputs.getFirst().recipient(),
+                "each step names the recipient the results' send grants are checked for");
     }
 
     private static ChatTool tool(ChatCapability capability) {

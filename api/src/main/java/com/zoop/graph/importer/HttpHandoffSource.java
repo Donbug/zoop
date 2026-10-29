@@ -1,14 +1,28 @@
 package com.zoop.graph.importer;
 
 import java.util.Set;
+import java.util.Set;
+import java.util.Set;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import com.zoop.ai.AiClientException;
 import com.zoop.ai.AiServiceRejectionException;
 import com.zoop.ai.AiTransportException;
+import com.zoop.ai.AiTransportException;
+import com.zoop.ai.AiTransportException;
+import com.zoop.ai.AiTransportException;
 import com.zoop.ai.handoff.HandoffReadClient;
 import com.zoop.ai.handoff.HandoffReadClient.HandoffRead;
 import com.zoop.graph.importer.HandoffExportParser.VerifiedHandoff;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * ai/service's read-only handoff HTTP as the handoff source. {@code GET /internal/v1/graph-handoffs/{id}/bundle} answers with
@@ -29,6 +43,7 @@ import com.zoop.graph.importer.HandoffExportParser.VerifiedHandoff;
  * </ul>
  */
 public final class HttpHandoffSource implements HandoffSource {
+    private static final Logger log = LoggerFactory.getLogger(HttpHandoffSource.class);
     private static final Set<AiTransportException.Failure> OUTSIDE_CONTRACT = Set.of(
             AiTransportException.Failure.RESPONSE_MALFORMED, AiTransportException.Failure.UNEXPECTED_RESPONSE,
             AiTransportException.Failure.RESPONSE_TOO_LARGE, AiTransportException.Failure.REDIRECT_REFUSED);
@@ -46,7 +61,11 @@ public final class HttpHandoffSource implements HandoffSource {
 
     @Override
     public VerifiedHandoff fetch(GraphHandoffRequest request) {
-        return parser.parse(answer(() -> client.bundle(request.handoffId())), request);
+        HandoffRead read = answer(() -> client.bundle(request.handoffId()));
+        // The per-request stamps are logged, not kept in the receipt (which is a function of the pins).
+        log.info("handoff {} read over HTTP: delivery {} checkedAt {} observedAt {}", request.handoffId(), read.delivery().state(),
+                read.delivery().checkedAt().orElse("-"), read.observedAt());
+        return parser.parse(read, request);
     }
 
     @Override

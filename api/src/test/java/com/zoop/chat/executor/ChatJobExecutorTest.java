@@ -13,6 +13,7 @@ import com.zoop.chat.dto.ChatFailure;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.repository.ChatJobRow;
 import com.zoop.chat.repository.ChatToolCallEnd;
+import com.zoop.chat.repository.NewChatToolCall;
 import com.zoop.chat.tool.ChatToolRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -224,7 +225,7 @@ class ChatJobExecutorTest {
             control.toolCallStarted("tc-0");
             control.toolCallFinished("tc-0", new ChatToolCallEnd("succeeded", null, "v1", List.of("ev-1"), false, false));
             control.toolCallStarted("tc-1");
-            // 2 reserved + 11 would pass the per-attempt cap of 12: nothing of it is reserved.
+            // 2 reserved + 11 would pass the job's cap: nothing of it is reserved.
             assertThrows(IllegalArgumentException.class,
                     () -> control.reserveToolCalls(2, Collections.nCopies(11, reservation("company.read"))));
             assertEquals(List.of("tc-2"), control.reserveToolCalls(2, List.of(reservation("evidence.resolve"))));
@@ -239,6 +240,54 @@ class ChatJobExecutorTest {
         assertEquals(2, calls.get(2).row.planRevision());
         assertEquals(2, calls.get(2).row.callIndex());
         assertEquals(1, calls.get(2).row.attemptNo());
+    }
+
+    @Test
+    void aRerunCountsTheCallsItsEarlierAttemptsMadeAgainstTheJobsBudget() {
+        // Attempt 1 made four calls and left one reserved call that never ran; attempt 2 is the rerun.
+        String attempts = "[{\"n\":1,\"mode\":\"run\",\"requestKey\":\"job-00001\",\"status\":\"failed\"},"
+                + "{\"n\":2,\"mode\":\"rerun\",\"requestKey\":\"job-00001-r\",\"status\":\"queued\"}]";
+        store.add(withAttempts(queued("job-00001", null, null, 0, "run"), attempts));
+        for (int i = 0; i < 5; i++) {
+            store.reserveToolCalls(List.of(new NewChatToolCall("row-" + i, "job-00001", 1, 1, i, "tc-" + i,
+                    ChatToolRegistry.VERSION, "zoop-core-read", "company.read", "app:company.read", "chat-tool/v1",
+                    "0".repeat(64), "{}")), NOW);
+        }
+        store.toolCalls("job-00001").forEach(c -> c.status = "succeeded");
+        store.toolCalls("job-00001").get(4).status = "cancelled";
+
+        executor(new ScriptedChatEngine((run, control) -> {
+            assertEquals(2, run.attemptNo());
+            assertEquals(ChatRunControl.MAX_TOOL_CALLS - 4, control.toolCallsLeft(), "a reservation that never ran is not a call");
+            assertThrows(IllegalArgumentException.class,
+                    () -> control.reserveToolCalls(1, Collections.nCopies(3, reservation("company.read"))));
+            assertEquals(List.of("tc-0", "tc-1"), control.reserveToolCalls(1,
+                    Collections.nCopies(2, reservation("company.read"))), "the rerun numbers its own calls");
+            assertEquals(0, control.toolCallsLeft());
+            assertThrows(IllegalArgumentException.class,
+                    () -> control.reserveToolCalls(2, List.of(reservation("issue.read"))));
+            return ScriptedChatEngine.generalAnswer("답");
+        })).runOnce();
+        assertEquals(7, store.toolCalls("job-00001").size());
+    }
+
+    @Test
+    void aShortenedDeadlineHoldsForTheFinalStoreAndForARequestReachingTheRun() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        executor(new ScriptedChatEngine((run, control) -> {
+            control.shortenDeadline(NOW.plusSeconds(45));
+            control.shortenDeadline(NOW.plusSeconds(50));
+            assertEquals(Duration.ofSeconds(45), control.remaining(), "a deadline is only ever brought forward");
+            var attached = executor(null).attach("job-00001", 1).orElseThrow();
+            assertEquals(Duration.ofSeconds(45), attached.control().remaining(), "the MCP endpoint sees it too");
+            // Verification ends past 45 s but well inside the job's 60 s: the result is not stored as completed.
+            clock.advance(Duration.ofSeconds(50));
+            return ScriptedChatEngine.generalAnswer("늦은 답");
+        })).runOnce();
+
+        var job = store.job("job-00001");
+        assertEquals("failed", job.row.status());
+        assertEquals("deadline_guard", job(job).reason());
     }
 
     @Test
@@ -300,6 +349,13 @@ class ChatJobExecutorTest {
                 List.of(),
                 null, status, null, "completed".equals(status) ? "clarification" : null, resolves, choice, depth, null, null,
                 0, attempts, NOW, NOW, null);
+    }
+
+    private static ChatJobRow withAttempts(ChatJobRow r, String attempts) {
+        return new ChatJobRow(r.id(), r.sessionId(), r.memberId(), r.seq(), r.question(), r.requestHash(), r.askedAt(),
+                r.frozenContext(), r.frozenSelection(), r.contextCompanyIds(), r.graphVersionId(), r.status(), r.phase(),
+                r.outcome(), r.resolvesJobId(), r.resolvesChoiceId(), r.clarificationDepth(), r.result(), r.failure(),
+                r.runs(), attempts, r.createdAt(), r.updatedAt(), r.finishedAt());
     }
 
     private ChatJobRow withResult(ChatJobRow r, ChatResult result) {

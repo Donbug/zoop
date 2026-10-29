@@ -33,6 +33,7 @@ export default function GraphHelp({ disabled }: { disabled: boolean }) {
         ref={trigger}
         type="button"
         aria-label="조작 도움말"
+        className="max-md:min-h-10 max-md:min-w-10"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         disabled={disabled}

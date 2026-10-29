@@ -37,6 +37,13 @@ import {
 import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { arrangeFlow, arrangeFocus } from './graph-arrange';
 import { applyGraphReading } from './graph-readability';
+import {
+  cameraMotion,
+  EDGE_ANIMATION,
+  followRoundLogos,
+  NODE_ANIMATION,
+  type CameraMove,
+} from './graph-motion';
 import GraphMobileTools from './GraphMobileTools';
 import MapEmptyState from './MapEmptyState';
 import type { PersonalScope } from '@/types/map';
@@ -234,6 +241,8 @@ export default function GraphCanvas({
   );
   const [hoveredIssue, setHoveredIssue] = useState<string | null>(null);
   const fitPending = useRef(false);
+  /** [맞춤] 버튼으로 생긴 맞춤만 움직인다(첫 그리기·크기 변경 맞춤은 바로). */
+  const fitRequested = useRef(false);
   const defaultZoomPending = useRef(false);
   const followFit = useRef(true);
   const minimapShown = useRef(false);
@@ -456,13 +465,15 @@ export default function GraphCanvas({
     fitPending.current = false;
     await graph.translateBy(
       [safe.x + safe.width / 2 - point[0], safe.y + safe.height / 2 - point[1]],
-      false,
+      cameraMotion('select'),
     );
   }
   async function fitVisibleGraph(
     graph: Graph,
     ids?: Set<string>,
     maxZoom = 1.5,
+    // 사용자가 맞춤을 누르거나 배치를 바꾼 경우만 움직인다. 처음 그릴 때·크기가 바뀔 때는 바로 맞춘다.
+    animate: false | Extract<CameraMove, 'fit' | 'layout'> = false,
   ) {
     const host = container.current;
     if (!host || graph.destroyed || !host.clientWidth || !host.clientHeight)
@@ -539,6 +550,47 @@ export default function GraphCanvas({
       .map(fitFootprint);
     if (!footprints.length) return;
     const fit = fitZoom(footprints, safe, maxZoom);
+    const motion = animate ? cameraMotion(animate) : false;
+    // G6 5.1.1은 확대와 이동을 함께 움직이는 transform을 Graph에 공개하지 않아 viewport에서 직접 부른다.
+    const viewport = (
+      graph as unknown as {
+        context?: {
+          viewport?: {
+            transform(
+              options: {
+                mode: 'relative';
+                scale: number;
+                translate: [number, number];
+              },
+              animation: typeof motion,
+            ): Promise<void>;
+          };
+        };
+      }
+    ).context?.viewport;
+    if (motion && viewport) {
+      // 움직이는 transform은 화면 가운데를 기준으로 확대하므로,
+      // 끝난 뒤 맞춤 중심이 빈 영역 가운데에 오도록 카메라 위치를 직접 계산한다.
+      const zoom = graph.getZoom();
+      const [width, height] = graph.getSize();
+      const camera = graph.getCanvasByViewport([width / 2, height / 2]);
+      const target = [
+        fit.center[0] - (safe.x + safe.width / 2 - width / 2) / fit.zoom,
+        fit.center[1] - (safe.y + safe.height / 2 - height / 2) / fit.zoom,
+      ];
+      await viewport.transform(
+        {
+          mode: 'relative',
+          scale: fit.zoom / zoom,
+          translate: [
+            (camera[0] - target[0]) * zoom,
+            (camera[1] - target[1]) * zoom,
+          ],
+        },
+        motion,
+      );
+      return;
+    }
     await graph.zoomTo(fit.zoom, false);
     if (graph.destroyed) return;
     const center = graph.getViewportByCanvas(fit.center);
@@ -572,7 +624,7 @@ export default function GraphCanvas({
     drawing.current = drawing.current
       .then(async () => {
         if (!current.destroyed) {
-          await fitVisibleGraph(current, neighborhoodIds(base, id), 1.8);
+          await fitVisibleGraph(current, neighborhoodIds(base, id), 1.8, 'fit');
           scheduleReading();
         }
       })
@@ -616,6 +668,7 @@ export default function GraphCanvas({
   // 상태별(관련·선택·튜토리얼 등) 선·노드 색. 화면 모드를 바꾸면 그래프를 다시 만들지 않고 이 값만 바꾼다.
   const stateStyles = useEffectEvent(() => ({
     edge: {
+      animation: EDGE_ANIMATION,
       state: {
         related: {
           lineWidth: appearance.variant === 'improved' ? 2.5 : 2,
@@ -637,6 +690,7 @@ export default function GraphCanvas({
       },
     },
     node: {
+      animation: NODE_ANIMATION,
       state: {
         tutorial: {
           opacity: 1,
@@ -782,6 +836,11 @@ export default function GraphCanvas({
         // 근거에 연결선이 없어 사건만 강조할 때도 범례로 숨긴 사건을 드러낸다(15번).
         if (isolateSelection && selected) pathNodes.add(selected);
         // 배치가 바뀌면(포커스 진입·해제, 흐름 순 켜기·끄기) 이전 위치를 유지하지 않고 새 배치 전체를 화면에 맞춘다.
+        // 포커스 진입·단계 바꾸기·해제와 흐름 순 켜기·끄기에서는 노드가 지금 자리에서 새 자리로 옮겨 간다(프로토타입 G2).
+        const morphFrom =
+          arrangement !== lastArrangement.current && cameraMotion('layout')
+            ? renderedData.current
+            : null;
         if (arrangement !== lastArrangement.current) {
           lastArrangement.current = arrangement;
           preservePositions.current = false;
@@ -864,7 +923,36 @@ export default function GraphCanvas({
                 : 'visible',
           },
         }));
-        graph.setData(rendered);
+        // 옮겨 갈 노드는 먼저 이전 자리에 그리고, 맞춤 단계에서 목표 자리로 옮긴다.
+        const morphTargets: Record<string, [number, number]> = {};
+        const previous = new Map(
+          morphFrom?.nodes?.map((node) => [node.id, node.style]),
+        );
+        graph.setData(
+          morphFrom
+            ? {
+                ...rendered,
+                nodes: rendered.nodes?.map((node) => {
+                  const from = previous.get(node.id);
+                  const { x, y } = node.style ?? {};
+                  if (
+                    !from ||
+                    typeof from.x !== 'number' ||
+                    typeof from.y !== 'number' ||
+                    typeof x !== 'number' ||
+                    typeof y !== 'number' ||
+                    (from.x === x && from.y === y)
+                  )
+                    return node;
+                  morphTargets[String(node.id)] = [x, y];
+                  return {
+                    ...node,
+                    style: { ...node.style, x: from.x, y: from.y },
+                  };
+                }),
+              }
+            : rendered,
+        );
         await graph.draw();
         const visibleCount =
           rendered.nodes?.filter((node) => node.style?.visibility !== 'hidden')
@@ -901,7 +989,7 @@ export default function GraphCanvas({
           focusId !== lastFocused.current &&
           rendered.nodes?.some((node) => node.id === focusId)
         )
-          await graph.focusElement(focusId, false);
+          await graph.focusElement(focusId, cameraMotion('select'));
         lastFocused.current = focusId;
         // Resize changes layout coordinates. Center only after the new draw,
         // never on the previous layout before the detail rail has resized it.
@@ -916,12 +1004,30 @@ export default function GraphCanvas({
         ) {
           pendingNeighborhood.current = null;
           centerTarget.current = null;
-          await fitVisibleGraph(graph, neighborhoodIds(rendered, pending), 1.8);
+          await fitVisibleGraph(
+            graph,
+            neighborhoodIds(rendered, pending),
+            1.8,
+            'fit',
+          );
         }
+        // 노드 이동이 모델 좌표를 먼저 바꾸므로, 바로 이어서 재는 맞춤은 새 배치를 기준으로 한다.
+        const moving = Object.keys(morphTargets).length
+          ? graph.translateElementTo(morphTargets, true)
+          : null;
+        if (moving) followRoundLogos(graph, Object.keys(morphTargets), moving);
         if (fitPending.current) {
           fitPending.current = false;
-          await fitVisibleGraph(graph);
+          const animate = fitRequested.current;
+          fitRequested.current = false;
+          await fitVisibleGraph(
+            graph,
+            undefined,
+            undefined,
+            moving ? 'layout' : animate ? 'fit' : false,
+          );
         }
+        await moving;
         if (defaultZoomPending.current) {
           defaultZoomPending.current = false;
           await graph.zoomTo(0.53, false);
@@ -1117,16 +1223,19 @@ export default function GraphCanvas({
         container: host,
         width: host.clientWidth,
         height: host.clientHeight,
-        animation: false,
+        // 카메라 이동만 움직인다(graph-motion.ts). G6 5는 이 값이 false면 화면 이동 애니메이션도 모두 끄므로 켜 두고,
+        // 노드·연결선(stateStyles)과 휠 확대·끌기는 따로 꺼서 지금처럼 바로 반응하게 한다.
+        animation: true,
         data: initialData(host.clientWidth, host.clientHeight),
         // D-GRP-01: 빈 곳뿐 아니라 노드·연결 위에서 끌어도 지도를 움직인다(노드 자체는 옮기지 않는다).
         behaviors: [
-          { type: 'drag-canvas', enable: true },
-          'zoom-canvas',
+          { type: 'drag-canvas', enable: true, animation: false },
+          { type: 'zoom-canvas', animation: false },
           {
             type: 'zoom-canvas',
             key: 'map-pinch-zoom',
             trigger: ['pinch'],
+            animation: false,
             enable: () => pinchEnabled(),
           },
         ],
@@ -1293,6 +1402,7 @@ export default function GraphCanvas({
         preservePositions.current = false;
         followFit.current = true;
         fitPending.current = true;
+        fitRequested.current = true;
         setCenterSequence((sequence) => sequence + 1);
       } else {
         followFit.current = false;
@@ -1301,7 +1411,7 @@ export default function GraphCanvas({
             0.01,
             Math.min(4, graph.getZoom() * (action === 'in' ? 1.2 : 1 / 1.2)),
           ),
-          false,
+          cameraMotion('zoom'),
         );
         onTutorialAction?.('zoom');
       }
