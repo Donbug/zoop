@@ -727,6 +727,17 @@ test('connected member displays mock holding without replacing null values', asy
   expect(screen.getByText('계산 불가')).toBeTruthy();
   const region = screen.getByRole('region', { name: '가상 계좌 보유' });
   expect(within(region).getAllByText(/모의/).length).toBeGreaterThan(0);
+  // D-COM-01 / F6: private valuation timestamps retain the original machine values.
+  expect(
+    within(region)
+      .getByText('2026-10-05 12:00 KST', { exact: true })
+      .getAttribute('datetime'),
+  ).toBe(old);
+  expect(
+    within(region)
+      .getAllByText('2026-10-06 12:00 KST', { exact: true })
+      .every((element) => element.getAttribute('datetime') === time),
+  ).toBe(true);
   await act(async () => useAuthStore.getState().clearSession());
   expect(screen.queryByText('20주')).toBeNull();
 });
@@ -2002,4 +2013,138 @@ test('D-COM-06: recovering from an invalid reference time also clears the graph 
     await screen.findByRole('button', { name: '최신 제공 시점으로 조회' }),
   );
   expect(screen.getByTestId('address').textContent).not.toContain('graphAsOf');
+});
+
+// D-COM-01 / F6-F7: synthetic API responses verify display only; request selectors remain unchanged.
+function formattingQuote(
+  currency = 'KRW',
+  change: number | null = 2,
+  observedAt: string | null = time,
+  price: number | null = 120,
+) {
+  return {
+    status: 'available',
+    companyId: id,
+    source,
+    quote: {
+      price,
+      currency,
+      asOf: observedAt,
+      change,
+      changeRate: change === null ? null : 0.02,
+      volume: null,
+      dayLow: null,
+      dayHigh: null,
+      fiftyTwoWeekLow: null,
+      fiftyTwoWeekHigh: null,
+    },
+  };
+}
+
+test.each([
+  ['KRW', '120원', '2원'],
+  ['USD', '$120.00', '$2.00'],
+])(
+  'D-COM-01 F7 formats %s price and day change with currency',
+  async (currency, price, change) => {
+    server.on('GET', '/api/v1/companies/:id/quote', () =>
+      json(formattingQuote(currency)),
+    );
+    open(pinned);
+    const region = within(
+      await screen.findByRole('region', { name: '최신 시세' }),
+    );
+    expect(await region.findByText(price, { exact: true })).toBeTruthy();
+    expect(
+      region.getByText(
+        new RegExp(
+          `전일 대비 ${change.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+        ),
+      ),
+    ).toBeTruthy();
+  },
+);
+
+test('D-COM-01 F7 preserves missing quote amounts instead of fabricating zero', async () => {
+  server.on('GET', '/api/v1/companies/:id/quote', () =>
+    json(formattingQuote('KRW', null, null, null)),
+  );
+  open(pinned);
+  const region = within(
+    await screen.findByRole('region', { name: '최신 시세' }),
+  );
+  expect(
+    await region.findByText('미제공', { exact: true, selector: 'strong' }),
+  ).toBeTruthy();
+  expect(region.getByText(/전일 대비 미제공/)).toBeTruthy();
+  expect(region.queryByText('0원', { exact: true })).toBeNull();
+  expect(region.getByText(/공급자 관측 시각 미제공/)).toBeTruthy();
+});
+
+test('D-COM-01 F7 keeps zero as a real amount', async () => {
+  server.on('GET', '/api/v1/companies/:id/quote', () =>
+    json(formattingQuote('KRW', 0, time, 0)),
+  );
+  open(pinned);
+  const region = within(
+    await screen.findByRole('region', { name: '최신 시세' }),
+  );
+  expect(await region.findByText('0원', { exact: true })).toBeTruthy();
+  expect(region.getByText(/전일 대비 0원/)).toBeTruthy();
+});
+
+test('D-COM-01 F6 shows KST while preserving original metadata and observation times', async () => {
+  open(pinned);
+  const companyRegion = await screen.findByRole('region', {
+    name: '기업 개요',
+  });
+  const basis = await within(companyRegion).findByText('2026-10-06 12:00 KST', {
+    exact: true,
+  });
+  expect(basis.tagName).toBe('TIME');
+  expect(basis.getAttribute('datetime')).toBe(time);
+  const quoteRegion = screen.getByRole('region', { name: '최신 시세' });
+  const observed = await within(quoteRegion).findByText(
+    '2026-10-06 12:00 KST',
+    { exact: true },
+  );
+  expect(observed.getAttribute('datetime')).toBe(time);
+  expect(within(quoteRegion).getByText(/공급자 관측/).textContent).toContain(
+    '공급자 관측 2026-10-06 12:00 KST',
+  );
+  const last = server.calls('GET', '/api/v1/companies/:id').at(-1)!;
+  expect(last.query.get('asOf')).toBe(time);
+  expect(last.query.get('graphVersion')).toBe('v1');
+});
+
+test('D-COM-01 F6 formats chart table and financial timestamps without changing their ISO attributes', async () => {
+  server.on('GET', '/api/v1/companies/:id/financials', () =>
+    json({
+      status: 'available',
+      items: [
+        {
+          name: '합성 지표',
+          period: '합성 기간',
+          value: 0,
+          unit: '원',
+          accountingBasis: null,
+          source: 'synthetic',
+          asOf: old,
+        },
+      ],
+      metadata,
+    }),
+  );
+  open(pinned);
+  await userEvent.click(await screen.findByText('표로 보기', { exact: true }));
+  const table = screen.getByRole('table');
+  const cell = await within(table).findByText('2026-10-05 12:00 KST', {
+    exact: true,
+  });
+  expect(cell.getAttribute('datetime')).toBe(old);
+  const financial = await screen.findByRole('region', { name: '핵심 재무' });
+  const basis = await within(financial).findByText('2026-10-05 12:00 KST', {
+    exact: true,
+  });
+  expect(basis.getAttribute('datetime')).toBe(old);
 });

@@ -98,10 +98,22 @@ function fixedFailure(
     return '자료 공급원의 설정이나 응답 형식 문제로 지금은 확인할 수 없어요.';
   return null;
 }
+// D-COM-01 / F6: display KST while retaining the API timestamp for machines.
+function ReferenceTime({
+  value,
+  missing = '미제공',
+}: {
+  value: string | null | undefined;
+  missing?: string;
+}) {
+  return value ? <time dateTime={value}>{formatKst(value)}</time> : missing;
+}
+
 function Basis({ metadata }: { metadata: Meta | undefined }) {
   return metadata ? (
     <p className="wrap-anywhere">
-      출처 {metadata.source} · 공개 자료 기준 {metadata.asOf} · 버전{' '}
+      출처 {metadata.source} · 공개 자료 기준{' '}
+      <ReferenceTime value={metadata.asOf} /> · 버전{' '}
       {metadata.graphVersion ?? '미제공'}
       {metadata.partial ? ' · 일부 자료 미제공' : ''}
     </p>
@@ -611,19 +623,35 @@ export default function CompanyWorkspace() {
           {quote.data?.status === 'available' && (
             <>
               <strong className="text-2xl">
-                {number(quote.data.quote.price)} {quote.data.quote.currency}
+                {quote.data.quote.price === null
+                  ? '미제공'
+                  : formatMoney(
+                      quote.data.quote.price,
+                      quote.data.quote.currency,
+                    )}
               </strong>
               <span>
                 {' '}
-                · 전일 대비 {number(quote.data.quote.change)} (
+                · 전일 대비{' '}
+                {quote.data.quote.change === null
+                  ? '미제공'
+                  : formatMoney(
+                      quote.data.quote.change,
+                      quote.data.quote.currency,
+                    )}{' '}
+                (
                 {quote.data.quote.changeRate === null
                   ? '미제공'
                   : `${number(quote.data.quote.changeRate * 100)}%`}
                 )
               </span>
               <p>
-                공급자 관측 {quote.data.quote.asOf ?? '시각 미제공'} ·{' '}
-                {quote.data.source.name} ·{' '}
+                공급자 관측{' '}
+                <ReferenceTime
+                  value={quote.data.quote.asOf}
+                  missing="시각 미제공"
+                />{' '}
+                · {quote.data.source.name} ·{' '}
                 {quote.data.source.delayNote ?? '지연 정보 미제공'}
               </p>
               <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-xs [&_dt]:text-zoop-faint [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
@@ -685,8 +713,12 @@ export default function CompanyWorkspace() {
                     </dd>
                   </dl>
                   <p>
-                    모의 수량 기준 {portfolio.data?.mockAsOf ?? '미제공'} · 평가
-                    기준 {portfolio.data?.valuation?.calculatedAt ?? '미제공'}
+                    모의 수량 기준{' '}
+                    <ReferenceTime value={portfolio.data?.mockAsOf} /> · 평가
+                    기준{' '}
+                    <ReferenceTime
+                      value={portfolio.data?.valuation?.calculatedAt}
+                    />
                   </p>
                   {portfolio.data?.valuation?.weightUnavailableReason && (
                     <p>{portfolio.data.valuation.weightUnavailableReason}</p>
@@ -830,7 +862,9 @@ export default function CompanyWorkspace() {
                           key={point.time}
                           className="border-t-[0.667px] border-zoop-line"
                         >
-                          <td className="py-1">{point.time}</td>
+                          <td className="py-1">
+                            <ReferenceTime value={point.time} />
+                          </td>
                           <td className="py-1 text-right">
                             {number(point.close)}
                           </td>
@@ -1050,7 +1084,7 @@ export default function CompanyWorkspace() {
                       <dd>
                         {number(f.value)} {f.unit} ·{' '}
                         {f.accountingBasis ?? '회계 기준 미제공'} · {f.source} ·{' '}
-                        {f.asOf}
+                        <ReferenceTime value={f.asOf} />
                       </dd>
                     </div>
                   ))}
