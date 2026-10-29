@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+@import 'pretendard/dist/web/variable/pretendardvariable.css';
+@import '@fontsource-variable/inter';
 
 /* #169 서비스 셸과 D-GRP-02/03/04/05 상세 패널의 공용 토큰.
    화면별 값 대신 Tailwind 유틸리티(text-zoop-muted, font-panel 등)로 사용한다. */
@@ -116,14 +118,7 @@
     margin: 0;
     background: var(--color-zoop-wash);
     color: var(--color-zoop-ink);
-    font-family:
-      Inter,
-      Pretendard,
-      system-ui,
-      -apple-system,
-      BlinkMacSystemFont,
-      'Segoe UI',
-      sans-serif;
+    font-family: var(--font-panel);
   }
 
   button,
