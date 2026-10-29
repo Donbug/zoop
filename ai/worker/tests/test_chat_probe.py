@@ -38,7 +38,12 @@ def test_an_unauthenticated_refusal_with_a_bearer_challenge_is_the_zoop_endpoint
     (httpx.Response(401), "mcp_status_unexpected"),
     (httpx.Response(401, headers={"WWW-Authenticate": "Bearerish"}), "mcp_status_unexpected"),
     (httpx.Response(404), "mcp_status_unexpected"),
-    (httpx.Response(502), "mcp_status_unexpected"),
+    # A gateway in front answering for a backend it could not reach is a connection failure, not the endpoint answering.
+    (httpx.Response(502), "mcp_unavailable"),
+    (httpx.Response(503), "mcp_unavailable"),
+    (httpx.Response(504), "mcp_unavailable"),
+    (httpx.Response(500), "mcp_status_unexpected"),
+    (httpx.Response(403), "mcp_status_unexpected"),
     (httpx.Response(302, headers={"Location": "https://elsewhere.example/mcp"}), "mcp_status_unexpected"),
 ])
 def test_anything_but_the_endpoints_own_refusal_is_unreachable(response, reason):

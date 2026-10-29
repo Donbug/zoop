@@ -75,17 +75,20 @@ public class ChatMcpConfiguration {
      * The agent path, only with {@code zoop.chat.mcp.agent-enabled=true}: runs take it when their plan fits, through the chat
      * model stages ({@code zoop.ai.chat-client.enabled=true}); enabled without them, startup fails naming the setting. The URL
      * the provider calls this endpoint at is the AI runtime operator's ({@code ZOOP_AI_CHAT_MCP_SERVER_URL}), never sent from here.
+     * Live runs start only after the MCP preflight and circuit allow them ({@link ChatMcpCircuitBreaker}); replay runs reach no
+     * MCP endpoint (the AI runtime answers them from authored fixtures), so they have no preflight.
      */
     @Bean
     @ConditionalOnProperty(name = "zoop.chat.mcp.agent-enabled", havingValue = "true")
     ChatMcpAgent chatMcpAgent(ObjectProvider<ChatModels.Agent> agent, ChatMcpTools tools, ChatMcpGrants grants,
-            ChatSendGrants sendGrants, ChatExecutionRepository runs, ObjectProvider<HttpChatStageClient> client, Clock clock) {
+            ChatSendGrants sendGrants, ChatExecutionRepository runs, ObjectProvider<HttpChatStageClient> client, Clock clock,
+            @Value("${zoop.ai.chat-client.mode:replay}") String mode) {
         ChatModels.Agent stages = agent.getIfAvailable();
         HttpChatStageClient transport = client.getIfAvailable();
         if (stages == null || transport == null) {
             throw new IllegalStateException("zoop.chat.mcp.agent-enabled needs the chat model stages (zoop.ai.chat-client.enabled)");
         }
-        var circuit = new ChatMcpCircuitBreaker(transport::probeMcp, clock);
+        var circuit = "replay".equals(mode) ? null : new ChatMcpCircuitBreaker(transport::probeMcp, clock);
         return new ChatMcpAgent(stages, tools, grants, sendGrants.recipient(), runs, PROTOCOL_JSON, circuit);
     }
 

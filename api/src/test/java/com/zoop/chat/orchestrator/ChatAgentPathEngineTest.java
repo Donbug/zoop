@@ -177,12 +177,23 @@ class ChatAgentPathEngineTest {
         var agent = new Agent(Set.of(ChatCapability.COMPANY_READ));
         agent.available = false;
         var control = new Control(Duration.ofSeconds(60));
+        // The direct answer has no sections, so there is nothing to verify.
+        verdicts = new ChatSemanticVerdicts(List.of());
 
-        engine(agent).answer(run(), control);
+        var outcome = engine(agent).answer(run(), control);
 
         assertTrue(agent.requirements.isEmpty(), "no agent Responses step started");
         assertEquals(1, generated.size(), "the existing direct retrieval/generation path handled the run");
         assertEquals(1, control.reserved.size(), "the server-owned direct tool was used");
+        var route = assertInstanceOf(ChatEngineOutcome.Completed.class, outcome, outcome.toString()).routeSummary();
+        assertEquals("direct", route.path("path").asString());
+        assertEquals("unavailable", route.path("agentPreflight").asString());
+
+        // A run that was never an agent candidate reads on the same direct path and says so, with no preflight mark.
+        var plain = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(new Agent(Set.of())).answer(run(), new Control(Duration.ofSeconds(60)))).routeSummary();
+        assertEquals("direct", plain.path("path").asString());
+        assertTrue(plain.path("agentPreflight").isMissingNode());
     }
 
     @Test

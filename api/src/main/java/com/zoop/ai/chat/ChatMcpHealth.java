@@ -6,7 +6,8 @@ package com.zoop.ai.chat;
  * one.
  */
 public record ChatMcpHealth(boolean reachable, Reason reason) {
-    public enum Reason { TIMEOUT, CONNECT_FAILED, STATUS_UNEXPECTED }
+    /** {@code UNAVAILABLE}: a gateway in front answered 502, 503 or 504 for a backend it could not reach. */
+    public enum Reason { TIMEOUT, CONNECT_FAILED, UNAVAILABLE, STATUS_UNEXPECTED }
 
     public ChatMcpHealth {
         if (reachable == (reason != null)) {
