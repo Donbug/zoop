@@ -33,7 +33,7 @@ ENTRYPOINT ["/usr/bin/tini", "--", "zoop-ai-collector"]
 CMD ["run"]
 ```
 
-Task Definition의 command는 `zoop-ai-collector run`(또는 생략: 기본 `CMD`)이다. `stopTimeout`은 **120**(Fargate 최대)으로 둔다.
+컨테이너의 최종 프로세스 명령은 `zoop-ai-collector run`이다. 이미지의 `ENTRYPOINT`를 유지하는 ECS Task Definition에서는 `command`를 생략하거나 `["run"]`으로 지정한다. `stopTimeout`은 **120**(Fargate 최대)으로 둔다.
 
 | 하위 명령 | 동작 |
 |---|---|
