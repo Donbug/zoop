@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "briefing-playback-v1",
+  "scope": "finished_current_issue_read_projection",
+  "newModelCalls": 0,
+  "newPriceCalls": 0,
+  "rounds": [
+    {
+      "file": "2026-10-21-evening.json",
+      "id": "sim-2026-10-21-evening-b717c348435d",
+      "date": "2026-10-21",
+      "edition": "evening",
+      "resultVersion": "issue-intelligence-v1-view-d38f7defc8105132d6b96cc9574baf9fc809ca64980ef25b36ee2883703bf5a4",
+      "itemCount": 2,
+      "bytes": 65110,
+      "sha256": "325b8c99e9477eb4242d23b74e944567a88df3b8d99d8ff976f9b2bc524c782c"
+    },
+    {
+      "file": "2026-10-22-evening.json",
+      "id": "sim-2026-10-22-evening-6cec67477f41",
+      "date": "2026-10-22",
+      "edition": "evening",
+      "resultVersion": "issue-intelligence-v1-view-1fc3ab9b9d3b07df6788e12b91010ed289a595c6cdb55f59e65e32aa1b2732b7",
+      "itemCount": 1,
+      "bytes": 110192,
+      "sha256": "d0c1d3bc19fe9b351b0d6d910b7da6426062cf8d91fdff1ac785f0d1a971fb8c"
+    },
+    {
+      "file": "2026-10-22-morning.json",
+      "id": "sim-2026-10-22-morning-0537f757d685",
+      "date": "2026-10-22",
+      "edition": "morning",
+      "resultVersion": "issue-intelligence-v1-view-6cbc9b36397697a7820b6d50e73a094de48329a3f27a1b6a72e4a595c5991ba9",
+      "itemCount": 3,
+      "bytes": 116933,
+      "sha256": "4c59088c5cdf69cfede1db30c8f73822f1dfb9d28369c4ceb81411d4d65e25e6"
+    },
+    {
+      "file": "2026-10-23-morning.json",
+      "id": "sim-2026-10-23-morning-24a302eb4a26",
+      "date": "2026-10-23",
+      "edition": "morning",
+      "resultVersion": "issue-intelligence-v1-view-e4e727b9a5ab1b97d5ce66e11297aa05ba0b7e9ad7fdbd5a156377f2440f6703",
+      "itemCount": 3,
+      "bytes": 147087,
+      "sha256": "95aed6d3579ab7e615ed89a6121af08988f5b8cf8a851e4f04e0b1b445977719"
+    }
+  ],
+  "omitted": [
+    "previous generation archives",
+    "generation inputs, receipts, prompt and request digests",
+    "full article bodies and surrounding body context",
+    "unmerged follow-up review workspace",
+    "user feedback and sessions"
+  ],
+  "responseFields": [
+    "companyPriceContext",
+    "corrections",
+    "dataAsOf",
+    "dataWindow",
+    "date",
+    "edition",
+    "editionReview",
+    "emptyReason",
+    "generatedAt",
+    "graphVersion",
+    "id",
+    "issueIntelligence",
+    "issueReading",
+    "items",
+    "marketSummary",
+    "marketVariables",
+    "metadata",
+    "notice",
+    "outlook",
+    "previousComparison",
+    "publishedAt",
+    "references",
+    "scheduledAt",
+    "sinceMorning",
+    "status"
+  ]
+}
