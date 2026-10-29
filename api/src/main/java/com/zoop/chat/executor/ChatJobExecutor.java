@@ -14,6 +14,7 @@ import com.zoop.chat.dto.ChatFrozenContext;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.repository.ChatExecutionRepository;
 import com.zoop.chat.repository.ChatJobRow;
+import com.zoop.chat.repository.ChatKeptToolResult;
 import com.zoop.chat.repository.ChatRepository;
 import com.zoop.chat.repository.ChatRunningJob;
 import com.zoop.chat.repository.ChatToolCallEnd;
@@ -175,6 +176,14 @@ public class ChatJobExecutor {
         return runs.findReservedToolCall(jobId, attemptNo, capabilityId, inputDigest);
     }
 
+    /**
+     * The result an earlier call of the attempt with exactly this capability and input digest succeeded with and kept: what
+     * an identical request reuses (MCP actions contract 3.3).
+     */
+    public Optional<ChatKeptToolResult> keptToolResult(String jobId, int attemptNo, String capabilityId, String inputDigest) {
+        return runs.findKeptToolResult(jobId, attemptNo, capabilityId, inputDigest);
+    }
+
     /** Ends running jobs whose lease ran out; returns how many it ended. */
     public int recoverExpired() {
         int ended = 0;
@@ -301,6 +310,15 @@ public class ChatJobExecutor {
         }
 
         @Override
+        public Optional<String> claimToolCall(String capabilityId, String inputDigest) {
+            return recorded(() -> transaction.execute(status -> {
+                runs.limitWait(waitBudget());
+                return runs.claimReservedToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), capabilityId,
+                        inputDigest, clock.instant());
+            }));
+        }
+
+        @Override
         public int toolCallsLeft() {
             Integer made = recorded(() -> transaction.execute(status ->
                     runs.countJobToolCalls(claim.job().id(), claim.attemptNo())));
@@ -382,12 +400,28 @@ public class ChatJobExecutor {
 
         @Override
         public void toolCallFinished(String toolCallId, ChatToolCallEnd end) {
+            String[] refused = new String[1];
             Boolean finished = recorded(() -> transaction.execute(status -> {
                 runs.limitWait(waitBudget());
-                return runs.finishToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), toolCallId, end,
+                ChatToolCallEnd recording = end;
+                if (end.result() != null) {
+                    // The job row's lock orders the job's kept results, so their total is checked and written at once,
+                    // every size measured the way the column stores it.
+                    if (runs.lockOwned(claim.job().id(), claim.ownerToken(), clock.instant()).isEmpty()) return false;
+                    long size = runs.storedResultBytes(end.result());
+                    String over = size > MAX_CALL_RESULT_BYTES ? RESULT_TOO_LARGE
+                            : runs.keptResultBytes(claim.job().id()) + size > MAX_KEPT_RESULT_BYTES ? RESULTS_OVER_BUDGET
+                            : null;
+                    if (over != null) {
+                        refused[0] = over;
+                        recording = ChatToolCallEnd.failed(over);
+                    }
+                }
+                return runs.finishToolCall(claim.job().id(), claim.ownerToken(), claim.attemptNo(), toolCallId, recording,
                         clock.instant());
             }));
             if (!Boolean.TRUE.equals(finished)) throw new ChatRunSuperseded();
+            if (refused[0] != null) throw new ChatToolCallRefused(refused[0]);
         }
 
         /**

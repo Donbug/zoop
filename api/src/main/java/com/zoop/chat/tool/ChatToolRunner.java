@@ -3,6 +3,7 @@ package com.zoop.chat.tool;
 import com.zoop.chat.executor.ChatRun;
 import com.zoop.chat.executor.ChatRunControl;
 import com.zoop.chat.executor.ChatRunSuperseded;
+import com.zoop.chat.executor.ChatToolCallRefused;
 import com.zoop.chat.executor.ChatToolCallReservation;
 import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.common.json.Canonical;
@@ -150,7 +151,44 @@ public class ChatToolRunner implements AutoCloseable {
     public List<ChatToolResult> runReserved(ChatRun run, ChatRunControl control, List<String> ids,
             List<ChatToolRequest> calls, Delivery delivery) {
         if (ids.size() != calls.size()) throw new IllegalArgumentException("one reserved id per call");
-        List<ChatToolRegistry.Binding> bindings = calls.stream().map(this::binding).toList();
+        return run(run, control, ids, calls, calls.stream().map(call -> binding(call).tool()).toList(), delivery, false);
+    }
+
+    /**
+     * Runs one call its caller already started ({@link ChatRunControl#claimToolCall}: reserved → running in the same step
+     * that picked it) under the same limits and records as {@link #runReserved}.
+     */
+    public ChatToolResult runClaimed(ChatRun run, ChatRunControl control, String id, ChatToolRequest call,
+            Delivery delivery) {
+        return run(run, control, List.of(id), List.of(call), List.of(binding(call).tool()), delivery, true).getFirst();
+    }
+
+    /**
+     * Ends a call its caller already started ({@link ChatRunControl#claimToolCall}) with {@code earlier}, the output an
+     * identical earlier call of the run returned, instead of reading again (MCP actions contract 3.3): it is passed through
+     * {@code delivery} (whose checks run again now, so a grant withdrawn since is applied) and recorded exactly like a read,
+     * under the same limits.
+     */
+    public ChatToolResult runCached(ChatRun run, ChatRunControl control, String id, ChatToolRequest call,
+            ChatToolOutput earlier, Delivery delivery) {
+        ChatCapability capability = binding(call).tool().capability();
+        ChatTool reuse = new ChatTool() {
+            @Override
+            public ChatCapability capability() {
+                return capability;
+            }
+
+            @Override
+            public ChatToolOutput read(ChatToolScope scope, ChatToolRequest request) {
+                return earlier;
+            }
+        };
+        return run(run, control, List.of(id), List.of(call), List.of(reuse), delivery, true).getFirst();
+    }
+
+    /** Runs {@code calls} with {@code tools}; {@code alreadyStarted} when the caller already recorded their start. */
+    private List<ChatToolResult> run(ChatRun run, ChatRunControl control, List<String> ids, List<ChatToolRequest> calls,
+            List<ChatTool> tools, Delivery delivery, boolean alreadyStarted) {
         ChatToolScope scope = scope(run);
 
         long stageEnd = System.nanoTime() + Math.min(stageLimit.toNanos(), Math.max(0, control.remaining().toNanos()));
@@ -165,9 +203,9 @@ public class ChatToolRunner implements AutoCloseable {
             }
             String id = ids.get(i);
             ChatToolRequest call = calls.get(i);
-            ChatTool tool = bindings.get(i).tool();
+            ChatTool tool = tools.get(i);
             try {
-                control.toolCallStarted(id);
+                if (!alreadyStarted) control.toolCallStarted(id);
             } catch (ChatRunSuperseded lost) {
                 slots.release();
                 inFlight.release();
@@ -298,6 +336,9 @@ public class ChatToolRunner implements AutoCloseable {
         }
         try {
             control.toolCallFinished(id, end);
+        } catch (ChatToolCallRefused overLimit) {
+            // Recorded as that failure (a job limit only the record can check): the result is not delivered.
+            result = ChatToolResult.failed(id, call.capabilityId(), overLimit.code());
         } catch (ChatRunSuperseded lost) {
             superseded.set(true);
         } catch (RuntimeException unrecorded) {

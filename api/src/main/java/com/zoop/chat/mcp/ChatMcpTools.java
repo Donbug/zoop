@@ -2,10 +2,14 @@ package com.zoop.chat.mcp;
 
 import com.zoop.chat.executor.ChatJobExecutor;
 import com.zoop.chat.executor.ChatRun;
+import com.zoop.chat.executor.ChatRunControl;
 import com.zoop.chat.executor.ChatRunSuperseded;
+import com.zoop.chat.repository.ChatKeptToolResult;
 import com.zoop.chat.orchestrator.ChatPeriods;
 import com.zoop.chat.tool.ChatCapability;
+import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolOutput;
+import com.zoop.chat.tool.ChatToolPath;
 import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolRequest;
 import com.zoop.chat.tool.ChatToolResult;
@@ -14,6 +18,7 @@ import com.zoop.chat.tool.ChatToolUnavailable;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -23,6 +28,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -46,8 +58,17 @@ public final class ChatMcpTools {
     /** The ledger's plan revision of MCP calls: a run that hands tools to a model has no server plan of its own. */
     static final int PLAN_REVISION = 1;
     static final String VIA = "mcp";
-    /** Largest serialized result a call returns; a larger one is refused instead of being cut. */
-    static final int MAX_RESULT_BYTES = 256 * 1024;
+    /**
+     * Largest result a call returns; a larger one is refused instead of being cut. Checked early on the serialized output,
+     * and again as stored when it is recorded ({@link ChatRunControl#toolCallFinished}).
+     */
+    static final int MAX_RESULT_BYTES = ChatRunControl.MAX_CALL_RESULT_BYTES;
+
+    /** The longest wait for an identical request being read: a tool stage (10 s) and its record (2 s). */
+    static final Duration SINGLE_FLIGHT_WAIT = Duration.ofSeconds(12);
+    private static final TypeReference<List<ChatToolItem>> ITEMS = new TypeReference<>() { };
+    private static final TypeReference<List<ChatToolPath>> PATHS = new TypeReference<>() { };
+    private static final TypeReference<List<String>> STRINGS = new TypeReference<>() { };
 
     /** Room for the result envelope's own fields beyond the adapter output. */
     private static final int ENVELOPE_BYTES = 1024;
@@ -58,7 +79,7 @@ public final class ChatMcpTools {
     static final String GRANT_MISMATCH = "grant_mismatch";
     static final String INVALID_ARGUMENTS = "invalid_arguments";
     static final String BUDGET_EXHAUSTED = "tool_budget_exhausted";
-    static final String RESULT_TOO_LARGE = "result_too_large";
+    static final String RESULT_TOO_LARGE = ChatRunControl.RESULT_TOO_LARGE;
     static final String SEND_GRANTS_UNAVAILABLE = "send_grants_unavailable";
     /** What a result says when part of it was withheld for want of a send grant. */
     static final String SOURCE_GRANT_DENIED = "source_grant_denied";
@@ -68,6 +89,8 @@ public final class ChatMcpTools {
     private final ChatJobExecutor executor;
     private final ChatMcpSendGate gate;
     private final ObjectMapper mapper;
+    /** Identical requests being read now, by attempt, capability and input digest (this instance only). */
+    private final Map<String, CompletableFuture<Void>> flights = new ConcurrentHashMap<>();
 
     public ChatMcpTools(ChatToolRegistry registry, ChatToolRunner runner, ChatJobExecutor executor, ChatMcpSendGate gate,
             ObjectMapper mapper) {
@@ -163,19 +186,51 @@ public final class ChatMcpTools {
         // Only the exact call the server approved runs: same tool, same canonical request (targets, limit and everything
         // injected), reserved for this attempt and not started yet.
         String digest = runner.reservation(run, call, VIA).inputDigest();
-        Optional<String> approved = executor.reservedToolCall(run.jobId(), run.attemptNo(), call.capabilityId(), digest);
+        var control = attached.get().control();
+        // The approval this request uses is picked and started in one step: requests arriving together each take their
+        // own, and none is left behind for one that took another's.
+        Optional<String> approved;
+        try {
+            approved = control.claimToolCall(call.capabilityId(), digest);
+        } catch (ChatRunSuperseded ended) {
+            return refused(RUN_NOT_ACTIVE);
+        }
         if (approved.isEmpty()) return refused(NOT_APPROVED);
         var delivery = new Delivery(run);
         ChatToolResult result;
+        // One read per identical request of the attempt (MCP actions contract 3.3): a request that arrives while the same
+        // one is being read waits for it, and then, like a later repeat, reuses what it kept.
+        String flight = run.jobId() + "/" + run.attemptNo() + "/" + call.capabilityId() + "/" + digest;
+        CompletableFuture<Void> mine = new CompletableFuture<>();
+        CompletableFuture<Void> earlier = flights.putIfAbsent(flight, mine);
         try {
-            result = runner.runReserved(run, attached.get().control(), List.of(approved.get()), List.of(call), delivery)
-                    .getFirst();
+            if (earlier != null) awaitEarlier(earlier, control.remaining());
+            Optional<ChatKeptToolResult> reused = executor.keptToolResult(run.jobId(), run.attemptNo(),
+                    call.capabilityId(), digest);
+            if (reused.isPresent()) {
+                ChatToolResult kept = kept(mapper, reused.get());
+                delivery.cachedFrom = kept.toolCallId();
+                result = runner.runCached(run, control, approved.get(), call, new ChatToolOutput(
+                        kept.dataVersion(), kept.items(), kept.evidenceIds(), Boolean.TRUE.equals(kept.truncated()),
+                        Boolean.TRUE.equals(kept.nextAllowed()), kept.paths()), delivery);
+            } else {
+                result = runner.runClaimed(run, control, approved.get(), call, delivery);
+            }
         } catch (ChatRunSuperseded lost) {
-            // Either the run ended, or a concurrent identical request started this reservation first.
-            return refused(executor.attach(run.jobId(), run.attemptNo()).isPresent() ? NOT_APPROVED : RUN_NOT_ACTIVE);
+            return refused(RUN_NOT_ACTIVE);
+        } finally {
+            if (earlier == null) {
+                flights.remove(flight, mine);
+                mine.complete(null);
+            }
         }
         if (delivery.refusal != null && delivery.refusal.equals(result.error())) return refused(delivery.refusal);
-        Map<String, Object> structured = structured(result, delivery.withheld);
+        // Refused when recorded: over a result's or the job's limit as the column stores it.
+        if (ChatRunControl.RESULT_TOO_LARGE.equals(result.error())
+                || ChatRunControl.RESULTS_OVER_BUDGET.equals(result.error())) {
+            return refused(result.error());
+        }
+        Map<String, Object> structured = structured(result, delivery.withheld, delivery.cachedFrom);
         return McpSchema.CallToolResult.builder().structuredContent(structured)
                 .addTextContent(mapper.writeValueAsString(structured)).isError(!result.succeeded()).build();
     }
@@ -191,6 +246,8 @@ public final class ChatMcpTools {
         // pass() runs on the read's thread, the rest while the call is recorded.
         private volatile String refusal;
         private volatile ChatMcpSendGate.Withheld withheld = ChatMcpSendGate.Withheld.NONE;
+        /** The call whose kept result this one reuses; null for a read. */
+        private volatile String cachedFrom;
 
         Delivery(ChatRun run) {
             this.run = run;
@@ -219,7 +276,7 @@ public final class ChatMcpTools {
 
         @Override
         public String keep(ChatToolResult result) {
-            return mapper.writeValueAsString(structured(result, withheld));
+            return mapper.writeValueAsString(structured(result, withheld, cachedFrom));
         }
     }
 
@@ -291,7 +348,8 @@ public final class ChatMcpTools {
      * The envelope the model receives. When the send gate left something out, {@code withheld} says how much of each part and
      * why, so a short result is never read as everything there is.
      */
-    private static Map<String, Object> structured(ChatToolResult result, ChatMcpSendGate.Withheld withheld) {
+    private static Map<String, Object> structured(ChatToolResult result, ChatMcpSendGate.Withheld withheld,
+            String cachedFrom) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("schemaVersion", result.schemaVersion());
         out.put("toolCallId", result.toolCallId());
@@ -303,6 +361,8 @@ public final class ChatMcpTools {
         out.put("nextAllowed", result.nextAllowed());
         out.put("error", result.error());
         if (!result.paths().isEmpty()) out.put("paths", result.paths());
+        // A reuse says which call read it: the same data, not a second lookup.
+        if (result.succeeded() && cachedFrom != null) out.put("cachedFrom", cachedFrom);
         if (result.succeeded() && withheld.any()) {
             Map<String, Object> left = new LinkedHashMap<>();
             left.put("reason", SOURCE_GRANT_DENIED);
@@ -312,6 +372,32 @@ public final class ChatMcpTools {
             out.put("withheld", left);
         }
         return out;
+    }
+
+    /**
+     * Waits for an identical request this instance is reading, at most as long as a read and its record can take and never
+     * past the run's deadline. Past that the request reads on its own: waiting never ends it.
+     */
+    private static void awaitEarlier(CompletableFuture<Void> earlier, Duration left) {
+        long wait = Math.min(SINGLE_FLIGHT_WAIT.toNanos(), Math.max(0, left.toNanos()));
+        try {
+            earlier.get(wait, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException | TimeoutException notThere) {
+            // It failed or is still reading: this request reads itself.
+        }
+    }
+
+    /** A result as the attempt's ledger kept it ({@code chat_tool_calls.result}): exactly the envelope the model received. */
+    static ChatToolResult kept(ObjectMapper mapper, ChatKeptToolResult kept) {
+        JsonNode node = mapper.readTree(kept.result());
+        return new ChatToolResult(node.path("schemaVersion").asString(), kept.toolCallId(), kept.capabilityId(),
+                node.path("dataVersion").asString(null), mapper.convertValue(node.path("items"), ITEMS),
+                mapper.convertValue(node.path("evidenceIds"), STRINGS),
+                node.path("truncated").isBoolean() ? node.path("truncated").asBoolean() : null,
+                node.path("nextAllowed").isBoolean() ? node.path("nextAllowed").asBoolean() : null, null,
+                node.has("paths") ? mapper.convertValue(node.path("paths"), PATHS) : List.of());
     }
 
     private static McpSchema.CallToolResult refused(String code) {
