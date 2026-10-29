@@ -40,7 +40,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The three orchestrator model ports over the AI service's chat stages ({@code zoop-ai-chat-1}). The server decides what is
+ * The orchestrator model ports over the AI service's chat stages ({@code zoop-ai-chat-2}). The server decides what is
  * sent: the router gets the question chain, the requirements split by {@link ChatRequirementSplitter} and the descriptions of
  * the bound capabilities; company and issue names are resolved here, never by the model. Company names
  * ({@link CompanyNameResolver}) are resolved before the router, so a name that fits several companies becomes a clarification
@@ -350,14 +350,23 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
     // ---------------------------------------------------------------- verifier
 
     @Override
-    public ChatSemanticVerdicts verify(ChatRun run, List<ChatGeneratedAnswer.Section> sections, List<Citation> cited) {
+    public ChatSemanticVerdicts verify(ChatRun run, List<ChatGeneratedAnswer.Section> sections, List<Citation> cited,
+            ChatModels.ServerFacts facts) {
+        List<List<ChatModels.ServerFact>> bySection = facts.forRequest(run, sections);
         if (sections.isEmpty()) return new ChatSemanticVerdicts(List.of());
         ObjectNode input = StrictJson.newObject();
+        ObjectNode binding = input.putObject("requestBinding").put("invocationId", invocationId(run, "verify"));
+        nullable(binding, "graphVersionId", run.graphVersionId());
+        nullable(binding, "asOf", run.context().asOf() == null ? null : run.context().asOf().toString());
         ArrayNode wireSections = input.putArray("sections");
-        for (var section : sections) {
-            ObjectNode wire = wireSections.addObject().put("basis", section.basis()).put("text", section.text());
-            ArrayNode ids = wire.putArray("evidenceIds");
-            section.evidenceIds().forEach(ids::add);
+        for (int index = 0; index < sections.size(); index++) {
+            var section = sections.get(index);
+            ObjectNode wire = wireSections.addObject().put("sectionId", "s" + index)
+                    .put("basis", section.basis()).put("text", section.text());
+            section.requirementIds().forEach(wire.putArray("requirementIds")::add);
+            section.evidenceIds().forEach(wire.putArray("evidenceIds")::add);
+            ArrayNode serverFacts = wire.putArray("serverFacts");
+            bySection.get(index).forEach(fact -> serverFacts.add(serverFact(fact)));
         }
         ArrayNode wireCitations = input.putArray("citations");
         for (Citation citation : cited) {
@@ -375,6 +384,43 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             }
             return new ChatSemanticVerdicts(verdicts);
         });
+    }
+
+    private static ObjectNode serverFact(ChatModels.ServerFact fact) {
+        ObjectNode wire = StrictJson.newObject().put("requirementId", fact.requirementId());
+        switch (fact) {
+            case ChatModels.PortfolioFact scope -> {
+                wire.put("kind", "portfolio_scope").put("timing", "current_request_read")
+                        .put("queryScope", scope.queryScope()).put("truncated", scope.truncated())
+                        .put("companyLimit", scope.companyLimit());
+                scope.companyIds().forEach(wire.putArray("companyIds")::add);
+                ArrayNode companies = wire.putArray("companies");
+                for (var company : scope.companies()) {
+                    companies.addObject().put("companyId", company.companyId()).put("name", company.name())
+                            .put("held", company.held()).put("watched", company.watched());
+                }
+            }
+            case ChatModels.ComparisonFact comparison -> {
+                wire.put("kind", "graph_comparison").put("fromVersion", comparison.fromVersion())
+                        .put("toVersion", comparison.toVersion()).put("queryScope", comparison.queryScope())
+                        .put("evidenceLimit", comparison.evidenceLimit()).put("changeLimit", comparison.changeLimit())
+                        .put("evidenceRestricted", comparison.evidenceRestricted()).put("truncated", comparison.truncated());
+                nullable(wire, "asOf", comparison.asOf() == null ? null : comparison.asOf().toString());
+                nullable(wire, "since", comparison.since() == null ? null : comparison.since().toString());
+                comparison.targetIds().forEach(wire.putArray("targetIds")::add);
+                ArrayNode changes = wire.putArray("changes");
+                for (var change : comparison.changes()) {
+                    changes.addObject().put("id", change.id()).put("kind", change.kind()).put("name", change.name())
+                            .put("change", change.change());
+                }
+            }
+        }
+        return wire;
+    }
+
+    private static void nullable(ObjectNode node, String key, String value) {
+        if (value == null) node.putNull(key);
+        else node.put(key, value);
     }
 
     // ---------------------------------------------------------------- agent
@@ -436,9 +482,12 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
 
     // ---------------------------------------------------------------- one stage
 
+    private static String invocationId(ChatRun run, String suffix) {
+        return run.jobId() + "." + run.attemptNo() + "." + suffix;
+    }
+
     private JsonNode call(ChatRun run, String stage, String suffix, ObjectNode input) {
-        String invocation = run.jobId() + "." + run.attemptNo() + "." + suffix;
-        ChatStageCall request = new ChatStageCall(invocation, stage, mode, input);
+        ChatStageCall request = new ChatStageCall(invocationId(run, suffix), stage, mode, input);
         String execution;
         try {
             execution = recorder.start(run.jobId(), run.attemptNo(), stage, mode);

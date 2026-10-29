@@ -5,13 +5,19 @@ import com.zoop.chat.executor.ChatRunControl;
 import com.zoop.chat.executor.ChatRunSuperseded;
 import com.zoop.chat.executor.ChatToolCallRefused;
 import com.zoop.chat.executor.ChatToolCallReservation;
+import com.zoop.chat.orchestrator.ChatModels;
+import com.zoop.chat.repository.ChatKeptToolResult;
 import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.common.json.Canonical;
 import com.zoop.common.json.StrictJson;
+import java.time.DateTimeException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -26,6 +32,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -63,6 +72,9 @@ public class ChatToolRunner implements AutoCloseable {
     /** Reads of all runs that may be unfinished at once: four workers' worth of stages. */
     static final int MAX_IN_FLIGHT = 16;
     private static final Logger log = LoggerFactory.getLogger(ChatToolRunner.class);
+    private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    private static final TypeReference<List<ChatToolItem>> ITEMS = new TypeReference<>() { };
+    private static final TypeReference<List<ChatToolPath>> PATHS = new TypeReference<>() { };
 
     private final ChatToolRegistry registry;
     private final Duration stageLimit;
@@ -145,6 +157,55 @@ public class ChatToolRunner implements AutoCloseable {
     }
 
     /**
+     * Rebinds a succeeded MCP ledger read to the engine's run, including calls served on another instance. Only the stored
+     * reservation supplies the query scope; a model's tool summary, approval request or answer is never input to this
+     * method. Anything that is not exactly this run's own succeeded call is refused ({@link ChatModels.Failure.Fate#REFUSED}).
+     * A list the send gate cut ({@code withheld} items) is incomplete like a truncated one, so it is restored as truncated.
+     */
+    public ChatToolResult restore(ChatRun run, ChatKeptToolResult kept) {
+        try {
+            return rebound(run, kept);
+        } catch (StrictJson.Malformed | IllegalArgumentException | DateTimeException | JacksonException malformed) {
+            throw invalidKept();
+        }
+    }
+
+    private ChatToolResult rebound(ChatRun run, ChatKeptToolResult kept) {
+        if (!run.jobId().equals(kept.jobId()) || !run.memberId().equals(kept.memberId())
+                || run.attemptNo() != kept.attemptNo()) throw invalidKept();
+        var meta = StrictJson.parseObject(kept.requestMeta()).keys(
+                Set.of("via", "targets", "limit", "graphVersion", "asOf"), Set.of("evidenceScope", "since"));
+        if (!"mcp".equals(meta.string("via"))
+                || !Objects.equals(run.graphVersionId(), meta.stringOrNull("graphVersion"))
+                || !Objects.equals(run.context().asOf() == null ? null : run.context().asOf().toString(),
+                        meta.stringOrNull("asOf"))) throw invalidKept();
+        ChatToolRequest query = new ChatToolRequest(kept.capabilityId(), meta.strings("targets"), meta.count("limit"),
+                meta.has("evidenceScope") ? meta.strings("evidenceScope") : null,
+                meta.has("since") ? Instant.parse(meta.string("since")) : null);
+        if (!reservation(run, query, "mcp").inputDigest().equals(kept.inputDigest())) throw invalidKept();
+        var result = StrictJson.parseObject(kept.result()).keys(Set.of("schemaVersion", "toolCallId", "capabilityId",
+                "dataVersion", "items", "evidenceIds", "truncated", "nextAllowed", "error"),
+                Set.of("paths", "cachedFrom", "withheld"));
+        if (!ChatToolRegistry.SCHEMA_VERSION.equals(result.string("schemaVersion"))
+                || !kept.toolCallId().equals(result.string("toolCallId"))
+                || !kept.capabilityId().equals(result.string("capabilityId")) || !result.isNull("error")) {
+            throw invalidKept();
+        }
+        if (result.has("cachedFrom")) result.string("cachedFrom");
+        boolean cut = result.has("withheld") && result.object("withheld").keys(Set.of("reason", "items", "evidenceIds",
+                "paths"), Set.of()).count("items") > 0;
+        var output = new ChatToolOutput(result.string("dataVersion"), MAPPER.convertValue(result.array("items"), ITEMS),
+                result.strings("evidenceIds"), result.bool("truncated") || cut, result.bool("nextAllowed"),
+                result.has("paths") ? MAPPER.convertValue(result.array("paths"), PATHS) : List.of());
+        if (invalid(query, output) != null) throw invalidKept();
+        return ChatToolResult.succeeded(kept.toolCallId(), run, query, output);
+    }
+
+    private static ChatModels.Failure invalidKept() {
+        return new ChatModels.Failure(ChatModels.Failure.Fate.REFUSED, "kept tool result does not belong to the run");
+    }
+
+    /**
      * Runs calls that are already reserved ({@code ids}, in the same order as {@code calls}) under the same limits and
      * records as {@link #runStage}, with {@code delivery} deciding on each usable read before it is recorded.
      */
@@ -218,7 +279,7 @@ public class ChatToolRunner implements AutoCloseable {
                 slots.release();
                 inFlight.release();
                 started.add(CompletableFuture.supplyAsync(
-                        () -> finish(control, id, call, null, new TimeoutException(), superseded, delivery), records));
+                        () -> finish(run, control, id, call, null, new TimeoutException(), superseded, delivery), records));
                 continue;
             }
             // The task always runs (never cancelled before it starts), so its slots are always given back; a timeout
@@ -242,7 +303,7 @@ public class ChatToolRunner implements AutoCloseable {
                 Thread thread = reader.get();
                 if (error instanceof TimeoutException && thread != null) thread.interrupt();
             });
-            started.add(read.handleAsync((output, error) -> finish(control, id, call, output, error, superseded,
+            started.add(read.handleAsync((output, error) -> finish(run, control, id, call, output, error, superseded,
                     delivery), records));
         }
         awaitRecords(started, stageEnd, superseded);
@@ -308,7 +369,7 @@ public class ChatToolRunner implements AutoCloseable {
      * Records the end of one call. {@code output} is already what {@link Delivery#pass} let through (a subset of a usable
      * read is still usable); nothing here reads or waits beyond the record itself.
      */
-    private ChatToolResult finish(ChatRunControl control, String id, ChatToolRequest call, ChatToolOutput output,
+    private ChatToolResult finish(ChatRun run, ChatRunControl control, String id, ChatToolRequest call, ChatToolOutput output,
             Throwable error, AtomicBoolean superseded, Delivery delivery) {
         ChatToolResult result;
         ChatToolCallEnd end;
@@ -320,7 +381,7 @@ public class ChatToolRunner implements AutoCloseable {
             result = ChatToolResult.failed(id, call.capabilityId(), refused);
             end = ChatToolCallEnd.failed(refused);
         } else if (error == null && problem == null) {
-            result = ChatToolResult.succeeded(id, call.capabilityId(), output);
+            result = ChatToolResult.succeeded(id, run, call, output);
             end = new ChatToolCallEnd("succeeded", null, output.dataVersion(), output.evidenceIds(), output.truncated(),
                     output.nextAllowed(), delivery.keep(result));
         } else {

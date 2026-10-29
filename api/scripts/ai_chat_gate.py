@@ -4,7 +4,7 @@
 Authors the exact stage inputs the Java adapters (`com.zoop.chat.model.ChatModelStages`) must build for a fixed synthetic
 scenario, and an authored replay answer for each, keyed by the worker's own request identity. A Java input that differs in
 any field has no replay entry and is refused (`replay_input_mismatch`), so the gate proves the two sides agree on the
-`zoop-ai-chat-1` inputs and answers, not only on the envelope. Before any process starts, the fixture is replayed in-process
+`zoop-ai-chat-2` inputs and answers, not only on the envelope. Before any process starts, the fixture is replayed in-process
 through the worker runtime so an authoring mistake fails here and not as a Java mismatch.
 
 Then starts one real `ai/service` (127.0.0.1, fresh temp state, replay only, live gate closed: a supported Jev model name so
@@ -12,12 +12,15 @@ a live request reaches the gate, but no live enable, budget or provider key; syn
 no PostgreSQL) with the chat group, runs `./api/gradlew aiChatContractTest` against it, checks the JUnit report
 (every contract test named in CONTRACT_TESTS ran, none skipped or failed) and that no credential or private path reached the
 service log or the Gradle output.
+Then checks the native verifier request through a second service and a loopback fake Jev provider. Both services use fresh
+synthetic state; no external provider, real credential or PostgreSQL is involved.
 
 Run with the ai/service environment (`make service-install` first): `make api-ai-chat-smoke`. `--check-fixture` only runs the
 in-process fixture check. Needs JDK 21 (JAVA_HOME) like any api build.
 """
 from __future__ import annotations
 
+import copy
 import json
 import os
 import re
@@ -34,13 +37,14 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "ai" / "service" / "tests"))
+sys.path.insert(0, str(ROOT / "ai" / "worker" / "tests"))
 
 from support import PGREP, ServiceProcess, Workspace, remove_tree, terminate_runtime  # noqa: E402
 
 API = ROOT / "api"
 RESULTS = API / "build" / "test-results" / "aiChatContractTest"
 GRADLE_TIMEOUT_SECONDS = 900
-SCHEMA = "zoop-ai-chat-1"
+SCHEMA = "zoop-ai-chat-2"
 # Not a secret: the one Jev model the worker supports. Set so a live request passes the stage configuration and is refused
 # by the closed live gate itself; live enable, budget and provider keys stay unset.
 LIVE_JEV_MODEL = "jev-1.14.0"
@@ -49,6 +53,7 @@ CONTRACT_TESTS = frozenset({
     "theRouterAnswersTheServerSplitRequirementsWithTypedProbabilities",
     "theAnswerIsGeneratedFromTheGrantedQuote",
     "theVerifierJudgesEachSection",
+    "theOrchestratorSendsBoundMemberAndComparisonFacts",
     "theSameInvocationIsAnsweredFromTheLedgerAndNeverSentAgain",
     "aQuoteWithoutAChatGrantIsRefusedBeforeSending",
     "anInputTheFixtureDoesNotKnowIsRefusedNotGuessed",
@@ -83,8 +88,30 @@ ANSWER_INPUT = {
 ANSWER = {"sections": [{"basis": "evidence_grounded", "text": EVIDENCE_TEXT, "requirementIds": ["r1"], "evidenceIds": [EVIDENCE]}],
           "insufficientRequirementIds": [], "graphTargetIds": ["c-samsung"]}
 VERIFICATION_INPUT = {
-    "sections": [{"basis": "evidence_grounded", "text": EVIDENCE_TEXT, "evidenceIds": [EVIDENCE]},
-                 {"basis": "general_knowledge", "text": GENERAL_TEXT, "evidenceIds": []}],
+    "requestBinding": {"invocationId": "chat-verify-gate.1.verify", "graphVersionId": "gv-synthetic",
+                       "asOf": "2026-10-21T00:00:00Z"},
+    "sections": [{"sectionId": "s0", "requirementIds": ["r1"], "serverFacts": [],
+                  "basis": "evidence_grounded", "text": EVIDENCE_TEXT, "evidenceIds": [EVIDENCE]},
+                 {"sectionId": "s1", "requirementIds": ["r2"], "serverFacts": [],
+                  "basis": "general_knowledge", "text": GENERAL_TEXT, "evidenceIds": []}],
+    "citations": [QUOTE],
+}
+FACT_VERIFICATION_INPUT = {
+    "requestBinding": {"invocationId": "chat-facts-gate.1.verify", "graphVersionId": "gv-synthetic",
+                       "asOf": "2026-10-21T00:00:00Z"},
+    "sections": [{"sectionId": "s0", "requirementIds": ["r1"], "basis": "evidence_grounded",
+                  "text": "보유 종목 삼성전자와 관심 종목 NVIDIA의 조회된 지도 변경입니다.",
+                  "evidenceIds": [EVIDENCE], "serverFacts": [
+        {"kind": "portfolio_scope", "requirementId": "r1", "timing": "current_request_read",
+         "queryScope": "current_member", "companyIds": [], "companyLimit": 5, "truncated": True,
+         "companies": [{"companyId": "KRX:005930", "name": "삼성전자", "held": True, "watched": False},
+                       {"companyId": "NASDAQ:NVDA", "name": "NVIDIA", "held": False, "watched": True}]},
+        {"kind": "graph_comparison", "requirementId": "r1", "fromVersion": "gv-earlier", "toVersion": "gv-synthetic",
+         "asOf": "2026-10-21T00:00:00Z", "since": None, "queryScope": "targets",
+         "targetIds": ["KRX:005930", "NASDAQ:NVDA"], "evidenceLimit": 20, "changeLimit": 40,
+         "evidenceRestricted": False, "truncated": True,
+         "changes": [{"id": "iss-new", "kind": "issue", "name": "공급 계약", "change": "added"},
+                     {"id": "iss-old", "kind": "issue", "name": "이전 사건", "change": "removed"}]}]}],
     "citations": [QUOTE],
 }
 
@@ -95,7 +122,8 @@ class GateFailure(Exception):
 
 def _request(stage: str, payload: dict[str, Any]):
     from zoop_ai.chat_contracts import StageRequest
-    return StageRequest.model_validate({"schemaVersion": SCHEMA, "invocationId": "gate-authoring", "stage": stage,
+    invocation = payload.get("requestBinding", {}).get("invocationId", "gate-authoring")
+    return StageRequest.model_validate({"schemaVersion": SCHEMA, "invocationId": invocation, "stage": stage,
                                         "mode": "replay", "input": payload})
 
 
@@ -133,12 +161,14 @@ def author_replay() -> dict[str, Any]:
     entry("chat-verification", VERIFICATION_INPUT, {"model": "authored-synthetic-chat-verification",
                                                     "answers": {"s0-support": supported, "s0-advice": _noul(0.02),
                                                                 "s1-advice": _noul(0.02)}})
+    entry("chat-verification", FACT_VERIFICATION_INPUT, {"model": "authored-synthetic-chat-verification",
+                                                        "answers": {"s0-support": supported, "s0-advice": _noul(0.02)}})
     return {"schemaVersion": SCHEMA, "recordingKind": "authored-test", "responses": entries}
 
 
 def grants() -> dict[str, Any]:
     """Only SOURCE may be quoted to the replay recipient; the scenario's second source is deliberately absent."""
-    return {"schemaVersion": SCHEMA, "grants": [{
+    return {"schemaVersion": "zoop-ai-chat-1", "grants": [{
         "grantId": "g-chat-synthetic", "revision": "1", "sourceId": SOURCE, "enabled": True, "rights": "known",
         "allowedOperations": ["read", "model-send", "quote-display"], "recipients": ["authored-replay"],
         "purposes": ["chat-answer", "chat-verification"], "evidence": ["synthetic gate fixture"], "expiresAt": None}]}
@@ -147,15 +177,23 @@ def grants() -> dict[str, Any]:
 def check_fixture(replay: dict[str, Any], registry: dict[str, Any], state: Path) -> None:
     """Replays every authored stage through the worker runtime in-process: each must succeed with the expected answer."""
     from zoop_ai.chat_contracts import ChatGrantRegistry
-    from zoop_ai.chat_runtime import ReplaySender, invoke
+    from zoop_ai.chat_runtime import ReplaySender, invoke, provider_body, stage_config
 
     path = state / "replay.check.json"
     path.write_text(json.dumps(replay, ensure_ascii=False), encoding="utf-8")
     sender = ReplaySender(path)
     parsed = ChatGrantRegistry.model_validate(registry)
-    for stage, payload in (("chat-router", ROUTER_INPUT), ("chat-answer", ANSWER_INPUT), ("chat-verification", VERIFICATION_INPUT)):
-        result = invoke(_request(stage, payload).model_copy(update={"invocation_id": f"check-{stage}"}), state_dir=state,
-                        registry=parsed, sender=sender, env={})
+    for stage, payload in (("chat-router", ROUTER_INPUT), ("chat-answer", ANSWER_INPUT),
+                           ("chat-verification", VERIFICATION_INPUT), ("chat-verification", FACT_VERIFICATION_INPUT)):
+        request = _request(stage, payload)
+        if stage != "chat-verification":
+            request = request.model_copy(update={"invocation_id": f"check-{stage}"})
+        if stage == "chat-verification":
+            _, outbound = provider_body(request, stage_config(stage, "replay"))
+            assert outbound["state"]["requestBinding"] == payload["requestBinding"]
+            for sent, expected in zip(outbound["state"]["sections"], payload["sections"], strict=True):
+                assert sent["serverFacts"] == expected["serverFacts"]
+        result = invoke(request, state_dir=state, registry=parsed, sender=sender, env={})
         if result.status != "succeeded":
             raise GateFailure(f"authored {stage} fixture does not replay: {result.failure.code if result.failure else '?'}")
     answer = invoke(_request("chat-answer", ANSWER_INPUT).model_copy(update={"invocation_id": "check-answer-again"}),
@@ -241,6 +279,74 @@ def terminate_chat(command: Path, state: Path, timeout: float = 10.0) -> None:
         time.sleep(0.1)
 
 
+def check_native_http(root: Path, command: Path) -> None:
+    """Real service HTTP -> CLI decoder -> Jev builder -> loopback native provider, with synthetic credentials only."""
+    from fake_providers import FakeServer, jev_respond
+    from zoop_ai.chat_runtime import stage_config
+
+    provider = FakeServer(jev_respond())
+    service = None
+    state = root / "native-chat-state"
+    try:
+        workspace = Workspace(root / "native")
+        settings = {"ZOOP_AI_CHAT_LIVE_ENABLED": "1", "ZOOP_AI_CHAT_MAX_CALLS": "2",
+                    "ZOOP_AI_CHAT_JEV_MODEL": LIVE_JEV_MODEL, "TYPESAFE_BASE_URL": provider.base,
+                    "TYPESAFE_API_KEY": "synthetic-loopback-only"}
+        registry = grants()
+        registry["grants"][0]["recipients"] = [
+            "typesafe-native:" + stage_config("chat-verification", "live", settings).provider_revision]
+        grant_path = root / "native-grants.json"
+        grant_path.write_text(json.dumps(registry), encoding="utf-8")
+        env = workspace.env(**settings, ZOOP_AI_SERVICE_CHAT_COMMAND=str(command), ZOOP_AI_CHAT_STATE_DIR=str(state),
+                            ZOOP_AI_SERVICE_CHAT_GRANTS=str(grant_path))
+        service = ServiceProcess(workspace, env=env).start()
+        body = _request("chat-verification", FACT_VERIFICATION_INPUT).wire()
+        body["mode"] = "live"
+
+        def send(value):
+            return service.request("POST", "/internal/v1/chat-stages/chat-verification", as_="chatter",
+                                   body=value, key=value["invocationId"])
+
+        response = send(body)
+        assert response.status_code == 200, response.text
+        assert response.json()["answer"]["sections"] == [{"support": "supported", "prohibitedAdvice": "no"}]
+        assert len(provider.requests) == 1
+        observed = provider.requests[0]
+        assert observed["path"] == "/v1/systemone"
+        state_sent = observed["body"]["state"]
+        assert state_sent["requestBinding"] == FACT_VERIFICATION_INPUT["requestBinding"]
+        assert state_sent["sections"][0]["serverFacts"] == FACT_VERIFICATION_INPUT["sections"][0]["serverFacts"]
+        assert state_sent["sections"][0]["citedQuotes"] == [{"quote": QUOTE["quote"]}]
+        assert set(observed["body"]["questions"]) == {"s0-support", "s0-advice"}
+
+        for change in (
+                lambda v: v.update(invocationId="foreign-job.1.verify"),
+                lambda v: v["input"]["sections"][0]["serverFacts"][0].update(requirementId="other"),
+                lambda v: v["input"]["sections"][0]["serverFacts"][1].update(toVersion="stale"),
+                lambda v: v["input"]["sections"][0].update(sectionId="s1"),
+                lambda v: v.update(schemaVersion="zoop-ai-chat-1")):
+            forged = copy.deepcopy(body)
+            change(forged)
+            assert send(forged).status_code == 422
+        assert len(provider.requests) == 1, "invalid context must not reach a provider"
+
+        absent = copy.deepcopy(body)
+        absent["invocationId"] = absent["input"]["requestBinding"]["invocationId"] = "no-facts.1.verify"
+        absent["input"]["sections"][0].update(serverFacts=[], evidenceIds=[])
+        absent["input"]["citations"] = []
+        response = send(absent)
+        assert response.status_code == 200, response.text
+        assert response.json()["answer"]["sections"] == [{"support": "hold", "prohibitedAdvice": "no"}]
+        assert len(provider.requests) == 2
+        assert provider.requests[1]["body"]["state"]["sections"][0]["serverFacts"] == []
+        print("chat-native-loopback: context=bound, forgeryRejections=5, absentContext=hold, localProviderCalls=2, externalCalls=0")
+    finally:
+        if service is not None:
+            service.close()
+        terminate_chat(command, state)
+        provider.close()
+
+
 def main(argv: list[str]) -> int:
     root = Path(tempfile.mkdtemp(prefix="zoop-api-ai-chat-contract-")).resolve()
     root.chmod(0o700)
@@ -291,7 +397,10 @@ def main(argv: list[str]) -> int:
         private = [*workspace.private_strings(), str(chat), str(command)]
         if any(s in output or s in service.logs() for s in private):
             raise GateFailure("a credential or private path reached the service log or the Gradle output")
-        print(f"api-ai-chat-smoke: status=passed, javaTests={tests}, services=1, providerCalls=0")
+        service.close()
+        service = None
+        check_native_http(root, command)
+        print(f"api-ai-chat-smoke: status=passed, javaTests={tests}, services=2, localProviderCalls=2, externalCalls=0")
         return 0
     except (GateFailure, AssertionError, OSError) as error:
         print(f"api-ai-chat-smoke: status=failed: {error}", file=sys.stderr)

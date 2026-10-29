@@ -317,8 +317,9 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
 
         control.phase("verifying");
         List<Citation> allCited = List.copyOf(cited.values());
+        ChatModels.ServerFacts facts = ChatModels.ServerFacts.capture(run, passed.sections(), branches);
         ChatSemanticVerdicts verdicts = model(control, limits.verify(), limits.server(),
-                () -> verifier.verify(run, passed.sections(), allCited));
+                () -> verifier.verify(run, passed.sections(), allCited, facts));
         Set<String> held = held(passed.sections(), verdicts);
         if (held == null) return validationFailed();
         route.putArray("heldRequirements").addAll(strings(held));

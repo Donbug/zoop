@@ -7,17 +7,16 @@ import com.zoop.chat.executor.ChatRunSuperseded;
 import com.zoop.chat.orchestrator.ChatAgentPath;
 import com.zoop.chat.orchestrator.ChatModels;
 import com.zoop.chat.repository.ChatExecutionRepository;
-import com.zoop.chat.repository.ChatKeptToolResult;
 import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolPath;
 import com.zoop.chat.tool.ChatToolResult;
+import com.zoop.chat.tool.ChatToolRunner;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * The agent path over the ZOOP MCP endpoint (MCP actions contract 3.4): the server issues the run's grant token, Luna runs in
@@ -52,17 +51,17 @@ public final class ChatMcpAgent implements ChatAgentPath {
     /** The recipient the results' send grants are checked for ({@link ChatSendGrants#recipient}); each step names it. */
     private final String recipient;
     private final ChatExecutionRepository runs;
-    private final ObjectMapper mapper;
+    private final ChatToolRunner runner;
     private final ChatMcpCircuitBreaker circuit;
 
     public ChatMcpAgent(ChatModels.Agent agent, ChatMcpTools tools, ChatMcpGrants grants, String recipient,
-            ChatExecutionRepository runs, ObjectMapper mapper, ChatMcpCircuitBreaker circuit) {
+            ChatExecutionRepository runs, ChatToolRunner runner, ChatMcpCircuitBreaker circuit) {
         this.agent = agent;
         this.tools = tools;
         this.grants = grants;
         this.recipient = recipient;
         this.runs = runs;
-        this.mapper = mapper;
+        this.runner = runner;
         this.circuit = circuit;
     }
 
@@ -167,12 +166,11 @@ public final class ChatMcpAgent implements ChatAgentPath {
         return ids;
     }
 
-    /** The results the attempt's MCP calls returned to the model, as kept on the ledger. */
+    /**
+     * The results the attempt's MCP calls returned to the model, as kept on the ledger and rebound to this run: a kept
+     * result that does not belong to it is refused, never passed on.
+     */
     private List<ChatToolResult> kept(ChatRun run) {
-        List<ChatToolResult> results = new ArrayList<>();
-        for (ChatKeptToolResult kept : runs.keptToolResults(run.jobId(), run.attemptNo())) {
-            results.add(ChatMcpTools.kept(mapper, kept));
-        }
-        return results;
+        return runs.keptToolResults(run.jobId(), run.attemptNo()).stream().map(kept -> runner.restore(run, kept)).toList();
     }
 }

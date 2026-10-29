@@ -258,9 +258,14 @@ public final class MemoryChatStore implements ChatRepository, ChatExecutionRepos
         return toolCalls.stream().filter(c -> c.row.jobId().equals(jobId) && c.row.attemptNo() == attemptNo
                         && "succeeded".equals(c.status) && c.end != null && c.end.result() != null)
                 .sorted(Comparator.comparingInt(c -> c.row.callIndex()))
-                .map(c -> new com.zoop.chat.repository.ChatKeptToolResult(c.row.toolCallId(), c.row.capabilityId(),
-                        c.end.result()))
+                .map(this::kept)
                 .toList();
+    }
+
+    private com.zoop.chat.repository.ChatKeptToolResult kept(ToolCall c) {
+        return new com.zoop.chat.repository.ChatKeptToolResult(c.row.jobId(), jobs.get(c.row.jobId()).row.memberId(),
+                c.row.attemptNo(), c.row.toolCallId(), c.row.capabilityId(), c.row.requestMeta(), c.row.inputDigest(),
+                c.end.result());
     }
 
     @Override
@@ -270,8 +275,7 @@ public final class MemoryChatStore implements ChatRepository, ChatExecutionRepos
                         && c.row.capabilityId().equals(capabilityId) && c.row.inputDigest().equals(inputDigest)
                         && "succeeded".equals(c.status) && c.end != null && c.end.result() != null)
                 .min(Comparator.comparingInt(c -> c.row.callIndex()))
-                .map(c -> new com.zoop.chat.repository.ChatKeptToolResult(c.row.toolCallId(), c.row.capabilityId(),
-                        c.end.result()));
+                .map(this::kept);
     }
 
     @Override

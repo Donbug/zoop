@@ -79,14 +79,15 @@ public class ChatMcpConfiguration {
     @Bean
     @ConditionalOnProperty(name = "zoop.chat.mcp.agent-enabled", havingValue = "true")
     ChatMcpAgent chatMcpAgent(ObjectProvider<ChatModels.Agent> agent, ChatMcpTools tools, ChatMcpGrants grants,
-            ChatSendGrants sendGrants, ChatExecutionRepository runs, ObjectProvider<HttpChatStageClient> client, Clock clock) {
+            ChatSendGrants sendGrants, ChatExecutionRepository runs, ChatToolRunner runner,
+            ObjectProvider<HttpChatStageClient> client, Clock clock) {
         ChatModels.Agent stages = agent.getIfAvailable();
         HttpChatStageClient transport = client.getIfAvailable();
         if (stages == null || transport == null) {
             throw new IllegalStateException("zoop.chat.mcp.agent-enabled needs the chat model stages (zoop.ai.chat-client.enabled)");
         }
         var circuit = new ChatMcpCircuitBreaker(transport::probeMcp, clock);
-        return new ChatMcpAgent(stages, tools, grants, sendGrants.recipient(), runs, PROTOCOL_JSON, circuit);
+        return new ChatMcpAgent(stages, tools, grants, sendGrants.recipient(), runs, runner, circuit);
     }
 
     @Bean(destroyMethod = "")

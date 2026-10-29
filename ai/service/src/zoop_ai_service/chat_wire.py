@@ -1,5 +1,5 @@
 """Wire models of the chatbot model stage family (`/internal/v1/chat-stages`). The service never imports `zoop_ai`: these mirror the worker's
-`zoop-ai-chat-1` contract as an allowlisted view (unknown keys are dropped on output, missing ones fail closed), and the field-for-field agreement is
+`zoop-ai-chat-2` contract as an allowlisted view (unknown keys are dropped on output, missing ones fail closed), and the field-for-field agreement is
 tested. The stage input stays an opaque object for the service: the installed `zoop-ai-chat` validates it completely."""
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
-CHAT_SCHEMA = "zoop-ai-chat-1"
+CHAT_SCHEMA = "zoop-ai-chat-2"
 ChatStage = Literal["chat-router", "chat-answer", "chat-verification", "chat-agent"]
 STAGES: tuple[str, ...] = ("chat-router", "chat-answer", "chat-verification", "chat-agent")
 # The caller's invocation id. The service prefixes it with the principal before the child sees it, so two principals never share a ledger row.
@@ -29,12 +29,12 @@ class ChatView(ChatWire):
 
 
 class ChatStageRequest(ChatWire):
-    schema_version: Literal["zoop-ai-chat-1"]
+    schema_version: Literal["zoop-ai-chat-2"]
     invocation_id: str = Field(pattern=r"^[A-Za-z0-9_.:-]{8,96}$",
                                description="Identifies one stage of one attempt; must equal Idempotency-Key. The same id and input never send twice.")
     stage: ChatStage
     mode: Literal["replay", "live"]
-    input: dict[str, Any] = Field(description="The stage input of the zoop-ai-chat-1 contract (RouterInput, AnswerInput or VerificationInput).")
+    input: dict[str, Any] = Field(description="The closed zoop-ai-chat-2 stage input (RouterInput, AnswerInput, VerificationInput or AgentInput).")
 
 
 class ChatUsage(ChatView):
@@ -64,7 +64,7 @@ class ChatStageFailure(ChatView):
 class ChatMcpHealth(ChatView):
     """Whether the operator's ZOOP MCP server answered a content-free probe at its configured URL (`zoop-ai-chat probe-mcp`): an MCP ping
     with no grant that the endpoint itself must refuse as unauthenticated. Nothing is run and no model is called."""
-    schema_version: Literal["zoop-ai-chat-1"]
+    schema_version: Literal["zoop-ai-chat-2"]
     mcp: Literal["reachable", "unreachable"]
     reason: Literal["mcp_timeout", "mcp_connect_failed", "mcp_status_unexpected"] | None = Field(
         default=None, description="Why it is unreachable: no answer in time, no connection, or an answer that is not the endpoint's own refusal.")
@@ -149,7 +149,7 @@ class ChatStageResult(ChatView):
     """The outcome. Besides the field shapes the door checks the invariants: `succeeded` has an answer of its own stage's model, no failure and a
     receipt; `failed` has a failure and no answer; `unknown` implies `sent`; a receipt is present exactly when something was sent and names the
     requested mode."""
-    schema_version: Literal["zoop-ai-chat-1"]
+    schema_version: Literal["zoop-ai-chat-2"]
     invocation_id: str
     stage: ChatStage
     status: Literal["succeeded", "failed"]

@@ -32,6 +32,7 @@ import com.zoop.chat.tool.ChatToolOutput;
 import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolRequest;
 import com.zoop.chat.tool.ChatToolRunner;
+import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.chat.tool.ChatToolScope;
 import com.zoop.chat.tool.ChatToolUnavailable;
 import org.junit.jupiter.api.AfterEach;
@@ -63,6 +64,9 @@ class OrchestratedChatEngineTest {
     private RuntimeException routerFailure;
     private RuntimeException generatorFailure;
     private int verifierCalls;
+    private ChatModels.ServerFacts verifiedFacts;
+    private ChatRun verifiedRun;
+    private List<Section> verifiedSections;
 
     OrchestratedChatEngineTest() {
         tools.put(ChatCapability.COMPANY_READ, (scope, request) -> {
@@ -612,6 +616,68 @@ class OrchestratedChatEngineTest {
                 result.citations().stream().map(Citation::sourceKind).collect(java.util.stream.Collectors.toSet()));
     }
 
+    @Test
+    void serverFactsStayOnTheParentRequirementAndRejectForeignRunsOrSections() {
+        tools.put(ChatCapability.PORTFOLIO_SCOPE_READ, (scope, query) -> new ChatToolOutput("member-scope",
+                List.of(new ChatToolItem(HYNIX, "company", "SK하이닉스 (보유)", List.of(HYNIX), List.of()),
+                        new ChatToolItem(NVDA, "company", "NVIDIA (관심)", List.of(NVDA), List.of())),
+                List.of(), true, false));
+        tools.put(ChatCapability.GRAPH_VERSION_DIFF, (scope, query) -> new ChatToolOutput("v0.." + scope.graphVersionId(),
+                List.of(new ChatToolItem("iss-new", "issue", "[새로 생김] 공급 계약", List.of(HYNIX), List.of("ev-issue")),
+                        new ChatToolItem("iss-old", "issue", "[사라짐] 이전 사건", List.of(NVDA), List.of())),
+                List.of("ev-issue"), true, false));
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q05, 0.9, ChatQueryType.Q07, 0.9),
+                Map.of("portfolio.scope.read", 0.9, "graph.version.diff", 0.9)));
+        answer = new ChatGeneratedAnswer(List.of(grounded("보유·관심 종목의 조회된 변경입니다.", List.of("r1"),
+                "ev-issue")), List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("hold", "no")));
+        var control = new Control(Duration.ofSeconds(60));
+        assertEquals("insufficient_evidence", completed(engine().answer(run(), control)).outcome());
+        assertEquals(2, control.reserved.size(), "scope and diff once each; no verifier membership requery");
+        assertEquals(1, generated.getFirst().branches().size(), "scope stays merged into parent");
+        var facts = verifiedFacts.forRequest(verifiedRun, verifiedSections).getFirst();
+        assertEquals(2, facts.size());
+        var member = assertInstanceOf(ChatModels.PortfolioFact.class, facts.getFirst());
+        assertEquals("r1", member.requirementId());
+        assertEquals("current_member", member.queryScope());
+        assertEquals(List.of(), member.companyIds());
+        assertEquals(List.of(new ChatModels.MemberCompany(HYNIX, "SK하이닉스", true, false),
+                new ChatModels.MemberCompany(NVDA, "NVIDIA", false, true)), member.companies());
+        assertTrue(member.truncated());
+        var comparison = assertInstanceOf(ChatModels.ComparisonFact.class, facts.getLast());
+        assertEquals("r1", comparison.requirementId());
+        assertEquals("v0", comparison.fromVersion());
+        assertEquals("v1", comparison.toVersion());
+        assertEquals(verifiedRun.context().asOf(), comparison.asOf());
+        assertEquals(List.of(HYNIX, NVDA), comparison.targetIds());
+        assertEquals(20, comparison.evidenceLimit());
+        assertEquals(List.of("added", "removed"), comparison.changes().stream().map(ChatModels.GraphChange::change).toList());
+        assertTrue(comparison.truncated());
+
+        ChatRun other = new ChatRun(verifiedRun.jobId(), verifiedRun.sessionId(), "other-member", verifiedRun.attemptNo(),
+                verifiedRun.mode(), verifiedRun.turns(), verifiedRun.context(), verifiedRun.selection(),
+                verifiedRun.graphVersionId(), verifiedRun.clarificationDepth(), verifiedRun.askedAt(), verifiedRun.deadline());
+        assertThrows(ChatModels.Failure.class, () -> verifiedFacts.forRequest(other, verifiedSections));
+        assertThrows(ChatModels.Failure.class, () -> verifiedFacts.forRequest(run(), verifiedSections));
+        assertThrows(ChatModels.Failure.class, () -> verifiedFacts.forRequest(verifiedRun,
+                List.of(grounded("다른 주장", List.of("r1"), "ev-issue"))));
+        assertThrows(ChatModels.Failure.class, () -> ChatModels.ServerFacts.capture(other, verifiedSections,
+                generated.getFirst().branches()));
+        var original = generated.getFirst().branches().getFirst().results().getLast();
+        var stale = new ChatToolResult(original.schemaVersion(), original.toolCallId(), original.capabilityId(),
+                "v0..stale", original.items(), original.evidenceIds(), original.truncated(), original.nextAllowed(),
+                null, original.paths(), original.provenance());
+        var branch = new ChatBranchContext.Branch("r1", "비교", Set.of(ChatQueryType.Q05), false, List.of(stale), false);
+        assertThrows(ChatModels.Failure.class, () -> ChatModels.ServerFacts.capture(verifiedRun, verifiedSections,
+                List.of(branch)));
+        var unbound = new ChatToolResult(original.schemaVersion(), original.toolCallId(), original.capabilityId(),
+                original.dataVersion(), original.items(), original.evidenceIds(), original.truncated(), original.nextAllowed(),
+                null, original.paths(), null);
+        var unboundBranch = new ChatBranchContext.Branch("r1", "비교", Set.of(ChatQueryType.Q05), false, List.of(unbound), false);
+        assertThrows(ChatModels.Failure.class, () -> ChatModels.ServerFacts.capture(verifiedRun, verifiedSections,
+                List.of(unboundBranch)));
+    }
+
     // ---- fixtures -------------------------------------------------------------------------------------------------------
 
     private ChatRouteDecision dependent(String cardinality, int count) {
@@ -643,8 +709,11 @@ class OrchestratedChatEngineTest {
             if (generatorFailure != null) throw generatorFailure;
             return answer;
         };
-        ChatModels.Verifier verifier = (run, sections, citations) -> {
+        ChatModels.Verifier verifier = (run, sections, citations, facts) -> {
             verifierCalls++;
+            verifiedFacts = facts;
+            verifiedRun = run;
+            verifiedSections = sections;
             return verdicts;
         };
         ChatCitationSource citations = (id, version, asOf, trace) -> Optional.ofNullable(readable.get(id));

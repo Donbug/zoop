@@ -295,7 +295,7 @@ class ChatAgentPathEngineTest {
             generated.add(context);
             return directAnswer;
         };
-        ChatModels.Verifier verifier = (run, sections, citations) -> {
+        ChatModels.Verifier verifier = (run, sections, citations, facts) -> {
             verifierCalls++;
             return verdicts;
         };

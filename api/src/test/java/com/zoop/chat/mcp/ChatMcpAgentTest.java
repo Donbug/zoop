@@ -2,24 +2,34 @@ package com.zoop.chat.mcp;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zoop.chat.executor.ChatEngine;
+import com.zoop.chat.executor.ChatEngineOutcome;
 import com.zoop.chat.executor.ChatJobExecutor;
 import com.zoop.chat.executor.ChatRunSuperseded;
 import com.zoop.chat.executor.MemoryChatStore;
 import com.zoop.chat.executor.NoChatTransactions;
+import com.zoop.chat.dto.Citation;
 import com.zoop.chat.orchestrator.ChatAgentPath;
+import com.zoop.chat.orchestrator.ChatCitationSource;
 import com.zoop.chat.orchestrator.ChatGeneratedAnswer;
 import com.zoop.chat.orchestrator.ChatModels;
+import com.zoop.chat.orchestrator.ChatQueryType;
+import com.zoop.chat.orchestrator.ChatRouteDecision;
+import com.zoop.chat.orchestrator.ChatSemanticVerdicts;
+import com.zoop.chat.orchestrator.OrchestratedChatEngine;
 import com.zoop.chat.repository.ChatJobRow;
+import com.zoop.chat.repository.ChatKeptToolResult;
 import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatTool;
 import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolOutput;
 import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolRequest;
+import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.chat.tool.ChatToolRunner;
 import com.zoop.chat.tool.ChatToolScope;
 import io.modelcontextprotocol.common.McpTransportContext;
@@ -32,6 +42,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
@@ -40,6 +51,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * D-AI-02: the agent path's approval loop over the real MCP tools and a running job of the memory store. A scripted Luna asks,
@@ -63,6 +75,7 @@ class ChatMcpAgentTest {
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     private MemoryChatStore store;
     private ChatToolRunner runner;
+    private ChatToolRegistry registry;
     private ChatJobExecutor executor;
     private ChatMcpTools tools;
     private ChatMcpGrants grants;
@@ -71,7 +84,8 @@ class ChatMcpAgentTest {
     @BeforeEach
     void setUp() {
         store = new MemoryChatStore();
-        var registry = new ChatToolRegistry(List.of(tool(ChatCapability.COMPANY_READ), tool(ChatCapability.ISSUE_READ)));
+        registry = new ChatToolRegistry(List.of(tool(ChatCapability.COMPANY_READ), tool(ChatCapability.ISSUE_READ),
+                tool(ChatCapability.GRAPH_VERSION_DIFF)));
         runner = new ChatToolRunner(registry);
         executor = new ChatJobExecutor(store, store,
                 new StaticListableBeanFactory(Map.of()).getBeanProvider(ChatEngine.class), mapper, clock,
@@ -83,7 +97,8 @@ class ChatMcpAgentTest {
                 + "\"ownerToken\":\"owner-1\"}]";
         store.add(new ChatJobRow(JOB, "conv-0001", "member-a", 1, "SK하이닉스 최근 사건", "a".repeat(64), NOW, CONTEXT,
                 SELECTION, List.of(), "gv-1", "queued", null, null, null, null, 0, null, null, 0, attempts, NOW, NOW, null));
-        assertTrue(store.start(JOB, "owner-1", NOW.plusSeconds(45), NOW.plusSeconds(60), attempts, NOW));
+        // The full orchestrator reserves 53 seconds before routing; use the production 60-second job deadline.
+        assertTrue(store.start(JOB, "owner-1", NOW.plusSeconds(60), NOW.plusSeconds(60), attempts, NOW));
     }
 
     @AfterEach
@@ -125,9 +140,12 @@ class ChatMcpAgentTest {
         return new ChatModels.AgentStep("resp_done", List.of(), ANSWER);
     }
 
+    private ChatMcpCircuitBreaker circuit() {
+        return new ChatMcpCircuitBreaker(() -> new com.zoop.ai.chat.ChatMcpHealth(true, null), clock);
+    }
+
     private ChatAgentPath.Outcome run(ChatAgentPath.Steps steps) {
-        var circuit = new ChatMcpCircuitBreaker(() -> new com.zoop.ai.chat.ChatMcpHealth(true, null), clock);
-        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, mapper, circuit);
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner, circuit());
         var attached = executor.attach(JOB, 1).orElseThrow();
         return agent.run(attached.run(), attached.control(), REQUIREMENTS, List.of(ChatCapability.COMPANY_READ), 20, steps);
     }
@@ -285,10 +303,141 @@ class ChatMcpAgentTest {
         run(steps(false));
         var grant = grants.verify(luna.inputs.getFirst().grantToken()).orElseThrow();
         assertEquals(List.of(ChatCapability.COMPANY_READ), grant.tools());
-        assertEquals(NOW.plusSeconds(45), grant.expiresAt());
+        assertEquals(NOW.plusSeconds(60), grant.expiresAt());
         assertEquals(JOB, grant.jobId());
         assertEquals(ChatSendGrantsTest.RECIPIENT, luna.inputs.getFirst().recipient(),
                 "each step names the recipient the results' send grants are checked for");
+    }
+
+    /** A Q05 requirement on one resolved company: the map-change read both execution paths serve. */
+    private static final ChatModels.Router MAP_CHANGE = (current, bound) -> new ChatRouteDecision(List.of(
+            new ChatRouteDecision.Requirement("r1", "지도 변경", true, Map.of(ChatQueryType.Q05, 0.9),
+                    Map.of("graph.version.diff", 0.9), List.of("KRX:000660"), 0, null)), null);
+    private static final ChatCitationSource CITATIONS = (id, version, asOf, trace) -> Optional.of(new Citation("article", id,
+            "합성 근거", "art-1", "v1", null, null, 0, 5, "합성 기사", "합성 출처", NOW, "https://example.test"));
+
+    /** The facts the verifier was given for the first section, one list per verification. */
+    private static ChatModels.Verifier holdingVerifier(List<List<ChatModels.ServerFact>> observed) {
+        return (current, sections, citations, facts) -> {
+            observed.add(facts.forRequest(current, sections).getFirst());
+            return new ChatSemanticVerdicts(List.of(new ChatSemanticVerdicts.Verdict("hold", "no")));
+        };
+    }
+
+    @Test
+    void theDirectAndTheAgentPathVerifyAgainstTheSameFacts() {
+        var attached = executor.attach(JOB, 1).orElseThrow();
+        List<List<ChatModels.ServerFact>> observed = new ArrayList<>();
+        try (var direct = new OrchestratedChatEngine(MAP_CHANGE, (current, context) -> ANSWER, holdingVerifier(observed),
+                registry, runner, CITATIONS, clock)) {
+            assertInstanceOf(ChatEngineOutcome.Completed.class, direct.answer(attached.run(), attached.control()));
+        }
+        luna.script.add(n -> held("mcpr_diff", "graph_version_diff", Map.of("targets", List.of("KRX:000660"))));
+        luna.script.add(n -> done());
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner, circuit());
+        try (var viaAgent = new OrchestratedChatEngine(MAP_CHANGE,
+                (current, context) -> { throw new AssertionError("Q05 must use the agent"); }, holdingVerifier(observed),
+                registry, runner, CITATIONS, clock, agent)) {
+            assertInstanceOf(ChatEngineOutcome.Completed.class, viaAgent.answer(attached.run(), attached.control()));
+        }
+        assertEquals(2, observed.size());
+        assertEquals(1, observed.getFirst().size());
+        assertEquals(observed.getFirst(), observed.getLast(), "the same read gives the same fact on both paths");
+    }
+
+    @Test
+    void aRepeatedIdenticalReadIsOneFactNotTwo() {
+        luna.script.add(n -> held("mcpr_1", "graph_version_diff", Map.of("targets", List.of("KRX:000660"))));
+        luna.script.add(n -> held("mcpr_2", "graph_version_diff", Map.of("targets", List.of("KRX:000660"))));
+        luna.script.add(n -> done());
+        var attached = executor.attach(JOB, 1).orElseThrow();
+        List<List<ChatModels.ServerFact>> observed = new ArrayList<>();
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner, circuit());
+        try (var engine = new OrchestratedChatEngine(MAP_CHANGE,
+                (current, context) -> { throw new AssertionError("Q05 must use the agent"); }, holdingVerifier(observed),
+                registry, runner, CITATIONS, clock, agent)) {
+            engine.answer(attached.run(), attached.control());
+        }
+        assertEquals(2, store.keptToolResults(JOB, 1).size(), "the repeat is its own call, served from the first read");
+        assertEquals(1, observed.getFirst().size());
+    }
+
+    @Test
+    void aListTheSendGateCutIsRestoredAsTruncatedSoItNeverProvesAbsence() {
+        luna.script.add(n -> held("mcpr_diff", "graph_version_diff", Map.of("targets", List.of("KRX:000660"))));
+        luna.script.add(n -> done());
+        var attached = executor.attach(JOB, 1).orElseThrow();
+        List<List<ChatModels.ServerFact>> observed = new ArrayList<>();
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner, circuit());
+        try (var engine = new OrchestratedChatEngine(MAP_CHANGE,
+                (current, context) -> { throw new AssertionError("Q05 must use the agent"); }, holdingVerifier(observed),
+                registry, runner, CITATIONS, clock, agent)) {
+            engine.answer(attached.run(), attached.control());
+        }
+        var kept = store.keptToolResults(JOB, 1).getFirst();
+        assertFalse(runner.restore(attached.run(), kept).truncated());
+
+        var envelope = (ObjectNode) mapper.readTree(kept.result());
+        envelope.put("cachedFrom", "tc-0");
+        envelope.putObject("withheld").put("reason", "source_grant_denied").put("items", 0).put("evidenceIds", 1)
+                .put("paths", 0);
+        assertFalse(restored(attached, kept, envelope).truncated(), "withheld evidence leaves the change list whole");
+        ((ObjectNode) envelope.get("withheld")).put("items", 1);
+        assertTrue(restored(attached, kept, envelope).truncated(), "a withheld change leaves the list incomplete");
+        envelope.put("unknown", true);
+        assertThrows(ChatModels.Failure.class, () -> restored(attached, kept, envelope));
+    }
+
+    private ChatToolResult restored(ChatJobExecutor.Attached attached, ChatKeptToolResult kept,
+            ObjectNode envelope) {
+        return runner.restore(attached.run(), new ChatKeptToolResult(kept.jobId(), kept.memberId(), kept.attemptNo(),
+                kept.toolCallId(), kept.capabilityId(), kept.requestMeta(), kept.inputDigest(),
+                mapper.writeValueAsString(envelope)));
+    }
+
+    @Test
+    void approvedComparisonSurvivesLedgerRehydrationAndBindsOnlyToThisRun() {
+        luna.script.add(n -> held("mcpr_diff", "graph_version_diff",
+                Map.of("targets", List.of("KRX:000660"), "limit", 7)));
+        luna.script.add(n -> done());
+        var attached = executor.attach(JOB, 1).orElseThrow();
+        var run = attached.run();
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner, circuit());
+        List<List<ChatModels.ServerFact>> facts = new ArrayList<>();
+        try (var engine = new OrchestratedChatEngine(MAP_CHANGE,
+                (current, context) -> { throw new AssertionError("Q05 must use the agent"); }, holdingVerifier(facts),
+                registry, runner, CITATIONS, clock, agent)) {
+            var result = engine.answer(run, attached.control());
+            var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class, result, result.toString());
+            assertEquals("insufficient_evidence", outcome.result().outcome(), "canonical facts never bypass verification");
+        }
+        List<ChatModels.ServerFact> observed = facts.getFirst();
+        assertEquals(1, luna.made.size());
+        assertEquals(1, observed.size(), "one ledger call supplies one comparison, never membership");
+        var fact = assertInstanceOf(ChatModels.ComparisonFact.class, observed.getFirst());
+        assertEquals("r1", fact.requirementId());
+        assertEquals("gv-0", fact.fromVersion());
+        assertEquals("gv-1", fact.toVersion());
+        assertEquals(run.context().asOf(), fact.asOf());
+        assertEquals(List.of("KRX:000660"), fact.targetIds());
+        assertEquals(7, fact.evidenceLimit());
+        assertEquals(List.of(new ChatModels.GraphChange("iss-new", "issue", "공급 계약", "added")), fact.changes());
+
+        var kept = store.keptToolResults(JOB, 1).getFirst();
+        var forged = List.of(
+                new ChatKeptToolResult("other-job", kept.memberId(), 1, kept.toolCallId(), kept.capabilityId(),
+                        kept.requestMeta(), kept.inputDigest(), kept.result()),
+                new ChatKeptToolResult(JOB, "other-member", 1, kept.toolCallId(), kept.capabilityId(),
+                        kept.requestMeta(), kept.inputDigest(), kept.result()),
+                new ChatKeptToolResult(JOB, kept.memberId(), 2, kept.toolCallId(), kept.capabilityId(),
+                        kept.requestMeta(), kept.inputDigest(), kept.result()),
+                new ChatKeptToolResult(JOB, kept.memberId(), 1, "other-call", kept.capabilityId(),
+                        kept.requestMeta(), kept.inputDigest(), kept.result()),
+                new ChatKeptToolResult(JOB, kept.memberId(), 1, kept.toolCallId(), kept.capabilityId(),
+                        kept.requestMeta().replace("gv-1", "stale"), kept.inputDigest(), kept.result()),
+                new ChatKeptToolResult(JOB, kept.memberId(), 1, kept.toolCallId(), kept.capabilityId(),
+                        kept.requestMeta().replace("KRX:000660", "NASDAQ:NVDA"), kept.inputDigest(), kept.result()));
+        for (var wrong : forged) assertThrows(ChatModels.Failure.class, () -> runner.restore(run, wrong));
     }
 
     private static ChatTool tool(ChatCapability capability) {
@@ -300,6 +449,11 @@ class ChatMcpAgentTest {
 
             @Override
             public ChatToolOutput read(ChatToolScope scope, ChatToolRequest request) {
+                if (capability == ChatCapability.GRAPH_VERSION_DIFF) {
+                    return new ChatToolOutput("gv-0.." + scope.graphVersionId(),
+                            List.of(new ChatToolItem("iss-new", "issue", "[새로 생김] 공급 계약",
+                                    List.of("KRX:000660"), List.of("ev-1"))), List.of("ev-1"), false, false);
+                }
                 String id = request.targets().getFirst();
                 // Each company relates to Samsung Electronics, which a later round may then read.
                 return new ChatToolOutput(scope.graphVersionId(),
