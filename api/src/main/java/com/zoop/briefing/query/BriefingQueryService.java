@@ -275,6 +275,7 @@ public class BriefingQueryService {
         validateSnapshot(row);
         var payload = row.payload();
         var out = mapper.createObjectNode();
+        out.put("feedbackVersion", repository.feedbackVersion(row.id()));
         for (String field : List.of("id", "date", "edition", "scheduledAt", "generatedAt", "dataWindow", "graphVersion",
                 "items", "references", "emptyReason", "outlook", "metadata")) {
             out.set(field, payload.get(field).deepCopy());

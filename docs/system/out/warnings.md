@@ -274,7 +274,7 @@
 | BFF_PATH_DIFFERENCE | difference | getEvidence | 목표 /api/v1/evidence/{id} ↔ BFF /api/evidence/{id} |  |
 | BFF_FIELD_DIFFERENCE | difference | getEvidence | 목표만 125 · BFF만 55 · 형식/필수/권한 변경 16 |  |
 | BFF_PATH_DIFFERENCE | difference | getBriefing | 목표 /api/v1/briefings ↔ BFF /api/briefings |  |
-| BFF_FIELD_DIFFERENCE | difference | getBriefing | 목표만 1857 · BFF만 60 · 형식/필수/권한 변경 21 |  |
+| BFF_FIELD_DIFFERENCE | difference | getBriefing | 목표만 1859 · BFF만 60 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | listBriefingRounds | 목표 /api/v1/briefings/rounds ↔ BFF /api/briefings/rounds |  |
 | BFF_FIELD_DIFFERENCE | difference | listBriefingRounds | 목표만 84 · BFF만 39 · 형식/필수/권한 변경 6 |  |
 | TARGET_ONLY_API | difference | getBriefingRecap | GET /api/v1/briefings/{id}/recap: 직접 대응 BFF 없음 |  |
@@ -352,7 +352,7 @@
 | BFF_PATH_DIFFERENCE | difference | recordInteractionEvents | 목표 /api/v1/telemetry ↔ BFF /api/telemetry |  |
 | BFF_FIELD_DIFFERENCE | difference | recordInteractionEvents | 목표만 206 · BFF만 28 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | getMyFeedback | 목표 /api/v1/feedback ↔ BFF /api/feedback |  |
-| BFF_FIELD_DIFFERENCE | difference | getMyFeedback | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 7 |  |
+| BFF_FIELD_DIFFERENCE | difference | getMyFeedback | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | setFeedback | 목표 /api/v1/feedback ↔ BFF /api/feedback |  |
 | BFF_FIELD_DIFFERENCE | difference | setFeedback | 목표만 160 · BFF만 12 · 형식/필수/권한 변경 10 |  |
 | BFF_PATH_DIFFERENCE | difference | getInsightsOverview | 목표 /api/v1/admin/insights/overview ↔ BFF /api/admin/insights/overview |  |

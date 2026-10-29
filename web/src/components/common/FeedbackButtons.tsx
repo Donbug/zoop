@@ -16,12 +16,13 @@ const TOGGLE = `inline-flex h-8 items-center gap-1 rounded-[3px] border-[0.667px
 type Props = {
   feature: FeedbackFeature;
   targetId: string;
-  /** 사용자가 본 결과 버전(브리핑은 graphVersion). 서버와 다르면 저장하지 않는다(409). */
+  /** 사용자가 본 결과 버전(브리핑은 feedbackVersion, 구버전 API는 graphVersion). 서버와 다르면 저장하지 않는다(409). */
   targetVersion?: string | null;
   /** 접근 가능한 이름에 쓰는 대상 이름(예: "이 브리핑", "핵심 이슈 1") */
   subject: string;
   /** 서버에 저장된 내 평가. 아직 모르면 undefined */
   saved?: FeedbackValue;
+  savedReason?: string | null;
   /** 저장이 확인되면 부모의 상태를 바꾼다. */
   onSaved?: (item: FeedbackItem) => void;
 };
@@ -71,6 +72,7 @@ function MemberFeedback({
   targetVersion,
   subject,
   saved,
+  savedReason,
   onSaved,
 }: Props) {
   const revision = useAuthStore((s) => s.sessionRevision);
@@ -91,6 +93,11 @@ function MemberFeedback({
   } | null>(null);
   const [reasonOpen, setReasonOpen] = useState(false);
   const [reason, setReason] = useState('');
+  const [storedReason, setStoredReason] = useState<string | null | undefined>(
+    undefined,
+  );
+  const currentReason =
+    storedReason !== undefined ? storedReason : (savedReason ?? null);
   const current = value ?? saved ?? 'none';
 
   async function send(next: FeedbackValue, withReason?: string) {
@@ -125,6 +132,8 @@ function MemberFeedback({
       )
         throw new Error('평가 저장 응답이 요청과 일치하지 않아요.');
       setValue(item.value);
+      setStoredReason(item.reason);
+      setReason(item.reason ?? '');
       onSaved?.(item);
       setReasonOpen(item.value === 'down' && !withReason);
       if (item.value !== 'down') setReason('');
@@ -174,6 +183,22 @@ function MemberFeedback({
           {current === 'down' && '도움이 안 됐다고 남겼어요'}
         </span>
       </div>
+      {!reasonOpen && current === 'down' && (
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-zoop-muted">
+          {currentReason && <p>남긴 이유: {currentReason}</p>}
+          <button
+            type="button"
+            className={TOGGLE}
+            disabled={pending}
+            onClick={() => {
+              setReason(currentReason ?? '');
+              setReasonOpen(true);
+            }}
+          >
+            {currentReason ? '이유 수정' : '이유 추가'}
+          </button>
+        </div>
+      )}
       {reasonOpen && current === 'down' && (
         <form
           onSubmit={submitReason}

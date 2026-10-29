@@ -340,6 +340,50 @@ describe('FS066-01 브리핑 평가', () => {
     expect(server.calls('PUT', '/api/v1/feedback')).toHaveLength(1);
   });
 
+  it('graphVersion 없는 발행본도 feedbackVersion으로 저장하고 남긴 이유를 복원·수정한다', async () => {
+    signInMember();
+    ({ server } = setup('/briefing', {
+      ...briefing(),
+      graphVersion: null,
+      feedbackVersion: 'publication:verified-sha',
+    }));
+    server.on('GET', '/api/v1/feedback', (request) =>
+      json({
+        items:
+          request.query.get('feature') === 'briefing_round'
+            ? [
+                {
+                  feature: 'briefing_round',
+                  targetId: ROUND,
+                  targetVersion: 'publication:verified-sha',
+                  value: 'down',
+                  reason: '기존 저장 이유',
+                },
+              ]
+            : [],
+        nextCursor: null,
+      }),
+    );
+    server.on('PUT', '/api/v1/feedback', (request) => json(request.body));
+    const user = userEvent.setup();
+    expect(await screen.findByText('남긴 이유: 기존 저장 이유')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: '이유 수정' }));
+    const reason = screen.getByPlaceholderText('어떤 점이 아쉬웠나요? (선택)');
+    expect((reason as HTMLTextAreaElement).value).toBe('기존 저장 이유');
+    await user.clear(reason);
+    await user.type(reason, '기업별 비교를 보강해주세요');
+    await user.click(screen.getByRole('button', { name: '이유 보내기' }));
+    expect(
+      await screen.findByText('남긴 이유: 기업별 비교를 보강해주세요'),
+    ).toBeTruthy();
+    expect(server.calls('PUT', '/api/v1/feedback')[0].body).toMatchObject({
+      targetId: ROUND,
+      targetVersion: 'publication:verified-sha',
+      value: 'down',
+      reason: '기업별 비교를 보강해주세요',
+    });
+  });
+
   it('결과 버전이 없는 회차는 평가를 읽거나 보내지 않고 이유를 알린다', async () => {
     signInMember();
     ({ server } = setup('/briefing', { ...briefing(), graphVersion: null }));

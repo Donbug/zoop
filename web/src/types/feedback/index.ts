@@ -10,7 +10,7 @@ export type FeedbackVote = {
   feature: FeedbackFeature;
   targetId: string;
   value: FeedbackValue;
-  /** 사용자가 본 결과 버전(브리핑은 graphVersion). 서버의 현재 버전과 다르면 409 */
+  /** 사용자가 본 결과 버전(브리핑은 feedbackVersion (구버전은 graphVersion)). 서버의 현재 버전과 다르면 409 */
   targetVersion?: string | null;
   /** 싫어요에만 붙이는 선택 사유 */
   reason?: string | null;

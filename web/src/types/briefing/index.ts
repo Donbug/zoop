@@ -181,6 +181,8 @@ export type BriefingContinuity = {
 
 /** Consumer fields of getBriefing; publication snapshots are never recalculated. */
 export type BriefingResponse = {
+  /** Immutable feedback result version; graphVersion or publication digest when graph-less. */
+  feedbackVersion?: string | null;
   id: string;
   date: string;
   edition: BriefingEdition;

@@ -123,11 +123,13 @@ export default function PublishedBriefing({
     key: string;
     error?: boolean;
     values: Record<string, FeedbackValue>;
+    reasons?: Record<string, string | null>;
   } | null>(null);
+  const ratingVersion = published?.feedbackVersion ?? published?.graphVersion;
   const feedbackKey =
-    // 결과 버전(graphVersion)이 없으면 평가를 버전에 연결할 수 없으므로 읽지도 않는다.
-    published?.graphVersion && memberId
-      ? `${memberId}:${published.id}:${published.graphVersion}:${retry}:${feedbackAttempt}`
+    // 발행 결과 식별 버전이 없으면 평가를 버전에 연결할 수 없으므로 읽지도 않는다.
+    published && ratingVersion && memberId
+      ? `${memberId}:${published.id}:${ratingVersion}:${retry}:${feedbackAttempt}`
       : null;
   useEffect(() => {
     if (!feedbackKey || !published) return;
@@ -144,19 +146,28 @@ export default function PublishedBriefing({
       .then(([round, issues]) => {
         if (
           [...round.items, ...issues.items].some(
-            (item) => item.targetVersion !== published.graphVersion,
+            (item) => item.targetVersion !== ratingVersion,
           )
         )
           throw new Error('다른 버전의 평가입니다.');
-        return Object.fromEntries(
-          [...round.items, ...issues.items].map((item) => [
-            `${item.feature}:${item.targetId}`,
-            item.value,
-          ]),
-        );
+        const items = [...round.items, ...issues.items];
+        return {
+          values: Object.fromEntries(
+            items.map((item) => [
+              `${item.feature}:${item.targetId}`,
+              item.value,
+            ]),
+          ),
+          reasons: Object.fromEntries(
+            items.map((item) => [
+              `${item.feature}:${item.targetId}`,
+              item.reason,
+            ]),
+          ),
+        };
       })
-      .then((values) => {
-        if (active) setMyFeedback({ key: feedbackKey, values });
+      .then((data) => {
+        if (active) setMyFeedback({ key: feedbackKey, ...data });
       })
       .catch(() => {
         if (active)
@@ -165,14 +176,12 @@ export default function PublishedBriefing({
     return () => {
       active = false;
     };
-  }, [feedbackKey, published]);
+  }, [feedbackKey, published, ratingVersion]);
   const saved = (
     feature: string,
     targetId: string,
   ): FeedbackValue | undefined =>
-    published?.graphVersion &&
-    myFeedback?.key === feedbackKey &&
-    !myFeedback.error
+    ratingVersion && myFeedback?.key === feedbackKey && !myFeedback.error
       ? (myFeedback?.values[`${feature}:${targetId}`] ?? 'none')
       : undefined;
   const reload = () => {
@@ -261,14 +270,19 @@ export default function PublishedBriefing({
             subject={`핵심 이슈 ${item.rank}`}
           />
         ) : (
-          result.graphVersion && (
+          ratingVersion && (
             <FeedbackButtons
               key={`${feedbackKey}:${item.eventId}`}
               feature="briefing_issue"
               targetId={`${result.id}/${item.eventId}`}
-              targetVersion={result.graphVersion}
+              targetVersion={ratingVersion}
               subject={`핵심 이슈 ${item.rank}`}
               saved={saved('briefing_issue', `${result.id}/${item.eventId}`)}
+              savedReason={
+                myFeedback?.reasons?.[
+                  `briefing_issue:${result.id}/${item.eventId}`
+                ]
+              }
             />
           )
         )}
@@ -301,14 +315,15 @@ export default function PublishedBriefing({
           subject="이 브리핑 회차"
           showNote
         />
-      ) : result.graphVersion ? (
+      ) : ratingVersion ? (
         <FeedbackButtons
           key={`${feedbackKey}:round`}
           feature="briefing_round"
           targetId={result.id}
-          targetVersion={result.graphVersion}
+          targetVersion={ratingVersion}
           subject="이 브리핑 회차"
           saved={saved('briefing_round', result.id)}
+          savedReason={myFeedback?.reasons?.[`briefing_round:${result.id}`]}
         />
       ) : (
         <p className={NOTE}>

@@ -352,6 +352,10 @@
     }
   },
   "changed": {
+    "query.feature:required": {
+      "target": false,
+      "bff": true
+    },
     "query.targetIds": {
       "target": {
         "type": "string",
@@ -362,6 +366,10 @@
         "minLength": 1,
         "maxLength": 2000
       }
+    },
+    "query.targetIds:required": {
+      "target": false,
+      "bff": true
     },
     "response:401:application/json.error.code": {
       "target": {

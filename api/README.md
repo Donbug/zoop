@@ -465,3 +465,7 @@ JVM은 보존 응답의 SHA·기업·통화·해상도·요청 마감·완료 �
 ### S3 사후 재평가 조회
 
 기존 발행본에 S3 평가가 없으면 별도로 승인·실행한 실제 인용 기반 결과를 `GET /api/v1/briefings/{roundId}/items/{eventId}/impact-reviews`로 읽을 수 있습니다. 기본 설정은 비활성이며 읽기용 manifest와 SHA-256을 명시해야 합니다. 원래 발행본·시세·근거를 변경하지 않고 사후 생성 시각과 입력 범위를 구분합니다. 조회는 AI를 호출하지 않습니다. 실행·예산·현재 권한 경계는 [S3 영향 평가](docs/BRIEFING_S3_IMPACTS.md)를 따릅니다. 키·실제 입력·결과 파일은 저장소에 포함하지 않습니다.
+
+### 브리핑 회원 평가·관리자 선호도
+
+`/api/v1/feedback`의 회원별 회차/이슈 도움 됨·안 됨·사유를 PostgreSQL에 저장하며, `/api/v1/admin/feedback/summary`와 `/dislikes`가 관리자 화면에 집계·사유를 제공합니다. 세션·CSRF·현재 발행 버전과 읽기 권한을 검증하고 취소도 보존합니다. 기존 익명 미리보기 SQLite와 구분합니다. [저장·집계·보존 및 검증](../docs/development/briefing-member-feedback.md)을 참고하세요.
