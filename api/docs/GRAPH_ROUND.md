@@ -17,7 +17,7 @@ slot 도래 → R1 round-run 요청 → R2 계획 조회 → R3 analyze_plan 접
 
 | 테이블 | 내용 |
 |---|---|
-| `graph_rounds` | 슬롯당 1행(`round_id = round-yyyyMMdd'T'HHmm` KST, `slot_at` UNIQUE). 단계, 계획(`plan_id`·`plan_digest`), `analysis_job_id`(FK `analysis_jobs`), handoff(`handoff_id`·두 digest), `graph_version_id`·`activated_version_id`(FK `graph_versions`, **ON DELETE SET NULL**: 보존 정책이 옛 버전을 지워도 회차 행은 남는다), `failure_code`(failed일 때만, CHECK), `attempts`·`next_attempt_at`(대기 단계의 backoff), `lease_owner`·`lease_until`(인스턴스 둘일 때의 lease, 둘 다 있거나 둘 다 없음), `started_by`(`system:scheduler` 또는 `admin:<id>`) |
+| `graph_rounds` | 슬롯당 1행(`round_id = round-yyyyMMdd'T'HHmm` KST, `slot_at` UNIQUE). 단계, 계획(`plan_id`·`plan_digest`), `analysis_job_id`(FK `analysis_jobs`), handoff(`handoff_id`·두 digest), `graph_version_id`·`activated_version_id`(FK `graph_versions`, **ON DELETE SET NULL**: 보존 정책이 옛 버전을 지워도 회차 행은 남는다), `failure_code`(failed일 때만, CHECK), `attempts`·`next_attempt_at`(대기 단계의 backoff), `lease_owner`·`lease_until`(인스턴스 둘일 때의 lease, 둘 다 있거나 둘 다 없음), `started_by`(행을 만든 주체: `system:scheduler` 또는 수동 시작의 `admin:<id>`. 한 번 쓰며, retry는 이벤트 `retried`와 감사 로그로 남긴다) |
 | `graph_round_events` | 회차의 시도마다 1행(append-only): `stage`, `outcome`(advanced·waiting·failed·retried·skipped), `code`, `request_id`(외부 호출의 `X-Request-ID`), `detail` jsonb(코드·digest만, 8 KiB 이내) |
 
 trigger로 `graph_rounds`는 DELETE와 식별 열(`round_id`·`slot_at`·`started_by`·`created_at`) 변경을 거절하고, `graph_round_events`는 UPDATE·DELETE를 거절합니다. 두 표는 영구 보존입니다(회차 단위 감사 이력). 시험은 TRUNCATE로 정리합니다.
@@ -33,6 +33,7 @@ trigger로 `graph_rounds`는 DELETE와 식별 열(`round_id`·`slot_at`·`starte
 - **수입 순서 보호** (`skipped_superseded`): 가장 최근 `imported` 회차보다 **오래된** 슬롯은 읽지도 않고 `skipped`로 끝냅니다. 자동 활성화가 commit 순(`sequence`)으로 고르므로 뒤늦게 수입된 옛 회차가 공개되는 일을 막습니다. 누적 묶음 계약(A안)에서는 최신 회차가 이전 내용을 포함하므로 손실이 없습니다.
 - 일시 실패는 기다립니다: `import_busy`(다른 수입·운영자 명령이 artifact store lock 보유) → `busy-retry-after`(기본 5분), `handoff_export_unavailable`·`ingestion_export_unavailable`·`database_unavailable`·`artifact_store_unavailable` → `wait-retry-after`(기본 1분). `max-attempts-per-stage`(기본 20)에 이르면 `failed(import_timeout)`.
 - 그 밖의 실패(`handoff_withheld`·`handoff_refused`·`pin_mismatch`·`bundle_invalid`·`rights_changed`·`version_conflict` 등)는 `failed(import:<code>)`이고 이벤트 `detail`에 생산자 코드·관측 번호만 남깁니다.
+- 순서 보호 검사와 수입은 DB 전역 advisory lock(`JdbcGraphRoundImportLock`, 세션 수준, 전용 커넥션)을 잡은 채 이어서 하므로 다른 인스턴스가 그 사이에 수입할 수 없습니다. lock을 다른 인스턴스가 쥐고 있으면 `import:round_import_busy`로 `busy-retry-after`만큼 기다립니다. 운영자 수입 명령은 회차가 아니므로 이 순서 규칙 밖입니다.
 - 호출 스레드에서 동기로 돕니다(스케줄러 전용 스레드, 요청 스레드 아님). 수입 트랜잭션은 `companies` SHARE lock과 묶음 기사 행 lock을 commit 직전 재확인(관측별 `require-store`)까지 잡으므로, 그 기사에 닿는 활성화·철회는 수입이 끝날 때까지 기다립니다.
 
 ## 설정 (`zoop.graph.round.*`, 웹 애플리케이션 전용, 기본 꺼짐)
@@ -58,7 +59,7 @@ trigger로 `graph_rounds`는 DELETE와 식별 열(`round_id`·`slot_at`·`starte
 | `listGraphRounds` | `GET /api/v1/admin/pipeline/rounds?stage&cursor&limit` | 최신 슬롯부터, `stage` 필터(단계 wire 값), 불투명 커서(마지막 슬롯), limit 1~100(기본 20) |
 | `getGraphRound` | `GET /api/v1/admin/pipeline/rounds/{roundId}` | 행 전체 + 이벤트 타임라인(코드·요청 ID·시각·detail). 모르는 id·형식 밖 id는 404 |
 
-응답에는 경로·본문·비밀이 없습니다(행에 애초에 없습니다). `retryGraphRound`·`startGraphRound`는 OpenAPI에 함께 명세하되 구현은 PR-R2입니다(미구현 호출은 404).
+응답에는 경로·본문·비밀이 없습니다(행에 애초에 없습니다). `retryGraphRound`·`startGraphRound`는 OpenAPI에 명세만 두고(이 PR의 `docs/api/openapi.yaml` 변경) 구현은 PR-R2입니다(미구현 호출은 404). retry는 `started_by`를 바꾸지 않고 이벤트 `retried`(관리자 id)와 감사 로그로 남깁니다.
 
 ## 시험
 
@@ -66,7 +67,7 @@ trigger로 `graph_rounds`는 DELETE와 식별 열(`round_id`·`slot_at`·`starte
 - `GraphRoundImportBridgeTest`: staged→imported, unchanged, `skipped_superseded`, withheld→failed, busy→waiting→`import_timeout`, 준비 안 된 회차 거절.
 - `GraphRoundImportConfigurationTest`: 꺼짐·웹 전용·설정 닫힘(snapshot source, read client, CLI 경로, import-source, operator).
 - `GraphRoundAdminServiceTest`: 목록 순서·필터·커서, 상세·타임라인·404, overview 섹션.
-- `PipelineOverviewPostgresTest`(`auth-postgres`): 기존 검사 + `rounds` 섹션이 직렬화됨.
+- `PipelineOverviewPostgresTest`(`auth-postgres`): 기존 검사 + `rounds` 섹션(`enabled=false`, null 시각, 배열)이 직렬화됨.
 
 ## 다음 (PR-R2, AI #387 뒤)
 

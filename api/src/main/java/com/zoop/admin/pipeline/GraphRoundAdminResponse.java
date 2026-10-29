@@ -19,7 +19,7 @@ public final class GraphRoundAdminResponse {
      * One round as the admin sees it. Codes, ids and digests only: no path, body or secret is ever on a round row.
      *
      * @param stage         {@code scheduled} … {@code imported} | {@code skipped} | {@code failed}
-     * @param startedBy     {@code system:scheduler} or {@code admin:<id>}
+     * @param startedBy     who created the row: {@code system:scheduler} or {@code admin:<id>} (manual start); a retry is an event
      * @param failureCode   only while {@code failed}
      * @param activatedVersionId the version the auto-activation (or an admin) made public for this round, recorded afterwards
      */

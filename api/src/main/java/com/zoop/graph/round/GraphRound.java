@@ -9,7 +9,8 @@ import java.util.Optional;
  * @param roundId     {@code round-yyyyMMdd'T'HHmm} in KST; the AI side's handoff id for the round is derived from it
  * @param slotAt      the slot instant
  * @param stage       current stage
- * @param startedBy   {@code system:scheduler} or {@code admin:<id>} (manual start or retry)
+ * @param startedBy   who created the row: {@code system:scheduler} or {@code admin:<id>} (manual start). Written once; a retry
+ *                    is recorded as an event ({@code retried}) and an audit row, never here
  * @param attempts    attempts made at the current stage
  * @param nextAttemptAt when a waiting stage may be tried again (backoff), or empty
  * @param lease       the instance holding the row and until when, or empty

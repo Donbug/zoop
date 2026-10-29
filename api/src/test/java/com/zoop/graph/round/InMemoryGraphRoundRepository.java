@@ -61,7 +61,7 @@ public final class InMemoryGraphRoundRepository implements GraphRoundRepository 
     @Override
     public Optional<GraphRound> claim(String roundId, String owner, Duration lease, Instant now) {
         GraphRound round = rows.get(roundId);
-        if (round == null) return Optional.empty();
+        if (round == null || !round.open()) return Optional.empty();
         boolean free = round.lease().map(l -> l.owner().equals(owner) || l.until().isBefore(now)).orElse(true);
         if (!free) return Optional.empty();
         GraphRound taken = with(round, round.stage(), round.failureCode().orElse(null), round.attempts(),
@@ -92,8 +92,8 @@ public final class InMemoryGraphRoundRepository implements GraphRoundRepository 
                 first(patch.analysisJobId(), round.analysisJobId()), first(patch.handoffId(), round.handoffId()),
                 first(patch.manifestDigest(), round.manifestDigest()), first(patch.bundleDigest(), round.bundleDigest()),
                 first(patch.graphVersionId(), round.graphVersionId()), round.activatedVersionId(), round.activationNote(),
-                Optional.ofNullable(patch.failureCode()), attempts, Optional.ofNullable(next), round.lease(), round.startedBy(),
-                round.createdAt(), at);
+                Optional.ofNullable(patch.failureCode()), attempts, Optional.ofNullable(next),
+                patch.stage().terminal() ? Optional.empty() : round.lease(), round.startedBy(), round.createdAt(), at);
         rows.put(roundId, updated);
         events.add(new GraphRoundEvent(events.size() + 1, roundId, at, patch.stage(), outcome, Optional.ofNullable(code),
                 Optional.ofNullable(requestId), Optional.ofNullable(detail)));

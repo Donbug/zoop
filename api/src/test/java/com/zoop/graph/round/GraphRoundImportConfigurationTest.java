@@ -12,6 +12,8 @@ import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import javax.sql.DataSource;
+
 import com.zoop.ai.config.AiHandoffReadClientConfiguration;
 import com.zoop.document.repository.DocumentRegistryRepository;
 import com.zoop.graph.importer.GraphHandoffRepository;
@@ -64,6 +66,7 @@ class GraphRoundImportConfigurationTest {
                 .withBean(GraphHandoffRepository.class, () -> Mockito.mock(GraphHandoffRepository.class))
                 .withBean(GraphRoundRepository.class, InMemoryGraphRoundRepository::new)
                 .withBean(TransactionOperations.class, TransactionOperations::withoutTransaction)
+                .withBean(DataSource.class, () -> Mockito.mock(DataSource.class))
                 .withBean(Clock.class, Clock::systemUTC)
                 .withUserConfiguration(AiHandoffReadClientConfiguration.class, GraphRoundImportConfiguration.class);
     }

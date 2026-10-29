@@ -169,6 +169,9 @@ class GraphRoundRepositoryPostgresTest {
         GraphRound imported = rounds.advance(ROUND_2, GraphRoundPatch.advanceTo(GraphRoundStage.IMPORTED)
                 .handoff("round-20261030T0935", DIGEST, DIGEST), Outcome.ADVANCED, null, null, null, NOW.plusSeconds(7));
         assertEquals(Optional.of("round-20261030T0935"), imported.handoffId());
+        assertTrue(imported.lease().isEmpty(), "a terminal stage drops the lease");
+        assertTrue(rounds.claim(ROUND_2, "task-a", java.time.Duration.ofMinutes(2), NOW.plusSeconds(8)).isEmpty(),
+                "a terminal round is never taken");
         assertEquals(List.of(ROUND_1), rounds.due(NOW.plusSeconds(1800), 10).stream().map(GraphRound::roundId).toList());
         assertEquals(1, rounds.openCount());
         assertEquals(Optional.of(ROUND_2), rounds.newestImported().map(GraphRound::roundId));

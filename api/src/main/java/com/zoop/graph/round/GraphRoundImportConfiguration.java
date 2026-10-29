@@ -5,6 +5,8 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Clock;
 
+import javax.sql.DataSource;
+
 import com.zoop.ai.handoff.HandoffReadClient;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.artifact.storage.ArtifactStoreException;
@@ -47,7 +49,7 @@ public class GraphRoundImportConfiguration {
     @Bean
     GraphRoundImportBridge graphRoundImportBridge(GraphRoundProperties properties, Environment environment,
             ObjectProvider<HandoffReadClient> handoffReads, DocumentRegistryRepository registry, GraphHandoffRepository graph,
-            GraphRoundRepository rounds, TransactionOperations transaction, Clock clock) {
+            GraphRoundRepository rounds, TransactionOperations transaction, DataSource dataSource, Clock clock) {
         Path root = artifactRoot(environment);
         HandoffReadClient client = handoffReads.getIfAvailable();
         if (client == null) {
@@ -63,7 +65,7 @@ public class GraphRoundImportConfiguration {
         }
         GraphHandoffImporter importer = new GraphHandoffImporter(new HttpHandoffSource(client), ingestion,
                 new IngestionExportParser(), store, registry, graph, transaction, clock);
-        return new GraphRoundImportBridge(importer, rounds, properties, clock);
+        return new GraphRoundImportBridge(importer, rounds, new JdbcGraphRoundImportLock(dataSource), properties, clock);
     }
 
     private static Path artifactRoot(Environment environment) {

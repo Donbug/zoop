@@ -14,7 +14,7 @@ import com.zoop.graph.importer.GraphHandoffResult;
 import com.zoop.graph.round.GraphRoundEvent.Outcome;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -27,7 +27,9 @@ import tools.jackson.databind.node.ObjectNode;
  *     scheduler's.</li>
  * <li>an older slot than the newest round already imported → {@code skipped} ({@code skipped_superseded}): the auto-activation
  *     picks by commit order, so a late import of an older round must never become public after a newer one. Under the cumulative
- *     bundle contract the newer round already holds the older one's content.</li>
+ *     bundle contract the newer round already holds the older one's content. The check and the import happen under one
+ *     database-wide {@link GraphRoundImportLock}, so no other instance can import in between; when the lock is held elsewhere
+ *     the round waits like for a busy store.</li>
  * <li>a transient failure (store busy, source unavailable, database unavailable) → the row waits and is tried again later; past
  *     {@code max-attempts-per-stage} the round fails with {@code import_timeout}.</li>
  * <li>every other failure → {@code failed(import:<code>)}; the round keeps its id and can be retried.</li>
@@ -39,29 +41,32 @@ public final class GraphRoundImportBridge {
     private static final Logger log = LoggerFactory.getLogger(GraphRoundImportBridge.class);
     static final String SKIPPED_SUPERSEDED = "skipped_superseded";
     static final String IMPORT_TIMEOUT = "import_timeout";
+    static final String IMPORT_LOCKED = "import:round_import_busy";
     private static final Set<GraphHandoffFailure> WAIT = Set.of(GraphHandoffFailure.HANDOFF_EXPORT_UNAVAILABLE,
             GraphHandoffFailure.INGESTION_EXPORT_UNAVAILABLE, GraphHandoffFailure.DATABASE_UNAVAILABLE,
             GraphHandoffFailure.ARTIFACT_STORE_UNAVAILABLE);
 
     private final GraphHandoffImporter importer;
     private final GraphRoundRepository rounds;
+    private final GraphRoundImportLock lock;
     private final String operator;
     private final Duration waitRetryAfter;
     private final Duration busyRetryAfter;
     private final int maxAttempts;
     private final Clock clock;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final JsonNodeFactory nodes = JsonNodeFactory.instance;
 
-    public GraphRoundImportBridge(GraphHandoffImporter importer, GraphRoundRepository rounds, GraphRoundProperties properties,
-            Clock clock) {
-        this(importer, rounds, properties.operator(), properties.waitRetryAfter(), properties.busyRetryAfter(),
+    public GraphRoundImportBridge(GraphHandoffImporter importer, GraphRoundRepository rounds, GraphRoundImportLock lock,
+            GraphRoundProperties properties, Clock clock) {
+        this(importer, rounds, lock, properties.operator(), properties.waitRetryAfter(), properties.busyRetryAfter(),
                 properties.maxAttemptsPerStage(), clock);
     }
 
-    public GraphRoundImportBridge(GraphHandoffImporter importer, GraphRoundRepository rounds, String operator,
-            Duration waitRetryAfter, Duration busyRetryAfter, int maxAttempts, Clock clock) {
+    public GraphRoundImportBridge(GraphHandoffImporter importer, GraphRoundRepository rounds, GraphRoundImportLock lock,
+            String operator, Duration waitRetryAfter, Duration busyRetryAfter, int maxAttempts, Clock clock) {
         this.importer = importer;
         this.rounds = rounds;
+        this.lock = lock;
         this.operator = operator;
         this.waitRetryAfter = waitRetryAfter;
         this.busyRetryAfter = busyRetryAfter;
@@ -82,10 +87,21 @@ public final class GraphRoundImportBridge {
         String manifestDigest = round.manifestDigest().orElseThrow(() -> new IllegalStateException("round has no manifest digest"));
         String bundleDigest = round.bundleDigest().orElseThrow(() -> new IllegalStateException("round has no bundle digest"));
 
+        Optional<GraphRoundImportLock.Held> held = lock.tryAcquire();
+        if (held.isEmpty()) {
+            return wait(round, IMPORT_LOCKED, nodes.objectNode(), busyRetryAfter);
+        }
+        try (GraphRoundImportLock.Held ignored = held.get()) {
+            return imported(round, handoffId, manifestDigest, bundleDigest);
+        }
+    }
+
+    private GraphRound imported(GraphRound round, String handoffId, String manifestDigest, String bundleDigest) {
+        String roundId = round.roundId();
         Optional<GraphRound> newest = rounds.newestImported();
         if (newest.isPresent() && newest.get().slotAt().isAfter(round.slotAt())) {
             log.info("graph round {} skipped: round {} was imported already", roundId, newest.get().roundId());
-            ObjectNode detail = mapper.createObjectNode();
+            ObjectNode detail = nodes.objectNode();
             detail.put("supersededBy", newest.get().roundId());
             return rounds.advance(roundId, GraphRoundPatch.advanceTo(GraphRoundStage.SKIPPED), Outcome.SKIPPED,
                     SKIPPED_SUPERSEDED, null, detail, clock.instant());
@@ -96,7 +112,7 @@ public final class GraphRoundImportBridge {
         Instant now = clock.instant();
         if (result.succeeded()) {
             GraphHandoffResult.Staged staged = result.staged();
-            ObjectNode detail = mapper.createObjectNode();
+            ObjectNode detail = nodes.objectNode();
             detail.put("versionId", staged.versionId());
             detail.put("outcome", staged.outcome().wire());
             detail.put("manifestDigest", staged.manifestDigest());
@@ -108,22 +124,28 @@ public final class GraphRoundImportBridge {
 
         GraphHandoffException failure = result.failure();
         String code = "import:" + failure.failure().code();
-        ObjectNode detail = mapper.createObjectNode();
+        ObjectNode detail = nodes.objectNode();
         detail.put("failure", failure.failure().code());
         if (failure.cliCode() != null) detail.put("code", failure.cliCode());
         if (failure.observation() >= 0) detail.put("observation", failure.observation());
         boolean busy = failure.failure() == GraphHandoffFailure.IMPORT_BUSY;
         if (busy || WAIT.contains(failure.failure())) {
-            if (round.attempts() + 1 >= maxAttempts) {
-                log.warn("graph round {} import gave up after {} attempts: {}", roundId, round.attempts() + 1, code);
-                return rounds.advance(roundId, GraphRoundPatch.fail(IMPORT_TIMEOUT), Outcome.FAILED, code, null, detail, now);
-            }
-            Instant next = now.plus(busy ? busyRetryAfter : waitRetryAfter);
-            log.info("graph round {} import waits until {}: {}", roundId, next, code);
-            return rounds.advance(roundId, GraphRoundPatch.waitAt(GraphRoundStage.HANDOFF_READY, next), Outcome.WAITING, code,
-                    null, detail, now);
+            return wait(round, code, detail, busy ? busyRetryAfter : waitRetryAfter);
         }
         log.warn("graph round {} import failed: {}", roundId, code);
         return rounds.advance(roundId, GraphRoundPatch.fail(code), Outcome.FAILED, code, null, detail, now);
+    }
+
+    /** A transient failure: the row waits for {@code retryAfter}, or fails with {@code import_timeout} at the attempt bound. */
+    private GraphRound wait(GraphRound round, String code, ObjectNode detail, Duration retryAfter) {
+        Instant now = clock.instant();
+        if (round.attempts() + 1 >= maxAttempts) {
+            log.warn("graph round {} import gave up after {} attempts: {}", round.roundId(), round.attempts() + 1, code);
+            return rounds.advance(round.roundId(), GraphRoundPatch.fail(IMPORT_TIMEOUT), Outcome.FAILED, code, null, detail, now);
+        }
+        Instant next = now.plus(retryAfter);
+        log.info("graph round {} import waits until {}: {}", round.roundId(), next, code);
+        return rounds.advance(round.roundId(), GraphRoundPatch.waitAt(GraphRoundStage.HANDOFF_READY, next), Outcome.WAITING,
+                code, null, detail, now);
     }
 }

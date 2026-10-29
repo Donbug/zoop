@@ -27,6 +27,7 @@ import com.zoop.graph.round.GraphRound;
 import com.zoop.graph.round.GraphRoundEvent;
 import com.zoop.graph.round.GraphRoundEvent.Outcome;
 import com.zoop.graph.round.GraphRoundImportBridge;
+import com.zoop.graph.round.GraphRoundImportLock;
 import com.zoop.graph.round.GraphRoundStage;
 import com.zoop.graph.round.InMemoryGraphRoundRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,6 +57,8 @@ class GraphRoundImportBridgeTest {
     private FakeHandoffRead reads;
     private Built built;
     private InMemoryGraphRoundRepository rounds;
+    private boolean lockFree = true;
+    private int lockAcquired;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -80,7 +83,12 @@ class GraphRoundImportBridgeTest {
         };
         GraphHandoffImporter importer = new GraphHandoffImporter(new HttpHandoffSource(reads), ingestion,
                 new IngestionExportParser(), store, registry, graph, transaction, Clock.fixed(NOW, ZoneOffset.UTC));
-        return new GraphRoundImportBridge(importer, rounds, "scheduler", Duration.ofMinutes(1), Duration.ofMinutes(5),
+        GraphRoundImportLock lock = () -> {
+            if (!lockFree) return Optional.empty();
+            lockAcquired++;
+            return Optional.of(() -> lockAcquired--);
+        };
+        return new GraphRoundImportBridge(importer, rounds, lock, "scheduler", Duration.ofMinutes(1), Duration.ofMinutes(5),
                 maxAttempts, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -105,6 +113,7 @@ class GraphRoundImportBridgeTest {
         assertEquals(Optional.of("staged"), events.get(0).code());
         assertEquals(built.versionId(), events.get(0).detail().orElseThrow().get("versionId").stringValue());
         assertEquals(1, reads.bundleCalls.get());
+        assertEquals(0, lockAcquired, "the import lock is released with the import");
 
         // The same pins again (a retry after a lost outcome) are unchanged, still an import.
         rounds.seed(ROUND_2, SLOT_2, GraphRoundStage.HANDOFF_READY, built.spec().handoffId(), built.manifestDigest(),
@@ -166,6 +175,20 @@ class GraphRoundImportBridgeTest {
             assertEquals(Optional.of("import_timeout"), gaveUp.failureCode());
             assertEquals(20, gaveUp.attempts(), "the exhausted bound stays visible");
         }
+    }
+
+    @Test
+    void anImportLockHeldElsewhereMakesTheRoundWaitWithoutReadingAnything() {
+        ready(ROUND_2, SLOT_2, 0);
+        lockFree = false;
+
+        GraphRound waiting = bridge(20).importRound(ROUND_2);
+
+        assertEquals(GraphRoundStage.HANDOFF_READY, waiting.stage());
+        assertEquals(1, waiting.attempts());
+        assertEquals(Optional.of(NOW.plus(Duration.ofMinutes(5))), waiting.nextAttemptAt());
+        assertEquals(Optional.of("import:round_import_busy"), rounds.events(ROUND_2).get(0).code());
+        assertEquals(0, reads.bundleCalls.get());
     }
 
     @Test
