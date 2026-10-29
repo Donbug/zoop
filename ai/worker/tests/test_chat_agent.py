@@ -20,6 +20,8 @@ TOKEN = "zmcp1.k1.eyJqb2IiOiJqb2ItMSJ9.c2lnbmF0dXJlLXN5bnRoZXRpYw"
 URL = "https://api.zoop.example/mcp"
 LIVE = {"ZOOP_AI_CHAT_LIVE_ENABLED": "1", "ZOOP_AI_CHAT_MAX_CALLS": "5", "ZOOP_AI_API_KEY": "luna-key-synthetic",
         "ZOOP_AI_CHAT_AGENT_MODEL": "gpt-6-luna", "ZOOP_AI_CHAT_MCP_SERVER_URL": URL}
+# The recipient the application checked the MCP results' send grants for: the live agent stage's own.
+RECIPIENT = stage_config("chat-agent", "live", LIVE).recipient()
 
 
 def agent_input(**change: Any) -> dict[str, Any]:
@@ -27,7 +29,7 @@ def agent_input(**change: Any) -> dict[str, Any]:
                "requirements": [{"requirementId": "r1", "label": "SK하이닉스와 삼성전자의 관계", "general": False,
                                  "targets": ["KRX:000660", "KRX:005930"]},
                                 {"requirementId": "r2", "label": "HBM — 개념 설명", "general": True}],
-               "mcp": {"authorization": TOKEN, "allowedTools": ["company_read", "graph_path_read"]},
+               "mcp": {"authorization": TOKEN, "allowedTools": ["company_read", "graph_path_read"], "recipient": RECIPIENT},
                "maxCitations": 20}
     payload.update(change)
     return payload
@@ -126,11 +128,15 @@ def test_a_continuation_resumes_the_stored_response_with_only_the_applications_d
 
 @pytest.mark.parametrize("change", [
     # A caller never names the server: the URL is the operator's setting.
-    {"mcp": {"serverUrl": "https://attacker.example/mcp", "authorization": TOKEN, "allowedTools": ["company_read"]}},
-    {"mcp": {"authorization": "short", "allowedTools": ["company_read"]}},
-    {"mcp": {"authorization": TOKEN, "allowedTools": []}},
-    {"mcp": {"authorization": TOKEN, "allowedTools": ["company.read"]}},
-    {"mcp": {"authorization": TOKEN, "allowedTools": ["a", "a"]}},
+    {"mcp": {"serverUrl": "https://attacker.example/mcp", "authorization": TOKEN, "allowedTools": ["company_read"],
+             "recipient": RECIPIENT}},
+    {"mcp": {"authorization": "short", "allowedTools": ["company_read"], "recipient": RECIPIENT}},
+    {"mcp": {"authorization": TOKEN, "allowedTools": [], "recipient": RECIPIENT}},
+    {"mcp": {"authorization": TOKEN, "allowedTools": ["company.read"], "recipient": RECIPIENT}},
+    {"mcp": {"authorization": TOKEN, "allowedTools": ["a", "a"], "recipient": RECIPIENT}},
+    # The recipient the application checked the results for is required, and is a recipient name.
+    {"mcp": {"authorization": TOKEN, "allowedTools": ["company_read"]}},
+    {"mcp": {"authorization": TOKEN, "allowedTools": ["company_read"], "recipient": "openai compatible"}},
     {"continuation": {"previousResponseId": "resp_1", "decisions": []}},
     {"continuation": continuation(("mcpr_1", True), ("mcpr_1", False))},
     {"requirements": [{"requirementId": "r1", "label": "a", "general": False},
@@ -267,15 +273,42 @@ def test_an_authored_replay_step_matches_its_input_whatever_the_token(tmp_path):
     config = stage_config("chat-agent", "replay")
     fixture = tmp_path / "replay.json"
     fixture.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-1", "recordingKind": "authored-test", "responses": [
-        {"stage": "chat-agent", "inputDigest": request_identity(request(agent_input(), mode="replay"), config),
+        {"stage": "chat-agent", "inputDigest": request_identity(request(agent_input(mcp={**agent_input()["mcp"], "recipient": "authored-replay"}),
+                                                mode="replay"), config),
          "response": {**approval_response(("mcpr_1", "company_read", {"targets": ["KRX:000660"]})),
                       "model": "authored-synthetic-chat-agent"}}]}), encoding="utf-8")
     state = tmp_path / "state"
     state.mkdir()
-    rotated = agent_input(mcp={**agent_input()["mcp"], "authorization": TOKEN + "rotated"})
+    rotated = agent_input(mcp={**agent_input()["mcp"], "authorization": TOKEN + "rotated", "recipient": "authored-replay"})
     result = invoke(request(rotated, mode="replay"), state_dir=state, registry=None, sender=ReplaySender(fixture))
     assert result.status == "succeeded" and result.answer["approvalRequests"][0]["approvalRequestId"] == "mcpr_1"
     assert result.receipt.execution_mode == "replay"
+
+
+@pytest.mark.parametrize("mode,named", [
+    # The application checked its results for another endpoint's recipient than this runtime would send to.
+    ("live", "openai-compatible:" + "0" * 64),
+    ("live", "authored-replay"),
+    ("replay", RECIPIENT),
+])
+def test_a_step_for_another_recipient_than_the_stages_own_is_never_sent(tmp_path, mode, named):
+    endpoint = Endpoint()
+    payload = agent_input(mcp={**agent_input()["mcp"], "recipient": named})
+    if mode == "live":
+        result = run(request(payload), tmp_path, endpoint)
+    else:
+        fixture = tmp_path / "replay.json"
+        fixture.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-1", "recordingKind": "authored-test",
+                                       "responses": []}), encoding="utf-8")
+        result = invoke(request(payload, mode="replay"), state_dir=tmp_path, registry=None, sender=ReplaySender(fixture))
+    assert result.status == "failed" and result.failure.code == "mcp_recipient_mismatch"
+    assert result.failure.sent is False and result.receipt is None
+    assert endpoint.calls == []
+
+
+def test_the_recipient_is_checked_here_and_never_sent_to_the_provider():
+    body = chat_agent.build_request(AgentInput.model_validate(agent_input()), "gpt-6-luna", "medium", URL)
+    assert RECIPIENT not in json.dumps(body)
 
 
 def test_redaction_keeps_everything_but_echoed_credentials():

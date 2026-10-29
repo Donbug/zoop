@@ -18,6 +18,8 @@ ends `approval_required` (the held calls, no answer) or `completed` (the final a
 own ledger and resumes the stored response (`continuation.previousResponseId`, so the provider stores responses) with its decisions in a NEW step with its own
 invocation id. The input carries the application's job-scoped MCP grant token; the runtime sends it only to the provider, as the MCP tool's `authorization`,
 and keeps it out of every identity and stored answer. The MCP server URL is never part of a request: it is the operator's `ZOOP_AI_CHAT_MCP_SERVER_URL`.
+`mcp.recipient` names the recipient the application checked its MCP results' send grants for (those results reach the provider from the application, not
+through this runtime); a step is sent only when it is exactly the stage's own recipient, otherwise it fails `mcp_recipient_mismatch` with nothing sent.
 
 **Once per invocation.** `invocationId` (equal to `Idempotency-Key`) names one stage of one attempt. The runtime sends it at most once: the same id and input
 return the stored outcome, another input under the same id is the stage failure `invocation_conflict`, and a request whose outcome is unknown stays `unknown`.
@@ -55,7 +57,8 @@ def examples() -> dict[str, Any]:
         "schemaVersion": "zoop-ai-chat-1", "invocationId": "job-00000001:1:chat-agent:2", "stage": "chat-agent", "mode": "replay",
         "input": {"turns": [{"text": "SK하이닉스 최근 사건 알려줘"}],
                   "requirements": [{"requirementId": "r1", "label": "SK하이닉스 최근 사건", "general": False}],
-                  "mcp": {"authorization": "zmcp1.k1.synthetic-grant-token.synthetic-mac", "allowedTools": ["company_read", "issue_read"]},
+                  "mcp": {"authorization": "zmcp1.k1.synthetic-grant-token.synthetic-mac", "allowedTools": ["company_read", "issue_read"],
+                          "recipient": "authored-replay"},
                   "maxCitations": 20,
                   "continuation": {"previousResponseId": "resp_synthetic_1",
                                    "decisions": [{"approvalRequestId": "mcpr_synthetic_1", "approve": True}]}}})

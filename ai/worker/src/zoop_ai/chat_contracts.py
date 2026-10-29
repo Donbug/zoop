@@ -212,9 +212,15 @@ class AgentRequirement(Wire):
 class McpConnection(Wire):
     """The run's access to the ZOOP MCP server: the job-scoped grant token the application issued (sent as the MCP tool's
     `authorization` on every request; this runtime never stores or logs it) and the tools the run may use. The server's URL is
-    no part of a request: it is the operator's `ZOOP_AI_CHAT_MCP_SERVER_URL`, so no caller can send the grant elsewhere."""
+    no part of a request: it is the operator's `ZOOP_AI_CHAT_MCP_SERVER_URL`, so no caller can send the grant elsewhere.
+
+    `recipient` is the recipient the application checked its tool results' send grants for: the results go from its MCP server
+    to the provider directly, never through this runtime's grant check. A step is sent only when it is exactly this stage's
+    own recipient (`<provider>:<revision>` live, `authored-replay` in replay); otherwise `mcp_recipient_mismatch`, nothing sent.
+    It is no credential and is part of the step's identity; it is never sent to the provider."""
     authorization: str = Field(min_length=16, max_length=4096, pattern=r"^[A-Za-z0-9._-]+$")
     allowed_tools: list[str] = Field(min_length=1, max_length=MAX_AGENT_TOOLS)
+    recipient: str = Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9._:-]+$")
 
     @model_validator(mode="after")
     def tool_names(self):
