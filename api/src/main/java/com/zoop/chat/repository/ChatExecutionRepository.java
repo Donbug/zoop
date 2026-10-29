@@ -31,6 +31,12 @@ public interface ChatExecutionRepository {
 
     boolean phase(String jobId, String ownerToken, String phase, Instant at);
 
+    /**
+     * Brings the running job's deadline forward to {@code deadline} (never later), fenced like every run write; false when
+     * the run no longer owns the job.
+     */
+    boolean shortenDeadline(String jobId, String ownerToken, Instant deadline, Instant at);
+
     /** Records that the run is about to call a model (after {@link #lockOwned} in the same transaction). */
     void recordModelCall(String jobId, int runs, String attempts, Instant at);
 
@@ -55,6 +61,12 @@ public interface ChatExecutionRepository {
 
     /** How many tool calls the attempt has reserved so far (after {@link #lockOwned} in the same transaction). */
     int countToolCalls(String jobId, int attemptNo);
+
+    /**
+     * The job's tool calls that count against its budget: every call this attempt reserved, and those of its earlier
+     * attempts that were made (all but {@code cancelled}, a reservation that never ran).
+     */
+    int countJobToolCalls(String jobId, int attemptNo);
 
     /** Stores reserved tool calls (after {@link #lockOwned} in the same transaction). */
     void reserveToolCalls(List<NewChatToolCall> calls, Instant at);

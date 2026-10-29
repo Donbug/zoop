@@ -340,6 +340,64 @@ class ChatExecutorPostgresTest {
     }
 
     @Test
+    void aRerunGetsWhatIsLeftOfTheJobsCallsNotANewBudget() {
+        engine.script((run, control) -> {
+            assertEquals(ChatRunControl.MAX_TOOL_CALLS, control.toolCallsLeft());
+            control.reserveToolCalls(1, Collections.nCopies(4, reservation("company.read")));
+            for (String id : List.of("tc-0", "tc-1", "tc-2")) {
+                control.toolCallStarted(id);
+                control.toolCallFinished(id, new ChatToolCallEnd("succeeded", null, "v1", List.of(), false, false));
+            }
+            return new ChatEngineOutcome.Failed("transient", "provider_error", true);
+        });
+        String jobId = submit("다시 처리할 질문");
+        assertTrue(executor.runOnce());
+        assertEquals("rerun", service.getJob(member, jobId).failure().retry());
+        assertEquals("queued", service.retry(member, jobId, "retry-" + suffix()).job().status());
+
+        engine.script((run, control) -> {
+            assertEquals(2, run.attemptNo());
+            // Three calls were made; the fourth reservation never ran (cancelled with the attempt) and does not count.
+            assertEquals(ChatRunControl.MAX_TOOL_CALLS - 3, control.toolCallsLeft());
+            assertThrows(IllegalArgumentException.class,
+                    () -> control.reserveToolCalls(1, Collections.nCopies(4, reservation("issue.read"))));
+            assertEquals(List.of("tc-0", "tc-1", "tc-2"),
+                    control.reserveToolCalls(1, Collections.nCopies(3, reservation("issue.read"))));
+            assertEquals(0, control.toolCallsLeft());
+            return ScriptedChatEngine.generalAnswer("남은 호출로 처리한 답");
+        });
+        assertTrue(executor.runOnce());
+        assertEquals("completed", service.getJob(member, jobId).status());
+        assertEquals(List.of("1:succeeded", "1:succeeded", "1:succeeded", "1:cancelled", "2:cancelled", "2:cancelled",
+                "2:cancelled"), jdbc.queryForList("SELECT attempt_no || ':' || status FROM chat_tool_calls "
+                + "WHERE chat_job_id = ? ORDER BY attempt_no, call_index", String.class, jobId));
+    }
+
+    @Test
+    void aShortenedDeadlineIsStoredReachesAttachedRequestsAndHoldsForTheFinalStore() {
+        engine.script((run, control) -> {
+            Instant shorter = run.deadline().minusSeconds(15);
+            control.shortenDeadline(shorter);
+            Instant stored = jdbc.queryForObject("SELECT deadline_at FROM chat_jobs WHERE id = ?", Timestamp.class,
+                    run.jobId()).toInstant();
+            assertTrue(Duration.between(shorter, stored).abs().toMillis() < 1);
+            control.shortenDeadline(run.deadline());
+            assertTrue(Duration.between(shorter, jdbc.queryForObject("SELECT deadline_at FROM chat_jobs WHERE id = ?",
+                    Timestamp.class, run.jobId()).toInstant()).abs().toMillis() < 1, "never moved later");
+            var attached = executor.attach(run.jobId(), 1).orElseThrow();
+            assertTrue(attached.control().remaining().compareTo(Duration.ofSeconds(45)) <= 0);
+            // Past the shortened deadline, though inside the claim's: the result is not stored as completed.
+            control.shortenDeadline(Instant.now().minusMillis(1));
+            return ScriptedChatEngine.generalAnswer("기한을 넘긴 답");
+        });
+        String jobId = submit("기한을 줄인 질문");
+        assertTrue(executor.runOnce());
+        var failed = service.getJob(member, jobId);
+        assertEquals("failed", failed.status());
+        assertEquals("deadline_guard", failed.failure().reason());
+    }
+
+    @Test
     void aCancelClosesTheRunsToolCallsAndFencesItsLaterWrites() {
         String jobId = submit("도구 호출 중 취소");
         var claim = executor.claimNext().orElseThrow();

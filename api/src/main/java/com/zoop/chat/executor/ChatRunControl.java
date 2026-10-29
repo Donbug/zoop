@@ -2,6 +2,7 @@ package com.zoop.chat.executor;
 
 import com.zoop.chat.repository.ChatToolCallEnd;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -21,13 +22,27 @@ public interface ChatRunControl {
     /** Time left until the run's deadline (zero or negative once passed). */
     Duration remaining();
 
+    /**
+     * Brings the run's deadline forward to {@code deadline} (never later): from then on {@link #remaining}, every fenced
+     * record, a tool request reaching the run from outside and the final store keep to it, so a result past it is not stored
+     * as completed. Throws {@link ChatRunSuperseded} when the run no longer owns the job.
+     */
+    void shortenDeadline(Instant deadline);
+
     /** Whether this run still owns the job; false after a cancel, an expired lease or a newer run. */
     boolean owned();
 
     /**
+     * Calls the job may still reserve: {@link #MAX_TOOL_CALLS} less this attempt's reservations and the calls its earlier
+     * attempts made. A rerun does not open a new budget.
+     */
+    int toolCallsLeft();
+
+    /**
      * Records a confirmed plan's calls as {@code reserved} {@code chat_tool_calls} rows of this attempt, continuing its call
-     * index, and returns their tool-call ids in order. An attempt holds at most {@link #MAX_TOOL_CALLS} calls across plan
-     * revisions; a plan that would exceed it is refused with {@link IllegalArgumentException} and nothing is reserved.
+     * index, and returns their tool-call ids in order. A job holds at most {@link #MAX_TOOL_CALLS} calls across plan
+     * revisions and attempts ({@link #toolCallsLeft}); a plan that would exceed it is refused with
+     * {@link IllegalArgumentException} and nothing is reserved.
      */
     List<String> reserveToolCalls(int planRevision, List<ChatToolCallReservation> calls);
 
@@ -38,9 +53,9 @@ public interface ChatRunControl {
     void toolCallFinished(String toolCallId, ChatToolCallEnd end);
 
     /**
-     * Tool calls one attempt may make, supplementary rounds, failures and agent approvals included (MCP actions contract 3.2:
-     * 8 per job, at most 6 internal and 2 web). Every bound read is internal until a web search tool exists, so the cap is
-     * the internal 6; the 2 web calls come with that tool, counted apart.
+     * Tool calls one job may make across its attempts, supplementary rounds, failures and agent approvals included (MCP
+     * actions contract 3.2: 8 per job, at most 6 internal and 2 web). Every bound read is internal until a web search tool
+     * exists, so the cap is the internal 6; the 2 web calls come with that tool, counted apart.
      */
     int MAX_TOOL_CALLS = 6;
 }

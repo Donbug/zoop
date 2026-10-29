@@ -115,6 +115,11 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     static final Duration AGENT_JOB = Duration.ofSeconds(45);
     /** All agent steps together (MCP round trips, approvals, tool calls and the final answer): at most 35 s. */
     static final Duration AGENT_TOTAL = Duration.ofSeconds(35);
+    /**
+     * A rerun whose job has fewer calls left than its plan needs: the same input always would, so it is not rerun and the
+     * member is asked to narrow the question ({@code budget_exceeded}, chat failure contract).
+     */
+    static final ChatEngineOutcome.Failed TOOL_BUDGET_SPENT = new ChatEngineOutcome.Failed("budget_exceeded", null, false);
 
     public OrchestratedChatEngine(ChatModels.Router router, ChatModels.Generator generator, ChatModels.Verifier verifier,
             ChatToolRegistry registry, ChatToolRunner runner, ChatCitationSource citations, Clock clock) {
@@ -199,10 +204,12 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             // The agent path: Luna chooses and chains the allowed reads, the server decides each one, and the answer is
             // checked below against exactly the results of the calls that ran (shared by the requirements they serve).
             control.phase("retrieving");
+            if (control.toolCallsLeft() < 1) throw new Stop(TOOL_BUDGET_SPENT);
+            // The run's deadline becomes 45 s from the job's start: verification and the final store keep to it too.
+            control.shortenDeadline(run.deadline().minus(ChatJobExecutor.MAX_DEADLINE.minus(AGENT_JOB)));
             Duration after = limits.verify().plus(limits.server());
-            // Luna has min(35 s, what is left of the 45 s agent job before verification and saving): never 35 s on top.
-            Duration jobLeft = control.remaining().minus(ChatJobExecutor.MAX_DEADLINE.minus(AGENT_JOB));
-            Duration luna = min(AGENT_TOTAL, jobLeft.minus(after));
+            // Luna has min(35 s, what is left of it before verification and saving): never 35 s on top.
+            Duration luna = min(AGENT_TOTAL, control.remaining().minus(after));
             if (luna.compareTo(MIN_AGENT_STEP) < 0) throw new DeadlineGuard();
             Instant lunaEnd = clock.instant().plus(luna);
             ChatAgentPath.Outcome ran = agent.run(run, control, agentRequirements(confirmed), agentTools,
@@ -231,6 +238,8 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                     .put("deniedCalls", ran.denied());
         } else if (confirmed.requirements().stream().anyMatch(p -> p.mode() == Mode.TOOLS)) {
             control.phase("retrieving");
+            // A rerun reads within what is left of the job's calls, never a new budget.
+            if (ChatPlanner.worstCaseCalls(confirmed) > control.toolCallsLeft()) throw new Stop(TOOL_BUDGET_SPENT);
             guard(control, limits.tools().plus(limits.generate()).plus(limits.verify()).plus(limits.server()));
             retrieved = retrieval.run(run, control, confirmed);
             if (retrieved.failed() != null) throw new Stop(toolFailure(retrieved.failed()));

@@ -120,6 +120,14 @@ public final class MemoryChatStore implements ChatRepository, ChatExecutionRepos
     }
 
     @Override
+    public synchronized boolean shortenDeadline(String jobId, String ownerToken, Instant deadline, Instant at) {
+        Job job = jobs.get(jobId);
+        if (!owned(job, ownerToken, at)) return false;
+        if (deadline.isBefore(job.deadline)) job.deadline = deadline;
+        return true;
+    }
+
+    @Override
     public void recordModelCall(String jobId, int runs, String attempts, Instant at) {
         Job job = jobs.get(jobId);
         job.row = with(job.row, job.row.status(), job.row.phase(), runs, attempts, at, null);
@@ -186,6 +194,12 @@ public final class MemoryChatStore implements ChatRepository, ChatExecutionRepos
     @Override
     public synchronized int countToolCalls(String jobId, int attemptNo) {
         return (int) toolCalls.stream().filter(c -> c.row.jobId().equals(jobId) && c.row.attemptNo() == attemptNo).count();
+    }
+
+    @Override
+    public synchronized int countJobToolCalls(String jobId, int attemptNo) {
+        return (int) toolCalls.stream().filter(c -> c.row.jobId().equals(jobId)
+                && (c.row.attemptNo() == attemptNo || !"cancelled".equals(c.status))).count();
     }
 
     @Override

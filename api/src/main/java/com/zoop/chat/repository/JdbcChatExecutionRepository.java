@@ -77,6 +77,12 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
     }
 
     @Override
+    public boolean shortenDeadline(String jobId, String ownerToken, Instant deadline, Instant at) {
+        return jdbc.update("UPDATE chat_jobs SET deadline_at = LEAST(deadline_at, :deadline), updated_at = :at WHERE id = :id AND "
+                + OWNED, params(jobId, ownerToken, at).addValue("deadline", Timestamp.from(deadline))) == 1;
+    }
+
+    @Override
     public void recordModelCall(String jobId, int runs, String attempts, Instant at) {
         jdbc.update("UPDATE chat_jobs SET runs = :runs, attempts = CAST(:attempts AS jsonb), updated_at = :at WHERE id = :id",
                 new MapSqlParameterSource().addValue("id", jobId).addValue("runs", runs).addValue("attempts", attempts)
@@ -138,6 +144,15 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM chat_tool_calls WHERE chat_job_id = :id AND attempt_no = :attempt",
                 new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo), Integer.class);
+        return count == null ? 0 : count;
+    }
+
+    @Override
+    public int countJobToolCalls(String jobId, int attemptNo) {
+        Integer count = jdbc.queryForObject("""
+                SELECT count(*) FROM chat_tool_calls
+                 WHERE chat_job_id = :id AND (attempt_no = :attempt OR status <> 'cancelled')
+                """, new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo), Integer.class);
         return count == null ? 0 : count;
     }
 
