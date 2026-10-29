@@ -167,12 +167,25 @@ def get(url):
         return json.load(response)
 
 
-def verify(api, index):
+def verify(api, index, files=None):
+    # The recorded response predates the additive feedbackVersion field. Validate that
+    # field independently against checked-in publication identity/hash; retain the
+    # original response digest and all original content, dates, prices and evidence.
+    versions = {} if files is None else {
+        row['id']: row['graph_version_id'] or 'publication:' + row['payload_sha256']
+        for row in load(files['tables/briefing_rounds.json'])
+    }
     checked = []
     for row in index['expected']:
         paths = {row['path']: row['responseSha256'], **row['relatedResponses']}
         for path, expected in paths.items():
-            if response_digest(get(api + path)) != expected:
+            response = get(api + path)
+            if path == row['path'] and 'feedbackVersion' in response:
+                response = dict(response)
+                version = versions.get(response.get('id'))
+                if version is None or response.pop('feedbackVersion') != version:
+                    raise DemoError('feedback_version_changed:' + path)
+            if response_digest(response) != expected:
                 raise DemoError('recorded_response_changed:' + path)
         checked.append({'date': row['date'], 'edition': row['edition'], 'coreItems': row['coreItems']})
     return checked
@@ -301,7 +314,7 @@ def run(args):
                     time.sleep(.5)
             else:
                 raise DemoError('api_not_ready')
-            result = {'status': 'READY', 'newAiCalls': 0, 'newPriceCalls': 0, 'rounds': verify(api, index),
+            result = {'status': 'READY', 'newAiCalls': 0, 'newPriceCalls': 0, 'rounds': verify(api, index, files),
                       'apiUrl': api, 'briefingUrl': web + '/briefing?date=2026-10-22&edition=evening&reading=compact'}
             if not args.api_only:
                 with (work / 'web.log').open('w') as log:

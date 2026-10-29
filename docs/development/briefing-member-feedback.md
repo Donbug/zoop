@@ -32,3 +32,5 @@ FS066-01/02, D-BRF-01, A-ADM-02b. 도움 됨·안 됨과 선택 사유를 실제
 새 키·AI 호출은 필요 없다. 기존 DB 연결과 회원/관리자 세션·CSRF 설정으로 실행한다. 관리자 계정은 프로젝트의 공식 provision 절차를 사용한다.
 
 검증: `DB_URL=jdbc:postgresql://.../<disposable-db> DB_USERNAME=... DB_PASSWORD=... ./api/gradlew -p api authIntegrationTest --tests com.zoop.feedback.FeedbackPostgresTest`. 실제 HTTP·PostgreSQL로 소유권, CSRF, 버전, 중복 요청, 취소, 회차별 이슈, 집계·사유·KST 기간·서명 커서를 검증한다. 프론트는 `web/tests/briefing/briefingPersonalFeedback.test.tsx` 및 `web/tests/admin/adminInsights.test.tsx`를 사용한다.
+
+팀원용 `scripts/briefing_team_demo.py`는 기존 저장 응답 해시를 바꾸지 않는다. 새 `feedbackVersion` 필드만 검증한 발행 DB 사본의 graphVersion/원문 SHA와 별도로 대조한 뒤 원래 응답 digest를 검사한다. 다른 문안·지표·근거·시각·추가 필드는 여전히 불일치로 실패한다.

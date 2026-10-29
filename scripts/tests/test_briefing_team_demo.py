@@ -108,6 +108,27 @@ class TeamDemoTest(unittest.TestCase):
             with self.assertRaisesRegex(demo.DemoError, 'recorded_response_changed'):
                 demo.verify('http://127.0.0.1:8080', expected)
 
+    def test_additive_feedback_version_is_bound_to_recorded_publication_without_changing_original_digest(self):
+        payload = {'id': 'round', 'status': 'published', 'graphVersion': None, 'items': []}
+        path = '/api/v1/briefings?date=2026-10-21&edition=evening'
+        index = {'expected': [{'date': '2026-10-21', 'edition': 'evening', 'coreItems': 0,
+                              'path': path, 'responseSha256': demo.response_digest(payload), 'relatedResponses': {}}]}
+        files = {'tables/briefing_rounds.json': demo.canonical([
+            {'id': 'round', 'graph_version_id': None, 'payload_sha256': 'a' * 64}])}
+        response = {**payload, 'feedbackVersion': 'publication:' + 'a' * 64}
+        with patch.object(demo, 'get', return_value=response):
+            self.assertEqual(1, len(demo.verify('http://127.0.0.1:8080', index, files)))
+            with self.assertRaisesRegex(demo.DemoError, 'feedback_version_changed'):
+                demo.verify('http://127.0.0.1:8080', index)  # never blindly discard an unbound version
+        for changed in ({**response, 'feedbackVersion': 'publication:' + 'b' * 64},
+                        {**response, 'feedbackVersion': None},
+                        {**response, 'id': 'different-round'},
+                        {**response, 'items': [{'changed': True}]}):
+            with patch.object(demo, 'get', return_value=changed):
+                with self.assertRaises(demo.DemoError):
+                    demo.verify('http://127.0.0.1:8080', index, files)
+        self.assertNotEqual(demo.response_digest(payload), demo.response_digest(response))
+
     def test_check_mode_needs_no_tools_or_network(self):
         args = demo.parser().parse_args(['--data', str(self.root), '--check'])
         with patch.object(demo.subprocess, 'run', side_effect=AssertionError('process executed')):
