@@ -454,10 +454,14 @@ export default function CompanyWorkspace() {
     ),
   );
   useEffect(() => {
-    if (selectedBucket)
-      document
-        .getElementById(bucketElementId(selectedBucket))
-        ?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    if (!selectedBucket) return;
+    // 스크립트가 고른 smooth는 CSS의 동작 줄이기 규칙보다 앞서므로 여기서 따로 끈다.
+    const reduced =
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    document.getElementById(bucketElementId(selectedBucket))?.scrollIntoView?.({
+      block: 'nearest',
+      behavior: reduced ? 'auto' : 'smooth',
+    });
   }, [selectedBucket]);
   const mapQuery = new URLSearchParams({
     mode: 'all',
