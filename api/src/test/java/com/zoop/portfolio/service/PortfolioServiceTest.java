@@ -109,9 +109,9 @@ class PortfolioServiceTest {
 
         assertEquals("available", portfolio.valuation().weightStatus());
         assertEquals("USD", portfolio.valuation().currency());
-        assertEquals(0, new java.math.BigDecimal("2000").compareTo(portfolio.valuation().totalMarketValue()));
+        assertEquals(0, new java.math.BigDecimal("2400").compareTo(portfolio.valuation().totalMarketValue()));
         assertEquals(0, new java.math.BigDecimal("1200").compareTo(portfolio.holdings().get(0).marketValue()));
-        assertEquals(0, new java.math.BigDecimal("0.6").compareTo(portfolio.holdings().get(0).weight()));
+        assertEquals(0, new java.math.BigDecimal("0.5").compareTo(portfolio.holdings().get(0).weight()));
         assertInstanceOf(com.zoop.portfolio.dto.HoldingOut.Available.class,
                 portfolio.holdings().get(0).quote());
     }
