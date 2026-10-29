@@ -35,9 +35,16 @@ const logos: Record<string, string> = {
 // Other marks fit in the inscribed square so circular nodes cannot cut their corners off.
 export function logoScale(url?: string | null) {
   return url &&
-    ['samsung', 'sk-hynix', 'asml', 'naver', 'kakao', 'kt'].some(
-      (name) => url === `/graph-assets/${name}.svg`,
-    )
+    [
+      'samsung',
+      'samsung-sds',
+      'sk-hynix',
+      'sk-telecom',
+      'asml',
+      'naver',
+      'kakao',
+      'kt',
+    ].some((name) => url === `/graph-assets/${name}.svg`)
     ? 1
     : 0.68;
 }
