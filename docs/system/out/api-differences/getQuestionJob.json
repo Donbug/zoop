@@ -125,7 +125,8 @@
         "results_truncated",
         "not_in_member_scope",
         "evidence_insufficient",
-        "out_of_scope"
+        "out_of_scope",
+        "tool_unavailable"
       ]
     },
     "response:200:application/json.result<anyOf:0>.limitations[].kind:required": true,
