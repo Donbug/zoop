@@ -199,7 +199,7 @@ public final class MemoryChatStore implements ChatRepository, ChatExecutionRepos
     @Override
     public synchronized int countJobToolCalls(String jobId, int attemptNo, boolean web) {
         return (int) toolCalls.stream().filter(c -> c.row.jobId().equals(jobId)
-                && (c.row.attemptNo() == attemptNo || !"cancelled".equals(c.status))
+                && (web || c.row.attemptNo() == attemptNo || !"cancelled".equals(c.status))
                 && "web-search".equals(c.row.registryGroup()) == web).count();
     }
 

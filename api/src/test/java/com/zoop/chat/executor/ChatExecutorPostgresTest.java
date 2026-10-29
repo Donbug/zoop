@@ -398,6 +398,29 @@ class ChatExecutorPostgresTest {
     }
 
     @Test
+    void aRerunCountsWebReservationsThatNeverStartedAgainstTheJobsWebBudget() {
+        engine.script((run, control) -> {
+            control.reserveToolCalls(1, Collections.nCopies(ChatRunControl.MAX_WEB_CALLS, web()));
+            return new ChatEngineOutcome.Failed("transient", "provider_error", true);
+        });
+        String jobId = submit("웹 예산을 이어 쓰는 질문");
+        assertTrue(executor.runOnce());
+        assertEquals("queued", service.retry(member, jobId, "retry-" + suffix()).job().status());
+
+        engine.script((run, control) -> {
+            assertEquals(2, run.attemptNo());
+            var spent = assertThrows(ChatWebBudgetExhausted.class,
+                    () -> control.reserveToolCalls(1, List.of(web())));
+            assertEquals(ChatWebBudgetExhausted.Budget.JOB, spent.budget());
+            return ScriptedChatEngine.generalAnswer("웹 없이 계속한 답");
+        });
+        assertTrue(executor.runOnce());
+        assertEquals(List.of("1:cancelled", "1:cancelled"), jdbc.queryForList(
+                "SELECT attempt_no || ':' || status FROM chat_tool_calls WHERE chat_job_id = ? ORDER BY call_index",
+                String.class, jobId));
+    }
+
+    @Test
     void aShortenedDeadlineIsStoredReachesAttachedRequestsAndHoldsForTheFinalStore() {
         engine.script((run, control) -> {
             Instant shorter = run.deadline().minusSeconds(15);
@@ -560,6 +583,11 @@ class ChatExecutorPostgresTest {
     private static ChatToolCallReservation reservation(String capability) {
         return new ChatToolCallReservation(ChatToolRegistry.VERSION, "zoop-core-read", capability, "app:" + capability,
                 "chat-tool/v1", "0".repeat(64), "{\"limit\":20}");
+    }
+
+    private static ChatToolCallReservation web() {
+        return new ChatToolCallReservation(ChatToolRegistry.VERSION, "web-search", "web.search", "app:web.search",
+                "chat-tool/v1", "1".repeat(64), "{\"limit\":5}");
     }
 
     private String submit(String question) {
