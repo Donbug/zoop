@@ -199,6 +199,24 @@ class ChatMcpAgentTest {
     }
 
     @Test
+    void atMostFourCallsAreApprovedInARoundSoAtMostFourRunAtOnce() {
+        // Five reachable calls asked at once (the resolved company at five result limits): the fifth waits a round.
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", java.util.stream.IntStream.rangeClosed(1, 5)
+                .mapToObj(i -> new ChatModels.ApprovalRequest("mcpr_" + i, "company_read",
+                        Map.of("targets", List.of("KRX:000660"), "limit", i)))
+                .toList(), null));
+        luna.script.add(n -> done());
+
+        var outcome = run(steps(false));
+
+        assertEquals(List.of(true, true, true, true, false),
+                luna.inputs.get(1).decisions().stream().map(ChatModels.Decision::approve).toList());
+        assertEquals(4, outcome.approved());
+        assertEquals(1, outcome.denied());
+        assertEquals(4, store.toolCalls(JOB).size(), "the denied one was never reserved");
+    }
+
+    @Test
     void aTargetTheServerNeverResolvedAndNoApprovedCallReturnedIsDenied() {
         // Round 1: an id nobody resolved is denied; the resolved company is approved.
         luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(

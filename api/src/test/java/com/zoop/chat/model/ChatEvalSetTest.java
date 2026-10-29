@@ -667,6 +667,11 @@ class ChatEvalSetTest {
         @Override public void beforeModelCall() { }
         @Override public Duration remaining() { return Duration.ofSeconds(60); }
         @Override public boolean owned() { return true; }
+        @Override public int toolCallsLeft() { return MAX_TOOL_CALLS - reserved; }
+        @Override
+        public void shortenDeadline(java.time.Instant deadline) {
+            throw new UnsupportedOperationException("only the agent path shortens a deadline");
+        }
 
         @Override
         public List<String> reserveToolCalls(int planRevision, List<ChatToolCallReservation> calls) {

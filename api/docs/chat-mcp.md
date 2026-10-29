@@ -56,7 +56,7 @@ MCP 메시지를 읽기 전에 순서대로 검사한다.
 `require_approval=always`에서 Java가 모델의 `mcp_approval_request`를 승인할 때 `ChatMcpTools.approve(attached, 도구, 인자)`를 부른다. 승인은 그 정확한 호출(도구 + 정규화 요청: targets·limit·서버 주입값)을 `chat_tool_calls`에 `reserved`로 예약하고 `input_digest`로 식별한다.
 
 - `/mcp`의 `tools/call`은 같은 attempt에 같은 기능·같은 digest로 **아직 시작되지 않은 예약**이 있을 때만 실행하며, 예약을 `running`으로 바꾸는 fenced 전이로 한 번만 소비한다. 없으면 `call_not_approved`이고 아무것도 읽지 않는다. 승인받지 않은 target, 다른 limit, 이미 쓴 승인은 모두 여기서 막힌다.
-- 승인 시점에 예약되므로 attempt 호출 상한(현재 12회)을 원자적으로 차감한다. 상한 초과 승인은 `tool_budget_exhausted`다.
+- 승인 시점에 예약되므로 job 호출 상한(6회, 아래 "예산")을 원자적으로 차감한다. 상한은 job 단위라 재실행(rerun)한 attempt도 이전 attempt가 실제로 한 호출(실행되지 않고 `cancelled`로 닫힌 예약 제외)을 뺀 나머지만 쓴다. 상한 초과 승인은 `tool_budget_exhausted`다.
 - 승인됐지만 호출되지 않은 예약은 job이 끝날 때 기존 규칙대로 `cancelled`로 닫힌다.
 - 이번 PR에는 `approve`를 부르는 실행 경로(ai/service의 approval request 전달)가 아직 없다. 계약과 강제 지점만 먼저 고정했다.
 
@@ -71,7 +71,7 @@ MCP 메시지를 읽기 전에 순서대로 검사한다.
 | `grant_mismatch` | grant의 graphVersion·asOf·subject scope가 job과 다름 |
 | `invalid_arguments` | 인자 규칙 위반(아무것도 읽지 않음, 원장 기록 없음) |
 | `call_not_approved` | 서버가 승인(예약)한 호출과 정확히 일치하지 않거나 이미 사용됨 |
-| `tool_budget_exhausted` | (승인 시) attempt의 호출 상한(현재 12회) 도달 |
+| `tool_budget_exhausted` | (승인 시) job의 호출 상한(6회, 이전 attempt 포함) 도달 |
 | `result_too_large` | 직렬화 결과 256 KiB 초과. 원장 기록 **전에** 검사해 `failed`/`result_too_large`로 남기며 근거·dataVersion은 기록하지 않음 |
 | `send_grants_unavailable` | 아래 모델 전송 gate가 판단할 수 없음(grant 레지스트리를 읽지 못함·형식 위반, 근거 출처를 읽지 못함). 읽기는 실행됐지만 결과를 보내지 않고 `failed`로 남김 |
 | `tool_timeout` `tool_unavailable` `tool_failed` | 기존 runner 실패 코드(원장에 `failed`) |
@@ -103,17 +103,19 @@ MCP 호출도 `chat_tool_calls`에 기존 호출과 같은 상태(예약 → 실
 **흐름.**
 1. Java가 run의 grant 토큰을 발급하고 `chat-agent` 1단계를 부른다. 요구마다 planner가 해석한 대상 ID(`targets`)를 넘기고, 허용 도구는 계획의 기능만이다.
 2. 단계가 `approval_required`로 멈추면 Java가 요청마다 결정한다. **run의 허용 도구이고, `targets`의 모든 ID가 도달 가능하며, `ChatMcpTools.approve`가 예약에 성공한 호출만 승인**하고 나머지는 거부한다. 도달 가능한 ID는 첫 라운드엔 요구의 해석된 `targets`, 다음 라운드부터는 거기에 이전에 승인·실행된 결과의 항목·기업·경로 양끝·단계·근거 ID를 더한 서버 소유 목록이다. `targets`가 없는 호출(고정 문서, 버전 비교 전체 그래프)은 인자 검사만 거친다. 프롬프트의 "ID를 추측하지 않는다"와 공급자의 `allowed_tools`는 서버 검사를 대신하지 않는다. 결정을 continuation(`previous_response_id`)으로 보내면 공급자가 승인된 호출만 `/mcp`로 실행한다.
-3. 승인 라운드는 최대 3회. 다음 단계 하나만 할 시간이 남거나 라운드를 다 쓰면 남은 요청을 모두 거부해 그 단계가 답을 쓰게 한다. 그 뒤에도 묻는 run은 실패한 모델 단계다.
+3. 승인 라운드는 최대 3회이고, 한 라운드에 최대 4건만 승인한다(나머지는 거부, Luna는 다음 라운드에 다시 요청 가능). 공급자는 라운드의 승인 호출을 마친 뒤 단계를 답하므로 job의 동시 실행이 4개를 넘지 않는다. 다음 단계 하나만 할 시간이 남거나 라운드를 다 쓰면 남은 요청을 모두 거부해 그 단계가 답을 쓰게 한다. 그 뒤에도 묻는 run은 실패한 모델 단계다.
 4. 최종 답은 **실행된 호출의 결과로** 검사한다. `/mcp`는 성공 호출의 결과 봉투를 모델에 보낸 것과 같은 JSON으로 `chat_tool_calls.result`(jsonb, 256 KiB 이하, migration `V20261028140000`)에 남기고, Java는 그 결과로 branch를 만들어 기존 결정론 검사·인용·Jev 검증·결과 생성을 그대로 거친다. 어느 인스턴스가 `/mcp` 호출을 받았든 같은 PostgreSQL에서 읽는다. 결과는 run의 요구들이 공유한다(승인 요청에 요구 ID가 아직 없다).
 
-**시간.** 단계마다 `min(35초, 남은 시간 − 검증·서버 예약)`을 기다리고, 그 값이 답 작성용 10초보다 작으면 시작하지 않고 `deadline_guard`로 끝낸다. route 요약에 `path=agent`, `agentSteps`, `approvedCalls`, `deniedCalls`를 남긴다.
+**시간.** agent run은 job 시작부터 **45초** 안에 검증·저장까지 끝낸다. agent 경로가 시작되면 run의 기한 자체를 시작 + 45초로 앞당긴다(`ChatRunControl.shortenDeadline`, DB `deadline_at`도 owner fence로 함께, 늦추지는 않음). 그래서 남은 시간 계산, 기록 대기, `/mcp`로 붙는 요청, 최종 저장의 지연 판정이 모두 45초를 따르며, 45초를 넘긴 결과는 60초 안이어도 완료로 저장하지 않는다(`deadline_guard`, 모델을 부른 뒤면 `response_unknown`). Luna 단계 전체(MCP 왕복·승인 continuation·도구·최종 답)는 `min(35초, 45초 중 남은 시간 − 검증·서버 예약 14초)`이고, 각 단계는 그 남은 예산까지만 기다린다. 예산이 답 작성용 10초보다 작으면 시작하지 않고 `deadline_guard`, 남은 예산이 20초 미만이면 마지막 단계로 보고 새 도구를 승인하지 않는다(마지막 10초 신규 도구 금지). direct 경로는 router·도구·답 작성·검증 단계 한도(합 63초)가 45초에 들어가지 않아, 실측으로 다시 정할 때까지 job 기한 60초를 그대로 쓴다.
+
+**fan-out.** 대상이 5개(한 호출의 `targets` 상한)를 넘는 요구가 있는 계획은 agent 경로를 타지 않고 direct 경로에서 서버가 5개씩 나눠 읽는다. route 요약에 `path=agent`, `agentSteps`, `approvedCalls`, `deniedCalls`를 남긴다.
 
 ## 5. 켜기 전에 남은 조건
 
 아래가 끝나기 전에는 로컬 합성 시험 밖에서 `ZOOP_CHAT_MCP_ENABLED`·`ZOOP_CHAT_AGENT_ENABLED`를 켜지 않는다.
 
 1. ~~**model-send grant 검사.**~~ 구현(3장 "모델 전송 gate"). 켜기 전에 운영자가 레지스트리에 `chat-agent` 목적·agent 수신자 grant와 `zoop-graph` source를 등록하고, OpenAI 보유 조건을 거버넌스 10장에 기록해야 한다.
-2. **예산 8/6/2·동시 4개(job 단위)·요청 캐시·job당 결과 1 MiB**(단계 2). 현재는 기존 attempt당 12회와 runner의 호출 3초·단계 10초, 승인 3라운드만 적용된다. rate limit은 인스턴스별이다. job 기한도 아직 기존 60초다.
+2. **예산**(단계 2): job 단위 호출 상한 6회(내부 몫, 웹 2회는 웹 검색 도구와 함께. rerun은 남은 호출만 쓰고, 계획에 모자라면 `budget_exceeded`로 재실행 불가), agent 라운드당 승인 4건(동시 4개), fan-out 5, agent run 45초(검증·저장까지)·Luna 35초는 구현했다. 남은 것: **요청 캐시·single-flight·캐시 적중 재검사·job당 결과 1 MiB**, 그래프 경로 5초·웹 7초의 도구별 시간, direct 경로 45초(단계 한도 실측 후). rate limit은 인스턴스별이다.
 3. **승인 요청의 요구 매핑**: 지금은 결과를 run의 요구들이 공유한다. 요구별 인용 결속이 필요하면 승인 요청에 requirementIds를 받도록 계약을 넓힌다.
 4. **네트워크·운영**: HTTPS 인바운드 노출 범위, 공급자 출발지 제한 여부(IP allowlist만으로 인증하지 않음), 승인된 소량 live latency spike(실제 Responses·MCP 응답 형태 확인 포함).
 

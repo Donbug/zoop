@@ -391,6 +391,12 @@ class ChatToolRunnerTest {
         @Override public void beforeModelCall() { events.add("model"); }
         @Override public Duration remaining() { return remaining; }
         @Override public boolean owned() { return true; }
+        @Override public int toolCallsLeft() { return MAX_TOOL_CALLS - reserved.size(); }
+
+        @Override
+        public void shortenDeadline(Instant deadline) {
+            throw new UnsupportedOperationException("the runner never shortens a deadline");
+        }
 
         @Override
         public List<String> reserveToolCalls(int planRevision, List<ChatToolCallReservation> calls) {

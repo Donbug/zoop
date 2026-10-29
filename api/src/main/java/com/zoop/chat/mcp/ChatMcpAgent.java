@@ -26,8 +26,9 @@ import tools.jackson.databind.ObjectMapper;
  * steps, and every tool call Luna proposes is decided here and only here.
  *
  * <ul>
- * <li>A proposed call is approved exactly when it names one of the run's allowed tools, every target it names is reachable
- * and {@link ChatMcpTools#approve} reserves it (valid arguments, within the attempt's call limit); otherwise it is denied.
+ * <li>A proposed call is approved exactly when it names one of the run's allowed tools, every target it names is reachable,
+ * fewer than {@link #MAX_ROUND_CALLS} calls were approved in its round and {@link ChatMcpTools#approve} reserves it (valid
+ * arguments, within the attempt's call limit); otherwise it is denied.
  * Reachable are the ids the server resolved for the requirements and, from the next round on, the ids the calls it
  * approved returned (items, their companies, path endpoints and steps, evidence). Nothing is approved without being
  * reserved, and a denied call never runs.</li>
@@ -41,6 +42,11 @@ import tools.jackson.databind.ObjectMapper;
  */
 public final class ChatMcpAgent implements ChatAgentPath {
     static final int MAX_ROUNDS = 3;
+    /**
+     * Calls approved in one round, so at most this many of the job's calls run at once (MCP actions contract 3.2): the
+     * provider makes a round's approved calls before it answers the step, and the next round is decided only then.
+     */
+    static final int MAX_ROUND_CALLS = 4;
     private static final TypeReference<List<ChatToolItem>> ITEMS = new TypeReference<>() { };
     private static final TypeReference<List<ChatToolPath>> PATHS = new TypeReference<>() { };
     private static final TypeReference<List<String>> STRINGS = new TypeReference<>() { };
@@ -96,18 +102,25 @@ public final class ChatMcpAgent implements ChatAgentPath {
             if (closing) rounds = MAX_ROUNDS + 1;
             if (!closing) kept(run).forEach(result -> reachable.addAll(reached(result)));
             List<ChatModels.Decision> next = new ArrayList<>();
+            int round = 0;
             for (ChatModels.ApprovalRequest request : outcome.approvals()) {
                 boolean approve = false;
                 // Only the run's own tools on ids the server resolved or a call it approved returned: neither the
-                // provider's allowed_tools nor the prompt's "never guess an id" is a server-side check.
-                if (!closing && names.contains(request.toolName()) && targetsReachable(request.arguments(), reachable)) {
+                // provider's allowed_tools nor the prompt's "never guess an id" is a server-side check. Past four in a
+                // round the rest are denied; Luna may ask for them again in the next round.
+                if (!closing && round < MAX_ROUND_CALLS && names.contains(request.toolName())
+                        && targetsReachable(request.arguments(), reachable)) {
                     ChatMcpTools.Approval approval = tools.approve(attached, request.toolName(), request.arguments());
                     if (ChatMcpTools.RUN_NOT_ACTIVE.equals(approval.refused())) throw new ChatRunSuperseded();
                     approve = approval.approved();
                 }
                 next.add(new ChatModels.Decision(request.id(), approve));
-                if (approve) approved++;
-                else denied++;
+                if (approve) {
+                    approved++;
+                    round++;
+                } else {
+                    denied++;
+                }
             }
             previous = outcome.responseId();
             decisions = next;
