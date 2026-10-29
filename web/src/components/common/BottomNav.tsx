@@ -15,7 +15,7 @@ export default function BottomNav() {
               end={menu.to === '/'}
               className={({ isActive }) =>
                 `flex h-16 items-center justify-center text-sm ${
-                  isActive ? 'font-semibold text-black' : 'text-gray-400'
+                  isActive ? 'font-semibold text-black' : 'text-zoop-muted'
                 }`
               }
             >
