@@ -16,6 +16,7 @@ import {
   useNavigate,
 } from 'react-router-dom';
 import CompanyDetailPage from '@/pages/company/CompanyDetailPage';
+import AppLayout from '@/components/common/AppLayout';
 import MapPage from '@/pages/map/MapPage';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
@@ -329,6 +330,33 @@ function open(query = '') {
   );
 }
 const pinned = `?asOf=${encodeURIComponent(time)}&graphVersion=v1`;
+
+test.each(['events', 'documents', 'info'])(
+  'D-COM-01 F4 keeps one main and the skip-link target on the %s tab',
+  async (tab) => {
+    const view = renderRoutes(
+      [
+        {
+          element: <AppLayout />,
+          children: [
+            { path: '/companies/:id', element: <CompanyDetailPage /> },
+          ],
+        },
+      ],
+      `/companies/${encodeURIComponent(id)}${pinned}&tab=${tab}`,
+    );
+    await screen.findByRole('heading', { name: '합성 기업', level: 1 });
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    const main = screen.getByRole('main');
+    expect(main.id).toBe('service-main');
+    await view.user.click(
+      screen.getByRole('link', { name: '본문으로 건너뛰기' }),
+    );
+    expect(document.activeElement).toBe(main);
+    expect(view.router.state.location.hash).toBe('');
+    expect(view.router.state.location.search).toContain(`tab=${tab}`);
+  },
+);
 
 function openHistory() {
   return renderRoutes(
