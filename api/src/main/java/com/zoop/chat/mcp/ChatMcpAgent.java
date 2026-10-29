@@ -33,9 +33,15 @@ import tools.jackson.databind.ObjectMapper;
  * <li>At most {@link #MAX_ROUNDS} rounds of approvals (the dependency rounds of ZOOP-AIG-001 6.3.3). The step after the last
  * round denies whatever is still asked, so Luna answers from what it has; a run that still asks after that is a failed
  * model step, never an endless loop.</li>
+ * <li>A web search (web search design 1 and 2) names a query, not ids, so reachability does not apply. It is approved only
+ * from a round after an approved internal read came back empty or cut: the web is the last resort of what ZOOP's own data
+ * left unmet, never the first look. Its query must pass {@link com.zoop.chat.tool.ChatWebQueryPolicy} and it takes the
+ * job's and the day's web budgets when it is reserved; a spent budget denies it and is reported as
+ * {@code web_budget_exhausted}.</li>
  * <li>The final answer is returned with the results of the calls that ran, read back from {@code chat_tool_calls.result}:
  * exactly what the model received, whichever instance served the call. Results are never synthesized for a denied
- * call.</li>
+ * call. Beside it go the web faults the answer went on without: an approved search that left no result
+ * ({@code web_unavailable}), one that found nothing ({@code web_no_results}), a spent budget.</li>
  * </ul>
  */
 public final class ChatMcpAgent implements ChatAgentPath {
@@ -90,6 +96,9 @@ public final class ChatMcpAgent implements ChatAgentPath {
         List<ChatModels.Decision> decisions = List.of();
         int approved = 0;
         int denied = 0;
+        int webApproved = 0;
+        Set<String> notices = new LinkedHashSet<>();
+        String web = ChatMcpTools.name(ChatCapability.WEB_SEARCH);
         for (int step = 1, rounds = 0; ; step++) {
             var input = new ChatModels.AgentInput(requirements, token, names, recipient, maxCitations, previous,
                     decisions);
@@ -102,7 +111,11 @@ public final class ChatMcpAgent implements ChatAgentPath {
                 if (circuit != null) circuit.agentFailed(failure.code());
                 throw failure;
             }
-            if (outcome.completed()) return new Outcome(outcome.answer(), kept(run), step, approved, denied);
+            if (outcome.completed()) {
+                List<ChatToolResult> results = kept(run);
+                return new Outcome(outcome.answer(), results, step, approved, denied,
+                        webNotices(results, webApproved, notices));
+            }
             if (rounds > MAX_ROUNDS) {
                 throw new ChatModels.Failure(ChatModels.Failure.Fate.NOT_SENT, "the agent kept asking after its last round");
             }
@@ -110,19 +123,24 @@ public final class ChatMcpAgent implements ChatAgentPath {
             // Past the last round, or with time for only one more step, nothing more runs: the next step writes the answer.
             boolean closing = rounds > MAX_ROUNDS || steps.closing();
             if (closing) rounds = MAX_ROUNDS + 1;
-            if (!closing) kept(run).forEach(result -> reachable.addAll(reached(result)));
+            List<ChatToolResult> done = closing ? List.of() : kept(run);
+            done.forEach(result -> reachable.addAll(reached(result)));
+            boolean webOpen = unmet(done);
             List<ChatModels.Decision> next = new ArrayList<>();
             int round = 0;
             for (ChatModels.ApprovalRequest request : outcome.approvals()) {
                 boolean approve = false;
+                boolean search = web.equals(request.toolName());
                 // Only the run's own tools on ids the server resolved or a call it approved returned: neither the
                 // provider's allowed_tools nor the prompt's "never guess an id" is a server-side check. Past four in a
                 // round the rest are denied; Luna may ask for them again in the next round.
                 if (!closing && round < MAX_ROUND_CALLS && names.contains(request.toolName())
-                        && targetsReachable(request.arguments(), reachable)) {
+                        && (search ? webOpen : targetsReachable(request.arguments(), reachable))) {
                     ChatMcpTools.Approval approval = tools.approve(attached, request.toolName(), request.arguments());
                     if (ChatMcpTools.RUN_NOT_ACTIVE.equals(approval.refused())) throw new ChatRunSuperseded();
+                    if (ChatMcpTools.WEB_BUDGET_EXHAUSTED.equals(approval.refused())) notices.add(WEB_BUDGET_EXHAUSTED);
                     approve = approval.approved();
+                    if (approve && search) webApproved++;
                 }
                 next.add(new ChatModels.Decision(request.id(), approve));
                 if (approve) {
@@ -135,6 +153,33 @@ public final class ChatMcpAgent implements ChatAgentPath {
             previous = outcome.responseId();
             decisions = next;
         }
+    }
+
+    static final String WEB_UNAVAILABLE = "web_unavailable";
+    static final String WEB_NO_RESULTS = "web_no_results";
+    static final String WEB_BUDGET_EXHAUSTED = "web_budget_exhausted";
+
+    /**
+     * Whether ZOOP's own reads left something for the web: an approved internal read that found nothing within its scope
+     * or was cut by a limit. Approval requests carry no requirement, so this is decided for the run (api/docs/chat-mcp.md 5, item 4).
+     */
+    static boolean unmet(List<ChatToolResult> done) {
+        return done.stream().anyMatch(r -> !ChatCapability.WEB_SEARCH.id().equals(r.capabilityId())
+                && (r.items().isEmpty() || Boolean.TRUE.equals(r.truncated())));
+    }
+
+    /** The web faults of a finished run, in a fixed order. */
+    static List<String> webNotices(List<ChatToolResult> results, int webApproved, Set<String> refused) {
+        List<ChatToolResult> searches = results.stream()
+                .filter(r -> ChatCapability.WEB_SEARCH.id().equals(r.capabilityId())).toList();
+        Set<String> notices = new LinkedHashSet<>();
+        // An approved search with no kept result failed, timed out or never came back.
+        if (searches.size() < webApproved) notices.add(WEB_UNAVAILABLE);
+        if (searches.stream().anyMatch(r -> r.webResults().isEmpty() && !Boolean.TRUE.equals(r.truncated()))) {
+            notices.add(WEB_NO_RESULTS);
+        }
+        notices.addAll(refused);
+        return List.copyOf(notices);
     }
 
     /**

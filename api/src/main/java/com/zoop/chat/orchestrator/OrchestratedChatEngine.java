@@ -6,6 +6,7 @@ import com.zoop.chat.dto.ChatAppliedItem;
 import com.zoop.chat.dto.ChatAppliedPeriod;
 import com.zoop.chat.dto.ChatLimitation;
 import com.zoop.chat.dto.ChatResult;
+import com.zoop.chat.dto.ChatNotice;
 import com.zoop.chat.dto.Citation;
 import com.zoop.chat.executor.ChatEngine;
 import com.zoop.chat.executor.ChatEngineOutcome;
@@ -199,6 +200,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
 
         var retrieved = new ChatRetrieval.Outcome(Map.of(), Map.of(), Set.of(), null, null);
         ChatGeneratedAnswer agentAnswer = null;
+        List<String> agentNotices = List.of();
         boolean directStart = false;
         List<ChatCapability> agentTools = agentTools(confirmed);
         if (agentTools != null && !agent.available()) {
@@ -242,6 +244,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                     .forEach(p -> results.put(p.id(), ran.results()));
             retrieved = new ChatRetrieval.Outcome(results, Map.of(), Set.of(), null, null);
             agentAnswer = ran.answer();
+            agentNotices = ran.notices();
             route.put("path", "agent").put("agentSteps", ran.steps()).put("approvedCalls", ran.approved())
                     .put("deniedCalls", ran.denied());
         } else if (confirmed.requirements().stream().anyMatch(p -> p.mode() == Mode.TOOLS)) {
@@ -393,7 +396,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         var targets = passed.graphTargets().stream().filter(g -> reachable.contains(g.id())).toList();
         ChatResult result = ChatResults.answered(run, kept, keptCitations, targets,
                 items(retrieved, answered, "company"), items(retrieved, answered, "issue"), limitations, partial,
-                directStart ? List.of(ChatResults.notice("mcp_direct_start")) : List.of(), overrode(run, confirmed, answered),
+                notices(directStart, agentNotices), overrode(run, confirmed, answered),
                 writtenPeriod(run, confirmed, answered), clock.instant());
         route.put("outcome", "answered");
         return new ChatEngineOutcome.Completed(result, route);
@@ -530,8 +533,27 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             }
             tools.addAll(p.capabilities());
         }
-        return tools.isEmpty() ? null : List.copyOf(tools);
+        if (tools.isEmpty()) return null;
+        // The web is the last resort of a fact question (Q03~Q08, web search design 1): offered beside its internal reads,
+        // approved only once they left something unmet. A question with no such requirement (Q01 service rules, Q02
+        // concepts alone) is never offered it here.
+        boolean fact = plan.requirements().stream().anyMatch(p -> p.mode() == Mode.TOOLS
+                && p.types().stream().anyMatch(WEB_TYPES::contains));
+        if (fact && exposed.contains(ChatCapability.WEB_SEARCH)) tools.add(ChatCapability.WEB_SEARCH);
+        return List.copyOf(tools);
     }
+
+    /** What the answer went on without: a direct start, and the web faults of an agent run. */
+    private static List<ChatNotice> notices(boolean directStart, List<String> agentNotices) {
+        List<ChatNotice> notices = new ArrayList<>();
+        if (directStart) notices.add(ChatResults.notice("mcp_direct_start"));
+        agentNotices.forEach(code -> notices.add(ChatResults.notice(code)));
+        return notices;
+    }
+
+    /** The question types whose unmet requirements may fall back on the web (web search design 1). */
+    private static final Set<ChatQueryType> WEB_TYPES = Set.of(ChatQueryType.Q03, ChatQueryType.Q04, ChatQueryType.Q05,
+            ChatQueryType.Q06, ChatQueryType.Q07, ChatQueryType.Q08);
 
     /** The answerable requirements of the plan as the agent sees them: reads with their resolved targets, general parts. */
     private static List<ChatModels.AgentRequirement> agentRequirements(ChatPlan.Run plan) {

@@ -27,7 +27,8 @@ public enum ChatCapability {
     PORTFOLIO_SCOPE_READ("portfolio.scope.read", "zoop-member-scope-read", "회원 본인의 보유·관심 종목 범위 확인"),
     /**
      * The supplementary public web search (web search design): one server-checked query per call, counted apart from the
-     * internal reads. Never planned by the router nor exposed on MCP ({@link ChatToolRegistry#bound}).
+     * internal reads. Never planned by the router ({@link ChatToolRegistry#bound}); on the agent path Luna may ask for it
+     * and the server decides each call.
      */
     WEB_SEARCH("web.search", ChatCapability.WEB_GROUP, "공개 웹 검색(보조 근거)");
 

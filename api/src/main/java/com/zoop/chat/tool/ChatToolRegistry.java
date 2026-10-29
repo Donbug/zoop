@@ -41,9 +41,9 @@ public class ChatToolRegistry {
     }
 
     /**
-     * The capability ids a plan may name: those that can be executed now, without the web search, which only the server's
-     * own web step calls (web search design 2: Jev probabilities alone never start a search). It is never offered to the
-     * router or exposed on MCP.
+     * The capability ids a plan may name: those that can be executed now, without the web search (web search design 2: Jev
+     * probabilities alone never start a search). It is never offered to the router; the MCP tools add it on their own, for
+     * the server to decide each call of the agent path.
      */
     public Set<String> bound() {
         return tools.keySet().stream().filter(c -> !c.web()).map(ChatCapability::id)
