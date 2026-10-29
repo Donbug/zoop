@@ -23,7 +23,8 @@ from typing import Any
 SCHEMA = "zoop-chat-live-spike-1"
 MAX_JOB_SECONDS = Decimal("45")
 MAX_INPUT_TOKENS = 24_000
-MAX_OUTPUT_TOKENS = 2_000
+# The final answer's length; reasoning is not assumed to fit in it (MCP actions contract 3.2).
+MAX_ANSWER_TOKENS = 2_000
 DEFAULT_MIN_SAMPLES = 5
 
 # This is intentionally fixed in code so an operator cannot weaken the gate by editing
@@ -43,7 +44,7 @@ TOP_KEYS = {
 RUN_KEYS = {
     "runId", "scenario", "mode", "status", "startedAt", "committedAt", "toolCalls",
     "approvalRounds", "providerCalls", "inputTokens", "outputTokens", "reasoningTokens",
-    "costUsd", "failureCode",
+    "answerTokens", "costUsd", "failureCode",
 }
 
 
@@ -66,6 +67,7 @@ class Run:
     input_tokens: int
     output_tokens: int
     reasoning_tokens: int
+    answer_tokens: int
     cost_usd: Decimal
     failure_code: str | None
 
@@ -140,17 +142,33 @@ def _run(value: Any, index: int) -> Run:
 
     tool_calls = _count(value["toolCalls"], f"{where}.toolCalls")
     rounds = _count(value["approvalRounds"], f"{where}.approvalRounds")
+    provider_calls = _count(value["providerCalls"], f"{where}.providerCalls")
     expected_calls, expected_rounds = SCENARIOS[scenario]
-    if tool_calls != expected_calls or rounds != expected_rounds:
+    if status == "completed":
+        # A completed run is exactly its scenario: one initial Responses call and one per approval continuation.
+        if tool_calls != expected_calls or rounds != expected_rounds:
+            raise EvidenceError(
+                f"{where} does not match {scenario}: toolCalls={tool_calls}, approvalRounds={rounds}"
+            )
+        if provider_calls != rounds + 1:
+            raise EvidenceError(
+                f"{where}.providerCalls must equal approvalRounds + 1 for a completed run"
+            )
+    elif tool_calls > expected_calls or rounds > expected_rounds or provider_calls > rounds + 1:
+        # A failed run stops where it failed, so it records what it reached; it may never claim more than its scenario.
         raise EvidenceError(
-            f"{where} does not match {scenario}: toolCalls={tool_calls}, approvalRounds={rounds}"
+            f"{where} exceeds {scenario}: toolCalls={tool_calls}, approvalRounds={rounds}, providerCalls={provider_calls}"
         )
 
-    provider_calls = _count(value["providerCalls"], f"{where}.providerCalls")
-    if status == "completed" and provider_calls != rounds + 1:
-        raise EvidenceError(
-            f"{where}.providerCalls must equal approvalRounds + 1 for a completed run"
-        )
+    # outputTokens is the provider's reported total, reasoning included; answerTokens is the final answer alone (the last
+    # step's output less its reasoning), which is what the 2k limit bounds (MCP actions contract 3.2).
+    output_tokens = _count(value["outputTokens"], f"{where}.outputTokens")
+    reasoning_tokens = _count(value["reasoningTokens"], f"{where}.reasoningTokens")
+    answer_tokens = _count(value["answerTokens"], f"{where}.answerTokens")
+    if reasoning_tokens > output_tokens:
+        raise EvidenceError(f"{where}.reasoningTokens must be part of outputTokens")
+    if answer_tokens > output_tokens - reasoning_tokens:
+        raise EvidenceError(f"{where}.answerTokens must be part of outputTokens beyond reasoningTokens")
 
     return Run(
         run_id=run_id,
@@ -161,8 +179,9 @@ def _run(value: Any, index: int) -> Run:
         approval_rounds=rounds,
         provider_calls=provider_calls,
         input_tokens=_count(value["inputTokens"], f"{where}.inputTokens"),
-        output_tokens=_count(value["outputTokens"], f"{where}.outputTokens"),
-        reasoning_tokens=_count(value["reasoningTokens"], f"{where}.reasoningTokens"),
+        output_tokens=output_tokens,
+        reasoning_tokens=reasoning_tokens,
+        answer_tokens=answer_tokens,
         cost_usd=_money(value["costUsd"], f"{where}.costUsd"),
         failure_code=failure,
     )
@@ -225,6 +244,7 @@ def report(metadata: dict[str, str], runs: list[Run], min_samples: int) -> dict[
             "inputTokens": sum(run.input_tokens for run in selected),
             "outputTokens": sum(run.output_tokens for run in selected),
             "reasoningTokens": sum(run.reasoning_tokens for run in selected),
+            "maxAnswerTokens": max(run.answer_tokens for run in selected),
             "costUsd": str(sum((run.cost_usd for run in selected), Decimal(0))),
         }
         if completed != len(selected):
@@ -235,8 +255,8 @@ def report(metadata: dict[str, str], runs: list[Run], min_samples: int) -> dict[
             failures.append(f"{run.run_id}: terminal commit exceeded {MAX_JOB_SECONDS}s")
         if run.input_tokens > MAX_INPUT_TOKENS:
             failures.append(f"{run.run_id}: input tokens exceeded {MAX_INPUT_TOKENS}")
-        if run.output_tokens > MAX_OUTPUT_TOKENS:
-            failures.append(f"{run.run_id}: output tokens exceeded {MAX_OUTPUT_TOKENS}")
+        if run.answer_tokens > MAX_ANSWER_TOKENS:
+            failures.append(f"{run.run_id}: answer tokens exceeded {MAX_ANSWER_TOKENS}")
         if run.failure_code in {"response_unknown", "stage_outcome_unknown", "reconcile_required"}:
             failures.append(f"{run.run_id}: provider outcome is unknown")
 
