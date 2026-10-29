@@ -1,370 +1,5 @@
 [
   {
-    "name": "admin-login-1440",
-    "url": "/admin/login?theme=light",
-    "width": 1440,
-    "scrollWidth": 1440,
-    "theme": "light",
-    "bodyFont": "\"Pretendard Variable\", Pretendard, sans-serif",
-    "fonts": [
-      {
-        "family": "Pretendard Variable",
-        "status": "loaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      }
-    ],
-    "h1": ["줍 관리자"],
-    "controls": [
-      {
-        "text": "관리자 로그인",
-        "tag": "BUTTON",
-        "width": 358,
-        "height": 50,
-        "color": "rgb(255, 255, 255)",
-        "background": "rgb(26, 26, 26)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "700"
-      },
-      {
-        "text": "회원 로그인으로",
-        "tag": "A",
-        "width": 69,
-        "height": 17,
-        "color": "rgb(98, 98, 98)",
-        "background": "rgba(0, 0, 0, 0)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "400"
-      }
-    ],
-    "guidance": [],
-    "times": [],
-    "prices": [],
-    "platformFonts": {
-      "h1": [
-        {
-          "familyName": "Pretendard Variable",
-          "postScriptName": "PretendardVariable-ExtraBold",
-          "isCustomFont": true,
-          "glyphCount": 5
-        }
-      ]
-    }
-  },
-  {
-    "name": "login-1440",
-    "url": "/login?theme=light",
-    "width": 1440,
-    "scrollWidth": 1440,
-    "theme": "light",
-    "bodyFont": "\"Pretendard Variable\", Pretendard, sans-serif",
-    "fonts": [
-      {
-        "family": "Pretendard Variable",
-        "status": "loaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "loaded"
-      }
-    ],
-    "h1": ["이메일로 로그인"],
-    "controls": [
-      {
-        "text": "ZOOP",
-        "tag": "A",
-        "width": 45,
-        "height": 24,
-        "color": "rgb(26, 26, 26)",
-        "background": "rgba(0, 0, 0, 0)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "400"
-      },
-      {
-        "text": "화면 테마 전환",
-        "tag": "BUTTON",
-        "width": 32,
-        "height": 32,
-        "color": "rgb(98, 98, 98)",
-        "background": "rgba(0, 0, 0, 0)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "400"
-      },
-      {
-        "text": "로그인",
-        "tag": "BUTTON",
-        "width": 340,
-        "height": 48,
-        "color": "rgb(255, 255, 255)",
-        "background": "rgb(26, 26, 26)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "700"
-      },
-      {
-        "text": "이메일로 회원가입",
-        "tag": "A",
-        "width": 86,
-        "height": 18,
-        "color": "rgb(98, 98, 98)",
-        "background": "rgba(0, 0, 0, 0)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "400"
-      },
-      {
-        "text": "로그인 없이 둘러보기",
-        "tag": "BUTTON",
-        "width": 99,
-        "height": 18,
-        "color": "rgb(98, 98, 98)",
-        "background": "rgba(0, 0, 0, 0)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "400"
-      },
-      {
-        "text": "구글 로그인",
-        "tag": "A",
-        "width": 40,
-        "height": 42,
-        "color": "rgb(26, 26, 26)",
-        "background": "rgba(0, 0, 0, 0)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "400"
-      },
-      {
-        "text": "카카오톡 로그인",
-        "tag": "A",
-        "width": 40,
-        "height": 42,
-        "color": "rgb(26, 26, 26)",
-        "background": "rgba(0, 0, 0, 0)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "400"
-      }
-    ],
-    "guidance": [],
-    "times": [],
-    "prices": [],
-    "platformFonts": {
-      "h1": [
-        {
-          "familyName": "Pretendard Variable",
-          "postScriptName": "PretendardVariable",
-          "isCustomFont": true,
-          "glyphCount": 8
-        }
-      ],
-      ".font-inter": [
-        {
-          "familyName": "Inter",
-          "postScriptName": "Inter-ExtraBold",
-          "isCustomFont": true,
-          "glyphCount": 4
-        }
-      ]
-    }
-  },
-  {
-    "name": "signup-1440",
-    "url": "/signup?theme=light",
-    "width": 1440,
-    "scrollWidth": 1440,
-    "theme": "light",
-    "bodyFont": "\"Pretendard Variable\", Pretendard, sans-serif",
-    "fonts": [
-      {
-        "family": "Pretendard Variable",
-        "status": "loaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "unloaded"
-      },
-      {
-        "family": "Inter Variable",
-        "status": "loaded"
-      }
-    ],
-    "h1": [
-      "이메일로 가입하기",
-      "Zoop 개인정보 처리방침",
-      "Zoop 서비스 이용약관"
-    ],
-    "controls": [
-      {
-        "text": "ZOOP",
-        "tag": "A",
-        "width": 45,
-        "height": 24,
-        "color": "rgb(26, 26, 26)",
-        "background": "rgba(0, 0, 0, 0)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "400"
-      },
-      {
-        "text": "← 시작 화면으로",
-        "tag": "A",
-        "width": 92,
-        "height": 42,
-        "color": "oklch(0.373 0.034 259.733)",
-        "background": "rgba(0, 0, 0, 0)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "600"
-      },
-      {
-        "text": "가입하고 시작하기",
-        "tag": "BUTTON",
-        "width": 380,
-        "height": 50,
-        "color": "rgb(255, 255, 255)",
-        "background": "rgb(26, 26, 26)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "700"
-      }
-    ],
-    "guidance": [
-      {
-        "text": "8자 이상 32자 이하로 입력해 주세요. 공백은 그대로 사용되며, 제어 문자와 흔한 비밀번호는 쓸 수 없어요.",
-        "tag": "P",
-        "width": 380,
-        "height": 36,
-        "color": "rgb(115, 115, 115)",
-        "background": "rgba(0, 0, 0, 0)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "400"
-      },
-      {
-        "text": "(필수)",
-        "tag": "SPAN",
-        "width": 34,
-        "height": 20,
-        "color": "oklch(0.551 0.027 264.364)",
-        "background": "rgba(0, 0, 0, 0)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "500"
-      },
-      {
-        "text": "개인정보 처리방침 본문 보기Zoop 개인정보 처리방침개인정보처리자: 돈벌래버전: 2026-10-13.1시행일: 2026년 10월 13일개인정보 보호 책임자 및 문",
-        "tag": "DETAILS",
-        "width": 352,
-        "height": 24,
-        "color": "oklch(0.551 0.027 264.364)",
-        "background": "rgba(0, 0, 0, 0)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "400"
-      },
-      {
-        "text": "(필수)",
-        "tag": "SPAN",
-        "width": 34,
-        "height": 20,
-        "color": "oklch(0.551 0.027 264.364)",
-        "background": "rgba(0, 0, 0, 0)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "500"
-      },
-      {
-        "text": "서비스 이용약관 본문 보기Zoop 서비스 이용약관서비스 제공자: 돈벌래버전: 2026-10-13.1시행일: 2026년 10월 13일문의: 김도현 (dohyun38",
-        "tag": "DETAILS",
-        "width": 352,
-        "height": 24,
-        "color": "oklch(0.551 0.027 264.364)",
-        "background": "rgba(0, 0, 0, 0)",
-        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
-        "weight": "400"
-      }
-    ],
-    "times": [],
-    "prices": [],
-    "platformFonts": {
-      "h1": [
-        {
-          "familyName": "Pretendard Variable",
-          "postScriptName": "PretendardVariable-Bold",
-          "isCustomFont": true,
-          "glyphCount": 9
-        }
-      ],
-      ".font-inter": [
-        {
-          "familyName": "Inter",
-          "postScriptName": "Inter-ExtraBold",
-          "isCustomFont": true,
-          "glyphCount": 4
-        }
-      ]
-    }
-  },
-  {
     "name": "map-1440",
     "url": "/?mode=all&theme=light",
     "width": 1440,
@@ -1491,11 +1126,11 @@
     }
   },
   {
-    "name": "admin-login-dark-390",
-    "url": "/admin/login?theme=dark",
-    "width": 390,
-    "scrollWidth": 390,
-    "theme": "dark",
+    "name": "admin-login-1440",
+    "url": "/admin/login?theme=light",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "theme": "light",
     "bodyFont": "\"Pretendard Variable\", Pretendard, sans-serif",
     "fonts": [
       {
@@ -1538,8 +1173,8 @@
         "tag": "BUTTON",
         "width": 358,
         "height": 50,
-        "color": "rgb(23, 23, 23)",
-        "background": "rgb(255, 255, 255)",
+        "color": "rgb(255, 255, 255)",
+        "background": "rgb(26, 26, 26)",
         "font": "\"Pretendard Variable\", Pretendard, sans-serif",
         "weight": "700"
       },
@@ -1548,7 +1183,7 @@
         "tag": "A",
         "width": 69,
         "height": 17,
-        "color": "rgb(212, 212, 212)",
+        "color": "rgb(98, 98, 98)",
         "background": "rgba(0, 0, 0, 0)",
         "font": "\"Pretendard Variable\", Pretendard, sans-serif",
         "weight": "400"
@@ -1632,6 +1267,288 @@
           "postScriptName": "PretendardVariable-Bold",
           "isCustomFont": true,
           "glyphCount": 13
+        }
+      ]
+    }
+  },
+  {
+    "name": "login-1440",
+    "url": "/login?theme=light",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "theme": "light",
+    "bodyFont": "\"Pretendard Variable\", Pretendard, sans-serif",
+    "fonts": [
+      {
+        "family": "Pretendard Variable",
+        "status": "loaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "loaded"
+      }
+    ],
+    "h1": ["이메일로 로그인"],
+    "controls": [
+      {
+        "text": "ZOOP",
+        "tag": "A",
+        "width": 45,
+        "height": 24,
+        "color": "rgb(26, 26, 26)",
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
+        "weight": "400"
+      },
+      {
+        "text": "화면 테마 전환",
+        "tag": "BUTTON",
+        "width": 32,
+        "height": 32,
+        "color": "rgb(98, 98, 98)",
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
+        "weight": "400"
+      },
+      {
+        "text": "세션 다시 확인",
+        "tag": "BUTTON",
+        "width": 94,
+        "height": 42,
+        "color": "rgb(26, 26, 26)",
+        "background": "rgb(255, 255, 255)",
+        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
+        "weight": "600"
+      },
+      {
+        "text": "로그인",
+        "tag": "BUTTON",
+        "width": 340,
+        "height": 48,
+        "color": "rgb(255, 255, 255)",
+        "background": "rgb(26, 26, 26)",
+        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
+        "weight": "700"
+      },
+      {
+        "text": "이메일로 회원가입",
+        "tag": "A",
+        "width": 86,
+        "height": 18,
+        "color": "rgb(98, 98, 98)",
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
+        "weight": "400"
+      },
+      {
+        "text": "로그인 없이 둘러보기",
+        "tag": "BUTTON",
+        "width": 99,
+        "height": 18,
+        "color": "rgb(98, 98, 98)",
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
+        "weight": "400"
+      }
+    ],
+    "guidance": [],
+    "times": [],
+    "prices": [],
+    "platformFonts": {
+      "h1": [
+        {
+          "familyName": "Pretendard Variable",
+          "postScriptName": "PretendardVariable",
+          "isCustomFont": true,
+          "glyphCount": 8
+        }
+      ],
+      ".font-inter": [
+        {
+          "familyName": "Inter",
+          "postScriptName": "Inter-ExtraBold",
+          "isCustomFont": true,
+          "glyphCount": 4
+        }
+      ]
+    }
+  },
+  {
+    "name": "signup-1440",
+    "url": "/signup?theme=light",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "theme": "light",
+    "bodyFont": "\"Pretendard Variable\", Pretendard, sans-serif",
+    "fonts": [
+      {
+        "family": "Pretendard Variable",
+        "status": "loaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "loaded"
+      }
+    ],
+    "h1": [],
+    "controls": [
+      {
+        "text": "ZOOP",
+        "tag": "A",
+        "width": 45,
+        "height": 24,
+        "color": "rgb(26, 26, 26)",
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
+        "weight": "400"
+      },
+      {
+        "text": "세션 다시 확인",
+        "tag": "BUTTON",
+        "width": 94,
+        "height": 42,
+        "color": "rgb(26, 26, 26)",
+        "background": "rgb(255, 255, 255)",
+        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
+        "weight": "600"
+      }
+    ],
+    "guidance": [],
+    "times": [],
+    "prices": [],
+    "platformFonts": {
+      ".font-inter": [
+        {
+          "familyName": "Inter",
+          "postScriptName": "Inter-ExtraBold",
+          "isCustomFont": true,
+          "glyphCount": 4
+        }
+      ]
+    }
+  },
+  {
+    "name": "admin-login-dark-390",
+    "url": "/admin/login?theme=dark",
+    "width": 390,
+    "scrollWidth": 390,
+    "theme": "dark",
+    "bodyFont": "\"Pretendard Variable\", Pretendard, sans-serif",
+    "fonts": [
+      {
+        "family": "Pretendard Variable",
+        "status": "loaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      },
+      {
+        "family": "Inter Variable",
+        "status": "unloaded"
+      }
+    ],
+    "h1": ["줍 관리자"],
+    "controls": [
+      {
+        "text": "관리자 로그인",
+        "tag": "BUTTON",
+        "width": 358,
+        "height": 50,
+        "color": "rgb(23, 23, 23)",
+        "background": "rgb(255, 255, 255)",
+        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
+        "weight": "700"
+      },
+      {
+        "text": "회원 로그인으로",
+        "tag": "A",
+        "width": 69,
+        "height": 17,
+        "color": "rgb(212, 212, 212)",
+        "background": "rgba(0, 0, 0, 0)",
+        "font": "\"Pretendard Variable\", Pretendard, sans-serif",
+        "weight": "400"
+      }
+    ],
+    "guidance": [],
+    "times": [],
+    "prices": [],
+    "platformFonts": {
+      "h1": [
+        {
+          "familyName": "Pretendard Variable",
+          "postScriptName": "PretendardVariable-ExtraBold",
+          "isCustomFont": true,
+          "glyphCount": 5
         }
       ]
     }
