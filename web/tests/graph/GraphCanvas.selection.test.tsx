@@ -1610,4 +1610,19 @@ describe('D-GRP-01 지도 카메라 움직임', () => {
     reduced.unmount();
     vi.unstubAllGlobals();
   });
+  it('흐름 순으로 정렬을 켜고 끌 때도 노드를 이전 자리에서 새 자리로 옮긴다', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    stubMotion(false);
+    const view = render(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    canvas.translateElementTo.mockClear();
+    view.rerender(<GraphCanvas data={data} flow />);
+    await waitFor(() => expect(canvas.translateElementTo).toHaveBeenCalled());
+    expect(canvas.translateElementTo.mock.lastCall![1]).toBe(true);
+    canvas.translateElementTo.mockClear();
+    view.rerender(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.translateElementTo).toHaveBeenCalled());
+    view.unmount();
+    vi.unstubAllGlobals();
+  });
 });

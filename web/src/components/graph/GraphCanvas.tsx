@@ -836,12 +836,9 @@ export default function GraphCanvas({
         // 근거에 연결선이 없어 사건만 강조할 때도 범례로 숨긴 사건을 드러낸다(15번).
         if (isolateSelection && selected) pathNodes.add(selected);
         // 배치가 바뀌면(포커스 진입·해제, 흐름 순 켜기·끄기) 이전 위치를 유지하지 않고 새 배치 전체를 화면에 맞춘다.
-        // 포커스에 들어가거나 단계를 바꾸거나 나올 때는 노드가 지금 자리에서 새 자리로 옮겨 간다(프로토타입 G2).
+        // 포커스 진입·단계 바꾸기·해제와 흐름 순 켜기·끄기에서는 노드가 지금 자리에서 새 자리로 옮겨 간다(프로토타입 G2).
         const morphFrom =
-          arrangement !== lastArrangement.current &&
-          (arrangement.startsWith('focus:') ||
-            lastArrangement.current.startsWith('focus:')) &&
-          cameraMotion('layout')
+          arrangement !== lastArrangement.current && cameraMotion('layout')
             ? renderedData.current
             : null;
         if (arrangement !== lastArrangement.current) {
