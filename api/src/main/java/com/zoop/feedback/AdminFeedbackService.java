@@ -21,8 +21,9 @@ public class AdminFeedbackService {
   private static final int MIN_SAMPLE = 5;
   private static final String PURPOSE = "admin-feedback-cursor-v1";
   private static final String FROM =
-      " FROM briefing_feedback f JOIN briefing_rounds r ON r.id=f.round_id WHERE f.value IN"
-          + " ('up','down') AND r.status='published' AND f.target_version="
+      " FROM briefing_feedback f JOIN briefing_rounds r ON r.id=f.round_id JOIN members m ON"
+          + " m.id=f.member_id WHERE f.value IN ('up','down') AND r.status='published' AND"
+          + " f.target_version="
           + FeedbackVersion.SQL;
   private final JdbcTemplate jdbc;
   private final ObjectMapper mapper;
@@ -116,7 +117,7 @@ public class AdminFeedbackService {
     var rows =
         jdbc.queryForList(
             """
-            SELECT f.*,r.round_date,r.edition,
+            SELECT f.*,r.round_date,r.edition,m.email AS owner_email,m.display_name AS owner_name,
                 (SELECT i->>'title' FROM jsonb_array_elements(r.published_payload->'items') i WHERE i->>'eventId'=f.event_id) issue_title
             """
                 + FROM
@@ -143,7 +144,12 @@ public class AdminFeedbackService {
                   .put("featureLabel", label(feature))
                   .put("targetId", (String) row.get("target_id"))
                   .put("targetLabel", title)
-                  .put("reason", (String) row.get("reason"))
+                  .put(
+                      "reason",
+                      FeedbackReasonMasker.mask(
+                          (String) row.get("reason"),
+                          (String) row.get("owner_email"),
+                          (String) row.get("owner_name")))
                   .put("voter", voter((String) row.get("member_id")))
                   .putNull("sessionId");
             });

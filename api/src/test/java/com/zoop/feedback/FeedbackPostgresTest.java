@@ -270,6 +270,22 @@ class FeedbackPostgresTest {
     assertEquals(1, day.json().at("/features/0/total").asInt());
   }
 
+  @Test
+  void adminMasksReasonOnReadAndPreservesMemberOriginal() throws Exception {
+    var member = member();
+    var admin = admin();
+    String original = "Synthetic Member other@example.com 010-1234-5678 2026-10-29";
+    assertEquals(200, vote(member, ROUND, "down", original, "synthetic-graph-v1").status());
+    assertEquals(
+        original,
+        request("GET", "/api/v1/feedback", member, null).json().at("/items/0/reason").asText());
+    var response = request("GET", "/api/v1/admin/feedback/dislikes", admin, null);
+    assertEquals(200, response.status());
+    assertEquals("[이름] [이메일] [전화번호] 2026-10-29", response.json().at("/items/0/reason").asText());
+    assertEquals(
+        original, jdbc.queryForObject("SELECT reason FROM briefing_feedback", String.class));
+  }
+
   private JsonNode summary(Login a) throws Exception {
     var r = request("GET", "/api/v1/admin/feedback/summary", a, null);
     assertEquals(200, r.status(), r.body());
