@@ -144,6 +144,14 @@ class HttpHandoffSourceTest {
         assertEquals(GraphHandoffFailure.HANDOFF_EXPORT_UNAVAILABLE, unreachable.failure());
         assertTrue(unreachable.cliCode() == null);
 
+        // An answer outside the contract is invalid, not a transient failure: a retry would not do better.
+        GraphHandoffException malformed = failure(failing(new AiTransportException(AiOperation.HANDOFF_READ, "r-5",
+                AiTransportException.Failure.RESPONSE_MALFORMED, OptionalInt.of(200), null)), built.request());
+        assertEquals(GraphHandoffFailure.HANDOFF_EXPORT_INVALID, malformed.failure());
+        GraphHandoffException tooLarge = failure(failing(new AiTransportException(AiOperation.HANDOFF_READ, "r-6",
+                AiTransportException.Failure.RESPONSE_TOO_LARGE, OptionalInt.of(200), null)), built.request());
+        assertEquals(GraphHandoffFailure.HANDOFF_EXPORT_INVALID, tooLarge.failure());
+
         // The status route maps the same way.
         HttpHandoffSource notAllowed = failing(new HandoffServiceErrorException(AiOperation.HANDOFF_READ, "r-4", 403,
                 "handoff_not_allowed", false, Optional.empty(), Optional.empty(), Optional.empty()));

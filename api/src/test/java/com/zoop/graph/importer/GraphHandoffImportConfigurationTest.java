@@ -259,7 +259,7 @@ class GraphHandoffImportConfigurationTest {
     }
 
     @Test
-    void aBlankHandoffSourceIsTheCliDefaultAndTheCliRefusesAnIdleReadClient() {
+    void aBlankHandoffSourceIsTheCliDefaultAndAnEnabledReadClientDoesNotDisturbTheCli() {
         runner().withPropertyValues(with("ZOOP_GRAPH_HANDOFF_IMPORT_HANDOFF_SOURCE", "")).run(context -> {
             assertNull(context.getStartupFailure());
             assertEquals(GraphHandoffImportSettings.HandoffSourceKind.CLI,
@@ -273,10 +273,10 @@ class GraphHandoffImportConfigurationTest {
                 .withPropertyValues(cliWithReader.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue())
                         .toArray(String[]::new))
                 .run(context -> {
-                    Throwable failure = configurationFailure(context.getStartupFailure());
-                    assertNotNull(failure);
-                    assertTrue(failure.getMessage().startsWith("zoop.graph-handoff-import.handoff-source "), failure.getMessage());
-                    assertTrue(failure.getMessage().contains("zoop.ai.handoff-read-client.enabled"), failure.getMessage());
+                    // The same environment serves the web application's round bridge, which needs the client: not a refusal.
+                    assertNull(context.getStartupFailure());
+                    assertEquals(GraphHandoffImportSettings.HandoffSourceKind.CLI,
+                            context.getBean(GraphHandoffImportSettings.class).handoffSource());
                 });
     }
 

@@ -1,0 +1,215 @@
+package com.zoop.graph.round;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+import com.zoop.graph.round.GraphRound.Lease;
+import com.zoop.graph.round.GraphRoundEvent.Outcome;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+/** {@code graph_rounds} and {@code graph_round_events} over the app database. */
+@Repository
+public class JdbcGraphRoundRepository implements GraphRoundRepository {
+    static final int MAX_DETAIL_BYTES = 8 * 1024;
+    private static final String SELECT = """
+            SELECT round_id, slot_at, stage, plan_id, plan_digest, analysis_job_id, handoff_id, manifest_digest, bundle_digest,
+                   graph_version_id, activated_version_id, activation_note, failure_code, attempts, next_attempt_at,
+                   lease_owner, lease_until, started_by, created_at, updated_at
+            FROM graph_rounds
+            """;
+
+    private final NamedParameterJdbcTemplate jdbc;
+    private final ObjectMapper mapper;
+    private final TransactionTemplate tx;
+
+    public JdbcGraphRoundRepository(NamedParameterJdbcTemplate jdbc, ObjectMapper mapper,
+            PlatformTransactionManager transactions) {
+        this.jdbc = jdbc;
+        this.mapper = mapper;
+        this.tx = new TransactionTemplate(transactions);
+    }
+
+    @Override
+    public GraphRound create(String roundId, Instant slotAt, String startedBy, Instant now) {
+        jdbc.update("""
+                INSERT INTO graph_rounds (round_id, slot_at, stage, attempts, started_by, created_at, updated_at)
+                VALUES (:id, :slot, 'scheduled', 0, :by, :now, :now)
+                """, new MapSqlParameterSource("id", roundId).addValue("slot", stamp(slotAt)).addValue("by", startedBy)
+                .addValue("now", stamp(now)));
+        return find(roundId).orElseThrow();
+    }
+
+    @Override
+    public Optional<GraphRound> find(String roundId) {
+        return first(jdbc.query(SELECT + "WHERE round_id = :id", new MapSqlParameterSource("id", roundId),
+                JdbcGraphRoundRepository::round));
+    }
+
+    @Override
+    public Optional<GraphRound> findBySlot(Instant slotAt) {
+        return first(jdbc.query(SELECT + "WHERE slot_at = :slot", new MapSqlParameterSource("slot", stamp(slotAt)),
+                JdbcGraphRoundRepository::round));
+    }
+
+    @Override
+    public List<GraphRound> due(Instant now, int limit) {
+        return jdbc.query(SELECT + """
+                WHERE stage NOT IN ('imported', 'skipped', 'failed')
+                  AND (next_attempt_at IS NULL OR next_attempt_at <= :now)
+                ORDER BY slot_at LIMIT :limit
+                """, new MapSqlParameterSource("now", stamp(now)).addValue("limit", limit), JdbcGraphRoundRepository::round);
+    }
+
+    @Override
+    public Optional<GraphRound> claim(String roundId, String owner, Duration lease, Instant now) {
+        int taken = jdbc.update("""
+                UPDATE graph_rounds SET lease_owner = :owner, lease_until = :until, updated_at = :now
+                WHERE round_id = :id AND (lease_owner IS NULL OR lease_owner = :owner OR lease_until < :now)
+                """, new MapSqlParameterSource("id", roundId).addValue("owner", owner).addValue("until", stamp(now.plus(lease)))
+                .addValue("now", stamp(now)));
+        return taken == 0 ? Optional.empty() : find(roundId);
+    }
+
+    @Override
+    public void release(String roundId, String owner) {
+        jdbc.update("""
+                UPDATE graph_rounds SET lease_owner = NULL, lease_until = NULL
+                WHERE round_id = :id AND lease_owner = :owner
+                """, new MapSqlParameterSource("id", roundId).addValue("owner", owner));
+    }
+
+    @Override
+    public GraphRound advance(String roundId, GraphRoundPatch patch, Outcome outcome, String code, String requestId,
+            JsonNode detail, Instant at) {
+        String detailJson = detail == null ? null : mapper.writeValueAsString(detail);
+        if (detailJson != null && detailJson.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_DETAIL_BYTES) {
+            throw new IllegalArgumentException("round event detail exceeds " + MAX_DETAIL_BYTES + " bytes");
+        }
+        return tx.execute(ignored -> {
+            int updated = jdbc.update("""
+                    UPDATE graph_rounds SET
+                        stage = :stage,
+                        plan_id = COALESCE(:planId, plan_id),
+                        plan_digest = COALESCE(:planDigest, plan_digest),
+                        analysis_job_id = COALESCE(:jobId, analysis_job_id),
+                        handoff_id = COALESCE(:handoffId, handoff_id),
+                        manifest_digest = COALESCE(:manifestDigest, manifest_digest),
+                        bundle_digest = COALESCE(:bundleDigest, bundle_digest),
+                        graph_version_id = COALESCE(:versionId, graph_version_id),
+                        failure_code = :failureCode,
+                        attempts = CASE WHEN :reset THEN 0 ELSE attempts END + CASE WHEN :count THEN 1 ELSE 0 END,
+                        next_attempt_at = CASE WHEN :clearNext THEN NULL ELSE COALESCE(:nextAt, next_attempt_at) END,
+                        updated_at = :at
+                    WHERE round_id = :id
+                    """, new MapSqlParameterSource("id", roundId).addValue("stage", patch.stage().wire())
+                    .addValue("planId", patch.planId()).addValue("planDigest", patch.planDigest())
+                    .addValue("jobId", patch.analysisJobId()).addValue("handoffId", patch.handoffId())
+                    .addValue("manifestDigest", patch.manifestDigest()).addValue("bundleDigest", patch.bundleDigest())
+                    .addValue("versionId", patch.graphVersionId()).addValue("failureCode", patch.failureCode())
+                    .addValue("reset", patch.resetAttempts()).addValue("count", patch.countAttempt())
+                    .addValue("clearNext", patch.clearNextAttempt()).addValue("nextAt", stamp(patch.nextAttemptAt()))
+                    .addValue("at", stamp(at)));
+            if (updated != 1) throw new IllegalStateException("round not found: " + roundId);
+            jdbc.update("""
+                    INSERT INTO graph_round_events (round_id, at, stage, outcome, code, request_id, detail)
+                    VALUES (:id, :at, :stage, :outcome, :code, :requestId, CAST(:detail AS jsonb))
+                    """, new MapSqlParameterSource("id", roundId).addValue("at", stamp(at)).addValue("stage", patch.stage().wire())
+                    .addValue("outcome", outcome.wire()).addValue("code", code).addValue("requestId", requestId)
+                    .addValue("detail", detailJson));
+            return find(roundId).orElseThrow();
+        });
+    }
+
+    @Override
+    public void recordActivation(String roundId, String activatedVersionId, String note, Instant at) {
+        jdbc.update("""
+                UPDATE graph_rounds SET activated_version_id = :version, activation_note = :note, updated_at = :at
+                WHERE round_id = :id
+                """, new MapSqlParameterSource("id", roundId).addValue("version", activatedVersionId).addValue("note", note)
+                .addValue("at", stamp(at)));
+    }
+
+    @Override
+    public List<GraphRoundEvent> events(String roundId) {
+        return jdbc.query("""
+                SELECT id, round_id, at, stage, outcome, code, request_id, detail::text AS detail
+                FROM graph_round_events WHERE round_id = :id ORDER BY id
+                """, new MapSqlParameterSource("id", roundId), this::event);
+    }
+
+    @Override
+    public List<GraphRound> page(GraphRoundStage stage, Instant beforeSlot, int limit) {
+        StringBuilder where = new StringBuilder("WHERE TRUE");
+        MapSqlParameterSource params = new MapSqlParameterSource("limit", limit);
+        if (stage != null) {
+            where.append(" AND stage = :stage");
+            params.addValue("stage", stage.wire());
+        }
+        if (beforeSlot != null) {
+            where.append(" AND slot_at < :before");
+            params.addValue("before", stamp(beforeSlot));
+        }
+        return jdbc.query(SELECT + where + " ORDER BY slot_at DESC LIMIT :limit", params, JdbcGraphRoundRepository::round);
+    }
+
+    @Override
+    public long openCount() {
+        Long count = jdbc.queryForObject(
+                "SELECT count(*) FROM graph_rounds WHERE stage NOT IN ('imported', 'skipped', 'failed')",
+                new MapSqlParameterSource(), Long.class);
+        return count == null ? 0 : count;
+    }
+
+    @Override
+    public Optional<GraphRound> newestImported() {
+        return first(jdbc.query(SELECT + "WHERE stage = 'imported' ORDER BY slot_at DESC LIMIT 1", new MapSqlParameterSource(),
+                JdbcGraphRoundRepository::round));
+    }
+
+    private static GraphRound round(ResultSet rs, int row) throws SQLException {
+        String leaseOwner = rs.getString("lease_owner");
+        Timestamp leaseUntil = rs.getTimestamp("lease_until");
+        return new GraphRound(rs.getString("round_id"), rs.getTimestamp("slot_at").toInstant(),
+                GraphRoundStage.parse(rs.getString("stage")), text(rs, "plan_id"), text(rs, "plan_digest"),
+                text(rs, "analysis_job_id"), text(rs, "handoff_id"), text(rs, "manifest_digest"), text(rs, "bundle_digest"),
+                text(rs, "graph_version_id"), text(rs, "activated_version_id"), text(rs, "activation_note"),
+                text(rs, "failure_code"), rs.getInt("attempts"), instant(rs, "next_attempt_at"),
+                leaseOwner == null ? Optional.empty() : Optional.of(new Lease(leaseOwner, leaseUntil.toInstant())),
+                rs.getString("started_by"), rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant());
+    }
+
+    private GraphRoundEvent event(ResultSet rs, int row) throws SQLException {
+        String detail = rs.getString("detail");
+        return new GraphRoundEvent(rs.getLong("id"), rs.getString("round_id"), rs.getTimestamp("at").toInstant(),
+                GraphRoundStage.parse(rs.getString("stage")), Outcome.parse(rs.getString("outcome")), text(rs, "code"),
+                text(rs, "request_id"), detail == null ? Optional.empty() : Optional.of(mapper.readTree(detail)));
+    }
+
+    private static Optional<String> text(ResultSet rs, String column) throws SQLException {
+        return Optional.ofNullable(rs.getString(column));
+    }
+
+    private static Optional<Instant> instant(ResultSet rs, String column) throws SQLException {
+        Timestamp value = rs.getTimestamp(column);
+        return value == null ? Optional.empty() : Optional.of(value.toInstant());
+    }
+
+    private static Timestamp stamp(Instant at) {
+        return at == null ? null : Timestamp.from(at);
+    }
+
+    private static <T> Optional<T> first(List<T> rows) {
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.getFirst());
+    }
+}

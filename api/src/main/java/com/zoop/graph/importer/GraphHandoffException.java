@@ -9,7 +9,8 @@ import java.util.regex.Pattern;
  */
 public final class GraphHandoffException extends RuntimeException {
     /** The CLIs' own codes are lowercase snake_case (digits allowed, e.g. {@code s2_payload_invalid}); anything else is not echoed. */
-    private static final Pattern CLI_CODE = Pattern.compile("[a-z0-9_]{1,64}");
+    /** A producer or service code as the result carries it: the CLI's snake_case codes and ai/service's wider {@code Safe} alphabet. */
+    private static final Pattern CLI_CODE = Pattern.compile("[A-Za-z0-9_.:-]{1,80}");
 
     private final GraphHandoffFailure failure;
     private final String cliCode;

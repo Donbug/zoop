@@ -1,9 +1,11 @@
 package com.zoop.graph.importer;
 
+import java.util.Set;
 import java.util.function.Supplier;
 
 import com.zoop.ai.AiClientException;
 import com.zoop.ai.AiServiceRejectionException;
+import com.zoop.ai.AiTransportException;
 import com.zoop.ai.handoff.HandoffReadClient;
 import com.zoop.ai.handoff.HandoffReadClient.HandoffRead;
 import com.zoop.graph.importer.HandoffExportParser.VerifiedHandoff;
@@ -18,13 +20,18 @@ import com.zoop.graph.importer.HandoffExportParser.VerifiedHandoff;
  * <ul>
  * <li>A withheld answer is {@code handoff_withheld} with the service's reason code (never "no data").</li>
  * <li>503 answers ({@code runtime_busy}, {@code runtime_unavailable}, {@code service_busy}, {@code service_configuration_invalid})
- *     and every transport failure are {@code handoff_export_unavailable}: a later run may succeed.</li>
+ *     and transport failures (connect, timeout, I/O) are {@code handoff_export_unavailable}: a later run may succeed.</li>
+ * <li>An answer outside the contract (malformed or unexpected body, over the size bound, a redirect) is
+ *     {@code handoff_export_invalid}: the same request will not do better until the service is fixed.</li>
  * <li>Every other error envelope (401, 403 {@code handoff_not_allowed}, 404 {@code handoff_not_found}, 409
  *     {@code execution_unavailable}, 422, 500 {@code runtime_contract_mismatch}/{@code runtime_binding_mismatch}) is
  *     {@code handoff_refused} with that code: the same request will not do better until an operator acts.</li>
  * </ul>
  */
 public final class HttpHandoffSource implements HandoffSource {
+    private static final Set<AiTransportException.Failure> OUTSIDE_CONTRACT = Set.of(
+            AiTransportException.Failure.RESPONSE_MALFORMED, AiTransportException.Failure.UNEXPECTED_RESPONSE,
+            AiTransportException.Failure.RESPONSE_TOO_LARGE, AiTransportException.Failure.REDIRECT_REFUSED);
     private final HandoffReadClient client;
     private final HandoffReadParser parser;
 
@@ -55,7 +62,10 @@ public final class HttpHandoffSource implements HandoffSource {
                 throw new GraphHandoffException(GraphHandoffFailure.HANDOFF_EXPORT_UNAVAILABLE);
             }
             throw GraphHandoffException.handoffRefused(refused.code());
-        } catch (AiClientException transport) {
+        } catch (AiTransportException transport) {
+            throw new GraphHandoffException(OUTSIDE_CONTRACT.contains(transport.failure())
+                    ? GraphHandoffFailure.HANDOFF_EXPORT_INVALID : GraphHandoffFailure.HANDOFF_EXPORT_UNAVAILABLE);
+        } catch (AiClientException other) {
             throw new GraphHandoffException(GraphHandoffFailure.HANDOFF_EXPORT_UNAVAILABLE);
         } catch (IllegalArgumentException outsideContract) {
             throw new GraphHandoffException(GraphHandoffFailure.HANDOFF_EXPORT_INVALID);
