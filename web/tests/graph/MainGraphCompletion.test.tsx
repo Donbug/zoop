@@ -1201,6 +1201,24 @@ describe('D-GRP-06 · 기업 영향 경로', () => {
     );
   });
 
+  it('D-GRP-03 선택한 기업 패널을 키보드로 좌우 조절하고 너비를 저장한다', async () => {
+    localStorage.removeItem('zoop:graph-company-panel-width');
+    setup('/?mode=all&select=node%3AKRX%3A005930');
+    const panel = await screen.findByRole('complementary', {
+      name: '삼성전자 기업 상세',
+    });
+    const separator = screen.getByRole('separator', {
+      name: '기업 패널 너비 조절',
+    });
+    expect(separator.getAttribute('aria-valuenow')).toBe('320');
+    separator.focus();
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(separator.getAttribute('aria-valuenow')).toBe('336');
+    expect((panel as HTMLElement).style.width).toBe('336px');
+    expect(localStorage.getItem('zoop:graph-company-panel-width')).toBe('336');
+    localStorage.removeItem('zoop:graph-company-panel-width');
+  });
+
   it('기업의 직접 사건에서 URL 경로 패널을 열고 닫을 때 기업 선택을 보존한다', async () => {
     const router = setup();
     await userEvent.click(
@@ -1250,7 +1268,7 @@ describe('D-GRP-07b · 선택 기업 포커스', () => {
     });
     await userEvent.click(
       await within(panel).findByRole('button', {
-        name: '이 기업 중심으로 보기',
+        name: '기업 중심 그래프',
       }),
     );
     expect(

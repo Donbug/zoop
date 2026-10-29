@@ -91,9 +91,7 @@ describe('D-MY-01 / 01b 내 종목: 보유 종목과 계좌 연결', () => {
     expect(section.textContent).toContain(
       '보유 종목의 시세 통화가 서로 달라요.',
     );
-    expect(list.textContent).toContain(
-      '005930 · 20주 · 평가 5,430,000원 · 비중 계산 불가',
-    );
+    expect(list.textContent).toContain('005930 · 20주 · 평가 5,430,000원 · -');
     expect(
       within(list)
         .getByRole('link', { name: '삼성전자, 지도에서 보기' })

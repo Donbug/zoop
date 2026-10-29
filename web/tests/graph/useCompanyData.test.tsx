@@ -47,6 +47,31 @@ describe('useCompanyData', () => {
     expect(api.getPortfolio).not.toHaveBeenCalled();
     expect(result.current.data?.holding).toBeNull();
   });
+
+  it('다른 기업만 보유한 포트폴리오에서는 선택 기업의 보유 내역을 반환하지 않는다', async () => {
+    vi.mocked(api.getPortfolio).mockResolvedValue({
+      connected: true,
+      mockAsOf: null,
+      holdings: [
+        {
+          companyId: 'KRX:OTHER',
+          name: '다른 기업',
+          ticker: null,
+          quantity: 2,
+          avgPrice: 100,
+          avgPriceCurrency: null,
+          marketValue: null,
+          weight: null,
+        },
+      ],
+    });
+    const { result } = renderHook(() =>
+      useCompanyData('KRX:005930', 'member-token'),
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.data?.holding).toBeNull();
+  });
+
   it('keeps round selectors on documents but leaves latest prices independent', async () => {
     const context = {
       round: 'round-old',
