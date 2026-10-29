@@ -28,6 +28,7 @@ PROJECTS = (
 HELP = """Polyglot monorepo: app code stays in its current directories.
 Discovery: make help | projects | available-checks
 Public/offline: make config-check | contracts-check | docs-check | tokens-check | secret-check | tooling-test | public-check
+Approved chatbot live evidence (does not run model calls): make chat-live-spike-report CHAT_LIVE_SPIKE_EVIDENCE=/absolute/evidence.json [CHAT_LIVE_SPIKE_REPORT=/absolute/report.json]
 Prototype web only: make web-install | web-typecheck | web-test | web-build
 Production web (root web/) only: make app-web-install | app-web-lint | app-web-format-check | app-web-build | app-web-test
 BFF only: make bff-install | bff-test | bff-build

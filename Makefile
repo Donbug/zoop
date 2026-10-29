@@ -15,7 +15,7 @@ API_GRADLE ?= ./api/gradlew -p api --console=plain
 ARTIFACT_DIR ?= /tmp/zoop-release-artifacts
 COMMIT ?=
 
-.PHONY: help projects available-checks config-check tooling-test public-check contracts-check worker-schema-check worker-contracts-check evaluation-verification-check bff-types-check docs-check tokens-check secret-check web-install web-typecheck web-test web-build app-web-install app-web-lint app-web-format-check app-web-build app-web-test bff-install bff-test bff-build worker-install worker-test worker-build pipeline-install pipeline-test pipeline-smoke pipeline-build service-install service-test service-smoke service-pipeline-test service-pipeline-smoke service-openapi-check service-build api-test api-ai-smoke api-ai-chat-smoke api-build package-artifacts
+.PHONY: help projects available-checks config-check tooling-test chat-live-spike-report public-check contracts-check worker-schema-check worker-contracts-check evaluation-verification-check bff-types-check docs-check tokens-check secret-check web-install web-typecheck web-test web-build app-web-install app-web-lint app-web-format-check app-web-build app-web-test bff-install bff-test bff-build worker-install worker-test worker-build pipeline-install pipeline-test pipeline-smoke pipeline-build service-install service-test service-smoke service-pipeline-test service-pipeline-smoke service-openapi-check service-build api-test api-ai-smoke api-ai-chat-smoke api-build package-artifacts
 help:
 	@$(PYTHON) scripts/repo_checks.py help
 projects:
@@ -27,6 +27,11 @@ config-check:
 
 tooling-test:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m unittest discover -s scripts/tests -v
+CHAT_LIVE_SPIKE_EVIDENCE ?=
+CHAT_LIVE_SPIKE_REPORT ?=
+chat-live-spike-report:
+	@test -n "$(CHAT_LIVE_SPIKE_EVIDENCE)" || { printf '%s\n' 'Set CHAT_LIVE_SPIKE_EVIDENCE to the approved content-free evidence JSON.'; exit 2; }
+	$(PYTHON) scripts/chat_live_spike_report.py "$(CHAT_LIVE_SPIKE_EVIDENCE)" $(if $(CHAT_LIVE_SPIKE_REPORT),--output "$(CHAT_LIVE_SPIKE_REPORT)")
 public-check:
 	$(if $(PUBLIC_PYTHON),$(PUBLIC_PYTHON),$(UV) run --no-project --with pyyaml --with openpyxl --with openapi-spec-validator $(PYTHON)) scripts/repo_checks.py public
 	PYTHONDONTWRITEBYTECODE=1 $(if $(PUBLIC_PYTHON),$(PUBLIC_PYTHON),$(UV) run --no-project --with pyyaml --with openpyxl --with openapi-spec-validator $(PYTHON)) -m unittest discover -s scripts/tests -p test_doc_system.py -v
