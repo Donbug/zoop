@@ -207,7 +207,7 @@ Q07의 `portfolio.scope.read`는 Java server-only precondition으로 실행하�
 
 ## 5. 다음 PR 범위
 
-1. latency spike: MCP 서버 단독 시험, 합성 Responses replay, 승인된 소량 live 도구 1·4·8회 측정. 무내용 evidence와 p50/p95·토큰·비용·45초 gate는 [live spike 절차](chat-live-spike.md)와 `scripts/chat_live_spike_report.py`에 고정했다. 실제 호출은 운영 승인 뒤 별도 실행하며, 웹 도구가 없는 동안 총 8회 시나리오는 미충족으로 남긴다.
+1. latency spike: MCP 서버 단독 시험, 합성 Responses replay, 승인된 소량 live 도구 1·4·8회 측정. 무내용 evidence와 p50/p95·토큰·비용·45초 gate는 [live spike 절차](chat-live-spike.md)와 `scripts/chat_live_spike_report.py`에 고정했다. 운영 HTTPS·grant·Responses 보유 조건·키 회전·사고 대응 결정은 [운영 readiness gate](chat-operations-readiness.md)가 같은 후보 commit의 spike와 결속한다. 실제 호출은 운영 승인 뒤 별도 실행하며, 웹 도구가 없는 동안 총 8회 시나리오는 미충족으로 남긴다.
 2. StageLimits 8/6/2·45초, 요청 캐시·single-flight, 서버 requirement coverage
 3. Java Tool Service 추출, 원격 MCP endpoint·서비스 인증·크기/rate limit·grant, preflight direct 시작·circuit breaker
 4. ai/service Luna Responses 전환, allowed_tools·Java 승인 continuation·usage/deadline
