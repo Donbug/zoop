@@ -30,12 +30,27 @@
   --color-panel-soft: #f8f8f8;
   --radius-panel: 8px;
 
-  /* 서비스 화면 전환. motion-safe:animate-service-enter로만 쓴다. */
-  --animate-service-enter: service-enter 180ms ease-out;
+  /* 움직임 토큰(프로토타입 tokens.css와 같은 값). 길이는 duration-150처럼 숫자 유틸리티로 쓰고,
+     곡선은 ease-standard·ease-enter·ease-exit·ease-enter-expressive 유틸리티로 쓴다.
+     지도 카메라는 같은 값을 components/graph/graph-motion.ts에서 쓴다. */
+  --motion-fast: 150ms;
+  --motion-exit: 200ms;
+  --motion-normal: 250ms;
+  --motion-slow: 300ms;
+  --motion-graph: 600ms;
+  --ease-standard: cubic-bezier(0.35, 0, 0.35, 1);
+  --ease-enter: cubic-bezier(0, 0, 0.15, 1);
+  --ease-exit: cubic-bezier(0.35, 0, 1, 1);
+  --ease-enter-expressive: cubic-bezier(0.03, 0.4, 0.1, 1);
+
+  /* 서비스 화면 전환. motion-safe:animate-service-enter로만 쓴다.
+     backwards: 시작 전 지연 동안에도 첫 장면(투명)으로 둬서 한 번 번쩍이지 않게 한다. */
+  --animate-service-enter: service-enter 250ms cubic-bezier(0, 0, 0.15, 1)
+    backwards;
   @keyframes service-enter {
     from {
       opacity: 0;
-      transform: translateY(6px);
+      transform: translateY(8px);
     }
     to {
       opacity: 1;
@@ -123,5 +138,18 @@
   /* 검은 선 아이콘(graph-assets)은 다크에서 밝게 뒤집는다. 기업 로고는 뒤집지 않는다. */
   :root[data-theme='dark'] [data-icon] {
     filter: invert(0.92);
+  }
+
+  /* 동작 줄이기: 화면의 모든 전환·애니메이션과 부드러운 스크롤을 끈다(프로토타입 index.css와 같은 규칙).
+     motion-safe:를 빠뜨린 곳도 함께 멈춘다. 지도 카메라는 graph-motion.ts가 따로 끈다. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
