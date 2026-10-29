@@ -9,6 +9,7 @@ import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.dto.Citation;
 import com.zoop.chat.executor.ChatEngine;
 import com.zoop.chat.executor.ChatEngineOutcome;
+import com.zoop.chat.executor.ChatJobExecutor;
 import com.zoop.chat.executor.ChatRun;
 import com.zoop.chat.executor.ChatRunControl;
 import com.zoop.chat.orchestrator.ChatBranchContext.Branch;
@@ -17,12 +18,14 @@ import com.zoop.chat.orchestrator.ChatPlan.Planned;
 import com.zoop.chat.orchestrator.ChatResults.InsufficientCause;
 import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatToolRegistry;
+import com.zoop.chat.tool.ChatToolRequest;
 import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.chat.tool.ChatToolRunner;
 import com.zoop.chat.tool.ChatToolUnavailable;
 import com.zoop.common.json.StrictJson;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -104,6 +107,14 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     static final Duration AGENT_STEP = Duration.ofSeconds(33).plus(StageLimits.SERVICE_HEADROOM);
     /** The least an agent step is given: the time to write the answer (MCP actions contract 3.2). */
     static final Duration MIN_AGENT_STEP = Duration.ofSeconds(10);
+    /**
+     * An agent run ends within 45 s of its start, verification and saving included (MCP actions contract 3.2), inside the
+     * job's own deadline ({@link ChatJobExecutor#MAX_DEADLINE}, kept for the direct path until its stage limits are re-set
+     * from measured p95: router, tools, answer and verification do not fit 45 s).
+     */
+    static final Duration AGENT_JOB = Duration.ofSeconds(45);
+    /** All agent steps together (MCP round trips, approvals, tool calls and the final answer): at most 35 s. */
+    static final Duration AGENT_TOTAL = Duration.ofSeconds(35);
 
     public OrchestratedChatEngine(ChatModels.Router router, ChatModels.Generator generator, ChatModels.Verifier verifier,
             ChatToolRegistry registry, ChatToolRunner runner, ChatCitationSource citations, Clock clock) {
@@ -189,22 +200,26 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             // checked below against exactly the results of the calls that ran (shared by the requirements they serve).
             control.phase("retrieving");
             Duration after = limits.verify().plus(limits.server());
-            guard(control, MIN_AGENT_STEP.plus(after));
+            // Luna has min(35 s, what is left of the 45 s agent job before verification and saving): never 35 s on top.
+            Duration jobLeft = control.remaining().minus(ChatJobExecutor.MAX_DEADLINE.minus(AGENT_JOB));
+            Duration luna = min(AGENT_TOTAL, jobLeft.minus(after));
+            if (luna.compareTo(MIN_AGENT_STEP) < 0) throw new DeadlineGuard();
+            Instant lunaEnd = clock.instant().plus(luna);
             ChatAgentPath.Outcome ran = agent.run(run, control, agentRequirements(confirmed), agentTools,
                     ChatAnswerCheck.MAX_CITATIONS, new ChatAgentPath.Steps() {
                         @Override
                         public ChatModels.AgentStep run(Supplier<ChatModels.AgentStep> step) {
-                            // Each step waits at most what is left before verification and saving, and never less than
-                            // the time an answer needs; the effective Luna budget is the remaining time, not a fixed 35 s.
-                            Duration left = control.remaining().minus(after);
-                            Duration limit = left.compareTo(AGENT_STEP) < 0 ? left : AGENT_STEP;
+                            // Each step waits at most what is left of the Luna budget, and never less than the time an
+                            // answer needs.
+                            Duration limit = min(AGENT_STEP, Duration.between(clock.instant(), lunaEnd));
                             if (limit.compareTo(MIN_AGENT_STEP) < 0) throw new DeadlineGuard();
                             return model(control, limit, after, step);
                         }
 
                         @Override
                         public boolean closing() {
-                            return control.remaining().minus(after).compareTo(MIN_AGENT_STEP.multipliedBy(2)) < 0;
+                            // The last 10 s write the answer: no new tool starts in them.
+                            return Duration.between(clock.instant(), lunaEnd).compareTo(MIN_AGENT_STEP.multipliedBy(2)) < 0;
                         }
                     });
             Map<String, List<ChatToolResult>> results = new LinkedHashMap<>();
@@ -466,8 +481,9 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     /**
      * The tools of the agent path for this plan, or null for the direct path. The agent takes a plan whose reads are all
      * independent first-stage reads the MCP endpoint exposes: no member-scope read or dependent stage (Q07 and checkpointed
-     * plans stay direct, the member scope being a server-only precondition) and at least one read at all (a plan of general
-     * and limited requirements needs no tools).
+     * plans stay direct, the member scope being a server-only precondition), no requirement over the fan-out of one call
+     * ({@link ChatToolRequest#MAX_TARGETS} targets: the server batches those itself, MCP actions contract 3.2) and at least one
+     * read at all (a plan of general and limited requirements needs no tools).
      */
     List<ChatCapability> agentTools(ChatPlan.Run plan) {
         if (agent == null) return null;
@@ -476,7 +492,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         for (Planned p : plan.requirements()) {
             if (p.mode() != Mode.TOOLS) continue;
             if (p.origin() == ChatPlan.Origin.SCOPE || p.dependsOn() != null || p.stage() != 1
-                    || !exposed.containsAll(p.capabilities())) {
+                    || p.targets().size() > ChatToolRequest.MAX_TARGETS || !exposed.containsAll(p.capabilities())) {
                 return null;
             }
             tools.addAll(p.capabilities());
@@ -488,8 +504,12 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     private static List<ChatModels.AgentRequirement> agentRequirements(ChatPlan.Run plan) {
         return plan.requirements().stream().filter(p -> p.mode() == Mode.TOOLS || p.mode() == Mode.GENERAL)
                 .map(p -> new ChatModels.AgentRequirement(p.id(), p.label(), p.mode() == Mode.GENERAL,
-                        p.mode() == Mode.TOOLS ? p.targets().stream().limit(10).toList() : List.of()))
+                        p.mode() == Mode.TOOLS ? p.targets() : List.of()))
                 .toList();
+    }
+
+    private static Duration min(Duration a, Duration b) {
+        return a.compareTo(b) <= 0 ? a : b;
     }
 
     private static void guard(ChatRunControl control, Duration needed) {

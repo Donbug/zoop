@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.dto.Citation;
 import com.zoop.chat.executor.ChatEngineOutcome;
+import com.zoop.chat.executor.ChatJobExecutor;
 import com.zoop.chat.executor.ChatRun;
 import com.zoop.chat.executor.ChatRunControl;
 import com.zoop.chat.executor.ChatToolCallReservation;
@@ -56,12 +57,16 @@ class ChatAgentPathEngineTest {
     private ChatGeneratedAnswer directAnswer = new ChatGeneratedAnswer(List.of(), List.of("r1"), List.of());
     private ChatSemanticVerdicts verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
     private int verifierCalls;
+    /** When set, the time left once the router has answered (the router's own time spent). */
+    private Control routed;
+    private Duration leftAfterRouter;
 
     /** A scripted agent path: records what it was given and returns a fixed answer with the results of "the calls that ran". */
     private static final class Agent implements ChatAgentPath {
         final Set<ChatCapability> exposed;
         final List<List<ChatModels.AgentRequirement>> requirements = new ArrayList<>();
         final List<List<ChatCapability>> allowed = new ArrayList<>();
+        final List<Boolean> closing = new ArrayList<>();
         ChatGeneratedAnswer answer;
         List<ChatToolResult> results = List.of();
 
@@ -80,6 +85,7 @@ class ChatAgentPathEngineTest {
             requirements.add(given);
             allowed.add(tools);
             // One step through the engine's guard and limit, like the real path.
+            closing.add(steps.closing());
             steps.run(() -> new ChatModels.AgentStep("resp_1", List.of(), answer));
             return new Outcome(answer, results, 1, 1, 0);
         }
@@ -139,13 +145,16 @@ class ChatAgentPathEngineTest {
                                 .dependingOn(new Dependency("r1", "atLeast", 1))),
                 ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.95), Map.of())),
                 ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("issue.read", 0.9),
-                        List.of("iss-1"))));
+                        List.of("iss-1"))),
+                // Six companies: over one call's fan-out, so the server batches them itself.
+                ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
+                        List.of(HYNIX, NVDA, "KRX:005930", "NASDAQ:AMD", "NYSE:TSM", "NASDAQ:ASML"))));
         for (ChatRouteDecision plan : plans) {
             decision = plan;
             engine(agent).answer(ChatPlannerTest.run(0, "v1"), new Control(Duration.ofSeconds(60)));
         }
         assertTrue(agent.requirements.isEmpty(), "the agent took none of them");
-        assertEquals(3, generated.size(), "each was answered by the direct generator");
+        assertEquals(4, generated.size(), "each was answered by the direct generator");
     }
 
     @Test
@@ -158,6 +167,35 @@ class ChatAgentPathEngineTest {
         var control = new Control(Duration.ofSeconds(25));
         assertEquals(new ChatEngineOutcome.Failed("transient", "deadline_guard", true),
                 engine(agent).answer(ChatPlannerTest.run(0, "v1"), control));
+    }
+
+    @Test
+    void anAgentRunKeepsToFortyFiveSecondsFromItsStartWithLunaAtMostThirtyFive() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
+                List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ));
+        agent.answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX)), List.of(),
+                List.of(HYNIX));
+        agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
+        // At the start of the job (60 s to its deadline, 45 s of the agent run): Luna has min(35, 45 - 14) = 31 s.
+        assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(ChatPlannerTest.run(0, "v1"), new Control(ChatJobExecutor.MAX_DEADLINE)));
+        assertEquals(List.of(false), agent.closing, "31 s leave room for more than the closing step");
+        // A router that took 20 s leaves 40 s to the deadline, 25 s of the agent run: 11 s for Luna, only the step that
+        // writes the answer.
+        var answered = routedThen(agent, Duration.ofSeconds(40));
+        assertInstanceOf(ChatEngineOutcome.Completed.class, answered, answered.toString());
+        assertEquals(List.of(false, true), agent.closing);
+        // One that took 22 s leaves 38 s, 24 s on the job but 9 s for Luna in the agent run: the agent does not start.
+        assertEquals(new ChatEngineOutcome.Failed("transient", "deadline_guard", true),
+                routedThen(agent, Duration.ofSeconds(38)));
+        assertEquals(2, agent.requirements.size());
+    }
+
+    private ChatEngineOutcome routedThen(ChatAgentPath agent, Duration left) {
+        routed = new Control(ChatJobExecutor.MAX_DEADLINE);
+        leftAfterRouter = left;
+        return engine(agent).answer(ChatPlannerTest.run(0, "v1"), routed);
     }
 
     private OrchestratedChatEngine engine(ChatAgentPath agent) {
@@ -176,7 +214,10 @@ class ChatAgentPathEngineTest {
         var registry = new ChatToolRegistry(List.of(company, issue));
         var runner = new ChatToolRunner(registry);
         runners.add(runner);
-        ChatModels.Router router = (run, bound) -> decision;
+        ChatModels.Router router = (run, bound) -> {
+            if (routed != null) routed.remaining = leftAfterRouter;
+            return decision;
+        };
         ChatModels.Generator generator = (run, context) -> {
             generated.add(context);
             return directAnswer;
@@ -211,7 +252,7 @@ class ChatAgentPathEngineTest {
     private static final class Control implements ChatRunControl {
         final List<String> phases = new ArrayList<>();
         final List<ChatToolCallReservation> reserved = new ArrayList<>();
-        final Duration remaining;
+        Duration remaining;
         int modelCalls;
 
         Control(Duration remaining) {

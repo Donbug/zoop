@@ -55,7 +55,8 @@ import tools.jackson.databind.node.ObjectNode;
  */
 @Component
 public class ChatJobExecutor {
-    static final Duration MAX_DEADLINE = Duration.ofSeconds(60);
+    /** The run deadline of every job; the agent path keeps to its own 45 s inside it (OrchestratedChatEngine.AGENT_JOB). */
+    public static final Duration MAX_DEADLINE = Duration.ofSeconds(60);
     static final Duration LEASE_GRACE = Duration.ofSeconds(15);
     static final String RESULT_SCHEMA_VERSION = "chat-result/v1";
     static final String ROUTE_SCHEMA_VERSION = "chat-route/v1";
