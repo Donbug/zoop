@@ -51,10 +51,11 @@ class Kit(OfflineFixture):
         self.rounds = 0
 
     # ---- ingestion ----------------------------------------------------------------------------------------------
-    def ingest(self, name: str, documents: list[dict]) -> list[dict]:
+    def ingest(self, name: str, documents: list[dict], *, slot: str | None = None) -> list[dict]:
         """documents: [{"supplier": str|None, "html": bytes, "published": iso|None, "url": str, "publisher": str|None}] -> exact observation refs.
 
-        `publisher` is the operator-declared outlet written into the real fixture item (absent or None: unspecified, no key)."""
+        `publisher` is the operator-declared outlet written into the real fixture item (absent or None: unspecified, no key). `slot` makes the round a timed one: its checked
+        window ends at that instant (`window.through`) and the manifest covers exactly it, like a `tick` round."""
         items, bodies = [], {}
         for index, document in enumerate(documents):
             ref = f"d{index}"
@@ -62,9 +63,9 @@ class Kit(OfflineFixture):
             item = self.item(f"c{index}", document["supplier"], document.get("url", f"https://example.invalid/{name}/{index}"), ref=ref, publisher=document.get("publisher"))
             item["publishedAt"] = document.get("published", "2026-10-08T00:00:00+00:00")
             items.append(item)
-        manifest = self.manifest(name, [items], bodies=bodies)
+        manifest = self.manifest(name, [items], bodies=bodies, coverage=slot)
         rid = f"round-{name}"
-        result = self.cli("run", self.request(manifest, rid, self.rounds), state="ingestion", manifest=manifest)
+        result = self.cli("run", self.request(manifest, rid, self.rounds, {"from": slot, "through": slot} if slot else None), state="ingestion", manifest=manifest)
         self.rounds += 1
         assert result["state"] == "complete" and result["counts"]["textReady"] == len(documents), result
         return [{"roundId": rid, "sourceId": "synthetic-source", "page": r["page"], "ordinal": r["ordinal"], "documentId": r["documentId"],
