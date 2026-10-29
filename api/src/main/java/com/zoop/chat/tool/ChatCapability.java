@@ -24,7 +24,15 @@ public enum ChatCapability {
     GRAPH_VERSION_DIFF("graph.version.diff", "zoop-graph-read", "그래프 버전 사이의 차이 계산"),
     BRIEFING_READ("briefing.read", "zoop-briefing-read", "발행된 출근·퇴근 브리핑 읽기"),
     BRIEFING_EVIDENCE("briefing.evidence", "zoop-briefing-read", "브리핑 항목의 근거 읽기"),
-    PORTFOLIO_SCOPE_READ("portfolio.scope.read", "zoop-member-scope-read", "회원 본인의 보유·관심 종목 범위 확인");
+    PORTFOLIO_SCOPE_READ("portfolio.scope.read", "zoop-member-scope-read", "회원 본인의 보유·관심 종목 범위 확인"),
+    /**
+     * The supplementary public web search (web search design): one server-checked query per call, counted apart from the
+     * internal reads. Never planned by the router nor exposed on MCP ({@link ChatToolRegistry#bound}).
+     */
+    WEB_SEARCH("web.search", ChatCapability.WEB_GROUP, "공개 웹 검색(보조 근거)");
+
+    /** The registry group of the web search, whose calls have their own budget and time limit. */
+    public static final String WEB_GROUP = "web-search";
 
     private final String id;
     private final String group;
@@ -47,6 +55,11 @@ public enum ChatCapability {
 
     public String group() {
         return group;
+    }
+
+    /** Whether it searches the public web rather than reading ZOOP's own data. */
+    public boolean web() {
+        return WEB_GROUP.equals(group);
     }
 
     /** Whether its reads need the run's pinned public graph; ZOOP's own documents do not. */

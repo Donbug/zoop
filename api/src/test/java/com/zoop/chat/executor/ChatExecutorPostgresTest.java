@@ -96,6 +96,30 @@ class ChatExecutorPostgresTest {
     }
 
     @Test
+    void theDaysWebSearchQuotasAreTakenTogetherOrNotAtAllAndGoWithTheMember() {
+        // A day of its own, so the project row is this test's alone.
+        var day = java.time.LocalDate.of(2000, 1, 1).plusDays(Math.floorMod(UUID.randomUUID().hashCode(), 3650));
+        var tx = new org.springframework.transaction.support.TransactionTemplate(transactions);
+        assertNull(tx.execute(s -> runs.takeWebSearchQuota(memberId, day, 2, 3, 3)));
+        assertEquals("member", tx.execute(s -> runs.takeWebSearchQuota(memberId, day, 2, 3, 10)));
+        assertEquals(2, used(day, "project"), "the member's refusal takes nothing from the project");
+        assertEquals("project", tx.execute(s -> runs.takeWebSearchQuota(memberId, day, 1, 10, 2)));
+        assertNull(tx.execute(s -> runs.takeWebSearchQuota(memberId, day, 1, 3, 3)));
+        assertEquals(3, used(day, "project"));
+        assertEquals(3, used(day, "member:" + memberId));
+
+        jdbc.update("DELETE FROM members WHERE id = ?", memberId);
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM chat_web_search_quotas WHERE member_id = ?",
+                Integer.class, memberId), "a member's quota rows go with the member");
+        assertEquals(3, used(day, "project"));
+    }
+
+    private int used(java.time.LocalDate day, String subject) {
+        return jdbc.queryForObject("SELECT used FROM chat_web_search_quotas WHERE quota_date = ? AND subject_key = ?",
+                Integer.class, day, subject);
+    }
+
+    @Test
     void aQueuedQuestionRunsToAStoredResultTheMemberCanRead() {
         engine.script((run, control) -> {
             control.beforeModelCall();

@@ -142,6 +142,7 @@ class ChatToolRunnerTest {
     void graphComputationsHaveTheLongerCallLimitAndOtherReadsKeepTheirOwn() {
         assertEquals(Duration.ofSeconds(3), ChatToolRunner.CALL_LIMIT);
         assertEquals(Duration.ofSeconds(5), ChatToolRunner.GRAPH_CALL_LIMIT);
+        assertEquals(Duration.ofSeconds(7), ChatToolRunner.WEB_CALL_LIMIT);
         var control = new RecordingControl(Duration.ofSeconds(60));
         ChatToolFunction slow = (scope, request) -> {
             try {

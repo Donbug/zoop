@@ -64,9 +64,17 @@ public interface ChatExecutionRepository {
 
     /**
      * The job's tool calls that count against its budget: every call this attempt reserved, and those of its earlier
-     * attempts that were made (all but {@code cancelled}, a reservation that never ran).
+     * attempts that were made (all but {@code cancelled}, a reservation that never ran). {@code web} counts the web
+     * searches ({@code registry_group = web-search}) instead of the internal reads; the two budgets are apart.
      */
-    int countJobToolCalls(String jobId, int attemptNo);
+    int countJobToolCalls(String jobId, int attemptNo, boolean web);
+
+    /**
+     * Takes {@code calls} web searches from the KST day's quotas of the project and of {@code memberId}, both or neither
+     * (inside the transaction that reserves them). Returns null when taken, else the quota that had too few left:
+     * {@code project} or {@code member}. Nothing is taken then.
+     */
+    String takeWebSearchQuota(String memberId, java.time.LocalDate day, int calls, int memberCap, int projectCap);
 
     /** Stores reserved tool calls (after {@link #lockOwned} in the same transaction). */
     void reserveToolCalls(List<NewChatToolCall> calls, Instant at);
