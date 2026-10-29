@@ -294,6 +294,8 @@ zoop-ai-handoff inspect --state-dir DIR < {"schemaVersion":"zoop-ai-handoff-1","
 
 검증기는 source·감사·정책·source event·대표 선택·관계별 provenance/sourceRefs·구조 basis·제외 상세의 중첩 필드까지 닫힌 형식으로 확인합니다. sourceRefs와 upstream·기사 근거의 참조 관계, 관계 ID(`edge-`+정규 JSON preimage의 SHA-256)도 검증합니다. `STRUCTURALLY_RELATED_TO` ID의 preimage는 `{type,source,target,basis:[relationKey,…]}`이며 다른 두 유형은 `{type,source,target}`입니다. 문서와 앱의 실제 텍스트 일치는 앱이 import 때 별도로 확인해야 합니다.
 
+**S3 source 정책 pin.** `sources[].policies.policy`가 `zoop-relation-policy-2`이면 기존 일곱 키(`producer`, `verifier`, `impactProducer`, `impactVerifier`, `policy`, `revalidationPolicy`, `impactPolicy`)와 `countryContext: "zoop-country-context-1"`을 정확히 요구합니다. 보존된 `zoop-relation-policy-1`은 기존 일곱 키만 허용합니다. 알 수 없는 policy/context 버전, 현재 pin 누락, 이전 policy에 새 pin을 붙인 모양은 거부합니다. 생산자·내부 HTTP·Java가 같은 규칙으로 검사하며, 이전 bundle·receipt의 바이트를 고치거나 이전 S3 job 실행을 허용하지 않습니다. 외부 bundle `-7`, 단일 bundle의 전달 파일 목록, 스냅샷 형식 3과 공개 ID 정책은 바꾸지 않습니다.
+
 기존 `handoff.sqlite3`가 있는 네임스페이스는 어떤 파일이나 권한을 변경하기 전에 읽기 전용으로 소유 표식과 원장 구조를 검사합니다. 다른 DB나 일부만 존재하는 디렉터리는 채택하지 않습니다. 새 원장만 초기화할 수 있습니다. `export`의 마지막 확인과 응답 직렬화는 S3 읽기 잠금을 유지한 채 수행하지만, 잠금이 보호하지 않는 원천 권한·운영자 파일은 확인 직후에도 바뀔 수 있습니다. 앱 import 직전의 별도 재확인은 여전히 필요합니다.
 
 ## 앱 import가 해야 할 것 (AI가 확인하지 않은 것 = `appImportPending`)
