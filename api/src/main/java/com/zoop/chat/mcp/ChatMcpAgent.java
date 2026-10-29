@@ -33,8 +33,8 @@ import tools.jackson.databind.ObjectMapper;
  * <li>At most {@link #MAX_ROUNDS} rounds of approvals (the dependency rounds of ZOOP-AIG-001 6.3.3). The step after the last
  * round denies whatever is still asked, so Luna answers from what it has; a run that still asks after that is a failed
  * model step, never an endless loop.</li>
- * <li>A web search (web search design 1 and 2) names a query, not ids, so reachability does not apply. A run with a concept
- * part (a general requirement, Q02) may make one search from the first round: the web is a concept's first support. Any
+ * <li>A web search (web search design 1 and 2) names a query, not ids, so reachability does not apply. A concept-only run
+ * (one or more general requirements, Q02) may make one search from the first round: the web is a concept's first support. Any
  * other search is approved only from a round after an approved internal read came back empty or cut: the web is the last
  * resort of what ZOOP's own data left unmet, never the first look. Its query must pass {@link com.zoop.chat.tool.ChatWebQueryPolicy} and it takes the
  * job's and the day's web budgets when it is reserved; a spent budget denies it and is reported as
@@ -100,7 +100,10 @@ public final class ChatMcpAgent implements ChatAgentPath {
         int webApproved = 0;
         Set<String> notices = new LinkedHashSet<>();
         String web = ChatMcpTools.name(ChatCapability.WEB_SEARCH);
-        boolean concept = requirements.stream().anyMatch(ChatModels.AgentRequirement::general);
+        // Approval requests do not identify the requirement they serve. In a mixed run, a first-round query could be for a
+        // fact requirement and bypass its internal-first rule, so only a concept-only run gets the early search.
+        boolean conceptOnly = !requirements.isEmpty()
+                && requirements.stream().allMatch(ChatModels.AgentRequirement::general);
         for (int step = 1, rounds = 0; ; step++) {
             var input = new ChatModels.AgentInput(requirements, token, names, recipient, maxCitations, previous,
                     decisions);
@@ -137,7 +140,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
                 // provider's allowed_tools nor the prompt's "never guess an id" is a server-side check. Past four in a
                 // round the rest are denied; Luna may ask for them again in the next round.
                 if (!closing && round < MAX_ROUND_CALLS && names.contains(request.toolName())
-                        && (search ? webOpen || concept && webApproved == 0
+                        && (search ? webOpen || conceptOnly && webApproved == 0
                                 : targetsReachable(request.arguments(), reachable))) {
                     ChatMcpTools.Approval approval = tools.approve(attached, request.toolName(), request.arguments());
                     if (ChatMcpTools.RUN_NOT_ACTIVE.equals(approval.refused())) throw new ChatRunSuperseded();
