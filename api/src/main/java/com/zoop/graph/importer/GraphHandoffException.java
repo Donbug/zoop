@@ -8,18 +8,8 @@ import java.util.regex.Pattern;
  * so that nothing else can ride along into a log.
  */
 public final class GraphHandoffException extends RuntimeException {
-    /** The CLIs' own codes are lowercase snake_case (digits allowed, e.g. {@code s2_payload_invalid}); anything else is not echoed. */
-    /** The ingestion CLI's own codes (snake_case); anything else is not echoed. */
-    /** The ingestion CLI's own codes (snake_case); anything else is not echoed. */
-    /** The ingestion CLI's own codes (snake_case); anything else is not echoed. */
-    /** The ingestion CLI's own codes (snake_case); anything else is not echoed. */
+    /** The ingestion CLI's own codes: lowercase snake_case (digits allowed, e.g. {@code s2_payload_invalid}); anything else is not echoed. */
     private static final Pattern CLI_CODE = Pattern.compile("[a-z0-9_]{1,64}");
-    /** A handoff refusal or withheld reason: the CLI's snake_case codes and ai/service's wider {@code Safe} alphabet. */
-    private static final Pattern HANDOFF_CODE = Pattern.compile("[A-Za-z0-9_.:-]{1,80}");
-    /** A handoff refusal or withheld reason: the CLI's snake_case codes and ai/service's wider {@code Safe} alphabet. */
-    private static final Pattern HANDOFF_CODE = Pattern.compile("[A-Za-z0-9_.:-]{1,80}");
-    /** A handoff refusal or withheld reason: the CLI's snake_case codes and ai/service's wider {@code Safe} alphabet. */
-    private static final Pattern HANDOFF_CODE = Pattern.compile("[A-Za-z0-9_.:-]{1,80}");
     /** A handoff refusal or withheld reason: the CLI's snake_case codes and ai/service's wider {@code Safe} alphabet. */
     private static final Pattern HANDOFF_CODE = Pattern.compile("[A-Za-z0-9_.:-]{1,80}");
 
