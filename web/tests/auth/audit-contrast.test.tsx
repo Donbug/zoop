@@ -3,8 +3,6 @@ import { beforeEach, expect, it } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import BottomNav from '@/components/common/BottomNav';
 import SignupForm from '@/components/auth/SignupForm';
-import GraphLegend from '@/components/graph/GraphLegend';
-import { createMockGraph } from '@/mocks/graph/response';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { createFakeServer, json } from '../support/fakeServer';
 
@@ -17,21 +15,6 @@ beforeEach(() => {
     csrfToken: null,
     expiresAt: null,
   });
-});
-
-it('D-GRP-01 F5 legend keeps mobile targets without changing desktop sizing', () => {
-  render(
-    <GraphLegend
-      data={createMockGraph({ mode: 'all', personalFilter: 'all' })}
-      hidden={[]}
-      onToggle={() => {}}
-    />,
-  );
-  for (const button of screen.getAllByRole('button')) {
-    expect(button.classList.contains('max-md:min-h-10')).toBe(true);
-    expect(button.classList.contains('max-md:min-w-10')).toBe(true);
-    expect(button.classList.contains('min-h-10')).toBe(false);
-  }
 });
 
 it('F1 common mobile navigation uses theme ink for the current destination', () => {

@@ -25,5 +25,4 @@ it('FS001 F5 gives the 404 return link a mobile touch target', () => {
   render(<RouterProvider router={router} />);
   const link = screen.getByRole('link', { name: '지도로 돌아가기' });
   expect(link.classList.contains('max-md:min-h-10')).toBe(true);
-  expect(link.classList.contains('max-md:min-w-10')).toBe(true);
 });

@@ -70,7 +70,7 @@ export default function GraphLegend({
             title={help}
             aria-description={help}
             onClick={() => onToggle(key)}
-            className="relationship-count max-md:min-h-10 max-md:min-w-10 shrink-0! gap-1.5! border border-transparent text-zoop-muted aria-pressed:border-zoop-line aria-pressed:text-zoop-ink aria-pressed:font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink disabled:cursor-not-allowed disabled:opacity-60 [&[aria-pressed=false]]:bg-transparent! [&[aria-pressed=false]]:opacity-50"
+            className="relationship-count shrink-0! gap-1.5! border border-transparent text-zoop-muted aria-pressed:border-zoop-line aria-pressed:text-zoop-ink aria-pressed:font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink disabled:cursor-not-allowed disabled:opacity-60 [&[aria-pressed=false]]:bg-transparent! [&[aria-pressed=false]]:opacity-50"
           >
             {kind ? (
               <GraphIcon name={key} size={12} />
