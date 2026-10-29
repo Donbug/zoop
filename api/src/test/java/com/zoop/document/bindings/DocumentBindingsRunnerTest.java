@@ -216,6 +216,24 @@ class DocumentBindingsRunnerTest {
     }
 
     @Test
+    void anOutputPublishedByAnotherRunWhileThisOneWasWritingIsNeverReplaced() throws Exception {
+        // The race the exclusive publish exists for: a second run creates the output between this run's write and its publish.
+        AtomicInteger writes = new AtomicInteger();
+        DocumentBindingsRunner.Writer raced = (channel, content) -> {
+            DocumentBindingsRunner.WHOLE.write(channel, content);
+            if (writes.incrementAndGet() == 1) Files.writeString(output, "published by the other run");
+        };
+
+        DocumentBindingsAbortedException aborted = assertThrows(DocumentBindingsAbortedException.class,
+                () -> runner(raced).run(null));
+
+        assertEquals(DocumentBindingsFailure.OUTPUT_UNAVAILABLE, aborted.failure());
+        assertEquals("published by the other run", Files.readString(output), "the earlier output is kept byte for byte");
+        assertEquals(List.of("bindings.json", "result.json"), files(), "this run's temporary file is removed");
+        assertEquals("output_unavailable", result().object("failure").string("code"));
+    }
+
+    @Test
     void aResultThatCannotBeRecordedRemovesTheOutputThisRunPublished() throws Exception {
         AtomicInteger writes = new AtomicInteger();
         List<Boolean> outputPublishedBeforeResult = new java.util.ArrayList<>();

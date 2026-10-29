@@ -27,7 +27,9 @@ import org.springframework.boot.ApplicationRunner;
  * the process exits non-zero.
  *
  * <p>The output is never visible before it is whole: the bytes go to an owner-only temporary file next to it, are forced to
- * disk, and the file is then given the output's name in one rename that never replaces an existing file. A write that fails
+ * disk, and the file is then published under the output's name as a hard link ({@code Files.createLink}), which the file
+ * system refuses when that name exists, so two runs aimed at the same output cannot both succeed and nothing is ever
+ * replaced (a rename would replace; a move's existence check is not atomic with it). A write that fails
  * removes the temporary file; a result that cannot be recorded removes the output this run published, so an output file that
  * exists holds the whole export and was reported in a result. A run that died leaves an empty result ("outcome unknown,
  * re-run with new paths"; the export writes nothing to the database, so a re-run is always safe) and possibly a
@@ -121,12 +123,13 @@ public final class DocumentBindingsRunner implements ApplicationRunner {
     }
 
     /**
-     * Gives the complete, forced temporary file the output's name in one rename. Without {@code REPLACE_EXISTING} an existing
-     * file (or link) of that name is never touched: the move is refused and the temporary file removed.
+     * Publishes the complete, forced temporary file under the output's name as a hard link, the same exclusive publish as
+     * {@code ArtifactFileStore.put}: the link call fails when the name exists, atomically, so a concurrent run cannot replace
+     * what the other published. The temporary name is then removed; the content stays under the output's name.
      */
     private static void publish(Path temporary, Path output) {
         try {
-            Files.move(temporary, output);
+            Files.createLink(output, temporary);
         } catch (FileAlreadyExistsException exists) {
             log.error("document bindings output already exists ({})", DocumentBindingsFailure.OUTPUT_UNAVAILABLE.code());
             discard(temporary, "complete but unpublished output");
@@ -136,6 +139,7 @@ public final class DocumentBindingsRunner implements ApplicationRunner {
             discard(temporary, "complete but unpublished output");
             throw new DocumentBindingsException(DocumentBindingsFailure.OUTPUT_UNAVAILABLE);
         }
+        discard(temporary, "temporary name of the published output");
     }
 
     /** Removes a file this run created; nothing it did not create is ever deleted. */
