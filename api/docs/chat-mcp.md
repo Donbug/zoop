@@ -55,7 +55,7 @@ MCP 메시지를 읽기 전에 순서대로 검사한다.
 
 `require_approval=always`에서 Java가 모델의 `mcp_approval_request`를 승인할 때 `ChatMcpTools.approve(attached, 도구, 인자)`를 부른다. 승인은 그 정확한 호출(도구 + 정규화 요청: targets·limit·서버 주입값)을 `chat_tool_calls`에 `reserved`로 예약하고 `input_digest`로 식별한다.
 
-- `/mcp`의 `tools/call`은 같은 attempt에 같은 기능·같은 digest로 **아직 시작되지 않은 예약**이 있을 때만 실행하며, 예약을 `running`으로 바꾸는 fenced 전이로 한 번만 소비한다. 없으면 `call_not_approved`이고 아무것도 읽지 않는다. 승인받지 않은 target, 다른 limit, 이미 쓴 승인은 모두 여기서 막힌다.
+- `/mcp`의 `tools/call`은 같은 attempt에 같은 기능·같은 digest로 **아직 시작되지 않은 예약**이 있을 때만 실행하며, 예약을 고르는 것과 `running`으로 바꾸는 것을 한 문장(`UPDATE … WHERE id = (SELECT … FOR UPDATE SKIP LOCKED) RETURNING`, owner fence)으로 해서 한 번만 소비한다(`ChatRunControl.claimToolCall`). 같은 요청이 동시에 와도 각자 다른 예약을 잡는다. 없으면 `call_not_approved`이고 아무것도 읽지 않는다. 승인받지 않은 target, 다른 limit, 이미 쓴 승인은 모두 여기서 막힌다.
 - 승인 시점에 예약되므로 job 호출 상한(6회, 아래 "예산")을 원자적으로 차감한다. 상한은 job 단위라 재실행(rerun)한 attempt도 이전 attempt가 실제로 한 호출(실행되지 않고 `cancelled`로 닫힌 예약 제외)을 뺀 나머지만 쓴다. 상한 초과 승인은 `tool_budget_exhausted`다.
 - 승인됐지만 호출되지 않은 예약은 job이 끝날 때 기존 규칙대로 `cancelled`로 닫힌다.
 - 이번 PR에는 `approve`를 부르는 실행 경로(ai/service의 approval request 전달)가 아직 없다. 계약과 강제 지점만 먼저 고정했다.
@@ -72,7 +72,7 @@ MCP 메시지를 읽기 전에 순서대로 검사한다.
 | `invalid_arguments` | 인자 규칙 위반(아무것도 읽지 않음, 원장 기록 없음) |
 | `call_not_approved` | 서버가 승인(예약)한 호출과 정확히 일치하지 않거나 이미 사용됨 |
 | `tool_budget_exhausted` | (승인 시) job의 호출 상한(6회, 이전 attempt 포함) 도달 |
-| `result_too_large` | 직렬화 결과 256 KiB 초과. 원장 기록 **전에** 검사해 `failed`/`result_too_large`로 남기며 근거·dataVersion은 기록하지 않음 |
+| `result_too_large` | 결과 256 KiB 초과. 직렬화 크기로 먼저 거르고, 기록할 때 **저장된 JSON 텍스트**(`jsonb::text`, 공백 정규화 후) 크기로 다시 검사한다. 어느 쪽이든 `failed`/`result_too_large`로 남기며 근거·dataVersion·결과는 기록하지 않음(컬럼 제약 위반으로 run이 멈추지 않음) |
 | `job_results_too_large` | 이 결과를 남기면 job이 모델에 보낸 결과 합계가 1 MiB를 넘음. 기록 트랜잭션에서 job 행을 잠그고 검사해 `failed`로 남기며 결과는 보내지 않음 |
 | `send_grants_unavailable` | 아래 모델 전송 gate가 판단할 수 없음(grant 레지스트리를 읽지 못함·형식 위반, 근거 출처를 읽지 못함). 읽기는 실행됐지만 결과를 보내지 않고 `failed`로 남김 |
 | `tool_timeout` `tool_unavailable` `tool_failed` | 기존 runner 실패 코드(원장에 `failed`) |
@@ -97,13 +97,13 @@ hosted MCP 결과는 ai/service의 전송 gate를 거치지 않고 이 엔드포
 
 - 다시 오면 처음 성공해 남긴 결과(`chat_tool_calls.result`)를 재사용한다. 결과에는 자기 `toolCallId`와 함께 `cachedFrom`(처음 읽은 호출)을 붙인다. 재사용도 승인·예약된 호출 하나로 원장과 예산에 들어간다.
 - 재사용 결과도 지금의 모델 전송 gate를 다시 거친다(grant 철회, 지금 인용할 수 없는 근거). 과거에 허용된 결과로 현재 차단을 우회하지 않는다.
-- 같은 요청이 읽는 중에 오면 그 읽기가 끝나길 기다렸다가(최대 12초, run 기한 안) 남긴 결과를 재사용한다. 첫 읽기가 실패했거나 기다림이 끝나면 직접 읽는다. 실패·timeout은 재사용하지 않는다.
+- 요청은 먼저 자기 예약을 잡은 뒤(위 "호출 승인") 같은 요청이 읽는 중이면 그 읽기가 끝나길 기다렸다가(최대 12초, run 기한 안) 남긴 결과를 재사용한다. 첫 읽기가 실패했거나 기다림이 끝나면 직접 읽는다. 실패·timeout은 재사용하지 않는다.
 - 기다림은 **같은 인스턴스 안에서만** 합류한다. 다른 인스턴스로 동시에 온 같은 요청은 각자 읽을 수 있다(나중에 오는 반복은 DB의 남긴 결과로 재사용).
 - direct 경로는 서버가 한 단계의 같은 호출을 미리 합치므로(`ChatRetrieval`) 이 재사용을 쓰지 않는다. attempt가 바뀌면(rerun) 새로 읽는다.
 
 ### job당 결과 1 MiB
 
-job의 호출이 모델용으로 남긴 결과(`chat_tool_calls.result`, 저장된 JSON 텍스트 기준)의 합은 attempt를 합쳐 1 MiB 이하다. 결과를 남기는 기록 트랜잭션에서 job 행을 잠근 뒤 합계를 검사하고 쓰므로 동시 호출에도 넘지 않는다. 넘을 결과는 `failed`/`job_results_too_large`로 기록되고 보내지 않는다.
+job의 호출이 모델용으로 남긴 결과(`chat_tool_calls.result`, 저장된 JSON 텍스트 기준)의 합은 attempt를 합쳐 1 MiB 이하다. 결과를 남기는 기록 트랜잭션에서 job 행을 잠근 뒤, 새 결과의 크기도 DB가 저장할 표현(`octet_length(CAST(:result AS jsonb)::text)`)으로 재서 합계를 검사하고 쓰므로 동시 호출에도, 표현 차이로도 넘지 않는다. 넘을 결과는 `failed`/`job_results_too_large`로 기록되고 보내지 않는다.
 
 ### 원장
 
