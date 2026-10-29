@@ -72,7 +72,7 @@ export default function BriefingIssueList({
                   {item.rank}. {item.title}
                 </h4>
                 {(item.matchedCompanyIds ?? []).length > 0 && (
-                  <p className="self-start rounded-full border-[0.667px] border-zoop-ink px-2 py-[2px] text-[10px] font-semibold">
+                  <p className="self-start rounded-full border-[0.667px] border-zoop-ink px-2 py-[2px] text-[11px] font-semibold">
                     내 종목:{' '}
                     {item.companies
                       .filter((company) =>

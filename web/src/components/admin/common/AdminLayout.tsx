@@ -92,7 +92,7 @@ export default function AdminLayout() {
           <div className="mt-8 flex flex-col gap-2 border-t-[0.667px] border-zoop-line pt-4">
             <p className="flex flex-col gap-0.5">
               <strong className="text-xs">{admin.displayName}</strong>
-              <span className="font-inter text-[10px] text-zoop-faint">
+              <span className="font-inter text-[11px] text-zoop-faint">
                 {admin.role}
               </span>
             </p>
