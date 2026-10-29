@@ -71,6 +71,14 @@ public final class ChatSendGrants {
         this.clock = clock;
     }
 
+    /**
+     * The agent recipient the grants are checked for. Every agent step names it, and the AI runtime sends a step only when it
+     * is the stage's own recipient, so results are never checked for one recipient and received by another.
+     */
+    public String recipient() {
+        return recipient;
+    }
+
     /** The sources whose text may be sent to the agent now. Throws {@link Unavailable} when the registry cannot be used. */
     public Predicate<String> sendable() {
         List<Grant> grants = load();

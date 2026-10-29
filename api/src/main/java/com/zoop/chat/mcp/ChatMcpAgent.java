@@ -48,14 +48,17 @@ public final class ChatMcpAgent implements ChatAgentPath {
     private final ChatModels.Agent agent;
     private final ChatMcpTools tools;
     private final ChatMcpGrants grants;
+    /** The recipient the results' send grants are checked for ({@link ChatSendGrants#recipient}); each step names it. */
+    private final String recipient;
     private final ChatExecutionRepository runs;
     private final ObjectMapper mapper;
 
-    public ChatMcpAgent(ChatModels.Agent agent, ChatMcpTools tools, ChatMcpGrants grants, ChatExecutionRepository runs,
-            ObjectMapper mapper) {
+    public ChatMcpAgent(ChatModels.Agent agent, ChatMcpTools tools, ChatMcpGrants grants, String recipient,
+            ChatExecutionRepository runs, ObjectMapper mapper) {
         this.agent = agent;
         this.tools = tools;
         this.grants = grants;
+        this.recipient = recipient;
         this.runs = runs;
         this.mapper = mapper;
     }
@@ -79,7 +82,8 @@ public final class ChatMcpAgent implements ChatAgentPath {
         int approved = 0;
         int denied = 0;
         for (int step = 1, rounds = 0; ; step++) {
-            var input = new ChatModels.AgentInput(requirements, token, names, maxCitations, previous, decisions);
+            var input = new ChatModels.AgentInput(requirements, token, names, recipient, maxCitations, previous,
+                    decisions);
             int number = step;
             ChatModels.AgentStep outcome = steps.run(() -> agent.step(run, number, input));
             if (outcome.completed()) return new Outcome(outcome.answer(), kept(run), step, approved, denied);

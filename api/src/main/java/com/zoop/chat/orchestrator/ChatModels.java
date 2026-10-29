@@ -54,13 +54,15 @@ public final class ChatModels {
     public record Decision(String approvalRequestId, boolean approve) { }
 
     /**
-     * What one agent step sends: the requirements, the run's grant token, the tools the run may use and, for a continuation,
-     * the stored response and the server's decisions on it. The MCP server's URL is no part of it: the AI runtime sends grants
-     * only to its operator's configured server ({@code ZOOP_AI_CHAT_MCP_SERVER_URL}).
+     * What one agent step sends: the requirements, the run's grant token, the tools the run may use, the recipient the MCP
+     * results' send grants are checked for (the AI runtime sends the step only when that is its own recipient) and, for a
+     * continuation, the stored response and the server's decisions on it. The MCP server's URL is no part of it: the AI
+     * runtime sends grants only to its operator's configured server ({@code ZOOP_AI_CHAT_MCP_SERVER_URL}).
      */
     public record AgentInput(List<AgentRequirement> requirements, String grantToken, List<String> allowedTools,
-            int maxCitations, String previousResponseId, List<Decision> decisions) {
+            String recipient, int maxCitations, String previousResponseId, List<Decision> decisions) {
         public AgentInput {
+            if (recipient == null || recipient.isBlank()) throw new IllegalArgumentException("a step names its recipient");
             requirements = List.copyOf(requirements);
             allowedTools = List.copyOf(allowedTools);
             decisions = List.copyOf(decisions);

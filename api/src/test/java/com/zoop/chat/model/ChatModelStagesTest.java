@@ -134,7 +134,8 @@ class ChatModelStagesTest {
                 {"responseId":"resp_1","status":"approval_required","mcpCalls":[],"answer":null,
                  "approvalRequests":[{"approvalRequestId":"mcpr_1","toolName":"company_read","arguments":{"targets":["KRX:000660"],"limit":null}}]}""");
         var held = stages.step(run(root("SK하이닉스 최근 사건")), 1, new com.zoop.chat.orchestrator.ChatModels.AgentInput(
-                List.of(requirement), "zmcp1.k1.payload.mac-synthetic", List.of("company_read"), 20, null, List.of()));
+                List.of(requirement), "zmcp1.k1.payload.mac-synthetic", List.of("company_read"), "authored-replay", 20, null,
+                List.of()));
         assertFalse(held.completed());
         assertEquals("company_read", held.approvals().getFirst().toolName());
         assertTrue(held.approvals().getFirst().arguments().containsKey("limit"), "an explicit null is kept for the server check");
@@ -145,6 +146,7 @@ class ChatModelStagesTest {
         var mcp = first.input().path("mcp");
         assertEquals("zmcp1.k1.payload.mac-synthetic", mcp.path("authorization").asString());
         assertFalse(mcp.has("serverUrl"), "the MCP server URL is the AI runtime operator's, never sent from here");
+        assertEquals("authored-replay", mcp.path("recipient").asString(), "the recipient the results are checked for");
         assertEquals("KRX:000660", first.input().path("requirements").get(0).path("targets").get(0).asString());
         assertFalse(first.input().has("continuation"));
 
@@ -153,7 +155,7 @@ class ChatModelStagesTest {
                  "answer":{"sections":[{"basis":"evidence_grounded","text":"공급 계약","requirementIds":["r1"],"evidenceIds":["%s"]}],
                            "insufficientRequirementIds":[],"graphTargetIds":["KRX:000660"]}}""".formatted(EV_A));
         var done = stages.step(run(root("SK하이닉스 최근 사건")), 2, new com.zoop.chat.orchestrator.ChatModels.AgentInput(
-                List.of(requirement), "zmcp1.k1.payload.mac-synthetic", List.of("company_read"), 20, "resp_1",
+                List.of(requirement), "zmcp1.k1.payload.mac-synthetic", List.of("company_read"), "authored-replay", 20, "resp_1",
                 List.of(new com.zoop.chat.orchestrator.ChatModels.Decision("mcpr_1", true))));
         assertTrue(done.completed());
         assertEquals(List.of(EV_A), done.answer().sections().getFirst().evidenceIds());

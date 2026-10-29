@@ -126,7 +126,7 @@ class ChatMcpAgentTest {
     }
 
     private ChatAgentPath.Outcome run(ChatAgentPath.Steps steps) {
-        var agent = new ChatMcpAgent(luna, tools, grants, store, mapper);
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, mapper);
         var attached = executor.attach(JOB, 1).orElseThrow();
         return agent.run(attached.run(), attached.control(), REQUIREMENTS, List.of(ChatCapability.COMPANY_READ), 20, steps);
     }
@@ -268,6 +268,8 @@ class ChatMcpAgentTest {
         assertEquals(List.of(ChatCapability.COMPANY_READ), grant.tools());
         assertEquals(NOW.plusSeconds(45), grant.expiresAt());
         assertEquals(JOB, grant.jobId());
+        assertEquals(ChatSendGrantsTest.RECIPIENT, luna.inputs.getFirst().recipient(),
+                "each step names the recipient the results' send grants are checked for");
     }
 
     private static ChatTool tool(ChatCapability capability) {
