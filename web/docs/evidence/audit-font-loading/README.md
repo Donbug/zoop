@@ -4,18 +4,20 @@
 
 2026-10-29 로컬 Chrome에서 document.fonts와 DevTools CSS.getPlatformFontsForNode를 확인했습니다. `measurements.json`의 platformFonts는 실제 렌더링 글꼴과 glyphCount를 기록합니다. document.fonts에 등록돼도 쓰지 않는 언어 subset은 unloaded일 수 있습니다.
 
-| 직접 진입     | 폭             | 실제 사용 글꼴                             |
-| ------------- | -------------- | ------------------------------------------ |
-| 관리자 로그인 | 1440, 다크 390 | h1 Pretendard Variable (custom, 5 glyphs)  |
-| 404           | 390            | h1 Pretendard Variable (custom, 13 glyphs) |
-| 로그인        | 1440           | h1 Pretendard Variable, 로고 Inter         |
-| 회원가입      | 1440           | h1 Pretendard Variable, 로고 Inter         |
-| 지도          | 1440           | 로고 Inter, 본문 기존 Pretendard 역할      |
-| 기업 상세     | 1440           | h1 Pretendard Variable, 로고 Inter         |
+| 직접 진입     | 폭             | 실제 사용 글꼴                                                                              |
+| ------------- | -------------- | ------------------------------------------------------------------------------------------- |
+| 관리자 로그인 | 1440, 다크 390 | h1 Pretendard Variable (custom, 5 glyphs)                                                   |
+| 404           | 390            | h1 Pretendard Variable (custom, 13 glyphs)                                                  |
+| 로그인        | 1440           | h1 Pretendard Variable, 로고 Inter                                                          |
+| 회원가입      | 1440           | 최초 정상 화면 h1 Pretendard Variable, 재촬영 오류 화면 body Pretendard Variable·로고 Inter |
+| 지도          | 1440           | 로고 Inter, 본문 기존 Pretendard 역할                                                       |
+| 기업 상세     | 1440           | h1 Pretendard Variable, 로고 Inter                                                          |
 
 body는 모든 화면에서 `"Pretendard Variable", Pretendard, sans-serif`입니다. 서비스 화면의 기존 `.service-surface`도 이 이름을 사용하므로 본문 역할을 유지합니다. `.font-inter`는 기존 Inter Variable face(플랫폼 이름 Inter)를 사용합니다. SOURCE/AS OF mono 설정은 수정하지 않습니다.
 
 관리자 로그인(라이트·다크), 404, 로그인, 회원가입은 main `4f7934b5` 통합본에서 다시 촬영했습니다. 지도·기업 상세 이미지는 앞서 #394 `71fb8b71` 기반에서 확인한 동일 글꼴 수정의 기록입니다. 두 서비스 화면의 명시적인 `.service-surface` 글꼴 역할은 그대로입니다. App/경로 변경은 PR에 포함하지 않습니다.
+
+재촬영은 인증 API 미연결 상태입니다. 로그인에는 세션 확인 오류와 폼이 함께 보이며 회원가입은 폼 대신 세션 오류 안내가 보입니다. 회원가입의 정상 h1은 [최초 정상 화면 검증](https://github.com/Donbug/zoop/blob/02f66594/web/docs/evidence/audit-font-loading/signup-1440.png)에서 확인했습니다. 현재 측정 기록의 회원가입 h1은 비어 있으며, 이를 정상 폼 검증으로 취급하지 않습니다. 오류 화면에서도 body의 Pretendard Variable 역할과 로고 Inter는 유지됩니다.
 
 | 수정 전                                      | 수정 후                                                                          |
 | -------------------------------------------- | -------------------------------------------------------------------------------- |
