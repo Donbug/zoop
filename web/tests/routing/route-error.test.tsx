@@ -16,3 +16,14 @@ it('shows a not found page and a map link for an unknown route', () => {
     screen.getByRole('link', { name: '지도로 돌아가기' }).getAttribute('href'),
   ).toBe('/');
 });
+
+it('FS001 F5 gives the 404 return link a mobile touch target', () => {
+  const router = createMemoryRouter(
+    [{ path: '*', element: <RouteError notFound /> }],
+    { initialEntries: ['/unknown'] },
+  );
+  render(<RouterProvider router={router} />);
+  const link = screen.getByRole('link', { name: '지도로 돌아가기' });
+  expect(link.classList.contains('max-md:min-h-10')).toBe(true);
+  expect(link.classList.contains('max-md:min-w-10')).toBe(true);
+});
