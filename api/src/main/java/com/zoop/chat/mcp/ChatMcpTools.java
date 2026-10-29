@@ -188,8 +188,9 @@ public final class ChatMcpTools {
      */
     private final class Delivery implements ChatToolRunner.Delivery {
         private final ChatRun run;
-        private String refusal;
-        private ChatMcpSendGate.Withheld withheld = ChatMcpSendGate.Withheld.NONE;
+        // pass() runs on the read's thread, the rest while the call is recorded.
+        private volatile String refusal;
+        private volatile ChatMcpSendGate.Withheld withheld = ChatMcpSendGate.Withheld.NONE;
 
         Delivery(ChatRun run) {
             this.run = run;
