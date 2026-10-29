@@ -111,7 +111,7 @@ class PortfolioPostgresTest {
                         .cookie(new jakarta.servlet.http.Cookie(SessionCookie.NAME, issued.token())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(2))
-                .andExpect(jsonPath("$.items[1].holdingsCount").value(2));
+                .andExpect(jsonPath("$.items[1].holdingsCount").value(3));
 
         mvc.perform(get("/api/v1/portfolio/mock-portfolios")
                         .cookie(new jakarta.servlet.http.Cookie(SessionCookie.NAME, guest.token())))
@@ -135,7 +135,7 @@ class PortfolioPostgresTest {
                         .content("{\"mockPortfolioId\":\"demo-growth\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("connected"))
-                .andExpect(jsonPath("$.holdingsCount").value(2))
+                .andExpect(jsonPath("$.holdingsCount").value(3))
                 .andReturn();
         String connectionId = mapper.readTree(connected.getResponse().getContentAsString()).path("id").asText();
 
