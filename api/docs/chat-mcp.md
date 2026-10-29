@@ -88,7 +88,7 @@ hosted MCP 결과는 ai/service의 전송 gate를 거치지 않고 이 엔드포
 - **수신자 결속**: Java가 검사한 수신자와 결과를 실제로 받는 수신자가 같아야 한다. Java는 agent 단계마다 `mcp.recipient`에 `ZOOP_CHAT_MCP_SEND_RECIPIENT`를 넣고, worker는 새 invocation을 보내기 전에 그 값이 그 단계의 실제 수신자(설정된 endpoint로 계산한 `openai-compatible:<revision>`, replay `authored-replay`)와 정확히 같은지 확인한다. 다르면 `mcp_recipient_mismatch`로 아무것도 보내지 않는다(Java에서는 거절된 모델 단계). 이 값은 공급자로 보내지 않는다.
 - **출처 대응**: 기업 항목(이름) = `zoop-company-catalog`, 사건 제목·경로 단계(ID·관계 유형·역할, 이름 없음) = `zoop-graph`(새 source ID), 관계(엣지) 항목은 label이 양 끝 이름(기업명 포함)과 관계로 이루어진 복합 label이라 `zoop-graph`와 `zoop-company-catalog`가 **모두** 있어야 함, ZOOP 문서 제목 = `zoop-docs`, 근거(근거 항목의 label은 기사 제목) = direct 경로의 인용과 같은 규칙. 근거는 run의 고정 버전·asOf로 인용 읽기를 해서 기업 개요면 카탈로그, ZOOP 문서 구간이면 `zoop-docs`, 기사면 `articles.provider`(`CitedMcpSources`)이며 지금 인용할 수 없는 근거는 출처가 없어 보내지 않는다. 그 밖의 항목 종류도 보내지 않는다.
 - **뺀 부분**: 허용되지 않은 항목·경로는 **통째로**, 근거 ID는 결과와 항목·경로 단계의 목록에서 모두 뺀다. 맨 ID도 보내지 않는다. 결과에는 `withheld: {reason: "source_grant_denied", items, evidenceIds, paths}`로 개수만 남는다(아무것도 빼지 않았으면 없음). 원장의 `evidence_ids`와 `chat_tool_calls.result`도 보낸 것만 담으므로, 최종 답 검사와 다음 라운드의 도달 가능한 ID에도 뺀 것은 들어가지 않는다.
-- **시간**: 검사(레지스트리·근거 출처 읽기)는 읽기와 같은 스레드에서 그 호출의 시간 한도(3초)와 runner 전체 슬롯 안에서 돈다. 느린 검사는 느린 읽기처럼 `tool_timeout`이 되고, 호출 기록 스레드를 붙잡지 않는다.
+- **시간**: 검사(레지스트리·근거 출처 읽기)는 읽기와 같은 스레드에서 그 호출의 시간 한도(3초, 그래프 계산 5초)와 runner 전체 슬롯 안에서 돈다. 느린 검사는 느린 읽기처럼 `tool_timeout`이 되고, 호출 기록 스레드를 붙잡지 않는다.
 - **판단 불가**: 레지스트리를 읽지 못하거나 근거 출처를 읽지 못하면 빈 허용이 아니라 호출 거부(`send_grants_unavailable`)다. 설정이 없거나 기동 때 레지스트리를 읽지 못하면 `/mcp`를 켠 기동 자체가 실패한다.
 
 ### 같은 요청의 재사용 (요청 캐시·single-flight)
@@ -134,7 +134,7 @@ agent 단계가 하나라도 시작된 뒤의 `mcp_unreachable`는 **같은 run�
 아래가 끝나기 전에는 로컬 합성 시험 밖에서 `ZOOP_CHAT_MCP_ENABLED`·`ZOOP_CHAT_AGENT_ENABLED`를 켜지 않는다.
 
 1. ~~**model-send grant 검사.**~~ 구현(3장 "모델 전송 gate"). 켜기 전에 운영자가 레지스트리에 `chat-agent` 목적·agent 수신자 grant와 `zoop-graph` source를 등록하고, OpenAI 보유 조건을 거버넌스 10장에 기록해야 한다.
-2. **예산**(단계 2): job 단위 호출 상한 6회(내부 몫, 웹 2회는 웹 검색 도구와 함께. rerun은 남은 호출만 쓰고, 계획에 모자라면 `budget_exceeded`로 재실행 불가), agent 라운드당 승인 4건(동시 4개), fan-out 5, agent run 45초(검증·저장까지)·Luna 35초는 구현했다. 요청 캐시·single-flight(인스턴스 안)·재사용 시 gate 재검사·job당 결과 1 MiB도 구현했다(3장). 남은 것: 그래프 경로 5초·웹 7초의 도구별 시간, direct 경로 45초(단계 한도 실측 후), 인스턴스를 넘는 single-flight(필요하면). rate limit은 인스턴스별이다.
+2. **예산**(단계 2): job 단위 호출 상한 6회(내부 몫, 웹 2회는 웹 검색 도구와 함께. rerun은 남은 호출만 쓰고, 계획에 모자라면 `budget_exceeded`로 재실행 불가), agent 라운드당 승인 4건(동시 4개), fan-out 5, agent run 45초(검증·저장까지)·Luna 35초는 구현했다. 요청 캐시·single-flight(인스턴스 안)·재사용 시 gate 재검사·job당 결과 1 MiB도 구현했다(3장). 도구별 시간은 일반 읽기 3초·그래프 계산(`zoop-graph-read`: `graph.path.read`·`graph.version.diff`) 5초로 구현했다(단계 10초와 run 기한으로 줄어듦). 남은 것: 웹 7초(웹 검색 도구와 함께), direct 경로 45초(단계 한도 실측 후), 인스턴스를 넘는 single-flight(필요하면). rate limit은 인스턴스별이다.
 3. ~~**preflight·circuit breaker.**~~ 구현. AI runtime의 무과금 health probe와 Java의 5회/3실패·30초·단일 half-open probe, 시작 전 direct 선택, 실행 중 무대체를 적용했다.
 4. **승인 요청의 요구 매핑**: 지금은 결과를 run의 요구들이 공유한다. 요구별 인용 결속이 필요하면 승인 요청에 requirementIds를 받도록 계약을 넓힌다.
 5. **네트워크·운영**: HTTPS 인바운드 노출 범위, 공급자 출발지 제한 여부(IP allowlist만으로 인증하지 않음), 승인된 소량 live latency spike(실제 Responses·MCP 응답 형태 확인 포함). Spike의 승인·합성 데이터·무내용 증거·통과 gate는 [챗봇 MCP live latency spike](../../docs/development/chat-live-spike.md)에 고정했다. HTTPS·출발지 제한 선택, model-send grant, `store=true` 보유 조건·외부 처리 고지, 키 회전, 사고·증거 보존 책임은 [운영 readiness gate](../../docs/development/chat-operations-readiness.md)가 같은 후보 commit의 통과한 spike와 함께 검사한다. 이 검사는 배포나 플래그 변경을 하지 않는다. 현재 웹 도구가 없어 총 8회 시나리오는 실행할 수 없으므로, 웹 2회 몫이 구현되기 전에는 gate를 통과로 기록하지 않는다.
