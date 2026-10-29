@@ -43,6 +43,7 @@ class GraphHandoffImportConfigurationTest {
         base = temp.toRealPath();
         Path handoffCli = executable("zoop-ai-handoff");
         Path ingestionCli = executable("zoop-ai-ingest");
+        valid.put("ZOOP_GRAPH_SNAPSHOT_SOURCE", "none");
         valid.put("ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED", "true");
         valid.put("ZOOP_GRAPH_HANDOFF_IMPORT_REQUEST", Files.writeString(base.resolve("request.json"), "{}").toString());
         valid.put("ZOOP_GRAPH_HANDOFF_IMPORT_RESULT", base.resolve("result.json").toString());
