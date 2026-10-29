@@ -6,8 +6,10 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Clock;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
+import com.zoop.ai.config.AiHandoffReadClientConfiguration;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.document.repository.DocumentRegistryRepository;
 import com.zoop.document.service.InMemoryDocumentRegistry;
@@ -156,7 +158,7 @@ class GraphHandoffImportConfigurationTest {
             assertEquals(base.resolve("artifacts"), settings.artifactRoot());
             assertEquals(base.resolve("sources.json"), settings.ingestionSources());
             assertEquals(base.resolve("ingestion"), settings.ingestionState());
-            assertEquals("GraphHandoffImportProperties[enabled=true]",
+            assertEquals("GraphHandoffImportProperties[enabled=true, handoffSource=cli]",
                     context.getBean(GraphHandoffImportProperties.class).toString());
         });
     }
@@ -220,6 +222,83 @@ class GraphHandoffImportConfigurationTest {
             Throwable failure = configurationFailure(context.getStartupFailure());
             assertNotNull(failure);
             assertTrue(failure.getMessage().startsWith("zoop.graph-handoff-import.canonical "), failure.getMessage());
+        });
+    }
+
+    /** The HTTP source: the seven CLI-only settings left out, the read-only handoff client configured. */
+    private String[] httpValues(String... extra) {
+        Map<String, String> changed = new LinkedHashMap<>(valid);
+        for (String cliOnly : List.of("ZOOP_HANDOFF_CLI", "ZOOP_HANDOFF_STATE_DIR", "ZOOP_RELATION_STATE_DIR",
+                "ZOOP_EXTRACTION_STATE_DIR", "ZOOP_HANDOFF_CANONICAL", "ZOOP_HANDOFF_DECISIONS", "ZOOP_HANDOFF_BINDINGS")) {
+            changed.remove(cliOnly);
+        }
+        changed.put("ZOOP_GRAPH_HANDOFF_IMPORT_HANDOFF_SOURCE", "http");
+        changed.put("ZOOP_AI_HANDOFF_READ_CLIENT_ENABLED", "true");
+        changed.put("ZOOP_AI_HANDOFF_READ_CLIENT_BASE_URL", "https://ai.internal.example");
+        changed.put("ZOOP_AI_HANDOFF_READ_CLIENT_TOKEN", "read-token-0123456789abcdefghijklmnopqrstuvwxyz");
+        for (int i = 0; i + 1 < extra.length; i += 2) {
+            changed.put(extra[i], extra[i + 1]);
+        }
+        return changed.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue()).toArray(String[]::new);
+    }
+
+    @Test
+    void theHttpSourceNeedsOnlyTheS2CliAndTheReadClientAndLeavesTheCliOnlySettingsNull() {
+        runner().withUserConfiguration(AiHandoffReadClientConfiguration.class).withPropertyValues(httpValues()).run(context -> {
+            assertNull(context.getStartupFailure());
+            assertNotNull(context.getBean(GraphHandoffRunner.class));
+            GraphHandoffImportSettings settings = context.getBean(GraphHandoffImportSettings.class);
+            assertEquals(GraphHandoffImportSettings.HandoffSourceKind.HTTP, settings.handoffSource());
+            assertNull(settings.handoffCli());
+            assertNull(settings.handoffState());
+            assertNull(settings.canonical());
+            assertEquals(base.resolve("ingestion"), settings.ingestionState());
+            assertEquals("GraphHandoffImportProperties[enabled=true, handoffSource=http]",
+                    context.getBean(GraphHandoffImportProperties.class).toString());
+        });
+    }
+
+    @Test
+    void aBlankHandoffSourceIsTheCliDefaultAndTheCliRefusesAnIdleReadClient() {
+        runner().withPropertyValues(with("ZOOP_GRAPH_HANDOFF_IMPORT_HANDOFF_SOURCE", "")).run(context -> {
+            assertNull(context.getStartupFailure());
+            assertEquals(GraphHandoffImportSettings.HandoffSourceKind.CLI,
+                    context.getBean(GraphHandoffImportSettings.class).handoffSource());
+        });
+        Map<String, String> cliWithReader = new LinkedHashMap<>(valid);
+        cliWithReader.put("ZOOP_AI_HANDOFF_READ_CLIENT_ENABLED", "true");
+        cliWithReader.put("ZOOP_AI_HANDOFF_READ_CLIENT_BASE_URL", "https://ai.internal.example");
+        cliWithReader.put("ZOOP_AI_HANDOFF_READ_CLIENT_TOKEN", "read-token-0123456789abcdefghijklmnopqrstuvwxyz");
+        runner().withUserConfiguration(AiHandoffReadClientConfiguration.class)
+                .withPropertyValues(cliWithReader.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue())
+                        .toArray(String[]::new))
+                .run(context -> {
+                    Throwable failure = configurationFailure(context.getStartupFailure());
+                    assertNotNull(failure);
+                    assertTrue(failure.getMessage().startsWith("zoop.graph-handoff-import.handoff-source "), failure.getMessage());
+                    assertTrue(failure.getMessage().contains("zoop.ai.handoff-read-client.enabled"), failure.getMessage());
+                });
+    }
+
+    @Test
+    void theHttpSourceWithoutTheReadClientOrWithACliOnlySettingOrAnUnknownSourceFailsClosed() {
+        runner().withPropertyValues(httpValues("ZOOP_AI_HANDOFF_READ_CLIENT_ENABLED", "false")).run(context -> {
+            Throwable failure = configurationFailure(context.getStartupFailure());
+            assertNotNull(failure);
+            assertTrue(failure.getMessage().startsWith("zoop.graph-handoff-import.handoff-source "), failure.getMessage());
+            assertTrue(failure.getMessage().contains("zoop.ai.handoff-read-client.enabled"), failure.getMessage());
+        });
+        runner().withUserConfiguration(AiHandoffReadClientConfiguration.class)
+                .withPropertyValues(httpValues("ZOOP_HANDOFF_DECISIONS", valid.get("ZOOP_HANDOFF_DECISIONS"))).run(context -> {
+                    Throwable failure = configurationFailure(context.getStartupFailure());
+                    assertNotNull(failure);
+                    assertTrue(failure.getMessage().startsWith("zoop.graph-handoff-import.decisions "), failure.getMessage());
+                    assertFalse(failure.getMessage().contains(base.toString()), failure.getMessage());
+                });
+        runner().withPropertyValues(with("ZOOP_GRAPH_HANDOFF_IMPORT_HANDOFF_SOURCE", "grpc")).run(context -> {
+            Throwable failure = configurationFailure(context.getStartupFailure());
+            assertNotNull(failure);
+            assertTrue(failure.getMessage().startsWith("zoop.graph-handoff-import.handoff-source "), failure.getMessage());
         });
     }
 

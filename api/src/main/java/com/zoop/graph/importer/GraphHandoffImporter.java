@@ -104,8 +104,7 @@ public final class GraphHandoffImporter {
     private static final String AVAILABLE = "available";
     private static final Logger log = LoggerFactory.getLogger(GraphHandoffImporter.class);
 
-    private final HandoffExporter handoffExporter;
-    private final HandoffExportParser handoffParser;
+    private final HandoffSource handoffSource;
     private final HandoffObservationVerifier observations;
     private final ArtifactFileStore store;
     private final DocumentRegistryRepository registry;
@@ -113,11 +112,17 @@ public final class GraphHandoffImporter {
     private final TransactionOperations transaction;
     private final Clock clock;
 
+    /** The installed CLI as the handoff source. */
     public GraphHandoffImporter(HandoffExporter handoffExporter, IngestionExporter ingestionExporter,
             IngestionExportParser ingestionParser, ArtifactFileStore store, DocumentRegistryRepository registry,
             GraphHandoffRepository graph, TransactionOperations transaction, Clock clock) {
-        this.handoffExporter = handoffExporter;
-        this.handoffParser = new HandoffExportParser();
+        this(new CliHandoffSource(handoffExporter), ingestionExporter, ingestionParser, store, registry, graph, transaction, clock);
+    }
+
+    public GraphHandoffImporter(HandoffSource handoffSource, IngestionExporter ingestionExporter,
+            IngestionExportParser ingestionParser, ArtifactFileStore store, DocumentRegistryRepository registry,
+            GraphHandoffRepository graph, TransactionOperations transaction, Clock clock) {
+        this.handoffSource = handoffSource;
         this.observations = new HandoffObservationVerifier(ingestionExporter, ingestionParser);
         this.store = store;
         this.registry = registry;
@@ -173,17 +178,22 @@ public final class GraphHandoffImporter {
 
     /** One complete check: the current handoff, then the current rights and source facts of every observation. */
     private Checked check(GraphHandoffRequest request) {
-        VerifiedHandoff handoff = handoffParser.parse(handoffExporter.export(request.handoffId()), request);
+        VerifiedHandoff handoff = handoffSource.fetch(request);
         List<ObservationFacts> facts = observations.collect(handoff.bundle());
         return new Checked(handoff, facts, HandoffObservationVerifier.byArticle(handoff.bundle(), facts));
     }
 
-    /** Repeats {@link #check} immediately before the commit; any difference means authority moved after the first look. */
+    /**
+     * The same checks immediately before the commit: the digests the producer stands behind now (the source's content-free
+     * look), then the current rights and source facts of every observation. Any difference means authority moved after the
+     * first look. The digests pin the content, so the facts are collected over the bundle already verified: equal digests mean
+     * the producer still delivers exactly it.
+     */
     private void recheck(GraphHandoffRequest request, Checked first) {
-        Checked second = check(request);
-        if (!second.handoff().manifestDigest().equals(first.handoff().manifestDigest())
-                || !second.handoff().bundleDigest().equals(first.handoff().bundleDigest())
-                || !second.facts().equals(first.facts())) {
+        HandoffSource.Current current = handoffSource.current(request);
+        if (!current.manifestDigest().equals(first.handoff().manifestDigest())
+                || !current.bundleDigest().equals(first.handoff().bundleDigest())
+                || !observations.collect(first.handoff().bundle()).equals(first.facts())) {
             throw new GraphHandoffException(GraphHandoffFailure.RIGHTS_CHANGED);
         }
     }

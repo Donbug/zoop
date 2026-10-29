@@ -159,6 +159,15 @@ zoop:
       connect-timeout: ${ZOOP_AI_HANDOFF_EXPOSURE_CLIENT_CONNECT_TIMEOUT:3s}
       request-timeout: ${ZOOP_AI_HANDOFF_EXPOSURE_CLIENT_REQUEST_TIMEOUT:60s}
       max-response-bytes: ${ZOOP_AI_HANDOFF_EXPOSURE_CLIENT_MAX_RESPONSE_BYTES:7340032}
+    handoff-read-client:
+      # Read-only handoff family (scope handoff.read): GET /internal/v1/graph-handoffs/{id} and /bundle. Used only by the graph
+      # handoff import with handoff-source=http in place of the installed zoop-ai-handoff export. A bundle is at most 6 MiB.
+      enabled: ${ZOOP_AI_HANDOFF_READ_CLIENT_ENABLED:false}
+      base-url: ${ZOOP_AI_HANDOFF_READ_CLIENT_BASE_URL:}
+      token: ${ZOOP_AI_HANDOFF_READ_CLIENT_TOKEN:}
+      connect-timeout: ${ZOOP_AI_HANDOFF_READ_CLIENT_CONNECT_TIMEOUT:3s}
+      request-timeout: ${ZOOP_AI_HANDOFF_READ_CLIENT_REQUEST_TIMEOUT:60s}
+      max-response-bytes: ${ZOOP_AI_HANDOFF_READ_CLIENT_MAX_RESPONSE_BYTES:16777216}
     chat-client:
       # Chatbot model stages through ai/service (POST /internal/v1/chat-stages/{stage}). Disabled by default. Enabled, it
       # registers the chat engine, so zoop.chat.questions-enabled may be turned on. mode: replay (AI-side fixtures, no network)
@@ -203,7 +212,13 @@ zoop:
     # the handoff export and the per-observation `zoop-ai-ingest export --require-store` both read them. `canonical`, `decisions`
     # and `bindings` are the operator files the handoff was frozen with (pinned by hash in its manifest). Paths only; the database
     # uses DB_*, which no CLI receives.
+    # handoff-source: cli (default; the installed zoop-ai-handoff export, which needs handoff-cli, the three handoff/S3/S2 ledger
+    # directories and the three operator files) or http (ai/service GET /internal/v1/graph-handoffs/{id}/bundle through
+    # zoop.ai.handoff-read-client, which must then be enabled; those seven CLI settings must be left unset). An empty value is
+    # cli, and with cli the read client must stay disabled (an authority this run would not use). The observation check stays
+    # the installed zoop-ai-ingest export --require-store in both modes until the AI side offers it over HTTP.
     enabled: ${ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED:false}
+    handoff-source: ${ZOOP_GRAPH_HANDOFF_IMPORT_HANDOFF_SOURCE:cli}
     request: ${ZOOP_GRAPH_HANDOFF_IMPORT_REQUEST:}
     result: ${ZOOP_GRAPH_HANDOFF_IMPORT_RESULT:}
     handoff-cli: ${ZOOP_HANDOFF_CLI:}

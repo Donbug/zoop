@@ -40,9 +40,21 @@ public final class HandoffExportParser {
     private static final Set<String> ATTEMPT_KINDS = Set.of("freeze", "recover");
     private static final Set<String> ATTEMPT_OUTCOMES = Set.of("written", "confirmed", "artifact-missing", "artifact-invalid");
 
-    /** A current, fully verified handoff: the typed bundle plus the original objects the receipt artifact retains. */
+    /**
+     * A current, fully verified handoff: the typed bundle plus the original objects the receipt artifact retains.
+     * {@code producerNode} is what the receipt keeps under {@code producer}: for a CLI export its {@code receipt} and
+     * {@code attempts}, for an HTTP read the service's {@code read} answer (see {@link HandoffReadParser}).
+     */
     public record VerifiedHandoff(HandoffBundle bundle, Manifest manifest, JsonNode manifestNode, JsonNode bundleNode,
-            JsonNode receiptNode, JsonNode attemptsNode, String manifestDigest, String bundleDigest, String contentDigest) {
+            JsonNode producerNode, String manifestDigest, String bundleDigest, String contentDigest) {
+    }
+
+    /** The {@code producer} object of a receipt built from a CLI export: the producer's own receipt and its attempts. */
+    static ObjectNode producer(JsonNode receiptNode, JsonNode attemptsNode) {
+        ObjectNode producer = StrictJson.newObject();
+        producer.set("receipt", receiptNode);
+        producer.set("attempts", attemptsNode);
+        return producer;
     }
 
     public VerifiedHandoff parse(byte[] export, GraphHandoffRequest request) {
@@ -121,7 +133,7 @@ public final class HandoffExportParser {
         if (!reviewMatches) {
             throw new GraphHandoffException(GraphHandoffFailure.REVIEW_STATE_CHANGED);
         }
-        return new VerifiedHandoff(bundle, manifest, manifestNode, bundleNode, receiptNode, attempts, manifestDigest,
+        return new VerifiedHandoff(bundle, manifest, manifestNode, bundleNode, producer(receiptNode, attempts), manifestDigest,
                 bundleDigest, contentDigest);
     }
 

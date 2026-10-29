@@ -18,7 +18,9 @@ public enum AiOperation {
     /** Commits reference-only plan authority; never enqueues model work. */
     PLAN_ADMIT(true),
     /** Reads the identity-only public exposure of fixed handoffs; never changes the AI service or the app. */
-    EXPOSURE(false);
+    EXPOSURE(false),
+    /** Reads one allowlisted handoff's verified status or whole bundle; never changes the AI service or the app. */
+    HANDOFF_READ(false);
 
     private final boolean mutating;
 

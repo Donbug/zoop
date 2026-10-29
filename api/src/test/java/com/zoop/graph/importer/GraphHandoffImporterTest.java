@@ -955,7 +955,7 @@ class GraphHandoffImporterTest {
         InMemoryGraphHandoffRepository.State graphBefore = graph.state();
         InMemoryDocumentRegistry.State registryBefore = registry.state();
         long filesBefore = fileCount();
-        GraphHandoffImporter legacy = new GraphHandoffImporter(handoffId -> {
+        GraphHandoffImporter legacy = new GraphHandoffImporter((HandoffExporter) handoffId -> {
             throw GraphHandoffException.handoffWithheld("handoff_contract_changed");
         }, ingestion, new IngestionExportParser(), store, registry, graph, transaction, Clock.fixed(NOW, ZoneOffset.UTC));
 
@@ -1769,5 +1769,61 @@ class GraphHandoffImporterTest {
         assertEquals(Outcome.UNCHANGED, again.staged().outcome());
         assertTrue(java.util.Arrays.equals(snapshotBytes, Files.readAllBytes(snapshotFile(twoHop.versionId()))));
         assertTrue(java.util.Arrays.equals(receiptBytes, Files.readAllBytes(receiptFile(twoHop.versionId()))));
+    }
+
+    // ------------------------------------------------------------------------------------------ the HTTP handoff source -----
+
+    private GraphHandoffImporter httpImporter(HandoffFixtures.FakeHandoffRead reads) {
+        return new GraphHandoffImporter(new HttpHandoffSource(reads), ingestion, new IngestionExportParser(), store, registry, graph,
+                transaction, Clock.fixed(NOW, ZoneOffset.UTC));
+    }
+
+    @Test
+    void theHttpHandoffSourceStagesTheSameVersionAsTheCliAndTheReceiptSaysWhereTheBundleCameFrom() throws Exception {
+        HandoffFixtures.FakeHandoffRead reads = new HandoffFixtures.FakeHandoffRead(HandoffFixtures.read(built));
+        GraphHandoffImporter http = httpImporter(reads);
+
+        GraphHandoffResult result = http.run(built.request());
+
+        assertTrue(result.succeeded(), () -> String.valueOf(result.failure() == null ? null : result.failure().failure()));
+        assertEquals(Outcome.STAGED, result.staged().outcome());
+        String versionId = built.versionId();
+        assertEquals(1, reads.bundleCalls.get(), "one bundle read to check");
+        assertEquals(1, reads.statusCalls.get(), "one content-free status read right before the commit");
+        // The snapshot is a function of the verified bundle alone, so it is byte-identical to the CLI path's.
+        freshSetUp();
+        importer.run(built.request());
+        byte[] cliSnapshot = Files.readAllBytes(snapshotFile(versionId));
+        freshSetUp();
+        reads = new HandoffFixtures.FakeHandoffRead(HandoffFixtures.read(built));
+        http = httpImporter(reads);
+        assertEquals(Outcome.STAGED, http.run(built.request()).staged().outcome());
+        assertTrue(java.util.Arrays.equals(cliSnapshot, Files.readAllBytes(snapshotFile(versionId))));
+        // The receipt keeps the same manifest, bundle and digests, and under `producer` the service's answer instead of a CLI receipt.
+        JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId)));
+        assertEquals(built.manifestDigest(), receipt.get("manifestDigest").stringValue());
+        assertEquals(built.bundleDigest(), receipt.get("bundleDigest").stringValue());
+        assertEquals(built.bundle(), receipt.get("bundle"));
+        JsonNode producer = receipt.get("producer");
+        assertFalse(producer.has("receipt"));
+        assertFalse(producer.has("attempts"));
+        assertEquals(HandoffReadParser.TRANSPORT, producer.get("read").get("transport").stringValue());
+        assertEquals(built.bundleDigest(), producer.get("read").get("verification").get("bundleDigest").stringValue());
+        // The same pins again: unchanged, through the same route.
+        assertEquals(Outcome.UNCHANGED, http.run(built.request()).staged().outcome());
+    }
+
+    @Test
+    void aHandoffWithheldByTheServiceBetweenTheCheckAndTheCommitRollsTheHttpImportBack() throws Exception {
+        InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+        InMemoryDocumentRegistry.State registryBefore = registry.state();
+        long filesBefore = fileCount();
+        GraphHandoffImporter http = httpImporter(new HandoffFixtures.FakeHandoffRead(HandoffFixtures.read(built)).withholdFrom(2));
+
+        GraphHandoffException failure = failure(http.run(built.request()));
+
+        assertEquals(GraphHandoffFailure.HANDOFF_WITHHELD, failure.failure());
+        assertEquals("source_unauthorized", failure.cliCode());
+        assertNothingWritten(graphBefore, registryBefore, filesBefore);
     }
 }
