@@ -540,6 +540,24 @@ it('D-GRP-01 shows help and event focus controls', async () => {
   expect(new URLSearchParams(router.state.location.search).get('hops')).toBe(
     '2',
   );
+  // D-GRP-01 / F5: mobile targets grow without changing desktop recipes.
+  // The existing graph typography applies an important 28px minimum.
+  expect(
+    document
+      .querySelector('.relationship-map')!
+      .classList.contains(
+        'max-md:[&_.relationship-graph-filters_button]:min-h-10!',
+      ),
+  ).toBe(true);
+  for (const name of [
+    '조작 도움말',
+    '지도 데이터 안내',
+    '튜토리얼 다시 보기',
+  ]) {
+    const button = screen.getByRole('button', { name });
+    expect(button.classList.contains('max-md:min-h-10')).toBe(true);
+    expect(button.classList.contains('max-md:min-w-10')).toBe(true);
+  }
   await userEvent.click(screen.getByRole('button', { name: '조작 도움말' }));
   expect(
     screen.getByRole('region', { name: '지도 조작 도움말' }).textContent,

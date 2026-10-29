@@ -433,3 +433,15 @@ describe('Issue #11 · WBS 6.4.5 · D-WAT-01/01b', () => {
     );
   });
 });
+
+it('D-WAT-01 F5 keeps mobile previous and remove targets at least 40px', async () => {
+  renderPage();
+  await choose();
+  for (const button of [
+    screen.getByRole('button', { name: '← 이전 단계' }),
+    screen.getByRole('button', { name: '삼성전자 해제' }),
+  ]) {
+    expect(button.classList.contains('max-md:min-h-10')).toBe(true);
+    expect(button.classList.contains('max-md:min-w-10')).toBe(true);
+  }
+});
