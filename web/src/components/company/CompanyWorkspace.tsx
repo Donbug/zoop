@@ -213,6 +213,10 @@ function eventReferenceTime(
   return current && Date.parse(time) > Date.parse(current) ? current : time;
 }
 
+/** 같은 순간을 다르게 적은 RFC 3339 시각(Z·오프셋·소수초)도 같은 시각으로 본다. */
+const sameInstant = (a: string | null, b: string | null) =>
+  !!a && !!b && Date.parse(a) === Date.parse(b);
+
 export default function CompanyWorkspace() {
   const { id = '' } = useParams();
   const { params, updateQuery } = useRouteQuery();
@@ -410,10 +414,12 @@ export default function CompanyWorkspace() {
   // 다른 사건을 고르는 순간(그래프 시점이 풀리기 전)에도 그 사건을 남의 시각으로 조회하지 않는다.
   const selectedEvent =
     events.data?.items.find((item) => item.id === eventId) ?? event.data;
-  const impactSnapshot =
-    graphAsOf && eventReferenceTime(selectedEvent, asOf) === graphAsOf
-      ? graphSnapshot
-      : snapshot;
+  const impactSnapshot = sameInstant(
+    graphAsOf,
+    eventReferenceTime(selectedEvent, asOf),
+  )
+    ? graphSnapshot
+    : snapshot;
   const impact = useCompanyResource<Impact>(
     ready && eventId
       ? companyUrl(
@@ -516,7 +522,7 @@ export default function CompanyWorkspace() {
   /** D-COM-06: 사건 시각의 관계 그래프. 월·연 정밀도나 시각 미상, 현재 기준 시점과 같거나 늦은 사건은 옮기지 않는다. */
   const eventGraphTime = (item: Events['items'][number]) => {
     const time = eventReferenceTime(item, asOf);
-    return time && time !== asOf ? time : null;
+    return time && asOf && Date.parse(time) < Date.parse(asOf) ? time : null;
   };
   function showEventGraph(item: Events['items'][number], time: string) {
     setClosedGraphTime(null);
@@ -972,7 +978,7 @@ export default function CompanyWorkspace() {
                                 <button
                                   type="button"
                                   aria-pressed={
-                                    graphAsOf === itemGraphTime &&
+                                    sameInstant(graphAsOf, itemGraphTime) &&
                                     eventId === item.id
                                   }
                                   data-graph-time-trigger

@@ -1915,6 +1915,56 @@ test('D-COM-06: day events use the KST day end; month, unknown and later events 
   ).toBeNull();
 });
 
+test.each(['2026-10-05T12:00:00+09:00', '2026-10-05T03:00:00.000Z'])(
+  'D-COM-06: a graph time written differently from the event time still drives the impact path (%s)',
+  async (graphTime) => {
+    open(`${pinned}&graphAsOf=${encodeURIComponent(graphTime)}&event=issue-a`);
+    await waitFor(() => {
+      const impact = server
+        .calls('GET', '/api/v1/companies/:id/issues/:issueId/impact')
+        .filter((call) => call.params.issueId === 'issue-a');
+      expect(impact.length).toBeGreaterThan(0);
+      expect(impact.at(-1)!.query.get('asOf')).toBe(graphTime);
+      expect(impact.at(-1)!.query.has('graphVersion')).toBe(false);
+    });
+    expect(
+      (
+        await screen.findByRole('button', {
+          name: '합성 사건 A · 이 당시 관계그래프 보기',
+        })
+      ).getAttribute('aria-pressed'),
+    ).toBe('true');
+  },
+);
+
+test('D-COM-06: an event at the reference time written with an offset offers no graph time', async () => {
+  server.on('GET', '/api/v1/events', () =>
+    json({
+      items: [
+        events[0],
+        {
+          ...events[1],
+          id: 'issue-same',
+          title: '같은 시각 사건',
+          eventTime: '2026-10-06T12:00:00+09:00',
+        },
+      ],
+      unknownTimeItems: [],
+      nextCursor: null,
+      metadata: { ...metadata, total: 2, excludedUnknownTime: 0 },
+    }),
+  );
+  open(pinned);
+  await screen.findByRole('button', {
+    name: '합성 사건 A · 이 당시 관계그래프 보기',
+  });
+  expect(
+    screen.queryByRole('button', {
+      name: '같은 시각 사건 · 이 당시 관계그래프 보기',
+    }),
+  ).toBeNull();
+});
+
 test('D-COM-06: [최신 시점] also clears the event-time graph', async () => {
   open(`${pinned}&graphAsOf=${encodeURIComponent(old)}`);
   const user = userEvent.setup();
