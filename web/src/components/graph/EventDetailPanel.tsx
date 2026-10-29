@@ -6,7 +6,6 @@ import type { EventContext, EventDetail } from '@/types/map/event';
 import type { GraphNode } from '@/types/map/graph';
 import GraphIcon from './GraphIcon';
 import EventLinkedDetails from './EventLinkedDetails';
-import ApprovalNote from './ApprovalNote';
 import {
   formatEventTime,
   formatPublishedAt,
@@ -166,7 +165,7 @@ export default function EventDetailPanel({
         )}
         {data && (
           <>
-            {!failed('approval') && <ApprovalNote approval={data.approval} />}
+            {/* 승인 출처(approval)는 관리자 쪽 정보라 사용자 패널에 보이지 않는다(FE 전달 3-1, 2026-10-28). */}
             <div
               className={`${ui.actions} [&>button:last-child]:col-span-2 [&>button:last-child]:bg-panel-ink [&>button:last-child]:text-white`}
             >

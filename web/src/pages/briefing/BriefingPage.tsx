@@ -26,7 +26,7 @@ export default function BriefingPage() {
   const personal = params.get('view') === 'personal';
   return (
     <section
-      className={`mx-auto w-full text-zoop-ink ${compact ? 'max-w-[480px]' : 'max-w-[800px]'}`}
+      className="mx-auto w-full max-w-[1040px] text-zoop-ink"
       data-screen-id={edition === 'morning' ? 'D-BRF-01' : 'D-BRF-02'}
     >
       <h1 className="flex items-center gap-2.5 text-[28px] font-[750] tracking-[-0.045em]">

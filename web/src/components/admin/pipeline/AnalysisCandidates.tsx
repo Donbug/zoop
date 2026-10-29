@@ -252,7 +252,7 @@ function CandidatesSession() {
                           {row.title ?? '사건 없는 관계 후보'}
                         </button>
                         {!row.active && (
-                          <span className="mt-1 inline-block rounded-[3px] border-[0.667px] border-zoop-line px-1.5 py-0.5 text-[10px] text-zoop-muted">
+                          <span className="mt-1 inline-block rounded-[3px] border-[0.667px] border-zoop-line px-1.5 py-0.5 text-[11px] text-zoop-muted">
                             비활성
                           </span>
                         )}

@@ -10,7 +10,7 @@ import java.util.List;
 public record EventDetail(String title, String id, String eventTime, String timePrecision, String period,
         List<MentionOut> mentions, List<ArticleOut> articles, List<RelationOut> relations, List<CompanyLink> companies,
         SourceSupportOut sourceSupport, List<FieldDecisionOut> fieldDecisions, List<String> evidenceIds, Follows follows,
-        Object approval, Object summary, Metadata metadata) {
+        ApprovalOut approval, Object summary, Metadata metadata) {
 
     /** One original S2 mention as the AI handoff gave it (verification none); a field an operator held or rejected is null. */
     public record MentionOut(String title, String mentionId, String articleId, String action, String target,
@@ -43,4 +43,10 @@ public record EventDetail(String title, String id, String eventTime, String time
     public record FollowRef(String title, String id, String eventTime, String timePrecision) { }
 
     public record Unavailable(String status, String reason) { }
+
+    /**
+     * An operator's final approval behind a shown relation of this event (always {@code admin-review}); ruleId stays null because
+     * publication rules only hide content (AI 5-A), so no rule ever puts it on the graph.
+     */
+    public record ApprovalOut(String source, String label, String scope, String ruleId) { }
 }

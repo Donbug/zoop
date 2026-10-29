@@ -12,7 +12,7 @@ export const NOTE =
 export const BODY =
   'text-[13px] leading-[1.7] whitespace-pre-wrap [overflow-wrap:anywhere]';
 export const STATUS_PILL =
-  'shrink-0 rounded-full border-[0.667px] border-zoop-line px-2 py-[3px] text-[9px] font-semibold text-zoop-muted';
+  'shrink-0 rounded-full border-[0.667px] border-zoop-line px-2 py-[3px] text-[11px] font-semibold text-zoop-muted';
 export const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink';
 export const PRIMARY_BUTTON = `mt-4 rounded-[3px] bg-zoop-ink px-4 py-2.5 text-xs font-semibold text-zoop-paper ${FOCUS_RING}`;

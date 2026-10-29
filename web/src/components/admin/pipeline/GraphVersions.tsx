@@ -153,7 +153,7 @@ export default function GraphVersions({
                   <td className={`${TD} font-inter font-semibold break-all`}>
                     {version.id}
                     {version.kind === 'fixture' && (
-                      <span className="ml-2 rounded-full bg-zoop-soft px-2 py-1 text-[10px] font-normal text-zoop-muted">
+                      <span className="ml-2 rounded-full bg-zoop-soft px-2 py-1 text-[11px] font-normal text-zoop-muted">
                         합성
                       </span>
                     )}

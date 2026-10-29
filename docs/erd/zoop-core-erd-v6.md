@@ -571,13 +571,16 @@ job checkpoint `zoop-app-analyze-plan-checkpoint-1`은 phase, activeOrdinal, ter
 
 ### 32. ai_executions — AI 호출·재사용·복구 관측
 
+FS068/getAiUsage 집계 원천, null 규칙, 합성 기대값은 [관리자 AI 사용량 집계 기준](../../api/docs/AI_USAGE_AGGREGATION.md)을 참고한다.
+
 ```text
 id text PK; feature text; execution_mode text; status text
 chat_job_id text? FK chat_jobs; briefing_attempt_id text? FK briefing_attempts
 analysis_job_id text? FK analysis_jobs; document_analysis_id text? FK document_analyses
 ai_job_id text?; ai_attempt_id text?; stage text?; receipt_artifact_id text? FK artifacts
 grant_id text?; grant_revision text?; grant_checked_at timestamptz?; grant_scope jsonb?
-attempt_no integer?; provider text?; model text?; prompt_version text?; reasoning_effort text?
+attempt_no integer?; provider_send_state text?; provider_revision text?; receipt_execution_mode text?
+provider_sent_at timestamptz?; provider_received_at timestamptz?; provider text?; model text?; prompt_version text?; reasoning_effort text?
 input_tokens bigint?; output_tokens bigint?; estimated_cost numeric?; actual_cost numeric?; currency text?
 error_code text?; error_message text?; started_at timestamptz; finished_at timestamptz?
 transmission_confirmed boolean?; retry_unit_id text?; cost_basis jsonb?
@@ -587,6 +590,8 @@ UNIQUE(ai_job_id, ai_attempt_id) WHERE ai_job_id IS NOT NULL AND ai_attempt_id I
 feature별 시간·오류·비용 집계가 필요하므로 개별 행을 유지한다. 네 소유/문맥 FK 중 적어도 하나가 NOT NULL이어야 한다. chat_job_id·briefing_attempt_id·analysis_job_id 세 실행 소유 FK는 최대 하나만 허용하고 document_analysis_id는 독립 또는 실행 소유 FK와 함께 허용한다. 문서 분석과 analysis_job이 함께 있으면 document_analyses.analysis_job_id와 일치해야 한다. 다른 실행 소유와 문서 분석을 함께 기록하면 고정 입력에 해당 분석 ID가 실제 포함됐는지 저장 경로에서 검사한다. 이것은 실행 한 건의 추가 문맥이며 중복 실행 행을 만들지 않는다.
 
 컬럼 CHECK는 `num_nonnulls(chat_job_id, briefing_attempt_id, analysis_job_id, document_analysis_id)>=1` 및 `num_nonnulls(chat_job_id, briefing_attempt_id, analysis_job_id)<=1`이다. 교차 행 관계는 저장 트랜잭션/트리거로 검증한다. chat/analysis 작업에 연결된 attempt_no는 그 소유 작업의 실제 시도 번호이고, briefing_attempt_id는 자체로 시도를 식별한다. 문서 분석만 연결된 실행은 attempt_no=NULL을 허용한다. 집계는 실행 id를 기준으로 한 번만 센다.
+
+chatbot 실행은 `chat_job_id`와 실제 `chat_jobs.attempts[].n`에 해당하는 `attempt_no`를 함께 저장한다. `provider_send_state`는 `sent`/`not_sent`/`unknown`으로 요청 전송 여부를 보존하며, 과거 행은 NULL(미확인)이다. 이 값과 `status`는 서로 다른 축이다. 챗봇 attempt 재시도 수는 작업 단위 `chat_jobs.attempts`를 기준으로 세며 개별 모델 단계 연결에는 이 쌍을 쓴다.
 
 execution_mode는 live/replay/save_only로 통일한다. replay는 저장 산출물 재사용이고 save_only는 검증 결과 저장 복구로 모델 실호출 수에 넣지 않는다. 문서 provenance의 replay/live와 같은 용어를 쓰되 save_only를 해당 공개 enum에 추가하지 않는다. 미제공 비용은 NULL. 인덱스: `(feature, started_at)`, `(status, started_at)`.
 
@@ -645,7 +650,7 @@ outcome text; purpose text?; reason text?; request_id text; detail jsonb; occurr
 id text PK; chat_job_id text FK chat_jobs; attempt_no integer; plan_revision integer; call_index integer
 tool_call_id text; registry_version text; registry_group text; capability_id text; tool_id text; schema_version text
 input_digest text; request_meta jsonb; request_artifact_id text? FK artifacts; response_artifact_id text? FK artifacts
-data_version text?; evidence_ids text[]; truncated boolean?; next_allowed boolean?
+data_version text?; evidence_ids text[]; truncated boolean?; next_allowed boolean?; result jsonb?
 status text; error_code text?; started_at timestamptz; finished_at timestamptz?
 UNIQUE(chat_job_id, attempt_no, tool_call_id)
 UNIQUE(chat_job_id, attempt_no, call_index)
@@ -656,6 +661,8 @@ UNIQUE(chat_job_id, attempt_no, call_index)
 상태는 `reserved`, `running`, `succeeded`, `failed`, `cancelled`, `unknown`이다. 계획 확정 시 호출 예산을 `reserved`로 먼저 기록하고 소유 토큰을 확인한 실행만 전이한다. timeout 등으로 외부 완료 여부를 모르면 `unknown`을 실패나 호출 0회로 바꾸지 않는다. 같은 논리 조회를 재사용한 경우 새 성공 호출을 만들지 않고 원 호출 ID를 `route_summary`에 참조한다. 추가 조회 라운드는 `plan_revision`을 증가시키며 최대 횟수는 정책 버전과 함께 검증한다.
 
 `tool_call_id`는 시도 안의 계획 순서로 `tc-<call_index>`를 쓴다. 앱 내부 읽기 어댑터(`tool_id` `app:<capabilityId>`)는 같은 프로세스의 읽기 전용 조회이므로 개별 3초·단계 10초 상한을 넘긴 호출은 결과를 버리고 `failed`(`error_code=tool_timeout`)로 닫는다. 단계 상한 안에 시작하지 못한 호출은 `reserved`로 남고, 시작 기록이 단계 상한 뒤에 끝난 호출은 실행하지 않는다. 상한을 넘긴 읽기는 중단 신호를 받으며, 실제로 끝날 때까지 앱 전체 동시 읽기 한도(16)를 계속 차지한다. 예약·시작·종료 기록은 작업 실행 기한 안에서만 잠금·DB를 기다리고(`statement_timeout`), 기록하지 못하면 결과를 쓰지 않고 실행을 멈춰 lease 회수로 끝낸다. 작업이 완료·실패·취소·lease 만료 회수로 끝나면 그 작업의 `reserved` 호출은 `cancelled`, `running` 호출은 `unknown`으로 함께 닫는다. `error_code`는 `tool_timeout`, `tool_unavailable`(고정 그래프 없음, 버전·스냅샷·근거 상태 확인 불가), `tool_failed`(어댑터 오류·결과 형식 위반)이며, 실패한 호출을 빈 결과나 “없음”으로 바꾸지 않는다.
+
+`result`는 챗봇 MCP 경로(`request_meta.via = "mcp"`)의 성공 호출만 가지는 정규화 결과 봉투(`chat-tool/v1`의 items·evidenceIds·paths·truncated 등, 256 KiB 이하)다. 모델이 공급자 쪽에서 받은 것과 같은 결과를 남겨, 앱이 최종 답의 인용·지도 대상을 바로 그 결과로 결정론 검사한다. 성공 종료 기록과 같은 fenced 갱신에서만 쓰며, 서버 계획(direct) 호출은 남기지 않는다. 작업과 같은 보존·삭제 정책을 따른다(2026-10-28).
 
 `evidence_ids`는 성공 응답에서 답변 후보에 전달한 근거 ID이며 저장 시 현재 공개 문서 버전과 일치하는지 검사한다. 응답의 `data_version`, `truncated`, `next_allowed`와 artifact가 있으면 그 내용이 일치해야 한다. 기본 인덱스는 `(chat_job_id, attempt_no, call_index)`, `(tool_id, started_at)`, `(status, started_at)`이다. 요청당 호출 수·지연·오류·중복 제거율은 이 테이블에서 집계하고 모델 호출·토큰·비용은 `ai_executions`에서 별도로 집계한다.
 

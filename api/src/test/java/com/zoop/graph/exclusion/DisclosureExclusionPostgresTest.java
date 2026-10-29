@@ -396,13 +396,15 @@ class DisclosureExclusionPostgresTest {
         assertEquals(Set.of("issue-a"), first.issueIds());
         assertEquals(Set.of("edge-a"), first.relationIds());
         assertEquals(Set.of(ExposureReports.EVIDENCE), first.evidenceIds());
+        assertEquals(Set.of(new DisclosureExclusions.ArticleTarget(ExposureReports.ARTICLE, ExposureReports.ARTICLE_VERSION)),
+                first.articleTargets());
         // Per version: the same ids in another version (a corrected handoff may reuse them) are untouched.
         DisclosureExclusions other = reader.current(v2);
         assertEquals(Set.of(), other.issueIds());
         assertEquals(result.revision(), other.revision(), "the revision is app-wide");
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM disclosure_exclusion_targets WHERE graph_version_id = ? "
                 + "AND target_kind = 'article' AND article_version = ?", Integer.class, v1, ExposureReports.ARTICLE_VERSION),
-                "articles are recorded for the readers outside the graph");
+                "article targets are recorded with their exact version for company document filtering");
         assertEquals(Map.of("article", 1, "evidence", 1, "issue", 1, "relation", 1), result.versions().get(0).changed());
 
         ExclusionResult again = run(ExposureReports.exclude(report.deepCopy()));

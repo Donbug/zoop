@@ -495,6 +495,8 @@ class GraphHandoffImporterTest {
         var versions = org.mockito.Mockito.mock(com.zoop.graph.version.GraphVersionRepository.class);
         org.mockito.Mockito.when(versions.find(versionId)).thenReturn(java.util.Optional.of(version));
         org.mockito.Mockito.when(versions.everActivated(versionId)).thenReturn(true);
+        // Activated at the read time: a read of this version alone is pinned to its first publication (#88).
+        org.mockito.Mockito.when(versions.firstActivatedAt(versionId)).thenReturn(java.util.Optional.of(NOW));
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         var publicReader = new com.zoop.graph.read.PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(versions, clock),
                 new com.zoop.graph.snapshot.ArtifactGraphSnapshotStore(store, registry, null),
@@ -582,6 +584,7 @@ class GraphHandoffImporterTest {
         GraphVersionRepository versions = mock(GraphVersionRepository.class);
         when(versions.find(versionId)).thenReturn(Optional.of(version));
         when(versions.everActivated(versionId)).thenReturn(true);
+        when(versions.firstActivatedAt(versionId)).thenReturn(Optional.of(NOW));
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         when(versions.active()).thenReturn(Optional.of(version));
         GraphVersionSelector selector = new GraphVersionSelector(versions, clock);

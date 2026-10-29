@@ -4,22 +4,24 @@
   "profiles": [
     {
       "id": "demo-growth",
-      "label": "성장형 모의 프로필",
+      "label": "AI·클라우드 성장형",
       "accountId": "MOCK-KR-1001",
       "cash": { "amount": 2500000, "currency": "KRW" },
       "holdings": [
         { "companyId": "NASDAQ:NVDA", "name": "NVIDIA", "ticker": "NVDA", "quantity": 12, "avgPrice": 120.5, "avgPriceCurrency": "USD" },
-        { "companyId": "NASDAQ:MSFT", "name": "Microsoft", "ticker": "MSFT", "quantity": 4, "avgPrice": 410, "avgPriceCurrency": "USD" }
+        { "companyId": "NASDAQ:MSFT", "name": "Microsoft", "ticker": "MSFT", "quantity": 4, "avgPrice": 410, "avgPriceCurrency": "USD" },
+        { "companyId": "NASDAQ:AMZN", "name": "Amazon", "ticker": "AMZN", "quantity": 2, "avgPrice": 180, "avgPriceCurrency": "USD" }
       ]
     },
     {
       "id": "demo-balanced",
-      "label": "균형형 모의 프로필",
+      "label": "반도체 집중형",
       "accountId": "MOCK-KR-1002",
       "cash": { "amount": 0, "currency": "KRW" },
       "holdings": [
         { "companyId": "KRX:005930", "name": "삼성전자", "ticker": "005930", "quantity": 30, "avgPrice": 71000, "avgPriceCurrency": "KRW" },
-        { "companyId": "KRX:000660", "name": "SK하이닉스", "ticker": "000660", "quantity": 5, "avgPrice": 180000, "avgPriceCurrency": "KRW" }
+        { "companyId": "KRX:000660", "name": "SK하이닉스", "ticker": "000660", "quantity": 5, "avgPrice": 180000, "avgPriceCurrency": "KRW" },
+        { "companyId": "NYSE:TSM", "name": "TSMC", "ticker": "TSM", "quantity": 3, "avgPrice": 170, "avgPriceCurrency": "USD" }
       ]
     }
   ]

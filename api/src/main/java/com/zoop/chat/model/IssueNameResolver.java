@@ -62,7 +62,8 @@ public class IssueNameResolver {
         if (graphVersion == null) return NONE;
         List<PublicGraphSnapshot.Issue> issues;
         try {
-            issues = new GraphContextLookup(graphs.read(null, graphVersion, asOf).graph()).issues();
+            // The run's frozen pin, kept as it is: filtered only when the question was (#88).
+            issues = new GraphContextLookup(graphs.readPinned(graphVersion, asOf, asOf != null).graph()).issues();
         } catch (CustomException | DataAccessException | TransactionException unavailable) {
             throw new ChatToolUnavailable("graph version " + graphVersion + " cannot be read", unavailable);
         }

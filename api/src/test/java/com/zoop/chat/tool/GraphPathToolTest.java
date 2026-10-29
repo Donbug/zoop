@@ -227,6 +227,9 @@ class GraphPathToolTest {
             public Optional<GraphVersionRecord> active() { return Optional.of(known.get(ACTIVE)); }
             public Optional<String> activeVersionIdAt(Instant asOf) { return Optional.of(ACTIVE); }
             public boolean everActivated(String id) { return known.containsKey(id); }
+            public Optional<Instant> firstActivatedAt(String id) {
+                return known.containsKey(id) ? Optional.of(NOW) : Optional.empty();
+            }
         };
     }
 

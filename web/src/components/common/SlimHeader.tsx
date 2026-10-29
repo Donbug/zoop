@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { toggleTheme } from '@/util/theme-color';
+import { useThemeToggle } from '@/util/theme-color';
 import './service-shell.css';
 
 // D-AUT-01/02 · D-ONB-01/02 · D-WAT-01/01b, Figma 619:1087.
@@ -8,6 +8,7 @@ export default function SlimHeader({
 }: {
   themeSwitch?: boolean;
 }) {
+  const toggleTheme = useThemeToggle();
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-zoop-line bg-white px-5 text-zoop-ink">
       <Link

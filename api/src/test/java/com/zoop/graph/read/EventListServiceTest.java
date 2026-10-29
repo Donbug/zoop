@@ -146,6 +146,98 @@ class EventListServiceTest {
         assertEquals(Set.of(NOW.plusSeconds(1).toString()), asOfs); // every page keeps the first page's time
     }
 
+    /** Every page of one list, following nextCursor; graphVersion is sent on the first page only. */
+    private static List<String> allPages(EventListService paged, String graphVersion, String firstCursor) {
+        List<String> all = new java.util.ArrayList<>();
+        String cursor = firstCursor;
+        for (int page = 0; page < 20; page++) {
+            var r = paged.list(null, null, null, null, cursor, 1, cursor == null ? graphVersion : null, null);
+            all.addAll(ids(r.items()));
+            all.addAll(ids(r.unknownTimeItems()));
+            cursor = r.nextCursor();
+            if (cursor == null) return all;
+        }
+        throw new AssertionError("no last page");
+    }
+
+    @Test
+    void aLaterPageWithAnAsOfKeepsTheFirstPagesVersionWhenAnotherIsActivatedForThatTimeBetweenPages() {
+        // The version public at the asOf, as the selector sees it: 10-01 for the first page, 10-08 after an activation.
+        String[] activeAt = {"fixture-2026-10-01"};
+        var fixtures = GraphReadFixtures.repository();
+        var versions = new com.zoop.graph.version.GraphVersionRepository() {
+            public java.util.Optional<com.zoop.graph.version.GraphVersionRecord> find(String id) { return fixtures.find(id); }
+            public java.util.Optional<com.zoop.graph.version.GraphVersionRecord> active() { return fixtures.active(); }
+            public java.util.Optional<String> activeVersionIdAt(Instant asOf) { return java.util.Optional.of(activeAt[0]); }
+            public boolean everActivated(String id) { return fixtures.everActivated(id); }
+            public java.util.Optional<Instant> firstActivatedAt(String id) { return fixtures.firstActivatedAt(id); }
+        };
+        var reader = new PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(versions,
+                java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)),
+                new com.zoop.graph.snapshot.FixtureGraphSnapshotStore(getClass().getClassLoader()), pinned -> DisclosureExclusions.NONE);
+        var paged = new EventListService(reader, mock(NamedParameterJdbcTemplate.class), JsonMapper.builder().build());
+        String asOf = "2026-10-05T00:00:00Z";
+
+        List<String> expected = new java.util.ArrayList<>();
+        String next = null;
+        do {
+            var page = paged.list(null, null, null, null, next, 1, null, asOf);
+            expected.addAll(ids(page.items()));
+            expected.addAll(ids(page.unknownTimeItems()));
+            next = page.nextCursor();
+        } while (next != null);
+
+        var first = paged.list(null, null, null, null, null, 1, null, asOf);
+        assertNotNull(first.nextCursor());
+        activeAt[0] = "fixture-2026-10-08";
+        List<String> pages = new java.util.ArrayList<>(ids(first.items()));
+        pages.addAll(ids(first.unknownTimeItems()));
+        next = first.nextCursor();
+        while (next != null) {
+            var page = paged.list(null, null, null, null, next, 1, null, asOf);
+            assertEquals("fixture-2026-10-01", page.metadata().graphVersion(), "the cursor's version, not the newly active one");
+            pages.addAll(ids(page.items()));
+            pages.addAll(ids(page.unknownTimeItems()));
+            next = page.nextCursor();
+        }
+        assertEquals(expected, pages, "no event skipped or repeated across the activation");
+    }
+
+    @Test
+    void aLaterPageKeepsTheFirstPagesReadAndIsNeverReReadAsAVersionAlone() throws Exception {
+        // One article of the active version has no publication time: a read as of the version's first activation drops what
+        // only it supports, the default (unfiltered) read keeps it.
+        var base = GraphReadFixtures.snapshot("fixture-2026-10-08");
+        var articles = base.articles().stream().map(a -> a == base.articles().getFirst()
+                ? new com.zoop.graph.snapshot.PublicGraphSnapshot.Article(a.articleId(), a.version(), a.title(), a.url(), null)
+                : a).toList();
+        var snapshot = new com.zoop.graph.snapshot.PublicGraphSnapshot(base.snapshotFormat(), base.versionId(),
+                base.sourceBundleId(), base.companies(), base.issues(), base.relations(), articles, base.evidence());
+        var reader = new PublicGraphReader(new com.zoop.graph.version.GraphVersionSelector(GraphReadFixtures.repository(),
+                java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC)), version -> snapshot, pinned -> DisclosureExclusions.NONE);
+        var paged = new EventListService(reader, mock(NamedParameterJdbcTemplate.class), JsonMapper.builder().build());
+        var whole = paged.list(null, null, null, null, null, null, null, null);
+        var pinnedWhole = paged.list(null, null, null, null, null, null, "fixture-2026-10-08", null);
+        List<String> unfiltered = new java.util.ArrayList<>(ids(whole.items()));
+        unfiltered.addAll(ids(whole.unknownTimeItems()));
+        List<String> filtered = new java.util.ArrayList<>(ids(pinnedWhole.items()));
+        filtered.addAll(ids(pinnedWhole.unknownTimeItems()));
+        assertFalse(filtered.containsAll(unfiltered), "the fixture must make the two reads differ");
+
+        // Default first page: every later page stays unfiltered, so nothing is skipped.
+        assertEquals(unfiltered, allPages(paged, null, null));
+        // Version-only first page: filtered as of the first activation, and so is every later page.
+        assertEquals(filtered, allPages(paged, "fixture-2026-10-08", null));
+
+        // A cursor issued before the filter flag existed reads its version unfiltered, as it did then.
+        String first = paged.list(null, null, null, null, null, 1, null, null).nextCursor();
+        var mapper = JsonMapper.builder().build();
+        var json = (tools.jackson.databind.node.ObjectNode) mapper.readTree(java.util.Base64.getUrlDecoder().decode(first));
+        assertNotNull(json.remove("filtered"));
+        String old = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(mapper.writeValueAsBytes(json));
+        assertEquals(unfiltered.subList(1, unfiltered.size()), allPages(paged, null, old));
+    }
+
     @Test
     void recentComparesInstantsNotStrings() {
         Issue whole = issue("2026-10-05T09:00:00Z", "datetime", null);

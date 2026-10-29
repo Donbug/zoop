@@ -195,7 +195,12 @@ export type BriefingResponse = {
   editionReview?: import('./editionReview').EditionReview;
   companyPriceContext?: import('./priceContext').BriefingPriceContext;
   aiPriceOutlooks?: import('./aiPriceOutlook').AiPriceOutlooks;
+  preservedPublication?: {
+    sha256: string;
+    response: Omit<BriefingResponse, 'preservedPublication'>;
+  };
   issueIntelligence?: import('./issueIntelligence').IssueIntelligence;
+  issueReading?: import('./issueReading').IssueReading;
   judgmentUpdate?: import('./judgmentUpdate').JudgmentUpdate;
   companyOutlooks?: import('./companyOutlook').CompanyOutlooks;
   marketSummary: BriefingMarketSummary;

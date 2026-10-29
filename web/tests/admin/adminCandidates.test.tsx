@@ -386,8 +386,9 @@ describe('A-ADM-03 후보 결정 · 67 (decideAnalysisCandidate)', () => {
     await user.click(within(form).getByRole('button', { name: '거부하기' }));
 
     expect((await within(form).findByRole('alert')).textContent).toContain(
-      '상세를 새로 읽고 다시 확인해 주세요.',
+      '관계 상태나 AI 원천이 바뀌었어요.',
     );
+    expect(await within(form).findByText(/상세를 새로 읽었어요/)).toBeTruthy();
     expect(
       (within(form).getByLabelText('거부 사유') as HTMLTextAreaElement).value,
     ).toBe('오보');
@@ -395,6 +396,122 @@ describe('A-ADM-03 후보 결정 · 67 (decideAnalysisCandidate)', () => {
       decision: 'reject',
       relationId: 'rel-1',
     });
+    // 409면 상세를 다시 읽는다(1-3·2-6).
+    await waitFor(() => expect(server.calls('GET', CANDIDATE)).toHaveLength(2));
+  });
+
+  test('다시 읽은 관계를 그 사이 다른 관리자가 결정했으면 폼을 닫고 알린다', async () => {
+    server.on('POST', DECISION, () => {
+      server.on('GET', CANDIDATE, ({ params }) => {
+        const base = candidateDetail(params.candidateId);
+        return json({
+          ...base,
+          relations: [
+            ...base.relations.map((relation) => ({
+              ...relation,
+              revision: 2,
+              decision: {
+                id: 9,
+                targetType: 'relation',
+                targetId: relation.relationId,
+                decision: 'allow' as const,
+                reason: '확인',
+                adminEmail: 'other@zoop.test',
+                decidedAt: '2026-10-28T05:00:00Z',
+                revision: 2,
+                origin: 'admin',
+              },
+            })),
+            // 다른 관계는 아직 결정하지 않았다.
+            {
+              ...base.relations[0],
+              relationId: 'rel-2',
+              target: '반도체 수출 규제',
+            },
+          ],
+        });
+      });
+      return apiError(409, 'REVISION_CONFLICT');
+    });
+    const { user, aside } = await openDetail();
+
+    await user.click(within(aside).getByRole('button', { name: reject }));
+    const form = within(aside).getByRole('form', { name: '관계 거부' });
+    await user.type(within(form).getByLabelText('거부 사유'), '오보');
+    await user.click(within(form).getByRole('button', { name: '거부하기' }));
+
+    expect(
+      await within(aside).findByText(/그 사이 고른 관계가 결정됐거나/),
+    ).toBeTruthy();
+    expect(within(aside).queryByRole('form', { name: '관계 거부' })).toBeNull();
+    // #393 리뷰 2: 선택이 풀려 다른 관계를 바로 고를 수 있다.
+    const other = within(aside).getByRole('button', {
+      name: '삼성전자 → 반도체 수출 규제 관계 거부',
+    }) as HTMLButtonElement;
+    expect(other.disabled).toBe(false);
+    await user.click(other);
+    expect(within(aside).getByRole('form', { name: '관계 거부' })).toBeTruthy();
+    expect(
+      within(aside).queryByText(/그 사이 고른 관계가 결정됐거나/),
+    ).toBeNull();
+  });
+
+  // #393 리뷰 1: 새 상세가 오기 전이나 다시 읽기에 실패하면 예전 revision으로 보내지 않는다.
+  test('409 뒤 상세를 다시 읽는 동안·실패하면 보내기를 막고 다시 읽기를 제공한다', async () => {
+    server.on('POST', DECISION, () => {
+      server.on('GET', CANDIDATE, () => apiError(503, 'SOURCE_UNAVAILABLE'));
+      return apiError(409, 'REVISION_CONFLICT');
+    });
+    const { user, aside } = await openDetail();
+
+    await user.click(within(aside).getByRole('button', { name: reject }));
+    const form = within(aside).getByRole('form', { name: '관계 거부' });
+    await user.type(within(form).getByLabelText('거부 사유'), '오보');
+    await user.click(within(form).getByRole('button', { name: '거부하기' }));
+
+    const retry = await within(form).findByRole('button', {
+      name: '다시 읽기',
+    });
+    expect(within(form).getByText(/상세를 새로 읽지 못했어요/)).toBeTruthy();
+    expect(
+      (
+        within(form).getByRole('button', {
+          name: '거부하기',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(within(form).queryByText(/상세를 새로 읽었어요/)).toBeNull();
+
+    let release!: () => void;
+    server.on('GET', CANDIDATE, async ({ params }) => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return json(candidateDetail(params.candidateId));
+    });
+    await user.click(retry);
+    expect(
+      await within(form).findByText(/상세를 새로 읽고 있어요/),
+    ).toBeTruthy();
+    expect(
+      (
+        within(form).getByRole('button', {
+          name: '거부하기',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    release();
+    expect(await within(form).findByText(/상세를 새로 읽었어요/)).toBeTruthy();
+    expect(
+      (
+        within(form).getByRole('button', {
+          name: '거부하기',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
+    expect(
+      (within(form).getByLabelText('거부 사유') as HTMLTextAreaElement).value,
+    ).toBe('오보');
   });
 
   test.each([

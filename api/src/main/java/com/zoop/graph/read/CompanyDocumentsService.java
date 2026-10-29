@@ -42,7 +42,7 @@ public class CompanyDocumentsService {
             Object documentSummary, Object analysisStatus, Object analysisProvenance, String resultVersion) { }
     public record Response(List<Document> items, Metadata metadata, String nextCursor) { }
     record Cursor(String companyId, String kind, String from, String to, int limit, String graphVersion,
-            String asOf, String pinnedAt, String lastArticleId, String lastPublishedAt, String round) { }
+            String asOf, String pinnedAt, String lastArticleId, String lastPublishedAt, String round, Boolean filtered) { }
     private record DocumentKey(String articleId, String articleVersion) { }
     private record Candidate(PublicGraphSnapshot.Article snapshot, ArticleRow article, VersionRow version,
             List<EventRef> events, Set<String> evidenceIds, Instant published) { }
@@ -92,9 +92,12 @@ public class CompanyDocumentsService {
             throw new CustomException(ErrorCode.INVALID_CURSOR);
         }
         requireCatalog(companyId);
-        PublicGraphReader.Pinned pinned = reader.read(round,
-                after == null ? graphVersion : after.graphVersion(), requestedAsOf);
+        // A later page without a round or asOf keeps the first page's pinned read, never re-read as a version-only address.
+        PublicGraphReader.Pinned pinned = after != null && round == null && requestedAsOf == null
+                ? reader.readPinned(after.graphVersion(), Instant.parse(after.pinnedAt()), Boolean.TRUE.equals(after.filtered()))
+                : reader.read(round, after == null ? graphVersion : after.graphVersion(), requestedAsOf);
         DisplayGraph graph = pinned.graph();
+        Set<DisclosureExclusions.ArticleTarget> excludedArticles = pinned.exclusions().articleTargets();
         Map<DocumentKey, PublicGraphSnapshot.Article> snapshotArticles = new HashMap<>();
         Map<String, List<PublicGraphSnapshot.Article>> articlesById = new HashMap<>();
         for (var article : graph.snapshot.articles()) {
@@ -137,6 +140,7 @@ public class CompanyDocumentsService {
         List<Candidate> candidates = new ArrayList<>();
         for (var entry : events.entrySet()) {
             PublicGraphSnapshot.Article snapshot = snapshotArticles.get(entry.getKey());
+            if (excludedArticles.contains(new DisclosureExclusions.ArticleTarget(snapshot.articleId(), snapshot.version()))) continue;
             ArticleRow article = registry.findArticle(entry.getKey().articleId()).orElse(null);
             if (article == null || !"available".equals(article.accessStatus())) continue;
             if (kind != null && !kind.equals(article.kind())) continue;
@@ -173,12 +177,15 @@ public class CompanyDocumentsService {
             boolean sourceAuthorized = false;
             for (String evidenceId : candidate.evidenceIds()) {
                 try {
-                    EvidenceResponse visible = evidence.read(evidenceId, round, pinned.selected().version().id(),
-                            round == null ? asOf : pinned.selected().asOf().toString(),
-                            companyId, requestId);
-                    boolean sameSnapshot = (asOf == null && round == null) || visible.metadata() != null
+                    // Outside a round the page's own pin is kept: the version as pinned, filtered only when the first page was.
+                    EvidenceResponse visible = round == null
+                            ? evidence.readPinned(evidenceId, pinned.selected().version().id(),
+                                    pinned.selected().asOfRequested() ? pinned.selected().asOf() : null, companyId, requestId)
+                            : evidence.read(evidenceId, round, pinned.selected().version().id(),
+                                    pinned.selected().asOf().toString(), companyId, requestId);
+                    boolean sameSnapshot = visible.metadata() != null
                             && pinned.selected().version().id().equals(visible.metadata().graphVersion())
-                            && pinned.selected().asOf().equals(visible.metadata().asOf());
+                            && (round == null || pinned.selected().asOf().equals(visible.metadata().asOf()));
                     boolean sameDocument = sameSnapshot && candidate.snapshot().articleId().equals(visible.articleId())
                             && candidate.snapshot().version().equals(visible.articleVersion());
                     if (sameDocument) {
@@ -208,7 +215,7 @@ public class CompanyDocumentsService {
         Candidate last = pageEnd == candidates.size() ? null : candidates.get(pageEnd - 1);
         String next = last == null ? null : encode(new Cursor(companyId, kind, from, to, pageLimit,
                 pinned.selected().version().id(), asOf, pinnedAt, last.snapshot().articleId(),
-                last.published() == null ? null : last.published().toString(), round));
+                last.published() == null ? null : last.published().toString(), round, pinned.selected().asOfRequested()));
         return new Response(List.copyOf(page), new Metadata(pinned.selected().source(), Instant.parse(pinnedAt),
                 pinned.selected().version().id(), requestId, false, List.of()), next);
     }

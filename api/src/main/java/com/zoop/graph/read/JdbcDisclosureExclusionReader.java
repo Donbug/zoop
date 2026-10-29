@@ -13,21 +13,22 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
  * The exclusion store's read: the targets of one version whose latest change is an {@code exclude}, and the app-wide exclusion
  * revision, in ONE statement and without the publication lock. Changes are numbered MAX+1 under that lock, which is held to the
  * commit, so one statement sees a committed prefix of them and the targets it returns are the state at the revision it returns.
- * Article targets are stored for the readers outside the graph and not returned here. A store that cannot be read is 503
+ * Article targets are returned with their exact version for the company document-list reader. A store that cannot be read is 503
  * SOURCE_UNAVAILABLE for every reader (public graph, activation check), never an empty overlay.
  */
 public class JdbcDisclosureExclusionReader implements DisclosureExclusionReader {
     // The cross join keeps one row (kind NULL) when nothing of the version is excluded.
     private static final String CURRENT = """
             WITH latest AS (
-                SELECT DISTINCT ON (t.target_kind, t.target_id, t.article_version) t.target_kind, t.target_id, t.revision
+                SELECT DISTINCT ON (t.target_kind, t.target_id, t.article_version)
+                       t.target_kind, t.target_id, t.article_version, t.revision
                 FROM disclosure_exclusion_targets t
-                WHERE t.graph_version_id = :version AND t.target_kind IN ('issue', 'relation', 'evidence')
+                WHERE t.graph_version_id = :version
                 ORDER BY t.target_kind, t.target_id, t.article_version, t.revision DESC
             )
-            SELECT r.revision, x.target_kind, x.target_id
+            SELECT r.revision, x.target_kind, x.target_id, x.article_version
             FROM (SELECT COALESCE(MAX(revision), 0) AS revision FROM disclosure_exclusion_changes) r
-            LEFT JOIN (SELECT l.target_kind, l.target_id FROM latest l
+            LEFT JOIN (SELECT l.target_kind, l.target_id, l.article_version FROM latest l
                        JOIN disclosure_exclusion_changes c ON c.revision = l.revision
                        WHERE c.action = 'exclude') x ON true
             """;
@@ -44,6 +45,7 @@ public class JdbcDisclosureExclusionReader implements DisclosureExclusionReader 
         Set<String> issues = new HashSet<>();
         Set<String> relations = new HashSet<>();
         Set<String> evidence = new HashSet<>();
+        Set<DisclosureExclusions.ArticleTarget> articles = new HashSet<>();
         try {
             jdbc.query(CURRENT, new MapSqlParameterSource("version", versionId), result -> {
                 revision[0] = result.getLong("revision");
@@ -54,12 +56,13 @@ public class JdbcDisclosureExclusionReader implements DisclosureExclusionReader 
                     case "issue" -> issues.add(id);
                     case "relation" -> relations.add(id);
                     case "evidence" -> evidence.add(id);
+                    case "article" -> articles.add(new DisclosureExclusions.ArticleTarget(id, result.getString("article_version")));
                     default -> throw new IllegalStateException("Unknown exclusion target kind");
                 }
             });
         } catch (DataAccessException unreadable) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, unreadable);
         }
-        return new DisclosureExclusions(revision[0], issues, relations, evidence);
+        return new DisclosureExclusions(revision[0], issues, relations, evidence, articles);
     }
 }

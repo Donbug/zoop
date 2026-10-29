@@ -14,6 +14,7 @@ import type {
 import {
   apiError,
   createFakeServer,
+  deferred,
   json,
   type FakeServer,
 } from '../support/fakeServer';
@@ -133,6 +134,8 @@ function detail(base: AdminRound, overrides: Partial<RoundDetail> = {}) {
 function feature(overrides: Partial<AiFeatureUsage>): AiFeatureUsage {
   return {
     feature: 'chatbot',
+    availability: 'complete',
+    unavailableMetrics: [],
     label: 'AI 챗봇',
     engine: 'BFF 규칙 기반 답변 · 모델 호출 없음',
     modelBacked: false,
@@ -162,6 +165,8 @@ function feature(overrides: Partial<AiFeatureUsage>): AiFeatureUsage {
 }
 
 const aiUsage: AiUsage = {
+  availability: 'complete',
+  unavailableMetrics: [],
   asOf: '2026-10-06T03:45:01Z',
   window: '7d',
   cost: {
@@ -541,6 +546,116 @@ describe('A-ADM-04 브리핑 운영 (FS070·FS071)', () => {
 });
 
 describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
+  test('권한이 없으면 AI 사용량을 조회하지 않는다', async () => {
+    server.on('GET', SESSION, () => apiError(401, 'AUTH_REQUIRED'));
+    open('/admin/ai');
+    expect(
+      await screen.findByText('관리자 세션을 확인하지 못했어요.'),
+    ).toBeTruthy();
+    expect(server.calls('GET', AI_USAGE)).toHaveLength(0);
+  });
+
+  test('로딩 중에는 집계를 표시하지 않고 조회 실패 후 다시 시도한다', async () => {
+    const pending = deferred<Response>();
+    server.on('GET', AI_USAGE, () => pending.promise);
+    const { user } = open('/admin/ai');
+    expect(await screen.findByText('AI 사용량을 불러오고 있어요')).toBeTruthy();
+    expect(
+      screen.queryByRole('table', { name: 'AI 기능별 사용량' }),
+    ).toBeNull();
+    pending.resolve(apiError(503, 'SOURCE_UNAVAILABLE'));
+    expect(
+      await screen.findByText('AI 사용량을 불러오지 못했어요'),
+    ).toBeTruthy();
+    server.on('GET', AI_USAGE, () => json(aiUsage));
+    await user.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(
+      await screen.findByRole('table', { name: 'AI 기능별 사용량' }),
+    ).toBeTruthy();
+    expect(server.calls('GET', AI_USAGE)).toHaveLength(2);
+  });
+
+  test('AI 사용량 조회 권한 거부를 오류 상태로 표시한다', async () => {
+    server.on('GET', AI_USAGE, () => apiError(403, 'ACCESS_DENIED'));
+    open('/admin/ai');
+    expect(
+      await screen.findByText('AI 사용량을 불러오지 못했어요'),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('table', { name: 'AI 기능별 사용량' }),
+    ).toBeNull();
+  });
+
+  test('사용 기록이 없는 기능은 0건과 미제공 비용을 구분한다', async () => {
+    server.on('GET', AI_USAGE, () =>
+      json({
+        ...aiUsage,
+        availability: 'partial',
+        features: [
+          feature({
+            requests: 0,
+            succeeded: 0,
+            failed: 0,
+            usage: {
+              modelCalls: 0,
+              inputTokens: 0,
+              outputTokens: 0,
+              replayCalls: 0,
+              retries: 0,
+            },
+            cost: {
+              status: 'unavailable',
+              actual: null,
+              estimated: null,
+              currency: null,
+              reason: '단가 자료 없음',
+            },
+          }),
+        ],
+      }),
+    );
+    open('/admin/ai');
+    const table = await screen.findByRole('table', {
+      name: 'AI 기능별 사용량',
+    });
+    const row = within(table).getAllByRole('row')[1];
+    expect(within(row).getAllByText('0')).toHaveLength(8);
+    expect(within(row).getByText('미제공')).toBeTruthy();
+  });
+
+  test('오류 원천이 일부 없어도 확인된 오류는 보여 준다', async () => {
+    server.on('GET', AI_USAGE, () =>
+      json({
+        ...aiUsage,
+        availability: 'partial',
+        features: [
+          feature({ recentErrors: null }),
+          feature({
+            feature: 'briefing',
+            label: '브리핑',
+            recentErrors: [
+              {
+                at: '2026-10-06T02:00:00Z',
+                code: 'MODEL_TIMEOUT',
+                message: null,
+              },
+            ],
+          }),
+        ],
+      }),
+    );
+    open('/admin/ai');
+    expect(
+      await screen.findByText('일부 기능의 오류 원천을 사용할 수 없어요.'),
+    ).toBeTruthy();
+    expect(
+      within(screen.getByRole('table', { name: 'AI 최근 오류' })).getByText(
+        'MODEL_TIMEOUT',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText('이 기간에 기록된 오류가 없어요.')).toBeNull();
+  });
+
   test('기능별 사용량에서 모르는 값은 0이 아니라 –로, 비용은 실제·추정을 구분한다', async () => {
     server.on('GET', AI_USAGE, () => json(aiUsage));
     open('/admin/ai');
@@ -673,6 +788,37 @@ describe('A-ADM-04b AI 사용량·오류 (FS068)', () => {
       screen.getAllByText('AI 사용량 API가 아직 이 값을 주지 않아요.'),
     ).toHaveLength(3);
     expect(screen.queryByRole('group', { name: /날짜별/ })).toBeNull();
+  });
+
+  test('부분 집계는 불명확한 수치를 0으로 보이지 않고 미가용 원천을 알린다', async () => {
+    server.on('GET', AI_USAGE, () =>
+      json({
+        ...aiUsage,
+        availability: 'partial',
+        unavailableMetrics: ['briefing.requests'],
+        features: [
+          feature({
+            availability: 'partial',
+            unavailableMetrics: ['requests', 'failed'],
+            requests: null,
+            failed: null,
+            recentErrors: null,
+            usage: { ...feature({}).usage, replayCalls: null, retries: null },
+          }),
+        ],
+      }),
+    );
+    open('/admin/ai');
+
+    const table = await screen.findByRole('table', {
+      name: 'AI 기능별 사용량',
+    });
+    const chat = within(within(table).getAllByRole('row')[1]);
+    expect(chat.getAllByText('–').length).toBeGreaterThanOrEqual(4);
+    expect(screen.getByText(/일부 집계 원천을 사용할 수 없어요/)).toBeTruthy();
+    expect(
+      screen.getByText('일부 기능의 오류 원천을 사용할 수 없어요.'),
+    ).toBeTruthy();
   });
 
   test('전체·브리핑·AI 챗봇 보기로 회원 사용 비율과 날짜별 토큰·비용을 나눠 보여 준다', async () => {

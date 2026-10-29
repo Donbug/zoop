@@ -374,15 +374,28 @@ def analyze(client, targets):
     passed, final_checks, attempts = {}, {}, []
     for attempt in range(2):
         if not remaining: break
-        data = {'issues': remaining, 'repair': attempts[-1] if attempts else None}
+        ids = [f['issueId'] for f in remaining]
+        repair = None if not attempts else {
+            'draft': {'issues': {i: attempts[-1]['draft']['issues'].get(i) for i in ids}},
+            'verification': {'checks': {i: final_checks[i] for i in ids}}}
+        data = {'issues': remaining, 'repair': repair}
         drafted = _call(client, 'analysis', data, analysis_schema(remaining), 12000)
-        try:
-            validate_analysis(drafted, remaining)
-        except (ValueError, base.ReplayError) as error:
-            checked = {'checks': {t['issueId']: {'supported': False, 'reason': str(error)} for t in remaining}}
-        else:
-            checked = _call(client, 'analysis-verification', {'issues': remaining, 'draft': drafted},
-                verification_schema([t['issueId'] for t in remaining]), 6000)
+        checked, valid = {'checks': {}}, []
+        for f in remaining:
+            iid = f['issueId']
+            try:
+                validate_analysis({'issues': {iid: drafted['issues'].get(iid)}}, [f])
+            except (ValueError, base.ReplayError) as error:
+                checked['checks'][iid] = {'supported': False, 'reason': str(error)}
+            else:
+                valid.append(f)
+        if valid:
+            valid_ids = [f['issueId'] for f in valid]
+            verified = _call(client, 'analysis-verification', {'issues': valid,
+                'draft': {'issues': {i: drafted['issues'][i] for i in valid_ids}}},
+                verification_schema(valid_ids), 6000)
+            base.validate_schema(verified, verification_schema(valid_ids))
+            checked['checks'].update(verified['checks'])
         attempts.append({'draft': drafted, 'verification': checked})
         for f in remaining:
             iid = f['issueId']; verdict = checked['checks'][iid]

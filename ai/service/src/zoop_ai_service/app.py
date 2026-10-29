@@ -748,7 +748,7 @@ def create_app(service: JobService | None = None, relation: RelationJobs | None 
               responses={**CHAT_ERRORS, 200: {"model": ChatStageResult,
                                                 "description": "The stage ran (or its stored outcome was returned). `status=failed` is a stage outcome, not a transport error."}})
     async def chat_stage(request: Request, principal: Annotated[Principal, Depends(require("chat.invoke"))],
-                         stage: Annotated[str, Path(description="chat-router, chat-answer or chat-verification.",
+                         stage: Annotated[str, Path(description="chat-router, chat-answer, chat-verification or chat-agent.",
                                                     json_schema_extra={"enum": list(STAGES)})],
                          idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key", description="Must equal body.invocationId.")] = None,
                          x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:

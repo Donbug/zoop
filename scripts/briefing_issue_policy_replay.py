@@ -45,18 +45,24 @@ def replay(bundle, metadata):
                  for s in effective.get(past['roundId'], past)['selected']]
         after = grouped.freeze_grouped_selection({'selected': proposals, 'assessments': assessments},
             candidates, original['identitySha256'], prior, grouped.issue_policy.VERSION) if candidates else []
-        prepared = company.freeze_issue_inputs(presentations[r['roundId']], r, metadata, history,
-            version='company-outlook-v4') if selected else []
+        cutoff = original['identity']['window']['to']
+        presentation = presentations.get(r['roundId'])
+        if presentation is not None:
+            grouped.require(company.context.legacy._aware(presentation['marketEnrichment']['cutoff']) ==
+                            company.context.legacy._aware(cutoff), 'replay_presentation_cutoff')
+        prepared = company.freeze_issue_inputs(presentation, r, metadata, history,
+            version='company-outlook-v4') if selected and presentation is not None else []
         before_context = next((h for h in history if h['roundId'] == r['roundId']), None)
         rows.append({'roundId': r['roundId'], 'date': r['date'], 'edition': r['edition'],
             'before': [s['issueId'] for s in selected], 'after': [s['issueId'] for s in after],
-            'selected': after, 'preparedIssueInputs': prepared,
+            'selected': after, 'preparedIssueInputs': prepared, 'cutoff': cutoff,
+            'preparationStatus': 'ready' if prepared else 'presentation_missing' if presentation is None else 'no_selected_issues',
             'companyOnlyPreviousCount': sum(t['previous']['status'] == 'available' for t in before_context['frozen']['targets']) if before_context else 0,
             'issueCompanyPreviousCount': sum(t['previous']['status'] == 'available' for f in prepared for t in f['targets']),
             'originalResultSha256': r.get('resultSha256'),
             'preservedTracking': [{'issueIds': t.get('issueIds', []), 'companyId': t['companyId'],
                 'roundId': h['roundId'], 'conditions': c['conditions']}
-                for h in history if h['status'] == 'PASS' and h['cutoff'] < presentations[r['roundId']]['marketEnrichment']['cutoff']
+                for h in history if h['status'] == 'PASS' and company.context.legacy._aware(h['cutoff']) < company.context.legacy._aware(cutoff)
                 for t in h['frozen']['targets'] for c in h['draft']['companies'] if t['companyId'] == c['companyId']]})
     return {'policyVersion': grouped.issue_policy.VERSION, 'newPaidCalls': 0,
         'scope': 'recorded_selected_proposals_only', 'unselectedCandidatesReassessed': False,

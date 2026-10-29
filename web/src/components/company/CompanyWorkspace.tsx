@@ -2,8 +2,14 @@ import CompanyInfoTab from './CompanyInfoTab';
 import PriceChart from './PriceChart';
 import { formatKst, formatMoney } from '@/util/format';
 import BoltIcon from './BoltIcon';
-import { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useNavigationType,
+  useParams,
+} from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useCompanyResource, type Resource } from '@/hooks/useCompanyResource';
@@ -145,6 +151,40 @@ const BUCKET_PAGE = 10;
 const bucketElementId = (key: string) =>
   `bucket-${key.replace(/[^\w-]/g, '_')}`;
 
+function ClockIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      className="size-3.5 shrink-0"
+    >
+      <circle cx="8" cy="8" r="6" />
+      <path d="M8 4.8V8l2.2 1.4" />
+    </svg>
+  );
+}
+/** 관계 그래프 영역은 svg를 그래프 크기로 늘리므로 아이콘의 크기·배경을 되돌린다. */
+function HomeIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-3.5! w-3.5! shrink-0 bg-transparent!"
+    >
+      <path d="M2.5 7.5 8 3l5.5 4.5M4 6.5V13h3V9.5h2V13h3V6.5" />
+    </svg>
+  );
+}
+
 /** 사건 시점 지도의 기준 시각. 현재 기준 시점보다 늦을 수 없다. */
 function eventReferenceTime(
   event: { eventTime: string | null; timePrecision: string } | null | undefined,
@@ -165,6 +205,7 @@ export default function CompanyWorkspace() {
   const { id = '' } = useParams();
   const { params, updateQuery } = useRouteQuery();
   const location = useLocation();
+  const navigationType = useNavigationType();
   const navigate = useNavigate();
   const auth = useAuth();
   const revision = useAuthStore((s) => s.sessionRevision);
@@ -174,8 +215,40 @@ export default function CompanyWorkspace() {
   const asOf = params.get('asOf'),
     version = params.get('graphVersion'),
     eventId = params.get('event');
+  // D-COM-06: 타임라인 사건의 [이 당시 관계그래프 보기]로 고른 시각. 오른쪽 관계 그래프에만 쓰고
+  // 차트·타임라인의 기준 시점(asOf)은 그대로 둔다. 정확한 시각이 아니거나 기준 시점보다 이르지 않으면 무시한다.
+  const requestedGraphAsOf = params.get('graphAsOf');
   const invalid = !!asOf && !exactTime(asOf);
+  // 그래프 밖을 눌러 끝낸 시점은 주소에서 지워지기 전에도 바로 현재 시점 그래프로 보인다.
+  const [closedGraphTime, setClosedGraphTime] = useState<{
+    asOf: string;
+    entryKey: string;
+  } | null>(null);
+  const closedGraphAsOf = closedGraphTime?.asOf ?? null;
+  // D-COM-06: the close is complete once the URL drops that time. Clear it
+  // before rendering so Back/Forward can restore the same timestamp later.
+  if (
+    closedGraphTime &&
+    (requestedGraphAsOf !== closedGraphTime.asOf ||
+      (navigationType === 'POP' && location.key !== closedGraphTime.entryKey))
+  )
+    setClosedGraphTime(null);
+  else if (closedGraphTime && location.key !== closedGraphTime.entryKey)
+    setClosedGraphTime({ ...closedGraphTime, entryKey: location.key });
+  const graphAsOf =
+    requestedGraphAsOf &&
+    requestedGraphAsOf !== closedGraphAsOf &&
+    exactTime(requestedGraphAsOf) &&
+    asOf &&
+    !invalid &&
+    Date.parse(requestedGraphAsOf) < Date.parse(asOf)
+      ? requestedGraphAsOf
+      : null;
   const snapshot = { asOf, graphVersion: version };
+  // 사건 시점 그래프는 그 시점의 공개 버전을 서버가 고르게 한다(버전을 보내지 않는다).
+  const graphSnapshot = graphAsOf
+    ? { asOf: graphAsOf, graphVersion: null }
+    : snapshot;
   const ready = !!asOf && !invalid;
   const versionOnly = versionOnlyAddress(asOf, version);
   const range = ready ? timeRange(asOf!, period) : {};
@@ -183,7 +256,73 @@ export default function CompanyWorkspace() {
     invalid ? null : companyUrl(id, '', snapshot),
     owner,
   );
+  // D-COM-04·06 (#358): 버전만 있는 주소는 서버가 그 버전이 처음 공개된 시각을 metadata.asOf로 준다.
+  // 그 버전으로 답했고 정확한 시각이면 주소의 asOf로 채운다(처음 열 때와 같은 방식). 채운 주소를 기억해
+  // "처음 공개된 시점으로 보는 중"을 알리고, 그 주소가 409·422면 예전처럼 열 수 없다고 안내한다.
+  const [versionPin, setVersionPin] = useState<{
+    version: string;
+    asOf: string;
+  } | null>(null);
+  const versionStart =
+    versionOnly &&
+    company.data?.metadata.graphVersion === version &&
+    exactTime(company.data.metadata.asOf)
+      ? requestTime(company.data.metadata.asOf)
+      : null;
+  if (
+    versionStart &&
+    (versionPin?.version !== version || versionPin.asOf !== versionStart)
+  )
+    setVersionPin({ version: version!, asOf: versionStart });
+  const pinnedFromVersion =
+    !!versionPin && versionPin.version === version && versionPin.asOf === asOf;
+  const versionStartFailed =
+    pinnedFromVersion &&
+    (company.errorStatus === 409 || company.errorStatus === 422);
   const quote = useCompanyResource<Quote>(companyUrl(id, '/quote'));
+  // D-COM-06: 사건 시점 그래프는 그래프를 쓰는 동안만 유지한다. 그래프 영역 밖(다른 사건·탭·빈 곳 등)을
+  // 누르면 현재 기준 시점 그래프로 돌아간다. 키보드로 누른 것도 click으로 들어온다.
+  // 누른 곳의 동작(다른 사건 고르기 등)도 주소를 바꾸므로, 주소의 graphAsOf는 그 변경이 반영된 뒤에 지운다.
+  // 먼저 지우면 아직 반영되지 않은 그 변경을 예전 주소로 덮어쓴다.
+  const graphPanel = useRef<HTMLElement>(null);
+  const paramsKey = params.toString();
+  const clearClosedGraphTime = useEffectEvent(() => {
+    if (closedGraphAsOf && params.get('graphAsOf') === closedGraphAsOf)
+      updateQuery({ graphAsOf: null }, { replace: true });
+  });
+  useEffect(() => {
+    clearClosedGraphTime();
+  }, [paramsKey]);
+  const clearIfUnchanged = useEffectEvent((clickedAt: string) => {
+    // 누른 곳이 주소를 바꾸지 않았으면(빈 곳 등) 여기서 지운다.
+    if (params.toString() === clickedAt) clearClosedGraphTime();
+  });
+  // 지운 뒤 그래프 시점이 풀려 듣기를 해제해도 예약한 정리는 남아야 해서 타이머는 화면을 떠날 때만 취소한다.
+  const closeTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(closeTimer.current), []);
+  const graphTimeOpen = graphAsOf;
+  useEffect(() => {
+    if (!graphTimeOpen) return;
+    const timeToClose = graphTimeOpen;
+    const clickedAt = paramsKey;
+    function outside(event: MouseEvent) {
+      const target = event.target;
+      if (
+        !(target instanceof Element) ||
+        graphPanel.current?.contains(target) ||
+        target.closest('[data-graph-time-trigger]')
+      )
+        return;
+      setClosedGraphTime({ asOf: timeToClose, entryKey: location.key });
+      window.clearTimeout(closeTimer.current);
+      closeTimer.current = window.setTimeout(
+        () => clearIfUnchanged(clickedAt),
+        300,
+      );
+    }
+    document.addEventListener('click', outside, true);
+    return () => document.removeEventListener('click', outside, true);
+  }, [graphTimeOpen, paramsKey, location.key]);
   // 버전 단독 주소는 그 버전의 차트를 열 수 없다고 안내하므로 가격 조회도 시작하지 않는다.
   const prices = useCompanyResource<Prices>(
     invalid || versionOnly
@@ -194,7 +333,11 @@ export default function CompanyWorkspace() {
     // FS040: 처음 열 때의 기준 시점은 기업 응답의 공개 기준 시점과 그 버전이다. 가격 봉 시각은
     // 거래가 없는 날(주말·휴장)에 오래된 시점을 가리켜 이후 공개 자료를 빼거나 409를 만든다.
     // 공개 그래프 버전이 없으면(스냅샷 미게시) 고정하지 않는다. 고정하면 409가 된다.
-    // 주소에 graphVersion만 있는 과거 조회는 metadata.asOf가 요청 시각이라 덧붙이면 422가 된다.
+    // 주소에 graphVersion만 있으면 그 버전이 처음 공개된 시각(versionStart)을 asOf로 채운다.
+    if (versionStart) {
+      updateQuery({ asOf: versionStart, period }, { replace: true });
+      return;
+    }
     const latest = company.data?.metadata.asOf;
     const currentVersion = company.data?.metadata.graphVersion ?? null;
     if (
@@ -222,6 +365,7 @@ export default function CompanyWorkspace() {
     company.data?.metadata.asOf,
     company.data?.metadata.graphVersion,
     period,
+    versionStart,
   ]);
   const depth = params.get('depth') === '2' ? 2 : 1;
   const eventsQuery = new URLSearchParams({
@@ -243,19 +387,27 @@ export default function CompanyWorkspace() {
     true,
   );
   const graph = useCompanyResource<GraphResponse>(
-    ready ? companyUrl(id, '/graph', { ...snapshot, depth }) : null,
+    ready ? companyUrl(id, '/graph', { ...graphSnapshot, depth }) : null,
   );
   const event = useCompanyResource<EventDetail>(
     ready && eventId
       ? `/api/v1/events/${encodeURIComponent(eventId)}?${new URLSearchParams(Object.entries(snapshot).filter((entry): entry is [string, string] => entry[1] !== null))}`
       : null,
   );
+  // 영향 경로는 그래프 시점이 지금 고른 사건의 시각일 때만 그 시각으로 조회한다.
+  // 다른 사건을 고르는 순간(그래프 시점이 풀리기 전)에도 그 사건을 남의 시각으로 조회하지 않는다.
+  const selectedEvent =
+    events.data?.items.find((item) => item.id === eventId) ?? event.data;
+  const impactSnapshot =
+    graphAsOf && eventReferenceTime(selectedEvent, asOf) === graphAsOf
+      ? graphSnapshot
+      : snapshot;
   const impact = useCompanyResource<Impact>(
     ready && eventId
       ? companyUrl(
           id,
           `/issues/${encodeURIComponent(eventId)}/impact`,
-          snapshot,
+          impactSnapshot,
         )
       : null,
   );
@@ -316,17 +468,21 @@ export default function CompanyWorkspace() {
     depth: String(depth),
     returnTo: `${location.pathname}${location.search}`,
   });
-  if (asOf) mapQuery.set('asOf', asOf);
-  if (version) mapQuery.set('graphVersion', version);
+  if (graphAsOf) mapQuery.set('asOf', graphAsOf);
+  else if (asOf) mapQuery.set('asOf', asOf);
+  if (version && !graphAsOf) mapQuery.set('graphVersion', version);
   if (eventId) mapQuery.set('event', eventId);
   // 사건의 관계는 그 사건 시각 기준 지도로 연다. 기업 상세의 기준 시점은 그대로 둔다.
   // 시각이 없으면 현재 기준 시점을 쓰고, 일 정밀도는 그날 한국 시간 끝까지로 본다.
   const eventMapQuery = new URLSearchParams(mapQuery);
   const eventAsOf = eventReferenceTime(event.data, asOf);
-  if (eventAsOf && eventAsOf !== asOf) {
+  if (eventAsOf) {
     eventMapQuery.set('asOf', eventAsOf);
-    // 다른 시점이면 그 시점의 공개 버전을 서버가 고르게 한다.
+    // D-COM-06: 사건 링크는 오른쪽 그래프의 임시 시점을 물려받지 않는다.
+    // 본문과 같은 시점이면 원래 공개 버전을 복원하고, 다르면 서버가 고른다.
     eventMapQuery.delete('graphVersion');
+    if (version && Date.parse(eventAsOf) === Date.parse(asOf ?? ''))
+      eventMapQuery.set('graphVersion', version);
   }
   const highlighted = graph.data ? impactEdges(graph.data, impact.data) : [];
   function selectEvent(item: Events['items'][number], targetTab?: string) {
@@ -338,8 +494,26 @@ export default function CompanyWorkspace() {
       ...(targetTab
         ? { tab: targetTab, docScope: 'event', document: null, evidence: null }
         : {}),
-      // 사건을 골라도 기준 시점은 바꾸지 않는다(D-COM-06 시점 이동 없음).
+      // 사건을 골라도 기준 시점은 바꾸지 않는다. 그래프 시점은 [이 당시 관계그래프 보기]로만 옮긴다.
     });
+  }
+  /** D-COM-06: 사건 시각의 관계 그래프. 월·연 정밀도나 시각 미상, 현재 기준 시점과 같거나 늦은 사건은 옮기지 않는다. */
+  const eventGraphTime = (item: Events['items'][number]) => {
+    const time = eventReferenceTime(item, asOf);
+    return time && time !== asOf ? time : null;
+  };
+  function showEventGraph(item: Events['items'][number], time: string) {
+    setClosedGraphTime(null);
+    updateQuery({
+      graphAsOf: time,
+      event: item.id,
+      bucket: bucketKey(item, period),
+      document: null,
+      evidence: null,
+    });
+    // 좁은 화면에서는 관계 그래프가 본문 아래에 있으므로 바뀐 그래프로 옮겨 보여 준다.
+    if (window.matchMedia?.('(max-width: 1000px)').matches)
+      graphPanel.current?.scrollIntoView({ block: 'start' });
   }
   if (invalid)
     return (
@@ -350,6 +524,7 @@ export default function CompanyWorkspace() {
             updateQuery({
               asOf: null,
               graphVersion: null,
+              graphAsOf: null,
               event: null,
               bucket: null,
             })
@@ -367,14 +542,41 @@ export default function CompanyWorkspace() {
         portfolio={portfolio}
       />
       <main className="min-w-0 rounded-2xl bg-white p-6 shadow-sm max-md:p-4">
-        {versionOnly && (
+        {versionOnly && (company.loading || versionStart) && (
+          <p role="status" className="mb-4 text-[13px] text-zoop-muted">
+            그래프 버전({version})이 처음 공개된 시점을 확인하고 있어요.
+          </p>
+        )}
+        {versionOnly && !company.loading && !versionStart && (
           <p role="alert" className="mb-4 text-[13px] text-zoop-alert">
             이 주소에는 기준 시점 없이 그래프 버전({version})만 있어, 그 버전의
             차트·사건·관계 그래프를 열 수 없어요.{' '}
             <button
               type="button"
               className="font-semibold underline"
-              onClick={() => updateQuery({ graphVersion: null })}
+              // 최신 자료에서 남은 사건 시점(graphAsOf)이 다시 활성화되지 않게 함께 지운다.
+              onClick={() =>
+                updateQuery({ graphVersion: null, graphAsOf: null })
+              }
+            >
+              최신 자료로 보기
+            </button>
+          </p>
+        )}
+        {pinnedFromVersion && !versionStartFailed && (
+          <p role="status" className="mb-4 text-[13px] text-zoop-muted">
+            {`그래프 버전(${version})이 처음 공개된 시점(${formatKst(asOf!)})으로 보는 중이에요.`}
+          </p>
+        )}
+        {versionStartFailed && (
+          <p role="alert" className="mb-4 text-[13px] text-zoop-alert">
+            {`그래프 버전(${version})이 처음 공개된 시점으로 열지 못했어요. `}
+            <button
+              type="button"
+              className="font-semibold underline"
+              onClick={() =>
+                updateQuery({ asOf: null, graphVersion: null, graphAsOf: null })
+              }
             >
               최신 자료로 보기
             </button>
@@ -544,6 +746,7 @@ export default function CompanyWorkspace() {
                 updateQuery({
                   asOf: null,
                   graphVersion: null,
+                  graphAsOf: null,
                   event: null,
                   bucket: null,
                   document: null,
@@ -699,34 +902,54 @@ export default function CompanyWorkspace() {
                           <BoltIcon />
                           사건 {items.length}건
                         </button>
-                        {items.map((item) => (
-                          <article
-                            key={item.id}
-                            className="flex flex-col gap-1 border-0! py-0!"
-                          >
-                            <p className="text-[11px] text-zoop-muted">
-                              문서 {item.articleCount}건 ·{' '}
-                              {relationLabel(item.relationTypes) ||
-                                '직접 관계 미확인'}
-                            </p>
-                            <button
-                              aria-pressed={eventId === item.id}
-                              onClick={() => selectEvent(item)}
-                              className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-left text-sm! font-semibold text-zoop-ink underline-offset-4 hover:underline aria-pressed:underline"
+                        {items.map((item) => {
+                          const itemGraphTime = eventGraphTime(item);
+                          return (
+                            <article
+                              key={item.id}
+                              className="flex flex-col gap-1 border-0! py-0! xl:grid xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start xl:gap-x-3 xl:[&>*]:col-start-1"
                             >
-                              {item.title}
-                            </button>
-                            <p className="text-[11px] text-zoop-muted tabular-nums">
-                              {item.eventTime ?? '시점 미상'}
-                            </p>
-                            <button
-                              onClick={() => selectEvent(item, 'documents')}
-                              className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-[11px]! text-zoop-muted underline underline-offset-4"
-                            >
-                              근거 문서 {item.articleCount}건 보기
-                            </button>
-                          </article>
-                        ))}
+                              <p className="text-[11px] text-zoop-muted">
+                                문서 {item.articleCount}건 ·{' '}
+                                {relationLabel(item.relationTypes) ||
+                                  '직접 관계 미확인'}
+                              </p>
+                              <button
+                                aria-pressed={eventId === item.id}
+                                onClick={() => selectEvent(item)}
+                                className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-left text-sm! font-semibold text-zoop-ink underline-offset-4 hover:underline aria-pressed:underline"
+                              >
+                                {item.title}
+                              </button>
+                              <p className="text-[11px] text-zoop-muted tabular-nums">
+                                {item.eventTime ?? '시점 미상'}
+                              </p>
+                              <button
+                                onClick={() => selectEvent(item, 'documents')}
+                                className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-[11px]! text-zoop-muted underline underline-offset-4"
+                              >
+                                근거 문서 {item.articleCount}건 보기
+                              </button>
+                              {itemGraphTime && (
+                                <button
+                                  type="button"
+                                  aria-pressed={
+                                    graphAsOf === itemGraphTime &&
+                                    eventId === item.id
+                                  }
+                                  data-graph-time-trigger
+                                  aria-label={`${item.title} · 이 당시 관계그래프 보기`}
+                                  onClick={() =>
+                                    showEventGraph(item, itemGraphTime)
+                                  }
+                                  className="mt-1 inline-flex items-center gap-1.5 self-start whitespace-nowrap xl:col-start-2! xl:row-span-4 xl:row-start-1 xl:mt-0 xl:self-center"
+                                >
+                                  <ClockIcon />이 당시 관계그래프 보기
+                                </button>
+                              )}
+                            </article>
+                          );
+                        })}
                       </div>
                     </li>
                   ))}
@@ -839,8 +1062,11 @@ export default function CompanyWorkspace() {
           )}
         </section>
       </main>
+      {/* D-COM-04: 넓은 화면은 와이어프레임처럼 오른쪽 열에 두고 스크롤해도 화면 안에 남는다.
+          1000px 이하에서는 본문 아래로 옮겨 넓게 본다. */}
       <aside
-        className="min-w-0 rounded-2xl bg-white p-4 shadow-sm [&_li]:text-xs [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full [&_svg]:bg-zoop-line max-[1000px]:col-start-2 max-md:w-full"
+        ref={graphPanel}
+        className="min-w-0 self-start rounded-2xl bg-white p-4 shadow-sm min-[1001px]:sticky min-[1001px]:top-4 min-[1001px]:max-h-[calc(100vh-2rem)] min-[1001px]:overflow-y-auto max-[1000px]:col-start-2 [&_li]:text-xs [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full [&_svg]:bg-zoop-line max-md:w-full"
         aria-label="시점 기반 관계 그래프"
         data-screen-id="D-COM-04"
       >
@@ -862,6 +1088,12 @@ export default function CompanyWorkspace() {
             </button>
           ))}
         </nav>
+        {graphAsOf && (
+          <p role="status" className="mt-2">
+            사건 시점 {formatKst(graphAsOf)} 기준 관계예요. 차트·타임라인은 기존
+            기준 시점 그대로예요.
+          </p>
+        )}
         <Status resource={graph} label="관계 그래프" />
         {!ready && !versionOnly && (
           <p role="status">관계 그래프의 기준 시점을 확인하고 있어요.</p>
@@ -878,7 +1110,7 @@ export default function CompanyWorkspace() {
               <p key={`${failure.section}:${i}`}>{failure.message}</p>
             ))}
             <CompanyGraphPreview
-              key={`${id}:${asOf}:${version}:${depth}`}
+              key={`${id}:${asOf}:${version}:${graphAsOf}:${depth}`}
               selectedId={eventId ?? id}
               data={graph.data}
               highlighted={highlighted}
@@ -902,11 +1134,27 @@ export default function CompanyWorkspace() {
                   next.delete('document');
                   next.delete('evidence');
                   next.delete('docScope');
+                  next.delete('graphAsOf');
                   navigate(`/companies/${encodeURIComponent(node)}?${next}`);
                 }
               }}
             />
           </>
+        )}
+        {/* 사건 시점 그래프를 열 수 없어도(공개 버전 없음 등) 돌아갈 수 있게 그래프 상태와 상관없이 둔다. */}
+        {graphAsOf && (
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              aria-label="현재 시점 관계 그래프로 돌아가기"
+              title="현재 시점으로"
+              className={`${ui.button} inline-flex items-center gap-1`}
+              onClick={() => updateQuery({ graphAsOf: null })}
+            >
+              <HomeIcon />
+              현재
+            </button>
+          </div>
         )}
         {eventId && (
           <>

@@ -274,7 +274,7 @@ test('D-BRF-01·02 keeps the displayed briefing usable when telemetry fails', as
   await user.click(await screen.findByText('합성 핵심 이슈'));
   await events();
   expect(
-    screen.getByRole('heading', { name: '무슨 일이 있었나요?' }),
+    screen.getByRole('heading', { name: '공통으로 확인된 사실' }),
   ).toBeTruthy();
   expect(screen.queryByText(/계측.*실패/)).toBeNull();
 });

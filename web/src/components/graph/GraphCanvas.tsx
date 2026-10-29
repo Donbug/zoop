@@ -14,7 +14,7 @@ import {
 } from './graph-appearance';
 import { createPortal } from 'react-dom';
 import GraphLegend from './GraphLegend';
-import { themeColor } from '@/util/theme-color';
+import { themeColor, useColorTheme } from '@/util/theme-color';
 import {
   Graph,
   type GraphData,
@@ -38,6 +38,8 @@ import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { arrangeFlow, arrangeFocus } from './graph-arrange';
 import { applyGraphReading } from './graph-readability';
 import GraphMobileTools from './GraphMobileTools';
+import MapEmptyState from './MapEmptyState';
+import type { PersonalScope } from '@/types/map';
 import {
   fitFootprint,
   fitZoom,
@@ -73,6 +75,8 @@ export default function GraphCanvas({
   tutorialCameraEnabled = false,
   tutorialShowNeighborhood = false,
   onTutorialAction,
+  onPersonalFilter,
+  onMarket,
 }: {
   data: GraphResponse;
   filterHost?: HTMLElement | null;
@@ -83,6 +87,8 @@ export default function GraphCanvas({
   tutorialCameraEnabled?: boolean;
   tutorialShowNeighborhood?: boolean;
   onTutorialAction?: (action: 'pan' | 'zoom') => void;
+  onPersonalFilter?: (scope: PersonalScope) => void;
+  onMarket?: () => void;
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
   focusId?: string | null;
@@ -115,6 +121,8 @@ export default function GraphCanvas({
     [variant, theme, preview],
   );
   const colors = appearanceColors(appearance);
+  // 화면 모드가 바뀌면 그래프는 그대로 두고 토큰 색(themeColor)만 다시 읽는다. 카메라·선택이 그대로 남는다.
+  const colorTheme = useColorTheme();
   const tutorialAction = useEffectEvent((action: 'pan' | 'zoom') =>
     onTutorialAction?.(action),
   );
@@ -233,6 +241,8 @@ export default function GraphCanvas({
   const centerTarget = useRef<string | null>(null);
   const previousSelected = useRef<string | null>(null);
   const preservePositions = useRef(false);
+  // 화면 모드 전환처럼 색만 바뀌는 다시 그리기는 지금 노드 위치를 한 번 그대로 쓴다.
+  const keepPositionsOnce = useRef(false);
   const [centerSequence, setCenterSequence] = useState(0);
   const syncTutorialMarker = useEffectEvent(() => {
     const graph = instance.current;
@@ -603,6 +613,93 @@ export default function GraphCanvas({
     if (neighborhoodRequest) zoomNeighborhood(neighborhoodRequest.id);
   }, [neighborhoodRequest]);
 
+  // 상태별(관련·선택·튜토리얼 등) 선·노드 색. 화면 모드를 바꾸면 그래프를 다시 만들지 않고 이 값만 바꾼다.
+  const stateStyles = useEffectEvent(() => ({
+    edge: {
+      state: {
+        related: {
+          lineWidth: appearance.variant === 'improved' ? 2.5 : 2,
+          stroke:
+            appearance.variant === 'improved'
+              ? colors.selected
+              : themeColor('ink'),
+          strokeOpacity: 1,
+        },
+        inactive: { strokeOpacity: 0.2 },
+        selected: {
+          lineWidth: appearance.variant === 'improved' ? 2.5 : 2,
+          stroke:
+            appearance.variant === 'improved'
+              ? colors.selected
+              : themeColor('ink'),
+          strokeOpacity: 1,
+        },
+      },
+    },
+    node: {
+      state: {
+        tutorial: {
+          opacity: 1,
+          halo: true,
+          stroke: themeColor('ink'),
+          lineDash: [6, 4],
+          haloStroke: themeColor('ink'),
+          haloOpacity: 1,
+          haloFill: 'transparent',
+          haloLineDash: [5, 4],
+          haloLineWidth: 4,
+          haloStrokeOpacity: 1,
+          lineWidth: 3,
+        },
+        related: {
+          opacity: 1,
+          lineWidth: 1.4,
+          labelFill: themeColor('ink'),
+        },
+        inactive: { opacity: 0.35 },
+        hovered: {
+          opacity: 1,
+          lineWidth: 2,
+          halo: true,
+          haloStroke: themeColor('ink'),
+          haloFill: 'transparent',
+          labelFill: themeColor('ink'),
+        },
+        selected: {
+          lineWidth: 2,
+          halo: true,
+          haloStroke: themeColor('ink'),
+          haloFill: 'transparent',
+          // G6 기본 테마의 selected는 이름표를 12px로 줄인다. 노드에 정한 크기·굵기를 그대로 쓴다.
+          labelFontSize: (datum: NodeData) =>
+            Number(datum.style?.labelFontSize ?? 12),
+          labelFontWeight: (datum: NodeData) =>
+            datum.style?.labelFontWeight ?? 700,
+        },
+      },
+    },
+  }));
+  // 화면 모드가 바뀌면 같은 그래프·카메라에서 색만 다시 읽어 그린다(82번).
+  // 처음 그릴 자료도 그때의 화면 모드로 만든다. 화면 모드는 그래프를 다시 만드는 조건이 아니다.
+  const initialData = useEffectEvent((width: number, height: number) =>
+    styleGraph(toG6Data(data, width, height), appearance),
+  );
+  const applyColorTheme = useEffectEvent(() => {
+    const graph = instance.current;
+    if (!graph || graph.destroyed) return;
+    const { node, edge } = stateStyles();
+    graph.setNode(node);
+    graph.setEdge(edge);
+    keepPositionsOnce.current = true;
+    syncSelection();
+  });
+  const themeKey = `${colorTheme}:${theme}`;
+  const appliedTheme = useRef(themeKey);
+  useEffect(() => {
+    if (appliedTheme.current === themeKey) return;
+    appliedTheme.current = themeKey;
+    applyColorTheme();
+  }, [themeKey]);
   const syncSelection = useEffectEvent(() => {
     const graph = instance.current;
     const host = container.current;
@@ -719,7 +816,7 @@ export default function GraphCanvas({
         // the graph the user just centered (including its surrounding nodes).
         if (
           arrangement === 'map' &&
-          preservePositions.current &&
+          (preservePositions.current || keepPositionsOnce.current) &&
           renderedData.current
         ) {
           const positions = new Map(
@@ -735,6 +832,7 @@ export default function GraphCanvas({
               : node;
           });
         }
+        keepPositionsOnce.current = false;
         const hiddenNodes = new Set([
           ...data.nodes
             .filter(
@@ -1020,10 +1118,7 @@ export default function GraphCanvas({
         width: host.clientWidth,
         height: host.clientHeight,
         animation: false,
-        data: styleGraph(
-          toG6Data(data, host.clientWidth, host.clientHeight),
-          appearance,
-        ),
+        data: initialData(host.clientWidth, host.clientHeight),
         // D-GRP-01: 빈 곳뿐 아니라 노드·연결 위에서 끌어도 지도를 움직인다(노드 자체는 옮기지 않는다).
         behaviors: [
           { type: 'drag-canvas', enable: true },
@@ -1036,69 +1131,7 @@ export default function GraphCanvas({
           },
         ],
         zoomRange: [0.01, 4],
-        edge: {
-          state: {
-            related: {
-              lineWidth: appearance.variant === 'improved' ? 2.5 : 2,
-              stroke:
-                appearance.variant === 'improved'
-                  ? colors.selected
-                  : themeColor('ink'),
-              strokeOpacity: 1,
-            },
-            inactive: { strokeOpacity: 0.2 },
-            selected: {
-              lineWidth: appearance.variant === 'improved' ? 2.5 : 2,
-              stroke:
-                appearance.variant === 'improved'
-                  ? colors.selected
-                  : themeColor('ink'),
-              strokeOpacity: 1,
-            },
-          },
-        },
-        node: {
-          state: {
-            tutorial: {
-              opacity: 1,
-              halo: true,
-              stroke: themeColor('ink'),
-              lineDash: [6, 4],
-              haloStroke: themeColor('ink'),
-              haloOpacity: 1,
-              haloFill: 'transparent',
-              haloLineDash: [5, 4],
-              haloLineWidth: 4,
-              haloStrokeOpacity: 1,
-              lineWidth: 3,
-            },
-            related: {
-              opacity: 1,
-              lineWidth: 1.4,
-              labelFill: themeColor('ink'),
-            },
-            inactive: { opacity: 0.35 },
-            hovered: {
-              opacity: 1,
-              lineWidth: 2,
-              halo: true,
-              haloStroke: themeColor('ink'),
-              haloFill: 'transparent',
-              labelFill: themeColor('ink'),
-            },
-            selected: {
-              lineWidth: 2,
-              halo: true,
-              haloStroke: themeColor('ink'),
-              haloFill: 'transparent',
-              // G6 기본 테마의 selected는 이름표를 12px로 줄인다. 노드에 정한 크기·굵기를 그대로 쓴다.
-              labelFontSize: (datum: NodeData) =>
-                Number(datum.style?.labelFontSize ?? 12),
-              labelFontWeight: (datum: NodeData) =>
-                datum.style?.labelFontWeight ?? 700,
-            },
-          },
-        },
+        ...stateStyles(),
       });
       graph.on('node:dblclick', (event: IElementEvent) =>
         zoomNeighborhood(event.target.id),
@@ -1167,7 +1200,7 @@ export default function GraphCanvas({
       // 포커스·흐름 순으로 열면 기억한 원래 지도 카메라를 쓰지 않고 새 배치에 맞춘다.
       const arranged = isArranged();
       const camera =
-        !appearance.preview &&
+        !preview &&
         !arranged &&
         saved &&
         sameViewport(saved.size, host.clientWidth, host.clientHeight)
@@ -1250,7 +1283,7 @@ export default function GraphCanvas({
       graph?.destroy();
       instance.current = null;
     };
-  }, [data, retry, memoryOwner, appearance, colors.selected]);
+  }, [data, retry, memoryOwner, variant, preview]);
   async function control(action: 'in' | 'out' | 'fit') {
     const graph = instance.current;
     if (!graph || graph.destroyed) return;
@@ -1446,7 +1479,7 @@ export default function GraphCanvas({
           <GraphIcon name="plus" />
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-[3px] bg-zoop-ink px-1.5 py-0.5 text-[10px] whitespace-nowrap text-zoop-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+            className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-[3px] bg-zoop-ink px-1.5 py-0.5 text-[11px] whitespace-nowrap text-zoop-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
           >
             확대
           </span>
@@ -1460,7 +1493,7 @@ export default function GraphCanvas({
           <GraphIcon name="minus" />
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-[3px] bg-zoop-ink px-1.5 py-0.5 text-[10px] whitespace-nowrap text-zoop-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+            className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-[3px] bg-zoop-ink px-1.5 py-0.5 text-[11px] whitespace-nowrap text-zoop-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
           >
             축소
           </span>
@@ -1475,7 +1508,7 @@ export default function GraphCanvas({
           <GraphIcon name="fit" />
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-[3px] bg-zoop-ink px-1.5 py-0.5 text-[10px] whitespace-nowrap text-zoop-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+            className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-[3px] bg-zoop-ink px-1.5 py-0.5 text-[11px] whitespace-nowrap text-zoop-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
           >
             전체 그래프 맞춤
           </span>
@@ -1518,23 +1551,11 @@ export default function GraphCanvas({
           {selectedNode.watch ? ' · 관심' : ''}
         </p>
       )}
-      {data.nodes.length === 0 && (
-        <div className="relationship-message" role="status">
-          {personal
-            ? data.metadata.personalFilter === 'holdings'
-              ? '보유종목이 없습니다.'
-              : data.metadata.personalFilter === 'watchlist'
-                ? '관심종목이 없습니다.'
-                : '보유종목 또는 관심종목이 없습니다.'
-            : '현재 표시할 수 있는 관계 데이터가 없습니다.'}
-          {personal && <a href="/my">관심종목 설정</a>}
-        </div>
-      )}
-      {data.nodes.length > 0 && data.edges.length === 0 && (
-        <p className="relationship-empty-relations" role="status">
-          현재 확인된 관련 관계가 없습니다.
-        </p>
-      )}
+      <MapEmptyState
+        graph={data}
+        onPersonalFilter={onPersonalFilter}
+        onMarket={onMarket}
+      />
       {renderError && (
         <div className="relationship-message" role="alert">
           그래프를 표시하지 못했습니다.

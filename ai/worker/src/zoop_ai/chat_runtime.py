@@ -9,9 +9,15 @@ Rules (ZOOP-AIG-001 6.3.2-6.3.3, design summary 5.1):
   and separate from the S1 and pipeline gates. Without them nothing is sent. Replay never touches the network.
 - Every quoted span must be allowed by the operator chat grant registry: an enabled grant with known rights, `model-send`, the
   stage as purpose and the exact recipient (`authored-replay`, or `<provider>:<revision>` live). Otherwise nothing is sent.
-- Each stage has its own client timeout (router 4 s, answer 25 s, verification 6 s); a timeout after sending is `unknown`.
-- The models are pinned like the pipeline's: Luna `gpt-6-luna` at reasoning effort `high`, Jev `jev-1.14.0`. The model that
-  answered must be the pinned one (a Luna answer may name a `gpt-6-luna-...` snapshot) and is what the receipt records.
+- Each stage has its own client timeout (router 4 s, answer 25 s, verification 6 s, agent step 30 s); a timeout after sending
+  is `unknown`.
+- The models are pinned like the pipeline's: Luna `gpt-6-luna` at reasoning effort `high` for `chat-answer` and `medium` for
+  `chat-agent`, Jev `jev-1.14.0`. The model that answered must be the pinned one (a Luna answer may name a `gpt-6-luna-...`
+  snapshot) and is what the receipt records.
+- An agent step (`chat-agent`) is one Responses request, so the same ledger rules hold per step: the application gives every
+  step its own invocation id. Its MCP grant token is excluded from every identity and redacted from the stored raw answer.
+  Its tool results reach the provider from the application's MCP server, which checks their send grants for the recipient
+  the step names; a step is sent only when that is this stage's own recipient (`mcp_recipient_mismatch` otherwise).
 - Order of one invocation: the ledger first (a known invocation answers from its record, whatever the gate or keys are now),
   then the gate, grants and sender for a new one, then one atomic claim with the live ceiling, the send, the raw answer stored,
   and only then usage and answer interpretation. Any interpretation failure keeps the raw answer as a definite failure.
@@ -29,13 +35,16 @@ from typing import Any
 import httpx
 from pydantic import ValidationError
 
-from . import chat_jev, chat_luna
-from .chat_contracts import (CHAT_SCHEMA_VERSION, AnswerInput, ChatAnswer, ChatGrantRegistry, Receipt, RouterInput,
-                             StageFailure, StageRequest, StageResult, Usage, VerificationInput)
+from . import chat_agent, chat_jev, chat_luna
+from .chat_contracts import (CHAT_SCHEMA_VERSION, AgentInput, AnswerInput, ChatAnswer, ChatGrantRegistry, Receipt,
+                             RouterInput, StageFailure, StageRequest, StageResult, Usage, VerificationInput)
 from .contracts import canonical, digest
 from .provider import DEFAULT_BASE_URL, NATIVE_DEFAULT_BASE_URL, ProviderError, native_revision, validate_base_url
 
-STAGE_TIMEOUT = {"chat-router": 4.0, "chat-answer": 25.0, "chat-verification": 6.0}
+# An agent step includes the MCP calls the provider makes after an approval; the application bounds the whole run (35 s).
+STAGE_TIMEOUT = {"chat-router": 4.0, "chat-answer": 25.0, "chat-verification": 6.0, "chat-agent": 30.0}
+LUNA_STAGES = {"chat-answer": (chat_luna, "ZOOP_AI_CHAT_ANSWER_MODEL", "ZOOP_AI_CHAT_ANSWER_REASONING_EFFORT"),
+               "chat-agent": (chat_agent, "ZOOP_AI_CHAT_AGENT_MODEL", "ZOOP_AI_CHAT_AGENT_REASONING_EFFORT")}
 LUNA = "openai-compatible"
 JEV = "typesafe-native"
 REPLAY = "authored-replay"
@@ -53,35 +62,53 @@ class ChatStageConfig:
     reasoning_effort: str | None
     prompt_version: str
     mode: str
+    # A live agent step's ZOOP MCP server: the operator's canonical URL (`ZOOP_AI_CHAT_MCP_SERVER_URL`); None otherwise.
+    mcp_server_url: str | None = None
 
     def recipient(self) -> str:
         return self.provider if self.mode == "replay" else f"{self.provider}:{self.provider_revision}"
 
     def wire(self) -> dict[str, Any]:
-        return {"provider": self.provider, "providerRevision": self.provider_revision, "model": self.model,
+        wire = {"provider": self.provider, "providerRevision": self.provider_revision, "model": self.model,
                 "reasoningEffort": self.reasoning_effort, "promptVersion": self.prompt_version}
+        if self.mcp_server_url is not None:
+            wire["mcpServerUrl"] = self.mcp_server_url
+        return wire
 
 
 def _prompt_version(stage: str) -> str:
-    return chat_luna.prompt_version() if stage == "chat-answer" else chat_jev.prompt_version(stage)
+    if stage in LUNA_STAGES:
+        return LUNA_STAGES[stage][0].prompt_version()
+    return chat_jev.prompt_version(stage)
 
 
 def stage_config(stage: str, mode: str, env: dict[str, str] | None = None) -> ChatStageConfig:
     env = os.environ if env is None else env
     if mode == "replay":
         return ChatStageConfig(REPLAY, "authored-replay-1", "authored-synthetic-" + stage, None, _prompt_version(stage), mode)
-    if stage == "chat-answer":
+    if stage in LUNA_STAGES:
+        module, model_key, effort_key = LUNA_STAGES[stage]
         base = env.get("ZOOP_AI_BASE_URL", "").strip() or DEFAULT_BASE_URL
         validate_base_url(base)
-        model = env.get("ZOOP_AI_CHAT_ANSWER_MODEL", "").strip()
+        model = env.get(model_key, "").strip()
         if not model:
             raise ProviderError("stage_model_required")
-        if model != chat_luna.MODEL:
+        if model != module.MODEL:
             raise ProviderError("answer_model_unsupported")
-        effort = env.get("ZOOP_AI_CHAT_ANSWER_REASONING_EFFORT", "").strip() or chat_luna.REASONING_EFFORT
-        if effort != chat_luna.REASONING_EFFORT:
+        effort = env.get(effort_key, "").strip() or module.REASONING_EFFORT
+        if effort != module.REASONING_EFFORT:
             raise ProviderError("reasoning_effort_unsupported")
-        return ChatStageConfig(LUNA, digest({"endpoint": base}), model, effort, _prompt_version(stage), mode)
+        server = None
+        if stage == "chat-agent":
+            # The only host a run's grant may reach: set by the operator, never taken from a request.
+            configured = env.get("ZOOP_AI_CHAT_MCP_SERVER_URL", "").strip()
+            if not configured:
+                raise ProviderError("mcp_server_url_required")
+            try:
+                server = chat_agent.server_url(configured)
+            except ValueError:
+                raise ProviderError("mcp_server_url_invalid") from None
+        return ChatStageConfig(LUNA, digest({"endpoint": base}), model, effort, _prompt_version(stage), mode, server)
     base = env.get("TYPESAFE_BASE_URL", "").strip() or NATIVE_DEFAULT_BASE_URL
     validate_base_url(base)
     if "/systemone" in base:
@@ -94,9 +121,16 @@ def stage_config(stage: str, mode: str, env: dict[str, str] | None = None) -> Ch
     return ChatStageConfig(JEV, native_revision(base), model, None, _prompt_version(stage), mode)
 
 
+def _identified_input(request: StageRequest) -> dict[str, Any]:
+    """The input as identities see it: an agent step's MCP grant token is replaced, so no digest is derived from a credential and
+    a replay fixture does not depend on a per-run token."""
+    parsed = request.parsed()
+    return chat_agent.identity_input(parsed) if isinstance(parsed, AgentInput) else parsed.wire()
+
+
 def request_identity(request: StageRequest, config: ChatStageConfig) -> str:
     """What the provider is asked: the input and the frozen stage configuration. It keys the authored replay fixture."""
-    return digest({"schemaVersion": CHAT_SCHEMA_VERSION, "stage": request.stage, "input": request.parsed().wire(),
+    return digest({"schemaVersion": CHAT_SCHEMA_VERSION, "stage": request.stage, "input": _identified_input(request),
                    "config": config.wire()})
 
 
@@ -104,7 +138,7 @@ def request_digest(request: StageRequest) -> str:
     """What the caller asked under an invocation id, without the configuration: a later configuration change (gate, key, model
     setting) never makes a stored invocation look new or conflicting."""
     return digest({"schemaVersion": CHAT_SCHEMA_VERSION, "stage": request.stage, "mode": request.mode,
-                   "input": request.parsed().wire()})
+                   "input": _identified_input(request)})
 
 
 def live_ceiling(env: dict[str, str] | None = None) -> int:
@@ -136,6 +170,13 @@ def check_grants(request: StageRequest, recipient: str, registry: ChatGrantRegis
             for g in registry.grants)
         if not allowed:
             raise ProviderError("source_grant_denied")
+
+
+def check_recipient(request: StageRequest, recipient: str) -> None:
+    """An agent step goes only to the recipient the application checked its MCP results' send grants for."""
+    parsed = request.parsed()
+    if isinstance(parsed, AgentInput) and parsed.mcp.recipient != recipient:
+        raise ProviderError("mcp_recipient_mismatch")
 
 
 class ChatLedger:
@@ -220,9 +261,9 @@ class ChatLedger:
             raise
 
     def received(self, invocation_id: str, raw: Any) -> None:
-        """Keeps the provider's raw answer durably before it is interpreted."""
+        """Keeps the provider's raw answer durably before it is interpreted, without any echoed MCP credential."""
         self.db.execute("UPDATE chat_invocations SET raw=?, updated_at=? WHERE invocation_id=? AND status='sent'",
-                        (canonical(raw), _now(), invocation_id))
+                        (canonical(chat_agent.redact(raw)), _now(), invocation_id))
 
     def finish(self, result: StageResult) -> None:
         status = "succeeded" if result.status == "succeeded" else "unknown" if result.failure and result.failure.unknown \
@@ -248,6 +289,10 @@ def provider_body(request: StageRequest, config: ChatStageConfig) -> tuple[str, 
     parsed = request.parsed()
     if request.stage == "chat-answer":
         return "chat/completions", chat_luna.build_request(parsed, config.model, config.reasoning_effort)
+    if request.stage == "chat-agent":
+        if config.mcp_server_url is None:
+            raise ProviderError("mcp_server_url_required")
+        return "responses", chat_agent.build_request(parsed, config.model, config.reasoning_effort, config.mcp_server_url)
     if request.stage == "chat-router":
         return "systemone", chat_jev.build_router_request(parsed, config.model)
     return "systemone", chat_jev.build_verification_request(parsed, config.model)
@@ -339,8 +384,9 @@ def _details(block: dict[str, Any], name: str) -> dict[str, Any]:
     return value
 
 
-def usage_of(raw: Any, provider: str) -> Usage:
-    """Reported token counts. No usage block is no counts; a block of the wrong shape is a ValueError, never another error."""
+def usage_of(raw: Any, provider: str, stage: str | None = None) -> Usage:
+    """Reported token counts. No usage block is no counts; a block of the wrong shape is a ValueError, never another error. An
+    agent step reports the Responses usage of the whole step (its reasoning and MCP round trips included)."""
     block = raw.get("usage") if isinstance(raw, dict) else None
     if block is None:
         return _no_usage()
@@ -349,6 +395,10 @@ def usage_of(raw: Any, provider: str) -> Usage:
     if provider == JEV:
         return Usage(input_tokens=_count(block, "input_tokens"), output_tokens=_count(block, "output_tokens"),
                      cached_tokens=None, reasoning_tokens=None)
+    if stage == "chat-agent":
+        return Usage(input_tokens=_count(block, "input_tokens"), output_tokens=_count(block, "output_tokens"),
+                     cached_tokens=_count(_details(block, "input_tokens_details"), "cached_tokens"),
+                     reasoning_tokens=_count(_details(block, "output_tokens_details"), "reasoning_tokens"))
     return Usage(input_tokens=_count(block, "prompt_tokens"), output_tokens=_count(block, "completion_tokens"),
                  cached_tokens=_count(_details(block, "prompt_tokens_details"), "cached_tokens"),
                  reasoning_tokens=_count(_details(block, "completion_tokens_details"), "reasoning_tokens"))
@@ -372,6 +422,8 @@ def interpret(request: StageRequest, config: ChatStageConfig, raw: Any) -> dict[
         return chat_jev.interpret_router(raw, parsed, config.model).wire()
     if request.stage == "chat-verification":
         return chat_jev.interpret_verification(raw, parsed, config.model).wire()
+    if request.stage == "chat-agent":
+        return chat_agent.interpret(raw, parsed).wire()
     return _interpret_answer(raw, parsed)
 
 
@@ -437,6 +489,7 @@ def invoke(request: StageRequest, *, state_dir: Path, registry: ChatGrantRegistr
             ceiling = live_ceiling(env) if request.mode == "live" else None
             identity = request_identity(request, config)
             check_grants(request, config.recipient(), registry)
+            check_recipient(request, config.recipient())
             sender.preflight(request, config)
         except ProviderError as refused:
             return _failed(request, refused.code, sent=False, unknown=False, receipt=None)
@@ -461,7 +514,7 @@ def invoke(request: StageRequest, *, state_dir: Path, registry: ChatGrantRegistr
         ledger.received(request.invocation_id, raw)
         receipt = receipt.model_copy(update={"received_at": _now()})
         try:
-            receipt = receipt.model_copy(update={"usage": usage_of(raw, config.provider),
+            receipt = receipt.model_copy(update={"usage": usage_of(raw, config.provider, request.stage),
                                                  "model": responded_model(raw, config)})
             answer = interpret(request, config, raw)
         except ValueError as invalid:

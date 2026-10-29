@@ -1,4 +1,8 @@
+import { useSyncExternalStore } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+
 type Token = 'ink' | 'muted' | 'faint' | 'line' | 'paper' | 'soft' | 'up';
+export type ColorTheme = 'light' | 'dark';
 
 const LIGHT: Record<Token, string> = {
   ink: '#1a1a1a',
@@ -35,18 +39,69 @@ export function applyInitialTheme() {
   document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
 }
 
-/** 화면 모드 전환. 캔버스 색을 다시 읽도록 새로 불러온다. */
-export function toggleTheme() {
-  const next =
-    document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-  const url = new URL(window.location.href);
-  url.searchParams.delete('theme');
+const listeners = new Set<() => void>();
+
+/** 지금 화면 모드(:root[data-theme]) */
+export function currentTheme(): ColorTheme {
+  if (typeof document === 'undefined') return 'light';
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+}
+
+function subscribeTheme(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/** 화면 모드가 바뀌면 다시 그린다. 캔버스(G6)는 이 값이 바뀔 때 토큰 색을 다시 읽는다. */
+export function useColorTheme() {
+  return useSyncExternalStore<ColorTheme>(
+    subscribeTheme,
+    currentTheme,
+    () => 'light',
+  );
+}
+
+/**
+ * 화면 모드 전환. 새로 불러오지 않아 입력 중인 내용과 화면 상태가 남는다(82번).
+ * 주소의 ?theme=은 건드리지 않는다. 라우터 안에서는 useThemeToggle로 주소까지 맞춘다.
+ */
+export function toggleTheme(): { theme: ColorTheme; stored: boolean } {
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  let stored = true;
   try {
     localStorage.setItem(KEY, next);
   } catch {
-    // 캔버스를 다시 그리려고 새로 불러와도 선택이 사라지지 않게 URL에 남긴다.
-    url.searchParams.set('theme', next);
+    stored = false;
   }
   document.documentElement.dataset.theme = next;
-  window.location.replace(url.toString());
+  for (const listener of listeners) listener();
+  return { theme: next, stored };
+}
+
+/**
+ * 화면 모드를 바꾸고 주소의 ?theme=을 라우터로 맞춘다.
+ * 저장했으면 ?theme=을 지워 저장한 값이 다음 새로 고침에 쓰이게 하고, 저장소가 없으면 주소에 남긴다.
+ * 라우터를 거쳐야 이후 주소 갱신(useRouteQuery)이 예전 ?theme=을 되살리지 않는다.
+ */
+export function useThemeToggle() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  return () => {
+    const { theme, stored } = toggleTheme();
+    const wanted = stored ? null : theme;
+    const next = new URLSearchParams(location.search);
+    if (next.get('theme') === wanted) return;
+    if (wanted) next.set('theme', wanted);
+    else next.delete('theme');
+    navigate(
+      {
+        pathname: location.pathname,
+        search: next.size ? `?${next}` : '',
+        hash: location.hash,
+      },
+      { replace: true, preventScrollReset: true, state: location.state },
+    );
+  };
 }

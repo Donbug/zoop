@@ -55,10 +55,14 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code <jobId>.<attempt>.<stage>}, so a rerun of the job is a new invocation and a repeat of the same one is never sent
  * twice.
  */
-public class ChatModelStages implements ChatModels.Router, ChatModels.Generator, ChatModels.Verifier {
+public class ChatModelStages implements ChatModels.Router, ChatModels.Generator, ChatModels.Verifier, ChatModels.Agent {
     static final String ROUTER = "chat-router";
     static final String ANSWER = "chat-answer";
     static final String VERIFICATION = "chat-verification";
+    static final String AGENT = "chat-agent";
+    private static final tools.jackson.databind.ObjectMapper ARGUMENTS = tools.jackson.databind.json.JsonMapper.builder().build();
+    private static final tools.jackson.core.type.TypeReference<Map<String, Object>> ARGUMENT_MAP =
+            new tools.jackson.core.type.TypeReference<>() { };
     static final int MAX_REQUIREMENTS = 6;
     static final int MAX_ITEMS = 50;
     static final int MAX_QUOTES = 20;
@@ -373,6 +377,63 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         });
     }
 
+    // ---------------------------------------------------------------- agent
+
+    /**
+     * One {@code chat-agent} step: the requirements with their resolved targets, the MCP connection and, for a continuation,
+     * the stored response with the server's decisions. Each step is its own invocation ({@code <job>.<attempt>.agent-<n>}).
+     */
+    @Override
+    public ChatModels.AgentStep step(ChatRun run, int step, ChatModels.AgentInput agent) {
+        ObjectNode input = StrictJson.newObject();
+        input.set("turns", turns(run));
+        ArrayNode requirements = input.putArray("requirements");
+        for (ChatModels.AgentRequirement requirement : agent.requirements()) {
+            ObjectNode wire = requirements.addObject().put("requirementId", requirement.id())
+                    .put("label", requirement.label()).put("general", requirement.general());
+            ArrayNode targets = wire.putArray("targets");
+            requirement.targets().forEach(targets::add);
+        }
+        ObjectNode mcp = input.putObject("mcp").put("authorization", agent.grantToken());
+        ArrayNode tools = mcp.putArray("allowedTools");
+        agent.allowedTools().forEach(tools::add);
+        mcp.put("recipient", agent.recipient());
+        input.put("maxCitations", Math.min(MAX_QUOTES, agent.maxCitations()));
+        if (agent.previousResponseId() != null) {
+            ObjectNode continuation = input.putObject("continuation").put("previousResponseId", agent.previousResponseId());
+            ArrayNode decisions = continuation.putArray("decisions");
+            agent.decisions().forEach(d -> decisions.addObject().put("approvalRequestId", d.approvalRequestId())
+                    .put("approve", d.approve()));
+        }
+        JsonNode answer = call(run, AGENT, "agent-" + step, input);
+        return decode(() -> {
+            List<ChatModels.ApprovalRequest> approvals = new ArrayList<>();
+            for (JsonNode request : array(answer, "approvalRequests")) {
+                JsonNode arguments = request.get("arguments");
+                if (arguments == null || !arguments.isObject()) throw new IllegalArgumentException("arguments");
+                approvals.add(new ChatModels.ApprovalRequest(text(request, "approvalRequestId"), text(request, "toolName"),
+                        ARGUMENTS.convertValue(arguments, ARGUMENT_MAP)));
+            }
+            JsonNode written = answer.get("answer");
+            ChatGeneratedAnswer generated = null;
+            if ("completed".equals(text(answer, "status"))) {
+                if (written == null || !written.isObject()) throw new IllegalArgumentException("answer");
+                generated = generated(written);
+            }
+            return new ChatModels.AgentStep(text(answer, "responseId"), approvals, generated);
+        });
+    }
+
+    private static ChatGeneratedAnswer generated(JsonNode answer) {
+        List<ChatGeneratedAnswer.Section> sections = new ArrayList<>();
+        for (JsonNode s : array(answer, "sections")) {
+            sections.add(new ChatGeneratedAnswer.Section(text(s, "basis"), text(s, "text"), strings(s, "requirementIds"),
+                    strings(s, "evidenceIds")));
+        }
+        return new ChatGeneratedAnswer(sections, strings(answer, "insufficientRequirementIds"),
+                strings(answer, "graphTargetIds"));
+    }
+
     // ---------------------------------------------------------------- one stage
 
     private JsonNode call(ChatRun run, String stage, String suffix, ObjectNode input) {
@@ -380,7 +441,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         ChatStageCall request = new ChatStageCall(invocation, stage, mode, input);
         String execution;
         try {
-            execution = recorder.start(run.jobId(), stage, mode);
+            execution = recorder.start(run.jobId(), run.attemptNo(), stage, mode);
         } catch (RuntimeException unrecorded) {
             throw new ChatModels.Failure(Fate.NOT_SENT, "the model call could not be recorded");
         }
@@ -389,16 +450,18 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             reply = client.invoke(request);
         } catch (AiClientException error) {
             Fate fate = fate(error);
-            finish(execution, fate == Fate.UNKNOWN ? "unknown" : "failed", null, code(error));
+            finish(execution, fate == Fate.UNKNOWN ? "unknown" : "failed",
+                    fate == Fate.UNKNOWN ? "unknown" : "not_sent", null, code(error));
             throw new ChatModels.Failure(fate, "chat stage " + stage + " failed: " + code(error));
         }
         if (!reply.succeeded()) {
             ChatStageReply.Failure failure = reply.failure();
             Fate fate = failure.unknown() ? Fate.UNKNOWN : failure.sent() ? Fate.NOT_SENT : Fate.REFUSED;
-            finish(execution, failure.unknown() ? "unknown" : "failed", reply.receipt(), failure.code());
+            String sendState = failure.unknown() ? "unknown" : failure.sent() ? "sent" : "not_sent";
+            finish(execution, failure.unknown() ? "unknown" : "failed", sendState, reply.receipt(), failure.code());
             throw new ChatModels.Failure(fate, "chat stage " + stage + " failed: " + failure.code());
         }
-        finish(execution, "succeeded", reply.receipt(), null);
+        finish(execution, "succeeded", "sent", reply.receipt(), null);
         return reply.answer();
     }
 
@@ -423,13 +486,13 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         return "client_error";
     }
 
-    private void finish(String execution, String status, ChatStageReply.Receipt receipt, String code) {
+    private void finish(String execution, String status, String sendState, ChatStageReply.Receipt receipt, String code) {
         // A stage the engine cut off is interrupted, before or during this write, and an interrupted thread cannot use its
         // database connection. The outcome is written on a thread of its own, which the cancellation never reaches, and this
         // thread waits for it; an interrupt that arrives meanwhile is kept for after.
         Thread writer = Thread.ofVirtual().name("chat-model-ledger").start(() -> {
             try {
-                recorder.finish(execution, status, receipt, code);
+                recorder.finish(execution, status, sendState, receipt, code);
             } catch (RuntimeException unrecorded) {
                 // The stage outcome stands; the running row stays as evidence that the call was made.
             }

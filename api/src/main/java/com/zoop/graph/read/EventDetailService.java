@@ -10,6 +10,7 @@ import com.zoop.document.repository.DocumentRegistryRepository;
 import com.zoop.document.repository.VersionRow;
 import com.zoop.graph.importer.MentionIds;
 import com.zoop.graph.read.dto.EventDetail;
+import com.zoop.graph.read.dto.EventDetail.ApprovalOut;
 import com.zoop.graph.read.dto.EventDetail.ArticleOut;
 import com.zoop.graph.read.dto.EventDetail.CompanyLink;
 import com.zoop.graph.read.dto.EventDetail.FieldDecisionOut;
@@ -46,13 +47,16 @@ import org.springframework.stereotype.Service;
  * sequence from the snapshot, and, for an imported version, the original mentions, operator field verdicts and source support
  * the AI handoff carried (the version's receipt, read once). An issue that is not visible in that read is 404, never looked up in
  * another version. Values held or rejected by an operator field verdict never leave this service, and nothing is inferred that
- * the handoff did not give: no summary, no approval, no confirmed role.
+ * the handoff did not give: no summary, no confirmed role. approval is read from the receipt's relation provenance, never guessed.
  */
 @Service
 public class EventDetailService {
     static final String SUMMARY_UNAVAILABLE = "사건 요약은 아직 제공되지 않습니다.";
     private static final String IMPORTED = "snapshot";
     private static final Set<String> WITHHELD = Set.of("HOLD", "REJECT");
+    /** INVOLVES provenance when at least one contributing S3 relation rests on an operator's final approval of a HOLD. */
+    private static final String OPERATOR_APPROVED = "manual-operator-final-approval";
+    static final ApprovalOut ADMIN_APPROVAL = new ApprovalOut("admin-review", "관리자 승인", "relation", null);
     /** Immutable receipt formats with the same mention, field-verdict, source-support and headline-selection contract. */
     private static final Set<String> BUNDLE_SCHEMAS = Set.of(
             "zoop-graph-handoff-bundle-5", "zoop-graph-handoff-bundle-6", "zoop-graph-handoff-bundle-7");
@@ -85,8 +89,9 @@ public class EventDetailService {
         Map<String, PublicGraphSnapshot.Evidence> inSnapshot = new LinkedHashMap<>();
         snapshot.evidence().forEach(e -> inSnapshot.put(e.evidenceId(), e));
         Map<String, Boolean> judged = new HashMap<>();
+        Instant filteredAt = pinned.selected().asOfRequested() ? pinned.selected().asOf() : null;
         Predicate<String> shown = e -> inSnapshot.containsKey(e) && (bundle == null
-                || judged.computeIfAbsent(e, k -> (round == null ? receipts.shownNow(k, versionId, at, requestId)
+                || judged.computeIfAbsent(e, k -> (round == null ? receipts.shownNow(k, versionId, filteredAt, requestId)
                         : receipts.shownNow(k, round, versionId, at, requestId))));
 
         Map<String, Obj> mentionsById = handoff == null ? Map.of() : mentionsById(handoff, issue, shown);
@@ -114,7 +119,8 @@ public class EventDetailService {
                 relations.stream().map(EventDetailService::relation).toList(), companies(graph, id, relations),
                 sourceSupport(handoff, articles.stream().map(ArticleOut::id).toList()), fieldDecisions(handoff, appIds),
                 issue.evidenceIds().stream().filter(shown).toList(),
-                follows(graph, id, relations), null, new Unavailable("unavailable", SUMMARY_UNAVAILABLE), metadata);
+                follows(graph, id, relations), approval(bundle, id, relations),
+                new Unavailable("unavailable", SUMMARY_UNAVAILABLE), metadata);
     }
 
     /**
@@ -326,6 +332,29 @@ public class EventDetailService {
                     verdict.string("decision"), verdict.string("reasonCode")));
         }
         return byMention.entrySet().stream().map(e -> new FieldDecisionOut(null, e.getKey(), e.getValue())).toList();
+    }
+
+    /**
+     * {@code admin-review} when a company relation this read shows (INVOLVES from this issue, already cut by asOf, exclusions
+     * and current evidence rights) rests on an operator's final approval in the receipt; null otherwise, and always for a
+     * synthetic fixture (no receipt). Only the receipt literal is read; who approved and when stay in the receipt and the admin
+     * decision log. Formats 5 to 7 all carry the literal (added in bundle 4); a receipt without relations is not describable.
+     */
+    private static ApprovalOut approval(Obj bundle, String id, List<Relation> relations) {
+        if (bundle == null) return null;
+        if (!bundle.has("relations") || !bundle.raw("relations").isArray()) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        }
+        Set<String> shown = relations.stream()
+                .filter(r -> "INVOLVES".equals(r.relationType()) && r.source().equals(id))
+                .map(Relation::relationId).collect(Collectors.toSet());
+        for (Obj relation : bundle.objects("relations")) {
+            if (shown.contains(relation.string("id")) && relation.has("provenance")
+                    && OPERATOR_APPROVED.equals(relation.object("provenance").stringOrNull("s3SemanticValidation"))) {
+                return ADMIN_APPROVAL;
+            }
+        }
+        return null;
     }
 
     /** FOLLOWS points from the later issue to the earlier one; only issues visible in this read are listed. */

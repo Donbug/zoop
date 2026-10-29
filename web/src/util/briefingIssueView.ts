@@ -6,6 +6,14 @@ import { validPriceContext } from './briefingPriceContext';
 import { issuePrevious } from './briefingIssueComparison';
 import { validIssueIntelligence } from './issueIntelligence';
 
+type IssueReference = {
+  id: string;
+  title: string;
+  url: string;
+  publishedAt: string;
+  quote: string;
+};
+
 /** A company is never the selection key. Each statement must actually cite this issue.
  * A company-wide judgment citing another selected issue cannot be cloned across cards.
  * Nonselected background sources remain identified as context, not S3 impact verdicts.
@@ -88,7 +96,10 @@ export function briefingIssueViews(
               fact: current?.newInformation,
               conditions: current?.conditions ?? [],
               risks: current?.risks ?? [],
-              refs: sourceIds.map((id) => ({ id, ...issue!.sources[id] })),
+              refs: sourceIds.map((id): IssueReference => ({
+                id,
+                ...issue!.sources[id],
+              })),
               assessment: current?.assessment,
               price,
               news:
@@ -148,7 +159,16 @@ export function briefingIssueViews(
           const conclusion = anchored(original?.takeaway)
             ? original.takeaway
             : undefined;
-          const nextChecks = original?.watch.filter(anchored) ?? conditions;
+          const watch = original?.watch.filter(anchored) ?? [];
+          const nextChecks = [...watch, ...conditions].filter(
+            (value, index, all) =>
+              all.findIndex(
+                (other) =>
+                  other.text === value.text &&
+                  [...other.evidenceIds].sort().join('|') ===
+                    [...value.evidenceIds].sort().join('|'),
+              ) === index,
+          );
           const positive = anchored(original?.positive)
             ? original.positive
             : undefined;
@@ -158,7 +178,7 @@ export function briefingIssueViews(
           const fact = anchored(original?.newInformation)
             ? original.newInformation
             : undefined;
-          const refs = [
+          const refs: IssueReference[] = [
             ...new Set(
               [
                 impact,

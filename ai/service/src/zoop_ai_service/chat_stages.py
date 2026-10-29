@@ -29,7 +29,7 @@ from .chat_wire import ANSWERS, CHAT_SCHEMA, INVOCATION_ID, ChatStageRequest, Ch
 SLOTS = 4
 SLOT_WAIT = 1.0
 # The worker's own client timeout per stage plus process start and ledger writes.
-STAGE_DEADLINE = {"chat-router": 4.0 + 3.0, "chat-answer": 25.0 + 3.0, "chat-verification": 6.0 + 3.0}
+STAGE_DEADLINE = {"chat-router": 4.0 + 3.0, "chat-answer": 25.0 + 3.0, "chat-verification": 6.0 + 3.0, "chat-agent": 30.0 + 3.0}
 # Exit-64 codes that are the caller's fault, and those that are the server's configuration.
 REQUEST_CODES = frozenset({"request_invalid"})
 CONFIG_CODES = frozenset({"state_dir_invalid", "grant_registry_invalid", "replay_fixture_invalid", "replay_fixture_required"})

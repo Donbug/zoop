@@ -182,6 +182,24 @@ public class EvidenceService {
     }
 
     /**
+     * {@link #read} for a caller that already pinned {@code graphVersion} (a company documents page): the version is kept as
+     * pinned, never re-selected from the public selector, and {@code filteredAt} is set only when that read was filtered by a
+     * requested time, so an unfiltered page keeps its undated documents. Current source grants are still checked now.
+     */
+    public EvidenceResponse readPinned(String id, String graphVersion, Instant filteredAt, String companyId, String requestId) {
+        if (id == null || !EVIDENCE_ID.matcher(id).matches()) {
+            throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
+        Instant now = clock.instant();
+        try {
+            return transaction.execute(status -> dispatch(id, graphVersion, filteredAt, companyId, requestId, now, true));
+        } catch (DataAccessException | TransactionException error) {
+            log.warn("Evidence read failed in the database (cause={}, requestId={})", error.getClass().getSimpleName(), requestId);
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, error);
+        }
+    }
+
+    /**
      * The registry is chosen by what is STORED, never by a request parameter: a row whose verification artifact is a graph
      * import {@code verification_receipt} is a graph body citation; every other row is an S1 summary citation. S1 citations
      * have no pinned form: a graph version or as-of is refused before the S1 registry is read.
@@ -192,7 +210,7 @@ public class EvidenceService {
         ArtifactRow verification = row.verificationArtifactId() == null ? null
                 : registry.findArtifact(row.verificationArtifactId()).orElse(null);
         if (verification != null && GRAPH_RECEIPT.equals(verification.kind())) {
-            return serveGraph(row, graphVersion, asOf, companyId, requestId, now);
+            return serveGraph(row, graphVersion, asOf, companyId, requestId, now, pinGraphOnly);
         }
         if (!pinGraphOnly && (graphVersion != null || asOf != null)) {
             throw new CustomException(ErrorCode.VERSION_UNAVAILABLE);
@@ -371,9 +389,11 @@ public class EvidenceService {
      * involved. Any denial is {@code EVIDENCE_UNAVAILABLE} without a reason on the wire.
      */
     private EvidenceResponse serveGraph(EvidenceView row, String graphVersion, Instant asOf, String companyId, String requestId,
-            Instant now) {
+            Instant now, boolean pinned) {
         // A selector failure keeps its own status: 409 unavailable or staged, 422 inconsistent, 503 unreadable snapshot.
-        GraphEvidence found = graph.read(graphVersion, asOf, row.id());
+        // A re-check of a version the caller already pinned keeps it as pinned (asOf only when that read was filtered).
+        GraphEvidence found = pinned && graphVersion != null ? graph.readPinned(graphVersion, asOf, row.id())
+                : graph.read(graphVersion, asOf, row.id());
         return serveGraph(row, companyId, requestId, now, found);
     }
 

@@ -52,6 +52,13 @@ export default function CandidateDetailPanel({
     decision: 'allow' | 'reject';
   } | null>(null);
   const [message, setMessage] = useState('');
+  // 409 뒤 조용히 다시 읽는 동안 기억하는 이전 상세. 새 상세가 오면 비운다.
+  const [conflictFrom, setConflictFrom] = useState<{
+    data: CandidateDetail;
+    refreshError?: Error;
+  } | null>(null);
+  // 다시 읽은 상세에서 고른 관계를 더는 결정할 수 없어 폼을 닫았다는 안내
+  const [closedNotice, setClosedNotice] = useState(false);
 
   if (detail.status === 'loading')
     return <Loading>후보 상세를 불러오고 있어요</Loading>;
@@ -85,6 +92,31 @@ export default function CandidateDetailPanel({
   const targetRelation = target
     ? c.relations.find((relation) => relation.relationId === target.relationId)
     : undefined;
+  // 409 뒤 다시 읽기: 새 상세가 오기 전(reloading)이나 실패(failed)면 예전 revision으로 다시 보내지 않게 막는다.
+  if (conflictFrom && c !== conflictFrom.data) setConflictFrom(null);
+  const refresh: 'idle' | 'reloading' | 'failed' =
+    !conflictFrom || c !== conflictFrom.data
+      ? 'idle'
+      : detail.refreshError && detail.refreshError !== conflictFrom.refreshError
+        ? 'failed'
+        : 'reloading';
+  function reloadAfterConflict() {
+    setConflictFrom({ data: c, refreshError: detail.refreshError });
+    detail.reload({ quiet: true });
+  }
+  // 새로 읽은 상세에서 그 관계를 더는 결정할 수 없으면(다른 관리자가 결정·재분석에서 빠짐)
+  // 폼을 닫고 선택을 풀어 다른 관계를 바로 고를 수 있게 한다.
+  if (
+    target &&
+    refresh === 'idle' &&
+    !(
+      targetRelation &&
+      (target.decision === 'allow' ? canAllow : canReject)(targetRelation)
+    )
+  ) {
+    setTarget(null);
+    setClosedNotice(true);
+  }
   function done(result: CandidateDecisionResponse) {
     setMessage(
       result.decision === 'approved'
@@ -243,7 +275,7 @@ export default function CandidateDetailPanel({
                 <tr key={relation.relationId}>
                   <td className={`${TD} whitespace-nowrap`}>
                     {relationLabel(relation.relationType)}
-                    <span className="block font-inter text-[10px] break-all text-zoop-muted">
+                    <span className="block font-inter text-[11px] break-all text-zoop-muted">
                       {relation.relationId} · 회차 {relation.revision}
                     </span>
                   </td>
@@ -266,6 +298,7 @@ export default function CandidateDetailPanel({
                           aria-label={`${relation.source} → ${relation.target} 관계 승인`}
                           onClick={() => {
                             setMessage('');
+                            setClosedNotice(false);
                             setTarget({
                               relationId: relation.relationId,
                               decision: 'allow',
@@ -281,6 +314,7 @@ export default function CandidateDetailPanel({
                           aria-label={`${relation.source} → ${relation.target} 관계 거부`}
                           onClick={() => {
                             setMessage('');
+                            setClosedNotice(false);
                             setTarget({
                               relationId: relation.relationId,
                               decision: 'reject',
@@ -296,14 +330,29 @@ export default function CandidateDetailPanel({
               ))}
             </tbody>
           </Table>
+          {closedNotice && (
+            <p role="status" className="text-xs text-zoop-alert">
+              그 사이 고른 관계가 결정됐거나 목록에서 빠져 더는 결정할 수 없어
+              폼을 닫았어요. 새로 읽은 상태를 확인해 주세요.
+            </p>
+          )}
           {target && targetRelation && (
             <CandidateDecisionForm
               key={`${target.relationId}:${target.decision}`}
               candidateId={c.candidateId}
               relation={targetRelation}
               decision={target.decision}
-              onCancel={() => setTarget(null)}
+              refresh={refresh}
+              onRetryRefresh={reloadAfterConflict}
+              onCancel={() => {
+                setTarget(null);
+                setConflictFrom(null);
+              }}
               onDone={done}
+              onConflict={() => {
+                reloadAfterConflict();
+                onDecided?.();
+              }}
             />
           )}
         </Section>

@@ -46,7 +46,7 @@ const point = (id: string) =>
 function ExampleMap() {
   return (
     <figure className="relative m-0 overflow-hidden rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper">
-      <figcaption className="absolute top-3 left-3 rounded-full border-[0.667px] border-zoop-line bg-zoop-wash px-2 py-0.5 text-[10px] text-zoop-muted">
+      <figcaption className="absolute top-3 left-3 rounded-full border-[0.667px] border-zoop-line bg-zoop-wash px-2 py-0.5 text-[11px] text-zoop-muted">
         예시 화면
       </figcaption>
       <svg
@@ -130,7 +130,7 @@ function ExampleMap() {
               x={c.x}
               y={c.y + 36}
               textAnchor="middle"
-              className="fill-zoop-muted text-[10px]"
+              className="fill-zoop-muted text-[11px]"
             >
               {c.holding ? `${c.label} · 보유` : c.label}
             </text>

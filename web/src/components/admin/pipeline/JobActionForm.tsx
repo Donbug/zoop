@@ -201,7 +201,7 @@ export default function JobActionForm({
           onChange={(event) => setReason(event.target.value)}
           className={TEXTAREA}
         />
-        <p className="self-end text-[10px] text-zoop-faint tabular-nums">
+        <p className="self-end text-[11px] text-zoop-faint tabular-nums">
           {reason.length}/{REASON_MAX}
         </p>
       </div>

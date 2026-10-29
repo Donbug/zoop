@@ -6,12 +6,12 @@ from __future__ import annotations
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
 CHAT_SCHEMA = "zoop-ai-chat-1"
-ChatStage = Literal["chat-router", "chat-answer", "chat-verification"]
-STAGES: tuple[str, ...] = ("chat-router", "chat-answer", "chat-verification")
+ChatStage = Literal["chat-router", "chat-answer", "chat-verification", "chat-agent"]
+STAGES: tuple[str, ...] = ("chat-router", "chat-answer", "chat-verification", "chat-agent")
 # The caller's invocation id. The service prefixes it with the principal before the child sees it, so two principals never share a ledger row.
 INVOCATION_ID = re.compile(r"[A-Za-z0-9_.:-]{8,96}")
 
@@ -98,7 +98,36 @@ class VerificationAnswer(ChatWire):
     sections: list[SectionVerdict]
 
 
-ANSWERS: dict[str, type[ChatWire]] = {"chat-router": RouterAnswer, "chat-answer": ChatAnswer, "chat-verification": VerificationAnswer}
+class ApprovalRequest(ChatWire):
+    """A tool call the model proposed and the provider holds for the application's decision. The service relays it; it never decides."""
+    approval_request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+    tool_name: str = Field(pattern=r"^[A-Za-z0-9_]{1,64}$")
+    arguments: dict[str, Any]
+
+
+class McpCallSummary(ChatWire):
+    tool_name: str = Field(pattern=r"^[A-Za-z0-9_]{1,64}$")
+    failed: bool
+
+
+class AgentAnswer(ChatWire):
+    """One `chat-agent` step: `approval_required` with the held tool calls and no answer, or `completed` with the final answer. `responseId` is
+    the stored provider response the next step resumes with the application's decisions."""
+    response_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+    status: Literal["approval_required", "completed"]
+    approval_requests: list[ApprovalRequest]
+    mcp_calls: list[McpCallSummary]
+    answer: ChatAnswer | None
+
+    @model_validator(mode="after")
+    def outcome(self):
+        if (self.status == "approval_required") != bool(self.approval_requests) or (self.status == "completed") != (self.answer is not None):
+            raise ValueError("approval requests exactly when approval is required, an answer exactly when completed")
+        return self
+
+
+ANSWERS: dict[str, type[ChatWire]] = {"chat-router": RouterAnswer, "chat-answer": ChatAnswer, "chat-verification": VerificationAnswer,
+                                      "chat-agent": AgentAnswer}
 
 
 class ChatStageResult(ChatView):
@@ -109,7 +138,8 @@ class ChatStageResult(ChatView):
     invocation_id: str
     stage: ChatStage
     status: Literal["succeeded", "failed"]
-    answer: RouterAnswer | ChatAnswer | VerificationAnswer | None = Field(
-        description="The typed stage answer when succeeded: RouterAnswer (chat-router), ChatAnswer (chat-answer) or VerificationAnswer (chat-verification).")
+    answer: RouterAnswer | ChatAnswer | VerificationAnswer | AgentAnswer | None = Field(
+        description="The typed stage answer when succeeded: RouterAnswer (chat-router), ChatAnswer (chat-answer), VerificationAnswer "
+                    "(chat-verification) or AgentAnswer (chat-agent).")
     failure: ChatStageFailure | None
     receipt: ChatReceipt | None = Field(description="Who received the request and what they reported; present once a request was sent.")
