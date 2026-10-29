@@ -317,7 +317,7 @@ bundle `-7` 스테이징 뒤, 공개 제외 저장소가 연결된 기본 설정
 
 ## 그래프 정기 회차 (#55)
 
-`com.zoop.graph.round`는 공개 그래프를 30분 회차마다 자동으로 갱신하는 작업의 앱 쪽 조각입니다(AI는 `round-runs`·`round-handoffs`·관측 export를 HTTP로 제공, 앱은 스케줄러·`analyze_plan` 접수·수입·활성화). 2026-10-29 현재 들어 있는 것은 **회차 상태 테이블**(슬롯당 1행 + append-only 이벤트, lease, 영구 보존), **수입 bridge**(`GraphRoundImportBridge`: 위 운영자 수입기와 같은 `GraphHandoffImporter`를 웹 애플리케이션 안에서 회차 행의 핀으로 호출하고 결과를 행·이벤트에 기록. 가장 최근 수입된 회차보다 오래된 슬롯은 `skipped_superseded`로 건너뛰어 자동 활성화가 옛 회차를 공개하지 않게 함), **관리자 읽기**(`GET /api/v1/admin/pipeline/rounds`, `/{roundId}`, overview의 `rounds` 섹션)입니다. 스케줄러 본체·retry·수동 시작은 AI #387 계약 뒤에 붙으며, 그 전까지 `ZOOP_GRAPH_ROUND_ENABLED=true`는 설정 검증 외에 아무것도 시작하지 않습니다. 설정·단계·제약·배포 제약(artifact store가 로컬 디스크 전용이라 단일 인스턴스)은 [그래프 정기 회차](docs/GRAPH_ROUND.md)에 있습니다.
+`com.zoop.graph.round`는 공개 그래프를 30분 회차마다 자동으로 갱신하는 작업의 앱 쪽 조각입니다(AI는 `round-runs`·`round-handoffs`·관측 export를 HTTP로 제공, 앱은 스케줄러·`analyze_plan` 접수·수입·활성화). 2026-10-29 현재 들어 있는 것은 **회차 상태 테이블**(슬롯당 1행 + append-only 이벤트, lease, 영구 보존), **수입 bridge**(`GraphRoundImportBridge`: 위 운영자 수입기와 같은 `GraphHandoffImporter`를 웹 애플리케이션 안에서 회차 행의 핀으로 호출하고 결과를 행·이벤트에 기록. 버전과 회차의 연결은 수입 트랜잭션 안에서 기록하고, 그 기록을 기준으로 수입이 commit된 최근 회차보다 오래된 슬롯은 `skipped_superseded`로 건너뛰어 자동 활성화가 옛 회차를 공개하지 않게 함. 모든 기록은 claim한 lease의 token으로 fencing), **관리자 읽기**(`GET /api/v1/admin/pipeline/rounds`, `/{roundId}`, overview의 `rounds` 섹션)입니다. 스케줄러 본체·retry·수동 시작은 AI #387 계약 뒤에 붙으며, 그 전까지 `ZOOP_GRAPH_ROUND_ENABLED=true`는 설정 검증 외에 아무것도 시작하지 않습니다. 설정·단계·제약·배포 제약(artifact store가 로컬 디스크 전용이라 단일 인스턴스)은 [그래프 정기 회차](docs/GRAPH_ROUND.md)에 있습니다.
 
 
 ## 공개 제외 명령 (FS081)

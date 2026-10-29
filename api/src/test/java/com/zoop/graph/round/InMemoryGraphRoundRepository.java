@@ -13,10 +13,15 @@ import com.zoop.graph.round.GraphRound.Lease;
 import com.zoop.graph.round.GraphRoundEvent.Outcome;
 import tools.jackson.databind.JsonNode;
 
-/** The round rows in memory, with the same rules as the SQL (one row per slot, append-only timeline). */
+/**
+ * The round rows in memory, with the same rules as the SQL (one row per slot, append-only timeline, fencing on the lease token
+ * and the expected stage). {@link #link} has no transaction of its own here: a test that needs "the link is undone with the
+ * import" wraps it like the importer's double does.
+ */
 public final class InMemoryGraphRoundRepository implements GraphRoundRepository {
     private final Map<String, GraphRound> rows = new LinkedHashMap<>();
     private final List<GraphRoundEvent> events = new ArrayList<>();
+    private long tokens;
 
     @Override
     public GraphRound create(String roundId, Instant slotAt, String startedBy, Instant now) {
@@ -30,13 +35,19 @@ public final class InMemoryGraphRoundRepository implements GraphRoundRepository 
         return round;
     }
 
-    /** A row at a given stage with its handoff pins, as the scheduler would have left it before R7. */
+    /** A row at a given stage with its handoff pins, as the scheduler would have left it before R7 (no lease). */
     public GraphRound seed(String roundId, Instant slotAt, GraphRoundStage stage, String handoffId, String manifestDigest,
             String bundleDigest, int attempts) {
+        return seed(roundId, slotAt, stage, handoffId, manifestDigest, bundleDigest, null, attempts);
+    }
+
+    /** The same with a version already linked (an import whose stage change was lost). */
+    public GraphRound seed(String roundId, Instant slotAt, GraphRoundStage stage, String handoffId, String manifestDigest,
+            String bundleDigest, String graphVersionId, int attempts) {
         GraphRound round = new GraphRound(roundId, slotAt, stage, Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.ofNullable(handoffId), Optional.ofNullable(manifestDigest), Optional.ofNullable(bundleDigest),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), attempts, Optional.empty(),
-                Optional.empty(), "system:scheduler", slotAt, slotAt);
+                Optional.ofNullable(graphVersionId), Optional.empty(), Optional.empty(), Optional.empty(), attempts,
+                Optional.empty(), Optional.empty(), "system:scheduler", slotAt, slotAt);
         rows.put(roundId, round);
         return round;
     }
@@ -61,11 +72,16 @@ public final class InMemoryGraphRoundRepository implements GraphRoundRepository 
     @Override
     public Optional<GraphRound> claim(String roundId, String owner, Duration lease, Instant now) {
         GraphRound round = rows.get(roundId);
-        if (round == null || !round.open()) return Optional.empty();
+        if (round == null || round.stage() == GraphRoundStage.IMPORTED || round.stage() == GraphRoundStage.SKIPPED) {
+            return Optional.empty();
+        }
         boolean free = round.lease().map(l -> l.owner().equals(owner) || l.until().isBefore(now)).orElse(true);
         if (!free) return Optional.empty();
+        boolean renewal = round.lease().map(l -> l.owner().equals(owner) && !l.until().isBefore(now)).orElse(false);
+        long token = renewal ? round.lease().orElseThrow().token() : ++tokens;
         GraphRound taken = with(round, round.stage(), round.failureCode().orElse(null), round.attempts(),
-                round.nextAttemptAt().orElse(null), Optional.of(new Lease(owner, now.plus(lease))), round.graphVersionId().orElse(null), now);
+                round.nextAttemptAt().orElse(null), Optional.of(new Lease(owner, now.plus(lease), token)),
+                round.graphVersionId().orElse(null), now);
         rows.put(roundId, taken);
         return Optional.of(taken);
     }
@@ -80,10 +96,11 @@ public final class InMemoryGraphRoundRepository implements GraphRoundRepository 
     }
 
     @Override
-    public GraphRound advance(String roundId, GraphRoundPatch patch, Outcome outcome, String code, String requestId,
-            JsonNode detail, Instant at) {
-        GraphRound round = rows.get(roundId);
-        if (round == null) throw new IllegalStateException("round not found");
+    public Optional<GraphRound> advance(GraphRound expected, GraphRoundPatch patch, Outcome outcome, String code,
+            String requestId, JsonNode detail, Instant at) {
+        GraphRound round = current(expected);
+        if (round == null) return Optional.empty();
+        String roundId = round.roundId();
         int attempts = (patch.resetAttempts() ? 0 : round.attempts()) + (patch.countAttempt() ? 1 : 0);
         Instant next = patch.clearNextAttempt() ? null : patch.nextAttemptAt() != null ? patch.nextAttemptAt()
                 : round.nextAttemptAt().orElse(null);
@@ -91,13 +108,32 @@ public final class InMemoryGraphRoundRepository implements GraphRoundRepository 
                 first(patch.planId(), round.planId()), first(patch.planDigest(), round.planDigest()),
                 first(patch.analysisJobId(), round.analysisJobId()), first(patch.handoffId(), round.handoffId()),
                 first(patch.manifestDigest(), round.manifestDigest()), first(patch.bundleDigest(), round.bundleDigest()),
-                first(patch.graphVersionId(), round.graphVersionId()), round.activatedVersionId(), round.activationNote(),
+                patch.clearGraphVersion() ? Optional.empty() : first(patch.graphVersionId(), round.graphVersionId()),
+                round.activatedVersionId(), round.activationNote(),
                 Optional.ofNullable(patch.failureCode()), attempts, Optional.ofNullable(next),
                 patch.stage().terminal() ? Optional.empty() : round.lease(), round.startedBy(), round.createdAt(), at);
         rows.put(roundId, updated);
         events.add(new GraphRoundEvent(events.size() + 1, roundId, at, patch.stage(), outcome, Optional.ofNullable(code),
                 Optional.ofNullable(requestId), Optional.ofNullable(detail)));
-        return updated;
+        return Optional.of(updated);
+    }
+
+    @Override
+    public boolean link(GraphRound expected, String graphVersionId, Instant at) {
+        GraphRound round = current(expected);
+        if (round == null) return false;
+        rows.put(round.roundId(), with(round, round.stage(), round.failureCode().orElse(null), round.attempts(),
+                round.nextAttemptAt().orElse(null), round.lease(), graphVersionId, at));
+        return true;
+    }
+
+    /** The row when it is still at the expected stage under the expected lease token, else null (fenced). */
+    private GraphRound current(GraphRound expected) {
+        long token = expected.lease().orElseThrow(() -> new IllegalArgumentException("the round must be claimed first")).token();
+        GraphRound round = rows.get(expected.roundId());
+        if (round == null) throw new IllegalStateException("round not found");
+        boolean same = round.stage() == expected.stage() && round.lease().map(l -> l.token() == token).orElse(false);
+        return same ? round : null;
     }
 
     @Override
@@ -129,7 +165,7 @@ public final class InMemoryGraphRoundRepository implements GraphRoundRepository 
 
     @Override
     public Optional<GraphRound> newestImported() {
-        return rows.values().stream().filter(r -> r.stage() == GraphRoundStage.IMPORTED)
+        return rows.values().stream().filter(r -> r.stage() == GraphRoundStage.IMPORTED || r.graphVersionId().isPresent())
                 .max(Comparator.comparing(GraphRound::slotAt));
     }
 

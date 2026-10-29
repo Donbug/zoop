@@ -9,6 +9,12 @@
 --     external request id and the codes and digests of the answer. Never a path, a body or a secret. Rows are written once and
 --     leave only with their round, which itself is never deleted.
 -- The analysis job and the graph version a round produced are foreign keys, so a round can be followed to what it made.
+-- graph_version_id is written INSIDE the import transaction that registers the version (GraphRoundRepository.link), so the
+-- version and the round's claim on it commit together: the import order guard reads this column, never only the stage, and
+-- a crash between that commit and the stage change leaves nothing the guard cannot see.
+-- lease_token: issued with every new lease (claim). Every stage change (advance) and the link carry the token and the expected
+-- stage in their WHERE clause, so a worker whose lease expired and was taken over cannot write a late outcome over the new
+-- holder's (fencing).
 
 CREATE TABLE graph_rounds (
     round_id text PRIMARY KEY,
@@ -30,6 +36,7 @@ CREATE TABLE graph_rounds (
     next_attempt_at timestamptz,
     lease_owner text,
     lease_until timestamptz,
+    lease_token bigint,
     started_by text NOT NULL,
     created_at timestamptz NOT NULL,
     updated_at timestamptz NOT NULL,
@@ -40,7 +47,8 @@ CREATE TABLE graph_rounds (
         'handoff_ready', 'imported', 'skipped', 'failed')),
     CONSTRAINT ck_graph_rounds_failure CHECK ((stage = 'failed') = (failure_code IS NOT NULL)),
     CONSTRAINT ck_graph_rounds_attempts CHECK (attempts >= 0),
-    CONSTRAINT ck_graph_rounds_lease CHECK ((lease_owner IS NULL) = (lease_until IS NULL)),
+    CONSTRAINT ck_graph_rounds_lease CHECK (
+        (lease_owner IS NULL) = (lease_until IS NULL) AND (lease_owner IS NULL) = (lease_token IS NULL)),
     CONSTRAINT ck_graph_rounds_started_by CHECK (started_by ~ '^(system:scheduler|admin:[A-Za-z0-9._:-]{1,128})$'),
     CONSTRAINT ck_graph_rounds_digests CHECK (
         (manifest_digest IS NULL OR manifest_digest ~ '^[a-f0-9]{64}$')
@@ -48,10 +56,15 @@ CREATE TABLE graph_rounds (
         AND (plan_digest IS NULL OR plan_digest ~ '^[a-f0-9]{64}$'))
 );
 
--- The scheduler's work list: open rounds oldest first; the admin list: newest first; "newest imported round" for the import
--- order guard (an older round is never imported after a newer one).
+-- Fencing tokens: one per lease, never reused.
+CREATE SEQUENCE graph_round_lease_tokens AS bigint;
+
+-- The scheduler's work list: open rounds oldest first; the admin list: newest first; "newest round whose import committed"
+-- (stage imported, or a version linked inside the import transaction) for the import order guard (an older round is never
+-- imported after a newer one).
 CREATE INDEX ix_graph_rounds_open ON graph_rounds (slot_at) WHERE stage NOT IN ('imported', 'skipped', 'failed');
 CREATE INDEX ix_graph_rounds_stage_slot ON graph_rounds (stage, slot_at DESC);
+CREATE INDEX ix_graph_rounds_imported ON graph_rounds (slot_at DESC) WHERE stage = 'imported' OR graph_version_id IS NOT NULL;
 
 CREATE TABLE graph_round_events (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -79,7 +92,9 @@ $$;
 CREATE TRIGGER tr_graph_round_events_guard BEFORE UPDATE OR DELETE ON graph_round_events
     FOR EACH ROW EXECUTE FUNCTION graph_round_events_guard();
 
--- A round row is kept for good (round-level audit view); only its stage and progress columns change.
+-- A round row is kept for good (round-level audit view); only its stage and progress columns change. A finished round
+-- (imported, skipped) is never reopened (failed is: a retry resumes it), and the version a round made is written once (the
+-- FK's SET NULL when the retention policy prunes that version is the one way it changes).
 CREATE FUNCTION graph_rounds_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
@@ -88,6 +103,13 @@ BEGIN
     IF NEW.round_id IS DISTINCT FROM OLD.round_id OR NEW.slot_at IS DISTINCT FROM OLD.slot_at
        OR NEW.started_by IS DISTINCT FROM OLD.started_by OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
         RAISE EXCEPTION 'graph round identity is written once' USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF OLD.stage IN ('imported', 'skipped') AND NEW.stage IS DISTINCT FROM OLD.stage THEN
+        RAISE EXCEPTION 'a finished graph round is never reopened' USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF OLD.graph_version_id IS NOT NULL AND NEW.graph_version_id IS NOT NULL
+       AND NEW.graph_version_id IS DISTINCT FROM OLD.graph_version_id THEN
+        RAISE EXCEPTION 'the version a graph round made is written once' USING ERRCODE = 'restrict_violation';
     END IF;
     RETURN NEW;
 END

@@ -19,6 +19,12 @@ import com.zoop.graph.importer.HandoffFixtures.Built;
 import com.zoop.graph.importer.HandoffFixtures.FakeHandoff;
 import com.zoop.graph.importer.HandoffFixtures.FakeIngestion;
 import com.zoop.graph.read.GraphQueryService;
+import com.zoop.graph.round.GraphRound;
+import com.zoop.graph.round.GraphRoundEvent;
+import com.zoop.graph.round.GraphRoundImportBridge;
+import com.zoop.graph.round.GraphRoundPatch;
+import com.zoop.graph.round.GraphRoundStage;
+import com.zoop.graph.round.JdbcGraphRoundRepository;
 import com.zoop.graph.snapshot.ArtifactGraphSnapshotStore;
 import com.zoop.graph.snapshot.FixtureGraphVersionSeeder;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
@@ -29,9 +35,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -65,6 +73,7 @@ class GraphHandoffImportPostgresIntegrationTest {
     private static JdbcGraphHandoffRepository graph;
     private static TransactionTemplate transaction;
     private static FixtureGraphVersionSeeder seeder;
+    private static JdbcGraphRoundRepository rounds;
 
     @TempDir
     Path temp;
@@ -95,6 +104,7 @@ class GraphHandoffImportPostgresIntegrationTest {
         graph = context.getBean(JdbcGraphHandoffRepository.class);
         transaction = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
         seeder = context.getBean(FixtureGraphVersionSeeder.class);
+        rounds = context.getBean(JdbcGraphRoundRepository.class);
     }
 
     @AfterAll
@@ -105,6 +115,8 @@ class GraphHandoffImportPostgresIntegrationTest {
 
     /** Removes everything this test creates, children first; the fixture versions are re-seeded by every test. */
     private static void clean() {
+        // Round rows reference versions (SET NULL on delete) and are guarded against DELETE: TRUNCATE first.
+        jdbc.execute("TRUNCATE graph_round_events, graph_rounds");
         jdbc.update("DELETE FROM graph_activations");
         jdbc.update("DELETE FROM graph_versions");
         jdbc.update("DELETE FROM evidence WHERE article_id = ?", HandoffFixtures.ARTICLE_ID);
@@ -812,5 +824,73 @@ class GraphHandoffImportPostgresIntegrationTest {
             // The schema is this test's alone; the shared test database must not keep a copy per run.
             jdbc.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE");
         }
+    }
+
+    /**
+     * The round bridge over the real tables (#428 review): the newest round's import commits its version together with the
+     * round's link to it, in one transaction. When the process stops right after that commit (before the row reaches
+     * {@code imported}), an older round retried afterwards is still skipped, because the order guard reads the committed link;
+     * the newest round's next attempt completes with {@code unchanged} and no second version. A fenced link (the lease taken
+     * over during the import) rolls the whole import back.
+     */
+    @Test
+    void aRoundVersionCommittedBeforeTheStageChangeSupersedesOlderRoundsAndTheNextAttemptCompletesIt() throws Exception {
+        Instant slot1 = Instant.parse("2026-10-30T00:05:00Z");
+        Instant slot2 = Instant.parse("2026-10-30T00:35:00Z");
+        Instant now = Instant.parse("2026-10-30T00:40:00Z");
+        Duration lease = Duration.ofMinutes(10);
+        String handoffId = built.spec().handoffId();
+        rounds.create("round-20261030T0905", slot1, "system:scheduler", now);
+        rounds.create("round-20261030T0935", slot2, "system:scheduler", now);
+        GraphRound older = rounds.advance(rounds.claim("round-20261030T0905", "task-a", lease, now).orElseThrow(),
+                GraphRoundPatch.advanceTo(GraphRoundStage.HANDOFF_READY).handoff(handoffId, built.manifestDigest(),
+                        built.bundleDigest()), GraphRoundEvent.Outcome.ADVANCED, null, null, null, now).orElseThrow();
+        GraphRound newest = rounds.advance(rounds.claim("round-20261030T0935", "task-a", lease, now).orElseThrow(),
+                GraphRoundPatch.advanceTo(GraphRoundStage.HANDOFF_READY).handoff(handoffId, built.manifestDigest(),
+                        built.bundleDigest()), GraphRoundEvent.Outcome.ADVANCED, null, null, null, now).orElseThrow();
+        GraphRoundImportBridge bridge = new GraphRoundImportBridge(importer, rounds, () -> Optional.of(() -> { }), "scheduler",
+                Duration.ofMinutes(1), Duration.ofMinutes(5), 20, Clock.fixed(now, java.time.ZoneOffset.UTC));
+        int versionsBefore = count("SELECT count(*) FROM graph_versions");
+        long filesBefore = files();
+        int newestEventsBefore = rounds.events("round-20261030T0935").size();
+
+        // A link fenced inside the import (the lease was taken over meanwhile) rolls the import back: no version, no files.
+        rounds.claim("round-20261030T0935", "task-b", lease, now.plus(lease).plusSeconds(1)).orElseThrow();
+        GraphRound untouched = bridge.importRound(newest);
+        assertEquals("task-b", untouched.lease().orElseThrow().owner());
+        assertEquals(GraphRoundStage.HANDOFF_READY, untouched.stage());
+        assertTrue(untouched.graphVersionId().isEmpty());
+        assertEquals(versionsBefore, count("SELECT count(*) FROM graph_versions"));
+        assertEquals(filesBefore, files());
+        assertEquals(newestEventsBefore, rounds.events("round-20261030T0935").size(), "nothing is recorded by the fenced worker");
+
+        // The holder's import, stopped right after the commit: what the bridge's transaction leaves, without the advance().
+        GraphRound holder = rounds.find("round-20261030T0935").orElseThrow();
+        GraphHandoffResult committed = importer.run(new GraphHandoffRequest(handoffId, built.manifestDigest(),
+                built.bundleDigest(), "scheduler"), staged -> assertTrue(rounds.link(holder, staged.versionId(), now)));
+        assertTrue(committed.succeeded());
+        GraphRound linked = rounds.find("round-20261030T0935").orElseThrow();
+        assertEquals(Optional.of(built.versionId()), linked.graphVersionId());
+        assertEquals(GraphRoundStage.HANDOFF_READY, linked.stage(), "the stage change was lost");
+        assertEquals(versionsBefore + 1, count("SELECT count(*) FROM graph_versions"));
+        assertEquals(Optional.of("round-20261030T0935"), rounds.newestImported().map(GraphRound::roundId));
+
+        // The older round retried now: skipped before anything is read, no new version.
+        GraphRound skipped = bridge.importRound(older);
+        assertEquals(GraphRoundStage.SKIPPED, skipped.stage());
+        List<GraphRoundEvent> events = rounds.events("round-20261030T0905");
+        assertEquals("skipped_superseded", events.get(events.size() - 1).code().orElseThrow());
+        assertEquals("round-20261030T0935", events.get(events.size() - 1).detail().orElseThrow().get("supersededBy").stringValue());
+        assertEquals(versionsBefore + 1, count("SELECT count(*) FROM graph_versions"));
+
+        // The newest round's next attempt: the same pins are unchanged, the stage change completes, still one version.
+        GraphRound completed = bridge.importRound(rounds.claim("round-20261030T0935", "task-b", lease, now).orElseThrow());
+        assertEquals(GraphRoundStage.IMPORTED, completed.stage());
+        assertEquals(Optional.of(built.versionId()), completed.graphVersionId());
+        assertTrue(completed.lease().isEmpty());
+        List<GraphRoundEvent> newestEvents = rounds.events("round-20261030T0935");
+        assertEquals("unchanged", newestEvents.get(newestEvents.size() - 1).code().orElseThrow());
+        assertEquals(versionsBefore + 1, count("SELECT count(*) FROM graph_versions"));
+        assertEquals(1, count("SELECT count(*) FROM graph_rounds WHERE graph_version_id = ?", built.versionId()));
     }
 }

@@ -15,6 +15,7 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -26,10 +27,12 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
     private static final String COLUMNS = """
             round_id, slot_at, stage, plan_id, plan_digest, analysis_job_id, handoff_id, manifest_digest, bundle_digest,
             graph_version_id, activated_version_id, activation_note, failure_code, attempts, next_attempt_at,
-            lease_owner, lease_until, started_by, created_at, updated_at
+            lease_owner, lease_until, lease_token, started_by, created_at, updated_at
             """;
     private static final String SELECT = "SELECT " + COLUMNS + " FROM graph_rounds ";
     private static final String TERMINAL = "('imported', 'skipped', 'failed')";
+    /** Finished for good; a failed round is still taken for a retry. */
+    private static final String FINISHED = "('imported', 'skipped')";
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper mapper;
@@ -73,12 +76,19 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
                 """, new MapSqlParameterSource("now", stamp(now)).addValue("limit", limit), JdbcGraphRoundRepository::round);
     }
 
-    /** Only an open row can be taken: a terminal round has nothing left to do and keeps no lease. */
+    /**
+     * A finished row ({@code imported}, {@code skipped}) is never taken: it has nothing left to do and keeps no lease; a failed
+     * one is taken for its retry. A new lease gets the next token of {@code graph_round_lease_tokens}; the holder renewing an
+     * unexpired lease keeps its token.
+     */
     @Override
     public Optional<GraphRound> claim(String roundId, String owner, Duration lease, Instant now) {
         return first(jdbc.query("""
-                UPDATE graph_rounds SET lease_owner = :owner, lease_until = :until, updated_at = :now
-                WHERE round_id = :id AND stage NOT IN """ + TERMINAL + """
+                UPDATE graph_rounds SET
+                    lease_token = CASE WHEN lease_owner = :owner AND lease_until >= :now THEN lease_token
+                                       ELSE nextval('graph_round_lease_tokens') END,
+                    lease_owner = :owner, lease_until = :until, updated_at = :now
+                WHERE round_id = :id AND stage NOT IN """ + FINISHED + """
                   AND (lease_owner IS NULL OR lease_owner = :owner OR lease_until < :now)
                 RETURNING
                 """ + COLUMNS, new MapSqlParameterSource("id", roundId).addValue("owner", owner)
@@ -88,19 +98,24 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
     @Override
     public void release(String roundId, String owner) {
         jdbc.update("""
-                UPDATE graph_rounds SET lease_owner = NULL, lease_until = NULL
+                UPDATE graph_rounds SET lease_owner = NULL, lease_until = NULL, lease_token = NULL
                 WHERE round_id = :id AND lease_owner = :owner
                 """, new MapSqlParameterSource("id", roundId).addValue("owner", owner));
     }
 
-    /** The lease is kept while the round stays open and dropped with a terminal stage. */
+    /**
+     * Fenced on the expected stage and the lease token: a row that moved on, or whose lease another holder took, is left as it is
+     * and no event is written. The lease is kept while the round stays open and dropped with a terminal stage.
+     */
     @Override
-    public GraphRound advance(String roundId, GraphRoundPatch patch, Outcome outcome, String code, String requestId,
-            JsonNode detail, Instant at) {
+    public Optional<GraphRound> advance(GraphRound expected, GraphRoundPatch patch, Outcome outcome, String code,
+            String requestId, JsonNode detail, Instant at) {
+        long token = token(expected);
         String detailJson = detail == null ? null : mapper.writeValueAsString(detail);
         if (detailJson != null && detailJson.getBytes(StandardCharsets.UTF_8).length > MAX_DETAIL_BYTES) {
             throw new IllegalArgumentException("round event detail exceeds " + MAX_DETAIL_BYTES + " bytes");
         }
+        String roundId = expected.roundId();
         return tx.execute(ignored -> {
             List<GraphRound> updated = jdbc.query("""
                     UPDATE graph_rounds SET
@@ -111,32 +126,56 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
                         handoff_id = COALESCE(:handoffId, handoff_id),
                         manifest_digest = COALESCE(:manifestDigest, manifest_digest),
                         bundle_digest = COALESCE(:bundleDigest, bundle_digest),
-                        graph_version_id = COALESCE(:versionId, graph_version_id),
+                        graph_version_id = CASE WHEN :clearVersion THEN NULL ELSE COALESCE(:versionId, graph_version_id) END,
                         failure_code = :failureCode,
                         attempts = CASE WHEN :reset THEN 0 ELSE attempts END + CASE WHEN :count THEN 1 ELSE 0 END,
                         next_attempt_at = CASE WHEN :clearNext THEN NULL ELSE COALESCE(:nextAt, next_attempt_at) END,
                         lease_owner = CASE WHEN :terminal THEN NULL ELSE lease_owner END,
                         lease_until = CASE WHEN :terminal THEN NULL ELSE lease_until END,
+                        lease_token = CASE WHEN :terminal THEN NULL ELSE lease_token END,
                         updated_at = :at
-                    WHERE round_id = :id
+                    WHERE round_id = :id AND stage = :expectedStage AND lease_token = :token
                     RETURNING
                     """ + COLUMNS, new MapSqlParameterSource("id", roundId).addValue("stage", patch.stage().wire())
+                    .addValue("expectedStage", expected.stage().wire()).addValue("token", token)
                     .addValue("planId", patch.planId()).addValue("planDigest", patch.planDigest())
                     .addValue("jobId", patch.analysisJobId()).addValue("handoffId", patch.handoffId())
                     .addValue("manifestDigest", patch.manifestDigest()).addValue("bundleDigest", patch.bundleDigest())
-                    .addValue("versionId", patch.graphVersionId()).addValue("failureCode", patch.failureCode())
+                    .addValue("versionId", patch.graphVersionId()).addValue("clearVersion", patch.clearGraphVersion())
+                    .addValue("failureCode", patch.failureCode())
                     .addValue("reset", patch.resetAttempts()).addValue("count", patch.countAttempt())
                     .addValue("clearNext", patch.clearNextAttempt()).addValue("nextAt", stamp(patch.nextAttemptAt()))
                     .addValue("terminal", patch.stage().terminal()).addValue("at", stamp(at)), JdbcGraphRoundRepository::round);
-            if (updated.size() != 1) throw new IllegalStateException("round not found: " + roundId);
+            if (updated.isEmpty()) {
+                if (find(roundId).isEmpty()) throw new IllegalStateException("round not found: " + roundId);
+                return Optional.empty();
+            }
             jdbc.update("""
                     INSERT INTO graph_round_events (round_id, at, stage, outcome, code, request_id, detail)
                     VALUES (:id, :at, :stage, :outcome, :code, :requestId, CAST(:detail AS jsonb))
                     """, new MapSqlParameterSource("id", roundId).addValue("at", stamp(at)).addValue("stage", patch.stage().wire())
                     .addValue("outcome", outcome.wire()).addValue("code", code).addValue("requestId", requestId)
                     .addValue("detail", detailJson));
-            return updated.getFirst();
+            return Optional.of(updated.getFirst());
         });
+    }
+
+    /** Runs in the caller's transaction (no template of its own): the import's, so the link commits with the version. */
+    @Override
+    public boolean link(GraphRound expected, String graphVersionId, Instant at) {
+        long token = token(expected);
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("link must run inside the import transaction");
+        }
+        return jdbc.update("""
+                UPDATE graph_rounds SET graph_version_id = :versionId, updated_at = :at
+                WHERE round_id = :id AND stage = :expectedStage AND lease_token = :token
+                """, new MapSqlParameterSource("id", expected.roundId()).addValue("versionId", graphVersionId)
+                .addValue("expectedStage", expected.stage().wire()).addValue("token", token).addValue("at", stamp(at))) == 1;
+    }
+
+    private static long token(GraphRound expected) {
+        return expected.lease().orElseThrow(() -> new IllegalArgumentException("the round must be claimed first")).token();
     }
 
     @Override
@@ -180,8 +219,8 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
 
     @Override
     public Optional<GraphRound> newestImported() {
-        return first(jdbc.query(SELECT + "WHERE stage = 'imported' ORDER BY slot_at DESC LIMIT 1", new MapSqlParameterSource(),
-                JdbcGraphRoundRepository::round));
+        return first(jdbc.query(SELECT + "WHERE stage = 'imported' OR graph_version_id IS NOT NULL ORDER BY slot_at DESC LIMIT 1",
+                new MapSqlParameterSource(), JdbcGraphRoundRepository::round));
     }
 
     private static GraphRound round(ResultSet rs, int row) throws SQLException {
@@ -192,7 +231,8 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
                 text(rs, "analysis_job_id"), text(rs, "handoff_id"), text(rs, "manifest_digest"), text(rs, "bundle_digest"),
                 text(rs, "graph_version_id"), text(rs, "activated_version_id"), text(rs, "activation_note"),
                 text(rs, "failure_code"), rs.getInt("attempts"), instant(rs, "next_attempt_at"),
-                leaseOwner == null ? Optional.empty() : Optional.of(new Lease(leaseOwner, leaseUntil.toInstant())),
+                leaseOwner == null ? Optional.empty()
+                        : Optional.of(new Lease(leaseOwner, leaseUntil.toInstant(), rs.getLong("lease_token"))),
                 rs.getString("started_by"), rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant());
     }
 

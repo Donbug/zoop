@@ -17,6 +17,7 @@ import com.zoop.admin.pipeline.GraphRoundAdminResponse.GraphRoundsSection;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.graph.round.GraphRoundEvent.Outcome;
+import com.zoop.graph.round.GraphRound;
 import com.zoop.graph.round.GraphRoundPatch;
 import com.zoop.graph.round.GraphRoundStage;
 import com.zoop.graph.round.GraphRoundStatus;
@@ -48,9 +49,13 @@ class GraphRoundAdminServiceTest {
         }
     }
 
+    private GraphRound claimed(String roundId) {
+        return rounds.claim(roundId, "task-a", java.time.Duration.ofMinutes(2), NOW).orElseThrow();
+    }
+
     @Test
     void theListIsNewestFirstFilteredByStageAndPagedByAnOpaqueSlotCursor() {
-        rounds.advance("round-20261030T0935", GraphRoundPatch.advanceTo(GraphRoundStage.IMPORTED).graphVersion("gv-1"),
+        rounds.advance(claimed("round-20261030T0935"), GraphRoundPatch.advanceTo(GraphRoundStage.IMPORTED).graphVersion("gv-1"),
                 Outcome.ADVANCED, "staged", null, null, NOW);
 
         GraphRoundList first = service.list(null, null, 2);
@@ -80,10 +85,11 @@ class GraphRoundAdminServiceTest {
     void theDetailCarriesTheRowAndItsTimelineAndAnUnknownRoundIsNotFound() {
         ObjectNode detail = new ObjectMapper().createObjectNode();
         detail.put("planDigest", DIGEST);
-        rounds.advance("round-20261030T0905", GraphRoundPatch.advanceTo(GraphRoundStage.PLAN_READY).plan("plan-1", DIGEST),
-                Outcome.ADVANCED, null, "req-1", detail, NOW);
-        rounds.advance("round-20261030T0905", GraphRoundPatch.fail("plan_rejected:binding"), Outcome.FAILED,
-                "plan_rejected:binding", "req-2", null, NOW.plusSeconds(1));
+        GraphRound planned = rounds.advance(claimed("round-20261030T0905"),
+                GraphRoundPatch.advanceTo(GraphRoundStage.PLAN_READY).plan("plan-1", DIGEST), Outcome.ADVANCED, null, "req-1",
+                detail, NOW).orElseThrow();
+        rounds.advance(planned, GraphRoundPatch.fail("plan_rejected:binding"), Outcome.FAILED, "plan_rejected:binding", "req-2",
+                null, NOW.plusSeconds(1));
 
         GraphRoundDetail got = service.get("round-20261030T0905");
 
@@ -102,7 +108,7 @@ class GraphRoundAdminServiceTest {
 
     @Test
     void theOverviewSectionSaysDisabledWithoutASchedulerAndCountsOpenRounds() {
-        rounds.advance("round-20261030T0935", GraphRoundPatch.advanceTo(GraphRoundStage.SKIPPED), Outcome.SKIPPED,
+        rounds.advance(claimed("round-20261030T0935"), GraphRoundPatch.advanceTo(GraphRoundStage.SKIPPED), Outcome.SKIPPED,
                 "no_new_material", null, null, NOW);
 
         GraphRoundsSection section = service.section();

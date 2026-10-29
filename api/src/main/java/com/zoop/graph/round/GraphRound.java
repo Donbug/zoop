@@ -13,7 +13,7 @@ import java.util.Optional;
  *                    is recorded as an event ({@code retried}) and an audit row, never here
  * @param attempts    attempts made at the current stage
  * @param nextAttemptAt when a waiting stage may be tried again (backoff), or empty
- * @param lease       the instance holding the row and until when, or empty
+ * @param lease       the instance holding the row, until when, and the fencing token of that lease, or empty
  */
 public record GraphRound(String roundId, Instant slotAt, GraphRoundStage stage, Optional<String> planId,
         Optional<String> planDigest, Optional<String> analysisJobId, Optional<String> handoffId,
@@ -21,7 +21,11 @@ public record GraphRound(String roundId, Instant slotAt, GraphRoundStage stage, 
         Optional<String> activatedVersionId, Optional<String> activationNote, Optional<String> failureCode, int attempts,
         Optional<Instant> nextAttemptAt, Optional<Lease> lease, String startedBy, Instant createdAt, Instant updatedAt) {
 
-    public record Lease(String owner, Instant until) {
+    /**
+     * @param token issued by {@code claim} with every new lease; every write of an outcome ({@code advance}, {@code link})
+     *              carries it, so the write of a holder whose lease was taken over is refused
+     */
+    public record Lease(String owner, Instant until, long token) {
     }
 
     public boolean open() {
