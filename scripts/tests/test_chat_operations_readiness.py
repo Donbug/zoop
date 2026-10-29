@@ -37,8 +37,10 @@ def live_evidence(candidate: str = "a" * 40, samples: int = 5) -> dict:
                 "approvalRounds": rounds,
                 "providerCalls": rounds + 1,
                 "inputTokens": 10_000,
-                "outputTokens": 1_000,
+                # The provider total (reasoning included), its reasoning part and the final answer alone.
+                "outputTokens": 4_000,
                 "reasoningTokens": 3_000,
+                "answerTokens": 1_000,
                 "costUsd": "0.0123",
                 "failureCode": None,
             })
