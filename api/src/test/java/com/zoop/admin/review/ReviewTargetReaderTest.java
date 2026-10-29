@@ -1,6 +1,7 @@
 package com.zoop.admin.review;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.zoop.admin.review.ReviewTargetReader.Projection;
@@ -236,5 +237,28 @@ class ReviewTargetReaderTest {
 
         assertEquals(List.of("B", "삼성전자"), rows.get("candidate:" + rel('1')).companyIds());
         assertEquals(List.of("SUPPLIES_V2"), rows.get("relation:" + rel('1')).relationTypes());
+    }
+    private static String bound(String incoming, String observation) {
+        return """
+                {"binding":{"incoming":"%s","documents":{"member":{"observation":{"documentId":"member-doc","rawVersion":"%s",
+                 "documentVersion":"%s"}},"doc-key":{"observation":%s}}},"eventCandidates":[]}"""
+                .formatted(incoming, "7".repeat(64), "8".repeat(64), observation);
+    }
+
+    @Test
+    void theAnalysedDocumentIsTheIncomingOneOfTheBindingAndNothingElse() {
+        String observation = """
+                {"roundId":"r","sourceId":"s","page":0,"ordinal":1,"documentId":"문서-1","rawVersion":"%s","documentVersion":"%s"}"""
+                .formatted("5".repeat(64), "6".repeat(64));
+        assertEquals(new ReviewTargetReader.Document("문서-1", "5".repeat(64), "6".repeat(64)),
+                ReviewTargetReader.read(bound("doc-key", observation), s3()).document(), "the incoming document, not a member");
+        assertEquals("member-doc", ReviewTargetReader.read(bound("member", observation), s3()).document().documentId());
+
+        assertNull(ReviewTargetReader.read(s2(), s3()).document(), "no binding");
+        assertNull(ReviewTargetReader.read(bound("missing", observation), s3()).document(), "an incoming key with no document");
+        assertNull(ReviewTargetReader.read(bound("doc-key", observation.replace("5".repeat(64), "5".repeat(63))), s3())
+                .document(), "a raw version that is no exact hash");
+        assertNull(ReviewTargetReader.read(bound("doc-key", observation.replace("\"문서-1\"", "\"\"")), s3()).document(),
+                "an empty document id");
     }
 }

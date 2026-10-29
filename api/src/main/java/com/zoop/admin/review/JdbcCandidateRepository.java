@@ -33,20 +33,21 @@ public class JdbcCandidateRepository {
             """;
 
     /**
-     * Whether the current candidate row {@code alias} is the newest analysis of its input: false when another S3 job has a current
-     * candidate row for the same AI event ({@code issue_id}, the S2 {@code targetEventId}) from the same S2 input (the plan units'
-     * {@code s2_input_digest}, which pins the document, the snapshot, the catalogue and the run) and its S3 result was observed
-     * strictly later. The event id alone is not enough: other documents and other snapshots can name the same id, and their
-     * candidates stay listed. Rows without a plan unit, without an event id or observed at the same instant are never hidden. The
-     * older job's rows stay decidable and keep their history; only the list and the overview leave them out.
+     * Whether the current candidate row {@code alias} belongs to the newest analysis of its document: false when the plan unit of
+     * another S3 job analysed the same document (the S2 observation's {@code documentId}, {@code rawVersion} and
+     * {@code documentVersion} the sync recorded) and its S3 result was observed strictly later. Then every candidate of the older
+     * job is left out, matched or not, so a re-analysis that names its candidates differently (a live model's mention ids) or finds
+     * none at all still replaces it, and two different documents never hide each other. A job whose unit names no document (synced
+     * before the column, or a result without one), without a plan unit or observed at the same instant is never hidden. The older
+     * job's rows stay decidable and keep their history; only the list and the overview leave them out.
      */
     public static String newestAnalysis(String alias) {
         return """
-                NOT EXISTS (SELECT 1 FROM review_targets n
-                              JOIN analysis_plan_units nu ON nu.s3_job_id = n.source_job_id
-                              JOIN analysis_plan_units au ON au.s3_job_id = %1$s.source_job_id
-                             WHERE n.target_type = 'candidate' AND n.is_current AND n.issue_id = %1$s.issue_id
-                               AND n.source_job_id <> %1$s.source_job_id AND nu.s2_input_digest = au.s2_input_digest
+                NOT EXISTS (SELECT 1 FROM analysis_plan_units au
+                              JOIN analysis_plan_units nu ON nu.s2_document_id = au.s2_document_id
+                                   AND nu.s2_raw_version = au.s2_raw_version AND nu.s2_document_version = au.s2_document_version
+                                   AND nu.s3_job_id <> au.s3_job_id
+                             WHERE au.s3_job_id = %1$s.source_job_id
                                AND CAST(nu.s3_checkpoint->>'resultObservedAt' AS timestamptz)
                                  > CAST(au.s3_checkpoint->>'resultObservedAt' AS timestamptz))""".formatted(alias);
     }

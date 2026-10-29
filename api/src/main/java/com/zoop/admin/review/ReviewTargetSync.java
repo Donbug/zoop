@@ -140,6 +140,8 @@ public final class ReviewTargetSync {
                 rows += reviews.markPresentRelations(payload.jobId(), payload.inputDigest(), projection.rows().stream()
                         .filter(row -> row.type().equals("relation")).map(ReviewTargetReader.Row::externalId).toList(), at);
             }
+            // What a later analysis of the same document is matched on; it never changes the rows written above.
+            if (projection.document() != null) reviews.recordDocument(payload.jobId(), projection.document());
             return rows + reviews.refreshCandidates(payload.jobId(), at);
         });
         if (written > 0) {

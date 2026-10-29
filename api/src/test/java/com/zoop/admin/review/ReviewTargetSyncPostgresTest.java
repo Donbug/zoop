@@ -11,6 +11,7 @@ import static com.zoop.admin.review.ReviewTargetReaderTest.s3;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -226,13 +227,12 @@ class ReviewTargetSyncPostgresTest {
     }
 
     /**
-     * An admitted one-unit analyze plan whose S3 job is {@code s3JobId}, its S2 input {@code s2Input} and its S3 result observed at
-     * {@code observedAt}: the row the newest-analysis rule reads. No S3 input digest, so the sync scheduler never picks it up.
+     * An admitted one-unit analyze plan: S2 job {@code s2Job} with input {@code s2Input}, S3 job {@code s3JobId} whose result was
+     * observed at {@code observedAt}. No S3 input digest, so the sync scheduler never picks it up; the test syncs it itself.
      */
-    private void planUnit(String s3JobId, String s2Input, Instant observedAt) {
+    private void planUnit(String s3JobId, String s2Job, String s2Input, Instant observedAt) {
         String key = Canonical.sha256(s3JobId);
         String planId = "s2plan-" + key;
-        String s2Job = "s2-" + key.substring(0, 40);
         String extraction = "{\"jobId\":\"" + s2Job + "\",\"approvedRequestDigest\":\"" + "a".repeat(64) + "\"}";
         String relationSubmit = "{\"jobId\":\"" + s3JobId + "\"}";
         String manifest = """
@@ -263,6 +263,42 @@ class ReviewTargetSyncPostgresTest {
         });
     }
 
+    /**
+     * The S2 result as the producer writes it for an analysis of {@code documentId}: its frozen binding names the incoming document
+     * by its observation. Every other part is this test's two events.
+     */
+    private String analysing(String documentId) {
+        return """
+                {"binding":{"incoming":"doc-key","documents":{"doc-key":{"observation":{"roundId":"round-1","sourceId":"src",
+                 "page":0,"ordinal":0,"documentId":"%s","rawVersion":"%s","documentVersion":"%s"}}}},""".formatted(documentId,
+                "5".repeat(64), "6".repeat(64)) + s2Json.substring(1);
+    }
+
+    /**
+     * One analysis of {@code documentId} under a new plan, as the producer runs it: a new S2 job id and an input digest that hashes
+     * it, so no two analyses share either, and a new S3 job reading {@code relations}, observed at {@code observedAt}. A null
+     * document is a result whose binding names none.
+     */
+    private String analyse(String s3JobId, String documentId, Instant observedAt, UntrustedRelationPayload relations) {
+        String s2Job = "s2-" + Canonical.sha256(s3JobId).substring(0, 40);
+        String input = Canonical.sha256("{\"request\":{\"jobId\":\"" + s2Job + "\"}}");
+        String json = documentId == null ? s2Json : analysing(documentId);
+        planUnit(s3JobId, s2Job, input, observedAt);
+        ExtractionResult result = mock(ExtractionResult.class);
+        when(result.readyPayload()).thenReturn(Optional.of(new UntrustedExtractionPayload(s2Job, input, json)));
+        when(extraction.result(s2Job)).thenReturn(result);
+        sync.sync(new RelationUpstream(s2Job, input), Canonical.sha256(json), relations);
+        return s3JobId;
+    }
+
+    private String analyse(String s3JobId, String documentId, Instant observedAt) {
+        return analyse(s3JobId, documentId, observedAt, reanalysed(s3JobId));
+    }
+
+    private String inputOf(String s3JobId) {
+        return jdbc.queryForObject("SELECT s2_input_digest FROM analysis_plan_units WHERE s3_job_id = ?", String.class, s3JobId);
+    }
+
     /** The S3 jobs whose candidate row for {@code external} the list shows when searched by the event id, one row per page. */
     private List<String> listed(String event, String external, String status) {
         var filter = new JdbcCandidateRepository.Filter(status, null, null, null, event, List.of(), List.of());
@@ -280,84 +316,85 @@ class ReviewTargetSyncPostgresTest {
     }
 
     /**
-     * C2 (#132, PR #395 review): the same S2 input analysed again keeps the older job's rows current, so the list, the counts and
-     * the overview show the analysis observed last; the older job's HOLD stays decidable.
+     * C2 (#132, PR #395 review): the same document analysed again under another plan. The two S2 jobs share neither job id nor
+     * input digest, as the producer makes them; the document they analysed is the same. The list, the counts and the overview show
+     * the analysis observed last only; the older job's HOLD stays decidable.
      */
     @Test
-    void theSameInputReanalysedIsListedAndCountedOnceUnderTheAnalysisObservedLast() {
+    void theSameDocumentReanalysedUnderAnotherPlanIsListedAndCountedOnceUnderTheAnalysisObservedLast() {
         String event = linkTo("event-" + UUID.randomUUID());
-        String input = Canonical.sha256(event);
+        String document = "document-" + UUID.randomUUID();
         Instant earlier = Instant.parse("2026-10-28T00:00:00Z");
-        sync.sync(upstream, recorded, result("hold", "2"));
-        String olderJob = s3Job;
-        planUnit(olderJob, input, earlier);
+        String olderJob = analyse("s3-older-" + UUID.randomUUID(), document, earlier);
         Map<String, Integer> countsBefore = candidates.counts();
         long holdBefore = overview.decisions().holdPending();
         long activeBefore = overview.candidates().active();
 
         // Observed later but sorting first by id: the order is the observation, not the job id.
-        String newerJob = "s3-0-" + UUID.randomUUID();
-        planUnit(newerJob, input, earlier.plusSeconds(60));
-        sync.sync(upstream, recorded, reanalysed(newerJob));
+        String newerJob = analyse("s3-0-" + UUID.randomUUID(), document, earlier.plusSeconds(60));
+        assertNotEquals(inputOf(olderJob), inputOf(newerJob), "a new plan never shares the S2 input digest");
 
         assertEquals(List.of(newerJob), listed(event, EVENT_A, null), "listed once, page by page");
         assertEquals(List.of(newerJob), listed(event, EVENT_A, "HOLD"), "the older HOLD is not listed by status either");
-        assertEquals(countsBefore.get("HOLD") + 1, candidates.counts().get("HOLD"), "only the standalone candidate is new");
-        assertEquals(activeBefore + 1, overview.candidates().active());
-        assertEquals(holdBefore + 1, overview.decisions().holdPending(), "the event's HOLD moved to the newer analysis");
+        assertEquals(countsBefore, candidates.counts(), "every candidate of the older job is replaced, the standalone one too");
+        assertEquals(activeBefore, overview.candidates().active());
+        assertEquals(holdBefore, overview.decisions().holdPending(), "the HOLDs moved to the newer analysis");
 
-        var older = reviews.currentCandidate(candidateTargetId(EVENT_A)).orElseThrow();
+        var older = reviews.currentCandidate(jdbc.queryForObject("SELECT id FROM review_targets WHERE source_job_id = ? "
+                + "AND target_type = 'candidate' AND candidate_id = ? AND is_current", String.class, olderJob, EVENT_A))
+                .orElseThrow();
         assertEquals("HOLD", reviews.currentRelation(older, rel('2')).orElseThrow().status(),
                 "the older job's HOLD can still be decided, and its row and history stay");
     }
 
-    /**
-     * The review's counterexamples: another document, or another snapshot whose local event id happens to match, reaches the
-     * same {@code targetEventId} with another S2 input. Both stay listed. So do analyses observed at the same instant and jobs
-     * no plan unit owns.
-     */
+    /** A newer analysis of the document that finds nothing to review still replaces the older one: there is no row to pair. */
     @Test
-    void candidatesFromAnotherInputAtTheSameInstantOrWithoutAPlanUnitAreNeverHidden() {
+    void aReanalysisThatFindsNoCandidateStillReplacesTheOlderOne() {
         String event = linkTo("event-" + UUID.randomUUID());
-        Instant at = Instant.parse("2026-10-28T00:00:00Z");
-        sync.sync(upstream, recorded, result("hold", "2"));
-        String first = s3Job;
-        planUnit(first, Canonical.sha256(event + "-document-a"), at);
+        String document = "document-" + UUID.randomUUID();
+        Instant earlier = Instant.parse("2026-10-28T00:00:00Z");
+        String olderJob = analyse("s3-older-" + UUID.randomUUID(), document, earlier);
+        assertEquals(List.of(olderJob), listed(event, EVENT_A, null));
 
-        String otherDocument = "s3-doc-" + UUID.randomUUID();
-        planUnit(otherDocument, Canonical.sha256(event + "-document-b"), at.plusSeconds(60));
-        sync.sync(upstream, recorded, reanalysed(otherDocument));
-        String otherSnapshot = "s3-snap-" + UUID.randomUUID();
-        planUnit(otherSnapshot, Canonical.sha256(event + "-snapshot-2"), at.plusSeconds(120));
-        sync.sync(upstream, recorded, reanalysed(otherSnapshot));
-        assertEquals(List.of(first, otherDocument, otherSnapshot).stream().sorted().toList(), listed(event, EVENT_A, null),
-                "the same event id from other inputs is another candidate");
+        String newerJob = "s3-empty-" + UUID.randomUUID();
+        analyse(newerJob, document, earlier.plusSeconds(60), new UntrustedRelationPayload(newerJob, "4".repeat(64), s3(),
+                List.of()));
 
-        String sameInstant = "s3-tie-" + UUID.randomUUID();
-        planUnit(sameInstant, Canonical.sha256(event + "-document-a"), at);
-        sync.sync(upstream, recorded, reanalysed(sameInstant));
-        String noUnit = "s3-none-" + UUID.randomUUID();
-        sync.sync(upstream, recorded, reanalysed(noUnit));
-        assertEquals(List.of(first, otherDocument, otherSnapshot, sameInstant, noUnit).stream().sorted().toList(),
-                listed(event, EVENT_A, null), "no strictly later analysis of the same input, nothing hidden");
+        assertEquals(List.of(), listed(event, EVENT_A, null), "the newest analysis of the document has no candidate");
     }
 
+    /**
+     * The review's counterexamples: another document reaching the same {@code targetEventId}, and analyses observed at the same
+     * instant, a result whose binding names no document and jobs no plan unit owns. None hides another.
+     */
     @Test
-    void aReanalysedNewEventWithoutAnEventIdIsListedOncePerJob() {
-        sync.sync(upstream, recorded, result("hold", "2"));
-        String olderJob = s3Job;
-        String input = Canonical.sha256(olderJob);
-        planUnit(olderJob, input, Instant.parse("2026-10-28T00:00:00Z"));
-        String newerJob = olderJob + "-z";
-        planUnit(newerJob, input, Instant.parse("2026-10-28T00:01:00Z"));
+    void anotherDocumentTheSameInstantNoDocumentOrNoPlanUnitNeverHides() {
+        String event = linkTo("event-" + UUID.randomUUID());
+        String document = "document-" + UUID.randomUUID();
+        Instant at = Instant.parse("2026-10-28T00:00:00Z");
+        String first = analyse("s3-a-" + UUID.randomUUID(), document, at);
+        String otherDocument = analyse("s3-b-" + UUID.randomUUID(), document + "-b", at.plusSeconds(60));
+        String sameInstant = analyse("s3-tie-" + UUID.randomUUID(), document, at);
+        String noDocument = analyse("s3-nodoc-" + UUID.randomUUID(), null, at.plusSeconds(120));
+        String noUnit = "s3-none-" + UUID.randomUUID();
+        sync.sync(upstream, recorded, reanalysed(noUnit));
 
-        sync.sync(upstream, recorded, reanalysed(newerJob));
+        assertEquals(List.of(first, otherDocument, sameInstant, noDocument, noUnit).stream().sorted().toList(),
+                listed(event, EVENT_A, null), "no strictly later analysis of the same document, nothing hidden");
+    }
 
-        assertEquals(2, jdbc.queryForObject("""
-                SELECT count(*) FROM review_targets t
-                WHERE t.target_type = 'candidate' AND t.is_current AND t.external_id = ? AND t.source_job_id IN (?, ?) AND """
-                + " " + JdbcCandidateRepository.newestAnalysis("t"), Integer.class, EVENT_A, olderJob, newerJob),
-                "nothing tells the two analyses are of one event");
+    /** The S2 result is fixed by its recorded hash: a unit is never moved to another document. */
+    @Test
+    void aUnitKeepsTheDocumentItWasFirstRecordedWith() {
+        linkTo("event-" + UUID.randomUUID());
+        String job = analyse("s3-" + UUID.randomUUID(), "document-a", Instant.parse("2026-10-28T00:00:00Z"));
+        assertFalse(reviews.recordDocument(job, new ReviewTargetReader.Document("document-a", "5".repeat(64), "6".repeat(64))),
+                "the same document again changes nothing");
+        // The repository's refusal reaches callers through Spring's repository exception translation.
+        assertThrows(org.springframework.dao.InvalidDataAccessApiUsageException.class, () -> reviews.recordDocument(job,
+                new ReviewTargetReader.Document("document-b", "5".repeat(64), "6".repeat(64))));
+        assertEquals("document-a", jdbc.queryForObject("SELECT s2_document_id FROM analysis_plan_units WHERE s3_job_id = ?",
+                String.class, job));
     }
 
     private boolean active(String type, String external) {

@@ -33,6 +33,9 @@ import tools.jackson.databind.JsonNode;
  */
 final class ReviewTargetReader {
     static final Pattern EVENT_CANDIDATE_ID = Pattern.compile("evc-[a-f0-9]{64}");
+    /** The S2 observation contract: a document id of 1 to 200 characters and its exact raw and document versions. */
+    private static final Pattern DOCUMENT_ID = Pattern.compile(".{1,200}", Pattern.DOTALL);
+    private static final Pattern VERSION = Pattern.compile("[a-f0-9]{64}");
     private static final Pattern SOURCE_REVISION = Pattern.compile("0|[1-9][0-9]{0,8}");
     /** A source id as the AI writes it (any language), without control characters or surrounding blanks. */
     private static final Pattern REF = Pattern.compile("[^\\p{Cntrl}\\s](?:[^\\p{Cntrl}]{0,198}[^\\p{Cntrl}\\s])?");
@@ -59,7 +62,17 @@ final class ReviewTargetReader {
     record Company(String sourceId, String name, String role) {
     }
 
-    record Projection(List<Row> rows, int unknownEvents, int skipped) {
+    /**
+     * @param document the document the S2 job analysed ({@link #analysed}); null when its result does not name it readably
+     */
+    record Projection(List<Row> rows, int unknownEvents, int skipped, Document document) {
+    }
+
+    /**
+     * The document an S2 job analysed, as its frozen binding names it ({@code binding.documents[binding.incoming].observation}):
+     * the identity two analyses of the same document share whatever plan, job or snapshot they ran under (#132).
+     */
+    record Document(String documentId, String rawVersion, String documentVersion) {
     }
 
     private record Event(boolean listed, Set<String> companies, String issueId, String title, String action, String target,
@@ -120,7 +133,19 @@ final class ReviewTargetReader {
         List<Row> rows = new ArrayList<>();
         grouped.forEach((event, relations) -> candidate(rows, event, events.byId().get(event), relations));
         for (Relation relation : alone) candidate(rows, relation.id(), null, List.of(relation));
-        return new Projection(rows, unknown, skipped);
+        return new Projection(rows, unknown, skipped, analysed(s2));
+    }
+
+    /** {@link Document} of the S2 result, or null when its binding does not name the analysed document in the contract's form. */
+    static Document analysed(Obj s2) {
+        try {
+            Obj binding = s2.object("binding");
+            Obj observation = binding.object("documents").object(binding.string("incoming")).object("observation");
+            return new Document(matching(observation.string("documentId"), DOCUMENT_ID),
+                    matching(observation.string("rawVersion"), VERSION), matching(observation.string("documentVersion"), VERSION));
+        } catch (Malformed unreadable) {
+            return null;
+        }
     }
 
     private static Events events(Obj s2) {
