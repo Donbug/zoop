@@ -73,6 +73,7 @@ MCP 메시지를 읽기 전에 순서대로 검사한다.
 | `call_not_approved` | 서버가 승인(예약)한 호출과 정확히 일치하지 않거나 이미 사용됨 |
 | `tool_budget_exhausted` | (승인 시) job의 호출 상한(6회, 이전 attempt 포함) 도달 |
 | `result_too_large` | 직렬화 결과 256 KiB 초과. 원장 기록 **전에** 검사해 `failed`/`result_too_large`로 남기며 근거·dataVersion은 기록하지 않음 |
+| `job_results_too_large` | 이 결과를 남기면 job이 모델에 보낸 결과 합계가 1 MiB를 넘음. 기록 트랜잭션에서 job 행을 잠그고 검사해 `failed`로 남기며 결과는 보내지 않음 |
 | `send_grants_unavailable` | 아래 모델 전송 gate가 판단할 수 없음(grant 레지스트리를 읽지 못함·형식 위반, 근거 출처를 읽지 못함). 읽기는 실행됐지만 결과를 보내지 않고 `failed`로 남김 |
 | `tool_timeout` `tool_unavailable` `tool_failed` | 기존 runner 실패 코드(원장에 `failed`) |
 
@@ -89,6 +90,20 @@ hosted MCP 결과는 ai/service의 전송 gate를 거치지 않고 이 엔드포
 - **뺀 부분**: 허용되지 않은 항목·경로는 **통째로**, 근거 ID는 결과와 항목·경로 단계의 목록에서 모두 뺀다. 맨 ID도 보내지 않는다. 결과에는 `withheld: {reason: "source_grant_denied", items, evidenceIds, paths}`로 개수만 남는다(아무것도 빼지 않았으면 없음). 원장의 `evidence_ids`와 `chat_tool_calls.result`도 보낸 것만 담으므로, 최종 답 검사와 다음 라운드의 도달 가능한 ID에도 뺀 것은 들어가지 않는다.
 - **시간**: 검사(레지스트리·근거 출처 읽기)는 읽기와 같은 스레드에서 그 호출의 시간 한도(3초)와 runner 전체 슬롯 안에서 돈다. 느린 검사는 느린 읽기처럼 `tool_timeout`이 되고, 호출 기록 스레드를 붙잡지 않는다.
 - **판단 불가**: 레지스트리를 읽지 못하거나 근거 출처를 읽지 못하면 빈 허용이 아니라 호출 거부(`send_grants_unavailable`)다. 설정이 없거나 기동 때 레지스트리를 읽지 못하면 `/mcp`를 켠 기동 자체가 실패한다.
+
+### 같은 요청의 재사용 (요청 캐시·single-flight)
+
+같은 attempt에서 **정확히 같은 정규화 요청**(기능 + 요청 digest: targets·limit·서버 주입 버전·asOf·근거 범위·비교 시작)은 한 번만 읽는다(MCP 실행 계약 3.3).
+
+- 다시 오면 처음 성공해 남긴 결과(`chat_tool_calls.result`)를 재사용한다. 결과에는 자기 `toolCallId`와 함께 `cachedFrom`(처음 읽은 호출)을 붙인다. 재사용도 승인·예약된 호출 하나로 원장과 예산에 들어간다.
+- 재사용 결과도 지금의 모델 전송 gate를 다시 거친다(grant 철회, 지금 인용할 수 없는 근거). 과거에 허용된 결과로 현재 차단을 우회하지 않는다.
+- 같은 요청이 읽는 중에 오면 그 읽기가 끝나길 기다렸다가(최대 12초, run 기한 안) 남긴 결과를 재사용한다. 첫 읽기가 실패했거나 기다림이 끝나면 직접 읽는다. 실패·timeout은 재사용하지 않는다.
+- 기다림은 **같은 인스턴스 안에서만** 합류한다. 다른 인스턴스로 동시에 온 같은 요청은 각자 읽을 수 있다(나중에 오는 반복은 DB의 남긴 결과로 재사용).
+- direct 경로는 서버가 한 단계의 같은 호출을 미리 합치므로(`ChatRetrieval`) 이 재사용을 쓰지 않는다. attempt가 바뀌면(rerun) 새로 읽는다.
+
+### job당 결과 1 MiB
+
+job의 호출이 모델용으로 남긴 결과(`chat_tool_calls.result`, 저장된 JSON 텍스트 기준)의 합은 attempt를 합쳐 1 MiB 이하다. 결과를 남기는 기록 트랜잭션에서 job 행을 잠근 뒤 합계를 검사하고 쓰므로 동시 호출에도 넘지 않는다. 넘을 결과는 `failed`/`job_results_too_large`로 기록되고 보내지 않는다.
 
 ### 원장
 
@@ -115,7 +130,7 @@ MCP 호출도 `chat_tool_calls`에 기존 호출과 같은 상태(예약 → 실
 아래가 끝나기 전에는 로컬 합성 시험 밖에서 `ZOOP_CHAT_MCP_ENABLED`·`ZOOP_CHAT_AGENT_ENABLED`를 켜지 않는다.
 
 1. ~~**model-send grant 검사.**~~ 구현(3장 "모델 전송 gate"). 켜기 전에 운영자가 레지스트리에 `chat-agent` 목적·agent 수신자 grant와 `zoop-graph` source를 등록하고, OpenAI 보유 조건을 거버넌스 10장에 기록해야 한다.
-2. **예산**(단계 2): job 단위 호출 상한 6회(내부 몫, 웹 2회는 웹 검색 도구와 함께. rerun은 남은 호출만 쓰고, 계획에 모자라면 `budget_exceeded`로 재실행 불가), agent 라운드당 승인 4건(동시 4개), fan-out 5, agent run 45초(검증·저장까지)·Luna 35초는 구현했다. 남은 것: **요청 캐시·single-flight·캐시 적중 재검사·job당 결과 1 MiB**, 그래프 경로 5초·웹 7초의 도구별 시간, direct 경로 45초(단계 한도 실측 후). rate limit은 인스턴스별이다.
+2. **예산**(단계 2): job 단위 호출 상한 6회(내부 몫, 웹 2회는 웹 검색 도구와 함께. rerun은 남은 호출만 쓰고, 계획에 모자라면 `budget_exceeded`로 재실행 불가), agent 라운드당 승인 4건(동시 4개), fan-out 5, agent run 45초(검증·저장까지)·Luna 35초는 구현했다. 요청 캐시·single-flight(인스턴스 안)·재사용 시 gate 재검사·job당 결과 1 MiB도 구현했다(3장). 남은 것: 그래프 경로 5초·웹 7초의 도구별 시간, direct 경로 45초(단계 한도 실측 후), 인스턴스를 넘는 single-flight(필요하면). rate limit은 인스턴스별이다.
 3. **승인 요청의 요구 매핑**: 지금은 결과를 run의 요구들이 공유한다. 요구별 인용 결속이 필요하면 승인 요청에 requirementIds를 받도록 계약을 넓힌다.
 4. **네트워크·운영**: HTTPS 인바운드 노출 범위, 공급자 출발지 제한 여부(IP allowlist만으로 인증하지 않음), 승인된 소량 live latency spike(실제 Responses·MCP 응답 형태 확인 포함).
 
