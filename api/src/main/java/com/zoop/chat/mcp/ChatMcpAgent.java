@@ -53,15 +53,22 @@ public final class ChatMcpAgent implements ChatAgentPath {
     private final String recipient;
     private final ChatExecutionRepository runs;
     private final ObjectMapper mapper;
+    private final ChatMcpCircuitBreaker circuit;
 
     public ChatMcpAgent(ChatModels.Agent agent, ChatMcpTools tools, ChatMcpGrants grants, String recipient,
-            ChatExecutionRepository runs, ObjectMapper mapper) {
+            ChatExecutionRepository runs, ObjectMapper mapper, ChatMcpCircuitBreaker circuit) {
         this.agent = agent;
         this.tools = tools;
         this.grants = grants;
         this.recipient = recipient;
         this.runs = runs;
         this.mapper = mapper;
+        this.circuit = circuit;
+    }
+
+    @Override
+    public boolean available() {
+        return circuit.allowAgent();
     }
 
     @Override
@@ -86,7 +93,14 @@ public final class ChatMcpAgent implements ChatAgentPath {
             var input = new ChatModels.AgentInput(requirements, token, names, recipient, maxCitations, previous,
                     decisions);
             int number = step;
-            ChatModels.AgentStep outcome = steps.run(() -> agent.step(run, number, input));
+            ChatModels.AgentStep outcome;
+            try {
+                outcome = steps.run(() -> agent.step(run, number, input));
+            } catch (ChatModels.Failure failure) {
+                // This run remains failed. The observation affects only the path selected by later jobs.
+                circuit.agentFailed(failure.code());
+                throw failure;
+            }
             if (outcome.completed()) return new Outcome(outcome.answer(), kept(run), step, approved, denied);
             if (rounds > MAX_ROUNDS) {
                 throw new ChatModels.Failure(ChatModels.Failure.Fate.NOT_SENT, "the agent kept asking after its last round");

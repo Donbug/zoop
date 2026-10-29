@@ -126,7 +126,8 @@ class ChatMcpAgentTest {
     }
 
     private ChatAgentPath.Outcome run(ChatAgentPath.Steps steps) {
-        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, mapper);
+        var circuit = new ChatMcpCircuitBreaker(() -> new com.zoop.ai.chat.ChatMcpHealth(true, null), clock);
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, mapper, circuit);
         var attached = executor.attach(JOB, 1).orElseThrow();
         return agent.run(attached.run(), attached.control(), REQUIREMENTS, List.of(ChatCapability.COMPANY_READ), 20, steps);
     }

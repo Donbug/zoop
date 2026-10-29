@@ -105,14 +105,25 @@ public final class ChatModels {
         public enum Fate { NOT_SENT, UNKNOWN, REFUSED }
 
         private final Fate fate;
+        private final String code;
 
         public Failure(Fate fate, String message) {
+            this(fate, null, message);
+        }
+
+        public Failure(Fate fate, String code, String message) {
             super(message);
             this.fate = fate;
+            this.code = code;
         }
 
         public Fate fate() {
             return fate;
+        }
+
+        /** The stable AI runtime failure code, when the failure came from a stage outcome. */
+        public String code() {
+            return code;
         }
     }
 }
