@@ -6,6 +6,13 @@ Use `SlimHeader` from `@/components/common/SlimHeader` for D-AUT-01/02, D-ONB-01
 
 Read before editing frontend UI. Baseline: D-GRP-03 company side panel, Figma 619:6729. Applies to D-GRP-02 event, D-GRP-04 relation, D-GRP-05 evidence. Wireframes remain the navigation reference; this guide unifies the visual primitives, not the data semantics.
 
+## Embedded Markdown (D-AUT-02)
+
+For embedded Markdown such as D-AUT-02 terms, use `MarkdownContent` with
+`headingOffset={1}` so document headings start below the page h1. The offset
+changes heading semantics only, caps at h6, and preserves the existing visual
+classes. Omit the prop for standalone documents to keep their original levels.
+
 ## Import and reuse
 
 ```tsx
@@ -29,11 +36,6 @@ import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 `shell`, `wideShell`, `header`, `title`, `close`, `scroll`, `sectionFrame`, `section`, `muted`, `secondary`, `itemTitle`, `button`, `actions`, `textActions`, `state`, `footer`, `avatar`, `list`, `badge` are complete, statically discoverable Tailwind class recipes. `sectionFrame` supplies the shared padding/border for specialized content such as company charts; `section` also supplies text and headings. `wideShell` is reserved for the 400 px D-GRP-05 evidence dialog. Use `actions` for bordered button grids and `textActions` for Figma's borderless evidence/document actions. Keep native HTML semantics and accessible labels in the calling component. Do not concatenate dynamic Tailwind class fragments.
 
 ## Tokens and proportions
-
-For embedded Markdown such as D-AUT-02 terms, use `MarkdownContent` with
-`headingOffset={1}` so document headings start below the page h1. The offset
-changes heading semantics only, caps at h6, and preserves the existing visual
-classes. Omit the prop for standalone documents to keep their original levels.
 
 Tokens live in `src/index.css` under `@theme`. Use `font-panel`, `text-panel-ink`, `text-panel-muted`, `border-panel-line`, `border-panel-control`, `bg-panel-soft`, `rounded-panel` instead of repeating hex values. Error and warning text uses `text-zoop-alert`.
 
