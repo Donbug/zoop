@@ -10414,6 +10414,319 @@
         ]
       }
     },
+    "/internal/v1/observations/export": {
+      "post": {
+        "tags": [
+          "observations"
+        ],
+        "summary": "Export one exact observation with current read/store/quote-display rights",
+        "operationId": "exportObservation",
+        "parameters": [
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,128}$"
+            },
+            "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exact native CLI export JSON, including authorized document.text and optional native provenance; no wrapper or omitted fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservationExport"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing, malformed or unknown bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Missing, malformed or unknown bearer token",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "authentication_required",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope_denied or source_unauthorized: current read/store/quote-display rights are required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Principal lacks the route's scope",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "scope_denied",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "round_not_found, observation_not_found or document_version_not_in_round.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Unknown job, another principal's job, or never accepted",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "job_not_found",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "registry_changed, scope_configuration_conflict or preparation_profile_unbound; never recover automatically.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "request_too_large: declared or streamed body exceeds 2,000,000 bytes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "unsupported_media_type: requires application/json with UTF-8.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_request: exact closed native selector; no query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Runtime validation of the submitted input",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "invalid_request",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": "input_or_configuration_invalid",
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "runtime_contract_mismatch, runtime_binding_mismatch or internal_error; no content is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "execution_unavailable (group disabled), runtime_busy, service_busy, runtime_unavailable or service_configuration_invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Runtime unavailable: retry with the same key and body",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "runtime_unavailable",
+                        "retryable": true,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before another explicit read; the service never retries automatically.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "observation.read"
+            ]
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObservationExportRequest"
+              }
+            }
+          }
+        },
+        "description": "Requires observation.read, granted only to the configured internal importer principal. This scope permits exact reads across the server's ingestion registry; it is not per-observation ownership. One explicit native selector; schemaVersion is required and unknown fields are refused. Runs only zoop-ai-ingest export --require-store against server-owned state and sources on every request. The native CLI checks current read, store and quote-display grants and frozen source configuration. The service additionally validates selector identity, text sourceHash, document version and locator hashes before returning the unchanged native JSON. One request returns one observation synchronously with 200; batch and asynchronous (202) delivery are open design items of issue #407. Authorized document.text is intentionally present only in a 200 response. No status route, cache, job, ingestion write, retry or recovery. No query parameters, client paths/CLI arguments, observationId or requireStore option. Idempotency-Key is not required and conveys no authority; a repeated request rechecks current rights rather than replaying a cached result. Input limit 2,000,000 bytes; stdout/response limit 16 MiB; 45-second child deadline; at most two concurrent exports. Ingestion writer contention is 503 runtime_busy with runtimeCode ingestion_busy. Disabled configuration is 503 execution_unavailable after authentication. Error codes contain no text, path, key or raw diagnostics. All responses use Cache-Control: no-store. This read does not grant model-send, publication, activation or perpetual rights. Rights checks and HTTP delivery are separate observations, not atomic revocation or recall of already delivered text."
+      }
+    },
     "/internal/v1/chat-stages/{stage}": {
       "post": {
         "tags": [
@@ -19012,6 +19325,613 @@
         ],
         "title": "McpCallSummary"
       },
+      "NativeCollection": {
+        "properties": {
+          "provenance": {
+            "type": "string",
+            "const": "collected_http",
+            "title": "Provenance"
+          },
+          "collectionId": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Collectionid"
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/NativeFileRef"
+          },
+          "fetchedAt": {
+            "type": "string",
+            "title": "Fetchedat"
+          },
+          "finalUrl": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Finalurl"
+          },
+          "httpStatus": {
+            "type": "integer",
+            "maximum": 299.0,
+            "minimum": 200.0,
+            "title": "Httpstatus"
+          },
+          "contentType": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Contenttype"
+          },
+          "bodySha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Bodysha256"
+          },
+          "documentKind": {
+            "type": "string",
+            "enum": [
+              "news",
+              "disclosure"
+            ],
+            "title": "Documentkind"
+          },
+          "network": {
+            "type": "string",
+            "enum": [
+              "external",
+              "synthetic_loopback"
+            ],
+            "title": "Network"
+          },
+          "published": {
+            "$ref": "#/components/schemas/NativePublished"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provenance",
+          "collectionId",
+          "receipt",
+          "fetchedAt",
+          "finalUrl",
+          "httpStatus",
+          "contentType",
+          "bodySha256",
+          "documentKind",
+          "network",
+          "published"
+        ],
+        "title": "NativeCollection"
+      },
+      "NativeFileRef": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "File"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "file",
+          "sha256"
+        ],
+        "title": "NativeFileRef"
+      },
+      "NativeGrant": {
+        "properties": {
+          "grantId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Grantid"
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "grantId",
+          "revision"
+        ],
+        "title": "NativeGrant"
+      },
+      "NativeLocator": {
+        "properties": {
+          "locatorId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Locatorid"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "End"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "locatorId",
+          "start",
+          "end"
+        ],
+        "title": "NativeLocator"
+      },
+      "NativeLocatorMetadata": {
+        "properties": {
+          "rawArtifactId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Rawartifactid"
+          },
+          "rawHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Rawhash"
+          },
+          "rawVersion": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Rawversion"
+          },
+          "representationHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Representationhash"
+          },
+          "mappingHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Mappinghash"
+          },
+          "parserProfile": {
+            "$ref": "#/components/schemas/NativeParserProfile"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          },
+          "pageCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagecount"
+          },
+          "emptyPageCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emptypagecount"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rawArtifactId",
+          "rawHash",
+          "rawVersion",
+          "representationHash",
+          "mappingHash",
+          "parserProfile",
+          "limitations"
+        ],
+        "title": "NativeLocatorMetadata"
+      },
+      "NativeObservation": {
+        "properties": {
+          "roundId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Roundid"
+          },
+          "sourceId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Sourceid"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Page"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Ordinal"
+          },
+          "pageId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Pageid"
+          },
+          "observedAt": {
+            "type": "string",
+            "title": "Observedat"
+          },
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Documentid"
+          },
+          "rawVersion": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Rawversion"
+          },
+          "documentVersion": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Documentversion"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Url"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Title"
+          },
+          "publishedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publishedat"
+          },
+          "modifiedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modifiedat"
+          },
+          "sourceRevision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcerevision"
+          },
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "text/html",
+              "application/pdf"
+            ],
+            "title": "Mediatype"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 35,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "collected_http"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance"
+          },
+          "collection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NativeCollection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "roundId",
+          "sourceId",
+          "page",
+          "ordinal",
+          "pageId",
+          "observedAt",
+          "documentId",
+          "rawVersion",
+          "documentVersion",
+          "url",
+          "title",
+          "publishedAt",
+          "modifiedAt",
+          "sourceRevision",
+          "mediaType"
+        ],
+        "title": "NativeObservation"
+      },
+      "NativeParserProfile": {
+        "properties": {
+          "parser": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Parser"
+          },
+          "lxml": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Lxml"
+          },
+          "pypdf": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Pypdf"
+          },
+          "mappingVersion": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Mappingversion"
+          },
+          "htmlDecoding": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Htmldecoding"
+          },
+          "htmlScope": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Htmlscope"
+          },
+          "pdfExtraction": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Pdfextraction"
+          },
+          "articleXPath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articlexpath"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "parser",
+          "lxml",
+          "pypdf",
+          "mappingVersion",
+          "htmlDecoding",
+          "htmlScope",
+          "pdfExtraction",
+          "articleXPath"
+        ],
+        "title": "NativeParserProfile"
+      },
+      "NativeProjection": {
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Documentid"
+          },
+          "documentVersion": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Documentversion"
+          },
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Sourceid"
+          },
+          "textArtifactId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Textartifactid"
+          },
+          "inputKind": {
+            "type": "string",
+            "const": "body",
+            "title": "Inputkind"
+          },
+          "cleanerVersion": {
+            "type": "string",
+            "const": "exact-copy-1",
+            "title": "Cleanerversion"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 500000,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "sourceHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Sourcehash"
+          },
+          "rawLocators": {
+            "items": {
+              "$ref": "#/components/schemas/NativeLocator"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Rawlocators"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "documentId",
+          "documentVersion",
+          "sourceId",
+          "textArtifactId",
+          "inputKind",
+          "cleanerVersion",
+          "text",
+          "sourceHash",
+          "rawLocators"
+        ],
+        "title": "NativeProjection"
+      },
+      "NativePublished": {
+        "properties": {
+          "raw": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw"
+          },
+          "precision": {
+            "type": "string",
+            "enum": [
+              "instant",
+              "day",
+              "unresolved",
+              "unknown"
+            ],
+            "title": "Precision"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "basis": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Basis"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "raw",
+          "precision",
+          "date",
+          "basis"
+        ],
+        "title": "NativePublished"
+      },
+      "ObservationExport": {
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "zoop-ingestion-s2-1",
+            "title": "Schemaversion"
+          },
+          "observation": {
+            "$ref": "#/components/schemas/NativeObservation"
+          },
+          "grant": {
+            "$ref": "#/components/schemas/NativeGrant"
+          },
+          "document": {
+            "$ref": "#/components/schemas/NativeProjection"
+          },
+          "locatorMetadata": {
+            "$ref": "#/components/schemas/NativeLocatorMetadata"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schemaVersion",
+          "observation",
+          "grant",
+          "document",
+          "locatorMetadata"
+        ],
+        "title": "ObservationExport"
+      },
       "PlanAdmissionEnvelope": {
         "properties": {
           "schemaVersion": {
@@ -21602,6 +22522,65 @@
         ],
         "title": "PlanReference",
         "type": "object"
+      },
+      "ObservationExportRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "schemaVersion": {
+            "const": "zoop-ingestion-s2-1",
+            "title": "Schemaversion",
+            "type": "string"
+          },
+          "roundId": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Roundid",
+            "type": "string"
+          },
+          "sourceId": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Sourceid",
+            "type": "string"
+          },
+          "page": {
+            "minimum": 0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "ordinal": {
+            "minimum": 0,
+            "title": "Ordinal",
+            "type": "integer"
+          },
+          "documentId": {
+            "minLength": 1,
+            "title": "Documentid",
+            "type": "string"
+          },
+          "rawVersion": {
+            "minLength": 1,
+            "title": "Rawversion",
+            "type": "string"
+          },
+          "documentVersion": {
+            "minLength": 1,
+            "title": "Documentversion",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "roundId",
+          "sourceId",
+          "page",
+          "ordinal",
+          "documentId",
+          "rawVersion",
+          "documentVersion"
+        ],
+        "title": "ObservationExportRequest",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -21646,6 +22625,10 @@
     {
       "name": "plan-admissions",
       "description": "Bounded exact plan admission and immutable reference reads; no dispatch."
+    },
+    {
+      "name": "observations",
+      "description": "Synchronous native ingestion export with current read/store/quote-display rights; no ingestion writes or model permission."
     },
     {
       "name": "plan-admission-policy",

@@ -6,6 +6,8 @@
 
 > **경계.** 이 서비스는 pipeline의 비공개 Neo4j 버전 projection(`zoop-ai-graph`, FS080 일부)을 **읽기 전용 두 라우트**(`/internal/v1/graph-versions`, 아래 별도 절)로만 감싸고, 별개로 AI handoff bundle의 **읽기 전용 두 라우트**(`/internal/v1/graph-handoffs`, 아래 절)를 제공합니다. 버전 생성(`init`·`freeze`·`project`·`recover`)·게시·활성화·FS081 철회·목록·호출자 Cypher는 없고, Neo4j write 자격과 쓰기 명령은 pipeline 운영자 프로세스만 갖습니다. 공개 API·Spring 클라이언트·활성 포인터는 없습니다([pipeline README](../pipeline/README.md), [AI 실행 계약](../../docs/design/ai-system.md), [백엔드 인수 문서](../../api/docs/GRAPH_READ_HANDOFF.md)).
 
+> **관측 export(#387의 세 번째 작업만).** `POST /internal/v1/observations/export`는 설치된 `zoop-ai-ingest export --require-store`를 동기 호출합니다. 현재 권한이 허용하는 문서 본문을 200 응답에 포함하며, 수집 실행·회차 job·freeze·스케줄러는 추가하지 않습니다. 설정과 운영 경계는 아래 「관측 export」 절을 따릅니다.
+
 ```bash
 make service-install           # uv sync --project ai/service --frozen --group dev (공개 의존성만, 토큰 없음)
 make service-test              # 실제 uvicorn + 설치된 zoop-ai + authored replay (4-worker 병렬, 느린 테스트 30개 시간 출력)
@@ -48,6 +50,41 @@ ai/service/.venv/bin/python -m zoop_ai_service.main   # 또는 zoop-ai-service (
 | live 통과 | `ZOOP_AI_LIVE_ENABLED=1`과 양수 `ZOOP_AI_GLOBAL_MAX_CALLS`가 **모두 있을 때만** live가 열리고, 그렇지 않으면 `ZOOP_AI_LIVE_ENABLED/GLOBAL_MAX_CALLS/PROVIDER/BASE_URL/API_KEY`와 네이티브 검증용 `ZOOP_AI_VERIFY_PROVIDER`·`TYPESAFE_API_KEY/BASE_URL/VALIDATION_MODEL`은 child에 전달되지 않는다(Jev key는 live가 열린 S1 child에만 가고 S2/S3/그래프 child에는 가지 않는다). stage별 `ZOOP_AI_{DOCUMENT_SUMMARY,DOCUMENT_SENTIMENT,VERIFY,BRIEFING_OUTLOOK}_{MODEL,REASONING_EFFORT}`는 입력 digest에 영향을 주므로 항상 통과한다. |
 
 잘못된 설정은 종료 코드 78과 `{"error":"service_config_invalid","field":"<VAR>","reason":"<code>"}`만 출력합니다(값 출력 없음). child 환경은 `PATH=/usr/bin:/bin`, `LANG=C.UTF-8`, `PYTHON*` 몇 개와 위 통과 값뿐입니다. 요청이 경로·명령·환경·provider URL·모델·fixture·grant registry를 고를 수는 없습니다.
+
+### 관측 export(선택, 기본 꺼짐)
+
+`POST /internal/v1/observations/export`에는 `observation.read`가 필요합니다. 이 scope는 운영자가 지정한 내부 문서 수입 principal에만 명시적으로 부여하며, 기존 principal에 자동으로 추가하지 않습니다. 저장소에 관측별 소유자 정보가 없으므로 이 scope는 **서버가 설정한 공용 ingestion 저장소 전체의 정확한 관측 조회 권한**입니다. 다른 principal에도 운영자가 같은 scope를 명시적으로 부여하면 동일한 현재 source 권리 검사를 거쳐 조회할 수 있습니다. Scope가 없는 인증된 principal은 403, 알 수 없는 토큰은 401입니다.
+
+| 설정 | 규칙 |
+|---|---|
+| `ZOOP_AI_SERVICE_INGESTION_COMMAND` | 설치된 `zoop-ai-ingest` 실행 파일의 절대 경로입니다. 이 설정이 관측 export 그룹을 켭니다. |
+| `ZOOP_AI_INGESTION_STATE_DIR` | 기존 ingestion 저장소의 절대 경로입니다. 새 저장소를 만들거나 복구하지 않습니다. |
+| `ZOOP_AI_SERVICE_SOURCES` | 현재 운영자 source registry 파일입니다. CLI가 요청마다 다시 읽습니다. |
+| `ZOOP_STATE_DIR` | 기존 pipeline 소유권 검사에 필요한 앱 상태 경로입니다. 서비스·worker·ingestion 상태 경로와 겹칠 수 없습니다. |
+
+기존 서비스 필수 설정도 필요합니다. S2·S3와 함께 사용할 때 ingestion·sources 설정을 그대로 공유하며, graph·handoff가 함께 설정되어 있으면 같은 ingestion·registry를 가리켜야 합니다. Command 설정이 없으면 인증 후 503 `execution_unavailable`, command만 있고 필수 설정이 빠졌으면 시작을 거부합니다. 수집 설정만으로 S2·S3 실행 그룹을 켜지 않습니다.
+
+요청은 닫힌 native selector입니다. `schemaVersion`은 필수이며 값은 `zoop-ingestion-s2-1`입니다. 나머지 필드는 정확히 `roundId`, `sourceId`, `page`, `ordinal`, `documentId`, `rawVersion`, `documentVersion`입니다. `observationId`, 클라이언트 경로·CLI 인자·registry·`requireStore` 옵션과 query parameter는 받지 않습니다. `Idempotency-Key`는 필요하지 않고 권한이나 캐시 신원을 만들지 않습니다.
+
+서버는 항상 `export --require-store`만 실행합니다. CLI가 현재 `read`·`store`·`quote-display`, 고정된 source 설정과 관측 버전을 검사하며, 서비스는 응답의 selector 일치, 본문의 `sourceHash`, document version과 locator hash를 검증합니다. 성공 응답은 **CLI의 정확한 JSON**이며 `document.text`, locator와 선택적 publisher·language·collection 필드를 보존합니다. `language`는 native가 선언한 2~35자 문자열만 받고, 미지정 필드는 추가하지 않습니다. 별도 wrapper나 상태 조회 경로는 없습니다. 한 요청은 관측 하나를 동기 200으로 돌려주며, 묶음 조회와 비동기(202) 전달은 #407에서 정할 열린 항목입니다. 요청은 2,000,000바이트, stdout·응답은 16 MiB, child 실행은 45초, 동시 export는 2개로 제한합니다. 모든 응답에 `Cache-Control: no-store`가 붙습니다.
+
+| 결과 | HTTP |
+|---|---|
+| 허용된 native export | 200 |
+| `source_unauthorized` | 403 |
+| `round_not_found`, `observation_not_found`, `document_version_not_in_round` | 404 |
+| `registry_changed`, `scope_configuration_conflict`, `preparation_profile_unbound` | 409 |
+| writer lock의 `ingestion_busy` | 503 `runtime_busy`, `runtimeCode=ingestion_busy`, `Retry-After: 2` |
+| hot WAL·손상된 설정 등 native 상태 거부 | 503 `service_configuration_invalid`와 안전한 `runtimeCode` |
+| stdout 계약·본문 hash·응답 신원 불일치 | 500 `runtime_contract_mismatch` 또는 `runtime_binding_mismatch` |
+
+오류와 로그에는 본문·운영자 경로·키·raw stderr를 넣지 않습니다. 요청마다 권리를 새로 확인하며, 캐시·ingestion 쓰기·자동 재시도·복구·job 등록은 하지 않습니다. 권리 검사와 HTTP 전달은 별개 시점이므로 이미 전달한 본문을 회수하거나 원자적 철회를 보장하지 않습니다. 이 조회는 모델 송신·grant 발급·게시·활성화를 허가하지 않습니다.
+
+**기존 온라인 profile에 scope만 추가해 재시작하면 안 됩니다.** Plan authority binding은 모든 principal 이름과 scope를 고정하므로 `observation.read` 추가도 기존 binding을 바꾸며 시작이 거부됩니다. 이 변경은 기존 profile·binding·quota·영수증을 수정하거나 초기화하지 않습니다. 운영자는 기존 이력을 보존한 별도 읽기 전용 서비스 profile을 사용하거나, 별도 승인된 migration 절차를 준비해야 합니다. 새 profile은 기존 실행 예산이나 admission 한도를 초기화하는 수단이 아닙니다.
+
+배포에는 pipeline CLI 설치, 내구성 있는 동일 ingestion 저장소·현재 registry, 명시적 importer scope와 기존 loopback/TLS proxy 구성이 필요합니다. 기본 개발 컨테이너는 pipeline 설치를 포함하지 않습니다. 앱의 `IngestionExporter.export(Observation)`와 selector·응답은 호환되지만 기존 `ProcessIngestionExporter`는 여전히 로컬 CLI를 호출하며, HTTP 전송 구현은 앱의 별도 작업입니다. 비공개 처리 권한·retained provenance를 공개 권한으로 바꾸지 않으며, 공개 OpenAPI·AWS 설정은 그대로입니다.
+
+오프라인 실제 HTTP→CLI smoke: `ai/service/.venv/bin/python ai/service/scripts/observation_export_smoke.py`. 합성 HTML로 만든 native 저장소만 사용하며 네트워크는 loopback으로 제한하고 `.env` 읽기를 거부합니다. 설치된 pipeline 환경이 필요하며 의존성을 자동으로 설치하지 않습니다.
 
 ### 온라인 plan admission(선택, 기본 꺼짐)
 
