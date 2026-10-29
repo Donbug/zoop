@@ -4739,6 +4739,18 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | label | 필수 | string | 해당 요구를 회원 질문의 표현으로 나타낸 문구 |
 | message | 필수 | string | kind별 서버 템플릿으로 만든 안내 문장 |
 
+<a id="schema-chatnotice"></a>
+
+### ChatNotice
+
+답하지 못한 요구는 아니지만 회원이 알아야 할 장애·우회. 요구를 답하지 못했으면 limitations에 쓴다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| code | 필수 | string {mcp_direct_start, web_unavailable, web_no_results, web_budget_exhausted, web_not_configured, tool_unavailable, tool_budget_exhausted} | mcp_direct_start: 도구 연결(MCP) 사전 확인이 실패해 서버가 정한 기본 조회 경로로 처음부터 답함(답변 검증은 같음). web_*: 보조 웹 검색이 실패·0건·예산 소진·미설정이라 쓰지 못함. tool_*: 내부 조회 하나가 실패하거나 호출 예산이 모자랐으나 다른 근거로 해당 요구를 답함. 지금 서버가 만드는 값은 mcp_direct_start뿐이며 나머지는 웹 검색 도구·도구 장애 부분 답변과 함께 생긴다. 클라이언트는 모르는 code도 message로 표시한다. |
+| labels | 필수 | string[] | 알림이 해당하는 요구를 회원 질문의 표현으로 나타낸 문구. 실행 전체에 해당하면 빈 배열이다. |
+| message | 필수 | string | code별 서버 템플릿으로 만든 안내 문장 |
+
 <a id="schema-chatperiod"></a>
 
 ### ChatPeriod
@@ -4770,7 +4782,9 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | applied | 필수 | [ChatApplied](#schema-chatapplied) |  |
 | choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: 기업·기간·범위·스냅샷 중 회원이 고를 수 있는 선택지. 선택은 원 작업을 수정하지 않고 resolves.choiceId를 담은 새 질문으로 접수한다. |
 | action | 필수 | [ChatAction](#schema-chataction) / null | guidance: what the member can do to meet the missing condition |
-| limitations | 필수 | [ChatLimitation](#schema-chatlimitation)[] | answered에서 답하지 않은 요구. 모든 필수 요구는 본문에서 근거와 함께 답했거나 이 배열의 항목 중 정확히 하나에 속한다. answered가 아니면 빈 배열이며 전체 이유는 reason을 쓴다. 도구 장애·timeout은 항목이 아니라 failed다. |
+| limitations | 필수 | [ChatLimitation](#schema-chatlimitation)[] | answered에서 답하지 않은 요구. 모든 필수 요구는 본문에서 근거와 함께 답했거나 이 배열의 항목 중 정확히 하나에 속한다. answered가 아니면 빈 배열이며 전체 이유는 reason을 쓴다. 도구 장애·timeout은 항목이 아니라 failed다. 답한 요구 옆의 주의(내 종목 앞 5개만 확인한 results_truncated, 질문한 기업이나 기준점이 보유·관심 종목이 아닌 not_in_member_scope)도 여기에 둔다. |
+| answerStatus | 필수 | string {complete, partial, guidance} | job.status·outcome과 별개인 답변 완결 정도. answered에서 명시 요구를 모두 답했으면 complete(notices가 있어도), 일부라도 답하지 못했으면 partial(limitations가 있으면 partial이며, 예외는 기준점만 보유·관심 종목 밖이고 조회는 한 not_in_member_scope 하나), clarification·guidance·insufficient_evidence이거나 돌려줄 때 인용 근거를 읽을 수 없어 본문을 고정 안내로 바꿨으면 guidance다. 서버가 정하며 모델 자기평가로 정하지 않는다. 이 필드 이전에 저장된 결과는 outcome과 limitations로 계산한다(answered이고 limitations가 있으면 partial). |
+| notices | 필수 | [ChatNotice](#schema-chatnotice)[] | 답변을 막지 않은 장애·우회. 이 필드 이전에 저장된 결과는 빈 배열이다. |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-chatsessionresponse"></a>

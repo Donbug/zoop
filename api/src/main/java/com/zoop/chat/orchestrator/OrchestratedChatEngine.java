@@ -199,11 +199,13 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
 
         var retrieved = new ChatRetrieval.Outcome(Map.of(), Map.of(), Set.of(), null, null);
         ChatGeneratedAnswer agentAnswer = null;
+        boolean directStart = false;
         List<ChatCapability> agentTools = agentTools(confirmed);
         if (agentTools != null && !agent.available()) {
             // Preflight/circuit decisions happen before the first agent step. The direct path begins here; a failure after an
             // agent step has started is never replaced with direct results in this run.
             agentTools = null;
+            directStart = true;
             route.put("agentPreflight", "unavailable");
         }
         if (agentTools != null) {
@@ -362,12 +364,18 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 limitations.add(ChatResults.scopeCut(byId.get(id).label()));
             }
         }
-        retrieved.outside().forEach((id, how) -> {
+        // A reference point outside the member's companies was read all the same: the only note that leaves nothing
+        // unanswered, so it alone does not make the answer partial.
+        int anchorNotes = 0;
+        for (var entry : retrieved.outside().entrySet()) {
+            String id = entry.getKey();
             // Answered on the member's companies, though the question also named one that is not: say so beside it.
             if (explicit(decision, id) && kept.stream().anyMatch(s -> s.requirementIds().contains(id))) {
-                limitations.add(ChatResults.outsideScope(how, byId.get(id).label()));
+                limitations.add(ChatResults.outsideScope(entry.getValue(), byId.get(id).label()));
+                if (entry.getValue() == ChatRetrieval.Outside.ANCHOR) anchorNotes++;
             }
-        });
+        }
+        boolean partial = limitations.size() > anchorNotes;
 
         Set<String> answered = new HashSet<>();
         kept.forEach(s -> answered.addAll(s.requirementIds()));
@@ -377,8 +385,9 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                 .forEach(b -> b.results().forEach(r -> r.items().forEach(i -> reachable.add(i.id()))));
         var targets = passed.graphTargets().stream().filter(g -> reachable.contains(g.id())).toList();
         ChatResult result = ChatResults.answered(run, kept, keptCitations, targets,
-                items(retrieved, answered, "company"), items(retrieved, answered, "issue"), limitations,
-                overrode(run, confirmed, answered), writtenPeriod(run, confirmed, answered), clock.instant());
+                items(retrieved, answered, "company"), items(retrieved, answered, "issue"), limitations, partial,
+                directStart ? List.of(ChatResults.notice("mcp_direct_start")) : List.of(), overrode(run, confirmed, answered),
+                writtenPeriod(run, confirmed, answered), clock.instant());
         route.put("outcome", "answered");
         return new ChatEngineOutcome.Completed(result, route);
     }
