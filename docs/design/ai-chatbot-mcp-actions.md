@@ -143,13 +143,13 @@ Circuit breaker 초기값은 endpoint별 최근 5회 **연결** 시도 중 3회 
 
 ‘항상 답변’은 시스템이 정상적으로 응답을 전달할 수 있는 한 검증된 내용 또는 확인 불가 안내를 제공한다는 뜻이다. 웹 실패만으로 전체 job을 failed로 만들지 않는다. 다른 기술 장애·권한 거부·검증 실패·저장 실패의 사실을 성공 원장으로 덮지 않는다.
 
-목표 공개 필드는 `answerStatus=complete|partial|guidance`(신규, 미구현)이며 job.status·outcome과 별개다. answered에서 미충족 요구가 있으면 partial, 모두 답했으면 complete, clarification/guidance/insufficient_evidence는 guidance다. 보완 웹만 실패하고 모든 요구를 답했다면 complete일 수 있다.
+목표 공개 필드는 `answerStatus=complete|partial|guidance`(2026-10-30 구현)이며 job.status·outcome과 별개다. answered에서 미충족 요구가 있으면 partial, 모두 답했으면 complete, clarification/guidance/insufficient_evidence는 guidance다. 보완 웹만 실패하고 모든 요구를 답했다면 complete일 수 있다. 내 종목 앞 5개만 확인했거나 질문한 기업이 보유·관심 종목 밖이면 일부를 답하지 못한 것이라 partial이고, 기준점만 보유·관심 종목 밖이며 조회는 한 경우만 limitation이 있어도 complete다. 인용 근거를 지금 읽을 수 없어 본문을 고정 안내로 바꿔 돌려주면 guidance다. 이 필드 이전에 저장된 결과는 outcome과 limitations로 계산한다.
 
-새 `notices[]`에는 requirementIds와 code·message를 담아 web_unavailable·web_no_results·web_budget_exhausted·web_not_configured·mcp_direct_start·tool_unavailable·tool_budget_exhausted를 원인대로 표시한다. 기존 limitations는 답하지 못한 요구만 담으며 필요한 장애 kind를 함께 확장한다. 예를 들어 내부 근거로 요구를 완결하면 web_unavailable notice만 붙이고, 최신 소식 요구가 남으면 partial과 해당 limitation을 함께 표시한다. 모델은 제한 여부를 자의로 확정하지 못한다.
+새 `notices[]`에는 code·message와 해당 요구의 회원 표현(`labels`, 실행 전체면 빈 배열)을 담아 web_unavailable·web_no_results·web_budget_exhausted·web_not_configured·mcp_direct_start·tool_unavailable·tool_budget_exhausted를 원인대로 표시한다. 기존 limitations는 답하지 못한 요구만 담으며 필요한 장애 kind를 함께 확장한다. 예를 들어 내부 근거로 요구를 완결하면 web_unavailable notice만 붙이고, 최신 소식 요구가 남으면 partial과 해당 limitation을 함께 표시한다. 모델은 제한 여부를 자의로 확정하지 못한다. 공개 결과에는 요구 ID가 없으므로 limitation의 `label`처럼 요구를 회원 질문의 표현으로 가리킨다. 2026-10-30 기준 서버가 만드는 notice는 `mcp_direct_start`(preflight·circuit으로 처음부터 direct 경로) 하나이며, web_*는 웹 검색 도구, tool_*는 도구 장애 부분 답변과 함께 생긴다.
 
 답할 근거가 전혀 없으면 guidance 또는 조회 성공 시 insufficient_evidence의 고정 안내다. Q02 웹 실패는 general_knowledge로 개념 설명 가능하지만 최신 기업 사실·수치·전망을 만들어내지 않는다. 모델 결과 불명/검증 실패 등 failed job에는 기존 ChatFailure 기반 고정 안내를 표시한다. cancelled·미인증·저장/전달 시스템 장애는 completed로 가장하지 않는다. 안전 안내 자체에 다시 모델 검증을 호출할 필요는 없다.
 
-현재 공개 API에는 answerStatus·notices 및 추가 limitation kind가 없다. UI가 임의로 새 필드를 추측하지 않으며 구현 PR에서 DTO·저장·OpenAPI·웹 타입·재열람 guard를 동시에 변경한다.
+answerStatus·notices는 DTO·저장·OpenAPI·웹 타입·재열람 guard에 함께 들어갔다(저장 migration 없음: 결과 jsonb에 담긴다). 도구 장애의 limitation kind는 아직 없다(도구 장애는 지금도 failed).
 
 ## 4. 유형별 도구와 UI 동작
 
