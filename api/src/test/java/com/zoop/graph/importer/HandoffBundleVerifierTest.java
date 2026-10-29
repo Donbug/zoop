@@ -73,6 +73,30 @@ class HandoffBundleVerifierTest {
     }
 
     @Test
+    void sourcePoliciesKeepHistoricalBytesAndRequireTheExactCurrentCountryPin() throws Exception {
+        ObjectNode historical = (ObjectNode) HandoffFixtures.parse(resource("export-valid.json")).get("bundle");
+        String before = historical.toString();
+        HandoffBundleVerifier.verify(historical);
+        assertEquals(before, historical.toString());
+        ObjectNode current = historical.deepCopy();
+        for (JsonNode source : current.get("sources").values()) {
+            ObjectNode policies = (ObjectNode) source.get("policies");
+            policies.put("policy", "zoop-relation-policy-2");
+            policies.put("countryContext", "zoop-country-context-1");
+        }
+        HandoffBundleVerifier.verify(current);
+        for (Consumer<ObjectNode> change : List.<Consumer<ObjectNode>>of(
+                p -> p.remove("countryContext"), p -> p.put("countryContext", "zoop-country-context-2"),
+                p -> p.putNull("countryContext"), p -> p.put("countryContext", ""),
+                p -> p.put("policy", "zoop-relation-policy-1"), p -> p.put("policy", "zoop-relation-policy-3"),
+                p -> p.put("unrecognized", "pin"))) {
+            ObjectNode broken = current.deepCopy();
+            change.accept((ObjectNode) broken.get("sources").get(0).get("policies"));
+            assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(broken));
+        }
+    }
+
+    @Test
     void aRealProducerExportCarriesTheHandWrittenFieldProvenanceAndAnyEditOfItIsRefused() throws Exception {
         // expected-field-provenance.json is written by hand in graph_handoff_smoke.py (never derived from the planner): per export file,
         // per issue id, the field provenance the authored world implies.

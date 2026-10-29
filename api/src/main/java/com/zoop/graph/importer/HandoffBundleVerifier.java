@@ -252,8 +252,17 @@ final class HandoffBundleVerifier {
             need(sourceKind.equals(sourceProvenance.string("sourceKind"))
                     && executionMode.equals(sourceProvenance.string("executionMode"))
                     && recordingKind.equals(sourceProvenance.string("recordingKind")));
-            Obj versions = source.object("policies").exactly(Set.of("producer", "verifier", "impactProducer",
-                    "impactVerifier", "policy", "revalidationPolicy", "impactPolicy"));
+            Obj versions = source.object("policies");
+            String sourcePolicy = versions.string("policy");
+            if (sourcePolicy.equals("zoop-relation-policy-2")) {
+                versions.exactly(Set.of("producer", "verifier", "impactProducer", "impactVerifier",
+                        "policy", "revalidationPolicy", "impactPolicy", "countryContext"));
+                need(versions.string("countryContext").equals("zoop-country-context-1"));
+            } else {
+                need(sourcePolicy.equals("zoop-relation-policy-1"));
+                versions.exactly(Set.of("producer", "verifier", "impactProducer",
+                        "impactVerifier", "policy", "revalidationPolicy", "impactPolicy"));
+            }
             for (String name : versions.node().propertyNames()) {
                 need(!versions.string(name).isEmpty());
             }
