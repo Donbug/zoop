@@ -1,6 +1,8 @@
 import CompanyInfoTab from './CompanyInfoTab';
 import PriceChart from './PriceChart';
 import { formatKst, formatMoney } from '@/util/format';
+import { formatEventTime } from '@/util/event-time';
+import { ChangeRate } from '@/components/stocks/StockQuote';
 import BoltIcon from './BoltIcon';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
@@ -43,6 +45,9 @@ import {
   requestTime,
   versionOnlyAddress,
 } from './detail-model';
+
+// D-COM-01 B1: 백엔드 financials 컨트롤러가 생기면 계약을 확인하고 다시 켠다.
+const COMPANY_FINANCIALS_ENABLED = false;
 
 const workspaceClasses =
   'company-workspace grid grid-cols-[200px_minmax(0,1fr)_280px] gap-3 m-0 overflow-visible text-zoop-ink max-[1000px]:grid-cols-[160px_minmax(0,1fr)] max-md:flex max-md:flex-col [&_section]:border-b [&_section]:border-zoop-line [&_section]:py-4 [&_h1]:text-[26px] [&_h1]:font-bold [&_h1]:tracking-[-0.035em] [&_h2]:mb-3 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:tracking-[-0.025em] [&_h3]:font-semibold [&_p]:text-xs [&_p]:text-zoop-muted [&_p]:leading-[1.7] [&_button]:cursor-pointer [&_button]:rounded-full [&_button]:border [&_button]:border-zoop-line [&_button]:bg-white [&_button]:min-h-[36px] [&_button]:px-4 [&_button]:py-2 [&_button]:text-xs! [&_button[aria-pressed=true]]:bg-zoop-ink [&_button[aria-pressed=true]]:text-white [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-default [&_a]:cursor-pointer [&_a]:px-[9px] [&_a]:py-1.5 [&_a]:text-xs [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-zoop-ink [&_nav]:my-3 [&_nav]:flex [&_nav]:flex-wrap [&_nav]:gap-1.5 [&_article]:border-b [&_article]:border-zoop-line [&_article]:py-3 [&_table]:w-full [&_table]:text-xs [&_table]:wrap-anywhere [&_[role=alert]]:text-zoop-alert [&_details]:my-3 [&_input]:max-w-full [&_input]:rounded-xl [&_input]:border [&_input]:border-zoop-line [&_input]:bg-white [&_input]:px-3 [&_input]:py-2 [&_input]:min-h-[38px] [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-2 [&_summary:focus-visible]:outline-zoop-ink max-md:[&_table]:block max-md:[&_table]:overflow-auto max-md:[&_section]:min-w-0 max-md:[&_section]:wrap-anywhere';
@@ -434,7 +439,9 @@ export default function CompanyWorkspace() {
     owner,
   );
   const financials = useCompanyResource<Financials>(
-    ready ? companyUrl(id, '/financials', snapshot) : null,
+    COMPANY_FINANCIALS_ENABLED && ready
+      ? companyUrl(id, '/financials', snapshot)
+      : null,
   );
   const tab = ['events', 'documents', 'info'].includes(params.get('tab') ?? '')
     ? params.get('tab')!
@@ -643,17 +650,12 @@ export default function CompanyWorkspace() {
               <span>
                 {' '}
                 · 전일 대비{' '}
-                {quote.data.quote.change === null
-                  ? '미제공'
-                  : formatMoney(
-                      quote.data.quote.change,
-                      quote.data.quote.currency,
-                    )}{' '}
-                (
-                {quote.data.quote.changeRate === null
-                  ? '미제공'
-                  : `${number(quote.data.quote.changeRate * 100)}%`}
-                )
+                <ChangeRate
+                  rate={quote.data.quote.changeRate}
+                  change={quote.data.quote.change}
+                  currency={quote.data.quote.currency}
+                  className=""
+                />
               </span>
               <p>
                 공급자 관측{' '}
@@ -966,7 +968,16 @@ export default function CompanyWorkspace() {
                                 {item.title}
                               </button>
                               <p className="text-[11px] text-zoop-muted tabular-nums">
-                                {item.eventTime ?? '시점 미상'}
+                                {item.eventTime ? (
+                                  <time dateTime={item.eventTime}>
+                                    {formatEventTime(
+                                      item.eventTime,
+                                      item.timePrecision,
+                                    )}
+                                  </time>
+                                ) : (
+                                  '시점 미상'
+                                )}
                               </p>
                               <button
                                 onClick={() => selectEvent(item, 'documents')}
@@ -1072,41 +1083,43 @@ export default function CompanyWorkspace() {
         )}
         {tab === 'documents' && <CompanyDocumentPanel />}
         {tab === 'info' && <CompanyInfoTab resource={company} />}
-        <section aria-label="핵심 재무">
-          <h2>핵심 재무</h2>
-          <Status resource={financials} label="재무" />
-          {financials.data && (
-            <>
-              <Basis metadata={financials.data.metadata} />
-              {financials.data.status !== 'available' ? (
-                <p>
-                  {financials.data.status === 'failed'
-                    ? '재무 조회 실패'
-                    : '재무 미제공'}{' '}
-                  · {financials.data.reason}
-                  <button onClick={financials.retry}>재무 다시 조회</button>
-                </p>
-              ) : financials.data.items.length ? (
-                <dl>
-                  {financials.data.items.map((f, i) => (
-                    <div key={`${f.name}:${i}`}>
-                      <dt>
-                        {f.name} ({f.period})
-                      </dt>
-                      <dd>
-                        {number(f.value)} {f.unit} ·{' '}
-                        {f.accountingBasis ?? '회계 기준 미제공'} · {f.source} ·{' '}
-                        <ReferenceTime value={f.asOf} />
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              ) : (
-                <p>제공된 재무 항목이 없어요.</p>
-              )}
-            </>
-          )}
-        </section>
+        {COMPANY_FINANCIALS_ENABLED && (
+          <section aria-label="핵심 재무">
+            <h2>핵심 재무</h2>
+            <Status resource={financials} label="재무" />
+            {financials.data && (
+              <>
+                <Basis metadata={financials.data.metadata} />
+                {financials.data.status !== 'available' ? (
+                  <p>
+                    {financials.data.status === 'failed'
+                      ? '재무 조회 실패'
+                      : '재무 미제공'}{' '}
+                    · {financials.data.reason}
+                    <button onClick={financials.retry}>재무 다시 조회</button>
+                  </p>
+                ) : financials.data.items.length ? (
+                  <dl>
+                    {financials.data.items.map((f, i) => (
+                      <div key={`${f.name}:${i}`}>
+                        <dt>
+                          {f.name} ({f.period})
+                        </dt>
+                        <dd>
+                          {number(f.value)} {f.unit} ·{' '}
+                          {f.accountingBasis ?? '회계 기준 미제공'} · {f.source}{' '}
+                          · <ReferenceTime value={f.asOf} />
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : (
+                  <p>제공된 재무 항목이 없어요.</p>
+                )}
+              </>
+            )}
+          </section>
+        )}
       </main>
       {/* D-COM-04: 넓은 화면은 와이어프레임처럼 오른쪽 열에 두고 스크롤해도 화면 안에 남는다.
           1000px 이하에서는 본문 아래로 옮겨 넓게 본다. */}
