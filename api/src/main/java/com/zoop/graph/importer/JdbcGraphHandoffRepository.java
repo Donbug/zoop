@@ -69,6 +69,17 @@ public class JdbcGraphHandoffRepository implements GraphHandoffRepository {
             """;
     private static final String INSERT_VERSION_RULE =
             "INSERT INTO graph_version_rules (graph_version_id, rule_id) VALUES (:id, :ruleId)";
+    private static final String SOURCES = """
+            SELECT ordinal, handoff_id, receipt_artifact_id, bundle_snapshot_artifact_id
+            FROM graph_version_sources
+            WHERE graph_version_id = :id
+            ORDER BY ordinal
+            """;
+    private static final String INSERT_SOURCE = """
+            INSERT INTO graph_version_sources (graph_version_id, ordinal, handoff_id, receipt_artifact_id,
+                bundle_snapshot_artifact_id)
+            VALUES (:id, :ordinal, :handoffId, :receiptArtifactId, :bundleArtifactId)
+            """;
 
     private final NamedParameterJdbcTemplate jdbc;
     private final DocumentAnalysisRepository analysis;
@@ -167,6 +178,23 @@ public class JdbcGraphHandoffRepository implements GraphHandoffRepository {
         for (String ruleId : version.ruleIds()) {
             jdbc.update(INSERT_VERSION_RULE, new MapSqlParameterSource("id", version.id()).addValue("ruleId", ruleId));
         }
+    }
+
+    @Override
+    public List<Source> sources(String versionId) {
+        return jdbc.query(SOURCES, new MapSqlParameterSource("id", versionId), (result, index) -> new Source(
+                result.getInt("ordinal"), result.getString("handoff_id"), result.getString("receipt_artifact_id"),
+                result.getString("bundle_snapshot_artifact_id")));
+    }
+
+    @Override
+    public void insertSource(NewSource source) {
+        jdbc.update(INSERT_SOURCE, new MapSqlParameterSource()
+                .addValue("id", source.versionId())
+                .addValue("ordinal", source.ordinal())
+                .addValue("handoffId", source.handoffId())
+                .addValue("receiptArtifactId", source.receiptArtifactId())
+                .addValue("bundleArtifactId", source.bundleSnapshotArtifactId()));
     }
 
     private static Instant instant(ResultSet result, String column) throws SQLException {

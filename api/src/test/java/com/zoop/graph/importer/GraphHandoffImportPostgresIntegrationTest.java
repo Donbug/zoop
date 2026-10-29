@@ -110,8 +110,8 @@ class GraphHandoffImportPostgresIntegrationTest {
         jdbc.update("DELETE FROM evidence WHERE article_id = ?", HandoffFixtures.ARTICLE_ID);
         jdbc.update("DELETE FROM article_versions WHERE article_id = ?", HandoffFixtures.ARTICLE_ID);
         jdbc.update("DELETE FROM articles WHERE id = ?", HandoffFixtures.ARTICLE_ID);
-        jdbc.update("DELETE FROM artifacts WHERE id = ? OR id = 'exact-pg-test' OR id LIKE 'artifact-gv-%' OR id LIKE 'artifact-receipt-gv-%'",
-                "text-" + HandoffFixtures.ARTICLE_VERSION);
+        jdbc.update("DELETE FROM artifacts WHERE id = ? OR id = 'exact-pg-test' OR id LIKE 'artifact-gv-%' OR id LIKE 'artifact-receipt-gv-%'"
+                + " OR id LIKE 'artifact-bundle-gv-%'", "text-" + HandoffFixtures.ARTICLE_VERSION);
         jdbc.update("DELETE FROM artifacts WHERE kind = 'graph_snapshot' AND id LIKE 'artifact-fixture-%'");
         jdbc.update("DELETE FROM companies WHERE id LIKE 'SYNTH:%'");
         jdbc.update("DELETE FROM companies WHERE id = ?", HandoffFixtures.ISSUE);
@@ -370,7 +370,8 @@ class GraphHandoffImportPostgresIntegrationTest {
         // The first spans had been inserted and the artifacts registered inside the transaction; none of it survived.
         assertEquals(1, count("SELECT count(*) FROM evidence WHERE article_id = ?", HandoffFixtures.ARTICLE_ID));
         assertEquals(0, count("SELECT count(*) FROM graph_versions WHERE id LIKE 'gv-%'"));
-        assertEquals(0, count("SELECT count(*) FROM artifacts WHERE id LIKE 'artifact-gv-%' OR id LIKE 'artifact-receipt-gv-%'"));
+        assertEquals(0, count("SELECT count(*) FROM artifacts WHERE id LIKE 'artifact-gv-%' OR id LIKE 'artifact-receipt-gv-%'"
+                + " OR id LIKE 'artifact-bundle-gv-%'"));
         assertEquals(filesBefore, files());
         assertFalse(Files.exists(root.resolve("graph_snapshot").resolve(built.versionId() + ".json")));
         assertEquals(active, activeVersion());
@@ -389,7 +390,8 @@ class GraphHandoffImportPostgresIntegrationTest {
         assertEquals(GraphHandoffFailure.INGESTION_EXPORT_FAILED, result.failure().failure());
         assertEquals(0, count("SELECT count(*) FROM evidence WHERE article_id = ?", HandoffFixtures.ARTICLE_ID));
         assertEquals(0, count("SELECT count(*) FROM graph_versions WHERE id LIKE 'gv-%'"));
-        assertEquals(0, count("SELECT count(*) FROM artifacts WHERE id LIKE 'artifact-gv-%' OR id LIKE 'artifact-receipt-gv-%'"));
+        assertEquals(0, count("SELECT count(*) FROM artifacts WHERE id LIKE 'artifact-gv-%' OR id LIKE 'artifact-receipt-gv-%'"
+                + " OR id LIKE 'artifact-bundle-gv-%'"));
         assertEquals(filesBefore, files());
         assertEquals(history, activationFingerprint());
     }
@@ -503,7 +505,8 @@ class GraphHandoffImportPostgresIntegrationTest {
                     "SELECT coalesce(quote_verified::text, 'null') || '|' || coalesce(verification_artifact_id, 'null') FROM evidence WHERE id = ?",
                     String.class, id), "the stored row must not be repaired");
             assertEquals(0, count("SELECT count(*) FROM graph_versions WHERE id LIKE 'gv-%'"), before);
-            assertEquals(0, count("SELECT count(*) FROM artifacts WHERE id LIKE 'artifact-gv-%' OR id LIKE 'artifact-receipt-gv-%'"),
+            assertEquals(0, count("SELECT count(*) FROM artifacts WHERE id LIKE 'artifact-gv-%' OR id LIKE 'artifact-receipt-gv-%'"
+                    + " OR id LIKE 'artifact-bundle-gv-%'"),
                     before);
             assertEquals(filesBefore, files(), before);
         }
@@ -723,6 +726,91 @@ class GraphHandoffImportPostgresIntegrationTest {
                 accepted = false;
             }
             assertEquals(com.zoop.graph.rules.PublicationRuleEvaluator.RULE_ID.matcher(id).matches(), accepted, id);
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------ composition (#55, PR-1) ----
+
+    @Test
+    void theCompositionRowAndTheBundleProjectionAreWrittenOnceWithTheVersionAndLeaveOnlyWithIt() throws Exception {
+        GraphHandoffResult result = importer.run(built.request());
+        assertTrue(result.succeeded(), () -> String.valueOf(result.failure() == null ? null : result.failure().failure()));
+        String versionId = built.versionId();
+
+        Map<String, Object> source = jdbc.queryForMap(
+                "SELECT ordinal, handoff_id, receipt_artifact_id, bundle_snapshot_artifact_id FROM graph_version_sources "
+                        + "WHERE graph_version_id = ?", versionId);
+        assertEquals(0, ((Number) source.get("ordinal")).intValue());
+        assertEquals(HandoffFixtures.HANDOFF_ID, source.get("handoff_id"));
+        assertEquals("artifact-receipt-" + versionId, source.get("receipt_artifact_id"));
+        // No rule hid anything, so the rule-free projection is the stored snapshot itself; no second artifact or file exists.
+        assertEquals("artifact-" + versionId, source.get("bundle_snapshot_artifact_id"));
+        assertEquals(0, count("SELECT count(*) FROM artifacts WHERE id = ?", "artifact-bundle-" + versionId));
+        assertEquals(0, count("SELECT count(*) FROM artifacts WHERE kind = 'graph_bundle_snapshot'"));
+
+        // Written once: neither an UPDATE nor a DELETE of the row itself is allowed.
+        for (String statement : List.of("UPDATE graph_version_sources SET ordinal = 7 WHERE graph_version_id = ?",
+                "DELETE FROM graph_version_sources WHERE graph_version_id = ?")) {
+            assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update(statement, versionId), statement);
+        }
+        assertEquals(1, count("SELECT count(*) FROM graph_version_sources WHERE graph_version_id = ?", versionId));
+        // The row belongs to its version: it goes with it and with nothing else (rolled back here, the version stays).
+        transaction.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            jdbc.update("DELETE FROM graph_versions WHERE id = ?", versionId);
+            assertEquals(0, count("SELECT count(*) FROM graph_version_sources WHERE graph_version_id = ?", versionId));
+        });
+        assertEquals(1, count("SELECT count(*) FROM graph_version_sources WHERE graph_version_id = ?", versionId));
+        // The receipt the row points at cannot vanish under it.
+        assertThrows(org.springframework.dao.DataAccessException.class,
+                () -> jdbc.update("DELETE FROM artifacts WHERE id = ?", "artifact-receipt-" + versionId));
+    }
+
+    @Test
+    void theMigrationBackfillsOneSourceRowPerImportedVersionWithoutAProjection() {
+        String url = System.getenv("ZOOP_COMPANY_TEST_DB_URL");
+        String password = System.getenv().getOrDefault("ZOOP_COMPANY_TEST_DB_PASSWORD", "");
+        String schema = "sources_upgrade_" + java.util.UUID.randomUUID().toString().replace("-", "");
+        String upgradeUrl = url + "?currentSchema=" + schema + ",public";
+        try {
+            // Everything before the composition migration, then what an earlier import and the fixture seeder would have left.
+            org.flywaydb.core.Flyway.configure().dataSource(upgradeUrl, "company_test", password).schemas(schema)
+                    .defaultSchema(schema).target("20261028140000").load().migrate();
+            String imported = "gv-" + "1".repeat(64);
+            String fixture = "fixture-upgrade";
+            String at = "2026-10-20T00:00:00Z";
+            for (String[] artifact : new String[][] {
+                    {"artifact-" + imported, "graph_snapshot", "artifact-root:graph_snapshot/" + imported + ".json"},
+                    {"artifact-receipt-" + imported, "verification_receipt", "artifact-root:verification_receipt/" + imported + ".json"},
+                    {"artifact-" + fixture, "graph_snapshot", "classpath:graph-fixtures/" + fixture + ".json"}}) {
+                jdbc.update("INSERT INTO " + schema + ".artifacts (id, kind, storage_uri, sha256, bytes, media_type, created_at) "
+                        + "VALUES (?, ?, ?, ?, 1, 'application/json', ?::timestamptz)", artifact[0], artifact[1], artifact[2],
+                        "a".repeat(64), at);
+            }
+            jdbc.update("INSERT INTO " + schema + ".graph_versions (id, sequence, kind, created_at, created_by, source_label, "
+                    + "issue_count, relation_count, article_count, snapshot_artifact_id, review_revision) VALUES "
+                    + "(?, 1, 'fixture', ?::timestamptz, 'system', 'fixture', 0, 0, 0, ?, 0), "
+                    + "(?, 2, 'snapshot', ?::timestamptz, 'operator:a', ?, 1, 1, 1, ?, 0)",
+                    fixture, at, "artifact-" + fixture, imported, at, "graph-handoff:handoff-pg-backfill", "artifact-" + imported);
+
+            org.flywaydb.core.Flyway upgrade = org.flywaydb.core.Flyway.configure()
+                    .dataSource(upgradeUrl, "company_test", password).schemas(schema).defaultSchema(schema).load();
+            upgrade.migrate();
+            upgrade.validate();
+
+            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM " + schema + ".graph_version_sources", Integer.class));
+            Map<String, Object> row = jdbc.queryForMap("SELECT graph_version_id, ordinal, handoff_id, receipt_artifact_id, "
+                    + "bundle_snapshot_artifact_id FROM " + schema + ".graph_version_sources");
+            assertEquals(imported, row.get("graph_version_id"));
+            assertEquals(0, ((Number) row.get("ordinal")).intValue());
+            assertEquals("handoff-pg-backfill", row.get("handoff_id"));
+            assertEquals("artifact-receipt-" + imported, row.get("receipt_artifact_id"));
+            assertEquals(null, row.get("bundle_snapshot_artifact_id"), "no rule-free projection was kept before the migration");
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM " + schema
+                    + ".graph_version_sources WHERE graph_version_id = ?", Integer.class, fixture));
+        } finally {
+            // The schema is this test's alone; the shared test database must not keep a copy per run.
+            jdbc.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE");
         }
     }
 }
