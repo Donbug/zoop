@@ -501,7 +501,9 @@ function IssueCard({
           if (next && !open) recordOpen();
           setOpen(next);
         }}
-        className="scroll-mt-4 overflow-hidden rounded-2xl border border-zoop-line bg-zoop-paper"
+        className={`scroll-mt-4 overflow-hidden border border-zoop-line bg-zoop-paper ${
+          corrections.length ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'
+        }`}
       >
         <summary
           className={`cursor-pointer list-none p-5 sm:p-6 ${FOCUS_RING}`}
@@ -699,7 +701,8 @@ function IssueCard({
         )}
       </details>
       {corrections.length > 0 && (
-        <div className="px-5 pb-5 sm:px-6">
+        // 접힌 카드에서도 정정이 보이도록 카드 아래쪽 테두리 안에 붙여 둔다.
+        <div className="rounded-b-2xl border border-t-0 border-zoop-line bg-zoop-paper px-5 pb-5 sm:px-6">
           <IssueCorrections corrections={corrections} />
         </div>
       )}

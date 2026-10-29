@@ -62,84 +62,88 @@ export default function BriefingIssueList({
         </p>
       ) : (
         <ol>
-          {items.slice(0, 3).map((item) => (
-            <li
-              key={item.eventId}
-              id={issueAnchor(item)}
-              className="scroll-mt-4 flex flex-col gap-1.5 border-t-[0.667px] border-zoop-line pt-5 first:border-t-0 first:pt-0 [&+li]:mt-5"
-            >
-              <BriefingReadingSection
-                compact={compact}
-                title={`${item.rank}. ${item.title} · 근거 ${item.evidenceCount}건`}
+          {[...items]
+            .sort((a, b) => a.rank - b.rank)
+            .slice(0, 3)
+            .map((item) => (
+              <li
+                key={item.eventId}
+                id={issueAnchor(item)}
+                className="scroll-mt-4 flex flex-col gap-1.5 border-t-[0.667px] border-zoop-line pt-5 first:border-t-0 first:pt-0 [&+li]:mt-5"
               >
-                <p className={NOTE}>
-                  {item.timePrecision === 'unknown' || !item.eventTime
-                    ? '발생 시각 미상'
-                    : `발생 ${item.eventTime}`}
-                </p>
-                <h4 className="text-sm font-bold">
-                  {item.rank}. {item.title}
-                </h4>
-                {(item.matchedCompanyIds ?? []).length > 0 && (
-                  <p className="self-start rounded-full border-[0.667px] border-zoop-ink px-2 py-[2px] text-[11px] font-semibold">
-                    내 종목:{' '}
-                    {item.companies
-                      .filter((company) =>
-                        (item.matchedCompanyIds ?? []).includes(company.id),
-                      )
-                      .map((company) => company.name)
-                      .join(', ') || (item.matchedCompanyIds ?? []).join(', ')}
+                <BriefingReadingSection
+                  compact={compact}
+                  title={`${item.rank}. ${item.title} · 근거 ${item.evidenceCount}건`}
+                >
+                  <p className={NOTE}>
+                    {item.timePrecision === 'unknown' || !item.eventTime
+                      ? '발생 시각 미상'
+                      : `발생 ${item.eventTime}`}
                   </p>
-                )}
-                <p className="text-[11px] text-zoop-muted">
-                  {item.companies.length
-                    ? item.companies.map((company, index) => (
-                        <span key={company.id || index}>
-                          {index > 0 && ', '}
-                          {company.id ? (
-                            <Link
-                              to={`/companies/${encodeURIComponent(company.id)}`}
-                              className={`underline underline-offset-4 ${FOCUS_RING}`}
-                            >
-                              {company.name}
-                            </Link>
-                          ) : (
-                            company.name
-                          )}
-                        </span>
-                      ))
-                    : '확인된 기업 없음'}
-                </p>
-                <BriefingDocumentSentiments
-                  sentiments={item.documentSentiments}
-                  companies={item.companies}
-                  label={`핵심 이슈 ${item.rank} 문서 판정`}
-                />
-                <p className={BODY}>
-                  {'text' in item.summary
-                    ? item.summary.text
-                    : item.summary.reason}
-                </p>
-                <p className={NOTE}>
-                  선정 이유: {item.reason} · 근거 {item.evidenceCount}건
-                  {item.sourceSupport &&
-                    ` · 보도 기사 ${item.sourceSupport.articleCount}건`}
-                </p>
-                {roundId && (
-                  <BriefingItemDetails
-                    key={`${roundId}:${item.eventId}:${graphVersion}`}
-                    roundId={roundId}
-                    graphVersion={graphVersion}
-                    item={item}
+                  <h4 className="text-sm font-bold">
+                    {item.rank}. {item.title}
+                  </h4>
+                  {(item.matchedCompanyIds ?? []).length > 0 && (
+                    <p className="self-start rounded-full border-[0.667px] border-zoop-ink px-2 py-[2px] text-[11px] font-semibold">
+                      내 종목:{' '}
+                      {item.companies
+                        .filter((company) =>
+                          (item.matchedCompanyIds ?? []).includes(company.id),
+                        )
+                        .map((company) => company.name)
+                        .join(', ') ||
+                        (item.matchedCompanyIds ?? []).join(', ')}
+                    </p>
+                  )}
+                  <p className="text-[11px] text-zoop-muted">
+                    {item.companies.length
+                      ? item.companies.map((company, index) => (
+                          <span key={company.id || index}>
+                            {index > 0 && ', '}
+                            {company.id ? (
+                              <Link
+                                to={`/companies/${encodeURIComponent(company.id)}`}
+                                className={`underline underline-offset-4 ${FOCUS_RING}`}
+                              >
+                                {company.name}
+                              </Link>
+                            ) : (
+                              company.name
+                            )}
+                          </span>
+                        ))
+                      : '확인된 기업 없음'}
+                  </p>
+                  <BriefingDocumentSentiments
+                    sentiments={item.documentSentiments}
+                    companies={item.companies}
+                    label={`핵심 이슈 ${item.rank} 문서 판정`}
                   />
-                )}
-                {renderExtra?.(item)}
-                <IssueCorrections
-                  corrections={issueCorrections?.get(item.eventId) ?? []}
-                />
-              </BriefingReadingSection>
-            </li>
-          ))}
+                  <p className={BODY}>
+                    {'text' in item.summary
+                      ? item.summary.text
+                      : item.summary.reason}
+                  </p>
+                  <p className={NOTE}>
+                    선정 이유: {item.reason} · 근거 {item.evidenceCount}건
+                    {item.sourceSupport &&
+                      ` · 보도 기사 ${item.sourceSupport.articleCount}건`}
+                  </p>
+                  {roundId && (
+                    <BriefingItemDetails
+                      key={`${roundId}:${item.eventId}:${graphVersion}`}
+                      roundId={roundId}
+                      graphVersion={graphVersion}
+                      item={item}
+                    />
+                  )}
+                  {renderExtra?.(item)}
+                  <IssueCorrections
+                    corrections={issueCorrections?.get(item.eventId) ?? []}
+                  />
+                </BriefingReadingSection>
+              </li>
+            ))}
         </ol>
       )}
     </section>

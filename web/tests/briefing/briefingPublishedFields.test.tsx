@@ -229,6 +229,34 @@ describe.each([
     expect(within(history).getAllByText(/정정 시각/)).toHaveLength(4);
   });
 
+  it('응답 순서가 순위와 달라도 상위 3건 기준으로 이슈 정정을 붙인다', async () => {
+    const [first, second] = briefing().items;
+    setup(
+      briefing({
+        items: [
+          item({ title: '합성 이슈 넷', eventId: 'event-4', rank: 4 }),
+          second,
+          item({ title: '합성 이슈 셋', eventId: 'event-3', rank: 3 }),
+          first,
+        ],
+        corrections: [
+          correction(1, 'event-4', '네 번째 이슈 정정 내용'),
+          correction(2, 'event-3', '세 번째 이슈 정정 내용'),
+        ],
+      }),
+      compact,
+    );
+    const issueList = await screen.findByRole('list', {
+      name: '이 이슈의 정정',
+    });
+    expect(within(issueList).getByText(/세 번째 이슈 정정 내용/)).toBeTruthy();
+    expect(screen.queryByText(/합성 이슈 넷/)).toBeNull();
+    const history = screen
+      .getByRole('heading', { name: '정정 이력' })
+      .closest('section')!;
+    expect(within(history).getByText(/네 번째 이슈 정정 내용/)).toBeTruthy();
+  });
+
   it('공지에 시각이 있으면 함께 보이고 끝에 안내 문구가 붙는다', async () => {
     setup(
       briefing({
