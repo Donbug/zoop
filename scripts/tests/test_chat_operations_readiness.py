@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -166,6 +167,13 @@ class ChatOperationsReadinessTest(unittest.TestCase):
             result = readiness.evaluate(readiness.load(manifest_path), evidence_path)
         self.assertEqual("failed", result["gate"])
         self.assertTrue(any("tools-8-rounds-3" in failure for failure in result["failures"]))
+
+    def test_the_checker_runs_isolated_without_its_directory_on_sys_path(self):
+        # python -I (and -P) leave the script's directory off sys.path; the spike checker beside it still loads.
+        for flag in ("-I", "-P"):
+            done = subprocess.run([sys.executable, flag, str(ROOT / "scripts" / "chat_operations_readiness.py"), "--help"],
+                                  capture_output=True, text=True, timeout=60)
+            self.assertEqual(0, done.returncode, flag + ": " + done.stderr)
 
 
 if __name__ == "__main__":

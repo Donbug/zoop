@@ -9,6 +9,7 @@ Passing this gate does not enable either chatbot feature flag.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
 import sys
@@ -16,7 +17,24 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import chat_live_spike_report as spike
+
+
+def _spike_report():
+    """The live spike checker beside this file, loaded by path: it works with `python -I` or `-P` too, which leave the script's
+    directory off `sys.path`. A module already loaded under the same name (the tests, or a caller) is reused."""
+    name = "chat_live_spike_report"
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.spec_from_file_location(name, Path(__file__).resolve().with_name(name + ".py"))
+    if spec is None or spec.loader is None:
+        raise ImportError(name)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+spike = _spike_report()
 
 
 SCHEMA = "zoop-chat-operations-readiness-1"
