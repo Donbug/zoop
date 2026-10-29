@@ -348,6 +348,12 @@ ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli recover \
 - 동시 child 4개, 슬롯을 1초 안에 얻지 못하면 503 `service_busy`. child 기한은 stage 상한 + 3초(라우터 7초, 답변 28초, 검증 9초).
 - 시험: `tests/test_chat_unit.py`(child 없음), `tests/test_chat_http.py`(실제 uvicorn + 기록용 stand-in CLI). 실제 worker CLI는 `ai/worker/tests/test_chat_stages.py`.
 
+### MCP 연결 preflight (`GET /internal/v1/chat-mcp-health`)
+
+같은 `chat.invoke` scope와 chat 설정 그룹 아래에서 `zoop-ai-chat probe-mcp`를 실행한다. 본문·Idempotency-Key·grant·모델 호출·원장 행은 없고 live 호출 예산도 쓰지 않는다. child가 운영자 설정 URL에 내용 없는 MCP `ping`을 보내며 endpoint 자체의 `401` Bearer challenge만 `mcp=reachable`로 인정한다. timeout·연결 실패·예상 밖 status/challenge는 **200** `mcp=unreachable`과 각각 `mcp_timeout`·`mcp_connect_failed`·`mcp_status_unexpected` reason이다. URL 누락·형식 오류는 503 `service_configuration_invalid`, 비정상/계약 밖 child 출력은 502 `probe_failed`, 5초 service deadline 초과는 504 `probe_failed`다.
+
+이 route는 실행 전 경로 선택에 필요한 관측만 제공한다. Java의 endpoint별 circuit breaker와 direct adapter 선택은 애플리케이션 책임이며, probe 자체가 circuit을 저장하거나 실행 중 MCP 실패를 direct 결과로 교체하지 않는다. stage child와 같은 4개 슬롯을 사용한다.
+
 ## 네트워크와 한계
 
 - 서비스는 `127.0.0.1`에만 묻습니다. 운영에서는 같은 호스트/네임스페이스의 HTTPS reverse proxy가 TLS, 본문 2,000,000B 상한, `Authorization` 비로깅을 맡고 App SG에서만 접근되게 해야 합니다. **이는 가정이며 관측·배포한 사실이 없습니다**(WBS 6.11.2/8의 실관측 과제).

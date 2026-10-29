@@ -61,6 +61,21 @@ class ChatStageFailure(ChatView):
     unknown: bool = Field(description="Sent, and its outcome is unknown (timeout or disconnect): it is never sent again.")
 
 
+class ChatMcpHealth(ChatView):
+    """Whether the operator's ZOOP MCP server answered a content-free probe at its configured URL (`zoop-ai-chat probe-mcp`): an MCP ping
+    with no grant that the endpoint itself must refuse as unauthenticated. Nothing is run and no model is called."""
+    schema_version: Literal["zoop-ai-chat-1"]
+    mcp: Literal["reachable", "unreachable"]
+    reason: Literal["mcp_timeout", "mcp_connect_failed", "mcp_status_unexpected"] | None = Field(
+        default=None, description="Why it is unreachable: no answer in time, no connection, or an answer that is not the endpoint's own refusal.")
+
+    @model_validator(mode="after")
+    def reason_when_unreachable(self):
+        if (self.mcp == "unreachable") != (self.reason is not None):
+            raise ValueError("an unreachable server has a reason and a reachable one none")
+        return self
+
+
 QueryType = Literal["Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08"]
 
 

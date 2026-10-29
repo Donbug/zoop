@@ -1,4 +1,4 @@
-"""The five S1 `/internal/v1/analysis-jobs` routes, the five S2 `/internal/v1/extraction-jobs` routes, the eight S3 `/internal/v1/relation-jobs` routes (five job routes, three review-operation routes) the two read-only `/internal/v1/graph-versions` routes, the two read-only `/internal/v1/graph-handoffs` routes and the synchronous `/internal/v1/chat-stages/{stage}` route. HTTP framing only: auth, headers, bounded strict body parsing, error envelope, request id.
+"""The five S1 `/internal/v1/analysis-jobs` routes, the five S2 `/internal/v1/extraction-jobs` routes, the eight S3 `/internal/v1/relation-jobs` routes (five job routes, three review-operation routes) the two read-only `/internal/v1/graph-versions` routes, the two read-only `/internal/v1/graph-handoffs` routes, the synchronous `/internal/v1/chat-stages/{stage}` route and the content-free `/internal/v1/chat-mcp-health` probe. HTTP framing only: auth, headers, bounded strict body parsing, error envelope, request id.
 
 Order is fixed: authentication and scope, then headers, then body. Documentation, CORS, proxy headers and the server header are
 off. An unexpected exception becomes a bare `internal_error` envelope; its text is never sent or logged.
@@ -22,7 +22,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .auth import authenticate
 from .chat_stages import ChatStages
-from .chat_wire import STAGES, ChatStageRequest, ChatStageResult
+from .chat_wire import STAGES, ChatMcpHealth, ChatStageRequest, ChatStageResult
 from .config import Principal
 from .jobs import ApiError, JobService, Observation, Reply
 from .logs import emit
@@ -346,6 +346,17 @@ CHAT_ERRORS = {
     502: {"model": ErrorEnvelope, "description": "stage_outcome_unknown: the runtime ended abnormally or its output was unreadable. It may have sent the request: never resend this invocation."},
     503: {"model": ErrorEnvelope, "description": "runtime_unavailable, service_busy or service_configuration_invalid (retryable): nothing was sent."},
     504: {"model": ErrorEnvelope, "description": "stage_outcome_unknown: the stage deadline passed. It may have sent the request: never resend this invocation."},
+}
+
+CHAT_PROBE_ERRORS = {
+    401: CHAT_ERRORS[401],
+    403: CHAT_ERRORS[403],
+    409: CHAT_ERRORS[409],
+    422: {"model": ErrorEnvelope, "description": "invalid_request: query parameters are not accepted."},
+    500: CHAT_ERRORS[500],
+    502: {"model": ErrorEnvelope, "description": "probe_failed: the probe child ended abnormally or returned an invalid result."},
+    503: {"model": ErrorEnvelope, "description": "runtime_unavailable, service_busy or service_configuration_invalid (retryable)."},
+    504: {"model": ErrorEnvelope, "description": "probe_failed: the content-free MCP probe deadline passed."},
 }
 
 HANDOFF_ERRORS = {
@@ -743,8 +754,23 @@ def create_app(service: JobService | None = None, relation: RelationJobs | None 
                              handoff_id: Annotated[str, PATH_HANDOFF_ID], x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
         return await handoff_call(request, "bundle", principal, handoff_id)
 
+    @app.get("/internal/v1/chat-mcp-health", operation_id="probeChatMcp", tags=["chat-stages"], status_code=200,
+             response_model=ChatMcpHealth, summary="Probe the configured ZOOP MCP endpoint without a grant or model call",
+             responses={**CHAT_PROBE_ERRORS, 200: {"model": ChatMcpHealth,
+                                                    "description": "The endpoint answered its own unauthenticated refusal, or the probe classified why it was unreachable."}})
+    async def chat_mcp_health(request: Request, _principal: Annotated[Principal, Depends(require("chat.invoke"))],
+                              x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        chat_stages = request.app.state.chat
+        if chat_stages is None:
+            raise ApiError(409, "execution_unavailable")
+        graph_query(request, ())
+        context = _context(request)
+        seen = context["seen"] = Observation()
+        result = await run_in_threadpool(chat_stages.probe_mcp, seen)
+        return JSONResponse(result.wire(), status_code=200)
+
     @app.post("/internal/v1/chat-stages/{stage}", operation_id="invokeChatStage", tags=["chat-stages"], status_code=200,
-              response_model=ChatStageResult, summary="Run one chatbot model stage synchronously: router, answer or verification",
+              response_model=ChatStageResult, summary="Run one chatbot model stage synchronously: router, answer, verification or agent",
               responses={**CHAT_ERRORS, 200: {"model": ChatStageResult,
                                                 "description": "The stage ran (or its stored outcome was returned). `status=failed` is a stage outcome, not a transport error."}})
     async def chat_stage(request: Request, principal: Annotated[Principal, Depends(require("chat.invoke"))],

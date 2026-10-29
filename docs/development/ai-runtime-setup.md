@@ -167,7 +167,8 @@ ai/worker/.venv/bin/python ai/worker/scripts/native_jev_smoke.py
 | `chat-verification` | 네이티브 Jev `/systemone` | 근거 구간 지지 Choice, 모든 구간 투자 판단 Noul | 6초 |
 | `chat-agent` | OpenAI 호환 `responses`, `ZOOP_AI_CHAT_AGENT_MODEL`은 정확히 `gpt-6-luna`, `_REASONING_EFFORT`는 `medium`(생략 시 `medium`, 다른 값 거절), `store=true`, MCP 서버 URL은 운영자 설정 `ZOOP_AI_CHAT_MCP_SERVER_URL`만(HTTPS·기본 포트·userinfo/query/fragment 없음, 요청으로 지정 불가, 없으면 live 송신 안 함), grant는 MCP 도구의 `authorization`으로 매 단계 전송 | ZOOP MCP 도구(`require_approval=always`) 한 단계: 승인 요청에서 멈추거나 `chat-answer`와 같은 schema의 최종 답변. 승인은 앱이 결정하고 다음 단계(`continuation`)로 전달 | 30초 |
 
-- **게이트·예산**: `ZOOP_AI_CHAT_LIVE_ENABLED=1`과 양수 `ZOOP_AI_CHAT_MAX_CALLS`가 모두 있어야 live 송신. 상한은 세 stage가 공유하며 `chat.sqlite3`의 live 송신 건수로 센다. 없으면 `chat_live_disabled`로 아무것도 보내지 않는다. key는 생성 `ZOOP_AI_API_KEY`, Jev `TYPESAFE_API_KEY`이며 각 key는 자기 endpoint에만 간다.
+- **MCP preflight**: `zoop-ai-chat probe-mcp`는 모델 단계와 별개로 운영자 설정 URL에 grant 없는 JSON-RPC `ping`을 보낸다. endpoint 자체의 `401` Bearer challenge만 exit 0 `reachable`; timeout·연결 실패·다른 응답은 exit 2 `unreachable`과 닫힌 reason이며 redirect를 따르지 않는다. URL 설정 오류는 exit 64다. 원장·모델·live 예산을 쓰지 않으며 ai/service의 `GET /internal/v1/chat-mcp-health`가 같은 `chat.invoke` scope로 노출한다. 이는 Java가 Responses 시작 전 경로를 선택하기 위한 관측이고 circuit 상태나 direct 전환을 자체 관리하지 않는다.
+- **게이트·예산**: `ZOOP_AI_CHAT_LIVE_ENABLED=1`과 양수 `ZOOP_AI_CHAT_MAX_CALLS`가 모두 있어야 live 송신. 상한은 네 model stage가 공유하며 `chat.sqlite3`의 live 송신 건수로 센다. 없으면 `chat_live_disabled`로 아무것도 보내지 않는다. key는 생성 `ZOOP_AI_API_KEY`, Jev `TYPESAFE_API_KEY`이며 각 key는 자기 endpoint에만 간다.
 - **원장 우선·멱등·응답 불명**: `invocationId`(작업·시도·stage)당 한 번만 보낸다.
   - 원장을 **가장 먼저** 읽는다. 이미 있는 invocation은 지금의 gate·key·모델 설정과 무관하게 기록된 결과를 돌려주고, 보낸 호출을 "안 보냄"으로 바꾸지 않는다. 같은 id에 다른 요청(stage·mode·입력)이 오면 `invocation_conflict`이다.
   - 성공했던 답의 인용 출처 grant가 그 뒤 철회되면 `source_grant_withdrawn`(`sent=true`, 영수증 유지, 재전송 없음)으로 본문을 숨긴다.
