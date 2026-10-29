@@ -1,0 +1,24 @@
+name: Finished briefing playback
+on:
+  pull_request:
+    paths:
+      - 'demo/briefing-playback-2026-10-21_23/**'
+      - 'scripts/briefing_playback.py'
+      - 'scripts/briefing_preview_feedback.py'
+      - 'scripts/tests/test_briefing_playback.py'
+      - '.github/workflows/briefing-playback.yml'
+permissions:
+  contents: read
+jobs:
+  playback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - run: python3 scripts/briefing_playback.py --check
+      - run: python3 -m unittest discover -s scripts/tests -p test_briefing_playback.py
