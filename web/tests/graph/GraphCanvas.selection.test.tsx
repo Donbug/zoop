@@ -10,6 +10,10 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import GraphCanvas from '@/components/graph/GraphCanvas';
 import { GraphAppearanceContext } from '@/components/graph/graph-appearance';
+import {
+  EDGE_ANIMATION,
+  NODE_ANIMATION,
+} from '@/components/graph/graph-motion';
 import { createMockGraph } from '@/mocks/graph/response';
 import type { GraphData } from '@antv/g6';
 import {
@@ -21,6 +25,7 @@ import MapPage from '@/pages/map/MapPage';
 import * as graphApi from '@/apis/graph/graph';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
+import { toggleTheme, useColorTheme } from '@/util/theme-color';
 
 const canvas = vi.hoisted(() => ({
   created: vi.fn(),
@@ -36,9 +41,14 @@ const canvas = vi.hoisted(() => ({
   zoomTo: vi.fn(),
   translateTo: vi.fn(),
   translateBy: vi.fn(),
+  translateElementTo: vi.fn<(...args: unknown[]) => Promise<void>>(
+    async () => {},
+  ),
   getZoom: vi.fn(() => 1),
   getPosition: vi.fn(() => [0, 0]),
   setSize: vi.fn(),
+  setNode: vi.fn(),
+  setEdge: vi.fn(),
   resizeCallbacks: [] as (() => void)[],
   handlers: new Map<string, (event: { target: { id: string } }) => void>(),
 }));
@@ -61,6 +71,7 @@ vi.mock('@antv/g6', () => ({
     zoomTo = canvas.zoomTo;
     translateTo = canvas.translateTo;
     translateBy = canvas.translateBy;
+    translateElementTo = canvas.translateElementTo;
     getViewportByCanvas(point: number[]) {
       return point;
     }
@@ -68,6 +79,8 @@ vi.mock('@antv/g6', () => ({
       return canvas.setData.mock.lastCall?.[0]?.nodes ?? [];
     }
     setSize = canvas.setSize;
+    setNode = canvas.setNode;
+    setEdge = canvas.setEdge;
     setData = canvas.setData;
     draw = canvas.draw;
     setElementState = canvas.setElementState;
@@ -124,6 +137,49 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     );
     expect(canvas.created).toHaveBeenCalledTimes(1);
     expect(canvas.destroyed).not.toHaveBeenCalled();
+  });
+
+  it('D-GRP-01 82번 화면 모드를 바꾸면 그래프·카메라는 그대로 두고 색만 다시 읽어 그린다', async () => {
+    document.documentElement.dataset.theme = 'light';
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    // 지도 화면처럼 화면 모드를 그래프 모양(GraphAppearanceContext)으로도 내려준다.
+    function Themed() {
+      const theme = useColorTheme();
+      return (
+        <GraphAppearanceContext value={{ variant: 'improved', theme }}>
+          <GraphCanvas data={data} />
+        </GraphAppearanceContext>
+      );
+    }
+    render(<Themed />);
+    await waitFor(() => expect(canvas.created).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    const draws = canvas.setData.mock.calls.length;
+    canvas.zoomTo.mockClear();
+    canvas.translateTo.mockClear();
+    canvas.fitView.mockClear();
+
+    document.documentElement.style.setProperty('--color-zoop-ink', '#fafafa');
+    act(() => {
+      toggleTheme();
+    });
+
+    await waitFor(() =>
+      expect(canvas.setData.mock.calls.length).toBeGreaterThan(draws),
+    );
+    expect(canvas.created).toHaveBeenCalledTimes(1);
+    expect(canvas.destroyed).not.toHaveBeenCalled();
+    expect(canvas.setNode.mock.lastCall?.[0].state.hovered.haloStroke).toBe(
+      '#fafafa',
+    );
+    expect(canvas.setEdge).toHaveBeenCalled();
+    expect(canvas.zoomTo).not.toHaveBeenCalled();
+    expect(canvas.translateTo).not.toHaveBeenCalled();
+    expect(canvas.fitView).not.toHaveBeenCalled();
+    document.documentElement.style.removeProperty('--color-zoop-ink');
+    act(() => {
+      toggleTheme();
+    });
   });
 
   it('D-GRP-01 does not move nodes by dragging; only the map camera moves', async () => {
@@ -1408,7 +1464,11 @@ describe('D-GRP-02 · canvas selection bridge', () => {
         state: Record<string, Record<string, unknown>>;
       };
     };
-    expect(options.behaviors[0]).toEqual({ type: 'drag-canvas', enable: true });
+    expect(options.behaviors[0]).toEqual({
+      type: 'drag-canvas',
+      enable: true,
+      animation: false,
+    });
     const surface = screen.getByRole('img', { name: /관계 지도:/ });
 
     fireEvent.pointerDown(surface, { button: 0, clientX: 100, clientY: 100 });
@@ -1445,5 +1505,124 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     };
     expect(state.selected.labelFontSize(datum)).toBe(26);
     expect(state.selected.labelFontWeight(datum)).toBe(800);
+  });
+});
+
+describe('D-GRP-01 지도 카메라 움직임', () => {
+  function stubMotion(reduce: boolean) {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('prefers-reduced-motion') ? reduce : false,
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+    }));
+  }
+
+  it('G6는 카메라만 움직이고 노드·연결선·휠 확대·끌기는 바로 반응하게 둔다', async () => {
+    render(
+      <GraphCanvas
+        data={createMockGraph({ mode: 'all', personalFilter: 'all' })}
+      />,
+    );
+    await waitFor(() => expect(canvas.created).toHaveBeenCalledTimes(1));
+    const options = canvas.created.mock.lastCall![0] as {
+      animation: unknown;
+      node: { animation: unknown };
+      edge: { animation: unknown };
+      behaviors: (string | { type: string; animation?: unknown })[];
+    };
+    // G6 5는 그래프 animation이 false면 화면 이동 애니메이션도 모두 끈다.
+    expect(options.animation).toBe(true);
+    // 노드·연결선은 배치를 바꿀 때 부르는 이동(translate)만 움직인다.
+    expect(options.node.animation).toEqual(NODE_ANIMATION);
+    expect(options.edge.animation).toEqual(EDGE_ANIMATION);
+    for (const stage of ['enter', 'exit', 'show', 'hide', 'update'] as const) {
+      expect(NODE_ANIMATION[stage]).toBe(false);
+      expect(EDGE_ANIMATION[stage]).toBe(false);
+    }
+    for (const behavior of options.behaviors) {
+      expect(typeof behavior).toBe('object');
+      expect((behavior as { animation?: unknown }).animation).toBe(false);
+    }
+  });
+
+  it('확대·축소 버튼은 250ms로 움직이고, 동작 줄이기면 바로 옮긴다', async () => {
+    stubMotion(false);
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const view = render(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.created).toHaveBeenCalledTimes(1));
+    canvas.zoomTo.mockClear();
+    await userEvent.click(screen.getByRole('button', { name: /^확대$/ }));
+    expect(canvas.zoomTo).toHaveBeenLastCalledWith(1.2, {
+      duration: 250,
+      easing: 'cubic-bezier(0.35, 0, 0.35, 1)',
+    });
+
+    stubMotion(true);
+    canvas.zoomTo.mockClear();
+    await userEvent.click(screen.getByRole('button', { name: /^축소$/ }));
+    expect(canvas.zoomTo).toHaveBeenLastCalledWith(1 / 1.2, false);
+    view.unmount();
+    vi.unstubAllGlobals();
+  });
+  it('포커스에 들어가면 노드를 이전 자리에 그린 뒤 새 자리로 옮기고, 동작 줄이기면 바로 놓는다', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const focusId = data.nodes.find((node) => node.kind === 'company')!.id;
+    const lastNodes = () =>
+      new Map(
+        (
+          canvas.setData.mock.lastCall![0] as {
+            nodes: { id: string; style: { x: number; y: number } }[];
+          }
+        ).nodes.map((node) => [node.id, [node.style.x, node.style.y]]),
+      );
+
+    stubMotion(false);
+    const view = render(<GraphCanvas data={data} focusLayout />);
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    const before = lastNodes();
+    canvas.setData.mockClear();
+    view.rerender(<GraphCanvas data={data} focusId={focusId} focusLayout />);
+    await waitFor(() => expect(canvas.translateElementTo).toHaveBeenCalled());
+    const [targets, animated] = canvas.translateElementTo.mock.lastCall! as [
+      Record<string, [number, number]>,
+      boolean,
+    ];
+    expect(animated).toBe(true);
+    expect(Object.keys(targets).length).toBeGreaterThan(0);
+    const drawn = lastNodes();
+    for (const id of Object.keys(targets)) {
+      expect(drawn.get(id)).toEqual(before.get(id));
+      expect(targets[id]).not.toEqual(before.get(id));
+    }
+    view.unmount();
+
+    stubMotion(true);
+    canvas.translateElementTo.mockClear();
+    const reduced = render(<GraphCanvas data={data} focusLayout />);
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    reduced.rerender(<GraphCanvas data={data} focusId={focusId} focusLayout />);
+    await waitFor(() => expect(canvas.setElementState).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(canvas.translateElementTo).not.toHaveBeenCalled();
+    reduced.unmount();
+    vi.unstubAllGlobals();
+  });
+  it('흐름 순으로 정렬을 켜고 끌 때도 노드를 이전 자리에서 새 자리로 옮긴다', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    stubMotion(false);
+    const view = render(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    canvas.translateElementTo.mockClear();
+    view.rerender(<GraphCanvas data={data} flow />);
+    await waitFor(() => expect(canvas.translateElementTo).toHaveBeenCalled());
+    expect(canvas.translateElementTo.mock.lastCall![1]).toBe(true);
+    canvas.translateElementTo.mockClear();
+    view.rerender(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.translateElementTo).toHaveBeenCalled());
+    view.unmount();
+    vi.unstubAllGlobals();
   });
 });

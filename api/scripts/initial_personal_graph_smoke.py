@@ -84,7 +84,7 @@ connection = call("POST", "/api/v1/portfolio/connections", {
     "mockPortfolioId": "demo-balanced",
 }, csrf=csrf, headers={"Idempotency-Key": "issue42-connect"}, expected=201)
 combined = personal()
-assert combined["metadata"]["focusCompanyIds"] == ["KRX:005930", "KRX:000660", "NASDAQ:NVDA"]
+assert combined["metadata"]["focusCompanyIds"] == ["KRX:005930", "KRX:000660", "NYSE:TSM", "NASDAQ:NVDA"]
 assert any(node["id"] == "KRX:005930" and node["holding"] and node["watch"] for node in combined["nodes"])
 
 call("PUT", "/api/v1/me/settings", {
@@ -92,7 +92,7 @@ call("PUT", "/api/v1/me/settings", {
     "watchlistIds": [],
 }, csrf=csrf)
 held = personal()
-assert held["metadata"]["focusCompanyIds"] == ["KRX:005930", "KRX:000660"]
+assert held["metadata"]["focusCompanyIds"] == ["KRX:005930", "KRX:000660", "NYSE:TSM"]
 assert all(not node["watch"] for node in held["nodes"])
 call("DELETE", "/api/v1/portfolio/connections/" + connection["id"], csrf=csrf, expected=204)
 assert personal()["metadata"]["emptyReason"] == "no_personal_stocks"

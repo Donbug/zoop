@@ -12,6 +12,14 @@ public interface GraphEvidenceReader {
     /** @param graphVersion a pinned version id, or {@code null} for the active one; {@code asOf} {@code null} when not requested */
     GraphEvidence read(String graphVersion, Instant asOf, String evidenceId);
 
+    /**
+     * A version an earlier step already pinned, kept as it was: filtered at {@code asOf} when given, otherwise not filtered.
+     * Never reinterpreted as a version-only address.
+     */
+    default GraphEvidence readPinned(String versionId, Instant asOf, String evidenceId) {
+        return read(versionId, asOf, evidenceId);
+    }
+
     /** A round keeps its own version/cutoff; preserved is set only for a validated local reconstruction. */
     record RoundRead(GraphEvidence graph, com.zoop.document.evidence.dto.EvidenceResponse preserved) { }
 

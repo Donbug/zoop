@@ -116,7 +116,7 @@ export default function AiUsageOverview() {
   const days = data?.daily ? totalsByDay(data.daily, view) : null;
   const errors = data
     ? features.flatMap((feature) =>
-        feature.recentErrors.map((error) => ({ ...error, feature })),
+        (feature.recentErrors ?? []).map((error) => ({ ...error, feature })),
       )
     : [];
 
@@ -171,6 +171,13 @@ export default function AiUsageOverview() {
             · 범위{' '}
             {WINDOWS.find((option) => option.value === data.window)?.label}
           </Note>
+          {data.availability === 'partial' && (
+            <Note>
+              일부 집계 원천을 사용할 수 없어요. 미확정 값은 ‘–’로 표시하며,
+              상세 미제공 항목:{' '}
+              {data.unavailableMetrics.join(', ') || '기능별 참고 표시'}.
+            </Note>
+          )}
           <Section
             title={`${view === 'all' ? 'AI' : viewLabel} 사용 회원 비율`}
           >
@@ -208,7 +215,11 @@ export default function AiUsageOverview() {
           )}
           <Section title="기능별 사용량">
             {features.length === 0 ? (
-              <Empty>집계할 AI 기능이 없어요.</Empty>
+              <Empty>
+                {data.availability === 'partial'
+                  ? '기능별 집계 원천을 사용할 수 없어요.'
+                  : '집계할 AI 기능이 없어요.'}
+              </Empty>
             ) : (
               <Table caption="AI 기능별 사용량">
                 <thead>
@@ -238,9 +249,9 @@ export default function AiUsageOverview() {
                       <td className={`${TD} min-w-32 text-zoop-muted`}>
                         {feature.engine}
                       </td>
-                      <td className={NUM}>{count(feature.requests)}</td>
-                      <td className={NUM}>{count(feature.succeeded)}</td>
-                      <td className={NUM}>{count(feature.failed)}</td>
+                      <td className={NUM}>{known(feature.requests)}</td>
+                      <td className={NUM}>{known(feature.succeeded)}</td>
+                      <td className={NUM}>{known(feature.failed)}</td>
                       <td className={NUM}>
                         {duration(feature.latencyMs?.avg)}
                       </td>
@@ -249,9 +260,9 @@ export default function AiUsageOverview() {
                       </td>
                       <td className={NUM}>{known(feature.usage.modelCalls)}</td>
                       <td className={NUM}>
-                        {count(feature.usage.replayCalls)}
+                        {known(feature.usage.replayCalls)}
                       </td>
-                      <td className={NUM}>{count(feature.usage.retries)}</td>
+                      <td className={NUM}>{known(feature.usage.retries)}</td>
                       <td className={NUM}>
                         {known(feature.usage.inputTokens)}
                       </td>
@@ -269,16 +280,23 @@ export default function AiUsageOverview() {
                 </tbody>
               </Table>
             )}
-            {features.some((feature) => feature.note) && (
+            {features.some(
+              (feature) => feature.note || feature.availability !== 'complete',
+            ) && (
               <ul
                 aria-label="집계 참고"
                 className="flex flex-col gap-1 text-[11px] leading-relaxed text-zoop-muted"
               >
                 {features
-                  .filter((feature) => feature.note)
+                  .filter(
+                    (feature) =>
+                      feature.note || feature.availability !== 'complete',
+                  )
                   .map((feature) => (
                     <li key={feature.feature}>
-                      ⓘ {feature.label}: {feature.note}
+                      ⓘ {feature.label}:{' '}
+                      {feature.note ||
+                        `일부 값 미제공 (${feature.unavailableMetrics.join(', ') || feature.availability})`}
                     </li>
                   ))}
               </ul>
@@ -286,9 +304,13 @@ export default function AiUsageOverview() {
           </Section>
 
           <Section title="최근 오류">
-            {errors.length === 0 ? (
+            {features.some((feature) => feature.recentErrors === null) && (
+              <Note>일부 기능의 오류 원천을 사용할 수 없어요.</Note>
+            )}
+            {errors.length === 0 &&
+            features.every((feature) => feature.recentErrors !== null) ? (
               <Empty>이 기간에 기록된 오류가 없어요.</Empty>
-            ) : (
+            ) : errors.length > 0 ? (
               <Table caption="AI 최근 오류">
                 <thead>
                   <tr>
@@ -317,7 +339,7 @@ export default function AiUsageOverview() {
                   ))}
                 </tbody>
               </Table>
-            )}
+            ) : null}
           </Section>
 
           {view === 'all' && data.pastRuns.length > 0 && (

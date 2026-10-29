@@ -26,6 +26,9 @@ dependencies {
 	implementation 'org.bouncycastle:bcprov-jdk18on:1.86'
 	implementation 'org.flywaydb:flyway-database-postgresql'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
+	// Chat MCP endpoint (/mcp): the official MCP Java SDK's servlet stateless Streamable HTTP transport, Jackson 3 mapping.
+	implementation 'io.modelcontextprotocol.sdk:mcp-core:2.1.0'
+	implementation 'io.modelcontextprotocol.sdk:mcp-json-jackson3:2.1.0'
 	runtimeOnly 'org.postgresql:postgresql'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

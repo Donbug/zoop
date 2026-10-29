@@ -267,7 +267,7 @@ export function CompanyRankingPanel({ window }: { window: StatsWindow }) {
                     {row.name}
                   </Link>
                   {row.ticker && (
-                    <span className="ml-2 font-inter text-[10px] text-zoop-faint">
+                    <span className="ml-2 font-inter text-[11px] text-zoop-faint">
                       {row.ticker}
                     </span>
                   )}

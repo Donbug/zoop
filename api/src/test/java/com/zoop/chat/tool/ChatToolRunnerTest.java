@@ -273,6 +273,36 @@ class ChatToolRunnerTest {
         assertTrue(free.getFirst().succeeded());
     }
 
+    @Test
+    void aSlowDeliveryCheckTimesItsCallOutAndNeverHoldsTheThreadsThatRecordCalls() {
+        var release = new CountDownLatch(1);
+        var runner = runner(Map.of(ChatCapability.COMPANY_READ, (scope, request) -> output("v1", List.of()),
+                ChatCapability.ISSUE_READ, (scope, request) -> output("v1", List.of())), Duration.ofSeconds(2),
+                Duration.ofMillis(200));
+        // A send-grant check stuck on its database, more of them than there are record threads.
+        var stuck = new ChatToolRunner.Delivery() {
+            @Override
+            public ChatToolOutput pass(ChatToolOutput output) {
+                awaitIgnoringInterrupts(release);
+                return output;
+            }
+        };
+        try {
+            var control = new RecordingControl(Duration.ofSeconds(60));
+            var results = runner.runReserved(run("v1", null), control, List.of("tc-a", "tc-b", "tc-c", "tc-d"),
+                    Collections.nCopies(4, request("company.read")), stuck);
+            assertTrue(results.stream().allMatch(r -> ChatToolRunner.TIMEOUT.equals(r.error())),
+                    "the check counts against the call's own time limit");
+            assertEquals(ChatToolCallEnd.failed(ChatToolRunner.TIMEOUT), control.ends.get("tc-a"));
+            // Every record thread is free: a direct call of another job is recorded as usual.
+            var direct = runner.runStage(run("v1", null), new RecordingControl(Duration.ofSeconds(60)), 1,
+                    List.of(request("issue.read")));
+            assertTrue(direct.getFirst().succeeded());
+        } finally {
+            release.countDown();
+        }
+    }
+
     private ChatToolRunner runner(Map<ChatCapability, ChatToolFunction> tools) {
         return runner(tools, ChatToolRunner.STAGE_LIMIT, ChatToolRunner.CALL_LIMIT);
     }
@@ -361,6 +391,12 @@ class ChatToolRunnerTest {
         @Override public void beforeModelCall() { events.add("model"); }
         @Override public Duration remaining() { return remaining; }
         @Override public boolean owned() { return true; }
+        @Override public int toolCallsLeft() { return MAX_TOOL_CALLS - reserved.size(); }
+
+        @Override
+        public void shortenDeadline(Instant deadline) {
+            throw new UnsupportedOperationException("the runner never shortens a deadline");
+        }
 
         @Override
         public List<String> reserveToolCalls(int planRevision, List<ChatToolCallReservation> calls) {
@@ -371,6 +407,11 @@ class ChatToolRunnerTest {
                 reserved.add(call);
             }
             return ids;
+        }
+
+        @Override
+        public java.util.Optional<String> claimToolCall(String capabilityId, String inputDigest) {
+            throw new UnsupportedOperationException("only the MCP endpoint claims an approved call");
         }
 
         @Override

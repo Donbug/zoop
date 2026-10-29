@@ -327,7 +327,7 @@ ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli recover \
 
 ## 챗봇 모델 단계 (`/internal/v1/chat-stages/{stage}`)
 
-챗봇 오케스트레이터가 모델 단계 하나(`chat-router` 네이티브 Jev, `chat-answer` Luna, `chat-verification` 네이티브 Jev)를 **동기**로 실행하는 다섯 번째 가족이다. scope는 `chat.invoke`이며 설치된 `zoop-ai-chat invoke`만 고정 argv로 실행한다(계약 `zoop-ai-chat-1`, 규칙은 [AI 런타임 준비 §11](../../docs/development/ai-runtime-setup.md)). 아래 그룹이 없으면 인증 뒤 409 `execution_unavailable`이다.
+챗봇 오케스트레이터가 모델 단계 하나(`chat-router` 네이티브 Jev, `chat-answer` Luna, `chat-verification` 네이티브 Jev, `chat-agent` Luna Responses + ZOOP MCP 한 단계)를 **동기**로 실행하는 다섯 번째 가족이다. scope는 `chat.invoke`이며 설치된 `zoop-ai-chat invoke`만 고정 argv로 실행한다(계약 `zoop-ai-chat-1`, 규칙은 [AI 런타임 준비 §11](../../docs/development/ai-runtime-setup.md)). 아래 그룹이 없으면 인증 뒤 409 `execution_unavailable`이다.
 
 | 변수 | 규칙 |
 |---|---|
@@ -335,7 +335,7 @@ ai/service/.venv/bin/python -m zoop_ai_service.plan_install_cli recover \
 | `ZOOP_AI_CHAT_STATE_DIR` | 호출 원장(`chat.sqlite3`) 디렉터리. 없으면 0700으로 만든다(부모는 있어야 함). 이미 있으면 이 사용자 소유의 실제 디렉터리(symlink 아님)이고 group·world 권한이 없어야 하며, 그 안의 원장 파일(`chat.sqlite3`, `-wal`, `-shm`)도 이 사용자 소유의 일반 파일이고 비공개여야 한다. 아니면 기동을 거부한다(`state_dir_not_private`, `ledger_not_private`). 기존 경로를 chmod로 고치지 않는다. 서비스·worker·앱 상태와 겹쳐도 거부 |
 | `ZOOP_AI_SERVICE_CHAT_GRANTS` | 운영자 챗봇 grant registry(`schemaVersion: zoop-ai-chat-1`). S1 registry와 별도 |
 | `ZOOP_AI_SERVICE_CHAT_REPLAY` | 선택. authored replay fixture. 없으면 `mode=replay`는 409 `execution_unavailable` |
-| 챗봇 live | `ZOOP_AI_CHAT_LIVE_ENABLED=1`과 양수 `ZOOP_AI_CHAT_MAX_CALLS`가 모두 있을 때만 이 둘과 `ZOOP_AI_API_KEY`·`TYPESAFE_API_KEY`가 **챗봇 child에만** 전달된다. 모델·endpoint 이름(`ZOOP_AI_CHAT_ANSWER_MODEL`·`_REASONING_EFFORT`, `ZOOP_AI_CHAT_JEV_MODEL`, `ZOOP_AI_BASE_URL`, `TYPESAFE_BASE_URL`)은 항상 전달된다. S1·파이프라인 게이트는 이 child를 열지 않는다 |
+| 챗봇 live | `ZOOP_AI_CHAT_LIVE_ENABLED=1`과 양수 `ZOOP_AI_CHAT_MAX_CALLS`가 모두 있을 때만 이 둘과 `ZOOP_AI_API_KEY`·`TYPESAFE_API_KEY`가 **챗봇 child에만** 전달된다. 모델·endpoint 이름(`ZOOP_AI_CHAT_ANSWER_MODEL`·`_REASONING_EFFORT`, `ZOOP_AI_CHAT_AGENT_MODEL`·`_REASONING_EFFORT`, `ZOOP_AI_CHAT_MCP_SERVER_URL`(chat-agent grant가 갈 수 있는 유일한 MCP 서버), `ZOOP_AI_CHAT_JEV_MODEL`, `ZOOP_AI_BASE_URL`, `TYPESAFE_BASE_URL`)은 항상 전달된다. S1·파이프라인 게이트는 이 child를 열지 않는다 |
 
 - 챗봇 원장은 함께 설정된 S2/S3·graph·handoff·exposure의 모든 원장 루트와도 분리한다(`chat_roots_overlap`). S2/S3와 exposure는 같은 `RelationGate`로 직렬화하지만, 별도 원장을 쓰는 챗봇은 이 gate를 공유하지 않는다.
 

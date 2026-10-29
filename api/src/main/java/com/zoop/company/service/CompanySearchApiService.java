@@ -48,7 +48,7 @@ public class CompanySearchApiService {
         if (page.asOf() != null && !page.asOf().equals(snapshot.asOf())) {
             throw new CustomException(ErrorCode.INTERNAL_ERROR);
         }
-        page = searchService.pinGraphSnapshot(page, snapshot.graphVersion(), snapshot.asOf());
+        page = searchService.pinGraphSnapshot(page, snapshot.graphVersion(), snapshot.asOf(), snapshot.asOfRequested());
         Map<String, Long> counts = snapshot.counts();
         List<CompanySummaryResponse> items = page.items().stream()
                 .map(company -> toSummary(company, counts.get(company.id())))

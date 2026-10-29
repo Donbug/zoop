@@ -81,11 +81,11 @@ export interface EventDetail {
     outcomes: { field: string; decision: string; reason: string | null }[];
   }[];
   follows: { previous: FollowRef[]; next: FollowRef[] };
+  /** 관리자 최종 승인이 있는 사건만 채워진다. 사용자 화면에는 보이지 않는다(FE 전달 3-1). */
   approval: {
-    source: 'admin-review' | 'review-rule';
+    source: 'admin-review';
     label: string;
     scope: string;
-    ruleId: string | null;
   } | null;
   metadata: {
     source: string;

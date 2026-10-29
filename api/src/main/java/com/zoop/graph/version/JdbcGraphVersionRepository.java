@@ -65,6 +65,14 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
     }
 
     @Override
+    public Optional<Instant> firstActivatedAt(String versionId) {
+        return jdbc.query("""
+                SELECT min(activated_at) AS at FROM graph_activations WHERE version_id = :id AND pointer_changed
+                """, new MapSqlParameterSource("id", versionId), (rs, n) -> rs.getTimestamp("at")).stream()
+                .filter(Objects::nonNull).map(Timestamp::toInstant).findFirst();
+    }
+
+    @Override
     public Optional<String> previousVersionId(String versionId, Instant at) {
         return first(jdbc.queryForList("""
                 SELECT previous_version_id FROM graph_activations

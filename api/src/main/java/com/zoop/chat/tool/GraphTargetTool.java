@@ -63,7 +63,7 @@ abstract class GraphTargetTool implements ChatTool {
         GraphContextLookup lookup;
         String version;
         try {
-            var pinned = reader.read(null, scope.graphVersionId(), scope.asOf());
+            var pinned = reader.readPinned(scope.graphVersionId(), scope.asOf(), scope.asOf() != null);
             lookup = new GraphContextLookup(pinned.graph());
             version = pinned.selected().version().id();
         } catch (CustomException | DataAccessException | TransactionException unavailable) {

@@ -11,6 +11,7 @@ import java.util.Optional;
 import com.zoop.chat.repository.ChatExecutionRepository;
 import com.zoop.chat.repository.ChatJobRow;
 import com.zoop.chat.repository.ChatRepository;
+import com.zoop.chat.repository.ChatRunningJob;
 import com.zoop.chat.repository.ChatSessionRow;
 import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.repository.NewChatJob;
@@ -20,15 +21,15 @@ import com.zoop.chat.repository.NewChatToolCall;
  * In-memory job store with the executor's fences: a run's writes apply only while the job is running under its owner token
  * and an unexpired lease. Only the reads the executor needs are implemented.
  */
-final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
+public final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
     final Map<String, Job> jobs = new LinkedHashMap<>();
     final List<ToolCall> toolCalls = new ArrayList<>();
 
     /** A {@code chat_tool_calls} row: the reservation, its status and how it ended. */
-    static final class ToolCall {
-        final NewChatToolCall row;
-        String status = "reserved";
-        ChatToolCallEnd end;
+    public static final class ToolCall {
+        public final NewChatToolCall row;
+        public String status = "reserved";
+        public ChatToolCallEnd end;
 
         ToolCall(NewChatToolCall row) {
             this.row = row;
@@ -52,7 +53,7 @@ final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
         }
     }
 
-    void add(ChatJobRow row) {
+    public void add(ChatJobRow row) {
         jobs.put(row.id(), new Job(row));
     }
 
@@ -61,7 +62,7 @@ final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
     }
 
     /** What a member's cancel does to the row. */
-    void cancel(String id, Instant at) {
+    public void cancel(String id, Instant at) {
         Job job = jobs.get(id);
         job.row = with(job.row, "cancelled", null, job.row.runs(), job.row.attempts(), at, at);
         job.ownerToken = null;
@@ -69,7 +70,7 @@ final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
         closeToolCalls(id);
     }
 
-    synchronized List<ToolCall> toolCalls(String jobId) {
+    public synchronized List<ToolCall> toolCalls(String jobId) {
         return toolCalls.stream().filter(c -> c.row.jobId().equals(jobId)).toList();
     }
 
@@ -103,11 +104,26 @@ final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
     }
 
     @Override
+    public Optional<ChatRunningJob> findRunning(String jobId, Instant at) {
+        Job job = jobs.get(jobId);
+        if (job == null || job.ownerToken == null || !owned(job, job.ownerToken, at)) return Optional.empty();
+        return Optional.of(new ChatRunningJob(job.row, job.ownerToken, job.deadline));
+    }
+
+    @Override
     public boolean phase(String jobId, String ownerToken, String phase, Instant at) {
         Job job = jobs.get(jobId);
         if (!owned(job, ownerToken, at)) return false;
         job.row = with(job.row, "running", phase, job.row.runs(), job.row.attempts(), at, null);
         job.phases.add(phase);
+        return true;
+    }
+
+    @Override
+    public synchronized boolean shortenDeadline(String jobId, String ownerToken, Instant deadline, Instant at) {
+        Job job = jobs.get(jobId);
+        if (!owned(job, ownerToken, at)) return false;
+        if (deadline.isBefore(job.deadline)) job.deadline = deadline;
         return true;
     }
 
@@ -181,8 +197,41 @@ final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
     }
 
     @Override
+    public synchronized int countJobToolCalls(String jobId, int attemptNo) {
+        return (int) toolCalls.stream().filter(c -> c.row.jobId().equals(jobId)
+                && (c.row.attemptNo() == attemptNo || !"cancelled".equals(c.status))).count();
+    }
+
+    @Override
     public synchronized void reserveToolCalls(List<NewChatToolCall> calls, Instant at) {
         calls.forEach(call -> toolCalls.add(new ToolCall(call)));
+    }
+
+    @Override
+    public synchronized Optional<String> findReservedToolCall(String jobId, int attemptNo, String capabilityId,
+            String inputDigest) {
+        return toolCalls.stream().filter(c -> c.row.jobId().equals(jobId) && c.row.attemptNo() == attemptNo
+                        && c.row.capabilityId().equals(capabilityId) && c.row.inputDigest().equals(inputDigest)
+                        && "reserved".equals(c.status))
+                .min(java.util.Comparator.comparingInt(c -> c.row.callIndex())).map(c -> c.row.toolCallId());
+    }
+
+    @Override
+    public synchronized Optional<String> claimReservedToolCall(String jobId, String ownerToken, int attemptNo,
+            String capabilityId, String inputDigest, Instant at) {
+        if (!owned(jobs.get(jobId), ownerToken, at)) return Optional.empty();
+        var claimed = toolCalls.stream().filter(c -> c.row.jobId().equals(jobId) && c.row.attemptNo() == attemptNo
+                        && c.row.capabilityId().equals(capabilityId) && c.row.inputDigest().equals(inputDigest)
+                        && "reserved".equals(c.status))
+                .min(Comparator.comparingInt(c -> c.row.callIndex()));
+        claimed.ifPresent(c -> c.status = "running");
+        return claimed.map(c -> c.row.toolCallId());
+    }
+
+    /** Memory stores JSON as given: its stored size is its own UTF-8 size. */
+    @Override
+    public long storedResultBytes(String result) {
+        return result.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
     }
 
     @Override
@@ -202,6 +251,33 @@ final class MemoryChatStore implements ChatRepository, ChatExecutionRepository {
         call.status = end.status();
         call.end = end;
         return true;
+    }
+
+    @Override
+    public synchronized List<com.zoop.chat.repository.ChatKeptToolResult> keptToolResults(String jobId, int attemptNo) {
+        return toolCalls.stream().filter(c -> c.row.jobId().equals(jobId) && c.row.attemptNo() == attemptNo
+                        && "succeeded".equals(c.status) && c.end != null && c.end.result() != null)
+                .sorted(Comparator.comparingInt(c -> c.row.callIndex()))
+                .map(c -> new com.zoop.chat.repository.ChatKeptToolResult(c.row.toolCallId(), c.row.capabilityId(),
+                        c.end.result()))
+                .toList();
+    }
+
+    @Override
+    public synchronized Optional<com.zoop.chat.repository.ChatKeptToolResult> findKeptToolResult(String jobId, int attemptNo,
+            String capabilityId, String inputDigest) {
+        return toolCalls.stream().filter(c -> c.row.jobId().equals(jobId) && c.row.attemptNo() == attemptNo
+                        && c.row.capabilityId().equals(capabilityId) && c.row.inputDigest().equals(inputDigest)
+                        && "succeeded".equals(c.status) && c.end != null && c.end.result() != null)
+                .min(Comparator.comparingInt(c -> c.row.callIndex()))
+                .map(c -> new com.zoop.chat.repository.ChatKeptToolResult(c.row.toolCallId(), c.row.capabilityId(),
+                        c.end.result()));
+    }
+
+    @Override
+    public synchronized long keptResultBytes(String jobId) {
+        return toolCalls.stream().filter(c -> c.row.jobId().equals(jobId) && c.end != null && c.end.result() != null)
+                .mapToLong(c -> c.end.result().getBytes(java.nio.charset.StandardCharsets.UTF_8).length).sum();
     }
 
     private ToolCall toolCall(String jobId, int attemptNo, String toolCallId) {

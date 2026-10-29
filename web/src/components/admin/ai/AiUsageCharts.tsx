@@ -147,7 +147,7 @@ function DayBars({
                 y={y(max * ratio)}
                 textAnchor="end"
                 dominantBaseline="middle"
-                className="fill-zoop-muted text-[10px] tabular-nums"
+                className="fill-zoop-muted text-[11px] tabular-nums"
               >
                 {tick(max * ratio)}
               </text>
@@ -189,7 +189,7 @@ function DayBars({
                     x={PAD.left + slot * index + slot / 2}
                     y={H - 6}
                     textAnchor="middle"
-                    className="fill-zoop-muted text-[10px] tabular-nums"
+                    className="fill-zoop-muted text-[11px] tabular-nums"
                   >
                     {shortDate(date)}
                   </text>
@@ -407,7 +407,7 @@ export function MemberRate({
   const subject =
     view === 'chatbot' ? 'AI 챗봇' : view === 'briefing' ? '브리핑' : 'AI 기능';
   const rate =
-    used !== null && members.totalMembers > 0
+    used !== null && members.totalMembers !== null && members.totalMembers > 0
       ? used / members.totalMembers
       : null;
   return (
@@ -425,7 +425,9 @@ export function MemberRate({
           <dt className="sr-only">회원 수</dt>
           <dd className="text-xs text-zoop-muted tabular-nums">
             {used === null ? '측정 안 함' : `${count(used)}명`} / 전체{' '}
-            {count(members.totalMembers)}명
+            {members.totalMembers === null
+              ? '–'
+              : `${count(members.totalMembers)}명`}
           </dd>
         </div>
       </dl>

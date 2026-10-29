@@ -81,6 +81,13 @@ export type CorrectionRequest = {
 export type SuspensionAction = 'suspend' | 'resume';
 
 export type AiUsageWindow = '24h' | '7d' | '30d' | 'all';
+export type AiUsageAvailability = 'complete' | 'partial' | 'unavailable';
+export type AiFeature =
+  | 'chatbot'
+  | 'news-analysis'
+  | 'briefing'
+  | 'document-sentiment'
+  | 'briefing-outlook';
 
 /** 실제 청구 비용과 추정 비용을 따로 둔다. 모르면 null이고 0으로 채우지 않는다. */
 export type FeatureCost = {
@@ -92,25 +99,28 @@ export type FeatureCost = {
 };
 
 export type AiFeatureUsage = {
-  feature: string;
+  feature: AiFeature;
+  availability: AiUsageAvailability;
+  unavailableMetrics: string[];
   label: string;
   /** 처리 방식 설명 */
   engine: string;
   modelBacked: boolean;
-  requests: number;
-  succeeded: number;
-  failed: number;
+  requests: number | null;
+  succeeded: number | null;
+  failed: number | null;
   latencyMs: { avg: number; p95: number; max: number } | null;
   usage: {
     modelCalls: number | null;
     inputTokens: number | null;
     outputTokens: number | null;
-    replayCalls: number;
-    retries: number;
+    replayCalls: number | null;
+    retries: number | null;
   };
   cost: FeatureCost;
   source: 'measured' | 'job-runner' | 'ledger-db' | 'document';
-  recentErrors: { at: string; code: string | null; message: string | null }[];
+  recentErrors:
+    { at: string; code: string | null; message: string | null }[] | null;
   note: string;
 };
 
@@ -141,7 +151,9 @@ export type PastRun = {
  * 비용은 실제 청구액과 추정액을 따로 둔다.
  */
 export type AiUsageDayFeature = {
-  feature: string;
+  feature: AiFeature;
+  availability: AiUsageAvailability;
+  unavailableMetrics: string[];
   modelCalls: number | null;
   inputTokens: number | null;
   outputTokens: number | null;
@@ -160,7 +172,9 @@ export type AiUsageDay = {
  * 기능별 회원 수는 측정하지 않으면 null이다.
  */
 export type AiUsageMembers = {
-  totalMembers: number;
+  availability: AiUsageAvailability;
+  unavailableMetrics: string[];
+  totalMembers: number | null;
   aiMembers: number | null;
   chatbotMembers: number | null;
   briefingMembers: number | null;
@@ -168,8 +182,11 @@ export type AiUsageMembers = {
 };
 
 export type AiUsage = {
+  availability: 'complete' | 'partial';
+  unavailableMetrics: string[];
   asOf: string;
   window: AiUsageWindow;
+  /** 기능별 원천을 하나라도 못 읽어도 정해진 5개 기능 행을 유지한다. */
   features: AiFeatureUsage[];
   pastRuns: PastRun[];
   cost: FeatureCost;

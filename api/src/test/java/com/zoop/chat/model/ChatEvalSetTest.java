@@ -184,12 +184,12 @@ class ChatEvalSetTest {
         }, "replay", world.names, world.issues, world.citations, articleId -> Optional.of("fixture-news"), new ChatModelRecorder(null,
                 Clock.systemUTC()) {
             @Override
-            public String start(String jobId, String stage, String mode) {
+            public String start(String jobId, int attemptNo, String stage, String mode) {
                 return "aix-eval";
             }
 
             @Override
-            public void finish(String execution, String status, ChatStageReply.Receipt receipt, String code) {
+            public void finish(String execution, String status, String sendState, ChatStageReply.Receipt receipt, String code) {
             }
         });
         ChatModels.Router router = (r, bound) -> {
@@ -645,6 +645,7 @@ class ChatEvalSetTest {
                     return Optional.of(asOf.isBefore(Instant.parse("2026-10-08T00:00:00Z")) ? EARLIER : GRAPH);
                 }
                 public boolean everActivated(String id) { return known.containsKey(id); }
+                public Optional<Instant> firstActivatedAt(String id) { return EARLIER.equals(id) ? Optional.of(Instant.parse("2026-10-01T00:00:00Z")) : GRAPH.equals(id) ? Optional.of(Instant.parse("2026-10-08T00:00:00Z")) : Optional.empty(); }
                 public Optional<String> previousVersionId(String id, Instant at) {
                     return GRAPH.equals(id) ? Optional.of(EARLIER) : Optional.empty();
                 }
@@ -666,6 +667,11 @@ class ChatEvalSetTest {
         @Override public void beforeModelCall() { }
         @Override public Duration remaining() { return Duration.ofSeconds(60); }
         @Override public boolean owned() { return true; }
+        @Override public int toolCallsLeft() { return MAX_TOOL_CALLS - reserved; }
+        @Override
+        public void shortenDeadline(java.time.Instant deadline) {
+            throw new UnsupportedOperationException("only the agent path shortens a deadline");
+        }
 
         @Override
         public List<String> reserveToolCalls(int planRevision, List<ChatToolCallReservation> calls) {
@@ -678,6 +684,11 @@ class ChatEvalSetTest {
         }
 
         @Override public void toolCallStarted(String toolCallId) { }
+
+        @Override
+        public java.util.Optional<String> claimToolCall(String capabilityId, String inputDigest) {
+            throw new UnsupportedOperationException("only the MCP endpoint claims an approved call");
+        }
         @Override public void toolCallFinished(String toolCallId, ChatToolCallEnd end) { }
     }
 

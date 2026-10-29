@@ -68,7 +68,7 @@ public class GraphPathTool implements ChatTool {
         GraphPathLookup paths;
         String version;
         try {
-            var pinned = reader.read(null, scope.graphVersionId(), scope.asOf());
+            var pinned = reader.readPinned(scope.graphVersionId(), scope.asOf(), scope.asOf() != null);
             lookup = new GraphContextLookup(pinned.graph());
             paths = new GraphPathLookup(pinned.graph());
             version = pinned.selected().version().id();

@@ -109,12 +109,12 @@ class AiChatContractTest {
                 articleId -> Optional.of(articleId.equals("art-synthetic") ? SOURCE : "src-chat-ungranted"),
                 new ChatModelRecorder(null, Clock.systemUTC()) {
                     @Override
-                    public String start(String jobId, String stage, String executionMode) {
+                    public String start(String jobId, int attemptNo, String stage, String executionMode) {
                         return "aix-" + UUID.randomUUID();
                     }
 
                     @Override
-                    public void finish(String id, String status, ChatStageReply.Receipt receipt, String errorCode) {
+                    public void finish(String id, String status, String sendState, ChatStageReply.Receipt receipt, String errorCode) {
                         recorded.add(status + " " + errorCode);
                         receipts.add(receipt);
                     }

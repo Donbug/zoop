@@ -167,6 +167,34 @@ def test_a_consistent_failed_result_with_a_receipt_passes_and_keeps_its_fate(tmp
     assert body.invocation_id == "job-00000001:1:router"
 
 
+HELD = {"responseId": "resp_1", "status": "approval_required", "answer": None, "mcpCalls": [],
+        "approvalRequests": [{"approvalRequestId": "mcpr_1", "toolName": "company_read", "arguments": {"targets": ["KRX:000660"]}}]}
+FINAL = {"responseId": "resp_2", "status": "completed", "approvalRequests": [], "mcpCalls": [{"toolName": "company_read", "failed": False}],
+         "answer": {"sections": [], "insufficientRequirementIds": ["r1"], "graphTargetIds": []}}
+
+
+@pytest.mark.parametrize("step", [HELD, FINAL])
+def test_an_agent_step_is_relayed_with_its_own_deadline(tmp_path, step):
+    process = Scripted(lambda p: Outcome("result", result=result(p["invocationId"], stage="chat-agent", answer=step), exit_code=0))
+    status, body = ChatStages(config(tmp_path), process).invoke("app", "chat-agent", request("chat-agent"), Observation())
+    assert status == 200 and body.answer.status == step["status"] and process.calls[0][1] == STAGE_DEADLINE["chat-agent"] == 33.0
+
+
+@pytest.mark.parametrize("step", [
+    {**HELD, "approvalRequests": []},                                            # held without requests
+    {**HELD, "answer": FINAL["answer"]},                                         # held with an answer
+    {**FINAL, "answer": None},                                                   # completed without an answer
+    {**FINAL, "approvalRequests": HELD["approvalRequests"]},                     # completed with held calls
+    {**HELD, "approvalRequests": [{**HELD["approvalRequests"][0], "toolName": "company.read"}]},
+    {**HELD, "approved": True},                                                  # an unknown key
+])
+def test_a_self_contradicting_agent_step_is_never_a_200(tmp_path, step):
+    process = Scripted(lambda p: Outcome("result", result=result(p["invocationId"], stage="chat-agent", answer=step), exit_code=0))
+    with pytest.raises(ApiError) as caught:
+        ChatStages(config(tmp_path), process).invoke("app", "chat-agent", request("chat-agent"), Observation())
+    assert (caught.value.status, caught.value.code) == (502, "stage_outcome_unknown")
+
+
 def test_no_slot_within_the_wait_is_busy_and_starts_nothing(tmp_path):
     process = Scripted(lambda payload: Outcome("result", result=result(payload["invocationId"]), exit_code=0))
     process.hold = threading.Event()

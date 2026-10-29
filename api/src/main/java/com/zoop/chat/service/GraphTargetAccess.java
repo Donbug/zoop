@@ -29,7 +29,8 @@ public class GraphTargetAccess implements ChatTargetAccess {
         if (graphVersion == null) return Optional.empty();
         GraphContextLookup lookup;
         try {
-            lookup = new GraphContextLookup(reader.read(null, graphVersion, asOf, requestId).graph());
+            // The run's frozen pin, kept as it is: filtered only when the question was (#88), never a version-only address.
+            lookup = new GraphContextLookup(reader.readPinned(graphVersion, asOf, asOf != null).graph());
         } catch (CustomException | DataAccessException | TransactionException unavailable) {
             return Optional.empty();
         }

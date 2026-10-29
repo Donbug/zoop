@@ -25,17 +25,30 @@ public class PublicGraphReader {
     }
 
     /** One pinned version and what is publicly visible in it for this request. */
-    public record Pinned(SelectedGraphVersion selected, DisplayGraph graph) { }
+    public record Pinned(SelectedGraphVersion selected, DisplayGraph graph, DisclosureExclusions exclusions) {
+        public Pinned(SelectedGraphVersion selected, DisplayGraph graph) {
+            this(selected, graph, DisclosureExclusions.NONE);
+        }
+    }
 
     public Pinned read(String round, String graphVersion, Instant asOf) {
         return read(round, graphVersion, asOf, null);
     }
 
     public Pinned read(String round, String graphVersion, Instant asOf, String requestId) {
-        SelectedGraphVersion selected = selector.select(round, graphVersion, asOf, requestId);
+        return read(selector.select(round, graphVersion, asOf, requestId));
+    }
+
+    /** A version an earlier step of this read already pinned, kept as it was ({@link GraphVersionSelector#pinned}). */
+    public Pinned readPinned(String versionId, Instant asOf, boolean asOfRequested) {
+        return read(selector.pinned(versionId, asOf, asOfRequested));
+    }
+
+    private Pinned read(SelectedGraphVersion selected) {
         PublicGraphSnapshot snapshot = store.load(selected.version());
+        DisclosureExclusions currentExclusions = exclusions.current(selected.version().id());
         PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot,
-                selected.asOfRequested() ? selected.asOf() : null, exclusions.current(selected.version().id()),
+                selected.asOfRequested() ? selected.asOf() : null, currentExclusions,
                 selected.briefing() != null && selected.briefing().reconstruction() != null);
         var basis = selected.briefing();
         if (basis != null) {
@@ -51,6 +64,6 @@ public class PublicGraphReader {
             // Restrict the shared snapshot BEFORE deriving edges or serving any detail consumer.
             visible = GraphSnapshotFilter.briefing(visible, basis);
         }
-        return new Pinned(selected, DisplayGraph.of(visible));
+        return new Pinned(selected, DisplayGraph.of(visible), currentExclusions);
     }
 }

@@ -46,6 +46,23 @@ class GraphCompanyIssueCountsTest {
     }
 
     @Test
+    void aLaterPageKeepsTheFirstPagesReadAndIsNeverReReadAsAVersionAlone() {
+        var undated = new GraphCompanyIssueCounts(GraphReadFixtures.undatedReader(NOW));
+        List<String> all = GraphReadFixtures.withAnUndatedArticle().companies().stream()
+                .map(com.zoop.graph.snapshot.PublicGraphSnapshot.Company::companyId).toList();
+        var whole = undated.countIssues(all, null, null, false);
+        var versionOnly = undated.countIssues(all, "fixture-2026-10-08", null, false);
+        org.junit.jupiter.api.Assertions.assertNotEquals(whole.counts(), versionOnly.counts(), "the fixture must make the reads differ");
+        org.junit.jupiter.api.Assertions.assertFalse(whole.asOfRequested());
+        org.junit.jupiter.api.Assertions.assertTrue(versionOnly.asOfRequested(), "filtered as of the first activation");
+
+        // Default first page: the next page echoes its version and read time unfiltered.
+        assertEquals(whole, undated.countIssues(all, whole.graphVersion(), whole.asOf(), false));
+        // Version-only first page: the search cursor carries asOfRequested, so the next page is filtered the same way.
+        assertEquals(versionOnly, undated.countIssues(all, versionOnly.graphVersion(), versionOnly.asOf(), true));
+    }
+
+    @Test
     void currentExclusionsLowerTheCount() {
         exclusions = new DisclosureExclusions(1, Set.of(HBM_EQUIP), Set.of(), Set.of());
         assertEquals(0L, counts.countIssues(List.of(HANMI), null, null, false).counts().get(HANMI));

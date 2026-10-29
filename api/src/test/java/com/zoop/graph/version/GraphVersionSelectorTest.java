@@ -72,6 +72,57 @@ class GraphVersionSelectorTest {
     }
 
     @Test
+    void aVersionAloneIsReadAsOfItsFirstPublicationAndTheTimeOpensTheSameView() {
+        Instant first = Instant.parse("2026-10-01T00:00:00Z");
+        SelectedGraphVersion selected = selector.select(null, "v1", null);
+        assertEquals("v1", selected.version().id());
+        assertEquals(first, selected.asOf(), "its first activation, not the request time");
+        assertTrue(selected.asOfRequested());
+        assertEquals("v1", selector.select(null, "v1", selected.asOf()).version().id(), "sent back with it: same version");
+
+        // Rolled back to later: still the first publication, so a shared address keeps one view.
+        repository.activate("v1", Instant.parse("2026-10-10T00:00:00Z"));
+        assertEquals(first, selector.select(null, "v1", null).asOf());
+    }
+
+    @Test
+    void aSubMillisecondActivationIsRoundedUpSoAMillisecondClientOpensTheSameVersion() {
+        repository.register("v3");
+        repository.activate("v3", Instant.parse("2026-10-09T00:00:00.123456Z"));
+        SelectedGraphVersion selected = selector.select(null, "v3", null);
+        assertEquals(Instant.parse("2026-10-09T00:00:00.124Z"), selected.asOf(), "never just before the activation");
+        assertEquals("v3", selector.select(null, "v3", selected.asOf()).version().id());
+    }
+
+    @Test
+    void aVersionReplacedInTheSameMillisecondIsReadAsOfTheRequest() {
+        repository.register("v4");
+        repository.register("v5");
+        Instant same = Instant.parse("2026-10-09T00:00:00Z");
+        repository.activate("v4", same);
+        repository.activate("v5", same);
+        SelectedGraphVersion selected = selector.select(null, "v4", null);
+        assertEquals("v4", selected.version().id());
+        assertEquals(NOW, selected.asOf(), "no time opens v4, so it is not pinned to one that opens v5");
+        assertFalse(selected.asOfRequested());
+    }
+
+    @Test
+    void anAlreadyPinnedVersionIsKeptAsItWasReadNotReinterpretedAsAVersionAlone() {
+        Instant firstPage = Instant.parse("2026-10-16T11:00:00Z");
+        SelectedGraphVersion kept = selector.pinned("v1", firstPage, false);
+        assertEquals("v1", kept.version().id());
+        assertEquals(firstPage, kept.asOf(), "the first page's time, not the first activation");
+        assertFalse(kept.asOfRequested(), "the first page was not filtered, so neither is this one");
+        assertTrue(selector.pinned("v1", Instant.parse("2026-10-01T00:00:00Z"), true).asOfRequested());
+        assertEquals(NOW, selector.pinned("v1", null, false).asOf());
+        assertEquals(ErrorCode.VERSION_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> selector.pinned("registered-only", firstPage, false)).getErrorCode());
+        assertEquals(ErrorCode.INVALID_REQUEST, assertThrows(CustomException.class,
+                () -> selector.pinned("bad id", firstPage, false)).getErrorCode());
+    }
+
+    @Test
     void malformedVersionIdIsInvalid() {
         assertEquals(ErrorCode.INVALID_REQUEST, failure(null, "bad id/..", null));
     }
@@ -152,6 +203,12 @@ class GraphVersionSelectorTest {
         @Override
         public boolean everActivated(String versionId) {
             return activations.stream().anyMatch(a -> a[1].equals(versionId));
+        }
+
+        @Override
+        public Optional<Instant> firstActivatedAt(String versionId) {
+            return activations.stream().filter(a -> a[1].equals(versionId)).map(a -> (Instant) a[2])
+                    .min(Comparator.naturalOrder());
         }
     }
 }

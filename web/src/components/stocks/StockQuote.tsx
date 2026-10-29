@@ -8,13 +8,13 @@ function ChangeRate({ rate }: { rate: number }) {
   const percent = Math.abs(rate * 100).toFixed(2);
   if (rate > 0)
     return (
-      <span className="mt-0.5 text-[10px] text-zoop-up">▲ +{percent}%</span>
+      <span className="mt-0.5 text-[11px] text-zoop-up">▲ +{percent}%</span>
     );
   if (rate < 0)
     return (
-      <span className="mt-0.5 text-[10px] text-zoop-down">▼ -{percent}%</span>
+      <span className="mt-0.5 text-[11px] text-zoop-down">▼ -{percent}%</span>
     );
-  return <span className="mt-0.5 text-[10px] text-zoop-faint">0.00%</span>;
+  return <span className="mt-0.5 text-[11px] text-zoop-muted">0.00%</span>;
 }
 
 function Frame({ children, label }: { children: ReactNode; label?: string }) {
@@ -28,7 +28,7 @@ function Frame({ children, label }: { children: ReactNode; label?: string }) {
   );
 }
 
-const muted = 'text-[10px] text-zoop-faint';
+const muted = 'text-[11px] text-zoop-muted';
 
 // 종목 행의 최신 시세. 행마다 따로 조회하며, 시세가 없거나 실패해도 행은 그대로 쓸 수 있다.
 export default function StockQuote({ companyId }: { companyId: string }) {
@@ -59,7 +59,7 @@ export default function StockQuote({ companyId }: { companyId: string }) {
   const { price, currency, changeRate } = quote.data.quote;
   return (
     <Frame>
-      <strong className="text-[13px] font-bold text-zoop-ink">
+      <strong className="text-[13px] font-bold text-zoop-ink tabular-nums">
         {formatMoney(price, currency)}
       </strong>
       {changeRate !== null && <ChangeRate rate={changeRate} />}

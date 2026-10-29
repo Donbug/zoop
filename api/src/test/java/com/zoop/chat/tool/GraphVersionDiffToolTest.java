@@ -42,6 +42,8 @@ class GraphVersionDiffToolTest {
 
     private final Set<String> denied = new HashSet<>();
     private DisclosureExclusions exclusions = DisclosureExclusions.NONE;
+    /** When true, the activation history is moved before any fixture issue was reported: 10-01 on 09-01, 10-08 on 09-02. */
+    private static boolean early;
 
     @Test
     void withoutAPeriodTheMapIsComparedWithThePreviousPublicVersion() {
@@ -81,6 +83,18 @@ class GraphVersionDiffToolTest {
         assertTrue(out.items().isEmpty(), "no additions shown as removals");
         assertTrue(out.truncated(), "it cannot be compared, which is not \"nothing changed\"");
         assertEquals(OLD, out.dataVersion());
+    }
+
+    @Test
+    void anUnfilteredRunComparesBothMapsUnfilteredWhateverTheirFirstPublication() {
+        var expected = tool().read(SCOPE, whole(null)).items();
+        early = true;
+        try {
+            assertEquals(expected, tool().read(SCOPE, whole(null)).items(),
+                    "neither map is re-read as a version-only address, so neither is filtered at a first publication");
+        } finally {
+            early = false;
+        }
     }
 
     @Test
@@ -155,10 +169,13 @@ class GraphVersionDiffToolTest {
             public Optional<GraphVersionRecord> find(String id) { return Optional.ofNullable(known.get(id)); }
             public Optional<GraphVersionRecord> active() { return Optional.of(known.get(ACTIVE)); }
             public Optional<String> activeVersionIdAt(Instant asOf) {
-                if (asOf.isBefore(Instant.parse("2026-10-01T00:00:00Z"))) return Optional.empty();
-                return Optional.of(asOf.isBefore(Instant.parse("2026-10-08T00:00:00Z")) ? OLD : ACTIVE);
+                Instant old = Instant.parse(early ? "2026-09-01T00:00:00Z" : "2026-10-01T00:00:00Z");
+                Instant active = Instant.parse(early ? "2026-09-02T00:00:00Z" : "2026-10-08T00:00:00Z");
+                if (asOf.isBefore(old)) return Optional.empty();
+                return Optional.of(asOf.isBefore(active) ? OLD : ACTIVE);
             }
             public boolean everActivated(String id) { return known.containsKey(id); }
+            public Optional<Instant> firstActivatedAt(String id) { if (early && known.containsKey(id)) return Optional.of(Instant.parse(OLD.equals(id) ? "2026-09-01T00:00:00Z" : "2026-09-02T00:00:00Z")); return OLD.equals(id) ? Optional.of(Instant.parse("2026-10-01T00:00:00Z")) : ACTIVE.equals(id) ? Optional.of(Instant.parse("2026-10-08T00:00:00Z")) : Optional.empty(); }
             public Optional<String> previousVersionId(String id, Instant at) {
                 return ACTIVE.equals(id) ? Optional.of(OLD) : Optional.empty();
             }

@@ -5,11 +5,13 @@ import java.util.Optional;
 
 import com.zoop.ai.config.AiChatClientProperties;
 import com.zoop.ai.http.HttpChatStageClient;
+import com.zoop.chat.orchestrator.ChatAgentPath;
 import com.zoop.chat.orchestrator.ChatCitationSource;
 import com.zoop.chat.orchestrator.OrchestratedChatEngine;
 import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolRunner;
 import com.zoop.graph.read.PublicGraphReader;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -44,7 +46,8 @@ public class ChatModelConfiguration {
 
     @Bean
     OrchestratedChatEngine chatEngine(ChatModelStages stages, ChatToolRegistry registry, ChatToolRunner runner,
-            ChatCitationSource citations, Clock clock) {
-        return new OrchestratedChatEngine(stages, stages, stages, registry, runner, citations, clock);
+            ChatCitationSource citations, Clock clock, ObjectProvider<ChatAgentPath> agent) {
+        // The agent path exists only with the MCP endpoint and its agent flag on (ChatMcpConfiguration); otherwise direct.
+        return new OrchestratedChatEngine(stages, stages, stages, registry, runner, citations, clock, agent.getIfAvailable());
     }
 }

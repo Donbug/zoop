@@ -307,6 +307,63 @@ class EventDetailServiceTest {
                 () -> service.get(EUV, null, null, null, "r")).getErrorCode());
     }
 
+    // ---- approval: the receipt's INVOLVES provenance behind a relation this read shows ------------------------------
+
+    private static StrictJson.Obj operatorApproved() {
+        return StrictJson.parseObject(bundle(false).node().toString().replace(
+                "independent-verifier-supported-all-claims", "manual-operator-final-approval"));
+    }
+
+    @Test
+    void anAutomaticallyVerifiedRelationCarriesNoApproval() {
+        assertNull(imported(bundle(false)).get(EUV, null, null, null, "r").approval());
+    }
+
+    @Test
+    void aShownRelationRestingOnAnOperatorApprovalIsAnAdminReviewWithoutARule() {
+        for (String schema : List.of("zoop-graph-handoff-bundle-5", "zoop-graph-handoff-bundle-6",
+                "zoop-graph-handoff-bundle-7")) {
+            String json = operatorApproved().node().toString().replace("zoop-graph-handoff-bundle-5", schema);
+            EventDetail.ApprovalOut approval = imported(StrictJson.parseObject(json)).get(EUV, null, null, null, "r")
+                    .approval();
+
+            assertEquals(EventDetailService.ADMIN_APPROVAL, approval, schema);
+            assertEquals("admin-review", approval.source(), schema);
+            assertNull(approval.ruleId(), "rules only hide content");
+        }
+    }
+
+    @Test
+    void anApprovedRelationThisReadDoesNotShowIsNotCounted() {
+        EventDetailService excluded = imported(operatorApproved(), List.of(),
+                new DisclosureExclusions(1, java.util.Set.of(), java.util.Set.of("rel-fixture-05"), java.util.Set.of()));
+
+        EventDetail detail = excluded.get(EUV, null, null, null, "r");
+
+        assertTrue(detail.relations().stream().noneMatch(r -> r.id().equals("rel-fixture-05")));
+        assertNull(detail.approval(), "an excluded relation's approval is not this event's");
+    }
+
+    @Test
+    void anApprovalOnAnotherEventsRelationIsNotThisEventsOne() {
+        String elsewhere = operatorApproved().node().toString().replace("\"rel-fixture-05\"", "\"rel-other\"");
+        assertNull(imported(StrictJson.parseObject(elsewhere)).get(EUV, null, null, null, "r").approval());
+    }
+
+    @Test
+    void aReceiptWithoutRelationsIsUnavailableRatherThanUnapproved() {
+        var node = (tools.jackson.databind.node.ObjectNode) bundle(false).node().deepCopy();
+        node.remove("relations");
+        String none = node.toString();
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> imported(StrictJson.parseObject(none)).get(EUV, null, null, null, "r")).getErrorCode());
+    }
+
+    @Test
+    void aFixtureVersionHasNoReceiptAndSoNoApproval() {
+        assertNull(fixtures().get(EUV, null, null, null, "r").approval());
+    }
+
     // ---- current rights, exclusions, article versions and old receipts (PR #278 review) --------------------------------
 
     private static final String TSM_EVIDENCE = "ev-2efb74012127277470344892d9ba439c77a42180b4538d86c319d643bfefbc62";
@@ -508,6 +565,9 @@ class EventDetailServiceTest {
             public Optional<GraphVersionRecord> active() { return Optional.of(record); }
             public Optional<String> activeVersionIdAt(Instant asOf) { return Optional.of(record.id()); }
             public boolean everActivated(String id) { return record.id().equals(id); }
+            public Optional<Instant> firstActivatedAt(String id) {
+                return record.id().equals(id) ? Optional.of(NOW) : Optional.empty();
+            }
         };
         PublicGraphReader reader = new PublicGraphReader(new GraphVersionSelector(versions, Clock.fixed(NOW, ZoneOffset.UTC)),
                 version -> snapshot, pinned -> exclusions);
@@ -530,7 +590,7 @@ class EventDetailServiceTest {
                 {"id":"%s","mentions":[%s],"fieldVerdicts":[],
                  "sourceSupport":{"articleCount":1,"knownLineageCount":null,"unknownLineageArticles":["%s"],
                    "independentSourceCount":null,"duplicateGroups":[]}}""";
-        return StrictJson.parseObject("{\"schemaVersion\":\"zoop-graph-handoff-bundle-5\",\"issues\":["
+        return StrictJson.parseObject("{\"schemaVersion\":\"zoop-graph-handoff-bundle-5\",\"relations\":[],\"issues\":["
                 + issue.formatted(HBM_EQUIP, mention.formatted("de", "e1", "art-hbm-equip", "equip title", EQUIP_EV[0],
                         EQUIP_EV[1]), "art-hbm-equip") + ","
                 + issue.formatted(HBM_SUPPLY, mention.formatted("ds", "s1", "art-hbm-supply", "supply title", SUPPLY_EV[0],
@@ -540,7 +600,10 @@ class EventDetailServiceTest {
     /** The parts of an AI handoff bundle getEvent reads; values a verdict holds or rejects are marked so a leak is visible. */
     private static StrictJson.Obj bundle(boolean allBackground) {
         return StrictJson.parseObject("""
-                {"schemaVersion":"zoop-graph-handoff-bundle-5","issues":[{"id":"%s",
+                {"schemaVersion":"zoop-graph-handoff-bundle-5",
+                 "relations":[{"id":"rel-fixture-05","provenance":{"origin":"s3-relation",
+                   "s3SemanticValidation":"independent-verifier-supported-all-claims"}}],
+                 "issues":[{"id":"%s",
                   "mentions":[
                     {"documentId":"d1","documentVersion":"dv1","mentionId":"m1","articleId":"%s","articleVersion":"v1",
                      "title":"m1 title","action":"export","target":"EUV","eventTime":"2026-09","timePrecision":"month",

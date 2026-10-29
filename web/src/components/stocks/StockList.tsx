@@ -61,7 +61,7 @@ export default function StockList({
                 {pendingId === row.id && ' · 저장 중'}
               </p>
               {heldIds.has(row.id) && (
-                <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-zoop-muted">
+                <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-zoop-muted">
                   <GraphIcon name="holding" size={10} />
                   보유
                 </span>

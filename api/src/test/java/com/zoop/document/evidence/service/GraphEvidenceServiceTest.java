@@ -980,6 +980,11 @@ class GraphEvidenceServiceTest {
         public boolean everActivated(String versionId) {
             return GRAPH_VERSION.equals(versionId);
         }
+
+        @Override
+        public Optional<Instant> firstActivatedAt(String versionId) {
+            return GRAPH_VERSION.equals(versionId) ? Optional.of(ACTIVATED) : Optional.empty();
+        }
     }
 
     /**
@@ -1031,7 +1036,11 @@ class GraphEvidenceServiceTest {
         assertEquals(GRAPH_VERSION, basis.metadata().graphVersion());
         EvidenceResponse direct = service().read(DIRECT_ID, null, null, null, null, "r2");
         assertEquals(List.of("iss-1"), direct.eventIds(), "directly cited evidence is unchanged by the basis seam");
-        assertNull(outcome(EVIDENCE_ID, GRAPH_VERSION, null), "the selected version pinned explicitly");
+        // The version alone is read as of its first publication (#88, ACTIVATED 10-10), before this basis was verified
+        // (10-12): only the directly cited span is shown then, as with that asOf.
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, GRAPH_VERSION, null),
+                "the selected version pinned explicitly, at its first publication");
+        assertNull(outcome(DIRECT_ID, GRAPH_VERSION, null));
         assertEquals(ErrorCode.VERSION_UNAVAILABLE, outcome(EVIDENCE_ID, "gv-" + "0".repeat(64), null), "a version that was never active");
     }
 

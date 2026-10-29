@@ -195,7 +195,7 @@ export default function BriefingComparison(props: Props) {
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <p className="flex flex-wrap items-start gap-x-2 gap-y-1">
                   <span
-                    className={`shrink-0 rounded-full border-[0.667px] px-2 py-[2px] text-[10px] font-semibold ${
+                    className={`shrink-0 rounded-full border-[0.667px] px-2 py-[2px] text-[11px] font-semibold ${
                       item.change === 'dropped'
                         ? 'border-zoop-line text-zoop-muted'
                         : 'border-zoop-ink text-zoop-ink'
