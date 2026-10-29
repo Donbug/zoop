@@ -27,7 +27,7 @@ manifest의 `decisions`에는 다음 여덟 항목이 정확히 있어야 한다
 
 `rollout`은 검증 당시 두 기능 플래그가 모두 `false`였음을 기록하고, 이후 별도의 활성화 변경 참조와 rollback 책임 역할을 요구한다. gate가 통과해도 스크립트가 환경변수나 배포 상태를 바꾸지는 않는다.
 
-운영 manifest와 [live spike evidence](chat-live-spike.md)는 같은 소문자 40자리 `candidateCommit`이어야 한다. readiness 명령은 live evidence를 다시 엄격하게 읽어 네 필수 시나리오, 표본 수, 45초·24k/2k, 비용을 재검증한다.
+운영 manifest와 [live spike evidence](chat-live-spike.md)는 같은 소문자 40자리 `candidateCommit`이어야 한다. readiness 명령은 live evidence를 다시 엄격하게 읽어 네 필수 시나리오, 표본 수, 45초·입력 24k·최종 답변 2k(`answerTokens`, reasoning 제외), 비용을 재검증한다.
 
 ```sh
 python scripts/chat_operations_readiness.py \
