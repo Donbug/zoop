@@ -16,10 +16,11 @@ export function ChangeRate({
   /** D-COM-01 N-i: pass an empty class to inherit the company's inline typography. */
   className?: string;
 }) {
+  // 화살표·색은 change(없으면 rate)로 정하고, 각 숫자는 자기 부호를 그대로 보인다.
   const direction = change ?? rate;
   const up = direction !== null && direction > 0;
   const down = direction !== null && direction < 0;
-  const sign = up ? '+' : down ? '-' : '';
+  const sign = (value: number) => (value > 0 ? '+' : value < 0 ? '-' : '');
   const arrow = up ? '▲ ' : down ? '▼ ' : '';
   const color = up
     ? 'text-zoop-up'
@@ -27,11 +28,13 @@ export function ChangeRate({
       ? 'text-zoop-down'
       : 'text-zoop-muted';
   const percent =
-    rate === null ? '미제공' : `${sign}${Math.abs(rate * 100).toFixed(2)}%`;
+    rate === null
+      ? '미제공'
+      : `${sign(rate)}${Math.abs(rate * 100).toFixed(2)}%`;
   const amount =
     change == null || !currency
       ? '미제공'
-      : `${sign}${formatMoney(Math.abs(change), currency)}`;
+      : `${sign(change)}${formatMoney(Math.abs(change), currency)}`;
   return (
     <span className={`${className} ${color}`.trim()}>
       {change === undefined

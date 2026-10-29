@@ -1,7 +1,7 @@
 import CompanyInfoTab from './CompanyInfoTab';
 import PriceChart from './PriceChart';
 import { formatKst, formatMoney } from '@/util/format';
-import { formatEventTime } from '@/util/event-time';
+import { formatTimelineTime } from '@/util/event-time';
 import { ChangeRate } from '@/components/stocks/StockQuote';
 import BoltIcon from './BoltIcon';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
@@ -970,7 +970,7 @@ export default function CompanyWorkspace() {
                               <p className="text-[11px] text-zoop-muted tabular-nums">
                                 {item.eventTime ? (
                                   <time dateTime={item.eventTime}>
-                                    {formatEventTime(
+                                    {formatTimelineTime(
                                       item.eventTime,
                                       item.timePrecision,
                                     )}

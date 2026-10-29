@@ -2162,7 +2162,7 @@ test('D-COM-01 F7 keeps zero as a real amount', async () => {
     await screen.findByRole('region', { name: '최신 시세' }),
   );
   expect(await region.findByText('0원', { exact: true })).toBeTruthy();
-  expect(region.getByText('0원 (2.00%)', { exact: true })).toBeTruthy();
+  expect(region.getByText('0원 (+2.00%)', { exact: true })).toBeTruthy();
 });
 
 test('D-COM-01 F6 shows KST while preserving original metadata and observation times', async () => {
@@ -2277,11 +2277,11 @@ test.each([
   [null, -0.02, 'KRW', '▼ 미제공 (-2.00%)', 'text-zoop-down'],
   [2, null, 'KRW', '▲ +2원 (미제공)', 'text-zoop-up'],
   [null, null, 'KRW', '미제공 (미제공)', 'text-zoop-muted'],
-  [0, 0.02, 'KRW', '0원 (2.00%)', 'text-zoop-muted'],
-  [2, -0.02, 'KRW', '▲ +2원 (+2.00%)', 'text-zoop-up'],
+  [0, 0.02, 'KRW', '0원 (+2.00%)', 'text-zoop-muted'],
+  [2, -0.02, 'KRW', '▲ +2원 (-2.00%)', 'text-zoop-up'],
   [-2, -0.02, 'USD', '▼ -$2.00 (-2.00%)', 'text-zoop-down'],
 ] as const)(
-  'D-COM-01 N-i shows change %s and rate %s in %s with a shared direction',
+  'D-COM-01 N-i shows change %s and rate %s in %s with the change direction and each value sign',
   async (change, rate, currency, label, color) => {
     const response = formattingQuote(currency, change);
     response.quote.changeRate = rate;

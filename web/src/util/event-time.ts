@@ -8,7 +8,7 @@ export const exactTime = (value: string | null | undefined) =>
   Number.isFinite(Date.parse(value));
 
 /** D-COM-01 N-k: prototype precision branches, using main's KST formatter. */
-export function formatEventTime(
+export function formatTimelineTime(
   value: string | null | undefined,
   precision: TimePrecision | null | undefined,
 ) {
