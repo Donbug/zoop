@@ -51,7 +51,7 @@ class PortfolioServiceTest {
 
         var preview = service.getProfile("demo-growth", "preview-1");
 
-        assertEquals(2, preview.holdings().size());
+        assertEquals(3, preview.holdings().size());
         assertEquals("available", preview.valuation().weightStatus());
         assertTrue(repository.connections.isEmpty());
     }
@@ -63,7 +63,7 @@ class PortfolioServiceTest {
         assertEquals(first.id(), retry.id());
         assertEquals(first.connectedAt(), retry.connectedAt());
         assertEquals("MOCK-KR-1001", first.accountId());
-        assertEquals(2, first.holdingsCount());
+        assertEquals(3, first.holdingsCount());
         assertEquals(1, repository.connections.size());
 
         var sameProfileNewKey = service.connect(MEMBER, "demo-growth", "connect-2", "req-3");

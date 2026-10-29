@@ -85,7 +85,7 @@ class PortfolioPostgresTest {
 
         var portfolio = service.getMyPortfolio(member, "read-portfolio");
         assertTrue(portfolio.connected());
-        assertEquals(2, portfolio.holdings().size());
+        assertEquals(3, portfolio.holdings().size());
         assertEquals("unavailable", portfolio.holdings().getFirst().quote().status());
         assertNull(portfolio.holdings().getFirst().marketValue());
 
