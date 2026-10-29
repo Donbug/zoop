@@ -233,7 +233,7 @@ export function FeedbackSummaryPanel({ period }: { period: FeedbackPeriod }) {
                 {data.features.map((feature) => (
                   <th key={feature.feature} className={`${TH} text-right`}>
                     {feature.label}
-                    <span className="block text-[10px] font-normal">
+                    <span className="block text-[11px] font-normal">
                       좋아요 / 싫어요(비율)
                     </span>
                   </th>

@@ -27,7 +27,7 @@ export const panelStyles = {
   state:
     'm-4 rounded-panel border border-panel-line bg-panel-soft p-3 text-[11px] leading-[16.5px] text-panel-secondary [&_p]:my-2 [&_button]:mt-2 [&_button]:underline [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-4',
   footer:
-    'shrink-0 border-t border-panel-line px-4 py-3 text-[10px] leading-[15px] text-panel-muted',
+    'shrink-0 border-t border-panel-line px-4 py-3 text-[11px] leading-[15px] text-panel-muted',
   avatar:
     'grid size-[30px] shrink-0 place-items-center rounded-full border border-panel-line bg-panel-soft text-[11px] font-bold text-panel-secondary',
   list: 'm-0 list-none divide-y divide-panel-line p-0 [&>li]:py-2.5',

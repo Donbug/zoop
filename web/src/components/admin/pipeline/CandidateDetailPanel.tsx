@@ -275,7 +275,7 @@ export default function CandidateDetailPanel({
                 <tr key={relation.relationId}>
                   <td className={`${TD} whitespace-nowrap`}>
                     {relationLabel(relation.relationType)}
-                    <span className="block font-inter text-[10px] break-all text-zoop-muted">
+                    <span className="block font-inter text-[11px] break-all text-zoop-muted">
                       {relation.relationId} · 회차 {relation.revision}
                     </span>
                   </td>

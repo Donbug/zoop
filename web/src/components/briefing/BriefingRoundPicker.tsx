@@ -213,7 +213,7 @@ export default function BriefingRoundPicker({
           onChange={(event) => void selectDate(event.target.value)}
           className={CONTROL}
         />
-        <p className="text-[10px] text-zoop-muted">
+        <p className="text-[11px] text-zoop-muted">
           회차 이력을 불러오지 못해 날짜를 직접 골라요.{' '}
           <button
             type="button"
@@ -277,7 +277,7 @@ export default function BriefingRoundPicker({
         </button>
       )}
       {state.error && state.rounds.length > 0 && (
-        <p role="alert" className="text-[10px] text-zoop-alert">
+        <p role="alert" className="text-[11px] text-zoop-alert">
           이전 회차를 불러오지 못했어요.
         </p>
       )}

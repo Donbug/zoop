@@ -254,7 +254,7 @@ function AnalysisJobsSession() {
                       {jobName(job)}
                     </button>
                     {job.retryOf && (
-                      <span className="ml-2 rounded-[3px] border-[0.667px] border-zoop-line px-1.5 py-0.5 text-[10px] text-zoop-muted">
+                      <span className="ml-2 rounded-[3px] border-[0.667px] border-zoop-line px-1.5 py-0.5 text-[11px] text-zoop-muted">
                         재시도
                       </span>
                     )}
@@ -432,7 +432,7 @@ function JobDetail({
             </span>
           )}
           {job.recovered && (
-            <span className="rounded-[3px] border-[0.667px] border-zoop-line px-1.5 py-0.5 text-[10px] font-normal text-zoop-muted">
+            <span className="rounded-[3px] border-[0.667px] border-zoop-line px-1.5 py-0.5 text-[11px] font-normal text-zoop-muted">
               재시작 복구
             </span>
           )}

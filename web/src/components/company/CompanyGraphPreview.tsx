@@ -166,7 +166,7 @@ export default function CompanyGraphPreview({
                 x={point.x}
                 y={point.y + 31}
                 textAnchor="middle"
-                className="fill-zoop-ink text-[10px]"
+                className="fill-zoop-ink text-[11px]"
               >
                 {node.label.slice(0, 15)}
               </text>
