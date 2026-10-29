@@ -25,7 +25,10 @@ public class AdminFeedbackController {
 
   @ApiResponse(
       responseCode = "200",
-      content = @Content(schema = @Schema(implementation = FeedbackHttpSchemas.Summary.class)))
+      content =
+          @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = FeedbackHttpSchemas.Summary.class)))
   @GetMapping("/summary")
   @Operation(operationId = "getFeedbackSummary", summary = "브리핑 회원 평가 요약·일별 추이")
   public ObjectNode summary(
@@ -37,7 +40,10 @@ public class AdminFeedbackController {
 
   @ApiResponse(
       responseCode = "200",
-      content = @Content(schema = @Schema(implementation = FeedbackHttpSchemas.Dislikes.class)))
+      content =
+          @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = FeedbackHttpSchemas.Dislikes.class)))
   @GetMapping("/dislikes")
   @Operation(operationId = "listDislikedResults", summary = "브리핑 싫어요 사유 목록")
   public ObjectNode dislikes(

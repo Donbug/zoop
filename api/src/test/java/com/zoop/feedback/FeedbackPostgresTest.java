@@ -33,7 +33,8 @@ import tools.jackson.databind.json.JsonMapper;
     properties = {
       "ZOOP_AUTH_CSRF_ACTIVE_KEY_ID=test",
       "ZOOP_AUTH_CSRF_KEYS=test=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-      "ZOOP_AUTH_ALLOWED_ORIGINS=https://zoop.example"
+      "ZOOP_AUTH_ALLOWED_ORIGINS=https://zoop.example",
+      "springdoc.api-docs.enabled=true"
     })
 @EnabledIfEnvironmentVariable(named = "DB_URL", matches = "jdbc:postgresql:.*")
 @Tag("auth-postgres")
@@ -284,6 +285,27 @@ class FeedbackPostgresTest {
     assertEquals("[이름] [이메일] [전화번호] 2026-10-29", response.json().at("/items/0/reason").asText());
     assertEquals(
         original, jdbc.queryForObject("SELECT reason FROM briefing_feedback", String.class));
+  }
+
+  @Test
+  void swaggerPublishesTypedJsonFeedbackAndAdminResponses() throws Exception {
+    var docs = request("GET", "/v3/api-docs", null, null);
+    assertEquals(200, docs.status());
+    assertEquals(
+        "#/components/schemas/FeedbackItem",
+        docs.json()
+            .at(
+                "/paths/~1api~1v1~1feedback/put/responses/200/content/application~1json/schema/$ref")
+            .asText());
+    assertEquals(
+        "#/components/schemas/FeedbackSummary",
+        docs.json()
+            .at(
+                "/paths/~1api~1v1~1admin~1feedback~1summary/get/responses/200/content/application~1json/schema/$ref")
+            .asText());
+    assertEquals(
+        "listDislikedResults",
+        docs.json().at("/paths/~1api~1v1~1admin~1feedback~1dislikes/get/operationId").asText());
   }
 
   private JsonNode summary(Login a) throws Exception {

@@ -23,9 +23,15 @@ public class MemberFeedbackController {
 
   @ApiResponse(
       responseCode = "200",
-      content = @Content(schema = @Schema(implementation = FeedbackHttpSchemas.Item.class)))
+      content =
+          @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = FeedbackHttpSchemas.Item.class)))
   @io.swagger.v3.oas.annotations.parameters.RequestBody(
-      content = @Content(schema = @Schema(implementation = FeedbackHttpSchemas.Vote.class)))
+      content =
+          @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = FeedbackHttpSchemas.Vote.class)))
   @PutMapping
   @Operation(operationId = "setFeedback", summary = "회원 브리핑 도움 됨·안 됨·이유 저장")
   public ObjectNode put(@RequestBody JsonNode body, HttpServletRequest request) {
@@ -34,7 +40,10 @@ public class MemberFeedbackController {
 
   @ApiResponse(
       responseCode = "200",
-      content = @Content(schema = @Schema(implementation = FeedbackHttpSchemas.Page.class)))
+      content =
+          @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = FeedbackHttpSchemas.Page.class)))
   @GetMapping
   @Operation(operationId = "getMyFeedback", summary = "본인의 유효 브리핑 평가 조회")
   public ObjectNode get(
