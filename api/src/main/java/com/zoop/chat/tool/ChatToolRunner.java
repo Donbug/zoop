@@ -109,11 +109,20 @@ public class ChatToolRunner implements AutoCloseable {
     }
 
     /**
-     * What the caller of {@link #runReserved} does with a usable read before it is recorded: refuse it with a failure code
-     * (recorded {@code failed}, no result reported), or keep its result envelope (JSON) on the ledger with the success.
+     * What the caller of {@link #runReserved} does with a usable read before it is recorded: narrow it to what may be passed
+     * on (the result and the ledger then show only that), refuse it with a failure code (recorded {@code failed}, no result
+     * reported), or keep its result envelope (JSON) on the ledger with the success.
+     *
+     * <p>{@link #pass} may read (grants, sources): it runs on the read's own thread inside the call's time limit and
+     * runner-wide slot, so a slow check times the call out like a slow read and never holds the threads that record calls.
+     * {@link #refuse} and {@link #keep} run while the call is recorded and must not block.
      */
     public interface Delivery {
         Delivery NONE = new Delivery() { };
+
+        default ChatToolOutput pass(ChatToolOutput output) {
+            return output;
+        }
 
         default String refuse(ChatToolOutput output) {
             return null;
@@ -181,7 +190,7 @@ public class ChatToolRunner implements AutoCloseable {
             pool.execute(() -> {
                 reader.set(Thread.currentThread());
                 try {
-                    if (!read.isDone()) read.complete(tool.read(scope, call));
+                    if (!read.isDone()) read.complete(passed(call, tool.read(scope, call), delivery));
                 } catch (Throwable error) {
                     read.completeExceptionally(error);
                 } finally {
@@ -252,6 +261,15 @@ public class ChatToolRunner implements AutoCloseable {
         }
     }
 
+    /** A usable output as {@code delivery} passes it on, on the read's thread; an unusable one is left for the record. */
+    private static ChatToolOutput passed(ChatToolRequest call, ChatToolOutput output, Delivery delivery) {
+        return invalid(call, output) == null ? delivery.pass(output) : output;
+    }
+
+    /**
+     * Records the end of one call. {@code output} is already what {@link Delivery#pass} let through (a subset of a usable
+     * read is still usable); nothing here reads or waits beyond the record itself.
+     */
     private ChatToolResult finish(ChatRunControl control, String id, ChatToolRequest call, ChatToolOutput output,
             Throwable error, AtomicBoolean superseded, Delivery delivery) {
         ChatToolResult result;
@@ -259,8 +277,8 @@ public class ChatToolRunner implements AutoCloseable {
         String problem = error == null ? invalid(call, output) : null;
         String refused = error == null && problem == null ? delivery.refuse(output) : null;
         if (refused != null) {
-            // A usable read the caller cannot pass on (an MCP result over its size limit): recorded as that failure, so
-            // the ledger never shows evidence as delivered that was not.
+            // A usable read the caller cannot pass on (an MCP result over its size limit, or one its send grants cannot be
+            // checked for): recorded as that failure, so the ledger never shows evidence as delivered that was not.
             result = ChatToolResult.failed(id, call.capabilityId(), refused);
             end = ChatToolCallEnd.failed(refused);
         } else if (error == null && problem == null) {

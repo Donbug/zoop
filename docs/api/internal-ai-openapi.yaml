@@ -257,6 +257,8 @@
     own ledger and resumes the stored response (`continuation.previousResponseId`, so the provider stores responses) with its decisions in a NEW step with its own
     invocation id. The input carries the application's job-scoped MCP grant token; the runtime sends it only to the provider, as the MCP tool's `authorization`,
     and keeps it out of every identity and stored answer. The MCP server URL is never part of a request: it is the operator's `ZOOP_AI_CHAT_MCP_SERVER_URL`.
+    `mcp.recipient` names the recipient the application checked its MCP results' send grants for (those results reach the provider from the application, not
+    through this runtime); a step is sent only when it is exactly the stage's own recipient, otherwise it fails `mcp_recipient_mismatch` with nothing sent.
 
     **Once per invocation.** `invocationId` (equal to `Idempotency-Key`) names one stage of one attempt. The runtime sends it at most once: the same id and input
     return the stored outcome, another input under the same id is the stage failure `invocation_conflict`, and a request whose outcome is unknown stays `unknown`.
@@ -7941,6 +7943,7 @@
                       "allowedTools":
                         - "company_read"
                         - "issue_read"
+                      "recipient": "authored-replay"
                     "maxCitations": 20
                     "continuation":
                       "previousResponseId": "resp_synthetic_1"

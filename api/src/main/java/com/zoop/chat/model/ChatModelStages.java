@@ -397,6 +397,7 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
         ObjectNode mcp = input.putObject("mcp").put("authorization", agent.grantToken());
         ArrayNode tools = mcp.putArray("allowedTools");
         agent.allowedTools().forEach(tools::add);
+        mcp.put("recipient", agent.recipient());
         input.put("maxCitations", Math.min(MAX_QUOTES, agent.maxCitations()));
         if (agent.previousResponseId() != null) {
             ObjectNode continuation = input.putObject("continuation").put("previousResponseId", agent.previousResponseId());

@@ -10,6 +10,7 @@ import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolRequest;
 import com.zoop.chat.tool.ChatToolResult;
 import com.zoop.chat.tool.ChatToolRunner;
+import com.zoop.chat.tool.ChatToolUnavailable;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema;
@@ -34,6 +35,10 @@ import tools.jackson.databind.ObjectMapper;
  * <p>A model chooses only the targets and a result limit. Everything else comes from the job: the pinned graph version and
  * asOf, the evidence the member narrowed the selection to, the compared period of a graph diff and the fixed ZOOP documents
  * of a policy read. A refused or failed call is a tool error result with a code ({@code isError}), never an empty success.
+ *
+ * <p>A result goes from here to the model provider directly, so before it is recorded and returned it is narrowed to what
+ * the chat grants allow sending to the agent ({@link ChatMcpSendGate}); a result whose grants cannot be checked is refused
+ * ({@link #SEND_GRANTS_UNAVAILABLE}), never returned unchecked.
  */
 public final class ChatMcpTools {
     /** The {@link McpTransportContext} key of the verified grant (set by {@link ChatMcpAccessFilter}). */
@@ -54,15 +59,21 @@ public final class ChatMcpTools {
     static final String INVALID_ARGUMENTS = "invalid_arguments";
     static final String BUDGET_EXHAUSTED = "tool_budget_exhausted";
     static final String RESULT_TOO_LARGE = "result_too_large";
+    static final String SEND_GRANTS_UNAVAILABLE = "send_grants_unavailable";
+    /** What a result says when part of it was withheld for want of a send grant. */
+    static final String SOURCE_GRANT_DENIED = "source_grant_denied";
 
     private final ChatToolRegistry registry;
     private final ChatToolRunner runner;
     private final ChatJobExecutor executor;
+    private final ChatMcpSendGate gate;
     private final ObjectMapper mapper;
 
-    public ChatMcpTools(ChatToolRegistry registry, ChatToolRunner runner, ChatJobExecutor executor, ObjectMapper mapper) {
+    public ChatMcpTools(ChatToolRegistry registry, ChatToolRunner runner, ChatJobExecutor executor, ChatMcpSendGate gate,
+            ObjectMapper mapper) {
         this.registry = registry;
         this.runner = runner;
+        this.gate = gate;
         this.executor = executor;
         this.mapper = mapper;
     }
@@ -154,6 +165,7 @@ public final class ChatMcpTools {
         String digest = runner.reservation(run, call, VIA).inputDigest();
         Optional<String> approved = executor.reservedToolCall(run.jobId(), run.attemptNo(), call.capabilityId(), digest);
         if (approved.isEmpty()) return refused(NOT_APPROVED);
+        var delivery = new Delivery(run);
         ChatToolResult result;
         try {
             result = runner.runReserved(run, attached.get().control(), List.of(approved.get()), List.of(call), delivery)
@@ -162,30 +174,54 @@ public final class ChatMcpTools {
             // Either the run ended, or a concurrent identical request started this reservation first.
             return refused(executor.attach(run.jobId(), run.attemptNo()).isPresent() ? NOT_APPROVED : RUN_NOT_ACTIVE);
         }
-        if (RESULT_TOO_LARGE.equals(result.error())) return refused(RESULT_TOO_LARGE);
-        Map<String, Object> structured = structured(result);
+        if (delivery.refusal != null && delivery.refusal.equals(result.error())) return refused(delivery.refusal);
+        Map<String, Object> structured = structured(result, delivery.withheld);
         return McpSchema.CallToolResult.builder().structuredContent(structured)
                 .addTextContent(mapper.writeValueAsString(structured)).isError(!result.succeeded()).build();
     }
 
     /**
-     * What a usable MCP read does before it is recorded: an output over {@link #MAX_RESULT_BYTES} is refused as
-     * {@link #RESULT_TOO_LARGE}; otherwise the success keeps exactly the envelope the model receives, so the server checks
-     * the final answer against it.
+     * What one usable MCP read does before it is recorded: it is narrowed to what the send grants allow
+     * ({@link ChatMcpSendGate}), refused as {@link #SEND_GRANTS_UNAVAILABLE} when that cannot be decided and as
+     * {@link #RESULT_TOO_LARGE} over {@link #MAX_RESULT_BYTES}; otherwise the success keeps exactly the envelope the model
+     * receives, so the server checks the final answer against it.
      */
-    private final ChatToolRunner.Delivery delivery = new ChatToolRunner.Delivery() {
+    private final class Delivery implements ChatToolRunner.Delivery {
+        private final ChatRun run;
+        // pass() runs on the read's thread, the rest while the call is recorded.
+        private volatile String refusal;
+        private volatile ChatMcpSendGate.Withheld withheld = ChatMcpSendGate.Withheld.NONE;
+
+        Delivery(ChatRun run) {
+            this.run = run;
+        }
+
+        @Override
+        public ChatToolOutput pass(ChatToolOutput output) {
+            try {
+                var passed = gate.pass(run, output);
+                withheld = passed.withheld();
+                return passed.output();
+            } catch (ChatSendGrants.Unavailable | ChatToolUnavailable unchecked) {
+                refusal = SEND_GRANTS_UNAVAILABLE;
+                return output;
+            }
+        }
+
         @Override
         public String refuse(ChatToolOutput output) {
+            if (refusal != null) return refusal;
             // The envelope adds a few short fields (ids, versions, flags) to the output's own serialization.
             int bytes = mapper.writeValueAsBytes(output).length + ENVELOPE_BYTES;
-            return bytes > MAX_RESULT_BYTES ? RESULT_TOO_LARGE : null;
+            if (bytes > MAX_RESULT_BYTES) refusal = RESULT_TOO_LARGE;
+            return refusal;
         }
 
         @Override
         public String keep(ChatToolResult result) {
-            return mapper.writeValueAsString(structured(result));
+            return mapper.writeValueAsString(structured(result, withheld));
         }
-    };
+    }
 
     /**
      * The call a model's arguments make: {@code targets} (1 to 5 distinct ids) and an optional {@code limit} (1 to 20), and
@@ -251,7 +287,11 @@ public final class ChatMcpTools {
                 .build();
     }
 
-    private static Map<String, Object> structured(ChatToolResult result) {
+    /**
+     * The envelope the model receives. When the send gate left something out, {@code withheld} says how much of each part and
+     * why, so a short result is never read as everything there is.
+     */
+    private static Map<String, Object> structured(ChatToolResult result, ChatMcpSendGate.Withheld withheld) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("schemaVersion", result.schemaVersion());
         out.put("toolCallId", result.toolCallId());
@@ -263,6 +303,14 @@ public final class ChatMcpTools {
         out.put("nextAllowed", result.nextAllowed());
         out.put("error", result.error());
         if (!result.paths().isEmpty()) out.put("paths", result.paths());
+        if (result.succeeded() && withheld.any()) {
+            Map<String, Object> left = new LinkedHashMap<>();
+            left.put("reason", SOURCE_GRANT_DENIED);
+            left.put("items", withheld.items());
+            left.put("evidenceIds", withheld.evidenceIds());
+            left.put("paths", withheld.paths());
+            out.put("withheld", left);
+        }
         return out;
     }
 
