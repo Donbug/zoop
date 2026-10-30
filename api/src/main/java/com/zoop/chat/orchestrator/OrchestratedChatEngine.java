@@ -181,6 +181,13 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         } catch (Stop stop) {
             return stop.failed;
         } catch (ChatModels.Failure failure) {
+            // The same question would meet the same limit: the member narrows it instead of rerunning it.
+            if (ChatModels.INPUT_BUDGET_EXCEEDED.equals(failure.code())) {
+                return new ChatEngineOutcome.Failed("budget_exceeded", "context_too_large", false);
+            }
+            if (ChatModels.OUTPUT_BUDGET_EXCEEDED.equals(failure.code())) {
+                return new ChatEngineOutcome.Failed("budget_exceeded", "output_limit", false);
+            }
             if (failure.fate() == ChatModels.Failure.Fate.REFUSED) return new ChatEngineOutcome.Failed("internal", null, false);
             boolean unknown = failure.fate() == ChatModels.Failure.Fate.UNKNOWN;
             return new ChatEngineOutcome.Failed("transient", unknown ? "response_unknown" : "provider_error", !unknown);
