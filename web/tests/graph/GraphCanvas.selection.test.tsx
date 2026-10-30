@@ -92,6 +92,13 @@ vi.mock('@antv/g6', () => ({
   },
 }));
 
+/** GraphCanvas sends only changed element states; merge the calls to read what is applied now. */
+const appliedStates = () =>
+  Object.assign(
+    {},
+    ...canvas.setElementState.mock.calls.map(([states]) => states),
+  ) as Record<string, string[]>;
+
 beforeEach(() => {
   vi.clearAllMocks();
   sessionStorage.clear();
@@ -1205,25 +1212,21 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       }),
     );
     await waitFor(() =>
-      expect(canvas.setElementState).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          'mock-issue-1': ['hovered'],
-          'KRX:005930': ['related', 'selected'],
-        }),
-      ),
+      expect(appliedStates()).toMatchObject({
+        'mock-issue-1': ['hovered'],
+        'KRX:005930': ['related', 'selected'],
+      }),
     );
     await act(async () =>
       canvas.handlers.get('canvas:pointerleave')!({ target: { id: 'canvas' } }),
     );
     await waitFor(() =>
-      expect(canvas.setElementState).toHaveBeenLastCalledWith(
+      expect(appliedStates()).toMatchObject({
         // Without hover, the clicked node keeps its connections emphasized.
-        expect.objectContaining({
-          'mock-issue-1': ['related'],
-          'KRX:005930': ['related', 'selected'],
-          [shared.id]: expect.arrayContaining(['selected']),
-        }),
-      ),
+        'mock-issue-1': ['related'],
+        'KRX:005930': ['related', 'selected'],
+        [shared.id]: expect.arrayContaining(['selected']),
+      }),
     );
     expect(canvas.created).toHaveBeenCalledOnce();
   });

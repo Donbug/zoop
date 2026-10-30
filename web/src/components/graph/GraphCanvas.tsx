@@ -191,6 +191,10 @@ export default function GraphCanvas({
   const hoveredEdge = useRef<string | null>(null);
   const readingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderedData = useRef<ReturnType<typeof toG6Data> | null>(null);
+  const appliedStates = useRef({
+    rendered: null as ReturnType<typeof toG6Data> | null,
+    states: new Map<string, string>(),
+  });
   const lastArrangement = useRef('map');
   const [renderError, setRenderError] = useState(false);
   const reading = useEffectEvent(() => {
@@ -384,11 +388,30 @@ export default function GraphCanvas({
         if (id === selectedEdgeId && !tutorialLocked)
           states[id].push('selected');
       }
-      await graph.setElementState(states);
+      // 노드가 많으면 모든 요소의 상태를 다시 넣는 일이 hover마다 가장 무겁다. 바뀐 요소만 넘긴다.
+      const applied = appliedStates.current;
+      if (applied.rendered !== rendered) {
+        applied.rendered = rendered;
+        applied.states.clear();
+      }
+      const changed: Record<string, string[]> = {};
+      for (const [id, next] of Object.entries(states)) {
+        const key = next.join(' ');
+        if (applied.states.get(id) === key) continue;
+        applied.states.set(id, key);
+        changed[id] = next;
+      }
+      if (Object.keys(changed).length) await graph.setElementState(changed);
       scheduleReading();
     },
   );
+  const hoverSyncQueued = useRef(false);
+  const hoverClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverNode = useEffectEvent((id: string | null) => {
+    if (hoverClearTimer.current !== null) {
+      clearTimeout(hoverClearTimer.current);
+      hoverClearTimer.current = null;
+    }
     if (tutorialLocked) return;
     if (hovered.current === id) return;
     hovered.current = id;
@@ -398,8 +421,12 @@ export default function GraphCanvas({
     );
     const graph = instance.current;
     if (!graph) return;
+    // 마우스가 빠르게 지나가면 쌓인 hover를 하나씩 그리지 않고, 차례가 왔을 때의 hover만 그린다.
+    if (hoverSyncQueued.current) return;
+    hoverSyncQueued.current = true;
     drawing.current = drawing.current
       .then(async () => {
+        hoverSyncQueued.current = false;
         if (
           graph.destroyed ||
           instance.current !== graph ||
@@ -409,12 +436,20 @@ export default function GraphCanvas({
         await syncVisualStates(graph, renderedData.current);
       })
       .catch(() => {
+        hoverSyncQueued.current = false;
         if (!graph.destroyed) setRenderError(true);
       });
   });
   const leaveNode = useEffectEvent((id: string) => {
     // A late leave from the previous node must not clear the new node's hover.
-    if (hovered.current === id) hoverNode(null);
+    if (hovered.current !== id) return;
+    setHoveredIssue(null);
+    // 노드 사이를 옮겨 다닐 때 전체 흐림을 풀었다 다시 거는 일을 막도록, 해제는 잠깐 기다린다.
+    if (hoverClearTimer.current !== null) clearTimeout(hoverClearTimer.current);
+    hoverClearTimer.current = setTimeout(() => {
+      hoverClearTimer.current = null;
+      if (hovered.current === id) hoverNode(null);
+    }, 120);
   });
   const isArranged = useEffectEvent(
     () => (focusLayout && Boolean(focusId)) || flow,
@@ -892,6 +927,9 @@ export default function GraphCanvas({
           });
         }
         keepPositionsOnce.current = false;
+        const relationTypes = new Map(
+          data.edges.map((edge) => [edge.id, edge.relationType]),
+        );
         const hiddenNodes = new Set([
           ...data.nodes
             .filter(
@@ -916,9 +954,7 @@ export default function GraphCanvas({
               !highlightedEdgeIds.includes(String(edge.id)) &&
               (hiddenNodes.has(String(edge.source)) ||
                 hiddenNodes.has(String(edge.target)) ||
-                view.hidden.includes(
-                  data.edges.find((item) => item.id === edge.id)!.relationType,
-                ))
+                view.hidden.includes(relationTypes.get(String(edge.id))!))
                 ? 'hidden'
                 : 'visible',
           },
@@ -958,6 +994,11 @@ export default function GraphCanvas({
           rendered.nodes?.filter((node) => node.style?.visibility !== 'hidden')
             .length ?? 0;
         minimapShown.current = visibleCount > 60 && host.clientWidth >= 768;
+        const minimapEdges = new Set(
+          rendered.edges
+            ?.filter((edge) => edge.style?.visibility !== 'hidden')
+            .map((edge) => String(edge.id)),
+        );
         graph.setPlugins(
           minimapShown.current
             ? [
@@ -971,11 +1012,7 @@ export default function GraphCanvas({
                   filter: (id: string, kind: string) =>
                     kind === 'node'
                       ? !hiddenNodes.has(id)
-                      : (rendered.edges?.some(
-                          (edge) =>
-                            edge.id === id &&
-                            edge.style?.visibility !== 'hidden',
-                        ) ?? false),
+                      : minimapEdges.has(id),
                 },
               ]
             : [],
@@ -1075,10 +1112,6 @@ export default function GraphCanvas({
     centerSequence,
     tutorialTargetId,
     tutorialCenterId,
-    tutorialPhase,
-    tutorialLocked,
-    tutorialCameraEnabled,
-    tutorialShowNeighborhood,
     selectedEdgeId,
     isolateSelection,
     evidenceMode,
@@ -1089,6 +1122,29 @@ export default function GraphCanvas({
     highlightedEdgeIds,
     connectionPath,
     view.hidden,
+  ]);
+  // 튜토리얼 단계의 잠금·카메라·이웃 표시는 그려진 데이터를 바꾸지 않는다. 지도 전체를 다시 그리지 않고 상태만 맞춘다.
+  const syncTutorialStates = useEffectEvent(() => {
+    const graph = instance.current;
+    if (!graph) return;
+    drawing.current = drawing.current
+      .then(async () => {
+        const rendered = renderedData.current;
+        if (graph.destroyed || instance.current !== graph || !rendered) return;
+        await syncVisualStates(graph, rendered);
+        syncTutorialMarker();
+      })
+      .catch(() => {
+        if (!graph.destroyed) setRenderError(true);
+      });
+  });
+  useEffect(() => {
+    syncTutorialStates();
+  }, [
+    tutorialPhase,
+    tutorialLocked,
+    tutorialCameraEnabled,
+    tutorialShowNeighborhood,
   ]);
   useEffect(() => {
     const host = container.current;
@@ -1280,7 +1336,8 @@ export default function GraphCanvas({
         try {
           const nextZoom = graph.getZoom();
           setZoom(nextZoom);
-          scheduleReading();
+          // 이름표 크기와 겹침은 배율에만 달려 있어서, 끌어서 옮기기만 하면 다시 재지 않는다.
+          if (Math.abs(nextZoom - previousZoom) > 0.0001) scheduleReading();
           if (
             wheelPending &&
             currentTutorialPhase() === 'zoom' &&
@@ -1379,6 +1436,10 @@ export default function GraphCanvas({
       if (readingTimer.current !== null) {
         clearTimeout(readingTimer.current);
         readingTimer.current = null;
+      }
+      if (hoverClearTimer.current !== null) {
+        clearTimeout(hoverClearTimer.current);
+        hoverClearTimer.current = null;
       }
       disposed = true;
       host.removeEventListener('pointerleave', clearHover);

@@ -141,6 +141,12 @@ export function readingStyles(
   };
 }
 
+/** Label styles last pushed per graph; a new base (setData) starts over. */
+const appliedLabels = new WeakMap<
+  Graph,
+  { base: GraphData; styles: Map<string, string> }
+>();
+
 // Public G6 canvas/display-object APIs give actual label bounds (font/wrap/padding/rotation).
 export async function applyGraphReading(
   graph: Graph,
@@ -161,16 +167,30 @@ export async function applyGraphReading(
         ([key]) => key.startsWith('label') || (badges && key === 'badges'),
       ),
     );
-  graph.updateNodeData(
-    (styles.nodes ?? []).map((n) => ({
-      id: n.id,
-      style: labelStyle(n.style, true),
-    })),
-  );
-  graph.updateEdgeData(
-    (styles.edges ?? []).map((e) => ({ id: e.id, style: labelStyle(e.style) })),
-  );
-  await graph.draw();
+  // Hover keeps the zoom, so most label styles are unchanged: only push and redraw the changed ones.
+  let applied = appliedLabels.get(graph);
+  if (applied?.base !== base) {
+    applied = { base, styles: new Map() };
+    appliedLabels.set(graph, applied);
+  }
+  const { styles: previous } = applied;
+  const changed = (
+    items: { id?: unknown; style?: Record<string, unknown> }[] | undefined,
+    badges = false,
+  ) =>
+    (items ?? []).flatMap((item) => {
+      const id = String(item.id);
+      const style = labelStyle(item.style, badges);
+      const key = JSON.stringify(style);
+      if (previous.get(id) === key) return [];
+      previous.set(id, key);
+      return [{ id, style }];
+    });
+  const nodeUpdates = changed(styles.nodes, true);
+  const edgeUpdates = changed(styles.edges);
+  if (nodeUpdates.length) graph.updateNodeData(nodeUpdates);
+  if (edgeUpdates.length) graph.updateEdgeData(edgeUpdates);
+  if (nodeUpdates.length || edgeUpdates.length) await graph.draw();
   if (graph.destroyed) return;
   const document = graph.getCanvas().document;
   type Shape = {
@@ -210,8 +230,25 @@ export async function applyGraphReading(
     });
   };
   type ElementShape = { getShape: (name: string) => Shape | undefined };
+  // G's getElementById walks the whole scene; collect every element in one walk instead.
+  const wanted = new Set([
+    ...(styles.nodes ?? []).map((node) => String(node.id)),
+    ...(styles.edges ?? []).map((edge) => String(edge.id)),
+  ]);
+  const elements = new Map<string, ElementShape>();
+  type SceneNode = { id?: string; childNodes?: SceneNode[] };
+  const collect = (scene: SceneNode) => {
+    if (scene.id && wanted.has(scene.id)) {
+      elements.set(scene.id, scene as unknown as ElementShape);
+      return;
+    }
+    scene.childNodes?.forEach(collect);
+  };
+  const root = document.documentElement as unknown as SceneNode | undefined;
+  if (root) collect(root);
   const element = (id: string) =>
-    document.getElementById(id) as unknown as ElementShape | null;
+    elements.get(id) ??
+    (document.getElementById(id) as unknown as ElementShape | null);
   const screenBox = (shape: Shape | undefined): Rect | null => {
     if (!shape) return null;
     const bounds = shape.getRenderBounds();

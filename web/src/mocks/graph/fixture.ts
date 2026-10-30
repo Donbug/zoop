@@ -146,6 +146,54 @@ export const directEdges: GraphEdge[] = cases.flatMap(([, ids], i) =>
     evidenceIds: [`mock-evidence-${i + 1}`],
   })),
 );
+/** Performance fixture at the server NODE_LIMIT (500): 200 companies, 300 issues. */
+export function largeFixture() {
+  let seed = 7;
+  const next = (n: number) => {
+    seed = (seed * 48271) % 2147483647;
+    return seed % n;
+  };
+  const largeCompanies: GraphNode[] = Array.from({ length: 200 }, (_, i) => {
+    const [, label, brandColor, logo] = catalog[i % catalog.length];
+    // The tutorial guides with 삼성전자, so keep its real ID once.
+    const samsung = i === 1;
+    return {
+      ...nodeDefaults,
+      id: samsung ? 'KRX:005930' : `MOCK:${String(i + 1).padStart(3, '0')}`,
+      kind: 'company',
+      label: samsung ? label : `${label} ${Math.floor(i / catalog.length) + 1}`,
+      brandColor,
+      logoUrl: logo ? `/graph-assets/${logo}.svg` : null,
+    };
+  });
+  const largeIssues: GraphNode[] = Array.from({ length: 300 }, (_, i) => ({
+    ...issues[i % (issues.length - 1)],
+    id: `mock-large-issue-${i + 1}`,
+    label: `${cases[i % (cases.length - 1)][0]} ${Math.floor(i / (cases.length - 1)) + 1}`,
+  }));
+  const largeEdges: GraphEdge[] = largeIssues.flatMap((issue, i) => {
+    const ids = new Set<string>(i === 0 ? [largeCompanies[1].id] : []);
+    const count = 1 + next(3);
+    while (ids.size < count) ids.add(largeCompanies[next(200)].id);
+    return [...ids].map((id, j) => ({
+      id: `mock-large-relation-${i + 1}-${j + 1}`,
+      source: issue.id,
+      target: id,
+      relationType: 'INVOLVES',
+      role: 'participant',
+      summary: String(issue.label),
+      assertionStatus: 'approved',
+      derived: false,
+      via: [],
+      evidenceIds: [`mock-large-evidence-${i + 1}`],
+    }));
+  });
+  return {
+    companies: largeCompanies,
+    issues: largeIssues,
+    directEdges: largeEdges,
+  };
+}
 export const follows: GraphEdge[] = [
   {
     id: 'mock-follows-1',
