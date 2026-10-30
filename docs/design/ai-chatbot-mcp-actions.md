@@ -176,6 +176,8 @@ UI 동작은 DB 읽기 도구와 분리한다. 조회 결과의 유효한 ID를 
 
 각 제안은 서버 발급 actionId, 허용 kind, label, requirementIds, typed target, 필요 시 graphVersion/asOf를 가진다. 초기 kind는 `open_company`, `focus_relation`, `focus_path`, `open_evidence`, `open_briefing`, `open_watchlist`로 제한한다. 실제 필드·enum은 구현 PR에서 DTO·OpenAPI·클라이언트와 함께 확정한다. Q01 도움말 및 Q05 비교 화면은 실제 지원 route가 확인된 경우만 확장한다.
 
+구현(2026-10-30): `open_company`(답변의 `graphTargets`에 있는 기업), `focus_path`(`found`로 읽은 경로, 답변과 같은 스냅샷의 지도에서만), `open_briefing`(실제로 읽은 회차)만 OpenAPI `ChatUiAction`으로 제공한다. 답한 요구의 조회 결과에서 서버가 답변당 최대 6개를 만들며 모델은 제안하지 않는다. 돌려줄 때 지금 볼 수 없는 기업이 든 항목은 빼고, 답변을 가리면 모두 뺀다. `focus_relation`·`open_evidence`·`open_watchlist`는 아직 없다: 관계는 `graphTargets`로 지도에서 열리고 근거는 인용 목록이 대신한다.
+
 - 대상 ID가 도구 결과에 존재하고 공개·권한·버전 검사를 통과해야 동작을 만든다. 외부 보도만으로 내부 관계 ID를 만들지 않는다.
 - 클릭 후 대상 화면의 기존 API·권한·404 처리로 현재 공개 상태·권한을 다시 확인한다. 버튼 확인 전용 API는 추가하지 않으며 경로 포커스에 기존 API로 부족한 버전 확인은 구현 PR에서 계약화한다. 삭제·철회·버전 불일치는 ‘현재 열 수 없음’으로 안내하고 다른 간선으로 치환하지 않는다.
 - polling·복구·재열람으로 동작을 재실행하지 않는다. 외부 출처는 서버가 검증한 http(s) URL만 사용한다.

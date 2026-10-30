@@ -6,6 +6,7 @@ import {
   formatPublishedAt,
   safeArticleUrl,
 } from '@/components/graph/event-format';
+import { useAiChatStore } from '@/stores/useAiChatStore';
 import type {
   ChatAnswerBasis,
   ChatBasis,
@@ -363,6 +364,9 @@ function Answer({
       {result.graphTargets.length > 0 && onViewOnMap && (
         <MapTargets job={job} result={result} onViewOnMap={onViewOnMap} />
       )}
+      {result.uiActions.length > 0 && (
+        <UiActions result={result} onViewOnMap={onViewOnMap} />
+      )}
       <Applied result={result} />
     </div>
   );
@@ -407,6 +411,84 @@ function MapTargets({
           이 답변은 그래프 버전 {result.applied.graphVersion}
           {job.context.asOf ? ` · ${job.context.asOf}` : ''} 기준이라 지금
           지도에서 그대로 열 수 없어요.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// 서버가 준 동작만 눌렀을 때 연다. 대상 화면이 권한·공개 상태를 다시 확인하고, 모르는 kind는 그리지 않는다.
+function UiActions({
+  result,
+  onViewOnMap,
+}: {
+  result: ChatResult;
+  onViewOnMap?: Props['onViewOnMap'];
+}) {
+  const [unavailable, setUnavailable] = useState(false);
+  const close = useAiChatStore((state) => state.close);
+  return (
+    <div>
+      <div className={ui.textActions}>
+        {result.uiActions.map((action) => {
+          const { target } = action;
+          if (action.kind === 'open_company' && target.companyId) {
+            return (
+              <Link
+                key={action.actionId}
+                to={`/companies/${encodeURIComponent(target.companyId)}`}
+                onClick={close}
+              >
+                {action.label}
+              </Link>
+            );
+          }
+          if (action.kind === 'open_briefing' && target.date) {
+            const query = new URLSearchParams({
+              date: target.date,
+              edition: target.edition ?? 'morning',
+            });
+            return (
+              <Link
+                key={action.actionId}
+                to={`/briefing?${query}`}
+                onClick={close}
+              >
+                {action.label}
+              </Link>
+            );
+          }
+          if (
+            action.kind === 'focus_path' &&
+            target.fromId &&
+            target.toId &&
+            onViewOnMap
+          ) {
+            return (
+              <button
+                key={action.actionId}
+                type="button"
+                onClick={() =>
+                  setUnavailable(
+                    !onViewOnMap({
+                      id: `${target.fromId},${target.toId}`,
+                      kind: 'path',
+                      graphVersion: target.graphVersion,
+                      asOf: target.asOf,
+                    }),
+                  )
+                }
+              >
+                {action.label}
+              </button>
+            );
+          }
+          return null;
+        })}
+      </div>
+      {unavailable && (
+        <p className={ui.muted} role="status">
+          이 경로는 답변을 만든 그래프 기준이라 지금 지도에서 열 수 없어요.
         </p>
       )}
     </div>

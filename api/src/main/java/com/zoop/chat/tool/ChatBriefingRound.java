@@ -1,6 +1,7 @@
 package com.zoop.chat.tool;
 
 import java.time.LocalDate;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
@@ -13,7 +14,8 @@ public record ChatBriefingRound(LocalDate date, String edition) {
     public static final String LATEST = "briefing:latest";
 
     private static final Pattern REF = Pattern.compile("briefing:(\\d{4}-\\d{2}-\\d{2})(?::(morning|evening))?");
-    private static final Pattern MORNING = Pattern.compile("아침|출근|오전|모닝");
+    private static final Pattern READ = Pattern.compile("briefing:(\\d{4}-\\d{2}-\\d{2}):(morning|evening):.+");
+    private static final Pattern MORNING =Pattern.compile("아침|출근|오전|모닝");
     private static final Pattern EVENING = Pattern.compile("저녁|퇴근|오후|이브닝");
 
     public ChatBriefingRound {
@@ -34,6 +36,17 @@ public record ChatBriefingRound(LocalDate date, String edition) {
         var m = REF.matcher(target);
         if (!m.matches()) throw new IllegalArgumentException("not a briefing round: " + target);
         return new ChatBriefingRound(LocalDate.parse(m.group(1)), m.group(2));
+    }
+
+    /** The {@code dataVersion} of a read that found round {@code id}: the day and edition it really was, whatever was asked. */
+    public static String dataVersion(String date, String edition, String id) {
+        return "briefing:" + date + ":" + edition + ":" + id;
+    }
+
+    /** The round a read's {@code dataVersion} names; empty for a read that found none. */
+    public static Optional<ChatBriefingRound> ofDataVersion(String dataVersion) {
+        var m = READ.matcher(dataVersion == null ? "" : dataVersion);
+        return m.matches() ? Optional.of(new ChatBriefingRound(LocalDate.parse(m.group(1)), m.group(2))) : Optional.empty();
     }
 
     /**

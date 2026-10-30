@@ -12380,6 +12380,12 @@ components:
           type: "array"
           maxItems: 8
           description: "답변을 막지 않은 장애·우회. 이 필드 이전에 저장된 결과는 빈 배열이다."
+        uiActions:
+          items:
+            "$ref": "#/components/schemas/ChatUiAction"
+          type: "array"
+          maxItems: 6
+          description: "답변에서 회원이 눌러 열 수 있는 화면. 서버가 답한 요구의 실제 조회 결과로만 만들며 모델이 제안하지 않는다. 눌렀을 때만 실행하고, polling·재열람으로 실행하지 않는다. 돌려줄 때 지금 볼 수 없는 기업이 들어간 항목은 뺀다. 이 필드 이전에 저장된 결과는 빈 배열이다."
         metadata:
           "$ref": "#/components/schemas/Metadata"
       type: "object"
@@ -12399,7 +12405,105 @@ components:
         - "limitations"
         - "answerStatus"
         - "notices"
+        - "uiActions"
         - "metadata"
+    ChatUiAction:
+      properties:
+        actionId:
+          type: "string"
+          description: "이 결과 안에서만 유일한 서버 발급 ID"
+        kind:
+          type: "string"
+          enum:
+            - "open_company"
+            - "focus_path"
+            - "open_briefing"
+          description: "open_company: 기업 상세. focus_path: 지도에서 두 기업 사이 경로. open_briefing: 해당 회차 브리핑. 클라이언트는 모르는 kind를 표시하지 않는다."
+        label:
+          type: "string"
+          maxLength: 300
+          description: "서버가 조회 결과의 이름으로 만든 표시 문구"
+        requirementIds:
+          items:
+            type: "string"
+          type: "array"
+          maxItems: 6
+          description: "이 동작을 낳은 답한 요구"
+        target:
+          "$ref": "#/components/schemas/ChatUiActionTarget"
+      type: "object"
+      required:
+        - "actionId"
+        - "kind"
+        - "label"
+        - "requirementIds"
+        - "target"
+    ChatUiActionTarget:
+      properties:
+        companyId:
+          anyOf:
+            -
+              type: "string"
+            -
+              type: "null"
+          description: "open_company"
+        fromId:
+          anyOf:
+            -
+              type: "string"
+            -
+              type: "null"
+          description: "focus_path 시작 기업"
+        toId:
+          anyOf:
+            -
+              type: "string"
+            -
+              type: "null"
+          description: "focus_path 끝 기업"
+        date:
+          anyOf:
+            -
+              type: "string"
+              pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+            -
+              type: "null"
+          description: "open_briefing 회차의 KST 날짜"
+        edition:
+          anyOf:
+            -
+              type: "string"
+              enum:
+                - "morning"
+                - "evening"
+            -
+              type: "null"
+          description: "open_briefing 회차"
+        graphVersion:
+          anyOf:
+            -
+              type: "string"
+            -
+              type: "null"
+          description: "focus_path: 경로를 읽은 그래프 버전. 지금 지도가 다른 스냅샷이면 열지 않고 안내한다."
+        asOf:
+          anyOf:
+            -
+              type: "string"
+              format: "date-time"
+            -
+              type: "null"
+          description: "focus_path: 질문에 고정된 기준 시각"
+      type: "object"
+      required:
+        - "companyId"
+        - "fromId"
+        - "toId"
+        - "date"
+        - "edition"
+        - "graphVersion"
+        - "asOf"
+      description: "kind에 해당하는 필드만 값이 있다."
     ChatSessionResponse:
       properties:
         id:
