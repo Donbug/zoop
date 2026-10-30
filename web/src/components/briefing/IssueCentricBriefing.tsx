@@ -717,9 +717,11 @@ export default function IssueCentricBriefing({
   renderExtra,
   compact = true,
   issueCorrections,
+  beforeIssues,
 }: {
   result: BriefingResponse;
   items?: BriefingItem[];
+  beforeIssues?: ReactNode;
   /** 55: 화면에 있는 이슈에 붙는 정정(eventId별) */
   issueCorrections?: Map<string, Correction[]>;
   compact?: boolean;
@@ -781,6 +783,7 @@ export default function IssueCentricBriefing({
         compact
         showBaseline
       />
+      {beforeIssues}
       {result.items.length === 0 &&
         result.emptyReason === 'no_issues_in_window' &&
         !result.issueIntelligence &&
@@ -814,7 +817,9 @@ export default function IssueCentricBriefing({
           </p>
         )}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className={SECTION_TITLE}>핵심 이슈</h3>
+          <h3 className={SECTION_TITLE}>
+            {beforeIssues ? '공통 핵심 이슈' : '핵심 이슈'}
+          </h3>
           {!result.issueIntelligence && (
             <Link
               to={`/?round=${encodeURIComponent(result.id)}`}
