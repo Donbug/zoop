@@ -7383,7 +7383,7 @@ paths:
       tags:
         - "admin-feedback"
       summary: "AI 기능별 유효 평가 집계"
-      description: "현재 제공 중인 발행 버전의 회원 브리핑 평가를 집계합니다. none·중단·과거 버전·익명 미리보기는 제외합니다. 비율은 up/(up+down), 표본 5건 미만은 null입니다. 기간·일별 추이는 KST 마지막 변경일 기준이며 챗봇 원장 미연결은 unsupported로 구분합니다."
+      description: "현재 읽을 수 있는 동일 버전의 브리핑 회차·핵심 이슈·저장 챗봇 답변·검증된 뉴스 요약에 대한 마지막 회원 평가를 집계합니다. none·중단·과거 버전·차단 회원·익명 미리보기는 제외합니다. 비율은 up/(up+down), 표본 5건 미만은 null입니다. 기간·일별 추이는 KST 마지막 변경일 기준입니다. 원천 장애는 성공 0건으로 바꾸지 않습니다."
       operationId: "getFeedbackSummary"
       parameters:
         -
