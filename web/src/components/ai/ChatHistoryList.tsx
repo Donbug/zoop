@@ -105,7 +105,7 @@ export default function ChatHistoryList({
                   {deleteEnabled && confirming !== item.id && (
                     <button
                       type="button"
-                      className="shrink-0 p-1 text-[11px] text-panel-secondary underline"
+                      className="shrink-0 p-1 text-caption text-panel-secondary underline"
                       aria-label={`“${item.title}” 대화 삭제`}
                       disabled={deleting !== null}
                       onClick={() => {

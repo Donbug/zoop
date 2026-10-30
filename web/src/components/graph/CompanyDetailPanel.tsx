@@ -161,7 +161,7 @@ export default function CompanyDetailPanel(props: Props) {
           <CompanyLogo
             name={name}
             logoUrl={logoUrl}
-            className="size-14 shrink-0 rounded-full border border-zoop-line bg-zoop-paper text-[18px] font-extrabold"
+            className="size-14 shrink-0 rounded-full border border-zoop-line bg-zoop-paper text-title-sm font-extrabold"
           />
           <div className="min-w-0 flex-1">
             <p className="company-code">

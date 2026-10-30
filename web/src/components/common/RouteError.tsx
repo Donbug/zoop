@@ -11,10 +11,10 @@ export default function RouteError({
     notFound || (isRouteErrorResponse(error) && error.status === 404);
   return (
     <main className="mx-auto max-w-lg p-8 text-zoop-ink">
-      <h1 className="text-xl font-bold">
+      <h1 className="text-title font-bold">
         {missing ? '페이지를 찾을 수 없어요' : '화면을 불러오지 못했어요'}
       </h1>
-      <p className="mt-3 text-sm text-zoop-muted">
+      <p className="mt-3 text-body text-zoop-muted">
         {missing
           ? '주소를 확인하거나 지도로 돌아가 주세요.'
           : '다시 시도하거나 지도로 돌아가 주세요.'}

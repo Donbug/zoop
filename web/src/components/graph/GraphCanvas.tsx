@@ -37,6 +37,7 @@ import {
 import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { arrangeFlow, arrangeFocus } from './graph-arrange';
 import { applyGraphReading } from './graph-readability';
+import { graphText, loadGraphFonts } from './graph-fonts';
 import {
   cameraMotion,
   EDGE_ANIMATION,
@@ -923,6 +924,14 @@ export default function GraphCanvas({
                 : 'visible',
           },
         }));
+        // 캔버스 글자는 그릴 때 준비된 글꼴로 한 번만 그려지므로, 쓸 글자의 글꼴을 먼저 받는다.
+        await loadGraphFonts(
+          graphText(
+            rendered,
+            data.nodes.map((node) => node.label),
+          ),
+        );
+        if (graph.destroyed) return;
         // 옮겨 갈 노드는 먼저 이전 자리에 그리고, 맞춤 단계에서 목표 자리로 옮긴다.
         const morphTargets: Record<string, [number, number]> = {};
         const previous = new Map(
@@ -1441,7 +1450,7 @@ export default function GraphCanvas({
       {hoveredIssue && (
         <p
           role="tooltip"
-          className="pointer-events-none absolute top-3 right-3 z-20 max-w-[min(22rem,65%)] rounded border border-panel-line bg-zoop-paper px-3 py-2 font-panel text-sm text-panel-ink shadow-sm break-words"
+          className="pointer-events-none absolute top-3 right-3 z-20 max-w-[min(22rem,65%)] rounded border border-panel-line bg-zoop-paper px-3 py-2 font-panel text-body text-panel-ink shadow-sm break-words"
         >
           {hoveredIssue}
         </p>
@@ -1486,7 +1495,7 @@ export default function GraphCanvas({
       </div>
       {tutorialPhase === 'pan' && (
         <button
-          className="absolute z-20 grid size-32 -translate-x-1/2 -translate-y-1/2 touch-none place-items-center rounded-full border-2 border-dashed border-zoop-ink bg-zoop-paper/75 px-3 text-center text-xs font-bold text-zoop-ink focus-visible:outline-4"
+          className="absolute z-20 grid size-32 -translate-x-1/2 -translate-y-1/2 touch-none place-items-center rounded-full border-2 border-dashed border-zoop-ink bg-zoop-paper/75 px-3 text-center text-caption font-bold text-zoop-ink focus-visible:outline-4"
           style={{
             left: dragAnchor?.x ?? '62.5%',
             top: dragAnchor?.y ?? '71.65%',
@@ -1589,7 +1598,7 @@ export default function GraphCanvas({
           <GraphIcon name="plus" />
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-[3px] bg-zoop-ink px-1.5 py-0.5 text-[11px] whitespace-nowrap text-zoop-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+            className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-[3px] bg-zoop-ink px-1.5 py-0.5 text-caption whitespace-nowrap text-zoop-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
           >
             확대
           </span>
@@ -1603,7 +1612,7 @@ export default function GraphCanvas({
           <GraphIcon name="minus" />
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-[3px] bg-zoop-ink px-1.5 py-0.5 text-[11px] whitespace-nowrap text-zoop-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+            className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-[3px] bg-zoop-ink px-1.5 py-0.5 text-caption whitespace-nowrap text-zoop-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
           >
             축소
           </span>
@@ -1618,7 +1627,7 @@ export default function GraphCanvas({
           <GraphIcon name="fit" />
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-[3px] bg-zoop-ink px-1.5 py-0.5 text-[11px] whitespace-nowrap text-zoop-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+            className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-[3px] bg-zoop-ink px-1.5 py-0.5 text-caption whitespace-nowrap text-zoop-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
           >
             전체 그래프 맞춤
           </span>
@@ -1634,7 +1643,7 @@ export default function GraphCanvas({
                 : '사건에서 관련 기업, 선행 사건에서 후속 사건 방향으로 왼쪽에서 오른쪽에 정렬해요.'
             }
             onClick={() => onFlowChange(!flow)}
-            className="max-md:hidden! w-auto! px-2! text-[13px] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 aria-pressed:bg-zoop-soft aria-pressed:outline-[0.667px] aria-pressed:outline-zoop-ink"
+            className="max-md:hidden! w-auto! px-2! text-body font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 aria-pressed:bg-zoop-soft aria-pressed:outline-[0.667px] aria-pressed:outline-zoop-ink"
           >
             흐름 순으로 정렬
           </button>
@@ -1646,7 +1655,7 @@ export default function GraphCanvas({
             focusActive={focusLayout && Boolean(focusId)}
           />
         )}
-        <output className="max-md:sr-only text-[13px]!">
+        <output className="max-md:sr-only text-body!">
           {Math.round(zoom * 100)}% · 드래그로 이동 · 휠로 확대
         </output>
       </div>

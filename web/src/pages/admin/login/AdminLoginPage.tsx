@@ -109,14 +109,14 @@ export default function AdminLoginPage() {
       >
         <h1
           id="admin-login-title"
-          className="text-xl font-[750] tracking-[-0.035em]"
+          className="text-title font-[750] tracking-[-0.035em]"
         >
           줍 관리자
         </h1>
         {expired && !error && (
           <p
             role="alert"
-            className="rounded-2xl bg-zoop-soft px-4 py-3 text-[11px] leading-relaxed text-zoop-ink"
+            className="rounded-2xl bg-zoop-soft px-4 py-3 text-caption leading-relaxed text-zoop-ink"
           >
             {expired}
           </p>
@@ -128,13 +128,13 @@ export default function AdminLoginPage() {
         >
           <label
             htmlFor="admin-email"
-            className="mt-2 text-[11px] font-semibold text-zoop-muted"
+            className="mt-2 text-caption font-semibold text-zoop-muted"
           >
             관리자 이메일
           </label>
           <input
             id="admin-email"
-            className="h-[50px] rounded-full border border-transparent bg-zoop-soft px-5 text-[13px] text-zoop-ink focus:border-zoop-ink disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
+            className="h-[50px] rounded-full border border-transparent bg-zoop-soft px-5 text-body text-zoop-ink focus:border-zoop-ink disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
             type="email"
             autoComplete="username"
             value={email}
@@ -144,13 +144,13 @@ export default function AdminLoginPage() {
           />
           <label
             htmlFor="admin-password"
-            className="mt-2 text-[11px] font-semibold text-zoop-muted"
+            className="mt-2 text-caption font-semibold text-zoop-muted"
           >
             비밀번호
           </label>
           <input
             id="admin-password"
-            className="h-[50px] rounded-full border border-transparent bg-zoop-soft px-5 text-[13px] text-zoop-ink focus:border-zoop-ink disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
+            className="h-[50px] rounded-full border border-transparent bg-zoop-soft px-5 text-body text-zoop-ink focus:border-zoop-ink disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
             type="password"
             autoComplete="current-password"
             value={password}
@@ -161,7 +161,7 @@ export default function AdminLoginPage() {
           {missing && (
             <p
               role="alert"
-              className="text-[11px] leading-relaxed text-zoop-alert"
+              className="text-caption leading-relaxed text-zoop-alert"
             >
               관리자 이메일과 비밀번호를 모두 입력해 주세요.
             </p>
@@ -169,7 +169,7 @@ export default function AdminLoginPage() {
           {error && (
             <p
               role="alert"
-              className="text-[11px] leading-relaxed text-zoop-alert"
+              className="text-caption leading-relaxed text-zoop-alert"
             >
               {error}
             </p>
@@ -177,18 +177,18 @@ export default function AdminLoginPage() {
           <button
             type="submit"
             disabled={pending}
-            className="mt-3.5 h-[50px] rounded-full bg-zoop-ink text-[13px] font-bold text-zoop-paper transition-opacity hover:opacity-85 disabled:cursor-progress disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
+            className="mt-3.5 h-[50px] rounded-full bg-zoop-ink text-body font-bold text-zoop-paper transition-opacity hover:opacity-85 disabled:cursor-progress disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
           >
             {pending ? '확인하고 있어요' : '관리자 로그인'}
           </button>
         </form>
-        <p className="text-center text-[11px] text-zoop-faint">
+        <p className="text-center text-caption text-zoop-faint">
           관리자 세션은 회원 세션과 분리돼요
           {idleMinutes ? ` · ${idleMinutes}분 동안 활동이 없으면 만료` : ''}
         </p>
         <Link
           to="/login"
-          className="self-center text-[11px] text-zoop-muted underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
+          className="self-center text-caption text-zoop-muted underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
         >
           회원 로그인으로
         </Link>

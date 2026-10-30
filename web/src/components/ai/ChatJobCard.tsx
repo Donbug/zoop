@@ -226,7 +226,7 @@ function ResultView({
         )}
         <button
           type="button"
-          className="mt-2 text-[11px] underline"
+          className="mt-2 text-caption underline"
           disabled={busy}
           onClick={() => onAnswerFreely(job)}
         >
@@ -281,7 +281,7 @@ function Answer({
         result.sections.map((section, i) => (
           <section key={i} aria-label={`${BASIS_LABEL[section.basis]} 구간`}>
             <p className={`${ui.badge} mb-1`}>{BASIS_LABEL[section.basis]}</p>
-            <p className="m-0 whitespace-pre-wrap wrap-anywhere text-[12px] leading-[19.5px]">
+            <p className="m-0 whitespace-pre-wrap wrap-anywhere text-caption leading-[19.5px]">
               {section.text}
             </p>
             {section.evidenceIds.length > 0 && (
@@ -298,7 +298,7 @@ function Answer({
         ))
       ) : (
         // 인용을 지금 읽을 수 없어 서버가 고정 안내만 보낸 경우: 그대로 보여 준다.
-        <p className="m-0 whitespace-pre-wrap wrap-anywhere text-[12px] leading-[19.5px]">
+        <p className="m-0 whitespace-pre-wrap wrap-anywhere text-caption leading-[19.5px]">
           {result.answer}
         </p>
       )}
@@ -519,7 +519,7 @@ function Citation({ n, citation }: { n: number; citation: ChatCitation }) {
           ? ` · ZOOP 문서 ${citation.docVersion ?? ''}`
           : ` · ${web ? '웹 검색 결과 · ' : ''}${citation.publisher ?? '출처 미제공'}${published ? ` · ${published}` : ''}`}
       </p>
-      <blockquote className="my-1 rounded-[3px] bg-panel-soft px-3 py-2 text-[11px] wrap-anywhere">
+      <blockquote className="my-1 rounded-[3px] bg-panel-soft px-3 py-2 text-caption wrap-anywhere">
         {citation.quote}
       </blockquote>
       {href && (

@@ -80,7 +80,7 @@ export default function AdminLayout() {
         className="min-w-0 border-b-[0.667px] border-zoop-line bg-zoop-paper p-4 text-zoop-ink md:sticky md:top-0 md:h-dvh md:self-start md:overflow-y-auto md:border-r-[0.667px] md:border-b-0 md:p-6"
       >
         <div className="mb-5 flex items-center justify-between gap-3">
-          <p className="text-xl font-bold">줍 관리자</p>
+          <p className="text-title font-bold">줍 관리자</p>
           <button
             type="button"
             aria-controls="admin-sidebar"
@@ -100,7 +100,7 @@ export default function AdminLayout() {
               to={menu.to}
               end={menu.to === '/admin'}
               className={({ isActive }) =>
-                `rounded-full px-4 py-3 text-xs transition-colors duration-150 ${FOCUS_RING} ${
+                `rounded-full px-4 py-3 text-caption transition-colors duration-150 ${FOCUS_RING} ${
                   isActive
                     ? 'bg-zoop-ink font-semibold text-zoop-paper'
                     : 'text-zoop-muted hover:bg-zoop-wash hover:text-zoop-ink'
@@ -129,8 +129,8 @@ export default function AdminLayout() {
         {admin && (
           <div className="mt-8 flex flex-col gap-2 border-t-[0.667px] border-zoop-line pt-4">
             <p className="flex flex-col gap-0.5">
-              <strong className="text-xs">{admin.displayName}</strong>
-              <span className="font-inter text-[11px] text-zoop-faint">
+              <strong className="text-caption">{admin.displayName}</strong>
+              <span className="font-num text-caption text-zoop-faint">
                 {admin.role}
               </span>
             </p>

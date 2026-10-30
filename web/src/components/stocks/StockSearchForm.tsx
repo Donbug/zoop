@@ -30,7 +30,7 @@ export default function StockSearchForm({
     >
       <label
         htmlFor="stock-search"
-        className="mb-2 block text-xs font-semibold text-zoop-ink"
+        className="mb-2 block text-caption font-semibold text-zoop-ink"
       >
         기업명·영문명·티커 검색
       </label>
@@ -47,7 +47,7 @@ export default function StockSearchForm({
             disabled={disabled}
             placeholder="예: 삼성, NVIDIA, 005930"
             onChange={(event) => onDraftChange(event.target.value)}
-            className="h-[42px] w-full rounded-[3px] border-[1.333px] border-zoop-ink bg-zoop-paper pr-[38px] pl-[34px] text-[13px] text-zoop-ink disabled:opacity-50 [&::-webkit-search-cancel-button]:hidden"
+            className="h-[42px] w-full rounded-[3px] border-[1.333px] border-zoop-ink bg-zoop-paper pr-[38px] pl-[34px] text-body text-zoop-ink disabled:opacity-50 [&::-webkit-search-cancel-button]:hidden"
           />
           {draft && (
             <button
@@ -58,7 +58,7 @@ export default function StockSearchForm({
                 onDraftChange('');
                 input.current?.focus();
               }}
-              className="absolute top-1/2 right-1.5 size-7 -translate-y-1/2 rounded-full text-[15px] text-zoop-muted hover:bg-zoop-soft"
+              className="absolute top-1/2 right-1.5 size-7 -translate-y-1/2 rounded-full text-lead text-zoop-muted hover:bg-zoop-soft"
             >
               ×
             </button>
@@ -67,7 +67,7 @@ export default function StockSearchForm({
         <button
           type="submit"
           disabled={disabled}
-          className="flex h-[42px] shrink-0 items-center gap-1.5 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3.5 text-[13px] font-bold text-zoop-ink disabled:opacity-50"
+          className="flex h-[42px] shrink-0 items-center gap-1.5 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3.5 text-body font-bold text-zoop-ink disabled:opacity-50"
         >
           <GraphIcon name="search" size={14} />
           검색

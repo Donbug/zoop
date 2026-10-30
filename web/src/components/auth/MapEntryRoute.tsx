@@ -8,7 +8,7 @@ export default function MapEntryRoute() {
   const location = useLocation();
   if (auth.checking)
     return (
-      <p role="status" className="p-6 text-sm text-zoop-muted">
+      <p role="status" className="p-6 text-body text-zoop-muted">
         로그인 상태를 확인하고 있어요.
       </p>
     );

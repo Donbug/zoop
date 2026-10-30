@@ -43,7 +43,7 @@ export default function AdminProtectedRoute() {
 
   if (status === 'checking') {
     return (
-      <p role="status" className="p-6 text-xs text-zoop-muted">
+      <p role="status" className="p-6 text-caption text-zoop-muted">
         관리자 세션을 확인하고 있어요
       </p>
     );
@@ -54,7 +54,7 @@ export default function AdminProtectedRoute() {
     return (
       <div
         role="alert"
-        className="flex items-center gap-3 p-6 text-xs text-zoop-muted"
+        className="flex items-center gap-3 p-6 text-caption text-zoop-muted"
       >
         <p>관리자 세션을 확인하지 못했어요.</p>
         <button

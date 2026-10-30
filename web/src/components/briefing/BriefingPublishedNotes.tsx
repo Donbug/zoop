@@ -39,7 +39,7 @@ export function BriefingOutlook({
   return (
     <section className={SECTION} aria-label="회차 판단">
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <h3 className="text-xs font-bold">회차 판단</h3>
+        <h3 className="text-caption font-bold">회차 판단</h3>
         <span className={STATUS_PILL}>
           {outlookLabels[outlook.label]}
           <span className="sr-only"> 회차 판정</span>
@@ -81,11 +81,11 @@ export function BriefingCorrectionNote({
     <li className="flex flex-col gap-1 rounded-[3px] bg-zoop-wash p-3">
       <p className={NOTE}>정정 시각 {briefingTime(correction.createdAt)}</p>
       {correction.original && (
-        <p className="text-xs text-zoop-faint line-through">
+        <p className="text-caption text-zoop-faint line-through">
           발행 원문: {correction.original}
         </p>
       )}
-      <p className="text-xs">정정 내용: {correction.corrected}</p>
+      <p className="text-caption">정정 내용: {correction.corrected}</p>
       <p className={NOTE}>사유: {correction.reason}</p>
     </li>
   );
@@ -147,7 +147,7 @@ export function BriefingDocumentSentiments({
   ];
   if (!unique.length) return null;
   return (
-    <ul aria-label={label} className="flex flex-col gap-1.5 text-[11px]">
+    <ul aria-label={label} className="flex flex-col gap-1.5 text-caption">
       {unique.map(({ articleId, sentiment }) => {
         const name =
           companies.find((c) => c.id === sentiment.companyId)?.name ??

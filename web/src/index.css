@@ -1,13 +1,22 @@
 @import 'tailwindcss';
-@import 'pretendard/dist/web/variable/pretendardvariable.css';
-@import '@fontsource-variable/inter';
+@import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
+@import 'wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.css';
+/* SUIT 패키지 CSS에는 font-display가 없어서, 글꼴을 받는 동안 숫자가 비어 보이지 않게 직접 정의한다. */
+@font-face {
+  font-family: 'SUIT Variable';
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('@sun-typeface/suit/fonts/variable/woff2/SUIT-Variable.woff2')
+    format('woff2-variations');
+}
 
 /* #169 서비스 셸과 D-GRP-02/03/04/05 상세 패널의 공용 토큰.
    화면별 값 대신 Tailwind 유틸리티(text-zoop-muted, font-panel 등)로 사용한다. */
 @theme {
-  --color-zoop-ink: #1a1a1a;
-  --color-zoop-muted: #626262;
-  --color-zoop-faint: #737373;
+  /* 본문 글자는 한 가지 진한 색으로 쓴다. 위계는 크기·굵기로 나눈다. */
+  --color-zoop-ink: #212121;
+  --color-zoop-muted: #212121;
+  --color-zoop-faint: #212121;
   --color-zoop-line: #e2e2e2;
   --color-zoop-paper: #ffffff;
   --color-zoop-wash: #f5f5f5;
@@ -21,12 +30,30 @@
   /* A-ADM-03 보류(HOLD) 판정 */
   --color-zoop-hold: #c2410c;
   --color-zoop-map: #dfdfdc;
-  --font-inter: 'Inter Variable', 'Pretendard Variable', sans-serif;
+  /* 본문 Pretendard · 제목 Wanted Sans · 숫자 SUIT. 세 글꼴 모두 npm 패키지의 woff2를 번들한다. */
+  --font-heading: 'Wanted Sans Variable', 'Pretendard Variable', sans-serif;
+  --font-num: 'SUIT Variable', 'Pretendard Variable', sans-serif;
+
+  /* 글자 크기 6단계. 12px 미만은 쓰지 않는다.
+     caption: 출처·시각·배지 · body: 본문·패널 · lead: 강조 본문
+     title-sm: 카드·섹션 제목 · title: 화면 소제목 · display: 화면 제목 */
+  --text-caption: 12px;
+  --text-caption--line-height: 1.5;
+  --text-body: 14px;
+  --text-body--line-height: 1.6;
+  --text-lead: 16px;
+  --text-lead--line-height: 1.6;
+  --text-title-sm: 18px;
+  --text-title-sm--line-height: 1.45;
+  --text-title: 22px;
+  --text-title--line-height: 1.35;
+  --text-display: 28px;
+  --text-display--line-height: 1.25;
 
   --font-panel: 'Pretendard Variable', Pretendard, sans-serif;
-  --color-panel-ink: #1a1a1a;
-  --color-panel-secondary: #626262;
-  --color-panel-muted: #737373;
+  --color-panel-ink: #212121;
+  --color-panel-secondary: #212121;
+  --color-panel-muted: #212121;
   --color-panel-line: #e2e2e2;
   --color-panel-control: #e2e2e2;
   --color-panel-soft: #f8f8f8;
@@ -62,12 +89,14 @@
 }
 
 /* 다크 테마도 로그인 화면과 같은 중성 회색 팔레트를 쓴다.
-   Tailwind 기본 흰색·회색 단계도 뒤집어, 아직 토큰으로 옮기지 않은 화면도 함께 어두워지게 한다. */
+   Tailwind 기본 흰색·회색 단계도 뒤집어, 아직 토큰으로 옮기지 않은 화면도 함께 어두워지게 한다.
+   글자는 순백 대신 #ededed(본문)·#a0a0a0(보조)·#8f8f8f(옅은 보조)를 쓴다.
+   본문 대비는 라이트(#212121/#fff, 약 16:1)와 비슷한 약 15:1이고, 옅은 보조도 #262626 패널 위에서 4.5:1을 넘긴다. */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --color-zoop-ink: #ffffff;
-  --color-zoop-muted: #d4d4d4;
-  --color-zoop-faint: #a3a3a3;
+  --color-zoop-ink: #ededed;
+  --color-zoop-muted: #a0a0a0;
+  --color-zoop-faint: #8f8f8f;
   --color-zoop-line: #373737;
   --color-zoop-paper: #171717;
   --color-zoop-wash: #171717;
@@ -79,9 +108,9 @@
   --color-zoop-positive: #86efac;
   --color-zoop-mixed: #fcd34d;
   --color-zoop-hold: #fdba74;
-  --color-panel-ink: #ffffff;
-  --color-panel-secondary: #d4d4d4;
-  --color-panel-muted: #a3a3a3;
+  --color-panel-ink: #ededed;
+  --color-panel-secondary: #a0a0a0;
+  --color-panel-muted: #8f8f8f;
   --color-panel-line: #373737;
   --color-panel-control: #373737;
   --color-panel-soft: #262626;
@@ -95,8 +124,8 @@
   --color-gray-600: #bdbdbd;
   --color-gray-700: #d4d4d4;
   --color-gray-800: #e5e5e5;
-  --color-gray-900: #f5f5f5;
-  --color-gray-950: #ffffff;
+  --color-gray-900: #ededed;
+  --color-gray-950: #f5f5f5;
 }
 
 /* 기본 규칙은 base 레이어에 둔다. 레이어 밖에 두면 Tailwind 유틸리티(text-xs 등)보다
@@ -119,6 +148,13 @@
     background: var(--color-zoop-wash);
     color: var(--color-zoop-ink);
     font-family: var(--font-panel);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-heading);
   }
 
   button,

@@ -44,7 +44,7 @@ function EvidenceCard({
   const href = safeArticleUrl(evidence.article?.url ?? null);
   return (
     <article
-      className={`${ui.section} px-5! py-4! [&_h3]:mt-2! [&_h3]:mb-0! [&_blockquote]:mt-2 [&_blockquote]:rounded-[3px] [&_blockquote]:bg-panel-soft [&_blockquote]:px-3 [&_blockquote]:py-2.5 [&_blockquote]:text-[12px] [&_blockquote]:leading-[19.5px] [&_blockquote]:wrap-anywhere`}
+      className={`${ui.section} px-5! py-4! [&_h3]:mt-2! [&_h3]:mb-0! [&_blockquote]:mt-2 [&_blockquote]:rounded-[3px] [&_blockquote]:bg-panel-soft [&_blockquote]:px-3 [&_blockquote]:py-2.5 [&_blockquote]:text-caption [&_blockquote]:leading-[19.5px] [&_blockquote]:wrap-anywhere`}
     >
       {evidence.article ? (
         <>
@@ -254,7 +254,7 @@ export default function EvidenceDrawer({
           <p className={`mt-1 ${ui.secondary}`}>
             {target.label ?? '선택한 연결의 근거'}
           </p>
-          <span className="mt-2 block text-base" aria-hidden="true">
+          <span className="mt-2 block text-lead" aria-hidden="true">
             ▱
           </span>
         </header>
