@@ -420,7 +420,8 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         ChatResult result = ChatResults.answered(run, kept, keptCitations, targets,
                 items(retrieved, answered, "company"), items(retrieved, answered, "issue"), limitations, partial,
                 notices(directStart, agentNotices), overrode(run, confirmed, answered),
-                writtenPeriod(run, confirmed, answered), clock.instant());
+                writtenPeriod(run, confirmed, answered),
+                ChatUiActions.of(branches, answered, targets, run.graphVersionId(), run.context().asOf()), clock.instant());
         route.put("outcome", "answered");
         return new ChatEngineOutcome.Completed(result, route);
     }

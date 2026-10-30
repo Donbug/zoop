@@ -104,7 +104,8 @@ public class BriefingReadTool implements ChatTool {
                     + " — 선정 이유: " + issue.path("reason").asString();
             items.add(new ChatToolItem(issue.path("eventId").asString(), "briefing_item", label, involved, evidence));
         }
-        return new ChatToolOutput("briefing:" + response.path("id").asString(), items, List.copyOf(passed), truncated,
+        return new ChatToolOutput(ChatBriefingRound.dataVersion(response.path("date").asString(),
+                response.path("edition").asString(), response.path("id").asString()), items, List.copyOf(passed), truncated,
                 false);
     }
 
