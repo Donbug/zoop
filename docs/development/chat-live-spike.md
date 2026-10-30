@@ -55,20 +55,20 @@ manifest(`zoop-chat-live-spike-manifest-1`)는 다음 필드만 허용한다.
 | Evidence | 원장 |
 | --- | --- |
 | `startedAt`, `committedAt` | job의 시도 `startedAt`, `chat_jobs.finished_at` |
-| `toolCalls` | 그 시도의 `chat_tool_calls` 중 `cancelled`가 아닌 호출(웹 포함) |
+| `toolCalls` | 그 시도의 `chat_tool_calls` 중 `cancelled`가 아닌 호출(웹 포함). 완료 run은 `route_summary.approvedCalls`와 같아야 하고 `deniedCalls`는 0이어야 한다 |
 | `providerCalls`, `approvalRounds` | 보낸 `chat-agent` 단계 수, 그 수 − 1 |
 | `inputTokens`, `outputTokens`, `reasoningTokens` | `chat-agent` 단계 합 |
 | `answerTokens` | 완료 run의 마지막 단계 출력 − reasoning, 실패 run은 0 |
 | `model`, `promptVersion`, `toolRegistryVersion` | 원장 값. 여러 값이 섞이면 거부 |
 | `costUsd` | 그 시도의 모든 모델 단계 토큰 × `pricing` |
 
-`costUsd`는 청구액이 아니라 추정값이다. 원장에 cached token이 없어 입력 전체를 비캐시 가격으로 계산하므로 실제보다 크게 나온다.
+`costUsd`는 청구액이 아니라 추정값이다. 원장에 cached token이 없어 입력 전체를 비캐시 가격으로 계산하므로 실제보다 크게 나온다. 완료 run은 보낸 모든 단계의 입력·출력 usage가 있어야 한다. 실패 run은 실패 증거로 남기되, usage를 보고하지 않은 단계가 있으면 비용이 하한값이며 추출기가 `costUnknownRuns`로 알린다. 실패 run이 있으면 gate는 어차피 실패하므로 낮은 비용이 통과로 이어지지 않는다.
 
 | 종료 | 뜻 |
 | --- | --- |
 | 0 | evidence를 썼다. 보고서 gate의 로더가 받아들인 뒤에만 쓴다. |
-| 2 | 완료 run의 호출 수나 라운드가 시나리오와 다르다(`mismatches`). 아무것도 쓰지 않으며 run을 빼거나 다른 시나리오로 바꾸지 않는다. 처리는 승인자가 정한다. |
-| 64 | 입력 오류이거나 증거가 될 수 없는 run이다(미완료, 재실행, direct 경로, live 아님, 토큰 미보고, 가격 없음). |
+| 2 | 완료 run의 호출 수나 라운드가 시나리오와 다르거나, 거부된 호출 또는 승인되고 실행되지 않은 호출이 있다(`mismatches`). 아무것도 쓰지 않으며 run을 빼거나 다른 시나리오로 바꾸지 않는다. 처리는 승인자가 정한다. |
+| 64 | 입력 오류이거나 증거가 될 수 없는 run이다(미완료, 재실행, direct 경로, live 아님, 완료 run의 usage 미보고, 가격 없음). |
 
 ## Evidence 형식
 

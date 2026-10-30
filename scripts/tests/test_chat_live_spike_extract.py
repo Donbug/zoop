@@ -28,6 +28,7 @@ def job(job_id: str = "job-1", rounds: int = 1, calls: int = 1, **changes) -> di
     row = {
         "job_id": job_id, "status": "completed", "failure_code": None, "attempts": 1, "attempt_mode": "run",
         "started_at": "2026-10-30T00:00:00Z", "finished_at": "2026-10-30T00:00:20.000000Z", "path": "agent",
+        "approved_calls": calls, "denied_calls": 0,
         "tool_calls": calls, "web_calls": 0, "registry_versions": ["chat-tools/v8"],
         "stages": [stage("chat-router", 100, 10, None, model="jev")] + [stage() for _ in range(rounds + 1)]
         + [stage("chat-verification", 200, 20, None, model="jev")],
@@ -71,6 +72,26 @@ class ExtractTest(unittest.TestCase):
             extract.extract(manifest(("job-1", "tools-4-rounds-1")), [job(calls=3)])
         self.assertIn("job-1: tools-4-rounds-1 expects 4 calls in 1 rounds, ran 3 in 1", raised.exception.mismatches)
 
+    def test_a_run_of_the_right_shape_with_a_denied_call_is_not_that_scenario(self) -> None:
+        with self.assertRaises(extract.ShapeMismatch) as raised:
+            extract.extract(manifest(("job-1", "tools-1-rounds-1")), [job(denied_calls=1)])
+        self.assertEqual(["job-1: 1 calls were denied"], raised.exception.mismatches)
+
+    def test_an_approved_call_that_never_ran_is_not_that_scenario(self) -> None:
+        with self.assertRaises(extract.ShapeMismatch) as raised:
+            extract.extract(manifest(("job-1", "tools-1-rounds-1")), [job(approved_calls=2)])
+        self.assertEqual(["job-1: 2 calls were approved, 1 ran"], raised.exception.mismatches)
+
+    def test_a_failed_run_with_a_stage_of_unknown_cost_stays_and_is_named(self) -> None:
+        failed = job(status="failed", failure_code="provider_error", calls=0, approved_calls=None, denied_calls=None,
+                     stages=[stage("chat-router", None, None, None, model="jev")])
+        ledger = [failed, job("job-2")]
+        run = extract.extract(manifest(("job-1", "tools-1-rounds-1"), ("job-2", "tools-1-rounds-1")), ledger)["runs"][0]
+
+        self.assertEqual("failed", run["status"])
+        self.assertEqual("0", run["costUsd"])
+        self.assertEqual(["job-1"], extract.cost_unknown(ledger))
+
     def test_a_failed_run_stays_in_the_evidence_with_what_it_reached(self) -> None:
         failed = job(status="failed", failure_code="response_unknown", calls=2,
                      stages=[stage(), stage(input_tokens=None, output=None, reasoning=None, send="unknown")])
@@ -88,10 +109,17 @@ class ExtractTest(unittest.TestCase):
             "not a live run": job(stages=[dict(stage(), mode="replay"), stage()]),
             "null is not evidence": job(stages=[stage(reasoning=None), stage()]),
             "no price": job(stages=[stage(model="other"), stage(model="other")]),
+            "did not report its usage": job(stages=[stage("chat-verification", None, 20, None, model="jev"), stage(),
+                                                    stage()]),
+            "does not record": job(denied_calls=None),
         }
         for message, row in cases.items():
             with self.subTest(message), self.assertRaisesRegex(extract.ExtractError, message):
                 extract.extract(manifest(("job-1", "tools-1-rounds-1")), [row])
+
+        kept = job(stages=[stage("chat-router", None, None, None, send="not_sent", model="jev"), stage(), stage()])
+        self.assertEqual("0.012", extract.extract(manifest(("job-1", "tools-1-rounds-1")), [kept])["runs"][0]["costUsd"],
+                         "a stage that was never sent cost nothing")
 
         with self.assertRaisesRegex(extract.ExtractError, "not in the ledger"):
             extract.extract(manifest(("job-2", "tools-1-rounds-1")), [job()])

@@ -3,8 +3,10 @@
 
 The inputs are the output of scripts/chat_live_spike_ledger.sql and an operator manifest naming the approved run and which
 job measured which scenario. Everything measured comes from the ledger, never from the manifest, and the result is checked
-by the same loader as the report gate before it is written. A completed run whose shape is not its scenario stops the
-extraction with the runs named: it is neither dropped nor relabelled, and the operator decides what to do with it.
+by the same loader as the report gate before it is written. A completed run whose shape is not its scenario, or that had a
+call denied, stops the extraction with the runs named: it is neither dropped nor relabelled, and the operator decides what
+to do with it. A failed run stays in the evidence even when a stage reported no usage; its cost is then a lower bound, and
+the command names it.
 """
 from __future__ import annotations
 
@@ -86,7 +88,7 @@ def _cost(stages: list[dict[str, Any]], prices: dict[str, tuple[Decimal, Decimal
     """Every provider stage of the attempt, all input at the uncached price: an upper estimate of the bill."""
     total = Decimal(0)
     for stage in stages:
-        if stage["sendState"] == "not_sent" or stage["sendState"] is None:
+        if stage["sendState"] == "not_sent" or (stage["inputTokens"] is None and stage["outputTokens"] is None):
             continue
         model = stage["model"]
         if model not in prices:
@@ -94,6 +96,11 @@ def _cost(stages: list[dict[str, Any]], prices: dict[str, tuple[Decimal, Decimal
         total += Decimal(stage["inputTokens"] or 0) * prices[model][0] / MILLION
         total += Decimal(stage["outputTokens"] or 0) * prices[model][1] / MILLION
     return total
+
+
+def _usage_missing(stages: list[dict[str, Any]]) -> bool:
+    """Whether a stage that may have reached the provider did not report what it used."""
+    return any(s["sendState"] != "not_sent" and (s["inputTokens"] is None or s["outputTokens"] is None) for s in stages)
 
 
 def _single(values: set[Any], what: str) -> Any:
@@ -123,6 +130,8 @@ def _run(job: dict[str, Any], scenario: str, prices: dict[str, tuple[Decimal, De
         for step in agent:
             if None in (step["inputTokens"], step["outputTokens"], step["reasoningTokens"]):
                 raise ExtractError(f"{where}: a completed step did not report its tokens; null is not evidence")
+        if _usage_missing(stages):
+            raise ExtractError(f"{where}: a sent stage did not report its usage; null is not evidence")
 
     output = sum(s["outputTokens"] or 0 for s in agent)
     reasoning = sum(s["reasoningTokens"] or 0 for s in agent)
@@ -175,9 +184,17 @@ def extract(manifest: Any, ledger: Any) -> dict[str, Any]:
             raise ExtractError(f"job {job_id}: unknown scenario {scenario}")
         run = _run(jobs[job_id], scenario, prices)
         calls, rounds = report.SCENARIOS[scenario]
-        if run["status"] == "completed" and (run["toolCalls"], run["approvalRounds"]) != (calls, rounds):
-            mismatches.append(f"{job_id}: {scenario} expects {calls} calls in {rounds} rounds, "
-                              f"ran {run['toolCalls']} in {run['approvalRounds']}")
+        if run["status"] == "completed":
+            job = jobs[job_id]
+            if job["denied_calls"] is None or job["approved_calls"] is None:
+                raise ExtractError(f"job {job_id}: the route does not record its approved and denied calls")
+            if (run["toolCalls"], run["approvalRounds"]) != (calls, rounds):
+                mismatches.append(f"{job_id}: {scenario} expects {calls} calls in {rounds} rounds, "
+                                  f"ran {run['toolCalls']} in {run['approvalRounds']}")
+            if job["denied_calls"] != 0:
+                mismatches.append(f"{job_id}: {job['denied_calls']} calls were denied")
+            if job["approved_calls"] != run["toolCalls"]:
+                mismatches.append(f"{job_id}: {job['approved_calls']} calls were approved, {run['toolCalls']} ran")
         runs.append(run)
     if mismatches:
         raise ShapeMismatch(mismatches)
@@ -196,6 +213,11 @@ def extract(manifest: Any, ledger: Any) -> dict[str, Any]:
         "toolRegistryVersion": _single({v for job in named for v in job["registry_versions"]}, "tool registry version"),
         "runs": runs,
     }
+
+
+def cost_unknown(ledger: list[dict[str, Any]]) -> list[str]:
+    """The failed runs whose cost is only a lower bound. Only failed runs can get here: a completed one is refused."""
+    return sorted(job["job_id"] for job in ledger if _usage_missing(job["stages"]))
 
 
 def write(evidence: dict[str, Any], output: Path) -> None:
@@ -219,14 +241,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, required=True, help="the zoop-chat-live-spike-1 evidence to write")
     args = parser.parse_args(argv)
     try:
-        write(extract(_read(args.manifest, "manifest"), _read(args.ledger, "ledger")), args.output)
+        ledger = _read(args.ledger, "ledger")
+        write(extract(_read(args.manifest, "manifest"), ledger), args.output)
     except ShapeMismatch as error:
         print(json.dumps({"status": "shape_mismatch", "mismatches": error.mismatches}, ensure_ascii=False))
         return 2
     except ExtractError as error:
         print(json.dumps({"status": "invalid", "error": str(error)}, ensure_ascii=False))
         return 64
-    print(json.dumps({"status": "written", "output": str(args.output)}, ensure_ascii=False))
+    print(json.dumps({"status": "written", "output": str(args.output), "costUnknownRuns": cost_unknown(ledger)},
+                     ensure_ascii=False))
     return 0
 
 

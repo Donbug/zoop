@@ -11,6 +11,8 @@ FROM (
            last.attempt ->> 'startedAt' AS started_at,
            to_char(j.finished_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS finished_at,
            j.route_summary ->> 'path' AS path,
+           (j.route_summary ->> 'approvedCalls')::integer AS approved_calls,
+           (j.route_summary ->> 'deniedCalls')::integer AS denied_calls,
            calls.tool_calls,
            calls.web_calls,
            calls.registry_versions,
