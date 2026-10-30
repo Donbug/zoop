@@ -30,6 +30,14 @@ public interface ChatRepository {
 
     List<ChatJobRow> jobs(String sessionId);
 
+    /** The conversation's completed answers (answered or insufficient evidence) before {@code seq}, newest first. */
+    default List<ChatJobRow> answersBefore(String sessionId, int seq, int limit) {
+        return jobs(sessionId).stream()
+                .filter(j -> j.seq() < seq && "completed".equals(j.status())
+                        && ("answered".equals(j.outcome()) || "insufficient_evidence".equals(j.outcome())))
+                .sorted(java.util.Comparator.comparingInt(ChatJobRow::seq).reversed()).limit(limit).toList();
+    }
+
     Optional<ChatJobRow> findJob(String jobId);
 
     Optional<ChatJobRow> activeJob(String sessionId);

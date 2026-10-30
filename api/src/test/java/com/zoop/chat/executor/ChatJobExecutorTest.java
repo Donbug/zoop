@@ -8,7 +8,10 @@ import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
+import com.zoop.chat.dto.ChatAppliedItem;
 import com.zoop.chat.dto.ChatFailure;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.repository.ChatJobRow;
@@ -97,6 +100,40 @@ class ChatJobExecutorTest {
                 new ChatRun.Turn("job-00002", "질문 job-00002", "choice-a", "choice-a 선택"),
                 new ChatRun.Turn("job-00003", "질문 job-00003", null, null)), run.turns());
         assertEquals("guidance", store.job("job-00003").row.outcome());
+    }
+
+    @Test
+    void aRunCarriesTheLastAnswersTargetsItCanStillSeeAndAReplyCarriesTheSameOnes() {
+        store.add(answered(queued("job-00001", null, null, 0, "run", "completed"), """
+                {"applied":{"companies":[{"id":"KRX:005930","label":"삼성전자"},{"id":"KRX:000660","label":"SK하이닉스"}],"issues":[],
+                "period":{"start":"2026-10-12","end":"2026-10-18","basis":"question","expression":"지난주"}}}"""));
+        store.add(withResult(queued("job-00002", null, null, 1, "run", "completed"),
+                ScriptedChatEngine.clarification("어느 기업인가요?", "KRX:000660").result()));
+        store.add(queued("job-00003", "job-00002", "KRX:000660", 2, "run"));
+        var engine = new ScriptedChatEngine((run, control) -> ScriptedChatEngine.guidance("안내"));
+
+        var beans = new StaticListableBeanFactory(Map.of("engine", engine));
+        new ChatJobExecutor(store, store, beans.getBeanProvider(ChatEngine.class), mapper, clock, new NoTransactions(),
+                (ids, version, asOf, request) -> Optional.of(Set.of("KRX:000660"))).runOnce();
+
+        var prior = engine.runs.getFirst().prior();
+        assertEquals(List.of(new ChatAppliedItem("KRX:000660", "SK하이닉스")), prior.companies(),
+                "a company no longer visible is no candidate");
+        assertEquals("2026-10-12", prior.period().start());
+    }
+
+    @Test
+    void carriedTargetsThatCannotBeCheckedAreDropped() {
+        store.add(answered(queued("job-00001", null, null, 0, "run", "completed"), """
+                {"applied":{"companies":[{"id":"KRX:005930","label":"삼성전자"}],"issues":[],"period":null}}"""));
+        store.add(queued("job-00002", null, null, 1, "run"));
+        var engine = new ScriptedChatEngine((run, control) -> ScriptedChatEngine.guidance("안내"));
+
+        var beans = new StaticListableBeanFactory(Map.of("engine", engine));
+        new ChatJobExecutor(store, store, beans.getBeanProvider(ChatEngine.class), mapper, clock, new NoTransactions(),
+                (ids, version, asOf, request) -> Optional.empty()).runOnce();
+
+        assertTrue(engine.runs.getFirst().prior().companies().isEmpty());
     }
 
     @Test
@@ -430,6 +467,13 @@ class ChatJobExecutorTest {
                 r.frozenContext(), r.frozenSelection(), r.contextCompanyIds(), r.graphVersionId(), r.status(), r.phase(),
                 r.outcome(), r.resolvesJobId(), r.resolvesChoiceId(), r.clarificationDepth(), r.result(), r.failure(),
                 r.runs(), attempts, r.createdAt(), r.updatedAt(), r.finishedAt());
+    }
+
+    private static ChatJobRow answered(ChatJobRow r, String result) {
+        return new ChatJobRow(r.id(), r.sessionId(), r.memberId(), r.seq(), r.question(), r.requestHash(), r.askedAt(),
+                r.frozenContext(), r.frozenSelection(), r.contextCompanyIds(), r.graphVersionId(), r.status(), r.phase(),
+                "answered", r.resolvesJobId(), r.resolvesChoiceId(), r.clarificationDepth(), result, r.failure(), r.runs(),
+                r.attempts(), r.createdAt(), r.updatedAt(), r.finishedAt());
     }
 
     private ChatJobRow withResult(ChatJobRow r, ChatResult result) {

@@ -110,6 +110,15 @@ public class JdbcChatRepository implements ChatRepository {
     }
 
     @Override
+    public List<ChatJobRow> answersBefore(String sessionId, int seq, int limit) {
+        return jdbc.query(JOB_SELECT + """
+                 WHERE j.session_id = :id AND j.seq < :seq AND j.status = 'completed'
+                   AND j.outcome IN ('answered', 'insufficient_evidence')
+                 ORDER BY j.seq DESC LIMIT :limit
+                """, new MapSqlParameterSource("id", sessionId).addValue("seq", seq).addValue("limit", limit), JOB);
+    }
+
+    @Override
     public Optional<ChatJobRow> findJob(String jobId) {
         return jdbc.query(JOB_SELECT + " WHERE j.id = :id", new MapSqlParameterSource("id", jobId), JOB)
                 .stream().findFirst();

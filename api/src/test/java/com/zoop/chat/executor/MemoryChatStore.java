@@ -346,7 +346,10 @@ public final class MemoryChatStore implements ChatRepository, ChatExecutionRepos
             String afterId, int limit) { throw new UnsupportedOperationException(); }
     @Override public boolean deleteSession(String sessionId) { throw new UnsupportedOperationException(); }
     @Override public int countJobs(String sessionId) { throw new UnsupportedOperationException(); }
-    @Override public List<ChatJobRow> jobs(String sessionId) { throw new UnsupportedOperationException(); }
+    @Override public List<ChatJobRow> jobs(String sessionId) {
+        return jobs.values().stream().map(job -> job.row)
+                .filter(row -> row.sessionId().equals(sessionId) && row.result() != null).toList();
+    }
     @Override public Optional<ChatJobRow> activeJob(String sessionId) { throw new UnsupportedOperationException(); }
     @Override public int nextSeq(String sessionId) { throw new UnsupportedOperationException(); }
     @Override public boolean insertJob(NewChatJob job) { throw new UnsupportedOperationException(); }
