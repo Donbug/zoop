@@ -1,5 +1,3 @@
-@import 'pretendard/dist/web/variable/pretendardvariable.css';
-
 /* Figma 619:1819 / 619:2374. Scoped to WBS 6.6.21, no global token rewrite. */
 .relationship-map {
   font-family: 'Pretendard Variable', sans-serif;

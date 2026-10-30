@@ -1,7 +1,14 @@
 @import 'tailwindcss';
-@import 'pretendard/dist/web/variable/pretendardvariable.css';
+@import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 @import 'wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.css';
-@import '@sun-typeface/suit/fonts/variable/woff2/SUIT-Variable.css';
+/* SUIT 패키지 CSS에는 font-display가 없어서, 글꼴을 받는 동안 숫자가 비어 보이지 않게 직접 정의한다. */
+@font-face {
+  font-family: 'SUIT Variable';
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('@sun-typeface/suit/fonts/variable/woff2/SUIT-Variable.woff2')
+    format('woff2-variations');
+}
 
 /* #169 서비스 셸과 D-GRP-02/03/04/05 상세 패널의 공용 토큰.
    화면별 값 대신 Tailwind 유틸리티(text-zoop-muted, font-panel 등)로 사용한다. */
