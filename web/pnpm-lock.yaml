@@ -12,7 +12,7 @@ importers:
         specifier: ^5.1.1
         version: 5.1.1
       '@sun-typeface/suit':
-        specifier: 2.0.5
+        specifier: ^2.0.5
         version: 2.0.5
       axios:
         specifier: ^1.20.0
@@ -30,7 +30,7 @@ importers:
         specifier: ^7.18.4
         version: 7.18.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       wanted-sans:
-        specifier: 1.0.3
+        specifier: ^1.0.3
         version: 1.0.3
       zustand:
         specifier: ^5.0.15
