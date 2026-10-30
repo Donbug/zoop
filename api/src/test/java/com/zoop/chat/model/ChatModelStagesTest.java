@@ -57,7 +57,7 @@ class ChatModelStagesTest {
             new Entry("한미", HANMI_PHARM),
             new Entry("한미", HANMI_SCIENCE));
     private static final ChatStageReply.Receipt RECEIPT = new ChatStageReply.Receipt("typesafe", "systemone-v1", "jev",
-            "chat-router-1", "replay", 10L, 4L, Instant.parse("2026-10-22T01:00:00Z"), Instant.parse("2026-10-22T01:00:01Z"));
+            "chat-router-1", "replay", 10L, 4L, null, Instant.parse("2026-10-22T01:00:00Z"), Instant.parse("2026-10-22T01:00:01Z"));
 
     private final List<ChatStageCall> calls = new ArrayList<>();
     private List<IssueNameResolver.Entry> issueCatalog = List.of();

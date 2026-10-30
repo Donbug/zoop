@@ -57,7 +57,7 @@ class HttpChatStageClientTest {
 
     private static final String RECEIPT = """
             {"provider":"typesafe","providerRevision":"systemone-v1","model":"jev","promptVersion":"chat-router-1",\
-            "executionMode":"replay","usage":{"inputTokens":120,"outputTokens":null,"cachedTokens":null,"reasoningTokens":null},\
+            "executionMode":"replay","usage":{"inputTokens":120,"outputTokens":null,"cachedTokens":null,"reasoningTokens":7},\
             "sentAt":"2026-10-22T01:00:00Z","receivedAt":"2026-10-22T01:00:01Z"}""";
 
     @Test
@@ -69,6 +69,7 @@ class HttpChatStageClientTest {
         assertTrue(reply.answer().get("requirements").isArray());
         assertEquals("jev", reply.receipt().model());
         assertEquals(120L, reply.receipt().inputTokens());
+        assertEquals(7L, reply.receipt().reasoningTokens());
         assertNull(reply.receipt().outputTokens());
         assertEquals(Instant.parse("2026-10-22T01:00:00Z"), reply.receipt().sentAt());
 
