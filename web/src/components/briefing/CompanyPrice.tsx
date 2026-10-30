@@ -51,16 +51,16 @@ export default function CompanyPrice({
       className="mt-3 rounded-panel border border-panel-line bg-white p-3"
       aria-label={`${company.companyName} 회차 기준 시세`}
     >
-      <p className="text-xs text-zoop-muted">
+      <p className="text-caption text-zoop-muted">
         {latest.kind === 'daily_close'
           ? '최근 정규장 종가'
           : '마감까지 완료된 5분봉 종가'}
       </p>
-      <p className="mt-1 text-lg font-bold tabular-nums">
+      <p className="mt-1 text-title-sm font-bold tabular-nums">
         {value(latest.value, price.currency)}
         {price.comparisonStatus === 'available' &&
           price.changeRate !== null && (
-            <span className="ml-2 text-sm font-medium">
+            <span className="ml-2 text-body font-medium">
               {Number(price.changeRate) > 0 ? '+' : ''}
               {price.changeRate}%
               <span className="ml-1 font-normal text-zoop-muted">
@@ -86,7 +86,7 @@ export default function CompanyPrice({
       ) : null}
       <details className="mt-1">
         <summary
-          className={`min-h-11 cursor-pointer content-center text-xs text-zoop-muted ${FOCUS_RING}`}
+          className={`min-h-11 cursor-pointer content-center text-caption text-zoop-muted ${FOCUS_RING}`}
         >
           시세 시각·출처 확인
         </summary>

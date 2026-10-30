@@ -28,7 +28,7 @@ import org.springframework.transaction.TransactionException;
  * empty result; any other error stays an adapter fault.
  */
 abstract class GraphTargetTool implements ChatTool {
-    /** Items one read returns at most (zoop-ai-chat-2 {@code Branch.items}). */
+    /** Items one read returns at most (zoop-ai-chat-3 {@code Branch.items}). */
     static final int MAX_ITEMS = 50;
 
     private final PublicGraphReader reader;

@@ -569,7 +569,7 @@ public class ChatJobExecutor {
     private static ChatResult withMessageId(ChatResult r, String messageId) {
         return new ChatResult(r.outcome(), messageId, r.answer(), r.sections(), r.answerBasis(), r.reason(), r.sources(),
                 r.citations(), r.graphTargets(), r.applied(), r.choices(), r.action(), r.limitations(), r.metadata(),
-                r.answerStatus(), r.notices());
+                r.answerStatus(), r.notices(), r.uiActions());
     }
 
     private ArrayNode attempts(String json) {

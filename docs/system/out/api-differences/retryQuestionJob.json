@@ -263,6 +263,98 @@
       "maxLength": 12000
     },
     "response:200:application/json.result<anyOf:0>.sections[].text:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions": {
+      "type": "array",
+      "maxItems": 6
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[]": {
+      "type": "object"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].actionId": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].actionId:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].kind": {
+      "type": "string",
+      "enum": [
+        "open_company",
+        "focus_path",
+        "open_briefing"
+      ]
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].kind:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].label": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].label:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].requirementIds": {
+      "type": "array",
+      "maxItems": 6
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].requirementIds:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].requirementIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target": {
+      "type": "object"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.asOf:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.asOf<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.asOf<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.companyId:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.companyId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.companyId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.date:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.date<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.date<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.edition:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.edition<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "morning",
+        "evening"
+      ]
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.edition<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.fromId:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.fromId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.fromId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.graphVersion:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.graphVersion<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.graphVersion<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.toId:required": true,
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.toId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target.toId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.result<anyOf:0>.uiActions[].target:required": true,
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -513,6 +605,98 @@
       "maxLength": 12000
     },
     "response:202:application/json.result<anyOf:0>.sections[].text:required": true,
+    "response:202:application/json.result<anyOf:0>.uiActions": {
+      "type": "array",
+      "maxItems": 6
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions:required": true,
+    "response:202:application/json.result<anyOf:0>.uiActions[]": {
+      "type": "object"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].actionId": {
+      "type": "string"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].actionId:required": true,
+    "response:202:application/json.result<anyOf:0>.uiActions[].kind": {
+      "type": "string",
+      "enum": [
+        "open_company",
+        "focus_path",
+        "open_briefing"
+      ]
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].kind:required": true,
+    "response:202:application/json.result<anyOf:0>.uiActions[].label": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].label:required": true,
+    "response:202:application/json.result<anyOf:0>.uiActions[].requirementIds": {
+      "type": "array",
+      "maxItems": 6
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].requirementIds:required": true,
+    "response:202:application/json.result<anyOf:0>.uiActions[].requirementIds[]": {
+      "type": "string"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].target": {
+      "type": "object"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.asOf:required": true,
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.asOf<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.asOf<anyOf:1>": {
+      "type": "null"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.companyId:required": true,
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.companyId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.companyId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.date:required": true,
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.date<anyOf:0>": {
+      "type": "string"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.date<anyOf:1>": {
+      "type": "null"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.edition:required": true,
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.edition<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "morning",
+        "evening"
+      ]
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.edition<anyOf:1>": {
+      "type": "null"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.fromId:required": true,
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.fromId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.fromId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.graphVersion:required": true,
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.graphVersion<anyOf:0>": {
+      "type": "string"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.graphVersion<anyOf:1>": {
+      "type": "null"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.toId:required": true,
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.toId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].target.toId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:202:application/json.result<anyOf:0>.uiActions[].target:required": true,
     "response:202:header:X-Request-ID": {
       "type": "string"
     },

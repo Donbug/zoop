@@ -146,6 +146,23 @@ export type ChatNotice = {
   message: string;
 };
 
+// 서버가 답한 요구의 조회 결과로 만든 동작. 눌렀을 때만 실행하며 target은 kind에 해당하는 필드만 값이 있다.
+export type ChatUiAction = {
+  actionId: string;
+  kind: 'open_company' | 'focus_path' | 'open_briefing';
+  label: string;
+  requirementIds: string[];
+  target: {
+    companyId: string | null;
+    fromId: string | null;
+    toId: string | null;
+    date: string | null;
+    edition: 'morning' | 'evening' | null;
+    graphVersion: string | null;
+    asOf: string | null;
+  };
+};
+
 export type ChatResult = {
   outcome: ChatOutcome;
   messageId: string;
@@ -162,6 +179,7 @@ export type ChatResult = {
   limitations: ChatLimitation[];
   answerStatus: ChatAnswerStatus;
   notices: ChatNotice[];
+  uiActions: ChatUiAction[];
 };
 
 export type ChatFailureKind =

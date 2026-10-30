@@ -66,7 +66,7 @@ function MarketInfo({
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={`${labels[item.id]} 출처 열기 (새 창)`}
-                className={`inline-flex min-h-11 items-center text-xs underline underline-offset-4 ${FOCUS_RING}`}
+                className={`inline-flex min-h-11 items-center text-caption underline underline-offset-4 ${FOCUS_RING}`}
               >
                 {labels[item.id]} 출처 ↗
               </a>
@@ -118,7 +118,7 @@ function Change({ item }: { item: MarketIndicator }) {
         : 'text-zoop-muted';
   const arrow = item.change > 0 ? '▲ ' : item.change < 0 ? '▼ ' : '';
   return (
-    <p className={`text-[11px] font-semibold tabular-nums ${tone}`}>
+    <p className={`text-caption font-semibold tabular-nums ${tone}`}>
       {arrow}
       {signed(item.change)}
       {item.unit === 'KRW' ? '원' : ''} (
@@ -179,9 +179,9 @@ export default function MarketIndicators({
               }
             >
               <p className="flex items-center gap-2">
-                <strong className="text-xs">{label}</strong>
+                <strong className="text-caption">{label}</strong>
                 {item && item.status !== 'ok' && (
-                  <span className="text-[11px] font-semibold text-zoop-alert">
+                  <span className="text-caption font-semibold text-zoop-alert">
                     {statuses[item.status]}
                   </span>
                 )}
@@ -195,8 +195,8 @@ export default function MarketIndicators({
                   <p
                     className={
                       compact
-                        ? 'mt-2 text-base font-bold tracking-tight tabular-nums'
-                        : 'mt-3 mb-1 text-2xl font-[750] tracking-[-0.03em] tabular-nums'
+                        ? 'mt-2 text-lead font-bold tracking-tight tabular-nums'
+                        : 'mt-3 mb-1 text-title font-[750] tracking-[-0.03em] tabular-nums'
                     }
                   >
                     {number(item.value!)}
@@ -204,7 +204,7 @@ export default function MarketIndicators({
                   </p>
                   {compact ? (
                     <p
-                      className={`mt-1 text-xs font-semibold tabular-nums ${item.changeRate !== null && item.changeRate < 0 ? 'text-zoop-down' : item.changeRate !== null && item.changeRate > 0 ? 'text-zoop-up' : 'text-zoop-muted'}`}
+                      className={`mt-1 text-caption font-semibold tabular-nums ${item.changeRate !== null && item.changeRate < 0 ? 'text-zoop-down' : item.changeRate !== null && item.changeRate > 0 ? 'text-zoop-up' : 'text-zoop-muted'}`}
                     >
                       {item.changeRate === null
                         ? '등락률 미확인'
@@ -228,7 +228,7 @@ export default function MarketIndicators({
               {item && compact && (
                 <details className="mt-2">
                   <summary
-                    className={`min-h-11 cursor-pointer content-center text-[11px] text-zoop-muted ${FOCUS_RING}`}
+                    className={`min-h-11 cursor-pointer content-center text-caption text-zoop-muted ${FOCUS_RING}`}
                   >
                     출처·비교 기준
                   </summary>

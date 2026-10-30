@@ -94,7 +94,7 @@ export default function BriefingRecap({
                   compact={compact}
                   title={`이전 이슈 · ${item.title}`}
                 >
-                  <h4 className="text-sm font-bold">
+                  <h4 className="text-body font-bold">
                     이전 이슈 · {item.title}
                   </h4>
                   <p className={BODY}>
@@ -113,7 +113,7 @@ export default function BriefingRecap({
             ))}
           </ol>
           <Link
-            className={`mt-3 inline-block text-xs font-semibold underline ${FOCUS_RING}`}
+            className={`mt-3 inline-block text-caption font-semibold underline ${FOCUS_RING}`}
             to={`/briefing?date=${previous.date}&edition=${previous.edition}&reading=full`}
           >
             이전 브리핑 전문·관전 조건 확인
