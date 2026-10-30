@@ -109,7 +109,8 @@ public final class HttpChatStageClient implements ChatStageClient, AutoCloseable
         Obj usage = r.object("usage");
         return new ChatStageReply.Receipt(r.string("provider", NAME), r.string("providerRevision", NAME),
                 r.string("model", NAME), r.string("promptVersion", NAME), r.string("executionMode", NAME),
-                usage.optCount("inputTokens"), usage.optCount("outputTokens"), instant(r.string("sentAt", NAME)),
+                usage.optCount("inputTokens"), usage.optCount("outputTokens"), usage.optCount("reasoningTokens"),
+                instant(r.string("sentAt", NAME)),
                 r.optString("receivedAt", NAME).map(HttpChatStageClient::instant).orElse(null));
     }
 

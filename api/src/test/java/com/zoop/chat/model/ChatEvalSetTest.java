@@ -113,7 +113,7 @@ class ChatEvalSetTest {
     private static final Map<String, String> STAGE_NAMES = Map.of(ChatModelStages.ROUTER, "router", ChatModelStages.ANSWER,
             "answer", ChatModelStages.VERIFICATION, "verify");
     private static final ChatStageReply.Receipt RECEIPT = new ChatStageReply.Receipt("replay", "chat-eval", "scripted",
-            "chat-eval-v1", "replay", null, null, NOW, NOW);
+            "chat-eval-v1", "replay", null, null, null, NOW, NOW);
 
     private static final List<ObjectNode> reported = Collections.synchronizedList(new ArrayList<>());
     private static JsonNode set;

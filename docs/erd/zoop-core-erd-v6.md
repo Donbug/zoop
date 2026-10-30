@@ -581,7 +581,7 @@ ai_job_id text?; ai_attempt_id text?; stage text?; receipt_artifact_id text? FK 
 grant_id text?; grant_revision text?; grant_checked_at timestamptz?; grant_scope jsonb?
 attempt_no integer?; provider_send_state text?; provider_revision text?; receipt_execution_mode text?
 provider_sent_at timestamptz?; provider_received_at timestamptz?; provider text?; model text?; prompt_version text?; reasoning_effort text?
-input_tokens bigint?; output_tokens bigint?; estimated_cost numeric?; actual_cost numeric?; currency text?
+input_tokens bigint?; output_tokens bigint?; reasoning_tokens bigint?; estimated_cost numeric?; actual_cost numeric?; currency text?
 error_code text?; error_message text?; started_at timestamptz; finished_at timestamptz?
 transmission_confirmed boolean?; retry_unit_id text?; cost_basis jsonb?
 UNIQUE(ai_job_id, ai_attempt_id) WHERE ai_job_id IS NOT NULL AND ai_attempt_id IS NOT NULL
