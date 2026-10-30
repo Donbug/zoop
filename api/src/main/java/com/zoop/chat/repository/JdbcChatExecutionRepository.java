@@ -92,6 +92,29 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
     }
 
     @Override
+    public boolean keepVerified(String jobId, String ownerToken, int attemptNo, String result, String routeSummary, Instant at) {
+        return jdbc.update("""
+                INSERT INTO chat_recovery_results (chat_job_id, attempt_no, result, route_summary, created_at)
+                SELECT id, :attempt, CAST(:result AS jsonb), CAST(:route AS jsonb), :at FROM chat_jobs
+                 WHERE id = :id AND status = 'running' AND owner_token = :token AND lease_until > :at
+                """, params(jobId, ownerToken, at).addValue("attempt", attemptNo).addValue("result", result)
+                .addValue("route", routeSummary)) == 1;
+    }
+
+    @Override
+    public Optional<ChatRecoveryResult> verifiedResult(String jobId, int attemptNo) {
+        return jdbc.query("SELECT result::text, route_summary::text FROM chat_recovery_results "
+                        + "WHERE chat_job_id = :id AND attempt_no = :attempt",
+                new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo),
+                (rs, index) -> new ChatRecoveryResult(rs.getString(1), rs.getString(2))).stream().findFirst();
+    }
+
+    @Override
+    public void dropVerified(String jobId) {
+        jdbc.update("DELETE FROM chat_recovery_results WHERE chat_job_id = :id", new MapSqlParameterSource("id", jobId));
+    }
+
+    @Override
     public boolean complete(String jobId, String ownerToken, Instant at, String outcome, String messageId, String result,
             String resultSchemaVersion, String routeSummary, String routeSchemaVersion, String attempts) {
         return jdbc.update("UPDATE chat_jobs SET status = 'completed', outcome = :outcome, message_id = :messageId, "
