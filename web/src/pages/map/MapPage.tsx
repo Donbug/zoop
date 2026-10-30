@@ -1702,17 +1702,8 @@ function MapWorkspace({
                 : undefined
             }
             onClosed={() => {
-              // 근거를 불러오지 못한 경우에도 창을 확인하고 닫으면 다음 단계로 이어 간다.
+              // D-GRP-T4/T5: 근거 창을 닫은 뒤 AI 버튼을 강조해 모달이 남지 않게 한다.
               if (tutorialOpen && tutorialStep === 4) setTutorialStep(5);
-            }}
-            onReady={(id) => {
-              if (
-                tutorialOpen &&
-                tutorialStep === 4 &&
-                target &&
-                id === `${target.company.id},${target.issue.id}`
-              )
-                setTutorialStep(5);
             }}
             mapResult={
               activeEvidence
