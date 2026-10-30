@@ -2361,7 +2361,7 @@ DB에 저장된 회차만 예정 시각·ID 내림차순으로 조회한다. 날
 
 ## getMyFeedback · 본인의 유효 평가 상태 조회
 
-본인의 유효 평가 상태 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+로그인 회원 본인의 PostgreSQL 브리핑 평가를 조회합니다. 현재 발행 버전과 같은 항목만 반환합니다. feature/targetIds 생략 시 본인 전체, targetIds는 쉼표 구분 최대 100개입니다. cursor는 회원·필터·페이지 크기에 결속됩니다. 챗봇 평가는 별도 미구현입니다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2381,8 +2381,8 @@ DB에 저장된 회차만 예정 시각·ID 내림차순으로 조회한다. 날
 
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
-| feature | query | 필수 | string {chatbot_answer, briefing_round, briefing_issue} |  |
-| targetIds | query | 필수 | string | Comma separated |
+| feature | query | 선택 | string {chatbot_answer, briefing_round, briefing_issue} |  |
+| targetIds | query | 선택 | string | Comma separated |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
 | limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
@@ -2391,7 +2391,7 @@ DB에 저장된 회차만 예정 시각·ID 내림차순으로 조회한다. 날
 
 ## setFeedback · AI 결과 평가 목표 상태 설정
 
-AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+브리핑 회차·이슈 평가를 회원별·feature별·targetId별 한 행에 저장합니다. briefing_issue targetId는 회차ID/이슈ID이며 실제 발행 항목을 검증합니다. 회원 세션·CSRF·현재 읽기 권한이 필요합니다. 같은 요청 재전송은 행을 늘리지 않고, none은 평가 취소 상태로 보존합니다. 챗봇 평가는 별도 미구현입니다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2530,7 +2530,7 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 
 ## getFeedbackSummary · AI 기능별 유효 평가 집계
 
-AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+현재 제공 중인 발행 버전의 회원 브리핑 평가를 집계합니다. none·중단·과거 버전·익명 미리보기는 제외합니다. 비율은 up/(up+down), 표본 5건 미만은 null입니다. 기간·일별 추이는 KST 마지막 변경일 기준이며 챗봇 원장 미연결은 unsupported로 구분합니다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2559,7 +2559,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 ## listDislikedResults · 현재 부정 평가 결과 조회
 
-현재 부정 평가 결과 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+현재 제공 중인 발행 버전의 회원 down 평가·사유를 조회합니다. 취소·제공 중단·과거 버전·로컬 익명 미리보기 평가는 제외합니다. 회원은 익명 식별자로 표시하며 이메일·세션 토큰은 반환하지 않습니다. KST 날짜는 마지막 평가 변경일 기준입니다. cursor는 관리자·기간·페이지 크기에 결속됩니다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -4240,6 +4240,7 @@ The immutable published original of a round (what users saw before any correctio
 | dataWindow | 필수 | [BriefingWindow](#schema-briefingwindow) / null |  |
 | dataAsOf | 필수 | string (date-time) / null |  |
 | graphVersion | 필수 | string / null |  |
+| feedbackVersion | 선택 | string, null | 회원 평가 대상 버전. graphVersion이 있으면 동일 값, 허용된 과거 재생 발행본은 publication:원문SHA256. 그래프 버전과 별도이며 발행 원문은 변경하지 않습니다. |
 | items | 필수 | [BriefingItem](#schema-briefingitem)[] |  |
 | continuity | 선택 | [BriefingContinuity](#schema-briefingcontinuity) / null | 선택적 참고 소식·복기·수집 범위. 기존 발행본에는 생략될 수 있다. |
 | aiPriceOutlooks | 선택 | [AiPriceOutlooks](#schema-aipriceoutlooks) | v5 실제 가격·원문 입력으로 새로 생성·독립 모델 검증한 기업 전망. 보류 시 새 문안을 표시하지 않고 기존 기록을 유지합니다. |
@@ -5715,8 +5716,8 @@ same request again never toggles anything.
 | feature | 필수 | string {chatbot_answer, briefing_round, briefing_issue} |  |
 | targetId | 필수 | string |  |
 | value | 필수 | string {up, down, none} |  |
-| targetVersion | 선택 | string / null | Result version the voter saw (a briefing's graphVersion). A different current version is 409. |
-| reason | 선택 | string / null | Optional, only with a dislike |
+| targetVersion | 선택 | string / null | 브리핑은 응답의 feedbackVersion(구버전 응답은 graphVersion)을 그대로 전송합니다. graphVersion이 없는 허용된 과거 재생본은 publication:원문SHA256입니다. 현재 발행본과 다르면 409. |
+| reason | 선택 | string / null | 안 됨(down)에만 선택 입력, 최대 200자. 취소(none)는 삭제하지 않고 사유를 비웁니다. |
 
 <a id="schema-fielddecisionout"></a>
 
