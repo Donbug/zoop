@@ -6,7 +6,8 @@ import shutil
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import briefing_team_demo as demo
@@ -107,6 +108,54 @@ class TeamDemoTest(unittest.TestCase):
         with patch.object(demo, 'get', return_value={'status': 'published', 'items': [{'wrong': True}]}):
             with self.assertRaisesRegex(demo.DemoError, 'recorded_response_changed'):
                 demo.verify('http://127.0.0.1:8080', expected)
+
+    def test_additive_feedback_version_is_bound_to_recorded_publication_without_changing_original_digest(self):
+        payload = {'id': 'round', 'status': 'published', 'graphVersion': None, 'items': []}
+        path = '/api/v1/briefings?date=2026-10-21&edition=evening'
+        index = {'expected': [{'date': '2026-10-21', 'edition': 'evening', 'coreItems': 0,
+                              'path': path, 'responseSha256': demo.response_digest(payload), 'relatedResponses': {}}]}
+        files = {'tables/briefing_rounds.json': demo.canonical([
+            {'id': 'round', 'graph_version_id': None, 'payload_sha256': 'a' * 64}])}
+        response = {**payload, 'feedbackVersion': 'publication:' + 'a' * 64}
+        with patch.object(demo, 'get', return_value=response):
+            self.assertEqual(1, len(demo.verify('http://127.0.0.1:8080', index, files)))
+            with self.assertRaisesRegex(demo.DemoError, 'feedback_version_changed'):
+                demo.verify('http://127.0.0.1:8080', index)  # never blindly discard an unbound version
+        for changed in ({**response, 'feedbackVersion': 'publication:' + 'b' * 64},
+                        {**response, 'feedbackVersion': None},
+                        {**response, 'id': 'different-round'},
+                        {**response, 'items': [{'changed': True}]}):
+            with patch.object(demo, 'get', return_value=changed):
+                with self.assertRaises(demo.DemoError):
+                    demo.verify('http://127.0.0.1:8080', index, files)
+        self.assertNotEqual(demo.response_digest(payload), demo.response_digest(response))
+
+    def test_default_frontend_run_binds_feedback_versions_on_both_api_and_proxy(self):
+        # Exercise run(), not only verify(): both default startup checks must receive the publication files.
+        jar = Path(self.temp.name) / 'api.jar'
+        jar.write_bytes(b'authored dummy jar; never executed')
+        args = demo.parser().parse_args(['--data', str(self.root), '--jar', str(jar), '--once'])
+        index, files = demo.validate(self.root)
+        seen = []
+        def checked(api, actual_index, actual_files=None):
+            self.assertEqual(index, actual_index)
+            self.assertEqual(files, actual_files)
+            seen.append(api)
+            return []
+        process = MagicMock()
+        process.poll.return_value = None
+        done = SimpleNamespace(returncode=0, stdout='127.0.0.1:55432')
+        with patch.object(demo, 'free_port', side_effect=[18080, 13080]), \
+             patch.object(demo, 'java_command', return_value='java'), \
+             patch.object(demo.shutil, 'which', return_value='node'), \
+             patch.object(demo.Path, 'is_file', return_value=True), \
+             patch.object(demo.subprocess, 'run', return_value=done), \
+             patch.object(demo.subprocess, 'Popen', return_value=process), \
+             patch.object(demo, 'get', return_value={}), \
+             patch.object(demo, 'verify', side_effect=checked), \
+             patch.object(demo, 'cleanup_owned_container'):
+            self.assertEqual('READY', demo.run(args)['status'])
+        self.assertEqual(['http://127.0.0.1:18080', 'http://127.0.0.1:13080'], seen)
 
     def test_check_mode_needs_no_tools_or_network(self):
         args = demo.parser().parse_args(['--data', str(self.root), '--check'])

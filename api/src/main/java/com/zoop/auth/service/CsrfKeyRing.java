@@ -48,7 +48,8 @@ public final class CsrfKeyRing {
 
     /** The cursors allowed to borrow these keys; each signs under its own purpose, so one never verifies as another. */
     private static final Set<String> CURSOR_PURPOSES = Set.of("admin-audit-cursor-v1", "admin-job-cursor-v1",
-            "admin-rule-cursor-v1", "admin-candidate-cursor-v1", "chat-session-cursor-v1");
+            "admin-briefing-rounds-v1", "admin-rule-cursor-v1", "admin-candidate-cursor-v1", "chat-session-cursor-v1",
+            "member-feedback-cursor-v1", "admin-feedback-cursor-v1", "admin-feedback-voter-v1");
 
     public String activeKeyId() {
         return activeKeyId;

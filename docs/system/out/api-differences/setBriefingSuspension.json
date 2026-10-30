@@ -16,6 +16,20 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "response:200:application/json.reprocessState": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "queued",
+        "running",
+        "completed",
+        "failed",
+        null
+      ]
+    },
+    "response:200:application/json.reprocessState:required": false,
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -506,6 +520,75 @@
       },
       "bff": {
         "type": "string"
+      }
+    },
+    "response:200:application/json.stages.generate.status": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "running",
+          "done",
+          "failed",
+          "skipped",
+          "unknown"
+        ]
+      },
+      "bff": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "running",
+          "done",
+          "failed",
+          "skipped"
+        ]
+      }
+    },
+    "response:200:application/json.stages.publish.status": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "running",
+          "done",
+          "failed",
+          "skipped",
+          "unknown"
+        ]
+      },
+      "bff": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "running",
+          "done",
+          "failed",
+          "skipped"
+        ]
+      }
+    },
+    "response:200:application/json.stages.verify.status": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "running",
+          "done",
+          "failed",
+          "skipped",
+          "unknown"
+        ]
+      },
+      "bff": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "running",
+          "done",
+          "failed",
+          "skipped"
+        ]
       }
     },
     "response:401:application/json.error.code": {

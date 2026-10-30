@@ -1,3 +1,4 @@
+import SavedResultFeedback from '@/components/common/SavedResultFeedback';
 import type { EvidenceResponse } from '@/types/evidence';
 import DocumentSentiment from '@/components/graph/DocumentSentiment';
 
@@ -95,6 +96,14 @@ export default function EvidenceAnalysis({
             <p className="leading-relaxed text-zoop-ink">{summary.text}</p>
           )}
           <p>원문을 대체하지 않아요.</p>
+          {evidence.resultVersion && (
+            <SavedResultFeedback
+              feature="news_summary"
+              targetId={evidence.id}
+              targetVersion={evidence.resultVersion}
+              subject="이 뉴스 요약"
+            />
+          )}
         </section>
       )}
       {ownCitation?.inputKind === 'summary' && (

@@ -63,6 +63,13 @@
       ]
     },
     "response:200:application/json.context.graphVersion:required": true,
+    "response:200:application/json.feedbackVersion:required": false,
+    "response:200:application/json.feedbackVersion<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.feedbackVersion<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.phase:required": true,
     "response:200:application/json.phase<anyOf:0>": {
       "type": "string",
@@ -313,6 +320,13 @@
       ]
     },
     "response:202:application/json.context.graphVersion:required": true,
+    "response:202:application/json.feedbackVersion:required": false,
+    "response:202:application/json.feedbackVersion<anyOf:0>": {
+      "type": "string"
+    },
+    "response:202:application/json.feedbackVersion<anyOf:1>": {
+      "type": "null"
+    },
     "response:202:application/json.phase:required": true,
     "response:202:application/json.phase<anyOf:0>": {
       "type": "string",

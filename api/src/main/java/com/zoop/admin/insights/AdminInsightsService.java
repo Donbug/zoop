@@ -30,11 +30,13 @@ public class AdminInsightsService {
     private final NamedParameterJdbcTemplate jdbc;
     private final Clock clock;
     private final MockPortfolioCatalog portfolios;
+    private final com.zoop.feedback.AdminFeedbackService feedback;
 
-    public AdminInsightsService(NamedParameterJdbcTemplate jdbc, Clock clock, MockPortfolioCatalog portfolios) {
+    public AdminInsightsService(NamedParameterJdbcTemplate jdbc, Clock clock, MockPortfolioCatalog portfolios, com.zoop.feedback.AdminFeedbackService feedback) {
         this.jdbc = jdbc;
         this.clock = clock;
         this.portfolios = portfolios;
+        this.feedback = feedback;
     }
 
     @Transactional(readOnly = true)
@@ -50,7 +52,18 @@ public class AdminInsightsService {
                 """, params(window, asOf), (rs, n) -> new MemberCounts(rs.getLong("registered"),
                 rs.getLong("active"), rs.getLong("blocked")));
         return new Overview("7d", asOf, MIN_SAMPLE, metrics,
-                new Feedback(null, null, null, false, "unavailable", "not_integrated"), members);
+                feedback(), members);
+    }
+
+    private Feedback feedback(){
+        try{
+            var summary=feedback.summary("7d",null,null);long up=0,down=0;
+            for(var feature:summary.path("features")){up+=feature.path("up").asLong();down+=feature.path("down").asLong();}
+            long total=up+down;return new Feedback(up,down,total<MIN_SAMPLE?null:(double)up/total,total>0&&total<MIN_SAMPLE,"available",null);
+        }catch(com.zoop.common.exception.CustomException e){
+            if(e.getErrorCode()!=com.zoop.common.exception.ErrorCode.SOURCE_UNAVAILABLE)throw e;
+            return new Feedback(null,null,null,false,"unavailable","source_unavailable");
+        }
     }
 
     @Transactional(readOnly = true)

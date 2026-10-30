@@ -6301,7 +6301,7 @@ paths:
       tags:
         - "admin-briefings"
       summary: "브리핑 회차 운영 상태 목록"
-      description: "브리핑 회차 운영 상태 목록.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "DB에 저장된 회차만 예정 시각·ID 내림차순으로 조회한다. 날짜는 KST 양끝 날짜 포함, 시각은 오프셋 필수·양끝 포함이며 from/to 형식은 같아야 한다. 커서는 관리자·필터·limit에 결속된다. 생성 시도 수/trigger는 generation 원장만 기준이며 과거 미기록은 0/null이다. 현재 재처리 API가 없어 reprocessable=false이다. 조회는 누락 회차 생성·수집·AI 호출·상태 변경을 하지 않는다."
       operationId: "listAdminBriefingRounds"
       parameters:
         -
@@ -6436,7 +6436,7 @@ paths:
           "$ref": "#/components/responses/Error500"
         "503":
           "$ref": "#/components/responses/Error503"
-      description: "브리핑 생성·검증·발행 상태 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "관리자 인증 후 동일 DB 스냅샷에서 원문 해시를 확인해 발행 원문(제공 중단 회차 포함), 정정과 generation 처리 이력을 읽는다. 미기록 단계는 unknown, 미확인 시각은 null이며 공개 시각만으로 검증 성공을 추정하지 않는다. 조회는 상태를 변경하지 않는다. 운영 재처리·정정·중단/재개 쓰기 API는 별도 구현 범위이다."
       security:
         -
           adminSession: []
@@ -6477,7 +6477,7 @@ paths:
       tags:
         - "admin-briefings"
       summary: "미발행 회차 재처리"
-      description: "미발행 회차 재처리.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "서버에 등록한 고정 입력으로 예정 시각이 지난 미발행 회차의 새 생성·검증·저장 시도를 접수한다. 모델 재호출은 별도 운영자 승인과 호출 상한이 필요하다. 저장 복구는 실제 모델 호출·재시도에 세지 않는다. 발행은 별도 절차다. 같은 관리자·회차·Idempotency-Key·사유는 최초 202 응답을 반환하고, 내용 변경 또는 진행 중 회차는 409다."
       operationId: "reprocessBriefingRound"
       parameters:
         -
@@ -6870,13 +6870,13 @@ paths:
       tags:
         - "feedback"
       summary: "본인의 유효 평가 상태 조회"
-      description: "본인의 유효 평가 상태 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "로그인 회원 본인의 PostgreSQL 브리핑 평가를 조회합니다. 현재 발행 버전과 같은 항목만 반환합니다. feature/targetIds 생략 시 본인 전체, targetIds는 쉼표 구분 최대 100개입니다. cursor는 회원·필터·페이지 크기에 결속됩니다. 챗봇 평가는 별도 미구현입니다."
       operationId: "getMyFeedback"
       parameters:
         -
           name: "feature"
           in: "query"
-          required: true
+          required: false
           schema:
             enum:
               - "chatbot_answer"
@@ -6886,7 +6886,7 @@ paths:
         -
           name: "targetIds"
           in: "query"
-          required: true
+          required: false
           schema:
             type: "string"
             minLength: 1
@@ -6966,7 +6966,7 @@ paths:
       tags:
         - "feedback"
       summary: "AI 결과 평가 목표 상태 설정"
-      description: "AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "브리핑 회차·이슈 평가를 회원별·feature별·targetId별 한 행에 저장합니다. briefing_issue targetId는 회차ID/이슈ID이며 실제 발행 항목을 검증합니다. 회원 세션·CSRF·현재 읽기 권한이 필요합니다. 같은 요청 재전송은 행을 늘리지 않고, none은 평가 취소 상태로 보존합니다. 챗봇 평가는 별도 미구현입니다."
       operationId: "setFeedback"
       requestBody:
         required: true
@@ -7383,7 +7383,7 @@ paths:
       tags:
         - "admin-feedback"
       summary: "AI 기능별 유효 평가 집계"
-      description: "AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "현재 읽을 수 있는 동일 버전의 브리핑 회차·핵심 이슈·저장 챗봇 답변·검증된 뉴스 요약에 대한 마지막 회원 평가를 집계합니다. none·중단·과거 버전·차단 회원·익명 미리보기는 제외합니다. 비율은 up/(up+down), 표본 5건 미만은 null입니다. 기간·일별 추이는 KST 마지막 변경일 기준입니다. 원천 장애는 성공 0건으로 바꾸지 않습니다."
       operationId: "getFeedbackSummary"
       parameters:
         -
@@ -7488,7 +7488,7 @@ paths:
       tags:
         - "admin-feedback"
       summary: "현재 부정 평가 결과 조회"
-      description: "현재 부정 평가 결과 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "현재 제공 중인 발행 버전의 회원 down 평가·사유를 조회합니다. 취소·제공 중단·과거 버전·로컬 익명 미리보기 평가는 제외합니다. 회원은 익명 식별자로 표시하며 이메일·세션 토큰은 반환하지 않습니다. KST 날짜는 마지막 평가 변경일 기준입니다. cursor는 관리자·기간·페이지 크기에 결속됩니다."
       operationId: "listDislikedResults"
       parameters:
         -
@@ -8477,6 +8477,7 @@ paths:
           - "목차의 요구 번호 42는 기준일 재무·실적(요구 42)이며 FS042 시점 그래프와 의미가 다르다. 재무 폐기 선언이 없어 별도 유보하며 시점 그래프 의미의 승인 범위는 팀 최종 확인이 필요하다."
           - "날짜 정밀도만 있는 사건을 정확한 조회 asOf로 바꾸는 기준과 이력 보존 기간을 팀이 확인해야 한다."
 components:
+
   securitySchemes:
     memberSession:
       type: "apiKey"
@@ -8489,6 +8490,82 @@ components:
       name: "zoop_admin_session"
       description: "관리자 세션 및 작업별 권한 검증."
   schemas:
+
+    BriefingAiExecution:
+      type: object
+      description: 모델 호출 메타데이터만 반환한다. archive는 원래 시작 시각과 시도 번호를 알 수 없는 과거 영수증 일부이며 전체
+        사용량으로 외삽하지 않는다. live 중 전송 확인만 실제 호출 수에 포함하고 비용은 청구 자료가 없으면 미확인이다.
+      properties:
+        id:
+          type: string
+        feature:
+          type: string
+          enum:
+          - briefing
+          - briefing-outlook
+        stage:
+          type: string
+        status:
+          type: string
+        model:
+          type:
+          - string
+          - 'null'
+        origin:
+          type: string
+          enum:
+          - runtime
+          - archive
+        mode:
+          type: string
+          enum:
+          - live
+          - replay
+          - save_only
+        attemptNo:
+          type: integer
+        startedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        finishedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        inputTokens:
+          type:
+          - integer
+          - 'null'
+        outputTokens:
+          type:
+          - integer
+          - 'null'
+        transmissionConfirmed:
+          type:
+          - boolean
+          - 'null'
+        errorCode:
+          type:
+          - string
+          - 'null'
+      required:
+      - id
+      - feature
+      - stage
+      - status
+      - model
+      - origin
+      - mode
+      - attemptNo
+      - startedAt
+      - finishedAt
+      - inputTokens
+      - outputTokens
+      - transmissionConfirmed
+      - errorCode
+
     CompanyStatement:
       type: object
       required: [text, evidenceIds]
@@ -9988,6 +10065,14 @@ components:
         - "relationType"
     AttemptOut:
       properties:
+        outcome:
+          anyOf:
+            - type: "string"
+            - type: "null"
+        failureStage:
+          anyOf:
+            - type: "string"
+            - type: "null"
         n:
           type: "integer"
         trigger:
@@ -11014,6 +11099,9 @@ components:
               type: "string"
             -
               type: "null"
+        feedbackVersion:
+          type: [string, "null"]
+          description: "회원 평가 대상 버전. graphVersion이 있으면 동일 값, 허용된 과거 재생 발행본은 publication:원문SHA256. 그래프 버전과 별도이며 발행 원문은 변경하지 않습니다."
         items:
           items:
             "$ref": "#/components/schemas/BriefingItem"
@@ -12103,6 +12191,11 @@ components:
       description: "The selection frozen when the question was first received."
     ChatJob:
       properties:
+        feedbackVersion:
+          anyOf:
+            - type: "string"
+            - type: "null"
+          description: "저장·검증 완료 answered 답변의 평가 버전. 응답 본문이 바뀌면 달라지며 요청별 metadata는 제외한다. member feedback에는 result.messageId와 이 값을 그대로 보낸다."
         id:
           type: "string"
         sessionId:
@@ -13221,13 +13314,13 @@ components:
           const: "7d"
           description: "생성 시각 기준 직전 7일의 반개구간 [generatedAt-7d, generatedAt)."
         requests:
-          type: "integer"
+          type: ["integer", "null"]
           description: "기간 안에 접수된 사용자 요청 수. AI 공급자 실행 시도 횟수와 구분한다."
         succeeded:
-          type: "integer"
+          type: ["integer", "null"]
           description: "기간 안에 접수되어 성공으로 종료된 사용자 요청 수."
         failed:
-          type: "integer"
+          type: ["integer", "null"]
           description: "기간 안에 접수되어 실패로 종료된 사용자 요청 수. 재시도는 최초 사용자 요청 한 건으로 센다. 성공·실패가 미확정인 요청은 두 값에서 제외한다."
         features:
           items:
@@ -13247,10 +13340,10 @@ components:
         label:
           type: "string"
         requests:
-          type: "integer"
+          type: ["integer", "null"]
           description: "해당 AI 기능에 접수된 사용자 요청 수."
         failed:
-          type: "integer"
+          type: ["integer", "null"]
           description: "해당 기능에서 실패로 종료된 사용자 요청 수."
       type: "object"
       required:
@@ -14350,6 +14443,7 @@ components:
           type: "string"
           enum:
             - "chatbot_answer"
+            - "news_summary"
             - "briefing_round"
             - "briefing_issue"
         label:
@@ -14388,6 +14482,7 @@ components:
           type: "string"
           enum:
             - "chatbot_answer"
+            - "news_summary"
             - "briefing_round"
             - "briefing_issue"
         targetId:
@@ -14483,6 +14578,7 @@ components:
           type: "string"
           enum:
             - "chatbot_answer"
+            - "news_summary"
             - "briefing_round"
             - "briefing_issue"
         targetId:
@@ -14501,14 +14597,14 @@ components:
               type: "string"
             -
               type: "null"
-          description: "Result version the voter saw (a briefing's graphVersion). A different current version is 409."
+          description: "chatbot_answer는 result.messageId와 ChatJob.feedbackVersion, news_summary는 evidenceId와 documentSummary.resultVersion을 그대로 전송합니다. 현재 읽기 권한과 버전을 확인하며 none 취소는 기존 버전만 허용합니다. 브리핑은 응답의 feedbackVersion(구버전 응답은 graphVersion)을 그대로 전송합니다. graphVersion이 없는 허용된 과거 재생본은 publication:원문SHA256입니다. 현재 발행본과 다르면 409."
         reason:
           anyOf:
             -
               type: "string"
             -
               type: "null"
-          description: "Optional, only with a dislike"
+          description: "안 됨(down)에만 선택 입력, 최대 200자. 취소(none)는 삭제하지 않고 사유를 비웁니다."
       additionalProperties: false
       type: "object"
       required:
@@ -17397,6 +17493,18 @@ components:
       description: "An application publication rule; the id carries its version (``<ruleId>@<version>``). A rule can only keep\nalready eligible content off the public graph. It never publishes a HOLD, never turns a HOLD into an approval and never\nchanges an AI judgement input: content is published only by an AI pass inside a handoff or by an administrator allow\nfollowed by a new handoff, import and activation. ``changedAt``/``changedBy``/``reason`` are the latest change, null\nonly while the rule has never been changed (a rule switched back to its default keeps its latest change).\n``history`` is every change, newest first."
     RoundDetail:
       properties:
+        reprocessState:
+          type: ["string", "null"]
+          enum: ["queued", "running", "completed", "failed", null]
+          description: "최근 재처리 작업 상태. completed는 결과 저장 완료이며 발행 여부는 publishedAt으로 확인한다."
+        historyAvailability:
+          type: "string"
+          enum: ["recorded", "unrecorded"]
+          description: "생성 시도 원장 유무. 과거 영수증의 일부 수집은 원래 생성 시도의 복원을 뜻하지 않는다."
+        aiExecutions:
+          type: "array"
+          items:
+            "$ref": "#/components/schemas/BriefingAiExecution"
         id:
           type: "string"
         date:
@@ -17547,6 +17655,10 @@ components:
         - "nextCursor"
     RoundOut:
       properties:
+        reprocessState:
+          type: ["string", "null"]
+          enum: ["queued", "running", "completed", "failed", null]
+          description: "최근 재처리 작업 상태. completed는 결과 저장 완료이며 발행 여부는 publishedAt으로 확인한다."
         id:
           type: "string"
         date:
@@ -18192,6 +18304,8 @@ components:
             - "done"
             - "failed"
             - "skipped"
+            - "unknown"
+          description: "unknown은 단계 기록 없음이며 성공·실패·대기로 추정하지 않는다."
         at:
           anyOf:
             -

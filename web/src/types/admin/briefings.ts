@@ -3,7 +3,8 @@
 
 import type { DashboardRoundStatus } from './dashboard';
 
-export type StageStatus = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
+export type StageStatus =
+  'pending' | 'running' | 'done' | 'failed' | 'skipped' | 'unknown';
 
 export type Stage = { status: StageStatus; at: string | null };
 
@@ -30,6 +31,7 @@ export type AdminRound = {
   correctionCount: number;
   suspension: Suspension | null;
   reprocessable: boolean;
+  reprocessState?: 'queued' | 'running' | 'completed' | 'failed' | null;
   /** 재처리할 수 없는 이유 */
   blockedReason: string | null;
 };
@@ -58,12 +60,31 @@ export type PublishedBriefing = {
 };
 
 export type RoundDetail = AdminRound & {
+  historyAvailability?: 'recorded' | 'unrecorded';
+  aiExecutions?: {
+    id: string;
+    origin?: 'runtime' | 'archive';
+    attemptNo: number;
+    feature: string;
+    stage: string;
+    status: string;
+    model: string | null;
+    mode: 'live' | 'replay' | 'save_only';
+    startedAt: string | null;
+    finishedAt: string | null;
+    inputTokens: number | null;
+    outputTokens: number | null;
+    transmissionConfirmed: boolean | null;
+    errorCode: string | null;
+  }[];
   published: PublishedBriefing | null;
   corrections: Correction[];
   attemptsLog: {
+    outcome?: string | null;
+    failureStage?: string | null;
     n: number;
     trigger: 'scheduler' | 'admin';
-    startedAt: string;
+    startedAt: string | null;
     finishedAt: string | null;
     status: string;
     failureReason: string | null;

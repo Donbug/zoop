@@ -45,9 +45,11 @@ const DT = 'text-[11px] text-zoop-muted';
 function RoundDetailView({
   round,
   onAction,
+  readOnly,
 }: {
   round: RoundDetailData;
   onAction: (action: RoundAction) => void;
+  readOnly: boolean;
 }) {
   const items = round.published?.items ?? [];
   return (
@@ -86,12 +88,22 @@ function RoundDetailView({
             </span>
           )}
         </dd>
-        <dt className={DT}>시도</dt>
-        <dd className={`${DD} tabular-nums`}>{count(round.attempts)}회</dd>
+        <dt className={DT}>기록된 생성 시도</dt>
+        <dd className={`${DD} tabular-nums`}>
+          {round.historyAvailability === 'unrecorded'
+            ? '과거 생성 시도 미기록'
+            : `${count(round.attempts)}회`}
+        </dd>
       </dl>
       {round.failureReason && (
         <p className="rounded-2xl bg-zoop-soft px-4 py-3 text-xs text-zoop-alert">
           실패 사유: {round.failureReason}
+        </p>
+      )}
+      {round.reprocessState === 'completed' && !round.published && (
+        <p role="status" className="rounded-2xl bg-zoop-soft px-4 py-3 text-xs">
+          재처리 결과를 저장했습니다. 발행 대기 상태이며 기존 발행본은
+          유지됩니다.
         </p>
       )}
       {round.suspension && (
@@ -106,7 +118,7 @@ function RoundDetailView({
       <div className="flex flex-wrap items-center gap-2 border-y-[0.667px] border-zoop-line py-3">
         <button
           type="button"
-          disabled={!round.reprocessable}
+          disabled={readOnly || !round.reprocessable}
           onClick={() => onAction('reprocess')}
           className={BUTTON}
         >
@@ -114,7 +126,7 @@ function RoundDetailView({
         </button>
         <button
           type="button"
-          disabled={!round.published}
+          disabled={readOnly || !round.published}
           onClick={() => onAction('correct')}
           className={BUTTON}
         >
@@ -123,6 +135,7 @@ function RoundDetailView({
         {round.status === 'suspended' ? (
           <button
             type="button"
+            disabled={readOnly}
             onClick={() => onAction('resume')}
             className={BUTTON}
           >
@@ -131,14 +144,14 @@ function RoundDetailView({
         ) : (
           <button
             type="button"
-            disabled={!round.published}
+            disabled={readOnly || !round.published}
             onClick={() => onAction('suspend')}
             className={BUTTON}
           >
             제공 중단
           </button>
         )}
-        {!round.reprocessable && round.blockedReason && (
+        {!readOnly && !round.reprocessable && round.blockedReason && (
           <p className="w-full text-[11px] text-zoop-muted">
             재처리할 수 없어요: {round.blockedReason}
           </p>
@@ -211,6 +224,60 @@ function RoundDetailView({
         )}
       </Section>
 
+      {round.historyAvailability === 'unrecorded' && (
+        <p className="text-xs text-zoop-muted">
+          발행 결과는 보존돼 있지만 과거 생성·검증 시도 전체는 미기록입니다.
+          확인 가능한 모델 영수증은 별도로 표시하며, 미기록을 실제 호출·토큰
+          0으로 해석하지 않습니다.
+        </p>
+      )}
+      {round.aiExecutions && round.aiExecutions.length > 0 && (
+        <Section title="모델 호출 기록">
+          <Table caption="회차 모델 실행 기록">
+            <thead>
+              <tr>
+                <th className={TH}>시도</th>
+                <th className={TH}>단계 · 모델</th>
+                <th className={TH}>시작 / 종료</th>
+                <th className={TH}>실행 방식</th>
+                <th className={TH}>상태</th>
+                <th className={TH}>입력 / 출력 토큰</th>
+              </tr>
+            </thead>
+            <tbody>
+              {round.aiExecutions.map((call) => (
+                <tr key={call.id}>
+                  <td className={TD}>
+                    {call.origin === 'archive'
+                      ? '과거 영수증(원 시도 미확인)'
+                      : call.attemptNo}
+                  </td>
+                  <td className={TD}>
+                    {call.stage} · {call.model ?? '–'}
+                  </td>
+                  <td className={TD}>
+                    {formatKst(call.startedAt)} / {formatKst(call.finishedAt)}
+                  </td>
+                  <td className={TD}>
+                    {call.mode === 'live'
+                      ? '실제 호출'
+                      : call.mode === 'replay'
+                        ? '결과 재사용(호출 없음)'
+                        : '저장 복구(호출 없음)'}
+                  </td>
+                  <td className={TD}>
+                    {call.status}
+                    {call.errorCode && ` · ${call.errorCode}`}
+                  </td>
+                  <td className={TD}>
+                    {call.inputTokens ?? '–'} / {call.outputTokens ?? '–'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </Section>
+      )}
       <Section title="처리 기록">
         {round.attemptsLog.length === 0 ? (
           <Empty>아직 처리 기록이 없어요.</Empty>
@@ -220,6 +287,7 @@ function RoundDetailView({
               <tr>
                 <th className={TH}>#</th>
                 <th className={TH}>시작</th>
+                <th className={TH}>종료</th>
                 <th className={TH}>상태</th>
                 <th className={TH}>요청</th>
                 <th className={TH}>실패 사유</th>
@@ -234,6 +302,7 @@ function RoundDetailView({
                   >
                     {formatKst(attempt.startedAt)}
                   </td>
+                  <td className={TD}>{formatKst(attempt.finishedAt)}</td>
                   <td className={TD}>
                     {roundStatusLabel[
                       attempt.status as keyof typeof roundStatusLabel
@@ -245,7 +314,9 @@ function RoundDetailView({
                       : (attempt.adminEmail ?? '관리자')}
                   </td>
                   <td className={`${TD} text-zoop-muted`}>
-                    {attempt.failureReason ?? '–'}
+                    {[attempt.failureStage, attempt.failureReason]
+                      .filter(Boolean)
+                      .join(' · ') || '–'}
                   </td>
                 </tr>
               ))}
@@ -261,10 +332,12 @@ function RoundPanel({
   roundId,
   onClose,
   onChanged,
+  readOnly,
 }: {
   roundId: string;
   onClose: () => void;
   onChanged: () => void;
+  readOnly: boolean;
 }) {
   const load = useCallback(() => getAdminBriefingRound(roundId), [roundId]);
   const detail = useAsyncData(load);
@@ -314,7 +387,7 @@ function RoundPanel({
           onRetry={detail.reload}
         />
       )}
-      {round && action && (
+      {round && action && !readOnly && (
         <RoundActionForm
           key={action}
           round={round}
@@ -331,6 +404,7 @@ function RoundPanel({
       {round && (
         <RoundDetailView
           round={round}
+          readOnly={readOnly}
           onAction={(next) => {
             setDone(null);
             setAction(next);
@@ -344,7 +418,11 @@ function RoundPanel({
 // A-ADM-04 브리핑 운영 (FS070-01·02, FS071-01·02)
 // - 회차별 데이터 기준 시점·생성/검증/발행 상태·실패 사유. 조회는 재처리나 발행을 하지 않는다.
 // - 선택한 회차는 주소(?round=)에 남는다. 관리 작업은 사유를 받고, 끝나면 목록과 상세를 다시 읽는다.
-export default function BriefingOperations() {
+export default function BriefingOperations({
+  readOnly = false,
+}: {
+  readOnly?: boolean;
+}) {
   const { params, updateQuery } = useRouteQuery();
   const selectedId = params.get('round');
   const rounds = useCursorPages(listAdminBriefingRounds);
@@ -371,6 +449,17 @@ export default function BriefingOperations() {
           )
         }
       />
+      {readOnly ? (
+        <Note>
+          회차 조회만 제공됩니다. 재처리·정정·제공 중단 및 재개는 아직 지원하지
+          않습니다.
+        </Note>
+      ) : (
+        <Note>
+          정정·중단·재개는 변경 이력으로 저장됩니다. 재처리는 미발행 회차의 고정
+          입력으로 생성·검증·저장을 진행하며, 발행은 별도 승인 절차를 따릅니다.
+        </Note>
+      )}
       {rounds.refreshError && (
         <p role="status" className="text-[11px] text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.
@@ -464,6 +553,7 @@ export default function BriefingOperations() {
             <RoundPanel
               key={selectedId}
               roundId={selectedId}
+              readOnly={readOnly}
               onClose={() => updateQuery({ round: null }, { replace: true })}
               onChanged={rounds.reload}
             />

@@ -2181,7 +2181,7 @@ RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 앱 작업
 
 ## listAdminBriefingRounds · 브리핑 회차 운영 상태 목록
 
-브리핑 회차 운영 상태 목록.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+DB에 저장된 회차만 예정 시각·ID 내림차순으로 조회한다. 날짜는 KST 양끝 날짜 포함, 시각은 오프셋 필수·양끝 포함이며 from/to 형식은 같아야 한다. 커서는 관리자·필터·limit에 결속된다. 생성 시도 수/trigger는 generation 원장만 기준이며 과거 미기록은 0/null이다. 현재 재처리 API가 없어 reprocessable=false이다. 조회는 누락 회차 생성·수집·AI 호출·상태 변경을 하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2211,7 +2211,7 @@ RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 앱 작업
 
 ## getAdminBriefingRound · 브리핑 생성·검증·발행 상태 조회
 
-브리핑 생성·검증·발행 상태 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+관리자 인증 후 동일 DB 스냅샷에서 원문 해시를 확인해 발행 원문(제공 중단 회차 포함), 정정과 generation 처리 이력을 읽는다. 미기록 단계는 unknown, 미확인 시각은 null이며 공개 시각만으로 검증 성공을 추정하지 않는다. 조회는 상태를 변경하지 않는다. 운영 재처리·정정·중단/재개 쓰기 API는 별도 구현 범위이다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2238,7 +2238,7 @@ RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 앱 작업
 
 ## reprocessBriefingRound · 미발행 회차 재처리
 
-미발행 회차 재처리.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+서버에 등록한 고정 입력으로 예정 시각이 지난 미발행 회차의 새 생성·검증·저장 시도를 접수한다. 모델 재호출은 별도 운영자 승인과 호출 상한이 필요하다. 저장 복구는 실제 모델 호출·재시도에 세지 않는다. 발행은 별도 절차다. 같은 관리자·회차·Idempotency-Key·사유는 최초 202 응답을 반환하고, 내용 변경 또는 진행 중 회차는 409다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2361,7 +2361,7 @@ RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 앱 작업
 
 ## getMyFeedback · 본인의 유효 평가 상태 조회
 
-본인의 유효 평가 상태 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+로그인 회원 본인의 PostgreSQL 브리핑 평가를 조회합니다. 현재 발행 버전과 같은 항목만 반환합니다. feature/targetIds 생략 시 본인 전체, targetIds는 쉼표 구분 최대 100개입니다. cursor는 회원·필터·페이지 크기에 결속됩니다. 챗봇 평가는 별도 미구현입니다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2381,8 +2381,8 @@ RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 앱 작업
 
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
-| feature | query | 필수 | string {chatbot_answer, briefing_round, briefing_issue} |  |
-| targetIds | query | 필수 | string | Comma separated |
+| feature | query | 선택 | string {chatbot_answer, briefing_round, briefing_issue} |  |
+| targetIds | query | 선택 | string | Comma separated |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
 | limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
@@ -2391,7 +2391,7 @@ RetryState.allowed인 실패·취소 작업만 retry_of가 있는 새 앱 작업
 
 ## setFeedback · AI 결과 평가 목표 상태 설정
 
-AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+브리핑 회차·이슈 평가를 회원별·feature별·targetId별 한 행에 저장합니다. briefing_issue targetId는 회차ID/이슈ID이며 실제 발행 항목을 검증합니다. 회원 세션·CSRF·현재 읽기 권한이 필요합니다. 같은 요청 재전송은 행을 늘리지 않고, none은 평가 취소 상태로 보존합니다. 챗봇 평가는 별도 미구현입니다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2530,7 +2530,7 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 
 ## getFeedbackSummary · AI 기능별 유효 평가 집계
 
-AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+현재 읽을 수 있는 동일 버전의 브리핑 회차·핵심 이슈·저장 챗봇 답변·검증된 뉴스 요약에 대한 마지막 회원 평가를 집계합니다. none·중단·과거 버전·차단 회원·익명 미리보기는 제외합니다. 비율은 up/(up+down), 표본 5건 미만은 null입니다. 기간·일별 추이는 KST 마지막 변경일 기준입니다. 원천 장애는 성공 0건으로 바꾸지 않습니다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2559,7 +2559,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 ## listDislikedResults · 현재 부정 평가 결과 조회
 
-현재 부정 평가 결과 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+현재 제공 중인 발행 버전의 회원 down 평가·사유를 조회합니다. 취소·제공 중단·과거 버전·로컬 익명 미리보기 평가는 제외합니다. 회원은 익명 식별자로 표시하며 이메일·세션 토큰은 반환하지 않습니다. KST 날짜는 마지막 평가 변경일 기준입니다. cursor는 관리자·기간·페이지 크기에 결속됩니다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2886,6 +2886,29 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 ## 공통 스키마
 
 nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하지 않는다. 필수 필드는 null 허용 여부와 별개다. JSON 필드 이름·중첩 참조의 정본은 OpenAPI다.
+
+<a id="schema-briefingaiexecution"></a>
+
+### BriefingAiExecution
+
+모델 호출 메타데이터만 반환한다. archive는 원래 시작 시각과 시도 번호를 알 수 없는 과거 영수증 일부이며 전체 사용량으로 외삽하지 않는다. live 중 전송 확인만 실제 호출 수에 포함하고 비용은 청구 자료가 없으면 미확인이다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| feature | 필수 | string {briefing, briefing-outlook} |  |
+| stage | 필수 | string |  |
+| status | 필수 | string |  |
+| model | 필수 | string, null |  |
+| origin | 필수 | string {runtime, archive} |  |
+| mode | 필수 | string {live, replay, save_only} |  |
+| attemptNo | 필수 | integer |  |
+| startedAt | 필수 | string, null (date-time) |  |
+| finishedAt | 필수 | string, null (date-time) |  |
+| inputTokens | 필수 | integer, null |  |
+| outputTokens | 필수 | integer, null |  |
+| transmissionConfirmed | 필수 | boolean, null |  |
+| errorCode | 필수 | string, null |  |
 
 <a id="schema-companystatement"></a>
 
@@ -3632,6 +3655,8 @@ AI 사용 회원 수(getAiUsage.members). 화면은 각 값을 totalMembers로 �
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| outcome | 선택 | string / null |  |
+| failureStage | 선택 | string / null |  |
 | n | 필수 | integer |  |
 | trigger | 필수 | string {scheduler, admin} |  |
 | startedAt | 필수 | string (date-time) |  |
@@ -4240,6 +4265,7 @@ The immutable published original of a round (what users saw before any correctio
 | dataWindow | 필수 | [BriefingWindow](#schema-briefingwindow) / null |  |
 | dataAsOf | 필수 | string (date-time) / null |  |
 | graphVersion | 필수 | string / null |  |
+| feedbackVersion | 선택 | string, null | 회원 평가 대상 버전. graphVersion이 있으면 동일 값, 허용된 과거 재생 발행본은 publication:원문SHA256. 그래프 버전과 별도이며 발행 원문은 변경하지 않습니다. |
 | items | 필수 | [BriefingItem](#schema-briefingitem)[] |  |
 | continuity | 선택 | [BriefingContinuity](#schema-briefingcontinuity) / null | 선택적 참고 소식·복기·수집 범위. 기존 발행본에는 생략될 수 있다. |
 | aiPriceOutlooks | 선택 | [AiPriceOutlooks](#schema-aipriceoutlooks) | v5 실제 가격·원문 입력으로 새로 생성·독립 모델 검증한 기업 전망. 보류 시 새 문안을 표시하지 않고 기존 기록을 유지합니다. |
@@ -4697,6 +4723,7 @@ The selection frozen when the question was first received.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| feedbackVersion | 선택 | string / null | 저장·검증 완료 answered 답변의 평가 버전. 응답 본문이 바뀌면 달라지며 요청별 metadata는 제외한다. member feedback에는 result.messageId와 이 값을 그대로 보낸다. |
 | id | 필수 | string |  |
 | sessionId | 필수 | string |  |
 | seq | 필수 | integer |  |
@@ -5133,9 +5160,9 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | window | 필수 | string | 생성 시각 기준 직전 7일의 반개구간 [generatedAt-7d, generatedAt). |
-| requests | 필수 | integer | 기간 안에 접수된 사용자 요청 수. AI 공급자 실행 시도 횟수와 구분한다. |
-| succeeded | 필수 | integer | 기간 안에 접수되어 성공으로 종료된 사용자 요청 수. |
-| failed | 필수 | integer | 기간 안에 접수되어 실패로 종료된 사용자 요청 수. 재시도는 최초 사용자 요청 한 건으로 센다. 성공·실패가 미확정인 요청은 두 값에서 제외한다. |
+| requests | 필수 | integer, null | 기간 안에 접수된 사용자 요청 수. AI 공급자 실행 시도 횟수와 구분한다. |
+| succeeded | 필수 | integer, null | 기간 안에 접수되어 성공으로 종료된 사용자 요청 수. |
+| failed | 필수 | integer, null | 기간 안에 접수되어 실패로 종료된 사용자 요청 수. 재시도는 최초 사용자 요청 한 건으로 센다. 성공·실패가 미확정인 요청은 두 값에서 제외한다. |
 | features | 필수 | [DashboardAiFeature](#schema-dashboardaifeature)[] |  |
 
 <a id="schema-dashboardaifeature"></a>
@@ -5148,8 +5175,8 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | --- | --- | --- | --- |
 | feature | 필수 | string |  |
 | label | 필수 | string |  |
-| requests | 필수 | integer | 해당 AI 기능에 접수된 사용자 요청 수. |
-| failed | 필수 | integer | 해당 기능에서 실패로 종료된 사용자 요청 수. |
+| requests | 필수 | integer, null | 해당 AI 기능에 접수된 사용자 요청 수. |
+| failed | 필수 | integer, null | 해당 기능에서 실패로 종료된 사용자 요청 수. |
 
 <a id="schema-dashboardaudit"></a>
 
@@ -5652,7 +5679,7 @@ details에는 승인된 검증 정보만 제공한다. 스택·원문·개인정
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| feature | 필수 | string {chatbot_answer, briefing_round, briefing_issue} |  |
+| feature | 필수 | string {chatbot_answer, news_summary, briefing_round, briefing_issue} |  |
 | label | 필수 | string |  |
 | up | 필수 | integer |  |
 | down | 필수 | integer |  |
@@ -5669,7 +5696,7 @@ details에는 승인된 검증 정보만 제공한다. 스택·원문·개인정
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| feature | 필수 | string {chatbot_answer, briefing_round, briefing_issue} |  |
+| feature | 필수 | string {chatbot_answer, news_summary, briefing_round, briefing_issue} |  |
 | targetId | 필수 | string |  |
 | targetVersion | 필수 | string / null | Result version the rating is linked to; null for chatbot answers (an answer never changes) |
 | value | 필수 | string {up, down, none} |  |
@@ -5712,11 +5739,11 @@ same request again never toggles anything.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| feature | 필수 | string {chatbot_answer, briefing_round, briefing_issue} |  |
+| feature | 필수 | string {chatbot_answer, news_summary, briefing_round, briefing_issue} |  |
 | targetId | 필수 | string |  |
 | value | 필수 | string {up, down, none} |  |
-| targetVersion | 선택 | string / null | Result version the voter saw (a briefing's graphVersion). A different current version is 409. |
-| reason | 선택 | string / null | Optional, only with a dislike |
+| targetVersion | 선택 | string / null | chatbot_answer는 result.messageId와 ChatJob.feedbackVersion, news_summary는 evidenceId와 documentSummary.resultVersion을 그대로 전송합니다. 현재 읽기 권한과 버전을 확인하며 none 취소는 기존 버전만 허용합니다. 브리핑은 응답의 feedbackVersion(구버전 응답은 graphVersion)을 그대로 전송합니다. graphVersion이 없는 허용된 과거 재생본은 publication:원문SHA256입니다. 현재 발행본과 다르면 409. |
+| reason | 선택 | string / null | 안 됨(down)에만 선택 입력, 최대 200자. 취소(none)는 삭제하지 않고 사유를 비웁니다. |
 
 <a id="schema-fielddecisionout"></a>
 
@@ -7043,6 +7070,9 @@ only while the rule has never been changed (a rule switched back to its default 
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| reprocessState | 선택 | string, null {queued, running, completed, failed, None} | 최근 재처리 작업 상태. completed는 결과 저장 완료이며 발행 여부는 publishedAt으로 확인한다. |
+| historyAvailability | 선택 | string {recorded, unrecorded} | 생성 시도 원장 유무. 과거 영수증의 일부 수집은 원래 생성 시도의 복원을 뜻하지 않는다. |
+| aiExecutions | 선택 | [BriefingAiExecution](#schema-briefingaiexecution)[] |  |
 | id | 필수 | string |  |
 | date | 필수 | string (date) |  |
 | edition | 필수 | string {morning, evening} |  |
@@ -7087,6 +7117,7 @@ only while the rule has never been changed (a rule switched back to its default 
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| reprocessState | 선택 | string, null {queued, running, completed, failed, None} | 최근 재처리 작업 상태. completed는 결과 저장 완료이며 발행 여부는 publishedAt으로 확인한다. |
 | id | 필수 | string |  |
 | date | 필수 | string (date) |  |
 | edition | 필수 | string {morning, evening} |  |
@@ -7381,7 +7412,7 @@ Key issues of an evening round compared with the same day's published morning ro
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| status | 필수 | string {pending, running, done, failed, skipped} |  |
+| status | 필수 | string {pending, running, done, failed, skipped, unknown} | unknown은 단계 기록 없음이며 성공·실패·대기로 추정하지 않는다. |
 | at | 필수 | string / null |  |
 
 <a id="schema-stagesout"></a>
