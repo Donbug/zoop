@@ -79,6 +79,7 @@ public class ChatToolRunner implements AutoCloseable {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private static final TypeReference<List<ChatToolItem>> ITEMS = new TypeReference<>() { };
     private static final TypeReference<List<ChatToolPath>> PATHS = new TypeReference<>() { };
+    private static final TypeReference<List<ChatWebResult>> WEB = new TypeReference<>() { };
 
     private final ChatToolRegistry registry;
     private final Duration stageLimit;
@@ -166,6 +167,7 @@ public class ChatToolRunner implements AutoCloseable {
      * Rebinds succeeded MCP ledger reads to the engine's run, including calls served on another instance. Only stored
      * reservations supply query scope. Cached reads require retained ancestors with matching run and query pins;
      * incompleteness survives every reuse, including envelopes written before truncation was propagated on delivery.
+     * A web search's hits come back with it, one per {@code web_result} item; hits the send gate withheld leave it cut.
      */
     public List<ChatToolResult> restore(ChatRun run, List<ChatKeptToolResult> kept) {
         try {
@@ -200,25 +202,37 @@ public class ChatToolRunner implements AutoCloseable {
         if (!reservation(run, query, "mcp").inputDigest().equals(kept.inputDigest())) throw invalidKept();
         var result = StrictJson.parseObject(kept.result()).keys(Set.of("schemaVersion", "toolCallId", "capabilityId",
                 "dataVersion", "items", "evidenceIds", "truncated", "nextAllowed", "error"),
-                Set.of("paths", "cachedFrom", "withheld"));
+                Set.of("paths", "cachedFrom", "withheld", "webResults"));
         if (!ChatToolRegistry.SCHEMA_VERSION.equals(result.string("schemaVersion"))
                 || !kept.toolCallId().equals(result.string("toolCallId"))
                 || !kept.capabilityId().equals(result.string("capabilityId")) || !result.isNull("error")) {
             throw invalidKept();
         }
-        boolean cut = result.has("withheld") && result.object("withheld").keys(Set.of("reason", "items", "evidenceIds",
-                "paths"), Set.of()).count("items") > 0;
+        boolean cut = false;
+        if (result.has("withheld")) {
+            var withheld = result.object("withheld").keys(Set.of("reason", "items", "evidenceIds", "paths"),
+                    Set.of("webResults"));
+            cut = withheld.count("items") > 0 || withheld.has("webResults") && withheld.count("webResults") > 0;
+        }
+        List<ChatWebResult> web = result.has("webResults") ? MAPPER.convertValue(result.array("webResults"), WEB)
+                : List.of();
         var output = new ChatToolOutput(result.string("dataVersion"), MAPPER.convertValue(result.array("items"), ITEMS),
                 result.strings("evidenceIds"), result.bool("truncated") || cut, result.bool("nextAllowed"),
-                result.has("paths") ? MAPPER.convertValue(result.array("paths"), PATHS) : List.of());
+                result.has("paths") ? MAPPER.convertValue(result.array("paths"), PATHS) : List.of(), web);
         if (invalid(query, output) != null) throw invalidKept();
+        // A hit is kept only with its item, and only a web search has hits.
+        List<String> hitItems = output.items().stream().filter(i -> "web_result".equals(i.kind())).map(ChatToolItem::id)
+                .toList();
+        if (!hitItems.equals(web.stream().map(ChatWebResult::id).toList())
+                || !web.isEmpty() && !ChatCapability.WEB_SEARCH.id().equals(kept.capabilityId())) throw invalidKept();
         if (result.has("cachedFrom")) {
             var source = retained.get(result.string("cachedFrom"));
             if (source == null) throw invalidKept();
             var earlier = rebound(run, source, retained, restored, visiting);
             if (!query.equals(earlier.provenance().request()) || !output.dataVersion().equals(earlier.dataVersion())
                     || output.nextAllowed() != earlier.nextAllowed()
-                    || !earlier.evidenceIds().containsAll(output.evidenceIds())) throw invalidKept();
+                    || !earlier.evidenceIds().containsAll(output.evidenceIds())
+                    || !earlier.webResults().containsAll(output.webResults())) throw invalidKept();
             for (var item : output.items()) {
                 if (earlier.items().stream().noneMatch(original -> Objects.equals(original.id(), item.id())
                         && Objects.equals(original.kind(), item.kind()) && Objects.equals(original.label(), item.label())
@@ -227,7 +241,7 @@ public class ChatToolRunner implements AutoCloseable {
             }
             output = new ChatToolOutput(output.dataVersion(), output.items(), output.evidenceIds(),
                     output.truncated() || earlier.truncated() || output.items().size() < earlier.items().size(),
-                    output.nextAllowed(), output.paths());
+                    output.nextAllowed(), output.paths(), output.webResults());
         }
         var bound = ChatToolResult.succeeded(kept.toolCallId(), run, query, output);
         visiting.remove(kept.toolCallId());
