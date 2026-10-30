@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 5156)
+Total output lines: 543
+
 import BriefingPreservedContext from './BriefingPreservedContext';
 import { preservedPublication } from '@/util/preservedBriefing';
 import { useEffect, useState } from 'react';
@@ -36,7 +39,6 @@ import {
   FOCUS_RING,
   PRIMARY_BUTTON,
   SECTION,
-  SECTION_TITLE,
   STATUS_PILL,
 } from './briefingStyles';
 
@@ -259,25 +261,7 @@ export default function PublishedBriefing({
             roundId={result.id}
             resultVersion={previewAnalysis.resultVersion}
             feature="briefing_issue"
-            targetId={`${result.id}/${item.eventId}`}
-            subject={`핵심 이슈 ${item.rank}`}
-          />
-        ) : (
-          result.graphVersion && (
-            <FeedbackButtons
-              key={`${feedbackKey}:${item.eventId}`}
-              feature="briefing_issue"
-              targetId={`${result.id}/${item.eventId}`}
-              targetVersion={result.graphVersion}
-              subject={`핵심 이슈 ${item.rank}`}
-              saved={saved('briefing_issue', `${result.id}/${item.eventId}`)}
-            />
-          )
-        )}
-      </div>
-    );
-
-  const feedbackReadError = myFeedback?.key === feedbackKey &&
+  …156 tokens truncated…key === feedbackKey &&
     myFeedback?.error && (
       <p role="alert" className={EMPTY}>
         내 평가를 불러오지 못해 평가 버튼을 잠시 사용할 수 없어요.{' '}
@@ -292,7 +276,6 @@ export default function PublishedBriefing({
     );
   const roundFeedback = result && (
     <section className={SECTION} aria-label="이 브리핑 평가">
-      <h3 className={SECTION_TITLE}>이 브리핑은 어땠나요?</h3>
       {previewAnalysis ? (
         <BriefingPreviewFeedback
           key={`${previewAnalysis.resultVersion}:round`}
@@ -301,7 +284,6 @@ export default function PublishedBriefing({
           feature="briefing_round"
           targetId={result.id}
           subject="이 브리핑 회차"
-          showNote
         />
       ) : result.graphVersion ? (
         <FeedbackButtons
@@ -530,15 +512,6 @@ export default function PublishedBriefing({
               </BriefingReadingSection>
             )}
             {compact && result.status === 'published' && roundFeedback}
-            {compact && (
-              <BriefingReadingSection
-                compact
-                title="발행 정보와 자료 확인 범위"
-              >
-                {publicationInfo}
-                {knownLimits && partialInfo}
-              </BriefingReadingSection>
-            )}
           </>
         )}
         {result?.status === 'published' && (
