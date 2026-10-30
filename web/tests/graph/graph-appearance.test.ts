@@ -69,12 +69,12 @@ test.each(['light', 'dark'] as const)(
     expect(
       candidate.edges
         ?.filter((e) => !e.style?.lineDash)
-        .every((e) => e.style?.lineWidth === 1.1),
+        .every((e) => e.style?.lineWidth === 2.2),
     ).toBe(true);
     expect(
       candidate.edges
         ?.filter((e) => e.style?.lineDash)
-        .every((e) => e.style?.lineWidth === 1),
+        .every((e) => e.style?.lineWidth === 2),
     ).toBe(true);
   },
 );
@@ -144,7 +144,7 @@ test.each(['light', 'dark'] as const)(
     );
     const result = styleGraph(data, { variant: 'improved', theme });
     result.edges?.forEach((edge, index) => {
-      expect(Number(edge.style?.lineWidth)).toBeLessThan(2);
+      expect(Number(edge.style?.lineWidth)).toBeLessThan(3);
       expect(edge.style?.lineDash).toEqual(data.edges?.[index].style?.lineDash);
       expect(edge.style?.endArrow).toBe(data.edges?.[index].style?.endArrow);
       expect(edge.style?.increasedLineWidthForHitTesting).toBe(

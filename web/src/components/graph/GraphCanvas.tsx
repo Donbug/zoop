@@ -671,7 +671,7 @@ export default function GraphCanvas({
       animation: EDGE_ANIMATION,
       state: {
         related: {
-          lineWidth: appearance.variant === 'improved' ? 2.5 : 2,
+          lineWidth: appearance.variant === 'improved' ? 3.5 : 3,
           stroke:
             appearance.variant === 'improved'
               ? colors.selected
@@ -680,7 +680,7 @@ export default function GraphCanvas({
         },
         inactive: { strokeOpacity: 0.2 },
         selected: {
-          lineWidth: appearance.variant === 'improved' ? 2.5 : 2,
+          lineWidth: appearance.variant === 'improved' ? 3.5 : 3,
           stroke:
             appearance.variant === 'improved'
               ? colors.selected
@@ -803,7 +803,7 @@ export default function GraphCanvas({
                       : themeColor('ink')
                     : themeColor('ink'),
                   strokeOpacity: 1,
-                  lineWidth: connectionPath ? 2 : 4,
+                  lineWidth: connectionPath ? 3 : 4.5,
                 },
               }
             : edge,

@@ -403,7 +403,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
         const direct = rendered.edges?.find(
           (edge) => !edge.style?.lineDash && !edge.style?.endArrow,
         );
-        expect(direct?.style?.lineWidth).toBe(1.1);
+        expect(direct?.style?.lineWidth).toBe(2.2);
         expect(direct?.style?.stroke).toBe(
           theme === 'dark' ? '#a5a9b1' : '#71757c',
         );
