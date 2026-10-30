@@ -9,10 +9,10 @@
 | `web.search` 도구(`ChatWebSearchTool`), 공급자 포트(`ChatWebSearchProvider`), 합성 공급자 | 실제 공급자(미선정), 공급자 키·약관·처리 국가 결정 |
 | 검색어 검사(`ChatWebQueryPolicy`), Q02만 있는 run의 기본 1회 검색 | 혼합 질문의 Q02 기본 검색, Q01이 섞인 질문의 다른 부분 웹 검색(승인 요청에 요구 ID가 없어 검색을 어느 요구에 묶을지 알 수 없음) |
 | agent 경로의 MCP 도구 노출과 Java 승인 gate(5장), `web-search:<공급자>` 전송 grant 검사, 웹 장애·예산 → notice | 요구별 미충족 판단(승인 요청에 요구 ID가 없어 run 단위로 판단) |
-| 호출당 7초, job당 웹 2회(내부 6회와 별도), 회원 하루 20회·프로젝트 하루 500회 원자 예약 | 답변 인용 계약(`web_reported` basis, `Citation.sourceKind=web_result`), AI 단계 계약, 화면 |
-| `web_*` notice 문구(`ChatResults`) | snapshot 저장·재열람, Jev 후검증 쪽 전송 grant |
+| 호출당 7초, job당 웹 2회(내부 6회와 별도), 회원 하루 20회·프로젝트 하루 500회 원자 예약 | 실제 공급자의 재열람 권리(저장·보유 기간): 정해지기 전에는 합성 공급자 인용만 다시 보여 줌 |
+| `web_*` notice 문구(`ChatResults`), 답변 인용 계약(6장: `web_reported` basis, `Citation.sourceKind=web_result`, AI 단계 계약, 화면) | snapshot 저장 |
 
-라우터·서버 계획은 이 도구를 고르지 않는다(`ChatToolRegistry.bound()`에서 빠짐). 등록되면 MCP 도구로 노출되고, agent 경로에서만 Luna가 요청하고 서버가 승인한다(5장). **인용 계약이 없는 동안 웹 도구와 agent 경로를 함께 켜면 기동을 거절한다**: 웹에서 읽은 내용이 검사할 인용 없이 답에 섞일 수 있기 때문이다. 그래서 지금은 어떤 질문도 웹을 쓰지 않으며, 연결은 시험으로만 확인한다.
+라우터·서버 계획은 이 도구를 고르지 않는다(`ChatToolRegistry.bound()`에서 빠짐). 등록되면 MCP 도구로 노출되고, agent 경로에서만 Luna가 요청하고 서버가 승인한다(5장). 웹 결과는 `web_reported` 구간에서 `web_result`로 인용되고 Jev가 snippet과 대조하므로(6장), 웹 도구와 agent 경로를 함께 켤 수 있다(2026-10-30). 실제 공급자가 없어 합성 공급자로만 동작한다.
 
 ## 2. 켜는 방법 (로컬·시험 전용)
 
@@ -54,7 +54,14 @@ ZOOP_CHAT_WEB_ENABLED=true ZOOP_CHAT_WEB_PROVIDER=synthetic
 5. **전송**: 결과의 웹 hit은 `web-search:<공급자>` grant가 `chat-agent` 수신자에 허용될 때만 모델에 보낸다. 아니면 hit과 그 항목을 통째로 빼고 `withheld.webResults`에 개수만 적는다.
 6. **notice**: 승인됐는데 호출이 실패했거나 전송 grant 때문에 hit이 모두 빠진 검색은 `web_unavailable`, 공급자가 성공적으로 0건을 돌려준 검색은 `web_no_results`, 예산 거부는 `web_budget_exhausted`다. 답변을 막지 않으며 answered 결과의 `notices`에 붙는다(요구 표현 없음).
 
-## 6. 시험
+## 6. 답변 인용 (`web_reported`·`web_result`)
+
+- **구간**: 웹 결과로 답한 부분은 `web_reported` 구간이다. 그 구간의 요구가 실제로 받은 웹 결과의 ID(`web-<hash>`)만, 하나 이상 인용한다. 근거 구간·ZOOP 문서 구간은 웹 결과를 인용할 수 없고, 웹 구간은 줍 근거를 인용할 수 없다(`validation_failed`). 개념(일반 개념) 요구도 run의 웹 결과로 답할 수 있다(내부 조회 결과는 받지 않음).
+- **인용**: `Citation.sourceKind=web_result`, `evidenceId`=결과 ID, `quote`=snippet, `articleTitle`=제목, `publisher`=도메인, `docId`=공급자, `url`·`publishedAt`. 줍의 근거로 승격하지 않는다. `answerBasis`에 `web_reported`가 더해진다(여러 수준이면 `mixed`).
+- **검증**: Jev는 웹 구간을 인용한 snippet만으로 판정한다. snippet에 없는 내용이나 확인된 사실처럼 쓴 주장은 지지되지 않는다. snippet은 `web-search:<공급자>`의 `chat-verification` 전송 grant로 보낸다.
+- **재열람**: 다시 검색하지 않는다. 실제 공급자의 저장·재열람 권리가 정해지기 전까지 합성 공급자 인용만 다시 보여 주고, 그 밖의 웹 인용이 있으면 본문을 고정 안내로 바꾼다(`ChatResponseGuard`).
+
+## 7. 시험
 
 ```sh
 ./api/gradlew -p api test --tests 'com.zoop.chat.tool.ChatWebSearch*' --tests 'com.zoop.chat.executor.ChatJobExecutorTest'
@@ -67,4 +74,8 @@ ZOOP_CHAT_WEB_ENABLED=true ZOOP_CHAT_WEB_PROVIDER=synthetic
 - `ChatMcpAgentTest`: 실제 MCP 도구 위에서 개념-only run의 첫 라운드 검색 1회, 혼합·사실 run의 첫 라운드 웹 거부, 내부 0건 뒤 승인, 회원에 관한 검색어 거부, 결과의 웹 hit이 원장에서 돌아옴, 0건·장애·job 예산 초과가 notice가 되고 답은 계속됨.
 - `ChatMcpSendGateTest`: 웹 hit은 그 공급자의 grant가 있을 때만 전송.
 - `ChatAgentPathEngineTest`: 사실 질문의 agent 실행에 웹 도구가 허용되고 웹 notice가 결과에 붙으며 complete를 유지. 개념 질문이 검색만 들고 agent로 가고, 시작하지 못하면 웹 없이 `web_unavailable`. Q01이 섞이면 웹 없음.
-- `ChatMcpConfigurationTest`: 웹 도구와 agent 경로를 함께 켜면 기동 거절.
+- `ChatMcpConfigurationTest`: 웹 도구와 agent 경로를 함께 켤 수 있음.
+- `ChatAgentPathEngineTest`(인용): 웹 보도 구간이 `web_result` 인용과 함께 답이 되고 Jev가 그 snippet을 받음, 근거 구간의 웹 인용·웹 구간의 근거 인용은 `validation_failed`, 개념(Q02) 요구가 run의 웹 결과로 답함.
+- `ChatResponseGuardTest`: 합성 공급자 웹 인용은 다시 보여 주고 다른 공급자 인용은 본문을 고정 안내로 바꿈.
+- `ChatModelStagesTest`: 웹 인용은 `web-search:<공급자>` grant로 검증 단계에 감.
+- worker `test_chat_stages.py`: 웹 구간은 웹 인용만(하나 이상), 웹 인용은 `web-search:` 출처로만, 섞이면 거절.
