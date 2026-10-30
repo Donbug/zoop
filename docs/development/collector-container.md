@@ -16,7 +16,7 @@ AWS Fargate의 standalone `RunTask`로 뉴스 **수집**을 돌리기 위한 이
 
 - build context는 **`ai/pipeline/`** 하나다. `uv.lock`이 `../worker` 없이 설치된다(worker는 dev 그룹의 테스트 의존성일 뿐이다).
 - Python 3.12 slim(trixie) + `uv sync --frozen --no-dev --no-editable --group container`, Node 22(node 이미지의 binary만 복사) + `_defuddle/package-lock.json`의 `npm ci --omit=dev`를 설치된 패키지 안(`.../zoop_ai_pipeline/_defuddle/node_modules`)에 둔다. 비root 사용자 `collector`(uid/gid 10001), init은 `tini`.
-- `boto3`는 `pyproject.toml`의 **dependency group `container`**(고정 `boto3==1.43.121`, `uv.lock` 포함)로만 설치된다. S3를 쓰는 코드는 `collector_s3.py` 하나이고 다른 경로는 boto3를 import하지 않는다. 자격 증명은 기본 AWS provider chain(ECS task role)만 쓰며 설정에 키가 없다.
+- `boto3`는 `pyproject.toml`의 **dependency group `container`**에 고정한다(`boto3==1.43.121`, `uv.lock` 포함). `dev` 그룹도 이 그룹을 포함하므로 CI의 `make pipeline-install`이 실제 S3 전송 시험에 필요한 SDK를 설치한다. 제품의 S3 코드는 `collector_s3.py`에 모여 있다. 자격 증명은 기본 AWS provider chain(ECS task role)으로 공급한다.
 
 ```sh
 docker build -f ai/pipeline/Dockerfile \
@@ -221,7 +221,7 @@ s3://<bucket>/<prefix>/runs/<runId>/checkpoints/<seq:06d>-<checkpointId>/<privat
 
 ```sh
 cd ai/pipeline
-uv run --frozen --group container python -m pytest tests/test_collector_container.py -q -s
+uv run --frozen --group dev python -m pytest tests/test_collector_container.py -n 4 --dist loadfile -q
 ```
 
 컨테이너 smoke: 같은 네트워크에 S3 호환 서버와 loopback fixture 서버를 두고(`synthetic loopback` 설정은 `127.0.0.1`만 허용하므로 fixture 컨테이너의 network namespace를 `--network container:<fixture>`로 공유), `PRIVATE_CONFIG_S3_URI`+`SHA256`·`ZOOP_COLLECTOR_S3_URI`·`AWS_ENDPOINT_URL`을 주고 `run` → 주기 checkpoint → `docker exec … zoop-ai-collector checkpoint` → `docker stop -t 60` → 새 컨테이너에서 `restore`/`run`.

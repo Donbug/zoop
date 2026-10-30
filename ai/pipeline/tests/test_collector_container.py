@@ -6,8 +6,11 @@ import shutil
 import os
 import signal
 import sqlite3
+import subprocess
+import sys
 import threading
 import time
+from contextlib import contextmanager, nullcontext
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -443,15 +446,54 @@ def controller_env(tmp_path, values, **overrides):
     return env
 
 
+@contextmanager
 def sigterm_when(condition, timeout=60):
+    cancelled = threading.Event()
+
     def watcher():
         deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline and not condition():
-            time.sleep(0.05)
-        os.kill(os.getpid(), signal.SIGTERM)
+        while not cancelled.wait(0.05) and time.monotonic() < deadline:
+            if condition():
+                if not cancelled.is_set():
+                    os.kill(os.getpid(), signal.SIGTERM)
+                return
+
     thread = threading.Thread(target=watcher, daemon=True)
     thread.start()
-    return thread
+    try:
+        yield thread
+    finally:
+        cancelled.set()
+        thread.join(1)
+        assert not thread.is_alive(), "signal watcher outlived its test scope"
+
+
+@pytest.mark.parametrize("end", ["timeout", "scope-error"])
+def test_signal_watcher_leaves_its_process_alive_without_a_trigger(end):
+    program = """
+import signal
+import sys
+import threading
+from tests.test_collector_container import sigterm_when
+
+signal.signal(signal.SIGTERM, signal.SIG_DFL)
+ready = threading.Event()
+try:
+    with sigterm_when(ready.is_set, timeout=0.1 if sys.argv[1] == "timeout" else 60) as thread:
+        if sys.argv[1] == "scope-error":
+            raise RuntimeError("synthetic test failure")
+        thread.join(1)
+except RuntimeError:
+    pass
+ready.set()
+thread.join(1)
+assert not thread.is_alive()
+print("scope-closed")
+"""
+    child = subprocess.run([sys.executable, "-c", program, end], capture_output=True, text=True,
+                           timeout=5, start_new_session=True)
+    assert child.returncode == 0, (child.returncode, child.stdout, child.stderr)
+    assert child.stdout.strip() == "scope-closed"
 
 
 def latest_manifest(store):
@@ -464,9 +506,9 @@ def test_sigterm_stops_admission_drains_and_uploads_a_final_checkpoint(tmp_path)
     try:
         values = paged_values(tmp_path, site, count=12, delay=0.4)
         env, store = controller_env(tmp_path, values), FakeStore()
-        sigterm_when(lambda: site.hits("/article/2") >= 1)
         started = time.monotonic()
-        code = rt.run(env, store_factory=lambda bucket: store)
+        with sigterm_when(lambda: site.hits("/article/2") >= 1):
+            code = rt.run(env, store_factory=lambda bucket: store)
         elapsed = time.monotonic() - started
         assert code == rt.EXIT_OK and elapsed < 40
         manifest = latest_manifest(store)
@@ -486,8 +528,8 @@ def test_restore_on_start_continues_without_refetching_settled_articles(tmp_path
     try:
         values = paged_values(tmp_path, site, count=10, delay=0.3)
         env, store = controller_env(tmp_path, values), FakeStore()
-        sigterm_when(lambda: site.hits("/article/1") >= 1)
-        assert rt.run(env, store_factory=lambda bucket: store) == rt.EXIT_OK
+        with sigterm_when(lambda: site.hits("/article/1") >= 1):
+            assert rt.run(env, store_factory=lambda bucket: store) == rt.EXIT_OK
         first = latest_manifest(store)
         shutil.rmtree(tmp_path / "state")
         assert rt.run(env, store_factory=lambda bucket: store) == rt.EXIT_OK
@@ -506,9 +548,9 @@ def test_drain_deadline_kills_the_worker_marks_it_unknown_and_still_checkpoints(
         values = paged_values(tmp_path, site, count=4, delay=25)
         env = controller_env(tmp_path, values, ZOOP_COLLECTOR_DRAIN_SECONDS="1")
         store = FakeStore()
-        sigterm_when(lambda: site.hits("/article/0") + site.hits("/article/1") + site.hits("/article/2") + site.hits("/article/3") >= 1)
         started = time.monotonic()
-        code = rt.run(env, store_factory=lambda bucket: store)
+        with sigterm_when(lambda: sum(site.hits(f"/article/{i}") for i in range(4)) >= 1):
+            code = rt.run(env, store_factory=lambda bucket: store)
         assert code == rt.EXIT_OK and time.monotonic() - started < 40
         manifest = latest_manifest(store)
         assert manifest["paths"][0]["shutdown"] == "killed-marked-unknown"
@@ -540,8 +582,8 @@ def test_sigterm_while_a_checkpoint_waits_for_a_busy_worker_still_drains_on_time
         env = controller_env(tmp_path, values, ZOOP_COLLECTOR_DRAIN_SECONDS="1", ZOOP_COLLECTOR_CHECKPOINT_INTERVAL_SECONDS="1")
         store = FakeStore()
         started = time.monotonic()
-        sigterm_when(lambda: sum(site.hits(f"/article/{i}") for i in range(4)) >= 1 and time.monotonic() > started + 3)
-        assert rt.run(env, store_factory=lambda bucket: store) == rt.EXIT_OK
+        with sigterm_when(lambda: sum(site.hits(f"/article/{i}") for i in range(4)) >= 1 and time.monotonic() > started + 3):
+            assert rt.run(env, store_factory=lambda bucket: store) == rt.EXIT_OK
         assert time.monotonic() - started < 30
         assert latest_manifest(store)["kind"] == "final"
     finally:
@@ -559,16 +601,15 @@ def test_sigterm_during_upload_stops_admission_and_bounds_exit(tmp_path):
         objects.block = lambda method, key: method == "PUT" and "/private/" in key
         observed = {}
 
-        def stop_during_upload():
-            if objects.entered.wait(15):
-                observed["sent"] = time.monotonic()
-                observed["admitted"] = sum(site.hits(f"/article/{i}") for i in range(30))
-                os.kill(os.getpid(), signal.SIGTERM)
+        def upload_ready():
+            if not objects.entered.is_set():
+                return False
+            observed["sent"] = time.monotonic()
+            observed["admitted"] = sum(site.hits(f"/article/{i}") for i in range(30))
+            return True
 
-        watcher = threading.Thread(target=stop_during_upload, daemon=True)
-        watcher.start()
-        code = rt.run(env, store_factory=lambda bucket: objects.client())
-        watcher.join(1)
+        with sigterm_when(upload_ready, timeout=15):
+            code = rt.run(env, store_factory=lambda bucket: objects.client())
         assert "sent" in observed
         elapsed = time.monotonic() - observed["sent"]
         admitted = sum(site.hits(f"/article/{i}") for i in range(30))
@@ -650,10 +691,9 @@ def test_accepted_latest_with_lost_response_is_unknown_and_never_retried(tmp_pat
                              ZOOP_COLLECTOR_FINAL_SECONDS="3", ZOOP_COLLECTOR_RESERVE_SECONDS="1",
                              ZOOP_COLLECTOR_STOP_TIMEOUT_SECONDS="6")
         objects.block = lambda method, key: method == "PUT" and key.endswith("latest.json")
-        if interrupt == "sigterm":
-            sigterm_when(objects.entered.is_set)
         started = time.monotonic()
-        code = rt.run(env, store_factory=lambda bucket: objects.client(read_timeout=0.1 if interrupt == "read-timeout" else 30))
+        with sigterm_when(objects.entered.is_set) if interrupt == "sigterm" else nullcontext():
+            code = rt.run(env, store_factory=lambda bucket: objects.client(read_timeout=0.1 if interrupt == "read-timeout" else 30))
         elapsed = time.monotonic() - started
         assert objects.entered.is_set() and code == rt.EXIT_CHECKPOINT
         status = json.loads((tmp_path / "state" / "control" / "status.json").read_bytes())
@@ -682,6 +722,7 @@ def test_periodic_and_external_checkpoint_is_served_by_the_live_controller(tmp_p
         store = FakeStore()
         os.environ.update({key: env[key] for key in ("ZOOP_COLLECTOR_STATE_ROOT", "ZOOP_COLLECTOR_CONFIG_DIR")})
         outcome = []
+        checkpoint_ready = threading.Event()
 
         def client():
             deadline = time.monotonic() + 30
@@ -695,11 +736,12 @@ def test_periodic_and_external_checkpoint_is_served_by_the_live_controller(tmp_p
                     if status["lastCheckpoint"] is not None:
                         break
                     time.sleep(0.05)
-            os.kill(os.getpid(), signal.SIGTERM)
+            checkpoint_ready.set()
 
         threading.Thread(target=client, daemon=True).start()
         try:
-            assert rt.run(env, store_factory=lambda bucket: store) == rt.EXIT_OK
+            with sigterm_when(checkpoint_ready.is_set):
+                assert rt.run(env, store_factory=lambda bucket: store) == rt.EXIT_OK
         finally:
             os.environ.pop("ZOOP_COLLECTOR_STATE_ROOT")
             os.environ.pop("ZOOP_COLLECTOR_CONFIG_DIR")

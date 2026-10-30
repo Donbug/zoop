@@ -513,6 +513,7 @@ container = [
     { name = "boto3" },
 ]
 dev = [
+    { name = "boto3" },
     { name = "pytest" },
     { name = "pytest-xdist" },
     { name = "zoop-ai-worker" },
@@ -530,6 +531,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 container = [{ name = "boto3", specifier = "==1.43.121" }]
 dev = [
+    { name = "boto3", specifier = "==1.43.121" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-xdist", specifier = "==3.8.0" },
     { name = "zoop-ai-worker", directory = "../worker" },

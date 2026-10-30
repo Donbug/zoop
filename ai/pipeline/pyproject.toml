@@ -26,8 +26,8 @@ zoop-ai-collector = "zoop_ai_pipeline.collector_cli:main"
 
 [dependency-groups]
 # The S1 worker is only a test dependency: citation parity checks compare against its public exact() rule.
-dev = ["pytest==9.1.1", "pytest-xdist==3.8.0", "zoop-ai-worker"]
-# Installed only into the collector image (`uv sync --group container`): the S3 checkpoint store, no other code path imports boto3.
+dev = ["pytest==9.1.1", "pytest-xdist==3.8.0", "zoop-ai-worker", {include-group = "container"}]
+# The collector image and dev tests share the pinned S3 SDK.
 container = ["boto3==1.43.121"]
 
 [tool.uv]
