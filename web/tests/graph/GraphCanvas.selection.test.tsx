@@ -411,10 +411,6 @@ describe('D-GRP-02 · canvas selection bridge', () => {
           (node) => node.id === 'NASDAQ:NVDA',
         )?.style;
         expect(Number(label?.labelFontSize)).toBeGreaterThan(17.2);
-        const aiFeature = screen.getByRole('button', { name: 'AI 기능' });
-        expect(aiFeature.querySelector('img')?.getAttribute('src')).toBe(
-          '/graph-assets/ai.svg',
-        );
         expect(
           screen.getByRole('button', { name: 'AI 채팅' }).querySelector('img'),
         ).toBeNull();

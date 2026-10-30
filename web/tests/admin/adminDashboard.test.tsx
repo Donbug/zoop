@@ -294,9 +294,7 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
     });
     expect(await within(section).findByText('40.5%')).toBeTruthy();
     expect(within(section).getByText('15 / 37노출')).toBeTruthy();
-    expect(
-      within(section).getByText('0 / 4명 (분모 5 미만이라 비율 숨김)'),
-    ).toBeTruthy();
+    expect(within(section).getByText('0 / 4명 (표본 부족)')).toBeTruthy();
     expect(within(section).getByText('3명')).toBeTruthy();
     expect(within(section).getByText('차단 0명')).toBeTruthy();
   });

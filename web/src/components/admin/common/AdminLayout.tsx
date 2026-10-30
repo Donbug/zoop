@@ -1,4 +1,9 @@
-import { useState } from 'react';
+import {
+  useState,
+  type PointerEvent,
+  type CSSProperties,
+  type KeyboardEvent,
+} from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { adminMenus } from '@/constants/navigation';
 import { logoutAdmin } from '@/apis/admin/auth';
@@ -26,6 +31,31 @@ export default function AdminLayout() {
   const toggleTheme = useThemeToggle();
   const admin = useAdminSessionStore((state) => state.admin);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const stored = Number(
+      window.localStorage.getItem('zoop:admin-sidebar-width'),
+    );
+    return Number.isFinite(stored) && stored >= 192 && stored <= 384
+      ? stored
+      : 224;
+  });
+
+  const changeSidebarWidth = (width: number) => {
+    const nextWidth = Math.min(384, Math.max(192, width));
+    setSidebarWidth(nextWidth);
+    window.localStorage.setItem('zoop:admin-sidebar-width', String(nextWidth));
+  };
+
+  const resizeSidebar = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.buttons === 0) return;
+    changeSidebarWidth(event.clientX);
+  };
+
+  const handleResizeKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    changeSidebarWidth(sidebarWidth + (event.key === 'ArrowRight' ? 16 : -16));
+  };
 
   const logout = async () => {
     await logoutAdmin().catch(() => undefined);
@@ -34,7 +64,8 @@ export default function AdminLayout() {
 
   return (
     <div
-      className={`admin-surface min-h-dvh grid grid-cols-1 bg-zoop-paper text-zoop-ink ${sidebarOpen ? 'md:grid-cols-[14rem_1fr]' : 'md:grid-cols-1'}`}
+      className={`admin-surface relative min-h-dvh grid grid-cols-1 bg-zoop-paper text-zoop-ink ${sidebarOpen ? 'md:grid-cols-[var(--admin-sidebar-width)_minmax(0,1fr)]' : 'md:grid-cols-1'}`}
+      style={{ '--admin-sidebar-width': `${sidebarWidth}px` } as CSSProperties}
     >
       <a
         href="#admin-main"
@@ -46,7 +77,7 @@ export default function AdminLayout() {
       <aside
         id="admin-sidebar"
         hidden={!sidebarOpen}
-        className="min-w-0 border-b-[0.667px] border-zoop-line bg-zoop-paper p-4 text-zoop-ink md:border-r-[0.667px] md:border-b-0 md:p-6"
+        className="min-w-0 border-b-[0.667px] border-zoop-line bg-zoop-paper p-4 text-zoop-ink md:sticky md:top-0 md:h-dvh md:self-start md:overflow-y-auto md:border-r-[0.667px] md:border-b-0 md:p-6"
       >
         <div className="mb-5 flex items-center justify-between gap-3">
           <p className="text-xl font-bold">줍 관리자</p>
@@ -82,11 +113,18 @@ export default function AdminLayout() {
         </nav>
         <button
           type="button"
-          className={`${BUTTON} mt-4`}
+          className={`mt-4 grid size-8 place-items-center rounded-full text-zoop-muted hover:bg-zoop-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink`}
           onClick={toggleTheme}
-          aria-label="화면 모드 전환"
+          aria-label="화면 테마 전환"
+          title="밝은 모드 / 어두운 모드 전환"
         >
-          테마 전환
+          <img
+            src="/graph-assets/slim-moon.svg"
+            width="16"
+            height="16"
+            alt=""
+            data-icon
+          />
         </button>
         {admin && (
           <div className="mt-8 flex flex-col gap-2 border-t-[0.667px] border-zoop-line pt-4">
@@ -106,6 +144,24 @@ export default function AdminLayout() {
           </div>
         )}
       </aside>
+      {sidebarOpen && (
+        <div
+          role="separator"
+          aria-label="사이드바 너비 조절"
+          aria-orientation="vertical"
+          aria-valuemin={192}
+          aria-valuemax={384}
+          aria-valuenow={sidebarWidth}
+          tabIndex={0}
+          onPointerDown={(event) =>
+            event.currentTarget.setPointerCapture(event.pointerId)
+          }
+          onPointerMove={resizeSidebar}
+          onKeyDown={handleResizeKeyDown}
+          className="absolute inset-y-0 z-10 hidden w-2 -translate-x-1/2 cursor-col-resize touch-none md:block"
+          style={{ left: `${sidebarWidth}px` }}
+        />
+      )}
       <main
         id="admin-main"
         tabIndex={-1}

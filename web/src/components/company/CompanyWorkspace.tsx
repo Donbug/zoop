@@ -683,64 +683,54 @@ export default function CompanyWorkspace() {
             </>
           )}
         </section>
-        <section aria-label="가상 계좌 보유">
-          <h2>가상 계좌 보유 · 프로젝트용 모의 데이터</h2>
-          {!auth.isAuthenticated ? (
-            <p>
-              {auth.checking
-                ? '로그인 상태 확인 중…'
-                : '로그인하고 가상 계좌를 연결하면 모의 보유 정보를 볼 수 있어요.'}
-            </p>
-          ) : (
-            <>
+        {(holding || portfolio.error) && (
+          <section aria-label="가상 계좌 보유">
+            <h2>가상 계좌 보유 · 프로젝트용 모의 데이터</h2>
+            {portfolio.error && (
               <Status resource={portfolio} label="모의 보유" />
-              {portfolio.data && !portfolio.data.connected && (
-                <p>연결된 가상 계좌가 없어요.</p>
-              )}
-              {portfolio.data?.connected && !holding && (
-                <p>이 기업의 모의 보유 종목이 없어요.</p>
-              )}
-              {holding && (
-                <>
-                  <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-xs [&_dt]:text-zoop-faint [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
-                    <dt>보유 수량</dt>
-                    <dd>{number(holding.quantity)}주</dd>
-                    <dt>평균 매입가</dt>
-                    <dd>
-                      {number(holding.avgPrice)}{' '}
-                      {holding.avgPriceCurrency ?? '통화 미상'}
-                    </dd>
-                    <dt>평가 금액</dt>
-                    <dd>
-                      {number(holding.marketValue)}{' '}
-                      {holding.quote.status === 'available'
-                        ? holding.quote.currency
-                        : '시세 미제공'}
-                    </dd>
-                    <dt>자산 비중</dt>
-                    <dd>
-                      {holding.weight === null
-                        ? '계산 불가'
-                        : `${number(holding.weight * 100)}%`}
-                    </dd>
-                  </dl>
-                  <p>
-                    모의 수량 기준{' '}
-                    <ReferenceTime value={portfolio.data?.mockAsOf} /> · 평가
-                    기준{' '}
-                    <ReferenceTime
-                      value={portfolio.data?.valuation?.calculatedAt}
-                    />
-                  </p>
-                  {portfolio.data?.valuation?.weightUnavailableReason && (
-                    <p>{portfolio.data.valuation.weightUnavailableReason}</p>
-                  )}
-                </>
-              )}
-              <Basis metadata={portfolio.data?.metadata} />
-            </>
-          )}
-        </section>
+            )}
+            {holding && (
+              <>
+                <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-xs [&_dt]:text-zoop-faint [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
+                  <dt>보유 수량</dt>
+                  <dd>{number(holding.quantity)}주</dd>
+                  <dt>평균 매입가</dt>
+                  <dd>
+                    {number(holding.avgPrice)}{' '}
+                    {holding.avgPriceCurrency ?? '통화 미상'}
+                  </dd>
+                  <dt>평가 금액</dt>
+                  <dd>
+                    {number(holding.marketValue)}{' '}
+                    {holding.quote.status === 'available'
+                      ? holding.quote.currency
+                      : '시세 미제공'}
+                  </dd>
+                  <dt>자산 비중</dt>
+                  <dd>
+                    {holding.weight === null
+                      ? '-'
+                      : `${number(holding.weight * 100)}%`}
+                  </dd>
+                </dl>
+                <p>
+                  모의 수량 기준{' '}
+                  <ReferenceTime value={portfolio.data?.mockAsOf} /> · 평가 기준{' '}
+                  <ReferenceTime
+                    value={portfolio.data?.valuation?.calculatedAt}
+                  />
+                </p>
+                {portfolio.data?.valuation?.weightUnavailableReason && (
+                  <p>{portfolio.data.valuation.weightUnavailableReason}</p>
+                )}
+              </>
+            )}
+            {!holding && portfolio.data?.connected && (
+              <p>이 기업의 모의 보유 종목이 없어요.</p>
+            )}
+            <Basis metadata={portfolio.data?.metadata} />
+          </section>
+        )}
         <nav
           aria-label="기업 상세 보기"
           className="my-0! gap-0! border-b border-zoop-line"

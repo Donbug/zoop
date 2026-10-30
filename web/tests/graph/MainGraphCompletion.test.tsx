@@ -527,7 +527,7 @@ it('D-GRP-05 isolates the related event when no edge has that evidence', async (
   vi.restoreAllMocks();
 });
 
-it('D-GRP-01 shows help and event focus controls', async () => {
+it('D-GRP-01 keeps event focus and map information controls without the extra help button', async () => {
   anonymous();
   vi.mocked(getGraph).mockResolvedValue(
     createMockGraph({ mode: 'all', personalFilter: 'all' }),
@@ -549,21 +549,12 @@ it('D-GRP-01 shows help and event focus controls', async () => {
         'max-md:[&_.relationship-graph-filters_button]:min-h-10!',
       ),
   ).toBe(true);
-  for (const name of [
-    '조작 도움말',
-    '지도 데이터 안내',
-    '튜토리얼 다시 보기',
-  ]) {
+  for (const name of ['지도 데이터 안내', '튜토리얼 다시 보기']) {
     const button = screen.getByRole('button', { name });
     expect(button.classList.contains('max-md:min-h-10')).toBe(true);
     expect(button.classList.contains('max-md:min-w-10')).toBe(true);
   }
-  await userEvent.click(screen.getByRole('button', { name: '조작 도움말' }));
-  expect(
-    screen.getByRole('region', { name: '지도 조작 도움말' }).textContent,
-  ).toContain('Shift+Enter');
-  await userEvent.keyboard('{Escape}');
-  expect(screen.queryByRole('region', { name: '지도 조작 도움말' })).toBeNull();
+  expect(screen.queryByRole('button', { name: '조작 도움말' })).toBeNull();
 });
 
 it('D-BRF-04 회차 지도를 최신 main 지도에 연결하고 현재 지도로 복귀한다', async () => {
@@ -1165,7 +1156,7 @@ describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
     await screen.findByRole('heading', { name: '근거 문서' });
     await screen.findByText('튜토리얼 5/5');
     await userEvent.click(screen.getByRole('button', { name: '근거 창 닫기' }));
-    expect(screen.getByRole('heading', { name: 'AI에게 묻기' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'AI에게 질문' })).toBeTruthy();
     expect(
       screen.queryByRole('button', { name: '튜토리얼 건너뛰기' }),
     ).toBeNull();
@@ -1199,6 +1190,24 @@ describe('D-GRP-06 · 기업 영향 경로', () => {
     vi.mocked(getGraph).mockImplementation(async (request) =>
       createMockGraph(request),
     );
+  });
+
+  it('D-GRP-03 선택한 기업 패널을 키보드로 좌우 조절하고 너비를 저장한다', async () => {
+    localStorage.removeItem('zoop:graph-company-panel-width');
+    setup('/?mode=all&select=node%3AKRX%3A005930');
+    const panel = await screen.findByRole('complementary', {
+      name: '삼성전자 기업 상세',
+    });
+    const separator = screen.getByRole('separator', {
+      name: '기업 패널 너비 조절',
+    });
+    expect(separator.getAttribute('aria-valuenow')).toBe('320');
+    separator.focus();
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(separator.getAttribute('aria-valuenow')).toBe('336');
+    expect((panel as HTMLElement).style.width).toBe('336px');
+    expect(localStorage.getItem('zoop:graph-company-panel-width')).toBe('336');
+    localStorage.removeItem('zoop:graph-company-panel-width');
   });
 
   it('기업의 직접 사건에서 URL 경로 패널을 열고 닫을 때 기업 선택을 보존한다', async () => {
@@ -1250,7 +1259,7 @@ describe('D-GRP-07b · 선택 기업 포커스', () => {
     });
     await userEvent.click(
       await within(panel).findByRole('button', {
-        name: '이 기업 중심으로 보기',
+        name: '기업 중심 그래프',
       }),
     );
     expect(
