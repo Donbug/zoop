@@ -15,7 +15,6 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -41,7 +40,7 @@ public class DisclosureExclusionConfiguration {
 
     @Bean
     DisclosureExclusionRunner disclosureExclusionRunner(Properties properties, ApplicationContext context,
-            NamedParameterJdbcTemplate jdbc, DocumentRegistryRepository registry, TransactionOperations transaction,
+            JdbcDisclosureExclusionRepository repository, DocumentRegistryRepository registry, TransactionOperations transaction,
             ObjectProvider<HandoffExposureClient> exposure) {
         if (context instanceof WebApplicationContext) {
             throw new IllegalStateException("zoop.disclosure-exclusion.enabled requires spring.main.web-application-type=none");
@@ -53,8 +52,8 @@ public class DisclosureExclusionConfiguration {
             throw new IllegalStateException("zoop.disclosure-exclusion.artifact-root cannot be used as an artifact store");
         }
         return new DisclosureExclusionRunner(path("request", properties.request()), path("result", properties.result()),
-                new ExclusionRequestParser(), new DisclosureExclusionService(new JdbcDisclosureExclusionRepository(jdbc), registry,
-                        store, transaction, exposure.getIfAvailable()));
+                new ExclusionRequestParser(), new DisclosureExclusionService(repository, registry, store, transaction,
+                        exposure.getIfAvailable()));
     }
 
     private static Path path(String name, String value) {

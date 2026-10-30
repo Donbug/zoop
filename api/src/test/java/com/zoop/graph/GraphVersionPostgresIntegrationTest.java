@@ -7,10 +7,22 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zoop.ZoopApplication;
+import com.zoop.admin.auth.repository.AdminAuditRepository;
 import com.zoop.admin.auth.service.AdminPrincipal;
 import com.zoop.admin.dashboard.repository.AdminDashboardRepository;
 import com.zoop.admin.graph.AdminGraphVersionService;
 import com.zoop.admin.graph.GraphVersionActivateRequest;
+import com.zoop.admin.graph.JdbcAdminGraphVersionRepository;
+import com.zoop.document.evidence.service.EvidenceService;
+import com.zoop.graph.exclusion.DisclosureExclusionCarry;
+import com.zoop.graph.read.DisclosureExclusionReader;
+import java.time.Clock;
+import java.util.concurrent.atomic.AtomicInteger;
+import tools.jackson.databind.ObjectMapper;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import com.zoop.admin.graph.GraphVersionAdminResponse.GraphVersionOut;
 import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
 import com.zoop.auth.service.MemberSettingsService;
@@ -482,6 +494,46 @@ class GraphVersionPostgresIntegrationTest {
                 Timestamp.class));
         assertEquals(0, jdbc.queryForObject(
                 "SELECT count(*) FROM graph_activations WHERE reason = 'go live'", Integer.class));
+    }
+
+    @Test
+    void aRefusedActivationRollsBackTheExclusionsItCarriedFromThePublicVersion() {
+        // The public version carries an exclusion (as the operator command writes it); the candidate is an imported-kind version
+        // whose rights check fails. The carry (#55 A-14) runs in the activation's transaction, so it is rolled back with it.
+        long revision = jdbc.queryForObject("SELECT COALESCE(MAX(revision), 0) + 1 FROM disclosure_exclusion_changes", Long.class);
+        jdbc.update("INSERT INTO disclosure_exclusion_changes (revision, action, cause, report_sha256, reason, operator, changed_at) "
+                + "VALUES (?, 'exclude', 'source-change', ?, 'it exclusion', 'it-operator', now())", revision, "8".repeat(64));
+        jdbc.update("INSERT INTO disclosure_exclusion_targets (revision, graph_version_id, target_kind, target_id) "
+                + "VALUES (?, 'fixture-2026-10-08', 'issue', 'issue-carried')", revision);
+        unpublish("fixture-2026-10-01");
+        // Both as imported versions: the public one is the carry's base, the candidate gets the rights checks.
+        jdbc.update("UPDATE graph_versions SET kind = 'snapshot' WHERE id IN ('fixture-2026-10-01', 'fixture-2026-10-08')");
+        // The real service over the real beans, with the carry observed: the proof that it ran, and what it wrote, inside the
+        // activation's transaction before the refusal.
+        DisclosureExclusionCarry carry = spy(context.getBean(DisclosureExclusionCarry.class));
+        AtomicInteger carried = new AtomicInteger(-1);
+        doAnswer(invocation -> {
+            int count = (int) invocation.callRealMethod();
+            carried.set(count);
+            return count;
+        }).when(carry).carry(any(), any(), any());
+        AdminGraphVersionService service = new AdminGraphVersionService(context.getBean(JdbcAdminGraphVersionRepository.class),
+                repository, context.getBean(GraphSnapshotStore.class), context.getBean(DisclosureExclusionReader.class), carry,
+                context.getBean(EvidenceService.class), context.getBean(AdminAuditRepository.class),
+                context.getBean(ObjectMapper.class), context.getBean(Clock.class), false, "fixture");
+        AdminPrincipal admin = admin();
+
+        var error = assertThrows(CustomException.class, () -> service.activate("fixture-2026-10-01",
+                new GraphVersionActivateRequest("carry", "fixture-2026-10-08"), "graph-key-carry", admin, "it"));
+
+        assertEquals(ErrorCode.REVISION_CONFLICT, error.getErrorCode());
+        verify(carry).carry("fixture-2026-10-08", "fixture-2026-10-01", "admin:" + admin.adminId());
+        assertEquals(1, carried.get(), "the carry wrote the one target before the rights check refused the activation");
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM disclosure_exclusion_targets WHERE graph_version_id = "
+                + "'fixture-2026-10-01'", Integer.class), "the carried targets went with the refused activation");
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM disclosure_exclusion_changes WHERE revision > ?", Integer.class,
+                revision), "and so did the carried change");
+        assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
     }
 
     @Test

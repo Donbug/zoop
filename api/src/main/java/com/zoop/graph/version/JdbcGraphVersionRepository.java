@@ -177,6 +177,15 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
         return activateChecked(versionId, adminId, adminEmail, reason, publishable);
     }
 
+    /** The imported ({@code snapshot}) version that was most recently made the public pointer, active or not. */
+    public Optional<String> lastActivatedImported() {
+        return first(jdbc.queryForList("""
+                SELECT v.id FROM graph_activations g JOIN graph_versions v ON v.id = g.version_id
+                 WHERE g.pointer_changed AND v.kind = 'snapshot'
+                 ORDER BY g.activated_at DESC, g.id DESC LIMIT 1
+                """, new MapSqlParameterSource(), String.class));
+    }
+
     /**
      * The newest imported version that was imported at or after {@code since}, was never the public pointer and comes after the
      * active version (FS059: an older import never replaces a newer public version). Imports are ordered by {@code sequence},
