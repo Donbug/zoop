@@ -15,11 +15,11 @@ public class JdbcAdminBriefingRepository {
                 r.stages,r.failure_reason,r.generated_at,r.published_at,r.graph_version_id,r.review_revision,
                 CASE WHEN r.published_at IS NOT NULL THEN jsonb_array_length(r.published_payload->'items') END AS item_count,
                 (SELECT count(*) FROM briefing_attempts a WHERE a.round_id=r.id AND a.purpose='generation') AS attempts,
-                a.trigger, a.stages AS attempt_stages,
+                a.trigger, a.status AS attempt_status, a.stages AS attempt_stages,
                 (SELECT count(*) FROM briefing_changes c WHERE c.round_id=r.id AND c.kind='correction') AS correction_count,
                 s.suspended,s.reason AS suspension_reason,s.created_at AS suspension_at,s.admin_email_snapshot AS suspension_admin
             FROM briefing_rounds r
-            LEFT JOIN LATERAL (SELECT trigger,stages FROM briefing_attempts
+            LEFT JOIN LATERAL (SELECT trigger,status,stages FROM briefing_attempts
                 WHERE round_id=r.id AND purpose='generation' ORDER BY attempt_no DESC LIMIT 1) a ON true
             LEFT JOIN LATERAL (SELECT suspended,reason,created_at,admin_email_snapshot FROM briefing_changes
                 WHERE round_id=r.id AND kind='suspension' ORDER BY seq DESC LIMIT 1) s ON true

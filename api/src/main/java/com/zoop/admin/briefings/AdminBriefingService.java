@@ -118,10 +118,13 @@ public class AdminBriefingService {
                     catch (RuntimeException ignored) { /* unknown time stays null */ }
                 }
             }
+            if ("unknown".equals(stage.path("status").asText())) {
+                stage.put("status", attemptStage(attempt, r.get("attempt_status"), name));
+            }
             Instant completed = name.equals("generate") ? at(r, "generated_at") : name.equals("publish") ? at(r, "published_at") : null;
             if (completed != null) stage.put("status", "done").put("at", completed.toString());
-            else if (name.equals("generate") && "generating".equals(r.get("status"))
-                    || name.equals("verify") && "verifying".equals(r.get("status"))) stage.put("status", "running");
+            else if (!"done".equals(stage.path("status").asText()) && (name.equals("generate") && "generating".equals(r.get("status"))
+                    || name.equals("verify") && "verifying".equals(r.get("status")))) stage.put("status", "running");
             else if ("failed".equals(r.get("status"))) {
                 String failed = attempt.path("failureStage").asText();
                 if (name.equals(failed) || name.equals("verify") && failed.endsWith("verification")
@@ -129,6 +132,27 @@ public class AdminBriefingService {
             }
         }
         return out;
+    }
+
+    /** Model transport success is not semantic PASS; only the completed available outcome confirms verification. */
+    private static String attemptStage(JsonNode attempt, Object attemptStatus, String name) {
+        if (name.equals("publish")) return "unknown"; // Generation completion never implies publication.
+        String suffix = name.equals("generate") ? "generation" : "verification";
+        Set<String> states = new java.util.HashSet<>();
+        for (var entry : attempt.properties()) {
+            if ((entry.getKey().equals(suffix) || entry.getKey().endsWith("_" + suffix))
+                    && "briefing".equals(entry.getValue().path("feature").asText())) {
+                states.add(entry.getValue().path("status").asText());
+            }
+        }
+        if (states.isEmpty()) return "unknown";
+        if ("completed".equals(attemptStatus) && "available".equals(attempt.path("outcome").asText())) return "done";
+        if (name.equals("verify") && "withheld".equals(attempt.path("outcome").asText())) return "failed";
+        if (states.contains("running")) return "running";
+        if (states.contains("failed")) return "failed";
+        // A verification call can succeed while rejecting the draft. Without the final outcome its result is unknown.
+        if (name.equals("verify")) return "unknown";
+        return states.stream().allMatch(Set.of("succeeded", "reused")::contains) ? "done" : "unknown";
     }
 
     private JsonNode json(Object raw) { return raw == null ? mapper.createObjectNode() : StrictJson.parseObject(raw.toString()).node(); }

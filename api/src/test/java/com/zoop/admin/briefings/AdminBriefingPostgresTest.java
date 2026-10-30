@@ -109,6 +109,65 @@ class AdminBriefingPostgresTest {
         assertThat(body).doesNotContain("owner_token", "request_key", "generation_token", "private.invalid", "secret");
     }
 
+    @Test void completedAvailableGenerationLedgerProjectsDoneWithoutInventingTimestamps() throws Exception {
+        Cookie cookie = login();
+        seed("ledger-complete", "2194-01-01", "2194-01-01T00:20:00Z", "scheduled");
+        ledgerAttempt("ledger-complete", 1, "generation", "failed", "failed", "succeeded", "failed");
+        ledgerAttempt("ledger-complete", 2, "generation", "completed", "available", "reused", "succeeded");
+        ledgerAttempt("ledger-complete", 3, "outlook", "failed", "failed", "failed", "failed");
+        String before = jdbc.queryForObject("SELECT to_jsonb(r)::text FROM briefing_rounds r WHERE id='ledger-complete'", String.class);
+        mvc.perform(get(URL + "/ledger-complete").cookie(cookie)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.attempts").value(2))
+            .andExpect(jsonPath("$.stages.generate.status").value("done"))
+            .andExpect(jsonPath("$.stages.verify.status").value("done"))
+            .andExpect(jsonPath("$.stages.generate.at").isEmpty())
+            .andExpect(jsonPath("$.stages.verify.at").isEmpty())
+            .andExpect(jsonPath("$.generatedAt").isEmpty())
+            .andExpect(jsonPath("$.stages.publish.status").value("unknown"));
+        mvc.perform(get(URL).cookie(cookie).param("from", "2194-01-01").param("to", "2194-01-01"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].stages.generate.status").value("done"))
+            .andExpect(jsonPath("$.items[0].stages.verify.status").value("done"));
+        assertThat(jdbc.queryForObject("SELECT to_jsonb(r)::text FROM briefing_rounds r WHERE id='ledger-complete'", String.class)).isEqualTo(before);
+    }
+
+    @Test void successfulVerificationTransportDoesNotOverrideWithheldSemanticOutcome() throws Exception {
+        Cookie cookie = login();
+        seed("ledger-withheld", "2194-01-02", "2194-01-02T00:20:00Z", "failed");
+        ledgerAttempt("ledger-withheld", 1, "generation", "completed", "withheld", "succeeded", "succeeded");
+        mvc.perform(get(URL + "/ledger-withheld").cookie(cookie)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.stages.generate.status").value("done"))
+            .andExpect(jsonPath("$.stages.verify.status").value("failed"))
+            .andExpect(jsonPath("$.stages.verify.at").isEmpty());
+    }
+
+    @Test void activeVerificationPreservesCompletedGenerationAndUnknownOutcomeStaysUnknown() throws Exception {
+        Cookie cookie = login();
+        seed("ledger-active", "2194-01-03", "2194-01-03T00:20:00Z", "scheduled");
+        ledgerAttempt("ledger-active", 1, "generation", "verifying", null, "succeeded", "running");
+        jdbc.update("""
+            UPDATE briefing_rounds r SET status='verifying',attempt_no=1,generation_token=a.owner_token,lease_until=a.lease_until
+            FROM briefing_attempts a WHERE r.id='ledger-active' AND a.round_id=r.id
+            """);
+        mvc.perform(get(URL + "/ledger-active").cookie(cookie)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.stages.generate.status").value("done"))
+            .andExpect(jsonPath("$.stages.verify.status").value("running"));
+        seed("ledger-unknown", "2194-01-04", "2194-01-04T00:20:00Z", "scheduled");
+        ledgerAttempt("ledger-unknown", 1, "generation", "completed", null, "succeeded", "succeeded");
+        mvc.perform(get(URL + "/ledger-unknown").cookie(cookie)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.stages.generate.status").value("done"))
+            .andExpect(jsonPath("$.stages.verify.status").value("unknown"));
+    }
+
+    @Test void latestAttemptDoesNotBorrowCompletedStagesFromAnOlderAttempt() throws Exception {
+        Cookie cookie = login();
+        seed("ledger-latest", "2194-01-05", "2194-01-05T00:20:00Z", "failed");
+        ledgerAttempt("ledger-latest", 1, "generation", "completed", "available", "succeeded", "succeeded");
+        attempt("ledger-latest", 2, "generation", "{}");
+        mvc.perform(get(URL + "/ledger-latest").cookie(cookie)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.stages.generate.status").value("unknown"))
+            .andExpect(jsonPath("$.stages.verify.status").value("unknown"));
+    }
+
     @Test void publishedOriginalCorrectionsAndSuspensionAreReadWithoutChangingStoredHistory() throws Exception {
         Cookie cookie = login();
         seed("published-round", "2193-01-01", "2193-01-01T00:20:00Z", "scheduled");
@@ -172,6 +231,21 @@ class AdminBriefingPostgresTest {
             VALUES(?,?,?,?,?,'scheduler',?,'failed',?::jsonb,now(),now(),now(),'verification_rejected')
             """, key, round, n, key, purpose, key, stages);
     }
+    private void ledgerAttempt(String round, int n, String purpose, String status, String outcome,
+            String generate, String verify) {
+        String key = UUID.randomUUID().toString();
+        var stages = mapper.createObjectNode().put("purpose", purpose).put("inputSha256", "a".repeat(64));
+        String feature = purpose.equals("generation") ? "briefing" : "briefing-outlook";
+        stages.putObject("round_simulation_morning_generation").put("status", generate).put("feature", feature);
+        stages.putObject("round_simulation_morning_verification").put("status", verify).put("feature", feature);
+        if (outcome != null) stages.put("outcome", outcome);
+        jdbc.update("""
+            INSERT INTO briefing_attempts(id,round_id,attempt_no,request_key,purpose,trigger,owner_token,status,stages,
+              started_at,finished_at,lease_until)
+            VALUES(?,?,?,?,?,'scheduler',?,?,?::jsonb,now(),CASE WHEN ? IN ('completed','failed','cancelled') THEN now() END,now()+interval '5 min')
+            """, key, round, n, key, purpose, key, status, stages.toString(), status);
+    }
+
     private void publishEmpty(String id) {
         jdbc.update("INSERT INTO artifacts(id,kind,storage_uri,sha256,bytes,media_type,created_at) VALUES('admin-test-artifact','extracted_text','file:///synthetic',?,0,'text/plain',now())", "a".repeat(64));
         jdbc.update("INSERT INTO articles(id,kind,provider,provider_key,lineage_key,access_status,created_at) VALUES('admin-test-article','news','synthetic','admin-test','admin-test','available',now())");

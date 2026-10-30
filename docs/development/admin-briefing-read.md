@@ -13,7 +13,7 @@
 
 `briefing_rounds`, `briefing_changes`, `briefing_attempts`를 같은 읽기 전용 repeatable-read transaction에서 조회한다. 새 migration이나 기존 결과 backfill은 없다. 발행 원문은 기존 PostgreSQL JSONB SHA-256 검사를 통과한 내용만 반환한다. 중단된 회차도 관리자는 원문과 중단 이유를 볼 수 있고, 정정은 원문 덮어쓰기 없이 별도 이력으로 제공한다.
 
-- 발행·생성 완료는 저장된 시각으로 표시한다. `verify` 기록이 없는 과거 회차를 임의로 완료 처리하지 않고 `StageOut.status=unknown`(기록 없음)을 반환한다.
+- 저장된 회차 단계·완료 시각을 우선 사용하고, 미기록 단계는 최신 `purpose=generation` 시도의 실제 단계 원장으로 보완한다. `feature=briefing`인 generation의 succeeded/reused는 생성 완료이며, verification의 모델 호출 성공만으로 검증 PASS를 뜻하지 않는다. completed + outcome=available은 확인된 생성·검증 완료, outcome=withheld는 실행된 검증의 보류(실패)로 표시한다. 오래된 시도나 별도 전망 분석 단계로 현재 시도를 덮지 않는다. 완료 상태만 있고 시각이 없으면 `at=null`이며 generatedAt을 만들지 않는다. 발행은 실제 저장 시각으로만 완료 처리한다. 단계·최종 결과가 없는 과거 회차는 `StageOut.status=unknown`(기록 없음)으로 유지한다.
 - `attempts`, `trigger`, `attemptsLog`는 `purpose=generation` 원장만 사용한다. 별도 `outlook` 호출을 생성 재시도로 중복 집계하지 않는다. 과거 원장이 없으면 기록된 시도 0, trigger null이며 실제 AI 호출이 없었다는 의미가 아니다.
 - 운영 예정 시각은 09:20 / 17:30 Asia/Seoul. 저장된 회차의 실제 예정/생성/발행 시각은 그대로 표시한다.
 - 토큰·임대·요청 본문은 응답에 넣지 않는다. 실패 사유는 안전한 코드만 노출하며 자유 형식의 내부 오류는 일반 안내로 대체한다.
