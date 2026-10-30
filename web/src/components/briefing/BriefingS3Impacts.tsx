@@ -10,7 +10,7 @@ const labels = {
   positive: '긍정',
   negative: '부정',
   mixed: '긍정·부정 혼재',
-  undetermined: '판단 유보',
+  undetermined: '판단 보류',
 };
 const sides = {
   positive: '긍정 근거',
