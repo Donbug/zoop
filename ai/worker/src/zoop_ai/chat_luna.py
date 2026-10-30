@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from .chat_contracts import AnswerInput, ChatAnswer
+from .chat_contracts import MAX_OUTPUT_TOKENS, AnswerInput, ChatAnswer, estimated_tokens
 from .contracts import canonical, digest
 
-PROMPT_REVISION = "zoop-chat-answer-2026-10-26-1"
+PROMPT_REVISION = "zoop-chat-answer-2026-10-30-1"
 # Pinned like the pipeline (cost and behaviour are only known for it); a live configuration naming another is refused.
 MODEL = "gpt-6-luna"
 REASONING_EFFORT = "high"
@@ -36,7 +36,7 @@ PROMPT = (
     "모두 적는다. 근거가 부족해 답할 수 없는 요구는 구간 없이 insufficientRequirementIds에 넣는다. 모든 요구는 구간과 "
     "insufficientRequirementIds 중 정확히 한 곳에 속한다. 전체 인용은 서로 다른 evidenceId maxCitations개 이하다. "
     "매수·매도·보유 권유, 목표 주가, 가격·수익 예측, 수익 보장을 쓰지 않는다. graphTargetIds에는 본문이 실제로 가리키는 "
-    "branch items의 company·issue id만 넣는다. 한국어로 간결하게 쓴다."
+    "branch items의 company·issue id만 넣는다. 한국어로 간결하게 쓰고, 답변 전체는 공백 포함 2,000자를 넘기지 않는다."
 )
 
 
@@ -47,6 +47,7 @@ def schema() -> dict[str, Any]:
 def build_request(payload: AnswerInput, model: str, reasoning_effort: str | None) -> dict[str, Any]:
     request: dict[str, Any] = {
         "model": model,
+        "max_completion_tokens": MAX_OUTPUT_TOKENS,
         "messages": [{"role": "system", "content": PROMPT},
                      {"role": "user", "content": canonical(payload.wire())}],
         "response_format": {"type": "json_schema",
@@ -55,6 +56,11 @@ def build_request(payload: AnswerInput, model: str, reasoning_effort: str | None
     if reasoning_effort is not None:
         request["reasoning_effort"] = reasoning_effort
     return request
+
+
+def input_tokens(payload: AnswerInput) -> int:
+    """The estimated input of a request, schema included."""
+    return estimated_tokens(PROMPT + canonical(schema()) + canonical(payload.wire()))
 
 
 def prompt_version() -> str:
