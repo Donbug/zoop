@@ -22,7 +22,13 @@ public enum AiOperation {
     /** Reads the identity-only public exposure of fixed handoffs; never changes the AI service or the app. */
     EXPOSURE(false),
     /** Reads one allowlisted handoff's verified status or whole bundle; never changes the AI service or the app. */
-    HANDOFF_READ(false);
+    HANDOFF_READ(false),
+    /** Starts the AI tick and plan-round for one app slot (#387 ①); idempotent on the round id, so a lost answer is read back. */
+    ROUND_RUN(true),
+    /** Asks the AI side to freeze the cumulative bundle of one slot (#387 ②); idempotent on the round id. */
+    ROUND_HANDOFF(true),
+    /** Reads a round run's or a round handoff's status. */
+    ROUND_READ(false);
 
     private final boolean mutating;
 

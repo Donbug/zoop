@@ -252,7 +252,7 @@ class GraphRoundRepositoryPostgresTest {
         assertTrue(failed.lease().isEmpty(), "a terminal stage drops the lease");
         assertThrows(IllegalArgumentException.class, () -> GraphRoundPatch.fail(null));
         assertThrows(IllegalArgumentException.class, () -> new GraphRoundPatch(GraphRoundStage.IMPORTED, null, null, null, null,
-                null, null, null, "code", null, true, false, true, false));
+                null, null, null, null, "code", null, true, false, true, false));
         assertThrows(IllegalArgumentException.class, () -> GraphRoundPatch.retryAt(GraphRoundStage.IMPORTED));
         assertThrows(IllegalArgumentException.class, () -> GraphRoundPatch.retryAt(GraphRoundStage.SCHEDULED).graphVersion("v"));
         assertFalse(GraphRoundPatch.retryAt(GraphRoundStage.HANDOFF_READY).clearGraphVersion(), "same pins: the link is kept");

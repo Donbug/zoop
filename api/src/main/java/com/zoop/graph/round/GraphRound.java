@@ -8,6 +8,8 @@ import java.util.Optional;
  *
  * @param roundId     {@code round-yyyyMMdd'T'HHmm} in KST; the AI side's handoff id for the round is derived from it
  * @param slotAt      the slot instant
+ * @param ingestionRoundId the AI ingestion round the slot's run made ({@code slot-…}, #387 ①), named by the freeze request; empty
+ *                    for a slot without a run (no new material, the freeze-only slot)
  * @param stage       current stage
  * @param graphVersionId the version the round is linked to now (written in the import transaction; a retry that freezes
  *                    again forgets it)
@@ -20,7 +22,7 @@ import java.util.Optional;
  * @param lease       the instance holding the row, until when, and the fencing token of that lease, or empty
  */
 public record GraphRound(String roundId, Instant slotAt, GraphRoundStage stage, Optional<String> planId,
-        Optional<String> planDigest, Optional<String> analysisJobId, Optional<String> handoffId,
+        Optional<String> planDigest, Optional<String> ingestionRoundId, Optional<String> analysisJobId, Optional<String> handoffId,
         Optional<String> manifestDigest, Optional<String> bundleDigest, Optional<String> graphVersionId,
         Optional<Instant> versionCommittedAt, Optional<String> activatedVersionId, Optional<String> activationNote,
         Optional<String> failureCode, int attempts, Optional<Instant> nextAttemptAt, Optional<Lease> lease, String startedBy,

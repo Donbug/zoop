@@ -25,7 +25,8 @@ import tools.jackson.databind.ObjectMapper;
 public class JdbcGraphRoundRepository implements GraphRoundRepository {
     static final int MAX_DETAIL_BYTES = 8 * 1024;
     private static final String COLUMNS = """
-            round_id, slot_at, stage, plan_id, plan_digest, analysis_job_id, handoff_id, manifest_digest, bundle_digest,
+            round_id, slot_at, stage, plan_id, plan_digest, ingestion_round_id, analysis_job_id, handoff_id, manifest_digest,
+            bundle_digest,
             graph_version_id, version_committed_at, activated_version_id, activation_note, failure_code, attempts,
             next_attempt_at,
             lease_owner, lease_until, lease_token, started_by, created_at, updated_at
@@ -123,6 +124,7 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
                         stage = :stage,
                         plan_id = COALESCE(:planId, plan_id),
                         plan_digest = COALESCE(:planDigest, plan_digest),
+                        ingestion_round_id = COALESCE(:ingestionRoundId, ingestion_round_id),
                         analysis_job_id = COALESCE(:jobId, analysis_job_id),
                         handoff_id = COALESCE(:handoffId, handoff_id),
                         manifest_digest = COALESCE(:manifestDigest, manifest_digest),
@@ -141,6 +143,7 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
                     """ + COLUMNS, new MapSqlParameterSource("id", roundId).addValue("stage", patch.stage().wire())
                     .addValue("expectedStage", expected.stage().wire()).addValue("token", token)
                     .addValue("planId", patch.planId()).addValue("planDigest", patch.planDigest())
+                    .addValue("ingestionRoundId", patch.ingestionRoundId())
                     .addValue("jobId", patch.analysisJobId()).addValue("handoffId", patch.handoffId())
                     .addValue("manifestDigest", patch.manifestDigest()).addValue("bundleDigest", patch.bundleDigest())
                     .addValue("versionId", patch.graphVersionId()).addValue("clearVersion", patch.clearGraphVersion())
@@ -236,7 +239,7 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
         Timestamp leaseUntil = rs.getTimestamp("lease_until");
         return new GraphRound(rs.getString("round_id"), rs.getTimestamp("slot_at").toInstant(),
                 GraphRoundStage.parse(rs.getString("stage")), text(rs, "plan_id"), text(rs, "plan_digest"),
-                text(rs, "analysis_job_id"), text(rs, "handoff_id"), text(rs, "manifest_digest"), text(rs, "bundle_digest"),
+                text(rs, "ingestion_round_id"), text(rs, "analysis_job_id"), text(rs, "handoff_id"), text(rs, "manifest_digest"), text(rs, "bundle_digest"),
                 text(rs, "graph_version_id"), instant(rs, "version_committed_at"), text(rs, "activated_version_id"),
                 text(rs, "activation_note"),
                 text(rs, "failure_code"), rs.getInt("attempts"), instant(rs, "next_attempt_at"),

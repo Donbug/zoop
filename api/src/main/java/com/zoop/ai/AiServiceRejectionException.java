@@ -20,7 +20,7 @@ import java.util.Optional;
  */
 public abstract sealed class AiServiceRejectionException extends AiClientException
         permits AiServiceErrorException, ExtractionServiceErrorException, RelationServiceErrorException, PlanAdmissionServiceErrorException,
-                HandoffServiceErrorException {
+                HandoffServiceErrorException, RoundServiceErrorException {
     private final int httpStatus;
     private final String code;
     private final boolean retryable;
