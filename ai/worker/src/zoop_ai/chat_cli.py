@@ -1,8 +1,13 @@
 """`zoop-ai-chat invoke --state-dir DIR [--grants FILE] [--replay FILE]`: one chatbot model stage.
+`zoop-ai-chat probe-mcp`: whether the operator's ZOOP MCP server answers at its configured URL (`chat_probe`).
 
-stdin is one `StageRequest` JSON, stdout is one canonical `StageResult` JSON. Exit 0 when the stage succeeded, 2 when it failed
-(the result says why and whether anything was sent), 64 for a request that is not a valid `StageRequest`. The grant registry is
-the operator's chat registry, never part of the request; replay requests need `--replay`, live requests use the environment.
+invoke: stdin is one `StageRequest` JSON, stdout is one canonical `StageResult` JSON. Exit 0 when the stage succeeded, 2 when it
+failed (the result says why and whether anything was sent), 64 for a request that is not a valid `StageRequest`. The grant
+registry is the operator's chat registry, never part of the request; replay requests need `--replay`, live requests use the
+environment.
+
+probe-mcp: stdin is ignored, stdout is one canonical probe result. Exit 0 when the server is reachable, 2 when it is not (the
+result names why), 64 when the URL is missing or invalid.
 """
 from __future__ import annotations
 
@@ -12,6 +17,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from . import chat_probe
 from .chat_contracts import ChatGrantRegistry, StageRequest
 from .chat_runtime import LiveSender, ReplaySender, invoke
 from .contracts import canonical
@@ -23,15 +29,26 @@ def _fail(code: str, status: int) -> int:
     return status
 
 
+def _probe() -> int:
+    try:
+        result = chat_probe.probe()
+    except ProviderError as error:
+        return _fail(error.code, 64)
+    print(canonical(result))
+    return 0 if result["mcp"] == "reachable" else 2
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="zoop-ai-chat")
-    parser.add_argument("command", choices=["invoke"])
-    parser.add_argument("--state-dir", type=Path, required=True)
+    parser.add_argument("command", choices=["invoke", "probe-mcp"])
+    parser.add_argument("--state-dir", type=Path, help="The chat invocation ledger directory; required by invoke")
     parser.add_argument("--grants", type=Path, help="Operator-owned chat grant registry (zoop-ai-chat-1)")
     parser.add_argument("--replay", type=Path, help="Authored replay fixture; required for replay requests")
     args = parser.parse_args(argv)
 
-    if not args.state_dir.is_absolute() or not args.state_dir.is_dir():
+    if args.command == "probe-mcp":
+        return _probe()
+    if args.state_dir is None or not args.state_dir.is_absolute() or not args.state_dir.is_dir():
         return _fail("state_dir_invalid", 64)
     try:
         request = StageRequest.model_validate_json(sys.stdin.read())

@@ -111,10 +111,10 @@ describe('D-ONB-02 가상 계좌 연결', () => {
     const { user, location } = openAccountStep();
 
     expect(
-      await screen.findByText(
-        '실제 증권 계좌가 아니에요. 준비된 모의 데이터로 만든 가상 계좌예요.',
+      screen.queryByText(
+        '실제 증권 계좌가 아닌 준비된 모의 데이터로 만든 가상 계좌',
       ),
-    ).toBeTruthy();
+    ).toBeNull();
     await screen.findByRole('list', { name: '가상 계좌 목록' });
     expect(accountButton(/성장주 계좌/).getAttribute('aria-pressed')).toBe(
       'true',

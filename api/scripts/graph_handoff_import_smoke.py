@@ -286,6 +286,7 @@ class Smoke:
               'activations', (SELECT md5(coalesce(string_agg(a::text, '|' ORDER BY a.id), '')) FROM graph_activations a),
               'evidence', (SELECT md5(coalesce(string_agg(e::text, '|' ORDER BY e.id), '')) FROM evidence e),
               'artifacts', (SELECT md5(coalesce(string_agg(x::text, '|' ORDER BY x.id), '')) FROM artifacts x),
+              'sources', (SELECT md5(coalesce(string_agg(s::text, '|' ORDER BY s.graph_version_id, s.ordinal), '')) FROM graph_version_sources s),
               'articles', (SELECT md5(coalesce(string_agg(a::text, '|' ORDER BY a.id), '')) FROM articles a),
               'versionsOfArticles', (SELECT md5(coalesce(string_agg(v::text, '|' ORDER BY v.article_id, v.version), '')) FROM article_versions v),
               'briefingRounds', (SELECT md5(coalesce(string_agg(r::text, '|' ORDER BY r.id), '')) FROM briefing_rounds r),
@@ -713,6 +714,15 @@ def approved_world_phase(args, db, layout, scratch: Path) -> dict:
     status, result, output = smoke5.graph_import("approved", smoke5.request(hid, manifest_digest, bundle_digest))
     check(status == 0 and result and result["status"] == "succeeded" and result["outcome"] == "staged" and result["graphVersionId"] == vid,
           f"the approved handoff was not staged: {result} {output[-800:]}")
+    # composition (#55 PR-1): the version records its one bundle; with no rule hiding anything the bundle's rule-free projection
+    # is the stored snapshot itself, so no graph_bundle file and no second artifact exist
+    check(not (layout.artifacts / "graph_bundle" / f"{vid}.json").exists()
+          and result["bundleSnapshot"]["artifactId"] == f"artifact-{vid}" and result["bundleSnapshot"]["file"] == "created"
+          and result["composition"] == {"sources": [hid], "newSource": hid}
+          and db.scalar(f"SELECT count(*) FROM graph_version_sources WHERE graph_version_id = '{vid}' AND ordinal = 0 "
+                        f"AND handoff_id = '{hid}' AND bundle_snapshot_artifact_id = 'artifact-{vid}'") == 1
+          and db.scalar("SELECT count(*) FROM artifacts WHERE kind = 'graph_bundle_snapshot'") == 0,
+          f"the approved import did not record its composition as expected: {result.get('bundleSnapshot')} {result.get('composition')}")
 
     # approval bases: the result states how the staged edges' S3 relations became eligible, from hand-written expectations ---------------
     approvals = hs.expected_approvals(world5)
@@ -904,7 +914,8 @@ def path_world_phase(args, db, layout, scratch: Path) -> dict:
     check(status != 0 and result and result["status"] == "failed" and result["failure"]["code"] == "company_mismatch",
           f"a renamed private path company was not refused as company_mismatch: {result} {output[-500:]}")
     check(smoke6.table_fingerprint() == before and not (layout.artifacts / "graph_snapshot" / f"{versions['private']}.json").exists()
-          and not (layout.artifacts / "verification_receipt" / f"{versions['private']}.json").exists(), "a refused path import left rows or files behind")
+          and not (layout.artifacts / "verification_receipt" / f"{versions['private']}.json").exists()
+          and not (layout.artifacts / "graph_bundle" / f"{versions['private']}.json").exists(), "a refused path import left rows or files behind")
 
     imported = {}
     for middle in PATH_MIDDLES:

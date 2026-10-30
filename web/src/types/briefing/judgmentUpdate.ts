@@ -42,7 +42,7 @@ export type JudgmentUpdate = {
       evidenceId: string;
       title: string;
       url: string;
-      fullBody: string;
+      fullBody?: string;
       publishedAt: string;
     }
   >;

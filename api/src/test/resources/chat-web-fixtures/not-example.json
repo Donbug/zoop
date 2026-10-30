@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "zoop-chat-web-fixture-1",
+  "queries": {
+    "HBM": [
+      {"url": "https://news.real-site.kr/hbm", "title": "실제처럼 보이는 출처", "snippet": "합성 픽스처는 이런 출처를 쓸 수 없다.", "publishedAt": null}
+    ]
+  },
+  "unavailable": []
+}

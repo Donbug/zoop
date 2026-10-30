@@ -269,6 +269,12 @@
     **Live and rights.** Nothing reaches a provider unless the chat gate is open (`ZOOP_AI_CHAT_LIVE_ENABLED=1` and a positive `ZOOP_AI_CHAT_MAX_CALLS`, shared by
     the chat stages and separate from the S1 and pipeline gates), and quoted spans are sent only under the operator chat grant registry (`model-send`, the stage
     as purpose and the exact recipient). Stage time limits: router 4 s, answer 25 s, verification 6 s, agent step 30 s.
+
+    **MCP preflight (`GET /internal/v1/chat-mcp-health`).** Under the same `chat.invoke` scope, the service runs `zoop-ai-chat probe-mcp` with no request body,
+    grant, model call, ledger row or live-budget charge. The child sends a content-free JSON-RPC `ping` to the operator-configured MCP URL and treats only that
+    endpoint's own `401` Bearer challenge as `reachable`. Timeout, connection failure and any other status are a 200 `unreachable` health answer with a closed
+    reason. A missing or invalid operator URL is 503 configuration error; an unreadable child outcome is `probe_failed`. Callers use this before starting a
+    Responses run; this route does not itself select a direct path or maintain the application's circuit breaker.
 "paths":
   "/internal/v1/analysis-jobs":
     "post":
@@ -7671,11 +7677,154 @@
       "security":
         - "bearerAuth":
             - "handoff.read"
+  "/internal/v1/chat-mcp-health":
+    "get":
+      "tags":
+        - "chat-stages"
+      "summary": "Probe the configured ZOOP MCP endpoint without a grant or model call"
+      "operationId": "probeChatMcp"
+      "parameters":
+        - "name": "X-Request-ID"
+          "in": "header"
+          "required": false
+          "schema":
+            "type": "string"
+            "pattern": "^[A-Za-z0-9._-]{1,128}$"
+          "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+      "responses":
+        "200":
+          "description": "The endpoint answered its own unauthenticated refusal, or the probe classified why it was unreachable."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ChatMcpHealth"
+              "examples":
+                "reachable":
+                  "summary": "The configured endpoint answered its Bearer challenge"
+                  "value":
+                    "schemaVersion": "zoop-ai-chat-1"
+                    "mcp": "reachable"
+                    "reason": null
+                "unreachable":
+                  "summary": "No answer before the content-free probe deadline"
+                  "value":
+                    "schemaVersion": "zoop-ai-chat-1"
+                    "mcp": "unreachable"
+                    "reason": "mcp_timeout"
+        "401":
+          "description": "authentication_required: missing, malformed or unknown bearer token."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              "examples":
+                "example":
+                  "summary": "Missing, malformed or unknown bearer token"
+                  "value":
+                    "schemaVersion": "zoop-ai-internal-1"
+                    "error":
+                      "code": "authentication_required"
+                      "retryable": false
+                      "requestId": "req-0001"
+                      "runtimeCode": null
+                      "field": null
+                    "status": null
+          "headers":
+            "WWW-Authenticate":
+              "description": "Bearer"
+              "schema":
+                "type": "string"
+        "403":
+          "description": "scope_denied: the principal lacks `chat.invoke`."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              "examples":
+                "example":
+                  "summary": "Principal lacks the route's scope"
+                  "value":
+                    "schemaVersion": "zoop-ai-internal-1"
+                    "error":
+                      "code": "scope_denied"
+                      "retryable": false
+                      "requestId": "req-0001"
+                      "runtimeCode": null
+                      "field": null
+                    "status": null
+        "409":
+          "description": "execution_unavailable: the chat configuration group is not enabled, or a replay request without a configured fixture."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+        "422":
+          "description": "invalid_request: query parameters are not accepted."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              "examples":
+                "example":
+                  "summary": "Runtime validation of the submitted input"
+                  "value":
+                    "schemaVersion": "zoop-ai-internal-1"
+                    "error":
+                      "code": "invalid_request"
+                      "retryable": false
+                      "requestId": "req-0001"
+                      "runtimeCode": "input_or_configuration_invalid"
+                      "field": null
+                    "status": null
+        "500":
+          "description": "internal_error."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+        "502":
+          "description": "probe_failed: the probe child ended abnormally or returned an invalid result."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+        "503":
+          "description": "runtime_unavailable, service_busy or service_configuration_invalid (retryable)."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+              "examples":
+                "example":
+                  "summary": "Runtime unavailable: retry with the same key and body"
+                  "value":
+                    "schemaVersion": "zoop-ai-internal-1"
+                    "error":
+                      "code": "runtime_unavailable"
+                      "retryable": true
+                      "requestId": "req-0001"
+                      "runtimeCode": null
+                      "field": null
+                    "status": null
+          "headers":
+            "Retry-After":
+              "description": "Seconds before retrying with the same key and body."
+              "schema":
+                "type": "integer"
+        "504":
+          "description": "probe_failed: the content-free MCP probe deadline passed."
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ErrorEnvelope"
+      "security":
+        - "bearerAuth":
+            - "chat.invoke"
   "/internal/v1/chat-stages/{stage}":
     "post":
       "tags":
         - "chat-stages"
-      "summary": "Run one chatbot model stage synchronously: router, answer or verification"
+      "summary": "Run one chatbot model stage synchronously: router, answer, verification or agent"
       "operationId": "invokeChatStage"
       "parameters":
         - "name": "stage"
@@ -11591,6 +11740,37 @@
         - "insufficientRequirementIds"
         - "graphTargetIds"
       "title": "ChatAnswer"
+    "ChatMcpHealth":
+      "properties":
+        "schemaVersion":
+          "type": "string"
+          "const": "zoop-ai-chat-1"
+          "title": "Schemaversion"
+        "mcp":
+          "type": "string"
+          "enum":
+            - "reachable"
+            - "unreachable"
+          "title": "Mcp"
+        "reason":
+          "anyOf":
+            - "type": "string"
+              "enum":
+                - "mcp_timeout"
+                - "mcp_connect_failed"
+                - "mcp_unavailable"
+                - "mcp_status_unexpected"
+            - "type": "null"
+          "title": "Reason"
+          "description": "Why it is unreachable: no answer in time, no connection, a gateway in front answering 502/503/504 for a backend it could not reach, or any other answer that is not the endpoint's own refusal."
+      "type": "object"
+      "required":
+        - "schemaVersion"
+        - "mcp"
+      "title": "ChatMcpHealth"
+      "description": |-
+        Whether the operator's ZOOP MCP server answered a content-free probe at its configured URL (`zoop-ai-chat probe-mcp`): an MCP ping
+        with no grant that the endpoint itself must refuse as unauthenticated. Nothing is run and no model is called.
     "ChatReceipt":
       "properties":
         "provider":

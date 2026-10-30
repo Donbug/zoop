@@ -333,6 +333,10 @@ class LiveSender:
             except httpx.TransportError:
                 raise ProviderError("provider_response_unknown", uncertain=True) from None
         if not 200 <= response.status_code < 300:
+            if response.status_code == 424 and request.stage == "chat-agent":
+                # The provider could not reach the ZOOP MCP server (it could not list its tools): the connection failure
+                # the application counts for its circuit. Shape per the provider documentation; confirmed in the live spike.
+                raise ProviderError(chat_agent.MCP_UNREACHABLE)
             raise ProviderError("provider_option_unsupported" if response.status_code == 400
                                 else f"provider_http_{response.status_code}")
         try:

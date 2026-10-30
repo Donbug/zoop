@@ -3,6 +3,8 @@ package com.zoop.chat.mcp;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.zoop.chat.executor.ChatEngine;
+import com.zoop.ai.AiClientSettings;
+import com.zoop.ai.http.HttpChatStageClient;
 import com.zoop.chat.executor.ChatJobExecutor;
 import com.zoop.chat.executor.MemoryChatStore;
 import com.zoop.chat.executor.NoChatTransactions;
@@ -13,6 +15,7 @@ import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolRunner;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -103,8 +106,41 @@ class ChatMcpConfigurationTest {
                         .hasMessageContaining("zoop.ai.chat-client.enabled"));
         ChatModels.Agent stages = (run, step, input) -> { throw new UnsupportedOperationException(); };
         withRepository.withBean(ChatModels.Agent.class, () -> stages)
+                .withBean(HttpChatStageClient.class, () -> new HttpChatStageClient(AiClientSettings.of(
+                        "http://127.0.0.1:1", "test-chat-token-000000000000000000000001", Duration.ofSeconds(1),
+                        Duration.ofSeconds(1), 65_536)))
                 .withPropertyValues(endpoint("zoop.chat.mcp.agent-enabled=true"))
                 .run(context -> assertThat(context).hasSingleBean(ChatMcpAgent.class));
+    }
+
+    @Test
+    void replayRunsHaveNoPreflightWhileLiveRunsStartOnlyAfterTheProbe() {
+        ChatModels.Agent stages = (run, step, input) -> { throw new UnsupportedOperationException(); };
+        // The AI service is nowhere (port 1): a probe could only fail.
+        var agentPath = runner.withBean(ChatExecutionRepository.class, MemoryChatStore::new)
+                .withBean(ChatModels.Agent.class, () -> stages)
+                .withBean(HttpChatStageClient.class, () -> new HttpChatStageClient(AiClientSettings.of(
+                        "http://127.0.0.1:1", "test-chat-token-000000000000000000000001", Duration.ofSeconds(1),
+                        Duration.ofSeconds(1), 65_536)));
+        agentPath.withPropertyValues(endpoint("zoop.chat.mcp.agent-enabled=true"))
+                .run(context -> assertThat(context.getBean(ChatMcpAgent.class).available())
+                        .as("replay reaches no MCP endpoint, so nothing is probed").isTrue());
+        agentPath.withPropertyValues(endpoint("zoop.chat.mcp.agent-enabled=true", "zoop.ai.chat-client.mode=live"))
+                .run(context -> assertThat(context.getBean(ChatMcpAgent.class).available())
+                        .as("a live run whose health was not proven starts on the direct path").isFalse());
+    }
+
+    @Test
+    void theWebSearchAndTheAgentPathCannotBeOnTogetherUntilWebResultsCanBeCited() {
+        ChatModels.Agent stages = (run, step, input) -> { throw new UnsupportedOperationException(); };
+        runner.withBean(ChatExecutionRepository.class, MemoryChatStore::new)
+                .withBean(ChatModels.Agent.class, () -> stages)
+                .withBean(HttpChatStageClient.class, () -> new HttpChatStageClient(AiClientSettings.of(
+                        "http://127.0.0.1:1", "test-chat-token-000000000000000000000001", Duration.ofSeconds(1),
+                        Duration.ofSeconds(1), 65_536)))
+                .withPropertyValues(endpoint("zoop.chat.mcp.agent-enabled=true", "zoop.chat.web.enabled=true"))
+                .run(context -> assertThat(context.getStartupFailure()).rootCause()
+                        .hasMessageContaining("until web results can be cited"));
     }
 
     @Test

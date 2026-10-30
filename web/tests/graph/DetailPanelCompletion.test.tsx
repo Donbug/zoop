@@ -450,7 +450,6 @@ describe('D-GRP-03 · document judgements retain company/event context', () => {
           onClose={vi.fn()}
           onSelectIssue={vi.fn()}
           onFocus={vi.fn()}
-          onConnections={vi.fn()}
           onAskAi={vi.fn()}
         />
       </MemoryRouter>,

@@ -99,7 +99,7 @@ class ChatEvalSetTest {
     static final Path REPORT = Path.of("build", "reports", "chat-eval");
     /** The expectations a case may state; any other key is a typo, not a skipped check. */
     static final Set<String> EXPECTATIONS = Set.of("requirements", "targets", "stages", "tools", "outcome", "reason", "failure",
-            "deterministicCheck", "answerBasis", "citationKinds", "limitations", "planned", "droppedGeneral",
+            "deterministicCheck", "answerBasis", "answerStatus", "citationKinds", "limitations", "planned", "droppedGeneral",
             "heldRequirements", "appliedCompanies", "appliedIssues", "appliedPeriod", "graphTargets", "questionOverrodeContext",
             "choices");
     /** What a limitation's message says for each cause the server names. */
@@ -365,7 +365,8 @@ class ChatEvalSetTest {
         JsonNode route = completed.routeSummary();
         // The reason code the server decided; the result carries its wording.
         o.put("outcome", result.outcome()).put("reason", route.path("reason").isString() ? route.get("reason").stringValue() : null)
-                .put("reasonText", result.reason()).put("answerBasis", result.answerBasis());
+                .put("reasonText", result.reason()).put("answerBasis", result.answerBasis())
+                .put("answerStatus", result.answerStatus());
         o.putArray("citationKinds").addAll(strings(new TreeSet<>(result.citations().stream()
                 .map(Citation::sourceKind).toList())));
         ArrayNode limitations = o.putArray("limitations");

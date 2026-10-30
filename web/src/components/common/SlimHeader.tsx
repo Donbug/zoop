@@ -22,7 +22,7 @@ export default function SlimHeader({
         aria-label="화면 도구"
         className="flex items-center gap-2 text-zoop-muted"
       >
-        <span className="grid size-8 place-items-center" aria-hidden="true">
+        {/* <span className="grid size-8 place-items-center" aria-hidden="true">
           <img
             src="/graph-assets/slim-archive.svg"
             width="16"
@@ -30,7 +30,7 @@ export default function SlimHeader({
             alt=""
             data-icon
           />
-        </span>
+        </span> */}
         {themeSwitch ? (
           <button
             type="button"

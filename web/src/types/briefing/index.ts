@@ -1,6 +1,7 @@
 export type BriefingEdition = 'morning' | 'evening';
 
 import type { EventDetail } from '@/types/map/event';
+import type { DocumentSentiment, SentimentLabel } from '@/types/evidence';
 import type { MarketOutlookAnalysis } from './marketOutlook';
 export type { MarketOutlookAnalysis } from './marketOutlook';
 /** 전망 분석은 발행 당시 검증한 구조화 결과가 있는 회차에만 존재한다. */
@@ -23,6 +24,25 @@ export type BriefingItem = Pick<
   reason: string;
   evidenceCount: number;
   matchedCompanyIds?: string[];
+  /** getBriefing SourceSupportOut. 과거 저장 응답에는 없을 수 있다. */
+  sourceSupport?: { articleCount: number };
+  /** 문서×기업 판정(DocumentSentimentRef). 이슈 단위로 합치지 않는다. */
+  documentSentiments?: BriefingDocumentSentiment[];
+};
+
+export type BriefingDocumentSentiment = {
+  articleId: string;
+  sentiment: DocumentSentiment;
+};
+
+/** 발행 회차 판정(BriefingOutlook). 주가 전망이 아니며 문서별 판정과 구분한다. */
+export type BriefingOutlook = {
+  label: SentimentLabel;
+  rationale: string;
+  issueIds: string[];
+  judgedAt: string;
+  model: string;
+  promptVersion: string;
 };
 
 /** D-BRF-01·02: 선택한 발행 회차에 고정된 문안·근거. 최신 사건/문서 조회로 대체하지 않는다. */
@@ -227,12 +247,16 @@ export type BriefingResponse = {
   } | null;
   corrections: {
     id: number;
+    /** 이 정정이 속한 핵심 이슈. 회차 전체 정정이면 null. 과거 응답에는 없을 수 있다. */
+    eventId?: string | null;
     original: string | null;
     corrected: string;
     reason: string;
     createdAt: string;
   }[];
   metadata: EventDetail['metadata'];
+  /** 과거 응답에는 없을 수 있다. */
+  outlook?: BriefingOutlook | null;
 };
 
 /** listBriefingRounds 한 줄(BriefingRoundRef). 공개 이력은 발행·제공 중단 회차만 담는다. */

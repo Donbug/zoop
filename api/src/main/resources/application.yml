@@ -102,6 +102,13 @@ zoop:
       # the endpoint above and the chat model stages. The URL the model provider reaches this endpoint at is set on the AI
       # runtime (ZOOP_AI_CHAT_MCP_SERVER_URL), the only server a run's grant is ever sent to.
       agent-enabled: ${ZOOP_CHAT_AGENT_ENABLED:false}
+    web:
+      # The supplementary web search tool (api/docs/chat-web-search.md). Off by default. No real provider is selected yet:
+      # enabled, it needs provider=synthetic (fixture hits under example domains, local and tests only). It is never
+      # planned by the router; it is an MCP tool of the agent path, and the two cannot be on together until web results
+      # can be cited.
+      enabled: ${ZOOP_CHAT_WEB_ENABLED:false}
+      provider: ${ZOOP_CHAT_WEB_PROVIDER:none}
   analysis:
     analyze-plan:
       # Executes fixed admitted S2/S3 units only; completion does not collect or publish data.
@@ -196,6 +203,18 @@ zoop:
     ingestion-state-dir: ${ZOOP_INGESTION_STATE_DIR:}
     ingestion-sources: ${ZOOP_INGESTION_SOURCES:}
     artifact-root: ${ZOOP_ARTIFACT_ROOT:}
+  document-bindings:
+    # Operator-only, non-web export of the AI handoff's app document bindings file (zoop-app-document-bindings-1, see
+    # api/docs/DOCUMENT_BINDINGS.md). Disabled by default; the application starts without any of these settings. Enabled, it
+    # refuses to start unless the run is non-web (--spring.main.web-application-type=none) and both files are new normalized
+    # absolute paths, and refuses to run next to another operator command (one run per process). It reads the registry only and
+    # writes nothing. `scope` is `available` (default: versions of available articles) or `all`; `selection` optionally names an
+    # explicit list of document versions.
+    enabled: ${ZOOP_DOCUMENT_BINDINGS_ENABLED:false}
+    output: ${ZOOP_DOCUMENT_BINDINGS_OUTPUT:}
+    result: ${ZOOP_DOCUMENT_BINDINGS_RESULT:}
+    selection: ${ZOOP_DOCUMENT_BINDINGS_SELECTION:}
+    scope: ${ZOOP_DOCUMENT_BINDINGS_SCOPE:available}
   graph-handoff-import:
     # Operator-only, non-web staging of one AI handoff as an INACTIVE graph version (see api/README.md). Disabled by default; the
     # application starts without any of these settings. Enabled, it refuses to start unless the run is non-web

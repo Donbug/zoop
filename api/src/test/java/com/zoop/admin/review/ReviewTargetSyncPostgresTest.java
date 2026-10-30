@@ -11,6 +11,7 @@ import static com.zoop.admin.review.ReviewTargetReaderTest.s3;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -27,16 +28,20 @@ import com.zoop.common.json.StrictJson.Malformed;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** The review-target projection over the real migration: unique keys, the identity trigger and the decision repository reads. */
 @SpringBootTest(properties = {
@@ -53,6 +58,8 @@ class ReviewTargetSyncPostgresTest {
     @Autowired JdbcReviewRepository reviews;
     @Autowired PlatformTransactionManager transactions;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.zoop.admin.pipeline.JdbcPipelineOverviewReader overview;
+    @Autowired JdbcCandidateRepository candidates;
 
     private final ExtractionClient extraction = mock(ExtractionClient.class);
     private ReviewTargetSync sync;
@@ -202,6 +209,283 @@ class ReviewTargetSyncPostgresTest {
 
         assertTrue(active("relation", rel('2')), "it may still be there: only a complete reading deactivates");
         assertEquals("HOLD", status("candidate", EVENT_A));
+    }
+
+    /** The same four relations read again by another S3 job: a re-analysis of the same S2 content under a new plan. */
+    private UntrustedRelationPayload reanalysed(String job) {
+        return new UntrustedRelationPayload(job, "4".repeat(64), s3(
+                relation(rel('1'), "PARTICIPATES_IN", endpoint("company", "SK"), endpoint("event", EVENT_A), "eligible", "1"),
+                relation(rel('2'), "PARTICIPATES_IN", endpoint("company", "SS"), endpoint("event", EVENT_A), "hold", "2"),
+                relation(rel('3'), "PARTICIPATES_IN", endpoint("company", "SK"), endpoint("event", EVENT_HELD), "hold", "1"),
+                relation(rel('4'), "SUPPLIES", endpoint("company", "A"), endpoint("company", "B"), "hold", "1")), List.of());
+    }
+
+    /** Both S2 events name this snapshot event, unique per test so the list can be searched by it. */
+    private String linkTo(String eventId) {
+        s2Json = s2Json.replace("\"targetEventId\":null", "\"targetEventId\":\"" + eventId + "\"");
+        recorded = Canonical.sha256(s2Json);
+        upstreamResult(Optional.of(new UntrustedExtractionPayload(upstream.jobId(), S2_DIGEST, s2Json)));
+        return eventId;
+    }
+
+    /**
+     * An admitted one-unit analyze plan: S2 job {@code s2Job} with input {@code s2Input}, S3 job {@code s3JobId} whose result was
+     * observed at {@code observedAt}. No S3 input digest, so the sync scheduler never picks it up; the test syncs it itself.
+     */
+    private void planUnit(String s3JobId, String s2Job, String s2Input, Instant observedAt) {
+        String key = Canonical.sha256(s3JobId);
+        String planId = "s2plan-" + key;
+        String extraction = "{\"jobId\":\"" + s2Job + "\",\"approvedRequestDigest\":\"" + "a".repeat(64) + "\"}";
+        String relationSubmit = "{\"jobId\":\"" + s3JobId + "\"}";
+        String manifest = """
+                {"schemaVersion":"zoop-ai-plan-manifest-1","planId":"%s","planDigest":"%s","receiptSha256":"%s",
+                 "principal":"app","round":{},"provenance":{},"manifestDigest":"%s",
+                 "units":[{"unitKey":"%s","extractionSubmit":%s,"extractionInputDigest":"%s","relationSubmit":%s}]}"""
+                .formatted(planId, "b".repeat(64), "c".repeat(64), "d".repeat(64), s2Job, extraction, s2Input, relationSubmit);
+        String stage = """
+                {"schemaVersion":"zoop-app-analyze-plan-stage-1","state":"result_observed","intentAt":null,
+                 "acceptedObservedAt":"%1$s","resultObservedAt":"%1$s","resultContentSha256":"%2$s","receipts":[],
+                 "lastStatus":{"extraction":{"state":"READY","delivery":{"state":"AVAILABLE"}},
+                               "relation":{"state":"READY","delivery":{"state":"AVAILABLE"}}},
+                 "failureCategory":null,"failureCode":null,"consecutiveFailures":0,"recoveryDispatches":0}"""
+                .formatted(observedAt, "e".repeat(64));
+        new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            jdbc.update("""
+                    INSERT INTO analysis_plans (plan_id, plan_digest, service_binding, expected_principal, registered_at,
+                        registered_by, admission_id, accepted_at, policy_revision, policy_digest, receipt_sha256, manifest_digest,
+                        manifest)
+                    VALUES (?, ?, ?, 'app', now(), 'sync-test', ?, now(), 1, ?, ?, ?, CAST(? AS jsonb))""",
+                    planId, "b".repeat(64), "f".repeat(64), "pa-" + key, "a".repeat(64), "c".repeat(64), "d".repeat(64),
+                    manifest);
+            jdbc.update("""
+                    INSERT INTO analysis_plan_units (plan_id, ordinal, unit_key, s2_job_id, s2_approved_request_digest,
+                        s2_input_digest, s3_job_id, s2_submit, s3_submit, s2_checkpoint, s3_checkpoint)
+                    VALUES (?, 1, ?, ?, ?, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb), CAST(? AS jsonb), CAST(? AS jsonb))""",
+                    planId, s2Job, s2Job, "a".repeat(64), s2Input, s3JobId, extraction, relationSubmit, stage, stage);
+        });
+    }
+
+    /**
+     * The S2 result as the service relays it for an analysis of {@code documentId}: each event candidate names the job's analysed
+     * document. Every other part is this test's two events.
+     */
+    private String analysing(String documentId) {
+        return s2Json.replace("{\"eventCandidateId\"", "{\"document\":{\"documentId\":\"" + documentId
+                + "\",\"documentVersion\":\"" + "6".repeat(64) + "\"},\"eventCandidateId\"");
+    }
+
+    /**
+     * One analysis of {@code documentId} under a new plan, as the producer runs it: a new S2 job id and an input digest that hashes
+     * it, so no two analyses share either, and a new S3 job reading {@code relations}, observed at {@code observedAt}. A null
+     * document is a result whose candidates name none.
+     */
+    private String analyse(String s3JobId, String documentId, Instant observedAt, UntrustedRelationPayload relations) {
+        String s2Job = "s2-" + Canonical.sha256(s3JobId).substring(0, 40);
+        String input = Canonical.sha256("{\"request\":{\"jobId\":\"" + s2Job + "\"}}");
+        String json = documentId == null ? s2Json : analysing(documentId);
+        planUnit(s3JobId, s2Job, input, observedAt);
+        ExtractionResult result = mock(ExtractionResult.class);
+        when(result.readyPayload()).thenReturn(Optional.of(new UntrustedExtractionPayload(s2Job, input, json)));
+        when(extraction.result(s2Job)).thenReturn(result);
+        sync.sync(new RelationUpstream(s2Job, input), Canonical.sha256(json), relations);
+        return s3JobId;
+    }
+
+    private String analyse(String s3JobId, String documentId, Instant observedAt) {
+        return analyse(s3JobId, documentId, observedAt, reanalysed(s3JobId));
+    }
+
+    private String inputOf(String s3JobId) {
+        return jdbc.queryForObject("SELECT s2_input_digest FROM analysis_plan_units WHERE s3_job_id = ?", String.class, s3JobId);
+    }
+
+    /** The S3 jobs whose candidate row for {@code external} the list shows when searched by the event id, one row per page. */
+    private List<String> listed(String event, String external, String status) {
+        var filter = new JdbcCandidateRepository.Filter(status, null, null, null, event, List.of(), List.of());
+        List<String> jobs = new java.util.ArrayList<>();
+        Instant afterAt = null;
+        String afterId = null;
+        while (true) {
+            var page = candidates.page(filter, afterAt, afterId, 1);
+            if (page.isEmpty()) return jobs.stream().sorted().toList();
+            var only = page.getFirst();
+            if (only.candidateId().equals(external)) jobs.add(only.s3JobId());
+            afterAt = only.updatedAt();
+            afterId = only.id();
+        }
+    }
+
+    /**
+     * C2 (#132, PR #395 review): the same document analysed again under another plan. The two S2 jobs share neither job id nor
+     * input digest, as the producer makes them; the document they analysed is the same. The list, the counts and the overview show
+     * the analysis observed last only; the older job's HOLD stays decidable.
+     */
+    @Test
+    void theSameDocumentReanalysedUnderAnotherPlanIsListedAndCountedOnceUnderTheAnalysisObservedLast() {
+        String event = linkTo("event-" + UUID.randomUUID());
+        String document = "document-" + UUID.randomUUID();
+        Instant earlier = Instant.parse("2026-10-28T00:00:00Z");
+        String olderJob = analyse("s3-older-" + UUID.randomUUID(), document, earlier);
+        Map<String, Integer> countsBefore = candidates.counts();
+        long holdBefore = overview.decisions().holdPending();
+        long activeBefore = overview.candidates().active();
+
+        // Observed later but sorting first by id: the order is the observation, not the job id.
+        String newerJob = analyse("s3-0-" + UUID.randomUUID(), document, earlier.plusSeconds(60));
+        assertNotEquals(inputOf(olderJob), inputOf(newerJob), "a new plan never shares the S2 input digest");
+
+        assertEquals(List.of(newerJob), listed(event, EVENT_A, null), "listed once, page by page");
+        assertEquals(List.of(newerJob), listed(event, EVENT_A, "HOLD"), "the older HOLD is not listed by status either");
+        assertEquals(countsBefore, candidates.counts(), "every candidate of the older job is replaced, the standalone one too");
+        assertEquals(activeBefore, overview.candidates().active());
+        assertEquals(holdBefore, overview.decisions().holdPending(), "the HOLDs moved to the newer analysis");
+
+        var older = reviews.currentCandidate(jdbc.queryForObject("SELECT id FROM review_targets WHERE source_job_id = ? "
+                + "AND target_type = 'candidate' AND candidate_id = ? AND is_current", String.class, olderJob, EVENT_A))
+                .orElseThrow();
+        assertEquals("HOLD", reviews.currentRelation(older, rel('2')).orElseThrow().status(),
+                "the older job's HOLD can still be decided, and its row and history stay");
+    }
+
+    /**
+     * A newer analysis that finds no event candidate names no document in the service's result (it relays no binding), so it
+     * cannot be told to be of the same document and replaces nothing.
+     */
+    @Test
+    void aReanalysisThatFindsNoCandidateNamesNoDocumentAndReplacesNothing() {
+        String event = linkTo("event-" + UUID.randomUUID());
+        String document = "document-" + UUID.randomUUID();
+        Instant earlier = Instant.parse("2026-10-28T00:00:00Z");
+        String olderJob = analyse("s3-older-" + UUID.randomUUID(), document, earlier);
+        String kept = s2Json;
+        s2Json = s2();
+        String newerJob = "s3-empty-" + UUID.randomUUID();
+        analyse(newerJob, document, earlier.plusSeconds(60), new UntrustedRelationPayload(newerJob, "4".repeat(64), s3(),
+                List.of()));
+        s2Json = kept;
+
+        assertNull(jdbc.queryForObject("SELECT s2_document_id FROM analysis_plan_units WHERE s3_job_id = ?", String.class,
+                newerJob));
+        assertEquals(List.of(olderJob), listed(event, EVENT_A, null), "the older analysis stays listed");
+    }
+
+    /**
+     * A newer analysis of the same document whose relations were not all read (one unreadable, or one with no verdict yet) lists
+     * less than the analysis it would replace: it records no document and hides nothing, so the older HOLD stays listed and
+     * counted. Once a reading of it is complete it records the document and replaces the older analysis.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"unknown", "pending"})
+    void anIncompleteReadingOfANewerAnalysisRecordsNoDocumentAndHidesNothing(String status) {
+        String event = linkTo("event-" + UUID.randomUUID());
+        String document = "document-" + UUID.randomUUID();
+        Instant earlier = Instant.parse("2026-10-28T00:00:00Z");
+        String olderJob = analyse("s3-older-" + UUID.randomUUID(), document, earlier);
+        long holdBefore = overview.decisions().holdPending();
+        Map<String, Integer> countsBefore = candidates.counts();
+
+        String newerJob = "s3-partial-" + UUID.randomUUID();
+        analyse(newerJob, document, earlier.plusSeconds(60), new UntrustedRelationPayload(newerJob, "4".repeat(64), s3(
+                relation(rel('2'), "PARTICIPATES_IN", endpoint("company", "SS"), endpoint("event", EVENT_A), status, "2")),
+                List.of()));
+
+        assertNull(jdbc.queryForObject("SELECT s2_document_id FROM analysis_plan_units WHERE s3_job_id = ?", String.class,
+                newerJob), status);
+        assertEquals(List.of(olderJob), listed(event, EVENT_A, "HOLD"), status + ": the older HOLD stays listed");
+        assertEquals(countsBefore.get("HOLD"), candidates.counts().get("HOLD"), status);
+        assertEquals(holdBefore, overview.decisions().holdPending(), status + ": and stays counted as waiting");
+
+        String s2Job = jdbc.queryForObject("SELECT s2_job_id FROM analysis_plan_units WHERE s3_job_id = ?", String.class,
+                newerJob);
+        String json = analysing(document);
+        sync.sync(new RelationUpstream(s2Job, inputOf(newerJob)), Canonical.sha256(json), reanalysed(newerJob));
+        assertEquals(document, jdbc.queryForObject("SELECT s2_document_id FROM analysis_plan_units WHERE s3_job_id = ?",
+                String.class, newerJob), status + ": a complete reading records it");
+        assertEquals(List.of(newerJob), listed(event, EVENT_A, "HOLD"), status);
+    }
+
+    /**
+     * The review's counterexamples: another document reaching the same {@code targetEventId}, and analyses observed at the same
+     * instant, a result whose candidates name no document and jobs no plan unit owns. None hides another.
+     */
+    @Test
+    void anotherDocumentTheSameInstantNoDocumentOrNoPlanUnitNeverHides() {
+        String event = linkTo("event-" + UUID.randomUUID());
+        String document = "document-" + UUID.randomUUID();
+        Instant at = Instant.parse("2026-10-28T00:00:00Z");
+        String first = analyse("s3-a-" + UUID.randomUUID(), document, at);
+        String otherDocument = analyse("s3-b-" + UUID.randomUUID(), document + "-b", at.plusSeconds(60));
+        String sameInstant = analyse("s3-tie-" + UUID.randomUUID(), document, at);
+        String noDocument = analyse("s3-nodoc-" + UUID.randomUUID(), null, at.plusSeconds(120));
+        String noUnit = "s3-none-" + UUID.randomUUID();
+        sync.sync(upstream, recorded, reanalysed(noUnit));
+
+        assertEquals(List.of(first, otherDocument, sameInstant, noDocument, noUnit).stream().sorted().toList(),
+                listed(event, EVENT_A, null), "no strictly later analysis of the same document, nothing hidden");
+    }
+
+    /**
+     * The same regression over what the AI side really produces (api/scripts/export_reanalysis_fixtures.py): one round planned twice
+     * by the actual {@code plan_round} under two enqueue ids, each S2 job run by the actual pipeline and rendered by the service's
+     * {@code ExtractionJobContent}. Their job ids and input digests differ and their results carry no binding; the analysed document
+     * is the one their event candidates name.
+     */
+    @Test
+    void twoPlansOfOneRoundFromTheRealPlanBuilderAreOneAnalysisListedOnce() throws Exception {
+        String text;
+        try (var in = getClass().getResourceAsStream("/review/reanalysis-two-plans.json")) {
+            text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+        var fixture = com.zoop.common.json.StrictJson.parseObject(text);
+        var plans = fixture.objects("plans");
+        assertEquals(2, plans.size());
+        assertNotEquals(plans.get(0).string("s2JobId"), plans.get(1).string("s2JobId"));
+        assertNotEquals(plans.get(0).string("s2InputDigest"), plans.get(1).string("s2InputDigest"),
+                "the producer hashes the job id into the input digest");
+        var document = fixture.object("document");
+
+        Instant at = Instant.parse("2026-10-28T00:00:00Z");
+        List<String> jobs = new java.util.ArrayList<>();
+        for (int index = 0; index < plans.size(); index++) {
+            var plan = plans.get(index);
+            String s2Job = plan.string("s2JobId");
+            String input = plan.string("s2InputDigest");
+            String json = plan.raw("s2Result").toString();
+            assertFalse(json.contains("\"binding\""), "the service relays no binding");
+            String event = plan.object("s2Result").objects("eventCandidates").getFirst().string("eventCandidateId");
+            String s3Job = "s3-fixture-" + index + "-" + UUID.randomUUID();
+            planUnit(s3Job, s2Job, input, at.plusSeconds(60L * index));
+            ExtractionResult result = mock(ExtractionResult.class);
+            when(result.readyPayload()).thenReturn(Optional.of(new UntrustedExtractionPayload(s2Job, input, json)));
+            when(extraction.result(s2Job)).thenReturn(result);
+            sync.sync(new RelationUpstream(s2Job, input), Canonical.sha256(json), new UntrustedRelationPayload(s3Job,
+                    "4".repeat(64), s3(relation(rel('1'), "PARTICIPATES_IN", endpoint("company", "SK"), endpoint("event", event),
+                            "hold", "1")), List.of()));
+            jobs.add(s3Job);
+            assertEquals(List.of(document.string("documentId"), document.string("documentVersion")), jdbc.queryForList(
+                    "SELECT unnest(ARRAY[s2_document_id, s2_document_version]) FROM analysis_plan_units WHERE s3_job_id = ?",
+                    String.class, s3Job), "the document every candidate names");
+        }
+
+        assertEquals(List.of(jobs.get(1)), jdbc.queryForList("""
+                SELECT t.source_job_id FROM review_targets t
+                WHERE t.target_type = 'candidate' AND t.is_current AND t.source_job_id IN (?, ?) AND """
+                + " " + JdbcCandidateRepository.newestAnalysis("t"), String.class, jobs.get(0), jobs.get(1)),
+                "only the plan observed last is listed");
+    }
+
+    /** The S2 result is fixed by its recorded hash: a unit is never moved to another document. */
+    @Test
+    void aUnitKeepsTheDocumentItWasFirstRecordedWith() {
+        linkTo("event-" + UUID.randomUUID());
+        String job = analyse("s3-" + UUID.randomUUID(), "document-a", Instant.parse("2026-10-28T00:00:00Z"));
+        assertFalse(reviews.recordDocument(job, new ReviewTargetReader.Document("document-a", "6".repeat(64))),
+                "the same document again changes nothing");
+        // The repository's refusal reaches callers through Spring's repository exception translation.
+        assertThrows(org.springframework.dao.InvalidDataAccessApiUsageException.class, () -> reviews.recordDocument(job,
+                new ReviewTargetReader.Document("document-b", "6".repeat(64))));
+        assertEquals("document-a", jdbc.queryForObject("SELECT s2_document_id FROM analysis_plan_units WHERE s3_job_id = ?",
+                String.class, job));
     }
 
     private boolean active(String type, String external) {

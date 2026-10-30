@@ -16,6 +16,7 @@ import {
   useNavigate,
 } from 'react-router-dom';
 import CompanyDetailPage from '@/pages/company/CompanyDetailPage';
+import AppLayout from '@/components/common/AppLayout';
 import MapPage from '@/pages/map/MapPage';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
@@ -329,6 +330,33 @@ function open(query = '') {
   );
 }
 const pinned = `?asOf=${encodeURIComponent(time)}&graphVersion=v1`;
+
+test.each(['events', 'documents', 'info'])(
+  'D-COM-01 F4 keeps one main and the skip-link target on the %s tab',
+  async (tab) => {
+    const view = renderRoutes(
+      [
+        {
+          element: <AppLayout />,
+          children: [
+            { path: '/companies/:id', element: <CompanyDetailPage /> },
+          ],
+        },
+      ],
+      `/companies/${encodeURIComponent(id)}${pinned}&tab=${tab}`,
+    );
+    await screen.findByRole('heading', { name: '합성 기업', level: 1 });
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    const main = screen.getByRole('main');
+    expect(main.id).toBe('service-main');
+    await view.user.click(
+      screen.getByRole('link', { name: '본문으로 건너뛰기' }),
+    );
+    expect(document.activeElement).toBe(main);
+    expect(view.router.state.location.hash).toBe('');
+    expect(view.router.state.location.search).toContain(`tab=${tab}`);
+  },
+);
 
 function openHistory() {
   return renderRoutes(
@@ -724,7 +752,7 @@ test('connected member displays mock holding without replacing null values', asy
   );
   open(pinned);
   await screen.findByText('20주');
-  expect(screen.getByText('계산 불가')).toBeTruthy();
+  expect(screen.getByText('-', { selector: 'dd' })).toBeTruthy();
   const region = screen.getByRole('region', { name: '가상 계좌 보유' });
   expect(within(region).getAllByText(/모의/).length).toBeGreaterThan(0);
   // D-COM-01 / F6: private valuation timestamps retain the original machine values.
@@ -740,6 +768,45 @@ test('connected member displays mock holding without replacing null values', asy
   ).toBe(true);
   await act(async () => useAuthStore.getState().clearSession());
   expect(screen.queryByText('20주')).toBeNull();
+});
+test('D-COM-01 company detail hides holdings when the portfolio only holds other companies', async () => {
+  useAuthStore.getState().setSession({
+    authenticated: true,
+    kind: 'member',
+    user: {
+      id: 'synthetic-member',
+      email: 'synthetic@example.test',
+      displayName: '가상',
+    },
+    setup: { completed: true, tutorialCompleted: false },
+    csrfToken: 'synthetic',
+    expiresAt: null,
+  });
+  server.on('GET', '/api/v1/portfolio', () =>
+    json({
+      connected: true,
+      holdings: [
+        {
+          companyId: 'KRX:OTHER',
+          quantity: 20,
+          avgPrice: 100,
+          avgPriceCurrency: 'KRW',
+          marketValue: 2000,
+          weight: 1,
+          quote: { status: 'available', currency: 'KRW' },
+        },
+      ],
+      mockAsOf: old,
+      valuation: null,
+      metadata,
+    }),
+  );
+  open(pinned);
+  await waitFor(() =>
+    expect(server.calls('GET', '/api/v1/portfolio').length).toBeGreaterThan(0),
+  );
+  expect(screen.queryByRole('region', { name: '가상 계좌 보유' })).toBeNull();
+  expect(screen.queryByText('이 기업의 모의 보유 종목이 없어요.')).toBeNull();
 });
 test('switching member hides previous holdings while next response is pending', async () => {
   const session = (id: string) => ({
@@ -787,7 +854,7 @@ test('switching member hides previous holdings while next response is pending', 
       }),
     ),
   );
-  await screen.findByText('연결된 가상 계좌가 없어요.');
+  expect(screen.queryByRole('region', { name: '가상 계좌 보유' })).toBeNull();
 });
 test('event map link opens the event-time map; round trip restores period, time, tab, event and bucket exactly', async () => {
   const query = `${pinned}&period=1m&tab=events&event=issue-a&bucket=2026-10-05`;
@@ -2092,8 +2159,8 @@ function formattingQuote(
 }
 
 test.each([
-  ['KRW', '120원', '2원'],
-  ['USD', '$120.00', '$2.00'],
+  ['KRW', '120원', '▲ +2원 (+2.00%)'],
+  ['USD', '$120.00', '▲ +$2.00 (+2.00%)'],
 ])(
   'D-COM-01 F7 formats %s price and day change with currency',
   async (currency, price, change) => {
@@ -2105,13 +2172,7 @@ test.each([
       await screen.findByRole('region', { name: '최신 시세' }),
     );
     expect(await region.findByText(price, { exact: true })).toBeTruthy();
-    expect(
-      region.getByText(
-        new RegExp(
-          `전일 대비 ${change.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
-        ),
-      ),
-    ).toBeTruthy();
+    expect(region.getByText(change, { exact: true })).toBeTruthy();
   },
 );
 
@@ -2126,7 +2187,7 @@ test('D-COM-01 F7 preserves missing quote amounts instead of fabricating zero', 
   expect(
     await region.findByText('미제공', { exact: true, selector: 'strong' }),
   ).toBeTruthy();
-  expect(region.getByText(/전일 대비 미제공/)).toBeTruthy();
+  expect(region.getByText('미제공 (미제공)', { exact: true })).toBeTruthy();
   expect(region.queryByText('0원', { exact: true })).toBeNull();
   expect(region.getByText(/공급자 관측 시각 미제공/)).toBeTruthy();
 });
@@ -2140,7 +2201,7 @@ test('D-COM-01 F7 keeps zero as a real amount', async () => {
     await screen.findByRole('region', { name: '최신 시세' }),
   );
   expect(await region.findByText('0원', { exact: true })).toBeTruthy();
-  expect(region.getByText(/전일 대비 0원/)).toBeTruthy();
+  expect(region.getByText('0원 (+2.00%)', { exact: true })).toBeTruthy();
 });
 
 test('D-COM-01 F6 shows KST while preserving original metadata and observation times', async () => {
@@ -2167,7 +2228,7 @@ test('D-COM-01 F6 shows KST while preserving original metadata and observation t
   expect(last.query.get('graphVersion')).toBe('v1');
 });
 
-test('D-COM-01 F6 formats chart table and financial timestamps without changing their ISO attributes', async () => {
+test('D-COM-01 F6 preserves chart timestamps while B1 keeps unsupported financials hidden', async () => {
   server.on('GET', '/api/v1/companies/:id/financials', () =>
     json({
       status: 'available',
@@ -2192,11 +2253,10 @@ test('D-COM-01 F6 formats chart table and financial timestamps without changing 
     exact: true,
   });
   expect(cell.getAttribute('datetime')).toBe(old);
-  const financial = await screen.findByRole('region', { name: '핵심 재무' });
-  const basis = await within(financial).findByText('2026-10-05 12:00 KST', {
-    exact: true,
-  });
-  expect(basis.getAttribute('datetime')).toBe(old);
+  expect(server.calls('GET', '/api/v1/companies/:id/financials')).toHaveLength(
+    0,
+  );
+  expect(screen.queryByRole('region', { name: '핵심 재무' })).toBeNull();
 });
 
 test('D-COM-01 F6 shows unknown-time event report times in KST and keeps missing ones', async () => {
@@ -2239,3 +2299,74 @@ test('D-COM-01 F6 shows unknown-time event report times in KST and keeps missing
       .textContent,
   ).toContain('보도 시각 미상 (사건 시각 아님)');
 });
+
+test('D-COM-01 B1 makes no unsupported financials request or financial section', async () => {
+  open(pinned);
+  await screen.findByRole('heading', { name: '합성 기업', level: 1 });
+  expect(server.calls('GET', '/api/v1/companies/:id/financials')).toHaveLength(
+    0,
+  );
+  expect(screen.queryByRole('region', { name: '핵심 재무' })).toBeNull();
+});
+
+test.each([
+  [2, 0.02, 'KRW', '▲ +2원 (+2.00%)', 'text-zoop-up'],
+  [-2, -0.02, 'KRW', '▼ -2원 (-2.00%)', 'text-zoop-down'],
+  [0, 0, 'KRW', '0원 (0.00%)', 'text-zoop-muted'],
+  [null, -0.02, 'KRW', '▼ 미제공 (-2.00%)', 'text-zoop-down'],
+  [2, null, 'KRW', '▲ +2원 (미제공)', 'text-zoop-up'],
+  [null, null, 'KRW', '미제공 (미제공)', 'text-zoop-muted'],
+  [0, 0.02, 'KRW', '0원 (+2.00%)', 'text-zoop-muted'],
+  [2, -0.02, 'KRW', '▲ +2원 (-2.00%)', 'text-zoop-up'],
+  [-2, -0.02, 'USD', '▼ -$2.00 (-2.00%)', 'text-zoop-down'],
+] as const)(
+  'D-COM-01 N-i shows change %s and rate %s in %s with the change direction and each value sign',
+  async (change, rate, currency, label, color) => {
+    const response = formattingQuote(currency, change);
+    response.quote.changeRate = rate;
+    server.on('GET', '/api/v1/companies/:id/quote', () => json(response));
+    open(pinned);
+    const region = within(
+      await screen.findByRole('region', { name: '최신 시세' }),
+    );
+    const indicator = await region.findByText(label, { exact: true });
+    expect(indicator.classList.contains(color)).toBe(true);
+    expect(indicator.classList.contains('text-[11px]')).toBe(false);
+    expect(indicator.classList.contains('mt-0.5')).toBe(false);
+  },
+);
+
+test.each([
+  ['datetime', '2026-10-05T03:00:00Z', '2026-10-05 12:00 KST'],
+  ['day', '2026-10-05', '2026-10-05'],
+  ['month', '2026-10', '2026-10'],
+  ['year', '2026', '2026'],
+  ['unknown', '2026-10-05', '시점 미상'],
+  ['unknown', null, '시점 미상'],
+  ['datetime', '2026-10-05T03:00:00', '시점 미상'],
+] as const)(
+  'D-COM-01 N-k displays %s event time %s without inventing precision',
+  async (precision, eventTime, label) => {
+    server.on('GET', '/api/v1/events', () =>
+      json({
+        items: [{ ...events[0], timePrecision: precision, eventTime }],
+        unknownTimeItems: [],
+        nextCursor: null,
+        metadata: { ...metadata, total: 1, excludedUnknownTime: 0 },
+      }),
+    );
+    open(pinned);
+    const title = await screen.findByRole('button', { name: '합성 사건 A' });
+    const row = within(title.closest('article')!);
+    const stamp = await row.findByText(label, {
+      exact: true,
+      selector: eventTime ? 'time' : 'p',
+    });
+    if (eventTime) expect(stamp.getAttribute('datetime')).toBe(eventTime);
+    else expect(title.closest('article')!.querySelector('time')).toBeNull();
+    expect(screen.getByTestId('address').textContent).toContain(pinned);
+    expect(screen.getByTestId('address').textContent).not.toContain(
+      'graphAsOf',
+    );
+  },
+);

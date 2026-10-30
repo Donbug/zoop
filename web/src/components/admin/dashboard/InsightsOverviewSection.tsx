@@ -55,7 +55,7 @@ export default function InsightsOverviewSection() {
                 value={<MetricValue metric={metric} />}
                 detail={
                   metric.kind === 'ratio' ? (
-                    <MetricBasis metric={metric} minSample={data.minSample} />
+                    <MetricBasis metric={metric} />
                   ) : undefined
                 }
               />

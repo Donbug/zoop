@@ -4,17 +4,44 @@ import { useAsyncData } from '@/hooks/useAsyncData';
 import { formatMoney } from '@/util/format';
 
 /** 등락률(비율)을 화살표와 부호가 붙은 백분율로. 오르면 빨강, 내리면 파랑(국내 관례) */
-function ChangeRate({ rate }: { rate: number }) {
-  const percent = Math.abs(rate * 100).toFixed(2);
-  if (rate > 0)
-    return (
-      <span className="mt-0.5 text-[11px] text-zoop-up">▲ +{percent}%</span>
-    );
-  if (rate < 0)
-    return (
-      <span className="mt-0.5 text-[11px] text-zoop-down">▼ -{percent}%</span>
-    );
-  return <span className="mt-0.5 text-[11px] text-zoop-muted">0.00%</span>;
+export function ChangeRate({
+  rate,
+  change,
+  currency,
+  className = 'mt-0.5 text-[11px]',
+}: {
+  rate: number | null;
+  change?: number | null;
+  currency?: string;
+  /** D-COM-01 N-i: pass an empty class to inherit the company's inline typography. */
+  className?: string;
+}) {
+  // 화살표·색은 change(없으면 rate)로 정하고, 각 숫자는 자기 부호를 그대로 보인다.
+  const direction = change ?? rate;
+  const up = direction !== null && direction > 0;
+  const down = direction !== null && direction < 0;
+  const sign = (value: number) => (value > 0 ? '+' : value < 0 ? '-' : '');
+  const arrow = up ? '▲ ' : down ? '▼ ' : '';
+  const color = up
+    ? 'text-zoop-up'
+    : down
+      ? 'text-zoop-down'
+      : 'text-zoop-muted';
+  const percent =
+    rate === null
+      ? '미제공'
+      : `${sign(rate)}${Math.abs(rate * 100).toFixed(2)}%`;
+  const amount =
+    change == null || !currency
+      ? '미제공'
+      : `${sign(change)}${formatMoney(Math.abs(change), currency)}`;
+  return (
+    <span className={`${className} ${color}`.trim()}>
+      {change === undefined
+        ? `${arrow}${percent}`
+        : `${arrow}${amount} (${percent})`}
+    </span>
+  );
 }
 
 function Frame({ children, label }: { children: ReactNode; label?: string }) {

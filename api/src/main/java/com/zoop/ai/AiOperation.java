@@ -15,6 +15,8 @@ public enum AiOperation {
     OPERATION(false),
     /** One chatbot model stage (router, answer or verification); it may send a model request. */
     CHAT_STAGE(true),
+    /** Reads the configured chat MCP endpoint's content-free health observation; no model request is made. */
+    CHAT_MCP_HEALTH(false),
     /** Commits reference-only plan authority; never enqueues model work. */
     PLAN_ADMIT(true),
     /** Reads the identity-only public exposure of fixed handoffs; never changes the AI service or the app. */

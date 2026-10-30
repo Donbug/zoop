@@ -299,7 +299,7 @@ export default function SignupForm({ social = false }: { social?: boolean }) {
                     </summary>
                     <div className="mt-1 max-h-[200px] overflow-auto bg-white p-3 text-gray-700">
                       {usable(t) ? (
-                        <MarkdownContent source={t.body!} />
+                        <MarkdownContent source={t.body!} headingOffset={1} />
                       ) : (
                         '약관 본문 준비 중'
                       )}
