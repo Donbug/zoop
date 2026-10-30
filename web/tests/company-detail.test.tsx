@@ -334,7 +334,9 @@ const pinned = `?asOf=${encodeURIComponent(time)}&graphVersion=v1`;
 test('D-COM-01 48 normalizes a missing tab and announces the prototype notice', async () => {
   open(`${pinned}&tab=gone&depth=2`);
   await screen.findByText('요청한 탭이 없어 사건 탭을 보여 드려요');
-  expect(screen.getByTestId('address').textContent).not.toContain('tab=gone');
+  await waitFor(() =>
+    expect(screen.getByTestId('address').textContent).not.toContain('tab=gone'),
+  );
   expect(screen.getByTestId('address').textContent).toContain('depth=2');
 });
 

@@ -516,7 +516,13 @@ export default function CompanyWorkspace() {
     );
   });
   useEffect(() => {
-    normalizeRoute();
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) normalizeRoute();
+    });
+    return () => {
+      active = false;
+    };
   }, [
     id,
     unknownTab,
