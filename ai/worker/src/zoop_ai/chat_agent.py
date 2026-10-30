@@ -24,11 +24,11 @@ from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import ValidationError
 
-from .chat_contracts import (PROVIDER_ID, AgentAnswer, AgentInput, ApprovalRequest, ChatAnswer, McpCallSummary,
-                             MAX_APPROVALS, MAX_MCP_CALLS)
+from .chat_contracts import (OUTPUT_BUDGET_EXCEEDED, PROVIDER_ID, AgentAnswer, AgentInput, ApprovalRequest, ChatAnswer,
+                             McpCallSummary, MAX_APPROVALS, MAX_MCP_CALLS, MAX_OUTPUT_TOKENS)
 from .contracts import canonical, digest
 
-PROMPT_REVISION = "zoop-chat-agent-2026-10-28-1"
+PROMPT_REVISION = "zoop-chat-agent-2026-10-30-1"
 # Pinned like the answer stage; the agent runs at medium effort until high has proven quality and the 45 s limit (MCP actions
 # contract 3.2).
 MODEL = "gpt-6-luna"
@@ -47,6 +47,9 @@ PROMPT = (
     "근거 기반 구간(evidence_grounded)에는 도구 결과의 evidenceIds만 근거로 쓰고, 문장마다 뒷받침하는 evidenceIds를 넣는다. "
     "도구 결과에 없는 사실·수치·날짜·인과·전망을 더하지 않는다. zoopPolicy_read 결과로 서비스 이용 방법이나 정책을 설명하는 "
     "구간은 ZOOP 문서 구간(zoop_documented)으로 두고, 근거 기반 구간과 섞지 않는다. "
+    "web_search 결과(webResults)로 답하는 구간은 웹 보도 구간(web_reported)으로 두고, 그 결과의 id만 evidenceIds에 "
+    "넣는다. 웹 보도 구간은 snippet에 적힌 것만 쓰고 줍이 확인한 사실처럼 쓰지 않으며, 근거 기반·ZOOP 문서 구간과 섞지 "
+    "않는다. 서비스 이용 방법이나 정책은 웹으로 답하지 않는다. "
     "general=true인 요구만 일반 개념 구간(general_knowledge)으로 설명할 수 있고, 그 구간에는 근거를 넣지 않으며 최신 "
     "기업·시장 사실, 수치, 날짜, 가격, 전망을 쓰지 않는다. "
     "경로 조회의 paths에서 status=none은 한도 안에서 연결이 없음이 확인된 것이고 status=cut은 확인하지 못한 것이므로 "
@@ -54,7 +57,8 @@ PROMPT = (
     "각 구간의 requirementIds는 그 구간이 답하는 요구다. 근거가 부족해 답할 수 없는 요구는 구간 없이 "
     "insufficientRequirementIds에 넣는다. 모든 요구는 구간과 insufficientRequirementIds 중 정확히 한 곳에 속한다. "
     "전체 인용은 서로 다른 evidenceId maxCitations개 이하다. 매수·매도·보유 권유, 목표 주가, 가격·수익 예측, 수익 보장을 "
-    "쓰지 않는다. graphTargetIds에는 본문이 실제로 가리키는 도구 결과 items의 company·issue id만 넣는다. 한국어로 간결하게 쓴다."
+    "쓰지 않는다. graphTargetIds에는 본문이 실제로 가리키는 도구 결과 items의 company·issue id만 넣는다. 한국어로 간결하게 "
+    "쓰고, 답변 전체는 공백 포함 2,000자를 넘기지 않는다."
 )
 
 
@@ -93,6 +97,7 @@ def build_request(payload: AgentInput, model: str, reasoning_effort: str | None,
     request: dict[str, Any] = {
         "model": model,
         "store": True,
+        "max_output_tokens": MAX_OUTPUT_TOKENS,
         "instructions": PROMPT,
         "tools": [_tool(payload, url)],
         "text": {"format": {"type": "json_schema", "name": "chat_answer", "strict": True, "schema": schema()}},
@@ -198,7 +203,9 @@ def interpret(raw: Any, payload: AgentInput) -> AgentAnswer:
         return AgentAnswer(response_id=response_id, status="approval_required", approval_requests=approvals,
                            mcp_calls=calls, answer=None)
     if raw.get("status") == "incomplete":
-        raise ValueError("agent_incomplete")
+        details = raw.get("incomplete_details")
+        cut = isinstance(details, dict) and details.get("reason") == "max_output_tokens"
+        raise ValueError(OUTPUT_BUDGET_EXCEEDED if cut else "agent_incomplete")
     if raw.get("status") != "completed":
         raise ValueError("agent_response_invalid")
     if refused:

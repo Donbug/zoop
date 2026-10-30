@@ -1,6 +1,6 @@
 # AI 챗봇 Luna MCP 실행·복합 질의·화면 동작 계약
 
-기준일: 2026-10-28 / 상태: 2026-10-28 팀 결정 · 구현 예정 · 출시 검증 별도
+기준일: 2026-10-28 / 상태: 2026-10-28 팀 결정 · 구현 현황은 [챗봇 MCP 엔드포인트](../../api/docs/chat-mcp.md) · 출시 검증 별도
 
 상위 정책: [AI 거버넌스 v0.11](../ZOOP_AI_거버넌스_정책.md) / [설계 요약](ai-chatbot-design-summary.md) / [보조 웹 검색](ai-chatbot-web-search.md)
 
@@ -22,8 +22,8 @@ MCP 도입 목적은 **Luna가 조회 결과를 보고 다음 도구·인자를 
 ## 2. 턴별 분류와 문맥
 
 - 새 질문/job마다 요구와 Q 유형을 다시 분류한다. 세션에 분류를 고정하지 않는다.
-- 기존 구현은 확인 질문 사슬만 모델 입력에 포함한다. 일반 이전 턴 문맥 승계는 별도 미구현 기능이다. 도입 시 같은 대화의 직전 완료 2턴에서 서버가 검증한 대상 ID·기간·선택 정보만 후보로 전달한다. 답변 본문·원문·숨겨진 추론은 승계하지 않고 현재 권한을 재확인한다.
-- 명시된 새 대상·기간이 우선이다. ‘그 회사’ 후보가 여럿이면 clarification한다.
+- 모델 입력에는 지금처럼 확인 질문 사슬만 넣는다. 이전 턴 문맥 승계는 서버 계획 단계에서 한다(2026-10-30 구현). 같은 대화의 직전 답변 2턴(`answered`·`insufficient_evidence`, 이어지는 질문의 사슬 시작 전)에서 저장된 `applied`의 기업·사건 ID와 질문·선택 기간만 후보로 쓴다. 답변 본문·원문·숨겨진 추론은 승계하지 않고, 대상은 이번 job의 고정 그래프에서 다시 확인해 보이는 것만 남긴다(확인 불가면 후보 없음).
+- 명시된 새 대상·기간이 우선이고, 그다음 화면 선택, 그다음 이전 턴 후보다. ‘그 회사’ 후보가 여럿이면 후보를 선택지로 clarification한다. 지목 없는 조회는 후보가 하나면 그 대상을 읽고, 지도 전체를 볼 수 있는 조회는 ‘그 회사’처럼 가리킬 때만 후보를 쓴다. 승계한 기간은 비교 조회에만 쓰며 `applied.period.basis=context`로 표시한다.
 - job 안의 graphVersion·asOf·선택 evidence 범위는 고정한다. 기술 재시도와 resolves 확인 답은 기존 고정 문맥을 승계한다. 독립된 ‘최신’ 새 질문에서만 새 시점을 정한다.
 - polling·재열람·저장 복구는 새 분류·도구 호출을 만들지 않는다. 이전 답변은 새로운 사실의 근거가 아니다.
 
@@ -86,6 +86,8 @@ MCP 자격 증명은 OpenAI 모델 API 키와 별개다. job·실행 세대·sub
 초기 Responses의 `reasoning.effort`는 `medium`으로 고정한다. 구현 첫 단계에서 도구 1·4·8회와 승인 continuation 1·3라운드의 합성 replay 및 승인된 소량 live latency spike를 수행해 p50/p95·토큰·비용을 기록한다. `high`는 같은 평가 세트에서 품질 이득과 45초 준수를 모두 증명한 뒤 정책 revision으로 올린다.
 
 모델 측 요청 1건에도 여러 추론·도구 왕복이 있을 수 있다. 모델/도구 토큰·continuation·reasoning 사용량을 실제 영수증으로 합산하고, 서버가 예약하는 모델 출력 비용은 reasoning도 포함한다. 2,000은 최종 답변 길이 상한이며 reasoning 비용까지 그 안이라고 가정하지 않는다. 모델이 초과 호출을 시도하면 gate가 거부하고 실행기가 신규 실행을 종료한다.
+
+토큰 상한 구현(2026-10-30): 공급자 출력 상한은 reasoning을 포함하므로 Luna 요청에 8,000(답변 2,000 + reasoning 몫 6,000, spike 뒤 재조정)을 보내고, 받은 뒤 출력에서 reasoning을 뺀 값이 2,000을 넘거나 출력 상한에서 잘린 답은 버려 `budget_exceeded/output_limit`으로 끝낸다. direct 답변은 입력 전체를 한 번에 보내므로 추정치(토크나이저 없이 ASCII 4자·그 외 1.3자당 1토큰)가 24,000을 넘으면 보내지 않고 `budget_exceeded/context_too_large`다. agent는 입력이 공급자 쪽에서 늘어나므로 Java가 단계별 보고값을 합산한다. 다음 단계 입력은 직전 단계 이상이므로, 합계 + 직전 입력이 24,000을 넘으면 더 보내지 않고 `context_too_large`, 합계 + 직전 입력 2배가 넘으면 새 도구를 거부해 다음 단계가 답을 쓴다. 한 단계의 도구 결과로 입력이 크게 늘면 사후에야 알 수 있어 그 단계의 초과는 막지 못하고, 공급자가 사용량을 보고하지 않으면 합산하지 않는다.
 
 ### 3.3 요청 단위 캐시와 중복 억제
 
@@ -185,4 +187,4 @@ UI 동작은 DB 읽기 도구와 분리한다. 조회 결과의 유효한 ID를 
 
 동시 변경 대상은 planner capability·실행 봉투, Responses MCP 연결·서버 바인딩·승인 continuation, ChatResult·answerStatus/notices·citation/basis·UI action 계약, 감사 기록, 응답 검사·재열람 guard, 생성 명세·클라이언트, 화면·테스트다. 공개 job 접수·polling·resolves 수명주기는 유지한다. 미구현 계약을 OpenAPI 출력에만 먼저 추가하지 않는다.
 
-평가는 [고정 평가 세트의 다음 버전 항목](../development/ai-chatbot-eval-set.md)을 따른다. 독립 Luna coverage-verifier 계획은 3.1절로 대체한다. Responses MCP 실행·Java 승인 continuation·cache·direct 시작 경로·부분 응답은 모두 구현 예정이다. 공식 API 근거: [Luna 모델](https://developers.openai.com/api/docs/models/gpt-6-luna), [Responses MCP](https://developers.openai.com/api/docs/guides/tools-connectors-mcp)(2026-10-28 확인). 기존 Figma 보드는 이전 설계일 수 있으며 구현 전에 별도로 동기화한다.
+평가는 [고정 평가 세트의 다음 버전 항목](../development/ai-chatbot-eval-set.md)을 따른다. 독립 Luna coverage-verifier 계획은 3.1절로 대체한다. Responses MCP 실행·Java 승인 continuation·cache·direct 시작 경로·부분 응답은 구현됐고(2026-10-30, 기능 플래그 기본 꺼짐, 합성 replay로만 확인) live 확인이 남았다. 공식 API 근거: [Luna 모델](https://developers.openai.com/api/docs/models/gpt-6-luna), [Responses MCP](https://developers.openai.com/api/docs/guides/tools-connectors-mcp)(2026-10-28 확인). 기존 Figma 보드는 이전 설계일 수 있으며 구현 전에 별도로 동기화한다.

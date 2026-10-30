@@ -13,7 +13,7 @@ import httpx
 import pytest
 
 from zoop_ai import chat_cli, chat_jev, chat_luna, chat_runtime
-from zoop_ai.chat_contracts import ChatGrantRegistry, Receipt, RouterInput, StageRequest, VerificationInput
+from zoop_ai.chat_contracts import ChatGrantRegistry, Receipt, RouterInput, StageRequest, VerificationInput, estimated_tokens
 from zoop_ai.chat_runtime import ChatLedger, LiveSender, ReplaySender, invoke, request_identity, stage_config
 from zoop_ai.provider import ProviderError
 
@@ -239,6 +239,86 @@ def test_closed_server_fact_contract_rejects_misbinding_and_extra_private_data(m
         VerificationInput.model_validate(payload)
 
 
+def selection_input() -> dict[str, Any]:
+    payload = verification_input()
+    payload["sections"][0]["serverFacts"] = [
+        {"kind": "publication_record", "requirementId": "r1", "issueId": "iss-1", "issueTitle": "HBM 공급 계약",
+         "graphVersion": "gv-new", "reviewRevision": 12, "ruleRevision": 3, "decision": "allow",
+         "decisionPath": "admin_review", "decidedAt": "2026-10-20T05:00:00Z",
+         "rules": [{"ruleId": "single-source@1", "title": "출처가 기사 1개뿐인 관계 숨기기", "summary": "근거 기사 2개 미만인 관계를 숨깁니다."}]},
+        {"kind": "briefing_selection", "requirementId": "r1", "issueId": "iss-1", "issueTitle": "HBM 공급 계약",
+         "roundId": "br-1", "date": "2026-10-21", "edition": "morning", "rank": 1, "reason": "관심 기업 두 곳이 연결"}]
+    return payload
+
+
+def test_selection_records_are_closed_server_facts_bound_to_the_pinned_version():
+    # D-AI-02 Q08: the recorded publication and briefing selection reach Jev as facts, never as quotes.
+    parsed = VerificationInput.model_validate(selection_input())
+    kinds = [type(f).__name__ for f in parsed.sections[0].server_facts]
+    assert kinds == ["PublicationFact", "BriefingSelectionFact"]
+    none = selection_input()
+    none["sections"][0]["serverFacts"][0].update(decision=None, decisionPath="none", decidedAt=None, ruleRevision=None,
+                                                 rules=[])
+    VerificationInput.model_validate(none)
+    assert "publication_record" in chat_jev.VERIFY_TASK and "not an automatic approval" in chat_jev.VERIFY_TASK
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda f: f[0].update(graphVersion="gv-stale"),
+    lambda f: f[0].update(decisionPath="none"),
+    lambda f: f[0].update(decidedAt=None),
+    lambda f: f[0].update(decidedAt="2026-10-20T05:00:00"),
+    lambda f: f[0].update(adminEmail="admin@zoop.example"),
+    lambda f: f[0].update(reason="운영 메모"),
+    lambda f: f[0]["rules"].append(dict(f[0]["rules"][0])),
+    lambda f: f[0]["rules"][0].update(ruleId="no-version"),
+    lambda f: f[1].update(edition="noon"),
+    lambda f: f[1].update(rank=0),
+    lambda f: f[1].update(reason=""),
+    lambda f: f[1].update(requirementId="r-other"),
+])
+def test_selection_facts_refuse_misbinding_and_any_decider_detail(mutate):
+    payload = selection_input()
+    mutate(payload["sections"][0]["serverFacts"])
+    with pytest.raises(ValueError):
+        VerificationInput.model_validate(payload)
+
+
+WEB_HIT = "web-" + "a" * 32
+
+
+def web_input() -> dict[str, Any]:
+    payload = verification_input()
+    payload["sections"] = [{"sectionId": "s0", "requirementIds": ["r1"], "serverFacts": [], "basis": "web_reported",
+                            "text": "웹 검색 결과에 따르면 HBM은 D램을 쌓은 메모리다.", "evidenceIds": [WEB_HIT]}]
+    payload["citations"] = [{"evidenceId": WEB_HIT, "sourceId": "web-search:synthetic",
+                             "quote": "[합성 자료] HBM은 D램을 쌓은 메모리다.", "articleTitle": "[합성] HBM이란"}]
+    return payload
+
+
+def test_a_web_section_is_checked_against_its_snippets_under_the_providers_grant():
+    # D-AI-02: what the web reported is verified against the snippet, never taken as ZOOP's own fact.
+    payload = VerificationInput.model_validate(web_input())
+    body = chat_jev.build_verification_request(payload, chat_jev.MODEL)
+    assert set(body["questions"]) == {"s0-support", "s0-advice"}
+    assert "web_reported" in chat_jev.VERIFY_TASK
+    from zoop_ai import chat_agent
+    assert "web_reported" in chat_agent.PROMPT
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda p: p["sections"][0].update(basis="evidence_grounded"),
+    lambda p: p["sections"][0].update(evidenceIds=[]),
+    lambda p: p["citations"][0].update(sourceId="news-provider-1"),
+    lambda p: p["citations"][0].update(evidenceId="web-short"),
+])
+def test_web_hits_and_evidence_never_mix(mutate):
+    payload = web_input()
+    mutate(payload)
+    with pytest.raises(ValueError):
+        VerificationInput.model_validate(payload)
+
+
 def test_a_verification_request_binds_to_its_own_invocation_and_refuses_the_v1_wire():
     payload = facts_input()
     request("chat-verification", payload).parsed()
@@ -345,6 +425,47 @@ def test_the_answer_request_is_strict_json_with_the_chat_prompt_and_its_answer_i
                   registry=grants(recipient))
         assert bad.failure.code == code and bad.failure.sent and not bad.failure.unknown
         assert bad.receipt is not None, "a received answer keeps its receipt"
+
+
+def sized(content: Any, *, output: int, reasoning: int, finish: str = "stop"):
+    def respond(path, body):
+        return httpx.Response(200, json={"model": "gpt-6-luna", "choices": [{"finish_reason": finish,
+                                                                             "message": {"content": json.dumps(content)}}],
+                                         "usage": {"prompt_tokens": 100, "completion_tokens": output,
+                                                   "completion_tokens_details": {"reasoning_tokens": reasoning}}})
+    return respond
+
+
+GOOD_ANSWER = {"sections": [{"basis": "evidence_grounded", "text": "SK하이닉스는 HBM을 공급한다.", "requirementIds": ["r2"],
+                             "evidenceIds": [EV1]}], "insufficientRequirementIds": [], "graphTargetIds": []}
+
+
+def test_an_answer_is_limited_to_2k_tokens_without_its_reasoning_and_cut_answers_fail_alike(tmp_path):
+    recipient = f"openai-compatible:{stage_config('chat-answer', 'live', LIVE).provider_revision}"
+    endpoint = Endpoint(sized(GOOD_ANSWER, output=7000, reasoning=5000))
+    fits = run(request("chat-answer", answer_input()), tmp_path, endpoint, registry=grants(recipient))
+    assert fits.status == "succeeded", fits
+    assert endpoint.calls[0][1]["max_completion_tokens"] == 8000
+
+    for i, response in enumerate([sized(GOOD_ANSWER, output=7000, reasoning=4999),
+                                  sized(GOOD_ANSWER, output=8000, reasoning=7000, finish="length")]):
+        over = run(request("chat-answer", answer_input(), invocation=f"job-1:a1:long-{i}"), tmp_path, Endpoint(response),
+                   registry=grants(recipient))
+        assert over.failure.code == "output_budget_exceeded" and over.failure.sent and not over.failure.unknown
+        assert over.receipt is not None
+
+
+def test_a_direct_answer_over_its_input_limit_is_refused_before_anything_is_sent(tmp_path, monkeypatch):
+    recipient = f"openai-compatible:{stage_config('chat-answer', 'live', LIVE).provider_revision}"
+    monkeypatch.setattr(chat_runtime, "MAX_INPUT_TOKENS", chat_luna.input_tokens(request("chat-answer", answer_input()).parsed()) - 1)
+    endpoint = Endpoint(sized(GOOD_ANSWER, output=10, reasoning=0))
+    refused = run(request("chat-answer", answer_input()), tmp_path, endpoint, registry=grants(recipient))
+    assert refused.failure.code == "input_budget_exceeded" and not refused.failure.sent
+    assert endpoint.calls == []
+
+
+def test_token_estimates_count_korean_higher_than_latin_text():
+    assert estimated_tokens("a" * 400) == 100 and estimated_tokens("가" * 400) == 300
 
 
 # ---- ledger: idempotency, unknown fate, budget ---------------------------------------------------------------------------
@@ -566,7 +687,7 @@ def test_path_pairs_keep_their_status_and_steps_name_only_quoted_evidence():
 
 def test_the_answer_prompt_explains_paths_and_its_version_moved():
     assert "status=cut" in chat_luna.PROMPT and "evidenceIds" in chat_luna.PROMPT
-    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-10-26-1-")
+    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-10-30-1-")
 
 
 def test_the_answer_prompt_and_schema_know_zoop_document_sections():

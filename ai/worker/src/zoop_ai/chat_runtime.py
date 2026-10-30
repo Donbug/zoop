@@ -21,6 +21,8 @@ Rules (ZOOP-AIG-001 6.3.2-6.3.3, design summary 5.1):
 - Order of one invocation: the ledger first (a known invocation answers from its record, whatever the gate or keys are now),
   then the gate, grants and sender for a new one, then one atomic claim with the live ceiling, the send, the raw answer stored,
   and only then usage and answer interpretation. Any interpretation failure keeps the raw answer as a definite failure.
+- Luna's tokens (ZOOP-AIG-001 6.3.3): a direct answer whose estimated input passes 24k is refused unsent, and a final answer over
+  2k without reasoning, or cut by the output cap, fails with a code the application shows as `budget_exceeded`.
 """
 from __future__ import annotations
 
@@ -36,7 +38,8 @@ import httpx
 from pydantic import ValidationError
 
 from . import chat_agent, chat_jev, chat_luna
-from .chat_contracts import (CHAT_SCHEMA_VERSION, AgentInput, AnswerInput, ChatAnswer, ChatGrantRegistry, Receipt,
+from .chat_contracts import (CHAT_SCHEMA_VERSION, INPUT_BUDGET_EXCEEDED, MAX_ANSWER_TOKENS, MAX_INPUT_TOKENS,
+                             OUTPUT_BUDGET_EXCEEDED, AgentInput, AnswerInput, ChatAnswer, ChatGrantRegistry, Receipt,
                              RouterInput, StageFailure, StageRequest, StageResult, Usage, VerificationInput)
 from .contracts import canonical, digest
 from .provider import DEFAULT_BASE_URL, NATIVE_DEFAULT_BASE_URL, ProviderError, native_revision, validate_base_url
@@ -433,10 +436,13 @@ def interpret(request: StageRequest, config: ChatStageConfig, raw: Any) -> dict[
 
 def _interpret_answer(raw: Any, payload: AnswerInput) -> dict[str, Any]:
     try:
-        message = raw["choices"][0]["message"]
+        choice = raw["choices"][0]
+        message = choice["message"]
         content = message.get("content")
     except (KeyError, IndexError, TypeError, AttributeError):
         raise ValueError("answer_response_invalid") from None
+    if choice.get("finish_reason") == "length":
+        raise ValueError(OUTPUT_BUDGET_EXCEEDED)
     if message.get("refusal") or not isinstance(content, str):
         raise ValueError("answer_refused")
     try:
@@ -455,6 +461,22 @@ def _interpret_answer(raw: Any, payload: AnswerInput) -> dict[str, Any]:
     if not set(answer.insufficient_requirement_ids) <= set(branches) or len(cited) > payload.max_citations:
         raise ValueError("answer_budget_invalid")
     return answer.wire()
+
+
+def check_input_budget(request: StageRequest) -> None:
+    """A direct answer goes out with all its input at once, so one too large is refused before anything is sent. An agent step's
+    input grows at the provider: the application adds up what each step reports (OrchestratedChatEngine)."""
+    parsed = request.parsed()
+    if isinstance(parsed, AnswerInput) and chat_luna.input_tokens(parsed) > MAX_INPUT_TOKENS:
+        raise ProviderError(INPUT_BUDGET_EXCEEDED)
+
+
+def check_answer_tokens(answer: dict[str, Any], usage: Usage, stage: str) -> None:
+    """A final Luna answer over its length, reasoning aside, by the provider's own count; none reported is not checked."""
+    if stage not in LUNA_STAGES or answer.get("status") == "approval_required" or usage.output_tokens is None:
+        return
+    if usage.output_tokens - (usage.reasoning_tokens or 0) > MAX_ANSWER_TOKENS:
+        raise ValueError(OUTPUT_BUDGET_EXCEEDED)
 
 
 def _recipient(receipt: Receipt) -> str:
@@ -494,6 +516,7 @@ def invoke(request: StageRequest, *, state_dir: Path, registry: ChatGrantRegistr
             identity = request_identity(request, config)
             check_grants(request, config.recipient(), registry)
             check_recipient(request, config.recipient())
+            check_input_budget(request)
             sender.preflight(request, config)
         except ProviderError as refused:
             return _failed(request, refused.code, sent=False, unknown=False, receipt=None)
@@ -521,6 +544,7 @@ def invoke(request: StageRequest, *, state_dir: Path, registry: ChatGrantRegistr
             receipt = receipt.model_copy(update={"usage": usage_of(raw, config.provider, request.stage),
                                                  "model": responded_model(raw, config)})
             answer = interpret(request, config, raw)
+            check_answer_tokens(answer, receipt.usage, request.stage)
         except ValueError as invalid:
             result = _failed(request, str(invalid), sent=True, unknown=False, receipt=receipt)
         except Exception:  # noqa: BLE001 - any other interpretation error keeps the stored raw answer as a definite failure

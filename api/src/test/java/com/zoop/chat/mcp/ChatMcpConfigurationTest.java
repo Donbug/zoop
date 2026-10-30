@@ -131,7 +131,7 @@ class ChatMcpConfigurationTest {
     }
 
     @Test
-    void theWebSearchAndTheAgentPathCannotBeOnTogetherUntilWebResultsCanBeCited() {
+    void theWebSearchAndTheAgentPathMayBeOnTogetherNowThatWebResultsAreCited() {
         ChatModels.Agent stages = (run, step, input) -> { throw new UnsupportedOperationException(); };
         runner.withBean(ChatExecutionRepository.class, MemoryChatStore::new)
                 .withBean(ChatModels.Agent.class, () -> stages)
@@ -139,8 +139,7 @@ class ChatMcpConfigurationTest {
                         "http://127.0.0.1:1", "test-chat-token-000000000000000000000001", Duration.ofSeconds(1),
                         Duration.ofSeconds(1), 65_536)))
                 .withPropertyValues(endpoint("zoop.chat.mcp.agent-enabled=true", "zoop.chat.web.enabled=true"))
-                .run(context -> assertThat(context.getStartupFailure()).rootCause()
-                        .hasMessageContaining("until web results can be cited"));
+                .run(context -> assertThat(context).hasSingleBean(ChatMcpAgent.class));
     }
 
     @Test

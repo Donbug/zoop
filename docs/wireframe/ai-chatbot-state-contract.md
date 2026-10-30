@@ -14,7 +14,7 @@
 
 - 새 질문은 기존 대화에서도 재분류한다. 세션 고정 Q 유형을 강제하지 않는다. Q02/Q03/Q04 복합 요구는 한 답변으로 제공하며 별도 질문으로 강제하지 않는다.
 - Q01은 웹 검색을 사용하지 않는다. Q02는 웹을 기본 보조로 시도하고 Q03~Q08은 내부 근거가 부족할 때 마지막 수단으로 사용한다. 웹 결과는 ‘외부 웹 보도 · ZOOP 내부 근거 아님’과 검색 시점을 표시하고 일반 지식·내부 evidence와 구분한다.
-- `answerStatus`·`notices[]`는 2026-10-30 DTO·OpenAPI·클라이언트·저장·guard에 함께 구현됐다. `web_reported`·`web_result`·`uiActions[]`는 아직 현재 API 지원 필드가 아니다. 현재 `action=set_watchlist`를 임의 동작 실행기로 바꾸지 않는다.
+- `answerStatus`·`notices[]`는 2026-10-30 DTO·OpenAPI·클라이언트·저장·guard에 함께 구현됐다. `web_reported`·`web_result`도 같은 날 구현됐다(실제 웹 공급자 전, 합성 공급자만). `uiActions[]`는 아직 현재 API 지원 필드가 아니다. 현재 `action=set_watchlist`를 임의 동작 실행기로 바꾸지 않는다.
 - 보조 웹 검색 timeout·unavailable은 검증된 답을 숨기지 않는다. `notices.code=web_unavailable`을 표시하고, 외부 확인이 남은 요구만 “답하지 않은 부분”에 둔다. 웹 실패를 “관련 자료 없음”으로 바꾸지 않는다.
 - direct 경로에서 독립 요구 일부의 내부 조회만 timeout·unavailable이면 그 요구는 `tool_unavailable` limitation으로 남기고 검증된 나머지 요구를 `partial`로 돌려준다. 답한 요구가 하나도 없거나 어댑터·권한·스키마 오류이면 job 실패를 부분 답변으로 숨기지 않는다.
 - 기업 상세·간선/경로 포커스·근거·브리핑 동작은 서버가 실제 조회 결과로 만든 typed 버튼으로 제공한다. 클릭 시 실행하고 자동 이동하지 않으며 polling·복구·재열람으로 재실행하지 않는다.

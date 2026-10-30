@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -21,11 +22,13 @@ import com.zoop.chat.repository.ChatRepository;
 import com.zoop.chat.repository.ChatRunningJob;
 import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.repository.NewChatToolCall;
+import com.zoop.chat.service.ChatTargetAccess;
 import com.zoop.chat.service.FrozenSelection;
 import com.zoop.chat.tool.ChatCapability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -52,6 +55,9 @@ import tools.jackson.databind.node.ObjectNode;
  * <li>A run's tool calls ({@code chat_tool_calls}) are reserved, started and finished under the same fence, at most
  * {@link ChatRunControl#MAX_TOOL_CALLS} per attempt. When the job ends, its calls still reserved are closed as
  * {@code cancelled} and those still running as {@code unknown}.</li>
+ * <li>A verified result is kept per attempt before it is stored. When storing fails, or the lease runs out after it was kept,
+ * the job fails as {@code save_failed} with {@code retry=save_only}: that attempt saves the kept result, with no model
+ * call and outside the run limit.</li>
  * </ul>
  *
  * <p>The run deadline is the policy maximum until the orchestrator plans per-route deadlines (ZOOP-AIG-001 6.3.3); the lease
@@ -78,9 +84,18 @@ public class ChatJobExecutor {
     private final ObjectMapper mapper;
     private final Clock clock;
     private final TransactionTemplate transaction;
+    /** Rechecks what earlier answers carry over; null carries no target. */
+    private final ChatTargetAccess targets;
 
     public ChatJobExecutor(ChatRepository chats, ChatExecutionRepository runs, ObjectProvider<ChatEngine> engines,
             ObjectMapper mapper, Clock clock, PlatformTransactionManager transactionManager) {
+        this(chats, runs, engines, mapper, clock, transactionManager, null);
+    }
+
+    @Autowired
+    public ChatJobExecutor(ChatRepository chats, ChatExecutionRepository runs, ObjectProvider<ChatEngine> engines,
+            ObjectMapper mapper, Clock clock, PlatformTransactionManager transactionManager, ChatTargetAccess targets) {
+        this.targets = targets;
         this.chats = chats;
         this.runs = runs;
         this.engines = engines;
@@ -129,14 +144,15 @@ public class ChatJobExecutor {
         ChatEngine engine = engines.getIfAvailable();
         ChatEngineOutcome outcome;
         Instant deadline = claim.deadline();
-        if (engine == null || "save_only".equals(claim.mode())) {
-            // No recovery artifact store exists yet, so a kept verified result cannot be saved again.
-            outcome = engine == null ? new ChatEngineOutcome.Failed("internal", null, false)
-                    : new ChatEngineOutcome.Failed("result_lost", null, false);
+        boolean saveOnly = "save_only".equals(claim.mode());
+        if (engine == null) {
+            outcome = new ChatEngineOutcome.Failed("internal", null, false);
+        } else if (saveOnly) {
+            outcome = keptOutcome(claim);
         } else {
             Control control = new Control(claim);
             try {
-                outcome = engine.answer(run(claim), control);
+                outcome = engine.answer(visiblePrior(run(claim)), control);
             } catch (ChatRunSuperseded superseded) {
                 return;
             } catch (RuntimeException unexpected) {
@@ -146,8 +162,60 @@ public class ChatJobExecutor {
             // The deadline the run kept to, brought forward when its path has a shorter one (the agent path's 45 s).
             deadline = control.deadline;
         }
-        if (!store(claim, deadline, outcome)) {
-            log.info("chat run of job {} no longer owns it; its outcome was discarded", claim.job().id());
+        boolean kept = saveOnly ? outcome instanceof ChatEngineOutcome.Completed : keep(claim, outcome);
+        try {
+            if (!store(claim, deadline, outcome)) {
+                log.info("chat run of job {} no longer owns it; its outcome was discarded", claim.job().id());
+            }
+        } catch (DataAccessException | TransactionException unsaved) {
+            // Without a kept result the lease recovery ends the job; with one the member can save it again.
+            log.warn("chat result of job {} could not be stored", claim.job().id(), unsaved);
+            if (kept) saveFailed(claim);
+        }
+    }
+
+    /** Keeps a verified result in its own transaction, so it outlives a failed save; a result it cannot keep is still saved. */
+    private boolean keep(Claim claim, ChatEngineOutcome outcome) {
+        if (!(outcome instanceof ChatEngineOutcome.Completed completed) || !acceptable(claim, completed.result())) return false;
+        try {
+            String route = completed.routeSummary() == null ? null : mapper.writeValueAsString(completed.routeSummary());
+            return runs.keepVerified(claim.job().id(), claim.ownerToken(), claim.attemptNo(),
+                    mapper.writeValueAsString(completed.result()), route, clock.instant());
+        } catch (DataAccessException | TransactionException unkept) {
+            log.warn("verified chat result of job {} could not be kept", claim.job().id(), unkept);
+            return false;
+        }
+    }
+
+    /** What a save_only attempt saves: the source attempt's verified result, never a model call. */
+    private ChatEngineOutcome keptOutcome(Claim claim) {
+        ObjectNode attempt = attempt(attempts(claim.job().attempts()), claim.attemptNo());
+        return runs.verifiedResult(claim.job().id(), sourceAttempt(attempt))
+                .<ChatEngineOutcome>map(kept -> new ChatEngineOutcome.Completed(mapper.readValue(kept.result(), ChatResult.class),
+                        kept.routeSummary() == null ? null : mapper.readTree(kept.routeSummary())))
+                .orElseGet(() -> new ChatEngineOutcome.Failed("result_lost", null, false));
+    }
+
+    private static int sourceAttempt(ObjectNode attempt) {
+        return attempt.path("sourceAttemptNo").asInt(attempt.path("n").asInt());
+    }
+
+    /** Ends a run whose result was kept but not saved; if this fails too, the lease recovery reaches the same end. */
+    private void saveFailed(Claim claim) {
+        try {
+            transaction.executeWithoutResult(status -> {
+                Instant now = clock.instant();
+                Optional<ChatJobRow> locked = runs.lockOwned(claim.job().id(), claim.ownerToken(), now);
+                if (locked.isEmpty()) return;
+                ArrayNode attempts = attempts(locked.get().attempts());
+                ObjectNode attempt = attempt(attempts, claim.attemptNo());
+                ChatFailure failure = ChatFailures.of("save_failed", null, false, locked.get().runs());
+                attempt.put("status", "failed").put("finishedAt", now.toString());
+                attempt.set("failure", mapper.valueToTree(failure));
+                runs.fail(claim.job().id(), claim.ownerToken(), now, mapper.writeValueAsString(failure), attempts.toString());
+            });
+        } catch (DataAccessException | TransactionException unsaved) {
+            log.warn("chat job {} could not be marked unsaved", claim.job().id(), unsaved);
         }
     }
 
@@ -201,9 +269,12 @@ public class ChatJobExecutor {
                 ArrayNode attempts = attempts(job.attempts());
                 Optional<ObjectNode> attempt = current(attempts, "running");
                 boolean modelCalled = attempt.map(a -> a.path("modelCalled").asBoolean(false)).orElse(true);
-                ChatFailure failure = modelCalled ? ChatFailures.of("transient", "response_unknown", false, job.runs())
+                // A run that kept its verified result and stopped before saving it needs no model to finish.
+                boolean kept = attempt.flatMap(a -> runs.verifiedResult(jobId, sourceAttempt(a))).isPresent();
+                ChatFailure failure = kept ? ChatFailures.of("save_failed", null, false, job.runs())
+                        : modelCalled ? ChatFailures.of("transient", "response_unknown", false, job.runs())
                         : ChatFailures.of("transient", "deadline_guard", true, job.runs());
-                attempt.ifPresent(a -> a.put("status", modelCalled ? "unknown" : "failed")
+                attempt.ifPresent(a -> a.put("status", modelCalled && !kept ? "unknown" : "failed")
                         .put("finishedAt", now.toString()));
                 return runs.failExpired(jobId, now, mapper.writeValueAsString(failure), attempts.toString());
             });
@@ -227,9 +298,11 @@ public class ChatJobExecutor {
                 attempt.put("status", "succeeded").put("finishedAt", now.toString());
                 ChatResult result = withMessageId(completed.result(), messageId(claim.job().id()));
                 String route = completed.routeSummary() == null ? null : mapper.writeValueAsString(completed.routeSummary());
-                return runs.complete(claim.job().id(), claim.ownerToken(), now, result.outcome(), result.messageId(),
+                boolean completedNow = runs.complete(claim.job().id(), claim.ownerToken(), now, result.outcome(), result.messageId(),
                         mapper.writeValueAsString(result), RESULT_SCHEMA_VERSION, route,
                         route == null ? null : ROUTE_SCHEMA_VERSION, attempts.toString());
+                if (completedNow) runs.dropVerified(claim.job().id());
+                return completedNow;
             }
             var failed = (ChatEngineOutcome.Failed) ending;
             String kind = ChatFailures.ENGINE_KINDS.contains(failed.kind()) || "result_lost".equals(failed.kind())
@@ -238,8 +311,10 @@ public class ChatJobExecutor {
             attempt.put("status", "response_unknown".equals(failed.reason()) ? "unknown" : "failed")
                     .put("finishedAt", now.toString());
             attempt.set("failure", mapper.valueToTree(failure));
-            return runs.fail(claim.job().id(), claim.ownerToken(), now, mapper.writeValueAsString(failure),
+            boolean failedNow = runs.fail(claim.job().id(), claim.ownerToken(), now, mapper.writeValueAsString(failure),
                     attempts.toString());
+            if (failedNow) runs.dropVerified(claim.job().id());
+            return failedNow;
         });
         return Boolean.TRUE.equals(stored);
     }
@@ -288,10 +363,25 @@ public class ChatJobExecutor {
                     choiceLabel(parent, at.resolvesChoiceId())));
             at = parent;
         }
+        // The chain's root is the question that follows the earlier answers: a reply or a rerun carries the same ones.
         return new ChatRun(job.id(), job.sessionId(), job.memberId(), claim.attemptNo(), claim.mode(), List.copyOf(turns),
                 mapper.readValue(job.frozenContext(), ChatFrozenContext.class),
                 mapper.readValue(job.frozenSelection(), FrozenSelection.class), job.graphVersionId(),
-                job.clarificationDepth(), job.askedAt(), claim.deadline());
+                job.clarificationDepth(), job.askedAt(), claim.deadline(),
+                ChatPriorTurns.of(chats.answersBefore(at.sessionId(), at.seq(), ChatPriorTurns.TURNS), mapper));
+    }
+
+    /** The run with the carried targets it may still see in its own pinned graph; none when that could not be checked. */
+    private ChatRun visiblePrior(ChatRun run) {
+        var prior = run.prior();
+        if (prior.companies().isEmpty() && prior.issues().isEmpty()) return run;
+        Set<String> ids = new HashSet<>();
+        prior.companies().forEach(c -> ids.add(c.id()));
+        prior.issues().forEach(i -> ids.add(i.id()));
+        Set<String> visible = targets == null ? Set.of()
+                : targets.visible(ids, run.graphVersionId(), run.context().asOf(), run.jobId()).orElse(Set.of());
+        return run.withPrior(new ChatRun.Prior(prior.companies().stream().filter(c -> visible.contains(c.id())).toList(),
+                prior.issues().stream().filter(i -> visible.contains(i.id())).toList(), prior.period()));
     }
 
     /** The fenced control an engine uses; every call checks that this run still owns the job. */

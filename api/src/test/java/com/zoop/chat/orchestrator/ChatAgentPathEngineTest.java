@@ -59,6 +59,7 @@ class ChatAgentPathEngineTest {
     private List<String> directEvidence = List.of();
     private ChatSemanticVerdicts verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
     private int verifierCalls;
+    private List<Citation> verifiedCitations = List.of();
     /** The engine's clock; the router moves it on by {@link #routerTakes}, as a router call spends time. */
     private Instant now = NOW;
     private Duration routerTakes = Duration.ZERO;
@@ -199,6 +200,67 @@ class ChatAgentPathEngineTest {
         agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
         engine(agent).answer(run(), new Control(Duration.ofSeconds(60)));
         assertEquals(List.of(List.of(ChatCapability.COMPANY_READ)), agent.allowed);
+    }
+
+    private static final String HIT = "web-" + "a".repeat(32);
+
+    private static ChatToolResult webResult() {
+        var hit = new com.zoop.chat.tool.ChatWebResult(HIT, "https://news.example.com/hbm", "news.example.com",
+                "[합성] HBM이란", "[합성 자료] HBM은 D램을 쌓은 메모리다.", Instant.parse("2026-10-01T00:00:00Z"), "synthetic",
+                Instant.parse("2026-10-30T01:00:00Z"));
+        return new ChatToolResult("chat-tool/v1", "tc-1", "web.search", "web:synthetic",
+                List.of(new ChatToolItem(HIT, "web_result", hit.title(), List.of(), List.of())), List.of(), false, false, null,
+                List.of(), List.of(hit), null);
+    }
+
+    @Test
+    void aWebSectionCitesTheHitItsSearchReturnedAndANoticeOrConceptMayRestOnIt() {
+        // D-AI-02: what the web reported is a section of its own, cited as a web result, never as ZOOP evidence.
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
+                List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH));
+        agent.answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX),
+                new Section("web_reported", "웹 검색 결과에 따르면 HBM은 D램을 쌓은 메모리예요.", List.of("r1"), List.of(HIT))),
+                List.of(), List.of());
+        agent.results = List.of(companyResult(HYNIX, EV_HYNIX), webResult());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no"), new Verdict("supported", "no")));
+
+        ChatResult result = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+
+        assertEquals("answered", result.outcome());
+        assertEquals("mixed", result.answerBasis());
+        var web = result.citations().stream().filter(c -> "web_result".equals(c.sourceKind())).findFirst().orElseThrow();
+        assertEquals(HIT, web.evidenceId());
+        assertEquals("synthetic", web.docId());
+        assertEquals("news.example.com", web.publisher());
+        assertEquals("https://news.example.com/hbm", web.url());
+        assertEquals("[합성 자료] HBM은 D램을 쌓은 메모리다.", web.quote());
+        assertTrue(verifiedCitations.contains(web), "the verifier checks the web section against the snippet");
+
+        // A ZOOP evidence section may not cite a web hit, nor a web section ZOOP evidence.
+        for (var mixed : List.of(grounded("HBM입니다.", HIT),
+                new Section("web_reported", "웹에서는 이렇게 보도했어요.", List.of("r1"), List.of(EV_HYNIX)))) {
+            agent.answer = new ChatGeneratedAnswer(List.of(mixed), List.of(), List.of());
+            verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+            assertEquals(new ChatEngineOutcome.Failed("validation_failed", null, false),
+                    engine(agent).answer(run(), new Control(Duration.ofSeconds(60))), mixed.basis());
+        }
+    }
+
+    @Test
+    void aConceptRestsOnTheRunsWebHitNotOnItsInternalReads() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()));
+        var agent = new Agent(Set.of(ChatCapability.WEB_SEARCH));
+        agent.answer = new ChatGeneratedAnswer(List.of(new Section("web_reported", "HBM은 D램을 쌓은 메모리라고 보도됐어요.",
+                List.of("r1"), List.of(HIT))), List.of(), List.of());
+        agent.results = List.of(webResult());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+
+        ChatResult result = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+        assertEquals("web_reported", result.answerBasis());
+        assertEquals(List.of("web_result"), result.citations().stream().map(Citation::sourceKind).toList());
     }
 
     @Test
@@ -409,6 +471,7 @@ class ChatAgentPathEngineTest {
         };
         ChatModels.Verifier verifier = (run, sections, citations, facts) -> {
             verifierCalls++;
+            verifiedCitations = citations;
             return verdicts;
         };
         ChatCitationSource citations = (id, version, asOf, trace) -> Optional.ofNullable(readable.get(id));

@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
 import com.zoop.chat.dto.ChatJobRequest;
 import com.zoop.chat.repository.ChatExecutionRepository;
+import com.zoop.chat.repository.ChatJobRow;
 import com.zoop.chat.repository.ChatRepository;
 import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.service.ChatService;
@@ -121,6 +122,21 @@ class ChatExecutorPostgresTest {
     }
 
     @Test
+    void aKeptResultIsOnePerAttemptAndGoesWhenTheResultIsStored() {
+        engine.script((run, control) -> ScriptedChatEngine.generalAnswer("보관한 답"));
+        String jobId = submit("HBM이 뭐야?");
+        var claim = executor.claimNext().orElseThrow();
+        assertTrue(runs.keepVerified(jobId, claim.ownerToken(), 1, "{\"outcome\":\"answered\"}", "{\"path\":\"direct\"}", Instant.now()));
+        assertFalse(runs.keepVerified(jobId, "someone-else", 2, "{}", null, Instant.now()), "the run's fence applies");
+        assertEquals("{\"path\": \"direct\"}", runs.verifiedResult(jobId, 1).orElseThrow().routeSummary());
+
+        executor.execute(claim);
+
+        assertEquals("completed", service.getJob(member, jobId).status());
+        assertTrue(runs.verifiedResult(jobId, 1).isEmpty());
+    }
+
+    @Test
     void aQueuedQuestionRunsToAStoredResultTheMemberCanRead() {
         engine.script((run, control) -> {
             control.beforeModelCall();
@@ -142,6 +158,10 @@ class ChatExecutorPostgresTest {
         assertEquals("chat-result/v1", jdbc.queryForObject("SELECT result_schema_version FROM chat_jobs WHERE id = ?",
                 String.class, jobId));
         assertFalse(executor.runOnce());
+
+        var row = chats.findJob(jobId).orElseThrow();
+        assertEquals(List.of(jobId), chats.answersBefore(row.sessionId(), row.seq() + 1, 2).stream().map(ChatJobRow::id).toList());
+        assertTrue(chats.answersBefore(row.sessionId(), row.seq(), 2).isEmpty());
     }
 
     @Test
