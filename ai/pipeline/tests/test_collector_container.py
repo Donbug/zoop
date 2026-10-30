@@ -491,7 +491,7 @@ assert not thread.is_alive()
 print("scope-closed")
 """
     child = subprocess.run([sys.executable, "-c", program, end], capture_output=True, text=True,
-                           timeout=5, start_new_session=True)
+                           cwd=Path(__file__).resolve().parents[1], timeout=5, start_new_session=True)
     assert child.returncode == 0, (child.returncode, child.stdout, child.stderr)
     assert child.stdout.strip() == "scope-closed"
 

@@ -219,9 +219,11 @@ s3://<bucket>/<prefix>/runs/<runId>/checkpoints/<seq:06d>-<checkpointId>/<privat
 
 ## 10. 검증 방법
 
+CI와 같은 작업 디렉터리를 사용하도록 저장소 루트에서 실행한다.
+
 ```sh
-cd ai/pipeline
-uv run --frozen --group dev python -m pytest tests/test_collector_container.py -n 4 --dist loadfile -q
+uv run --project ai/pipeline --frozen --group dev python -m pytest \
+  ai/pipeline/tests/test_collector_container.py -n 4 --dist loadfile -q
 ```
 
 컨테이너 smoke: 같은 네트워크에 S3 호환 서버와 loopback fixture 서버를 두고(`synthetic loopback` 설정은 `127.0.0.1`만 허용하므로 fixture 컨테이너의 network namespace를 `--network container:<fixture>`로 공유), `PRIVATE_CONFIG_S3_URI`+`SHA256`·`ZOOP_COLLECTOR_S3_URI`·`AWS_ENDPOINT_URL`을 주고 `run` → 주기 checkpoint → `docker exec … zoop-ai-collector checkpoint` → `docker stop -t 60` → 새 컨테이너에서 `restore`/`run`.
