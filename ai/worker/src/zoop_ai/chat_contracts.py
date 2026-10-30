@@ -386,7 +386,53 @@ class ComparisonFact(Wire):
         return self
 
 
-ServerFact = Annotated[PortfolioFact | ComparisonFact, Field(discriminator="kind")]
+class PublicationRule(Wire):
+    rule_id: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,63}@[1-9][0-9]{0,8}$")
+    title: str = Field(min_length=1, max_length=200)
+    summary: str = Field(min_length=1, max_length=1000)
+
+
+class PublicationFact(Wire):
+    """Why an issue is on the map at the request's pinned graph version (Q08): the last review decision's kind, time and
+    path up to the version's review revision, and the rules the version was filtered with. No decider, no decider's note."""
+    kind: Literal["publication_record"]
+    requirement_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")
+    issue_id: str = Field(min_length=1, max_length=200)
+    issue_title: str = Field(min_length=1, max_length=300)
+    graph_version: str = Field(min_length=1, max_length=200)
+    review_revision: int = Field(ge=0)
+    rule_revision: int | None = Field(ge=0)
+    decision: Literal["allow", "reject"] | None
+    decision_path: Literal["admin_review", "snapshot_migration", "none"]
+    decided_at: str | None
+    rules: list[PublicationRule] = Field(max_length=10)
+
+    @model_validator(mode="after")
+    def recorded(self):
+        if (self.decision_path == "none") != (self.decision is None) or (self.decision is None) != (self.decided_at is None):
+            raise ValueError("a decision has its path and time, and no decision has neither")
+        if self.decided_at is not None and datetime.fromisoformat(self.decided_at).tzinfo is None:
+            raise ValueError("decidedAt requires timezone")
+        if len({r.rule_id for r in self.rules}) != len(self.rules):
+            raise ValueError("rule ids must be distinct")
+        return self
+
+
+class BriefingSelectionFact(Wire):
+    """Why a published briefing round picked an issue (Q08): its rank and the selection reason the round recorded."""
+    kind: Literal["briefing_selection"]
+    requirement_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")
+    issue_id: str = Field(min_length=1, max_length=200)
+    issue_title: str = Field(min_length=1, max_length=300)
+    round_id: str = Field(min_length=1, max_length=256)
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    edition: Literal["morning", "evening"]
+    rank: int = Field(ge=1, le=20)
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+ServerFact = Annotated[PortfolioFact | ComparisonFact | PublicationFact | BriefingSelectionFact,
+                       Field(discriminator="kind")]
 
 
 class VerifySection(Wire):
@@ -423,6 +469,8 @@ class VerificationInput(Wire):
                         fact.to_version != self.request_binding.graph_version_id
                         or fact.as_of != self.request_binding.as_of):
                     raise ValueError("comparison belongs to another version or asOf")
+                if isinstance(fact, PublicationFact) and fact.graph_version != self.request_binding.graph_version_id:
+                    raise ValueError("publication record belongs to another version")
         for section in self.sections:
             if section.basis == "general_knowledge" and section.evidence_ids:
                 raise ValueError("a general section cites nothing")
