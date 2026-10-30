@@ -44,20 +44,26 @@ function elementLayer(graph: Graph) {
   return layer && document?.createElement ? { document, layer } : null;
 }
 
-function element(state: State, layer: Shape, id: string) {
-  const found = state.elements.get(id);
-  if (found?.parentNode === layer) return found;
-  // setData can replace elements; rebuild the index from the layer.
-  state.elements.clear();
-  for (const child of layer.childNodes ?? [])
-    if (child.id) state.elements.set(child.id, child);
-  return state.elements.get(id);
+/** Element lookup for one pass; the index is rebuilt at most once per pass. */
+function elementFinder(state: State, layer: Shape) {
+  let rebuilt = false;
+  return (id: string) => {
+    const found = state.elements.get(id);
+    if (found?.parentNode === layer) return found;
+    if (rebuilt) return undefined;
+    // setData can replace elements; rebuild the index from the layer.
+    rebuilt = true;
+    state.elements.clear();
+    for (const child of layer.childNodes ?? [])
+      if (child.id) state.elements.set(child.id, child);
+    return state.elements.get(id);
+  };
 }
 
-function raise(state: State, layer: Shape) {
+function raise(state: State, element: (id: string) => Shape | undefined) {
   if (!state.dimmed) return;
   for (const [id, kind] of state.bright) {
-    const shape = element(state, layer, id);
+    const shape = element(id);
     if (!shape) continue;
     const z = kind === 'node' ? NODE_Z : EDGE_Z;
     if (shape.style.zIndex === z) continue;
@@ -104,9 +110,10 @@ export function applyMapDimming(
   // The cover must be a sibling of the elements for zIndex to order them.
   if (state.cover.parentNode !== scene.layer)
     scene.layer.appendChild?.(state.cover);
+  const element = elementFinder(state, scene.layer);
   for (const [id, z] of state.raised) {
     if (dimmed && bright.has(id)) continue;
-    const shape = element(state, scene.layer, id);
+    const shape = element(id);
     if (shape && Number(shape.style.zIndex) >= COVER_Z) shape.style.zIndex = z;
     state.raised.delete(id);
   }
@@ -117,7 +124,7 @@ export function applyMapDimming(
     state.cover.style.fill = color;
   }
   state.cover.style.visibility = dimmed ? 'visible' : 'hidden';
-  raise(state, scene.layer);
+  raise(state, element);
 }
 
 /** After any G6 draw: elements it redrew are back at their own zIndex. */
@@ -127,5 +134,5 @@ export function restoreMapDimming(graph: Graph) {
   if (!state || !scene) return;
   if (state.cover.parentNode !== scene.layer)
     scene.layer.appendChild?.(state.cover);
-  raise(state, scene.layer);
+  raise(state, elementFinder(state, scene.layer));
 }

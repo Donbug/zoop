@@ -158,13 +158,14 @@ const READING_KEYS = new Set([
   'labelMaxLines',
   'badges',
 ]);
-const appliedKey = (key: string) => READING_KEYS.has(key);
 
 /**
  * Carry the label styles the reading pass applied into new graph data, and fill
  * keys the new data leaves out (G6's zIndex, sourceNode/targetNode, ...) from the
  * model. G6 updateData keeps omitted keys anyway, but its diff counts them as
  * changes: setData would redraw every element, then the reading pass again.
+ * An element whose own label input changed (text, badges, ...) keeps the new
+ * data's values instead, so it never shows the old label until the next reading.
  */
 export function keepAppliedStyles(graph: Graph, data: GraphData): GraphData {
   if (
@@ -178,14 +179,28 @@ export function keepAppliedStyles(graph: Graph, data: GraphData): GraphData {
       item.style ?? {},
     ]),
   );
+  const read = appliedLabels.get(graph)?.base;
+  const before = new Map(
+    [...(read?.nodes ?? []), ...(read?.edges ?? [])].map((item) => [
+      String(item.id),
+      item.style ?? {},
+    ]),
+  );
   const keep = <T extends { id?: unknown; style?: Record<string, unknown> }>(
     item: T,
   ): T => {
     const model = current.get(String(item.id));
     if (!model) return item;
     const style: Record<string, unknown> = { ...item.style };
+    const last = before.get(String(item.id));
+    const sameLabel =
+      !last ||
+      [...READING_KEYS].every(
+        (key) => JSON.stringify(last[key]) === JSON.stringify(style[key]),
+      );
     for (const [key, value] of Object.entries(model))
-      if (appliedKey(key) || !(key in style)) style[key] = value;
+      if ((sameLabel && READING_KEYS.has(key)) || !(key in style))
+        style[key] = value;
     return { ...item, style };
   };
   return {
@@ -222,14 +237,7 @@ export async function applyGraphReading(
     appliedLabels.set(graph, applied);
   } else if (applied.base !== base) {
     // setData keeps applied label styles on elements that stay (keepAppliedStyles);
-    // elements that were not in the previous base start from their defaults.
-    const before = new Set(
-      [...(applied.base.nodes ?? []), ...(applied.base.edges ?? [])].map(
-        (item) => String(item.id),
-      ),
-    );
-    for (const id of applied.styles.keys())
-      if (!before.has(id)) applied.styles.delete(id);
+    // elements that left the data start from their defaults if they come back.
     const after = new Set(
       [...(base.nodes ?? []), ...(base.edges ?? [])].map((item) =>
         String(item.id),

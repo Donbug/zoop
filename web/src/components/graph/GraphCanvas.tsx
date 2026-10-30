@@ -512,13 +512,18 @@ export default function GraphCanvas({
       clearTimeout(hoverClearTimer.current);
       hoverClearTimer.current = null;
     }
-    if (tutorialLocked) return;
-    if (hovered.current === id) return;
-    hovered.current = id;
+    if (tutorialLocked) {
+      // A leave during the tutorial lock must not leave a stale hover for after it.
+      if (id === null) hovered.current = null;
+      return;
+    }
+    // leaveNode already hid the tooltip; coming back to the same node shows it again.
     setHoveredIssue(
       data.nodes.find((node) => node.id === id && node.kind === 'issue')
         ?.label ?? null,
     );
+    if (hovered.current === id) return;
+    hovered.current = id;
     const graph = instance.current;
     if (!graph) return;
     // 마우스가 빠르게 지나가면 쌓인 hover를 하나씩 그리지 않고, 차례가 왔을 때의 hover만 그린다.

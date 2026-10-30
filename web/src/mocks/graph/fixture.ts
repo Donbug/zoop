@@ -146,8 +146,12 @@ export const directEdges: GraphEdge[] = cases.flatMap(([, ids], i) =>
     evidenceIds: [`mock-evidence-${i + 1}`],
   })),
 );
-/** Performance fixture at the server NODE_LIMIT (500): 200 companies, 300 issues. */
+let large: ReturnType<typeof buildLargeFixture> | undefined;
+/** Performance fixture at the server NODE_LIMIT (500): 200 companies, 300 issues. Built once. */
 export function largeFixture() {
+  return (large ??= buildLargeFixture());
+}
+function buildLargeFixture() {
   let seed = 7;
   const next = (n: number) => {
     seed = (seed * 48271) % 2147483647;

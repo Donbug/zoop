@@ -641,6 +641,11 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       canvas.handlers.get('node:pointerleave')!({ target: { id: issue.id } }),
     );
     expect(screen.queryByRole('tooltip')).toBeNull();
+    // Coming back before the delayed hover clear shows the title again.
+    act(() =>
+      canvas.handlers.get('node:pointerenter')!({ target: { id: issue.id } }),
+    );
+    expect(screen.getByRole('tooltip').textContent).toBe(issue.label);
   });
   it('fits the graph around remaining overlays without recreating it', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
