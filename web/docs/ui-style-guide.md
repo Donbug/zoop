@@ -42,14 +42,37 @@ Tokens live in `src/index.css` under `@theme`. Use `font-panel`, `text-panel-ink
 | Element               | Baseline                                |
 | --------------------- | --------------------------------------- |
 | Rail / section        | 320 px / 16 px padding; evidence 400 px |
-| Font                  | Pretendard Variable                     |
-| Heading               | 17 px / 25.5 px / bold                  |
-| Section / list title  | 13 px / 12 px                           |
-| Body label / action   | 11 px / 12 px                           |
+| Font                  | Pretendard Variable (`font-panel`)      |
+| Heading               | `text-title-sm` / 25.5 px / bold        |
+| Section / list title  | `text-body` / `text-caption`            |
+| Body label / action   | `text-caption` / `text-caption`         |
 | Border / radius       | 1 px `#d6d6d2` / 4 px                   |
 | Close / action height | 32 px / 32 px                           |
 
-These values come from the D-GRP-03/D-GRP-05 Figma frames (619:6729, 619:8225), including the 11 px body scale and 32 px controls. A future accessibility/responsive size change should update all panels together, not introduce one-off typography. Existing chart and graph geometry CSS stays local; new repeated UI styling belongs in these recipes. Avoid unlayered `font: inherit` or high-specificity rules overriding Tailwind utilities.
+The proportions come from the D-GRP-03/D-GRP-05 Figma frames (619:6729, 619:8225); their 11–13 px text now maps to the type scale below (#451). A future accessibility/responsive size change should update all panels together, not introduce one-off typography. Existing chart and graph geometry CSS stays local; new repeated UI styling belongs in these recipes. Avoid unlayered `font: inherit` or high-specificity rules overriding Tailwind utilities.
+
+### Typography
+
+Three bundled web fonts (OFL-1.1, npm packages, no CDN; notices in `public/licenses/fonts.txt`):
+
+| Role                        | Token / utility                   | Font                                 |
+| --------------------------- | --------------------------------- | ------------------------------------ |
+| Body, panels                | `font-panel` (base layer default) | Pretendard Variable (dynamic subset) |
+| h1–h4, ZOOP wordmark        | `font-heading` (base layer h1–h4) | Wanted Sans Variable (split)         |
+| Numbers, prices, times, IDs | `font-num`                        | SUIT Variable (`font-display: swap`) |
+
+Use only these six sizes; do not add `text-[Npx]` or Tailwind `text-xs`…`text-3xl`. Nothing is smaller than 12 px.
+
+| Utility         | Size / line height | Use                     |
+| --------------- | ------------------ | ----------------------- |
+| `text-caption`  | 12 px / 1.5        | Sources, times, badges  |
+| `text-body`     | 14 px / 1.6        | Body text, panels       |
+| `text-lead`     | 16 px / 1.6        | Emphasized body         |
+| `text-title-sm` | 18 px / 1.45       | Card and section titles |
+| `text-title`    | 22 px / 1.35       | Screen subheadings      |
+| `text-display`  | 28 px / 1.25       | Screen titles           |
+
+Light-theme text is one ink, `#212121` (`zoop-ink/muted/faint`, `panel-*`); show hierarchy with size and weight, not grey. The G6 canvas cannot read CSS: its label fonts are set in `graph-model.ts` (companies Pretendard, issues Wanted Sans, badges and initials SUIT), and `graph-fonts.ts` loads those fonts for the drawn text before `setData`. Canvas label sizes follow the map's own zoom-based reading rules (`graph-readability.ts`), not this scale.
 
 ### Dark theme
 
