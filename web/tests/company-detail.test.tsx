@@ -484,7 +484,9 @@ test('D-COM-06: catalog company switch clears the prior company event graph time
     }),
   );
   open(`${pinned}&graphAsOf=${encodeURIComponent(old)}`);
-  const catalog = screen.getByRole('complementary', { name: '기업 선택' });
+  const catalog = await screen.findByRole('complementary', {
+    name: '기업 선택',
+  });
   await userEvent.type(
     within(catalog).getByRole('textbox', { name: '기업명·종목 코드' }),
     'OTHER',
