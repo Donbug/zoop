@@ -2,6 +2,13 @@ package com.zoop.chat.orchestrator;
 
 import com.zoop.chat.dto.Citation;
 import com.zoop.chat.executor.ChatRun;
+import com.zoop.chat.tool.ChatCapability;
+import com.zoop.chat.tool.ChatToolItem;
+import com.zoop.chat.tool.ChatToolRequest;
+import com.zoop.chat.tool.ChatToolResult;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,7 +38,156 @@ public final class ChatModels {
 
     /** Jev semantic verification of the sections that passed the deterministic checks. */
     public interface Verifier {
-        ChatSemanticVerdicts verify(ChatRun run, List<ChatGeneratedAnswer.Section> sections, List<Citation> citations);
+        ChatSemanticVerdicts verify(ChatRun run, List<ChatGeneratedAnswer.Section> sections, List<Citation> citations,
+                ServerFacts facts);
+    }
+
+    /** Canonical facts are server observations, not article evidence and never a model's assertions. */
+    public sealed interface ServerFact permits PortfolioFact, ComparisonFact {
+        String requirementId();
+    }
+
+    public record MemberCompany(String companyId, String name, boolean held, boolean watched) { }
+
+    public record PortfolioFact(String requirementId, String queryScope, List<String> companyIds,
+            List<MemberCompany> companies, boolean truncated, int companyLimit) implements ServerFact { }
+
+    public record GraphChange(String id, String kind, String name, String change) { }
+
+    public record ComparisonFact(String requirementId, String fromVersion, String toVersion, Instant asOf,
+            Instant since, String queryScope, List<String> targetIds, int evidenceLimit, int changeLimit,
+            boolean evidenceRestricted, List<GraphChange> changes, boolean truncated) implements ServerFact { }
+
+    /**
+     * A short-lived, non-deserializable envelope captured from current branches, consumed with the exact run and checked
+     * sections. Scope reads merged into their parent stay attached to it; no membership query is repeated.
+     */
+    public static final class ServerFacts {
+        private final ChatRun owner;
+        private final List<ChatGeneratedAnswer.Section> sections;
+        private final List<List<ServerFact>> bySection;
+
+        private ServerFacts(ChatRun owner, List<ChatGeneratedAnswer.Section> sections, List<List<ServerFact>> bySection) {
+            this.owner = owner;
+            this.sections = List.copyOf(sections);
+            this.bySection = List.copyOf(bySection);
+        }
+
+        public static ServerFacts withoutTools(ChatRun run, List<ChatGeneratedAnswer.Section> sections) {
+            return new ServerFacts(run, sections, sections.stream().map(s -> List.<ServerFact>of()).toList());
+        }
+
+        public List<List<ServerFact>> forRequest(ChatRun run, List<ChatGeneratedAnswer.Section> checked) {
+            if (owner != run || !sections.equals(checked)) throw invalidFacts();
+            return bySection;
+        }
+
+        static ServerFacts capture(ChatRun run, List<ChatGeneratedAnswer.Section> sections,
+                List<ChatBranchContext.Branch> branches) {
+            List<List<ServerFact>> all = new ArrayList<>();
+            for (var section : sections) {
+                List<ServerFact> facts = new ArrayList<>();
+                for (var branch : branches) {
+                    if (!"evidence_grounded".equals(section.basis())
+                            || !section.requirementIds().contains(branch.requirementId()) || branch.general()) continue;
+                    Set<String> seen = new HashSet<>();
+                    for (var result : branch.results()) {
+                        boolean portfolio = ChatCapability.PORTFOLIO_SCOPE_READ.id().equals(result.capabilityId());
+                        boolean comparison = ChatCapability.GRAPH_VERSION_DIFF.id().equals(result.capabilityId());
+                        if (!portfolio && !comparison) continue;
+                        if (!result.succeeded() || result.provenance() == null
+                                || !result.provenance().belongsTo(run)) throw invalidFacts();
+                        ChatToolRequest query = result.provenance().request();
+                        if (!query.capabilityId().equals(result.capabilityId()) || result.truncated() == null
+                                || !seen.add(result.toolCallId())) throw invalidFacts();
+                        ServerFact fact = portfolio ? portfolio(branch.requirementId(), result, query)
+                                : comparison(run, branch.requirementId(), result, query);
+                        // No baseline is not a comparison and therefore supplies no facts; an identical read adds nothing.
+                        if (fact != null && !facts.contains(fact)) facts.add(fact);
+                    }
+                }
+                if (facts.size() > 72) throw invalidFacts();
+                all.add(List.copyOf(facts));
+            }
+            return new ServerFacts(run, sections, all);
+        }
+
+        private static PortfolioFact portfolio(String requirement, ChatToolResult result, ChatToolRequest query) {
+            if (!"member-scope".equals(result.dataVersion()) || result.items().size() > ChatToolRequest.MAX_TARGETS) {
+                throw invalidFacts();
+            }
+            boolean whole = query.targets().equals(List.of(ChatCapability.MEMBER_SELF));
+            List<String> targets = whole ? List.of() : query.targets();
+            if (targets.stream().anyMatch(id -> !companyId(id))) throw invalidFacts();
+            List<MemberCompany> companies = new ArrayList<>();
+            for (ChatToolItem item : result.items()) {
+                if (!"company".equals(item.kind()) || !companyId(item.id())) throw invalidFacts();
+                String suffix;
+                boolean held;
+                boolean watched;
+                if (item.label().endsWith(" (보유·관심)")) {
+                    suffix = " (보유·관심)"; held = true; watched = true;
+                } else if (item.label().endsWith(" (보유)")) {
+                    suffix = " (보유)"; held = true; watched = false;
+                } else if (item.label().endsWith(" (관심)")) {
+                    suffix = " (관심)"; held = false; watched = true;
+                } else {
+                    throw invalidFacts();
+                }
+                if (!whole && !targets.contains(item.id())) throw invalidFacts();
+                companies.add(new MemberCompany(item.id(), bounded(item.label().substring(0,
+                        item.label().length() - suffix.length())), held, watched));
+            }
+            return new PortfolioFact(requirement, whole ? "current_member" : "named_companies", targets,
+                    List.copyOf(companies), result.truncated(), ChatToolRequest.MAX_TARGETS);
+        }
+
+        private static ComparisonFact comparison(ChatRun run, String requirement, ChatToolResult result,
+                ChatToolRequest query) {
+            String version = result.dataVersion();
+            if (version == null || run.graphVersionId() == null) throw invalidFacts();
+            String suffix = ".." + run.graphVersionId();
+            if (!version.endsWith(suffix)) {
+                if (version.equals(run.graphVersionId()) && result.truncated() && result.items().isEmpty()) return null;
+                throw invalidFacts();
+            }
+            String earlier = version.substring(0, version.length() - suffix.length());
+            if (earlier.isBlank() || earlier.length() > 200 || result.items().size() > 40) throw invalidFacts();
+            List<String> targets = query.targets().stream().filter(id -> !id.startsWith("ev-")).toList();
+            boolean whole = targets.isEmpty() || targets.equals(List.of(ChatCapability.WHOLE_GRAPH));
+            if (!whole && targets.stream().anyMatch(id -> id.startsWith("member:") || id.equals(ChatCapability.WHOLE_GRAPH))) {
+                throw invalidFacts();
+            }
+            List<GraphChange> changes = new ArrayList<>();
+            for (ChatToolItem item : result.items()) {
+                if (!Set.of("company", "issue", "edge").contains(item.kind())) throw invalidFacts();
+                String prefix = item.label().startsWith("[새로 생김] ") ? "[새로 생김] "
+                        : item.label().startsWith("[사라짐] ") ? "[사라짐] " : null;
+                if (prefix == null) throw invalidFacts();
+                String name = item.label().substring(prefix.length());
+                if (name.codePointCount(0, name.length()) > 300) {
+                    name = name.substring(0, name.offsetByCodePoints(0, 299)) + "…";
+                }
+                changes.add(new GraphChange(item.id(), item.kind(), bounded(name),
+                        prefix.equals("[새로 생김] ") ? "added" : "removed"));
+            }
+            return new ComparisonFact(requirement, earlier, run.graphVersionId(), run.context().asOf(), query.since(),
+                    whole ? "whole_graph" : "targets", whole ? List.of() : targets, query.limit(), 40,
+                    query.evidenceScope() != null, List.copyOf(changes), result.truncated());
+        }
+
+        private static boolean companyId(String id) {
+            return id != null && id.length() <= 200 && id.indexOf(':') > 0 && !id.startsWith("member:");
+        }
+
+        private static String bounded(String name) {
+            if (name.isBlank() || name.codePointCount(0, name.length()) > 300) throw invalidFacts();
+            return name;
+        }
+
+        private static Failure invalidFacts() {
+            return new Failure(Failure.Fate.REFUSED, "server facts do not belong to the checked request");
+        }
     }
 
     /**

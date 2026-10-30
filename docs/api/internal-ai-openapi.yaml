@@ -246,7 +246,7 @@
     `runtime_unavailable`. All carry `Retry-After`; there is exactly one child per request and no automatic retry. A child answer that is not the contract this service
     knows is 500 `runtime_contract_mismatch` or `runtime_binding_mismatch` (not retryable). A 503 or 500 is never an empty bundle.
 
-    **Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-1`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
+    **Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-2`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
     stage synchronously through the installed `zoop-ai-chat invoke`: `chat-router` (native Jev, typed probabilities per requirement), `chat-answer` (Luna, a strict
     JSON answer by sections), `chat-verification` (native Jev, per-section support and prohibited-advice verdicts) or `chat-agent` (one step of a Luna Responses run
     that calls the ZOOP MCP tools). It is off unless its all-or-nothing server configuration group is set (otherwise 409 `execution_unavailable` after
@@ -265,6 +265,15 @@
     The id is bound to the calling principal. A **200** carries the stage outcome: `status=succeeded` with the typed `answer`, or `status=failed` with a stable
     `failure.code`, whether a request was `sent` and whether its fate is `unknown`. A **502/504 `stage_outcome_unknown`** means the runtime may have sent the
     request: never resend that invocation. A **503** means nothing was sent.
+
+    **Verification server facts.** The v2 verification input has `requestBinding` (`invocationId`, pinned `graphVersionId`, `asOf`)
+    and ordered sections (`sectionId`, `requirementIds`, `basis`, `text`, `evidenceIds`, `serverFacts`). The application alone
+    derives bounded typed `portfolio_scope` and `graph_comparison` facts from successful reads in that request, never from answer
+    text. Facts are scoped to their parent requirement and section, separate from granted article quotes. Membership is current
+    at the read, not historical asOf membership; a truncated list cannot establish completeness or absence. Graph facts name
+    the exact baseline, current version, asOf, since, query targets and limits. Missing observations supply no facts. The
+    service rejects a binding to another invocation before launching the worker; the worker rejects wrong sections,
+    requirements, versions or extra fields. Old stage envelopes are refused; the independent source-grant registry stays v1.
 
     **Live and rights.** Nothing reaches a provider unless the chat gate is open (`ZOOP_AI_CHAT_LIVE_ENABLED=1` and a positive `ZOOP_AI_CHAT_MAX_CALLS`, shared by
     the chat stages and separate from the S1 and pipeline gates), and quoted spans are sent only under the operator chat grant registry (`model-send`, the stage
@@ -7702,13 +7711,13 @@
                 "reachable":
                   "summary": "The configured endpoint answered its Bearer challenge"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-1"
+                    "schemaVersion": "zoop-ai-chat-2"
                     "mcp": "reachable"
                     "reason": null
                 "unreachable":
                   "summary": "No answer before the content-free probe deadline"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-1"
+                    "schemaVersion": "zoop-ai-chat-2"
                     "mcp": "unreachable"
                     "reason": "mcp_timeout"
         "401":
@@ -7865,7 +7874,7 @@
                 "succeeded":
                   "summary": "Router probabilities"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-1"
+                    "schemaVersion": "zoop-ai-chat-2"
                     "invocationId": "job-00000001:1:chat-router"
                     "stage": "chat-router"
                     "status": "succeeded"
@@ -7900,7 +7909,7 @@
                 "notSent":
                   "summary": "A quote without a matching chat grant: nothing was sent"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-1"
+                    "schemaVersion": "zoop-ai-chat-2"
                     "invocationId": "job-00000001:1:chat-answer"
                     "stage": "chat-answer"
                     "status": "failed"
@@ -7913,7 +7922,7 @@
                 "agentHeld":
                   "summary": "chat-agent step held at an approval request"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-1"
+                    "schemaVersion": "zoop-ai-chat-2"
                     "invocationId": "job-00000001:1:chat-agent:1"
                     "stage": "chat-agent"
                     "status": "succeeded"
@@ -8061,7 +8070,7 @@
               "router":
                 "summary": "chat-router replay request (synthetic question)"
                 "value":
-                  "schemaVersion": "zoop-ai-chat-1"
+                  "schemaVersion": "zoop-ai-chat-2"
                   "invocationId": "job-00000001:1:chat-router"
                   "stage": "chat-router"
                   "mode": "replay"
@@ -8076,7 +8085,7 @@
               "agentContinuation":
                 "summary": "chat-agent continuation step with the application's decision (synthetic token)"
                 "value":
-                  "schemaVersion": "zoop-ai-chat-1"
+                  "schemaVersion": "zoop-ai-chat-2"
                   "invocationId": "job-00000001:1:chat-agent:2"
                   "stage": "chat-agent"
                   "mode": "replay"
@@ -11744,7 +11753,7 @@
       "properties":
         "schemaVersion":
           "type": "string"
-          "const": "zoop-ai-chat-1"
+          "const": "zoop-ai-chat-2"
           "title": "Schemaversion"
         "mcp":
           "type": "string"
@@ -11836,7 +11845,7 @@
       "properties":
         "schemaVersion":
           "type": "string"
-          "const": "zoop-ai-chat-1"
+          "const": "zoop-ai-chat-2"
           "title": "Schemaversion"
         "invocationId":
           "type": "string"
@@ -15756,7 +15765,7 @@
       "additionalProperties": false
       "properties":
         "schemaVersion":
-          "const": "zoop-ai-chat-1"
+          "const": "zoop-ai-chat-2"
           "title": "Schemaversion"
           "type": "string"
         "invocationId":
@@ -15780,7 +15789,7 @@
           "type": "string"
         "input":
           "additionalProperties": true
-          "description": "The stage input of the zoop-ai-chat-1 contract (RouterInput, AnswerInput or VerificationInput)."
+          "description": "The closed zoop-ai-chat-2 stage input (RouterInput, AnswerInput, VerificationInput or AgentInput)."
           "title": "Input"
           "type": "object"
       "required":
