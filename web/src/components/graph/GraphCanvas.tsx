@@ -328,19 +328,14 @@ export default function GraphCanvas({
       const visibleIds = new Set(
         rendered.nodes?.map((node) => String(node.id)),
       );
-      // 마우스를 올린 노드가 우선이고, 없으면 클릭해 선택한 노드의 연결을 계속 강조한다.
-      const anchor =
-        (evidenceMode ? null : hovered.current) ??
-        (selected && nodeKinds.has(selected) ? selected : null);
-      const active =
-        anchor &&
-        visibleIds.has(anchor) &&
-        (!focusId || focusedNodes.has(anchor))
-          ? anchor
+      const usable = (id: string | null) =>
+        id && visibleIds.has(id) && (!focusId || focusedNodes.has(id))
+          ? id
           : null;
-      const relatedNodes = new Set(active ? [active] : []);
-      const relatedEdges = new Set<string>();
-      if (active && !isolateSelection) {
+      const neighborhood = (active: string | null) => {
+        const nodes = new Set(active ? [active] : []);
+        const edges = new Set<string>();
+        if (!active || isolateSelection) return { nodes, edges };
         for (const edge of rendered.edges ?? []) {
           const source = String(edge.source);
           const target = String(edge.target);
@@ -348,28 +343,34 @@ export default function GraphCanvas({
             (source === active || target === active) &&
             (!focusId || (focusedNodes.has(source) && focusedNodes.has(target)))
           ) {
-            relatedNodes.add(source);
-            relatedNodes.add(target);
-            relatedEdges.add(String(edge.id));
+            nodes.add(source);
+            nodes.add(target);
+            edges.add(String(edge.id));
           }
         }
-      }
+        return { nodes, edges };
+      };
+      // 클릭해 선택한 노드만 나머지 지도를 흐리게 한다. hover는 올린 노드와 그 연결만 밝게 강조해서,
+      // 노드가 많아도 마우스를 움직일 때마다 지도 전체를 다시 그리지 않는다.
+      const chosen = usable(
+        selected && nodeKinds.has(selected) ? selected : null,
+      );
+      const hover = usable(evidenceMode ? null : hovered.current);
+      const chosenArea = neighborhood(chosen);
+      const hoverArea = neighborhood(hover);
       // 포커스 모드에서는 연결 없는 노드가 이미 숨겨지므로, 남은 1·2단계 노드·연결선을 흐리게 하지 않는다.
-      const dimRest = !(focusLayout && focusId);
+      const dimRest = Boolean(chosen) && !(focusLayout && focusId);
       const states: Record<string, string[]> = {};
       for (const node of rendered.nodes ?? []) {
         const id = String(node.id);
-        states[id] = active
-          ? [
-              id === active
-                ? id === hovered.current
-                  ? 'hovered'
-                  : 'related'
-                : relatedNodes.has(id)
-                  ? 'related'
-                  : 'inactive',
-            ].filter((state) => dimRest || state !== 'inactive')
-          : [];
+        states[id] =
+          id === hover
+            ? ['hovered']
+            : hoverArea.nodes.has(id) || chosenArea.nodes.has(id)
+              ? ['related']
+              : dimRest
+                ? ['inactive']
+                : [];
         if (tutorialLocked && !tutorialPhase && !tutorialShowNeighborhood)
           states[id] = id === tutorialTargetId ? [] : ['inactive'];
         if (id === selected && (!tutorialLocked || tutorialShowNeighborhood))
@@ -378,11 +379,12 @@ export default function GraphCanvas({
       }
       for (const edge of rendered.edges ?? []) {
         const id = String(edge.id);
-        states[id] = active
-          ? [relatedEdges.has(id) ? 'related' : 'inactive'].filter(
-              (state) => dimRest || state !== 'inactive',
-            )
-          : [];
+        states[id] =
+          hoverArea.edges.has(id) || chosenArea.edges.has(id)
+            ? ['related']
+            : dimRest
+              ? ['inactive']
+              : [];
         if (tutorialLocked && !tutorialShowNeighborhood)
           states[id] = ['inactive'];
         if (id === selectedEdgeId && !tutorialLocked)

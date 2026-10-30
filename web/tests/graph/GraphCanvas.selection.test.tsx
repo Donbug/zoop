@@ -1151,7 +1151,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       screen.getByRole('img', { name: /시장 전체 관계 지도/ }),
     ).toBeTruthy();
   });
-  it('D-GRP-01 hover emphasizes incident nodes/edges without selecting or redrawing the viewport', async () => {
+  it('D-GRP-01 hover emphasizes incident nodes/edges without dimming, selecting or redrawing the viewport', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const onSelect = vi.fn();
     render(<GraphCanvas data={data} onSelect={onSelect} />);
@@ -1167,15 +1167,14 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       }),
     );
     await waitFor(() =>
-      expect(canvas.setElementState).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          'NASDAQ:NVDA': ['hovered'],
-          'mock-issue-1': ['related'],
-          [edge.id]: ['related'],
-          'KRX:005380': ['inactive'],
-        }),
-      ),
+      expect(appliedStates()).toMatchObject({
+        'NASDAQ:NVDA': ['hovered'],
+        'mock-issue-1': ['related'],
+        [edge.id]: ['related'],
+      }),
     );
+    // Only a click selection dims the rest; hover leaves unrelated nodes as they were.
+    expect(appliedStates()['KRX:005380'] ?? []).toEqual([]);
     expect(onSelect).not.toHaveBeenCalled();
     expect(canvas.draw).toHaveBeenCalledTimes(draws);
     expect(canvas.setData).toHaveBeenCalledTimes(layouts);
