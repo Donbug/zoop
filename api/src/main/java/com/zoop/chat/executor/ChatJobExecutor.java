@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -21,11 +22,13 @@ import com.zoop.chat.repository.ChatRepository;
 import com.zoop.chat.repository.ChatRunningJob;
 import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.repository.NewChatToolCall;
+import com.zoop.chat.service.ChatTargetAccess;
 import com.zoop.chat.service.FrozenSelection;
 import com.zoop.chat.tool.ChatCapability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -78,9 +81,18 @@ public class ChatJobExecutor {
     private final ObjectMapper mapper;
     private final Clock clock;
     private final TransactionTemplate transaction;
+    /** Rechecks what earlier answers carry over; null carries no target. */
+    private final ChatTargetAccess targets;
 
     public ChatJobExecutor(ChatRepository chats, ChatExecutionRepository runs, ObjectProvider<ChatEngine> engines,
             ObjectMapper mapper, Clock clock, PlatformTransactionManager transactionManager) {
+        this(chats, runs, engines, mapper, clock, transactionManager, null);
+    }
+
+    @Autowired
+    public ChatJobExecutor(ChatRepository chats, ChatExecutionRepository runs, ObjectProvider<ChatEngine> engines,
+            ObjectMapper mapper, Clock clock, PlatformTransactionManager transactionManager, ChatTargetAccess targets) {
+        this.targets = targets;
         this.chats = chats;
         this.runs = runs;
         this.engines = engines;
@@ -136,7 +148,7 @@ public class ChatJobExecutor {
         } else {
             Control control = new Control(claim);
             try {
-                outcome = engine.answer(run(claim), control);
+                outcome = engine.answer(visiblePrior(run(claim)), control);
             } catch (ChatRunSuperseded superseded) {
                 return;
             } catch (RuntimeException unexpected) {
@@ -288,10 +300,25 @@ public class ChatJobExecutor {
                     choiceLabel(parent, at.resolvesChoiceId())));
             at = parent;
         }
+        // The chain's root is the question that follows the earlier answers: a reply or a rerun carries the same ones.
         return new ChatRun(job.id(), job.sessionId(), job.memberId(), claim.attemptNo(), claim.mode(), List.copyOf(turns),
                 mapper.readValue(job.frozenContext(), ChatFrozenContext.class),
                 mapper.readValue(job.frozenSelection(), FrozenSelection.class), job.graphVersionId(),
-                job.clarificationDepth(), job.askedAt(), claim.deadline());
+                job.clarificationDepth(), job.askedAt(), claim.deadline(),
+                ChatPriorTurns.of(chats.answersBefore(at.sessionId(), at.seq(), ChatPriorTurns.TURNS), mapper));
+    }
+
+    /** The run with the carried targets it may still see in its own pinned graph; none when that could not be checked. */
+    private ChatRun visiblePrior(ChatRun run) {
+        var prior = run.prior();
+        if (prior.companies().isEmpty() && prior.issues().isEmpty()) return run;
+        Set<String> ids = new HashSet<>();
+        prior.companies().forEach(c -> ids.add(c.id()));
+        prior.issues().forEach(i -> ids.add(i.id()));
+        Set<String> visible = targets == null ? Set.of()
+                : targets.visible(ids, run.graphVersionId(), run.context().asOf(), run.jobId()).orElse(Set.of());
+        return run.withPrior(new ChatRun.Prior(prior.companies().stream().filter(c -> visible.contains(c.id())).toList(),
+                prior.issues().stream().filter(i -> visible.contains(i.id())).toList(), prior.period()));
     }
 
     /** The fenced control an engine uses; every call checks that this run still owns the job. */

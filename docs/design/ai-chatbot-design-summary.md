@@ -155,14 +155,14 @@ general_knowledge에는 서버 고정 안내 ‘일반 개념 설명입니다. �
 - 모델이 생성한 SQL·Cypher·임의 URL·스크립트를 실행하지 않는다. 도구는 읽기 전용이다.
 - UI 제안은 유효 조회 ID에서 서버가 만들고 사용자 클릭 시 실행한다. graphTargets와 uiActions는 같은 도메인 결과에서 파생하며 충돌 시 동작을 차단한다.
 - 재열람·polling은 검색·모델 호출·화면 동작을 재실행하지 않는다. 검증 전 본문은 숨긴다.
-- 이전 일반 턴 문맥 승계는 별도 신규 기능이다. 직전 완료 2턴의 검증된 ID·기간만 사용하고 현재 권한을 재검사한다. 본문은 승계하지 않는다.
+- 이전 일반 턴 문맥 승계는 직전 답변 2턴의 검증된 ID·기간만 서버 계획에 쓰고 현재 공개 여부를 재검사한다. 본문은 승계하지 않는다(2026-10-30 구현).
 
 ## 10. 현재 구현과 목표의 경계
 
 | 영역 | 현재 코드 | 추가 구현 |
 | --- | --- | --- |
 | 공개 job | 회원 전용 저장·polling·멱등성·취소·lease·재시도, answerStatus/notices·`tool_unavailable` limitation | 저장 복구(`save_only`) |
-| 모델 | chat-router Jev·chat-verification Jev, direct의 chat-answer Luna(chat/completions·high·도구 없음), agent의 chat-agent Luna(Responses MCP·medium·Java 승인 continuation, 기본 꺼짐, 합성 replay로만 확인) | live 확인, 입력 24k·답변 2k guard, 이전 2턴 문맥 승계 |
+| 모델 | chat-router Jev·chat-verification Jev, direct의 chat-answer Luna(chat/completions·high·도구 없음), agent의 chat-agent Luna(Responses MCP·medium·Java 승인 continuation, 기본 꺼짐, 합성 replay로만 확인) | live 확인, 입력 24k·답변 2k guard |
 | 도구 | company.read, issue.read, evidence.resolve, graph.path.read, graph.version.diff, portfolio.scope.read, zoopPolicy.read, briefing.read, selectionRule.read, web.search(합성 공급자만). portfolio.scope.read·briefing.read·selectionRule.read는 server-only, 나머지는 MCP 공통 gate·cache·direct 시작 경로 위 | help.search, screenSpec.read, document.search, briefing.evidence, 실제 웹 공급자 |
 | 근거·검증 | BranchContext·서버 citation·결정론 검사·section Jev·서버 사실·웹 출처·grant 선반환 검사 | claim 인과 검증·token guard·웹 snapshot |
 | 화면 | D-AI-01~02b API 연결·결과/인용/확인/실패·부분 안내·웹 보도 구간 | uiActions, 와이어프레임 근거와 종단 시험 |

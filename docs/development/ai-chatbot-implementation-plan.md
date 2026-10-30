@@ -20,7 +20,7 @@
 
 ### 2026-10-28 승인된 개발 기준
 
-이 절은 아래의 2026-10-27 목표와 충돌할 때 우선한다. 다음 항목은 목표 기준이며 구현 완료 표시가 아니다. 2026-10-30 기준 구현 여부는 3장 표와 단계별 "현재 상태"를 따른다. 1~7은 대부분 구현됐고(기능 플래그 기본 꺼짐, 합성 replay로만 확인), 남은 것은 혼합 질문의 Q02 기본 검색, direct 경로 45초, 입력 24k·답변 2k, 8번 턴 문맥이다.
+이 절은 아래의 2026-10-27 목표와 충돌할 때 우선한다. 다음 항목은 목표 기준이며 구현 완료 표시가 아니다. 2026-10-30 기준 구현 여부는 3장 표와 단계별 "현재 상태"를 따른다. 1~7은 대부분 구현됐고(기능 플래그 기본 꺼짐, 합성 replay로만 확인), 남은 것은 혼합 질문의 Q02 기본 검색, direct 경로 45초, 입력 24k·답변 2k다. 8번 턴 문맥은 서버 계획 단계로 구현했다(2026-10-30, [MCP 실행 계약](../design/ai-chatbot-mcp-actions.md)).
 
 2026-10-28 팀 결정이며 2026-10-25의 MCP 미사용 결정을 대체한다.
 
@@ -53,7 +53,7 @@
 | 데이터 기반 | 기업·문서·evidence·공개 그래프 버전과 현재 권리 재검사 경로가 있고 `company.read`·`issue.read`·`evidence.resolve`·`graph.path.read`·`graph.version.diff`·`portfolio.scope.read`·`briefing.read`·`selectionRule.read`·`zoopPolicy.read`와 합성 공급자 `web.search`가 연결됨(`company.read`는 기업 카탈로그 개요를 `company_profile` 인용으로, `zoopPolicy.read`는 승인 약관을 `zoop_doc` 인용으로 전달) | Q01은 정책 문서만, Q02~Q08 도구 구현. Q01 도움말·화면 명세, `document.search`, `briefing.evidence`, 실제 웹 공급자와 종단 공개 시험은 추가 필요 |
 | 와이어프레임 | 네 정적 화면은 질문·되묻기·회수·조회 오류의 시각 기준을 제공하지만 동작 상태를 증명하지 않음 | 별도 상태 계약으로 로딩·오류·근거 수준·복구를 고정함 |
 
-결론적으로 백엔드의 저장·공개 API·작업 실행기·라우터·오케스트레이터·도구 레지스트리·Luna 생성·Jev 검증과 웹 D-AI-01~02b 연결은 구현돼 있다. Luna Responses MCP agent 경로도 기본 꺼진 상태로 구현돼 있다. 다만 서버 requirement coverage, claim 단위 `unsupportedCausality`, 24k/2k token guard, recovery artifact·`save_only`, 이전 턴 문맥 승계, `uiActions[]`, 미연결 도구, live spike, 평가 보정과 출시 증명은 남아 있다. 기능 플래그와 live gate는 기본적으로 꺼져 있으므로 “코드가 있음”은 “출시됨”이나 “실제 모델 호출 승인됨”을 뜻하지 않는다.
+결론적으로 백엔드의 저장·공개 API·작업 실행기·라우터·오케스트레이터·도구 레지스트리·Luna 생성·Jev 검증과 웹 D-AI-01~02b 연결은 구현돼 있다. Luna Responses MCP agent 경로도 기본 꺼진 상태로 구현돼 있다. 다만 서버 requirement coverage, claim 단위 `unsupportedCausality`, 24k/2k token guard, recovery artifact·`save_only`, `uiActions[]`, 미연결 도구, live spike, 평가 보정과 출시 증명은 남아 있다. 기능 플래그와 live gate는 기본적으로 꺼져 있으므로 “코드가 있음”은 “출시됨”이나 “실제 모델 호출 승인됨”을 뜻하지 않는다.
 
 ### 구현된 도구 결정 기록 (현재 코드 기준)
 
@@ -100,7 +100,7 @@ flowchart LR
 | 0 계약·fixture | 부분 구현 | 목표 내부 schema 전체와 고정 평가 fixture 정리 |
 | 1 저장·job 수명주기 | 부분 구현 | recovery artifact와 실제 `save_only` 복구 |
 | 2 오케스트레이터 | 부분 구현 | 서버 requirement coverage, direct 경로 45초(단계 한도 실측 후) |
-| 3 router·Luna agent | 부분 구현 | Jev router·Luna Responses MCP·Java 승인 루프는 구현(합성 replay로만 확인). live 확인, 라우터 wire `dependsOn`, 승인 요청의 요구 매핑, 이전 2턴 문맥 |
+| 3 router·Luna agent | 부분 구현 | Jev router·Luna Responses MCP·Java 승인 루프는 구현(합성 replay로만 확인). live 확인, 라우터 wire `dependsOn`, 승인 요청의 요구 매핑 |
 | 4 읽기 도구 | 부분 구현 | Q03 일부, Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`), Q06 발행 브리핑(`briefing.read`), Q08 선정 기록(`selectionRule.read`, 2026-10-30), `web.search`(합성 공급자) 구현, Q01 도움말·화면 명세, `document.search`, `briefing.evidence` 미연결, 실제 웹 공급자 미정 |
 | 5 생성·출력 검증 | 부분 구현 | 구간 단위 생성·검증은 구현, claim 단위 검증·token guard 미구현 |
 | 6 웹 | 구현 | `uiActions[]`, OpenAPI 타입 생성 seam, 실제 백엔드와의 종단 확인 |
