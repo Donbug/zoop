@@ -23,6 +23,16 @@ python scripts/chat_live_spike_report.py /secure/operator/chat-live-spike.json \
 
 기본 최소 표본은 시나리오당 5회다. 성공은 exit 0과 `gate: passed`, 미달은 exit 2와 구체적인 `failures`, 형식 오류는 exit 64와 `gate: invalid`다. p50/p95는 작은 표본에서도 관측값을 만들지 않는 nearest-rank 방식이다.
 
+## 시나리오 재현성
+
+`ChatMcpAgentTest`가 scripted Luna로 네 모양이 서버 승인 규칙 안에서 거부 없이 가능한지 확인한다(합성 replay, 8-call은 라운드별 4·3·1회). 이것은 규칙이 막지 않는다는 뜻이지 실제 Luna가 그렇게 고른다는 뜻이 아니다. live에서 달라질 수 있는 지점은 다음과 같다.
+
+- **호출 수**: Luna가 대상 여러 개를 한 호출로 묶거나(한 호출에 5개까지) 호출을 줄이면 완료 run이 시나리오와 달라진다. 추출기가 exit 2로 알린다.
+- **입력 예산**: 세 번째 라운드를 승인하려면 단계 입력 a, b, c가 `a + b + 3c ≤ 24k`여야 한다(다음 단계가 이번 입력만큼 더 든다고 보고 남겨 둠). 예를 들어 3k·5k·7k면 세 번째 라운드가 거부되고 run은 2라운드로 끝난다. `tools-4-rounds-3`과 `tools-8-rounds-3`은 도구 결과가 작아야 하며, 추론이 많은 실제 run에서 이 한도에 먼저 닿을 수 있다.
+- **시간**: Luna 합산 35초 안에서 남은 시간이 20초 미만이면 새 도구를 승인하지 않으므로, 네 단계가 느리면 라운드가 줄어든다.
+
+실행 전에 승인자가 정할 것: 시나리오와 다른 완료 run의 처리, 재시도를 포함한 총 run 수 상한(기본 표본 20회)이다.
+
 ## Evidence 추출
 
 ```sh
