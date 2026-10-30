@@ -696,6 +696,20 @@
       "type": "string"
     },
     "response:200:application/json.published<anyOf:0>.metadata.requestId:required": true,
+    "response:200:application/json.reprocessState": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "queued",
+        "running",
+        "completed",
+        "failed",
+        null
+      ]
+    },
+    "response:200:application/json.reprocessState:required": false,
     "response:200:header:X-Request-ID": {
       "type": "string"
     },

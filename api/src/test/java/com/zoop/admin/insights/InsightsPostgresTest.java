@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 })
 @EnabledIfEnvironmentVariable(named = "DB_URL", matches = "jdbc:postgresql:.*")
 @Tag("auth-postgres")
+@org.springframework.transaction.annotation.Transactional
 class InsightsPostgresTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper mapper;

@@ -19,6 +19,7 @@ import tools.jackson.databind.node.ObjectNode;
 public class AdminBriefingReprocessController {
     private final AdminBriefingReprocessService service;
     public AdminBriefingReprocessController(AdminBriefingReprocessService service){this.service=service;}
+    @io.swagger.v3.oas.annotations.media.Schema(name="AdminBriefingReprocessRequest")
     public record Request(@NotBlank @Size(max=500) String reason){}
     @PostMapping("/{roundId}/reprocess")
     @Operation(operationId="reprocessBriefingRound",summary="미발행 회차의 새 생성 시도 접수")

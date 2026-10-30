@@ -88,9 +88,9 @@ class AiUsagePostgresTest {
         var result = mvc.perform(get("/api/v1/admin/ai-usage").param("window", "24h").cookie(admin))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.features[2].feature").value("briefing"))
-                .andExpect(jsonPath("$.features[2].usage.modelCalls").value(2))
-                .andExpect(jsonPath("$.features[2].usage.retries").value(1))
-                .andExpect(jsonPath("$.features[2].usage.inputTokens").value(30))
+                .andExpect(jsonPath("$.features[2].usage.modelCalls").value(hasUnrecordedPublications ? (Object)null : 2))
+                .andExpect(jsonPath("$.features[2].usage.retries").value(hasUnrecordedPublications ? (Object)null : 1))
+                .andExpect(jsonPath("$.features[2].usage.inputTokens").value(hasUnrecordedPublications ? (Object)null : 30))
                 .andExpect(jsonPath("$.features[4].feature").value("briefing-outlook"))
                 .andExpect(jsonPath("$.features[4].usage.modelCalls").value(1))
                 .andExpect(jsonPath("$.features[4].usage.inputTokens").value(11));

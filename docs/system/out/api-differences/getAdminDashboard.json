@@ -184,6 +184,20 @@
     "response:200:application/json.briefings<anyOf:0>.latest[].publishedAt<anyOf:1>": {
       "type": "null"
     },
+    "response:200:application/json.briefings<anyOf:0>.latest[].reprocessState": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "queued",
+        "running",
+        "completed",
+        "failed",
+        null
+      ]
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].reprocessState:required": false,
     "response:200:application/json.briefings<anyOf:0>.latest[].reprocessable": {
       "type": "boolean"
     },

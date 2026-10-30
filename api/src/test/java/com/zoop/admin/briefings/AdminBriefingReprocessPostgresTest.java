@@ -34,14 +34,17 @@ class AdminBriefingReprocessPostgresTest {
     @Autowired WebApplicationContext context;@Autowired RequestIdFilter ids;@Autowired JdbcTemplate jdbc;
     @Autowired AdminProvisioningService provision;@Autowired ObjectMapper mapper;@Autowired BriefingReprocessWorker worker;
     MockMvc mvc;Cookie cookie;String csrf,round;
-    @BeforeEach void setup()throws Exception{
+    @BeforeEach void setup(TestInfo info)throws Exception{
         mvc=MockMvcBuilders.webAppContextSetup(context).addFilters(ids).build();
         String email="reprocess-"+UUID.randomUUID()+"@example.com";provision.provision(email,"Synthetic admin","Synthetic-admin-2026!","test-provision");
         var result=mvc.perform(post("/api/v1/admin/auth/login").header("Origin","https://zoop.example").with(r->{r.setRemoteAddr("192.0.2.215");return r;}).contentType("application/json").content("{\"email\":\""+email+"\",\"password\":\"Synthetic-admin-2026!\"}"))
             .andExpect(status().isOk()).andReturn().getResponse();
         cookie=new Cookie(AdminSessionCookie.NAME,result.getHeader("Set-Cookie").split(";",2)[0].split("=",2)[1]);csrf=mapper.readTree(result.getContentAsString()).path("csrfToken").asText();
         round="reprocess-"+UUID.randomUUID();
-        jdbc.update("INSERT INTO briefing_rounds(id,round_date,edition,scheduled_at,window_to,open_start,status) VALUES(?,'1980-01-01','morning','1980-01-01T00:20Z','1980-01-01T00:20Z',true,'failed')",round);
+        boolean positive=info.getTestMethod().orElseThrow().getName().startsWith("actualPython");
+        String date=positive?jdbc.queryForObject("SELECT (COALESCE(max(round_date),date '1700-01-01')+1)::text FROM briefing_rounds WHERE id LIKE 'reprocess-positive-%'",String.class):"1980-01-01";
+        if(positive)round="reprocess-positive-"+UUID.randomUUID();
+        jdbc.update("INSERT INTO briefing_rounds(id,round_date,edition,scheduled_at,window_to,open_start,status) VALUES(?,?::date,'morning',?::timestamptz,?::timestamptz,true,'failed')",round,date,date+"T00:20:00Z",date+"T00:20:00Z");
         byte[] input=("{\"schemaVersion\":\"briefing-recorded-result-v1\",\"roundId\":\""+round+"\",\"purpose\":\"generation\",\"outcome\":\"available\",\"result\":{\"verification\":{\"status\":\"PASS\"}}}").getBytes(java.nio.charset.StandardCharsets.UTF_8);
         try(var files=ArtifactFileStore.at(root).open()){
             String artifact="input-"+UUID.randomUUID();var file=files.put("reprocess_test",artifact+".json",input);
@@ -94,5 +97,6 @@ class AdminBriefingReprocessPostgresTest {
             .andExpect(jsonPath("$.publishedAt").isEmpty()).andExpect(jsonPath("$.attemptsLog[0].outcome").value("available"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ai_executions e JOIN briefing_attempts a ON a.id=e.briefing_attempt_id WHERE a.round_id=? AND e.execution_mode='live'",Integer.class,round)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ai_executions e JOIN briefing_attempts a ON a.id=e.briefing_attempt_id WHERE a.round_id=? AND e.execution_mode='save_only'",Integer.class,round)).isEqualTo(1);
+
     }
 }

@@ -102,7 +102,8 @@ function RoundDetailView({
       )}
       {round.reprocessState === 'completed' && !round.published && (
         <p role="status" className="rounded-2xl bg-zoop-soft px-4 py-3 text-xs">
-          재처리 결과를 저장했습니다. 발행 대기 상태이며 기존 발행본은 유지됩니다.
+          재처리 결과를 저장했습니다. 발행 대기 상태이며 기존 발행본은
+          유지됩니다.
         </p>
       )}
       {round.suspension && (

@@ -2238,7 +2238,7 @@ DB에 저장된 회차만 예정 시각·ID 내림차순으로 조회한다. 날
 
 ## reprocessBriefingRound · 미발행 회차 재처리
 
-미발행 회차 재처리.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+서버에 등록한 고정 입력으로 예정 시각이 지난 미발행 회차의 새 생성·검증·저장 시도를 접수한다. 모델 재호출은 별도 운영자 승인과 호출 상한이 필요하다. 저장 복구는 실제 모델 호출·재시도에 세지 않는다. 발행은 별도 절차다. 같은 관리자·회차·Idempotency-Key·사유는 최초 202 응답을 반환하고, 내용 변경 또는 진행 중 회차는 409다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -7070,6 +7070,7 @@ only while the rule has never been changed (a rule switched back to its default 
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| reprocessState | 선택 | string, null {queued, running, completed, failed, None} | 최근 재처리 작업 상태. completed는 결과 저장 완료이며 발행 여부는 publishedAt으로 확인한다. |
 | historyAvailability | 선택 | string {recorded, unrecorded} | 생성 시도 원장 유무. 과거 영수증의 일부 수집은 원래 생성 시도의 복원을 뜻하지 않는다. |
 | aiExecutions | 선택 | [BriefingAiExecution](#schema-briefingaiexecution)[] |  |
 | id | 필수 | string |  |
@@ -7116,6 +7117,7 @@ only while the rule has never been changed (a rule switched back to its default 
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
+| reprocessState | 선택 | string, null {queued, running, completed, failed, None} | 최근 재처리 작업 상태. completed는 결과 저장 완료이며 발행 여부는 publishedAt으로 확인한다. |
 | id | 필수 | string |  |
 | date | 필수 | string (date) |  |
 | edition | 필수 | string {morning, evening} |  |

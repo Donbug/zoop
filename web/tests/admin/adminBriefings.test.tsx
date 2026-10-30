@@ -312,7 +312,7 @@ describe('A-ADM-04 브리핑 운영 (FS070·FS071)', () => {
     await user.click(within(panel).getByRole('button', { name: '재처리' }));
     const form = within(panel).getByRole('form', { name: '브리핑 재처리' });
     expect(
-      within(form).getByText(/무료\(모델을 다시 부르지 않아요\)/),
+      within(form).getByText(/서버에서 승인한 실행 방식과 호출 상한/),
     ).toBeTruthy();
     await user.click(within(form).getByRole('button', { name: '재처리 요청' }));
     expect(within(form).getByText('사유를 입력해 주세요.')).toBeTruthy();

@@ -31,7 +31,7 @@ export type AdminRound = {
   correctionCount: number;
   suspension: Suspension | null;
   reprocessable: boolean;
-  reprocessState?: "queued" | "running" | "completed" | "failed" | null;
+  reprocessState?: 'queued' | 'running' | 'completed' | 'failed' | null;
   /** 재처리할 수 없는 이유 */
   blockedReason: string | null;
 };

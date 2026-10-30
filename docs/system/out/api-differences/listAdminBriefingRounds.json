@@ -16,6 +16,20 @@
       "minimum": 1
     },
     "query.limit:required": false,
+    "response:200:application/json.items[].reprocessState": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "queued",
+        "running",
+        "completed",
+        "failed",
+        null
+      ]
+    },
+    "response:200:application/json.items[].reprocessState:required": false,
     "response:200:application/json.nextCursor": {
       "type": [
         "string",
