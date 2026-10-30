@@ -150,12 +150,44 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
     }
 
     @Override
-    public int countJobToolCalls(String jobId, int attemptNo) {
+    public int countJobToolCalls(String jobId, int attemptNo, boolean web) {
         Integer count = jdbc.queryForObject("""
                 SELECT count(*) FROM chat_tool_calls
-                 WHERE chat_job_id = :id AND (attempt_no = :attempt OR status <> 'cancelled')
-                """, new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo), Integer.class);
+                 WHERE chat_job_id = :id
+                   AND (registry_group = 'web-search') = :web
+                   AND (:web OR attempt_no = :attempt OR status <> 'cancelled')
+                """, new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo).addValue("web", web),
+                Integer.class);
         return count == null ? 0 : count;
+    }
+
+    @Override
+    public String takeWebSearchQuota(String memberId, java.time.LocalDate day, int calls, int memberCap, int projectCap) {
+        var params = new MapSqlParameterSource().addValue("day", day).addValue("member", memberId)
+                .addValue("memberKey", "member:" + memberId).addValue("calls", calls)
+                .addValue("memberCap", memberCap).addValue("projectCap", projectCap);
+        jdbc.update("""
+                INSERT INTO chat_web_search_quotas (quota_date, subject_key, member_id, used)
+                VALUES (:day, 'project', NULL, 0), (:day, :memberKey, :member, 0)
+                ON CONFLICT (quota_date, subject_key) DO NOTHING
+                """, params);
+        // The project row first, then the member's: every caller locks them in the same order.
+        if (jdbc.update("""
+                UPDATE chat_web_search_quotas SET used = used + :calls
+                 WHERE quota_date = :day AND subject_key = 'project' AND used + :calls <= :projectCap
+                """, params) != 1) return "project";
+        if (jdbc.update("""
+                UPDATE chat_web_search_quotas SET used = used + :calls
+                 WHERE quota_date = :day AND subject_key = :memberKey AND used + :calls <= :memberCap
+                """, params) != 1) {
+            // Give the project's back: the caller refuses the reservation, and nothing may stay taken.
+            jdbc.update("""
+                    UPDATE chat_web_search_quotas SET used = used - :calls
+                     WHERE quota_date = :day AND subject_key = 'project'
+                    """, params);
+            return "member";
+        }
+        return null;
     }
 
     @Override

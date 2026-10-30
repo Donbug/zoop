@@ -770,13 +770,13 @@ class OrchestratedChatEngineTest {
         var original = generated.getFirst().branches().getFirst().results().getLast();
         var stale = new ChatToolResult(original.schemaVersion(), original.toolCallId(), original.capabilityId(),
                 "v0..stale", original.items(), original.evidenceIds(), original.truncated(), original.nextAllowed(),
-                null, original.paths(), original.provenance());
+                null, original.paths(), original.webResults(), original.provenance());
         var branch = new ChatBranchContext.Branch("r1", "비교", Set.of(ChatQueryType.Q05), false, List.of(stale), false);
         assertThrows(ChatModels.Failure.class, () -> ChatModels.ServerFacts.capture(verifiedRun, verifiedSections,
                 List.of(branch)));
         var unbound = new ChatToolResult(original.schemaVersion(), original.toolCallId(), original.capabilityId(),
                 original.dataVersion(), original.items(), original.evidenceIds(), original.truncated(), original.nextAllowed(),
-                null, original.paths(), null);
+                null, original.paths(), original.webResults(), null);
         var unboundBranch = new ChatBranchContext.Branch("r1", "비교", Set.of(ChatQueryType.Q05), false, List.of(unbound), false);
         assertThrows(ChatModels.Failure.class, () -> ChatModels.ServerFacts.capture(verifiedRun, verifiedSections,
                 List.of(unboundBranch)));

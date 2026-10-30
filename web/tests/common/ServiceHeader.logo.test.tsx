@@ -15,5 +15,7 @@ it('서비스 헤더와 간단 헤더의 로고는 ZOOP 한 단어다', () => {
   const logos = screen.getAllByRole('link', { name: 'ZOOP' });
   expect(logos).toHaveLength(2);
   for (const logo of logos) expect(logo.textContent).toBe('ZOOP');
+  expect(screen.getByRole('button', { name: 'AI 채팅' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'AI 기능' })).toBeNull();
   expect(screen.queryByText('줍')).toBeNull();
 });

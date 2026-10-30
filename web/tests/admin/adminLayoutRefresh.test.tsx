@@ -61,9 +61,37 @@ test('A-ADM-01~05 본문 건너뛰기와 일반 화면의 테마 전환을 연�
   expect(document.activeElement).toBe(skip);
   await user.keyboard('{Enter}');
   expect(document.activeElement).toBe(screen.getByRole('main'));
-  await user.click(screen.getByRole('button', { name: '화면 모드 전환' }));
+  await user.click(screen.getByRole('button', { name: '화면 테마 전환' }));
   expect(toggleTheme).toHaveBeenCalledOnce();
 });
+
+test('A-ADM-01~05 사이드바는 고정되고 너비를 키보드로 조절해요', async () => {
+  window.localStorage.removeItem('zoop:admin-sidebar-width');
+  const { user } = renderRoutes(
+    [
+      {
+        element: <AdminProtectedRoute />,
+        children: [
+          {
+            element: <AdminLayout />,
+            children: [{ path: '/admin/dashboard', element: <Content /> }],
+          },
+        ],
+      },
+    ],
+    '/admin/dashboard',
+  );
+  const sidebar = screen.getByRole('complementary');
+  const resizer = screen.getByRole('separator', { name: '사이드바 너비 조절' });
+  expect(sidebar.className).toContain('md:sticky');
+  expect(sidebar.className).toContain('md:h-dvh');
+  expect(resizer.getAttribute('aria-valuenow')).toBe('224');
+  resizer.focus();
+  await user.keyboard('{ArrowRight}');
+  expect(resizer.getAttribute('aria-valuenow')).toBe('240');
+  expect(window.localStorage.getItem('zoop:admin-sidebar-width')).toBe('240');
+});
+
 test('A-ADM-01~05 같은 경로에서 관리자가 바뀌면 이전 입력을 제거해요', async () => {
   const { user } = renderRoutes(
     [

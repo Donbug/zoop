@@ -213,12 +213,13 @@ it('lists holdings with their quote and picks one for the map', async () => {
   expect(onPick).toHaveBeenCalledWith('KRX:005930');
 });
 
-it('explains an empty portfolio and asks guests to log in', async () => {
+it('hides the holdings section when the portfolio has no positions', async () => {
   server.on('GET', '/api/v1/portfolio', () =>
     json({ connected: false, connection: null, holdings: [], mockAsOf: null }),
   );
   renderSidebar();
-  expect(await screen.findByText(/보유 종목이 없어요/)).toBeTruthy();
+  expect(await screen.findByRole('region', { name: '관심 종목' })).toBeTruthy();
+  expect(screen.queryByRole('region', { name: '보유 종목' })).toBeNull();
 });
 
 it('does not request the portfolio for a guest', () => {
