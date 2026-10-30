@@ -77,6 +77,8 @@ class AiUsagePostgresTest {
     @Test
     void aggregatesBriefingGenerationAndOutlookSeparately() throws Exception {
         Cookie admin = login();
+        long existingRequests=jdbc.queryForObject("SELECT count(*) FROM briefing_attempts WHERE purpose='generation' AND started_at>=clock_timestamp()-interval '24 hours'",Long.class);
+        long existingSucceeded=jdbc.queryForObject("SELECT count(*) FROM briefing_attempts WHERE purpose='generation' AND started_at>=clock_timestamp()-interval '24 hours' AND status='completed' AND stages->>'outcome'='available'",Long.class);
         seedBriefingUsage();
         boolean hasUnrecordedPublications = jdbc.queryForObject("""
                 SELECT EXISTS (SELECT 1 FROM briefing_rounds r
@@ -99,8 +101,8 @@ class AiUsagePostgresTest {
                     .andExpect(jsonPath("$.features[2].unavailableMetrics").isArray())
                     .andExpect(jsonPath("$.features[4].requests").doesNotExist());
         } else {
-            result.andExpect(jsonPath("$.features[2].requests").value(1))
-                    .andExpect(jsonPath("$.features[2].succeeded").value(1))
+            result.andExpect(jsonPath("$.features[2].requests").value((int)existingRequests+1))
+                    .andExpect(jsonPath("$.features[2].succeeded").value((int)existingSucceeded+1))
                     .andExpect(jsonPath("$.features[4].requests").value(1));
         }
     }
