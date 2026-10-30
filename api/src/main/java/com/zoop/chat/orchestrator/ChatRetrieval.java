@@ -202,12 +202,12 @@ final class ChatRetrieval {
 
     /**
      * The period a comparison compares with: the one the requirement's own words write ({@link ChatPeriods}), else the one
-     * the member selected with the question; empty for "the previous public graph".
+     * the member selected with the question, else the one the last answers used; empty for "the previous public graph".
      */
     static Optional<ChatPeriods.Period> period(ChatRun run, Planned p) {
         var written = ChatPeriods.parse(p.label(), run.askedAt());
-        if (written.isPresent() || run.context().period() == null) return written;
-        var selected = run.context().period();
+        if (written.isPresent() || run.period() == null) return written;
+        var selected = run.period();
         return Optional.of(new ChatPeriods.Period(LocalDate.parse(selected.start()), LocalDate.parse(selected.end()), null));
     }
 

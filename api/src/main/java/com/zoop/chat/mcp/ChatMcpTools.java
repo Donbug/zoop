@@ -337,7 +337,7 @@ public final class ChatMcpTools {
         }
         var selection = run.selection();
         List<String> scope = fixed || selection.evidenceIds().isEmpty() ? null : selection.evidencePool();
-        var period = run.context().period();
+        var period = run.period();
         var since = capability != ChatCapability.GRAPH_VERSION_DIFF || period == null ? null
                 : new ChatPeriods.Period(LocalDate.parse(period.start()), LocalDate.parse(period.end()), null)
                         .startInstant();
