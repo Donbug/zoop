@@ -1,6 +1,6 @@
 # AI 챗봇 Luna MCP 실행·복합 질의·화면 동작 계약
 
-기준일: 2026-10-28 / 상태: 2026-10-28 팀 결정 · 구현 예정 · 출시 검증 별도
+기준일: 2026-10-28 / 상태: 2026-10-28 팀 결정 · 구현 현황은 [챗봇 MCP 엔드포인트](../../api/docs/chat-mcp.md) · 출시 검증 별도
 
 상위 정책: [AI 거버넌스 v0.11](../ZOOP_AI_거버넌스_정책.md) / [설계 요약](ai-chatbot-design-summary.md) / [보조 웹 검색](ai-chatbot-web-search.md)
 
@@ -185,4 +185,4 @@ UI 동작은 DB 읽기 도구와 분리한다. 조회 결과의 유효한 ID를 
 
 동시 변경 대상은 planner capability·실행 봉투, Responses MCP 연결·서버 바인딩·승인 continuation, ChatResult·answerStatus/notices·citation/basis·UI action 계약, 감사 기록, 응답 검사·재열람 guard, 생성 명세·클라이언트, 화면·테스트다. 공개 job 접수·polling·resolves 수명주기는 유지한다. 미구현 계약을 OpenAPI 출력에만 먼저 추가하지 않는다.
 
-평가는 [고정 평가 세트의 다음 버전 항목](../development/ai-chatbot-eval-set.md)을 따른다. 독립 Luna coverage-verifier 계획은 3.1절로 대체한다. Responses MCP 실행·Java 승인 continuation·cache·direct 시작 경로·부분 응답은 모두 구현 예정이다. 공식 API 근거: [Luna 모델](https://developers.openai.com/api/docs/models/gpt-6-luna), [Responses MCP](https://developers.openai.com/api/docs/guides/tools-connectors-mcp)(2026-10-28 확인). 기존 Figma 보드는 이전 설계일 수 있으며 구현 전에 별도로 동기화한다.
+평가는 [고정 평가 세트의 다음 버전 항목](../development/ai-chatbot-eval-set.md)을 따른다. 독립 Luna coverage-verifier 계획은 3.1절로 대체한다. Responses MCP 실행·Java 승인 continuation·cache·direct 시작 경로·부분 응답은 구현됐고(2026-10-30, 기능 플래그 기본 꺼짐, 합성 replay로만 확인) live 확인이 남았다. 공식 API 근거: [Luna 모델](https://developers.openai.com/api/docs/models/gpt-6-luna), [Responses MCP](https://developers.openai.com/api/docs/guides/tools-connectors-mcp)(2026-10-28 확인). 기존 Figma 보드는 이전 설계일 수 있으며 구현 전에 별도로 동기화한다.
