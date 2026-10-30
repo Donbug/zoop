@@ -7,12 +7,12 @@
 ## 순서
 
 1. `/mcp`를 인터넷 전체가 아니라 승인된 HTTPS ingress로 노출하고 `zoop-ai-chat probe-mcp`가 endpoint의 `401 Bearer` challenge를 확인하는지 본다.
-2. `chat-agent` 목적과 실제 recipient를 가진 model-send grant, `zoop-graph` source, 별도 MCP HMAC 키를 격리 환경에 등록한다. 키·grant·질문·답변·URL은 spike evidence에 쓰지 않는다.
+2. `chat-agent` 목적과 실제 recipient를 가진 model-send grant, `zoop-graph` source, 별도 MCP HMAC 키를 격리 환경에 등록한다. 8-call 시나리오에는 `ZOOP_CHAT_WEB_ENABLED=true`, `ZOOP_CHAT_WEB_PROVIDER=synthetic`과 `web-search:<공급자>` source grant도 필요하다. 키·grant·질문·답변·URL은 spike evidence에 쓰지 않는다.
 3. 합성 기업·근거만 사용해 아래 네 시나리오를 각 5회 실행한다. 같은 실행을 자동 재전송하지 않으며 provider outcome이 unknown이면 그 run은 실패 증거로 남긴다.
 4. job의 `running` 시각부터 terminal DB commit 시각, 실제 tool/approval/provider 호출 수, provider usage와 청구·추정 비용을 원장에서 추출해 `zoop-chat-live-spike-1` JSON을 만든다.
 5. 보고서 gate를 실행한다. 모든 시나리오가 성공하고 각 job이 45초, 입력 24k, 최종 답변 2k(reasoning 제외)를 지켜야 한다.
 
-필수 시나리오는 `tools-1-rounds-1`, `tools-4-rounds-1`, `tools-4-rounds-3`, `tools-8-rounds-3`이다. 현재 내부 도구 상한은 6이고 웹 도구가 없으므로 8-call 시나리오는 아직 통과시킬 수 없다. 이 사실을 우회해 6회를 8회로 기록하지 않는다. 웹 2회 도구와 총 8회 예산이 구현되거나, 별도 정책 revision이 승인되기 전까지 live gate는 닫힌 상태가 맞다.
+필수 시나리오는 `tools-1-rounds-1`, `tools-4-rounds-1`, `tools-4-rounds-3`, `tools-8-rounds-3`이다. 8-call은 내부 6회와 웹 2회로 채운다. 예산과 웹 도구는 구현됐지만(2026-10-30) 이 시나리오를 실행해 확인하지는 않았다. 웹 검색은 개념만 있는 run이 아니면 앞 라운드의 승인된 내부 조회가 0건이거나 잘렸을 때만 승인되므로, 합성 대상과 질문을 그 조건에 맞춰야 한다. 호출 수는 Luna가 고르므로 정확히 8회가 된다는 보장이 없고, 완료 run은 시나리오와 정확히 같아야 한다. 실제 웹 공급자가 없어 합성 공급자로만 측정하며, 공급자가 정해지면 지연을 다시 잰다. 6회를 8회로 기록하지 않으며, 이 시나리오가 통과하거나 별도 정책 revision이 승인되기 전까지 live gate는 닫힌 상태가 맞다.
 
 ```sh
 python scripts/chat_live_spike_report.py /secure/operator/chat-live-spike.json \
