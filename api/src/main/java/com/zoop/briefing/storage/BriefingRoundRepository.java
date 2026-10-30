@@ -35,6 +35,10 @@ public class BriefingRoundRepository {
         this.jdbc = jdbc;
     }
 
+    public String feedbackVersion(String id) {
+        return jdbc.queryForObject("SELECT COALESCE(graph_version_id,'publication:'||payload_sha256) FROM briefing_rounds WHERE id=? AND published_at IS NOT NULL", String.class,id);
+    }
+
     public Optional<BriefingRound> find(LocalDate date, String edition) {
         return jdbc.query(ROUND + " WHERE round_date=? AND edition=?", rows, date, edition).stream().findFirst();
     }

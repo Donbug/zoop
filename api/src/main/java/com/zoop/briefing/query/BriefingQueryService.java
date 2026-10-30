@@ -275,6 +275,7 @@ public class BriefingQueryService {
         validateSnapshot(row);
         var payload = row.payload();
         var out = mapper.createObjectNode();
+        out.put("feedbackVersion", repository.feedbackVersion(row.id()));
         for (String field : List.of("id", "date", "edition", "scheduledAt", "generatedAt", "dataWindow", "graphVersion",
                 "items", "references", "emptyReason", "outlook", "metadata")) {
             out.set(field, payload.get(field).deepCopy());
@@ -398,9 +399,15 @@ public class BriefingQueryService {
         return out;
     }
 
+    /** Shared current-authority gate for public reads and feedback aggregates. Infrastructure failures propagate. */
+    public boolean isCurrentlyReadable(BriefingRound row, String requestId) {
+        return row.publishedAt() != null && "published".equals(row.status())
+                && (!BriefingReplayReadPolicy.marked(row) || replay.permits(row))
+                && access.mayRead(row, requestId);
+    }
+
     private void requireReadable(BriefingRound row, String requestId) {
-        if (BriefingReplayReadPolicy.marked(row) && !replay.permits(row)) unavailable();
-        if (!"published".equals(row.status()) || !access.mayRead(row, requestId)) unavailable();
+        if (!isCurrentlyReadable(row, requestId)) unavailable();
     }
 
     private static void graphUnavailable(ObjectNode out, String reason) {
