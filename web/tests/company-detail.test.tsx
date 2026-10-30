@@ -331,6 +331,38 @@ function open(query = '') {
 }
 const pinned = `?asOf=${encodeURIComponent(time)}&graphVersion=v1`;
 
+test('D-COM-01 48 normalizes a missing tab and announces the prototype notice', async () => {
+  open(`${pinned}&tab=gone&depth=2`);
+  await screen.findByText('요청한 탭이 없어 사건 탭을 보여 드려요');
+  expect(screen.getByTestId('address').textContent).not.toContain('tab=gone');
+  expect(screen.getByTestId('address').textContent).toContain('depth=2');
+});
+
+test('D-COM-01 48 clears a missing event without changing pinned graph time', async () => {
+  server.on('GET', '/api/v1/events/:id', () =>
+    apiError(404, 'RESOURCE_NOT_FOUND'),
+  );
+  open(`${pinned}&event=gone&graphAsOf=${encodeURIComponent(old)}`);
+  await screen.findByText('선택했던 사건을 지금은 볼 수 없어 선택을 풀었어요');
+  await waitFor(() =>
+    expect(screen.getByTestId('address').textContent).not.toContain(
+      'event=gone',
+    ),
+  );
+  const address = screen.getByTestId('address').textContent!;
+  expect(address).not.toContain('event=gone');
+  expect(
+    new URL(address, 'http://localhost').searchParams.get('graphAsOf'),
+  ).toBe(old);
+});
+
+test('D-COM-01 48 does not clear an event when the list fails', async () => {
+  server.on('GET', '/api/v1/events', () => apiError(503, 'SOURCE_UNAVAILABLE'));
+  open(`${pinned}&event=issue-a`);
+  await screen.findByText(/타임라인 조회 실패/);
+  expect(screen.getByTestId('address').textContent).toContain('event=issue-a');
+});
+
 test.each(['events', 'documents', 'info'])(
   'D-COM-01 F4 keeps one main and the skip-link target on the %s tab',
   async (tab) => {

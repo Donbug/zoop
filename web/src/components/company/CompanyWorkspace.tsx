@@ -15,6 +15,7 @@ import CompanyLogo from '@/components/common/CompanyLogo';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { getCompanyMetrics } from '@/apis/graph/companies';
+import { BRIEFING_DISCLAIMER } from '@/components/briefing/briefingCorrections';
 import {
   Link,
   useLocation,
@@ -478,6 +479,53 @@ export default function CompanyWorkspace() {
   const tab = ['events', 'documents', 'info'].includes(params.get('tab') ?? '')
     ? params.get('tab')!
     : 'events';
+  // D-COM-01 48: preserve prototype route notices instead of silently changing selection.
+  const unknownTab =
+    params.has('tab') &&
+    !['events', 'documents', 'info'].includes(params.get('tab')!);
+  const [routeNotice, setRouteNotice] = useState<{
+    companyId: string;
+    messages: string[];
+  } | null>(null);
+  const normalizeRoute = useEffectEvent(() => {
+    const gone = !!eventId && event.errorStatus === 404;
+    const outside =
+      !!eventId &&
+      !!event.data &&
+      !!events.data &&
+      !events.loading &&
+      ![...events.data.items, ...events.data.unknownTimeItems].some(
+        (item) => item.id === eventId,
+      );
+    if (!unknownTab && !gone && !outside) return;
+    const messages = [];
+    if (unknownTab) messages.push('요청한 탭이 없어 사건 탭을 보여 드려요');
+    if (gone || outside)
+      messages.push(
+        gone
+          ? '선택했던 사건을 지금은 볼 수 없어 선택을 풀었어요'
+          : '선택했던 사건이 이 기간에 없어 선택을 풀었어요',
+      );
+    setRouteNotice({ companyId: id, messages });
+    updateQuery(
+      {
+        ...(unknownTab ? { tab: null } : {}),
+        ...(gone || outside ? { event: null, bucket: null } : {}),
+      },
+      { replace: true },
+    );
+  });
+  useEffect(() => {
+    normalizeRoute();
+  }, [
+    id,
+    unknownTab,
+    eventId,
+    event.errorStatus,
+    event.data,
+    events.data,
+    events.loading,
+  ]);
   const groups = new Map<string, Events['items']>();
   for (const item of events.data?.items ?? []) {
     const key = bucketKey(item, period);
@@ -623,6 +671,13 @@ export default function CompanyWorkspace() {
         />
       )}
       <div className="min-w-0 rounded-2xl bg-white p-6 shadow-sm max-md:p-4">
+        {routeNotice?.companyId === id && (
+          <div role="status">
+            {routeNotice.messages.map((message) => (
+              <p key={message}>{message}</p>
+            ))}
+          </div>
+        )}
         {versionOnly && (company.loading || versionStart) && (
           <p role="status" className="mb-4 text-[13px] text-zoop-muted">
             그래프 버전({version})이 처음 공개된 시점을 확인하고 있어요.
@@ -1241,9 +1296,7 @@ export default function CompanyWorkspace() {
             )}
           </section>
         )}
-        <p className="text-xs text-zoop-muted">
-          본 정보는 참고용이며 투자 권유가 아니에요.
-        </p>
+        <p className="text-xs text-zoop-muted">{BRIEFING_DISCLAIMER}</p>
       </div>
       {/* D-COM-04: 넓은 화면은 와이어프레임처럼 오른쪽 열에 두고 스크롤해도 화면 안에 남는다.
           1000px 이하에서는 본문 아래로 옮겨 넓게 본다. */}
