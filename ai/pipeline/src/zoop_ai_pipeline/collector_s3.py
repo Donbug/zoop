@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from threading import Lock
 
 from .collector_checkpoint import CheckpointError
 
@@ -20,12 +21,31 @@ def parse_uri(uri: str) -> tuple[str, str]:
 
 
 class S3Store:
-    def __init__(self, bucket: str, *, client=None):
+    def __init__(self, bucket: str, *, client_options: dict | None = None):
+        self.bucket = bucket
+        self._options = dict(client_options or {})
+        self._connection = None
+        self._client_lock = Lock()
+
+    @property
+    def _client(self):
+        # Defer credential discovery until after spawn has consumed its arguments; it may perform network I/O.
         import boto3
         from botocore.config import Config
-        self.bucket = bucket
-        self._client = client or boto3.client("s3", config=Config(
-            retries={"max_attempts": 4, "mode": "standard"}, connect_timeout=5, read_timeout=30))
+        with self._client_lock:
+            if self._connection is None:
+                options = dict(self._options)
+                options.setdefault("config", Config(
+                    retries={"max_attempts": 4, "mode": "standard"}, connect_timeout=5, read_timeout=30))
+                self._connection = boto3.client("s3", **options)
+        return self._connection
+
+    def __getstate__(self):
+        # Botocore clients/sockets cannot cross process boundaries.
+        return self.bucket, self._options
+
+    def __setstate__(self, state):
+        self.__init__(state[0], client_options=state[1])
 
     @staticmethod
     def _missing(error) -> bool:
@@ -51,6 +71,17 @@ class S3Store:
 
     def put_bytes(self, key: str, data: bytes) -> None:
         self._call(self._client.put_object, Bucket=self.bucket, Key=key, Body=data)
+
+    def put_pointer(self, key: str, data: bytes) -> None:
+        """Dispatch latest exactly once; a lost response requires operator reconciliation."""
+        import boto3
+        from botocore.config import Config
+        options = {**self._options, "config": self._client.meta.config.merge(Config(retries={"total_max_attempts": 1}))}
+        client = boto3.client("s3", **options)
+        try:
+            self._call(client.put_object, Bucket=self.bucket, Key=key, Body=data)
+        finally:
+            client.close()
 
     def get_bytes(self, key: str) -> bytes | None:
         from botocore.exceptions import ClientError

@@ -2,20 +2,23 @@
 
 `capture` runs only at a quiescent point (every path paused at a request boundary or exited), copies each state tree
 into a staging directory and returns the file table. `publish` uploads a staged checkpoint and moves the `latest`
-pointer last. `restore` verifies every byte before a state tree appears under its final name. The object store is
-any object with the five methods used here; production uses `collector_s3.S3Store`.
+pointer last. `restore` verifies every byte before a state tree appears under its final name. Stores must be
+spawn-serializable; production uses `collector_s3.S3Store`, which opens fresh clients in each process.
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import multiprocessing
 import os
 import re
 import shutil
+import signal
 import sqlite3
 import stat
 import time
 import uuid
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -35,6 +38,7 @@ class CheckpointError(Exception):
     def __init__(self, code: str, detail: str = ""):
         super().__init__(f"{code}: {detail}" if detail else code)
         self.code = code
+        self.detail = detail
 
 
 def utc_now() -> str:
@@ -261,15 +265,87 @@ def _deadline_check(deadline: float | None) -> None:
         raise CheckpointError("deadline_exceeded")
 
 
-def publish(store, prefix: str, staging: Path, manifest: dict, previous: dict | None, *, deadline: float | None = None,
-            workers: int = 8) -> dict:
-    """Upload and verify every file, write MANIFEST.json, then overwrite the latest pointer. Returns the pointer."""
+
+def _child_operation(connection, operation, args) -> None:
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    try:
+        result = operation(*args)
+        connection.send(("ok", result))
+    except CheckpointError as exc:
+        connection.send(("error", exc.code, exc.detail))
+    except Exception as exc:
+        connection.send(("error", "checkpoint_operation_failed", type(exc).__name__))
+    finally:
+        connection.close()
+
+
+def run_bounded(operation, args: tuple, *, deadline: float | None = None,
+                cancelled: Callable[[], bool] | None = None, pointer_key: str | None = None):
+    """Run snapshot/store work in a killable process, including its threads and client cleanup in the budget.
+
+    Cancellation is checked every 20 ms. A quarter of the remaining budget (at most one second) is reserved
+    for killing/reaping. Once a pointer writer is dispatched, any lost confirmation is a remote-commit unknown.
+    """
+    def check():
+        if cancelled is not None and cancelled():
+            raise CheckpointError("controller_stopping")
+        _deadline_check(io_deadline)
+
+    now = time.monotonic()
+    io_deadline = None if deadline is None else deadline - min(1.0, max(0, deadline - now) / 4)
+    check()
+    context = multiprocessing.get_context("spawn")
+    reader, writer = context.Pipe(duplex=False)
+    process = context.Process(target=_child_operation, args=(writer, operation, args))
+    started = False
+    try:
+        check()
+        process.start()
+        started = True
+        writer.close()
+        while not reader.poll(0.02):
+            check()
+            if not process.is_alive():
+                raise CheckpointError("checkpoint_process_failed", str(process.exitcode))
+        outcome = reader.recv()
+        while process.is_alive():
+            check()
+            process.join(0.02)
+        check()
+        if outcome[0] == "error":
+            raise CheckpointError(outcome[1], outcome[2])
+        if process.exitcode != 0:
+            raise CheckpointError("checkpoint_process_failed", str(process.exitcode))
+        return outcome[1]
+    except (CheckpointError, EOFError) as exc:
+        if started and pointer_key is not None:
+            cause = exc.code if isinstance(exc, CheckpointError) else "checkpoint_process_failed"
+            detail = exc.detail if isinstance(exc, CheckpointError) else ""
+            raise CheckpointError("remote_commit_unknown", json.dumps({
+                "manifestKey": pointer_key, "cause": cause, "detail": detail})) from None
+        if isinstance(exc, EOFError):
+            raise CheckpointError("checkpoint_process_failed") from None
+        raise
+    finally:
+        writer.close()
+        reader.close()
+        if started:
+            if process.is_alive():
+                process.kill()
+            remaining = 1.0 if deadline is None else max(0, deadline - time.monotonic())
+            process.join(remaining)
+            if process.is_alive():
+                raise CheckpointError("checkpoint_cleanup_timeout", pointer_key or "")
+        process.close()
+
+
+def _publish_files(store, prefix: str, staging: Path, manifest: dict, previous: dict | None, workers: int) -> dict:
     base = checkpoint_base(prefix, manifest["seq"], manifest["checkpointId"])
     earlier = ({entry["path"]: entry for entry in previous["files"]} if previous else {})
     earlier_base = (checkpoint_base(prefix, previous["seq"], previous["checkpointId"]) if previous else "")
 
     def transfer(entry: dict) -> None:
-        _deadline_check(deadline)
+        # The supervising process bounds the complete call, including SDK retries and executor shutdown.
         key = f"{base}/{entry['path']}"
         before = earlier.get(entry["path"])
         if before is not None and before["sha256"] == entry["sha256"] and before["bytes"] == entry["bytes"]:
@@ -282,7 +358,6 @@ def publish(store, prefix: str, staging: Path, manifest: dict, previous: dict | 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for future in [pool.submit(transfer, entry) for entry in manifest["files"]]:
             future.result()
-    _deadline_check(deadline)
     encoded = encode_manifest(manifest)
     manifest_key = f"{base}/{MANIFEST_NAME}"
     store.put_bytes(manifest_key, encoded)
@@ -291,8 +366,20 @@ def publish(store, prefix: str, staging: Path, manifest: dict, previous: dict | 
     pointer = {"schemaVersion": LATEST_SCHEMA, "runId": manifest["runId"], "seq": manifest["seq"],
                "checkpointId": manifest["checkpointId"], "manifestKey": manifest_key,
                "manifestSha256": hashlib.sha256(encoded).hexdigest(), "updatedAt": utc_now()}
-    _deadline_check(deadline)
-    store.put_bytes(f"{prefix}/{LATEST_NAME}", (json.dumps(pointer, sort_keys=True, indent=2) + "\n").encode())
+    return pointer
+
+
+def _publish_pointer(store, key: str, pointer: dict) -> None:
+    store.put_pointer(key, (json.dumps(pointer, sort_keys=True, indent=2) + "\n").encode())
+
+
+def publish(store, prefix: str, staging: Path, manifest: dict, previous: dict | None, *, deadline: float | None = None,
+            workers: int = 8, cancelled: Callable[[], bool] | None = None) -> dict:
+    """Verify immutable objects before dispatching a separately bounded, single-attempt latest-pointer write."""
+    pointer = run_bounded(_publish_files, (store, prefix, staging, manifest, previous, workers),
+                          deadline=deadline, cancelled=cancelled)
+    run_bounded(_publish_pointer, (store, f"{prefix}/{LATEST_NAME}", pointer),
+                deadline=deadline, cancelled=cancelled, pointer_key=pointer["manifestKey"])
     return pointer
 
 

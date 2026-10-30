@@ -1,11 +1,14 @@
 """Container collector: consistent checkpoints, manifest verification, restore, cooperative stop and SIGTERM shutdown."""
 import hashlib
 import json
+import multiprocessing
+import shutil
 import os
 import signal
 import sqlite3
 import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -18,13 +21,22 @@ from zoop_ai_pipeline import collector_runtime as rt
 from zoop_ai_pipeline import private_intake as intake
 from zoop_ai_pipeline.collector_control import NO_CONTROL, Control, PipeControl
 from zoop_ai_pipeline.news_sources import descriptor, surface
+from zoop_ai_pipeline.collector_s3 import S3Store
+
+
+@pytest.fixture(scope="module", autouse=True)
+def shared_store():
+    global _store_manager
+    with multiprocessing.get_context("spawn").Manager() as manager:
+        _store_manager = manager
+        yield
 
 
 class FakeStore:
-    """The object-store interface used by the collector, held in memory; `calls` records write order."""
+    """Process-shared object store; `calls` records completed write order."""
 
     def __init__(self):
-        self.objects, self.calls, self.lock = {}, [], threading.Lock()
+        self.objects, self.calls, self.lock = _store_manager.dict(), _store_manager.list(), _store_manager.Lock()
 
     def put_file(self, key, path, *, sha256):
         with self.lock:
@@ -41,6 +53,8 @@ class FakeStore:
             self.objects[key] = (data, None)
             self.calls.append(("put", key))
 
+    put_pointer = put_bytes
+
     def get_bytes(self, key):
         item = self.objects.get(key)
         return None if item is None else item[0]
@@ -53,6 +67,108 @@ class FakeStore:
     def head(self, key):
         item = self.objects.get(key)
         return None if item is None else (len(item[0]), item[1])
+
+
+class UnsignedStore(S3Store):
+    """Reconstruct the SDK's non-pickleable UNSIGNED sentinel inside each process."""
+
+    def __init__(self, endpoint, read_timeout):
+        from botocore import UNSIGNED
+        from botocore.config import Config
+        self.endpoint, self.read_timeout = endpoint, read_timeout
+        super().__init__("bucket", client_options={
+            "endpoint_url": endpoint, "region_name": "us-east-1",
+            "config": Config(signature_version=UNSIGNED, proxies={}, read_timeout=read_timeout,
+                             request_checksum_calculation="when_required", retries={"total_max_attempts": 5})})
+
+    def __getstate__(self):
+        return self.endpoint, self.read_timeout
+
+    def __setstate__(self, state):
+        self.__init__(*state)
+
+
+class ObjectServer:
+    """Loopback S3 protocol fixture; a blocked response outlives the publishing client."""
+
+    def __init__(self):
+        self.store = FakeStore()
+        self.block = None
+        self.before = None
+        self.retry_key = None
+        self.trickle = False
+        self.entered, self.release = threading.Event(), threading.Event()
+        self.requests = []
+        owner = self
+
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def handle_object(self):
+                key = self.path.removeprefix("/bucket/")
+                owner.requests.append((self.command, key, time.monotonic()))
+                if owner.before:
+                    owner.before(self.command, key)
+                data = b""
+                if self.command == "PUT":
+                    data = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                    source = self.headers.get("x-amz-copy-source")
+                    metadata = self.headers.get("x-amz-meta-sha256")
+                    if source:
+                        data = owner.store.objects[source.removeprefix("bucket/").removeprefix("/bucket/")][0]
+                    owner.store.objects[key] = (data, metadata)
+                    if source:
+                        data = b'<CopyObjectResult><ETag>"copied"</ETag><LastModified>2026-10-30T00:00:00Z</LastModified></CopyObjectResult>'
+                    else:
+                        data = b""
+                elif key in owner.store.objects:
+                    data = owner.store.objects[key][0]
+                if owner.block and owner.block(self.command, key):
+                    owner.entered.set()
+                    owner.release.wait(8)
+                status = 200 if key in owner.store.objects else 404
+                if key == owner.retry_key:
+                    status, data = 503, b"<Error><Code>SlowDown</Code></Error>"
+                self.send_response(status)
+                self.send_header("Content-Length", str(len(data)))
+                if key in owner.store.objects:
+                    metadata = owner.store.objects[key][1]
+                    if metadata:
+                        self.send_header("x-amz-meta-sha256", metadata)
+                self.send_header("ETag", '"fixture"')
+                self.end_headers()
+                if self.command != "HEAD":
+                    try:
+                        if owner.trickle and key.endswith("MANIFEST.json"):
+                            for byte in data:
+                                self.wfile.write(bytes([byte]))
+                                self.wfile.flush()
+                                time.sleep(0.02)
+                        else:
+                            self.wfile.write(data)
+                    except (BrokenPipeError, ConnectionResetError):
+                        pass
+
+            do_GET = do_HEAD = do_PUT = handle_object
+
+            def log_message(self, *args):
+                pass
+
+        class Server(ThreadingHTTPServer):
+            request_queue_size = 64
+
+        self.server = Server(("127.0.0.1", 0), Handler)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+    def client(self, read_timeout=30):
+        return UnsignedStore(f"http://127.0.0.1:{self.server.server_port}", read_timeout)
+
+    def close(self):
+        self.release.set()
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(1)
 
 
 def sha(data):
@@ -151,7 +267,7 @@ def test_manifest_is_written_after_every_file_and_the_pointer_last(tmp_path):
 def test_unchanged_files_are_copied_server_side_from_the_previous_checkpoint(tmp_path):
     store = FakeStore()
     first, _ = checkpoint_once(tmp_path, store, seq=1)
-    store.calls.clear()
+    store.calls[:] = []
     # Same bytes in a second checkpoint: every file is reused; the SQLite backup may legitimately differ.
     staging = tmp_path / "again"
     second_tables = cp.capture({"private": tmp_path / "state1" / "private"}, staging)
@@ -373,7 +489,6 @@ def test_restore_on_start_continues_without_refetching_settled_articles(tmp_path
         sigterm_when(lambda: site.hits("/article/1") >= 1)
         assert rt.run(env, store_factory=lambda bucket: store) == rt.EXIT_OK
         first = latest_manifest(store)
-        import shutil
         shutil.rmtree(tmp_path / "state")
         assert rt.run(env, store_factory=lambda bucket: store) == rt.EXIT_OK
         second = latest_manifest(store)
@@ -403,6 +518,17 @@ def test_drain_deadline_kills_the_worker_marks_it_unknown_and_still_checkpoints(
         cp.restore(store, "pfx/runs/run-1", "run-1", restored)
         state = json.loads((restored / "private" / "STATE.json").read_bytes())["state"]
         assert state["pendingRequest"] is None and state["unknownRequests"] >= 1
+        before = {i: site.hits(f"/article/{i}") for i in range(4)}
+        unknown_before = state["unknownRequests"]
+        shutil.rmtree(tmp_path / "state")
+        for i in range(4):
+            site.route(f"/article/{i}", article("2026-07-27"))
+        assert rt.run(env, store_factory=lambda bucket: store) == rt.EXIT_OK
+        resumed = json.loads((tmp_path / "state" / "private" / "STATE.json").read_bytes())["state"]
+        assert resumed["unknownRequests"] == unknown_before and resumed["pendingRequest"] is None
+        assert resumed["blocked"] == ["127.0.0.1"]
+        assert {i: site.hits(f"/article/{i}") for i in range(4)} == before
+        assert sum(before.values()) == 1
     finally:
         site.close()
 
@@ -422,11 +548,138 @@ def test_sigterm_while_a_checkpoint_waits_for_a_busy_worker_still_drains_on_time
         site.close()
 
 
-def test_external_checkpoint_request_is_served_by_the_live_controller(tmp_path):
+def test_sigterm_during_upload_stops_admission_and_bounds_exit(tmp_path):
+    site, objects = LocalSite(), ObjectServer()
+    try:
+        values = paged_values(tmp_path, site, count=30, delay=0.2)
+        env = controller_env(tmp_path, values, ZOOP_COLLECTOR_CHECKPOINT_INTERVAL_SECONDS="1",
+                             ZOOP_COLLECTOR_DRAIN_SECONDS="1", ZOOP_COLLECTOR_RECOVER_SECONDS="1",
+                             ZOOP_COLLECTOR_FINAL_SECONDS="2", ZOOP_COLLECTOR_RESERVE_SECONDS="1",
+                             ZOOP_COLLECTOR_STOP_TIMEOUT_SECONDS="5")
+        objects.block = lambda method, key: method == "PUT" and "/private/" in key
+        observed = {}
+
+        def stop_during_upload():
+            if objects.entered.wait(15):
+                observed["sent"] = time.monotonic()
+                observed["admitted"] = sum(site.hits(f"/article/{i}") for i in range(30))
+                os.kill(os.getpid(), signal.SIGTERM)
+
+        watcher = threading.Thread(target=stop_during_upload, daemon=True)
+        watcher.start()
+        code = rt.run(env, store_factory=lambda bucket: objects.client())
+        watcher.join(1)
+        assert "sent" in observed
+        elapsed = time.monotonic() - observed["sent"]
+        admitted = sum(site.hits(f"/article/{i}") for i in range(30))
+        assert admitted <= observed["admitted"] + 1, (observed, admitted, elapsed)
+        assert code == rt.EXIT_CHECKPOINT and elapsed < 5, (code, elapsed)
+        print(json.dumps({"proof": "sigterm-during-upload", "seconds": elapsed,
+                          "admittedAtSignal": observed["admitted"], "admittedAtExit": admitted, "exit": code}))
+        objects.release.set()
+        time.sleep(0.3)
+        assert not [key for method, key, _ in objects.requests if method == "PUT" and key.endswith("latest.json")]
+        assert len(multiprocessing.active_children()) == 1  # Only the fixture's shared-store manager remains.
+    finally:
+        objects.close()
+        site.close()
+
+
+@pytest.mark.parametrize("fault", ["stalled-put", "retry", "trickle-body"])
+def test_whole_publish_deadline_preserves_previous_latest(tmp_path, fault):
+    objects = ObjectServer()
+    try:
+        store = objects.client(read_timeout=1.2 if fault == "trickle-body" else 30)
+        first, pointer = checkpoint_once(tmp_path, store)
+        prior = store.get_bytes("pfx/runs/run-1/latest.json")
+        staging = tmp_path / "late"
+        (staging / "private").mkdir(parents=True)
+        (staging / "private" / "first").write_bytes(b"first")
+        (staging / "private" / "last").write_bytes(b"last")
+        tables = {"dirs": ["private"], "sqlite": [], "files": [
+            {"path": f"private/{name}", "bytes": len(data), "sha256": sha(data), "kind": "file"}
+            for name, data in (("first", b"first"), ("last", b"last"))]}
+        second = cp.build_manifest(run_id="run-1", checkpoint_id="bbbbbbbbbbbb", seq=2, kind="final",
+                                   tables=tables, paths=[], unknown=0, previous=pointer, image={})
+        base = cp.checkpoint_base("pfx/runs/run-1", 2, second["checkpointId"])
+        started = time.monotonic()
+        deadline = started + 2
+
+        def delay_first_head(method, key):
+            if method == "HEAD" and key == f"{base}/private/first":
+                time.sleep(max(0, started + 1 - time.monotonic()))
+
+        objects.before = delay_first_head
+        if fault == "stalled-put":
+            objects.block = lambda method, key: method == "PUT" and key == f"{base}/private/last"
+        elif fault == "retry":
+            objects.retry_key = f"{base}/private/last"
+        else:
+            objects.trickle = True
+        with pytest.raises(cp.CheckpointError, match="deadline_exceeded"):
+            cp.publish(store, "pfx/runs/run-1", staging, second, first, deadline=deadline, workers=1)
+        elapsed = time.monotonic() - started
+        last_start = next(at for method, key, at in objects.requests if method == "PUT" and key == f"{base}/private/last")
+        assert 0.9 <= last_start - started < 1.5
+        assert elapsed < 2
+        objects.release.set()
+        objects.trickle = False
+        requests_at_return = len(objects.requests)
+        time.sleep(0.4)
+        assert len(objects.requests) == requests_at_return
+        assert store.get_bytes("pfx/runs/run-1/latest.json") == prior
+        restored = tmp_path / "restored"
+        restored.mkdir()
+        manifest = cp.restore(store, "pfx/runs/run-1", "run-1", restored)
+        assert manifest["checkpointId"] == first["checkpointId"] and manifest["unknownOutcomes"] == 2
+        assert cp.count_unknown("private", restored) == 2
+        assert len(multiprocessing.active_children()) == 1
+        print(json.dumps({"proof": fault, "seconds": elapsed, "lastTransferStartSeconds": last_start - started,
+                          "deadlineSeconds": 2, "restoredUnknown": 2}))
+    finally:
+        objects.close()
+
+
+@pytest.mark.parametrize("interrupt", ["deadline", "sigterm", "read-timeout"])
+def test_accepted_latest_with_lost_response_is_unknown_and_never_retried(tmp_path, interrupt):
+    site, objects = LocalSite(), ObjectServer()
+    try:
+        values = paged_values(tmp_path, site, count=12 if interrupt == "sigterm" else 1, delay=0.2)
+        env = controller_env(tmp_path, values, ZOOP_COLLECTOR_CHECKPOINT_INTERVAL_SECONDS="1" if interrupt == "sigterm" else "0",
+                             ZOOP_COLLECTOR_DRAIN_SECONDS="1", ZOOP_COLLECTOR_RECOVER_SECONDS="1",
+                             ZOOP_COLLECTOR_FINAL_SECONDS="3", ZOOP_COLLECTOR_RESERVE_SECONDS="1",
+                             ZOOP_COLLECTOR_STOP_TIMEOUT_SECONDS="6")
+        objects.block = lambda method, key: method == "PUT" and key.endswith("latest.json")
+        if interrupt == "sigterm":
+            sigterm_when(objects.entered.is_set)
+        started = time.monotonic()
+        code = rt.run(env, store_factory=lambda bucket: objects.client(read_timeout=0.1 if interrupt == "read-timeout" else 30))
+        elapsed = time.monotonic() - started
+        assert objects.entered.is_set() and code == rt.EXIT_CHECKPOINT
+        status = json.loads((tmp_path / "state" / "control" / "status.json").read_bytes())
+        assert status["publicationUnknown"]["manifestKey"].endswith("/MANIFEST.json")
+        assert status["phase"] == "stopped"
+        accepted = json.loads(objects.store.get_bytes("pfx/runs/run-1/latest.json"))
+        assert accepted["manifestKey"] == status["publicationUnknown"]["manifestKey"]
+        objects.release.set()
+        time.sleep(0.4)
+        puts = [key for method, key, _ in objects.requests if method == "PUT" and key.endswith("latest.json")]
+        assert len(puts) == 1 and elapsed < 6
+        assert len(multiprocessing.active_children()) == 1
+        print(json.dumps({"proof": f"accepted-latest-{interrupt}", "seconds": elapsed, "exit": code,
+                          "latestPuts": len(puts), "unknown": status["publicationUnknown"]}))
+    finally:
+        objects.close()
+        site.close()
+
+
+@pytest.mark.parametrize("kind", ["requested", "periodic"])
+def test_periodic_and_external_checkpoint_is_served_by_the_live_controller(tmp_path, kind):
     site = LocalSite()
     try:
         values = paged_values(tmp_path, site, count=10, delay=0.3)
-        env, store = controller_env(tmp_path, values), FakeStore()
+        env = controller_env(tmp_path, values, ZOOP_COLLECTOR_CHECKPOINT_INTERVAL_SECONDS="1" if kind == "periodic" else "0")
+        store = FakeStore()
         os.environ.update({key: env[key] for key in ("ZOOP_COLLECTOR_STATE_ROOT", "ZOOP_COLLECTOR_CONFIG_DIR")})
         outcome = []
 
@@ -434,7 +687,14 @@ def test_external_checkpoint_request_is_served_by_the_live_controller(tmp_path):
             deadline = time.monotonic() + 30
             while time.monotonic() < deadline and not (tmp_path / "state" / "control" / "status.json").exists():
                 time.sleep(0.05)
-            outcome.append(cli._checkpoint(60))
+            if kind == "requested":
+                outcome.append(cli._checkpoint(60))
+            else:
+                while time.monotonic() < deadline:
+                    status = json.loads((tmp_path / "state" / "control" / "status.json").read_bytes())
+                    if status["lastCheckpoint"] is not None:
+                        break
+                    time.sleep(0.05)
             os.kill(os.getpid(), signal.SIGTERM)
 
         threading.Thread(target=client, daemon=True).start()
@@ -443,10 +703,10 @@ def test_external_checkpoint_request_is_served_by_the_live_controller(tmp_path):
         finally:
             os.environ.pop("ZOOP_COLLECTOR_STATE_ROOT")
             os.environ.pop("ZOOP_COLLECTOR_CONFIG_DIR")
-        assert outcome == [rt.EXIT_OK]
+        assert outcome == ([rt.EXIT_OK] if kind == "requested" else [])
         first = [key for key in store.objects if key.endswith("MANIFEST.json") and "/000001-" in key]
         kinds = [json.loads(store.objects[key][0])["kind"] for key in first]
-        assert kinds == ["requested"]
+        assert kinds == [kind] and latest_manifest(store)["kind"] == "final"
     finally:
         site.close()
 

@@ -310,20 +310,17 @@ class Worker:
         except (ProcessLookupError, PermissionError):
             pass
 
-    def stop(self) -> None:
-        self.send("STOP")
-        self.signal_group(signal.SIGTERM)
-
     def kill(self) -> None:
         self.killed = True
         self.signal_group(signal.SIGKILL)
 
     def reap(self, timeout: float) -> int | None:
+        deadline = time.monotonic() + timeout
         try:
-            code = self.process.wait(timeout)
+            code = self.process.wait(max(0, deadline - time.monotonic()))
         except subprocess.TimeoutExpired:
             return None
-        self._reader.join(1)
+        self._reader.join(max(0, deadline - time.monotonic()))
         self.poll()
         return code
 
@@ -344,6 +341,7 @@ class Controller:
         self.lock_fd: int | None = None
         self.started = cp.utc_now()
         self.shutdown: dict[str, str] = {}
+        self.publication_unknown: dict | None = None
 
     # -- lifecycle ---------------------------------------------------------------------------------
 
@@ -366,6 +364,9 @@ class Controller:
     def on_signal(self, number, _frame) -> None:
         if self.stop_at is None:
             self.stop_at = time.monotonic()
+            # Signals stop admission even while the controller is waiting on snapshot/upload I/O.
+            for worker in self.workers.values():
+                worker.signal_group(signal.SIGTERM)
             log("stop_requested", signal=signal.Signals(number).name)
         self.wake.set()
 
@@ -412,8 +413,9 @@ class Controller:
             if all(worker.poll() is not None or nonce in worker.acked for worker in waiting):
                 return
             time.sleep(0.05)
-        for worker in waiting:
-            worker.send("RESUME")
+        if self.stop_at is None:
+            for worker in waiting:
+                worker.send("RESUME")
         if self.stop_at is not None:
             raise cp.CheckpointError("controller_stopping")
         raise cp.CheckpointError("pause_timeout", f"{timeout:g}s")
@@ -423,17 +425,19 @@ class Controller:
         staging = self.settings.staging_dir / f"{seq:06d}-{identifier}"
         quiescent = kind == "final"
         started = time.monotonic()
+        stopping = self.stop_at
+        cancelled = lambda: self.stop_at != stopping
         if not quiescent:
             if self.stop_at is not None:
                 raise cp.CheckpointError("controller_stopping")
             self.pause_all(self.settings.pause_timeout)
         try:
-            tables = cp.capture(self.state_dirs(), staging)
+            tables = cp.run_bounded(cp.capture, (self.state_dirs(), staging), deadline=deadline, cancelled=cancelled)
         except BaseException:
             shutil.rmtree(staging, ignore_errors=True)
             raise
         finally:
-            if not quiescent:
+            if not quiescent and self.stop_at is None:
                 for worker in self.live():
                     worker.send("RESUME")
         paused = time.monotonic() - started
@@ -448,7 +452,7 @@ class Controller:
             manifest = cp.build_manifest(run_id=self.settings.run_id, checkpoint_id=identifier, seq=seq, kind=kind, tables=tables,
                                          paths=paths, unknown=sum(item["unknownOutcomes"] for item in paths), previous=previous,
                                          image=self.settings.image)
-            pointer = cp.publish(self.store, self.prefix, staging, manifest, self.previous, deadline=deadline)
+            pointer = cp.publish(self.store, self.prefix, staging, manifest, self.previous, deadline=deadline, cancelled=cancelled)
         finally:
             shutil.rmtree(staging, ignore_errors=True)
         self.seq, self.previous, self.last_checkpoint = seq, manifest, pointer
@@ -467,6 +471,9 @@ class Controller:
         except cp.CheckpointError as exc:
             if exc.code == "controller_stopping":
                 return {"ok": False, "error": exc.code}
+            if exc.code == "remote_commit_unknown":
+                self.publication_unknown = json.loads(exc.detail)
+                self.on_signal(signal.SIGTERM, None)
             self.checkpoint_failures += 1
             log("checkpoint_failed", kind=kind, code=exc.code, detail=str(exc), consecutive=self.checkpoint_failures)
             return {"ok": False, "error": exc.code, "detail": str(exc)}
@@ -498,7 +505,7 @@ class Controller:
                                                               "checkpointId": self.last_checkpoint["checkpointId"],
                                                               "manifestKey": self.last_checkpoint["manifestKey"],
                                                               "updatedAt": self.last_checkpoint["updatedAt"]},
-                  "checkpointFailures": self.checkpoint_failures}
+                  "checkpointFailures": self.checkpoint_failures, "publicationUnknown": self.publication_unknown}
         _atomic_write(self.settings.control_dir / "status.json", json.dumps(status, sort_keys=True, indent=2).encode(), 0o644)
 
     # -- main loop and shutdown --------------------------------------------------------------------
@@ -519,10 +526,10 @@ class Controller:
                 next_status = now + 2
             self.wake.wait(0.2)
 
-    def drain(self, deadline: float) -> list[Worker]:
+    def drain(self, deadline: float, finish_deadline: float) -> list[Worker]:
         """Stop admission, wait until `deadline`, then kill whatever is still running. Returns the killed workers."""
         for worker in self.live():
-            worker.stop()
+            worker.send("STOP")
         while self.live() and time.monotonic() < deadline:
             time.sleep(0.05)
         killed = self.live()
@@ -530,18 +537,21 @@ class Controller:
             log("drain_deadline_exceeded", worker=worker.name)
             worker.kill()
         for worker in self.workers.values():
-            worker.reap(5)
+            worker.reap(max(0, min(1, finish_deadline - time.monotonic())))
         return killed
 
-    def recover(self, killed: list[Worker]) -> None:
+    def recover(self, killed: list[Worker], deadline: float) -> None:
         """A killed worker left a pending request or attempt; a stop-at-birth worker records it as unknown and exits."""
         for worker in killed:
             self.shutdown[worker.name] = "killed-unrecovered"
+            if worker.process.poll() is None or time.monotonic() >= deadline:
+                log("recovery_failed", worker=worker.name, reason="deadline")
+                continue
             recovery = Worker(self.settings, worker.name, self.env, recover_only=True)
-            code = recovery.reap(self.settings.recover_seconds)
+            code = recovery.reap(max(0, deadline - time.monotonic() - 0.25))
             if code is None:
                 recovery.kill()
-                recovery.reap(5)
+                recovery.reap(max(0, deadline - time.monotonic()))
                 log("recovery_failed", worker=worker.name, reason="timeout")
             elif code != 0:
                 log("recovery_failed", worker=worker.name, exitCode=code)
@@ -553,18 +563,23 @@ class Controller:
         self.phase = "stopping"
         began = self.stop_at if self.stop_at is not None else time.monotonic()
         if self.stop_at is not None:
-            killed = self.drain(began + self.settings.drain_seconds)
-            self.recover(killed)
             deadline = began + self.settings.stop_timeout - self.settings.reserve_seconds
+            killed = self.drain(began + self.settings.drain_seconds, deadline)
+            self.recover(killed, min(deadline, time.monotonic() + self.settings.recover_seconds))
+            deadline = min(deadline, time.monotonic() + self.settings.final_seconds)
         else:
+            deadline = time.monotonic() + self.settings.final_seconds
             for worker in self.workers.values():
-                worker.reap(5)
-            deadline = None
+                worker.reap(max(0, min(1, deadline - time.monotonic())))
         self.write_status()
         try:
+            if self.publication_unknown is not None:
+                raise cp.CheckpointError("remote_commit_unknown", json.dumps(self.publication_unknown))
             self.checkpoint("final", deadline=deadline)
             final_ok = True
         except cp.CheckpointError as exc:
+            if exc.code == "remote_commit_unknown":
+                self.publication_unknown = json.loads(exc.detail)
             log("final_checkpoint_failed", code=exc.code, detail=str(exc))
             final_ok = False
         failed = [name for name, worker in self.workers.items()
