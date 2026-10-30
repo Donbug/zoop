@@ -221,6 +221,87 @@ class ChatJobExecutorTest {
     }
 
     @Test
+    void aVerifiedResultThatCouldNotBeSavedIsSavedAgainWithoutAnyModelCall() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        var engine = new ScriptedChatEngine((run, control) -> {
+            control.beforeModelCall();
+            return ScriptedChatEngine.generalAnswer("저장에 실패할 답");
+        });
+        store.failingCompletes = 1;
+        var executor = executor(engine);
+        executor.runOnce();
+
+        var failure = job(store.job("job-00001"));
+        assertEquals("save_failed", failure.kind());
+        assertEquals("save_only", failure.retry());
+        assertEquals(1, store.job("job-00001").row.runs());
+        assertTrue(store.verifiedResult("job-00001", 1).isPresent());
+
+        store.jobs.get("job-00001").row = requeuedSaveOnly(store.job("job-00001").row);
+        executor.runOnce();
+
+        assertEquals("completed", store.job("job-00001").row.status());
+        assertEquals("answered", store.job("job-00001").row.outcome());
+        assertEquals(1, store.job("job-00001").row.runs(), "a save is not a run");
+        assertEquals(1, engine.runs.size(), "the engine is not called again");
+        assertEquals("msg-job-00001", store.job("job-00001").messageId);
+        assertTrue(mapper.readValue(store.job("job-00001").result, ChatResult.class).sections().getFirst().text()
+                .contains("저장에 실패할 답"));
+        assertTrue(store.verifiedResult("job-00001", 1).isEmpty(), "the kept copy goes once it is saved");
+    }
+
+    @Test
+    void aLeaseThatRunsOutAfterTheResultWasKeptOffersTheSaveInsteadOfAnUnknownFate() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        var executor = executor(new ScriptedChatEngine((run, control) -> ScriptedChatEngine.guidance("안내")));
+        var claim = executor.claimNext().orElseThrow();
+        store.keepVerified("job-00001", claim.ownerToken(), 1, "{}", null, NOW);
+        clock.advance(ChatJobExecutor.MAX_DEADLINE.plus(ChatJobExecutor.LEASE_GRACE));
+
+        assertEquals(1, executor.recoverExpired());
+
+        assertEquals("save_only", job(store.job("job-00001")).retry());
+    }
+
+    @Test
+    void aResultThatNeverGotSavedAndWasNotKeptEndsByLease() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        store.failingCompletes = 1;
+        store.refuseKeeping = true;
+        var executor = executor(new ScriptedChatEngine((run, control) -> ScriptedChatEngine.generalAnswer("답")));
+        executor.runOnce();
+        assertEquals("running", store.job("job-00001").row.status());
+
+        clock.advance(ChatJobExecutor.MAX_DEADLINE.plus(ChatJobExecutor.LEASE_GRACE));
+        executor.recoverExpired();
+
+        assertEquals("transient", job(store.job("job-00001")).kind());
+    }
+
+    @Test
+    void aFailedRunForgetsWhatItKept() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        var executor = executor(new ScriptedChatEngine((run, control) -> {
+            clock.advance(ChatJobExecutor.MAX_DEADLINE.plusSeconds(1));
+            control.beforeModelCall();
+            return ScriptedChatEngine.generalAnswer("기한 뒤의 답");
+        }));
+        executor.runOnce();
+
+        assertEquals("response_unknown", job(store.job("job-00001")).reason());
+        assertTrue(store.verifiedResult("job-00001", 1).isEmpty());
+    }
+
+    private static ChatJobRow requeuedSaveOnly(ChatJobRow r) {
+        String attempts = r.attempts().substring(0, r.attempts().length() - 1) + ",{\"n\":2,\"mode\":\"save_only\","
+                + "\"requestKey\":\"retry-1\",\"status\":\"queued\",\"sourceAttemptNo\":1}]";
+        return new ChatJobRow(r.id(), r.sessionId(), r.memberId(), r.seq(), r.question(), r.requestHash(), r.askedAt(),
+                r.frozenContext(), r.frozenSelection(), r.contextCompanyIds(), r.graphVersionId(), "queued", null, null,
+                r.resolvesJobId(), r.resolvesChoiceId(), r.clarificationDepth(), null, null, r.runs(), attempts, r.createdAt(),
+                r.updatedAt(), null);
+    }
+
+    @Test
     void aSaveOnlyAttemptCannotRecoverWithoutAKeptResult() {
         store.add(queued("job-00001", null, null, 0, "save_only"));
         var engine = new ScriptedChatEngine((run, control) -> fail("save_only must not call the engine"));

@@ -170,7 +170,10 @@ public class JdbcChatRepository implements ChatRepository {
                     finished_at = :at, updated_at = :at
                  WHERE id = :id AND status IN ('queued', 'running')
                 """, params) == 1;
-        if (cancelled) jdbc.update(JdbcChatExecutionRepository.CLOSE_TOOL_CALLS, params);
+        if (cancelled) {
+            jdbc.update(JdbcChatExecutionRepository.CLOSE_TOOL_CALLS, params);
+            jdbc.update("DELETE FROM chat_recovery_results WHERE chat_job_id = :id", params);
+        }
         return cancelled;
     }
 

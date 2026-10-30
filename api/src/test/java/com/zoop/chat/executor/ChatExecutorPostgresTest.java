@@ -122,6 +122,21 @@ class ChatExecutorPostgresTest {
     }
 
     @Test
+    void aKeptResultIsOnePerAttemptAndGoesWhenTheResultIsStored() {
+        engine.script((run, control) -> ScriptedChatEngine.generalAnswer("보관한 답"));
+        String jobId = submit("HBM이 뭐야?");
+        var claim = executor.claimNext().orElseThrow();
+        assertTrue(runs.keepVerified(jobId, claim.ownerToken(), 1, "{\"outcome\":\"answered\"}", "{\"path\":\"direct\"}", Instant.now()));
+        assertFalse(runs.keepVerified(jobId, "someone-else", 2, "{}", null, Instant.now()), "the run's fence applies");
+        assertEquals("{\"path\": \"direct\"}", runs.verifiedResult(jobId, 1).orElseThrow().routeSummary());
+
+        executor.execute(claim);
+
+        assertEquals("completed", service.getJob(member, jobId).status());
+        assertTrue(runs.verifiedResult(jobId, 1).isEmpty());
+    }
+
+    @Test
     void aQueuedQuestionRunsToAStoredResultTheMemberCanRead() {
         engine.script((run, control) -> {
             control.beforeModelCall();
