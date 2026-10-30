@@ -127,7 +127,9 @@ public final class ChatMcpTools {
         Set<String> bound = registry.bound();
         boolean web = registry.bind(ChatCapability.WEB_SEARCH.id()).isPresent();
         return java.util.Arrays.stream(ChatCapability.values())
-                .filter(c -> c != ChatCapability.PORTFOLIO_SCOPE_READ && bound.contains(c.id())
+                // A briefing read's round comes from the requirement's words, which the agent's arguments cannot carry.
+                .filter(c -> c != ChatCapability.PORTFOLIO_SCOPE_READ && c != ChatCapability.BRIEFING_READ
+                        && bound.contains(c.id())
                         || c == ChatCapability.WEB_SEARCH && web).toList();
     }
 

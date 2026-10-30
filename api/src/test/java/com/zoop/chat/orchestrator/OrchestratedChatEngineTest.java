@@ -94,6 +94,29 @@ class OrchestratedChatEngineTest {
     }
 
     @Test
+    void aBriefingQuestionReadsTheRoundItsOwnWordsName() {
+        // D-AI-02 Q06: "오늘 아침" is that day's morning round (asked 1970-01-01 09:00 KST), never a model's choice.
+        List<ChatToolRequest> briefing = new ArrayList<>();
+        tools.put(ChatCapability.BRIEFING_READ, (scope, request) -> {
+            briefing.add(request);
+            return new ChatToolOutput("briefing:br-1", List.of(new ChatToolItem("iss-1", "briefing_item",
+                    "[1970-01-01 출근 브리핑 1위] HBM 공급 — 선정 이유: 연결", List.of(HYNIX), List.of(evidence(HYNIX)))),
+                    List.of(evidence(HYNIX)), false, false);
+        });
+        decision = ChatPlannerTest.decision(new ChatRouteDecision.Requirement("r1", "오늘 아침 브리핑에 뭐 나왔어", true,
+                Map.of(ChatQueryType.Q06, 0.9), Map.of("briefing.read", 0.9), List.of(), 0.0, null));
+        answer = new ChatGeneratedAnswer(List.of(grounded("오늘 출근 브리핑에는 HBM 공급 사건이 있었어요.", List.of("r1"),
+                evidence(HYNIX))), List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+
+        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+
+        assertEquals("answered", result.outcome());
+        assertEquals(List.of(List.of("briefing:1970-01-01:morning")), briefing.stream().map(ChatToolRequest::targets).toList());
+        assertEquals(List.of(readable.get(evidence(HYNIX))), result.citations());
+    }
+
+    @Test
     void aGeneralConceptIsOneGeneralSectionWithTheServerNoticeAndNoSources() {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.95), Map.of()));
         answer = new ChatGeneratedAnswer(List.of(general("HBM은 고대역폭 메모리입니다.", "r1")), List.of(), List.of());

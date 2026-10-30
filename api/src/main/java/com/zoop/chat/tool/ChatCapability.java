@@ -90,6 +90,7 @@ public enum ChatCapability {
         return switch (this) {
             case GRAPH_VERSION_DIFF -> List.of(WHOLE_GRAPH);
             case PORTFOLIO_SCOPE_READ -> List.of(MEMBER_SELF);
+            case BRIEFING_READ -> List.of(ChatBriefingRound.LATEST);
             default -> List.of();
         };
     }
