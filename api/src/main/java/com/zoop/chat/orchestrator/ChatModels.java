@@ -290,8 +290,22 @@ public final class ChatModels {
         }
     }
 
-    /** One step's outcome: held at {@code approvals} (no answer), or the final {@code answer} (no approvals). */
-    public record AgentStep(String responseId, List<ApprovalRequest> approvals, ChatGeneratedAnswer answer) {
+    /** Luna's accumulated input of one run (ZOOP-AIG-001 6.3.3). */
+    public static final long MAX_INPUT_TOKENS = 24_000;
+    /** A failure code of the answer stages: the input is over its limit, nothing more is sent for this run. */
+    public static final String INPUT_BUDGET_EXCEEDED = "input_budget_exceeded";
+    /** A failure code of the answer stages: the answer passed its length or was cut at the output cap. */
+    public static final String OUTPUT_BUDGET_EXCEEDED = "output_budget_exceeded";
+
+    /**
+     * One step's outcome: held at {@code approvals} (no answer), or the final {@code answer} (no approvals). {@code inputTokens}
+     * is what the provider reported for the step, null when it reported none.
+     */
+    public record AgentStep(String responseId, List<ApprovalRequest> approvals, ChatGeneratedAnswer answer, Long inputTokens) {
+        public AgentStep(String responseId, List<ApprovalRequest> approvals, ChatGeneratedAnswer answer) {
+            this(responseId, approvals, answer, null);
+        }
+
         public AgentStep {
             approvals = List.copyOf(approvals);
             if (approvals.isEmpty() == (answer == null)) {

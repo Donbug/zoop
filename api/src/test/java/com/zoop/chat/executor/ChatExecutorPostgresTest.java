@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import com.zoop.auth.service.MemberSessionService.MemberPrincipal;
 import com.zoop.chat.dto.ChatJobRequest;
 import com.zoop.chat.repository.ChatExecutionRepository;
+import com.zoop.chat.repository.ChatJobRow;
 import com.zoop.chat.repository.ChatRepository;
 import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.service.ChatService;
@@ -142,6 +143,10 @@ class ChatExecutorPostgresTest {
         assertEquals("chat-result/v1", jdbc.queryForObject("SELECT result_schema_version FROM chat_jobs WHERE id = ?",
                 String.class, jobId));
         assertFalse(executor.runOnce());
+
+        var row = chats.findJob(jobId).orElseThrow();
+        assertEquals(List.of(jobId), chats.answersBefore(row.sessionId(), row.seq() + 1, 2).stream().map(ChatJobRow::id).toList());
+        assertTrue(chats.answersBefore(row.sessionId(), row.seq(), 2).isEmpty());
     }
 
     @Test

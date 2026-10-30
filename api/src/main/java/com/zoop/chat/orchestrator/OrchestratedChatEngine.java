@@ -181,6 +181,13 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         } catch (Stop stop) {
             return stop.failed;
         } catch (ChatModels.Failure failure) {
+            // The same question would meet the same limit: the member narrows it instead of rerunning it.
+            if (ChatModels.INPUT_BUDGET_EXCEEDED.equals(failure.code())) {
+                return new ChatEngineOutcome.Failed("budget_exceeded", "context_too_large", false);
+            }
+            if (ChatModels.OUTPUT_BUDGET_EXCEEDED.equals(failure.code())) {
+                return new ChatEngineOutcome.Failed("budget_exceeded", "output_limit", false);
+            }
             if (failure.fate() == ChatModels.Failure.Fate.REFUSED) return new ChatEngineOutcome.Failed("internal", null, false);
             boolean unknown = failure.fate() == ChatModels.Failure.Fate.UNKNOWN;
             return new ChatEngineOutcome.Failed("transient", unknown ? "response_unknown" : "provider_error", !unknown);
@@ -453,14 +460,17 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         return List.copyOf(items.values());
     }
 
-    /** The period an answered comparison read from the question's own words, or null when none did. */
+    /**
+     * The period an answered comparison read from the question's own words or carried from the last answers, or null when
+     * none did; a selected period is applied on its own.
+     */
     private static ChatAppliedPeriod writtenPeriod(ChatRun run, ChatPlan.Run plan, Set<String> answered) {
         for (Planned p : plan.requirements()) {
             if (!answered.contains(p.id()) || !p.capabilities().contains(ChatCapability.GRAPH_VERSION_DIFF)) continue;
-            var period = ChatRetrieval.period(run, p).filter(found -> found.expression() != null);
+            var period = ChatRetrieval.period(run, p).filter(found -> found.expression() != null || run.context().period() == null);
             if (period.isPresent()) {
-                return new ChatAppliedPeriod(period.get().start().toString(), period.get().end().toString(), "question",
-                        period.get().expression());
+                return new ChatAppliedPeriod(period.get().start().toString(), period.get().end().toString(),
+                        period.get().expression() != null ? "question" : "context", period.get().expression());
             }
         }
         return null;

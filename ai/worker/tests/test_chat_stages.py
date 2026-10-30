@@ -13,7 +13,7 @@ import httpx
 import pytest
 
 from zoop_ai import chat_cli, chat_jev, chat_luna, chat_runtime
-from zoop_ai.chat_contracts import ChatGrantRegistry, Receipt, RouterInput, StageRequest, VerificationInput
+from zoop_ai.chat_contracts import ChatGrantRegistry, Receipt, RouterInput, StageRequest, VerificationInput, estimated_tokens
 from zoop_ai.chat_runtime import ChatLedger, LiveSender, ReplaySender, invoke, request_identity, stage_config
 from zoop_ai.provider import ProviderError
 
@@ -427,6 +427,47 @@ def test_the_answer_request_is_strict_json_with_the_chat_prompt_and_its_answer_i
         assert bad.receipt is not None, "a received answer keeps its receipt"
 
 
+def sized(content: Any, *, output: int, reasoning: int, finish: str = "stop"):
+    def respond(path, body):
+        return httpx.Response(200, json={"model": "gpt-6-luna", "choices": [{"finish_reason": finish,
+                                                                             "message": {"content": json.dumps(content)}}],
+                                         "usage": {"prompt_tokens": 100, "completion_tokens": output,
+                                                   "completion_tokens_details": {"reasoning_tokens": reasoning}}})
+    return respond
+
+
+GOOD_ANSWER = {"sections": [{"basis": "evidence_grounded", "text": "SK하이닉스는 HBM을 공급한다.", "requirementIds": ["r2"],
+                             "evidenceIds": [EV1]}], "insufficientRequirementIds": [], "graphTargetIds": []}
+
+
+def test_an_answer_is_limited_to_2k_tokens_without_its_reasoning_and_cut_answers_fail_alike(tmp_path):
+    recipient = f"openai-compatible:{stage_config('chat-answer', 'live', LIVE).provider_revision}"
+    endpoint = Endpoint(sized(GOOD_ANSWER, output=7000, reasoning=5000))
+    fits = run(request("chat-answer", answer_input()), tmp_path, endpoint, registry=grants(recipient))
+    assert fits.status == "succeeded", fits
+    assert endpoint.calls[0][1]["max_completion_tokens"] == 8000
+
+    for i, response in enumerate([sized(GOOD_ANSWER, output=7000, reasoning=4999),
+                                  sized(GOOD_ANSWER, output=8000, reasoning=7000, finish="length")]):
+        over = run(request("chat-answer", answer_input(), invocation=f"job-1:a1:long-{i}"), tmp_path, Endpoint(response),
+                   registry=grants(recipient))
+        assert over.failure.code == "output_budget_exceeded" and over.failure.sent and not over.failure.unknown
+        assert over.receipt is not None
+
+
+def test_a_direct_answer_over_its_input_limit_is_refused_before_anything_is_sent(tmp_path, monkeypatch):
+    recipient = f"openai-compatible:{stage_config('chat-answer', 'live', LIVE).provider_revision}"
+    monkeypatch.setattr(chat_runtime, "MAX_INPUT_TOKENS", chat_luna.input_tokens(request("chat-answer", answer_input()).parsed()) - 1)
+    endpoint = Endpoint(sized(GOOD_ANSWER, output=10, reasoning=0))
+    refused = run(request("chat-answer", answer_input()), tmp_path, endpoint, registry=grants(recipient))
+    assert refused.failure.code == "input_budget_exceeded" and not refused.failure.sent
+    assert endpoint.calls == []
+
+
+def test_token_estimates_count_korean_higher_than_latin_text():
+    assert estimated_tokens("a" * 400) == 100 and estimated_tokens("가" * 400) == 300
+
+
 # ---- ledger: idempotency, unknown fate, budget ---------------------------------------------------------------------------
 
 def test_an_invocation_is_sent_once_and_another_input_under_its_id_is_refused(tmp_path):
@@ -646,7 +687,7 @@ def test_path_pairs_keep_their_status_and_steps_name_only_quoted_evidence():
 
 def test_the_answer_prompt_explains_paths_and_its_version_moved():
     assert "status=cut" in chat_luna.PROMPT and "evidenceIds" in chat_luna.PROMPT
-    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-10-26-1-")
+    assert chat_luna.prompt_version().startswith("zoop-chat-answer-2026-10-30-1-")
 
 
 def test_the_answer_prompt_and_schema_know_zoop_document_sections():
