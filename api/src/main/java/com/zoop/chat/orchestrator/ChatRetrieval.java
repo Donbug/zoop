@@ -151,7 +151,8 @@ final class ChatRetrieval {
                     // the fixed ZOOP documents, which it is not about.
                     boolean fixed = !capability.documents().isEmpty();
                     var read = fixed ? capability.documents()
-                            : capability == ChatCapability.BRIEFING_READ ? briefingTargets(run, p, targets) : targets;
+                            : capability == ChatCapability.BRIEFING_READ ? briefingTargets(run, p, targets)
+                            : capability == ChatCapability.SELECTION_RULE_READ ? selectionTargets(run, p, targets) : targets;
                     List<String> scope = fixed ? null : p.evidenceScope();
                     Instant since = capability == ChatCapability.GRAPH_VERSION_DIFF ? since(run, p).orElse(null) : null;
                     for (List<String> chunk : batches(capability, read)) {
@@ -220,6 +221,18 @@ final class ChatRetrieval {
         List<String> read = new ArrayList<>();
         read.add(ChatBriefingRound.ref(p.label(), day.orElse(null), today));
         targets.stream().filter(t -> ChatPlanner.companyId(t) && !ChatBriefingRound.isRef(t))
+                .limit(ChatToolRequest.MAX_TARGETS - 1).forEach(read::add);
+        return List.copyOf(read);
+    }
+
+    /**
+     * A selection read's targets: the round the requirement's words name, as for a briefing read, then the issues it
+     * names (a selection is about issues, never companies).
+     */
+    static List<String> selectionTargets(ChatRun run, Planned p, List<String> targets) {
+        List<String> read = new ArrayList<>();
+        read.add(briefingTargets(run, p, List.of()).getFirst());
+        targets.stream().filter(t -> !ChatBriefingRound.isRef(t) && !ChatPlanner.companyId(t))
                 .limit(ChatToolRequest.MAX_TARGETS - 1).forEach(read::add);
         return List.copyOf(read);
     }

@@ -124,8 +124,10 @@ final class ChatAnswerCheck {
                 owners.forEach(b -> b.results().forEach(r -> {
                     if (documentRead(r) == documented) passedOn.addAll(r.evidenceIds());
                 }));
-                // Nothing found, or only the member's own companies read: neither has public evidence to cite.
-                boolean nothingFound = owners.stream().allMatch(b -> b.noneFound() || memberOnly(b));
+                // Nothing found, or only server records read (the member's own companies, an issue's selection
+                // records): none of them has public evidence to cite. The verifier checks such sections against the
+                // records themselves (server facts).
+                boolean nothingFound = owners.stream().allMatch(b -> b.noneFound() || memberOnly(b) || recordsOnly(b));
                 if (owners.stream().anyMatch(Branch::general) || !passedOn.containsAll(section.evidenceIds())
                         || (section.evidenceIds().isEmpty() && !nothingFound)) {
                     return Result.fail(documented ? "document_section" : "evidence_section");
@@ -177,6 +179,12 @@ final class ChatAnswerCheck {
     static boolean memberOnly(Branch branch) {
         return !branch.results().isEmpty() && branch.results().stream().allMatch(r -> ChatCapability.of(r.capabilityId())
                 .map(c -> c == ChatCapability.PORTFOLIO_SCOPE_READ).orElse(false));
+    }
+
+    /** A requirement that read only selection records ({@code selectionRule.read}) and found some. */
+    static boolean recordsOnly(Branch branch) {
+        return !branch.results().isEmpty() && branch.results().stream().allMatch(r -> ChatCapability.of(r.capabilityId())
+                .map(c -> c == ChatCapability.SELECTION_RULE_READ).orElse(false) && !r.selectionRecords().isEmpty());
     }
 
     /** A read of ZOOP's own documents: a capability that reads no graph. */
