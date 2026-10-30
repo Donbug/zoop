@@ -527,7 +527,7 @@ it('D-GRP-05 isolates the related event when no edge has that evidence', async (
   vi.restoreAllMocks();
 });
 
-it('D-GRP-01 shows help and event focus controls', async () => {
+it('D-GRP-01 keeps event focus and map information controls without the extra help button', async () => {
   anonymous();
   vi.mocked(getGraph).mockResolvedValue(
     createMockGraph({ mode: 'all', personalFilter: 'all' }),
@@ -549,21 +549,12 @@ it('D-GRP-01 shows help and event focus controls', async () => {
         'max-md:[&_.relationship-graph-filters_button]:min-h-10!',
       ),
   ).toBe(true);
-  for (const name of [
-    '조작 도움말',
-    '지도 데이터 안내',
-    '튜토리얼 다시 보기',
-  ]) {
+  for (const name of ['지도 데이터 안내', '튜토리얼 다시 보기']) {
     const button = screen.getByRole('button', { name });
     expect(button.classList.contains('max-md:min-h-10')).toBe(true);
     expect(button.classList.contains('max-md:min-w-10')).toBe(true);
   }
-  await userEvent.click(screen.getByRole('button', { name: '조작 도움말' }));
-  expect(
-    screen.getByRole('region', { name: '지도 조작 도움말' }).textContent,
-  ).toContain('Shift+Enter');
-  await userEvent.keyboard('{Escape}');
-  expect(screen.queryByRole('region', { name: '지도 조작 도움말' })).toBeNull();
+  expect(screen.queryByRole('button', { name: '조작 도움말' })).toBeNull();
 });
 
 it('D-BRF-04 회차 지도를 최신 main 지도에 연결하고 현재 지도로 복귀한다', async () => {

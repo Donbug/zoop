@@ -24,7 +24,6 @@ import GraphIcon from '@/components/graph/GraphIcon';
 import GraphTutorial from '@/components/graph/GraphTutorial';
 import { tutorialTarget } from '@/components/graph/tutorial/tutorial-target';
 import GraphFocusControls from '@/components/graph/GraphFocusControls';
-import GraphHelp from '@/components/graph/GraphHelp';
 import CompanyLogo from '@/components/common/CompanyLogo';
 import CompanyPathPanel from '@/components/graph/CompanyPathPanel';
 import { companyPath } from '@/components/graph/company-path';
@@ -1075,7 +1074,6 @@ function MapWorkspace({
               </>
             )}
             <div className="relationship-toolbar-help">
-              <GraphHelp disabled={tutorialOpen} />
               <button
                 onClick={() => setNotice(notice === 'info' ? '' : 'info')}
                 aria-label="지도 데이터 안내"
