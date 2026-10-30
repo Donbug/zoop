@@ -3,6 +3,7 @@ package com.zoop.chat.orchestrator;
 import com.zoop.chat.dto.Citation;
 import com.zoop.chat.executor.ChatRun;
 import com.zoop.chat.tool.ChatCapability;
+import com.zoop.chat.tool.ChatSelectionRecord;
 import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolRequest;
 import com.zoop.chat.tool.ChatToolResult;
@@ -11,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -43,11 +45,26 @@ public final class ChatModels {
     }
 
     /** Canonical facts are server observations, not article evidence and never a model's assertions. */
-    public sealed interface ServerFact permits PortfolioFact, ComparisonFact {
+    public sealed interface ServerFact permits PortfolioFact, ComparisonFact, PublicationFact, BriefingSelectionFact {
         String requirementId();
     }
 
     public record MemberCompany(String companyId, String name, boolean held, boolean watched) { }
+
+    /** A rule a graph version was filtered with, as the rule states it. */
+    public record PublicationRule(String ruleId, String title, String summary) { }
+
+    /**
+     * Why an issue is on the map at the run's pinned version (Q08): the last review decision's kind, time and path up to
+     * the version's review revision, and the rules the version was filtered with. Never who decided or their note.
+     */
+    public record PublicationFact(String requirementId, String issueId, String issueTitle, String graphVersion,
+            long reviewRevision, Long ruleRevision, String decision, String decisionPath, Instant decidedAt,
+            List<PublicationRule> rules) implements ServerFact { }
+
+    /** Why a published briefing round picked an issue (Q08): its rank and the selection reason the round recorded. */
+    public record BriefingSelectionFact(String requirementId, String issueId, String issueTitle, String roundId,
+            java.time.LocalDate date, String edition, int rank, String reason) implements ServerFact { }
 
     public record PortfolioFact(String requirementId, String queryScope, List<String> companyIds,
             List<MemberCompany> companies, boolean truncated, int companyLimit) implements ServerFact { }
@@ -94,12 +111,19 @@ public final class ChatModels {
                     for (var result : branch.results()) {
                         boolean portfolio = ChatCapability.PORTFOLIO_SCOPE_READ.id().equals(result.capabilityId());
                         boolean comparison = ChatCapability.GRAPH_VERSION_DIFF.id().equals(result.capabilityId());
-                        if (!portfolio && !comparison) continue;
+                        boolean selection = ChatCapability.SELECTION_RULE_READ.id().equals(result.capabilityId());
+                        if (!portfolio && !comparison && !selection) continue;
                         if (!result.succeeded() || result.provenance() == null
                                 || !result.provenance().belongsTo(run)) throw invalidFacts();
                         ChatToolRequest query = result.provenance().request();
                         if (!query.capabilityId().equals(result.capabilityId()) || result.truncated() == null
                                 || !seen.add(result.toolCallId())) throw invalidFacts();
+                        if (selection) {
+                            for (ServerFact fact : selections(run, branch.requirementId(), result)) {
+                                if (!facts.contains(fact)) facts.add(fact);
+                            }
+                            continue;
+                        }
                         ServerFact fact = portfolio ? portfolio(branch.requirementId(), result, query)
                                 : comparison(run, branch.requirementId(), result, query);
                         // No baseline is not a comparison and therefore supplies no facts; an identical read adds nothing.
@@ -178,6 +202,36 @@ public final class ChatModels {
 
         private static boolean companyId(String id) {
             return id != null && id.length() <= 200 && id.indexOf(':') > 0 && !id.startsWith("member:");
+        }
+
+        /** The records of a selection read as facts: a publication only at the run's own pinned version. */
+        private static List<ServerFact> selections(ChatRun run, String requirement, ChatToolResult result) {
+            if (!Objects.equals(run.graphVersionId(), result.dataVersion()) || result.selectionRecords().size() > 8) {
+                throw invalidFacts();
+            }
+            List<ServerFact> facts = new ArrayList<>();
+            for (ChatSelectionRecord record : result.selectionRecords()) {
+                switch (record) {
+                    case ChatSelectionRecord.Publication p -> {
+                        if (!p.graphVersionId().equals(run.graphVersionId()) || p.rules().size() > 10) throw invalidFacts();
+                        facts.add(new PublicationFact(requirement, p.issueId(), clipped(p.issueTitle(), 300),
+                                p.graphVersionId(), p.reviewRevision(), p.ruleRevision(), p.decision(), p.decisionPath(),
+                                p.decidedAt(), p.rules().stream().map(r -> new PublicationRule(r.ruleId(),
+                                        clipped(r.title(), 200), clipped(r.summary(), 1000))).toList()));
+                    }
+                    case ChatSelectionRecord.BriefingSelection s -> facts.add(new BriefingSelectionFact(requirement,
+                            s.issueId(), clipped(s.issueTitle(), 300), s.roundId(), s.date(), s.edition(), s.rank(),
+                            clipped(s.reason(), 1000)));
+                }
+            }
+            return facts;
+        }
+
+        /** A server-written text kept whole up to {@code max} code points, else cut with an ellipsis; never blank. */
+        private static String clipped(String text, int max) {
+            if (text == null || text.isBlank()) throw invalidFacts();
+            if (text.codePointCount(0, text.length()) <= max) return text;
+            return text.substring(0, text.offsetByCodePoints(0, max - 1)) + "…";
         }
 
         private static String bounded(String name) {

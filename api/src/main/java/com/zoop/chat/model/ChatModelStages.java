@@ -400,6 +400,22 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
                             .put("held", company.held()).put("watched", company.watched());
                 }
             }
+            case ChatModels.PublicationFact p -> {
+                wire.put("kind", "publication_record").put("issueId", p.issueId()).put("issueTitle", p.issueTitle())
+                        .put("graphVersion", p.graphVersion()).put("reviewRevision", p.reviewRevision())
+                        .put("decisionPath", p.decisionPath());
+                if (p.ruleRevision() == null) wire.putNull("ruleRevision");
+                else wire.put("ruleRevision", p.ruleRevision());
+                nullable(wire, "decision", p.decision());
+                nullable(wire, "decidedAt", p.decidedAt() == null ? null : p.decidedAt().toString());
+                ArrayNode rules = wire.putArray("rules");
+                for (var rule : p.rules()) {
+                    rules.addObject().put("ruleId", rule.ruleId()).put("title", rule.title()).put("summary", rule.summary());
+                }
+            }
+            case ChatModels.BriefingSelectionFact s -> wire.put("kind", "briefing_selection").put("issueId", s.issueId())
+                    .put("issueTitle", s.issueTitle()).put("roundId", s.roundId()).put("date", s.date().toString())
+                    .put("edition", s.edition()).put("rank", s.rank()).put("reason", s.reason());
             case ChatModels.ComparisonFact comparison -> {
                 wire.put("kind", "graph_comparison").put("fromVersion", comparison.fromVersion())
                         .put("toVersion", comparison.toVersion()).put("queryScope", comparison.queryScope())

@@ -11,12 +11,22 @@ import java.util.List;
  */
 public record ChatToolResult(String schemaVersion, String toolCallId, String capabilityId, String dataVersion,
         List<ChatToolItem> items, List<String> evidenceIds, Boolean truncated, Boolean nextAllowed, String error,
-        List<ChatToolPath> paths, List<ChatWebResult> webResults, Provenance provenance) {
+        List<ChatToolPath> paths, List<ChatWebResult> webResults, Provenance provenance,
+        List<ChatSelectionRecord> selectionRecords) {
     public ChatToolResult {
         items = List.copyOf(items);
         evidenceIds = List.copyOf(evidenceIds);
         paths = List.copyOf(paths);
         webResults = List.copyOf(webResults);
+        selectionRecords = List.copyOf(selectionRecords);
+    }
+
+    /** A result with no selection records: every read but {@code selectionRule.read}. */
+    public ChatToolResult(String schemaVersion, String toolCallId, String capabilityId, String dataVersion,
+            List<ChatToolItem> items, List<String> evidenceIds, Boolean truncated, Boolean nextAllowed, String error,
+            List<ChatToolPath> paths, List<ChatWebResult> webResults, Provenance provenance) {
+        this(schemaVersion, toolCallId, capabilityId, dataVersion, items, evidenceIds, truncated, nextAllowed, error,
+                paths, webResults, provenance, List.of());
     }
 
     public ChatToolResult(String schemaVersion, String toolCallId, String capabilityId, String dataVersion,
@@ -56,7 +66,7 @@ public record ChatToolResult(String schemaVersion, String toolCallId, String cap
     static ChatToolResult succeeded(String toolCallId, ChatRun run, ChatToolRequest request, ChatToolOutput output) {
         return new ChatToolResult(ChatToolRegistry.SCHEMA_VERSION, toolCallId, request.capabilityId(), output.dataVersion(),
                 output.items(), output.evidenceIds(), output.truncated(), output.nextAllowed(), null, output.paths(),
-                output.webResults(), new Provenance(run, request));
+                output.webResults(), new Provenance(run, request), output.selectionRecords());
     }
 
     static ChatToolResult failed(String toolCallId, String capabilityId, String error) {

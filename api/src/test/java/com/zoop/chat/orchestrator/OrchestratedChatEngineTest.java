@@ -25,7 +25,10 @@ import com.zoop.chat.orchestrator.ChatPlannerTest.Req;
 import com.zoop.chat.orchestrator.ChatRouteDecision.Dependency;
 import com.zoop.chat.orchestrator.ChatSemanticVerdicts.Verdict;
 import com.zoop.chat.repository.ChatToolCallEnd;
+import com.zoop.chat.tool.ChatBriefingRound;
 import com.zoop.chat.tool.ChatCapability;
+import com.zoop.chat.tool.ChatSelectionRecord;
+import com.zoop.chat.tool.SelectionRuleReadTool;
 import com.zoop.chat.tool.ChatTool;
 import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolOutput;
@@ -95,6 +98,38 @@ class OrchestratedChatEngineTest {
     void tearDown() {
         runners.forEach(ChatToolRunner::close);
         engines.forEach(OrchestratedChatEngine::close);
+    }
+
+    @Test
+    void aSelectionQuestionIsAnsweredFromTheRecordsAndTheVerifierGetsThemAsFacts() {
+        // D-AI-02 Q08: the recorded publication carries no article to cite; the verifier checks the section against it.
+        List<ChatToolRequest> asked = new ArrayList<>();
+        var publication = new ChatSelectionRecord.Publication("iss-1", "HBM 공급", "v1", 12, 3L, "allow", "admin_review",
+                Instant.parse("2026-10-20T05:00:00Z"), List.of(new ChatSelectionRecord.Rule("single-source@1",
+                "출처가 기사 1개뿐인 관계 숨기기", "근거 기사 2개 미만인 관계를 숨깁니다.")));
+        tools.put(ChatCapability.SELECTION_RULE_READ, (scope, request) -> {
+            asked.add(request);
+            return new ChatToolOutput(scope.graphVersionId(), List.of(new ChatToolItem("sel-map:iss-1", "selection_record",
+                    SelectionRuleReadTool.label(publication), List.of(), List.of())), List.of(), false, false, List.of(),
+                    List.of(), List.of(publication));
+        });
+        decision = ChatPlannerTest.decision(new ChatRouteDecision.Requirement("r1", "이 사건은 왜 지도에 있어", true,
+                Map.of(ChatQueryType.Q08, 0.9), Map.of("selectionRule.read", 0.9), List.of("iss-1"), 0.0, null));
+        answer = new ChatGeneratedAnswer(List.of(grounded("이 사건은 관리자 검수에서 공개 승인됐어요.", List.of("r1"))),
+                List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+
+        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+
+        assertEquals("answered", result.outcome());
+        assertTrue(result.citations().isEmpty(), "a record is no article");
+        assertEquals(List.of(List.of(ChatBriefingRound.LATEST, "iss-1")),
+                asked.stream().map(ChatToolRequest::targets).toList());
+        var fact = assertInstanceOf(ChatModels.PublicationFact.class,
+                verifiedFacts.forRequest(verifiedRun, verifiedSections).getFirst().getFirst());
+        assertEquals("r1", fact.requirementId());
+        assertEquals("admin_review", fact.decisionPath());
+        assertEquals(List.of("single-source@1"), fact.rules().stream().map(ChatModels.PublicationRule::ruleId).toList());
     }
 
     @Test

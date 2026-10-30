@@ -239,6 +239,51 @@ def test_closed_server_fact_contract_rejects_misbinding_and_extra_private_data(m
         VerificationInput.model_validate(payload)
 
 
+def selection_input() -> dict[str, Any]:
+    payload = verification_input()
+    payload["sections"][0]["serverFacts"] = [
+        {"kind": "publication_record", "requirementId": "r1", "issueId": "iss-1", "issueTitle": "HBM 공급 계약",
+         "graphVersion": "gv-new", "reviewRevision": 12, "ruleRevision": 3, "decision": "allow",
+         "decisionPath": "admin_review", "decidedAt": "2026-10-20T05:00:00Z",
+         "rules": [{"ruleId": "single-source@1", "title": "출처가 기사 1개뿐인 관계 숨기기", "summary": "근거 기사 2개 미만인 관계를 숨깁니다."}]},
+        {"kind": "briefing_selection", "requirementId": "r1", "issueId": "iss-1", "issueTitle": "HBM 공급 계약",
+         "roundId": "br-1", "date": "2026-10-21", "edition": "morning", "rank": 1, "reason": "관심 기업 두 곳이 연결"}]
+    return payload
+
+
+def test_selection_records_are_closed_server_facts_bound_to_the_pinned_version():
+    # D-AI-02 Q08: the recorded publication and briefing selection reach Jev as facts, never as quotes.
+    parsed = VerificationInput.model_validate(selection_input())
+    kinds = [type(f).__name__ for f in parsed.sections[0].server_facts]
+    assert kinds == ["PublicationFact", "BriefingSelectionFact"]
+    none = selection_input()
+    none["sections"][0]["serverFacts"][0].update(decision=None, decisionPath="none", decidedAt=None, ruleRevision=None,
+                                                 rules=[])
+    VerificationInput.model_validate(none)
+    assert "publication_record" in chat_jev.VERIFY_TASK and "not an automatic approval" in chat_jev.VERIFY_TASK
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda f: f[0].update(graphVersion="gv-stale"),
+    lambda f: f[0].update(decisionPath="none"),
+    lambda f: f[0].update(decidedAt=None),
+    lambda f: f[0].update(decidedAt="2026-10-20T05:00:00"),
+    lambda f: f[0].update(adminEmail="admin@zoop.example"),
+    lambda f: f[0].update(reason="운영 메모"),
+    lambda f: f[0]["rules"].append(dict(f[0]["rules"][0])),
+    lambda f: f[0]["rules"][0].update(ruleId="no-version"),
+    lambda f: f[1].update(edition="noon"),
+    lambda f: f[1].update(rank=0),
+    lambda f: f[1].update(reason=""),
+    lambda f: f[1].update(requirementId="r-other"),
+])
+def test_selection_facts_refuse_misbinding_and_any_decider_detail(mutate):
+    payload = selection_input()
+    mutate(payload["sections"][0]["serverFacts"])
+    with pytest.raises(ValueError):
+        VerificationInput.model_validate(payload)
+
+
 def test_a_verification_request_binds_to_its_own_invocation_and_refuses_the_v1_wire():
     payload = facts_input()
     request("chat-verification", payload).parsed()
