@@ -94,8 +94,8 @@ class AiUsagePostgresTest {
                 .andExpect(jsonPath("$.features[2].usage.retries").value(hasUnrecordedPublications ? (Object)null : 1))
                 .andExpect(jsonPath("$.features[2].usage.inputTokens").value(hasUnrecordedPublications ? (Object)null : 30))
                 .andExpect(jsonPath("$.features[4].feature").value("briefing-outlook"))
-                .andExpect(jsonPath("$.features[4].usage.modelCalls").value(1))
-                .andExpect(jsonPath("$.features[4].usage.inputTokens").value(11));
+                .andExpect(jsonPath("$.features[4].usage.modelCalls").value(hasUnrecordedPublications ? (Object)null : 1))
+                .andExpect(jsonPath("$.features[4].usage.inputTokens").value(hasUnrecordedPublications ? (Object)null : 11));
         if (hasUnrecordedPublications) {
             result.andExpect(jsonPath("$.features[2].requests").doesNotExist())
                     .andExpect(jsonPath("$.features[2].unavailableMetrics").isArray())
