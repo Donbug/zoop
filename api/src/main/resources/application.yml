@@ -105,8 +105,7 @@ zoop:
     web:
       # The supplementary web search tool (api/docs/chat-web-search.md). Off by default. No real provider is selected yet:
       # enabled, it needs provider=synthetic (fixture hits under example domains, local and tests only). It is never
-      # planned by the router; it is an MCP tool of the agent path, and the two cannot be on together until web results
-      # can be cited.
+      # planned by the router; it is an MCP tool of the agent path, whose answers cite its hits as web_result.
       enabled: ${ZOOP_CHAT_WEB_ENABLED:false}
       provider: ${ZOOP_CHAT_WEB_PROVIDER:none}
   analysis:

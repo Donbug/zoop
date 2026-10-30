@@ -73,6 +73,24 @@ class ChatResponseGuardTest {
     }
 
     @Test
+    void aSyntheticWebCitationIsShownAgainAndAnyOtherProvidersIsWithheld() {
+        // Until a real provider's redisplay rights are decided (web search design 7), only the synthetic one is shown again.
+        var job = job(List.of(), web("synthetic"));
+        assertSame(job, guard(Set.of()).job(job, "r"), "no evidence record is read for a web hit");
+        assertEquals(ChatResponseGuard.WITHHELD_ANSWER, guard(Set.of()).job(job(List.of(), web("other")), "r").result()
+                .answer());
+    }
+
+    private static ChatResult web(String provider) {
+        String hit = "web-" + "b".repeat(32);
+        var citation = new Citation("web_result", hit, "[합성] snippet", null, null, provider, null, 0, 12, "[합성] 제목",
+                "news.example.com", AT, "https://news.example.com/a");
+        return new ChatResult("answered", "msg-job-00001", "웹 본문",
+                List.of(new ChatAnswerSection("web_reported", "웹 본문", List.of(hit))), "web_reported", null, List.of(),
+                List.of(citation), List.of(), applied(), List.of(), null, List.of(), metadata());
+    }
+
+    @Test
     void aZoopDocumentCitationIsShownWhileItsVersionIsInEffectAndWithheldOnceReplaced() {
         var job = job(List.of(), documented("zoop_doc"));
         assertSame(job, guard(Set.of("doc-1")).job(job, "r"));

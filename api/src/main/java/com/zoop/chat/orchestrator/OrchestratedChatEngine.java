@@ -21,6 +21,7 @@ import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatToolRegistry;
 import com.zoop.chat.tool.ChatToolRequest;
 import com.zoop.chat.tool.ChatToolResult;
+import com.zoop.chat.tool.ChatWebResult;
 import com.zoop.chat.tool.ChatToolRunner;
 import com.zoop.chat.tool.ChatToolUnavailable;
 import com.zoop.common.json.StrictJson;
@@ -244,6 +245,12 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             Map<String, List<ChatToolResult>> results = new LinkedHashMap<>();
             confirmed.requirements().stream().filter(p -> p.mode() == Mode.TOOLS)
                     .forEach(p -> results.put(p.id(), ran.results()));
+            // A concept part may rest on the run's web hits (Q02's first support), never on its internal reads.
+            List<ChatToolResult> web = ran.results().stream().filter(r -> !r.webResults().isEmpty()).toList();
+            if (!web.isEmpty()) {
+                confirmed.requirements().stream().filter(p -> p.mode() == Mode.GENERAL)
+                        .forEach(p -> results.put(p.id(), web));
+            }
             retrieved = new ChatRetrieval.Outcome(results, Map.of(), Set.of(), null, null);
             agentAnswer = ran.answer();
             agentNotices = ran.notices();
@@ -312,19 +319,25 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         var passed = checked.passed();
         if (!passed.dropped().isEmpty()) route.putArray("droppedGeneral").addAll(strings(passed.dropped()));
 
+        Map<String, ChatWebResult> hits = new LinkedHashMap<>();
+        branches.forEach(b -> b.results().forEach(r -> r.webResults().forEach(h -> hits.putIfAbsent(h.id(), h))));
         Map<String, Citation> cited = new LinkedHashMap<>();
         for (var section : passed.sections()) {
             for (String id : section.evidenceIds()) {
                 Citation citation = cited.get(id);
                 if (citation == null) {
-                    Optional<Citation> read = citations.cite(id, run.graphVersionId(), run.context().asOf(), run.jobId());
+                    // A web hit is cited as the search returned it: there is no evidence record to read again.
+                    Optional<Citation> read = hits.containsKey(id) ? Optional.of(webCitation(hits.get(id)))
+                            : citations.cite(id, run.graphVersionId(), run.context().asOf(), run.jobId());
                     // Readable when the tool passed it on and not now: the answer cannot stand on it.
                     if (read.isEmpty()) return validationFailed();
                     citation = read.get();
                     cited.put(id, citation);
                 }
-                // A ZOOP document section quotes ZOOP documents only, and no other section quotes them.
-                if ("zoop_documented".equals(section.basis()) != "zoop_doc".equals(citation.sourceKind())) {
+                // A ZOOP document section quotes ZOOP documents only, a web section web hits only, and no other section
+                // quotes either.
+                if ("zoop_documented".equals(section.basis()) != "zoop_doc".equals(citation.sourceKind())
+                        || "web_reported".equals(section.basis()) != "web_result".equals(citation.sourceKind())) {
                     return validationFailed();
                 }
             }
@@ -554,6 +567,16 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
     /** Whether the agent was offered nothing but the web: a concept question with no read of its own. */
     private static boolean webOnly(List<ChatCapability> tools) {
         return tools != null && tools.equals(List.of(ChatCapability.WEB_SEARCH));
+    }
+
+    /**
+     * The public citation of a web hit (web search design 6): its server id, snippet, title, domain as publisher, provider
+     * as {@code docId}, publication time and URL. It is no ZOOP evidence and never becomes one.
+     */
+    static Citation webCitation(ChatWebResult hit) {
+        return new Citation("web_result", hit.id(), hit.snippet(), null, null, hit.provider(), null, 0,
+                hit.snippet().codePointCount(0, hit.snippet().length()), hit.title(), hit.domain(), hit.publishedAt(),
+                hit.url());
     }
 
     /** What the answer went on without: a direct start, and the web faults of an agent run. */
