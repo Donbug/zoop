@@ -10,7 +10,6 @@ import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import EvidenceAnalysis from './EvidenceAnalysis';
 
 interface Props {
-  onReady?: (targetId: string) => void;
   /** 사용자가 창을 닫았을 때. 튜토리얼은 근거를 불러오지 못해도 닫으면 다음 단계로 넘어간다. */
   onClosed?: () => void;
   onTutorialSkip?: () => void;
@@ -103,7 +102,6 @@ function EvidenceCard({
 
 // D-GRP-05 · Figma 619:8225 · FS024 · ERD v6 evidence/article_versions.
 export default function EvidenceDrawer({
-  onReady,
   onClosed,
   onViewOnMap,
   onTutorialSkip,
@@ -125,11 +123,6 @@ export default function EvidenceDrawer({
     retry,
     target?.mapContext,
   );
-
-  useEffect(() => {
-    if (target && !loading && items.some((item) => item.article !== null))
-      onReady?.(target.id);
-  }, [target, loading, items, onReady]);
 
   useEffect(() => {
     if (!target) return;
