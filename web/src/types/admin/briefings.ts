@@ -3,7 +3,8 @@
 
 import type { DashboardRoundStatus } from './dashboard';
 
-export type StageStatus = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
+export type StageStatus =
+  'pending' | 'running' | 'done' | 'failed' | 'skipped' | 'unknown';
 
 export type Stage = { status: StageStatus; at: string | null };
 

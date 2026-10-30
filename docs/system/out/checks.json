@@ -2356,7 +2356,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "listAdminBriefingRounds",
       "severity": "difference",
-      "message": "목표만 120 · BFF만 21 · 형식/필수/권한 변경 12",
+      "message": "목표만 120 · BFF만 21 · 형식/필수/권한 변경 15",
       "source": ""
     },
     {
@@ -2370,7 +2370,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAdminBriefingRound",
       "severity": "difference",
-      "message": "목표만 309 · BFF만 37 · 형식/필수/권한 변경 27",
+      "message": "목표만 309 · BFF만 37 · 형식/필수/권한 변경 30",
       "source": ""
     },
     {
@@ -2384,7 +2384,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "reprocessBriefingRound",
       "severity": "difference",
-      "message": "목표만 162 · BFF만 12 · 형식/필수/권한 변경 13",
+      "message": "목표만 162 · BFF만 12 · 형식/필수/권한 변경 16",
       "source": ""
     },
     {
@@ -2412,7 +2412,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "setBriefingSuspension",
       "severity": "difference",
-      "message": "목표만 162 · BFF만 12 · 형식/필수/권한 변경 13",
+      "message": "목표만 162 · BFF만 12 · 형식/필수/권한 변경 16",
       "source": ""
     },
     {
