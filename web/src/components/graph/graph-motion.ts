@@ -9,8 +9,9 @@ const DURATION: Record<CameraMove, number> = {
   select: 300,
   zoom: 250,
   fit: 300,
-  // 포커스 진입·단계 바꾸기·전체 보기에서 노드가 새 자리로 옮겨 가는 시간(프로토타입 graph-layout)
-  layout: 600,
+  // 포커스 진입·단계 바꾸기·전체 보기에서 노드가 새 자리로 옮겨 가는 시간.
+  // 프로토타입 graph-layout은 600ms지만, 노드 500개에서 프레임마다 다시 그리는 비용이 커서 절반으로 줄였다.
+  layout: 300,
 };
 const STANDARD_EASING = 'cubic-bezier(0.35, 0, 0.35, 1)';
 
