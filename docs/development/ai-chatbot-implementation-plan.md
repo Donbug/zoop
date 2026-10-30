@@ -46,14 +46,14 @@
 | 공개 챗봇 계약 | 목표 OpenAPI에 더해 Spring `ChatController`가 세션 생성·조회, 최신 대화 복원, 질문 job 접수·조회·재시도·취소를 구현함 | 공개 producer 구현됨. 배포 활성화는 별도 |
 | ERD | `V20261021120000__create_chat_jobs.sql`이 `chat_sessions`, `chat_jobs`, `chat_tool_calls`와 `ai_executions.chat_job_id` FK를 생성함 | 저장·제약·동시성 시험 구현됨. 적용된 migration은 수정하지 않음 |
 | 프로토타입 BFF | `prototype/bff`에 규칙 기반 질문 해석, 기간 처리, 세션·job·복구·save_only와 테스트가 있음 | 상태 머신·불변식의 참고 구현. 운영 AI 답변 엔진으로 승격하지 않음 |
-| 본개발 Java API | controller/service/repository, 고정 문맥, 작업 executor, 오케스트레이터, 모델 단계 adapter와 읽기 도구 실행기가 있음 | 백엔드 수직 경로 구현됨. recovery artifact·`save_only` 저장 복구는 미구현 |
+| 본개발 Java API | controller/service/repository, 고정 문맥, 작업 executor, 오케스트레이터, 모델 단계 adapter와 읽기 도구 실행기가 있음 | 백엔드 수직 경로와 `save_only` 저장 복구 구현됨 |
 | 루트 웹 | `web/src/apis/chat`, `use-chat-conversation`, `AiChatDrawer`·`ChatJobCard`가 대화 생성·복원, 질문 접수·polling·취소·재시도와 답변·인용·확인 질문·실패 렌더링을 구현함(Vitest) | 구현됨. 타입은 손으로 쓴 `web/src/types/ai`이고 실제 백엔드·모델 종단 시험은 없음 |
 | AI worker | `zoop-ai-chat`이 `chat-router`(Jev), `chat-answer`(Luna), `chat-agent`(Luna Responses MCP), `chat-verification`(Jev)을 별도 계약·원장·grant·live gate로 실행함 | 구현됨, 기본 비활성. 임계값 보정과 실제 승인 호출은 별도 |
 | AI 내부 서비스 | `/internal/v1/chat-stages/{stage}`가 인증된 synchronous stage door로 구현되고 생성 OpenAPI에 포함됨 | 구현됨. 앱은 `HttpChatStageClient`로만 호출 |
 | 데이터 기반 | 기업·문서·evidence·공개 그래프 버전과 현재 권리 재검사 경로가 있고 `company.read`·`issue.read`·`evidence.resolve`·`graph.path.read`·`graph.version.diff`·`portfolio.scope.read`·`briefing.read`·`selectionRule.read`·`zoopPolicy.read`와 합성 공급자 `web.search`가 연결됨(`company.read`는 기업 카탈로그 개요를 `company_profile` 인용으로, `zoopPolicy.read`는 승인 약관을 `zoop_doc` 인용으로 전달) | Q01은 정책 문서만, Q02~Q08 도구 구현. Q01 도움말·화면 명세, `document.search`, `briefing.evidence`, 실제 웹 공급자와 종단 공개 시험은 추가 필요 |
 | 와이어프레임 | 네 정적 화면은 질문·되묻기·회수·조회 오류의 시각 기준을 제공하지만 동작 상태를 증명하지 않음 | 별도 상태 계약으로 로딩·오류·근거 수준·복구를 고정함 |
 
-결론적으로 백엔드의 저장·공개 API·작업 실행기·라우터·오케스트레이터·도구 레지스트리·Luna 생성·Jev 검증과 웹 D-AI-01~02b 연결은 구현돼 있다. Luna Responses MCP agent 경로도 기본 꺼진 상태로 구현돼 있다. 다만 서버 requirement coverage, claim 단위 `unsupportedCausality`, recovery artifact·`save_only`, `uiActions[]`, 미연결 도구, live spike, 평가 보정과 출시 증명은 남아 있다. 기능 플래그와 live gate는 기본적으로 꺼져 있으므로 “코드가 있음”은 “출시됨”이나 “실제 모델 호출 승인됨”을 뜻하지 않는다.
+결론적으로 백엔드의 저장·공개 API·작업 실행기·라우터·오케스트레이터·도구 레지스트리·Luna 생성·Jev 검증과 웹 D-AI-01~02b 연결은 구현돼 있다. Luna Responses MCP agent 경로도 기본 꺼진 상태로 구현돼 있다. 다만 서버 requirement coverage, claim 단위 `unsupportedCausality`, `uiActions[]`, 미연결 도구, live spike, 평가 보정과 출시 증명은 남아 있다. 기능 플래그와 live gate는 기본적으로 꺼져 있으므로 “코드가 있음”은 “출시됨”이나 “실제 모델 호출 승인됨”을 뜻하지 않는다.
 
 ### 구현된 도구 결정 기록 (현재 코드 기준)
 
@@ -98,7 +98,7 @@ flowchart LR
 | 단계 | 2026-10-30 main 상태 | 남은 핵심 |
 | --- | --- | --- |
 | 0 계약·fixture | 부분 구현 | 목표 내부 schema 전체와 고정 평가 fixture 정리 |
-| 1 저장·job 수명주기 | 부분 구현 | recovery artifact와 실제 `save_only` 복구 |
+| 1 저장·job 수명주기 | 구현 | 복구본을 DB에 두므로 DB 장애 자체는 복구 대상이 아님 |
 | 2 오케스트레이터 | 부분 구현 | 서버 requirement coverage, direct 경로 45초(단계 한도 실측 후) |
 | 3 router·Luna agent | 부분 구현 | Jev router·Luna Responses MCP·Java 승인 루프는 구현(합성 replay로만 확인). live 확인, 라우터 wire `dependsOn`, 승인 요청의 요구 매핑 |
 | 4 읽기 도구 | 부분 구현 | Q03 일부, Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`), Q06 발행 브리핑(`briefing.read`), Q08 선정 기록(`selectionRule.read`, 2026-10-30), `web.search`(합성 공급자) 구현, Q01 도움말·화면 명세, `document.search`, `briefing.evidence` 미연결, 실제 웹 공급자 미정 |
@@ -124,7 +124,7 @@ flowchart LR
 
 완료 조건: 동시 접수 한 건만 성공, 다른 회원 접근 차단, 같은 jobId 같은 본문 재전송은 같은 작업 반환, 다른 본문은 409, save_only 모델 호출 0회, 깊이 2 작업의 clarification 저장 0건.
 
-현재 상태: migration, 공개 API, 멱등성·소유권, 단일 활성 job, lease/owner fence, 취소·만료 회수와 최대 3회 rerun은 구현됐다. recovery artifact 저장소가 없어 `save_only` 시도는 현재 `result_lost`로 닫히므로 이 단계의 완료 조건 전체를 충족한 것은 아니다.
+현재 상태: migration, 공개 API, 멱등성·소유권, 단일 활성 job, lease/owner fence, 취소·만료 회수와 최대 3회 rerun은 구현됐다. `save_only`도 구현했다(2026-10-30): 검증 결과를 파일이 아니라 `chat_recovery_results`에 시도별로 먼저 커밋하고, 저장 실패나 그 뒤의 lease 만료는 `save_failed`·`retry=save_only`로 끝나며, 모델 호출 없이 저장만 다시 한다. 복구본이 없으면 `result_lost`다.
 
 ### 단계 2 — 오케스트레이터·예산·캐시
 
