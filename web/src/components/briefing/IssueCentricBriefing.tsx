@@ -24,6 +24,7 @@ import {
 } from '@/util/briefingIssueReading';
 import { safeArticleUrl } from '@/components/graph/event-format';
 import MarketIndicators from './MarketIndicators';
+import PriorIssueFollowUps from './PriorIssueFollowUps';
 import BriefingItemDetails from './BriefingItemDetails';
 import BriefingContinuity from './BriefingContinuity';
 import BriefingRecap from './BriefingRecap';
@@ -863,6 +864,7 @@ export default function IssueCentricBriefing({
           </p>
         )}
       </section>
+      <PriorIssueFollowUps key={result.id} result={result} />
     </div>
   );
 }
