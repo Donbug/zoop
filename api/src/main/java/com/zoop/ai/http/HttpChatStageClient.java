@@ -72,6 +72,7 @@ public final class HttpChatStageClient implements ChatStageClient, AutoCloseable
         ChatMcpHealth.Reason decoded = switch (reason) {
             case "mcp_timeout" -> ChatMcpHealth.Reason.TIMEOUT;
             case "mcp_connect_failed" -> ChatMcpHealth.Reason.CONNECT_FAILED;
+            case "mcp_unavailable" -> ChatMcpHealth.Reason.UNAVAILABLE;
             case "mcp_status_unexpected" -> ChatMcpHealth.Reason.STATUS_UNEXPECTED;
             default -> throw new Malformed("reason");
         };

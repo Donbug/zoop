@@ -111,11 +111,31 @@ export type ChatLimitationKind =
   | 'results_truncated'
   | 'not_in_member_scope'
   | 'evidence_insufficient'
-  | 'out_of_scope';
+  | 'out_of_scope'
+  | 'tool_unavailable';
 
 export type ChatLimitation = {
   kind: ChatLimitationKind;
   label: string;
+  message: string;
+};
+
+// 답변 완결 정도(MCP 실행 계약 3.5): 서버가 정하며 job.status·outcome과 별개다.
+export type ChatAnswerStatus = 'complete' | 'partial' | 'guidance';
+
+export type ChatNoticeCode =
+  | 'mcp_direct_start'
+  | 'web_unavailable'
+  | 'web_no_results'
+  | 'web_budget_exhausted'
+  | 'web_not_configured'
+  | 'tool_unavailable'
+  | 'tool_budget_exhausted';
+
+// 답변을 막지 않은 장애·우회. labels가 비어 있으면 실행 전체에 해당한다.
+export type ChatNotice = {
+  code: ChatNoticeCode;
+  labels: string[];
   message: string;
 };
 
@@ -133,6 +153,8 @@ export type ChatResult = {
   choices: ChatChoice[];
   action: ChatAction | null;
   limitations: ChatLimitation[];
+  answerStatus: ChatAnswerStatus;
+  notices: ChatNotice[];
 };
 
 export type ChatFailureKind =

@@ -164,6 +164,17 @@ function fixture(): BriefingResponse {
   } as unknown as BriefingResponse;
 }
 describe('D-BRF-01/02 edition reviews', () => {
+  it('keeps quotes and original links when the finished projection omits full article bodies', () => {
+    const r = fixture();
+    for (const source of Object.values(r.editionReview!.sources))
+      delete source.fullBody;
+    render(<EditionReview result={r} compact={false} />);
+    expect(screen.queryByText('전체 보존 원문')).toBeNull();
+    expect(
+      screen.getAllByRole('link', { name: '합성 원문 ↗' }).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText('계획입니다.').length).toBeGreaterThan(0);
+  });
   it('separates price gains from evidence confirmation and keeps every morning company', async () => {
     const r = fixture();
     expect(validEditionReview(r)).toBeTruthy();

@@ -168,6 +168,8 @@ class OrchestratedChatEngineTest {
         assertEquals("answered", result.outcome());
         assertEquals("mixed", result.answerBasis());
         assertTrue(result.limitations().isEmpty());
+        assertEquals("complete", result.answerStatus());
+        assertTrue(result.notices().isEmpty());
         assertEquals(List.of(readable.get(evidence(HYNIX))), result.citations());
 
         var concept = generated.getFirst().branches().get(1);
@@ -195,6 +197,7 @@ class OrchestratedChatEngineTest {
         assertEquals("general_knowledge", noEvidence.answerBasis());
         assertEquals(List.of("evidence_insufficient"), noEvidence.limitations().stream().map(l -> l.kind()).toList());
         assertEquals("요구 r1", noEvidence.limitations().getFirst().label());
+        assertEquals("partial", noEvidence.answerStatus(), "the fact part is unanswered");
 
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9, ChatQueryType.Q03, 0.9), Map.of()));
         answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리 칩을 쌓은 메모리입니다.", "r1-c")), List.of(),
@@ -228,6 +231,7 @@ class OrchestratedChatEngineTest {
         verdicts = new ChatSemanticVerdicts(List.of());
         ChatResult nothingLeft = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
         assertEquals("insufficient_evidence", nothingLeft.outcome());
+        assertEquals("guidance", nothingLeft.answerStatus());
 
         answer = new ChatGeneratedAnswer(List.of(general("HBM은 메모리입니다. 지금 매수하세요.", "r1-c"),
                 grounded("SK하이닉스는 HBM을 공급합니다.", List.of("r1"), evidence(HYNIX))), List.of(), List.of());
@@ -293,6 +297,7 @@ class OrchestratedChatEngineTest {
         ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
         assertEquals(List.of("investment_advice"), result.limitations().stream().map(l -> l.kind()).toList());
         assertEquals("요구 r2", result.limitations().getFirst().label());
+        assertEquals("partial", result.answerStatus());
         assertEquals(List.of("r1"), generated.getFirst().branches().stream().map(b -> b.requirementId()).toList());
 
         generated.clear();
@@ -365,7 +370,7 @@ class OrchestratedChatEngineTest {
     }
 
     @Test
-    void aToolFailureEndsTheRunAndIsNeverALimitation() {
+    void aToolFailureThatLeavesNothingAnsweredEndsTheRun() {
         decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
                 List.of(HYNIX)));
         tools.put(ChatCapability.COMPANY_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
@@ -373,6 +378,86 @@ class OrchestratedChatEngineTest {
         tools.put(ChatCapability.COMPANY_READ, (scope, request) -> { throw new IllegalStateException("bug"); });
         assertFailed("internal", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
         assertTrue(generated.isEmpty());
+    }
+
+    @Test
+    void aPassingToolFaultLeavesOnlyItsRequirementUnansweredAndTheRestIsAPartialAnswer() {
+        // D-AI-02: the member gets what could be read and is told which part could not be.
+        decision = ChatPlannerTest.decision(
+                req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)),
+                req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("issue.read", 0.9), List.of("iss-1")));
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
+        answer = new ChatGeneratedAnswer(List.of(grounded("HBM 공급 사건이 있습니다.", List.of("r2"), "ev-issue")),
+                List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+
+        var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        ChatResult result = outcome.result();
+        assertEquals("answered", result.outcome());
+        assertEquals("partial", result.answerStatus());
+        assertEquals(List.of("tool_unavailable"), result.limitations().stream().map(l -> l.kind()).toList());
+        assertEquals("요구 r1", result.limitations().getFirst().label());
+        assertEquals(List.of("r2"), generated.getFirst().branches().stream().map(b -> b.requirementId()).toList(),
+                "the unanswered requirement is no branch: nothing is written about it");
+        assertEquals("r1", outcome.routeSummary().path("toolFaults").get(0).asString());
+
+        // A timeout is the same passing fault.
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> {
+            try {
+                Thread.sleep(10_000);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            return new ChatToolOutput(scope.graphVersionId(), List.of(), List.of(), false, false);
+        });
+        ChatResult late = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertEquals(List.of("tool_unavailable"), late.limitations().stream().map(l -> l.kind()).toList());
+    }
+
+    @Test
+    void anAdapterFaultInOneRequirementStillEndsTheRun() {
+        decision = ChatPlannerTest.decision(
+                req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)),
+                req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("issue.read", 0.9), List.of("iss-1")));
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> { throw new IllegalStateException("bug"); });
+        assertFailed("internal", null, false, engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertTrue(generated.isEmpty(), "a bug is not passed off as a partial answer");
+    }
+
+    @Test
+    void aFaultedSourceLeavesItsDependentUnavailableNotUnderItsCondition() {
+        // The second stage cannot run when its source could not be read: that is the fault, not a checkpoint miss.
+        decision = dependent("exactly", 2);
+        tools.put(ChatCapability.ISSUE_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
+        var control = new Control(Duration.ofSeconds(60));
+        assertFailed("transient", null, true, engine().answer(run(), control));
+        assertEquals(1, control.reserved.size(), "the dependent stage never ran");
+
+        // The source read and the dependent stage faulted: the source is answered, the dependent is unavailable.
+        tools.put(ChatCapability.ISSUE_READ, (scope, request) -> new ChatToolOutput(scope.graphVersionId(),
+                List.of(new ChatToolItem("iss-1", "issue", "HBM 공급", List.of(HYNIX, NVDA), List.of("ev-issue"))),
+                List.of("ev-issue"), false, false));
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
+        answer = new ChatGeneratedAnswer(List.of(grounded("HBM 공급 사건이 있습니다.", List.of("r1"), "ev-issue")),
+                List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("supported", "no")));
+        ChatResult result = completed(engine().answer(run(), new Control(Duration.ofSeconds(60))));
+        assertEquals("partial", result.answerStatus());
+        assertEquals(List.of("tool_unavailable"), result.limitations().stream().map(l -> l.kind()).toList());
+        assertEquals("요구 r2", result.limitations().getFirst().label());
+    }
+
+    @Test
+    void aFaultIsNeverHiddenAsMissingEvidenceWhenWhatWasReadIsHeld() {
+        decision = ChatPlannerTest.decision(
+                req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9), List.of(HYNIX)),
+                req("r2", Map.of(ChatQueryType.Q03, 0.9), Map.of("issue.read", 0.9), List.of("iss-1")));
+        tools.put(ChatCapability.COMPANY_READ, (scope, request) -> { throw new ChatToolUnavailable("snapshot"); });
+        answer = new ChatGeneratedAnswer(List.of(grounded("HBM 공급 사건이 있습니다.", List.of("r2"), "ev-issue")),
+                List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict("hold", "no")));
+        assertFailed("transient", null, true, engine().answer(run(), new Control(Duration.ofSeconds(60))));
     }
 
     @Test

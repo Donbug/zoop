@@ -258,3 +258,21 @@ def test_no_slot_within_the_wait_is_busy_and_starts_nothing(tmp_path):
     finally:
         process.hold.set()
         first.join()
+
+
+def test_a_probe_answers_while_every_stage_slot_is_held(tmp_path):
+    # An agent step holding the only stage slot must not make a reachable MCP server look unproven.
+    reachable = Outcome("result", result={"schemaVersion": "zoop-ai-chat-1", "mcp": "reachable"}, exit_code=0)
+    process = Scripted(lambda payload: Outcome("result", result=result(payload["invocationId"]), exit_code=0),
+                       probe_outcome=reachable)
+    process.hold = threading.Event()
+    stages = ChatStages(config(tmp_path), process, slots=1, slot_wait=0.1)
+    first = threading.Thread(target=stages.invoke, args=("app", "chat-router", request(), Observation()))
+    first.start()
+    try:
+        while not process.calls:
+            pass
+        assert stages.probe_mcp(Observation()).mcp == "reachable"
+    finally:
+        process.hold.set()
+        first.join()
