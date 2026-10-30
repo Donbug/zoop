@@ -218,7 +218,13 @@ public class ChatService {
             if (repository.activeJob(job.sessionId()).isPresent()) throw new CustomException(ErrorCode.JOB_IN_PROGRESS);
 
             Instant now = clock.instant();
-            attempts.add(attempt(attempts.size() + 1, mode, idempotencyKey, now));
+            ObjectNode next = attempt(attempts.size() + 1, mode, idempotencyKey, now);
+            if ("save_only".equals(mode)) {
+                // The attempt that verified the result, also when an earlier save_only attempt failed in turn.
+                JsonNode last = attempts.get(attempts.size() - 1);
+                next.put("sourceAttemptNo", last.path("sourceAttemptNo").asInt(last.path("n").asInt()));
+            }
+            attempts.add(next);
             if (!repository.requeue(jobId, now, attempts.toString())) throw new IllegalStateException("locked job moved");
             repository.touchSession(job.sessionId(), now);
             return new JobResult(view(repository.findJob(jobId).orElseThrow()), true);
