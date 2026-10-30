@@ -100,6 +100,20 @@ final class GraphHandoffResultWriter {
         });
         file(root.putObject("snapshot"), staged.snapshot());
         file(root.putObject("receipt"), staged.receipt());
+        if (staged.bundleSnapshot() == null) {
+            root.putNull("bundleSnapshot");
+        } else {
+            file(root.putObject("bundleSnapshot"), staged.bundleSnapshot());
+        }
+        ObjectNode composition = root.putObject("composition");
+        ArrayNode sources = composition.putArray("sources");
+        staged.sources().forEach(sources::add);
+        // Only a staged import added a source; a re-import of the same pins composed nothing.
+        if (staged.outcome() == GraphHandoffResult.Outcome.STAGED) {
+            composition.put("newSource", staged.handoffId());
+        } else {
+            composition.putNull("newSource");
+        }
         return StrictJson.write(root);
     }
 

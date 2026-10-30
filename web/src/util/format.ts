@@ -4,9 +4,9 @@ export function formatQuantity(quantity: number) {
   return `${quantity.toLocaleString('ko-KR')}주`;
 }
 
-/** 자산 비중(0..1). 계산할 수 없으면 그대로 알린다. */
+/** 자산 비중(0..1). 계산할 수 없으면 대시로 표시한다. */
 export function formatWeight(weight: number | null) {
-  if (weight === null) return '비중 계산 불가';
+  if (weight === null) return '-';
   return `비중 ${(weight * 100).toLocaleString('ko-KR', {
     maximumFractionDigits: 1,
   })}%`;

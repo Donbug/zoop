@@ -752,7 +752,7 @@ test('connected member displays mock holding without replacing null values', asy
   );
   open(pinned);
   await screen.findByText('20주');
-  expect(screen.getByText('계산 불가')).toBeTruthy();
+  expect(screen.getByText('-', { selector: 'dd' })).toBeTruthy();
   const region = screen.getByRole('region', { name: '가상 계좌 보유' });
   expect(within(region).getAllByText(/모의/).length).toBeGreaterThan(0);
   // D-COM-01 / F6: private valuation timestamps retain the original machine values.
@@ -768,6 +768,45 @@ test('connected member displays mock holding without replacing null values', asy
   ).toBe(true);
   await act(async () => useAuthStore.getState().clearSession());
   expect(screen.queryByText('20주')).toBeNull();
+});
+test('D-COM-01 company detail hides holdings when the portfolio only holds other companies', async () => {
+  useAuthStore.getState().setSession({
+    authenticated: true,
+    kind: 'member',
+    user: {
+      id: 'synthetic-member',
+      email: 'synthetic@example.test',
+      displayName: '가상',
+    },
+    setup: { completed: true, tutorialCompleted: false },
+    csrfToken: 'synthetic',
+    expiresAt: null,
+  });
+  server.on('GET', '/api/v1/portfolio', () =>
+    json({
+      connected: true,
+      holdings: [
+        {
+          companyId: 'KRX:OTHER',
+          quantity: 20,
+          avgPrice: 100,
+          avgPriceCurrency: 'KRW',
+          marketValue: 2000,
+          weight: 1,
+          quote: { status: 'available', currency: 'KRW' },
+        },
+      ],
+      mockAsOf: old,
+      valuation: null,
+      metadata,
+    }),
+  );
+  open(pinned);
+  await waitFor(() =>
+    expect(server.calls('GET', '/api/v1/portfolio').length).toBeGreaterThan(0),
+  );
+  expect(screen.queryByRole('region', { name: '가상 계좌 보유' })).toBeNull();
+  expect(screen.queryByText('이 기업의 모의 보유 종목이 없어요.')).toBeNull();
 });
 test('switching member hides previous holdings while next response is pending', async () => {
   const session = (id: string) => ({
@@ -815,7 +854,7 @@ test('switching member hides previous holdings while next response is pending', 
       }),
     ),
   );
-  await screen.findByText('연결된 가상 계좌가 없어요.');
+  expect(screen.queryByRole('region', { name: '가상 계좌 보유' })).toBeNull();
 });
 test('event map link opens the event-time map; round trip restores period, time, tab, event and bucket exactly', async () => {
   const query = `${pinned}&period=1m&tab=events&event=issue-a&bucket=2026-10-05`;

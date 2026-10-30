@@ -151,8 +151,9 @@ public class JdbcChatExecutionRepository implements ChatExecutionRepository {
     public int countJobToolCalls(String jobId, int attemptNo, boolean web) {
         Integer count = jdbc.queryForObject("""
                 SELECT count(*) FROM chat_tool_calls
-                 WHERE chat_job_id = :id AND (attempt_no = :attempt OR status <> 'cancelled')
+                 WHERE chat_job_id = :id
                    AND (registry_group = 'web-search') = :web
+                   AND (:web OR attempt_no = :attempt OR status <> 'cancelled')
                 """, new MapSqlParameterSource().addValue("id", jobId).addValue("attempt", attemptNo).addValue("web", web),
                 Integer.class);
         return count == null ? 0 : count;

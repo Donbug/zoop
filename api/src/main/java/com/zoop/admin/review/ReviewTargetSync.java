@@ -140,6 +140,12 @@ public final class ReviewTargetSync {
                 rows += reviews.markPresentRelations(payload.jobId(), payload.inputDigest(), projection.rows().stream()
                         .filter(row -> row.type().equals("relation")).map(ReviewTargetReader.Row::externalId).toList(), at);
             }
+            // What a later analysis of the same document is matched on; it never changes the rows written above. Recorded only
+            // from a complete reading: a unit that names its document replaces older analyses of it, and rows left out
+            // (unreadable, or no verdict yet) would hide their candidates with nothing listed in their place.
+            if (projection.complete() && projection.document() != null) {
+                reviews.recordDocument(payload.jobId(), projection.document());
+            }
             return rows + reviews.refreshCandidates(payload.jobId(), at);
         });
         if (written > 0) {
