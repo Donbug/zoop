@@ -205,9 +205,11 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         List<ChatCapability> agentTools = agentTools(confirmed);
         if (agentTools != null && !agent.available()) {
             // Preflight/circuit decisions happen before the first agent step. The direct path begins here; a failure after an
-            // agent step has started is never replaced with direct results in this run.
+            // agent step has started is never replaced with direct results in this run. A concept question that went to
+            // the agent only for its search is answered without the web, and says so.
+            if (webOnly(agentTools)) agentNotices = List.of("web_unavailable");
+            else directStart = true;
             agentTools = null;
-            directStart = true;
             route.put("agentPreflight", "unavailable");
         }
         if (agentTools != null) {
@@ -533,14 +535,24 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             }
             tools.addAll(p.capabilities());
         }
-        if (tools.isEmpty()) return null;
-        // The web is the last resort of a fact question (Q03~Q08, web search design 1): offered beside its internal reads,
-        // approved only once they left something unmet. A question with no such requirement (Q01 service rules, Q02
-        // concepts alone) is never offered it here.
+        // The web (web search design 1) is the first support of a concept (Q02: one search, tried by default) and the last
+        // resort of a fact question (Q03~Q08: approved only once the internal reads left something unmet). A question
+        // with a service-rule part (Q01) is never offered it: its answer may not rest on the web, and a search cannot yet
+        // be tied to the part it serves.
+        boolean concept = plan.requirements().stream().anyMatch(p -> p.mode() == Mode.GENERAL);
         boolean fact = plan.requirements().stream().anyMatch(p -> p.mode() == Mode.TOOLS
                 && p.types().stream().anyMatch(WEB_TYPES::contains));
-        if (fact && exposed.contains(ChatCapability.WEB_SEARCH)) tools.add(ChatCapability.WEB_SEARCH);
-        return List.copyOf(tools);
+        boolean rules = plan.requirements().stream().anyMatch(p -> p.types().contains(ChatQueryType.Q01));
+        if ((concept || fact) && !rules && exposed.contains(ChatCapability.WEB_SEARCH)) {
+            // A concept question with no read of its own goes to the agent for its search alone.
+            tools.add(ChatCapability.WEB_SEARCH);
+        }
+        return tools.isEmpty() ? null : List.copyOf(tools);
+    }
+
+    /** Whether the agent was offered nothing but the web: a concept question with no read of its own. */
+    private static boolean webOnly(List<ChatCapability> tools) {
+        return tools != null && tools.equals(List.of(ChatCapability.WEB_SEARCH));
     }
 
     /** What the answer went on without: a direct start, and the web faults of an agent run. */

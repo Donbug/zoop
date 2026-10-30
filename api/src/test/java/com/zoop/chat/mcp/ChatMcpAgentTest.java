@@ -219,6 +219,46 @@ class ChatMcpAgentTest {
     }
 
     @Test
+    void aConceptMayMakeOneSearchFromTheFirstRound() {
+        useWeb();
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(search("w1", "HBM"), search("w2", "EUV 수출 규제")),
+                null));
+        luna.script.add(n -> done());
+        var circuit = new ChatMcpCircuitBreaker(() -> new com.zoop.ai.chat.ChatMcpHealth(true, null), clock);
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, mapper, circuit);
+        var attached = executor.attach(JOB, 1).orElseThrow();
+        var outcome = agent.run(attached.run(), attached.control(),
+                List.of(new ChatModels.AgentRequirement("r1", "HBM이 뭐야", true, List.of())),
+                List.of(ChatCapability.WEB_SEARCH), 20, steps(false));
+
+        assertEquals(List.of(new ChatModels.Decision("w1", true), new ChatModels.Decision("w2", false)),
+                luna.inputs.get(1).decisions(), "one search for the concept; nothing internal left more unmet");
+        assertEquals(1, outcome.results().size());
+        assertEquals(2, outcome.results().getFirst().webResults().size());
+    }
+
+    @Test
+    void aMixedConceptAndFactRunCannotUseTheConceptExceptionForAFactQuery() {
+        useWeb();
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(search("w0", "SK하이닉스 최신 소식"),
+                new ChatModels.ApprovalRequest("c1", "company_read", Map.of("targets", List.of("KRX:000660")))), null));
+        luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(search("w1", "SK하이닉스 최신 소식")), null));
+        luna.script.add(n -> done());
+        var circuit = new ChatMcpCircuitBreaker(() -> new com.zoop.ai.chat.ChatMcpHealth(true, null), clock);
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, mapper, circuit);
+        var attached = executor.attach(JOB, 1).orElseThrow();
+        agent.run(attached.run(), attached.control(), List.of(
+                new ChatModels.AgentRequirement("r1", "HBM이 뭐야", true, List.of()),
+                new ChatModels.AgentRequirement("r2", "SK하이닉스 최신 소식", false, List.of("KRX:000660"))),
+                List.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH), 20, steps(false));
+
+        assertEquals(List.of(new ChatModels.Decision("w0", false), new ChatModels.Decision("c1", true)),
+                luna.inputs.get(1).decisions(), "a mixed run cannot bind the early query to its concept requirement");
+        assertEquals(List.of(new ChatModels.Decision("w1", true)), luna.inputs.get(2).decisions(),
+                "after the internal read found nothing, the normal last-resort rule opens the web");
+    }
+
+    @Test
     void webFaultsTheAnswerWentOnWithoutAreNoticesNeverAFailure() {
         useWeb();
         luna.script.add(n -> held("c1", "company_read", Map.of("targets", List.of("KRX:000660"))));
