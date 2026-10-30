@@ -1,0 +1,29 @@
+# 관리자 브리핑 회차 조회 (A-ADM-04 / FS070-01)
+
+`/admin/briefings`는 Spring의 관리자 세션으로 기존 PostgreSQL 회차를 조회한다. 회차 생성, 모델 호출, 발행, 정정, 제공 중단/재개는 이 구현에서 수행하지 않는다. 미연결 쓰기 버튼은 기본 화면에서 비활성화된다.
+
+## 읽기 API
+
+- `GET /api/v1/admin/briefings`: `scheduled_at DESC, id DESC` 목록. `from`, `to`는 생략 가능하며 둘을 제공하면 동일한 날짜 또는 offset date-time 형식이어야 한다. 날짜는 한국 시간 해당 일 전체를 포함하고, date-time은 경계 시각까지 포함한다.
+- `limit=1..100` (기본 50). `nextCursor`는 관리자 ID·필터·페이지 크기에 결합된 서명 커서다. 다음 페이지에서도 같은 필터를 전달한다. 같은 예정 시각의 회차도 ID로 안정적으로 구분한다.
+- `GET /api/v1/admin/briefings/{round_id}`: 회차 상태·발행 원문·정정 이력·생성 시도 기록. 존재하지 않는 회차는 404, DB 조회 실패/원문 digest 불일치는 503이며 빈 목록으로 가장하지 않는다.
+- 관리자 인증 없이 401. 일반 사용자 세션을 관리자 세션으로 인정하지 않는다. POST/PATCH 실행 API는 이 변경에 포함되지 않는다.
+
+## 저장 의미
+
+`briefing_rounds`, `briefing_changes`, `briefing_attempts`를 같은 읽기 전용 repeatable-read transaction에서 조회한다. 새 migration이나 기존 결과 backfill은 없다. 발행 원문은 기존 PostgreSQL JSONB SHA-256 검사를 통과한 내용만 반환한다. 중단된 회차도 관리자는 원문과 중단 이유를 볼 수 있고, 정정은 원문 덮어쓰기 없이 별도 이력으로 제공한다.
+
+- 저장된 회차 단계·완료 시각을 우선 사용하고, 미기록 단계는 최신 `purpose=generation` 시도의 실제 단계 원장으로 보완한다. `feature=briefing`인 generation의 succeeded/reused는 생성 완료이며, verification의 모델 호출 성공만으로 검증 PASS를 뜻하지 않는다. completed + outcome=available은 확인된 생성·검증 완료, outcome=withheld는 실행된 검증의 보류(실패)로 표시한다. 오래된 시도나 별도 전망 분석 단계로 현재 시도를 덮지 않는다. 완료 상태만 있고 시각이 없으면 `at=null`이며 generatedAt을 만들지 않는다. 발행은 실제 저장 시각으로만 완료 처리한다. 단계·최종 결과가 없는 과거 회차는 `StageOut.status=unknown`(기록 없음)으로 유지한다.
+- `attempts`, `trigger`, `attemptsLog`는 `purpose=generation` 원장만 사용한다. 별도 `outlook` 호출을 생성 재시도로 중복 집계하지 않는다. 과거 원장이 없으면 기록된 시도 0, trigger null이며 실제 AI 호출이 없었다는 의미가 아니다.
+- 운영 예정 시각은 09:20 / 17:30 Asia/Seoul. 저장된 회차의 실제 예정/생성/발행 시각은 그대로 표시한다.
+- 토큰·임대·요청 본문은 응답에 넣지 않는다. 실패 사유는 안전한 코드만 노출하며 자유 형식의 내부 오류는 일반 안내로 대체한다.
+
+## 로컬 확인
+
+1. `api/README.md`에 따라 PostgreSQL과 API 환경을 설정하고 migration을 적용한다. 기존 DB는 먼저 백업한다.
+2. 같은 README의 `admin-provision` 명령으로 관리자 계정을 만든다. 일반 회원 로그인과 별도 계정이다.
+3. 로컬 HTTP만 사용하는 경우 `SPRING_PROFILES_ACTIVE=local`, `ZOOP_AUTH_ALLOWED_ORIGINS`를 실제 프론트 주소로 설정한다.
+4. `web/.env.local`에 `ZOOP_DEV_API_TARGET=http://localhost:<API 포트>`를 설정하고 `pnpm dev`를 실행한다.
+5. `/admin/login`에서 로그인한 뒤 `/admin/briefings`에서 회차를 선택한다. 저장된 회차가 없으면 빈 상태가 정상이며 임의 회차나 AI 결과를 생성하지 않는다.
+
+검증: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`를 분리된 시험 DB로 설정하고 `./api/gradlew -p api authIntegrationTest --tests com.zoop.admin.briefings.AdminBriefingPostgresTest`; 화면은 `cd web && pnpm test tests/admin/adminBriefings.test.tsx`.

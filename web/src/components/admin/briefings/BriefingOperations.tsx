@@ -45,9 +45,11 @@ const DT = 'text-[11px] text-zoop-muted';
 function RoundDetailView({
   round,
   onAction,
+  readOnly,
 }: {
   round: RoundDetailData;
   onAction: (action: RoundAction) => void;
+  readOnly: boolean;
 }) {
   const items = round.published?.items ?? [];
   return (
@@ -86,7 +88,7 @@ function RoundDetailView({
             </span>
           )}
         </dd>
-        <dt className={DT}>시도</dt>
+        <dt className={DT}>기록된 생성 시도</dt>
         <dd className={`${DD} tabular-nums`}>{count(round.attempts)}회</dd>
       </dl>
       {round.failureReason && (
@@ -106,7 +108,7 @@ function RoundDetailView({
       <div className="flex flex-wrap items-center gap-2 border-y-[0.667px] border-zoop-line py-3">
         <button
           type="button"
-          disabled={!round.reprocessable}
+          disabled={readOnly || !round.reprocessable}
           onClick={() => onAction('reprocess')}
           className={BUTTON}
         >
@@ -114,7 +116,7 @@ function RoundDetailView({
         </button>
         <button
           type="button"
-          disabled={!round.published}
+          disabled={readOnly || !round.published}
           onClick={() => onAction('correct')}
           className={BUTTON}
         >
@@ -123,6 +125,7 @@ function RoundDetailView({
         {round.status === 'suspended' ? (
           <button
             type="button"
+            disabled={readOnly}
             onClick={() => onAction('resume')}
             className={BUTTON}
           >
@@ -131,14 +134,14 @@ function RoundDetailView({
         ) : (
           <button
             type="button"
-            disabled={!round.published}
+            disabled={readOnly || !round.published}
             onClick={() => onAction('suspend')}
             className={BUTTON}
           >
             제공 중단
           </button>
         )}
-        {!round.reprocessable && round.blockedReason && (
+        {!readOnly && !round.reprocessable && round.blockedReason && (
           <p className="w-full text-[11px] text-zoop-muted">
             재처리할 수 없어요: {round.blockedReason}
           </p>
@@ -261,10 +264,12 @@ function RoundPanel({
   roundId,
   onClose,
   onChanged,
+  readOnly,
 }: {
   roundId: string;
   onClose: () => void;
   onChanged: () => void;
+  readOnly: boolean;
 }) {
   const load = useCallback(() => getAdminBriefingRound(roundId), [roundId]);
   const detail = useAsyncData(load);
@@ -314,7 +319,7 @@ function RoundPanel({
           onRetry={detail.reload}
         />
       )}
-      {round && action && (
+      {round && action && !readOnly && (
         <RoundActionForm
           key={action}
           round={round}
@@ -331,6 +336,7 @@ function RoundPanel({
       {round && (
         <RoundDetailView
           round={round}
+          readOnly={readOnly}
           onAction={(next) => {
             setDone(null);
             setAction(next);
@@ -344,7 +350,11 @@ function RoundPanel({
 // A-ADM-04 브리핑 운영 (FS070-01·02, FS071-01·02)
 // - 회차별 데이터 기준 시점·생성/검증/발행 상태·실패 사유. 조회는 재처리나 발행을 하지 않는다.
 // - 선택한 회차는 주소(?round=)에 남는다. 관리 작업은 사유를 받고, 끝나면 목록과 상세를 다시 읽는다.
-export default function BriefingOperations() {
+export default function BriefingOperations({
+  readOnly = true,
+}: {
+  readOnly?: boolean;
+}) {
   const { params, updateQuery } = useRouteQuery();
   const selectedId = params.get('round');
   const rounds = useCursorPages(listAdminBriefingRounds);
@@ -371,6 +381,12 @@ export default function BriefingOperations() {
           )
         }
       />
+      {readOnly && (
+        <Note>
+          회차 조회만 제공됩니다. 재처리·정정·제공 중단 및 재개는 아직 지원하지
+          않습니다.
+        </Note>
+      )}
       {rounds.refreshError && (
         <p role="status" className="text-[11px] text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.
@@ -464,6 +480,7 @@ export default function BriefingOperations() {
             <RoundPanel
               key={selectedId}
               roundId={selectedId}
+              readOnly={readOnly}
               onClose={() => updateQuery({ round: null }, { replace: true })}
               onChanged={rounds.reload}
             />

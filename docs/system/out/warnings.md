@@ -340,15 +340,15 @@
 | BFF_PATH_DIFFERENCE | difference | getAiUsage | 목표 /api/v1/admin/ai-usage ↔ BFF /api/admin/ai-usage |  |
 | BFF_FIELD_DIFFERENCE | difference | getAiUsage | 목표만 214 · BFF만 50 · 형식/필수/권한 변경 8 |  |
 | BFF_PATH_DIFFERENCE | difference | listAdminBriefingRounds | 목표 /api/v1/admin/briefings ↔ BFF /api/admin/briefings |  |
-| BFF_FIELD_DIFFERENCE | difference | listAdminBriefingRounds | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 12 |  |
+| BFF_FIELD_DIFFERENCE | difference | listAdminBriefingRounds | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 15 |  |
 | BFF_PATH_DIFFERENCE | difference | getAdminBriefingRound | 목표 /api/v1/admin/briefings/{round_id} ↔ BFF /api/admin/briefings/{round_id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getAdminBriefingRound | 목표만 309 · BFF만 37 · 형식/필수/권한 변경 27 |  |
+| BFF_FIELD_DIFFERENCE | difference | getAdminBriefingRound | 목표만 309 · BFF만 37 · 형식/필수/권한 변경 30 |  |
 | BFF_PATH_DIFFERENCE | difference | reprocessBriefingRound | 목표 /api/v1/admin/briefings/{round_id}/reprocess ↔ BFF /api/admin/briefings/{round_id}/reprocess |  |
-| BFF_FIELD_DIFFERENCE | difference | reprocessBriefingRound | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 13 |  |
+| BFF_FIELD_DIFFERENCE | difference | reprocessBriefingRound | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 16 |  |
 | BFF_PATH_DIFFERENCE | difference | appendBriefingCorrection | 목표 /api/v1/admin/briefings/{round_id}/corrections ↔ BFF /api/admin/briefings/{round_id}/corrections |  |
 | BFF_FIELD_DIFFERENCE | difference | appendBriefingCorrection | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 12 |  |
 | BFF_PATH_DIFFERENCE | difference | setBriefingSuspension | 목표 /api/v1/admin/briefings/{round_id}/suspension ↔ BFF /api/admin/briefings/{round_id}/suspension |  |
-| BFF_FIELD_DIFFERENCE | difference | setBriefingSuspension | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 13 |  |
+| BFF_FIELD_DIFFERENCE | difference | setBriefingSuspension | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 16 |  |
 | BFF_PATH_DIFFERENCE | difference | recordInteractionEvents | 목표 /api/v1/telemetry ↔ BFF /api/telemetry |  |
 | BFF_FIELD_DIFFERENCE | difference | recordInteractionEvents | 목표만 206 · BFF만 28 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | getMyFeedback | 목표 /api/v1/feedback ↔ BFF /api/feedback |  |
