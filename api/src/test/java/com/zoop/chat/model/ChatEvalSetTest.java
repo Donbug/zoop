@@ -271,9 +271,13 @@ class ChatEvalSetTest {
                     String id = requirement.get("requirementId").stringValue();
                     JsonNode r = routed.get(id);
                     if (r == null) throw new AssertionError("the script does not route " + id);
-                    requirements.addObject().put("requirementId", id).<ObjectNode>set("types", r.get("types"))
+                    ObjectNode decided = requirements.addObject().put("requirementId", id)
+                            .<ObjectNode>set("types", r.get("types"))
                             .<ObjectNode>set("capabilities", r.get("capabilities"))
                             .put("prohibitedAdvice", r.path("prohibitedAdvice").asDouble(0.0));
+                    JsonNode dependency = r.get("dependsOn");
+                    if (dependency == null) decided.putNull("dependsOn");
+                    else decided.set("dependsOn", dependency);
                 }
                 answer = out;
             }
