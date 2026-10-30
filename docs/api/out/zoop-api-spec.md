@@ -213,8 +213,19 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | [unblockMember](#unblockmember) | POST | /api/v1/admin/members/{member_id}/unblock | 관리자(작업별 권한) | P2 |
 | [getCompanyFinancials](#getcompanyfinancials) | GET | /api/v1/companies/{id}/financials | 공개 | P1 |
 | [getCompanyIssueImpact](#getcompanyissueimpact) | GET | /api/v1/companies/{id}/issues/{issueId}/impact | 공개 | P1 |
+| [getPersonalizedBriefingIssues](#getpersonalizedbriefingissues) | GET | /api/v1/briefings/{id}/personalized/issues | 회원(본인) | P2 |
 | [getPersonalizedBriefing](#getpersonalizedbriefing) | GET | /api/v1/briefings/{id}/personalized | 회원(본인) | P2 |
 | [getCompanyGraphAsOf](#getcompanygraphasof) | GET | /api/v1/companies/{id}/graph | 공개 | P1 |
+| [getBriefingPersonalizationOptions](#getbriefingpersonalizationoptions) | GET | /api/v1/briefings/personalization/options | 회원(본인) | P2 |
+| [selectPersonalBriefingIssues](#selectpersonalbriefingissues) | POST | /api/v1/briefings/{id}/personalized/selection | 회원(본인) | P2 |
+| [createPersonalBriefingGeneration](#createpersonalbriefinggeneration) | POST | /api/v1/briefings/{id}/personalized/generations | 회원(본인) | P2 |
+| [getPersonalBriefingGeneration](#getpersonalbriefinggeneration) | GET | /api/v1/briefings/{id}/personalized/generations/{jobId} | 회원(본인) | P2 |
+| [retryPersonalBriefingGeneration](#retrypersonalbriefinggeneration) | POST | /api/v1/briefings/{id}/personalized/generations/{jobId}/retry | 회원(본인) | P2 |
+| [getPersonalBriefingSettings](#getpersonalbriefingsettings) | GET | /api/v1/briefings/personalization/settings | 회원(본인) | P2 |
+| [savePersonalBriefingSettings](#savepersonalbriefingsettings) | PUT | /api/v1/briefings/personalization/settings | 회원(본인) | P2 |
+| [initializePersonalBriefingSettings](#initializepersonalbriefingsettings) | POST | /api/v1/briefings/personalization/settings/initialize | 회원(본인) | P2 |
+| [getPersonalBriefingDelivery](#getpersonalbriefingdelivery) | GET | /api/v1/briefings/{id}/personalized/delivery | 회원(본인) | P2 |
+| [createPersonalBriefingDemo](#createpersonalbriefingdemo) | POST | /api/v1/briefings/{id}/personalized/demo | 회원(본인) | P2 |
 
 <a id="getmembersession"></a>
 
@@ -2824,6 +2835,33 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. 단독으로 지정하면 그 버전이 처음 공개된 시각 기준으로 조회하고 그 시각을 metadata.asOf로 돌려준다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 
+<a id="getpersonalizedbriefingissues"></a>
+
+## getPersonalizedBriefingIssues · 보유·관심 종목 관련 이슈 최대 3개
+
+회원 본인의 현재 보유·관심 종목을 합쳐, 해당 회차의 전체 근거 검증·중요도·새 정보 적격 후보에서 최대 3개를 고릅니다. 같은 기업의 독립 사건은 허용하고 동일 사건·동일 근거 재추출은 제외합니다. 가격·생성 API 호출 없이 저장 결과를 재사용합니다. 공통 발행본과 별도 선정 투영이며 발행 원문·평가 대상은 변경하지 않습니다. 후보 저장본 부재·관련 이슈 없음·현재 권한 부족을 구분하고, 이전 추적은 고정 직전 회차의 같은 이슈+기업 기준입니다. 과거 열람 이력이 아닌 현재 종목으로 재현한 비교입니다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/briefings/{id}/personalized/issues` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [PersonalBriefingSelection](#schema-personalbriefingselection), 409: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
+| FS/NFS | [FS036](../../system/out/feature-FS036.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
+| WBS | 6.1.2, 6.11.1, 6.8.9, 6.8.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 직접 대응 API 없음. 기업 패널/공개 회차의 현재 UI 동작은 목표 seam의 구현을 뜻하지 않는다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| id | path | 필수 | string |  |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+
 <a id="getpersonalizedbriefing"></a>
 
 ## getPersonalizedBriefing · 고정 회차의 개인화 브리핑 조회
@@ -2883,9 +2921,467 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. 단독으로 지정하면 그 버전이 처음 공개된 시각 기준으로 조회하고 그 시각을 metadata.asOf로 돌려준다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
+<a id="getbriefingpersonalizationoptions"></a>
+
+## getBriefingPersonalizationOptions · 개인화 종목 카탈로그·로고
+
+선택 목록 조회. importMine=true일 때만 보유·관심 종목 ID를 함께 반환한다. 읽기 중 AI 호출 없음.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/briefings/personalization/options` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [BriefingPersonalizationOptions](#schema-briefingpersonalizationoptions), 400: [ErrorResponse](#schema-errorresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
+| FS/NFS | [FS036](../../system/out/feature-FS036.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
+| WBS | 6.1.2, 6.11.1, 6.8.9, 6.8.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 로그인 회원의 사전 설정과 회차별 불변 발행. 초기 설정은 보유·관심 종목 기본값이며, UI 이슈 수 조절은 제공하지 않는다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| importMine | query | 선택 | boolean |  |
+
+<a id="selectpersonalbriefingissues"></a>
+
+## selectPersonalBriefingIssues · 명시 종목으로 회차 적격 이슈 선정
+
+공통 정책의 최대3개를 고르고 근거·시세·기존 분석을 재사용한다. 이 API 자체는 모델을 호출하지 않는다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `POST /api/v1/briefings/{id}/personalized/selection` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | [PersonalBriefingChoice](#schema-personalbriefingchoice) |
+| 응답 | 200: [ExplicitPersonalBriefingSelection](#schema-explicitpersonalbriefingselection), 400: [ErrorResponse](#schema-errorresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
+| FS/NFS | [FS036](../../system/out/feature-FS036.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
+| WBS | 6.1.2, 6.11.1, 6.8.9, 6.8.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 로그인 회원의 사전 설정과 회차별 불변 발행. 초기 설정은 보유·관심 종목 기본값이며, UI 이슈 수 조절은 제공하지 않는다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| id | path | 필수 | string |  |
+| X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
+
+본문 스키마: [PersonalBriefingChoice](#schema-personalbriefingchoice). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
+
+<a id="createpersonalbriefinggeneration"></a>
+
+## createPersonalBriefingGeneration · 데모의 미생성 분석 작업 접수
+
+데모 플래그와 모델 접수 플래그가 켜진 경우만 허용한다. choice/selectionVersion을 다시 검증하고 같은 요청은 재사용한다. 실제 AI 전송은 별도 워커가 담당한다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `POST /api/v1/briefings/{id}/personalized/generations` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | object |
+| 응답 | 200: [PersonalBriefingGeneration](#schema-personalbriefinggeneration), 400: [ErrorResponse](#schema-errorresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
+| FS/NFS | [FS036](../../system/out/feature-FS036.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
+| WBS | 6.1.2, 6.11.1, 6.8.9, 6.8.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 로그인 회원의 사전 설정과 회차별 불변 발행. 초기 설정은 보유·관심 종목 기본값이며, UI 이슈 수 조절은 제공하지 않는다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| id | path | 필수 | string |  |
+| X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
+
+본문 스키마: [object](#schema-object). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
+
+<a id="getpersonalbriefinggeneration"></a>
+
+## getPersonalBriefingGeneration · 본인의 생성 진행·결과 조회
+
+회원 소유권·선택·회차·후보 버전을 재확인하며 모델을 호출하지 않는다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/briefings/{id}/personalized/generations/{jobId}` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [PersonalBriefingGeneration](#schema-personalbriefinggeneration), 400: [ErrorResponse](#schema-errorresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
+| FS/NFS | [FS036](../../system/out/feature-FS036.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
+| WBS | 6.1.2, 6.11.1, 6.8.9, 6.8.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 로그인 회원의 사전 설정과 회차별 불변 발행. 초기 설정은 보유·관심 종목 기본값이며, UI 이슈 수 조절은 제공하지 않는다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| id | path | 필수 | string |  |
+| jobId | path | 필수 | string |  |
+
+<a id="retrypersonalbriefinggeneration"></a>
+
+## retryPersonalBriefingGeneration · 데모의 알려진 의미 검증 보류 보완
+
+데모에서만 한 번 추가 시도한다. 원 시도/실패/영수증은 보존하며 미응답·예산 종료는 자동 재전송하지 않는다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `POST /api/v1/briefings/{id}/personalized/generations/{jobId}/retry` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [PersonalBriefingGeneration](#schema-personalbriefinggeneration), 400: [ErrorResponse](#schema-errorresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
+| FS/NFS | [FS036](../../system/out/feature-FS036.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
+| WBS | 6.1.2, 6.11.1, 6.8.9, 6.8.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 로그인 회원의 사전 설정과 회차별 불변 발행. 초기 설정은 보유·관심 종목 기본값이며, UI 이슈 수 조절은 제공하지 않는다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| id | path | 필수 | string |  |
+| jobId | path | 필수 | string |  |
+| X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
+
+<a id="getpersonalbriefingsettings"></a>
+
+## getPersonalBriefingSettings · 저장된 개인화 설정 조회
+
+읽기 전용이며 AI 호출과 설정 초기화를 수행하지 않는다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/briefings/personalization/settings` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [PersonalBriefingSettings](#schema-personalbriefingsettings), 400: [ErrorResponse](#schema-errorresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
+| FS/NFS | [FS036](../../system/out/feature-FS036.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
+| WBS | 6.1.2, 6.11.1, 6.8.9, 6.8.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 로그인 회원의 사전 설정과 회차별 불변 발행. 초기 설정은 보유·관심 종목 기본값이며, UI 이슈 수 조절은 제공하지 않는다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+
+<a id="savepersonalbriefingsettings"></a>
+
+## savePersonalBriefingSettings · 기준 종목 변경·다음 회차 적용
+
+expectedRevision을 검증한다. 저장 이후 첫09:20/17:30부터 적용하고 기존 발행 결과는 변경하지 않는다. 설정 저장은 최대3개/min0/종목당3 공통 정책으로 정규화하며 사용자 이슈 수 조절은 제공하지 않는다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `PUT /api/v1/briefings/personalization/settings` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | object |
+| 응답 | 200: [PersonalBriefingSettings](#schema-personalbriefingsettings), 400: [ErrorResponse](#schema-errorresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
+| FS/NFS | [FS036](../../system/out/feature-FS036.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
+| WBS | 6.1.2, 6.11.1, 6.8.9, 6.8.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 로그인 회원의 사전 설정과 회차별 불변 발행. 초기 설정은 보유·관심 종목 기본값이며, UI 이슈 수 조절은 제공하지 않는다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
+
+본문 스키마: [object](#schema-object). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
+
+<a id="initializepersonalbriefingsettings"></a>
+
+## initializePersonalBriefingSettings · 최초 보유·관심 종목 기본 설정
+
+본인의 보유·관심 종목을 중복 제거하여 최초 한 번 저장한다. 기존 설정은 덮어쓰지 않는다. 둘 다 없으면 no_companies로 반환하고 설정/개인 발행/AI 작업을 만들지 않는다. 멱등 초기화이며 AI 호출 없음.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `POST /api/v1/briefings/personalization/settings/initialize` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [PersonalBriefingSettings](#schema-personalbriefingsettings), 400: [ErrorResponse](#schema-errorresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
+| FS/NFS | [FS036](../../system/out/feature-FS036.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
+| WBS | 6.1.2, 6.11.1, 6.8.9, 6.8.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 로그인 회원의 사전 설정과 회차별 불변 발행. 초기 설정은 보유·관심 종목 기본값이며, UI 이슈 수 조절은 제공하지 않는다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
+
+<a id="getpersonalbriefingdelivery"></a>
+
+## getPersonalBriefingDelivery · 회차별 고정 개인 브리핑 조회
+
+당시 설정과 선정·검증 결과를 그대로 제공한다. 설정 변경·새로고침으로 재생성하지 않는다. demo=true는 명시 활성화된 데모에서만 별도 결과를 조회한다. 현재 원문 권리/정정/제공 상태는 재확인한다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/briefings/{id}/personalized/delivery` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [PersonalBriefingDelivery](#schema-personalbriefingdelivery), 400: [ErrorResponse](#schema-errorresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
+| FS/NFS | [FS036](../../system/out/feature-FS036.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
+| WBS | 6.1.2, 6.11.1, 6.8.9, 6.8.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 로그인 회원의 사전 설정과 회차별 불변 발행. 초기 설정은 보유·관심 종목 기본값이며, UI 이슈 수 조절은 제공하지 않는다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| id | path | 필수 | string |  |
+| demo | query | 선택 | boolean |  |
+
+<a id="createpersonalbriefingdemo"></a>
+
+## createPersonalBriefingDemo · 현재 설정의 별도 데모 미리보기
+
+데모 플래그가 켜진 경우만 허용하며 정식 자동 발행과 별도로 보존한다. 과거 회차를 정식 발행으로 소급하지 않는다. 같은 회차/설정 버전은 같은 데모 기록을 반환한다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `POST /api/v1/briefings/{id}/personalized/demo` |
+| 권한·우선순위 | 회원(본인) · P2 |
+| 요청 본문 | object |
+| 응답 | 200: [PersonalBriefingDelivery](#schema-personalbriefingdelivery), 400: [ErrorResponse](#schema-errorresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
+| FS/NFS | [FS036](../../system/out/feature-FS036.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
+| WBS | 6.1.2, 6.11.1, 6.8.9, 6.8.14 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 로그인 회원의 사전 설정과 회차별 불변 발행. 초기 설정은 보유·관심 종목 기본값이며, UI 이슈 수 조절은 제공하지 않는다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| id | path | 필수 | string |  |
+| X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
+
+본문 스키마: [object](#schema-object). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
+
 ## 공통 스키마
 
 nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하지 않는다. 필수 필드는 null 허용 여부와 별개다. JSON 필드 이름·중첩 참조의 정본은 OpenAPI다.
+
+<a id="schema-personalbriefingchoice"></a>
+
+### PersonalBriefingChoice
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyIds | 필수 | string[] (uniqueItems) |  |
+| maxIssues | 선택 | integer |  |
+| minIssues | 선택 | integer |  |
+| perCompanyLimit | 선택 | integer |  |
+
+<a id="schema-explicitpersonalbriefingselection"></a>
+
+### ExplicitPersonalBriefingSelection
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| roundId | 필수 | string |  |
+| dataAsOf | 필수 | string (date-time) |  |
+| status | 선택 | string |  |
+| analysisStatus | 선택 | string |  |
+| eligibleCount | 선택 | integer |  |
+| matchingCount | 선택 | integer |  |
+| minimumShortfall | 선택 | integer |  |
+| pendingAnalysisCount | 선택 | integer |  |
+| poolVersion | 선택 | string |  |
+| selectionVersion | 필수 | string |  |
+| choice | 필수 | [PersonalBriefingChoice](#schema-personalbriefingchoice) |  |
+| presentation | 필수 | [BriefingResponse](#schema-briefingresponse) |  |
+| verifiedPresentation | 선택 | [BriefingResponse](#schema-briefingresponse) |  |
+| details | 선택 | object |  |
+| tracking | 선택 | object[] |  |
+
+<a id="schema-personalbriefinggeneration"></a>
+
+### PersonalBriefingGeneration
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| status | 필수 | string {queued, running, ready, partial, withheld, requires_recovery, budget_exhausted, stale, failed} |  |
+| selectionVersion | 필수 | string |  |
+| attempt | 선택 | integer |  |
+| selection | 선택 | [ExplicitPersonalBriefingSelection](#schema-explicitpersonalbriefingselection) |  |
+| outcome | 선택 | object, null |  |
+
+<a id="schema-personalbriefingpreference"></a>
+
+### PersonalBriefingPreference
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| revisionId | 필수 | string |  |
+| revision | 필수 | integer |  |
+| choice | 필수 | [PersonalBriefingChoice](#schema-personalbriefingchoice) |  |
+| savedAt | 필수 | string (date-time) |  |
+| effectiveFrom | 필수 | string (date-time) |  |
+
+<a id="schema-personalbriefingsettings"></a>
+
+### PersonalBriefingSettings
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| preference | 필수 | [PersonalBriefingPreference](#schema-personalbriefingpreference) / null |  |
+| initializationStatus | 선택 | string {existing, initialized, no_companies} |  |
+| demoEnabled | 필수 | boolean |  |
+| timezone | 필수 | string {Asia/Seoul} |  |
+| schedule | 필수 | string[] |  |
+| nextScheduledAt | 필수 | string (date-time) |  |
+
+<a id="schema-personalbriefingdelivery"></a>
+
+### PersonalBriefingDelivery
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 선택 | string |  |
+| roundId | 필수 | string |  |
+| status | 필수 | string {not_published, generating, ready, partial, withheld, failed} |  |
+| mode | 선택 | string {scheduled, demo} |  |
+| preferenceRevision | 선택 | string |  |
+| scheduledAt | 선택 | string (date-time) |  |
+| selection | 선택 | [ExplicitPersonalBriefingSelection](#schema-explicitpersonalbriefingselection) |  |
+
+<a id="schema-briefingpersonalizationoptions"></a>
+
+### BriefingPersonalizationOptions
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companies | 필수 | object[] |  |
+| companies[].id | 필수 | string |  |
+| companies[].name | 필수 | string |  |
+| companies[].logoUrl | 선택 | string, null |  |
+| selectedIds | 필수 | string[] |  |
+| importedBasis | 선택 | string |  |
+
+<a id="schema-personalbriefingselection"></a>
+
+### PersonalBriefingSelection
+
+저장된 전체 적격 후보에서의 개인별 선정. 원래 공통 발행본을 변경하지 않습니다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| aiAnalysis | 선택 | object | 현재 회원·종목·선정 입력과 일치하고 생성·독립 검증 영수증을 확인한 별도 AI 분석. 읽기 시 모델 호출 없음. |
+| aiAnalysis.status | 필수 | string {available, unavailable} |  |
+| aiAnalysis.reason | 선택 | string |  |
+| aiAnalysis.resultVersion | 선택 | string |  |
+| aiAnalysis.model | 선택 | string |  |
+| aiAnalysis.promptVersion | 선택 | string |  |
+| aiAnalysis.generatedAt | 선택 | string (date-time) |  |
+| aiAnalysis.draft | 선택 | object | overview와 이슈·기업별 근거 연결 분석. 사업 영향과 가격 관측을 구분한다. |
+| roundId | 필수 | string |  |
+| dataAsOf | 필수 | string (date-time) |  |
+| policyVersion | 필수 | string |  |
+| basisObservedAt | 필수 | string (date-time) |  |
+| basis | 필수 | object |  |
+| basis.holdings | 필수 | string[] |  |
+| basis.watchlist | 필수 | string[] |  |
+| basis.holdingsKind | 필수 | string |  |
+| poolVersion | 필수 | string |  |
+| status | 필수 | string {available, no_companies, pool_unavailable, no_matching_issues, sources_unavailable} |  |
+| message | 필수 | string |  |
+| eligibleCount | 필수 | integer |  |
+| matchingCount | 필수 | integer |  |
+| excludedByCurrentAccess | 필수 | integer |  |
+| items | 필수 | object[] |  |
+| items[].issueId | 필수 | string |  |
+| items[].title | 필수 | string |  |
+| items[].importance | 필수 | integer |  |
+| items[].whyImportant | 필수 | string |  |
+| items[].whyNow | 필수 | string |  |
+| items[].analysis | 필수 | string |  |
+| items[].nextCheck | 필수 | string |  |
+| items[].matches | 필수 | object[] |  |
+| items[].matches[].companyId | 필수 | string |  |
+| items[].matches[].name | 필수 | string |  |
+| items[].matches[].reason | 필수 | string |  |
+| items[].matches[].directness | 필수 | string {direct, indirect} |  |
+| items[].matches[].kinds | 필수 | string {holding, watchlist}[] |  |
+| items[].sources | 필수 | object[] |  |
+| items[].sources[].evidenceId | 필수 | string |  |
+| items[].sources[].quote | 필수 | string |  |
+| items[].sources[].url | 필수 | string (uri) |  |
+| items[].sources[].publishedAt | 필수 | string (date-time) |  |
+| previousRoundId | 필수 | string |  |
+| trackingStatus | 선택 | string |  |
+| tracking | 필수 | object[] |  |
+| tracking[].issueId | 필수 | string |  |
+| tracking[].title | 필수 | string |  |
+| tracking[].companyId | 필수 | string |  |
+| tracking[].companyName | 필수 | string |  |
+| tracking[].status | 필수 | string {not_observed, follow_up_available} |  |
+| tracking[].message | 필수 | string |  |
+| tracking[].nextCheck | 필수 | string |  |
+| tracking[].basis | 필수 | string |  |
+| scope | 선택 | string |  |
 
 <a id="schema-companystatement"></a>
 

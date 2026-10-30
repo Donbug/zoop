@@ -42,7 +42,7 @@
 | companies | 9 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | events | 2 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | evidence | 1 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
-| briefings | 8 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
+| briefings | 19 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | chat | 9 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | admin | 37 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | telemetry | 1 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |

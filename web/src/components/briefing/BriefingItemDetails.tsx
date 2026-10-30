@@ -151,12 +151,14 @@ export default function BriefingItemDetails({
   item,
   isRecap = false,
   evidenceOnly = false,
+  initialDetail,
 }: {
   roundId: string;
   graphVersion: string | null;
   item: BriefingItem;
   isRecap?: boolean;
   evidenceOnly?: boolean;
+  initialDetail?: BriefingItemDetail;
 }) {
   const roundLabel = isRecap ? '이전 회차' : '이 회차';
   const issueLabel = isRecap ? '이전 핵심 이슈' : '핵심 이슈';
@@ -178,6 +180,19 @@ export default function BriefingItemDetails({
 
   function load(recheck = false) {
     if ((state.status === 'ready' && !recheck) || pending.current) return;
+    if (initialDetail) {
+      if (
+        initialDetail.roundId !== roundId ||
+        initialDetail.eventId !== item.eventId ||
+        initialDetail.metadata.graphVersion !== graphVersion
+      ) {
+        setState({
+          status: 'error',
+          message: '선택한 회차·이슈와 근거가 일치하지 않아요.',
+        });
+      } else setState({ status: 'ready', detail: initialDetail });
+      return;
+    }
     setState({ status: 'loading' });
     pending.current = getBriefingItemDetail(roundId, item.eventId, graphVersion)
       .then((detail) => {

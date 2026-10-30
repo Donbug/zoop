@@ -1,0 +1,219 @@
+{
+  "fixtureKind": "synthetic_no_real_provider_call",
+  "selection": {
+    "roundId": "r",
+    "poolVersion": "p",
+    "status": "available",
+    "dataAsOf": "2026-10-22T09:20:00+09:00",
+    "basis": {
+      "holdings": [
+        "C"
+      ],
+      "watchlist": []
+    },
+    "items": [
+      {
+        "issueId": "i0",
+        "title": "합성 독립 사건 0",
+        "whyImportant": "합성 계약 변경",
+        "whyNow": "합성 계약 확인",
+        "matches": [
+          {
+            "companyId": "C",
+            "name": "합성기업",
+            "reason": "합성 직접 당사자",
+            "kinds": [
+              "holding"
+            ]
+          }
+        ],
+        "sources": [
+          {
+            "evidenceId": "e0",
+            "documentId": "d0",
+            "bodySha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "quote": "합성 기업은 서로 다른 사건 0의 계약을 발표했다.",
+            "publishedAt": "2026-10-22T08:00:00+09:00",
+            "url": "https://example.invalid/source"
+          }
+        ]
+      }
+    ]
+  },
+  "saved": {
+    "input": {
+      "version": "personal-briefing-v1",
+      "roundId": "r",
+      "cutoff": "2026-10-22T09:20:00+09:00",
+      "scope": "stored_round",
+      "selectionBasis": {
+        "roundId": "r",
+        "poolVersion": "p",
+        "basis": {
+          "holdings": [
+            "C"
+          ],
+          "watchlist": []
+        },
+        "issues": [
+          {
+            "issueId": "i0",
+            "companyIds": [
+              "C"
+            ]
+          }
+        ]
+      },
+      "issues": [
+        {
+          "issueId": "i0",
+          "title": "합성 독립 사건 0",
+          "whyImportant": "합성 계약 변경",
+          "whyNow": "합성 계약 확인",
+          "sources": {
+            "e0": {
+              "evidenceId": "e0",
+              "documentId": "d0",
+              "quote": "합성 기업은 서로 다른 사건 0의 계약을 발표했다.",
+              "publishedAt": "2026-10-22T08:00:00+09:00",
+              "url": "https://example.invalid/source"
+            }
+          },
+          "targets": [
+            {
+              "companyId": "C",
+              "name": "합성기업",
+              "kinds": [
+                "holding"
+              ],
+              "connectionReason": "합성 직접 당사자",
+              "evidenceIds": [
+                "e0"
+              ],
+              "frozenPrice": {
+                "status": "unavailable",
+                "reason": "not_observed"
+              },
+              "previous": {
+                "status": "unavailable",
+                "reason": "same_issue_company_previous_missing"
+              }
+            }
+          ]
+        }
+      ],
+      "inputSha256": "14dfd53769f2b63772078eb060e8de21d97b526e0f384b91a3a30dd35980e632"
+    },
+    "result": {
+      "schemaVersion": "personal-briefing-v1",
+      "status": "PASS",
+      "model": "gpt-6-luna",
+      "promptVersion": "personal-briefing-v1",
+      "roundId": "r",
+      "cutoff": "2026-10-22T09:20:00+09:00",
+      "inputSha256": "14dfd53769f2b63772078eb060e8de21d97b526e0f384b91a3a30dd35980e632",
+      "selectionBasis": {
+        "roundId": "r",
+        "poolVersion": "p",
+        "basis": {
+          "holdings": [
+            "C"
+          ],
+          "watchlist": []
+        },
+        "issues": [
+          {
+            "issueId": "i0",
+            "companyIds": [
+              "C"
+            ]
+          }
+        ]
+      },
+      "verificationMode": "separate_request_same_model",
+      "generatedAt": "2026-10-30T00:00:00Z",
+      "draft": {
+        "overview": {
+          "text": "합성 계약의 실행 여부를 확인합니다.",
+          "evidenceIds": [
+            "e0"
+          ]
+        },
+        "issues": {
+          "i0": {
+            "companies": {
+              "C": {
+                "keyPoint": {
+                  "text": "합성 계약의 실행 여부를 확인합니다.",
+                  "evidenceIds": [
+                    "e0"
+                  ]
+                },
+                "confirmedFact": {
+                  "text": "합성 계약의 실행 여부를 확인합니다.",
+                  "evidenceIds": [
+                    "e0"
+                  ]
+                },
+                "businessImpact": {
+                  "text": "합성 계약의 실행 여부를 확인합니다.",
+                  "evidenceIds": [
+                    "e0"
+                  ]
+                },
+                "forMyStocks": {
+                  "text": "합성 계약의 실행 여부를 확인합니다.",
+                  "evidenceIds": [
+                    "e0"
+                  ]
+                },
+                "previousChange": {
+                  "text": "합성 계약의 실행 여부를 확인합니다.",
+                  "evidenceIds": [
+                    "e0"
+                  ],
+                  "status": "unavailable"
+                },
+                "nextCheck": {
+                  "text": "합성 계약의 실행 여부를 확인합니다.",
+                  "evidenceIds": [
+                    "e0"
+                  ]
+                },
+                "direction": "watch",
+                "priceObservation": null
+              }
+            }
+          }
+        }
+      },
+      "verification": {
+        "overviewSupported": true,
+        "overviewReason": "합성 근거 일치",
+        "issues": {
+          "i0": {
+            "C": {
+              "supported": true,
+              "reason": "합성 조건 일치"
+            }
+          }
+        }
+      },
+      "resultVersion": "personal-briefing-v1-c57e867e9403b025982312ae99d19429da530b705b2e0ac6d995891cb000f0e6"
+    },
+    "proof": [
+      {
+        "request": "{\"input\":\"{\\\"frozen\\\":{\\\"cutoff\\\":\\\"2026-10-22T09:20:00+09:00\\\",\\\"inputSha256\\\":\\\"14dfd53769f2b63772078eb060e8de21d97b526e0f384b91a3a30dd35980e632\\\",\\\"issues\\\":[{\\\"issueId\\\":\\\"i0\\\",\\\"sources\\\":{\\\"e0\\\":{\\\"documentId\\\":\\\"d0\\\",\\\"evidenceId\\\":\\\"e0\\\",\\\"publishedAt\\\":\\\"2026-10-22T08:00:00+09:00\\\",\\\"quote\\\":\\\"합성 기업은 서로 다른 사건 0의 계약을 발표했다.\\\",\\\"url\\\":\\\"https://example.invalid/source\\\"}},\\\"targets\\\":[{\\\"companyId\\\":\\\"C\\\",\\\"connectionReason\\\":\\\"합성 직접 당사자\\\",\\\"evidenceIds\\\":[\\\"e0\\\"],\\\"frozenPrice\\\":{\\\"reason\\\":\\\"not_observed\\\",\\\"status\\\":\\\"unavailable\\\"},\\\"kinds\\\":[\\\"holding\\\"],\\\"name\\\":\\\"합성기업\\\",\\\"previous\\\":{\\\"reason\\\":\\\"same_issue_company_previous_missing\\\",\\\"status\\\":\\\"unavailable\\\"}}],\\\"title\\\":\\\"합성 독립 사건 0\\\",\\\"whyImportant\\\":\\\"합성 계약 변경\\\",\\\"whyNow\\\":\\\"합성 계약 확인\\\"}],\\\"roundId\\\":\\\"r\\\",\\\"scope\\\":\\\"stored_round\\\",\\\"selectionBasis\\\":{\\\"basis\\\":{\\\"holdings\\\":[\\\"C\\\"],\\\"watchlist\\\":[]},\\\"issues\\\":[{\\\"companyIds\\\":[\\\"C\\\"],\\\"issueId\\\":\\\"i0\\\"}],\\\"poolVersion\\\":\\\"p\\\",\\\"roundId\\\":\\\"r\\\"},\\\"version\\\":\\\"personal-briefing-v1\\\"}}\",\"model\":\"gpt-6-luna\",\"store\":false,\"text\":{\"format\":{\"name\":\"personal-analysis\"}}}",
+        "response": "{\"id\":\"resp_authored_synthetic_not_a_provider_call\",\"output\":[{\"content\":[{\"text\":\"{\\\"issues\\\":{\\\"i0\\\":{\\\"companies\\\":{\\\"C\\\":{\\\"businessImpact\\\":{\\\"evidenceIds\\\":[\\\"e0\\\"],\\\"text\\\":\\\"합성 계약의 실행 여부를 확인합니다.\\\"},\\\"confirmedFact\\\":{\\\"evidenceIds\\\":[\\\"e0\\\"],\\\"text\\\":\\\"합성 계약의 실행 여부를 확인합니다.\\\"},\\\"direction\\\":\\\"watch\\\",\\\"forMyStocks\\\":{\\\"evidenceIds\\\":[\\\"e0\\\"],\\\"text\\\":\\\"합성 계약의 실행 여부를 확인합니다.\\\"},\\\"keyPoint\\\":{\\\"evidenceIds\\\":[\\\"e0\\\"],\\\"text\\\":\\\"합성 계약의 실행 여부를 확인합니다.\\\"},\\\"nextCheck\\\":{\\\"evidenceIds\\\":[\\\"e0\\\"],\\\"text\\\":\\\"합성 계약의 실행 여부를 확인합니다.\\\"},\\\"previousChange\\\":{\\\"evidenceIds\\\":[\\\"e0\\\"],\\\"status\\\":\\\"unavailable\\\",\\\"text\\\":\\\"합성 계약의 실행 여부를 확인합니다.\\\"},\\\"priceObservation\\\":null}}}},\\\"overview\\\":{\\\"evidenceIds\\\":[\\\"e0\\\"],\\\"text\\\":\\\"합성 계약의 실행 여부를 확인합니다.\\\"}}\",\"type\":\"output_text\"}]}],\"status\":\"completed\",\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}",
+        "requestSha256": "63702a2749b794d8a89bda2f6438dba5cc85330fe040c95a4d7c9f7734070a66",
+        "responseSha256": "91bcab8e54bec1e750a7d58837316ea97ea88d9f193b39096942974571b3a589"
+      },
+      {
+        "request": "{\"input\":\"{\\\"draft\\\":{\\\"issues\\\":{\\\"i0\\\":{\\\"companies\\\":{\\\"C\\\":{\\\"businessImpact\\\":{\\\"evidenceIds\\\":[\\\"e0\\\"],\\\"text\\\":\\\"합성 계약의 실행 여부를 확인합니다.\\\"},\\\"confirmedFact\\\":{\\\"evidenceIds\\\":[\\\"e0\\\"],\\\"text\\\":\\\"합성 계약의 실행 여부를 확인합니다.\\\"},\\\"direction\\\":\\\"watch\\\",\\\"forMyStocks\\\":{\\\"evidenceIds\\\":[\\\"e0\\\"],\\\"text\\\":\\\"합성 계약의 실행 여부를 확인합니다.\\\"},\\\"keyPoint\\\":{\\\"evidenceIds\\\":[\\\"e0\\\"],\\\"text\\\":\\\"합성 계약의 실행 여부를 확인합니다.\\\"},\\\"nextCheck\\\":{\\\"evidenceIds\\\":[\\\"e0\\\"],\\\"text\\\":\\\"합성 계약의 실행 여부를 확인합니다.\\\"},\\\"previousChange\\\":{\\\"evidenceIds\\\":[\\\"e0\\\"],\\\"status\\\":\\\"unavailable\\\",\\\"text\\\":\\\"합성 계약의 실행 여부를 확인합니다.\\\"},\\\"priceObservation\\\":null}}}},\\\"overview\\\":{\\\"evidenceIds\\\":[\\\"e0\\\"],\\\"text\\\":\\\"합성 계약의 실행 여부를 확인합니다.\\\"}},\\\"frozen\\\":{\\\"cutoff\\\":\\\"2026-10-22T09:20:00+09:00\\\",\\\"inputSha256\\\":\\\"14dfd53769f2b63772078eb060e8de21d97b526e0f384b91a3a30dd35980e632\\\",\\\"issues\\\":[{\\\"issueId\\\":\\\"i0\\\",\\\"sources\\\":{\\\"e0\\\":{\\\"documentId\\\":\\\"d0\\\",\\\"evidenceId\\\":\\\"e0\\\",\\\"publishedAt\\\":\\\"2026-10-22T08:00:00+09:00\\\",\\\"quote\\\":\\\"합성 기업은 서로 다른 사건 0의 계약을 발표했다.\\\",\\\"url\\\":\\\"https://example.invalid/source\\\"}},\\\"targets\\\":[{\\\"companyId\\\":\\\"C\\\",\\\"connectionReason\\\":\\\"합성 직접 당사자\\\",\\\"evidenceIds\\\":[\\\"e0\\\"],\\\"frozenPrice\\\":{\\\"reason\\\":\\\"not_observed\\\",\\\"status\\\":\\\"unavailable\\\"},\\\"kinds\\\":[\\\"holding\\\"],\\\"name\\\":\\\"합성기업\\\",\\\"previous\\\":{\\\"reason\\\":\\\"same_issue_company_previous_missing\\\",\\\"status\\\":\\\"unavailable\\\"}}],\\\"title\\\":\\\"합성 독립 사건 0\\\",\\\"whyImportant\\\":\\\"합성 계약 변경\\\",\\\"whyNow\\\":\\\"합성 계약 확인\\\"}],\\\"roundId\\\":\\\"r\\\",\\\"scope\\\":\\\"stored_round\\\",\\\"selectionBasis\\\":{\\\"basis\\\":{\\\"holdings\\\":[\\\"C\\\"],\\\"watchlist\\\":[]},\\\"issues\\\":[{\\\"companyIds\\\":[\\\"C\\\"],\\\"issueId\\\":\\\"i0\\\"}],\\\"poolVersion\\\":\\\"p\\\",\\\"roundId\\\":\\\"r\\\"},\\\"version\\\":\\\"personal-briefing-v1\\\"}}\",\"model\":\"gpt-6-luna\",\"store\":false,\"text\":{\"format\":{\"name\":\"personal-verification\"}}}",
+        "response": "{\"id\":\"resp_authored_synthetic_not_a_provider_call\",\"output\":[{\"content\":[{\"text\":\"{\\\"issues\\\":{\\\"i0\\\":{\\\"C\\\":{\\\"reason\\\":\\\"합성 조건 일치\\\",\\\"supported\\\":true}}},\\\"overviewReason\\\":\\\"합성 근거 일치\\\",\\\"overviewSupported\\\":true}\",\"type\":\"output_text\"}]}],\"status\":\"completed\",\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}",
+        "requestSha256": "a5aa3ab871205782e503e51c6d0f55fbce5821560d7137393baaeea42e7fddcc",
+        "responseSha256": "71bdc5c8cec75caab6ad411ac62ca5757c21f2e90ca2a5d8d6be8d7835a07f9a"
+      }
+    ]
+  }
+}

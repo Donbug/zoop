@@ -77,7 +77,7 @@ export default function BriefingPage() {
           onClick={() => updateQuery({ view: 'personal' })}
           className={`px-3 ${EDITION_BUTTON}`}
         >
-          내 종목 기준
+          개인화 브리핑
         </button>
       </div>
 

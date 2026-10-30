@@ -381,9 +381,20 @@
 | BFF_FIELD_DIFFERENCE | difference | unblockMember | 목표만 203 · BFF만 18 · 형식/필수/권한 변경 12 |  |
 | TARGET_ONLY_API | difference | getCompanyFinancials | GET /api/v1/companies/{id}/financials: 직접 대응 BFF 없음 |  |
 | TARGET_ONLY_API | difference | getCompanyIssueImpact | GET /api/v1/companies/{id}/issues/{issueId}/impact: 직접 대응 BFF 없음 |  |
+| TARGET_ONLY_API | difference | getPersonalizedBriefingIssues | GET /api/v1/briefings/{id}/personalized/issues: 직접 대응 BFF 없음 |  |
 | TARGET_ONLY_API | difference | getPersonalizedBriefing | GET /api/v1/briefings/{id}/personalized: 직접 대응 BFF 없음 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompanyGraphAsOf | 목표 /api/v1/companies/{id}/graph ↔ BFF /api/companies/{id}/graph |  |
 | BFF_FIELD_DIFFERENCE | difference | getCompanyGraphAsOf | 목표만 124 · BFF만 41 · 형식/필수/권한 변경 7 |  |
+| TARGET_ONLY_API | difference | getBriefingPersonalizationOptions | GET /api/v1/briefings/personalization/options: 직접 대응 BFF 없음 |  |
+| TARGET_ONLY_API | difference | selectPersonalBriefingIssues | POST /api/v1/briefings/{id}/personalized/selection: 직접 대응 BFF 없음 |  |
+| TARGET_ONLY_API | difference | createPersonalBriefingGeneration | POST /api/v1/briefings/{id}/personalized/generations: 직접 대응 BFF 없음 |  |
+| TARGET_ONLY_API | difference | getPersonalBriefingGeneration | GET /api/v1/briefings/{id}/personalized/generations/{jobId}: 직접 대응 BFF 없음 |  |
+| TARGET_ONLY_API | difference | retryPersonalBriefingGeneration | POST /api/v1/briefings/{id}/personalized/generations/{jobId}/retry: 직접 대응 BFF 없음 |  |
+| TARGET_ONLY_API | difference | getPersonalBriefingSettings | GET /api/v1/briefings/personalization/settings: 직접 대응 BFF 없음 |  |
+| TARGET_ONLY_API | difference | savePersonalBriefingSettings | PUT /api/v1/briefings/personalization/settings: 직접 대응 BFF 없음 |  |
+| TARGET_ONLY_API | difference | initializePersonalBriefingSettings | POST /api/v1/briefings/personalization/settings/initialize: 직접 대응 BFF 없음 |  |
+| TARGET_ONLY_API | difference | getPersonalBriefingDelivery | GET /api/v1/briefings/{id}/personalized/delivery: 직접 대응 BFF 없음 |  |
+| TARGET_ONLY_API | difference | createPersonalBriefingDemo | POST /api/v1/briefings/{id}/personalized/demo: 직접 대응 BFF 없음 |  |
 | PROTOTYPE_ONLY_API | difference | health_api_health_get | GET /api/health: 프로토타입 상태 점검 경로다. 정식 readiness/liveness 계약은 배포 설계에서 별도 확정한다. |  |
 | PROTOTYPE_ONLY_API | difference | mock_idp_consent_api_auth_social_mock_idp_consent_post | POST /api/auth/social/mock/idp/consent: 개발용 모의 IdP 동의 흐름은 정식 인증 계약에서 제외한다. |  |
 | PROTOTYPE_ONLY_API | difference | get_evaluations_api_briefings__id__evaluations_get | GET /api/briefings/{id}/evaluations: 프로토타입에서도 미제공인 가격/예측 평가 자리다. 투자 예측을 목표 계약에 넣지 않는다. |  |
