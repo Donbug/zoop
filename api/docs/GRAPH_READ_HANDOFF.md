@@ -708,6 +708,18 @@ CLI는 현재 bundle `-7`만 처리하며 하나라도 해석할 수 없는 선�
 
 실제 loopback HTTP/설치 CLI 회귀와 smoke는 synthetic authored replay 자료를 사용합니다(`ai/service/scripts/handoff_exposure_service_smoke.py`). 실기사 품질이나 운영 배포를 증명하지 않으며, 앱의 버전별 제외 적용과 정정·복구 정책은 여전히 앱 소유입니다.
 
+## 2026-10-30: 관측 재확인의 HTTP 전환 (#55 PR-R2a, AI PR #431)
+
+수입기가 관측마다 현재 권리(`read`·`store`·`quote-display`)를 재확인하는 원천을 설정으로 고릅니다(`zoop.graph-handoff-import.observation-source`, `ZOOP_GRAPH_HANDOFF_IMPORT_OBSERVATION_SOURCE`). 기본 `cli`는 지금까지의 설치된 `zoop-ai-ingest export --require-store`이고, `http`는 ai/service의 `POST /internal/v1/observations/export`(`exportObservation`, scope `observation.read`, 클라이언트 설정 `zoop.ai.observation-export-client.*`)입니다. 이것으로 handoff 읽기(10-29)와 관측 재확인이 모두 HTTP가 되어 수입기는 AI CLI 없이 돕니다(#387 전제).
+
+**계약(AI PR #431).** 요청 본문은 CLI stdin과 같은 닫힌 selector(`schemaVersion: zoop-ingestion-s2-1`, `roundId`·`sourceId`·`page`·`ordinal`·`documentId`·`rawVersion`·`documentVersion`)이고, 200 응답은 서비스가 실행한 CLI의 **정확한 JSON**입니다(`document.text` 포함, 선택 키 `publisher`·`language`·`provenance`·`collection` 보존). 관측 1건 = 요청 1건 동기이며 묶음·202는 없습니다(D-R6). 서비스 한도: child 45초, 응답 16 MiB, 동시 2개, `Cache-Control: no-store`. `Idempotency-Key`는 쓰지 않습니다.
+
+**검증은 CLI 경로와 같습니다.** `HttpObservationExportClient`는 응답이 export 스키마의 객체이고 `observation`이 요청 selector를 그대로 되돌려주는지만 보고 **받은 바이트를 그대로** 넘깁니다. 그 바이트를 같은 `IngestionExportParser`가 CLI stdout과 똑같이 검증합니다(selector 일치, `sourceHash`, document version·locator hash, 닫힌 키). 파서는 10-30부터 관측의 선택 키 `language`(2~35자, 제어·구분 문자 없음)를 받습니다. collector runtime(AI PR #433)이 이 키를 내보내기 시작하므로 CLI 경로도 같은 파서로 받으며, 값은 검증만 하고 저장하지 않습니다.
+
+**오류 매핑(`HttpIngestionExporter`).** 503 `ErrorEnvelope`(`runtime_busy`·`service_busy`·`execution_unavailable`·`service_configuration_invalid`)와 전송 실패(연결·timeout·중단)는 `ingestion_export_unavailable`(다음 실행이 성공할 수 있음; 서비스의 `Retry-After`는 전달하지 않고 호출자의 고정 대기 규칙을 씀, CLI 경로와 같음). 그 밖의 envelope는 `ingestion_export_failed`에 그 코드이며 코드가 원인을 가리킵니다: CLI의 거절 그대로(403 `source_unauthorized`, 404 `round_not_found`·`observation_not_found`·`document_version_not_in_round`, 409 `registry_changed`·`scope_configuration_conflict`·`preparation_profile_unbound`), 이 클라이언트의 토큰·요청(401 `authentication_required`, 403 `scope_denied`, 413·415·422), AI 쪽 CLI 결합(500 `runtime_contract_mismatch`·`runtime_binding_mismatch`, 운영자가 고쳐야 함). 계약 밖 응답(형식·스키마·selector 불일치, 크기 초과, redirect, 예상 밖 상태)은 `export_invalid`. 수입기는 세 코드를 전과 같이 `ingestion_export_failed`(+코드)·`ingestion_export_unavailable`·`ingestion_export_invalid`로 올립니다. 재시도·proxy·redirect 없음.
+
+**설정 규칙.** `http`면 `zoop.ai.observation-export-client.enabled=true`가 없을 때 기동 거절(`observation-source`), `ingestion-cli`가 설정되어 있으면 그 이름으로 기동 거절. `cli`(빈 값도 `cli`)면서 export 클라이언트가 켜져 있으면 `observation-source`로 기동 거절. `ingestion-state-dir`·`ingestion-sources`는 이 프로세스가 CLI를 하나라도 실행할 때(`handoff-source=cli` 또는 `observation-source=cli`) 필수이고, 둘 다 `http`면 설정되어 있을 때 거절합니다(AI 서비스가 자기 원장·registry를 읽음). scope `observation.read`는 `handoff.read`와 같은 **앱 수입 전용 principal**에 둡니다(#431 답, 10-30). 시험: `HttpObservationExportClientTest`(요청 본문·헤더, 바이트 보존, 오류 envelope, selector 불일치·계약 밖 응답), `HttpIngestionExporterTest`(세 코드 매핑), `IngestionExportParserTest`(`language`), `GraphHandoffImportConfigurationTest`(observation-source 규칙).
+
 ## 2026-10-28: 버전의 구성 행과 묶음 projection (#55 정기 회차, 앱 PR-1 · `V20261028170000`)
 
 **무엇.** 정기 회차에서는 여러 회차의 묶음(handoff)을 한 공개 버전으로 조립해야 한다(AI 회신 4번: "묶음 하나가 앱의 전체 그래프 버전이므로 회차 증분만 활성화하면 기존 그래프가 줄어든다"). 그 첫 단계로 수입기가 버전마다 두 가지를 더 남긴다. 공개 읽기·활성화·제외는 바뀌지 않는다.

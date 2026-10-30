@@ -22,7 +22,9 @@ public enum AiOperation {
     /** Reads the identity-only public exposure of fixed handoffs; never changes the AI service or the app. */
     EXPOSURE(false),
     /** Reads one allowlisted handoff's verified status or whole bundle; never changes the AI service or the app. */
-    HANDOFF_READ(false);
+    HANDOFF_READ(false),
+    /** Runs the installed S2-1 export for one observation under the current rights; reads only, nothing is cached or written. */
+    OBSERVATION_EXPORT(false);
 
     private final boolean mutating;
 

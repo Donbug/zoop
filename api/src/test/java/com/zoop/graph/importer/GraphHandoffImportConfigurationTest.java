@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.zoop.ai.config.AiHandoffReadClientConfiguration;
+import com.zoop.ai.config.AiObservationExportClientConfiguration;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.document.repository.DocumentRegistryRepository;
 import com.zoop.document.service.InMemoryDocumentRegistry;
@@ -159,7 +160,7 @@ class GraphHandoffImportConfigurationTest {
             assertEquals(base.resolve("artifacts"), settings.artifactRoot());
             assertEquals(base.resolve("sources.json"), settings.ingestionSources());
             assertEquals(base.resolve("ingestion"), settings.ingestionState());
-            assertEquals("GraphHandoffImportProperties[enabled=true, handoffSource=cli]",
+            assertEquals("GraphHandoffImportProperties[enabled=true, handoffSource=cli, observationSource=cli]",
                     context.getBean(GraphHandoffImportProperties.class).toString());
         });
     }
@@ -228,6 +229,14 @@ class GraphHandoffImportConfigurationTest {
 
     /** The HTTP source: the seven CLI-only settings left out, the read-only handoff client configured. */
     private String[] httpValues(String... extra) {
+        Map<String, String> changed = httpMap();
+        for (int i = 0; i + 1 < extra.length; i += 2) {
+            changed.put(extra[i], extra[i + 1]);
+        }
+        return array(changed);
+    }
+
+    private Map<String, String> httpMap() {
         Map<String, String> changed = new LinkedHashMap<>(valid);
         for (String cliOnly : List.of("ZOOP_HANDOFF_CLI", "ZOOP_HANDOFF_STATE_DIR", "ZOOP_RELATION_STATE_DIR",
                 "ZOOP_EXTRACTION_STATE_DIR", "ZOOP_HANDOFF_CANONICAL", "ZOOP_HANDOFF_DECISIONS", "ZOOP_HANDOFF_BINDINGS")) {
@@ -237,10 +246,7 @@ class GraphHandoffImportConfigurationTest {
         changed.put("ZOOP_AI_HANDOFF_READ_CLIENT_ENABLED", "true");
         changed.put("ZOOP_AI_HANDOFF_READ_CLIENT_BASE_URL", "https://ai.internal.example");
         changed.put("ZOOP_AI_HANDOFF_READ_CLIENT_TOKEN", "read-token-0123456789abcdefghijklmnopqrstuvwxyz");
-        for (int i = 0; i + 1 < extra.length; i += 2) {
-            changed.put(extra[i], extra[i + 1]);
-        }
-        return changed.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue()).toArray(String[]::new);
+        return changed;
     }
 
     @Test
@@ -254,7 +260,7 @@ class GraphHandoffImportConfigurationTest {
             assertNull(settings.handoffState());
             assertNull(settings.canonical());
             assertEquals(base.resolve("ingestion"), settings.ingestionState());
-            assertEquals("GraphHandoffImportProperties[enabled=true, handoffSource=http]",
+            assertEquals("GraphHandoffImportProperties[enabled=true, handoffSource=http, observationSource=cli]",
                     context.getBean(GraphHandoffImportProperties.class).toString());
         });
     }
@@ -300,6 +306,100 @@ class GraphHandoffImportConfigurationTest {
             Throwable failure = configurationFailure(context.getStartupFailure());
             assertNotNull(failure);
             assertTrue(failure.getMessage().startsWith("zoop.graph-handoff-import.handoff-source "), failure.getMessage());
+        });
+    }
+
+    /** The HTTP observation source: the S2-1 CLI left out, the observation export client configured. */
+    private static Map<String, String> observationHttp(Map<String, String> from) {
+        Map<String, String> changed = new LinkedHashMap<>(from);
+        changed.remove("ZOOP_INGESTION_CLI");
+        changed.put("ZOOP_GRAPH_HANDOFF_IMPORT_OBSERVATION_SOURCE", "http");
+        changed.put("ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED", "true");
+        changed.put("ZOOP_AI_OBSERVATION_EXPORT_CLIENT_BASE_URL", "https://ai.internal.example");
+        changed.put("ZOOP_AI_OBSERVATION_EXPORT_CLIENT_TOKEN", "export-token-0123456789abcdefghijklmnopqrstuvwxyz");
+        return changed;
+    }
+
+    private static String[] array(Map<String, String> values) {
+        return values.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue()).toArray(String[]::new);
+    }
+
+    @Test
+    void theHttpObservationSourceNeedsTheExportClientNotTheS2CliAndKeepsTheLedgerSettingsWhileTheHandoffCliRuns() {
+        runner().withUserConfiguration(AiObservationExportClientConfiguration.class).withPropertyValues(array(observationHttp(valid)))
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertNotNull(context.getBean(GraphHandoffRunner.class));
+                    GraphHandoffImportSettings settings = context.getBean(GraphHandoffImportSettings.class);
+                    assertEquals(GraphHandoffImportSettings.ObservationSourceKind.HTTP, settings.observationSource());
+                    assertEquals(GraphHandoffImportSettings.HandoffSourceKind.CLI, settings.handoffSource());
+                    assertNull(settings.ingestionCli());
+                    assertEquals(base.resolve("ingestion"), settings.ingestionState(), "the handoff CLI still reads the ledger");
+                    assertEquals(base.resolve("sources.json"), settings.ingestionSources());
+                    assertEquals("GraphHandoffImportProperties[enabled=true, handoffSource=cli, observationSource=http]",
+                            context.getBean(GraphHandoffImportProperties.class).toString());
+                });
+    }
+
+    @Test
+    void withBothSourcesOverHttpNoCliRunsHereAndTheLedgerSettingsMustBeLeftUnset() {
+        Map<String, String> both = observationHttp(httpMap());
+        both.remove("ZOOP_INGESTION_CLI");
+        both.remove("ZOOP_INGESTION_STATE_DIR");
+        both.remove("ZOOP_INGESTION_SOURCES");
+        runner().withUserConfiguration(AiHandoffReadClientConfiguration.class, AiObservationExportClientConfiguration.class)
+                .withPropertyValues(array(both)).run(context -> {
+                    assertNull(context.getStartupFailure());
+                    GraphHandoffImportSettings settings = context.getBean(GraphHandoffImportSettings.class);
+                    assertNull(settings.ingestionCli());
+                    assertNull(settings.ingestionState());
+                    assertNull(settings.ingestionSources());
+                    assertNull(settings.handoffCli());
+                });
+        Map<String, String> ledgerLeft = new LinkedHashMap<>(both);
+        ledgerLeft.put("ZOOP_INGESTION_SOURCES", valid.get("ZOOP_INGESTION_SOURCES"));
+        runner().withUserConfiguration(AiHandoffReadClientConfiguration.class, AiObservationExportClientConfiguration.class)
+                .withPropertyValues(array(ledgerLeft)).run(context -> {
+                    Throwable failure = configurationFailure(context.getStartupFailure());
+                    assertNotNull(failure);
+                    assertTrue(failure.getMessage().startsWith("zoop.graph-handoff-import.ingestion-sources "), failure.getMessage());
+                    assertFalse(failure.getMessage().contains(base.toString()), failure.getMessage());
+                });
+    }
+
+    @Test
+    void theObservationSourceAndTheExportClientAreExclusiveInBothDirectionsAndAnUnknownValueFailsClosed() {
+        Map<String, String> httpWithoutClient = observationHttp(valid);
+        httpWithoutClient.put("ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED", "false");
+        runner().withPropertyValues(array(httpWithoutClient)).run(context -> {
+            Throwable failure = configurationFailure(context.getStartupFailure());
+            assertNotNull(failure);
+            assertTrue(failure.getMessage().startsWith("zoop.graph-handoff-import.observation-source "), failure.getMessage());
+            assertTrue(failure.getMessage().contains("zoop.ai.observation-export-client.enabled"), failure.getMessage());
+        });
+        Map<String, String> cliWithClient = observationHttp(valid);
+        cliWithClient.put("ZOOP_GRAPH_HANDOFF_IMPORT_OBSERVATION_SOURCE", "cli");
+        cliWithClient.put("ZOOP_INGESTION_CLI", valid.get("ZOOP_INGESTION_CLI"));
+        runner().withUserConfiguration(AiObservationExportClientConfiguration.class).withPropertyValues(array(cliWithClient))
+                .run(context -> {
+                    Throwable failure = configurationFailure(context.getStartupFailure());
+                    assertNotNull(failure);
+                    assertTrue(failure.getMessage().startsWith("zoop.graph-handoff-import.observation-source "), failure.getMessage());
+                    assertTrue(failure.getMessage().contains("zoop.ai.observation-export-client.enabled"), failure.getMessage());
+                });
+        Map<String, String> httpWithCli = observationHttp(valid);
+        httpWithCli.put("ZOOP_INGESTION_CLI", valid.get("ZOOP_INGESTION_CLI"));
+        runner().withUserConfiguration(AiObservationExportClientConfiguration.class).withPropertyValues(array(httpWithCli))
+                .run(context -> {
+                    Throwable failure = configurationFailure(context.getStartupFailure());
+                    assertNotNull(failure);
+                    assertTrue(failure.getMessage().startsWith("zoop.graph-handoff-import.ingestion-cli "), failure.getMessage());
+                    assertTrue(failure.getMessage().contains("observation-source=http"), failure.getMessage());
+                });
+        runner().withPropertyValues(with("ZOOP_GRAPH_HANDOFF_IMPORT_OBSERVATION_SOURCE", "grpc")).run(context -> {
+            Throwable failure = configurationFailure(context.getStartupFailure());
+            assertNotNull(failure);
+            assertTrue(failure.getMessage().startsWith("zoop.graph-handoff-import.observation-source "), failure.getMessage());
         });
     }
 

@@ -175,6 +175,17 @@ zoop:
       connect-timeout: ${ZOOP_AI_HANDOFF_READ_CLIENT_CONNECT_TIMEOUT:3s}
       request-timeout: ${ZOOP_AI_HANDOFF_READ_CLIENT_REQUEST_TIMEOUT:60s}
       max-response-bytes: ${ZOOP_AI_HANDOFF_READ_CLIENT_MAX_RESPONSE_BYTES:16777216}
+    observation-export-client:
+      # Observation export route (scope observation.read): POST /internal/v1/observations/export runs the installed
+      # zoop-ai-ingest export --require-store on the AI side for ONE observation and answers the CLI's JSON (document.text
+      # included). Used only by the graph handoff import with observation-source=http. The AI child runs at most 45 s and the
+      # answer is at most 16 MiB, so the request deadline stays above 45 s. One request = one observation; no batch, no job.
+      enabled: ${ZOOP_AI_OBSERVATION_EXPORT_CLIENT_ENABLED:false}
+      base-url: ${ZOOP_AI_OBSERVATION_EXPORT_CLIENT_BASE_URL:}
+      token: ${ZOOP_AI_OBSERVATION_EXPORT_CLIENT_TOKEN:}
+      connect-timeout: ${ZOOP_AI_OBSERVATION_EXPORT_CLIENT_CONNECT_TIMEOUT:3s}
+      request-timeout: ${ZOOP_AI_OBSERVATION_EXPORT_CLIENT_REQUEST_TIMEOUT:50s}
+      max-response-bytes: ${ZOOP_AI_OBSERVATION_EXPORT_CLIENT_MAX_RESPONSE_BYTES:16777216}
     chat-client:
       # Chatbot model stages through ai/service (POST /internal/v1/chat-stages/{stage}). Disabled by default. Enabled, it
       # registers the chat engine, so zoop.chat.questions-enabled may be turned on. mode: replay (AI-side fixtures, no network)
@@ -234,10 +245,14 @@ zoop:
     # handoff-source: cli (default; the installed zoop-ai-handoff export, which needs handoff-cli, the three handoff/S3/S2 ledger
     # directories and the three operator files) or http (ai/service GET /internal/v1/graph-handoffs/{id}/bundle through
     # zoop.ai.handoff-read-client, which must then be enabled; those seven CLI settings must be left unset). An empty value is
-    # cli, and with cli the read client must stay disabled (an authority this run would not use). The observation check stays
-    # the installed zoop-ai-ingest export --require-store in both modes until the AI side offers it over HTTP.
+    # cli, and with cli the read client must stay disabled (an authority this run would not use).
+    # observation-source: cli (default; the installed zoop-ai-ingest export --require-store, which needs ingestion-cli) or http
+    # (ai/service POST /internal/v1/observations/export through zoop.ai.observation-export-client, which must then be enabled;
+    # ingestion-cli must be left unset). ingestion-state-dir and ingestion-sources are read by whichever CLI still runs here and
+    # must be left unset when both sources are http. The same exclusivity rule applies: cli refuses an idle export client.
     enabled: ${ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED:false}
     handoff-source: ${ZOOP_GRAPH_HANDOFF_IMPORT_HANDOFF_SOURCE:cli}
+    observation-source: ${ZOOP_GRAPH_HANDOFF_IMPORT_OBSERVATION_SOURCE:cli}
     request: ${ZOOP_GRAPH_HANDOFF_IMPORT_REQUEST:}
     result: ${ZOOP_GRAPH_HANDOFF_IMPORT_RESULT:}
     handoff-cli: ${ZOOP_HANDOFF_CLI:}
