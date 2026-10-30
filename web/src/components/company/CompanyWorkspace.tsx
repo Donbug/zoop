@@ -825,7 +825,6 @@ export default function CompanyWorkspace() {
             </>
           )}
         </section>
-<<<<<<< HEAD
         {/* D-COM-01 42: metrics explicitly reject asOf/graphVersion; keep latest and label separately. */}
         <section aria-label="주요 지표">
           <h2>주요 지표 · 최신 기준</h2>
@@ -866,22 +865,10 @@ export default function CompanyWorkspace() {
             </>
           )}
         </section>
-        <section aria-label="가상 계좌 보유">
-          <h2>가상 계좌 보유 · 프로젝트용 모의 데이터</h2>
-          {!auth.isAuthenticated ? (
-            <p>
-              {auth.checking
-                ? '로그인 상태 확인 중…'
-                : '로그인하고 가상 계좌를 연결하면 모의 보유 정보를 볼 수 있어요.'}
-            </p>
-          ) : (
-            <>
-=======
         {(holding || portfolio.error) && (
           <section aria-label="가상 계좌 보유">
             <h2>가상 계좌 보유 · 프로젝트용 모의 데이터</h2>
             {portfolio.error && (
->>>>>>> origin/main
               <Status resource={portfolio} label="모의 보유" />
             )}
             {holding && (
