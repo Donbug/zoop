@@ -145,7 +145,7 @@ export default function ServiceIntro() {
   return (
     <aside aria-labelledby="intro-title" className="flex flex-col gap-6">
       <div className="border-b-[0.667px] border-zoop-line pb-4">
-        <p className="text-[28px] font-[750] tracking-[-0.045em] text-zoop-ink font-inter">
+        <p className="text-[28px] font-[750] tracking-[-0.045em] text-zoop-ink font-heading">
           ZOOP
         </p>
         <p className="mt-1.5 text-xs text-zoop-muted">

@@ -48,7 +48,7 @@ it('applies the URL theme even when browser storage is unavailable', () => {
 });
 
 it('reads the current token value for canvas colors and falls back to light', () => {
-  expect(themeColor('ink')).toBe('#1a1a1a');
+  expect(themeColor('ink')).toBe('#212121');
   document.documentElement.style.setProperty('--color-zoop-ink', '#ffffff');
   expect(themeColor('ink')).toBe('#ffffff');
 });

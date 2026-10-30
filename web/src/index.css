@@ -1,13 +1,15 @@
 @import 'tailwindcss';
 @import 'pretendard/dist/web/variable/pretendardvariable.css';
-@import '@fontsource-variable/inter';
+@import 'wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.css';
+@import '@sun-typeface/suit/fonts/variable/woff2/SUIT-Variable.css';
 
 /* #169 서비스 셸과 D-GRP-02/03/04/05 상세 패널의 공용 토큰.
    화면별 값 대신 Tailwind 유틸리티(text-zoop-muted, font-panel 등)로 사용한다. */
 @theme {
-  --color-zoop-ink: #1a1a1a;
-  --color-zoop-muted: #626262;
-  --color-zoop-faint: #737373;
+  /* 본문 글자는 한 가지 진한 색으로 쓴다. 위계는 크기·굵기로 나눈다. */
+  --color-zoop-ink: #212121;
+  --color-zoop-muted: #212121;
+  --color-zoop-faint: #212121;
   --color-zoop-line: #e2e2e2;
   --color-zoop-paper: #ffffff;
   --color-zoop-wash: #f5f5f5;
@@ -21,12 +23,14 @@
   /* A-ADM-03 보류(HOLD) 판정 */
   --color-zoop-hold: #c2410c;
   --color-zoop-map: #dfdfdc;
-  --font-inter: 'Inter Variable', 'Pretendard Variable', sans-serif;
+  /* 본문 Pretendard · 제목 Wanted Sans · 숫자 SUIT. 세 글꼴 모두 npm 패키지의 woff2를 번들한다. */
+  --font-heading: 'Wanted Sans Variable', 'Pretendard Variable', sans-serif;
+  --font-num: 'SUIT Variable', 'Pretendard Variable', sans-serif;
 
   --font-panel: 'Pretendard Variable', Pretendard, sans-serif;
-  --color-panel-ink: #1a1a1a;
-  --color-panel-secondary: #626262;
-  --color-panel-muted: #737373;
+  --color-panel-ink: #212121;
+  --color-panel-secondary: #212121;
+  --color-panel-muted: #212121;
   --color-panel-line: #e2e2e2;
   --color-panel-control: #e2e2e2;
   --color-panel-soft: #f8f8f8;
@@ -119,6 +123,13 @@
     background: var(--color-zoop-wash);
     color: var(--color-zoop-ink);
     font-family: var(--font-panel);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-heading);
   }
 
   button,

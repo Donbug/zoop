@@ -462,7 +462,7 @@ function StocksSession() {
         </p>
       ) : (
         <>
-          <p className="mt-5 mb-2 font-inter text-[11px] text-zoop-muted">
+          <p className="mt-5 mb-2 font-num text-[11px] text-zoop-muted">
             {rows.length}개 종목
           </p>
           <StockList

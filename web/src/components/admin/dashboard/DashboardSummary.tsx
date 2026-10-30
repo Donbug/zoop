@@ -125,7 +125,7 @@ function Briefings({ data }: { data: Dashboard }) {
                 <td className={`${TD} font-semibold`}>
                   {roundStatusLabel[round.status]}
                 </td>
-                <td className={`${TD} font-inter tabular-nums`}>
+                <td className={`${TD} font-num tabular-nums`}>
                   {formatKst(round.dataWindow.end)}
                 </td>
               </tr>
@@ -170,7 +170,7 @@ function Jobs({ data }: { data: Dashboard }) {
                 <td className={`${TD} font-semibold`}>
                   {jobStatusLabel[job.status]}
                 </td>
-                <td className={`${TD} font-inter tabular-nums`}>
+                <td className={`${TD} font-num tabular-nums`}>
                   {formatKst(job.requestedAt)}
                 </td>
               </tr>

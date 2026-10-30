@@ -100,11 +100,11 @@ export default function GraphVersionForm({
       <p className="text-sm font-bold">그래프 버전 전환</p>
       <p className="text-[11px] leading-relaxed text-zoop-muted">
         사용자에게 보이는 그래프를{' '}
-        <strong className="font-inter text-zoop-ink">
+        <strong className="font-num text-zoop-ink">
           {activeVersionId ?? '없음'}
         </strong>
-        에서 <strong className="font-inter text-zoop-ink">{version.id}</strong>
-        로 바꿔요. 서버가 이 버전의 그래프와 근거를 다시 확인한 뒤에만 바뀌어요.
+        에서 <strong className="font-num text-zoop-ink">{version.id}</strong>로
+        바꿔요. 서버가 이 버전의 그래프와 근거를 다시 확인한 뒤에만 바뀌어요.
       </p>
       <div className="flex flex-col gap-1">
         <label htmlFor={reasonId} className="text-[11px] text-zoop-muted">

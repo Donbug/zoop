@@ -143,7 +143,7 @@ export default function AdminCompanyStatsPage() {
                 <tbody>
                   {[...data.series].reverse().map((day) => (
                     <tr key={day.date}>
-                      <td className={`${TD} font-inter tabular-nums`}>
+                      <td className={`${TD} font-num tabular-nums`}>
                         {day.date}
                       </td>
                       <td className={`${TD} text-right tabular-nums`}>

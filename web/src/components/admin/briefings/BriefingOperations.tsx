@@ -71,14 +71,14 @@ function RoundDetailView({
           </ul>
         </dd>
         <dt className={DT}>데이터 범위</dt>
-        <dd className={`${DD} font-inter tabular-nums`}>
+        <dd className={`${DD} font-num tabular-nums`}>
           {round.dataWindow.openStart
             ? '처음부터'
             : formatKst(round.dataWindow.start)}{' '}
           ~ {formatKst(round.dataWindow.end)}
         </dd>
         <dt className={DT}>발행</dt>
-        <dd className={`${DD} font-inter tabular-nums`}>
+        <dd className={`${DD} font-num tabular-nums`}>
           {round.publishedAt ? formatKst(round.publishedAt) : '–'}
           {round.graphVersion && (
             <span className="ml-2 text-zoop-muted">
@@ -230,7 +230,7 @@ function RoundDetailView({
                 <tr key={attempt.n}>
                   <td className={`${TD} tabular-nums`}>{attempt.n}</td>
                   <td
-                    className={`${TD} whitespace-nowrap font-inter tabular-nums`}
+                    className={`${TD} whitespace-nowrap font-num tabular-nums`}
                   >
                     {formatKst(attempt.startedAt)}
                   </td>
@@ -430,7 +430,7 @@ export default function BriefingOperations() {
                         )}
                       </td>
                       <td
-                        className={`${TD} whitespace-nowrap font-inter tabular-nums`}
+                        className={`${TD} whitespace-nowrap font-num tabular-nums`}
                       >
                         {formatKst(round.dataWindow.end)}
                       </td>

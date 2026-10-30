@@ -84,7 +84,7 @@ function Transcript({
   return (
     <>
       <Note>
-        <span className="font-inter">{data.user}</span> ·{' '}
+        <span className="font-num">{data.user}</span> ·{' '}
         {data.userKind === 'member' ? '회원' : '비회원'} · 시작{' '}
         {formatKst(data.startedAt)} · 질문 {data.messages.length}개
       </Note>
@@ -120,7 +120,7 @@ function Transcript({
                 <span className="font-semibold text-zoop-ink">
                   질문 {message.seq}
                 </span>
-                <span className="font-inter tabular-nums">
+                <span className="font-num tabular-nums">
                   {formatKst(message.at)}
                 </span>
                 <span>{messageStatus[message.status] ?? message.status}</span>

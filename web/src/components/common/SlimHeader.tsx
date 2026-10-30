@@ -16,7 +16,7 @@ export default function SlimHeader({
         aria-label="ZOOP"
         className="flex items-center gap-1.5 no-underline focus-visible:outline-2 focus-visible:outline-offset-2"
       >
-        <strong className="font-inter text-base font-extrabold">ZOOP</strong>
+        <strong className="font-heading text-base font-extrabold">ZOOP</strong>
       </Link>
       <div
         aria-label="화면 도구"

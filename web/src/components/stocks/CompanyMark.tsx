@@ -12,7 +12,7 @@ export default function CompanyMark({
     <CompanyLogo
       name={name}
       logoUrl={logoUrl}
-      className="size-8 rounded-full bg-gray-200 text-sm font-semibold text-gray-700"
+      className="size-8 rounded-full bg-gray-200 text-sm font-semibold text-zoop-ink"
     />
   );
 }

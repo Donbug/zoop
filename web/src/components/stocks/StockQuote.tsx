@@ -48,7 +48,7 @@ function Frame({ children, label }: { children: ReactNode; label?: string }) {
   return (
     <span
       aria-label={label}
-      className="flex min-w-[84px] flex-col items-end font-inter max-md:min-w-0"
+      className="flex min-w-[84px] flex-col items-end font-num max-md:min-w-0"
     >
       {children}
     </span>

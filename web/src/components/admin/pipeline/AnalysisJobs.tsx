@@ -89,7 +89,7 @@ function IngestBaselineLine({ baseline }: { baseline: IngestBaseline }) {
       <dl className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs">
         <div className="flex flex-wrap items-center gap-x-2">
           <dt className="text-[11px] text-zoop-muted">기사 처리 기준 시점</dt>
-          <dd className="font-inter tabular-nums">
+          <dd className="font-num tabular-nums">
             {formatKst(baseline.at)}
             {baseline.outcome &&
               ` · ${ingestOutcomeLabel[baseline.outcome] ?? baseline.outcome}`}
@@ -282,7 +282,7 @@ function AnalysisJobsSession() {
                     )}
                   </td>
                   <td
-                    className={`${TD} whitespace-nowrap font-inter tabular-nums`}
+                    className={`${TD} whitespace-nowrap font-num tabular-nums`}
                   >
                     {formatKst(job.requestedAt)}
                   </td>
@@ -397,7 +397,7 @@ function JobDetail({
       <div className="flex items-start gap-2">
         <h2 id="job-title" className="min-w-0 flex-1 text-sm font-bold">
           {jobName(job)}
-          <span className="mt-0.5 block font-inter text-[11px] font-normal break-all text-zoop-muted">
+          <span className="mt-0.5 block font-num text-[11px] font-normal break-all text-zoop-muted">
             {job.id}
           </span>
         </h2>
@@ -438,11 +438,11 @@ function JobDetail({
           )}
         </dd>
         <dt className="text-[11px] text-zoop-muted">요청</dt>
-        <dd className="font-inter tabular-nums">
+        <dd className="font-num tabular-nums">
           {formatKst(job.requestedAt)} · {job.requestedBy}
         </dd>
         <dt className="text-[11px] text-zoop-muted">시작·종료</dt>
-        <dd className="font-inter tabular-nums">
+        <dd className="font-num tabular-nums">
           {job.startedAt ? formatKst(job.startedAt) : '시작 전'} ~{' '}
           {job.finishedAt
             ? formatKst(job.finishedAt)
@@ -460,7 +460,7 @@ function JobDetail({
                 type="button"
                 disabled={pending}
                 onClick={() => onSelect(job.retryOf as string)}
-                className="font-inter break-all underline underline-offset-4 disabled:opacity-60"
+                className="font-num break-all underline underline-offset-4 disabled:opacity-60"
               >
                 {job.retryOf}
               </button>
@@ -474,7 +474,7 @@ function JobDetail({
       {job.error && (
         <p role="alert" className="text-xs text-zoop-alert">
           {job.error.message}{' '}
-          <span className="font-inter text-[11px] text-zoop-muted">
+          <span className="font-num text-[11px] text-zoop-muted">
             ({job.error.code})
           </span>
         </p>
@@ -613,7 +613,7 @@ function JobDetail({
               )}
             </dd>
             <dt className="text-[11px] text-zoop-muted">기준 시점</dt>
-            <dd className="font-inter tabular-nums">
+            <dd className="font-num tabular-nums">
               {formatKst(job.ingest.baselineBefore)} →{' '}
               {formatKst(job.ingest.baselineAfter)}
               {job.ingest.outcome &&

@@ -194,7 +194,7 @@ export default function PublishedBriefing({
 
   const publicationInfo = result && (
     <>
-      <p className="mt-1.5 font-inter text-[11px] leading-normal text-zoop-faint">
+      <p className="mt-1.5 font-num text-[11px] leading-normal text-zoop-faint">
         발행일 {result.date} · 예정 {clock(result.scheduledAt)} · 생성{' '}
         {briefingTime(result.generatedAt)} · 발행{' '}
         {briefingTime(result.publishedAt)} · 데이터 기준{' '}

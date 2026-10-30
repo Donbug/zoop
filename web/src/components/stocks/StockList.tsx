@@ -49,7 +49,7 @@ export default function StockList({
               >
                 {row.name}
               </Link>
-              <p className="mt-[3px] font-inter text-[11px] text-zoop-muted">
+              <p className="mt-[3px] font-num text-[11px] text-zoop-muted">
                 {[
                   row.ticker,
                   row.issueCount === null

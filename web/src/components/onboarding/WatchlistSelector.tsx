@@ -209,7 +209,7 @@ export default function WatchlistSelector() {
       : '/onboarding/account';
   return (
     <section
-      className="mx-auto mt-6 flex min-h-[65dvh] w-full max-w-[640px] flex-col gap-5 text-gray-950 md:min-h-[580px]"
+      className="mx-auto mt-6 flex min-h-[65dvh] w-full max-w-[640px] flex-col gap-5 text-zoop-ink md:min-h-[580px]"
       data-screen-id={ids.length ? 'D-WAT-01b' : 'D-WAT-01'}
       aria-busy={busy}
     >
@@ -224,12 +224,12 @@ export default function WatchlistSelector() {
       <h1 className="text-[21px] font-bold md:text-2xl">
         관심 있는 종목을 골라 주세요
       </h1>
-      <p className="text-sm leading-relaxed text-gray-600">
+      <p className="text-sm leading-relaxed text-zoop-ink">
         고른 종목을 중심으로 내 종목 지도를 보여드려요. 나중에 [내 종목]에서
         언제든 바꿀 수 있어요.
       </p>
       {lookup.loading && (
-        <p role="status" className="text-sm text-gray-500">
+        <p role="status" className="text-sm text-zoop-ink">
           보유 종목과 관심 목록을 확인하고 있어요.
         </p>
       )}
@@ -286,7 +286,7 @@ export default function WatchlistSelector() {
       <section aria-label="고른 종목">
         <div className="flex justify-between text-sm">
           <h2 className="font-bold">☆ 고른 종목</h2>
-          <span className="text-gray-500">{ids.length}개</span>
+          <span className="text-zoop-ink">{ids.length}개</span>
         </div>
         {ids.length > 0 ? (
           <ul className="mt-3 flex flex-wrap gap-2">
@@ -316,7 +316,7 @@ export default function WatchlistSelector() {
           </ul>
         ) : (
           ready && (
-            <p className="mt-2.5 rounded border border-dashed border-gray-300 p-3 text-sm leading-relaxed text-gray-600">
+            <p className="mt-2.5 rounded border border-dashed border-gray-300 p-3 text-sm leading-relaxed text-zoop-ink">
               {holdings?.length
                 ? '관심 종목을 추가하지 않아도 보유 종목으로 내 종목 지도를 시작할 수 있어요.'
                 : '관심 종목 없이 시작하면 시장 전체 지도가 열려요.'}
@@ -331,13 +331,13 @@ export default function WatchlistSelector() {
           search.items.length > 0 && (
             <div className="mb-2 flex justify-between text-sm">
               <h2 className="font-bold">'{query}' 검색 결과</h2>
-              <span className="text-gray-500">
+              <span className="text-zoop-ink">
                 {search.items.length}개 종목
               </span>
             </div>
           )}
         {search.loading && (
-          <p role="status" className="text-sm text-gray-500">
+          <p role="status" className="text-sm text-zoop-ink">
             검색하고 있어요.
           </p>
         )}
@@ -361,7 +361,7 @@ export default function WatchlistSelector() {
           !search.loading &&
           !search.error &&
           search.items.length === 0 && (
-            <p role="status" className="text-sm text-gray-500">
+            <p role="status" className="text-sm text-zoop-ink">
               검색 결과가 없어요.
             </p>
           )}
@@ -379,13 +379,13 @@ export default function WatchlistSelector() {
                 />
                 <div className="min-w-0 flex-1">
                   <strong className="text-sm">{company.name}</strong>
-                  <small className="mt-1 block text-[11px] text-gray-500">
+                  <small className="mt-1 block text-[11px] text-zoop-ink">
                     {company.ticker ?? company.id} · 승인된 사건{' '}
                     {company.issueCount}건
                   </small>
                 </div>
                 {heldIds.has(company.id) && (
-                  <span className="shrink-0 rounded-full bg-gray-200 px-2 py-0.5 text-[11px] font-semibold text-gray-700">
+                  <span className="shrink-0 rounded-full bg-gray-200 px-2 py-0.5 text-[11px] font-semibold text-zoop-ink">
                     보유
                   </span>
                 )}

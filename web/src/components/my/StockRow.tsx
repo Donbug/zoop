@@ -21,15 +21,15 @@ export default function StockRow({
       >
         <CompanyMark name={name} logoUrl={logoUrl} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium text-gray-950">
+          <span className="block truncate font-medium text-zoop-ink">
             {name}
           </span>
           {description && (
-            <span className="block text-sm text-gray-500">{description}</span>
+            <span className="block text-sm text-zoop-ink">{description}</span>
           )}
         </span>
         {trailing && (
-          <span className="shrink-0 text-sm text-gray-950 tabular-nums">
+          <span className="shrink-0 text-sm text-zoop-ink tabular-nums">
             {trailing}
           </span>
         )}
@@ -37,7 +37,7 @@ export default function StockRow({
       <Link
         to={`/companies/${encoded}`}
         aria-label={`${name} 기업 상세`}
-        className="flex size-9 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-950"
+        className="flex size-9 shrink-0 items-center justify-center rounded-lg text-zoop-ink hover:bg-gray-100 hover:text-zoop-ink"
       >
         ↗
       </Link>

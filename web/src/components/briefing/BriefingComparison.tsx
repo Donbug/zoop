@@ -203,7 +203,7 @@ export default function BriefingComparison(props: Props) {
               key={`${item.change}-${item.eventId}`}
               className="flex gap-3 border-b-[0.667px] border-zoop-line py-3 last:border-b-0 max-sm:flex-col max-sm:gap-1"
             >
-              <p className="w-28 shrink-0 font-inter text-[11px] text-zoop-muted tabular-nums">
+              <p className="w-28 shrink-0 font-num text-[11px] text-zoop-muted tabular-nums">
                 {reported(item.reportedAt, roundDate ?? '')}
               </p>
               <div className="flex min-w-0 flex-1 flex-col gap-1">

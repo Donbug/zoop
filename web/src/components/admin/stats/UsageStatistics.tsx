@@ -115,9 +115,7 @@ export function StatsSummaryPanel({ window }: { window: StatsWindow }) {
             <tbody>
               {trend.map((day) => (
                 <tr key={day.date}>
-                  <td className={`${TD} font-inter tabular-nums`}>
-                    {day.date}
-                  </td>
+                  <td className={`${TD} font-num tabular-nums`}>{day.date}</td>
                   <td className={`${TD} text-right tabular-nums`}>
                     {count(day.activeUsers)}
                   </td>
@@ -245,7 +243,7 @@ export function CompanyRankingPanel({ window }: { window: StatsWindow }) {
                     {row.name}
                   </Link>
                   {row.ticker && (
-                    <span className="ml-2 font-inter text-[11px] text-zoop-faint">
+                    <span className="ml-2 font-num text-[11px] text-zoop-faint">
                       {row.ticker}
                     </span>
                   )}

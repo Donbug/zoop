@@ -136,7 +136,7 @@ export default function CandidateDetailPanel({
       <div className="flex items-start gap-2">
         <h2 id="candidate-title" className="min-w-0 flex-1 text-sm font-bold">
           {c.title ?? '사건 없는 관계 후보'}
-          <span className="mt-0.5 block font-inter text-[11px] font-normal break-all text-zoop-muted">
+          <span className="mt-0.5 block font-num text-[11px] font-normal break-all text-zoop-muted">
             {c.candidateId}
           </span>
         </h2>
@@ -175,7 +175,7 @@ export default function CandidateDetailPanel({
             : '–'}
         </dd>
         <dt className="text-[11px] text-zoop-muted">원천 버전</dt>
-        <dd className="font-inter break-all">{c.sourceVersion}</dd>
+        <dd className="font-num break-all">{c.sourceVersion}</dd>
       </dl>
 
       {c.reasons.length > 0 && (
@@ -275,7 +275,7 @@ export default function CandidateDetailPanel({
                 <tr key={relation.relationId}>
                   <td className={`${TD} whitespace-nowrap`}>
                     {relationLabel(relation.relationType)}
-                    <span className="block font-inter text-[11px] break-all text-zoop-muted">
+                    <span className="block font-num text-[11px] break-all text-zoop-muted">
                       {relation.relationId} · 회차 {relation.revision}
                     </span>
                   </td>

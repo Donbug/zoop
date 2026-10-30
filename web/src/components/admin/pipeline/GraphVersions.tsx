@@ -69,7 +69,7 @@ export default function GraphVersions({
       <Section title="그래프 버전">
         <Note>
           사용자에게 보이는 버전:{' '}
-          <strong className="font-inter text-zoop-ink">
+          <strong className="font-num text-zoop-ink">
             {activeVersionId ?? '없음'}
           </strong>
           . 이미 있는 버전으로만 바꿀 수 있어요. 새 버전 게시는 아직 지원하지
@@ -150,7 +150,7 @@ export default function GraphVersions({
                     version.id === activeVersionId ? 'bg-zoop-soft' : undefined
                   }
                 >
-                  <td className={`${TD} font-inter font-semibold break-all`}>
+                  <td className={`${TD} font-num font-semibold break-all`}>
                     {version.id}
                     {version.kind === 'fixture' && (
                       <span className="ml-2 rounded-full bg-zoop-soft px-2 py-1 text-[11px] font-normal text-zoop-muted">
@@ -166,7 +166,7 @@ export default function GraphVersions({
                     )}
                   </td>
                   <td
-                    className={`${TD} whitespace-nowrap font-inter tabular-nums`}
+                    className={`${TD} whitespace-nowrap font-num tabular-nums`}
                   >
                     {formatKst(version.createdAt)}
                   </td>
@@ -236,7 +236,7 @@ export default function GraphVersions({
               {first.activations.map((activation, index) => (
                 <tr key={`${activation.versionId}-${activation.at}-${index}`}>
                   <td
-                    className={`${TD} whitespace-nowrap font-inter tabular-nums`}
+                    className={`${TD} whitespace-nowrap font-num tabular-nums`}
                   >
                     {formatKst(activation.at)}
                   </td>
@@ -244,7 +244,7 @@ export default function GraphVersions({
                     {activationLabel[activation.action] ?? activation.action}
                   </td>
                   <td
-                    className={`${TD} font-inter whitespace-nowrap tabular-nums`}
+                    className={`${TD} font-num whitespace-nowrap tabular-nums`}
                   >
                     {activation.previousVersionId
                       ? `${activation.previousVersionId} → `

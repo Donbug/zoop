@@ -324,16 +324,14 @@ export default function AiUsageOverview() {
                   {errors.map((error, index) => (
                     <tr key={`${error.feature.feature}-${error.at}-${index}`}>
                       <td
-                        className={`${TD} whitespace-nowrap font-inter tabular-nums`}
+                        className={`${TD} whitespace-nowrap font-num tabular-nums`}
                       >
                         {formatKst(error.at)}
                       </td>
                       <td className={`${TD} whitespace-nowrap`}>
                         {error.feature.label}
                       </td>
-                      <td className={`${TD} font-inter`}>
-                        {error.code ?? '–'}
-                      </td>
+                      <td className={`${TD} font-num`}>{error.code ?? '–'}</td>
                       <td className={TD}>{error.message ?? '–'}</td>
                     </tr>
                   ))}

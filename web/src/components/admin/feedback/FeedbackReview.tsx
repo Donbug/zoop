@@ -92,7 +92,7 @@ export function DateRangeForm({
           value={from}
           max={to || undefined}
           onChange={(event) => setFrom(event.target.value)}
-          className={`${INPUT} w-40 font-inter`}
+          className={`${INPUT} w-40 font-num`}
         />
       </label>
       <label className={FIELD_LABEL}>
@@ -102,7 +102,7 @@ export function DateRangeForm({
           value={to}
           min={from || undefined}
           onChange={(event) => setTo(event.target.value)}
-          className={`${INPUT} w-40 font-inter`}
+          className={`${INPUT} w-40 font-num`}
         />
       </label>
       <button
@@ -243,7 +243,7 @@ export function FeedbackSummaryPanel({ period }: { period: FeedbackPeriod }) {
             <tbody>
               {dates.map((date) => (
                 <tr key={date}>
-                  <td className={`${TD} font-inter tabular-nums`}>{date}</td>
+                  <td className={`${TD} font-num tabular-nums`}>{date}</td>
                   {data.features.map((feature) => {
                     const day = feature.days.find((item) => item.date === date);
                     return (
@@ -313,7 +313,7 @@ export function DislikesPanel({
         <tbody>
           {rows.map((row) => (
             <tr key={`${row.feature}-${row.targetId}-${row.voter}`}>
-              <td className={`${TD} whitespace-nowrap font-inter tabular-nums`}>
+              <td className={`${TD} whitespace-nowrap font-num tabular-nums`}>
                 {formatKst(row.at)}
               </td>
               <td className={`${TD} whitespace-nowrap`}>{row.featureLabel}</td>
@@ -325,7 +325,7 @@ export function DislikesPanel({
                   <span className="text-zoop-faint">사유 없음</span>
                 )}
               </td>
-              <td className={`${TD} whitespace-nowrap font-inter`}>
+              <td className={`${TD} whitespace-nowrap font-num`}>
                 {row.voter}
               </td>
               <td className={TD}>
@@ -485,10 +485,10 @@ function TranscriptList({
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <td className={`${TD} whitespace-nowrap font-inter tabular-nums`}>
+              <td className={`${TD} whitespace-nowrap font-num tabular-nums`}>
                 {formatKst(row.lastAt)}
               </td>
-              <td className={`${TD} whitespace-nowrap font-inter`}>
+              <td className={`${TD} whitespace-nowrap font-num`}>
                 {row.user}
                 <span className="ml-2 font-sans text-zoop-muted">
                   {row.userKind === 'member' ? '회원' : '비회원'}

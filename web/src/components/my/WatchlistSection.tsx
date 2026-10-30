@@ -118,14 +118,14 @@ export default function WatchlistSection({
           관심 종목
         </h2>
         {settings.status === 'success' && (
-          <span className="text-sm text-gray-500 tabular-nums">
+          <span className="text-sm text-zoop-ink tabular-nums">
             {shownIds.length}개{pending && ' · 저장 중'}
           </span>
         )}
       </div>
 
       {settings.status === 'loading' && (
-        <p role="status" className="text-sm text-gray-500">
+        <p role="status" className="text-sm text-zoop-ink">
           관심 종목을 불러오고 있어요
         </p>
       )}
@@ -138,7 +138,7 @@ export default function WatchlistSection({
 
       {settings.status === 'success' &&
         (shownIds.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-gray-300 px-4 py-3 text-sm text-gray-600">
+          <p className="rounded-xl border border-dashed border-gray-300 px-4 py-3 text-sm text-zoop-ink">
             아직 관심 종목이 없어요. 아래에서 기업을 검색해 추가하면 내 종목
             지도에 함께 보여요.
           </p>
@@ -156,7 +156,7 @@ export default function WatchlistSection({
                   onClick={() =>
                     void change({ companyId: id, name, watched: false })
                   }
-                  className="flex size-9 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-950 disabled:cursor-not-allowed disabled:text-gray-300"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-lg text-zoop-ink hover:bg-gray-100 hover:text-zoop-ink disabled:cursor-not-allowed disabled:text-gray-300"
                 >
                   ×
                 </button>
@@ -164,7 +164,7 @@ export default function WatchlistSection({
               if (!brief) {
                 return (
                   <li key={id} className="flex items-center gap-2 py-3">
-                    <p className="flex-1 text-sm text-gray-500">
+                    <p className="flex-1 text-sm text-zoop-ink">
                       {entry?.status === 'error'
                         ? '종목 정보를 불러오지 못했어요.'
                         : '종목 정보를 불러오고 있어요'}
@@ -174,7 +174,7 @@ export default function WatchlistSection({
                         type="button"
                         aria-label="종목 정보 다시 불러오기"
                         onClick={() => retryBrief(id)}
-                        className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 hover:bg-gray-50"
+                        className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-zoop-ink hover:bg-gray-50"
                       >
                         다시 시도
                       </button>
@@ -228,7 +228,7 @@ export default function WatchlistSection({
           {portfolio.status === 'success' &&
             heldIds.length === 0 &&
             shownIds.length === 0 && (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-zoop-ink">
                 보유·관심이 모두 없으면 지도는 시장 전체로 열려요.
               </p>
             )}

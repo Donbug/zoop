@@ -186,7 +186,7 @@ function MemberDetail({ memberId }: { memberId: string }) {
                   {data.history.map((entry, index) => (
                     <tr key={`${entry.at}-${index}`}>
                       <td
-                        className={`${TD} whitespace-nowrap font-inter tabular-nums`}
+                        className={`${TD} whitespace-nowrap font-num tabular-nums`}
                       >
                         {formatKst(entry.at)}
                       </td>

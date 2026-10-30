@@ -77,7 +77,7 @@ export default function CompanySearch({
       {query && (
         <div aria-live="polite" aria-busy={search.status === 'loading'}>
           {search.status === 'loading' && (
-            <p role="status" className="text-sm text-gray-500">
+            <p role="status" className="text-sm text-zoop-ink">
               ‘{query}’ 종목을 찾고 있어요
             </p>
           )}
@@ -89,13 +89,13 @@ export default function CompanySearch({
             />
           )}
           {search.status === 'success' && items.length === 0 && (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-zoop-ink">
               ‘{query}’와 맞는 종목이 없어요. 검색어를 고쳐 다시 검색해 보세요.
             </p>
           )}
           {search.status === 'success' && items.length > 0 && (
             <>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-zoop-ink">
                 ‘{query}’ 검색 결과{' '}
                 <span className="tabular-nums">{items.length}개 종목</span>
               </p>
@@ -115,10 +115,10 @@ export default function CompanySearch({
                         logoUrl={company.logoUrl}
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-gray-950">
+                        <p className="truncate font-medium text-zoop-ink">
                           {company.name}
                         </p>
-                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500">
+                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zoop-ink">
                           <span className="tabular-nums">
                             {[
                               company.ticker,
@@ -139,7 +139,7 @@ export default function CompanySearch({
                         className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
                           picked
                             ? 'bg-gray-950 text-white'
-                            : 'border border-gray-300 text-gray-900 hover:bg-gray-50'
+                            : 'border border-gray-300 text-zoop-ink hover:bg-gray-50'
                         }`}
                       >
                         {picked ? '선택됨' : addLabel}

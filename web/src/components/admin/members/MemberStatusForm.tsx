@@ -79,7 +79,7 @@ export default function MemberStatusForm({
     >
       <p className="text-sm font-bold">{title}</p>
       <p className="text-[11px] leading-relaxed text-zoop-muted">
-        <strong className="font-inter text-zoop-ink">{member.id}</strong>(
+        <strong className="font-num text-zoop-ink">{member.id}</strong>(
         {member.emailMasked})
         {block
           ? '을 차단해요. 열려 있는 모든 세션이 지금 끝나고, 다시 로그인할 수 없어요.'
