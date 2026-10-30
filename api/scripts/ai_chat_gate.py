@@ -222,12 +222,13 @@ def check_fixture(replay: dict[str, Any], registry: dict[str, Any], state: Path)
     path.write_text(json.dumps(replay, ensure_ascii=False), encoding="utf-8")
     sender = ReplaySender(path)
     parsed = ChatGrantRegistry.model_validate(registry)
-    for stage, payload in (("chat-router", ROUTER_INPUT), ("chat-router", DEPENDENCY_ROUTER_INPUT),
-                           ("chat-answer", ANSWER_INPUT),
-                           ("chat-verification", VERIFICATION_INPUT), ("chat-verification", FACT_VERIFICATION_INPUT)):
+    for index, (stage, payload) in enumerate((("chat-router", ROUTER_INPUT), ("chat-router", DEPENDENCY_ROUTER_INPUT),
+                                              ("chat-answer", ANSWER_INPUT),
+                                              ("chat-verification", VERIFICATION_INPUT),
+                                              ("chat-verification", FACT_VERIFICATION_INPUT))):
         request = _request(stage, payload)
         if stage != "chat-verification":
-            request = request.model_copy(update={"invocation_id": f"check-{stage}"})
+            request = request.model_copy(update={"invocation_id": f"check-{index}-{stage}"})
         if stage == "chat-verification":
             _, outbound = provider_body(request, stage_config(stage, "replay"))
             assert outbound["state"]["requestBinding"] == payload["requestBinding"]
