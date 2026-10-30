@@ -52,6 +52,7 @@ import {
   legacyTimeRange,
   bucketKey,
   impactEdges,
+  money,
   number,
   requestTime,
   versionOnlyAddress,
@@ -773,12 +774,7 @@ export default function CompanyWorkspace() {
           {quote.data?.status === 'available' && (
             <>
               <strong className="text-title">
-                {quote.data.quote.price === null
-                  ? '미제공'
-                  : formatMoney(
-                      quote.data.quote.price,
-                      quote.data.quote.currency,
-                    )}
+                {money(quote.data.quote.price, quote.data.quote.currency)}
               </strong>
               <span>
                 {' '}
@@ -813,13 +809,20 @@ export default function CompanyWorkspace() {
                 <dd>{number(quote.data.quote.volume)}</dd>
                 <dt>당일 저가~고가</dt>
                 <dd>
-                  {number(quote.data.quote.dayLow)} ~{' '}
-                  {number(quote.data.quote.dayHigh)}
+                  {money(quote.data.quote.dayLow, quote.data.quote.currency)} ~{' '}
+                  {money(quote.data.quote.dayHigh, quote.data.quote.currency)}
                 </dd>
                 <dt>52주 저가~고가</dt>
                 <dd>
-                  {number(quote.data.quote.fiftyTwoWeekLow)} ~{' '}
-                  {number(quote.data.quote.fiftyTwoWeekHigh)}
+                  {money(
+                    quote.data.quote.fiftyTwoWeekLow,
+                    quote.data.quote.currency,
+                  )}{' '}
+                  ~{' '}
+                  {money(
+                    quote.data.quote.fiftyTwoWeekHigh,
+                    quote.data.quote.currency,
+                  )}
                 </dd>
               </dl>
             </>
@@ -878,15 +881,18 @@ export default function CompanyWorkspace() {
                   <dd>{number(holding.quantity)}주</dd>
                   <dt>평균 매입가</dt>
                   <dd>
-                    {number(holding.avgPrice)}{' '}
-                    {holding.avgPriceCurrency ?? '통화 미상'}
+                    {holding.avgPriceCurrency
+                      ? money(holding.avgPrice, holding.avgPriceCurrency)
+                      : `${number(holding.avgPrice)} 통화 미상`}
                   </dd>
                   <dt>평가 금액</dt>
                   <dd>
-                    {number(holding.marketValue)}{' '}
-                    {holding.quote.status === 'available'
-                      ? holding.quote.currency
-                      : '시세 미제공'}
+                    {holding.quote.status === 'available' &&
+                    holding.quote.currency
+                      ? money(holding.marketValue, holding.quote.currency)
+                      : holding.marketValue == null
+                        ? '시세 미제공'
+                        : `${number(holding.marketValue)} 시세 미제공`}
                   </dd>
                   <dt>자산 비중</dt>
                   <dd>

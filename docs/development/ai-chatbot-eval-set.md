@@ -113,7 +113,7 @@ Q07에서 질문이 기업을 지목하는 경우(구현 계획 결정 (11))는 
 
 세트에 넣지 못한 것:
 
-- **체크포인트·의존 단계**: 라우터 wire(`zoop-ai-chat-1`)에 의존 관계 필드가 없어 `ChatModelStages`는 항상 `dependsOn: null`을 만든다. 질문에서 `exactly(2)` 같은 체크포인트를 만들 경로가 없으므로, 그 흐름은 `OrchestratedChatEngineTest`의 결정 대본으로만 확인된다. 라우터 계약에 의존 관계가 들어오면 이 세트에 사례를 추가한다.
+- **체크포인트·의존 단계**: 라우터 wire(`zoop-ai-chat-2`)에 의존 관계 필드가 없어 `ChatModelStages`는 항상 `dependsOn: null`을 만든다. 질문에서 `exactly(2)` 같은 체크포인트를 만들 경로가 없으므로, 그 흐름은 `OrchestratedChatEngineTest`의 결정 대본으로만 확인된다. 라우터 계약에 의존 관계가 들어오면 이 세트에 사례를 추가한다.
 - **확인 질문의 답(깊이 1·2)**, **선택 근거로 좁힌 질문(`evidencePool`)**, **시간 한도(`deadline_guard`)**: 실행기가 단일 턴·고정 시간만 다룬다. 필요하면 사례 형식에 `turns`와 남은 시간을 더한다.
 
 ## 6. 다음 단계

@@ -12,12 +12,13 @@ import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolPath;
 import com.zoop.chat.tool.ChatToolResult;
+import com.zoop.chat.tool.ChatToolRunner;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The agent path over the ZOOP MCP endpoint (MCP actions contract 3.4): the server issues the run's grant token, Luna runs in
@@ -47,6 +48,8 @@ import tools.jackson.databind.ObjectMapper;
  */
 public final class ChatMcpAgent implements ChatAgentPath {
     static final int MAX_ROUNDS = 3;
+    /** Reads a kept envelope's own fields (what was withheld); never a result passed on. */
+    private static final JsonMapper JSON = JsonMapper.builder().build();
     /**
      * Calls approved in one round, so at most this many of the job's calls run at once (MCP actions contract 3.2): the
      * provider makes a round's approved calls before it answers the step, and the next round is decided only then.
@@ -59,18 +62,18 @@ public final class ChatMcpAgent implements ChatAgentPath {
     /** The recipient the results' send grants are checked for ({@link ChatSendGrants#recipient}); each step names it. */
     private final String recipient;
     private final ChatExecutionRepository runs;
-    private final ObjectMapper mapper;
+    private final ChatToolRunner runner;
     /** The MCP preflight and circuit of live runs; null for replay runs, which reach no MCP endpoint. */
     private final ChatMcpCircuitBreaker circuit;
 
     public ChatMcpAgent(ChatModels.Agent agent, ChatMcpTools tools, ChatMcpGrants grants, String recipient,
-            ChatExecutionRepository runs, ObjectMapper mapper, ChatMcpCircuitBreaker circuit) {
+            ChatExecutionRepository runs, ChatToolRunner runner, ChatMcpCircuitBreaker circuit) {
         this.agent = agent;
         this.tools = tools;
         this.grants = grants;
         this.recipient = recipient;
         this.runs = runs;
-        this.mapper = mapper;
+        this.runner = runner;
         this.circuit = circuit;
     }
 
@@ -196,7 +199,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
         Set<String> withheld = new LinkedHashSet<>();
         for (ChatKeptToolResult kept : runs.keptToolResults(run.jobId(), run.attemptNo())) {
             if (!ChatCapability.WEB_SEARCH.id().equals(kept.capabilityId())) continue;
-            if (mapper.readTree(kept.result()).path("withheld").path("webResults").asInt(0) > 0) {
+            if (JSON.readTree(kept.result()).path("withheld").path("webResults").asInt(0) > 0) {
                 withheld.add(kept.toolCallId());
             }
         }
@@ -234,12 +237,11 @@ public final class ChatMcpAgent implements ChatAgentPath {
         return ids;
     }
 
-    /** The results the attempt's MCP calls returned to the model, as kept on the ledger. */
+    /**
+     * The results the attempt's MCP calls returned to the model, as kept on the ledger and rebound to this run: a kept
+     * result that does not belong to it is refused, never passed on.
+     */
     private List<ChatToolResult> kept(ChatRun run) {
-        List<ChatToolResult> results = new ArrayList<>();
-        for (ChatKeptToolResult kept : runs.keptToolResults(run.jobId(), run.attemptNo())) {
-            results.add(ChatMcpTools.kept(mapper, kept));
-        }
-        return results;
+        return runner.restore(run, runs.keptToolResults(run.jobId(), run.attemptNo()));
     }
 }

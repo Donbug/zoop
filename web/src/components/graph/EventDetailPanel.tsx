@@ -1,6 +1,7 @@
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import CompanyLogo from '@/components/common/CompanyLogo';
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useEventData } from '@/hooks/useEventData';
 import type { EventContext, EventDetail } from '@/types/map/event';
 import type { GraphNode } from '@/types/map/graph';
@@ -76,15 +77,15 @@ export default function EventDetailPanel({
               className={ui.avatar}
             />
             <div>
-              <a
-                href={
+              <Link
+                to={
                   companyDetailHref?.(company.id) ??
                   `/companies/${encodeURIComponent(company.id)}`
                 }
                 className="text-zoop-ink underline underline-offset-4 focus-visible:outline-2"
               >
                 <strong>{company.name}</strong>
-              </a>
+              </Link>
               <p>
                 {company.roleUnconfirmed
                   ? '역할 미확인'

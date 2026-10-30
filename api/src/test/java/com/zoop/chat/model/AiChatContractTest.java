@@ -1,6 +1,7 @@
 package com.zoop.chat.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -11,6 +12,8 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +27,10 @@ import com.zoop.ai.http.HttpChatStageClient;
 import com.zoop.chat.dto.ChatFrozenContext;
 import com.zoop.chat.dto.Citation;
 import com.zoop.chat.executor.ChatRun;
+import com.zoop.chat.executor.ChatEngineOutcome;
+import com.zoop.chat.executor.ChatRunControl;
+import com.zoop.chat.executor.ChatToolCallReservation;
+import com.zoop.chat.repository.ChatToolCallEnd;
 import com.zoop.chat.model.CompanyNameResolver.Company;
 import com.zoop.chat.model.CompanyNameResolver.Entry;
 import com.zoop.chat.orchestrator.ChatBranchContext;
@@ -33,6 +40,14 @@ import com.zoop.chat.orchestrator.ChatModels.Failure.Fate;
 import com.zoop.chat.orchestrator.ChatQueryType;
 import com.zoop.chat.orchestrator.ChatRouteDecision;
 import com.zoop.chat.orchestrator.ChatSemanticVerdicts;
+import com.zoop.chat.orchestrator.OrchestratedChatEngine;
+import com.zoop.chat.tool.ChatCapability;
+import com.zoop.chat.tool.ChatTool;
+import com.zoop.chat.tool.ChatToolOutput;
+import com.zoop.chat.tool.ChatToolRegistry;
+import com.zoop.chat.tool.ChatToolRequest;
+import com.zoop.chat.tool.ChatToolRunner;
+import com.zoop.chat.tool.ChatToolScope;
 import com.zoop.chat.service.FrozenSelection;
 import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolResult;
@@ -48,7 +63,7 @@ import tools.jackson.databind.json.JsonMapper;
  * Real Java adapters -> ai/service (uvicorn) -> installed {@code zoop-ai-chat}, replay only. The inputs are built by the
  * production {@link ChatModelStages} from the same synthetic scenario the gate authored its replay fixture from
  * ({@code api/scripts/ai_chat_gate.py}); the replay answers only an input identical in every field, so a passing stage proves
- * the two sides agree on {@code zoop-ai-chat-1}. Not runnable on its own: {@code make api-ai-chat-smoke} starts the service and
+ * the two sides agree on {@code zoop-ai-chat-2}. Not runnable on its own: {@code make api-ai-chat-smoke} starts the service and
  * exports {@code ZOOP_AI_CHAT_CONTRACT_MANIFEST}. Without it every test fails; none skips.
  */
 @Tag("ai-chat-contract")
@@ -132,7 +147,10 @@ class AiChatContractTest {
 
     /** A fresh job per call: each test's invocations are its own. */
     private static ChatRun run(String question) {
-        String job = "chat-gate-" + UUID.randomUUID().toString().substring(0, 12);
+        return run(question, "chat-gate-" + UUID.randomUUID().toString().substring(0, 12));
+    }
+
+    private static ChatRun run(String question, String job) {
         return new ChatRun(job, "chat-session-gate", "member-gate", 1, "run", List.of(new ChatRun.Turn(job, question, null, null)),
                 new ChatFrozenContext(List.of(), 0, null, Instant.parse("2026-10-21T00:00:00Z"), "gv-synthetic"),
                 FrozenSelection.NONE, "gv-synthetic", 0, Instant.parse("2026-10-22T00:00:00Z"),
@@ -182,9 +200,82 @@ class AiChatContractTest {
         var sections = List.of(
                 new ChatGeneratedAnswer.Section("evidence_grounded", EVIDENCE_TEXT, List.of("r1"), List.of(EVIDENCE)),
                 new ChatGeneratedAnswer.Section("general_knowledge", GENERAL_TEXT, List.of("r2"), List.of()));
-        ChatSemanticVerdicts verdicts = stages().verify(run(ANSWER_QUESTION), sections, List.of(citation(EVIDENCE, "art-synthetic")));
+        ChatRun run = run(ANSWER_QUESTION, "chat-verify-gate");
+        ChatSemanticVerdicts verdicts = stages().verify(run, sections, List.of(citation(EVIDENCE, "art-synthetic")),
+                ChatModels.ServerFacts.withoutTools(run, sections));
         assertEquals(List.of(new ChatSemanticVerdicts.Verdict("supported", "no"), new ChatSemanticVerdicts.Verdict(null, "no")),
                 verdicts.sections());
+    }
+
+    @Test
+    void theOrchestratorSendsBoundMemberAndComparisonFacts() {
+        AtomicInteger reads = new AtomicInteger();
+        var registry = new ChatToolRegistry(List.of(
+                new ChatTool() {
+                    public ChatCapability capability() { return ChatCapability.PORTFOLIO_SCOPE_READ; }
+                    public ChatToolOutput read(ChatToolScope scope, ChatToolRequest query) {
+                        reads.incrementAndGet();
+                        assertEquals("member-gate", scope.memberId());
+                        return new ChatToolOutput("member-scope", List.of(
+                                new ChatToolItem("KRX:005930", "company", "삼성전자 (보유)", List.of("KRX:005930"), List.of()),
+                                new ChatToolItem("NASDAQ:NVDA", "company", "NVIDIA (관심)", List.of("NASDAQ:NVDA"), List.of())),
+                                List.of(), true, false);
+                    }
+                },
+                new ChatTool() {
+                    public ChatCapability capability() { return ChatCapability.GRAPH_VERSION_DIFF; }
+                    public ChatToolOutput read(ChatToolScope scope, ChatToolRequest query) {
+                        reads.incrementAndGet();
+                        assertEquals(List.of("KRX:005930", "NASDAQ:NVDA"), query.targets());
+                        return new ChatToolOutput("gv-earlier.." + scope.graphVersionId(), List.of(
+                                new ChatToolItem("iss-new", "issue", "[새로 생김] 공급 계약", List.of("KRX:005930"), List.of(EVIDENCE)),
+                                new ChatToolItem("iss-old", "issue", "[사라짐] 이전 사건", List.of("NASDAQ:NVDA"), List.of()),
+                                new ChatToolItem("edge-stable", "edge",
+                                        "[새로 생김] " + "가".repeat(298) + "\uD840\uDC00" + "끝".repeat(20),
+                                        List.of("KRX:005930", "NASDAQ:NVDA"), List.of(EVIDENCE))),
+                                List.of(EVIDENCE), true, false);
+                    }
+                }));
+        ChatModels.Router router = (run, bound) -> new ChatRouteDecision(List.of(new ChatRouteDecision.Requirement(
+                "r1", "내 종목 지도 변경", true, Map.of(ChatQueryType.Q05, 0.9, ChatQueryType.Q07, 0.9),
+                Map.of("portfolio.scope.read", 0.9, "graph.version.diff", 0.9), List.of(), 0.0, null)), null);
+        ChatModels.Generator generator = (run, context) -> {
+            assertEquals(1, context.branches().size(), "scope branch is merged into its parent");
+            return new ChatGeneratedAnswer(List.of(new ChatGeneratedAnswer.Section("evidence_grounded",
+                    "보유 종목 삼성전자와 관심 종목 NVIDIA의 조회된 지도 변경입니다.", List.of("r1"), List.of(EVIDENCE))),
+                    List.of(), List.of());
+        };
+        var control = new GateControl();
+        try (var runner = new ChatToolRunner(registry);
+                var engine = new OrchestratedChatEngine(router, generator, stages(), registry, runner,
+                        (id, version, asOf, trace) -> Optional.of(citation(id, "art-synthetic")),
+                        Clock.fixed(Instant.parse("2026-10-22T00:00:00Z"), ZoneOffset.UTC))) {
+            var outcome = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                    engine.answer(run("내 종목 지도 변경", "chat-facts-gate"), control));
+            assertEquals("answered", outcome.result().outcome());
+        }
+        assertEquals(2, reads.get(), "verifier must not requery membership");
+        assertEquals(3, control.modelCalls);
+        assertEquals("replay", receipts.getLast().executionMode());
+    }
+
+    private static final class GateControl implements ChatRunControl {
+        int modelCalls;
+        int toolCalls;
+        public void phase(String phase) { }
+        public void beforeModelCall() { modelCalls++; }
+        public Duration remaining() { return Duration.ofSeconds(60); }
+        public void shortenDeadline(Instant deadline) { }
+        public boolean owned() { return true; }
+        public int toolCallsLeft() { return 12; }
+        public List<String> reserveToolCalls(int revision, List<ChatToolCallReservation> calls) {
+            List<String> ids = new ArrayList<>();
+            for (var ignored : calls) ids.add("tc-gate-" + toolCalls++);
+            return ids;
+        }
+        public void toolCallStarted(String id) { }
+        public Optional<String> claimToolCall(String capabilityId, String inputDigest) { return Optional.empty(); }
+        public void toolCallFinished(String id, ChatToolCallEnd end) { }
     }
 
     @Test

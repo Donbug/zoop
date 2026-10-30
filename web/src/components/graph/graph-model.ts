@@ -249,7 +249,7 @@ export function toG6Data(
               e.relationType === 'FOLLOWS'
                 ? themeColor('ink')
                 : themeColor('faint'),
-            lineWidth: 0.65,
+            lineWidth: 1.3,
             strokeOpacity: dimmed
               ? 0.08
               : e.relationType === 'SHARES_ISSUE'
@@ -257,7 +257,7 @@ export function toG6Data(
                 : 0.75,
             lineDash: e.relationType === 'SHARES_ISSUE' ? [2, 4] : undefined,
             endArrow: e.relationType === 'FOLLOWS',
-            endArrowSize: 4,
+            endArrowSize: 6,
             cursor: isSelectableRelation(e) ? 'pointer' : 'default',
             increasedLineWidthForHitTesting: isSelectableRelation(e) ? 8 : 0,
           },

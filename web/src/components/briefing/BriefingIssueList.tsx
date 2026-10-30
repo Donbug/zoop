@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { BriefingItem, BriefingResponse } from '@/types/briefing';
 import { issueAnchor } from '@/util/briefingIssueView';
+import { eventTimeText } from '@/util/event-time';
 import BriefingReadingSection from './BriefingReadingSection';
 import BriefingItemDetails from './BriefingItemDetails';
 import {
@@ -17,7 +18,14 @@ import {
   SECTION_TITLE,
 } from './briefingStyles';
 
+/** N-y: 정밀도에 맞춘 KST 표기. 알 수 없으면 기존 문구를 유지한다. */
+function eventTimeLabel(item: BriefingItem) {
+  const time = eventTimeText(item.eventTime, item.timePrecision);
+  return time ? `발생 ${time}` : '발생 시각 미상';
+}
+
 // D-BRF-01·02 핵심 이슈 (FS028·FS030). 서버가 고른 최대 3개만 보여 주고, 부족해도 채우지 않는다.
+
 export default function BriefingIssueList({
   items,
   compact = false,
@@ -75,11 +83,7 @@ export default function BriefingIssueList({
                   compact={compact}
                   title={`${item.rank}. ${item.title} · 근거 ${item.evidenceCount}건`}
                 >
-                  <p className={NOTE}>
-                    {item.timePrecision === 'unknown' || !item.eventTime
-                      ? '발생 시각 미상'
-                      : `발생 ${item.eventTime}`}
-                  </p>
+                  <p className={NOTE}>{eventTimeLabel(item)}</p>
                   <h4 className="text-body font-bold">
                     {item.rank}. {item.title}
                   </h4>

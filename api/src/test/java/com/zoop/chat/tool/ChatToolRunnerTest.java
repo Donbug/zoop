@@ -91,6 +91,24 @@ class ChatToolRunnerTest {
     }
 
     @Test
+    void aWebReadKeepsItsHitsAndItsRunBoundProvenance() {
+        var web = new ChatWebSearchTool(new SyntheticWebSearchProvider(),
+                java.time.Clock.fixed(AS_OF, java.time.ZoneOffset.UTC));
+        var runner = runner(Map.of(ChatCapability.WEB_SEARCH, web::read));
+        var current = run("v1", AS_OF);
+        var query = new ChatToolRequest("web.search", List.of("HBM"), 5);
+        var result = runner.runStage(current, new RecordingControl(Duration.ofSeconds(60)), 1, List.of(query)).getFirst();
+
+        assertEquals(List.of("news.example.com", "wiki.example.org"),
+                result.webResults().stream().map(ChatWebResult::domain).toList());
+        assertEquals(result.items().stream().map(ChatToolItem::id).toList(),
+                result.webResults().stream().map(ChatWebResult::id).toList());
+        assertTrue(result.provenance().belongsTo(current));
+        assertEquals(query, result.provenance().request());
+        assertFalse(result.provenance().belongsTo(run("v1", AS_OF)));
+    }
+
+    @Test
     void aFailedCallIsAnErrorWithNoItemsNeverAnEmptyResult() {
         var control = new RecordingControl(Duration.ofSeconds(60));
         var runner = runner(Map.of(

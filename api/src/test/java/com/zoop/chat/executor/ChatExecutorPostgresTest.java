@@ -8,6 +8,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -266,6 +267,11 @@ class ChatExecutorPostgresTest {
         assertEquals(1, results.size(), "a failed call keeps nothing");
         assertEquals("tc-0", results.getFirst().toolCallId());
         assertEquals("company.read", results.getFirst().capabilityId());
+        assertEquals(jobId, results.getFirst().jobId(), "a kept result carries its reservation and owner");
+        assertEquals(member.memberId(), results.getFirst().memberId());
+        assertEquals(1, results.getFirst().attemptNo());
+        assertEquals("0".repeat(64), results.getFirst().inputDigest());
+        assertEquals("{\"limit\": 20}", results.getFirst().requestMeta(), "as the jsonb column stores it");
         assertEquals("KRX:000660", mapper.readTree(results.getFirst().result()).path("items").get(0).path("id").asString());
         assertTrue(runs.keptToolResults(jobId, 2).isEmpty());
         // The database refuses a result over its limit or on a call that did not succeed.
@@ -458,6 +464,8 @@ class ChatExecutorPostgresTest {
         control.toolCallFinished("tc-0", new ChatToolCallEnd("succeeded", null, "v1", List.of(), false, false, small));
         var kept = executor.keptToolResult(jobId, 1, "company.read", digest).orElseThrow();
         assertEquals("tc-0", kept.toolCallId(), "the first one that kept its result");
+        assertEquals(member.memberId(), kept.memberId());
+        assertEquals(digest, kept.inputDigest());
         assertTrue(executor.keptToolResult(jobId, 1, "issue.read", digest).isEmpty());
         assertTrue(executor.keptToolResult(jobId, 2, "company.read", digest).isEmpty(), "another attempt reads anew");
 
@@ -578,6 +586,38 @@ class ChatExecutorPostgresTest {
         assertEquals(List.of("company.read failed:tool_unavailable", "graph.path.read failed:tool_unavailable"),
                 jdbc.queryForList("SELECT capability_id || ' ' || status || ':' || error_code FROM chat_tool_calls "
                         + "WHERE chat_job_id = ? ORDER BY call_index", String.class, jobId));
+    }
+
+    @Test
+    void aKeptMcpResultRestoresToItsOwnRunAfterTheJsonbRoundTrip() {
+        String jobId = submit("보관된 조회 복원");
+        executor.claimNext().orElseThrow();
+        var attached = executor.attach(jobId, 1).orElseThrow();
+        var run = attached.run();
+        var query = new ChatToolRequest("graph.version.diff", List.of("KRX:000660"), 7);
+        String id = attached.control().reserveToolCalls(1, List.of(tools.reservation(run, query, "mcp"))).getFirst();
+        attached.control().toolCallStarted(id);
+        var envelope = new java.util.LinkedHashMap<String, Object>();
+        envelope.put("schemaVersion", ChatToolRegistry.SCHEMA_VERSION);
+        envelope.put("toolCallId", id);
+        envelope.put("capabilityId", "graph.version.diff");
+        envelope.put("dataVersion", "gv-0..gv-1");
+        envelope.put("items", List.of(Map.of("id", "iss-new", "kind", "issue", "label", "[새로 생김] 공급 계약",
+                "companyIds", List.of("KRX:000660"), "evidenceIds", List.of())));
+        envelope.put("evidenceIds", List.of());
+        envelope.put("truncated", false);
+        envelope.put("nextAllowed", false);
+        envelope.put("error", null);
+        attached.control().toolCallFinished(id, new ChatToolCallEnd("succeeded", null, "gv-0..gv-1", List.of(), false,
+                false, mapper.writeValueAsString(envelope)));
+
+        var restored = tools.restore(run, runs.keptToolResults(jobId, 1)).getFirst();
+
+        assertTrue(restored.provenance().belongsTo(run));
+        assertFalse(restored.provenance().belongsTo(executor.attach(jobId, 1).orElseThrow().run()), "another run object");
+        assertEquals(query, restored.provenance().request());
+        assertEquals("gv-0..gv-1", restored.dataVersion());
+        assertEquals("[새로 생김] 공급 계약", restored.items().getFirst().label());
     }
 
     private static ChatToolCallReservation reservation(String capability) {

@@ -39,14 +39,17 @@ def answer_input() -> dict[str, Any]:
             "maxCitations": 20}
 
 
-def verification_input() -> dict[str, Any]:
-    return {"sections": [{"basis": "evidence_grounded", "text": "SK하이닉스는 HBM을 공급한다.", "evidenceIds": [EV1]},
-                         {"basis": "general_knowledge", "text": "HBM은 메모리다.", "evidenceIds": []}],
+def verification_input(invocation: str = "job-1:a1:stage") -> dict[str, Any]:
+    return {"requestBinding": {"invocationId": invocation, "graphVersionId": "gv-new", "asOf": "2026-10-21T00:00:00Z"},
+            "sections": [{"sectionId": "s0", "requirementIds": ["r1"], "serverFacts": [],
+                          "basis": "evidence_grounded", "text": "SK하이닉스는 HBM을 공급한다.", "evidenceIds": [EV1]},
+                         {"sectionId": "s1", "requirementIds": ["r2"], "serverFacts": [],
+                          "basis": "general_knowledge", "text": "HBM은 메모리다.", "evidenceIds": []}],
             "citations": [{"evidenceId": EV1, "sourceId": "src-news", "quote": "HBM 공급 계약을 맺었다"}]}
 
 
 def request(stage: str, payload: dict[str, Any], *, mode: str = "live", invocation: str = "job-1:a1:stage") -> StageRequest:
-    return StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-1", "invocationId": invocation, "stage": stage,
+    return StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-2", "invocationId": invocation, "stage": stage,
                                         "mode": mode, "input": payload})
 
 
@@ -147,7 +150,9 @@ def test_verification_policy_holds_whatever_is_uncertain():
 
 def test_a_zoop_document_section_is_checked_against_its_quotes_like_evidence():
     payload = VerificationInput.model_validate({
-        "sections": [{"basis": "zoop_documented", "text": "탈퇴하면 대화 기록이 지워집니다.", "evidenceIds": [EV2]}],
+        "requestBinding": verification_input()["requestBinding"],
+        "sections": [{"sectionId": "s0", "requirementIds": ["r1"], "serverFacts": [],
+                      "basis": "zoop_documented", "text": "탈퇴하면 대화 기록이 지워집니다.", "evidenceIds": [EV2]}],
         "citations": [{"evidenceId": EV2, "sourceId": "zoop-docs", "quote": "## 2. 보유 기간\n\n탈퇴하면 지웁니다."}]})
     body = chat_jev.build_verification_request(payload, chat_jev.MODEL)
     assert set(body["questions"]) == {"s0-support", "s0-advice"}
@@ -160,6 +165,105 @@ def test_stage_identities_are_separate_from_s1_and_from_each_other():
     versions = {chat_jev.prompt_version("chat-router"), chat_jev.prompt_version("chat-verification"),
                 chat_luna.prompt_version()}
     assert len(versions) == 3 and all(v.startswith("zoop-") for v in versions)
+
+
+def facts_input() -> dict[str, Any]:
+    payload = verification_input()
+    payload["sections"][0]["serverFacts"] = [
+        {"kind": "portfolio_scope", "requirementId": "r1", "timing": "current_request_read",
+         "queryScope": "current_member", "companyIds": [], "companyLimit": 5, "truncated": True,
+         "companies": [{"companyId": "KRX:000660", "name": "SK하이닉스", "held": True, "watched": False},
+                       {"companyId": "NASDAQ:NVDA", "name": "NVIDIA", "held": False, "watched": True}]},
+        {"kind": "graph_comparison", "requirementId": "r1", "fromVersion": "gv-old", "toVersion": "gv-new",
+         "asOf": "2026-10-21T00:00:00Z", "since": "2026-10-01T00:00:00Z", "queryScope": "targets",
+         "targetIds": ["KRX:000660"], "evidenceLimit": 20, "changeLimit": 40, "evidenceRestricted": False, "truncated": True,
+         "changes": [{"id": "iss-new", "kind": "issue", "name": "공급 계약", "change": "added"},
+                     {"id": "iss-old", "kind": "issue", "name": "이전 사건", "change": "removed"}]}]
+    return payload
+
+
+def test_server_facts_reach_the_real_jev_http_builder_without_becoming_quotes(tmp_path):
+    payload = facts_input()
+
+    def respond(path, body):
+        assert path == "/v1/systemone"
+        assert body["state"]["requestBinding"] == payload["requestBinding"]
+        first, second = body["state"]["sections"]
+        assert first["serverFacts"] == payload["sections"][0]["serverFacts"]
+        assert second["serverFacts"] == []
+        assert first["citedQuotes"] == [{"quote": "HBM 공급 계약을 맺었다"}]
+        assert set(body["questions"]) == {"s0-support", "s0-advice", "s1-advice"}
+        # A scripted insufficient answer tests HOLD plumbing, never semantic accuracy.
+        return httpx.Response(200, json={"model": chat_jev.MODEL, "answers": {
+            "s0-support": choice("insufficient"), "s0-advice": noul(0.02), "s1-advice": noul(0.02)}})
+
+    endpoint = Endpoint(respond)
+    recipient = f"typesafe-native:{stage_config('chat-verification', 'live', LIVE).provider_revision}"
+    req = request("chat-verification", payload)
+    result = run(req, tmp_path, endpoint, registry=grants(recipient))
+    assert result.status == "succeeded" and result.answer["sections"][0]["support"] == "hold"
+    assert run(req, tmp_path, endpoint, registry=grants(recipient)).wire() == result.wire()
+    assert len(endpoint.calls) == 1
+    outbound = json.dumps(endpoint.calls[0][1]["state"])
+    for field in ("memberId", "accountId", "quantity", "money", "articleBody", "member:self"):
+        assert field not in outbound
+
+
+def test_canonical_facts_do_not_bypass_quote_grants(tmp_path):
+    endpoint = Endpoint(jev_all())
+    result = run(request("chat-verification", facts_input()), tmp_path, endpoint, registry=None)
+    assert result.failure.code == "source_grant_required" and not result.failure.sent
+    assert endpoint.calls == []
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda p: p.pop("requestBinding"),
+    lambda p: p["sections"][0].update(sectionId="s1"),
+    lambda p: p["sections"][0]["serverFacts"][0].update(requirementId="r-other"),
+    lambda p: p["sections"][0]["serverFacts"][1].update(toVersion="gv-stale"),
+    lambda p: p["sections"][0]["serverFacts"][1].update(asOf="2026-10-20T00:00:00Z"),
+    lambda p: p["sections"][0]["serverFacts"][0].update(memberId="unrelated-member"),
+    lambda p: p["sections"][0]["serverFacts"][0]["companies"][0].update(quantity=100),
+    lambda p: p["sections"][0]["serverFacts"][1].update(articleBody="not allowed"),
+    lambda p: p["sections"][0]["serverFacts"][1]["changes"][0].update(name="가" * 301),
+    lambda p: p["sections"][0]["serverFacts"][0].update(queryScope="named_companies", companyIds=["member:self"]),
+    lambda p: p["sections"][0]["serverFacts"][0].update(companies=p["sections"][0]["serverFacts"][0]["companies"] * 3),
+    lambda p: p["sections"][0]["serverFacts"][0]["companies"][0].update(held=False, watched=False),
+    lambda p: p["sections"][1].update(serverFacts=p["sections"][0]["serverFacts"]),
+    lambda p: p["sections"][0].update(evidenceIds=["ev-" + "f" * 64]),
+])
+def test_closed_server_fact_contract_rejects_misbinding_and_extra_private_data(mutate):
+    payload = facts_input()
+    mutate(payload)
+    with pytest.raises(ValueError):
+        VerificationInput.model_validate(payload)
+
+
+def test_a_verification_request_binds_to_its_own_invocation_and_refuses_the_v1_wire():
+    payload = facts_input()
+    request("chat-verification", payload).parsed()
+    request("chat-verification", payload, invocation="app:job-1:a1:stage").parsed()
+    with pytest.raises(ValueError, match="another invocation"):
+        request("chat-verification", payload, invocation="other-job.1.verify").parsed()
+    with pytest.raises(ValueError):
+        StageRequest.model_validate({"schemaVersion": "zoop-ai-chat-1", "invocationId": "job-1:a1:stage",
+                                     "stage": "chat-verification", "mode": "replay", "input": payload})
+    from zoop_ai.chat_contracts import ChatAnswer
+    with pytest.raises(ValueError):
+        ChatAnswer.model_validate({"sections": [{"basis": "evidence_grounded", "text": "claim",
+            "requirementIds": ["r1"], "evidenceIds": [], "serverFacts": payload["sections"][0]["serverFacts"]}],
+            "insufficientRequirementIds": [], "graphTargetIds": []})
+
+
+def test_missing_quotes_and_server_facts_cannot_be_auto_supported():
+    payload = verification_input()
+    payload["sections"][0]["evidenceIds"] = []
+    payload["citations"] = []
+    parsed = VerificationInput.model_validate(payload)
+    raw = {"model": chat_jev.MODEL, "answers": {
+        "s0-support": choice("supported"), "s0-advice": noul(0.02), "s1-advice": noul(0.02)}}
+    assert chat_jev.build_verification_request(parsed, chat_jev.MODEL)["state"]["sections"][0]["serverFacts"] == []
+    assert chat_jev.interpret_verification(raw, parsed, chat_jev.MODEL).sections[0].support == "hold"
 
 
 # ---- live gate, keys, grants -----------------------------------------------------------------------------------------------
@@ -390,7 +494,7 @@ def test_the_live_ceiling_is_shared_by_all_chat_stages(tmp_path):
     env = {**LIVE, "ZOOP_AI_CHAT_MAX_CALLS": "1"}
     assert run(request("chat-router", router_input(), invocation="job-1:a1:router"), tmp_path, endpoint, env=env).status \
         == "succeeded"
-    over = run(request("chat-verification", verification_input(), invocation="job-1:a1:verify"), tmp_path, endpoint, env=env,
+    over = run(request("chat-verification", verification_input("job-1:a1:verify"), invocation="job-1:a1:verify"), tmp_path, endpoint, env=env,
                registry=grants(f"typesafe-native:{stage_config('chat-verification', 'live', env).provider_revision}"))
     assert over.failure.code == "chat_budget_exhausted" and not over.failure.sent
     assert len(endpoint.calls) == 1
@@ -401,7 +505,7 @@ def test_the_live_ceiling_is_shared_by_all_chat_stages(tmp_path):
 def replay_file(tmp: Path, req: StageRequest, response: Any) -> Path:
     path = tmp / "replay.json"
     entry = {"stage": req.stage, "inputDigest": request_identity(req, stage_config(req.stage, "replay")), "response": response}
-    path.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-1", "recordingKind": "authored-test", "responses": [entry]}),
+    path.write_text(json.dumps({"schemaVersion": "zoop-ai-chat-2", "recordingKind": "authored-test", "responses": [entry]}),
                     encoding="utf-8")
     return path
 
@@ -428,7 +532,7 @@ def test_cli_prints_the_result_and_exits_by_outcome(tmp_path, monkeypatch, capsy
     printed = json.loads(capsys.readouterr().out)
     assert printed["status"] == "succeeded" and printed["invocationId"] == req.invocation_id
 
-    monkeypatch.setattr("sys.stdin", io.StringIO('{"schemaVersion":"zoop-ai-chat-1"}'))
+    monkeypatch.setattr("sys.stdin", io.StringIO('{"schemaVersion":"zoop-ai-chat-2"}'))
     assert chat_cli.main(["invoke", "--state-dir", str(state)]) == 64
     assert json.loads(capsys.readouterr().out) == {"error": "request_invalid"}
 
