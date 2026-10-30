@@ -51,7 +51,8 @@ final class ChatAnswerCheck {
     static final int MAX_CITATIONS = 20;
     static final int MAX_GRAPH_TARGETS = 50;
     static final int MAX_ANSWER = 12_000;
-    private static final Set<String> BASES = Set.of("general_knowledge", "zoop_documented", "evidence_grounded");
+    private static final Set<String> BASES = Set.of("general_knowledge", "zoop_documented", "evidence_grounded",
+            "web_reported");
     /** Current-fact markers a general explanation must not carry. */
     private static final Pattern CURRENT_FACT = Pattern.compile(
             "\\d[\\d,.]*\\s*(%|퍼센트|원|달러|엔|위안|억|조|만\\s*원|USD|KRW|bp)|[$₩€¥]\\s*\\d|(19|20)\\d{2}\\s*년"
@@ -118,14 +119,25 @@ final class ChatAnswerCheck {
                 sections.add(new ChatGeneratedAnswer.Section(section.basis(),
                         text.startsWith(GENERAL_NOTICE) ? text : GENERAL_NOTICE + " " + text, section.requirementIds(),
                         List.of()));
+            } else if ("web_reported".equals(section.basis())) {
+                // What a web search reported (web search design 6): only hits its requirements' own searches returned, at
+                // least one, and never ZOOP evidence. A concept part may rest on it too (Q02's first support).
+                Set<String> hits = new HashSet<>();
+                owners.forEach(b -> b.results().forEach(r -> r.webResults().forEach(h -> hits.add(h.id()))));
+                if (section.evidenceIds().isEmpty() || !hits.containsAll(section.evidenceIds())) {
+                    return Result.fail("web_section");
+                }
+                sections.add(section);
             } else {
                 boolean documented = "zoop_documented".equals(section.basis());
                 Set<String> passedOn = new HashSet<>();
                 owners.forEach(b -> b.results().forEach(r -> {
                     if (documentRead(r) == documented) passedOn.addAll(r.evidenceIds());
                 }));
-                // Nothing found, or only the member's own companies read: neither has public evidence to cite.
-                boolean nothingFound = owners.stream().allMatch(b -> b.noneFound() || memberOnly(b));
+                // Nothing found, or only server records read (the member's own companies, an issue's selection
+                // records): none of them has public evidence to cite. The verifier checks such sections against the
+                // records themselves (server facts).
+                boolean nothingFound = owners.stream().allMatch(b -> b.noneFound() || memberOnly(b) || recordsOnly(b));
                 if (owners.stream().anyMatch(Branch::general) || !passedOn.containsAll(section.evidenceIds())
                         || (section.evidenceIds().isEmpty() && !nothingFound)) {
                     return Result.fail(documented ? "document_section" : "evidence_section");
@@ -177,6 +189,12 @@ final class ChatAnswerCheck {
     static boolean memberOnly(Branch branch) {
         return !branch.results().isEmpty() && branch.results().stream().allMatch(r -> ChatCapability.of(r.capabilityId())
                 .map(c -> c == ChatCapability.PORTFOLIO_SCOPE_READ).orElse(false));
+    }
+
+    /** A requirement that read only selection records ({@code selectionRule.read}) and found some. */
+    static boolean recordsOnly(Branch branch) {
+        return !branch.results().isEmpty() && branch.results().stream().allMatch(r -> ChatCapability.of(r.capabilityId())
+                .map(c -> c == ChatCapability.SELECTION_RULE_READ).orElse(false) && !r.selectionRecords().isEmpty());
     }
 
     /** A read of ZOOP's own documents: a capability that reads no graph. */

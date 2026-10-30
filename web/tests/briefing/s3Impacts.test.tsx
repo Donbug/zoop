@@ -157,7 +157,7 @@ describe('version-bound S3 issue impacts', () => {
     expect(
       await screen.findByText(/이 이슈에는 저장된 기업 영향 평가가 없습니다/),
     ).toBeTruthy();
-    expect(screen.queryByText(/판단 유보/)).toBeNull();
+    expect(screen.queryByText(/판단 보류/)).toBeNull();
   });
   it('distinguishes a transient failure and retries with GET only', async () => {
     const server = createFakeServer();
@@ -189,7 +189,7 @@ describe('version-bound S3 issue impacts', () => {
     v.companies[0].assessments[0].label = 'undetermined';
     server.on('GET', route, () => json(v));
     render(<BriefingS3Impacts round={round} item={item} />);
-    expect(await screen.findByText('판단 유보 · 인용 근거 검증')).toBeTruthy();
+    expect(await screen.findByText('판단 보류 · 인용 근거 검증')).toBeTruthy();
     expect(screen.getByText(/평가는 수행했지만/)).toBeTruthy();
     expect(screen.queryByText(/저장된 기업 영향 평가가 없습니다/)).toBeNull();
   });
@@ -397,7 +397,7 @@ describe('D-BRF-01/02 offline evidence preparation', () => {
     const server = createFakeServer();
     server.on('GET', route, () => json(withPlan()));
     render(<BriefingS3Impacts round={round} item={item} />);
-    await screen.findByText('판단 유보 · 인용 근거 검증');
+    await screen.findByText('판단 보류 · 인용 근거 검증');
     await userEvent.click(screen.getByText('보강한 근거·추가로 확인할 자료'));
     expect(screen.getByText(/AI 재평가 전/)).toBeTruthy();
     expect(screen.getByText('당시 자료 추가 확인 · 계약 조건')).toBeTruthy();
@@ -520,10 +520,10 @@ describe('D-BRF-01/02 offline evidence preparation', () => {
       await screen.findByText(
         label === 'positive'
           ? '긍정 · 공식 근거 보강 후 재검증'
-          : '판단 유보 · 공식 근거 보강 후 재검증',
+          : '판단 보류 · 공식 근거 보강 후 재검증',
       );
       expect(
-        screen.getByText('이전 검증 기록 · 판단 유보 · 인용 근거 검증'),
+        screen.getByText('이전 검증 기록 · 판단 보류 · 인용 근거 검증'),
       ).toBeTruthy();
       expect(
         screen.getByText('회사의 조건부 계획을 확인했습니다.'),
@@ -588,14 +588,14 @@ describe('D-BRF-01/02 offline evidence preparation', () => {
     expect(
       screen.getByText(/기존 뉴스·가격 시점 설명은 저장 당시 기준/),
     ).toBeTruthy();
-    expect(screen.getByText('판단 유보 · 인용 근거 검증')).toBeTruthy();
+    expect(screen.getByText('판단 보류 · 인용 근거 검증')).toBeTruthy();
     expect(screen.queryByText('새로 연결한 공식 자료')).toBeNull();
   });
   it('links later official references while keeping the held assessment and original evidence', async () => {
     const server = createFakeServer();
     server.on('GET', route, () => json(withLinkedSources()));
     render(<BriefingS3Impacts round={round} item={item} />);
-    await screen.findByText('판단 유보 · 인용 근거 검증');
+    await screen.findByText('판단 보류 · 인용 근거 검증');
     await userEvent.click(screen.getByText('보강한 근거·추가로 확인할 자료'));
     expect(screen.getByText('계약 조건을 추가 확인했습니다.')).toBeTruthy();
     await userEvent.click(screen.getByText('공식 출처 · 공식 계약'));
@@ -603,7 +603,7 @@ describe('D-BRF-01/02 offline evidence preparation', () => {
       'https://www.sec.gov/fixture',
     );
     expect(screen.getByText(/SEC 접수 시각/)).toBeTruthy();
-    expect(screen.getByText('판단 유보 · 인용 근거 검증')).toBeTruthy();
+    expect(screen.getByText('판단 보류 · 인용 근거 검증')).toBeTruthy();
     expect(server.requests.every((r) => r.method === 'GET')).toBe(true);
   });
   it('rejects foreign, future, fake-verification, unsafe and effect-bearing supplemental sources', () => {

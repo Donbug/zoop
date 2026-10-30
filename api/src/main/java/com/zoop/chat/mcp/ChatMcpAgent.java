@@ -101,6 +101,7 @@ public final class ChatMcpAgent implements ChatAgentPath {
         int approved = 0;
         int denied = 0;
         int webApproved = 0;
+        long inputTokens = 0;
         Set<String> notices = new LinkedHashSet<>();
         String web = ChatMcpTools.name(ChatCapability.WEB_SEARCH);
         // Approval requests do not identify the requirement they serve. In a mixed run, a first-round query could be for a
@@ -128,8 +129,16 @@ public final class ChatMcpAgent implements ChatAgentPath {
                 throw new ChatModels.Failure(ChatModels.Failure.Fate.NOT_SENT, "the agent kept asking after its last round");
             }
             rounds++;
-            // Past the last round, or with time for only one more step, nothing more runs: the next step writes the answer.
-            boolean closing = rounds > MAX_ROUNDS || steps.closing();
+            // A continuation carries at least what this step took as input. With no room for one more, the run stops unsent;
+            // with room for only one, that one writes the answer. A provider that reports nothing counts as nothing.
+            long last = outcome.inputTokens() == null ? 0 : outcome.inputTokens();
+            inputTokens += last;
+            if (inputTokens + last > ChatModels.MAX_INPUT_TOKENS) {
+                throw new ChatModels.Failure(ChatModels.Failure.Fate.REFUSED, ChatModels.INPUT_BUDGET_EXCEEDED,
+                        "the run has no input tokens left for another step");
+            }
+            // Past the last round, or with time or tokens for only one more step, nothing more runs: the next step answers.
+            boolean closing = rounds > MAX_ROUNDS || steps.closing() || inputTokens + 2 * last > ChatModels.MAX_INPUT_TOKENS;
             if (closing) rounds = MAX_ROUNDS + 1;
             List<ChatToolResult> done = closing ? List.of() : kept(run);
             done.forEach(result -> reachable.addAll(reached(result)));

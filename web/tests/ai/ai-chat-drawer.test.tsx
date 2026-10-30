@@ -723,6 +723,55 @@ describe('D-AI-02 · job states and stored results', () => {
     expect(within(card).queryByRole('link', { name: /원문 보기/ })).toBeNull();
   });
 
+  it('shows what the web reported as its own section, citing the page and its domain as a web result', async () => {
+    const hit = 'web-' + 'a'.repeat(32);
+    const reported = job({
+      question: 'HBM이 뭐야?',
+      result: result({
+        answer: 'HBM은 D램을 쌓은 메모리라고 보도됐어요.',
+        answerBasis: 'web_reported',
+        sections: [
+          {
+            basis: 'web_reported',
+            text: 'HBM은 D램을 쌓은 메모리라고 보도됐어요.',
+            evidenceIds: [hit],
+          },
+        ],
+        citations: [
+          {
+            sourceKind: 'web_result',
+            evidenceId: hit,
+            quote: '[합성 자료] HBM은 D램을 쌓은 메모리다.',
+            articleId: null,
+            articleVersion: null,
+            docId: 'synthetic',
+            docVersion: null,
+            start: 0,
+            end: 22,
+            articleTitle: '[합성] HBM이란',
+            publisher: 'news.example.com',
+            publishedAt: null,
+            url: 'https://news.example.com/hbm',
+          },
+        ],
+      }),
+    });
+    server.on('GET', CURRENT, () => json(conversation([reported])));
+    await open();
+    const card = await screen.findByRole('article', { name: 'HBM이 뭐야?' });
+    expect(
+      within(card).getByRole('region', { name: '웹 검색 보도 구간' }),
+    ).toBeTruthy();
+    expect(
+      within(card).getByText(/웹 검색 결과 · news\.example\.com/),
+    ).toBeTruthy();
+    expect(
+      within(card)
+        .getByRole('link', { name: /웹 페이지 보기/ })
+        .getAttribute('href'),
+    ).toBe('https://news.example.com/hbm');
+  });
+
   it('shows a withheld answer as the server sent it, without a basis badge', async () => {
     const withheld = job({
       result: result({

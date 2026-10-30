@@ -30,6 +30,7 @@ const BASIS_LABEL: Record<ChatBasis, string> = {
   general_knowledge: '일반 개념',
   zoop_documented: 'ZOOP 안내',
   evidence_grounded: '근거 확인됨',
+  web_reported: '웹 검색 보도',
 };
 
 const ANSWER_BASIS_LABEL: Partial<Record<ChatAnswerBasis, string>> = {
@@ -422,8 +423,9 @@ function labelOf(result: ChatResult, id: string) {
 
 function Citation({ n, citation }: { n: number; citation: ChatCitation }) {
   const profile = citation.sourceKind === 'company_profile';
+  const web = citation.sourceKind === 'web_result';
   const href =
-    citation.sourceKind === 'article' || profile
+    citation.sourceKind === 'article' || profile || web
       ? safeArticleUrl(citation.url)
       : null;
   const published = formatPublishedAt(citation.publishedAt);
@@ -433,7 +435,7 @@ function Citation({ n, citation }: { n: number; citation: ChatCitation }) {
         [{n}] {citation.articleTitle ?? '제목 미제공'}
         {citation.sourceKind === 'zoop_doc'
           ? ` · ZOOP 문서 ${citation.docVersion ?? ''}`
-          : ` · ${citation.publisher ?? '출처 미제공'}${published ? ` · ${published}` : ''}`}
+          : ` · ${web ? '웹 검색 결과 · ' : ''}${citation.publisher ?? '출처 미제공'}${published ? ` · ${published}` : ''}`}
       </p>
       <blockquote className="my-1 rounded-[3px] bg-panel-soft px-3 py-2 text-[11px] wrap-anywhere">
         {citation.quote}
@@ -445,7 +447,11 @@ function Citation({ n, citation }: { n: number; citation: ChatCitation }) {
           rel="noopener noreferrer"
           className="underline"
         >
-          {profile ? '↗ 기업 홈페이지' : '↗ 원문 보기'}{' '}
+          {profile
+            ? '↗ 기업 홈페이지'
+            : web
+              ? '↗ 웹 페이지 보기'
+              : '↗ 원문 보기'}{' '}
           <span className="sr-only">(새 창에서 열림)</span>
         </a>
       )}

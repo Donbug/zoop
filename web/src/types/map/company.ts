@@ -1,3 +1,4 @@
+import type { TimePrecision } from './event';
 export type SourceInfo = {
   provider: 'toss' | 'yahoo' | 'naver';
   name: string;
@@ -11,6 +12,8 @@ export type CompanyIssue = {
   issueId: string;
   title: string;
   eventTime: string | null;
+  /** API CompanyIssueRef.timePrecision. 예전 응답·mock에는 없을 수 있다. */
+  timePrecision?: TimePrecision | null;
   evidenceCount: number;
 };
 

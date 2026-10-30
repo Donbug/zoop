@@ -268,8 +268,10 @@
 
     **Verification server facts.** The v2 verification input has `requestBinding` (`invocationId`, pinned `graphVersionId`, `asOf`)
     and ordered sections (`sectionId`, `requirementIds`, `basis`, `text`, `evidenceIds`, `serverFacts`). The application alone
-    derives bounded typed `portfolio_scope` and `graph_comparison` facts from successful reads in that request, never from answer
-    text. Facts are scoped to their parent requirement and section, separate from granted article quotes. Membership is current
+    derives bounded typed `portfolio_scope`, `graph_comparison`, `publication_record` and `briefing_selection` facts from
+    successful reads in that request, never from answer text. A publication record is an issue's last review decision (kind,
+    time and path, never the decider or their note) up to the pinned version's review revision and the rules that version was
+    filtered with; a briefing selection is a published round's rank and recorded reason for an issue. Facts are scoped to their parent requirement and section, separate from granted article quotes. Membership is current
     at the read, not historical asOf membership; a truncated list cannot establish completeness or absence. Graph facts name
     the exact baseline, current version, asOf, since, query targets and limits. Missing observations supply no facts. The
     service rejects a binding to another invocation before launching the worker; the worker rejects wrong sections,

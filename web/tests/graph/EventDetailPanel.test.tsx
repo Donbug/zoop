@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import EventDetailPanel from '@/components/graph/EventDetailPanel';
 import { getEvent } from '@/apis/graph/events';
 import { createMockEvent } from '@/mocks/events/fixture';
@@ -29,7 +30,7 @@ describe('D-GRP-02 · panel states and accessibility', () => {
   it('shows a distinct loading state, moves focus, then exposes actions to the keyboard', async () => {
     const pending = deferred<EventDetail>();
     mocked.mockReturnValue(pending.promise);
-    render(<EventDetailPanel {...props} />);
+    render(<EventDetailPanel {...props} />, { wrapper: MemoryRouter });
     expect(screen.getByRole('status').textContent).toContain('불러오는 중');
     expect(document.activeElement).toBe(
       screen.getByRole('heading', { name: '사건 상세' }),
@@ -51,7 +52,7 @@ describe('D-GRP-02 · panel states and accessibility', () => {
     mocked
       .mockRejectedValueOnce(new Error('일시적인 오류'))
       .mockResolvedValueOnce(createMockEvent(props.id));
-    render(<EventDetailPanel {...props} />);
+    render(<EventDetailPanel {...props} />, { wrapper: MemoryRouter });
     expect((await screen.findByRole('alert')).textContent).toContain(
       '일시적인 오류',
     );
@@ -65,7 +66,9 @@ describe('D-GRP-02 · panel states and accessibility', () => {
     mocked
       .mockReturnValueOnce(first.promise)
       .mockResolvedValueOnce(createMockEvent('mock-issue-2'));
-    const { rerender } = render(<EventDetailPanel {...props} />);
+    const { rerender } = render(<EventDetailPanel {...props} />, {
+      wrapper: MemoryRouter,
+    });
     rerender(<EventDetailPanel {...props} id="mock-issue-2" />);
     await screen.findByRole('heading', { name: 'HBM3E 12단 경쟁' });
     await act(async () => first.resolve(createMockEvent(props.id)));
@@ -77,7 +80,9 @@ describe('D-GRP-02 · panel states and accessibility', () => {
     mocked
       .mockResolvedValueOnce(createMockEvent(props.id))
       .mockReturnValueOnce(new Promise(() => {}));
-    const { rerender } = render(<EventDetailPanel {...props} />);
+    const { rerender } = render(<EventDetailPanel {...props} />, {
+      wrapper: MemoryRouter,
+    });
     await screen.findByRole('heading', { name: 'HBM4 공급 계약' });
     rerender(
       <EventDetailPanel {...props} context={{ graphVersion: 'other' }} />,
@@ -115,7 +120,7 @@ describe('D-GRP-02 · panel states and accessibility', () => {
     event.companies[0].roleUnconfirmed = true;
     event.companies[1].relationType = 'STRUCTURALLY_RELATED_TO';
     mocked.mockResolvedValue(event);
-    render(<EventDetailPanel {...props} />);
+    render(<EventDetailPanel {...props} />, { wrapper: MemoryRouter });
     await screen.findByRole('heading', { name: '직접 관련 기업 2곳' });
     expect(screen.getByText('역할 미확인')).toBeTruthy();
     expect(
@@ -126,7 +131,7 @@ describe('D-GRP-02 · panel states and accessibility', () => {
     mocked
       .mockResolvedValueOnce(createMockEvent(props.id, 'partial'))
       .mockResolvedValueOnce(createMockEvent(props.id));
-    render(<EventDetailPanel {...props} />);
+    render(<EventDetailPanel {...props} />, { wrapper: MemoryRouter });
     await screen.findByText('일부 정보를 불러오지 못했습니다.');
     expect(screen.queryByText('관련 문서가 없습니다.')).toBeNull();
     expect(
@@ -146,9 +151,41 @@ describe('D-GRP-02 · panel states and accessibility', () => {
 it('D-GRP-02 AI에게 묻기는 onAction("ai")으로 사건 문맥을 넘겨요', async () => {
   const event = createMockEvent(props.id);
   mocked.mockResolvedValue(event);
-  render(<EventDetailPanel {...props} />);
+  render(<EventDetailPanel {...props} />, { wrapper: MemoryRouter });
   await userEvent.click(
     await screen.findByRole('button', { name: 'AI에게 묻기' }),
   );
   expect(props.onAction).toHaveBeenCalledWith('ai', event);
+});
+
+function Where() {
+  return <p data-testid="where">{useLocation().pathname}</p>;
+}
+it('B4 opens a related company inside the router without reloading the document', async () => {
+  const event = createMockEvent(props.id);
+  mocked.mockResolvedValue(event);
+  const company = event.companies.find(
+    (item) => item.relationType === 'INVOLVES',
+  )!;
+  const before = window.location.href;
+  render(
+    <MemoryRouter initialEntries={['/']}>
+      <Routes>
+        <Route path="*" element={<Where />} />
+      </Routes>
+      <EventDetailPanel
+        {...props}
+        companyDetailHref={(id) =>
+          `/companies/${encodeURIComponent(id)}?from=map`
+        }
+      />
+    </MemoryRouter>,
+  );
+  await userEvent.click(
+    await screen.findByRole('link', { name: company.name }),
+  );
+  expect(screen.getByTestId('where').textContent).toBe(
+    `/companies/${encodeURIComponent(company.id)}`,
+  );
+  expect(window.location.href).toBe(before);
 });

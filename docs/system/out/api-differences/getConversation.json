@@ -61,6 +61,7 @@
         "general_knowledge",
         "zoop_documented",
         "evidence_grounded",
+        "web_reported",
         "mixed",
         "none"
       ]
@@ -105,7 +106,8 @@
       "enum": [
         "article",
         "zoop_doc",
-        "company_profile"
+        "company_profile",
+        "web_result"
       ]
     },
     "response:200:application/json.jobs[].result<anyOf:0>.citations[].sourceKind:required": true,
@@ -233,7 +235,8 @@
       "enum": [
         "general_knowledge",
         "zoop_documented",
-        "evidence_grounded"
+        "evidence_grounded",
+        "web_reported"
       ]
     },
     "response:200:application/json.jobs[].result<anyOf:0>.sections[].basis:required": true,

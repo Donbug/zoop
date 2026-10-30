@@ -2,6 +2,7 @@ import type { ChartPeriod } from '@/types/company';
 import type { Event, Impact } from '@/types/company/detail';
 import type { GraphResponse } from '@/types/map/graph';
 import { exactTime } from '@/util/event-time';
+import { formatMoney } from '@/util/format';
 export { exactTime } from '@/util/event-time';
 export const periods: {
   value: ChartPeriod;
@@ -156,3 +157,10 @@ export const number = (value: number | null | undefined) =>
     : new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 2 }).format(
         value,
       );
+/** N-x: 현재가와 같은 통화 표기. 값이 없으면 '미제공'. 원화는 평균 매입가처럼 소수가 있으면 그대로 둔다. */
+export const money = (value: number | null | undefined, currency: string) =>
+  value == null
+    ? '미제공'
+    : currency === 'KRW' && !Number.isInteger(value)
+      ? `${number(value)}원`
+      : formatMoney(value, currency);

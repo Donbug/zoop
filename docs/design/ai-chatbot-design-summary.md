@@ -1,7 +1,7 @@
 # ZOOP AI 챗봇 설계 요약
 
 문서 버전: 1.7 / 기준 정책: ZOOP-AIG-001 v0.11 / 설계 갱신: 2026-10-28
-상태: 2026-10-28 팀 결정 · 구현 예정 · 출시 검증 별도
+상태: 2026-10-28 팀 결정 · 구현 현황은 10장(2026-10-30 기준) · 출시 검증 별도
 
 이번 팀 결정은 2026-10-25의 MCP 미사용 결정을 대체한다. 기존 Java direct adapter는 Responses 시작 전 MCP 장애가 확인된 job의 시작 경로와 비교 기준으로 유지한다.
 
@@ -17,7 +17,7 @@ Jev가 Q01~Q08 유형과 기능 후보를 분류하면 서버가 허용 도구·
 - Q01은 웹 검색 금지. Q03~Q08은 내부 조회를 먼저 하고 부족한 요구에만 마지막 웹 검색을 사용한다.
 - 웹 장애만으로 전체 답변을 실패시키지 않는다. 정상 근거 답변·부분 답변·확인 불가 안내를 제공한다.
 - 요청 단위 cache/single-flight로 동일 조회를 재사용한다. 권한/철회는 cache hit에서도 재검사한다.
-- MCP 연결 장애에는 공통 Tool Service의 Java direct adapter로 최대 1회 전환한다. 인증/권한/grant/스키마 거부를 우회하지 않는다.
+- Responses 시작 전 MCP 장애가 확인되면 공통 Tool Service의 Java direct adapter로 시작한다. 실행 중에는 전환하지 않고 인증/권한/grant/스키마 거부를 우회하지 않는다.
 - 개별 답변은 자동 검증한다. 공개 데이터 생성·관리자 검수와 구분한다.
 
 ## 2. 목표 처리 흐름
@@ -88,7 +88,7 @@ Jev가 Q01~Q08 유형과 기능 후보를 분류하면 서버가 허용 도구·
 
 실효 Luna 시간은 min(35초, job 잔여 − 후검증 6초 − 서버 3초)다. router가 4초를 쓰면 32초다. 최종 작성용 10초를 남기고 새 도구를 중단한다. 제한으로 중단한 자료를 전체 조회라고 표시하지 않는다. 최악 경로가 예산을 넘으면 범위를 확인하며 실행 중에는 확인된 결과/안내로 종료한다.
 
-초기 Responses reasoning effort는 `medium`이다. 구현 전에 도구 1·4·8회와 승인 continuation의 합성 replay 및 승인된 소량 live 지연 spike를 수행한다. `high`는 품질 이득과 45초 준수를 함께 증명한 뒤 적용한다.
+초기 Responses reasoning effort는 `medium`이다. 활성화 전에 도구 1·4·8회와 승인 continuation의 합성 replay 및 승인된 소량 live 지연 spike를 수행한다. `high`는 품질 이득과 45초 준수를 함께 증명한 뒤 적용한다.
 
 캐시 키에는 job·실행 세대·도구/스키마/정책 revision·정규화 인자·회원 scope·버전·asOf를 포함한다. 동일 요청의 실제 조회는 1회이고 동시 요청은 single-flight로 합친다. 성공·정상 0건만 캐시하며 실패는 실패 원장으로 별도 관리한다. hit에도 권한·철회·model-send grant를 확인하고 원 결과와 toolCallId를 그대로 연결한다. 상세는 [MCP 계약 3.3절](ai-chatbot-mcp-actions.md#33-요청-단위-캐시와-중복-억제).
 
@@ -106,7 +106,7 @@ Q07의 `portfolio.scope.read`는 Java server-only precondition이며 MCP에 노�
 
 ## 7. 결과와 장애 응답
 
-현재 ChatJob은 queued/running/completed/failed/cancelled, ChatResult.outcome은 answered/clarification/guidance/insufficient_evidence다. 이번 목표는 새 job 상태 PARTIAL이 아니라 별도 **answerStatus=complete|partial|guidance**, **notices[]** 및 장애 limitation 확장이다. 아직 DTO/OpenAPI/웹에 구현되지 않았다.
+현재 ChatJob은 queued/running/completed/failed/cancelled, ChatResult.outcome은 answered/clarification/guidance/insufficient_evidence다. 새 job 상태 PARTIAL 대신 별도 **answerStatus=complete|partial|guidance**, **notices[]** 및 장애 limitation 확장을 쓴다. 2026-10-30 DTO/OpenAPI/저장/웹에 구현됐다.
 
 | 상황 | 목표 표시 |
 | --- | --- |
@@ -123,7 +123,7 @@ Q07의 `portfolio.scope.read`는 Java server-only precondition이며 MCP에 노�
 
 notices는 답변을 막지 않은 장애/처리 정보, limitations는 미충족 요구다. 이 둘을 분리해 답한 요구와 limitation을 정확히 하나에 대응시키는 기존 규칙을 유지한다. 웹 오류를 evidence_insufficient나 ‘관련 뉴스 없음’으로 숨기지 않는다.
 
-현재 공개 limitation kind는 `investment_advice`, `precondition_unmet`, `results_truncated`, `not_in_member_scope`(내 종목(Q07) 질문이 지목한 기업이 회원의 보유·관심 종목이 아님, 서버 `portfolio.scope.read` 판정), `evidence_insufficient`, `out_of_scope`다. 장애 원인 kind 확장은 목표 계약이다.
+현재 공개 limitation kind는 `investment_advice`, `precondition_unmet`, `results_truncated`, `not_in_member_scope`(내 종목(Q07) 질문이 지목한 기업이 회원의 보유·관심 종목이 아님, 서버 `portfolio.scope.read` 판정), `evidence_insufficient`, `out_of_scope`, `tool_unavailable`(direct 경로에서 일부 요구의 조회만 시간 초과·자료 일시 불가)다.
 
 ## 8. 검증과 복구
 
@@ -155,17 +155,17 @@ general_knowledge에는 서버 고정 안내 ‘일반 개념 설명입니다. �
 - 모델이 생성한 SQL·Cypher·임의 URL·스크립트를 실행하지 않는다. 도구는 읽기 전용이다.
 - UI 제안은 유효 조회 ID에서 서버가 만들고 사용자 클릭 시 실행한다. graphTargets와 uiActions는 같은 도메인 결과에서 파생하며 충돌 시 동작을 차단한다.
 - 재열람·polling은 검색·모델 호출·화면 동작을 재실행하지 않는다. 검증 전 본문은 숨긴다.
-- 이전 일반 턴 문맥 승계는 별도 신규 기능이다. 직전 완료 2턴의 검증된 ID·기간만 사용하고 현재 권한을 재검사한다. 본문은 승계하지 않는다.
+- 이전 일반 턴 문맥 승계는 직전 답변 2턴의 검증된 ID·기간만 서버 계획에 쓰고 현재 공개 여부를 재검사한다. 본문은 승계하지 않는다(2026-10-30 구현).
 
 ## 10. 현재 구현과 목표의 경계
 
 | 영역 | 현재 코드 | 추가 구현 |
 | --- | --- | --- |
-| 공개 job | 회원 전용 저장·polling·멱등성·취소·lease·재시도 | answerStatus/notices·장애 limitation, 저장 복구 |
-| 모델 | chat-router Jev·chat-answer Luna·chat-verification Jev, Luna는 chat/completions·high·도구 없음 | Luna Responses MCP·Java 승인 continuation·medium·사용량·deadline |
-| 도구 | company.read, issue.read, evidence.resolve, graph.path.read, graph.version.diff, portfolio.scope.read, zoopPolicy.read | portfolio.scope.read는 server-only, 나머지 MCP 외피·공통 gate·cache·direct 시작 경로 |
-| 근거·검증 | BranchContext·서버 citation·결정론 검사·section Jev | 웹 출처·claim 인과 검증·token guard·grant 선반환 검사 |
-| 화면 | D-AI-01~02b API 연결·결과/인용/확인/실패 | 새 목표 필드·부분 안내·UI 동작, 와이어프레임 근거와 종단 시험 |
+| 공개 job | 회원 전용 저장·polling·멱등성·취소·lease·재시도, answerStatus/notices·`tool_unavailable` limitation, 저장 복구(`save_only`) | 종단 시험 |
+| 모델 | chat-router Jev·chat-verification Jev, direct의 chat-answer Luna(chat/completions·high·도구 없음), agent의 chat-agent Luna(Responses MCP·medium·Java 승인 continuation, 기본 꺼짐, 합성 replay로만 확인) | live 확인, 입력 추정·출력 몫 실측 보정 |
+| 도구 | company.read, issue.read, evidence.resolve, graph.path.read, graph.version.diff, portfolio.scope.read, zoopPolicy.read, briefing.read, selectionRule.read, web.search(합성 공급자만). portfolio.scope.read·briefing.read·selectionRule.read는 server-only, 나머지는 MCP 공통 gate·cache·direct 시작 경로 위 | help.search, screenSpec.read, document.search, briefing.evidence, 실제 웹 공급자 |
+| 근거·검증 | BranchContext·서버 citation·결정론 검사·section Jev·서버 사실·웹 출처·grant 선반환 검사 | claim 인과 검증·웹 snapshot |
+| 화면 | D-AI-01~02b API 연결·결과/인용/확인/실패·부분 안내·웹 보도 구간 | uiActions, 와이어프레임 근거와 종단 시험 |
 
 문서 개정으로 런타임·OpenAPI·DB·Figma를 변경하거나 실제 모델을 실행한 것은 아니다. 날짜별 구현 증거는 [개발 계획](../development/ai-chatbot-implementation-plan.md)에 보존한다.
 

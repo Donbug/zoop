@@ -143,6 +143,42 @@ class ChatMcpAgentTest {
         return new ChatModels.AgentStep("resp_done", List.of(), ANSWER);
     }
 
+    private static ChatModels.AgentStep heldAt(long inputTokens) {
+        return new ChatModels.AgentStep("resp_a", List.of(new ChatModels.ApprovalRequest("a", "company_read",
+                Map.of("targets", List.of("KRX:000660")))), null, inputTokens);
+    }
+
+    @org.junit.jupiter.api.Test
+    void withTokensForOnlyOneMoreStepNoNewToolRunsAndThatStepAnswers() {
+        luna.script.add(n -> heldAt(9_000));
+        luna.script.add(n -> done());
+
+        var outcome = run(steps(false));
+
+        assertEquals(2, outcome.steps());
+        assertEquals(0, outcome.approved());
+        assertEquals(1, outcome.denied());
+    }
+
+    @org.junit.jupiter.api.Test
+    void withNoTokensForAnotherStepTheRunStopsAsAContextTooLarge() {
+        luna.script.add(n -> heldAt(12_001));
+        luna.script.add(n -> done());
+
+        var failure = assertThrows(ChatModels.Failure.class, () -> run(steps(false)));
+
+        assertEquals(ChatModels.INPUT_BUDGET_EXCEEDED, failure.code());
+        assertEquals(1, luna.inputs.size(), "nothing more is sent");
+    }
+
+    @org.junit.jupiter.api.Test
+    void aProviderThatReportsNoTokensKeepsTheRoundRules() {
+        luna.script.add(n -> held("a", "company_read", Map.of("targets", List.of("KRX:000660"))));
+        luna.script.add(n -> done());
+
+        assertEquals(1, run(steps(false)).approved());
+    }
+
     private ChatMcpCircuitBreaker circuit() {
         return new ChatMcpCircuitBreaker(() -> new com.zoop.ai.chat.ChatMcpHealth(true, null), clock);
     }

@@ -110,6 +110,15 @@ public class JdbcChatRepository implements ChatRepository {
     }
 
     @Override
+    public List<ChatJobRow> answersBefore(String sessionId, int seq, int limit) {
+        return jdbc.query(JOB_SELECT + """
+                 WHERE j.session_id = :id AND j.seq < :seq AND j.status = 'completed'
+                   AND j.outcome IN ('answered', 'insufficient_evidence')
+                 ORDER BY j.seq DESC LIMIT :limit
+                """, new MapSqlParameterSource("id", sessionId).addValue("seq", seq).addValue("limit", limit), JOB);
+    }
+
+    @Override
     public Optional<ChatJobRow> findJob(String jobId) {
         return jdbc.query(JOB_SELECT + " WHERE j.id = :id", new MapSqlParameterSource("id", jobId), JOB)
                 .stream().findFirst();
@@ -161,7 +170,10 @@ public class JdbcChatRepository implements ChatRepository {
                     finished_at = :at, updated_at = :at
                  WHERE id = :id AND status IN ('queued', 'running')
                 """, params) == 1;
-        if (cancelled) jdbc.update(JdbcChatExecutionRepository.CLOSE_TOOL_CALLS, params);
+        if (cancelled) {
+            jdbc.update(JdbcChatExecutionRepository.CLOSE_TOOL_CALLS, params);
+            jdbc.update("DELETE FROM chat_recovery_results WHERE chat_job_id = :id", params);
+        }
         return cancelled;
     }
 
