@@ -29,8 +29,11 @@ from .contracts import Wire
 CHAT_SCHEMA_VERSION = "zoop-ai-chat-2"
 ChatStage = Literal["chat-router", "chat-answer", "chat-verification", "chat-agent"]
 QueryType = Literal["Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08"]
-# `zoop_documented` rests on ZOOP's own approved documents (policies), `evidence_grounded` on public evidence.
-Basis = Literal["general_knowledge", "zoop_documented", "evidence_grounded"]
+# `zoop_documented` rests on ZOOP's own approved documents (policies), `evidence_grounded` on public evidence,
+# `web_reported` on what a supplementary web search returned (a snippet, never ZOOP's own verified fact).
+Basis = Literal["general_knowledge", "zoop_documented", "evidence_grounded", "web_reported"]
+# A web hit's id is the application's own (`web-` and a hash of provider and URL), never an evidence id.
+WEB_RESULT_ID = r"^web-[0-9a-f]{32}$"
 
 MAX_REQUIREMENTS = 6
 MAX_SECTIONS = 12
@@ -110,7 +113,7 @@ class RouterAnswer(Wire):
 
 class Quote(Wire):
     """A quoted span the answer may cite. `source_id` selects the grant; the text itself is the minimum span, never the article."""
-    evidence_id: str = Field(pattern=r"^ev-[0-9a-f]{64}$")
+    evidence_id: str = Field(pattern=r"^(ev-[0-9a-f]{64}|web-[0-9a-f]{32})$")
     source_id: str = Field(min_length=1)
     quote: str = Field(min_length=1, max_length=2000)
     article_title: str | None = Field(default=None, max_length=500)
@@ -476,6 +479,14 @@ class VerificationInput(Wire):
                 raise ValueError("a general section cites nothing")
             if not set(section.evidence_ids) <= known:
                 raise ValueError("a section cites evidence that is not provided")
+            web = [e.startswith("web-") for e in section.evidence_ids]
+            if section.basis == "web_reported" and (not web or not all(web)):
+                raise ValueError("a web section cites web hits only, at least one")
+            if section.basis != "web_reported" and any(web):
+                raise ValueError("only a web section cites web hits")
+        for citation in self.citations:
+            if citation.evidence_id.startswith("web-") != citation.source_id.startswith("web-search:"):
+                raise ValueError("a web hit is quoted under its web provider's grant, and only it")
         return self
 
 

@@ -4523,9 +4523,9 @@ answered 본문의 근거 수준별 구간.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| basis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded} | 이 구간의 근거 수준. general_knowledge 구간은 서버가 고정 안내 문장 '일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.'로 시작하고 최신 사실·수치·전망·투자 판단을 담지 않는다. |
+| basis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded, web_reported} | 이 구간의 근거 수준. web_reported는 보조 웹 검색이 보도한 내용으로, 인용한 웹 결과의 snippet에 적힌 것만 담으며 줍이 확인한 사실이 아니다. general_knowledge 구간은 서버가 고정 안내 문장 '일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.'로 시작하고 최신 사실·수치·전망·투자 판단을 담지 않는다. |
 | text | 필수 | string |  |
-| evidenceIds | 필수 | string[] (uniqueItems) | 이 구간의 사실 주장이 연결된 근거. 모두 result.citations의 evidenceId여야 하며 general_knowledge 구간은 빈 배열이다. zoop_documented 구간은 sourceKind=zoop_doc, evidence_grounded 구간은 sourceKind=article 또는 company_profile 인용만 가리킨다. |
+| evidenceIds | 필수 | string[] (uniqueItems) | 이 구간의 사실 주장이 연결된 근거. 모두 result.citations의 evidenceId여야 하며 general_knowledge 구간은 빈 배열이다. zoop_documented 구간은 sourceKind=zoop_doc, evidence_grounded 구간은 sourceKind=article 또는 company_profile, web_reported 구간은 sourceKind=web_result 인용만(하나 이상) 가리킨다. Q08 선정 기록이나 내 종목 범위만 읽은 evidence_grounded 구간은 인용 없이 올 수 있다(서버 기록을 검증 단계가 사실로 확인). |
 
 <a id="schema-chatapplied"></a>
 
@@ -4774,7 +4774,7 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | messageId | 필수 | string |  |
 | answer | 필수 | string | 표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만들며, 이어 붙인 전체가 12000자를 넘으면 검증 실패다. 돌려줄 때 인용 근거를 지금 읽을 수 없으면 저장 결과와 달리 고정 안내 문장만 담고 sections·citations는 빈 배열이다(getQuestionJob). |
 | sections | 필수 | [ChatAnswerSection](#schema-chatanswersection)[] | answered 본문을 근거 수준별로 나눈 구간. answered가 아니면 빈 배열이다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다. |
-| answerBasis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded, mixed, none} | 사용자 표시용 답변 근거 수준. 서버가 sections에서 계산한다: 구간 basis가 한 종류면 그 값(Q02 일반 개념 general_knowledge, 승인된 ZOOP 도움말·정책 zoop_documented, 공개 근거 기반 사실 evidence_grounded), 두 종류 이상이면 mixed, 구간이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가로 정하지 않는다. |
+| answerBasis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded, web_reported, mixed, none} | 사용자 표시용 답변 근거 수준. 서버가 sections에서 계산한다: 구간 basis가 한 종류면 그 값(Q02 일반 개념 general_knowledge, 승인된 ZOOP 도움말·정책 zoop_documented, 공개 근거 기반 사실 evidence_grounded, 보조 웹 검색이 보도한 내용 web_reported), 두 종류 이상이면 mixed, 구간이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가로 정하지 않는다. |
 | reason | 필수 | string / null |  |
 | sources | 필수 | string[] (uniqueItems) |  |
 | citations | 필수 | [Citation](#schema-citation)[] |  |
@@ -4807,7 +4807,7 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| sourceKind | 필수 | string {article, zoop_doc, company_profile} | article: 뉴스·공시 원문(articleId·articleVersion 필수, docId·docVersion null). zoop_doc: 승인된 ZOOP 도움말·화면 명세·정책 문서(docId·docVersion 필수, articleId·articleVersion·publisher·publishedAt·url은 null, articleTitle에는 문서 제목). company_profile: 줍이 검수한 기업 카탈로그 프로필(사업 개요·법인명·대표·설립일·업종·홈페이지) 전문(docId는 기업 ID, articleId·articleVersion·docVersion·publishedAt은 null, start=0·end는 quote의 code point 길이, articleTitle은 '<기업명> 기업 개요', publisher는 '줍 기업 카탈로그', url은 기업 홈페이지 또는 null). 카탈로그가 인용한 문장을 바꾸면 그 인용은 더 이상 읽을 수 없다. zoop_documented 구간은 zoop_doc 인용만, evidence_grounded 구간은 article·company_profile 인용만 쓴다. |
+| sourceKind | 필수 | string {article, zoop_doc, company_profile, web_result} | web_result: 보조 웹 검색 결과(줍의 근거가 아님). evidenceId는 서버가 공급자와 URL로 만든 web-<hash>, quote는 공급자 snippet(최대 500자), start=0·end는 quote의 code point 길이, articleTitle은 페이지 제목, publisher는 페이지 도메인, docId는 검색 공급자 ID, publishedAt은 공급자가 준 게시 시각(없으면 null), url은 페이지 주소, articleId·articleVersion·docVersion은 null. 본문을 가져오지 않으며 재열람 때 다시 검색하지 않는다. 실제 공급자의 재열람 권리가 정해지기 전까지 합성 공급자(synthetic) 인용만 다시 보여 주고 그 밖의 웹 인용이 있으면 본문을 고정 안내로 바꾼다. article: 뉴스·공시 원문(articleId·articleVersion 필수, docId·docVersion null). zoop_doc: 승인된 ZOOP 도움말·화면 명세·정책 문서(docId·docVersion 필수, articleId·articleVersion·publisher·publishedAt·url은 null, articleTitle에는 문서 제목). company_profile: 줍이 검수한 기업 카탈로그 프로필(사업 개요·법인명·대표·설립일·업종·홈페이지) 전문(docId는 기업 ID, articleId·articleVersion·docVersion·publishedAt은 null, start=0·end는 quote의 code point 길이, articleTitle은 '<기업명> 기업 개요', publisher는 '줍 기업 카탈로그', url은 기업 홈페이지 또는 null). 카탈로그가 인용한 문장을 바꾸면 그 인용은 더 이상 읽을 수 없다. zoop_documented 구간은 zoop_doc 인용만, evidence_grounded 구간은 article·company_profile 인용만 쓴다. |
 | evidenceId | 필수 | string | 인용 식별자. article이면 evidence ID, company_profile이면 기업 ID와 인용 문장으로 만든 결정적 ID(ev- 형식), zoop_doc이면 서버가 문서 ID·버전·구간으로 만든 결정적 ID다. sections[].evidenceIds가 이 값을 가리킨다. |
 | quote | 필수 | string |  |
 | articleId | 필수 | string, null |  |

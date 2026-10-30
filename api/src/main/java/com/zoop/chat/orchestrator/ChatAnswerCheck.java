@@ -51,7 +51,8 @@ final class ChatAnswerCheck {
     static final int MAX_CITATIONS = 20;
     static final int MAX_GRAPH_TARGETS = 50;
     static final int MAX_ANSWER = 12_000;
-    private static final Set<String> BASES = Set.of("general_knowledge", "zoop_documented", "evidence_grounded");
+    private static final Set<String> BASES = Set.of("general_knowledge", "zoop_documented", "evidence_grounded",
+            "web_reported");
     /** Current-fact markers a general explanation must not carry. */
     private static final Pattern CURRENT_FACT = Pattern.compile(
             "\\d[\\d,.]*\\s*(%|퍼센트|원|달러|엔|위안|억|조|만\\s*원|USD|KRW|bp)|[$₩€¥]\\s*\\d|(19|20)\\d{2}\\s*년"
@@ -118,6 +119,15 @@ final class ChatAnswerCheck {
                 sections.add(new ChatGeneratedAnswer.Section(section.basis(),
                         text.startsWith(GENERAL_NOTICE) ? text : GENERAL_NOTICE + " " + text, section.requirementIds(),
                         List.of()));
+            } else if ("web_reported".equals(section.basis())) {
+                // What a web search reported (web search design 6): only hits its requirements' own searches returned, at
+                // least one, and never ZOOP evidence. A concept part may rest on it too (Q02's first support).
+                Set<String> hits = new HashSet<>();
+                owners.forEach(b -> b.results().forEach(r -> r.webResults().forEach(h -> hits.add(h.id()))));
+                if (section.evidenceIds().isEmpty() || !hits.containsAll(section.evidenceIds())) {
+                    return Result.fail("web_section");
+                }
+                sections.add(section);
             } else {
                 boolean documented = "zoop_documented".equals(section.basis());
                 Set<String> passedOn = new HashSet<>();

@@ -284,6 +284,41 @@ def test_selection_facts_refuse_misbinding_and_any_decider_detail(mutate):
         VerificationInput.model_validate(payload)
 
 
+WEB_HIT = "web-" + "a" * 32
+
+
+def web_input() -> dict[str, Any]:
+    payload = verification_input()
+    payload["sections"] = [{"sectionId": "s0", "requirementIds": ["r1"], "serverFacts": [], "basis": "web_reported",
+                            "text": "웹 검색 결과에 따르면 HBM은 D램을 쌓은 메모리다.", "evidenceIds": [WEB_HIT]}]
+    payload["citations"] = [{"evidenceId": WEB_HIT, "sourceId": "web-search:synthetic",
+                             "quote": "[합성 자료] HBM은 D램을 쌓은 메모리다.", "articleTitle": "[합성] HBM이란"}]
+    return payload
+
+
+def test_a_web_section_is_checked_against_its_snippets_under_the_providers_grant():
+    # D-AI-02: what the web reported is verified against the snippet, never taken as ZOOP's own fact.
+    payload = VerificationInput.model_validate(web_input())
+    body = chat_jev.build_verification_request(payload, chat_jev.MODEL)
+    assert set(body["questions"]) == {"s0-support", "s0-advice"}
+    assert "web_reported" in chat_jev.VERIFY_TASK
+    from zoop_ai import chat_agent
+    assert "web_reported" in chat_agent.PROMPT
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda p: p["sections"][0].update(basis="evidence_grounded"),
+    lambda p: p["sections"][0].update(evidenceIds=[]),
+    lambda p: p["citations"][0].update(sourceId="news-provider-1"),
+    lambda p: p["citations"][0].update(evidenceId="web-short"),
+])
+def test_web_hits_and_evidence_never_mix(mutate):
+    payload = web_input()
+    mutate(payload)
+    with pytest.raises(ValueError):
+        VerificationInput.model_validate(payload)
+
+
 def test_a_verification_request_binds_to_its_own_invocation_and_refuses_the_v1_wire():
     payload = facts_input()
     request("chat-verification", payload).parsed()

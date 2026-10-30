@@ -333,6 +333,9 @@ public class ChatModelStages implements ChatModels.Router, ChatModels.Generator,
             sourceId = Optional.of(ChatZoopDocs.SOURCE_ID);
         } else if ("article".equals(citation.sourceKind()) && citation.articleId() != null) {
             sourceId = sources.sourceOf(citation.articleId());
+        } else if ("web_result".equals(citation.sourceKind()) && citation.docId() != null) {
+            // A web hit's snippet goes out under its provider's grant, never an article provider's.
+            sourceId = Optional.of("web-search:" + citation.docId());
         } else {
             return Optional.empty();
         }

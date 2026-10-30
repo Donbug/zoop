@@ -346,6 +346,23 @@ class ChatModelStagesTest {
     }
 
     @Test
+    void aWebHitIsSentUnderItsProvidersGrant() {
+        answer = call -> succeeded(call, """
+                {"sections":[{"support":"supported","prohibitedAdvice":"no"}]}""");
+        String hit = "web-" + "c".repeat(32);
+        var web = new Citation("web_result", hit, "[합성 자료] HBM은 D램을 쌓은 메모리다.", null, null, "synthetic", null, 0, 20,
+                "[합성] HBM이란", "news.example.com", null, "https://news.example.com/hbm");
+        ChatRun run = run(root("q"));
+        var sections = List.of(new ChatGeneratedAnswer.Section("web_reported", "HBM은 D램을 쌓은 메모리라고 보도됐어요.",
+                List.of("r1"), List.of(hit)));
+        stages.verify(run, sections, List.of(web), ChatModels.ServerFacts.withoutTools(run, sections));
+        JsonNode sent = calls.getFirst().input();
+        assertEquals("web-search:synthetic", sent.get("citations").get(0).get("sourceId").stringValue());
+        assertEquals(hit, sent.get("citations").get(0).get("evidenceId").stringValue());
+        assertEquals("web_reported", sent.get("sections").get(0).get("basis").stringValue());
+    }
+
+    @Test
     void aZoopDocumentQuoteIsSentUnderTheZoopDocumentGrant() {
         answer = call -> succeeded(call, """
                 {"sections":[{"support":"supported","prohibitedAdvice":"no"}]}""");

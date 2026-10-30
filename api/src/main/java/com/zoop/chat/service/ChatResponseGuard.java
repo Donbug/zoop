@@ -18,6 +18,7 @@ import com.zoop.chat.dto.ChatJob;
 import com.zoop.chat.dto.ChatResult;
 import com.zoop.chat.dto.Citation;
 import com.zoop.chat.dto.GraphTarget;
+import com.zoop.chat.tool.SyntheticWebSearchProvider;
 import org.springframework.stereotype.Component;
 
 /**
@@ -104,12 +105,19 @@ public class ChatResponseGuard {
         Set<String> documents = new LinkedHashSet<>();
         for (Citation citation : nullSafe(result.citations())) {
             // A catalog profile or ZOOP document quote is checked like an article: readable while its source still holds it.
+            // A web hit has no record to read again: only the synthetic provider's may be shown again, until a real
+            // provider's redisplay rights are decided (web search design 7). Any other web citation withholds the answer.
+            if ("web_result".equals(citation.sourceKind())) {
+                if (!SyntheticWebSearchProvider.ID.equals(citation.docId())) return false;
+                continue;
+            }
             boolean checkable = CHECKABLE.contains(citation.sourceKind());
             (checkable ? articles : documents).add(citation.evidenceId());
         }
         if (!documents.isEmpty()) return false;
         Set<String> cited = new LinkedHashSet<>(articles);
-        nullSafe(result.sections()).forEach(s -> cited.addAll(nullSafe(s.evidenceIds())));
+        nullSafe(result.sections()).stream().filter(s -> !"web_reported".equals(s.basis()))
+                .forEach(s -> cited.addAll(nullSafe(s.evidenceIds())));
         for (String id : cited) {
             if (!readable(id, version, asOf, requestId, checked)) return false;
         }
