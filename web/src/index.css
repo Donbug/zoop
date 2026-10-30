@@ -27,6 +27,22 @@
   --font-heading: 'Wanted Sans Variable', 'Pretendard Variable', sans-serif;
   --font-num: 'SUIT Variable', 'Pretendard Variable', sans-serif;
 
+  /* 글자 크기 6단계. 12px 미만은 쓰지 않는다.
+     caption: 출처·시각·배지 · body: 본문·패널 · lead: 강조 본문
+     title-sm: 카드·섹션 제목 · title: 화면 소제목 · display: 화면 제목 */
+  --text-caption: 12px;
+  --text-caption--line-height: 1.5;
+  --text-body: 14px;
+  --text-body--line-height: 1.6;
+  --text-lead: 16px;
+  --text-lead--line-height: 1.6;
+  --text-title-sm: 18px;
+  --text-title-sm--line-height: 1.45;
+  --text-title: 22px;
+  --text-title--line-height: 1.35;
+  --text-display: 28px;
+  --text-display--line-height: 1.25;
+
   --font-panel: 'Pretendard Variable', Pretendard, sans-serif;
   --color-panel-ink: #212121;
   --color-panel-secondary: #212121;

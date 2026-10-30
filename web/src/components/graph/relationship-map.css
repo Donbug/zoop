@@ -50,13 +50,13 @@
   text-decoration: none;
 }
 .relationship-logo strong {
-  font-size: 16px;
+  font-size: var(--text-lead);
   font-weight: 800;
   line-height: 24px;
   letter-spacing: -0.4px;
 }
 .relationship-logo span {
-  font-size: 11px;
+  font-size: var(--text-caption);
   color: var(--color-zoop-muted);
   font-weight: 500;
 }
@@ -72,7 +72,7 @@
   align-items: center;
   gap: 6px;
   padding: 0 12px;
-  font-size: 15px;
+  font-size: var(--text-lead);
   line-height: 22px;
   font-weight: 600;
   color: var(--color-zoop-muted);
@@ -101,7 +101,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--text-caption);
   line-height: 16px;
   color: var(--color-zoop-muted);
 }
@@ -127,7 +127,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--text-caption);
   line-height: 16.5px;
 }
 .relationship-sidebar-toggle {
@@ -281,7 +281,7 @@
   place-items: center;
   border-radius: 50%;
   color: var(--color-zoop-paper);
-  font-size: 11.4px;
+  font-size: var(--text-caption);
   font-weight: 800;
   overflow: hidden;
 }
@@ -298,7 +298,7 @@
 }
 .company-identity-meta > p {
   color: var(--color-zoop-faint);
-  font-size: 11px;
+  font-size: var(--text-caption);
   line-height: 16.5px;
 }
 .company-statuses {
@@ -308,21 +308,21 @@
 }
 .company-statuses span {
   color: var(--color-zoop-muted);
-  font-size: 11px;
+  font-size: var(--text-caption);
   line-height: 16.5px;
 }
 .company-aliases summary,
 .company-source summary,
 .company-metrics summary {
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--text-caption);
   font-weight: 600;
 }
 .company-aliases p,
 .company-source p {
   padding-top: 6px;
   color: var(--color-zoop-muted);
-  font-size: 11px;
+  font-size: var(--text-caption);
 }
 .company-aliases {
   margin-top: 8px;
@@ -348,13 +348,13 @@
   margin-bottom: 12px;
 }
 .company-section-title h3 {
-  font-size: 13px;
+  font-size: var(--text-body);
   line-height: 19.5px;
   letter-spacing: -0.1px;
 }
 .company-section-title span {
   color: var(--color-zoop-faint);
-  font-size: 11px;
+  font-size: var(--text-caption);
   line-height: 15px;
 }
 .company-price-row {
@@ -365,20 +365,20 @@
 }
 .company-price-row > strong {
   font-family: 'Pretendard Variable', Pretendard, sans-serif;
-  font-size: 22px;
+  font-size: var(--text-title);
   font-weight: 800;
   line-height: 33px;
   letter-spacing: -0.5px;
 }
 .company-price-row > strong small {
-  font-size: 12px;
+  font-size: var(--text-caption);
   color: var(--color-zoop-ink);
   letter-spacing: 0;
 }
 .company-price-row > .up,
 .company-price-row > .down {
   color: var(--color-zoop-ink);
-  font-size: 12px;
+  font-size: var(--text-caption);
   font-weight: 600;
   line-height: 18px;
 }
@@ -388,7 +388,7 @@
   gap: 4px;
   margin: 4px 0 12px;
   color: var(--color-zoop-faint);
-  font-size: 11px;
+  font-size: var(--text-caption);
   line-height: 16.25px;
 }
 .company-source {
@@ -429,7 +429,7 @@
 .company-stat-grid span,
 .company-holding span {
   color: var(--color-zoop-faint);
-  font-size: 11px;
+  font-size: var(--text-caption);
   line-height: 16.5px;
   display: flex;
   flex-direction: column;
@@ -437,12 +437,12 @@
 .company-stat-grid b,
 .company-holding b {
   color: var(--color-zoop-ink);
-  font-size: 13px;
+  font-size: var(--text-body);
   line-height: 19.5px;
   font-weight: 600;
 }
 .company-holding b {
-  font-size: 14px;
+  font-size: var(--text-body);
   line-height: 21px;
 }
 .company-price-chart {
@@ -451,7 +451,7 @@
 .company-price-chart figcaption {
   margin-bottom: 8px;
   color: var(--color-zoop-faint);
-  font-size: 11px;
+  font-size: var(--text-caption);
   line-height: 16.5px;
 }
 .company-sparkline {
@@ -471,7 +471,7 @@
 }
 .company-caption {
   color: var(--color-zoop-faint);
-  font-size: 11px;
+  font-size: var(--text-caption);
   line-height: 15px;
 }
 .company-chart-range {
@@ -479,7 +479,7 @@
   justify-content: space-between;
   color: var(--color-zoop-faint);
   padding-top: 4px;
-  font-size: 11px;
+  font-size: var(--text-caption);
   line-height: 15px;
 }
 .company-metrics summary {
@@ -499,7 +499,7 @@
   display: flex;
   justify-content: space-between;
   padding-top: 8px;
-  font-size: 11px;
+  font-size: var(--text-caption);
 }
 .company-list {
   margin: 0;
@@ -537,13 +537,13 @@
   display: block;
 }
 .company-list b {
-  font-size: 12px;
+  font-size: var(--text-caption);
   line-height: 18px;
 }
 .company-list span {
   padding-top: 2px;
   color: var(--color-zoop-faint);
-  font-size: 11px;
+  font-size: var(--text-caption);
   line-height: 15px;
 }
 .company-unavailable,
@@ -552,7 +552,7 @@
 .company-panel-loading,
 .company-panel-fatal {
   color: var(--color-zoop-muted);
-  font-size: 11px;
+  font-size: var(--text-caption);
   line-height: 16.5px;
 }
 .company-section-error,
@@ -613,23 +613,24 @@
   height: 26px;
 }
 .relationship-title i {
-  font: italic 15px/20.625px var(--font-heading);
+  font: italic var(--text-lead) / var(--text-lead--line-height)
+    var(--font-heading);
 }
 .relationship-title h1 {
-  font-size: 24px;
+  font-size: var(--text-title);
   line-height: 24px;
   font-weight: 600;
   letter-spacing: -0.96px;
 }
 .relationship-subtitle {
-  font-size: 11px;
+  font-size: var(--text-caption);
   line-height: 14.438px;
   font-weight: 500;
   letter-spacing: -0.2625px;
   padding-top: 4px;
 }
 .relationship-meta {
-  font: 9px/12.375px var(--font-num);
+  font: var(--text-caption) / var(--text-caption--line-height) var(--font-num);
   color: var(--color-zoop-faint);
   letter-spacing: 0.225px;
   padding-top: 2px;
@@ -645,7 +646,7 @@
 }
 .relationship-legend-items h2 {
   grid-column: 1 / -1;
-  font: 9px/12.375px var(--font-num);
+  font: var(--text-caption) / var(--text-caption--line-height) var(--font-num);
   letter-spacing: 1.08px;
   margin-bottom: 1px;
 }
@@ -653,7 +654,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--text-caption);
   line-height: 13.75px;
   color: var(--color-zoop-muted);
 }
@@ -675,7 +676,7 @@
   transform: rotate(45deg);
 }
 .legend-folded {
-  font: 8px/11px var(--font-num);
+  font: var(--text-caption) / var(--text-caption--line-height) var(--font-num);
 }
 .legend-line {
   display: inline-block;
@@ -700,7 +701,7 @@
   border-bottom: 2.667px solid transparent;
 }
 .legend-size {
-  font-size: 11px;
+  font-size: var(--text-caption);
   font-weight: 400;
 }
 .relationship-disconnected {
@@ -717,11 +718,11 @@
   place-items: center;
   border: 0.667px solid var(--color-zoop-ink);
   border-radius: 50%;
-  font: 13px/19.5px var(--font-num);
+  font: var(--text-body) / var(--text-body--line-height) var(--font-num);
 }
 .relationship-disconnected p {
   margin-top: 6px;
-  font-size: 11px;
+  font-size: var(--text-caption);
   line-height: 15px;
   letter-spacing: 0.25px;
   color: var(--color-zoop-muted);
@@ -735,7 +736,7 @@
   padding-top: 6px;
   text-align: right;
   pointer-events: none;
-  font: 8.5px/13.813px var(--font-num);
+  font: var(--text-caption) / var(--text-caption--line-height) var(--font-num);
   letter-spacing: 0.2125px;
   color: var(--color-zoop-faint);
 }
@@ -757,7 +758,7 @@
 }
 .relationship-zoom output {
   padding: 0 10px;
-  font-size: 11px;
+  font-size: var(--text-caption);
   line-height: 15px;
   letter-spacing: 0.25px;
 }
@@ -770,7 +771,7 @@
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  font-size: 13px;
+  font-size: var(--text-body);
 }
 .relationship-message a,
 .relationship-message button,
@@ -789,7 +790,7 @@
   background: var(--color-zoop-paper);
   padding: 12px 16px;
   color: var(--color-zoop-muted);
-  font-size: 12px;
+  font-size: var(--text-caption);
   line-height: 18px;
   box-shadow: 0 2px 8px #00000008;
 }
@@ -806,7 +807,7 @@
   padding: 4px 8px;
   border: 0.667px solid var(--color-zoop-line);
   border-radius: 3px;
-  font-size: 11px;
+  font-size: var(--text-caption);
 }
 .relationship-accessible-nodes button {
   position: absolute;
@@ -834,11 +835,11 @@
 }
 .out-of-scope-page h1 {
   color: var(--color-zoop-ink);
-  font-size: 18px;
+  font-size: var(--text-title-sm);
   font-weight: 600;
 }
 .out-of-scope-page p {
-  font-size: 12px;
+  font-size: var(--text-caption);
 }
 
 /* FS015: 실제 조작 대상만 점선으로 강조한다. */

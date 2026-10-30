@@ -175,7 +175,7 @@ export default function BriefingComparison(props: Props) {
         {referenceHref && (
           <Link
             to={referenceHref}
-            className={`text-[11px] text-zoop-muted underline underline-offset-4 hover:text-zoop-ink ${FOCUS_RING}`}
+            className={`text-caption text-zoop-muted underline underline-offset-4 hover:text-zoop-ink ${FOCUS_RING}`}
           >
             {reference} 보기
           </Link>
@@ -203,13 +203,13 @@ export default function BriefingComparison(props: Props) {
               key={`${item.change}-${item.eventId}`}
               className="flex gap-3 border-b-[0.667px] border-zoop-line py-3 last:border-b-0 max-sm:flex-col max-sm:gap-1"
             >
-              <p className="w-28 shrink-0 font-num text-[11px] text-zoop-muted tabular-nums">
+              <p className="w-28 shrink-0 font-num text-caption text-zoop-muted tabular-nums">
                 {reported(item.reportedAt, roundDate ?? '')}
               </p>
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <p className="flex flex-wrap items-start gap-x-2 gap-y-1">
                   <span
-                    className={`shrink-0 rounded-full border-[0.667px] px-2 py-[2px] text-[11px] font-semibold ${
+                    className={`shrink-0 rounded-full border-[0.667px] px-2 py-[2px] text-caption font-semibold ${
                       item.change === 'dropped'
                         ? 'border-zoop-line text-zoop-muted'
                         : 'border-zoop-ink text-zoop-ink'
@@ -220,7 +220,7 @@ export default function BriefingComparison(props: Props) {
                   {graphHref(item) ? (
                     <Link
                       to={graphHref(item)!}
-                      className={`min-w-0 flex-1 text-[13px] font-semibold underline underline-offset-4 ${
+                      className={`min-w-0 flex-1 text-body font-semibold underline underline-offset-4 ${
                         item.change === 'dropped' ? 'text-zoop-muted' : ''
                       } ${FOCUS_RING}`}
                     >
@@ -228,7 +228,7 @@ export default function BriefingComparison(props: Props) {
                     </Link>
                   ) : (
                     <span
-                      className={`min-w-0 flex-1 text-[13px] font-semibold ${
+                      className={`min-w-0 flex-1 text-body font-semibold ${
                         item.change === 'dropped' ? 'text-zoop-muted' : ''
                       }`}
                     >

@@ -94,7 +94,7 @@ export default function InvestmentChoice() {
   return (
     <OnboardingStep title="지금 주식에 투자하고 계신가요?">
       {settings.status === 'loading' && (
-        <p role="status" className="text-sm text-zoop-ink">
+        <p role="status" className="text-body text-zoop-ink">
           설정을 불러오고 있어요
         </p>
       )}
@@ -127,7 +127,7 @@ export default function InvestmentChoice() {
                   <span className="font-semibold text-zoop-ink">
                     {option.title}
                   </span>
-                  <span className="text-sm text-zoop-ink">
+                  <span className="text-body text-zoop-ink">
                     {option.description}
                   </span>
                 </span>
@@ -137,7 +137,7 @@ export default function InvestmentChoice() {
         </ul>
       )}
       {saving && (
-        <p role="status" className="text-sm text-zoop-ink">
+        <p role="status" className="text-body text-zoop-ink">
           선택을 저장하고 있어요
         </p>
       )}

@@ -25,11 +25,11 @@ export default function StockRow({
             {name}
           </span>
           {description && (
-            <span className="block text-sm text-zoop-ink">{description}</span>
+            <span className="block text-body text-zoop-ink">{description}</span>
           )}
         </span>
         {trailing && (
-          <span className="shrink-0 text-sm text-zoop-ink tabular-nums">
+          <span className="shrink-0 text-body text-zoop-ink tabular-nums">
             {trailing}
           </span>
         )}

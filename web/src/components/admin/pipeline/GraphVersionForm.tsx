@@ -97,8 +97,8 @@ export default function GraphVersionForm({
       onSubmit={(event) => void submit(event)}
       className="flex flex-col gap-3 rounded-2xl bg-zoop-soft p-5"
     >
-      <p className="text-sm font-bold">그래프 버전 전환</p>
-      <p className="text-[11px] leading-relaxed text-zoop-muted">
+      <p className="text-body font-bold">그래프 버전 전환</p>
+      <p className="text-caption leading-relaxed text-zoop-muted">
         사용자에게 보이는 그래프를{' '}
         <strong className="font-num text-zoop-ink">
           {activeVersionId ?? '없음'}
@@ -107,7 +107,7 @@ export default function GraphVersionForm({
         바꿔요. 서버가 이 버전의 그래프와 근거를 다시 확인한 뒤에만 바뀌어요.
       </p>
       <div className="flex flex-col gap-1">
-        <label htmlFor={reasonId} className="text-[11px] text-zoop-muted">
+        <label htmlFor={reasonId} className="text-caption text-zoop-muted">
           전환 사유(감사 로그에 남아요)
         </label>
         <textarea
@@ -120,19 +120,19 @@ export default function GraphVersionForm({
           className={TEXTAREA}
         />
       </div>
-      <p className="text-[11px] text-zoop-muted">사유 {reason.length}/500자</p>
+      <p className="text-caption text-zoop-muted">사유 {reason.length}/500자</p>
       {missing && (
-        <p role="alert" className="text-[11px] text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           사유를 1~500자로 입력해 주세요.
         </p>
       )}
       {stale && (
-        <p role="alert" className="text-[11px] text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           목록을 다시 불러온 뒤 전환해 주세요.
         </p>
       )}
       {error && (
-        <p role="alert" className="text-[11px] text-zoop-alert">
+        <p role="alert" className="text-caption text-zoop-alert">
           버전을 바꾸지 못했어요. {activationErrorMessage(error)}
         </p>
       )}

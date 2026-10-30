@@ -311,7 +311,7 @@ function StocksSession() {
       className="mx-auto w-full max-w-[800px] text-zoop-ink"
       data-screen-id="D-STK-01"
     >
-      <h1 className="flex items-center gap-2.5 text-[28px] font-[750] tracking-[-0.045em]">
+      <h1 className="flex items-center gap-2.5 text-display font-[750] tracking-[-0.045em]">
         <GraphIcon name="search" size={24} />
         종목
       </h1>
@@ -337,7 +337,7 @@ function StocksSession() {
             type="button"
             aria-pressed={scope === value}
             onClick={() => changeScope(value)}
-            className="min-w-[76px] rounded-[2px] text-xs font-semibold text-zoop-muted aria-pressed:bg-zoop-paper aria-pressed:text-zoop-ink aria-pressed:shadow-[0_0_0_0.5px_#1a1a1a14]"
+            className="min-w-[76px] rounded-[2px] text-caption font-semibold text-zoop-muted aria-pressed:bg-zoop-paper aria-pressed:text-zoop-ink aria-pressed:shadow-[0_0_0_0.5px_#1a1a1a14]"
           >
             {label}
           </button>
@@ -365,7 +365,7 @@ function StocksSession() {
                 key={value}
                 type="button"
                 aria-pressed={personal === value}
-                className="rounded-panel border border-zoop-line px-3 py-2 text-xs aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper"
+                className="rounded-panel border border-zoop-line px-3 py-2 text-caption aria-pressed:bg-zoop-ink aria-pressed:text-zoop-paper"
                 onClick={() => {
                   const next = new URLSearchParams(params);
                   try {
@@ -399,7 +399,7 @@ function StocksSession() {
       {loginNeeded && !isAuthenticated && (
         <p
           role="alert"
-          className="mt-5 rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-wash p-[18px] text-[11px] leading-relaxed text-zoop-muted [&_a]:font-bold [&_a]:text-zoop-ink [&_a]:underline"
+          className="mt-5 rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-wash p-[18px] text-caption leading-relaxed text-zoop-muted [&_a]:font-bold [&_a]:text-zoop-ink [&_a]:underline"
         >
           로그인하면 관심 종목을 저장할 수 있어요.{' '}
           <Link to="/login" state={{ from: location }}>
@@ -408,7 +408,7 @@ function StocksSession() {
         </p>
       )}
       {memberDataFailed && (
-        <div className="mt-5 text-xs text-zoop-muted">
+        <div className="mt-5 text-caption text-zoop-muted">
           <ErrorNotice
             title="관심·보유 종목을 불러오지 못했어요"
             message="다시 불러오기 전에는 관심 종목을 바꿀 수 없어요."
@@ -421,25 +421,25 @@ function StocksSession() {
       )}
 
       {scope === 'mine' && !checking && !isAuthenticated ? (
-        <p className="mt-5 rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-wash p-[18px] text-[11px] leading-relaxed text-zoop-muted [&_a]:font-bold [&_a]:text-zoop-ink [&_a]:underline">
+        <p className="mt-5 rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-wash p-[18px] text-caption leading-relaxed text-zoop-muted [&_a]:font-bold [&_a]:text-zoop-ink [&_a]:underline">
           로그인하면 보유·관심 종목만 모아 볼 수 있어요.{' '}
           <Link to="/login" state={{ from: location }}>
             로그인
           </Link>
         </p>
       ) : listLoading ? (
-        <p role="status" className="mt-5 text-xs text-zoop-muted">
+        <p role="status" className="mt-5 text-caption text-zoop-muted">
           종목을 불러오고 있어요
         </p>
       ) : scope === 'all' && first.status === 'error' ? (
-        <div className="mt-5 text-xs text-zoop-muted">
+        <div className="mt-5 text-caption text-zoop-muted">
           <ErrorNotice
             title="종목을 불러오지 못했어요"
             onRetry={first.reload}
           />
         </div>
       ) : scope === 'mine' && mineFailed ? (
-        <div className="mt-5 text-xs text-zoop-muted">
+        <div className="mt-5 text-caption text-zoop-muted">
           <ErrorNotice
             title="일부 종목 정보를 불러오지 못했어요"
             message="목록을 비어 있는 것으로 표시하지 않고 다시 불러올 수 있어요."
@@ -447,7 +447,7 @@ function StocksSession() {
           />
         </div>
       ) : rows.length === 0 ? (
-        <p className="mt-5 rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-wash p-[18px] text-[11px] leading-relaxed text-zoop-muted">
+        <p className="mt-5 rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-wash p-[18px] text-caption leading-relaxed text-zoop-muted">
           {scope === 'mine'
             ? personal === 'held'
               ? '표시할 보유 종목이 없어요.'
@@ -462,7 +462,7 @@ function StocksSession() {
         </p>
       ) : (
         <>
-          <p className="mt-5 mb-2 font-num text-[11px] text-zoop-muted">
+          <p className="mt-5 mb-2 font-num text-caption text-zoop-muted">
             {rows.length}개 종목
           </p>
           <StockList
@@ -480,7 +480,7 @@ function StocksSession() {
           {scope === 'all' && nextCursor && (
             <button
               type="button"
-              className="mx-auto mt-4 block h-9 min-w-[120px] rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper text-xs font-semibold text-zoop-ink disabled:cursor-progress disabled:opacity-50"
+              className="mx-auto mt-4 block h-9 min-w-[120px] rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper text-caption font-semibold text-zoop-ink disabled:cursor-progress disabled:opacity-50"
               disabled={moreState === 'loading'}
               onClick={() => void loadMore()}
             >
@@ -488,7 +488,7 @@ function StocksSession() {
             </button>
           )}
           {scope === 'all' && moreState === 'error' && (
-            <div className="mt-5 text-xs text-zoop-muted">
+            <div className="mt-5 text-caption text-zoop-muted">
               <ErrorNotice
                 title="다음 종목을 불러오지 못했어요"
                 onRetry={() => void loadMore()}

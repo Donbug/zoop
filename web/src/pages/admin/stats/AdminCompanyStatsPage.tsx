@@ -52,7 +52,7 @@ export default function AdminCompanyStatsPage() {
     >
       <Link
         to={back}
-        className={`self-start text-[11px] text-zoop-muted hover:text-zoop-ink ${FOCUS_RING}`}
+        className={`self-start text-caption text-zoop-muted hover:text-zoop-ink ${FOCUS_RING}`}
       >
         ← 종목 순위
       </Link>

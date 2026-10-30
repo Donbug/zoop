@@ -134,7 +134,7 @@ function Briefings({ data }: { data: Dashboard }) {
         </Table>
       )}
       {briefing && briefing.delayedOrFailed > 0 && (
-        <p className="text-[11px] text-zoop-alert">
+        <p className="text-caption text-zoop-alert">
           늦게 발행됐거나 실패한 회차가 {count(briefing.delayedOrFailed)}건
           있어요.
         </p>
@@ -262,7 +262,7 @@ export default function DashboardSummary() {
     <div className="flex flex-col gap-6 py-8 text-zoop-ink">
       <PageHeader title="대시보드" />
       {/* {data && (
-        <p className="text-xs text-zoop-muted">
+        <p className="text-caption text-zoop-muted">
           갱신{' '}
           {new Date(data.generatedAt).toLocaleTimeString('ko-KR', {
             timeZone: 'Asia/Seoul',
@@ -272,7 +272,7 @@ export default function DashboardSummary() {
         </p>
       )} */}
       {dashboard.refreshError && (
-        <p role="status" className="text-xs text-zoop-muted">
+        <p role="status" className="text-caption text-zoop-muted">
           새로 고치지 못했어요. 이전 결과를 표시해요.
         </p>
       )}
@@ -294,7 +294,7 @@ export default function DashboardSummary() {
           {data.ledger.status === 'unavailable' && (
             <p
               role="status"
-              className="rounded-2xl bg-zoop-soft px-4 py-3 text-[11px] text-zoop-muted"
+              className="rounded-2xl bg-zoop-soft px-4 py-3 text-caption text-zoop-muted"
             >
               원장에 연결하지 못해 검수 현황을 표시하지 못했어요.
               {data.ledger.error && ` (${data.ledger.error.message})`}

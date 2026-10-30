@@ -134,9 +134,9 @@ export default function CandidateDetailPanel({
   return (
     <article aria-labelledby="candidate-title" className="flex flex-col gap-5">
       <div className="flex items-start gap-2">
-        <h2 id="candidate-title" className="min-w-0 flex-1 text-sm font-bold">
+        <h2 id="candidate-title" className="min-w-0 flex-1 text-body font-bold">
           {c.title ?? '사건 없는 관계 후보'}
-          <span className="mt-0.5 block font-num text-[11px] font-normal break-all text-zoop-muted">
+          <span className="mt-0.5 block font-num text-caption font-normal break-all text-zoop-muted">
             {c.candidateId}
           </span>
         </h2>
@@ -150,19 +150,19 @@ export default function CandidateDetailPanel({
         </button>
       </div>
 
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-xs">
-        <dt className="text-[11px] text-zoop-muted">판정</dt>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-caption">
+        <dt className="text-caption text-zoop-muted">판정</dt>
         <dd className="font-semibold">
           {candidateStatusLabel[c.status]}
           {!c.active && ' · 비활성'}
         </dd>
-        <dt className="text-[11px] text-zoop-muted">사용자 그래프</dt>
+        <dt className="text-caption text-zoop-muted">사용자 그래프</dt>
         <dd>{userGraphLabel(c.onUserGraph)}</dd>
-        <dt className="text-[11px] text-zoop-muted">GraphDB 반영</dt>
+        <dt className="text-caption text-zoop-muted">GraphDB 반영</dt>
         <dd>{candidateGraphLabel[c.graphDb]}</dd>
-        <dt className="text-[11px] text-zoop-muted">사건 시각</dt>
+        <dt className="text-caption text-zoop-muted">사건 시각</dt>
         <dd>{c.eventTime ? formatKst(c.eventTime) : '–'}</dd>
-        <dt className="text-[11px] text-zoop-muted">관련 기업</dt>
+        <dt className="text-caption text-zoop-muted">관련 기업</dt>
         <dd>
           {c.companies.length
             ? c.companies
@@ -174,13 +174,13 @@ export default function CandidateDetailPanel({
                 .join(', ')
             : '–'}
         </dd>
-        <dt className="text-[11px] text-zoop-muted">원천 버전</dt>
+        <dt className="text-caption text-zoop-muted">원천 버전</dt>
         <dd className="font-num break-all">{c.sourceVersion}</dd>
       </dl>
 
       {c.reasons.length > 0 && (
         <Section title={reasonTitle(c)}>
-          <ul className="flex list-disc flex-col gap-1 pl-4 text-xs leading-relaxed">
+          <ul className="flex list-disc flex-col gap-1 pl-4 text-caption leading-relaxed">
             {c.reasons.map((reason) => (
               <li key={reason}>{reason}</li>
             ))}
@@ -190,7 +190,7 @@ export default function CandidateDetailPanel({
       {c.invalidationReason && <Note>비활성 사유: {c.invalidationReason}</Note>}
 
       {message && (
-        <p role="status" className="text-xs font-semibold">
+        <p role="status" className="text-caption font-semibold">
           {message}
         </p>
       )}
@@ -217,9 +217,9 @@ export default function CandidateDetailPanel({
               return (
                 <li
                   key={`${evidence.articleId}:${evidence.articleVersion}:${evidence.start}:${evidence.end}`}
-                  className="flex flex-col gap-1 rounded-2xl bg-zoop-soft px-4 py-3 text-xs"
+                  className="flex flex-col gap-1 rounded-2xl bg-zoop-soft px-4 py-3 text-caption"
                 >
-                  <span className="text-[11px] text-zoop-muted">
+                  <span className="text-caption text-zoop-muted">
                     {[
                       article?.publisher,
                       article?.publishedAt && formatKst(article.publishedAt),
@@ -275,7 +275,7 @@ export default function CandidateDetailPanel({
                 <tr key={relation.relationId}>
                   <td className={`${TD} whitespace-nowrap`}>
                     {relationLabel(relation.relationType)}
-                    <span className="block font-num text-[11px] break-all text-zoop-muted">
+                    <span className="block font-num text-caption break-all text-zoop-muted">
                       {relation.relationId} · 회차 {relation.revision}
                     </span>
                   </td>
@@ -331,7 +331,7 @@ export default function CandidateDetailPanel({
             </tbody>
           </Table>
           {closedNotice && (
-            <p role="status" className="text-xs text-zoop-alert">
+            <p role="status" className="text-caption text-zoop-alert">
               그 사이 고른 관계가 결정됐거나 목록에서 빠져 더는 결정할 수 없어
               폼을 닫았어요. 새로 읽은 상태를 확인해 주세요.
             </p>
@@ -396,13 +396,13 @@ export default function CandidateDetailPanel({
         {c.history.length === 0 ? (
           <Empty>아직 검수 결정이 없어요.</Empty>
         ) : (
-          <ul className="flex flex-col gap-2 text-xs">
+          <ul className="flex flex-col gap-2 text-caption">
             {c.history.map((item) => (
               <li key={item.id} className="flex flex-col gap-0.5">
                 <span className="font-semibold">
                   {decisionLabel[item.decision]} · {item.adminEmail}
                 </span>
-                <span className="text-[11px] break-all text-zoop-muted">
+                <span className="text-caption break-all text-zoop-muted">
                   {item.targetType === 'relation'
                     ? `관계 ${item.targetId}`
                     : item.targetType === 'candidate'
@@ -410,7 +410,7 @@ export default function CandidateDetailPanel({
                       : `${item.targetType} ${item.targetId}`}{' '}
                   · 판정 회차 {item.revision}
                 </span>
-                <span className="text-[11px] text-zoop-muted">
+                <span className="text-caption text-zoop-muted">
                   {formatKst(item.decidedAt)}
                 </span>
                 <span className="leading-relaxed">{item.reason}</span>

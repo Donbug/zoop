@@ -60,24 +60,24 @@ export default function CompanySearch({
           placeholder="기업명이나 종목 코드로 검색"
           autoComplete="off"
           enterKeyHint="search"
-          className="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none focus:border-gray-950"
+          className="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-body outline-none focus:border-gray-950"
         />
         <button
           type="submit"
-          className="shrink-0 rounded-xl bg-gray-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800"
+          className="shrink-0 rounded-xl bg-gray-950 px-4 py-2.5 text-body font-semibold text-white hover:bg-gray-800"
         >
           검색
         </button>
       </form>
       {emptyHint && (
-        <p role="alert" className="text-sm font-medium text-red-700">
+        <p role="alert" className="text-body font-medium text-red-700">
           검색할 기업명이나 종목 코드를 입력해 주세요.
         </p>
       )}
       {query && (
         <div aria-live="polite" aria-busy={search.status === 'loading'}>
           {search.status === 'loading' && (
-            <p role="status" className="text-sm text-zoop-ink">
+            <p role="status" className="text-body text-zoop-ink">
               ‘{query}’ 종목을 찾고 있어요
             </p>
           )}
@@ -89,13 +89,13 @@ export default function CompanySearch({
             />
           )}
           {search.status === 'success' && items.length === 0 && (
-            <p className="text-sm text-zoop-ink">
+            <p className="text-body text-zoop-ink">
               ‘{query}’와 맞는 종목이 없어요. 검색어를 고쳐 다시 검색해 보세요.
             </p>
           )}
           {search.status === 'success' && items.length > 0 && (
             <>
-              <p className="text-sm text-zoop-ink">
+              <p className="text-body text-zoop-ink">
                 ‘{query}’ 검색 결과{' '}
                 <span className="tabular-nums">{items.length}개 종목</span>
               </p>
@@ -118,7 +118,7 @@ export default function CompanySearch({
                         <p className="truncate font-medium text-zoop-ink">
                           {company.name}
                         </p>
-                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zoop-ink">
+                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body text-zoop-ink">
                           <span className="tabular-nums">
                             {[
                               company.ticker,
@@ -136,7 +136,7 @@ export default function CompanySearch({
                         aria-label={`${company.name} ${picked ? '선택됨' : addLabel}`}
                         disabled={disabled}
                         onClick={() => onToggle(company)}
-                        className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+                        className={`shrink-0 rounded-lg px-3 py-1.5 text-body font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
                           picked
                             ? 'bg-gray-950 text-white'
                             : 'border border-gray-300 text-zoop-ink hover:bg-gray-50'

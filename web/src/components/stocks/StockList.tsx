@@ -16,7 +16,7 @@ type StockListProps = {
 };
 
 const action =
-  'grid size-8 shrink-0 place-items-center rounded-[3px] text-sm text-zoop-muted no-underline hover:bg-zoop-soft hover:text-zoop-ink disabled:cursor-default disabled:opacity-45 aria-pressed:border-[0.667px] aria-pressed:border-zoop-ink aria-pressed:text-zoop-ink';
+  'grid size-8 shrink-0 place-items-center rounded-[3px] text-body text-zoop-muted no-underline hover:bg-zoop-soft hover:text-zoop-ink disabled:cursor-default disabled:opacity-45 aria-pressed:border-[0.667px] aria-pressed:border-zoop-ink aria-pressed:text-zoop-ink';
 
 // D-STK-01 종목 행: 머리글자·이름·티커·승인 사건 수·보유, 최신 시세, 상세(↗)·지도·관심(☆)
 export default function StockList({
@@ -40,16 +40,16 @@ export default function StockList({
             <CompanyLogo
               name={row.name}
               logoUrl={row.logoUrl}
-              className="size-8 rounded-full bg-zoop-ink text-xs font-bold text-zoop-paper"
+              className="size-8 rounded-full bg-zoop-ink text-caption font-bold text-zoop-paper"
             />
             <div className="min-w-0 flex-1">
               <Link
                 to={`/companies/${encoded}`}
-                className="block truncate text-[13px] font-bold text-zoop-ink hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
+                className="block truncate text-body font-bold text-zoop-ink hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
               >
                 {row.name}
               </Link>
-              <p className="mt-[3px] font-num text-[11px] text-zoop-muted">
+              <p className="mt-[3px] font-num text-caption text-zoop-muted">
                 {[
                   row.ticker,
                   row.issueCount === null
@@ -61,7 +61,7 @@ export default function StockList({
                 {pendingId === row.id && ' · 저장 중'}
               </p>
               {heldIds.has(row.id) && (
-                <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-zoop-muted">
+                <span className="mt-1 inline-flex items-center gap-1 text-caption font-semibold text-zoop-muted">
                   <GraphIcon name="holding" size={10} />
                   보유
                 </span>

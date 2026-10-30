@@ -46,7 +46,7 @@ const point = (id: string) =>
 function ExampleMap() {
   return (
     <figure className="relative m-0 overflow-hidden rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper">
-      <figcaption className="absolute top-3 left-3 rounded-full border-[0.667px] border-zoop-line bg-zoop-wash px-2 py-0.5 text-[11px] text-zoop-muted">
+      <figcaption className="absolute top-3 left-3 rounded-full border-[0.667px] border-zoop-line bg-zoop-wash px-2 py-0.5 text-caption text-zoop-muted">
         예시 화면
       </figcaption>
       <svg
@@ -98,7 +98,7 @@ function ExampleMap() {
               x={i.below ? i.x : i.x + 14}
               y={i.below ? i.y + 26 : i.y + 4}
               textAnchor={i.below ? 'middle' : 'start'}
-              className="fill-zoop-ink text-[11px] font-semibold"
+              className="fill-zoop-ink text-caption font-semibold"
             >
               {i.label}
             </text>
@@ -130,7 +130,7 @@ function ExampleMap() {
               x={c.x}
               y={c.y + 36}
               textAnchor="middle"
-              className="fill-zoop-muted text-[11px]"
+              className="fill-zoop-muted text-caption"
             >
               {c.holding ? `${c.label} · 보유` : c.label}
             </text>
@@ -145,26 +145,26 @@ export default function ServiceIntro() {
   return (
     <aside aria-labelledby="intro-title" className="flex flex-col gap-6">
       <div className="border-b-[0.667px] border-zoop-line pb-4">
-        <p className="text-[28px] font-[750] tracking-[-0.045em] text-zoop-ink font-heading">
+        <p className="text-display font-[750] tracking-[-0.045em] text-zoop-ink font-heading">
           ZOOP
         </p>
-        <p className="mt-1.5 text-xs text-zoop-muted">
+        <p className="mt-1.5 text-caption text-zoop-muted">
           내 종목 주변의 사건과 근거를 탐색해요
         </p>
       </div>
       <div>
-        <p className="text-[11px] font-semibold tracking-[0.02em] text-zoop-muted">
+        <p className="text-caption font-semibold tracking-[0.02em] text-zoop-muted">
           사건으로 읽는 종목 지도
         </p>
         <h2
           id="intro-title"
-          className="mt-2 text-[26px] leading-[1.3] font-[750] tracking-[-0.04em] text-zoop-ink lg:text-[32px]"
+          className="mt-2 text-display leading-[1.3] font-[750] tracking-[-0.04em] text-zoop-ink lg:text-display"
         >
           내 종목 주변에서 일어난 일을
           <br />
           하나의 그래프로 한눈에 봐요
         </h2>
-        <p className="mt-3 max-w-[520px] text-[13px] leading-[1.6] text-zoop-muted">
+        <p className="mt-3 max-w-[520px] text-body leading-[1.6] text-zoop-muted">
           공시와 기사에서 확인된 사건을 기업과 이어, 어떤 일이 어떤 근거로 내
           종목과 연결되는지 보여 줘요.
         </p>
@@ -178,10 +178,10 @@ export default function ServiceIntro() {
             <span className="grid size-7 place-items-center rounded-full bg-zoop-soft">
               <GraphIcon name={f.icon} size={14} />
             </span>
-            <strong className="text-[12px] font-bold text-zoop-ink">
+            <strong className="text-caption font-bold text-zoop-ink">
               {f.title}
             </strong>
-            <p className="text-[11px] leading-[1.55] text-zoop-muted">
+            <p className="text-caption leading-[1.55] text-zoop-muted">
               {f.text}
             </p>
           </li>

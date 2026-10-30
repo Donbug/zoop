@@ -76,9 +76,9 @@ export default function BriefingS3Impacts({
       aria-label="이슈별 S3 기업 영향"
       className="space-y-3 border-t border-zoop-line pt-4"
     >
-      <h4 className="text-sm font-bold">이 이슈의 기업별 영향</h4>
+      <h4 className="text-body font-bold">이 이슈의 기업별 영향</h4>
       {value?.reviewContext && (
-        <span className="inline-flex rounded border border-zoop-line px-2 py-1 text-[11px] text-zoop-muted">
+        <span className="inline-flex rounded border border-zoop-line px-2 py-1 text-caption text-zoop-muted">
           발행 후 추가 평가
         </span>
       )}
@@ -107,7 +107,7 @@ export default function BriefingS3Impacts({
               key={c.companyId}
               className="space-y-3 rounded border border-zoop-line p-3"
             >
-              <h5 className="text-sm font-semibold">{c.companyName}</h5>
+              <h5 className="text-body font-semibold">{c.companyName}</h5>
               {c.assessments.length === 0 && (
                 <p className={NOTE}>이 기업에 연결된 영향 평가가 없습니다.</p>
               )}
@@ -136,7 +136,7 @@ export default function BriefingS3Impacts({
                       aria-label="원문 발행 시각 점검"
                       className="space-y-2 rounded border border-zoop-line bg-zoop-wash p-3"
                     >
-                      <p className="text-xs font-semibold">
+                      <p className="text-caption font-semibold">
                         원문 발행 시각 확인 필요
                       </p>
                       <p className={BODY}>
@@ -161,7 +161,7 @@ export default function BriefingS3Impacts({
                         )}
                       </p>
                       <a
-                        className={`text-xs underline ${FOCUS_RING}`}
+                        className={`text-caption underline ${FOCUS_RING}`}
                         href={safeArticleUrl(
                           a.evidencePlan.research.timeCheck.distributionUrl,
                         )!}
@@ -177,7 +177,7 @@ export default function BriefingS3Impacts({
                       aria-label={`${c.companyName} 최신 재검증`}
                       className="space-y-3 rounded border border-zoop-line bg-zoop-wash p-3"
                     >
-                      <h6 className="text-sm font-semibold">
+                      <h6 className="text-body font-semibold">
                         <ImpactCue tone={a.supplementalReview.label} badge>
                           {labels[a.supplementalReview.label]} · 공식 근거 보강
                           후 재검증
@@ -190,7 +190,7 @@ export default function BriefingS3Impacts({
                         {briefingTime(a.supplementalReview.assessedAt)}
                       </p>
                       <p className={BODY}>{a.supplementalReview.summary}</p>
-                      <p className="text-xs font-semibold">확인된 사실</p>
+                      <p className="text-caption font-semibold">확인된 사실</p>
                       <ul className="list-disc space-y-2 pl-5">
                         {a.supplementalReview.confirmedFacts.map((f, index) => (
                           <li className={BODY} key={index}>
@@ -201,7 +201,7 @@ export default function BriefingS3Impacts({
                       <p className={NOTE}>{a.supplementalReview.limitations}</p>
                       <details>
                         <summary
-                          className={`min-h-11 cursor-pointer content-center text-xs underline ${FOCUS_RING}`}
+                          className={`min-h-11 cursor-pointer content-center text-caption underline ${FOCUS_RING}`}
                         >
                           재검증에 사용한 인용·출처{' '}
                           {a.supplementalReview.evidence.length}건
@@ -211,7 +211,7 @@ export default function BriefingS3Impacts({
                             className="space-y-2 border-t border-zoop-line py-3"
                             key={e.id}
                           >
-                            <p className="text-xs font-semibold">
+                            <p className="text-caption font-semibold">
                               <ImpactCue tone={e.effect}>
                                 {sides[e.effect]}
                               </ImpactCue>
@@ -226,7 +226,7 @@ export default function BriefingS3Impacts({
                                 href={safeArticleUrl(e.url)!}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className={`text-xs underline ${FOCUS_RING}`}
+                                className={`text-caption underline ${FOCUS_RING}`}
                               >
                                 {e.title} ↗
                               </a>
@@ -244,14 +244,14 @@ export default function BriefingS3Impacts({
                       aria-label={`${c.companyName} 확인된 사실`}
                       className="space-y-2"
                     >
-                      <h6 className="text-xs font-semibold">
+                      <h6 className="text-caption font-semibold">
                         원문에서 확인된 내용
                       </h6>
                       <p className={BODY}>{item.title}</p>
                       {a.facts!.map((f) => (
                         <details key={f.id}>
                           <summary
-                            className={`min-h-11 cursor-pointer content-center text-xs underline ${FOCUS_RING}`}
+                            className={`min-h-11 cursor-pointer content-center text-caption underline ${FOCUS_RING}`}
                           >
                             사실 근거 · {f.title}
                           </summary>
@@ -262,7 +262,7 @@ export default function BriefingS3Impacts({
                           </blockquote>
                           {safeArticleUrl(f.url) && (
                             <a
-                              className={`text-xs underline ${FOCUS_RING}`}
+                              className={`text-caption underline ${FOCUS_RING}`}
                               href={safeArticleUrl(f.url)!}
                               target="_blank"
                               rel="noopener noreferrer"
@@ -279,7 +279,7 @@ export default function BriefingS3Impacts({
                     <p className={NOTE}>{states[a.status]}</p>
                   ) : (
                     <>
-                      <p className="text-sm font-semibold">
+                      <p className="text-body font-semibold">
                         <ImpactCue tone={a.label!} badge>
                           {a.supplementalReview ? '이전 검증 기록 · ' : ''}
                           {c.assessments.length > 1 ? `평가 ${i + 1} · ` : ''}
@@ -294,13 +294,13 @@ export default function BriefingS3Impacts({
                       )}
                       <details open={!a.facts?.length}>
                         <summary
-                          className={`min-h-11 cursor-pointer content-center text-xs underline ${FOCUS_RING}`}
+                          className={`min-h-11 cursor-pointer content-center text-caption underline ${FOCUS_RING}`}
                         >
                           긍부정 검증 인용 {a.evidence.length}건
                         </summary>
                         {a.evidence.map((e) => (
                           <div key={e.id}>
-                            <p className="text-xs font-semibold">
+                            <p className="text-caption font-semibold">
                               <ImpactCue tone={e.effect}>
                                 {sides[e.effect]}
                               </ImpactCue>
@@ -312,7 +312,7 @@ export default function BriefingS3Impacts({
                             </blockquote>
                             {safeArticleUrl(e.url) && (
                               <a
-                                className={`text-xs underline ${FOCUS_RING}`}
+                                className={`text-caption underline ${FOCUS_RING}`}
                                 href={safeArticleUrl(e.url)!}
                                 target="_blank"
                                 rel="noopener noreferrer"
@@ -333,7 +333,7 @@ export default function BriefingS3Impacts({
                   {a.evidencePlan && (
                     <details className="space-y-3">
                       <summary
-                        className={`min-h-11 cursor-pointer content-center text-xs font-semibold underline ${FOCUS_RING}`}
+                        className={`min-h-11 cursor-pointer content-center text-caption font-semibold underline ${FOCUS_RING}`}
                       >
                         보강한 근거·추가로 확인할 자료
                       </summary>
@@ -349,7 +349,7 @@ export default function BriefingS3Impacts({
                             className="space-y-3 rounded border border-zoop-line bg-zoop-wash p-3"
                             aria-label="새로 확인한 공식 자료"
                           >
-                            <h6 className="text-xs font-semibold">
+                            <h6 className="text-caption font-semibold">
                               새로 연결한 공식 자료
                             </h6>
                             <p className={NOTE}>
@@ -369,7 +369,7 @@ export default function BriefingS3Impacts({
                                 <p className={NOTE}>{source.limitations}</p>
                                 <details>
                                   <summary
-                                    className={`min-h-11 cursor-pointer content-center text-xs underline ${FOCUS_RING}`}
+                                    className={`min-h-11 cursor-pointer content-center text-caption underline ${FOCUS_RING}`}
                                   >
                                     공식 출처 · {source.title}
                                   </summary>
@@ -379,7 +379,7 @@ export default function BriefingS3Impacts({
                                     {source.excerpt}
                                   </blockquote>
                                   <a
-                                    className={`text-xs underline ${FOCUS_RING}`}
+                                    className={`text-caption underline ${FOCUS_RING}`}
                                     href={safeArticleUrl(source.url)!}
                                     target="_blank"
                                     rel="noopener noreferrer"
@@ -400,7 +400,7 @@ export default function BriefingS3Impacts({
                             ))}
                           </section>
                         )}
-                      <h6 className="text-xs font-semibold">
+                      <h6 className="text-caption font-semibold">
                         기존 자료로 보강한 내용
                       </h6>
                       <ul className="space-y-3">
@@ -419,7 +419,7 @@ export default function BriefingS3Impacts({
                             </p>
                             <details>
                               <summary
-                                className={`min-h-11 cursor-pointer content-center text-xs underline ${FOCUS_RING}`}
+                                className={`min-h-11 cursor-pointer content-center text-caption underline ${FOCUS_RING}`}
                               >
                                 보강 원문 · {fact.source.title}
                               </summary>
@@ -430,7 +430,7 @@ export default function BriefingS3Impacts({
                               </blockquote>
                               {safeArticleUrl(fact.source.url) && (
                                 <a
-                                  className={`text-xs underline ${FOCUS_RING}`}
+                                  className={`text-caption underline ${FOCUS_RING}`}
                                   href={safeArticleUrl(fact.source.url)!}
                                   target="_blank"
                                   rel="noopener noreferrer"
@@ -445,7 +445,7 @@ export default function BriefingS3Impacts({
                           </li>
                         ))}
                       </ul>
-                      <h6 className="text-xs font-semibold">
+                      <h6 className="text-caption font-semibold">
                         추가 확인과 향후 추적
                       </h6>
                       <ul className="space-y-3">
@@ -500,7 +500,7 @@ export function BriefingS3Disclosure({
   return (
     <details onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary
-        className={`min-h-11 cursor-pointer content-center text-xs underline ${FOCUS_RING}`}
+        className={`min-h-11 cursor-pointer content-center text-caption underline ${FOCUS_RING}`}
       >
         기업별 영향·근거 보기
       </summary>

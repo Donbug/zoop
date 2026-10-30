@@ -8,7 +8,7 @@ export function ChangeRate({
   rate,
   change,
   currency,
-  className = 'mt-0.5 text-[11px]',
+  className = 'mt-0.5 text-caption',
 }: {
   rate: number | null;
   change?: number | null;
@@ -55,7 +55,7 @@ function Frame({ children, label }: { children: ReactNode; label?: string }) {
   );
 }
 
-const muted = 'text-[11px] text-zoop-muted';
+const muted = 'text-caption text-zoop-muted';
 
 // 종목 행의 최신 시세. 행마다 따로 조회하며, 시세가 없거나 실패해도 행은 그대로 쓸 수 있다.
 export default function StockQuote({ companyId }: { companyId: string }) {
@@ -86,7 +86,7 @@ export default function StockQuote({ companyId }: { companyId: string }) {
   const { price, currency, changeRate } = quote.data.quote;
   return (
     <Frame>
-      <strong className="text-[13px] font-bold text-zoop-ink tabular-nums">
+      <strong className="text-body font-bold text-zoop-ink tabular-nums">
         {formatMoney(price, currency)}
       </strong>
       {changeRate !== null && <ChangeRate rate={changeRate} />}

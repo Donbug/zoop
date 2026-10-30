@@ -17,13 +17,13 @@ export default function OnboardingStep({
             type="button"
             onClick={onBack}
             disabled={backDisabled}
-            className="self-start text-sm font-medium text-zoop-ink hover:text-zoop-ink disabled:cursor-not-allowed disabled:text-gray-300"
+            className="self-start text-body font-medium text-zoop-ink hover:text-zoop-ink disabled:cursor-not-allowed disabled:text-gray-300"
           >
             ← 이전 단계
           </button>
         )}
-        <h1 className="text-2xl font-bold text-zoop-ink">{title}</h1>
-        {subtitle && <p className="text-sm text-zoop-ink">{subtitle}</p>}
+        <h1 className="text-title font-bold text-zoop-ink">{title}</h1>
+        {subtitle && <p className="text-body text-zoop-ink">{subtitle}</p>}
       </div>
       {children}
       {footer && (

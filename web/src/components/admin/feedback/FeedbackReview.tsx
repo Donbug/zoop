@@ -31,8 +31,8 @@ import type { FeedbackPeriod, TranscriptFilter } from '@/types/admin/insights';
 import { formatKst } from '@/util/format';
 import { transcriptPath } from './transcriptPath';
 
-const INPUT = `h-10 rounded-full border border-transparent bg-zoop-soft px-4 text-xs text-zoop-ink focus:border-zoop-ink ${FOCUS_RING}`;
-const FIELD_LABEL = 'flex flex-col gap-1 text-[11px] text-zoop-muted';
+const INPUT = `h-10 rounded-full border border-transparent bg-zoop-soft px-4 text-caption text-zoop-ink focus:border-zoop-ink ${FOCUS_RING}`;
+const FIELD_LABEL = 'flex flex-col gap-1 text-caption text-zoop-muted';
 
 /** 지금 적용된 기간을 한 줄로: 직접 고른 날짜가 있으면 그것, 아니면 미리 정한 기간 */
 function periodText({ window, start, end }: FeedbackPeriod) {
@@ -126,7 +126,7 @@ export function DateRangeForm({
         </button>
       )}
       {invalid && (
-        <p role="alert" className="basis-full text-[11px] text-zoop-alert">
+        <p role="alert" className="basis-full text-caption text-zoop-alert">
           시작일이 종료일보다 늦어요.
         </p>
       )}
@@ -199,11 +199,11 @@ export function FeedbackSummaryPanel({ period }: { period: FeedbackPeriod }) {
                 </td>
                 <td className={`${TD} text-right`}>
                   {feature.total === 0 ? (
-                    <span className="text-[11px] text-zoop-muted">
+                    <span className="text-caption text-zoop-muted">
                       평가 없음
                     </span>
                   ) : feature.rate === null ? (
-                    <span className="text-[11px] text-zoop-muted">
+                    <span className="text-caption text-zoop-muted">
                       표본 부족({count(feature.total)}/{data.minSample})
                     </span>
                   ) : (
@@ -233,7 +233,7 @@ export function FeedbackSummaryPanel({ period }: { period: FeedbackPeriod }) {
                 {data.features.map((feature) => (
                   <th key={feature.feature} className={`${TH} text-right`}>
                     {feature.label}
-                    <span className="block text-[11px] font-normal">
+                    <span className="block text-caption font-normal">
                       좋아요 / 싫어요(비율)
                     </span>
                   </th>
@@ -394,7 +394,7 @@ export function PurposeForm({
         {purpose ? '목적 바꾸기' : '대화록 열기'}
       </button>
       {missing && (
-        <p role="alert" className="basis-full text-[11px] text-zoop-alert">
+        <p role="alert" className="basis-full text-caption text-zoop-alert">
           열람 목적을 입력해 주세요.
         </p>
       )}

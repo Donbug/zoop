@@ -114,18 +114,18 @@ export default function WatchlistSection({
       className="rounded-xl border border-gray-200 bg-white p-5"
     >
       <div className="mb-3 flex items-center gap-2">
-        <h2 id="my-watchlist" className="flex-1 text-lg font-semibold">
+        <h2 id="my-watchlist" className="flex-1 text-title-sm font-semibold">
           관심 종목
         </h2>
         {settings.status === 'success' && (
-          <span className="text-sm text-zoop-ink tabular-nums">
+          <span className="text-body text-zoop-ink tabular-nums">
             {shownIds.length}개{pending && ' · 저장 중'}
           </span>
         )}
       </div>
 
       {settings.status === 'loading' && (
-        <p role="status" className="text-sm text-zoop-ink">
+        <p role="status" className="text-body text-zoop-ink">
           관심 종목을 불러오고 있어요
         </p>
       )}
@@ -138,7 +138,7 @@ export default function WatchlistSection({
 
       {settings.status === 'success' &&
         (shownIds.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-gray-300 px-4 py-3 text-sm text-zoop-ink">
+          <p className="rounded-xl border border-dashed border-gray-300 px-4 py-3 text-body text-zoop-ink">
             아직 관심 종목이 없어요. 아래에서 기업을 검색해 추가하면 내 종목
             지도에 함께 보여요.
           </p>
@@ -164,7 +164,7 @@ export default function WatchlistSection({
               if (!brief) {
                 return (
                   <li key={id} className="flex items-center gap-2 py-3">
-                    <p className="flex-1 text-sm text-zoop-ink">
+                    <p className="flex-1 text-body text-zoop-ink">
                       {entry?.status === 'error'
                         ? '종목 정보를 불러오지 못했어요.'
                         : '종목 정보를 불러오고 있어요'}
@@ -174,7 +174,7 @@ export default function WatchlistSection({
                         type="button"
                         aria-label="종목 정보 다시 불러오기"
                         onClick={() => retryBrief(id)}
-                        className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-zoop-ink hover:bg-gray-50"
+                        className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-body font-medium text-zoop-ink hover:bg-gray-50"
                       >
                         다시 시도
                       </button>
@@ -214,7 +214,7 @@ export default function WatchlistSection({
 
       {settings.status === 'success' && (
         <div className="mt-5 flex flex-col gap-3">
-          <h3 className="text-base font-semibold">관심 종목 추가</h3>
+          <h3 className="text-lead font-semibold">관심 종목 추가</h3>
           <CompanySearch
             label="관심 종목 추가"
             terms={terms}
@@ -228,7 +228,7 @@ export default function WatchlistSection({
           {portfolio.status === 'success' &&
             heldIds.length === 0 &&
             shownIds.length === 0 && (
-              <p className="text-sm text-zoop-ink">
+              <p className="text-body text-zoop-ink">
                 보유·관심이 모두 없으면 지도는 시장 전체로 열려요.
               </p>
             )}
@@ -238,7 +238,7 @@ export default function WatchlistSection({
       {failed && (
         <div
           role="alert"
-          className="fixed inset-x-4 bottom-20 z-[60] flex items-center gap-3 rounded-xl bg-gray-950 py-2 pr-2 pl-4 text-sm text-white shadow-lg md:inset-x-auto md:right-6 md:bottom-6 md:w-96"
+          className="fixed inset-x-4 bottom-20 z-[60] flex items-center gap-3 rounded-xl bg-gray-950 py-2 pr-2 pl-4 text-body text-white shadow-lg md:inset-x-auto md:right-6 md:bottom-6 md:w-96"
         >
           <p className="min-w-0 flex-1">
             관심 종목을 저장하지 못했어요. 목록을 이전 상태로 되돌렸어요.
