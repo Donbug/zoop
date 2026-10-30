@@ -161,12 +161,16 @@ const READING_KEYS = new Set([
 const appliedKey = (key: string) => READING_KEYS.has(key);
 
 /**
- * Carry the label styles the reading pass applied, and G6's own zIndex, into
- * new graph data. Without them setData sees every element as changed and
- * redraws all of them, then the reading pass redraws them again.
+ * Carry the label styles the reading pass applied into new graph data, and fill
+ * keys the new data leaves out (G6's zIndex, sourceNode/targetNode, ...) from the
+ * model. G6 updateData keeps omitted keys anyway, but its diff counts them as
+ * changes: setData would redraw every element, then the reading pass again.
  */
 export function keepAppliedStyles(graph: Graph, data: GraphData): GraphData {
-  if (typeof graph.getNodeData !== 'function' || !appliedLabels.has(graph))
+  if (
+    typeof graph.getNodeData !== 'function' ||
+    typeof graph.getEdgeData !== 'function'
+  )
     return data;
   const current = new Map(
     [...graph.getNodeData(), ...graph.getEdgeData()].map((item) => [
@@ -181,8 +185,7 @@ export function keepAppliedStyles(graph: Graph, data: GraphData): GraphData {
     if (!model) return item;
     const style: Record<string, unknown> = { ...item.style };
     for (const [key, value] of Object.entries(model))
-      if (appliedKey(key) || (key === 'zIndex' && !(key in style)))
-        style[key] = value;
+      if (appliedKey(key) || !(key in style)) style[key] = value;
     return { ...item, style };
   };
   return {
