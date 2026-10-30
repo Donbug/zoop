@@ -76,9 +76,9 @@ public interface GraphRoundRepository {
     long openCount();
 
     /**
-     * The newest slot whose import committed: at {@code imported}, or any row with its version linked ({@link #link} committed
-     * with the version; the stage change after it was lost, or a later attempt of that round failed). An older slot is never
-     * imported after it.
+     * The newest slot whose import committed: at {@code imported}, or any row whose {@code versionCommittedAt} is set
+     * ({@link #link} committed with the version; the stage change after it was lost, a later attempt failed, or a retry dropped
+     * the link since). An older slot is never imported after it.
      */
     Optional<GraphRound> newestImported();
 }

@@ -26,7 +26,8 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
     static final int MAX_DETAIL_BYTES = 8 * 1024;
     private static final String COLUMNS = """
             round_id, slot_at, stage, plan_id, plan_digest, analysis_job_id, handoff_id, manifest_digest, bundle_digest,
-            graph_version_id, activated_version_id, activation_note, failure_code, attempts, next_attempt_at,
+            graph_version_id, version_committed_at, activated_version_id, activation_note, failure_code, attempts,
+            next_attempt_at,
             lease_owner, lease_until, lease_token, started_by, created_at, updated_at
             """;
     private static final String SELECT = "SELECT " + COLUMNS + " FROM graph_rounds ";
@@ -127,6 +128,7 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
                         manifest_digest = COALESCE(:manifestDigest, manifest_digest),
                         bundle_digest = COALESCE(:bundleDigest, bundle_digest),
                         graph_version_id = CASE WHEN :clearVersion THEN NULL ELSE COALESCE(:versionId, graph_version_id) END,
+                        version_committed_at = COALESCE(version_committed_at, CAST(:committedAt AS timestamptz)),
                         failure_code = :failureCode,
                         attempts = CASE WHEN :reset THEN 0 ELSE attempts END + CASE WHEN :count THEN 1 ELSE 0 END,
                         next_attempt_at = CASE WHEN :clearNext THEN NULL ELSE COALESCE(:nextAt, next_attempt_at) END,
@@ -142,6 +144,7 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
                     .addValue("jobId", patch.analysisJobId()).addValue("handoffId", patch.handoffId())
                     .addValue("manifestDigest", patch.manifestDigest()).addValue("bundleDigest", patch.bundleDigest())
                     .addValue("versionId", patch.graphVersionId()).addValue("clearVersion", patch.clearGraphVersion())
+                    .addValue("committedAt", stamp(patch.graphVersionId() == null ? null : at))
                     .addValue("failureCode", patch.failureCode())
                     .addValue("reset", patch.resetAttempts()).addValue("count", patch.countAttempt())
                     .addValue("clearNext", patch.clearNextAttempt()).addValue("nextAt", stamp(patch.nextAttemptAt()))
@@ -160,7 +163,10 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
         });
     }
 
-    /** Runs in the caller's transaction (no template of its own): the import's, so the link commits with the version. */
+    /**
+     * Runs in the caller's transaction (no template of its own): the import's, so the link commits with the version. The
+     * commit record ({@code version_committed_at}) is set with the first link of the slot and kept by every later one.
+     */
     @Override
     public boolean link(GraphRound expected, String graphVersionId, Instant at) {
         long token = token(expected);
@@ -168,7 +174,8 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
             throw new IllegalStateException("link must run inside the import transaction");
         }
         return jdbc.update("""
-                UPDATE graph_rounds SET graph_version_id = :versionId, updated_at = :at
+                UPDATE graph_rounds SET graph_version_id = :versionId,
+                    version_committed_at = COALESCE(version_committed_at, :at), updated_at = :at
                 WHERE round_id = :id AND stage = :expectedStage AND lease_token = :token
                 """, new MapSqlParameterSource("id", expected.roundId()).addValue("versionId", graphVersionId)
                 .addValue("expectedStage", expected.stage().wire()).addValue("token", token).addValue("at", stamp(at))) == 1;
@@ -219,7 +226,8 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
 
     @Override
     public Optional<GraphRound> newestImported() {
-        return first(jdbc.query(SELECT + "WHERE stage = 'imported' OR graph_version_id IS NOT NULL ORDER BY slot_at DESC LIMIT 1",
+        return first(jdbc.query(SELECT
+                + "WHERE stage = 'imported' OR version_committed_at IS NOT NULL ORDER BY slot_at DESC LIMIT 1",
                 new MapSqlParameterSource(), JdbcGraphRoundRepository::round));
     }
 
@@ -229,7 +237,8 @@ public class JdbcGraphRoundRepository implements GraphRoundRepository {
         return new GraphRound(rs.getString("round_id"), rs.getTimestamp("slot_at").toInstant(),
                 GraphRoundStage.parse(rs.getString("stage")), text(rs, "plan_id"), text(rs, "plan_digest"),
                 text(rs, "analysis_job_id"), text(rs, "handoff_id"), text(rs, "manifest_digest"), text(rs, "bundle_digest"),
-                text(rs, "graph_version_id"), text(rs, "activated_version_id"), text(rs, "activation_note"),
+                text(rs, "graph_version_id"), instant(rs, "version_committed_at"), text(rs, "activated_version_id"),
+                text(rs, "activation_note"),
                 text(rs, "failure_code"), rs.getInt("attempts"), instant(rs, "next_attempt_at"),
                 leaseOwner == null ? Optional.empty()
                         : Optional.of(new Lease(leaseOwner, leaseUntil.toInstant(), rs.getLong("lease_token"))),

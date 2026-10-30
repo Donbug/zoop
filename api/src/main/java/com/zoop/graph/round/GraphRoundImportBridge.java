@@ -34,8 +34,11 @@ import tools.jackson.databind.node.ObjectNode;
  * <li>an older slot than the newest round whose import committed, with no committed import of its own → {@code skipped}
  *     ({@code skipped_superseded}): the
  *     auto-activation picks by commit order, so a late import of an older round must never become public after a newer one.
- *     The guard reads {@link GraphRoundRepository#newestImported()} (stage {@code imported}, or a version linked in the import
- *     transaction), never the stage alone. The check and the import happen under one database-wide
+ *     The guard reads {@link GraphRoundRepository#newestImported()} (stage {@code imported}, or a version committed in the
+ *     import transaction: {@code versionCommittedAt}, which no retry clears), never the stage alone. A retry that keeps the
+ *     pins keeps the link too, so such a round completes as {@code unchanged}; a retry that froze again dropped the link, and
+ *     its new handoff is skipped like any older slot's (the version its earlier import made stays registered; the skip's
+ *     detail carries {@code versionCommittedAt} then). The check and the import happen under one database-wide
  *     {@link GraphRoundImportLock}, so no other instance can import in between; when the lock is held elsewhere the round
  *     waits like for a busy store. What the skipped round's bundle held is covered only under a cumulative bundle contract
  *     (AI side, #407 clause 2, not fixed yet): until then a skip is a round whose content was not imported.</li>
@@ -132,6 +135,7 @@ public final class GraphRoundImportBridge {
             log.info("graph round {} skipped: round {} was imported already", roundId, newest.get().roundId());
             ObjectNode detail = nodes.objectNode();
             detail.put("supersededBy", newest.get().roundId());
+            round.versionCommittedAt().ifPresent(at -> detail.put("versionCommittedAt", at.toString()));
             return record(round, GraphRoundPatch.advanceTo(GraphRoundStage.SKIPPED), Outcome.SKIPPED, SKIPPED_SUPERSEDED, detail,
                     clock.instant());
         }

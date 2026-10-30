@@ -29,6 +29,7 @@ import com.zoop.graph.round.GraphRoundEvent;
 import com.zoop.graph.round.GraphRoundEvent.Outcome;
 import com.zoop.graph.round.GraphRoundImportBridge;
 import com.zoop.graph.round.GraphRoundImportLock;
+import com.zoop.graph.round.GraphRoundPatch;
 import com.zoop.graph.round.GraphRoundStage;
 import com.zoop.graph.round.InMemoryGraphRoundRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -178,6 +179,48 @@ class GraphRoundImportBridgeTest {
         assertEquals(GraphRoundStage.IMPORTED, completed.stage());
         assertEquals(Optional.of(built.versionId()), completed.graphVersionId());
         assertEquals(Optional.of("unchanged"), rounds.events(ROUND_2).get(1).code());
+        assertEquals(versions, graph.state().versions().size(), "no second version");
+    }
+
+    /**
+     * The newest round's version committed, the stage change was lost, the recovery attempt failed and the round was retried.
+     * A retry that keeps the pins (resumes at handoff_ready) keeps the link; a retry that freezes again (resumes before it)
+     * drops the link but never the record that the slot's import committed. So an older round is still skipped without being
+     * read, and the retried round completes with the same pins as unchanged, still one version.
+     */
+    @Test
+    void aRetryAfterTheNewestRoundsImportCommittedStillSupersedesOlderRounds() {
+        bridge(20).importRound(ready(ROUND_2, SLOT_2, 0));
+        int versions = graph.state().versions().size();
+        rounds.seed(ROUND_2, SLOT_2, GraphRoundStage.HANDOFF_READY, built.spec().handoffId(), built.manifestDigest(),
+                built.bundleDigest(), built.versionId(), 0);
+        rounds.advance(claim(ROUND_2), GraphRoundPatch.fail("import:database_unavailable"), Outcome.FAILED,
+                "import:database_unavailable", null, null, NOW).orElseThrow();
+        GraphRound samePins = rounds.advance(claim(ROUND_2), GraphRoundPatch.retryAt(GraphRoundStage.HANDOFF_READY),
+                Outcome.RETRIED, null, null, null, NOW).orElseThrow();
+        assertEquals(Optional.of(built.versionId()), samePins.graphVersionId(), "a retry at handoff_ready keeps the link");
+        rounds.advance(claim(ROUND_2), GraphRoundPatch.fail("import:database_unavailable"), Outcome.FAILED,
+                "import:database_unavailable", null, null, NOW).orElseThrow();
+        GraphRound refrozen = rounds.advance(claim(ROUND_2), GraphRoundPatch.retryAt(GraphRoundStage.FREEZE_REQUESTED),
+                Outcome.RETRIED, null, null, null, NOW).orElseThrow();
+        assertTrue(refrozen.graphVersionId().isEmpty(), "a retry that freezes again drops the link");
+        assertTrue(refrozen.versionCommittedAt().isPresent(), "the commit record stays");
+        assertEquals(Optional.of(ROUND_2), rounds.newestImported().map(GraphRound::roundId));
+        reads.bundleCalls.set(0);
+
+        GraphRound skipped = bridge(20).importRound(ready(ROUND_1, SLOT_1, 0));
+        assertEquals(GraphRoundStage.SKIPPED, skipped.stage());
+        assertEquals(ROUND_2, rounds.events(ROUND_1).get(0).detail().orElseThrow().get("supersededBy").stringValue());
+        assertEquals(0, reads.bundleCalls.get(), "the older round's bundle is never read");
+
+        // The new freeze produced the same pins: unchanged, the link is written again, no second version.
+        rounds.advance(refrozen, GraphRoundPatch.advanceTo(GraphRoundStage.HANDOFF_READY).handoff(built.spec().handoffId(),
+                built.manifestDigest(), built.bundleDigest()), Outcome.ADVANCED, null, null, null, NOW).orElseThrow();
+        GraphRound completed = bridge(20).importRound(claim(ROUND_2));
+        assertEquals(GraphRoundStage.IMPORTED, completed.stage());
+        assertEquals(Optional.of(built.versionId()), completed.graphVersionId());
+        assertEquals(refrozen.versionCommittedAt(), completed.versionCommittedAt());
+        assertEquals(Optional.of("unchanged"), rounds.events(ROUND_2).get(6).code());
         assertEquals(versions, graph.state().versions().size(), "no second version");
     }
 

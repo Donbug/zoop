@@ -207,6 +207,7 @@ class GraphRoundRepositoryPostgresTest {
         transaction.executeWithoutResult(status -> assertTrue(rounds.link(newest, versionId, NOW.plusSeconds(4))));
         GraphRound linked = rounds.find(ROUND_2).orElseThrow();
         assertEquals(Optional.of(versionId), linked.graphVersionId());
+        assertEquals(Optional.of(NOW.plusSeconds(4)), linked.versionCommittedAt(), "the commit record is set with the link");
         assertEquals(GraphRoundStage.HANDOFF_READY, linked.stage());
         assertEquals(Optional.of(ROUND_2), rounds.newestImported().map(GraphRound::roundId));
         // Fenced: another holder's lease, or a stale stage, and nothing is written.
@@ -221,6 +222,7 @@ class GraphRoundRepositoryPostgresTest {
         assertEquals(GraphRoundStage.IMPORTED, imported.stage());
         assertTrue(imported.lease().isEmpty());
         assertEquals(Optional.of(versionId), imported.graphVersionId());
+        assertEquals(Optional.of(NOW.plusSeconds(4)), imported.versionCommittedAt(), "the first commit's instant is kept");
         // The version a round made is written once; a finished round is never reopened.
         assertThrows(DataAccessException.class,
                 () -> jdbc.update("UPDATE graph_rounds SET graph_version_id = 'other' WHERE round_id = ?", ROUND_2));
@@ -253,15 +255,27 @@ class GraphRoundRepositoryPostgresTest {
                 null, null, null, "code", null, true, false, true, false));
         assertThrows(IllegalArgumentException.class, () -> GraphRoundPatch.retryAt(GraphRoundStage.IMPORTED));
         assertThrows(IllegalArgumentException.class, () -> GraphRoundPatch.retryAt(GraphRoundStage.SCHEDULED).graphVersion("v"));
+        assertFalse(GraphRoundPatch.retryAt(GraphRoundStage.HANDOFF_READY).clearGraphVersion(), "same pins: the link is kept");
+        assertTrue(GraphRoundPatch.retryAt(GraphRoundStage.FREEZE_REQUESTED).clearGraphVersion(), "a new freeze: the link goes");
 
         // A retry resumes under the same round id (a failed round can be claimed again): the failure code is cleared with the
-        // stage, and so is the linked version (the one way the column changes; the guard refuses value-to-value changes).
+        // stage, and so is the linked version when the retry freezes again (the one way the column changes; the guard refuses
+        // value-to-value changes). The record that this slot's import committed is not: the order guard still counts the slot,
+        // so an older slot is still refused after it, and the column itself is written once.
         GraphRound retried = advanced(claimed(ROUND_1, "task-a"), GraphRoundPatch.retryAt(GraphRoundStage.SCHEDULED),
                 Outcome.RETRIED, null, null, null, NOW.plusSeconds(6));
         assertTrue(retried.failureCode().isEmpty());
         assertTrue(retried.open());
         assertTrue(retried.graphVersionId().isEmpty());
-        assertTrue(rounds.newestImported().isEmpty());
+        assertEquals(Optional.of(NOW.plusSeconds(4)), retried.versionCommittedAt());
+        assertEquals(Optional.of(ROUND_1), rounds.newestImported().map(GraphRound::roundId), "a retry keeps the commit record");
+        assertThrows(DataAccessException.class,
+                () -> jdbc.update("UPDATE graph_rounds SET version_committed_at = NULL WHERE round_id = ?", ROUND_1));
+        assertThrows(DataAccessException.class,
+                () -> jdbc.update("UPDATE graph_rounds SET version_committed_at = now() WHERE round_id = ?", ROUND_1));
+        assertThrows(DataAccessException.class, () -> jdbc.update(
+                "UPDATE graph_rounds SET graph_version_id = ?, version_committed_at = NULL WHERE round_id = ?", versionId, ROUND_2),
+                "a link without its commit record is refused by the CHECK");
 
         GraphRound imported = advanced(claimed(ROUND_2, "task-a"), GraphRoundPatch.advanceTo(GraphRoundStage.IMPORTED)
                 .handoff("round-20261030T0935", DIGEST, DIGEST), Outcome.ADVANCED, null, null, null, NOW.plusSeconds(7));

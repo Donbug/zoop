@@ -9,9 +9,11 @@ import java.util.Objects;
  *
  * @param countAttempt  one more attempt at the (new) stage
  * @param resetAttempts the stage changed: attempts start again at 0 (or 1 with {@code countAttempt})
- * @param clearGraphVersion a retry: the version the round linked is forgotten (the version row stays; the retried import links
- *                      its own). The only way the column goes from one value to another, since the row guard refuses a change
- *                      between two values
+ * @param clearGraphVersion a retry that freezes again: the version the round linked is forgotten (the version row stays; the
+ *                      retried import links its own). The only way the column goes from one value to another, since the row
+ *                      guard refuses a change between two values. A retry that keeps the pins (resumes at
+ *                      {@code handoff_ready}) keeps the link. The record that a version of the slot committed
+ *                      ({@code versionCommittedAt}) is never cleared: the import order guard still counts the slot
  */
 public record GraphRoundPatch(GraphRoundStage stage, String planId, String planDigest, String analysisJobId, String handoffId,
         String manifestDigest, String bundleDigest, String graphVersionId, String failureCode, Instant nextAttemptAt,
@@ -32,9 +34,15 @@ public record GraphRoundPatch(GraphRoundStage stage, String planId, String planD
         return new GraphRoundPatch(stage, null, null, null, null, null, null, null, null, null, true, false, true, false);
     }
 
-    /** A retry: the row resumes at the open {@code stage}, attempts start again, and the version it had linked is forgotten. */
+    /**
+     * A retry: the row resumes at the open {@code stage} and attempts start again. Resuming before {@code handoff_ready} means
+     * a new freeze, whose handoff may differ, so the version the round had linked is forgotten; resuming at
+     * {@code handoff_ready} keeps the pins and the link (the import answers {@code unchanged} for them).
+     */
     public static GraphRoundPatch retryAt(GraphRoundStage stage) {
-        return new GraphRoundPatch(stage, null, null, null, null, null, null, null, null, null, true, false, true, true);
+        if (stage.terminal()) throw new IllegalArgumentException("a retry resumes at an open stage");
+        boolean refreeze = stage.compareTo(GraphRoundStage.HANDOFF_READY) < 0;
+        return new GraphRoundPatch(stage, null, null, null, null, null, null, null, null, null, true, false, true, refreeze);
     }
 
     /** The row stays at {@code stage} and one more attempt is counted; the next attempt is at {@code nextAttemptAt}. */

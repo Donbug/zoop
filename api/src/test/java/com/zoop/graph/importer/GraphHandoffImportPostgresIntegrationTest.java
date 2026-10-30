@@ -875,6 +875,24 @@ class GraphHandoffImportPostgresIntegrationTest {
         assertEquals(versionsBefore + 1, count("SELECT count(*) FROM graph_versions"));
         assertEquals(Optional.of("round-20261030T0935"), rounds.newestImported().map(GraphRound::roundId));
 
+        // The recovery attempt fails and the round is retried with a new freeze: the retry drops the link, not the record that
+        // the slot's import committed, so the order guard still sees the slot. (A retry at handoff_ready would keep the link.)
+        GraphRound failedAttempt = rounds.advance(rounds.claim("round-20261030T0935", "task-b", lease, now).orElseThrow(),
+                GraphRoundPatch.fail("import:database_unavailable"), GraphRoundEvent.Outcome.FAILED,
+                "import:database_unavailable", null, null, now).orElseThrow();
+        assertEquals(Optional.of(built.versionId()), failedAttempt.graphVersionId());
+        GraphRound retried = rounds.advance(rounds.claim("round-20261030T0935", "task-b", lease, now).orElseThrow(),
+                GraphRoundPatch.retryAt(GraphRoundStage.FREEZE_REQUESTED), GraphRoundEvent.Outcome.RETRIED, null, null, null,
+                now).orElseThrow();
+        assertTrue(retried.graphVersionId().isEmpty());
+        assertEquals(linked.versionCommittedAt(), retried.versionCommittedAt());
+        assertEquals(Optional.of("round-20261030T0935"), rounds.newestImported().map(GraphRound::roundId),
+                "a retry keeps the commit record");
+        // The new freeze gave the same pins.
+        rounds.advance(retried, GraphRoundPatch.advanceTo(GraphRoundStage.HANDOFF_READY).handoff(handoffId,
+                built.manifestDigest(), built.bundleDigest()), GraphRoundEvent.Outcome.ADVANCED, null, null, null, now)
+                .orElseThrow();
+
         // The older round retried now: skipped before anything is read, no new version.
         GraphRound skipped = bridge.importRound(older);
         assertEquals(GraphRoundStage.SKIPPED, skipped.stage());
@@ -883,10 +901,12 @@ class GraphHandoffImportPostgresIntegrationTest {
         assertEquals("round-20261030T0935", events.get(events.size() - 1).detail().orElseThrow().get("supersededBy").stringValue());
         assertEquals(versionsBefore + 1, count("SELECT count(*) FROM graph_versions"));
 
-        // The newest round's next attempt: the same pins are unchanged, the stage change completes, still one version.
+        // The newest round's next attempt: the same pins are unchanged, the stage change completes, still one version; the
+        // link is written again and the commit record keeps its first instant.
         GraphRound completed = bridge.importRound(rounds.claim("round-20261030T0935", "task-b", lease, now).orElseThrow());
         assertEquals(GraphRoundStage.IMPORTED, completed.stage());
         assertEquals(Optional.of(built.versionId()), completed.graphVersionId());
+        assertEquals(linked.versionCommittedAt(), completed.versionCommittedAt());
         assertTrue(completed.lease().isEmpty());
         List<GraphRoundEvent> newestEvents = rounds.events("round-20261030T0935");
         assertEquals("unchanged", newestEvents.get(newestEvents.size() - 1).code().orElseThrow());
