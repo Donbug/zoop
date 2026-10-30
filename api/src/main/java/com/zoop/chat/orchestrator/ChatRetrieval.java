@@ -5,6 +5,7 @@ import com.zoop.chat.executor.ChatRun;
 import com.zoop.chat.executor.ChatRunControl;
 import com.zoop.chat.orchestrator.ChatPlan.Mode;
 import com.zoop.chat.orchestrator.ChatPlan.Planned;
+import com.zoop.chat.tool.ChatBriefingRound;
 import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolRequest;
@@ -149,7 +150,8 @@ final class ChatRetrieval {
                     // The member's narrowed evidence selection bounds the reads of the requirement's own targets, never
                     // the fixed ZOOP documents, which it is not about.
                     boolean fixed = !capability.documents().isEmpty();
-                    var read = fixed ? capability.documents() : targets;
+                    var read = fixed ? capability.documents()
+                            : capability == ChatCapability.BRIEFING_READ ? briefingTargets(run, p, targets) : targets;
                     List<String> scope = fixed ? null : p.evidenceScope();
                     Instant since = capability == ChatCapability.GRAPH_VERSION_DIFF ? since(run, p).orElse(null) : null;
                     for (List<String> chunk : batches(capability, read)) {
@@ -206,6 +208,20 @@ final class ChatRetrieval {
         if (written.isPresent() || run.context().period() == null) return written;
         var selected = run.context().period();
         return Optional.of(new ChatPeriods.Period(LocalDate.parse(selected.start()), LocalDate.parse(selected.end()), null));
+    }
+
+    /**
+     * A briefing read's targets: the round the requirement's words name ({@link ChatBriefingRound#ref}, from its own day or
+     * edition, else the latest), then the companies it names, to keep only their issues.
+     */
+    static List<String> briefingTargets(ChatRun run, Planned p, List<String> targets) {
+        LocalDate today = LocalDate.ofInstant(run.askedAt(), ChatPeriods.KST);
+        var day = ChatPeriods.parse(p.label(), run.askedAt()).filter(d -> d.start().equals(d.end())).map(d -> d.start());
+        List<String> read = new ArrayList<>();
+        read.add(ChatBriefingRound.ref(p.label(), day.orElse(null), today));
+        targets.stream().filter(t -> ChatPlanner.companyId(t) && !ChatBriefingRound.isRef(t))
+                .limit(ChatToolRequest.MAX_TARGETS - 1).forEach(read::add);
+        return List.copyOf(read);
     }
 
     private static Optional<Instant> since(ChatRun run, Planned p) {

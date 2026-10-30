@@ -6,6 +6,7 @@ import com.zoop.chat.service.ChatZoopDocs;
 import com.zoop.chat.tool.ChatToolItem;
 import com.zoop.chat.tool.ChatToolOutput;
 import com.zoop.chat.tool.ChatToolPath;
+import com.zoop.chat.tool.ChatWebResult;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -20,18 +21,25 @@ import java.util.function.Predicate;
  * and every path step (ids, relation type and role, no names) are ZOOP's graph's ({@link #GRAPH_SOURCE_ID}), a ZOOP document
  * title ZOOP's documents', and evidence (an evidence item's label is its article's title) the source of its record
  * ({@link ChatMcpSources}). A relation's label is composite, the names of both ends (companies among them) and the
- * relation, so it needs every source it is made of: the graph's and the catalog's. An item of any other kind is withheld.
+ * relation, so it needs every source it is made of: the graph's and the catalog's. A web hit (and its {@code web_result}
+ * item) needs the grant of its provider, {@code web-search:<provider>} (web search design 5). An item of any other kind is
+ * withheld.
  */
 public final class ChatMcpSendGate {
     /** The chat grant registry's source id of ZOOP's public graph data: issue titles, relations and path steps. */
     public static final String GRAPH_SOURCE_ID = "zoop-graph";
 
+    /** The chat grant registry's source id of a web search provider's hits. */
+    public static String webSource(String provider) {
+        return "web-search:" + provider;
+    }
+
     /** What was left out of a result, by part; all zero when nothing was. */
-    public record Withheld(int items, int evidenceIds, int paths) {
-        static final Withheld NONE = new Withheld(0, 0, 0);
+    public record Withheld(int items, int evidenceIds, int paths, int webResults) {
+        static final Withheld NONE = new Withheld(0, 0, 0, 0);
 
         public boolean any() {
-            return items + evidenceIds + paths > 0;
+            return items + evidenceIds + paths + webResults > 0;
         }
     }
 
@@ -68,6 +76,9 @@ public final class ChatMcpSendGate {
         }
         boolean graph = sendable.test(GRAPH_SOURCE_ID);
         boolean catalog = sendable.test(ChatCompanyProfiles.SOURCE_ID);
+        List<ChatWebResult> web = output.webResults().stream().filter(h -> sendable.test(webSource(h.provider()))).toList();
+        Set<String> webIds = new LinkedHashSet<>();
+        web.forEach(h -> webIds.add(h.id()));
 
         List<ChatToolItem> items = new ArrayList<>();
         for (ChatToolItem item : output.items()) {
@@ -78,6 +89,7 @@ public final class ChatMcpSendGate {
                 case "edge" -> graph && catalog;
                 case "zoop_doc" -> sendable.test(ChatZoopDocs.SOURCE_ID);
                 case "evidence" -> allowed.contains(item.id());
+                case "web_result" -> webIds.contains(item.id());
                 default -> false;
             };
             if (itemAllowed) {
@@ -96,9 +108,10 @@ public final class ChatMcpSendGate {
         }
         List<String> passedEvidence = output.evidenceIds().stream().filter(allowed::contains).toList();
         var withheld = new Withheld(output.items().size() - items.size(),
-                (int) evidence.stream().filter(id -> !allowed.contains(id)).count(), output.paths().size() - paths.size());
+                (int) evidence.stream().filter(id -> !allowed.contains(id)).count(), output.paths().size() - paths.size(),
+                output.webResults().size() - web.size());
         if (!withheld.any()) return new Passed(output, Withheld.NONE);
         return new Passed(new ChatToolOutput(output.dataVersion(), items, passedEvidence, output.truncated(),
-                output.nextAllowed(), paths), withheld);
+                output.nextAllowed(), paths, web), withheld);
     }
 }

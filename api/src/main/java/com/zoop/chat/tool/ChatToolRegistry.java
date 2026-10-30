@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class ChatToolRegistry {
     /** Changes whenever a binding or a tool's input or output meaning changes. */
-    public static final String VERSION = "chat-tools/v6";
+    public static final String VERSION = "chat-tools/v7";
     /** The common request and result envelope. */
     public static final String SCHEMA_VERSION = "chat-tool/v1";
 
@@ -41,9 +41,9 @@ public class ChatToolRegistry {
     }
 
     /**
-     * The capability ids a plan may name: those that can be executed now, without the web search, which only the server's
-     * own web step calls (web search design 2: Jev probabilities alone never start a search). It is never offered to the
-     * router or exposed on MCP.
+     * The capability ids a plan may name: those that can be executed now, without the web search (web search design 2: Jev
+     * probabilities alone never start a search). It is never offered to the router; the MCP tools add it on their own, for
+     * the server to decide each call of the agent path.
      */
     public Set<String> bound() {
         return tools.keySet().stream().filter(c -> !c.web()).map(ChatCapability::id)

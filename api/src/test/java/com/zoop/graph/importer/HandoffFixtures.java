@@ -6,9 +6,14 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
+import com.zoop.ai.handoff.HandoffReadClient;
+import com.zoop.ai.handoff.HandoffReadClient.Delivery;
+import com.zoop.ai.handoff.HandoffReadClient.HandoffRead;
+import com.zoop.ai.handoff.HandoffReadClient.Verification;
 import com.zoop.artifact.storage.ArtifactFileStore;
 import com.zoop.common.json.Canonical;
 import com.zoop.common.json.StrictJson;
@@ -1064,6 +1069,69 @@ final class HandoffFixtures {
                 throw GraphHandoffException.handoffWithheld("source_unauthorized");
             }
             return envelope;
+        }
+    }
+
+    /**
+     * The same handoff as ai/service's {@code getGraphHandoffBundle} would deliver it while current: the service's verification
+     * over the built bundle's own bytes, the frozen manifest and the bundle.
+     */
+    static HandoffRead read(Built built) {
+        ObjectNode bundle = built.bundle();
+        return new HandoffRead(built.spec().handoffId(), "ready",
+                new Delivery("current", Optional.empty(), Optional.of("2026-10-17T00:00:00+00:00")),
+                Optional.of(new Verification(built.manifestDigest(), built.bundleDigest(),
+                        bundle.get("digests").get("content").stringValue(), Canonical.bytes(bundle).length, bundle.get("counts"),
+                        bundle.get("sources").size(), bundle.get("provenance"))),
+                Optional.of(built.manifest()), Optional.of(bundle), "2026-10-17T00:00:01Z");
+    }
+
+    /** A withheld answer of the read-only handoff HTTP: identity, state and a reason, nothing else. */
+    static HandoffRead withheld(String handoffId, String reason) {
+        return new HandoffRead(handoffId, "ready", new Delivery("withheld", Optional.of(reason), Optional.empty()),
+                Optional.empty(), Optional.empty(), Optional.empty(), "2026-10-17T00:00:01Z");
+    }
+
+    /**
+     * ai/service's stand-in: serves one answer on both routes (the status route without the content), or withholds from the
+     * n-th call on, counting the routes together.
+     */
+    static final class FakeHandoffRead implements HandoffReadClient {
+        final AtomicInteger calls = new AtomicInteger();
+        final AtomicInteger statusCalls = new AtomicInteger();
+        final AtomicInteger bundleCalls = new AtomicInteger();
+        HandoffRead answer;
+        private int withholdFromCall = Integer.MAX_VALUE;
+
+        FakeHandoffRead(HandoffRead answer) {
+            this.answer = answer;
+        }
+
+        FakeHandoffRead withholdFrom(int call) {
+            this.withholdFromCall = call;
+            return this;
+        }
+
+        @Override
+        public HandoffRead status(String handoffId) {
+            statusCalls.incrementAndGet();
+            HandoffRead read = answer(handoffId);
+            return new HandoffRead(read.handoffId(), read.state(), read.delivery(), read.verification(), Optional.empty(),
+                    Optional.empty(), read.observedAt());
+        }
+
+        @Override
+        public HandoffRead bundle(String handoffId) {
+            bundleCalls.incrementAndGet();
+            return answer(handoffId);
+        }
+
+        private HandoffRead answer(String handoffId) {
+            int call = calls.incrementAndGet();
+            if (call >= withholdFromCall) {
+                return withheld(handoffId, "source_unauthorized");
+            }
+            return answer;
         }
     }
 

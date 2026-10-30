@@ -7,11 +7,13 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * {@code zoop.graph-handoff-import.*}, normally set from {@code ZOOP_GRAPH_HANDOFF_IMPORT_*}, {@code ZOOP_HANDOFF_*},
  * {@code ZOOP_*_STATE_DIR}, {@code ZOOP_INGESTION_*} and {@code ZOOP_ARTIFACT_ROOT} environment variables (see
  * {@code application.yml}). Disabled unless {@code enabled=true}; when enabled {@link GraphHandoffImportSettings#of} validates
- * every value at startup.
+ * every value at startup. {@code handoffSource} is {@code cli} (the installed {@code zoop-ai-handoff export}) or {@code http}
+ * (ai/service's read-only handoff family through {@code zoop.ai.handoff-read-client}).
  */
 @ConfigurationProperties("zoop.graph-handoff-import")
 public record GraphHandoffImportProperties(
         @DefaultValue("false") boolean enabled,
+        @DefaultValue("cli") String handoffSource,
         String request,
         String result,
         String handoffCli,
@@ -32,6 +34,6 @@ public record GraphHandoffImportProperties(
 
     @Override
     public String toString() {
-        return "GraphHandoffImportProperties[enabled=" + enabled + "]";
+        return "GraphHandoffImportProperties[enabled=" + enabled + ", handoffSource=" + handoffSource + "]";
     }
 }

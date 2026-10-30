@@ -57,6 +57,8 @@
 
 ### 구현된 도구 결정 기록 (현재 코드 기준)
 
+Q06 `briefing.read`(2026-10-30, `chat-tools/v7`): 요구 문구의 날짜(오늘·어제·날짜)와 회차(아침·출근 → 출근, 저녁·퇴근 → 퇴근)로 발행 회차를 서버가 정하고(`briefing:<date>[:<edition>]`, 둘 다 없으면 최신 발행 회차), 질문이 기업을 지목하면 그 기업이 관련된 이슈만 남긴다. 공개 브리핑 조회(`GET /api/v1/briefings`)를 그대로 거쳐 권리·정정·제공 중단이 같게 적용되고, 발행되지 않았거나 중단된 회차, 질문 시점(asOf) 뒤에 발행된 회차는 읽을 이슈가 없다. 이슈의 근거는 실행의 고정 그래프 버전·asOf에서 지금 인용할 수 있는 것만 넘긴다. 회차를 요구 문구에서 정하므로 agent 경로(MCP)에는 노출하지 않는다.
+
 아래는 이미 구현된 direct 경로(`chat-tools/v5`)의 사용자 승인 결정이다. MCP 전환 뒤에도 같은 Tool Service의 동작 기준으로 유지하며, 목표 변경(예: Q07 `portfolio.scope.read`의 Java server-only 실행)은 2026-10-28 절을 따른다.
 
 Q05 기간 비교의 잠정 결정(2026-10-27, 사용자 승인, 평가 세트로 보정 전): (7) 비교 기준은 질문에 적힌 기간이다. 정해진 한국어 표현(오늘·어제·그제, 이번 주·지난주, 이번 달·지난달, N일·N주·N달 전, 최근 N일·N주, `YYYY-MM-DD`, `M월 D일`)만 서버가 KST로 결정론적으로 해석하고(`ChatPeriods`), 여러 표현은 가장 이른 시작부터 가장 늦은 끝까지 한 기간으로 묶는다. 기간 시작 시각(KST 자정)에 공개돼 있던 지도와 작업이 고정한 지도를 비교한다. 질문에 기간이 없으면 회원이 고른 기간, 그것도 없으면 고정 지도 직전에 공개됐던 지도와 비교한다. 해석한 기간은 결과의 `applied.period`(`basis=question`, `expression`)로 보인다. (8) `graph.version.diff`는 대상(기업·사건)을 지목하면 그와 관련된 변화만, 아니면 지도 전체 변화를 최대 40건 돌려주고, 추가된 항목만 지금 고정 지도의 근거를 싣는다. 비교할 이전 공개 지도가 없으면 "변화 없음"이 아니라 잘린 조회(`truncated`)다. 레지스트리는 `chat-tools/v3`다.
@@ -97,7 +99,7 @@ flowchart LR
 | 1 저장·job 수명주기 | 부분 구현 | recovery artifact와 실제 `save_only` 복구 |
 | 2 오케스트레이터 | 부분 구현 | 8/6/2·45초 deadline, 요청 cache·single-flight, 서버 requirement coverage |
 | 3 router·Luna agent | 부분 구현 | Jev router는 구현, Luna Responses MCP 실행은 미구현 |
-| 4 읽기 도구 | 부분 구현 | Q03 일부, Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`) 구현, Q01 일부·Q06·Q08 미연결 |
+| 4 읽기 도구 | 부분 구현 | Q03 일부, Q04 경로, Q05 지도 버전 비교(`graph.version.diff`), Q07 내 종목(`portfolio.scope.read`), Q06 발행 브리핑(`briefing.read`, 2026-10-30) 구현, Q01 일부·Q08·`briefing.evidence` 미연결 |
 | 5 생성·출력 검증 | 부분 구현 | 구간 단위 생성·검증은 구현, claim 단위 검증·token guard 미구현 |
 | 6 웹 | 구현 | OpenAPI 타입 생성 seam, 실제 백엔드와의 종단 확인 |
 | 7 평가·출시 | 부분 구현 | 고정 평가 세트 v1(대본 실행)만 있음. 실제 모델·데이터 평가와 임계값 보정, 보안·종단·배포 증명 |

@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * D-AI-02 web search tool (web search design 3, 5 and 6): only checked public queries leave, hits are bounded and checked,
- * an outage is never an empty result, and the tool is never planned or exposed.
+ * an outage is never an empty result, and the tool is never planned by the server.
  */
 class ChatWebSearchToolTest {
     private static final Instant NOW = Instant.parse("2026-10-30T01:00:00Z");
@@ -114,7 +114,7 @@ class ChatWebSearchToolTest {
     }
 
     @Test
-    void theRegistryRunsTheWebSearchButNeverOffersItToAPlanOrMcp() {
+    void theRegistryRunsTheWebSearchButNeverOffersItToAPlan() {
         var registry = new ChatToolRegistry(List.of(new ChatWebSearchTool(new SyntheticWebSearchProvider(), CLOCK)));
         assertTrue(registry.bind("web.search").isPresent());
         assertEquals("web-search", registry.bind("web.search").get().capability().group());

@@ -105,7 +105,8 @@ zoop:
     web:
       # The supplementary web search tool (api/docs/chat-web-search.md). Off by default. No real provider is selected yet:
       # enabled, it needs provider=synthetic (fixture hits under example domains, local and tests only). It is never
-      # planned by the router nor exposed on MCP until the server's web step is wired.
+      # planned by the router; it is an MCP tool of the agent path, and the two cannot be on together until web results
+      # can be cited.
       enabled: ${ZOOP_CHAT_WEB_ENABLED:false}
       provider: ${ZOOP_CHAT_WEB_PROVIDER:none}
   analysis:
@@ -166,6 +167,15 @@ zoop:
       connect-timeout: ${ZOOP_AI_HANDOFF_EXPOSURE_CLIENT_CONNECT_TIMEOUT:3s}
       request-timeout: ${ZOOP_AI_HANDOFF_EXPOSURE_CLIENT_REQUEST_TIMEOUT:60s}
       max-response-bytes: ${ZOOP_AI_HANDOFF_EXPOSURE_CLIENT_MAX_RESPONSE_BYTES:7340032}
+    handoff-read-client:
+      # Read-only handoff family (scope handoff.read): GET /internal/v1/graph-handoffs/{id} and /bundle. Used only by the graph
+      # handoff import with handoff-source=http in place of the installed zoop-ai-handoff export. A bundle is at most 6 MiB.
+      enabled: ${ZOOP_AI_HANDOFF_READ_CLIENT_ENABLED:false}
+      base-url: ${ZOOP_AI_HANDOFF_READ_CLIENT_BASE_URL:}
+      token: ${ZOOP_AI_HANDOFF_READ_CLIENT_TOKEN:}
+      connect-timeout: ${ZOOP_AI_HANDOFF_READ_CLIENT_CONNECT_TIMEOUT:3s}
+      request-timeout: ${ZOOP_AI_HANDOFF_READ_CLIENT_REQUEST_TIMEOUT:60s}
+      max-response-bytes: ${ZOOP_AI_HANDOFF_READ_CLIENT_MAX_RESPONSE_BYTES:16777216}
     chat-client:
       # Chatbot model stages through ai/service (POST /internal/v1/chat-stages/{stage}). Disabled by default. Enabled, it
       # registers the chat engine, so zoop.chat.questions-enabled may be turned on. mode: replay (AI-side fixtures, no network)
@@ -202,6 +212,18 @@ zoop:
     ingestion-state-dir: ${ZOOP_INGESTION_STATE_DIR:}
     ingestion-sources: ${ZOOP_INGESTION_SOURCES:}
     artifact-root: ${ZOOP_ARTIFACT_ROOT:}
+  document-bindings:
+    # Operator-only, non-web export of the AI handoff's app document bindings file (zoop-app-document-bindings-1, see
+    # api/docs/DOCUMENT_BINDINGS.md). Disabled by default; the application starts without any of these settings. Enabled, it
+    # refuses to start unless the run is non-web (--spring.main.web-application-type=none) and both files are new normalized
+    # absolute paths, and refuses to run next to another operator command (one run per process). It reads the registry only and
+    # writes nothing. `scope` is `available` (default: versions of available articles) or `all`; `selection` optionally names an
+    # explicit list of document versions.
+    enabled: ${ZOOP_DOCUMENT_BINDINGS_ENABLED:false}
+    output: ${ZOOP_DOCUMENT_BINDINGS_OUTPUT:}
+    result: ${ZOOP_DOCUMENT_BINDINGS_RESULT:}
+    selection: ${ZOOP_DOCUMENT_BINDINGS_SELECTION:}
+    scope: ${ZOOP_DOCUMENT_BINDINGS_SCOPE:available}
   graph-handoff-import:
     # Operator-only, non-web staging of one AI handoff as an INACTIVE graph version (see api/README.md). Disabled by default; the
     # application starts without any of these settings. Enabled, it refuses to start unless the run is non-web
@@ -210,7 +232,13 @@ zoop:
     # the handoff export and the per-observation `zoop-ai-ingest export --require-store` both read them. `canonical`, `decisions`
     # and `bindings` are the operator files the handoff was frozen with (pinned by hash in its manifest). Paths only; the database
     # uses DB_*, which no CLI receives.
+    # handoff-source: cli (default; the installed zoop-ai-handoff export, which needs handoff-cli, the three handoff/S3/S2 ledger
+    # directories and the three operator files) or http (ai/service GET /internal/v1/graph-handoffs/{id}/bundle through
+    # zoop.ai.handoff-read-client, which must then be enabled; those seven CLI settings must be left unset). An empty value is
+    # cli, and with cli the read client must stay disabled (an authority this run would not use). The observation check stays
+    # the installed zoop-ai-ingest export --require-store in both modes until the AI side offers it over HTTP.
     enabled: ${ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED:false}
+    handoff-source: ${ZOOP_GRAPH_HANDOFF_IMPORT_HANDOFF_SOURCE:cli}
     request: ${ZOOP_GRAPH_HANDOFF_IMPORT_REQUEST:}
     result: ${ZOOP_GRAPH_HANDOFF_IMPORT_RESULT:}
     handoff-cli: ${ZOOP_HANDOFF_CLI:}

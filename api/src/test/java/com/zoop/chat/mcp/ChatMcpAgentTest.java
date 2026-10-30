@@ -23,6 +23,7 @@ import com.zoop.chat.orchestrator.ChatSemanticVerdicts;
 import com.zoop.chat.orchestrator.OrchestratedChatEngine;
 import com.zoop.chat.repository.ChatJobRow;
 import com.zoop.chat.repository.ChatKeptToolResult;
+import com.zoop.chat.service.ChatCompanyProfiles;
 import com.zoop.chat.tool.ChatCapability;
 import com.zoop.chat.tool.ChatTool;
 import com.zoop.chat.tool.ChatToolItem;
@@ -164,6 +165,153 @@ class ChatMcpAgentTest {
                 return closing;
             }
         };
+    }
+
+    /** Registers the web search (synthetic provider, granted) beside a company read that finds nothing. */
+    private void useWeb() {
+        useWeb(true);
+    }
+
+    private void useWeb(boolean grantWebResults) {
+        runner.close();
+        ChatTool empty = new ChatTool() {
+            @Override
+            public ChatCapability capability() {
+                return ChatCapability.COMPANY_READ;
+            }
+
+            @Override
+            public ChatToolOutput read(ChatToolScope scope, ChatToolRequest request) {
+                return new ChatToolOutput(scope.graphVersionId(), List.of(), List.of(), false, false);
+            }
+        };
+        var registry = new ChatToolRegistry(List.of(empty,
+                new com.zoop.chat.tool.ChatWebSearchTool(new com.zoop.chat.tool.SyntheticWebSearchProvider(), clock)));
+        runner = new ChatToolRunner(registry);
+        Path file = grantWebResults
+                ? ChatSendGrantsTest.write(dir.resolve("web-grants.json"), ChatCompanyProfiles.SOURCE_ID,
+                        ChatMcpSendGate.GRAPH_SOURCE_ID, ChatMcpSendGate.webSource("synthetic"))
+                : ChatSendGrantsTest.write(dir.resolve("web-grants.json"), ChatCompanyProfiles.SOURCE_ID,
+                        ChatMcpSendGate.GRAPH_SOURCE_ID);
+        var gate = new ChatMcpSendGate(new ChatSendGrants(file.toString(), ChatSendGrantsTest.RECIPIENT, clock),
+                (run, ids) -> Map.of());
+        tools = new ChatMcpTools(registry, runner, executor, gate, mapper);
+    }
+
+    private ChatAgentPath.Outcome runWithWeb() {
+        var circuit = new ChatMcpCircuitBreaker(() -> new com.zoop.ai.chat.ChatMcpHealth(true, null), clock);
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner, circuit);
+        var attached = executor.attach(JOB, 1).orElseThrow();
+        return agent.run(attached.run(), attached.control(), REQUIREMENTS,
+                List.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH), 20, steps(false));
+    }
+
+    private static ChatModels.ApprovalRequest search(String id, String query) {
+        return new ChatModels.ApprovalRequest(id, "web_search", Map.of("targets", List.of(query)));
+    }
+
+    @Test
+    void aWebSearchIsApprovedOnlyAfterAnInternalReadLeftSomethingUnmetAndOnlyForAQueryThatMayLeave() {
+        useWeb();
+        assertTrue(tools.exposed().contains(ChatCapability.WEB_SEARCH), "the web search is an MCP tool when registered");
+        // Round 1: the web first is refused; the company read runs and finds nothing.
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(search("w0", "HBM"),
+                new ChatModels.ApprovalRequest("c1", "company_read", Map.of("targets", List.of("KRX:000660")))), null));
+        // Round 2: a query about the member is refused, a public one runs.
+        luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(search("w1", "SK하이닉스 보유 수량"),
+                search("w2", "HBM")), null));
+        luna.script.add(n -> done());
+
+        var outcome = runWithWeb();
+
+        assertEquals(List.of(new ChatModels.Decision("w0", false), new ChatModels.Decision("c1", true)),
+                luna.inputs.get(1).decisions(), "the web is the last resort, not the first look");
+        assertEquals(List.of(new ChatModels.Decision("w1", false), new ChatModels.Decision("w2", true)),
+                luna.inputs.get(2).decisions());
+        assertEquals(List.of("company_read", "web_search"), luna.inputs.getFirst().allowedTools());
+        var web = outcome.results().stream().filter(r -> "web.search".equals(r.capabilityId())).toList();
+        assertEquals(1, web.size());
+        assertEquals(2, web.getFirst().webResults().size(), "the hits the model received come back from the ledger");
+        assertEquals("synthetic", web.getFirst().webResults().getFirst().provider());
+        assertTrue(outcome.notices().isEmpty());
+        assertEquals(List.of("HBM"), store.toolCalls(JOB).stream().filter(c -> "web.search".equals(c.row.capabilityId()))
+                .map(c -> c.row.requestMeta().replaceAll(".*\"targets\":\\[\"([^\"]*)\".*", "$1")).toList());
+    }
+
+    @Test
+    void aConceptMayMakeOneSearchFromTheFirstRound() {
+        useWeb();
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(search("w1", "HBM"), search("w2", "EUV 수출 규제")),
+                null));
+        luna.script.add(n -> done());
+        var circuit = new ChatMcpCircuitBreaker(() -> new com.zoop.ai.chat.ChatMcpHealth(true, null), clock);
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner, circuit);
+        var attached = executor.attach(JOB, 1).orElseThrow();
+        var outcome = agent.run(attached.run(), attached.control(),
+                List.of(new ChatModels.AgentRequirement("r1", "HBM이 뭐야", true, List.of())),
+                List.of(ChatCapability.WEB_SEARCH), 20, steps(false));
+
+        assertEquals(List.of(new ChatModels.Decision("w1", true), new ChatModels.Decision("w2", false)),
+                luna.inputs.get(1).decisions(), "one search for the concept; nothing internal left more unmet");
+        assertEquals(1, outcome.results().size());
+        assertEquals(2, outcome.results().getFirst().webResults().size());
+    }
+
+    @Test
+    void aMixedConceptAndFactRunCannotUseTheConceptExceptionForAFactQuery() {
+        useWeb();
+        luna.script.add(n -> new ChatModels.AgentStep("resp_1", List.of(search("w0", "SK하이닉스 최신 소식"),
+                new ChatModels.ApprovalRequest("c1", "company_read", Map.of("targets", List.of("KRX:000660")))), null));
+        luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(search("w1", "SK하이닉스 최신 소식")), null));
+        luna.script.add(n -> done());
+        var circuit = new ChatMcpCircuitBreaker(() -> new com.zoop.ai.chat.ChatMcpHealth(true, null), clock);
+        var agent = new ChatMcpAgent(luna, tools, grants, ChatSendGrantsTest.RECIPIENT, store, runner, circuit);
+        var attached = executor.attach(JOB, 1).orElseThrow();
+        agent.run(attached.run(), attached.control(), List.of(
+                new ChatModels.AgentRequirement("r1", "HBM이 뭐야", true, List.of()),
+                new ChatModels.AgentRequirement("r2", "SK하이닉스 최신 소식", false, List.of("KRX:000660"))),
+                List.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH), 20, steps(false));
+
+        assertEquals(List.of(new ChatModels.Decision("w0", false), new ChatModels.Decision("c1", true)),
+                luna.inputs.get(1).decisions(), "a mixed run cannot bind the early query to its concept requirement");
+        assertEquals(List.of(new ChatModels.Decision("w1", true)), luna.inputs.get(2).decisions(),
+                "after the internal read found nothing, the normal last-resort rule opens the web");
+    }
+
+    @Test
+    void webFaultsTheAnswerWentOnWithoutAreNoticesNeverAFailure() {
+        useWeb();
+        luna.script.add(n -> held("c1", "company_read", Map.of("targets", List.of("KRX:000660"))));
+        // Nothing found, then a provider outage: both approved, the job's two web searches.
+        luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(search("w1", "없는 검색어"),
+                search("w2", "장애 시험")), null));
+        // A third search is over the job's web budget.
+        luna.script.add(n -> new ChatModels.AgentStep("resp_3", List.of(search("w3", "HBM")), null));
+        luna.script.add(n -> done());
+
+        var outcome = runWithWeb();
+
+        assertEquals(List.of(new ChatModels.Decision("w3", false)), luna.inputs.get(3).decisions());
+        assertEquals(List.of(ChatMcpAgent.WEB_UNAVAILABLE, ChatMcpAgent.WEB_NO_RESULTS, ChatMcpAgent.WEB_BUDGET_EXHAUSTED),
+                outcome.notices());
+        assertEquals(ANSWER, outcome.answer(), "the answer goes on");
+    }
+
+    @Test
+    void webHitsWithheldByTheSendGrantAreUnavailableNotNoResults() {
+        useWeb(false);
+        luna.script.add(n -> held("c1", "company_read", Map.of("targets", List.of("KRX:000660"))));
+        luna.script.add(n -> new ChatModels.AgentStep("resp_2", List.of(search("w1", "HBM")), null));
+        luna.script.add(n -> done());
+
+        var outcome = runWithWeb();
+
+        assertEquals(List.of(ChatMcpAgent.WEB_UNAVAILABLE), outcome.notices());
+        assertTrue(outcome.results().stream().filter(r -> "web.search".equals(r.capabilityId()))
+                .allMatch(r -> r.webResults().isEmpty()), "withheld hits never reach the model or final answer check");
+        String kept = store.toolCalls(JOB).stream().filter(c -> "web.search".equals(c.row.capabilityId()))
+                .findFirst().orElseThrow().end.result();
+        assertEquals(2, mapper.readTree(kept).path("withheld").path("webResults").asInt());
     }
 
     @Test

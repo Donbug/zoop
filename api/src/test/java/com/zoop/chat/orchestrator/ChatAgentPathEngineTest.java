@@ -76,6 +76,7 @@ class ChatAgentPathEngineTest {
         final List<Boolean> closing = new ArrayList<>();
         ChatGeneratedAnswer answer;
         List<ChatToolResult> results = List.of();
+        List<String> notices = List.of();
         boolean available = true;
         ChatModels.Failure failure;
 
@@ -102,7 +103,7 @@ class ChatAgentPathEngineTest {
             // One step through the engine's guard and limit, like the real path.
             closing.add(steps.closing());
             steps.run(() -> new ChatModels.AgentStep("resp_1", List.of(), answer));
-            return new Outcome(answer, results, 1, 1, 0);
+            return new Outcome(answer, results, 1, 1, 0, notices);
         }
     }
 
@@ -134,6 +135,70 @@ class ChatAgentPathEngineTest {
         assertEquals(1, verifierCalls);
         assertEquals(List.of("retrieving", "verifying"), control.phases);
         assertEquals(3, control.modelCalls, "router, one agent step, verifier");
+    }
+
+    @Test
+    void aFactQuestionsAgentRunIsOfferedTheWebAndItsWebFaultsBecomeNotices() {
+        // D-AI-02: the web is offered beside the internal reads of a fact question; the answer says what it went without.
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q03, 0.9), Map.of("company.read", 0.9),
+                List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH));
+        agent.answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX)), List.of(),
+                List.of());
+        agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
+        agent.notices = List.of("web_unavailable", "web_budget_exhausted");
+
+        ChatResult result = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+
+        assertEquals(List.of(List.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH)), agent.allowed);
+        assertEquals("complete", result.answerStatus(), "a web fault leaves nothing unanswered");
+        assertEquals(List.of("web_unavailable", "web_budget_exhausted"),
+                result.notices().stream().map(n -> n.code()).toList());
+    }
+
+    @Test
+    void aConceptQuestionGoesToTheAgentForItsSearchAndWithoutItSaysTheWebWasNotUsed() {
+        // D-AI-02: a concept (Q02) is the web's first use; it has no read of its own, so the agent gets the search alone.
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q02, 0.9), Map.of()));
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH));
+        agent.answer = new ChatGeneratedAnswer(List.of(new Section("general_knowledge", "HBM은 쌓은 D램이에요.",
+                List.of("r1"), List.of())), List.of(), List.of());
+        verdicts = new ChatSemanticVerdicts(List.of(new Verdict(null, "no")));
+
+        ChatResult viaAgent = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+        assertEquals(List.of(List.of(ChatCapability.WEB_SEARCH)), agent.allowed);
+        assertTrue(generated.isEmpty(), "the direct generator is not called");
+        assertEquals("general_knowledge", viaAgent.answerBasis());
+
+        // The agent cannot start: the concept is answered on the direct path, without the web, and says so.
+        agent.available = false;
+        directAnswer = agent.answer;
+        ChatResult direct = assertInstanceOf(ChatEngineOutcome.Completed.class,
+                engine(agent).answer(run(), new Control(Duration.ofSeconds(60)))).result();
+        assertEquals(1, generated.size());
+        assertEquals(List.of("web_unavailable"), direct.notices().stream().map(n -> n.code()).toList(),
+                "not mcp_direct_start: there was nothing to read but the web");
+
+        // Without the web, a concept question stays on the direct path as before.
+        generated.clear();
+        var plain = new Agent(Set.of(ChatCapability.COMPANY_READ));
+        assertInstanceOf(ChatEngineOutcome.Completed.class, engine(plain).answer(run(), new Control(Duration.ofSeconds(60))));
+        assertTrue(plain.requirements.isEmpty());
+        assertEquals(1, generated.size());
+    }
+
+    @Test
+    void aQuestionWithAServiceRulePartIsNeverOfferedTheWeb() {
+        decision = ChatPlannerTest.decision(req("r1", Map.of(ChatQueryType.Q01, 0.9, ChatQueryType.Q03, 0.9),
+                Map.of("company.read", 0.9), List.of(HYNIX)));
+        var agent = new Agent(Set.of(ChatCapability.COMPANY_READ, ChatCapability.WEB_SEARCH));
+        agent.answer = new ChatGeneratedAnswer(List.of(grounded("SK하이닉스는 HBM을 공급합니다.", EV_HYNIX)), List.of(),
+                List.of());
+        agent.results = List.of(companyResult(HYNIX, EV_HYNIX));
+        engine(agent).answer(run(), new Control(Duration.ofSeconds(60)));
+        assertEquals(List.of(List.of(ChatCapability.COMPANY_READ)), agent.allowed);
     }
 
     @Test

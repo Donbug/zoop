@@ -4,7 +4,18 @@ import { formatKst, formatMoney } from '@/util/format';
 import { formatTimelineTime } from '@/util/event-time';
 import { ChangeRate } from '@/components/stocks/StockQuote';
 import BoltIcon from './BoltIcon';
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from 'react';
+import CompanyLogo from '@/components/common/CompanyLogo';
+import { useAsyncData } from '@/hooks/useAsyncData';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { getCompanyMetrics } from '@/apis/graph/companies';
+import { BRIEFING_DISCLAIMER } from '@/components/briefing/briefingCorrections';
 import {
   Link,
   useLocation,
@@ -277,6 +288,24 @@ export default function CompanyWorkspace() {
     invalid ? null : companyUrl(id, '', snapshot),
     owner,
   );
+  // D-COM-01 새5: resolve the company before starting dependent sections.
+  // Snapshot conflicts (409/422) remain independent section errors, never a missing company.
+  const missingCompany = company.errorStatus === 404;
+  const companyIdentity = `${id}|${owner}`;
+  const [resolvedCompany, setResolvedCompany] = useState<string | null>(null);
+  if (!company.loading && resolvedCompany !== companyIdentity)
+    setResolvedCompany(companyIdentity);
+  // A snapshot query change must not remount the catalog or reread member settings.
+  const canLoadSections =
+    !missingCompany &&
+    (!company.loading || resolvedCompany === companyIdentity);
+  const settings = useCompanySettings(canLoadSections);
+  const metrics = useAsyncData(
+    useCallback(
+      () => (canLoadSections ? getCompanyMetrics(id) : Promise.resolve(null)),
+      [id, canLoadSections],
+    ),
+  );
   // D-COM-04·06 (#358): 버전만 있는 주소는 서버가 그 버전이 처음 공개된 시각을 metadata.asOf로 준다.
   // 그 버전으로 답했고 정확한 시각이면 주소의 asOf로 채운다(처음 열 때와 같은 방식). 채운 주소를 기억해
   // "처음 공개된 시점으로 보는 중"을 알리고, 그 주소가 409·422면 예전처럼 열 수 없다고 안내한다.
@@ -300,7 +329,9 @@ export default function CompanyWorkspace() {
   const versionStartFailed =
     pinnedFromVersion &&
     (company.errorStatus === 409 || company.errorStatus === 422);
-  const quote = useCompanyResource<Quote>(companyUrl(id, '/quote'));
+  const quote = useCompanyResource<Quote>(
+    canLoadSections ? companyUrl(id, '/quote') : null,
+  );
   // D-COM-06: 사건 시점 그래프는 그래프를 쓰는 동안만 유지한다. 그래프 영역 밖(다른 사건·탭·빈 곳 등)을
   // 누르면 현재 기준 시점 그래프로 돌아간다. 키보드로 누른 것도 click으로 들어온다.
   // 누른 곳의 동작(다른 사건 고르기 등)도 주소를 바꾸므로, 주소의 graphAsOf는 그 변경이 반영된 뒤에 지운다.
@@ -346,7 +377,7 @@ export default function CompanyWorkspace() {
   }, [graphTimeOpen, paramsKey, location.key]);
   // 버전 단독 주소는 그 버전의 차트를 열 수 없다고 안내하므로 가격 조회도 시작하지 않는다.
   const prices = useCompanyResource<Prices>(
-    invalid || versionOnly
+    invalid || versionOnly || !canLoadSections
       ? null
       : companyUrl(id, '/prices', { period, ...range }),
   );
@@ -403,15 +434,17 @@ export default function CompanyWorkspace() {
     ...(version ? { graphVersion: version } : {}),
   });
   const events = useCompanyResource<Events>(
-    ready ? `/api/v1/events?${eventsQuery}` : null,
+    ready && canLoadSections ? `/api/v1/events?${eventsQuery}` : null,
     '',
     true,
   );
   const graph = useCompanyResource<GraphResponse>(
-    ready ? companyUrl(id, '/graph', { ...graphSnapshot, depth }) : null,
+    ready && canLoadSections
+      ? companyUrl(id, '/graph', { ...graphSnapshot, depth })
+      : null,
   );
   const event = useCompanyResource<EventDetail>(
-    ready && eventId
+    ready && canLoadSections && eventId
       ? `/api/v1/events/${encodeURIComponent(eventId)}?${new URLSearchParams(Object.entries(snapshot).filter((entry): entry is [string, string] => entry[1] !== null))}`
       : null,
   );
@@ -426,7 +459,7 @@ export default function CompanyWorkspace() {
     ? graphSnapshot
     : snapshot;
   const impact = useCompanyResource<Impact>(
-    ready && eventId
+    ready && canLoadSections && eventId
       ? companyUrl(
           id,
           `/issues/${encodeURIComponent(eventId)}/impact`,
@@ -435,17 +468,70 @@ export default function CompanyWorkspace() {
       : null,
   );
   const portfolio = useCompanyResource<Portfolio>(
-    auth.isAuthenticated ? '/api/v1/portfolio' : null,
+    auth.isAuthenticated && canLoadSections ? '/api/v1/portfolio' : null,
     owner,
   );
   const financials = useCompanyResource<Financials>(
-    COMPANY_FINANCIALS_ENABLED && ready
+    COMPANY_FINANCIALS_ENABLED && ready && canLoadSections
       ? companyUrl(id, '/financials', snapshot)
       : null,
   );
   const tab = ['events', 'documents', 'info'].includes(params.get('tab') ?? '')
     ? params.get('tab')!
     : 'events';
+  // D-COM-01 48: preserve prototype route notices instead of silently changing selection.
+  const unknownTab =
+    params.has('tab') &&
+    !['events', 'documents', 'info'].includes(params.get('tab')!);
+  const [routeNotice, setRouteNotice] = useState<{
+    companyId: string;
+    messages: string[];
+  } | null>(null);
+  const normalizeRoute = useEffectEvent(() => {
+    const gone = !!eventId && event.errorStatus === 404;
+    const outside =
+      !!eventId &&
+      !!event.data &&
+      !!events.data &&
+      !events.loading &&
+      ![...events.data.items, ...events.data.unknownTimeItems].some(
+        (item) => item.id === eventId,
+      );
+    if (!unknownTab && !gone && !outside) return;
+    const messages = [];
+    if (unknownTab) messages.push('요청한 탭이 없어 사건 탭을 보여 드려요');
+    if (gone || outside)
+      messages.push(
+        gone
+          ? '선택했던 사건을 지금은 볼 수 없어 선택을 풀었어요'
+          : '선택했던 사건이 이 기간에 없어 선택을 풀었어요',
+      );
+    setRouteNotice({ companyId: id, messages });
+    updateQuery(
+      {
+        ...(unknownTab ? { tab: null } : {}),
+        ...(gone || outside ? { event: null, bucket: null } : {}),
+      },
+      { replace: true },
+    );
+  });
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) normalizeRoute();
+    });
+    return () => {
+      active = false;
+    };
+  }, [
+    id,
+    unknownTab,
+    eventId,
+    event.errorStatus,
+    event.data,
+    events.data,
+    events.loading,
+  ]);
   const groups = new Map<string, Events['items']>();
   for (const item of events.data?.items ?? []) {
     const key = bucketKey(item, period);
@@ -563,14 +649,41 @@ export default function CompanyWorkspace() {
         </button>
       </div>
     );
+  if (missingCompany)
+    return (
+      <section
+        className="mx-auto max-w-2xl px-4 py-12 text-zoop-ink"
+        data-screen-id="D-COM-01"
+      >
+        <h1 className="text-2xl font-bold">기업을 찾을 수 없어요</h1>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link className={ui.button} to="/?mode=all">
+            시장 전체 지도에서 찾기
+          </Link>
+          <Link className={ui.button} to="/my">
+            내 종목 보기
+          </Link>
+        </div>
+      </section>
+    );
   return (
     <div className={workspaceClasses} data-screen-id="D-COM-01 D-COM-01b">
-      <CompanyCatalog
-        graph={graph}
-        currentCompany={company.data}
-        portfolio={portfolio}
-      />
+      {canLoadSections && (
+        <CompanyCatalog
+          graph={graph}
+          currentCompany={company.data}
+          portfolio={portfolio}
+          settings={settings}
+        />
+      )}
       <div className="min-w-0 rounded-2xl bg-white p-6 shadow-sm max-md:p-4">
+        {routeNotice?.companyId === id && (
+          <div role="status">
+            {routeNotice.messages.map((message) => (
+              <p key={message}>{message}</p>
+            ))}
+          </div>
+        )}
         {versionOnly && (company.loading || versionStart) && (
           <p role="status" className="mb-4 text-[13px] text-zoop-muted">
             그래프 버전({version})이 처음 공개된 시점을 확인하고 있어요.
@@ -615,12 +728,32 @@ export default function CompanyWorkspace() {
           <Status resource={company} label="기업 정보" />
           {company.data && (
             <>
-              <h1>{company.data.name}</h1>
-              <p>
-                {company.data.ticker ?? '코드 미제공'} ·{' '}
-                {company.data.market ?? '시장 미제공'} ·{' '}
-                {company.data.sector ?? '업종 미제공'}
-              </p>
+              {/* D-COM-01 45: prototype CompanyHeader, using the shared logo and member resources. */}
+              <div className="flex items-center gap-3">
+                <CompanyLogo
+                  name={company.data.name}
+                  logoUrl={company.data.logoUrl}
+                  className="size-12 rounded-full border border-zoop-line bg-zoop-paper text-lg"
+                />
+                <div className="min-w-0 flex-1">
+                  <h1 tabIndex={-1}>{company.data.name}</h1>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zoop-muted">
+                    <span>
+                      {company.data.sector ?? '업종 미제공'} ·{' '}
+                      {company.data.ticker ?? '코드 미제공'} ·{' '}
+                      {company.data.market ?? '시장 미제공'}
+                    </span>
+                    {auth.isAuthenticated && holding && (
+                      <span className={ui.badge}>보유</span>
+                    )}
+                    {auth.isAuthenticated &&
+                      settings.status === 'success' &&
+                      settings.data?.watchlistIds.includes(id) && (
+                        <span className={ui.badge}>관심</span>
+                      )}
+                  </div>
+                </div>
+              </div>
               <p>
                 {company.data.summary?.summary ??
                   company.data.summary?.text ??
@@ -667,6 +800,15 @@ export default function CompanyWorkspace() {
                 {quote.data.source.delayNote ?? '지연 정보 미제공'}
               </p>
               <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-xs [&_dt]:text-zoop-faint [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
+                <dt>시가총액</dt>
+                <dd>
+                  {quote.data.quote.marketCap == null
+                    ? '미제공'
+                    : formatMoney(
+                        quote.data.quote.marketCap,
+                        quote.data.quote.currency,
+                      )}
+                </dd>
                 <dt>거래량</dt>
                 <dd>{number(quote.data.quote.volume)}</dd>
                 <dt>당일 저가~고가</dt>
@@ -679,6 +821,46 @@ export default function CompanyWorkspace() {
                   {number(quote.data.quote.fiftyTwoWeekLow)} ~{' '}
                   {number(quote.data.quote.fiftyTwoWeekHigh)}
                 </dd>
+              </dl>
+            </>
+          )}
+        </section>
+        {/* D-COM-01 42: metrics explicitly reject asOf/graphVersion; keep latest and label separately. */}
+        <section aria-label="주요 지표">
+          <h2>주요 지표 · 최신 기준</h2>
+          {metrics.status === 'loading' && (
+            <p role="status">주요 지표를 불러오고 있어요</p>
+          )}
+          {metrics.status === 'error' && (
+            <div role="alert">
+              <p>주요 지표를 불러오지 못했어요</p>
+              <button onClick={metrics.reload}>다시 시도</button>
+            </div>
+          )}
+          {metrics.data?.status === 'unavailable' && (
+            <p>지표 미제공 · {metrics.data.reason}</p>
+          )}
+          {metrics.data?.status === 'available' && (
+            <>
+              <p>
+                주요 지표 · {metrics.data.source.name} · 기준{' '}
+                <ReferenceTime value={metrics.data.asOf} />
+              </p>
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs md:grid-cols-4">
+                {metrics.data.items.map((item) => (
+                  <div key={item.code} className="min-w-0">
+                    <dt className="text-zoop-muted">{item.label}</dt>
+                    <dd className="font-semibold tabular-nums">
+                      {item.value}
+                      {item.basis && (
+                        <span className="font-normal text-zoop-muted">
+                          {' '}
+                          ({item.basis} 기준)
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                ))}
               </dl>
             </>
           )}
@@ -1071,7 +1253,7 @@ export default function CompanyWorkspace() {
             )}
           </section>
         )}
-        {tab === 'documents' && <CompanyDocumentPanel />}
+        {tab === 'documents' && canLoadSections && <CompanyDocumentPanel />}
         {tab === 'info' && <CompanyInfoTab resource={company} />}
         {COMPANY_FINANCIALS_ENABLED && (
           <section aria-label="핵심 재무">
@@ -1110,6 +1292,7 @@ export default function CompanyWorkspace() {
             )}
           </section>
         )}
+        <p className="text-xs text-zoop-muted">{BRIEFING_DISCLAIMER}</p>
       </div>
       {/* D-COM-04: 넓은 화면은 와이어프레임처럼 오른쪽 열에 두고 스크롤해도 화면 안에 남는다.
           1000px 이하에서는 본문 아래로 옮겨 넓게 본다. */}
