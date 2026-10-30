@@ -94,5 +94,16 @@
 | unblockMember | /api/v1/admin/members/{member_id}/unblock | /api/admin/members/{member_id}/unblock | 목표만 203 · BFF만 18 · 형식/필수/권한 변경 12 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | getCompanyFinancials | /api/v1/companies/{id}/financials | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
 | getCompanyIssueImpact | /api/v1/companies/{id}/issues/{issueId}/impact | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
+| getPersonalizedBriefingIssues | /api/v1/briefings/{id}/personalized/issues | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
 | getPersonalizedBriefing | /api/v1/briefings/{id}/personalized | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
 | getCompanyGraphAsOf | /api/v1/companies/{id}/graph | /api/companies/{id}/graph | 목표만 124 · BFF만 41 · 형식/필수/권한 변경 7 | /api → /api/v1 경로 버전 및 공통 오류·요청 ID 적용. / BFF는 현재 저장된 승인 자료를 문서 공개 시각으로 거른다. 목표는 asOf와 실제 사용한 불변 공개 버전을 함께 고정한다. |
+| getBriefingPersonalizationOptions | /api/v1/briefings/personalization/options | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
+| selectPersonalBriefingIssues | /api/v1/briefings/{id}/personalized/selection | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
+| createPersonalBriefingGeneration | /api/v1/briefings/{id}/personalized/generations | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
+| getPersonalBriefingGeneration | /api/v1/briefings/{id}/personalized/generations/{jobId} | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
+| retryPersonalBriefingGeneration | /api/v1/briefings/{id}/personalized/generations/{jobId}/retry | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
+| getPersonalBriefingSettings | /api/v1/briefings/personalization/settings | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
+| savePersonalBriefingSettings | /api/v1/briefings/personalization/settings | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
+| initializePersonalBriefingSettings | /api/v1/briefings/personalization/settings/initialize | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
+| getPersonalBriefingDelivery | /api/v1/briefings/{id}/personalized/delivery | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
+| createPersonalBriefingDemo | /api/v1/briefings/{id}/personalized/demo | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |

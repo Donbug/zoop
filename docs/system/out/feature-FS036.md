@@ -38,4 +38,15 @@
 
 | 작업 | 메서드·목표 경로 | WBS | 권한 |
 | --- | --- | --- | --- |
+| [getPersonalizedBriefingIssues](../../api/out/zoop-api-spec.md#getpersonalizedbriefingissues) | GET /api/v1/briefings/{id}/personalized/issues | 6.1.2, 6.11.1, 6.8.9, 6.8.14 | 회원(본인) |
 | [getPersonalizedBriefing](../../api/out/zoop-api-spec.md#getpersonalizedbriefing) | GET /api/v1/briefings/{id}/personalized | 6.1.2, 6.11.1, 6.8.9, 6.8.14 | 회원(본인) |
+| [getBriefingPersonalizationOptions](../../api/out/zoop-api-spec.md#getbriefingpersonalizationoptions) | GET /api/v1/briefings/personalization/options | 6.1.2, 6.11.1, 6.8.9, 6.8.14 | 회원(본인) |
+| [selectPersonalBriefingIssues](../../api/out/zoop-api-spec.md#selectpersonalbriefingissues) | POST /api/v1/briefings/{id}/personalized/selection | 6.1.2, 6.11.1, 6.8.9, 6.8.14 | 회원(본인) |
+| [createPersonalBriefingGeneration](../../api/out/zoop-api-spec.md#createpersonalbriefinggeneration) | POST /api/v1/briefings/{id}/personalized/generations | 6.1.2, 6.11.1, 6.8.9, 6.8.14 | 회원(본인) |
+| [getPersonalBriefingGeneration](../../api/out/zoop-api-spec.md#getpersonalbriefinggeneration) | GET /api/v1/briefings/{id}/personalized/generations/{jobId} | 6.1.2, 6.11.1, 6.8.9, 6.8.14 | 회원(본인) |
+| [retryPersonalBriefingGeneration](../../api/out/zoop-api-spec.md#retrypersonalbriefinggeneration) | POST /api/v1/briefings/{id}/personalized/generations/{jobId}/retry | 6.1.2, 6.11.1, 6.8.9, 6.8.14 | 회원(본인) |
+| [getPersonalBriefingSettings](../../api/out/zoop-api-spec.md#getpersonalbriefingsettings) | GET /api/v1/briefings/personalization/settings | 6.1.2, 6.11.1, 6.8.9, 6.8.14 | 회원(본인) |
+| [savePersonalBriefingSettings](../../api/out/zoop-api-spec.md#savepersonalbriefingsettings) | PUT /api/v1/briefings/personalization/settings | 6.1.2, 6.11.1, 6.8.9, 6.8.14 | 회원(본인) |
+| [initializePersonalBriefingSettings](../../api/out/zoop-api-spec.md#initializepersonalbriefingsettings) | POST /api/v1/briefings/personalization/settings/initialize | 6.1.2, 6.11.1, 6.8.9, 6.8.14 | 회원(본인) |
+| [getPersonalBriefingDelivery](../../api/out/zoop-api-spec.md#getpersonalbriefingdelivery) | GET /api/v1/briefings/{id}/personalized/delivery | 6.1.2, 6.11.1, 6.8.9, 6.8.14 | 회원(본인) |
+| [createPersonalBriefingDemo](../../api/out/zoop-api-spec.md#createpersonalbriefingdemo) | POST /api/v1/briefings/{id}/personalized/demo | 6.1.2, 6.11.1, 6.8.9, 6.8.14 | 회원(본인) |

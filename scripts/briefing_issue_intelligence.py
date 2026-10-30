@@ -368,14 +368,14 @@ def assess_candidates(client, frozen):
     return assessed, verified, attempts
 
 
-def analyze(client, targets):
+def analyze(client, targets, initial_repair=None):
     """One bounded repair of rejected issues; preserve each passed draft verbatim."""
     remaining = list(targets)
     passed, final_checks, attempts = {}, {}, []
     for attempt in range(2):
         if not remaining: break
         ids = [f['issueId'] for f in remaining]
-        repair = None if not attempts else {
+        repair = copy.deepcopy(initial_repair) if not attempts else {
             'draft': {'issues': {i: attempts[-1]['draft']['issues'].get(i) for i in ids}},
             'verification': {'checks': {i: final_checks[i] for i in ids}}}
         data = {'issues': remaining, 'repair': repair}

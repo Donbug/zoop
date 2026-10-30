@@ -56,7 +56,7 @@ public class AuthRequestConfiguration implements WebMvcConfigurer {
         registry.addInterceptor(memberAuthorizationInterceptor)
                 .addPathPatterns("/api/v1/me/**", "/api/v1/portfolio", "/api/v1/portfolio/**",
                         "/api/v1/chat/**",
-                        "/api/v1/feedback", "/api/v1/briefings/*/personalized",
+                        "/api/v1/feedback", "/api/v1/briefings/*/personalized", "/api/v1/briefings/*/personalized/issues", "/api/v1/briefings/*/personalized/selection", "/api/v1/briefings/*/personalized/generations", "/api/v1/briefings/*/personalized/generations/*", "/api/v1/briefings/*/personalized/generations/*/retry", "/api/v1/briefings/personalization/options", "/api/v1/briefings/personalization/settings", "/api/v1/briefings/personalization/settings/initialize", "/api/v1/briefings/*/personalized/delivery", "/api/v1/briefings/*/personalized/demo",
                         "/api/v1/auth/tutorial");
         registry.addInterceptor(adminAuthorizationInterceptor)
                 .addPathPatterns("/api/v1/admin/**")
