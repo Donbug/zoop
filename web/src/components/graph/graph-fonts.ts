@@ -9,8 +9,12 @@ export const GRAPH_FONTS = [
 /** Never hold the map back longer than this; a late font falls back to the stack. */
 const FONT_WAIT_MS = 3000;
 
-/** Every character the canvas may draw: labels, logo initials and badges. */
-export function graphText(data: GraphData) {
+/**
+ * Every character the canvas may draw: labels, logo initials and badges.
+ * `labels` adds text drawn later, e.g. full issue titles that readingStyles
+ * swaps in for the shortened labelText.
+ */
+export function graphText(data: GraphData, labels: readonly string[] = []) {
   const text = new Set('0123456789');
   const add = (value: unknown) => {
     if (typeof value === 'string') for (const char of value) text.add(char);
@@ -23,6 +27,7 @@ export function graphText(data: GraphData) {
       for (const badge of badges) add((badge as { text?: unknown }).text);
   }
   for (const edge of data.edges ?? []) add(edge.style?.labelText);
+  for (const label of labels) add(label);
   return [...text].join('');
 }
 

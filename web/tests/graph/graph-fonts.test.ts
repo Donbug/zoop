@@ -56,3 +56,11 @@ test('loadGraphFonts never holds the map back on a slow or failing font', async 
   stubFonts(() => Promise.reject(new Error('network')));
   await expect(loadGraphFonts('삼성')).resolves.toBeUndefined();
 });
+
+test('graphText includes full labels drawn after the shortened labelText', () => {
+  const text = graphText(
+    { nodes: [{ id: 'i', style: { labelText: '반도체 수출…' } }] },
+    ['반도체 수출 규제 강화 발표'],
+  );
+  for (const char of '규제강화발표') expect(text).toContain(char);
+});

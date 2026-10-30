@@ -925,7 +925,12 @@ export default function GraphCanvas({
           },
         }));
         // 캔버스 글자는 그릴 때 준비된 글꼴로 한 번만 그려지므로, 쓸 글자의 글꼴을 먼저 받는다.
-        await loadGraphFonts(graphText(rendered));
+        await loadGraphFonts(
+          graphText(
+            rendered,
+            data.nodes.map((node) => node.label),
+          ),
+        );
         if (graph.destroyed) return;
         // 옮겨 갈 노드는 먼저 이전 자리에 그리고, 맞춤 단계에서 목표 자리로 옮긴다.
         const morphTargets: Record<string, [number, number]> = {};
