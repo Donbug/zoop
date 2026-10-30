@@ -26,7 +26,7 @@ from pydantic import Field, model_validator
 
 from .contracts import Wire
 
-CHAT_SCHEMA_VERSION = "zoop-ai-chat-2"
+CHAT_SCHEMA_VERSION = "zoop-ai-chat-3"
 ChatStage = Literal["chat-router", "chat-answer", "chat-verification", "chat-agent"]
 QueryType = Literal["Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08"]
 # `zoop_documented` rests on ZOOP's own approved documents (policies), `evidence_grounded` on public evidence,
@@ -113,11 +113,19 @@ class RouterInput(Wire):
         return self
 
 
+class RouterDependency(Wire):
+    """Run this requirement on companies found by an earlier requirement when its checkpoint matches."""
+    requirement_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")
+    cardinality: Literal["exactly", "atLeast", "atMost"]
+    count: int = Field(ge=1, le=5)
+
+
 class RoutedRequirement(Wire):
     requirement_id: str
     types: dict[QueryType, float]
     capabilities: dict[str, float]
     prohibited_advice: float
+    depends_on: RouterDependency | None
 
 
 class RouterAnswer(Wire):
@@ -519,7 +527,7 @@ INPUTS: dict[str, type[Wire]] = {"chat-router": RouterInput, "chat-answer": Answ
 class StageRequest(Wire):
     """What the application asks of one stage. `invocation_id` identifies the attempt's stage: the same id with the same input
     returns the stored outcome and never sends again; the same id with another input is refused."""
-    schema_version: Literal["zoop-ai-chat-2"]
+    schema_version: Literal["zoop-ai-chat-3"]
     invocation_id: str = Field(pattern=r"^[A-Za-z0-9_.:-]{8,160}$")
     stage: ChatStage
     mode: Literal["replay", "live"]
@@ -570,7 +578,7 @@ class StageFailure(Wire):
 
 
 class StageResult(Wire):
-    schema_version: Literal["zoop-ai-chat-2"]
+    schema_version: Literal["zoop-ai-chat-3"]
     invocation_id: str
     stage: ChatStage
     status: Literal["succeeded", "failed"]

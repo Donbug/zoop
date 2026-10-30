@@ -246,7 +246,7 @@
     `runtime_unavailable`. All carry `Retry-After`; there is exactly one child per request and no automatic retry. A child answer that is not the contract this service
     knows is 500 `runtime_contract_mismatch` or `runtime_binding_mismatch` (not retryable). A 503 or 500 is never an empty bundle.
 
-    **Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-2`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
+    **Chat stages (`/internal/v1/chat-stages/{stage}`, contract `zoop-ai-chat-3`, scope `chat.invoke`).** A fifth, separate family that runs ONE chatbot model
     stage synchronously through the installed `zoop-ai-chat invoke`: `chat-router` (native Jev, typed probabilities per requirement), `chat-answer` (Luna, a strict
     JSON answer by sections), `chat-verification` (native Jev, per-section support and prohibited-advice verdicts) or `chat-agent` (one step of a Luna Responses run
     that calls the ZOOP MCP tools). It is off unless its all-or-nothing server configuration group is set (otherwise 409 `execution_unavailable` after
@@ -7713,13 +7713,13 @@
                 "reachable":
                   "summary": "The configured endpoint answered its Bearer challenge"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-2"
+                    "schemaVersion": "zoop-ai-chat-3"
                     "mcp": "reachable"
                     "reason": null
                 "unreachable":
                   "summary": "No answer before the content-free probe deadline"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-2"
+                    "schemaVersion": "zoop-ai-chat-3"
                     "mcp": "unreachable"
                     "reason": "mcp_timeout"
         "401":
@@ -7876,7 +7876,7 @@
                 "succeeded":
                   "summary": "Router probabilities"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-2"
+                    "schemaVersion": "zoop-ai-chat-3"
                     "invocationId": "job-00000001:1:chat-router"
                     "stage": "chat-router"
                     "status": "succeeded"
@@ -7894,6 +7894,7 @@
                             "Q08": 0.01
                           "capabilities": {}
                           "prohibitedAdvice": 0.02
+                          "dependsOn": null
                     "failure": null
                     "receipt":
                       "provider": "authored-replay"
@@ -7911,7 +7912,7 @@
                 "notSent":
                   "summary": "A quote without a matching chat grant: nothing was sent"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-2"
+                    "schemaVersion": "zoop-ai-chat-3"
                     "invocationId": "job-00000001:1:chat-answer"
                     "stage": "chat-answer"
                     "status": "failed"
@@ -7924,7 +7925,7 @@
                 "agentHeld":
                   "summary": "chat-agent step held at an approval request"
                   "value":
-                    "schemaVersion": "zoop-ai-chat-2"
+                    "schemaVersion": "zoop-ai-chat-3"
                     "invocationId": "job-00000001:1:chat-agent:1"
                     "stage": "chat-agent"
                     "status": "succeeded"
@@ -8072,7 +8073,7 @@
               "router":
                 "summary": "chat-router replay request (synthetic question)"
                 "value":
-                  "schemaVersion": "zoop-ai-chat-2"
+                  "schemaVersion": "zoop-ai-chat-3"
                   "invocationId": "job-00000001:1:chat-router"
                   "stage": "chat-router"
                   "mode": "replay"
@@ -8087,7 +8088,7 @@
               "agentContinuation":
                 "summary": "chat-agent continuation step with the application's decision (synthetic token)"
                 "value":
-                  "schemaVersion": "zoop-ai-chat-2"
+                  "schemaVersion": "zoop-ai-chat-3"
                   "invocationId": "job-00000001:1:chat-agent:2"
                   "stage": "chat-agent"
                   "mode": "replay"
@@ -11755,7 +11756,7 @@
       "properties":
         "schemaVersion":
           "type": "string"
-          "const": "zoop-ai-chat-2"
+          "const": "zoop-ai-chat-3"
           "title": "Schemaversion"
         "mcp":
           "type": "string"
@@ -11847,7 +11848,7 @@
       "properties":
         "schemaVersion":
           "type": "string"
-          "const": "zoop-ai-chat-2"
+          "const": "zoop-ai-chat-3"
           "title": "Schemaversion"
         "invocationId":
           "type": "string"
@@ -15577,6 +15578,10 @@
         "prohibitedAdvice":
           "type": "number"
           "title": "Prohibitedadvice"
+        "dependsOn":
+          "anyOf":
+            - "$ref": "#/components/schemas/RouterDependency"
+            - "type": "null"
       "additionalProperties": false
       "type": "object"
       "required":
@@ -15584,6 +15589,7 @@
         - "types"
         - "capabilities"
         - "prohibitedAdvice"
+        - "dependsOn"
       "title": "RoutedRequirement"
       "description": "Closed like every stage answer: a key the worker contract does not define is refused, never relayed."
     "RouterAnswer":
@@ -15598,6 +15604,30 @@
       "required":
         - "requirements"
       "title": "RouterAnswer"
+    "RouterDependency":
+      "properties":
+        "requirementId":
+          "type": "string"
+          "title": "Requirementid"
+        "cardinality":
+          "type": "string"
+          "enum":
+            - "exactly"
+            - "atLeast"
+            - "atMost"
+          "title": "Cardinality"
+        "count":
+          "type": "integer"
+          "maximum": 5.0
+          "minimum": 1.0
+          "title": "Count"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "requirementId"
+        - "cardinality"
+        - "count"
+      "title": "RouterDependency"
     "SectionVerdict":
       "properties":
         "support":
@@ -15767,7 +15797,7 @@
       "additionalProperties": false
       "properties":
         "schemaVersion":
-          "const": "zoop-ai-chat-2"
+          "const": "zoop-ai-chat-3"
           "title": "Schemaversion"
           "type": "string"
         "invocationId":
@@ -15791,7 +15821,7 @@
           "type": "string"
         "input":
           "additionalProperties": true
-          "description": "The closed zoop-ai-chat-2 stage input (RouterInput, AnswerInput, VerificationInput or AgentInput)."
+          "description": "The closed zoop-ai-chat-3 stage input (RouterInput, AnswerInput, VerificationInput or AgentInput)."
           "title": "Input"
           "type": "object"
       "required":

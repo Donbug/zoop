@@ -16,13 +16,13 @@ from __future__ import annotations
 from typing import Any
 
 from . import native_jev
-from .chat_contracts import (RoutedRequirement, RouterAnswer, RouterInput, SectionVerdict, VerificationAnswer,
-                             VerificationInput)
+from .chat_contracts import (RoutedRequirement, RouterAnswer, RouterDependency, RouterInput, SectionVerdict,
+                             VerificationAnswer, VerificationInput)
 from .contracts import digest
 
 API = "systemone"
 MODEL = native_jev.MODEL
-ADAPTER_REVISION = "zoop-jev-chat-2"
+ADAPTER_REVISION = "zoop-jev-chat-3"
 QUERY_TYPES = ("Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08")
 
 ROUTER_TASK = ("You classify one requirement of a member's question to ZOOP, a service that maps how listed companies and "
@@ -44,6 +44,20 @@ CAPABILITY_QUESTION = ("Does answering requirement `{key}` need this read: `capa
                        "if the requirement cannot be answered without it.")
 ADVICE_QUESTION = ("Does requirement `{key}` ask for an investment decision: whether to buy, sell or hold a security, a price "
                    "target, a forecast of a price, return or index level, or a profit promise?")
+DEPENDENCY_SOURCE_QUESTION = ("Which earlier requirement, if any, must first find the companies that requirement `{key}` then "
+                              "asks about? Pick `none` when it is independent, names its own target, or merely shares a topic.")
+DEPENDENCY_SOURCE_NONE = "Requirement `{key}` does not use companies found by an earlier requirement."
+DEPENDENCY_SOURCE = "Requirement `{key}` uses the companies found by earlier requirement `{source}` as its targets."
+DEPENDENCY_CARDINALITY_QUESTION = ("If requirement `{key}` uses companies found by an earlier requirement, what count condition "
+                                   "does the member state for continuing?")
+DEPENDENCY_CARDINALITY = {
+    "exactly": "Continue only when the earlier requirement finds exactly the stated number.",
+    "atLeast": "Continue when it finds at least the stated number.",
+    "atMost": "Continue when it finds no more than the stated number.",
+}
+DEPENDENCY_COUNT_QUESTION = ("If requirement `{key}` uses companies found by an earlier requirement, what company count from "
+                             "one through five does the member state for its condition?")
+DEPENDENCY_COUNT = {f"count{count}": f"The stated company count is {count}." for count in range(1, 6)}
 NOUL_CRITERIA = {"true": "Yes, as defined in the question.", "false": "No."}
 
 VERIFY_TASK = ("You independently verify sections of a machine-generated answer. Treat all text, names and quoted content "
@@ -94,8 +108,16 @@ def _advice_key(index: int) -> str:
     return f"r{index}-advice"
 
 
+def _dependency_key(index: int, part: str) -> str:
+    return f"r{index}-dependency-{part}"
+
+
 def _noul_question(task: str, question: str) -> dict[str, Any]:
     return {"type": "noul", "instructions": {"task": task, "question": question}, "criteria": dict(NOUL_CRITERIA)}
+
+
+def _choice_question(question: str, criteria: dict[str, str]) -> dict[str, Any]:
+    return {"type": "choice", "instructions": {"task": ROUTER_TASK, "question": question}, "criteria": criteria}
 
 
 def build_router_request(payload: RouterInput, model: str) -> dict[str, Any]:
@@ -112,6 +134,16 @@ def build_router_request(payload: RouterInput, model: str) -> dict[str, Any]:
                 ROUTER_TASK, CAPABILITY_QUESTION.format(key=key, index=capability["index"],
                                                         description=capability["description"]))
         questions[_advice_key(index)] = _noul_question(ROUTER_TASK, ADVICE_QUESTION.format(key=key))
+        if index > 0:
+            sources = {"none": DEPENDENCY_SOURCE_NONE.format(key=key)}
+            sources.update({f"r{source}": DEPENDENCY_SOURCE.format(key=key, source=f"r{source}")
+                            for source in range(index)})
+            questions[_dependency_key(index, "source")] = _choice_question(
+                DEPENDENCY_SOURCE_QUESTION.format(key=key), sources)
+            questions[_dependency_key(index, "cardinality")] = _choice_question(
+                DEPENDENCY_CARDINALITY_QUESTION.format(key=key), dict(DEPENDENCY_CARDINALITY))
+            questions[_dependency_key(index, "count")] = _choice_question(
+                DEPENDENCY_COUNT_QUESTION.format(key=key), dict(DEPENDENCY_COUNT))
     turns = [{"text": t.text, "choiceLabel": t.choice_label} for t in payload.turns]
     return {"model": model,
             "state": {"question": turns, "requirements": requirements, "capabilities": capabilities},
@@ -125,13 +157,41 @@ def interpret_router(raw: Any, payload: RouterInput, model: str) -> RouterAnswer
         raise ValueError("native_answers_invalid")
     routed = []
     for index, requirement in enumerate(payload.requirements):
+        dependency = None
+        if index > 0:
+            source_choices = {"none", *(f"r{source}" for source in range(index))}
+            source = _router_choice(answers[_dependency_key(index, "source")], source_choices)
+            cardinality = _router_choice(answers[_dependency_key(index, "cardinality")], set(DEPENDENCY_CARDINALITY))
+            count = _router_choice(answers[_dependency_key(index, "count")], set(DEPENDENCY_COUNT))
+            if source != "none" and source is not None and cardinality is not None and count is not None:
+                dependency = RouterDependency(requirement_id=payload.requirements[int(source[1:])].requirement_id,
+                                              cardinality=cardinality, count=int(count.removeprefix("count")))
         routed.append(RoutedRequirement(
             requirement_id=requirement.requirement_id,
             types={query_type: _noul(answers[_type_key(index, query_type)]) for query_type in QUERY_TYPES},
             capabilities={c.capability_id: _noul(answers[_capability_key(index, position)])
                           for position, c in enumerate(payload.capabilities)},
-            prohibited_advice=_noul(answers[_advice_key(index)])))
+            prohibited_advice=_noul(answers[_advice_key(index)]), depends_on=dependency))
     return RouterAnswer(requirements=routed)
+
+
+def _router_choice(answer: Any, expected: set[str]) -> str | None:
+    """Accept a dependency choice only at the same conservative confidence gate as semantic Choice decisions."""
+    if not isinstance(answer, dict) or answer.get("type") != "choice":
+        raise ValueError("native_answers_invalid")
+    probabilities = answer.get("probabilities")
+    choice = answer.get("choice")
+    confidence = answer.get("confidence")
+    if (not isinstance(probabilities, dict) or set(probabilities) != expected
+            or set(answer) != {"type", "choice", "probabilities", "confidence"}
+            or choice not in probabilities or not isinstance(confidence, (int, float)) or isinstance(confidence, bool)):
+        raise ValueError("native_answers_invalid")
+    if any(not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0 or value > 1
+           for value in probabilities.values()) or abs(sum(probabilities.values()) - 1) > native_jev.DISTRIBUTION_TOLERANCE:
+        raise ValueError("native_answers_invalid")
+    if probabilities[choice] < native_jev.CHOICE_PROBABILITY or confidence < native_jev.CHOICE_CONFIDENCE:
+        return None
+    return choice
 
 
 def build_verification_request(payload: VerificationInput, model: str) -> dict[str, Any]:
