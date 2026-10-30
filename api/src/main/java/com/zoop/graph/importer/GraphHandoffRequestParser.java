@@ -3,6 +3,7 @@ package com.zoop.graph.importer;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import com.zoop.ai.http.HandoffWire;
 import com.zoop.common.json.StrictJson;
 
 /**
@@ -15,7 +16,7 @@ public final class GraphHandoffRequestParser {
     public static final String SCHEMA_VERSION = "zoop-graph-handoff-import-1";
     public static final int MAX_BYTES = 64 * 1024;
 
-    private static final Pattern HANDOFF_ID = Pattern.compile("[A-Za-z0-9._:-]{1,200}");
+    private static final Pattern HANDOFF_ID = HandoffWire.HANDOFF_ID;
     private static final Pattern OPERATOR = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,63}");
 
     public GraphHandoffRequest parse(byte[] bytes) {

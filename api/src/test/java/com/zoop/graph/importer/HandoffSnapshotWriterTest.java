@@ -352,8 +352,8 @@ class HandoffSnapshotWriterTest {
                 first.rawVersion(), first.title(), first.url(), first.publishedAt(), first.precision(), first.observations(),
                 first.textSha256(), first.origin()));
         VerifiedHandoff ambiguous = new VerifiedHandoff(rebuilt(bundle, bundle.issues(), bundle.evidence(), articles),
-                verified.manifest(), verified.manifestNode(), verified.bundleNode(), verified.receiptNode(),
-                verified.attemptsNode(), verified.manifestDigest(), verified.bundleDigest(), verified.contentDigest());
+                verified.manifest(), verified.manifestNode(), verified.bundleNode(), verified.producerNode(),
+                verified.manifestDigest(), verified.bundleDigest(), verified.contentDigest());
 
         GraphHandoffException refused = assertThrows(GraphHandoffException.class,
                 () -> HandoffSnapshotWriter.snapshot(version(ambiguous), ambiguous));
@@ -494,7 +494,7 @@ class HandoffSnapshotWriterTest {
             rawIssue.set("representative", event.deepCopy());
         }
         return new VerifiedHandoff(rebuilt(typed, issues, evidence, articles), base.manifest(), base.manifestNode(), raw,
-                base.receiptNode(), base.attemptsNode(), base.manifestDigest(), base.bundleDigest(), base.contentDigest());
+                base.producerNode(), base.manifestDigest(), base.bundleDigest(), base.contentDigest());
     }
 
     private static byte[] resource(String name) throws IOException {
