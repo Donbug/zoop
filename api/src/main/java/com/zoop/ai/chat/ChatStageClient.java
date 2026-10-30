@@ -1,7 +1,7 @@
 package com.zoop.ai.chat;
 
 /**
- * The chatbot model stage transport ({@code POST /internal/v1/chat-stages/{stage}}, contract {@code zoop-ai-chat-2}): one
+ * The chatbot model stage transport ({@code POST /internal/v1/chat-stages/{stage}}, contract {@code zoop-ai-chat-3}): one
  * synchronous stage per call. The client never retries; the invocation id makes a resend of the same input safe.
  *
  * <p>Outcomes: a returned {@link ChatStageReply} is the stage outcome (succeeded, or failed with whether a request was sent and

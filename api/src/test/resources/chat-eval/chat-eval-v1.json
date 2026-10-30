@@ -350,6 +350,38 @@
       }
     },
     {
+      "id": "q07-dependent-company-details",
+      "group": "Q07",
+      "question": "내 종목을 찾아줘? 정확히 두 곳이면 그 회사들을 설명해줘",
+      "memberScope": [
+        {"id": "KRX:000660", "name": "SK하이닉스", "held": true},
+        {"id": "KRX:005930", "name": "삼성전자", "watched": true}
+      ],
+      "script": {
+        "router": {
+          "r1": {"types": {"Q07": 0.9}, "capabilities": {}},
+          "r2": {
+            "types": {"Q03": 0.9},
+            "capabilities": {"company.read": 0.9},
+            "dependsOn": {"requirementId": "r1", "cardinality": "exactly", "count": 2}
+          }
+        },
+        "answer": {"sections": [
+          {"basis": "evidence_grounded", "text": "내 종목은 SK하이닉스와 삼성전자입니다.", "requirementIds": ["r1"], "evidenceIds": []},
+          {"basis": "evidence_grounded", "text": "두 회사는 메모리 반도체를 만듭니다.", "requirementIds": ["r2"], "evidenceIds": ["$branch"]}
+        ]}
+      },
+      "expect": {
+        "requirements": ["내 종목을 찾아줘", "정확히 두 곳이면 그 회사들을 설명해줘"],
+        "stages": ["router", "answer", "verify"],
+        "tools": ["company.read", "portfolio.scope.read"],
+        "planned": ["r1:tools", "r2:tools"],
+        "outcome": "answered",
+        "appliedCompanies": ["KRX:000660", "KRX:005930"],
+        "limitations": []
+      }
+    },
+    {
       "id": "q07-no-stocks",
       "group": "Q07",
       "question": "내 종목 관련 사건 알려줘",
