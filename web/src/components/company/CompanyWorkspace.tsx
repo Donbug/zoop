@@ -1,6 +1,8 @@
 import CompanyInfoTab from './CompanyInfoTab';
 import PriceChart from './PriceChart';
 import { formatKst, formatMoney } from '@/util/format';
+import { formatTimelineTime } from '@/util/event-time';
+import { ChangeRate } from '@/components/stocks/StockQuote';
 import BoltIcon from './BoltIcon';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
@@ -43,6 +45,9 @@ import {
   requestTime,
   versionOnlyAddress,
 } from './detail-model';
+
+// D-COM-01 B1: 백엔드 financials 컨트롤러가 생기면 계약을 확인하고 다시 켠다.
+const COMPANY_FINANCIALS_ENABLED = false;
 
 const workspaceClasses =
   'company-workspace grid grid-cols-[200px_minmax(0,1fr)_280px] gap-3 m-0 overflow-visible text-zoop-ink max-[1000px]:grid-cols-[160px_minmax(0,1fr)] max-md:flex max-md:flex-col [&_section]:border-b [&_section]:border-zoop-line [&_section]:py-4 [&_h1]:text-[26px] [&_h1]:font-bold [&_h1]:tracking-[-0.035em] [&_h2]:mb-3 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:tracking-[-0.025em] [&_h3]:font-semibold [&_p]:text-xs [&_p]:text-zoop-muted [&_p]:leading-[1.7] [&_button]:cursor-pointer [&_button]:rounded-full [&_button]:border [&_button]:border-zoop-line [&_button]:bg-white [&_button]:min-h-[36px] [&_button]:px-4 [&_button]:py-2 [&_button]:text-xs! [&_button[aria-pressed=true]]:bg-zoop-ink [&_button[aria-pressed=true]]:text-white [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-default [&_a]:cursor-pointer [&_a]:px-[9px] [&_a]:py-1.5 [&_a]:text-xs [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-zoop-ink [&_nav]:my-3 [&_nav]:flex [&_nav]:flex-wrap [&_nav]:gap-1.5 [&_article]:border-b [&_article]:border-zoop-line [&_article]:py-3 [&_table]:w-full [&_table]:text-xs [&_table]:wrap-anywhere [&_[role=alert]]:text-zoop-alert [&_details]:my-3 [&_input]:max-w-full [&_input]:rounded-xl [&_input]:border [&_input]:border-zoop-line [&_input]:bg-white [&_input]:px-3 [&_input]:py-2 [&_input]:min-h-[38px] [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-2 [&_summary:focus-visible]:outline-zoop-ink max-md:[&_table]:block max-md:[&_table]:overflow-auto max-md:[&_section]:min-w-0 max-md:[&_section]:wrap-anywhere';
@@ -98,10 +103,22 @@ function fixedFailure(
     return '자료 공급원의 설정이나 응답 형식 문제로 지금은 확인할 수 없어요.';
   return null;
 }
+// D-COM-01 / F6: display KST while retaining the API timestamp for machines.
+function ReferenceTime({
+  value,
+  missing = '미제공',
+}: {
+  value: string | null | undefined;
+  missing?: string;
+}) {
+  return value ? <time dateTime={value}>{formatKst(value)}</time> : missing;
+}
+
 function Basis({ metadata }: { metadata: Meta | undefined }) {
   return metadata ? (
     <p className="wrap-anywhere">
-      출처 {metadata.source} · 공개 자료 기준 {metadata.asOf} · 버전{' '}
+      출처 {metadata.source} · 공개 자료 기준{' '}
+      <ReferenceTime value={metadata.asOf} /> · 버전{' '}
       {metadata.graphVersion ?? '미제공'}
       {metadata.partial ? ' · 일부 자료 미제공' : ''}
     </p>
@@ -200,6 +217,10 @@ function eventReferenceTime(
   if (!time) return current;
   return current && Date.parse(time) > Date.parse(current) ? current : time;
 }
+
+/** 같은 순간을 다르게 적은 RFC 3339 시각(Z·오프셋·소수초)도 같은 시각으로 본다. */
+const sameInstant = (a: string | null, b: string | null) =>
+  !!a && !!b && Date.parse(a) === Date.parse(b);
 
 export default function CompanyWorkspace() {
   const { id = '' } = useParams();
@@ -398,10 +419,12 @@ export default function CompanyWorkspace() {
   // 다른 사건을 고르는 순간(그래프 시점이 풀리기 전)에도 그 사건을 남의 시각으로 조회하지 않는다.
   const selectedEvent =
     events.data?.items.find((item) => item.id === eventId) ?? event.data;
-  const impactSnapshot =
-    graphAsOf && eventReferenceTime(selectedEvent, asOf) === graphAsOf
-      ? graphSnapshot
-      : snapshot;
+  const impactSnapshot = sameInstant(
+    graphAsOf,
+    eventReferenceTime(selectedEvent, asOf),
+  )
+    ? graphSnapshot
+    : snapshot;
   const impact = useCompanyResource<Impact>(
     ready && eventId
       ? companyUrl(
@@ -416,7 +439,9 @@ export default function CompanyWorkspace() {
     owner,
   );
   const financials = useCompanyResource<Financials>(
-    ready ? companyUrl(id, '/financials', snapshot) : null,
+    COMPANY_FINANCIALS_ENABLED && ready
+      ? companyUrl(id, '/financials', snapshot)
+      : null,
   );
   const tab = ['events', 'documents', 'info'].includes(params.get('tab') ?? '')
     ? params.get('tab')!
@@ -454,10 +479,14 @@ export default function CompanyWorkspace() {
     ),
   );
   useEffect(() => {
-    if (selectedBucket)
-      document
-        .getElementById(bucketElementId(selectedBucket))
-        ?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    if (!selectedBucket) return;
+    // 스크립트가 고른 smooth는 CSS의 동작 줄이기 규칙보다 앞서므로 여기서 따로 끈다.
+    const reduced =
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    document.getElementById(bucketElementId(selectedBucket))?.scrollIntoView?.({
+      block: 'nearest',
+      behavior: reduced ? 'auto' : 'smooth',
+    });
   }, [selectedBucket]);
   const mapQuery = new URLSearchParams({
     mode: 'all',
@@ -500,7 +529,7 @@ export default function CompanyWorkspace() {
   /** D-COM-06: 사건 시각의 관계 그래프. 월·연 정밀도나 시각 미상, 현재 기준 시점과 같거나 늦은 사건은 옮기지 않는다. */
   const eventGraphTime = (item: Events['items'][number]) => {
     const time = eventReferenceTime(item, asOf);
-    return time && time !== asOf ? time : null;
+    return time && asOf && Date.parse(time) < Date.parse(asOf) ? time : null;
   };
   function showEventGraph(item: Events['items'][number], time: string) {
     setClosedGraphTime(null);
@@ -541,7 +570,7 @@ export default function CompanyWorkspace() {
         currentCompany={company.data}
         portfolio={portfolio}
       />
-      <main className="min-w-0 rounded-2xl bg-white p-6 shadow-sm max-md:p-4">
+      <div className="min-w-0 rounded-2xl bg-white p-6 shadow-sm max-md:p-4">
         {versionOnly && (company.loading || versionStart) && (
           <p role="status" className="mb-4 text-[13px] text-zoop-muted">
             그래프 버전({version})이 처음 공개된 시점을 확인하고 있어요.
@@ -611,19 +640,30 @@ export default function CompanyWorkspace() {
           {quote.data?.status === 'available' && (
             <>
               <strong className="text-2xl">
-                {number(quote.data.quote.price)} {quote.data.quote.currency}
+                {quote.data.quote.price === null
+                  ? '미제공'
+                  : formatMoney(
+                      quote.data.quote.price,
+                      quote.data.quote.currency,
+                    )}
               </strong>
               <span>
                 {' '}
-                · 전일 대비 {number(quote.data.quote.change)} (
-                {quote.data.quote.changeRate === null
-                  ? '미제공'
-                  : `${number(quote.data.quote.changeRate * 100)}%`}
-                )
+                · 전일 대비{' '}
+                <ChangeRate
+                  rate={quote.data.quote.changeRate}
+                  change={quote.data.quote.change}
+                  currency={quote.data.quote.currency}
+                  className=""
+                />
               </span>
               <p>
-                공급자 관측 {quote.data.quote.asOf ?? '시각 미제공'} ·{' '}
-                {quote.data.source.name} ·{' '}
+                공급자 관측{' '}
+                <ReferenceTime
+                  value={quote.data.quote.asOf}
+                  missing="시각 미제공"
+                />{' '}
+                · {quote.data.source.name} ·{' '}
                 {quote.data.source.delayNote ?? '지연 정보 미제공'}
               </p>
               <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-xs [&_dt]:text-zoop-faint [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
@@ -643,60 +683,54 @@ export default function CompanyWorkspace() {
             </>
           )}
         </section>
-        <section aria-label="가상 계좌 보유">
-          <h2>가상 계좌 보유 · 프로젝트용 모의 데이터</h2>
-          {!auth.isAuthenticated ? (
-            <p>
-              {auth.checking
-                ? '로그인 상태 확인 중…'
-                : '로그인하고 가상 계좌를 연결하면 모의 보유 정보를 볼 수 있어요.'}
-            </p>
-          ) : (
-            <>
+        {(holding || portfolio.error) && (
+          <section aria-label="가상 계좌 보유">
+            <h2>가상 계좌 보유 · 프로젝트용 모의 데이터</h2>
+            {portfolio.error && (
               <Status resource={portfolio} label="모의 보유" />
-              {portfolio.data && !portfolio.data.connected && (
-                <p>연결된 가상 계좌가 없어요.</p>
-              )}
-              {portfolio.data?.connected && !holding && (
-                <p>이 기업의 모의 보유 종목이 없어요.</p>
-              )}
-              {holding && (
-                <>
-                  <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-xs [&_dt]:text-zoop-faint [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
-                    <dt>보유 수량</dt>
-                    <dd>{number(holding.quantity)}주</dd>
-                    <dt>평균 매입가</dt>
-                    <dd>
-                      {number(holding.avgPrice)}{' '}
-                      {holding.avgPriceCurrency ?? '통화 미상'}
-                    </dd>
-                    <dt>평가 금액</dt>
-                    <dd>
-                      {number(holding.marketValue)}{' '}
-                      {holding.quote.status === 'available'
-                        ? holding.quote.currency
-                        : '시세 미제공'}
-                    </dd>
-                    <dt>자산 비중</dt>
-                    <dd>
-                      {holding.weight === null
-                        ? '계산 불가'
-                        : `${number(holding.weight * 100)}%`}
-                    </dd>
-                  </dl>
-                  <p>
-                    모의 수량 기준 {portfolio.data?.mockAsOf ?? '미제공'} · 평가
-                    기준 {portfolio.data?.valuation?.calculatedAt ?? '미제공'}
-                  </p>
-                  {portfolio.data?.valuation?.weightUnavailableReason && (
-                    <p>{portfolio.data.valuation.weightUnavailableReason}</p>
-                  )}
-                </>
-              )}
-              <Basis metadata={portfolio.data?.metadata} />
-            </>
-          )}
-        </section>
+            )}
+            {holding && (
+              <>
+                <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-xs [&_dt]:text-zoop-faint [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
+                  <dt>보유 수량</dt>
+                  <dd>{number(holding.quantity)}주</dd>
+                  <dt>평균 매입가</dt>
+                  <dd>
+                    {number(holding.avgPrice)}{' '}
+                    {holding.avgPriceCurrency ?? '통화 미상'}
+                  </dd>
+                  <dt>평가 금액</dt>
+                  <dd>
+                    {number(holding.marketValue)}{' '}
+                    {holding.quote.status === 'available'
+                      ? holding.quote.currency
+                      : '시세 미제공'}
+                  </dd>
+                  <dt>자산 비중</dt>
+                  <dd>
+                    {holding.weight === null
+                      ? '-'
+                      : `${number(holding.weight * 100)}%`}
+                  </dd>
+                </dl>
+                <p>
+                  모의 수량 기준{' '}
+                  <ReferenceTime value={portfolio.data?.mockAsOf} /> · 평가 기준{' '}
+                  <ReferenceTime
+                    value={portfolio.data?.valuation?.calculatedAt}
+                  />
+                </p>
+                {portfolio.data?.valuation?.weightUnavailableReason && (
+                  <p>{portfolio.data.valuation.weightUnavailableReason}</p>
+                )}
+              </>
+            )}
+            {!holding && portfolio.data?.connected && (
+              <p>이 기업의 모의 보유 종목이 없어요.</p>
+            )}
+            <Basis metadata={portfolio.data?.metadata} />
+          </section>
+        )}
         <nav
           aria-label="기업 상세 보기"
           className="my-0! gap-0! border-b border-zoop-line"
@@ -830,7 +864,9 @@ export default function CompanyWorkspace() {
                           key={point.time}
                           className="border-t-[0.667px] border-zoop-line"
                         >
-                          <td className="py-1">{point.time}</td>
+                          <td className="py-1">
+                            <ReferenceTime value={point.time} />
+                          </td>
                           <td className="py-1 text-right">
                             {number(point.close)}
                           </td>
@@ -922,7 +958,16 @@ export default function CompanyWorkspace() {
                                 {item.title}
                               </button>
                               <p className="text-[11px] text-zoop-muted tabular-nums">
-                                {item.eventTime ?? '시점 미상'}
+                                {item.eventTime ? (
+                                  <time dateTime={item.eventTime}>
+                                    {formatTimelineTime(
+                                      item.eventTime,
+                                      item.timePrecision,
+                                    )}
+                                  </time>
+                                ) : (
+                                  '시점 미상'
+                                )}
                               </p>
                               <button
                                 onClick={() => selectEvent(item, 'documents')}
@@ -934,7 +979,7 @@ export default function CompanyWorkspace() {
                                 <button
                                   type="button"
                                   aria-pressed={
-                                    graphAsOf === itemGraphTime &&
+                                    sameInstant(graphAsOf, itemGraphTime) &&
                                     eventId === item.id
                                   }
                                   data-graph-time-trigger
@@ -978,7 +1023,9 @@ export default function CompanyWorkspace() {
                         <button onClick={() => selectEvent(item)}>
                           {item.title}
                         </button>{' '}
-                        · 보도 시각 {item.reportedAt ?? '미상'} (사건 시각 아님)
+                        · 보도 시각{' '}
+                        <ReferenceTime value={item.reportedAt} missing="미상" />{' '}
+                        (사건 시각 아님)
                       </p>
                     ))}
                   </details>
@@ -1026,42 +1073,44 @@ export default function CompanyWorkspace() {
         )}
         {tab === 'documents' && <CompanyDocumentPanel />}
         {tab === 'info' && <CompanyInfoTab resource={company} />}
-        <section aria-label="핵심 재무">
-          <h2>핵심 재무</h2>
-          <Status resource={financials} label="재무" />
-          {financials.data && (
-            <>
-              <Basis metadata={financials.data.metadata} />
-              {financials.data.status !== 'available' ? (
-                <p>
-                  {financials.data.status === 'failed'
-                    ? '재무 조회 실패'
-                    : '재무 미제공'}{' '}
-                  · {financials.data.reason}
-                  <button onClick={financials.retry}>재무 다시 조회</button>
-                </p>
-              ) : financials.data.items.length ? (
-                <dl>
-                  {financials.data.items.map((f, i) => (
-                    <div key={`${f.name}:${i}`}>
-                      <dt>
-                        {f.name} ({f.period})
-                      </dt>
-                      <dd>
-                        {number(f.value)} {f.unit} ·{' '}
-                        {f.accountingBasis ?? '회계 기준 미제공'} · {f.source} ·{' '}
-                        {f.asOf}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              ) : (
-                <p>제공된 재무 항목이 없어요.</p>
-              )}
-            </>
-          )}
-        </section>
-      </main>
+        {COMPANY_FINANCIALS_ENABLED && (
+          <section aria-label="핵심 재무">
+            <h2>핵심 재무</h2>
+            <Status resource={financials} label="재무" />
+            {financials.data && (
+              <>
+                <Basis metadata={financials.data.metadata} />
+                {financials.data.status !== 'available' ? (
+                  <p>
+                    {financials.data.status === 'failed'
+                      ? '재무 조회 실패'
+                      : '재무 미제공'}{' '}
+                    · {financials.data.reason}
+                    <button onClick={financials.retry}>재무 다시 조회</button>
+                  </p>
+                ) : financials.data.items.length ? (
+                  <dl>
+                    {financials.data.items.map((f, i) => (
+                      <div key={`${f.name}:${i}`}>
+                        <dt>
+                          {f.name} ({f.period})
+                        </dt>
+                        <dd>
+                          {number(f.value)} {f.unit} ·{' '}
+                          {f.accountingBasis ?? '회계 기준 미제공'} · {f.source}{' '}
+                          · <ReferenceTime value={f.asOf} />
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : (
+                  <p>제공된 재무 항목이 없어요.</p>
+                )}
+              </>
+            )}
+          </section>
+        )}
+      </div>
       {/* D-COM-04: 넓은 화면은 와이어프레임처럼 오른쪽 열에 두고 스크롤해도 화면 안에 남는다.
           1000px 이하에서는 본문 아래로 옮겨 넓게 본다. */}
       <aside

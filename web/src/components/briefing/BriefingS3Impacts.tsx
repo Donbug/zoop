@@ -5,6 +5,7 @@ import { getBriefingItemImpacts } from '@/apis/briefing/impacts';
 import { safeArticleUrl } from '@/components/graph/event-format';
 import { briefingTime } from '@/util/briefingTime';
 import { BODY, NOTE, FOCUS_RING } from './briefingStyles';
+import ImpactCue from '@/components/common/ImpactCue';
 const labels = {
   positive: '긍정',
   negative: '부정',
@@ -177,8 +178,10 @@ export default function BriefingS3Impacts({
                       className="space-y-3 rounded border border-zoop-line bg-zoop-wash p-3"
                     >
                       <h6 className="text-sm font-semibold">
-                        {labels[a.supplementalReview.label]} · 공식 근거 보강 후
-                        재검증
+                        <ImpactCue tone={a.supplementalReview.label} badge>
+                          {labels[a.supplementalReview.label]} · 공식 근거 보강
+                          후 재검증
+                        </ImpactCue>
                       </h6>
                       <p className={NOTE}>
                         이전 {labels[a.supplementalReview.previousLabel]} →
@@ -209,7 +212,9 @@ export default function BriefingS3Impacts({
                             key={e.id}
                           >
                             <p className="text-xs font-semibold">
-                              {sides[e.effect]}
+                              <ImpactCue tone={e.effect}>
+                                {sides[e.effect]}
+                              </ImpactCue>
                             </p>
                             <blockquote
                               className={`${BODY} border-l-2 border-zoop-line pl-3`}
@@ -275,9 +280,11 @@ export default function BriefingS3Impacts({
                   ) : (
                     <>
                       <p className="text-sm font-semibold">
-                        {a.supplementalReview ? '이전 검증 기록 · ' : ''}
-                        {c.assessments.length > 1 ? `평가 ${i + 1} · ` : ''}
-                        {labels[a.label!]} · 인용 근거 검증
+                        <ImpactCue tone={a.label!} badge>
+                          {a.supplementalReview ? '이전 검증 기록 · ' : ''}
+                          {c.assessments.length > 1 ? `평가 ${i + 1} · ` : ''}
+                          {labels[a.label!]} · 인용 근거 검증
+                        </ImpactCue>
                       </p>
                       {a.label === 'undetermined' && (
                         <p className={NOTE}>
@@ -294,7 +301,9 @@ export default function BriefingS3Impacts({
                         {a.evidence.map((e) => (
                           <div key={e.id}>
                             <p className="text-xs font-semibold">
-                              {sides[e.effect]}
+                              <ImpactCue tone={e.effect}>
+                                {sides[e.effect]}
+                              </ImpactCue>
                             </p>
                             <blockquote
                               className={`${BODY} border-l-2 border-zoop-line pl-3`}

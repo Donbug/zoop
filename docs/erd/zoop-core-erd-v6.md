@@ -6,7 +6,7 @@
 
 ## 1. 결정 요약
 
-**PostgreSQL 42개 테이블.** 함께 저장하고 읽는 결과는 JSON으로 통합하고 독립 조회·집계·무결성에 필요한 관계는 테이블로 유지한다. v0.7 챗봇 오케스트레이션의 실제 도구 호출은 독립 관측·예산 집계를 위해 `chat_tool_calls`로 분리하고, 고정 계획의 여러 앱 시도가 공유하는 실행 참조는 `analysis_plans`·`analysis_plan_units`로 정규화한다.
+**PostgreSQL 43개 테이블.** 함께 저장하고 읽는 결과는 JSON으로 통합하고 독립 조회·집계·무결성에 필요한 관계는 테이블로 유지한다. v0.7 챗봇 오케스트레이션의 실제 도구 호출은 독립 관측·예산 집계를 위해 `chat_tool_calls`로 분리하고, 고정 계획의 여러 앱 시도가 공유하는 실행 참조는 `analysis_plans`·`analysis_plan_units`로 정규화한다.
 
 기존 설계는 회원과 1:1인 비밀번호·설정, 분석 결과 내부의 주장·인용, 발행본 내부 항목·판정, 응답과 함께 읽는 채팅 인용까지 분리했다. API가 독립 수정·검색을 요구하지 않는 구성 요소에도 별도 테이블을 배정한 것이 개수 증가의 큰 원인이다. 재시도·정정·감사 등 명세가 실제로 요구하는 기능도 개수에 영향을 준다.
 
@@ -24,12 +24,12 @@
 | 기업·관심·모의 계좌 | 5 | 별칭은 배열, 보유내역은 기업 FK가 있는 별도 테이블 |
 | 문서·근거·분석 | 5 | 분석 내부 주장·인용·긍부정을 한 결과에 저장 |
 | 브리핑 | 3 | 회차에 발행 원문 보관, 정정·중단은 한 이력 테이블 |
-| 채팅 | 3 | 작업에 결과·인용·라우팅 요약을 포함하고 실제 도구 호출은 독립 기록 |
+| 채팅 | 4 | 작업에 결과·인용·라우팅 요약을 포함하고 실제 도구 호출은 독립 기록, 웹 검색 일일 한도는 원자 예약용 카운터 |
 | 그래프·검수·공개 규칙·공개 제외 | 10 | 실제 조회 이력 유지, 버전 상태·활성 포인터 통합, 버전별 적용 규칙, 버전별 공개 제외 이력·명령 기록 |
 | 평가·작업·통계·감사 | 8 | 독립 집계·조회가 필요한 기록, 계획 등록·단위별 실행 원장 유지 |
-| **합계** | **42** | Neo4j 노드·관계 및 파일 저장소는 이 개수에 포함하지 않음 |
+| **합계** | **43** | Neo4j 노드·관계 및 파일 저장소는 이 개수에 포함하지 않음 |
 
-42개는 이 설계안의 선택이지 API가 강제하는 최소 개수가 아니다. 개발 일정과 인력 배분은 이 ERD의 범위에서 제외한다.
+43개는 이 설계안의 선택이지 API가 강제하는 최소 개수가 아니다. 개발 일정과 인력 배분은 이 ERD의 범위에서 제외한다.
 
 ## 2. 저장소와 공통 규칙
 
@@ -665,6 +665,16 @@ UNIQUE(chat_job_id, attempt_no, call_index)
 `result`는 챗봇 MCP 경로(`request_meta.via = "mcp"`)의 성공 호출만 가지는 정규화 결과 봉투(`chat-tool/v1`의 items·evidenceIds·paths·truncated 등, 256 KiB 이하)다. 모델이 공급자 쪽에서 받은 것과 같은 결과를 남겨, 앱이 최종 답의 인용·지도 대상을 바로 그 결과로 결정론 검사한다. 성공 종료 기록과 같은 fenced 갱신에서만 쓰며, 서버 계획(direct) 호출은 남기지 않는다. 작업과 같은 보존·삭제 정책을 따른다(2026-10-28).
 
 `evidence_ids`는 성공 응답에서 답변 후보에 전달한 근거 ID이며 저장 시 현재 공개 문서 버전과 일치하는지 검사한다. 응답의 `data_version`, `truncated`, `next_allowed`와 artifact가 있으면 그 내용이 일치해야 한다. 기본 인덱스는 `(chat_job_id, attempt_no, call_index)`, `(tool_id, started_at)`, `(status, started_at)`이다. 요청당 호출 수·지연·오류·중복 제거율은 이 테이블에서 집계하고 모델 호출·토큰·비용은 `ai_executions`에서 별도로 집계한다.
+
+### 36A. chat_web_search_quotas — 챗봇 웹 검색 일일 한도
+
+```text
+quota_date date; subject_key text('project' | 'member:<member_id>'); member_id text? FK members ON DELETE CASCADE
+used integer(>= 0)
+PRIMARY KEY(quota_date, subject_key)
+```
+
+챗봇 보조 웹 검색의 KST 날짜별 사용량이다(웹 검색 설계 3절: 회원 하루 20회, 프로젝트 전체 하루 500회). `subject_key`가 `project`이면 `member_id`는 NULL이고, 회원 행은 `member:<member_id>`다. 웹 검색 호출을 `chat_tool_calls`에 `reserved`로 기록하는 같은 트랜잭션에서 프로젝트 행, 회원 행 순서로 조건부 증가(`used + n <= 한도`)하고, 하나라도 모자라면 예약 전체를 되돌린다. 그래서 동시 요청이 함께 한도를 넘지 못한다. 예약된 웹 호출은 성공·실패·timeout·미시작과 관계없이 모두 센다. 대화 삭제로 줄지 않으며 회원 탈퇴 시 회원 행만 함께 지운다. job당 웹 2회는 이 테이블이 아니라 `chat_tool_calls`의 `registry_group = 'web-search'` 행으로 센다(2026-10-30).
 
 ### 37–39. disclosure_exclusion_changes, disclosure_exclusion_targets, disclosure_exclusion_requests — 공개 제외(FS081)
 

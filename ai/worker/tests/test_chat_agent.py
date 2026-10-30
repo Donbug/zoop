@@ -181,6 +181,28 @@ def test_a_step_that_stops_at_approval_requests_relays_them_and_never_stores_the
     assert all(TOKEN not in (column or "") for row in stored for column in row)
 
 
+def test_a_provider_that_could_not_reach_the_mcp_server_is_mcp_unreachable(tmp_path):
+    for ledger in ("a", "b", "c"):
+        (tmp_path / ledger).mkdir()
+    # The provider's 424 (it could not list the server's tools): a definite failure the application counts for its circuit.
+    refused = run(request(agent_input()), tmp_path / "a", Endpoint(httpx.Response(
+        424, json={"error": {"message": "Error retrieving tool list from MCP server: 'zoop'", "type": "external_connector_error"}})))
+    assert refused.status == "failed" and refused.failure.code == "mcp_unreachable"
+    assert refused.failure.sent is True and refused.failure.unknown is False
+
+    # A tool listing that failed inside a response: the provider never reached the tools either.
+    failed_listing = {"id": "resp_1", "object": "response", "status": "completed", "model": "gpt-6-luna",
+                      "output": [{"type": "mcp_list_tools", "id": "mcpl_1", "server_label": "zoop", "tools": [],
+                                  "error": "Error retrieving tool list from MCP server"}],
+                      "usage": {"input_tokens": 100, "output_tokens": 0}}
+    listed = run(request(agent_input()), tmp_path / "b", Endpoint(failed_listing))
+    assert listed.status == "failed" and listed.failure.code == "mcp_unreachable"
+
+    # Another provider error stays what it was: only a failed connection counts.
+    other = run(request(agent_input()), tmp_path / "c", Endpoint(httpx.Response(500, json={"error": {}})))
+    assert other.failure.code == "provider_http_500"
+
+
 def test_a_continuation_step_ends_with_the_final_answer_and_the_calls_the_provider_made(tmp_path):
     calls = [{"type": "mcp_call", "id": "mcp_1", "server_label": "zoop", "name": "company_read",
               "arguments": "{\"targets\":[\"KRX:000660\"]}", "output": "{}", "error": None},

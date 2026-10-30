@@ -220,7 +220,7 @@ describe('D-GRP-02 · map selection and downstream context', () => {
       },
     });
     await userEvent.click(
-      screen.getByRole('button', { name: '이 노드 중심으로 보기' }),
+      screen.getByRole('button', { name: '이슈 중심 그래프' }),
     );
     expect(new URLSearchParams(router.state.location.search).get('focus')).toBe(
       'mock-issue-1',

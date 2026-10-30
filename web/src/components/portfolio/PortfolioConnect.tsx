@@ -20,15 +20,13 @@ import type {
   PortfolioConnectProps,
 } from '@/types/portfolio';
 
-const MOCK_NOTICE =
-  '실제 증권 계좌가 아니에요. 준비된 모의 데이터로 만든 가상 계좌예요.';
+const MOCK_NOTICE = '실제 증권 계좌가 아닌 준비된 모의 데이터로 만든 가상 계좌';
 
 const primaryButton =
   'w-full rounded-xl bg-gray-950 px-4 py-3 font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300';
 const secondaryButton =
   'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 font-semibold text-gray-950 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300';
 
-// 와이어프레임 D-ONB-02의 아이콘(모의 데이터·은행·선택됨). 장식이라 읽지 않는다.
 const iconProps = {
   'aria-hidden': true,
   viewBox: '0 0 24 24',
@@ -38,14 +36,6 @@ const iconProps = {
   strokeLinecap: 'round',
   strokeLinejoin: 'round',
 } as const;
-
-function FlaskIcon() {
-  return (
-    <svg {...iconProps} className="size-4 shrink-0 text-amber-600">
-      <path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3M7 15h10" />
-    </svg>
-  );
-}
 
 function BankIcon({ className }: { className: string }) {
   return (
@@ -74,7 +64,6 @@ function CheckIcon() {
 function MockNotice() {
   return (
     <p className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
-      <FlaskIcon />
       {MOCK_NOTICE}
     </p>
   );
@@ -261,7 +250,7 @@ export default function PortfolioConnect({
         </>
       }
     >
-      <MockNotice />
+      {/* <MockNotice /> */}
       <section
         aria-labelledby="portfolio-connect-options"
         className="flex flex-col gap-3"
@@ -270,7 +259,7 @@ export default function PortfolioConnect({
           id="portfolio-connect-options"
           className="flex items-center gap-2 font-semibold text-gray-950"
         >
-          <BankIcon className="size-5 shrink-0" />
+          {/* <BankIcon className="size-5 shrink-0" /> */}
           가상 계좌 선택
         </h2>
         {(options.status === 'loading' || portfolio.status === 'loading') && (

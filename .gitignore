@@ -49,3 +49,4 @@ docs/screen-plan/captures/rendered/
 
 # Locally restored briefing corpus
 /.local/briefing-data/
+/.local/briefing-playback/

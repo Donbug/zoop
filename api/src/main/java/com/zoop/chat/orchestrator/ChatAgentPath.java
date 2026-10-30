@@ -17,6 +17,14 @@ import java.util.function.Supplier;
  * (the server plans and reads, Luna only writes).
  */
 public interface ChatAgentPath {
+    /**
+     * Checks whether a new agent run may start. Production performs the MCP preflight and circuit decision here; false means
+     * the engine starts the direct path before any agent model request. Test and non-MCP paths are available by default.
+     */
+    default boolean available() {
+        return true;
+    }
+
     /** The capabilities the agent may be given (those exposed as MCP tools). */
     Set<ChatCapability> tools();
 
@@ -40,11 +48,18 @@ public interface ChatAgentPath {
 
     /**
      * The final answer, the results of the calls that ran (as the model received them), and what the run decided: steps,
-     * approved and denied calls.
+     * approved and denied calls. {@code notices} are the codes of web faults the answer went on without (web search design
+     * 4: {@code web_unavailable}, {@code web_no_results}, {@code web_budget_exhausted}).
      */
-    record Outcome(ChatGeneratedAnswer answer, List<ChatToolResult> results, int steps, int approved, int denied) {
+    record Outcome(ChatGeneratedAnswer answer, List<ChatToolResult> results, int steps, int approved, int denied,
+            List<String> notices) {
         public Outcome {
             results = List.copyOf(results);
+            notices = List.copyOf(notices);
+        }
+
+        public Outcome(ChatGeneratedAnswer answer, List<ChatToolResult> results, int steps, int approved, int denied) {
+            this(answer, results, steps, approved, denied, List.of());
         }
     }
 }

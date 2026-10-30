@@ -160,7 +160,7 @@ public class ChatResponseGuard {
         if (targetsKept && shown == applied) return r;
         return new ChatResult(r.outcome(), r.messageId(), r.answer(), r.sections(), r.answerBasis(), r.reason(), r.sources(),
                 r.citations(), targetsKept ? r.graphTargets() : graphTargets, shown, r.choices(), r.action(),
-                r.limitations(), r.metadata());
+                r.limitations(), r.metadata(), r.answerStatus(), r.notices());
     }
 
     private static List<ChatAppliedItem> visibleOnly(List<ChatAppliedItem> items, Map<String, Boolean> seen, String at) {
@@ -169,7 +169,9 @@ public class ChatResponseGuard {
 
     private static ChatResult withheld(ChatResult r) {
         return new ChatResult(r.outcome(), r.messageId(), WITHHELD_ANSWER, List.of(), "none", r.reason(), List.of(),
-                List.of(), List.of(), r.applied(), r.choices(), r.action(), r.limitations(), r.metadata());
+                List.of(), List.of(), r.applied(), r.choices(), r.action(), r.limitations(), r.metadata(),
+                // Nothing of the answer is shown, only the fixed sentence.
+                "guidance", r.notices());
     }
 
     private static <T> List<T> nullSafe(List<T> values) {

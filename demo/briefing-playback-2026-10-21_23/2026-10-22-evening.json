@@ -1,0 +1,2161 @@
+{
+  "details": {
+    "issue-f11c16cafa07056464277c73": {
+      "claims": [
+        {
+          "evidenceIds": [
+            "evidence-grouped-49affffbede1c3245237e8c564cc"
+          ],
+          "text": "보도에 따르면 삼성전자는 대당 약 5300억원(약 3억9550만달러)인 차세대 High-NA EUV 시스템을 2028년까지 양산에 도입할 계획이다.",
+          "type": "fact"
+        }
+      ],
+      "companies": [
+        {
+          "id": "KRX:005930",
+          "name": "삼성전자",
+          "relationType": "INVOLVES",
+          "role": "company planning production using High-NA EUV systems",
+          "roleUnconfirmed": false
+        }
+      ],
+      "eventId": "issue-f11c16cafa07056464277c73",
+      "evidence": [
+        {
+          "bodyContext": null,
+          "bodySha256": "781157ca1fee9a703be4ef528b0030c3064aff0488b424588175e5dcd15ff83f",
+          "documentId": "news-a8a7c44546288bd2aacebb358e06efb35a16e8d58833dd63f6b576bf1d2853c2",
+          "documentVersion": "sha256-781157ca1fee9a703be4ef528b0030c3064aff0488b424588175e5dcd15ff83f",
+          "evidenceId": "evidence-grouped-49affffbede1c3245237e8c564cc",
+          "id": "evidence-grouped-49affffbede1c3245237e8c564cc",
+          "publishedAt": "2026-10-22T00:28:13+00:00",
+          "publisher": "",
+          "quote": "Samsung, in particular, plans to introduce next-generation High-NA EUV lithography systems, priced at approximately 530 billion won (about $395.5 million) per unit, into mass production by 2028.",
+          "quoteVerified": true,
+          "sourceKind": "news",
+          "title": "ASML Warns of Equipment Shortages Through 2028 as AI Demand Surges - Businesskorea",
+          "url": "https://www.businesskorea.co.kr/news/articleView.html?idxno=279388"
+        }
+      ],
+      "limitations": [
+        "회차 마감 이전 원발행 시각 기준의 과거 자료 재분석입니다."
+      ],
+      "metadata": {
+        "asOf": "2026-10-22T08:30:00Z",
+        "failures": [
+          {
+            "asOf": null,
+            "code": "RETROSPECTIVE_BODY",
+            "message": "원 발행시각 기준의 과거 시뮬레이션이며 당시 수집·동일 본문 버전·전체 시장 모집단을 입증하지 않습니다.",
+            "retryable": false,
+            "section": "dataWindow"
+          },
+          {
+            "asOf": null,
+            "code": "SOURCE_UNAVAILABLE",
+            "message": "운영 권한·공개 그래프 승인이 없는 localhost 과거 시뮬레이션입니다.",
+            "retryable": false,
+            "section": "graphVersion"
+          },
+          {
+            "asOf": null,
+            "code": "RETROSPECTIVE_DAILY_SNAPSHOT",
+            "message": "회차 마감 이전 일별 지표를 나중에 조회한 과거 시뮬레이션입니다. 당시 장중 관측값·개별 뉴스의 주가 영향 인과관계를 입증하지 않습니다.",
+            "retryable": false,
+            "section": "marketVariables"
+          }
+        ],
+        "graphVersion": null,
+        "partial": true,
+        "schedule": {
+          "confirmed": true,
+          "evening": "17:30",
+          "morning": "09:20"
+        },
+        "selection": {
+          "basis": "market",
+          "reason": "기존 회차의 중요도 선정과 원문 근거를 유지하고, 문장별 검증·이전 발행 근거 비교를 통과한 항목을 제공합니다."
+        },
+        "source": "zoop-briefing-publication-clock-simulation"
+      },
+      "roundId": "sim-2026-10-22-evening-6cec67477f41",
+      "selectionReason": "반도체 생산 계획에 직접 연결된 차세대 노광 시스템의 양산 도입 계획이다. 장비 가격은 대당 약 5300억원으로 제시됐으며, 핵심 사업의 장비 도입·생산 계획에 관한 구체적인 변화다. 이번 보도에서 삼성전자의 High-NA EUV 시스템 양산 도입 목표가 2028년까지이며 대당 가격은 약 5300억원이라는 계획이 확인됐다.",
+      "summary": {
+        "evidenceIds": [
+          "evidence-grouped-49affffbede1c3245237e8c564cc"
+        ],
+        "generatedAt": "2026-10-28T07:16:23.979098+00:00",
+        "resultVersion": "issue-intelligence-v1-1423b67ac7f5db94179bc02aa618d8ed6fa86121db051654f85f3de018fb12fe",
+        "text": "보도에 따르면 삼성전자는 대당 약 5300억원(약 3억9550만달러)인 차세대 High-NA EUV 시스템을 2028년까지 양산에 도입할 계획이다."
+      },
+      "title": "삼성전자, High-NA EUV 장비 2028년까지 양산 도입 계획"
+    }
+  },
+  "response": {
+    "companyPriceContext": {
+      "authorship": "deterministic_price_observation",
+      "companies": [
+        {
+          "barCount": 78,
+          "companyId": "KRX:005930",
+          "companyName": "삼성전자",
+          "completeSession": true,
+          "currency": "KRW",
+          "cutoff": "2026-10-22T08:30:00Z",
+          "day": {
+            "baselineClose": "224000",
+            "baselineDate": "2026-10-21",
+            "changeRatePercent": "-4.24",
+            "closeOrLast": "214500",
+            "from": "2026-10-22T00:00:00Z",
+            "high": "226000",
+            "kind": "provider_daily_bar",
+            "low": "212000",
+            "open": "223500",
+            "to": "2026-10-22T06:30:00Z",
+            "volume": "20498358"
+          },
+          "exchangeTimezone": "Asia/Seoul",
+          "flow": "장중 관측 고점 226000·저점 212000 KRW. 종가는 고점 대비 -5.09%입니다.",
+          "interpretation": "기사 전후의 실제 가격 변화와 사업상 확인 조건을 함께 살펴봅니다. 시장·업종·동시 뉴스와의 비교가 없어 기사 효과나 사업 판단의 적중으로 단정하지 않습니다.",
+          "latest": {
+            "kind": "daily_close",
+            "observedAt": "2026-10-22T06:30:00Z",
+            "value": "214500"
+          },
+          "limitation": "기사와 가격의 시간상 전후 관측이며 인과관계·사업 조건 확인·예측 적중을 입증하지 않습니다.",
+          "news": [
+            {
+              "before": {
+                "kind": "five_minute_close",
+                "observedAt": "2026-10-22T00:25:00Z",
+                "value": "221500"
+              },
+              "changeRatePercent": "-3.16",
+              "evidenceId": "evidence-grouped-49affffbede1c3245237e8c564cc",
+              "observation": "공개 전 마지막 확인 가격 221500 → 최근 확인 가격 214500 KRW (-3.16%). 기사 후 시작·완료한 5분봉 72개가 있습니다.",
+              "postNewsBars": 72,
+              "publishedAt": "2026-10-22T00:28:13Z",
+              "status": "observed",
+              "timing": "during_session"
+            }
+          ],
+          "outlook": {
+            "authorship": "source_bound_composition",
+            "businessJudgment": {
+              "evidenceIds": [
+                "evidence-grouped-49affffbede1c3245237e8c564cc"
+              ],
+              "text": "2028년까지 High-NA EUV 양산 도입 계획은 제조 경쟁력 확보 기회입니다. 실제 장비 확보·공정 적용은 아직 확인할 조건이며 대당 약5300억 원을 확정 구매액이나 실적 기여액으로 취급하지 않습니다."
+            },
+            "evidenceIds": [
+              "evidence-grouped-49affffbede1c3245237e8c564cc"
+            ],
+            "marketNote": "국내 지수는 아래 기간의 시장 참고값입니다. 종목과 관측 구간이 일치하지 않으면 상대 성과를 계산하지 않습니다.",
+            "nextCheck": "주가 하락이 관측됐지만, 가격만으로 기존 사업 판단을 높이거나 낮추지 않습니다. 뉴스의 효과나 사업 조건 확인을 뜻하지 않습니다. 다음 거래일에는 장비 확보 시점·도입 규모·양산 공정 적용이 구체화되는지 확인합니다.",
+            "priceObservation": "2026-10-22 국내 정규장 종가 214500 KRW, 2026-10-21 제공 종가 대비 -4.24%입니다. 같은 날 출근의 해당 기업 가격 관측이 없어 아침 이후 비교를 유보합니다. 10/22 09:28 KST 기사 공개 전 마지막 확인가 대비 -3.16%이며, 기사 이후 시작·완료한 봉 72개를 확인했습니다.",
+            "schemaVersion": "zoop-company-price-outlook-v1",
+            "stance": "watch",
+            "takeaway": "장비 가격을 확정 구매액으로 보지 않고 도입·공정 적용을 확인합니다. 2026-10-22 종가 -4.24% (2026-10-21 대비).",
+            "text": "2028년까지 High-NA EUV 양산 도입 계획은 제조 경쟁력 확보 기회입니다. 실제 장비 확보·공정 적용은 아직 확인할 조건이며 대당 약5300억 원을 확정 구매액이나 실적 기여액으로 취급하지 않습니다. 가격 측면에서는 2026-10-22 국내 정규장 종가 214500 KRW, 2026-10-21 제공 종가 대비 -4.24%입니다. 같은 날 출근의 해당 기업 가격 관측이 없어 아침 이후 비교를 유보합니다. 10/22 09:28 KST 기사 공개 전 마지막 확인가 대비 -3.16%이며, 기사 이후 시작·완료한 봉 72개를 확인했습니다. 주가 하락이 관측됐지만, 가격만으로 기존 사업 판단을 높이거나 낮추지 않습니다. 뉴스의 효과나 사업 조건 확인을 뜻하지 않습니다. 다음 거래일에는 장비 확보 시점·도입 규모·양산 공정 적용이 구체화되는지 확인합니다."
+          },
+          "provider": "toss",
+          "sessionDate": "2026-10-22",
+          "sinceMorning": {
+            "observation": "같은 날 출근의 해당 기업 가격 관측이 없어 아침 이후 비교를 유보합니다.",
+            "status": "unavailable"
+          },
+          "status": "available",
+          "summary": "2026-10-22 국내 정규장 종가 214500 KRW, 2026-10-21 제공 종가 대비 -4.24%입니다."
+        },
+        {
+          "barCount": 78,
+          "companyId": "NASDAQ:AAPL",
+          "companyName": "Apple",
+          "completeSession": true,
+          "currency": "USD",
+          "cutoff": "2026-10-22T08:30:00Z",
+          "day": {
+            "baselineClose": "339.5",
+            "baselineDate": "2026-10-20",
+            "changeRatePercent": "1.32",
+            "closeOrLast": "343.99",
+            "from": "2026-10-21T13:30:00Z",
+            "high": "345.25",
+            "kind": "provider_daily_bar",
+            "low": "338.83",
+            "open": "339.36",
+            "to": "2026-10-21T20:00:00Z",
+            "volume": "35614126"
+          },
+          "exchangeTimezone": "America/New_York",
+          "flow": "장중 관측 고점 345.25·저점 338.83 USD. 종가는 고점 대비 -0.36%입니다.",
+          "interpretation": "기사 전후의 실제 가격 변화와 사업상 확인 조건을 함께 살펴봅니다. 시장·업종·동시 뉴스와의 비교가 없어 기사 효과나 사업 판단의 적중으로 단정하지 않습니다.",
+          "latest": {
+            "kind": "daily_close",
+            "observedAt": "2026-10-21T20:00:00Z",
+            "value": "343.99"
+          },
+          "limitation": "기사와 가격의 시간상 전후 관측이며 인과관계·사업 조건 확인·예측 적중을 입증하지 않습니다.",
+          "news": [
+            {
+              "before": {
+                "kind": "five_minute_close",
+                "observedAt": "2026-10-21T14:35:00Z",
+                "value": "339.99"
+              },
+              "changeRatePercent": "1.18",
+              "evidenceId": "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6",
+              "observation": "공개 전 마지막 확인 가격 339.99 → 최근 확인 가격 343.99 USD (+1.18%). 기사 후 시작·완료한 5분봉 64개가 있습니다.",
+              "postNewsBars": 64,
+              "publishedAt": "2026-10-21T14:35:38Z",
+              "status": "observed",
+              "timing": "during_session"
+            }
+          ],
+          "outlook": {
+            "authorship": "source_bound_composition",
+            "businessJudgment": {
+              "evidenceIds": [
+                "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+              ],
+              "text": "배송 예상이2027년1월로 늦춰진 보도는 출하·매출 인식 시점의 확인 과제입니다. 주문량과 지연 원인이 없어 강한 수요나 공급 차질 중 어느 쪽인지 단정할 수 없습니다."
+            },
+            "evidenceIds": [
+              "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+            ],
+            "marketNote": "국내 지수·원/달러는 시장 참고값이며 이 해외기업의 직접 비교지수나 같은 거래 구간의 가격 변화율이 아닙니다.",
+            "nextCheck": "주가 상승이 관측됐지만, 가격만으로 기존 사업 판단을 높이거나 낮추지 않습니다. 뉴스의 효과나 사업 조건 확인을 뜻하지 않습니다. 다음 거래일에는 배송 예상의 후속 변경과 실제 출하·주문 정보를 확인합니다.",
+            "priceObservation": "2026-10-21 미국 정규장 종가 343.99 USD, 2026-10-20 제공 종가 대비 +1.32%입니다. 출근 이후 새 정규장 관측이 없어 가격 변화를 평가하지 않습니다. 10/21 23:35 KST 기사 공개 전 마지막 확인가 대비 +1.18%이며, 기사 이후 시작·완료한 봉 64개를 확인했습니다.",
+            "schemaVersion": "zoop-company-price-outlook-v1",
+            "stance": "cautious_watch",
+            "takeaway": "주문 증가로 단정하지 않고 실제 출하와 지연 원인을 확인합니다. 2026-10-21 종가 +1.32% (2026-10-20 대비).",
+            "text": "배송 예상이2027년1월로 늦춰진 보도는 출하·매출 인식 시점의 확인 과제입니다. 주문량과 지연 원인이 없어 강한 수요나 공급 차질 중 어느 쪽인지 단정할 수 없습니다. 가격 측면에서는 2026-10-21 미국 정규장 종가 343.99 USD, 2026-10-20 제공 종가 대비 +1.32%입니다. 출근 이후 새 정규장 관측이 없어 가격 변화를 평가하지 않습니다. 10/21 23:35 KST 기사 공개 전 마지막 확인가 대비 +1.18%이며, 기사 이후 시작·완료한 봉 64개를 확인했습니다. 주가 상승이 관측됐지만, 가격만으로 기존 사업 판단을 높이거나 낮추지 않습니다. 뉴스의 효과나 사업 조건 확인을 뜻하지 않습니다. 다음 거래일에는 배송 예상의 후속 변경과 실제 출하·주문 정보를 확인합니다."
+          },
+          "provider": "toss",
+          "sessionDate": "2026-10-21",
+          "sinceMorning": {
+            "before": {
+              "kind": "daily_close",
+              "observedAt": "2026-10-21T20:00:00Z",
+              "value": "343.99"
+            },
+            "observation": "출근 이후 새 정규장 관측이 없어 가격 변화를 평가하지 않습니다.",
+            "status": "no_new_session"
+          },
+          "status": "available",
+          "summary": "2026-10-21 미국 정규장 종가 343.99 USD, 2026-10-20 제공 종가 대비 +1.32%입니다."
+        },
+        {
+          "barCount": 78,
+          "companyId": "NASDAQ:META",
+          "companyName": "Meta",
+          "completeSession": true,
+          "currency": "USD",
+          "cutoff": "2026-10-22T08:30:00Z",
+          "day": {
+            "baselineClose": "694.25",
+            "baselineDate": "2026-10-20",
+            "changeRatePercent": "0.47",
+            "closeOrLast": "697.52",
+            "from": "2026-10-21T13:30:00Z",
+            "high": "713.22",
+            "kind": "provider_daily_bar",
+            "low": "689.68",
+            "open": "697.595",
+            "to": "2026-10-21T20:00:00Z",
+            "volume": "29203903"
+          },
+          "exchangeTimezone": "America/New_York",
+          "flow": "장중 관측 고점 713.22·저점 689.68 USD. 종가는 고점 대비 -2.20%입니다.",
+          "interpretation": "현재 가격은 거래 맥락으로 활용합니다. 기사 후 관측 또는 공개 직전 비교 구간이 부족해, 기존 사업 판단을 주가만으로 강화·약화하지 않습니다.",
+          "latest": {
+            "kind": "daily_close",
+            "observedAt": "2026-10-21T20:00:00Z",
+            "value": "697.52"
+          },
+          "limitation": "기사와 가격의 시간상 전후 관측이며 인과관계·사업 조건 확인·예측 적중을 입증하지 않습니다.",
+          "news": [
+            {
+              "before": {
+                "kind": "daily_close",
+                "observedAt": "2026-10-21T20:00:00Z",
+                "value": "697.52"
+              },
+              "changeRatePercent": null,
+              "evidenceId": "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e",
+              "observation": "기사 공개 후 거래를 보여 주는 완료 봉이 없습니다. 이 회차 가격을 해당 기사 반응으로 평가하지 않습니다.",
+              "postNewsBars": 0,
+              "publishedAt": "2026-10-21T20:01:00Z",
+              "status": "no_post_news_trade",
+              "timing": "after_session"
+            }
+          ],
+          "outlook": {
+            "authorship": "source_bound_composition",
+            "businessJudgment": {
+              "evidenceIds": [
+                "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+              ],
+              "text": "비의결권Class C 신설 승인은 자본 구조 변화입니다. 2027년1월 효력 발생 예정과 후속 발행 규모·경제적 조건을 확인해야 하며 사업 실적 개선으로 연결하지 않습니다."
+            },
+            "evidenceIds": [
+              "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+            ],
+            "marketNote": "국내 지수·원/달러는 시장 참고값이며 이 해외기업의 직접 비교지수나 같은 거래 구간의 가격 변화율이 아닙니다.",
+            "nextCheck": "기사 후 정규장 관측이 없어 이 가격을 새 소식의 반응으로 판단하지 않습니다. 다음 거래일에는 효력 발생과 발행 규모·주주 영향이 후속 공시로 구체화되는지 확인합니다.",
+            "priceObservation": "2026-10-21 미국 정규장 종가 697.52 USD, 2026-10-20 제공 종가 대비 +0.47%입니다. 출근 이후 새 정규장 관측이 없어 가격 변화를 평가하지 않습니다.",
+            "schemaVersion": "zoop-company-price-outlook-v1",
+            "stance": "watch",
+            "takeaway": "승인 사실과 실적 효과를 구분하고 발행 조건을 확인합니다. 2026-10-21 종가 +0.47% (2026-10-20 대비).",
+            "text": "비의결권Class C 신설 승인은 자본 구조 변화입니다. 2027년1월 효력 발생 예정과 후속 발행 규모·경제적 조건을 확인해야 하며 사업 실적 개선으로 연결하지 않습니다. 가격 측면에서는 2026-10-21 미국 정규장 종가 697.52 USD, 2026-10-20 제공 종가 대비 +0.47%입니다. 출근 이후 새 정규장 관측이 없어 가격 변화를 평가하지 않습니다. 기사 후 정규장 관측이 없어 이 가격을 새 소식의 반응으로 판단하지 않습니다. 다음 거래일에는 효력 발생과 발행 규모·주주 영향이 후속 공시로 구체화되는지 확인합니다."
+          },
+          "provider": "toss",
+          "sessionDate": "2026-10-21",
+          "sinceMorning": {
+            "before": {
+              "kind": "daily_close",
+              "observedAt": "2026-10-21T20:00:00Z",
+              "value": "697.52"
+            },
+            "observation": "출근 이후 새 정규장 관측이 없어 가격 변화를 평가하지 않습니다.",
+            "status": "no_new_session"
+          },
+          "status": "available",
+          "summary": "2026-10-21 미국 정규장 종가 697.52 USD, 2026-10-20 제공 종가 대비 +0.47%입니다."
+        },
+        {
+          "barCount": 78,
+          "companyId": "NASDAQ:NVDA",
+          "companyName": "NVIDIA",
+          "completeSession": true,
+          "currency": "USD",
+          "cutoff": "2026-10-22T08:30:00Z",
+          "day": {
+            "baselineClose": "216.47",
+            "baselineDate": "2026-10-20",
+            "changeRatePercent": "2.54",
+            "closeOrLast": "221.97",
+            "from": "2026-10-21T13:30:00Z",
+            "high": "222.19",
+            "kind": "provider_daily_bar",
+            "low": "217.66",
+            "open": "220.96",
+            "to": "2026-10-21T20:00:00Z",
+            "volume": "87085733"
+          },
+          "exchangeTimezone": "America/New_York",
+          "flow": "장중 관측 고점 222.19·저점 217.66 USD. 종가는 고점 대비 -0.10%입니다.",
+          "interpretation": "현재 가격은 거래 맥락으로 활용합니다. 기사 후 관측 또는 공개 직전 비교 구간이 부족해, 기존 사업 판단을 주가만으로 강화·약화하지 않습니다.",
+          "latest": {
+            "kind": "daily_close",
+            "observedAt": "2026-10-21T20:00:00Z",
+            "value": "221.97"
+          },
+          "limitation": "기사와 가격의 시간상 전후 관측이며 인과관계·사업 조건 확인·예측 적중을 입증하지 않습니다.",
+          "news": [
+            {
+              "before": null,
+              "changeRatePercent": null,
+              "evidenceId": "evidence-grouped-28fc2570e12ff5493d4efddf701c",
+              "observation": "최신 거래는 기사 이후지만 공개 직전 가격 구간을 확보하지 못했습니다. 기사 전후 반응의 수치는 유보합니다.",
+              "postNewsBars": 78,
+              "publishedAt": "2026-10-21T02:33:00Z",
+              "status": "event_window_unavailable",
+              "timing": "before_session"
+            }
+          ],
+          "outlook": {
+            "authorship": "source_bound_composition",
+            "businessJudgment": {
+              "evidenceIds": [
+                "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+              ],
+              "text": "11억 달러 용량 예약 선급금과 KYEC의 미국 테스트 시설 계획은 미래 공급 준비에 관한 정보입니다. 2027년4월 대량 생산 목표의 실행이 확인돼야 실제 테스트 용량 확보로 평가할 수 있습니다."
+            },
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+            ],
+            "marketNote": "국내 지수·원/달러는 시장 참고값이며 이 해외기업의 직접 비교지수나 같은 거래 구간의 가격 변화율이 아닙니다.",
+            "nextCheck": "기사 공개 직전 비교 구간이 부족해 뉴스 전후 가격 반응 평가는 유보합니다. 다음 거래일에는 KYEC의 미국 시설·장비 마련과2027년4월 생산 목표의 진행을 확인합니다.",
+            "priceObservation": "2026-10-21 미국 정규장 종가 221.97 USD, 2026-10-20 제공 종가 대비 +2.54%입니다. 출근 이후 새 정규장 관측이 없어 가격 변화를 평가하지 않습니다.",
+            "schemaVersion": "zoop-company-price-outlook-v1",
+            "stance": "watch",
+            "takeaway": "예약 선급금과 실제 테스트 용량 확보를 구분합니다. 2026-10-21 종가 +2.54% (2026-10-20 대비).",
+            "text": "11억 달러 용량 예약 선급금과 KYEC의 미국 테스트 시설 계획은 미래 공급 준비에 관한 정보입니다. 2027년4월 대량 생산 목표의 실행이 확인돼야 실제 테스트 용량 확보로 평가할 수 있습니다. 가격 측면에서는 2026-10-21 미국 정규장 종가 221.97 USD, 2026-10-20 제공 종가 대비 +2.54%입니다. 출근 이후 새 정규장 관측이 없어 가격 변화를 평가하지 않습니다. 기사 공개 직전 비교 구간이 부족해 뉴스 전후 가격 반응 평가는 유보합니다. 다음 거래일에는 KYEC의 미국 시설·장비 마련과2027년4월 생산 목표의 진행을 확인합니다."
+          },
+          "provider": "toss",
+          "sessionDate": "2026-10-21",
+          "sinceMorning": {
+            "before": {
+              "kind": "daily_close",
+              "observedAt": "2026-10-21T20:00:00Z",
+              "value": "221.97"
+            },
+            "observation": "출근 이후 새 정규장 관측이 없어 가격 변화를 평가하지 않습니다.",
+            "status": "no_new_session"
+          },
+          "status": "available",
+          "summary": "2026-10-21 미국 정규장 종가 221.97 USD, 2026-10-20 제공 종가 대비 +2.54%입니다."
+        },
+        {
+          "barCount": 78,
+          "companyId": "KRX:018260",
+          "companyName": "삼성에스디에스",
+          "completeSession": true,
+          "currency": "KRW",
+          "cutoff": "2026-10-22T08:30:00Z",
+          "day": {
+            "baselineClose": "200500",
+            "baselineDate": "2026-10-21",
+            "changeRatePercent": "4.24",
+            "closeOrLast": "209000",
+            "from": "2026-10-22T00:00:00Z",
+            "high": "218000",
+            "kind": "provider_daily_bar",
+            "low": "198000",
+            "open": "201000",
+            "to": "2026-10-22T06:30:00Z",
+            "volume": "580342"
+          },
+          "exchangeTimezone": "Asia/Seoul",
+          "flow": "장중 관측 고점 218000·저점 198000 KRW. 종가는 고점 대비 -4.13%입니다.",
+          "interpretation": "현재 가격은 거래 맥락으로 활용합니다. 기사 후 관측 또는 공개 직전 비교 구간이 부족해, 기존 사업 판단을 주가만으로 강화·약화하지 않습니다.",
+          "latest": {
+            "kind": "daily_close",
+            "observedAt": "2026-10-22T06:30:00Z",
+            "value": "209000"
+          },
+          "limitation": "기사와 가격의 시간상 전후 관측이며 인과관계·사업 조건 확인·예측 적중을 입증하지 않습니다.",
+          "news": [
+            {
+              "before": null,
+              "changeRatePercent": null,
+              "evidenceId": "evidence-grouped-ec60cc2c10c734b4d659d1bd1679",
+              "observation": "최신 거래는 기사 이후지만 공개 직전 가격 구간을 확보하지 못했습니다. 기사 전후 반응의 수치는 유보합니다.",
+              "postNewsBars": 78,
+              "publishedAt": "2026-10-21T07:51:08Z",
+              "status": "event_window_unavailable",
+              "timing": "before_session"
+            }
+          ],
+          "outlook": {
+            "authorship": "source_bound_composition",
+            "businessJudgment": {
+              "evidenceIds": [
+                "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+              ],
+              "text": "공공 부문 고객 기반 확대는 기회지만 계약 금액과 실제 운영 범위가 확인돼야 사업 기여를 판단할 수 있습니다."
+            },
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "marketNote": "국내 지수는 아래 기간의 시장 참고값입니다. 종목과 관측 구간이 일치하지 않으면 상대 성과를 계산하지 않습니다.",
+            "nextCheck": "기사 공개 직전 비교 구간이 부족해 뉴스 전후 가격 반응 평가는 유보합니다. 다음 거래일에는 주요 부처의 플랫폼 적용 범위·운영 개시가 확인되는지 살펴봅니다.",
+            "priceObservation": "2026-10-22 국내 정규장 종가 209000 KRW, 2026-10-21 제공 종가 대비 +4.24%입니다. 출근 가격 211500 → 회차 기준 209000 KRW (-1.18%).",
+            "schemaVersion": "zoop-company-price-outlook-v1",
+            "stance": "watch",
+            "takeaway": "도입 결정이 실제 적용·운영으로 이어지는지 관찰합니다. 2026-10-22 종가 +4.24% (2026-10-21 대비).",
+            "text": "공공 부문 고객 기반 확대는 기회지만 계약 금액과 실제 운영 범위가 확인돼야 사업 기여를 판단할 수 있습니다. 가격 측면에서는 2026-10-22 국내 정규장 종가 209000 KRW, 2026-10-21 제공 종가 대비 +4.24%입니다. 출근 가격 211500 → 회차 기준 209000 KRW (-1.18%). 기사 공개 직전 비교 구간이 부족해 뉴스 전후 가격 반응 평가는 유보합니다. 다음 거래일에는 주요 부처의 플랫폼 적용 범위·운영 개시가 확인되는지 살펴봅니다."
+          },
+          "provider": "toss",
+          "sessionDate": "2026-10-22",
+          "sinceMorning": {
+            "before": {
+              "kind": "five_minute_close",
+              "observedAt": "2026-10-22T00:20:00Z",
+              "value": "211500"
+            },
+            "changeRatePercent": "-1.18",
+            "observation": "출근 가격 211500 → 회차 기준 209000 KRW (-1.18%).",
+            "status": "available"
+          },
+          "status": "available",
+          "summary": "2026-10-22 국내 정규장 종가 209000 KRW, 2026-10-21 제공 종가 대비 +4.24%입니다."
+        }
+      ],
+      "cutoff": "2026-10-22T17:30:00+09:00",
+      "date": "2026-10-22",
+      "edition": "evening",
+      "generatedAt": "2026-10-24T05:24:10.475204+00:00",
+      "marketReference": {
+        "indicators": [
+          {
+            "baselineDate": "2026-10-20",
+            "changeRatePercent": "-0.34",
+            "id": "kospi",
+            "label": "KOSPI",
+            "observedAt": null,
+            "observedDate": "2026-10-22",
+            "source": {
+              "delayNote": "과거 일별 종가입니다. 출근 회차의 장중 값이나 당시 수집본을 입증하지 않습니다.",
+              "name": "Yahoo Finance 지수 일별 이력",
+              "official": false,
+              "provider": "yahoo",
+              "symbol": "^KS11",
+              "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5EKS11?period1=1791644400&period2=1792767600&interval=1d"
+            },
+            "status": "ok",
+            "text": "KOSPI 2026-10-22 종가 5533.77 pt, 2026-10-20 종가 대비 -0.34%",
+            "unit": "pt",
+            "value": 5533.77,
+            "valueKind": "close"
+          },
+          {
+            "baselineDate": "2026-10-20",
+            "changeRatePercent": "-2.29",
+            "id": "kosdaq",
+            "label": "KOSDAQ",
+            "observedAt": null,
+            "observedDate": "2026-10-22",
+            "source": {
+              "delayNote": "과거 일별 종가입니다. 출근 회차의 장중 값이나 당시 수집본을 입증하지 않습니다.",
+              "name": "Yahoo Finance 지수 일별 이력",
+              "official": false,
+              "provider": "yahoo",
+              "symbol": "^KQ11",
+              "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5EKQ11?period1=1791644400&period2=1792767600&interval=1d"
+            },
+            "status": "ok",
+            "text": "KOSDAQ 2026-10-22 종가 764.1 pt, 2026-10-20 종가 대비 -2.29%",
+            "unit": "pt",
+            "value": 764.1,
+            "valueKind": "close"
+          },
+          {
+            "baselineDate": "2026-10-20",
+            "changeRatePercent": "0.04",
+            "id": "usdkrw",
+            "label": "원/달러",
+            "observedAt": null,
+            "observedDate": "2026-10-21",
+            "source": {
+              "delayNote": "날짜만 제공되는 일별 고시값으로 외환시장 종가·회차 시점 실시간 환율이 아닙니다.",
+              "name": "하나은행 고시 기준환율(네이버 일별 이력)",
+              "official": false,
+              "provider": "naver",
+              "symbol": "FX_USDKRW",
+              "url": "https://api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices?pageSize=40&page=1"
+            },
+            "status": "delayed",
+            "text": "원/달러 2026-10-21 일별 고시값 1327.5 원, 2026-10-20 일별 고시값 대비 +0.04% · 지연 자료",
+            "unit": "KRW",
+            "value": 1327.5,
+            "valueKind": "reference"
+          }
+        ],
+        "note": "각 지표의 관측일·비교일을 그대로 표시합니다. 거래 구간·통화·상장 시장이 다른 기업과 직접 비교하거나 뉴스 원인으로 사용하지 않습니다.",
+        "status": "available"
+      },
+      "outlookIntegrationVersion": "zoop-company-price-outlook-v1",
+      "resultVersion": "price-context-v1-77fabd75dd39413d3ae99dbbbca2fdc513364a93662a73b240d383f96ab9414c",
+      "reviewVersion": "edition-v1-03d38589b28a94045695f8e7ecca4d8cd097dc2dfc32463318b55591a378baf4",
+      "roundId": "sim-2026-10-22-evening-6cec67477f41",
+      "schemaVersion": "zoop-company-price-context-v1",
+      "scopeNote": "토스 API 보존 응답의 회차 마감 이전 관측으로 재구성했습니다. 사후 수집이며 당시 수집·예측 적중을 입증하지 않습니다.",
+      "status": "derived"
+    },
+    "corrections": [],
+    "dataAsOf": "2026-10-22T08:30:00Z",
+    "dataWindow": {
+      "end": "2026-10-22T08:30:00Z",
+      "openStart": false,
+      "start": "2026-10-22T00:20:00Z"
+    },
+    "date": "2026-10-22",
+    "edition": "evening",
+    "editionReview": {
+      "analysisVersion": "company-v1-38873a3520e852e8c25526904098b390d2a27240c914f193f7751af8c0d491e0",
+      "capabilities": {
+        "calendar": "unverified",
+        "flows": "unavailable",
+        "intraday": "unavailable",
+        "sectors": "unavailable"
+      },
+      "companies": [
+        {
+          "checks": [],
+          "companyId": "KRX:005930",
+          "companyName": "삼성전자",
+          "judgment": {
+            "evidenceIds": [
+              "evidence-grouped-49affffbede1c3245237e8c564cc"
+            ],
+            "text": "2028년까지 High-NA EUV 양산 도입 계획은 제조 경쟁력 확보 기회입니다. 실제 장비 확보·공정 적용은 아직 확인할 조건이며 대당 약5300억 원을 확정 구매액이나 실적 기여액으로 취급하지 않습니다."
+          },
+          "negative": {
+            "evidenceIds": [
+              "evidence-grouped-49affffbede1c3245237e8c564cc"
+            ],
+            "text": "도입 취소·납기 연기·양산 적용 지연이 확인되면 실행 전망을 낮춥니다."
+          },
+          "newInformation": {
+            "evidenceIds": [
+              "evidence-grouped-49affffbede1c3245237e8c564cc"
+            ],
+            "text": "2028년까지 High-NA EUV 양산 도입 계획은 제조 경쟁력 확보 기회입니다. 실제 장비 확보·공정 적용은 아직 확인할 조건이며 대당 약5300억 원을 확정 구매액이나 실적 기여액으로 취급하지 않습니다."
+          },
+          "positive": {
+            "evidenceIds": [
+              "evidence-grouped-49affffbede1c3245237e8c564cc"
+            ],
+            "text": "장비 확보와 공정 적용 일정이 구체화되면 투자 계획의 실행 가능성을 높여 평가합니다."
+          },
+          "previous": null,
+          "price": {
+            "baseline": {
+              "kind": "five_minute_close",
+              "observedAt": "2026-10-22T00:20:00Z",
+              "sessionDate": "2026-10-22",
+              "value": "223250.00"
+            },
+            "baselineKind": "morning_cutoff",
+            "change": "-8750.00",
+            "changeRate": "-3.92",
+            "companyId": "KRX:005930",
+            "comparisonStatus": "available",
+            "currency": "KRW",
+            "cutoff": "2026-10-22T17:30:00+09:00",
+            "exchangeTimezone": "Asia/Seoul",
+            "latest": {
+              "kind": "daily_close",
+              "observedAt": "2026-10-22T06:30:00Z",
+              "sessionDate": "2026-10-22",
+              "value": "214500.00"
+            },
+            "note": "나중에 조회한 과거 정규장 이력입니다. 5분봉은 종료 후 사용하며 당시 수집·실시간 시세는 입증하지 않습니다.",
+            "official": false,
+            "reason": null,
+            "source": "Yahoo Finance",
+            "sources": [
+              {
+                "bytes": 32739,
+                "collectedAt": "2026-10-23T06:58:56.119573+00:00",
+                "companyId": "KRX:005930",
+                "httpStatus": 200,
+                "interval": "5m",
+                "period1": 1791936000,
+                "period2": 1792800000,
+                "sha256": "291c3da9a910afee48425a1817ed708cf864d60ed238c3a69aa07d58ca14ac8f",
+                "url": "https://query1.finance.yahoo.com/v8/finance/chart/005930.KS?period1=1791936000&period2=1792800000&interval=5m&includePrePost=false&events=splits%2Cdiv"
+              },
+              {
+                "bytes": 1730,
+                "collectedAt": "2026-10-23T06:58:56.436202+00:00",
+                "companyId": "KRX:005930",
+                "httpStatus": 200,
+                "interval": "1d",
+                "period1": 1791936000,
+                "period2": 1792800000,
+                "sha256": "829d913913b2aa5eff541a167f58d8659fbfd0105a389c6d30270d54594e8e2c",
+                "url": "https://query1.finance.yahoo.com/v8/finance/chart/005930.KS?period1=1791936000&period2=1792800000&interval=1d&includePrePost=false&events=splits%2Cdiv"
+              }
+            ],
+            "status": "available"
+          },
+          "role": "selected",
+          "sourceIds": [
+            "evidence-grouped-49affffbede1c3245237e8c564cc"
+          ],
+          "stance": "watch",
+          "takeaway": {
+            "evidenceIds": [
+              "evidence-grouped-49affffbede1c3245237e8c564cc"
+            ],
+            "text": "장비 가격을 확정 구매액으로 보지 않고 도입·공정 적용을 확인합니다."
+          },
+          "title": {
+            "evidenceIds": [
+              "evidence-grouped-49affffbede1c3245237e8c564cc"
+            ],
+            "text": "High-NA 양산 도입 추적"
+          },
+          "watch": [
+            {
+              "evidenceIds": [
+                "evidence-grouped-49affffbede1c3245237e8c564cc"
+              ],
+              "text": "장비 확보 시점·도입 규모·양산 공정 적용이 구체화되는지 확인합니다."
+            }
+          ]
+        },
+        {
+          "checks": [
+            {
+              "condition": "배송 예상의 후속 변경과 실제 출하·주문 정보를 확인합니다.",
+              "observation": {
+                "evidenceIds": [
+                  "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+                ],
+                "text": "이번 회차에 연결된 자료에는 이 조건의 실현·훼손을 확인할 새 근거가 없습니다. 조건 관찰을 이어가며 적중·실패 평가는 유보합니다."
+              },
+              "status": "not_observed"
+            }
+          ],
+          "companyId": "NASDAQ:AAPL",
+          "companyName": "Apple",
+          "judgment": {
+            "evidenceIds": [
+              "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+            ],
+            "text": "배송 예상이2027년1월로 늦춰진 보도는 출하·매출 인식 시점의 확인 과제입니다. 주문량과 지연 원인이 없어 강한 수요나 공급 차질 중 어느 쪽인지 단정할 수 없습니다."
+          },
+          "negative": {
+            "evidenceIds": [
+              "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+            ],
+            "text": "배송이 더 늦어지거나 주문 취소가 확인되면 출하·매출 시점의 부담을 높여 평가합니다."
+          },
+          "newInformation": {
+            "evidenceIds": [
+              "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+            ],
+            "text": "이번 회차에 연결된 자료에서 기존 확인 조건을 해소할 추가 근거가 없습니다. 기존 판단과 확인 과제를 추적합니다."
+          },
+          "positive": {
+            "evidenceIds": [
+              "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+            ],
+            "text": "실제 출하 진행과 주문 규모가 확인되면 수요·매출 시점 평가를 구체화합니다."
+          },
+          "previous": {
+            "checks": [],
+            "companyId": "NASDAQ:AAPL",
+            "judgment": {
+              "evidenceIds": [
+                "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+              ],
+              "text": "배송 예상이2027년1월로 늦춰진 보도는 출하·매출 인식 시점의 확인 과제입니다. 주문량과 지연 원인이 없어 강한 수요나 공급 차질 중 어느 쪽인지 단정할 수 없습니다."
+            },
+            "negative": {
+              "evidenceIds": [
+                "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+              ],
+              "text": "배송이 더 늦어지거나 주문 취소가 확인되면 출하·매출 시점의 부담을 높여 평가합니다."
+            },
+            "newInformation": {
+              "evidenceIds": [
+                "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+              ],
+              "text": "배송 예상이2027년1월로 늦춰진 보도는 출하·매출 인식 시점의 확인 과제입니다. 주문량과 지연 원인이 없어 강한 수요나 공급 차질 중 어느 쪽인지 단정할 수 없습니다."
+            },
+            "positive": {
+              "evidenceIds": [
+                "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+              ],
+              "text": "실제 출하 진행과 주문 규모가 확인되면 수요·매출 시점 평가를 구체화합니다."
+            },
+            "stance": "cautious_watch",
+            "takeaway": {
+              "evidenceIds": [
+                "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+              ],
+              "text": "주문 증가로 단정하지 않고 실제 출하와 지연 원인을 확인합니다."
+            },
+            "title": {
+              "evidenceIds": [
+                "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+              ],
+              "text": "배송 예상 지연 추적"
+            },
+            "watch": [
+              {
+                "evidenceIds": [
+                  "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+                ],
+                "text": "배송 예상의 후속 변경과 실제 출하·주문 정보를 확인합니다."
+              }
+            ]
+          },
+          "price": {
+            "baseline": {
+              "kind": "daily_close",
+              "observedAt": "2026-10-21T20:00:00Z",
+              "sessionDate": "2026-10-21",
+              "value": "343.99"
+            },
+            "baselineKind": "morning_cutoff",
+            "change": null,
+            "changeRate": null,
+            "companyId": "NASDAQ:AAPL",
+            "comparisonStatus": "no_new_session",
+            "currency": "USD",
+            "cutoff": "2026-10-22T17:30:00+09:00",
+            "exchangeTimezone": "America/New_York",
+            "latest": {
+              "kind": "daily_close",
+              "observedAt": "2026-10-21T20:00:00Z",
+              "sessionDate": "2026-10-21",
+              "value": "343.99"
+            },
+            "note": "나중에 조회한 과거 정규장 이력입니다. 5분봉은 종료 후 사용하며 당시 수집·실시간 시세는 입증하지 않습니다.",
+            "official": false,
+            "reason": null,
+            "source": "Yahoo Finance",
+            "sources": [
+              {
+                "bytes": 50179,
+                "collectedAt": "2026-10-23T06:58:57.539168+00:00",
+                "companyId": "NASDAQ:AAPL",
+                "httpStatus": 200,
+                "interval": "5m",
+                "period1": 1791936000,
+                "period2": 1792800000,
+                "sha256": "47d1fd883b11bacaa8582bcf94490ab203b9bba0c26db2d463d883fa5b42d879",
+                "url": "https://query1.finance.yahoo.com/v8/finance/chart/AAPL?period1=1791936000&period2=1792800000&interval=5m&includePrePost=false&events=splits%2Cdiv"
+              },
+              {
+                "bytes": 1885,
+                "collectedAt": "2026-10-23T06:58:57.870842+00:00",
+                "companyId": "NASDAQ:AAPL",
+                "httpStatus": 200,
+                "interval": "1d",
+                "period1": 1791936000,
+                "period2": 1792800000,
+                "sha256": "57ea9ef30049dc968d3ba3963050c0a0fbf5df55c1a40b9fcadd7dd0c5755b7b",
+                "url": "https://query1.finance.yahoo.com/v8/finance/chart/AAPL?period1=1791936000&period2=1792800000&interval=1d&includePrePost=false&events=splits%2Cdiv"
+              }
+            ],
+            "status": "available"
+          },
+          "role": "tracked",
+          "sourceIds": [
+            "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+          ],
+          "stance": "cautious_watch",
+          "takeaway": {
+            "evidenceIds": [
+              "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+            ],
+            "text": "주문 증가로 단정하지 않고 실제 출하와 지연 원인을 확인합니다."
+          },
+          "title": {
+            "evidenceIds": [
+              "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+            ],
+            "text": "배송 예상 지연 추적"
+          },
+          "watch": [
+            {
+              "evidenceIds": [
+                "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+              ],
+              "text": "배송 예상의 후속 변경과 실제 출하·주문 정보를 확인합니다."
+            }
+          ]
+        },
+        {
+          "checks": [
+            {
+              "condition": "효력 발생과 발행 규모·주주 영향이 후속 공시로 구체화되는지 확인합니다.",
+              "observation": {
+                "evidenceIds": [
+                  "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+                ],
+                "text": "이번 회차에 연결된 자료에는 이 조건의 실현·훼손을 확인할 새 근거가 없습니다. 조건 관찰을 이어가며 적중·실패 평가는 유보합니다."
+              },
+              "status": "not_observed"
+            }
+          ],
+          "companyId": "NASDAQ:META",
+          "companyName": "Meta",
+          "judgment": {
+            "evidenceIds": [
+              "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+            ],
+            "text": "비의결권Class C 신설 승인은 자본 구조 변화입니다. 2027년1월 효력 발생 예정과 후속 발행 규모·경제적 조건을 확인해야 하며 사업 실적 개선으로 연결하지 않습니다."
+          },
+          "negative": {
+            "evidenceIds": [
+              "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+            ],
+            "text": "주주 부담이나 희석을 확대하는 조건이 확인되면 해당 위험을 높여 평가합니다."
+          },
+          "newInformation": {
+            "evidenceIds": [
+              "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+            ],
+            "text": "이번 회차에 연결된 자료에서 기존 확인 조건을 해소할 추가 근거가 없습니다. 기존 판단과 확인 과제를 추적합니다."
+          },
+          "positive": {
+            "evidenceIds": [
+              "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+            ],
+            "text": "경제적 조건과 주주 권리에 미치는 영향이 확인되면 자본정책 평가를 구체화합니다."
+          },
+          "previous": {
+            "checks": [],
+            "companyId": "NASDAQ:META",
+            "judgment": {
+              "evidenceIds": [
+                "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+              ],
+              "text": "비의결권Class C 신설 승인은 자본 구조 변화입니다. 2027년1월 효력 발생 예정과 후속 발행 규모·경제적 조건을 확인해야 하며 사업 실적 개선으로 연결하지 않습니다."
+            },
+            "negative": {
+              "evidenceIds": [
+                "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+              ],
+              "text": "주주 부담이나 희석을 확대하는 조건이 확인되면 해당 위험을 높여 평가합니다."
+            },
+            "newInformation": {
+              "evidenceIds": [
+                "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+              ],
+              "text": "비의결권Class C 신설 승인은 자본 구조 변화입니다. 2027년1월 효력 발생 예정과 후속 발행 규모·경제적 조건을 확인해야 하며 사업 실적 개선으로 연결하지 않습니다."
+            },
+            "positive": {
+              "evidenceIds": [
+                "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+              ],
+              "text": "경제적 조건과 주주 권리에 미치는 영향이 확인되면 자본정책 평가를 구체화합니다."
+            },
+            "stance": "watch",
+            "takeaway": {
+              "evidenceIds": [
+                "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+              ],
+              "text": "승인 사실과 실적 효과를 구분하고 발행 조건을 확인합니다."
+            },
+            "title": {
+              "evidenceIds": [
+                "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+              ],
+              "text": "Class C 후속 조건 관찰"
+            },
+            "watch": [
+              {
+                "evidenceIds": [
+                  "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+                ],
+                "text": "효력 발생과 발행 규모·주주 영향이 후속 공시로 구체화되는지 확인합니다."
+              }
+            ]
+          },
+          "price": {
+            "baseline": {
+              "kind": "daily_close",
+              "observedAt": "2026-10-21T20:00:00Z",
+              "sessionDate": "2026-10-21",
+              "value": "697.52"
+            },
+            "baselineKind": "morning_cutoff",
+            "change": null,
+            "changeRate": null,
+            "companyId": "NASDAQ:META",
+            "comparisonStatus": "no_new_session",
+            "currency": "USD",
+            "cutoff": "2026-10-22T17:30:00+09:00",
+            "exchangeTimezone": "America/New_York",
+            "latest": {
+              "kind": "daily_close",
+              "observedAt": "2026-10-21T20:00:00Z",
+              "sessionDate": "2026-10-21",
+              "value": "697.52"
+            },
+            "note": "나중에 조회한 과거 정규장 이력입니다. 5분봉은 종료 후 사용하며 당시 수집·실시간 시세는 입증하지 않습니다.",
+            "official": false,
+            "reason": null,
+            "source": "Yahoo Finance",
+            "sources": [
+              {
+                "bytes": 48368,
+                "collectedAt": "2026-10-23T06:58:58.294876+00:00",
+                "companyId": "NASDAQ:META",
+                "httpStatus": 200,
+                "interval": "5m",
+                "period1": 1791936000,
+                "period2": 1792800000,
+                "sha256": "75f562214248d587686f2c0752e9b6349a9adb6255c05f0e83b53b69ea644c0a",
+                "url": "https://query1.finance.yahoo.com/v8/finance/chart/META?period1=1791936000&period2=1792800000&interval=5m&includePrePost=false&events=splits%2Cdiv"
+              },
+              {
+                "bytes": 1921,
+                "collectedAt": "2026-10-23T06:58:58.567841+00:00",
+                "companyId": "NASDAQ:META",
+                "httpStatus": 200,
+                "interval": "1d",
+                "period1": 1791936000,
+                "period2": 1792800000,
+                "sha256": "91846aae5f2090632dced5fc01b3ceaea20ae2f93038add75b07dd314948f846",
+                "url": "https://query1.finance.yahoo.com/v8/finance/chart/META?period1=1791936000&period2=1792800000&interval=1d&includePrePost=false&events=splits%2Cdiv"
+              }
+            ],
+            "status": "available"
+          },
+          "role": "tracked",
+          "sourceIds": [
+            "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+          ],
+          "stance": "watch",
+          "takeaway": {
+            "evidenceIds": [
+              "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+            ],
+            "text": "승인 사실과 실적 효과를 구분하고 발행 조건을 확인합니다."
+          },
+          "title": {
+            "evidenceIds": [
+              "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+            ],
+            "text": "Class C 후속 조건 관찰"
+          },
+          "watch": [
+            {
+              "evidenceIds": [
+                "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+              ],
+              "text": "효력 발생과 발행 규모·주주 영향이 후속 공시로 구체화되는지 확인합니다."
+            }
+          ]
+        },
+        {
+          "checks": [
+            {
+              "condition": "KYEC의 미국 시설·장비 마련과2027년4월 생산 목표의 진행을 확인합니다.",
+              "observation": {
+                "evidenceIds": [
+                  "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+                ],
+                "text": "이번 회차에 연결된 자료에는 이 조건의 실현·훼손을 확인할 새 근거가 없습니다. 조건 관찰을 이어가며 적중·실패 평가는 유보합니다."
+              },
+              "status": "not_observed"
+            }
+          ],
+          "companyId": "NASDAQ:NVDA",
+          "companyName": "NVIDIA",
+          "judgment": {
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+            ],
+            "text": "11억 달러 용량 예약 선급금과 KYEC의 미국 테스트 시설 계획은 미래 공급 준비에 관한 정보입니다. 2027년4월 대량 생산 목표의 실행이 확인돼야 실제 테스트 용량 확보로 평가할 수 있습니다."
+          },
+          "negative": {
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+            ],
+            "text": "시설 준비나 생산 개시의 지연이 확인되면 공급 준비 전망을 낮춥니다."
+          },
+          "newInformation": {
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+            ],
+            "text": "이번 회차에 연결된 자료에서 기존 확인 조건을 해소할 추가 근거가 없습니다. 기존 판단과 확인 과제를 추적합니다."
+          },
+          "positive": {
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+            ],
+            "text": "시설·장비 준비와 실제 생산 개시가 확인되면 테스트 용량 확보 가시성을 높여 봅니다."
+          },
+          "previous": {
+            "checks": [
+              {
+                "condition": "KYEC의 미국 시설·장비 마련과2027년4월 생산 목표의 진행을 확인합니다.",
+                "observation": {
+                  "evidenceIds": [
+                    "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+                  ],
+                  "text": "이번 회차에 연결된 자료에는 이 조건의 실현·훼손을 확인할 새 근거가 없습니다. 조건 관찰을 이어가며 적중·실패 평가는 유보합니다."
+                },
+                "status": "not_observed"
+              }
+            ],
+            "companyId": "NASDAQ:NVDA",
+            "judgment": {
+              "evidenceIds": [
+                "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+              ],
+              "text": "11억 달러 용량 예약 선급금과 KYEC의 미국 테스트 시설 계획은 미래 공급 준비에 관한 정보입니다. 2027년4월 대량 생산 목표의 실행이 확인돼야 실제 테스트 용량 확보로 평가할 수 있습니다."
+            },
+            "negative": {
+              "evidenceIds": [
+                "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+              ],
+              "text": "시설 준비나 생산 개시의 지연이 확인되면 공급 준비 전망을 낮춥니다."
+            },
+            "newInformation": {
+              "evidenceIds": [
+                "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+              ],
+              "text": "이번 회차에 연결된 자료에서 기존 확인 조건을 해소할 추가 근거가 없습니다. 기존 판단과 확인 과제를 추적합니다."
+            },
+            "positive": {
+              "evidenceIds": [
+                "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+              ],
+              "text": "시설·장비 준비와 실제 생산 개시가 확인되면 테스트 용량 확보 가시성을 높여 봅니다."
+            },
+            "stance": "watch",
+            "takeaway": {
+              "evidenceIds": [
+                "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+              ],
+              "text": "예약 선급금과 실제 테스트 용량 확보를 구분합니다."
+            },
+            "title": {
+              "evidenceIds": [
+                "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+              ],
+              "text": "테스트 용량 확보 계획"
+            },
+            "watch": [
+              {
+                "evidenceIds": [
+                  "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+                ],
+                "text": "KYEC의 미국 시설·장비 마련과2027년4월 생산 목표의 진행을 확인합니다."
+              }
+            ]
+          },
+          "price": {
+            "baseline": {
+              "kind": "daily_close",
+              "observedAt": "2026-10-21T20:00:00Z",
+              "sessionDate": "2026-10-21",
+              "value": "221.97"
+            },
+            "baselineKind": "morning_cutoff",
+            "change": null,
+            "changeRate": null,
+            "companyId": "NASDAQ:NVDA",
+            "comparisonStatus": "no_new_session",
+            "currency": "USD",
+            "cutoff": "2026-10-22T17:30:00+09:00",
+            "exchangeTimezone": "America/New_York",
+            "latest": {
+              "kind": "daily_close",
+              "observedAt": "2026-10-21T20:00:00Z",
+              "sessionDate": "2026-10-21",
+              "value": "221.97"
+            },
+            "note": "나중에 조회한 과거 정규장 이력입니다. 5분봉은 종료 후 사용하며 당시 수집·실시간 시세는 입증하지 않습니다.",
+            "official": false,
+            "reason": null,
+            "source": "Yahoo Finance",
+            "sources": [
+              {
+                "bytes": 51735,
+                "collectedAt": "2026-10-23T06:58:58.991903+00:00",
+                "companyId": "NASDAQ:NVDA",
+                "httpStatus": 200,
+                "interval": "5m",
+                "period1": 1791936000,
+                "period2": 1792800000,
+                "sha256": "9d5198448aec4656c530f53934a0c33b7d79d0cb8a8e980c48acd33a265e7f5b",
+                "url": "https://query1.finance.yahoo.com/v8/finance/chart/NVDA?period1=1791936000&period2=1792800000&interval=5m&includePrePost=false&events=splits%2Cdiv"
+              },
+              {
+                "bytes": 1987,
+                "collectedAt": "2026-10-23T06:58:59.279935+00:00",
+                "companyId": "NASDAQ:NVDA",
+                "httpStatus": 200,
+                "interval": "1d",
+                "period1": 1791936000,
+                "period2": 1792800000,
+                "sha256": "9f47439a63f3867e2ca34a9dae7e2984dd3902554a0d7f0bbc6399943d05528f",
+                "url": "https://query1.finance.yahoo.com/v8/finance/chart/NVDA?period1=1791936000&period2=1792800000&interval=1d&includePrePost=false&events=splits%2Cdiv"
+              }
+            ],
+            "status": "available"
+          },
+          "role": "tracked",
+          "sourceIds": [
+            "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+          ],
+          "stance": "watch",
+          "takeaway": {
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+            ],
+            "text": "예약 선급금과 실제 테스트 용량 확보를 구분합니다."
+          },
+          "title": {
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+            ],
+            "text": "테스트 용량 확보 계획"
+          },
+          "watch": [
+            {
+              "evidenceIds": [
+                "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+              ],
+              "text": "KYEC의 미국 시설·장비 마련과2027년4월 생산 목표의 진행을 확인합니다."
+            }
+          ]
+        },
+        {
+          "checks": [
+            {
+              "condition": "주요 부처의 플랫폼 적용 범위·운영 개시가 확인되는지 살펴봅니다.",
+              "observation": {
+                "evidenceIds": [
+                  "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                ],
+                "text": "이번 회차에 연결된 자료에는 이 조건의 실현·훼손을 확인할 새 근거가 없습니다. 조건 관찰을 이어가며 적중·실패 평가는 유보합니다."
+              },
+              "status": "not_observed"
+            }
+          ],
+          "companyId": "KRX:018260",
+          "companyName": "삼성에스디에스",
+          "judgment": {
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "text": "공공 부문 고객 기반 확대는 기회지만 계약 금액과 실제 운영 범위가 확인돼야 사업 기여를 판단할 수 있습니다."
+          },
+          "negative": {
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "text": "도입 취소나 적용 지연이 확인되면 실행 가능성을 낮춰 봅니다."
+          },
+          "newInformation": {
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "text": "이번 회차에 연결된 자료에서 기존 확인 조건을 해소할 추가 근거가 없습니다. 기존 판단과 확인 과제를 추적합니다."
+          },
+          "positive": {
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "text": "실제 적용 범위와 이용 현황이 구체화되면 사업 가시성을 높여 평가합니다."
+          },
+          "previous": {
+            "checks": [
+              {
+                "condition": "주요 부처의 플랫폼 적용 범위·운영 개시가 확인되는지 살펴봅니다.",
+                "observation": {
+                  "evidenceIds": [
+                    "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                  ],
+                  "text": "이번 회차에 연결된 자료에는 이 조건의 실현·훼손을 확인할 새 근거가 없습니다. 조건 관찰을 이어가며 적중·실패 평가는 유보합니다."
+                },
+                "status": "not_observed"
+              }
+            ],
+            "companyId": "KRX:018260",
+            "judgment": {
+              "evidenceIds": [
+                "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+              ],
+              "text": "공공 부문 고객 기반 확대는 기회지만 계약 금액과 실제 운영 범위가 확인돼야 사업 기여를 판단할 수 있습니다."
+            },
+            "negative": {
+              "evidenceIds": [
+                "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+              ],
+              "text": "도입 취소나 적용 지연이 확인되면 실행 가능성을 낮춰 봅니다."
+            },
+            "newInformation": {
+              "evidenceIds": [
+                "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+              ],
+              "text": "이번 회차에 연결된 자료에서 기존 확인 조건을 해소할 추가 근거가 없습니다. 기존 판단과 확인 과제를 추적합니다."
+            },
+            "positive": {
+              "evidenceIds": [
+                "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+              ],
+              "text": "실제 적용 범위와 이용 현황이 구체화되면 사업 가시성을 높여 평가합니다."
+            },
+            "stance": "watch",
+            "takeaway": {
+              "evidenceIds": [
+                "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+              ],
+              "text": "도입 결정이 실제 적용·운영으로 이어지는지 관찰합니다."
+            },
+            "title": {
+              "evidenceIds": [
+                "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+              ],
+              "text": "공공 AI 도입 실행 확인"
+            },
+            "watch": [
+              {
+                "evidenceIds": [
+                  "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                ],
+                "text": "주요 부처의 플랫폼 적용 범위·운영 개시가 확인되는지 살펴봅니다."
+              }
+            ]
+          },
+          "price": {
+            "baseline": {
+              "kind": "five_minute_close",
+              "observedAt": "2026-10-22T00:20:00Z",
+              "sessionDate": "2026-10-22",
+              "value": "211500.00"
+            },
+            "baselineKind": "morning_cutoff",
+            "change": "-4500.00",
+            "changeRate": "-2.13",
+            "companyId": "KRX:018260",
+            "comparisonStatus": "available",
+            "currency": "KRW",
+            "cutoff": "2026-10-22T17:30:00+09:00",
+            "exchangeTimezone": "Asia/Seoul",
+            "latest": {
+              "kind": "daily_close",
+              "observedAt": "2026-10-22T06:30:00Z",
+              "sessionDate": "2026-10-22",
+              "value": "207000.00"
+            },
+            "note": "나중에 조회한 과거 정규장 이력입니다. 5분봉은 종료 후 사용하며 당시 수집·실시간 시세는 입증하지 않습니다.",
+            "official": false,
+            "reason": null,
+            "source": "Yahoo Finance",
+            "sources": [
+              {
+                "bytes": 31531,
+                "collectedAt": "2026-10-23T06:58:56.775833+00:00",
+                "companyId": "KRX:018260",
+                "httpStatus": 200,
+                "interval": "5m",
+                "period1": 1791936000,
+                "period2": 1792800000,
+                "sha256": "096e841d12ff305df09aba26a27d8e901dbe07a0a0251f406932710941287c9c",
+                "url": "https://query1.finance.yahoo.com/v8/finance/chart/018260.KS?period1=1791936000&period2=1792800000&interval=5m&includePrePost=false&events=splits%2Cdiv"
+              },
+              {
+                "bytes": 1703,
+                "collectedAt": "2026-10-23T06:58:57.069431+00:00",
+                "companyId": "KRX:018260",
+                "httpStatus": 200,
+                "interval": "1d",
+                "period1": 1791936000,
+                "period2": 1792800000,
+                "sha256": "0bba71bc4372c2d91d6929dcab0b38563aaa1de9915507f49ea3aaccc9ff44c8",
+                "url": "https://query1.finance.yahoo.com/v8/finance/chart/018260.KS?period1=1791936000&period2=1792800000&interval=1d&includePrePost=false&events=splits%2Cdiv"
+              }
+            ],
+            "status": "available"
+          },
+          "role": "tracked",
+          "sourceIds": [
+            "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+          ],
+          "stance": "watch",
+          "takeaway": {
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "text": "도입 결정이 실제 적용·운영으로 이어지는지 관찰합니다."
+          },
+          "title": {
+            "evidenceIds": [
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+            ],
+            "text": "공공 AI 도입 실행 확인"
+          },
+          "watch": [
+            {
+              "evidenceIds": [
+                "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+              ],
+              "text": "주요 부처의 플랫폼 적용 범위·운영 개시가 확인되는지 살펴봅니다."
+            }
+          ]
+        }
+      ],
+      "comparison": {
+        "evidenceIds": [
+          "evidence-grouped-28fc2570e12ff5493d4efddf701c",
+          "evidence-grouped-ec60cc2c10c734b4d659d1bd1679",
+          "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e",
+          "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6",
+          "evidence-grouped-49affffbede1c3245237e8c564cc"
+        ],
+        "text": "아침에 남긴 Apple 출하·Meta 발행 조건, NVIDIA 테스트 시설·삼성SDS 도입 조건을 모두 다시 점검했습니다. 이 회차에 연결된 자료로는 실현·훼손이 관측되지 않아 적중·실패나 근거 강화로 평가하지 않습니다. 미국 기업은 아침 이후 새 정규장 관측도 없어 가격 비교를 따로 유보합니다."
+      },
+      "cutoff": "2026-10-22T17:30:00+09:00",
+      "date": "2026-10-22",
+      "edition": "evening",
+      "headline": "오늘 종가는 확인했지만 하루 흐름·아침 조건의 결과 평가는 유보합니다",
+      "marketInterpretation": {
+        "evidenceIds": [],
+        "text": "KOSPI와 KOSDAQ의22일 종가는20일 연결 기준보다 낮습니다. 그러나 중간 거래일 기준이 빠져 오늘 하루 하락했다고 판단할 수 없습니다. 장중·업종·수급이 없으므로 오전 반등·오후 매도나 특정 뉴스가 장을 이끌었다고 설명하지 않습니다."
+      },
+      "marketVariables": {
+        "collectedAt": "2026-10-23T06:04:40.515813+00:00",
+        "indicators": [
+          {
+            "baseline": {
+              "at": null,
+              "date": "2026-10-20",
+              "value": 5552.74
+            },
+            "change": -18.97,
+            "changeRate": -0.003416331396751874,
+            "id": "kospi",
+            "label": "KOSPI",
+            "observedAt": null,
+            "observedDate": "2026-10-22",
+            "reason": "회차 마감 전 가장 최근 확인된 거래일 종가입니다. 장중 시세는 제공하지 않습니다.",
+            "reasonCode": null,
+            "source": {
+              "delayNote": "과거 일별 종가입니다. 출근 회차의 장중 값이나 당시 수집본을 입증하지 않습니다.",
+              "name": "Yahoo Finance 지수 일별 이력",
+              "official": false,
+              "provider": "yahoo",
+              "symbol": "^KS11",
+              "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5EKS11?period1=1791644400&period2=1792767600&interval=1d"
+            },
+            "status": "ok",
+            "unit": "pt",
+            "value": 5533.77,
+            "valueKind": "close"
+          },
+          {
+            "baseline": {
+              "at": null,
+              "date": "2026-10-20",
+              "value": 781.97
+            },
+            "change": -17.87,
+            "changeRate": -0.02285253909996547,
+            "id": "kosdaq",
+            "label": "KOSDAQ",
+            "observedAt": null,
+            "observedDate": "2026-10-22",
+            "reason": "회차 마감 전 가장 최근 확인된 거래일 종가입니다. 장중 시세는 제공하지 않습니다.",
+            "reasonCode": null,
+            "source": {
+              "delayNote": "과거 일별 종가입니다. 출근 회차의 장중 값이나 당시 수집본을 입증하지 않습니다.",
+              "name": "Yahoo Finance 지수 일별 이력",
+              "official": false,
+              "provider": "yahoo",
+              "symbol": "^KQ11",
+              "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5EKQ11?period1=1791644400&period2=1792767600&interval=1d"
+            },
+            "status": "ok",
+            "unit": "pt",
+            "value": 764.1,
+            "valueKind": "close"
+          },
+          {
+            "baseline": {
+              "at": null,
+              "date": "2026-10-20",
+              "value": 1327.0
+            },
+            "change": 0.5,
+            "changeRate": 0.00037678975131876413,
+            "id": "usdkrw",
+            "label": "원/달러",
+            "observedAt": null,
+            "observedDate": "2026-10-21",
+            "reason": "회차 마감 전에 확정 가능한 직전 날짜의 일별 고시환율입니다. 당일 고시 마감 시각은 확인되지 않았습니다.",
+            "reasonCode": null,
+            "source": {
+              "delayNote": "날짜만 제공되는 일별 고시값으로 외환시장 종가·회차 시점 실시간 환율이 아닙니다.",
+              "name": "하나은행 고시 기준환율(네이버 일별 이력)",
+              "official": false,
+              "provider": "naver",
+              "symbol": "FX_USDKRW",
+              "url": "https://api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices?pageSize=40&page=1"
+            },
+            "status": "delayed",
+            "unit": "KRW",
+            "value": 1327.5,
+            "valueKind": "reference"
+          }
+        ],
+        "rateCutoffAt": "2026-10-22T17:30:00+09:00",
+        "referenceAt": "2026-10-22T17:30:00+09:00",
+        "status": "available"
+      },
+      "nextSession": {
+        "evidenceIds": [
+          "evidence-grouped-28fc2570e12ff5493d4efddf701c",
+          "evidence-grouped-ec60cc2c10c734b4d659d1bd1679",
+          "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e",
+          "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6",
+          "evidence-grouped-49affffbede1c3245237e8c564cc"
+        ],
+        "text": "다음 거래일에는 삼성전자의 장비 도입·양산 적용 구체화와 아침 기업의 미해결 조건을 이어서 확인합니다. 계약·출하·도입이 실제로 구체화되면 해당 사업 판단을 강화하고 지연·취소가 확인되면 낮춥니다. 시장 방향 전망은 전 거래일 지수와 장중·업종·수급을 보강한 뒤 재평가합니다."
+      },
+      "previousReview": {
+        "cutoff": "2026-10-22T09:20:00+09:00",
+        "date": "2026-10-22",
+        "draft": {
+          "companies": [
+            {
+              "checks": [],
+              "companyId": "NASDAQ:AAPL",
+              "judgment": {
+                "evidenceIds": [
+                  "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+                ],
+                "text": "배송 예상이2027년1월로 늦춰진 보도는 출하·매출 인식 시점의 확인 과제입니다. 주문량과 지연 원인이 없어 강한 수요나 공급 차질 중 어느 쪽인지 단정할 수 없습니다."
+              },
+              "negative": {
+                "evidenceIds": [
+                  "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+                ],
+                "text": "배송이 더 늦어지거나 주문 취소가 확인되면 출하·매출 시점의 부담을 높여 평가합니다."
+              },
+              "newInformation": {
+                "evidenceIds": [
+                  "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+                ],
+                "text": "배송 예상이2027년1월로 늦춰진 보도는 출하·매출 인식 시점의 확인 과제입니다. 주문량과 지연 원인이 없어 강한 수요나 공급 차질 중 어느 쪽인지 단정할 수 없습니다."
+              },
+              "positive": {
+                "evidenceIds": [
+                  "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+                ],
+                "text": "실제 출하 진행과 주문 규모가 확인되면 수요·매출 시점 평가를 구체화합니다."
+              },
+              "stance": "cautious_watch",
+              "takeaway": {
+                "evidenceIds": [
+                  "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+                ],
+                "text": "주문 증가로 단정하지 않고 실제 출하와 지연 원인을 확인합니다."
+              },
+              "title": {
+                "evidenceIds": [
+                  "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+                ],
+                "text": "배송 예상 지연 추적"
+              },
+              "watch": [
+                {
+                  "evidenceIds": [
+                    "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+                  ],
+                  "text": "배송 예상의 후속 변경과 실제 출하·주문 정보를 확인합니다."
+                }
+              ]
+            },
+            {
+              "checks": [],
+              "companyId": "NASDAQ:META",
+              "judgment": {
+                "evidenceIds": [
+                  "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+                ],
+                "text": "비의결권Class C 신설 승인은 자본 구조 변화입니다. 2027년1월 효력 발생 예정과 후속 발행 규모·경제적 조건을 확인해야 하며 사업 실적 개선으로 연결하지 않습니다."
+              },
+              "negative": {
+                "evidenceIds": [
+                  "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+                ],
+                "text": "주주 부담이나 희석을 확대하는 조건이 확인되면 해당 위험을 높여 평가합니다."
+              },
+              "newInformation": {
+                "evidenceIds": [
+                  "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+                ],
+                "text": "비의결권Class C 신설 승인은 자본 구조 변화입니다. 2027년1월 효력 발생 예정과 후속 발행 규모·경제적 조건을 확인해야 하며 사업 실적 개선으로 연결하지 않습니다."
+              },
+              "positive": {
+                "evidenceIds": [
+                  "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+                ],
+                "text": "경제적 조건과 주주 권리에 미치는 영향이 확인되면 자본정책 평가를 구체화합니다."
+              },
+              "stance": "watch",
+              "takeaway": {
+                "evidenceIds": [
+                  "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+                ],
+                "text": "승인 사실과 실적 효과를 구분하고 발행 조건을 확인합니다."
+              },
+              "title": {
+                "evidenceIds": [
+                  "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+                ],
+                "text": "Class C 후속 조건 관찰"
+              },
+              "watch": [
+                {
+                  "evidenceIds": [
+                    "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e"
+                  ],
+                  "text": "효력 발생과 발행 규모·주주 영향이 후속 공시로 구체화되는지 확인합니다."
+                }
+              ]
+            },
+            {
+              "checks": [
+                {
+                  "condition": "KYEC의 미국 시설·장비 마련과2027년4월 생산 목표의 진행을 확인합니다.",
+                  "observation": {
+                    "evidenceIds": [
+                      "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+                    ],
+                    "text": "이번 회차에 연결된 자료에는 이 조건의 실현·훼손을 확인할 새 근거가 없습니다. 조건 관찰을 이어가며 적중·실패 평가는 유보합니다."
+                  },
+                  "status": "not_observed"
+                }
+              ],
+              "companyId": "NASDAQ:NVDA",
+              "judgment": {
+                "evidenceIds": [
+                  "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+                ],
+                "text": "11억 달러 용량 예약 선급금과 KYEC의 미국 테스트 시설 계획은 미래 공급 준비에 관한 정보입니다. 2027년4월 대량 생산 목표의 실행이 확인돼야 실제 테스트 용량 확보로 평가할 수 있습니다."
+              },
+              "negative": {
+                "evidenceIds": [
+                  "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+                ],
+                "text": "시설 준비나 생산 개시의 지연이 확인되면 공급 준비 전망을 낮춥니다."
+              },
+              "newInformation": {
+                "evidenceIds": [
+                  "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+                ],
+                "text": "이번 회차에 연결된 자료에서 기존 확인 조건을 해소할 추가 근거가 없습니다. 기존 판단과 확인 과제를 추적합니다."
+              },
+              "positive": {
+                "evidenceIds": [
+                  "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+                ],
+                "text": "시설·장비 준비와 실제 생산 개시가 확인되면 테스트 용량 확보 가시성을 높여 봅니다."
+              },
+              "stance": "watch",
+              "takeaway": {
+                "evidenceIds": [
+                  "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+                ],
+                "text": "예약 선급금과 실제 테스트 용량 확보를 구분합니다."
+              },
+              "title": {
+                "evidenceIds": [
+                  "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+                ],
+                "text": "테스트 용량 확보 계획"
+              },
+              "watch": [
+                {
+                  "evidenceIds": [
+                    "evidence-grouped-28fc2570e12ff5493d4efddf701c"
+                  ],
+                  "text": "KYEC의 미국 시설·장비 마련과2027년4월 생산 목표의 진행을 확인합니다."
+                }
+              ]
+            },
+            {
+              "checks": [
+                {
+                  "condition": "주요 부처의 플랫폼 적용 범위·운영 개시가 확인되는지 살펴봅니다.",
+                  "observation": {
+                    "evidenceIds": [
+                      "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                    ],
+                    "text": "이번 회차에 연결된 자료에는 이 조건의 실현·훼손을 확인할 새 근거가 없습니다. 조건 관찰을 이어가며 적중·실패 평가는 유보합니다."
+                  },
+                  "status": "not_observed"
+                }
+              ],
+              "companyId": "KRX:018260",
+              "judgment": {
+                "evidenceIds": [
+                  "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                ],
+                "text": "공공 부문 고객 기반 확대는 기회지만 계약 금액과 실제 운영 범위가 확인돼야 사업 기여를 판단할 수 있습니다."
+              },
+              "negative": {
+                "evidenceIds": [
+                  "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                ],
+                "text": "도입 취소나 적용 지연이 확인되면 실행 가능성을 낮춰 봅니다."
+              },
+              "newInformation": {
+                "evidenceIds": [
+                  "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                ],
+                "text": "이번 회차에 연결된 자료에서 기존 확인 조건을 해소할 추가 근거가 없습니다. 기존 판단과 확인 과제를 추적합니다."
+              },
+              "positive": {
+                "evidenceIds": [
+                  "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                ],
+                "text": "실제 적용 범위와 이용 현황이 구체화되면 사업 가시성을 높여 평가합니다."
+              },
+              "stance": "watch",
+              "takeaway": {
+                "evidenceIds": [
+                  "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                ],
+                "text": "도입 결정이 실제 적용·운영으로 이어지는지 관찰합니다."
+              },
+              "title": {
+                "evidenceIds": [
+                  "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                ],
+                "text": "공공 AI 도입 실행 확인"
+              },
+              "watch": [
+                {
+                  "evidenceIds": [
+                    "evidence-grouped-ec60cc2c10c734b4d659d1bd1679"
+                  ],
+                  "text": "주요 부처의 플랫폼 적용 범위·운영 개시가 확인되는지 살펴봅니다."
+                }
+              ]
+            }
+          ],
+          "comparison": {
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c",
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679",
+              "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e",
+              "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+            ],
+            "text": "전날에는 NVIDIA 테스트 용량 준비와 삼성SDS 공공 도입의 실행을 관찰했습니다. 밤새 연결된 자료는 Apple 출하 시점과 Meta 자본정책이라는 별도 확인 과제를 더합니다. 전날 기업의 조건이 해소됐다는 뜻은 아닙니다."
+          },
+          "headline": "오늘은 Apple 출하·Meta 자본정책의 후속 조건을 확인합니다",
+          "marketInterpretation": {
+            "evidenceIds": [],
+            "text": "현재 연결된 지수는10월20일 종가로22일 개장 후 흐름이나21일 장을 설명할 수 없습니다. 오늘 시장 방향 판단을 유보하고 기업별 후속 사실을 먼저 확인합니다."
+          },
+          "nextSession": {
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c",
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679",
+              "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e",
+              "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+            ],
+            "text": "오늘의 확인 순서는 Apple 출하·주문 정보, Meta 발행 조건, 이전 기업들의 시설·공공 도입 실행입니다. 확인되면 해당 사업 판단을 갱신하고 반대 정보가 나오면 관점을 낮춥니다. 현재 가격에서 매수 가능한지를 평가할 실적·가격 수준 근거는 추가 연결이 필요합니다."
+          },
+          "summary": {
+            "evidenceIds": [
+              "evidence-grouped-28fc2570e12ff5493d4efddf701c",
+              "evidence-grouped-ec60cc2c10c734b4d659d1bd1679",
+              "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e",
+              "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6"
+            ],
+            "text": "Apple의 배송 예상 지연과 Meta의 주식 종류 신설을 우선 관찰합니다. 실적 개선이나 매수 신호로 바로 해석하지 않고 출하·주문 및 후속 발행 조건을 확인합니다. 전날 NVIDIA·삼성SDS의 실행 과제도 남겨 둡니다."
+          }
+        },
+        "edition": "morning",
+        "resultVersion": "edition-v1-d834928465851364fdd414f35d1d20f3f7a577888c776c84bf1ff910748bcc58",
+        "roundId": "sim-2026-10-22-morning-0537f757d685"
+      },
+      "resultVersion": "edition-v1-03d38589b28a94045695f8e7ecca4d8cd097dc2dfc32463318b55591a378baf4",
+      "reviewedAt": "2026-10-24T04:03:46.109066+00:00",
+      "reviewer": "codex",
+      "roundId": "sim-2026-10-22-evening-6cec67477f41",
+      "schemaVersion": "zoop-edition-review-v1",
+      "scopeNote": "원발행 시각 기준 과거 시뮬레이션·원문 대조 편집본입니다. 나중에 조회한 보존 자료이며 당시 본문 동일성·주가 인과·예측 적중은 입증하지 않습니다.",
+      "sources": {
+        "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e": {
+          "bodySha256": "fc4ac0d5f613e8c71e8be0c4734603cd0a2f5a5aeda63d2d3f778d10977d701b",
+          "documentId": "news-fc2c17929d5a2cdbc236952a8d5780f60066711ba954dd7d363536a2e0176384",
+          "documentVersion": "sha256-fc4ac0d5f613e8c71e8be0c4734603cd0a2f5a5aeda63d2d3f778d10977d701b",
+          "evidenceId": "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e",
+          "publishedAt": "2026-10-21T20:01:00+00:00",
+          "quote": "The Board of Directors has approved the establishment of a new class of publicly listed, non-voting Class C common stock, with an effective date in January 2027.",
+          "title": "Meta Reports Third Quarter 2026 Results",
+          "url": "https://www.prnewswire.com/news-releases/meta-reports-third-quarter-2026-results-302915964.html"
+        },
+        "evidence-grouped-28fc2570e12ff5493d4efddf701c": {
+          "bodySha256": "db79daf4cd541b5e9914723f609cdd54ba99f67dbba51b61bcce0e3044a015af",
+          "documentId": "news-33e8a073cb12402818f71498de563b421ae6e41030f788d4bfe6a9ab94d2a751",
+          "documentVersion": "sha256-db79daf4cd541b5e9914723f609cdd54ba99f67dbba51b61bcce0e3044a015af",
+          "evidenceId": "evidence-grouped-28fc2570e12ff5493d4efddf701c",
+          "publishedAt": "2026-10-21T02:33:00+00:00",
+          "quote": "NVIDIA’s $1.1 billion capacity reservation advance to KYEC will support new U.S. testing facilities and equipment, with high-volume production targeted for April 2027.",
+          "title": "NVIDIA and Supply Chain Partners Expand Capacity to Accelerate AI Infrastructure Buildout - 新浪香港",
+          "url": "https://portal.sina.com.hk/finance/finance-globenewswire/globenewswire/2026/10/21/1962159/nvidia-and-supply-chain-partners-expand-capacity-to-accelerate-ai-infrastructure-buildout/"
+        },
+        "evidence-grouped-49affffbede1c3245237e8c564cc": {
+          "bodySha256": "781157ca1fee9a703be4ef528b0030c3064aff0488b424588175e5dcd15ff83f",
+          "documentId": "news-a8a7c44546288bd2aacebb358e06efb35a16e8d58833dd63f6b576bf1d2853c2",
+          "documentVersion": "sha256-781157ca1fee9a703be4ef528b0030c3064aff0488b424588175e5dcd15ff83f",
+          "evidenceId": "evidence-grouped-49affffbede1c3245237e8c564cc",
+          "publishedAt": "2026-10-22T00:28:13+00:00",
+          "quote": "Samsung, in particular, plans to introduce next-generation High-NA EUV lithography systems, priced at approximately 530 billion won (about $395.5 million) per unit, into mass production by 2028.",
+          "title": "ASML Warns of Equipment Shortages Through 2028 as AI Demand Surges - Businesskorea",
+          "url": "https://www.businesskorea.co.kr/news/articleView.html?idxno=279388"
+        },
+        "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6": {
+          "bodySha256": "16c9c7aeb5d3fec7ef0fdac65890208ccf965d92b2c811e709391a6f0c9014f8",
+          "documentId": "news-542c96adf4e7af11c49c4c3e7351f68676f9af6dce12d21e1a360f743c2b6c5f",
+          "documentVersion": "sha256-16c9c7aeb5d3fec7ef0fdac65890208ccf965d92b2c811e709391a6f0c9014f8",
+          "evidenceId": "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6",
+          "publishedAt": "2026-10-21T14:35:38+00:00",
+          "quote": "delivery estimates slipped into January 2027 within minutes of preorders opening on October 16.",
+          "title": "[News] Apple Signs Up to US$100M Titanium Deal for Products Including iPhone Duo; TSMC Arizona to Supply 100M+ Chips",
+          "url": "https://www.trendforce.com/news/2026/10/21/news-apple-signs-up-to-us100m-titanium-deal-for-products-including-iphone-duo-tsmc-arizona-to-supply-100m-chips/"
+        },
+        "evidence-grouped-ec60cc2c10c734b4d659d1bd1679": {
+          "bodySha256": "769842409a5c7813e5f5688123a196c0ffdc115e8aeae70d5cdab3e3781e94fe",
+          "documentId": "news-45287b57d3e461d5e73c9c4994f3ab7acde744d6402f494cba9e79b3951901c8",
+          "documentVersion": "sha256-769842409a5c7813e5f5688123a196c0ffdc115e8aeae70d5cdab3e3781e94fe",
+          "evidenceId": "evidence-grouped-ec60cc2c10c734b4d659d1bd1679",
+          "publishedAt": "2026-10-21T07:51:08+00:00",
+          "quote": "최근 중앙부처 단일 조직 가운데 규모가 가장 큰 경찰청을 고객으로 확보했으며 경제·안보 분야 주요 부처들도 '브리티웍스' 도입을 결정했다.",
+          "title": "삼성SDS·네이버, 공무원 AI 플랫폼 경쟁 치열…공공 AX 주도권 누가 쥘까 - ZDNet korea",
+          "url": "https://zdnet.co.kr/view/?no=20261021164518"
+        }
+      },
+      "status": "REVIEWED",
+      "summary": {
+        "evidenceIds": [
+          "evidence-grouped-28fc2570e12ff5493d4efddf701c",
+          "evidence-grouped-ec60cc2c10c734b4d659d1bd1679",
+          "evidence-grouped-02ea7f0394e2ef20904f4edd7b1e",
+          "evidence-grouped-9a6541ba904bdb6a152bcb8ee2f6",
+          "evidence-grouped-49affffbede1c3245237e8c564cc"
+        ],
+        "text": "22일 지수 종가는 확보됐지만 비교 기준이20일이라 오늘 하루 강약을 확정할 수 없습니다. 아침의 Apple·Meta와 이전 추적 기업은 확인 조건이 관측됐는지 점검하고, 새로 선정된 삼성전자 도입 계획을 함께 살펴봅니다."
+      },
+      "verificationMode": "editorial_source_review"
+    },
+    "emptyReason": null,
+    "generatedAt": "2026-10-28T07:16:23.979098+00:00",
+    "graphVersion": null,
+    "id": "sim-2026-10-22-evening-6cec67477f41",
+    "issueIntelligence": {
+      "cutoff": "2026-10-22T17:30:00+09:00",
+      "date": "2026-10-22",
+      "edition": "evening",
+      "generatedAt": "2026-10-28T07:16:23.979098+00:00",
+      "issues": [
+        {
+          "companies": [
+            {
+              "assessment": "watch",
+              "companyId": "KRX:005930",
+              "comparison": {
+                "evidenceIds": [
+                  "evidence-grouped-49affffbede1c3245237e8c564cc"
+                ],
+                "previousResultVersion": null,
+                "status": "unavailable",
+                "text": "이전 퇴근의 같은 이슈·같은 기업 판단을 비교할 수 없어 판단의 유지·변화를 단정하지 않는다."
+              },
+              "conditions": [
+                {
+                  "evidenceIds": [
+                    "evidence-grouped-49affffbede1c3245237e8c564cc"
+                  ],
+                  "text": "2028년까지 양산 도입 계획이 실제 장비 계약·도입과 양산 적용으로 이어지는지 확인할 필요가 있다."
+                }
+              ],
+              "impact": {
+                "evidenceIds": [
+                  "evidence-grouped-49affffbede1c3245237e8c564cc"
+                ],
+                "text": "High-NA EUV 시스템의 양산 도입 계획은 반도체 생산 장비 계획에 연결되지만, 보도에는 실제 도입 규모나 생산량·매출 효과가 제시되지 않았다."
+              },
+              "negative": {
+                "evidenceIds": [
+                  "evidence-grouped-49affffbede1c3245237e8c564cc"
+                ],
+                "text": "대당 약 5300억원으로 보도됐지만 실제 계약·구매 여부와 전체 도입 대수는 확인되지 않았다."
+              },
+              "newInformation": {
+                "evidenceIds": [
+                  "evidence-grouped-49affffbede1c3245237e8c564cc"
+                ],
+                "text": "보도에 따르면 삼성전자는 대당 약 5300억원(약 3억9550만달러)인 차세대 High-NA EUV 시스템을 2028년까지 양산에 도입할 계획이다."
+              },
+              "outlook": {
+                "evidenceIds": [
+                  "evidence-grouped-49affffbede1c3245237e8c564cc"
+                ],
+                "text": "사업 측면에서는 차세대 노광 장비의 양산 도입 계획이 확인됐지만, 실제 계약·도입과 생산 효과는 아직 확인되지 않았다. 삼성전자 주가는 10월 22일 종가 214500원으로 직전 거래일 종가 224000원 대비 -4.24%였고, 기사 전후 관측은 221500원 대비 -3.16%였다. 이 가격 변동이 해당 보도 때문에 발생했다고 단정할 수 없다. 다음 거래일에는 장비 계약·도입의 구체화와 양산 적용 여부를 확인할 필요가 있다."
+              },
+              "positive": {
+                "evidenceIds": [
+                  "evidence-grouped-49affffbede1c3245237e8c564cc"
+                ],
+                "text": "2028년까지 차세대 High-NA EUV 시스템을 양산에 도입하려는 계획이 보도돼 생산 장비 계획의 구체적 방향이 확인됐다."
+              },
+              "previous": {
+                "reason": "same_issue_company_judgment_missing_or_ambiguous",
+                "status": "unavailable"
+              },
+              "risks": [
+                {
+                  "evidenceIds": [
+                    "evidence-grouped-49affffbede1c3245237e8c564cc"
+                  ],
+                  "text": "계획이 실제 계약과 장비 도입으로 이어지는지, 대당 약 5300억원의 장비가 몇 대 도입되는지는 보도에서 확인되지 않았다."
+                }
+              ],
+              "sourceIds": [
+                "evidence-grouped-49affffbede1c3245237e8c564cc"
+              ],
+              "takeaway": {
+                "evidenceIds": [
+                  "evidence-grouped-49affffbede1c3245237e8c564cc"
+                ],
+                "text": "삼성전자는 대당 약 5300억원인 High-NA EUV 시스템을 2028년까지 양산에 도입할 계획이지만, 실제 계약과 생산 효과는 확인되지 않아 사업 영향은 지켜볼 단계다."
+              }
+            }
+          ],
+          "headline": {
+            "evidenceIds": [
+              "evidence-grouped-49affffbede1c3245237e8c564cc"
+            ],
+            "text": "삼성전자, High-NA EUV 장비 2028년까지 양산 도입 계획"
+          },
+          "issueId": "issue-f11c16cafa07056464277c73",
+          "resultVersion": "issue-intelligence-v1-1423b67ac7f5db94179bc02aa618d8ed6fa86121db051654f85f3de018fb12fe",
+          "sources": {
+            "evidence-grouped-49affffbede1c3245237e8c564cc": {
+              "bodySha256": "781157ca1fee9a703be4ef528b0030c3064aff0488b424588175e5dcd15ff83f",
+              "documentId": "news-a8a7c44546288bd2aacebb358e06efb35a16e8d58833dd63f6b576bf1d2853c2",
+              "evidenceId": "evidence-grouped-49affffbede1c3245237e8c564cc",
+              "publishedAt": "2026-10-22T00:28:13+00:00",
+              "quote": "Samsung, in particular, plans to introduce next-generation High-NA EUV lithography systems, priced at approximately 530 billion won (about $395.5 million) per unit, into mass production by 2028.",
+              "title": "ASML Warns of Equipment Shortages Through 2028 as AI Demand Surges - Businesskorea",
+              "url": "https://www.businesskorea.co.kr/news/articleView.html?idxno=279388"
+            }
+          },
+          "status": "PASS"
+        }
+      ],
+      "model": "gpt-6-luna",
+      "policyVersion": "issue-selection-policy-v2",
+      "resultVersion": "issue-intelligence-v1-view-1fc3ab9b9d3b07df6788e12b91010ed289a595c6cdb55f59e65e32aa1b2732b7",
+      "roundId": "sim-2026-10-22-evening-6cec67477f41",
+      "schemaVersion": "issue-intelligence-v1",
+      "verificationMode": "separate_model_request"
+    },
+    "issueReading": {
+      "baseResultVersion": "issue-intelligence-v1-view-1fc3ab9b9d3b07df6788e12b91010ed289a595c6cdb55f59e65e32aa1b2732b7",
+      "cutoff": "2026-10-22T17:30:00+09:00",
+      "groups": [],
+      "issues": [
+        {
+          "connections": [
+            {
+              "basis": {
+                "evidenceIds": [
+                  "evidence-grouped-49affffbede1c3245237e8c564cc"
+                ],
+                "text": "삼성전자가 대당 약 5300억원(약 3억9550만달러)인 High-NA EUV 시스템을 2028년까지 양산에 도입할 계획이라고 보도됐다."
+              },
+              "companyId": "KRX:005930",
+              "position": "related"
+            }
+          ],
+          "issueId": "issue-f11c16cafa07056464277c73",
+          "priceUsedForRanking": true,
+          "whyImportant": {
+            "evidenceIds": [
+              "evidence-grouped-49affffbede1c3245237e8c564cc"
+            ],
+            "text": "반도체 생산 계획에 직접 연결된 차세대 노광 시스템의 양산 도입 계획이다. 장비 가격은 대당 약 5300억원으로 제시됐으며, 핵심 사업의 장비 도입·생산 계획에 관한 구체적인 변화다."
+          },
+          "whyNow": {
+            "evidenceIds": [
+              "evidence-grouped-49affffbede1c3245237e8c564cc"
+            ],
+            "text": "이번 보도에서 삼성전자의 High-NA EUV 시스템 양산 도입 목표가 2028년까지이며 대당 가격은 약 5300억원이라는 계획이 확인됐다."
+          }
+        }
+      ],
+      "roundId": "sim-2026-10-22-evening-6cec67477f41",
+      "schemaVersion": "issue-reading-review-v1"
+    },
+    "items": [
+      {
+        "companies": [
+          {
+            "id": "KRX:005930",
+            "name": "삼성전자",
+            "relationType": "INVOLVES",
+            "role": "company planning production using High-NA EUV systems",
+            "roleUnconfirmed": false
+          }
+        ],
+        "eventId": "issue-f11c16cafa07056464277c73",
+        "eventTime": null,
+        "evidenceCount": 1,
+        "evidenceIds": [
+          "evidence-grouped-49affffbede1c3245237e8c564cc"
+        ],
+        "rank": 1,
+        "reason": "반도체 생산 계획에 직접 연결된 차세대 노광 시스템의 양산 도입 계획이다. 장비 가격은 대당 약 5300억원으로 제시됐으며, 핵심 사업의 장비 도입·생산 계획에 관한 구체적인 변화다. 이번 보도에서 삼성전자의 High-NA EUV 시스템 양산 도입 목표가 2028년까지이며 대당 가격은 약 5300억원이라는 계획이 확인됐다.",
+        "reportedAt": "2026-10-22T00:28:13+00:00",
+        "summary": {
+          "evidenceIds": [
+            "evidence-grouped-49affffbede1c3245237e8c564cc"
+          ],
+          "generatedAt": "2026-10-28T07:16:23.979098+00:00",
+          "resultVersion": "issue-intelligence-v1-1423b67ac7f5db94179bc02aa618d8ed6fa86121db051654f85f3de018fb12fe",
+          "text": "보도에 따르면 삼성전자는 대당 약 5300억원(약 3억9550만달러)인 차세대 High-NA EUV 시스템을 2028년까지 양산에 도입할 계획이다."
+        },
+        "timePrecision": "unknown",
+        "title": "삼성전자, High-NA EUV 장비 2028년까지 양산 도입 계획"
+      }
+    ],
+    "marketSummary": {
+      "evidenceIds": [
+        "evidence-grouped-49affffbede1c3245237e8c564cc"
+      ],
+      "generatedAt": "2026-10-23T06:54:57.413751Z",
+      "resultVersion": "derived-v1-91d47a204092f87a2293eaabe3e370762130984d87cbd917d9d135a4a24b2d2d",
+      "text": "삼성전자는 차세대 High-NA EUV 노광 장비를 2028년까지 양산에 도입할 계획이다.\n보도는 해당 장비의 대당 가격을 약 5,300억 원(약 3억9,550만 달러)으로 제시했다.\nKOSPI 2026-10-22 종가 5533.77pt.\nKOSDAQ 2026-10-22 종가 764.1pt.\n원/달러 환율 2026-10-21 은행고시 기준환율 1327.5원.\n검증된 핵심 이슈 문장과 회차 지표를 묶은 요약입니다. 전체 적격 기업·업종 분석과 새 전망 생성은 포함하지 않습니다."
+    },
+    "marketVariables": {
+      "collectedAt": "2026-10-23T06:04:40.515813+00:00",
+      "indicators": [
+        {
+          "baseline": {
+            "at": null,
+            "date": "2026-10-20",
+            "value": 5552.74
+          },
+          "change": -18.97,
+          "changeRate": -0.003416331396751874,
+          "id": "kospi",
+          "label": "KOSPI",
+          "observedAt": null,
+          "observedDate": "2026-10-22",
+          "reason": "회차 마감 전 가장 최근 확인된 거래일 종가입니다. 장중 시세는 제공하지 않습니다.",
+          "reasonCode": null,
+          "source": {
+            "delayNote": "과거 일별 종가입니다. 출근 회차의 장중 값이나 당시 수집본을 입증하지 않습니다.",
+            "name": "Yahoo Finance 지수 일별 이력",
+            "official": false,
+            "provider": "yahoo",
+            "symbol": "^KS11",
+            "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5EKS11?period1=1791644400&period2=1792767600&interval=1d"
+          },
+          "status": "ok",
+          "unit": "pt",
+          "value": 5533.77,
+          "valueKind": "close"
+        },
+        {
+          "baseline": {
+            "at": null,
+            "date": "2026-10-20",
+            "value": 781.97
+          },
+          "change": -17.87,
+          "changeRate": -0.02285253909996547,
+          "id": "kosdaq",
+          "label": "KOSDAQ",
+          "observedAt": null,
+          "observedDate": "2026-10-22",
+          "reason": "회차 마감 전 가장 최근 확인된 거래일 종가입니다. 장중 시세는 제공하지 않습니다.",
+          "reasonCode": null,
+          "source": {
+            "delayNote": "과거 일별 종가입니다. 출근 회차의 장중 값이나 당시 수집본을 입증하지 않습니다.",
+            "name": "Yahoo Finance 지수 일별 이력",
+            "official": false,
+            "provider": "yahoo",
+            "symbol": "^KQ11",
+            "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5EKQ11?period1=1791644400&period2=1792767600&interval=1d"
+          },
+          "status": "ok",
+          "unit": "pt",
+          "value": 764.1,
+          "valueKind": "close"
+        },
+        {
+          "baseline": {
+            "at": null,
+            "date": "2026-10-20",
+            "value": 1327.0
+          },
+          "change": 0.5,
+          "changeRate": 0.00037678975131876413,
+          "id": "usdkrw",
+          "label": "원/달러",
+          "observedAt": null,
+          "observedDate": "2026-10-21",
+          "reason": "회차 마감 전에 확정 가능한 직전 날짜의 일별 고시환율입니다. 당일 고시 마감 시각은 확인되지 않았습니다.",
+          "reasonCode": null,
+          "source": {
+            "delayNote": "날짜만 제공되는 일별 고시값으로 외환시장 종가·회차 시점 실시간 환율이 아닙니다.",
+            "name": "하나은행 고시 기준환율(네이버 일별 이력)",
+            "official": false,
+            "provider": "naver",
+            "symbol": "FX_USDKRW",
+            "url": "https://api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices?pageSize=40&page=1"
+          },
+          "status": "delayed",
+          "unit": "KRW",
+          "value": 1327.5,
+          "valueKind": "reference"
+        }
+      ],
+      "rateCutoffAt": "2026-10-22T17:30:00+09:00",
+      "referenceAt": "2026-10-22T17:30:00+09:00",
+      "status": "available"
+    },
+    "metadata": {
+      "asOf": "2026-10-22T08:30:00Z",
+      "failures": [
+        {
+          "asOf": null,
+          "code": "RETROSPECTIVE_BODY",
+          "message": "원 발행시각 기준의 과거 시뮬레이션이며 당시 수집·동일 본문 버전·전체 시장 모집단을 입증하지 않습니다.",
+          "retryable": false,
+          "section": "dataWindow"
+        },
+        {
+          "asOf": null,
+          "code": "SOURCE_UNAVAILABLE",
+          "message": "운영 권한·공개 그래프 승인이 없는 localhost 과거 시뮬레이션입니다.",
+          "retryable": false,
+          "section": "graphVersion"
+        },
+        {
+          "asOf": null,
+          "code": "RETROSPECTIVE_DAILY_SNAPSHOT",
+          "message": "회차 마감 이전 일별 지표를 나중에 조회한 과거 시뮬레이션입니다. 당시 장중 관측값·개별 뉴스의 주가 영향 인과관계를 입증하지 않습니다.",
+          "retryable": false,
+          "section": "marketVariables"
+        }
+      ],
+      "graphVersion": null,
+      "partial": true,
+      "schedule": {
+        "confirmed": true,
+        "evening": "17:30",
+        "morning": "09:20"
+      },
+      "selection": {
+        "basis": "market",
+        "reason": "근거 검증 후 사건 중요도·새 정보를 평가한 별도 재분석입니다."
+      },
+      "source": "zoop-briefing-publication-clock-simulation"
+    },
+    "notice": {
+      "at": "2026-10-28T07:16:23.979098+00:00",
+      "kind": "analysis_revision",
+      "message": "이슈 중심 정책으로 새로 생성·검증한 비교본입니다.",
+      "reason": null
+    },
+    "outlook": null,
+    "previousComparison": {
+      "reason": "새 분석의 판단 비교는 이슈 상세에서 확인하세요.",
+      "status": "unavailable"
+    },
+    "publishedAt": "2026-10-24T06:54:00.676558Z",
+    "references": {
+      "companyIds": [
+        "KRX:005930"
+      ],
+      "eventIds": [
+        "issue-f11c16cafa07056464277c73"
+      ],
+      "evidenceIds": [
+        "evidence-grouped-49affffbede1c3245237e8c564cc"
+      ]
+    },
+    "scheduledAt": "2026-10-22T08:30:00Z",
+    "sinceMorning": {
+      "reason": "새 분석의 판단 비교는 이슈 상세에서 확인하세요.",
+      "status": "unavailable"
+    },
+    "status": "published"
+  }
+}

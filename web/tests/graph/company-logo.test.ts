@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { companyLogo } from '@/util/company-logo';
+import { companyLogo, logoScale } from '@/util/company-logo';
 import { createMockGraph } from '@/mocks/graph/response';
 import { toG6Data } from '@/components/graph/graph-model';
 import { styleGraph } from '@/components/graph/graph-appearance';
@@ -108,3 +108,13 @@ it.each([
     }
   },
 );
+
+it('D-GRP-01 fills the circle with logos that carry their own tile', () => {
+  // SK텔레콤·삼성SDS use the same tiled marks as SK하이닉스·삼성전자.
+  for (const url of [
+    '/graph-assets/sk-telecom.svg',
+    '/graph-assets/samsung-sds.svg',
+  ])
+    expect(logoScale(url)).toBe(1);
+  expect(logoScale('/graph-assets/lg.svg')).toBe(0.68);
+});

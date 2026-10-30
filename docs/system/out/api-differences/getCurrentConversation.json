@@ -66,6 +66,15 @@
       ]
     },
     "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.answerBasis:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.answerStatus": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partial",
+        "guidance"
+      ]
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.answerStatus:required": true,
     "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.choices[].kind": {
       "type": "string",
       "enum": [
@@ -116,7 +125,8 @@
         "results_truncated",
         "not_in_member_scope",
         "evidence_insufficient",
-        "out_of_scope"
+        "out_of_scope",
+        "tool_unavailable"
       ]
     },
     "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.limitations[].kind:required": true,
@@ -175,6 +185,41 @@
       "type": "string"
     },
     "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.metadata.requestId:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.notices": {
+      "type": "array",
+      "maxItems": 8
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.notices:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.notices[]": {
+      "type": "object"
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.notices[].code": {
+      "type": "string",
+      "enum": [
+        "mcp_direct_start",
+        "web_unavailable",
+        "web_no_results",
+        "web_budget_exhausted",
+        "web_not_configured",
+        "tool_unavailable",
+        "tool_budget_exhausted"
+      ]
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.notices[].code:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.notices[].labels": {
+      "type": "array",
+      "maxItems": 6
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.notices[].labels:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.notices[].labels[]": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.notices[].message": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.notices[].message:required": true,
     "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.sections": {
       "type": "array",
       "maxItems": 12

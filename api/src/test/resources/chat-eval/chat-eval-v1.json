@@ -383,6 +383,7 @@
       "expect": {
         "outcome": "answered",
         "appliedCompanies": ["KRX:000660", "KRX:005930", "NASDAQ:NVDA", "NYSE:TSM"],
+        "answerStatus": "partial",
         "limitations": [{"kind": "results_truncated", "label": "내 종목 관련 사건 알려줘", "cause": "scope_cut"}]
       }
     },
@@ -417,6 +418,7 @@
         "planned": ["r1-s:tools", "r1:tools"],
         "outcome": "answered",
         "appliedCompanies": ["KRX:005930"],
+        "answerStatus": "partial",
         "limitations": [{"kind": "not_in_member_scope", "cause": "named_outside"}]
       }
     },
@@ -452,6 +454,7 @@
         "planned": ["r1-s:tools", "r1:tools"],
         "outcome": "answered",
         "appliedCompanies": ["NASDAQ:NVDA", "KRX:000660"],
+        "answerStatus": "complete",
         "limitations": [{"kind": "not_in_member_scope", "cause": "anchor_outside"}]
       }
     },

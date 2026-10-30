@@ -78,6 +78,8 @@ function result(patch: Partial<ChatResult> = {}): ChatResult {
     choices: [],
     action: null,
     limitations: [],
+    answerStatus: 'complete',
+    notices: [],
     ...patch,
   };
 }
@@ -615,6 +617,7 @@ describe('D-AI-02 · job states and stored results', () => {
             message: '매수·매도 같은 투자 판단은 제공하지 않아요.',
           },
         ],
+        answerStatus: 'partial',
         applied: {
           companies: [{ id: 'KRX:000660', label: 'SK하이닉스' }],
           issues: [],
@@ -738,6 +741,57 @@ describe('D-AI-02 · job states and stored results', () => {
     ).toBeTruthy();
     expect(within(card).queryByText('근거 확인됨')).toBeNull();
     expect(within(card).queryByText('일반 개념')).toBeNull();
+  });
+
+  it('shows the notices beside a complete answer and calls its notes points to note, not unanswered parts', async () => {
+    const complete = job({
+      question: '내 종목 중에 NVIDIA와 연결된 게 있어?',
+      result: result({
+        answer: '보유한 SK하이닉스가 NVIDIA와 연결돼 있어요.',
+        answerBasis: 'general_knowledge',
+        sections: [
+          {
+            basis: 'general_knowledge',
+            text: '보유한 SK하이닉스가 NVIDIA와 연결돼 있어요.',
+            evidenceIds: [],
+          },
+        ],
+        limitations: [
+          {
+            kind: 'not_in_member_scope',
+            label: '내 종목 중에 NVIDIA와 연결된 게 있어',
+            message: '기준으로 지목한 기업은 보유·관심 종목이 아니에요.',
+          },
+        ],
+        answerStatus: 'complete',
+        notices: [
+          {
+            code: 'mcp_direct_start',
+            labels: [],
+            message:
+              '자료 조회 연결이 원활하지 않아 기본 조회 방식으로 답했어요.',
+          },
+          {
+            code: 'web_unavailable',
+            labels: ['NVIDIA 최근 소식'],
+            message: '웹 검색을 쓸 수 없었어요.',
+          },
+        ],
+      }),
+    });
+    server.on('GET', CURRENT, () => json(conversation([complete])));
+    await open();
+    const card = await screen.findByRole('article', {
+      name: '내 종목 중에 NVIDIA와 연결된 게 있어?',
+    });
+    const notices = within(card).getByRole('region', { name: '안내' });
+    expect(notices.textContent).toContain('기본 조회 방식으로 답했어요');
+    expect(notices.textContent).toContain('NVIDIA 최근 소식: 웹 검색을');
+    const notes = within(card).getByRole('region', { name: '참고할 점' });
+    expect(notes.textContent).toContain('보유·관심 종목이 아니에요');
+    expect(
+      within(card).queryByRole('region', { name: '답하지 않은 부분' }),
+    ).toBeNull();
   });
 
   it('offers only the retry the failure allows and sends it with an Idempotency-Key', async () => {

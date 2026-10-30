@@ -146,7 +146,15 @@ describe('D-BRF-01 이전 퇴근 브리핑 대비', () => {
       name: /이전 브리핑 대비/,
     });
     expect(within(section).getByText('이어짐')).toBeTruthy();
-    expect(within(section).queryByRole('link')).toBeNull();
+    expect(
+      within(section).queryByRole('link', { name: /브리핑 보기/ }),
+    ).toBeNull();
+    // 이슈 제목은 이번 회차 지도로만 잇는다.
+    expect(
+      within(section)
+        .getByRole('link', { name: '계속 선정된 합성 이슈' })
+        .getAttribute('href'),
+    ).toBe('/?round=brf-2026-10-08-morning&select=node%3Acontinuing-issue');
   });
 
   it('출근 회차의 고정 이전 회차·기준시각·근거와 순위 변화를 조회 결과대로 표시한다', async () => {

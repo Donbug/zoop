@@ -1,9 +1,12 @@
+import BriefingPreservedContext from './BriefingPreservedContext';
+import { preservedPublication } from '@/util/preservedBriefing';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { ApiError } from '@/apis/auth/ApiService';
 import { getBriefing } from '@/apis/briefing/briefing';
 import { getMyFeedback } from '@/apis/feedback/feedback';
 import FeedbackButtons from '@/components/common/FeedbackButtons';
+import BriefingPreviewFeedback from './BriefingPreviewFeedback';
+import { validIssueIntelligence } from '@/util/issueIntelligence';
 import { usePersonalBriefing } from '@/hooks/usePersonalBriefing';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import type { FeedbackValue } from '@/types/feedback';
@@ -13,24 +16,20 @@ import type {
   BriefingResponse,
 } from '@/types/briefing';
 import { briefingTime } from '@/util/briefingTime';
-import CompanyOutlooks from './CompanyOutlooks';
-import JudgmentUpdate from './JudgmentUpdate';
-import EditionReview from './EditionReview';
+import BriefingTelemetry, { BriefingIssueMapLink } from './BriefingTelemetry';
 import IssueCentricBriefing from './IssueCentricBriefing';
 import { BriefingS3Disclosure } from './BriefingS3Impacts';
-import { validEditionReview } from '@/util/editionReview';
-import { validJudgment } from '@/util/judgmentUpdate';
 import BriefingReadingSection from './BriefingReadingSection';
-import MarketIndicators from './MarketIndicators';
-import MarketSummary from './MarketSummary';
 import BriefingIssueList from './BriefingIssueList';
 import BriefingRecap from './BriefingRecap';
 import BriefingContinuity from './BriefingContinuity';
 import BriefingComparison from './BriefingComparison';
 import PersonalBasisNotice from './PersonalBasisNotice';
+import { BriefingCorrections, BriefingOutlook } from './BriefingPublishedNotes';
+import { BRIEFING_DISCLAIMER, splitCorrections } from './briefingCorrections';
+import { issueAnchor } from '@/util/briefingIssueView';
 import { hasOnlyKnownLimitations } from './briefingLimitations';
 import {
-  BODY,
   CARD,
   EMPTY,
   NOTE,
@@ -108,6 +107,10 @@ export default function PublishedBriefing({
   const memberId = useAuthStore(selectMemberId);
   const checking = useAuthStore((s) => s.status === 'checking');
   const published = result?.status === 'published' ? result : null;
+  const previewAnalysis =
+    import.meta.env.VITE_BRIEFING_PREVIEW_FEEDBACK === 'true' && result
+      ? validIssueIntelligence(result)
+      : null;
   const personalView = usePersonalBriefing(
     personal && memberId && published ? published : null,
   );
@@ -239,21 +242,37 @@ export default function PublishedBriefing({
     result && (
       <div className="mt-1 flex flex-col gap-2">
         {!compact && <BriefingS3Disclosure round={result} item={item} />}
-        <Link
-          to={`/?round=${encodeURIComponent(result.id)}&select=${encodeURIComponent(`node:${item.eventId}`)}`}
-          className={`self-start text-[11px] font-semibold underline underline-offset-4 ${FOCUS_RING}`}
-        >
-          이 회차 관계 그래프에서 보기
-        </Link>
-        {result.graphVersion && (
-          <FeedbackButtons
-            key={`${feedbackKey}:${item.eventId}`}
+        {!result.issueIntelligence && (
+          <BriefingIssueMapLink
+            roundId={result.id}
+            eventId={item.eventId}
+            compact={compact}
+            to={`/?round=${encodeURIComponent(result.id)}&select=${encodeURIComponent(`node:${item.eventId}`)}`}
+            className={`self-start text-[11px] font-semibold underline underline-offset-4 ${FOCUS_RING}`}
+          >
+            이 회차 관계 그래프에서 보기
+          </BriefingIssueMapLink>
+        )}
+        {previewAnalysis ? (
+          <BriefingPreviewFeedback
+            key={`${previewAnalysis.resultVersion}:${item.eventId}`}
+            roundId={result.id}
+            resultVersion={previewAnalysis.resultVersion}
             feature="briefing_issue"
             targetId={`${result.id}/${item.eventId}`}
-            targetVersion={result.graphVersion}
             subject={`핵심 이슈 ${item.rank}`}
-            saved={saved('briefing_issue', `${result.id}/${item.eventId}`)}
           />
+        ) : (
+          result.graphVersion && (
+            <FeedbackButtons
+              key={`${feedbackKey}:${item.eventId}`}
+              feature="briefing_issue"
+              targetId={`${result.id}/${item.eventId}`}
+              targetVersion={result.graphVersion}
+              subject={`핵심 이슈 ${item.rank}`}
+              saved={saved('briefing_issue', `${result.id}/${item.eventId}`)}
+            />
+          )
         )}
       </div>
     );
@@ -274,7 +293,17 @@ export default function PublishedBriefing({
   const roundFeedback = result && (
     <section className={SECTION} aria-label="이 브리핑 평가">
       <h3 className={SECTION_TITLE}>이 브리핑은 어땠나요?</h3>
-      {result.graphVersion ? (
+      {previewAnalysis ? (
+        <BriefingPreviewFeedback
+          key={`${previewAnalysis.resultVersion}:round`}
+          roundId={result.id}
+          resultVersion={previewAnalysis.resultVersion}
+          feature="briefing_round"
+          targetId={result.id}
+          subject="이 브리핑 회차"
+          showNote
+        />
+      ) : result.graphVersion ? (
         <FeedbackButtons
           key={`${feedbackKey}:round`}
           feature="briefing_round"
@@ -291,242 +320,236 @@ export default function PublishedBriefing({
     </section>
   );
 
-  const currentContext = result && (
-    <>
-      <EditionReview result={result} compact={compact} />
-      {validEditionReview(result) ? (
-        <BriefingReadingSection compact title="이전 분석·기업 시세·근거 보존본">
-          <JudgmentUpdate result={result} compact={compact} />
-          <CompanyOutlooks result={result} compact={false} />
-        </BriefingReadingSection>
-      ) : (
-        <>
-          <JudgmentUpdate result={result} compact={compact} />
-          {validJudgment(result) ? (
-            <BriefingReadingSection
-              compact
-              title="기존 생성 전문·시세·근거 보존본"
-            >
-              <p className={NOTE}>
-                아래는 비교 분석 추가 전 생성한 문안입니다. 좁은 인용에 따른
-                과거의 ‘일정 미확인’ 표현은 위의 원문 전체 기반 판단을
-                확인하세요.
-              </p>
-              <CompanyOutlooks result={result} compact={false} />
-            </BriefingReadingSection>
-          ) : (
-            <CompanyOutlooks result={result} compact={compact} />
-          )}
-        </>
-      )}
-      {compact && (
-        <MarketIndicators variables={result.marketVariables} compact />
-      )}
-      <BriefingReadingSection
-        compact={compact}
-        title={
-          result.edition === 'morning'
-            ? '시장 요약·시장 전체 전망 읽기'
-            : '시장 요약·시장 흐름 비교 읽기'
-        }
-      >
-        <MarketSummary
-          summary={result.marketSummary}
-          edition={result.edition}
-          dataAsOf={result.dataAsOf}
-        />
-      </BriefingReadingSection>
-      {!compact && <MarketIndicators variables={result.marketVariables} />}
-    </>
+  // 화면은 순위 상위 3건만 그린다. 나머지 이슈의 정정은 회차 정정으로 남긴다.
+  const shownItems = result
+    ? [...(personalBriefing ?? result).items]
+        .sort((a, b) => a.rank - b.rank)
+        .slice(0, 3)
+    : [];
+  const corrections = splitCorrections(
+    result?.corrections ?? [],
+    shownItems.map((item) => item.eventId),
   );
 
+  const currentContext = result && (
+    <BriefingPreservedContext result={result} compact={compact} />
+  );
+  const original = result && preservedPublication(result);
+
   return (
-    <article
-      data-reading={compact ? 'compact' : 'full'}
-      className={CARD}
-      aria-busy={loading}
-    >
-      {loading && (
-        <p role="status" className="text-xs text-zoop-muted">
-          브리핑을 불러오고 있어요.
-        </p>
-      )}
-      {error && (
-        <p role="alert" className={EMPTY}>
-          {error}
-        </p>
-      )}
-      {result && (
-        <>
-          <header className="border-b-[0.667px] border-zoop-line pb-[18px]">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-bold tracking-[-0.025em]">
-                {result.edition === 'morning' ? '출근' : '퇴근'} 브리핑
-              </h2>
-              <span className={STATUS_PILL}>
-                {result.continuity?.mode === 'reference'
-                  ? '참고 브리핑'
-                  : result.continuity?.mode === 'recap'
-                    ? result.continuity.recap.status === 'available'
-                      ? '복기 브리핑'
-                      : '확인 브리핑'
-                    : statuses[result.status]}
-              </span>
-            </div>
-            {compact && (
-              <p className={`${NOTE} mt-2`}>
-                데이터 기준 {briefingTime(result.dataAsOf)}
-                {result.metadata.source.includes('simulation') ||
-                result.metadata.source.includes('replay')
-                  ? ' · 과거 자료 시뮬레이션'
-                  : ''}
+    <BriefingTelemetry roundId={published?.id ?? null}>
+      <article
+        data-reading={compact ? 'compact' : 'full'}
+        className={CARD}
+        aria-busy={loading}
+      >
+        {loading && (
+          <p role="status" className="text-xs text-zoop-muted">
+            브리핑을 불러오고 있어요.
+          </p>
+        )}
+        {error && (
+          <p role="alert" className={EMPTY}>
+            {error}
+          </p>
+        )}
+        {result && (
+          <>
+            <header className="border-b-[0.667px] border-zoop-line pb-[18px]">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-bold tracking-[-0.025em]">
+                  {result.edition === 'morning' ? '출근' : '퇴근'} 브리핑
+                </h2>
+                <span className={STATUS_PILL}>
+                  {result.continuity?.mode === 'reference'
+                    ? '참고 브리핑'
+                    : result.continuity?.mode === 'recap'
+                      ? result.continuity.recap.status === 'available'
+                        ? '복기 브리핑'
+                        : '확인 브리핑'
+                      : statuses[result.status]}
+                </span>
+              </div>
+              {compact && (
+                <p className={`${NOTE} mt-2`}>
+                  데이터 기준 {briefingTime(result.dataAsOf)}
+                  {result.metadata.source.includes('simulation') ||
+                  result.metadata.source.includes('replay')
+                    ? ' · 과거 자료 시뮬레이션'
+                    : ''}
+                </p>
+              )}
+              {!compact && publicationInfo}
+            </header>
+            {result.notice && (
+              <p className={`${EMPTY} mt-4`} role="status">
+                {result.notice.message}
+                {result.notice.reason && ` · ${result.notice.reason}`}
+                {result.notice.at && ` · ${briefingTime(result.notice.at)}`}
               </p>
             )}
-            {!compact && publicationInfo}
-          </header>
-          {result.notice && (
-            <p className={`${EMPTY} mt-4`} role="status">
-              {result.notice.message}
-              {result.notice.reason && ` · ${result.notice.reason}`}
-            </p>
-          )}
-          {!compact &&
-            result.continuity &&
-            result.continuity.mode !== 'core' && (
-              <BriefingContinuity value={result.continuity} compact={compact} />
+            {!compact && result.status === 'published' && (
+              <BriefingOutlook
+                outlook={result.outlook}
+                issues={(personalBriefing ?? result).items.map((item) => ({
+                  eventId: item.eventId,
+                  title: item.title,
+                  anchor: shownItems.includes(item)
+                    ? issueAnchor(item)
+                    : undefined,
+                }))}
+              />
             )}
-          {result.status === 'published' && compact && (
-            <>
-              {personal && (
-                <PersonalBasisNotice
-                  member={Boolean(memberId)}
-                  checking={checking}
-                  state={personalView.state}
-                  dataAsOf={result.dataAsOf}
-                  onRetry={personalView.reload}
+            {!compact &&
+              result.continuity &&
+              result.continuity.mode !== 'core' && (
+                <BriefingContinuity
+                  value={result.continuity}
+                  compact={compact}
                 />
               )}
-              {!knownLimits && partialInfo}
-              {feedbackReadError}
-              <IssueCentricBriefing
-                result={result}
-                items={(personalBriefing ?? result).items}
-                renderExtra={issueExtra}
-              />
-              {result.corrections.length > 0 && (
-                <section className={SECTION}>
-                  <h3 className={SECTION_TITLE}>정정 이력</h3>
-                  {result.corrections.map((c) => (
-                    <p key={c.id} className={BODY}>
-                      {c.corrected} · {c.reason}
-                    </p>
-                  ))}
-                </section>
-              )}
-            </>
-          )}
-          {result.status === 'published' && !compact && (
-            <BriefingReadingSection
-              compact={
-                compact &&
-                Boolean(result.continuity && result.continuity.mode !== 'core')
-              }
-              title="시장·지표와 전체 저장 상태 보기"
-            >
-              {(!compact || !knownLimits) && partialInfo}
-              {currentContext}
-              {result.items.length === 0 &&
-                result.emptyReason === 'no_issues_in_window' &&
-                !result.continuity && (
-                  <BriefingRecap
-                    key={`${result.id}:${result.graphVersion}:${result.dataAsOf}`}
-                    round={result}
-                    compact={compact}
+            {result.status === 'published' && compact && (
+              <>
+                {personal && (
+                  <PersonalBasisNotice
+                    member={Boolean(memberId)}
+                    checking={checking}
+                    state={personalView.state}
+                    dataAsOf={result.dataAsOf}
+                    onRetry={personalView.reload}
                   />
                 )}
-              {personal && (
-                <PersonalBasisNotice
-                  member={Boolean(memberId)}
-                  checking={checking}
-                  state={personalView.state}
-                  dataAsOf={result.dataAsOf}
-                  onRetry={personalView.reload}
+                {!knownLimits && partialInfo}
+                {feedbackReadError}
+                <IssueCentricBriefing
+                  result={result}
+                  items={(personalBriefing ?? result).items}
+                  renderExtra={issueExtra}
+                  issueCorrections={corrections.byIssue}
                 />
-              )}
-              {feedbackReadError}
-              <BriefingIssueList
-                compact={compact}
-                items={(personalBriefing ?? result).items}
-                roundId={result.id}
-                graphVersion={result.graphVersion}
-                graphHref={`/?round=${encodeURIComponent(result.id)}`}
-                renderExtra={issueExtra}
-              />
+                <BriefingCorrections corrections={corrections.round} />
+              </>
+            )}
+            {result.status === 'published' && !compact && (
               <BriefingReadingSection
-                compact={compact}
-                title="이전 브리핑과 핵심 이슈 변화 보기"
+                compact={
+                  compact &&
+                  Boolean(
+                    result.continuity && result.continuity.mode !== 'core',
+                  )
+                }
+                title="시장·지표와 전체 저장 상태 보기"
               >
-                {result.edition === 'evening' && (
-                  <BriefingComparison
-                    since={result.sinceMorning}
-                    roundDate={result.date}
-                  />
-                )}
-                {result.edition === 'morning' && (
-                  <BriefingComparison
-                    basis="previous"
-                    previous={result.previousComparison ?? null}
-                    roundDate={result.date}
-                  />
-                )}
-              </BriefingReadingSection>
-              {result.corrections.length > 0 && (
-                <section className={SECTION}>
-                  <h3 className={SECTION_TITLE}>정정 이력</h3>
-                  <ol className="flex flex-col gap-3">
-                    {result.corrections.map((correction) => (
-                      <li
-                        key={correction.id}
-                        className="flex flex-col gap-1 rounded-[3px] bg-zoop-wash p-3"
-                      >
+                {(!compact || !knownLimits) && partialInfo}
+                {result.issueIntelligence ? (
+                  <>
+                    <IssueCentricBriefing
+                      compact={false}
+                      result={result}
+                      items={(personalBriefing ?? result).items}
+                      renderExtra={issueExtra}
+                      issueCorrections={corrections.byIssue}
+                    />
+                    <BriefingReadingSection
+                      compact
+                      title="이전 생성 전문·시장 요약·시세 보존본"
+                    >
+                      {original ? (
+                        <BriefingPreservedContext
+                          result={original}
+                          compact={false}
+                        />
+                      ) : (
                         <p className={NOTE}>
-                          정정 시각 {briefingTime(correction.createdAt)}
+                          이전 발행본을 확인하지 못해 보존본을 표시하지
+                          않습니다.
                         </p>
-                        {correction.original && (
-                          <p className="text-xs text-zoop-faint line-through">
-                            발행 원문: {correction.original}
-                          </p>
-                        )}
-                        <p className="text-xs">
-                          정정 내용: {correction.corrected}
-                        </p>
-                        <p className={NOTE}>사유: {correction.reason}</p>
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-              )}
-              {roundFeedback}
-            </BriefingReadingSection>
-          )}
-          {compact && result.status === 'published' && (
-            <BriefingReadingSection compact title="이 브리핑 평가">
-              {roundFeedback}
-            </BriefingReadingSection>
-          )}
-          {compact && (
-            <BriefingReadingSection compact title="발행 정보와 자료 확인 범위">
-              {publicationInfo}
-              {knownLimits && partialInfo}
-            </BriefingReadingSection>
-          )}
-        </>
-      )}
-      {canRetry && (
-        <button className={PRIMARY_BUTTON} type="button" onClick={reload}>
-          다시 시도
-        </button>
-      )}
-    </article>
+                      )}
+                    </BriefingReadingSection>
+                  </>
+                ) : (
+                  currentContext
+                )}
+                {result.items.length === 0 &&
+                  result.emptyReason === 'no_issues_in_window' &&
+                  !result.issueIntelligence &&
+                  !result.continuity && (
+                    <BriefingRecap
+                      key={`${result.id}:${result.graphVersion}:${result.dataAsOf}`}
+                      round={result}
+                      compact={compact}
+                    />
+                  )}
+                {personal && (
+                  <PersonalBasisNotice
+                    member={Boolean(memberId)}
+                    checking={checking}
+                    state={personalView.state}
+                    dataAsOf={result.dataAsOf}
+                    onRetry={personalView.reload}
+                  />
+                )}
+                {feedbackReadError}
+                {!result.issueIntelligence && (
+                  <BriefingIssueList
+                    compact={compact}
+                    items={(personalBriefing ?? result).items}
+                    roundId={result.id}
+                    graphVersion={result.graphVersion}
+                    graphHref={`/?round=${encodeURIComponent(result.id)}`}
+                    renderExtra={issueExtra}
+                    issueCorrections={corrections.byIssue}
+                  />
+                )}
+                <BriefingReadingSection
+                  compact={compact}
+                  title="이전 브리핑과 핵심 이슈 변화 보기"
+                >
+                  {result.edition === 'evening' && (
+                    <BriefingComparison
+                      since={result.sinceMorning}
+                      roundDate={result.date}
+                      graphRoundId={
+                        result.issueIntelligence ? undefined : result.id
+                      }
+                    />
+                  )}
+                  {result.edition === 'morning' && (
+                    <BriefingComparison
+                      basis="previous"
+                      previous={result.previousComparison ?? null}
+                      roundDate={result.date}
+                      graphRoundId={
+                        result.issueIntelligence ? undefined : result.id
+                      }
+                    />
+                  )}
+                </BriefingReadingSection>
+                <BriefingCorrections corrections={corrections.round} />
+                {roundFeedback}
+              </BriefingReadingSection>
+            )}
+            {compact && result.status === 'published' && roundFeedback}
+            {compact && (
+              <BriefingReadingSection
+                compact
+                title="발행 정보와 자료 확인 범위"
+              >
+                {publicationInfo}
+                {knownLimits && partialInfo}
+              </BriefingReadingSection>
+            )}
+          </>
+        )}
+        {result?.status === 'published' && (
+          <p className={`${NOTE} mt-4`}>{BRIEFING_DISCLAIMER}</p>
+        )}
+        {canRetry && (
+          <button className={PRIMARY_BUTTON} type="button" onClick={reload}>
+            다시 시도
+          </button>
+        )}
+      </article>
+    </BriefingTelemetry>
   );
 }

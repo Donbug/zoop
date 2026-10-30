@@ -6,11 +6,13 @@ import GraphIcon from '@/components/graph/GraphIcon';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import type { BriefingEdition } from '@/types/briefing';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
+import { useScreenView } from '@/util/track';
 
 const EDITION_BUTTON = `min-w-[76px] whitespace-nowrap rounded-[2px] text-xs font-semibold text-zoop-muted aria-pressed:bg-zoop-paper aria-pressed:text-zoop-ink aria-pressed:shadow-[0_0_0_0.5px_#1a1a1a14] max-sm:flex-1 ${FOCUS_RING}`;
 
 // D-BRF-01 출근 · D-BRF-02 퇴근 브리핑 (/briefing). 날짜·회차는 주소(?date=&edition=)에 남는다.
 export default function BriefingPage() {
+  useScreenView('briefing');
   const { params, updateQuery } = useRouteQuery();
   const auth = useAuth();
   const memberId = useAuthStore(selectMemberId);
@@ -24,7 +26,7 @@ export default function BriefingPage() {
   const personal = params.get('view') === 'personal';
   return (
     <section
-      className={`mx-auto w-full text-zoop-ink ${compact ? 'max-w-[480px]' : 'max-w-[800px]'}`}
+      className="mx-auto w-full max-w-[1040px] text-zoop-ink"
       data-screen-id={edition === 'morning' ? 'D-BRF-01' : 'D-BRF-02'}
     >
       <h1 className="flex items-center gap-2.5 text-[28px] font-[750] tracking-[-0.045em]">

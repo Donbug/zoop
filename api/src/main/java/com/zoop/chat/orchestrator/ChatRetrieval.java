@@ -29,8 +29,10 @@ import java.util.Set;
  * instead of the requirement's targets.
  *
  * <ul>
- * <li>A failed call (timeout, unavailable data, adapter fault) ends retrieval at once: no checkpoint is evaluated and no
- * later stage runs.</li>
+ * <li>A call that timed out or found its data unavailable leaves the requirements it served unanswered
+ * ({@code tool_unavailable}), and the requirements that depend on them too; the others go on ({@code faulted} keeps the
+ * first such call, so the engine can still fail the job when nothing is answered). An adapter fault is a bug, not a
+ * passing fault: it ends retrieval at once, with no checkpoint evaluated and no later stage run.</li>
  * <li>Checkpoint over the companies the source found: more than the condition allows (or more than a stage can fan out to)
  * stops with a clarification built from what was actually found; fewer makes the dependent requirement
  * {@code precondition_unmet}; none at all, when the source was not cut by a limit, lets the source answer that nothing was
@@ -41,16 +43,21 @@ import java.util.Set;
  * </ul>
  */
 final class ChatRetrieval {
+    /** A requirement whose own read, or the read it depends on, timed out or found its data unavailable. */
+    static final String TOOL_UNAVAILABLE = "tool_unavailable";
+
     /**
      * What retrieval produced: results per requirement, the limitations it decided, or a stop or failed call. {@code cut}
      * holds the requirements that read on only part of the member's companies (Q07: more than a stage fans out to).
      * {@code outside} holds the Q07 requirements that name a company that is not the member's, by how it was named.
+     * {@code faulted} is the first call that left a requirement {@link #TOOL_UNAVAILABLE}, null when none did.
      */
     record Outcome(Map<String, List<ChatToolResult>> results, Map<String, String> limitations, Set<String> noneFound,
-            ChatPlan.Stop stop, ChatToolResult failed, Set<String> cut, Map<String, Outside> outside) {
+            ChatPlan.Stop stop, ChatToolResult failed, Set<String> cut, Map<String, Outside> outside,
+            ChatToolResult faulted) {
         Outcome(Map<String, List<ChatToolResult>> results, Map<String, String> limitations, Set<String> noneFound,
                 ChatPlan.Stop stop, ChatToolResult failed) {
-            this(results, limitations, noneFound, stop, failed, Set.of(), Map.of());
+            this(results, limitations, noneFound, stop, failed, Set.of(), Map.of(), null);
         }
     }
 
@@ -74,6 +81,7 @@ final class ChatRetrieval {
         Map<String, Outside> outside = new LinkedHashMap<>();
         Map<String, Planned> byId = new HashMap<>();
         plan.requirements().forEach(p -> byId.put(p.id(), p));
+        ChatToolResult faulted = null;
         for (int stage = 1; stage <= plan.stages(); stage++) {
             List<ChatToolRequest> calls = new ArrayList<>();
             Map<String, Integer> callIndex = new HashMap<>();
@@ -84,7 +92,9 @@ final class ChatRetrieval {
                 if (p.dependsOn() != null) {
                     var source = p.dependsOn().requirementId();
                     if (limitations.containsKey(source)) {
-                        limitations.put(p.id(), "precondition_unmet");
+                        // What it depends on could not be read: the same fault, not a condition the source failed.
+                        limitations.put(p.id(), TOOL_UNAVAILABLE.equals(limitations.get(source)) ? TOOL_UNAVAILABLE
+                                : "precondition_unmet");
                         continue;
                     }
                     Found found = found(results.getOrDefault(source, List.of()));
@@ -158,10 +168,19 @@ final class ChatRetrieval {
             if (calls.isEmpty()) continue;
             List<ChatToolResult> stageResults = runner.runStage(run, control, 1, calls);
             for (ChatToolResult result : stageResults) {
-                if (!result.succeeded()) return new Outcome(results, limitations, noneFound, null, result);
+                if (!result.succeeded() && !passing(result)) return new Outcome(results, limitations, noneFound, null, result);
             }
-            owned.forEach((requirement, indexes) -> results.put(requirement,
-                    indexes.stream().map(stageResults::get).toList()));
+            for (var entry : owned.entrySet()) {
+                List<ChatToolResult> mine = entry.getValue().stream().map(stageResults::get).toList();
+                Optional<ChatToolResult> fault = mine.stream().filter(r -> !r.succeeded()).findFirst();
+                if (fault.isEmpty()) {
+                    results.put(entry.getKey(), mine);
+                    continue;
+                }
+                // Part of a requirement's reads is not its answer: the whole requirement is left unanswered.
+                limitations.put(entry.getKey(), TOOL_UNAVAILABLE);
+                if (faulted == null) faulted = fault.get();
+            }
         }
         for (Planned p : plan.requirements()) {
             // An independent lookup that found nothing and was not cut may say so.
@@ -170,7 +189,12 @@ final class ChatRetrieval {
                 noneFound.add(p.id());
             }
         }
-        return new Outcome(results, limitations, noneFound, null, null, cut, outside);
+        return new Outcome(results, limitations, noneFound, null, null, cut, outside, faulted);
+    }
+
+    /** A timeout or unavailable data: a fault of the moment that leaves its requirement unanswered, not a bug. */
+    private static boolean passing(ChatToolResult failed) {
+        return ChatToolRunner.TIMEOUT.equals(failed.error()) || ChatToolRunner.UNAVAILABLE.equals(failed.error());
     }
 
     /**

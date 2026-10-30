@@ -36,8 +36,8 @@ import tools.jackson.databind.node.ObjectNode;
  * <li>Every capability must be bound in {@link ChatToolRegistry} before anything is reserved; an unbound one refuses the
  * whole stage. The stage's calls are reserved first ({@code reserved}, at most 12 per attempt) and each is marked
  * {@code running} just before it starts.</li>
- * <li>At most four calls of a stage run at once. A call has 3 seconds and the stage 10 seconds, never past the run's
- * deadline; a call that runs out ends {@code failed}/{@link #TIMEOUT} and its read is interrupted. A call that could not
+ * <li>At most four calls of a stage run at once. A call has 3 seconds, a graph computation ({@code zoop-graph-read}:
+ * paths, version comparison) 5 seconds, a web search 7 seconds, and the stage 10 seconds, never past the run's deadline; a call that runs out ends {@code failed}/{@link #TIMEOUT} and its read is interrupted. A call that could not
  * start within the stage stays reserved and is closed as {@code cancelled} with the job, and a call whose start was
  * recorded only after the stage ran out is not run at all.</li>
  * <li>Reads that have not ended, timed-out ones included, hold a runner-wide slot ({@link #MAX_IN_FLIGHT}) until their
@@ -58,6 +58,8 @@ public class ChatToolRunner implements AutoCloseable {
     public static final String FAILED = "tool_failed";
     static final Duration STAGE_LIMIT = Duration.ofSeconds(10);
     static final Duration CALL_LIMIT = Duration.ofSeconds(3);
+    static final Duration GRAPH_CALL_LIMIT = Duration.ofSeconds(5);
+    static final Duration WEB_CALL_LIMIT = Duration.ofSeconds(7);
     static final Duration RECORD_GRACE = Duration.ofSeconds(2);
     static final int MAX_CONCURRENT = 4;
     /** Reads of all runs that may be unfinished at once: four workers' worth of stages. */
@@ -67,6 +69,7 @@ public class ChatToolRunner implements AutoCloseable {
     private final ChatToolRegistry registry;
     private final Duration stageLimit;
     private final Duration callLimit;
+    private final Duration graphCallLimit;
     private final Duration recordGrace;
     private final Semaphore inFlight;
     private final ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor();
@@ -79,14 +82,15 @@ public class ChatToolRunner implements AutoCloseable {
 
     @Autowired
     public ChatToolRunner(ChatToolRegistry registry) {
-        this(registry, STAGE_LIMIT, CALL_LIMIT, RECORD_GRACE, MAX_IN_FLIGHT);
+        this(registry, STAGE_LIMIT, CALL_LIMIT, GRAPH_CALL_LIMIT, RECORD_GRACE, MAX_IN_FLIGHT);
     }
 
-    ChatToolRunner(ChatToolRegistry registry, Duration stageLimit, Duration callLimit, Duration recordGrace,
-            int maxInFlight) {
+    ChatToolRunner(ChatToolRegistry registry, Duration stageLimit, Duration callLimit, Duration graphCallLimit,
+            Duration recordGrace, int maxInFlight) {
         this.registry = registry;
         this.stageLimit = stageLimit;
         this.callLimit = callLimit;
+        this.graphCallLimit = graphCallLimit;
         this.recordGrace = recordGrace;
         this.inFlight = new Semaphore(maxInFlight);
     }
@@ -212,7 +216,7 @@ public class ChatToolRunner implements AutoCloseable {
                 superseded.set(true);
                 break;
             }
-            long budget = Math.min(callLimit.toNanos(), stageEnd - System.nanoTime());
+            long budget = Math.min(limit(tool.capability()).toNanos(), stageEnd - System.nanoTime());
             if (budget <= 0) {
                 // Its start was recorded too late: it runs out without being made.
                 slots.release();
@@ -260,6 +264,12 @@ public class ChatToolRunner implements AutoCloseable {
     public void close() {
         pool.shutdownNow();
         records.shutdownNow();
+    }
+
+    /** The time one call of {@code capability} has, before the stage and the run's deadline shorten it. */
+    private Duration limit(ChatCapability capability) {
+        if (capability.web()) return WEB_CALL_LIMIT;
+        return "zoop-graph-read".equals(capability.group()) ? graphCallLimit : callLimit;
     }
 
     private ChatToolRegistry.Binding binding(ChatToolRequest call) {

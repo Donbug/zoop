@@ -69,18 +69,25 @@ function Statement({
                   </a>
                   <p className={NOTE}>보도 {briefingTime(s.publishedAt)}</p>
                   <blockquote className={`${NOTE} mt-1`}>{s.quote}</blockquote>
-                  <details>
-                    <summary
-                      className={`min-h-11 cursor-pointer content-center text-xs ${FOCUS_RING}`}
-                    >
-                      전체 보존 원문
-                    </summary>
-                    <blockquote
-                      className={`${NOTE} max-h-64 overflow-auto whitespace-pre-wrap`}
-                    >
-                      {s.fullBody}
-                    </blockquote>
-                  </details>
+                  {s.fullBody ? (
+                    <details>
+                      <summary
+                        className={`min-h-11 cursor-pointer content-center text-xs ${FOCUS_RING}`}
+                      >
+                        전체 보존 원문
+                      </summary>
+                      <blockquote
+                        className={`${NOTE} max-h-64 overflow-auto whitespace-pre-wrap`}
+                      >
+                        {s.fullBody}
+                      </blockquote>
+                    </details>
+                  ) : (
+                    <p className={NOTE}>
+                      전체 본문은 포함되지 않았습니다. 원문 링크에서 확인해
+                      주세요.
+                    </p>
+                  )}
                 </li>
               );
             })}

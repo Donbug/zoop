@@ -300,9 +300,41 @@ function Answer({
           {result.answer}
         </p>
       )}
+      {result.notices.length > 0 && (
+        <section aria-label="안내" className={ui.state}>
+          <strong>안내</strong>
+          <ul>
+            {result.notices.map((notice, i) => (
+              <li key={i} data-code={notice.code}>
+                {notice.labels.length > 0 && (
+                  <>
+                    <span className="font-semibold">
+                      {notice.labels.join(', ')}
+                    </span>
+                    :{' '}
+                  </>
+                )}
+                {notice.message}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {result.limitations.length > 0 && (
-        <section aria-label="답하지 않은 부분" className={ui.state}>
-          <strong>답하지 않은 부분</strong>
+        // 모두 답한 답변(complete)의 limitation은 답한 요구 옆의 주의뿐이다.
+        <section
+          aria-label={
+            result.answerStatus === 'complete'
+              ? '참고할 점'
+              : '답하지 않은 부분'
+          }
+          className={ui.state}
+        >
+          <strong>
+            {result.answerStatus === 'complete'
+              ? '참고할 점'
+              : '답하지 않은 부분'}
+          </strong>
           <ul>
             {result.limitations.map((limitation, i) => (
               <li key={i} data-kind={limitation.kind}>
