@@ -89,12 +89,14 @@
 }
 
 /* 다크 테마도 로그인 화면과 같은 중성 회색 팔레트를 쓴다.
-   Tailwind 기본 흰색·회색 단계도 뒤집어, 아직 토큰으로 옮기지 않은 화면도 함께 어두워지게 한다. */
+   Tailwind 기본 흰색·회색 단계도 뒤집어, 아직 토큰으로 옮기지 않은 화면도 함께 어두워지게 한다.
+   글자는 순백 대신 #ededed(본문)·#a0a0a0(보조)·#8f8f8f(옅은 보조)를 쓴다.
+   본문 대비는 라이트(#212121/#fff, 약 16:1)와 비슷한 약 15:1이고, 옅은 보조도 #262626 패널 위에서 4.5:1을 넘긴다. */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --color-zoop-ink: #ffffff;
-  --color-zoop-muted: #d4d4d4;
-  --color-zoop-faint: #a3a3a3;
+  --color-zoop-ink: #ededed;
+  --color-zoop-muted: #a0a0a0;
+  --color-zoop-faint: #8f8f8f;
   --color-zoop-line: #373737;
   --color-zoop-paper: #171717;
   --color-zoop-wash: #171717;
@@ -106,9 +108,9 @@
   --color-zoop-positive: #86efac;
   --color-zoop-mixed: #fcd34d;
   --color-zoop-hold: #fdba74;
-  --color-panel-ink: #ffffff;
-  --color-panel-secondary: #d4d4d4;
-  --color-panel-muted: #a3a3a3;
+  --color-panel-ink: #ededed;
+  --color-panel-secondary: #a0a0a0;
+  --color-panel-muted: #8f8f8f;
   --color-panel-line: #373737;
   --color-panel-control: #373737;
   --color-panel-soft: #262626;
@@ -122,8 +124,8 @@
   --color-gray-600: #bdbdbd;
   --color-gray-700: #d4d4d4;
   --color-gray-800: #e5e5e5;
-  --color-gray-900: #f5f5f5;
-  --color-gray-950: #ffffff;
+  --color-gray-900: #ededed;
+  --color-gray-950: #f5f5f5;
 }
 
 /* 기본 규칙은 base 레이어에 둔다. 레이어 밖에 두면 Tailwind 유틸리티(text-xs 등)보다

@@ -76,7 +76,7 @@ Light-theme text is one ink, `#212121` (`zoop-ink/muted/faint`, `panel-*`); show
 
 ### Dark theme
 
-`:root[data-theme='dark']` in `src/index.css` gives every `zoop-*` and `panel-*` token a dark value; light values stay in `@theme`. Use tokens instead of hex so both themes follow. The Tailwind `white` and `gray-*` scale is inverted in dark for screens not yet on tokens. G6 canvas colors cannot read CSS, so graph code calls `themeColor()` from `src/util/theme-color.ts`; the header moon button (`toggleTheme`) reloads so the canvas redraws. Black line icons from `/graph-assets` carry `data-icon` and are inverted in dark; company logos are not.
+`:root[data-theme='dark']` in `src/index.css` gives every `zoop-*` and `panel-*` token a dark value; light values stay in `@theme`. Dark text avoids pure white: `#ededed` body (`ink`, about 15:1 on `#171717`, close to light's 16:1), `#a0a0a0` secondary (`muted`/`panel-secondary`), `#8f8f8f` faint (`faint`/`panel-muted`, still 4.5:1 on `#262626` panels). The improved map's dark overrides in `map-appearance-styles.ts` and `appearanceColors()` use the same three values. Use tokens instead of hex so both themes follow. The Tailwind `white` and `gray-*` scale is inverted in dark for screens not yet on tokens. G6 canvas colors cannot read CSS, so graph code calls `themeColor()` from `src/util/theme-color.ts`; the header moon button (`toggleTheme`) reloads so the canvas redraws. Black line icons from `/graph-assets` carry `data-icon` and are inverted in dark; company logos are not.
 
 ## Behavior checklist
 
