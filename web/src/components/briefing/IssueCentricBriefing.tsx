@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 7694)
-Total output lines: 863
-
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useBriefingIssueTracking } from './briefingTelemetryContext';
@@ -287,7 +284,316 @@ function CompanyInIssue({
                   {view.risks.map((c, i) => (
                     <li className={BODY} key={i}>
                       {c.text}
-       …2694 tokens truncated…`${NOTE} mt-2`}>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
+        </details>
+      )}
+      {view.refs.length > 0 && (
+        <details>
+          <summary
+            className={`min-h-11 cursor-pointer content-center text-xs ${FOCUS_RING}`}
+          >
+            기업 판단의 근거·배경 {view.refs.length}건
+          </summary>
+          <ul className="space-y-4">
+            {view.refs.map((s) => (
+              <li key={s.id}>
+                {safeArticleUrl(s.url) ? (
+                  <a
+                    href={safeArticleUrl(s.url)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`text-sm underline ${FOCUS_RING}`}
+                  >
+                    {s.title} ↗
+                  </a>
+                ) : (
+                  <p className={BODY}>{s.title}</p>
+                )}
+                <p className={NOTE}>{briefingTime(s.publishedAt)}</p>
+                <blockquote
+                  className={`${NOTE} mt-2 border-l-2 border-zoop-line pl-3`}
+                >
+                  {s.quote}
+                </blockquote>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
+  );
+}
+
+/** Follow-up belongs to the issue that supplied the evidence, never to a company-only card. */
+function IssueFollowUp({
+  view,
+  result,
+  hideComparison = false,
+  comparisonState = 'ready',
+}: {
+  view: BriefingIssueView;
+  result: BriefingResponse;
+  hideComparison?: boolean;
+  comparisonState?: 'loading' | 'error' | 'ready';
+}) {
+  const evening = result.edition === 'evening';
+  const changed = view.companies.filter(
+    (c) => c.comparison && c.comparison.status !== 'unavailable',
+  );
+  const watching = view.companies.filter((c) => c.nextChecks.length > 0);
+  return (
+    <>
+      {!hideComparison && (
+        <section>
+          {view.companies
+            .filter((c) => c.previous)
+            .map((c) => (
+              <div
+                key={c.company.id}
+                className="mb-3 rounded border border-zoop-line p-3"
+              >
+                <p className="text-xs font-semibold">
+                  {c.company.name} · 같은 이슈의 이전 판단
+                </p>
+                <p className={`${BODY} mt-1`}>{c.previous!.judgment.text}</p>
+              </div>
+            ))}
+          {comparisonState !== 'ready' ? (
+            <p className={NOTE}>
+              {comparisonState === 'loading'
+                ? '이전 회차 판단을 확인하고 있어요.'
+                : '이전 회차 조회 실패로 판단 비교를 확인하지 못했어요.'}
+            </p>
+          ) : changed.length ? (
+            <>
+              <h4 className="text-sm font-bold">
+                {evening
+                  ? '아침 판단에서 달라진 점'
+                  : '전날 판단에서 달라진 점'}
+              </h4>
+              <ul className="mt-2 space-y-3">
+                {changed.map((c) => (
+                  <li key={c.company.id}>
+                    <p className="text-xs font-semibold">{c.company.name}</p>
+                    <p className={`${BODY} mt-1`}>{c.comparison!.text}</p>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className={NOTE}>비교 가능한 이전 판단 없음</p>
+          )}
+          {!result.issueIntelligence && result.aiPriceOutlooks?.historyNote && (
+            <details className="mt-2">
+              <summary
+                className={`min-h-11 cursor-pointer content-center text-xs ${FOCUS_RING}`}
+              >
+                비교에 사용한 판본
+              </summary>
+              <p className={NOTE}>{result.aiPriceOutlooks.historyNote}</p>
+            </details>
+          )}
+        </section>
+      )}
+      <section>
+        <h4 className="text-sm font-bold">
+          <ImpactCue tone="neutral" icon="calendar">
+            다음 확인사항
+          </ImpactCue>
+        </h4>
+        {watching.length ? (
+          <ul className="mt-2 space-y-3">
+            {watching.map((c) => (
+              <li key={c.company.id}>
+                <p className="text-xs font-semibold">{c.company.name}</p>
+                <ul className="mt-1 list-disc space-y-2 pl-4">
+                  {c.nextChecks.map((condition, i) => (
+                    <li className={BODY} key={i}>
+                      {condition.text}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className={`${NOTE} mt-2`}>
+            이 이슈에 연결된 확인 조건이 아직 없습니다.
+          </p>
+        )}
+      </section>
+    </>
+  );
+}
+
+function IssueCard({
+  group,
+  rank,
+  compact,
+  comparisonState,
+  result,
+  renderExtra,
+  corrections,
+}: {
+  corrections: Correction[];
+  group: ReturnType<typeof readingGroups>[number];
+  rank: number;
+  comparisonState: 'loading' | 'error' | 'ready';
+  compact: boolean;
+  result: BriefingResponse;
+  renderExtra?: (item: BriefingItem) => ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const item = group.members[0].item;
+  const recordOpen = useBriefingIssueTracking(result.id, item.eventId);
+  const displayedItem = { ...item, rank };
+  const companies = groupCompanies(group);
+  const facts = uniqueText(
+    group.members.flatMap((v) =>
+      paragraphs(
+        'text' in v.item.summary ? v.item.summary.text : v.item.summary.reason,
+      ),
+    ),
+  );
+  const selectionSummary = group.selections.length
+    ? uniqueText([
+        sentences(group.selections[0].whyImportant.text)[0],
+        sentences(group.selections[0].whyNow.text)[0],
+      ]).join(' ')
+    : sentences(item.reason)[0];
+  const newsObserved = companies.some((c) =>
+    c.view.news.some((n) => n.status === 'observed'),
+  );
+  const summaryView = {
+    ...group.members[0],
+    companies: companies.map((c) => c.view),
+  };
+  const evidenceCount = new Set(
+    group.members.flatMap((v) => v.item.evidenceIds),
+  ).size;
+  const sentiments = group.members.flatMap(
+    (m) => m.item.documentSentiments ?? [],
+  );
+  return (
+    <li>
+      {group.members.length > 1 &&
+        group.members.map((m) => (
+          // 회차 판단의 근거 이슈 앵커. 묶음 카드는 사건마다 같은 카드로 이어 준다.
+          <span
+            key={m.item.eventId}
+            id={issueAnchor(m.item)}
+            className="block scroll-mt-4"
+          />
+        ))}
+      <details
+        id={
+          group.members.length > 1
+            ? `briefing-group-${group.id}`
+            : issueAnchor(item)
+        }
+        onToggle={(e) => {
+          const next = e.currentTarget.open;
+          if (next && !open) recordOpen();
+          setOpen(next);
+        }}
+        className={`scroll-mt-4 overflow-hidden border border-zoop-line bg-zoop-paper ${
+          corrections.length ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'
+        }`}
+      >
+        <summary
+          className={`cursor-pointer list-none p-5 transition-transform duration-150 ease-out active:scale-[0.99] motion-reduce:transition-none sm:p-6 ${FOCUS_RING}`}
+        >
+          <span className="flex justify-between gap-3 text-xs text-zoop-muted">
+            <span>핵심 이슈 {rank}</span>
+            <span aria-hidden>{open ? '접기 −' : '자세히 +'}</span>
+          </span>
+          <strong className="mt-3 block text-lg font-bold leading-snug">
+            {group.title}
+          </strong>
+          <span className="mt-3 block text-sm leading-relaxed">
+            <b>선정 이유 · </b>
+            {selectionSummary}
+          </span>
+          <span className="mt-3 block text-xs text-zoop-muted">
+            {companies.length
+              ? companies.map((c) => c.view.company.name).join(' · ')
+              : '연결 기업 미확인'}{' '}
+            · 관련 기업 {companies.length}곳 · 근거 {evidenceCount}건
+            {group.members.length === 1 && articleCount(item)}
+          </span>
+        </summary>
+        {open && (
+          <div className="space-y-6 border-t border-zoop-line p-5 sm:p-6">
+            <p className={NOTE}>
+              시장 관측 ·{' '}
+              {newsObserved
+                ? '일부 연결 기업의 발표 전후 가격 관측 있음 · 인과관계와 구분'
+                : '발표 전후 비교 가능한 주가 반응 미확인 · 저장 시세는 별도 표시'}
+            </p>
+            {group.reason && (
+              <p className={NOTE}>함께 묶은 이유 · {group.reason}</p>
+            )}
+            <section>
+              <h4 className="text-sm font-bold">
+                <ImpactCue tone="neutral" icon="check">
+                  공통으로 확인된 사실
+                </ImpactCue>
+              </h4>
+              <ul className="mt-2 space-y-2">
+                {facts.map((fact) => (
+                  <li className={BODY} key={fact}>
+                    {fact}
+                  </li>
+                ))}
+              </ul>
+            </section>
+            {companies.map(({ view, connection, position }) => (
+              <CompanyInIssue
+                key={view.company.id}
+                view={view}
+                compact={compact}
+                commonFacts={facts}
+                connection={connection}
+                position={position}
+                sentiments={sentiments}
+                evening={result.edition === 'evening'}
+              />
+            ))}
+            <IssueFollowUp
+              comparisonState={comparisonState}
+              view={summaryView}
+              result={result}
+              hideComparison={
+                group.members.length > 1 &&
+                group.members.some((m) =>
+                  m.companies.some(
+                    (c) =>
+                      c.previous ||
+                      (c.comparison && c.comparison.status !== 'unavailable'),
+                  ),
+                )
+              }
+            />
+            {group.members.length > 1 ? (
+              <details>
+                <summary
+                  className={`min-h-11 cursor-pointer content-center text-xs ${FOCUS_RING}`}
+                >
+                  세부 사건의 원래 분석·근거·평가
+                </summary>
+                <div className="space-y-5">
+                  {group.members.map((member) => (
+                    <section
+                      key={member.item.eventId}
+                      aria-label={`${member.item.title} 원래 분석`}
+                    >
+                      <h4 className="text-sm font-bold">{member.item.title}</h4>
+                      <p className={`${NOTE} mt-2`}>
                         {member.item.reason}
                         {articleCount(member.item)}
                       </p>
