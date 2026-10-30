@@ -102,6 +102,12 @@ zoop:
       # the endpoint above and the chat model stages. The URL the model provider reaches this endpoint at is set on the AI
       # runtime (ZOOP_AI_CHAT_MCP_SERVER_URL), the only server a run's grant is ever sent to.
       agent-enabled: ${ZOOP_CHAT_AGENT_ENABLED:false}
+    web:
+      # The supplementary web search tool (api/docs/chat-web-search.md). Off by default. No real provider is selected yet:
+      # enabled, it needs provider=synthetic (fixture hits under example domains, local and tests only). It is never
+      # planned by the router nor exposed on MCP until the server's web step is wired.
+      enabled: ${ZOOP_CHAT_WEB_ENABLED:false}
+      provider: ${ZOOP_CHAT_WEB_PROVIDER:none}
   analysis:
     analyze-plan:
       # Executes fixed admitted S2/S3 units only; completion does not collect or publish data.

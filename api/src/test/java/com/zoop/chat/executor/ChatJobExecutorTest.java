@@ -272,6 +272,75 @@ class ChatJobExecutorTest {
     }
 
     @Test
+    void webSearchesHaveTheirOwnJobBudgetAndTakeTheDaysQuotasAllOrNothing() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        // 2026-10-21T03:00Z is 12:00 KST on the 21st.
+        String day = "2026-10-21";
+        executor(new ScriptedChatEngine((run, control) -> {
+            // The internal six are untouched by web searches, and the other way round.
+            assertEquals(List.of("tc-0", "tc-1"), control.reserveToolCalls(1, Collections.nCopies(2, web())));
+            assertEquals(ChatRunControl.MAX_TOOL_CALLS, control.toolCallsLeft());
+            var job = assertThrows(ChatWebBudgetExhausted.class, () -> control.reserveToolCalls(2, List.of(web())));
+            assertEquals(ChatWebBudgetExhausted.Budget.JOB, job.budget());
+            // A refused plan reserves none of its internal calls either.
+            assertThrows(ChatWebBudgetExhausted.class,
+                    () -> control.reserveToolCalls(2, List.of(reservation("company.read"), web())));
+            assertEquals(2, store.toolCalls("job-00001").size());
+            assertEquals(List.of("tc-2"), control.reserveToolCalls(2, List.of(reservation("company.read"))));
+            return ScriptedChatEngine.generalAnswer("답");
+        })).runOnce();
+        assertEquals(2, store.webQuotas.get(day + "/project"));
+        assertEquals(2, store.webQuotas.get(day + "/member:member-a"));
+
+        // The member's day is spent: nothing is reserved and the project's quota is not taken.
+        store.add(queued("job-00002", null, null, 0, "run"));
+        store.webQuotas.put(day + "/member:member-a", ChatRunControl.MEMBER_DAILY_WEB_CALLS - 1);
+        executor(new ScriptedChatEngine((run, control) -> {
+            var member = assertThrows(ChatWebBudgetExhausted.class,
+                    () -> control.reserveToolCalls(1, Collections.nCopies(2, web())));
+            assertEquals(ChatWebBudgetExhausted.Budget.MEMBER, member.budget());
+            assertEquals(List.of("tc-0"), control.reserveToolCalls(1, List.of(web())), "one is still left");
+            return ScriptedChatEngine.generalAnswer("답");
+        })).runOnce();
+        assertEquals(ChatRunControl.MEMBER_DAILY_WEB_CALLS, store.webQuotas.get(day + "/member:member-a"));
+        assertEquals(3, store.webQuotas.get(day + "/project"));
+
+        store.add(queued("job-00003", null, null, 0, "run"));
+        store.webQuotas.put(day + "/member:member-a", 0);
+        store.webQuotas.put(day + "/project", ChatRunControl.PROJECT_DAILY_WEB_CALLS);
+        executor(new ScriptedChatEngine((run, control) -> {
+            assertEquals(ChatWebBudgetExhausted.Budget.PROJECT, assertThrows(ChatWebBudgetExhausted.class,
+                    () -> control.reserveToolCalls(1, List.of(web()))).budget());
+            return ScriptedChatEngine.generalAnswer("답");
+        })).runOnce();
+        assertEquals(0, store.webQuotas.get(day + "/member:member-a"));
+        assertTrue(store.toolCalls("job-00003").isEmpty());
+    }
+
+    @Test
+    void aRerunDoesNotReopenTheJobsBudgetForWebSearchesThatNeverStarted() {
+        String attempts = "[{\"n\":1,\"mode\":\"run\",\"requestKey\":\"job-00001\",\"status\":\"failed\"},"
+                + "{\"n\":2,\"mode\":\"rerun\",\"requestKey\":\"job-00001-r\",\"status\":\"queued\"}]";
+        store.add(withAttempts(queued("job-00001", null, null, 0, "run"), attempts));
+        for (int i = 0; i < ChatRunControl.MAX_WEB_CALLS; i++) {
+            store.reserveToolCalls(List.of(new NewChatToolCall("row-" + i, "job-00001", 1, 1, i, "tc-" + i,
+                    ChatToolRegistry.VERSION, "web-search", "web.search", "app:web.search", "chat-tool/v1",
+                    "1".repeat(64), "{}")), NOW);
+        }
+        store.toolCalls("job-00001").forEach(c -> c.status = "cancelled");
+
+        executor(new ScriptedChatEngine((run, control) -> {
+            assertEquals(2, run.attemptNo());
+            var spent = assertThrows(ChatWebBudgetExhausted.class,
+                    () -> control.reserveToolCalls(1, List.of(web())));
+            assertEquals(ChatWebBudgetExhausted.Budget.JOB, spent.budget());
+            assertTrue(store.webQuotas.isEmpty(), "a job-budget refusal takes no daily quota");
+            return ScriptedChatEngine.generalAnswer("답");
+        })).runOnce();
+        assertEquals(ChatRunControl.MAX_WEB_CALLS, store.toolCalls("job-00001").size());
+    }
+
+    @Test
     void aShortenedDeadlineHoldsForTheFinalStoreAndForARequestReachingTheRun() {
         store.add(queued("job-00001", null, null, 0, "run"));
         executor(new ScriptedChatEngine((run, control) -> {
@@ -306,6 +375,11 @@ class ChatJobExecutorTest {
 
         assertEquals(List.of("unknown", "cancelled"),
                 store.toolCalls("job-00001").stream().map(c -> c.status).toList());
+    }
+
+    private static ChatToolCallReservation web() {
+        return new ChatToolCallReservation(ChatToolRegistry.VERSION, "web-search", "web.search", "app:web.search",
+                "chat-tool/v1", "1".repeat(64), "{}");
     }
 
     private static ChatToolCallReservation reservation(String capability) {
