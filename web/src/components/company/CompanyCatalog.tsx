@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { useCompanyResource, type Resource } from '@/hooks/useCompanyResource';
-import { useAsyncData } from '@/hooks/useAsyncData';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuthStore, selectMemberId } from '@/stores/useAuthStore';
-import { getSettings } from '@/apis/settings/settings';
 import type { GraphResponse } from '@/types/map/graph';
 import CompanyCatalogRow, { type CatalogCompany } from './CompanyCatalogRow';
 
@@ -12,7 +11,9 @@ export default function CompanyCatalog({
   graph: graphResource,
   currentCompany,
   portfolio,
+  settings: sharedSettings,
 }: {
+  settings?: ReturnType<typeof useCompanySettings>;
   graph?: Resource<GraphResponse>;
   currentCompany?: CatalogCompany | null;
   portfolio: {
@@ -39,12 +40,8 @@ export default function CompanyCatalog({
     '',
     false,
   );
-  const settings = useAsyncData(
-    useCallback(
-      () => (member ? getSettings() : Promise.resolve(null)),
-      [member],
-    ),
-  );
+  const ownSettings = useCompanySettings(!sharedSettings);
+  const settings = sharedSettings ?? ownSettings;
   const recentKey = `zoop.company.recent:${owner}`;
   const recent = useMemo(() => {
     let saved: unknown = [];
