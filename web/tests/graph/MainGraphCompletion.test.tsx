@@ -1156,7 +1156,7 @@ describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
     await screen.findByRole('heading', { name: '근거 문서' });
     await screen.findByText('튜토리얼 5/5');
     await userEvent.click(screen.getByRole('button', { name: '근거 창 닫기' }));
-    expect(screen.getByRole('heading', { name: 'AI에게 묻기' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'AI에게 질문' })).toBeTruthy();
     expect(
       screen.queryByRole('button', { name: '튜토리얼 건너뛰기' }),
     ).toBeNull();
