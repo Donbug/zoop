@@ -527,10 +527,16 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       expect(canvas.setElementState).toHaveBeenCalledWith(
         expect.objectContaining({
           [issue.id]: ['tutorial'],
-          [data.nodes[0].id]: ['inactive'],
         }),
       ),
     );
+    // Everything but the target sits under the dimming cover.
+    expect(appliedStates()[data.nodes[0].id] ?? []).toEqual([]);
+    expect(
+      document
+        .querySelector('[data-map-dimmed]')
+        ?.getAttribute('data-map-dimmed'),
+    ).toBe('true');
     act(() =>
       canvas.handlers.get('node:click')!({ target: { id: data.nodes[0].id } }),
     );
@@ -1155,7 +1161,8 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const onSelect = vi.fn();
     render(<GraphCanvas data={data} onSelect={onSelect} />);
-    await waitFor(() => expect(canvas.setElementState).toHaveBeenCalled());
+    // Nothing is emphasized yet, so no element state needs to be sent.
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
     const draws = canvas.draw.mock.calls.length;
     const layouts = canvas.setData.mock.calls.length;
     const edge = data.edges.find(
@@ -1233,15 +1240,13 @@ describe('D-GRP-02 · canvas selection bridge', () => {
   it('D-GRP-01 hover cannot brighten nodes outside an explicit focus scope', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     render(<GraphCanvas data={data} focusId="NASDAQ:NVDA" focusHops={1} />);
-    await waitFor(() => expect(canvas.setElementState).toHaveBeenCalled());
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
     await act(async () =>
       canvas.handlers.get('node:pointerenter')!({
         target: { id: 'KRX:005380' },
       }),
     );
-    expect(canvas.setElementState).toHaveBeenLastCalledWith(
-      expect.objectContaining({ 'KRX:005380': [] }),
-    );
+    expect(appliedStates()['KRX:005380'] ?? []).toEqual([]);
     await act(async () =>
       canvas.handlers.get('node:pointerenter')!({
         target: { id: 'NASDAQ:NVDA' },
@@ -1271,9 +1276,15 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       string[]
     >;
     expect(states['NASDAQ:NVDA']).toEqual(expect.arrayContaining(['selected']));
+    // Dimming is one cover over the map (graph-dimming.ts), not a G6 state.
     expect(
       Object.values(states).some((list) => list.includes('inactive')),
     ).toBe(false);
+    expect(
+      document
+        .querySelector('[data-map-dimmed]')
+        ?.getAttribute('data-map-dimmed'),
+    ).toBe('false');
   });
 
   it('D-GRP-01 outside focus mode a selected company still dims unrelated nodes', async () => {
@@ -1284,9 +1295,15 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       string,
       string[]
     >;
+    // Dimming is one cover over the map (graph-dimming.ts), not a G6 state.
     expect(
       Object.values(states).some((list) => list.includes('inactive')),
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      document
+        .querySelector('[data-map-dimmed]')
+        ?.getAttribute('data-map-dimmed'),
+    ).toBe('true');
   });
 
   it('D-GRP-01 shows each zoom control name on hover and lets the tutorial camera step use fit', () => {
@@ -1601,8 +1618,11 @@ describe('D-GRP-01 지도 카메라 움직임', () => {
     canvas.translateElementTo.mockClear();
     const reduced = render(<GraphCanvas data={data} focusLayout />);
     await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    const layouts = canvas.setData.mock.calls.length;
     reduced.rerender(<GraphCanvas data={data} focusId={focusId} focusLayout />);
-    await waitFor(() => expect(canvas.setElementState).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(canvas.setData.mock.calls.length).toBeGreaterThan(layouts),
+    );
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(canvas.translateElementTo).not.toHaveBeenCalled();
     reduced.unmount();

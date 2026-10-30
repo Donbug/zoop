@@ -36,7 +36,8 @@ import {
 } from './graph-view';
 import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { arrangeFlow, arrangeFocus } from './graph-arrange';
-import { applyGraphReading } from './graph-readability';
+import { applyGraphReading, keepAppliedStyles } from './graph-readability';
+import { applyMapDimming, restoreMapDimming } from './graph-dimming';
 import {
   cameraMotion,
   EDGE_ANIMATION,
@@ -56,6 +57,16 @@ import {
 
 const noHighlightedEdges: string[] = [];
 
+/** 접근성 목록에서 누른 버튼의 노드·연결선 id. 비활성 버튼은 고르지 않는다. */
+function accessibleTarget(target: EventTarget) {
+  const button =
+    target instanceof Element
+      ? target.closest<HTMLButtonElement>('button')
+      : null;
+  return button && !button.disabled
+    ? { nodeId: button.dataset.nodeId, edgeId: button.dataset.edgeId }
+    : {};
+}
 export default function GraphCanvas({
   data,
   selectedId: selected = null,
@@ -192,6 +203,7 @@ export default function GraphCanvas({
   const readingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderedData = useRef<ReturnType<typeof toG6Data> | null>(null);
   const appliedStates = useRef({
+    graph: null as Graph | null,
     rendered: null as ReturnType<typeof toG6Data> | null,
     states: new Map<string, string>(),
   });
@@ -322,6 +334,70 @@ export default function GraphCanvas({
   const personal = data.metadata.mode === 'personal';
   const focusedNodes = focusNeighborhood(data, focusId, focusHops);
   const selectedNode = data.nodes.find((n) => n.id === selected);
+  // 노드·연결선 1,000개가 넘으면 이 목록을 hover·배율 변경마다 다시 만드는 일이 무겁다.
+  // 클릭·키 처리는 감싼 요소에서 위임받고, 목록은 내용이 바뀔 때만 다시 만든다.
+  const accessibleButtons = useMemo(() => {
+    const labels = new Map(data.nodes.map((node) => [node.id, node.label]));
+    const kinds = new Map(data.nodes.map((node) => [node.id, node.kind]));
+    return (
+      <>
+        {data.nodes
+          .filter((node) => !view.hidden.includes(node.kind))
+          .map((node) => (
+            <button
+              key={node.id}
+              data-node-id={node.id}
+              data-tutorial-managed-disabled
+              disabled={tutorialLocked && node.id !== tutorialTargetId}
+              data-tutorial-action={
+                node.id === tutorialTargetId ? 'node' : undefined
+              }
+              aria-pressed={selected === node.id}
+              className={
+                node.id === tutorialTargetId ? 'tutorial-target' : undefined
+              }
+              title="Shift+Enter로 연결된 이웃 맞춤 확대"
+            >
+              {node.kind === 'issue' ? '사건: ' : '기업: '}
+              {node.label}
+              {node.holding ? ' · 보유' : ''}
+              {node.watch ? ' · 관심' : ''}
+            </button>
+          ))}
+        {data.edges
+          .filter(
+            (edge) =>
+              isSelectableRelation(edge) &&
+              !view.hidden.includes(edge.relationType) &&
+              [edge.source, edge.target].every((id) => {
+                const kind = kinds.get(id);
+                return !kind || !view.hidden.includes(kind);
+              }),
+          )
+          .map((edge) => (
+            <button
+              key={edge.id}
+              data-edge-id={edge.id}
+              data-tutorial-managed-disabled
+              disabled={tutorialLocked}
+              aria-pressed={selectedEdgeId === edge.id}
+              title="Shift+Enter로 연결된 이웃 맞춤 확대"
+            >
+              연결선: {labels.get(edge.source)} – {labels.get(edge.target)} ·{' '}
+              {edge.relationType === 'SHARES_ISSUE' ? '사건 공유' : '후속 관계'}{' '}
+              · {edge.summary}
+            </button>
+          ))}
+      </>
+    );
+  }, [
+    data,
+    view.hidden,
+    tutorialLocked,
+    tutorialTargetId,
+    selected,
+    selectedEdgeId,
+  ]);
   // D-GRP-01: hover changes presentation only, never selection, layout or viewport.
   const syncVisualStates = useEffectEvent(
     async (graph: Graph, rendered: ReturnType<typeof toG6Data>) => {
@@ -392,18 +468,40 @@ export default function GraphCanvas({
       }
       // 노드가 많으면 모든 요소의 상태를 다시 넣는 일이 hover마다 가장 무겁다. 바뀐 요소만 넘긴다.
       const applied = appliedStates.current;
-      if (applied.rendered !== rendered) {
-        applied.rendered = rendered;
+      // G6 setData keeps the states of elements that stay; new elements start with none.
+      if (applied.graph !== graph) {
+        applied.graph = graph;
         applied.states.clear();
       }
+      if (applied.rendered !== rendered) {
+        applied.rendered = rendered;
+        for (const id of applied.states.keys())
+          if (!(id in states)) applied.states.delete(id);
+      }
+      // 흐림은 덮개 하나로 그린다(graph-dimming.ts). G6에는 흐리지 않는 상태만 넘기고, 밝게 둘 요소만 덮개 위로 올린다.
+      const dimmed = Object.values(states).some((list) =>
+        list.includes('inactive'),
+      );
+      const bright = new Map<string, 'node' | 'edge'>();
+      for (const node of rendered.nodes ?? [])
+        if (!states[String(node.id)].includes('inactive'))
+          bright.set(String(node.id), 'node');
+      for (const edge of rendered.edges ?? [])
+        if (!states[String(edge.id)].includes('inactive'))
+          bright.set(String(edge.id), 'edge');
       const changed: Record<string, string[]> = {};
-      for (const [id, next] of Object.entries(states)) {
+      for (const [id, all] of Object.entries(states)) {
+        const next = all.filter((state) => state !== 'inactive');
         const key = next.join(' ');
-        if (applied.states.get(id) === key) continue;
+        if ((applied.states.get(id) ?? '') === key) continue;
         applied.states.set(id, key);
         changed[id] = next;
       }
       if (Object.keys(changed).length) await graph.setElementState(changed);
+      if (graph.destroyed) return;
+      const host = container.current;
+      host?.setAttribute('data-map-dimmed', String(dimmed));
+      applyMapDimming(graph, dimmed, bright, themeColor('paper'));
       scheduleReading();
     },
   );
@@ -504,6 +602,20 @@ export default function GraphCanvas({
       [safe.x + safe.width / 2 - point[0], safe.y + safe.height / 2 - point[1]],
       cameraMotion('select'),
     );
+  }
+  /**
+   * G6 미니맵은 그릴 때마다(hover·흐림 같은 상태 변경 포함) 요소를 모두 복제해 다시 그린다.
+   * 그 연결을 끊고, 데이터나 위치가 바뀐 뒤에만 돌려받은 함수로 다시 그린다.
+   */
+  function minimapOnDataChange(graph: Graph) {
+    const plugin = minimapShown.current
+      ? (graph.getPluginInstance('graph-overview') as unknown as
+          { onDraw?: () => void; onRender?: () => void } | undefined)
+      : undefined;
+    if (!plugin?.onDraw || !plugin.onRender) return null;
+    graph.off('afterdraw', plugin.onDraw);
+    graph.off('afteranimate', plugin.onRender);
+    return plugin.onRender;
   }
   async function fitVisibleGraph(
     graph: Graph,
@@ -715,7 +827,6 @@ export default function GraphCanvas({
               : themeColor('ink'),
           strokeOpacity: 1,
         },
-        inactive: { strokeOpacity: 0.2 },
         selected: {
           lineWidth: appearance.variant === 'improved' ? 3.5 : 3,
           stroke:
@@ -747,7 +858,6 @@ export default function GraphCanvas({
           lineWidth: 1.4,
           labelFill: themeColor('ink'),
         },
-        inactive: { opacity: 0.35 },
         hovered: {
           opacity: 1,
           lineWidth: 2,
@@ -967,29 +1077,32 @@ export default function GraphCanvas({
           morphFrom?.nodes?.map((node) => [node.id, node.style]),
         );
         graph.setData(
-          morphFrom
-            ? {
-                ...rendered,
-                nodes: rendered.nodes?.map((node) => {
-                  const from = previous.get(node.id);
-                  const { x, y } = node.style ?? {};
-                  if (
-                    !from ||
-                    typeof from.x !== 'number' ||
-                    typeof from.y !== 'number' ||
-                    typeof x !== 'number' ||
-                    typeof y !== 'number' ||
-                    (from.x === x && from.y === y)
-                  )
-                    return node;
-                  morphTargets[String(node.id)] = [x, y];
-                  return {
-                    ...node,
-                    style: { ...node.style, x: from.x, y: from.y },
-                  };
-                }),
-              }
-            : rendered,
+          keepAppliedStyles(
+            graph,
+            morphFrom
+              ? {
+                  ...rendered,
+                  nodes: rendered.nodes?.map((node) => {
+                    const from = previous.get(node.id);
+                    const { x, y } = node.style ?? {};
+                    if (
+                      !from ||
+                      typeof from.x !== 'number' ||
+                      typeof from.y !== 'number' ||
+                      typeof x !== 'number' ||
+                      typeof y !== 'number' ||
+                      (from.x === x && from.y === y)
+                    )
+                      return node;
+                    morphTargets[String(node.id)] = [x, y];
+                    return {
+                      ...node,
+                      style: { ...node.style, x: from.x, y: from.y },
+                    };
+                  }),
+                }
+              : rendered,
+          ),
         );
         await graph.draw();
         const visibleCount =
@@ -1020,8 +1133,10 @@ export default function GraphCanvas({
             : [],
         );
         if (graph.destroyed) return;
+        const renderMinimap = minimapOnDataChange(graph);
         renderedData.current = rendered;
         await syncVisualStates(graph, rendered);
+        renderMinimap?.();
         if (
           !arrangeFocusNow &&
           focusId &&
@@ -1067,6 +1182,7 @@ export default function GraphCanvas({
           );
         }
         await moving;
+        if (moving) renderMinimap?.();
         if (defaultZoomPending.current) {
           defaultZoomPending.current = false;
           await graph.zoomTo(0.53, false);
@@ -1327,6 +1443,9 @@ export default function GraphCanvas({
         leaveNode(event.target.id),
       );
       graph.on('canvas:pointerleave', clearHover);
+      graph.on('afterdraw', () => {
+        if (graph) restoreMapDimming(graph);
+      });
       graph.on('canvas:click', () => {
         if (!dragged) selectNode(null);
       });
@@ -1744,68 +1863,21 @@ export default function GraphCanvas({
         className="relationship-accessible-nodes"
         aria-label="키보드로 기업·사건·연결선 선택"
         inert={Boolean(tutorialPhase)}
+        onClick={(event) => {
+          const { nodeId, edgeId } = accessibleTarget(event.target);
+          if (nodeId) handleNodeSelect(nodeId);
+          else if (edgeId) onSelectEdge?.(edgeId);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' || !event.shiftKey) return;
+          const { nodeId, edgeId } = accessibleTarget(event.target);
+          if (!nodeId && !edgeId) return;
+          event.preventDefault();
+          if (nodeId) requestNeighborhood(nodeId);
+          else if (edgeId) setNeighborhoodRequest({ id: edgeId });
+        }}
       >
-        {data.nodes
-          .filter((node) => !view.hidden.includes(node.kind))
-          .map((node) => (
-            <button
-              key={node.id}
-              data-tutorial-managed-disabled
-              disabled={tutorialLocked && node.id !== tutorialTargetId}
-              data-tutorial-action={
-                node.id === tutorialTargetId ? 'node' : undefined
-              }
-              aria-pressed={selected === node.id}
-              className={
-                node.id === tutorialTargetId ? 'tutorial-target' : undefined
-              }
-              title="Shift+Enter로 연결된 이웃 맞춤 확대"
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && event.shiftKey) {
-                  event.preventDefault();
-                  requestNeighborhood(node.id);
-                }
-              }}
-              onClick={() => handleNodeSelect(node.id)}
-            >
-              {node.kind === 'issue' ? '사건: ' : '기업: '}
-              {node.label}
-              {node.holding ? ' · 보유' : ''}
-              {node.watch ? ' · 관심' : ''}
-            </button>
-          ))}
-        {data.edges
-          .filter(
-            (edge) =>
-              isSelectableRelation(edge) &&
-              !view.hidden.includes(edge.relationType) &&
-              [edge.source, edge.target].every((id) => {
-                const kind = nodeKinds.get(id);
-                return !kind || !view.hidden.includes(kind);
-              }),
-          )
-          .map((edge) => (
-            <button
-              key={edge.id}
-              data-tutorial-managed-disabled
-              disabled={tutorialLocked}
-              aria-pressed={selectedEdgeId === edge.id}
-              title="Shift+Enter로 연결된 이웃 맞춤 확대"
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && event.shiftKey) {
-                  event.preventDefault();
-                  setNeighborhoodRequest({ id: edge.id });
-                }
-              }}
-              onClick={() => onSelectEdge?.(edge.id)}
-            >
-              연결선:{' '}
-              {data.nodes.find((node) => node.id === edge.source)?.label} –{' '}
-              {data.nodes.find((node) => node.id === edge.target)?.label} ·{' '}
-              {edge.relationType === 'SHARES_ISSUE' ? '사건 공유' : '후속 관계'}{' '}
-              · {edge.summary}
-            </button>
-          ))}
+        {accessibleButtons}
       </div>
     </div>
   );

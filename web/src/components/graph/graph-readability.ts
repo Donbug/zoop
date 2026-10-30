@@ -147,6 +147,51 @@ const appliedLabels = new WeakMap<
   { base: GraphData; styles: Map<string, string> }
 >();
 
+/** Keys readingStyles derives from zoom; other label styles (colours) still come from the new data. */
+const READING_KEYS = new Set([
+  'labelText',
+  'labelVisibility',
+  'labelFontSize',
+  'labelWordWrap',
+  'labelWordWrapWidth',
+  'labelMaxWidth',
+  'labelMaxLines',
+  'badges',
+]);
+const appliedKey = (key: string) => READING_KEYS.has(key);
+
+/**
+ * Carry the label styles the reading pass applied, and G6's own zIndex, into
+ * new graph data. Without them setData sees every element as changed and
+ * redraws all of them, then the reading pass redraws them again.
+ */
+export function keepAppliedStyles(graph: Graph, data: GraphData): GraphData {
+  if (typeof graph.getNodeData !== 'function' || !appliedLabels.has(graph))
+    return data;
+  const current = new Map(
+    [...graph.getNodeData(), ...graph.getEdgeData()].map((item) => [
+      String(item.id),
+      item.style ?? {},
+    ]),
+  );
+  const keep = <T extends { id?: unknown; style?: Record<string, unknown> }>(
+    item: T,
+  ): T => {
+    const model = current.get(String(item.id));
+    if (!model) return item;
+    const style: Record<string, unknown> = { ...item.style };
+    for (const [key, value] of Object.entries(model))
+      if (appliedKey(key) || (key === 'zIndex' && !(key in style)))
+        style[key] = value;
+    return { ...item, style };
+  };
+  return {
+    ...data,
+    nodes: data.nodes?.map(keep),
+    edges: data.edges?.map(keep),
+  };
+}
+
 // Public G6 canvas/display-object APIs give actual label bounds (font/wrap/padding/rotation).
 export async function applyGraphReading(
   graph: Graph,
@@ -169,9 +214,27 @@ export async function applyGraphReading(
     );
   // Hover keeps the zoom, so most label styles are unchanged: only push and redraw the changed ones.
   let applied = appliedLabels.get(graph);
-  if (applied?.base !== base) {
+  if (!applied) {
     applied = { base, styles: new Map() };
     appliedLabels.set(graph, applied);
+  } else if (applied.base !== base) {
+    // setData keeps applied label styles on elements that stay (keepAppliedStyles);
+    // elements that were not in the previous base start from their defaults.
+    const before = new Set(
+      [...(applied.base.nodes ?? []), ...(applied.base.edges ?? [])].map(
+        (item) => String(item.id),
+      ),
+    );
+    for (const id of applied.styles.keys())
+      if (!before.has(id)) applied.styles.delete(id);
+    const after = new Set(
+      [...(base.nodes ?? []), ...(base.edges ?? [])].map((item) =>
+        String(item.id),
+      ),
+    );
+    for (const id of applied.styles.keys())
+      if (!after.has(id)) applied.styles.delete(id);
+    applied.base = base;
   }
   const { styles: previous } = applied;
   const changed = (
