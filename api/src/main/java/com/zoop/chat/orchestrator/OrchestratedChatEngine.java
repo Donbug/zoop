@@ -254,6 +254,10 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
             retrieved = retrieval.run(run, control, confirmed);
             if (retrieved.failed() != null) throw new Stop(toolFailure(retrieved.failed()));
             if (retrieved.stop() != null) return stopped(run, route, retrieved.stop());
+            if (retrieved.faulted() != null) {
+                route.putArray("toolFaults").addAll(strings(retrieved.limitations().entrySet().stream()
+                        .filter(e -> ChatRetrieval.TOOL_UNAVAILABLE.equals(e.getValue())).map(Map.Entry::getKey).toList()));
+            }
         }
 
         Map<String, Planned> byId = new LinkedHashMap<>();
@@ -274,6 +278,8 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
                     retrieved.noneFound().contains(p.id()), p.parent(), avoid));
         }
         route.set("limited", json(limited));
+        // A fault that leaves nothing answered is the job's failure, never hidden as missing evidence.
+        if (branches.isEmpty() && retrieved.faulted() != null) throw new Stop(toolFailure(retrieved.faulted()));
         if (branches.isEmpty()) {
             boolean unanswerable = limited.values().stream().allMatch(k -> k.equals("investment_advice") || k.equals("out_of_scope"));
             if (unanswerable) {
@@ -333,6 +339,7 @@ public class OrchestratedChatEngine implements ChatEngine, AutoCloseable {
         passed.sections().stream().filter(s -> !kept.contains(s)).forEach(s -> insufficient.addAll(s.requirementIds()));
         // A requirement still answered by a kept section of its own is answered; a joining section goes with any held part.
         insufficient.removeIf(id -> kept.stream().anyMatch(s -> s.requirementIds().contains(id)));
+        if (kept.isEmpty() && retrieved.faulted() != null) throw new Stop(toolFailure(retrieved.faulted()));
         if (kept.isEmpty()) {
             // The most specific cause the server knows: a limit it hit, then a verdict, then a lookup that found nothing.
             List<String> unanswered = insufficient.stream().filter(id -> byId.get(id).parent() == null).toList();

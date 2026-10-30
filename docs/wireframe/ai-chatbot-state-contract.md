@@ -16,6 +16,7 @@
 - Q01은 웹 검색을 사용하지 않는다. Q02는 웹을 기본 보조로 시도하고 Q03~Q08은 내부 근거가 부족할 때 마지막 수단으로 사용한다. 웹 결과는 ‘외부 웹 보도 · ZOOP 내부 근거 아님’과 검색 시점을 표시하고 일반 지식·내부 evidence와 구분한다.
 - `answerStatus`·`notices[]`는 2026-10-30 DTO·OpenAPI·클라이언트·저장·guard에 함께 구현됐다. `web_reported`·`web_result`·`uiActions[]`는 아직 현재 API 지원 필드가 아니다. 현재 `action=set_watchlist`를 임의 동작 실행기로 바꾸지 않는다.
 - 보조 웹 검색 timeout·unavailable은 검증된 답을 숨기지 않는다. `notices.code=web_unavailable`을 표시하고, 외부 확인이 남은 요구만 “답하지 않은 부분”에 둔다. 웹 실패를 “관련 자료 없음”으로 바꾸지 않는다.
+- direct 경로에서 독립 요구 일부의 내부 조회만 timeout·unavailable이면 그 요구는 `tool_unavailable` limitation으로 남기고 검증된 나머지 요구를 `partial`로 돌려준다. 답한 요구가 하나도 없거나 어댑터·권한·스키마 오류이면 job 실패를 부분 답변으로 숨기지 않는다.
 - 기업 상세·간선/경로 포커스·근거·브리핑 동작은 서버가 실제 조회 결과로 만든 typed 버튼으로 제공한다. 클릭 시 실행하고 자동 이동하지 않으며 polling·복구·재열람으로 재실행하지 않는다.
 - 클릭 시 권한·철회·버전 불일치를 확인한다. 열 수 없으면 안내하고 다른 간선으로 치환하지 않는다. 웹 보도만으로 내부 지도 간선 버튼을 만들지 않는다.
 - 화면 ID·대상 계약은 [MCP·화면 동작 계약](../design/ai-chatbot-mcp-actions.md)을 따른다. 이번 개정은 Figma·화면 구현 수정이 아니다. 구현 시 개별 와이어프레임을 확인한다.
@@ -120,7 +121,7 @@
 | `insufficient_evidence` | 실제 조회 범위와 부족한 근거 설명. “사건이 없다”로 바꾸지 않음 |
 | `validation_failed` | 결과 미표시, 자동 재생성 없음, 요청 ID와 허용된 복구 안내 |
 | `budget_exceeded` | 부분 답변 미표시, 재시도 버튼 없음. `reason`이 `context_too_large`면 대상·기간을 줄이도록, `output_limit`이면 질문을 나누도록 안내하고 새 질문을 유도 |
-| `transient` | 장애와 근거 부족을 구분하고 retry 값에 따른 동작만 제공. `tool_timeout`·`deadline_guard`·`provider_error`는 “일시적으로 처리하지 못했어요” 계열 문구를 쓰고 “자료 없음”으로 표현하지 않음. `response_unknown`은 재시도 버튼 없이 처리 결과를 확인하지 못했다는 안내와 요청 ID를 보여 주고 새 질문을 유도 |
+| `transient` | 장애와 근거 부족을 구분하고 retry 값에 따른 동작만 제공. direct 경로의 독립 요구 하나만 `tool_timeout`·`tool_unavailable`이고 다른 요구를 검증해 답할 수 있으면 completed/partial의 `tool_unavailable` limitation으로 표시하지만, 답한 요구가 없으면 이 실패 상태를 유지한다. `deadline_guard`·`provider_error` 등은 “일시적으로 처리하지 못했어요” 계열 문구를 쓰고 “자료 없음”으로 표현하지 않음. `response_unknown`은 재시도 버튼 없이 처리 결과를 확인하지 못했다는 안내와 요청 ID를 보여 주고 새 질문을 유도 |
 | `permission_denied` | 개인·원문 데이터 미표시, 로그인·권한 안내 |
 
 ## 5. 접근성·상태 보존
@@ -138,7 +139,7 @@
 3. Q02 일반 개념만 물으면 `answerBasis=general_knowledge`와 구간 하나로 표시하고, 고정 안내 문구는 한 번만 보이며 sources/citations는 비어 있다.
 4. 근거 기반 답변은 모든 인용이 공개 문서 버전과 연결되고 철회 뒤 다시 열 때 노출되지 않는다.
 5. 대화 GET 503은 `D-AI-02b`로 표시되고 “다시 확인”이 새 AI 실행을 만들지 않는다.
-6. 인증·권한·스키마·출력 검증 실패는 부분 답변으로 바뀌지 않는다. 보조 웹 timeout만 발생하면 검증된 답과 `web_unavailable` notice를 유지한다.
+6. 인증·권한·스키마·출력 검증 실패는 부분 답변으로 바뀌지 않는다. direct 경로에서 독립 요구 하나의 내부 조회만 timeout·unavailable이고 다른 요구를 검증해 답하면 `partial`과 `tool_unavailable` limitation을 유지하며, 모두 실패하면 `transient`다. 보조 웹 timeout만 발생하면 검증된 답과 `web_unavailable` notice를 유지한다.
 7. 로그아웃 중 늦게 도착한 응답이 이전 회원 화면이나 cache에 남지 않는다.
 8. “HBM 설명과 지금 살 주식”은 `answered`로 HBM 설명을 표시하고, 매수 판단은 “답하지 않은 부분”에 `investment_advice` 항목의 `label`·`message`로 표시한다.
 9. “HBM이 뭐고 SK하이닉스 최근 HBM 뉴스는?”은 `answerBasis=mixed`로 “일반 개념” 구간(고정 안내 + 설명, 인용 없음)과 “근거 확인됨” 구간(뉴스, 인용 연결)을 나눠 표시한다.

@@ -111,7 +111,8 @@ export type ChatLimitationKind =
   | 'results_truncated'
   | 'not_in_member_scope'
   | 'evidence_insufficient'
-  | 'out_of_scope';
+  | 'out_of_scope'
+  | 'tool_unavailable';
 
 export type ChatLimitation = {
   kind: ChatLimitationKind;
