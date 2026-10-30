@@ -48,11 +48,18 @@ public interface ChatAgentPath {
 
     /**
      * The final answer, the results of the calls that ran (as the model received them), and what the run decided: steps,
-     * approved and denied calls.
+     * approved and denied calls. {@code notices} are the codes of web faults the answer went on without (web search design
+     * 4: {@code web_unavailable}, {@code web_no_results}, {@code web_budget_exhausted}).
      */
-    record Outcome(ChatGeneratedAnswer answer, List<ChatToolResult> results, int steps, int approved, int denied) {
+    record Outcome(ChatGeneratedAnswer answer, List<ChatToolResult> results, int steps, int approved, int denied,
+            List<String> notices) {
         public Outcome {
             results = List.copyOf(results);
+            notices = List.copyOf(notices);
+        }
+
+        public Outcome(ChatGeneratedAnswer answer, List<ChatToolResult> results, int steps, int approved, int denied) {
+            this(answer, results, steps, approved, denied, List.of());
         }
     }
 }
