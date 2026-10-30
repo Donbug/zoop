@@ -53,10 +53,17 @@ public record GraphHandoffResult(Staged staged, GraphHandoffException failure) {
     public record Staged(String handoffId, String versionId, Outcome outcome, String manifestDigest, String bundleDigest,
             String contentDigest, String sourceKind, String executionMode, String recordingKind, Map<String, Integer> origins,
             Map<String, Integer> approvalBases, int companies, int issues, int relations, int articles, int evidence,
-            int evidenceRegistered, int evidenceExisting, StoredFileFact snapshot, StoredFileFact receipt, RuleFacts rules) {
+            int evidenceRegistered, int evidenceExisting, StoredFileFact snapshot, StoredFileFact receipt,
+            StoredFileFact bundleSnapshot, List<String> sources, RuleFacts rules) {
+        /**
+         * @param bundleSnapshot the bundle's rule-free projection ({@code graph_bundle_snapshot}); {@code null} only for an
+         *                       {@code unchanged} import of a version staged before the composition table existed
+         * @param sources        the handoff ids the version is composed of, in order (this import alone: its own handoff)
+         */
         public Staged {
             origins = Map.copyOf(origins);
             approvalBases = Map.copyOf(approvalBases);
+            sources = List.copyOf(sources);
             Objects.requireNonNull(rules);
         }
     }
