@@ -559,14 +559,12 @@ export default function CompanyWorkspace() {
   const visibleUnknown = (events.data?.unknownTimeItems ?? []).filter(
     keepRelation,
   );
-  const latestDates = [
-    eventRangeDate(events.data?.metadata.latestEventTime),
-    eventRangeDate(events.data?.metadata.latestReportedAt),
-  ]
-    .filter((date): date is string => !!date)
-    .sort();
+  // latestReportedAt also covers dated events; it only stands in when no event date is known.
+  const latestEventTime = events.data?.metadata.latestEventTime;
   const widerEmptyPeriod = widerCompanyPeriod(
-    latestDates.at(-1),
+    eventRangeDate(latestEventTime)
+      ? latestEventTime
+      : events.data?.metadata.latestReportedAt,
     period,
     asOf,
     eventsQuery.get('from'),
@@ -1461,16 +1459,20 @@ export default function CompanyWorkspace() {
               data={graph.data}
               highlighted={highlighted}
               onSelect={(node, kind) => {
-                if (kind === 'issue')
+                if (kind === 'issue') {
+                  const eventTime = graph.data?.nodes.find(
+                    (item) => item.id === node,
+                  )?.eventTime;
                   updateQuery({
-                    period:
-                      widerCompanyPeriod(
-                        graph.data?.nodes.find((item) => item.id === node)
-                          ?.eventTime,
-                        period,
-                        asOf,
-                        eventsQuery.get('from'),
-                      ) ?? period,
+                    // prototype pickGraphIssue: an issue without a known time falls back to 1y.
+                    period: eventTime
+                      ? (widerCompanyPeriod(
+                          eventTime,
+                          period,
+                          asOf,
+                          eventsQuery.get('from'),
+                        ) ?? period)
+                      : '1y',
                     event: node,
                     document: null,
                     evidence: null,
@@ -1481,7 +1483,7 @@ export default function CompanyWorkspace() {
                         )
                       : null,
                   });
-                else {
+                } else {
                   const next = new URLSearchParams(params);
                   next.delete('event');
                   next.delete('bucket');

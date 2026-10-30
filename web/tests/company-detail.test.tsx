@@ -436,6 +436,99 @@ test('D-COM-05 C39 widens an empty period using the contracted latest event date
   ).toBe(time);
 });
 
+test('D-COM-05 C39 widens to the latest event date when a newer report date exists', async () => {
+  server.on('GET', '/api/v1/events', () =>
+    json({
+      items: [],
+      unknownTimeItems: [],
+      nextCursor: null,
+      metadata: {
+        ...metadata,
+        total: 0,
+        excludedUnknownTime: 0,
+        latestEventTime: '2026-09-20',
+        latestReportedAt: old,
+      },
+    }),
+  );
+  open(`${pinned}&period=1w`);
+  await userEvent.click(
+    await screen.findByRole('button', { name: '1개월로 넓혀 보기' }),
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId('address').textContent).toContain('period=1m'),
+  );
+  expect(
+    new URL(
+      screen.getByTestId('address').textContent!,
+      'http://localhost',
+    ).searchParams.get('asOf'),
+  ).toBe(time);
+});
+
+test('D-COM-05 C새6 keeps a graph-picked unknown-time event by widening to 1y', async () => {
+  const unknown = {
+    ...events[0],
+    id: 'issue-u',
+    title: '시점 미상 합성 사건',
+    eventTime: null,
+    timePrecision: 'unknown',
+  };
+  server.on('GET', '/api/v1/companies/:id/graph', (r) =>
+    json({
+      ...graph,
+      nodes: [
+        ...graph.nodes,
+        {
+          ...graph.nodes[1],
+          id: 'issue-u',
+          label: '시점 미상 합성 사건',
+          eventTime: null,
+          timePrecision: 'unknown',
+        },
+      ],
+      metadata: { ...graph.metadata, asOf: r.query.get('asOf') ?? time },
+    }),
+  );
+  server.on('GET', '/api/v1/events', (r) =>
+    json({
+      items: [],
+      unknownTimeItems:
+        Date.parse(r.query.get('from')!) <= Date.parse('2026-09-20T03:00:00Z')
+          ? [unknown]
+          : [],
+      nextCursor: null,
+      metadata: { ...metadata, total: 0, excludedUnknownTime: 1 },
+    }),
+  );
+  server.on('GET', '/api/v1/events/:id', () =>
+    json({
+      ...unknown,
+      period: null,
+      companies: [],
+      articles: [],
+      relations: [],
+      evidenceIds: [],
+      metadata,
+    }),
+  );
+  open(`${pinned}&period=1d`);
+  await userEvent.click(
+    await within(
+      await screen.findByRole('list', { name: '기업 관계 그래프 노드 목록' }),
+    ).findByRole('button', { name: '사건 · 시점 미상 합성 사건' }),
+  );
+  await screen.findByText('시점 미상 사건 1건');
+  const query = new URL(
+    screen.getByTestId('address').textContent!,
+    'http://localhost',
+  ).searchParams;
+  expect(query.get('period')).toBe('1y');
+  expect(query.get('event')).toBe('issue-u');
+  expect(query.get('asOf')).toBe(time);
+  expect(screen.queryByText(/선택을 풀었어요/)).toBeNull();
+});
+
 test.each([null, '2020-01-01'])(
   'D-COM-05 C39 does not invent a wider range for %s',
   async (latestEventTime) => {
